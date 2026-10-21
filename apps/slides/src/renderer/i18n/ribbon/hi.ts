@@ -45,14 +45,11 @@ export const hi = {
   ribbonPasteTipDisabled: 'चिपकाएँ (पहले कैनवास तत्व की प्रतिलिपि बनाएँ या काटें)',
   ribbonCutTip: 'काटें (⌘X)',
   ribbonCopyTip: 'प्रतिलिपि बनाएँ (⌘C)',
-  ribbonBrushTipNoSelection:
-    'स्वरूप पेंटर (पहले कोई तत्व चुनें; ⌘⇧C स्वरूप की प्रतिलिपि / ⌘⇧V स्वरूप चिपकाएँ)',
+  ribbonBrushTipNoSelection: 'स्वरूप पेंटर (पहले कोई तत्व चुनें)',
   ribbonBrushTipContinuous: 'स्वरूप पेंटर निरंतर मोड (बाहर निकलने के लिए Esc दबाएँ)',
   ribbonBrushTipOnce: 'स्वरूप पेंटर एकल मोड (लागू करने के लिए लक्ष्य तत्व पर क्लिक करें)',
-  ribbonBrushTipHasFormat:
-    'स्वरूप पेंटर (एक बार के लिए क्लिक / निरंतर के लिए डबल-क्लिक; ⌘⇧C स्वरूप की प्रतिलिपि / ⌘⇧V स्वरूप चिपकाएँ)',
-  ribbonBrushTipDefault:
-    'स्वरूप पेंटर (स्वरूप की प्रतिलिपि बनाकर लागू करने के लिए क्लिक करें; ⌘⇧C स्वरूप की प्रतिलिपि / ⌘⇧V स्वरूप चिपकाएँ)',
+  ribbonBrushTipHasFormat: 'स्वरूप पेंटर (एक बार के लिए क्लिक / निरंतर के लिए डबल-क्लिक)',
+  ribbonBrushTipDefault: 'स्वरूप पेंटर (स्वरूप की प्रतिलिपि बनाकर लागू करने के लिए क्लिक करें)',
   ribbonGroupSlides: 'स्लाइड्स',
   ribbonNewSlide: 'नई स्लाइड',
   ribbonNewSlideTip: 'नई रिक्त स्लाइड (वर्तमान स्लाइड के लेआउट की पृष्ठभूमि बनाए रखती है)',
@@ -367,9 +364,9 @@ export const hi = {
   ribbonAnimDelayTip: 'ट्रिगर के बाद प्रारंभ होने से पहले विलंब (सेकंड)',
   ribbonGroupStartShow: 'स्लाइड शो प्रारंभ करें',
   ribbonFromBeginning: 'शुरुआत से',
-  ribbonFromBeginningTip: 'स्लाइड 1 से पूर्ण स्क्रीन शो (F5; छिपी स्लाइड छोड़ दी जाती हैं)',
+  ribbonFromBeginningTip: 'स्लाइड 1 से पूर्ण स्क्रीन शो (छिपी स्लाइड छोड़ दी जाती हैं)',
   ribbonFromCurrent: 'वर्तमान स्लाइड से',
-  ribbonFromCurrentTip: 'वर्तमान स्लाइड से पूर्ण स्क्रीन शो (⇧F5)',
+  ribbonFromCurrentTip: 'वर्तमान स्लाइड से पूर्ण स्क्रीन शो',
   ribbonPresenterView: 'प्रस्तुतकर्ता दृश्य',
   ribbonPresenterViewTip:
     'प्रस्तुतकर्ता दृश्य: नोट्स / अगली स्लाइड / टाइमर / पेन; कई डिस्प्ले होने पर शो दूसरे डिस्प्ले पर पूर्ण स्क्रीन चलता है',

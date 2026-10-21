@@ -297,7 +297,11 @@ describe('G8-18 mention access through the frame bridge (F1)', () => {
   })
 
   it('the frame claims commentsShareView with comments, so the host grant can become effective', () => {
-    expect(frameCommentsClaim(true)).toEqual({ comments: true, commentsShareView: true })
+    expect(frameCommentsClaim(true)).toEqual({
+      comments: true,
+      commentsShareView: true,
+      commentsViewVersion: true,
+    })
     expect(frameCommentsClaim(false)).toEqual({})
     expect(
       frameMentionAccess({ capabilities: { comments: true, commentsShareView: true } }),
@@ -321,6 +325,36 @@ describe('installFrameComments: only with the effective comments capability', ()
     const api = await pending
     expect(api).not.toBeNull()
     expect(target.uniworkComments).toBe(api)
+  })
+
+  it('publishes window.uniworkAvatars (a loader factory on the frame token) with comments', async () => {
+    const p = framePort()
+    const target: Record<string, unknown> = {}
+    const port = {
+      ...p.port,
+      getToken: async () => 'tok-1',
+      refreshToken: async () => 'tok-2',
+    }
+    const pending = installFrameComments(port, {}, target)
+    p.mock.init()
+    await pending
+    const frame = target.uniworkAvatars as { createSource(): { load: unknown; dispose(): void } }
+    const a = frame.createSource()
+    const b = frame.createSource()
+    expect(a).not.toBe(b)
+    expect(a.load).toBeTypeOf('function')
+    a.dispose()
+    b.dispose()
+  })
+
+  it('publishes no avatar loader for a client without a frame token', async () => {
+    const p = framePort()
+    const target: Record<string, unknown> = {}
+    const pending = installFrameComments(p.port, {}, target)
+    p.mock.init()
+    await pending
+    expect(target.uniworkAvatars).toBeUndefined()
+    expect(target.uniworkComments).toBeDefined()
   })
 
   it('installs nothing and sends nothing without it', async () => {

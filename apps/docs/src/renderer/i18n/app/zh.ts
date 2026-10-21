@@ -25,6 +25,8 @@ export const zh = {
   appScLineBreak: '换行符',
   appScNbsp: '不换行空格',
   appScNbHyphen: '不换行连字符',
+  appScFindNext: '查找下一个',
+  appScOptHyphen: '可选连字符',
   appScGrowFont1: '增大字号 1 磅',
   appScShrinkFont1: '减小字号 1 磅',
   appScListDemote: '降低列表级别',
@@ -210,7 +212,7 @@ export const zh = {
   // Quick actions bar
   appAutoSave: '自动保存',
   appAutoSaveTip: '自动保存(每 30 秒及窗口失焦时)',
-  appSaveShortcutTip: '保存 (⌘S)',
+  appSaveShortcutTip: '保存 ({keys})',
   appUndo: '撤销',
   appRedo: '恢复',
   // Start screen
@@ -554,7 +556,13 @@ export const zh = {
   appOnlyEncrypted: '“{name}”受密码保护，无法在此处打开。',
   appFileExportPdf: '导出为 PDF…',
   appFilePrint: '打印…',
+  appPrintNoDocument: '请先打开文档再打印。',
   appPrintNoPrinter: '此电脑没有可用的打印机。可以改为将文档保存为 PDF。',
   appPrintFailedPdfHint: '打印没有成功:{error}。可以改为将文档保存为 PDF。',
   appPrintSaveAsPdf: '另存为 PDF…',
+  // UNI-1920 (RFSH-5): File > Save as a copy on a locked-out web tab; labels reuse the
+  // conflict-dialog copy wording of each locale
+  appFileSaveCopy: '另存为副本…',
+  appCopySaved: '你的版本已另存为新文档：{title}。',
+  appCopySaveFailed: '无法创建副本。你的更改仍然安全；请重试。',
 }

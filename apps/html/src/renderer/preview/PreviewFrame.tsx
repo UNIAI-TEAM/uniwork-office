@@ -16,6 +16,8 @@ function randomKey(): string {
 
 export interface PreviewFrameHandle {
   post(msg: ToInspector): void
+  /** the iframe element holds the host's focus: a real keystroke inside the page, not a forged message */
+  hasFocus(): boolean
 }
 
 interface Props {
@@ -24,6 +26,11 @@ interface Props {
   /** bump to reload the frame after the buffer was pushed to the main process */
   nonce: number
   zoom: number
+  /**
+   * A source view (read-only and locked): the page never runs its scripts. Desktop loads the same
+   * preview document in an empty sandbox; the web bridge falls back to its script-free copy.
+   */
+  scriptsOff?: boolean
   onMessage: (msg: FromInspector) => void
   /** fires for every document the frame loads, link navigations included */
   onLoad?: () => void
@@ -52,13 +59,14 @@ interface Props {
  * Web frame, static (cap 'htmlPreviewScripts' off, or preview.html never answered): the bridge
  * hands over a copy without scripts, handlers or remote loads (`onStaticPreview`), shown through
  * srcdoc in a frame with an empty sandbox (no scripts, no same-origin, no forms, no popups) and
- * `credentialless`. No inspector runs there.
+ * `credentialless`. No inspector runs there, so keys pressed while focus is inside it (Ctrl+F1, F12,
+ * ...) never reach the app: a known gap of the static preview, not covered by the key relay.
  *
  * Every inspector message goes through the strict parser (inspector-validate.ts): the page's
  * own scripts share the inspector's realm and can forge anything it sends.
  */
 export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function PreviewFrame(
-  { url, nonce, zoom, onMessage, onLoad, draft },
+  { url, nonce, zoom, scriptsOff, onMessage, onLoad, draft },
   ref,
 ) {
   const frameRef = useRef<HTMLIFrameElement>(null)
@@ -74,7 +82,7 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
   )
   // preview.html did not boot (host without its policy): static from then on
   const [fallback, setFallback] = useState(false)
-  const staticMode = !cap('htmlPreviewScripts') || fallback
+  const staticMode = !cap('htmlPreviewScripts') || fallback || (!!scriptsOff && !!connectPreview)
   const portMode = !staticMode && !!connectPreview
   const [staticDoc, setStaticDoc] = useState('')
   const channelRef = useRef<{ post(msg: unknown): void; close(): void } | null>(null)
@@ -154,6 +162,7 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
       if (portMode) channelRef.current?.post(msg)
       else frameRef.current?.contentWindow?.postMessage(msg, '*')
     },
+    hasFocus: () => !!frameRef.current && document.activeElement === frameRef.current,
   }))
 
   return (
@@ -172,12 +181,16 @@ export const PreviewFrame = forwardRef<PreviewFrameHandle, Props>(function Previ
         />
       ) : (
         <iframe
+          // Sandbox flags are read when a navigation starts, and React applies an update in prop
+          // order (src, then sandbox): re-flagging a live frame would load the page under the old
+          // allow-scripts flags. A scripts-off frame is therefore a new element, born with its flags.
+          key={scriptsOff ? 'scripts-off' : 'scripts-on'}
           ref={frameRef}
           className="preview-frame"
           title={t('viewPreview')}
           src={src}
           onLoad={handleLoad}
-          sandbox="allow-scripts allow-forms allow-popups allow-modals"
+          sandbox={scriptsOff ? '' : 'allow-scripts allow-forms allow-popups allow-modals'}
           // web: no cookies or storage of the app in the preview (desktop: no-op)
           {...(portMode ? { credentialless: '' } : {})}
           referrerPolicy="no-referrer"

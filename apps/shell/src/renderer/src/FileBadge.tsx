@@ -3,9 +3,9 @@ import iconXlsx from './assets/file-xlsx.svg'
 import iconPptx from './assets/file-pptx.svg'
 import iconPdf from './assets/file-pdf.svg'
 import iconMd from './assets/file-md.svg'
+import iconTxt from './assets/file-txt.svg'
 import iconHtml from './assets/file-html.svg'
-// the web's UniNote tile (uniwork:packages/views/documents/uninote-icon.tsx), drawn static
-import iconUninote from './assets/file-uninote.svg'
+import { UniNoteIcon } from './UniNoteIcon'
 
 const FILE_ICONS: Record<string, string> = {
   docx: iconDocx,
@@ -15,13 +15,14 @@ const FILE_ICONS: Record<string, string> = {
   pdf: iconPdf,
   md: iconMd,
   markdown: iconMd,
+  txt: iconTxt,
   html: iconHtml,
   htm: iconHtml,
-  uninote: iconUninote,
 }
 
-/** file-type icon by extension; an unknown extension gets a neutral letter tile */
+/** file-type icon by extension ('page' = UniNote, the shared option J tile); an unknown extension gets a neutral letter tile */
 export function FileBadge({ ext, size }: { ext: string; size: number }) {
+  if (ext === 'page') return <UniNoteIcon width={size} height={size} />
   const icon = FILE_ICONS[ext]
   if (icon) {
     return <img src={icon} width={size} height={size} alt="" aria-hidden="true" />

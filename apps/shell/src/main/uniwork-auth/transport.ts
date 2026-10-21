@@ -237,11 +237,11 @@ export function parseOrgs(raw: unknown): OrgResponse[] {
 }
 
 export function parseOrgMembership(raw: unknown): OrgMembershipResponse {
-  if (!isRecord(raw) || !isRecord(raw.membership)) throw new TransportError('malformed_response')
-  const m = raw.membership
-  const role = str(m.role)
-  const deactivatedAt = optStr(m.deactivated_at)
-  const platformRole = optStr(m.platform_role)
+  // D's OrgMembershipSDO is flat: {role, deactivated_at?, platform_role?}
+  if (!isRecord(raw)) throw new TransportError('malformed_response')
+  const role = str(raw.role)
+  const deactivatedAt = optStr(raw.deactivated_at)
+  const platformRole = optStr(raw.platform_role)
   return {
     role,
     ...(deactivatedAt ? { deactivatedAt } : {}),

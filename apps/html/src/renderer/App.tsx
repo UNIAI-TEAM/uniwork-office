@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import {
   Dropdown,
   FindPanel,
+  stepFindMatch,
   type FindFocusRequest,
   type AiScopeQuoteData,
   useAutoSavePref,
@@ -18,6 +19,15 @@ import {
 } from '@genoffice/electron-utils/headless-export'
 import { useI18n } from './i18n/locale'
 import { cap, platform } from './capabilities'
+import {
+  createHtmlFrameKeyReplay,
+  hostHasUserActivation,
+  htmlFrameKeyClaims,
+  htmlWindowCommand,
+  type HtmlShortcutCommand,
+} from './shortcuts'
+import { LinkPopover } from './components/LinkPopover'
+import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import { useNarrowFrame } from './narrow-frame'
 import { parseDocText, serializeDocText, type Envelope } from './document/envelope'
 import { textWithPendingStyles } from './document/pending-draft'
@@ -83,6 +93,10 @@ import type { ExportFormat, SaveMode, UniworkViewState } from '../shared/ipc'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
+interface HtmlUniworkLockSeam {
+  onUniworkStateChanged?(cb: (path: string) => void): () => void
+  uniworkReadOnlySave?(path?: string): Promise<void>
+}
 
 interface TextSel {
   sid: number
@@ -99,6 +113,13 @@ const inTextField = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   !!target.closest('.cm-editor, input, textarea, [contenteditable=""], [contenteditable="true"]')
 const PREVIEW_DEBOUNCE_MS = 150
+/** the inline element each formatting command wraps a preview text selection in */
+const WRAP_TAG = { bold: 'strong', italic: 'em', underline: 'u' } as const satisfies Partial<
+  Record<HtmlShortcutCommand, string>
+>
+
+/** the shortcuts a frame in view mode may still relay on a read-only copy */
+const READ_ONLY_FRAME_KEYS = new Set(['print', 'zoomIn', 'zoomOut', 'zoomReset', 'escape'])
 const DEFAULT_ENVELOPE: Envelope = { bom: false, eol: '\n', trailingNewline: true }
 /** live style pokes are written to the source as one set_style op this long after the last change */
 const STYLE_COMMIT_MS = 600
@@ -147,6 +168,11 @@ export default function App() {
   const [autoSave, setAutoSave] = useAutoSavePref('htmlapp.autoSave', window.htmlApi)
   // a UniWork copy never autosaves; a view-only one refuses every edit
   const [uniwork, setUniwork] = useState<UniworkViewState>({ bound: false, readOnly: false })
+  // the path whose UniWork answer has arrived. The preview frame waits for it, so a source view
+  // never loads (and runs) the page in a scripts-on sandbox first. Derived from the path, not a
+  // flag reset in an effect: a flag would still read "known" in the very commit that sets the
+  // path, so the frame would load the real document, drop back to about:blank and load it again.
+  const [uniworkAnsweredPath, setUniworkAnsweredPath] = useState<string | null>(null)
   const uniworkRef = useRef(uniwork)
   uniworkRef.current = uniwork
   const [findTarget, setFindTarget] = useState<FindTarget | null>(null)
@@ -166,6 +192,8 @@ export default function App() {
   const [selectedState, setSelectedState] = useState<NodeState>('static')
   const [textSel, setTextSel] = useState<TextSel | null>(null)
   const wrapSelectionRef = useRef<(tag: string) => void>(() => {})
+  const openLinkRef = useRef<() => void>(() => {})
+  const [linkSel, setLinkSel] = useState<TextSel | null>(null)
   const moveSelectedRef = useRef<(dir: -1 | 1) => void>(() => {})
   // selected element as the preview sees it: drives the floating toolbar and the style panel
   const [selRect, setSelRect] = useState<ElementRect | null>(null)
@@ -273,7 +301,12 @@ export default function App() {
   // both previews (the web bundle's preview.html and the desktop html-preview:// document) block
   // fetch/XHR and nested frames, so a page using them gets one note
   const previewLimited = useMemo(() => usesBlockedPreviewFeatures(text), [text])
-  const visualEdit = cap('htmlVisualEdit')
+  // a view-only UniWork copy has no element editing: no selection chrome, toolbar or style panel
+  const visualEdit = cap('htmlVisualEdit') && !uniwork.readOnly
+  // a view-only copy (shared view-only or a source view) never runs the page's own scripts
+  const previewScriptsOff = uniwork.readOnly
+  // an untitled document has no UniWork binding to wait for
+  const uniworkKnown = path === null || uniworkAnsweredPath === path
 
   const getMap = useCallback((): ParseMap => {
     const cached = mapRef.current
@@ -395,15 +428,17 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('htmlapp.viewMode', view)
   }, [view])
-  const frameMode = (mode: CanvasMode) => (mode === 'edit' ? 'inspect' : 'browse')
+  const frameMode = (mode: CanvasMode) =>
+    mode !== 'edit' ? 'browse' : uniworkRef.current.readOnly ? 'view' : 'inspect'
   const prevCanvasModeRef = useRef(canvasMode)
   useEffect(() => {
     // a presentation lets links navigate the frame; coming back reloads the instrumented document
     if (prevCanvasModeRef.current === 'present' && canvasMode !== 'present')
       setPreviewNonce((n) => n + 1)
     prevCanvasModeRef.current = canvasMode
+    // the lock ping flips readOnly while the frame stays loaded, so it re-posts the mode too
     previewRef.current?.post({ type: 'gx:setMode', mode: frameMode(canvasMode) })
-  }, [canvasMode])
+  }, [canvasMode, uniwork.readOnly])
 
   useEffect(() => {
     rememberAiPanelOpen('htmlapp.showAi', aiOpen)
@@ -714,14 +749,38 @@ export default function App() {
   }, [getMap])
   useEffect(postMarks, [editQueue, canvasMode, postMarks])
 
+  // runPrint is declared further down; the inspector's relayed mod+P reaches it through this ref
+  const runPrintRef = useRef<() => Promise<boolean>>(async () => false)
+  const frameKeyReplayRef = useRef(createHtmlFrameKeyReplay())
   const onInspectorMessage = useCallback(
     (msg: FromInspector) => {
       // a click that lands while the frame is reloading carries sids from the previous copy
       if (!frameVersionsRef.current.has(msg.version)) return
+      // a view-only copy: the frame is in view mode, and a page script can forge anything, so only
+      // readiness, scroll, zoom, blocked links and the few shortcuts the host owns get through
+      if (
+        uniworkRef.current.readOnly &&
+        !(
+          msg.type === 'gx:ready' ||
+          msg.type === 'gx:scroll' ||
+          msg.type === 'gx:zoom' ||
+          msg.type === 'gx:navigateBlocked' ||
+          msg.type === 'gx:keyEvent' ||
+          (msg.type === 'gx:keyCommand' && READ_ONLY_FRAME_KEYS.has(msg.command))
+        )
+      )
+        return
       switch (msg.type) {
         case 'gx:ready': {
           previewRef.current?.post({ type: 'gx:theme', dark: isDarkTheme() })
           previewRef.current?.post({ type: 'gx:setMode', mode: frameMode(canvasModeRef.current) })
+          // web (UNI-1919): a mod+P inside the preview never reaches the frame's print
+          // accelerator, so the inspector relays it; desktop keeps the shell menu's accelerator
+          previewRef.current?.post({
+            type: 'gx:printKey',
+            claim: !!window.htmlApi.connectPreview && cap('print'),
+          })
+          previewRef.current?.post({ type: 'gx:keyClaims', claims: htmlFrameKeyClaims() })
           // an edit reloaded the page under the reader: put it back where it was before selecting
           if (frameScrollRef.current !== null)
             previewRef.current?.post({ type: 'gx:scrollTo', y: frameScrollRef.current })
@@ -825,7 +884,23 @@ export default function App() {
         case 'gx:zoom':
           if (canvasModeRef.current !== 'present') setZoom((z) => clampZoom(z - msg.delta * 0.6))
           return
+        case 'gx:keyEvent': {
+          // focus is inside the frame: replay the table's app-level keys on the window; a page can
+          // forge this message, so it needs the frame to hold focus, a real key's user activation on the
+          // host, and Save / Save As are rate-limited (shortcuts.ts)
+          const replay = frameKeyReplayRef.current(msg, {
+            frameFocused: !!previewRef.current?.hasFocus(),
+            userActive: hostHasUserActivation(),
+            saving: savingRef.current,
+          })
+          if (replay) window.dispatchEvent(replay)
+          return
+        }
         case 'gx:keyCommand': {
+          if (msg.command === 'print') {
+            void runPrintRef.current()
+            return
+          }
           if (canvasModeRef.current === 'present') {
             if (msg.command === 'escape') setCanvasModeState('edit')
             return
@@ -859,9 +934,10 @@ export default function App() {
             moveSelectedRef.current(msg.command === 'moveUp' ? -1 : 1)
           else if (msg.command === 'delete') runManual([{ op: 'remove', sid }], 'clear')
           else if (msg.command === 'escape') selectSid(null)
-          else if (msg.command === 'askAi') setAskMode({ kind: 'new' })
           else if (msg.command === 'bold') wrapSelectionRef.current('strong')
           else if (msg.command === 'italic') wrapSelectionRef.current('em')
+          else if (msg.command === 'underline') wrapSelectionRef.current('u')
+          else if (msg.command === 'link') openLinkRef.current()
           else if (msg.command === 'parent' && e.parentSid !== null) {
             const parent = map.bySid.get(e.parentSid)
             if (parent && parent.tag !== 'body' && parent.tag !== 'html')
@@ -929,6 +1005,22 @@ export default function App() {
       setTextSel(null)
   }
   wrapSelectionRef.current = wrapSelection
+  /** Ctrl/Cmd+K: ask for an address, then wrap the preview's text selection in a link */
+  openLinkRef.current = () => {
+    if (statusRef.current !== 'ready' || canvasModeRef.current === 'present') return
+    if (uniwork.readOnly) return
+    if (textSel) setLinkSel(textSel)
+    else setNotice(t('linkNeedsSelection'))
+  }
+  const applyLink = (href: string) => {
+    const sel = linkSel
+    setLinkSel(null)
+    if (!sel) return
+    if (
+      runManual([{ op: 'wrap_text', ...sel, index: sel.textNodeIndex, tag: 'a', attrs: { href } }])
+    )
+      setTextSel(null)
+  }
   const askAi = () => {
     if (selectedEntry) setAskMode({ kind: 'new' })
   }
@@ -1255,6 +1347,13 @@ export default function App() {
     async (mode: SaveMode, suggestedName?: string, origin?: 'auto'): Promise<boolean> => {
       const allowed = mode === 'saveAs' ? cap('saveAs') : cap('save')
       if (statusRef.current !== 'ready' || !allowed) return false
+      // EL-1(b) VEL-1: an explicit Save on a read-only bound copy asks main to
+      // explain the lock instead of writing (Save As and unbound files keep
+      // today's path)
+      if (mode === 'save' && !origin && uniworkRef.current.bound && uniworkRef.current.readOnly) {
+        void (window.htmlApi as HtmlUniworkLockSeam).uniworkReadOnlySave?.()?.catch(() => {})
+        return false
+      }
       // uncommitted live style pokes belong to the document being saved
       flushPending()
       // a menu save or ⌘S during an autosave queues behind it instead of being dropped;
@@ -1388,6 +1487,7 @@ export default function App() {
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t is not referentially stable
   }, [])
+  runPrintRef.current = runPrint
 
   // Headless export mode (--headless-export): this renderer lives in a hidden
   // window whose only job is to run the File menu's PDF or Word export against
@@ -1415,6 +1515,11 @@ export default function App() {
   useEffect(() => {
     const offSave = window.htmlApi.onSaveRequest((mode) => {
       if (statusRef.current !== 'ready') {
+        window.htmlApi.sendSaveRequestAck(false)
+        return
+      }
+      if (mode === 'save' && uniworkRef.current.bound && uniworkRef.current.readOnly) {
+        void doSave(mode)
         window.htmlApi.sendSaveRequestAck(false)
         return
       }
@@ -1463,41 +1568,46 @@ export default function App() {
       )
     })
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey) return
-      const key = event.key.toLowerCase()
-      if (key === 's') {
-        event.preventDefault()
-        void doSave(event.shiftKey ? 'saveAs' : 'save')
-      } else if (key === '\\') {
-        event.preventDefault()
-        cycleView()
-      } else if (key === 'f' && !event.shiftKey) {
-        event.preventDefault()
-        openFind(false)
-      } else if (key === 'h' && !event.shiftKey) {
-        // Word's replace shortcut: Ctrl+H on Windows/Linux, Control+H on macOS —
-        // its ⌘H belongs to the system Hide role, so the menu keeps that key
-        event.preventDefault()
-        openFind(true)
-      } else if (key === '=' || key === '+') {
-        event.preventDefault()
-        zoomIn()
-      } else if (key === '-' || key === '_') {
-        event.preventDefault()
-        zoomOut()
-      } else if (key === '0') {
-        event.preventDefault()
-        setZoom(100)
-      } else if (key === 'b' || key === 'i') {
-        if (inTextField(event.target)) return
-        event.preventDefault()
-        wrapSelectionRef.current(key === 'b' ? 'strong' : 'em')
-      } else if (key === 'z' || (key === 'y' && !event.shiftKey)) {
-        // CodeMirror and form fields keep their own history
-        if (inTextField(event.target)) return
-        event.preventDefault()
-        if (key === 'z' && !event.shiftKey) editorRef.current?.undo()
-        else editorRef.current?.redo()
+      const command = htmlWindowCommand(event, inTextField(event.target))
+      if (!command) return
+      event.preventDefault()
+      switch (command) {
+        case 'save':
+        case 'saveAs':
+          void doSave(command)
+          return
+        case 'cycleView':
+          cycleView()
+          return
+        case 'find':
+        case 'replace':
+          openFind(command === 'replace')
+          return
+        case 'findNext':
+          // an open panel steps to the next hit; a closed one opens (Word's "repeat Find")
+          if (!stepFindMatch('next')) openFind(false)
+          return
+        case 'zoomIn':
+          zoomIn()
+          return
+        case 'zoomOut':
+          zoomOut()
+          return
+        case 'zoomReset':
+          setZoom(100)
+          return
+        case 'bold':
+        case 'italic':
+        case 'underline':
+          wrapSelectionRef.current(WRAP_TAG[command])
+          return
+        case 'link':
+          openLinkRef.current()
+          return
+        case 'undo':
+        case 'redo':
+          editorRef.current?.[command]()
+          return
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
@@ -1534,16 +1644,32 @@ export default function App() {
       return
     }
     // the browser harness may not expose the method: a missing or failed answer is a plain local file
-    void Promise.resolve(window.htmlApi.uniworkState?.())
-      .then((state) => {
-        if (live) setUniwork({ bound: state?.bound === true, readOnly: state?.readOnly === true })
-      })
-      .catch((err) => {
-        console.warn('[html] UniWork state query failed:', err)
-        if (live) setUniwork({ bound: false, readOnly: false })
-      })
+    const query = () => {
+      void Promise.resolve(window.htmlApi.uniworkState?.())
+        .then((state) => {
+          if (!live) return
+          setUniwork({
+            bound: state?.bound === true,
+            readOnly: state?.readOnly === true,
+            locked: state?.locked === true,
+          })
+          setUniworkAnsweredPath(path)
+        })
+        .catch((err) => {
+          console.warn('[html] UniWork state query failed:', err)
+          if (!live) return
+          setUniwork({ bound: false, readOnly: false })
+          setUniworkAnsweredPath(path)
+        })
+    }
+    query()
+    // EL-1(b) VEL-2: the edit lock makes readOnly change while the document stays open
+    const unsubscribe = (window.htmlApi as HtmlUniworkLockSeam).onUniworkStateChanged?.((p) => {
+      if (p === path) query()
+    })
     return () => {
       live = false
+      unsubscribe?.()
     }
   }, [path])
 
@@ -1579,6 +1705,8 @@ export default function App() {
         return applyOps(ops, false)
       },
       replaceAll: (html) => replaceAll(html, true),
+      // the adapter bound feeds the AI through the shared rule: a web frame reads as bound
+      uniworkBound: () => uniworkBoundForAi(uniworkRef.current.bound, platform()),
     },
     getSnapshot: () => ({ text: textRef.current }),
     restoreSnapshot: (snapshot) => replaceAll(snapshot.text, false),
@@ -1749,6 +1877,7 @@ export default function App() {
               readOnly={uniwork.readOnly}
               onCollapse={() => setAiOpen(false)}
               open={aiOpen}
+              dockHidden={canvasMode === 'present'}
               onExpand={() => setAiOpen(true)}
             />
           </div>
@@ -1785,7 +1914,8 @@ export default function App() {
                 {previewLimited && canvasMode === 'edit' && <PreviewLimitNote />}
                 <PreviewFrame
                   ref={previewRef}
-                  url={previewUrl}
+                  url={uniworkKnown ? previewUrl : null}
+                  scriptsOff={previewScriptsOff}
                   nonce={previewNonce}
                   zoom={zoom}
                   onMessage={onInspectorMessage}
@@ -1954,6 +2084,9 @@ export default function App() {
           </footer>
         </div>
       </div>
+      {linkSel && canvasMode !== 'present' && (
+        <LinkPopover onApply={applyLink} onCancel={() => setLinkSel(null)} />
+      )}
       {aiEnabled && askTarget && askMode && canvasMode !== 'present' && !uniwork.readOnly && (
         <AiAskPopover
           key={askMode.kind === 'edit' ? askMode.qid : 'new'}

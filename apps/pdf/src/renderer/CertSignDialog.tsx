@@ -10,6 +10,7 @@ import type {
 import type { TFunc } from './i18n/locale'
 import { useModalDialog } from './modal-dialog'
 import { renderSignatureAppearance } from './cert-appearance'
+import { isConfirmKey } from './shortcuts'
 
 const BOX_WIDTH = 210
 const BOX_HEIGHT = 70
@@ -279,7 +280,7 @@ export function CertSignDialog({
                   value={storePassword}
                   onChange={(e) => setStorePassword(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') void loadSystem(storePassword || undefined)
+                    if (isConfirmKey(e)) void loadSystem(storePassword || undefined)
                   }}
                 />
                 <button
@@ -324,7 +325,7 @@ export function CertSignDialog({
                 disabled={!cert || busy}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') void (signer ? sign() : check())
+                  if (isConfirmKey(e)) void (signer ? sign() : check())
                 }}
               />
               <button

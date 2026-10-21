@@ -12,12 +12,12 @@ export const it = {
   usMyFolderPrivate: 'Privato, visibile solo a te',
   usChange: 'Cambia',
   usSave: 'Salva',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Chiudi',
   usPickTitle: 'Scegli dove salvare',
   usBack: 'Torna al nome',
   usSearchFolders: 'Cerca cartelle',
-  usSharedNote:
-    'Se salvato in una cartella condivisa, il documento riceve le autorizzazioni di quella cartella.',
   usChooseFolder: 'Scegli “{folder}”',
   usSelected: 'Selezionato',
   usRootBlocked: 'Scegli una cartella',
@@ -33,4 +33,8 @@ export const it = {
   usErrAlreadyBound: 'Questa scheda è già collegata a un documento UniWork. Salva come al solito.',
   usErrNotFound:
     'Il file da salvare o la cartella scelta non è stato trovato. Scegli di nuovo dove salvare e riprova.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

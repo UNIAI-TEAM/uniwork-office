@@ -22,6 +22,8 @@ import { useI18n } from '../i18n/locale'
 import { MorphStage } from './MorphStage'
 import { InkLayer, type InkStroke } from './ShowInk'
 import { isWeb } from '../capabilities'
+import { showNavKey } from '../show-keys'
+import { shortcutPlatform, shortcutSurface } from '../shortcuts'
 
 const ANIMATED = ['fade', 'push', 'wipe', 'split', 'circle'] as const
 
@@ -188,25 +190,14 @@ export function AudienceView() {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  // Navigation input sent back to the presenter (this side doesn't change state); Esc ends the whole show
+  // Navigation input sent back to the presenter (this side doesn't change state); Esc ends the
+  // whole show. The show's own next / previous / end keys (show-keys.ts), nothing else.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        window.slidesApi.audienceNav('exit')
-      } else if (
-        e.key === 'ArrowRight' ||
-        e.key === 'ArrowDown' ||
-        e.key === ' ' ||
-        e.key === 'Enter' ||
-        e.key === 'PageDown'
-      ) {
-        e.preventDefault()
-        window.slidesApi.audienceNav('next')
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
-        e.preventDefault()
-        window.slidesApi.audienceNav('prev')
-      }
+      const nav = showNavKey(e, shortcutPlatform(), shortcutSurface())
+      if (!nav) return
+      e.preventDefault()
+      window.slidesApi.audienceNav(nav)
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)

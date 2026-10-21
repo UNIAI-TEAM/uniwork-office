@@ -1,5 +1,7 @@
 import type { UniworkDocEditLock, UniworkDocErrorCode } from '../../shared/home-api'
+import type { ShareRejectedItem } from '../../shared/share-api'
 import { isDecimalString } from './formats'
+import { parseRejectedItems } from './share-rejected'
 
 /**
  * A failed UniWork documents call. `code` is the user-facing code from the
@@ -38,6 +40,32 @@ export class UniworkDocError extends Error {
   readonly holderId?: string | null
   /** EL-1(a) (UNI-1645c): lock holder metadata from 423 `document_locked` */
   readonly editLock?: UniworkDocEditLock
+  /**
+   * UNI-1918 (B69-lite): the server's own `fields.reason` of a
+   * `document_upload_invalid` refusal (`file_claim_expired`,
+   * `file_not_ready`, `upload_canceled`, `file_deleting`). Without it those
+   * four answers are indistinguishable, and only an expired claim may be
+   * resumed with a fresh upload key after ONE lookup.
+   */
+  readonly reason?: string
+  /** EL-1(b) (UNI-1645c): 409 `edit_lock_lost` fields.reason */
+  readonly lostReason?:
+    | 'released'
+    | 'expired'
+    | 'taken_over'
+    | 'handed_over'
+    | 'access_lost'
+    | 'document_archived'
+    | 'moved_here'
+    | 'session_revoked'
+    | 'member_deactivated'
+    | 'organization_suspended'
+    | 'document_deleted'
+    | 'unknown'
+  /** EL-1(b) (UNI-1645c): 409 `edit_lock_lost` fields.by_name */
+  readonly byName?: string | null
+  /** UNI-2047 SD-A: the refused items of a 422 `document_access_rejected` (an access update) */
+  readonly rejected?: ShareRejectedItem[]
 
   constructor(
     code: UniworkDocErrorCode,
@@ -54,6 +82,10 @@ export class UniworkDocError extends Error {
       documentTitle?: string
       holderId?: string | null
       editLock?: UniworkDocEditLock
+      reason?: string
+      lostReason?: UniworkDocError['lostReason']
+      byName?: string | null
+      rejected?: ShareRejectedItem[]
     } = {},
   ) {
     super(`uniwork document request failed: ${code}`)
@@ -71,7 +103,31 @@ export class UniworkDocError extends Error {
     this.documentTitle = extra.documentTitle
     this.holderId = extra.holderId
     this.editLock = extra.editLock
+    this.reason = extra.reason
+    this.lostReason = extra.lostReason
+    this.byName = extra.byName
+    this.rejected = extra.rejected
   }
+}
+
+const EDIT_LOCK_LOST_REASONS = new Set([
+  'released',
+  'expired',
+  'taken_over',
+  'handed_over',
+  'access_lost',
+  'document_archived',
+  'moved_here',
+  'session_revoked',
+  'member_deactivated',
+  'organization_suspended',
+  'document_deleted',
+])
+
+function lostReasonOf(value: unknown): NonNullable<UniworkDocError['lostReason']> {
+  return typeof value === 'string' && EDIT_LOCK_LOST_REASONS.has(value)
+    ? (value as NonNullable<UniworkDocError['lostReason']>)
+    : 'unknown'
 }
 
 function boundedLockString(value: unknown, max: number): string | null {
@@ -173,6 +229,16 @@ export function errorFromResponse(
   if (serverCode === 'upload_session_busy') return new UniworkDocError('server_error', retried)
   if (serverCode === 'upload_session_too_small') return new UniworkDocError('server_error', at)
   if (serverCode === 'upload_parts_invalid') return new UniworkDocError('server_error', at)
+  // UNI-1918 (B69-lite): a staged upload the server can no longer resolve. The
+  // four reasons (`file_claim_expired`, `file_not_ready`, `upload_canceled`,
+  // `file_deleting`) are NOT interchangeable: only an expired claim may be
+  // resumed (a fresh upload key, after ONE lookup proves the old attempt did
+  // not commit), so the reason is kept on the error. The code stays the coded
+  // 409 (`server_error` + status) the save pipeline already switches on.
+  if (serverCode === 'document_upload_invalid') {
+    const reason = boundedLockString(envelope?.fields?.reason, 64)
+    return new UniworkDocError('server_error', { ...at, ...(reason ? { reason } : {}) })
+  }
   if (serverCode === 'upload_size_mismatch' || serverCode === 'upload_probe_mismatch') {
     // the file changed under us: the same shape the app already answers an
     // upload-checksum mismatch with, so nothing retries it silently
@@ -205,6 +271,15 @@ export function errorFromResponse(
       ...(isDecimalString(current) ? { currentRevision: current } : {}),
     })
   }
+  // EL-1(b) (UNI-1645c): 409 edit_lock_lost on a heartbeat — keep reason / by_name.
+  if (status === 409 && serverCode === 'edit_lock_lost') {
+    const fields = envelope?.fields
+    return new UniworkDocError('server_error', {
+      ...at,
+      lostReason: lostReasonOf(fields?.reason),
+      byName: boundedLockString(fields?.by_name, 256),
+    })
+  }
   if (serverCode && CONFLICT_CODES.has(serverCode)) {
     const current = envelope?.fields?.current_revision
     return new UniworkDocError('conflict', {
@@ -230,6 +305,17 @@ export function errorFromResponse(
   if (serverCode === 'document_cycle') return new UniworkDocError('document_cycle', at)
   if (serverCode === 'document_parent_kind') {
     return new UniworkDocError('document_parent_kind', at)
+  }
+  // UNI-1975: the server refuses sharing a folder (only documents are shared). The
+  // app never sends it today; a user-facing refusal, not retried, not terminal.
+  if (serverCode === 'folder_not_shareable') return new UniworkDocError('folder_not_shareable', at)
+  // UNI-2047 SD-A: an access update the server refused item by item; the list rides the error so
+  // the share dialog can name each refused person (a bare 422 stays the generic server_error)
+  if (serverCode === 'document_access_rejected') {
+    return new UniworkDocError('server_error', {
+      ...at,
+      rejected: parseRejectedItems(envelope?.fields?.rejected),
+    })
   }
   // G5-06 (UNI-1352): the server's own verdicts, kept apart from the generic
   // forbidden/deleted a caller would otherwise act on. A capability kill

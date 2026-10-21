@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import { INTENT_STORE_REGISTRATION } from '../src/main/uniwork-sync/intent-store'
+import type { StoreScope } from '../src/main/uniwork-sync/keys'
 import {
+  OFFLINE_LIBRARY_STORE_REGISTRATION,
   PIN_RECORD_SCHEMA,
   blobKey,
+  decodePinRecord,
   manifestFromDetail,
   pinKey,
   type PinRecord,
@@ -11,9 +14,10 @@ import {
 } from '../src/main/uniwork-sync/offline-library'
 import { DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
 import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
-import { createStoreLayer } from '../src/main/uniwork-sync/store'
+import { createStoreLayer, recordFileName } from '../src/main/uniwork-sync/store'
 import {
   ORG,
+  ROOT,
   SCOPE,
   WS,
   addDoc,
@@ -768,5 +772,1274 @@ describe('T5-5 restore and a quota refusal at reconnect', () => {
     // room made: "Thử lại" downloads it
     expect(await h.manager.unpin('seed_0')).toMatchObject({ kind: 'unpinned' })
     expect(await h.manager.downloadNow('doc_1')).toMatchObject({ row: { state: 'ready' } })
+  })
+})
+
+describe('R4F-2 (UNI-1362): a write in flight at the account boundary never recreates a row', () => {
+  /**
+   * The `nth` key verification of the library layer from now on waits for
+   * `release()`; `reached` resolves once the call is waiting there.
+   */
+  function holdVerify(h: Harness, nth: number) {
+    let release!: () => void
+    let reached!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const entered = new Promise<void>((resolve) => (reached = resolve))
+    const real = h.layer.verifyKey.bind(h.layer)
+    let calls = 0
+    h.layer.verifyKey = async (scope) => {
+      calls += 1
+      if (calls === nth) {
+        reached()
+        await gate
+      }
+      return real(scope)
+    }
+    return { release, entered }
+  }
+
+  /** sign-out the way the wiring does it: lock the manager, then wipe the library scope */
+  async function signOut(h: Harness) {
+    h.manager.lockBoundary()
+    h.session.scope = null
+    await h.layer.lockAndWipe(SCOPE)
+  }
+
+  const revokeNotice = {
+    documentId: 'doc_1',
+    reason: 'offline_lease_revoked',
+    deleteCommittedCache: true,
+    keepDrafts: true,
+  } as const
+
+  async function pinnedHarness() {
+    const changes: string[] = []
+    const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+    addDoc(h, 'doc_1', 1)
+    rowOf(await pinDoc(h))
+    changes.length = 0
+    return { h, changes }
+  }
+
+  it('handleArchived held in putPin across sign-out: no row recreated, no notice, null', async () => {
+    const { h, changes } = await pinnedHarness()
+    // getPin verifies first, putPin second
+    const hold = holdVerify(h, 2)
+    const archiving = h.manager.handleArchived('doc_1')
+    await hold.entered
+    await signOut(h)
+    hold.release()
+    expect(await archiving).toBeNull()
+    expect(changes).toEqual([])
+    expect(h.storeFiles()).toEqual([])
+    h.session.scope = SCOPE
+    h.session.id = 'sess_2'
+    expect(await h.manager.row('doc_1')).toBeNull()
+  })
+
+  it('handleArchived held in putPin across a new session of the same account: no row recreated', async () => {
+    const { h, changes } = await pinnedHarness()
+    const hold = holdVerify(h, 2)
+    const archiving = h.manager.handleArchived('doc_1')
+    await hold.entered
+    // the same account signs in again: the session change is the boundary
+    h.session.id = 'sess_2'
+    h.manager.markOpen('doc_other')
+    await h.layer.lockAndWipe(SCOPE)
+    hold.release()
+    expect(await archiving).toBeNull()
+    expect(changes).toEqual([])
+    expect(h.storeFiles()).toEqual([])
+    expect(await h.manager.row('doc_1')).toBeNull()
+  })
+
+  it('handleLeaseRevoked held in the final row write across sign-out: no revoked row', async () => {
+    const { h, changes } = await pinnedHarness()
+    // getPin, the copy's one delete, then the revoked row
+    const hold = holdVerify(h, 3)
+    const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+    await hold.entered
+    await signOut(h)
+    hold.release()
+    expect(await revoking).toBeNull()
+    expect(changes).toEqual([])
+    expect(h.storeFiles()).toEqual([])
+  })
+
+  it('handleLeaseRevoked held in wipeKeys across sign-out: the row write after it is refused', async () => {
+    const { h, changes } = await pinnedHarness()
+    // getPin, then the copy's delete is held: the row write starts after the boundary
+    const hold = holdVerify(h, 2)
+    const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+    await hold.entered
+    await signOut(h)
+    hold.release()
+    expect(await revoking).toBeNull()
+    expect(changes).toEqual([])
+    expect(h.storeFiles()).toEqual([])
+    h.session.scope = SCOPE
+    h.session.id = 'sess_2'
+    expect(await h.manager.row('doc_1')).toBeNull()
+  })
+
+  describe('FUSR-R1 (UNI-1362): every step of an operation is checked against the boundary it started in', () => {
+    const SCOPE_B: StoreScope = { deploymentId: 'dep_1', accountId: 'user_2' }
+    const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    function gate() {
+      let release!: () => void
+      let reached!: () => void
+      const open = new Promise<void>((resolve) => (release = resolve))
+      const entered = new Promise<void>((resolve) => (reached = resolve))
+      return { open, release, entered, reached }
+    }
+
+    /** the first lease projection (`view`) from now on waits for `release()` */
+    function holdLeaseView(h: Harness) {
+      const held = gate()
+      const real = h.leases.effectiveState.bind(h.leases)
+      let armed = true
+      h.leases.effectiveState = async (documentId) => {
+        if (armed) {
+          armed = false
+          held.reached()
+          await held.open
+        }
+        return real(documentId)
+      }
+      return { release: held.release, entered: held.entered }
+    }
+
+    /** the first metadata read of the documents client from now on waits for `release()` */
+    function holdGetDocument(h: Harness) {
+      const held = gate()
+      const real = h.docs.getDocument.bind(h.docs)
+      let armed = true
+      h.docs.getDocument = async (documentId) => {
+        const detail = await real(documentId)
+        if (armed) {
+          armed = false
+          held.reached()
+          await held.open
+        }
+        return detail
+      }
+      return { release: held.release, entered: held.entered }
+    }
+
+    /** like holdVerify, but counting only from `arm()` on */
+    function holdVerifyAfter(h: Harness, nth: number) {
+      const held = gate()
+      const real = h.layer.verifyKey.bind(h.layer)
+      let calls = -1
+      h.layer.verifyKey = async (scope) => {
+        if (calls >= 0) {
+          calls += 1
+          if (calls === nth) {
+            held.reached()
+            await held.open
+          }
+        }
+        return real(scope)
+      }
+      return { arm: () => (calls = 0), release: held.release, entered: held.entered }
+    }
+
+    async function libraryRecords(h: Harness, scope: StoreScope) {
+      const opened = await h.layer.open(scope)
+      if (opened.kind !== 'ok') throw new Error(`did not open: ${opened.kind}`)
+      return opened.store.records(OFFLINE_LIBRARY_STORE_REGISTRATION.name)
+    }
+
+    const filesOf = (h: Harness, scope: StoreScope) =>
+      h.fs.listFiles(`${ROOT}/${scope.deploymentId}/${scope.accountId}`)
+
+    /** sign-out while the outgoing scope is still the active one (the sign-out hook awaits the wipe) */
+    async function lockAndWipeOutgoing(h: Harness) {
+      h.manager.lockBoundary()
+      await h.layer.lockAndWipe(SCOPE)
+    }
+
+    function switchTo(h: Harness, scope: StoreScope, session: string) {
+      h.session.scope = scope
+      h.session.id = session
+    }
+
+    it('FUSR-R1-2: a write that finished before the boundary announces nothing after it', async () => {
+      const { h, changes } = await pinnedHarness()
+      const held = gate()
+      const real = h.store.putPin.bind(h.store)
+      h.store.putPin = async (record) => {
+        const result = await real(record)
+        held.reached()
+        await held.open
+        return result
+      }
+      const archiving = h.manager.handleArchived('doc_1')
+      await held.entered
+      h.manager.lockBoundary()
+      held.release()
+      expect(await archiving).toBeNull()
+      expect(changes).toEqual([])
+    })
+
+    it("FUSR-R1-3: a revoke queued behind the document lock leaves the next account's copy alone", async () => {
+      const h = createHarness()
+      addDoc(h, 'doc_1', 1)
+      // account B holds its own usable copy of the same document id
+      switchTo(h, SCOPE_B, 'sess_B1')
+      rowOf(await pinDoc(h))
+      const bRecords = await libraryRecords(h, SCOPE_B)
+      const stored = await bRecords.read(pinKey('doc_1'))
+      if (stored.kind !== 'ok') throw new Error('B did not pin')
+      const bRow = decodePinRecord(stored.value)!
+      const bBlob = blobKey('doc_1', bRow.readyGeneration!, 'main')
+      expect(bRow.state).toBe('ready')
+      expect((await bRecords.read(bBlob)).kind).toBe('ok')
+      // account A pins it too; an archive of A holds A's document lock (lease projection)
+      switchTo(h, SCOPE, 'sess_A1')
+      rowOf(await pinDoc(h))
+      const hold = holdLeaseView(h)
+      const archiving = h.manager.handleArchived('doc_1')
+      await hold.entered
+      // A's revoke queues behind that lock
+      const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+      await flush()
+      await signOut(h)
+      switchTo(h, SCOPE_B, 'sess_B2')
+      hold.release()
+      await archiving
+      expect(await revoking).toBeNull()
+      expect((await bRecords.read(bBlob)).kind).toBe('ok')
+      const after = await bRecords.read(pinKey('doc_1'))
+      expect(after.kind === 'ok' && decodePinRecord(after.value)?.state).toBe('ready')
+    })
+
+    it("FUSR-R1-3: a multi-key deletion that crosses a boundary between two keys never deletes in the next account's scope", async () => {
+      const h = createHarness()
+      const readyKey = blobKey('doc_1', '0000000a', 'main')
+      const stagingKey = blobKey('doc_1', '0000000b', 'main')
+      const seed = seedRow('doc_1', 4096)
+      // account A holds a committed copy and a staging generation: two keys to delete
+      expect(
+        (
+          await h.store.putPin({
+            ...seed,
+            state: 'ready',
+            readyManifest: seed.manifest,
+            readyGeneration: '0000000a',
+            readyVersion: 1,
+            bytes: 4096,
+            staging: { generation: '0000000b', keys: [stagingKey] },
+          })
+        ).kind,
+      ).toBe('ok')
+      expect((await h.store.writeIndex({ pins: ['doc_1'], cleanup: {} })).kind).toBe('ok')
+      expect((await h.store.putBlob(readyKey, plaintext('a-ready'))).kind).toBe('ok')
+      expect((await h.store.putBlob(stagingKey, plaintext('a-staging'))).kind).toBe('ok')
+      // account B owns a record at the key the revoke would reach second
+      const bRecords = await libraryRecords(h, SCOPE_B)
+      expect((await bRecords.write(stagingKey, plaintext('b-staging'))).kind).toBe('ok')
+      // getPin, then the first delete is held
+      const hold = holdVerify(h, 2)
+      const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+      await hold.entered
+      await signOut(h)
+      switchTo(h, SCOPE_B, 'sess_B')
+      hold.release()
+      expect(await revoking).toBeNull()
+      expect((await bRecords.read(stagingKey)).kind).toBe('ok')
+    })
+
+    it('FUSR-R1-4: an archive whose lease projection spans the sign-out returns nothing', async () => {
+      const { h } = await pinnedHarness()
+      const hold = holdLeaseView(h)
+      const archiving = h.manager.handleArchived('doc_1')
+      await hold.entered
+      await signOut(h)
+      hold.release()
+      expect(await archiving).toBeNull()
+      expect(h.storeFiles()).toEqual([])
+    })
+
+    it('FUSR-R1-5: a revoke whose lease projection spans the sign-out returns nothing', async () => {
+      const { h } = await pinnedHarness()
+      const hold = holdLeaseView(h)
+      const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+      await hold.entered
+      await signOut(h)
+      hold.release()
+      expect(await revoking).toBeNull()
+      expect(h.storeFiles()).toEqual([])
+    })
+
+    it('FUSR-R1-6: a refresh whose metadata read spans the sign-out writes no row', async () => {
+      const { h, changes } = await pinnedHarness()
+      const hold = holdGetDocument(h)
+      const refreshing = h.manager.refresh('doc_1')
+      await hold.entered
+      await lockAndWipeOutgoing(h)
+      expect(h.storeFiles()).toEqual([])
+      hold.release()
+      expect(await refreshing).toEqual({ kind: 'refused', code: 'interrupted' })
+      expect(h.storeFiles()).toEqual([])
+      expect(changes).toEqual([])
+    })
+
+    it('FUSR-R1-6: a refresh whose metadata read spans an account switch persists nothing under the new account', async () => {
+      const { h, changes } = await pinnedHarness()
+      const hold = holdGetDocument(h)
+      const refreshing = h.manager.refresh('doc_1')
+      await hold.entered
+      await lockAndWipeOutgoing(h)
+      switchTo(h, SCOPE_B, 'sess_B')
+      h.manager.markOpen('doc_other')
+      hold.release()
+      expect(await refreshing).toEqual({ kind: 'refused', code: 'interrupted' })
+      expect(filesOf(h, SCOPE_B)).toEqual([])
+      expect(filesOf(h, SCOPE)).toEqual([])
+      expect(changes).toEqual([])
+    })
+
+    it('FUSR-R1-7: a refresh whose metadata read fails with a revoke across the sign-out recreates no row', async () => {
+      const { h, changes } = await pinnedHarness()
+      const held = gate()
+      h.docs.getDocument = async () => {
+        held.reached()
+        await held.open
+        throw new UniworkDocError('forbidden')
+      }
+      const refreshing = h.manager.refresh('doc_1')
+      await held.entered
+      await lockAndWipeOutgoing(h)
+      held.release()
+      expect(await refreshing).toEqual({ kind: 'refused', code: 'interrupted' })
+      expect(h.storeFiles()).toEqual([])
+      expect(changes).toEqual([])
+    })
+
+    it('FUSR-R1-6: an eviction whose copy deletion spans the sign-out writes no row', async () => {
+      const { h, changes } = await pinnedHarness()
+      // getPin, then the copy's delete is held
+      const hold = holdVerify(h, 2)
+      const evicting = h.manager.evict('doc_1')
+      await hold.entered
+      await lockAndWipeOutgoing(h)
+      hold.release()
+      expect(await evicting).toEqual({ kind: 'refused', code: 'interrupted' })
+      expect(h.storeFiles()).toEqual([])
+      expect(changes).toEqual([])
+    })
+
+    it('FUSR-R1-6: recovery whose staging deletion spans the sign-out writes no row', async () => {
+      const changes: string[] = []
+      const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+      const stagingKey = blobKey('doc_1', '0000000a', 'main')
+      expect(
+        (
+          await h.store.putPin({
+            ...seedRow('doc_1', 4096),
+            state: 'downloading',
+            staging: { generation: '0000000a', keys: [stagingKey] },
+          })
+        ).kind,
+      ).toBe('ok')
+      expect((await h.store.writeIndex({ pins: ['doc_1'], cleanup: {} })).kind).toBe('ok')
+      expect((await h.store.putBlob(stagingKey, plaintext('staged'))).kind).toBe('ok')
+      // the index read, getPin, then the staging delete is held
+      const hold = holdVerify(h, 3)
+      const recovering = h.manager.recover()
+      await hold.entered
+      await lockAndWipeOutgoing(h)
+      hold.release()
+      await recovering
+      expect(h.storeFiles()).toEqual([])
+      expect(changes).toEqual([])
+    })
+
+    it('FUSR-R1-6/7: a failed download that settles into a revoke across the sign-out recreates no row', async () => {
+      const changes: string[] = []
+      const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+      addDoc(h, 'doc_1', 1)
+      // from the stream failure on: the settle's getPin, its staging delete, the purge's delete (held)
+      const hold = holdVerifyAfter(h, 3)
+      h.docs.downloadStream = async () => {
+        hold.arm()
+        throw new UniworkDocError('permission_revoked')
+      }
+      const pinning = pinDoc(h)
+      await hold.entered
+      await lockAndWipeOutgoing(h)
+      changes.length = 0
+      hold.release()
+      await pinning
+      expect(h.storeFiles()).toEqual([])
+      expect(changes).toEqual([])
+    })
+
+    it('FUSR-R1-6: a deferred cleanup whose blob deletion spans an account switch copies no index into the new account', async () => {
+      const h = createHarness()
+      addDoc(h, 'doc_1', 1)
+      addDoc(h, 'doc_2', 1)
+      rowOf(await pinDoc(h, 'doc_1'))
+      rowOf(await pinDoc(h, 'doc_2'))
+      h.manager.markOpen('doc_1')
+      expect(await h.manager.unpin('doc_1')).toEqual({ kind: 'unpinned', deferred: true })
+      // the index read, then the first deferred blob delete is held
+      const hold = holdVerify(h, 2)
+      const closing = h.manager.markClosed('doc_1')
+      await hold.entered
+      h.manager.lockBoundary()
+      switchTo(h, SCOPE_B, 'sess_B')
+      await h.layer.lockAndWipe(SCOPE)
+      hold.release()
+      await closing
+      expect(filesOf(h, SCOPE_B)).toEqual([])
+      expect(await h.manager.pinnedIds()).toEqual(new Set())
+    })
+
+    describe('FUSR-R1-8: the held revoke is refused with a usable session already active', () => {
+      for (const [label, scope, session] of [
+        ['a new session of the same account', SCOPE, 'sess_2'],
+        ['another account', SCOPE_B, 'sess_B'],
+      ] as const) {
+        it(`${label}: no row recreated in either scope, no notice`, async () => {
+          const { h, changes } = await pinnedHarness()
+          // getPin, then the copy's delete is held
+          const hold = holdVerify(h, 2)
+          const revoking = h.manager.handleLeaseRevoked(revokeNotice)
+          await hold.entered
+          await signOut(h)
+          switchTo(h, scope, session)
+          h.manager.markOpen('doc_other')
+          hold.release()
+          expect(await revoking).toBeNull()
+          expect(changes).toEqual([])
+          expect(filesOf(h, SCOPE)).toEqual([])
+          expect(filesOf(h, SCOPE_B)).toEqual([])
+          expect(await h.manager.row('doc_1')).toBeNull()
+          // the new session is usable
+          expect(rowOf(await pinDoc(h)).state).toBe('ready')
+        })
+      }
+    })
+
+    describe('FUSR-R1-9: after a boundary a fresh archive and revoke on the same manager persist', () => {
+      for (const [label, scope] of [
+        ['the same account', SCOPE],
+        ['another account', SCOPE_B],
+      ] as const) {
+        it(label, async () => {
+          const { h } = await pinnedHarness()
+          await signOut(h)
+          switchTo(h, scope, 'sess_2')
+          rowOf(await pinDoc(h))
+          expect(await h.manager.handleArchived('doc_1')).toMatchObject({ archived: true })
+          const archived = await h.store.getPin('doc_1')
+          expect(archived.kind === 'ok' && archived.record.archived).toBe(true)
+          expect(await h.manager.handleLeaseRevoked(revokeNotice)).toMatchObject({
+            state: 'revoked',
+          })
+          const revoked = await h.store.getPin('doc_1')
+          expect(revoked.kind === 'ok' && revoked.record.state).toBe('revoked')
+        })
+      }
+    })
+
+    describe('FUSR-R4: a row the index does not list is never a pin - a fresh pin discards it and pins anew', () => {
+      const interrupted = { kind: 'refused', code: 'interrupted' }
+
+      /**
+       * The first pin's reservation row is written, then a boundary that wipes
+       * nothing (the sign-out hook was aborted) passes before the index entry:
+       * the old pin is refused and the row is left behind, unlisted.
+       */
+      async function abortReservation(h: Harness, others: string[]) {
+        const held = gate()
+        const real = h.store.putPin.bind(h.store)
+        let armed = true
+        h.store.putPin = async (record) => {
+          const result = await real(record)
+          if (armed) {
+            armed = false
+            held.reached()
+            await held.open
+          }
+          return result
+        }
+        const pinning = pinDoc(h)
+        await held.entered
+        h.manager.lockBoundary()
+        held.release()
+        expect(await pinning).toEqual(interrupted)
+        h.store.putPin = real
+        const orphan = await h.store.getPin('doc_1')
+        expect(orphan.kind).toBe('ok')
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).toEqual(others)
+      }
+
+      /**
+       * An unpin whose index write completed is cut by a boundary that wipes
+       * nothing: the document is no longer listed, its row (with its copy and
+       * staging) is still there, and with `open` the copy's keys are on the
+       * deferred cleanup list.
+       */
+      async function abortUnpin(h: Harness, options: { open?: boolean } = {}) {
+        if (options.open) h.manager.markOpen('doc_1')
+        const held = gate()
+        const real = h.store.writeIndex.bind(h.store)
+        let armed = true
+        h.store.writeIndex = async (index) => {
+          const result = await real(index)
+          if (armed) {
+            armed = false
+            held.reached()
+            await held.open
+          }
+          return result
+        }
+        const unpinning = h.manager.unpin('doc_1')
+        await held.entered
+        h.manager.lockBoundary()
+        held.release()
+        expect(await unpinning).toEqual(interrupted)
+        h.store.writeIndex = real
+        const orphan = await h.store.getPin('doc_1')
+        expect(orphan.kind).toBe('ok')
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).not.toContain('doc_1')
+      }
+
+      const cleanupOf = async (h: Harness, documentId = 'doc_1') => {
+        const index = await h.store.readIndex()
+        return index.kind === 'ok' ? (index.index.cleanup[documentId] ?? []) : []
+      }
+      const hasFile = (h: Harness, key: string) => h.storeFiles().includes(recordFile(key))
+      const blobOf = (generation: string) => blobKey('doc_1', generation, 'main')
+      /** the index record, plus a row and one blob for each ready pin */
+      const filesOfReadyPins = (pins: number) => 1 + 2 * pins
+
+      it('online: the fresh pin lists the document, holds a ready openable copy, keeps the others and leaves no orphan key', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_2', 1)
+        const doc = addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h, 'doc_2'))
+        await abortReservation(h, ['doc_2'])
+        expect(rowOf(await pinDoc(h)).state).toBe('ready')
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).toEqual(['doc_2', 'doc_1'])
+        expect((await h.manager.list()).map((row) => row.documentId)).toEqual(['doc_2', 'doc_1'])
+        const opened = await h.manager.openCached('doc_1')
+        expect(opened.kind).toBe('ok')
+        expect(opened.kind === 'ok' && Buffer.from(opened.bytes).equals(doc.bytes)).toBe(true)
+        expect(await h.manager.quota()).toEqual({
+          usedBytes: 2 * 4096,
+          maxBytes: 2 * GiB,
+          pins: 2,
+          maxPins: 200,
+        })
+        expect(await h.manager.row('doc_2')).toMatchObject({ state: 'ready' })
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(2))
+      })
+
+      it('offline: the fresh pin is waiting-network and listed, the reconnect downloads it, no orphan key is left', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        h.online.on = false
+        await abortReservation(h, [])
+        expect(rowOf(await pinDoc(h)).state).toBe('waiting-network')
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).toEqual(['doc_1'])
+        expect((await h.manager.list()).map((row) => row.documentId)).toEqual(['doc_1'])
+        // the index and the one row
+        expect(h.storeFiles()).toHaveLength(2)
+        h.online.on = true
+        const results = await h.manager.onReconnect()
+        expect(results.get('doc_1')).toMatchObject({ kind: 'ok', row: { state: 'ready' } })
+        expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(1))
+      })
+
+      it('FUSR-R3-1: a copy the deferred cleanup of an interrupted unpin owns is never reported ready and then deleted by recovery', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        addDoc(h, 'doc_2', 1)
+        rowOf(await pinDoc(h, 'doc_2'))
+        rowOf(await pinDoc(h))
+        await abortUnpin(h, { open: true })
+        const owned = await cleanupOf(h)
+        expect(owned).toHaveLength(1)
+        h.online.on = false
+        const pinned = rowOf(await pinDoc(h))
+        await h.manager.recover()
+        // whatever the fresh pin reported ready must still open after recovery
+        if (pinned.state === 'ready') expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        h.online.on = true
+        const results = await h.manager.onReconnect()
+        expect(results.get('doc_1')).toMatchObject({ kind: 'ok', row: { state: 'ready' } })
+        await h.manager.recover()
+        expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        expect((await h.manager.openCached('doc_2')).kind).toBe('ok')
+        // the cleanup ran for the keys it owns; nothing it names is a key of the live copy
+        expect(await cleanupOf(h)).toEqual([])
+        expect(hasFile(h, owned[0]!)).toBe(false)
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(2))
+      })
+
+      it('FUSR-R3-4: the keys a deferred unpin still owns stay for its tab, the fresh copy does not use them', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h))
+        await abortUnpin(h, { open: true })
+        const owned = await cleanupOf(h)
+        expect(owned).toHaveLength(1)
+        // the tab is open again in the new session
+        h.manager.markOpen('doc_1')
+        expect(rowOf(await pinDoc(h)).state).toBe('ready')
+        expect(hasFile(h, owned[0]!)).toBe(true)
+        expect(await cleanupOf(h)).toEqual(owned)
+        await h.manager.markClosed('doc_1')
+        expect(hasFile(h, owned[0]!)).toBe(false)
+        expect(await cleanupOf(h)).toEqual([])
+        expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(1))
+      })
+
+      it('FUSR-R3-2: the replacement of an interrupted unpin keeps the byte cap', async () => {
+        const h = createHarness({ limits: { maxBytes: 8192 } })
+        addDoc(h, 'doc_1', 1)
+        addDoc(h, 'doc_2', 1)
+        rowOf(await pinDoc(h))
+        rowOf(await pinDoc(h, 'doc_2'))
+        await abortUnpin(h)
+        // the head grew to the whole cap
+        addDoc(h, 'doc_1', 2, 8192)
+        h.docs.downloads.length = 0
+        expect(await pinDoc(h)).toEqual({ kind: 'refused', code: 'offline_cap_reached' })
+        expect(h.docs.downloads).toEqual([])
+        const quota = await h.manager.quota()
+        expect(quota.usedBytes).toBeLessThanOrEqual(quota.maxBytes)
+        expect(await h.manager.row('doc_1')).toBeNull()
+        expect(await h.manager.row('doc_2')).toMatchObject({ state: 'ready' })
+        expect((await h.manager.openCached('doc_2')).kind).toBe('ok')
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(1))
+      })
+
+      it('FUSR-R3-3: a refused index write leaves no key without an owner, and the retry pins', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h))
+        await abortUnpin(h)
+        h.online.on = false
+        // the next index write hits a full disk, once
+        let failed = false
+        h.fs.failWrite = (path) => {
+          if (failed || !path.includes(recordFileName('index'))) return false
+          failed = true
+          return true
+        }
+        expect((await pinDoc(h)).kind).toBe('refused')
+        h.fs.failWrite = null
+        expect(failed).toBe(true)
+        const row = await h.store.getPin('doc_1')
+        const blobKept = hasFile(h, blobOf('00000001'))
+        // never: row missing + blob there + no cleanup entry
+        expect(row.kind !== 'ok' && blobKept && (await cleanupOf(h)).length === 0).toBe(false)
+        expect(rowOf(await pinDoc(h)).state).toBe('waiting-network')
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).toEqual(['doc_1'])
+      })
+
+      it('FUSR-R3-4: the staging an aborted refresh left on the row is deleted by the fresh pin, not abandoned', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h))
+        addDoc(h, 'doc_1', 2)
+        // v2 downloads: its first staging blob write completes, then a no-wipe boundary passes
+        const held = gate()
+        const real = h.store.putBlob.bind(h.store)
+        h.store.putBlob = async (key, bytes) => {
+          const result = await real(key, bytes)
+          held.reached()
+          await held.open
+          return result
+        }
+        const refreshing = h.manager.downloadNow('doc_1')
+        await held.entered
+        h.manager.lockBoundary()
+        held.release()
+        expect(await refreshing).toEqual(interrupted)
+        h.store.putBlob = real
+        expect(hasFile(h, blobOf('00000002'))).toBe(true)
+        await abortUnpin(h)
+        expect(rowOf(await pinDoc(h)).state).toBe('ready')
+        // the old copy and the abandoned staging are both gone; only the new generation is there
+        expect(hasFile(h, blobOf('00000001'))).toBe(false)
+        expect(hasFile(h, blobOf('00000002'))).toBe(false)
+        expect(hasFile(h, blobOf('00000003'))).toBe(true)
+        await h.manager.recover()
+        expect(await h.manager.unpin('doc_1')).toEqual({ kind: 'unpinned', deferred: false })
+        // only the index record is left
+        expect(h.storeFiles()).toHaveLength(1)
+      })
+
+      it('FUSR-R3-5: an unlisted revoked row is no pin: with the lease still revoked the pin refuses like any revoked document and leaks nothing', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h))
+        expect(await h.manager.handleLeaseRevoked(revokeNotice)).toMatchObject({ state: 'revoked' })
+        h.leases.states.set('doc_1', leaseState('revoked'))
+        await abortUnpin(h)
+        h.docs.downloads.length = 0
+        expect(await pinDoc(h)).toEqual({ kind: 'refused', code: 'revoked' })
+        expect(await h.manager.row('doc_1')).toBeNull()
+        const index = await h.store.readIndex()
+        expect(index.kind === 'ok' && index.index.pins).toEqual([])
+        expect(h.docs.downloads).toEqual([])
+        // no half-listed row, no key: only the index record is left
+        expect(h.storeFiles()).toHaveLength(1)
+      })
+
+      it('FUSR-R3-6: a transfer running for the unlisted row is stopped first - one transfer at a time, the stopped one aborted, no staging left', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        await abortReservation(h, [])
+        const signals: Array<AbortSignal | undefined> = []
+        let active = 0
+        let peak = 0
+        const real = h.docs.downloadStream.bind(h.docs)
+        h.docs.downloadStream = async (documentId, version, options) => {
+          signals.push(options?.signal)
+          active += 1
+          peak = Math.max(peak, active)
+          try {
+            return await real(documentId, version, options)
+          } finally {
+            active -= 1
+          }
+        }
+        const hold = slowDownload(h, 'doc_1', 1)
+        const downloading = h.manager.downloadNow('doc_1')
+        await hold.waiting
+        const pinning = pinDoc(h)
+        await flush()
+        hold.release()
+        await downloading
+        expect(rowOf(await pinning).state).toBe('ready')
+        expect(peak).toBe(1)
+        expect(signals[0]?.aborted).toBe(true)
+        expect(h.manager.cancel('doc_1')).toBe(false)
+        expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        expect(h.storeFiles()).toHaveLength(filesOfReadyPins(1))
+      })
+
+      describe('FUSR-R4-3: a transfer stopped for a discard is silent', () => {
+        /** an unlisted row with a fresh downloadNow held on its second chunk */
+        async function heldOrphanTransfer(onChange: (documentId: string) => void) {
+          const h = createHarness({ onChange })
+          const doc = addDoc(h, 'doc_1', 1)
+          await abortReservation(h, [])
+          const hold = slowDownload(h, 'doc_1', 1)
+          // a chunk that was already on its way when the abort landed still reports progress
+          const real = h.docs.downloadStream.bind(h.docs)
+          h.docs.downloadStream = async (documentId, version, options) => {
+            try {
+              return await real(documentId, version, options)
+            } catch (error) {
+              options?.onProgress?.({ receivedBytes: 2048, totalBytes: 4096 })
+              throw error
+            }
+          }
+          const downloading = h.manager.downloadNow('doc_1')
+          await hold.waiting
+          return { h, doc, hold, downloading }
+        }
+
+        it('writes no row, announces nothing and leaves no staging while the discarding pin stops it', async () => {
+          const notices: string[] = []
+          const { h, doc, hold, downloading } = await heldOrphanTransfer((id) => notices.push(id))
+          // the replacement is refused before it writes anything: every row write or
+          // notice from here on is the stopped transfer's
+          doc.declaredSize = 256 * MiB + 1
+          const rows: PinRecord[] = []
+          const real = h.store.putPin.bind(h.store)
+          h.store.putPin = (record) => {
+            rows.push(record)
+            return real(record)
+          }
+          notices.length = 0
+          const pinning = pinDoc(h)
+          await flush()
+          hold.release()
+          expect(await pinning).toEqual({ kind: 'refused', code: 'too_large' })
+          await downloading
+          expect(rows).toEqual([])
+          expect(notices).toEqual([])
+          expect(h.manager.cancel('doc_1')).toBe(false)
+          expect(await h.manager.row('doc_1')).toBeNull()
+          expect(h.storeFiles()).toEqual([])
+        })
+
+        it("wipes only its own generation's keys: another generation's blob of the document survives and the fresh copy settles ready", async () => {
+          const h = createHarness()
+          addDoc(h, 'doc_1', 1)
+          await abortReservation(h, [])
+          const foreign = blobKey('doc_1', '00000fff', 'main')
+          expect((await h.store.putBlob(foreign, plaintext('foreign', 64))).kind).toBe('ok')
+          // the transfer has staged its bytes and waits on the read-back
+          const held = gate()
+          const real = h.store.getBlob.bind(h.store)
+          let own = ''
+          h.store.getBlob = async (key) => {
+            if (!own) {
+              own = key
+              held.reached()
+              await held.open
+            }
+            return real(key)
+          }
+          const downloading = h.manager.downloadNow('doc_1')
+          await held.entered
+          expect(hasFile(h, own)).toBe(true)
+          const pinning = pinDoc(h)
+          await flush()
+          held.release()
+          expect(rowOf(await pinning).state).toBe('ready')
+          await downloading
+          expect(hasFile(h, own)).toBe(false)
+          expect(hasFile(h, foreign)).toBe(true)
+          expect((await h.manager.openCached('doc_1')).kind).toBe('ok')
+        })
+
+        it("FUPS-R1-2: a boundary crossed while the stop is pending leaves the next account's blobs at the job's keys alone and recreates nothing of the old scope", async () => {
+          const notices: string[] = []
+          const { h, hold, downloading } = await heldOrphanTransfer((id) => notices.push(id))
+          const orphan = await h.store.getPin('doc_1')
+          const keys = orphan.kind === 'ok' ? (orphan.record.staging?.keys ?? []) : []
+          expect(keys).toHaveLength(1)
+          const pinning = pinDoc(h)
+          await flush()
+          // the stop is pending: the transfer is silenced and aborted, held in its stream
+          await lockAndWipeOutgoing(h)
+          switchTo(h, SCOPE_B, 'sess_B1')
+          for (const key of keys) {
+            expect((await h.store.putBlob(key, plaintext('b-owned', 64))).kind).toBe('ok')
+          }
+          const snapshot = () =>
+            new Map(filesOf(h, SCOPE_B).map((path) => [path, Buffer.from(h.fs.files.get(path)!)]))
+          const before = snapshot()
+          expect(before.size).toBe(keys.length)
+          notices.length = 0
+          hold.release()
+          expect(await pinning).toEqual(interrupted)
+          await downloading
+          expect(snapshot()).toEqual(before)
+          expect(filesOf(h, SCOPE)).toEqual([])
+          await expect(
+            h.fs.list(`${ROOT}/${SCOPE.deploymentId}/${SCOPE.accountId}`),
+          ).rejects.toMatchObject({
+            code: 'ENOENT',
+          })
+          expect(notices).toEqual([])
+        })
+
+        it("FUPS-R1-2: a boundary crossed after the stop's first key deletion completed deletes no further key under the next account", async () => {
+          const notices: string[] = []
+          const asset = plaintext('asset', 1024)
+          const h = createHarness({
+            onChange: (id) => notices.push(id),
+            fetchAsset: async () => asset,
+            manifestOf: (detail) => ({
+              ...manifestFromDetail(detail),
+              assets: [{ path: 'media/a.png', sha256: sha(asset), sizeBytes: 1024 }],
+            }),
+          })
+          addDoc(h, 'doc_1', 1)
+          await abortReservation(h, [])
+          const stream = slowDownload(h, 'doc_1', 1)
+          const downloading = h.manager.downloadNow('doc_1')
+          await stream.waiting
+          // the job's own keys are on the row now: its settlement deletes both, one after the other
+          const orphan = await h.store.getPin('doc_1')
+          const keys = orphan.kind === 'ok' ? (orphan.record.staging?.keys ?? []) : []
+          expect(keys).toHaveLength(2)
+          const held = gate()
+          const realDelete = h.store.deleteBlob.bind(h.store)
+          let deletes = 0
+          h.store.deleteBlob = async (key) => {
+            deletes += 1
+            const result = await realDelete(key)
+            if (deletes === 1) {
+              held.reached()
+              await held.open
+            }
+            return result
+          }
+          const pinning = pinDoc(h)
+          await flush()
+          stream.release()
+          await held.entered
+          expect(deletes).toBe(1)
+          await lockAndWipeOutgoing(h)
+          switchTo(h, SCOPE_B, 'sess_B1')
+          for (const key of keys) {
+            expect((await h.store.putBlob(key, plaintext('b-owned', 64))).kind).toBe('ok')
+          }
+          const snapshot = () =>
+            new Map(filesOf(h, SCOPE_B).map((path) => [path, Buffer.from(h.fs.files.get(path)!)]))
+          const before = snapshot()
+          expect(before.size).toBe(2)
+          notices.length = 0
+          held.release()
+          expect(await pinning).toEqual(interrupted)
+          await downloading
+          expect(deletes).toBe(1)
+          expect(snapshot()).toEqual(before)
+          expect(filesOf(h, SCOPE)).toEqual([])
+          await expect(
+            h.fs.list(`${ROOT}/${SCOPE.deploymentId}/${SCOPE.accountId}`),
+          ).rejects.toMatchObject({
+            code: 'ENOENT',
+          })
+          expect(notices).toEqual([])
+        })
+
+        it('an ordinary cancel of the same transfer still settles interrupted and announces it', async () => {
+          const notices: string[] = []
+          const { h, hold, downloading } = await heldOrphanTransfer((id) => notices.push(id))
+          notices.length = 0
+          expect(h.manager.cancel('doc_1')).toBe(true)
+          hold.release()
+          await downloading
+          expect(notices).toContain('doc_1')
+          const stored = await h.store.getPin('doc_1')
+          expect(stored.kind === 'ok' && stored.record.state).toBe('interrupted')
+        })
+      })
+
+      it('FUSR-R4-1: the settled state a full disk kept in memory for the discarded row does not outlive it', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h))
+        await abortUnpin(h)
+        // a fresh refresh of the unlisted row: the full disk refuses its settled row too
+        addDoc(h, 'doc_1', 2)
+        h.docs.beforeChunk = () => {
+          h.fs.failWrite = () => true
+        }
+        expect(await h.manager.downloadNow('doc_1')).toMatchObject({
+          kind: 'ok',
+          row: { state: 'update-kept', readyVersion: 1 },
+        })
+        h.fs.failWrite = null
+        h.docs.beforeChunk = null
+        h.online.on = false
+        const pinned = rowOf(await pinDoc(h))
+        expect(pinned).toMatchObject({ state: 'waiting-network', bytes: 0, readyVersion: null })
+        expect(pinned.failure).toBeUndefined()
+        const stored = await h.store.getPin('doc_1')
+        expect(stored.kind === 'ok' && stored.record).toMatchObject({
+          state: 'waiting-network',
+          bytes: 0,
+          readyVersion: null,
+        })
+        const row = await h.manager.row('doc_1')
+        expect(row).toMatchObject({ state: 'waiting-network', bytes: 0, readyVersion: null })
+        expect(row?.failure).toBeUndefined()
+        const listed = (await h.manager.list()).find((entry) => entry.documentId === 'doc_1')
+        expect(listed).toMatchObject({ state: 'waiting-network', bytes: 0, readyVersion: null })
+        expect(listed?.failure).toBeUndefined()
+        expect(await h.manager.openCached('doc_1')).toMatchObject({
+          kind: 'refused',
+          code: 'not_ready',
+        })
+      })
+
+      describe('FUSR-R4-2: a document id the cleanup map inherits a property for pins like any other', () => {
+        it.each(['constructor', 'toString'])('%s', async (documentId) => {
+          const h = createHarness()
+          addDoc(h, documentId, 1)
+          h.online.on = false
+          const held = gate()
+          const real = h.store.putPin.bind(h.store)
+          let armed = true
+          h.store.putPin = async (record) => {
+            const result = await real(record)
+            if (armed) {
+              armed = false
+              held.reached()
+              await held.open
+            }
+            return result
+          }
+          const pinning = pinDoc(h, documentId)
+          await held.entered
+          h.manager.lockBoundary()
+          held.release()
+          expect(await pinning).toEqual(interrupted)
+          h.store.putPin = real
+          expect((await h.store.getPin(documentId)).kind).toBe('ok')
+          expect(rowOf(await pinDoc(h, documentId)).state).toBe('waiting-network')
+          const index = await h.store.readIndex()
+          expect(index.kind === 'ok' && index.index.pins).toEqual([documentId])
+          h.online.on = true
+          const results = await h.manager.onReconnect()
+          expect(results.get(documentId)).toMatchObject({ kind: 'ok', row: { state: 'ready' } })
+          expect((await h.manager.openCached(documentId)).kind).toBe('ok')
+        })
+
+        it('control: a key the document own cleanup entry names is still left to its owner', async () => {
+          const h = createHarness()
+          addDoc(h, 'doc_1', 1)
+          rowOf(await pinDoc(h))
+          await abortUnpin(h, { open: true })
+          const owned = await cleanupOf(h)
+          expect(owned).toHaveLength(1)
+          expect(rowOf(await pinDoc(h)).state).toBe('ready')
+          expect(hasFile(h, owned[0]!)).toBe(true)
+          expect(await cleanupOf(h)).toEqual(owned)
+        })
+      })
+
+      it('FUSR-R4-4: a discard whose first key deletion completes across the boundary deletes nothing under the new account', async () => {
+        const changes: string[] = []
+        const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+        addDoc(h, 'doc_1', 1)
+        rowOf(await pinDoc(h))
+        // the refresh of v2 leaves its first staging blob (generation 2) on the row
+        addDoc(h, 'doc_1', 2)
+        const staged = gate()
+        const realPut = h.store.putBlob.bind(h.store)
+        h.store.putBlob = async (key, bytes) => {
+          const result = await realPut(key, bytes)
+          staged.reached()
+          await staged.open
+          return result
+        }
+        const refreshing = h.manager.downloadNow('doc_1')
+        await staged.entered
+        h.manager.lockBoundary()
+        staged.release()
+        expect(await refreshing).toEqual(interrupted)
+        h.store.putBlob = realPut
+        await abortUnpin(h)
+        expect(hasFile(h, blobOf('00000001'))).toBe(true)
+        expect(hasFile(h, blobOf('00000002'))).toBe(true)
+        // account B holds a usable copy and a blob at the key of A's second deletion
+        switchTo(h, SCOPE_B, 'sess_B1')
+        rowOf(await pinDoc(h))
+        expect((await h.store.putBlob(blobOf('00000002'), Buffer.from('b-owned'))).kind).toBe('ok')
+        const snapshot = () =>
+          new Map(filesOf(h, SCOPE_B).map((path) => [path, Buffer.from(h.fs.files.get(path)!)]))
+        const before = snapshot()
+        // index, row, main blob and the one at A's key
+        expect(before.size).toBe(4)
+        switchTo(h, SCOPE, 'sess_A2')
+        // A's fresh pin discards the orphan: the first deletion completes, then the boundary
+        const held = gate()
+        const realDelete = h.store.deleteBlob.bind(h.store)
+        let deletes = 0
+        h.store.deleteBlob = async (key) => {
+          deletes += 1
+          const result = await realDelete(key)
+          if (deletes === 1) {
+            held.reached()
+            await held.open
+          }
+          return result
+        }
+        changes.length = 0
+        const pinning = pinDoc(h)
+        await held.entered
+        await signOut(h)
+        switchTo(h, SCOPE_B, 'sess_B2')
+        held.release()
+        expect(await pinning).toEqual(interrupted)
+        expect(deletes).toBe(1)
+        expect(snapshot()).toEqual(before)
+        expect(filesOf(h, SCOPE)).toEqual([])
+        expect(changes).toEqual([])
+      })
+    })
+
+    describe('FUSR-R2-2: a transfer that finishes across a boundary publishes no row of the old scope', () => {
+      it('a download whose old-version deletion completes across the sign-out is refused', async () => {
+        const { h, changes } = await pinnedHarness()
+        addDoc(h, 'doc_1', 2)
+        // the committed v2 replaces v1: the deletion of v1's blob completes, then waits
+        const held = gate()
+        const real = h.store.deleteBlob.bind(h.store)
+        h.store.deleteBlob = async (key) => {
+          const result = await real(key)
+          held.reached()
+          await held.open
+          return result
+        }
+        const downloading = h.manager.downloadNow('doc_1')
+        await held.entered
+        await signOut(h)
+        switchTo(h, SCOPE_B, 'sess_B')
+        changes.length = 0
+        held.release()
+        expect(await downloading).toEqual({ kind: 'refused', code: 'interrupted' })
+        expect(changes).toEqual([])
+        expect(filesOf(h, SCOPE)).toEqual([])
+        expect(filesOf(h, SCOPE_B)).toEqual([])
+      })
+
+      it('a download that settles into a revoke across the sign-out is refused, not downloading', async () => {
+        const changes: string[] = []
+        const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+        addDoc(h, 'doc_1', 1)
+        // from the stream failure on: the settle's getPin, its staging delete, the purge's delete (held)
+        const hold = holdVerifyAfter(h, 3)
+        h.docs.downloadStream = async () => {
+          hold.arm()
+          throw new UniworkDocError('permission_revoked')
+        }
+        const pinning = pinDoc(h)
+        await hold.entered
+        await lockAndWipeOutgoing(h)
+        changes.length = 0
+        hold.release()
+        expect(await pinning).toEqual({ kind: 'refused', code: 'interrupted' })
+        expect(h.storeFiles()).toEqual([])
+        expect(changes).toEqual([])
+      })
+
+      it('FUSR-R3-7: a pin whose downloading row write completes across the sign-out is refused, not pinned', async () => {
+        const changes: string[] = []
+        const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+        addDoc(h, 'doc_1', 1)
+        // only the successful write of the downloading row is held: beginDownload's settled return
+        const held = gate()
+        const real = h.store.putPin.bind(h.store)
+        h.store.putPin = async (record) => {
+          const result = await real(record)
+          if (record.state === 'downloading') {
+            held.reached()
+            await held.open
+          }
+          return result
+        }
+        const pinning = pinDoc(h)
+        await held.entered
+        await lockAndWipeOutgoing(h)
+        changes.length = 0
+        held.release()
+        expect(await pinning).toEqual({ kind: 'refused', code: 'interrupted' })
+        expect(h.docs.downloads).toEqual([])
+        expect(h.storeFiles()).toEqual([])
+        expect(changes).toEqual([])
+      })
+
+      it('an offline pin whose lease projection spans the sign-out is refused, not waiting', async () => {
+        const changes: string[] = []
+        const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+        h.online.on = false
+        const hold = holdLeaseView(h)
+        const pinning = pinDoc(h)
+        await hold.entered
+        await lockAndWipeOutgoing(h)
+        changes.length = 0
+        hold.release()
+        expect(await pinning).toEqual({ kind: 'refused', code: 'interrupted' })
+        expect(h.storeFiles()).toEqual([])
+        expect(changes).toEqual([])
+      })
+    })
+
+    describe('FUSR-R2-3..6: the boundary guards each have their own permanent pin', () => {
+      const interrupted = { kind: 'refused', code: 'interrupted' }
+
+      /** every file of the scope with its exact (encrypted) bytes */
+      const snapshotOf = (h: Harness, scope: StoreScope) =>
+        new Map(filesOf(h, scope).map((path) => [path, Buffer.from(h.fs.files.get(path)!)]))
+
+      /** account B holds its own usable copy of doc_1; account A (the active one) pins it too */
+      async function populatedB(h: Harness) {
+        switchTo(h, SCOPE_B, 'sess_B1')
+        rowOf(await pinDoc(h))
+        switchTo(h, SCOPE, 'sess_A1')
+        rowOf(await pinDoc(h))
+        const before = snapshotOf(h, SCOPE_B)
+        // index, row and the main blob
+        expect(before.size).toBe(3)
+        return before
+      }
+
+      it('FUSR-R2-3: an eviction queued behind the document lock across a switch to a populated B leaves B alone', async () => {
+        const h = createHarness()
+        addDoc(h, 'doc_1', 1)
+        const before = await populatedB(h)
+        // an archive of A holds A's document lock (lease projection); A's eviction queues behind it
+        const hold = holdLeaseView(h)
+        const archiving = h.manager.handleArchived('doc_1')
+        await hold.entered
+        const evicting = h.manager.evict('doc_1')
+        await flush()
+        await signOut(h)
+        switchTo(h, SCOPE_B, 'sess_B2')
+        hold.release()
+        await archiving
+        expect(await evicting).toEqual(interrupted)
+        expect(snapshotOf(h, SCOPE_B)).toEqual(before)
+      })
+
+      it("FUSR-R2-4: a refresh that purges after a revoke answer holds the boundary inside purgeRecord's deletions", async () => {
+        const changes: string[] = []
+        const h = createHarness({ onChange: (documentId) => changes.push(documentId) })
+        addDoc(h, 'doc_1', 1)
+        const before = await populatedB(h)
+        h.docs.getDocument = async () => {
+          throw new UniworkDocError('forbidden')
+        }
+        changes.length = 0
+        // getPin, then the purge's copy deletion (inside refresh -> purgeRecord -> wipeKeys) is held
+        const hold = holdVerify(h, 2)
+        const refreshing = h.manager.refresh('doc_1')
+        await hold.entered
+        await signOut(h)
+        switchTo(h, SCOPE_B, 'sess_B2')
+        hold.release()
+        expect(await refreshing).toEqual(interrupted)
+        expect(changes).toEqual([])
+        expect(filesOf(h, SCOPE)).toEqual([])
+        expect(snapshotOf(h, SCOPE_B)).toEqual(before)
+      })
+
+      it('FUSR-R2-5: cached bytes read before a sign-out that finishes during the verification write are not returned', async () => {
+        const { h } = await pinnedHarness()
+        const held = gate()
+        const real = h.store.putPin.bind(h.store)
+        h.store.putPin = async (record) => {
+          const result = await real(record)
+          held.reached()
+          await held.open
+          return result
+        }
+        const opening = h.manager.openCached('doc_1')
+        await held.entered
+        await signOut(h)
+        held.release()
+        expect(await opening).toEqual(interrupted)
+        expect(h.storeFiles()).toEqual([])
+      })
+
+      it('FUSR-R2-6: a session change alone (no other manager call) interrupts a held refresh', async () => {
+        const { h, changes } = await pinnedHarness()
+        const hold = holdGetDocument(h)
+        const refreshing = h.manager.refresh('doc_1')
+        await hold.entered
+        const before = snapshotOf(h, SCOPE)
+        // the same account signs in again: only the session id moved, nothing else is called
+        h.session.id = 'sess_2'
+        hold.release()
+        expect(await refreshing).toEqual(interrupted)
+        expect(snapshotOf(h, SCOPE)).toEqual(before)
+        expect(changes).toEqual([])
+      })
+    })
   })
 })

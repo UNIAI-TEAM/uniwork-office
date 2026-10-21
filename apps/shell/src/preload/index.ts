@@ -16,12 +16,16 @@ import type {
 } from '@genoffice/ai-provider/browser'
 import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
-import {
-  installUniworkAiFlagBridge,
-  installUniworkCloudStatusBridge,
-} from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
 import { installUniworkDiscussionBridge } from '@genoffice/electron-utils/discussion-bridge'
 import type { UpdateUiState } from '../shared/update-api'
+import {
+  SOURCE_VIEW_CHANNELS,
+  type OpenSourceValue,
+  type SourceViewErrorCode,
+  type SourceViewResult,
+  type SourceViewState,
+} from '../shared/source-view'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type {
   AccountLoginEvent,
@@ -61,6 +65,7 @@ import type {
   UniworkDocProperties,
   UniworkDocRenamedEvent,
   UniworkDocStatus,
+  UniworkFirstSaveNameRequest,
   UniworkDocSummary,
   UniworkFirstSaveInput,
   UniworkFolderChildren,
@@ -76,6 +81,7 @@ import type {
   UniworkResult,
   UniworkSearchPage,
   UniworkSearchQuery,
+  UniworkSourceListPage,
   UniworkSharedPage,
   UniworkSharedQuery,
   UniworkTreeChangedEvent,
@@ -90,8 +96,10 @@ import {
   HOME_CHANNELS,
   PROJECT_CHANNELS,
   UNIWORK_DOC_CHANNELS,
+  UNIWORK_SHARE_CHANNELS,
   UNIWORK_LOCK_REASONS,
 } from '../shared/home-api'
+import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
 import type {
   IntegrationsApi,
@@ -101,6 +109,23 @@ import type {
 import type { TabsApi, TabSummary } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
 import { UNIWORK_WORK_CHANNELS } from '../shared/uniwork-work-api'
+import type {
+  ShareAccess,
+  ShareAccessRequest,
+  ShareBreakGlassGrant,
+  ShareBreakGlassRevokeInput,
+  ShareBulkResult,
+  ShareCandidatePage,
+  ShareLinkCreated,
+  ShareMemberPage,
+  ShareLinkRevokeInput,
+  ShareRejectedItem,
+  ShareRequestDecision,
+  ShareResult,
+  ShareSettings,
+  ShareUpdate,
+  UniworkShareApi,
+} from '../shared/share-api'
 import type {
   UniworkWorkApi,
   UniworkWorkResult,
@@ -271,6 +296,34 @@ function asUniworkResult<T>(result: unknown): UniworkResult<T> {
 }
 
 /**
+ * UNI-1993: the open-source reply. The renderer dereferences `value.path` and
+ * maps `error` onto a notice, so any other shape is a `server_error`.
+ */
+function asSourceOpenResult(result: unknown): SourceViewResult<OpenSourceValue> {
+  if (result && typeof result === 'object') {
+    const r = result as { ok?: unknown; value?: unknown; error?: unknown }
+    if (r.ok === true && r.value && typeof r.value === 'object') {
+      const v = r.value as { path?: unknown; reused?: unknown }
+      if (typeof v.path === 'string' && v.path && typeof v.reused === 'boolean') {
+        return { ok: true, value: { path: v.path, reused: v.reused } }
+      }
+    } else if (r.ok === false && typeof r.error === 'string' && r.error) {
+      return { ok: false, error: r.error as SourceViewErrorCode }
+    }
+  }
+  return { ok: false, error: 'server_error' }
+}
+
+/** UNI-1993: the chip state of a path; anything that is not a full state is null */
+function asSourceViewState(raw: unknown): SourceViewState | null {
+  if (!raw || typeof raw !== 'object') return null
+  const s = raw as { name?: unknown; origin?: unknown; parentTitle?: unknown }
+  if (typeof s.name !== 'string' || typeof s.origin !== 'string') return null
+  if (typeof s.parentTitle !== 'string') return null
+  return { name: s.name, origin: s.origin, parentTitle: s.parentTitle }
+}
+
+/**
  * An S18 action result from main: the same shape as UniworkResult, but its
  * error union also carries the two field errors and a cancelled upload. Both
  * branches are checked the way the other pushes are checked - an `ok:true` must
@@ -426,6 +479,31 @@ function asUniworkRemoteBar(raw: unknown): UniworkRemoteBar | null {
       return { kind: r.kind }
     default:
       return null
+  }
+}
+
+/** UNI-1959: a first-save-name push with every field of the right type, else null (dropped) */
+function asFirstSaveNameRequest(raw: unknown): UniworkFirstSaveNameRequest | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Partial<Record<keyof UniworkFirstSaveNameRequest, unknown>>
+  if (
+    typeof r.requestId !== 'string' ||
+    !r.requestId ||
+    typeof r.path !== 'string' ||
+    typeof r.documentId !== 'string' ||
+    !r.documentId ||
+    typeof r.workspaceId !== 'string' ||
+    typeof r.title !== 'string'
+  ) {
+    return null
+  }
+  return {
+    requestId: r.requestId,
+    path: r.path,
+    documentId: r.documentId,
+    workspaceId: r.workspaceId,
+    title: r.title,
+    parentId: typeof r.parentId === 'string' && r.parentId ? r.parentId : null,
   }
 }
 
@@ -586,6 +664,9 @@ const homeApi: HomeApi = {
   },
   async newMarkdown(opts) {
     await ipcRenderer.invoke(HOME_CHANNELS.newMarkdown, opts)
+  },
+  async newTxt(opts) {
+    await ipcRenderer.invoke(HOME_CHANNELS.newTxt, opts)
   },
   async newHtml(opts) {
     await ipcRenderer.invoke(HOME_CHANNELS.newHtml, opts)
@@ -1007,7 +1088,12 @@ const homeApi: HomeApi = {
       system: input.system,
       user: input.user,
     })
-    const raw = (result ?? {}) as { ok?: unknown; content?: unknown; error?: unknown }
+    const raw = (result ?? {}) as {
+      ok?: unknown
+      content?: unknown
+      error?: unknown
+      uniworkCode?: unknown
+    }
     if (raw.ok === true) {
       return {
         ok: true,
@@ -1017,6 +1103,7 @@ const homeApi: HomeApi = {
     return {
       ok: false,
       error: typeof raw.error === 'string' ? raw.error : 'AI request failed',
+      ...(typeof raw.uniworkCode === 'string' ? { uniworkCode: raw.uniworkCode } : {}),
     }
   },
   aiStream(request: AiStreamRequest) {
@@ -1157,6 +1244,48 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listTrash, q),
     )
   },
+  async uniworkListFavorites(q) {
+    return asUniworkResult<UniworkDocListPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listFavorites, q),
+    )
+  },
+  async uniworkFavoriteDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocFavoriteResult>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.favoriteDocument, documentId),
+    )
+  },
+  async uniworkUnfavoriteDocument(documentId: string) {
+    return asUniworkActionResult<{ documentId: string }>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.unfavoriteDocument, documentId),
+    )
+  },
+  async uniworkListSources(q) {
+    return asUniworkResult<UniworkSourceListPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listSources, q),
+    )
+  },
+  async uniworkDownloadSource(input) {
+    return asUniworkResult<{ path: string | null }>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.downloadSource, input),
+    )
+  },
+  async uniworkOpenSource(input) {
+    return asSourceOpenResult(await ipcRenderer.invoke(SOURCE_VIEW_CHANNELS.openSource, input))
+  },
+  async uniworkSourceViewState(path: string) {
+    return asSourceViewState(await ipcRenderer.invoke(SOURCE_VIEW_CHANNELS.sourceViewState, path))
+  },
+  onUniworkSourceViewHint(cb) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const fields =
+        raw && typeof raw === 'object' ? (raw as { path?: unknown; copy?: unknown }) : {}
+      if (typeof fields.path === 'string' && fields.path) {
+        cb(fields.copy === true ? { path: fields.path, copy: true } : { path: fields.path })
+      }
+    }
+    ipcRenderer.on(SOURCE_VIEW_CHANNELS.hint, listener)
+    return () => ipcRenderer.removeListener(SOURCE_VIEW_CHANNELS.hint, listener)
+  },
   async uniworkDocumentProperties(documentId: string) {
     return asUniworkResult<UniworkDocProperties>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.documentProperties, documentId),
@@ -1195,9 +1324,18 @@ const homeApi: HomeApi = {
     if (typeof uploadId !== 'string' || !uploadId) return
     await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.cancelUpload, uploadId)
   },
-  async uniworkRenameDocument(documentId: string, name: string) {
+  async uniworkRenameDocument(
+    documentId: string,
+    name: string,
+    options?: { shareWithWorkspace?: boolean },
+  ) {
     return asUniworkActionResult<UniworkDocSummary>(
-      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.renameDocument, documentId, name),
+      await ipcRenderer.invoke(
+        UNIWORK_DOC_CHANNELS.renameDocument,
+        documentId,
+        name,
+        ...(options?.shareWithWorkspace === true ? [{ shareWithWorkspace: true }] : []),
+      ),
     )
   },
   async uniworkArchiveDocument(documentId: string) {
@@ -1208,6 +1346,27 @@ const homeApi: HomeApi = {
   async uniworkRestoreDocument(documentId: string) {
     return asUniworkActionResult<UniworkDocSummary>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.restoreDocument, documentId),
+    )
+  },
+  // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf
+  async uniworkListShelved(q) {
+    return asUniworkResult<UniworkDocListPage>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.listShelved, q),
+    )
+  },
+  async uniworkUnshelveDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocShelveResult>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.unshelveDocument, documentId),
+    )
+  },
+  async uniworkTrashShelvedDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.trashShelvedDocument, documentId),
+    )
+  },
+  async uniworkShelveDocument(documentId: string) {
+    return asUniworkActionResult<UniworkDocShelveResult>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.shelveDocument, documentId),
     )
   },
   async uniworkFolderTree(workspaceId: string) {
@@ -1271,6 +1430,26 @@ const homeApi: HomeApi = {
     ipcRenderer.on(UNIWORK_DOC_CHANNELS.queuePopover, listener)
     return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.queuePopover, listener)
   },
+  onUniworkFirstSaveName(cb) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const request = asFirstSaveNameRequest(raw)
+      if (request) cb(request)
+    }
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.firstSaveName, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.firstSaveName, listener)
+  },
+  async uniworkFirstSaveNameAnswer(input) {
+    await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.firstSaveNameAnswer, input)
+  },
+  onUniworkFirstSaveNameDismiss(cb) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const requestId =
+        raw && typeof raw === 'object' ? (raw as { requestId?: unknown }).requestId : null
+      if (typeof requestId === 'string' && requestId) cb(requestId)
+    }
+    ipcRenderer.on(UNIWORK_DOC_CHANNELS.firstSaveNameDismiss, listener)
+    return () => ipcRenderer.removeListener(UNIWORK_DOC_CHANNELS.firstSaveNameDismiss, listener)
+  },
   async uniworkSave(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.save, path))
   },
@@ -1331,6 +1510,9 @@ const homeApi: HomeApi = {
     return asUniworkStatus(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.remoteAction, path, action),
     )
+  },
+  async uniworkEditHere(path) {
+    return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.editHere, path))
   },
   async uniworkSetBarInset(heightPx) {
     if (typeof heightPx !== 'number' || !Number.isFinite(heightPx)) return
@@ -1396,7 +1578,6 @@ void ipcRenderer
 contextBridge.exposeInMainWorld('aiOffice', homeApi)
 // window.uniworkAiFlag: the home renderer's provider list mirrors the shell's UniWork AI flag
 installUniworkAiFlagBridge()
-installUniworkCloudStatusBridge()
 
 const projectApi: ProjectHomeApi = {
   async listProjects() {
@@ -1601,9 +1782,110 @@ const workApi: UniworkWorkApi = {
   async openWeb(target) {
     return (await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.openWeb, target)) === true
   },
+  async webUrl(target) {
+    const url = await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.webUrl, target)
+    return typeof url === 'string' ? url : null
+  },
 }
 
 contextBridge.exposeInMainWorld('uniworkWork', workApi)
+
+/**
+ * UNI-2047 APP-SHARE-DIALOG: main answers every share call with a `ShareResult`;
+ * anything else is `malformed_response`. A failure keeps only its known fields, so
+ * a stray one main never meant to send does not reach the renderer.
+ */
+function asShareResult<T>(result: unknown): ShareResult<T> {
+  if (result && typeof result === 'object') {
+    const r = result as {
+      ok?: unknown
+      value?: unknown
+      error?: unknown
+      status?: unknown
+      rejected?: unknown
+      retryable?: unknown
+    }
+    if (r.ok === true) return { ok: true, value: r.value as T }
+    if (r.ok === false && typeof r.error === 'string' && r.error) {
+      return {
+        ok: false,
+        error: r.error as Extract<ShareResult<T>, { ok: false }>['error'],
+        ...(typeof r.status === 'number' ? { status: r.status } : {}),
+        ...(Array.isArray(r.rejected) ? { rejected: r.rejected as ShareRejectedItem[] } : {}),
+        ...(r.retryable === true ? { retryable: true } : {}),
+      }
+    }
+  }
+  return { ok: false, error: 'malformed_response' }
+}
+
+const shareApi: UniworkShareApi = {
+  async get(documentId) {
+    return asShareResult<ShareAccess>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.get, documentId),
+    )
+  },
+  async update(input) {
+    return asShareResult<ShareUpdate>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.update, input),
+    )
+  },
+  async candidates(input) {
+    return asShareResult<ShareCandidatePage>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.candidates, input),
+    )
+  },
+  async linkCreate(input) {
+    return asShareResult<ShareLinkCreated>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.linkCreate, input),
+    )
+  },
+  async linkRevoke(input) {
+    return asShareResult<ShareLinkRevokeInput>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.linkRevoke, input),
+    )
+  },
+  async settings() {
+    return asShareResult<ShareSettings>(await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.settings))
+  },
+  async requests(documentId) {
+    return asShareResult<ShareAccessRequest[] | null>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.requests, documentId),
+    )
+  },
+  async requestApprove(input) {
+    return asShareResult<ShareRequestDecision>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.requestApprove, input),
+    )
+  },
+  async requestDecline(input) {
+    return asShareResult<ShareRequestDecision>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.requestDecline, input),
+    )
+  },
+  async bulk(plan) {
+    return asShareResult<ShareBulkResult>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.bulk, plan),
+    )
+  },
+  async breakGlassGrant(input) {
+    return asShareResult<ShareBreakGlassGrant | null>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.breakGlassGrant, input),
+    )
+  },
+  async breakGlassRevoke(input) {
+    return asShareResult<ShareBreakGlassRevokeInput>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.breakGlassRevoke, input),
+    )
+  },
+  async members(input) {
+    return asShareResult<ShareMemberPage>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.members, input),
+    )
+  },
+}
+
+contextBridge.exposeInMainWorld('uniworkShare', shareApi)
 
 // open documents dragged from the OS anywhere over Home or the tab strip
 installDropOpenBridge()

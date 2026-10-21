@@ -140,19 +140,21 @@ export const pt = {
   uwDocType: 'Tipo',
   uwDocLocation: 'Local',
   uwDocRename: 'Renomear',
-  uwDocArchive: 'Arquivar',
+  uwDocArchive: 'Mover para a lixeira',
   uwDocRestore: 'Restaurar',
-  uwDocArchiveConfirm: 'Arquivar “{name}”? Você pode restaurá-lo depois.',
+  uwDocArchiveConfirm:
+    '“{name}” e toda a sua subárvore ficarão 30 dias na lixeira antes da exclusão permanente. Os gestores podem restaurá-los durante esse período.',
   uwDocNameEmpty: 'Digite um nome para o documento.',
   uwDocNameTooLong: 'O nome é longo demais (no máximo 500 caracteres).',
   uwDocRenamedAnnounce: 'O documento foi renomeado para {name}.',
   uwDocActionFailed: 'Não deu certo. Tente novamente.',
+  uwUniNoteOpenFailed: 'A UniNote foi criada, mas não foi possível abri-la. Abra-a pela lista.',
   uwDocActionsFor: 'Mais ações para “{name}”',
   uwDocCreate: 'Criar',
   uwDocUploadPick: 'Escolher um arquivo',
   uwDocUploading: 'Carregando “{name}”…',
   uwDocLocationTop: 'Nível superior',
-  uwDocArchived: 'Arquivado',
+  uwDocArchived: 'Movido para a lixeira',
   uwSizeWarnChip: 'Aproximando-se do limite de {max} (atualmente {size}).',
   uwSizeWarnDismiss: 'Fechar aviso de tamanho',
   uwSaveBlockTitle: 'Não foi possível salvar no UniWork',
@@ -171,4 +173,35 @@ export const pt = {
   uwTipEditLockedSelf: 'Você está editando este documento em outra janela.',
   uwErrEditLocked: 'Outra pessoa está editando este documento.',
   uwReasonEditLocked: 'outra pessoa está editando',
+  uwLockBannerOther: '{name} está a editar desde {time}. Está a ver em modo só de leitura.',
+  uwLockBannerSelfElsewhere: 'Está a editar este documento noutra janela.',
+  uwLockBannerFree: 'Ninguém está a editar este documento agora.',
+  uwLockEditHere: 'Editar aqui',
+  uwLockAcquiring: 'A obter acesso de edição…',
+  uwLockReadOnlyExplain: 'Nada foi guardado — o documento é só de leitura.',
+  uwLockLostTitle: 'Já não está a editar',
+  uwLockLostTakenOver:
+    '{name} assumiu a edição. As suas alterações não guardadas ainda estão aqui.',
+  uwLockLostHandedOver:
+    'Passou a edição a {name}. As suas alterações não guardadas ainda estão aqui.',
+  uwLockLostExpired:
+    'A edição expirou porque não conseguimos chegar ao servidor durante algum tempo (sem rede ou o dispositivo suspendeu). As suas alterações não guardadas ainda estão aqui.',
+  uwLockLostMovedHere:
+    'Está agora a editar este documento noutra janela. As alterações não guardadas nesta janela ainda estão aqui.',
+  uwLockLostAccessLost:
+    'Já não tem permissão para editar este documento. As suas alterações não guardadas ainda estão aqui.',
+  uwLockLostGeneric: 'Já não está a editar. As suas alterações não guardadas ainda estão aqui.',
+  uwLockLostHeldBy:
+    '{name} está a editar agora. As suas alterações não guardadas ainda estão aqui.',
+  uwLockAcquireFailed:
+    'Não foi possível obter acesso de edição. Tente novamente dentro de alguns minutos.',
+  uwChipSourceView: 'Somente leitura · De {origin}',
+  uwTipSourceView:
+    'Este arquivo está anexado em {origin}{parent}. As alterações não serão salvas. Para obter uma cópia, use Baixar na lista de documentos.',
+  uwSourceViewSaveHint: 'Este arquivo é somente leitura — as alterações não são salvas.',
+  uwSourceViewCopyHint: 'Para obter uma cópia, use Baixar na lista de documentos.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Tarefas',
+  uwSourceOriginMeeting: 'Reuniões',
+  uwSourceOriginEmail: 'E-mail',
 } satisfies Record<keyof typeof zh, string>

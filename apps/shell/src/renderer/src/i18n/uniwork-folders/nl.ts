@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const nl = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Documenten (hoofdmap)',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Mappen',
   ufContentsLabel: 'Inhoud van de map',
@@ -27,6 +27,7 @@ export const nl = {
   ufTooDeep: 'De documentstructuur is maximaal {max} niveaus diep.',
   ufCycle: 'Een map kan niet naar zichzelf of naar een van zijn submappen worden verplaatst.',
   ufParentKind: 'Een map staat in de hoofdmap of in een andere map.',
+  ufNotShareable: 'Mappen kunnen niet worden gedeeld. Deel in plaats daarvan elk document.',
   ufFolderGone: 'Deze map is hier niet meer.',
   ufFolderNoAccess: 'Je hebt geen toegang meer tot deze map.',
   ufNoPermission: 'Je hebt geen toestemming om deze map te wijzigen.',

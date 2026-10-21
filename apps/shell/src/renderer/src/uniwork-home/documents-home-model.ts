@@ -1,12 +1,17 @@
 import type {
   UniworkDocFormat,
+  UniworkDocShareScope,
   UniworkDocListPage,
   UniworkDocListQuery,
   UniworkDocSummary,
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkFolderQuery,
+  UniworkListSort,
   UniworkResult,
+  UniworkSourceFile,
+  UniworkSourceListPage,
+  UniworkSourceListQuery,
 } from '../../../shared/home-api'
 import type { StringKey, TFunc } from '../locale'
 
@@ -14,7 +19,9 @@ export type UniworkDocVisibility = 'private' | 'workspace' | 'restricted'
 export type UniworkDocAccessLevel = 'view' | 'comment' | 'edit' | 'manage'
 
 export interface UniworkListFilters {
-  format?: UniworkDocFormat
+  format?: UniworkDocFormat | 'txt'
+  /** UniNote chip: the server's `kind=page` (never together with `format`) */
+  kind?: 'page'
   updatedBy?: string
   updatedFrom?: string
 }
@@ -22,6 +29,8 @@ export interface UniworkListFilters {
 export type DocumentsHomeDoc = UniworkDocSummary & {
   position?: number
   visibility?: UniworkDocVisibility
+  /** web Access cell source: the server's `share_scope` (absent = no scope label) */
+  shareScope?: UniworkDocShareScope
   myLevel?: UniworkDocAccessLevel
   updatedById?: string
   updatedByName?: string
@@ -36,6 +45,7 @@ export type DocumentsHomeSubViewId =
   | 'shared-by-me'
   | 'archive'
   | 'trash'
+  | 'elsewhere'
 
 export type DocumentsHomeDataSource =
   | 'children-root'
@@ -44,6 +54,9 @@ export type DocumentsHomeDataSource =
   | 'shared-with-me'
   | 'shared-by-me'
   | 'trash'
+  | 'shelved'
+  | 'favorites'
+  | 'sources'
   | 'none'
 
 export interface DocumentsHomeNavEntry {
@@ -55,7 +68,7 @@ export interface DocumentsHomeNavEntry {
 
 /**
  * DESKTOP-HOME DH-1 sub-navigation entry table in exact board order (Desktop.dc.html:20-27).
- * Entries with `available: false` (Starred / Gắn sao, Archive / Lưu trữ) are hidden and not rendered.
+ * Entries with `available: false` (My Folder: a tree row) are hidden and not rendered.
  */
 export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
   {
@@ -67,7 +80,9 @@ export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
   {
     id: 'my-folder',
     labelKey: 'uhNavMyFolder',
-    available: true,
+    // UNI-1957: My Folder is listed once, as the tree row under Folders (a stand-in row
+    // until the server has created it); the view itself is still reachable by id.
+    available: false,
     source: 'my-folder-children',
   },
   {
@@ -79,8 +94,9 @@ export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
   {
     id: 'starred',
     labelKey: 'uhNavStarred',
-    available: false,
-    source: 'none',
+    // UNI-2047 B6: the server's SV-2 favorites route; an older server's 404 is the list error state
+    available: true,
+    source: 'favorites',
   },
   {
     id: 'shared-with-me',
@@ -97,14 +113,23 @@ export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
   {
     id: 'archive',
     labelKey: 'uhNavArchive',
-    available: false,
-    source: 'none',
+    // UNI-1961: the Lưu trữ shelf (ARCHIVE-01), as the web's sidebar lists it
+    available: true,
+    source: 'shelved',
   },
   {
     id: 'trash',
     labelKey: 'uhNavTrash',
     available: true,
     source: 'trash',
+  },
+  {
+    id: 'elsewhere',
+    labelKey: 'dlNavElsewhere',
+    // UNI-2047 B4: the web's "From elsewhere": the files of Chat, Meetings, Email and Tasks, a page of
+    // their own (the workspace root lists documents only)
+    available: true,
+    source: 'sources',
   },
 ] as const
 
@@ -118,10 +143,13 @@ export function getDocumentsHomeNavEntry(id: DocumentsHomeSubViewId): DocumentsH
   )
 }
 
-export type DocumentsHomeTypeFilter = 'all' | UniworkDocFormat
+/**
+ * The type chips of the shared list rules. `page` (UniNote) is no server format: the server only
+ * knows the file formats (and `txt`), so a UniNote pick sends no type and narrows the loaded rows.
+ */
+export type DocumentsHomeTypeFilter = 'all' | 'page' | UniworkDocFormat | 'txt'
 export type DocumentsHomeUpdatedPreset = 'any' | '24h' | '7d' | '30d'
 export type DocumentsHomeSort = 'recent' | 'name'
-export type DocumentsHomeViewMode = 'list' | 'grid'
 
 export interface DocumentsHomeFilterState {
   format: DocumentsHomeTypeFilter
@@ -135,18 +163,21 @@ export const DEFAULT_DOCUMENTS_HOME_FILTERS: DocumentsHomeFilterState = {
   updatedPreset: 'any',
 }
 
-export const DOCUMENTS_HOME_FORMAT_OPTIONS: readonly {
+/** the type chips, in the shared order of every screen (Rules board: Mọi loại · UniNote · .docx … .txt) */
+export const DOCUMENTS_HOME_TYPE_CHIPS: readonly {
   value: DocumentsHomeTypeFilter
   labelKey?: StringKey
   literal?: string
 }[] = [
-  { value: 'all', labelKey: 'uhFilterTypeAll' },
-  { value: 'docx', literal: 'DOCX (.docx)' },
-  { value: 'xlsx', literal: 'XLSX (.xlsx)' },
-  { value: 'pptx', literal: 'PPTX (.pptx)' },
-  { value: 'pdf', literal: 'PDF (.pdf)' },
-  { value: 'md', literal: 'Markdown (.md)' },
-  { value: 'html', literal: 'HTML (.html)' },
+  { value: 'all', labelKey: 'dlFilterAllTypes' },
+  { value: 'page', labelKey: 'dlFilterUniNote' },
+  { value: 'docx', literal: '.docx' },
+  { value: 'xlsx', literal: '.xlsx' },
+  { value: 'pptx', literal: '.pptx' },
+  { value: 'pdf', literal: '.pdf' },
+  { value: 'md', literal: '.md' },
+  { value: 'html', literal: '.html' },
+  { value: 'txt', literal: '.txt' },
 ]
 
 export const DOCUMENTS_HOME_UPDATED_OPTIONS: readonly {
@@ -185,7 +216,9 @@ export function toUniworkListFilters(
   nowMs: number = Date.now(),
 ): UniworkListFilters {
   const filters: UniworkListFilters = {}
-  if (state.format !== 'all') {
+  if (state.format === 'page') {
+    filters.kind = 'page'
+  } else if (state.format !== 'all') {
     filters.format = state.format
   }
   const updatedBy = state.updatedBy.trim()
@@ -248,65 +281,6 @@ export function updatedByOptionsForSelect(
   return [...options, { id: selected, name: fallbackName }]
 }
 
-export interface FormattedAccessCell {
-  visibilityLabel: string | null
-  levelLabel: string | null
-  isEmpty: boolean
-  tone: UniworkDocVisibility | 'none'
-}
-
-const VISIBILITY_KEYS: Record<UniworkDocVisibility, StringKey> = {
-  private: 'uhVisPrivate',
-  workspace: 'uhVisWorkspace',
-  restricted: 'uhVisRestricted',
-}
-
-const LEVEL_KEYS: Record<UniworkDocAccessLevel, StringKey> = {
-  manage: 'uhLevelManage',
-  edit: 'uhLevelEdit',
-  comment: 'uhLevelComment',
-  view: 'uhLevelView',
-}
-
-/**
- * Formats the `Truy cập` column strictly from `doc.visibility` and `doc.myLevel`.
- * Never guesses from `canEdit`/`canManage`: if `visibility` is absent, omits visibility;
- * if `myLevel` is absent, omits `"Bạn: ..."`; if both are absent, `isEmpty` is true (`"—"`).
- */
-export function formatAccessCell(doc: DocumentsHomeDoc, t: TFunc): FormattedAccessCell {
-  const visKey = doc.visibility ? VISIBILITY_KEYS[doc.visibility] : undefined
-  const visibilityLabel = visKey ? t(visKey) : null
-  const lvlKey = doc.myLevel ? LEVEL_KEYS[doc.myLevel] : undefined
-  const levelLabel = lvlKey ? t('uhLevelPrefix', { level: t(lvlKey) }) : null
-  return {
-    visibilityLabel,
-    levelLabel,
-    isEmpty: visibilityLabel === null && levelLabel === null,
-    tone: doc.visibility ?? 'none',
-  }
-}
-
-export interface FormattedUpdatedByCell {
-  name: string | null
-  initial: string | null
-}
-
-/**
- * Formats the `Người sửa gần nhất` column strictly from `doc.updatedByName`.
- * When `updatedByName` is absent or blank, returns `{ name: null, initial: null }` so UI prints `"—"`.
- */
-export function formatUpdatedByCell(doc: DocumentsHomeDoc): FormattedUpdatedByCell {
-  const name = doc.updatedByName?.trim()
-  if (!name) {
-    return { name: null, initial: null }
-  }
-  const firstChar = Array.from(name)[0] ?? ''
-  return {
-    name,
-    initial: firstChar ? firstChar.toUpperCase() : null,
-  }
-}
-
 /** Splits items into folders and files and sorts them according to the active sort order. */
 export function splitAndSortItems(
   items: readonly DocumentsHomeDoc[],
@@ -351,6 +325,12 @@ export function splitAndSortItems(
   return { folders, files }
 }
 
+/** UNI-2047: the sort a header click sends to the server (nothing sent = the server's own order) */
+export interface DocumentsHomeWireSort {
+  sort?: UniworkListSort
+  order?: 'asc' | 'desc'
+}
+
 /** Structural adapter for W1 HomeApi list endpoints (compatible before and after W1 merges). */
 export interface DocumentsHomeApiAdapter {
   uniworkListChildren?: (
@@ -360,16 +340,51 @@ export interface DocumentsHomeApiAdapter {
   uniworkListDocuments?: (
     q: UniworkDocListQuery & UniworkListFilters,
   ) => Promise<UniworkResult<UniworkDocListPage>>
-  uniworkListSharedWithMe?: (q?: {
-    cursor?: string
-    limit?: number
-  }) => Promise<UniworkResult<UniworkDocListPage>>
+  uniworkListSharedWithMe?: (
+    q?: {
+      cursor?: string
+      limit?: number
+      includePages?: boolean
+    } & UniworkListFilters &
+      DocumentsHomeWireSort,
+  ) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListSharedByMe?: (
-    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+    q: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+    } & UniworkListFilters &
+      DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListTrash?: (
-    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+    q: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+    } & UniworkListFilters &
+      DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-2047 B6: Gắn sao - the SV-2 route reads the type, the kind and the sort only */
+  uniworkListFavorites?: (
+    q: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+      format?: UniworkListFilters['format']
+      kind?: UniworkListFilters['kind']
+    } & DocumentsHomeWireSort,
+  ) => Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-1961: the Lưu trữ shelf (only the type filter applies there, and the sort) */
+  uniworkListShelved?: (
+    q: {
+      workspaceId: string
+      cursor?: string
+      limit?: number
+      format?: UniworkListFilters['format']
+      kind?: UniworkListFilters['kind']
+    } & DocumentsHomeWireSort,
+  ) => Promise<UniworkResult<UniworkDocListPage>>
+  uniworkListSources?: (q: UniworkSourceListQuery) => Promise<UniworkResult<UniworkSourceListPage>>
 }
 
 function mapDocListPageResult(
@@ -397,12 +412,17 @@ export async function fetchDocumentsHomePage(
     myFolderId?: string | null
     cursor?: string
     filters: UniworkListFilters
+    /** UNI-2047: the header sort; unset sends nothing */
+    sort?: DocumentsHomeWireSort | null
   },
 ): Promise<{
   result: UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>
   ensuredMyFolder?: UniworkFolderNode
 }> {
   const { workspaceId, subView, folderId, myFolderId, cursor, filters } = params
+  const sortArgs: DocumentsHomeWireSort = params.sort
+    ? { sort: params.sort.sort, order: params.sort.order }
+    : {}
 
   if (subView === 'workspace') {
     if (typeof api.uniworkListChildren !== 'function') {
@@ -413,6 +433,7 @@ export async function fetchDocumentsHomePage(
       parentId: folderId,
       cursor,
       ...filters,
+      ...sortArgs,
     })
     return {
       result: res,
@@ -441,6 +462,7 @@ export async function fetchDocumentsHomePage(
       parentId: targetFolderId,
       cursor,
       ...filters,
+      ...sortArgs,
     })
     return {
       result: res,
@@ -452,10 +474,13 @@ export async function fetchDocumentsHomePage(
     if (typeof api.uniworkListDocuments !== 'function') {
       return { result: { ok: true, value: { items: [], nextCursor: null } } }
     }
+    // UNI-1953: the Documents home Recent also lists UniNote pages
     const res = await api.uniworkListDocuments({
       workspaceId,
       cursor,
       ...filters,
+      ...sortArgs,
+      includePages: true,
     })
     return {
       result: mapDocListPageResult(res),
@@ -466,7 +491,14 @@ export async function fetchDocumentsHomePage(
     if (typeof api.uniworkListSharedWithMe !== 'function') {
       return { result: { ok: true, value: { items: [], nextCursor: null } } }
     }
-    const res = await api.uniworkListSharedWithMe(cursor ? { cursor } : {})
+    // UNI-1953: a shared UniNote is listed too
+    // UNI-2047: the type / editor / date filters go to every workspace's route
+    const res = await api.uniworkListSharedWithMe({
+      ...(cursor ? { cursor } : {}),
+      includePages: true,
+      ...filters,
+      ...sortArgs,
+    })
     return {
       result: mapDocListPageResult(res),
     }
@@ -480,9 +512,20 @@ export async function fetchDocumentsHomePage(
       workspaceId,
       cursor,
       ...filters,
+      ...sortArgs,
     })
+    const page = mapDocListPageResult(res)
+    // UNI-1974: folders are not shareable; an older share the server still returns is no row here
     return {
-      result: mapDocListPageResult(res),
+      result: page.ok
+        ? {
+            ok: true,
+            value: {
+              ...page.value,
+              items: page.value.items.filter((doc) => doc.kind !== 'folder'),
+            },
+          }
+        : page,
     }
   }
 
@@ -494,6 +537,43 @@ export async function fetchDocumentsHomePage(
       workspaceId,
       cursor,
       ...filters,
+      ...sortArgs,
+    })
+    return {
+      result: mapDocListPageResult(res),
+    }
+  }
+
+  if (subView === 'starred') {
+    if (typeof api.uniworkListFavorites !== 'function') {
+      return { result: { ok: true, value: { items: [], nextCursor: null } } }
+    }
+    // UNI-2047 B6: the favorites route takes the type and the sort, nothing else (Người sửa /
+    // Cập nhật narrow the loaded rows in the screen); a 404 from an older server is the error state
+    const res = await api.uniworkListFavorites({
+      workspaceId,
+      ...(cursor ? { cursor } : {}),
+      ...(filters.format ? { format: filters.format } : {}),
+      ...(filters.kind ? { kind: filters.kind } : {}),
+      ...sortArgs,
+    })
+    return {
+      result: mapDocListPageResult(res),
+    }
+  }
+
+  if (subView === 'archive') {
+    if (typeof api.uniworkListShelved !== 'function') {
+      return { result: { ok: true, value: { items: [], nextCursor: null } } }
+    }
+    // UNI-1961: the shelf takes the type filter only (the web sends `format`
+    // alone; the live views' updater/date filters never reach it)
+    const res = await api.uniworkListShelved({
+      workspaceId,
+      ...(cursor ? { cursor } : {}),
+      ...(filters.format ? { format: filters.format } : {}),
+      ...(filters.kind ? { kind: filters.kind } : {}),
+      ...sortArgs,
     })
     return {
       result: mapDocListPageResult(res),
@@ -501,4 +581,166 @@ export async function fetchDocumentsHomePage(
   }
 
   return { result: { ok: true, value: { items: [], nextCursor: null } } }
+}
+
+// ── UNI-1961: the Lưu trữ (Archive) shelf ──────────────────────────────
+
+/** the "Lưu trữ bởi" value of rows shelved by nobody (`shelved_by` null) */
+export const SHELVED_BY_SYSTEM = ' system'
+/** the "Lưu trữ bởi" value of rows whose shelver left the workspace */
+export const SHELVED_BY_FORMER = ' former'
+
+/** the "Lưu trữ bởi" key of one row: a member id, former or system; null = unknown (no member list) */
+export function shelverKeyOf(doc: DocumentsHomeDoc): string | null {
+  if (!doc.shelvedById) return SHELVED_BY_SYSTEM
+  if (doc.shelvedByName?.trim()) return doc.shelvedById
+  if (doc.shelvedByFormer) return SHELVED_BY_FORMER
+  return null
+}
+
+/** the "Lưu trữ bởi" cell: the member's name, the former-member / system line, or null ("—") */
+export function shelverLabelOf(doc: DocumentsHomeDoc, t: TFunc): string | null {
+  const key = shelverKeyOf(doc)
+  if (key === SHELVED_BY_SYSTEM) return t('uhShelvedBySystem')
+  if (key === SHELVED_BY_FORMER) return t('uhShelvedByFormer')
+  return key ? (doc.shelvedByName?.trim() ?? null) : null
+}
+
+/**
+ * The "Lưu trữ bởi" options the loaded rows name, in first-seen order: the
+ * members, then one former-member entry, then the system (the web lists the
+ * same three groups; the shelf has no `shelved_by` parameter, so the filter
+ * narrows the loaded pages only).
+ */
+export function shelvedByOptionsOf(
+  docs: readonly DocumentsHomeDoc[],
+  t: TFunc,
+): readonly UpdatedByOption[] {
+  const members = new Map<string, string>()
+  let former = false
+  let system = false
+  for (const doc of docs) {
+    const key = shelverKeyOf(doc)
+    if (key === SHELVED_BY_SYSTEM) system = true
+    else if (key === SHELVED_BY_FORMER) former = true
+    else if (key && !members.has(key)) members.set(key, doc.shelvedByName!.trim())
+  }
+  return [
+    ...Array.from(members.entries()).map(([id, name]) => ({ id, name })),
+    ...(former ? [{ id: SHELVED_BY_FORMER, name: t('uhShelvedByFormer') }] : []),
+    ...(system ? [{ id: SHELVED_BY_SYSTEM, name: t('uhShelvedBySystem') }] : []),
+  ]
+}
+
+/** the web's canManageTrashed: `my_level` manage, or the admin_scope of a restricted row */
+export function canManageShelved(doc: DocumentsHomeDoc): boolean {
+  return doc.canManage === true || doc.myLevel === 'manage' || doc.adminScope === true
+}
+
+/**
+ * UNI-1961: one row of the documents table: a workspace document or a file
+ * that lives in another module (chat, task, meeting, email), as the web's
+ * library rows (D library-rows.ts `LibraryRow`).
+ */
+export type DocumentsHomeTableRow =
+  | { type: 'doc'; id: string; doc: DocumentsHomeDoc }
+  | { type: 'source'; id: string; source: UniworkSourceFile }
+
+/**
+ * UNI-1961: the home filters a source row cannot get from the server (the web
+ * runs them on merged source rows, use-documents-library.ts): the editor is the
+ * file's owner, the date its `updated_at`. The type went to the server as `type`.
+ */
+export function sourceMatchesFilters(
+  source: UniworkSourceFile,
+  filters: UniworkListFilters,
+): boolean {
+  if (filters.updatedBy && source.owner?.id !== filters.updatedBy) return false
+  if (filters.updatedFrom) {
+    const since = Date.parse(filters.updatedFrom)
+    const at = Date.parse(source.updatedAt)
+    if (!Number.isNaN(since) && (Number.isNaN(at) || at < since)) return false
+  }
+  return true
+}
+
+/**
+ * UNI-2047: the type chips the server cannot apply. UniNote is no file format, so the loaded rows
+ * are narrowed here and no source file (always a file) stays; `.txt` is applied to the source files
+ * here as well, whatever the sources route does with it.
+ */
+export function rowMatchesType(
+  row: DocumentsHomeTableRow,
+  format: DocumentsHomeTypeFilter,
+): boolean {
+  if (format === 'page') return row.type === 'doc' && row.doc.kind === 'page'
+  if (format === 'txt' && row.type === 'source') {
+    return row.source.extension.toLowerCase().replace(/^\./, '') === 'txt'
+  }
+  return true
+}
+
+/**
+ * UNI-2047: Người sửa / Cập nhật on rows the server could not filter (the shelf takes the type only,
+ * so those two narrow the loaded pages, like Lưu trữ bởi). A row without the field does not match.
+ */
+export function docMatchesUpdated(doc: DocumentsHomeDoc, filters: UniworkListFilters): boolean {
+  if (filters.updatedBy && doc.updatedById !== filters.updatedBy) return false
+  if (filters.updatedFrom) {
+    const since = Date.parse(filters.updatedFrom)
+    const at = Date.parse(doc.updatedAt)
+    if (!Number.isNaN(since) && (Number.isNaN(at) || at < since)) return false
+  }
+  return true
+}
+
+/**
+ * UNI-1961: one page of the root's source files, with the home's format filter
+ * as the sources `type`. Null when the bridge has no sources call. `source` narrows to one
+ * module (a sidebar row of Từ nơi khác); `limit` is the sidebar's availability probe.
+ */
+export async function fetchDocumentsHomeSources(
+  api: DocumentsHomeApiAdapter,
+  params: {
+    workspaceId: string
+    filters: UniworkListFilters
+    cursor?: string
+    source?: string | null
+    limit?: number
+  },
+): Promise<UniworkResult<UniworkSourceListPage> | null> {
+  if (typeof api.uniworkListSources !== 'function') return null
+  return api.uniworkListSources({
+    workspaceId: params.workspaceId,
+    ...(params.source ? { source: params.source } : {}),
+    ...(params.filters.format ? { type: params.filters.format } : {}),
+    ...(params.cursor ? { cursor: params.cursor } : {}),
+    ...(params.limit ? { limit: params.limit } : {}),
+  })
+}
+
+/**
+ * UNI-2047 B4: the Người sửa options of the Từ nơi khác page: the owners of the loaded source files
+ * (a source file's editor is its owner), once each; an owner with no name is left out, never an id.
+ */
+export function sourceAuthorsOf(sources: readonly UniworkSourceFile[]): readonly UpdatedByOption[] {
+  const seen = new Map<string, string>()
+  for (const source of sources) {
+    const id = source.owner?.id.trim()
+    const name = source.owner?.name.trim()
+    if (id && name && !seen.has(id)) seen.set(id, name)
+  }
+  return Array.from(seen, ([id, name]) => ({ id, name }))
+}
+
+/**
+ * UNI-1961: the web's Size cell (D library-rows.ts `rowSizeBytes`): a file
+ * document's bytes when it has any, every source file's; pages and folders
+ * say nothing.
+ */
+export function rowSizeBytes(row: DocumentsHomeTableRow): number | null {
+  if (row.type === 'source') return row.source.sizeBytes
+  return row.doc.kind === 'file' && (row.doc.sizeBytes ?? 0) > 0
+    ? (row.doc.sizeBytes ?? null)
+    : null
 }

@@ -44,8 +44,10 @@ import {
   type PageSetupJournalState,
 } from './edit-journal'
 import { indexedFormulaText } from './formula-view'
+import { growSheetToFit } from './grid-growth'
 import { buildLazyChangePlan } from './lazy-plan'
 import { t } from './i18n/locale'
+import { sheetsHint } from './sheets-keymap'
 import type { PivotActionContext } from './pivot-actions'
 import { refreshPivotTables } from './pivot-actions'
 import {
@@ -56,7 +58,7 @@ import {
   structuralDeleteFormulaError,
   type StreamedRefSheet,
 } from './plan-operations'
-import { aiBulkUndoGate, journalSuppression } from './univer-state'
+import { aiBulkUndoGate, journalSuppression, lazySheetScreenExtent } from './univer-state'
 import { isVeryHiddenSheet } from './very-hidden-sheets'
 import { effectiveSheetProtection, mergeSheetProtectionAllow } from './sheet-protection'
 import {
@@ -451,6 +453,30 @@ async function applyChangePlanNow(
     }
     for (const op of plannedOps) await executeOp(op, run)
     setPendingEdits(journalSize(state.editJournal))
+    // Grow each target worksheet inside the undo batch before any cellChanges
+    // or formatChanges getRange call so writes past the initial 1000×26 grid
+    // succeed and share the batch's single undo entry.
+    const neededBySheet = new Map<string, { rowCount: number; columnCount: number }>()
+    const recordNeeded = (sheetId: string, rowCount: number, columnCount: number) => {
+      const prev = neededBySheet.get(sheetId)
+      if (prev) {
+        prev.rowCount = Math.max(prev.rowCount, rowCount)
+        prev.columnCount = Math.max(prev.columnCount, columnCount)
+      } else {
+        neededBySheet.set(sheetId, { rowCount, columnCount })
+      }
+    }
+    for (const change of plan.cellChanges) {
+      const bounds = parseRange(change.address)
+      recordNeeded(change.sheetId, bounds.endRow + 1, bounds.endColumn + 1)
+    }
+    for (const formatChange of plan.formatChanges) {
+      const bounds = parseRange(formatChange.range)
+      recordNeeded(formatChange.sheetId, bounds.endRow + 1, bounds.endColumn + 1)
+    }
+    for (const [sheetId, needed] of neededBySheet) {
+      growSheetToFit(runtime, sheetById(sheetId), needed)
+    }
     // Streaming mode: formulas in this batch may reference file cells the
     // engine does not hold — load & pin them first so the formulas compute
     // correctly and survive eviction (propose checked the session budget).
@@ -515,7 +541,7 @@ async function applyChangePlanNow(
     undoBatch.settle()
     if (aiBulkUndoGate.dropped) {
       notices.push(
-        'this change is too large for the undo history — the [Undo] button and ⌘Z will not revert it',
+        `this change is too large for the undo history — the [Undo] button and ${sheetsHint('sheets-07')} will not revert it`,
       )
     }
     return notices.length > 0 ? { ok: true, notices } : { ok: true }
@@ -541,6 +567,7 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
   // here so a gated op fails loud instead of reporting success.
   const gate = lazyGateFailure(state, op)
   if (gate) throw new Error(run.userFacing && gate.messageKey ? t(gate.messageKey) : gate.reason)
+  growForPlannedOp(runtime, sheetById, op)
   if (op.op === 'insert_rows') sheetById(op.sheetId).insertRowsBefore(op.row - 1, op.count)
   else if (op.op === 'delete_rows') sheetById(op.sheetId).deleteRows(op.row - 1, op.count)
   else if (op.op === 'insert_cols')
@@ -916,18 +943,12 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
         setPendingEdits(journalSize(current.editJournal))
         const active = runtime.univerAPI.getActiveWorkbook()?.getActiveSheet()
         if (active?.getSheetId() !== op.sheetId) return
-        if (targetIsInsertedThisSession) {
-          // The inserted column has no underlying file cells to restore.
-          // Update only the resident intersection; evicting the whole
-          // viewport made unrelated A:J data flash blank while a CT fill
-          // reloaded asynchronously.
-          const loaded = current.loadedRanges.get(op.sheetId)
-          if (!loaded) return
-          const startRow = Math.max(loaded.startRow, fill.startRow)
-          const endRow = Math.min(loaded.endRow, fill.endRow)
-          const startColumn = Math.max(loaded.startColumn, fill.startColumn)
-          const endColumn = Math.min(loaded.endColumn, fill.endColumn)
-          if (startRow > endRow || startColumn > endColumn) return
+        const paintCells = (
+          startRow: number,
+          endRow: number,
+          startColumn: number,
+          endColumn: number,
+        ) => {
           const value = direction === 'undo' ? null : fill.value
           const matrix = Array.from({ length: endRow - startRow + 1 }, () =>
             Array.from({ length: endColumn - startColumn + 1 }, () => ({
@@ -955,7 +976,33 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
           } finally {
             journalSuppression.active = false
           }
+        }
+        if (targetIsInsertedThisSession) {
+          // The inserted column has no underlying file cells to restore.
+          // Update only the resident intersection; evicting the whole
+          // viewport made unrelated A:J data flash blank while a CT fill
+          // reloaded asynchronously.
+          const loaded = current.loadedRanges.get(op.sheetId)
+          if (!loaded) return
+          const startRow = Math.max(loaded.startRow, fill.startRow)
+          const endRow = Math.min(loaded.endRow, fill.endRow)
+          const startColumn = Math.max(loaded.startColumn, fill.startColumn)
+          const endColumn = Math.min(loaded.endColumn, fill.endColumn, active.getMaxColumns() - 1)
+          if (startRow > endRow || startColumn > endColumn) return
+          paintCells(startRow, endRow, startColumn, endColumn)
           return
+        }
+        // Columns the grid grew to past the file extent (this batch or an
+        // earlier scroll) are journal-owned like inserted columns: the
+        // reload's window is clamped to the file's screen extent and the
+        // journal overlay never reaches them, so a fill landing there would
+        // show blank until save/reopen. Paint them directly, then let the
+        // evict + reload repaint the file-backed part of the range.
+        const extentColumns = lazySheetScreenExtent(current, op.sheetId)?.columns
+        const grownStartColumn = Math.max(fill.startColumn, extentColumns ?? fill.endColumn + 1)
+        const grownEndColumn = Math.min(fill.endColumn, active.getMaxColumns() - 1)
+        if (grownStartColumn <= grownEndColumn && fill.startRow <= fill.endRow) {
+          paintCells(fill.startRow, fill.endRow, grownStartColumn, grownEndColumn)
         }
         current.loadedRanges.delete(op.sheetId)
         void loadVisibleRange(runtime, lazyWorkbookRef, active, setMessage)
@@ -1159,12 +1206,17 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
     const writeBounds = filtered
       ? { ...dst, endRow: dst.startRow + sourceRows.length - 1 }
       : { ...dst }
-    if (filtered && writeBounds.endRow >= targetSheet.getMaxRows()) {
+    if (filtered && writeBounds.endRow >= MAX_GRID_ROWS) {
       throw new Error(
-        `copy_range filter matched ${sourceRows.length} rows, but the target sheet grid has only ` +
-          `${targetSheet.getMaxRows()} rows (the write would reach row ${writeBounds.endRow + 1}) — ` +
-          'create the target sheet with enough rows (add_sheet rows) or insert_rows first, then retry.',
+        `copy_range filter matched ${sourceRows.length} rows, which would reach row ${writeBounds.endRow + 1} ` +
+          `beyond the sheet grid limit (${MAX_GRID_ROWS} rows).`,
       )
+    }
+    if (filtered) {
+      growSheetToFit(runtime, targetSheet, {
+        rowCount: writeBounds.endRow + 1,
+        columnCount: writeBounds.endColumn + 1,
+      })
     }
     // Streamed (cached-value) mode never installs `f` into the grid; the
     // harvested formula index recovers the source formulas so an
@@ -1577,6 +1629,75 @@ async function executeOp(op: PlannedOp, run: OpRun): Promise<void> {
     )
   }
   run.markApplied()
+}
+
+/**
+ * Grows the target worksheet(s) for a structural/layout/range-level op before
+ * it calls `getRange`, keeping pure row/column insert and delete anchors on the
+ * caller's existing grid checks.
+ */
+function growForPlannedOp(
+  runtime: UniverRuntime,
+  sheetById: (id: string) => UniverWorksheet,
+  op: PlannedOp,
+): void {
+  const growRange = (sheetId: string, range: string) => {
+    const bounds = parseRange(range)
+    growSheetToFit(runtime, sheetById(sheetId), {
+      rowCount: bounds.endRow + 1,
+      columnCount: bounds.endColumn + 1,
+    })
+  }
+  const growAddress = (sheetId: string, address: string) => {
+    const cell = parseAddress(address)
+    growSheetToFit(runtime, sheetById(sheetId), {
+      rowCount: cell.row + 1,
+      columnCount: cell.column + 1,
+    })
+  }
+  if (
+    op.op === 'merge_cells' ||
+    op.op === 'unmerge_cells' ||
+    op.op === 'clear_range' ||
+    op.op === 'convert_to_values' ||
+    op.op === 'find_replace' ||
+    op.op === 'sort_range' ||
+    op.op === 'set_filter' ||
+    op.op === 'add_conditional_format' ||
+    op.op === 'add_table'
+  ) {
+    growRange(op.sheetId, op.range)
+  } else if (op.op === 'set_data_validation') {
+    growRange(op.sheetId, op.range)
+    if (op.validation?.kind === 'listRef') {
+      growRange(op.sheetId, op.validation.range)
+    }
+  } else if (op.op === 'fill_range') {
+    growRange(op.sheetId, op.target)
+  } else if (op.op === 'copy_range') {
+    const dst = copyTargetBounds(op)
+    const endRow = op.filterColumn !== undefined ? dst.startRow : dst.endRow
+    growSheetToFit(runtime, sheetById(op.sheetId), {
+      rowCount: endRow + 1,
+      columnCount: dst.endColumn + 1,
+    })
+  } else if (op.op === 'set_hyperlink' || op.op === 'set_note') {
+    growAddress(op.sheetId, op.address)
+  } else if (op.op === 'set_row_height' || op.op === 'set_rows_hidden') {
+    growSheetToFit(runtime, sheetById(op.sheetId), { rowCount: op.row - 1 + op.count })
+  } else if (op.op === 'set_col_width' || op.op === 'set_cols_hidden') {
+    growSheetToFit(runtime, sheetById(op.sheetId), {
+      columnCount: columnIndex(op.column) + op.count,
+    })
+  } else if (op.op === 'add_chart') {
+    growRange(op.sheetId, op.dataRange)
+    if (op.anchorCell) growAddress(op.sheetId, op.anchorCell)
+  } else if (op.op === 'add_shape' || op.op === 'add_image') {
+    if (op.anchorCell) growAddress(op.sheetId, op.anchorCell)
+  } else if (op.op === 'add_sparkline') {
+    growRange(op.sheetId, op.dataRange)
+    if (op.targetCell) growAddress(op.sheetId, op.targetCell)
+  }
 }
 
 function headerFooterParts(

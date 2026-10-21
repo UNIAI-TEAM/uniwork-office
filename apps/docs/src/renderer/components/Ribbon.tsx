@@ -131,7 +131,10 @@ import {
 import { RibbonColorPalette } from './ribbon-color-palette'
 import { HeaderFooterTab, type HfAction, type HfEditingInfo } from './ribbon-hf-tab'
 import { PasteSpecialDialog } from './PasteSpecialDialog'
-import { cap } from '../capabilities'
+import { FILE_MENU_FIXED_QUERY, closeOnResize, fileMenuAnchor } from './file-menu-anchor'
+import { cap, saveCopyAvailable } from '../capabilities'
+import { createShortcutMatcher, shortcutHint, shortcutSurface } from '../shortcuts'
+import { docsShortcut } from '../../shared/docs-shortcuts'
 import { fontFamiliesFor, isEastAsianFontName, systemFamiliesBesidesCandidates } from '../font-list'
 import {
   fontSizeLabel,
@@ -235,6 +238,7 @@ interface RibbonProps {
   actionsRef?: React.MutableRefObject<{
     stepFontSize?: (dir: 1 | -1) => void
     nudgeFontSize?: (dir: 1 | -1) => void
+    toggleList?: (kind: 'bullet' | 'ordered') => void
   }>
   /** Quick-access area on the tab row's left (save/undo-redo/autosave), matching the WPS/Office QAT */
   quickActions?: React.ReactNode
@@ -274,7 +278,8 @@ interface RibbonProps {
   onOpen: () => void
   onSave: () => void
   onSaveAs: () => void
-  /** File ▸ Export as PDF: a local file export through printToPDF, no system printer needed */
+  /** File ▸ Save as a copy: web bridge only — the locked-out tab's copy (UNI-1920); absent on desktop */
+  onSaveCopy?: () => void
   onExportPdf?: () => void
   onPrint?: () => void
   showAi: boolean
@@ -504,6 +509,8 @@ const IS_MAC = navigator.platform.toLowerCase().includes('mac')
 const WIDTH_CASE_LANGS = new Set<Lang>(['zh', 'zh-TW', 'ja'])
 /** shell tab mode: the tab strip above owns traffic lights / caption buttons */
 const IN_TAB = new URLSearchParams(window.location.search).get('mode') === 'tab'
+/** the ribbon's own keys, from the docs shortcut table */
+const matchFormatClipKey = createShortcutMatcher(['copy-format', 'paste-format'])
 
 const TABS = (
   IS_MAC
@@ -704,6 +711,12 @@ function keepDocumentFocus(e: ReactMouseEvent<HTMLDivElement>) {
   if (target.closest('button')) e.preventDefault()
 }
 
+/** a File-menu row's key hint, read from the shortcut table (nothing when the command has no key here) */
+function FileMenuKey({ command }: { command: string }) {
+  const keys = shortcutHint(command)
+  return keys ? <span className="file-menu-key">{keys}</span> : null
+}
+
 function RibbonInner({
   actionsRef,
   quickActions,
@@ -729,6 +742,7 @@ function RibbonInner({
   onOpen,
   onSave,
   onSaveAs,
+  onSaveCopy,
   onExportPdf,
   onPrint,
   showAi,
@@ -824,17 +838,47 @@ function RibbonInner({
   onPagePreview,
 }: RibbonProps) {
   const { t, lang } = useI18n()
-  const collapse = useRibbonCollapse('aidocs.ribbonCollapsed', {
-    collapse: t('ribbonCollapse'),
-    expand: t('ribbonExpand'),
-    // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (see genoffice#362)
-    compact: t('ribbonCompact'),
-    expandFull: t('ribbonExpand'),
-  })
+  const collapse = useRibbonCollapse(
+    'aidocs.ribbonCollapsed',
+    {
+      collapse: t('ribbonCollapse'),
+      expand: t('ribbonExpand'),
+      // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (see genoffice#362)
+      compact: t('ribbonCompact'),
+      expandFull: t('ribbonExpand'),
+    },
+    {
+      action: docsShortcut('docs-086'),
+      compactAction: docsShortcut('docs-087'),
+      surface: shortcutSurface(),
+    },
+  )
   // The one-click AI actions need text to work on; grey them out on an empty document
   const docEmpty = !hasDoc || fs.docEmpty
   const [tab, setTab] = useState<RibbonTab>('home')
   const [dropdown, setDropdown] = useState<string | null>(null)
+  // phone width: the tab row scrolls and the File menu is fixed (styles.css); anchor it from the
+  // File tab's measured rectangle, since a fixed box ignores the row's scroll offset
+  const fileMenuRef = useRef<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    const menu = fileMenuRef.current
+    if (dropdown !== 'file' || !menu || !window.matchMedia?.(FILE_MENU_FIXED_QUERY).matches) return
+    const tab = menu.parentElement?.querySelector('.ribbon-tab-file')
+    if (!tab) return
+    menu.style.left = '0px' // measure the natural width, not one squeezed by a far-right start
+    const { left, top } = fileMenuAnchor(
+      tab.getBoundingClientRect(),
+      menu.offsetWidth,
+      window.innerWidth,
+    )
+    menu.style.left = `${left}px`
+    menu.style.top = `${top}px`
+  }, [dropdown])
+  // the measured anchor goes stale when the viewport changes under the open menu: close it
+  useEffect(() => {
+    if (dropdown !== 'file') return
+    return closeOnResize(window, () => setDropdown((v) => (v === 'file' ? null : v)))
+  }, [dropdown])
   // null = Automatic: the pen button clears the run colour instead of writing one
   const [penColor, setPenColor] = useState<string | null>('FF0000')
   const [penHighlight, setPenHighlight] = useState('yellow')
@@ -1699,6 +1743,7 @@ function RibbonInner({
     if (!actionsRef) return
     actionsRef.current.stepFontSize = stepFontSize
     actionsRef.current.nudgeFontSize = nudgeFontSize
+    actionsRef.current.toggleList = toggleList
   })
 
   const toggleVertAlign = (kind: 'superscript' | 'subscript') => {
@@ -1822,15 +1867,14 @@ function RibbonInner({
     else armPainter(true)
   }
 
-  // Word's copy / paste formatting chords (⇧⌘C / ⇧⌘V; off the Mac the paste
-  // chord carries Alt because Ctrl+Shift+V is the paste-and-match-style menu
-  // accelerator). Paste targets the selection, or the word at the caret.
+  // Word's copy / paste formatting chords (Ctrl+Alt+C / Ctrl+Alt+V, ⌥⌘C / ⌥⌘V; the desktop
+  // keeps the old Shift chords that do not collide). Paste targets the selection, or the word
+  // at the caret.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey) return
-      const copy = e.code === 'KeyC' && !e.altKey
-      const paste = e.code === 'KeyV' && e.altKey === !IS_MAC
-      if (!copy && !paste) return
+      const command = matchFormatClipKey(e)
+      if (!command) return
+      const copy = command === 'copy-format'
       const el = document.activeElement
       if (el && el !== document.body && !el.closest('.ProseMirror')) return
       if (!editor.isEditable || getActiveSubEditor()) return
@@ -2012,6 +2056,9 @@ function RibbonInner({
       <div
         className={`ribbon-tabs ${IN_TAB ? '' : IS_MAC ? 'ribbon-tabs-mac' : 'ribbon-tabs-win'}`}
         onDoubleClick={collapse.onTabsDoubleClick}
+        // phone width: the File menu is anchored from where the File tab was when it opened;
+        // scrolling the row moves the tab away, so the menu closes
+        onScroll={() => setDropdown((v) => (v === 'file' ? null : v))}
       >
         {!IS_MAC && (
           <div className="file-tab-wrap">
@@ -2022,7 +2069,7 @@ function RibbonInner({
               {t('ribbonTabFile')}
             </button>
             {dropdown === 'file' && (
-              <div data-rb-panel="" className="file-menu">
+              <div data-rb-panel="" className="file-menu" ref={fileMenuRef}>
                 {cap('open') && (
                   <button
                     onClick={() => {
@@ -2030,7 +2077,7 @@ function RibbonInner({
                       onOpen()
                     }}
                   >
-                    {t('ribbonOpen')} <span className="file-menu-key">Ctrl+O</span>
+                    {t('ribbonOpen')} <FileMenuKey command="open" />
                   </button>
                 )}
                 {cap('save') && (
@@ -2041,7 +2088,7 @@ function RibbonInner({
                       onSave()
                     }}
                   >
-                    {t('ribbonSave')} <span className="file-menu-key">Ctrl+S</span>
+                    {t('ribbonSave')} <FileMenuKey command="save" />
                   </button>
                 )}
                 {cap('saveAs') && (
@@ -2052,7 +2099,18 @@ function RibbonInner({
                       onSaveAs()
                     }}
                   >
-                    {t('ribbonSaveAs')} <span className="file-menu-key">Ctrl+Shift+S</span>
+                    {t('ribbonSaveAs')} <FileMenuKey command="save-as" />
+                  </button>
+                )}
+                {saveCopyAvailable() && onSaveCopy && (
+                  <button
+                    disabled={!hasDoc}
+                    onClick={() => {
+                      setDropdown(null)
+                      onSaveCopy()
+                    }}
+                  >
+                    {t('appFileSaveCopy')}
                   </button>
                 )}
                 {cap('exportPdf') && onExportPdf && (
@@ -2074,7 +2132,7 @@ function RibbonInner({
                       onPrint()
                     }}
                   >
-                    {t('appFilePrint')} <span className="file-menu-key">Ctrl+P</span>
+                    {t('appFilePrint')} <FileMenuKey command="print" />
                   </button>
                 )}
               </div>
@@ -2243,17 +2301,22 @@ function RibbonInner({
                 <div className="ribbon-group-items">
                   <div className="rb-col">
                     <div className="rb-row">
-                      {shapeMarkBtn('bold', shapeTextActive.bold, t('ribbonBoldTip'), <b>B</b>)}
+                      {shapeMarkBtn(
+                        'bold',
+                        shapeTextActive.bold,
+                        t('ribbonBoldTip', { keys: shortcutHint('bold') }),
+                        <b>B</b>,
+                      )}
                       {shapeMarkBtn(
                         'italic',
                         shapeTextActive.italic,
-                        t('ribbonItalicTip'),
+                        t('ribbonItalicTip', { keys: shortcutHint('italic') }),
                         <i>I</i>,
                       )}
                       {shapeMarkBtn(
                         'underline',
                         shapeTextActive.underline,
-                        t('ribbonUnderlineTip'),
+                        t('ribbonUnderlineTip', { keys: shortcutHint('underline') }),
                         <u>U</u>,
                       )}
                       <div className="rb-split-wrap">
@@ -2291,10 +2354,26 @@ function RibbonInner({
                       </div>
                     </div>
                     <div className="rb-row">
-                      {shapeAlignBtn('left', t('ribbonAlignLeftTip'), <IconAlignLeft />)}
-                      {shapeAlignBtn('center', t('ribbonAlignCenterTip'), <IconAlignCenter />)}
-                      {shapeAlignBtn('right', t('ribbonAlignRightTip'), <IconAlignRight />)}
-                      {shapeAlignBtn('justify', t('ribbonJustifyTip'), <IconAlignJustify />)}
+                      {shapeAlignBtn(
+                        'left',
+                        t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') }),
+                        <IconAlignLeft />,
+                      )}
+                      {shapeAlignBtn(
+                        'center',
+                        t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') }),
+                        <IconAlignCenter />,
+                      )}
+                      {shapeAlignBtn(
+                        'right',
+                        t('ribbonAlignRightTip', { keys: shortcutHint('align-right') }),
+                        <IconAlignRight />,
+                      )}
+                      {shapeAlignBtn(
+                        'justify',
+                        t('ribbonJustifyTip', { keys: shortcutHint('align-justify') }),
+                        <IconAlignJustify />,
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2443,9 +2522,21 @@ function RibbonInner({
               <div className="table-tool-row">
                 {(
                   [
-                    ['left', <IconAlignLeft key="l" />, t('ribbonAlignLeftTip')],
-                    ['center', <IconAlignCenter key="c" />, t('ribbonAlignCenterTip')],
-                    ['right', <IconAlignRight key="r" />, t('ribbonAlignRightTip')],
+                    [
+                      'left',
+                      <IconAlignLeft key="l" />,
+                      t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') }),
+                    ],
+                    [
+                      'center',
+                      <IconAlignCenter key="c" />,
+                      t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') }),
+                    ],
+                    [
+                      'right',
+                      <IconAlignRight key="r" />,
+                      t('ribbonAlignRightTip', { keys: shortcutHint('align-right') }),
+                    ],
                   ] as const
                 ).map(([value, icon, label]) => (
                   <button
@@ -3291,8 +3382,8 @@ function RibbonInner({
                   <button
                     className="rb-small"
                     disabled={!canEdit}
-                    data-tip={t('ribbonCutTip')}
-                    aria-label={t('ribbonCutTip')}
+                    data-tip={t('ribbonCutTip', { keys: shortcutHint('cut') })}
+                    aria-label={t('ribbonCutTip', { keys: shortcutHint('cut') })}
                     onClick={() => clipboard('cut')}
                   >
                     <IconCut />
@@ -3300,8 +3391,8 @@ function RibbonInner({
                   <button
                     className="rb-small"
                     disabled={!hasDoc}
-                    data-tip={t('ribbonCopyTip')}
-                    aria-label={t('ribbonCopyTip')}
+                    data-tip={t('ribbonCopyTip', { keys: shortcutHint('copy') })}
+                    aria-label={t('ribbonCopyTip', { keys: shortcutHint('copy') })}
                     onClick={() => clipboard('copy')}
                   >
                     <IconCopy />
@@ -3522,9 +3613,24 @@ function RibbonInner({
                   </button>
                 </div>
                 <div className="rb-row">
-                  {markBtn('bold', fs.bold, t('ribbonBoldTip'), <b>B</b>)}
-                  {markBtn('italic', fs.italic, t('ribbonItalicTip'), <i>I</i>)}
-                  {markBtn('underline', fs.underline, t('ribbonUnderlineTip'), <u>U</u>)}
+                  {markBtn(
+                    'bold',
+                    fs.bold,
+                    t('ribbonBoldTip', { keys: shortcutHint('bold') }),
+                    <b>B</b>,
+                  )}
+                  {markBtn(
+                    'italic',
+                    fs.italic,
+                    t('ribbonItalicTip', { keys: shortcutHint('italic') }),
+                    <i>I</i>,
+                  )}
+                  {markBtn(
+                    'underline',
+                    fs.underline,
+                    t('ribbonUnderlineTip', { keys: shortcutHint('underline') }),
+                    <u>U</u>,
+                  )}
                   {markBtn('strike', fs.strike, t('ribbonStrikethrough'), <s>ab</s>)}
                   <button
                     className={`rb-icon ${fs.vertAlign === 'subscript' ? 'active' : ''}`}
@@ -3885,8 +3991,8 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'left' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonAlignLeftTip')}
-                    aria-label={t('ribbonAlignLeftTip')}
+                    data-tip={t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') })}
+                    aria-label={t('ribbonAlignLeftTip', { keys: shortcutHint('align-left') })}
                     onClick={() => setSelectionAlign(ed, 'left')}
                   >
                     <IconAlignLeft />
@@ -3894,8 +4000,8 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'center' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonAlignCenterTip')}
-                    aria-label={t('ribbonAlignCenterTip')}
+                    data-tip={t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') })}
+                    aria-label={t('ribbonAlignCenterTip', { keys: shortcutHint('align-center') })}
                     onClick={() => setSelectionAlign(ed, 'center')}
                   >
                     <IconAlignCenter />
@@ -3903,8 +4009,8 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'right' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonAlignRightTip')}
-                    aria-label={t('ribbonAlignRightTip')}
+                    data-tip={t('ribbonAlignRightTip', { keys: shortcutHint('align-right') })}
+                    aria-label={t('ribbonAlignRightTip', { keys: shortcutHint('align-right') })}
                     onClick={() => setSelectionAlign(ed, 'right')}
                   >
                     <IconAlignRight />
@@ -3912,8 +4018,8 @@ function RibbonInner({
                   <button
                     className={`rb-icon ${activeAlign === 'justify' ? 'active' : ''}`}
                     disabled={!canEdit}
-                    data-tip={t('ribbonJustifyTip')}
-                    aria-label={t('ribbonJustifyTip')}
+                    data-tip={t('ribbonJustifyTip', { keys: shortcutHint('align-justify') })}
+                    aria-label={t('ribbonJustifyTip', { keys: shortcutHint('align-justify') })}
                     onClick={() => setSelectionAlign(ed, 'justify')}
                   >
                     <IconAlignJustify />

@@ -74,7 +74,23 @@ import { CropDialog, CutoutDialog, cropImagePng } from './ImageDialogs'
 import { cropRect, flipPixels, multiplyAlpha } from './image-bake'
 import type { CropFractions, ImageBakeOp } from './image-bake'
 import { removeBackground, type PixelImage } from './cutout'
-import { clickMarkupTool, navAction, resetDocLoadState, shouldHandleDocumentUndo } from './keyNav'
+import {
+  clickMarkupTool,
+  navKeyAction,
+  resetDocLoadState,
+  shouldHandleDocumentUndo,
+} from './keyNav'
+import {
+  isCancelKey,
+  isConfirmKey,
+  matchPdfKey,
+  pdfPrevMatchTip,
+  pdfRibbonCollapseOptions,
+  pdfTip,
+  resolvePdfWindowKey,
+  searchEnterDirection,
+  onTextEditKeyDown,
+} from './shortcuts'
 import { rowOfVisIdx, spreadRows, stepPage } from './spread'
 import {
   captureViewState,
@@ -130,7 +146,6 @@ import {
   spliceCharColors,
 } from './color-runs'
 import type { CharStyle } from './color-runs'
-import { platformShortcuts } from '@genoffice/i18n'
 import {
   Dropdown,
   aiPanelInitiallyOpen,
@@ -142,8 +157,20 @@ import {
 } from '@genoffice/ui'
 import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
-import { drainedOrigin, forcesBoundSave, type SaveOrigin } from './uniwork-save'
-import { queryPdfUniworkState } from './uniwork-state'
+import {
+  drainedOrigin,
+  dropWrittenPending,
+  forcesBoundSave,
+  pdfExplainReadOnlySave,
+  type PdfReadOnlySaveSeam,
+  type SaveOrigin,
+} from './uniwork-save'
+import {
+  openBoxesCountAsDirty,
+  pdfUniworkBoundForAi,
+  usePdfUniworkState,
+  type PdfUniworkSeam,
+} from './uniwork-state'
 import { collabStrings } from '@genoffice/ui/collab'
 import { PdfServerCommentsHost, type PdfServerComments } from './server-comments/PdfServerComments'
 import { commentFrameBox, rerunOnResize, scrollLeftToReveal } from './server-comments/reveal-view'
@@ -167,7 +194,6 @@ import type {
   PageImageRef,
   PdfConvertFormat,
   PdfSignatureInfo,
-  PdfUniworkState,
   SavePdfRequest,
   StaticFormFillRecord,
   StampInput,
@@ -240,6 +266,7 @@ import type {
   LocalAnnotDelete,
   LocalNoteEdit,
   EditSnapshot,
+  PendingLists,
   SavedSnapshot,
   AnnotSelection,
 } from './edit-state'
@@ -338,10 +365,11 @@ type RibbonTab = (typeof RIBBON_TABS)[number]['id'] | 'fillForm'
 
 export default function App() {
   const { lang, t } = useI18n()
-  const collapse = useRibbonCollapse('genoffice-pdf-ribbon-collapsed', {
-    collapse: t('ribbonCollapse'),
-    expand: t('ribbonExpand'),
-  })
+  const collapse = useRibbonCollapse(
+    'genoffice-pdf-ribbon-collapsed',
+    { collapse: t('ribbonCollapse'), expand: t('ribbonExpand') },
+    pdfRibbonCollapseOptions(),
+  )
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [filePath, setFilePath] = useState('')
   const [status, setStatus] = useState<'loading' | 'error' | 'empty' | 'password' | 'ready'>(
@@ -1456,24 +1484,7 @@ export default function App() {
   }, [])
 
   /** UniWork document state of the open file (bound working copy / view only); all false for local files */
-  const [uniwork, setUniwork] = useState<PdfUniworkState>({ bound: false, readOnly: false })
-  useEffect(() => {
-    let live = true
-    if (!filePath) {
-      setUniwork({ bound: false, readOnly: false })
-      return
-    }
-    // Re-queried whenever the open path changes (open, rename, redaction copy). The
-    // previous answer stays until the new one arrives: a view-only copy must not turn
-    // editable, nor a bound one autosave, in the gap.
-    // A missing method or a failed query reads as a plain local file.
-    void queryPdfUniworkState(window.pdfApi, filePath).then((state) => {
-      if (live) setUniwork(state)
-    })
-    return () => {
-      live = false
-    }
-  }, [filePath])
+  const uniwork = usePdfUniworkState(window.pdfApi as PdfUniworkSeam, filePath)
 
   /** G8-15: a bound document with the comments bridge keeps its comments on UniWork (server mode) */
   const commentsBridge = useMemo(() => pdfCommentsBridge(), [])
@@ -1962,14 +1973,14 @@ export default function App() {
     return [...records.values()]
   }, [imageEdits, savedStaticFormFills])
 
-  const ordinaryDirty =
-    markups.length > 0 ||
-    annotDeletes.length > 0 ||
-    noteEdits.length > 0 ||
-    drawings.length > 0 ||
-    textEdits.length > 0 ||
-    textInserts.length > 0 ||
-    imageEdits.length > 0 ||
+  const hasOrdinaryDirty = (pending: PendingLists) =>
+    pending.markups.length > 0 ||
+    pending.annotDeletes.length > 0 ||
+    pending.noteEdits.length > 0 ||
+    pending.drawings.length > 0 ||
+    pending.textEdits.length > 0 ||
+    pending.textInserts.length > 0 ||
+    pending.imageEdits.length > 0 ||
     stampCfg !== null ||
     formEdits.size > 0 ||
     rotations.size > 0 ||
@@ -1977,6 +1988,15 @@ export default function App() {
     order !== null ||
     metadata !== null ||
     recovered
+  const ordinaryDirty = hasOrdinaryDirty({
+    markups,
+    annotDeletes,
+    noteEdits,
+    drawings,
+    textEdits,
+    textInserts,
+    imageEdits,
+  })
   const dirty = redactions.length > 0 || ordinaryDirty
 
   // Existing images are listed while edit-image mode is on; `doc` in the deps refreshes
@@ -3809,14 +3829,17 @@ export default function App() {
     edits: LocalTextEdit[] = textEdits,
     noteFlush?: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] },
     extraDrawings: LocalDrawing[] = [],
-  ) => withoutFileNoteWrites(rawEditsPayload(edits, noteFlush, extraDrawings), serverComments)
+    pending?: Pick<PendingLists, 'markups' | 'annotDeletes' | 'textInserts' | 'imageEdits'>,
+  ) =>
+    withoutFileNoteWrites(rawEditsPayload(edits, noteFlush, extraDrawings, pending), serverComments)
   const rawEditsPayload = (
     edits: LocalTextEdit[],
     noteFlush: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] } | undefined,
     extraDrawings: LocalDrawing[],
+    pending?: Pick<PendingLists, 'markups' | 'annotDeletes' | 'textInserts' | 'imageEdits'>,
   ) => ({
-    markups: markups.map(({ id: _id, ...rest }) => rest),
-    annotDeletes: annotDeletes.map((d): AnnotDeleteInput => ({
+    markups: (pending?.markups ?? markups).map(({ id: _id, ...rest }) => rest),
+    annotDeletes: (pending?.annotDeletes ?? annotDeletes).map((d): AnnotDeleteInput => ({
       pageIndex: d.annot.pageIndex,
       objNum: d.annot.objNum,
       subtype: d.annot.type,
@@ -3833,8 +3856,8 @@ export default function App() {
     })),
     drawings: [...(noteFlush?.drawings ?? drawings), ...extraDrawings].map((d) => d.input),
     textEdits: edits.map((e) => e.input),
-    textInserts: textInserts.map((insert) => insert.input),
-    imageEdits: imageEdits.map((e) => e.input),
+    textInserts: (pending?.textInserts ?? textInserts).map((insert) => insert.input),
+    imageEdits: (pending?.imageEdits ?? imageEdits).map((e) => e.input),
     staticFormFills,
     stamps: stampCfg ? renderStamps(stampCfg, visList) : [],
     formValues: [...formEdits.values()],
@@ -3871,11 +3894,35 @@ export default function App() {
   const queuedSavesRef = useRef<{ origin: SaveOrigin; resolve: (ok: boolean) => void }[]>([])
   /** Origin of the save that most recently started writing (a queued save checks it) */
   const lastWriteOriginRef = useRef<SaveOrigin | null>(null)
+  /** What the last save that succeeded sent. A drained (queued) save drops pending items that are
+      still equal to these: the render it runs from can still list edits that save wrote. A belt
+      only: it covers the id-carrying lists (not rotations, deleted pages, order, metadata, stamp or
+      form edits); the primary guard is draining from the render after `saveSettled` */
+  const lastWrittenRef = useRef<PendingLists | null>(null)
+  /** Bumped each time a save settles, after `saveInFlightRef` is cleared and the post-save
+      subtractions are queued: the drain effect runs from the render that carries both */
+  const [saveSettled, setSaveSettled] = useState(0)
 
   /** `user` = explicit Save (button, ⌘S, menu, close prompt); `auto` = autosave tick/blur;
       `internal` = flush before a page tool. Main fires the UniWork user-save hook only for `user`. */
-  const save = (origin: SaveOrigin = 'user', afterUserSave = false): Promise<boolean> => {
+  const save = (
+    origin: SaveOrigin = 'user',
+    afterUserSave = false,
+    drained = false,
+  ): Promise<boolean> => {
     if (redactionRequestInFlightRef.current) return Promise.resolve(false)
+    // EL-1(b) VEL-1: an explicit Save on a read-only bound PDF asks the shell to
+    // explain the lock and never writes (local read-only PDFs keep today's path)
+    if (
+      pdfExplainReadOnlySave(window.pdfApi as PdfReadOnlySaveSeam, {
+        origin,
+        bound: uniwork.bound,
+        readOnly: uniwork.readOnly,
+        filePath,
+      })
+    ) {
+      return Promise.resolve(false)
+    }
     // A save is already writing: queue behind it instead of reporting failure — the
     // close prompt's "Save" and ⌘S regularly collide with the blur-triggered autosave
     // (the prompt itself blurs the window). The ref is set synchronously, so this also
@@ -3890,8 +3937,23 @@ export default function App() {
     const edits = commitTextDraft()
     // Same for an open comment-edit box in the notes margin
     const noteFlush = commitNoteEdit()
+    // A drained save (queued behind one that wrote) leaves out what that save already wrote
+    const written = drained ? lastWrittenRef.current : null
+    const toWrite: PendingLists = {
+      markups: written ? dropWrittenPending(markups, written.markups) : markups,
+      annotDeletes: written ? dropWrittenPending(annotDeletes, written.annotDeletes) : annotDeletes,
+      noteEdits: written
+        ? dropWrittenPending(noteFlush.noteEdits, written.noteEdits)
+        : noteFlush.noteEdits,
+      drawings: written
+        ? dropWrittenPending(noteFlush.drawings, written.drawings)
+        : noteFlush.drawings,
+      textEdits: written ? dropWrittenPending(edits, written.textEdits) : edits,
+      textInserts: written ? dropWrittenPending(textInserts, written.textInserts) : textInserts,
+      imageEdits: written ? dropWrittenPending(imageEdits, written.imageEdits) : imageEdits,
+    }
     const anythingToSave =
-      ordinaryDirty ||
+      (written ? hasOrdinaryDirty(toWrite) : ordinaryDirty) ||
       edits !== textEdits ||
       noteFlush.drawings !== drawings ||
       noteFlush.noteEdits !== noteEdits
@@ -3931,14 +3993,29 @@ export default function App() {
       setSaveState('saving')
       const result = await window.pdfApi.save({
         path: filePath,
-        ...editsPayload(edits, noteFlush),
+        ...editsPayload(
+          toWrite.textEdits,
+          { drawings: toWrite.drawings, noteEdits: toWrite.noteEdits },
+          [],
+          toWrite,
+        ),
         origin,
       })
       if (!result.ok) {
+        lastWrittenRef.current = null
         // main declining an autosave tick that raced the document's UniWork state is
         // not a failure the user can act on
         if (!(origin === 'auto' && isUniworkRefusal(result.error))) opFailed(result.error)
         return false
+      }
+      lastWrittenRef.current = {
+        markups,
+        annotDeletes,
+        noteEdits: noteFlush.noteEdits,
+        drawings: noteFlush.drawings,
+        textEdits: edits,
+        textInserts,
+        imageEdits,
       }
       // the restored draft is the file's new version now
       setRecovered(false)
@@ -3999,25 +4076,27 @@ export default function App() {
         inFlightNoteWritesRef.current = new Map()
         inFlightPageMapRef.current = null
       }
+      setSaveSettled((n) => n + 1)
     })
     saveInFlightRef.current = tracked
     return tracked
   }
 
-  // Drain queued saves. This effect runs after every commit, so by the time it fires
-  // the in-flight save's reload has rendered and `save` reads post-reload state: the
-  // follow-up writes only what is still pending (usually nothing) instead of
-  // re-applying the previous payload.
+  // Drain queued saves. It runs only after a save settled (`saveSettled`), from the render that
+  // carries the post-save subtractions of the reload, so `save` reads post-reload state: the
+  // follow-up writes only what is still pending (usually nothing) instead of re-applying the
+  // previous payload. A render that merely has no save in flight is not enough (UNI-1984).
   useEffect(() => {
     if (queuedSavesRef.current.length === 0 || saveInFlightRef.current !== null) return
     const queued = queuedSavesRef.current
     queuedSavesRef.current = []
     // One explicit request makes the whole drained batch explicit (autosave opt-in)
     const origin = drainedOrigin(queued.map((q) => q.origin))
-    void save(origin, lastWriteOriginRef.current === 'user').then((ok) => {
+    void save(origin, lastWriteOriginRef.current === 'user', true).then((ok) => {
       for (const q of queued) q.resolve(ok)
     })
-  })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- save is rebuilt every render; only a settled save drains
+  }, [saveSettled])
 
   /**
    * Save As: apply pending edits onto the source bytes and write only to targetPath.
@@ -5494,8 +5573,12 @@ export default function App() {
     }
     return { textEdits: edits, noteFlush, newNotes, open }
   }
-  const openBoxesDirty =
-    !readOnly && (textDraft || noteEditDraft || noteDraft) ? pendingOpenBoxes().open : false
+  // platform read-only only: a draft typed before the edit lock was lost still counts (edits kept)
+  const openBoxesDirty = openBoxesCountAsDirty(
+    viewOnly || encryptedReadOnly,
+    !!(textDraft || noteEditDraft || noteDraft),
+    () => pendingOpenBoxes().open,
+  )
 
   // Mirror dirty state to the main process (close-tab/close-window guard). An open editor box with
   // typed changes counts: Save folds it in, and the web draft copy needs the frame to be dirty
@@ -5880,7 +5963,7 @@ export default function App() {
     readOnly: () => readOnly,
     serverComments: () => serverComments,
     draftServerComment: (origIdx, at, text) => startServerComment(origIdx, at, text),
-    uniworkBound: () => uniwork.bound,
+    uniworkBound: () => pdfUniworkBoundForAi(uniwork),
     ocrText: (origIdx) => ocrPages.get(origIdx)?.entry.text ?? null,
     selection: () => aiSelection,
     pendingSummary: aiPendingSummary,
@@ -6265,7 +6348,8 @@ export default function App() {
     return window.pdfApi.onPrintRequest(openPrintDlg)
   })
 
-  // Shortcuts: ⌘S/⌘F/⌘P/⌘±/⌘0 + page navigation (only ⌘ combos kept while an input control is focused)
+  // Shortcuts: the pdf table's chords (Save, Find, Print, zoom, fit, rotate, undo/redo) + page
+  // navigation (only table chords and plain keys; an IME composition and AltGr never fire)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (redactionRequestInFlightRef.current) return
@@ -6276,36 +6360,61 @@ export default function App() {
           target.tagName === 'TEXTAREA' ||
           target.tagName === 'SELECT' ||
           target.isContentEditable)
-      if (!shouldHandleDocumentUndo(e.target, e.key, e.metaKey || e.ctrlKey)) return
-      if (e.metaKey || e.ctrlKey) {
-        const k = e.key.toLowerCase()
-        if (k === 's') {
-          e.preventDefault()
-          if (cap('save')) void save()
-        } else if (k === 'z') {
-          e.preventDefault()
-          if (e.shiftKey) redo()
-          else undo()
-        } else if (k === 'f') {
-          e.preventDefault()
-          openSearch()
-        } else if (k === 'p' && !e.shiftKey) {
-          e.preventDefault()
-          if (cap('print')) openPrintDlg()
-        } else if (e.key === '=' || e.key === '+') {
-          e.preventDefault()
-          zoomIn()
-        } else if (e.key === '-') {
-          e.preventDefault()
-          zoomOut()
-        } else if (e.key === '0') {
-          e.preventDefault()
-          fitModeRef.current = 'width'
-          recomputeFit()
+      const effect = resolvePdfWindowKey(e, {
+        inEditable,
+        documentUndo: shouldHandleDocumentUndo(e.target, 'z', true),
+      })
+      const action = effect?.action
+      if (effect && action) {
+        if (effect.preventDefault) e.preventDefault()
+        switch (action.id) {
+          case 'pdf-01':
+            if (cap('save')) void save()
+            break
+          case 'pdf-02':
+            // Save As: the shell menu (desktop) or the host (web frame) owns the dialog; the key
+            // must not fall into Save and must reach the menu accelerator, so no preventDefault
+            break
+          case 'pdf-03':
+            undo()
+            break
+          case 'pdf-04':
+            redo()
+            break
+          case 'pdf-05':
+            openSearch()
+            break
+          case 'pdf-06':
+            if (searchOpen) searchStep(e.shiftKey ? -1 : 1)
+            else openSearch()
+            break
+          case 'pdf-07':
+            if (cap('print')) openPrintDlg()
+            break
+          case 'pdf-08':
+            zoomIn()
+            break
+          case 'pdf-09':
+            zoomOut()
+            break
+          case 'pdf-10':
+            applyScale(1, null)
+            break
+          case 'pdf-11':
+            fitModeRef.current = fitModeRef.current === 'width' ? 'page' : 'width'
+            recomputeFit()
+            break
+          case 'pdf-12': {
+            const error = rotateAllPages(effect.rotate ?? 90)
+            if (error) showNotice(error)
+            break
+          }
         }
         return
       }
-      if (e.key === 'Escape') {
+      // Any other Ctrl / Cmd chord belongs to the browser or the text field
+      if (e.metaKey || e.ctrlKey) return
+      if (isCancelKey(e, 'overlay')) {
         // Modal dialogs and local overlays own Escape; the states behind them must not react too
         if (
           e.defaultPrevented ||
@@ -6313,7 +6422,7 @@ export default function App() {
           stampDlg ||
           propsDlg ||
           document.querySelector(
-            '[role="dialog"], [role="menu"], [aria-modal="true"], [data-esc-local]',
+            '[role="dialog"]:not([data-overlay-dock]), [role="menu"], [aria-modal="true"]:not([data-overlay-dock]), [data-esc-local]',
           )
         )
           return
@@ -6360,33 +6469,32 @@ export default function App() {
         return
       }
       if (inEditable) return
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selected) {
+      if (selected && matchPdfKey(e, 'selection')) {
         e.preventDefault()
         deleteSelected()
         return
       }
       // Shift+navigation extends the text layer's native selection (Excel/
-      // Word parity: Shift+→ grows the selection by a character). Swallowing
-      // it here turned the keys into page flips and froze the selection.
-      if (e.shiftKey && !window.getSelection()?.isCollapsed) return
+      // Word parity: Shift+→ grows the selection by a character); navKeyAction
+      // leaves every Shift chord but Shift+Space alone.
       const el = scrollRef.current
       if (!el) return
       const inThumbs = !!thumbsRef.current?.contains(document.activeElement)
-      const action = navAction(e.key, inThumbs)
-      if (!action) return
+      const nav = navKeyAction(e, inThumbs)
+      if (!nav) return
       e.preventDefault()
-      switch (action.type) {
+      switch (nav.type) {
         case 'scrollViewport':
-          el.scrollTop += action.dir * (el.clientHeight - 40)
+          el.scrollTop += nav.dir * (el.clientHeight - 40)
           break
         case 'scrollEdge':
-          el.scrollTop = action.edge === 'top' ? 0 : el.scrollHeight
+          el.scrollTop = nav.edge === 'top' ? 0 : el.scrollHeight
           break
         case 'scrollBy':
-          el.scrollTop += action.delta
+          el.scrollTop += nav.delta
           break
         case 'stepPage': {
-          const target = stepPage(visList, spread, currentPage, action.dir)
+          const target = stepPage(visList, spread, currentPage, nav.dir)
           scrollToPage(target)
           if (inThumbs) {
             const thumbEl = thumbsRef.current?.querySelector<HTMLElement>(
@@ -6602,7 +6710,7 @@ export default function App() {
               className="tb-page-input"
               value={pageInput}
               onChange={(e) => setPageInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && commitPageInput()}
+              onKeyDown={(e) => isConfirmKey(e, 'page-box') && commitPageInput()}
               onBlur={commitPageInput}
             />
             <span className="tb-page-total">{t('pageOf', { total: pageCount })}</span>
@@ -6610,7 +6718,7 @@ export default function App() {
           <div className="rb-row">
             <button
               className="rb-icon"
-              data-tip={t('zoomOut')}
+              data-tip={pdfTip(t('zoomOut'), 'pdf-09')}
               aria-label={t('zoomOut')}
               onClick={zoomOut}
             >
@@ -6619,7 +6727,7 @@ export default function App() {
             <span className="tb-zoom">{Math.round(scale * 100)}%</span>
             <button
               className="rb-icon"
-              data-tip={t('zoomIn')}
+              data-tip={pdfTip(t('zoomIn'), 'pdf-08')}
               aria-label={t('zoomIn')}
               onClick={zoomIn}
             >
@@ -6629,6 +6737,7 @@ export default function App() {
         </div>
         <button
           className="rb-big"
+          data-tip={pdfTip(t('fitWidth'), 'pdf-11')}
           onClick={() => {
             fitModeRef.current = 'width'
             recomputeFit()
@@ -6641,6 +6750,7 @@ export default function App() {
         </button>
         <button
           className="rb-big"
+          data-tip={pdfTip(t('fitPage'), 'pdf-11')}
           onClick={() => {
             fitModeRef.current = 'page'
             recomputeFit()
@@ -6658,7 +6768,7 @@ export default function App() {
   const searchBtn = (
     <button
       className={`rb-big${searchOpen ? ' active' : ''}`}
-      data-tip={`${t('search')} (${platformShortcuts('⌘F')})`}
+      data-tip={pdfTip(t('search'), 'pdf-05')}
       onClick={() => (searchOpen ? closeSearch() : openSearch())}
     >
       <span className="rb-big-icon">
@@ -6838,7 +6948,7 @@ export default function App() {
           {cap('save') && (
             <button
               className="qa-btn"
-              data-tip={`${t('save')} (${platformShortcuts('⌘S')})`}
+              data-tip={pdfTip(t('save'), 'pdf-01')}
               aria-label={t('save')}
               disabled={
                 (!dirty && !openBoxesDirty && !(uniwork.bound && !uniwork.readOnly)) ||
@@ -6852,8 +6962,8 @@ export default function App() {
           )}
           <button
             className="qa-btn"
-            data-tip={`${t('undo')} (${platformShortcuts('⌘Z')})`}
-            aria-label={`${t('undo')} (${platformShortcuts('⌘Z')})`}
+            data-tip={pdfTip(t('undo'), 'pdf-03')}
+            aria-label={pdfTip(t('undo'), 'pdf-03')}
             disabled={!history.canUndo}
             onClick={undo}
           >
@@ -6861,8 +6971,8 @@ export default function App() {
           </button>
           <button
             className="qa-btn"
-            data-tip={`${t('redo')} (${platformShortcuts('⇧⌘Z')})`}
-            aria-label={`${t('redo')} (${platformShortcuts('⇧⌘Z')})`}
+            data-tip={pdfTip(t('redo'), 'pdf-04')}
+            aria-label={pdfTip(t('redo'), 'pdf-04')}
             disabled={!history.canRedo}
             onClick={redo}
           >
@@ -7046,7 +7156,7 @@ export default function App() {
                   {cap('print') && (
                     <button
                       className="rb-big"
-                      data-tip={`${t('print')} (${platformShortcuts('⌘P')})`}
+                      data-tip={pdfTip(t('print'), 'pdf-07')}
                       disabled={printing}
                       onClick={openPrintDlg}
                     >
@@ -8763,24 +8873,15 @@ export default function App() {
                                             const g = draftGhostRef.current
                                             if (g) g.scrollLeft = e.currentTarget.scrollLeft
                                           }}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                                              e.preventDefault()
-                                              commitTextDraft()
-                                            } else if (e.key === 'Escape') {
-                                              e.preventDefault()
-                                              e.stopPropagation()
-                                              setTextDraft(null)
-                                            } else if (
-                                              (e.key === 'Backspace' || e.key === 'Delete') &&
-                                              textDraft.value === ''
-                                            ) {
-                                              // The editor is already empty: one more delete
-                                              // press removes the run itself
-                                              e.preventDefault()
-                                              deleteDraftRun()
-                                            }
-                                          }}
+                                          onKeyDown={(e) =>
+                                            // An already empty editor: one more delete press
+                                            // removes the run itself
+                                            onTextEditKeyDown(e, textDraft.value === '', {
+                                              commit: commitTextDraft,
+                                              cancel: () => setTextDraft(null),
+                                              deleteRun: deleteDraftRun,
+                                            })
+                                          }
                                         />
                                         {draftStyles && (
                                           <div
@@ -9154,8 +9255,9 @@ export default function App() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') searchStep(e.shiftKey ? -1 : 1)
-                    else if (e.key === 'Escape') {
+                    const enterDir = searchEnterDirection(e)
+                    if (enterDir) searchStep(enterDir)
+                    else if (isCancelKey(e)) {
                       e.preventDefault()
                       closeSearch()
                     }
@@ -9173,7 +9275,7 @@ export default function App() {
                 </span>
                 <button
                   className="rb-icon"
-                  data-tip={t('searchPrev')}
+                  data-tip={pdfPrevMatchTip(t('searchPrev'))}
                   aria-label={t('searchPrev')}
                   disabled={activeMatches.length === 0}
                   onClick={() => searchStep(-1)}
@@ -9182,7 +9284,7 @@ export default function App() {
                 </button>
                 <button
                   className="rb-icon"
-                  data-tip={t('searchNext')}
+                  data-tip={pdfTip(t('searchNext'), 'pdf-06')}
                   aria-label={t('searchNext')}
                   disabled={activeMatches.length === 0}
                   onClick={() => searchStep(1)}
@@ -9664,8 +9766,8 @@ export default function App() {
                       setExtractInvalid(false)
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') confirmExtract()
-                      else if (e.key === 'Escape') {
+                      if (isConfirmKey(e)) confirmExtract()
+                      else if (isCancelKey(e)) {
                         e.preventDefault()
                         setExtractDlg(false)
                       }
@@ -9696,8 +9798,8 @@ export default function App() {
                       setSplitInvalid(false)
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') confirmSplit()
-                      else if (e.key === 'Escape') {
+                      if (isConfirmKey(e)) confirmSplit()
+                      else if (isCancelKey(e)) {
                         e.preventDefault()
                         setSplitDlg(false)
                       }
@@ -9758,8 +9860,8 @@ export default function App() {
                         setPrintInvalid(false)
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') confirmPrint()
-                        else if (e.key === 'Escape') {
+                        if (isConfirmKey(e)) confirmPrint()
+                        else if (isCancelKey(e)) {
                           e.preventDefault()
                           setPrintDlg(false)
                         }
@@ -9793,8 +9895,8 @@ export default function App() {
                         setMergeCountInvalid(false)
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') confirmMergePages()
-                        else if (e.key === 'Escape') {
+                        if (isConfirmKey(e)) confirmMergePages()
+                        else if (isCancelKey(e)) {
                           e.preventDefault()
                           setMergePagesDlg(false)
                         }
@@ -9855,8 +9957,8 @@ export default function App() {
                       setReplaceInvalid(false)
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') confirmReplace()
-                      else if (e.key === 'Escape') {
+                      if (isConfirmKey(e)) confirmReplace()
+                      else if (isCancelKey(e)) {
                         e.preventDefault()
                         setReplaceDlg(false)
                       }
@@ -10001,7 +10103,7 @@ export default function App() {
             <div className="status-right">
               <button
                 className="zoom-btn"
-                data-tip={t('zoomOut')}
+                data-tip={pdfTip(t('zoomOut'), 'pdf-09')}
                 aria-label={t('zoomOut')}
                 onClick={zoomOut}
               >
@@ -10018,7 +10120,7 @@ export default function App() {
               />
               <button
                 className="zoom-btn"
-                data-tip={t('zoomIn')}
+                data-tip={pdfTip(t('zoomIn'), 'pdf-08')}
                 aria-label={t('zoomIn')}
                 onClick={zoomIn}
               >

@@ -4,6 +4,7 @@ import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
 import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
 import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
+import { uniworkHomeStrings } from '../src/renderer/src/i18n/strings-uniwork-home'
 import { strings } from '../src/renderer/src/strings'
 import { UNIWORK_ERROR_KEYS, UNIWORK_STATE_KEYS } from '../src/renderer/src/uniwork-docs-model'
 
@@ -44,6 +45,23 @@ describe('uniwork documents string shards', () => {
         ),
       )
       expect(bad).toEqual([])
+    },
+  )
+
+  // UNI-1961 F2: the row's trash command and the shelve command (Lưu trữ / Archive) are two
+  // different commands; the web calls the trash one "Move to trash" in every language
+  it.each([...LANGS])(
+    'locale %s names the trash command as trash, never as the shelve command (F2)',
+    (lang) => {
+      const docs = table(lang)
+      const home = uniworkHomeStrings[lang] as Record<string, string>
+      expect(docs.uwDocArchive).toBe(home.uhShelvedMoveToTrash)
+      expect(docs.uwDocArchive).not.toBe(home.uhShelvedShelve)
+      // the confirm states the 30-day trash window, as the web does, and says nothing of archiving
+      expect(docs.uwDocArchiveConfirm).toContain('30')
+      const stem = Array.from(home.uhShelvedShelve!).slice(0, 4).join('').toLowerCase()
+      expect(docs.uwDocArchiveConfirm!.toLowerCase()).not.toContain(stem)
+      expect(docs.uwDocArchived!.toLowerCase()).not.toContain(stem)
     },
   )
 
@@ -90,6 +108,8 @@ describe('uniwork documents string shards', () => {
         'document_too_deep',
         'document_cycle',
         'document_parent_kind',
+        // UNI-1975: a folder can't be shared
+        'folder_not_shareable',
       ].sort(),
     )
     // the G5-04 / G5-06 refusals reuse the sync shard's sentences, FD-11's the folders shard's
@@ -138,10 +158,10 @@ describe('uniwork documents string shards', () => {
     expect(uniworkDocumentStrings.en.uwChipViewOnly).toBe('View only')
     expect(uniworkDocumentStrings.vi.uwChipViewOnly).toBe('Chỉ xem')
     expect(uniworkDocumentStrings.en.uwPickHiddenFormats).toBe(
-      'Hidden because UniWork Office cannot open their format: {count}',
+      'Hidden because UniWork Office can’t open these formats: {count}',
     )
     expect(uniworkDocumentStrings.vi.uwPickHiddenFormats).toBe(
-      'Đã ẩn vì UniWork Office chưa mở được định dạng: {count}',
+      'Đã ẩn {count} mục có định dạng UniWork Office chưa mở được',
     )
     expect(uniworkDocumentStrings.en.uwErrTicketExpired).toBe(
       'This link expired. Open the document again from UniWork.',

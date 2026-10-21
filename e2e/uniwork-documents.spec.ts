@@ -19,6 +19,9 @@ import { recordPath, type StoreRecords } from '../apps/shell/src/main/uniwork-sy
 import { openRecord, readRecordFrame } from '../apps/shell/src/main/uniwork-sync/store/codec'
 // the en shard of the conflict dialog strings (FE-12-03): an alert check follows the copy
 import { en as syncEn } from '../apps/shell/src/renderer/src/i18n/sync/en'
+// the en shard of the UniWork documents strings (EL-1b W3): the edit-lock strip's copy is
+// asserted verbatim, not by guessing translations
+import { en as uniworkDocsEn } from '../apps/shell/src/renderer/src/i18n/uniwork-documents/en'
 import {
   closeAndSaveVideo,
   launchShell,
@@ -122,6 +125,20 @@ interface DocStatus {
   state: string
   error?: string
   lastSavedAt?: string
+  /** EL-1(a): holder metadata while state === 'edit_locked' */
+  editLock?: {
+    holderName: string | null
+    since: string | null
+    heldByMe: boolean
+  }
+  /** EL-1(b): this window's edit-lock session (absent = no session) */
+  lockSession?: {
+    phase: string
+    holderName: string | null
+    since: string | null
+    lostReason?: string
+    byName?: string | null
+  }
 }
 
 interface AppContext {
@@ -453,13 +470,23 @@ test.describe.serial('UniWork documents', () => {
       expect(stub.exchangeAttempts(ticket)).toBe(1)
       // the descriptor's own document: the open reads its detail and bytes, in
       // that order, and nothing of the decoy
-      const routes = callsFor(stub, doc.id).map((c) => c.route)
+      // EL-1(b): an editable open also starts an edit-lock session (POST /documents/<id>/edit-lock,
+      // plus any heartbeat / DELETE under /edit-lock); strip those routes before asserting the
+      // detail -> download open order and the G8-17 extra detail reads.
+      const docCalls = callsFor(stub, doc.id)
+      const lockPrefix = `/documents/${doc.id}/edit-lock`
+      const routes = docCalls
+        .map((c) => c.route)
+        .filter((route) => route !== lockPrefix && !route.startsWith(`${lockPrefix}/`))
       expect(routes.slice(0, 2)).toEqual([`/documents/${doc.id}`, `/documents/${doc.id}/download`])
       // G8-17 (S18 renamed-elsewhere): activating the launched tab re-reads the
       // document's metadata (main: index.ts refreshPath -> refreshMetadataFor ->
       // GET /documents/<id>), so extra detail reads may follow the open - and
       // only those.
       expect(routes.slice(2).filter((route) => route !== `/documents/${doc.id}`)).toEqual([])
+      expect(
+        docCalls.filter((c) => c.method === 'POST' && c.route === lockPrefix).length,
+      ).toBeGreaterThanOrEqual(1)
 
       // the same link handed over again is not redeemed again and opens nothing new
       await deliverUrl(launched, shellEnv(stub), url)
@@ -713,9 +740,9 @@ test.describe.serial('UniWork documents', () => {
         'Overwrite…',
         'Cancel',
       ])
-      // the ✕ in turn is addressed by role + name: it must be visible and come
-      // after Cancel in DOM (Tab) order - it is rendered last in the alertdialog
-      const closeX = dialog.getByRole('button', { name: 'Close', exact: true })
+      // the ✕ in turn is its header control (A49: scoped so the locked step's
+      // Close-named footer button can never be picked up instead)
+      const closeX = dialog.locator('button.uw-conflict-close')
       await expect(closeX).toBeVisible()
       const buttonOrder = await dialog
         .getByRole('button')
@@ -801,6 +828,23 @@ test.describe.serial('UniWork documents', () => {
       expect(drafts).toHaveLength(1)
       expect(drafts[0]!.title).toBe('conflict-latest.docx')
       expect(await zipEntry(drafts[0]!.snapshot, 'word/document.xml')).toContain(MARKER)
+
+      // A46: the kept draft is also a real Sync Center row — visible by name and openable
+      await shell.evaluate(() => {
+        window.dispatchEvent(
+          new CustomEvent('uniwork:open-settings', { detail: { section: 'sync' } }),
+        )
+      })
+      const settings = shell.getByRole('dialog', { name: 'Settings' })
+      const draftRow = settings.getByRole('row', {
+        name: 'conflict-latest.docx: Kept draft',
+        exact: true,
+      })
+      await expect(draftRow).toBeVisible()
+      const docsBefore = launched.app.windows()
+      await draftRow.getByRole('button', { name: 'Open draft', exact: true }).click()
+      const preview = await pageAfter(launched.app, '://docs/', docsBefore)
+      await expect.poll(async () => docsText(preview), { timeout: 30_000 }).toContain(MARKER)
     })
   })
 
@@ -901,7 +945,7 @@ test.describe.serial('UniWork documents', () => {
           .filter((c) => c.method === 'POST' && c.route === `/documents/${doc.id}/copies`),
       ).toEqual([expect.objectContaining({ status: 201, idempotencyKey: expect.any(String) })])
 
-      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await dialog.locator('button.uw-conflict-close').click()
       await expect(dialog).toBeHidden()
 
       // no native message box or save dialog; the source stays in conflict with no new intent
@@ -948,7 +992,7 @@ test.describe.serial('UniWork documents', () => {
         expect.objectContaining({ status: 503 }),
       ])
 
-      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await dialog.locator('button.uw-conflict-close').click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'conflict', 5_000)
       expect(stub.commits(doc.id)).toHaveLength(1)
@@ -1007,7 +1051,7 @@ test.describe.serial('UniWork documents', () => {
           ),
         ).toEqual([expect.stringMatching(/conflict-noseat \(my version\)\.docx$/)])
 
-        await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+        await dialog.locator('button.uw-conflict-close').click()
         await expect(dialog).toBeHidden()
         // no copy, no upload, no intent change: the source is still in conflict
         expect(stub.copiesOf(doc.id)).toHaveLength(0)
@@ -1061,7 +1105,7 @@ test.describe.serial('UniWork documents', () => {
           ),
       ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
 
-      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await dialog.locator('button.uw-conflict-close').click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'conflict', 5_000)
       expect(stub.commits(doc.id)).toHaveLength(1)
@@ -1111,7 +1155,7 @@ test.describe.serial('UniWork documents', () => {
           ),
       ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
 
-      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await dialog.locator('button.uw-conflict-close').click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'conflict', 5_000)
       expect(stub.commits(doc.id)).toHaveLength(1)
@@ -1159,7 +1203,7 @@ test.describe.serial('UniWork documents', () => {
           ),
       ).toEqual([expect.objectContaining({ status: 200, idempotencyKey: commitKeys[0] })])
 
-      await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+      await dialog.locator('button.uw-conflict-close').click()
       await expect(dialog).toBeHidden()
       await expectState(shell, 'conflict', 5_000)
       expect(stub.commits(doc.id)).toHaveLength(1)
@@ -1523,10 +1567,17 @@ test.describe.serial('UniWork documents', () => {
       const pill = document.querySelector('.uw-pill:not(.uw-notice)') as HTMLElement | null
       const label = pill?.querySelector('.uw-pill-label') as HTMLElement | null
       if (!pill || !label) return null
-      const range = document.createRange()
-      range.selectNodeContents(label)
-      const text = range.getBoundingClientRect()
+      // only the drawn words count: the compact and short pills keep the whole sentence in a
+      // clipped sr-only span inside the label, which is read, not painted
       const box = label.getBoundingClientRect()
+      const range = document.createRange()
+      let textRight = box.left
+      for (const node of Array.from(label.childNodes)) {
+        if (node instanceof Element && node.classList.contains('uw-sr-only')) continue
+        range.selectNodeContents(node)
+        const r = range.getBoundingClientRect()
+        if (r.width > 0) textRight = Math.max(textRight, r.right)
+      }
       const outer = pill.getBoundingClientRect()
       // the nearest ancestor that clips its content is where a pill gets cut off
       let clipRight = window.innerWidth
@@ -1548,10 +1599,16 @@ test.describe.serial('UniWork documents', () => {
           covered.push(`${top.tagName.toLowerCase()}.${String(top.className)} at ${Math.round(x)}`)
         }
       }
-      // padding: the first and last things in the pill sit the same distance from its border
-      const first = pill.firstElementChild?.getBoundingClientRect()
-      const lastEl = pill.lastElementChild as HTMLElement | null
-      const last = lastEl?.getBoundingClientRect()
+      // padding: the first and last things in the pill sit the same distance from its border;
+      // only children laid out in the row count (not the sr-only text or the hidden focus tip)
+      const inRow = Array.from(pill.children).filter((el) => {
+        const style = getComputedStyle(el)
+        return (
+          style.display !== 'none' && style.position !== 'absolute' && style.position !== 'fixed'
+        )
+      })
+      const first = inRow[0]?.getBoundingClientRect()
+      const last = inRow[inRow.length - 1]?.getBoundingClientRect()
       const hasButton = !!pill.querySelector('.uw-pill-action, .uw-pill-close')
       return {
         hasButton,
@@ -1564,7 +1621,7 @@ test.describe.serial('UniWork documents', () => {
         title: pill.getAttribute('title') ?? '',
         labelScroll: label.scrollWidth,
         labelClient: label.clientWidth,
-        textRight: text.right,
+        textRight,
         boxRight: box.right,
         pillScroll: pill.scrollWidth,
         pillClient: pill.clientWidth,
@@ -1728,4 +1785,199 @@ test.describe.serial('UniWork documents', () => {
       })
     })
   }
+
+  // k ───────────────────────────────────────────────────────────────────────
+  test('k. a 423 on commit shows the holder in the pill and is not retried', async () => {
+    test.setTimeout(150_000)
+    const name = 'lock-commit-423.docx'
+    const doc = stub.addDocument({ filename: name, bytes: await docxBytes() })
+    try {
+      await withApp('uniwork-docs-lock-423', async ({ launched, shell }) => {
+        await openFromPicker(shell, name)
+        const editor = await docsEditor(launched.app)
+        await expect
+          .poll(async () => (await activeStatus(shell))?.lockSession?.phase, { timeout: 30_000 })
+          .toBe('held')
+        await typeInDocs(editor, MARKER)
+
+        // someone else takes the lock after this window opened -> the commit gets 423
+        stub.lockHeldBy(doc.id, { name: 'Grace Hopper', since: '2026-10-18T03:12:00Z' })
+        await saveShortcut(editor)
+        await expectState(shell, 'edit_locked')
+
+        // the session flips to 'lost' (outranking edit_locked in the pill and strip); the
+        // holder's name is carried on both the parked binding's editLock and the lost session,
+        // and rendered visibly in the pill label (uwChipEditLocked) and strip message (uwLockLostHeldBy)
+        await expect(label(shell)).toHaveText(
+          uniworkDocsEn.uwChipEditLocked.replace('{name}', 'Grace Hopper'),
+        )
+        await expect(chip(shell).locator('.uw-pill-action')).toHaveText(
+          uniworkDocsEn.uwLockEditHere,
+        )
+        const strip = shell.locator('.uw-editlock-strip')
+        await expect(strip).toHaveAttribute('data-phase', 'lost')
+        await expect(strip.locator('.uw-editlock-title')).toHaveText(uniworkDocsEn.uwLockLostTitle)
+        await expect(strip.locator('.uw-editlock-message')).toHaveText(
+          uniworkDocsEn.uwLockLostHeldBy.replace('{name}', 'Grace Hopper'),
+        )
+        const status = (await activeStatus(shell))!
+        expect(status).toMatchObject({
+          state: 'edit_locked',
+          editLock: { holderName: 'Grace Hopper', heldByMe: false },
+          lockSession: { phase: 'lost', byName: 'Grace Hopper' },
+        })
+        expect(await binding(status.path)).toMatchObject({
+          state: 'edit_locked',
+          editLock: { holderName: 'Grace Hopper', heldByMe: false },
+        })
+
+        // at most one commit call for that save over ~5 s (no retry burst, no conflict dialog)
+        await sleep(5_000)
+        const commits = stub.commits(doc.id)
+        expect(commits).toHaveLength(1)
+        expect(commits[0]).toMatchObject({ status: 423 })
+        await expect(shell.getByRole('alertdialog')).toHaveCount(0)
+        expect(await seenMessageBoxes(launched)).toHaveLength(0)
+
+        // the local edits are kept on disk and in the editor
+        expect(await zipEntry(await readFile(status.path), 'word/document.xml')).toContain(MARKER)
+        expect(await docsText(editor)).toContain(MARKER)
+      })
+    } finally {
+      stub.releaseHeldLock(doc.id)
+    }
+  })
+
+  // l ───────────────────────────────────────────────────────────────────────
+  test('l. someone else editing opens read-only; once free, Sửa ở đây appears within one poll', async () => {
+    test.setTimeout(180_000)
+    const name = 'lock-held-before-open.docx'
+    const doc = stub.addDocument({ filename: name, bytes: await docxBytes() })
+    stub.lockHeldBy(doc.id, { name: 'Charles Babbage', since: '2026-10-18T03:12:00Z' })
+    try {
+      await withApp('uniwork-docs-lock-other', async ({ launched, shell }) => {
+        await openFromPicker(shell, name)
+        const editor = await docsEditor(launched.app)
+
+        // acquire answered 423 held_by_me=false -> read-only, strip names the holder
+        const strip = shell.locator('.uw-editlock-strip')
+        await expect(strip).toHaveAttribute('data-phase', 'other', { timeout: 30_000 })
+        await expect(strip.locator('.uw-editlock-message')).toContainText('Charles Babbage')
+        await expect(strip.locator('.uw-editlock-message')).toContainText('has been editing since')
+        await expect(label(shell)).toHaveText(uniworkDocsEn.uwChipViewOnly)
+        expect(
+          await editor.evaluate(
+            () => (window as unknown as AidocsWindow).__aidocs!.editor!.isEditable,
+          ),
+        ).toBe(false)
+        expect((await activeStatus(shell))?.lockSession).toMatchObject({
+          phase: 'other',
+          holderName: 'Charles Babbage',
+        })
+
+        // Ctrl+S on a read-only-by-lock document writes nothing (strict zero delta of write routes)
+        const beforeCount = stub.callCount()
+        await saveShortcut(editor)
+        await sleep(2_500)
+        const afterSave = stub.calls().slice(beforeCount)
+        expect(afterSave.filter((c) => c.method !== 'GET')).toEqual([])
+        expect(stub.uploads(doc.id)).toHaveLength(0)
+        expect(stub.commits(doc.id)).toHaveLength(0)
+
+        // the other person leaves -> the next R1 poll (woken on window focus, or the 30 s tick)
+        // sees lock: null and switches the strip to 'free' with the Edit here button
+        stub.releaseHeldLock(doc.id)
+        await launched.app.evaluate(({ BrowserWindow }) => {
+          for (const win of BrowserWindow.getAllWindows()) {
+            if (!win.isDestroyed()) win.focus()
+          }
+        })
+        await expect(strip).toHaveAttribute('data-phase', 'free', { timeout: 40_000 })
+        await expect(strip.locator('.uw-editlock-message')).toHaveText(
+          uniworkDocsEn.uwLockBannerFree,
+        )
+        const editHere = strip.locator('[data-lock-action="edit-here"]')
+        await expect(editHere).toBeVisible()
+        await expect(editHere).toHaveText(uniworkDocsEn.uwLockEditHere)
+
+        // clicking it runs R2 acquire -> 201, the strip leaves and the editor becomes editable
+        const acquiresBefore = callsFor(stub, doc.id).filter(
+          (c) => c.method === 'POST' && c.route === `/documents/${doc.id}/edit-lock`,
+        ).length
+        await editHere.click()
+        await expect
+          .poll(async () => (await activeStatus(shell))?.lockSession?.phase, { timeout: 30_000 })
+          .toBe('held')
+        await expect(strip).toHaveCount(0)
+        const acquires = callsFor(stub, doc.id).filter(
+          (c) => c.method === 'POST' && c.route === `/documents/${doc.id}/edit-lock`,
+        )
+        expect(acquires.length).toBeGreaterThan(acquiresBefore)
+        expect(acquires[acquires.length - 1]).toMatchObject({ status: 201, client: 'desktop' })
+        await expect
+          .poll(
+            () =>
+              editor.evaluate(
+                () => (window as unknown as AidocsWindow).__aidocs!.editor!.isEditable,
+              ),
+            { timeout: 15_000 },
+          )
+          .toBe(true)
+      })
+    } finally {
+      stub.releaseHeldLock(doc.id)
+    }
+  })
+
+  // m ───────────────────────────────────────────────────────────────────────
+  test('m. commits carry edit_lock_id and closing the document releases the lock', async () => {
+    test.setTimeout(150_000)
+    const name = 'lock-commit-and-release.docx'
+    const doc = stub.addDocument({ filename: name, bytes: await docxBytes() })
+    await withApp('uniwork-docs-lock-lifecycle', async ({ launched, shell }) => {
+      await openFromPicker(shell, name)
+      const editor = await docsEditor(launched.app)
+      await expect
+        .poll(async () => (await activeStatus(shell))?.lockSession?.phase, { timeout: 30_000 })
+        .toBe('held')
+
+      // R2 was logged on open with client: 'desktop'
+      const acquires = callsFor(stub, doc.id).filter(
+        (c) => c.method === 'POST' && c.route === `/documents/${doc.id}/edit-lock`,
+      )
+      expect(acquires).toEqual([
+        expect.objectContaining({ status: 201, client: 'desktop', lockId: expect.any(String) }),
+      ])
+      const grantedLockId = acquires[0]!.lockId!
+
+      // saving sends the granted edit_lock_id on the commit body
+      await typeInDocs(editor, MARKER)
+      await saveShortcut(editor)
+      await expectState(shell, 'saved')
+      const commits = stub.commits(doc.id)
+      expect(commits).toHaveLength(1)
+      expect(commits[0]).toMatchObject({
+        status: 200,
+        baseRevision: '41',
+        editLockId: grantedLockId,
+      })
+
+      // closing the document tab sends DELETE /documents/{id}/edit-lock/{lockId}
+      const tab = shell.locator('.tab-bar .tab-item:not(.tab-home)')
+      await expect(tab).toHaveCount(1)
+      await tab.locator('.tab-close').click()
+      await expect(tab).toHaveCount(0, { timeout: 30_000 })
+      await expect
+        .poll(
+          () =>
+            callsFor(stub, doc.id).filter(
+              (c) =>
+                c.method === 'DELETE' &&
+                c.route === `/documents/${doc.id}/edit-lock/${grantedLockId}`,
+            ),
+          { timeout: 15_000 },
+        )
+        .toEqual([expect.objectContaining({ status: 204, lockId: grantedLockId })])
+    })
+  })
 })

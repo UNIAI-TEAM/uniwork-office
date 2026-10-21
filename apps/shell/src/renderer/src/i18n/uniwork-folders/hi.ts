@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const hi = {
-  ufRoot: 'UniWork',
+  ufRoot: 'दस्तावेज़ (रूट)',
   ufTreeLabel: 'फ़ोल्डर',
   ufContentsLabel: 'फ़ोल्डर की सामग्री',
   ufRecent: 'हाल के',
@@ -25,6 +25,7 @@ export const hi = {
   ufTooDeep: 'दस्तावेज़ ट्री अधिकतम {max} स्तर गहरा हो सकता है।',
   ufCycle: 'फ़ोल्डर को उसी में या उसके किसी सबफ़ोल्डर में नहीं ले जाया जा सकता।',
   ufParentKind: 'फ़ोल्डर रूट में या किसी दूसरे फ़ोल्डर में होता है।',
+  ufNotShareable: 'फ़ोल्डर साझा नहीं किए जा सकते। इसके बजाय हर दस्तावेज़ अलग से साझा करें।',
   ufFolderGone: 'यह फ़ोल्डर अब यहाँ नहीं है।',
   ufFolderNoAccess: 'अब आपके पास इस फ़ोल्डर तक पहुँच नहीं है।',
   ufNoPermission: 'आपको इस फ़ोल्डर को बदलने की अनुमति नहीं है।',

@@ -23,6 +23,7 @@ import {
 } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import {
+  AvatarSourceProvider,
   CollabComposer,
   CollabPanel,
   collabStrings,
@@ -30,6 +31,7 @@ import {
   loadDraft,
   sendAnchorMap,
   useCollabThreads,
+  useFrameAvatarSource,
   type CollabActions,
   type CollabAnchorAdapter,
   type CollabController,
@@ -47,6 +49,7 @@ import {
   type PdfCommentsContext,
 } from './pdf-comments-context'
 import { makePdfAnchor, pointAnchorRect, type PdfAnchor } from './pdf-anchor'
+import { isCancelKey } from '../shortcuts'
 
 export interface PdfServerCommentsOptions {
   /** `window.uniworkComments` as the preload (or the web frame bridge) exposes it */
@@ -124,7 +127,21 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
     [context.documentId, context.level, context.myUserId, lang, platform],
   )
   const strings = useMemo(() => collabStrings(lang), [lang])
-  const controller = useCollabThreads(source, host, { strings, adapter })
+  // "View in version N" of a lost thread: the desktop shell opens that version read-only; a bridge
+  // without it (the web frame's port) gives the kit no handler, so the action does not show
+  const onViewVersion = useMemo(() => {
+    const openVersion = bridge.openVersion?.bind(bridge)
+    return openVersion
+      ? ({ commentId, versionNo }: { commentId: string; versionNo: number }) =>
+          openVersion({ path, commentId, versionNo })
+      : undefined
+  }, [bridge, path])
+  const controller = useCollabThreads(source, host, {
+    strings,
+    adapter,
+    openVersionId: context.versionId ?? undefined,
+    ...(onViewVersion ? { onViewVersion } : {}),
+  })
   const ctlRef = useRef(controller)
   ctlRef.current = controller
   const onRevealRef = useRef(o.onRevealRequest)
@@ -180,10 +197,9 @@ export function usePdfServerComments(o: PdfServerCommentsOptions): PdfServerComm
   useEffect(() => {
     setShift(null)
     const resend = createAnchorResend({
-      roots: () => {
-        const c = ctlRef.current
-        return [...c.threads, ...c.resolved].map((t) => t.root)
-      },
+      // a fresh list: with the pane closed nothing else lists after the first one
+      roots: async () =>
+        (await ctlRef.current.freshComments()).filter((c) => !c.parent_id && !c.deleted_at),
       send: (versionId, items) => sendAnchorMap(source, versionId, items),
       onUpdated: () => void ctlRef.current.reload(),
       onShift: setShift,
@@ -336,7 +352,7 @@ export function PdfCommentsPanel(p: PdfCommentsPanelProps) {
   // new-thread composer lets it fall through. It is dropped (with its page frame) and the panel closes.
   // An unedited AI draft is not dirty to the kit either, but it is not empty: it stays untouched.
   const onKeyDown = (e: ReactKeyboardEvent) => {
-    if (e.key !== 'Escape' || e.defaultPrevented || e.nativeEvent.isComposing) return
+    if (!isCancelKey(e) || e.defaultPrevented) return
     if (!baseRef.current.newThread || !(e.target as HTMLElement).closest('.collab-thread--new'))
       return
     if (!comments.cancelEmptyThread()) return
@@ -397,6 +413,7 @@ export function PdfServerCommentsHost(p: PdfServerCommentsHostProps) {
     saveFirstText,
     ...opts
   } = p
+  const avatars = useFrameAvatarSource()
   const comments = usePdfServerComments({ ...opts, open })
   apiRef.current = comments
   useEffect(
@@ -421,14 +438,16 @@ export function PdfServerCommentsHost(p: PdfServerCommentsHostProps) {
   }, [open, comments])
   if (!open) return null
   return (
-    <PdfCommentsPanel
-      comments={comments}
-      {...(panelId ? { id: panelId } : {})}
-      lang={opts.lang}
-      onClose={onClose}
-      {...(onFocusOpener ? { onFocusOpener } : {})}
-      {...(inFile ? { inFile } : {})}
-      {...(comments.needsSave ? { saveFirst: saveFirstText } : {})}
-    />
+    <AvatarSourceProvider value={avatars}>
+      <PdfCommentsPanel
+        comments={comments}
+        {...(panelId ? { id: panelId } : {})}
+        lang={opts.lang}
+        onClose={onClose}
+        {...(onFocusOpener ? { onFocusOpener } : {})}
+        {...(inFile ? { inFile } : {})}
+        {...(comments.needsSave ? { saveFirst: saveFirstText } : {})}
+      />
+    </AvatarSourceProvider>
   )
 }

@@ -1,7 +1,17 @@
 import { existsSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
-import { open, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
-import { createHash, randomUUID } from 'node:crypto'
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import {
+  lstat,
+  open,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type {
   RecentUniworkSource,
   SignOutPlan,
@@ -22,7 +32,10 @@ import type {
   UniworkDocRenamedEvent,
   UniworkDocSummary,
   UniworkDocStatus,
+  UniworkDocEditLock,
+  UniworkEditLockSessionView,
   UniworkFirstSaveInput,
+  UniworkFirstSaveNameRequest,
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkFolderQuery,
@@ -35,15 +48,20 @@ import type {
   UniworkRemoteAction,
   UniworkRemoteBar,
   UniworkResult,
+  UniworkSourceDownloadInput,
+  UniworkSourceListPage,
+  UniworkSourceListQuery,
   UniworkSearchPage,
   UniworkSearchQuery,
   UniworkSharedPage,
   UniworkSharedQuery,
+  UniworkShelvedQuery,
   UniworkTreeChangedEvent,
   UniworkUploadDocInput,
   UniworkUploadProgress,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
+import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../../shared/home-api'
 import type {
   UniworkConflictAction,
   UniworkConflictIntentBlock,
@@ -59,15 +77,18 @@ import {
 } from '../uniwork-auth/deployment'
 import type { ProfileOutcome } from '../uniwork-auth/profile-store'
 import {
+  BINDING_FILE,
   type Binding,
   BindingStore,
   type BoundDocument,
+  bindingKindOf,
   docLevelOf,
   documentNameIn,
   hasLegacyIntentFiles,
   type LastOwner,
   type NewerStore,
   type PathBinding,
+  parseBinding,
   scopeWorkingCopyDirs,
 } from './binding-store'
 import {
@@ -75,19 +96,38 @@ import {
   type UniworkCreateTarget,
   type UniworkDocsClient,
   createUniworkDocsClient,
+  isListSort,
+  uniworkId,
+  uniworkSourceId,
 } from './client'
+import {
+  createUniworkEditLockClient,
+  type UniworkEditLockClient,
+} from '../uniwork-edit-lock/client'
+import {
+  EditLockSession,
+  asEditLockTransport,
+  newEditorId,
+  type EditLockSessionView,
+} from '../uniwork-edit-lock/session'
 import { UniworkDocError } from './errors'
+import { EDIT_LOCK_QUIT_CAP_MS } from './edit-lock-quit'
 import {
   copyTitleFor,
   formatForMime,
   formatForName,
   hasReplacementChar,
+  sanitizeFilename,
   sha256Hex,
   workingCopyName,
 } from './formats'
 import { pathKey } from '../../shared/path-key'
+import { isBlankDefaultTitle } from '../../shared/blank-default-names'
 import { LaunchController } from './launch'
 import { createDocumentLimitsCache, type DocumentLimits, type DocumentLimitsCache } from './limits'
+import { DRAFT_PREVIEW_DIR } from '@genoffice/electron-utils/draft-preview'
+import type { OpenSourceValue, SourceViewResult, SourceViewState } from '../../shared/source-view'
+import { SourceViewRegistry, createSourceViewOpener, type SourceViewOpener } from './source-view'
 import { tUniworkDocs } from './strings'
 import {
   abortUploadSession,
@@ -99,6 +139,12 @@ import {
   type SavedUploadSession,
   type UploadSessionTarget,
 } from './upload-session'
+import {
+  createFirstSaveStore,
+  firstSaveKey,
+  FIRST_SAVES_STORE_REGISTRATION,
+  type FirstSaveStore,
+} from '../uniwork-sync/first-saves'
 import {
   createUploadSessionStore,
   uploadSessionKey,
@@ -155,6 +201,7 @@ import { compareRevision } from '../uniwork-sync/feed/revision'
 import type { FeedChange } from '../uniwork-sync/feed/client'
 import { decideRemote, type RemoteLocal, type RemoteNotice } from './remote-newer'
 import type { StoreRecords } from '../uniwork-sync/store'
+import { offlineCopyKey } from '../uniwork-sync/offline-library/copies'
 
 /**
  * UniWork documents in the shell main process: the picker reads, the open
@@ -181,6 +228,19 @@ export function refuseLockedOpenPath(
 /** the slice of the service the open funnel needs */
 export interface LockRefuser {
   refuseLockedPath(path: string): boolean
+}
+
+/**
+ * S01-R2-4: one first-save attempt's Idempotency-Key and its durable record
+ * (`store` is null when the account has no store to keep it in). `restored`:
+ * the key came from the record of an earlier run, not from this process.
+ */
+interface FirstSaveAttempt {
+  store: FirstSaveStore | null
+  recordKey: string
+  idempotencyKey: string
+  fingerprint: string
+  restored: boolean
 }
 
 export interface SessionIdentity {
@@ -290,6 +350,12 @@ export interface UniworkDocsServiceDeps {
    * `onUserSave`.
    */
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
+  /**
+   * The shell itself rewrote the file at `path` behind its module: a module
+   * that refuses to write over another program's change (docs) forgets what
+   * it recorded, so the next Save writes. Absent / a no-op for the others.
+   */
+  noteShellRewrote?(path: string): void
   /** remounts the tab showing the path so it re-reads the file */
   reloadPath(path: string): void
   activePath(): string | undefined
@@ -338,6 +404,24 @@ export interface UniworkDocsServiceDeps {
   /** G5-06u: ask the shell renderer to open the queue popover of a path */
   pushQueuePopover?(request: UniworkQueuePopoverRequest): void
   /**
+   * UNI-1959: ask the shell renderer for the "Name the document" dialog on the
+   * first save of a blank-created document and wait for its verdict:
+   * `continue` (named / moved / unchanged: the save goes on), `cancel` (no
+   * save) or `unavailable` (no dialog host was ever up: the save goes on, but
+   * nothing was confirmed). Absent = the save never asks (a build without the
+   * dialog host).
+   */
+  requestFirstSaveName?(
+    request: UniworkFirstSaveNameRequest,
+  ): Promise<'continue' | 'cancel' | 'unavailable'>
+  /** UNI-1959: takes a pending ask back (its tab closed, its session ended): cancel + drop its dialog */
+  dismissFirstSaveName?(requestId: string): void
+  /**
+   * EL-1(b) fix6 (VEL-2): broadcast `{ path }` on `uniwork:doc-state-changed`
+   * when `isReadOnly(path)` or `isBound(path)` may have changed.
+   */
+  pushDocStateChanged?(path: string): void
+  /**
    * G5-06u: whether `path` is a tab of the shell window (the only window with
    * a pill and a queue popover). False for a detached editor window, whose
    * Ctrl/Cmd+S keeps the inline replay. Absent = every path is a shell tab.
@@ -350,6 +434,12 @@ export interface UniworkDocsServiceDeps {
   stopRuntime?(): void
   openPaths?(): string[]
   closePathNow?(path: string): void
+  /**
+   * UNI-1993: the sync center's startup sweep of the draft-preview root (one
+   * promise, shared). A source file is written only after it settled; absent =
+   * nothing to wait for.
+   */
+  sourceViewStartupSweep?: Promise<unknown>
   aiHistoryPaths?(): string[]
   forgetAiHistory?(paths: string[]): void
   /** G5-09 S5: pushes the current conflict dialog view to the shell renderer */
@@ -405,6 +495,8 @@ export interface UniworkDocsServiceDeps {
   notifySaved?(path: string, versionId: string): void
   /** test seam: replaces the HTTP client */
   client?: UniworkDocsClient
+  /** EL-1(b): test seam for the edit-lock client (absent = no acquire in injected-client tests) */
+  editLockClient?: UniworkEditLockClient
   /** SIZE-F1: overrides `documents.limits` (`GET /api/v1/config`); a test seam */
   limits?: () => Promise<DocumentLimits> | DocumentLimits
   sleep?(ms: number): Promise<void>
@@ -415,6 +507,11 @@ export interface UniworkDocsServiceDeps {
    * shrink it; production leaves the shared CLOSE_SAVE_WAIT_MS default.
    */
   firstSaveFlushTimeoutMs?: number
+  /**
+   * How long "Save to UniWork" from the close prompt waits for the upload to
+   * settle (UNI-1959 test seam; production leaves CLOSE_SAVE_WAIT_MS).
+   */
+  closeSaveWaitMs?: number
   /**
    * ADVISOR D4 (a): this build's packaging flag (the wiring passes
    * app.isPackaged), read only by the dev-only S6 display fixture. Absent reads
@@ -470,6 +567,19 @@ const UNSENT_STATES: ReadonlySet<string> = new Set([
  */
 export const CLOSE_SAVE_WAIT_MS = 30_000
 
+/** UNI-1959: one first-save naming operation (see `firstSaveOps`) */
+interface FirstSaveOp {
+  /** the session that started it: its identity and epoch are revalidated before every step */
+  session: { identity: SessionIdentity; epoch: number }
+  documentId: string
+  /** the id of the ask pushed to the renderer, once there is one (dismissed with it) */
+  requestId: string | null
+  cancelled: boolean
+}
+
+/** back-off before a failed last-account.json write is retried */
+const LAST_OWNER_RETRY_MS = 2000
+
 /** shared-with-me aggregation bounds (one workspace page, total rows, total pages) */
 const SHARED_PAGE_SIZE = 50
 const SHARED_MAX_ROWS = 500
@@ -491,6 +601,87 @@ function parseOffsetCursor(cursor: string | undefined): number {
   if (!cursor) return 0
   const match = /^shared:(\d+)$/.exec(cursor)
   return match ? Number(match[1]) : 0
+}
+
+/**
+ * UNI-2047: the merge order of "Shared with me". Every workspace answers in the
+ * server's own order, so the aggregate re-sorts by the requested key. Each key
+ * has its own default direction (the web's); a row without the key sorts last
+ * in either direction. Nothing requested = newest first, as before.
+ */
+function sharedComparator(
+  sort: UniworkListFilters['sort'],
+  order: UniworkListFilters['order'],
+): (a: UniworkDocSummary, b: UniworkDocSummary) => number {
+  const key = sort ?? 'updated'
+  const sortKey = (row: UniworkDocSummary): string | number | undefined => {
+    switch (key) {
+      case 'name':
+        return row.title
+      case 'size':
+        return row.sizeBytes
+      case 'editor':
+        return row.updatedByUser?.name ?? row.updatedByName
+      case 'shared':
+        return row.shared?.at
+      case 'activity':
+        return row.lastActivity?.at
+      case 'starred':
+        return row.favoritedAt
+      case 'deleted':
+        return row.archivedAt
+      case 'shelved':
+        return row.shelvedAt
+      default:
+        return row.updatedAt
+    }
+  }
+  const ascending = (order ?? (key === 'name' || key === 'editor' ? 'asc' : 'desc')) === 'asc'
+  return (a, b) => {
+    const left = sortKey(a)
+    const right = sortKey(b)
+    if (left !== right) {
+      if (left === undefined) return 1
+      if (right === undefined) return -1
+      const cmp =
+        key === 'name' || key === 'editor'
+          ? String(left).localeCompare(String(right))
+          : left < right
+            ? -1
+            : 1
+      return ascending ? cmp : -cmp
+    }
+    // a stable tie-break: newest first
+    return a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0
+  }
+}
+
+/** UNI-1961: a source file's suggested save name: its last segment, never a path */
+function sourceFileName(name: unknown): string {
+  const last = typeof name === 'string' ? (name.split(/[\\/]/).pop() ?? '') : ''
+  // eslint-disable-next-line no-control-regex -- a file name never carries control characters
+  const clean = last.replace(/[<>:"|?*\u0000-\u001f]/g, '').trim()
+  if (!clean || clean === '.' || clean === '..') return 'download'
+  if (clean.length <= 200) return clean
+  const rawExt = extname(clean)
+  const ext = rawExt.length > 1 && rawExt.length <= 32 ? rawExt : ''
+  return `${clean.slice(0, 200 - ext.length)}${ext}`
+}
+
+async function resolvePhysicalPath(targetPath: string): Promise<string> {
+  let current = resolve(targetPath)
+  const tail: string[] = []
+  for (;;) {
+    try {
+      const real = await realpath(current)
+      return tail.length > 0 ? join(real, ...tail.reverse()) : real
+    } catch {
+      const parent = dirname(current)
+      if (parent === current) return resolve(targetPath)
+      tail.push(basename(current))
+      current = parent
+    }
+  }
 }
 
 async function result<T>(run: () => Promise<T>): Promise<UniworkResult<T>> {
@@ -658,7 +849,7 @@ function requireName(raw: string, max = MAX_DOC_NAME_RUNES): string {
  */
 async function actionResult<T>(
   run: () => Promise<T>,
-  options: { nameField?: boolean } = {},
+  options: { nameField?: boolean; flagMissingEndpoint?: boolean } = {},
 ): Promise<UniworkDocActionResult<T>> {
   try {
     return { ok: true, value: await run() }
@@ -680,12 +871,22 @@ async function actionResult<T>(
     // names the server document it left (compensated or not)
     const documentId = error instanceof UniworkDocError ? error.documentId : undefined
     const documentTitle = error instanceof UniworkDocError ? error.documentTitle : undefined
+    // UNI-1959: the server has no route for this create (the web's isEndpointMissing)
+    const endpointMissing =
+      options.flagMissingEndpoint === true &&
+      error instanceof UniworkDocError &&
+      (error.status === 404 || error.status === 501)
+    // UNI-2047: a throttle (429 / 503) is the one failure a batch may repeat once
+    const retryable =
+      error instanceof UniworkDocError && (error.status === 429 || error.status === 503)
     return {
       ok: false,
       error: code,
+      ...(retryable ? { retryable: true } : {}),
       ...(max === undefined ? {} : { max }),
       ...(documentId === undefined ? {} : { documentId }),
       ...(documentTitle === undefined ? {} : { documentTitle }),
+      ...(endpointMissing ? { endpointMissing: true } : {}),
     }
   }
 }
@@ -805,6 +1006,31 @@ function isDocumentProbeReason(
   )
 }
 
+/**
+ * S01-R2-4 fix2: the binding errors that mean the account no longer holds the
+ * document (archived, deleted, access lost): a first-save record of such a
+ * document is stale. The same words the blocked-document paths already use.
+ */
+const FIRST_SAVE_ENDED_ERRORS: ReadonlySet<string> = new Set([
+  'document_archived',
+  'document_deleted',
+  'deleted',
+  'not_found',
+  'permission_revoked',
+  'forbidden',
+])
+
+function errorCodeOf(error: unknown): string | undefined {
+  const code = (error as { code?: unknown } | null)?.code
+  return typeof code === 'string' ? code : undefined
+}
+
+/** a path that is not there (a missing file, or a file where a folder should be) - not an I/O failure */
+function isAbsentPath(error: unknown): boolean {
+  const code = errorCodeOf(error)
+  return code === 'ENOENT' || code === 'ENOTDIR'
+}
+
 /** no revision of this app's own has been seen for a document yet */
 const NO_ECHO: ReadonlySet<string> = new Set()
 
@@ -819,10 +1045,19 @@ function accessFor(level: string | null): UniworkDocAccess {
  */
 function withServerContext(binding: Binding, detail: DocumentDetail, readOnly = false): Binding {
   const next = { ...binding }
+  const shelved = Boolean(detail.shelvedAt)
   const level = docLevelOf(detail.myLevel)
-  // a read-only copy (a view ticket, or a launch that asked to view) never shows a level above view
+  // a read-only copy (a view ticket, or a launch that asked to view) never shows a level above view;
+  // a shelved document keeps its real ACL in `level` while `shelved: true` and `access: 'view'`
+  // enforce read-only in main-process policy (R1-7)
   if (level) next.level = readOnly ? 'view' : level
   else delete next.level
+  if (shelved) {
+    next.shelved = true
+    next.access = 'view'
+  } else {
+    delete next.shelved
+  }
   if (detail.file.versionId && next.baseVersion === detail.file.version) {
     next.baseVersionId = detail.file.versionId
   }
@@ -978,15 +1213,35 @@ export class UniworkDocsService {
   readonly coordinator: SaveCoordinator
   readonly launch: LaunchController
   readonly limitsCache: DocumentLimitsCache
+  /** UNI-1993: the view-only source files (not documents); index.ts merges it into the module seams */
+  readonly sourceViews = new SourceViewRegistry()
+  private readonly sourceViewOpener: SourceViewOpener
   private readonly deps: UniworkDocsServiceDeps
   /** the build's own version, stamped into bindings (see binding-store's minAppVersion) */
   private readonly appVersion: () => string
   private client: UniworkDocsClient | null
   private clientOrigin: string | null = null
+  private editLockHttp: UniworkEditLockClient | null = null
+  private editLockOrigin: string | null = null
+  /** pathKey -> live edit-lock session of this window */
+  private readonly editLocks = new Map<string, EditLockSession>()
+  /**
+   * EL1B-BE-R2-1: fire-and-forget drop DELETEs (window closed / removeTab /
+   * detached teardown) still in flight. will-quit joins these under the same
+   * cap as held sessions. Settled promises leave the set.
+   */
+  private readonly inFlightDropReleases = new Set<Promise<unknown>>()
+  /** pathKey -> editor_id for this process + path */
+  private readonly editorIds = new Map<string, string>()
   private lastOwner: LastOwner | null
+  /** the owner last-account.json holds: a failed write leaves it behind `lastOwner` and is retried */
+  private lastOwnerOnDisk: LastOwner | null
+  private lastOwnerRetryAt = 0
   private readonly statusListeners = new Set<(status: UniworkDocStatus) => void>()
   /** path key -> the newer-store lock currently shown for it (S11) */
   private readonly locks = new Map<string, UniworkDocLock>()
+  /** pathKey -> last published access/lock signature so access flips broadcast once */
+  private readonly lastPublishedAccess: Record<string, string> = Object.create(null)
   /** path -> checksum of the file as of its mtime/size (the sync close check) */
   private readonly hashMemo = new Map<string, { mtimeMs: number; size: number; checksum: string }>()
   /** working copies whose editor holds edits not written to the file yet */
@@ -1071,6 +1326,31 @@ export class UniworkDocsService {
    */
   private readonly selfRenamed = new Map<string, string>()
   /**
+   * UNI-1961 (R4-1): per-document generation advanced on each successful own
+   * shelve/unshelve transition so a metadata GET begun beforehand cannot
+   * overwrite the local transition with a stale shelved answer.
+   */
+  private readonly localPolicyGen = new Map<string, number>()
+  /**
+   * UNI-1959: documents this app created blank from the menu / strip / default
+   * name (`createDocument`) and has not had a first save for yet; their first
+   * user save asks name + folder. Keyed by account + document
+   * (`firstSaveKeyOf`), and emptied at every session boundary. A document the
+   * dialog already answered is in `firstSaveNamed` instead.
+   */
+  private readonly createdBlank = new Set<string>()
+  /** UNI-1959: documents whose "Name the document" step the person answered this session (never asked twice) */
+  private readonly firstSaveNamed = new Set<string>()
+  /**
+   * UNI-1959: the naming operation in flight per path key - the metadata read,
+   * the pushed ask and the held save are one unit owned by the session that
+   * started it. A second Save while it is open only waits; a closed tab or a
+   * session boundary cancels it.
+   */
+  private readonly firstSaveOps = new Map<string, FirstSaveOp>()
+  /** UNI-1959: told the path key of every naming op that ends (a close-save wait re-arms on it) */
+  private readonly firstSaveOpEnded = new Set<(key: string) => void>()
+  /**
    * G5-03a (S6): the bar of each path as this session knows it, keyed by path.
    * An entry (even `null`, an explicitly hidden bar) is authoritative over the
    * rebuild from the binding - so `later`/`close` stay hidden and a fresh
@@ -1090,6 +1370,8 @@ export class UniworkDocsService {
   private readonly ownEcho = new Map<string, Set<string>>()
   /** documents locked by a server verdict (403/404 revoked, 410 deleted) */
   private readonly remoteLocked = new Map<string, 'revoked' | 'deleted'>()
+  /** documentId → real working-copy path; forgetLocksWhere cannot rehydrate via pathKey on Windows */
+  private readonly remoteLockPath = new Map<string, string>()
   /** ADVISOR D4 (a): the parsed dev-only fixture and the mtime it was read at */
   private devFixture: {
     file: string
@@ -1098,6 +1380,18 @@ export class UniworkDocsService {
   } | null = null
   /** per path, the last editor state the poll reported (the AI settle edge) */
   private readonly editorAi = new Map<string, { aiRunning: boolean; aiEpoch: number }>()
+  /**
+   * A3 (UNI-1362): the remote decisions of a path that are running right now,
+   * keyed by `pathKey`. Every decision registers into an identity-bearing entry
+   * (`{ n }`, captured at increment) and its `finally` decrements/deletes only
+   * while that very entry is still the map's: `lockSession` clears the map
+   * without awaiting the decisions it drops, so an old finalizer must never
+   * release the entry a decision of the next session registered.
+   * `pruneClosedRemoteState` keeps `editorAi` while any entry exists, so the bar
+   * a decision is about to publish still has the AI sample its own settle edge
+   * re-decides on.
+   */
+  private readonly remoteDecisions = new Map<string, { n: number }>()
   /** one guarded reload per path at a time; a notice queued behind it runs after */
   private readonly remoteReloads = new Map<string, Promise<void>>()
   /**
@@ -1130,6 +1424,12 @@ export class UniworkDocsService {
    */
   private readonly firstSaveDone = new Set<string>()
   /**
+   * S01-R2-4 fix2: Idempotency-Keys the server refused (a payload mismatch) or
+   * that were replaced. Kept in process whatever the durable delete did, so a
+   * key that is known spent is never restored from a record again.
+   */
+  private readonly spentFirstSaveKeys = new Set<string>()
+  /**
    * bumped on lockSession and on an organization change so an own action
    * started before sign-out/switch/org-change never pushes treeChanged after
    */
@@ -1145,6 +1445,7 @@ export class UniworkDocsService {
       this.heldByMigration(dir),
     )
     this.lastOwner = this.store.readLastOwner()
+    this.lastOwnerOnDisk = this.lastOwner
     this.limitsCache = createDocumentLimitsCache({
       origin: () => this.deps.profile()?.apiOrigin ?? null,
       fetchLimits: async (startedOrigin) => {
@@ -1158,12 +1459,28 @@ export class UniworkDocsService {
         return client.getDocumentLimits ? await client.getDocumentLimits() : null
       },
     })
+    this.sourceViewOpener = createSourceViewOpener({
+      previewRoot: join(deps.userDataDir, DRAFT_PREVIEW_DIR),
+      ...(deps.sourceViewStartupSweep ? { startupSweep: deps.sourceViewStartupSweep } : {}),
+      registry: this.sourceViews,
+      identity: () => this.deps.identity(),
+      profile: () => this.deps.profile(),
+      storeLocked: () => this.storeLocked(),
+      documentMaxBytes: () => this.limitsCache.peek().max_bytes,
+      downloadSource: (workspaceId, sourceId) => this.api().downloadSource(workspaceId, sourceId),
+      openPath: (path) => this.deps.openPath(path),
+      closePath: (path) => this.deps.closePathNow?.(path),
+      isPathOpen: (path) => this.deps.isPathOpen(path),
+    })
     this.coordinator = new SaveCoordinator({
       store: this.store,
       client: {
         upload: (input) => this.api().upload(input),
         commit: (input) => this.api().commit(input),
         getDocument: (documentId) => this.api().getDocument(documentId),
+        // UNI-1918 (B69-lite): the one lookup the inline pipeline runs when the
+        // server refuses a staged upload whose claim expired
+        lookupCommit: (input) => this.api().lookupCommit(input),
         // BIGUP-A1: a version payload above `chunked_upload_threshold_bytes`
         // goes through an upload session instead of one multipart POST
         uploadSession: {
@@ -1230,13 +1547,32 @@ export class UniworkDocsService {
           const st = (await engine?.supersede(doc)) ?? doc.record.state
           return st
         },
+        supersedeDeferRelease: async (doc) => {
+          const engine = await this.queueEngineOrNull()
+          if (engine?.supersedeDeferRelease) return engine.supersedeDeferRelease(doc)
+          return {
+            state: (await engine?.supersede(doc)) ?? doc.record.state,
+            release: async () => {},
+          }
+        },
         tombstone: async (doc) =>
           (await this.queueEngineOrNull())?.tombstone(doc) ?? doc.record.state,
         isOtherWindow: (key) => this.queueSession?.dispatcher.isOtherWindow(key) === true,
+        // A32: no engine means the durable lease cannot be read, so the overlay
+        // is kept rather than cleared on a guess (see revalidateOtherWindow)
+        holdsOtherWindow: async (key) => {
+          const dispatcher = await this.queueEngineOrNull()
+          return dispatcher ? await dispatcher.holdsOtherWindow(key) : true
+        },
       },
       // the queue engine exposes no public in-flight state, so the service
       // reports the keys its own poll pass is running right now (G506-be-1)
       dispatcherBusy: (key) => this.queueInFlight.has(key),
+      prepareEditLock: (path) => this.prepareEditLock(path),
+      editLockId: (path) => this.editLockIdOf(path),
+      editLockHolder: (path) => this.editLockHolderOf(path),
+      onCommitEditLocked: (path, error) =>
+        this.editLocks.get(pathKey(path))?.markLostFromCommit(error),
       ...(deps.sleep ? { sleep: deps.sleep } : {}),
     })
     this.launch = new LaunchController({
@@ -1276,11 +1612,260 @@ export class UniworkDocsService {
     return this.client
   }
 
+  /** EL-1(b): lock client of this profile; null when tests inject only a docs client */
+  private editLockApi(): UniworkEditLockClient | null {
+    if (this.deps.editLockClient) return this.deps.editLockClient
+    if (this.deps.client) return null
+    const profile = this.deps.profile()
+    if (!profile) return null
+    if (!this.editLockHttp || this.editLockOrigin !== profile.apiOrigin) {
+      this.editLockHttp = createUniworkEditLockClient({
+        apiOrigin: profile.apiOrigin,
+        authorized: (call) => this.deps.authorized(call),
+        isSignedIn: () => this.deps.identity() !== null,
+        ...(this.deps.fetch ? { fetch: this.deps.fetch } : {}),
+      })
+      this.editLockOrigin = profile.apiOrigin
+    }
+    return this.editLockHttp
+  }
+
+  private editLockIdOf(path: string): string | null {
+    return this.editLocks.get(pathKey(path))?.lockId() ?? null
+  }
+
+  private editLockHolderOf(path: string): UniworkDocEditLock | null {
+    const view = this.editLocks.get(pathKey(path))?.view()
+    if (!view) return null
+    return {
+      holderName: view.holderName,
+      since: view.since,
+      expiresAt: null,
+      heldByMe: view.phase === 'self_elsewhere',
+    }
+  }
+
+  private async prepareEditLock(path: string): Promise<'held' | 'park' | 'proceed'> {
+    const session = this.editLocks.get(pathKey(path))
+    if (!session) return 'proceed'
+    return session.ensureHeldBeforeCommit()
+  }
+
+  private editLockReadOnly(path: string): boolean {
+    return this.editLocks.get(pathKey(path))?.isReadOnly() === true
+  }
+
+  private toLockView(view: EditLockSessionView): UniworkEditLockSessionView | undefined {
+    if (view.phase === 'none') return undefined
+    return {
+      phase: view.phase,
+      holderName: view.holderName,
+      since: view.since,
+      ...(view.phase === 'lost'
+        ? { lostReason: view.lostReason ?? 'unknown', byName: view.byName ?? null }
+        : {}),
+    }
+  }
+
+  private startEditLock(doc: BoundDocument): void {
+    if (doc.binding.access !== 'edit') {
+      void this.stopEditLock(doc.path, true)
+      return
+    }
+    if (this.coordinator.isOtherWindow(doc.key)) return
+    const api = this.editLockApi()
+    if (!api) return
+    const key = pathKey(doc.path)
+    const existing = this.editLocks.get(key)
+    if (
+      existing &&
+      existing.documentId === doc.binding.documentId &&
+      existing.view().phase !== 'acquiring'
+    ) {
+      return
+    }
+    if (existing) void this.stopEditLock(doc.path, true)
+    let editorId = this.editorIds.get(key)
+    if (!editorId) {
+      editorId = newEditorId()
+      this.editorIds.set(key, editorId)
+    }
+    const session = new EditLockSession({
+      documentId: doc.binding.documentId,
+      path: doc.path,
+      editorId,
+      transport: asEditLockTransport(api),
+      isOnline: () => this.queueOnline !== false,
+      isSignedIn: () => this.deps.identity() !== null,
+      onChange: (view) => {
+        if (view.phase === 'acquiring' || view.phase === 'none') return
+        const now = this.store.lookup(doc.path)
+        if (now) this.publish(this.statusOf(now))
+        this.notifyDocStateChanged(doc.path)
+        void this.maybeReplayRemoteAfterUnlock(doc.path)
+      },
+    })
+    this.editLocks.set(key, session)
+    void session.acquire().then(() => {
+      const view = session.view()
+      if (view.phase === 'none') {
+        if (this.editLocks.get(key) === session) {
+          this.editLocks.delete(key)
+          session.dispose()
+          this.notifyDocStateChanged(doc.path)
+        }
+        return
+      }
+      const now = this.store.lookup(doc.path)
+      if (now) this.publish(this.statusOf(now))
+      void this.maybeReplayRemoteAfterUnlock(doc.path)
+    })
+  }
+
+  private async stopEditLock(path: string, release: boolean): Promise<void> {
+    const key = pathKey(path)
+    const session = this.editLocks.get(key)
+    if (!session) return
+    if (this.editLocks.get(key) === session) this.editLocks.delete(key)
+    if (release) await this.capped(session.release(), EDIT_LOCK_QUIT_CAP_MS)
+    session.dispose()
+    this.notifyDocStateChanged(path)
+  }
+
+  async releaseAllEditLocks(capMs?: number): Promise<void> {
+    const sessions = [...this.editLocks.values()]
+    const paths = sessions
+      .map((s) => s.path)
+      .filter((p): p is string => typeof p === 'string' && p.length > 0)
+    this.editLocks.clear()
+    const drops = [...this.inFlightDropReleases]
+    const work = Promise.all([...sessions.map((s) => s.release().catch(() => undefined)), ...drops])
+    if (capMs !== undefined) {
+      await this.capped(work, capMs)
+    } else {
+      await work
+    }
+    for (const s of sessions) s.dispose()
+    for (const p of paths) this.notifyDocStateChanged(p)
+  }
+
+  /** will-quit holds the quit only while a held lock or a drop release is outstanding */
+  hasEditLocksToRelease(): boolean {
+    return this.editLocks.size > 0 || this.inFlightDropReleases.size > 0
+  }
+
+  /** will-quit: best-effort, 1.5 s cap; the quit gate awaits this then re-quits */
+  releaseEditLocksOnQuit(): Promise<void> {
+    return this.releaseAllEditLocks(EDIT_LOCK_QUIT_CAP_MS)
+  }
+
+  /**
+   * EL-1(b) fix3 B2: MCP closeTabWithoutPrompt / removeTab and a macOS
+   * clean-window close drop bound paths without confirmClose. One hook,
+   * best-effort, capped like quit. Callers stay fire-and-forget; will-quit
+   * joins the in-flight DELETE under the same single cap (EL1B-BE-R2-1).
+   */
+  async notePathsDropped(paths: string[]): Promise<void> {
+    const sessions: EditLockSession[] = []
+    const droppedPaths: string[] = []
+    for (const path of paths) {
+      if (typeof path !== 'string' || !path) continue
+      // UNI-1959: a name dialog still open for a closed tab is dismissed with it
+      this.cancelFirstSaveFor(path)
+      const key = pathKey(path)
+      const session = this.editLocks.get(key)
+      if (!session) continue
+      this.editLocks.delete(key)
+      sessions.push(session)
+      droppedPaths.push(path)
+    }
+    if (sessions.length === 0) return
+    const work = Promise.all(sessions.map((s) => s.release().catch(() => undefined)))
+    this.inFlightDropReleases.add(work)
+    void work.finally(() => {
+      this.inFlightDropReleases.delete(work)
+    })
+    await this.capped(work, EDIT_LOCK_QUIT_CAP_MS)
+    for (const s of sessions) s.dispose()
+    for (const p of droppedPaths) this.notifyDocStateChanged(p)
+  }
+
+  private async capped(work: Promise<unknown>, capMs: number): Promise<void> {
+    await Promise.race([work.catch(() => undefined), this.sleepMs(capMs)])
+  }
+
+  notePowerResume(): void {
+    for (const session of this.editLocks.values()) void session.wake()
+  }
+
+  noteWindowFocus(): void {
+    for (const session of this.editLocks.values()) {
+      if (session.view().phase === 'other') void session.wake()
+    }
+  }
+
+  /** EL-1(b): "Sửa ở đây" */
+  async editHere(path: string): Promise<UniworkDocStatus | null> {
+    if (typeof path !== 'string') return null
+    const doc = this.store.lookup(path)
+    if (!doc || !this.ownsLocally(doc)) return null
+    let session = this.editLocks.get(pathKey(path))
+    if (!session) {
+      this.startEditLock(doc)
+      session = this.editLocks.get(pathKey(path))
+    }
+    if (!session) return this.statusOf(doc)
+    const ok = await session.editHere()
+    if (!ok) return null
+    const now = this.store.lookup(path)
+    if (!now) return null
+    void this.maybeReplayRemoteAfterUnlock(path)
+    const status = this.statusOf(now)
+    this.publish(status)
+    return status
+  }
+
+  private async maybeReplayRemoteAfterUnlock(path: string): Promise<void> {
+    const doc = this.store.lookup(path)
+    if (!doc) return
+    const phase = this.editLocks.get(pathKey(path))?.view().phase
+    // granted / lock free — leave edit_locked and edit_lock read-only
+    if (phase !== 'held' && phase !== 'free') return
+    const documentId = doc.binding.documentId
+    const held = this.remoteHeld.get(documentId)
+    try {
+      const detail = await this.api().getDocument(documentId)
+      if (held) await this.redecideHeld(documentId)
+      if (compareRevision(detail.revision, doc.binding.baseRevision) > 0) {
+        await this.noteRemoteChange({
+          documentId,
+          revision: detail.revision,
+          version: detail.file.version,
+          versionId: detail.file.versionId ?? null,
+        })
+      }
+    } catch {
+      if (held) await this.redecideHeld(documentId).catch(() => undefined)
+    }
+  }
+
+  private notifyDocStateChanged(path: string): void {
+    if (typeof path !== 'string' || !path) return
+    this.deps.pushDocStateChanged?.(path)
+  }
+
   /** every status push: the shell window, then in-process waiters (close prompt) */
   private publish(status: UniworkDocStatus): void {
-    const full = this.withRemote(this.present(status))
+    const full = this.withRemote(this.present(this.withLockSession(status)))
     this.deps.pushStatus(full)
     for (const listener of [...this.statusListeners]) listener(full)
+    const accessSig = `${full.access}:${full.state === 'blocked' ? (full.error ?? '') : ''}`
+    const sigKey = pathKey(full.path)
+    const prevSig = this.lastPublishedAccess[sigKey]
+    this.lastPublishedAccess[sigKey] = accessSig
+    if (prevSig !== undefined && prevSig !== accessSig) {
+      this.notifyDocStateChanged(full.path)
+    }
     const open = this.conflictPrompt
     if (open && !open.controller.signal.aborted && samePath(open.path, full.path)) {
       if (full.state === 'blocked') {
@@ -1401,7 +1986,24 @@ export class UniworkDocsService {
   }
 
   private statusOf(doc: BoundDocument): UniworkDocStatus {
-    return this.withRemote(this.present(toStatus(doc)))
+    return this.withRemote(this.present(this.withLockSession(toStatus(doc))))
+  }
+
+  /** live lock view on every status (B6: one place, including non-statusOf publishes) */
+  private withLockSession(status: UniworkDocStatus): UniworkDocStatus {
+    const lockSession = this.toLockView(
+      this.editLocks.get(pathKey(status.path))?.view() ?? {
+        phase: 'none',
+        holderName: null,
+        since: null,
+      },
+    )
+    if (!lockSession) {
+      if (!status.lockSession) return status
+      const { lockSession: _dropped, ...rest } = status
+      return rest
+    }
+    return { ...status, lockSession }
   }
 
   /**
@@ -1414,6 +2016,9 @@ export class UniworkDocsService {
     // a poll pass that began before the last Save still sees the pre-Save
     // edits: the next pass reads the editor again
     if (dirty && mark !== undefined && (this.lastUserSave.get(doc.path) ?? 0) > mark) return
+    // UWNM-BE-R4-2: while the naming ask holds a first Save its bytes are unsent
+    // work, however clean the editor that wrote them reads
+    if (!dirty && this.firstSaveOps.has(pathKey(doc.path))) return
     if (dirty === this.editorDirty.has(doc.path)) return
     const before = this.statusOf(doc).state
     if (dirty) this.editorDirty.add(doc.path)
@@ -1462,15 +2067,19 @@ export class UniworkDocsService {
   private liveIdentity(): SessionIdentity | null {
     const identity = this.deps.identity()
     if (!identity) return null
-    const last = this.lastOwner
-    if (
-      !last ||
-      last.accountId !== identity.accountId ||
-      last.deploymentId !== identity.deploymentId
-    ) {
-      const owner = { accountId: identity.accountId, deploymentId: identity.deploymentId }
+    const owner = { accountId: identity.accountId, deploymentId: identity.deploymentId }
+    const sameOwner = (known: LastOwner | null) =>
+      !!known && known.accountId === owner.accountId && known.deploymentId === owner.deploymentId
+    if (!sameOwner(this.lastOwner)) {
       this.lastOwner = owner
-      void this.store.writeLastOwner(owner).catch(() => undefined)
+      // the back-off belongs to the owner whose write failed, not to the next one
+      this.lastOwnerRetryAt = 0
+    }
+    // a failed write is not remembered as persisted: a later observation retries it,
+    // at most once per back-off so a stuck disk does not stall every status read
+    if (!sameOwner(this.lastOwnerOnDisk) && Date.now() >= this.lastOwnerRetryAt) {
+      if (this.store.writeLastOwner(owner)) this.lastOwnerOnDisk = owner
+      else this.lastOwnerRetryAt = Date.now() + LAST_OWNER_RETRY_MS
     }
     return identity
   }
@@ -1531,6 +2140,9 @@ export class UniworkDocsService {
       return false
     }
     if (await this.isSameWorkingCopy(current.path, target)) return false
+    // A106 (UNI-1362): the working-copy root is the app's own folder; a user-picked
+    // export path may never land inside it
+    if (this.store.isInside(target)) return false
     try {
       const localBytes = new Uint8Array(await readFile(current.path))
       await writeFile(target, localBytes)
@@ -1804,7 +2416,9 @@ export class UniworkDocsService {
     const id = randomUUID()
     const dispatcher = new QueueDispatcher({
       intents: async () =>
-        this.deadQueueSessions.has(id) ? { kind: 'unavailable' } : { kind: 'ok', intents },
+        this.queueSession?.id !== id || this.deadQueueSessions.has(id)
+          ? { kind: 'unavailable' }
+          : { kind: 'ok', intents },
       client: {
         upload: (input) =>
           this.api().upload({ ...input, format: input.format as UniworkDocFormat }),
@@ -1850,9 +2464,14 @@ export class UniworkDocsService {
         )
       },
       publish: (record) => {
-        if (this.deadQueueSessions.has(id)) return
+        if (this.queueSession?.id !== id || this.deadQueueSessions.has(id)) return
         this.publishRecord(record)
       },
+      prepareEditLock: (path) => this.prepareEditLock(path),
+      editLockId: (path) => this.editLockIdOf(path),
+      editLockHolder: (path) => this.editLockHolderOf(path),
+      onCommitEditLocked: (path, error) =>
+        this.editLocks.get(pathKey(path))?.markLostFromCommit(error),
     })
     this.queueSession = { id, token, dispatcher, lock, intents, drafts, pause }
     return { kind: 'ok', ...this.queueSession }
@@ -2086,6 +2705,9 @@ export class UniworkDocsService {
    * wiring's `onPoll`), never on its own timer.
    */
   async pollSaveQueue(): Promise<void> {
+    // A3 (UNI-1362): the poll is the lifecycle hook a closed path gets: prune
+    // the ephemeral per-path state no view holds any more before the pass runs
+    this.pruneClosedRemoteState()
     const pass = this.runQueuePass()
     // teardownSaveQueue awaits this very pass, so it must be observable while it runs
     this.queuePass = pass
@@ -2093,6 +2715,36 @@ export class UniworkDocsService {
       await pass
     } finally {
       if (this.queuePass === pass) this.queuePass = null
+    }
+  }
+
+  /**
+   * A3 (UNI-1362): the ephemeral per-path S6 state of a document no view shows
+   * any more. Closing is the shell's (`tab-manager` / `closePathNow`), so the
+   * poll - the one lifecycle the service runs on its own - is where a closed
+   * path's entries go.
+   *
+   * - `editorAi`: the last editor answer of the path (a stale `aiRunning` /
+   *   `aiEpoch`). Kept while a bar is on screen: a `newer-ai` bar re-decides its
+   *   notice on this very memory when the turn ends, and a hidden (`null`) bar
+   *   or no bar at all can never reach that edge. Also kept while a remote
+   *   decision for the path is still in flight: that decision already read the
+   *   sample into its verdict, so dropping it would leave the bar it is about to
+   *   publish with no memory for its own settle edge.
+   * - `remoteReloads`: a per-path reload chain that has already settled. An
+   *   in-flight one is the promise a queued notice waits on and stays.
+   *
+   * The bars, notices, held notices and lock verdicts are authoritative (a
+   * `null` bar is the session's own `later`/`close` decision and a revoke/delete
+   * verdict must outlive the close), so they are left to their own writers and
+   * to the account boundary.
+   */
+  private pruneClosedRemoteState(): void {
+    for (const path of [...this.editorAi.keys()]) {
+      if (this.deps.isPathOpen(path)) continue
+      if (this.remoteDecisions.has(pathKey(path))) continue
+      if (this.remoteBars.get(pathKey(path))) continue
+      this.editorAi.delete(path)
     }
   }
 
@@ -2229,6 +2881,10 @@ export class UniworkDocsService {
     // remembered for the blocked re-probe: a pass that reported offline never
     // sends an access check either
     this.queueOnline = online
+    // EL-1(b): network-back wake (same signal the feed poll / queue uses)
+    if (online) {
+      for (const session of this.editLocks.values()) void session.wake()
+    }
     const access = await this.queueEngine()
     if (access.kind !== 'ok') return
     if (!this.isQueueSessionCurrent(access)) return
@@ -2249,6 +2905,7 @@ export class UniworkDocsService {
 
   /** "Hủy lần lưu" of one document; `closed` = its tab is closed -> kept draft */
   async cancelSave(path: string, closed = false): Promise<void> {
+    if (closed) await this.stopEditLock(path, true)
     if (closed && this.conflictPrompt && samePath(this.conflictPrompt.path, path)) {
       this.endConflictByMain(this.conflictPrompt)
     }
@@ -2343,12 +3000,38 @@ export class UniworkDocsService {
   }
 
   /**
+   * A32 (UNI-1362): a status read revalidates the window-local `other_window`
+   * overlay against the durable lease, because `applyRecord` - the only other
+   * path that clears it - runs only on a queue record push. The holder can
+   * release the lock and no record of this document ever move again: without
+   * this, `present` keeps re-applying a read-only status the window no longer
+   * has. Cosmetic only (`canSave` reads the live dispatcher), so a lock whose
+   * state cannot be read keeps the overlay rather than clearing it on a guess.
+   */
+  private async revalidateOtherWindow(doc: BoundDocument): Promise<void> {
+    if (!this.otherWindowStatus.has(doc.path)) return
+    if (await this.coordinator.holdsOtherWindow(doc.key)) return
+    this.otherWindowStatus.delete(doc.path)
+  }
+
+  /**
    * "Ghi đè" / "Tải lại" / "Lưu lại": the old intent is superseded BEFORE the
    * new one is minted or the base is replaced (EXPERIENCE - Superseded, :239).
    */
   private async supersedePending(doc: BoundDocument): Promise<void> {
     const queueDoc = await this.queueDocFromStore(doc)
     if (queueDoc) await this.coordinator.supersede(queueDoc)
+  }
+
+  /**
+   * `supersedePending` for the conflict actions: the old intent is persisted
+   * `cancelled` now, but the retained upload session's network DELETE is
+   * returned for the caller to run AFTER its local destructive steps, so no
+   * network sits between `saveRacedReplacement` and the last store write.
+   */
+  private async supersedePendingDeferRelease(doc: BoundDocument): Promise<() => Promise<void>> {
+    const queueDoc = await this.queueDocFromStore(doc)
+    return queueDoc ? await this.coordinator.supersedeDeferRelease(queueDoc) : async () => {}
   }
 
   /** the document's stored intent as a queue doc, or null when there is none */
@@ -2439,6 +3122,25 @@ export class UniworkDocsService {
       this.deadQueueSessions.add(session.id)
     }
     this.queueSession = null
+    if (session) this.pruneQueueSessionTombstones(session.id)
+  }
+
+  /**
+   * A30 (UNI-1362): once a session is detached from `queueSession` and every
+   * pass/publish closure has drained, its `id` can never match `queueSession?.id`
+   * again, so the tombstone sets may drop it while stale callbacks stay refused.
+   */
+  private pruneQueueSessionTombstones(id: string): void {
+    const drain = async (): Promise<void> => {
+      await this.queuePass?.catch(() => undefined)
+      if (this.pendingApplyRecords.size > 0) {
+        await Promise.all([...this.pendingApplyRecords])
+      }
+      if (this.queueSession?.id === id) return
+      this.stoppingQueueSessions.delete(id)
+      this.deadQueueSessions.delete(id)
+    }
+    void drain()
   }
 
   /**
@@ -2459,6 +3161,13 @@ export class UniworkDocsService {
     // is already running to unwind (and release its locks) before the records go
     await this.queuePass?.catch(() => undefined)
     this.stopQueue()
+    if (this.pendingApplyRecords.size > 0) {
+      await Promise.all([...this.pendingApplyRecords])
+    }
+    if (session && this.queueSession?.id !== session.id) {
+      this.stoppingQueueSessions.delete(session.id)
+      this.deadQueueSessions.delete(session.id)
+    }
   }
 
   private sleepMs(ms: number): Promise<void> {
@@ -2488,10 +3197,18 @@ export class UniworkDocsService {
       }
     }
     const keystoreLocked = this.storeLocked()
-    const access = !keystoreLocked
-      ? await this.intentAccess()
+    // A62 (UNI-1362): the plan enumerates `target`'s folders, so its intents must
+    // come from `target`'s own store, never the live session's. After an account
+    // switch the next account is already live, and reading through the live scope
+    // planned the leaving account's copies against the wrong account's intents (a
+    // copy with a stored intent could read as clean, and one without as pending).
+    // This is the same owner-scoped open `lockSession` already uses.
+    const open = !keystoreLocked
+      ? await this.openStoreOf(target)
       : ({ kind: 'keystore_locked' } as const)
-    const storeLockedNow = keystoreLocked || access.kind === 'keystore_locked'
+    const intents =
+      open.kind === 'ok' ? createIntentStore(open.records(INTENT_STORE_REGISTRATION.name)) : null
+    const storeLockedNow = keystoreLocked || open.kind === 'keystore_locked'
     const unsavedDocs = new Set<string>()
     const waitingDocs = new Set<string>()
     const ramOnlyDocs = new Set<string>()
@@ -2506,8 +3223,8 @@ export class UniworkDocsService {
         waitingDocs.add(key)
         unsavedDocs.add(key)
       }
-      if (access.kind === 'ok') {
-        const stored = await access.intents.read(key, {
+      if (intents) {
+        const stored = await intents.read(key, {
           orgId: binding.orgId,
           workspaceId: binding.workspaceId,
           baseVersion: binding.baseVersion,
@@ -2564,8 +3281,22 @@ export class UniworkDocsService {
     }
   }
 
-  /** Alias for `planSignOut` used by IPC handler (`UNIWORK_DOC_CHANNELS.signOutPlan`). */
+  /**
+   * Alias for `planSignOut` used by IPC handler (`UNIWORK_DOC_CHANNELS.signOutPlan`).
+   * A87 (UNI-1362): an interactive sign-out plan is always for the live session's
+   * scope (`owner` omitted -> `target` = live identity / lastOwner), so any
+   * entry left behind by a previously cancelled plan of another scope cannot
+   * still be paired with a pending lock and is pruned here without disturbing
+   * `AccountBoundary`'s interleaved `planSignOut(previous)` switch accounting.
+   */
   async signOutPlan(owner?: LastOwner | null): Promise<SignOutPlan> {
+    if (!owner) {
+      const target = this.liveIdentity() ?? this.lastOwner
+      const keepToken = target ? `${target.deploymentId}/${target.accountId}` : null
+      for (const token of [...this.plannedRamOnly.keys()]) {
+        if (token !== keepToken) this.plannedRamOnly.delete(token)
+      }
+    }
     return this.planSignOut(owner)
   }
 
@@ -2590,6 +3321,8 @@ export class UniworkDocsService {
     onWaiting?: () => void,
     options?: { switch?: boolean },
   ): Promise<SignOutLockResult> {
+    // UNI-1993: a source view belongs to the session, not to a stored document: it goes first
+    await this.dropSourceViews()
     const target = owner ?? this.liveIdentity() ?? this.lastOwner
     if (!target) return { ok: true, captureFailed: [] }
     // d5-1: an account switch is already effective, so a refused park cannot
@@ -2603,8 +3336,12 @@ export class UniworkDocsService {
     const planned = this.plannedRamOnly.get(scopeToken)
     this.plannedRamOnly.delete(scopeToken)
 
+    // EL-1(b): release held locks BEFORE the token / runtime go (capped)
+    await this.releaseAllEditLocks(EDIT_LOCK_QUIT_CAP_MS)
+
     // Step 1: stop runtime, block new commits, bounded receipt wait (30s)
     this.sessionEpoch += 1
+    this.endFirstSaveNaming()
     this.deps.stopRuntime?.()
     if (this.queueSession) {
       this.stoppingQueueSessions.add(this.queueSession.id)
@@ -2966,7 +3703,7 @@ export class UniworkDocsService {
       rmSync(accountDir, { recursive: true, force: true })
     }
 
-    // Step 5: clear all 15 in-memory caches on the service
+    // Step 5: clear all 16 in-memory caches on the service
     this.lockedScopes.add(scopeToken)
     // be-10: only the owner's own locks go (`forgetLocksWhere` already matched
     // this account): another account's S11 panel is not this sign-out's to drop
@@ -2983,7 +3720,9 @@ export class UniworkDocsService {
     this.remoteHeld.clear()
     this.ownEcho.clear()
     this.remoteLocked.clear()
+    this.remoteLockPath.clear()
     this.editorAi.clear()
+    this.remoteDecisions.clear()
     this.remoteReloads.clear()
     this.orgMemberNames.clear()
     this.orgMemberNamesOrg = null
@@ -3223,13 +3962,16 @@ export class UniworkDocsService {
 
   private clearSignedOutLocks(): void {
     let cleared = false
+    const clearedPaths: string[] = []
     for (const [key, lock] of [...this.locks]) {
       if (lock.reason === 'signed_out') {
         this.locks.delete(key)
         cleared = true
+        clearedPaths.push(lock.path)
       }
     }
     if (cleared) this.deps.pushLocks?.()
+    for (const p of clearedPaths) this.notifyDocStateChanged(p)
   }
 
   /** whether the durable store holds an intent for `doc`; 'locked' = unreachable now */
@@ -3259,21 +4001,55 @@ export class UniworkDocsService {
     if (!identity) return false
     const dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
     const binding = await this.store.readDir(dir)
-    if (!binding || binding.documentId !== documentId) return false
-    if (KEEP_LOCAL_STATES.has(binding.state) || binding.state === 'saving') return true
-    // the editor holds edits the file does not show yet: keeping the index
-    // entry keeps the tab's document reachable until the save lands
-    if (this.editorDirty.has(join(dir, binding.filename))) return true
-    const access = await this.intentAccess()
-    // the store cannot answer: keep the copy rather than evict local work
-    if (access.kind !== 'ok') return true
-    // the editor signal was read before this await: an editor that turned
-    // dirty while the store was answering is local work too, so re-read it
-    // here instead of evicting the entry the tab still needs
-    return (
-      (await access.intents.get(documentId)) !== null ||
-      this.editorDirty.has(join(dir, binding.filename))
-    )
+    const bound = binding && binding.documentId === documentId ? binding : null
+    if (bound) {
+      if (KEEP_LOCAL_STATES.has(bound.state) || bound.state === 'saving') return true
+      // the editor holds edits the file does not show yet: keeping the index
+      // entry keeps the tab's document reachable until the save lands
+      if (this.editorDirty.has(join(dir, bound.filename))) return true
+      const access = await this.intentAccess()
+      // the store cannot answer: keep the copy rather than evict local work
+      if (access.kind !== 'ok') return true
+      // the editor signal was read before this await: an editor that turned
+      // dirty while the store was answering is local work too, so re-read it
+      // here instead of evicting the entry the tab still needs
+      if ((await access.intents.get(documentId)) !== null) return true
+    }
+    // B34 (UNI-1362): a kept draft - the user's snapshot of a cancelled intent -
+    // is local work as well, and it lives in its own store, never in the intent
+    // one. A closed document whose only local work is a kept draft must still
+    // answer true: the offline library asks this before an unpin deletes the
+    // committed copy, and the feed's resync asks it before evicting the index
+    // entry. Read only: the draft bytes are never touched.
+    //
+    // R1-1: this runs even without a readable binding. A copy whose plaintext
+    // folder the sign-out deleted (never parked: it was clean) or that was
+    // never opened here has no binding at all, and the kept draft of it is
+    // still the user's work - answering "nothing local" there loses it.
+    if ((await this.hasKeptDraft(documentId)) === true) return true
+    return bound ? this.editorDirty.has(join(dir, bound.filename)) : false
+  }
+
+  /**
+   * B34 (UNI-1362): whether the drafts store holds at least one kept draft of
+   * `documentId`. The store is only read, never written.
+   *
+   * R1-2: every outcome that cannot prove "no draft" answers true, because the
+   * callers use this to decide whether deleting or evicting the copy is safe: a
+   * store that will not open, a namespace this build cannot reach, a read the
+   * boundary refused or interrupted, and a read that throws all leave the draft
+   * unproven, so they count as local work. Only a readable record with no
+   * entries answers false.
+   */
+  private async hasKeptDraft(documentId: string): Promise<boolean> {
+    try {
+      const open = await this.openSyncStore()
+      if (open.kind !== 'ok') return true
+      const drafts = createDraftStore(open.records(DRAFTS_STORE_REGISTRATION.name))
+      return (await drafts.has(documentId)) !== false
+    } catch {
+      return true
+    }
   }
 
   /**
@@ -3306,11 +4082,13 @@ export class UniworkDocsService {
       this.sessionOrgId = orgId
       if (prevOrgId !== null && prevOrgId !== orgId) {
         this.sessionEpoch += 1
+        this.endFirstSaveNaming()
       }
     } else if (orgGone) {
       this.sessionOrgId = null
       if (prevOrgId !== null) {
         this.sessionEpoch += 1
+        this.endFirstSaveNaming()
       }
     } else if (this.sessionOrgId === undefined) {
       this.sessionOrgId = prevOrgId
@@ -3443,15 +4221,18 @@ export class UniworkDocsService {
   /** the store opened (again): the keystore_locked panels are stale */
   private clearKeystoreLocks(): void {
     let cleared = false
+    const clearedPaths: string[] = []
     for (const [key, lock] of [...this.locks]) {
       if (lock.reason === 'keystore_locked') {
         this.locks.delete(key)
         cleared = true
+        clearedPaths.push(lock.path)
       }
     }
     // the renderer's list is its own: it must be told the list changed, or a
     // Retry that worked leaves the S11 panel up until some other push
     if (cleared) this.deps.pushLocks?.()
+    for (const p of clearedPaths) this.notifyDocStateChanged(p)
   }
 
   /**
@@ -3497,6 +4278,16 @@ export class UniworkDocsService {
       if (!doc) continue
       this.remoteLocked.delete(doc.binding.documentId)
       this.remoteHeld.delete(doc.binding.documentId)
+      this.remoteLockPath.delete(doc.binding.documentId)
+    }
+    // pathKey lowercases the filename on Windows, so lookup(pathKey) misses
+    // (`Plan.docx` !== `plan.docx`) and the bar loop cannot drop the verdict.
+    // remoteLockPath keeps the real path lockFromServer saw.
+    for (const [documentId, path] of [...this.remoteLockPath]) {
+      if (!match(path)) continue
+      this.remoteLocked.delete(documentId)
+      this.remoteHeld.delete(documentId)
+      this.remoteLockPath.delete(documentId)
     }
   }
 
@@ -3513,6 +4304,7 @@ export class UniworkDocsService {
     }
     this.locks.set(pathKey(lock.path), lock)
     this.deps.pushLock?.(lock)
+    this.notifyDocStateChanged(lock.path)
   }
 
   /**
@@ -3608,8 +4400,10 @@ export class UniworkDocsService {
     // the document key the in-memory lock map is keyed by.
     return (
       found.doc.binding.access === 'view' ||
+      found.doc.binding.shelved === true ||
       !this.ownsLocally(found.doc) ||
-      this.coordinator.isOtherWindow(found.doc.key)
+      this.coordinator.isOtherWindow(found.doc.key) ||
+      this.editLockReadOnly(found.doc.path)
     )
   }
 
@@ -3662,11 +4456,196 @@ export class UniworkDocsService {
       this.refuseMigration(doc)
       return
     }
-    // G5-06u: the user's own Save: a pending intent is not replayed and no
-    // second one is minted; the coordinator asks for the queue popover instead.
-    // Only a shell tab has the pill and popover: a detached editor window keeps
-    // the inline replay, so its Ctrl/Cmd+S is never a silent no-op (RBE6u-03)
+    // UNI-1959: the first save of a document created blank asks name + folder;
+    // the upload below waits for the verdict. An ask already open for this path
+    // is checked BEFORE eligibility is read again: the dialog's own rename
+    // changes the title the fallback predicate reads, and must not release the
+    // hold (BE-2). While it is open the edits the module just wrote are unsent
+    // work, so the copy stays dirty (BE-1) and a second Save only waits.
+    const key = pathKey(doc.path)
+    if (this.firstSaveOps.has(key)) {
+      this.editorDirty.add(doc.path)
+      return
+    }
+    const session = this.wantsFirstSaveName(doc) ? this.captureActionSessionOrNull() : null
+    if (session) {
+      const op: FirstSaveOp = {
+        session,
+        documentId: doc.binding.documentId,
+        requestId: null,
+        cancelled: false,
+      }
+      this.firstSaveOps.set(key, op)
+      this.editorDirty.add(doc.path)
+      void this.askFirstSaveName(op, doc)
+        .then((answer) => {
+          const live = this.firstSaveOpLive(op)
+          if (this.firstSaveOps.get(key) === op) this.endFirstSaveOp(key)
+          // a verdict that lands after the tab closed or the session ended resumes nothing
+          if (!live) return
+          if (answer === 'cancel') {
+            this.afterFirstSaveCancelled(path)
+            return
+          }
+          // only the person's own verdict marks the document named: an unavailable
+          // dialog host (nobody was asked) leaves the next Save to ask
+          if (answer === 'continue') this.markFirstSaveNamed(op)
+          const now = this.store.lookup(path)
+          if (!now || now.binding.documentId !== op.documentId || !this.ownsLocally(now)) return
+          this.editorDirty.delete(now.path)
+          this.saveAfterFirstSaveName(path)
+        })
+        // a store that throws here leaves the op ended and the edits unsent
+        .catch(() => undefined)
+      return
+    }
+    this.saveAfterFirstSaveName(path)
+  }
+
+  /**
+   * G5-06u: the user's own Save: a pending intent is not replayed and no
+   * second one is minted; the coordinator asks for the queue popover instead.
+   * Only a shell tab has the pill and popover: a detached editor window keeps
+   * the inline replay, so its Ctrl/Cmd+S is never a silent no-op (RBE6u-03)
+   */
+  private saveAfterFirstSaveName(path: string): void {
     void this.coordinator.save(path, { userSave: this.deps.isShellTab?.(path) ?? true })
+  }
+
+  /**
+   * UNI-1959 (the web's first-save-naming predicate): a document never saved -
+   * file version 1 - that this app created blank from the menu in this session
+   * or, after a restart, that still carries one of the default blank titles,
+   * and has not been asked yet. Version 1 is the one invariant: a document that
+   * reached version 2 by any save (a detached window, the chip) is never asked.
+   * A detached editor window has no dialog host, so it never asks.
+   */
+  private wantsFirstSaveName(doc: BoundDocument): boolean {
+    if (!this.deps.requestFirstSaveName) return false
+    if (this.deps.isShellTab?.(doc.path) === false) return false
+    const key = this.firstSaveKeyOf(doc.binding.documentId)
+    if (!key) return false
+    if (doc.binding.baseVersion !== 1) {
+      this.createdBlank.delete(key)
+      return false
+    }
+    if (this.firstSaveNamed.has(key)) return false
+    return this.createdBlank.has(key) || isBlankDefaultTitle(doc.binding.title)
+  }
+
+  /** `firstSaveNamed` / `createdBlank` are keyed by account too: a shared document is another account's own question */
+  private firstSaveKeyOf(documentId: string): string | null {
+    const identity = this.deps.identity()
+    return identity ? `${identity.deploymentId}/${identity.accountId}/${documentId}` : null
+  }
+
+  private markFirstSaveNamed(op: FirstSaveOp): void {
+    const key = this.firstSaveKeyOf(op.documentId)
+    if (!key) return
+    this.firstSaveNamed.add(key)
+    this.createdBlank.delete(key)
+  }
+
+  /** the operation may still act: not cancelled, and its session is the live one */
+  private firstSaveOpLive(op: FirstSaveOp): boolean {
+    return !op.cancelled && this.sessionLive(op.session)
+  }
+
+  /** cancel one operation and take its dialog off the renderer's queue */
+  private cancelFirstSaveOp(op: FirstSaveOp): void {
+    if (op.cancelled) return
+    op.cancelled = true
+    for (const [key, held] of this.firstSaveOps) if (held === op) this.endFirstSaveOp(key)
+    if (op.requestId) {
+      try {
+        this.deps.dismissFirstSaveName?.(op.requestId)
+      } catch {
+        // the dialog host is gone with the window; there is nothing to drop
+      }
+    }
+  }
+
+  /** the op of `key` is over: the path is free, and a waiting close starts its upload window */
+  private endFirstSaveOp(key: string): void {
+    this.firstSaveOps.delete(key)
+    for (const listener of [...this.firstSaveOpEnded]) listener(key)
+  }
+
+  /** a tab or window of `path` is gone: its naming operation goes with it */
+  private cancelFirstSaveFor(path: string): void {
+    const op = this.firstSaveOps.get(pathKey(path))
+    if (op) this.cancelFirstSaveOp(op)
+  }
+
+  /** a session boundary: every operation is cancelled and dismissed, and nothing remembered about naming survives */
+  private endFirstSaveNaming(): void {
+    for (const op of [...this.firstSaveOps.values()]) this.cancelFirstSaveOp(op)
+    this.firstSaveOps.clear()
+    this.createdBlank.clear()
+    this.firstSaveNamed.clear()
+  }
+
+  /**
+   * The person gave up naming: nothing is sent and the edits the editor wrote
+   * stay unsent work. The chip is published so a waiting close attempt hears it.
+   */
+  private afterFirstSaveCancelled(path: string): void {
+    const doc = this.store.lookup(path)
+    if (!doc || !this.ownsLocally(doc)) return
+    this.editorDirty.add(doc.path)
+    this.publish(this.statusOf(doc))
+    void this.refreshDirty(doc).catch(() => undefined)
+  }
+
+  /**
+   * Reads where the document sits now, asks the renderer for the dialog and
+   * answers its outcome. Every step is revalidated against the session that
+   * started the operation: metadata that lands after a sign-out, an account or
+   * organization change, or after the tab closed is never shown. An unreadable
+   * document (offline, gone) or a missing / failing dialog host is
+   * `unavailable`: the save is not blocked, but nothing was confirmed.
+   */
+  private async askFirstSaveName(
+    op: FirstSaveOp,
+    doc: BoundDocument,
+  ): Promise<'continue' | 'cancel' | 'unavailable'> {
+    let ref: DocumentRef
+    try {
+      ref = await this.api().documentRef(op.documentId)
+    } catch {
+      return 'unavailable'
+    }
+    if (!this.firstSaveOpLive(op)) return 'cancel'
+    const requestId = `fsn-${randomUUID()}`
+    op.requestId = requestId
+    try {
+      return await this.deps.requestFirstSaveName!({
+        requestId,
+        path: doc.path,
+        documentId: op.documentId,
+        workspaceId: ref.workspaceId || doc.binding.workspaceId,
+        title: ref.title,
+        parentId: ref.parentId,
+      })
+    } catch {
+      return 'unavailable'
+    }
+  }
+
+  /**
+   * EL-1(b) fix6 (VEL-1): an editor module's explicit Save while the bound
+   * working copy is read-only. Never writes and never fires the user-save
+   * hook; asks the shell renderer to open the explain popover for that path.
+   */
+  onReadOnlySave(path: string): void {
+    const doc = typeof path === 'string' ? this.store.lookup(path) : null
+    if (!doc || !this.ownsLocally(doc)) return
+    if (!this.isReadOnly(doc.path)) return
+    const status = this.statusOf(doc)
+    this.publish(status)
+    if (this.deps.isShellTab?.(doc.path) ?? true) {
+      this.deps.pushQueuePopover?.({ path: doc.path })
+    }
   }
 
   // ---- renderer API ----------------------------------------------------------
@@ -3724,6 +4703,15 @@ export class UniworkDocsService {
       const org = this.deps.selectedOrg()
       if (!org) return { documents: [], nextCursor: null }
       const api = this.api()
+      // UNI-2047: type / updater / date filters and the sort go to every workspace
+      const { format, updatedBy, updatedFrom, sort, order } = this.listFiltersOf(query)
+      const filters: UniworkListFilters = {
+        ...(format ? { format } : {}),
+        ...(updatedBy ? { updatedBy } : {}),
+        ...(updatedFrom ? { updatedFrom } : {}),
+        ...(sort ? { sort } : {}),
+        ...(order ? { order } : {}),
+      }
       const workspaces = await api.listWorkspaces(org.id)
       const nameOf = new Map(workspaces.map((ws) => [ws.id, ws.name]))
       const merged = new Map<string, UniworkDocSummary>()
@@ -3733,7 +4721,13 @@ export class UniworkDocsService {
           let pages = 0
           do {
             const page: Awaited<ReturnType<typeof api.listSharedWithMe>> =
-              await api.listSharedWithMe({ workspaceId: ws.id, cursor, limit: SHARED_PAGE_SIZE })
+              await api.listSharedWithMe({
+                workspaceId: ws.id,
+                cursor,
+                limit: SHARED_PAGE_SIZE,
+                ...(query.includePages === true ? { includePages: true } : {}),
+                ...filters,
+              })
             for (const doc of page.documents) {
               if (!merged.has(doc.id)) {
                 merged.set(doc.id, {
@@ -3747,9 +4741,9 @@ export class UniworkDocsService {
           } while (cursor && pages < SHARED_MAX_PAGES && merged.size < SHARED_MAX_ROWS)
         }),
       )
-      const all = [...merged.values()].sort((a, b) =>
-        a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0,
-      )
+      // each workspace answers in its own order, so the merge re-sorts by the
+      // requested key; no sort/order = newest first, as before
+      const all = [...merged.values()].sort(sharedComparator(sort, order))
       const limit = Math.min(
         SHARED_PAGE_SIZE,
         Math.max(1, Math.floor(Number(query.limit) || SHARED_PAGE_SIZE)),
@@ -3865,26 +4859,40 @@ export class UniworkDocsService {
    * response arriving after sign-out, account switch, organization change, or
    * `lockSession` must not reopen a coalescer window for the outgoing scope.
    */
-  private captureActionSessionOrNull(): { identity: SessionIdentity; epoch: number } | null {
+  private captureActionSessionOrNull(): {
+    identity: SessionIdentity
+    epoch: number
+    apiOrigin: string | null
+  } | null {
     const identity = this.liveIdentity()
     if (!identity) return null
     if (this.sessionOrgId === undefined) {
-      this.sessionOrgId = this.deps.selectedOrg()?.id ?? null
+      this.sessionOrgId = this.deps.selectedOrg?.()?.id ?? null
     }
-    return { identity, epoch: this.sessionEpoch }
+    return {
+      identity,
+      epoch: this.sessionEpoch ?? 0,
+      apiOrigin: this.deps.profile?.()?.apiOrigin ?? null,
+    }
   }
 
-  private captureActionSession(): { identity: SessionIdentity; epoch: number } {
+  private captureActionSession(): {
+    identity: SessionIdentity
+    epoch: number
+    apiOrigin: string | null
+  } {
     const session = this.captureActionSessionOrNull()
     if (!session) throw new UniworkDocError('not_signed_in')
     return session
   }
 
-  private pushTreeChangedFor(
-    started: { identity: SessionIdentity; epoch: number },
-    workspaceId: string,
-  ): void {
-    if (this.sessionEpoch !== started.epoch) return
+  /** the session that started an async action is still the live one (same epoch, same device session, same origin) */
+  private sessionLive(started: {
+    identity: SessionIdentity
+    epoch: number
+    apiOrigin?: string | null
+  }): boolean {
+    if ((this.sessionEpoch ?? 0) !== started.epoch) return false
     const current = this.deps.identity()
     const owner = started.identity
     if (
@@ -3893,8 +4901,20 @@ export class UniworkDocsService {
       current.deploymentId !== owner.deploymentId ||
       current.deviceSessionId !== owner.deviceSessionId
     ) {
-      return
+      return false
     }
+    if (started.apiOrigin !== undefined) {
+      const currentOrigin = this.deps.profile?.()?.apiOrigin ?? null
+      if (currentOrigin !== started.apiOrigin) return false
+    }
+    return true
+  }
+
+  private pushTreeChangedFor(
+    started: { identity: SessionIdentity; epoch: number },
+    workspaceId: string,
+  ): void {
+    if (!this.sessionLive(started)) return
     this.deps.pushTreeChanged?.({ workspaceId })
   }
 
@@ -3947,7 +4967,7 @@ export class UniworkDocsService {
   }
 
   /**
-   * Create a blank document (docx/xlsx/pptx) in a workspace/folder. The name is
+   * Create a blank document (docx/xlsx/pptx/md/html/pdf) in a workspace/folder. The name is
    * validated before any call (empty -> `name_empty`, over 500 runes ->
    * `name_too_long`, no request), and the answer is the server document; the
    * caller opens it by id, so no second local copy exists. A duplicate name is
@@ -3966,17 +4986,24 @@ export class UniworkDocsService {
           ...target.create,
           idempotencyKey: this.newIdempotencyKey(),
         })
+        // UNI-1959: a default-named blank (the menu / strip) is never saved yet - its
+        // first user save asks name + folder. A document the person named in the
+        // retained dialog is placed already and never asks (BE-6); a response that
+        // lands after the session ended marks nothing (BE-9).
+        const marked = isBlankDefaultTitle(name) ? this.firstSaveKeyOf(created.id) : null
+        if (marked && this.sessionLive(session)) this.createdBlank.add(marked)
         // FD-11: a new document changes the folder's contents for every view
         this.pushTreeChangedFor(session, target.workspaceId)
         return created
       },
-      { nameField: true },
+      { nameField: true, flagMissingEndpoint: true },
     )
   }
 
   /**
-   * Create an empty UniNote page. The desktop cannot open pages, so the caller
-   * only needs the id to hand it to the web app.
+   * UNI-1953: create a UniNote (a `page`) the way createDocument creates a blank
+   * file: same name check, same My Folder / parent rule, same tree-changed
+   * push. The app has no page editor, so the caller opens the answer on the web.
    */
   createPage(input: UniworkCreatePageInput): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(
@@ -3993,7 +5020,9 @@ export class UniworkDocsService {
         this.pushTreeChangedFor(session, target.workspaceId)
         return created
       },
-      { nameField: true },
+      // a server without the pages route (404 / 501) disables the UniNote kind like
+      // any other create; a folder create keeps ordinary errors (its row never disables)
+      { nameField: true, flagMissingEndpoint: true },
     )
   }
 
@@ -4414,6 +5443,8 @@ export class UniworkDocsService {
     // copy, so a retry from the old path finds a plain file and would create
     // a twin (S01-R1-3)
     if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
+    // S01-R2-4: the same refusal across a restart, from the account's durable record
+    await this.refuseBoundFirstSave(session, owner, tabPath)
     const title = requireName(input.title)
     const filename = basename(tabPath)
     if (!filename || !formatForName(filename)) {
@@ -4542,37 +5573,33 @@ export class UniworkDocsService {
         : 'my_folder'
     const bytesChecksum = sha256Hex(bytes)
     const keyFp = [owner, workspaceId, key, title, destination, bytesChecksum].join('')
-    const idempotencyKey = this.firstSaveKeys.get(keyFp) ?? this.newIdempotencyKey()
-    this.firstSaveKeys.set(keyFp, idempotencyKey)
+    // S01-R2-4: the attempt's key and its durable record, written `pending`
+    // BEFORE the request exists - a restart finds the key the create used
+    const attempt = await this.beginFirstSaveAttempt(session, owner, key, keyFp)
     // one client per save: the create + the bind read share it, so a
     // session landing mid-flight does not turn the second call into a
     // fresh not_signed_in on the same action
     const api = this.api()
-    const created = await api
-      .createFile({
-        workspaceId,
-        bytes,
-        filename,
-        title,
-        idempotencyKey,
-        ...createTarget,
-      })
-      .catch((error: unknown) => {
-        // S01-R2-3: D answered the fingerprint mismatch verdict for this
-        // create - the retained key is wrong for this body and must not pin
-        // the path until restart; drop it so the next retry mints a fresh key,
-        // then answer with the typed (retryable) verdict
-        if (error instanceof UniworkDocError && error.code === 'idempotency_mismatch') {
-          this.firstSaveKeys.delete(keyFp)
-        }
-        // S01-R4-3: the server's own size refusal, after the local preflight
-        // passed - re-wrapped exactly as the upload path does, so the renderer
-        // gets the basename, the size and the cap, never a bare too_large
-        if (error instanceof UniworkDocError && error.code === 'too_large') {
-          rethrowServerTooLarge(error, filename, bytes.byteLength, limits)
-        }
-        throw error
-      })
+    const created = await this.runFirstSaveCreate(attempt, keyFp, (idempotencyKey) =>
+      api
+        .createFile({
+          workspaceId,
+          bytes,
+          filename,
+          title,
+          idempotencyKey,
+          ...createTarget,
+        })
+        .catch((error: unknown) => {
+          // S01-R4-3: the server's own size refusal, after the local preflight
+          // passed - re-wrapped exactly as the upload path does, so the renderer
+          // gets the basename, the size and the cap, never a bare too_large
+          if (error instanceof UniworkDocError && error.code === 'too_large') {
+            rethrowServerTooLarge(error, filename, bytes.byteLength, limits)
+          }
+          throw error
+        }),
+    )
     return await this.bindFirstSaveDocument({
       session,
       owner,
@@ -4584,6 +5611,7 @@ export class UniworkDocsService {
       api,
       created,
       bytesChecksum,
+      attempt,
       onBindFailure: () => this.firstSaveKeys.delete(keyFp),
       writeWorkingCopy: (dir, name) => this.store.writeWorkingCopy(dir, name, bytes),
     })
@@ -4633,8 +5661,9 @@ export class UniworkDocsService {
     // the path may have been bound while the checksum streamed
     if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
     const keyFp = [owner, workspaceId, key, title, destination, bytesChecksum].join('')
-    let idempotencyKey = this.firstSaveKeys.get(keyFp) ?? this.newIdempotencyKey()
-    this.firstSaveKeys.set(keyFp, idempotencyKey)
+    // S01-R2-4: see the buffered path - the durable record carries the key
+    const attempt = await this.beginFirstSaveAttempt(session, owner, key, keyFp)
+    let idempotencyKey = attempt.idempotencyKey
     const api = this.api()
     const probe = await readLocalFileProbe({ path: tabPath }, size, filename)
     const parentId = await this.uploadSessionParentId(api, {
@@ -4667,9 +5696,16 @@ export class UniworkDocsService {
         // server no longer knows) restarts under a NEW key, and the rejected
         // one is dropped so no later retry of these bytes reuses it
         freshIdempotencyKey: () => this.newIdempotencyKey(),
-        onIdempotencyKey: (fresh) => {
+        onIdempotencyKey: async (fresh) => {
           this.firstSaveKeys.set(keyFp, fresh)
+          // the key this run leaves (refused, expired or unknown to D) is spent
+          this.spentFirstSaveKeys.add(attempt.idempotencyKey)
           idempotencyKey = fresh
+          // S01-R2-4: the record follows the key the run adopted (a restored key
+          // D no longer knows, or one it refused, is replaced for good)
+          attempt.idempotencyKey = fresh
+          attempt.restored = false
+          await this.saveFirstSaveRecord(attempt, { state: 'pending' })
         },
         onSessionState: async (state) => {
           await store?.put(resumeKey, {
@@ -4698,6 +5734,12 @@ export class UniworkDocsService {
       if (error instanceof UniworkDocError && error.code === 'too_large') {
         rethrowServerTooLarge(error, filename, size, input.limits)
       }
+      if (error instanceof UniworkDocError && error.code === 'idempotency_mismatch') {
+        // S01-R2-4: the key D refused is spent - not for this process, not for the next
+        this.firstSaveKeys.delete(keyFp)
+        this.spentFirstSaveKeys.add(attempt.idempotencyKey)
+        await this.dropFirstSaveRecord(attempt)
+      }
       throw error
     }
     await store?.remove(resumeKey)
@@ -4723,6 +5765,7 @@ export class UniworkDocsService {
       api,
       created,
       bytesChecksum,
+      attempt,
       onBindFailure: () => this.firstSaveKeys.delete(keyFp),
       writeWorkingCopy: (dir, name) => this.store.copyIntoWorkingCopy(dir, name, tabPath),
       verifyWorkingCopy: async (copiedPath, serverChecksum) => {
@@ -4759,6 +5802,8 @@ export class UniworkDocsService {
     api: UniworkDocsClient
     created: UniworkDocSummary
     bytesChecksum: string
+    /** S01-R2-4: the durable record of this attempt, kept in step with the bind */
+    attempt: FirstSaveAttempt
     writeWorkingCopy(dir: string, name: string): Promise<string>
     /** R1-BE-04: proves the copied working copy matches the uploaded bytes, or throws */
     verifyWorkingCopy?(copiedPath: string, serverChecksum: string): Promise<void>
@@ -4766,6 +5811,26 @@ export class UniworkDocsService {
   }): Promise<UniworkDocSummary> {
     const { session, owner, tabPath, key, title, filename, api, created, bytesChecksum } = input
     const createdTitle = created.title || title
+    // S01-R2-4 fix2: ONE overwrite guard, whatever the key's provenance (fresh,
+    // restored, cached across a retry) and whatever the copy's save state. A key
+    // that answers a document whose store folder holds anything - a binding of any
+    // state or schema, an unreadable one, any file - or whose folder cannot be
+    // inspected has been bound before: its copy may hold edits. Nothing is
+    // written, nothing is archived (outside the compensating try on purpose), the
+    // record catches up to `bound` and the existing `conflict` verdict answers.
+    // Only an absent or empty folder binds; a fresh key yields a fresh document id,
+    // so the guard costs nothing on the ordinary path.
+    const held = await this.inspectFirstSaveFolder(session.identity, created.id)
+    if (held.kind === 'held') {
+      this.firstSaveDone.add(`${owner}${key}`)
+      input.onBindFailure()
+      await this.saveFirstSaveRecord(input.attempt, {
+        state: 'bound',
+        documentId: created.id,
+        ...(held.copy ? { workingCopyPath: held.copy } : {}),
+      })
+      throw new UniworkDocError('conflict')
+    }
     // S01-R2-6: the written working copy is tracked so the compensation catch
     // can remove it on EVERY bind failure - a store.write that throws strands
     // it just like the sweep-refusal branch below did
@@ -4826,6 +5891,12 @@ export class UniworkDocsService {
       // retry of this path is refused by firstSaveDone above.
       this.firstSaveDone.add(`${owner}${key}`)
       input.onBindFailure()
+      // S01-R2-4: the same fact, durably: a restart refuses the original too
+      await this.saveFirstSaveRecord(input.attempt, {
+        state: 'bound',
+        documentId: created.id,
+        workingCopyPath: path,
+      })
       try {
         this.deps.notifyPathRenamed?.(tabPath, path)
       } catch (error) {
@@ -4833,7 +5904,10 @@ export class UniworkDocsService {
       }
       try {
         const doc = this.store.lookup(path)
-        if (doc) this.publish(toStatus(doc))
+        if (doc) {
+          if (doc.binding.access === 'edit') this.startEditLock(doc)
+          this.publish(toStatus(doc))
+        }
       } catch (error) {
         console.warn('uniwork docs: first-save: the status push failed:', error)
       }
@@ -4883,11 +5957,279 @@ export class UniworkDocsService {
       // compensated: the attempt's key is spent - a retry re-creates (binding
       // the trashed row would resurrect it without its own save)
       input.onBindFailure()
+      await this.dropFirstSaveRecord(input.attempt)
       const raced = error instanceof UniworkDocError && error.code === 'conflict'
       throw new UniworkDocError(
         (raced ? 'conflict' : 'first_save_bind_failed') as UniworkDocErrorCode,
         { documentId: created.id, documentTitle: createdTitle },
       )
+    }
+  }
+
+  /**
+   * S01-R2-4: the durable first-save record store of the live session, or null
+   * when there is none to use (no store, a locked keychain, or the session moved
+   * off the account the action started under: a record is never read or written
+   * for another owner).
+   */
+  private async firstSaveStore(session: {
+    identity: SessionIdentity
+  }): Promise<FirstSaveStore | null> {
+    const sync = this.deps.syncStore
+    if (!sync) return null
+    const scoped = (): boolean => {
+      const live = sync.scope()
+      return (
+        !!live &&
+        live.deploymentId === session.identity.deploymentId &&
+        live.accountId === session.identity.accountId
+      )
+    }
+    if (!scoped()) return null
+    // S01-R2-4 fix2 (R1-23): the service-level open runs the one-time legacy sweep,
+    // and it is ONE promise every caller joins - its handle can be the account that
+    // started it while the session has since moved on. It is awaited for the sweep
+    // only; the records come from the access itself, which opens the live scope's
+    // own handle, checked against the scope this action started under.
+    const swept = await this.openSyncStore().catch(() => null)
+    if (!swept || swept.kind !== 'ok' || !scoped()) return null
+    const own = await sync.open().catch(() => null)
+    if (!own || own.kind !== 'ok' || !scoped()) return null
+    return createFirstSaveStore(own.records(FIRST_SAVES_STORE_REGISTRATION.name))
+  }
+
+  /**
+   * S01-R2-4: a restart forgets `firstSaveDone`, and the original file is still
+   * plain. A `bound` record whose document this machine still holds (a binding of
+   * any non-terminal state and its working copy, see `firstSaveCopyState`) means
+   * the original already is a UniWork document: refuse with the same `conflict`
+   * the in-process guard answers, before any flush, read or request. A record
+   * whose document is gone (the working copy or the store folder was removed, the
+   * store wiped, the document archived or lost) is stale and never blocks a
+   * legitimate first save: it is dropped.
+   */
+  private async refuseBoundFirstSave(
+    session: { identity: SessionIdentity },
+    owner: string,
+    tabPath: string,
+  ): Promise<void> {
+    const store = await this.firstSaveStore(session)
+    if (!store) return
+    const recordKey = firstSaveKey(owner, pathKey(tabPath))
+    const saved = await store.get(recordKey).catch(() => null)
+    if (saved?.state !== 'bound' || !saved.documentId) return
+    const copy = await this.firstSaveCopyState(session.identity, saved.documentId)
+    if (copy.live) {
+      // a rename of the document moves its closed copy: the record follows the binding
+      if (copy.path && copy.path !== saved.workingCopyPath) {
+        await store
+          .put(recordKey, { ...saved, workingCopyPath: copy.path, at: new Date().toISOString() })
+          .catch(() => undefined)
+      }
+      throw new UniworkDocError('conflict')
+    }
+    await store.remove(recordKey).catch(() => undefined)
+  }
+
+  /**
+   * Is `documentId` still held on this machine? The binding.json of its store
+   * folder decides, and its CURRENT file name (not the path the record was made
+   * with) names the working copy. Live unless the account lost the document:
+   * a binding in any state but a terminal one (archived / deleted / access lost)
+   * whose copy exists. Only a missing binding.json or copy says it is gone; any
+   * other answer (an unreadable binding, a newer schema, a stat or read error)
+   * is unknown, and unknown is live - a record is never dropped on a guess.
+   */
+  private async firstSaveCopyState(
+    identity: SessionIdentity,
+    documentId: string,
+  ): Promise<{ live: false } | { live: true; path?: string }> {
+    let dir: string
+    try {
+      dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    } catch {
+      return { live: false }
+    }
+    let raw: unknown
+    try {
+      raw = JSON.parse(await readFile(join(dir, BINDING_FILE), 'utf8'))
+    } catch (error) {
+      return isAbsentPath(error) ? { live: false } : { live: true }
+    }
+    if (bindingKindOf(raw) === 'newer') return { live: true }
+    const binding = parseBinding(raw)
+    if (!binding) return { live: true }
+    if (binding.documentId !== documentId) return { live: false }
+    if (
+      binding.state === 'blocked' &&
+      binding.error &&
+      FIRST_SAVE_ENDED_ERRORS.has(binding.error)
+    ) {
+      return { live: false }
+    }
+    const path = join(dir, binding.filename)
+    try {
+      return (await stat(path)).isFile() ? { live: true, path } : { live: false }
+    } catch (error) {
+      return isAbsentPath(error) ? { live: false } : { live: true, path }
+    }
+  }
+
+  /**
+   * S01-R2-4 fix2: what the store folder of a created or replayed document holds
+   * before the bind writes into it. Only a folder that is confirmed absent (ENOENT)
+   * or empty is `free`; any entry (a binding of any state or schema, an unreadable
+   * one, a working copy, a stray file) and any failure to look (EIO, EPERM: unknown)
+   * is `held`, and `copy` is the working copy the CURRENT binding names when it reads.
+   */
+  private async inspectFirstSaveFolder(
+    identity: SessionIdentity,
+    documentId: string,
+  ): Promise<{ kind: 'free' } | { kind: 'held'; copy?: string }> {
+    let dir: string
+    try {
+      dir = this.store.dirFor(identity.deploymentId, identity.accountId, documentId)
+    } catch {
+      // not a folder name at all: the bind refuses it and compensates as before
+      return { kind: 'free' }
+    }
+    let names: string[]
+    try {
+      names = await readdir(dir)
+    } catch (error) {
+      return errorCodeOf(error) === 'ENOENT' ? { kind: 'free' } : { kind: 'held' }
+    }
+    if (names.length === 0) return { kind: 'free' }
+    const binding = await this.store.readDir(dir)
+    return {
+      kind: 'held',
+      ...(binding && binding.documentId === documentId
+        ? { copy: join(dir, binding.filename) }
+        : {}),
+    }
+  }
+
+  /**
+   * S01-R2-4: the Idempotency-Key of this attempt and its durable `pending`
+   * record, written BEFORE the create request. In process the key is the one
+   * `firstSaveKeys` holds; after a restart it is the key of a `pending` record
+   * of the SAME fingerprint (workspace, title, destination, bytes) - D replays
+   * a create it committed to the same document, so the retry binds that one
+   * instead of minting a twin. Another fingerprint is another attempt: a new key.
+   */
+  private async beginFirstSaveAttempt(
+    session: { identity: SessionIdentity },
+    owner: string,
+    key: string,
+    keyFp: string,
+  ): Promise<FirstSaveAttempt> {
+    const store = await this.firstSaveStore(session)
+    const recordKey = firstSaveKey(owner, key)
+    const fingerprint = sha256Hex(new TextEncoder().encode(keyFp))
+    let idempotencyKey = this.firstSaveKeys.get(keyFp)
+    let restored = false
+    if (!idempotencyKey) {
+      const saved = await store?.get(recordKey).catch(() => null)
+      if (
+        saved?.state === 'pending' &&
+        saved.fingerprint === fingerprint &&
+        !this.spentFirstSaveKeys.has(saved.idempotencyKey)
+      ) {
+        idempotencyKey = saved.idempotencyKey
+        restored = true
+      }
+    }
+    idempotencyKey ??= this.newIdempotencyKey()
+    this.firstSaveKeys.set(keyFp, idempotencyKey)
+    const attempt: FirstSaveAttempt = { store, recordKey, idempotencyKey, fingerprint, restored }
+    await this.saveFirstSaveRecord(attempt, { state: 'pending' })
+    return attempt
+  }
+
+  /**
+   * S01-R2-4: one first-save create under the attempt's key. A key restored from
+   * the durable record is a REPLAY of an earlier run: D answers the document it
+   * committed, and for a create it never committed (409 document_upload_invalid,
+   * the staged claim expired) or whose document is gone (404) nothing exists
+   * under the key any more - the record is dropped and the create is made ONCE
+   * more under a new key (the person asked to save now). A fingerprint mismatch
+   * (the key is for another body) drops the record and the retained key, and the
+   * typed, retryable verdict answers: the next try mints a fresh key.
+   */
+  private async runFirstSaveCreate<T>(
+    attempt: FirstSaveAttempt,
+    keyFp: string,
+    create: (idempotencyKey: string) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await create(attempt.idempotencyKey)
+    } catch (error) {
+      if (error instanceof UniworkDocError && error.code === 'idempotency_mismatch') {
+        // S01-R2-3: the retained key is wrong for this body and must not pin
+        // the path until restart
+        this.firstSaveKeys.delete(keyFp)
+        this.spentFirstSaveKeys.add(attempt.idempotencyKey)
+        await this.dropFirstSaveRecord(attempt)
+      } else if (
+        attempt.restored &&
+        error instanceof UniworkDocError &&
+        (error.status === 404 ||
+          (error.status === 409 && error.serverCode === 'document_upload_invalid'))
+      ) {
+        this.spentFirstSaveKeys.add(attempt.idempotencyKey)
+        await this.dropFirstSaveRecord(attempt)
+        attempt.idempotencyKey = this.newIdempotencyKey()
+        attempt.restored = false
+        this.firstSaveKeys.set(keyFp, attempt.idempotencyKey)
+        await this.saveFirstSaveRecord(attempt, { state: 'pending' })
+        return await create(attempt.idempotencyKey).catch(async (again: unknown) => {
+          if (again instanceof UniworkDocError && again.code === 'idempotency_mismatch') {
+            this.firstSaveKeys.delete(keyFp)
+            this.spentFirstSaveKeys.add(attempt.idempotencyKey)
+            await this.dropFirstSaveRecord(attempt)
+          }
+          throw again
+        })
+      }
+      throw error
+    }
+  }
+
+  /**
+   * S01-R2-4: writes the attempt's record. The record is bookkeeping for the next
+   * start: a store that is missing, locked or full never fails the save itself.
+   */
+  private async saveFirstSaveRecord(
+    attempt: FirstSaveAttempt,
+    state: { state: 'pending' } | { state: 'bound'; documentId: string; workingCopyPath?: string },
+  ): Promise<void> {
+    if (!attempt.store) return
+    try {
+      const written = await attempt.store.put(attempt.recordKey, {
+        idempotencyKey: attempt.idempotencyKey,
+        fingerprint: attempt.fingerprint,
+        ...state,
+        at: new Date().toISOString(),
+      })
+      if (written.kind !== 'ok') {
+        console.warn('uniwork docs: first-save: the restart record was not stored:', written.kind)
+      }
+    } catch {
+      console.warn('uniwork docs: first-save: the restart record was not stored')
+    }
+  }
+
+  /** S01-R2-4: removes the attempt's own `pending` record, never a newer attempt's or a bound one */
+  private async dropFirstSaveRecord(attempt: FirstSaveAttempt): Promise<void> {
+    const store = attempt.store
+    if (!store) return
+    try {
+      const saved = await store.get(attempt.recordKey)
+      if (saved?.state === 'pending' && saved.idempotencyKey === attempt.idempotencyKey) {
+        await store.remove(attempt.recordKey)
+      }
+    } catch {
+      // bookkeeping only: a stale record is dropped by the next reconcile
     }
   }
 
@@ -4964,6 +6306,7 @@ export class UniworkDocsService {
   renameDocument(
     documentId: string,
     name: string,
+    options?: { shareWithWorkspace?: boolean },
   ): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(
       async () => {
@@ -4979,15 +6322,28 @@ export class UniworkDocsService {
         if (ref.myLevel !== 'edit' && ref.myLevel !== 'manage') {
           throw new UniworkDocError('forbidden')
         }
-        if (title === ref.title) return this.summaryOf(ref)
-        const renamed = await this.api().rename({ documentId, revision: ref.revision, title })
+        // SD-D2, the web's first-save rule (first-save-naming.tsx): the PATCH also carries
+        // `visibility: "workspace"` only for a manager and only while the document is not
+        // already shared; only a literal true asks for it
+        const shareNow =
+          options?.shareWithWorkspace === true &&
+          ref.myLevel === 'manage' &&
+          ref.visibility !== 'workspace'
+        if (title === ref.title && !shareNow) return this.summaryOf(ref)
+        const renamed = await this.api().rename({
+          documentId,
+          revision: ref.revision,
+          title,
+          ...(shareNow ? { visibility: 'workspace' as const } : {}),
+        })
         // this service's own rename: only the revision it produced is its echo,
         // so a genuine later change for another revision is still followed (R1-6)
         this.selfRenamed.set(documentId, renamed.revision)
         // FD-11: the row's title changed for every view of the tree (not for a
         // no-op rename, which returned above)
         this.pushTreeChangedFor(session, renamed.summary.workspaceId)
-        await this.afterLocalRename(documentId, renamed.summary.title)
+        // a share-only PATCH keeps the title: the working copy has nothing to follow
+        if (title !== ref.title) await this.afterLocalRename(documentId, renamed.summary.title)
         return renamed.summary
       },
       { nameField: true },
@@ -5000,16 +6356,34 @@ export class UniworkDocsService {
       if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
       if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
       await this.requireManage(documentId)
-      return this.api().archive(documentId, this.newIdempotencyKey())
+      const session = this.captureActionSession()
+      const archived = await this.api().archive(documentId, this.newIdempotencyKey())
+      // S01-R2-4 fix2: an archived document is no longer the one its original was
+      // first-saved into; the record ends, the user's bytes are not touched
+      await this.endFirstSaveRecords(session, documentId)
+      return archived
     })
+  }
+
+  /** S01-R2-4 fix2: removes this account's first-save records of `documentId`; bookkeeping only, never fails the caller */
+  private async endFirstSaveRecords(
+    session: { identity: SessionIdentity },
+    documentId: string,
+  ): Promise<void> {
+    try {
+      const store = await this.firstSaveStore(session)
+      await store?.removeForDocument(documentId)
+    } catch {
+      // a record left behind is only a stale one: nothing is lost by it
+    }
   }
 
   /** S18: restore an archived document (only its own archive batch comes back) */
   restoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
     return actionResult(async () => {
-      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const session = this.captureActionSession()
       if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
-      await this.requireManage(documentId)
+      await this.requireManageAnyKind(documentId, session)
       return this.api().restore(documentId, this.newIdempotencyKey())
     })
   }
@@ -5217,15 +6591,35 @@ export class UniworkDocsService {
     if (names.size === 0) return rows
     return rows.map((row) => {
       const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
-      return updatedByName ? { ...row, updatedByName } : row
+      // UNI-2047: the trash's "deleted by"; a former member stays unnamed
+      const archivedByName = row.archivedById ? names.get(row.archivedById)?.trim() : undefined
+      return updatedByName || archivedByName
+        ? {
+            ...row,
+            ...(updatedByName ? { updatedByName } : {}),
+            ...(archivedByName ? { archivedByName } : {}),
+          }
+        : row
     })
   }
 
+  /**
+   * The IPC boundary of the list filters: a value outside the server's
+   * vocabulary (sort / order / activity) or of the wrong type is dropped, so an
+   * unset query stays today's request and a stray value never leaves.
+   */
   private listFiltersOf(q: UniworkListFilters): UniworkListFilters {
     return {
-      ...(typeof q.format === 'string' && q.format ? { format: q.format } : {}),
+      // a UniNote has no file format: the server answers 400 invalid_filter to both together
+      ...(typeof q.format === 'string' && q.format && q.kind !== 'page'
+        ? { format: q.format }
+        : {}),
+      ...(q.kind === 'page' ? { kind: q.kind } : {}),
       ...(typeof q.updatedBy === 'string' && q.updatedBy ? { updatedBy: q.updatedBy } : {}),
       ...(typeof q.updatedFrom === 'string' && q.updatedFrom ? { updatedFrom: q.updatedFrom } : {}),
+      ...(isListSort(q.sort) ? { sort: q.sort } : {}),
+      ...(q.order === 'asc' || q.order === 'desc' ? { order: q.order } : {}),
+      ...(q.activity === 'opened' || q.activity === 'edited' ? { activity: q.activity } : {}),
     }
   }
 
@@ -5252,6 +6646,7 @@ export class UniworkDocsService {
         ...(typeof query.query === 'string' ? { query: query.query } : {}),
         ...(typeof query.cursor === 'string' ? { cursor: query.cursor } : {}),
         ...(typeof query.limit === 'number' ? { limit: query.limit } : {}),
+        ...(query.includePages === true ? { includePages: true } : {}),
         ...this.listFiltersOf(query),
       })
       const documents = await this.enrichWorkspaceRows(query.workspaceId, page.documents)
@@ -5297,19 +6692,356 @@ export class UniworkDocsService {
     })
   }
 
+  /**
+   * UNI-2047 B6: the caller's stars in one workspace (SV-2, newest star first, paged). The route
+   * reads only the type, the kind, the sort and the paging, so the editor / date / activity filters
+   * stop here; an older server's 404 comes back as the usual `not_found` error result.
+   */
+  listFavorites(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      const { format, kind, sort, order } = this.listFiltersOf(q)
+      const page = await this.api().listFavorites({
+        workspaceId: q.workspaceId,
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...(format ? { format } : {}),
+        ...(kind ? { kind } : {}),
+        ...(sort ? { sort } : {}),
+        ...(order ? { order } : {}),
+      })
+      const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /** UNI-2047 B6: Gắn sao - the server checks the view level and answers the same on a repeat */
+  favoriteDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocFavoriteResult>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      return this.api().favorite(documentId)
+    })
+  }
+
+  /** UNI-2047 B6: Bỏ gắn sao - a star that is not there is still a success on the server */
+  unfavoriteDocument(documentId: string): Promise<UniworkDocActionResult<{ documentId: string }>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.api().unfavorite(documentId)
+      return { documentId }
+    })
+  }
+
+  /** UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf (paged, shelved_at DESC) */
+  listShelved(q: UniworkShelvedQuery): Promise<UniworkResult<UniworkDocListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      // UNI-2047: the shelf takes the type filter and the sort, nothing else
+      const { format, kind, sort, order } = this.listFiltersOf(q)
+      const page = await this.api().listShelved({
+        workspaceId: q.workspaceId,
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+        ...(format ? { format } : {}),
+        ...(kind ? { kind } : {}),
+        ...(sort ? { sort } : {}),
+        ...(order ? { order } : {}),
+      })
+      const documents = await this.enrichShelvedRows(q.workspaceId, page.documents)
+      return { documents, nextCursor: page.nextCursor }
+    })
+  }
+
+  /** UNI-1961: the Documents home's "other sources" files (owner names come from the server) */
+  listSources(q: UniworkSourceListQuery): Promise<UniworkResult<UniworkSourceListPage>> {
+    return result(async () => {
+      if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
+        throw new UniworkDocError('not_found')
+      }
+      return this.api().listSources({
+        workspaceId: q.workspaceId,
+        ...(typeof q.source === 'string' ? { source: q.source } : {}),
+        ...(typeof q.type === 'string' ? { type: q.type } : {}),
+        ...(typeof q.q === 'string' ? { q: q.q } : {}),
+        ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
+        ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
+      })
+    })
+  }
+
+  /**
+   * UNI-1961: the updater and the shelver by name. An id the member list does
+   * not hold is a former member; with no member list at all nothing is
+   * guessed (the renderer shows "—").
+   */
+  private async enrichShelvedRows(
+    workspaceId: string,
+    rows: UniworkDocSummary[],
+  ): Promise<UniworkDocSummary[]> {
+    const names = await this.memberNamesForWorkspace(workspaceId)
+    if (names.size === 0) return rows
+    return rows.map((row) => {
+      const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
+      const shelvedByName = row.shelvedById ? names.get(row.shelvedById)?.trim() : undefined
+      return {
+        ...row,
+        ...(updatedByName ? { updatedByName } : {}),
+        ...(shelvedByName
+          ? { shelvedByName }
+          : row.shelvedById && !names.has(row.shelvedById)
+            ? { shelvedByFormer: true }
+            : {}),
+      }
+    })
+  }
+
+  /** UNI-1961: Bỏ lưu trữ, for a shelved item of any kind the caller manages */
+  unshelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>> {
+    return actionResult(async () => {
+      const session = this.captureActionSession()
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManageAnyKind(documentId, session)
+      const res = await this.api().unshelve(documentId, this.newIdempotencyKey())
+      await this.afterLocalShelveChange(session, documentId, false, res.affected)
+      return res
+    })
+  }
+
+  /**
+   * UNI-1961: Chuyển vào thùng rác from Lưu trữ - the same trash route as
+   * `archiveDocument`, gated by the kind-agnostic manage read so a shelved
+   * folder or page can go too (`archiveDocument` itself stays file-only).
+   */
+  trashShelvedDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(async () => {
+      const session = this.captureActionSession()
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManageAnyKind(documentId, session)
+      const archived = await this.api().archive(documentId, this.newIdempotencyKey())
+      await this.endFirstSaveRecords(session, documentId)
+      return archived
+    })
+  }
+
+  /** UNI-1961: Lưu trữ a live item the caller manages (the web's row ⋯ "Lưu trữ") */
+  shelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>> {
+    return actionResult(async () => {
+      const session = this.captureActionSession()
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManageAnyKind(documentId, session)
+      const res = await this.api().shelve(documentId, this.newIdempotencyKey())
+      await this.afterLocalShelveChange(session, documentId, true, res.affected)
+      return res
+    })
+  }
+
+  /**
+   * UNI-1961 (R1-7): refresh any locally bound copy touched by a shelve or
+   * unshelve action so main-process read-only, save, comment, and edit-lock
+   * policy stay consistent with the server without altering the stored ACL (`level`).
+   */
+  private async afterLocalShelveChange(
+    session: { identity: SessionIdentity; epoch: number; apiOrigin?: string | null },
+    documentId: string,
+    shelved: boolean,
+    affected: readonly string[] = [],
+  ): Promise<void> {
+    if (!this.sessionLive(session) || typeof this.store?.dirFor !== 'function') return
+    const ids = new Set<string>([documentId, ...affected])
+    for (const id of ids) {
+      if (typeof id !== 'string' || !id) continue
+      const dir = this.store.dirFor(session.identity.deploymentId, session.identity.accountId, id)
+      const existing = await this.store.readDir(dir)
+      if (!existing || existing.documentId !== id) continue
+      const local = join(dir, existing.filename)
+      const doc = this.store.lookup(local)
+      if (!doc || doc.binding.documentId !== id || !this.store.exists(doc.path)) continue
+      if (shelved) await this.stopEditLock(doc.path, true)
+      if (!this.sessionLive(session)) return
+      const prevGen = this.localPolicyGen.get(id) ?? 0
+      let advancedGen = false
+      let fresh: BoundDocument | null
+      try {
+        fresh = await this.coordinator.updateBinding(doc, (latest) => {
+          const preservedLevel = latest.level ?? (latest.access === 'edit' ? 'edit' : undefined)
+          const next: Binding = {
+            ...latest,
+            ...(preservedLevel ? { level: preservedLevel } : {}),
+          }
+          if (shelved) {
+            next.shelved = true
+            next.access = 'view'
+          } else {
+            delete next.shelved
+            next.access = accessFor(next.level ?? null)
+          }
+          this.localPolicyGen.set(id, prevGen + 1)
+          advancedGen = true
+          return next
+        })
+      } catch (error) {
+        if (advancedGen) this.localPolicyGen.set(id, prevGen)
+        throw error
+      }
+      if (fresh) {
+        this.notifyDocStateChanged(fresh.path)
+        if (!shelved && fresh.binding.access === 'edit' && this.deps.isPathOpen(fresh.path)) {
+          this.startEditLock(fresh)
+        }
+      } else if (advancedGen) {
+        this.localPolicyGen.set(id, prevGen)
+      }
+    }
+  }
+
+  /** UNI-1961: manage (or admin_scope, the web's canManageTrashed) on a row of any kind */
+  private async requireManageAnyKind(
+    documentId: string,
+    session = this.captureActionSession(),
+  ): Promise<void> {
+    const ref = await this.api().documentManageRef(documentId)
+    if (!this.sessionLive(session)) throw new UniworkDocError('not_signed_in')
+    if (ref.myLevel !== 'manage' && !ref.adminScope) throw new UniworkDocError('forbidden')
+  }
+
+  /**
+   * UNI-1961: a source row's Download (the web's primary action when it cannot
+   * view the file): the save dialog suggests the file's own name, then the
+   * bytes are read and written there. A cancelled dialog reads nothing.
+   */
+  downloadSource(
+    input: UniworkSourceDownloadInput,
+  ): Promise<UniworkResult<{ path: string | null }>> {
+    return result(async () => {
+      if (!input || typeof input.workspaceId !== 'string' || typeof input.sourceId !== 'string') {
+        throw new UniworkDocError('not_found')
+      }
+      // refused ids never open the dialog
+      uniworkId(input.workspaceId)
+      uniworkSourceId(input.sourceId)
+      const target = (await this.deps.pickDownloadPath?.(sourceFileName(input.name))) ?? null
+      if (!target) return { path: null }
+      // A106 (UNI-1362) + R1-6: the working-copy root is the app's own folder
+      if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
+      const { bytes } = await this.api().downloadSource(input.workspaceId, input.sourceId)
+      if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
+      const resolvedTarget = resolve(target)
+      const tmp = join(dirname(resolvedTarget), `.uw-dl-${randomBytes(8).toString('hex')}.tmp`)
+      let createdTmp = false
+      try {
+        const existingStat = await lstat(resolvedTarget).catch(() => null)
+        const targetMode = existingStat?.isFile() ? existingStat.mode & 0o777 : 0o600
+        const handle = await open(tmp, 'wx', 0o600)
+        createdTmp = true
+        try {
+          await handle.writeFile(bytes)
+          await handle.chmod(targetMode)
+        } finally {
+          await handle.close()
+        }
+        if (await this.isForbiddenDownloadTarget(target)) throw new UniworkDocError('forbidden')
+        await rename(tmp, resolvedTarget)
+      } catch (error) {
+        if (createdTmp) await unlink(tmp).catch(() => undefined)
+        throw error
+      }
+      return { path: target }
+    })
+  }
+
+  /** UNI-1993: opens a Workspace source file as a view-only tab (see ./source-view) */
+  openSource(input: unknown): Promise<SourceViewResult<OpenSourceValue>> {
+    return this.sourceViewOpener.openSource(input)
+  }
+
+  /** UNI-1993: the tab chip's state of a path; null unless it is a source view */
+  sourceViewState(path: string): SourceViewState | null {
+    return this.sourceViews.meta(path)
+  }
+
+  /** UNI-1993: deletes the source files whose tab has been closed for the grace */
+  sweepSourceViews(): Promise<void> {
+    return this.sourceViewOpener.sweep()
+  }
+
+  /** UNI-1993: account boundary: closes every source tab and deletes the files */
+  dropSourceViews(): Promise<void> {
+    return this.sourceViewOpener.dropAll((path) => this.deps.closePathNow?.(path))
+  }
+
+  /** UNI-1993: quit: removes this session's source files synchronously */
+  disposeSourceViews(): void {
+    this.sourceViewOpener.disposeSync()
+  }
+
+  private async isForbiddenDownloadTarget(target: string): Promise<boolean> {
+    if (this.store.isInside(target)) return true
+    const resolvedTarget = resolve(target)
+    const linkStat = await lstat(resolvedTarget).catch(() => null)
+    if (linkStat?.isSymbolicLink()) return true
+    if (typeof this.store.root !== 'string' || !this.store.root) return false
+    const resolvedRoot = resolve(this.store.root)
+    const realRoot = await resolvePhysicalPath(resolvedRoot)
+    const insideRoot = (candidate: string): boolean => {
+      for (const root of [resolvedRoot, realRoot]) {
+        const rel = relative(root, resolve(candidate))
+        if (!rel || (!rel.startsWith('..') && !isAbsolute(rel))) return true
+      }
+      return false
+    }
+    if (insideRoot(resolvedTarget)) return true
+    const realParent = await resolvePhysicalPath(dirname(resolvedTarget))
+    if (insideRoot(join(realParent, basename(resolvedTarget)))) return true
+    const realTarget = await realpath(resolvedTarget).catch(() => null)
+    return realTarget !== null && insideRoot(realTarget)
+  }
+
   openDocument(documentId: string): Promise<UniworkResult<{ path: string }>> {
     return result(async () => {
       if (typeof documentId !== 'string') throw new UniworkDocError('not_found')
+      // G703B-P3 (FL-09): a cold restore with a locked keychain has no session
+      // to open with, and "sign in again" is the wrong answer for it: S11 says
+      // unlock the machine and retry (the data is not deleted)
+      if (!this.deps.identity() && this.storeLocked()) throw new UniworkDocError('keystore_locked')
       const { path } = await this.openFromServer(documentId)
       return { path }
     })
+  }
+
+  /**
+   * G703B-P3: the S11 lock of an offline open the locked keychain refused. The
+   * tab never opened, so the lock names where the offline copy of the document
+   * would sit: under the saved owner's scope when one is known, else under the
+   * store root (a session-less machine still has a panel to show).
+   */
+  offlineKeystoreLock(documentId: string): UniworkDocLock {
+    const scope = this.localScope()
+    const key = offlineCopyKey(documentId)
+    const dir = scope
+      ? this.store.dirFor(scope.deploymentId, scope.accountId, key)
+      : join(this.store.root, key)
+    const name = sanitizeFilename(documentId, 'docx')
+    return { path: join(dir, name), name, reason: 'keystore_locked' }
   }
 
   /** the status, after re-checking the working copy's bytes (A1.3) */
   async docStatus(path: string): Promise<UniworkDocStatus | null> {
     if (typeof path !== 'string') return null
     const doc = this.store.lookup(path)
-    return doc && this.ownsLocally(doc) ? this.statusOf(await this.refreshDirty(doc)) : null
+    if (!doc || !this.ownsLocally(doc)) return null
+    // A32 (UNI-1362): the overlay is revalidated against the durable lease here,
+    // so a window whose holder released the lock stops showing read-only even
+    // when no queue record of this document ever moves again
+    await this.revalidateOtherWindow(doc)
+    return this.statusOf(await this.refreshDirty(doc))
   }
 
   activeDocStatus(): Promise<UniworkDocStatus | null> {
@@ -5321,6 +7053,9 @@ export class UniworkDocsService {
   async refreshPath(path: string | undefined): Promise<void> {
     const doc = path ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return
+    // A32 (UNI-1362): the same revalidation the status read runs, so a tab that
+    // gains focus after the holder released the lock stops reading read-only
+    await this.revalidateOtherWindow(doc)
     await this.refreshDirty(doc)
     // S18 renamed-elsewhere: a tab that gains focus re-reads the document's
     // metadata, so a title changed on the web shows here without the feed
@@ -5392,7 +7127,8 @@ export class UniworkDocsService {
     if (!existing || existing.documentId !== documentId) return
     const local = join(dir, existing.filename)
     if (!this.store.exists(local)) return
-    if (KEEP_LOCAL_STATES.has(existing.state) || this.coordinator.isSaving(local)) return
+    if (this.coordinator.isSaving(local)) return
+    const policyGen = this.localPolicyGen.get(documentId) ?? 0
     let detail: DocumentDetail
     try {
       detail = await this.api().getDocument(documentId)
@@ -5404,17 +7140,57 @@ export class UniworkDocsService {
       if (verdict) await this.lockFromServer(documentId, verdict)
       return
     }
+    const currentIdentity = this.liveIdentity()
+    if (
+      !currentIdentity ||
+      currentIdentity.deploymentId !== identity.deploymentId ||
+      currentIdentity.accountId !== identity.accountId
+    ) {
+      return
+    }
     // the metadata read is async: a save may have started or settled, and an
-    // editor may have made the copy dirty, while it was in flight. The title is
-    // applied to the binding as it is NOW - never re-written from the one read
-    // before the await, which would clear that newer state (R1-4).
+    // editor may have made the copy dirty, while it was in flight. A shelved
+    // server verdict downgrades the latest binding to read-only through the
+    // coordinator's per-key chain independently of dirty/title handling
+    // (R1-7 residual), never upgrading in the reverse direction; the title is
+    // applied only when the copy is still clean and idle (R1-4).
     const latest = await this.store.readDir(dir)
     if (!latest || latest.documentId !== documentId) return
     const latestLocal = join(dir, latest.filename)
-    if (!this.store.exists(latestLocal)) return
-    if (KEEP_LOCAL_STATES.has(latest.state) || this.coordinator.isSaving(latestLocal)) return
-    if (detail.title === latest.title) return
-    await this.applyTitle(latest, detail.title, latestLocal, true)
+    const doc = this.store.lookup(latestLocal)
+    if (!doc || !this.store.exists(doc.path)) return
+    let after: BoundDocument | null = doc
+    if (detail.shelvedAt && (this.localPolicyGen.get(documentId) ?? 0) === policyGen) {
+      await this.stopEditLock(doc.path, true)
+      let policyChanged = false
+      try {
+        const refreshed = await this.coordinator.updateBinding(doc, (cur) => {
+          if ((this.localPolicyGen.get(documentId) ?? 0) !== policyGen) return null
+          if (cur.state === 'blocked') return null
+          if (cur.shelved && cur.access === 'view') return null
+          policyChanged = true
+          const preservedLevel = cur.level ?? (cur.access === 'edit' ? 'edit' : undefined)
+          return {
+            ...cur,
+            ...(preservedLevel ? { level: preservedLevel } : {}),
+            shelved: true,
+            access: 'view',
+          }
+        })
+        after = refreshed ?? this.store.lookup(doc.path)
+        if (policyChanged && after) this.notifyDocStateChanged(after.path)
+      } catch (error) {
+        console.warn(
+          `uniwork docs: shelving policy refresh for ${documentId} could not be persisted:`,
+          error instanceof UniworkDocError ? error.code : 'unknown',
+        )
+        return
+      }
+    }
+    if (!after || !this.store.exists(after.path)) return
+    if (KEEP_LOCAL_STATES.has(after.binding.state) || this.coordinator.isSaving(after.path)) return
+    if (detail.title === after.binding.title) return
+    await this.applyTitle(after.binding, detail.title, after.path, true)
   }
 
   /** the binding rewrite that follows a title change, plus the pushes it owes */
@@ -5523,6 +7299,14 @@ export class UniworkDocsService {
   async save(path: string): Promise<UniworkDocStatus | null> {
     const doc = typeof path === 'string' ? this.store.lookup(path) : null
     if (!doc || !this.ownsLocally(doc)) return null
+    if (this.editLockReadOnly(doc.path)) {
+      const status = this.statusOf(doc)
+      this.publish(status)
+      if (this.deps.isShellTab?.(doc.path) ?? true) {
+        this.deps.pushQueuePopover?.({ path: doc.path })
+      }
+      return status
+    }
     if (!this.canSave(doc)) return this.statusOf(doc)
     // a copy whose pre-store intent the sweep has not moved yet is left alone:
     // a save would rewrite its binding and drop that intent (R1-be-5)
@@ -5545,12 +7329,18 @@ export class UniworkDocsService {
   /** a Save that can reach the UniWork step (not view, conflict, saving or blocked) */
   private canSave(doc: BoundDocument): boolean {
     const b = doc.binding
-    if (b.access === 'view' || b.state === 'conflict' || this.coordinator.isSaving(doc.path)) {
+    if (
+      b.access === 'view' ||
+      b.shelved === true ||
+      b.state === 'conflict' ||
+      this.coordinator.isSaving(doc.path)
+    ) {
       return false
     }
     // another window holds the document lock: this window is read-only and
     // never writes (EXPERIENCE - Second-window bar, :129)
     if (this.coordinator.isOtherWindow(doc.key)) return false
+    if (this.editLockReadOnly(doc.path)) return false
     return !(b.state === 'blocked' && b.error !== 'quota_exceeded')
   }
 
@@ -5565,8 +7355,28 @@ export class UniworkDocsService {
   private async noteRemoteChange(notice: RemoteNotice): Promise<void> {
     const doc = await this.boundDocFor(notice.documentId)
     if (!doc || !this.deps.isPathOpen(doc.path)) return
-    const decision = decideRemote(notice, await this.remoteLocalFor(doc))
-    await this.applyRemoteDecision(doc, notice, decision)
+    // A3 (UNI-1362): this decision samples the editor's AI state into the verdict
+    // it acts on, so `editorAi` is kept until it has published its bar: a close
+    // plus a poll in that window must not drop the sample that very bar's own
+    // settle edge (`noteEditorState`) re-decides the notice on. The next poll
+    // after it settles prunes the closed path as usual.
+    const key = pathKey(doc.path)
+    // the entry this decision owns: an old finalizer (a decision dropped by a
+    // session reset) must release only its own entry, never the one a decision
+    // of the next session registered under the same path
+    const entry = this.remoteDecisions.get(key) ?? { n: 0 }
+    entry.n += 1
+    this.remoteDecisions.set(key, entry)
+    try {
+      const decision = decideRemote(notice, await this.remoteLocalFor(doc))
+      await this.applyRemoteDecision(doc, notice, decision)
+    } finally {
+      if (this.remoteDecisions.get(key) === entry) {
+        entry.n -= 1
+        if (entry.n > 0) this.remoteDecisions.set(key, entry)
+        else this.remoteDecisions.delete(key)
+      }
+    }
   }
 
   private async applyRemoteDecision(
@@ -5578,6 +7388,13 @@ export class UniworkDocsService {
       case 'ignore':
         if (decision.reason === 'malformed') {
           console.warn(`uniwork docs: ignoring a malformed feed revision for ${notice.documentId}`)
+        }
+        // EL1A-R2-1: keep a notice ignored because of edit_locked / edit_lock
+        if (
+          decision.reason === 'locked' &&
+          (doc.binding.state === 'edit_locked' || this.editLockReadOnly(doc.path))
+        ) {
+          this.remoteHeld.set(notice.documentId, notice)
         }
         return
       case 'hold':
@@ -5601,7 +7418,11 @@ export class UniworkDocsService {
       baseRevision: doc.binding.baseRevision,
       feedOn: await this.feedOnFor(doc.binding.orgId),
       dirty:
-        doc.binding.state === 'dirty' || this.editorDirty.has(doc.path) || editor.dirty === true,
+        doc.binding.state === 'dirty' ||
+        this.editorDirty.has(doc.path) ||
+        // UNI-1959: the bytes the editor saved while the name dialog is open are not sent yet
+        this.firstSaveOps.has(pathKey(doc.path)) ||
+        editor.dirty === true,
       aiRunning: editor.aiRunning,
       queue: record && !isTerminalQueueState(record.state) ? record.state : null,
       ...(record?.receipt ? { receiptRevision: record.receipt.revision } : {}),
@@ -5610,7 +7431,10 @@ export class UniworkDocsService {
       // commits are the newer versions, and reloading over a copy someone else is
       // editing would fight the lock (the pill names the holder instead)
       locked:
-        this.lockedFor(doc.binding) ?? (doc.binding.state === 'edit_locked' ? 'edit_locked' : null),
+        this.lockedFor(doc.binding) ??
+        (doc.binding.state === 'edit_locked' || this.editLockReadOnly(doc.path)
+          ? 'edit_locked'
+          : null),
     }
   }
 
@@ -5801,6 +7625,7 @@ export class UniworkDocsService {
     this.remoteLocked.set(documentId, verdict)
     const doc = await this.boundDocFor(documentId)
     if (!doc) return
+    this.remoteLockPath.set(documentId, doc.path)
     this.remoteBars.set(pathKey(doc.path), { kind: verdict })
     const next: Binding = {
       ...doc.binding,
@@ -5827,6 +7652,7 @@ export class UniworkDocsService {
     const verdict = this.remoteLocked.get(documentId)
     if (!verdict) return
     this.remoteLocked.delete(documentId)
+    this.remoteLockPath.delete(documentId)
     const key = pathKey(path)
     if (this.remoteBars.get(key)?.kind !== verdict) return
     this.remoteBars.delete(key)
@@ -5844,13 +7670,15 @@ export class UniworkDocsService {
       () => this.guardedReload(path, notice),
       () => this.guardedReload(path, notice),
     )
-    this.remoteReloads.set(
-      key,
-      run.then(
-        () => undefined,
-        () => undefined,
-      ),
+    const chain: Promise<void> = run.then(
+      () => {
+        if (this.remoteReloads.get(key) === chain) this.remoteReloads.delete(key)
+      },
+      () => {
+        if (this.remoteReloads.get(key) === chain) this.remoteReloads.delete(key)
+      },
     )
+    this.remoteReloads.set(key, chain)
     return run
   }
 
@@ -5895,9 +7723,14 @@ export class UniworkDocsService {
     }
     const fresh = this.store.lookup(doc.path)
     if (!fresh) return
-    // a save or the schema 1 -> 2 sweep took the copy while it was fetching:
-    // the fetched bytes may not be written over it
-    if (this.coordinator.isSaving(fresh.path) || this.heldByMigration(fresh.dir)) {
+    // a save, a first-save naming hold (UNI-1959: the module already wrote the
+    // bytes the upload waits on) or the schema 1 -> 2 sweep took the copy while
+    // it was fetching: the fetched bytes may not be written over it
+    if (
+      this.coordinator.isSaving(fresh.path) ||
+      this.firstSaveOps.has(pathKey(fresh.path)) ||
+      this.heldByMigration(fresh.dir)
+    ) {
       await this.showRemoteBar(fresh, notice, { kind: 'newer-dirty', version: notice.version })
       return
     }
@@ -5911,6 +7744,28 @@ export class UniworkDocsService {
     const previousBytes = await readFile(fresh.path)
       .then((bytes) => new Uint8Array(bytes))
       .catch(() => null)
+    // A5 (UNI-1362): the previous bytes are the only way back from a late edit
+    // or AI turn that starts after the write. If they cannot be read, the
+    // replacement would be unrecoverable, so refuse the reload here with the
+    // existing `reload-failed` bar instead of writing the fetched head.
+    if (previousBytes === null) {
+      await this.showRemoteBar(fresh, notice, {
+        kind: 'reload-failed',
+        version: notice.version,
+      })
+      return
+    }
+    // UWNM-BE-R3-1: a Save (or its naming hold) that took the copy while the
+    // previous bytes were read: they may already be the person's bytes the
+    // upload waits on. No await between this check and the write below
+    if (
+      this.coordinator.isSaving(fresh.path) ||
+      this.firstSaveOps.has(pathKey(fresh.path)) ||
+      this.heldByMigration(fresh.dir)
+    ) {
+      await this.showRemoteBar(fresh, notice, { kind: 'newer-dirty', version: notice.version })
+      return
+    }
     const previousBinding = fresh.binding
     await this.store.writeWorkingCopy(fresh.dir, fresh.binding.filename, fetched.bytes)
     const reloaded: Binding = {
@@ -5932,10 +7787,25 @@ export class UniworkDocsService {
     const done = await this.coordinator.commitState(fresh, next)
     const final = await this.editorState(done.path)
     const lateMove = final.aiEpoch !== before.aiEpoch
-    if (final.dirty === true || final.aiRunning || lateMove) {
+    // UNI-1959: a first Save that landed after the pre-write check is held by its naming op
+    const lateSave = this.firstSaveOps.has(pathKey(done.path))
+    if (final.dirty === true || final.aiRunning || lateMove || lateSave) {
       // a turn (or an edit) started after the write: the previous copy goes back
-      // byte for byte, binding included, and the bar says why
-      await this.restoreWorkingCopy(done, previousBinding, previousBytes)
+      // byte for byte, binding included, and the bar says why. A late Save may
+      // already have written the person's bytes over the fetched head: those
+      // stay, and only the binding goes back
+      const ownBytes = lateSave && !(await this.holdsBytes(done.path, fetched.bytes))
+      await this.restoreWorkingCopy(done, previousBinding, ownBytes ? null : previousBytes)
+      if (lateSave && !ownBytes) {
+        // UWNM-BE-R3-1: the Save wrote before the head landed over it (or wrote
+        // the head's own bytes), so the person's bytes are only in the editor.
+        // The copy stays unsent work and the module writes them again: that
+        // Save lands under the still-open naming op, and the verdict uploads it
+        this.editorDirty.add(done.path)
+        // UWNM-BE-R4-1: the restore was the shell's own write, not another program's
+        this.deps.noteShellRewrote?.(done.path)
+        this.deps.requestModuleSave(done.path)
+      }
       const restored = this.store.lookup(path)
       if (restored) {
         await this.showRemoteBar(restored, notice, {
@@ -5952,7 +7822,7 @@ export class UniworkDocsService {
     if (shown) this.publish(toStatus(shown))
   }
 
-  /** undo the write of a reload the last read refused */
+  /** undo the write of a reload the last read refused (`bytes` null: the file is not touched) */
   private async restoreWorkingCopy(
     doc: BoundDocument,
     binding: Binding,
@@ -5964,6 +7834,12 @@ export class UniworkDocsService {
     // the coordinator's chain, so the restore cannot interleave with a save's
     // own binding write for the same document
     await this.coordinator.commitState(doc, binding)
+  }
+
+  /** whether the file at `path` still holds exactly `bytes` (an unreadable file does not) */
+  private async holdsBytes(path: string, bytes: Uint8Array): Promise<boolean> {
+    const current = await readFile(path).catch(() => null)
+    return current !== null && sha256Hex(new Uint8Array(current)) === sha256Hex(bytes)
   }
 
   /** the rule order again for a notice whose bar needs a fresh verdict (an AI turn ended) */
@@ -6052,18 +7928,22 @@ export class UniworkDocsService {
    * computer); "Cancel" keeps it open. True = may close.
    */
   async confirmClose(path: string): Promise<boolean> {
+    const release = async (): Promise<true> => {
+      await this.stopEditLock(path, true)
+      return true
+    }
     for (;;) {
       let doc = this.store.lookup(path)
-      if (!doc || doc.binding.access !== 'edit' || !this.ownsLocally(doc)) return true
+      if (!doc || doc.binding.access !== 'edit' || !this.ownsLocally(doc)) return release()
       // a Save from the module's own close prompt may still be uploading
       if (this.coordinator.isSaving(doc.path)) {
         await this.coordinator.settled(doc.path)
         doc = this.store.lookup(path)
-        if (!doc) return true
+        if (!doc) return release()
       }
       doc = await this.refreshDirty(doc)
       const b = doc.binding
-      if (!UNSENT_STATES.has(b.state)) return true
+      if (!UNSENT_STATES.has(b.state)) return release()
       const kind: UnsavedCloseKind =
         b.state === 'conflict'
           ? 'conflict'
@@ -6075,12 +7955,17 @@ export class UniworkDocsService {
         if (this.conflictPrompt && samePath(this.conflictPrompt.path, path)) {
           this.endConflictByMain(this.conflictPrompt)
         }
-        return true
+        return release()
       }
-      if (kind === 'unsent' && choice === 'save') return this.saveForClose(path)
+      if (kind === 'unsent' && choice === 'save') {
+        const ok = await this.saveForClose(path)
+        if (ok) await this.stopEditLock(path, true)
+        return ok
+      }
       if (kind === 'conflict' && choice === 'resolve') {
         const outcome = await this.resolveForClose(path)
         if (outcome === 'again') continue
+        if (outcome === 'closed') await this.stopEditLock(path, true)
         return outcome === 'closed'
       }
       return false
@@ -6096,7 +7981,7 @@ export class UniworkDocsService {
       this.refuseMigration(latest)
       return false
     }
-    const wait = this.waitForSettle(latest.path, CLOSE_SAVE_WAIT_MS)
+    const wait = this.waitForSettle(latest.path, this.deps.closeSaveWaitMs ?? CLOSE_SAVE_WAIT_MS)
     const notWritten = () => {
       if (!this.coordinator.isSaving(latest.path)) wait.cancel()
     }
@@ -6164,17 +8049,34 @@ export class UniworkDocsService {
   ): { promise: Promise<UniworkDocStatus | null>; cancel: () => void } {
     let finish: (status: UniworkDocStatus | null) => void = () => undefined
     const promise = new Promise<UniworkDocStatus | null>((resolveWait) => {
+      const key = pathKey(path)
       const listener = (status: UniworkDocStatus) => {
         if (status.path === path && !ignore.has(status.state)) finish(status)
       }
-      const timer = setTimeout(() => finish(null), timeoutMs)
-      ;(timer as { unref?: () => void }).unref?.()
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const arm = () => {
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+          // UNI-1959: a person still naming the document is not a stalled upload:
+          // the wait goes on, and the dialog's answer arms a fresh window
+          if (!this.firstSaveOps.has(key)) finish(null)
+        }, timeoutMs)
+        ;(timer as { unref?: () => void }).unref?.()
+      }
+      // the upload a naming op held starts when the op ends: it gets the whole
+      // deadline from that moment, however long the person took to answer
+      const opEnded = (ended: string) => {
+        if (ended === key) arm()
+      }
+      arm()
       finish = (status) => {
         clearTimeout(timer)
         this.statusListeners.delete(listener)
+        this.firstSaveOpEnded.delete(opEnded)
         resolveWait(status)
       }
       this.statusListeners.add(listener)
+      this.firstSaveOpEnded.add(opEnded)
     })
     return { promise, cancel: () => finish(null) }
   }
@@ -6405,23 +8307,7 @@ export class UniworkDocsService {
       }
     }
 
-    let intent: UniworkConflictIntentBlock = 'none'
-    const access = await this.intentAccess()
-    if (access.kind === 'ok') {
-      const stored = await access.intents.read(session.doc.key, {
-        orgId: b.orgId,
-        workspaceId: b.workspaceId,
-        baseVersion: b.baseVersion,
-        length: 0,
-      })
-      const st = stored?.intent.state
-      if (st === 'committing' || st === 'reconciling' || st === 'reconciling-stuck') {
-        intent = st
-      }
-    }
-    if (intent === 'none' && this.coordinator.isSaving(session.path)) {
-      intent = 'committing'
-    }
+    const intent = await this.conflictIntentBlock(session.doc, session.path)
 
     const keepDraft = await this.probeKeepDraft(session, session.doc)
     const moduleKind: UniworkConflictView['module'] =
@@ -6465,6 +8351,58 @@ export class UniworkDocsService {
       notice: opts.notice ?? null,
       noticeArg: opts.noticeArg ?? null,
     }
+  }
+
+  /**
+   * The conflict dialog's uncertain-intent block for `doc`: `committing` /
+   * `reconciling` / `reconciling-stuck` from the durable store, or `committing`
+   * while a Save of the path is in flight in memory.
+   */
+  private async conflictIntentBlock(
+    doc: BoundDocument,
+    savingPath = doc.path,
+  ): Promise<UniworkConflictIntentBlock> {
+    const b = doc.binding
+    let intent: UniworkConflictIntentBlock = 'none'
+    const access = await this.intentAccess()
+    if (access.kind === 'ok') {
+      const stored = await access.intents.read(doc.key, {
+        orgId: b.orgId,
+        workspaceId: b.workspaceId,
+        baseVersion: b.baseVersion,
+        length: 0,
+      })
+      const st = stored?.intent.state
+      if (st === 'committing' || st === 'reconciling' || st === 'reconciling-stuck') {
+        intent = st
+      }
+    }
+    if (intent === 'none' && this.coordinator.isSaving(savingPath)) {
+      intent = 'committing'
+    }
+    return intent
+  }
+
+  /**
+   * N1: did a Save land between the action's view check and its first
+   * destructive step? The only await here is the drain of an in-flight
+   * attempt; the caller must keep this immediately before its
+   * `supersedePending` / `writeWorkingCopy` / `dropIntent`. True = a Save ran
+   * (its durable intent is not `none`, or the base the action started from
+   * moved): the replacement must supersede, drop and overwrite nothing.
+   */
+  private async saveRacedReplacement(
+    doc: BoundDocument,
+    start: { baseRevision: string; baseChecksum: string },
+  ): Promise<boolean> {
+    if (this.coordinator.isSaving(doc.path)) await this.coordinator.settled(doc.path)
+    if ((await this.conflictIntentBlock(doc)) !== 'none') return true
+    const now = this.store.lookup(doc.path)
+    if (!now) return true
+    return (
+      now.binding.baseRevision !== start.baseRevision ||
+      now.binding.baseChecksum !== start.baseChecksum
+    )
   }
 
   private async probeKeepDraft(
@@ -6634,6 +8572,9 @@ export class UniworkDocsService {
     }
     try {
       const done = await this.replaceWithLatest(chosen)
+      if (!done) {
+        return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+      }
       if (open.remoteNotice) {
         this.remoteBars.set(pathKey(done.path), {
           kind: 'updated',
@@ -7005,6 +8946,17 @@ export class UniworkDocsService {
       // the person cancelled the OS dialog: nothing changed
       return stay(open.downloadNotice ?? 'save_copy_no_seat')
     }
+    // A105 (UNI-1362): an account switch (or a lock) inside the awaits above ends
+    // the dialog. The same guard the reload path applies, right before the bytes
+    // leave: this account's version is never written out under another one.
+    if (!this.ownsLocally(chosen)) {
+      open.controller.abort()
+      open.finish()
+      return { kind: 'closed' }
+    }
+    // A106 (UNI-1362): reject a target picked inside the app's working-copy root
+    // before writing, using the existing download_failed refusal outcome.
+    if (this.store.isInside(target)) return failed()
     try {
       await writeFile(target, localBytes)
     } catch {
@@ -7089,12 +9041,33 @@ export class UniworkDocsService {
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
+    // N1: the view this action decided on was built earlier (its keep-draft
+    // probe and capability read await). A Save admitted since then - the user's
+    // Ctrl/Cmd+S - must not have its intent superseded or deleted under it, and
+    // the base it committed must not be overwritten by this one. Drain it and
+    // re-check right before the first destructive step, with no other await in
+    // between; a Save that ran leaves the decision to the conflict view.
+    if (
+      await this.saveRacedReplacement(chosen, {
+        baseRevision: chosen.binding.baseRevision,
+        baseChecksum: chosen.binding.baseChecksum,
+      })
+    ) {
+      return { kind: 'view', view: await this.buildConflictView(open, { fetchServer: false }) }
+    }
     // "Ghi đè": the old intent is superseded BEFORE a new one is minted, so the
     // user's snapshot is spent (superseded), never replayed against the new base
-    await this.supersedePending(chosen)
-    // the old base's intent is invalid on the server's revision
-    await this.dropIntent(chosen)
-    const ready = await this.coordinator.commitState(chosen, next)
+    const releaseSession = await this.supersedePendingDeferRelease(chosen)
+    let ready: BoundDocument
+    try {
+      // the old base's intent is invalid on the server's revision
+      await this.dropIntent(chosen)
+      ready = await this.coordinator.commitState(chosen, next)
+    } finally {
+      // the superseded intent's upload session is released after the local steps, and also
+      // when one of them fails, so the server session is never leaked
+      await releaseSession()
+    }
     if (!currentView.online) {
       await this.coordinator.save(ready.path, { forceOffline: true })
       open.controller.abort()
@@ -7168,7 +9141,7 @@ export class UniworkDocsService {
       documentId: b.documentId,
       workspaceId: b.workspaceId,
       title: b.title,
-      access: b.access,
+      access: b.shelved ? 'view' : b.access,
     }
   }
 
@@ -7184,7 +9157,7 @@ export class UniworkDocsService {
     return {
       documentId: b.documentId,
       versionId: b.baseVersionId ?? null,
-      ...(b.level ? { level: b.level } : {}),
+      ...(b.shelved ? { level: 'view' } : b.level ? { level: b.level } : {}),
       myUserId: doc.userId,
     }
   }
@@ -7192,38 +9165,62 @@ export class UniworkDocsService {
   // ---- flows -----------------------------------------------------------------
 
   /** "Discard my changes and open the latest": download, replace, reload the tab */
-  private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument> {
+  private async replaceWithLatest(doc: BoundDocument): Promise<BoundDocument | null> {
+    // A Save of this path may still be in flight: the module's own Save landing
+    // in the keep-draft flush window, or a Ctrl/Cmd+S racing the dialog. Its
+    // durable intent must never be superseded or deleted under it - the record
+    // is what authorizes the commit POST (R2), so deleting it refuses the POST
+    // and orphans the staged upload, and the base read below would race the
+    // commit.
+    // N1: a Save can also be admitted DURING this action (the user's Ctrl/Cmd+S
+    // while the download runs). So the drain + re-check runs immediately before
+    // the first destructive step - `supersedePending` / `writeWorkingCopy` /
+    // `dropIntent` - with no other await in between: a Save that ran (its
+    // durable intent is not `none`, or the base this action started from moved)
+    // leaves the replacement to the dialog's conflict view instead.
+    const start = {
+      baseRevision: doc.binding.baseRevision,
+      baseChecksum: doc.binding.baseChecksum,
+    }
     const { detail, bytes } = await this.fetchLatest(doc.binding.documentId)
+    if (await this.saveRacedReplacement(doc, start)) return null
     // "Tải lại": the old intent is superseded BEFORE the base is replaced, so
     // it is spent (cancelled/superseded), never replayed against the new base
-    await this.supersedePending(doc)
-    await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
-    // the local work (and its intent) is discarded: nothing is left to replay
-    await this.dropIntent(doc)
-    const fresh: Binding = {
-      ...doc.binding,
-      title: detail.title,
-      access: accessFor(detail.myLevel),
-      baseRevision: detail.revision,
-      baseVersion: detail.file.version,
-      baseChecksum: sha256Hex(bytes),
-      // the old intent is superseded below; the copy reads saved
-      state: 'saved',
+    const releaseSession = await this.supersedePendingDeferRelease(doc)
+    let done: BoundDocument
+    try {
+      await this.store.writeWorkingCopy(doc.dir, doc.binding.filename, bytes)
+      // the local work (and its intent) is discarded: nothing is left to replay
+      await this.dropIntent(doc)
+      const fresh: Binding = {
+        ...doc.binding,
+        title: detail.title,
+        access: accessFor(detail.myLevel),
+        baseRevision: detail.revision,
+        baseVersion: detail.file.version,
+        baseChecksum: sha256Hex(bytes),
+        // the old intent is superseded below; the copy reads saved
+        state: 'saved',
+      }
+      // the base moved: the old version id must not survive an unknown new one
+      delete fresh.baseVersionId
+      const next = withServerContext(fresh, detail)
+      delete next.error
+      delete next.serverRevision
+      delete next.serverVersion
+      // reloading the tab discards any pre-reload editor edits (and outdates an in-flight poll pass)
+      this.lastUserSave.set(doc.path, ++this.saveCounter)
+      this.editorDirty.delete(doc.path)
+      done = await this.coordinator.commitState(doc, next)
+      // the bar belonged to the replaced base: the copy is at the head now
+      this.remoteBars.delete(pathKey(doc.path))
+      this.remoteNotices.delete(pathKey(doc.path))
+      this.deps.reloadPath(doc.path)
+    } finally {
+      // the superseded intent's upload session is released after the local steps, and also
+      // when one of them fails, so the server session is never leaked
+      await releaseSession()
     }
-    // the base moved: the old version id must not survive an unknown new one
-    delete fresh.baseVersionId
-    const next = withServerContext(fresh, detail)
-    delete next.error
-    delete next.serverRevision
-    delete next.serverVersion
-    // reloading the tab discards any pre-reload editor edits (and outdates an in-flight poll pass)
-    this.lastUserSave.set(doc.path, ++this.saveCounter)
-    this.editorDirty.delete(doc.path)
-    const done = await this.coordinator.commitState(doc, next)
-    // the bar belonged to the replaced base: the copy is at the head now
-    this.remoteBars.delete(pathKey(doc.path))
-    this.remoteNotices.delete(pathKey(doc.path))
-    this.deps.reloadPath(doc.path)
     return done
   }
 
@@ -7302,9 +9299,14 @@ export class UniworkDocsService {
       const open = await this.openTabCopy(identity, documentId)
       if (open) return this.focusOpen(open.path, open.title)
     }
+    // UNI-2033: the @vN copy names the version it shows to the comments seam; a failed lookup
+    // leaves it unset (the comments kit then keeps a lost thread lost)
+    const viewVersionId = viewTicket
+      ? await this.versionIdOf(documentId, launch.version, detail)
+      : undefined
     const viewRequested = !!launch && launch.version === 0 && launch.operation === 'view'
-    const access: UniworkDocAccess =
-      viewTicket || viewRequested ? 'view' : accessFor(detail.myLevel)
+    const effectiveViewOnly = viewTicket || viewRequested || Boolean(detail.shelvedAt)
+    const access: UniworkDocAccess = effectiveViewOnly ? 'view' : accessFor(detail.myLevel)
     const dir = dirs[0]!
     const existing = await this.store.readDir(dir)
     const workspaceId = launch?.workspaceId ?? detail.workspaceId
@@ -7330,6 +9332,7 @@ export class UniworkDocsService {
             detail,
             viewTicket || viewRequested,
           )
+          if (viewVersionId) binding.baseVersionId = viewVersionId
           // G5-06 W4b: the queue's refusal code is `permission_revoked` (the old
           // `forbidden`); a re-granted edit level clears the copy for saving
           if (
@@ -7438,10 +9441,57 @@ export class UniworkDocsService {
       base,
       viewTicket || viewRequested,
     )
+    if (viewVersionId) binding.baseVersionId = viewVersionId
     // a refused write is never ignored, exactly as in the branch above: the
     // copy then reads as the binding that persisted, not the refused one
     const written = await this.store.write(dir, binding)
     return this.show(path, written ? binding : (existing ?? binding))
+  }
+
+  /**
+   * UNI-2033: the server id of version `versionNo`, or undefined when it cannot be read. The head
+   * version is already named by the document read, so only an older one costs a request.
+   */
+  private async versionIdOf(
+    documentId: string,
+    versionNo: number,
+    detail: DocumentDetail,
+  ): Promise<string | undefined> {
+    if (versionNo === detail.file.version) return detail.file.versionId
+    try {
+      return await this.api().getVersionId(documentId, versionNo)
+    } catch {
+      return undefined
+    }
+  }
+
+  /**
+   * UNI-2033 "View in version N": the read-only `@vN` copy of a document, opened like a view
+   * ticket but without one (the shell already holds the account session), then the thread of
+   * `commentId` is revealed in it through the same held reveal a launch ticket uses.
+   */
+  async openVersionView(
+    documentId: string,
+    versionNo: number,
+    commentId: string,
+  ): Promise<{ path: string; title: string }> {
+    if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+    const detail = await this.api().getDocument(documentId)
+    const opened = await this.openFromServer(documentId, {
+      // a ticket's bookkeeping fields; the view open reads none of them
+      receiptId: '',
+      redeemedAt: '',
+      downloadPath: '',
+      id: documentId,
+      organizationId: detail.organizationId,
+      workspaceId: detail.workspaceId,
+      title: detail.title,
+      operation: 'view',
+      version: versionNo,
+      revision: detail.revision,
+    })
+    this.deps.revealComment?.(opened.path, commentId)
+    return opened
   }
 
   /** the document's own working copy when a tab shows it */
@@ -7486,6 +9536,7 @@ export class UniworkDocsService {
     if (!this.deps.openPath(path)) throw new UniworkDocError('unsupported_format')
     const doc = this.store.lookup(path)
     if (doc) this.publish(toStatus(doc))
+    if (doc && doc.binding.access === 'edit' && !doc.binding.shelved) this.startEditLock(doc)
     return { path, title: binding?.title ?? doc?.binding.title ?? basename(path) }
   }
 }

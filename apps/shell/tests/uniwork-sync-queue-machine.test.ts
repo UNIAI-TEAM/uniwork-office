@@ -198,6 +198,34 @@ describe('uniwork save queue machine', () => {
     expect(out.record?.retryAt).toBe(iso(NOW + QUEUE_LIMITS.backoffBaseMs / 2))
   })
 
+  it('a plain reconciling tick emits lookup when its retryAt is due, never a new attempt', () => {
+    // B70: a lost commit answer leaves the record `reconciling` with no retryAt
+    // yet - the next poll pass looks it up
+    const first = transition(
+      record({ state: 'reconciling', attempt: 1, reconcileSince: iso(NOW) }),
+      { type: 'tick', now: NOW },
+      ctx(),
+    )
+    expect(first.effects).toEqual([{ kind: 'lookup' }])
+    expect(first.record?.state).toBe('reconciling')
+    expect(first.record?.attempt).toBe(1)
+    // an `in_flight` lookup sets retryAt: the next tick waits for it
+    const waiting = transition(
+      record({ state: 'reconciling', reconcileSince: iso(NOW), retryAt: iso(NOW + 1_000) }),
+      { type: 'tick', now: NOW },
+      ctx(),
+    )
+    expect(waiting.effects).toEqual([])
+    expect(waiting.record?.state).toBe('reconciling')
+    const due = transition(
+      record({ state: 'reconciling', reconcileSince: iso(NOW), retryAt: iso(NOW - 1) }),
+      { type: 'tick', now: NOW },
+      ctx(),
+    )
+    expect(due.effects).toEqual([{ kind: 'lookup' }])
+    expect(due.record?.state).toBe('reconciling')
+  })
+
   it('reconciling older than stuckAfterMs → stuck', () => {
     const since = NOW - QUEUE_LIMITS.stuckAfterMs
     const out = transition(

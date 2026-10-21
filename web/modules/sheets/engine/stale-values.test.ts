@@ -3,8 +3,10 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkbookSaveRequest } from '../../../../apps/sheets/src/shared/desktop-api'
 import {
+  KEEP,
   engineCanReplaySave,
   formulaCells,
+  formulaCellsWithValues,
   rewriteFormulaCachedValues,
   savedValuesMayChange,
   worksheetPartsByName,
@@ -107,6 +109,35 @@ describe('formulaCells', () => {
   })
 })
 
+describe('formulaCellsWithValues', () => {
+  it('parses the cached value of every formula cell and lists no constant', () => {
+    const xml = sheet(
+      '<c r="A1"><v>1</v></c>' +
+        '<c r="B1" t="e"><f>1/0</f><v>#N/A</v></c>' +
+        '<c r="C1" t="b"><f>1=1</f><v>1</v></c>' +
+        '<c r="D1" t="b"><f>1=2</f><v>0</v></c>' +
+        '<c r="E1" t="str"><f>"a"&amp;"&amp;b"</f><v>a&amp;b</v></c>' +
+        '<c r="F1"><f>A1</f><v>1</v></c>' +
+        '<c r="G1" t="n"><f>A1/1000</f><v>1E-3</v></c>' +
+        '<c r="H1"><f>A1+1</f></c>' +
+        '<c r="I1"><f>A1+1</f><v></v></c>' +
+        '<c r="AA1"><f t="shared" si="0"/><v>5</v></c>' +
+        '<c r="AB1" t="inlineStr"><is><t>f</t></is></c>',
+    )
+    expect(formulaCellsWithValues(xml)).toEqual([
+      { row: 0, column: 1, original: { error: '#N/A' } },
+      { row: 0, column: 2, original: true },
+      { row: 0, column: 3, original: false },
+      { row: 0, column: 4, original: 'a&b' },
+      { row: 0, column: 5, original: 1 },
+      { row: 0, column: 6, original: 0.001 },
+      { row: 0, column: 7 },
+      { row: 0, column: 8 },
+      { row: 0, column: 26, original: 5 },
+    ])
+  })
+})
+
 describe('rewriteFormulaCachedValues', () => {
   const xml = sheet(
     '<c r="A1" s="1"><v>1</v></c>' +
@@ -146,5 +177,15 @@ describe('rewriteFormulaCachedValues', () => {
     expect(rewriteFormulaCachedValues(clean)).toBe(clean)
     const same = sheet('<c r="B1"><f>A1*2</f><v>2</v></c>')
     expect(rewriteFormulaCachedValues(same, () => 2)).toBe(same)
+  })
+
+  it('leaves a KEEP cell byte-identical (attribute order included) and rewrites the others', () => {
+    const cell = `<c r="I2" s="3" t="e"><f>VLOOKUP(A2,'Q1'!$A$2:$G$7,7,FALSE)</f><v>#N/A</v></c>`
+    const kept = sheet(`${cell}<c r="J2"><f>A2*2</f><v>10</v></c>`)
+    const out = rewriteFormulaCachedValues(kept, (_row, column) => (column === 8 ? KEEP : 11))
+    expect(out).toContain(cell)
+    expect(out).toContain('<c r="J2"><f>A2*2</f><v>11</v></c>')
+    expect(rewriteFormulaCachedValues(kept, () => KEEP)).toBe(kept)
+    expect(rewriteFormulaCachedValues(xml, () => KEEP)).toBe(xml)
   })
 })

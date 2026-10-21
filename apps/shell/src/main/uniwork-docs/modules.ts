@@ -26,6 +26,7 @@ import {
   setSlidesUserSaveHook,
   setUniworkDocumentPolicy as setSlidesUniworkPolicy,
 } from '../../../../slides/src/main/slides-main'
+import { withSourceViews, type SourceViewBinding } from './source-view'
 
 export { clearDocsRecoveryCopy, clearWorkbookRecovery }
 
@@ -39,6 +40,11 @@ export interface UniworkModuleSeam {
    * (older tests) reads as not locked.
    */
   isLocked?(path: string): boolean
+  /**
+   * `isLocked` without side effects (the html state query asks it on every open). Optional:
+   * a seam without it is asked through `isLocked`.
+   */
+  peekLocked?(path: string): boolean
   /**
    * G5-11: consumes a one-shot capture request for `path` so a main-triggered
    * save writes the working copy to disk without firing the user-save hook.
@@ -59,6 +65,12 @@ export interface UniworkModuleSeam {
     clear: (entries: ReadonlyArray<string | { path: string; baseChecksum?: string }>) => void,
   ): void
   onUserSave(path: string): void
+  /**
+   * EL-1(b) fix6 (VEL-1): an editor module's explicit Save while the bound
+   * working copy is read-only. Requests the explain popover for `path`; never
+   * writes and never runs the user-save hook.
+   */
+  onReadOnlySave?(path: string): void
   /**
    * G5-04g: true when the path's folder declares a store this build does not
    * read, so the module's open chokepoint must not read the file at all. The
@@ -102,6 +114,13 @@ export function createCommentAuthorResolver(deps: {
 export const COMMENT_AUTHOR_CHANGED_CHANNEL = 'uniwork:comment-author-changed'
 
 /**
+ * EL-1(b) fix6 (VEL-2): pushed (`{ path: string }`) to every renderer
+ * webContents whenever `isReadOnly(path)` or `isBound(path)` may have changed —
+ * on edit-lock session phase transitions and on access changes the service
+ * publishes.
+ */
+export const UNIWORK_DOC_STATE_CHANGED_CHANNEL = 'uniwork:doc-state-changed'
+/**
  * G8-02: calls `broadcast` whenever an account status push changes the display
  * name a bound document would take (null = signed out / no name). Token
  * refreshes that keep the same name stay silent. Returns the unsubscribe.
@@ -128,11 +147,23 @@ export function watchCommentAuthorChanges(deps: {
  * document, else the neutral constant. null restores genoffice behaviour
  * everywhere (the modules then fall back to the same neutral constant, never
  * to the OS account).
+ *
+ * UNI-1993: `sourceViews` merges the view-only source paths into the seam, so
+ * every module reads a source file as bound, read-only and locked. Absent = the
+ * seam is the service's, unchanged.
  */
 export function installUniworkModuleSeams(
-  seam: UniworkModuleSeam | null,
+  serviceSeam: UniworkModuleSeam | null,
   commentAuthor: CommentAuthorResolver | null = null,
+  sourceViews: SourceViewBinding | null = null,
 ): void {
+  const seam =
+    serviceSeam && sourceViews
+      ? withSourceViews(serviceSeam, sourceViews.registry, {
+          onSourceSave: sourceViews.onSourceSave,
+          onSourceLocked: sourceViews.onSourceLocked,
+        })
+      : serviceSeam
   seam?.setClearRecovery?.((path: string) => {
     clearDocsRecoveryCopy(path)
     clearWorkbookRecovery(path)
@@ -147,9 +178,11 @@ export function installUniworkModuleSeams(
         // G5-03a: an S6 lock (revoked / deleted while open) refuses export,
         // Save As and print-to-PDF in every module
         isLocked: (path: string) => seam.isLocked?.(path) === true,
+        peekLocked: (path: string) => (seam.peekLocked ?? seam.isLocked)?.call(seam, path) === true,
         consumeCapture: (path: string) => seam.consumeCapture?.(path) === true,
         refuseOpen: (path: string) => seam.refuseLockedPath(path),
         commentAuthor: (path: string) => author(path),
+        readOnlySave: (path: string) => seam.onReadOnlySave?.(path),
       }
     : null
   const hook = seam ? (path: string) => seam.onUserSave(path) : null

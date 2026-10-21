@@ -6,6 +6,8 @@ import {
   uniworkIsReadOnly,
   uniworkRefusesOpen,
   uniworkRequestOrigin,
+  uniworkReadOnlySave,
+  uniworkSamePath,
   uniworkSaveAsDefault,
   uniworkSaveDecision,
 } from './uniwork-policy'
@@ -72,10 +74,8 @@ import {
   writeJsonAtomic,
   newerCopyMtime,
 } from '@genoffice/electron-utils'
-import {
-  answerUniworkAiFlagOff,
-  answerUniworkCloudStatusOff,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-cloud-status'
 import { createI18n, getUiLang, type Lang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore } from '@genoffice/project-store'
 
@@ -168,6 +168,7 @@ import {
   type WorkbookSaveRequest,
 } from '../shared/desktop-api'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
+import { sheetsMenuAccelerator, type SheetsMenuShortcut } from '../shared/sheets-shortcuts'
 import { createOpenRetryPaths } from './open-retry-paths'
 import { fetchAiImage } from './ai-fetch-image'
 import { atomicWriteFile } from './atomic-write'
@@ -1638,6 +1639,10 @@ interface SheetsTabSession {
   readonly webContents: WebContents
   readonly client: XlsxSidecarClient
   readonly sessions: Map<string, SessionInfo>
+  /// The workbook session the tab shows. `sessions` also holds auxiliary
+  /// merge-source sessions, so no position in the map identifies it; the
+  /// lock-follow state queries answer for this one (EL-1(b) fix10).
+  displayedSessionId: string | null
   readonly aiStreams: Map<string, AbortController>
   /// Chunked uploads of large saves' cell edits, pending their save request.
   readonly saveTransfers: SaveEditsTransferStore
@@ -1657,6 +1662,13 @@ function startPastedTempCleanup(): void {
   if (pastedTempCleanupStarted) return
   pastedTempCleanupStarted = true
   void cleanupExpiredPastedFiles(app.getPath('temp'))
+}
+
+/** The tab's displayed workbook session, never an auxiliary merge source. */
+function displayedSession(entry: SheetsTabSession): SessionInfo | undefined {
+  return entry.displayedSessionId === null
+    ? undefined
+    : entry.sessions.get(entry.displayedSessionId)
 }
 
 function sessionFor(event: IpcMainInvokeEvent): SheetsTabSession {
@@ -1754,6 +1766,7 @@ function registerSheetsSession(webContents: WebContents, client: XlsxSidecarClie
     webContents,
     client,
     sessions: new Map(),
+    displayedSessionId: null,
     aiStreams: new Map(),
     saveTransfers: new SaveEditsTransferStore(),
   })
@@ -2608,6 +2621,34 @@ export function registerSheetsIpc(): void {
     workbookCommentAuthor(sessionFor(event).sessions, sessionId),
   )
 
+  // EL-1(b) fix6 (VEL-2 / Addendum 1): bound / read-only state of the sender's
+  // open workbook session so the renderer can re-query on the lock ping.
+  ipcMain.handle(IPC_CHANNELS.uniworkState, (event) => {
+    const entry = sheetsTabs.get(event.sender.id)
+    const session = entry ? displayedSession(entry) : undefined
+    const path = session ? sessionDocumentPath(session) : null
+    return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+  })
+
+  // EL-1(b) fix6 (VEL-1): explicit Save on a read-only bound workbook asks the
+  // shell to explain the lock / view-only state (never writes, never fires hook).
+  ipcMain.handle(IPC_CHANNELS.uniworkReadOnlySave, (event, filePath?: unknown) => {
+    const entry = sheetsTabs.get(event.sender.id)
+    if (!entry) return
+    const shown = displayedSession(entry)
+    const displayedPath = shown ? sessionDocumentPath(shown) : null
+    const paths = [...entry.sessions.values()]
+      .map((s) => sessionDocumentPath(s))
+      .filter((p): p is string => typeof p === 'string' && p.length > 0)
+    if (typeof filePath === 'string' && filePath.length > 0) {
+      const matched = paths.find((p) => p === filePath || uniworkSamePath(p, filePath))
+      if (!matched) return
+      uniworkReadOnlySave(matched)
+      return
+    }
+    if (displayedPath) uniworkReadOnlySave(displayedPath)
+  })
+
   // Registered here (not in registerSheetsAiIpc, skipped in shell mode):
   // slides' ai:generate-image only exists once a slides view opens, so sheets
   // owns its channel the way pdf does.
@@ -2775,6 +2816,7 @@ export function registerSheetsIpc(): void {
       }
       return null
     }
+    entry.displayedSessionId = result.sessionId
     // an unsaved new workbook's tab already shows the untitled name; its temp
     // backing path must not become a recent file
     if (!prepared.unsavedNew) workbookOpenedHook?.(event.sender, path)
@@ -3458,6 +3500,7 @@ export function registerSheetsIpc(): void {
     // unreachable in practice; a null here means the session could not be
     // swapped over the bytes we just wrote.
     if (file === null) throw new Error('the saved workbook could not be reopened')
+    if (entry.displayedSessionId === request.sessionId) entry.displayedSessionId = file.sessionId
     if (quietUnsavedNew && session.suggestSaveAs !== undefined) {
       // the temp path must not reach the title or recents; the recovery copy
       // is what a crash restores from, so it tracks the saved bytes
@@ -3568,6 +3611,7 @@ export function registerSheetsIpc(): void {
     entry.saveTransfers.discardSession(validatedSessionId)
     const session = entry.sessions.get(validatedSessionId)
     if (!entry.sessions.delete(validatedSessionId)) return
+    if (entry.displayedSessionId === validatedSessionId) entry.displayedSessionId = null
     if (session === undefined) return
     if (session.unsavedNew && session.suggestSaveAs !== undefined)
       forgetUnsavedNewRecovery(session.suggestSaveAs)
@@ -4637,6 +4681,11 @@ export function setSheetsCloseTabHook(fn: (() => void) | null): void {
 function installApplicationMenu(): void {
   const sendMenuAction = sendSheetsMenuAction
   const labels = appMenuLabels(getUiLang())
+  // the menu item's accelerator from the shortcut table (none when its key has no menu form)
+  const acc = (item: SheetsMenuShortcut): { accelerator?: string } => {
+    const accelerator = sheetsMenuAccelerator(item, process.platform === 'darwin' ? 'mac' : 'win')
+    return accelerator ? { accelerator } : {}
+  }
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
@@ -4645,7 +4694,7 @@ function installApplicationMenu(): void {
         submenu: [
           {
             label: tm('menuOpenWorkbook'),
-            accelerator: 'CmdOrCtrl+O',
+            ...acc('open'),
             click: () => sendMenuAction('open'),
           },
           ...(extraFileMenuItems.length > 0
@@ -4654,18 +4703,19 @@ function installApplicationMenu(): void {
           { type: 'separator' },
           {
             label: tm('menuSave'),
-            accelerator: 'CmdOrCtrl+S',
+            ...acc('save'),
             click: () => sendMenuAction('save'),
           },
           {
+            // Excel's F12 / Shift+Cmd+S; the renderer handles the other Save As chords
             label: tm('menuSaveAs'),
-            accelerator: 'Shift+CmdOrCtrl+S',
+            ...acc('saveAs'),
             click: () => sendMenuAction('save-as'),
           },
           { type: 'separator' },
           {
             label: tm('menuPrint'),
-            accelerator: 'CmdOrCtrl+P',
+            ...acc('print'),
             click: () => sendMenuAction('print'),
           },
           { type: 'separator' },
@@ -4682,7 +4732,7 @@ function installApplicationMenu(): void {
             ? {
                 // closes the tab on every platform (the hook only exists in tab mode)
                 label: tm('menuClose'),
-                accelerator: 'CmdOrCtrl+W',
+                ...acc('close'),
                 click: () => closeActiveTabHook?.(),
               }
             : process.platform === 'darwin'
@@ -4697,12 +4747,13 @@ function installApplicationMenu(): void {
           // no-op that starves Univer of the shortcut — forward it instead.
           {
             label: tm('menuUndo'),
-            accelerator: 'CmdOrCtrl+Z',
+            ...acc('undo'),
             click: () => sendMenuAction('undo'),
           },
           {
+            // Excel's Ctrl+Y / Cmd+Y; Shift+Ctrl+Z still redoes through the renderer
             label: tm('menuRedo'),
-            accelerator: 'Shift+CmdOrCtrl+Z',
+            ...acc('redo'),
             click: () => sendMenuAction('redo'),
           },
           { type: 'separator' },

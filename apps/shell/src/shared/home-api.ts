@@ -21,6 +21,23 @@ import type {
   UniworkConflictReply,
   UniworkConflictView,
 } from './uniwork-conflict'
+import type {
+  OpenSourceInput,
+  OpenSourceValue,
+  SourceViewHint,
+  SourceViewResult,
+  SourceViewState,
+} from './source-view'
+
+export { SOURCE_VIEW_CHANNELS } from './source-view'
+export type {
+  OpenSourceInput,
+  OpenSourceValue,
+  SourceViewErrorCode,
+  SourceViewHint,
+  SourceViewResult,
+  SourceViewState,
+} from './source-view'
 
 export type {
   UniworkConflictAction,
@@ -132,7 +149,7 @@ export interface McpStatus {
   error?: string
 }
 
-export type UniworkDocFormat = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'html'
+export type UniworkDocFormat = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'html'
 export type UniworkDocAccess = 'edit' | 'view'
 export type UniworkSaveState =
   | 'ready'
@@ -184,6 +201,9 @@ export type UniworkDocErrorCode =
   | 'document_too_deep'
   | 'document_cycle'
   | 'document_parent_kind'
+  // UNI-1975: the server's 422 `folder_not_shareable` - a folder can't be shared,
+  // only documents are (user-facing, never retried)
+  | 'folder_not_shareable'
   // the account's durable sync store could not be opened (locked keychain) or
   // refused the pending intent (budget full)
   | 'keystore_locked'
@@ -216,6 +236,20 @@ export interface UniworkWorkspaceRef {
   myRole: string | null
 }
 
+/**
+ * UNI-1958 row 1: the server's list-row `share_scope` (who reaches the
+ * document), carried unchanged from the main parse to the Access cell.
+ */
+export interface UniworkDocShareScope {
+  homeWorkspace: boolean
+  /** live direct grants to people */
+  users: number
+  /** live direct grants to other workspaces */
+  workspaces: number
+  organization: boolean
+  publicLink: boolean
+}
+
 export interface UniworkDocSummary {
   id: string
   workspaceId: string
@@ -229,6 +263,8 @@ export interface UniworkDocSummary {
   visibility?: 'private' | 'workspace' | 'restricted'
   /** DESKTOP-HOME: server `my_level`; absent when omitted or unknown */
   myLevel?: 'view' | 'comment' | 'edit' | 'manage'
+  /** UNI-1958 row 1: server `share_scope`; absent when omitted (agent callers) or malformed */
+  shareScope?: UniworkDocShareScope
   /** shared-with-me rows only: the workspace the share lives in (name resolved by main) */
   workspaceName?: string
   /**
@@ -243,7 +279,8 @@ export interface UniworkDocSummary {
   archived?: boolean
   /**
    * FD-11: what the row is. Always present on `listChildren` and search rows;
-   * `'file'` on the library (`listDocuments`) and shared-with-me routes.
+   * `'file'` on the library (`listDocuments`) and shared-with-me routes, which
+   * add `'page'` only when asked (`includePages`).
    */
   kind?: UniworkEntryKind
   /** FD-11: the folder/page holding the document; null = the workspace root */
@@ -258,6 +295,115 @@ export interface UniworkDocSummary {
    * sends one (cut at the first unreadable ancestor).
    */
   path?: { id: string; title: string }[]
+  /** EL-1(b): list-row edit_lock summary (DH-2); absent when the server sent none */
+  editLock?: UniworkDocEditLock
+  /**
+   * UNI-1961 (ARCHIVE-01): the row sits in Lưu trữ (the server's `shelved_at`).
+   * Read leniently: an odd value drops the field, never the row.
+   */
+  shelvedAt?: string
+  /** UNI-1961: the server's `shelved_by` id; absent when null (the system shelved it) */
+  shelvedById?: string
+  /** UNI-1961: the shelver's display name, resolved by main from the workspace members */
+  shelvedByName?: string
+  /** UNI-1961: `shelved_by` names someone the workspace member list no longer holds */
+  shelvedByFormer?: boolean
+  /**
+   * UNI-1961: the server's `admin_scope` - a workspace admin on a restricted row
+   * administers it without a `my_level` (the web's canManageTrashed)
+   */
+  adminScope?: boolean
+  /** UNI-1961: a file row's `size_bytes` (the web's Size column); absent on pages/folders or 0 */
+  sizeBytes?: number
+  /** UNI-1961: the server's `origin` when it is one the web names (Group by Source) */
+  origin?: 'upload' | 'created'
+  /**
+   * UNI-2047 doclist fields. Every one is optional and read leniently by main:
+   * a missing or malformed server value leaves the key absent, so a screen
+   * hides its column instead of guessing.
+   */
+  /** trash rows: the server's `archived_at` timestamp (`archived` stays the flag) */
+  archivedAt?: string
+  /** trash rows: the server's `archived_by` id */
+  archivedById?: string
+  /** trash rows: who trashed it, resolved by main from the workspace members like `shelvedByName` */
+  archivedByName?: string
+  /** trash rows: when the server purges the row (`purge_after`); "N days left" counts to it */
+  purgeAfter?: string
+  /** the caller owns the row (`is_owner`) */
+  isOwner?: boolean
+  /** the last editor as the server names them; absent outside the caller's org or for a non-person */
+  updatedByUser?: UniworkDocUpdatedByUser
+  /** recent rows: the caller's last opened/edited/commented touch */
+  lastActivity?: UniworkDocLastActivity
+  /** shared-with-me rows: who shared the row and when */
+  shared?: UniworkDocShared
+  /** shared-by-me rows: how widely the caller shared the row */
+  shareSummary?: UniworkDocShareSummary
+  /** favorites rows: when the caller starred the row (`favorited_at`) */
+  favoritedAt?: string
+  /**
+   * UNI-2047 APP-SHARE-DIALOG: the server's `owner_kind` when the document belongs to another
+   * module (a work product); absent for an ordinary document. Such a row is never shared here.
+   */
+  ownerKind?: string
+}
+
+/** UNI-2047: the server's `updated_by_user`; `avatarUrl` is absolute http(s) and loads with no auth header */
+export interface UniworkDocUpdatedByUser {
+  name: string
+  avatarUrl?: string
+}
+
+/** UNI-2047: the server's `last_activity` on a recent row */
+export interface UniworkDocLastActivity {
+  kind: 'opened' | 'edited' | 'commented'
+  at: string
+}
+
+/** UNI-2047: the server's `shared` block on a shared-with-me row */
+export interface UniworkDocShared {
+  /** `shared.by`: the sharer's id */
+  byId?: string
+  /** `shared.by_kind`, kept as sent (the server may add kinds) */
+  byKind?: string
+  /** `shared.by_name`; absent when the sharer is outside the caller's org */
+  byName?: string
+  at: string
+}
+
+/**
+ * UNI-2047: the server's `share_summary` on a shared-by-me row. `people` are
+ * direct users, `links` are the live ones; `latestAt` is absent when nothing
+ * is shared.
+ */
+export interface UniworkDocShareSummary {
+  people: number
+  workspaces: number
+  links: number
+  latestAt?: string
+}
+
+/** UNI-2047: the sort keys a doclist route accepts (S3 plus the SV-0..SV-3 per-list keys) */
+export type UniworkListSort =
+  'updated' | 'name' | 'size' | 'editor' | 'activity' | 'shared' | 'starred' | 'deleted' | 'shelved'
+
+/** UNI-2047: the Recent segment (`activity` filter on `/documents/recent`) */
+export type UniworkListActivity = 'opened' | 'edited'
+
+/**
+ * UNI-1961 (ARCHIVE-01): the answer of an unshelve or shelve - the item, and
+ * the ids the batch touched (a folder unshelve may leave descendants the
+ * caller does not manage on the shelf).
+ */
+export interface UniworkDocShelveResult {
+  document: UniworkDocSummary
+  affected: string[]
+}
+
+/** UNI-2047 B6: the answer of Gắn sao - when the server recorded the star */
+export interface UniworkDocFavoriteResult {
+  favoritedAt: string
 }
 
 /** FD-11: the three entry kinds the folder tree holds */
@@ -273,12 +419,78 @@ export type UniworkSystemKind = 'my_folder'
 
 /**
  * DESKTOP-HOME: optional list filters for `listChildren`, `listDocuments`,
- * `listSharedByMe`, and `listTrash`. Unset = parameter omitted.
+ * `listSharedByMe`, `listTrash`, `listSharedWithMe`, `listShelved` and (UNI-2047 B6, only the type,
+ * the kind and the sort) `listFavorites`.
+ * Unset = parameter omitted.
  */
 export interface UniworkListFilters {
+  /** a file format; the server takes it on every list route */
   format?: UniworkDocFormat
+  /**
+   * UNI-2047: `page` = UniNote only (the flat `/documents` route's `kind`; a UniNote has no file
+   * format, so it never rides with `format`). Recent and Shared with me have no such param: the
+   * renderer narrows their loaded rows.
+   */
+  kind?: 'page'
   updatedBy?: string
   updatedFrom?: string
+  /** UNI-2047: server-side sort key; unset = the route's own order, nothing sent */
+  sort?: UniworkListSort
+  /** UNI-2047: sort direction; unset = the key's own default, nothing sent */
+  order?: 'asc' | 'desc'
+  /** UNI-2047: Recent only (`/documents/recent`): keep rows by their last touch */
+  activity?: UniworkListActivity
+}
+
+/**
+ * UNI-1961: one file of the Documents home's "other sources" list
+ * (`GET /workspaces/{ws}/documents/sources`): a document file attached in
+ * chat, a task, a meeting or email (UNI-1967: docx/xlsx/pptx/pdf/md/html/txt).
+ * The web's lenient shape (sources-schema.ts): every field but the ids, the
+ * source, the parent and the name takes a default when the server omits it.
+ */
+export interface UniworkSourceFile {
+  id: string
+  /** chat | task | meeting | email; kept as sent (a new module is not dropped) */
+  source: string
+  parent: { kind: string; id: string; title: string }
+  name: string
+  mimeType: string
+  extension: string
+  sizeBytes: number
+  updatedAt: string
+  owner: { id: string; name: string } | null
+  canOpenInApp: boolean
+  canSave: boolean
+}
+
+/**
+ * UNI-1961: the type filter the sources list takes (the web's `type`). A txt filter is
+ * accepted here (it follows UniworkDocFormat) but the client does not send it: the
+ * sources list has no txt type.
+ */
+export type UniworkSourceType = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'html'
+
+export interface UniworkSourceListQuery {
+  workspaceId: string
+  source?: string
+  type?: UniworkSourceType
+  q?: string
+  cursor?: string
+  limit?: number
+}
+
+export interface UniworkSourceListPage {
+  items: UniworkSourceFile[]
+  nextCursor: string | null
+}
+
+/** UNI-1961: download one source file to a path the person picks */
+export interface UniworkSourceDownloadInput {
+  workspaceId: string
+  sourceId: string
+  /** the suggested file name (the row's name; only its last segment is used) */
+  name: string
 }
 
 /**
@@ -348,6 +560,11 @@ export interface UniworkDocListQuery extends UniworkListFilters {
   query?: string
   cursor?: string
   limit?: number
+  /**
+   * UNI-1953: also list UniNote pages (the Documents home). Unset = files only,
+   * which every picker and every list that downloads keeps.
+   */
+  includePages?: boolean
 }
 
 export type UniworkResult<T> = { ok: true; value: T } | { ok: false; error: UniworkDocErrorCode }
@@ -357,15 +574,37 @@ export interface UniworkDocListPage {
   nextCursor: string | null
 }
 
-/** paged "shared with me" query; main aggregates the selected org's workspaces */
-export interface UniworkSharedQuery {
+/**
+ * paged "shared with me" query; main aggregates the selected org's workspaces.
+ * UNI-2047: the type / updater / date filters and the sort go to every
+ * workspace; a value outside the vocabulary is dropped, unset = today's call.
+ */
+export interface UniworkSharedQuery extends Pick<
+  UniworkListFilters,
+  'format' | 'updatedBy' | 'updatedFrom' | 'sort' | 'order'
+> {
   /** opaque cursor from the previous page; omit for the first page */
   cursor?: string
   /** page size, default 50, max 100 */
   limit?: number
+  /** UNI-1953: also list UniNote pages (the Documents home); unset = files only */
+  includePages?: boolean
 }
 
 export type UniworkSharedPage = UniworkDocListPage
+
+/**
+ * UNI-1961 / UNI-2047: the Lưu trữ shelf query. Only the type filter and the
+ * sort apply (`updatedBy` / `updatedFrom` / `activity` are never forwarded).
+ */
+export interface UniworkShelvedQuery extends Pick<
+  UniworkListFilters,
+  'format' | 'kind' | 'sort' | 'order'
+> {
+  workspaceId: string
+  cursor?: string
+  limit?: number
+}
 
 /**
  * The document properties panel (S17). Every name/time the server does not
@@ -439,6 +678,12 @@ export type UniworkDocActionResult<T> =
       sizeBytes?: number
       maxBytes?: number
       /**
+       * UNI-2047: the server throttled (429) or was briefly down (503), so the same call may be
+       * tried again once. Absent on every other failure: a `server_error` that is not a throttle
+       * may have been applied, and a second call would answer conflict / not_found.
+       */
+      retryable?: boolean
+      /**
        * FD-11 / B-R2-01: `document_too_deep` carries the depth cap so the
        * renderer can show it; D's `document_too_deep` has no `fields` map and
        * `max` is always the app constant 20 (matching the server's
@@ -452,10 +697,16 @@ export type UniworkDocActionResult<T> =
        */
       documentId?: string
       documentTitle?: string
+      /**
+       * UNI-1959: a create the server answered 404 / 501 - its route for this
+       * kind is not deployed - so the New menu disables that kind for the
+       * session. Set on create-document / create-page failures only.
+       */
+      endpointMissing?: boolean
     }
 
-/** the formats the New document dialog offers (D accepts more; these three are the Office ones) */
-export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx'
+/** the file formats D's blank route generates (UNI-1953: the Office three plus md / html / pdf; UNI-2046: txt) */
+export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'txt' | 'html' | 'pdf'
 
 export interface UniworkCreateDocInput {
   workspaceId: string
@@ -465,8 +716,13 @@ export interface UniworkCreateDocInput {
   format: UniworkDocNewFormat
 }
 
-/** a UniNote page has no file format: the create-document input without it */
-export type UniworkCreatePageInput = Omit<UniworkCreateDocInput, 'format'>
+/** UNI-1953: a UniNote is a page, not a file format: it has its own create call */
+export interface UniworkCreatePageInput {
+  workspaceId: string
+  /** ULID of the parent folder/page; null = the caller's My Folder */
+  folderId: string | null
+  name: string
+}
 
 export interface UniworkUploadDocInput {
   workspaceId: string
@@ -571,6 +827,34 @@ export interface UniworkDocEditLock {
   offlineHoldUntil?: string
 }
 
+/** EL-1(b): the desktop's own edit-lock session phase for an open bound document */
+export type UniworkEditLockPhase =
+  'acquiring' | 'held' | 'other' | 'self_elsewhere' | 'free' | 'lost' | 'unreachable'
+export type UniworkEditLockLostReason =
+  | 'released'
+  | 'expired'
+  | 'taken_over'
+  | 'handed_over'
+  | 'access_lost'
+  | 'document_archived'
+  | 'moved_here'
+  | 'session_revoked'
+  | 'member_deactivated'
+  | 'organization_suspended'
+  | 'document_deleted'
+  | 'unknown'
+export interface UniworkEditLockSessionView {
+  phase: UniworkEditLockPhase
+  /** 'other' | 'self_elsewhere': the holder's display name (null when the server sent none) */
+  holderName: string | null
+  /** 'other' | 'self_elsewhere': ISO time the holder started */
+  since: string | null
+  /** 'lost' only */
+  lostReason?: UniworkEditLockLostReason
+  /** 'lost' with taken_over / handed_over: who took it */
+  byName?: string | null
+}
+
 export interface UniworkDocStatus {
   path: string
   documentId: string
@@ -587,6 +871,8 @@ export interface UniworkDocStatus {
   error?: UniworkDocErrorCode
   /** EL-1(a) (UNI-1645c): populated while `state === 'edit_locked'`; absent otherwise. */
   editLock?: UniworkDocEditLock
+  /** EL-1(b): absent = no lock session (unbound, view access, version ticket, signed out) */
+  lockSession?: UniworkEditLockSessionView
   /** Payload size in bytes when known (e.g. when `error === 'too_large'`). */
   sizeBytes?: number
   /** Server/configured maximum document size in bytes when `error === 'too_large'`. */
@@ -620,6 +906,34 @@ export interface UniworkDocStatus {
  */
 export interface UniworkQueuePopoverRequest {
   path: string
+}
+
+/**
+ * UNI-1959 (mirrors the web UNI-1960): main asks the shell renderer for the
+ * "Name the document" dialog on the first save of a document created blank. The
+ * save is held until the renderer answers `continue` (the name / folder step is
+ * done or unchanged) or `cancel` (no save).
+ */
+export interface UniworkFirstSaveNameRequest {
+  /** minted by main per ask; the answer names it */
+  requestId: string
+  /** the working copy the editor saved */
+  path: string
+  documentId: string
+  workspaceId: string
+  /** the document's current title, with its extension (e.g. `Untitled document.docx`) */
+  title: string
+  /** the folder holding it now; null = unknown / workspace root */
+  parentId: string | null
+}
+
+export interface UniworkFirstSaveNameAnswer {
+  requestId: string
+  /**
+   * `shown` = the dialog is up (it stops main's delivery clock; the person has
+   * no deadline after it); `continue` / `cancel` = the verdict
+   */
+  answer: 'continue' | 'cancel' | 'shown'
 }
 
 export type UniworkConflictChoice = 'overwrite' | 'save-local-copy' | 'open-latest' | 'later'
@@ -956,6 +1270,8 @@ export interface HomeApi {
   submitAgentIntent(intent: AgentIntentDto): Promise<boolean>
   /** open a blank markdown editor tab */
   newMarkdown(opts?: NewFileOpts & { projectId?: string }): Promise<void>
+  /** a blank .txt in the default folder, opened in the markdown module as plain source */
+  newTxt(opts?: NewFileOpts & { projectId?: string }): Promise<void>
   /** open a blank html editor tab */
   newHtml(opts?: NewFileOpts & { projectId?: string }): Promise<void>
   /** drop entries from the recent list (does not touch the files) */
@@ -1167,13 +1483,25 @@ export interface HomeApi {
   uniworkListTrash(
     q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
   ): Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-1961: the Documents home's "other sources" files (paged) */
+  uniworkListSources(q: UniworkSourceListQuery): Promise<UniworkResult<UniworkSourceListPage>>
+  /** UNI-1961: save one source file through the save dialog; `path` null = cancelled */
+  uniworkDownloadSource(
+    input: UniworkSourceDownloadInput,
+  ): Promise<UniworkResult<{ path: string | null }>>
+  /** UNI-1993: open a source row's file as a view-only tab (no document, no sync) */
+  uniworkOpenSource(input: OpenSourceInput): Promise<SourceViewResult<OpenSourceValue>>
+  /** UNI-1993: the tab chip's state of a path; null unless the path is a view-only source */
+  uniworkSourceViewState(path: string): Promise<SourceViewState | null>
+  /** UNI-1993: an explicit Save hit a view-only source path (the "view only" hint) */
+  onUniworkSourceViewHint(cb: (payload: SourceViewHint) => void): () => void
   /** the document properties panel (S17); nulls where the server sends no value */
   uniworkDocumentProperties(documentId: string): Promise<UniworkResult<UniworkDocProperties>>
   /** S18: create a blank document (docx/xlsx/pptx) in a workspace/folder */
   uniworkCreateDocument(
     input: UniworkCreateDocInput,
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
-  /** create an empty UniNote page (opened on the web, never in the desktop) */
+  /** UNI-1953: create a UniNote (a page) in a workspace/folder; the app opens it on the web */
   uniworkCreatePage(
     input: UniworkCreatePageInput,
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
@@ -1195,6 +1523,12 @@ export interface HomeApi {
   uniworkRenameDocument(
     documentId: string,
     name: string,
+    /**
+     * SD-D2: the web's first-save share. `shareWithWorkspace` adds `visibility: "workspace"` to the
+     * same PATCH (manager of a not-yet-shared document only; main applies the rule), and an
+     * unchanged title still sends it
+     */
+    options?: { shareWithWorkspace?: boolean },
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** S18: archive a document (never a hard delete) */
   uniworkArchiveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
@@ -1227,6 +1561,33 @@ export interface HomeApi {
   onUniworkTreeChanged(cb: (event: UniworkTreeChangedEvent) => void): () => void
   /** a document was renamed (here or elsewhere); returns an unsubscribe */
   onUniworkDocRenamed(cb: (event: UniworkDocRenamedEvent) => void): () => void
+  /** UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf, shelved_at newest first (paged) */
+  uniworkListShelved(q: UniworkShelvedQuery): Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-1961: Bỏ lưu trữ - the item and its same-batch descendants the caller manages */
+  uniworkUnshelveDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<UniworkDocShelveResult>>
+  /** UNI-1961: Chuyển vào thùng rác from Lưu trữ (any kind: file, page or folder) */
+  uniworkTrashShelvedDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /** UNI-1961: Lưu trữ - shelve a live item the caller manages (the row ⋯; files and pages) */
+  uniworkShelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>>
+  /**
+   * UNI-2047 B6: the caller's stars in one workspace (`favorited_at` on each row, newest star first,
+   * paged). Only the type, the kind and the sort are read; an older server answers `not_found`.
+   */
+  uniworkListFavorites(
+    q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
+  ): Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-2047 B6: Gắn sao (idempotent) */
+  uniworkFavoriteDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<UniworkDocFavoriteResult>>
+  /** UNI-2047 B6: Bỏ gắn sao (idempotent) */
+  uniworkUnfavoriteDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<{ documentId: string }>>
   uniworkOpenDocument(documentId: string): Promise<UniworkResult<{ path: string }>>
   uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
   uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
@@ -1234,6 +1595,8 @@ export interface HomeApi {
   /** G5-06u: main asks for the queue popover of a path (Ctrl/Cmd+S with a pending save) */
   onUniworkQueuePopover(cb: (request: UniworkQueuePopoverRequest) => void): () => void
   uniworkSave(path: string): Promise<UniworkDocStatus | null>
+  /** EL-1(b): "Sửa ở đây" - acquire (move_from_self when self_elsewhere); resolves with the new status */
+  uniworkEditHere(path: string): Promise<UniworkDocStatus | null>
   /** Save a local copy of the bound working copy at `path` to a user-chosen path ("Lưu bản sao về máy"). */
   uniworkSaveLocalCopy?(path: string): Promise<boolean>
   uniworkResolveConflict(path: string): Promise<UniworkDocStatus | null>
@@ -1250,6 +1613,12 @@ export interface HomeApi {
    * live dialog from a dead renderer and would warn every time.
    */
   uniworkFirstSaveOpenAck(path: string): Promise<void>
+  /** UNI-1959: main asks for the "Name the document" dialog of a blank document's first save */
+  onUniworkFirstSaveName(cb: (request: UniworkFirstSaveNameRequest) => void): () => void
+  /** UNI-1959: the dialog's verdict; main continues or drops the held save */
+  uniworkFirstSaveNameAnswer(input: UniworkFirstSaveNameAnswer): Promise<void>
+  /** UNI-1959: main took an ask back (its tab closed, its session ended): drop its dialog / queue slot */
+  onUniworkFirstSaveNameDismiss(cb: (requestId: string) => void): () => void
   /** MYFOLDER-01 (Q3): ensure the caller's personal My Folder (dialog open) */
   uniworkEnsureMyFolder(workspaceId: string): Promise<UniworkResult<UniworkDocSummary>>
   /** G5-09: main pushes the conflict dialog view when S5 opens or updates in place */
@@ -1712,6 +2081,7 @@ export const HOME_CHANNELS = {
   newSheet: 'home:new-sheet',
   newSlide: 'home:new-slide',
   newMarkdown: 'home:new-markdown',
+  newTxt: 'home:new-txt',
   newHtml: 'home:new-html',
   newPdf: 'home:new-pdf',
   removeRecent: 'home:remove-recent',
@@ -1808,10 +2178,15 @@ export const UNIWORK_DOC_CHANNELS = {
   listSharedByMe: 'uniwork-doc:list-shared-by-me',
   /** invoke(q) -> archived documents in one workspace's trash (DESKTOP-HOME) */
   listTrash: 'uniwork-doc:list-trash',
+  /** invoke(q) -> the Documents home's "other sources" files (UNI-1961) */
+  listSources: 'uniwork-doc:list-sources',
+  /** invoke(input) -> save one source file through the save dialog (UNI-1961) */
+  downloadSource: 'uniwork-doc:download-source',
   /** invoke(documentId) -> the properties panel of one document */
   documentProperties: 'uniwork-doc:document-properties',
   /** invoke(input) -> create a blank document (S18) */
   createDocument: 'uniwork-doc:create-document',
+  /** invoke(input) -> create a UniNote page (UNI-1953) */
   createPage: 'uniwork-doc:create-page',
   /** invoke() -> the native open dialog's pick, or null when cancelled (S18) */
   pickUploadFile: 'uniwork-doc:pick-upload-file',
@@ -1869,12 +2244,23 @@ export const UNIWORK_DOC_CHANNELS = {
    * no dialog is up and File > Save warns instead of reporting a phantom save.
    */
   firstSaveOpenAck: 'uniwork-doc:first-save-open-ack',
+  /**
+   * UNI-1959: main -> shell renderer: open "Name the document" for the first
+   * save of a blank-created document (UniworkFirstSaveNameRequest)
+   */
+  firstSaveName: 'uniwork-doc:first-save-name',
+  /** UNI-1959: invoke(UniworkFirstSaveNameAnswer) - the dialog's verdict on a held save */
+  firstSaveNameAnswer: 'uniwork-doc:first-save-name-answer',
+  /** UNI-1959: main -> shell renderer: drop the dialog of this ask ({ requestId }) */
+  firstSaveNameDismiss: 'uniwork-doc:first-save-name-dismiss',
   /** MYFOLDER-01 (Q3): invoke(workspaceId) -> the ensured My Folder row (DocumentSDO) */
   ensureMyFolder: 'uniwork-doc:ensure-my-folder',
   /** invoke(sessionId, action) -> UniworkConflictReply (G5-09) */
   conflictAct: 'uniwork-doc:conflict-act',
   /** invoke(path, action) -> the S6 bar action (later/close/retry/reload/reload-now) */
   remoteAction: 'uniwork-doc:remote-action',
+  /** EL-1(b): invoke(path) -> "Sửa ở đây" acquire; UniworkDocStatus | null */
+  editHere: 'uniwork-doc:edit-here',
   /** invoke(heightPx) -> the S6 bar's height under the tab strip (active view inset) */
   barInset: 'uniwork-doc:bar-inset',
   launchEvent: 'uniwork-doc:launch-event',
@@ -1896,6 +2282,54 @@ export const UNIWORK_DOC_CHANNELS = {
   signOutPromptAnswer: 'uniwork-doc:sign-out-prompt-answer',
   /** invoke(path) -> save the bound working copy to a user-chosen local path ("Lưu bản sao về máy") */
   saveLocalCopy: 'uniwork-doc:save-local-copy',
+  /** invoke(q) -> the workspace's Lưu trữ shelf, shelved_at DESC (UNI-1961) */
+  listShelved: 'uniwork-doc:list-shelved',
+  /** invoke(documentId) -> Bỏ lưu trữ (UNI-1961) */
+  unshelveDocument: 'uniwork-doc:unshelve-document',
+  /** invoke(documentId) -> move a shelved item of any kind to the trash (UNI-1961) */
+  trashShelvedDocument: 'uniwork-doc:trash-shelved-document',
+  /** invoke(documentId) -> Lưu trữ a live item (UNI-1961) */
+  shelveDocument: 'uniwork-doc:shelve-document',
+  /** invoke(q) -> the caller's stars in one workspace, newest star first (UNI-2047 B6, SV-2) */
+  listFavorites: 'uniwork-doc:list-favorites',
+  /** invoke(documentId) -> Gắn sao (UNI-2047 B6; idempotent) */
+  favoriteDocument: 'uniwork-doc:favorite-document',
+  /** invoke(documentId) -> Bỏ gắn sao (UNI-2047 B6; idempotent) */
+  unfavoriteDocument: 'uniwork-doc:unfavorite-document',
+} as const
+
+/**
+ * UNI-2047 APP-SHARE-DIALOG: the Share dialog's channels (handlers in
+ * main/uniwork-docs/share-service.ts, wired in wiring.ts; the renderer-facing
+ * types are shared/share-api.ts). Every channel answers a `ShareResult`.
+ */
+export const UNIWORK_SHARE_CHANNELS = {
+  /** invoke(documentId) -> the access overview (`GET /documents/{id}/shares`) */
+  get: 'uniwork-share:get',
+  /** invoke({documentId, items, dryRun?}) -> add / change / remove access, or its preview */
+  update: 'uniwork-share:update',
+  /** invoke({documentId, q?, cursor?, limit?}) -> people / workspaces / organization to share with */
+  candidates: 'uniwork-share:candidates',
+  /** invoke({documentId, expiresInDays?}) -> a new public link (token + url once) */
+  linkCreate: 'uniwork-share:link-create',
+  /** invoke({documentId, linkId}) -> revoke a public link */
+  linkRevoke: 'uniwork-share:link-revoke',
+  /** invoke() -> the selected organization's public-links policy (read only) */
+  settings: 'uniwork-share:settings',
+  /** invoke(documentId) -> the pending access requests (null value = no such route) */
+  requests: 'uniwork-share:requests',
+  /** invoke({documentId, requestId, level?}) -> approve a request */
+  requestApprove: 'uniwork-share:request-approve',
+  /** invoke({documentId, requestId}) -> decline a request */
+  requestDecline: 'uniwork-share:request-decline',
+  /** invoke(plan) -> share several documents the same way, one after another */
+  bulk: 'uniwork-share:bulk',
+  /** invoke({documentId, reason}) -> open a 24 h emergency (break-glass) grant */
+  breakGlassGrant: 'uniwork-share:break-glass-grant',
+  /** invoke({documentId, grantId}) -> end one emergency grant */
+  breakGlassRevoke: 'uniwork-share:break-glass-revoke',
+  /** invoke({cursor?, limit?}) -> one page of the selected organization's members */
+  members: 'uniwork-share:members',
 } as const
 
 export const PROJECT_CHANNELS = {

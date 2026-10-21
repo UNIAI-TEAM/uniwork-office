@@ -29,8 +29,14 @@ import { openLocalHint } from '../../shared/open-extensions'
 import { useDismissablePopover } from '@genoffice/ui'
 import { boxOf, clipBoxesOf, followMenuAnchor } from './folder-menu-anchor'
 import { fileCountLabel } from './counts'
+import type { SortSpec } from './doclist/columns'
+import { deviceFileMenu, deviceFolderMenu } from './doclist/device-menu'
+import { deviceRows } from './doclist/device-model'
+import { DocList } from './doclist/DocList'
+import type { DocRowExtra, DocSubline } from './doclist/DocRow'
+import { readSort, writeSort } from './doclist/persist'
 import { useI18n } from './locale'
-import type { I18n, StringKey } from './locale'
+import type { StringKey } from './locale'
 import { CreditWallet } from './CreditWallet'
 import type { SettingsSectionId, SettingsTarget } from './SettingsModal'
 import { AccountEntry } from './AccountEntry'
@@ -49,6 +55,7 @@ import { PracticeHome } from './PracticeHome'
 import { wbStoreGetRaw, wbStoreSetRaw } from './workbench-store-client'
 import { onFilesChanged } from './file-events'
 import { FileBadge } from './FileBadge'
+import { shortcutHint, withShortcutHint } from './home-shortcut-hints'
 import { UniworkOpenCard } from './UniworkOpenCard'
 import { publishUniworkNotice } from './uniwork-notice-bus'
 import { openRecentEntry, openUniworkDocument } from './uniwork-open'
@@ -56,13 +63,16 @@ import { subscribeUniworkOpened } from './uniwork-recents-refresh'
 import {
   recentOpenAction,
   recentRowIsMissing,
-  recentRowModifiedMs,
   recentRowPolicy,
   splitEntriesByArea,
 } from './uniwork-docs-model'
 import { WorkErrorState, WorkNoWorkspace, WorkSkeleton } from './WorkErrorState'
-import { DocumentsHome } from './uniwork-home/DocumentsHome'
-import type { DocumentsHomeSubViewId } from './uniwork-home/documents-home-model'
+import {
+  DocumentsHome,
+  type ElsewhereSource as DocumentsHomeElsewhereSource,
+} from './uniwork-home/DocumentsHome'
+import type { DocumentsHomeDoc, DocumentsHomeSubViewId } from './uniwork-home/documents-home-model'
+import type { FolderMenuItem } from './uniwork-folders/FolderMenu'
 import { useOfflineToggle } from './OfflineToggle'
 
 export const HOME_AREA_KEY = 'uniwork.wb.homeArea'
@@ -162,23 +172,6 @@ function MoreDots() {
   )
 }
 
-function formatModified(mtimeMs: number, i18n: I18n): string {
-  const date = new Date(mtimeMs)
-  const now = new Date()
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-  const days = Math.round((startOfDay(now) - startOfDay(date)) / 86400000)
-  if (days <= 0) {
-    return `${i18n.t('today')} · ${date.toLocaleTimeString(i18n.dateLocale, { hour: '2-digit', minute: '2-digit' })}`
-  }
-  if (days === 1) return i18n.t('yesterday')
-  return date.toLocaleDateString(i18n.dateLocale, { month: 'short', day: 'numeric' })
-}
-
-function formatSize(bytes: number): string {
-  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`
-}
-
 function splitPath(path: string): string[] {
   return path.split(/[\\/]/).filter(Boolean)
 }
@@ -252,6 +245,7 @@ const FILTERS: { key: string; label: StringKey }[] = [
   { key: 'pdf', label: 'filterPdf' },
   { key: 'md', label: 'filterMd' },
   { key: 'html', label: 'filterHtml' },
+  { key: 'txt', label: 'filterTxt' },
 ]
 
 /** sidebar filter keys that stand for a family of extensions (mirrors recent-files.ts) */
@@ -259,7 +253,7 @@ const FILTER_FAMILY: Record<string, readonly string[]> = {
   docx: ['docx', 'doc'],
   xlsx: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'],
   pptx: ['pptx', 'ppt'],
-  md: ['md', 'markdown', 'txt', 'json'],
+  md: ['md', 'markdown'],
   html: ['html', 'htm'],
 }
 
@@ -280,29 +274,6 @@ function highlightText(text: string, needles: readonly string[]): ReactElement[]
     ) : (
       <span key={i}>{m.text}</span>
     ),
-  )
-}
-
-/** Check glyph marking the selected sort option; invisible on the others so labels stay aligned */
-function SortCheck({ visible }: { visible: boolean }): ReactElement {
-  return (
-    <svg
-      className="cloud-sort-check"
-      width="12"
-      height="12"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-      style={visible ? undefined : { visibility: 'hidden' }}
-    >
-      <path
-        d="M3 8.5L6.5 12L13 4.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   )
 }
 
@@ -1325,6 +1296,10 @@ export function Home() {
   const [uniworkSubViewByWs, setUniworkSubViewByWs] = useState<
     Record<string, DocumentsHomeSubViewId>
   >({})
+  // RV-16: the Từ nơi khác source row picked, kept with the sub-view per workspace
+  const [uniworkSourceByWs, setUniworkSourceByWs] = useState<
+    Record<string, DocumentsHomeElsewhereSource | null>
+  >({})
   const [uniworkSidebarSlot, setUniworkSidebarSlot] = useState<HTMLDivElement | null>(null)
   const [openingDocId, setOpeningDocId] = useState<string | null>(null)
   const [uwWsState, setUwWsState] = useState<WorkspaceListState>(() => ({
@@ -1387,16 +1362,13 @@ export function Home() {
   const composingRef = useRef(false)
   const searchSeq = useRef(0)
   const searchActive = searchQuery.trim().length > 0
-  // modified-column sort (WPS-style header popover), shared by the global and folder tables
-  const [fileSort, setFileSort] = useState<'recent' | 'oldest'>('recent')
-  const [fileSortMenuOpen, setFileSortMenuOpen] = useState(false)
-  const fileSortRef = useRef<HTMLDivElement>(null)
+  // header sort of the local file tables (shared rules: click a header, remembered per account);
+  // null until the user sorts: the lists then keep the order the main process gives and show no sorted header
+  const [fileSort, setFileSort] = useState<SortSpec | null>(() => readSort('device'))
   const [rowMenu, setRowMenu] = useState<string | null>(null)
   // G5-05u: "Dùng khi không có mạng" in a UniWork recents row's menu
   const offlineToggle = useOfflineToggle()
-  // actions cell (… button + menu) of the row whose menu is open — the dismissal guard root
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
-  const rowMenuWrapRef = useRef<HTMLSpanElement>(null)
   const [renaming, setRenaming] = useState<{ path: string; value: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string[] | null>(null)
   // unavailable recent entry (missing flag) the user clicked — offer list removal
@@ -1421,6 +1393,7 @@ export function Home() {
     if (uniworkAccountRef.current !== null && uniworkAccountRef.current !== acctKey) {
       setUniworkFolderByWs({})
       setUniworkSubViewByWs({})
+      setUniworkSourceByWs({})
     }
     if (s !== null) uniworkAccountRef.current = acctKey
     setRecentsAccount(acctKey)
@@ -1505,6 +1478,7 @@ export function Home() {
     setUwWsState((prev) => ({ ...prev, workspaceId: nextWsId }))
     setUniworkFolderByWs((prev) => ({ ...prev, [nextWsId]: null }))
     setUniworkSubViewByWs((prev) => ({ ...prev, [nextWsId]: 'workspace' }))
+    setUniworkSourceByWs((prev) => ({ ...prev, [nextWsId]: null }))
     setChatMode(false)
     setEduMode(false)
     setSelectedProjectId(null)
@@ -1858,11 +1832,6 @@ export function Home() {
 
   const hasMore = listLoaded && entries.length < listTotal
 
-  // unified dismissal: outside press, window blur, chrome press (tab strip / window drag)
-  useDismissablePopover(fileSortMenuOpen, () => setFileSortMenuOpen(false), {
-    inside: () => [fileSortRef.current],
-  })
-
   const loadMore = () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
@@ -1910,8 +1879,13 @@ export function Home() {
   }, [hasMore, entries.length])
 
   // unified dismissal: outside press, window blur, chrome press (tab strip / window drag)
+  // the row menu is the table's FolderMenu: its list is a portal beside the table, so the list
+  // and the "…" buttons count as inside
   useDismissablePopover(rowMenu !== null, () => setRowMenu(null), {
-    inside: () => [rowMenuWrapRef.current],
+    inside: () =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>('.uw-row-menu-list, [data-folder-menu-for]'),
+      ),
   })
   useDismissablePopover(folderMenu !== null, () => setFolderMenu(null), {
     inside: () => [folderMenuWrapRef.current],
@@ -1968,55 +1942,6 @@ export function Home() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [rowMenu, folderMenu, confirmDelete, confirmMissing, confirmDeleteFolder])
 
-  // WPS-style sortable "modified" column header, shared by both file tables
-  const renderModifiedHeader = () => (
-    <div className="cloud-col-sort" ref={fileSortRef}>
-      <button
-        className="cloud-col-sort-btn"
-        aria-haspopup="menu"
-        aria-expanded={fileSortMenuOpen}
-        onClick={() => setFileSortMenuOpen((o) => !o)}
-      >
-        {t('colModified')}
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 16 16"
-          fill="none"
-          aria-hidden="true"
-          style={fileSort === 'oldest' ? { transform: 'rotate(180deg)' } : undefined}
-        >
-          <path
-            d="M8 3v10M4.5 9.5L8 13l3.5-3.5"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-      {fileSortMenuOpen && (
-        <div className="cloud-sort-menu" role="menu">
-          {(['recent', 'oldest'] as const).map((key) => (
-            <button
-              key={key}
-              className={fileSort === key ? 'active' : ''}
-              role="menuitemradio"
-              aria-checked={fileSort === key}
-              onClick={() => {
-                setFileSort(key)
-                setFileSortMenuOpen(false)
-              }}
-            >
-              <SortCheck visible={fileSort === key} />
-              {t(key === 'recent' ? 'cloudSortRecent' : 'cloudSortOldest')}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-
   // ── Plain view (no folder selected): FD-13 splits loaded entries by area (UniWork vs device) ──
   const splitCurrent = splitEntriesByArea(entries)
   const splitOther = splitEntriesByArea(otherEntries)
@@ -2036,7 +1961,7 @@ export function Home() {
   useEffect(() => {
     if (!hasMore || loadingMore) return
     if (
-      fileSort === 'oldest' ||
+      fileSort !== null ||
       areaEntries.length === 0 ||
       (lastPageLen >= PAGE_SIZE && areaEntries.length < PAGE_SIZE)
     ) {
@@ -2045,18 +1970,12 @@ export function Home() {
   }, [fileSort, hasMore, loadingMore, areaEntries.length, lastPageLen])
 
   const selectedPaths = areaEntries.filter((e) => selected.has(e.path)).map((e) => e.path)
-  // UniWork documents have no local file to move or delete: they are never selectable
-  const selectableEntries = areaEntries.filter((e) => recentRowPolicy(e).selectable)
-  const allSelected =
-    selectableEntries.length > 0 && selectedPaths.length === selectableEntries.length
 
   // folder view: files of the selected folder under the type filter; shares the same `selected` set
   const folderListing = selectedFolder ? listings.get(selectedFolder) : undefined
   const folderFiles = (folderListing?.files ?? []).filter((e) => matchesFilter(e, filter))
   const folderSubfolders = folderListing?.folders ?? []
   const folderSelectedPaths = folderFiles.filter((e) => selected.has(e.path)).map((e) => e.path)
-  const folderAllSelected =
-    folderFiles.length > 0 && folderSelectedPaths.length === folderFiles.length
 
   // project files of the selected project
   useEffect(() => {
@@ -2075,14 +1994,9 @@ export function Home() {
       active = false
     }
   }, [projectMode, selectedProjectId, projectTick])
-  // "Move to project": the row menu expands the project list in place (the row menu
-  // scrolls, so a flyout submenu would be clipped); the selection bar has its own dropdown
-  const [moveFileMenu, setMoveFileMenu] = useState<string | null>(null)
+  // "Move to project": each other project is an entry of the row menu; the selection bar has its own dropdown
   const [bulkMoveMenu, setBulkMoveMenu] = useState(false)
   const bulkMoveWrapRef = useRef<HTMLSpanElement>(null)
-  useEffect(() => {
-    if (rowMenu === null) setMoveFileMenu(null)
-  }, [rowMenu])
   useDismissablePopover(bulkMoveMenu, () => setBulkMoveMenu(false), {
     inside: () => [bulkMoveWrapRef.current],
   })
@@ -2096,7 +2010,6 @@ export function Home() {
   }, [bulkMoveMenu])
 
   const moveFileTo = async (filePath: string, targetProjectId: string) => {
-    setMoveFileMenu(null)
     setRowMenu(null)
     try {
       await window.aiOfficeProject?.moveFile(filePath, targetProjectId)
@@ -2133,11 +2046,6 @@ export function Home() {
   const projSelectedPaths = projectFileEntries
     .filter((e) => selected.has(e.path))
     .map((e) => e.path)
-  const projAllSelected =
-    projectFileEntries.length > 0 && projSelectedPaths.length === projectFileEntries.length
-  const toggleSelectAllProject = () => {
-    setSelected(projAllSelected ? new Set() : new Set(projectFileEntries.map((e) => e.path)))
-  }
 
   const changeFilter = (key: string) => {
     setFilter(key)
@@ -2178,23 +2086,6 @@ export function Home() {
       for (const crumb of crumbsOf(owner, dir)) next.add(crumb.path)
       return next
     })
-  }
-
-  const toggleSelect = (path: string, on: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (on) next.add(path)
-      else next.delete(path)
-      return next
-    })
-  }
-
-  const toggleSelectAll = () => {
-    setSelected(allSelected ? new Set() : new Set(selectableEntries.map((e) => e.path)))
-  }
-
-  const toggleSelectAllFolder = () => {
-    setSelected(folderAllSelected ? new Set() : new Set(folderFiles.map((e) => e.path)))
   }
 
   const toggleStar = (path: string) => {
@@ -2244,8 +2135,8 @@ export function Home() {
     setRenaming({ path: entry.path, value: baseName(entry) })
   }
 
-  const commitRename = (entry: RecentEntry) => {
-    const value = renaming?.value.trim() ?? ''
+  const commitRename = (entry: RecentEntry, typed: string) => {
+    const value = typed.trim()
     setRenaming(null)
     if (!value || value === baseName(entry)) return
     const newName = entry.ext ? `${value}.${entry.ext}` : value
@@ -2293,12 +2184,12 @@ export function Home() {
     setFolderRenaming({ path: entry.path, where, value: entry.name })
   }
 
-  const commitRenameFolder = async () => {
+  const commitRenameFolder = async (typed?: string) => {
     const pending = folderRenamingRef.current
     folderRenamingRef.current = null
     setFolderRenaming(null)
     if (!pending) return
-    const value = pending.value.trim()
+    const value = (typed ?? pending.value).trim()
     if (!value || value === fileName(pending.path)) return
     const result = await window.aiOffice.renameFolder(pending.path, value)
     if (!result.ok) {
@@ -2353,10 +2244,9 @@ export function Home() {
 
   // ── Drag & drop (rows → folder rows) ──
 
-  const dragPathsFor = (path: string, context: 'global' | 'folder'): string[] => {
-    const pool = context === 'folder' ? folderSelectedPaths : selectedPaths
-    return pool.includes(path) ? pool : [path]
-  }
+  /** a drag of a ticked row carries every ticked row of its list, else just itself */
+  const dragPathsFor = (path: string, pool: readonly string[]): string[] =>
+    pool.includes(path) ? [...pool] : [path]
 
   const onRowDragStart = (event: ReactDragEvent, paths: string[]) => {
     event.dataTransfer.setData(DRAG_PATHS_MIME, JSON.stringify(paths))
@@ -2447,6 +2337,12 @@ export function Home() {
       action: () => window.aiOffice.newMarkdown(newFileOpts),
     },
     {
+      ext: 'txt',
+      title: t('newTxt'),
+      sub: '.txt',
+      action: () => window.aiOffice.newTxt(newFileOpts),
+    },
+    {
       ext: 'html',
       title: t('newHtml'),
       sub: '.html',
@@ -2460,11 +2356,20 @@ export function Home() {
     },
   ]
 
+  // the AI quick-create cards stay as they were; Plain text lives only in the New dropdown
+  const QUICK_CARD_ITEMS = NEW_ITEMS.filter((item) => item.ext !== 'txt')
+
   function renderQuickCards() {
     return (
       <div className="quick-cards">
-        {NEW_ITEMS.map((item) => (
-          <button key={item.ext} className="quick-card" onClick={() => void item.action()}>
+        {QUICK_CARD_ITEMS.map((item) => (
+          <button
+            key={item.ext}
+            className="quick-card"
+            // Ctrl/Cmd+N is the Home menu's New document
+            {...(item.ext === 'docx' ? { title: withShortcutHint(item.title, 'common-01') } : {})}
+            onClick={() => void item.action()}
+          >
             <FileBadge ext={item.ext} size={30} />
             <span className="quick-text">
               <span className="quick-title-row">
@@ -2481,6 +2386,7 @@ export function Home() {
           className="quick-card"
           onClick={() => void window.aiOffice.browse()}
           data-tip={OPEN_LOCAL_EXTENSIONS}
+          data-tip-kbd={shortcutHint('common-03') || undefined}
         >
           <span className="quick-folder">
             <FolderIcon size={18} />
@@ -2489,9 +2395,7 @@ export function Home() {
             <span className="quick-title-row">
               <span className="quick-title">{t('openLocal')}</span>
             </span>
-            <span className="quick-sub" title={OPEN_LOCAL_EXTENSIONS}>
-              {OPEN_LOCAL_EXTENSIONS}
-            </span>
+            <span className="quick-sub">{OPEN_LOCAL_EXTENSIONS}</span>
           </span>
         </button>
         <UniworkOpenCard onOpenSettings={() => setSettingsRequest({ section: 'account' })} />
@@ -2828,427 +2732,237 @@ export function Home() {
     )
   }
 
-  // ── File row rendering (shared by the plain view and the folder view) ──
+  // ── The device lists: Gần đây, Đã gắn sao, a folder's contents, project files and search hits
+  //    are all the shared DocList on the `device` screen ──
 
-  function renderFileRow(entry: RecentEntry, context: 'global' | 'folder') {
-    const isRenaming = renaming?.path === entry.path
+  /** the Sao toggle in a row's actions cell */
+  const renderStarButton = (entry: RecentEntry) => (
+    <button
+      type="button"
+      className={`star-btn${entry.starred ? ' starred' : ''}`}
+      aria-label={entry.starred ? t('unstar') : t('star')}
+      onClick={(event) => {
+        event.stopPropagation()
+        toggleStar(entry.path)
+      }}
+    >
+      <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+        <path
+          d="M8 1.9l1.9 3.85 4.25.62-3.07 3 .72 4.23L8 11.6l-3.8 2 .72-4.23-3.07-3 4.25-.62z"
+          fill={entry.starred ? 'currentColor' : 'none'}
+          stroke="currentColor"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  )
+
+  /** the file's own menu: Open · machine items │ Move │ Rename · Copy │ Group │ Remove / Unstar · Delete */
+  const fileMenuFor = (
+    entry: RecentEntry,
+    context: 'global' | 'folder',
+    tickedCount: number,
+    open: () => void,
+  ): FolderMenuItem[] => {
     // a UniWork document's working copy is managed by the app: no rename, move or file delete
     const policy = recentRowPolicy(entry)
-    const missing = recentRowIsMissing(entry)
-    const modifiedMs = recentRowModifiedMs(entry)
-    const editable = editableAt(entry.path) && policy.fileActions
-    const canDelete =
-      context === 'folder' ? folderSelectedPaths.length === 0 : selectedPaths.length === 0
     // inside a project the file's own project is not a target; elsewhere its project is unknown
     const otherProjects = projectMode
-      ? projects.filter((p) => p.id !== (selectedProjectId ?? undefined))
+      ? projects
+          .filter((p) => p.id !== (selectedProjectId ?? undefined))
+          .map((p) => ({ id: p.id, label: p.isDefault ? t('defaultProject') : p.name }))
       : []
-    return (
-      <li className="recent-row" key={entry.path}>
-        <div
-          className={`recent-item${missing ? ' missing' : ''}`}
-          role="button"
-          tabIndex={0}
-          draggable={!isRenaming && !missing && policy.draggable}
-          onDragStart={(e) => onRowDragStart(e, dragPathsFor(entry.path, context))}
-          onClick={() => {
-            if (isRenaming) return
-            if (recentOpenAction(entry) === 'confirm-missing') setConfirmMissing(entry)
-            else void openRecentEntry(entry, window.aiOffice)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && event.target === event.currentTarget) {
-              if (recentOpenAction(entry) === 'confirm-missing') setConfirmMissing(entry)
-              else void openRecentEntry(entry, window.aiOffice)
-            }
-          }}
-        >
-          <span className="col-check" onClick={(event) => event.stopPropagation()}>
-            {policy.selectable && (
-              <input
-                type="checkbox"
-                className="row-check"
-                checked={selected.has(entry.path)}
-                onChange={(event) => toggleSelect(entry.path, event.target.checked)}
-                aria-label={t('selectFile', { name: entry.name })}
-              />
-            )}
-          </span>
-          <span className="recent-icon">
-            <FileBadge ext={entry.ext} size={24} />
-          </span>
-          {isRenaming ? (
-            <input
-              className="rename-input"
-              value={renaming.value}
-              autoFocus
-              onFocus={(event) => event.target.select()}
-              onClick={(event) => event.stopPropagation()}
-              onChange={(event) => setRenaming({ path: entry.path, value: event.target.value })}
-              onBlur={() => commitRename(entry)}
-              onKeyDown={(event) => {
-                event.stopPropagation()
-                if (event.nativeEvent.isComposing) return
-                if (event.key === 'Enter') commitRename(entry)
-                if (event.key === 'Escape') setRenaming(null)
-              }}
-            />
-          ) : (
-            <span className="recent-name">{entry.name}</span>
-          )}
-          {policy.badge && area === 'uniwork' ? (
-            <span className="recent-path">
-              <span className="uw-recent-badge" title={t('uwRecentBadgeTip')}>
-                {t('uwRecentBadge')}
-              </span>
-            </span>
-          ) : (
-            <span className="recent-path" title={dirOf(entry.path)}>
-              {locationLabel(entry.path, roots)}
-            </span>
-          )}
-          <span className="recent-time">
-            {modifiedMs === null ? '—' : formatModified(modifiedMs, i18n)}
-          </span>
-          <span className="recent-size">{missing ? '—' : formatSize(entry.sizeBytes)}</span>
-          <button
-            className={`star-btn${entry.starred ? ' starred' : ''}`}
-            aria-label={entry.starred ? t('unstar') : t('star')}
-            onClick={(event) => {
-              event.stopPropagation()
-              toggleStar(entry.path)
-            }}
-          >
-            <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
-              <path
-                d="M8 1.9l1.9 3.85 4.25.62-3.07 3 .72 4.23L8 11.6l-3.8 2 .72-4.23-3.07-3 4.25-.62z"
-                fill={entry.starred ? '#f5a623' : 'none'}
-                stroke={entry.starred ? '#f5a623' : 'currentColor'}
-                strokeWidth="1.2"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-          <span
-            className="recent-actions"
-            ref={rowMenu === entry.path ? rowMenuWrapRef : undefined}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              className="more-btn"
-              aria-label={t('moreActions')}
-              aria-expanded={rowMenu === entry.path}
-              onClick={() => setRowMenu(rowMenu === entry.path ? null : entry.path)}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <circle cx="3.2" cy="8" r="1.4" fill="currentColor" />
-                <circle cx="8" cy="8" r="1.4" fill="currentColor" />
-                <circle cx="12.8" cy="8" r="1.4" fill="currentColor" />
-              </svg>
-            </button>
-            {rowMenu === entry.path && (
-              <div className="row-menu" role="menu">
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    setRowMenu(null)
-                    void openRecentEntry(entry, window.aiOffice)
-                  }}
-                >
-                  {t('open')}
-                </button>
-                {entry.uniwork && offlineToggle.labelOf(entry.uniwork.documentId) && (
-                  <button
-                    role="menuitem"
-                    onClick={() => {
-                      setRowMenu(null)
-                      offlineToggle.toggle({
-                        documentId: entry.uniwork!.documentId,
-                        workspaceId: entry.uniwork!.workspaceId,
-                        name: entry.uniwork!.title || entry.name,
-                      })
-                    }}
-                  >
-                    {offlineToggle.labelOf(entry.uniwork.documentId)}
-                  </button>
-                )}
-                {policy.showLocation && (
-                  <>
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setRowMenu(null)
-                        void window.aiOffice.revealPath(entry.path)
-                      }}
-                    >
-                      {t('revealInFolder')}
-                    </button>
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setRowMenu(null)
-                        void navigator.clipboard.writeText(entry.path)
-                      }}
-                    >
-                      {t('copyPath')}
-                    </button>
-                  </>
-                )}
-                {canMove && editable && !entry.missing && (
-                  <>
-                    <div className="row-menu-divider" />
-                    <button role="menuitem" onClick={() => startMove([entry.path])}>
-                      {t('moveToFolder')}
-                    </button>
-                  </>
-                )}
-                {otherProjects.length > 0 && policy.fileActions && (
-                  <>
-                    {!(canMove && editable && !entry.missing) && (
-                      <div className="row-menu-divider" />
-                    )}
-                    <button
-                      role="menuitem"
-                      className="submenu-trigger"
-                      aria-expanded={moveFileMenu === entry.path}
-                      onClick={() =>
-                        setMoveFileMenu(moveFileMenu === entry.path ? null : entry.path)
-                      }
-                    >
-                      {t('moveToProject')}
-                      <svg
-                        className="submenu-chevron"
-                        width="11"
-                        height="11"
-                        viewBox="0 0 12 12"
-                        aria-hidden="true"
-                      >
-                        <path
-                          d="M2.5 4.5l3.5 4 3.5-4"
-                          stroke="currentColor"
-                          strokeWidth="1.3"
-                          strokeLinecap="round"
-                          fill="none"
-                        />
-                      </svg>
-                    </button>
-                    {moveFileMenu === entry.path && (
-                      <div className="submenu" role="menu">
-                        {otherProjects.map((p) => (
-                          <button
-                            key={p.id}
-                            role="menuitem"
-                            onClick={() => void moveFileTo(entry.path, p.id)}
-                          >
-                            {p.isDefault ? t('defaultProject') : p.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-                {editable && (
-                  <>
-                    <div className="row-menu-divider" />
-                    <button role="menuitem" onClick={() => startRename(entry)}>
-                      {t('rename')}
-                    </button>
-                    <button role="menuitem" onClick={() => duplicateFile(entry.path)}>
-                      {t('duplicate')}
-                    </button>
-                  </>
-                )}
-                {entry.starred && (
-                  <>
-                    <div className="row-menu-divider" />
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setRowMenu(null)
-                        setGroupPicker([entry.path])
-                      }}
-                    >
-                      {t('moveToGroup')}
-                    </button>
-                  </>
-                )}
-                {canDelete && (context === 'global' || editable) && (
-                  <>
-                    <div className="row-menu-divider" />
-                    {context === 'global' &&
-                      // same root cause as the selection bar: in the Starred
-                      // view "remove from list" must unstar, not drop recents
-                      (view === 'starred' ? (
-                        <button role="menuitem" onClick={() => unstarSelected([entry.path])}>
-                          {t('unstar')}
-                        </button>
-                      ) : (
-                        <button role="menuitem" onClick={() => removeRecent([entry.path])}>
-                          {t('removeFromList')}
-                        </button>
-                      ))}
-                    {editable && (
-                      <button
-                        role="menuitem"
-                        className="danger"
-                        onClick={() => deleteFiles([entry.path])}
-                      >
-                        {t('deleteFiles')}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </span>
-        </div>
-      </li>
+    const offline = entry.uniwork
+      ? { id: entry.uniwork.documentId, workspaceId: entry.uniwork.workspaceId }
+      : null
+    return deviceFileMenu(
+      {
+        context,
+        view: view === 'starred' ? 'starred' : 'recent',
+        starred: entry.starred,
+        offlineLabel: offline ? offlineToggle.labelOf(offline.id) || null : null,
+        showLocation: policy.showLocation,
+        fileActions: policy.fileActions,
+        canMove,
+        editable: editableAt(entry.path) && policy.fileActions,
+        missing: !!entry.missing,
+        otherProjects,
+        canDelete: tickedCount === 0,
+      },
+      {
+        open,
+        toggleOffline: () => {
+          if (!entry.uniwork) return
+          offlineToggle.toggle({
+            documentId: entry.uniwork.documentId,
+            workspaceId: entry.uniwork.workspaceId,
+            name: entry.uniwork.title || entry.name,
+          })
+        },
+        reveal: () => void window.aiOffice.revealPath(entry.path),
+        copyPath: () => void navigator.clipboard.writeText(entry.path),
+        move: () => startMove([entry.path]),
+        moveToProject: (projectId) => void moveFileTo(entry.path, projectId),
+        rename: () => startRename(entry),
+        duplicate: () => duplicateFile(entry.path),
+        group: () => setGroupPicker([entry.path]),
+        removeFromList: () => removeRecent([entry.path]),
+        unstar: () => unstarSelected([entry.path]),
+        deleteFiles: () => deleteFiles([entry.path]),
+      },
+      t,
     )
   }
 
-  /** sub-folder row in the folder view's table: enter on click, same … menu as the tree */
-  function renderSubfolderRow(entry: FolderEntry) {
-    const isRenaming = folderRenaming?.where === 'table' && folderRenaming.path === entry.path
-    const editable = editableAt(entry.path)
-    return (
-      <li className="recent-row" key={entry.path}>
-        <div
-          className={`recent-item folder-item${dropTarget === entry.path ? ' drop-target' : ''}`}
-          role="button"
-          tabIndex={0}
-          draggable={!isRenaming}
-          onDragStart={(e) => onRowDragStart(e, [entry.path])}
-          {...folderDropProps(entry.path, { autoExpand: false })}
-          onClick={() => {
-            if (isRenaming) return
-            expandTo(entry.path)
-            selectFolder(entry.path)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && event.target === event.currentTarget) {
-              expandTo(entry.path)
-              selectFolder(entry.path)
+  /** the location (or the UniWork badge) is the second line of a file's name; "Folder" is a sub-folder's */
+  const deviceSublineFor = (entry: RecentEntry): DocSubline => {
+    if (recentRowPolicy(entry).badge && area === 'uniwork') {
+      return {
+        short: t('uwRecentBadge'),
+        full: t('uwRecentBadgeTip'),
+        node: (
+          <span className="uw-recent-badge" title={t('uwRecentBadgeTip')}>
+            {t('uwRecentBadge')}
+          </span>
+        ),
+      }
+    }
+    return { short: locationLabel(entry.path, roots), full: dirOf(entry.path) }
+  }
+
+  /** open a file row (a missing one asks first) */
+  const openDeviceEntry = (entry: RecentEntry) => {
+    if (recentOpenAction(entry) === 'confirm-missing') setConfirmMissing(entry)
+    else void openRecentEntry(entry, window.aiOffice)
+  }
+
+  function renderDeviceList(opts: {
+    files: readonly RecentEntry[]
+    folders?: readonly FolderEntry[]
+    context: 'global' | 'folder'
+    label: string
+  }) {
+    const { files, folders = [], context, label } = opts
+    const fileByPath = new Map(files.map((entry) => [entry.path, entry] as const))
+    const folderByPath = new Map(folders.map((entry) => [entry.path, entry] as const))
+    const ticked = files.filter((entry) => selected.has(entry.path)).map((entry) => entry.path)
+
+    const openDoc = (doc: DocumentsHomeDoc) => {
+      const folder = folderByPath.get(doc.id)
+      if (folder) {
+        expandTo(folder.path)
+        selectFolder(folder.path)
+        return
+      }
+      const entry = fileByPath.get(doc.id)
+      if (entry) openDeviceEntry(entry)
+    }
+
+    const menuFor = (doc: DocumentsHomeDoc): FolderMenuItem[] => {
+      const folder = folderByPath.get(doc.id)
+      if (folder) {
+        return deviceFolderMenu(
+          { editable: editableAt(folder.path) },
+          {
+            openFolder: () => openDoc(doc),
+            renameFolder: () => startRenameFolder(folder, 'table'),
+            moveFolder: () => startMove([folder.path]),
+            revealFolder: () => void window.aiOffice.revealPath(folder.path),
+            deleteFolder: () => setConfirmDeleteFolder(folder.path),
+          },
+          t,
+        )
+      }
+      const entry = fileByPath.get(doc.id)
+      return entry ? fileMenuFor(entry, context, ticked.length, () => openDoc(doc)) : []
+    }
+
+    const rowPropsFor = (doc: DocumentsHomeDoc): DocRowExtra | undefined => {
+      const folder = folderByPath.get(doc.id)
+      if (folder) {
+        const isRenaming = folderRenaming?.where === 'table' && folderRenaming.path === folder.path
+        return {
+          className: dropTarget === folder.path ? 'drop-target' : undefined,
+          draggable: !isRenaming,
+          onDragStart: (event) => onRowDragStart(event, [folder.path]),
+          ...folderDropProps(folder.path, { autoExpand: false }),
+          onContextMenu: (event) => {
+            event.preventDefault()
+            setRowMenu(folder.path)
+          },
+        }
+      }
+      const entry = fileByPath.get(doc.id)
+      if (!entry) return undefined
+      const policy = recentRowPolicy(entry)
+      const missing = recentRowIsMissing(entry)
+      return {
+        className: missing ? 'missing' : undefined,
+        draggable: renaming?.path !== entry.path && !missing && policy.draggable,
+        onDragStart: (event) => onRowDragStart(event, dragPathsFor(entry.path, ticked)),
+      }
+    }
+
+    const renamingFile = renaming ? fileByPath.get(renaming.path) : undefined
+    const renamingFolder =
+      folderRenaming?.where === 'table' ? folderByPath.get(folderRenaming.path) : undefined
+    const rename =
+      renaming && renamingFile
+        ? {
+            docId: renamingFile.path,
+            initial: renaming.value,
+            error: null,
+            busy: false,
+            onSave: (value: string) => commitRename(renamingFile, value),
+            onCancel: () => setRenaming(null),
+            onEdit: () => {},
+          }
+        : folderRenaming && renamingFolder
+          ? {
+              docId: renamingFolder.path,
+              initial: folderRenaming.value,
+              error: null,
+              busy: false,
+              onSave: (value: string) => void commitRenameFolder(value),
+              onCancel: () => setFolderRenaming(null),
+              onEdit: () => {},
             }
-          }}
-          onContextMenu={(e) => {
-            e.preventDefault()
-            setFolderMenu({
-              path: entry.path,
-              where: 'table',
-              top: e.clientY + 2,
-              right: fixedViewportWidth() - e.clientX,
-            })
-          }}
-        >
-          <span className="col-check" aria-hidden="true" />
-          <span className="recent-icon folder-badge">
-            <FolderIcon size={22} />
-          </span>
-          {isRenaming ? (
-            <input
-              className="rename-input"
-              value={folderRenaming.value}
-              autoFocus
-              onFocus={(event) => event.target.select()}
-              onClick={(event) => event.stopPropagation()}
-              onChange={(event) =>
-                setFolderRenaming({ path: entry.path, where: 'table', value: event.target.value })
-              }
-              onBlur={() => void commitRenameFolder()}
-              onKeyDown={(event) => {
-                event.stopPropagation()
-                if (event.nativeEvent.isComposing) return
-                if (event.key === 'Enter') void commitRenameFolder()
-                if (event.key === 'Escape') setFolderRenaming(null)
-              }}
-            />
-          ) : (
-            <span className="recent-name">{entry.name}</span>
-          )}
-          <span className="recent-path">{t('folderType')}</span>
-          <span className="recent-time">{formatModified(entry.mtimeMs, i18n)}</span>
-          <span className="recent-size">—</span>
-          <span />
-          <span
-            className="recent-actions"
-            ref={menuOpenAt('table', entry.path) ? folderMenuWrapRef : undefined}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              className="more-btn"
-              aria-label={t('folderMoreActions', { name: entry.name })}
-              aria-expanded={menuOpenAt('table', entry.path)}
-              onClick={(e) => {
-                if (menuOpenAt('table', entry.path)) {
-                  setFolderMenu(null)
-                  return
-                }
-                const rect = e.currentTarget.getBoundingClientRect()
-                setFolderMenu({
-                  path: entry.path,
-                  where: 'table',
-                  top: rect.bottom + 4,
-                  right: fixedViewportWidth() - rect.right,
-                })
-              }}
-            >
-              <MoreDots />
-            </button>
-            {folderMenu && menuOpenAt('table', entry.path) && (
-              <div
-                className="folder-menu"
-                role="menu"
-                style={{ top: folderMenu.top, right: folderMenu.right }}
-              >
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    setFolderMenu(null)
-                    expandTo(entry.path)
-                    selectFolder(entry.path)
-                  }}
-                >
-                  {t('open')}
-                </button>
-                {editable && (
-                  <>
-                    <button role="menuitem" onClick={() => startRenameFolder(entry, 'table')}>
-                      {t('rename')}
-                    </button>
-                    <button role="menuitem" onClick={() => startMove([entry.path])}>
-                      {t('moveToFolder')}
-                    </button>
-                  </>
-                )}
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    setFolderMenu(null)
-                    void window.aiOffice.revealPath(entry.path)
-                  }}
-                >
-                  {t('revealInFolder')}
-                </button>
-                {editable && (
-                  <>
-                    <div className="row-menu-divider" />
-                    <button
-                      role="menuitem"
-                      className="danger"
-                      onClick={() => {
-                        setFolderMenu(null)
-                        setConfirmDeleteFolder(entry.path)
-                      }}
-                    >
-                      {t('deleteFolder')}
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </span>
-        </div>
-      </li>
+          : undefined
+
+    return (
+      <DocList
+        screen="device"
+        rows={deviceRows(folders, files)}
+        sort={fileSort}
+        onSortChange={(next) => {
+          setFileSort(next)
+          writeSort('device', next)
+        }}
+        unsortedDefault
+        foldersFirst
+        selected={selected}
+        onSelectedChange={setSelected}
+        label={label}
+        openMenuId={rowMenu}
+        onOpenMenuChange={setRowMenu}
+        menuFor={menuFor}
+        actionsFor={(doc) => {
+          const entry = fileByPath.get(doc.id)
+          return entry ? renderStarButton(entry) : null
+        }}
+        onOpen={openDoc}
+        sublineFor={(doc) => {
+          const entry = fileByPath.get(doc.id)
+          return entry ? deviceSublineFor(entry) : { short: t('folderType'), full: t('folderType') }
+        }}
+        selectableFor={(doc) => {
+          const entry = fileByPath.get(doc.id)
+          return !!entry && recentRowPolicy(entry).selectable
+        }}
+        rowPropsFor={rowPropsFor}
+        rename={rename}
+      />
     )
   }
 
@@ -3351,44 +3065,92 @@ export function Home() {
     </div>
   )
 
-  const renderSearchRow = (hit: FileSearchHit) => (
-    <li
-      key={hit.path}
-      className="search-row"
-      role="button"
-      tabIndex={0}
-      onClick={() => void window.aiOffice.openPath(hit.path)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') void window.aiOffice.openPath(hit.path)
-      }}
-    >
-      <span className="recent-icon">
-        <FileBadge ext={hit.ext} size={24} />
-      </span>
-      <div className="search-main">
-        <div className="search-head">
-          <span className="search-name">{highlightText(hit.name, hit.needles)}</span>
-          <span className="search-path" title={dirOf(hit.path)}>
-            {highlightText(locationLabel(hit.path, roots), hit.needles)}
-          </span>
-        </div>
-        {hit.snippet && (
-          <p className="search-snippet">
-            {hit.snippet.map((part, i) =>
-              part.hit ? (
-                <mark key={i} className="search-hit">
-                  {part.text}
-                </mark>
-              ) : (
-                <span key={i}>{part.text}</span>
-              ),
-            )}
-          </p>
-        )}
-      </div>
-      <span className="search-time">{formatModified(hit.mtimeMs, i18n)}</span>
-    </li>
-  )
+  /** the search hits: the same table, the matches highlighted in the name and location, the snippet under them */
+  const renderSearchHits = (hits: readonly FileSearchHit[]) => {
+    const total = searchPage?.total ?? hits.length
+    const hitByPath = new Map(hits.map((hit) => [hit.path, hit] as const))
+    return (
+      <DocList
+        screen="device"
+        rows={deviceRows([], hits, true)}
+        sort={fileSort}
+        onSortChange={(next) => {
+          setFileSort(next)
+          writeSort('device', next)
+        }}
+        unsortedDefault
+        selected={selected}
+        onSelectedChange={setSelected}
+        label={t(total === 1 ? 'searchResultCountOne' : 'searchResultCount', { n: total })}
+        openMenuId={rowMenu}
+        onOpenMenuChange={setRowMenu}
+        menuFor={(doc) => {
+          const hit = hitByPath.get(doc.id)
+          return hit
+            ? deviceFileMenu(
+                {
+                  context: 'global',
+                  view: 'recent',
+                  starred: false,
+                  offlineLabel: null,
+                  showLocation: true,
+                  fileActions: false,
+                  canMove: false,
+                  editable: false,
+                  missing: false,
+                  otherProjects: [],
+                  canDelete: false,
+                },
+                {
+                  open: () => void window.aiOffice.openPath(hit.path),
+                  toggleOffline: () => {},
+                  reveal: () => void window.aiOffice.revealPath(hit.path),
+                  copyPath: () => void navigator.clipboard.writeText(hit.path),
+                  move: () => {},
+                  moveToProject: () => {},
+                  rename: () => {},
+                  duplicate: () => {},
+                  group: () => {},
+                  removeFromList: () => {},
+                  unstar: () => {},
+                  deleteFiles: () => {},
+                },
+                t,
+              )
+            : []
+        }}
+        onOpen={(doc) => void window.aiOffice.openPath(doc.id)}
+        selectableFor={() => false}
+        titleFor={(doc) => {
+          const hit = hitByPath.get(doc.id)
+          return hit ? highlightText(hit.name, hit.needles) : doc.title
+        }}
+        sublineFor={(doc) => {
+          const hit = hitByPath.get(doc.id)
+          if (!hit) return null
+          const where = locationLabel(hit.path, roots)
+          return {
+            short: where,
+            full: dirOf(hit.path),
+            node: highlightText(where, hit.needles),
+            detail: hit.snippet ? (
+              <p className="search-snippet">
+                {hit.snippet.map((part, i) =>
+                  part.hit ? (
+                    <mark key={i} className="search-hit">
+                      {part.text}
+                    </mark>
+                  ) : (
+                    <span key={i}>{part.text}</span>
+                  ),
+                )}
+              </p>
+            ) : null,
+          }
+        }}
+      />
+    )
+  }
 
   const renderSearchResults = () => {
     const page = searchPage
@@ -3403,9 +3165,7 @@ export function Home() {
         )}
         {page && page.hits.length === 0 && !busy
           ? renderEmpty(t('searchNoResults', { q }))
-          : page && (
-              <ul className="search-list">{orderedSearchHits(page.hits).map(renderSearchRow)}</ul>
-            )}
+          : page && renderSearchHits(orderedSearchHits(page.hits))}
       </div>
     )
   }
@@ -3437,7 +3197,6 @@ export function Home() {
 
   function renderFolderContent() {
     const total = folderSubfolders.length + folderFiles.length
-    const sortedFiles = fileSort === 'oldest' ? [...folderFiles].reverse() : folderFiles
     return (
       <main className="content">
         <section className="quick-start" aria-label={t('secQuickStart')}>
@@ -3502,37 +3261,16 @@ export function Home() {
             )}
           </div>
 
-          {searchActive ? (
-            renderSearchResults()
-          ) : total === 0 ? (
-            renderEmpty(filter === 'all' ? t('emptyFolder') : t('emptyFiltered'))
-          ) : (
-            <div
-              className={`recent-table${folderSelectedPaths.length > 0 ? ' has-selection' : ''}`}
-            >
-              <div className="recent-columns">
-                <span className="col-check">
-                  <input
-                    type="checkbox"
-                    checked={folderAllSelected}
-                    disabled={folderFiles.length === 0}
-                    onChange={toggleSelectAllFolder}
-                    aria-label={t('selectAll')}
-                  />
-                </span>
-                <span className="col-name">{t('colName')}</span>
-                <span className="col-path">{t('colLocation')}</span>
-                {renderModifiedHeader()}
-                <span className="col-size">{t('colSize')}</span>
-                <span />
-                <span />
-              </div>
-              <ul className="recent-list">
-                {folderSubfolders.map((entry) => renderSubfolderRow(entry))}
-                {sortedFiles.map((entry) => renderFileRow(entry, 'folder'))}
-              </ul>
-            </div>
-          )}
+          {searchActive
+            ? renderSearchResults()
+            : total === 0
+              ? renderEmpty(filter === 'all' ? t('emptyFolder') : t('emptyFiltered'))
+              : renderDeviceList({
+                  files: folderFiles,
+                  folders: folderSubfolders,
+                  context: 'folder',
+                  label: t('folders'),
+                })}
         </section>
       </main>
     )
@@ -3699,34 +3437,18 @@ export function Home() {
               )
             )
           ) : (
-            <div className={`recent-table${selectedPaths.length > 0 ? ' has-selection' : ''}`}>
-              <div className="recent-columns">
-                <span className="col-check">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleSelectAll}
-                    aria-label={t('selectAll')}
-                  />
-                </span>
-                <span className="col-name">{t('colName')}</span>
-                <span className="col-path">{t('colLocation')}</span>
-                {renderModifiedHeader()}
-                <span className="col-size">{t('colSize')}</span>
-                <span />
-                <span />
-              </div>
-              <ul className="recent-list">
-                {(fileSort === 'oldest' ? [...areaEntries].reverse() : areaEntries).map((entry) =>
-                  renderFileRow(entry, 'global'),
-                )}
-              </ul>
+            <>
+              {renderDeviceList({
+                files: areaEntries,
+                context: 'global',
+                label: view === 'recent' ? t('secRecent') : t('secStarred'),
+              })}
               {hasMore && (
                 <div ref={sentinelRef} className="load-more" aria-hidden="true">
                   <span className="load-more-spinner" />
                 </div>
               )}
-            </div>
+            </>
           )}
         </section>
       </>
@@ -3808,30 +3530,11 @@ export function Home() {
               <span className="empty-hint">{t('projEmptyHint')}</span>
             </p>
           ) : (
-            <div className="recent-table">
-              <div className="recent-columns">
-                <span className="col-check">
-                  <input
-                    type="checkbox"
-                    checked={projAllSelected}
-                    onChange={toggleSelectAllProject}
-                    aria-label={t('selectAll')}
-                  />
-                </span>
-                <span className="col-name">{t('colName')}</span>
-                <span className="col-path">{t('colLocation')}</span>
-                {renderModifiedHeader()}
-                <span className="col-size">{t('colSize')}</span>
-                <span />
-                <span />
-              </div>
-              <ul className="recent-list">
-                {(fileSort === 'oldest'
-                  ? [...projectFileEntries].reverse()
-                  : projectFileEntries
-                ).map((entry) => renderFileRow(entry, 'global'))}
-              </ul>
-            </div>
+            renderDeviceList({
+              files: projectFileEntries,
+              context: 'global',
+              label: t('secProjectFiles'),
+            })
           )}
         </section>
       </main>
@@ -3907,8 +3610,19 @@ export function Home() {
   const activeUwSubView: DocumentsHomeSubViewId = activeUwWorkspaceId
     ? (uniworkSubViewByWs[activeUwWorkspaceId] ?? 'workspace')
     : 'workspace'
-  const showUniworkPane =
-    area === 'uniwork' && !selectedProjectId && !eduMode && !chatMode && isSignedIn
+  // the sidebar slot stays up under My AI / Workbench; only the main pane yields to them
+  const showUniworkPane = area === 'uniwork' && !selectedProjectId && isSignedIn
+  const uniworkPaneReady =
+    showUniworkPane &&
+    acctView !== 'loading' &&
+    !uwWsState.workspaceError &&
+    uwWsState.workspaces !== null &&
+    uwWsState.workspaces.length > 0 &&
+    !!activeUwWorkspaceId
+  const leaveAiMode = () => {
+    setChatMode(false)
+    setEduMode(false)
+  }
 
   return (
     <div className="home">
@@ -4089,7 +3803,7 @@ export function Home() {
           }}
         />
       ) : area === 'uniwork' ? (
-        acctView === 'loading' ? (
+        uniworkPaneReady ? null : acctView === 'loading' ? (
           <main className="content">
             <WorkSkeleton />
           </main>
@@ -4118,31 +3832,41 @@ export function Home() {
               onRetry={() => setUwWsTick((n) => n + 1)}
             />
           </main>
-        ) : (
-          <main className="content home-uw-pane">
-            <DocumentsHome
-              key={`${recentsAccount}:${activeUwWorkspaceId}`}
-              workspaceId={activeUwWorkspaceId}
-              workspaces={uwWsState.workspaces}
-              onWorkspaceChange={selectUniworkWorkspace}
-              initialFolderId={activeUwFolderId}
-              initialSubView={activeUwSubView}
-              onSubViewChange={(sv) => {
-                setUniworkSubViewByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: sv }))
-              }}
-              onFolderChange={(folderId) => {
-                setUniworkFolderByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: folderId }))
-              }}
-              onOpenDocument={openUniworkDocFromPane}
-              openingId={openingDocId}
-              sidebarHost={uniworkSidebarSlot}
-            />
-          </main>
-        )
+        ) : null
       ) : selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
         renderFolderContent()
       ) : (
         renderGlobalContent()
+      )}
+
+      {/* stays mounted (main pane hidden) under My AI / Workbench so the portalled sidebar nav and its loaded lists survive */}
+      {uniworkPaneReady && uwWsState.workspaces && activeUwWorkspaceId && (
+        <main className="content home-uw-pane" hidden={chatMode || eduMode}>
+          <DocumentsHome
+            key={`${recentsAccount}:${activeUwWorkspaceId}`}
+            workspaceId={activeUwWorkspaceId}
+            workspaces={uwWsState.workspaces}
+            organizationName={orgName}
+            onWorkspaceChange={selectUniworkWorkspace}
+            initialFolderId={activeUwFolderId}
+            initialSubView={activeUwSubView}
+            initialElsewhereSource={uniworkSourceByWs[activeUwWorkspaceId] ?? null}
+            onElsewhereSourceChange={(source) => {
+              setUniworkSourceByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: source }))
+            }}
+            onSubViewChange={(sv) => {
+              setUniworkSubViewByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: sv }))
+            }}
+            onFolderChange={(folderId) => {
+              setUniworkFolderByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: folderId }))
+            }}
+            onOpenDocument={openUniworkDocFromPane}
+            openingId={openingDocId}
+            sidebarHost={uniworkSidebarSlot}
+            sidebarIdle={chatMode || eduMode}
+            onSidebarNavigate={leaveAiMode}
+          />
+        </main>
       )}
 
       <div className="agent-intent-host">

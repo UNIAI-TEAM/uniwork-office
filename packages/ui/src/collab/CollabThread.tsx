@@ -18,7 +18,14 @@ import {
 import { format } from '@genoffice/i18n'
 import { useModalKeys } from '../modal-keys'
 import { AnchorLabel, type AnchorLabelStrings } from './AnchorLabel'
+import { AvatarFace } from './avatar-source'
 import { CollabBody } from './CollabBody'
+import {
+  applyMentionEdit,
+  mentionDocFromBody,
+  mentionDocToBody,
+  type MentionDoc,
+} from './mention-query'
 import type {
   CollabActions,
   CollabConflict,
@@ -26,6 +33,7 @@ import type {
   CollabPermissions,
   CollabStrings,
   CollabThreadView,
+  CollabViewVersion,
 } from './use-collab-threads'
 import type {
   CollabAnchor,
@@ -118,6 +126,12 @@ function initials(name: string): string {
   const first = [...words[0]!][0] ?? ''
   const last = words.length > 1 ? ([...words[words.length - 1]!][0] ?? '') : ''
   return (first + last).toUpperCase()
+}
+
+/** photo with initials fallback: a load error (404, offline, CSP img-src block) swaps back to
+    initials; the flag tracks which src failed, so a url change renders the new photo */
+function CommentAvatar(p: { url: string | undefined; name: string }) {
+  return <AvatarFace url={p.url} initials={initials(p.name)} />
 }
 
 function copyText(text: string): void {
@@ -306,10 +320,11 @@ function EditBox({
   onSave(body: string): Promise<void>
   onClose(): void
 }) {
-  const [text, setText] = useState(initial)
+  const [doc, setDoc] = useState<MentionDoc>(() => mentionDocFromBody(initial))
   const [asking, setAsking] = useState(false)
   const [saving, setSaving] = useState(false)
   const areaRef = useRef<HTMLTextAreaElement>(null)
+  const pendingCaret = useRef<number | null>(null)
   const labelId = useId()
 
   useEffect(() => {
@@ -319,22 +334,32 @@ function EditBox({
     el.setSelectionRange(el.value.length, el.value.length)
   }, [])
 
+  /* a pasted token shows as '@Name' and is shorter than what was typed: restore the caret */
+  useLayoutEffect(() => {
+    const at = pendingCaret.current
+    if (at !== null && areaRef.current) {
+      areaRef.current.setSelectionRange(at, at)
+      pendingCaret.current = null
+    }
+  })
+
   useEffect(() => {
     const el = areaRef.current
     if (!el) return
     el.style.height = 'auto'
     if (el.scrollHeight > 0) el.style.height = `${Math.min(el.scrollHeight, 200)}px`
-  }, [text])
+  }, [doc.text])
 
   const cancel = () => {
-    if (text !== initial) setAsking(true)
+    /* dirty = the body that would be sent, not the '@Name' display text */
+    if (mentionDocToBody(doc) !== initial) setAsking(true)
     else onClose()
   }
   const save = async () => {
     if (saving) return
     setSaving(true)
     try {
-      await onSave(text)
+      await onSave(mentionDocToBody(doc))
     } finally {
       setSaving(false)
     }
@@ -349,8 +374,14 @@ function EditBox({
         ref={areaRef}
         className="collab-textarea"
         aria-labelledby={labelId}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
+        value={doc.text}
+        onChange={(e) => {
+          const edit = applyMentionEdit(doc, e.currentTarget.value, e.currentTarget.selectionStart)
+          if (edit.doc.text !== e.currentTarget.value) {
+            pendingCaret.current = edit.mapCaret(e.currentTarget.selectionStart)
+          }
+          setDoc(edit.doc)
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
             e.preventDefault()
@@ -531,6 +562,10 @@ export interface CollabThreadProps {
   formatTime?(iso: string | undefined): string
   /** called before a resolve / reopen so the panel puts focus back on that button after the move */
   onKeepFocus?(threadId: string): void
+  /** the version the editor shows: the "View in version N" action is hidden when it is the anchor's version */
+  openVersionId?: string
+  /** absent: no "View in version N" action */
+  onViewVersion?: CollabViewVersion
 }
 
 function CollabThreadImpl(p: CollabThreadProps) {
@@ -550,6 +585,9 @@ function CollabThreadImpl(p: CollabThreadProps) {
   const [historyFor, setHistoryFor] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const [viewing, setViewing] = useState(false)
+  const [viewFailed, setViewFailed] = useState(false)
+  const viewingRef = useRef(false)
   const replyBtnRef = useRef<HTMLButtonElement>(null)
   const itemRef = useRef<HTMLLIElement>(null)
   /** the control that opened history / edit / delete, for focus return */
@@ -609,6 +647,35 @@ function CollabThreadImpl(p: CollabThreadProps) {
     }
   }
 
+  // a lost anchor is only viewable in the version it was kept on: offer that version (never when it is open already)
+  const versionNo = root.anchor_version_no
+  const canViewVersion =
+    comment &&
+    !thread.deleted &&
+    !!root.anchor &&
+    thread.anchorState === 'lost' &&
+    typeof versionNo === 'number' &&
+    Number.isInteger(versionNo) &&
+    versionNo > 0 &&
+    !!p.onViewVersion &&
+    !(root.anchor_version_id && root.anchor_version_id === p.openVersionId)
+
+  const viewVersion = async (no: number) => {
+    if (viewingRef.current || !p.onViewVersion) return
+    viewingRef.current = true
+    setViewing(true)
+    setViewFailed(false)
+    try {
+      const out = await p.onViewVersion({ commentId: root.id, versionNo: no })
+      if (out && out.opened === false) setViewFailed(true)
+    } catch {
+      setViewFailed(true)
+    } finally {
+      viewingRef.current = false
+      setViewing(false)
+    }
+  }
+
   const anchorSlot =
     comment && root.anchor
       ? (p.renderAnchor
@@ -640,20 +707,23 @@ function CollabThreadImpl(p: CollabThreadProps) {
 
   const renderItem = (c: CollabComment, isRoot: boolean) => {
     const deleted = !!c.deleted_at
+    const edited = (c.revision ?? 1) > 1
     const authorId = isRoot ? rootAuthorId : `${base}a-${c.id}`
     const headRow = deleted ? null : (
       <>
         <span className="collab-av" aria-hidden="true">
-          {initials(nameOf(c))}
+          <CommentAvatar url={c.avatar_url} name={nameOf(c)} />
         </span>
         <span className="collab-au" id={authorId}>
           {nameOf(c)}
         </span>
-        {(c.revision ?? 1) > 1 && (
+        <span className="collab-dt">{fmt(c.created_at)}</span>
+        {edited && editing !== c.id && (
           <button
             type="button"
-            className="collab-link"
+            className="collab-link collab-edited"
             aria-expanded={historyFor === c.id}
+            title={format(strings.collabEdited ?? '', { time: fmt(c.updated_at) })}
             onClick={(e) => {
               if (historyFor === c.id) {
                 setHistoryFor(null)
@@ -663,10 +733,9 @@ function CollabThreadImpl(p: CollabThreadProps) {
               setHistoryFor(c.id)
             }}
           >
-            {format(strings.collabEdited ?? '', { time: fmt(c.updated_at) })}
+            {strings.collabEditedMark}
           </button>
         )}
-        <span className="collab-dt">{fmt(c.created_at)}</span>
       </>
     )
     const asHeading = isRoot && !comment
@@ -699,14 +768,18 @@ function CollabThreadImpl(p: CollabThreadProps) {
               ]
             : []),
           { key: 'copy', label: strings.collabCopyText ?? '', onSelect: () => copyText(c.body) },
-          {
-            key: 'history',
-            label: strings.collabHistory ?? '',
-            onSelect: () => {
-              openerRef.current = menuRef.current
-              setHistoryFor(c.id)
-            },
-          },
+          ...(edited
+            ? [
+                {
+                  key: 'history',
+                  label: strings.collabHistory ?? '',
+                  onSelect: () => {
+                    openerRef.current = menuRef.current
+                    setHistoryFor(c.id)
+                  },
+                },
+              ]
+            : []),
         ]
     return (
       <div className={isRoot ? 'collab-cm' : 'collab-cm collab-cm--reply'} data-comment-id={c.id}>
@@ -733,88 +806,102 @@ function CollabThreadImpl(p: CollabThreadProps) {
         ) : (
           <div className="collab-cmh">{headRow}</div>
         )}
-        {!deleted &&
-          (editing === c.id ? (
-            <EditBox
-              initial={c.body}
-              strings={strings}
-              onSave={async (body) => {
-                setFailed(false)
-                try {
-                  await actions.edit(c.id, body)
+        {!deleted && (
+          /* everything below the head row indents under the author name: web pl-10 root / pl-8 reply */
+          <div className="collab-cm-indent">
+            {editing === c.id ? (
+              <EditBox
+                initial={c.body}
+                strings={strings}
+                onSave={async (body) => {
+                  setFailed(false)
+                  try {
+                    await actions.edit(c.id, body)
+                    setEditing(null)
+                    restore(c.id)
+                  } catch {
+                    setFailed(true)
+                  }
+                }}
+                onClose={() => {
                   setEditing(null)
                   restore(c.id)
-                } catch {
-                  setFailed(true)
-                }
-              }}
-              onClose={() => {
-                setEditing(null)
-                restore(c.id)
-              }}
-            />
-          ) : (
-            <div className="collab-bd">{renderBody(c, mentions)}</div>
-          ))}
-        {!deleted && editing !== c.id && (
-          <div className="collab-acts">
-            {can.canWrite && !thread.deleted && p.renderComposer && (
-              <button
-                ref={isRoot ? replyBtnRef : undefined}
-                type="button"
-                className="collab-link"
-                onClick={() => setReplyOpen(true)}
-              >
-                {strings.collabReply}
-              </button>
-            )}
-            {isRoot && comment && root.anchor && p.adapter && thread.anchorState !== 'lost' && (
-              <button
-                type="button"
-                className="collab-link"
-                onClick={() => p.adapter?.goTo(root.anchor!)}
-              >
-                {strings.collabGoToAnchor}
-              </button>
-            )}
-            <ActionsMenu
-              label={strings.collabActions ?? ''}
-              items={menuItems}
-              buttonRef={menuRef}
-            />
-            {isRoot && can.canResolve(root) && (
-              <button
-                type="button"
-                className="collab-link collab-resolve"
-                data-resolve-for={root.id}
-                onClick={() => {
-                  p.onKeepFocus?.(root.id)
-                  void run(() =>
-                    thread.resolved ? actions.reopen(root.id) : actions.resolve(root.id),
-                  )
                 }}
-              >
-                {thread.resolved ? strings.collabReopen : strings.collabResolve}
-              </button>
+              />
+            ) : (
+              <div className="collab-bd">{renderBody(c, mentions)}</div>
+            )}
+            {editing !== c.id && (
+              <div className="collab-acts">
+                {can.canWrite && !thread.deleted && p.renderComposer && (
+                  <button
+                    ref={isRoot ? replyBtnRef : undefined}
+                    type="button"
+                    className="collab-link"
+                    onClick={() => setReplyOpen(true)}
+                  >
+                    {strings.collabReply}
+                  </button>
+                )}
+                {isRoot && comment && root.anchor && p.adapter && thread.anchorState !== 'lost' && (
+                  <button
+                    type="button"
+                    className="collab-link"
+                    onClick={() => p.adapter?.goTo(root.anchor!)}
+                  >
+                    {strings.collabGoToAnchor}
+                  </button>
+                )}
+                {isRoot && canViewVersion && (
+                  <button
+                    type="button"
+                    className="collab-link"
+                    disabled={viewing}
+                    onClick={() => void viewVersion(versionNo as number)}
+                  >
+                    {format(strings.collabAnchorViewVersion ?? '', { n: versionNo as number })}
+                  </button>
+                )}
+                <ActionsMenu
+                  label={strings.collabActions ?? ''}
+                  items={menuItems}
+                  buttonRef={menuRef}
+                />
+                {isRoot && can.canResolve(root) && (
+                  <button
+                    type="button"
+                    className="collab-link collab-resolve"
+                    data-resolve-for={root.id}
+                    onClick={() => {
+                      p.onKeepFocus?.(root.id)
+                      void run(() =>
+                        thread.resolved ? actions.reopen(root.id) : actions.resolve(root.id),
+                      )
+                    }}
+                  >
+                    {thread.resolved ? strings.collabReopen : strings.collabResolve}
+                  </button>
+                )}
+              </div>
+            )}
+            {edited && historyFor === c.id && (
+              <History
+                comment={c}
+                strings={strings}
+                lang={host.lang}
+                load={() => actions.history(c.id)}
+                nameOf={revisionName(c)}
+                renderBody={renderBody}
+                mentions={mentions}
+                formatTime={fmt}
+                onClose={() => {
+                  setHistoryFor(null)
+                  restore(c.id)
+                }}
+                onDeleted={() => setHistoryFor(null)}
+              />
             )}
           </div>
-        )}
-        {historyFor === c.id && (
-          <History
-            comment={c}
-            strings={strings}
-            lang={host.lang}
-            load={() => actions.history(c.id)}
-            nameOf={revisionName(c)}
-            renderBody={renderBody}
-            mentions={mentions}
-            formatTime={fmt}
-            onClose={() => {
-              setHistoryFor(null)
-              restore(c.id)
-            }}
-            onDeleted={() => setHistoryFor(null)}
-          />
         )}
         {deleting === c.id && (
           <CollabConfirmDialog
@@ -906,6 +993,11 @@ function CollabThreadImpl(p: CollabThreadProps) {
       {failed && (
         <p className="collab-why collab-why--err" role="alert">
           {strings.collabActionFailed}
+        </p>
+      )}
+      {viewFailed && (
+        <p className="collab-why collab-why--err" role="alert">
+          {strings.collabVersionViewUnavailable}
         </p>
       )}
       {showComposer && (

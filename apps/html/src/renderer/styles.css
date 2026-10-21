@@ -161,6 +161,10 @@ html.genoffice-popover-open .ribbon-tabs {
   align-items: stretch;
   padding: 6px 12px;
   height: 80px;
+  /* the scroller is the containing block of the fit-level clipped labels (position: absolute): with
+   * no positioned ancestor inside it they sat outside this clip and stretched the page sideways at
+   * phone width */
+  position: relative;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -819,56 +823,10 @@ html.genoffice-popover-open .ribbon-tabs {
   }
 }
 
-/* Narrow viewports (the web frame on a phone or tablet): the open AI dock overlays the page instead
-   of squeezing it. It keeps its 34 px rail slot in the row, the expanded panel floats over the
-   workspace, and on a phone it takes the whole row (the rail stays reachable to collapse it) -
-   the same behaviour as the Docs frame. */
-@media (max-width: 900px) {
-  .app-main {
-    position: relative;
-  }
-
-  .app-main:has(> .ai-dock) {
-    padding-left: 34px;
-  }
-
-  html[data-ai-panel-side='right'] .app-main:has(> .ai-dock) {
-    padding-left: 0;
-    padding-right: 34px;
-  }
-
-  .ai-dock {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 40;
-    width: min(var(--ai-panel-width, 360px), 100%);
-    background: var(--surface);
-  }
-
-  .ai-dock.collapsed {
-    width: 34px;
-  }
-
-  .ai-dock:not(.collapsed) {
-    box-shadow: var(--shadow-menu);
-  }
-
-  html[data-ai-panel-side='right'] .ai-dock {
-    left: auto;
-    right: 0;
-  }
-
-  .ai-dock .ai-panel-resizer {
-    display: none;
-  }
-}
-
-@media (max-width: 520px) {
-  .ai-dock:not(.collapsed) {
-    width: 100%;
-  }
+/* the no-key hint link: this module's accent is near-black / near-white, so on the accent it read as
+   plain text; the info blue marks it as a link (shared rule: @genoffice/ui ai-model-picker.css) */
+.ai-input-need-link {
+  color: var(--info);
 }
 
 /* collapsed AI sidebar: thin rail on the left edge (same as docs) */
@@ -2008,7 +1966,10 @@ html.genoffice-popover-open .ribbon-tabs {
   border: none;
   background: none;
   border-radius: var(--radius-16) var(--radius-16) 0 0;
-  padding: 12px 14px 4px;
+  /* vertical gaps live on margin, not padding (as docs/pdf): padding eats into the min-height, so a
+   * placeholder wrapped to two lines (narrow panel) ran under the hint below the box */
+  padding: 0 14px;
+  margin: 12px 0 4px;
   font-size: 16px;
   font-family: inherit;
   line-height: 24px;
@@ -2274,6 +2235,16 @@ html.genoffice-popover-open .ribbon-tabs {
 
 .ai-ask-pop-input:focus {
   border-color: var(--accent);
+}
+
+.ai-ask-pop-input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.link-pop-invalid {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--danger-text);
 }
 
 .ai-ask-pop-chips {

@@ -1,6 +1,6 @@
 import {
   aiUniworkText,
-  isUniworkQuestionRefusal,
+  isUniworkRefusalErrorKey,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiSaveDraftCard,
@@ -9,6 +9,7 @@ import {
   type AiModelPickerBridge,
   UniAiMark,
   composerNoteFor,
+  useOverlayDock,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
@@ -33,7 +34,7 @@ import { aiNoticeBody, aiNoticeKind } from '@genoffice/ai-provider/browser'
 import type {
   UniworkCloudStatusBridge,
   UniworkCloudStatusSnapshot,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+} from '@genoffice/electron-utils/uniwork-cloud-status'
 import { platform } from '../capabilities'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
@@ -51,8 +52,7 @@ import {
   AiUsageChip,
   addTokenUsage,
   Markdown,
-  uniworkErrorForChip,
-  uniworkErrorKeyOfText,
+  uniworkErrorForEntry,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
@@ -251,6 +251,8 @@ interface ChatEntry {
   text: string
   streaming?: boolean
   isError?: boolean
+  /** the S9 key the transport chose for this UniWork AI error; absent for any other failure */
+  errorKey?: string
   /** UniWork AI: the transport is waiting out a Retry-After; the run goes on, Stop is the only action */
   waitLine?: string | undefined
   /** UniWork AI: restarted conversation / provider boundary / dropped call, shown above the answer */
@@ -359,6 +361,7 @@ export function AiPanel({
   readOnly = false,
   onCollapse,
   open = true,
+  dockHidden = false,
   onExpand,
 }: {
   deps: HtmlAiDeps
@@ -376,6 +379,8 @@ export function AiPanel({
   onCollapse: () => void
   /** false while the dock is collapsed (the panel stays mounted, hidden) */
   open?: boolean
+  /** the dock is hidden by the frame (presenting): it is not an active dialog, whatever `open` says */
+  dockHidden?: boolean
   /** expand the dock: a send refused while collapsed opens it so the reason can be shown */
   onExpand?: () => void
 }): ReactElement {
@@ -575,6 +580,13 @@ export function AiPanel({
   const [panelWidth, setPanelWidth] = useState(() => clampPanelWidth(preferredWidthRef.current))
   const [resizing, setResizing] = useState(false)
   const asideRef = useRef<HTMLElement>(null)
+  // under 900 px the dock overlays the document: modal dialog, composer focus, Esc, focus return
+  useOverlayDock({
+    rootRef: asideRef,
+    open: open && !dockHidden,
+    onClose: onCollapse,
+    label: 'UniAI',
+  })
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -790,6 +802,7 @@ export function AiPanel({
             resolveAttachmentSrc: (ref) => resolveAttachmentSrc(ref),
             listAttachmentNames: () => availableAttachments().map((a) => a.name),
             getEditFence: () => fenceRef.current,
+            uniworkBound: () => depsRef.current.access.uniworkBound?.() ?? false,
           },
           () => readOnlyRef.current,
         ),
@@ -798,6 +811,7 @@ export function AiPanel({
         createIntentSkill(
           () => intentRef.current,
           () => isDocEmpty(depsRef.current.access.getText()),
+          () => depsRef.current.access.uniworkBound?.() === true,
         ),
       ]),
       captureSnapshot: () => depsRef.current.getSnapshot(),
@@ -902,12 +916,12 @@ export function AiPanel({
           queueRunRef.current = false
           setBusy(false)
         },
-        onError: (error) => {
+        onError: (error, errorKey) => {
           // once a tool ran the message was delivered; a later turn failing is not a send failure
           // a setup state (no key / no model) is not a send failure either: no "not sent" pill
           // a refused question (too long, rejected) is no send failure to retry as is: it goes back
           // into the composer to be shortened or fixed, as the message says
-          const refused = isUniworkQuestionRefusal(error)
+          const refused = isUniworkRefusalErrorKey(errorKey)
           if (refused) setPrompt((current) => current || runDisplayRef.current)
           const undelivered = runToolsRef.current.length === 0 && !aiNoticeKind(error) && !refused
           setChat((prev) => {
@@ -926,6 +940,7 @@ export function AiPanel({
                 streaming: false,
                 waitLine: undefined,
                 text: error,
+                errorKey,
                 isError: true,
                 tools: last.tools?.filter((tl) => !tl.running),
               }
@@ -1363,6 +1378,8 @@ export function AiPanel({
   }, [open, uniworkGate])
 
   const docEmpty = chat.length === 0 && isDocEmpty(deps.access.getText())
+  // a bound page has no whole-page writer, so the blank-page intent choice is gone: design is the only path
+  const intentBound = deps.access.uniworkBound?.() === true
 
   const lastEntry = chat.at(-1)
   const panelLiveAnnouncement =
@@ -1379,11 +1396,12 @@ export function AiPanel({
                   stopped: Boolean(lastEntry.stopped),
                   hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
                   clarifyAsked: receipts.some((r) => Boolean(r.qa)),
-                  notes: lastEntry.notes,
                   droppedToolCalls: droppedCallsOfNotes(lastEntry.notes),
                   toolExecutions: lastEntry.tools,
                   isError: Boolean(lastEntry.isError),
-                  error: lastEntry.isError ? uniworkErrorForChip(lastEntry.text) : null,
+                  error: lastEntry.isError
+                    ? uniworkErrorForEntry(lastEntry.errorKey, lastEntry.text)
+                    : null,
                 }
               : null,
         })
@@ -1475,7 +1493,7 @@ export function AiPanel({
             <div className="ai-chat-empty-title">
               {t(
                 docEmpty
-                  ? intent === 'write'
+                  ? intent === 'write' && !intentBound
                     ? 'aiEmptyWriteTitle'
                     : 'aiEmptyTitle'
                   : 'aiEmptyDocTitle',
@@ -1484,7 +1502,7 @@ export function AiPanel({
             <div className="ai-chat-empty-body">
               {t(
                 docEmpty
-                  ? intent === 'write'
+                  ? intent === 'write' && !intentBound
                     ? 'aiEmptyWriteBody'
                     : 'aiEmptyBody'
                   : 'aiEmptyDocBody',
@@ -1492,7 +1510,7 @@ export function AiPanel({
             </div>
             <div className="ai-starter-list">
               {(docEmpty
-                ? intent === 'write'
+                ? intent === 'write' && !intentBound
                   ? WRITE_STARTERS
                   : GENERATE_STARTERS
                 : EDIT_STARTERS
@@ -1517,9 +1535,7 @@ export function AiPanel({
             // it), so the "not sent" bubble adds no Retry of its own; failures of other providers keep it
             const next = chat[i + 1]
             const uniworkErrorFollows =
-              next?.role === 'assistant' &&
-              Boolean(next.isError) &&
-              uniworkErrorKeyOfText(next.text) !== null
+              next?.role === 'assistant' && Boolean(next.isError) && next.errorKey !== undefined
             const own = receipts.filter((r) => r.afterIdx === i)
             return (
               <div key={i} className="ai-msg ai-msg-user">
@@ -1598,11 +1614,10 @@ export function AiPanel({
               stopped: Boolean(entry.stopped),
               hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
               clarifyAsked: receipts.some((r) => Boolean(r.qa)),
-              notes: entry.notes,
               droppedToolCalls: droppedCallsOfNotes(entry.notes),
               toolExecutions: entry.tools,
               isError: Boolean(entry.isError),
-              error: entry.isError ? uniworkErrorForChip(entry.text) : null,
+              error: entry.isError ? uniworkErrorForEntry(entry.errorKey, entry.text) : null,
             },
           )
           const chip = chipView?.chip ?? null
@@ -1850,7 +1865,7 @@ export function AiPanel({
             {t('aiViewOnlyNotice')}
           </div>
         )}
-        {chat.length === 0 && docEmpty && !readOnly && (
+        {chat.length === 0 && docEmpty && !readOnly && !intentBound && (
           <div className="ai-intent-bar">
             <div className="ai-intent-label">{t('aiIntentLabel')}</div>
             <div className="ai-intent-cards" role="radiogroup" aria-label={t('aiIntentLabel')}>

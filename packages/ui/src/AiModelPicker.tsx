@@ -15,7 +15,7 @@ import {
 import { setAiModelNeedHint } from './ai-model-need'
 import { ProviderLogo } from './provider-logos'
 import { useDismissablePopover } from './popover-dismiss'
-import { AI_MODEL_PICKER_STRINGS, type AiModelPickerStrings } from './strings-ai-model-picker'
+import { AI_MODEL_PICKER_STRINGS } from './strings-ai-model-picker'
 import { aiUniworkStrings, aiUniworkText } from './strings-ai-uniwork'
 
 export type AiModelPickerCloudState =
@@ -100,15 +100,10 @@ type CloudStringKey =
 
 function pickerCloudText(
   lang: Lang,
-  strings: AiModelPickerStrings,
   key: CloudStringKey,
   params?: Record<string, string | number>,
 ): string {
-  const shardTable = (aiUniworkStrings[lang] ?? aiUniworkStrings.en) as Record<
-    string,
-    string | undefined
-  >
-  const template = shardTable[key] ?? strings[key]
+  const template = (aiUniworkStrings[lang] ?? aiUniworkStrings.en)[key]
   if (!params) return template
   return template.replace(/\{([a-zA-Z0-9]+)\}/g, (match, token: string) =>
     token in params ? String(params[token]) : match,
@@ -509,9 +504,9 @@ export function AiModelPicker({
     bridge.requireModel !== true && cloudStatus?.credits ? cloudStatus.credits : null
   const creditsVisibleText = desktopCredits
     ? desktopCredits.limit === null
-      ? pickerCloudText(lang, strings, 'cloudCreditsUnlimited')
+      ? pickerCloudText(lang, 'cloudCreditsUnlimited')
       : desktopCredits.remaining !== null
-        ? pickerCloudText(lang, strings, 'cloudCreditsLeft', {
+        ? pickerCloudText(lang, 'cloudCreditsLeft', {
             remaining: formatCreditCount(lang, desktopCredits.remaining),
             limit: formatCreditCount(lang, desktopCredits.limit),
           })
@@ -519,7 +514,7 @@ export function AiModelPicker({
     : null
   const creditsAriaText = desktopCredits
     ? desktopCredits.limit === null
-      ? pickerCloudText(lang, strings, 'cloudCreditsUnlimited')
+      ? pickerCloudText(lang, 'cloudCreditsUnlimited')
       : desktopCredits.remaining !== null
         ? aiUniworkText(lang, 'aiUniworkCreditsAria', {
             remaining: formatCreditCount(lang, desktopCredits.remaining),
@@ -540,31 +535,31 @@ export function AiModelPicker({
       case 'signed-out':
         return {
           text: aiUniworkText(lang, 'aiUniworkFooterSignIn'),
-          actionLabel: pickerCloudText(lang, strings, 'acctSignIn'),
+          actionLabel: pickerCloudText(lang, 'acctSignIn'),
           kind: 'sign-in' as const,
         }
       case 'not-entitled':
         return {
-          text: pickerCloudText(lang, strings, 'cloudStateNotEntitled'),
+          text: pickerCloudText(lang, 'cloudStateNotEntitled'),
           actionLabel: aiUniworkText(lang, 'aiUniworkDetails'),
           kind: 'details' as const,
         }
       case 'subscription-inactive':
         return {
-          text: pickerCloudText(lang, strings, 'cloudStateInactive'),
+          text: pickerCloudText(lang, 'cloudStateInactive'),
           actionLabel: aiUniworkText(lang, 'aiUniworkDetails'),
           kind: 'details' as const,
         }
       case 'credits-exhausted':
         return {
-          text: pickerCloudText(lang, strings, 'cloudStateExhausted'),
+          text: pickerCloudText(lang, 'cloudStateExhausted'),
           actionLabel: aiUniworkText(lang, 'aiUniworkDetails'),
           kind: 'details' as const,
         }
       case 'unavailable':
         if (cloudStatus.cloudUnavailable === true || cloudStatus.reason === 'cloud_unavailable') {
           return {
-            text: pickerCloudText(lang, strings, 'cloudStateUnavailable'),
+            text: pickerCloudText(lang, 'cloudStateUnavailable'),
             actionLabel: aiUniworkText(lang, 'aiUniworkDetails'),
             kind: 'details' as const,
           }
@@ -574,7 +569,7 @@ export function AiModelPicker({
       default:
         return null
     }
-  }, [bridge.requireModel, cloudStatus, lang, strings])
+  }, [bridge.requireModel, cloudStatus, lang])
 
   const onFooterAction = () => {
     const pop = popRef.current

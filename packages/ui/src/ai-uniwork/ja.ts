@@ -72,16 +72,12 @@ export const ja = {
     'UniWork AI はこのリクエストを受け付けられませんでした。内容を変更してから送信してください。',
   aiUniworkImagesNotSent: '画像は UniWork AI に送信されません。テキストのみ送信しました。',
   // Cloud state, credits and account actions (shared with picker footer and composer note)
-  cloudStateReady: '利用可能',
   cloudStateNotEntitled: 'プランに含まれていません',
   cloudStateExhausted: 'AI クレジットを使い切りました',
   cloudStateUnavailable: '現在利用できません',
-  cloudStateSignedOut: 'サインインしていません',
   cloudStateInactive: 'サブスクリプション無効',
-  cloudCredits: 'AI クレジット',
   cloudCreditsLeft: '残り {remaining} / {limit}',
   cloudCreditsUnlimited: '無制限',
-  cloudCreditsRenews: '{date} にリセット',
   cloudInactiveBody:
     '組織の UniWork サブスクリプションが有効でないため、クラウド AI は停止中です。管理者に更新を依頼してください。下の独自プロバイダーは引き続き使えます。',
   acctSignIn: 'サインイン',

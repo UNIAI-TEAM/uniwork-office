@@ -12,7 +12,7 @@ import {
   UNIWORK_CLOUD_STATUS_OPEN_ACCOUNT,
   UNIWORK_CLOUD_STATUS_SIGN_IN,
   type UniworkCloudStatusSnapshot,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+} from '@genoffice/electron-utils/uniwork-cloud-status'
 import { HOME_CHANNELS } from '../src/shared/home-api'
 
 const electron = vi.hoisted(() => ({
@@ -237,18 +237,26 @@ describe('shell account + cloud status integration (RB1-1, RB1-4, RB1-8, RB1-9)'
     const replace = handlers.get(HOME_CHANNELS.accountReplaceLockedSignIn)!
     const spy = vi.spyOn(uniworkAccount(), 'replaceLockedSignIn')
     // senders that call an account channel get status pushes, so they can receive
-    const withSend = <T extends { sender: object }>(event: T) => ({
-      ...event,
-      sender: { ...event.sender, send: vi.fn() },
-    })
+    const withSend = <T extends { sender: object }>(event: T) => {
+      const send = vi.fn()
+      return { event: { ...event, sender: { ...event.sender, send } }, send }
+    }
     // another page or a frame inside the shell never reaches the manager
-    expect(await replace(withSend(mainFrameEvent()))).toBe(false)
-    expect(await replace(withSend(forgedSubframeEvent()))).toBe(false)
+    const foreign = withSend(mainFrameEvent())
+    expect(await replace(foreign.event)).toBe(false)
+    const forged = withSend(forgedSubframeEvent())
+    expect(await replace(forged.event)).toBe(false)
     expect(spy).not.toHaveBeenCalled()
     // the shell page does, and main refuses: not keystore-locked after a failed Retry
     await uniworkAccount().restore()
     expect(await replace(shellEvent)).toBe(false)
     expect(spy).toHaveBeenCalledTimes(1)
+    // A84: a refused sender was never registered, so an account-status push
+    // reaches the shell page but neither refused sender
+    await uniworkAccount().retry()
+    expect(shellWc.send).toHaveBeenCalled()
+    expect(foreign.send).not.toHaveBeenCalled()
+    expect(forged.send).not.toHaveBeenCalled()
     spy.mockRestore()
   })
 

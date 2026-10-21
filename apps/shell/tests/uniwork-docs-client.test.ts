@@ -220,6 +220,24 @@ describe('error envelope mapping', () => {
     expect(JSON.parse(String(init.body))).toEqual({ upload_id: 'up_1', base_revision: '41' })
     expect((init.headers as Record<string, string>)['Idempotency-Key']).toBe('office-key-1')
   })
+
+  it('EL-1(b): commit sends edit_lock_id only when the input carries one', async () => {
+    const fetch = vi.fn<FetchLike>(async () => envelope(500, 'internal'))
+    await client(fetch)
+      .commit({
+        documentId: DOC,
+        uploadId: 'up_1',
+        baseRevision: '41',
+        idempotencyKey: 'office-key-1',
+        editLockId: '01J8X4LOCK0N1P2Q3R4S5T6U7V',
+      })
+      .catch(() => undefined)
+    expect(JSON.parse(String(fetch.mock.calls[0]![1].body))).toEqual({
+      upload_id: 'up_1',
+      base_revision: '41',
+      edit_lock_id: '01J8X4LOCK0N1P2Q3R4S5T6U7V',
+    })
+  })
 })
 
 describe('Retry-After (G5-06 be-9)', () => {
@@ -796,6 +814,108 @@ describe('401: one shared refresh, one retry (real account session)', () => {
     })
   })
 
+  it('parses share_scope on list, recent, shared-with-me and shared-by-me rows; malformed values are absent, the row stays (UNI-1958 row 1)', async () => {
+    const scope = (extra: Record<string, unknown> = {}) => ({
+      home_workspace: false,
+      users: 2,
+      workspaces: 1,
+      organization: false,
+      public_link: true,
+      ...extra,
+    })
+    const row = (id: string, share_scope?: unknown) => ({
+      id,
+      workspace_id: 'ws_1',
+      title: `${id}.docx`,
+      kind: 'file',
+      updated_at: '2026-10-17T01:00:00Z',
+      ...(share_scope === undefined ? {} : { share_scope }),
+    })
+    const rows = [
+      row('ok', scope()),
+      row('home', scope({ home_workspace: true, users: 0, workspaces: 0, public_link: false })),
+      row('absent'),
+      row('null', null),
+      row('string', 'users'),
+      row('array', [scope()]),
+      row('neg-users', scope({ users: -1 })),
+      row('neg-ws', scope({ workspaces: -2 })),
+      row('frac', scope({ users: 1.5 })),
+      row('str-count', scope({ users: '2' })),
+      row('str-bool', scope({ organization: 'true' })),
+      row('missing-key', { home_workspace: true, users: 1 }),
+    ]
+    const fetch = vi.fn<FetchLike>(async () => json(200, { documents: rows, next_cursor: null }))
+    const api = client(fetch)
+    const expectParsed = (documents: { id: string; shareScope?: unknown }[]) => {
+      const byId = Object.fromEntries(documents.map((d) => [d.id, d.shareScope]))
+      expect(documents.map((d) => d.id)).toEqual(rows.map((r) => r.id))
+      expect(byId.ok).toEqual({
+        homeWorkspace: false,
+        users: 2,
+        workspaces: 1,
+        organization: false,
+        publicLink: true,
+      })
+      expect(byId.home).toEqual({
+        homeWorkspace: true,
+        users: 0,
+        workspaces: 0,
+        organization: false,
+        publicLink: false,
+      })
+      for (const id of [
+        'absent',
+        'null',
+        'string',
+        'array',
+        'neg-users',
+        'neg-ws',
+        'frac',
+        'str-count',
+        'str-bool',
+        'missing-key',
+      ]) {
+        expect(byId[id], id).toBeUndefined()
+        expect(
+          documents.find((d) => d.id === id),
+          id,
+        ).not.toHaveProperty('shareScope')
+      }
+    }
+    expectParsed((await api.listDocuments({ workspaceId: 'ws_1' })).documents)
+    expectParsed((await api.listSharedWithMe({ workspaceId: 'ws_1' })).documents)
+    expectParsed((await api.listSharedByMe({ workspaceId: 'ws_1' })).documents)
+  })
+
+  // UNI-1975 guard tests (pass on the base too): the app adds nothing to the
+  // server's folder-sharing answers (UNI-1973 / UNI-1974 reach it with no app change)
+  it('lists Shared by me exactly as the server answers: no folder rows added, a recipient row without parent_id lands at the root', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(200, {
+        documents: [
+          {
+            id: 'top_doc',
+            workspace_id: 'ws_1',
+            title: 'Top.docx',
+            kind: 'file',
+            updated_at: '2026-10-17T03:00:00Z',
+            visibility: 'restricted',
+            my_level: 'manage',
+          },
+        ],
+        next_cursor: null,
+      }),
+    )
+    const api = client(fetch)
+    const page = await api.listSharedByMe({ workspaceId: 'ws_1' })
+    expect(page.documents.map((d) => d.id)).toEqual(['top_doc'])
+    expect(page.documents.some((d) => d.kind === 'folder')).toBe(false)
+    // the server masked parent_id: the row stays at the workspace root, never a guessed folder
+    expect(page.documents[0]!.parentId).toBeNull()
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('sends listSharedByMe, listTrash, listWorkspaceMembers and filter params only when set', async () => {
     const seen: string[] = []
     const fetch = vi.fn<FetchLike>(async (url) => {
@@ -865,5 +985,378 @@ describe('401: one shared refresh, one retry (real account session)', () => {
       `${ORIGIN}/api/v1/workspaces/ws_1/documents?limit=50&kind=file&updated_by=u_4&updated_from=2026-10-16T00%3A00%3A00Z`,
       `${ORIGIN}/api/v1/workspaces/ws_1/members`,
     ])
+  })
+})
+
+/**
+ * UNI-1953 CT1-1: Recent and Shared with me list UniNote pages for the
+ * Documents home (`includePages`), while every other caller (the picker, the
+ * overview, the tray) keeps the files-only list.
+ */
+describe('UniNote pages on the library lists (UNI-1953 CT1-1)', () => {
+  const rows = [
+    {
+      id: 'f1',
+      kind: 'file',
+      workspace_id: 'ws_1',
+      title: 'A.docx',
+      updated_at: '2026-10-17T01:00:00Z',
+    },
+    {
+      id: 'p1',
+      kind: 'page',
+      workspace_id: 'ws_1',
+      title: 'Ghi chú',
+      updated_at: '2026-10-17T02:00:00Z',
+    },
+    {
+      id: 'd1',
+      kind: 'folder',
+      workspace_id: 'ws_1',
+      title: 'Folder',
+      updated_at: '2026-10-17T03:00:00Z',
+    },
+  ]
+  const serve = () => {
+    const seen: string[] = []
+    const fetch = vi.fn<FetchLike>(async (url) => {
+      seen.push(url)
+      return json(200, { documents: rows, next_cursor: null })
+    })
+    return { api: client(fetch), seen }
+  }
+
+  it('listDocuments stays files-only by default (kind=file, no page row)', async () => {
+    const { api, seen } = serve()
+    const list = await api.listDocuments({ workspaceId: 'ws_1' })
+    expect(list.documents.map((d) => d.id)).toEqual(['f1'])
+    expect(seen[0]).toContain('kind=file')
+  })
+
+  it('listDocuments with includePages keeps files and pages, never a folder', async () => {
+    const { api, seen } = serve()
+    const list = await api.listDocuments({ workspaceId: 'ws_1', includePages: true })
+    expect(list.documents.map((d) => [d.id, d.kind])).toEqual([
+      ['f1', 'file'],
+      ['p1', 'page'],
+    ])
+    expect(seen[0]).not.toContain('kind=file')
+    // a page has no document format, whatever its title ends in
+    expect(list.documents[1]!.format).toBeNull()
+  })
+
+  it('listSharedWithMe stays files-only by default', async () => {
+    const { api } = serve()
+    const shared = await api.listSharedWithMe({ workspaceId: 'ws_1' })
+    expect(shared.documents.map((d) => d.id)).toEqual(['f1'])
+  })
+
+  it('listSharedWithMe with includePages keeps the page row as a page', async () => {
+    const { api } = serve()
+    const shared = await api.listSharedWithMe({ workspaceId: 'ws_1', includePages: true })
+    expect(shared.documents.map((d) => [d.id, d.kind])).toEqual([
+      ['f1', 'file'],
+      ['p1', 'page'],
+    ])
+  })
+})
+
+// UNI-1961: the "other sources" list of the Documents home (files attached in
+// chat, tasks, meetings, email) and their download proxy, as the web reads
+// them (D packages/core/api/endpoints/documents-sources.ts, sources-schema.ts).
+describe('document sources (UNI-1961)', () => {
+  const sourceItem = (over: Record<string, unknown> = {}) => ({
+    id: 'task:src_1',
+    source: 'task',
+    parent: { kind: 'task', id: 'task_1', title: 'Chuẩn bị họp', message_id: '' },
+    name: 'Biên bản.docx',
+    mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    extension: 'docx',
+    size_bytes: 325632,
+    updated_at: '2026-10-19T08:00:00Z',
+    owner: { id: 'u_1', kind: 'user', name: 'Minh Trần' },
+    can_open_in_app: true,
+    can_save: true,
+    ...over,
+  })
+
+  it('lists sources with source/type/q/cursor/limit only when set', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(200, { items: [], next_cursor: null }))
+    const api = client(fetch)
+    await api.listSources({ workspaceId: 'ws_1' })
+    await api.listSources({
+      workspaceId: 'ws_1',
+      source: 'task',
+      type: 'docx',
+      q: ' plan ',
+      cursor: 'c_2',
+      limit: 500,
+    })
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources?limit=50`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources?source=task&type=docx&q=plan&cursor=c_2&limit=100`,
+    ])
+    expect(fetch.mock.calls[0]![1].method).toBe('GET')
+  })
+
+  it('parses the web shape leniently: optional fields take their defaults', async () => {
+    const fetch = vi.fn<FetchLike>(async () =>
+      json(200, {
+        items: [
+          sourceItem(),
+          {
+            id: 'chat:src_2',
+            source: 'chat',
+            parent: { kind: 'chat_channel', id: 'room_1', title: 'Chung' },
+            name: 'notes.md',
+          },
+        ],
+        next_cursor: 'n_1',
+      }),
+    )
+    const page = await client(fetch).listSources({ workspaceId: 'ws_1' })
+    expect(page).toEqual({
+      items: [
+        {
+          id: 'task:src_1',
+          source: 'task',
+          parent: { kind: 'task', id: 'task_1', title: 'Chuẩn bị họp' },
+          name: 'Biên bản.docx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          extension: 'docx',
+          sizeBytes: 325632,
+          updatedAt: '2026-10-19T08:00:00Z',
+          owner: { id: 'u_1', name: 'Minh Trần' },
+          canOpenInApp: true,
+          canSave: true,
+        },
+        {
+          id: 'chat:src_2',
+          source: 'chat',
+          parent: { kind: 'chat_channel', id: 'room_1', title: 'Chung' },
+          name: 'notes.md',
+          mimeType: '',
+          extension: '',
+          sizeBytes: 0,
+          updatedAt: '',
+          owner: null,
+          canOpenInApp: false,
+          canSave: false,
+        },
+      ],
+      nextCursor: 'n_1',
+    })
+  })
+
+  it('an untrustworthy list is malformed_response, never an empty list', async () => {
+    for (const body of [
+      {},
+      { items: null },
+      { items: [{ id: 'task:src_1' }] },
+      { items: [sourceItem({ parent: 'task_1' })] },
+      { items: [], next_cursor: 7 },
+    ]) {
+      const api = client(async () => json(200, body))
+      expect(await codeOf(api.listSources({ workspaceId: 'ws_1' }))).toBe('malformed_response')
+    }
+  })
+
+  it('a source route the server lacks answers its error code (the home skips the merge)', async () => {
+    const api = client(async () => envelope(404, 'not_found'))
+    expect(await codeOf(api.listSources({ workspaceId: 'ws_1' }))).toBe('not_found')
+  })
+
+  it('downloads canonical compound source ids across all four prefixes and refuses opaque or malformed ids (R1-1)', async () => {
+    const fetch = vi.fn<FetchLike>(
+      async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }),
+    )
+    const api = client(fetch)
+    for (const sourceId of ['chat:att_1', 'task:att_1', 'meeting:att_1', 'email:att_1']) {
+      expect(await api.downloadSource('ws_1', sourceId)).toEqual({
+        bytes: new Uint8Array([1, 2, 3]),
+      })
+    }
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/chat%3Aatt_1/download`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/task%3Aatt_1/download`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/meeting%3Aatt_1/download`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources/email%3Aatt_1/download`,
+    ])
+    fetch.mockClear()
+    for (const bad of ['src_1', '../x', 'other:att_1', 'task:', `task:${'a'.repeat(65)}`]) {
+      expect(await codeOf(api.downloadSource('ws_1', bad))).toBe('not_found')
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('enforces the 256 MiB source download cap incrementally and cancels oversized streams at the crossing (R1-4, R1-12, R1-15)', async () => {
+    const maxBytes = 256 * 1024 * 1024
+    let declaredPulls = 0
+    const declaredApi = client(async () => {
+      const body = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            declaredPulls += 1
+            controller.enqueue(new Uint8Array(1024))
+          },
+        },
+        { highWaterMark: 0 },
+      )
+      return new Response(body, {
+        status: 200,
+        headers: { 'Content-Length': String(maxBytes + 1) },
+      })
+    })
+    expect(await codeOf(declaredApi.downloadSource('ws_1', 'task:att_1'))).toBe('too_large')
+    expect(declaredPulls).toBe(0)
+
+    const chunk = new Uint8Array(16 * 1024 * 1024)
+    let pulls = 0
+    let cancelled = false
+    const streamApi = client(async () => {
+      const body = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            pulls += 1
+            if (pulls > 20) {
+              controller.close()
+              return
+            }
+            controller.enqueue(chunk)
+          },
+          cancel() {
+            cancelled = true
+          },
+        },
+        { highWaterMark: 0 },
+      )
+      return new Response(body, { status: 200 })
+    })
+    expect(await codeOf(streamApi.downloadSource('ws_1', 'task:att_1'))).toBe('too_large')
+    expect(cancelled).toBe(true)
+    expect(pulls).toBe(17)
+  })
+
+  it('rejects shelve and unshelve responses whose document id does not match the requested id (R1-9)', async () => {
+    const api = client(async () =>
+      json(200, {
+        document: {
+          id: 'wrong_doc',
+          workspace_id: 'ws_1',
+          kind: 'page',
+          title: 'Wrong report',
+          updated_at: '2026-10-20T08:00:00Z',
+        },
+        affected: ['wrong_doc'],
+      }),
+    )
+    expect(await codeOf(api.shelve('doc_1', 'key-1'))).toBe('malformed_response')
+    expect(await codeOf(api.unshelve('doc_1', 'key-2'))).toBe('malformed_response')
+  })
+})
+
+// UNI-1961 item 2: list rows carry the file's size for the web's Size column
+describe('list rows carry size_bytes (UNI-1961)', () => {
+  it('reads size_bytes on a file row; a page, a folder, a zero or a bad size carries none', async () => {
+    const row = (over: Record<string, unknown>) => ({
+      workspace_id: 'ws_1',
+      title: 'x.docx',
+      updated_at: '2026-10-19T08:00:00Z',
+      parent_id: null,
+      ...over,
+    })
+    const api = client(async () =>
+      json(200, {
+        documents: [
+          row({ id: 'f1', kind: 'file', size_bytes: 325632 }),
+          row({ id: 'f2', kind: 'file', size_bytes: 0 }),
+          row({ id: 'f3', kind: 'file', size_bytes: 'big' }),
+          row({ id: 'p1', kind: 'page', title: 'Ghi chú', size_bytes: 10 }),
+          row({ id: 'd1', kind: 'folder', title: 'Thư mục', size_bytes: 10 }),
+        ],
+        next_cursor: null,
+      }),
+    )
+    const page = await api.listChildren({ workspaceId: 'ws_1', parentId: null })
+    expect(page.documents.map((d) => [d.id, d.sizeBytes])).toEqual([
+      ['f1', 325632],
+      ['f2', undefined],
+      ['f3', undefined],
+      ['p1', undefined],
+      ['d1', undefined],
+    ])
+  })
+})
+
+// UNI-1961 item 3: "Group by Source" reads a document's origin as the web does
+describe('list rows carry origin (UNI-1961)', () => {
+  it('keeps upload and created; anything else is no origin (the web calls it Documents)', async () => {
+    const row = (id: string, origin: unknown) => ({
+      id,
+      kind: 'file',
+      workspace_id: 'ws_1',
+      title: `${id}.docx`,
+      updated_at: '2026-10-19T08:00:00Z',
+      origin,
+    })
+    const api = client(async () =>
+      json(200, {
+        documents: [row('u', 'upload'), row('c', 'created'), row('x', 'import'), row('n', null)],
+        next_cursor: null,
+      }),
+    )
+    const page = await api.listChildren({ workspaceId: 'ws_1', parentId: null })
+    expect(page.documents.map((d) => [d.id, d.origin])).toEqual([
+      ['u', 'upload'],
+      ['c', 'created'],
+      ['x', undefined],
+      ['n', undefined],
+    ])
+  })
+})
+
+// UNI-2033: the id of one numbered version, for the read-only "View in version N" copy
+describe('getVersionId (UNI-2033)', () => {
+  it('reads GET /documents/{id}/versions/{N} and answers version.id', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(200, { version: { id: 'ver_2', version: 2 } }))
+    const api = client(fetch)
+    expect(await api.getVersionId(DOC, 2)).toBe('ver_2')
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      `${ORIGIN}/api/v1/documents/${DOC}/versions/2`,
+    ])
+    const init = fetch.mock.calls[0]![1]
+    expect(init.method).toBe('GET')
+    expect(init.redirect).toBe('error')
+    expect(init.cache).toBe('no-store')
+  })
+
+  it('maps the usual refusals through the documents error table', async () => {
+    expect(await codeOf(client(async () => envelope(404, 'not_found')).getVersionId(DOC, 9))).toBe(
+      'not_found',
+    )
+    expect(
+      await codeOf(client(async () => envelope(403, 'forbidden')).getVersionId(DOC, 2)),
+    ).not.toBe('resolved')
+  })
+
+  it('is strict: a missing id, another version number or a non-object body is malformed', async () => {
+    const malformed = async (body: unknown, no = 2) =>
+      codeOf(client(async () => json(200, body)).getVersionId(DOC, no))
+    expect(await malformed({ version: { version: 2 } })).toBe('malformed_response')
+    expect(await malformed({ version: { id: '', version: 2 } })).toBe('malformed_response')
+    expect(await malformed({ version: { id: 'ver_3', version: 3 } })).toBe('malformed_response')
+    expect(await malformed({ version: { id: 'ver_2', version: '2' } })).toBe('malformed_response')
+    expect(await malformed({})).toBe('malformed_response')
+    expect(await malformed([])).toBe('malformed_response')
+  })
+
+  it('refuses a bad document id or version number before the network', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(200, {}))
+    const api = client(fetch)
+    expect(await codeOf(api.getVersionId('../../evil', 2))).toBe('not_found')
+    expect(await codeOf(api.getVersionId(DOC, 0))).toBe('not_found')
+    expect(await codeOf(api.getVersionId(DOC, 1.5))).toBe('not_found')
+    expect(await codeOf(api.getVersionId(DOC, -1))).toBe('not_found')
+    expect(fetch).not.toHaveBeenCalled()
   })
 })

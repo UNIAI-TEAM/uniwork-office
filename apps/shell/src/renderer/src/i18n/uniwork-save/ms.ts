@@ -12,11 +12,12 @@ export const ms = {
   usMyFolderPrivate: 'Peribadi, hanya anda yang boleh melihat',
   usChange: 'Tukar',
   usSave: 'Simpan',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Tutup',
   usPickTitle: 'Pilih tempat simpan',
   usBack: 'Kembali ke penamaan',
   usSearchFolders: 'Cari folder',
-  usSharedNote: 'Jika disimpan dalam folder kongsi, dokumen menerima kebenaran folder itu.',
   usChooseFolder: 'Pilih “{folder}”',
   usSelected: 'Dipilih',
   usRootBlocked: 'Pilih satu folder',
@@ -32,4 +33,8 @@ export const ms = {
   usErrAlreadyBound: 'Tab ini sudah dipautkan kepada dokumen UniWork. Simpan seperti biasa.',
   usErrNotFound:
     'Fail untuk disimpan atau folder yang dipilih tidak ditemui. Pilih tempat simpan sekali lagi, kemudian cuba semula.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

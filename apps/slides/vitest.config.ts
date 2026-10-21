@@ -47,6 +47,7 @@ export default defineConfig({
         here,
         '../../packages/docx-engine/src/metafile.ts',
       ),
+      '@genoffice/shortcuts': resolve(here, '../../packages/shortcuts/src/index.ts'),
     },
   },
   test: {

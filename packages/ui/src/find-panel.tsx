@@ -18,6 +18,20 @@ export interface FindPanelStrings {
  * Editor adapter the panel drives. The target owns the match list of the last
  * `search`; indexes passed to the other methods refer to that list.
  */
+/**
+ * Presses the open panel's Next / Previous button (Word's "repeat Find"); false
+ * when no panel is open or it has no hit to step to.
+ */
+export function stepFindMatch(direction: 'next' | 'prev'): boolean {
+  if (typeof document === 'undefined') return false
+  const button = document.querySelector<HTMLButtonElement>(
+    `.find-btn[data-find-step="${direction}"]`,
+  )
+  if (!button || button.disabled) return false
+  button.click()
+  return true
+}
+
 export interface FindTarget {
   readonly editable: boolean
   /** rescan and repaint the highlights; returns the match count */
@@ -235,6 +249,7 @@ export function FindPanel({ target, strings, onClose, focusRequest }: FindPanelP
         <button
           type="button"
           className="find-btn"
+          data-find-step="prev"
           data-tip={strings.prevMatch}
           aria-label={strings.prevMatch}
           onClick={() => step(-1)}
@@ -245,6 +260,7 @@ export function FindPanel({ target, strings, onClose, focusRequest }: FindPanelP
         <button
           type="button"
           className="find-btn"
+          data-find-step="next"
           data-tip={strings.nextMatch}
           aria-label={strings.nextMatch}
           onClick={() => step(1)}

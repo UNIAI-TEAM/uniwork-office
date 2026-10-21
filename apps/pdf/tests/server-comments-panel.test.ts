@@ -125,6 +125,7 @@ function fakeBridge(
       }),
     ),
     searchMentions: vi.fn(() => ok({ candidates: [] })),
+    openVersion: vi.fn(() => Promise.resolve({ opened: true })),
     onReveal: vi.fn((handler) => {
       revealHandler = handler
       return () => {
@@ -294,6 +295,76 @@ describe('delete a page -> lost (G8-15)', () => {
   })
 })
 
+describe('a comment that appears with the panel closed (G819-A02b)', () => {
+  it('made on the server after the first list, it is in the PUT after the receipt', async () => {
+    const bridge = fakeBridge([comment({ id: 'c1', anchor: makePdfAnchor(1, RECT) })])
+    const { api, setOpen } = await mount(bridge)
+    await setOpen(false)
+    // the other host comments after this editor listed; nothing here lists again while closed
+    bridge.comments.push(comment({ id: 'c2', anchor: makePdfAnchor(2, RECT) }))
+    await act(async () => {
+      // the renderer saved with page 1 (index 0) deleted: 1 -> 0, 2 -> 1
+      api.current!.saved(
+        new Map([
+          [1, 0],
+          [2, 1],
+        ]),
+      )
+      bridge.receipt('ver-2')
+      await flush()
+    })
+    expect(bridge.anchors).toHaveBeenCalledTimes(1)
+    expect(bridge.anchors).toHaveBeenCalledWith({
+      path: PATH,
+      versionId: 'ver-2',
+      anchors: [
+        { commentId: 'c1', anchor: makePdfAnchor(1, RECT), state: 'lost' },
+        { commentId: 'c2', anchor: makePdfAnchor(1, RECT), state: 'exact' },
+      ],
+    })
+  })
+})
+
+describe('closed-panel Save after a prepare Save (G819-A02c)', () => {
+  it('the comment made while the prepare receipt is still in flight ends on page 1 at the shift version', async () => {
+    const bridge = fakeBridge()
+    const { api, setOpen } = await mount(bridge)
+    await setOpen(false)
+    // the prepare Save (3 pages, nothing moved) has its page map, its receipt comes a moment later
+    await act(async () => {
+      api.current!.saved(
+        new Map([
+          [0, 0],
+          [1, 1],
+          [2, 2],
+        ]),
+      )
+      await flush()
+    })
+    // the other host comments on page 2 before the prepare receipt lands
+    bridge.comments.push(comment({ id: 'c2', anchor: makePdfAnchor(2, RECT) }))
+    await act(async () => {
+      bridge.receipt('ver-1')
+      await flush()
+    })
+    // the desktop deletes page 1 and saves: the anchored page 2 becomes page 1
+    await act(async () => {
+      api.current!.saved(
+        new Map([
+          [1, 0],
+          [2, 1],
+        ]),
+      )
+      bridge.receipt('ver-2')
+      await flush()
+    })
+    expect(bridge.anchors.mock.calls.map(([call]) => [call.versionId, call.anchors])).toEqual([
+      ['ver-1', [{ commentId: 'c2', anchor: makePdfAnchor(2, RECT), state: 'exact' }]],
+      ['ver-2', [{ commentId: 'c2', anchor: makePdfAnchor(1, RECT), state: 'exact' }]],
+    ])
+  })
+})
+
 describe('reveal (G8-15)', () => {
   it('comments.reveal opens the panel and moves the viewer to the right page and rect', async () => {
     const bridge = fakeBridge([comment({ id: 'c1', anchor: makePdfAnchor(3, RECT) })])
@@ -322,6 +393,80 @@ describe('reveal (G8-15)', () => {
       await flush()
     })
     expect(onRevealRequest).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a lost comment and its older version (UNI-2033)', () => {
+  const VIEW = 'View in version 2'
+  const viewButtons = () =>
+    [...el.querySelectorAll<HTMLButtonElement>('button')].filter((b) => b.textContent === VIEW)
+
+  it('offers "View in version N" and asks the shell once, with the path, id and N', async () => {
+    const bridge = fakeBridge([
+      comment({
+        id: 'c1',
+        anchor_state: 'lost',
+        anchor_version_id: 'ver-0',
+        anchor_version_no: 2,
+      }),
+    ])
+    await mount(bridge)
+    expect(viewButtons()).toHaveLength(1)
+    await act(async () => {
+      viewButtons()[0]!.click()
+      await flush()
+    })
+    expect(bridge.openVersion).toHaveBeenCalledTimes(1)
+    expect(bridge.openVersion).toHaveBeenCalledWith({ path: PATH, commentId: 'c1', versionNo: 2 })
+    expect(el.textContent).not.toContain(collabStrings('en').collabVersionViewUnavailable)
+  })
+
+  it('shows the unavailable line when the shell could not open it', async () => {
+    const bridge = fakeBridge([
+      comment({
+        id: 'c1',
+        anchor_state: 'lost',
+        anchor_version_id: 'ver-0',
+        anchor_version_no: 2,
+      }),
+    ])
+    ;(bridge.openVersion as ReturnType<typeof vi.fn>).mockImplementation(() =>
+      Promise.resolve({ opened: false }),
+    )
+    await mount(bridge)
+    await act(async () => {
+      viewButtons()[0]!.click()
+      await flush()
+    })
+    expect(el.textContent).toContain(collabStrings('en').collabVersionViewUnavailable)
+  })
+
+  it('no action without a version number', async () => {
+    const bridge = fakeBridge([
+      comment({ id: 'c1', anchor_state: 'lost', anchor_version_id: 'ver-0' }),
+    ])
+    await mount(bridge)
+    expect(el.textContent).not.toContain('View in version')
+  })
+
+  it('in the version it was last anchored on, a lost thread reveals at its page and rect', async () => {
+    // the context's open version is ver-1
+    const bridge = fakeBridge([
+      comment({
+        id: 'c1',
+        anchor: makePdfAnchor(3, RECT),
+        anchor_state: 'lost',
+        anchor_version_id: 'ver-1',
+        anchor_version_no: 1,
+      }),
+    ])
+    const { goTo } = await mount(bridge)
+    await act(async () => {
+      bridge.reveal({ path: PATH, commentId: 'c1' })
+      await flush()
+    })
+    expect(goTo).toHaveBeenCalledWith(2, RECT)
+    expect(el.textContent).not.toContain('View in version')
   })
 })
 
@@ -457,8 +602,8 @@ describe('anchor_version_invalid keeps the anchors stale and retries on the next
       await flush()
     })
     expect(bridge.anchors).toHaveBeenCalledTimes(1)
-    // nothing changed on the server: no reload
-    expect((bridge.list as ReturnType<typeof vi.fn>).mock.calls.length).toBe(listCalls)
+    // nothing changed on the server: no reload after the PUT; the one list is the receipt's own refresh (G819-A02b)
+    expect((bridge.list as ReturnType<typeof vi.fn>).mock.calls.length).toBe(listCalls + 1)
     await act(async () => {
       api.current!.saved(new Map([[0, 0]])) // the next Save keeps page 1 (old page 2)
       bridge.receipt('ver-3')

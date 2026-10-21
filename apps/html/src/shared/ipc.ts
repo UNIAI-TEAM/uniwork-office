@@ -18,6 +18,7 @@ export const HTML_CHANNELS = {
   readFile: 'html:read-file',
   save: 'html:save',
   uniworkState: 'html:uniwork-state',
+  uniworkReadOnlySave: 'html:uniwork-read-only-save',
   saveRequest: 'html:save-request',
   saveRequestAck: 'html:save-request-ack',
   readTextRequest: 'html:read-text-request',
@@ -102,6 +103,11 @@ export type SaveMode = 'save' | 'saveAs'
 export interface UniworkViewState {
   bound: boolean
   readOnly: boolean
+  /**
+   * The shell locked this copy (revoked, deleted, or a source view): nothing is saved, exported
+   * or printed from it. With readOnly it also means the preview must not run the page's scripts.
+   */
+  locked?: boolean
 }
 
 export interface SaveHtmlRequest {
@@ -252,6 +258,10 @@ export interface HtmlApi {
   save(request: SaveHtmlRequest): Promise<SaveHtmlResult>
   /** Whether this view's document is a UniWork copy (AutoSave off) and whether it is view only; absent where the renderer runs without the desktop shell (browser harness), then a plain local file */
   uniworkState?(): Promise<UniworkViewState>
+  /** EL-1(b) fix6: pushed (`{ path }`) when `isReadOnly(path)` or `isBound(path)` may have changed */
+  onUniworkStateChanged?(cb: (path: string) => void): () => void
+  /** EL-1(b) fix6: explicit Save on a read-only bound HTML document asks main to explain */
+  uniworkReadOnlySave?(path?: string): Promise<void>
   /** Mirror unsaved-changes state to the main process; drives the save prompt before closing a tab/window */
   setDirty(dirty: boolean): void
   /** Shell menu Save / Save As → renderer serializes and calls save() with the given mode */

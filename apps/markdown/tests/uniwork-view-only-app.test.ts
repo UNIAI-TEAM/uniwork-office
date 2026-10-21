@@ -1,8 +1,11 @@
 /**
- * The real renderer App on a UniWork copy: a view-only document has no editable
- * properties, and the renderer leaves the decision about a save to main.
+ * EL-1(b) fix6 / VEL-1+VEL-2: the real markdown renderer App on a UniWork copy.
+ * Follows the shell's `uniwork:doc-state-changed` ping (re-queries
+ * uniworkState and flips read-only -> editable -> read-only), and on Ctrl+S or
+ * File > Save while read-only AND bound calls `uniworkReadOnlySave` instead of
+ * writing. Save As, autosave and unbound read-only files keep today's path.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from '../src/renderer/App'
@@ -13,36 +16,58 @@ vi.mock('../src/renderer/ai/AiPanel', () => ({
 }))
 
 const PATH = 'C:/u/uniwork-documents/dep/user/doc1/notes.md'
+const OTHER = 'C:/u/uniwork-documents/dep/user/doc2/other.md'
 const RAW = '---\ntitle: Quarterly\n---\n\nHello world\n'
 
 interface Harness {
   container: HTMLElement
-  api: Record<string, ReturnType<typeof vi.fn>>
+  api: Record<string, Mock>
+  setAnswer: (next: { bound: boolean; readOnly: boolean }) => void
+  ping: (p: string) => Promise<void>
   saveRequest: () => (mode: string) => void
+  unsubscribes: () => number
   unmount: () => void
 }
 
 /** how the browser harness may differ from the desktop preload */
 type StateApi = { bound: boolean; readOnly: boolean } | 'missing' | 'rejects'
 
+async function settle(): Promise<void> {
+  for (let i = 0; i < 8; i++) {
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+  }
+}
+
 async function mount(
-  uniwork: StateApi,
+  initial: StateApi,
   saveResult: unknown = { ok: true, canceled: true },
 ): Promise<Harness> {
+  let current = initial
+  let unsubscribes = 0
   const handlers: Record<string, (...args: never[]) => void> = {}
-  const stubs: Record<string, ReturnType<typeof vi.fn>> = {
+  const stubs: Record<string, Mock> = {
     consumePending: vi.fn(async () => PATH),
     readFile: vi.fn(async () => RAW),
     uniworkState: vi.fn(async () => {
-      if (uniwork === 'rejects') throw new Error('no handler')
-      return uniwork as { bound: boolean; readOnly: boolean }
+      if (current === 'rejects') throw new Error('no handler')
+      return current as { bound: boolean; readOnly: boolean }
     }),
+    onUniworkStateChanged: vi.fn((cb: (path: string) => void) => {
+      handlers.onUniworkStateChanged = cb as never
+      return () => {
+        unsubscribes += 1
+      }
+    }),
+    uniworkReadOnlySave: vi.fn(async () => undefined),
     save: vi.fn(async () => saveResult),
   }
   const api = new Proxy(stubs, {
     get(target, prop: string) {
       // the browser harness mocks the API without the method
-      if (prop === 'uniworkState' && uniwork === 'missing') return undefined
+      if (prop === 'uniworkState' && current === 'missing') return undefined
       // web-frame-only members (capabilities, draft recovery, text provider) are absent on the desktop preload
       if (prop === 'capabilities' || prop === 'consumeRecovered' || prop === 'provideText')
         return undefined
@@ -59,19 +84,27 @@ async function mount(
     },
   })
   vi.stubGlobal('markdownApi', api)
-  ;(window as unknown as { markdownApi: unknown }).markdownApi = api
+  Object.assign(window, { markdownApi: api })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   await act(async () => {
     root.render(createElement(LocaleProvider, { initial: 'en' }, createElement(App)))
   })
-  // let the open sequence (pending path, file read, state query) settle
-  for (let i = 0; i < 20; i++) await act(async () => await new Promise((r) => setTimeout(r, 10)))
+  await settle()
   return {
     container,
     api: stubs,
+    setAnswer: (next) => {
+      current = next
+    },
+    ping: async (p) => {
+      const cb = handlers.onUniworkStateChanged as ((path: string) => void) | undefined
+      cb?.(p)
+      await settle()
+    },
     saveRequest: () => handlers.onSaveRequest as never,
+    unsubscribes: () => unsubscribes,
     unmount: () => {
       act(() => root.unmount())
       container.remove()
@@ -144,13 +177,76 @@ describe('markdown App on a UniWork copy', () => {
     },
   )
 
-  it('hands every save request to main, even for a view-only copy', async () => {
+  it('explains on Ctrl+S and File > Save instead of saving while read-only and bound; Save As still saves', async () => {
     const h = await mount({ bound: true, readOnly: true })
     open.push(h)
     await act(async () => {
-      h.saveRequest()('save')
-      await new Promise((r) => setTimeout(r, 20))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true }))
     })
+    await settle()
+    expect(h.api.uniworkReadOnlySave).toHaveBeenCalledTimes(1)
+    expect(h.api.save).not.toHaveBeenCalled()
+
+    h.saveRequest()('save')
+    await settle()
+    expect(h.api.uniworkReadOnlySave).toHaveBeenCalledTimes(2)
+    expect(h.api.save).not.toHaveBeenCalled()
+
+    h.saveRequest()('saveAs')
+    await settle()
+    expect(h.api.save).toHaveBeenCalledTimes(1)
+    expect(h.api.uniworkReadOnlySave).toHaveBeenCalledTimes(2)
+  })
+
+  it('flips read-only -> editable -> read-only on the lock ping and gates Save / explain accordingly', async () => {
+    const h = await mount({ bound: true, readOnly: true })
+    open.push(h)
+    const fm = () => h.container.querySelector<HTMLTextAreaElement>('.fm-textarea')!
+    expect(fm().readOnly).toBe(true)
+    expect(h.api.uniworkState).toHaveBeenCalledTimes(1)
+
+    // Ping for another path is ignored
+    h.setAnswer({ bound: true, readOnly: false })
+    await h.ping(OTHER)
+    expect(h.api.uniworkState).toHaveBeenCalledTimes(1)
+    expect(fm().readOnly).toBe(true)
+
+    // Ping for this path flips to editable -> properties editable, Ctrl+S saves
+    await h.ping(PATH)
+    expect(h.api.uniworkState).toHaveBeenCalledTimes(2)
+    expect(fm().readOnly).toBe(false)
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true }))
+    })
+    await settle()
+    expect(h.api.save).toHaveBeenCalledTimes(1)
+    expect(h.api.uniworkReadOnlySave).not.toHaveBeenCalled()
+
+    // Ping flips back to read-only (lock lost) -> properties read-only, Ctrl+S explains
+    h.setAnswer({ bound: true, readOnly: true })
+    await h.ping(PATH)
+    expect(h.api.uniworkState).toHaveBeenCalledTimes(3)
+    expect(fm().readOnly).toBe(true)
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true }))
+    })
+    await settle()
+    expect(h.api.uniworkReadOnlySave).toHaveBeenCalledTimes(1)
+    expect(h.api.save).toHaveBeenCalledTimes(1)
+
+    h.unmount()
+    open.pop()
+    expect(h.unsubscribes()).toBe(1)
+  })
+
+  it('unbound read-only file keeps today’s behaviour (does not call uniworkReadOnlySave)', async () => {
+    const h = await mount({ bound: false, readOnly: true })
+    open.push(h)
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true }))
+    })
+    await settle()
+    expect(h.api.uniworkReadOnlySave).not.toHaveBeenCalled()
     expect(h.api.save).toHaveBeenCalledTimes(1)
   })
 
@@ -162,29 +258,29 @@ describe('markdown App on a UniWork copy', () => {
     async (bound, expected) => {
       const h = await mount({ bound, readOnly: false }, { ok: true, path: PATH })
       open.push(h)
-      await act(async () => {
-        h.saveRequest()('save')
-        await new Promise((r) => setTimeout(r, 20))
-      })
+      h.saveRequest()('save')
+      await settle()
       expect(h.api.save).toHaveBeenCalledTimes(1)
       const text = h.container.querySelector('.status-save')?.textContent ?? null
       expect(text).toBe(expected)
     },
   )
 
-  it('Ctrl+S on a UniWork copy is a plain Save (no dialog); only Ctrl+Shift+S is Save As', async () => {
+  it('Ctrl+S on a UniWork copy is a plain Save (no dialog); only F12 is Save As', async () => {
     const h = await mount({ bound: true, readOnly: false }, { ok: true, path: PATH })
     open.push(h)
-    const press = async (shiftKey: boolean) =>
-      act(async () => {
-        window.dispatchEvent(
-          new KeyboardEvent('keydown', { key: shiftKey ? 'S' : 's', ctrlKey: true, shiftKey }),
-        )
-        await new Promise((r) => setTimeout(r, 20))
+    const press = async (init: KeyboardEventInit) => {
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', init))
       })
-    await press(false)
+      await settle()
+    }
+    await press({ key: 's', ctrlKey: true })
     expect(h.api.save.mock.calls.at(-1)?.[0]).toMatchObject({ mode: 'save' })
-    await press(true)
+    // Ctrl+Shift+S is Strikethrough now (the editor's); Save As is F12
+    await press({ key: 'S', ctrlKey: true, shiftKey: true })
+    expect(h.api.save).toHaveBeenCalledTimes(1)
+    await press({ key: 'F12', code: 'F12' })
     expect(h.api.save.mock.calls.at(-1)?.[0]).toMatchObject({ mode: 'saveAs' })
   })
 })

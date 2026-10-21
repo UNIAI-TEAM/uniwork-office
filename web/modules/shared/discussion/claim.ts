@@ -24,7 +24,9 @@ export const FRAME_COMMENTS: Readonly<Record<OfficeModule, boolean>> = Object.fr
  * the `ready` capability entries of the switch: `comments` only when on. G8-18: the frame also claims
  * `commentsShareView` with it (it serves the pre-send dialog and the post-send notice); the effective
  * capability stays frame AND host grant, and the host grants it only to a caller who may share.
+ * UNI-2033: the same for `commentsViewVersion` (the "view that version" action on a lost anchor); the
+ * host never grants it inside a version view.
  */
 export function frameCommentsClaim(on: boolean): Capabilities {
-  return on ? { comments: true, commentsShareView: true } : {}
+  return on ? { comments: true, commentsShareView: true, commentsViewVersion: true } : {}
 }

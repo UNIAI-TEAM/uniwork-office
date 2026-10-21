@@ -26,6 +26,8 @@ export const id = {
   appScLineBreak: 'Hentian Baris',
   appScNbsp: 'Spasi Tak Terpisah',
   appScNbHyphen: 'Tanda Hubung Tak Terpisah',
+  appScFindNext: 'Cari Berikutnya',
+  appScOptHyphen: 'Tanda Hubung Opsional',
   appScGrowFont1: 'Perbesar Font 1 pt',
   appScShrinkFont1: 'Perkecil Font 1 pt',
   appScListDemote: 'Turunkan Level Daftar',
@@ -213,7 +215,7 @@ export const id = {
   appEndnotePlaceholder: 'Teks catatan akhir…',
   appAutoSave: 'Simpan Otomatis',
   appAutoSaveTip: 'Simpan otomatis (setiap 30 detik dan saat jendela kehilangan fokus)',
-  appSaveShortcutTip: 'Simpan (⌘S)',
+  appSaveShortcutTip: 'Simpan ({keys})',
   appUndo: 'Urungkan',
   appRedo: 'Ulangi',
   appStartOpening: 'Membuka…',
@@ -550,9 +552,13 @@ export const id = {
   appOnlyEncrypted: '"{name}" dilindungi kata sandi dan tidak dapat dibuka di sini.',
   appFileExportPdf: 'Ekspor sebagai PDF…',
   appFilePrint: 'Cetak…',
+  appPrintNoDocument: 'Buka dokumen untuk mencetaknya.',
   appPrintNoPrinter:
     'Tidak ada printer di komputer ini. Anda dapat menyimpan dokumen sebagai PDF sebagai gantinya.',
   appPrintFailedPdfHint:
     'Pencetakan gagal: {error}. Anda dapat menyimpan dokumen sebagai PDF sebagai gantinya.',
   appPrintSaveAsPdf: 'Simpan sebagai PDF…',
+  appFileSaveCopy: 'Simpan sebagai salinan…',
+  appCopySaved: 'Versi Anda disimpan sebagai dokumen baru: {title}.',
+  appCopySaveFailed: 'Tidak dapat membuat salinan. Perubahan Anda tetap aman; coba lagi.',
 } satisfies Record<keyof typeof zh, string>

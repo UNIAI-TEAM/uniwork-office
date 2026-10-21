@@ -11,11 +11,12 @@ export const pt = {
   usMyFolderPrivate: 'Privado, só você vê',
   usChange: 'Alterar',
   usSave: 'Salvar',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Fechar',
   usPickTitle: 'Escolher onde salvar',
   usBack: 'Voltar ao nome',
   usSearchFolders: 'Pesquisar pastas',
-  usSharedNote: 'Ao salvar numa pasta compartilhada, o documento recebe as permissões dessa pasta.',
   usChooseFolder: 'Escolher “{folder}”',
   usSelected: 'Selecionado',
   usRootBlocked: 'Escolha uma pasta',
@@ -31,4 +32,8 @@ export const pt = {
   usErrAlreadyBound: 'Esta aba já está vinculada a um documento do UniWork. Salve como de costume.',
   usErrNotFound:
     'O arquivo a salvar ou a pasta escolhida não foi encontrado. Escolha onde salvar de novo e tente outra vez.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

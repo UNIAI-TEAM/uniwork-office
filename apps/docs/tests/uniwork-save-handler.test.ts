@@ -2,15 +2,25 @@
  * The real docs:save / docs:save-as handlers on a UniWork working copy
  * (electron mocked): which writes land and which report a user save.
  */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 type IpcHandler = (event: unknown, ...args: unknown[]) => unknown
-const { handlers, showSaveDialog } = vi.hoisted(() => ({
+const { handlers, showSaveDialog, userData, writeHooks } = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
   showSaveDialog: vi.fn(),
+  userData: { dir: '' },
+  writeHooks: { duringWrite: null as null | (() => void) },
 }))
 
 interface FakeWebContents {
@@ -24,9 +34,21 @@ interface FakeWebContents {
 
 vi.mock('@genoffice/ai-search', () => ({}))
 
+// A86 (UNI-1362): the docs crash-recovery write lands through the shared
+// atomic writer, so the test can run the shell's sweep while that write is in
+// flight (the stale-recovery race the docs handler guards).
+vi.mock('@genoffice/electron-utils/atomic-write', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  atomicWriteFile: async (path: string, bytes: Buffer | Uint8Array) => {
+    writeHooks.duringWrite?.()
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, bytes)
+  },
+}))
+
 vi.mock('electron', () => ({
   app: {
-    getPath: vi.fn(() => tmpdir()),
+    getPath: vi.fn(() => userData.dir),
     on: vi.fn(),
     quit: vi.fn(),
     whenReady: vi.fn(() => new Promise(() => {})),
@@ -69,8 +91,11 @@ vi.mock('electron', () => ({
   WebContentsView: class {},
 }))
 
+import { dialog } from 'electron'
 import {
   authorizeMcpDocWrite,
+  clearRecoveryCopy,
+  forgetDocsDiskState,
   registerDocsIpc,
   setDocsUserSaveHook,
   setUniworkDocumentPolicy,
@@ -110,6 +135,8 @@ function openDoc(name = 'report.docx'): { path: string; wc: FakeWebContents } {
 describe('docs real handlers on a UniWork copy', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'docs-uniwork-'))
+    userData.dir = dir
+    writeHooks.duringWrite = null
     registerDocsIpc()
     hook.mockReset()
     bound.clear()
@@ -138,6 +165,37 @@ describe('docs real handlers on a UniWork copy', () => {
     expect((await call('docs:save', wc, path, bytes('two'), true)).ok).toBe(false)
     expect(readFileSync(path, 'utf8')).toBe('one')
     expect(hook).toHaveBeenCalledTimes(1)
+  })
+
+  it('UWNM-BE-R4-1: a Save onto a file the shell rewrote is not asked as a change by another program once docs forgot its state', async () => {
+    const prompt = vi.mocked(dialog.showMessageBox)
+    prompt.mockReset()
+    // the person's Cancel on "changed by another program": nothing is written
+    prompt.mockResolvedValue({ response: 1, checkboxChecked: false } as never)
+    const { path, wc } = openDoc()
+    bound.add(path)
+    expect((await call('docs:save', wc, path, bytes('the person'))).ok).toBe(true)
+    // the shell puts other bytes on disk behind docs' back (a reload's undo)
+    writeFileSync(path, 'the restored base')
+    expect(await call('docs:save', wc, path, bytes('the person'))).toMatchObject({
+      ok: false,
+      reason: 'external-modified',
+    })
+    expect(readFileSync(path, 'utf8')).toBe('the restored base')
+    expect(hook).toHaveBeenCalledTimes(1)
+
+    prompt.mockClear()
+    forgetDocsDiskState(path)
+    expect((await call('docs:save', wc, path, bytes('the person'))).ok).toBe(true)
+    expect(prompt).not.toHaveBeenCalled()
+    expect(readFileSync(path, 'utf8')).toBe('the person')
+    expect(hook).toHaveBeenCalledTimes(2)
+    // the write recorded its state again: another program's later edit is still caught
+    writeFileSync(path, 'another program wrote this')
+    expect((await call('docs:save', wc, path, bytes('the person'))).ok).toBe(false)
+    expect(prompt).toHaveBeenCalledTimes(1)
+    expect(readFileSync(path, 'utf8')).toBe('another program wrote this')
+    prompt.mockReset()
   })
 
   it('docs:save refuses a view-only copy', async () => {
@@ -200,6 +258,27 @@ describe('docs real handlers on a UniWork copy', () => {
     readOnly.add(path)
     expect((await call('docs:save-to', wc, path, bytes('nope'), true)).ok).toBe(false)
     expect(readFileSync(path, 'utf8')).toBe('agent')
+  })
+
+  // A86 (UNI-1362): the docs half of the stale-recovery race, exercised through
+  // the real handler rather than the removed test-only epoch counter.
+  it('docs:write-recovery undoes a copy the shell swept while the write was in flight', async () => {
+    const { path, wc } = openDoc()
+    // the sweep runs while the recovery write is mid-flight
+    writeHooks.duringWrite = () => clearRecoveryCopy(path)
+    expect(await call('docs:write-recovery', wc, path, bytes('dirty'))).toEqual({ ok: false })
+    expect(existsSync(join(dir, 'docs-autosave'))).toBe(true)
+    expect(readdirSync(join(dir, 'docs-autosave'))).toEqual([])
+  })
+
+  it('docs:write-recovery keeps a copy nothing raced, and refuses an unauthorized sender', async () => {
+    const { path, wc } = openDoc()
+    expect(await call('docs:write-recovery', wc, path, bytes('dirty'))).toEqual({ ok: true })
+    expect(readdirSync(join(dir, 'docs-autosave'))).toHaveLength(1)
+    // a renderer that never opened the document writes no recovery copy
+    const stranger = fakeWc()
+    expect(await call('docs:write-recovery', stranger, path, bytes('other'))).toEqual({ ok: false })
+    expect(readdirSync(join(dir, 'docs-autosave'))).toHaveLength(1)
   })
 })
 

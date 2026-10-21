@@ -1,8 +1,11 @@
 import type {
   UniworkDocFormat,
+  UniworkDocShelveResult,
   UniworkDocSummary,
   UniworkEntryKind,
   UniworkFolderNode,
+  UniworkSourceFile,
+  UniworkSourceListPage,
   UniworkSystemKind,
 } from '../../shared/home-api'
 import { UniworkDocError } from './errors'
@@ -25,6 +28,8 @@ export interface DocumentDetail {
   myLevel: string | null
   /** `archived_at`: present while the document sits in the trash */
   archivedAt: string | null
+  /** UNI-1961: `shelved_at`: present while the document sits in Archive (Lưu trữ) */
+  shelvedAt?: string
   /** G5-12: the folder or page holding the document; null = at the root, absent = not sent */
   parentId?: string | null
   file: {
@@ -210,6 +215,39 @@ function rowMyLevelOf(value: unknown): UniworkDocSummary['myLevel'] {
     : undefined
 }
 
+/** a non-negative whole share count, or null */
+function shareCountOf(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
+}
+
+/**
+ * UNI-1958 row 1: list-row `share_scope`. Lenient like `visibilityOf`: a
+ * missing, null, partial or mistyped block (or a negative / fractional count)
+ * is absent, never an error, and the row is kept.
+ */
+function shareScopeOf(value: unknown): UniworkDocSummary['shareScope'] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const scope = value as Record<string, unknown>
+  const users = shareCountOf(scope.users)
+  const workspaces = shareCountOf(scope.workspaces)
+  if (
+    users === null ||
+    workspaces === null ||
+    typeof scope.home_workspace !== 'boolean' ||
+    typeof scope.organization !== 'boolean' ||
+    typeof scope.public_link !== 'boolean'
+  ) {
+    return undefined
+  }
+  return {
+    homeWorkspace: scope.home_workspace,
+    users,
+    workspaces,
+    organization: scope.organization,
+    publicLink: scope.public_link,
+  }
+}
+
 /** one list row as the renderer's summary (title is the only name the server sends) */
 function summaryRow(
   row: Record<string, unknown>,
@@ -220,6 +258,7 @@ function summaryRow(
   const path = pathOf(row)
   const visibility = visibilityOf(row.visibility)
   const myLevel = rowMyLevelOf(row.my_level)
+  const shareScope = shareScopeOf(row.share_scope)
   const updatedById = optId(row.updated_by) ?? undefined
   return {
     id: str(row.id, 128),
@@ -233,11 +272,59 @@ function summaryRow(
     ...(updatedById ? { updatedById } : {}),
     ...(visibility ? { visibility } : {}),
     ...(myLevel ? { myLevel } : {}),
+    ...(shareScope ? { shareScope } : {}),
     ...summaryFlags(row),
     kind,
     parentId: parentIdOf(row.parent_id),
     ...(path ? { path } : {}),
     ...(systemKindOf(row.system_kind) ? { systemKind: 'my_folder' as const } : {}),
+    ...editLockOf(row.edit_lock),
+    ...shelvedFieldsOf(row),
+    ...doclistFieldsOf(row),
+    ...fileSizeOf(row, kind),
+    ...(row.origin === 'upload' || row.origin === 'created' ? { origin: row.origin } : {}),
+  }
+}
+
+/**
+ * UNI-1961: the web's Size column reads a file row's `size_bytes`; a page or
+ * folder, a zero, and a mistyped value show no size (never a guess).
+ */
+function fileSizeOf(
+  row: Record<string, unknown>,
+  kind: UniworkEntryKind,
+): { sizeBytes: number } | Record<string, never> {
+  const size = row.size_bytes
+  return kind === 'file' && typeof size === 'number' && Number.isSafeInteger(size) && size > 0
+    ? { sizeBytes: size }
+    : {}
+}
+
+/** EL-1(b): optional list-row `edit_lock` summary. Malformed objects are dropped, not the row. */
+function editLockOf(
+  raw: unknown,
+): { editLock: import('../../shared/home-api').UniworkDocEditLock } | Record<string, never> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const row = raw as Record<string, unknown>
+  const holderName =
+    typeof row.holder_name === 'string' && row.holder_name.trim() && row.holder_name.length <= 256
+      ? row.holder_name
+      : null
+  const since = typeof row.since === 'string' && row.since.length <= 64 ? row.since : null
+  const expiresAt =
+    typeof row.expires_at === 'string' && row.expires_at.length <= 64 ? row.expires_at : null
+  const offline =
+    typeof row.offline_hold_until === 'string' && row.offline_hold_until.length <= 64
+      ? row.offline_hold_until
+      : undefined
+  return {
+    editLock: {
+      holderName,
+      since,
+      expiresAt,
+      heldByMe: row.held_by_me === true,
+      ...(offline ? { offlineHoldUntil: offline } : {}),
+    },
   }
 }
 
@@ -307,6 +394,11 @@ export function parseDetail(raw: unknown): DocumentDetail {
     currentVersion: nonNegInt(doc.current_version),
     myLevel,
     archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
+    ...(typeof doc.shelved_at === 'string' &&
+    doc.shelved_at.length > 0 &&
+    doc.shelved_at.length <= 64
+      ? { shelvedAt: doc.shelved_at }
+      : {}),
     ...(typeof doc.parent_id === 'string' && doc.parent_id.length > 0 && doc.parent_id.length <= 128
       ? { parentId: doc.parent_id }
       : doc.parent_id === null
@@ -340,6 +432,8 @@ export interface DocumentRef {
   myLevel: string | null
   archivedAt: string | null
   format: UniworkDocFormat | null
+  /** the document's `visibility` when the server sent a known one (SD-D2 first-save share rule) */
+  visibility: UniworkDocSummary['visibility'] | null
 }
 
 export function parseDocumentRef(raw: unknown): DocumentRef {
@@ -359,6 +453,7 @@ export function parseDocumentRef(raw: unknown): DocumentRef {
     myLevel: typeof myLevel === 'string' ? myLevel : null,
     archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
     format: kind === 'folder' ? null : formatOf(doc, title),
+    visibility: visibilityOf(doc.visibility) ?? null,
   }
 }
 
@@ -377,6 +472,63 @@ export function parseDocumentList(raw: unknown, workspaceId: string): DocumentLi
     documents.push(summaryRow(row, workspaceId, kind))
   }
   return { documents, nextCursor: typeof next === 'string' && next ? next : null }
+}
+
+/**
+ * UNI-2047 B6: `POST /documents/{id}/favorite` answers `{favorite: {document_id, favorited_at, ...}}`
+ * (the live row, created or already there). It fails closed on a missing time and on an answer for
+ * another document, so a wrong body never reads as "starred".
+ */
+export function parseDocumentFavorite(raw: unknown, documentId: string): { favoritedAt: string } {
+  const favorite = record(record(raw).favorite)
+  if (favorite.document_id !== documentId) bad()
+  const favoritedAt = optTimestamp(favorite.favorited_at)
+  if (!favoritedAt) bad()
+  return { favoritedAt }
+}
+
+/**
+ * UNI-1961: `GET /workspaces/{ws}/documents/sources`, read the way the web reads
+ * it (D sources-schema.ts): the id, source, parent and name are required; every
+ * other field takes its default when absent or mistyped. A body that is not a
+ * list fails closed - an empty list would read as "no files".
+ */
+export function parseSourceList(raw: unknown): UniworkSourceListPage {
+  const body = record(raw)
+  if (!Array.isArray(body.items)) bad()
+  const next = body.next_cursor
+  if (next !== null && next !== undefined && typeof next !== 'string') bad()
+  const items = body.items.map(sourceFile)
+  return { items, nextCursor: typeof next === 'string' && next ? next : null }
+}
+
+function sourceFile(value: unknown): UniworkSourceFile {
+  const row = record(value)
+  const parent = record(row.parent)
+  const text = (field: unknown, max = 1024) =>
+    typeof field === 'string' && field.length <= max ? field : ''
+  const owner = isRecord(row.owner) ? row.owner : null
+  return {
+    id: str(row.id, 128),
+    source: str(row.source, 64),
+    parent: { kind: str(parent.kind, 64), id: str(parent.id, 128), title: text(parent.title) },
+    name: str(row.name),
+    mimeType: text(row.mime_type, 255),
+    extension: text(row.extension, 32),
+    sizeBytes:
+      typeof row.size_bytes === 'number' &&
+      Number.isSafeInteger(row.size_bytes) &&
+      row.size_bytes >= 0
+        ? row.size_bytes
+        : 0,
+    updatedAt: text(row.updated_at, 64),
+    owner:
+      owner && typeof owner.id === 'string' && owner.id && typeof owner.name === 'string'
+        ? { id: owner.id, name: owner.name }
+        : null,
+    canOpenInApp: row.can_open_in_app === true,
+    canSave: row.can_save === true,
+  }
 }
 
 export function parseUpload(raw: unknown): UploadReceipt {
@@ -633,8 +785,16 @@ export function parseProperties(raw: unknown): DocumentProperties {
   }
 }
 
-/** GET /workspaces/{ws}/documents/shared-with-me (a list page like `documents`) */
-export function parseSharedWithMe(raw: unknown, workspaceId: string): DocumentListResult {
+/**
+ * GET /workspaces/{ws}/documents/shared-with-me (a list page like `documents`).
+ * Files only unless `includePages` (UNI-1953: the Documents home lists a shared
+ * UniNote too).
+ */
+export function parseSharedWithMe(
+  raw: unknown,
+  workspaceId: string,
+  includePages = false,
+): DocumentListResult {
   const body = record(raw)
   if (!Array.isArray(body.documents)) bad()
   const next = body.next_cursor
@@ -642,7 +802,11 @@ export function parseSharedWithMe(raw: unknown, workspaceId: string): DocumentLi
   const documents: UniworkDocSummary[] = []
   for (const value of body.documents) {
     const row = record(value)
-    // "shared with me" is the library: files only, a folder is never shared
+    // "shared with me" is the library: files (and pages when asked), a folder is never shared
+    if (row.kind === 'page' && includePages) {
+      documents.push(summaryRow(row, workspaceId, 'page'))
+      continue
+    }
     if (row.kind !== 'file') continue
     documents.push(summaryRow(row, workspaceId, 'file'))
   }
@@ -773,4 +937,178 @@ export function parseRenamedTitle(raw: unknown): string | null {
   const doc = record(record(raw).document)
   const title = doc.title
   return typeof title === 'string' && title.length > 0 && title.length <= 512 ? title : null
+}
+
+/**
+ * UNI-1961 (ARCHIVE-01): the shelved pair and `admin_scope` a list row may
+ * carry. Lenient: an odd value drops the field, never the row (a null
+ * `shelved_by` is the system, so it stays absent too).
+ */
+function shelvedFieldsOf(
+  row: Record<string, unknown>,
+): Pick<UniworkDocSummary, 'shelvedAt' | 'shelvedById' | 'adminScope'> {
+  const at = row.shelved_at
+  const by = optId(row.shelved_by)
+  return {
+    ...(typeof at === 'string' && at.length > 0 && at.length <= 64 ? { shelvedAt: at } : {}),
+    ...(by ? { shelvedById: by } : {}),
+    ...(row.admin_scope === true ? { adminScope: true } : {}),
+  }
+}
+
+/** a short non-empty string, or null (the lenient twin of `str`) */
+function optText(value: unknown, max: number): string | null {
+  return typeof value === 'string' && value.length > 0 && value.length <= max ? value : null
+}
+
+/**
+ * UNI-2047: `updated_by_user.avatar_url` loads with no auth header from the
+ * renderer, so only an absolute http(s) URL is kept; anything else is dropped.
+ */
+function avatarUrlOf(value: unknown): string | null {
+  const text = optText(value, 2048)
+  if (!text) return null
+  try {
+    const url = new URL(text)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? text : null
+  } catch {
+    return null
+  }
+}
+
+/** `updated_by_user{name, avatar_url}`; null (outside the org / not a person) or an odd block is absent */
+function updatedByUserOf(value: unknown): UniworkDocSummary['updatedByUser'] {
+  if (!isRecord(value)) return undefined
+  const name = optText(value.name, 256)
+  if (!name) return undefined
+  const avatarUrl = avatarUrlOf(value.avatar_url)
+  return { name, ...(avatarUrl ? { avatarUrl } : {}) }
+}
+
+/** `last_activity{kind, at}` of a recent row */
+function lastActivityOf(value: unknown): UniworkDocSummary['lastActivity'] {
+  if (!isRecord(value)) return undefined
+  const kind = value.kind
+  const at = optTimestamp(value.at)
+  if ((kind !== 'opened' && kind !== 'edited' && kind !== 'commented') || !at) return undefined
+  return { kind, at }
+}
+
+/**
+ * `shared{by, by_kind, by_name, at}` of a shared-with-me row. `at` is the only
+ * member the block cannot do without; an odd `by`/`by_kind`/`by_name` (a null
+ * name is an outsider) drops just that member.
+ */
+function sharedOf(value: unknown): UniworkDocSummary['shared'] {
+  if (!isRecord(value)) return undefined
+  const at = optTimestamp(value.at)
+  if (!at) return undefined
+  const byId = optId(value.by)
+  const byKind = optText(value.by_kind, 32)
+  const byName = optText(value.by_name, 256)
+  return {
+    ...(byId ? { byId } : {}),
+    ...(byKind ? { byKind } : {}),
+    ...(byName ? { byName } : {}),
+    at,
+  }
+}
+
+/** `share_summary{people, workspaces, links, latest_at}`: the three counts or nothing */
+function shareSummaryOf(value: unknown): UniworkDocSummary['shareSummary'] {
+  if (!isRecord(value)) return undefined
+  const people = shareCountOf(value.people)
+  const workspaces = shareCountOf(value.workspaces)
+  const links = shareCountOf(value.links)
+  if (people === null || workspaces === null || links === null) return undefined
+  const latestAt = optTimestamp(value.latest_at)
+  return { people, workspaces, links, ...(latestAt ? { latestAt } : {}) }
+}
+
+/**
+ * UNI-2047: the optional doclist fields of a list row (trash pair, owner,
+ * last editor, recent activity, sharer, share summary, star time). Each is read
+ * on its own: an odd value leaves just that key absent, never the row.
+ */
+function doclistFieldsOf(
+  row: Record<string, unknown>,
+): Pick<
+  UniworkDocSummary,
+  | 'archivedAt'
+  | 'archivedById'
+  | 'purgeAfter'
+  | 'isOwner'
+  | 'updatedByUser'
+  | 'lastActivity'
+  | 'shared'
+  | 'shareSummary'
+  | 'favoritedAt'
+  | 'ownerKind'
+> {
+  const archivedAt = optTimestamp(row.archived_at)
+  const archivedById = optId(row.archived_by)
+  const purgeAfter = optTimestamp(row.purge_after)
+  const updatedByUser = updatedByUserOf(row.updated_by_user)
+  const lastActivity = lastActivityOf(row.last_activity)
+  const shared = sharedOf(row.shared)
+  const shareSummary = shareSummaryOf(row.share_summary)
+  const favoritedAt = optTimestamp(row.favorited_at)
+  const ownerKind = optId(row.owner_kind, 64)
+  return {
+    ...(archivedAt ? { archivedAt } : {}),
+    ...(archivedById ? { archivedById } : {}),
+    ...(purgeAfter ? { purgeAfter } : {}),
+    ...(typeof row.is_owner === 'boolean' ? { isOwner: row.is_owner } : {}),
+    ...(updatedByUser ? { updatedByUser } : {}),
+    ...(lastActivity ? { lastActivity } : {}),
+    ...(shared ? { shared } : {}),
+    ...(shareSummary ? { shareSummary } : {}),
+    ...(favoritedAt ? { favoritedAt } : {}),
+    ...(ownerKind ? { ownerKind } : {}),
+  }
+}
+
+/**
+ * UNI-1961: what the kind-agnostic manage gate needs from `GET /documents/{id}`
+ * - a folder or page has no `file` block, so `parseDetail` cannot serve it.
+ */
+export interface DocumentManageRef {
+  id: string
+  kind: UniworkEntryKind
+  myLevel: string | null
+  adminScope: boolean
+}
+
+export function parseDocumentManageRef(raw: unknown): DocumentManageRef {
+  const env = record(raw)
+  const doc = record(env.document)
+  const kind = kindOf(doc.kind)
+  if (!kind) bad()
+  const myLevel = doc.my_level ?? env.my_level
+  if (myLevel !== undefined && myLevel !== null && typeof myLevel !== 'string') bad()
+  return {
+    id: str(doc.id, 128),
+    kind,
+    myLevel: typeof myLevel === 'string' && myLevel.length > 0 ? myLevel : null,
+    adminScope: doc.admin_scope === true || env.admin_scope === true,
+  }
+}
+
+/**
+ * UNI-1961: the `{document, batch_id, affected}` answer of shelve/unshelve.
+ * The document fails closed like any summary; `affected` is lenient (an odd
+ * list reads as empty, an odd entry is dropped).
+ */
+export function parseDocumentShelveResult(raw: unknown): UniworkDocShelveResult {
+  const document = parseDocumentSummary(raw)
+  const affected = record(raw).affected
+  return {
+    document,
+    affected: Array.isArray(affected)
+      ? affected.filter(
+          (value): value is string =>
+            typeof value === 'string' && value.length > 0 && value.length <= 128,
+        )
+      : [],
+  }
 }

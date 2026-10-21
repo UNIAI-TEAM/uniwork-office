@@ -7,6 +7,7 @@
  */
 import { format } from '@genoffice/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AvatarFace } from './avatar-source'
 import { MENTION_DEBOUNCE_MS, MENTION_MAX_ROWS } from './mention-query'
 import { NoAccessBadge } from './NoAccessBadge'
 import type { CollabCandidate, CollabSource } from './types'
@@ -223,16 +224,17 @@ export function MentionPicker({
               {row.kind === 'candidate' ? (
                 <>
                   <span className="collab-mention-avatar" aria-hidden="true">
-                    {row.candidate.avatar_url ? (
-                      <img src={row.candidate.avatar_url} alt="" />
-                    ) : (
-                      initials(row.candidate.display_name)
-                    )}
+                    <AvatarFace
+                      url={row.candidate.avatar_url}
+                      initials={initials(row.candidate.display_name)}
+                    />
                   </span>
                   <span className="collab-mention-text">
                     <span className="collab-mention-name">{row.candidate.display_name}</span>
                     {row.candidate.email ? (
-                      <span className="collab-mention-email">{row.candidate.email}</span>
+                      <span className="collab-mention-email" title={row.candidate.email}>
+                        {row.candidate.email}
+                      </span>
                     ) : null}
                   </span>
                   {noAccess ? <NoAccessBadge label={noAccessBadge} /> : null}

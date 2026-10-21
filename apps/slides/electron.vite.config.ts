@@ -40,6 +40,7 @@ const workspaceAlias = {
   // Metafile (EMF/WMF) rasterizer shared with the docs engine (renderer-only: needs canvas)
   '@genoffice/docx-engine/metafile': resolve(here, '../../packages/docx-engine/src/metafile.ts'),
   '@genoffice/docx-engine/math': resolve(here, '../../packages/docx-engine/src/math.ts'),
+  '@genoffice/shortcuts': resolve(here, '../../packages/shortcuts/src/index.ts'),
 }
 
 export default defineConfig({

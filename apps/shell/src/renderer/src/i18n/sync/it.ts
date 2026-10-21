@@ -7,9 +7,10 @@ export const it = {
   uwChipPausedAdmin: 'Salvataggio in coda · invio in pausa',
   uwChipReconciling: 'Verifica dell’ultimo salvataggio…',
   uwChipReconcileStuck: 'Serve assistenza per confermare il salvataggio',
+  uwErrReconcileStuck: 'Serve assistenza per confermare il salvataggio.',
   uwChipRemoteNewer: 'Versione più recente su UniWork',
   uwTipQueued:
-    'Il salvataggio delle {time} è conservato al sicuro su questo computer e verrà inviato quando sarai online.',
+    'Il salvataggio delle {time} è conservato al sicuro su questo computer e verrà inviato non appena possibile.',
   uwTipQueuedNewer:
     'Il salvataggio delle {time} è in attesa di invio. Le modifiche successive non ne fanno parte.',
   uwTipPausedAdmin:
@@ -128,6 +129,8 @@ export const it = {
   uwSignOutWaiting: 'Completamento del salvataggio in corso prima di uscire…',
   uwSignOutCaptureFailed:
     'Alcune modifiche non salvate non sono state acquisite in tempo; la versione salvata o salvata automaticamente più recente viene conservata per il tuo account.',
+  uwSignOutTimedOut:
+    'Non è stato possibile confermare la disconnessione in tempo; l’account potrebbe essere ancora connesso. Riprova.',
   uwSwitchLostTitle: 'Alcune modifiche non salvate dell’account precedente sono andate perse',
   uwSwitchLostBody:
     'Un altro account ha effettuato l’accesso su questo computer, quindi l’account precedente è stato bloccato. Documenti le cui modifiche non salvate non è stato possibile conservare: {count}. Tutto il resto rimane bloccato su questo computer per quell’account.',
@@ -336,7 +339,7 @@ export const it = {
     'Hai annullato tutte le modifiche. La versione {n} su UniWork è più recente della copia aperta.',
   uwRemoteStopAiConfirm:
     'Interrompere l’esecuzione di UniWork AI per ricaricare? Le modifiche già fatte dall’IA appartengono alla copia aperta.',
-  uwRemoteWaitCommit: 'In attesa che termini il salvataggio in corso; poi potrai ricaricare.',
+  uwRemoteWaitCommit: 'In attesa che termini il salvataggio in corso; poi potrai continuare.',
   uwRemoteReload: 'Ricarica l’ultima versione…',
   uwRemoteLater: 'Più tardi',
   uwRemoteClose: 'Chiudi',

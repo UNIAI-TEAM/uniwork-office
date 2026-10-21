@@ -42,6 +42,12 @@ export default defineConfig({
       '@genoffice/electron-utils/uniwork-ai-flag': local(
         '../../packages/electron-utils/src/uniwork-ai-flag.ts',
       ),
+      '@genoffice/electron-utils/uniwork-cloud-status-bridge': local(
+        '../../packages/electron-utils/src/uniwork-cloud-status-bridge.ts',
+      ),
+      '@genoffice/electron-utils/uniwork-cloud-status': local(
+        '../../packages/electron-utils/src/uniwork-cloud-status.ts',
+      ),
       '@genoffice/electron-utils/draft-preview': local(
         '../../packages/electron-utils/src/draft-preview.ts',
       ),
@@ -63,11 +69,14 @@ export default defineConfig({
       '@genoffice/ai-provider/proxy-url': local('../../packages/ai-provider/src/proxy-url.ts'),
       '@genoffice/ai-provider': local('../../packages/ai-provider/src/index.ts'),
       '@genoffice/i18n': local('../../packages/i18n/src/index.ts'),
+      '@genoffice/shortcuts': local('../../packages/shortcuts/src/index.ts'),
       '@genoffice/ui/ai-uniwork-composer.css': local(
         '../../packages/ui/src/ai-uniwork-composer/ai-uniwork-composer.css',
       ),
       '@genoffice/ui/collab.css': local('../../packages/ui/src/collab/collab.css'),
       '@genoffice/ui/collab': local('../../packages/ui/src/collab/index.ts'),
+      // subpath before the bare name (string aliases are prefix replacements)
+      '@genoffice/ui/capabilities': local('../../packages/ui/src/capabilities.ts'),
       '@genoffice/ui': local('../../packages/ui/src/index.ts'),
     },
   },

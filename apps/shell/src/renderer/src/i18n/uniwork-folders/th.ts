@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const th = {
-  ufRoot: 'UniWork',
+  ufRoot: 'เอกสาร (ราก)',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'โฟลเดอร์',
   ufContentsLabel: 'เนื้อหาโฟลเดอร์',
@@ -26,6 +26,7 @@ export const th = {
   ufTooDeep: 'แผนผังเอกสารลึกได้สูงสุด {max} ระดับ',
   ufCycle: 'ไม่สามารถย้ายโฟลเดอร์ไปไว้ในตัวเองหรือโฟลเดอร์ย่อยของตัวเองได้',
   ufParentKind: 'โฟลเดอร์อยู่ได้เฉพาะที่ราก หรือในโฟลเดอร์อื่น',
+  ufNotShareable: 'ไม่สามารถแชร์โฟลเดอร์ได้ ให้แชร์เอกสารทีละฉบับแทน',
   ufFolderGone: 'โฟลเดอร์นี้ไม่อยู่ที่นี่แล้ว',
   ufFolderNoAccess: 'คุณไม่มีสิทธิ์เข้าถึงโฟลเดอร์นี้อีกต่อไป',
   ufNoPermission: 'คุณไม่มีสิทธิ์เปลี่ยนแปลงโฟลเดอร์นี้',

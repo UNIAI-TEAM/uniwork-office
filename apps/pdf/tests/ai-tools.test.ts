@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Op } from '../src/renderer/edit-ops'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { AGENT_TOOLS, executePdfTool, type PdfAiDeps } from '../src/renderer/ai/tools'
+import {
+  AGENT_TOOLS,
+  executePdfTool,
+  parseOptionalColor,
+  type PdfAiDeps,
+} from '../src/renderer/ai/tools'
 import type { SearchIndex } from '../src/renderer/search'
 import type { FormValueInput, PageImageRef } from '../src/shared/ipc'
 import {
@@ -412,13 +417,7 @@ describe('edit_text', () => {
     }
   })
 
-  it('rejects bad colors and read-only documents', async () => {
-    const badColor = await executePdfTool(
-      makeDeps(),
-      call('edit_text', { page: 1, old_text: 'Hello', new_text: 'Hi', color: 'red' }),
-    )
-    expect(badColor.isError).toBe(true)
-
+  it('rejects read-only documents', async () => {
     const ro = await executePdfTool(
       makeDeps({ readOnly: () => true }),
       call('edit_text', { page: 1, old_text: 'Hello', new_text: 'Hi' }),
@@ -1002,15 +1001,9 @@ describe('insert_text', () => {
     expect(deps.insertText).toHaveBeenCalledWith(expect.objectContaining({ rotate: 90 }))
   })
 
-  it('rejects empty text, bad colors, bad pages, and read-only documents', async () => {
+  it('rejects empty text, bad pages, and read-only documents', async () => {
     const empty = await executePdfTool(makeDeps(), call('insert_text', { page: 1, text: '  ' }))
     expect(empty.isError).toBe(true)
-
-    const badColor = await executePdfTool(
-      makeDeps(),
-      call('insert_text', { page: 1, text: 'Hi', color: 'red' }),
-    )
-    expect(badColor.isError).toBe(true)
 
     const badPage = await executePdfTool(makeDeps(), call('insert_text', { page: 9, text: 'Hi' }))
     expect(badPage.isError).toBe(true)
@@ -2112,7 +2105,7 @@ describe('annotations tools', () => {
     expect(result.output).toContain('Pn1')
   })
 
-  it('add_note forwards an optional pin color as rgb 0-1 and rejects bad hex', async () => {
+  it('add_note forwards an optional pin color as rgb 0-1 and ignores a bad one with a note', async () => {
     const deps = makeDeps()
     const ok = await executePdfTool(
       deps,
@@ -2124,9 +2117,9 @@ describe('annotations tools', () => {
       deps,
       call('add_note', { page: 1, text: 'Check', anchor_text: 'World', color: 'orange' }),
     )
-    expect(bad.isError).toBe(true)
-    expect(bad.output).toContain('#RRGGBB')
-    expect(deps.addNote).toHaveBeenCalledTimes(1)
+    expect(bad.isError).toBeUndefined()
+    expect(bad.output).toContain('color ignored: use #RRGGBB')
+    expect(deps.addNote).toHaveBeenLastCalledWith(0, [110, 712], 'Check', undefined)
   })
 
   it('add_note requires a position', async () => {
@@ -2417,8 +2410,6 @@ describe('set_watermark / set_header_footer', () => {
     })
     const bad = await executePdfTool(deps, call('set_watermark', { text: 'X', opacity: 2 }))
     expect(bad.isError).toBe(true)
-    const badColor = await executePdfTool(deps, call('set_watermark', { text: 'X', color: 'red' }))
-    expect(badColor.isError).toBe(true)
   })
 
   it('set_watermark with empty text removes only the watermark', async () => {
@@ -2529,11 +2520,6 @@ describe('inserted text lifecycle', () => {
     expect(nothing.isError).toBe(true)
     const empty = await executePdfTool(deps, call('edit_inserted_text', { id: 'dabc', text: ' ' }))
     expect(empty.isError).toBe(true)
-    const color = await executePdfTool(
-      deps,
-      call('edit_inserted_text', { id: 'dabc', color: 'red' }),
-    )
-    expect(color.isError).toBe(true)
     const align = await executePdfTool(
       deps,
       call('edit_inserted_text', { id: 'dabc', align: 'justify' }),
@@ -2638,6 +2624,40 @@ describe('file-level page operations', () => {
     expect(result.mutated).toBeUndefined()
     expect(result.output).toContain('declined')
     expect(deps.insertBlankPage).not.toHaveBeenCalled()
+  })
+
+  // UNI-1923 (B): a declined file-op card reaches nothing — not even the flush-save the op would
+  // run first. The flush lives inside the op dep (App.tsx runFileOp), so "no dep ran" IS "no save".
+  it('a declined file-op card fires no save path at all (nothing reaches UniWork)', async () => {
+    const deps = fourPages({ confirmFileOp: vi.fn(async () => false) })
+    const FILE_OP_DEPS: Array<keyof PdfAiDeps> = [
+      'insertBlankPage',
+      'setPageSize',
+      'cropPages',
+      'replacePages',
+      'extractPages',
+      'splitPdf',
+      'splitPages',
+      'mergePages',
+    ]
+    for (const c of [
+      call('insert_blank_page', { after_page: 2 }),
+      call('set_page_size', { preset: 'A4' }),
+      call('crop_pages', { pages: '1', left: 0.1, top: 0, right: 0.9, bottom: 1 }),
+      call('replace_pages', { pages: '1' }),
+      call('extract_pages', { pages: '1-2' }),
+      call('split_pdf', { pages_per_file: 2 }),
+      call('split_pages', { per_page: 2 }),
+      call('merge_pages', { per_sheet: 2, direction: 'horizontal' }),
+    ]) {
+      const result = await executePdfTool(deps, c)
+      expect(result.output, c.name).toContain('declined')
+      expect(result.mutated, c.name).toBeUndefined()
+    }
+    expect(deps.confirmFileOp).toHaveBeenCalled()
+    for (const key of FILE_OP_DEPS) {
+      expect(deps[key], key).not.toHaveBeenCalled()
+    }
   })
 
   it('stopping the run while the card is open reports the stop', async () => {
@@ -2845,5 +2865,252 @@ describe('file-level page operations', () => {
     const result = await executePdfTool(deps, call('split_pdf', { pages_per_file: 3 }))
     expect(result.isError).toBe(true)
     expect(result.output).toContain('boom')
+  })
+})
+
+describe('optional color parameter (UNI-1385)', () => {
+  const NOTE = 'color ignored: use #RRGGBB'
+
+  it.each([
+    ['empty string', '', {}],
+    ['null', null, {}],
+    ['undefined', undefined, {}],
+    ['whitespace', '  ', {}],
+    ['CSS name', 'black', { note: NOTE }],
+    ['5 digits', '#12345', { note: NOTE }],
+    ['7 digits', '#1234567', { note: NOTE }],
+    ['non-hex digits', '#12345g', { note: NOTE }],
+    ['number', 123456, { color: '#123456' }],
+    ['#RRGGBB', '#123456', { color: '#123456' }],
+    ['RRGGBB', '123456', { color: '#123456' }],
+    ['upper-case #RRGGBB', '#AABBCC', { color: '#aabbcc' }],
+    ['padded #RRGGBB', ' #123456 ', { color: '#123456' }],
+    ['#RGB', '#abc', { color: '#aabbcc' }],
+    ['upper-case #RGB', '#ABC', { color: '#aabbcc' }],
+    ['RGB', 'f80', { color: '#ff8800' }],
+  ])('parseOptionalColor: %s', (_label, raw, expected) => {
+    expect(parseOptionalColor(raw)).toEqual(expected)
+  })
+
+  describe('edit_text', () => {
+    const run = (color: unknown) => {
+      const deps = makeDeps()
+      return executePdfTool(
+        deps,
+        call('edit_text', { page: 1, old_text: 'Hello', new_text: 'Hi', color }),
+      ).then((result) => ({ deps, result }))
+    }
+
+    it('applies the text and keeps the colour when color is ""', async () => {
+      const { deps, result } = await run('')
+      expect(result.isError).toBeUndefined()
+      expect(result.mutated).toBe(true)
+      expect(result.output).not.toContain('color ignored')
+      expect(vi.mocked(deps.editText).mock.calls[0]![0].newColor).toBeUndefined()
+    })
+
+    it('applies the text, keeps the colour and notes it when color is "black"', async () => {
+      const { deps, result } = await run('black')
+      expect(result.isError).toBeUndefined()
+      expect(result.mutated).toBe(true)
+      expect(result.output).toContain('Replaced')
+      expect(result.output).toContain(NOTE)
+      expect(vi.mocked(deps.editText).mock.calls[0]![0].newColor).toBeUndefined()
+    })
+
+    it('still recolours on #FF0000', async () => {
+      const { deps, result } = await run('#FF0000')
+      expect(result.isError).toBeUndefined()
+      expect(result.output).not.toContain('color ignored')
+      expect(vi.mocked(deps.editText).mock.calls[0]![0].newColor).toEqual([255, 0, 0])
+    })
+  })
+
+  describe('insert_text', () => {
+    const run = (color: unknown) => {
+      const deps = makeDeps()
+      return executePdfTool(deps, call('insert_text', { page: 1, text: 'Hi', color })).then(
+        (result) => ({ deps, result }),
+      )
+    }
+
+    it('inserts black text with no note when color is ""', async () => {
+      const { deps, result } = await run('')
+      expect(result.isError).toBeUndefined()
+      expect(result.mutated).toBe(true)
+      expect(result.output).not.toContain('color ignored')
+      expect(vi.mocked(deps.insertText).mock.calls[0]![0].color).toEqual([0, 0, 0])
+    })
+
+    it('inserts black text and notes it when color is "black"', async () => {
+      const { deps, result } = await run('black')
+      expect(result.isError).toBeUndefined()
+      expect(result.mutated).toBe(true)
+      expect(result.output).toContain('Inserted')
+      expect(result.output).toContain(NOTE)
+      expect(vi.mocked(deps.insertText).mock.calls[0]![0].color).toEqual([0, 0, 0])
+    })
+
+    it('still colours the text on #FF0000', async () => {
+      const { deps, result } = await run('#FF0000')
+      expect(result.output).not.toContain('color ignored')
+      expect(vi.mocked(deps.insertText).mock.calls[0]![0].color).toEqual([255, 0, 0])
+    })
+  })
+
+  describe('the other tools never reject the call over the colour', () => {
+    it('edit_block keeps the colour on "" and "black" and notes only the latter', async () => {
+      for (const [color, noted] of [
+        ['', false],
+        ['black', true],
+      ] as const) {
+        const deps = makeDeps()
+        const result = await executePdfTool(
+          deps,
+          call('edit_block', { page: 1, paragraph_text: 'Hello', new_text: 'Hi', color }),
+        )
+        expect(result.isError).toBeUndefined()
+        expect(result.output.includes(NOTE)).toBe(noted)
+        expect(vi.mocked(deps.editText).mock.calls[0]![0].newColor).toBeUndefined()
+      }
+      const deps = makeDeps()
+      await executePdfTool(
+        deps,
+        call('edit_block', { page: 1, paragraph_text: 'Hello', new_text: 'Hi', color: '#00ff00' }),
+      )
+      expect(vi.mocked(deps.editText).mock.calls[0]![0].newColor).toEqual([0, 255, 0])
+    })
+
+    it('edit_inserted_text keeps the colour on "" and "black" and notes only the latter', async () => {
+      for (const [color, noted] of [
+        ['', false],
+        ['black', true],
+      ] as const) {
+        const deps = makeDeps({
+          textInserts: () => [
+            {
+              id: 'dabc',
+              input: {
+                pageIndex: 1,
+                origin: [100, 700],
+                text: 'Hello',
+                fontSize: 14,
+                color: [9, 9, 9],
+              },
+            },
+          ],
+        })
+        const result = await executePdfTool(
+          deps,
+          call('edit_inserted_text', { id: 'dabc', text: 'Bye', color }),
+        )
+        expect(result.isError).toBeUndefined()
+        expect(result.mutated).toBe(true)
+        expect(result.output.includes(NOTE)).toBe(noted)
+        expect(vi.mocked(deps.updateTextInsert).mock.calls[0]![1]).not.toHaveProperty('color')
+      }
+    })
+
+    it('edit_inserted_text with only an unusable colour still errors, with the note', async () => {
+      const PLAIN = 'Pass at least one of text, font_size, color, align'
+      const mk = () =>
+        makeDeps({
+          textInserts: () => [
+            {
+              id: 'dabc',
+              input: {
+                pageIndex: 1,
+                origin: [100, 700],
+                text: 'Hello',
+                fontSize: 14,
+                color: [9, 9, 9],
+              },
+            },
+          ],
+        })
+      const noted = await executePdfTool(
+        mk(),
+        call('edit_inserted_text', { id: 'dabc', color: 'black' }),
+      )
+      expect(noted.isError).toBe(true)
+      expect(noted.output).toContain(PLAIN)
+      expect(noted.output).toContain('color ignored: use #RRGGBB')
+      const empty = await executePdfTool(
+        mk(),
+        call('edit_inserted_text', { id: 'dabc', color: '' }),
+      )
+      expect(empty.isError).toBe(true)
+      expect(empty.output).toBe(PLAIN)
+    })
+
+    it('markup_text leaves the colour to the app on "" and "black" and notes only the latter', async () => {
+      for (const [color, noted] of [
+        ['', false],
+        ['black', true],
+      ] as const) {
+        const deps = makeDeps()
+        const result = await executePdfTool(
+          deps,
+          call('markup_text', { page: 1, text: 'Hello', type: 'highlight', color }),
+        )
+        expect(result.isError).toBeUndefined()
+        expect(result.output.includes(NOTE)).toBe(noted)
+        expect(deps.addMarkup).toHaveBeenCalledWith('highlight', 0, expect.anything(), undefined)
+      }
+    })
+
+    it('add_note leaves the colour to the app on "" and "black" and notes only the latter', async () => {
+      for (const [color, noted] of [
+        ['', false],
+        ['black', true],
+      ] as const) {
+        const deps = makeDeps()
+        const result = await executePdfTool(
+          deps,
+          call('add_note', { page: 1, text: 'Check', anchor_text: 'World', color }),
+        )
+        expect(result.isError).toBeUndefined()
+        expect(result.output.includes(NOTE)).toBe(noted)
+        expect(deps.addNote).toHaveBeenCalledWith(0, [110, 712], 'Check', undefined)
+      }
+    })
+
+    it('set_watermark keeps the session colour on "" and "black" and notes only the latter', async () => {
+      const wm = { text: 'OLD', angle: 35, opacity: 0.18, color: '#d0342c', sizeRatio: 0.11 }
+      for (const [color, noted] of [
+        ['', false],
+        ['black', true],
+      ] as const) {
+        const deps = makeDeps({ stamps: () => ({ wm, hf: null }) })
+        const result = await executePdfTool(deps, call('set_watermark', { text: 'DRAFT', color }))
+        expect(result.isError).toBeUndefined()
+        expect(result.mutated).toBe(true)
+        expect(result.output.includes(NOTE)).toBe(noted)
+        expect(deps.setStamps).toHaveBeenCalledWith({
+          wm: expect.objectContaining({ text: 'DRAFT', color: '#d0342c' }),
+          hf: null,
+        })
+      }
+    })
+
+    it('set_header_footer keeps the default colour on "" and "black" and notes only the latter', async () => {
+      const plain = makeDeps()
+      await executePdfTool(plain, call('set_header_footer', { header_left: 'ACME' }))
+      const defaultColor = vi.mocked(plain.setStamps).mock.calls[0]![0]!.hf!.color
+      for (const [color, noted] of [
+        ['', false],
+        ['black', true],
+      ] as const) {
+        const deps = makeDeps()
+        const result = await executePdfTool(
+          deps,
+          call('set_header_footer', { header_left: 'ACME', color }),
+        )
+        expect(result.isError).toBeUndefined()
+        expect(result.mutated).toBe(true)
+        expect(result.output.includes(NOTE)).toBe(noted)
+        expect(vi.mocked(deps.setStamps).mock.calls[0]![0]!.hf!.color).toBe(defaultColor)
+      }
+    })
   })
 })

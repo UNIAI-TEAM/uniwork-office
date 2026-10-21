@@ -24,7 +24,6 @@ import {
   pathKey,
   pickerBodyOf,
   pickerReducer,
-  pickerRowMeta,
   recentOpenAction,
   recentRowIsMissing,
   recentRowModifiedMs,
@@ -384,7 +383,7 @@ describe('G5-06 error codes -> sentence and reason', () => {
 
   it.each<[UniworkDocErrorCode, StringKey, StringKey]>([
     ['capability_off', 'uwTipPausedAdmin', 'uwReasonOther'],
-    ['intent_unknown', 'uwChipReconcileStuck', 'uwReasonOther'],
+    ['intent_unknown', 'uwErrReconcileStuck', 'uwReasonOther'],
     ['document_deleted', 'uwErrDeleted', 'uwReasonDeleted'],
     ['document_archived', 'uwReasonArchived', 'uwReasonArchived'],
     ['permission_revoked', 'uwErrForbidden', 'uwReasonForbidden'],
@@ -719,11 +718,14 @@ describe('time and path helpers', () => {
     expect(formatWhen('not a date', 'en-US', now)).toBe('')
   })
 
-  it('names who updated a document when the server says', () => {
-    const base = { ...doc('a', 'A.docx', 'docx'), updatedAt: '2026-04-02T09:30:00' }
-    expect(pickerRowMeta(base, t, 'en-US', now)).toMatch(/^Updated Apr/)
-    expect(pickerRowMeta({ ...base, updatedByName: 'Linh' }, t, 'en-US', now)).toMatch(/by Linh$/)
-    expect(pickerRowMeta({ ...base, updatedAt: '' }, t, 'en-US', now)).toBe('')
+  it('reads dates by the shared list rule (24h clock, yesterday, short day, year)', () => {
+    expect(formatWhen('2026-05-01T09:30:00', 'en-US', now)).toBe('09:30')
+    expect(formatWhen('2026-04-30T16:30:00', 'en-US', now)).toBe('Yesterday, 16:30')
+    expect(formatWhen('2026-04-30T16:30:00', 'vi-VN', now)).toBe('Hôm qua, 16:30')
+    expect(formatWhen('2026-04-02T09:30:00', 'en-US', now)).toBe('Apr 2')
+    expect(formatWhen('2026-04-02T09:30:00', 'vi-VN', now)).toBe('02/04')
+    expect(formatWhen('2025-10-18T09:30:00', 'en-US', now)).toBe('Oct 18, 2025')
+    expect(formatWhen('2025-10-18T09:30:00', 'vi-VN', now)).toBe('18/10/2025')
   })
 
   it('compares Windows paths regardless of slash direction and drive-letter case', () => {

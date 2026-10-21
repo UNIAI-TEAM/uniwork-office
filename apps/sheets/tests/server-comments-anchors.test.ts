@@ -213,6 +213,156 @@ describe('ServerAnchorStore + the anchor map after Save', () => {
   })
 })
 
+describe('a root first seen after local edits (G819-A02c)', () => {
+  const at = (id: string, sheet: string, range: string, version: string | null) => ({
+    ...rootAt(id, sheet, range),
+    anchor_version_id: version,
+  })
+
+  it('a comment on the opened version, first listed after a row insert above it, lands on B8', () => {
+    const store = new ServerAnchorStore()
+    store.markVersion('v1')
+    store.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 3, count: 1 })
+    const roots = [at('c1', 'sheet-2', 'B7', 'v1')]
+    store.track(roots, SHEETS)
+    expect(store.locationOf('c1')).toEqual({ sheetId: 'sheet-2', range: cell(7, 1) })
+    expect(buildAnchorUpdates(store, roots, SHEETS)).toEqual([
+      {
+        comment_id: 'c1',
+        anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B8' },
+        state: 'exact',
+      },
+    ])
+  })
+
+  it('replays the edits in order: an insert then a delete of the row the insert made', () => {
+    const store = new ServerAnchorStore()
+    store.markVersion('v1')
+    store.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 3, count: 2 })
+    store.applyStructuralOp('sheet-2', { kind: 'remove-rows', index: 3, count: 1 })
+    store.track([at('c1', 'sheet-2', 'B7', 'v1')], SHEETS)
+    expect(store.locationOf('c1')).toEqual({ sheetId: 'sheet-2', range: cell(7, 1) })
+  })
+
+  it('an edit the replay deletes the cell with makes the root lost', () => {
+    const store = new ServerAnchorStore()
+    store.markVersion('v1')
+    store.applyStructuralOp('sheet-2', { kind: 'remove-rows', index: 6, count: 1 })
+    const roots = [at('c1', 'sheet-2', 'B7', 'v1')]
+    store.track(roots, SHEETS)
+    expect(store.locationOf('c1')).toBeNull()
+    expect(buildAnchorUpdates(store, roots, SHEETS)[0]).toMatchObject({ state: 'lost' })
+  })
+
+  it('cut/paste and a removed sheet are replayed too', () => {
+    const store = new ServerAnchorStore()
+    store.markVersion('v1')
+    store.moveRange(
+      'sheet-2',
+      { startRow: 5, endRow: 7, startColumn: 0, endColumn: 3 },
+      'sheet-1',
+      { startRow: 0, endRow: 2, startColumn: 4, endColumn: 7 },
+    )
+    store.removeSheet('sheet-1')
+    store.track([at('c1', 'sheet-2', 'B7', 'v1'), at('c2', 'sheet-1', 'A1', 'v1')], SHEETS)
+    // c1 travelled to sheet-1, which was removed afterwards; c2 sat on the removed sheet
+    expect(store.locationOf('c1')).toBeNull()
+    expect(store.locationOf('c2')).toBeNull()
+  })
+
+  it('a root already tracked is never replayed again', () => {
+    const store = new ServerAnchorStore()
+    store.markVersion('v1')
+    const roots = [at('c1', 'sheet-2', 'B7', 'v1')]
+    store.track(roots, SHEETS)
+    store.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 3, count: 1 })
+    store.track(roots, SHEETS)
+    store.track([...roots], SHEETS)
+    expect(store.locationOf('c1')).toEqual({ sheetId: 'sheet-2', range: cell(7, 1) })
+  })
+
+  it('a version the editor never held is located as listed, not remapped', () => {
+    const store = new ServerAnchorStore()
+    store.markVersion('v1')
+    store.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 3, count: 1 })
+    store.track(
+      [
+        at('older', 'sheet-2', 'B7', 'v0'),
+        at('newer', 'sheet-2', 'B7', 'v9'),
+        at('none', 'sheet-2', 'B7', null),
+        rootAt('absent', 'sheet-2', 'B7'),
+      ],
+      SHEETS,
+    )
+    for (const id of ['older', 'newer', 'none', 'absent']) {
+      expect(store.locationOf(id)).toEqual({ sheetId: 'sheet-2', range: cell(6, 1) })
+    }
+  })
+
+  it('a Save receipt starts a new base: only the edits after it apply to a root on that version', () => {
+    const store = new ServerAnchorStore()
+    store.markVersion('v1')
+    store.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 0, count: 1 })
+    store.markVersion('v2')
+    store.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 0, count: 2 })
+    store.track([at('onV1', 'sheet-2', 'B7', 'v1'), at('onV2', 'sheet-2', 'B7', 'v2')], SHEETS)
+    expect(store.locationOf('onV1')).toEqual({ sheetId: 'sheet-2', range: cell(9, 1) })
+    expect(store.locationOf('onV2')).toEqual({ sheetId: 'sheet-2', range: cell(8, 1) })
+  })
+
+  it('marking a version twice keeps the first position', () => {
+    const store = new ServerAnchorStore()
+    store.markVersion('v1')
+    store.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 0, count: 1 })
+    store.markVersion('v1')
+    store.track([at('c1', 'sheet-2', 'B7', 'v1')], SHEETS)
+    expect(store.locationOf('c1')).toEqual({ sheetId: 'sheet-2', range: cell(7, 1) })
+  })
+
+  it('a root this editor created is encoded from the live place: tracked at once, never replayed', () => {
+    const store = new ServerAnchorStore()
+    store.markVersion('v1')
+    store.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 0, count: 1 })
+    // the selection was B8 after the insert; the server stores it on the base version v1
+    const created = at('mine', 'sheet-2', 'B8', 'v1')
+    store.trackCreated(created, SHEETS)
+    store.track([created], SHEETS)
+    expect(store.locationOf('mine')).toEqual({ sheetId: 'sheet-2', range: cell(7, 1) })
+    store.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 0, count: 1 })
+    expect(store.locationOf('mine')).toEqual({ sheetId: 'sheet-2', range: cell(8, 1) })
+  })
+
+  it('the reopen after a Save rebases the logged sheet ids too', () => {
+    const store = new ServerAnchorStore()
+    const before = [...SHEETS, { id: 'u-9', name: 'Added' }]
+    store.markVersion('v1')
+    store.applyStructuralOp('u-9', { kind: 'insert-rows', index: 0, count: 1 })
+    store.rebase(new Map(before.map((s) => [s.id, s.name])), [
+      ...SHEETS,
+      { id: 'sheet-3', name: 'Added' },
+    ])
+    store.track([at('c1', 'Added', 'C3', 'v1')], [...SHEETS, { id: 'sheet-3', name: 'Added' }])
+    expect(store.locationOf('c1')).toEqual({ sheetId: 'sheet-3', range: cell(3, 2) })
+  })
+
+  it('reset forgets the log: a reopened workbook starts from its own layout', () => {
+    const store = new ServerAnchorStore()
+    store.markVersion('v1')
+    store.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 0, count: 1 })
+    store.reset()
+    store.track([at('c1', 'sheet-2', 'B7', 'v1')], SHEETS)
+    expect(store.locationOf('c1')).toEqual({ sheetId: 'sheet-2', range: cell(6, 1) })
+  })
+
+  it('a server-lost root stays lost and is not relocated by the replay', () => {
+    const store = new ServerAnchorStore()
+    store.markVersion('v1')
+    store.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 0, count: 1 })
+    store.track([{ ...at('c1', 'sheet-2', 'B7', 'v1'), anchor_state: 'lost' }], SHEETS)
+    expect(store.locationOf('c1')).toBeNull()
+  })
+})
+
 describe('the kit anchor adapter', () => {
   function setup() {
     const store = new ServerAnchorStore()

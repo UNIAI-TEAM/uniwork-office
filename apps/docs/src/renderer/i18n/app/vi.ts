@@ -26,6 +26,8 @@ export const vi = {
   appScLineBreak: 'Ngắt dòng',
   appScNbsp: 'Khoảng trắng không ngắt',
   appScNbHyphen: 'Dấu gạch nối không ngắt',
+  appScFindNext: 'Tìm tiếp',
+  appScOptHyphen: 'Dấu gạch nối tùy chọn',
   appScGrowFont1: 'Tăng cỡ chữ 1 pt',
   appScShrinkFont1: 'Giảm cỡ chữ 1 pt',
   appScListDemote: 'Giảm cấp danh sách',
@@ -208,7 +210,7 @@ export const vi = {
   appEndnotePlaceholder: 'Văn bản chú thích cuối tài liệu…',
   appAutoSave: 'Tự động lưu',
   appAutoSaveTip: 'Tự động lưu (mỗi 30 giây và khi cửa sổ mất tiêu điểm)',
-  appSaveShortcutTip: 'Lưu (⌘S)',
+  appSaveShortcutTip: 'Lưu ({keys})',
   appUndo: 'Hoàn tác',
   appRedo: 'Làm lại',
   appStartOpening: 'Đang mở…',
@@ -543,9 +545,13 @@ export const vi = {
   appOnlyEncrypted: '"{name}" được bảo vệ bằng mật khẩu và không thể mở ở đây.',
   appFileExportPdf: 'Xuất dưới dạng PDF…',
   appFilePrint: 'In…',
+  appPrintNoDocument: 'Hãy mở một tài liệu để in.',
   appPrintNoPrinter:
     'Máy tính này không có máy in. Bạn có thể lưu tài liệu thành tệp PDF thay thế.',
   appPrintFailedPdfHint:
     'In không thành công: {error}. Bạn có thể lưu tài liệu thành tệp PDF thay thế.',
   appPrintSaveAsPdf: 'Lưu thành PDF…',
+  appFileSaveCopy: 'Lưu thành bản sao…',
+  appCopySaved: 'Đã lưu bản của bạn thành tài liệu mới: {title}.',
+  appCopySaveFailed: 'Chưa tạo được bản sao. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
 } satisfies Record<keyof typeof zh, string>

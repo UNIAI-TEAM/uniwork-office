@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import type { UniworkDocStatus } from '../../shared/home-api'
+import type { UniworkDocEditLock, UniworkDocStatus } from '../../shared/home-api'
 import type { Binding, BindingStore, BoundDocument } from './binding-store'
 import type { UniworkDocsClient } from './client'
 import { UniworkDocError, isTerminalRefusal } from './errors'
 import { sha256Hex } from './formats'
 import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits, type DocumentLimitsCache } from './limits'
-import type { CommitReceipt, DocumentDetail } from './parse'
+import type { CommitLookup, CommitReceipt, DocumentDetail } from './parse'
 import type { SavedUploadSession } from './upload-session'
 import {
   abortVersionUploadSession,
@@ -100,6 +100,62 @@ function needsRecheck(error: unknown): error is UniworkDocError {
 }
 
 /**
+ * R2: the verdict of one inline phase write. `ok` is true only when the store
+ * really holds this attempt's own record in `state` afterwards (or the settled
+ * record was cleaned up). A store refusal, an interrupted write, or a key a
+ * newer generation now owns is `ok: false`, and `state` then reports the state
+ * the store really holds (null when nothing is stored at all).
+ */
+type PhaseWrite =
+  | { ok: true; state: IntentRecordV2['state'] | null }
+  | {
+      ok: false
+      refusal: 'store_full' | 'interrupted' | 'owner_lost'
+      state: IntentRecordV2['state'] | null
+    }
+
+/**
+ * R2: the durable record could not be driven to `committing` before the commit
+ * POST. Carries why (and the state the store really holds), so the caller keeps
+ * the intent and publishes that state instead of committing blind.
+ */
+class PhaseWriteRefusedError extends UniworkDocError {
+  readonly refusal: 'store_full' | 'interrupted' | 'owner_lost'
+  readonly durableState: IntentRecordV2['state'] | null
+
+  constructor(
+    refusal: 'store_full' | 'interrupted' | 'owner_lost',
+    durableState: IntentRecordV2['state'] | null,
+  ) {
+    super(
+      refusal === 'store_full'
+        ? 'store_full'
+        : refusal === 'interrupted'
+          ? 'not_signed_in'
+          : 'server_error',
+    )
+    this.refusal = refusal
+    this.durableState = durableState
+  }
+}
+
+/**
+ * B70: a COMMIT-leg failure whose answer the server never gave. It keeps the
+ * original code and status - `applyFailure` and the trace read the same
+ * verdicts - and exists only so the pipeline can tell a lost commit answer
+ * (reconcile) from the same error on the upload leg (today's `offline`).
+ */
+class CommitAnswerLostError extends UniworkDocError {
+  constructor(reason: UniworkDocError) {
+    super(reason.code, {
+      ...(reason.serverCode === undefined ? {} : { serverCode: reason.serverCode }),
+      ...(reason.status === undefined ? {} : { status: reason.status }),
+      ...(reason.retryAfterMs === undefined ? {} : { retryAfterMs: reason.retryAfterMs }),
+    })
+  }
+}
+
+/**
  * The intent store of the live session, or why it cannot be reached. A locked
  * store refuses the save with `keystore_locked`; a session without one never
  * saves (the intent is what makes a replay safe).
@@ -122,13 +178,24 @@ export type SaveQueueEngine = Pick<
   | 'supersede'
   | 'tombstone'
   | 'isOtherWindow'
->
+  | 'holdsOtherWindow'
+> &
+  // optional so an engine without it keeps the awaited `supersede` (release included)
+  Partial<Pick<QueueDispatcher, 'supersedeDeferRelease'>>
 
 export interface SaveCoordinatorDeps {
   store: BindingStore
   client: Pick<UniworkDocsClient, 'upload' | 'commit' | 'getDocument'> & {
     /** BIGUP-A1: the upload-session routes for a version payload above the chunked threshold */
     uploadSession?: DocumentUploadSessionClient
+    /**
+     * UNI-1918 (B69-lite): the commit-intent lookup. The inline pipeline runs
+     * exactly ONE lookup when the server refuses a staged upload because its
+     * claim expired: only that answer (committed / not_committed / in_flight /
+     * unknown) decides what happens to the intent. Absent = the refusal keeps
+     * today's recheck (a caller without the route never resumes).
+     */
+    lookupCommit?(input: { documentId: string; idempotencyKey: string }): Promise<CommitLookup>
   }
   isSignedIn(): boolean
   /** the binding belongs to the signed-in account and the active deployment */
@@ -176,6 +243,17 @@ export interface SaveCoordinatorDeps {
    * key the queue is already running (G506-be-1).
    */
   dispatcherBusy?(docKey: string): boolean
+  /**
+   * EL-1(b) Q2: acquire before the first queued commit when the session is
+   * 'unreachable'. 'park' = 423 — fail as edit_locked, send no commit.
+   */
+  prepareEditLock?(path: string): Promise<'held' | 'park' | 'proceed'>
+  /** EL-1(b): lock id of a held path, sent as commit `edit_lock_id` */
+  editLockId?(path: string): string | null
+  /** EL-1(b) B8: holder summary for a synthesised park 423 */
+  editLockHolder?(path: string): UniworkDocEditLock | null
+  /** EL-1(b): 423 on commit while held — session becomes 'lost' */
+  onCommitEditLocked?(path: string, error: UniworkDocError): void
 }
 
 /**
@@ -199,8 +277,8 @@ export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocSta
     workspaceId: b.workspaceId,
     title: b.title,
     format: b.format,
-    access: b.access,
-    ...(b.level ? { commentsLevel: b.level } : {}),
+    access: b.shelved ? 'view' : b.access,
+    ...(b.shelved ? { commentsLevel: 'view' } : b.level ? { commentsLevel: b.level } : {}),
     state: b.state,
     ...(b.error ? { error: b.error } : {}),
     ...(b.state === 'edit_locked' && b.editLock ? { editLock: b.editLock } : {}),
@@ -704,6 +782,42 @@ export class SaveCoordinator {
         // (pendingNext = an unsent N+1) and the SAME record and key are replayed
         // below; a save that lands settles this very intent
         this.pendingNext.add(doc.path)
+        // R1: only a record the queue would really re-send may be replayed
+        // inline. A record whose commit may ALREADY be on the wire
+        // (`committing` / `reconciling`) is never uploaded and never POSTed
+        // again: exactly ONE lookup of the SAME key decides, exactly as the
+        // poll's own tick does. A record the queue already gave up on
+        // (`reconciling-stuck`) sends nothing at all and publishes the state the
+        // record really has.
+        if (intent.state === 'committing' || intent.state === 'reconciling') {
+          return await this.lookupInFlightRecord(doc, intent, intents)
+        }
+        if (intent.state === 'reconciling-stuck') {
+          return await this.commitState(doc, {
+            ...doc.binding,
+            state: 'reconciling-stuck',
+            error: 'intent_unknown',
+          })
+        }
+        // R3: a parked-offline record is provably unsent, and the machine's own
+        // `online` event takes it back to `queued` (or leaves it `paused_user`
+        // while the user's own pause holds). That existing transition is applied
+        // first, so the phase sequence below really walks `dispatch` →
+        // `uploaded` → `uploaded` and the durable record reaches `committing`
+        // before the POST. When the requeue does not happen - the user's pause
+        // holds, the store refused the write, a newer generation owns the key -
+        // nothing is sent and the chip shows the state the record really has.
+        if (intent.state === 'paused_offline') {
+          const requeued = await this.requeueForReplay(doc, intent, intents)
+          if (!requeued) {
+            return await this.commitState(doc, {
+              ...doc.binding,
+              state: 'paused_offline',
+              error: 'network',
+            })
+          }
+          intent = requeued
+        }
       }
       binding = withoutError({ ...binding, state: 'saving' })
       // the binding is persisted before the first network call: a crash or quit
@@ -727,6 +841,44 @@ export class SaveCoordinator {
       try {
         receipt = await this.uploadAndCommit(saving, intent, payload as Uint8Array, intents)
       } catch (error) {
+        // R2: the durable record could not be driven to `committing`, so the
+        // commit POST never left. Nothing was proven about the intent: it is
+        // kept and the chip shows the state the store really holds (a store
+        // refusal keeps today's store-error mapping).
+        if (error instanceof PhaseWriteRefusedError) {
+          if (error.refusal === 'store_full') {
+            return await this.commitState(saving, {
+              ...doc.binding,
+              state: 'error',
+              error: 'store_full',
+            })
+          }
+          if (error.refusal === 'interrupted') {
+            return await this.commitState(saving, {
+              ...doc.binding,
+              state: 'signed-out',
+              error: 'not_signed_in',
+            })
+          }
+          return await this.commitState(saving, {
+            ...doc.binding,
+            state: queueChipState(error.durableState ?? 'queued') ?? doc.binding.state,
+            ...(errorForState(error.durableState ?? 'queued')
+              ? { error: errorForState(error.durableState ?? 'queued') }
+              : {}),
+          })
+        }
+        // B69-lite: the server refused the staged upload because its claim
+        // expired. That is NOT "the upload is gone": the intent is kept and
+        // exactly ONE lookup decides what happens to it (never a dropped intent,
+        // never a fresh key minted behind the user's back).
+        if (
+          error instanceof UniworkDocError &&
+          error.serverCode === 'document_upload_invalid' &&
+          error.reason === 'file_claim_expired'
+        ) {
+          return await this.resumeExpiredClaim(saving, intent, intents)
+        }
         if (needsRecheck(error)) {
           return await this.recheckAgainstDocument(
             saving,
@@ -734,6 +886,13 @@ export class SaveCoordinator {
             { state: 'dirty', error: 'server_error' },
             intents,
           )
+        }
+        // B70: the commit POST may have landed and its answer was lost - the
+        // record reconciles (a lookup with the SAME key decides) instead of
+        // being re-POSTed by the next poll. Upload-leg failures keep today's
+        // `offline`/`queued` mapping: they are provably before the POST.
+        if (error instanceof CommitAnswerLostError) {
+          return await this.reconcileLostCommit(saving, intent, error, intents)
         }
         return await this.fail(saving, intent, error, intents)
       }
@@ -869,21 +1028,258 @@ export class SaveCoordinator {
     doc: BoundDocument,
     owner: IntentRecordV2,
     event: QueueEvent,
-  ): Promise<void> {
+  ): Promise<PhaseWrite> {
     const stored = await intents.read(doc.key, factsOf(doc, 0))
     if (
       !stored ||
       stored.intent.intentId !== owner.intentId ||
       stored.intent.generation !== owner.generation
     ) {
-      return
+      // a newer generation (N+1) owns the key: this attempt's phase is not
+      // written, and the record really sits where the store says it does
+      return { ok: false, refusal: 'owner_lost', state: stored?.intent.state ?? null }
     }
     const result = transition(stored.intent, event, { now: this.now().getTime() })
     if (!result.record || result.effects.some((effect) => effect.kind === 'cleanup')) {
       await this.cleanupIntent(intents, doc, stored.intent)
-      return
+      return { ok: true, state: null }
     }
-    await intents.put(doc.key, result.record, stored.payload)
+    const written = await intents.put(doc.key, result.record, stored.payload)
+    if (written.kind !== 'ok') {
+      // the store refused (or the account boundary wiped the scope): the
+      // durable record still carries the state it had before this phase
+      return {
+        ok: false,
+        refusal: written.kind === 'store_full' ? 'store_full' : 'interrupted',
+        state: stored.intent.state,
+      }
+    }
+    return { ok: true, state: result.record.state }
+  }
+
+  /**
+   * B70: a lost commit answer. The record reconciles through the machine
+   * (`commitFailed` from `committing` → `reconciling`, never `failed`, never
+   * `offline`) and the chip follows it. The commit key is untouched: the poll's
+   * tick performs the ONE lookup that decides. The binding state mirrors what
+   * `queueChipState` maps for `reconciling`, so the chip and the record agree
+   * even before the dispatcher's own publish lands.
+   */
+  private async reconcileLostCommit(
+    doc: BoundDocument,
+    intent: IntentRecordV2,
+    error: UniworkDocError,
+    intents: IntentStore,
+  ): Promise<BoundDocument> {
+    await this.settleRecord(intents, doc, intent, {
+      type: 'commitFailed',
+      error: error.code,
+      ...(error.retryAfterMs === undefined ? {} : { retryAfterMs: error.retryAfterMs }),
+    })
+    return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+  }
+
+  /**
+   * R1: a Save met a record whose commit may already be on the wire
+   * (`committing` / `reconciling`). Nothing is uploaded and nothing is POSTed:
+   * exactly ONE lookup of the record's own commit key decides, and only its
+   * answer moves the record - the same verdicts `resumeExpiredClaim` applies to
+   * the same machine event. A lookup that cannot be answered leaves the record
+   * `reconciling` for the next poll's tick.
+   */
+  private async lookupInFlightRecord(
+    doc: BoundDocument,
+    intent: IntentRecordV2,
+    intents: IntentStore,
+  ): Promise<BoundDocument> {
+    if (intent.state === 'committing') {
+      // N3: a crash-left `committing` row must DURABLY enter `reconciling`
+      // before the lookup (the same `commitFailed` transition `resumeExpiredClaim`
+      // applies for R7), so a lookup that fails transiently leaves an aging
+      // `reconciling` row with `reconcileSince` instead of a `committing` row
+      // the tick cannot age. A refused transition keeps the intent and sends nothing.
+      const entered = await this.settleRecord(intents, doc, intent, {
+        type: 'commitFailed',
+        error: 'ticket_expired',
+      })
+      if (!entered.ok || entered.state !== 'reconciling') {
+        if (!entered.ok && entered.refusal === 'store_full') {
+          return this.commitState(doc, { ...doc.binding, state: 'error', error: 'store_full' })
+        }
+        if (!entered.ok && entered.refusal === 'interrupted') {
+          return this.commitState(doc, {
+            ...doc.binding,
+            state: 'signed-out',
+            error: 'not_signed_in',
+          })
+        }
+        const durable = entered.state ?? 'committing'
+        return this.commitState(doc, {
+          ...doc.binding,
+          state: queueChipState(durable) ?? doc.binding.state,
+          ...(errorForState(durable) ? { error: errorForState(durable) } : {}),
+        })
+      }
+    }
+    const lookup = this.deps.client.lookupCommit
+    if (!lookup) {
+      await this.settleRecord(intents, doc, intent, { type: 'commitFailed', error: 'network' })
+      return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+    }
+    let answer: CommitLookup
+    try {
+      answer = await lookup({
+        documentId: intent.documentId,
+        idempotencyKey: intent.idempotencyKey,
+      })
+    } catch (error) {
+      const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
+      await this.settleRecord(intents, doc, intent, {
+        type: 'lookup',
+        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+        error: error instanceof UniworkDocError ? error.code : 'server_error',
+      })
+      return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+    }
+    if (answer.outcome === 'committed') {
+      return await this.settle(
+        doc,
+        intent,
+        {
+          revision: answer.receipt.revision,
+          version: answer.receipt.version,
+          versionId: answer.receipt.versionId,
+        },
+        intents,
+      )
+    }
+    await this.settleRecord(intents, doc, intent, { type: 'lookup', outcome: answer.outcome })
+    if (answer.outcome === 'unknown') {
+      return this.commitState(doc, {
+        ...doc.binding,
+        state: 'reconciling-stuck',
+        error: 'intent_unknown',
+      })
+    }
+    if (answer.outcome === 'not_committed') {
+      return this.commitState(doc, withoutError({ ...doc.binding, state: 'queued' }))
+    }
+    return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+  }
+
+  /**
+   * R3: the machine's own requeue of a parked-offline record - the `online`
+   * event a connectivity flip drives (`paused_offline` → `queued`, or
+   * `paused_user` while the user's own pause holds), applied inline and
+   * persisted BEFORE the replay. The record is only returned when the store
+   * really took the write and the machine's verdict is `queued`; null means
+   * this record must not be replayed inline (a user/admin pause holds it, the
+   * store refused the write, or a newer generation owns the key).
+   */
+  private async requeueForReplay(
+    doc: BoundDocument,
+    intent: IntentRecordV2,
+    intents: IntentStore,
+  ): Promise<IntentRecordV2 | null> {
+    if (intent.state !== 'paused_offline') return null
+    const stored = await intents.read(doc.key, factsOf(doc, intent.length))
+    if (
+      !stored ||
+      stored.intent.intentId !== intent.intentId ||
+      stored.intent.generation !== intent.generation
+    ) {
+      return null
+    }
+    const pausedUser = (await this.deps.pause?.isPaused().catch(() => false)) === true
+    const result = transition(
+      stored.intent,
+      { type: 'online', online: true },
+      { now: this.now().getTime(), pausedUser },
+    )
+    if (!result.record || result.record.state !== 'queued') return null
+    const written = await intents.put(doc.key, result.record, stored.payload)
+    return written.kind === 'ok' ? result.record : null
+  }
+
+  /**
+   * UNI-1918 (B69-lite): the server refused the staged upload with
+   * `document_upload_invalid` / `reason=file_claim_expired`. The claim of the
+   * upload this attempt staged under is gone, but the COMMIT is not thereby
+   * known to have happened: exactly ONE lookup of the intent's commit key
+   * decides, and only its answer moves the record.
+   *
+   * - `committed` → settle with the receipt;
+   * - `not_committed` → attempt n+1 under the SAME commit key (the next upload
+   *   stages under a fresh upload key, `uploadKeyFor`);
+   * - `in_flight` → `reconciling` (the next poll's tick looks again);
+   * - `unknown` → `reconciling-stuck` (never a blind resend).
+   *
+   * The lookup itself must never fail a save that could still be alive: a
+   * transport failure (or a missing route on a caller without one) leaves the
+   * record reconciling, where the poll's own lookup picks it up.
+   */
+  private async resumeExpiredClaim(
+    doc: BoundDocument,
+    intent: IntentRecordV2,
+    intents: IntentStore,
+  ): Promise<BoundDocument> {
+    // R7: the claim expired, so the record must DURABLY reconcile before the
+    // lookup - the machine's own `commitFailed` / `ticket_expired` event enters
+    // `reconciling` with `reconcileSince`. A lookup that then fails transiently
+    // therefore leaves an aging `reconciling` row (the stuck clock runs from
+    // that age), never a `committing` row the tick cannot age.
+    await this.settleRecord(intents, doc, intent, {
+      type: 'commitFailed',
+      error: 'ticket_expired',
+    })
+    const lookup = this.deps.client.lookupCommit
+    if (!lookup) {
+      return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+    }
+    let answer: CommitLookup
+    try {
+      answer = await lookup({
+        documentId: intent.documentId,
+        idempotencyKey: intent.idempotencyKey,
+      })
+    } catch (error) {
+      // the lookup could not be answered (offline, a locked store, a 5xx):
+      // nothing proves either way, so the intent reconciles and the poll retries
+      const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
+      await this.settleRecord(intents, doc, intent, {
+        type: 'lookup',
+        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+        error: error instanceof UniworkDocError ? error.code : 'server_error',
+      })
+      return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
+    }
+    if (answer.outcome === 'committed') {
+      return await this.settle(
+        doc,
+        intent,
+        {
+          revision: answer.receipt.revision,
+          version: answer.receipt.version,
+          versionId: answer.receipt.versionId,
+        },
+        intents,
+      )
+    }
+    // the machine's own lookup rules: `not_committed` → attempt+1 `queued` (the
+    // next attempt stages under a NEW upload key), `in_flight` → reconciling
+    // with a retryAt, `unknown` → reconciling-stuck
+    await this.settleRecord(intents, doc, intent, { type: 'lookup', outcome: answer.outcome })
+    if (answer.outcome === 'unknown') {
+      return this.commitState(doc, {
+        ...doc.binding,
+        state: 'reconciling-stuck',
+        error: 'intent_unknown',
+      })
+    }
+    if (answer.outcome === 'not_committed') {
+      return this.commitState(doc, withoutError({ ...doc.binding, state: 'queued' }))
+    }
+    return this.commitState(doc, { ...doc.binding, state: 'reconciling' })
   }
 
   /**
@@ -939,6 +1335,7 @@ export class SaveCoordinator {
           format: doc.binding.format,
           bytes: payload,
           idempotencyKey: intent.idempotencyKey,
+          attempt: intent.attempt,
           limits,
           ...(intent.uploadSession ? { resume: intent.uploadSession } : {}),
           signal: controller.signal,
@@ -964,12 +1361,61 @@ export class SaveCoordinator {
         if (!this.deps.isSignedIn() || !this.deps.ownsBinding(doc)) {
           throw new UniworkDocError('not_signed_in')
         }
-        return await this.deps.client.commit({
-          documentId: intent.documentId,
-          uploadId: upload.uploadId,
-          baseRevision: intent.baseRevision,
-          idempotencyKey: intent.idempotencyKey,
-        })
+        // the edit lock decides first: a parked save never reaches the durable
+        // `committing` phase below, so it is replayed, not reconciled
+        const prepared = (await this.deps.prepareEditLock?.(doc.path)) ?? 'proceed'
+        if (prepared === 'park') {
+          const holder = this.deps.editLockHolder?.(doc.path)
+          throw new UniworkDocError('edit_locked', {
+            status: 423,
+            serverCode: 'document_locked',
+            ...(holder ? { editLock: holder } : {}),
+          })
+        }
+        const editLockId = this.deps.editLockId?.(doc.path) ?? null
+        // B70 + R2: the commit is about to be POSTed, so the durable record
+        // must say `committing` BEFORE the request leaves - a crash or a lost
+        // answer then reads `committing`, never `queued` (which the next poll
+        // would re-POST blindly). Compare-then-put: a newer intent (N+1) is
+        // never clobbered. Every write is checked and the LAST one must have
+        // landed as `committing`: a store refusal, an interrupted write, or a
+        // key another generation now owns stops the save BEFORE the POST,
+        // because nothing durable authorizes it.
+        let phase: PhaseWrite = { ok: false, refusal: 'owner_lost', state: null }
+        for (const event of [
+          { type: 'dispatch' },
+          { type: 'uploaded' },
+          { type: 'uploaded' },
+        ] as const) {
+          phase = await this.settleRecord(intents, doc, intent, event)
+          if (!phase.ok) break
+        }
+        if (!phase.ok || phase.state !== 'committing') {
+          throw new PhaseWriteRefusedError(phase.ok ? 'owner_lost' : phase.refusal, phase.state)
+        }
+        try {
+          return await this.deps.client.commit({
+            documentId: intent.documentId,
+            uploadId: upload.uploadId,
+            baseRevision: intent.baseRevision,
+            idempotencyKey: intent.idempotencyKey,
+            ...(editLockId ? { editLockId } : {}),
+          })
+        } catch (error) {
+          // only the COMMIT leg is tagged, and only for an answer the server
+          // never gave (a network drop or a timeout): the same error before the
+          // POST is provably not-committed and keeps today's `offline`/`queued`
+          // mapping. A coded refusal is a real answer, and an
+          // `idempotency_in_flight` keeps today's bounded retry then `offline`.
+          if (
+            error instanceof UniworkDocError &&
+            (error.code === 'network' || error.code === 'timeout') &&
+            error.serverCode !== 'idempotency_in_flight'
+          ) {
+            throw new CommitAnswerLostError(error)
+          }
+          throw error
+        }
       } catch (error) {
         const inFlight =
           error instanceof UniworkDocError && error.serverCode === 'idempotency_in_flight'
@@ -1012,6 +1458,14 @@ export class SaveCoordinator {
     docKey: string,
     session: SavedUploadSession | undefined,
   ): Promise<void> {
+    await this.takeUploadRelease(docKey, session)()
+  }
+
+  /** local half now (abort part PUTs, forget the live session); the closure is the network DELETE alone */
+  private takeUploadRelease(
+    docKey: string,
+    session: SavedUploadSession | undefined,
+  ): () => Promise<void> {
     const controller = this.uploadAborts.get(docKey)
     if (controller) {
       controller.abort()
@@ -1021,11 +1475,13 @@ export class SaveCoordinator {
     this.uploadLiveSessions.delete(docKey)
     const sessionId = session?.sessionId ?? liveSessionId
     const client = this.deps.client.uploadSession
-    if (!sessionId || !client) return
-    try {
-      await abortVersionUploadSession(client, sessionId)
-    } catch (error) {
-      console.warn('uniwork docs: the upload session could not be aborted', error)
+    if (!sessionId || !client) return async () => {}
+    return async () => {
+      try {
+        await abortVersionUploadSession(client, sessionId)
+      } catch (error) {
+        console.warn('uniwork docs: the upload session could not be aborted', error)
+      }
     }
   }
 
@@ -1060,6 +1516,8 @@ export class SaveCoordinator {
         // timer: park the intent in `failed` with `lastError: 'edit_locked'` so
         // the recovery snapshot is kept on disk until the user explicitly saves
         // again or closes the document.
+        // EL-1(b): a 423 while we held also flips the session to 'lost'.
+        this.deps.onCommitEditLocked?.(doc.path, error)
         this.pendingNext.delete(doc.path)
         await this.settleRecord(intents, doc, intent, {
           type: 'commitFailed',
@@ -1234,17 +1692,35 @@ export class SaveCoordinator {
    * terminal, so it never moves the chip itself (see publishQueueState).
    */
   async supersede(doc: QueueDoc): Promise<void> {
+    const release = await this.supersedeDeferRelease(doc)
+    await release()
+  }
+
+  /**
+   * `supersede` with the upload-session DELETE (network) returned instead of
+   * awaited. A conflict action runs it after its local destructive steps, so no
+   * network sits between its final validation and its last store write.
+   */
+  async supersedeDeferRelease(doc: QueueDoc): Promise<() => Promise<void>> {
     // a superseded record is always terminal: the machine never moves it to a
     // chip state, and the caller's Overwrite / Reload is what the binding shows
     // next. So this never publishes (publishQueueState would drop it anyway).
     const priorSession = doc.record.uploadSession
-    if (!this.deps.dispatcher) {
-      await this.releaseUploadSession(doc.key, priorSession)
-      return
+    if (!this.deps.dispatcher) return this.takeUploadRelease(doc.key, priorSession)
+    const engine = this.deps.dispatcher
+    if (!engine.supersedeDeferRelease) {
+      const state = await engine.supersede(doc)
+      if (state === 'cancelled') await this.releaseUploadSession(doc.key, undefined)
+      return async () => {}
     }
-    const state = await this.deps.dispatcher.supersede(doc)
-    if (state === 'cancelled') {
-      await this.releaseUploadSession(doc.key, undefined)
+    const { state, release } = await engine.supersedeDeferRelease(doc)
+    if (state !== 'cancelled') return release
+    // the dispatcher took its own release (retained session); the coordinator's
+    // own controller / live session is released locally now, DELETE deferred
+    const own = this.takeUploadRelease(doc.key, undefined)
+    return async () => {
+      await release()
+      await own()
     }
   }
 
@@ -1270,6 +1746,15 @@ export class SaveCoordinator {
   /** whether another window holds the document lock (this one is read-only) */
   isOtherWindow(docKey: string): boolean {
     return this.deps.dispatcher?.isOtherWindow(docKey) === true
+  }
+
+  /**
+   * A32 (UNI-1362): whether the durable document lock is held by another window
+   * right now. `isOtherWindow` above is this process's own verdict and only a
+   * dispatch clears it, so the status front revalidates with this one instead.
+   */
+  async holdsOtherWindow(docKey: string): Promise<boolean> {
+    return (await this.deps.dispatcher?.holdsOtherWindow(docKey)) === true
   }
 
   /** push a queue record's state as the document's status (W4b maps the doc) */
@@ -1314,6 +1799,34 @@ export class SaveCoordinator {
         return Promise.resolve(latest ?? doc)
       }
       return this.writeBinding(latest, binding)
+    })
+  }
+
+  /**
+   * Mutate `doc`'s binding against the latest stored binding inside the
+   * per-key serialized chain (`serializeBinding`). Returns `null` when the
+   * document is no longer bound, or the current `BoundDocument` without
+   * writing when `patch` returns `null`. Propagates persistence failures
+   * rather than swallowing them (R3-5).
+   */
+  async updateBinding(
+    doc: BoundDocument,
+    patch: (latest: Binding) => Binding | null,
+  ): Promise<BoundDocument | null> {
+    return this.serializeBinding(doc.key, async () => {
+      const latest = this.deps.store.lookup(doc.path)
+      if (!latest || latest.binding.documentId !== doc.binding.documentId) return null
+      const next = patch(latest.binding)
+      if (!next) return latest
+      const written = await this.deps.store.write(latest.dir, next)
+      if (!written) {
+        this.activeSizeWarns.delete(latest.path)
+        this.publish(latest)
+        throw new Error('binding_write_refused')
+      }
+      const updated: BoundDocument = { ...latest, binding: next }
+      this.publish(updated)
+      return updated
     })
   }
 

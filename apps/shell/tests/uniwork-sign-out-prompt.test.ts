@@ -303,6 +303,56 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     expect(document.activeElement).toBe(backBtn)
   })
 
+  it('Tab wraps inside the prompt: it never leaves the alertdialog', async () => {
+    await render(statusFor('signed-in'), {
+      lang: 'en',
+      plan: { count: 2, waiting: 0, keystoreLocked: false, ramOnly: 0 },
+    })
+    await click(button(en.acctSignOut))
+    expect(promptDialog()).not.toBeNull()
+    const backBtn = promptButton(syncEn.uwActBack)!
+    const goBtn = promptButton(syncEn.uwSignOutGo)!
+    expect(document.activeElement).toBe(backBtn)
+
+    // Shift+Tab on the first stop wraps to the last, and the press is consumed
+    const wrapBack = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      backBtn.dispatchEvent(wrapBack)
+    })
+    expect(wrapBack.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(goBtn)
+
+    // Tab on the last stop wraps to the first
+    const wrapFwd = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      goBtn.dispatchEvent(wrapFwd)
+    })
+    expect(wrapFwd.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(backBtn)
+
+    // a Tab that is not at an edge is left alone (the handler does not consume it)
+    const midTab = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      backBtn.dispatchEvent(midTab)
+    })
+    expect(midTab.defaultPrevented).toBe(false)
+    goBtn.focus()
+    expect(document.activeElement).toBe(goBtn)
+  })
+
   it('waiting: uwSignOutWaiting in a polite live node, Đăng xuất aria-disabled', async () => {
     await render(statusFor('signed-in'), {
       lang: 'vi',
@@ -332,7 +382,10 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     expect(live.textContent).toBe(syncVi.uwSignOutWaiting)
     const busyGo = promptButton(syncVi.uwSignOutGo)!
     expect(busyGo.getAttribute('aria-disabled')).toBe('true')
-    expect(busyGo.disabled).toBe(false)
+    const busyBack = promptButton(syncVi.uwActBack)!
+    expect(busyBack.getAttribute('aria-disabled')).toBe('true')
+    expect(busyBack.getAttribute('aria-busy')).toBe('true')
+    expect(busyBack.disabled).toBe(false)
 
     // a second click while waiting does not fire another accountLogout call
     await act(async () => {
@@ -594,10 +647,10 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     })
     await flush()
     const expectedEn =
-      'Some unsaved changes could not be captured in time; the most recent saved or autosaved version is kept for your account.'
+      'Couldn’t keep some unsaved changes in time; the latest saved or autosaved version is kept for your account.'
     expect(syncEn.uwSignOutCaptureFailed).toBe(expectedEn)
     expect(syncVi.uwSignOutCaptureFailed).toBe(
-      'Một số thay đổi chưa lưu kịp; bản lưu hoặc tự lưu gần nhất được giữ cho tài khoản của bạn.',
+      'Không kịp giữ một số thay đổi chưa lưu; bản lưu hoặc tự lưu gần nhất vẫn được giữ cho tài khoản của bạn.',
     )
     expect(pane()?.textContent ?? '').not.toContain(expectedEn)
 
@@ -648,6 +701,22 @@ describe('Settings → Account sign-out prompt (S3)', () => {
 
       expect(promptDialog()).toBeNull()
       expect(api.accountStatus.mock.calls.length).toBeGreaterThan(statusCallsBefore)
+      // A72: the silent expiry reports its outcome instead of vanishing
+      const statusNodes = Array.from(
+        host.querySelectorAll<HTMLElement>('.acct-pane [role="status"]'),
+      )
+      expect(statusNodes.some((n) => n.textContent?.includes(syncVi.uwSignOutTimedOut))).toBe(true)
+      // a status push that shows the account signed out again settles the notice
+      await act(async () => {
+        api.pushStatus(statusFor('signed-out'))
+      })
+      await flush()
+      const statusNodesAfter = Array.from(
+        host.querySelectorAll<HTMLElement>('.acct-pane [role="status"]'),
+      )
+      expect(statusNodesAfter.some((n) => n.textContent?.includes(syncVi.uwSignOutTimedOut))).toBe(
+        false,
+      )
     } finally {
       vi.useRealTimers()
     }
@@ -784,7 +853,7 @@ describe('Settings → Account sign-out prompt (S3)', () => {
 
       // Notice is shown after captureFailed: 1
       const expectedEn =
-        'Some unsaved changes could not be captured in time; the most recent saved or autosaved version is kept for your account.'
+        'Couldn’t keep some unsaved changes in time; the latest saved or autosaved version is kept for your account.'
       expect(pane()?.textContent ?? '').toContain(expectedEn)
 
       // Open a new prompt before the 40s mark and advance past 40s -> neither clobbered nor refreshed
@@ -1039,6 +1108,7 @@ describe('Settings → Account sign-out prompt (S3)', () => {
       expect(api.answerSignOutPrompt).toHaveBeenCalledWith(`notice-${lang}`, true)
       expect(api.accountLogout).not.toHaveBeenCalled()
       expect(promptDialog()).toBeNull()
+
       expect(document.activeElement).toBe(button(acct.acctSignOut))
 
       // a second click path (Escape) has nothing left to answer
@@ -1088,6 +1158,30 @@ describe('Settings → Account sign-out prompt (S3)', () => {
     expect(api.answerSignOutPrompt).toHaveBeenCalledTimes(2)
     expect(api.answerSignOutPrompt).toHaveBeenLastCalledWith('req-notice', true)
     expect(promptDialog()).toBeNull()
+  })
+
+  it("Q2 = a: Tab wraps the notice's one button back onto itself", async () => {
+    await render(statusFor('signed-in'), { lang: 'en', open: false })
+    await act(async () => {
+      api.pushPrompt({
+        requestId: 'req-notice-tab',
+        plan: { count: 1, waiting: 0, keystoreLocked: true, ramOnly: 2 },
+        mode: 'notice',
+      })
+    })
+    await flush()
+    const okBtn = promptButton(syncEn.uwSwitchLostOk)!
+    expect(document.activeElement).toBe(okBtn)
+    const wrap = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      okBtn.dispatchEvent(wrap)
+    })
+    expect(wrap.defaultPrevented).toBe(true)
+    expect(document.activeElement).toBe(okBtn)
   })
 
   it('FE d4-1: a switch notice waits for an open aria-modal dialog: Settings stays closed, then opens and focuses OK', async () => {

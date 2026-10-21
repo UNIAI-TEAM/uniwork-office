@@ -3,6 +3,12 @@
  * find, zoom, element clipboard, format painter, selection cycling, nudging…
  * The handler reads the latest App state through ActionCtx, so App attaches it
  * once with an empty dependency list.
+ *
+ * Chords come from the `@genoffice/shortcuts` slides table (UNI-2011), matched
+ * once per event: PowerPoint's Windows keys on Windows, PowerPoint for Mac's on
+ * macOS, PowerPoint for the web's in the web frame. Keys whose CSV row names
+ * several commands at once (align, font size steps, zoom, clipboard, nudge,
+ * Delete, Tab, Escape) are still read from the event below.
  */
 import { deleteSelectedVertex } from './edit-points-actions'
 import type { FontSizeStep } from '@genoffice/pptx-ops/font-size'
@@ -12,6 +18,7 @@ import { FIT_WIDTH, NUDGE_STEP_PX } from './app-constants'
 import { isConnectorNode, isEditableText } from './konva-adapter'
 import * as clipboardActions from './clipboard-actions'
 import * as arrangeActions from './arrange-actions'
+import * as insertActions from './insert-actions'
 import * as slideActions from './slide-actions'
 import * as showActions from './show-actions'
 import * as styleActions from './style-actions'
@@ -20,6 +27,7 @@ import { shouldRouteHistoryToDeck } from './undo-routing'
 import { rangeSelection } from '../shared/slide-selection'
 import { nextPreset, prevPreset } from './zoom-steps'
 import { cap } from './capabilities'
+import { matchSlidesKey, shortcutPlatform } from './shortcuts'
 
 /** Whether focus is in a text input (input/textarea/contentEditable) — these cases use native undo/delete */
 function inTextField(): boolean {
@@ -39,10 +47,10 @@ const ALIGN_KEYS: Record<string, 'left' | 'center' | 'right' | 'justify'> = {
   j: 'justify',
 }
 
-const TOGGLE_KEYS: Record<string, 'bold' | 'italic' | 'underline'> = {
-  b: 'bold',
-  i: 'italic',
-  u: 'underline',
+const TOGGLE_ACTIONS: Record<string, 'bold' | 'italic' | 'underline'> = {
+  'slides-48': 'bold',
+  'slides-49': 'italic',
+  'slides-50': 'underline',
 }
 
 /** ⌘]/⌘[ = ±1 pt; ⇧⌘> / ⇧⌘< = next/previous ladder rung (key is layout-resolved, so '.'/',' cover keyboards where Shift yields no '>'/'<') */
@@ -75,6 +83,17 @@ function editEntry(e: KeyboardEvent, ctx: ActionCtx): Partial<EditingState> | nu
   return e.key === 'F2' ? { selectAll: true } : {}
 }
 
+/**
+ * The gap the selected slides move to (moveSlidesTo): one slide up / down
+ * (slides-19) or to the start / end (slides-20), the direction from the arrow.
+ */
+function slideMoveGap(id: string, key: string, selected: number[], count: number): number {
+  const up = key === 'ArrowUp'
+  if (id === 'slides-20') return up ? 0 : count
+  const sel = [...selected].sort((a, b) => a - b)
+  return up ? Math.max(0, sel[0]! - 1) : Math.min(count, sel[sel.length - 1]! + 2)
+}
+
 /** One Shift+arrow step on a side; shrinking never drops below one step (or the side's current size if already thinner) */
 function resizeBy(size: number, dir: number): number {
   return dir > 0
@@ -93,38 +112,21 @@ export function handleGlobalKeydown(
   const mod = e.metaKey || e.ctrlKey
   const inField = inTextField()
   const { editing, selectedIds, slide } = ctx
-  // F5 show from start / ⇧F5 from current slide
-  if (e.key === 'F5' && !mod) {
+  const id = matchSlidesKey(e, shortcutPlatform(platform))
+  // Start the show: F5 from the start, Shift+F5 from the current slide, Alt+F5 in
+  // presenter view (Mac: Shift+Cmd+Return / Cmd+Return / Option+Return; web: Ctrl+F5 /
+  // Ctrl+Shift+F5). The Return chords leave text editing alone.
+  if (id === 'slides-22' || id === 'slides-23' || id === 'slides-24') {
+    if (e.key === 'Enter' && (e.defaultPrevented || editing || inField || ctx.cropTarget)) return
     e.preventDefault()
-    showActions.startSlideShow(ctx, !e.shiftKey)
+    if (id === 'slides-24') showActions.startPresenterView(ctx, false)
+    else showActions.startSlideShow(ctx, id === 'slides-22')
     return
   }
-  // PowerPoint for macOS: ⌘+Enter starts from the current slide. Keep
-  // Ctrl+Enter untouched on Windows, where PowerPoint uses it to move between
-  // placeholders (and Shift+F5 already starts from the current slide).
-  if (
-    /mac/i.test(platform) &&
-    e.metaKey &&
-    !e.ctrlKey &&
-    !e.altKey &&
-    !e.shiftKey &&
-    e.key === 'Enter'
-  ) {
-    if (e.defaultPrevented || editing || inField || ctx.cropTarget) return
-    e.preventDefault()
-    showActions.startSlideShow(ctx, false)
-    return
-  }
-  // PowerPoint's new-slide chord: Ctrl+M on Windows, ⇧⌘N on mac. The renderer sees ⌘M
-  // before the menu accelerator (measured), so it must stay untouched there for Minimize.
+  // New slide: Ctrl+M on Windows, ⇧⌘N on mac. The renderer sees ⌘M before the menu
+  // accelerator (measured), so it must stay untouched there for Minimize.
   // Commits an open text edit and the notes draft first, in save()'s order.
-  const mac = /mac/i.test(platform)
-  if (
-    mod &&
-    !e.altKey &&
-    ((!mac && !e.shiftKey && (e.key === 'm' || e.key === 'M')) ||
-      (mac && e.metaKey && e.shiftKey && (e.key === 'n' || e.key === 'N')))
-  ) {
+  if (id === 'slides-14') {
     if (e.defaultPrevented || ctx.viewMode === 'reading' || ctx.masterItems || ctx.cropTarget)
       return
     e.preventDefault()
@@ -134,37 +136,40 @@ export function handleGlobalKeydown(
     return
   }
   // Undo/redo (menu accelerators normally intercept; fallback for shell/menuless scenarios)
-  if (mod && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
+  if (id === 'slides-07' || id === 'slides-08') {
     if (editing || (inField && !shouldRouteHistoryToDeck(e.target as HTMLElement))) return
     e.preventDefault()
-    void (e.shiftKey ? ctx.redo() : ctx.undo())
+    void (id === 'slides-08' ? ctx.redo() : ctx.undo())
     return
   }
-  if (mod && !e.altKey && (e.key === 'y' || e.key === 'Y')) {
-    if (editing || (inField && !shouldRouteHistoryToDeck(e.target as HTMLElement))) return
-    e.preventDefault()
-    void ctx.redo()
-    return
-  }
-  // ⌘F find/replace
-  if (mod && !e.altKey && (e.key === 'f' || e.key === 'F')) {
+  // ⌘F find, Ctrl+H / ⇧⌘H replace: one panel holds both boxes
+  if (id === 'slides-60' || id === 'slides-61') {
     if (editing) return
     e.preventDefault()
     ctx.setFindOpen(true)
     return
   }
-  // ⌘K: annotate the selection with an AI edit
-  if (mod && !e.altKey && !e.shiftKey && (e.key === 'k' || e.key === 'K')) {
-    if (editing || inField || selectedIds.length === 0) return
+  // ⌘K: insert hyperlink on the text being edited or the one selected shape (PowerPoint).
+  // Ask AI no longer has a key: its popover opens from the button (UNI-2011 D2/D4).
+  if (id === 'slides-59') {
+    const inEditor = !!(editing || ctx.editingCell) && inEditorOverlay()
+    if (!inEditor && (inField || selectedIds.length !== 1)) return
     e.preventDefault()
-    ctx.openAskPopover()
+    void insertActions.openLinkDialog(ctx)
     return
   }
   // ⌘P print
-  if (mod && !e.altKey && !e.shiftKey && (e.key === 'p' || e.key === 'P')) {
+  if (id === 'slides-05') {
     if (editing || inField) return
     e.preventDefault()
     if (cap('print')) ctx.setPrintDlgOpen(true)
+    return
+  }
+  // Insert comment: Ctrl+Alt+M (AltGr guarded) / Shift+Cmd+M opens the composer
+  if (id === 'slides-47') {
+    if (inField && !editing) return
+    e.preventDefault()
+    ctx.newComment()
     return
   }
   // PowerPoint text formatting: ⌘L/E/R/J align, ⌘]/⌘[ ±1 pt, ⇧⌘>/⇧⌘< grow/shrink
@@ -194,7 +199,7 @@ export function handleGlobalKeydown(
         styleActions.onFontSizeStep(ctx, step)
         return
       }
-      const toggle = e.shiftKey ? undefined : TOGGLE_KEYS[lower]
+      const toggle = id ? TOGGLE_ACTIONS[id] : undefined
       if (toggle && !inEditor) {
         e.preventDefault()
         styleActions.onTextToggle(ctx, toggle)
@@ -218,6 +223,11 @@ export function handleGlobalKeydown(
     ctx.setZoom(1)
     return
   }
+  if (id === 'slides-68' && !inField) {
+    e.preventDefault()
+    ctx.zoomToFit()
+    return
+  }
   if (editing || inField) return
   // ⌘C/⌘X with text dragged in plain DOM (e.g. AI panel, focus on body): let the
   // native copy run instead of hijacking it for the slide/element clipboard
@@ -231,7 +241,7 @@ export function handleGlobalKeydown(
     (ctx.overlayOpen ||
       e.defaultPrevented ||
       document.querySelector(
-        '[role="dialog"], [role="menu"], [aria-modal="true"], [data-esc-local]',
+        '[role="dialog"]:not([data-overlay-dock]), [role="menu"], [aria-modal="true"]:not([data-overlay-dock]), [data-esc-local]',
       ))
   )
     return
@@ -259,14 +269,14 @@ export function handleGlobalKeydown(
     deleteSelectedVertex(ctx)
     return
   }
-  // Element clipboard (text editing uses the native clipboard, not intercepted)
-  if (mod && !e.altKey && (e.key === 'v' || e.key === 'V')) {
-    if (e.shiftKey) {
-      // ⌘⇧V: paste format
-      e.preventDefault()
-      void clipboardActions.pasteFormat(ctx)
-      return
-    }
+  // Element clipboard (text editing uses the native clipboard, not intercepted).
+  // ⌘⇧V pastes the copied format on the desktop; the web leaves it to the browser.
+  if (id === 'slides-12') {
+    e.preventDefault()
+    void clipboardActions.pasteFormat(ctx)
+    return
+  }
+  if (mod && !e.altKey && !e.shiftKey && (e.key === 'v' || e.key === 'V')) {
     e.preventDefault()
     void clipboardActions.pasteClipboard(ctx)
     return
@@ -332,6 +342,24 @@ export function handleGlobalKeydown(
       .filter((n) => !n.decoration && !n.background && n.type !== 'placeholder-chip')
       .map((n) => n.sourceId)
     if (ids.length) ctx.setSelectedIds(ids)
+    return
+  }
+  // Duplicate the selected slides (PowerPoint's ⇧⌘D), from the canvas or the rail
+  if (id === 'slides-15') {
+    if (ctx.masterItems || ctx.viewMode === 'reading' || ctx.slides.length === 0) return
+    e.preventDefault()
+    const sel = ctx.selectedSlides.length ? ctx.selectedSlides : [ctx.current]
+    void slideActions.duplicateSlides(ctx, sel)
+    return
+  }
+  // Move the selected slides one up / down (⌘↑ / ⌘↓) or to the start / end (⇧⌘↑ / ⇧⌘↓)
+  // when no shape is selected or the rail has focus; with shapes selected ⌘+arrow nudges.
+  if ((id === 'slides-19' || id === 'slides-20') && (!selectedIds.length || slideRailHasFocus())) {
+    if (e.defaultPrevented || ctx.masterItems || ctx.viewMode === 'reading' || !ctx.slides.length)
+      return
+    e.preventDefault()
+    const sel = ctx.selectedSlides.length ? ctx.selectedSlides : [ctx.current]
+    void slideActions.moveSlidesTo(ctx, sel, slideMoveGap(id, e.key, sel, ctx.slides.length))
     return
   }
   // Nothing selected: ↑/↓ and PageUp/PageDown switch slides from either the
@@ -407,33 +435,40 @@ export function handleGlobalKeydown(
     }
     return
   }
-  if (mod && !e.altKey && (e.key === 'c' || e.key === 'C')) {
-    if (e.shiftKey) {
-      // ⌘⇧C: copy format
-      e.preventDefault()
-      clipboardActions.copyFormat(ctx)
-      return
-    }
+  // ⌘⇧C: copy format
+  if (id === 'slides-11') {
+    e.preventDefault()
+    clipboardActions.copyFormat(ctx)
+    return
+  }
+  if (mod && !e.altKey && !e.shiftKey && (e.key === 'c' || e.key === 'C')) {
     e.preventDefault()
     void clipboardActions.copySelected(ctx)
     return
   }
-  if (mod && !e.altKey && (e.key === 'x' || e.key === 'X')) {
+  if (mod && !e.altKey && !e.shiftKey && (e.key === 'x' || e.key === 'X')) {
     e.preventDefault()
     void clipboardActions.cutSelected(ctx)
     return
   }
-  // ⌘D duplicate in place
-  if (mod && !e.altKey && (e.key === 'd' || e.key === 'D')) {
+  // Ctrl+D duplicate in place (⇧⌘D is the slide, above)
+  if (id === 'slides-16') {
     e.preventDefault()
     void clipboardActions.duplicateSelected(ctx, selectedIds)
     return
   }
-  // ⌘G group / ⌘⇧G ungroup
-  if (mod && !e.altKey && (e.key === 'g' || e.key === 'G')) {
+  // Group / ungroup / regroup: Ctrl+G / Ctrl+Shift+G / Ctrl+Shift+J (Mac: ⌥⌘G / ⌥⇧⌘G / ⌥⌘J)
+  if (id === 'slides-37' || id === 'slides-38' || id === 'slides-39') {
     e.preventDefault()
-    if (e.shiftKey) void arrangeActions.ungroupSelected(ctx)
-    else void arrangeActions.groupSelected(ctx)
+    if (id === 'slides-37') void arrangeActions.groupSelected(ctx)
+    else if (id === 'slides-38') void arrangeActions.ungroupSelected(ctx)
+    else void arrangeActions.regroupSelected(ctx)
+    return
+  }
+  // Alt+→ / Alt+← rotate the selection 15° right / left (PowerPoint)
+  if (id === 'slides-43') {
+    e.preventDefault()
+    void arrangeActions.rotateSelected(ctx, e.key === 'ArrowLeft' ? -15 : 15)
     return
   }
   if (e.key === 'Delete' || e.key === 'Backspace') {

@@ -26,6 +26,8 @@ export const de = {
   appScLineBreak: 'Zeilenumbruch',
   appScNbsp: 'Geschütztes Leerzeichen',
   appScNbHyphen: 'Geschützter Bindestrich',
+  appScFindNext: 'Weitersuchen',
+  appScOptHyphen: 'Bedingter Trennstrich',
   appScGrowFont1: 'Schriftgrad um 1 pt vergrößern',
   appScShrinkFont1: 'Schriftgrad um 1 pt verkleinern',
   appScListDemote: 'Listenebene verringern',
@@ -224,7 +226,7 @@ export const de = {
   appAutoSave: 'Automatisches Speichern',
   appAutoSaveTip:
     'Automatisches Speichern (alle 30 Sekunden und wenn das Fenster den Fokus verliert)',
-  appSaveShortcutTip: 'Speichern (⌘S)',
+  appSaveShortcutTip: 'Speichern ({keys})',
   appUndo: 'Rückgängig',
   appRedo: 'Wiederholen',
   appStartOpening: 'Wird geöffnet…',
@@ -563,9 +565,14 @@ export const de = {
   appOnlyEncrypted: '„{name}“ ist kennwortgeschützt und kann hier nicht geöffnet werden.',
   appFileExportPdf: 'Als PDF exportieren…',
   appFilePrint: 'Drucken…',
+  appPrintNoDocument: 'Öffnen Sie ein Dokument, um es zu drucken.',
   appPrintNoPrinter:
     'Auf diesem Computer ist kein Drucker verfügbar. Sie können das Dokument stattdessen als PDF speichern.',
   appPrintFailedPdfHint:
     'Drucken ist fehlgeschlagen: {error}. Sie können das Dokument stattdessen als PDF speichern.',
   appPrintSaveAsPdf: 'Als PDF speichern…',
+  appFileSaveCopy: 'Als Kopie speichern…',
+  appCopySaved: 'Ihre Version wurde als neues Dokument gespeichert: {title}.',
+  appCopySaveFailed:
+    'Die Kopie konnte nicht erstellt werden. Ihre Änderungen sind weiterhin sicher; versuchen Sie es erneut.',
 } satisfies Record<keyof typeof zh, string>

@@ -13,8 +13,17 @@ import type {
   UniworkSearchPage,
   UniworkSearchQuery,
   UniworkSharedQuery,
+  UniworkSourceDownloadInput,
   UniworkTreeChangedEvent,
 } from '../../shared/home-api'
+import type { UniworkDocShelveResult } from '../../shared/home-api'
+import type {
+  OpenSourceInput,
+  OpenSourceValue,
+  SourceViewHint,
+  SourceViewResult,
+  SourceViewState,
+} from '../../shared/source-view'
 import type { DocNameError, NewDocFormat } from './uniwork-docs-model'
 
 /**
@@ -60,7 +69,11 @@ export type DocActionResult<T> =
       name?: string
       sizeBytes?: number
       maxBytes?: number
+      /** UNI-2047: the server throttled (429 / 503): the same call may be tried once more */
+      retryable?: boolean
       /** FD-11: the depth cap of a document_too_deep */ max?: number
+      /** UNI-1959: the server has no route for this create (404 / 501): disable that kind */
+      endpointMissing?: boolean
     }
 
 export interface CreateDocInput {
@@ -70,7 +83,12 @@ export interface CreateDocInput {
   format: NewDocFormat
 }
 
-export type CreatePageInput = Omit<CreateDocInput, 'format'>
+/** UNI-1953: a UniNote is a page, created through its own call and opened on the web */
+export interface CreatePageInput {
+  workspaceId: string
+  folderId: string | null
+  name: string
+}
 
 export interface UploadDocInput {
   workspaceId: string
@@ -107,6 +125,7 @@ interface ActionsBridge {
   uniworkRenameDocument?(
     documentId: string,
     name: string,
+    options?: { shareWithWorkspace?: boolean },
   ): Promise<DocActionResult<UniworkDocSummary>>
   uniworkArchiveDocument?(documentId: string): Promise<DocActionResult<unknown>>
   uniworkRestoreDocument?(documentId: string): Promise<DocActionResult<unknown>>
@@ -117,6 +136,12 @@ interface ActionsBridge {
   uniworkMoveDocument?(i: UniworkMoveDocumentInput): Promise<DocActionResult<UniworkMoveResult>>
   onUniworkTreeChanged?(cb: (event: UniworkTreeChangedEvent) => void): () => void
   onUniworkDocRenamed?(cb: (event: DocRenamedEvent) => void): () => void
+  uniworkDownloadSource?(
+    input: UniworkSourceDownloadInput,
+  ): Promise<UniworkResult<{ path: string | null }>>
+  uniworkOpenSource?(input: OpenSourceInput): Promise<SourceViewResult<OpenSourceValue>>
+  uniworkSourceViewState?(path: string): Promise<SourceViewState | null>
+  onUniworkSourceViewHint?(cb: (payload: SourceViewHint) => void): () => void
 }
 
 const unavailable = { ok: false, error: 'server_error' } as const
@@ -153,8 +178,14 @@ export function onUploadProgress(cb: (event: UploadProgressEvent) => void): () =
 export function renameDocument(
   documentId: string,
   name: string,
+  options?: { shareWithWorkspace?: boolean },
 ): Promise<DocActionResult<UniworkDocSummary>> {
-  return actions().uniworkRenameDocument?.(documentId, name) ?? Promise.resolve(unavailable)
+  const api = actions()
+  if (!api.uniworkRenameDocument) return Promise.resolve(unavailable)
+  // no third argument unless asked for: callers (and their mocks) of a plain rename see two
+  return options
+    ? api.uniworkRenameDocument(documentId, name, options)
+    : api.uniworkRenameDocument(documentId, name)
 }
 
 export function archiveDocument(documentId: string): Promise<DocActionResult<unknown>> {
@@ -210,6 +241,44 @@ export function moveDocument(
   return settleAct(actions().uniworkMoveDocument?.(input))
 }
 
+/** UNI-1961: save a Documents-home source file through the save dialog (path null = cancelled) */
+export function downloadSource(
+  input: UniworkSourceDownloadInput,
+): Promise<UniworkResult<{ path: string | null }>> {
+  return settleRead(actions().uniworkDownloadSource?.(input))
+}
+
+/**
+ * UNI-1993: open a source file view only in its editor tab (main downloads it to a temp copy and
+ * registers the path as a source view). A bridge that is missing or throws reads as a failure the
+ * caller maps to a toast: `server_error` / `network`.
+ */
+export async function openSource(
+  input: OpenSourceInput,
+): Promise<SourceViewResult<OpenSourceValue>> {
+  const call = actions().uniworkOpenSource?.(input)
+  if (!call) return { ok: false, error: 'server_error' }
+  try {
+    return await call
+  } catch {
+    return { ok: false, error: 'network' }
+  }
+}
+
+/** UNI-1993: the tab chip's facts for a path, or null when the path is no source view */
+export async function sourceViewStateOf(path: string): Promise<SourceViewState | null> {
+  try {
+    return (await actions().uniworkSourceViewState?.(path)) ?? null
+  } catch {
+    return null
+  }
+}
+
+/** UNI-1993: main says an explicit Save hit a source view path (the tab shows the hint) */
+export function onSourceViewHint(cb: (payload: SourceViewHint) => void): () => void {
+  return actions().onUniworkSourceViewHint?.(cb) ?? (() => undefined)
+}
+
 /** a workspace's tree changed (feed page or an own action, coalesced in main) */
 export function onTreeChanged(cb: (event: UniworkTreeChangedEvent) => void): () => void {
   return actions().onUniworkTreeChanged?.(cb) ?? (() => undefined)
@@ -223,4 +292,75 @@ export function onDocRenamed(cb: (event: DocRenamedEvent) => void): () => void {
 /** SIZE-F1: save the bound document's working copy to a user-chosen local path */
 export function saveLocalCopy(path: string): Promise<boolean> {
   return actions().uniworkSaveLocalCopy?.(path) ?? Promise.resolve(false)
+}
+
+// ── UNI-1961: the Lưu trữ (Archive) shelf ───────────────
+// The shelf list itself is read through the Documents home adapter
+// (fetchDocumentsHomePage); these are its two row commands.
+
+interface ShelvedBridge {
+  uniworkUnshelveDocument?(documentId: string): Promise<DocActionResult<UniworkDocShelveResult>>
+  uniworkTrashShelvedDocument?(documentId: string): Promise<DocActionResult<UniworkDocSummary>>
+  uniworkShelveDocument?(documentId: string): Promise<DocActionResult<UniworkDocShelveResult>>
+}
+
+function shelvedActions(): ShelvedBridge {
+  return window.aiOffice as unknown as ShelvedBridge
+}
+
+/** Bỏ lưu trữ: the item and its same-batch descendants the caller manages */
+export function unshelveDocument(
+  documentId: string,
+): Promise<DocActionResult<UniworkDocShelveResult>> {
+  return settleAct(shelvedActions().uniworkUnshelveDocument?.(documentId))
+}
+
+/** Chuyển vào thùng rác from Lưu trữ, for a shelved item of any kind */
+export function trashShelvedDocument(
+  documentId: string,
+): Promise<DocActionResult<UniworkDocSummary>> {
+  return settleAct(shelvedActions().uniworkTrashShelvedDocument?.(documentId))
+}
+
+/** Lưu trữ a live item from its row (the web's row ⋯ "Lưu trữ") */
+export function shelveDocument(
+  documentId: string,
+): Promise<DocActionResult<UniworkDocShelveResult>> {
+  return settleAct(shelvedActions().uniworkShelveDocument?.(documentId))
+}
+
+// ── UNI-2047 B6: Gắn sao (Starred) ──────────────────────
+// The Starred list is read through the Documents home adapter (fetchDocumentsHomePage); these are
+// the two row commands. A host without them (an older shell) has no Gắn sao entry at all.
+
+interface FavoriteBridge {
+  uniworkFavoriteDocument?(documentId: string): Promise<DocActionResult<{ favoritedAt: string }>>
+  uniworkUnfavoriteDocument?(documentId: string): Promise<DocActionResult<{ documentId: string }>>
+}
+
+function favoriteActions(): FavoriteBridge {
+  return window.aiOffice as unknown as FavoriteBridge
+}
+
+/** whether this shell can star and unstar (both calls present) */
+export function canFavoriteDocuments(): boolean {
+  const bridge = favoriteActions()
+  return (
+    typeof bridge?.uniworkFavoriteDocument === 'function' &&
+    typeof bridge?.uniworkUnfavoriteDocument === 'function'
+  )
+}
+
+/** Gắn sao a document from its row (idempotent on the server) */
+export function favoriteDocument(
+  documentId: string,
+): Promise<DocActionResult<{ favoritedAt: string }>> {
+  return settleAct(favoriteActions().uniworkFavoriteDocument?.(documentId))
+}
+
+/** Bỏ gắn sao a document from its row (idempotent on the server) */
+export function unfavoriteDocument(
+  documentId: string,
+): Promise<DocActionResult<{ documentId: string }>> {
+  return settleAct(favoriteActions().uniworkUnfavoriteDocument?.(documentId))
 }

@@ -1,4 +1,4 @@
-import { classifyDroppedToolReason, type PanelNote } from './notice-surface'
+import { classifyDroppedToolReason } from './notice-surface'
 
 export type ResultChipKind = 'edited' | 'unsupported' | 'clarify' | 'error' | 'answer'
 
@@ -101,10 +101,6 @@ export interface ResultChipInput {
   readonly mutated?: boolean | undefined
   readonly toolExecutions?: readonly ResultChipToolExecution[] | undefined
   readonly droppedToolCalls?: readonly ResultChipDroppedToolCall[] | undefined
-  /** @deprecated `resultChip` ignores it (RF1-13: only `droppedToolCalls` decides); removal is tracked in the G6-10 sweep */
-  readonly panelNotes?: readonly PanelNote[] | undefined
-  /** @deprecated Alias for `panelNotes`; ignored like it */
-  readonly notes?: readonly PanelNote[] | undefined
   /** True when the allowlisted `ask_clarification` tool was called */
   readonly clarifyCalled?: boolean | undefined
   /** Alias for `clarifyCalled` */

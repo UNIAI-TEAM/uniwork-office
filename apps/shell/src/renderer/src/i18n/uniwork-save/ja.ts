@@ -12,11 +12,12 @@ export const ja = {
   usMyFolderPrivate: '非公開、あなただけが見られます',
   usChange: '変更',
   usSave: '保存',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: '閉じる',
   usPickTitle: '保存先を選択',
   usBack: '名前の入力に戻る',
   usSearchFolders: 'フォルダーを検索',
-  usSharedNote: '共有フォルダーに保存すると、ドキュメントにはそのフォルダーの権限が適用されます。',
   usChooseFolder: '「{folder}」を選択',
   usSelected: '選択中',
   usRootBlocked: 'フォルダーを選んでください',
@@ -33,4 +34,8 @@ export const ja = {
     'このタブはすでに UniWork のドキュメントに関連付けられています。通常どおり保存してください。',
   usErrNotFound:
     '保存するファイルまたは選択したフォルダーが見つかりません。保存先を選び直してから、もう一度お試しください。',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

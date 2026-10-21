@@ -11,7 +11,10 @@ import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import { sha256Hex } from '../src/main/uniwork-docs/formats'
 import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits } from '../src/main/uniwork-docs/limits'
 import type { CommitLookup, UploadSessionState } from '../src/main/uniwork-docs/parse'
-import type { DocumentUploadSessionClient } from '../src/main/uniwork-sync/version-upload'
+import {
+  uploadKeyFor,
+  type DocumentUploadSessionClient,
+} from '../src/main/uniwork-sync/version-upload'
 import {
   createIntentStore,
   INTENT_STORE_REGISTRATION,
@@ -118,6 +121,10 @@ function fakeLock(
       const lease = table.leases.get(docKey)
       return !!lease && lease.owner === owner && lease.generation === generation
     },
+    async isHeld(docKey) {
+      const lease = table.leases.get(docKey)
+      return !!lease && lease.owner !== owner && clock() - lease.heartbeatAt <= goneMs
+    },
     async release(docKey, generation) {
       const lease = table.leases.get(docKey)
       if (lease && lease.owner === owner && lease.generation === generation) {
@@ -129,23 +136,42 @@ function fakeLock(
 
 interface ServerState {
   lookupOutcome: CommitLookup['outcome']
+  lookupError: UniworkDocError | null
   commitError: UniworkDocError | null
   uploadError: UniworkDocError | null
+  /**
+   * UNI-1918 (B69-lite): a refusal the server raises from the COMMIT call when
+   * `commitError` is null - the real shape of an expired staged upload
+   * (`409 document_upload_invalid` / `reason=file_claim_expired`), which D
+   * answers from the commit route, not from the upload route.
+   */
+  commitRefusal: UniworkDocError | null
   commitReceipt: { versionId: string; version: number; revision: string }
   uploadReceipt: { uploadId: string; checksumSha256: string }
   counts: { upload: number; commit: number; lookup: number }
   keys: { upload: string[]; commit: string[]; lookup: string[] }
+  /** EL-1(b): outgoing commit inputs (assert editLockId, never a mock echo) */
+  commitInputs: Array<{
+    documentId: string
+    uploadId: string
+    baseRevision: string
+    idempotencyKey: string
+    editLockId?: string
+  }>
 }
 
 function fakeServer(): { client: QueueClient; state: ServerState } {
   const state: ServerState = {
     lookupOutcome: 'in_flight',
+    lookupError: null,
     commitError: null,
     uploadError: null,
+    commitRefusal: null,
     commitReceipt: { versionId: 'ver_4', version: 4, revision: '42' },
     uploadReceipt: { uploadId: 'up_1', checksumSha256: 'unset' },
     counts: { upload: 0, commit: 0, lookup: 0 },
     keys: { upload: [], commit: [], lookup: [] },
+    commitInputs: [],
   }
   const client: QueueClient = {
     async upload(input) {
@@ -160,7 +186,9 @@ function fakeServer(): { client: QueueClient; state: ServerState } {
     async commit(input) {
       state.counts.commit += 1
       state.keys.commit.push(input.idempotencyKey)
+      state.commitInputs.push(input)
       if (state.commitError) throw state.commitError
+      if (state.commitRefusal) throw state.commitRefusal
       return {
         documentId: input.documentId,
         checksumSha256: state.uploadReceipt.checksumSha256,
@@ -170,6 +198,7 @@ function fakeServer(): { client: QueueClient; state: ServerState } {
     async lookupCommit(input) {
       state.counts.lookup += 1
       state.keys.lookup.push(input.idempotencyKey)
+      if (state.lookupError) throw state.lookupError
       if (state.lookupOutcome === 'committed') {
         return { outcome: 'committed', receipt: { versionId: 'ver_4', version: 4, revision: '42' } }
       }
@@ -227,7 +256,13 @@ afterEach(() => {
   rmSync(base, { recursive: true, force: true })
 })
 
-async function harness(): Promise<Harness> {
+async function harness(
+  extra: {
+    editLockId?: (path: string) => string | null
+    prepareEditLock?: (path: string) => Promise<'held' | 'park' | 'proceed'>
+    onCommitEditLocked?: (path: string, error: UniworkDocError) => void
+  } = {},
+): Promise<Harness> {
   const clock = new FakeClock()
   const safeStorage = createLockableSafeStorage()
   const layer = createStoreLayer({
@@ -268,6 +303,9 @@ async function harness(): Promise<Harness> {
       limits: QUEUE_LIMITS,
       publish: (record) => published.push(record),
       uuid: () => 'u1',
+      ...(extra.editLockId ? { editLockId: extra.editLockId } : {}),
+      ...(extra.prepareEditLock ? { prepareEditLock: extra.prepareEditLock } : {}),
+      ...(extra.onCommitEditLocked ? { onCommitEditLocked: extra.onCommitEditLocked } : {}),
       ...deps,
     })
   const makeDispatcher = (owner: string): QueueDispatcher =>
@@ -282,6 +320,7 @@ async function harness(): Promise<Harness> {
       getDocument: async () => {
         throw new UniworkDocError('not_found')
       },
+      lookupCommit: (input) => server.client.lookupCommit(input),
     },
     isSignedIn: () => true,
     ownsBinding: () => true,
@@ -294,6 +333,9 @@ async function harness(): Promise<Harness> {
     pause,
     drafts,
     dispatcher,
+    ...(extra.editLockId ? { editLockId: extra.editLockId } : {}),
+    ...(extra.prepareEditLock ? { prepareEditLock: extra.prepareEditLock } : {}),
+    ...(extra.onCommitEditLocked ? { onCommitEditLocked: extra.onCommitEditLocked } : {}),
   })
 
   const makeDoc = (opts: { key?: string; orgId?: string; payload?: string } = {}): QueueDoc => {
@@ -439,6 +481,27 @@ function refusingCoordinator(
 }
 
 describe('G5-06 W4a save queue (fakes)', () => {
+  it('R2: a phase write the store refuses stops before the commit POST', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    // the mint (the first write) succeeds; every later phase write is refused
+    // with `store_full`, so the durable record can never say `committing`
+    const original = h.intents.put.bind(h.intents)
+    let writes = 0
+    h.intents.put = async (key, intent, payload) => {
+      writes += 1
+      return writes === 1 ? await original(key, intent, payload) : { kind: 'store_full' }
+    }
+    const ended = await h.coordinator.save(doc.path)
+    // nothing may have been POSTed: the durable record never reached the state
+    // that authorizes a commit
+    expect(h.server.state.counts.commit).toBe(0)
+    expect(ended?.binding.state).toBe('error')
+    expect(ended?.binding.error).toBe('store_full')
+    // the intent is kept: nothing was proven about it
+    expect(await stored(h.intents, doc)).not.toBeNull()
+  })
+
   it('crash at each step, timeout after commit, cancel race', async () => {
     // a commit whose answer is lost after the server committed: never "failed",
     // always reconciling, and a lookup settles it
@@ -726,24 +789,100 @@ describe('G5-06 W4a save queue (fakes)', () => {
     },
   )
 
-  it('expired upload -> reconciling, exactly one lookup, no byte re-upload', async () => {
+  it('expired upload claim -> one lookup with the same commit key, no byte re-upload', async () => {
     const h = await harness()
     const doc = h.makeDoc()
     await h.dispatcher.enqueue(doc)
-    h.server.state.commitError = new UniworkDocError('ticket_expired', {
-      serverCode: 'ticket_expired',
+    // the real server answer: the COMMIT is refused with a coded 409 whose
+    // `fields.reason` is the expiry (D resolves the staged upload before it
+    // claims the intent, so the refusal arrives on the commit leg)
+    h.server.state.commitRefusal = new UniworkDocError('server_error', {
+      status: 409,
+      serverCode: 'document_upload_invalid',
+      reason: 'file_claim_expired',
     })
     await h.dispatcher.dispatchAll([doc])
+    // exactly one lookup, with the SAME commit key, and the state follows it
+    expect(h.server.state.counts.lookup).toBe(1)
+    expect(h.server.state.keys.lookup).toEqual([doc.record.idempotencyKey])
     expect(doc.record.state).toBe('reconciling')
     const uploads = h.server.state.counts.upload
     h.server.state.lookupOutcome = 'not_committed'
     await h.dispatcher.reconcile(doc)
-    expect(h.server.state.counts.lookup).toBe(1)
+    expect(h.server.state.counts.lookup).toBe(2)
     // proven not committed: a new attempt is minted with the SAME key, no re-upload yet
     expect(doc.record.state).toBe('queued')
     expect(doc.record.attempt).toBe(1)
     expect(h.server.state.counts.upload).toBe(uploads)
     expect(new Set(h.server.state.keys.lookup)).toEqual(new Set([doc.record.idempotencyKey]))
+    // the retry stages the same bytes under the NEW upload key, same commit key
+    h.server.state.commitRefusal = null
+    await h.dispatcher.dispatchAll([doc])
+    expect(h.server.state.keys.upload).toEqual([
+      doc.record.idempotencyKey,
+      `${doc.record.idempotencyKey}:u1`,
+    ])
+    expect(h.server.state.keys.commit).toEqual([
+      doc.record.idempotencyKey,
+      doc.record.idempotencyKey,
+    ])
+    expect(doc.record.state).toBe('committed')
+  })
+
+  it('R7: a failed expiry lookup leaves the dispatcher record reconciling with an age, never committing', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    h.server.state.commitRefusal = new UniworkDocError('server_error', {
+      status: 409,
+      serverCode: 'document_upload_invalid',
+      reason: 'file_claim_expired',
+    })
+    // the ONE lookup that decides cannot be answered: nothing proves either way
+    h.server.state.lookupError = new UniworkDocError('server_error', { status: 500 })
+    await h.dispatcher.dispatchAll([doc])
+    const after = await stored(h.intents, doc)
+    expect(after?.intent.state).toBe('reconciling')
+    expect(after?.intent.reconcileSince).toBeTruthy()
+  })
+
+  it('an expired claim whose lookup is unknown parks stuck, never a blind resend', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    h.server.state.commitRefusal = new UniworkDocError('server_error', {
+      status: 409,
+      serverCode: 'document_upload_invalid',
+      reason: 'file_claim_expired',
+    })
+    await h.dispatcher.dispatchAll([doc])
+    h.server.state.lookupOutcome = 'unknown'
+    await h.dispatcher.reconcile(doc)
+    expect(doc.record.state).toBe('reconciling-stuck')
+    expect(doc.record.attempt).toBe(0)
+    const uploads = h.server.state.counts.upload
+    const commits = h.server.state.counts.commit
+    await h.dispatcher.dispatchAll([doc])
+    expect(h.server.state.counts.upload).toBe(uploads)
+    expect(h.server.state.counts.commit).toBe(commits)
+  })
+
+  it("another document_upload_invalid reason keeps today's mapping", async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    h.server.state.commitRefusal = new UniworkDocError('server_error', {
+      status: 409,
+      serverCode: 'document_upload_invalid',
+      reason: 'upload_canceled',
+    })
+    await h.dispatcher.dispatchAll([doc])
+    // not an expiry: no lookup is spent on it. The record was `committing`, so
+    // the machine's own rule keeps it reconciling (a coded answer to a request
+    // whose POST may have landed) - never `failed`, never a new key
+    expect(h.server.state.counts.lookup).toBe(0)
+    expect(doc.record.state).toBe('reconciling')
+    expect(doc.record.attempt).toBe(0)
   })
 
   it('lookup unknown -> reconciling-stuck, no new attempt, "check again" only looks up', async () => {
@@ -1073,13 +1212,15 @@ describe('G5-06 W4a save queue (fakes)', () => {
     }
 
     // uploading at rest -> ZERO lookups: the record requeues and re-sends the
-    // SAME key in the same pass (one upload, one commit), never a lookup
+    // SAME key in the same pass (one upload, one commit), never a lookup. The
+    // requeue mints attempt 2, so the bytes stage under that attempt's upload
+    // key while the COMMIT key is unchanged (UNI-1918 B69-lite).
     const uploading = await harness()
     const up = await seedInFlight(uploading, 'uploading')
     const upKey = up.record.idempotencyKey
     await uploading.dispatcher.dispatchAll([up])
     expect(uploading.server.state.counts.lookup).toBe(0)
-    expect(uploading.server.state.keys.upload).toEqual([upKey])
+    expect(uploading.server.state.keys.upload).toEqual([uploadKeyFor(upKey, up.record.attempt)])
     expect(uploading.server.state.keys.commit).toEqual([upKey])
     expect(up.record.state).toBe('committed')
 
@@ -1089,7 +1230,7 @@ describe('G5-06 W4a save queue (fakes)', () => {
     const vaKey = va.record.idempotencyKey
     await validating.dispatcher.dispatchAll([va])
     expect(validating.server.state.counts.lookup).toBe(0)
-    expect(validating.server.state.keys.upload).toEqual([vaKey])
+    expect(validating.server.state.keys.upload).toEqual([uploadKeyFor(vaKey, va.record.attempt)])
     expect(validating.server.state.keys.commit).toEqual([vaKey])
     expect(va.record.state).toBe('committed')
 
@@ -1118,9 +1259,12 @@ describe('G5-06 W4a save queue (fakes)', () => {
     expect(n.record.state).toBe('queued')
     expect(n.record.idempotencyKey).toBe(keyBefore)
     expect(n.record.attempt).toBe(2)
-    // the next pass re-sends the same key: exactly one upload, one commit
+    // the next pass re-sends the same COMMIT key (the attempt's upload key is
+    // derived from the new attempt): exactly one upload, one commit
     await notCommitted.dispatcher.dispatchAll([n])
-    expect(notCommitted.server.state.keys.upload).toEqual([keyBefore])
+    expect(notCommitted.server.state.keys.upload).toEqual([
+      uploadKeyFor(keyBefore, n.record.attempt),
+    ])
     expect(notCommitted.server.state.keys.commit).toEqual([keyBefore])
 
     // committing at rest, lookup unknown -> reconciling-stuck, never a new attempt
@@ -1186,6 +1330,53 @@ describe('G5-06 W4a save queue (fakes)', () => {
     const mine = await seedInFlight(holder, 'committing')
     holder.server.state.lookupOutcome = 'not_committed'
     await holder.dispatcher.dispatchAll([mine])
+    expect(holder.server.state.counts.lookup).toBe(1)
+    expect(mine.record.state).toBe('queued')
+  })
+
+  it('R5: an automatic tick lookup runs under the document lock and canCommit, and writes nothing when refused', async () => {
+    const seedReconciling = async (h: Harness): Promise<QueueDoc> => {
+      const doc = h.makeDoc()
+      doc.record = {
+        ...doc.record,
+        state: 'reconciling',
+        attempt: 1,
+        reconcileSince: new Date(h.clock.now).toISOString(),
+      }
+      await h.intents.put(doc.key, doc.record, doc.payload)
+      return doc
+    }
+
+    // (a) another window holds a FRESH lease: the automatic tick sends no GET
+    // and leaves the shared record exactly as it was
+    const other = await harness()
+    const held = await seedReconciling(other)
+    other.lockTable.leases.set(held.key, {
+      owner: 'win1',
+      generation: 1,
+      heartbeatAt: other.clock.now,
+    })
+    const before = await stored(other.intents, held)
+    const loser = other.newDispatcher('win2')
+    await loser.tick([held])
+    expect(other.server.state.counts.lookup).toBe(0)
+    expect(await stored(other.intents, held)).toEqual(before)
+    expect(held.record.state).toBe('reconciling')
+
+    // (b) canCommit false (a torn-down / switched session): no GET, no write
+    const off = await harness()
+    const torn = await seedReconciling(off)
+    const beforeTorn = await stored(off.intents, torn)
+    const dead = off.newDispatcherWith({ canCommit: () => false })
+    await dead.tick([torn])
+    expect(off.server.state.counts.lookup).toBe(0)
+    expect(await stored(off.intents, torn)).toEqual(beforeTorn)
+
+    // (c) the holder runs the same record: exactly one GET, settled normally
+    const holder = await harness()
+    const mine = await seedReconciling(holder)
+    holder.server.state.lookupOutcome = 'not_committed'
+    await holder.dispatcher.tick([mine])
     expect(holder.server.state.counts.lookup).toBe(1)
     expect(mine.record.state).toBe('queued')
   })
@@ -1760,7 +1951,7 @@ function fakeVersionUploadSessions(options: FakeVersionSessionOptions) {
         method: 'PUT',
         url: `https://storage.example/version-part/${partNumber}`,
         headers: {},
-        expiresAt: '2026-10-19T00:00:00.000Z',
+        expiresAt: '2099-01-01T00:00:00.000Z',
       })
     }
     return {
@@ -1774,7 +1965,7 @@ function fakeVersionUploadSessions(options: FakeVersionSessionOptions) {
         size: Math.min(partSize, size - (partNumber - 1) * partSize),
       })),
       parts,
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
   }
 
@@ -1811,7 +2002,7 @@ function fakeVersionUploadSessions(options: FakeVersionSessionOptions) {
           uploadId: `upl_${input.sessionId}`,
           checksumSha256: options.checksumSha256,
           sizeBytes: size,
-          claimExpiresAt: '2026-10-19T00:00:00.000Z',
+          claimExpiresAt: '2099-01-01T00:00:00.000Z',
         },
       }
     },
@@ -1948,6 +2139,7 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
         getDocument: async () => {
           throw new UniworkDocError('not_found')
         },
+        lookupCommit: (input) => client.lookupCommit(input),
         uploadSession: sessions.uploadSession,
       },
       isSignedIn: () => true,
@@ -2094,6 +2286,20 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
     expect(await stored(h.intents, inlineDoc)).toBeNull()
   })
 
+  it('stages a later attempt of a chunked upload under :u<attempt> on the keyBase (B69-lite)', async () => {
+    const h = await chunkedHarness()
+    const doc = h.makeBigDoc('doc_attempt')
+    // the intent is already on attempt 2: the session create key must carry the
+    // attempt suffix on the base, while the COMMIT key stays the bare one
+    doc.record = { ...doc.record, attempt: 2 }
+    await h.intents.put(doc.key, doc.record, doc.payload)
+    await h.dispatcher.dispatchAll([doc])
+
+    expect(h.sessions.calls.creates.map((c) => c.idempotencyKey)).toEqual(['key_doc_attempt:u2:s0'])
+    expect(h.server.state.keys.commit).toEqual(['key_doc_attempt'])
+    expect(doc.record.state).toBe('committed')
+  })
+
   it('refuses a chunked version upload when the completed checksum mismatches the intent', async () => {
     const h = await chunkedHarness({ checksumSha256: 'b'.repeat(64) })
     const doc = h.makeBigDoc('doc_mismatch')
@@ -2173,7 +2379,7 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
         { partNumber: 2, etag: '"e2"' },
         { partNumber: 3, etag: '"e3"' },
       ],
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
     await h.intents.put(doc.key, doc.record, doc.payload)
     await h.dispatcher.dispatchAll([doc])
@@ -2192,6 +2398,41 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
     expect(h.server.state.counts.commit).toBe(1)
   })
 
+  it('R6: a fenced not_committed verdict durably drops the spent attempt session', async () => {
+    const h = await chunkedHarness()
+    const doc = h.makeBigDoc('doc_r6')
+    // attempt 1 staged bytes and completed its session; the commit POST then hit
+    // the expired staged claim and the ONE deciding lookup proved not_committed
+    doc.record = {
+      ...doc.record,
+      state: 'committing',
+      attempt: 1,
+      uploadSession: {
+        sessionId: 'ups_v1',
+        partSize: FAST_PART_SIZE,
+        totalParts: 6,
+        completedParts: [{ partNumber: 1, etag: '"e1"' }],
+        expiresAt: '2026-10-19T00:00:00.000Z',
+      },
+    }
+    await h.intents.put(doc.key, doc.record, doc.payload)
+    h.server.state.commitRefusal = new UniworkDocError('server_error', {
+      status: 409,
+      serverCode: 'document_upload_invalid',
+      reason: 'file_claim_expired',
+    })
+    h.server.state.lookupOutcome = 'not_committed'
+    await h.dispatcher.dispatchAll([doc])
+
+    const fenced = await stored(h.intents, doc)
+    expect(fenced?.intent.state).toBe('queued')
+    expect(fenced?.intent.attempt).toBe(2)
+    // the spent session is durably dropped: attempt 2 has nothing to resume, so
+    // it restages under its own upload key instead of handing back the old
+    // staged upload whose file claim already expired
+    expect(fenced?.intent.uploadSession).toBeUndefined()
+  })
+
   it('cancels and supersedes an intent with a saved uploadSession by sending DELETE', async () => {
     const h = await chunkedHarness()
     const doc = h.makeBigDoc('doc_cancel')
@@ -2200,7 +2441,7 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
       partSize: CHUNK_PART_SIZE,
       totalParts: 6,
       completedParts: [{ partNumber: 1, etag: '"e1"' }],
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
     await h.intents.put(doc.key, doc.record, doc.payload)
 
@@ -2216,7 +2457,7 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
       partSize: CHUNK_PART_SIZE,
       totalParts: 6,
       completedParts: [{ partNumber: 1, etag: '"e1"' }],
-      expiresAt: '2026-10-19T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
     }
     await h.intents.put(doc2.key, doc2.record, doc2.payload)
     await h.coordinator.supersede(doc2)
@@ -2423,6 +2664,17 @@ describe('BIGUP-A1 W2: chunked version upload (save coordinator + sync queue)', 
   })
 })
 
+describe('UNI-1918 B69-lite: the per-attempt upload key', () => {
+  it('attempt 0 keeps the bare commit key, later attempts append :u<n>', () => {
+    expect(uploadKeyFor('office-key-1', 0)).toBe('office-key-1')
+    expect(uploadKeyFor('office-key-1', 1)).toBe('office-key-1:u1')
+    expect(uploadKeyFor('office-key-1', 7)).toBe('office-key-1:u7')
+    // never a prefix of one another: two attempts can never collide
+    expect(uploadKeyFor('office-key-1', 1)).not.toBe(uploadKeyFor('office-key-1', 0))
+    expect(uploadKeyFor('office-key-1', 11)).not.toBe(uploadKeyFor('office-key-1', 1))
+  })
+})
+
 describe('EL-1(a): 423 document_locked -> edit_locked state, recovery preserved, manual-only retry', () => {
   const lockPayload = {
     holderName: 'Minh Trần',
@@ -2589,5 +2841,83 @@ describe('EL1A-BE-2 / EL1A-BE-5: queueBindingPatch (the record -> binding projec
     expect(patch).toHaveProperty('editLock', undefined)
     expect(queueBindingPatch(failedRecord({ state: 'committed' }))).toBeNull()
     expect(queueBindingPatch(failedRecord({ state: 'cancelled' }))).toBeNull()
+  })
+})
+
+describe('EL-1(b): outgoing commit carries edit_lock_id; 423 while held -> lost', () => {
+  const LOCK = '01J8X4LOCK0N1P2Q3R4S5T6U7V'
+
+  it('save-coordinator commit body includes edit_lock_id from the held path', async () => {
+    const h = await harness({ editLockId: () => LOCK })
+    const doc = h.makeDoc()
+    await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.commitInputs).toHaveLength(1)
+    expect(h.server.state.commitInputs[0]).toMatchObject({
+      uploadId: 'up_1',
+      baseRevision: '41',
+      editLockId: LOCK,
+    })
+  })
+
+  it('save-coordinator copy-like commit (no lock) omits editLockId', async () => {
+    const h = await harness()
+    const doc = h.makeDoc()
+    await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.commitInputs[0]?.editLockId).toBeUndefined()
+  })
+
+  it('queue dispatcher commit body includes edit_lock_id', async () => {
+    const h = await harness({ editLockId: () => LOCK })
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    await h.dispatcher.dispatchAll([doc])
+    expect(h.server.state.commitInputs.at(-1)).toMatchObject({ editLockId: LOCK })
+  })
+
+  it('commit 423 while held notifies onCommitEditLocked and parks edit_locked', async () => {
+    const lost: string[] = []
+    const h = await harness({
+      editLockId: () => LOCK,
+      onCommitEditLocked: (path) => lost.push(path),
+    })
+    const doc = h.makeDoc()
+    h.server.state.commitError = new UniworkDocError('edit_locked', {
+      status: 423,
+      serverCode: 'document_locked',
+      editLock: {
+        holderName: 'Lan',
+        since: '2026-10-15T03:12:00Z',
+        expiresAt: '2026-10-15T03:14:00Z',
+        heldByMe: false,
+      },
+    })
+    const ended = await h.coordinator.save(doc.path, { userSave: true })
+    expect(ended?.binding.state).toBe('edit_locked')
+    expect(lost).toEqual([doc.path])
+    const parked = await stored(h.intents, doc)
+    expect(parked?.intent.state).toBe('failed')
+    expect(parked?.intent.lastError).toBe('edit_locked')
+    expect(parked?.intent.retryAt).toBeUndefined()
+  })
+
+  it('Q2: prepareEditLock park sends no commit and parks edit_locked', async () => {
+    const h = await harness({
+      prepareEditLock: async () => 'park',
+      editLockId: () => null,
+    })
+    const doc = h.makeDoc()
+    const ended = await h.coordinator.save(doc.path, { userSave: true })
+    expect(h.server.state.counts.commit).toBe(0)
+    expect(ended?.binding.state).toBe('edit_locked')
+  })
+
+  it('Q2 dispatcher: prepareEditLock park sends no commit', async () => {
+    const h = await harness({ prepareEditLock: async () => 'park' })
+    const doc = h.makeDoc()
+    await h.dispatcher.enqueue(doc)
+    await h.dispatcher.dispatchAll([doc])
+    expect(h.server.state.counts.commit).toBe(0)
+    expect(doc.record.state).toBe('failed')
+    expect(doc.record.lastError).toBe('edit_locked')
   })
 })

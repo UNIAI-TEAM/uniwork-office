@@ -26,6 +26,8 @@ export const hi = {
   appScLineBreak: 'पंक्ति विराम',
   appScNbsp: 'अविच्छेद्य स्थान',
   appScNbHyphen: 'अविच्छेद्य हाइफ़न',
+  appScFindNext: 'अगला खोजें',
+  appScOptHyphen: 'वैकल्पिक हाइफ़न',
   appScGrowFont1: 'फ़ॉन्ट आकार 1 pt बढ़ाएँ',
   appScShrinkFont1: 'फ़ॉन्ट आकार 1 pt घटाएँ',
   appScListDemote: 'सूची स्तर घटाएँ',
@@ -211,7 +213,7 @@ export const hi = {
   appEndnotePlaceholder: 'अंत टिप्पणी का टेक्स्ट…',
   appAutoSave: 'स्वतः सहेजना',
   appAutoSaveTip: 'स्वतः सहेजना (हर 30 सेकंड में और विंडो का फ़ोकस हटने पर)',
-  appSaveShortcutTip: 'सहेजें (⌘S)',
+  appSaveShortcutTip: 'सहेजें ({keys})',
   appUndo: 'पूर्ववत करें',
   appRedo: 'फिर से करें',
   appStartOpening: 'खोला जा रहा है…',
@@ -547,9 +549,13 @@ export const hi = {
   appOnlyEncrypted: '"{name}" पासवर्ड से सुरक्षित है और यहाँ नहीं खोला जा सकता।',
   appFileExportPdf: 'PDF के रूप में निर्यात करें…',
   appFilePrint: 'प्रिंट करें…',
+  appPrintNoDocument: 'प्रिंट करने के लिए कोई दस्तावेज़ खोलें।',
   appPrintNoPrinter:
     'इस कंप्यूटर पर कोई प्रिंटर उपलब्ध नहीं है। आप इसके बजाय दस्तावेज़ को PDF के रूप में सहेज सकते हैं।',
   appPrintFailedPdfHint:
     'प्रिंट नहीं हो सका: {error}। आप इसके बजाय दस्तावेज़ को PDF के रूप में सहेज सकते हैं।',
   appPrintSaveAsPdf: 'PDF के रूप में सहेजें…',
+  appFileSaveCopy: 'प्रति के रूप में सहेजें…',
+  appCopySaved: 'आपका संस्करण नए दस्तावेज़ के रूप में सहेजा गया: {title}।',
+  appCopySaveFailed: 'प्रति नहीं बन सकी। आपके बदलाव अब भी सुरक्षित हैं; फिर से कोशिश करें।',
 } satisfies Record<keyof typeof zh, string>

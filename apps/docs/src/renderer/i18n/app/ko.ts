@@ -26,6 +26,8 @@ export const ko = {
   appScLineBreak: '줄 바꿈',
   appScNbsp: '줄바꿈 없는 공백',
   appScNbHyphen: '줄바꿈 없는 하이픈',
+  appScFindNext: '다음 찾기',
+  appScOptHyphen: '선택적 하이픈',
   appScGrowFont1: '글꼴 크기 1pt 크게',
   appScShrinkFont1: '글꼴 크기 1pt 작게',
   appScListDemote: '목록 수준 내리기',
@@ -222,7 +224,7 @@ export const ko = {
   // Quick actions bar
   appAutoSave: '자동 저장',
   appAutoSaveTip: '자동 저장(30초마다, 창 포커스가 해제될 때)',
-  appSaveShortcutTip: '저장 (⌘S)',
+  appSaveShortcutTip: '저장 ({keys})',
   appUndo: '실행 취소',
   appRedo: '다시 실행',
   // Start screen
@@ -569,8 +571,12 @@ export const ko = {
   appOnlyEncrypted: '"{name}" 문서는 암호로 보호되어 있어 여기서는 열 수 없습니다.',
   appFileExportPdf: 'PDF로 내보내기…',
   appFilePrint: '인쇄…',
+  appPrintNoDocument: '인쇄하려면 먼저 문서를 여세요.',
   appPrintNoPrinter:
     '이 컴퓨터에서 사용할 수 있는 프린터가 없습니다. 대신 문서를 PDF로 저장할 수 있습니다.',
   appPrintFailedPdfHint: '인쇄하지 못했습니다: {error}. 대신 문서를 PDF로 저장할 수 있습니다.',
   appPrintSaveAsPdf: 'PDF로 저장…',
+  appFileSaveCopy: '사본으로 저장…',
+  appCopySaved: '내 버전을 새 문서로 저장했습니다: {title}.',
+  appCopySaveFailed: '사본을 만들지 못했습니다. 변경 사항은 여전히 안전합니다. 다시 시도하세요.',
 } satisfies Record<keyof typeof zh, string>

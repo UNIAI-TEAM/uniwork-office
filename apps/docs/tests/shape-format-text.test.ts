@@ -15,6 +15,7 @@ import { NodeSelection } from '@tiptap/pm/state'
 import { parseDocx, saveDocx, type TextboxDisplay } from '@genoffice/docx-engine'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
 import { Ribbon } from '../src/renderer/components/Ribbon'
+import { shortcutHint } from '../src/renderer/shortcuts'
 import { computeFormatState } from '../src/renderer/components/ribbon-format-state'
 import { insertShapeAt } from '../src/renderer/components/ribbon-tabs'
 import { blocksToPmDoc, pmDocToSavePlan, type PmNode } from '../src/renderer/editor/convert'
@@ -74,8 +75,16 @@ function mountRibbon(editor: Editor) {
 }
 
 /** buttons are addressed by their tooltip so the test does not pin a locale */
-const tipped = (container: HTMLElement, key: Parameters<typeof t>[0]): HTMLButtonElement =>
-  container.querySelector(`.ribbon-body [data-tip="${t(key)}"]`) as HTMLButtonElement
+// the tips that name a key take it from the docs shortcut table
+const TIP_KEYS: Partial<Record<Parameters<typeof t>[0], string>> = {
+  ribbonBoldTip: 'bold',
+  ribbonAlignRightTip: 'align-right',
+}
+const tipped = (container: HTMLElement, key: Parameters<typeof t>[0]): HTMLButtonElement => {
+  const command = TIP_KEYS[key]
+  const tip = command ? t(key, { keys: shortcutHint(command) }) : t(key)
+  return container.querySelector(`.ribbon-body [data-tip="${tip}"]`) as HTMLButtonElement
+}
 
 describe('what the ribbon reads off a selected shape', () => {
   it('reports the formatting only while every run agrees', async () => {

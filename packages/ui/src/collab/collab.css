@@ -389,24 +389,48 @@
   padding: 4px 12px 8px;
 }
 
+/* in-file lists render replies as sibling .collab-cm rows, so the separator still applies there
+   (CollabThread replies live in .collab-replies li and are never .collab-cm siblings) */
 .collab-cm + .collab-cm {
   border-top: 1px solid var(--border);
 }
 
+/* replies sit under one thin left rule inside the thread card; per-reply border/padding stay off */
 .collab-replies {
   list-style: none;
-  margin: 0;
-  padding: 0;
+  margin: 0 12px 8px 28px;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--border);
+}
+
+.collab-replies li + li {
+  margin-top: 4px;
 }
 
 .collab-replies[hidden] {
   display: none;
 }
 
+/* the old indented reply look for in-file lists; thread replies inside .collab-replies override it */
 .collab-cm--reply {
   margin-left: 14px;
   padding-left: 10px;
   border-left: 2px solid var(--border);
+}
+
+.collab-replies .collab-cm--reply {
+  margin-left: 0;
+  padding: 4px 0;
+  border-left: 0;
+}
+
+/* the body column indents under the author name (web pl-10); a reply's avatar is 8px narrower */
+.collab-cm-indent {
+  padding-left: 40px;
+}
+
+.collab-cm--reply .collab-cm-indent {
+  padding-left: 32px;
 }
 
 .collab-cmh {
@@ -426,6 +450,8 @@ h3.collab-cmh {
   color: var(--text);
 }
 
+/* base size for in-file lists (no photo support there); thread rows carry data-comment-id
+   and take the web lg/md sizes (root 32px, reply 24px) below */
 .collab-av {
   flex: none;
   width: 22px;
@@ -438,6 +464,25 @@ h3.collab-cmh {
   background: var(--collab-mention-bg);
   color: var(--collab-mention-fg);
   border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.collab-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.collab-cm[data-comment-id] .collab-av {
+  width: 32px;
+  height: 32px;
+  font-size: var(--text-caption);
+}
+
+.collab-cm--reply[data-comment-id] .collab-av {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
 }
 
 .collab-au {
@@ -459,11 +504,22 @@ h3.collab-cmh {
   white-space: nowrap;
 }
 
+.collab-cmh .collab-edited {
+  color: var(--text-secondary);
+}
+
 .collab-dt {
   margin-left: auto;
   color: var(--text-secondary);
   flex: none;
   white-space: nowrap;
+}
+
+/* in a CollabThread row (it carries data-comment-id) the time sits in the head row before the
+   (edited) mark (web order); in-file rows have no attribute and keep .collab-dt's own
+   margin-left: auto */
+.collab-cm[data-comment-id] .collab-dt {
+  margin-left: 0;
 }
 
 .collab-bd {
@@ -475,7 +531,8 @@ h3.collab-cmh {
   flex-wrap: nowrap;
   align-items: center;
   gap: 0 2px;
-  margin-top: 2px;
+  margin-top: 1px;
+  margin-left: -8px;
 }
 
 .collab-acts .collab-link {

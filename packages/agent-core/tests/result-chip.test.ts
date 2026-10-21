@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  classifyDroppedToolReason,
-  noticeToPanelNote,
-  resultChip,
-  extractSheetsCellsMeta,
-} from '../src/index.js'
+import { classifyDroppedToolReason, resultChip, extractSheetsCellsMeta } from '../src/index.js'
 
 describe('notice-surface structured dropped reasons', () => {
   it('classifies only strict x_uniwork.dropped_tool_calls reasons (view_only and not_allowlisted) and rejects local aliases like readonly', () => {
@@ -14,29 +9,6 @@ describe('notice-surface structured dropped reasons', () => {
     expect(classifyDroppedToolReason('not_allowlisted')).toBe('not_allowlisted')
     expect(classifyDroppedToolReason('other_reason')).toBe('other')
     expect(classifyDroppedToolReason(undefined)).toBe('other')
-
-    const noteViewOnly = noticeToPanelNote({
-      kind: 'dropped_tool_calls',
-      calls: [{ name: 'apply_ops', reason: 'view_only' }],
-    })
-    expect(noteViewOnly).toEqual({
-      kind: 'dropped',
-      key: 'aiNoticeDroppedTool',
-      params: { name: 'apply_ops' },
-      reason: 'view_only',
-    })
-
-    const noteNotAllowlisted = noticeToPanelNote({
-      kind: 'dropped_tool_calls',
-      calls: [{ name: 'run_macro', reason: 'not_allowlisted', module: 'Sheets' }],
-    })
-    expect(noteNotAllowlisted).toEqual({
-      kind: 'dropped',
-      key: 'aiNoticeDroppedTool',
-      params: { name: 'run_macro' },
-      reason: 'not_allowlisted',
-      module: 'Sheets',
-    })
   })
 })
 
@@ -390,38 +362,14 @@ describe('resultChip deterministic priority table', () => {
     expect(stoppedSessionErrNoText.errorLine?.actionKey).toBe('acctSignInAgain')
   })
 
-  it('RF1-13 & RF1-23(a): unsupported chip comes only from x_uniwork.dropped_tool_calls (not local panelNotes), and deduplicates dropped calls', () => {
-    // Local panelNotes of kind 'dropped' alone must NOT trigger the unsupported chip when droppedToolCalls is empty
-    const localNotesOnly = resultChip({
-      text: 'Câu trả lời bình thường.',
-      panelNotes: [
-        {
-          kind: 'dropped',
-          text: 'Bạn chỉ có quyền xem tài liệu này nên AI không sửa được.',
-          reason: 'view_only',
-          toolName: 'apply_ops',
-        },
-      ],
-    })
-    expect(localNotesOnly.chip).toBe('answer')
-    expect(localNotesOnly.labelKey).toBe('aiResultAnswer')
-
-    // When both droppedToolCalls and panelNotes are passed, droppedToolCalls is the sole source and is deduplicated
+  it('RF1-13 & RF1-23(a): unsupported chip comes only from x_uniwork.dropped_tool_calls and deduplicates dropped calls', () => {
+    // droppedToolCalls is the sole source for the unsupported chip and is deduplicated
     const withBoth = resultChip({
       text: 'Thao tác chưa hỗ trợ.',
       moduleName: 'Sheets',
       droppedToolCalls: [
         { name: 'run_macro', reason: 'not_allowlisted', module: 'Sheets' },
         { name: 'run_macro', reason: 'not_allowlisted', module: 'Sheets' },
-      ],
-      panelNotes: [
-        {
-          kind: 'dropped',
-          text: 'UniWork AI chưa làm được thao tác này trong Sheets.',
-          reason: 'not_allowlisted',
-          module: 'Sheets',
-          toolName: 'run_macro',
-        },
       ],
     })
     expect(withBoth.chip).toBe('unsupported')

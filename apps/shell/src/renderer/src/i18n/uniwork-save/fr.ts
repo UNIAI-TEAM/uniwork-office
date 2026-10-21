@@ -12,12 +12,12 @@ export const fr = {
   usMyFolderPrivate: 'Privé, visible par vous seul',
   usChange: 'Modifier',
   usSave: 'Enregistrer',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Fermer',
   usPickTitle: 'Choisir l’emplacement',
   usBack: 'Revenir au nom',
   usSearchFolders: 'Rechercher un dossier',
-  usSharedNote:
-    'Enregistré dans un dossier partagé, le document prend les autorisations de ce dossier.',
   usChooseFolder: 'Choisir « {folder} »',
   usSelected: 'Sélectionné',
   usRootBlocked: 'Choisissez un dossier',
@@ -33,4 +33,8 @@ export const fr = {
   usErrAlreadyBound: 'Cet onglet est déjà lié à un document UniWork. Enregistrez comme d’habitude.',
   usErrNotFound:
     'Le fichier à enregistrer ou le dossier choisi est introuvable. Choisissez à nouveau l’emplacement, puis réessayez.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

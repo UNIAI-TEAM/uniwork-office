@@ -101,12 +101,29 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
     // the deck is read through the ref; only its order decides a new adapter
     [slideOrder, tracker],
   )
-  const controller = useCollabThreads(source, host, { adapter, strings })
+  // "View in version N" of a lost thread: the desktop shell opens that version read-only; the web
+  // frame's port has no such method, so the kit gets no handler and the action does not show
+  const onViewVersion = useMemo(() => {
+    const openVersion = bridge.openVersion?.bind(bridge)
+    return openVersion
+      ? ({ commentId, versionNo }: { commentId: string; versionNo: number }) =>
+          openVersion({ path, commentId, versionNo })
+      : undefined
+  }, [bridge, path])
+  const controller = useCollabThreads(source, host, {
+    adapter,
+    strings,
+    openVersionId: versionId ?? undefined,
+    ...(onViewVersion ? { onViewVersion } : {}),
+  })
   const ctlRef = useRef(controller)
   ctlRef.current = controller
   const lost = new WeakSet<object>()
   for (const t of [...controller.threads, ...controller.resolved]) {
-    if (t.root.anchor && t.root.anchor_state === 'lost') lost.add(t.root.anchor)
+    // lost stays lost, except in the version it was last anchored on (UNI-2033: the read-only copy
+    // of that version), where its anchor still names a real slide
+    const here = !!versionId && t.root.anchor_version_id === versionId
+    if (t.root.anchor && t.root.anchor_state === 'lost' && !here) lost.add(t.root.anchor)
   }
   lostRef.current = lost
 
@@ -153,53 +170,58 @@ export function useServerComments(o: ServerCommentsOptions): ServerComments {
   )
 
   // after the save receipt: the new version is the base of new threads, and every anchor follows its slide.
-  // A receipt that lands while the list is not ready waits here (the latest one wins) and runs once it is.
-  const pendingRound = useRef<string | null>(null)
-  const runRound = useCallback(
-    (round: string) => {
-      const ctl = ctlRef.current
-      const roots = [...ctl.threads, ...ctl.resolved].filter((t) => !t.deleted).map((t) => t.root)
+  // The map is built from a fresh list (with the pane closed nothing else lists, so a row made since the
+  // first list would be missed; a list that is still loading is joined). Rounds are serialized: one in
+  // flight, the newest receipt waits as the single pending version and replaces an older one.
+  useEffect(() => {
+    let disposed = false
+    const round: { running: boolean; pending: string | null } = { running: false, pending: null }
+    const runRound = async (queued: string) => {
+      const comments = await ctlRef.current.freshComments()
+      if (disposed) return
+      // a receipt that landed while the list was loading supersedes this one
+      const versionId = round.pending ?? queued
+      round.pending = null
       // what this round covers: a slide replaced while it is in flight is for the next round
       const marks = tracker.snapshot()
-      const updates = anchorUpdatesAfterSave(roots, slidesRef.current, (id) =>
+      const updates = anchorUpdatesAfterSave(comments, slidesRef.current, (id) =>
         tracker.replacedAt(id),
       )
-      void sendAnchorMap(source, round, updates).then(
-        (res) => {
-          if (res.outcome !== 'synced') return
-          // the server holds the lost threads now: a reused id can no longer pull them onto its slide
-          tracker.settle(marks)
-          // contract §2.6: a round that changed rows is followed by a full reload
-          if (res.updated.length > 0) void ctlRef.current.reload()
-        },
+      try {
+        const res = await sendAnchorMap(source, versionId, updates)
+        if (res.outcome !== 'synced') return
+        // the server holds the lost threads now: a reused id can no longer pull them onto its slide
+        tracker.settle(marks)
+        // contract §2.6: a round that changed rows is followed by a full reload
+        if (res.updated.length > 0) void ctlRef.current.reload()
+      } catch {
         // offline / server error: the shown anchors stay; the next save sends the map again
-        () => undefined,
-      )
-    },
-    [source, tracker],
-  )
-  useEffect(
-    () =>
-      bridge.onSaved((receipt) => {
-        if (receipt?.path !== path) return
-        if (typeof receipt.versionId !== 'string' || receipt.versionId === '') return
-        setVersionId(receipt.versionId)
-        if (ctlRef.current.state !== 'ready') {
-          pendingRound.current = receipt.versionId
-          return
+      }
+    }
+    const drain = async () => {
+      round.running = true
+      try {
+        while (round.pending !== null && !disposed) {
+          const queued = round.pending
+          round.pending = null
+          await runRound(queued)
         }
-        pendingRound.current = null
-        runRound(receipt.versionId)
-      }),
-    [bridge, path, runRound],
-  )
-  const ready = controller.state === 'ready'
-  useEffect(() => {
-    const round = pendingRound.current
-    if (!ready || round === null) return
-    pendingRound.current = null
-    runRound(round)
-  }, [ready, runRound])
+      } finally {
+        round.running = false
+      }
+    }
+    const off = bridge.onSaved((receipt) => {
+      if (receipt?.path !== path) return
+      if (typeof receipt.versionId !== 'string' || receipt.versionId === '') return
+      setVersionId(receipt.versionId)
+      round.pending = receipt.versionId
+      if (!round.running) void drain()
+    })
+    return () => {
+      disposed = true
+      off()
+    }
+  }, [bridge, path, source, tracker])
 
   const startThread = useCallback((index: number, objectId?: string): boolean => {
     if (!ctlRef.current.can.canWrite) return false

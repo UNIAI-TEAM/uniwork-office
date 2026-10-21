@@ -26,6 +26,8 @@ export const en = {
   appScLineBreak: 'Line Break',
   appScNbsp: 'Non-breaking Space',
   appScNbHyphen: 'Non-breaking Hyphen',
+  appScFindNext: 'Find Next',
+  appScOptHyphen: 'Optional Hyphen',
   appScGrowFont1: 'Increase Font Size 1 pt',
   appScShrinkFont1: 'Decrease Font Size 1 pt',
   appScListDemote: 'Demote List Item',
@@ -207,7 +209,7 @@ export const en = {
   appEndnotePlaceholder: 'Endnote text…',
   appAutoSave: 'AutoSave',
   appAutoSaveTip: 'AutoSave (every 30 seconds and when the window loses focus)',
-  appSaveShortcutTip: 'Save (⌘S)',
+  appSaveShortcutTip: 'Save ({keys})',
   appUndo: 'Undo',
   appRedo: 'Redo',
   appStartOpening: 'Opening…',
@@ -542,9 +544,14 @@ export const en = {
   appOnlyEncrypted: '"{name}" is password protected and cannot be opened here.',
   appFileExportPdf: 'Export as PDF…',
   appFilePrint: 'Print…',
+  appPrintNoDocument: 'Open a document to print it.',
   appPrintNoPrinter:
     'No printer is available on this computer. You can save the document as a PDF instead.',
   appPrintFailedPdfHint:
     'Printing did not work: {error}. You can save the document as a PDF instead.',
   appPrintSaveAsPdf: 'Save as PDF…',
+  // UNI-1920 (RFSH-5): File > Save as a copy on a locked-out web tab (conflict-dialog copy wording)
+  appFileSaveCopy: 'Save as a copy…',
+  appCopySaved: 'Your version was saved as a new document: {title}.',
+  appCopySaveFailed: 'Couldn’t create the copy. Your changes are still safe; try again.',
 } satisfies Record<keyof typeof zh, string>

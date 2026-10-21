@@ -26,6 +26,8 @@ export const ru = {
   appScLineBreak: 'Разрыв строки',
   appScNbsp: 'Неразрывный пробел',
   appScNbHyphen: 'Неразрывный дефис',
+  appScFindNext: 'Найти далее',
+  appScOptHyphen: 'Мягкий перенос',
   appScGrowFont1: 'Увеличить шрифт на 1 пт',
   appScShrinkFont1: 'Уменьшить шрифт на 1 пт',
   appScListDemote: 'Понизить уровень списка',
@@ -215,7 +217,7 @@ export const ru = {
   appEndnotePlaceholder: 'Текст концевой сноски…',
   appAutoSave: 'Автосохранение',
   appAutoSaveTip: 'Автосохранение (каждые 30 секунд и при потере фокуса окном)',
-  appSaveShortcutTip: 'Сохранить (⌘S)',
+  appSaveShortcutTip: 'Сохранить ({keys})',
   appUndo: 'Отменить',
   appRedo: 'Вернуть',
   appStartOpening: 'Открытие…',
@@ -553,9 +555,13 @@ export const ru = {
   appOnlyEncrypted: '«{name}» защищён паролем и не может быть открыт здесь.',
   appFileExportPdf: 'Экспорт в PDF…',
   appFilePrint: 'Печать…',
+  appPrintNoDocument: 'Откройте документ, чтобы распечатать его.',
   appPrintNoPrinter:
     'На этом компьютере нет доступного принтера. Вместо этого можно сохранить документ в PDF.',
   appPrintFailedPdfHint:
     'Не удалось напечатать: {error}. Вместо этого можно сохранить документ в PDF.',
   appPrintSaveAsPdf: 'Сохранить как PDF…',
+  appFileSaveCopy: 'Сохранить как копию…',
+  appCopySaved: 'Ваша версия сохранена как новый документ: {title}.',
+  appCopySaveFailed: 'Не удалось создать копию. Ваши изменения в безопасности; повторите попытку.',
 } satisfies Record<keyof typeof zh, string>

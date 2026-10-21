@@ -1,16 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { UniworkDocSummary } from '../../../shared/home-api'
-import { FileBadge } from '../FileBadge'
+import { DocPickerList } from '../doclist/PickerList'
 import { useI18n } from '../locale'
-import {
-  UNIWORK_ERROR_KEYS,
-  docExtension,
-  errorActionOf,
-  pickerRowMeta,
-} from '../uniwork-docs-model'
+import { UNIWORK_ERROR_KEYS, errorActionOf } from '../uniwork-docs-model'
 import { FolderMenu, type FolderMenuItem } from './FolderMenu'
-import { FolderGlyph } from './UniworkFolderTree'
 import {
   MY_FOLDER_LABEL_KEY,
   entryTitleOf,
@@ -62,7 +56,7 @@ export function BrowserContents({
   onLoadMore: () => void
   onRetry: () => void
 }) {
-  const { t, dateLocale } = useI18n()
+  const { t } = useI18n()
   const ownHiddenId = useId()
   const resolvedHiddenId = hiddenHintId ?? ownHiddenId
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -139,6 +133,12 @@ export function BrowserContents({
     )
   }
 
+  // a search hit's path, left-truncated: the one second line this list has
+  const pathOf = (doc: UniworkDocSummary) =>
+    search && doc.path
+      ? shortPath(labelMyFolderPath(doc.path, myFolderId, t(MY_FOLDER_LABEL_KEY)), t('ufRoot'))
+      : null
+
   const hiddenLine =
     hiddenCount > 0 ? (
       <p className="uwf-hidden" id={resolvedHiddenId} role="status">
@@ -178,78 +178,57 @@ export function BrowserContents({
 
   return (
     <>
-      <ul
-        className="uw-pick-list uwf-contents"
-        role="listbox"
-        aria-label={t('ufContentsLabel')}
-        aria-describedby={hiddenCount > 0 ? resolvedHiddenId : undefined}
-        ref={listRef}
-      >
-        {rows.map((doc) => {
-          const folder = isFolderEntry(doc)
-          const title = entryTitleOf(doc, t(MY_FOLDER_LABEL_KEY))
-          const path =
-            search && doc.path
-              ? shortPath(
-                  labelMyFolderPath(doc.path, myFolderId, t(MY_FOLDER_LABEL_KEY)),
-                  t('ufRoot'),
-                )
-              : null
+      <DocPickerList
+        className="uwf-contents"
+        label={t('ufContentsLabel')}
+        describedBy={hiddenCount > 0 ? resolvedHiddenId : undefined}
+        listRef={listRef}
+        // only the "…" sits beside a row here, at the row's end
+        reserve={44}
+        docs={rows}
+        activeId={active}
+        stateOf={(doc) => ({ opening: openingId === doc.id })}
+        titleOf={(doc) => entryTitleOf(doc, t(MY_FOLDER_LABEL_KEY))}
+        sublineFor={(doc) => {
+          const path = pathOf(doc)
+          return path ? { ...path, path: true } : null
+        }}
+        optionProps={(doc) => {
           const items = menuFor(doc)
-          const meta = folder ? '' : pickerRowMeta(doc, t, dateLocale)
+          return {
+            'data-id': doc.id,
+            tabIndex: doc.id === active ? 0 : -1,
+            className: 'uwf-row',
+            title: pathOf(doc)?.full,
+            onClick: () => setActiveId(doc.id),
+            onDoubleClick: () => open(doc),
+            onKeyDown: (e) => onKeyDown(e, doc),
+            onFocus: (e) => {
+              if (e.target === e.currentTarget) setActiveId(doc.id)
+            },
+            onContextMenu: (e) => {
+              if (items.length === 0) return
+              e.preventDefault()
+              setActiveId(doc.id)
+              setMenuId(doc.id)
+            },
+          }
+        }}
+        trailing={(doc) => {
+          const items = menuFor(doc)
+          if (items.length === 0) return null
+          const title = entryTitleOf(doc, t(MY_FOLDER_LABEL_KEY))
           return (
-            <li key={doc.id} role="presentation" className="uw-pick-item">
-              <div
-                role="option"
-                data-id={doc.id}
-                aria-selected={doc.id === active}
-                tabIndex={doc.id === active ? 0 : -1}
-                className={`uw-pick-row uwf-row${doc.id === active ? ' active' : ''}${openingId === doc.id ? ' opening' : ''}`}
-                title={path?.full}
-                onClick={() => setActiveId(doc.id)}
-                onDoubleClick={() => open(doc)}
-                onKeyDown={(e) => onKeyDown(e, doc)}
-                onFocus={(e) => {
-                  if (e.target === e.currentTarget) setActiveId(doc.id)
-                }}
-                onContextMenu={(e) => {
-                  if (items.length === 0) return
-                  e.preventDefault()
-                  setActiveId(doc.id)
-                  setMenuId(doc.id)
-                }}
-              >
-                {folder ? (
-                  <span className="uwf-row-icon">
-                    <FolderGlyph />
-                  </span>
-                ) : (
-                  <FileBadge ext={docExtension(doc)} size={24} />
-                )}
-                <span className="uw-pick-row-text">
-                  <span className="uw-pick-row-title">{title}</span>
-                  {path && (
-                    <span className="uw-pick-row-meta uwf-path">
-                      <span aria-hidden="true">{path.short}</span>
-                      <span className="uw-sr-only">{t('ufPathLabel', { path: path.full })}</span>
-                    </span>
-                  )}
-                  {!path && meta && <span className="uw-pick-row-meta">{meta}</span>}
-                </span>
-              </div>
-              {items.length > 0 && (
-                <FolderMenu
-                  label={t('ufActionsFor', { name: title })}
-                  items={items}
-                  dataFor={doc.id}
-                  open={menuId === doc.id}
-                  onOpenChange={(o) => setMenuId(o ? doc.id : null)}
-                />
-              )}
-            </li>
+            <FolderMenu
+              label={t('ufActionsFor', { name: title })}
+              items={items}
+              dataFor={doc.id}
+              open={menuId === doc.id}
+              onOpenChange={(o) => setMenuId(o ? doc.id : null)}
+            />
           )
-        })}
-      </ul>
+        }}
+      />
       {hiddenLine}
       {loadMoreBlock}
     </>

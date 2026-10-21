@@ -26,6 +26,8 @@ export const es = {
   appScLineBreak: 'Salto de línea',
   appScNbsp: 'Espacio de no separación',
   appScNbHyphen: 'Guion de no separación',
+  appScFindNext: 'Buscar siguiente',
+  appScOptHyphen: 'Guion opcional',
   appScGrowFont1: 'Aumentar fuente 1 pto',
   appScShrinkFont1: 'Reducir fuente 1 pto',
   appScListDemote: 'Disminuir nivel de lista',
@@ -218,7 +220,7 @@ export const es = {
   appEndnotePlaceholder: 'Texto de la nota al final…',
   appAutoSave: 'Autoguardado',
   appAutoSaveTip: 'Autoguardado (cada 30 segundos y cuando la ventana pierde el foco)',
-  appSaveShortcutTip: 'Guardar (⌘S)',
+  appSaveShortcutTip: 'Guardar ({keys})',
   appUndo: 'Deshacer',
   appRedo: 'Rehacer',
   appStartOpening: 'Abriendo…',
@@ -555,9 +557,13 @@ export const es = {
   appOnlyEncrypted: '«{name}» está protegido con contraseña y no se puede abrir aquí.',
   appFileExportPdf: 'Exportar como PDF…',
   appFilePrint: 'Imprimir…',
+  appPrintNoDocument: 'Abre un documento para imprimirlo.',
   appPrintNoPrinter:
     'No hay ninguna impresora disponible en este equipo. Puedes guardar el documento como PDF en su lugar.',
   appPrintFailedPdfHint:
     'No se pudo imprimir: {error}. Puedes guardar el documento como PDF en su lugar.',
   appPrintSaveAsPdf: 'Guardar como PDF…',
+  appFileSaveCopy: 'Guardar como copia…',
+  appCopySaved: 'Tu versión se guardó como documento nuevo: {title}.',
+  appCopySaveFailed: 'No se pudo crear la copia. Tus cambios siguen a salvo; vuelve a intentarlo.',
 } satisfies Record<keyof typeof zh, string>

@@ -26,6 +26,8 @@ export const ms = {
   appScLineBreak: 'Pemisah Baris',
   appScNbsp: 'Ruang Tak Putus',
   appScNbHyphen: 'Sengkang Tak Putus',
+  appScFindNext: 'Cari Seterusnya',
+  appScOptHyphen: 'Sengkang Pilihan',
   appScGrowFont1: 'Besarkan Fon 1 pt',
   appScShrinkFont1: 'Kecilkan Fon 1 pt',
   appScListDemote: 'Turunkan Aras Senarai',
@@ -216,7 +218,7 @@ export const ms = {
   appEndnotePlaceholder: 'Teks nota hujung…',
   appAutoSave: 'Autosimpan',
   appAutoSaveTip: 'Autosimpan (setiap 30 saat dan apabila tetingkap hilang fokus)',
-  appSaveShortcutTip: 'Simpan (⌘S)',
+  appSaveShortcutTip: 'Simpan ({keys})',
   appUndo: 'Buat asal',
   appRedo: 'Buat semula',
   appStartOpening: 'Membuka…',
@@ -552,9 +554,13 @@ export const ms = {
   appOnlyEncrypted: '"{name}" dilindungi kata laluan dan tidak boleh dibuka di sini.',
   appFileExportPdf: 'Eksport sebagai PDF…',
   appFilePrint: 'Cetak…',
+  appPrintNoDocument: 'Buka dokumen untuk mencetaknya.',
   appPrintNoPrinter:
     'Tiada pencetak tersedia pada komputer ini. Anda boleh menyimpan dokumen sebagai PDF sebagai ganti.',
   appPrintFailedPdfHint:
     'Pencetakan gagal: {error}. Anda boleh menyimpan dokumen sebagai PDF sebagai ganti.',
   appPrintSaveAsPdf: 'Simpan sebagai PDF…',
+  appFileSaveCopy: 'Simpan sebagai salinan…',
+  appCopySaved: 'Versi anda disimpan sebagai dokumen baharu: {title}.',
+  appCopySaveFailed: 'Tidak dapat mencipta salinan. Perubahan anda masih selamat; cuba lagi.',
 } satisfies Record<keyof typeof zh, string>

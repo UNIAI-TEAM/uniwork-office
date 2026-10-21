@@ -16,9 +16,11 @@ import { format } from '@genoffice/i18n'
 import type { UniworkCommentsApi } from '@genoffice/electron-utils/comments-ipc'
 import {
   AnchorLabel,
+  AvatarSourceProvider,
   CollabComposer,
   CollabPanel,
   collabStrings,
+  useFrameAvatarSource,
   type CollabActions,
   type CollabAnchorSlot,
 } from '@genoffice/ui/collab'
@@ -336,6 +338,7 @@ interface HostProps {
  * launch-ticket reveal work while the pane is closed; the pane renders into App's slot.
  */
 export function ServerCommentsHost(p: HostProps) {
+  const avatars = useFrameAvatarSource()
   const { lang, t } = useI18n()
   const server = useServerComments({
     bridge: p.bridge,
@@ -426,12 +429,14 @@ export function ServerCommentsHost(p: HostProps) {
 
   if (!p.slot) return null
   return createPortal(
-    <ServerCommentsPane
-      server={server}
-      slides={p.slides}
-      inFile={inFile}
-      onCollapse={p.onCollapse}
-    />,
+    <AvatarSourceProvider value={avatars}>
+      <ServerCommentsPane
+        server={server}
+        slides={p.slides}
+        inFile={inFile}
+        onCollapse={p.onCollapse}
+      />
+    </AvatarSourceProvider>,
     p.slot,
   )
 }

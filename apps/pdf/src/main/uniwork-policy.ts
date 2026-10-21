@@ -28,6 +28,11 @@ export interface UniworkDocumentPolicy {
    * save writes the working copy to disk without firing the user-save hook.
    */
   consumeCapture?(path: string): boolean
+  /**
+   * EL-1(b) fix6 (VEL-1): an explicit Save on a read-only bound document asks
+   * the shell to explain the lock / view-only state instead of writing.
+   */
+  readOnlySave?(path: string): void
 }
 
 let policy: UniworkDocumentPolicy | null = null
@@ -39,6 +44,16 @@ export function setUniworkDocumentPolicy(next: UniworkDocumentPolicy | null): vo
 
 export function setUniworkUserSaveHook(hook: ((path: string) => void) | null): void {
   userSaveHook = hook
+}
+
+/** EL-1(b) fix6 (VEL-1): forward a read-only Save attempt to the installed policy. */
+export function uniworkReadOnlySave(path: string | null | undefined): void {
+  if (!path || !policy?.readOnlySave) return
+  try {
+    policy.readOnlySave(path)
+  } catch {
+    /* best-effort explain */
+  }
 }
 
 /** A policy that throws must never break a local save, so it reads as "not bound". */

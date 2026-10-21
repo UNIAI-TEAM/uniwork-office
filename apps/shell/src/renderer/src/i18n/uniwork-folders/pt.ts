@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const pt = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Documentos (raiz)',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Pastas',
   ufContentsLabel: 'Conteúdo da pasta',
@@ -26,6 +26,7 @@ export const pt = {
   ufTooDeep: 'A árvore de documentos tem no máximo {max} níveis.',
   ufCycle: 'Uma pasta não pode ser movida para dentro de si mesma nem de uma de suas subpastas.',
   ufParentKind: 'Uma pasta fica na raiz ou dentro de outra pasta.',
+  ufNotShareable: 'As pastas não podem ser compartilhadas. Compartilhe cada documento.',
   ufFolderGone: 'Esta pasta não está mais aqui.',
   ufFolderNoAccess: 'Você não tem mais acesso a esta pasta.',
   ufNoPermission: 'Você não tem permissão para alterar esta pasta.',

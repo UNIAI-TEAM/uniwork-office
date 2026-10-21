@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
@@ -1141,6 +1141,7 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
     type Internals = {
       draftFlushWaiters: Map<string, unknown>
       store: { lookup(path: string): unknown }
+      probeKeepDraft(...args: unknown[]): Promise<unknown>
       openConflictSession(doc: unknown, opts: unknown): Promise<unknown>
       queueEngine(): Promise<{
         kind: string
@@ -1328,6 +1329,376 @@ describe('G5-09 desktop conflict dialog S5 session (main)', () => {
       await flow
       expect(hooks).toBe(2)
       await vi.waitFor(() => expect(commits(server)).toBeGreaterThan(before))
+    })
+
+    it('N2: the two-hook save whose commit answer is lost keeps its reconciling intent and blocks reload replacement', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      server.faults.push({ route: 'commit', kind: 'network' })
+      vi.mocked(ctx.deps.requestModuleSave).mockImplementation((targetPath: string) => {
+        queueMicrotask(() => {
+          writeFileSync(targetPath, 'flushed bytes')
+          ctx.setEditorDirty(false)
+          ctx.service.onUserSave(targetPath)
+          ctx.service.onUserSave(targetPath)
+        })
+        return true
+      })
+      const reply = await ctx.service.conflictAct(view.sessionId, {
+        kind: 'reload',
+        keep: 'draft',
+        stopAi: false,
+      })
+      expect(reply).toMatchObject({
+        kind: 'view',
+        view: { intent: 'reconciling' },
+      })
+      const postKey = server.calls.find(
+        (c) => c.path.endsWith('/versions/commit') && c.method === 'POST',
+      )?.headers['idempotency-key']
+      expect(postKey).toBeTruthy()
+      const after = await storedIntent(ctx, path)
+      expect(after?.intent).toMatchObject({
+        state: 'reconciling',
+        idempotencyKey: postKey,
+      })
+      expect(readFileSync(path, 'utf8')).toBe('flushed bytes')
+      expect(binding(path).state).not.toBe('saved')
+      expect((await ctx.service.docStatus(path))?.state).not.toBe('saved')
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+      ctx.service.closeConflictPrompt()
+      await flow
+    })
+
+    it('N1: a Save admitted while Reload waits on the download is drained, never superseded, and the action returns the conflict view', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      // the racing Save's commit answer never arrives: its record must survive as `reconciling`
+      server.faults.push({ route: 'commit', kind: 'network' })
+      const origFetch = server.fetch.getMockImplementation()!
+      let reloadReached!: () => void
+      const onReloadReached = new Promise<void>((resolve) => {
+        reloadReached = resolve
+      })
+      let releaseReload!: () => void
+      const reloadGate = new Promise<void>((resolve) => {
+        releaseReload = resolve
+      })
+      let commitReached!: () => void
+      const onCommitReached = new Promise<void>((resolve) => {
+        commitReached = resolve
+      })
+      let releaseCommit!: () => void
+      const commitGate = new Promise<void>((resolve) => {
+        releaseCommit = resolve
+      })
+      server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+        const u = new URL(url)
+        if (u.pathname === `/api/v1/documents/${DOC}/download`) {
+          reloadReached()
+          await reloadGate
+        }
+        if (u.pathname === `/api/v1/documents/${DOC}/versions/commit` && init.method === 'POST') {
+          commitReached()
+          await commitGate
+        }
+        return origFetch(url, init)
+      })
+      // the action may only move past its pre-destructive check once the in-flight Save settled
+      const coordinator = ctx.service.coordinator
+      const realSettled = coordinator.settled.bind(coordinator)
+      vi.spyOn(coordinator, 'settled').mockImplementation(async (target: string) => {
+        releaseCommit()
+        return realSettled(target)
+      })
+
+      const act = ctx.service.conflictAct(view.sessionId, {
+        kind: 'reload',
+        keep: 'discard',
+        stopAi: false,
+      })
+      await onReloadReached
+      writeFileSync(path, 'bytes from the racing save')
+      ctx.setEditorDirty(false)
+      ctx.service.onUserSave(path)
+      await onCommitReached
+      releaseReload()
+
+      const reply = await act
+      expect(reply).toMatchObject({ kind: 'view' })
+      const postKey = server.calls.find(
+        (c) => c.path.endsWith('/versions/commit') && c.method === 'POST',
+      )?.headers['idempotency-key']
+      expect(postKey).toBeTruthy()
+      expect(await storedIntent(ctx, path)).toMatchObject({
+        intent: { state: 'reconciling', idempotencyKey: postKey },
+      })
+      expect(readFileSync(path, 'utf8')).toBe('bytes from the racing save')
+      expect(binding(path).state).not.toBe('saved')
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+      ctx.service.closeConflictPrompt()
+      await flow
+    })
+
+    it('N1: a Save admitted while Overwrite waits on the keep-draft probe is drained, never dropped, and the action returns the conflict view', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      server.faults.push({ route: 'commit', kind: 'network' })
+      const origFetch = server.fetch.getMockImplementation()!
+      let commitReached!: () => void
+      const onCommitReached = new Promise<void>((resolve) => {
+        commitReached = resolve
+      })
+      let releaseCommit!: () => void
+      const commitGate = new Promise<void>((resolve) => {
+        releaseCommit = resolve
+      })
+      server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+        const u = new URL(url)
+        if (u.pathname === `/api/v1/documents/${DOC}/versions/commit` && init.method === 'POST') {
+          commitReached()
+          await commitGate
+        }
+        return origFetch(url, init)
+      })
+      // the view the action decides on is held open until the Save is on the wire
+      const engine = internals(ctx)
+      const realProbe = engine.probeKeepDraft.bind(engine)
+      let probeReached!: () => void
+      const onProbeReached = new Promise<void>((resolve) => {
+        probeReached = resolve
+      })
+      let releaseProbe!: () => void
+      const probeGate = new Promise<void>((resolve) => {
+        releaseProbe = resolve
+      })
+      vi.spyOn(engine, 'probeKeepDraft').mockImplementation(async (...args: unknown[]) => {
+        probeReached()
+        await probeGate
+        return realProbe(...args)
+      })
+      const coordinator = ctx.service.coordinator
+      const realSettled = coordinator.settled.bind(coordinator)
+      vi.spyOn(coordinator, 'settled').mockImplementation(async (target: string) => {
+        releaseCommit()
+        return realSettled(target)
+      })
+
+      const act = ctx.service.conflictAct(view.sessionId, { kind: 'overwrite', stopAi: false })
+      await onProbeReached
+      writeFileSync(path, 'bytes from the racing save')
+      ctx.setEditorDirty(false)
+      ctx.service.onUserSave(path)
+      await onCommitReached
+      releaseProbe()
+
+      const reply = await act
+      expect(reply).toMatchObject({ kind: 'view' })
+      const postKey = server.calls.find(
+        (c) => c.path.endsWith('/versions/commit') && c.method === 'POST',
+      )?.headers['idempotency-key']
+      expect(postKey).toBeTruthy()
+      expect(await storedIntent(ctx, path)).toMatchObject({
+        intent: { state: 'reconciling', idempotencyKey: postKey },
+      })
+      expect(readFileSync(path, 'utf8')).toBe('bytes from the racing save')
+      expect(binding(path).state).not.toBe('saved')
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+      ctx.service.closeConflictPrompt()
+      await flow
+    })
+
+    /**
+     * N1 residual: a `paused_offline` intent with a retained upload session. Superseding it
+     * persists `cancelled` and then used to AWAIT `DELETE /upload-sessions/{id}` inside the
+     * action's validated stretch; a Save admitted during that DELETE was wiped by the action's
+     * local destructive steps. The DELETE now runs after them, so no network sits between the
+     * final check and the last store write.
+     */
+    async function seedRetainedSession(
+      ctx: ReturnType<typeof setup>,
+      path: string,
+      bytes: string,
+    ): Promise<void> {
+      const opened = await ctx.layer.open({ deploymentId: 'default', accountId: 'acc_1' })
+      if (opened.kind !== 'ok') throw new Error('open store failed')
+      const intents = createIntentStore(opened.store.records(INTENT_STORE_REGISTRATION.name))
+      const payload = new TextEncoder().encode(bytes)
+      const now = new Date().toISOString()
+      const written = await intents.put(
+        basename(dirname(path)),
+        {
+          v: 2,
+          intentId: 'intent-seeded',
+          idempotencyKey: 'office-key-seeded',
+          documentId: DOC,
+          orgId: 'org_a',
+          workspaceId: 'ws_1',
+          baseRevision: '41',
+          baseVersion: 3,
+          checksum: createHash('sha256').update(payload).digest('hex'),
+          length: payload.byteLength,
+          generation: 1,
+          state: 'paused_offline',
+          attempt: 0,
+          createdAt: now,
+          updatedAt: now,
+          uploadSession: {
+            sessionId: 'ups_old',
+            partSize: 5 * 1024 * 1024,
+            totalParts: 6,
+            completedParts: [{ partNumber: 1, etag: '"e1"' }],
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        },
+        payload,
+      )
+      if (written.kind !== 'ok') throw new Error('seeding the intent failed')
+    }
+
+    /** gate the DELETE of the retained session; resolves `reached` once the action is waiting on it */
+    function gateSessionDelete(server: ReturnType<typeof fakeServer>) {
+      const origFetch = server.fetch.getMockImplementation()!
+      let reached!: () => void
+      const onReached = new Promise<void>((resolve) => {
+        reached = resolve
+      })
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+        const u = new URL(url)
+        if (u.pathname === '/api/v1/upload-sessions/ups_old' && init.method === 'DELETE') {
+          server.calls.push({ method: 'DELETE', path: u.pathname, headers: {} })
+          reached()
+          await gate
+          return new Response(null, { status: 204 })
+        }
+        return origFetch(url, init)
+      })
+      return { onReached, release }
+    }
+
+    const commitKeys = (server: ReturnType<typeof fakeServer>) =>
+      server.calls
+        .filter((c) => c.path.endsWith('/versions/commit') && c.method === 'POST')
+        .map((c) => c.headers['idempotency-key'])
+
+    it("N1 residual: a Save admitted during Reload's session DELETE keeps its reconciling intent and bytes (DELETE runs after the local steps)", async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      await seedRetainedSession(ctx, path, 'bytes of the paused intent')
+      server.faults.push({ route: 'commit', kind: 'network' })
+      const del = gateSessionDelete(server)
+
+      const act = ctx.service.conflictAct(view.sessionId, {
+        kind: 'reload',
+        keep: 'discard',
+        stopAi: false,
+      })
+      await del.onReached
+      // no network before the destructive steps: by the time the DELETE is on the wire the
+      // tab is already reloaded onto the replaced working copy (asserted below)
+      const reloadedBeforeDelete = vi.mocked(ctx.deps.reloadPath).mock.calls.length > 0
+      writeFileSync(path, 'new bytes of the racing save')
+      ctx.setEditorDirty(false)
+      ctx.service.onUserSave(path)
+      await vi.waitFor(() => expect(commitKeys(server)).toHaveLength(1))
+      const postKey = commitKeys(server)[0]
+      expect(postKey).toBeTruthy()
+      await vi.waitFor(async () =>
+        expect(await storedIntent(ctx, path)).toMatchObject({
+          intent: { state: 'reconciling', idempotencyKey: postKey },
+        }),
+      )
+      del.release()
+      await act
+
+      expect(await storedIntent(ctx, path)).toMatchObject({
+        intent: { state: 'reconciling', idempotencyKey: postKey },
+      })
+      expect(commitKeys(server)).toEqual([postKey])
+      expect(readFileSync(path, 'utf8')).toBe('new bytes of the racing save')
+      expect(binding(path).state).not.toBe('saved')
+      expect(reloadedBeforeDelete).toBe(true)
+      ctx.service.closeConflictPrompt()
+      await flow
+    })
+
+    it("N1 residual: a Save admitted during Overwrite's session DELETE is never forgotten for a second commit key (DELETE runs after the local steps)", async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      await seedRetainedSession(ctx, path, 'bytes of the paused intent')
+      server.faults.push({ route: 'commit', kind: 'network' })
+      const del = gateSessionDelete(server)
+
+      const act = ctx.service.conflictAct(view.sessionId, { kind: 'overwrite', stopAi: false })
+      await del.onReached
+      writeFileSync(path, 'new bytes of the racing save')
+      ctx.setEditorDirty(false)
+      ctx.service.onUserSave(path)
+      await vi.waitFor(() => expect(commitKeys(server)).toHaveLength(1))
+      const postKey = commitKeys(server)[0]
+      expect(postKey).toBeTruthy()
+      await vi.waitFor(async () =>
+        expect(await storedIntent(ctx, path)).toMatchObject({
+          intent: { state: 'reconciling', idempotencyKey: postKey },
+        }),
+      )
+      del.release()
+      await act
+
+      // the first key survives: the action's trailing Save looked it up (the fake has no lookup
+      // route for the document, so it ends `blocked`, not `cancelled`/gone) instead of POSTing again
+      const kept = await storedIntent(ctx, path)
+      expect(kept?.intent.idempotencyKey).toBe(postKey)
+      expect(kept?.intent.state).not.toBe('cancelled')
+      expect([...new Set(commitKeys(server))]).toEqual([postKey])
+      expect(readFileSync(path, 'utf8')).toBe('new bytes of the racing save')
+      ctx.service.closeConflictPrompt()
+      await flow
+    })
+
+    it('N1 residual: Reload whose local working-copy write fails still releases the superseded upload session', async () => {
+      const server = fakeServer()
+      const ctx = setup(server)
+      const { path, flow, view } = await openNewerDirty(ctx, server)
+      await seedRetainedSession(ctx, path, 'bytes of the paused intent')
+      const store = (ctx.service as unknown as { store: { writeWorkingCopy: () => Promise<void> } })
+        .store
+      vi.spyOn(store, 'writeWorkingCopy').mockRejectedValue(new Error('ENOSPC: no space left'))
+      const sessionDeletes = () =>
+        server.calls.filter(
+          (c) => c.method === 'DELETE' && c.path === '/api/v1/upload-sessions/ups_old',
+        )
+      // the DELETE is a fire-and-await closure; let the gated mock answer it
+      const origFetch = server.fetch.getMockImplementation()!
+      server.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+        const u = new URL(url)
+        if (u.pathname === '/api/v1/upload-sessions/ups_old' && init.method === 'DELETE') {
+          server.calls.push({ method: 'DELETE', path: u.pathname, headers: {} })
+          return new Response(null, { status: 204 })
+        }
+        return origFetch(url, init)
+      })
+
+      const result = await ctx.service.conflictAct(view.sessionId, {
+        kind: 'reload',
+        keep: 'discard',
+        stopAi: false,
+      })
+
+      expect(result.kind).toBe('view')
+      expect(ctx.deps.reloadPath).not.toHaveBeenCalled()
+      expect(sessionDeletes()).toHaveLength(1)
+      ctx.service.closeConflictPrompt()
+      await flow
     })
 
     it('BE-403: a dialog aborted while drafts.keep runs does not reload the tab; the kept draft stays', async () => {
@@ -2400,6 +2771,27 @@ describe('G5-12 W-F2 "Download my version" (main)', () => {
     await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
   })
 
+  // A105 (UNI-1362): the bytes are written only while the copy is still this
+  // account's. A switch inside the awaits above ends the dialog and writes
+  // nothing - the same guard the reload path already applies (d5-2).
+  it('an account switch before the picked path resolves ends the dialog and writes nothing', async () => {
+    const server = fakeServer()
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { view } = await openDialog(ctx, path)
+    const target = join(outDir(), 'stale.docx')
+    // the OS dialog is answered after the session moved on
+    pick(ctx).mockImplementation(async () => {
+      ctx.setAccount('acc_2')
+      return target
+    })
+
+    const reply = await download(ctx, view.sessionId)
+
+    expect(reply).toEqual({ kind: 'closed' })
+    expect(existsSync(target)).toBe(false)
+  })
+
   it('BE-12-304: after the folder refusal Download my version works like the no-seat step: the picked path gets the local bytes, a cancelled OS dialog keeps the folder notice', async () => {
     const server = fakeServer()
     server.state.parentId = FOLDER
@@ -2497,5 +2889,26 @@ describe('G5-12 W-F2 "Download my version" (main)', () => {
     expect(reply).toEqual({ kind: 'closed' })
     expect(await flow).toMatchObject({ state: 'conflict' })
     expect(() => readFileSync(target)).toThrow()
+  })
+
+  it('A106 (UNI-1362): refuses a picked download target inside the working-copy root with download_failed and writes nothing', async () => {
+    const server = fakeServer({ bytes: enc('v3'), title: 'Q4 plan.docx' })
+    const ctx = setup(server)
+    const path = await openAndConflict(ctx, server)
+    const { flow, view } = await openDialog(ctx, path)
+    const insideTarget = join(ctx.service.store.root, 'default', 'acc_1', 'stray-copy.docx')
+    pick(ctx).mockResolvedValue(insideTarget)
+
+    const reply = await download(ctx, view.sessionId)
+
+    expect(reply).toMatchObject({
+      kind: 'view',
+      view: { notice: 'download_failed', noticeArg: null },
+    })
+    expect(existsSync(insideTarget)).toBe(false)
+    expect(await ctx.service.saveLocalCopy(path)).toBe(false)
+    expect(existsSync(insideTarget)).toBe(false)
+    await ctx.service.conflictAct(view.sessionId, { kind: 'cancel' })
+    expect(await flow).toMatchObject({ state: 'conflict' })
   })
 })

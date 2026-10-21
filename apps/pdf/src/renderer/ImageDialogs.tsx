@@ -13,6 +13,7 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactElement, ReactN
 import { removeBackground, sampleBackgroundColors, type PixelImage, type RGB } from './cutout'
 import { DEFAULT_CUTOUT_TOLERANCE, type CropFractions } from './image-bake'
 import type { StringKey, TFunc } from './i18n/locale'
+import { isCancelKey, isConfirmKey } from './shortcuts'
 
 /** Longest side of the preview canvas (px) */
 const PREVIEW_MAX = 520
@@ -170,7 +171,7 @@ export function CutoutDialog({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (isCancelKey(e)) {
         e.preventDefault()
         onCancel()
       }
@@ -384,10 +385,15 @@ export function CropDialog({
   // Esc cancels / Enter applies
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (isCancelKey(e)) {
         e.preventDefault()
         onCancel()
-      } else if (e.key === 'Enter' && loaded && !error) {
+      } else if (
+        isConfirmKey(e) &&
+        loaded &&
+        !error &&
+        !(e.target as Element | null)?.closest?.('button')
+      ) {
         e.preventDefault()
         apply()
       }

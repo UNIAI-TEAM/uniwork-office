@@ -13,12 +13,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { Lang } from '@genoffice/i18n'
 import {
   COMMENTS_REVEAL_WAIT_MS,
+  AvatarSourceProvider,
   CollabComposer,
   CollabPanel,
   announcePolite,
   collabStrings,
   formatCollabTime,
   useCollabThreads,
+  useFrameAvatarSource,
+  type CollabComment,
   type CollabController,
   type CollabHostState,
   type CollabThreadView,
@@ -39,6 +42,7 @@ import {
 } from './anchor-store'
 import type { ServerMode } from './mode'
 import { createUniworkCommentsSource } from './seam'
+import { guardRevealFocus } from './reveal-focus-guard'
 
 /** what the ribbon / context menu reach while the host is mounted */
 export interface SheetsServerCommentsHandle {
@@ -79,13 +83,40 @@ export interface SheetsServerCommentsProps {
   store?: ServerAnchorStore
 }
 
-function rootsOf(ctl: CollabController): TrackedRoot[] {
+function versionOf(c: CollabComment): string | null {
+  return typeof c.anchor_version_id === 'string' ? c.anchor_version_id : null
+}
+
+/**
+ * The roots the store locates. A root the server holds as lost is not located, except in the
+ * version it was last anchored on (UNI-2033: the read-only copy of that version), where its anchor
+ * is still the real one.
+ */
+function rootsOf(ctl: CollabController, openVersionId?: string): TrackedRoot[] {
   return [...ctl.threads, ...ctl.resolved].map((t) => ({
     id: t.id,
     anchor: t.root.anchor,
-    anchor_state: t.root.anchor_state,
+    anchor_state:
+      t.root.anchor_state === 'lost' &&
+      openVersionId !== undefined &&
+      versionOf(t.root) === openVersionId
+        ? null
+        : t.root.anchor_state,
+    anchor_version_id: versionOf(t.root),
     deleted: t.deleted,
   }))
+}
+
+/** the roots of a raw list: what a Save round needs, without waiting for a render to derive threads */
+function rootsFromComments(comments: readonly CollabComment[]): TrackedRoot[] {
+  return comments
+    .filter((c) => !c.parent_id && !c.deleted_at)
+    .map((c) => ({
+      id: c.id,
+      anchor: c.anchor,
+      anchor_state: c.anchor_state,
+      anchor_version_id: versionOf(c),
+    }))
 }
 
 function threadOf(ctl: CollabController, id: string): CollabThreadView | undefined {
@@ -144,12 +175,29 @@ function InFileList(p: {
 }
 
 export function SheetsServerComments(p: SheetsServerCommentsProps) {
+  const avatars = useFrameAvatarSource()
   const { mode, view, lang, panelOpen } = p
   const store = p.store ?? serverAnchorStore
-  const source = useMemo(
-    () => createUniworkCommentsSource(mode.api, mode.path, 'comment'),
-    [mode.api, mode.path],
-  )
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const source = useMemo(() => {
+    const base = createUniworkCommentsSource(mode.api, mode.path, 'comment')
+    return {
+      ...base,
+      // a root made here is anchored on the live selection: it is in the live coordinates from the start
+      create: async (input: Parameters<typeof base.create>[0]) => {
+        const created = await base.create(input)
+        const root = created.comment
+        if (input.anchor && !root.parent_id) {
+          store.trackCreated(
+            { id: root.id, anchor: root.anchor, anchor_state: root.anchor_state },
+            viewRef.current.sheets(),
+          )
+        }
+        return created
+      },
+    }
+  }, [mode.api, mode.path, store])
   const platform = useMemo<CollabHostState['platform']>(
     () => (typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? 'mac' : 'other'),
     [],
@@ -167,8 +215,6 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
   )
   const strings = useMemo(() => collabStrings(lang), [lang])
 
-  const viewRef = useRef(view)
-  viewRef.current = view
   // a new adapter object only when a location moved or a listed anchor changed (kit: stable adapter)
   const storeVersion = useSyncExternalStore(store.subscribe, store.getVersion)
   const adapter = useMemo(
@@ -183,17 +229,6 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
     [store, storeVersion],
   )
 
-  const ctl = useCollabThreads(source, host, { adapter, strings })
-  const ctlRef = useRef(ctl)
-  ctlRef.current = ctl
-
-  // the latest server roots feed the store (new ids located once; known ids keep their live place);
-  // a reset (another open of the workbook) re-locates the listed roots at once
-  const epoch = useSyncExternalStore(store.subscribe, store.getEpoch)
-  useEffect(() => {
-    store.track(rootsOf(ctl), viewRef.current.sheets())
-  }, [store, epoch, ctl.threads, ctl.resolved]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // base_version_id of a new root: the version open at load, then the last Save receipt
   const versionRef = useRef<string | null>(mode.versionId)
   // mirrored in state so the "save first" line appears and goes away with it
@@ -201,21 +236,82 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
   useEffect(() => {
     versionRef.current = mode.versionId
     setKnownVersion(mode.versionId)
-  }, [mode.versionId])
+    // roots anchored on this version are taken through the edits made from here on
+    store.markVersion(mode.versionId)
+  }, [mode.versionId, store])
 
-  // after each Save receipt: one anchor map for every located (or lost) root
+  // "View in version N" of a lost thread: the desktop shell opens that version read-only; a host
+  // without it (the web frame) gives the kit no handler, so the action does not show
+  const onViewVersion = useMemo(() => {
+    const { api, path } = mode
+    return api.openVersion
+      ? ({ commentId, versionNo }: { commentId: string; versionNo: number }) =>
+          api.openVersion!({ path, commentId, versionNo })
+      : undefined
+  }, [mode])
+
+  const ctl = useCollabThreads(source, host, {
+    adapter,
+    strings,
+    openVersionId: knownVersion ?? undefined,
+    ...(onViewVersion ? { onViewVersion } : {}),
+  })
+  const ctlRef = useRef(ctl)
+  ctlRef.current = ctl
+
+  // the latest server roots feed the store (new ids located once; known ids keep their live place);
+  // a reset (another open of the workbook) re-locates the listed roots at once
+  const epoch = useSyncExternalStore(store.subscribe, store.getEpoch)
   useEffect(() => {
-    return mode.api.onSaved((payload) => {
+    store.track(rootsOf(ctl, knownVersion ?? undefined), viewRef.current.sheets())
+  }, [store, epoch, ctl.threads, ctl.resolved]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // after each Save receipt: one anchor map for every located (or lost) root, built from a fresh list
+  // (with the panel closed nothing else lists, so a comment made since the first list would be missed).
+  // Rounds are serialized: one in flight, the newest receipt waits as the single pending version.
+  useEffect(() => {
+    let disposed = false
+    const round: { running: boolean; pending: string | null } = { running: false, pending: null }
+    const runRound = async (queued: string) => {
+      const roots = rootsFromComments(await ctlRef.current.freshComments())
+      if (disposed) return
+      // a receipt that landed while the list was loading supersedes this one
+      const versionId = round.pending ?? queued
+      round.pending = null
+      store.track(roots, viewRef.current.sheets())
+      const updates = buildAnchorUpdates(store, roots, viewRef.current.sheets())
+      await syncAnchorsAfterSave(source, versionId, updates, () => {
+        void ctlRef.current.reload()
+      })
+    }
+    const drain = async () => {
+      round.running = true
+      try {
+        while (round.pending !== null && !disposed) {
+          const versionId = round.pending
+          round.pending = null
+          try {
+            await runRound(versionId)
+          } catch {
+            // a failed map is rebuilt from the live locations at the next Save receipt
+          }
+        }
+      } finally {
+        round.running = false
+      }
+    }
+    const off = mode.api.onSaved((payload) => {
       if (payload.path && mode.path && payload.path !== mode.path) return
       versionRef.current = payload.versionId
       setKnownVersion(payload.versionId)
-      const updates = buildAnchorUpdates(store, rootsOf(ctlRef.current), viewRef.current.sheets())
-      void syncAnchorsAfterSave(source, payload.versionId, updates, () => {
-        void ctlRef.current.reload()
-      }).catch(() => {
-        // a failed map is rebuilt from the live locations at the next Save receipt
-      })
+      store.markVersion(payload.versionId)
+      round.pending = payload.versionId
+      if (!round.running) void drain()
     })
+    return () => {
+      disposed = true
+      off()
+    }
   }, [mode.api, mode.path, source, store])
 
   // desktop reload rule (addendum §4.7): focus + every 30 s while the panel is open and the tab visible
@@ -272,6 +368,7 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
       waitersRef.current.push(done)
     })
   }, [])
+  const unguardRef = useRef<() => void>(() => undefined)
   const openRef = useRef(p.onOpenPanel)
   openRef.current = p.onOpenPanel
   useEffect(() => {
@@ -294,9 +391,14 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
       openRef.current()
       // located: the kit selects the cell / range (adapter.goTo); lost: the thread only
       const r = await ctlRef.current.reveal(commentId)
+      if (r.revealed) {
+        unguardRef.current()
+        unguardRef.current = guardRevealFocus(threadOf(ctlRef.current, commentId)?.id ?? commentId)
+      }
       return r.revealed
     })
   }, [mode.api, mode.path, loaded])
+  useEffect(() => () => unguardRef.current(), [])
 
   // one side panel at a time: announce open / close, close when another owner opens (harmless on desktop)
   const panelOpenRef = useRef(panelOpen)
@@ -377,35 +479,37 @@ export function SheetsServerComments(p: SheetsServerCommentsProps) {
   // a view or comment caller cannot save the file, so a "save first" prompt would lead nowhere
   const needsSave = !knownVersion && mode.level !== 'view' && mode.level !== 'comment'
   return (
-    <div className="sheets-server-comments">
-      <CollabPanel
-        className="sheets-server-panel"
-        controller={ctl}
-        strings={strings}
-        onClose={p.onClosePanel}
-        renderComposer={(slot) => <CollabComposer {...slot} strings={strings} />}
-        inFile={
-          p.inFile.length > 0
-            ? {
-                count: p.inFile.length,
-                content: (
-                  <InFileList
-                    threads={p.inFile}
-                    activeSheet={activeSheet}
-                    neutralAuthor={p.neutralAuthor}
-                    lang={lang}
-                    resolvedLabel={strings.collabResolved ?? ''}
-                  />
-                ),
-              }
-            : undefined
-        }
-      />
-      {needsSave && (
-        <p className="collab-pnote collab-pnote--warn sheets-server-save-first">
-          {p.saveFirstMessage}
-        </p>
-      )}
-    </div>
+    <AvatarSourceProvider value={avatars}>
+      <div className="sheets-server-comments">
+        <CollabPanel
+          className="sheets-server-panel"
+          controller={ctl}
+          strings={strings}
+          onClose={p.onClosePanel}
+          renderComposer={(slot) => <CollabComposer {...slot} strings={strings} />}
+          inFile={
+            p.inFile.length > 0
+              ? {
+                  count: p.inFile.length,
+                  content: (
+                    <InFileList
+                      threads={p.inFile}
+                      activeSheet={activeSheet}
+                      neutralAuthor={p.neutralAuthor}
+                      lang={lang}
+                      resolvedLabel={strings.collabResolved ?? ''}
+                    />
+                  ),
+                }
+              : undefined
+          }
+        />
+        {needsSave && (
+          <p className="collab-pnote collab-pnote--warn sheets-server-save-first">
+            {p.saveFirstMessage}
+          </p>
+        )}
+      </div>
+    </AvatarSourceProvider>
   )
 }

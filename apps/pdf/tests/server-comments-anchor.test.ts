@@ -105,7 +105,7 @@ describe('anchor re-send after the save receipt (contract §2.6)', () => {
     const send = vi.fn(async () => ({ outcome: 'synced' as const, updated: ['b'] }))
     const onUpdated = vi.fn()
     const resend = createAnchorResend({
-      roots: () => [root('a', 1), root('b', 2)],
+      roots: () => Promise.resolve([root('a', 1), root('b', 2)]),
       send,
       onUpdated,
     })
@@ -126,7 +126,11 @@ describe('anchor re-send after the save receipt (contract §2.6)', () => {
   it('a receipt before the renderer save lands waits for the save', async () => {
     const send = vi.fn(async () => ({ outcome: 'synced' as const, updated: [] as string[] }))
     const onUpdated = vi.fn()
-    const resend = createAnchorResend({ roots: () => [root('a', 1)], send, onUpdated })
+    const resend = createAnchorResend({
+      roots: () => Promise.resolve([root('a', 1)]),
+      send,
+      onUpdated,
+    })
     resend.receipt('ver-3')
     await flush()
     expect(send).not.toHaveBeenCalled()
@@ -147,7 +151,7 @@ describe('anchor re-send after the save receipt (contract §2.6)', () => {
     const onUpdated = vi.fn()
     const onError = vi.fn()
     const resend = createAnchorResend({
-      roots: () => [root('a', 1), root('b', 2)],
+      roots: () => Promise.resolve([root('a', 1), root('b', 2)]),
       send,
       onUpdated,
       onError,
@@ -182,7 +186,7 @@ describe('anchor re-send after the save receipt (contract §2.6)', () => {
       throw { code: 'malformed', details: { code: 'anchor_version_invalid' } }
     })
     const resend = createAnchorResend({
-      roots: () => [root('a', 1)],
+      roots: () => Promise.resolve([root('a', 1)]),
       send,
       onUpdated: () => {},
       onError,

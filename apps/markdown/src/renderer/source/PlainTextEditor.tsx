@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
-import { Annotation, Compartment, EditorState } from '@codemirror/state'
+import { Annotation, Compartment, EditorState, Prec } from '@codemirror/state'
 import {
   EditorView,
   keymap,
@@ -34,6 +34,7 @@ import { tags } from '@lezer/highlight'
 import type { FindTarget } from '@genoffice/ui'
 import type { TextMode } from '../../shared/text-mode'
 import { buildFindTarget, findHighlight } from './plain-find'
+import { markdownShortcutCommand } from '../shortcuts'
 
 /** Marks the load dispatch so replacing the buffer is not read back as a user edit */
 const Loaded = Annotation.define<boolean>()
@@ -95,12 +96,33 @@ const theme = EditorView.theme({
   '.cm-activeLineGutter': { backgroundColor: 'var(--hover)' },
 })
 
+/**
+ * Undo and redo from the markdown shortcut table: Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z (the Cmd forms on
+ * macOS). CodeMirror's stock history keymap binds Ctrl-Shift-z on Linux only and leaves Cmd+Y
+ * unbound, so the source view lacked the Ctrl+Shift+Z redo the editor has. The shared matcher
+ * skips IME composition and compares the letter case-insensitively.
+ */
+const historyKeys = Prec.highest(
+  EditorView.domEventHandlers({
+    keydown(event, view) {
+      if (view.composing) return false
+      const command = markdownShortcutCommand(event)
+      if (command !== 'undo' && command !== 'redo') return false
+      event.preventDefault()
+      if (command === 'undo') undo(view)
+      else redo(view)
+      return true
+    },
+  }),
+)
+
 function extensionsFor(mode: Props['mode']) {
   return [
     lineNumbers(),
     highlightActiveLineGutter(),
     highlightSpecialChars(),
     history(),
+    historyKeys,
     drawSelection(),
     dropCursor(),
     indentOnInput(),

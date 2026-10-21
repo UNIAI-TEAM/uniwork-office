@@ -276,7 +276,7 @@ describe('S18 new document', () => {
     await click(contracts)
     await click(buttonByText(picker as HTMLElement, folderEn.ufChoose))
     expect(host.querySelector('.uwf-picker')).toBeNull()
-    expect(location.textContent).toContain('UniWork › Contracts')
+    expect(location.textContent).toContain('Documents (root) › Contracts')
     await click(buttonByText(dialog, en.uwDocCreate))
     expect(api.uniworkCreateDocument).toHaveBeenCalledWith({
       workspaceId: 'w1',
@@ -310,8 +310,10 @@ describe('S18 new document', () => {
     )!
     await click(contracts)
     await click(buttonByText(picker as HTMLElement, folderEn.ufChoose))
-    expect(btn.querySelector('.uwf-location-path')?.textContent).toBe('UniWork › Contracts')
-    expect(btn.getAttribute('title')).toBe('UniWork › Contracts')
+    expect(btn.querySelector('.uwf-location-path')?.textContent).toBe(
+      'Documents (root) › Contracts',
+    )
+    expect(btn.getAttribute('title')).toBe('Documents (root) › Contracts')
 
     const homeCss = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
     const foldersCss = readFileSync(
@@ -693,15 +695,22 @@ describe('S18 row menu', () => {
 
   it('archives after a one-step confirmation, then offers Restore', async () => {
     await render([row('m', 'Old.docx', { canEdit: true, canManage: true })])
-    await openMenuItem('Old.docx', en.uwDocArchive)
+    await openMenuItem('Old.docx', 'Move to trash')
     const dialog = modal()!
-    expect(dialog.textContent).toContain('Archive “Old.docx”? You can restore it later.')
+    // UNI-1958 row 5: the web's move-to-trash wording (documents.archive.archive_description)
+    expect(dialog.textContent).toContain('Move to trash · Old.docx')
+    expect(dialog.textContent).toContain(
+      '“Old.docx” and its whole subtree will stay in the trash for 30 days before permanent deletion. Managers can restore them during this window.',
+    )
+    expect(dialog.textContent).not.toMatch(/archive/i)
     expect(api.uniworkArchiveDocument).not.toHaveBeenCalled()
     await click(dialog.querySelector('.btn-primary')!)
     expect(api.uniworkArchiveDocument).toHaveBeenCalledWith('m')
     expect(modal()).toBeNull()
     const archived = rowOf('Old.docx')
-    expect(archived.textContent).toContain(en.uwDocArchived)
+    // UNI-1958 row 5: the web's documents.library.archived_badge
+    expect(archived.textContent).toContain('In trash')
+    expect(archived.textContent).not.toMatch(/archived/i)
     expect(archived.getAttribute('aria-disabled')).toBeNull()
     await click(menuButton(archived)!)
     const items = Array.from(document.body.querySelectorAll('[role="menuitem"]')).map(
@@ -814,22 +823,38 @@ describe('S18 archived row and archive confirm (FX4)', () => {
       css.match(new RegExp(`${selector.replace(/[.>]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
     // the row itself is not translucent (that would dim the menu popup with it)
     expect(block('.uw-pick-row.disabled')).not.toMatch(/opacity/)
-    // only the icon and the text are
-    expect(block('.uw-pick-row.disabled > .uw-pick-row-text')).toMatch(/opacity:\s*0\.6/)
+    // only the icon and the text cells are: the picker grid dims its cells, never the row
+    const picker = readFileSync(
+      join(__dirname, '../src/renderer/src/doclist/doclist-picker.css'),
+      'utf8',
+    )
+    expect(picker).toMatch(
+      /\.uw-pick-row\.dh-pick-row\.disabled > \[data-col\]\s*\{[^}]*opacity:\s*0\.6/,
+    )
+    // the old text-wrapper selector no longer matches any dialog row
+    expect(css).not.toContain('.uw-pick-row.disabled > .uw-pick-row-text')
   })
 
   it('V17b-02: an archived row keeps its text at full opacity on the muted token', () => {
     const css = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
-    const block = (selector: string) =>
-      css.match(new RegExp(`${selector.replace(/[.>]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
-    // declared after the .disabled dimming, same specificity, so it wins
-    expect(css.indexOf('.uw-pick-row.archived > .uw-pick-row-text')).toBeGreaterThan(
-      css.indexOf('.uw-pick-row.disabled > .uw-pick-row-text'),
+    const picker = readFileSync(
+      join(__dirname, '../src/renderer/src/doclist/doclist-picker.css'),
+      'utf8',
     )
-    expect(block('.uw-pick-row.archived > .uw-pick-row-text')).toMatch(/opacity:\s*1\s*;/)
-    expect(block('.uw-pick-row.archived .uw-pick-row-title')).toMatch(
+    const block = (source: string, selector: string) =>
+      source.match(new RegExp(`${selector.replace(/[.>[\]=]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ??
+      ''
+    // the picker's cells are declared after the .disabled dimming, same specificity, so it wins
+    expect(picker.indexOf('.uw-pick-row.dh-pick-row.archived > [data-col]')).toBeGreaterThan(
+      picker.indexOf('.uw-pick-row.dh-pick-row.disabled > [data-col]'),
+    )
+    expect(block(picker, '.uw-pick-row.dh-pick-row.archived > [data-col]')).toMatch(
+      /opacity:\s*1\s*;/,
+    )
+    expect(block(css, '.uw-pick-row.archived .uw-pick-row-title')).toMatch(
       /color:\s*var\(--text-muted\)/,
     )
+    expect(css).not.toContain('.uw-pick-row.archived > .uw-pick-row-text')
   })
 
   it('V17b-04: the active row has a ring only while focus is inside the list, not in the search', () => {
@@ -844,7 +869,7 @@ describe('S18 archived row and archive confirm (FX4)', () => {
     await render([archivedRow(), row('u', 'Notes.txt', { format: null })])
     const archived = rowOf('Old.docx')
     const meta = archived.querySelector('.uw-pick-row-meta')!.textContent!
-    expect(meta).toContain(en.uwDocArchived)
+    expect(meta).toContain('In trash')
     // an archived row is parked, not unsupported
     expect(meta).not.toContain('Not supported')
     // FD-14: a really unsupported format is not listed at all

@@ -232,12 +232,22 @@ describe('UniworkRemoteBar: lock while open', () => {
     expect(el.getAttribute('role')).toBe('region')
   })
 
-  it('writes its sentence once to the window alert node, and says nothing again on a repeat push', async () => {
+  it('writes its sentence once to the window alert node, the sentence clears after ~1 s, and a repeat push says nothing', async () => {
+    vi.useFakeTimers()
     const watch = watchAnnouncements()
     await mount(status(STORE))
     expect(watch.count()).toBe(1)
     expect(alert().textContent).toBe(text('en', 'uwLockWhileOpen'))
     expect(polite().textContent).toBe('')
+    // the sentence dwells in the alert node, then clears (EXPERIENCE: ~1 s)
+    await act(async () => {
+      vi.advanceTimersByTime(999)
+    })
+    expect(alert().textContent).toBe(text('en', 'uwLockWhileOpen'))
+    await act(async () => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(alert().textContent).toBe('')
     // a status push that changes nothing about the lock says nothing new
     await mount(status(STORE, { state: 'saved' }))
     await mount(status(STORE, { pendingNext: true }))
@@ -246,8 +256,12 @@ describe('UniworkRemoteBar: lock while open', () => {
   })
 
   it('a ram-mode lock replacing a store-mode one is announced again, once', async () => {
+    vi.useFakeTimers()
     await mount(status(STORE))
     const watch = watchAnnouncements()
+    await act(async () => {
+      vi.advanceTimersByTime(1_000)
+    })
     await mount(status(RAM))
     expect(watch.count()).toBe(1)
     expect(alert().textContent).toBe(text('en', 'uwLockWhileOpenRam'))

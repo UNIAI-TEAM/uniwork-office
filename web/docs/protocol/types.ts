@@ -299,6 +299,12 @@ export type Capability =
    */
   | 'commentsShareView'
   /**
+   * additive (UNI-2033): the host can open version N read-only with a comment revealed, via
+   * `comments.viewVersion`. The frame offers "View that version" on a comment whose anchor was lost
+   * only when the effective capabilities have it. The host never grants it inside a version view.
+   */
+  | 'commentsViewVersion'
+  /**
    * additive (SIZE-F1): the host renders its own size warning banner and save-blocked modal from
    * `size_warning` / `save_blocked` events and triggers downloads via `doc.download`. When false or
    * absent, the frame renders its own fallback warning chip and save-blocked dialog.
@@ -327,6 +333,7 @@ export const CAPABILITY_KEYS: readonly Capability[] = [
   'uniworkAi',
   'comments',
   'commentsShareView',
+  'commentsViewVersion',
   'sizeUi',
 ]
 
@@ -1009,6 +1016,8 @@ export interface DocumentComment {
   revision?: number
   anchor?: CommentAnchor | null
   anchor_version_id?: string | null
+  /** additive (UNI-2033): the ordinal (>= 1) of `anchor_version_id`; null when the version is gone */
+  anchor_version_no?: number | null
   anchor_state?: OpenString<CommentAnchorState> | null
   resolved_at?: string | null
   /** set = a tombstone ("the content was deleted") */
@@ -1145,6 +1154,20 @@ export interface CommentsShareViewResult {
   ok: true
 }
 
+/**
+ * additive (UNI-2033): open version `version_no` read-only with `comment_id` revealed; send only
+ * with `commentsViewVersion`
+ */
+export interface CommentsViewVersionPayload {
+  comment_id: string
+  version_no: number
+}
+
+/** false: the host could not open that version (the frame says so itself) */
+export interface CommentsViewVersionResult {
+  opened: boolean
+}
+
 /** host -> frame: the comments of a document changed elsewhere (ids only) */
 export interface CommentsChangedPayload {
   document_id: string
@@ -1169,6 +1192,7 @@ const COMMENTS_REQUEST_TYPES: readonly string[] = [
   'comments.revisions',
   'comments.anchors',
   'comments.shareView',
+  'comments.viewVersion',
   'mentions.search',
 ]
 
@@ -1427,6 +1451,8 @@ export interface FrameRequests {
   'comments.revisions': Rpc<CommentIdPayload, CommentsRevisionsResult>
   'comments.anchors': Rpc<CommentsAnchorsPayload, CommentsAnchorsResult>
   'comments.shareView': Rpc<CommentsShareViewPayload, CommentsShareViewResult>
+  /** additive (UNI-2033): send only with the `commentsViewVersion` capability */
+  'comments.viewVersion': Rpc<CommentsViewVersionPayload, CommentsViewVersionResult>
   'mentions.search': Rpc<MentionsSearchPayload, MentionsSearchResult>
 }
 
@@ -1545,6 +1571,7 @@ const FRAME_REQUESTS: Record<FrameRequestType, true> = {
   'comments.revisions': true,
   'comments.anchors': true,
   'comments.shareView': true,
+  'comments.viewVersion': true,
   'mentions.search': true,
 }
 const FRAME_EVENTS: Record<FrameEventType, true> = {
@@ -1701,6 +1728,7 @@ function isDocumentComment(x: unknown): x is DocumentComment {
     isOpt(x.revision, isFiniteNum) &&
     isOptNullable(x.anchor, isCommentAnchor) &&
     isOptNullable(x.anchor_version_id, isStr) &&
+    isOptNullable(x.anchor_version_no, isPositiveSafeInt) &&
     isOptNullable(x.anchor_state, isStr) &&
     isOptNullable(x.resolved_at, isStr) &&
     isOptNullable(x.deleted_at, isStr) &&
@@ -1946,6 +1974,8 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
     x.anchors.length <= COMMENTS_MAX_ANCHORS &&
     x.anchors.every(isCommentAnchorUpdate),
   'request:comments.shareView': (x) => isObj(x) && isNonEmptyStr(x.user_id),
+  'request:comments.viewVersion': (x) =>
+    isObj(x) && isNonEmptyStr(x.comment_id) && isPositiveSafeInt(x.version_no),
   'request:mentions.search': (x) =>
     isObj(x) &&
     isStr(x.q) &&
@@ -2039,6 +2069,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
     ) &&
     isNonEmptyStr(x.list_token),
   'response:comments.shareView': (x) => isObj(x) && x.ok === true,
+  'response:comments.viewVersion': (x) => isObj(x) && isBool(x.opened),
   'response:mentions.search': (x) => isObj(x) && isArrayOf(x.candidates, isMentionCandidate),
   'response:comments.reveal': (x) => isObj(x) && isBool(x.revealed),
   'response:doc.download': (x) => isObj(x) && x.delivered === true,

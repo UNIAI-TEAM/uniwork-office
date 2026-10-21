@@ -50,6 +50,8 @@ function makeCtx(over: Record<string, unknown> = {}): ActionCtx {
     overlayOpen: false,
     findNodeCtx: () => null,
     flushNotes: vi.fn(async () => {}),
+    // Ctrl+Alt+M is PowerPoint's Insert comment
+    newComment: vi.fn(),
     ...over,
   } as unknown as ActionCtx
 }
@@ -874,6 +876,22 @@ describe('Escape on the canvas', () => {
     },
   )
 
+  it('a real dialog in the document owns Escape, the AI dock overlay (data-overlay-dock) does not', () => {
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    document.body.append(dialog)
+    const blocked = vi.fn()
+    handleGlobalKeydown(makeCtx({ selectedIds: ['a'], setSelectedIds: blocked }), keydown('Escape'))
+    expect(blocked).not.toHaveBeenCalled()
+
+    // the panel at 521-900 px: dialog semantics, but the slide stays visible and clickable
+    dialog.setAttribute('aria-modal', 'true')
+    dialog.setAttribute('data-overlay-dock', '')
+    const setSelectedIds = vi.fn()
+    handleGlobalKeydown(makeCtx({ selectedIds: ['a'], setSelectedIds }), keydown('Escape'))
+    expect(setSelectedIds).toHaveBeenCalledWith([])
+  })
+
   it('leaves in-group editing untouched while an overlay is open', () => {
     const setSelectedIds = vi.fn()
     const setEnteredGroupId = vi.fn()
@@ -1018,7 +1036,7 @@ describe('text formatting shortcuts', () => {
   ] as const)('toggles %s on selected shapes with Command+%s', (key, kind) => {
     const ctx = makeCtx({ selectedIds: ['a'] })
     const e = keydown(key)
-    handleGlobalKeydown(ctx, e)
+    handleGlobalKeydown(ctx, e, 'MacIntel')
     expect(e.defaultPrevented).toBe(true)
     expect(styleActions.onTextToggle).toHaveBeenCalledWith(ctx, kind)
   })

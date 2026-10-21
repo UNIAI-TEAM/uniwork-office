@@ -22,6 +22,7 @@ const en = {
   copyDialogTitle: 'Save a copy on this computer',
   copySuffix: '(my copy)',
   copyMyVersion: '(my version)',
+  viewVersionSuffix: 'version {version}, read-only',
   openLatestFailed: 'Couldn’t open the latest version. Your copy was not changed.',
   copyFailed: 'Couldn’t save the copy there. Choose another folder and try again.',
   closeMessage: 'Changes not saved to UniWork.',
@@ -80,6 +81,7 @@ const vi = {
   copyDialogTitle: 'Lưu một bản sao trên máy này',
   copySuffix: '(bản của tôi)',
   copyMyVersion: '(bản của tôi)',
+  viewVersionSuffix: 'phiên bản {version}, chỉ đọc',
   openLatestFailed: 'Không mở được phiên bản mới nhất. Bản của bạn vẫn giữ nguyên.',
   copyFailed: 'Không lưu được bản sao vào đó. Hãy chọn thư mục khác rồi thử lại.',
   closeMessage: 'Thay đổi chưa được lưu lên UniWork.',
@@ -121,10 +123,11 @@ export const UNIWORK_DOC_STRINGS = { en, vi } as const
 export function tUniworkDocs(
   lang: string,
   key: Key,
-  params: { title?: string; count?: number } = {},
+  params: { title?: string; count?: number; version?: number } = {},
 ): string {
   const table: Record<Key, string> = lang === 'vi' ? vi : en
   return table[key]
     .replace('{title}', params.title ?? '')
     .replace('{count}', String(params.count ?? 0))
+    .replace('{version}', String(params.version ?? 0))
 }

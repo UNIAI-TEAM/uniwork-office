@@ -276,7 +276,9 @@ describe('Open from UniWork: workspaces and Shared with me', () => {
     expect(rows().map((r) => r.querySelector('.uw-pick-row-title')?.textContent)).toEqual([
       'Contract.docx',
     ])
-    expect(rows()[0]!.querySelector('.uw-pick-row-meta')?.textContent).toMatch(/^Legal · /)
+    // UNI-2047 B2: the workspace is the second line; the editor and the date are columns now
+    expect(rows()[0]!.querySelector('.uw-pick-row-meta')?.textContent).toBe('Legal')
+    expect(rows()[0]!.querySelector('[data-col="updated"]')).not.toBeNull()
   })
 
   it('an empty shared list says nothing was shared yet', async () => {
@@ -331,6 +333,21 @@ describe('Open from UniWork: details panel', () => {
     expect(values[3]).toBe('Edit')
     expect(values[4]).toBe('4 · Lan Nguyen')
     expect(btn.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('UNI-1958 rows 2-3: My access names the web levels (vi: Nhận xét / Chỉ xem; en: Comment / View)', async () => {
+    const levelOf = async (myLevel: 'comment' | 'view', lang: Lang) => {
+      await render({ info: { ...FULL_INFO, myLevel } }, lang)
+      await click(infoButtons()[0]!)
+      const values = Array.from(infoPanel()!.querySelectorAll('dl dd')).map((d) => d.textContent)
+      act(() => root.unmount())
+      root = createRoot(host)
+      return values[3]
+    }
+    expect(await levelOf('comment', 'vi')).toBe('Nhận xét')
+    expect(await levelOf('view', 'vi')).toBe('Chỉ xem')
+    expect(await levelOf('comment', 'en')).toBe('Comment')
+    expect(await levelOf('view', 'en')).toBe('View')
   })
 
   it('shows "—" for every field the server did not send', async () => {

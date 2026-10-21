@@ -11,11 +11,12 @@ export const cs = {
   usMyFolderPrivate: 'Soukromé, vidíte jen vy',
   usChange: 'Změnit',
   usSave: 'Uložit',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Zavřít',
   usPickTitle: 'Vyberte, kam uložit',
   usBack: 'Zpět k pojmenování',
   usSearchFolders: 'Hledat složky',
-  usSharedNote: 'Při uložení do sdílené složky dostane dokument oprávnění této složky.',
   usChooseFolder: 'Vybrat „{folder}“',
   usSelected: 'Vybráno',
   usRootBlocked: 'Vyberte složku',
@@ -31,4 +32,8 @@ export const cs = {
   usErrAlreadyBound: 'Tato karta je už propojena s dokumentem UniWork. Ukládejte jako obvykle.',
   usErrNotFound:
     'Soubor k uložení nebo vybranou složku nelze najít. Znovu vyberte, kam uložit, a zkuste to znovu.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

@@ -164,11 +164,11 @@ describe('Open from UniWork as the browser', () => {
     expect($('[role="tree"]')).toBeTruthy()
     expect($('.uw-pick-body')?.textContent).toContain('Recent.docx')
     // no tree row reads as the open folder while Recent is shown
-    expect(treeItem('UniWork').getAttribute('aria-selected')).toBe('false')
+    expect(treeItem('Documents (root)').getAttribute('aria-selected')).toBe('false')
   })
 
   it('a tree folder shows its contents; Recent comes back from its view button', async () => {
-    await click(treeItem('UniWork'))
+    await click(treeItem('Documents (root)'))
     expect(button(en.ufRecent).getAttribute('aria-pressed')).toBe('false')
     expect($$('.uwf-contents [role="option"]').map((o) => o.textContent)).toEqual([
       expect.stringContaining('Alpha'),
@@ -188,7 +188,7 @@ describe('Open from UniWork as the browser', () => {
   })
 
   it('in a folder the search box searches titles; Escape returns to the folder first', async () => {
-    await click(treeItem('UniWork'))
+    await click(treeItem('Documents (root)'))
     expect($<HTMLInputElement>('.uw-pick-search')!.placeholder).toBe(en.ufSearchPh)
     const recentCalls = api.uniworkListDocuments.mock.calls.length
     await search('ins')
@@ -218,7 +218,7 @@ describe('Open from UniWork as the browser', () => {
     await click(treeItem('Alpha'))
     await click(button('New document'))
     const location = $<HTMLButtonElement>('.modal.uw-act .uwf-location-btn')!
-    expect(location.textContent).toContain('UniWork › Alpha')
+    expect(location.textContent).toContain('Documents (root) › Alpha')
     // Recent: no folder, which is My Folder since SAVE-01 Q1 (main sends destination my_folder)
     await click(button('Cancel'))
     await click(button(en.ufRecent))
@@ -238,5 +238,54 @@ describe('Open from UniWork as the browser', () => {
     })
     await flush()
     expect(api.uniworkOpenDocument).toHaveBeenCalledWith('d2')
+  })
+})
+
+describe('Open from UniWork in Vietnamese (UNI-1958 rows 7, 10)', () => {
+  async function renderVi() {
+    await act(async () => root.unmount())
+    root = createRoot(host)
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'vi' },
+          createElement(UniworkOpenDialog, {
+            onClose,
+            accountView: 'signed-in',
+            onSignIn: () => undefined,
+          }),
+        ),
+      )
+    })
+    await flush()
+  }
+
+  it('row 10: the tree view button reads "Được chia sẻ với tôi"', async () => {
+    await renderVi()
+    expect(button('Được chia sẻ với tôi')).toBeTruthy()
+    expect(button('Được chia sẻ với tôi').getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('row 7: the workspace picker is "Workspace" and the folder search says "workspace"', async () => {
+    await renderVi()
+    expect($('.uw-pick-ws')!.getAttribute('aria-label')).toBe('Workspace')
+    expect($('.uw-pick-ws optgroup')!.getAttribute('label')).toBe('Workspace')
+    await click(treeItem('Tài liệu (gốc)'))
+    expect($<HTMLInputElement>('.uw-pick-search')!.placeholder).toBe('Tìm theo tên trong workspace')
+  })
+
+  it('row 7: an empty workspace says "Workspace này chưa có tài liệu."', async () => {
+    api.uniworkListDocuments.mockImplementation(async () =>
+      ok<UniworkDocListPage>({ documents: [], nextCursor: null }),
+    )
+    await renderVi()
+    expect($('.uw-pick-state-title')!.textContent).toBe('Workspace này chưa có tài liệu.')
+  })
+
+  it('row 7: no workspaces says "Bạn chưa có workspace nào."', async () => {
+    api.uniworkListWorkspaces.mockImplementation(async () => ok([]))
+    await renderVi()
+    expect($('.uw-pick-state-title')!.textContent).toBe('Bạn chưa có workspace nào.')
   })
 })

@@ -12,11 +12,12 @@ export const ru = {
   usMyFolderPrivate: 'Личное, видно только вам',
   usChange: 'Изменить',
   usSave: 'Сохранить',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Закрыть',
   usPickTitle: 'Выберите место сохранения',
   usBack: 'Назад к имени',
   usSearchFolders: 'Поиск папок',
-  usSharedNote: 'При сохранении в общую папку документ получает права этой папки.',
   usChooseFolder: 'Выбрать «{folder}»',
   usSelected: 'Выбрано',
   usRootBlocked: 'Выберите папку',
@@ -32,4 +33,8 @@ export const ru = {
   usErrAlreadyBound: 'Эта вкладка уже связана с документом UniWork. Сохраняйте как обычно.',
   usErrNotFound:
     'Не удалось найти сохраняемый файл или выбранную папку. Выберите место сохранения заново и повторите попытку.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

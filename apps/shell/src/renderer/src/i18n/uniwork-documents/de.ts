@@ -145,19 +145,22 @@ export const de = {
   uwDocType: 'Typ',
   uwDocLocation: 'Speicherort',
   uwDocRename: 'Umbenennen',
-  uwDocArchive: 'Archivieren',
+  uwDocArchive: 'In den Papierkorb',
   uwDocRestore: 'Wiederherstellen',
-  uwDocArchiveConfirm: '„{name}“ archivieren? Sie können es später wiederherstellen.',
+  uwDocArchiveConfirm:
+    '„{name}“ und alle untergeordneten Elemente bleiben 30 Tage im Papierkorb, bevor sie endgültig gelöscht werden. Verwalter können sie in diesem Zeitraum wiederherstellen.',
   uwDocNameEmpty: 'Geben Sie einen Dokumentnamen ein.',
   uwDocNameTooLong: 'Der Name ist zu lang (höchstens 500 Zeichen).',
   uwDocRenamedAnnounce: 'Das Dokument wurde in {name} umbenannt.',
   uwDocActionFailed: 'Das hat nicht geklappt. Versuchen Sie es erneut.',
+  uwUniNoteOpenFailed:
+    'Die UniNote wurde erstellt, konnte aber nicht geöffnet werden. Öffnen Sie sie aus der Liste.',
   uwDocActionsFor: 'Weitere Aktionen für „{name}“',
   uwDocCreate: 'Erstellen',
   uwDocUploadPick: 'Datei auswählen',
   uwDocUploading: '„{name}“ wird hochgeladen…',
   uwDocLocationTop: 'Oberste Ebene',
-  uwDocArchived: 'Archiviert',
+  uwDocArchived: 'In den Papierkorb verschoben',
   uwSizeWarnChip: 'Nähert sich dem Limit von {max} (aktuell {size}).',
   uwSizeWarnDismiss: 'Größenwarnung schließen',
   uwSaveBlockTitle: 'Konnte nicht in UniWork gespeichert werden',
@@ -176,4 +179,34 @@ export const de = {
   uwTipEditLockedSelf: 'Sie bearbeiten dieses Dokument in einem anderen Fenster.',
   uwErrEditLocked: 'Jemand anderes bearbeitet dieses Dokument.',
   uwReasonEditLocked: 'jemand anderes bearbeitet es',
+  uwLockBannerOther: '{name} bearbeitet seit {time}. Sie sehen schreibgeschützt.',
+  uwLockBannerSelfElsewhere: 'Sie bearbeiten dieses Dokument in einem anderen Fenster.',
+  uwLockBannerFree: 'Niemand bearbeitet dieses Dokument gerade.',
+  uwLockEditHere: 'Hier bearbeiten',
+  uwLockAcquiring: 'Bearbeitungszugriff wird angefordert…',
+  uwLockReadOnlyExplain: 'Nichts wurde gespeichert — das Dokument ist schreibgeschützt.',
+  uwLockLostTitle: 'Sie bearbeiten nicht mehr',
+  uwLockLostTakenOver:
+    '{name} hat die Bearbeitung übernommen. Ihre ungespeicherten Änderungen sind noch da.',
+  uwLockLostHandedOver:
+    'Sie haben die Bearbeitung an {name} abgegeben. Ihre ungespeicherten Änderungen sind noch da.',
+  uwLockLostExpired:
+    'Die Bearbeitung ist abgelaufen, weil der Server eine Weile nicht erreichbar war (kein Netzwerk oder das Gerät schlief). Ihre ungespeicherten Änderungen sind noch da.',
+  uwLockLostMovedHere:
+    'Sie bearbeiten dieses Dokument jetzt in einem anderen Fenster. Die ungespeicherten Änderungen in diesem Fenster sind noch da.',
+  uwLockLostAccessLost:
+    'Sie dürfen dieses Dokument nicht mehr bearbeiten. Ihre ungespeicherten Änderungen sind noch da.',
+  uwLockLostGeneric: 'Sie bearbeiten nicht mehr. Ihre ungespeicherten Änderungen sind noch da.',
+  uwLockLostHeldBy: '{name} bearbeitet gerade. Ihre ungespeicherten Änderungen sind noch da.',
+  uwLockAcquireFailed:
+    'Bearbeitungszugriff konnte nicht angefordert werden. Versuchen Sie es in ein paar Minuten erneut.',
+  uwChipSourceView: 'Nur Ansicht · Aus {origin}',
+  uwTipSourceView:
+    'Diese Datei ist in {origin}{parent} angehängt. Änderungen werden nicht gespeichert. Für eine Kopie nutzen Sie „Herunterladen“ in der Dokumentenliste.',
+  uwSourceViewSaveHint: 'Diese Datei ist nur zur Ansicht — Änderungen werden nicht gespeichert.',
+  uwSourceViewCopyHint: 'Für eine Kopie nutzen Sie „Herunterladen“ in der Dokumentenliste.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Aufgaben',
+  uwSourceOriginMeeting: 'Meetings',
+  uwSourceOriginEmail: 'E-Mail',
 } satisfies Record<keyof typeof zh, string>

@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,9 +21,10 @@ import {
   type Binding,
   type BindingStore,
 } from '../src/main/uniwork-docs/binding-store'
-import { UniworkDocError } from '../src/main/uniwork-docs/errors'
+import { errorFromResponse, UniworkDocError } from '../src/main/uniwork-docs/errors'
 import type { SaveCoordinator } from '../src/main/uniwork-docs/save-coordinator'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
+import { pathKey } from '../src/shared/path-key'
 import type { DocumentDetail } from '../src/main/uniwork-docs/parse'
 import type { DownloadResult, UniworkDocsClient } from '../src/main/uniwork-docs/client'
 import {
@@ -24,6 +33,8 @@ import {
   type IntentStore,
 } from '../src/main/uniwork-sync/intent-store'
 import type { IntentRecordV2 } from '../src/main/uniwork-sync/queue/record'
+import { DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
+import { PAUSE_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/pause'
 import { NEVER_READ_CAPABILITIES } from '../src/main/uniwork-sync/capability/cache'
 import { createSafeStorageKeyProvider } from '../src/main/uniwork-sync/keys'
 import {
@@ -124,24 +135,47 @@ const AI_TURN: EditorState = { dirty: false, aiRunning: true, aiEpoch: 2 }
 interface Harness {
   service: UniworkDocsService
   statuses: UniworkDocStatus[]
+  /** the first pushed status (already pushed, or the next one) that matches */
+  statusWhere(match: (status: UniworkDocStatus) => boolean): Promise<UniworkDocStatus>
   reloaded: string[]
+  /** resolves with the path of the next reloadPath call */
+  nextReload(): Promise<string>
   openPaths: Set<string>
   client: {
     detail: DocumentDetail
     error: UniworkDocError | null
     downloadError: UniworkDocError | null
-    calls: { getDocument: number; download: number }
+    /** when set, the next download parks on it (and calls `downloadEntered`) */
+    downloadGate: Promise<void> | null
+    downloadEntered: (() => void) | null
+    calls: { getDocument: number; download: number; commit: number }
   }
   editorStates: EditorState[]
   syncStore: SyncStoreAccess
   intents(): Promise<IntentStore>
-  capability: { syncFeed: boolean }
+  capability: {
+    syncFeed: boolean
+    /**
+     * When set, the capability read a remote decision makes parks on this
+     * promise, so a test can hold the decision open across a close.
+     */
+    hold: Promise<void> | null
+    /** called the first time a capability read parks on `hold` */
+    entered: (() => void) | null
+  }
   /** what the conflict dialog (the bar's `reload` action) answers */
   ui: { conflict: UniworkConflictChoice; discard: boolean }
   views: UniworkConflictView[]
 }
 
-function setup(): Harness {
+function setup(
+  options: {
+    requestFirstSaveName?: (request: {
+      requestId: string
+      path: string
+    }) => Promise<'continue' | 'cancel'>
+  } = {},
+): Harness {
   const safeStorage = createLockableSafeStorage()
   const layer = createStoreLayer({
     root: join(dir, 'uniwork-sync', 'store'),
@@ -152,22 +186,35 @@ function setup(): Harness {
   layer.register(INTENT_STORE_REGISTRATION)
   layer.register(FEED_CURSORS_REGISTRATION)
   layer.register(DOC_INDEX_REGISTRATION)
+  layer.register(DRAFTS_STORE_REGISTRATION)
+  layer.register(PAUSE_STORE_REGISTRATION)
   const syncStore = createSyncStoreAccess({ layer, scope: () => ({ ...SCOPE }) })
 
   const statuses: UniworkDocStatus[] = []
+  const statusWaiters = new Set<(status: UniworkDocStatus) => void>()
   const views: UniworkConflictView[] = []
   const reloaded: string[] = []
+  const reloadWaiters: Array<(path: string) => void> = []
   const openPaths = new Set<string>([docPath()])
   const editorStates: EditorState[] = [CLEAN]
   let editorCalls = 0
-  const capability = { syncFeed: true }
+  const capability = {
+    syncFeed: true,
+    hold: null as Promise<void> | null,
+    entered: null as (() => void) | null,
+  }
   const client = {
     detail: detailOf('10', 4, HEAD_BYTES),
     error: null as UniworkDocError | null,
     downloadError: null as UniworkDocError | null,
-    calls: { getDocument: 0, download: 0 },
+    downloadGate: null as Promise<void> | null,
+    downloadEntered: null as (() => void) | null,
+    calls: { getDocument: 0, download: 0, commit: 0 },
   }
   const api = {
+    async documentRef() {
+      return { id: DOC, workspaceId: 'ws_1', title: 'Untitled document.docx', parentId: 'f_mine' }
+    },
     async getDocument(): Promise<DocumentDetail> {
       client.calls.getDocument += 1
       if (client.error) throw client.error
@@ -175,8 +222,37 @@ function setup(): Harness {
     },
     async download(): Promise<DownloadResult> {
       client.calls.download += 1
+      const gate = client.downloadGate
+      if (gate) {
+        client.downloadGate = null
+        client.downloadEntered?.()
+        await gate
+      }
       if (client.downloadError) throw client.downloadError
       return { bytes: HEAD_BYTES }
+    },
+    // a save's upload + commit: the server head is client.detail, so a commit
+    // on an older base is the server's version conflict
+    async upload(input: { bytes: Uint8Array }) {
+      return {
+        uploadId: 'upl_1',
+        checksumSha256: hex(input.bytes),
+        sizeBytes: input.bytes.byteLength,
+        claimExpiresAt: '2026-10-17T00:00:00Z',
+      }
+    },
+    async commit(input: { baseRevision: string }) {
+      client.calls.commit += 1
+      if (input.baseRevision !== client.detail.revision) {
+        throw errorFromResponse(409, {
+          error: {
+            code: 'document_version_conflict',
+            message: 'x',
+            fields: { current_revision: client.detail.revision },
+          },
+        })
+      }
+      throw new Error('this harness commits only onto an older base')
     },
   }
   const uiState = { conflict: 'later' as UniworkConflictChoice, discard: false }
@@ -206,7 +282,11 @@ function setup(): Harness {
     openPath: vi.fn(() => true),
     isPathOpen: (path: string) => openPaths.has(path),
     requestModuleSave: vi.fn(() => false),
-    reloadPath: (path: string) => reloaded.push(path),
+    requestFirstSaveName: options.requestFirstSaveName as never,
+    reloadPath: (path: string) => {
+      reloaded.push(path)
+      for (const waiter of reloadWaiters.splice(0)) waiter(path)
+    },
     activePath: () => docPath(),
     editorStateOf: async () => {
       const state = editorStates[Math.min(editorCalls, editorStates.length - 1)] ?? CLEAN
@@ -214,15 +294,28 @@ function setup(): Harness {
       return state
     },
     capability: {
-      get: async () => ({
-        kind: 'ok' as const,
-        capabilities: { sync_write: true, sync_feed: capability.syncFeed },
-        source: 'fresh' as const,
-      }),
+      get: async () => {
+        // A3 regression seam: the FIRST read after `hold` is set parks on it,
+        // which lands the decision between its editor-AI sample and its bar
+        const held = capability.hold
+        if (held) {
+          capability.hold = null
+          capability.entered?.()
+          await held
+        }
+        return {
+          kind: 'ok' as const,
+          capabilities: { sync_write: true, sync_feed: capability.syncFeed },
+          source: 'fresh' as const,
+        }
+      },
     },
     client: api as unknown as UniworkDocsClient,
     ui,
-    pushStatus: (status) => statuses.push(status),
+    pushStatus: (status) => {
+      statuses.push(status)
+      for (const waiter of [...statusWaiters]) waiter(status)
+    },
     pushConflict: (view) => views.push(view),
     pushLaunch: vi.fn(),
     reveal: vi.fn(),
@@ -230,7 +323,20 @@ function setup(): Harness {
   return {
     service,
     statuses,
+    statusWhere: (match) => {
+      const seen = statuses.find(match)
+      if (seen) return Promise.resolve(seen)
+      return new Promise((resolve) => {
+        const waiter = (status: UniworkDocStatus) => {
+          if (!match(status)) return
+          statusWaiters.delete(waiter)
+          resolve(status)
+        }
+        statusWaiters.add(waiter)
+      })
+    },
     reloaded,
+    nextReload: () => new Promise((resolve) => reloadWaiters.push(resolve)),
     openPaths,
     client,
     editorStates,
@@ -263,10 +369,13 @@ async function barOf(h: Harness): Promise<unknown> {
 }
 
 /** wait until the notice's async work shows the expected bar */
-async function waitForBar(h: Harness, expected: unknown): Promise<void> {
-  await vi.waitFor(async () => {
-    expect(await barOf(h)).toEqual(expected)
-  })
+async function waitForBar(h: Harness, expected: unknown, timeout?: number): Promise<void> {
+  await vi.waitFor(
+    async () => {
+      expect(await barOf(h)).toEqual(expected)
+    },
+    timeout === undefined ? undefined : { timeout },
+  )
 }
 
 describe('G5-03a S6 service: the guarded clean reload', () => {
@@ -419,13 +528,26 @@ describe('G5-03a S6 service: the guarded clean reload', () => {
     seedCopy()
     const h = setup()
     h.client.detail = detailOf('9', 3, HEAD_BYTES)
+    // join the notice-triggered guarded reload itself: its promise settles only after
+    // the not-newer decision (G703-R8-2), so the assertions below cannot run early
+    const guarded = h.service as unknown as {
+      guardedReload(path: string, notice: unknown): Promise<void>
+    }
+    const reloads: Promise<void>[] = []
+    const realGuardedReload = guarded.guardedReload.bind(guarded)
+    vi.spyOn(guarded, 'guardedReload').mockImplementation((path, remoteNotice) => {
+      const run = realGuardedReload(path, remoteNotice)
+      reloads.push(run)
+      return run
+    })
     notice(h)
-    await drain()
+    await vi.waitFor(() => expect(reloads).toHaveLength(1))
+    await reloads[0]
     expect(h.reloaded).toEqual([])
     expect(hex(copyBytes())).toBe(hex(BASE_BYTES))
-    // the fetch happened (the head's checksum is only known after the download),
-    // but the base it returned is not newer, so nothing was written
+    // the head was fetched, and its base is not newer, so nothing was written
     expect(h.client.calls.download).toBe(1)
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 3, state: 'saved' })
     expect(await barOf(h)).toBeUndefined()
   })
 })
@@ -571,8 +693,36 @@ describe('G5-03a S6 service: the lock', () => {
     seedCopy()
     const h = setup()
     h.client.error = new UniworkDocError('not_found', { status: 404 })
+    // FORK-RED-LOCKBAR: one unreproduced Windows red (0/300 local runs); every
+    // assertion carries the session's lock/bar state and the binding on disk so
+    // the next red names its cause
+    const internals = h.service as unknown as {
+      remoteLocked: Map<string, unknown>
+      remoteLockPath: Map<string, unknown>
+      remoteBars: Map<string, unknown>
+    }
+    const store = (h.service as unknown as { store: BindingStore }).store
+    // a sharing violation right after the service's atomic rename must not
+    // replace the dump with the raw fs error, and the store's own verdict goes
+    // next to the disk: "disk says blocked, classify says plain" is exactly a
+    // swallowed read error in lookup/classify
+    const diskBinding = () => {
+      try {
+        return existsSync(join(docDir(), BINDING_FILE)) ? bindingOf() : null
+      } catch (error) {
+        return `read failed: ${(error as NodeJS.ErrnoException).code ?? String(error)}`
+      }
+    }
+    const state = (step: string) =>
+      `${step}: ${JSON.stringify({
+        remoteLocked: [...internals.remoteLocked],
+        remoteLockPath: [...internals.remoteLockPath],
+        remoteBars: [...internals.remoteBars],
+        binding: diskBinding(),
+        classify: store.classify(docPath()).kind,
+      })}`
     await h.service.noteFeedGone(DOC)
-    expect(h.service.isLocked(docPath())).toBe(true)
+    expect(h.service.isLocked(docPath()), state('locked by the 404')).toBe(true)
 
     h.service.forgetLocksWhere(() => true)
 
@@ -582,9 +732,9 @@ describe('G5-03a S6 service: the lock', () => {
     // the next account's copy of the same document is not locked by it, and no
     // bar survives with it either.
     seedCopy({ state: 'dirty' })
-    expect(h.service.isLocked(docPath())).toBe(false)
-    expect(h.service.isReadOnly(docPath())).toBe(false)
-    expect(await barOf(h)).toBeUndefined()
+    expect(h.service.isLocked(docPath()), state('lock after the boundary')).toBe(false)
+    expect(h.service.isReadOnly(docPath()), state('read-only after the boundary')).toBe(false)
+    expect(await barOf(h), state('bar after the boundary')).toBeUndefined()
   })
 })
 
@@ -710,12 +860,36 @@ describe('G5-03a S6 service: hold, later and the persisted rebuild', () => {
   it('a second notice replaces the version: one bar, no stacking', async () => {
     seedCopy({ state: 'dirty' })
     const h = setup()
+    // the bar is in the session's map before its binding write lands, and the
+    // push only follows that write: a slow write (a loaded Windows box) shows
+    // the bar to docStatus with nothing pushed yet, so wait for the push itself
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.write.bind(store)
+    store.write = async (dir, binding) => {
+      await drain(200)
+      return realWrite(dir, binding)
+    }
+    const pushedOf = () => h.statuses.filter((status) => status.path === docPath())
+    // two writes of 200 ms each, serialized per document: every wait names its
+    // own timeout instead of vitest's 1000 ms default
+    const timeout = 3000
     notice(h, '10', 4)
-    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 }, timeout)
     notice(h, '11', 5)
-    await waitForBar(h, { kind: 'newer-dirty', version: 5 })
-    const pushed = h.statuses.filter((status) => status.path === docPath())
-    expect(pushed.length).toBeGreaterThan(0)
+    await waitForBar(h, { kind: 'newer-dirty', version: 5 }, timeout)
+    await vi.waitFor(
+      () =>
+        expect(pushedOf().map((status) => status.remote)).toContainEqual({
+          kind: 'newer-dirty',
+          version: 5,
+        }),
+      { timeout },
+    )
+    // notice 4's write already publishes the v5 bar; notice 5's own write is
+    // still inside the delay. Wait for it, or it lands after afterEach removed
+    // the directory and recreates it
+    await vi.waitFor(() => expect(bindingOf().serverVersion).toBe(5), { timeout })
+    const pushed = pushedOf()
     expect(pushed.every((status) => status.remote?.kind === 'newer-dirty')).toBe(true)
   })
 
@@ -819,13 +993,17 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     h.editorStates.splice(0, 1, AI_TURN)
     h.service.noteEditorState(docPath(), AI_TURN, 0)
     notice(h)
-    await waitForBar(h, { kind: 'newer-ai', version: 4 })
+    // awaited on the pushes themselves (no polling deadline): load cannot time it out
+    await h.statusWhere((status) => status.remote?.kind === 'newer-ai')
+    expect(await barOf(h)).toEqual({ kind: 'newer-ai', version: 4 })
 
     // the turn is over: the fresh read now answers a clean, idle editor
     h.editorStates.splice(0, 1, CLEAN)
+    const reload = h.nextReload()
     h.service.noteEditorState(docPath(), CLEAN, 0)
-    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
-    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(await reload).toBe(docPath())
+    expect(h.reloaded).toEqual([docPath()])
+    expect(await barOf(h)).toEqual({ kind: 'updated', version: 4 })
     expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
   })
 
@@ -875,5 +1053,560 @@ describe('G5-03a S6 service: the poll edges and the reload action', () => {
     expect(status?.remote).toEqual({ kind: 'newer-dirty', version: 4 })
     expect(hex(copyBytes())).toBe(hex(BASE_BYTES))
     expect(h.reloaded).toEqual([])
+  })
+
+  it('A5 (UNI-1362): refuses the reload with reload-failed when the previous working-copy bytes cannot be read', async () => {
+    seedCopy()
+    const h = setup()
+    unlinkSync(docPath())
+    notice(h)
+    await waitForBar(h, { kind: 'reload-failed', version: 4 })
+    expect(existsSync(docPath())).toBe(false)
+    expect(h.reloaded).toEqual([])
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', state: 'saved' })
+    expect(h.client.calls.download).toBe(1)
+  })
+
+  it('A3 (UNI-1362): keeps the editor-AI sample a closed path needs while its remote decision is still in flight', async () => {
+    seedCopy()
+    const h = setup()
+    h.editorStates.splice(0, 1, AI_TURN)
+    const internals = h.service as unknown as { editorAi: Map<string, unknown> }
+    // the running turn the session already reported: this is the sample the
+    // settle edge of a `newer-ai` bar is decided on
+    h.service.noteEditorState(docPath(), AI_TURN, 0)
+    expect(internals.editorAi.get(docPath())).toEqual({ aiRunning: true, aiEpoch: 2 })
+
+    // hold the decision between its editor-AI sample and the bar it publishes:
+    // remoteLocalFor reads the AI turn, then parks on the capability read
+    let entered!: () => void
+    const enteredP = new Promise<void>((resolve) => (entered = resolve))
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    h.capability.hold = gate
+    h.capability.entered = entered
+    notice(h)
+    await enteredP
+
+    // the path closes while the decision is in flight: the poll must not drop
+    // the `aiRunning` sample the decision was made on
+    h.openPaths.delete(docPath())
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // the delayed bar lands after the close, then the path is reopened and the
+    // AI turn ends: the sample is what lets the settle edge re-decide the notice
+    release()
+    await waitForBar(h, { kind: 'newer-ai', version: 4 })
+    h.editorStates.splice(0, 1, CLEAN)
+    h.openPaths.add(docPath())
+    h.service.noteEditorState(docPath(), CLEAN, 0)
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+  })
+
+  it('A3 (UNI-1362): a decision dropped by the session reset never releases the counter entry the next session registered', async () => {
+    seedCopy()
+    const h = setup()
+    h.editorStates.splice(0, 1, AI_TURN)
+    const internals = h.service as unknown as {
+      editorAi: Map<string, unknown>
+      remoteDecisions: Map<string, { n: number }>
+    }
+    h.service.noteEditorState(docPath(), AI_TURN, 0)
+
+    // decision A of the outgoing session: a notice that resolves to `ignore`
+    // (not-newer), held after its editor-AI sample on the capability read
+    let enteredA!: () => void
+    const enteredAP = new Promise<void>((resolve) => (enteredA = resolve))
+    let releaseA!: () => void
+    const gateA = new Promise<void>((resolve) => (releaseA = resolve))
+    h.capability.hold = gateA
+    h.capability.entered = enteredA
+    notice(h, '9', 3)
+    await enteredAP
+    expect(internals.remoteDecisions.get(pathKey(docPath()))).toEqual({ n: 1 })
+
+    // the account boundary's step 5 clears the map without awaiting A (exactly
+    // what lockSession does), the same account signs in again and its editor
+    // reports the new session's AI turn
+    internals.remoteDecisions.clear()
+    h.service.noteEditorState(docPath(), AI_TURN, 0)
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // decision B of the new session for the same path: held after its own
+    // editor-AI sample, before it publishes its `newer-ai` bar
+    let enteredB!: () => void
+    const enteredBP = new Promise<void>((resolve) => (enteredB = resolve))
+    let releaseB!: () => void
+    const gateB = new Promise<void>((resolve) => (releaseB = resolve))
+    h.capability.hold = gateB
+    h.capability.entered = enteredB
+    notice(h)
+    await enteredBP
+    const entryB = internals.remoteDecisions.get(pathKey(docPath()))
+    expect(entryB).toEqual({ n: 1 })
+
+    // A resumes and is ignored: its finalizer must release only its own entry,
+    // never B's replacement
+    releaseA()
+    await drain()
+    expect(internals.remoteDecisions.get(pathKey(docPath()))).toBe(entryB)
+
+    // the path closes while B is still in flight: the poll must keep the sample
+    // B's own bar re-decides on (B's entry is what keeps it)
+    h.openPaths.delete(docPath())
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // B publishes its bar, the turn ends after the reopen: the retained sample
+    // is what lets the settle edge re-decide the notice and reload the head
+    releaseB()
+    await waitForBar(h, { kind: 'newer-ai', version: 4 })
+    h.editorStates.splice(0, 1, CLEAN)
+    h.openPaths.add(docPath())
+    h.service.noteEditorState(docPath(), CLEAN, 0)
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+  })
+
+  it('A3 (UNI-1362): prunes closed-path editor-AI memory on poll once no live bar needs it, and drops settled reload chains', async () => {
+    seedCopy()
+    const h = setup()
+    const internals = h.service as unknown as {
+      editorAi: Map<string, unknown>
+      remoteReloads: Map<string, unknown>
+    }
+    h.service.noteEditorState(docPath(), CLEAN, 0)
+    expect(internals.editorAi.has(docPath())).toBe(true)
+    notice(h)
+    await vi.waitFor(() => expect(h.reloaded).toEqual([docPath()]))
+    await waitForBar(h, { kind: 'updated', version: 4 })
+    expect(internals.remoteReloads.size).toBe(0)
+
+    // while the updated bar is still on screen, closing the path keeps the memory
+    h.openPaths.delete(docPath())
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(true)
+
+    // once the session hides the bar (close) and the path is closed, the poll prunes it
+    await h.service.remoteAction(docPath(), 'close')
+    await h.service.pollSaveQueue()
+    expect(internals.editorAi.has(docPath())).toBe(false)
+  })
+})
+
+describe('UNI-1959 a pending first-save ask is local unsent work', () => {
+  const UNSENT = enc('local saved edits awaiting naming')
+
+  /** a version-1 copy under the default blank title, whose editor just saved `UNSENT` */
+  async function askedCopy() {
+    seedCopy({ title: 'Untitled document.docx', baseVersion: 1, state: 'ready' }, BASE_BYTES)
+    const asked: Array<{ requestId: string; path: string }> = []
+    let answer: (verdict: 'continue' | 'cancel') => void = () => undefined
+    const h = setup({
+      requestFirstSaveName: (request) =>
+        new Promise((resolve) => {
+          asked.push(request)
+          answer = resolve
+        }),
+    })
+    writeFileSync(docPath(), UNSENT)
+    h.service.onUserSave(docPath())
+    await drain()
+    expect(asked).toHaveLength(1)
+    return { h, asked, answer: (verdict: 'continue' | 'cancel') => answer(verdict) }
+  }
+
+  it('a newer feed notice while the ask is open keeps the saved bytes and the base', async () => {
+    const { h } = await askedCopy()
+    notice(h)
+    await drain(120)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf().baseRevision).toBe('9')
+    expect(bindingOf().baseVersion).toBe(1)
+    expect(h.client.calls.download).toBe(0)
+    expect(h.reloaded).toEqual([])
+    // the chip reads the copy as unsent while the dialog is open
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+  })
+
+  it('after a Cancel the unsent copy is still protected: dirty, bar newer-dirty, bytes kept', async () => {
+    const { h, answer } = await askedCopy()
+    answer('cancel')
+    await drain()
+    notice(h)
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf().baseRevision).toBe('9')
+    expect(h.client.calls.download).toBe(0)
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+  })
+
+  /** a clean version-1 blank copy whose naming answers are in the test's hands */
+  function blankCopy() {
+    seedCopy({ title: 'Untitled document.docx', baseVersion: 1, state: 'ready' }, BASE_BYTES)
+    const asked: Array<{ requestId: string; path: string }> = []
+    let answer: (verdict: 'continue' | 'cancel') => void = () => undefined
+    const h = setup({
+      requestFirstSaveName: (request) =>
+        new Promise((resolve) => {
+          asked.push(request)
+          answer = resolve
+        }),
+    })
+    // the head still carries the blank title the notice's metadata read brings along
+    h.client.detail = { ...detailOf('10', 4, HEAD_BYTES), title: 'Untitled document.docx' }
+    return { h, asked, answer: (verdict: 'continue' | 'cancel') => answer(verdict) }
+  }
+
+  it('UWNM-BE-R2-1: a reload already downloading when the first Save lands never writes over the held bytes', async () => {
+    const { h, asked, answer } = blankCopy()
+    // "never writes": not even a write a later check undoes
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    const headWrites: string[] = []
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      if (hex(bytes) === hex(HEAD_BYTES)) headWrites.push(filename)
+      return realWrite(target, filename, bytes)
+    }
+    let release!: () => void
+    h.client.downloadGate = new Promise<void>((resolve) => (release = resolve))
+    const entered = new Promise<void>((resolve) => (h.client.downloadEntered = resolve))
+    // the copy is clean when the notice is decided: the reload starts its download
+    notice(h)
+    await entered
+    // the person saves while the download is parked: the naming ask holds the upload
+    writeFileSync(docPath(), UNSENT)
+    h.service.onUserSave(docPath())
+    await vi.waitFor(() => expect(asked).toHaveLength(1))
+    release()
+
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
+    expect(headWrites).toEqual([])
+
+    // the answer releases the held edits into the normal save, which meets the
+    // newer head as a version conflict - the bytes are still the person's
+    const coordinator = (h.service as unknown as { coordinator: SaveCoordinator }).coordinator
+    const realSave = coordinator.save.bind(coordinator)
+    const saves: Array<Promise<unknown>> = []
+    coordinator.save = (path, options) => {
+      const run = realSave(path, options)
+      saves.push(run)
+      return run
+    }
+    answer('continue')
+    await vi.waitFor(() => expect(saves).toHaveLength(1))
+    await saves[0]
+    expect(bindingOf().state).toBe('conflict')
+    expect(h.client.calls.commit).toBe(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf().baseRevision).toBe('9')
+    expect(h.reloaded).toEqual([])
+  })
+
+  it('UWNM-BE-R2-1: a first Save that lands after the reload wrote keeps its bytes; the base goes back', async () => {
+    const { h, asked } = blankCopy()
+    // the module's Save lands between the reload's file write and its last read
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    let saved = false
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      const written = await realWrite(target, filename, bytes)
+      if (!saved && hex(bytes) === hex(HEAD_BYTES)) {
+        saved = true
+        writeFileSync(docPath(), UNSENT)
+        h.service.onUserSave(docPath())
+      }
+      return written
+    }
+    notice(h)
+
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    expect(saved).toBe(true)
+    expect(asked).toHaveLength(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
+  })
+
+  /**
+   * The module seam: a requested Save writes what the editor still holds
+   * (`editorBytes`) and fires the user-save hook, as a tab's module does. Each
+   * call's landing is a promise the test awaits (no wall-clock wait); with a
+   * `gate` the write waits on it, so a test can read the chip in between.
+   */
+  function moduleSaves(
+    h: Harness,
+    editorBytes: Uint8Array,
+    gate: Promise<void> = Promise.resolve(),
+  ): Array<Promise<void>> {
+    const landed: Array<Promise<void>> = []
+    const deps = (h.service as unknown as { deps: { requestModuleSave: ReturnType<typeof vi.fn> } })
+      .deps
+    deps.requestModuleSave.mockImplementation((path: string) => {
+      landed.push(
+        gate.then(() => {
+          writeFileSync(path, editorBytes)
+          h.service.onUserSave(path)
+        }),
+      )
+      return true
+    })
+    return landed
+  }
+
+  /** every coordinator save the service starts, so a test awaits the one `continue` releases */
+  function coordinatorSaves(h: Harness): Array<Promise<unknown>> {
+    const coordinator = (h.service as unknown as { coordinator: SaveCoordinator }).coordinator
+    const realSave = coordinator.save.bind(coordinator)
+    const saves: Array<Promise<unknown>> = []
+    coordinator.save = (path, options) => {
+      const run = realSave(path, options)
+      saves.push(run)
+      return run
+    }
+    return saves
+  }
+
+  it('UWNM-BE-R3-1: a first Save landing inside the reload write is saved again over the restored base; continue meets the version conflict', async () => {
+    const { h, asked, answer } = blankCopy()
+    let releaseResave!: () => void
+    const resaves = moduleSaves(h, UNSENT, new Promise((resolve) => (releaseResave = resolve)))
+    // PROBE-c: the module's Save lands after the reload read the previous bytes
+    // but before its own write replaces the file, so the head lands over it
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    let saved = false
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      if (!saved && hex(bytes) === hex(HEAD_BYTES)) {
+        saved = true
+        writeFileSync(docPath(), UNSENT)
+        h.service.onUserSave(docPath())
+        // the editor's next poll reports it clean: it believes the Save is done
+        h.service.noteEditorDirty(docPath(), false)
+      }
+      return realWrite(target, filename, bytes)
+    }
+    notice(h)
+
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    expect(saved).toBe(true)
+    // the person's bytes were only in the editor: the module is asked to write them again
+    await vi.waitFor(() => expect(resaves).toHaveLength(1))
+    // until that write lands the disk holds the base bytes: the chip still reads unsent work
+    expect(Buffer.from(copyBytes()).toString()).toBe('working copy bytes')
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+    releaseResave()
+    await resaves[0]
+    expect(asked).toHaveLength(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
+    expect(await barOf(h)).toEqual({ kind: 'newer-dirty', version: 4 })
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+
+    const saves = coordinatorSaves(h)
+    answer('continue')
+    await vi.waitFor(() => expect(saves).toHaveLength(1))
+    await saves[0]
+    expect(bindingOf().state).toBe('conflict')
+    expect(h.client.calls.commit).toBe(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf().baseRevision).toBe('9')
+    expect(h.reloaded).toEqual([])
+  })
+
+  it('UWNM-BE-R3-1: a late first Save whose bytes equal the fetched head never reads saved with nothing sent', async () => {
+    const { h, asked, answer } = blankCopy()
+    // PROBE-d: the person's saved bytes happen to be the head's bytes
+    const resaves = moduleSaves(h, HEAD_BYTES)
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    let saved = false
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      const written = await realWrite(target, filename, bytes)
+      if (!saved && hex(bytes) === hex(HEAD_BYTES)) {
+        saved = true
+        writeFileSync(docPath(), HEAD_BYTES)
+        h.service.onUserSave(docPath())
+      }
+      return written
+    }
+    notice(h)
+
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    await vi.waitFor(() => expect(resaves).toHaveLength(1))
+    await resaves[0]
+    expect(asked).toHaveLength(1)
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+
+    const saves = coordinatorSaves(h)
+    answer('continue')
+    await vi.waitFor(() => expect(saves).toHaveLength(1))
+    await saves[0]
+    // the edits went up and met the newer head: never a silent `saved`
+    expect(bindingOf().state).toBe('conflict')
+    expect(h.client.calls.commit).toBe(1)
+    expect(hex(copyBytes())).toBe(hex(HEAD_BYTES))
+  })
+
+  it('UWNM-BE-R3-1: a first Save landing while the reload reads the previous bytes stops it before any head write', async () => {
+    const { h, asked } = blankCopy()
+    const resaves = moduleSaves(h, UNSENT)
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    const headWrites: string[] = []
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      if (hex(bytes) === hex(HEAD_BYTES)) headWrites.push(filename)
+      return realWrite(target, filename, bytes)
+    }
+    // the reload's pre-write check is the first save-state read after the
+    // download: the module's Save is queued there, so it lands while the reload
+    // awaits its read of the previous bytes (a microtask runs before any file I/O).
+    // Nothing else reads the save state until the reload settles: the test awaits
+    // the reload chain itself, never a status poll (docStatus reads it too)
+    const coordinator = (h.service as unknown as { coordinator: SaveCoordinator }).coordinator
+    const realIsSaving = coordinator.isSaving.bind(coordinator)
+    let armed = false
+    let landed!: () => void
+    const saved = new Promise<void>((resolve) => (landed = resolve))
+    coordinator.isSaving = (path) => {
+      if (armed) {
+        armed = false
+        queueMicrotask(() => {
+          writeFileSync(docPath(), UNSENT)
+          h.service.onUserSave(docPath())
+          landed()
+        })
+      }
+      return realIsSaving(path)
+    }
+    const reloads = (h.service as unknown as { remoteReloads: Map<string, Promise<void>> })
+      .remoteReloads
+    let release!: () => void
+    h.client.downloadGate = new Promise<void>((resolve) => (release = resolve))
+    const entered = new Promise<void>((resolve) => (h.client.downloadEntered = resolve))
+    notice(h)
+    await entered
+    const reload = [...reloads.values()]
+    expect(reload).toHaveLength(1)
+    armed = true
+    release()
+    await saved
+    await reload[0]
+
+    expect(armed).toBe(false)
+    expect(headWrites).toEqual([])
+    expect(await barOf(h)).toEqual({ kind: 'newer-dirty', version: 4 })
+    await vi.waitFor(() => expect(asked).toHaveLength(1))
+    expect(resaves).toHaveLength(0)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+  })
+
+  /**
+   * The docs module seam: docs main records the bytes it last wrote and, on a
+   * Save, refuses to write over a disk that no longer holds them ("changed by
+   * another program", answered Cancel: nothing written, no hook) unless the
+   * shell said it rewrote that file itself. `save` is the person's own Save.
+   */
+  function docsModuleSaves(h: Harness, editorBytes: Uint8Array) {
+    const deps = (
+      h.service as unknown as {
+        deps: {
+          requestModuleSave: ReturnType<typeof vi.fn>
+          noteShellRewrote?: (path: string) => void
+        }
+      }
+    ).deps
+    let recorded: string | null = null
+    const forgotten = new Set<string>()
+    const noted = vi.fn((path: string) => void forgotten.add(path))
+    deps.noteShellRewrote = noted
+    const save = (path: string) => {
+      writeFileSync(path, editorBytes)
+      recorded = hex(editorBytes)
+      forgotten.delete(path)
+      h.service.onUserSave(path)
+    }
+    const landed: Array<Promise<boolean>> = []
+    deps.requestModuleSave.mockImplementation((path: string) => {
+      landed.push(
+        Promise.resolve().then(() => {
+          const changed = recorded !== null && recorded !== hex(new Uint8Array(readFileSync(path)))
+          if (changed && !forgotten.has(path)) return false
+          save(path)
+          return true
+        }),
+      )
+      return true
+    })
+    return { save, landed, noted }
+  }
+
+  it('UWNM-BE-R4-1: the docs re-save over the restored base is never refused as a change by another program; continue meets the version conflict', async () => {
+    const { h, asked, answer } = blankCopy()
+    const docs = docsModuleSaves(h, UNSENT)
+    // PROBE-c with docs: the person's first Save lands after the reload read the
+    // previous bytes, and the head's write lands over it
+    const store = (h.service as unknown as { store: BindingStore }).store
+    const realWrite = store.writeWorkingCopy.bind(store)
+    let saved = false
+    store.writeWorkingCopy = async (target, filename, bytes) => {
+      if (!saved && hex(bytes) === hex(HEAD_BYTES)) {
+        saved = true
+        docs.save(docPath())
+      }
+      return realWrite(target, filename, bytes)
+    }
+    notice(h)
+
+    await waitForBar(h, { kind: 'newer-dirty', version: 4 })
+    expect(saved).toBe(true)
+    await vi.waitFor(() => expect(docs.landed).toHaveLength(1))
+    // docs writes the person's bytes again: the shell told it the base on disk is its own
+    expect(await docs.landed[0]).toBe(true)
+    expect(docs.noted).toHaveBeenCalledWith(docPath())
+    expect(asked).toHaveLength(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf()).toMatchObject({ baseRevision: '9', baseVersion: 1 })
+    expect(h.reloaded).toEqual([])
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
+
+    const saves = coordinatorSaves(h)
+    answer('continue')
+    await vi.waitFor(() => expect(saves).toHaveLength(1))
+    await saves[0]
+    expect(bindingOf().state).toBe('conflict')
+    expect(h.client.calls.commit).toBe(1)
+    expect(Buffer.from(copyBytes()).toString()).toBe('local saved edits awaiting naming')
+    expect(bindingOf().baseRevision).toBe('9')
+  })
+
+  it('UWNM-BE-R4-2: a clean editor poll while the naming ask is open never clears the unsent mark', async () => {
+    const { h, asked } = blankCopy()
+    // an ordinary held first Save, no reload: the editor had edits, the module wrote them
+    h.service.noteEditorDirty(docPath(), true)
+    expect(h.statuses.at(-1)?.state).toBe('dirty')
+    writeFileSync(docPath(), UNSENT)
+    h.service.onUserSave(docPath())
+    await vi.waitFor(() => expect(asked).toHaveLength(1))
+    const pushed = h.statuses.length
+    // the editor believes the Save is done: its next poll reports it clean
+    h.service.noteEditorDirty(docPath(), false)
+    expect(h.statuses.slice(pushed).map((status) => status.state)).not.toContain('ready')
+    expect(h.statuses.at(-1)?.state).toBe('dirty')
+    expect((await h.service.docStatus(docPath()))?.state).toBe('dirty')
   })
 })

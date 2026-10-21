@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const de = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Dokumente (Stammordner)',
   ufTreeLabel: 'Ordner',
   ufContentsLabel: 'Ordnerinhalt',
   ufRecent: 'Zuletzt',
@@ -26,6 +26,7 @@ export const de = {
   ufTooDeep: 'Der Dokumentbaum hat höchstens {max} Ebenen.',
   ufCycle: 'Ein Ordner kann nicht in sich selbst oder einen seiner Unterordner verschoben werden.',
   ufParentKind: 'Ein Ordner liegt im Stammverzeichnis oder in einem anderen Ordner.',
+  ufNotShareable: 'Ordner können nicht geteilt werden. Teile stattdessen jedes Dokument einzeln.',
   ufFolderGone: 'Dieser Ordner ist nicht mehr hier.',
   ufFolderNoAccess: 'Du hast keinen Zugriff mehr auf diesen Ordner.',
   ufNoPermission: 'Du hast keine Berechtigung, diesen Ordner zu ändern.',

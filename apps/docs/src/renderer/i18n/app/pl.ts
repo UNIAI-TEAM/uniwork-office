@@ -26,6 +26,8 @@ export const pl = {
   appScLineBreak: 'Podział wiersza',
   appScNbsp: 'Spacja nierozdzielająca',
   appScNbHyphen: 'Łącznik nierozdzielający',
+  appScFindNext: 'Znajdź następne',
+  appScOptHyphen: 'Łącznik opcjonalny',
   appScGrowFont1: 'Zwiększ czcionkę o 1 pkt',
   appScShrinkFont1: 'Zmniejsz czcionkę o 1 pkt',
   appScListDemote: 'Zmniejsz poziom listy',
@@ -217,7 +219,7 @@ export const pl = {
   appEndnotePlaceholder: 'Treść przypisu końcowego…',
   appAutoSave: 'Autozapis',
   appAutoSaveTip: 'Autozapis (co 30 sekund oraz gdy okno traci fokus)',
-  appSaveShortcutTip: 'Zapisz (⌘S)',
+  appSaveShortcutTip: 'Zapisz ({keys})',
   appUndo: 'Cofnij',
   appRedo: 'Ponów',
   appStartOpening: 'Otwieranie…',
@@ -554,9 +556,13 @@ export const pl = {
   appOnlyEncrypted: 'Dokument „{name}” jest chroniony hasłem i nie można go tu otworzyć.',
   appFileExportPdf: 'Eksportuj jako PDF…',
   appFilePrint: 'Drukuj…',
+  appPrintNoDocument: 'Otwórz dokument, aby go wydrukować.',
   appPrintNoPrinter:
     'Na tym komputerze nie ma dostępnej drukarki. Możesz zamiast tego zapisać dokument jako PDF.',
   appPrintFailedPdfHint:
     'Drukowanie nie powiodło się: {error}. Możesz zamiast tego zapisać dokument jako PDF.',
   appPrintSaveAsPdf: 'Zapisz jako PDF…',
+  appFileSaveCopy: 'Zapisz jako kopię…',
+  appCopySaved: 'Twoja wersja została zapisana jako nowy dokument: {title}.',
+  appCopySaveFailed: 'Nie udało się utworzyć kopii. Zmiany są nadal bezpieczne; spróbuj ponownie.',
 } satisfies Record<keyof typeof zh, string>

@@ -22,6 +22,7 @@ import {
   type StoreRecords,
 } from '../src/main/uniwork-sync/store'
 import { createIntentStore, INTENT_STORE_REGISTRATION } from '../src/main/uniwork-sync/intent-store'
+import { DRAFTS_STORE_REGISTRATION } from '../src/main/uniwork-sync/queue/drafts'
 import {
   createLockableSafeStorage,
   runStoreCompliance,
@@ -98,6 +99,9 @@ function harness(
     clock: () => clock.now(),
   })
   layer.register(INTENT_STORE_REGISTRATION)
+  // R1-2 (UNI-1362): the production namespace, so "no kept draft" is a real
+  // readable answer here rather than an unregistered store (which fails closed)
+  layer.register(DRAFTS_STORE_REGISTRATION)
   layer.register(FEED_CURSORS_REGISTRATION)
   layer.register(DOC_INDEX_REGISTRATION)
 
@@ -930,6 +934,33 @@ describe('G506-be-3: only a failed feed round trip reports the queue offline', (
     })
     await runtime.tick()
     expect(polls).toEqual([false])
+  })
+
+  // B47 (UNI-1362): a consumer backoff is a scheduling state, not a failed
+  // round trip. Reporting it offline parked the queue and let the header's
+  // `offline` (prio 5) mask `resync_failed` (prio 7), so the person could not
+  // see the state their click has to clear.
+  it('a refused resync (a backoff) reports the queue online and keeps the refusal visible', async () => {
+    const { runtime, polls } = pollRuntime(['org_a'], async () => {
+      // the server answers, refusing the cursor: the resync below backs off
+      throw new FeedError({ kind: 'cursor_expired' })
+    })
+    await runtime.tick()
+    // the capability read reached the server and no round trip failed
+    expect(polls).toEqual([true])
+    expect(runtime.feedVerdict()).toEqual({ resynced: false, resyncFailed: false })
+
+    // a pass inside the backoff window issues no request at all: still online
+    await runtime.tick()
+    expect(polls).toEqual([true, true])
+
+    // and a round trip that really failed is still offline (the pass below
+    // cannot reach the server at all)
+    const down = pollRuntime(['org_a'], async () => {
+      throw new FeedError({ kind: 'other', error: new UniworkDocError('network') })
+    })
+    await down.runtime.tick()
+    expect(down.polls).toEqual([false])
   })
 })
 

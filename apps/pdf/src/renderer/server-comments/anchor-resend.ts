@@ -30,8 +30,8 @@ export function composePageMaps(
 }
 
 export interface AnchorResendDeps {
-  /** the anchored roots the server holds now (the controller's open + resolved threads) */
-  roots(): ReadonlyArray<Pick<CollabComment, 'id' | 'anchor' | 'anchor_state'>>
+  /** the anchored roots the server holds now: a fresh list, so a comment made since the first list is covered */
+  roots(): Promise<ReadonlyArray<Pick<CollabComment, 'id' | 'anchor' | 'anchor_state'>>>
   /** the whole map for one version: the kit's `sendAnchorMap` (chunks by 500, `anchor_version_invalid` -> `retry_next_save`); rejects for any other error */
   send(versionId: string, items: CollabAnchorUpdate[]): Promise<AnchorSyncOutcome>
   /** the server changed rows: reload the full list (never reuse the PUT's list_token) */
@@ -78,25 +78,24 @@ export function createAnchorResend(deps: AnchorResendDeps): AnchorResend {
   const flush = (): void => {
     if (!live || pendingMap === null || pendingVersion === null) return
     const map = carriedMap ? composePageMaps(carriedMap, pendingMap) : pendingMap
-    const items = remapAnchorsAfterSave(deps.roots(), map)
     const versionId = pendingVersion
     carriedMap = null
     pendingMap = null
     pendingVersion = null
-    if (items.length === 0) {
-      publishShift()
-      return
-    }
     inflightMap = map
     void (async () => {
       let updated = false
       try {
-        const r = await deps.send(versionId, items)
-        if (r.outcome === 'retry_next_save') {
-          // the shown anchors stay as the server has them; the next Save sends this change again
-          if (live) carriedMap = map
-        } else {
-          updated = r.updated.length > 0
+        const items = remapAnchorsAfterSave(await deps.roots(), map)
+        if (!live) return
+        if (items.length > 0) {
+          const r = await deps.send(versionId, items)
+          if (r.outcome === 'retry_next_save') {
+            // the shown anchors stay as the server has them; the next Save sends this change again
+            if (live) carriedMap = map
+          } else {
+            updated = r.updated.length > 0
+          }
         }
       } catch (error) {
         if (live) deps.onError?.(error)

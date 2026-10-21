@@ -6,7 +6,9 @@ import {
   type AiModelPickerBridge,
   UniAiMark,
   composerNoteFor,
+  useOverlayDock,
 } from '@genoffice/ui'
+import { NARROW_VIEWPORT_MAX_PX } from '../narrow-layout'
 import React, { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import {
@@ -19,7 +21,7 @@ import {
   AiUsageChip,
   type AiScopeQuoteData,
   type AiTokenUsageView,
-  uniworkErrorForChip,
+  uniworkErrorForEntry,
   useAiModelNeedHint,
   useChatRunQueue,
   useUniworkDisclosureAck,
@@ -35,7 +37,7 @@ import {
 import type {
   UniworkCloudStatusBridge,
   UniworkCloudStatusSnapshot,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+} from '@genoffice/electron-utils/uniwork-cloud-status'
 import { cap, platform } from '../capabilities'
 import type { ChangePlan } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { ATTACHMENT_IMAGE_EXTS, type AttachmentMeta } from '../../shared/desktop-api'
@@ -250,6 +252,8 @@ export interface AiChatMessage {
   readonly tools: readonly AiToolChip[]
   readonly streaming?: boolean | undefined
   readonly isError?: boolean | undefined
+  /** the S9 key the transport chose for this UniWork AI error; absent for any other failure */
+  readonly errorKey?: string | undefined
   /** the run failed and this user message was rolled back out of the model context */
   readonly undelivered?: boolean | undefined
   /** this user message was written to the project-store chat log (Retry re-persists when it wasn't) */
@@ -412,6 +416,14 @@ export function AiChatPanel({
   const stickToBottomRef = useRef(true)
   const [dragOver, setDragOver] = useState(false)
   const asideRef = useRef<HTMLElement | null>(null)
+  // under 719 px the panel overlays the grid (styles.css): modal dialog, composer focus, Esc, focus return
+  useOverlayDock({
+    rootRef: asideRef,
+    open: isOpen,
+    onClose: onCollapse,
+    label: 'UniAI',
+    maxWidthPx: NARROW_VIEWPORT_MAX_PX,
+  })
   const [resizing, setResizing] = useState(false)
   /** data-URL previews for image attachments, keyed by path (Genspark composer thumbnails) */
   const [attachmentPreviews, setAttachmentPreviews] = useState<Record<string, string>>({})
@@ -709,7 +721,9 @@ export function AiChatPanel({
                   })),
                   droppedToolCalls: lastEntry.droppedToolCalls,
                   isError: Boolean(lastEntry.isError),
-                  error: lastEntry.isError ? uniworkErrorForChip(lastEntry.text) : null,
+                  error: lastEntry.isError
+                    ? uniworkErrorForEntry(lastEntry.errorKey, lastEntry.text)
+                    : null,
                 }
               : null,
         })
@@ -846,7 +860,7 @@ export function AiChatPanel({
               })),
               droppedToolCalls: entry.droppedToolCalls,
               isError: Boolean(entry.isError),
-              error: entry.isError ? uniworkErrorForChip(entry.text) : null,
+              error: entry.isError ? uniworkErrorForEntry(entry.errorKey, entry.text) : null,
             },
           )
           const chip = chipView?.chip ?? null

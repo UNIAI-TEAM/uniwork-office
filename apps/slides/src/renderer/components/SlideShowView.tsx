@@ -25,10 +25,12 @@ import {
   INITIAL_SHOW_KEYS,
   pushVisited,
   reduceShowKey,
+  showGate,
   toggleScreen,
   type ShowKeyState,
   type ShowScreen,
 } from '../show-keys'
+import { shortcutPlatform, shortcutSurface } from '../shortcuts'
 import { buildShowMenu } from '../show-menu'
 import {
   computePlayOrder,
@@ -124,6 +126,8 @@ export function SlideShowView({
   const [grid, setGrid] = useState(false)
   const gridRef = useRef(grid)
   gridRef.current = grid
+  /** Ctrl+H / Cmd+I: the pointer stays hidden over the show until toggled back */
+  const [pointerHidden, setPointerHidden] = useState(false)
   /** Left button went down outside the open menu: that click only closes the menu, it must not advance */
   const menuClickRef = useRef(false)
 
@@ -400,21 +404,22 @@ export function SlideShowView({
   // Escape while open; the slide grid closes on Escape instead of ending the show.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (menuRef.current) return
-      if (gridRef.current) {
-        if (e.key === 'Escape') {
-          e.preventDefault()
-          setGrid(false)
-        }
-        return
+      const gate = showGate(e, { menuOpen: !!menuRef.current, gridOpen: !!gridRef.current })
+      if (gate === 'closeGrid') {
+        e.preventDefault()
+        setGrid(false)
       }
-      const r = reduceShowKey(showKeysRef.current, e.key)
+      if (gate !== 'show') return
+      const r = reduceShowKey(showKeysRef.current, e, shortcutPlatform(), shortcutSurface())
       if (!r) return
       e.preventDefault()
       setKeys(ended ? { ...r.state, screen: 'none' } : r.state)
       switch (r.action.type) {
         case 'exit':
           exitRef.current()
+          return
+        case 'pointer':
+          setPointerHidden((hidden) => !hidden)
           return
         case 'next':
           next()
@@ -490,7 +495,7 @@ export function SlideShowView({
 
   return (
     <div
-      className="slideshow"
+      className={`slideshow${pointerHidden ? ' ss-no-pointer' : ''}`}
       onClick={onRootClick}
       onMouseDownCapture={(e) => {
         menuClickRef.current =

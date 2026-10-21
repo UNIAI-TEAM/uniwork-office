@@ -52,6 +52,11 @@ import {
   type UniverWorksheet,
 } from './univer-state'
 import { viewOnlyLock } from './view-only-lock'
+import {
+  sheetsBlocksReadOnlySave,
+  watchSheetsUniworkState,
+  type SheetsUniworkSeam,
+} from './uniwork-state'
 import { applyChangePlan, planFromOps, type OpExecutorContext } from './op-executor'
 import { installSheetsMcpBridge, type McpSheetHandlers } from './mcp-bridge'
 import { renameChartRefsForSheet } from './workbook-ops'
@@ -72,7 +77,7 @@ import { createSaveGate, recoveryCopyBacksSession, shouldRunSaveTick } from './s
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   aiUniworkText,
-  isUniworkQuestionRefusal,
+  isUniworkRefusalErrorKey,
   useAutoSavePref,
   useCloudSignedIn,
   useAiModelNeedHint,
@@ -867,6 +872,8 @@ export function App({
   /// Non-null while the "Insert Timeline" field picker is open.
   const [timelinePicker, setTimelinePicker] = useState<TimelinePickerState | null>(null)
   const menuActionRef = useRef<(action: MenuAction) => void>(() => {})
+  /// latest ribbon command handler, for keys Univer's dispatcher hands back (Cmd+= recalculates)
+  const ribbonCommandRef = useRef<(command: string) => void>(() => {})
   /// Where the user was when a save started: the post-save session swap
   /// reinstalls the workbook, and the install consumes this instead of
   /// resetting the view to the first sheet's A1.
@@ -1214,6 +1221,23 @@ export function App({
       window.desktopApi?.onWorkbookRenamed?.((newName) => {
         setWorkbookFile((prev) => (prev ? { ...prev, name: newName } : prev))
       }) ?? (() => undefined),
+    [],
+  )
+  // EL-1(b) VEL-2: the edit lock makes readOnly change while the workbook stays
+  // open; re-query main and flip viewOnlyLock without touching pending edits.
+  useEffect(
+    () =>
+      watchSheetsUniworkState({
+        api: window.desktopApi as SheetsUniworkSeam | undefined,
+        getFile: () => lazyWorkbookRef.current?.file ?? null,
+        setFile: (next) => {
+          if (lazyWorkbookRef.current) lazyWorkbookRef.current.file = next
+          setWorkbookFile(next)
+        },
+        getWorkbook: () => univerRef.current?.univerAPI.getActiveWorkbook() ?? null,
+        lock: viewOnlyLock,
+        webViewOnly: isViewOnly(),
+      }),
     [],
   )
 
@@ -1679,15 +1703,15 @@ export function App({
           setAiRunScope(undefined)
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },
-        onError: (error) => {
+        onError: (error, errorKey) => {
           // a refused question (too long, rejected) goes back into the composer to be shortened or
           // fixed, as the message says
-          if (isUniworkQuestionRefusal(error))
+          if (isUniworkRefusalErrorKey(errorKey))
             setPrompt((current) => current || runQuestionRef.current)
           // the chat bubble is the only place the failure is shown; the status line only drops
           // the "AI is working" state (the same text also sat in the ribbon row and the status bar)
           setMessage('')
-          setChat((previous) => markRunFailed(previous, error))
+          setChat((previous) => markRunFailed(previous, error, errorKey))
           setAiRunScope(undefined)
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },
@@ -2195,6 +2219,7 @@ export function App({
         return row !== null && column !== null ? { row, column } : null
       },
       setCellsDialog,
+      (command) => ribbonCommandRef.current(command),
     )
     // Wide expression CF rules register folded/windowed formula ranges so
     // the engine stops rebuilding millions of per-cell dependency trees on
@@ -4819,8 +4844,18 @@ export function App({
     const gate = saveGateRef.current
     if (engineUnavailable !== null) return { ok: false }
     if (mode === 'recovery' && gate.busy) return { ok: false }
-    // View-only UniWork document: Save is unavailable (Save As stays open).
-    if (mode === 'save' && lazyWorkbookRef.current?.file.readOnly === true) return { ok: false }
+    // View-only UniWork document: Save is unavailable (Save As stays open);
+    // an explicit Save on a bound read-only workbook asks main to explain the lock.
+    if (
+      sheetsBlocksReadOnlySave(
+        window.desktopApi as SheetsUniworkSeam | undefined,
+        lazyWorkbookRef.current?.file,
+        mode,
+        quiet,
+      )
+    ) {
+      return { ok: false }
+    }
     return gate.run(async () => {
       if (!(await commitActiveEditor())) return { ok: false }
       return handleSaveImpl(saveContext(), mode, quiet, explicitTarget)
@@ -4881,6 +4916,7 @@ export function App({
     }
   }
   handleSaveRef.current = handleSave
+  ribbonCommandRef.current = handleRibbonCommand
 
   // MCP visible-grid session (planning/mcp-server.md phase 2): the shell pushes
   // read/apply/save commands; they run through the same executors the built-in

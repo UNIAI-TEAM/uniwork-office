@@ -23,6 +23,7 @@ import {
   ipcMain,
   nativeImage,
   nativeTheme,
+  powerMonitor,
   session,
   shell,
   webContents,
@@ -34,6 +35,14 @@ import { legalDocPath, openLegalDoc, type LegalDocEnv } from './legal-docs'
 import { isDraftPreviewPath } from './uniwork-sync/sync-center'
 import { applyUiScaleTo, applyUiScaleToAll, onUiScaleChanged, readUiScale } from './ui-scale'
 import { uiScaleMenuItems, withViewMenu } from './ui-scale-menu'
+import {
+  devToolsAccelerator,
+  editMenuAccelerators,
+  fileMenuAccelerators,
+  fullScreenAccelerator,
+  interfaceScaleAccelerators,
+  interfaceScaleAliasAccelerators,
+} from './shell-shortcuts'
 import menuDocxIcon1x from './assets/menu-docx.png?asset'
 import menuDocxIcon2x from './assets/menu-docx@2x.png?asset'
 import menuXlsxIcon1x from './assets/menu-xlsx.png?asset'
@@ -71,6 +80,7 @@ import {
   aboutMenuItem,
   checkUpdatesMenuItem,
   setUpdateCheckInvoker,
+  toggleDevToolsItem,
   installRendererProtocol,
 } from '@genoffice/electron-utils'
 import {
@@ -123,13 +133,17 @@ import { registerUniworkWork } from './uniwork-work/wiring'
 import { refuseLockedOpenPath } from './uniwork-docs/service'
 import {
   COMMENT_AUTHOR_CHANGED_CHANNEL,
+  UNIWORK_DOC_STATE_CHANGED_CHANNEL,
   createCommentAuthorResolver,
   installUniworkModuleSeams,
   watchCommentAuthorChanges,
 } from './uniwork-docs/modules'
 import { createModuleSaveRequester } from './uniwork-docs/module-save'
+import { createSourceSaveHint } from './uniwork-docs/source-view'
 import { saveTabToUniWork } from './uniwork-docs/first-save-open'
 import { mergeEditorStates, startEditorStatePoll } from './uniwork-docs/editor-state-poll'
+import { createActiveDocRefresh } from './uniwork-docs/active-doc-refresh'
+import { withViewVersionTitle } from './uniwork-docs/view-title'
 import { IPC_CHANNELS as SHEETS_IPC_CHANNELS } from '../../../sheets/src/shared/ipc-channels'
 import { isAgentIntentUrl, parseAgentIntentUrl } from './agent-intent-host'
 import { extractLaunchUrlFromArgv, isOfficeAppUrl, parseOfficeAppUrl } from '@uniwork/office-bridge'
@@ -146,6 +160,7 @@ import {
   buildDocsMenu,
   configureDocsRuntime,
   docsFileRenamed,
+  forgetDocsDiskState,
   readRecentFiles,
   readStarredFiles,
   readStarredGroupMap,
@@ -355,6 +370,7 @@ import {
   type FolderErrors,
 } from './folder-tree'
 import { PendingProjects, type PendingProject, type PendingProjectKind } from './pending-project'
+import { createBlankTxtFile } from './new-txt-file'
 import {
   FOLDER_ROOTS_KEY,
   describeExtraRoot,
@@ -377,6 +393,11 @@ import { listDeskDrafts } from './desk-drafts'
 import { runDeskTool } from './desk-tools'
 import { installShellCloseGuard } from './window-close-guard'
 import {
+  beginEditLockWillQuit,
+  finishEditLockWillQuit,
+  quitAgainAfterWillQuit,
+} from './uniwork-docs/edit-lock-quit'
+import {
   activateDetached,
   closeDetachedByPath,
   closeDetachedByPathNow,
@@ -390,6 +411,7 @@ import {
   detachedSetFileFor,
   detachedWebContentsFor,
   detachedRetitleFile,
+  setDetachedTitleDecorator,
   detachedSetTitleFor,
   detachedWindowForWebContents,
   dockBandFor,
@@ -699,8 +721,10 @@ const tMain = createI18n({
     untitledMarkdown: '未命名 Markdown',
     untitledHtml: '未命名 HTML',
     untitledPdf: '未命名 PDF',
+    untitledTxt: '未命名文本',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: '纯文本',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: '导出为 PDF…',
@@ -785,6 +809,8 @@ const tMain = createI18n({
     pdfDocxLocalCorruptDetail: '文件已损坏或不是有效的 PDF，无法转换。',
     dlgPickSaveDir: '选择默认保存位置',
     errSaveDirUnusable: '所选文件夹不可写，无法用作默认保存位置',
+    uwSourceViewSaveHint: '此文件仅供查看 — 更改不会被保存。',
+    uwSourceViewCopyHint: '如需副本，请在文档列表中使用“下载”。',
   },
   en: {
     dlgAddFolderRoot: 'Add Folder to Home',
@@ -814,8 +840,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Untitled Markdown',
     untitledHtml: 'Untitled HTML',
     untitledPdf: 'Untitled PDF',
+    untitledTxt: 'Untitled text',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Plain text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Export as PDF…',
@@ -904,6 +932,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'Choose Default Save Location',
     errSaveDirUnusable:
       'The selected folder is not writable and cannot be used as the default save location',
+    uwSourceViewSaveHint: "This file is view only — changes aren't saved.",
+    uwSourceViewCopyHint: 'To get a copy, use Download in the Documents list.',
   },
   vi: {
     dlgAddFolderRoot: 'Thêm thư mục vào Trang chủ',
@@ -916,8 +946,8 @@ const tMain = createI18n({
     menuFile: 'Tệp',
     menuSectionNew: 'Mới',
     menuOpenInNewWindow: 'Mở trong cửa sổ mới',
-    uwOfflinePin: 'Dùng khi không có mạng',
-    uwOfflineUnpin: 'Bỏ dùng khi không có mạng',
+    uwOfflinePin: 'Lưu để dùng offline',
+    uwOfflineUnpin: 'Bỏ dùng offline',
     uwOfflineUnpinConfirm:
       'Bản tải về sẽ được xóa khỏi máy này. Nháp và lần lưu đang chờ được giữ lại.',
     uwOfflineUnpinShort: 'Bỏ ghim',
@@ -929,8 +959,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown chưa có tiêu đề',
     untitledHtml: 'HTML chưa có tiêu đề',
     untitledPdf: 'PDF chưa có tiêu đề',
+    untitledTxt: 'Văn bản chưa có tiêu đề',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Văn bản thuần',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Xuất dưới dạng PDF…',
@@ -1023,6 +1055,8 @@ const tMain = createI18n({
     uwAccessDenied: 'Quyền truy cập Work Product này đã bị gỡ. Tệp trên máy của bạn được giữ lại.',
     uwSessionExpired: 'Phiên UniWork đã hết hạn.',
     uwUnsupported: 'Không thể mở loại tệp này từ UniWork.',
+    uwSourceViewSaveHint: 'Tệp này chỉ để xem — thay đổi không được lưu.',
+    uwSourceViewCopyHint: 'Muốn có bản sao, dùng Tải xuống ở danh sách Tài liệu.',
   },
   ja: {
     dlgAddFolderRoot: 'フォルダーをホームに追加',
@@ -1048,8 +1082,10 @@ const tMain = createI18n({
     untitledMarkdown: '無題の Markdown',
     untitledHtml: '無題の HTML',
     untitledPdf: '無題の PDF',
+    untitledTxt: '無題のテキスト',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'プレーンテキスト',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'PDF として書き出す…',
@@ -1142,6 +1178,9 @@ const tMain = createI18n({
     dlgPickSaveDir: '既定の保存先を選択',
     errSaveDirUnusable:
       '選択したフォルダーは書き込みできないため、既定の保存先として使用できません',
+    uwSourceViewSaveHint: 'このファイルは閲覧専用です — 変更は保存されません。',
+    uwSourceViewCopyHint:
+      'コピーが必要な場合は、ドキュメント一覧の「ダウンロード」を使ってください。',
   },
   ko: {
     dlgAddFolderRoot: '홈에 폴더 추가',
@@ -1167,8 +1206,10 @@ const tMain = createI18n({
     untitledMarkdown: '제목 없는 Markdown',
     untitledHtml: '제목 없는 HTML',
     untitledPdf: '제목 없는 PDF',
+    untitledTxt: '제목 없는 텍스트',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: '일반 텍스트',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'PDF로 내보내기…',
@@ -1260,6 +1301,8 @@ const tMain = createI18n({
     pdfDocxLocalCorruptDetail: '파일이 손상되었거나 유효한 PDF가 아니어서 변환할 수 없습니다.',
     dlgPickSaveDir: '기본 저장 위치 선택',
     errSaveDirUnusable: '선택한 폴더에 쓸 수 없어 기본 저장 위치로 사용할 수 없습니다',
+    uwSourceViewSaveHint: '이 파일은 보기 전용입니다 — 변경 내용은 저장되지 않습니다.',
+    uwSourceViewCopyHint: '사본이 필요하면 문서 목록에서 다운로드를 사용하세요.',
   },
   fr: {
     dlgAddFolderRoot: "Ajouter un dossier à l'accueil",
@@ -1285,8 +1328,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown sans titre',
     untitledHtml: 'HTML sans titre',
     untitledPdf: 'PDF sans titre',
+    untitledTxt: 'Texte sans titre',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Texte brut',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exporter en PDF…',
@@ -1380,6 +1425,10 @@ const tMain = createI18n({
     dlgPickSaveDir: "Choisir l'emplacement d'enregistrement par défaut",
     errSaveDirUnusable:
       "Le dossier sélectionné n'est pas accessible en écriture et ne peut pas servir d'emplacement d'enregistrement par défaut",
+    uwSourceViewSaveHint:
+      'Ce fichier est en lecture seule — les modifications ne sont pas enregistrées.',
+    uwSourceViewCopyHint:
+      'Pour en obtenir une copie, utilisez Télécharger dans la liste des documents.',
   },
   de: {
     dlgAddFolderRoot: 'Ordner zur Startseite hinzufügen',
@@ -1405,8 +1454,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Unbenanntes Markdown',
     untitledHtml: 'Unbenanntes HTML',
     untitledPdf: 'Unbenanntes PDF',
+    untitledTxt: 'Unbenannter Text',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Reiner Text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Als PDF exportieren…',
@@ -1501,6 +1552,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'Standard-Speicherort auswählen',
     errSaveDirUnusable:
       'Der ausgewählte Ordner ist nicht beschreibbar und kann nicht als Standard-Speicherort verwendet werden',
+    uwSourceViewSaveHint: 'Diese Datei ist nur zur Ansicht — Änderungen werden nicht gespeichert.',
+    uwSourceViewCopyHint: 'Für eine Kopie nutzen Sie „Herunterladen“ in der Dokumentenliste.',
   },
   es: {
     dlgAddFolderRoot: 'Añadir carpeta al inicio',
@@ -1526,8 +1579,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown sin título',
     untitledHtml: 'HTML sin título',
     untitledPdf: 'PDF sin título',
+    untitledTxt: 'Texto sin título',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Texto sin formato',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exportar como PDF…',
@@ -1621,6 +1676,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'Elegir ubicación de guardado predeterminada',
     errSaveDirUnusable:
       'La carpeta seleccionada no admite escritura y no puede usarse como ubicación de guardado predeterminada',
+    uwSourceViewSaveHint: 'Este archivo es de solo lectura — los cambios no se guardan.',
+    uwSourceViewCopyHint: 'Para obtener una copia, usa Descargar en la lista de documentos.',
   },
   th: {
     dlgAddFolderRoot: 'เพิ่มโฟลเดอร์ไปยังหน้าแรก',
@@ -1646,8 +1703,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown ไม่มีชื่อ',
     untitledHtml: 'HTML ไม่มีชื่อ',
     untitledPdf: 'PDF ไม่มีชื่อ',
+    untitledTxt: 'ข้อความไม่มีชื่อ',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'ข้อความธรรมดา',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'ส่งออกเป็น PDF…',
@@ -1737,6 +1796,8 @@ const tMain = createI18n({
     pdfDocxLocalCorruptDetail: 'ไฟล์เสียหายหรือไม่ใช่ PDF ที่ถูกต้อง จึงไม่สามารถแปลงได้',
     dlgPickSaveDir: 'เลือกตำแหน่งบันทึกเริ่มต้น',
     errSaveDirUnusable: 'โฟลเดอร์ที่เลือกไม่สามารถเขียนได้ จึงใช้เป็นตำแหน่งบันทึกเริ่มต้นไม่ได้',
+    uwSourceViewSaveHint: 'ไฟล์นี้ดูได้อย่างเดียว — การเปลี่ยนแปลงจะไม่ถูกบันทึก',
+    uwSourceViewCopyHint: 'หากต้องการสำเนา ให้ใช้ดาวน์โหลดในรายการเอกสาร',
   },
   id: {
     dlgAddFolderRoot: 'Tambahkan Folder ke Beranda',
@@ -1762,8 +1823,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown tanpa judul',
     untitledHtml: 'HTML tanpa judul',
     untitledPdf: 'PDF tanpa judul',
+    untitledTxt: 'Teks tanpa judul',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Teks biasa',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Ekspor sebagai PDF…',
@@ -1857,6 +1920,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'Pilih Lokasi Penyimpanan Default',
     errSaveDirUnusable:
       'Folder yang dipilih tidak dapat ditulis dan tidak bisa digunakan sebagai lokasi penyimpanan default',
+    uwSourceViewSaveHint: 'File ini hanya untuk dilihat — perubahan tidak disimpan.',
+    uwSourceViewCopyHint: 'Untuk mendapatkan salinan, gunakan Unduh di daftar Dokumen.',
   },
   ru: {
     dlgAddFolderRoot: 'Добавить папку на главную',
@@ -1882,8 +1947,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown без названия',
     untitledHtml: 'HTML без названия',
     untitledPdf: 'PDF без названия',
+    untitledTxt: 'Текст без названия',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Обычный текст',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Экспортировать в PDF…',
@@ -1977,6 +2044,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'Выбрать папку сохранения по умолчанию',
     errSaveDirUnusable:
       'Выбранная папка недоступна для записи и не может использоваться как папка сохранения по умолчанию',
+    uwSourceViewSaveHint: 'Этот файл только для просмотра — изменения не сохраняются.',
+    uwSourceViewCopyHint: 'Чтобы получить копию, нажмите «Скачать» в списке документов.',
   },
   ar: {
     dlgAddFolderRoot: 'إضافة مجلد إلى الصفحة الرئيسية',
@@ -2002,8 +2071,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown بدون عنوان',
     untitledHtml: 'HTML بدون عنوان',
     untitledPdf: 'PDF بدون عنوان',
+    untitledTxt: 'نص بدون عنوان',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'نص عادي',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'تصدير بتنسيق PDF…',
@@ -2093,6 +2164,8 @@ const tMain = createI18n({
     pdfDocxLocalCorruptDetail: 'الملف تالف أو ليس ملف PDF صالحًا ولا يمكن تحويله.',
     dlgPickSaveDir: 'اختيار موقع الحفظ الافتراضي',
     errSaveDirUnusable: 'المجلد المحدد غير قابل للكتابة ولا يمكن استخدامه كموقع حفظ افتراضي',
+    uwSourceViewSaveHint: 'هذا الملف للعرض فقط — لا يتم حفظ التغييرات.',
+    uwSourceViewCopyHint: 'للحصول على نسخة، استخدم «تنزيل» في قائمة المستندات.',
   },
   pt: {
     dlgAddFolderRoot: 'Adicionar pasta à página inicial',
@@ -2118,8 +2191,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown sem título',
     untitledHtml: 'HTML sem título',
     untitledPdf: 'PDF sem título',
+    untitledTxt: 'Texto sem título',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Texto simples',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exportar como PDF…',
@@ -2213,6 +2288,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'Escolher local de salvamento padrão',
     errSaveDirUnusable:
       'A pasta selecionada não permite gravação e não pode ser usada como local de salvamento padrão',
+    uwSourceViewSaveHint: 'Este arquivo é somente leitura — as alterações não são salvas.',
+    uwSourceViewCopyHint: 'Para obter uma cópia, use Baixar na lista de documentos.',
   },
   it: {
     dlgAddFolderRoot: 'Aggiungi cartella alla Home',
@@ -2238,8 +2315,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown senza titolo',
     untitledHtml: 'HTML senza titolo',
     untitledPdf: 'PDF senza titolo',
+    untitledTxt: 'Testo senza titolo',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Testo normale',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Esporta come PDF…',
@@ -2333,6 +2412,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'Scegli la posizione di salvataggio predefinita',
     errSaveDirUnusable:
       'La cartella selezionata non è scrivibile e non può essere usata come posizione di salvataggio predefinita',
+    uwSourceViewSaveHint: 'Questo file è in sola lettura — le modifiche non vengono salvate.',
+    uwSourceViewCopyHint: 'Per averne una copia, usa Scarica nell’elenco dei documenti.',
   },
   pl: {
     dlgAddFolderRoot: 'Dodaj folder do strony głównej',
@@ -2358,8 +2439,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown bez tytułu',
     untitledHtml: 'HTML bez tytułu',
     untitledPdf: 'PDF bez tytułu',
+    untitledTxt: 'Tekst bez tytułu',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Zwykły tekst',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Eksportuj jako PDF…',
@@ -2453,6 +2536,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'Wybierz domyślną lokalizację zapisu',
     errSaveDirUnusable:
       'Wybrany folder nie pozwala na zapis i nie może być domyślną lokalizacją zapisu',
+    uwSourceViewSaveHint: 'Ten plik jest tylko do podglądu — zmiany nie są zapisywane.',
+    uwSourceViewCopyHint: 'Aby mieć kopię, użyj opcji Pobierz na liście dokumentów.',
   },
   cs: {
     dlgAddFolderRoot: 'Přidat složku na domovskou stránku',
@@ -2478,8 +2563,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown bez názvu',
     untitledHtml: 'HTML bez názvu',
     untitledPdf: 'PDF bez názvu',
+    untitledTxt: 'Text bez názvu',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Prostý text',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exportovat jako PDF…',
@@ -2571,6 +2658,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'Zvolte výchozí umístění pro ukládání',
     errSaveDirUnusable:
       'Do vybrané složky nelze zapisovat a nelze ji použít jako výchozí umístění pro ukládání',
+    uwSourceViewSaveHint: 'Tento soubor je pouze pro čtení — změny se neukládají.',
+    uwSourceViewCopyHint: 'Kopii získáte pomocí Stáhnout v seznamu dokumentů.',
   },
   nl: {
     dlgAddFolderRoot: 'Map toevoegen aan startpagina',
@@ -2596,8 +2685,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Naamloos Markdown',
     untitledHtml: 'Naamloos HTML',
     untitledPdf: 'Naamloze PDF',
+    untitledTxt: 'Naamloze tekst',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Platte tekst',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exporteren als PDF…',
@@ -2691,6 +2782,9 @@ const tMain = createI18n({
     dlgPickSaveDir: 'Standaard opslaglocatie kiezen',
     errSaveDirUnusable:
       'De geselecteerde map is niet beschrijfbaar en kan niet als standaard opslaglocatie worden gebruikt',
+    uwSourceViewSaveHint:
+      'Dit bestand is alleen om te bekijken — wijzigingen worden niet opgeslagen.',
+    uwSourceViewCopyHint: 'Gebruik Downloaden in de documentenlijst om een kopie te krijgen.',
   },
   ms: {
     dlgAddFolderRoot: 'Tambah Folder ke Laman Utama',
@@ -2716,8 +2810,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown tanpa tajuk',
     untitledHtml: 'HTML tanpa tajuk',
     untitledPdf: 'PDF tanpa tajuk',
+    untitledTxt: 'Teks tanpa tajuk',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'Teks biasa',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Eksport sebagai PDF…',
@@ -2810,6 +2906,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'Pilih Lokasi Simpanan Lalai',
     errSaveDirUnusable:
       'Folder yang dipilih tidak boleh ditulis dan tidak dapat digunakan sebagai lokasi simpanan lalai',
+    uwSourceViewSaveHint: 'Fail ini untuk paparan sahaja — perubahan tidak disimpan.',
+    uwSourceViewCopyHint: 'Untuk mendapatkan salinan, gunakan Muat turun dalam senarai Dokumen.',
   },
   he: {
     dlgAddFolderRoot: 'הוספת תיקייה לדף הבית',
@@ -2834,8 +2932,10 @@ const tMain = createI18n({
     untitledMarkdown: 'Markdown ללא שם',
     untitledHtml: 'HTML ללא שם',
     untitledPdf: 'PDF ללא שם',
+    untitledTxt: 'טקסט ללא שם',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'טקסט פשוט',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'ייצוא כ-PDF…',
@@ -2926,6 +3026,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'בחירת מיקום שמירה כברירת מחדל',
     errSaveDirUnusable:
       'התיקייה שנבחרה אינה ניתנת לכתיבה ולא ניתן להשתמש בה כמיקום שמירה כברירת מחדל',
+    uwSourceViewSaveHint: 'קובץ זה לצפייה בלבד — שינויים לא נשמרים.',
+    uwSourceViewCopyHint: 'כדי לקבל עותק, השתמשו בהורדה ברשימת המסמכים.',
   },
   hi: {
     dlgAddFolderRoot: 'होम में फ़ोल्डर जोड़ें',
@@ -2951,8 +3053,10 @@ const tMain = createI18n({
     untitledMarkdown: 'अनाम Markdown',
     untitledHtml: 'अनाम HTML',
     untitledPdf: 'अनाम PDF',
+    untitledTxt: 'अनाम पाठ',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: 'सादा पाठ',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'PDF के रूप में निर्यात…',
@@ -3046,6 +3150,8 @@ const tMain = createI18n({
     dlgPickSaveDir: 'डिफ़ॉल्ट सहेजने का स्थान चुनें',
     errSaveDirUnusable:
       'चयनित फ़ोल्डर में लिखा नहीं जा सकता, इसलिए इसे डिफ़ॉल्ट सहेजने के स्थान के रूप में उपयोग नहीं किया जा सकता',
+    uwSourceViewSaveHint: 'यह फ़ाइल केवल देखने के लिए है — बदलाव सहेजे नहीं जाते।',
+    uwSourceViewCopyHint: 'प्रति पाने के लिए दस्तावेज़ सूची में डाउनलोड का उपयोग करें।',
   },
   'zh-TW': {
     dlgAddFolderRoot: '將資料夾加入首頁',
@@ -3070,8 +3176,10 @@ const tMain = createI18n({
     untitledMarkdown: '未命名 Markdown',
     untitledHtml: '未命名 HTML',
     untitledPdf: '未命名 PDF',
+    untitledTxt: '未命名文字',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewTxt: '純文字',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: '匯出為 PDF…',
@@ -3156,6 +3264,8 @@ const tMain = createI18n({
     pdfDocxLocalCorruptDetail: '檔案已損壞或不是有效的 PDF，無法轉換。',
     dlgPickSaveDir: '選擇預設儲存位置',
     errSaveDirUnusable: '所選資料夾無法寫入，無法作為預設儲存位置',
+    uwSourceViewSaveHint: '此檔案僅供檢視 — 變更不會被儲存。',
+    uwSourceViewCopyHint: '如需副本，請在文件清單中使用「下載」。',
   },
 })
 
@@ -3499,7 +3609,7 @@ const SEARCH_EXT_FAMILY: Record<string, readonly string[]> = {
   docx: ['docx', 'doc'],
   xlsx: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'],
   pptx: ['pptx', 'ppt'],
-  md: ['md', 'markdown', 'txt', 'json'],
+  md: ['md', 'markdown'],
   html: ['html', 'htm'],
 }
 
@@ -3549,9 +3659,44 @@ function applyMenuFor(kind: TabKind): void {
   withViewMenu(kind, tm, APP_SETTINGS_PATH)
 }
 
+/** `{ accelerator }` when the shortcut table gives the item one, to spread into a menu item */
+function acc(accelerator: string | undefined): { accelerator?: string } {
+  return accelerator ? { accelerator } : {}
+}
+
+/** Full screen and, in a development build, Developer tools: the View items every
+ *  shell-built menu carries (the same keys in every window, common-20 / common-21) */
+function shellViewItems(): MenuItemConstructorOptions[] {
+  const labels = appMenuLabels(currentLang())
+  return [
+    ...(app.isPackaged
+      ? []
+      : [toggleDevToolsItem(labels, devToolsAccelerator()), { type: 'separator' as const }]),
+    { role: 'togglefullscreen', label: labels.fullscreen, ...acc(fullScreenAccelerator()) },
+  ]
+}
+
 /** The Home menu's View menu: the interface-scale items (Home follows the scale). */
 function viewMenuTemplate(): MenuItemConstructorOptions {
-  return { label: tm('menuView'), submenu: uiScaleMenuItems(tm, APP_SETTINGS_PATH) }
+  return {
+    label: tm('menuView'),
+    submenu: [
+      ...uiScaleMenuItems(
+        tm,
+        APP_SETTINGS_PATH,
+        interfaceScaleAccelerators(),
+        interfaceScaleAliasAccelerators(),
+      ),
+      { type: 'separator' },
+      ...shellViewItems(),
+    ],
+  }
+}
+
+/** The View menu of the PDF, Markdown and HTML windows. No reload (a packaged build has none,
+ *  common-22) and no zoom items: each module's renderer owns its zoom keys. */
+function moduleViewMenuTemplate(): MenuItemConstructorOptions {
+  return { label: appMenuLabels(currentLang()).view, submenu: shellViewItems() }
 }
 
 /// Interface scale (genoffice#1913). Read once at boot, then replaced by the View menu.
@@ -3640,21 +3785,20 @@ function createShellWindow(): void {
   win.on('focus', () => {
     tabManager?.refreshActiveTargets()
     tabManager?.focusActiveView()
+    // S18: coming back to the app re-reads the open document, so a rename made
+    // on the web shows without waiting for the feed
+    activeDocRefresh.gainedFocus(tabManager?.activeFilePath())
   })
 
+  const inUniworkStore = (path: string): boolean =>
+    uniworkDocs?.service.store.isInside(path) === true
   const manager = new TabManager(
     win,
     () => {
       win.webContents.send(TABS_CHANNELS.changed, manager.list())
       publishOpenDocumentsIfOwner([...manager.openFilePaths(), ...detachedFilePaths()])
       // a UniWork copy written outside the save hook shows as dirty once its tab is active
-      const active = manager.activeFilePath()
-      if (active !== lastActiveDocPath) {
-        lastActiveDocPath = active
-        // a conflict dialog names one document: it closes when that tab is left
-        uniworkDocs?.service.noteActivePath(active)
-        void uniworkDocs?.service.refreshPath(active).catch(() => undefined)
-      }
+      activeDocRefresh.tabsChanged(manager.activeFilePath())
     },
     applyMenuFor,
     // no extension: these tabs have no file on disk yet; the title becomes the
@@ -3671,8 +3815,15 @@ function createShellWindow(): void {
               : tm('untitledSheet'),
     // the tab strip is interface chrome, so its height follows the scale
     () => currentUiScale,
+    // F12 opens the developer tools in a development build only
+    () => !app.isPackaged,
+    // UNI-2033: a read-only copy of an older version says so in its title
+    (filePath, title) => withViewVersionTitle(title, filePath, currentLang(), inUniworkStore),
   )
   tabManager = manager
+  setDetachedTitleDecorator((filePath, title) =>
+    withViewVersionTitle(title, filePath, currentLang(), inUniworkStore),
+  )
 
   // Docking: a detached window dragged over this window's tab strip hands its
   // document back. The strip reports the insertion slot for each preview
@@ -3856,6 +4007,8 @@ function createShellWindow(): void {
   win.on('closed', () => {
     if (shellWindow === win) shellWindow = null
     if (tabManager === manager) {
+      const dropped = manager.openFilePaths()
+      if (dropped.length > 0) void uniworkDocs?.service.notePathsDropped(dropped)
       tabManager = null
       setDockHost(null)
       publishAllOpenDocuments()
@@ -4052,8 +4205,11 @@ const droppedFilesDeps = () => ({
 })
 
 let uniworkDocs: UniworkDocsHandle | null = null
-/** the active tab's file at the last tab change (UniWork re-checks it on activation) */
-let lastActiveDocPath: string | undefined
+/** re-checks the active UniWork document on a tab switch and when the user comes back to it */
+const activeDocRefresh = createActiveDocRefresh({
+  noteActivePath: (path) => uniworkDocs?.service.noteActivePath(path),
+  refreshPath: (path) => uniworkDocs?.service.refreshPath(path) ?? Promise.resolve(),
+})
 
 /** the tab or detached window showing a path (UniWork documents: Save, reload) */
 function webContentsForPath(
@@ -4063,6 +4219,23 @@ function webContentsForPath(
   if (tab) return { tabId: tab.id, kind: tab.kind, webContents: tab.webContents }
   const detached = findDetachedTabByPath(path)
   return detached ? { kind: detached.kind, webContents: detached.webContents } : undefined
+}
+
+/**
+ * UNI-1993: the window that owns a path, for the "view only" hint: a tab belongs to
+ * the shell window (its renderer shows the strip and the notices).
+ */
+function sourceViewHostForPath(path: string): WebContents | undefined {
+  const owner = webContentsForPath(path)
+  if (!owner || owner.tabId === undefined) return undefined
+  return shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : undefined
+}
+
+/** the detached editor window showing a path, if it is in one and not in a tab */
+function sourceViewDetachedWindowForPath(path: string): BrowserWindow | undefined {
+  const owner = webContentsForPath(path)
+  if (!owner || owner.tabId !== undefined) return undefined
+  return detachedWindowForWebContents(owner.webContents.id)
 }
 
 /**
@@ -4108,6 +4281,8 @@ function uniworkDocsWiring() {
     isPathOpen: (path: string) => webContentsForPath(path) !== undefined,
     // the module's own Save (same path as the menu), which ends in the user-save hook
     requestModuleSave: requestUniworkModuleSave,
+    // UWNM-BE-R4-1: docs' outside-change check; slides / sheets keep no such state
+    noteShellRewrote: (path: string) => forgetDocsDiskState(path),
     reloadPath: (path: string) => {
       reloadPathTarget(webContentsForPath(path), path, (tabId) => tabManager?.reloadTab(tabId))
     },
@@ -4117,6 +4292,13 @@ function uniworkDocsWiring() {
     editorStateOf: (path: string) => editorStateOfPath(path),
     activePath: () => tabManager?.activeFilePath(),
     reveal: revealShellWindow,
+    // EL-1(b) fix6 (VEL-2): broadcast lock/access read-only flips to every
+    // editor webContents so open editors re-query uniwork-state in place.
+    pushDocStateChanged: (path: string) => {
+      for (const wc of webContents.getAllWebContents()) {
+        if (!wc.isDestroyed()) wc.send(UNIWORK_DOC_STATE_CHANGED_CHANNEL, { path })
+      }
+    },
     // G8-08: the editor showing the path (its preload listens for the reveal)
     commentsTarget: (path: string) => webContentsForPath(path)?.webContents,
     // G8-08/R1-2: the path the invoking editor window shows, so its held
@@ -4485,6 +4667,23 @@ function newMarkdownTab(): void {
   }
 }
 
+/**
+ * "New plain text" creates the blank .txt up front, like the blank PDF below: a .txt has no
+ * untitled mode in the markdown module (its mode follows the file name), so the file exists
+ * first and opens as plain source through the ordinary open route.
+ */
+function newTxtTab(): void {
+  // taken first: a failed write below must not leave the project waiting for a later file
+  const pendingProject = pendingProjects.take('txt')
+  try {
+    const filePath = createBlankTxtFile(newFileDir('txt'), tm('untitledTxt'))
+    if (pendingProject) assignToProject(filePath, pendingProject.projectId)
+    routeDocumentPath(filePath)
+  } catch (err) {
+    surfaceNewTabError(err)
+  }
+}
+
 function newHtmlTab(): void {
   try {
     bindPendingDir('html', () => tabManager?.openHtmlTab())
@@ -4572,6 +4771,8 @@ function registerHomeIpc(): void {
   )
   // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
   uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
+  powerMonitor.on('resume', () => uniworkDocs?.service.notePowerResume())
+  app.on('browser-window-focus', () => uniworkDocs?.service.noteWindowFocus())
   // UniWork work data for the Workbench (home, tasks, calendar, profile); logic in ./uniwork-work
   registerUniworkWork(ipcMain, {
     profile: () => uniworkDeploymentProfile(),
@@ -4584,12 +4785,33 @@ function registerHomeIpc(): void {
   // G8-02: the single comment-author source. A bound document takes the
   // signed-in account's display name; local files and signed-out sessions take
   // the neutral constant — the OS account name is never an author.
+  const sourceViewHint = createSourceSaveHint({
+    hostForPath: sourceViewHostForPath,
+    // a detached window has no renderer to show the band: say it in a native box on that window
+    detached: {
+      windowForPath: sourceViewDetachedWindowForPath,
+      notify: (win, copy) =>
+        dialog.showMessageBox(win, {
+          type: 'info',
+          message: tm('uwSourceViewSaveHint'),
+          ...(copy ? { detail: tm('uwSourceViewCopyHint') } : {}),
+        }),
+    },
+  })
   installUniworkModuleSeams(
     uniworkService,
     createCommentAuthorResolver({
       isBound: (path) => uniworkService.isBound(path),
       displayName: uniworkAccountDisplayName,
     }),
+    // UNI-1993: a view-only source file reads as bound/read-only/locked to every editor;
+    // an explicit Save on one only tells the window that owns it, and a refused Save As,
+    // export or print says the same plus where to get a copy
+    {
+      registry: uniworkService.sourceViews,
+      onSourceSave: (path) => sourceViewHint(path),
+      onSourceLocked: (path) => sourceViewHint(path, true),
+    },
   )
   // the chip reads "Unsaved changes" while an editor holds edits not saved yet
   startEditorStatePoll({
@@ -4941,6 +5163,12 @@ function registerHomeIpc(): void {
     newMarkdownTab()
   })
 
+  ipcMain.handle(HOME_CHANNELS.newTxt, (_event, opts?: HomeNewOpts) => {
+    rememberPendingDir('txt', opts)
+    rememberPendingProject('txt', opts)
+    newTxtTab()
+  })
+
   ipcMain.handle(HOME_CHANNELS.newHtml, (_event, opts?: HomeNewOpts) => {
     rememberPendingDir('html', opts)
     rememberPendingProject('html', opts)
@@ -5062,6 +5290,9 @@ function registerHomeIpc(): void {
     (_event, path: unknown, newName: unknown): RenameResult => {
       if (typeof path !== 'string' || typeof newName !== 'string')
         return { ok: false, error: tm('errBadArgs') }
+      // UNI-1993: a view-only source is a temp copy; renamed, it would leave the
+      // registry and read as a plain editable local file
+      if (uniworkDocs?.service.sourceViews.has(path)) return { ok: false, error: tm('errBadArgs') }
       // Validate the raw name before trimming: trimming first would
       // silently turn "report " into "report" and make the
       // trailing-space gate in isValidRenameName unreachable. Reject
@@ -5648,7 +5879,10 @@ function registerTabsIpc(): void {
   ipcMain.handle(TABS_CHANNELS.list, () => tabManager?.list() ?? [])
   ipcMain.handle(TABS_CHANNELS.activate, (_event, id: unknown) => {
     if (typeof id !== 'string' || !id) return
+    const before = tabManager?.activeFilePath()
     if (!activateDetached(id)) tabManager?.activateTab(id)
+    // a click on the tab that is already active is no tab switch: re-read it here
+    if (tabManager?.activeFilePath() === before) activeDocRefresh.gainedFocus(before)
   })
   ipcMain.handle(TABS_CHANNELS.close, (_event, id: unknown) => {
     if (typeof id !== 'string' || !id) return
@@ -5828,6 +6062,11 @@ function registerTabsIpc(): void {
         click: () => newMarkdownTab(),
       },
       {
+        label: tm('menuNewTxt'),
+        icon: menuIcons().md,
+        click: () => newTxtTab(),
+      },
+      {
         label: tm('menuNewHtml'),
         icon: menuIcons().html,
         click: () => newHtmlTab(),
@@ -5863,6 +6102,7 @@ async function openFileViaDialog(): Promise<void> {
 
 function buildHomeMenu(): void {
   const isMac = process.platform === 'darwin'
+  const a = fileMenuAccelerators('home')
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: 'appMenu' as const }] : []),
     {
@@ -5871,7 +6111,7 @@ function buildHomeMenu(): void {
         { label: tm('menuSectionNew'), type: 'header', enabled: false },
         {
           label: tm('menuNewDoc'),
-          accelerator: 'CmdOrCtrl+N',
+          ...acc(a.new),
           click: () => newDocTab(),
         },
         {
@@ -5880,20 +6120,21 @@ function buildHomeMenu(): void {
         },
         { label: tm('menuNewSlide'), click: () => newSlideTab() },
         { label: tm('menuNewMarkdown'), click: () => newMarkdownTab() },
+        { label: tm('menuNewTxt'), click: () => newTxtTab() },
         { label: tm('menuNewHtml'), click: () => newHtmlTab() },
         { label: tm('menuNewPdf'), click: () => void newPdfTab() },
         { type: 'separator' },
         {
           label: tm('menuOpen'),
-          accelerator: 'CmdOrCtrl+O',
+          ...acc(a.open),
           click: () => void openFileViaDialog(),
         },
         { type: 'separator' },
-        { role: 'close', label: tm('menuClose') },
+        { role: 'close', label: tm('menuClose'), ...acc(a.close) },
       ],
     },
     viewMenuTemplate(),
-    editMenuTemplate(process.platform, appMenuLabels(currentLang())),
+    editMenuTemplate(process.platform, appMenuLabels(currentLang()), editMenuAccelerators()),
     windowMenuTemplate(process.platform, appMenuLabels(currentLang())),
     {
       role: 'help',
@@ -5913,26 +6154,32 @@ function buildHomeMenu(): void {
 
 function buildPdfMenu(): void {
   const isMac = process.platform === 'darwin'
+  const a = fileMenuAccelerators('pdf')
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: 'appMenu' as const }] : []),
     {
       label: tm('menuFile'),
       submenu: [
         {
+          label: tm('menuNewPdf'),
+          ...acc(a.new),
+          click: () => void newPdfTab(),
+        },
+        { type: 'separator' },
+        {
           label: tm('menuOpen'),
-          accelerator: 'CmdOrCtrl+O',
+          ...acc(a.open),
           click: () => void openFileViaDialog(),
         },
         { type: 'separator' },
         {
           label: tm('backToHome'),
-          accelerator: 'Shift+CmdOrCtrl+H',
           click: () => tabManager?.openHomeTab(),
         },
         { type: 'separator' },
         {
           label: tm('menuSave'),
-          accelerator: 'CmdOrCtrl+S',
+          ...acc(a.save),
           click: () => {
             const tab = activePdfTarget()
             if (tab) void flushPdfSave(tab.webContents)
@@ -5940,7 +6187,7 @@ function buildPdfMenu(): void {
         },
         {
           label: tm('menuSaveAs'),
-          accelerator: 'CmdOrCtrl+Shift+S',
+          ...acc(a.saveAs),
           click: () => void savePdfAs(),
         },
         { type: 'separator' },
@@ -5962,7 +6209,7 @@ function buildPdfMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuPrint'),
-          accelerator: 'CmdOrCtrl+P',
+          ...acc(a.print),
           click: () => {
             const tab = activePdfTarget()
             if (tab) sendPdfPrintRequest(tab.webContents)
@@ -5971,12 +6218,13 @@ function buildPdfMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuClose'),
-          accelerator: 'CmdOrCtrl+W',
+          ...acc(a.close),
           click: () => closeFocusedEditor(),
         },
       ],
     },
-    editMenuTemplate(process.platform, appMenuLabels(currentLang())),
+    moduleViewMenuTemplate(),
+    editMenuTemplate(process.platform, appMenuLabels(currentLang()), editMenuAccelerators()),
     windowMenuTemplate(process.platform, appMenuLabels(currentLang())),
     {
       role: 'help',
@@ -5996,26 +6244,32 @@ function buildPdfMenu(): void {
 
 function buildMarkdownMenu(): void {
   const isMac = process.platform === 'darwin'
+  const a = fileMenuAccelerators('markdown')
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: 'appMenu' as const }] : []),
     {
       label: tm('menuFile'),
       submenu: [
         {
+          label: tm('menuNewMarkdown'),
+          ...acc(a.new),
+          click: () => newMarkdownTab(),
+        },
+        { type: 'separator' },
+        {
           label: tm('menuOpen'),
-          accelerator: 'CmdOrCtrl+O',
+          ...acc(a.open),
           click: () => void openFileViaDialog(),
         },
         { type: 'separator' },
         {
           label: tm('backToHome'),
-          accelerator: 'Shift+CmdOrCtrl+H',
           click: () => tabManager?.openHomeTab(),
         },
         { type: 'separator' },
         {
           label: tm('menuSave'),
-          accelerator: 'CmdOrCtrl+S',
+          ...acc(a.save),
           click: () => {
             const tab = activeMarkdownTarget()
             if (tab) void requestMarkdownSave(tab.webContents, 'save')
@@ -6023,7 +6277,7 @@ function buildMarkdownMenu(): void {
         },
         {
           label: tm('menuSaveAs'),
-          accelerator: 'CmdOrCtrl+Shift+S',
+          ...acc(a.saveAs),
           click: () => {
             const tab = activeMarkdownTarget()
             if (tab) void requestMarkdownSave(tab.webContents, 'saveAs')
@@ -6061,7 +6315,7 @@ function buildMarkdownMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuPrint'),
-          accelerator: 'CmdOrCtrl+P',
+          ...acc(a.print),
           click: () => {
             const tab = activeMarkdownTarget()
             if (tab) sendMarkdownPrintRequest(tab.webContents)
@@ -6070,12 +6324,13 @@ function buildMarkdownMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuClose'),
-          accelerator: 'CmdOrCtrl+W',
+          ...acc(a.close),
           click: () => closeFocusedEditor(),
         },
       ],
     },
-    editMenuTemplate(process.platform, appMenuLabels(currentLang())),
+    moduleViewMenuTemplate(),
+    editMenuTemplate(process.platform, appMenuLabels(currentLang()), editMenuAccelerators()),
     windowMenuTemplate(process.platform, appMenuLabels(currentLang())),
     {
       role: 'help',
@@ -6095,26 +6350,32 @@ function buildMarkdownMenu(): void {
 
 function buildHtmlMenu(): void {
   const isMac = process.platform === 'darwin'
+  const a = fileMenuAccelerators('html')
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [{ role: 'appMenu' as const }] : []),
     {
       label: tm('menuFile'),
       submenu: [
         {
+          label: tm('menuNewHtml'),
+          ...acc(a.new),
+          click: () => newHtmlTab(),
+        },
+        { type: 'separator' },
+        {
           label: tm('menuOpen'),
-          accelerator: 'CmdOrCtrl+O',
+          ...acc(a.open),
           click: () => void openFileViaDialog(),
         },
         { type: 'separator' },
         {
           label: tm('backToHome'),
-          accelerator: 'Shift+CmdOrCtrl+H',
           click: () => tabManager?.openHomeTab(),
         },
         { type: 'separator' },
         {
           label: tm('menuSave'),
-          accelerator: 'CmdOrCtrl+S',
+          ...acc(a.save),
           click: () => {
             const tab = activeHtmlTarget()
             if (tab) void requestHtmlSave(tab.webContents, 'save')
@@ -6122,7 +6383,7 @@ function buildHtmlMenu(): void {
         },
         {
           label: tm('menuSaveAs'),
-          accelerator: 'CmdOrCtrl+Shift+S',
+          ...acc(a.saveAs),
           click: () => {
             const tab = activeHtmlTarget()
             if (tab) void requestHtmlSave(tab.webContents, 'saveAs')
@@ -6153,7 +6414,7 @@ function buildHtmlMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuPrint'),
-          accelerator: 'CmdOrCtrl+P',
+          ...acc(a.print),
           click: () => {
             const tab = activeHtmlTarget()
             if (tab) sendHtmlPrintRequest(tab.webContents)
@@ -6162,12 +6423,13 @@ function buildHtmlMenu(): void {
         { type: 'separator' },
         {
           label: tm('menuClose'),
-          accelerator: 'CmdOrCtrl+W',
+          ...acc(a.close),
           click: () => closeFocusedEditor(),
         },
       ],
     },
-    editMenuTemplate(process.platform, appMenuLabels(currentLang())),
+    moduleViewMenuTemplate(),
+    editMenuTemplate(process.platform, appMenuLabels(currentLang()), editMenuAccelerators()),
     windowMenuTemplate(process.platform, appMenuLabels(currentLang())),
     {
       role: 'help',
@@ -6495,7 +6757,6 @@ function openThirdPartyNotices(): Promise<string> {
 function installBackToHomeItems(): void {
   const backToHomeItem: MenuItemConstructorOptions = {
     label: tm('backToHome'),
-    accelerator: 'Shift+CmdOrCtrl+H',
     click: () => tabManager?.openHomeTab(),
   }
   const saveToUniWorkItem: MenuItemConstructorOptions = {
@@ -6524,6 +6785,7 @@ function installDockMenu(): void {
       },
       { label: tm('menuNewSlide'), click: () => newSlideTab() },
       { label: tm('menuNewMarkdown'), click: () => newMarkdownTab() },
+      { label: tm('menuNewTxt'), click: () => newTxtTab() },
       { label: tm('menuNewPdf'), click: () => void newPdfTab() },
     ]),
   )
@@ -7032,8 +7294,21 @@ app.on('before-quit', () => {
   stopMcpSync()
 })
 
-// after every window has closed, so the shell window's own 'closed' republish cannot revive the file
-app.on('will-quit', () => {
+// after every window has closed with no veto, so a cancelled close prompt
+// never released the lock. Token is still valid: stopUniworkAccount is after
+// the bounded release on the second pass.
+app.on('will-quit', (event) => {
+  if (beginEditLockWillQuit(uniworkDocs?.service.hasEditLocksToRelease() ?? false) === 'hold') {
+    event.preventDefault()
+    void finishEditLockWillQuit(
+      (capMs) => uniworkDocs?.service.releaseAllEditLocks(capMs) ?? Promise.resolve(),
+    ).then(() => quitAgainAfterWillQuit(() => app.quit()))
+    return
+  }
+  // UNI-1993: the decrypted copies of the opened source files must not outlive the app. Here and
+  // not in before-quit: a close prompt can still veto the quit, and the tabs would then
+  // lose their files and read as plain local documents
+  uniworkDocs?.service.disposeSourceViews()
   stopUniworkAccount()
   fileIndexer?.stop()
   fileIndexStore?.close()

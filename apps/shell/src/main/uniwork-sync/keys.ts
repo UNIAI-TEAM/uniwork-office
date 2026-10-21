@@ -1,8 +1,13 @@
 import { randomBytes } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { mkdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { atomicWriteFile } from '../atomic-write'
-import { CredentialStoreError, type SafeStorageLike } from '../uniwork-auth/credentials'
+import {
+  CredentialStoreError,
+  ensureKeyringAvailable,
+  type SafeStorageLike,
+} from '../uniwork-auth/credentials'
 
 /**
  * One store key per account boundary: 32 random bytes that every encrypted
@@ -56,24 +61,6 @@ export function createSafeStorageKeyProvider(options: {
   // parallel opens of one scope must agree on one key: the first creation is shared
   const creating = new Map<string, Promise<Buffer>>()
 
-  /** no usable keyring at all: refused, never a plaintext fallback */
-  const ensureAvailable = () => {
-    let backend: string | undefined
-    try {
-      backend = safeStorage.getSelectedStorageBackend?.()
-    } catch {
-      backend = undefined
-    }
-    if (backend === 'basic_text') throw new CredentialStoreError('keyring_unavailable')
-    let available: boolean
-    try {
-      available = safeStorage.isEncryptionAvailable()
-    } catch {
-      available = false
-    }
-    if (!available) throw new CredentialStoreError('keyring_unavailable')
-  }
-
   /** a key file that is there but will not open: a lock, so the caller can retry */
   const unwrap = (wrapped: Buffer): Buffer => {
     let plain: string
@@ -106,8 +93,10 @@ export function createSafeStorageKeyProvider(options: {
 
   return {
     async key(scope) {
-      ensureAvailable()
       const path = keyFilePath(dir, scope)
+      // no usable keyring at all is refused, never a plaintext fallback; a locked real
+      // keyring with this scope's wrapped key already on disk is keystore_locked (FL-09)
+      ensureKeyringAvailable(safeStorage, existsSync(path))
       let wrapped: Buffer
       try {
         wrapped = await readFile(path)

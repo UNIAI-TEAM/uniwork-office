@@ -965,6 +965,207 @@ describe('DOC-05 comment level + G8-18 post-send inline notice', () => {
   })
 })
 
+describe('lost thread: View in version N', () => {
+  const lostRow = (over: Record<string, unknown> = {}) =>
+    cm({
+      id: 'l',
+      anchor: docx(1),
+      anchor_state: 'lost',
+      anchor_version_id: 'v-old',
+      anchor_version_no: 3,
+      ...over,
+    })
+  const viewBtn = () => $$('button').find((b) => b.textContent === 'View in version 3')
+  const goBtn = () => $$('button').find((b) => b.textContent === EN.collabGoToAnchor)
+
+  it('is shown when lost, version number known, handler given and another version is open', async () => {
+    const onViewVersion = vi.fn()
+    await mount(fakeSource(list([lostRow()])), host(), {
+      adapter: ad(),
+      openVersionId: 'v-head',
+      onViewVersion,
+    })
+    const b = viewBtn()!
+    expect(b).toBeDefined()
+    expect(b.tagName).toBe('BUTTON')
+    expect(b.getAttribute('type')).toBe('button')
+    expect(b.closest('.collab-acts')).not.toBeNull()
+    // it replaces the hidden Go to location
+    expect(goBtn()).toBeUndefined()
+    // the lost label stays words
+    expect($('.collab-anchor-state-lost')!.textContent).toBe(EN.collabAnchorLost)
+  })
+
+  it('is shown without an open version id too (it cannot equal the anchor version)', async () => {
+    await mount(fakeSource(list([lostRow()])), host(), { onViewVersion: vi.fn() })
+    expect(viewBtn()).toBeDefined()
+  })
+
+  it.each([
+    ['anchor_version_no missing', { anchor_version_no: undefined }],
+    ['anchor_version_no null', { anchor_version_no: null }],
+    ['anchor_version_no 0', { anchor_version_no: 0 }],
+    ['anchor_version_no fractional', { anchor_version_no: 2.5 }],
+    ['anchor_version_no negative', { anchor_version_no: -1 }],
+    ['anchor_version_no a string', { anchor_version_no: '3' }],
+  ])('is hidden: %s', async (_n, over) => {
+    await mount(fakeSource(list([lostRow(over)])), host(), {
+      adapter: ad(),
+      openVersionId: 'v-head',
+      onViewVersion: vi.fn(),
+    })
+    expect($$('button').some((b) => /^View in version/.test(b.textContent ?? ''))).toBe(false)
+    expect(goBtn()).toBeUndefined()
+  })
+
+  it('is hidden without a host handler', async () => {
+    await mount(fakeSource(list([lostRow()])), host(), { adapter: ad(), openVersionId: 'v-head' })
+    expect(viewBtn()).toBeUndefined()
+    expect(goBtn()).toBeUndefined()
+  })
+
+  it('is hidden when the open version is the anchor version: Go to location instead', async () => {
+    await mount(fakeSource(list([lostRow()])), host(), {
+      adapter: ad(),
+      openVersionId: 'v-old',
+      onViewVersion: vi.fn(),
+    })
+    expect(viewBtn()).toBeUndefined()
+    expect(goBtn()).toBeDefined()
+    expect($('.collab-anchor-state-lost')).toBeNull()
+  })
+
+  it('is hidden for an exact thread', async () => {
+    await mount(fakeSource(list([lostRow({ anchor_state: 'exact' })])), host(), {
+      adapter: ad(),
+      openVersionId: 'v-head',
+      onViewVersion: vi.fn(),
+    })
+    expect(viewBtn()).toBeUndefined()
+    expect(goBtn()).toBeDefined()
+  })
+
+  it('is hidden on a reply (only the root row carries the action) and for a discussion', async () => {
+    await mount(
+      fakeSource(
+        list([
+          lostRow(),
+          cm({ id: 'r', parent_id: 'l', anchor_version_no: 3 }),
+          cm({ id: 'd', kind: 'discussion', anchor_version_no: 3 }),
+        ]),
+      ),
+      host(),
+      { adapter: ad(), openVersionId: 'v-head', onViewVersion: vi.fn() },
+    )
+    expect($$('button').filter((b) => b.textContent === 'View in version 3')).toHaveLength(1)
+    expect($('[data-comment-id="r"] .collab-acts')?.textContent).not.toContain('View in version')
+  })
+
+  it('click calls the handler once with the root comment id and the number', async () => {
+    const onViewVersion = vi.fn(() => ({ opened: true }))
+    await mount(fakeSource(list([lostRow(), cm({ id: 'r', parent_id: 'l' })])), host(), {
+      adapter: ad(),
+      openVersionId: 'v-head',
+      onViewVersion,
+    })
+    await act(async () => {
+      viewBtn()!.click()
+      await flush()
+    })
+    expect(onViewVersion).toHaveBeenCalledTimes(1)
+    expect(onViewVersion).toHaveBeenCalledWith({ commentId: 'l', versionNo: 3 })
+    expect($('.collab-why--err')).toBeNull()
+  })
+
+  it('is disabled while pending and ignores a second click, then is enabled again', async () => {
+    let done!: (v: { opened: boolean }) => void
+    const onViewVersion = vi.fn(() => new Promise<{ opened: boolean }>((r) => (done = r)))
+    await mount(fakeSource(list([lostRow()])), host(), {
+      adapter: ad(),
+      openVersionId: 'v-head',
+      onViewVersion,
+    })
+    await act(async () => {
+      viewBtn()!.click()
+      await flush()
+    })
+    expect((viewBtn() as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => {
+      viewBtn()!.click()
+      await flush()
+    })
+    expect(onViewVersion).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      done({ opened: true })
+      await flush()
+    })
+    expect((viewBtn() as HTMLButtonElement).disabled).toBe(false)
+    expect($('.collab-why--err')).toBeNull()
+  })
+
+  it('{opened:false} shows the unavailable line as an alert', async () => {
+    const onViewVersion = vi.fn(() => Promise.resolve({ opened: false }))
+    await mount(fakeSource(list([lostRow()])), host(), {
+      adapter: ad(),
+      openVersionId: 'v-head',
+      onViewVersion,
+    })
+    await act(async () => {
+      viewBtn()!.click()
+      await flush()
+    })
+    const line = $('.collab-why--err')!
+    expect(line.getAttribute('role')).toBe('alert')
+    expect(line.textContent).toBe(EN.collabVersionViewUnavailable)
+    expect((viewBtn() as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('a throw (sync or async) shows the unavailable line and the next click clears it', async () => {
+    const onViewVersion = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error('boom')
+      })
+      .mockRejectedValueOnce(new Error('later'))
+      .mockResolvedValueOnce({ opened: true })
+    await mount(fakeSource(list([lostRow()])), host(), {
+      adapter: ad(),
+      openVersionId: 'v-head',
+      onViewVersion,
+    })
+    await act(async () => {
+      viewBtn()!.click()
+      await flush()
+    })
+    expect($('.collab-why--err')!.textContent).toBe(EN.collabVersionViewUnavailable)
+    await act(async () => {
+      viewBtn()!.click()
+      await flush()
+    })
+    expect($('.collab-why--err')!.textContent).toBe(EN.collabVersionViewUnavailable)
+    await act(async () => {
+      viewBtn()!.click()
+      await flush()
+    })
+    expect($('.collab-why--err')).toBeNull()
+  })
+
+  it('a handler that returns nothing is not an error', async () => {
+    const onViewVersion = vi.fn()
+    await mount(fakeSource(list([lostRow()])), host(), {
+      adapter: ad(),
+      openVersionId: 'v-head',
+      onViewVersion,
+    })
+    await act(async () => {
+      viewBtn()!.click()
+      await flush()
+    })
+    expect(onViewVersion).toHaveBeenCalledTimes(1)
+    expect($('.collab-why--err')).toBeNull()
+  })
+})
+
 describe('collab.css', () => {
   it('tokens only (no raw colours in rules), 24px targets, 44px under a coarse pointer', async () => {
     const { readFileSync } = await import('node:fs')

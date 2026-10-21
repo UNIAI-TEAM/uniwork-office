@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const ms = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Dokumen (akar)',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Folder',
   ufContentsLabel: 'Kandungan folder',
@@ -27,6 +27,7 @@ export const ms = {
   ufTooDeep: 'Pepohon dokumen paling dalam {max} tahap.',
   ufCycle: 'Folder tidak boleh dialihkan ke dalam dirinya sendiri atau salah satu subfoldernya.',
   ufParentKind: 'Folder terletak di akar atau di dalam folder lain.',
+  ufNotShareable: 'Folder tidak boleh dikongsi. Kongsi setiap dokumen satu demi satu.',
   ufFolderGone: 'Folder ini tiada lagi di sini.',
   ufFolderNoAccess: 'Anda tidak lagi mempunyai akses kepada folder ini.',
   ufNoPermission: 'Anda tiada kebenaran untuk mengubah folder ini.',

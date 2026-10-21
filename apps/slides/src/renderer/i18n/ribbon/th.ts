@@ -47,14 +47,11 @@ export const th = {
   ribbonPasteTipDisabled: 'วาง (คัดลอกหรือตัดองค์ประกอบบนผืนผ้าใบก่อน)',
   ribbonCutTip: 'ตัด (⌘X)',
   ribbonCopyTip: 'คัดลอก (⌘C)',
-  ribbonBrushTipNoSelection:
-    'ตัวคัดวางรูปแบบ (เลือกองค์ประกอบก่อน; ⌘⇧C คัดลอกรูปแบบ / ⌘⇧V วางรูปแบบ)',
+  ribbonBrushTipNoSelection: 'ตัวคัดวางรูปแบบ (เลือกองค์ประกอบก่อน)',
   ribbonBrushTipContinuous: 'ตัวคัดวางรูปแบบโหมดต่อเนื่อง (กด Esc เพื่อออก)',
   ribbonBrushTipOnce: 'ตัวคัดวางรูปแบบโหมดครั้งเดียว (คลิกองค์ประกอบเป้าหมายเพื่อนำไปใช้)',
-  ribbonBrushTipHasFormat:
-    'ตัวคัดวางรูปแบบ (คลิกใช้ครั้งเดียว / ดับเบิลคลิกใช้ต่อเนื่อง; ⌘⇧C คัดลอกรูปแบบ / ⌘⇧V วางรูปแบบ)',
-  ribbonBrushTipDefault:
-    'ตัวคัดวางรูปแบบ (คลิกเพื่อคัดลอกและนำรูปแบบไปใช้; ⌘⇧C คัดลอกรูปแบบ / ⌘⇧V วางรูปแบบ)',
+  ribbonBrushTipHasFormat: 'ตัวคัดวางรูปแบบ (คลิกใช้ครั้งเดียว / ดับเบิลคลิกใช้ต่อเนื่อง)',
+  ribbonBrushTipDefault: 'ตัวคัดวางรูปแบบ (คลิกเพื่อคัดลอกและนำรูปแบบไปใช้)',
   ribbonGroupSlides: 'สไลด์',
   ribbonNewSlide: 'สไลด์ใหม่',
   ribbonNewSlideTip: 'สไลด์เปล่าใหม่ (ใช้พื้นหลังเค้าโครงของสไลด์ปัจจุบันต่อ)',
@@ -359,9 +356,9 @@ export const th = {
   ribbonAnimDelayTip: 'หน่วงเวลาหลังทริกเกอร์ก่อนเริ่ม (วินาที)',
   ribbonGroupStartShow: 'เริ่มการนำเสนอสไลด์',
   ribbonFromBeginning: 'ตั้งแต่ต้น',
-  ribbonFromBeginningTip: 'นำเสนอเต็มหน้าจอตั้งแต่สไลด์ 1 (F5 ข้ามสไลด์ที่ซ่อน)',
+  ribbonFromBeginningTip: 'นำเสนอเต็มหน้าจอตั้งแต่สไลด์ 1 (ข้ามสไลด์ที่ซ่อน)',
   ribbonFromCurrent: 'จากสไลด์ปัจจุบัน',
-  ribbonFromCurrentTip: 'นำเสนอเต็มหน้าจอจากสไลด์ปัจจุบัน (⇧F5)',
+  ribbonFromCurrentTip: 'นำเสนอเต็มหน้าจอจากสไลด์ปัจจุบัน',
   ribbonPresenterView: 'มุมมองผู้นำเสนอ',
   ribbonPresenterViewTip:
     'มุมมองผู้นำเสนอ: บันทึกย่อ/สไลด์ถัดไป/ตัวจับเวลา/ปากกา เมื่อมีหลายจอ อีกจอจะแสดงการนำเสนอแบบเต็มหน้าจอ',

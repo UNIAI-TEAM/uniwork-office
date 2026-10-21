@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const es = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Documentos (raíz)',
   ufTreeLabel: 'Carpetas',
   ufContentsLabel: 'Contenido de la carpeta',
   ufRecent: 'Recientes',
@@ -26,6 +26,7 @@ export const es = {
   ufTooDeep: 'El árbol de documentos tiene como máximo {max} niveles.',
   ufCycle: 'Una carpeta no se puede mover a sí misma ni a una de sus subcarpetas.',
   ufParentKind: 'Una carpeta está en la raíz o dentro de otra carpeta.',
+  ufNotShareable: 'Las carpetas no se pueden compartir. Comparte cada documento por separado.',
   ufFolderGone: 'Esta carpeta ya no está aquí.',
   ufFolderNoAccess: 'Ya no tienes acceso a esta carpeta.',
   ufNoPermission: 'No tienes permiso para cambiar esta carpeta.',

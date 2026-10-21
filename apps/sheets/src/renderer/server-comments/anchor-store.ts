@@ -45,6 +45,8 @@ export interface TrackedRoot {
   readonly id: string
   readonly anchor?: CollabAnchor | null | undefined
   readonly anchor_state?: string | null | undefined
+  /** the version the listed anchor's coordinates belong to */
+  readonly anchor_version_id?: string | null | undefined
   readonly deleted?: boolean | undefined
 }
 
@@ -191,6 +193,50 @@ function inside(range: CellRange, outer: CellRange): boolean {
   )
 }
 
+/**
+ * One coordinate edit the store applied to its entries. The store keeps them in order so a root it first
+ * sees later (made on the server after the editor's first list) can be taken through the edits made
+ * since the version its anchor is written against.
+ */
+type LogEntry =
+  | { readonly kind: 'structural'; readonly sheetId: string; readonly op: StructuralJournalOp }
+  | {
+      readonly kind: 'move'
+      readonly fromSheetId: string
+      readonly from: CellRange
+      readonly toSheetId: string
+      readonly to: CellRange
+    }
+  | { readonly kind: 'remove-sheet'; readonly sheetId: string }
+
+/** a location through one logged edit; null = lost, the same object = unchanged */
+function applyLogEntry(at: Located, entry: LogEntry): Located | null {
+  switch (entry.kind) {
+    case 'structural': {
+      if (at.sheetId !== entry.sheetId) return at
+      const range = shiftRange(at.range, entry.op)
+      if (range === at.range) return at
+      return range ? { sheetId: at.sheetId, range } : null
+    }
+    case 'move': {
+      if (at.sheetId !== entry.fromSheetId || !inside(at.range, entry.from)) return at
+      const dr = entry.to.startRow - entry.from.startRow
+      const dc = entry.to.startColumn - entry.from.startColumn
+      return {
+        sheetId: entry.toSheetId,
+        range: {
+          startRow: at.range.startRow + dr,
+          endRow: at.range.endRow + dr,
+          startColumn: at.range.startColumn + dc,
+          endColumn: at.range.endColumn + dc,
+        },
+      }
+    }
+    case 'remove-sheet':
+      return at.sheetId === entry.sheetId ? null : at
+  }
+}
+
 type Listener = () => void
 
 export class ServerAnchorStore {
@@ -200,6 +246,10 @@ export class ServerAnchorStore {
   private byAnchor = new WeakMap<CollabAnchor, string>()
   /** stable sheet id -> the last name this workbook showed for it (labels of sheets gone since) */
   private knownNames = new Map<string, string>()
+  /** every edit applied to `entries` since the workbook opened, in order */
+  private log: LogEntry[] = []
+  /** version id -> `log.length` when that version became the base the editor works on */
+  private marks = new Map<string, number>()
   private listeners = new Set<Listener>()
   private version = 0
   private epoch = 0
@@ -219,6 +269,9 @@ export class ServerAnchorStore {
     this.byAnchor = new WeakMap()
     this.entries = new Map()
     this.knownNames = new Map()
+    // the reopened workbook is the layout of whatever version it was read from: no edit applies to it yet
+    this.log = []
+    for (const version of this.marks.keys()) this.marks.set(version, 0)
     this.epoch += 1
     this.bump()
   }
@@ -241,6 +294,24 @@ export class ServerAnchorStore {
     previous: ReadonlyMap<string, string>,
     next: readonly { id: string; name: string }[],
   ): void {
+    const rebased = (sheetId: string): string => {
+      const name = previous.get(sheetId)
+      return (name === undefined ? undefined : next.find((s) => s.name === name)?.id) ?? sheetId
+    }
+    this.log = this.log.map((entry) => {
+      switch (entry.kind) {
+        case 'structural':
+          return { ...entry, sheetId: rebased(entry.sheetId) }
+        case 'move':
+          return {
+            ...entry,
+            fromSheetId: rebased(entry.fromSheetId),
+            toSheetId: rebased(entry.toSheetId),
+          }
+        case 'remove-sheet':
+          return { ...entry, sheetId: rebased(entry.sheetId) }
+      }
+    })
     let changed = false
     for (const [id, at] of this.entries) {
       if (!at) continue
@@ -254,11 +325,38 @@ export class ServerAnchorStore {
   }
 
   /**
-   * The latest server roots: a new id is located once from its server anchor (a server-lost one
-   * stays lost); a known id keeps its live location. True when anything changed. Also remembers
-   * the names of the workbook's stable sheet ids for labels.
+   * `versionId` is the version the editor works on from now: the opened version, then each Save
+   * receipt's. A root first tracked later whose anchor is written against it is taken through the
+   * edits logged since this point. The first mark of a version wins.
+   */
+  markVersion(versionId: string | null | undefined): void {
+    if (versionId && !this.marks.has(versionId)) this.marks.set(versionId, this.log.length)
+  }
+
+  /**
+   * The latest server roots: a new id is located once from its server anchor and taken through the
+   * edits made since the version that anchor is written against (a server-lost one stays lost; an
+   * anchor on a version the editor never held is located as listed); a known id keeps its live
+   * location. True when anything changed. Also remembers the names of the workbook's stable sheet
+   * ids for labels.
    */
   track(roots: readonly TrackedRoot[], sheets: readonly LiveSheet[]): boolean {
+    return this.trackRoots(roots, sheets, true)
+  }
+
+  /**
+   * A root this editor just created: its anchor was encoded from the live selection, so it is
+   * already in the live coordinates and no logged edit applies to it.
+   */
+  trackCreated(root: TrackedRoot, sheets: readonly LiveSheet[]): boolean {
+    return this.trackRoots([root], sheets, false)
+  }
+
+  private trackRoots(
+    roots: readonly TrackedRoot[],
+    sheets: readonly LiveSheet[],
+    replay: boolean,
+  ): boolean {
     let changed = false
     for (const sheet of sheets) {
       if (sheet.stableId) this.knownNames.set(sheet.stableId, sheet.name)
@@ -277,12 +375,26 @@ export class ServerAnchorStore {
       if (sheets.length === 0 && root.anchor_state !== 'lost') continue
       this.entries.set(
         root.id,
-        root.anchor_state === 'lost' ? null : locateXlsxAnchor(sheets, anchor),
+        root.anchor_state === 'lost'
+          ? null
+          : this.sinceVersion(locateXlsxAnchor(sheets, anchor), replay && root.anchor_version_id),
       )
       changed = true
     }
     if (changed) this.bump()
     return changed
+  }
+
+  /** `at` through the edits logged since `versionId` became the base; as is for a version never marked */
+  private sinceVersion(
+    at: Located | null,
+    versionId: string | null | undefined | false,
+  ): Located | null {
+    const from = versionId ? this.marks.get(versionId) : undefined
+    if (!at || from === undefined) return at
+    let now: Located | null = at
+    for (let i = from; now && i < this.log.length; i += 1) now = applyLogEntry(now, this.log[i]!)
+    return now
   }
 
   /** undefined = not tracked; null = lost */
@@ -297,44 +409,28 @@ export class ServerAnchorStore {
 
   /** a row/column insert, delete or whole-row move on `sheetId` */
   applyStructuralOp(sheetId: string, op: StructuralJournalOp): void {
-    let changed = false
-    for (const [id, at] of this.entries) {
-      if (!at || at.sheetId !== sheetId) continue
-      const range = shiftRange(at.range, op)
-      if (range === at.range) continue
-      this.entries.set(id, range ? { sheetId, range } : null)
-      changed = true
-    }
-    if (changed) this.bump()
+    this.apply({ kind: 'structural', sheetId, op })
   }
 
   /** cut/paste or drag-move: anchors wholly inside the source travel with their cells */
   moveRange(fromSheetId: string, from: CellRange, toSheetId: string, to: CellRange): void {
-    let changed = false
-    for (const [id, at] of this.entries) {
-      if (!at || at.sheetId !== fromSheetId || !inside(at.range, from)) continue
-      const dr = to.startRow - from.startRow
-      const dc = to.startColumn - from.startColumn
-      this.entries.set(id, {
-        sheetId: toSheetId,
-        range: {
-          startRow: at.range.startRow + dr,
-          endRow: at.range.endRow + dr,
-          startColumn: at.range.startColumn + dc,
-          endColumn: at.range.endColumn + dc,
-        },
-      })
-      changed = true
-    }
-    if (changed) this.bump()
+    this.apply({ kind: 'move', fromSheetId, from, toSheetId, to })
   }
 
   /** a deleted sheet: its anchors are lost */
   removeSheet(sheetId: string): void {
+    this.apply({ kind: 'remove-sheet', sheetId })
+  }
+
+  /** log the edit, then move every tracked location through it */
+  private apply(entry: LogEntry): void {
+    this.log.push(entry)
     let changed = false
     for (const [id, at] of this.entries) {
-      if (!at || at.sheetId !== sheetId) continue
-      this.entries.set(id, null)
+      if (!at) continue
+      const next = applyLogEntry(at, entry)
+      if (next === at) continue
+      this.entries.set(id, next)
       changed = true
     }
     if (changed) this.bump()

@@ -13,6 +13,7 @@ import { showSaveDialogWithMemory } from '@genoffice/electron-utils'
 import { COMMENTS_CHANNELS } from '@genoffice/electron-utils/comments-ipc'
 import {
   UNIWORK_DOC_CHANNELS,
+  UNIWORK_SHARE_CHANNELS,
   type AccountStatus,
   type SignOutPlan,
   type SignOutProgress,
@@ -29,9 +30,13 @@ import {
   type UniworkMoveDocumentInput,
   type UniworkRemoteAction,
   type UniworkSearchQuery,
+  type UniworkSourceDownloadInput,
+  type UniworkSourceListQuery,
   type UniworkUploadDocInput,
   type UniworkSharedQuery,
+  type UniworkShelvedQuery,
 } from '../../shared/home-api'
+import { SOURCE_VIEW_CHANNELS } from '../../shared/source-view'
 import { createLaunchPusher, createPushHolder, type LaunchPushTarget } from './launch'
 import {
   applyUniworkProfile,
@@ -44,13 +49,14 @@ import {
   uniworkSessionIdentity,
 } from '../uniwork-auth'
 import { AccountBoundary } from './account-boundary'
+import { createShareClientProvider, createUniworkShareService } from './share-service'
 import {
   createUniworkComments,
   type DiscussionPushTarget,
   type UniworkCommentsHandle,
 } from './comments-wiring'
 import type { CommentsRevealPayload } from '@genoffice/electron-utils/comments-ipc'
-import { setUniworkCloseGuard } from './close-guard'
+import { setUniworkCloseGuard, setUniworkPathDropHook } from './close-guard'
 import { createSafeStorageKeyProvider } from '../uniwork-sync/keys'
 import {
   SyncRuntime,
@@ -89,8 +95,9 @@ import { scopeWorkingCopyDirs } from './binding-store'
 import { tUniworkDocs } from './strings'
 import { createTreeChangedCoalescer } from './tree-changed'
 import { registerFirstSaveOpenAck } from './first-save-open'
+import { createFirstSaveNameBroker, registerFirstSaveNameAnswer } from './first-save-name'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
-import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
+import { createWiredSyncCenter, startPreviewStartupSweep } from '../uniwork-sync/sync-center'
 import { createOfflineCopies } from '../uniwork-sync/offline-library/copies'
 import {
   createOfflineLibraryApi,
@@ -125,7 +132,11 @@ export interface UniworkDocsWiring {
    */
   refuseLockedPath(path: string): boolean
   isPathOpen(path: string): boolean
+  /** EL-1(b) fix6 (VEL-2): broadcast `{ path }` to every renderer webContents */
+  pushDocStateChanged?(path: string): void
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
+  /** UWNM-BE-R4-1: the shell rewrote `path` itself (docs forgets its disk state) */
+  noteShellRewrote?(path: string): void
   reloadPath(path: string): void
   /**
    * G5-03a: the FRESH editor state of one path, summed over every view that
@@ -412,7 +423,8 @@ function syncStoreFor(): { layer: StoreLayer; access: SyncStoreAccess } {
  * `userData/uniwork-sync/library/` - its own root, safeStorage-wrapped key per
  * scope and budget, so pinned bytes never count against the sync store budget
  * (lead decision on W5 "A"). Wiped at the account boundary beside the sync
- * scope. Residual: moves into G5-11's SYNC_STORE_REGISTRATIONS when it lands.
+ * scope. It stays its own layer, never a `SYNC_STORE_REGISTRATIONS` entry: the
+ * library's bytes and budget must not be folded into the sync layer's.
  */
 const libraryLayers = new Map<string, StoreLayer>()
 
@@ -675,6 +687,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     const wc = wiring.shellContents()
     if (wc && !wc.isDestroyed()) wc.send(channel, payload)
   }
+  // UNI-1959: the "Name the document" dialog's ask / verdict round trip
+  const firstSaveName = createFirstSaveNameBroker()
   const syncStore = syncStoreFor().access
   /**
    * FD-11: the one tree-changed push of this process. A feed page (through the
@@ -720,6 +734,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   // it) but the service needs it for the launch-ticket reveal: a holder breaks
   // the cycle, and the reveal only runs once both exist
   let comments: UniworkCommentsHandle | null = null
+  // UNI-1993: the draft-preview root is emptied ONCE per start; the sync center's
+  // draft previews and the view-only source files both wait for this same promise
+  const previewStartupSweep = startPreviewStartupSweep(app.getPath('userData'))
   const service = new UniworkDocsService({
     userDataDir: app.getPath('userData'),
     syncStore,
@@ -750,6 +767,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isPathOpen: (path) => wiring.isPathOpen(path),
     requestModuleSave: (path, onNotWritten, mode) =>
       wiring.requestModuleSave(path, onNotWritten, mode),
+    noteShellRewrote: (path) => wiring.noteShellRewrote?.(path),
     reloadPath: (path) => wiring.reloadPath(path),
     // G5-03a: the fresh editor state of one path (W2's live read; the wiring
     // placeholder is what index.ts installs today)
@@ -762,6 +780,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     stopRuntime: () => stopFeed(),
     openPaths: () => wiring.openPaths(),
     closePathNow: (path) => wiring.closePathNow(path),
+    sourceViewStartupSweep: previewStartupSweep,
     aiHistoryPaths: () => wiring.aiHistoryPaths(),
     forgetAiHistory: (paths) => wiring.forgetAiHistory(paths),
     // ADVISOR D4 (a): the dev-only fixture gate; index.ts passes app.isPackaged
@@ -779,6 +798,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     ui: conflictUi(wiring),
     pushStatus: (status) => push(UNIWORK_DOC_CHANNELS.docStatusEvent, status),
     pushQueuePopover: (request) => push(UNIWORK_DOC_CHANNELS.queuePopover, request),
+    requestFirstSaveName: (request) => firstSaveName.request(wiring.shellContents(), request),
+    dismissFirstSaveName: (requestId) => firstSaveName.cancel(requestId),
+    pushDocStateChanged: (path) => wiring.pushDocStateChanged?.(path),
     // G5-06u RBE6u-03: a path open as a tab of the shell window (the target
     // discussionTarget already resolves); a detached editor window is not one
     isShellTab: (path) => (wiring.discussionTarget ? wiring.discussionTarget(path) !== null : true),
@@ -876,6 +898,81 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listTrash, (_event, query: unknown) =>
     service.listTrash((query ?? {}) as UniworkDocListQuery),
   )
+  // UNI-2047 B6: Gắn sao (SV-2) - the list and the two star writes
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listFavorites, (_event, query: unknown) =>
+    service.listFavorites((query ?? {}) as Parameters<typeof service.listFavorites>[0]),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.favoriteDocument, (_event, documentId: unknown) =>
+    service.favoriteDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.unfavoriteDocument, (_event, documentId: unknown) =>
+    service.unfavoriteDocument(documentId as string),
+  )
+  // UNI-2047 APP-SHARE-DIALOG: the Share dialog's routes (one service, a result per call)
+  const shareService = createUniworkShareService({
+    client: createShareClientProvider({
+      profile: () => uniworkDeploymentProfile(),
+      authorized: (call) => authorizedRequest(call),
+      isSignedIn: () => uniworkSessionIdentity() !== null,
+    }),
+    isSignedIn: () => uniworkSessionIdentity() !== null,
+    selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
+    selectedOrgSlug: () => uniworkAccount().status().org?.slug ?? null,
+  })
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.get, (_event, documentId: unknown) =>
+    shareService.get(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.update, (_event, input: unknown) =>
+    shareService.update(input as Parameters<typeof shareService.update>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.candidates, (_event, input: unknown) =>
+    shareService.candidates(input as Parameters<typeof shareService.candidates>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.linkCreate, (_event, input: unknown) =>
+    shareService.linkCreate(input as Parameters<typeof shareService.linkCreate>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.linkRevoke, (_event, input: unknown) =>
+    shareService.linkRevoke(input as Parameters<typeof shareService.linkRevoke>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.settings, () => shareService.settings())
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.requests, (_event, documentId: unknown) =>
+    shareService.requests(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.requestApprove, (_event, input: unknown) =>
+    shareService.requestApprove(input as Parameters<typeof shareService.requestApprove>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.requestDecline, (_event, input: unknown) =>
+    shareService.requestDecline(input as Parameters<typeof shareService.requestDecline>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.breakGlassGrant, (_event, input: unknown) =>
+    shareService.breakGlassGrant(input as Parameters<typeof shareService.breakGlassGrant>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.breakGlassRevoke, (_event, input: unknown) =>
+    shareService.breakGlassRevoke(input as Parameters<typeof shareService.breakGlassRevoke>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.members, (_event, input: unknown) =>
+    shareService.members(input as Parameters<typeof shareService.members>[0]),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.bulk, (_event, plan: unknown) =>
+    shareService.bulk(plan as Parameters<typeof shareService.bulk>[0]),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listSources, (_event, query: unknown) =>
+    service.listSources((query ?? {}) as UniworkSourceListQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.downloadSource, (_event, input: unknown) =>
+    service.downloadSource((input ?? {}) as UniworkSourceDownloadInput),
+  )
+  // UNI-1993: a source row's primary action opens a view-only tab; never throws across IPC
+  ipcMain.handle(SOURCE_VIEW_CHANNELS.openSource, async (_event, input: unknown) => {
+    try {
+      return await service.openSource(input)
+    } catch {
+      return { ok: false, error: 'open_failed' }
+    }
+  })
+  ipcMain.handle(SOURCE_VIEW_CHANNELS.sourceViewState, (_event, path: unknown) =>
+    typeof path === 'string' ? service.sourceViewState(path) : null,
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.documentProperties, (_event, documentId: unknown) =>
     service.documentProperties(documentId as string),
   )
@@ -885,7 +982,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.createPage, (_event, input: unknown) =>
     service.createPage((input ?? {}) as UniworkCreatePageInput),
   )
-  ipcMain.handle(UNIWORK_DOC_CHANNELS.pickUploadFile,() => service.pickUploadFile())
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.pickUploadFile, () => service.pickUploadFile())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.uploadDocument, (_event, input: unknown) =>
     service.uploadDocument((input ?? {}) as UniworkUploadDocInput),
   )
@@ -896,14 +993,32 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   })
   ipcMain.handle(
     UNIWORK_DOC_CHANNELS.renameDocument,
-    (_event, documentId: unknown, name: unknown) =>
-      service.renameDocument(documentId as string, name as string),
+    (_event, documentId: unknown, name: unknown, options: unknown) =>
+      service.renameDocument(documentId as string, name as string, {
+        shareWithWorkspace:
+          typeof options === 'object' &&
+          options !== null &&
+          (options as { shareWithWorkspace?: unknown }).shareWithWorkspace === true,
+      }),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.archiveDocument, (_event, documentId: unknown) =>
     service.archiveDocument(documentId as string),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.restoreDocument, (_event, documentId: unknown) =>
     service.restoreDocument(documentId as string),
+  )
+  // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf, Bỏ lưu trữ and trash from Lưu trữ
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listShelved, (_event, query: unknown) =>
+    service.listShelved((query ?? {}) as UniworkShelvedQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.unshelveDocument, (_event, documentId: unknown) =>
+    service.unshelveDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.trashShelvedDocument, (_event, documentId: unknown) =>
+    service.trashShelvedDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.shelveDocument, (_event, documentId: unknown) =>
+    service.shelveDocument(documentId as string),
   )
   // FD-11: the folder-tree surface
   ipcMain.handle(UNIWORK_DOC_CHANNELS.folderTree, (_event, workspaceId: unknown) =>
@@ -938,6 +1053,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   // SAVE-01 r2 (S01-R1-6): the renderer's "dialog is open" ack that releases a
   // File > Save's pending firstSaveOpen; a stale or foreign ack is a no-op
   registerFirstSaveOpenAck(ipcMain)
+  registerFirstSaveNameAnswer(ipcMain, firstSaveName)
   ipcMain.handle(UNIWORK_DOC_CHANNELS.saveLocalCopy, (_event, path: unknown) =>
     service.saveLocalCopy(path as string),
   )
@@ -951,6 +1067,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   // it belongs to the window chrome (index.ts, W2).
   ipcMain.handle(UNIWORK_DOC_CHANNELS.remoteAction, (_event, path: unknown, action: unknown) =>
     service.remoteAction(path as string, action as UniworkRemoteAction),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.editHere, (_event, path: unknown) =>
+    service.editHere(path as string),
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.locks, () => service.currentLocks())
   ipcMain.handle(UNIWORK_DOC_CHANNELS.dismissLock, (_event, path: unknown) => {
@@ -971,6 +1090,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     pending.resolve(answer?.confirmed === true)
   })
   setUniworkCloseGuard(service)
+  setUniworkPathDropHook((paths) => {
+    void service.notePathsDropped(paths)
+  })
   const runtime = createSyncRuntime(service, {
     treeChanged: (workspaceId) => treeChanged.notify(workspaceId),
     libraryChanged: (documentId) => offlineRowChanged(documentId),
@@ -997,6 +1119,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     },
     show: (path) => service.showOfflineCopy(path),
     isPathOpen: (path) => wiring.isPathOpen(path),
+    lockOpened: (lock) => service.recordOfflineLock(lock),
+    leaseStamp: (documentId) => runtime.leases.commitStamp(documentId),
     appVersion: () => app.getVersion(),
   })
   // the service opens its cached copy through the same module (B5)
@@ -1013,12 +1137,14 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       (await runtime.capabilityRead(orgId)).capabilities.offline_library,
     signedOut: () => uniworkAccount().status().state !== 'signed-in',
     lastOwner: () => service.store.readLastOwner(),
+    activeDeploymentId: () => uniworkDeploymentProfile()?.deploymentId ?? null,
     libraryLayer: () => libraryLayerFor(),
     openDocument: (documentId) => service.openDocument(documentId),
     openCopy: (documentId) => offlineCopies.open(documentId),
     revealLibraryFolder: async () =>
       (await shell.openPath(join(app.getPath('userData'), 'uniwork-sync', 'library'))) === '',
     lockRefused: (lock) => service.recordOfflineLock(lock),
+    keystoreLock: (documentId) => service.offlineKeystoreLock(documentId),
     changed: () => offlinePush(),
   })
   /** stops the feed pass and remembers it, so the next status push restarts it */
@@ -1125,6 +1251,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     service,
     store: syncStoreFor(),
     accountStatus: () => uniworkAccount().status(),
+    activeDeploymentId: () => uniworkDeploymentProfile()?.deploymentId ?? null,
     capabilityRead: (orgId) => runtime.capabilityRead(orgId),
     feedVerdict: () => runtime.feedVerdict(),
     resetFeedResync: () => runtime.resetFeedResync(),
@@ -1147,6 +1274,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       return picked.canceled || !picked.filePath ? null : picked.filePath
     },
     pushChanged: (snapshot) => push(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, snapshot),
+    // UNI-1993: the view-only source files share the preview root, its startup sweep,
+    // the poll cadence of the closed-tab sweep and the account boundary
+    startupSweep: previewStartupSweep,
+    sweepSources: () => service.sweepSourceViews(),
+    dropSources: () => service.dropSourceViews(),
     // G5-05u B1/B7: the S3 block, and the head-offline set the S5 gate reads
     offline: async () => {
       const block = await offlineApi.snapshot()
@@ -1158,8 +1290,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   offlinePush = () => syncCenter.controller.notifyChanged()
   offlineRowChanged = (documentId) => offlineApi.rowChanged(documentId)
   registerOfflineLibraryIpc(ipcMain, offlineApi)
-  // a copy no window shows any more goes at the next pass (the offline twin of the draft sweep)
-  runtime.onPollVerdict(() => void offlineCopies.sweep())
+  // a copy no window shows any more goes at the next pass (the offline twin of the draft
+  // sweep); it runs after the pass's lease renewal so it reads the renewed lease (G703-R7-3)
+  runtime.onAfterLeasePass(() => void offlineCopies.sweep())
   changeListeners.push(() => syncCenter.controller.notifyChanged())
   // every feed pass's connectivity verdict: the offline header, its refusals and lastSyncAt
   runtime.onPollVerdict((online) => void syncCenter.notePoll(online))
@@ -1203,6 +1336,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
         // BE-R1-2: an account activation is the startup sweep - the last
         // session's read-only `@offline` plaintext goes before anything opens one
         void offlineCopies.recover().catch(() => undefined)
+        void offlineCopies.sweep().catch(() => undefined)
         // G8-16 S16: changing the organization reloads the library data. An
         // org-less push carrying orgsError is a transient /orgs failure; an
         // org-less push without it (deactivation, the picker) is a lasting

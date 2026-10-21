@@ -72,6 +72,13 @@ export interface DocLock {
   check(docKey: string, generation: number): Promise<boolean>
   /** delete the lease only when owner and generation still match */
   release(docKey: string, generation: number): Promise<void>
+  /**
+   * A32 (UNI-1362): true while ANOTHER owner's lease is fresh - the exact
+   * condition `acquire` refuses on, read without taking or writing anything. A
+   * window that shows a read-only status asks this to revalidate it once the
+   * holder is gone; a missing, stale or corrupt lease is nobody holding it.
+   */
+  isHeld(docKey: string): Promise<boolean>
 }
 
 const LOCK_DIR = 'doc-locks'
@@ -233,6 +240,14 @@ export function createDocLock(options: DocLockOptions): DocLock {
     async check(docKey, generation) {
       const current = await readLease(leasePathOf(docKey))
       return current.kind === 'ok' && holds(current.lease, generation)
+    },
+
+    async isHeld(docKey) {
+      const current = await readLease(leasePathOf(docKey))
+      if (current.kind !== 'ok') return false
+      // the same refusal `acquire` makes: another owner's lease inside its
+      // stale window is a live holder
+      return current.lease.owner !== owner && clock() - current.lease.heartbeatAt <= goneMs
     },
 
     async release(docKey, generation) {

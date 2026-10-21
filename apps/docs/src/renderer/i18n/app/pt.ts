@@ -26,6 +26,8 @@ export const pt = {
   appScLineBreak: 'Quebra de Linha',
   appScNbsp: 'Espaço Não Separável',
   appScNbHyphen: 'Hífen Não Separável',
+  appScFindNext: 'Localizar Seguinte',
+  appScOptHyphen: 'Hífen Opcional',
   appScGrowFont1: 'Aumentar Fonte em 1 pt',
   appScShrinkFont1: 'Diminuir Fonte em 1 pt',
   appScListDemote: 'Diminuir Nível da Lista',
@@ -213,7 +215,7 @@ export const pt = {
   appEndnotePlaceholder: 'Texto da nota de fim…',
   appAutoSave: 'Salvamento automático',
   appAutoSaveTip: 'Salvamento automático (a cada 30 segundos e quando a janela perde o foco)',
-  appSaveShortcutTip: 'Salvar (⌘S)',
+  appSaveShortcutTip: 'Salvar ({keys})',
   appUndo: 'Desfazer',
   appRedo: 'Refazer',
   appStartOpening: 'Abrindo…',
@@ -550,8 +552,13 @@ export const pt = {
   appOnlyEncrypted: '"{name}" está protegido por senha e não pode ser aberto aqui.',
   appFileExportPdf: 'Exportar como PDF…',
   appFilePrint: 'Imprimir…',
+  appPrintNoDocument: 'Abra um documento para imprimi-lo.',
   appPrintNoPrinter:
     'Não há nenhuma impressora disponível neste computador. Você pode salvar o documento como PDF.',
   appPrintFailedPdfHint: 'A impressão falhou: {error}. Você pode salvar o documento como PDF.',
   appPrintSaveAsPdf: 'Salvar como PDF…',
+  appFileSaveCopy: 'Salvar como cópia…',
+  appCopySaved: 'Sua versão foi salva como um novo documento: {title}.',
+  appCopySaveFailed:
+    'Não foi possível criar a cópia. Suas alterações continuam seguras; tente novamente.',
 } satisfies Record<keyof typeof zh, string>

@@ -20,6 +20,7 @@ import type { HtmlApi } from '../../../apps/html/src/shared/ipc'
 import aiStubs, { aiUnavailableMessage } from '../../docs/bridge/ai'
 import type { ModuleBridgeContext } from '../../docs/bridge/module-bridge'
 import { printHtmlDocument } from '../shared/print'
+import { installPrintAccelerator } from '../../docs/bridge/print-accelerator'
 import { toStaticHtml } from '../shared/static-html'
 import type { Capabilities } from '../../docs/protocol/types'
 import { textModuleGrants } from '../shared/capabilities'
@@ -58,6 +59,13 @@ export function createHtmlWebApi(ctx: ModuleBridgeContext, opts: TextWebApiOptio
       ...opts,
     },
   )
+
+  // Ctrl/Cmd+P inside the frame (UNI-1920): the HTML renderer binds no mod+P, so the browser's
+  // own print dialog would bypass runPrint. run = the same handlers onPrintRequest mounts,
+  // only while the `print` cap is effective; otherwise the browser keeps its default.
+  if (typeof window !== 'undefined') {
+    installPrintAccelerator(window, () => web.requestPrint())
+  }
 
   /** the latest instrumented buffer (scripts preview) and its static copy (fallback, on demand) */
   let source = ''

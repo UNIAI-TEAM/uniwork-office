@@ -104,6 +104,18 @@
   text-underline-offset: 2px;
 }
 
+/* B57: the account sign-out is a quiet action, not the loud accent link;
+   the shared .sc-link style stays for interactive links */
+.sc-account .sc-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.sc-account .sc-link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
 .sc-link:focus-visible,
 .sc-doc-btn:focus-visible,
 .sc-tab:focus-visible,
@@ -152,6 +164,17 @@
   text-align: center;
 }
 
+/* UNI-2047: the sync tables are status tables, not document lists, but they read in the document
+   tables' style (documents-home.css .dh-doc-*): a rounded frame, a 36px header in the 11.5px / 600
+   secondary type, 52px rows with the shared hover and no rule under the last one. The frame holds
+   the surface, so the rows can show the hover through their cells. */
+.sc-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
 /* Sync row table: fixed column widths, so an open in-row confirm only changes the actions cell */
 .sc-table {
   width: 100%;
@@ -161,12 +184,13 @@
 }
 
 .sc-table thead th {
-  padding: 6px 8px;
+  height: 36px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-subtle);
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 600;
   text-align: start;
 }
 
@@ -196,17 +220,31 @@
   white-space: nowrap;
 }
 
+.sc-row {
+  /* a table row's height is its minimum: a long detail or a confirm still grows it */
+  height: 52px;
+}
+
 .sc-row > th,
 .sc-row > td {
   padding: 10px 8px;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
   text-align: start;
-  vertical-align: top;
+  vertical-align: middle;
+}
+
+.sc-row:hover,
+.sc-row:focus-within {
+  background: var(--hover);
+}
+
+.sc-row:last-child > th,
+.sc-row:last-child > td {
+  border-bottom: 0;
 }
 
 .sc-doc {
-  font-weight: 500;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
@@ -215,8 +253,10 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--text-primary);
+  color: var(--text);
   font: inherit;
+  font-size: 13px;
+  font-weight: 600;
   text-align: start;
   cursor: pointer;
 }
@@ -336,6 +376,25 @@
 .sc .set-btn.sc-act-danger:focus-visible {
   outline: 2px solid var(--danger-text);
   outline-offset: 1px;
+}
+
+/* B56: while a row's confirm is open, an invisible copy of its action set holds
+   the cell's usual height so the row does not shrink; a taller confirm can still grow it */
+.sc-actions-confirm {
+  display: grid;
+}
+
+.sc-actions-ghost,
+.sc-actions-confirm .sc-confirm {
+  grid-area: 1 / 1;
+}
+
+.sc-actions-ghost {
+  visibility: hidden;
+}
+
+.sc-actions-confirm .sc-confirm {
+  align-content: start;
 }
 
 .sc-confirm {
@@ -462,8 +521,14 @@
 }
 
 .sc.is-narrow .sc-row {
+  height: auto;
+  min-height: 52px;
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
+}
+
+.sc.is-narrow .sc-row:last-child {
+  border-bottom: 0;
 }
 
 .sc.is-narrow .sc-actions {
@@ -482,7 +547,10 @@
   .sc-link,
   .sc-doc-btn,
   .sc-tab,
-  .sc-usage .set-btn {
+  .sc-usage .set-btn,
+  .sc-controls .set-btn,
+  .sc-status-line .set-btn,
+  .sc-store-error .set-btn {
     min-height: 44px;
   }
 }

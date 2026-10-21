@@ -18,6 +18,7 @@ import type {
   UniworkTreeChangedEvent,
 } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { formatListDate } from '../src/renderer/src/doclist/format'
 import { UniworkBrowser } from '../src/renderer/src/uniwork-folders/UniworkBrowser'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
@@ -225,21 +226,43 @@ describe('UniworkBrowser: tree and contents (S1)', () => {
     expect(treeEl.getAttribute('aria-label')).toBe(en.ufTreeLabel)
     expect(
       $$('[role="treeitem"]').map((el) => el.querySelector('.uwf-tree-title')?.textContent),
-    ).toEqual(['UniWork', 'Alpha', 'Beta'])
-    expect(treeItem('UniWork').getAttribute('aria-selected')).toBe('true')
+    ).toEqual(['Documents (root)', 'Alpha', 'Beta'])
+    expect(treeItem('Documents (root)').getAttribute('aria-selected')).toBe('true')
     expect(treeItem('Alpha').getAttribute('aria-level')).toBe('2')
     expect(treeItem('Alpha').getAttribute('aria-expanded')).toBe('false')
     expect(api.uniworkListChildren).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: 'w1', parentId: null }),
     )
-    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Report.docx'])
-    // the page and the zip are hidden with one count line (F11-L2: shared uwPickHiddenFormats)
+    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Meeting notes', 'Report.docx'])
+    // the zip is hidden with one count line (F11-L2: shared uwPickHiddenFormats); the page (UniNote) is listed (UNI-1953)
     const hiddenLine = $('.uwf-hidden')!
-    expect(hiddenLine.textContent).toBe(docEn.uwPickHiddenFormats.replace('{count}', '2'))
+    expect(hiddenLine.textContent).toBe(docEn.uwPickHiddenFormats.replace('{count}', '1'))
     // R2-3: hidden-formats count line has an id referenced by aria-describedby on the contents listbox and search box
     expect(hiddenLine.id).toBeTruthy()
     expect($('[role="listbox"]')?.getAttribute('aria-describedby')).toBe(hiddenLine.id)
     expect($('.uwf-own-search')?.getAttribute('aria-describedby')).toBe(hiddenLine.id)
+  })
+
+  it('lists the contents on the compact picker columns (UNI-2047 B2)', async () => {
+    children[''] = [
+      entry('d1', 'Report.docx', { updatedByName: 'Linh Tran', updatedAt: '2026-10-01T10:00:00Z' }),
+      asFolder('b', 'Beta'),
+    ]
+    await render()
+    expect($('.dh-picker-head')?.textContent).toBe('NameLast edited byUpdated')
+    const row = $$('[role="option"]').find((el) => el.textContent?.includes('Report.docx'))!
+    expect(row.querySelector('[data-col="editor"] .dh-person-name')?.textContent).toBe('Linh Tran')
+    expect(row.querySelector('[data-col="updated"]')?.textContent).toBe(
+      formatListDate('2026-10-01T10:00:00Z', new Date(), 'en-US'),
+    )
+    // the old "Updated … by Linh" second line is gone: the columns say it
+    expect(row.querySelector('.uw-pick-row-meta')).toBeNull()
+    // a folder is a row of the same list, Tên first
+    const beta = $$('[role="option"]').find((el) => el.textContent?.includes('Beta'))!
+    expect(beta.querySelector('[data-col="name"] .uwf-row-icon')).not.toBeNull()
+    // nothing to tick or sort in a picker
+    expect($('.uwf-contents input[type="checkbox"], .uwf-contents .dh-sort-head')).toBeNull()
+    expect($('[role="listbox"]')?.getAttribute('aria-label')).toBe(en.ufContentsLabel)
   })
 
   it('opens a folder from the tree, shows its breadcrumb and goes back by it', async () => {
@@ -260,10 +283,10 @@ describe('UniworkBrowser: tree and contents (S1)', () => {
     })
     await flush()
     expect(optionTitles()).toEqual(['Deal.docx'])
-    expect($$('.uwf-crumb-btn').map((b) => b.textContent)).toEqual(['UniWork', 'Alpha'])
+    expect($$('.uwf-crumb-btn').map((b) => b.textContent)).toEqual(['Documents (root)', 'Alpha'])
     expect($('.uwf-crumb-current')?.textContent).toBe('Contracts')
     await click($$('.uwf-crumb-btn')[0])
-    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Report.docx'])
+    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Meeting notes', 'Report.docx'])
   })
 
   it('opens a file with Enter on its row (the host opens it)', async () => {
@@ -291,7 +314,7 @@ describe('UniworkBrowser: tree and contents (S1)', () => {
     tree = [folder('l1', 'L1', [folder('l2', 'L2', [folder('l3', 'L3', [folder('l4', 'L4')])])])]
     children.l4 = []
     await render({ initialFolderId: 'l4' })
-    expect($$('.uwf-crumb-btn').map((b) => b.textContent)).toEqual(['UniWork', 'L3'])
+    expect($$('.uwf-crumb-btn').map((b) => b.textContent)).toEqual(['Documents (root)', 'L3'])
     const more = $('[data-folder-menu-for="crumbs-more"]')!
     expect(more.getAttribute('aria-label')).toBe(en.ufMoreLevels)
     await click(more)
@@ -392,7 +415,7 @@ describe('UniworkBrowser: freshness', () => {
     tree = [folder('a', 'Alpha')]
     await act(async () => window.dispatchEvent(new Event('focus')))
     await flush()
-    expect($('.uwf-crumb-current')?.textContent).toBe('UniWork')
+    expect($('.uwf-crumb-current')?.textContent).toBe('Documents (root)')
     expect($('.uwf-notice')?.textContent).toBe(en.ufFolderGone)
   })
 
@@ -555,10 +578,10 @@ describe('UniworkBrowser: search (S2)', () => {
       expect.objectContaining({ workspaceId: 'w1', query: 'bud', kind: 'all' }),
     )
     const hit = $$('[role="option"]').find((el) => el.textContent?.includes('Budget.xlsx'))!
-    expect(hit.getAttribute('title')).toBe('UniWork › Alpha › Contracts')
+    expect(hit.getAttribute('title')).toBe('Documents (root) › Alpha › Contracts')
     expect(hit.querySelector('.uwf-path [aria-hidden="true"]')?.textContent).toBe('… › Contracts ›')
     expect(hit.querySelector('.uwf-path .uw-sr-only')?.textContent).toBe(
-      en.ufPathLabel.replace('{path}', 'UniWork › Alpha › Contracts'),
+      en.ufPathLabel.replace('{path}', 'Documents (root) › Alpha › Contracts'),
     )
     const chips = $$('[role="radio"]')
     expect(chips.map((c) => c.textContent)).toEqual([
@@ -580,7 +603,7 @@ describe('UniworkBrowser: search (S2)', () => {
     await type(input, 'bud')
     await key(input, 'Escape')
     expect(input.value).toBe('')
-    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Report.docx'])
+    expect(optionTitles()).toEqual(['Alpha', 'Beta', 'Meeting notes', 'Report.docx'])
   })
 
   it('ignores a stale search answer, paginates search hits, and keeps search off skeleton on soft refresh (R1-1, R1-8)', async () => {
@@ -747,7 +770,7 @@ describe('UniworkBrowser: folder actions (S3)', () => {
       rows
         .find((el) => el.querySelector('.uwf-tree-title')?.textContent === title)
         ?.querySelector('.uwf-reason')?.textContent
-    expect(reasonOf('UniWork')).toBe(en.ufDisabledCurrent)
+    expect(reasonOf('Documents (root)')).toBe(en.ufDisabledCurrent)
     expect(reasonOf('Alpha')).toBe(en.ufDisabledInside)
     expect(reasonOf('Contracts')).toBe(en.ufDisabledInside)
     expect(reasonOf('Beta')).toBeUndefined()
@@ -784,12 +807,12 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     const picker = $('.uwf-picker')!
     const pickerTitles = () =>
       Array.from(picker.querySelectorAll('.uwf-tree-title')).map((el) => el.textContent)
-    expect(pickerTitles()).toEqual(['UniWork', 'Alpha', 'Beta'])
+    expect(pickerTitles()).toEqual(['Documents (root)', 'Alpha', 'Beta'])
 
     tree = [...tree, folder('g', 'Gamma')]
     await act(async () => api.pushTreeChanged({ workspaceId: 'w1' }))
     await flush()
-    expect(pickerTitles()).toEqual(['UniWork', 'Alpha', 'Beta', 'Gamma'])
+    expect(pickerTitles()).toEqual(['Documents (root)', 'Alpha', 'Beta', 'Gamma'])
   })
 
   it('clicking the svg inside an open FolderMenu button closes the menu without reopening it (R1-13)', async () => {
@@ -952,8 +975,11 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     const bundleCss = `${foldersCss}\n${homeCss.replace(/@position-try[^{]*\{[^}]*\}/g, '')}`
 
     await render()
-    const regularMeta = $<HTMLElement>('.uw-pick-row-meta:not(.uwf-path)')!
-    expect(regularMeta).toBeTruthy()
+    // UNI-2047 B2: the rows carry their editor and date as columns, so a plain second line (the
+    // Open dialog's workspace name) is probed with a stand-in inside the same list
+    const regularMeta = document.createElement('span')
+    regularMeta.className = 'uw-pick-row-meta'
+    $('.uwf-contents .uw-pick-row')!.append(regularMeta)
 
     // Trigger search so BrowserContents renders <span class="uw-pick-row-meta uwf-path">
     await type($<HTMLInputElement>('.uwf-own-search')!, 'bud')
@@ -1314,7 +1340,7 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     // Switch workspace to w2
     children[''] = [entry('w2-doc', 'WorkspaceTwo.docx', { workspaceId: 'w2' })]
     await render({ workspaceId: 'w2' })
-    expect($('.uwf-crumb-current')?.textContent).toBe('UniWork')
+    expect($('.uwf-crumb-current')?.textContent).toBe('Documents (root)')
     expect(optionTitles()).toEqual(['WorkspaceTwo.docx'])
 
     // Late w1 reply resolves and must be ignored
@@ -1322,7 +1348,7 @@ describe('UniworkBrowser: folder actions (S3)', () => {
       releaseStaleW1(ok({ items: [entry('stale', 'StaleW1.docx')], nextCursor: null })),
     )
     await flush()
-    expect($('.uwf-crumb-current')?.textContent).toBe('UniWork')
+    expect($('.uwf-crumb-current')?.textContent).toBe('Documents (root)')
     expect(optionTitles()).toEqual(['WorkspaceTwo.docx'])
   })
 

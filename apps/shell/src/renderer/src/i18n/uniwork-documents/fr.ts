@@ -145,19 +145,22 @@ export const fr = {
   uwDocType: 'Type',
   uwDocLocation: 'Emplacement',
   uwDocRename: 'Renommer',
-  uwDocArchive: 'Archiver',
+  uwDocArchive: 'Mettre à la corbeille',
   uwDocRestore: 'Restaurer',
-  uwDocArchiveConfirm: 'Archiver « {name} » ? Vous pourrez le restaurer plus tard.',
+  uwDocArchiveConfirm:
+    '« {name} » et toute sa sous-arborescence resteront 30 jours dans la corbeille avant la suppression définitive. Les gestionnaires peuvent les restaurer pendant ce délai.',
   uwDocNameEmpty: 'Saisissez un nom de document.',
   uwDocNameTooLong: 'Le nom est trop long (500 caractères au maximum).',
   uwDocRenamedAnnounce: 'Le document a été renommé en {name}.',
   uwDocActionFailed: 'Cela n’a pas fonctionné. Réessayez.',
+  uwUniNoteOpenFailed:
+    'La UniNote a été créée, mais elle n’a pas pu être ouverte. Ouvrez-la depuis la liste.',
   uwDocActionsFor: 'Autres actions pour « {name} »',
   uwDocCreate: 'Créer',
   uwDocUploadPick: 'Choisir un fichier',
   uwDocUploading: 'Importation de « {name} »…',
   uwDocLocationTop: 'Niveau supérieur',
-  uwDocArchived: 'Archivé',
+  uwDocArchived: 'Mis à la corbeille',
   uwSizeWarnChip: 'Approche de la limite de {max} (actuellement {size}).',
   uwSizeWarnDismiss: 'Fermer l’avertissement de taille',
   uwSaveBlockTitle: 'Impossible d’enregistrer dans UniWork',
@@ -176,4 +179,37 @@ export const fr = {
   uwTipEditLockedSelf: 'Vous modifiez ce document dans une autre fenêtre.',
   uwErrEditLocked: 'Une autre personne modifie ce document.',
   uwReasonEditLocked: 'une autre personne modifie',
+  uwLockBannerOther: '{name} modifie depuis {time}. Vous consultez en lecture seule.',
+  uwLockBannerSelfElsewhere: 'Vous modifiez ce document dans une autre fenêtre.',
+  uwLockBannerFree: 'Personne ne modifie ce document pour le moment.',
+  uwLockEditHere: 'Modifier ici',
+  uwLockAcquiring: 'Obtention de l’accès en modification…',
+  uwLockReadOnlyExplain: 'Rien n’a été enregistré — le document est en lecture seule.',
+  uwLockLostTitle: 'Vous ne modifiez plus',
+  uwLockLostTakenOver:
+    '{name} a pris la modification. Vos changements non enregistrés sont toujours là.',
+  uwLockLostHandedOver:
+    'Vous avez confié la modification à {name}. Vos changements non enregistrés sont toujours là.',
+  uwLockLostExpired:
+    'La modification a expiré car le serveur était injoignable depuis un moment (pas de réseau ou l’appareil s’est mis en veille). Vos changements non enregistrés sont toujours là.',
+  uwLockLostMovedHere:
+    'Vous modifiez maintenant ce document dans une autre fenêtre. Les changements non enregistrés de cette fenêtre sont toujours là.',
+  uwLockLostAccessLost:
+    'Vous n’avez plus l’autorisation de modifier ce document. Vos changements non enregistrés sont toujours là.',
+  uwLockLostGeneric: 'Vous ne modifiez plus. Vos changements non enregistrés sont toujours là.',
+  uwLockLostHeldBy:
+    '{name} modifie actuellement. Vos changements non enregistrés sont toujours là.',
+  uwLockAcquireFailed:
+    'Impossible d’obtenir l’accès en modification. Réessayez dans quelques minutes.',
+  uwChipSourceView: 'Lecture seule · Depuis {origin}',
+  uwTipSourceView:
+    'Ce fichier est joint dans {origin}{parent}. Les modifications ne seront pas enregistrées. Pour en obtenir une copie, utilisez Télécharger dans la liste des documents.',
+  uwSourceViewSaveHint:
+    'Ce fichier est en lecture seule — les modifications ne sont pas enregistrées.',
+  uwSourceViewCopyHint:
+    'Pour en obtenir une copie, utilisez Télécharger dans la liste des documents.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Tâches',
+  uwSourceOriginMeeting: 'Réunions',
+  uwSourceOriginEmail: 'E-mail',
 } satisfies Record<keyof typeof zh, string>

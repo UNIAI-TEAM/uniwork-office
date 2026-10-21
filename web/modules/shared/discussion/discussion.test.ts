@@ -132,7 +132,11 @@ describe('frame claim per module (D4)', () => {
       slides: false,
       pdf: false,
     })
-    expect(frameCommentsClaim(true)).toEqual({ comments: true, commentsShareView: true })
+    expect(frameCommentsClaim(true)).toEqual({
+      comments: true,
+      commentsShareView: true,
+      commentsViewVersion: true,
+    })
     expect(frameCommentsClaim(false)).toEqual({})
   })
 

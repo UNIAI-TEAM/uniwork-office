@@ -116,6 +116,7 @@ describe('handshake', () => {
         uniworkAi: false,
         comments: false,
         commentsShareView: false,
+        commentsViewVersion: false,
         sizeUi: false,
       },
     })

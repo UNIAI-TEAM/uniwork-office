@@ -26,6 +26,8 @@ export const fr = {
   appScLineBreak: 'Saut de ligne',
   appScNbsp: 'Espace insécable',
   appScNbHyphen: "Trait d'union insécable",
+  appScFindNext: 'Rechercher suivant',
+  appScOptHyphen: 'Trait d’union conditionnel',
   appScGrowFont1: 'Augmenter la police de 1 pt',
   appScShrinkFont1: 'Réduire la police de 1 pt',
   appScListDemote: 'Abaisser le niveau de liste',
@@ -221,7 +223,7 @@ export const fr = {
   appAutoSave: 'Enregistrement automatique',
   appAutoSaveTip:
     'Enregistrement automatique (toutes les 30 secondes et lorsque la fenêtre perd le focus)',
-  appSaveShortcutTip: 'Enregistrer (⌘S)',
+  appSaveShortcutTip: 'Enregistrer ({keys})',
   appUndo: 'Annuler',
   appRedo: 'Rétablir',
   appStartOpening: 'Ouverture…',
@@ -559,9 +561,14 @@ export const fr = {
   appOnlyEncrypted: '« {name} » est protégé par un mot de passe et ne peut pas être ouvert ici.',
   appFileExportPdf: 'Exporter en PDF…',
   appFilePrint: 'Imprimer…',
+  appPrintNoDocument: 'Ouvrez un document pour l’imprimer.',
   appPrintNoPrinter:
     "Aucune imprimante n'est disponible sur cet ordinateur. Vous pouvez enregistrer le document au format PDF à la place.",
   appPrintFailedPdfHint:
     "L'impression a échoué : {error}. Vous pouvez enregistrer le document au format PDF à la place.",
   appPrintSaveAsPdf: 'Enregistrer en PDF…',
+  appFileSaveCopy: 'Enregistrer une copie…',
+  appCopySaved: 'Votre version a été enregistrée comme nouveau document : {title}.',
+  appCopySaveFailed:
+    'Impossible de créer la copie. Vos modifications sont toujours en sécurité ; réessayez.',
 } satisfies Record<keyof typeof zh, string>

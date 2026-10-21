@@ -1,6 +1,6 @@
 import {
   aiUniworkText,
-  isUniworkQuestionRefusal,
+  isUniworkRefusalErrorKey,
   aiPanelWidthAtPointer,
   AiPanelSideButton,
   AiModelPicker,
@@ -17,6 +17,7 @@ import {
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
+  useOverlayDock,
 } from '@genoffice/ui'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
@@ -102,7 +103,7 @@ import { createElectronTransport } from './transport'
 import { workedStepsLabel } from './worked-steps'
 import { docHasAiMarks } from '../editor/ai-marker'
 import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from '../i18n/locale'
-import { AiErrorAction, Markdown, uniworkErrorForChip, useAiModelNeedHint } from '@genoffice/ui'
+import { AiErrorAction, Markdown, uniworkErrorForEntry, useAiModelNeedHint } from '@genoffice/ui'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import { AiSaveDraftCard } from '@genoffice/ui'
 import {
@@ -126,6 +127,7 @@ import fileDocumentIcon from '../assets/file-document.png'
 import fileGeneralIcon from '../assets/file-general.png'
 import { IconGear, IconNewChat, IconSidebarCollapse } from '../components/icons'
 import { cap } from '../capabilities'
+import { docsUniworkBoundForAi } from '../uniwork-doc-state'
 
 interface ToolActivity {
   name: string
@@ -160,6 +162,8 @@ interface ChatEntry {
   role: 'user' | 'assistant'
   text: string
   error?: string
+  /** the S9 key the transport chose for `error` (UniWork AI); absent for any other failure */
+  errorKey?: string
   streaming?: boolean
   turnLimit?: boolean
   stopped?: boolean
@@ -418,6 +422,8 @@ interface AiPanelProps {
   preset?: { text: string; nonce: number; autoRun?: boolean } | null
   /** false shows only the collapsed rail; the component stays mounted so panel state survives */
   open?: boolean
+  /** the dock is hidden by the frame (Read Mode): it is not an active dialog, whatever `open` says */
+  dockHidden?: boolean
   /** true suppresses even the collapsed rail (the "show the AI sidebar" setting is off) */
   hideRail?: boolean
   /** expand from the collapsed rail */
@@ -475,6 +481,7 @@ export function AiPanel({
   numIdFallback,
   preset,
   open = true,
+  dockHidden = false,
   hideRail = false,
   onExpand,
   onCollapse,
@@ -635,6 +642,13 @@ export function AiPanel({
   const [panelWidth, setPanelWidth] = useState(() => clampPanelWidth(preferredWidthRef.current))
   const [resizing, setResizing] = useState(false)
   const asideRef = useRef<HTMLElement>(null)
+  // under 900 px the dock overlays the document: modal dialog, composer focus, Esc, focus return
+  useOverlayDock({
+    rootRef: asideRef,
+    open: open && !dockHidden,
+    onClose: () => onCollapse?.(),
+    label: t('aiPanelTitle'),
+  })
 
   // The .ai-dock wrapper owns the animated width (Excel-parity 180ms slide);
   // it tracks the resizable panel width through this variable
@@ -1015,7 +1029,8 @@ export function AiPanel({
           () => notesAccessRef.current,
           () => mediaAnalysisAvailable(settingsRef.current, gskLoggedInRef.current),
           () => readOnlyRef.current,
-          () => boundRef.current,
+          // the adapter bound feeds the AI through the shared rule: a web frame reads as bound
+          () => docsUniworkBoundForAi(boundRef.current ?? false),
           () => askClarification,
           () => protectionRef.current,
           // an image URL the AI inserts must come from this run's image_search / generate_image or
@@ -1157,10 +1172,10 @@ export function AiPanel({
             persistMessage('assistant', finalText, runToolsRef.current)
           }
         },
-        onError: (error) => {
+        onError: (error, errorKey) => {
           // a refused question (too long, rejected) was not answered: it goes back into the composer
           // to be shortened or fixed, as the message says
-          if (isUniworkQuestionRefusal(error))
+          if (isUniworkRefusalErrorKey(errorKey))
             setInput((current) => current || lastInstructionRef.current)
           setChat((prev) => {
             const next = [...prev]
@@ -1169,6 +1184,7 @@ export function AiPanel({
               next[next.length - 1] = {
                 ...last,
                 streaming: false,
+                errorKey,
                 waitLine: undefined,
                 error,
                 tools: last.tools?.filter((tl) => !tl.running),
@@ -1747,10 +1763,9 @@ export function AiPanel({
                   stopped: Boolean(lastEntry.stopped),
                   hasStreamedText: lastEntry.streamedText ?? Boolean(lastEntry.text?.trim()),
                   clarifyAsked: Boolean(lastEntry.clarifyReceipts?.length),
-                  notes: lastEntry.notes,
                   droppedToolCalls: droppedCallsOfNotes(lastEntry.notes),
                   toolExecutions: lastEntry.tools,
-                  error: uniworkErrorForChip(lastEntry.error),
+                  error: uniworkErrorForEntry(lastEntry.errorKey, lastEntry.error),
                 }
               : null,
         })
@@ -1927,10 +1942,9 @@ export function AiPanel({
               stopped: Boolean(entry.stopped),
               hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
               clarifyAsked: Boolean(entry.clarifyReceipts?.length),
-              notes: entry.notes,
               droppedToolCalls: droppedCallsOfNotes(entry.notes),
               toolExecutions: entry.tools,
-              error: uniworkErrorForChip(entry.error),
+              error: uniworkErrorForEntry(entry.errorKey, entry.error),
             },
           )
           const chip = chipView?.chip ?? null
@@ -2120,7 +2134,7 @@ export function AiPanel({
                     !busy &&
                     lastInstructionRef.current &&
                     !aiNoticeKind(entry.error) &&
-                    !isUniworkQuestionRefusal(entry.error) &&
+                    !isUniworkRefusalErrorKey(entry.errorKey) &&
                     // the labelled "Thử lại" under the error line is the retry of an error turn
                     chip?.errorLine?.action !== 'retry' && (
                       <button

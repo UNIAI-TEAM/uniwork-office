@@ -7,7 +7,7 @@
  * use-collab-threads.ts, uniwork-source.ts, CollabPanel.tsx, CollabThread.tsx, strings.ts,
  * live-region.ts); `type-checks/ui-collab-shim.ts` fails `npm run typecheck` when they drift.
  */
-import type { ReactElement, ReactNode } from 'react'
+import type { Provider, ReactElement, ReactNode } from 'react'
 import type { Lang } from '@genoffice/i18n'
 
 export type CollabLevel = 'view' | 'comment' | 'edit' | 'manage'
@@ -29,6 +29,9 @@ export interface CollabComment {
   revision?: number | undefined
   anchor?: CollabAnchor | null | undefined
   anchor_state?: string | null | undefined
+  anchor_version_id?: string | null | undefined
+  /** the ordinal of `anchor_version_id`; null when the version row is gone */
+  anchor_version_no?: number | null | undefined
   resolved_at?: string | null | undefined
   deleted_at?: string | null | undefined
   created_at?: string | undefined
@@ -194,6 +197,15 @@ export interface UniworkCommentsLike {
   canListMembers?: boolean
 }
 
+/** the picture source of a frame (`@genoffice/ui/collab` avatar-source) */
+export interface AvatarSource {
+  load(url: string, signal: AbortSignal): Promise<string | null>
+  dispose?(): void
+}
+export const AvatarSourceProvider: Provider<AvatarSource | null>
+/** the avatar source of this web frame (null on desktop); disposed when the host unmounts */
+export function useFrameAvatarSource(): AvatarSource | null
+
 export function createUniworkCommentsSource(
   api: UniworkCommentsLike,
   path: string,
@@ -256,11 +268,22 @@ export interface CollabController {
   startThread(p: CollabNewThread): void
   cancelThread(): void
   reload(): Promise<void>
+  freshComments(): Promise<readonly CollabComment[]>
   reveal(commentId: string): Promise<{ revealed: boolean }>
 }
 
+/** the host opens version `versionNo` read-only; `opened: false` (or a throw) shows the unavailable line */
+export type CollabViewVersion = (req: {
+  commentId: string
+  versionNo: number
+}) => Promise<{ opened: boolean }> | { opened: boolean } | void
+
 export interface CollabControllerOptions {
   adapter?: CollabAnchorAdapter | undefined
+  /** the id of the version the editor shows: a lost comment anchored on it is located like any other */
+  openVersionId?: string | undefined
+  /** opens version N read-only for a lost comment; absent: no "View in version N" action */
+  onViewVersion?: CollabViewVersion | undefined
   strings?: CollabStrings | undefined
 }
 

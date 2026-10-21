@@ -63,6 +63,11 @@ import {
 import { CropOverlay } from './CropOverlay'
 import { createImageLoader } from './image-loader'
 import { runHeadlessPdfExport } from './headless-export'
+import {
+  slidesExplainReadOnlySave,
+  useSlidesUniworkState,
+  type SlidesUniworkSeam,
+} from './uniwork-state'
 import { syncPrivateFonts } from './doc-fonts'
 import { toPickerHex } from './color-input'
 import { InkOverlay } from './InkOverlay'
@@ -159,7 +164,7 @@ import type {
 import type { PathCmd } from './edit-points'
 import { createPreviewTracker, type EditPointsCommit } from './edit-points-actions'
 import { FIT_WIDTH, NARROW_FRAME_PX } from './app-constants'
-import { aiDockShouldYield, useWindowWidth } from './narrow-dock'
+import { aiDockShouldYield, COMMENTS_PANE_PX, useWindowWidth } from './narrow-dock'
 import { StageRuler } from './components/StageRuler'
 import { formatRulerValue, type RulerUnit } from './ruler-ticks'
 import * as fileActions from './file-actions'
@@ -178,6 +183,8 @@ import * as arrangeActions from './arrange-actions'
 import * as tableActions from './table-actions'
 import * as styleActions from './style-actions'
 import { handleGlobalKeydown, slideRailHasFocus } from './keyboard-actions'
+import { readingNavKey } from './show-keys'
+import { shortcutPlatform, shortcutSurface } from './shortcuts'
 import { clickSelection, currentAfterHistory, normalizeSelection } from '../shared/slide-selection'
 import {
   notesBaselineAfterFlush,
@@ -507,25 +514,9 @@ export function App() {
   // UniWork working copy: AutoSave is forced off (UniWork only takes explicit saves) and a
   // view-only document opens in Reading view with Save disabled. Re-queried per path
   // (open, Save As, rename); the stored AutoSave preference itself is left untouched.
-  const [uniwork, setUniwork] = useState({ bound: false, readOnly: false })
+  const uniwork = useSlidesUniworkState(window.slidesApi as SlidesUniworkSeam, path)
   const uniworkRef = useRef(uniwork)
   uniworkRef.current = uniwork
-  useEffect(() => {
-    let live = true
-    if (!path) {
-      setUniwork({ bound: false, readOnly: false })
-      return
-    }
-    void window.slidesApi
-      .uniworkState?.()
-      .then((s) => {
-        if (live && s) setUniwork({ bound: !!s.bound, readOnly: !!s.readOnly })
-      })
-      .catch(() => {})
-    return () => {
-      live = false
-    }
-  }, [path])
   const [commentsContext, setCommentsContext] = useState<SlidesCommentsContext | null>(null)
   const commentsBridgeApi = useMemo(() => commentsBridge(), [])
   useEffect(() => {
@@ -998,7 +989,7 @@ export function App() {
       // Fetch the layout list asynchronously (doesn't block opening)
       void window.slidesApi.getLayouts().then((r) => setLayoutsResult(r))
     },
-    [fitZoom],
+    [],
   )
 
   const setSelectedId = useCallback((id: string | null, additive = false) => {
@@ -1046,14 +1037,15 @@ export function App() {
   /** Set while the AI annotation popover is open (assigned below, next to askState) */
   const askOpenRef = useRef(false)
 
-  const save = useCallback(
-    (quiet = false, origin: 'user' | 'auto' = 'user'): Promise<boolean> =>
-      // a view-only UniWork document has no Save (the main process refuses it too)
-      uniworkRef.current.readOnly
-        ? Promise.resolve(false)
-        : fileActions.save(() => ctxRef.current, quiet, origin),
-    [],
-  )
+  const save = useCallback((quiet = false, origin: 'user' | 'auto' = 'user'): Promise<boolean> => {
+    // a view-only UniWork document has no Save (the main process refuses it too);
+    // an explicit Save on a bound read-only deck asks main to explain the lock
+    if (uniworkRef.current.readOnly) {
+      slidesExplainReadOnlySave(window.slidesApi as SlidesUniworkSeam, uniworkRef.current, origin)
+      return Promise.resolve(false)
+    }
+    return fileActions.save(() => ctxRef.current, quiet, origin)
+  }, [])
 
   // Close guard (closing tab/window) chose "Save": run the full save flow and report the result
   useEffect(() => {
@@ -2229,8 +2221,16 @@ export function App() {
     setSelectedIds([])
     setCtxMenu(null)
   }, [])
+  const prevReadOnlyRef = useRef(false)
   useEffect(() => {
-    if (!uniwork.readOnly) return
+    const wasReadOnly = prevReadOnlyRef.current
+    prevReadOnlyRef.current = uniwork.readOnly
+    if (!uniwork.readOnly) {
+      // EL-1(b): the deck became editable again (e.g. "Edit here" acquired the
+      // lock) — leave the Reading view that read-only forced on it
+      if (wasReadOnly) setViewMode((m) => (m === 'reading' ? 'normal' : m))
+      return
+    }
     setViewMode('reading')
     setEditing(null)
     setEditingCell(null)
@@ -2276,21 +2276,17 @@ export function App() {
         )
       )
         return
-      if (e.key === 'Escape') {
+      // the slide show's next / previous / end keys (show-keys.ts)
+      const nav = readingNavKey(e, shortcutPlatform(), shortcutSurface())
+      if (nav === 'exit') {
         if (!uniworkRef.current.readOnly) {
           e.preventDefault()
           setViewMode('normal')
         }
-      } else if (
-        e.key === 'ArrowRight' ||
-        e.key === 'ArrowDown' ||
-        e.key === ' ' ||
-        e.key === 'PageDown' ||
-        e.key === 'Enter'
-      ) {
+      } else if (nav === 'next') {
         e.preventDefault()
         setCurrent((c) => Math.min(c + 1, slides.length - 1))
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+      } else if (nav === 'prev') {
         e.preventDefault()
         setCurrent((c) => Math.max(c - 1, 0))
       }
@@ -3339,9 +3335,9 @@ export function App() {
     setChartDataDialogOpen,
     setFindOpen,
     setPrintDlgOpen,
-    openAskPopover,
     zoom,
     setZoom,
+    zoomToFit,
     masterItems,
     layouts: layoutsResult?.layouts ?? null,
     showRuler,
@@ -3804,6 +3800,7 @@ export function App() {
                   settings={aiSettings}
                   preset={aiPreset}
                   open={aiDockOpen}
+                  dockHidden={!!slideShow || !!presenter}
                   onExpand={toggleAi}
                   onCollapse={toggleAi}
                   onUndo={() => void undo()}
@@ -3875,84 +3872,97 @@ export function App() {
               (() => {
                 // Reading view: page fills the available area, click/arrow keys to turn pages, Esc to exit
                 const availH = Math.max(240, winSize.h - 40 - 112 - 24 - 76)
-                const availW = Math.max(320, winSize.w - 120)
+                const availW = Math.max(
+                  320,
+                  winSize.w - 120 - (showComments && serverComments ? COMMENTS_PANE_PX : 0),
+                )
                 const readW = Math.round(
                   Math.min(availW, availH * (slide.widthPx / slide.heightPx)),
                 )
                 return (
-                  <div className="reading-view">
-                    <div
-                      className="reading-slide"
-                      data-tip={t('appReadingSlideTitle')}
-                      onClick={() => setCurrent((c) => Math.min(c + 1, slides.length - 1))}
-                    >
-                      <SlideThumb slide={slide} images={images} width={readW} />
-                    </div>
-                    <div className="reading-bar">
-                      <button
-                        disabled={current === 0}
-                        onClick={() => setCurrent((c) => Math.max(c - 1, 0))}
-                      >
-                        {t('appReadingPrev')}
-                      </button>
-                      <span className="reading-page">
-                        {current + 1} / {slides.length}
-                      </span>
-                      <button
-                        disabled={current === slides.length - 1}
+                  <>
+                    <div className="reading-view">
+                      <div
+                        className="reading-slide"
+                        data-tip={t('appReadingSlideTitle')}
                         onClick={() => setCurrent((c) => Math.min(c + 1, slides.length - 1))}
                       >
-                        {t('appReadingNext')}
-                      </button>
-                      {!uniwork.readOnly && (
-                        <button className="reading-exit" onClick={() => onViewMode('normal')}>
-                          {t('appReadingExit')}
+                        <SlideThumb slide={slide} images={images} width={readW} />
+                      </div>
+                      <div className="reading-bar">
+                        <button
+                          disabled={current === 0}
+                          onClick={() => setCurrent((c) => Math.max(c - 1, 0))}
+                        >
+                          {t('appReadingPrev')}
                         </button>
-                      )}
+                        <span className="reading-page">
+                          {current + 1} / {slides.length}
+                        </span>
+                        <button
+                          disabled={current === slides.length - 1}
+                          onClick={() => setCurrent((c) => Math.min(c + 1, slides.length - 1))}
+                        >
+                          {t('appReadingNext')}
+                        </button>
+                        {!uniwork.readOnly && (
+                          <button className="reading-exit" onClick={() => onViewMode('normal')}>
+                            {t('appReadingExit')}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                    {showComments && serverComments && (
+                      <div className="comments-slot" ref={setServerCommentsSlot} />
+                    )}
+                  </>
                 )
               })()
             ) : viewMode === 'sorter' ? (
-              <div
-                className="sorter-view"
-                role="listbox"
-                tabIndex={0}
-                ref={sorterViewRef}
-                onContextMenu={(e) => onGapContextMenu(e, true)}
-              >
-                {slides.map((s, i) => (
-                  <div
-                    key={i}
-                    data-index={i}
-                    role="option"
-                    aria-selected={selectedSlides.includes(i)}
-                    className={`sorter-item ${i === current ? 'active' : selectedSlides.includes(i) ? 'selected' : ''} ${s.hidden ? 'thumb-hidden' : ''}${thumbDragCls(i)}`}
-                    data-tip={s.hidden ? t('appSorterHiddenTitle') : t('appSorterItemTitle')}
-                    {...thumbDragProps(i, true)}
-                    onClick={(e) => selectThumb(i, e)}
-                    onDoubleClick={() => {
-                      selectThumb(i)
-                      onViewMode('normal')
-                    }}
-                    onContextMenu={(e) => openThumbMenu(i, e)}
-                  >
-                    {visibleSorterItems.has(i) ? (
-                      <SlideThumb slide={s} images={images} width={208} />
-                    ) : (
-                      <div className="thumb-placeholder" style={thumbBox(s, 208)} />
-                    )}
-                    <span className="sorter-num">{i + 1}</span>
-                    {pasteFloater?.index === i && (
-                      <PasteOptionsFloater
-                        mode={pasteFloater.mode}
-                        onSelect={repasteSlideAs}
-                        onDismiss={() => setPasteFloater(null)}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
+              <>
+                <div
+                  className="sorter-view"
+                  role="listbox"
+                  tabIndex={0}
+                  ref={sorterViewRef}
+                  onContextMenu={(e) => onGapContextMenu(e, true)}
+                >
+                  {slides.map((s, i) => (
+                    <div
+                      key={i}
+                      data-index={i}
+                      role="option"
+                      aria-selected={selectedSlides.includes(i)}
+                      className={`sorter-item ${i === current ? 'active' : selectedSlides.includes(i) ? 'selected' : ''} ${s.hidden ? 'thumb-hidden' : ''}${thumbDragCls(i)}`}
+                      data-tip={s.hidden ? t('appSorterHiddenTitle') : t('appSorterItemTitle')}
+                      {...thumbDragProps(i, true)}
+                      onClick={(e) => selectThumb(i, e)}
+                      onDoubleClick={() => {
+                        selectThumb(i)
+                        onViewMode('normal')
+                      }}
+                      onContextMenu={(e) => openThumbMenu(i, e)}
+                    >
+                      {visibleSorterItems.has(i) ? (
+                        <SlideThumb slide={s} images={images} width={208} />
+                      ) : (
+                        <div className="thumb-placeholder" style={thumbBox(s, 208)} />
+                      )}
+                      <span className="sorter-num">{i + 1}</span>
+                      {pasteFloater?.index === i && (
+                        <PasteOptionsFloater
+                          mode={pasteFloater.mode}
+                          onSelect={repasteSlideAs}
+                          onDismiss={() => setPasteFloater(null)}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {showComments && serverComments && (
+                  <div className="comments-slot" ref={setServerCommentsSlot} />
+                )}
+              </>
             ) : (
               <>
                 {viewMode === 'outline' ? (

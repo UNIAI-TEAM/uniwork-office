@@ -292,6 +292,90 @@ describe('SyncCenterPane', () => {
     expect(onSignIn).toHaveBeenCalledTimes(1)
   })
 
+  it('guide/details disclosures link their trigger to the revealed text (aria-expanded + aria-controls)', async () => {
+    await render(
+      fakeApi(
+        snapshot({
+          tabs: {
+            attention: [
+              row('st', 'reconciling', { reconcileAttempts: 2 }),
+              row('f', 'failed', { failedReason: 'quota' }),
+            ],
+            pending: [],
+            recent: [],
+          },
+        }),
+      ),
+    )
+    const guide = button(vi_.uwActGuide!, rowEl('st'))
+    expect(guide.getAttribute('aria-expanded')).toBe('false')
+    expect(guide.hasAttribute('aria-controls')).toBe(false)
+    await click(guide)
+    const region = rowEl('st').querySelector('.sc-more-text')!
+    expect(region.textContent).toBe(vi_.uwTipReconciling)
+    expect(region.id).toBeTruthy()
+    expect(guide.getAttribute('aria-expanded')).toBe('true')
+    expect(guide.getAttribute('aria-controls')).toBe(region.id)
+
+    const details = button(vi_.uwActDetails!, rowEl('f'))
+    await click(details)
+    const detailText = rowEl('f').querySelector('.sc-more-text')!
+    expect(detailText.id).toBeTruthy()
+    expect(details.getAttribute('aria-controls')).toBe(detailText.id)
+    // the first disclosure closes when the second opens: its link is dropped
+    expect(rowEl('st').querySelector('.sc-more-text')).toBeNull()
+    expect(guide.getAttribute('aria-expanded')).toBe('false')
+    expect(guide.hasAttribute('aria-controls')).toBe(false)
+  })
+
+  it('narrow: the "…" menu disclosure entries carry expanded/controls for the same region', async () => {
+    stubNarrow()
+    await render(
+      fakeApi(
+        snapshot({
+          tabs: {
+            attention: [row('st', 'reconciling', { reconcileAttempts: 2 })],
+            pending: [],
+            recent: [],
+          },
+        }),
+      ),
+    )
+    const cell = rowEl('st').querySelector('.sc-actions')!
+    await click(button(fill(vi_.uwSyncMoreActions!, { doc: 'Tài liệu st' }), cell))
+    const items = Array.from(host.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+    expect(items.map((el) => el.textContent)).toEqual([vi_.uwActGuide])
+    const guide = items[0]!
+    expect(guide.getAttribute('aria-expanded')).toBe('false')
+    await click(guide)
+    const region = rowEl('st').querySelector('.sc-more-text')!
+    expect(region.id).toBeTruthy()
+    // reopened, the menu reports the open disclosure and points at its text
+    await click(button(fill(vi_.uwSyncMoreActions!, { doc: 'Tài liệu st' }), rowEl('st')))
+    const guide2 = host.querySelector<HTMLElement>('[role="menuitem"]')!
+    expect(guide2.getAttribute('aria-expanded')).toBe('true')
+    expect(guide2.getAttribute('aria-controls')).toBe(region.id)
+  })
+
+  it('an unknown upload total is an indeterminate progressbar, not a zero maximum', async () => {
+    await render(
+      fakeApi(
+        snapshot({
+          tabs: {
+            attention: [row('up', 'uploading', { progress: { done: 0, total: 0 } })],
+            pending: [],
+            recent: [],
+          },
+        }),
+      ),
+    )
+    const bar = rowEl('up').querySelector('[role="progressbar"]')!
+    expect(bar).not.toBeNull()
+    expect(bar.hasAttribute('aria-valuemax')).toBe(false)
+    expect(bar.hasAttribute('aria-valuenow')).toBe(false)
+    expect(bar.hasAttribute('aria-valuetext')).toBe(false)
+  })
+
   it('Gửi ngay offline stays in the Tab order, aria-disabled with its reason, and does not run', async () => {
     const s = snapshot({ tabs: { attention: [], pending: [row('q', 'queued')], recent: [] } })
     s.header = { ...s.header, online: false, status: 'offline' }
@@ -683,6 +767,21 @@ describe('SyncCenterPane live announcements (FE-1, FE-5, FE-6, FE-9)', () => {
     expect(status().textContent).toContain(vi_.uwSyncOffline!.split('{')[0]!.trim())
   })
 
+  it('UNI-1958 row 8: offline status line reads "Đang offline" (vi), with and without a sync time', async () => {
+    const off = snapshot()
+    off.header = { ...off.header, online: false, status: 'offline' }
+    await render(fakeApi(off))
+    expect(host.querySelector('.sc-status-line')!.textContent).toMatch(
+      /^Đang offline · lần đồng bộ cuối /,
+    )
+    const noTime = snapshot()
+    noTime.header = { ...noTime.header, online: false, status: 'offline', lastSyncAt: undefined }
+    act(() => root.unmount())
+    root = createRoot(host)
+    await render(fakeApi(noTime))
+    expect(host.querySelector('.sc-status-line')!.textContent).toBe('Đang offline')
+  })
+
   it('BE-2n-3: a session with no verdict yet shows the online line without a dangling time', async () => {
     const s = snapshot()
     s.header = { ...s.header, lastSyncAt: undefined }
@@ -763,6 +862,66 @@ describe('SyncCenterPane live announcements (FE-1, FE-5, FE-6, FE-9)', () => {
     expect(status().textContent).toBe(
       fill(vi_.uwSyncRowAnnounce!, { doc: 'Tài liệu stuck', state: vi_.uwBadgeBlocked! }),
     )
+  })
+
+  it('B54: an unrelated snapshot keeps the mark — the row own change is not re-announced', async () => {
+    const api = fakeApi(snapshot())
+    await render(api)
+    await click(button(vi_.uwActRecheck!, rowEl('stuck')))
+    // an unrelated push (header time moved, row badge unchanged) arrives first
+    const unrelated = snapshot()
+    unrelated.header = { ...unrelated.header, lastSyncAt: '2026-10-15T08:45:00.000Z' }
+    await act(async () => api.push(unrelated))
+    expect(status().textContent).toBe('')
+    // then the row's own state change arrives: still the user's own, not announced
+    await act(async () =>
+      api.push(
+        withAttention(
+          row('stuck', 'failed', { failedReason: 'quota' }),
+          row('draft', 'kept_draft'),
+        ),
+      ),
+    )
+    expect(status().textContent).toBe('')
+    // the mark ended with the row's own transition: the next change announces again
+    await act(async () =>
+      api.push(
+        withAttention(
+          row('stuck', 'blocked', { blockedReason: 'session_expired' }),
+          row('draft', 'kept_draft'),
+        ),
+      ),
+    )
+    expect(status().textContent).toBe(
+      fill(vi_.uwSyncRowAnnounce!, { doc: 'Tài liệu stuck', state: vi_.uwBadgeBlocked! }),
+    )
+  })
+
+  it('B52: Sync now and Pause are guarded while a header call is pending', async () => {
+    const api = fakeApi(snapshot())
+    let finish!: () => void
+    api.syncNow.mockImplementationOnce(
+      () => new Promise<SyncCenterActionResult>((res) => (finish = () => res({ ok: true }))),
+    )
+    await render(api)
+    const nowBtn = button(vi_.uwSyncNow!)
+    await act(async () => nowBtn.click())
+    expect(api.syncNow).toHaveBeenCalledTimes(1)
+    expect(nowBtn.getAttribute('aria-disabled')).toBe('true')
+    expect(nowBtn.getAttribute('aria-busy')).toBe('true')
+    const pauseBtn = button(vi_.uwSyncPause!)
+    expect(pauseBtn.getAttribute('aria-disabled')).toBe('true')
+    // rapid clicks while the call is pending do nothing
+    await act(async () => nowBtn.click())
+    await act(async () => pauseBtn.click())
+    expect(api.syncNow).toHaveBeenCalledTimes(1)
+    expect(api.setSendingPaused).not.toHaveBeenCalled()
+    await act(async () => finish())
+    await flush()
+    expect(button(vi_.uwSyncNow!).getAttribute('aria-disabled')).toBeNull()
+    await click(button(vi_.uwSyncPause!))
+    expect(api.setSendingPaused).toHaveBeenCalledTimes(1)
+    expect(api.setSendingPaused).toHaveBeenCalledWith(true)
   })
 
   it('the same refusal twice in a row is announced twice', async () => {
@@ -1089,5 +1248,57 @@ describe('SyncCenterPane visual review fixes (VIS-1..VIS-8)', () => {
     await render(api)
     expect(host.querySelector('.sc-store-error')).not.toBeNull()
     expect(host.querySelector('.sc-header')).toBeNull()
+  })
+})
+
+describe('UNI-2047 B5: the sync tables read in the shared table style', () => {
+  const css = readFileSync(resolve(__dirname, '../src/renderer/src/sync-center.css'), 'utf8')
+  const ruleBody = (selector: string): string => {
+    const at = css.indexOf(`${selector} {`)
+    if (at < 0) throw new Error(`no css rule "${selector}"`)
+    return css.slice(css.indexOf('{', at), css.indexOf('}', at))
+  }
+
+  it('the table sits in a bordered, rounded frame like the document tables', async () => {
+    await render(fakeApi(snapshot()))
+    const table = host.querySelector('table.sc-table')!
+    expect(table.parentElement?.classList.contains('sc-table-wrap')).toBe(true)
+    const frame = ruleBody('.sc-table-wrap')
+    expect(frame).toContain('border: 1px solid var(--border)')
+    expect(frame).toContain('border-radius: 10px')
+    expect(frame).toContain('background: var(--surface)')
+    expect(frame).toContain('overflow: hidden')
+  })
+
+  it('the header is 36px with the shared 11.5px / 600 secondary text', () => {
+    const head = ruleBody('.sc-table thead th')
+    expect(head).toContain('height: 36px')
+    expect(head).toContain('padding: 0 8px')
+    expect(head).toContain('font-size: 11.5px')
+    expect(head).toContain('font-weight: 600')
+    expect(head).toContain('background: var(--surface-subtle)')
+    expect(head).toContain('color: var(--text-secondary)')
+    expect(head).toContain('border-bottom: 1px solid var(--border)')
+  })
+
+  it('a row is at least 52px, centred, with the shared hover and no rule under the last one', () => {
+    expect(ruleBody('.sc-row')).toContain('height: 52px')
+    expect(ruleBody('.sc-row > th,\n.sc-row > td')).toContain('vertical-align: middle')
+    expect(ruleBody('.sc-row > th,\n.sc-row > td')).not.toContain('background')
+    expect(ruleBody('.sc-row:hover,\n.sc-row:focus-within')).toContain('background: var(--hover)')
+    expect(ruleBody('.sc-row:last-child > th,\n.sc-row:last-child > td')).toContain(
+      'border-bottom: 0',
+    )
+  })
+
+  it('the document name reads like the shared name cell (13px / 600)', () => {
+    expect(ruleBody('.sc-doc')).toContain('font-weight: 600')
+    expect(ruleBody('.sc-doc-btn')).toContain('font-size: 13px')
+    expect(ruleBody('.sc-doc-btn')).toContain('font-weight: 600')
+    expect(ruleBody('.sc-doc-btn')).toContain('color: var(--text)')
+  })
+
+  it('the narrow card layout keeps the frame and takes the last row rule off', () => {
+    expect(css).toContain('.sc.is-narrow .sc-row:last-child')
   })
 })

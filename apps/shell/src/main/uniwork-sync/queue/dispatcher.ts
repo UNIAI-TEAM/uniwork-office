@@ -1,6 +1,7 @@
-﻿import { randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import type { CommitLookup } from '../../uniwork-docs/parse'
 import { UniworkDocError } from '../../uniwork-docs/errors'
+import type { UniworkDocEditLock } from '../../../shared/home-api'
 import {
   DEFAULT_DOCUMENT_LIMITS,
   type DocumentLimits,
@@ -62,6 +63,8 @@ export interface QueueClient {
     uploadId: string
     baseRevision: string
     idempotencyKey: string
+    /** EL-1(b): the held lock of this path; omitted when none */
+    editLockId?: string
   }): Promise<{
     documentId: string
     versionId: string
@@ -179,6 +182,17 @@ export interface QueueDispatcherDeps {
   /** status push for every record change; the front maps a record to a chip */
   publish(record: IntentRecordV2): void
   uuid?(): string
+  /**
+   * EL-1(b): Q2 — await the path's lock session before the first queued commit
+   * when it is 'unreachable'. 'park' = 423, treat as edit_locked (no commit).
+   */
+  prepareEditLock?(path: string): Promise<'held' | 'park' | 'proceed'>
+  /** EL-1(b): current lock id of a held path (outgoing commit body) */
+  editLockId?(path: string): string | null
+  /** EL-1(b) B8: holder summary for a synthesised park 423 */
+  editLockHolder?(path: string): UniworkDocEditLock | null
+  /** EL-1(b): a 423 on commit while we held — session becomes 'lost' */
+  onCommitEditLocked?(path: string, error: UniworkDocError): void
 }
 
 /** what one pass did, for the caller (tests and the poll) */
@@ -231,6 +245,21 @@ export class QueueDispatcher {
   /** whether another window holds the document lock (this window is read-only) */
   isOtherWindow(key: string): boolean {
     return this.otherWindow.has(key)
+  }
+
+  /**
+   * A32 (UNI-1362): whether another window holds this document's lease right
+   * now, read from the durable lock file rather than this window's in-memory
+   * set (which only a dispatch clears). A lock whose state cannot be read
+   * answers true, so a caller revalidating its read-only status keeps it instead
+   * of clearing it on a guess.
+   */
+  async holdsOtherWindow(key: string): Promise<boolean> {
+    try {
+      return await this.deps.lock.isHeld(key)
+    } catch {
+      return true
+    }
   }
 
   /**
@@ -437,12 +466,34 @@ export class QueueDispatcher {
       if (doc.record.state !== 'reconciling' && doc.record.state !== 'reconciling-stuck') {
         continue
       }
-      const result = await this.apply(doc, { type: 'tick', now }, now)
-      outcomes.set(doc.key, doc.record.state)
-      if (result.effects.some((effect) => effect.kind === 'lookup')) {
-        await this.reconcile(doc, now)
+      // R5: the automatic pass obeys the same guards as a full dispatch - the
+      // document lock and `canCommit` - BEFORE its tick transition and its
+      // lookup. A window that does not own the document (or whose session no
+      // longer commits) sends no GET and writes nothing to the shared record:
+      // the holder ages the record and performs the lookup itself.
+      const lock = await this.deps.lock.acquire(doc.key)
+      if (lock.kind === 'other_window') {
+        this.otherWindow.add(doc.key)
+        this.publishOtherWindow(doc)
         outcomes.set(doc.key, doc.record.state)
-        dispatched += 1
+        continue
+      }
+      this.otherWindow.delete(doc.key)
+      const generation = lock.generation
+      try {
+        if (!this.sessionAllows(doc)) {
+          outcomes.set(doc.key, doc.record.state)
+          continue
+        }
+        const result = await this.apply(doc, { type: 'tick', now }, now)
+        outcomes.set(doc.key, doc.record.state)
+        if (result.effects.some((effect) => effect.kind === 'lookup')) {
+          await this.reconcile(doc, now)
+          outcomes.set(doc.key, doc.record.state)
+          dispatched += 1
+        }
+      } finally {
+        await this.deps.lock.release(doc.key, generation)
       }
     }
     return { dispatched, parked: 0, outcomes }
@@ -607,12 +658,29 @@ export class QueueDispatcher {
 
   /** Overwrite / Reload / "Luu lai": the old intent is superseded BEFORE a new one */
   async supersede(doc: QueueDoc, now = this.deps.clock()): Promise<QueueState> {
+    const { state, release } = await this.supersedeDeferRelease(doc, now)
+    await release()
+    return state
+  }
+
+  /**
+   * Same supersession, but the upload-session DELETE (network) is handed back
+   * instead of awaited: a caller that validated its destructive stretch (a
+   * conflict action) must not wait on the network inside it. The local part of
+   * the release (aborting this document's in-flight part PUTs) happens now, so
+   * the returned closure never touches a later Save's controller.
+   */
+  async supersedeDeferRelease(
+    doc: QueueDoc,
+    now = this.deps.clock(),
+  ): Promise<{ state: QueueState; release: () => Promise<void> }> {
     const priorSession = doc.record.uploadSession
     const result = await this.apply(doc, { type: 'supersede' }, now)
-    if (result.record?.state === 'cancelled') {
-      await this.releaseUploadSession(doc.key, priorSession)
-    }
-    return result.record?.state ?? doc.record.state
+    const release =
+      result.record?.state === 'cancelled'
+        ? this.takeUploadRelease(doc.key, priorSession)
+        : async () => {}
+    return { state: result.record?.state ?? doc.record.state, release }
   }
 
   /**
@@ -768,6 +836,7 @@ export class QueueDispatcher {
           format: doc.format,
           bytes: doc.payload,
           idempotencyKey: doc.record.idempotencyKey,
+          attempt: doc.record.attempt,
           limits: await this.resolveDocumentLimits(),
           ...(doc.record.uploadSession ? { resume: doc.record.uploadSession } : {}),
           signal: controller.signal,
@@ -808,6 +877,22 @@ export class QueueDispatcher {
       // and the session must still own the document right before the commit:
       // an account switch during the upload must not commit this copy
       if (!this.sessionAllows(doc)) return doc.record.state
+      // EL-1(b) Q2: an unreachable open acquires before the first queued commit
+      const prepared = (await this.deps.prepareEditLock?.(doc.path)) ?? 'proceed'
+      if (prepared === 'park') {
+        const holder = this.deps.editLockHolder?.(doc.path)
+        await this.failCommit(
+          doc,
+          new UniworkDocError('edit_locked', {
+            status: 423,
+            serverCode: 'document_locked',
+            ...(holder ? { editLock: holder } : {}),
+          }),
+          now,
+        )
+        return doc.record.state
+      }
+      const editLockId = this.deps.editLockId?.(doc.path) ?? null
       // the bytes are staged: the second `uploaded` advances uploading -> committing
       await this.apply(doc, { type: 'uploaded' }, now)
       let receipt: {
@@ -823,8 +908,12 @@ export class QueueDispatcher {
           uploadId: upload.uploadId,
           baseRevision: doc.record.baseRevision,
           idempotencyKey: doc.record.idempotencyKey,
+          ...(editLockId ? { editLockId } : {}),
         })
       } catch (error) {
+        if (error instanceof UniworkDocError && error.code === 'edit_locked' && editLockId) {
+          this.deps.onCommitEditLocked?.(doc.path, error)
+        }
         await this.failCommit(doc, error, now)
         return doc.record.state
       }
@@ -840,6 +929,26 @@ export class QueueDispatcher {
 
   /** a failed upload/commit: the machine decides the state (never "failed" on a lost answer) */
   private async failCommit(doc: QueueDoc, error: unknown, now: number): Promise<void> {
+    // UNI-1918 (B69-lite): the server refused the COMMIT because the staged
+    // upload's claim expired. That is not "the upload is gone": the commit
+    // POST may have been resolved before the claim lapsed, so the intent is
+    // kept and exactly ONE lookup of the SAME commit key decides
+    // (committed → settle, not_committed → attempt+1 queued, in_flight →
+    // reconciling, unknown → reconciling-stuck). Never a dropped intent, never
+    // a new key minted behind the user's back.
+    if (
+      error instanceof UniworkDocError &&
+      error.serverCode === 'document_upload_invalid' &&
+      error.reason === 'file_claim_expired'
+    ) {
+      // R7: the claim expired, so the record must DURABLY reconcile before the
+      // lookup (the machine's own `commitFailed` / `ticket_expired` enters
+      // `reconciling` with `reconcileSince`). A transient lookup failure then
+      // leaves an aging `reconciling` row the tick can age, never `committing`.
+      await this.apply(doc, { type: 'commitFailed', error: 'ticket_expired' }, now)
+      await this.settleInFlight(doc, now)
+      return
+    }
     const code = error instanceof UniworkDocError ? error.code : 'server_error'
     const retryAfterMs = error instanceof UniworkDocError ? error.retryAfterMs : undefined
     const maxBytes = error instanceof UniworkDocError ? error.maxBytes : undefined
@@ -1101,6 +1210,18 @@ export class QueueDispatcher {
     docKey: string,
     session: SavedUploadSession | undefined,
   ): Promise<void> {
+    await this.takeUploadRelease(docKey, session)()
+  }
+
+  /**
+   * The local half of the release (abort in-flight part PUTs, forget the live
+   * session) runs now; the returned closure is the network DELETE alone, bound
+   * to the session id captured here.
+   */
+  private takeUploadRelease(
+    docKey: string,
+    session: SavedUploadSession | undefined,
+  ): () => Promise<void> {
     const controller = this.uploadAborts.get(docKey)
     if (controller) {
       controller.abort()
@@ -1110,11 +1231,13 @@ export class QueueDispatcher {
     this.uploadLiveSessions.delete(docKey)
     const sessionId = session?.sessionId ?? liveSessionId
     const client = this.deps.client.uploadSession
-    if (!sessionId || !client) return
-    try {
-      await abortVersionUploadSession(client, sessionId)
-    } catch (error) {
-      console.warn('uniwork sync: the upload session could not be aborted', error)
+    if (!sessionId || !client) return async () => {}
+    return async () => {
+      try {
+        await abortVersionUploadSession(client, sessionId)
+      } catch (error) {
+        console.warn('uniwork sync: the upload session could not be aborted', error)
+      }
     }
   }
 

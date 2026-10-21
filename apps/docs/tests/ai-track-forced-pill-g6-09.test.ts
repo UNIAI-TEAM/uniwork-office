@@ -18,6 +18,7 @@ afterEach(() => {
   localStorage.clear()
 })
 
+const skinCss = readFileSync(join(__dirname, '../../../packages/ui/src/ai-panel.css'), 'utf8')
 const appCss = readFileSync(join(__dirname, '../src/renderer/styles.css'), 'utf8')
 const dicts = strings as unknown as Record<string, Record<string, string>>
 const pill = (c: HTMLElement) => c.querySelector('.ai-track-btn') as HTMLButtonElement
@@ -107,11 +108,11 @@ describe('forced Track pill: visible locked cue and keyboard reach (P-1)', () =>
 })
 
 describe('forced Track pill: styles (P-1 cue, P-2 clamp)', () => {
-  it('has a locked style and a keyboard focus ring', () => {
+  it('has a locked style and gets its keyboard focus ring from the shared skin', () => {
     expect(rule('.ai-track-btn.locked')).toMatch(/border-style:\s*dashed/)
-    expect(rule('.ai-track-btn:focus-visible')).toMatch(
-      /outline:\s*2px solid var\(--color-border-brand\)/,
-    )
+    // the ring moved into the shared skin's :is() focus-visible list; no private rule stays behind
+    expect(appCss).not.toMatch(/\.ai-track-btn\s*:focus-visible/)
+    expect(skinCss).toMatch(/:is\([^)]*\.ai-track-btn[^)]*\):focus-visible/)
     expect(rule('.ai-track-wrap.forced')).toMatch(/cursor:\s*not-allowed/)
   })
 

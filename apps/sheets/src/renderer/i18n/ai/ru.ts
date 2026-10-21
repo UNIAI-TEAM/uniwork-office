@@ -32,7 +32,7 @@ export const ru = {
   aiFootprintOverwritten: 'Перезаписано ячеек с данными: {count}',
   aiFootprintOverwrittenMin: 'Перезаписано ячеек с данными: не менее {count}',
   aiFootprintNoOverwrite: 'Существующие данные не перезаписаны',
-  aiUndoTitle: 'Отменить это изменение ИИ (аналогично ⌘Z)',
+  aiUndoTitle: 'Отменить это изменение ИИ (аналогично {undoKeys})',
   aiUndo: 'Отменить',
   aiPreviewAria: 'Предварительный просмотр изменений',
   aiProposedChanges: 'Предлагаемые изменения',

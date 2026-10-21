@@ -46,14 +46,11 @@ export const en = {
   ribbonPasteTipDisabled: 'Paste (copy or cut a canvas element first)',
   ribbonCutTip: 'Cut (⌘X)',
   ribbonCopyTip: 'Copy (⌘C)',
-  ribbonBrushTipNoSelection:
-    'Format Painter (select an element first; ⌘⇧C copy format / ⌘⇧V paste format)',
+  ribbonBrushTipNoSelection: 'Format Painter (select an element first)',
   ribbonBrushTipContinuous: 'Format Painter continuous mode (press Esc to exit)',
   ribbonBrushTipOnce: 'Format Painter single-use mode (click a target element to apply)',
-  ribbonBrushTipHasFormat:
-    'Format Painter (click for once / double-click for continuous; ⌘⇧C copy format / ⌘⇧V paste format)',
-  ribbonBrushTipDefault:
-    'Format Painter (click to copy and apply formatting; ⌘⇧C copy format / ⌘⇧V paste format)',
+  ribbonBrushTipHasFormat: 'Format Painter (click for once / double-click for continuous)',
+  ribbonBrushTipDefault: 'Format Painter (click to copy and apply formatting)',
   ribbonGroupSlides: 'Slides',
   ribbonNewSlide: 'New Slide',
   ribbonNewSlideTip: "New blank slide (keeps the current slide's layout background)",
@@ -360,9 +357,9 @@ export const en = {
   ribbonAnimDelayTip: 'Delay after the trigger before starting (seconds)',
   ribbonGroupStartShow: 'Start Slide Show',
   ribbonFromBeginning: 'From Beginning',
-  ribbonFromBeginningTip: 'Full-screen show from slide 1 (F5; hidden slides skipped)',
+  ribbonFromBeginningTip: 'Full-screen show from slide 1 (hidden slides skipped)',
   ribbonFromCurrent: 'From Current Slide',
-  ribbonFromCurrentTip: 'Full-screen show from the current slide (⇧F5)',
+  ribbonFromCurrentTip: 'Full-screen show from the current slide',
   ribbonPresenterView: 'Presenter View',
   ribbonPresenterViewTip:
     'Presenter view: notes / next slide / timer / pen; with multiple displays the show runs full screen on the other one',

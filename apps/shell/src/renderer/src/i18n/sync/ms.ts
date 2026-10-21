@@ -7,9 +7,10 @@ export const ms = {
   uwChipPausedAdmin: 'Simpanan dalam baris gilir · penghantaran dijeda',
   uwChipReconciling: 'Menyemak simpanan terakhir…',
   uwChipReconcileStuck: 'Sokongan diperlukan untuk mengesahkan simpanan',
+  uwErrReconcileStuck: 'Sokongan diperlukan untuk mengesahkan simpanan.',
   uwChipRemoteNewer: 'Versi lebih baharu di UniWork',
   uwTipQueued:
-    'Simpanan anda dari {time} disimpan dengan selamat pada komputer ini dan akan dihantar apabila anda dalam talian.',
+    'Simpanan anda dari {time} disimpan dengan selamat pada komputer ini dan akan dihantar sebaik sahaja boleh.',
   uwTipQueuedNewer:
     'Simpanan dari {time} sedang menunggu untuk dihantar. Suntingan selepas itu tidak termasuk.',
   uwTipPausedAdmin:
@@ -129,6 +130,8 @@ export const ms = {
   uwSignOutWaiting: 'Menyelesaikan simpanan yang sedang berjalan sebelum log keluar…',
   uwSignOutCaptureFailed:
     'Sesetengah perubahan yang belum disimpan tidak dapat ditangkap tepat pada masanya; versi simpanan atau autosimpan terkini disimpan untuk akaun anda.',
+  uwSignOutTimedOut:
+    'Log keluar tidak dapat disahkan tepat pada masanya; akaun mungkin masih log masuk. Cuba lagi.',
   uwSwitchLostTitle: 'Sebahagian perubahan yang belum disimpan bagi akaun sebelumnya telah hilang',
   uwSwitchLostBody:
     'Akaun lain telah log masuk pada komputer ini, jadi akaun sebelumnya telah dikunci. Dokumen yang perubahan belum disimpannya tidak dapat dikekalkan: {count}. Semua yang lain kekal dikunci pada komputer ini untuk akaun tersebut.',
@@ -336,7 +339,7 @@ export const ms = {
   uwRemoteStopAiConfirm:
     'Hentikan larian UniWork AI yang sedang berjalan untuk memuat semula? Perubahan yang telah dibuat AI milik salinan yang terbuka.',
   uwRemoteWaitCommit:
-    'Menunggu simpanan yang sedang berjalan selesai; anda boleh memuat semula selepas itu.',
+    'Menunggu simpanan yang sedang berjalan selesai; anda boleh meneruskan selepas itu.',
   uwRemoteReload: 'Muat semula versi terkini…',
   uwRemoteLater: 'Kemudian',
   uwRemoteClose: 'Tutup',

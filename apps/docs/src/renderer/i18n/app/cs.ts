@@ -26,6 +26,8 @@ export const cs = {
   appScLineBreak: 'Zalomení řádku',
   appScNbsp: 'Pevná mezera',
   appScNbHyphen: 'Pevná pomlčka',
+  appScFindNext: 'Najít další',
+  appScOptHyphen: 'Volitelné rozdělení',
   appScGrowFont1: 'Zvětšit písmo o 1 b.',
   appScShrinkFont1: 'Zmenšit písmo o 1 b.',
   appScListDemote: 'Snížit úroveň položky seznamu',
@@ -211,7 +213,7 @@ export const cs = {
   appEndnotePlaceholder: 'Text vysvětlivky…',
   appAutoSave: 'Automatické ukládání',
   appAutoSaveTip: 'Automatické ukládání (každých 30 sekund a při ztrátě fokusu okna)',
-  appSaveShortcutTip: 'Uložit (⌘S)',
+  appSaveShortcutTip: 'Uložit ({keys})',
   appUndo: 'Zpět',
   appRedo: 'Znovu',
   appStartOpening: 'Otevírání…',
@@ -546,8 +548,13 @@ export const cs = {
   appOnlyEncrypted: 'Dokument „{name}“ je chráněn heslem a nelze jej zde otevřít.',
   appFileExportPdf: 'Exportovat jako PDF…',
   appFilePrint: 'Tisk…',
+  appPrintNoDocument: 'Otevřete dokument, abyste ho mohli vytisknout.',
   appPrintNoPrinter:
     'Na tomto počítači není dostupná žádná tiskárna. Dokument můžete místo toho uložit jako PDF.',
   appPrintFailedPdfHint: 'Tisk se nepodařil: {error}. Dokument můžete místo toho uložit jako PDF.',
   appPrintSaveAsPdf: 'Uložit jako PDF…',
+  appFileSaveCopy: 'Uložit jako kopii…',
+  appCopySaved: 'Vaše verze byla uložena jako nový dokument: {title}.',
+  appCopySaveFailed:
+    'Kopii se nepodařilo vytvořit. Vaše změny jsou stále v bezpečí; zkuste to znovu.',
 } satisfies Record<keyof typeof zh, string>

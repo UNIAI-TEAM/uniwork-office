@@ -32,7 +32,7 @@ export const hi = {
   aiFootprintOverwritten: 'डेटा वाली ओवरराइट हुई सेल: {count}',
   aiFootprintOverwrittenMin: 'डेटा वाली ओवरराइट हुई सेल: कम से कम {count}',
   aiFootprintNoOverwrite: 'मौजूदा डेटा ओवरराइट नहीं हुआ',
-  aiUndoTitle: 'यह AI बदलाव पूर्ववत करें (⌘Z के समान)',
+  aiUndoTitle: 'यह AI बदलाव पूर्ववत करें ({undoKeys} के समान)',
   aiUndo: 'पूर्ववत करें',
   aiPreviewAria: 'बदलाव पूर्वावलोकन',
   aiProposedChanges: 'प्रस्तावित बदलाव',

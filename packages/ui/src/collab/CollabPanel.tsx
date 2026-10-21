@@ -380,6 +380,8 @@ export function CollabPanel(p: CollabPanelProps) {
       renderComposer={p.renderComposer}
       formatTime={p.formatTime}
       onKeepFocus={keepFocus}
+      openVersionId={ctl.openVersionId}
+      onViewVersion={ctl.onViewVersion}
     />
   )
 

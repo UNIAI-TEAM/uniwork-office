@@ -1,6 +1,7 @@
 /** The web frame half of the shared comments seam (lane contract G8-12 §3.3). */
 export {
   createFrameCommentsApi,
+  frameAvatars,
   installFrameComments,
   type FrameCommentsClient,
   type FrameCommentsExtras,
@@ -8,6 +9,13 @@ export {
   type FrameMentionsSearchInput,
 } from './frame-api'
 export { frameMentionAccess, type FrameMentionAccess } from './mention-access'
+export {
+  createFrameViewVersion,
+  frameOpenVersionId,
+  frameViewVersionAccess,
+  type FrameViewVersionRequest,
+  type FrameViewVersionResult,
+} from './version-view'
 export {
   createFrameDocVersion,
   frameDocVersion,

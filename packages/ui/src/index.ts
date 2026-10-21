@@ -50,6 +50,7 @@ export {
   FindPanel,
   type FindFocusRequest,
   type FindPanelStrings,
+  stepFindMatch,
   type FindTarget,
 } from './find-panel'
 export { findInText, foldCase, isWordChar, type FindOptions } from './find-text'
@@ -67,6 +68,7 @@ export {
   RIBBON_TOGGLE_SHORTCUT,
   type RibbonCollapse,
   type RibbonCollapseLabels,
+  type RibbonCollapseOptions,
   type RibbonDensity,
   type RibbonOverflow,
   type RibbonScrollMetrics,
@@ -116,16 +118,23 @@ export { CROP_EDGE_LABELS } from './strings-crop-edges'
 export {
   aiUniworkStrings,
   aiUniworkText,
-  isUniworkQuestionRefusal,
-  uniworkErrorForChip,
-  uniworkErrorKeyOfText,
+  isUniworkRefusalErrorKey,
+  uniworkErrorForEntry,
   type AiUniworkStringKey,
 } from './strings-ai-uniwork'
 export { AiErrorAction, type AiErrorActionProps } from './AiErrorAction'
 export { AiSaveDraftCard, type AiSaveDraftCardProps } from './AiSaveDraftCard'
 export { AI_SAVE_DRAFT_LABELS, type AiSaveDraftLabels } from './strings-ai-save-draft'
 export { ImageViewer, type ImageViewerLabels } from './image-viewer'
-export { trapTab, useModalKeys } from './modal-keys'
+export { focusableIn, trapTab, useModalKeys } from './modal-keys'
+export {
+  OVERLAY_DOCK_MAX_PX,
+  overlayDockQuery,
+  shouldCloseOnEscape,
+  shouldFocusComposer,
+  useOverlayDock,
+  type OverlayDockOptions,
+} from './use-overlay-dock'
 export {
   removeBackground,
   sampleBackgroundColors,

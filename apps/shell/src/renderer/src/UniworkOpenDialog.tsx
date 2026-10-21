@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { UniworkDocErrorCode, UniworkDocListPage, UniworkResult } from '../../shared/home-api'
 import { DEFAULT_MAX_DOCUMENT_BYTES } from '../../shared/size-format'
-import { FileBadge } from './FileBadge'
+import { DocPickerList } from './doclist/PickerList'
 import { UniworkDocInfoPanel, type DocInfoLoad } from './UniworkDocInfoPanel'
 import {
   ActionToast,
@@ -20,12 +20,12 @@ import { useI18n } from './locale'
 import { needsSignIn, type AccountView } from './account-model'
 import { publishLocalRename, publishUniworkNotice } from './uniwork-notice-bus'
 import {
+  NEW_DIALOG_FORMATS,
   PICKER_PAGE_SIZE,
   PICKER_SEARCH_DEBOUNCE_MS,
   SHARED_SOURCE_VALUE,
   UNIWORK_ERROR_KEYS,
   checkDocName,
-  docExtension,
   errorActionOf,
   hasRowActions,
   isDocNameError,
@@ -35,7 +35,6 @@ import {
   isOpenable,
   pickerBodyOf,
   pickerReducer,
-  pickerRowMeta,
   renameParts,
   retryActionOf,
   rowActionsOf,
@@ -50,6 +49,7 @@ import { readActiveWorkspaceId, writeActiveWorkspaceId } from './active-workspac
 import { useOfflineToggle } from './OfflineToggle'
 import { BROWSER_HIDDEN_HINT_ID } from './uniwork-folders/BrowserContents'
 import { UniworkBrowser } from './uniwork-folders/UniworkBrowser'
+import { openPageOnWeb } from './uniwork-page-web'
 import type { PathPart } from './uniwork-folders/uniwork-folders-model'
 import {
   archiveDocument,
@@ -154,7 +154,7 @@ export function UniworkOpenDialog({
    */
   onPick?: (doc: { id: string; title: string; workspaceId: string }) => Promise<string | null>
 }) {
-  const { t, dateLocale } = useI18n()
+  const { t } = useI18n()
   const [state, dispatch] = useReducer(pickerReducer, undefined, () =>
     initialPickerState(readActiveWorkspaceId()),
   )
@@ -190,8 +190,9 @@ export function UniworkOpenDialog({
   const clearToast = useCallback(() => setToast(null), [])
   /** G5-05u: the row menu's offline item (not in pin mode, where choosing already pins) */
   const offline = useOfflineToggle()
+  // a UniNote page has no file to keep offline, whatever its title ends in
   const offlineOf = (doc: LibraryDocRow) =>
-    onPick || !isOpenable(doc) ? null : offline.menuOf(doc.id)
+    onPick || doc.kind === 'page' || !isOpenable(doc) ? null : offline.menuOf(doc.id)
   /** FD-11: the workspace's Recent list, or the folder browser's contents */
   const [view, setView] = useState<'recent' | 'folder'>('recent')
   /** the committed title search of the folder view (the recent list keeps state.query) */
@@ -337,7 +338,21 @@ export function UniworkOpenDialog({
   }
 
   /** open a document by its id (a listed row, or the one just created / uploaded) */
-  const openById = (doc: { id: string; title: string; workspaceId?: string }) => {
+  const openById = (doc: { id: string; title: string; workspaceId?: string; kind?: string }) => {
+    // UNI-1953: a UniNote has no file to open; it opens on the web (never to a picker's caller)
+    if (doc.kind === 'page') {
+      const workspaceId =
+        doc.workspaceId ??
+        (stateRef.current.source === 'workspace' ? stateRef.current.workspaceId : null)
+      if (onPick || !workspaceId) {
+        setToast(t('uwDocActionFailed'))
+        return
+      }
+      void openPageOnWeb(stateRef.current.workspaces.items, workspaceId, doc.id).then((opened) => {
+        if (!opened && mounted.current) setToast(t('uwDocActionFailed'))
+      })
+      return
+    }
     if (onPick) {
       const workspaceId = (
         doc.workspaceId ??
@@ -708,68 +723,66 @@ export function UniworkOpenDialog({
                 ? t('uwPickHeadingResults')
                 : t(state.source === 'shared' ? 'uwLibShared' : 'uwPickHeadingRecent')}
             </div>
-            <ul
-              className="uw-pick-list"
+            <DocPickerList
               id="uw-pick-list"
-              role="listbox"
-              aria-label={t('uwPickListLabel')}
-              ref={listRef}
-            >
-              {docs.map((doc, index) => {
-                const openable = isOpenable(doc)
-                const row = doc as LibraryDocRow
-                const editing = renaming?.id === doc.id ? renaming : null
-                const active = doc.id === state.activeId
-                const archived = row.archived === true
-                // an archived row is a supported document that is parked; rows that cannot open are not listed
-                const updated = pickerRowMeta(doc, t, dateLocale)
-                const meta = archived
-                  ? [t('uwDocArchived'), updated].filter(Boolean).join(' · ')
-                  : updated
+              listRef={listRef}
+              label={t('uwPickListLabel')}
+              docs={docs}
+              activeId={state.activeId}
+              stateOf={(doc) => ({
+                disabled: !isOpenable(doc),
+                archived: (doc as LibraryDocRow).archived === true,
+                opening: state.opening?.id === doc.id,
+              })}
+              sublineFor={(doc) => {
                 // shared rows come from several workspaces: name the one each lives in
                 const where =
                   state.source === 'shared' ? (doc as SharedDocSummary).workspaceName?.trim() : ''
+                // an archived row is a supported document that is parked; rows that cannot open are not listed
+                const line = [
+                  where,
+                  (doc as LibraryDocRow).archived === true ? t('uwBadgeArchived') : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+                return line ? { short: line, full: line } : null
+              }}
+              nameFor={(doc) => {
+                const editing = renaming?.id === doc.id ? renaming : null
+                const row = doc as LibraryDocRow
+                return editing ? (
+                  <RenameField
+                    initial={renameParts(doc.title, doc.format).base}
+                    label={doc.title}
+                    error={editing.error}
+                    busy={editing.busy}
+                    onSave={(value) => saveRename(row, value)}
+                    onCancel={() => endRename(doc.id)}
+                    onEdit={() => {
+                      if (editing.error) setRenaming({ ...editing, error: null })
+                    }}
+                  />
+                ) : null
+              }}
+              optionProps={(doc, index) => {
+                const archived = (doc as LibraryDocRow).archived === true
+                const editing = renaming?.id === doc.id
+                return {
+                  id: optionId(index),
+                  'aria-disabled': archived ? undefined : !isOpenable(doc),
+                  onMouseMove: () => {
+                    if (doc.id !== state.activeId) dispatch({ type: 'set-active', id: doc.id })
+                  },
+                  onClick: () => {
+                    if (!editing) openDoc(doc.id)
+                  },
+                }
+              }}
+              trailing={(doc) => {
+                const row = doc as LibraryDocRow
+                const active = doc.id === state.activeId
                 return (
-                  <li key={doc.id} role="presentation" className="uw-pick-item">
-                    <div
-                      id={optionId(index)}
-                      role="option"
-                      aria-selected={active}
-                      aria-disabled={archived ? undefined : !openable}
-                      className={`uw-pick-row${active ? ' active' : ''}${openable ? '' : ' disabled'}${archived ? ' archived' : ''}${state.opening?.id === doc.id ? ' opening' : ''}`}
-                      onMouseMove={() => {
-                        if (!active) dispatch({ type: 'set-active', id: doc.id })
-                      }}
-                      onClick={() => {
-                        if (!editing) openDoc(doc.id)
-                      }}
-                    >
-                      <FileBadge ext={docExtension(doc)} size={24} />
-                      <span className="uw-pick-row-text">
-                        {editing ? (
-                          <RenameField
-                            initial={renameParts(doc.title, doc.format).base}
-                            label={doc.title}
-                            error={editing.error}
-                            busy={editing.busy}
-                            onSave={(value) => saveRename(row, value)}
-                            onCancel={() => endRename(doc.id)}
-                            onEdit={() => {
-                              if (editing.error) setRenaming({ ...editing, error: null })
-                            }}
-                          />
-                        ) : (
-                          <span className="uw-pick-row-title">{doc.title}</span>
-                        )}
-                        {(meta || where) && (
-                          <span className="uw-pick-row-meta">
-                            {where && <span className="uw-pick-row-where">{where}</span>}
-                            {where && meta ? ' · ' : ''}
-                            {meta}
-                          </span>
-                        )}
-                      </span>
-                    </div>
+                  <>
                     <button
                       type="button"
                       className={`uw-pick-info-btn${info?.id === doc.id ? ' on' : ''}`}
@@ -811,10 +824,10 @@ export function UniworkOpenDialog({
                         onAction={(action) => onRowAction(row, action)}
                       />
                     )}
-                  </li>
+                  </>
                 )
-              })}
-            </ul>
+              }}
+            />
             {renderLoadMore()}
           </>
         )
@@ -969,6 +982,7 @@ export function UniworkOpenDialog({
               mainOverride={folderView ? undefined : pickBody}
               offlineOf={(doc) => rowActionsOf(doc, offlineOf(doc)).offline}
               onOffline={(doc) => onRowAction(doc, 'offline')}
+              hidePages={Boolean(onPick)}
             />
           ) : (
             pickBody
@@ -1007,6 +1021,7 @@ export function UniworkOpenDialog({
         {form === 'new' && (
           <NewDocDialog
             workspaces={state.workspaces.items}
+            kinds={NEW_DIALOG_FORMATS}
             initialTarget={defaultTarget()}
             loadTree={loadFolderTree}
             onCreate={createDoc}

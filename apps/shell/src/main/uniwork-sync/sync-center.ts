@@ -1109,6 +1109,8 @@ export interface WiredSyncCenterDeps {
   service: WiredSyncCenterService
   store: { layer: StoreLayer; access: SyncStoreAccess }
   accountStatus(): AccountStatus
+  /** the deployment this build runs against: another deployment's last owner is not counted (G703B-P4) */
+  activeDeploymentId(): string | null
   capabilityRead(orgId: string): Promise<{
     kind: string
     capabilities: { sync_write: boolean; sync_feed?: boolean; offline_library?: boolean }
@@ -1137,8 +1139,31 @@ export interface WiredSyncCenterDeps {
     ext: UniworkDocFormat | string
   }): Promise<string | null>
   pushChanged(snapshot: SyncCenterSnapshot): void
+  /**
+   * UNI-1993: the ONE startup sweep of the preview root, built by the caller
+   * (`startPreviewStartupSweep`) and shared with the source-view opener, which
+   * writes into the same root. Absent = the center sweeps the root itself.
+   */
+  startupSweep?: Promise<unknown>
+  /** UNI-1993: deletes the source-view files whose tab has been closed (run by every poll) */
+  sweepSources?(): Promise<void>
+  /** UNI-1993: closes every source-view tab and deletes the files (an account boundary) */
+  dropSources?(): Promise<void>
   /** test seam: the clock of the preview sweep */
   now?(): number
+}
+
+/**
+ * The startup removal of the draft-preview root: a crash or a power cut left the
+ * previous session's decrypted copies behind. Built once at start and handed to
+ * everything that writes under the root, so no write can land before it ends.
+ */
+export function startPreviewStartupSweep(userDataDir: string): Promise<void> {
+  return rm(join(userDataDir, DRAFT_PREVIEW_DIR), {
+    recursive: true,
+    force: true,
+    maxRetries: 2,
+  }).catch(() => undefined)
 }
 
 export interface WiredSyncCenter {
@@ -1176,7 +1201,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
   const removeDir = (dir: string) =>
     rm(dir, { recursive: true, force: true, maxRetries: 2 }).catch(() => undefined)
   // startup sweep: a crash or a power cut left the previous session's previews behind
-  const startupSweep = removeDir(previewRoot)
+  const startupSweep = deps.startupSweep ?? removeDir(previewRoot)
   let lastAccount: string | undefined
 
   const dropPreview = async (draftId: string): Promise<void> => {
@@ -1245,7 +1270,9 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
       const org = status.org ? { id: status.org.id, name: status.org.name } : undefined
 
       if (sessionState === 'signed_out') {
-        const lastOwner = deps.service.store.readLastOwner()
+        // G703B-P4: only the active deployment's last owner has copies to count here
+        const last = deps.service.store.readLastOwner()
+        const lastOwner = last && last.deploymentId === deps.activeDeploymentId() ? last : null
         let lockedCount = 0
         if (lastOwner) {
           for (const dir of scopeWorkingCopyDirs(deps.service.store.root, lastOwner)) {
@@ -1580,6 +1607,11 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
       }),
 
     writeCopyFile: async (targetPath, bytes) => {
+      // A106 (UNI-1362): reject a target picked inside the app's working-copy
+      // root before writing (saveMyCopy maps the thrown refusal to code 'other').
+      if (deps.service.store.isInside(targetPath)) {
+        throw new Error('target inside working-copy root')
+      }
       await writeFile(targetPath, bytes)
     },
 
@@ -1602,6 +1634,8 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
       }
       controller.notifyChanged()
       await sweepPreviews()
+      // a source-view sweep that fails must not fail the poll
+      await deps.sweepSources?.().catch(() => undefined)
     },
     async noteAccount() {
       const scope = deps.store.access.scope()
@@ -1610,6 +1644,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
       if (account === lastAccount) return
       lastAccount = account
       await dropAllPreviews()
+      await deps.dropSources?.().catch(() => undefined)
     },
     sweepPreviews,
   }

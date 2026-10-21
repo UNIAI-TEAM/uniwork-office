@@ -134,6 +134,12 @@ describe('editMenuTemplate', () => {
     ])
     for (const item of submenuOf(tpl)) if (item.role) expect(item.label).toBeTruthy()
   })
+
+  it('takes accelerators from a shortcut table, leaving the other roles alone', () => {
+    const items = submenuOf(editMenuTemplate('win32', en, { redo: 'Ctrl+Y' }))
+    expect(items[1]).toMatchObject({ role: 'redo', accelerator: 'Ctrl+Y' })
+    expect(items.filter((i) => 'accelerator' in i)).toHaveLength(1)
+  })
 })
 
 describe('viewMenuTemplate', () => {

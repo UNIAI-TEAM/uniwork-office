@@ -3,7 +3,9 @@ import {
   setUniworkUserSaveHook,
   uniworkIsBound,
   uniworkIsLocked,
+  uniworkPeekLocked,
   uniworkIsReadOnly,
+  uniworkReadOnlySave,
   uniworkSaveDecision,
 } from './uniwork-policy'
 import {
@@ -50,10 +52,8 @@ import {
   printHtmlDocument,
   type PrintDialogOutcome,
 } from '@genoffice/electron-utils'
-import {
-  answerUniworkAiFlagOff,
-  answerUniworkCloudStatusOff,
-} from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
+import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-cloud-status'
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { parseFileToText } from '@genoffice/file-parse'
@@ -1396,7 +1396,26 @@ function registerHtmlIpc(): void {
 
   ipcMain.handle(HTML_CHANNELS.uniworkState, (e): UniworkViewState => {
     const path = savePathByWc.get(e.sender.id)
-    return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+    // `locked` only when set: a plain copy keeps the two-field answer
+    return {
+      bound: uniworkIsBound(path),
+      readOnly: uniworkIsReadOnly(path),
+      // a query, not a refused action: it must not raise the shell's view-only hint
+      ...(uniworkPeekLocked(path) ? { locked: true } : {}),
+    }
+  })
+
+  ipcMain.handle(HTML_CHANNELS.uniworkReadOnlySave, (e, filePath?: unknown) => {
+    const path = savePathByWc.get(e.sender.id)
+    if (!path) return
+    if (
+      typeof filePath === 'string' &&
+      filePath.length > 0 &&
+      !allowedByWc.get(e.sender.id)?.has(filePath)
+    ) {
+      return
+    }
+    uniworkReadOnlySave(typeof filePath === 'string' && filePath.length > 0 ? filePath : path)
   })
 
   ipcMain.handle(
@@ -1896,6 +1915,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     allowedByWc.set(wcId, new Set([openPath]))
   }
   installExternalLinkOpener(wc)
+  installReadOnlySaveKey(wc)
   wc.once('destroyed', () => {
     closePresentViewsOf(wcId)
     openPathByWc.delete(wcId)
@@ -1908,6 +1928,23 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     saveWaiters.get(wcId)?.(false)
     saveWaiters.delete(wcId)
     mcpSaveByWc.delete(wcId)
+  })
+}
+
+/**
+ * Ctrl/Cmd+S on a read-only UniWork copy explains the lock instead of saving. The renderer only
+ * hears the key while the focus is outside the preview frame (a frame, with or without scripts,
+ * keeps its own keys), so main takes it for every frame before the page or the menu sees it.
+ * Everything else, including Save As, keeps its normal path.
+ */
+function installReadOnlySaveKey(wc: WebContents): void {
+  wc.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.key.toLowerCase() !== 's') return
+    if (!(input.control || input.meta) || input.shift || input.alt) return
+    const path = savePathByWc.get(wc.id)
+    if (!path || !uniworkIsBound(path) || !uniworkIsReadOnly(path)) return
+    event.preventDefault()
+    if (!input.isAutoRepeat) uniworkReadOnlySave(path)
   })
 }
 

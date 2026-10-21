@@ -84,15 +84,23 @@ async function serveBytes(ctx: BrowserContext, urlPath: string, body: Buffer): P
   )
 }
 
-/** open `urlPath` through the test host; returns the editor iframe */
-async function openDoc(page: Page, urlPath: string, expectText: string): Promise<Frame> {
-  await page.goto(`/test-host/?open=${encodeURIComponent(urlPath)}`)
+/** open `urlPath` through the test host; returns the editor iframe. `extra` = more test-host query
+ * (e.g. '&readonly=1&saveCopy=1'); `mode: 'editable'` waits for the editable ProseMirror (default),
+ * 'readonly' for the view-only one whose contenteditable is false. */
+async function openDoc(
+  page: Page,
+  urlPath: string,
+  expectText: string,
+  extra = '',
+  mode: 'editable' | 'readonly' = 'editable',
+): Promise<Frame> {
+  await page.goto(`/test-host/?open=${encodeURIComponent(urlPath)}${extra}`)
   await page.waitForFunction(() =>
     /index\.html/.test((document.getElementById('frame') as HTMLIFrameElement)?.src ?? ''),
   )
   const ed = (await (await page.waitForSelector('#frame')).contentFrame())!
   await ed
-    .locator(EDITOR)
+    .locator(`.ProseMirror[contenteditable="${mode === 'editable'}"]`)
     .first()
     .getByText(expectText, { exact: false })
     .first()
@@ -591,3 +599,171 @@ for (const d of DOCS) {
     ).toEqual([])
   })
 }
+
+// UNI-1920 (RFSH-5): a locked-out Docs tab (host: save withheld, saveCopy granted, no profile)
+// offers File > Save as a copy…; an editable tab and a readOnly-profile tab never show it.
+const SAVE_COPY_ITEM = 'Save as a copy…'
+
+/** the labels of the open File menu, one trimmed string per entry (accelerator span included) */
+const fileMenuLabels = (ed: Frame): Promise<string[]> =>
+  ed.locator('.file-menu button').allTextContents()
+
+interface HostCopy {
+  name: string
+  /** byte length of the copy body the frame sent */
+  bytes: number
+}
+
+/** the test host's window.__host surface these steps use (installed by web/server/test-host/host.js) */
+interface TestHost {
+  saveCopies: () => HostCopy[]
+  files: () => Array<{ fileId: string; name: string }>
+}
+
+const saveCopies = (page: Page): Promise<HostCopy[]> =>
+  page.evaluate(() => {
+    const w = window as unknown as { __host: TestHost } // test host installs __host at boot
+    return w.__host.saveCopies()
+  })
+
+const hostFiles = (page: Page): Promise<Array<{ fileId: string; name: string }>> =>
+  page.evaluate(() => {
+    const w = window as unknown as { __host: TestHost } // test host installs __host at boot
+    return w.__host.files()
+  })
+
+/** records whether each mod+P keydown in the frame kept its default (browser print dialog) or the
+ * module's accelerator claimed it. The document-capture listener runs after the accelerator's
+ * window-capture one, so e.defaultPrevented is already final. */
+const watchCtrlP = (ed: Frame): Promise<void> =>
+  ed.evaluate(() => {
+    const w = window as unknown as { __ctrlPDefaultPrevented: boolean[] } // e2e scratch flag
+    w.__ctrlPDefaultPrevented = []
+    document.addEventListener(
+      'keydown',
+      (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p')
+          w.__ctrlPDefaultPrevented.push(e.defaultPrevented)
+      },
+      true,
+    )
+  })
+
+const ctrlPDefaults = (ed: Frame): Promise<boolean[]> =>
+  ed.evaluate(() => {
+    const w = window as unknown as { __ctrlPDefaultPrevented: boolean[] } // e2e scratch flag
+    return w.__ctrlPDefaultPrevented
+  })
+
+test('docs-web: File > Save as a copy on a locked-out tab (RFSH-5)', async ({ page }) => {
+  const consoleLines: string[] = []
+  attachConsole(page, consoleLines)
+
+  // locked out: no `save` grant, `saveCopy` granted — the only write the tab can do
+  let ed = await openDoc(
+    page,
+    '/fixtures/simple.docx',
+    '第一段',
+    '&readonly=1&saveCopy=1&lang=en',
+    'readonly',
+  )
+  await ed.locator('.ribbon-tab-file').click()
+  let labels = await fileMenuLabels(ed)
+  expect(labels, 'locked-out File menu hides Save and Save As').toEqual(
+    expect.not.arrayContaining(['Save Ctrl+S', 'Save As… F12']),
+  )
+  expect(labels).toContain(SAVE_COPY_ITEM)
+  await ed.locator('.file-menu button', { hasText: SAVE_COPY_ITEM }).click()
+  let copies: HostCopy[] = []
+  await expect
+    .poll(
+      async () => {
+        copies = await saveCopies(page)
+        return copies.length
+      },
+      { timeout: 20_000, message: 'host received api.saveCopy' },
+    )
+    .toBe(1)
+  expect(copies[0].name, 'the localized "(copy)" title').toBe('simple (copy)')
+  expect(copies[0].bytes, 'the copy carries the document body').toBeGreaterThan(0)
+  // the host stored the copy as a new document; the open document was not re-pointed
+  const files = await hostFiles(page)
+  expect(files).toHaveLength(2)
+  expect(files[1].name).toBe('simple (copy)')
+  await expect(ed.locator('.status-bar .status-msg')).toContainText('simple (copy)')
+
+  // an editable tab with the same grant keeps Save / Save As and never shows the copy entry
+  ed = await openDoc(page, '/fixtures/simple.docx', '第一段', '&saveCopy=1&lang=en')
+  await ed.locator('.ribbon-tab-file').click()
+  labels = await fileMenuLabels(ed)
+  expect(labels).toContain('Save Ctrl+S')
+  expect(labels, 'editable File menu has no copy entry').not.toContain(SAVE_COPY_ITEM)
+  await page.keyboard.press('Escape')
+
+  // a readOnly-profile viewer never gets the entry, even with the grant
+  ed = await openDoc(
+    page,
+    '/fixtures/simple.docx',
+    '第一段',
+    '&saveCopy=1&profile=readOnly&lang=en',
+    'readonly',
+  )
+  await ed.locator('.ribbon-tab-file').click()
+  labels = await fileMenuLabels(ed)
+  expect(labels, 'readOnly profile File menu has no copy entry').not.toContain(SAVE_COPY_ITEM)
+})
+
+// UNI-1920 (item B): Ctrl+P with focus inside the Docs frame opens the module's own print dialog
+// (the File > Print path) instead of the browser's; without the `print` grant nothing runs and the
+// key keeps its default.
+test('docs-web: Ctrl+P inside the frame runs the module print path once', async ({ page }) => {
+  const consoleLines: string[] = []
+  attachConsole(page, consoleLines)
+  let ed = await openDoc(page, '/fixtures/simple.docx', '第一段', '&lang=en')
+
+  await watchCtrlP(ed)
+  // window.print blocks headless Chromium: count instead (w4-hide.spec.ts pattern)
+  await ed.evaluate(() => {
+    const w = window as unknown as { __printed: number } // e2e print counter
+    w.__printed = 0
+    window.print = () => {
+      w.__printed++
+      window.dispatchEvent(new Event('afterprint'))
+    }
+  })
+
+  await ed.locator(EDITOR).first().click()
+  await page.keyboard.press('Control+p')
+  const dialog = ed.locator('.modal.print-dialog')
+  await expect(dialog, 'Ctrl+P opened the in-frame print dialog').toBeVisible({ timeout: 15_000 })
+  await dialog.locator('.modal-actions button.primary').click()
+  await expect
+    .poll(
+      () =>
+        ed.evaluate(() => {
+          const w = window as unknown as { __printed: number } // e2e print counter
+          return w.__printed
+        }),
+      { timeout: 15_000 },
+    )
+    .toBe(1)
+  await expect(dialog, 'a completed print closes the dialog').toHaveCount(0)
+  // a second press takes the same path: the dialog reopens exactly once more
+  await ed.locator(EDITOR).first().click()
+  await page.keyboard.press('Control+p')
+  await expect(dialog).toBeVisible({ timeout: 15_000 })
+  expect(await ctrlPDefaults(ed), 'both presses claimed (browser default prevented)').toEqual([
+    true,
+    true,
+  ])
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+
+  // without the print grant nothing runs and the key is not claimed (the browser default survives)
+  ed = await openDoc(page, '/fixtures/simple.docx', '第一段', '&noprint=1&lang=en')
+  await watchCtrlP(ed)
+  await ed.locator(EDITOR).first().click()
+  await page.keyboard.press('Control+p')
+  await expect(ed.locator('.modal.print-dialog'), 'no print grant -> no dialog').toHaveCount(0)
+  expect(await ctrlPDefaults(ed)).toEqual([false])
+})

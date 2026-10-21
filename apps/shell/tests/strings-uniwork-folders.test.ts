@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { LANGS } from '@genoffice/i18n'
 import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
+import { uniworkHomeStrings } from '../src/renderer/src/i18n/strings-uniwork-home'
 import { accountStrings } from '../src/renderer/src/i18n/strings-account'
 import { cloudStrings } from '../src/renderer/src/i18n/strings-cloud'
 import { syncStrings } from '../src/renderer/src/i18n/strings-sync'
@@ -65,7 +66,7 @@ describe('uniwork folders string shards', () => {
       'Thư mục đích đã có quá nhiều thư mục trùng tên. Hãy đổi tên trước khi chuyển.',
     )
     expect(vi.ufFolderGone).toBe('Thư mục này không còn ở đây.')
-    expect(vi.ufLocationRoot).toBe('UniWork (gốc)')
+    expect(vi.ufLocationRoot).toBe('Thư mục gốc của workspace')
     expect(vi.ufSameFolder).toBe('Cùng thư mục với bản gốc')
     expect(en.ufNameTaken).toBe('A folder with this name already exists here. Choose another name.')
     expect(en.ufTooDeep).toBe('The document tree is at most {max} levels deep.')
@@ -159,4 +160,22 @@ describe('uniwork folders string shards', () => {
     expect(table('vi').ufNoDeviceFolders).toBe('Chưa có thư mục nào trên máy này.')
     expect(table('en').ufNoDeviceFolders).toBe('No folders on this device yet.')
   })
+})
+
+// UNI-1961: every app surface that shows the documents root (tree, picker, breadcrumbs, the
+// copy-location path) reads the web's documents root label (documents.* "Documents (root)")
+describe('the documents root label (ufRoot) follows the web', () => {
+  it('vi and en carry the web words', () => {
+    expect(table('vi').ufRoot).toBe('Tài liệu (gốc)')
+    expect(table('en').ufRoot).toBe('Documents (root)')
+  })
+
+  it.each([...LANGS])(
+    'locale %s: ufRoot is the home shard root label, not the product name',
+    (lang) => {
+      const home = uniworkHomeStrings[lang] as Record<string, string>
+      expect(table(lang).ufRoot).toBe(home.uhShelvedPathRoot)
+      expect(table(lang).ufRoot).not.toBe('UniWork')
+    },
+  )
 })

@@ -80,9 +80,18 @@ export interface StageInput {
   live(): boolean
 }
 
-/** delete every staging record a download may have written (best effort) */
-export async function wipeKeys(store: OfflineLibraryStore, keys: Iterable<string>): Promise<void> {
+/**
+ * Delete every staging record a download may have written (best effort).
+ * FUSR-R1-3 (UNI-1362): `live` is checked synchronously before EACH delete, so
+ * a boundary that lands between two keys never deletes in the next scope.
+ */
+export async function wipeKeys(
+  store: OfflineLibraryStore,
+  keys: Iterable<string>,
+  live: () => boolean,
+): Promise<void> {
   for (const key of keys) {
+    if (!live()) return
     await store.deleteBlob(key).catch(() => undefined)
   }
 }
@@ -117,7 +126,7 @@ export async function stageSnapshot(input: StageInput): Promise<StageOutcome> {
     // a moved boundary means the scope is locked and wiped (or about to be): a
     // delete here would re-open it and re-create its empty folder. The staging
     // keys are on the row, so the wipe or the next recover() takes them.
-    if (input.live()) await wipeKeys(store, written)
+    if (input.live()) await wipeKeys(store, written, input.live)
     return outcome
   }
 

@@ -68,6 +68,7 @@ import {
 import { textAlignDecl } from './text-effects'
 import { noteMarkText } from '../note-format'
 import { t } from '../i18n/locale'
+import { createShortcutMatcher } from '../shortcuts'
 import {
   ommlToMathML,
   parseLazyMediaUrl,
@@ -1609,6 +1610,15 @@ export const EnterReplacesSelection = Extension.create({
   },
 })
 
+/** Word's insert chords, from the docs shortcut table (platform and web/desktop aware). */
+const matchInsertKey = createShortcutMatcher([
+  'page-break',
+  'column-break',
+  'nbsp',
+  'nb-hyphen',
+  'opt-hyphen',
+])
+
 /**
  * Word's insert-and-move chords that must only fire with editor focus. Kept
  * out of the application menu on purpose: a menu accelerator would
@@ -1665,14 +1675,32 @@ export const WordEditorShortcuts = Extension.create({
           })
           .run()
       },
-      'Mod-Enter': () => insertPageBreak(this.editor),
-      'Mod-Shift-Enter': () => insertColumnBreak(this.editor),
-      // U+00A0 and U+2011: the characters Word inserts for these two chords
-      'Mod-Shift-Space': () => this.editor.commands.insertContent('\u00a0'),
-      'Mod-Shift--': () => this.editor.commands.insertContent('\u2011'),
+      // docs-064 names both directions in one row, so these stay in the keymap
       'Alt-Shift-ArrowUp': () => moveBlocks(this.editor, -1),
       'Alt-Shift-ArrowDown': () => moveBlocks(this.editor, 1),
     }
+  },
+  addProseMirrorPlugins() {
+    const editor = this.editor
+    // U+00A0, U+2011 and U+00AD: the characters Word inserts for the three chords
+    const insert: Record<string, () => boolean> = {
+      'page-break': () => insertPageBreak(editor),
+      'column-break': () => insertColumnBreak(editor),
+      nbsp: () => editor.commands.insertContent('\u00a0'),
+      'nb-hyphen': () => editor.commands.insertContent('\u2011'),
+      'opt-hyphen': () => editor.commands.insertContent('\u00ad'),
+    }
+    return [
+      new Plugin({
+        key: new PluginKey('wordInsertKeys'),
+        props: {
+          handleKeyDown: (_view, event) => {
+            const command = matchInsertKey(event)
+            return command ? insert[command]() : false
+          },
+        },
+      }),
+    ]
   },
 })
 

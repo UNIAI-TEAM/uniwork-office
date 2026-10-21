@@ -921,17 +921,23 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 
 /* ── S6 new-version bar: hangs under the tab strip; main moves the active editor view down by its height ── */
 
-.uw-remote-bar {
-  --uw-remote-bg: var(--surface-subtle);
-  --uw-remote-border: var(--border);
-  --uw-remote-text: var(--text-primary);
-  --uw-remote-accent: var(--color-border-brand);
+.uw-top-bars {
+  /* the band under the tab strip: remote bar and lock strip stack inside it */
   box-sizing: border-box;
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
   z-index: 1;
+}
+
+.uw-remote-bar {
+  --uw-remote-bg: var(--surface-subtle);
+  --uw-remote-border: var(--border);
+  --uw-remote-text: var(--text-primary);
+  --uw-remote-accent: var(--color-border-brand);
+  box-sizing: border-box;
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1015,8 +1021,12 @@ body.overlay-title-bar .tab-bar-drag-spacer {
 }
 
 .uw-remote-action[aria-disabled='true'] {
-  /* busy or not available yet, not disabled: it keeps focus, so the ring stays */
-  opacity: 0.55;
+  /* busy or not available yet, not disabled: it keeps focus, so the ring stays.
+     Token-mixed colors keep the label readable where .55 opacity washed it out
+     on the warn bar (A10 / G5-13). */
+  background: color-mix(in srgb, var(--surface) 65%, var(--uw-remote-bg));
+  color: color-mix(in srgb, var(--uw-remote-text) 78%, var(--uw-remote-bg));
+  border-color: color-mix(in srgb, var(--uw-remote-border) 80%, var(--uw-remote-bg));
   cursor: not-allowed;
 }
 
@@ -1030,6 +1040,76 @@ body.overlay-title-bar .tab-bar-drag-spacer {
     min-width: 44px;
     min-height: 44px;
   }
+}
+
+/* ── EL-1(b) edit-lock strip: shares the remote bar's band, tokens and dot ── */
+
+.uw-editlock-strip {
+  --uw-remote-bg: var(--surface-subtle);
+  --uw-remote-border: var(--border);
+  --uw-remote-text: var(--text-primary);
+  --uw-remote-accent: var(--color-border-brand);
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--uw-remote-border);
+  background: var(--uw-remote-bg);
+  color: var(--uw-remote-text);
+  font-size: 12px;
+  line-height: 1.5;
+  -webkit-app-region: no-drag;
+}
+
+.uw-editlock-strip[data-tone='warn'] {
+  --uw-remote-bg: var(--warning-bg);
+  --uw-remote-border: var(--warning-border);
+  --uw-remote-text: var(--warning-text);
+  --uw-remote-accent: var(--warning-text);
+}
+
+.uw-editlock-strip[data-tone='success'] {
+  --uw-remote-bg: var(--success-bg);
+  --uw-remote-border: var(--success-border);
+  --uw-remote-text: var(--success);
+  --uw-remote-accent: var(--success);
+}
+
+.uw-editlock-strip .uw-editlock-text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.uw-editlock-strip .uw-editlock-title,
+.uw-editlock-strip .uw-editlock-message {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.uw-editlock-strip .uw-editlock-title {
+  font-weight: 600;
+}
+
+.uw-editlock-strip .uw-editlock-message {
+  margin-top: 2px;
+}
+
+.uw-editlock-strip .uw-editlock-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+
+.uw-editlock-strip .uw-editlock-action {
+  /* inherits .uw-remote-action chrome; the spinner keeps the label readable while acquiring */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* ── SIZE-F1 save-block band: reserves top-inset height so the modal sits above the editor view ── */

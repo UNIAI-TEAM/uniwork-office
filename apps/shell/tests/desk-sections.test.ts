@@ -111,10 +111,11 @@ describe('DeskInTray', () => {
     const h = home([comment])
     await render(createElement(DeskInTray, { home: h, signedIn: true, view: 'ready', local: [] }))
     expect(host.textContent).toContain('Contract-012')
-    // a person's comment: their initials and an info pill; the date is not mono
-    expect(host.querySelector('.wb-desk-avatar')!.textContent).toBe('L')
+    // a person's comment: an info pill; the date is the picker list's Cập nhật cell (shared formatter)
     expect(host.querySelector('.wb-pill.is-info')!.textContent).toBe('Comment')
-    expect(host.querySelector('.wb-desk-when')!.className).not.toContain('wb-mono')
+    expect(host.querySelector('.uw-pick-row [data-col="updated"]')!.textContent).toMatch(
+      /^\d{2}\/\d{2}(\/\d{4})?$|^[A-Z][a-z]{2} \d{1,2}(, \d{4})?$|^\d{2}:\d{2}$|^Yesterday, \d{2}:\d{2}$/,
+    )
     await act(async () => button('Contract-012')!.click())
     await act(async () => {
       for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -168,9 +169,111 @@ describe('DeskInTray', () => {
     )
     const titles = () => host.querySelectorAll<HTMLButtonElement>('.wb-desk-row-title')
     expect(titles()).toHaveLength(8)
-    await act(async () => host.querySelector<HTMLButtonElement>('li .wb-link')!.click())
+    // "Show more" sits under the list, not inside it as a fake row
+    expect(host.querySelector('.dh-picker ul .wb-link')).toBeNull()
+    await act(async () => host.querySelector<HTMLButtonElement>('.wb-link')!.click())
     expect(titles()).toHaveLength(9)
     expect(document.activeElement).toBe(titles()[8])
+  })
+
+  it('lists the tray on the compact picker variant of the shared DocList', async () => {
+    const shared = {
+      id: 's1',
+      workspaceId: 'w',
+      title: 'Plan',
+      format: 'docx',
+      updatedAt: new Date().toISOString(),
+      updatedByName: 'Minh Trần',
+      workspaceName: 'Legal',
+    }
+    api.uniworkListSharedWithMe.mockResolvedValueOnce({
+      ok: true,
+      value: { documents: [shared], nextCursor: null },
+    })
+    api.uniworkDocStatus.mockResolvedValue({
+      path: '/c/p.docx',
+      documentId: 'd9',
+      workspaceId: 'w',
+      title: 'Proposal',
+      format: 'docx',
+      access: 'edit',
+      state: 'conflict',
+    })
+    const local = [
+      {
+        path: '/c/p.docx',
+        name: 'p.docx',
+        ext: 'docx',
+        mtimeMs: 1,
+        sizeBytes: 1,
+        starred: false,
+        uniwork: { documentId: 'd9' },
+      } as RecentEntry,
+    ]
+    await render(
+      createElement(DeskInTray, { home: home([comment]), signedIn: true, view: 'ready', local }),
+    )
+    // a plain list: the title button is the control, so no listbox / option / aria-selected
+    expect(host.querySelector('[role="listbox"], [role="option"], [aria-selected]')).toBeNull()
+    const list = host.querySelector('.dh-picker ul[role="list"]')!
+    expect(list.getAttribute('aria-label')).toBe('Needs you')
+    // the quiet picker header: Tên · Cập nhật (Người sửa joins once the card is wide enough), nothing sortable
+    const head = host.querySelector('.dh-picker-head')!
+    expect(head.getAttribute('aria-hidden')).toBe('true')
+    expect(head.textContent).toContain('Name')
+    expect(head.querySelector('button')).toBeNull()
+    // no second table: no Chọn / Access / Size / Actions columns
+    expect(host.querySelector('.wb-desk-row')).toBeNull()
+    expect(host.querySelector('input[type="checkbox"]')).toBeNull()
+    const items = Array.from(list.querySelectorAll(':scope > li'))
+    // the tray's own order is kept: sync problem, comment, then the share
+    expect(items.map((li) => li.querySelector('.wb-row-title')!.textContent)).toEqual([
+      'Proposal',
+      'Contract-012',
+      'Plan',
+    ])
+    for (const li of items) {
+      expect(li.querySelector(':scope > .uw-pick-row .wb-row-title')).not.toBeNull()
+      // the pill sits beside the option in the same item
+      expect(li.querySelector(':scope > .wb-desk-trail .wb-pill')).not.toBeNull()
+      expect(li.querySelector(':scope > .uw-pick-row [data-col="updated"]')).not.toBeNull()
+    }
+    // second line: why the row is here (the share names its workspace); the date of a
+    // sync problem that has no save time reads as an empty cell, not a blank
+    expect(items[0]!.querySelector('.uw-pick-row-meta')!.textContent).toBe(
+      'This copy and the one on UniWork differ',
+    )
+    expect(items[0]!.querySelector('[data-col="updated"]')!.textContent).toBe('—')
+    expect(items[2]!.querySelector('.uw-pick-row-meta')!.textContent).toBe(
+      'Shared with you · Legal',
+    )
+    // Resolve stays a visible, labelled button beside its row only for a sync problem
+    expect(items[0]!.querySelector(':scope > .wb-desk-trail .wb-desk-row-act')).not.toBeNull()
+    expect(items[1]!.querySelector('.wb-desk-row-act')).toBeNull()
+    expect(items[2]!.querySelector('.wb-desk-row-act')).toBeNull()
+  })
+
+  it('opens a row from anywhere on it, once', async () => {
+    await render(
+      createElement(DeskInTray, {
+        home: home([comment]),
+        signedIn: true,
+        view: 'ready',
+        local: [],
+      }),
+    )
+    await act(async () =>
+      host.querySelector<HTMLElement>('.uw-pick-row [data-col="updated"]')!.click(),
+    )
+    await act(async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+    expect(api.uniworkOpenDocument).toHaveBeenCalledTimes(1)
+    await act(async () => button('Contract-012')!.click())
+    await act(async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+    expect(api.uniworkOpenDocument).toHaveBeenCalledTimes(2)
   })
 
   it('shows a sync problem from a working copy', async () => {

@@ -108,6 +108,18 @@ async function ready(page: Page, frame: Frame, text: string | RegExp) {
   await expect.poll(() => previewText(page), { timeout: 30_000 }).toMatch(text)
 }
 
+/**
+ * A view-only copy never runs the page (signed F3 = A, UNI-1993): the web bridge shows the
+ * script-free copy in the srcdoc frame with an empty sandbox, and preview.html is never loaded.
+ */
+async function readyStatic(page: Page, frame: Frame, text: string | RegExp) {
+  await expect(frame.locator('.workspace')).toBeVisible({ timeout: 30_000 })
+  const iframe = frame.locator('iframe.preview-frame')
+  await expect(iframe).toHaveAttribute('sandbox', '', { timeout: 30_000 })
+  await expect(iframe.contentFrame().locator('body')).toContainText(text, { timeout: 30_000 })
+  expect(page.frames().filter((f) => f.url().includes('/preview.html'))).toHaveLength(0)
+}
+
 async function view(frame: Frame, name: RegExp, mode: string) {
   await frame.getByRole('tab', { name }).click()
   await expect(frame.locator(`.workspace.view-${mode}`)).toBeVisible()
@@ -361,7 +373,7 @@ test('html: view only without the save grant', async ({ page }) => {
   const problems = await watch(page)
   await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
   const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en', readonly: '1' })
-  await ready(page, frame, /UniWork HTML web fixture/)
+  await readyStatic(page, frame, /UniWork HTML web fixture/)
   // the host announces view-only (banner + live region): cap viewOnlyChip is off on the web
   await expect(frame.locator('.status-view-only')).toHaveCount(0)
   await view(frame, /^Source$/, 'source')
@@ -476,4 +488,181 @@ test('html: a phone shows the AI panel over the page and a status bar that fits'
   )
   expect(clipped).toBe(false)
   await page.screenshot({ path: screenshotPath('html', 'narrow-390-light-en') })
+})
+
+// UNI-1920 (item B): Ctrl/Cmd+P with focus inside the HTML frame runs the module's print path —
+// the same one File > Print / the host `print` request take (htmlApi.printHtml over the static
+// copy) — instead of the browser's own dialog. Without the `print` grant nothing runs and the
+// key keeps its default.
+interface HtmlPrintArg {
+  html: string
+}
+
+/** the renderer calls window.htmlApi.printHtml(...) for every print; count and stub it — the real
+ * bridge opens the print iframe whose win.print() would block headless Chromium */
+const stubPrintHtml = (frame: Frame): Promise<void> =>
+  frame.evaluate(() => {
+    const w = window as unknown as {
+      htmlApi: { printHtml: (arg: HtmlPrintArg) => Promise<{ ok: boolean }> }
+      __prints: string[]
+    } // e2e: __prints records each print the module started
+    w.__prints = []
+    w.htmlApi.printHtml = async (arg) => {
+      w.__prints.push(arg.html)
+      return { ok: true }
+    }
+  })
+
+/** records whether each mod+P keydown kept its default: a document-capture listener runs after
+ * the accelerator's window-capture one, so e.defaultPrevented is already final */
+const watchCtrlP = (frame: Frame): Promise<void> =>
+  frame.evaluate(() => {
+    const w = window as unknown as { __ctrlPDefaultPrevented: boolean[] } // e2e scratch flag
+    w.__ctrlPDefaultPrevented = []
+    document.addEventListener(
+      'keydown',
+      (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p')
+          w.__ctrlPDefaultPrevented.push(e.defaultPrevented)
+      },
+      true,
+    )
+  })
+
+const ctrlPDefaults = (frame: Frame): Promise<boolean[]> =>
+  frame.evaluate(() => {
+    const w = window as unknown as { __ctrlPDefaultPrevented: boolean[] } // e2e scratch flag
+    return w.__ctrlPDefaultPrevented
+  })
+
+const prints = (frame: Frame): Promise<string[]> =>
+  frame.evaluate(() => {
+    const w = window as unknown as { __prints: string[] } // e2e print counter
+    return w.__prints
+  })
+
+test('html: Ctrl+P inside the frame runs the module print path once per press', async ({
+  page,
+}) => {
+  const problems = await watch(page)
+  await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
+  const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en' })
+  await ready(page, frame, /UniWork HTML web fixture/)
+  await stubPrintHtml(frame)
+  await watchCtrlP(frame)
+
+  // focus inside the frame (the source editor): the keystroke belongs to the frame
+  await view(frame, /^Source$/, 'source')
+  await frame.locator('.cm-content').click()
+  await page.keyboard.press('Control+p')
+  await expect.poll(() => prints(frame), { timeout: 15_000 }).toHaveLength(1)
+  // a second press runs the path once more — never twice per press
+  await page.keyboard.press('Control+p')
+  await expect.poll(() => prints(frame), { timeout: 15_000 }).toHaveLength(2)
+  expect(await ctrlPDefaults(frame), 'both presses claimed (browser default prevented)').toEqual([
+    true,
+    true,
+  ])
+  // the module printed the document: the serialized page reached htmlApi.printHtml
+  expect((await prints(frame))[0]).toContain('UniWork HTML web fixture')
+  await expectClean(page, frame, problems)
+})
+
+test('html: Ctrl+P without the print grant runs nothing and keeps the browser default', async ({
+  page,
+}) => {
+  const problems = await watch(page)
+  await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
+  const frame = await openModule(page, 'html', {
+    open: PAGE_PATH,
+    lang: 'en',
+    noprint: '1',
+  })
+  await ready(page, frame, /UniWork HTML web fixture/)
+  await stubPrintHtml(frame)
+  await watchCtrlP(frame)
+  await view(frame, /^Source$/, 'source')
+  await frame.locator('.cm-content').click()
+  await page.keyboard.press('Control+p')
+  await page.waitForTimeout(500)
+  expect(await prints(frame), 'no print grant -> the module print path never ran').toEqual([])
+  expect(await ctrlPDefaults(frame), 'the press was not claimed').toEqual([false])
+  await expectClean(page, frame, problems)
+})
+
+// UNI-1919 (RR2D-4): the default view is Preview, a nested sandboxed frame (preview.html, opaque
+// origin). A keydown inside it never reaches the module window, so the accelerator above cannot
+// hear it; the inspector injected into the page relays the press over its port and the module
+// runs the same print path once, with the browser's dialog suppressed inside the preview.
+test('html: Ctrl+P with focus inside the Preview runs the module print path once per press', async ({
+  page,
+}) => {
+  const problems = await watch(page)
+  await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
+  const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en' })
+  await ready(page, frame, /UniWork HTML web fixture/)
+  await stubPrintHtml(frame)
+  await watchCtrlP(frame)
+  const preview = previewFrame(page)!
+  await watchCtrlP(preview)
+
+  // focus inside the preview document (a click on rendered text also starts an inline edit)
+  await frame.locator('iframe.preview-frame').contentFrame().locator('h1').click()
+  await page.keyboard.press('Control+p')
+  await expect.poll(() => prints(frame), { timeout: 15_000 }).toHaveLength(1)
+  await page.keyboard.press('Control+p')
+  await expect.poll(() => prints(frame), { timeout: 15_000 }).toHaveLength(2)
+  await page.waitForTimeout(500)
+  expect(await prints(frame), 'one module print per press, never two').toHaveLength(2)
+  expect(await ctrlPDefaults(preview), 'both presses claimed inside the preview').toEqual([
+    true,
+    true,
+  ])
+  expect(await ctrlPDefaults(frame), 'the key never reached the module window').toEqual([])
+  expect((await prints(frame))[0]).toContain('UniWork HTML web fixture')
+  await expectClean(page, frame, problems)
+})
+
+// UNI-1919 (RC-1): text typed into an inline edit is only in the preview DOM until the edit
+// commits; the press must commit it first so the printed document carries it
+test('html: Ctrl+P during an inline text edit prints the typed text', async ({ page }) => {
+  const problems = await watch(page)
+  await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
+  const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en' })
+  await ready(page, frame, /UniWork HTML web fixture/)
+  await stubPrintHtml(frame)
+  // the click must land on the text itself (not the empty right of the block h1) to start the edit
+  await frame
+    .locator('iframe.preview-frame')
+    .contentFrame()
+    .locator('h1')
+    .click({ position: { x: 20, y: 10 } })
+  const marker = 'PrintMarkerZq1919'
+  await page.keyboard.type(marker)
+  await page.keyboard.press('Control+p')
+  await expect.poll(() => prints(frame), { timeout: 15_000 }).toHaveLength(1)
+  expect((await prints(frame))[0]).toContain(marker)
+  await expectClean(page, frame, problems)
+})
+
+test('html: Ctrl+P inside the Preview without the print grant keeps the browser default', async ({
+  page,
+}) => {
+  const problems = await watch(page)
+  await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
+  const frame = await openModule(page, 'html', {
+    open: PAGE_PATH,
+    lang: 'en',
+    noprint: '1',
+  })
+  await ready(page, frame, /UniWork HTML web fixture/)
+  await stubPrintHtml(frame)
+  const preview = previewFrame(page)!
+  await watchCtrlP(preview)
+  await frame.locator('iframe.preview-frame').contentFrame().locator('h1').click()
+  await page.keyboard.press('Control+p')
+  await page.waitForTimeout(500)
+  expect(await prints(frame), 'no print grant -> the module print path never ran').toEqual([])
+  expect(await ctrlPDefaults(preview), 'the press was not claimed').toEqual([false])
+  await expectClean(page, frame, problems)
 })

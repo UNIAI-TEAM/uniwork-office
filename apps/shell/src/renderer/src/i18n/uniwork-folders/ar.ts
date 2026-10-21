@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const ar = {
-  ufRoot: 'UniWork',
+  ufRoot: 'المستندات (الجذر)',
   ufTreeLabel: 'المجلدات',
   ufContentsLabel: 'محتوى المجلد',
   ufRecent: 'الأخيرة',
@@ -25,6 +25,7 @@ export const ar = {
   ufTooDeep: 'لا تتجاوز شجرة المستندات {max} مستوى.',
   ufCycle: 'لا يمكن نقل مجلد إلى نفسه أو إلى أحد مجلداته الفرعية.',
   ufParentKind: 'يوجد المجلد في الجذر أو داخل مجلد آخر.',
+  ufNotShareable: 'لا يمكن مشاركة المجلدات. شارك كل مستند على حدة.',
   ufFolderGone: 'لم يعد هذا المجلد هنا.',
   ufFolderNoAccess: 'لم تعد لديك صلاحية الوصول إلى هذا المجلد.',
   ufNoPermission: 'ليس لديك إذن لتغيير هذا المجلد.',

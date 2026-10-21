@@ -1,4 +1,14 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,7 +35,46 @@ let identity: { accountId: string; deviceSessionId: string; deploymentId: string
 const dialogs = vi.hoisted(() => ({
   open: [] as unknown[],
   result: { canceled: true, filePaths: [] as string[] },
+  save: { canceled: true } as { canceled: boolean; filePath?: string },
+  saveOptions: [] as unknown[],
 }))
+
+const downloadHooks = vi.hoisted(() => ({
+  nextRandomBytes: null as Buffer | null,
+  onRename: null as ((src: string, dest: string) => void) | null,
+}))
+
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = (await importOriginal()) as { randomBytes: (size: number) => Buffer }
+  return {
+    ...actual,
+    randomBytes: (size: number) => {
+      if (downloadHooks.nextRandomBytes && size === 8) {
+        const buf = downloadHooks.nextRandomBytes
+        downloadHooks.nextRandomBytes = null
+        return buf
+      }
+      return actual.randomBytes(size)
+    },
+  }
+})
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = (await importOriginal()) as {
+    rename: (src: string, dest: string) => Promise<void>
+  }
+  return {
+    ...actual,
+    rename: async (src: string, dest: string) => {
+      if (downloadHooks.onRename) {
+        const hook = downloadHooks.onRename
+        downloadHooks.onRename = null
+        hook(String(src), String(dest))
+      }
+      return actual.rename(src, dest)
+    },
+  }
+})
 
 vi.mock('electron', () => ({
   app: { getPath: () => dir, configureHostResolver: () => undefined },
@@ -36,7 +85,10 @@ vi.mock('electron', () => ({
       return dialogs.result
     }),
     showMessageBox: vi.fn(async () => ({ response: 1 })),
-    showSaveDialog: vi.fn(async () => ({ canceled: true })),
+    showSaveDialog: vi.fn(async (...args: unknown[]) => {
+      dialogs.saveOptions.push(args.at(-1))
+      return dialogs.save
+    }),
   },
   safeStorage: {
     isEncryptionAvailable: () => true,
@@ -78,6 +130,8 @@ beforeEach(() => {
   identity = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }
   dialogs.open.length = 0
   dialogs.result = { canceled: true, filePaths: [] }
+  dialogs.save = { canceled: true }
+  dialogs.saveOptions.length = 0
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -127,6 +181,7 @@ describe('the S18 action IPC', () => {
     const { handlers } = await setup()
     for (const channel of [
       UNIWORK_DOC_CHANNELS.createDocument,
+      UNIWORK_DOC_CHANNELS.createPage,
       UNIWORK_DOC_CHANNELS.pickUploadFile,
       UNIWORK_DOC_CHANNELS.uploadDocument,
       UNIWORK_DOC_CHANNELS.cancelUpload,
@@ -149,6 +204,18 @@ describe('the S18 action IPC', () => {
       folderId: null,
       name: '   ',
       format: 'docx',
+    })
+    expect(result).toEqual({ ok: false, error: 'name_empty' })
+  })
+
+  // UNI-1953 CT1-7: the create-page channel reaches service.createPage (an empty
+  // name is refused there, before any request, with the same result shape)
+  it('routes the create-page channel to the service createPage', async () => {
+    const { handlers } = await setup()
+    const result = await handlers.get(UNIWORK_DOC_CHANNELS.createPage)!(null, {
+      workspaceId: 'ws_1',
+      folderId: null,
+      name: '   ',
     })
     expect(result).toEqual({ ok: false, error: 'name_empty' })
   })
@@ -606,6 +673,370 @@ describe('the SAVE-01 first-save IPC (S01-R1-7)', () => {
       expect(trashParams.get('updated_by')).toBe('u_9')
       expect(trashParams.get('updated_from')).toBe('2026-10-01T00:00:00Z')
     } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
+// UNI-1961: the Documents home's "other sources" rows (list + download) reach
+// main through their own channels.
+describe('the document sources IPC (UNI-1961)', () => {
+  const sourcesBody = {
+    items: [
+      {
+        id: 'task:src_1',
+        source: 'task',
+        parent: { kind: 'task', id: 'task_1', title: 'Chuẩn bị họp' },
+        name: 'Biên bản.docx',
+        size_bytes: 12,
+        updated_at: '2026-10-19T08:00:00Z',
+        owner: { id: 'u_1', kind: 'user', name: 'Minh Trần' },
+      },
+    ],
+    next_cursor: null,
+  }
+
+  it('routes listSources to the server with its filters', async () => {
+    const { handlers } = await setup()
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        seen.push(String(input))
+        return new Response(JSON.stringify(sourcesBody), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }),
+    )
+    try {
+      const page = (await handlers.get(UNIWORK_DOC_CHANNELS.listSources)!(null, {
+        workspaceId: 'ws_1',
+        type: 'docx',
+        cursor: 'c_1',
+      })) as { ok: boolean; value?: { items: Array<{ id: string }>; nextCursor: string | null } }
+      expect(page.ok).toBe(true)
+      expect(page.value?.items.map((item) => item.id)).toEqual(['task:src_1'])
+      expect(page.value?.nextCursor).toBeNull()
+      expect(seen).toEqual([
+        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources?type=docx&cursor=c_1&limit=50',
+      ])
+      // a call without a workspace never reaches the server
+      expect(await handlers.get(UNIWORK_DOC_CHANNELS.listSources)!(null, {})).toEqual({
+        ok: false,
+        error: 'not_found',
+      })
+      expect(seen).toHaveLength(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('downloads canonical compound source ids into the picked path, preserves extensions on long names, and refuses malformed ids before the dialog (R1-1, R1-10)', async () => {
+    const { handlers } = await setup()
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        seen.push(String(input))
+        return new Response(new Uint8Array([7, 8, 9]), { status: 200 })
+      }),
+    )
+    try {
+      dialogs.saveOptions.length = 0
+      for (const bad of ['src_1', '../x', 'other:att_1', 'task:att/1']) {
+        expect(
+          await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+            workspaceId: 'ws_1',
+            sourceId: bad,
+            name: 'Biên bản.docx',
+          }),
+        ).toEqual({ ok: false, error: 'not_found' })
+      }
+      expect(dialogs.saveOptions).toHaveLength(0)
+      expect(seen).toEqual([])
+
+      const cancelled = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: `${'a'.repeat(200)}.pdf`,
+      })
+      expect(cancelled).toEqual({ ok: true, value: { path: null } })
+      expect(seen).toEqual([])
+      const longOpt = dialogs.saveOptions.at(-1) as {
+        defaultPath?: string
+        filters?: Array<{ extensions?: string[] }>
+      }
+      expect(longOpt.defaultPath).toBe(join(dir, `${'a'.repeat(196)}.pdf`))
+      expect(longOpt.filters?.[0]?.extensions).toEqual(['pdf'])
+
+      for (const prefix of ['chat', 'task', 'meeting', 'email'] as const) {
+        const target = join(dir, `${prefix}-Biên bản.docx`)
+        dialogs.save = { canceled: false, filePath: target }
+        const saved = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+          workspaceId: 'ws_1',
+          sourceId: `${prefix}:src_1`,
+          name: '../../Biên bản.docx',
+        })
+        const lastOpt = dialogs.saveOptions.at(-1) as { defaultPath?: string }
+        const suggested = lastOpt.defaultPath ?? ''
+        expect(suggested.endsWith('Biên bản.docx')).toBe(true)
+        expect(suggested).not.toContain('..')
+        expect(saved).toEqual({ ok: true, value: { path: target } })
+        expect([...readFileSync(target)]).toEqual([7, 8, 9])
+      }
+      expect(seen).toEqual([
+        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/chat%3Asrc_1/download',
+        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/task%3Asrc_1/download',
+        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/meeting%3Asrc_1/download',
+        'https://uniwork.example/api/v1/workspaces/ws_1/documents/sources/email%3Asrc_1/download',
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('cancels an oversized streamed source download at the cap and leaves an existing destination unchanged (R1-4, R1-12)', async () => {
+    const { handlers } = await setup()
+    const target = join(dir, 'existing.docx')
+    writeFileSync(target, new Uint8Array([1, 2, 3]))
+    dialogs.save = { canceled: false, filePath: target }
+    const chunk = new Uint8Array(16 * 1024 * 1024)
+    let pulls = 0
+    let cancelled = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        const body = new ReadableStream<Uint8Array>(
+          {
+            pull(controller) {
+              pulls += 1
+              if (pulls > 20) {
+                controller.close()
+                return
+              }
+              controller.enqueue(chunk)
+            },
+            cancel() {
+              cancelled = true
+            },
+          },
+          { highWaterMark: 0 },
+        )
+        return new Response(body, { status: 200 })
+      }),
+    )
+    try {
+      const res = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(res).toEqual({ ok: false, error: 'too_large' })
+      expect(cancelled).toBe(true)
+      expect(pulls).toBe(17)
+      expect([...readFileSync(target)]).toEqual([1, 2, 3])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('refuses direct store targets, final symlinks, parent-directory symlinks, and held-download symlink replacements without modifying protected bytes (R1-6, R1-13, R1-16)', async () => {
+    const { handlers } = await setup()
+    const storeDir = join(dir, 'uniwork-documents', 'default', 'acc_1', 'doc_1')
+    mkdirSync(storeDir, { recursive: true })
+    const storeFile = join(storeDir, 'Protected.docx')
+    writeFileSync(storeFile, new Uint8Array([10, 20, 30]))
+
+    const finalLink = join(dir, 'alias.docx')
+    symlinkSync(storeFile, finalLink)
+    const parentLink = join(dir, 'linked-store')
+    symlinkSync(storeDir, parentLink)
+    const viaParentLink = join(parentLink, 'Protected.docx')
+
+    let fetches = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        fetches += 1
+        return new Response(new Uint8Array([7, 8, 9]), { status: 200 })
+      }),
+    )
+    try {
+      for (const candidate of [storeFile, finalLink, viaParentLink]) {
+        dialogs.save = { canceled: false, filePath: candidate }
+        const res = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+          workspaceId: 'ws_1',
+          sourceId: 'task:src_1',
+          name: 'Protected.docx',
+        })
+        expect(res).toEqual({ ok: false, error: 'forbidden' })
+        expect([...readFileSync(storeFile)]).toEqual([10, 20, 30])
+      }
+      expect(fetches).toBe(0)
+
+      const raceTarget = join(dir, 'race-target.docx')
+      let releaseFetch: ((res: Response) => void) | undefined
+      let markFetchEntered: () => void = () => undefined
+      const fetchEntered = new Promise<void>((resolve) => {
+        markFetchEntered = resolve
+      })
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          () =>
+            new Promise<Response>((resolve) => {
+              releaseFetch = resolve
+              markFetchEntered()
+            }),
+        ),
+      )
+      dialogs.save = { canceled: false, filePath: raceTarget }
+      const pending = handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'Protected.docx',
+      })
+      await fetchEntered
+      symlinkSync(storeFile, raceTarget)
+      releaseFetch!(new Response(new Uint8Array([7, 8, 9]), { status: 200 }))
+      expect(await pending).toEqual({ ok: false, error: 'forbidden' })
+      expect([...readFileSync(storeFile)]).toEqual([10, 20, 30])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('stages source downloads through a private exclusive sibling temp file, preserves destination mode (0600 and 0660) under permissive umask, and cleans up on write or rename failure (R1-5, R2-2, R2-7, R2-10, R3-7)', async () => {
+    const { handlers } = await setup()
+    const subDir = join(dir, 'target-dir')
+    mkdirSync(subDir, { recursive: true })
+    const target = join(subDir, 'existing.docx')
+    writeFileSync(target, new Uint8Array([1, 2, 3, 4]))
+    chmodSync(target, 0o600)
+    chmodSync(subDir, 0o500)
+    dialogs.save = { canceled: false, filePath: target }
+    const prevUmask = process.umask(0o002)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new Uint8Array([7, 8, 9, 10]), { status: 200 })),
+    )
+    try {
+      const failed = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(failed).toEqual({ ok: false, error: 'server_error' })
+      expect([...readFileSync(target)]).toEqual([1, 2, 3, 4])
+      expect(readdirSync(subDir)).toEqual(['existing.docx'])
+
+      // R2-7: rename failure after the staged file has been written cleans up the staged sibling and leaves target unchanged
+      chmodSync(subDir, 0o700)
+      let stagedBytesAtRename: number[] = []
+      downloadHooks.onRename = (src) => {
+        stagedBytesAtRename = [...readFileSync(src)]
+        throw Object.assign(new Error('EXDEV'), { code: 'EXDEV' })
+      }
+      dialogs.save = { canceled: false, filePath: target }
+      const renameFailed = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(renameFailed).toEqual({ ok: false, error: 'server_error' })
+      expect(stagedBytesAtRename).toEqual([7, 8, 9, 10])
+      expect([...readFileSync(target)]).toEqual([1, 2, 3, 4])
+      expect(readdirSync(subDir)).toEqual(['existing.docx'])
+
+      // R2-2, R2-10: successful replacement preserves 0o600 mode even under permissive umask 0o002
+      dialogs.save = { canceled: false, filePath: target }
+      const saved = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(saved).toEqual({ ok: true, value: { path: target } })
+      expect([...readFileSync(target)]).toEqual([7, 8, 9, 10])
+      expect(statSync(target).mode & 0o777).toBe(0o600)
+      expect(readdirSync(subDir)).toEqual(['existing.docx'])
+
+      // R3-7: existing destination mode 0o660 also survives replacement under permissive umask
+      writeFileSync(target, new Uint8Array([1, 2, 3, 4]))
+      chmodSync(target, 0o660)
+      dialogs.save = { canceled: false, filePath: target }
+      const saved660 = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(saved660).toEqual({ ok: true, value: { path: target } })
+      expect([...readFileSync(target)]).toEqual([7, 8, 9, 10])
+      expect(statSync(target).mode & 0o777).toBe(0o660)
+      expect(readdirSync(subDir)).toEqual(['existing.docx'])
+    } finally {
+      downloadHooks.onRename = null
+      process.umask(prevUmask)
+      chmodSync(subDir, 0o700)
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('downloads into a valid 240-byte destination basename using a short independent staging name (R2-4)', async () => {
+    const { handlers } = await setup()
+    const subDir = join(dir, 'long-dir')
+    mkdirSync(subDir, { recursive: true })
+    const longName = `${'a'.repeat(235)}.docx`
+    expect(Buffer.byteLength(longName, 'utf8')).toBe(240)
+    const longTarget = join(subDir, longName)
+    writeFileSync(longTarget, new Uint8Array([1, 2, 3, 4]))
+    dialogs.save = { canceled: false, filePath: longTarget }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new Uint8Array([7, 8, 9, 10]), { status: 200 })),
+    )
+    try {
+      const saved = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: longName,
+      })
+      expect(saved).toEqual({ ok: true, value: { path: longTarget } })
+      expect([...readFileSync(longTarget)]).toEqual([7, 8, 9, 10])
+      expect(readdirSync(subDir)).toEqual([longName])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('preserves both a colliding sibling and the destination on an exclusive staging EEXIST collision (R2-5, R2-11)', async () => {
+    const { handlers } = await setup()
+    const subDir = join(dir, 'collision-dir')
+    mkdirSync(subDir, { recursive: true })
+    const target = join(subDir, 'existing.docx')
+    writeFileSync(target, new Uint8Array([1, 2, 3, 4]))
+    const legacySibling = join(subDir, '.existing.docx.deadbeefdeadbeef.tmp')
+    const shortSibling = join(subDir, '.uw-dl-deadbeefdeadbeef.tmp')
+    writeFileSync(legacySibling, new Uint8Array([99, 98, 97]))
+    writeFileSync(shortSibling, new Uint8Array([99, 98, 97]))
+    downloadHooks.nextRandomBytes = Buffer.from('deadbeefdeadbeef', 'hex')
+    dialogs.save = { canceled: false, filePath: target }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new Uint8Array([7, 8, 9, 10]), { status: 200 })),
+    )
+    try {
+      const failed = await handlers.get(UNIWORK_DOC_CHANNELS.downloadSource)!(null, {
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'existing.docx',
+      })
+      expect(failed).toEqual({ ok: false, error: 'server_error' })
+      expect([...readFileSync(target)]).toEqual([1, 2, 3, 4])
+      expect([...readFileSync(legacySibling)]).toEqual([99, 98, 97])
+      expect([...readFileSync(shortSibling)]).toEqual([99, 98, 97])
+    } finally {
+      downloadHooks.nextRandomBytes = null
       vi.unstubAllGlobals()
     }
   })

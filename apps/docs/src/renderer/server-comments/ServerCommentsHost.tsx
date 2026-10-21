@@ -15,11 +15,14 @@ import type { CommentInfo } from '@genoffice/docx-engine'
 import type { Lang } from '@genoffice/i18n'
 import {
   COMMENTS_REVEAL_WAIT_MS,
+  AvatarSourceProvider,
   CollabComposer,
   CollabPanel,
   collabStrings,
   formatCollabTime,
   useCollabThreads,
+  useFrameAvatarSource,
+  type CollabComment,
   type CollabComposerSlot,
   type CollabController,
   type CollabHostState,
@@ -82,14 +85,36 @@ export interface ServerCommentsHostProps {
   codec?: DocxCodecOptions
 }
 
-function rootsOf(ctl: CollabController): TrackedRoot[] {
+/**
+ * The roots the tracker locates. A root the server holds as lost is not located, except in the
+ * version it was last anchored on (UNI-2033: the read-only copy of that version), where its anchor
+ * is still the real one.
+ */
+function rootsOf(ctl: CollabController, openVersionId?: string): TrackedRoot[] {
   return [...ctl.threads, ...ctl.resolved].map((t) => ({
     id: t.id,
     anchor: t.root.anchor,
-    anchor_state: t.root.anchor_state,
+    anchor_state:
+      t.root.anchor_state === 'lost' &&
+      openVersionId !== undefined &&
+      t.root.anchor_version_id === openVersionId
+        ? null
+        : t.root.anchor_state,
     resolved: t.resolved,
     deleted: t.deleted,
   }))
+}
+
+/** the roots of a raw list: what a Save round needs, without waiting for a render to derive threads */
+function rootsFromComments(comments: readonly CollabComment[]): TrackedRoot[] {
+  return comments
+    .filter((c) => !c.parent_id && !c.deleted_at)
+    .map((c) => ({
+      id: c.id,
+      anchor: c.anchor,
+      anchor_state: c.anchor_state,
+      resolved: !!c.resolved_at,
+    }))
 }
 
 function threadOf(ctl: CollabController, id: string): CollabThreadView | undefined {
@@ -128,6 +153,7 @@ function InFileList(p: {
 }
 
 export function ServerCommentsHost(p: ServerCommentsHostProps) {
+  const avatars = useFrameAvatarSource()
   const { mode, editor, lang, panelOpen } = p
   const source = useMemo(
     () => createUniworkCommentsSource(mode.api, mode.path, 'comment'),
@@ -170,15 +196,6 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const adapter = useMemo(() => anchors?.adapter(), [anchors, adapterSeq])
 
-  const ctl = useCollabThreads(source, host, { adapter, strings })
-  const ctlRef = useRef(ctl)
-  ctlRef.current = ctl
-
-  // the latest server roots feed the tracker (new ids located once; known ids keep their live range)
-  useEffect(() => {
-    anchors?.syncThreads(rootsOf(ctl))
-  }, [anchors, ctl.threads, ctl.resolved]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // base_version_id of a new root: the version open at load, then the last Save receipt
   const versionRef = useRef<string | null>(mode.versionId)
   // mirrored in state so the "save first" line appears and goes away with it
@@ -188,23 +205,79 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
     setKnownVersion(mode.versionId)
   }, [mode.versionId])
 
-  // after each Save receipt: one anchor map for every located (or lost) root
+  // "View in version N" of a lost thread: the desktop shell opens that version read-only; a host
+  // without it (the web frame) gives the kit no handler, so the action does not show
+  const onViewVersion = useMemo(() => {
+    const { api, path } = mode
+    return api.openVersion
+      ? ({ commentId, versionNo }: { commentId: string; versionNo: number }) =>
+          api.openVersion!({ path, commentId, versionNo })
+      : undefined
+  }, [mode])
+
+  const ctl = useCollabThreads(source, host, {
+    adapter,
+    strings,
+    openVersionId: knownVersion ?? undefined,
+    ...(onViewVersion ? { onViewVersion } : {}),
+  })
+  const ctlRef = useRef(ctl)
+  ctlRef.current = ctl
+
+  // the latest server roots feed the tracker (new ids located once; known ids keep their live range)
+  useEffect(() => {
+    anchors?.syncThreads(rootsOf(ctl, knownVersion ?? undefined))
+  }, [anchors, ctl.threads, ctl.resolved]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // after each Save receipt: one anchor map for every located (or lost) root, built from a fresh list
+  // (with the panel closed nothing else lists, so a comment made since the first list would be missed).
+  // Rounds are serialized: one in flight, the newest receipt waits as the single pending version.
   const anchorsRef = useRef(anchors)
   anchorsRef.current = anchors
   useEffect(() => {
-    return mode.api.onSaved((payload) => {
+    let disposed = false
+    const round: { running: boolean; pending: string | null } = { running: false, pending: null }
+    const runRound = async (queued: string) => {
+      const roots = rootsFromComments(await ctlRef.current.freshComments())
+      const a = anchorsRef.current
+      if (disposed || !a) return
+      // a receipt that landed while the list was loading supersedes this one
+      const versionId = round.pending ?? queued
+      round.pending = null
+      a.syncThreads(roots)
+      const updates = buildAnchorUpdates(a, roots)
+      await syncAnchorsAfterSave(source, versionId, updates, () => {
+        void ctlRef.current.reload()
+      })
+    }
+    const drain = async () => {
+      round.running = true
+      try {
+        while (round.pending !== null && !disposed) {
+          const versionId = round.pending
+          round.pending = null
+          try {
+            await runRound(versionId)
+          } catch {
+            // a failed map is rebuilt from the live ranges at the next Save receipt
+          }
+        }
+      } finally {
+        round.running = false
+      }
+    }
+    const off = mode.api.onSaved((payload) => {
       if (payload.path && mode.path && payload.path !== mode.path) return
       versionRef.current = payload.versionId
       setKnownVersion(payload.versionId)
-      const a = anchorsRef.current
-      if (!a) return
-      const updates = buildAnchorUpdates(a, rootsOf(ctlRef.current))
-      void syncAnchorsAfterSave(source, payload.versionId, updates, () => {
-        void ctlRef.current.reload()
-      }).catch(() => {
-        // a failed map is rebuilt from the live ranges at the next Save receipt
-      })
+      if (!anchorsRef.current) return
+      round.pending = payload.versionId
+      if (!round.running) void drain()
     })
+    return () => {
+      disposed = true
+      off()
+    }
   }, [mode.api, mode.path, source])
 
   // desktop reload rule (addendum §4.7): focus + every 30 s while the panel is open and the tab visible
@@ -452,34 +525,36 @@ export function ServerCommentsHost(p: ServerCommentsHostProps) {
   // a view or comment caller cannot save the file, so a "save first" prompt would lead nowhere
   const needsSave = !knownVersion && mode.level !== 'view' && mode.level !== 'comment'
   return (
-    <div className="comments-pane docs-server-comments">
-      <CollabPanel
-        className="docs-server-panel"
-        controller={ctl}
-        strings={strings}
-        onClose={p.onClosePanel}
-        renderComposer={renderComposer}
-        inFile={
-          inFileCount > 0
-            ? {
-                count: inFileCount,
-                content: (
-                  <InFileList
-                    comments={p.inFileComments}
-                    neutralAuthor={p.neutralAuthor}
-                    lang={lang}
-                    resolvedLabel={strings.collabResolved ?? ''}
-                  />
-                ),
-              }
-            : undefined
-        }
-      />
-      {needsSave && (
-        <p className="collab-pnote collab-pnote--warn docs-server-save-first">
-          {p.saveFirstMessage}
-        </p>
-      )}
-    </div>
+    <AvatarSourceProvider value={avatars}>
+      <div className="comments-pane docs-server-comments">
+        <CollabPanel
+          className="docs-server-panel"
+          controller={ctl}
+          strings={strings}
+          onClose={p.onClosePanel}
+          renderComposer={renderComposer}
+          inFile={
+            inFileCount > 0
+              ? {
+                  count: inFileCount,
+                  content: (
+                    <InFileList
+                      comments={p.inFileComments}
+                      neutralAuthor={p.neutralAuthor}
+                      lang={lang}
+                      resolvedLabel={strings.collabResolved ?? ''}
+                    />
+                  ),
+                }
+              : undefined
+          }
+        />
+        {needsSave && (
+          <p className="collab-pnote collab-pnote--warn docs-server-save-first">
+            {p.saveFirstMessage}
+          </p>
+        )}
+      </div>
+    </AvatarSourceProvider>
   )
 }

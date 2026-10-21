@@ -251,10 +251,14 @@ export function breadcrumbOf(path: PathPart[], rootTitle: string): Crumb[] {
   return [root, { kind: 'more', hidden: path.slice(0, -2) }, ...items.slice(-2)]
 }
 
-/** a search hit's path: left-truncated to its direct parent, the full path for `title` */
+/**
+ * a search hit's path: left-truncated to its direct parent, the full path for `title`. A file
+ * directly in the root is the root's name alone: nothing follows it, so no trailing "›".
+ */
 export function shortPath(path: PathPart[], rootTitle: string): { short: string; full: string } {
   const full = [rootTitle, ...path.map((p) => p.title)].join(' › ')
-  if (path.length <= 1) return { short: `${full} ›`, full }
+  if (path.length === 0) return { short: full, full }
+  if (path.length === 1) return { short: `${full} ›`, full }
   return { short: `… › ${path[path.length - 1]!.title} ›`, full }
 }
 
@@ -267,12 +271,13 @@ export function isFolderEntry(doc: UniworkDocSummary): boolean {
 }
 
 /**
- * A row the app shows: folders always; files it can open. Pages (UniNote) and
- * other formats are hidden and counted (the FD-14 rule, applied per folder).
+ * A row the app shows: folders and pages (UniNote, opened on the web: UNI-1953)
+ * always; files it can open. Other formats are hidden and counted (the FD-14
+ * rule, applied per folder).
  */
 export function isShownEntry(doc: UniworkDocSummary): boolean {
   if (isFolderEntry(doc)) return true
-  if (doc.kind === 'page') return false
+  if (doc.kind === 'page') return true
   return isOpenable(doc)
 }
 
@@ -405,6 +410,8 @@ export function folderActionFailure(
       return { key: 'ufCycle' }
     case 'document_parent_kind':
       return { key: 'ufParentKind' }
+    case 'folder_not_shareable':
+      return { key: 'ufNotShareable' }
     case 'forbidden':
     case 'permission_revoked':
       return { key: 'ufNoPermission' }
@@ -467,7 +474,7 @@ export function entryTitleOf(doc: UniworkDocSummary, label: string): string {
   return isMyFolder(doc) ? label : doc.title
 }
 
-/** rename / move / archive / share are offered on every row but My Folder (Q2) */
+/** rename / move / archive are offered on every row but My Folder (Q2) */
 export function folderEditActionsOffered(entry: { systemKind?: UniworkSystemKind }): boolean {
   return !isMyFolder(entry)
 }

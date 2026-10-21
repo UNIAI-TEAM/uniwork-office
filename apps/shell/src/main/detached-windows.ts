@@ -25,7 +25,7 @@ import { htmlIsDirty, requestHtmlClose } from '../../../html/src/main/html-main'
 import { blankRetiredPage } from './retire-page'
 import { aiEpochOf, clearAiRun, isAiRunning, type EditorState } from './ai-run-registry'
 import { canonicalPath } from './tab-manager'
-import { confirmUniworkClose } from './uniwork-docs/close-guard'
+import { confirmUniworkClose, notePathsDropped } from './uniwork-docs/close-guard'
 import type { DetachedTab } from './tab-manager'
 import type { OpenDocumentTab, TabKind } from '../shared/tabs-api'
 import { DOCK_BAND_SLACK, DOCK_DWELL_MS, dockBand, pointInRect } from '../shared/tab-drag-geometry'
@@ -349,13 +349,27 @@ export async function detachedEditorStates(
   return out
 }
 
+/**
+ * UNI-2033: the title a detached window shows for its file (a read-only version copy says so).
+ * Idempotent by contract: a window docked back hands its decorated title to the tab strip,
+ * whose own decorator must not suffix it twice.
+ */
+let decorateTitle: (filePath: string | undefined, title: string) => string = (_filePath, title) =>
+  title
+
+export function setDetachedTitleDecorator(
+  decorate: (filePath: string | undefined, title: string) => string,
+): void {
+  decorateTitle = decorate
+}
+
 /** Save As / open-in-place landed on a new path — keep the window title and
  *  the dedup registry in sync (same contract as TabManager.setTabFileFor). */
 export function detachedSetFileFor(webContentsId: number, filePath: string): void {
   const rec = detached.get(webContentsId)
   if (!rec) return
   rec.filePath = filePath
-  if (!rec.window.isDestroyed()) rec.window.setTitle(basename(filePath))
+  if (!rec.window.isDestroyed()) rec.window.setTitle(decorateTitle(filePath, basename(filePath)))
   onChanged()
 }
 
@@ -375,7 +389,9 @@ export function detachedRenameFile(
   for (const rec of detached.values()) {
     if (rec.filePath && canonicalPath(rec.filePath) === wanted) {
       rec.filePath = newPath
-      if (!rec.window.isDestroyed()) rec.window.setTitle(basename(newPath))
+      if (!rec.window.isDestroyed()) {
+        rec.window.setTitle(decorateTitle(newPath, basename(newPath)))
+      }
       onChanged()
       return { kind: rec.kind, webContents: rec.view.webContents }
     }
@@ -396,7 +412,7 @@ export function detachedRetitleFile(
   const wanted = canonicalPath(path)
   for (const rec of detached.values()) {
     if (!rec.filePath || canonicalPath(rec.filePath) !== wanted) continue
-    if (!rec.window.isDestroyed()) rec.window.setTitle(title)
+    if (!rec.window.isDestroyed()) rec.window.setTitle(decorateTitle(rec.filePath, title))
     return { kind: rec.kind, webContents: rec.view.webContents }
   }
   return undefined
@@ -432,7 +448,9 @@ function releaseDetached(rec: DetachedRecord): DetachedTab {
   clearDockHover(rec)
   rec.released = true
   if (torn?.rec === rec) torn = null
-  const title = win.isDestroyed() ? (filePath ? basename(filePath) : '') : win.getTitle()
+  // stored tab titles are the plain file name; the window title carries the
+  // localized read-only suffix, which the strip re-applies itself
+  const title = filePath ? basename(filePath) : win.isDestroyed() ? '' : win.getTitle()
   detached.delete(view.webContents.id)
   if (!win.isDestroyed()) {
     win.contentView.removeChildView(view)
@@ -514,7 +532,7 @@ export function createDetachedEditorWindow(options: {
     ...origin,
     minWidth: 720,
     minHeight: 550,
-    title,
+    title: decorateTitle(filePath, title),
     show: !tearOffAt,
     // native frame: the editor view fills the window, so the OS title bar is
     // the only drag surface / window-controls host
@@ -530,6 +548,7 @@ export function createDetachedEditorWindow(options: {
     closeConfirmed = true
     clearDockHover(rec)
     if (torn?.rec === rec) torn = null
+    if (filePath) notePathsDropped([filePath])
     win.contentView.removeChildView(view)
     detached.delete(wcId)
     // G5-03a: the window is closed mid AI turn — the document must not stay

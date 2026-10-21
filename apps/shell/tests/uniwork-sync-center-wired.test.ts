@@ -113,6 +113,13 @@ function wired(
     /** the lease manager's effective state per document id (RES-3) */
     lease?: (documentId: string) => string
     offlineLibrary?: boolean
+    /** the deployment this build runs against (default: the last owner's) */
+    activeDeployment?: string | null
+    pickSaveDialog?: () => Promise<string | null>
+    /** UNI-1993: the one startup sweep shared with the source-view opener */
+    startupSweep?: Promise<unknown>
+    sweepSources?: () => Promise<void>
+    dropSources?: () => Promise<void>
   } = {},
 ) {
   const storeRoot = join(base, 'store')
@@ -228,6 +235,11 @@ function wired(
       readDir: async (dir: string) => bindings.get(basename(dir)) ?? null,
       readLastOwner: () => SCOPE,
       exists: () => true,
+      isInside: (targetPath: string) => {
+        const normalizedRoot = `${storeRoot.replace(/\\/g, '/')}/`
+        const normalizedTarget = targetPath.replace(/\\/g, '/')
+        return normalizedTarget.startsWith(normalizedRoot)
+      },
     },
     currentLocks: () => options.locks ?? [],
     syncCenterEngine: async () => ({
@@ -261,6 +273,8 @@ function wired(
         org: { id: 'org-1', name: 'VietAnts' },
         ...options.status,
       }) as never,
+    activeDeploymentId: () =>
+      options.activeDeployment === undefined ? SCOPE.deploymentId : options.activeDeployment,
     capabilityRead: async () => ({
       kind: 'ok',
       capabilities: {
@@ -288,9 +302,12 @@ function wired(
     isPathOpen: (path) => openPaths.has(path),
     defaultSaveDir: () => base,
     writeClipboard: () => undefined,
-    pickSaveDialog: async () => null,
+    pickSaveDialog: options.pickSaveDialog ?? (async () => null),
     pushChanged: () => undefined,
     now: () => clock,
+    ...(options.startupSweep ? { startupSweep: options.startupSweep } : {}),
+    ...(options.sweepSources ? { sweepSources: options.sweepSources } : {}),
+    ...(options.dropSources ? { dropSources: options.dropSources } : {}),
   })
   return {
     ...center,
@@ -756,10 +773,13 @@ describe('W10: "Đồng bộ ngay" restarts a feed stopped on refused resyncs, e
       await rt.runtime.tick()
     }
     await vi.waitFor(async () =>
-      expect((await h.controller.getSnapshot()).header.online).toBe(false),
+      expect((await h.controller.getSnapshot()).header.status).toBe('resync_failed'),
     )
     const stopped = (await h.controller.getSnapshot()).header
-    // the refused resyncs are reported as offline (deferred to G5-13), and the flag is still set
+    // B47 (UNI-1362): a refused resync is a round trip that REACHED the server,
+    // so the pass is not offline and the header names the condition the click
+    // clears instead of masking it behind `offline`
+    expect(stopped.online).toBe(true)
     expect(stopped.resyncFailed).toBe(true)
     tick.mockClear()
     return { rt, h, tick }
@@ -865,5 +885,89 @@ describe('EL1A-R2-2: wired Sync Center names edit_locked from a stored failed re
       state: 'failed',
       failedReason: 'edit_locked',
     })
+  })
+})
+
+describe('G703B-P4 (FL-08): the signed-out working-copy count belongs to the active deployment', () => {
+  const signedOut = { loggedIn: false, state: 'signed-out' }
+
+  it("counts the last owner's copies on the deployment it ran against (FL-07 unchanged)", async () => {
+    const h = wired({ docs: [{ key: 'doc-1' }], status: signedOut })
+    expect((await h.controller.getSnapshot()).signedOut).toEqual({ lockedCount: 1 })
+  })
+
+  it("does not count another deployment's last owner", async () => {
+    const h = wired({ docs: [{ key: 'doc-1' }], status: signedOut, activeDeployment: 'dep-B' })
+    expect((await h.controller.getSnapshot()).signedOut).toEqual({ lockedCount: 0 })
+  })
+
+  it('counts nothing while no deployment profile is known', async () => {
+    const h = wired({ docs: [{ key: 'doc-1' }], status: signedOut, activeDeployment: null })
+    expect((await h.controller.getSnapshot()).signedOut).toEqual({ lockedCount: 0 })
+  })
+})
+
+describe('A106 (UNI-1362): wired Sync Center refuses saveMyCopy targets inside the working-copy root', () => {
+  it('returns code other and writes nothing when the picked path lies inside service.store.root', async () => {
+    const insideTarget = join(base, 'store', SCOPE.deploymentId, SCOPE.accountId, 'stray.docx')
+    const h = wired({
+      docs: [{ key: 'doc-1' }],
+      pickSaveDialog: async () => insideTarget,
+    })
+    expect(await h.controller.saveMyCopy('doc-1')).toEqual({ ok: false, code: 'other' })
+    expect(existsSync(insideTarget)).toBe(false)
+  })
+})
+
+describe('UNI-1993 C1: the source views ride the sync center cadence', () => {
+  it('every poll also sweeps the closed source tabs, and a failing sweep never breaks the poll', async () => {
+    const sweepSources = vi.fn(async () => undefined)
+    const h = wired({ docs: [{ key: 'doc-1' }], sweepSources })
+    await h.notePoll(true)
+    await h.notePoll(undefined)
+    expect(sweepSources).toHaveBeenCalledTimes(2)
+
+    const failing = wired({
+      docs: [{ key: 'doc-1' }],
+      sweepSources: async () => {
+        throw new Error('disk')
+      },
+    })
+    await expect(failing.notePoll(true)).resolves.toBeUndefined()
+  })
+
+  it('a changed account drops the source views once; the same account again does not', async () => {
+    const dropSources = vi.fn(async () => undefined)
+    const h = wired({ docs: [{ key: 'doc-1' }], dropSources })
+    await h.noteAccount()
+    const first = dropSources.mock.calls.length
+    await h.noteAccount()
+    expect(dropSources).toHaveBeenCalledTimes(first)
+    h.setScope(null)
+    await h.noteAccount()
+    expect(dropSources).toHaveBeenCalledTimes(first + 1)
+    h.setScope({ deploymentId: 'dep-1', accountId: 'acc-2' })
+    await h.noteAccount()
+    expect(dropSources).toHaveBeenCalledTimes(first + 2)
+  })
+
+  it('a startup sweep handed in is THE sweep: the center does not remove the root a second time', async () => {
+    const root = join(base, 'userData', 'uniwork-drafts-preview')
+    const survivor = join(root, 'sources-now', 'ab', 'Plan.docx')
+    mkdirSync(join(root, 'sources-now', 'ab'), { recursive: true })
+    writeFileSync(survivor, 'written after the shared sweep')
+    wired({ docs: [{ key: 'doc-1' }], startupSweep: Promise.resolve() })
+    // an own removal of the root would take this file (a source written after the shared sweep)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(existsSync(survivor)).toBe(true)
+  })
+
+  it('wiring.ts builds one startup sweep and hands the same promise to the service and the center', () => {
+    const source = readFileSync(join(__dirname, '..', 'src/main/uniwork-docs/wiring.ts'), 'utf8')
+    expect(source).toContain('startPreviewStartupSweep(')
+    expect(source).toContain('sourceViewStartupSweep: previewStartupSweep')
+    expect(source).toContain('startupSweep: previewStartupSweep')
+    expect(source).toContain('sweepSources: () => service.sweepSourceViews()')
+    expect(source).toContain('dropSources: () => service.dropSourceViews()')
   })
 })

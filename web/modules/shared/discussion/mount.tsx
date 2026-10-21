@@ -30,13 +30,17 @@ import {
 } from '../../../docs/protocol/types'
 import { FrameDiscussion, type FrameDiscussionHandle } from './FrameDiscussion'
 import { createEditorShield, type EditorShield } from './overlay'
+import { frameAvatars } from '../comments/frame-api'
 import { frameMentionAccess } from '../comments/mention-access'
 import { createFrameDiscussionSource } from './source'
 import { frameRevealRouter } from '../comments/reveal-router'
 import { announceFrameSidePanel, onFrameSidePanel } from '../comments/side-panel'
 
 /** what the mount needs from the frame client; the two comment hooks are absent on old ports and mocks */
-export type DiscussionPort = Pick<FramePort, 'whenInitialized' | 'request'> & {
+export type DiscussionPort = Pick<
+  FramePort,
+  'whenInitialized' | 'request' | 'getToken' | 'refreshToken'
+> & {
   onCommentsChanged?(listener: (payload: CommentsChangedPayload) => void): () => void
   handleCommentsReveal?(
     handler: (
@@ -90,6 +94,10 @@ function DiscussionRoot({ port, session, revealMissing, doc }: RootProps) {
     user: session.user,
     profile: session.profile,
   })
+  const avatars = useMemo(
+    () => (port.getToken && port.refreshToken ? frameAvatars(port) : undefined),
+    [port],
+  )
   const handle = useRef<FrameDiscussionHandle>(null)
   const shield = useRef<EditorShield | null>(null)
   useEffect(() => {
@@ -131,6 +139,7 @@ function DiscussionRoot({ port, session, revealMissing, doc }: RootProps) {
   return (
     <FrameDiscussion
       handle={handle}
+      {...(avatars ? { avatars } : {})}
       source={source}
       documentId={session.documentId}
       level={(access.level ?? undefined) as CollabLevel | undefined}

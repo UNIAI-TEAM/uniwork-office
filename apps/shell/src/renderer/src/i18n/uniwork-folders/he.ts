@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const he = {
-  ufRoot: 'UniWork',
+  ufRoot: 'מסמכים (שורש)',
   ufTreeLabel: 'תיקיות',
   ufContentsLabel: 'תוכן התיקייה',
   ufRecent: 'אחרונים',
@@ -25,6 +25,7 @@ export const he = {
   ufTooDeep: 'עץ המסמכים מוגבל ל־{max} רמות.',
   ufCycle: 'אי אפשר להעביר תיקייה לתוך עצמה או לאחת מתיקיות המשנה שלה.',
   ufParentKind: 'תיקייה נמצאת בשורש או בתוך תיקייה אחרת.',
+  ufNotShareable: 'לא ניתן לשתף תיקיות. שתפו כל מסמך בנפרד.',
   ufFolderGone: 'התיקייה הזו כבר לא כאן.',
   ufFolderNoAccess: 'אין לך עוד גישה לתיקייה הזו.',
   ufNoPermission: 'אין לך הרשאה לשנות את התיקייה הזו.',

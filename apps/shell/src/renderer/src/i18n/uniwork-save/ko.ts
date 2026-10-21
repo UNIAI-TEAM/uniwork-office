@@ -12,11 +12,12 @@ export const ko = {
   usMyFolderPrivate: '비공개, 나만 볼 수 있음',
   usChange: '변경',
   usSave: '저장',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: '닫기',
   usPickTitle: '저장 위치 선택',
   usBack: '이름 지정으로 돌아가기',
   usSearchFolders: '폴더 검색',
-  usSharedNote: '공유 폴더에 저장하면 문서는 해당 폴더의 권한을 따릅니다.',
   usChooseFolder: '"{folder}" 선택',
   usSelected: '선택됨',
   usRootBlocked: '폴더를 선택하세요',
@@ -32,4 +33,8 @@ export const ko = {
   usErrAlreadyBound: '이 탭은 이미 UniWork 문서에 연결되어 있습니다. 평소처럼 저장하세요.',
   usErrNotFound:
     '저장할 파일이나 선택한 폴더를 찾을 수 없습니다. 저장 위치를 다시 선택한 뒤 다시 시도하세요.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>

@@ -32,7 +32,7 @@ export const vi = {
   aiFootprintOverwritten: 'Ô có dữ liệu bị ghi đè: {count}',
   aiFootprintOverwrittenMin: 'Ô có dữ liệu bị ghi đè: ít nhất {count}',
   aiFootprintNoOverwrite: 'Không ghi đè dữ liệu có sẵn',
-  aiUndoTitle: 'Hoàn tác thay đổi này của AI (tương đương ⌘Z)',
+  aiUndoTitle: 'Hoàn tác thay đổi này của AI (tương đương {undoKeys})',
   aiUndo: 'Hoàn tác',
   aiPreviewAria: 'Xem trước thay đổi',
   aiProposedChanges: 'Thay đổi đề xuất',

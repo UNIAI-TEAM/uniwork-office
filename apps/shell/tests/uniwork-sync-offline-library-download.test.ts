@@ -127,6 +127,60 @@ describe('G5-05 download: disk full on re-download keeps old ready', () => {
   })
 })
 
+describe('G703B-P2 download: a full disk that also refuses the settle row (FL-02)', () => {
+  /** ENOSPC from the first byte on: the content AND the settled row both fail to write */
+  async function fullDiskFirstDownload(h: Harness) {
+    addDoc(h, 'doc_1', 1)
+    h.docs.beforeChunk = () => {
+      h.fs.failWrite = () => true
+    }
+    return rowOf(await pinDoc(h))
+  }
+
+  it('the row read from the store after the settle failed still says disk-full, not downloading', async () => {
+    const h = createHarness()
+    expect(await fullDiskFirstDownload(h)).toMatchObject({ state: 'disk-full' })
+    expect(await h.manager.row('doc_1')).toMatchObject({
+      state: 'disk-full',
+      readyVersion: null,
+      failure: 'store_full',
+    })
+    expect((await h.manager.list()).map((row) => row.state)).toEqual(['disk-full'])
+  })
+
+  it('space back + retry -> ready (the recovery path is unchanged)', async () => {
+    const h = createHarness()
+    await fullDiskFirstDownload(h)
+    h.fs.failWrite = null
+    h.docs.beforeChunk = null
+    expect(await h.manager.downloadNow('doc_1')).toMatchObject({
+      kind: 'ok',
+      row: { state: 'ready', readyVersion: 1 },
+    })
+    expect(await h.manager.row('doc_1')).toMatchObject({ state: 'ready', readyVersion: 1 })
+    expect(await opened(h)).toMatchObject({ kind: 'ok' })
+  })
+
+  it('a held copy whose update-kept row cannot be written reads update-kept, old copy served', async () => {
+    const h = createHarness()
+    const { v1 } = await readyThenNewer(h)
+    h.docs.beforeChunk = () => {
+      h.fs.failWrite = () => true
+    }
+    expect(await h.manager.downloadNow('doc_1')).toMatchObject({
+      kind: 'ok',
+      row: { state: 'update-kept', readyVersion: 1 },
+    })
+    h.fs.failWrite = null
+    expect(await h.manager.row('doc_1')).toMatchObject({
+      state: 'update-kept',
+      readyVersion: 1,
+      failure: 'store_full',
+    })
+    expect(same((await opened(h)).bytes, v1.bytes)).toBe(true)
+  })
+})
+
 describe('G5-05 download: corrupt cache never ready', () => {
   it('main checksum mismatch on a first download -> corrupt, never ready', async () => {
     const h = createHarness()
@@ -351,10 +405,9 @@ describe('G5-05 download: sign-out during download', () => {
     h.docs.beforeChunk = (_id, index) => {
       if (index === 4) wiped = signOut(h)
     }
-    const row = rowOf(await pinDoc(h))
+    // FUSR-R2-2: the pin answers for the outgoing session, so it returns no row of it
+    expect(await pinDoc(h)).toEqual({ kind: 'refused', code: 'interrupted' })
     await wiped
-    expect(row.state).toBe('interrupted')
-    expect(row.readyVersion).toBeNull()
     expect(h.storeFiles()).toEqual([])
     expect(filesContaining(h.fs, doc.bytes)).toEqual([])
     // the same account signs in again: nothing of the download is ready
@@ -392,7 +445,8 @@ describe('G5-05 download: sign-out during download', () => {
       }
       return false
     }
-    rowOf(await pinDoc(h))
+    // FUSR-R2-2: the boundary moved, so the pin returns no row of the old scope
+    expect(await pinDoc(h)).toEqual({ kind: 'refused', code: 'interrupted' })
     await wiped
     // the boundary moved: no delete of the unwinding job re-opens (and re-creates) the scope
     expect(await scopeExists()).toBe(false)
@@ -408,9 +462,9 @@ describe('G5-05 download: sign-out during download', () => {
       if (path.includes(staging) && !wiped) wiped = signOut(h)
       return false
     }
-    const row = rowOf(await pinDoc(h))
+    // FUSR-R2-2: the pin returns no row of the signed-out session
+    expect(await pinDoc(h)).toEqual({ kind: 'refused', code: 'interrupted' })
     await wiped
-    expect(row.state).toBe('interrupted')
     expect(h.storeFiles()).toEqual([])
     expect(filesContaining(h.fs, doc.bytes)).toEqual([])
     h.session.scope = SCOPE

@@ -7,9 +7,10 @@ export const pl = {
   uwChipPausedAdmin: 'Zapis w kolejce · wysyłanie wstrzymane',
   uwChipReconciling: 'Sprawdzanie ostatniego zapisu…',
   uwChipReconcileStuck: 'Potrzebna pomoc, aby potwierdzić zapis',
+  uwErrReconcileStuck: 'Potrzebna pomoc, aby potwierdzić zapis.',
   uwChipRemoteNewer: 'Nowsza wersja w UniWork',
   uwTipQueued:
-    'Zapis z {time} jest bezpiecznie przechowywany na tym komputerze i zostanie wysłany, gdy będziesz online.',
+    'Zapis z {time} jest bezpiecznie przechowywany na tym komputerze i zostanie wysłany, jak tylko będzie to możliwe.',
   uwTipQueuedNewer: 'Zapis z {time} czeka na wysłanie. Późniejsze zmiany nie są jego częścią.',
   uwTipPausedAdmin: 'Administrator wstrzymał wysyłanie. Zapis pozostaje na tym komputerze.',
   uwTipPausedUser:
@@ -123,6 +124,8 @@ export const pl = {
   uwSignOutWaiting: 'Kończenie trwającego zapisu przed wylogowaniem…',
   uwSignOutCaptureFailed:
     'Niektórych niezapisanych zmian nie udało się przechwycić na czas; dla Twojego konta zachowano najnowszą zapisaną lub automatycznie zapisaną wersję.',
+  uwSignOutTimedOut:
+    'Nie udało się na czas potwierdzić wylogowania; konto może być nadal zalogowane. Spróbuj ponownie.',
   uwSwitchLostTitle: 'Część niezapisanych zmian poprzedniego konta została utracona',
   uwSwitchLostBody:
     'Na tym komputerze zalogowało się inne konto, więc poprzednie konto zostało zablokowane. Dokumenty, których niezapisanych zmian nie udało się zachować: {count}. Wszystko inne pozostaje zablokowane na tym komputerze dla tamtego konta.',
@@ -331,7 +334,7 @@ export const pl = {
     'Cofnięto wszystkie zmiany. Wersja {n} w UniWork jest nowsza niż otwarta kopia.',
   uwRemoteStopAiConfirm:
     'Zatrzymać działające UniWork AI, aby wczytać ponownie? Zmiany wprowadzone już przez AI należą do otwartej kopii.',
-  uwRemoteWaitCommit: 'Czekanie na zakończenie trwającego zapisu; potem można wczytać ponownie.',
+  uwRemoteWaitCommit: 'Czekanie na zakończenie trwającego zapisu; potem można kontynuować.',
   uwRemoteReload: 'Wczytaj najnowszą…',
   uwRemoteLater: 'Później',
   uwRemoteClose: 'Zamknij',

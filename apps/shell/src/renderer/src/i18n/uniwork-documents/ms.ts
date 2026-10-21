@@ -138,19 +138,21 @@ export const ms = {
   uwDocType: 'Jenis',
   uwDocLocation: 'Lokasi',
   uwDocRename: 'Namakan semula',
-  uwDocArchive: 'Arkibkan',
+  uwDocArchive: 'Alih ke sampah',
   uwDocRestore: 'Pulihkan',
-  uwDocArchiveConfirm: 'Arkibkan “{name}”? Anda boleh memulihkannya kemudian.',
+  uwDocArchiveConfirm:
+    '“{name}” dan seluruh kandungannya akan kekal dalam sampah selama 30 hari sebelum dipadam secara kekal. Pengurus boleh memulihkannya dalam tempoh ini.',
   uwDocNameEmpty: 'Masukkan nama dokumen.',
   uwDocNameTooLong: 'Nama terlalu panjang (maksimum 500 aksara).',
   uwDocRenamedAnnounce: 'Dokumen telah dinamakan semula kepada {name}.',
   uwDocActionFailed: 'Tidak berjaya. Cuba lagi.',
+  uwUniNoteOpenFailed: 'UniNote telah dicipta tetapi tidak dapat dibuka. Buka dari senarai.',
   uwDocActionsFor: 'Lagi tindakan untuk “{name}”',
   uwDocCreate: 'Cipta',
   uwDocUploadPick: 'Pilih fail',
   uwDocUploading: 'Memuat naik “{name}”…',
   uwDocLocationTop: 'Peringkat teratas',
-  uwDocArchived: 'Diarkibkan',
+  uwDocArchived: 'Dialih ke sampah',
   uwSizeWarnChip: 'Menghampiri had {max} (kini {size}).',
   uwSizeWarnDismiss: 'Tutup amaran saiz',
   uwSaveBlockTitle: 'Tidak dapat menyimpan ke UniWork',
@@ -169,4 +171,35 @@ export const ms = {
   uwTipEditLockedSelf: 'Anda menyunting dokumen ini dalam tetingkap lain.',
   uwErrEditLocked: 'Orang lain sedang menyunting dokumen ini.',
   uwReasonEditLocked: 'orang lain sedang menyunting',
+  uwLockBannerOther: '{name} sedang menyunting sejak {time}. Anda sedang melihat baca-sahaja.',
+  uwLockBannerSelfElsewhere: 'Anda sedang menyunting dokumen ini di tetingkap lain.',
+  uwLockBannerFree: 'Tiada sesiapa sedang menyunting dokumen ini sekarang.',
+  uwLockEditHere: 'Sunting di sini',
+  uwLockAcquiring: 'Mendapatkan akses sunting…',
+  uwLockReadOnlyExplain: 'Tiada apa disimpan — dokumen baca-sahaja.',
+  uwLockLostTitle: 'Anda tidak lagi menyunting',
+  uwLockLostTakenOver:
+    '{name} telah mengambil alih penyuntingan. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockLostHandedOver:
+    'Anda telah menyerahkan penyuntingan kepada {name}. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockLostExpired:
+    'Penyuntingan telah tamat tempoh kerana kami tidak dapat mencapai pelayan untuk seketika (tiada rangkaian atau peranti tertidur). Perubahan anda yang belum disimpan masih di sini.',
+  uwLockLostMovedHere:
+    'Anda kini menyunting dokumen ini di tetingkap lain. Perubahan belum disimpan dalam tetingkap ini masih di sini.',
+  uwLockLostAccessLost:
+    'Anda tidak lagi mempunyai kebenaran untuk menyunting dokumen ini. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockLostGeneric:
+    'Anda tidak lagi menyunting. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockLostHeldBy:
+    '{name} sedang menyunting sekarang. Perubahan anda yang belum disimpan masih di sini.',
+  uwLockAcquireFailed: 'Tidak dapat memperoleh akses penyuntingan. Cuba lagi dalam beberapa minit.',
+  uwChipSourceView: 'Paparan sahaja · Dari {origin}',
+  uwTipSourceView:
+    'Fail ini dilampirkan dalam {origin}{parent}. Perubahan tidak akan disimpan. Untuk mendapatkan salinan, gunakan Muat turun dalam senarai Dokumen.',
+  uwSourceViewSaveHint: 'Fail ini untuk paparan sahaja — perubahan tidak disimpan.',
+  uwSourceViewCopyHint: 'Untuk mendapatkan salinan, gunakan Muat turun dalam senarai Dokumen.',
+  uwSourceOriginChat: 'Sembang',
+  uwSourceOriginTask: 'Tugasan',
+  uwSourceOriginMeeting: 'Mesyuarat',
+  uwSourceOriginEmail: 'E-mel',
 } satisfies Record<keyof typeof zh, string>

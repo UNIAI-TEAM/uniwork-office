@@ -45,13 +45,11 @@ export const he = {
   ribbonPasteTipDisabled: 'הדבקה (העתק או גזור תחילה רכיב בקנבס)',
   ribbonCutTip: 'גזירה (⌘X)',
   ribbonCopyTip: 'העתקה (⌘C)',
-  ribbonBrushTipNoSelection: 'מברשת עיצוב (בחר תחילה רכיב; ⌘⇧C מעתיק עיצוב / ⌘⇧V מדביק עיצוב)',
+  ribbonBrushTipNoSelection: 'מברשת עיצוב (בחר תחילה רכיב)',
   ribbonBrushTipContinuous: 'מברשת עיצוב במצב רציף (הקש Esc ליציאה)',
   ribbonBrushTipOnce: 'מברשת עיצוב במצב חד-פעמי (לחץ על רכיב היעד כדי להחיל)',
-  ribbonBrushTipHasFormat:
-    'מברשת עיצוב (לחיצה לפעם אחת / לחיצה כפולה למצב רציף; ⌘⇧C מעתיק עיצוב / ⌘⇧V מדביק עיצוב)',
-  ribbonBrushTipDefault:
-    'מברשת עיצוב (לחץ כדי להעתיק ולהחיל עיצוב; ⌘⇧C מעתיק עיצוב / ⌘⇧V מדביק עיצוב)',
+  ribbonBrushTipHasFormat: 'מברשת עיצוב (לחיצה לפעם אחת / לחיצה כפולה למצב רציף)',
+  ribbonBrushTipDefault: 'מברשת עיצוב (לחץ כדי להעתיק ולהחיל עיצוב)',
   ribbonGroupSlides: 'שקופיות',
   ribbonNewSlide: 'שקופית חדשה',
   ribbonNewSlideTip: 'שקופית ריקה חדשה (שומרת על רקע הפריסה של השקופית הנוכחית)',
@@ -354,9 +352,9 @@ export const he = {
   ribbonAnimDelayTip: 'השהיה אחרי ההפעלה לפני ההתחלה (שניות)',
   ribbonGroupStartShow: 'התחלת הצגת שקופיות',
   ribbonFromBeginning: 'מההתחלה',
-  ribbonFromBeginningTip: 'הצגה במסך מלא משקופית 1 (F5; שקופיות מוסתרות מדולגות)',
+  ribbonFromBeginningTip: 'הצגה במסך מלא משקופית 1 (שקופיות מוסתרות מדולגות)',
   ribbonFromCurrent: 'מהשקופית הנוכחית',
-  ribbonFromCurrentTip: 'הצגה במסך מלא מהשקופית הנוכחית (⇧F5)',
+  ribbonFromCurrentTip: 'הצגה במסך מלא מהשקופית הנוכחית',
   ribbonPresenterView: 'תצוגת מציג',
   ribbonPresenterViewTip:
     'תצוגת מציג: הערות / השקופית הבאה / טיימר / עט; עם מספר צגים ההצגה רצה במסך מלא בצג השני',

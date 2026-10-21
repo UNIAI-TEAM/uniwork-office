@@ -4,10 +4,8 @@ import type { IpcRendererEvent } from 'electron'
 import type { RenderSlide } from '@genoffice/pptx-render'
 import type { ProjectApi } from '@genoffice/project-store'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
-import {
-  installUniworkAiFlagBridge,
-  installUniworkCloudStatusBridge,
-} from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import { installUniworkCloudStatusBridge } from '@genoffice/electron-utils/uniwork-cloud-status-bridge'
 import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import type {
@@ -362,6 +360,21 @@ const api: SlidesApi = {
   printSlides: (op: PrintSlidesOp) => ipcRenderer.invoke('slides:print', op),
   save: (origin?: 'user' | 'auto') => ipcRenderer.invoke('slides:save', origin),
   uniworkState: () => ipcRenderer.invoke('slides:uniwork-state'),
+  onUniworkStateChanged: (cb: (path: string) => void) => {
+    const listener = (_event: IpcRendererEvent, payload: unknown) => {
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'path' in payload &&
+        typeof payload.path === 'string'
+      ) {
+        cb(payload.path)
+      }
+    }
+    ipcRenderer.on('uniwork:doc-state-changed', listener)
+    return () => ipcRenderer.removeListener('uniwork:doc-state-changed', listener)
+  },
+  uniworkReadOnlySave: (path?: string) => ipcRenderer.invoke('slides:uniwork-read-only-save', path),
   saveAs: (defaultName: string) => ipcRenderer.invoke('slides:save-as', defaultName),
   onCloseSaveRequest: (handler: (origin?: 'user' | 'auto') => void) => {
     const listener = (_event: IpcRendererEvent, origin?: 'user' | 'auto') =>

@@ -401,6 +401,7 @@ describe('the comments IPC wiring (unbound -> zero requests)', () => {
         COMMENTS_CHANNELS.searchMentions,
         COMMENTS_CHANNELS.revealPending,
         COMMENTS_CHANNELS.context,
+        COMMENTS_CHANNELS.openVersion,
       ].sort(),
     )
   })
@@ -785,5 +786,143 @@ describe('the comments context + saved push (G8-12 §3.1)', () => {
     handle.saved(PATH, 'ver_8')
     handle.saved(OTHER, 'ver_9')
     expect(saved).toEqual([{ path: PATH, versionId: 'ver_8' }])
+  })
+})
+
+// UNI-2033: "View in version N" from a lost comment: the editor asks main to open it
+describe('comments.openVersion (UNI-2033)', () => {
+  const OTHER = '/home/u/UniWork/Other.docx'
+  const FOREIGN = '/home/u/UniWork/Foreign.docx'
+  const call = (handlers: Map<string, Handler>, senderId: number, payload: unknown) =>
+    handlers.get(COMMENTS_CHANNELS.openVersion)!({ sender: { id: senderId } }, payload)
+
+  function mountOpen(
+    options: {
+      server?: ReturnType<typeof createFakeCommentServer>
+      openVersionView?: (
+        documentId: string,
+        versionNo: number,
+        commentId: string,
+      ) => Promise<unknown>
+    } = {},
+  ) {
+    const { ipcMain, handlers } = fakeIpc()
+    const server = options.server ?? createFakeCommentServer()
+    if (!options.server) server.seed(DOC, [{ id: CMT, body: 'hi', kind: 'comment' }])
+    const openVersionView = vi.fn(
+      options.openVersionView ?? (async () => ({ path: '/w/doc@v2/Plan.docx', title: 'Plan' })),
+    )
+    const service = {
+      recentSource: (path: string) =>
+        path === PATH || path === OTHER
+          ? { documentId: DOC, workspaceId: 'ws-1', title: 'Plan', access: 'edit' as const }
+          : path === FOREIGN
+            ? ('hidden' as const)
+            : null,
+      openVersionView,
+    } as unknown as Parameters<typeof createUniworkComments>[1]['service']
+    createUniworkComments(ipcMain, {
+      service,
+      profile: () => ({ apiOrigin: ORIGIN }),
+      authorized: <T>(c: (t: string) => Promise<T>) => c('tok'),
+      isSignedIn: () => true,
+      fetch: server.fetch,
+      sendReveal: () => 'delivered',
+      // sender 7 shows PATH, sender 8 shows FOREIGN, sender 9 shows OTHER
+      shownPath: (sender) =>
+        sender.id === 7 ? PATH : sender.id === 8 ? FOREIGN : sender.id === 9 ? OTHER : null,
+    })
+    return { handlers, server, openVersionView }
+  }
+
+  it('a good request opens the version view once and answers opened:true', async () => {
+    const { handlers, openVersionView } = mountOpen()
+    expect(await call(handlers, 7, { path: PATH, commentId: CMT, versionNo: 2 })).toEqual({
+      opened: true,
+    })
+    expect(openVersionView.mock.calls).toEqual([[DOC, 2, CMT]])
+  })
+
+  it('confirms the comment with one list of the document, no other request', async () => {
+    const { handlers, server } = mountOpen()
+    await call(handlers, 7, { path: PATH, commentId: CMT, versionNo: 2 })
+    expect(server.calls).toHaveLength(1)
+    expect(server.calls[0]?.method).toBe('GET')
+    expect(server.calls[0]?.url).toContain(`/api/v1/documents/${DOC}/comments`)
+  })
+
+  it('a malformed request answers opened:false and touches nothing', async () => {
+    const { handlers, server, openVersionView } = mountOpen()
+    const bad: unknown[] = [
+      undefined,
+      null,
+      'x',
+      { path: '', commentId: CMT, versionNo: 2 },
+      { path: PATH, commentId: '', versionNo: 2 },
+      { path: PATH, commentId: CMT, versionNo: 0 },
+      { path: PATH, commentId: CMT, versionNo: -1 },
+      { path: PATH, commentId: CMT, versionNo: 1.5 },
+      { path: PATH, commentId: CMT, versionNo: '2' },
+      { path: PATH, commentId: CMT },
+    ]
+    for (const payload of bad) {
+      expect(await call(handlers, 7, payload), JSON.stringify(payload)).toEqual({ opened: false })
+    }
+    expect(server.calls).toHaveLength(0)
+    expect(openVersionView).not.toHaveBeenCalled()
+  })
+
+  it('an unbound path, another account’s copy, or a sender that does not show the path is refused', async () => {
+    const { handlers, server, openVersionView } = mountOpen()
+    const input = (path: string) => ({ path, commentId: CMT, versionNo: 2 })
+    // not a UniWork copy at all
+    expect(await call(handlers, 7, input('/home/u/Desktop/copy.docx'))).toEqual({ opened: false })
+    // another account / deployment's copy (recentSource says 'hidden')
+    expect(await call(handlers, 8, input(FOREIGN))).toEqual({ opened: false })
+    // the sender shows another document than the one it names
+    expect(await call(handlers, 9, input(PATH))).toEqual({ opened: false })
+    // an unknown sender (the shell, another window)
+    expect(await call(handlers, 99, input(PATH))).toEqual({ opened: false })
+    expect(server.calls).toHaveLength(0)
+    expect(openVersionView).not.toHaveBeenCalled()
+  })
+
+  it('a comment that is not one of this document’s comments is refused', async () => {
+    const { handlers, openVersionView } = mountOpen()
+    expect(
+      await call(handlers, 7, { path: PATH, commentId: 'not-a-comment', versionNo: 2 }),
+    ).toEqual({ opened: false })
+    expect(openVersionView).not.toHaveBeenCalled()
+  })
+
+  it('a discussion post is not a comment to view a version for', async () => {
+    const server = createFakeCommentServer()
+    server.seed(DOC, [{ id: CMT, body: 'talk', kind: 'discussion' }])
+    const { handlers, openVersionView } = mountOpen({ server })
+    expect(await call(handlers, 7, { path: PATH, commentId: CMT, versionNo: 2 })).toEqual({
+      opened: false,
+    })
+    expect(openVersionView).not.toHaveBeenCalled()
+  })
+
+  it('a server error on the list, or a failed open, answers opened:false and never throws', async () => {
+    const failing = createFakeCommentServer()
+    failing.seed(DOC, [{ id: CMT, body: 'hi', kind: 'comment' }])
+    failing.fail(500)
+    const a = mountOpen({ server: failing })
+    expect(await call(a.handlers, 7, { path: PATH, commentId: CMT, versionNo: 2 })).toEqual({
+      opened: false,
+    })
+    expect(a.openVersionView).not.toHaveBeenCalled()
+
+    const b = mountOpen({
+      openVersionView: async () => {
+        throw new Error('not_found')
+      },
+    })
+    expect(await call(b.handlers, 7, { path: PATH, commentId: CMT, versionNo: 2 })).toEqual({
+      opened: false,
+    })
+    expect(b.openVersionView).toHaveBeenCalledTimes(1)
   })
 })

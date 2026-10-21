@@ -230,7 +230,10 @@ export function SyncCenterPane({
   rowStatesRef.current = rowStates
   // a row the user did not act on that changed state is read once, politely
   const lastStates = useRef<Map<string, string> | null>(null)
-  const actedOn = useRef<Set<string>>(new Set())
+  // B54: id -> the badge the row had when the user's state-changing call ran; the
+  // mark ends only on that row's own badge change or removal, never on an
+  // unrelated snapshot (which would announce the user's own change a second time)
+  const actedOn = useRef<Map<string, string>>(new Map())
   useEffect(() => {
     if (!snap) return
     const now = rowStatesRef.current
@@ -244,9 +247,12 @@ export function SyncCenterPane({
       if (actedOn.current.has(id)) continue
       changed ??= s.text
     }
-    // the user's own acted-on marks end with this snapshot, except for a call still in flight
     const inFlight = busyRowIds(busyRef.current)
-    for (const id of Array.from(actedOn.current)) if (!inFlight.has(id)) actedOn.current.delete(id)
+    for (const [id, marked] of Array.from(actedOn.current)) {
+      const row = now.get(id)
+      if (!inFlight.has(id) && (row === undefined || row.badge !== marked))
+        actedOn.current.delete(id)
+    }
     if (changed) setLive(changed)
   }, [snap, setLive])
 
@@ -330,7 +336,7 @@ export function SyncCenterPane({
     busyRef.current.add(key)
     setBusy(new Set(busyRef.current))
     // only a state change is the user's own: copy, download and open leave the badge alone
-    if (STATE_CHANGING.has(a.id)) actedOn.current.add(r.id)
+    if (STATE_CHANGING.has(a.id)) actedOn.current.set(r.id, view.badge.key)
     const doc = titleOf(r, view)
     let result: SyncCenterActionResult
     try {
@@ -393,25 +399,35 @@ export function SyncCenterPane({
     setFocusAfter({ rowId: r.id, from })
   }
 
+  // B52: the header mutations get the same busy guard the row actions already had
+  const [headerBusy, setHeaderBusy] = useState<'now' | 'pause' | null>(null)
   const syncNow = () => {
-    if (!api || !header) return
+    if (!api || !header || headerBusy) return
     // a feed stopped on refused resyncs is restarted by this click, offline or not
     if (!header.online && !header.resyncFailed) {
       setLive(t('uwSyncNowOffline'))
       return
     }
-    void api.syncNow().then(
-      (res) => !res.ok && setLive(t(actionErrorKey(res.code), { cap: DRAFT_CAP })),
-      () => setLive(t('uwSyncActionFailed')),
-    )
+    setHeaderBusy('now')
+    void api
+      .syncNow()
+      .then(
+        (res) => !res.ok && setLive(t(actionErrorKey(res.code), { cap: DRAFT_CAP })),
+        () => setLive(t('uwSyncActionFailed')),
+      )
+      .finally(() => setHeaderBusy(null))
   }
 
   const togglePause = () => {
-    if (!api || !header) return
-    void api.setSendingPaused(!header.paused).then(
-      (res) => !res.ok && setLive(t(actionErrorKey(res.code), { cap: DRAFT_CAP })),
-      () => setLive(t('uwSyncActionFailed')),
-    )
+    if (!api || !header || headerBusy) return
+    setHeaderBusy('pause')
+    void api
+      .setSendingPaused(!header.paused)
+      .then(
+        (res) => !res.ok && setLive(t(actionErrorKey(res.code), { cap: DRAFT_CAP })),
+        () => setLive(t('uwSyncActionFailed')),
+      )
+      .finally(() => setHeaderBusy(null))
   }
 
   const [retrying, setRetrying] = useState(false)
@@ -483,37 +499,51 @@ export function SyncCenterPane({
   const renderActions = (r: SyncCenterRow, view: SyncRowView) => {
     if (confirm?.rowId === r.id) {
       const sentence = `${base}-confirm-${r.id}`
+      // B56: the row keeps its actions footprint while the confirm is open — the
+      // ghost set below holds the cell's height instead of collapsing to the
+      // shorter confirm block
       return (
-        <div
-          className="sc-confirm"
-          onKeyDown={(e) => {
-            if (e.key !== 'Escape') return
-            e.preventDefault()
-            e.stopPropagation()
-            closeConfirm()
-          }}
-        >
-          <span id={sentence} className="sc-confirm-text">
-            {t(confirm.action.confirm!.sentenceKey)}
-          </span>
-          <button
-            type="button"
-            className="set-btn danger sc-act"
-            aria-describedby={sentence}
-            aria-disabled={busyRows.has(r.id) || undefined}
-            onClick={() => void goConfirm(r, view)}
+        <div className="sc-actions-confirm">
+          <div className="sc-actions-ghost" aria-hidden="true">
+            {view.actions.map((a) => (
+              <span key={a.id} className="sc-act-wrap">
+                <button type="button" tabIndex={-1} className="set-btn sc-act" disabled>
+                  {t(a.labelKey)}
+                </button>
+              </span>
+            ))}
+          </div>
+          <div
+            className="sc-confirm"
+            onKeyDown={(e) => {
+              if (e.key !== 'Escape') return
+              e.preventDefault()
+              e.stopPropagation()
+              closeConfirm()
+            }}
           >
-            {t(confirm.action.confirm!.goKey)}
-          </button>
-          <button
-            type="button"
-            className="sc-link"
-            aria-describedby={sentence}
-            ref={backRef}
-            onClick={closeConfirm}
-          >
-            {t('uwActBack')}
-          </button>
+            <span id={sentence} className="sc-confirm-text">
+              {t(confirm.action.confirm!.sentenceKey)}
+            </span>
+            <button
+              type="button"
+              className="set-btn danger sc-act"
+              aria-describedby={sentence}
+              aria-disabled={busyRows.has(r.id) || undefined}
+              onClick={() => void goConfirm(r, view)}
+            >
+              {t(confirm.action.confirm!.goKey)}
+            </button>
+            <button
+              type="button"
+              className="sc-link"
+              aria-describedby={sentence}
+              ref={backRef}
+              onClick={closeConfirm}
+            >
+              {t('uwActBack')}
+            </button>
+          </div>
         </div>
       )
     }
@@ -522,6 +552,7 @@ export function SyncCenterPane({
       const running = busy.has(`${r.id}:${a.id}`)
       const disclosure = DISCLOSURES.has(a.id)
       const rowBusy = busyRows.has(r.id) && !disclosure
+      const disclosureOpen = disclosure && expanded === `${r.id}:${a.id}`
       return (
         <span key={a.id} className="sc-act-wrap">
           <button
@@ -531,7 +562,8 @@ export function SyncCenterPane({
             aria-disabled={a.unavailableKey || running || rowBusy ? true : undefined}
             aria-busy={running || undefined}
             aria-describedby={reasonId}
-            aria-expanded={disclosure ? expanded === `${r.id}:${a.id}` : undefined}
+            aria-expanded={disclosure ? disclosureOpen : undefined}
+            aria-controls={disclosureOpen ? `${base}-more-${r.id}` : undefined}
             onClick={() => activate(r, view, a, a.id)}
           >
             {t(a.labelKey)}
@@ -556,6 +588,12 @@ export function SyncCenterPane({
             danger: Boolean(a.confirm),
             disabled: Boolean(a.unavailableKey) || (busyRows.has(r.id) && !DISCLOSURES.has(a.id)),
             hint: a.unavailableKey ? t(a.unavailableKey) : undefined,
+            ...(DISCLOSURES.has(a.id)
+              ? {
+                  expanded: expanded === `${r.id}:${a.id}`,
+                  ...(expanded === `${r.id}:${a.id}` ? { controls: `${base}-more-${r.id}` } : {}),
+                }
+              : {}),
             onSelect: () => activate(r, view, a, 'more'),
           }))}
         />
@@ -606,13 +644,17 @@ export function SyncCenterPane({
               className="sc-progress"
               role="progressbar"
               aria-labelledby={docId}
-              aria-valuemin={0}
-              aria-valuemax={view.progress.total}
-              aria-valuenow={view.progress.done}
-              aria-valuetext={t('uwOfflineRowProgressAria', {
-                done: formatBytes(view.progress.done, dateLocale),
-                total: formatBytes(view.progress.total, dateLocale),
-              })}
+              {...(view.progress.total > 0
+                ? {
+                    'aria-valuemin': 0,
+                    'aria-valuemax': view.progress.total,
+                    'aria-valuenow': view.progress.done,
+                    'aria-valuetext': t('uwOfflineRowProgressAria', {
+                      done: formatBytes(view.progress.done, dateLocale),
+                      total: formatBytes(view.progress.total, dateLocale),
+                    }),
+                  }
+                : {})}
             >
               <span
                 className="sc-progress-fill"
@@ -622,9 +664,13 @@ export function SyncCenterPane({
               />
             </span>
           )}
-          {disclosure === 'guide' && <span className="sc-more-text">{t('uwTipReconciling')}</span>}
+          {disclosure === 'guide' && (
+            <span id={`${base}-more-${r.id}`} className="sc-more-text">
+              {t('uwTipReconciling')}
+            </span>
+          )}
           {disclosure === 'details' && (
-            <span className="sc-more-text">
+            <span id={`${base}-more-${r.id}`} className="sc-more-text">
               {fmt({
                 key: 'uwTipFailed',
                 keyParams: view.sub.keyParams,
@@ -735,26 +781,28 @@ export function SyncCenterPane({
           ) : snap.tabs[current.id].length === 0 ? (
             <p className="sc-empty">{t(current.emptyKey)}</p>
           ) : (
-            <table className="sc-table">
-              <caption className="sc-caption">{t(current.labelKey)}</caption>
-              <thead>
-                <tr>
-                  <th scope="col" className="sc-col sc-col-doc">
-                    {t('uwSyncColDoc')}
-                  </th>
-                  <th scope="col" className="sc-col sc-col-state">
-                    {t('uwSyncColState')}
-                  </th>
-                  <th scope="col" className="sc-col sc-col-detail">
-                    {t('uwSyncColDetail')}
-                  </th>
-                  <th scope="col" className="sc-col sc-col-actions">
-                    <span className="sc-col-hidden">{t('uwSyncColActions')}</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>{snap.tabs[current.id].map(renderRow)}</tbody>
-            </table>
+            <div className="sc-table-wrap">
+              <table className="sc-table">
+                <caption className="sc-caption">{t(current.labelKey)}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="sc-col sc-col-doc">
+                      {t('uwSyncColDoc')}
+                    </th>
+                    <th scope="col" className="sc-col sc-col-state">
+                      {t('uwSyncColState')}
+                    </th>
+                    <th scope="col" className="sc-col sc-col-detail">
+                      {t('uwSyncColDetail')}
+                    </th>
+                    <th scope="col" className="sc-col sc-col-actions">
+                      <span className="sc-col-hidden">{t('uwSyncColActions')}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>{snap.tabs[current.id].map(renderRow)}</tbody>
+              </table>
+            </div>
           )}
         </div>
       </>
@@ -807,13 +855,20 @@ export function SyncCenterPane({
               <button
                 type="button"
                 className="set-btn"
-                aria-disabled={offline || undefined}
+                aria-disabled={offline || headerBusy ? true : undefined}
+                aria-busy={headerBusy === 'now' ? true : undefined}
                 aria-describedby={offline ? nowReason : undefined}
                 onClick={syncNow}
               >
                 {t('uwSyncNow')}
               </button>
-              <button type="button" className="set-btn" onClick={togglePause}>
+              <button
+                type="button"
+                className="set-btn"
+                aria-disabled={headerBusy ? true : undefined}
+                aria-busy={headerBusy === 'pause' ? true : undefined}
+                onClick={togglePause}
+              >
                 {t(header.paused ? 'uwSyncResume' : 'uwSyncPause')}
               </button>
               {offline && (

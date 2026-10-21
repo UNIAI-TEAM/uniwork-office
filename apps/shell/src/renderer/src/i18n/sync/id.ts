@@ -7,9 +7,10 @@ export const id = {
   uwChipPausedAdmin: 'Penyimpanan dalam antrean · pengiriman dijeda',
   uwChipReconciling: 'Memeriksa penyimpanan terakhir…',
   uwChipReconcileStuck: 'Perlu dukungan untuk mengonfirmasi penyimpanan',
+  uwErrReconcileStuck: 'Perlu dukungan untuk mengonfirmasi penyimpanan.',
   uwChipRemoteNewer: 'Versi lebih baru di UniWork',
   uwTipQueued:
-    'Simpanan Anda dari {time} tersimpan aman di komputer ini dan akan dikirim saat Anda online.',
+    'Simpanan Anda dari {time} tersimpan aman di komputer ini dan akan dikirim segera setelah bisa.',
   uwTipQueuedNewer:
     'Simpanan dari {time} sedang menunggu dikirim. Editan setelahnya tidak termasuk.',
   uwTipPausedAdmin: 'Admin Anda menjeda pengiriman. Simpanan tetap ada di komputer ini.',
@@ -126,6 +127,8 @@ export const id = {
   uwSignOutWaiting: 'Menyelesaikan penyimpanan yang sedang berjalan sebelum keluar…',
   uwSignOutCaptureFailed:
     'Beberapa perubahan yang belum disimpan tidak sempat ditangkap tepat waktu; versi tersimpan atau simpan otomatis terbaru tetap disimpan untuk akun Anda.',
+  uwSignOutTimedOut:
+    'Belum dapat mengonfirmasi keluar tepat waktu; akun mungkin masih masuk. Coba lagi.',
   uwSwitchLostTitle: 'Sebagian perubahan yang belum disimpan dari akun sebelumnya hilang',
   uwSwitchLostBody:
     'Akun lain masuk di komputer ini, jadi akun sebelumnya dikunci. Dokumen yang perubahan belum disimpannya tidak dapat dipertahankan: {count}. Semua yang lain tetap terkunci di komputer ini untuk akun tersebut.',
@@ -329,7 +332,7 @@ export const id = {
   uwRemoteStopAiConfirm:
     'Hentikan proses UniWork AI yang sedang berjalan untuk memuat ulang? Perubahan yang sudah dibuat AI menjadi bagian salinan yang terbuka.',
   uwRemoteWaitCommit:
-    'Menunggu penyimpanan yang sedang berjalan selesai; Anda bisa memuat ulang setelahnya.',
+    'Menunggu penyimpanan yang sedang berjalan selesai; Anda bisa melanjutkan setelahnya.',
   uwRemoteReload: 'Muat ulang versi terbaru…',
   uwRemoteLater: 'Nanti',
   uwRemoteClose: 'Tutup',

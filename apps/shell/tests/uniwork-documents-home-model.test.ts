@@ -3,11 +3,12 @@ import {
   collectUpdatedByOptions,
   DEFAULT_DOCUMENTS_HOME_FILTERS,
   DOCUMENTS_HOME_NAV_ENTRIES,
+  DOCUMENTS_HOME_TYPE_CHIPS,
+  docMatchesUpdated,
   fetchDocumentsHomePage,
-  formatAccessCell,
-  formatUpdatedByCell,
   getDocumentsHomeNavEntry,
   hasActiveFilters,
+  rowMatchesType,
   splitAndSortItems,
   toUniworkListFilters,
   updatedByOptionsForSelect,
@@ -37,17 +38,6 @@ import { ms } from '../src/renderer/src/i18n/uniwork-home/ms'
 import { pl } from '../src/renderer/src/i18n/uniwork-home/pl'
 import { nl } from '../src/renderer/src/i18n/uniwork-home/nl'
 import { he } from '../src/renderer/src/i18n/uniwork-home/he'
-import type { TFunc } from '../src/renderer/src/locale'
-
-const tVi: TFunc = ((key: string, vars?: Record<string, string | number>) => {
-  let raw = (viLocale as Record<string, string>)[key] ?? key
-  if (vars) {
-    for (const [k, v] of Object.entries(vars)) {
-      raw = raw.replace(`{${k}}`, String(v))
-    }
-  }
-  return raw
-}) as TFunc
 
 function makeDoc(overrides: Partial<DocumentsHomeDoc> = {}): DocumentsHomeDoc {
   return {
@@ -63,7 +53,7 @@ function makeDoc(overrides: Partial<DocumentsHomeDoc> = {}): DocumentsHomeDoc {
 }
 
 describe('DH1-W2 documents-home-model', () => {
-  it('defines the 8 board sub-nav entries in exact order and hides starred + archive while available: false', () => {
+  it('defines the 9 sub-nav entries in exact order (UNI-1961: archive shown; UNI-2047 B6: starred shown)', () => {
     expect(DOCUMENTS_HOME_NAV_ENTRIES.map((e) => e.id)).toEqual([
       'workspace',
       'my-folder',
@@ -73,24 +63,29 @@ describe('DH1-W2 documents-home-model', () => {
       'shared-by-me',
       'archive',
       'trash',
+      'elsewhere',
     ])
 
     const starred = getDocumentsHomeNavEntry('starred')
     const archive = getDocumentsHomeNavEntry('archive')
-    expect(starred.available).toBe(false)
-    expect(archive.available).toBe(false)
+    expect(starred.available).toBe(true)
+    expect(starred.source).toBe('favorites')
+    expect(archive.available).toBe(true)
+    expect(archive.source).toBe('shelved')
 
+    // UNI-1957: My Folder is the tree row (or its stand-in), not a sub-nav entry
+    expect(getDocumentsHomeNavEntry('my-folder').available).toBe(false)
     const visibleIds = visibleDocumentsHomeNavEntries().map((e) => e.id)
     expect(visibleIds).toEqual([
       'workspace',
-      'my-folder',
       'recent',
+      'starred',
       'shared-with-me',
       'shared-by-me',
+      'archive',
       'trash',
+      'elsewhere',
     ])
-    expect(visibleIds).not.toContain('starred')
-    expect(visibleIds).not.toContain('archive')
   })
 
   it('converts UI filter state (format, updatedBy, updatedPreset) to UniworkListFilters', () => {
@@ -178,62 +173,69 @@ describe('DH1-W2 documents-home-model', () => {
     ])
   })
 
-  it('formats the Truy cập (Access) column from visibility + myLevel and never guesses when fields are absent', () => {
-    expect(formatAccessCell(makeDoc({ visibility: 'private', myLevel: 'manage' }), tVi)).toEqual({
-      visibilityLabel: 'Riêng tư',
-      levelLabel: 'Bạn: Quản lý',
-      isEmpty: false,
-      tone: 'private',
-    })
-    expect(formatAccessCell(makeDoc({ visibility: 'workspace', myLevel: 'edit' }), tVi)).toEqual({
-      visibilityLabel: 'Workspace',
-      levelLabel: 'Bạn: Chỉnh sửa',
-      isEmpty: false,
-      tone: 'workspace',
-    })
-    expect(
-      formatAccessCell(makeDoc({ visibility: 'restricted', myLevel: 'comment' }), tVi),
-    ).toEqual({
-      visibilityLabel: 'Hạn chế',
-      levelLabel: 'Bạn: Nhận xét',
-      isEmpty: false,
-      tone: 'restricted',
-    })
-    expect(formatAccessCell(makeDoc({ visibility: 'restricted', myLevel: 'view' }), tVi)).toEqual({
-      visibilityLabel: 'Hạn chế',
-      levelLabel: 'Bạn: Chỉ xem',
-      isEmpty: false,
-      tone: 'restricted',
-    })
-
-    // Partial or absent fields: never guessed from folder or sub-view
-    expect(formatAccessCell(makeDoc({ visibility: 'private', myLevel: undefined }), tVi)).toEqual({
-      visibilityLabel: 'Riêng tư',
-      levelLabel: null,
-      isEmpty: false,
-      tone: 'private',
-    })
-    expect(formatAccessCell(makeDoc({ visibility: undefined, myLevel: undefined }), tVi)).toEqual({
-      visibilityLabel: null,
-      levelLabel: null,
-      isEmpty: true,
-      tone: 'none',
-    })
+  it('lists Shared with me / Shared by me rows as given: a row without parentId stays a root row and no folder is added', async () => {
+    const rootRow = makeDoc({ id: 'recipient-doc', parentId: null })
+    const page = { ok: true as const, value: { documents: [rootRow], nextCursor: null } }
+    const api: DocumentsHomeApiAdapter = {
+      uniworkListChildren: vi.fn(),
+      uniworkEnsureMyFolder: vi.fn(),
+      uniworkListDocuments: vi.fn(),
+      uniworkListSharedWithMe: vi.fn(async () => page),
+      uniworkListSharedByMe: vi.fn(async () => page),
+    } as unknown as DocumentsHomeApiAdapter
+    for (const subView of ['shared-with-me', 'shared-by-me'] as const) {
+      const res = await fetchDocumentsHomePage(api, {
+        subView,
+        workspaceId: 'ws-1',
+        folderId: null,
+        myFolderId: null,
+        filters: DEFAULT_DOCUMENTS_HOME_FILTERS,
+      })
+      expect(res.result).toEqual({ ok: true, value: { items: [rootRow], nextCursor: null } })
+    }
   })
 
-  it('formats the Người sửa gần nhất (Last modified by) column with initial and returns null when updatedByName is absent', () => {
-    expect(formatUpdatedByCell(makeDoc({ updatedByName: 'Minh Trần' }))).toEqual({
-      name: 'Minh Trần',
-      initial: 'M',
-    })
-    expect(formatUpdatedByCell(makeDoc({ updatedByName: '   ' }))).toEqual({
-      name: null,
-      initial: null,
-    })
-    expect(formatUpdatedByCell(makeDoc({ updatedByName: undefined }))).toEqual({
-      name: null,
-      initial: null,
-    })
+  it('forwards the header sort to every list call and sends nothing without one (UNI-2047)', async () => {
+    const docs = { ok: true as const, value: { documents: [], nextCursor: null } }
+    const children = { ok: true as const, value: { items: [], nextCursor: null } }
+    const fn = (page: unknown) => vi.fn(async (..._args: unknown[]) => page)
+    const api = {
+      uniworkListChildren: fn(children),
+      uniworkListDocuments: fn(docs),
+      uniworkListSharedWithMe: fn(docs),
+      uniworkListSharedByMe: fn(docs),
+      uniworkListTrash: fn(docs),
+      uniworkListShelved: fn(docs),
+    }
+    const calls = [
+      ['workspace', 'uniworkListChildren'],
+      ['recent', 'uniworkListDocuments'],
+      ['shared-with-me', 'uniworkListSharedWithMe'],
+      ['shared-by-me', 'uniworkListSharedByMe'],
+      ['trash', 'uniworkListTrash'],
+      ['archive', 'uniworkListShelved'],
+    ] as const
+    for (const [subView, name] of calls) {
+      const base = {
+        subView,
+        workspaceId: 'ws-1',
+        folderId: null,
+        myFolderId: null,
+        filters: DEFAULT_DOCUMENTS_HOME_FILTERS,
+      }
+      await fetchDocumentsHomePage(api as unknown as DocumentsHomeApiAdapter, base)
+      expect(api[name].mock.calls.at(-1)?.[0], `${subView} unsorted`).not.toHaveProperty('sort')
+      expect(api[name].mock.calls.at(-1)?.[0], `${subView} unsorted`).not.toHaveProperty('order')
+
+      await fetchDocumentsHomePage(api as unknown as DocumentsHomeApiAdapter, {
+        ...base,
+        sort: { sort: 'name', order: 'desc' },
+      })
+      expect(api[name].mock.calls.at(-1)?.[0], `${subView} sorted`).toMatchObject({
+        sort: 'name',
+        order: 'desc',
+      })
+    }
   })
 
   it('splits folders and files and sorts by recent or name', () => {
@@ -366,18 +368,20 @@ describe('DH1-W2 documents-home-model', () => {
       myFolderId: null,
       filters,
     })
+    // UNI-1953 CT1-1: the Documents-home Recent also lists UniNote pages
     expect(api.uniworkListDocuments).toHaveBeenCalledWith({
       workspaceId: 'ws-1',
       cursor: undefined,
       format: 'docx',
       updatedBy: 'u-1',
+      includePages: true,
     })
     expect(recentRes.result).toEqual({
       ok: true,
       value: { items: [listDoc], nextCursor: 'list-next' },
     })
 
-    // shared-with-me is org-wide: sends {} when no cursor and { cursor } when paging, never workspaceId or filters
+    // shared-with-me is org-wide: no workspaceId; the type / editor / date filters ride along (UNI-2047 A3) with { includePages }, and { cursor } when paging
     const swmRes = await fetchDocumentsHomePage(api, {
       subView: 'shared-with-me',
       workspaceId: 'ws-1',
@@ -385,7 +389,11 @@ describe('DH1-W2 documents-home-model', () => {
       myFolderId: null,
       filters,
     })
-    expect(api.uniworkListSharedWithMe).toHaveBeenCalledWith({})
+    expect(api.uniworkListSharedWithMe).toHaveBeenCalledWith({
+      includePages: true,
+      format: 'docx',
+      updatedBy: 'u-1',
+    })
     expect(swmRes.result).toEqual({
       ok: true,
       value: { items: [listDoc], nextCursor: 'list-next' },
@@ -399,7 +407,12 @@ describe('DH1-W2 documents-home-model', () => {
       cursor: 'swm-cur-2',
       filters,
     })
-    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({ cursor: 'swm-cur-2' })
+    expect(api.uniworkListSharedWithMe).toHaveBeenLastCalledWith({
+      cursor: 'swm-cur-2',
+      includePages: true,
+      format: 'docx',
+      updatedBy: 'u-1',
+    })
 
     const sbmRes = await fetchDocumentsHomePage(api, {
       subView: 'shared-by-me',
@@ -506,5 +519,106 @@ describe('DH1-W2 documents-home-model', () => {
         `${code}.uhVisWorkspace non-empty`,
       ).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('UNI-1961 documents-home-model: the Lưu trữ (Archive) shelf', () => {
+  it('routes the archive sub-view to uniworkListShelved with the cursor and the type filter only', async () => {
+    const shelvedDoc = makeDoc({ id: 'shelved-doc', shelvedAt: '2026-10-18T09:00:00Z' })
+    const api: DocumentsHomeApiAdapter = {
+      uniworkListShelved: vi.fn(async () => ({
+        ok: true as const,
+        value: { documents: [shelvedDoc], nextCursor: 'shelf-next' },
+      })),
+      uniworkListTrash: vi.fn(),
+    }
+    const res = await fetchDocumentsHomePage(api, {
+      workspaceId: 'ws-1',
+      subView: 'archive',
+      folderId: null,
+      cursor: 'c-1',
+      filters: { format: 'pdf', updatedBy: 'u-1', updatedFrom: '2026-10-01T00:00:00Z' },
+    })
+    expect(api.uniworkListShelved).toHaveBeenCalledWith({
+      workspaceId: 'ws-1',
+      cursor: 'c-1',
+      format: 'pdf',
+    })
+    expect(api.uniworkListTrash).not.toHaveBeenCalled()
+    expect(res.result).toEqual({
+      ok: true,
+      value: { items: [shelvedDoc], nextCursor: 'shelf-next' },
+    })
+  })
+})
+
+describe('the shared type chips (UNI-2047 A3)', () => {
+  const doc = (partial: Partial<DocumentsHomeDoc>): DocumentsHomeDoc => ({
+    id: 'd',
+    workspaceId: 'ws-1',
+    title: 'd',
+    format: 'docx',
+    updatedAt: '2026-10-20T08:00:00.000Z',
+    kind: 'file',
+    parentId: null,
+    ...partial,
+  })
+  const asRow = (d: DocumentsHomeDoc) => ({ type: 'doc' as const, id: d.id, doc: d })
+  const source = (extension: string) =>
+    ({ type: 'source' as const, id: 's', source: { extension } }) as never
+
+  it('lists the chips in the one shared order', () => {
+    expect(DOCUMENTS_HOME_TYPE_CHIPS.map((c) => c.value)).toEqual([
+      'all',
+      'page',
+      'docx',
+      'xlsx',
+      'pptx',
+      'pdf',
+      'md',
+      'html',
+      'txt',
+    ])
+  })
+
+  it('sends a file format and .txt as format, and UniNote as kind', () => {
+    const at = Date.UTC(2026, 9, 21)
+    expect(toUniworkListFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'txt' }, at)).toEqual({
+      format: 'txt',
+    })
+    // UniNote is a kind, not a format: the server takes `kind=page` (and 400s on format + page)
+    expect(toUniworkListFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'page' }, at)).toEqual(
+      { kind: 'page' },
+    )
+    // UniNote still counts as an active filter (the Xóa bộ lọc button and the no-match state)
+    expect(hasActiveFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'page' })).toBe(true)
+  })
+
+  it('narrows UniNote on the loaded rows and drops every source file under it', () => {
+    expect(rowMatchesType(asRow(doc({ kind: 'page', format: null })), 'page')).toBe(true)
+    expect(rowMatchesType(asRow(doc({})), 'page')).toBe(false)
+    expect(rowMatchesType(asRow(doc({ kind: 'folder', format: null })), 'page')).toBe(false)
+    expect(rowMatchesType(source('pdf'), 'page')).toBe(false)
+    expect(rowMatchesType(asRow(doc({})), 'all')).toBe(true)
+  })
+
+  it('keeps only .txt source files under .txt (the sources route may not apply it)', () => {
+    expect(rowMatchesType(source('txt'), 'txt')).toBe(true)
+    expect(rowMatchesType(source('.TXT'), 'txt')).toBe(true)
+    expect(rowMatchesType(source('md'), 'txt')).toBe(false)
+    expect(rowMatchesType(source('md'), 'md')).toBe(true)
+  })
+
+  it('matches Người sửa and Cập nhật on a loaded row, a row without the field does not match', () => {
+    const d = doc({ updatedById: 'u-1' })
+    expect(docMatchesUpdated(d, {})).toBe(true)
+    expect(docMatchesUpdated(d, { updatedBy: 'u-1' })).toBe(true)
+    expect(docMatchesUpdated(d, { updatedBy: 'u-2' })).toBe(false)
+    expect(docMatchesUpdated(doc({}), { updatedBy: 'u-1' })).toBe(false)
+    expect(docMatchesUpdated(d, { updatedFrom: '2026-10-19T00:00:00.000Z' })).toBe(true)
+    expect(docMatchesUpdated(d, { updatedFrom: '2026-10-21T00:00:00.000Z' })).toBe(false)
+    expect(
+      docMatchesUpdated(doc({ updatedAt: 'garbage' }), { updatedFrom: '2026-10-19T00:00:00.000Z' }),
+    ).toBe(false)
   })
 })

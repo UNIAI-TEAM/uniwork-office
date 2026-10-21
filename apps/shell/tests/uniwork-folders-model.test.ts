@@ -246,22 +246,22 @@ describe('contents view', () => {
 
   it('puts folders first, then files, by name with the UI collator', () => {
     const view = contentsView(items, 'name', 'en-US')
-    expect(view.rows.map((r) => r.id)).toEqual(['f1', 'f2', 'd2', 'd1'])
+    expect(view.rows.map((r) => r.id)).toEqual(['f1', 'f2', 'd2', 'p1', 'd1'])
   })
 
   it('sorts by last update, newest first, folders still first', () => {
     const view = contentsView(items, 'updated', 'en-US')
-    expect(view.rows.map((r) => r.id)).toEqual(['f2', 'f1', 'd2', 'd1'])
+    expect(view.rows.map((r) => r.id)).toEqual(['f2', 'f1', 'd2', 'd1', 'p1'])
   })
 
-  it('hides pages and files the app cannot open, and counts them', () => {
-    expect(contentsView(items, 'name', 'en-US').hiddenCount).toBe(2)
+  it('lists pages (UniNote, UNI-1953) and hides only files the app cannot open, counting them', () => {
+    expect(contentsView(items, 'name', 'en-US').hiddenCount).toBe(1)
     expect(contentsView([doc('d1', 'a.docx')], 'name', 'en-US').hiddenCount).toBe(0)
   })
 
   it('keeps the server order when no sort applies (search results)', () => {
     const view = contentsView(items, null, 'en-US')
-    expect(view.rows.map((r) => r.id)).toEqual(['f2', 'd1', 'd2', 'f1'])
+    expect(view.rows.map((r) => r.id)).toEqual(['f2', 'd1', 'p1', 'd2', 'f1'])
   })
 })
 
@@ -331,7 +331,7 @@ describe('search path', () => {
       short: 'UniWork › Alpha ›',
       full: 'UniWork › Alpha',
     })
-    expect(shortPath([], 'UniWork')).toEqual({ short: 'UniWork ›', full: 'UniWork' })
+    expect(shortPath([], 'UniWork')).toEqual({ short: 'UniWork', full: 'UniWork' })
   })
 })
 
@@ -362,6 +362,8 @@ describe('folder action failures', () => {
     })
     expect(folderActionFailure('document_cycle')).toEqual({ key: 'ufCycle' })
     expect(folderActionFailure('document_parent_kind')).toEqual({ key: 'ufParentKind' })
+    // UNI-1975: folders can't be shared; the refusal has its own sentence
+    expect(folderActionFailure('folder_not_shareable')).toEqual({ key: 'ufNotShareable' })
     expect(folderActionFailure('forbidden')).toEqual({ key: 'ufNoPermission' })
     expect(folderActionFailure('network')).toEqual({ key: 'uwDocActionFailed' })
   })

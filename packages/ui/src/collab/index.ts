@@ -26,6 +26,7 @@ export {
   type CollabPermissions,
   type CollabStrings,
   type CollabThreadView,
+  type CollabViewVersion,
 } from './use-collab-threads'
 export { CollabPanel, type CollabInFileSlot, type CollabPanelProps } from './CollabPanel'
 export {
@@ -52,6 +53,14 @@ export {
   type CollabComposerProps,
   type CollabComposerStrings,
 } from './CollabComposer'
+export {
+  AvatarSourceContext,
+  AvatarSourceProvider,
+  useAvatarSrc,
+  useFrameAvatarSource,
+  type AvatarSource,
+  type FrameAvatars,
+} from './avatar-source'
 export { MentionPicker, type CollabPickerStrings } from './MentionPicker'
 export { clearDraft, loadDraft, saveDraft, type CollabDraftKey } from './draft-store'
 export { collabStrings, type CollabAllStrings } from './strings'

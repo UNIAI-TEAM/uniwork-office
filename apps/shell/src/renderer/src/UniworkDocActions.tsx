@@ -5,7 +5,6 @@ import type { UniworkFolderNode, UniworkResult, UniworkWorkspaceRef } from '../.
 import { useI18n, type StringKey } from './locale'
 import {
   DOC_NAME_ERROR_KEYS,
-  NEW_DOC_FORMATS,
   UNIWORK_ERROR_KEYS,
   checkDocName,
   isDocTitleTooLong,
@@ -13,9 +12,11 @@ import {
   uploadTooLargeTextOf,
   workspaceLabel,
   type DocNameError,
-  type NewDocFormat,
+  type NewDocKind,
   type RowActions,
 } from './uniwork-docs-model'
+import { FileBadge } from './FileBadge'
+import { placeMenu } from './menu-placement'
 import { UniworkFolderPicker } from './uniwork-folders/UniworkFolderPicker'
 import { MY_FOLDER_LABEL_KEY, type PathPart } from './uniwork-folders/uniwork-folders-model'
 
@@ -149,7 +150,17 @@ export function ActionModal({
   )
 }
 
-const FORMAT_LABEL: Record<NewDocFormat, string> = { docx: 'DOCX', xlsx: 'XLSX', pptx: 'PPTX' }
+/** the label of each kind the New document dialog and the Quick create strip offer (the web's names); Plain text is in neither (New menu only), so its entry is the New menu's label and only satisfies the Record type */
+export const NEW_KIND_LABEL_KEY: Record<NewDocKind, StringKey> = {
+  page: 'uhQuickPage',
+  docx: 'uhQuickDocx',
+  xlsx: 'uhQuickXlsx',
+  pptx: 'uhQuickPptx',
+  md: 'uhQuickMd',
+  txt: 'uhNewMenuTxt',
+  html: 'uhQuickHtml',
+  pdf: 'uhQuickPdf',
+}
 
 /**
  * The location fields shared by New document and Upload (FD-11 S4): the
@@ -277,23 +288,29 @@ export function FieldError({
  * New document: name (required), type, location. On success the library opens
  * the new document by its id; nothing is copied locally first.
  */
-export function NewDocDialog({
+export function NewDocDialog<K extends NewDocKind>({
   workspaces,
   initialTarget,
+  kinds,
+  initialKind,
   loadTree,
   onCreate,
   onCancel,
 }: {
   workspaces: UniworkWorkspaceRef[]
   initialTarget: DocTarget
+  /** the kinds the Type row offers, in order (UniNote is a page, not a file format) */
+  kinds: readonly K[]
+  /** the kind selected on open; the first one when absent */
+  initialKind?: K
   loadTree: LoadFolderTree
-  onCreate: (input: DocTarget & { name: string; format: NewDocFormat }) => Promise<ActionOutcome>
+  onCreate: (input: DocTarget & { name: string; format: K }) => Promise<ActionOutcome>
   onCancel: () => void
 }) {
   const { t } = useI18n()
   const id = useId()
   const [name, setName] = useState('')
-  const [format, setFormat] = useState<NewDocFormat>('docx')
+  const [format, setFormat] = useState<K>(initialKind ?? kinds[0]!)
   const [target, setTarget] = useState(initialTarget)
   const [error, setError] = useState<DocFieldError | null>(null)
   const [busy, setBusy] = useState(false)
@@ -364,7 +381,7 @@ export function NewDocDialog({
         <fieldset className="uw-act-field">
           <legend className="uw-act-label">{t('uwDocType')}</legend>
           <div className="uw-act-types">
-            {NEW_DOC_FORMATS.map((f) => (
+            {kinds.map((f) => (
               <label key={f} className={`uw-act-type${format === f ? ' on' : ''}`}>
                 <input
                   type="radio"
@@ -373,7 +390,8 @@ export function NewDocDialog({
                   checked={format === f}
                   onChange={() => setFormat(f)}
                 />
-                <span>{FORMAT_LABEL[f]}</span>
+                <FileBadge ext={f} size={22} />
+                <span>{t(NEW_KIND_LABEL_KEY[f])}</span>
               </label>
             ))}
           </div>
@@ -559,27 +577,8 @@ export function ArchiveConfirm({
 
 export type RowAction = keyof RowActions
 
-/** gap between the "…" button and its popup, and the least distance the popup keeps from the window edge */
-const MENU_GAP = 4
-const MENU_EDGE = 8
-
-/**
- * The popup is portalled to the body and placed with fixed coordinates, so no
- * scrollable list or clipped dialog can cut it off. It drops below the button
- * and flips upward when the room below is smaller than it is (and larger above).
- */
-export function placeMenu(button: HTMLElement, menu: HTMLElement) {
-  const anchor = button.getBoundingClientRect()
-  const { width, height } = menu.getBoundingClientRect()
-  const below = window.innerHeight - anchor.bottom - MENU_GAP - MENU_EDGE
-  const above = anchor.top - MENU_GAP - MENU_EDGE
-  const up = height > below && above > below
-  const top = up ? anchor.top - MENU_GAP - height : anchor.bottom + MENU_GAP
-  const left = Math.max(MENU_EDGE, anchor.right - width)
-  menu.style.top = `${Math.max(MENU_EDGE, top)}px`
-  menu.style.left = `${left}px`
-  menu.dataset.placement = up ? 'up' : 'down'
-}
+// the callers of the popup placement import it from here
+export { placeMenu }
 
 /**
  * The row's "…" menu (menu button pattern): Enter/Space/ArrowDown opens it on
@@ -816,9 +815,12 @@ export function ActionToast({
   message,
   onDone,
   tone = 'error',
+  action,
 }: {
   message: string
   onDone: () => void
+  /** UNI-1961: one command beside the text (the web's toast action, e.g. Hoàn tác) */
+  action?: { label: string; onClick: () => void }
   /**
    * FD-11 'ok': a done note (moved, created). It has no live role: the caller
    * says it once through the shell's uniwork-live region instead.
@@ -847,6 +849,18 @@ export function ActionToast({
         <circle cx="8" cy="11.1" r="0.9" fill="currentColor" />
       </svg>
       <span className="uw-act-toast-text">{message}</span>
+      {action && (
+        <button
+          type="button"
+          className="uw-act-toast-action"
+          onClick={() => {
+            onDone()
+            action.onClick()
+          }}
+        >
+          {action.label}
+        </button>
+      )}
       <button
         type="button"
         className="uw-act-toast-close"

@@ -13,7 +13,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { UNIWORK_DOC_CHANNELS } from '../src/shared/home-api'
 
 interface ActionsBridge {
-  uniworkRenameDocument(documentId: string, name: string): Promise<unknown>
+  uniworkRenameDocument(
+    documentId: string,
+    name: string,
+    options?: { shareWithWorkspace?: boolean },
+  ): Promise<unknown>
   uniworkArchiveDocument(documentId: string): Promise<unknown>
   uniworkCancelUploadDocument(uploadId: string): Promise<void>
   onUniworkUploadProgress(cb: (event: unknown) => void): () => void
@@ -29,6 +33,8 @@ interface ActionsBridge {
   onUniworkFirstSaveOpen(cb: (request: { path: string }) => void): () => void
   uniworkListSharedByMe(q: unknown): Promise<unknown>
   uniworkListTrash(q: unknown): Promise<unknown>
+  uniworkListSources(q: unknown): Promise<unknown>
+  uniworkDownloadSource(input: unknown): Promise<unknown>
 }
 
 /**
@@ -332,6 +338,55 @@ describe('the SAVE-01 first-save bridge members (S01-R1-7)', () => {
         channel: UNIWORK_DOC_CHANNELS.listTrash,
         args: [{ workspaceId: 'ws_1', cursor: 'c_1', limit: 25 }],
       },
+    ])
+  })
+})
+
+describe('the document sources bridge (UNI-1961)', () => {
+  it('routes uniworkListSources and uniworkDownloadSource through their IPC channels', async () => {
+    const reply = { ok: true, value: { items: [], nextCursor: null } }
+    const { bridge, invoked } = await loadBridge(reply)
+    invoked.length = 0
+    expect(await bridge.uniworkListSources({ workspaceId: 'ws_1', type: 'pdf' })).toEqual(reply)
+    expect(
+      await bridge.uniworkDownloadSource({
+        workspaceId: 'ws_1',
+        sourceId: 'task:src_1',
+        name: 'a.pdf',
+      }),
+    ).toEqual(reply)
+    expect(invoked).toEqual([
+      { channel: UNIWORK_DOC_CHANNELS.listSources, args: [{ workspaceId: 'ws_1', type: 'pdf' }] },
+      {
+        channel: UNIWORK_DOC_CHANNELS.downloadSource,
+        args: [{ workspaceId: 'ws_1', sourceId: 'task:src_1', name: 'a.pdf' }],
+      },
+    ])
+  })
+
+  it('a reply of no result shape is malformed_response', async () => {
+    const { bridge } = await loadBridge(undefined)
+    expect(await bridge.uniworkListSources({ workspaceId: 'ws_1' })).toEqual({
+      ok: false,
+      error: 'malformed_response',
+    })
+  })
+})
+
+describe('SD-D2: the rename call carries the first-save share flag', () => {
+  it('forwards { shareWithWorkspace: true } as the third argument, and nothing when it is not asked for', async () => {
+    const { bridge, invoked } = await loadBridge({
+      ok: true,
+      value: { id: 'doc_1', title: 'A.docx' },
+    })
+    await bridge.uniworkRenameDocument('doc_1', 'A.docx', { shareWithWorkspace: true })
+    await bridge.uniworkRenameDocument('doc_1', 'B.docx')
+    await bridge.uniworkRenameDocument('doc_1', 'C.docx', { shareWithWorkspace: false })
+    const renames = invoked.filter((i) => i.channel === UNIWORK_DOC_CHANNELS.renameDocument)
+    expect(renames.map((r) => r.args)).toEqual([
+      ['doc_1', 'A.docx', { shareWithWorkspace: true }],
+      ['doc_1', 'B.docx'],
+      ['doc_1', 'C.docx'],
     ])
   })
 })

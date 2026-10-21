@@ -96,6 +96,11 @@
   let selected = null
   let editing = null
   let dark = false
+  // the host claims mod+P (gx:printKey) only where its print path runs for this press (web, print
+  // granted); otherwise the key keeps the browser default (desktop: the shell menu owns it)
+  let claimPrint = false
+  // chords the host replays (gx:keyClaims): the frame cancels the browser's own action for them
+  let keyClaims = []
   let resizing = null
   let drag = null
   /** horizontal slide of a replaced element (image / video): live margin-left, committed as styles */
@@ -876,6 +881,15 @@
   document.addEventListener(
     'click',
     (e) => {
+      // view = a copy the person may only read: links stay inert like in inspect mode, nothing else reacts
+      if (mode === 'view') {
+        const link = e.target && e.target.closest && e.target.closest('a[href]')
+        if (link) {
+          e.preventDefault()
+          if (e.metaKey || e.ctrlKey) post({ type: 'gx:navigateBlocked', href: link.href })
+        }
+        return
+      }
       if (!selecting()) return
       if (swallowClick) {
         swallowClick = false
@@ -961,6 +975,27 @@
   document.addEventListener(
     'keydown',
     (e) => {
+      // mod+P never reaches the host window from inside this frame: relay it before any edit or
+      // field handling (same key rule as web/docs/bridge/print-accelerator.ts); a held press is
+      // still suppressed so this frame's own browser dialog never opens beside the module's
+      if (
+        claimPrint &&
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        e.key.toLowerCase() === 'p'
+      ) {
+        e.preventDefault()
+        if (e.repeat) return
+        // a run being typed lives only in this DOM: commit it first so the host serializes it
+        finishEdit(true)
+        post({ type: 'gx:keyCommand', command: 'print' })
+        return
+      }
+      // Cmd on macOS, Ctrl elsewhere: the host table's chords are exact, so Control+U on a Mac or
+      // Ctrl+Shift+K anywhere is not a command key
+      const cmdKey = /mac/i.test(navigator.platform) ? e.metaKey : e.ctrlKey
+      const inlineCommand = { b: 'bold', i: 'italic', u: 'underline', k: 'link' }
       if (editing) {
         const mod = (e.metaKey || e.ctrlKey) && !e.altKey
         if (e.key === 'Escape') {
@@ -971,15 +1006,16 @@
         } else if (e.key === 'Enter' && mod) {
           e.preventDefault()
           finishEdit(true)
-        } else if (mod && (e.key.toLowerCase() === 'b' || e.key.toLowerCase() === 'i')) {
-          // bold / italic on a range selected inside the edited run: commit the run first, then
-          // hand the host the range again (its re-select after the commit cleared it) and the command
+        } else if (cmdKey && !e.altKey && !e.shiftKey && inlineCommand[e.key.toLowerCase()]) {
+          // bold / italic / underline / link on a range selected inside the edited run: commit the
+          // run first, then hand the host the range again (its re-select after the commit cleared
+          // it) and the command
           const range = textSelection()
           if (!range) return
           e.preventDefault()
           finishEdit(true)
           post(range)
-          post({ type: 'gx:keyCommand', command: e.key.toLowerCase() === 'b' ? 'bold' : 'italic' })
+          post({ type: 'gx:keyCommand', command: inlineCommand[e.key.toLowerCase()] })
         }
         return
       }
@@ -1028,7 +1064,8 @@
         ArrowRight: 'child',
         Escape: 'escape',
       }
-      const modKey = mod ? { k: 'askAi', b: 'bold', i: 'italic' }[e.key.toLowerCase()] : undefined
+      const modKey =
+        cmdKey && !e.altKey && !e.shiftKey ? inlineCommand[e.key.toLowerCase()] : undefined
       const altKey =
         e.altKey && !mod ? { ArrowUp: 'moveUp', ArrowDown: 'moveDown' }[e.key] : undefined
       const command = modKey || altKey || map[e.key]
@@ -1039,12 +1076,76 @@
     },
     true,
   )
+  // A modifier chord or function key the handler above left alone (not relayed, not claimed) never
+  // reaches the host window while focus is in this frame (app-level keys: ribbon collapse, find,
+  // save, ...). Hand the host the raw key: it holds the shortcut table and decides.
+  // Chords the host replays (gx:keyClaims, web) also lose the browser's own action: find bar,
+  // Save page, history. Function keys have no text meaning; a page field or an open inline edit
+  // keeps the editing chords (bold, italic, underline, link, undo, redo, Ctrl+H = backspace on Mac).
+  const FIELD_CHORD_KEYS = 'biukzyh'
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.defaultPrevented || typeof e.key !== 'string') return
+      const fnKey = /^F\d{1,2}$/.test(e.key)
+      if (!fnKey && !(e.ctrlKey || e.metaKey || e.altKey)) return
+      if (/^(Control|Shift|Alt|Meta|AltGraph)$/.test(e.key)) return
+      // print is the claim above or the desktop menu's accelerator, never a replayed key
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'p') return
+      const lower = e.key.toLowerCase()
+      const inField =
+        e.target &&
+        (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable)
+      if (
+        !fnKey &&
+        (editing || inField) &&
+        (e.ctrlKey || e.metaKey) &&
+        lower.length === 1 &&
+        FIELD_CHORD_KEYS.includes(lower)
+      )
+        return
+      if (
+        keyClaims.some(
+          (c) =>
+            c.key === lower &&
+            c.ctrlKey === e.ctrlKey &&
+            c.altKey === e.altKey &&
+            c.shiftKey === e.shiftKey &&
+            c.metaKey === e.metaKey,
+        )
+      )
+        e.preventDefault()
+      // a held key is not replayed, and clipboard / select-all are the page's own
+      if (e.repeat) return
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        !e.altKey &&
+        !e.shiftKey &&
+        lower.length === 1 &&
+        'cvxa'.includes(lower)
+      )
+        return
+      post({
+        type: 'gx:keyEvent',
+        key: e.key,
+        code: e.code || '',
+        ctrlKey: e.ctrlKey,
+        altKey: e.altKey,
+        shiftKey: e.shiftKey,
+        metaKey: e.metaKey,
+        altGraph: !!(e.getModifierState && e.getModifierState('AltGraph')),
+        repeat: e.repeat,
+        composing: e.isComposing || e.keyCode === 229,
+      })
+    },
+    true,
+  )
   // Chromium reports trackpad pinch as ctrl+wheel; the frame swallows wheel events, so relay it.
   // Browse mode (present views) has no zoom control: leave the event alone there.
   document.addEventListener(
     'wheel',
     (e) => {
-      if (mode !== 'inspect' || (!e.ctrlKey && !e.metaKey)) return
+      if (mode === 'browse' || (!e.ctrlKey && !e.metaKey)) return
       e.preventDefault()
       post({ type: 'gx:zoom', delta: e.deltaY })
     },
@@ -1134,7 +1235,7 @@
         if (slide) endSlide(false)
         mode = msg.mode
         rehover()
-        if (mode === 'browse') select(null, false)
+        if (mode !== 'inspect') select(null, false)
         break
       case 'gx:beginTextEdit':
         select(bySid(msg.sid), false)
@@ -1142,6 +1243,14 @@
         break
       case 'gx:scrollTo':
         window.scrollTo(0, msg.y)
+        break
+      case 'gx:printKey':
+        claimPrint = msg.claim === true
+        break
+      case 'gx:keyClaims':
+        keyClaims = Array.isArray(msg.claims)
+          ? msg.claims.filter((c) => c && typeof c.key === 'string').slice(0, 32)
+          : []
         break
       case 'gx:theme':
         dark = !!msg.dark

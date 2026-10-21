@@ -141,19 +141,22 @@ export const nl = {
   uwDocType: 'Type',
   uwDocLocation: 'Locatie',
   uwDocRename: 'Naam wijzigen',
-  uwDocArchive: 'Archiveren',
+  uwDocArchive: 'Naar prullenbak',
   uwDocRestore: 'Herstellen',
-  uwDocArchiveConfirm: '“{name}” archiveren? Je kunt het later herstellen.',
+  uwDocArchiveConfirm:
+    '“{name}” en alles eronder blijft 30 dagen in de prullenbak voordat het definitief wordt verwijderd. Beheerders kunnen het in deze periode herstellen.',
   uwDocNameEmpty: 'Voer een documentnaam in.',
   uwDocNameTooLong: 'De naam is te lang (maximaal 500 tekens).',
   uwDocRenamedAnnounce: 'Het document is hernoemd naar {name}.',
   uwDocActionFailed: 'Dat is niet gelukt. Probeer het opnieuw.',
+  uwUniNoteOpenFailed:
+    'De UniNote is gemaakt, maar kon niet worden geopend. Open hem vanuit de lijst.',
   uwDocActionsFor: 'Meer acties voor “{name}”',
   uwDocCreate: 'Maken',
   uwDocUploadPick: 'Bestand kiezen',
   uwDocUploading: '“{name}” wordt geüpload…',
   uwDocLocationTop: 'Hoogste niveau',
-  uwDocArchived: 'Gearchiveerd',
+  uwDocArchived: 'Naar prullenbak verplaatst',
   uwSizeWarnChip: 'Nadert de limiet van {max} (momenteel {size}).',
   uwSizeWarnDismiss: 'Groottewaarschuwing sluiten',
   uwSaveBlockTitle: 'Kon niet opslaan in UniWork',
@@ -172,4 +175,36 @@ export const nl = {
   uwTipEditLockedSelf: 'U bewerkt dit document in een ander venster.',
   uwErrEditLocked: 'Iemand anders bewerkt dit document.',
   uwReasonEditLocked: 'iemand anders bewerkt het',
+  uwLockBannerOther: '{name} bewerkt sinds {time}. Je bekijkt alleen-lezen.',
+  uwLockBannerSelfElsewhere: 'Je bewerkt dit document in een ander venster.',
+  uwLockBannerFree: 'Niemand bewerkt dit document nu.',
+  uwLockEditHere: 'Hier bewerken',
+  uwLockAcquiring: 'Bewerkingstoegang wordt opgehaald…',
+  uwLockReadOnlyExplain: 'Er is niets opgeslagen — het document is alleen-lezen.',
+  uwLockLostTitle: 'Je bent niet meer aan het bewerken',
+  uwLockLostTakenOver:
+    '{name} heeft het bewerken overgenomen. Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockLostHandedOver:
+    'Je hebt het bewerken aan {name} overgedragen. Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockLostExpired:
+    'Het bewerken is verlopen omdat we de server een tijd niet konden bereiken (geen netwerk of het apparaat sliep). Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockLostMovedHere:
+    'Je bewerkt dit document nu in een ander venster. De niet-opgeslagen wijzigingen in dit venster zijn er nog.',
+  uwLockLostAccessLost:
+    'Je hebt geen toestemming meer om dit document te bewerken. Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockLostGeneric:
+    'Je bent niet meer aan het bewerken. Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockLostHeldBy: '{name} bewerkt nu. Je niet-opgeslagen wijzigingen zijn er nog.',
+  uwLockAcquireFailed:
+    'Kon geen bewerkingstoegang krijgen. Probeer het over een paar minuten opnieuw.',
+  uwChipSourceView: 'Alleen bekijken · Uit {origin}',
+  uwTipSourceView:
+    'Dit bestand is bijgevoegd in {origin}{parent}. Wijzigingen worden niet opgeslagen. Gebruik Downloaden in de documentenlijst om een kopie te krijgen.',
+  uwSourceViewSaveHint:
+    'Dit bestand is alleen om te bekijken — wijzigingen worden niet opgeslagen.',
+  uwSourceViewCopyHint: 'Gebruik Downloaden in de documentenlijst om een kopie te krijgen.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Taken',
+  uwSourceOriginMeeting: 'Vergaderingen',
+  uwSourceOriginEmail: 'E-mail',
 } satisfies Record<keyof typeof zh, string>

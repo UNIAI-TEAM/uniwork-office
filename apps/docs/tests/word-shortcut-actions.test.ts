@@ -188,12 +188,43 @@ describe('editor keymap inserts', () => {
     editor.destroy()
   })
 
-  it('Mod-Shift-Space and Mod-Shift-Hyphen insert the non-breaking characters', () => {
+  // Word's Windows keys (jsdom reports a non-Mac platform): Ctrl+Shift+Space, Alt+Shift+Minus,
+  // Ctrl+Alt+Minus. Ctrl+Shift+Minus is Word's subscript now, App's handler owns it.
+  it('Ctrl+Shift+Space, Alt+Shift+Minus and Ctrl+Alt+Minus insert Word\u2019s characters', () => {
     const editor = makeEditor(['ab'])
     selectAll(editor, 2, 2)
     expect(press(editor, { key: ' ', code: 'Space', ctrlKey: true, shiftKey: true })).toBe(true)
-    expect(press(editor, { key: '-', code: 'Minus', ctrlKey: true, shiftKey: true })).toBe(true)
-    expect(editor.state.doc.textContent).toBe('a\u00a0\u2011b')
+    expect(press(editor, { key: '_', code: 'Minus', altKey: true, shiftKey: true })).toBe(true)
+    expect(press(editor, { key: '-', code: 'Minus', ctrlKey: true, altKey: true })).toBe(true)
+    expect(editor.state.doc.textContent).toBe('a\u00a0\u2011\u00adb')
+    editor.destroy()
+  })
+
+  it('the old Ctrl+Shift+Minus no longer inserts a non-breaking hyphen', () => {
+    const editor = makeEditor(['ab'])
+    selectAll(editor, 2, 2)
+    expect(press(editor, { key: '_', code: 'Minus', ctrlKey: true, shiftKey: true })).toBe(false)
+    expect(editor.state.doc.textContent).toBe('ab')
+    editor.destroy()
+  })
+
+  it('AltGr and IME composition do not insert', () => {
+    const editor = makeEditor(['ab'])
+    selectAll(editor, 2, 2)
+    const altGr = new KeyboardEvent('keydown', {
+      key: '-',
+      code: 'Minus',
+      ctrlKey: true,
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    Object.defineProperty(altGr, 'getModifierState', { value: (k: string) => k === 'AltGraph' })
+    editor.view.dom.dispatchEvent(altGr)
+    expect(altGr.defaultPrevented).toBe(false)
+    const composing = { key: ' ', code: 'Space', ctrlKey: true, shiftKey: true }
+    expect(press(editor, { ...composing, isComposing: true })).toBe(false)
+    expect(editor.state.doc.textContent).toBe('ab')
     editor.destroy()
   })
 

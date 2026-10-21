@@ -401,10 +401,6 @@ function onCommitFailed(
     // "unknown" is never queued: the outcome cannot be proven either way
     return { record: enterStuck(record, ctx), effects: [] }
   }
-  if (error === 'other_window') {
-    // another window owns the document lock: read-only, the intent stays
-    return { record: withState(record, ctx, 'paused_offline', { retryAt: undefined }), effects: [] }
-  }
   if (error === 'ticket_expired') {
     // the upload claim expired: look the intent up before touching bytes again
     return { record: enterReconciling(record, ctx), effects: [] }
@@ -452,12 +448,23 @@ function onLookup(
           : ctx.syncWrite === false
             ? 'paused_admin'
             : 'queued'
+      // R6: the new attempt stages its bytes under its own upload key, so a
+      // session left by an attempt whose commit was already sent (or may have
+      // been) is spent - resuming it would hand back the old staged upload and
+      // its expired claim, and the retry would fail the same way forever. A
+      // record still mid-upload at rest keeps its session: that attempt never
+      // sent a commit and its parts are still worth resuming.
+      const spentSession =
+        record.state === 'committing' ||
+        record.state === 'reconciling' ||
+        record.state === 'reconciling-stuck'
       return {
         record: withState(record, ctx, state, {
           attempt: record.attempt + 1,
           retryAt: undefined,
           reconcileSince: undefined,
           lastError: undefined,
+          ...(spentSession ? { uploadSession: undefined } : {}),
         }),
         effects: [],
       }
@@ -523,7 +530,14 @@ function onTick(record: IntentRecordV2, now: number, ctx: QueueContext): Transit
     if (now - Date.parse(record.reconcileSince) >= limits.stuckAfterMs) {
       return { record: enterStuck(record, tickCtx), effects: [] }
     }
-    return { record, effects: [] }
+    // B70: a lost commit answer reconciles - the next poll pass looks the
+    // intent up (once), then the existing jittered backoff spaces the retries
+    // (`in_flight` sets `retryAt`; a `not_committed` requeues and re-sends the
+    // same key). Never a new attempt, never a re-uploaded byte.
+    if (record.retryAt !== undefined && now < Date.parse(record.retryAt)) {
+      return { record, effects: [] }
+    }
+    return { record, effects: [{ kind: 'lookup' }] }
   }
   if (record.state === 'reconciling-stuck') {
     // every recheckMs one lookup, never a new attempt

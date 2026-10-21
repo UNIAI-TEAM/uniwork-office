@@ -26,6 +26,8 @@ export const ja = {
   appScLineBreak: '改行',
   appScNbsp: '改行しないスペース',
   appScNbHyphen: '改行しないハイフン',
+  appScFindNext: '次を検索',
+  appScOptHyphen: '任意指定のハイフン',
   appScGrowFont1: 'フォントサイズを 1 pt 拡大',
   appScShrinkFont1: 'フォントサイズを 1 pt 縮小',
   appScListDemote: 'リストのレベルを下げる',
@@ -224,7 +226,7 @@ export const ja = {
   // Quick actions bar
   appAutoSave: '自動保存',
   appAutoSaveTip: '自動保存(30 秒ごと、およびウィンドウのフォーカスが外れたとき)',
-  appSaveShortcutTip: '上書き保存 (⌘S)',
+  appSaveShortcutTip: '上書き保存 ({keys})',
   appUndo: '元に戻す',
   appRedo: 'やり直し',
   // Start screen
@@ -573,9 +575,14 @@ export const ja = {
   appOnlyEncrypted: '「{name}」はパスワードで保護されているため、ここでは開けません。',
   appFileExportPdf: 'PDF としてエクスポート…',
   appFilePrint: '印刷…',
+  appPrintNoDocument: 'ドキュメントを開いてから印刷してください。',
   appPrintNoPrinter:
     'このコンピューターで使えるプリンターがありません。代わりにドキュメントを PDF として保存できます。',
   appPrintFailedPdfHint:
     '印刷できませんでした: {error}。代わりにドキュメントを PDF として保存できます。',
   appPrintSaveAsPdf: 'PDF として保存…',
+  appFileSaveCopy: 'コピーとして保存…',
+  appCopySaved: 'あなたのバージョンを新しいドキュメントとして保存しました：{title}。',
+  appCopySaveFailed:
+    'コピーを作成できませんでした。変更は引き続き安全です。もう一度お試しください。',
 } satisfies Record<keyof typeof zh, string>

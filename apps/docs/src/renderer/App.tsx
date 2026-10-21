@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { CSSProperties, MouseEvent as ReactMouseEvent, SetStateAction } from 'react'
+import type { CSSProperties, Dispatch, MouseEvent as ReactMouseEvent, SetStateAction } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import type { Editor } from '@tiptap/core'
 import { handleDocsControl, type ControlRequest } from './control'
@@ -271,8 +271,12 @@ import {
   saveStateLabel,
   setEditorEditable,
   uniworkAllowsSave,
+  uniworkCloseDirty,
+  uniworkExplainReadOnlySave,
   uniworkStateFor,
+  useDirtyWhileEditable,
   useUniworkDocState,
+  type UniworkLockSeam,
 } from './uniwork-doc-state'
 import { SPELLCHECK_KEY, spellcheckEnabled } from './spellcheck-pref'
 import { cachedByDoc } from './doc-cache'
@@ -335,7 +339,9 @@ import {
   type TableDialogKind,
 } from './components/TableDialogs'
 import { TablePropertiesDialog } from './components/TablePropertiesDialog'
-import { showToast } from './components/toast-bus'
+import { showToast, toastStatusLine } from './components/toast-bus'
+import { isNoDocumentPrintKey } from './print-shortcut'
+import { consumeWhen, createShortcutMatcher, shortcutHint, shortcutTip } from './shortcuts'
 import { setTableAutoFit, toggleRepeatHeaderRows } from './editor/table-properties'
 import { distributeSelectedColumns } from './editor/table-sizing'
 import {
@@ -353,6 +359,7 @@ import { WordCountDialog, type DocStats } from './components/WordCountDialog'
 import { AutoCorrectDialog } from './components/AutoCorrectDialog'
 import { PreferencesDialog } from './components/PreferencesDialog'
 import { applyCase, nextCaseMode, selectionText } from './editor/case-transform'
+import { toggleHiddenText } from './editor/hidden-text'
 import { stepHangingIndent, stepParagraphIndent } from './editor/indent'
 import { AppOnlyDialog } from './components/AppOnlyDialog'
 import { PasswordDialog } from './components/PasswordDialog'
@@ -493,7 +500,66 @@ import {
   type ReviewContext,
 } from './review-actions'
 
-const IS_MAC = navigator.platform.toLowerCase().includes('mac')
+/** The commands App's window handler runs; their keys come from the docs shortcut table. */
+const APP_SHORTCUTS = [
+  'save',
+  'save-as',
+  'open',
+  'print-preview',
+  'find',
+  'find-next',
+  'replace',
+  'goto',
+  'shortcuts',
+  'strike',
+  'font-dialog',
+  'grow-font',
+  'shrink-font',
+  'grow-font-1pt',
+  'shrink-font-1pt',
+  'superscript',
+  'subscript',
+  'change-case',
+  'all-caps',
+  'small-caps',
+  'hidden-text',
+  'clear-formatting',
+  'align-left',
+  'align-center',
+  'align-right',
+  'align-justify',
+  'spacing-1',
+  'spacing-15',
+  'spacing-2',
+  'indent',
+  'outdent',
+  'hanging-indent',
+  'hanging-indent-off',
+  'clear-para',
+  'style-normal',
+  'style-h1',
+  'style-h2',
+  'style-h3',
+  'bullets',
+  'numbering',
+  'link',
+  'comment',
+  'footnote',
+  'endnote',
+  'field-date',
+  'field-time',
+  'update-fields',
+  'toggle-field-codes',
+  'track-changes',
+  'word-count',
+  'proofread',
+  'formatting-marks',
+  'styles-pane',
+] as const
+type AppShortcut = (typeof APP_SHORTCUTS)[number]
+const matchAppShortcut = createShortcutMatcher(APP_SHORTCUTS) as (
+  e: KeyboardEvent,
+) => AppShortcut | null
 
 const twipsToPx = (twips: number) => (twips / 1440) * 96
 
@@ -845,6 +911,11 @@ export function App() {
   )
   const [status, setStatus] = useState<StatusLine>('')
   const [refusedMessage, setRefusedMessage] = useState<StatusLine>('')
+  // a phone-width frame hides the status message in the bar (styles.css, max-width 640px): raise an
+  // outcome as a toast instead (progress lines stay in the bar). `t` stays out of the deps.
+  useEffect(() => {
+    toastStatusLine(status, t)
+  }, [status])
   // A key + params line re-translates at render time, so only a ready
   // (already translated) string goes stale on a UI language switch.
   const clearStaleStatus = useCallback(
@@ -987,6 +1058,7 @@ export function App() {
   const [findFocusInput, setFindFocusInput] = useState(0)
   const [findFocusReplace, setFindFocusReplace] = useState(0)
   const [findFocusGoTo, setFindFocusGoTo] = useState(0)
+  const [findNext, setFindNext] = useState(0)
   // last pagination pass, read by the Go To tab (page / section / line targets)
   const pageLayoutRef = useRef<PageLayout | null>(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -995,6 +1067,7 @@ export function App() {
   const ribbonActionsRef = useRef<{
     stepFontSize?: (dir: 1 | -1) => void
     nudgeFontSize?: (dir: 1 | -1) => void
+    toggleList?: (kind: 'bullet' | 'ordered') => void
   }>({})
   const [showComments, setShowComments] = useState(false)
   const [showStylesPane, setShowStylesPane] = useState(false)
@@ -2428,8 +2501,12 @@ export function App() {
   const save = useCallback((saveAs: boolean, auto = false, newDocName?: string) => {
     if (!(saveAs ? cap('saveAs') : cap('save'))) return Promise.resolve(false)
     // UniWork seam: no autosave onto a UniWork document, no in-place Save of a view-only one
-    const state = uniworkStateFor(uniworkRef.current, fileCtxRef.current.doc?.filePath)
-    if (!uniworkAllowsSave(state, saveAs, auto)) return Promise.resolve(false)
+    const filePath = fileCtxRef.current.doc?.filePath
+    const state = uniworkStateFor(uniworkRef.current, filePath)
+    if (!uniworkAllowsSave(state, saveAs, auto)) {
+      uniworkExplainReadOnlySave(window.desktop as UniworkLockSeam, state, saveAs, auto, filePath)
+      return Promise.resolve(false)
+    }
     return saveImpl(fileCtxRef.current, saveAs, auto, newDocName)
   }, [])
 
@@ -2864,6 +2941,20 @@ export function App() {
   const printDoc = useCallback(() => {
     if (!cap('print')) return Promise.resolve()
     return printDocImpl(fileCtxRef.current)
+  }, [])
+
+  // File > Save as a copy (web only): the locked-out tab's copy via the bridge's api.saveCopy.
+  // Feedback mirrors the conflict dialog's copy outcome — a status line naming the new title,
+  // an error toast on failure, silence on a host-side cancel.
+  const saveCopyDoc = useCallback(async () => {
+    if (typeof window.desktop.saveDocxCopy !== 'function') return
+    const r = await window.desktop.saveDocxCopy()
+    if (r.ok) {
+      setStatus(t('appCopySaved', { title: r.title }))
+      return
+    }
+    if (r.reason === 'cancelled') return
+    showToast(t('appCopySaveFailed'), 'error')
   }, [])
 
   // for real-device verification: trigger export directly via CDP (same as __pageDebug)
@@ -3723,6 +3814,10 @@ export function App() {
     const contentH = twipsToPx(section.pageHeight) - effTopSingle - effBottomSingle
     let slices: PageSlice[] = []
     let timer: number | null = null
+    // set by the cleanup: callbacks that outlive this run (a font-ready promise
+    // settling late, a follow-up from a stale listener) must not re-arm a timer
+    // nobody will clear, or a pass would run against a destroyed editor
+    let disposed = false
     let suppressSig = ''
     let rowFillSig = ''
     // passes a pass schedules for itself (widths / suppression applied late);
@@ -3924,6 +4019,7 @@ export function App() {
     }
     const remeasure = () => {
       timer = null
+      if (disposed || editor?.isDestroyed) return
       lastPassAt = performance.now()
       const edited = fastEdits
       fastEdits = new Set()
@@ -5104,6 +5200,7 @@ export function App() {
       dirtyIndex: number | null = fastIndex,
       isFollowUp = false,
     ) => {
+      if (disposed) return
       if (fastIndex === null) fastEdits = null
       else fastEdits?.add(fastIndex)
       dirtyFrom = dirtyIndex === null || dirtyFrom === null ? null : Math.min(dirtyFrom, dirtyIndex)
@@ -5146,6 +5243,7 @@ export function App() {
     // (debounced: loadingdone fires per face, thousands of times on CJK documents)
     let hfTimer: number | undefined
     const onFontsChanged = (reprobeHf: boolean) => {
+      if (disposed) return
       bumpLineSampleFontEpoch()
       if (reprobeHf) {
         bumpHfProbeFontEpoch()
@@ -5195,6 +5293,7 @@ export function App() {
     }
     editor?.on('transaction', onShrinkTr)
     return () => {
+      disposed = true
       if (timer) window.clearTimeout(timer)
       if (hfTimer) window.clearTimeout(hfTimer)
       document.fonts.removeEventListener('loadingdone', onLoadingDone)
@@ -5237,6 +5336,14 @@ export function App() {
     revisionDisplay,
     delSectBreaks,
     pendingWatermarkImage,
+    // watermarkDirty gates the parsed watermark out of the gap-strips' float
+    // layer (a pending edit replaces it with the ghost/picture preview): a
+    // text-watermark change reaches no other dep, so without this the layer
+    // keeps painting the old shape behind the new ghost. colMode/hasVertical
+    // are memos over `sections`, so listing them restarts nothing extra.
+    watermarkDirty,
+    colMode,
+    hasVertical,
   ])
 
   // section at the cursor: the target the Layout tab acts on
@@ -5370,13 +5477,25 @@ export function App() {
   const anyDirtyRef = useRef(false)
   const hasUnsavedChanges = isDocDirty(fileCtxRef.current)
   anyDirtyRef.current = hasUnsavedChanges
+  // edits held when the edit lock is lost in place must still prompt on close
+  const dirtyWhileEditableRef = useDirtyWhileEditable(
+    uniwork.readOnly,
+    hasUnsavedChanges || dirtyRef.current,
+  )
 
   // close guard: the main process queries dirty state before closing a tab/window; choosing "Save" runs a full save and reports back
   useEffect(() => {
     const offCheck = window.desktop.onCloseCheck?.(() => {
       window.desktop.reportCloseCheck({
-        // a view-only UniWork document cannot be saved in place: nothing to ask
-        dirty: !!doc && !uniwork.readOnly && (anyDirtyRef.current || dirtyRef.current),
+        // a view-only UniWork document cannot be saved in place: nothing to ask,
+        // unless it lost its lock while holding edits (those are kept, so ask)
+        dirty:
+          !!doc &&
+          uniworkCloseDirty(
+            uniwork.readOnly,
+            dirtyWhileEditableRef.current,
+            anyDirtyRef.current || dirtyRef.current,
+          ),
         autoSave: autoSaveActive && !!doc?.filePath,
         filePath: doc?.filePath ?? null,
       })
@@ -5400,7 +5519,7 @@ export function App() {
       offCheck?.()
       offSave?.()
     }
-  }, [doc, save, autoSaveActive, uniwork.readOnly])
+  }, [doc, save, autoSaveActive, uniwork.readOnly, dirtyWhileEditableRef])
 
   // autosave: every 30s and on window blur, silently persist pending changes
   useEffect(() => {
@@ -5453,237 +5572,143 @@ export function App() {
       return !!(el as HTMLElement).closest('.ProseMirror, td[contenteditable]')
     }
     const handler = (e: KeyboardEvent) => {
+      // Print: with a document the native menu / browser owns the shortcut; with none it must
+      // not vanish silently (printDoc answers with the "open a document" message)
+      if (isNoDocumentPrintKey(e, !!doc, cap('print'))) {
+        e.preventDefault()
+        void printDoc()
+        return
+      }
+      const command = matchAppShortcut(e)
+      if (!command) return
       const canEdit = !!editor?.isEditable && focusInEditor()
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault()
-        if (e.shiftKey ? cap('saveAs') : cap('save')) void save(e.shiftKey)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
-        e.preventDefault()
-        if (cap('open')) void openFile()
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-        e.preventDefault()
-        if (doc) {
-          // bump even when the panel is already open: focus returns to the find box
-          setShowFind(true)
-          setFindFocusInput((n) => n + 1)
-        }
-      }
-      // Word's replace: Ctrl+H everywhere (macOS Cmd+H is the system hide role,
-      // which never reaches the renderer, so this branch is Ctrl+H there too)
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === 'h') {
-        e.preventDefault()
-        if (doc) {
-          setShowFind(true)
-          setFindFocusReplace((n) => n + 1)
-        }
-      }
-      // Go To: ⌥⌘G on the Mac (Word for Mac), Ctrl+G elsewhere (⇧⌘G stays Word Count)
-      if (
-        (e.metaKey || e.ctrlKey) &&
-        !e.shiftKey &&
-        e.altKey === IS_MAC &&
-        e.code === 'KeyG' &&
-        doc
-      ) {
-        e.preventDefault()
-        setShowFind(true)
-        setFindFocusGoTo((n) => n + 1)
-      }
-      // Word dialog shortcuts: Font ⌘D / Paragraph ⌥⌘M / Hyperlink ⌘K
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === 'd' && doc && canEdit) {
-        e.preventDefault()
-        setShowFontDialog(true)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyM' && doc && canEdit) {
-        e.preventDefault()
-        setShowParaDialog(true)
-      }
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === 'k' && doc && canEdit) {
-        e.preventDefault()
-        setShowLinkModal(true)
-      }
-      if (e.key === 'F9' && e.altKey && doc && editor) {
-        e.preventDefault()
-        toggleAllFieldCodes(editor.view)
-      } else if (e.key === 'F9' && doc && editor?.isEditable) {
-        e.preventDefault()
-        updateFields()
-      }
-      // Word alignment shortcuts
-      const ALIGN_KEYS: Record<string, 'left' | 'center' | 'right' | 'justify'> = {
-        l: 'left',
-        e: 'center',
-        r: 'right',
-        j: 'justify',
-      }
-      if (
-        (e.metaKey || e.ctrlKey) &&
-        !e.shiftKey &&
-        !e.altKey &&
-        e.key in ALIGN_KEYS &&
-        editor &&
-        canEdit
-      ) {
-        e.preventDefault()
-        // route into a focused textbox sub-editor, like the ribbon does
-        const target = getActiveSubEditor() ?? editor
-        setSelectionAlign(target, ALIGN_KEYS[e.key])
-      }
-      // Word line-spacing shortcuts ⌘1 / ⌘2 / ⌘5; e.code because shifted-digit
-      // layouts (AZERTY) make e.key unreliable
-      const SPACING_KEYS: Record<string, number> = { Digit1: 1, Digit2: 2, Digit5: 1.5 }
-      if (
-        (e.metaKey || e.ctrlKey) &&
-        !e.shiftKey &&
-        !e.altKey &&
-        e.code in SPACING_KEYS &&
-        editor &&
-        canEdit
-      ) {
-        e.preventDefault()
-        const attrs = { lineSpacing: SPACING_KEYS[e.code], lineRule: null, lineRawTwips: null }
-        setParaAttrs(getActiveSubEditor() ?? editor, attrs)
-      }
-      // Paragraph styles ⌥⌘0 Normal / ⌥⌘1..3 headings (Ctrl+Shift+N is taken by New Window)
-      const STYLE_KEYS: Record<string, 'p' | 'h1' | 'h2' | 'h3'> = {
-        Digit0: 'p',
-        Digit1: 'h1',
-        Digit2: 'h2',
-        Digit3: 'h3',
-      }
-      if (
-        (e.metaKey || e.ctrlKey) &&
-        e.altKey &&
-        !e.shiftKey &&
-        e.code in STYLE_KEYS &&
-        editor &&
-        canEdit
-      ) {
-        e.preventDefault()
-        // textboxes have no heading nodes — same gate as the ribbon style gallery
-        if (!getActiveSubEditor())
-          applyParagraphStyle(editor, STYLE_KEYS[e.code], ribbonStylesRef.current)
-      }
-      // Word grow/shrink font ⇧⌘. / ⇧⌘, — via the ribbon closure so bursts stay coalesced
-      if (
-        (e.metaKey || e.ctrlKey) &&
-        e.shiftKey &&
-        !e.altKey &&
-        (e.code === 'Period' || e.code === 'Comma') &&
-        editor &&
-        canEdit
-      ) {
-        e.preventDefault()
-        ribbonActionsRef.current.stepFontSize?.(e.code === 'Period' ? 1 : -1)
-      }
-      // Word's one-point nudge ⌘] / ⌘[
-      if (
-        (e.metaKey || e.ctrlKey) &&
-        !e.shiftKey &&
-        !e.altKey &&
-        (e.code === 'BracketRight' || e.code === 'BracketLeft') &&
-        editor &&
-        canEdit
-      ) {
-        e.preventDefault()
-        ribbonActionsRef.current.nudgeFontSize?.(e.code === 'BracketRight' ? 1 : -1)
-      }
-      // Superscript / subscript. Word's own ⌘= / ⇧⌘= collide with the zoom
-      // accelerators for the "=" half only, so the unshifted pair is on ⌘. / ⌘,
-      // (the same keys the shifted grow/shrink pair uses).
-      const vertAlign = e.shiftKey
-        ? e.code === 'Equal'
-          ? 'superscript'
-          : null
-        : e.code === 'Period'
-          ? 'superscript'
-          : e.code === 'Comma'
-            ? 'subscript'
-            : null
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && vertAlign && editor && canEdit) {
-        e.preventDefault()
-        const target = getActiveSubEditor() ?? editor
-        const current = target.getAttributes('docTextStyle').vertAlign
+      // the command's editor: a focused textbox sub-editor wins, like the ribbon
+      const target = editor && canEdit ? (getActiveSubEditor() ?? editor) : null
+      // body-only commands: textboxes have no headings, list numbering or paragraph indents
+      const body = target && !getActiveSubEditor() ? editor : null
+      const toggleStyle = (attr: 'vertAlign' | 'caps', value: string) => {
+        if (!target) return false
+        const current = target.getAttributes('docTextStyle')[attr]
         target
           .chain()
           .focus()
-          .setMark('docTextStyle', { vertAlign: current === vertAlign ? null : vertAlign })
+          .setMark('docTextStyle', { [attr]: current === value ? null : value })
           .run()
+        return true
       }
-      // Word's Shift+F3 case ring
-      if (e.shiftKey && e.key === 'F3' && editor && canEdit) {
-        e.preventDefault()
-        const target = getActiveSubEditor() ?? editor
-        applyCase(target, nextCaseMode(selectionText(target)))
+      const onTarget = (apply: (ed: Editor) => void) => {
+        if (!target) return false
+        apply(target)
+        return true
       }
-      // Clear character formatting ⌃␣ (Word uses Ctrl+Space on both platforms)
-      if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.code === 'Space' && canEdit) {
-        e.preventDefault()
-        ;(getActiveSubEditor() ?? editor)?.chain().focus().unsetAllMarks().run()
+      // still handled inside a textbox, where the command has nothing to change
+      const onBody = (apply: (ed: Editor) => void) => {
+        if (!target) return false
+        if (body) apply(body)
+        return true
       }
-      // Indent ⌃M / outdent ⌃⇧M and hanging indent ⌘T / ⇧⌘T. Ctrl-only on both
-      // platforms: ⌘M minimizes the window, and indenting a paragraph on the way
-      // out would be a silent edit.
-      if (e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'KeyM' && editor && canEdit) {
-        e.preventDefault()
-        if (!getActiveSubEditor()) stepParagraphIndent(editor, e.shiftKey ? -1 : 1)
+      const ifDoc = (apply: () => void) => {
+        if (!doc) return false
+        apply()
+        return true
       }
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.code === 'KeyT' && editor && canEdit) {
-        e.preventDefault()
-        if (!getActiveSubEditor()) stepHangingIndent(editor, e.shiftKey ? -1 : 1)
+      const ifEditing = (apply: () => void) => {
+        if (!doc || !canEdit) return false
+        apply()
+        return true
       }
-      // Clear paragraph formatting — Word's Ctrl+Q (⌘Q quits on macOS)
-      if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.code === 'KeyQ' && canEdit) {
-        e.preventDefault()
-        if (editor && !getActiveSubEditor()) clearParagraphFormatting(editor)
+      const openFind = (bump: Dispatch<SetStateAction<number>>) => {
+        if (!doc) return
+        // bump even when the panel is already open: focus returns to the find box
+        setShowFind(true)
+        bump((n) => n + 1)
       }
-      // Formatting marks: ⌘8 in Word for Mac, Ctrl+Shift+8 on Windows
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.code === 'Digit8' && doc) {
-        e.preventDefault()
-        setShowMarks((v) => !v)
+      const spacing = (lineSpacing: number) =>
+        onTarget((ed) => setParaAttrs(ed, { lineSpacing, lineRule: null, lineRawTwips: null }))
+      const style = (level: 'p' | 'h1' | 'h2' | 'h3') =>
+        onBody((ed) => applyParagraphStyle(ed, level, ribbonStylesRef.current))
+      // true: the key is handled and its default suppressed
+      const run: Record<AppShortcut, () => boolean> = {
+        save: () => {
+          if (cap('save')) void save(false)
+          return true
+        },
+        // F12 is DevTools in the web frame: swallowed only where Save As exists
+        'save-as': () => consumeWhen(cap('saveAs'), () => void save(true)),
+        // Ctrl/Cmd+O stays the browser's own dialog where the host grants no Open
+        open: () => consumeWhen(cap('open'), () => void openFile()),
+        'print-preview': () => ifDoc(() => setShowPagePreview(true)),
+        find: () => {
+          openFind(setFindFocusInput)
+          return true
+        },
+        // Word's Shift+F4: the open panel steps to its next match; with it closed there is no
+        // query to repeat, so the key opens Find
+        'find-next': () =>
+          ifDoc(() => (showFind ? setFindNext((n) => n + 1) : openFind(setFindFocusInput))),
+        replace: () => {
+          openFind(setFindFocusReplace)
+          return true
+        },
+        goto: () => ifDoc(() => openFind(setFindFocusGoTo)),
+        shortcuts: () => {
+          setShowShortcuts(true)
+          return true
+        },
+        strike: () => onTarget((ed) => ed.chain().focus().toggleMark('strike').run()),
+        'font-dialog': () => ifEditing(() => setShowFontDialog(true)),
+        // grow/shrink go through the ribbon closure so bursts stay coalesced
+        'grow-font': () => onTarget(() => ribbonActionsRef.current.stepFontSize?.(1)),
+        'shrink-font': () => onTarget(() => ribbonActionsRef.current.stepFontSize?.(-1)),
+        'grow-font-1pt': () => onTarget(() => ribbonActionsRef.current.nudgeFontSize?.(1)),
+        'shrink-font-1pt': () => onTarget(() => ribbonActionsRef.current.nudgeFontSize?.(-1)),
+        superscript: () => toggleStyle('vertAlign', 'superscript'),
+        subscript: () => toggleStyle('vertAlign', 'subscript'),
+        // Word's Shift+F3 case ring
+        'change-case': () => onTarget((ed) => applyCase(ed, nextCaseMode(selectionText(ed)))),
+        'all-caps': () => toggleStyle('caps', 'all'),
+        'small-caps': () => toggleStyle('caps', 'small'),
+        'hidden-text': () => onTarget(toggleHiddenText),
+        'clear-formatting': () => onTarget((ed) => ed.chain().focus().unsetAllMarks().run()),
+        'align-left': () => onTarget((ed) => setSelectionAlign(ed, 'left')),
+        'align-center': () => onTarget((ed) => setSelectionAlign(ed, 'center')),
+        'align-right': () => onTarget((ed) => setSelectionAlign(ed, 'right')),
+        'align-justify': () => onTarget((ed) => setSelectionAlign(ed, 'justify')),
+        'spacing-1': () => spacing(1),
+        'spacing-15': () => spacing(1.5),
+        'spacing-2': () => spacing(2),
+        indent: () => onBody((ed) => stepParagraphIndent(ed, 1)),
+        outdent: () => onBody((ed) => stepParagraphIndent(ed, -1)),
+        'hanging-indent': () => onBody((ed) => stepHangingIndent(ed, 1)),
+        'hanging-indent-off': () => onBody((ed) => stepHangingIndent(ed, -1)),
+        'clear-para': () => onBody(clearParagraphFormatting),
+        'style-normal': () => style('p'),
+        'style-h1': () => style('h1'),
+        'style-h2': () => style('h2'),
+        'style-h3': () => style('h3'),
+        bullets: () => onBody(() => ribbonActionsRef.current.toggleList?.('bullet')),
+        numbering: () => onBody(() => ribbonActionsRef.current.toggleList?.('ordered')),
+        link: () => ifEditing(() => setShowLinkModal(true)),
+        comment: () =>
+          ifEditing(() => {
+            setShowComments(true)
+            startNewComment()
+          }),
+        footnote: () => ifEditing(() => insertNote('footnote')),
+        endnote: () => ifEditing(() => insertNote('endnote')),
+        'field-date': () => ifEditing(() => insertField('DATE')),
+        'field-time': () => ifEditing(() => insertField('TIME')),
+        'update-fields': () => !!editor?.isEditable && ifDoc(updateFields),
+        'toggle-field-codes': () => !!editor && ifDoc(() => toggleAllFieldCodes(editor.view)),
+        // forced by an editing restriction, track changes cannot be turned off
+        'track-changes': () => ifDoc(() => !trackChangesForced && setTrackChanges((v) => !v)),
+        'word-count': () => ifDoc(openStats),
+        // Word's spelling & grammar check
+        proofread: () => ifDoc(runAiProofread),
+        'formatting-marks': () => ifDoc(() => setShowMarks((v) => !v)),
+        'styles-pane': () => ifDoc(() => setShowStylesPane(true)),
       }
-      // Track changes ⇧⌘E; forced by an editing restriction it cannot be turned off
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.code === 'KeyE' && doc) {
-        e.preventDefault()
-        if (!trackChangesForced) setTrackChanges((v) => !v)
-      }
-      // Word count ⇧⌘G
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.code === 'KeyG' && doc) {
-        e.preventDefault()
-        openStats()
-      }
-      // New comment ⌥⌘A (Word for Mac; Windows Word's Ctrl+Alt+M stays on the
-      // Paragraph dialog here)
-      if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyA' && doc && canEdit) {
-        e.preventDefault()
-        setShowComments(true)
-        startNewComment()
-      }
-      // Footnote ⌥⌘F, endnote ⌥⌘E on the Mac / Ctrl+Alt+D on Windows. The
-      // endnote key is platform-exclusive: ⌥⌘D belongs to the macOS Dock.
-      if ((e.metaKey || e.ctrlKey) && e.altKey && doc && canEdit) {
-        const endnoteCode = IS_MAC ? 'KeyE' : 'KeyD'
-        const note = e.code === 'KeyF' ? 'footnote' : e.code === endnoteCode ? 'endnote' : null
-        if (note) {
-          e.preventDefault()
-          insertNote(note)
-        }
-      }
-      // Date / time fields ⌥⇧D / ⌥⇧T
-      if (e.altKey && e.shiftKey && !e.metaKey && !e.ctrlKey && doc && canEdit) {
-        const instr = e.code === 'KeyD' ? 'DATE' : e.code === 'KeyT' ? 'TIME' : null
-        if (instr) {
-          e.preventDefault()
-          insertField(instr)
-        }
-      }
-      // Proofread F7 (Word's spelling & grammar check)
-      if (e.key === 'F7' && !e.shiftKey && doc) {
-        e.preventDefault()
-        runAiProofread()
-      }
+      if (run[command]()) e.preventDefault()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -5699,6 +5724,8 @@ export function App() {
     insertField,
     runAiProofread,
     trackChangesForced,
+    printDoc,
+    showFind,
   ])
 
   // double-click an inline equation / click an equation block's edit button (ones with LaTeX source) → reopen the equation dialog for editing
@@ -5902,7 +5929,7 @@ export function App() {
           void exportImages()
           break
         case 'print':
-          if (doc) void printDoc()
+          void printDoc()
           break
       }
     })
@@ -6856,6 +6883,7 @@ export function App() {
     onSave: () => void save(false),
     onSaveAs: () => void save(true),
     onExportPdf: () => void exportPdf(),
+    onSaveCopy: () => void saveCopyDoc(),
     onPrint: () => void printDoc(),
     onToggleAi: () => setShowAi((v) => !v),
     onSection: (next: SectionSettings) => {
@@ -7034,8 +7062,8 @@ export function App() {
         {cap('save') && (
           <button
             className="qa-btn"
-            data-tip={t('appSaveShortcutTip')}
-            aria-label={t('appSaveShortcutTip')}
+            data-tip={t('appSaveShortcutTip', { keys: shortcutHint('save') })}
+            aria-label={t('appSaveShortcutTip', { keys: shortcutHint('save') })}
             // a UniWork document saves even when clean (retry after a failed upload)
             disabled={!hasDoc || uniwork.readOnly || (!hasUnsavedChanges && !uniwork.bound)}
             onClick={() => void save(false)}
@@ -7045,8 +7073,8 @@ export function App() {
         )}
         <button
           className="qa-btn"
-          data-tip={t('appUndo')}
-          aria-label={t('appUndo')}
+          data-tip={shortcutTip(t('appUndo'), 'undo')}
+          aria-label={shortcutTip(t('appUndo'), 'undo')}
           disabled={!hasDoc || !histState.canUndo}
           onClick={() => editor?.chain().focus().undo().run()}
         >
@@ -7054,8 +7082,8 @@ export function App() {
         </button>
         <button
           className="qa-btn"
-          data-tip={t('appRedo')}
-          aria-label={t('appRedo')}
+          data-tip={shortcutTip(t('appRedo'), 'redo')}
+          aria-label={shortcutTip(t('appRedo'), 'redo')}
           disabled={!hasDoc || !histState.canRedo}
           onClick={() => editor?.chain().focus().redo().run()}
         >
@@ -7318,6 +7346,7 @@ export function App() {
               }
               preset={aiPreset}
               open={showAi}
+              dockHidden={readMode}
               hideRail={!aiSidebarEnabled}
               onExpand={() => setShowAi(true)}
               onCollapse={() => setShowAi(false)}
@@ -7355,6 +7384,7 @@ export function App() {
                 focusFindNonce={findFocusInput}
                 focusReplaceNonce={findFocusReplace}
                 focusGoToNonce={findFocusGoTo}
+                findNextNonce={findNext}
                 layout={() => pageLayoutRef.current}
               />
             )}

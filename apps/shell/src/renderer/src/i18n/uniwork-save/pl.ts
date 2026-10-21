@@ -11,11 +11,12 @@ export const pl = {
   usMyFolderPrivate: 'Prywatne, widoczne tylko dla Ciebie',
   usChange: 'Zmień',
   usSave: 'Zapisz',
+  usFirstTitle: 'Name the document',
+  usFirstHint: 'You can rename or move it later.',
   usClose: 'Zamknij',
   usPickTitle: 'Wybierz miejsce zapisu',
   usBack: 'Wróć do nazwy',
   usSearchFolders: 'Szukaj folderów',
-  usSharedNote: 'Zapisany w folderze udostępnionym dokument otrzymuje uprawnienia tego folderu.',
   usChooseFolder: 'Wybierz „{folder}”',
   usSelected: 'Wybrane',
   usRootBlocked: 'Wybierz folder',
@@ -31,4 +32,8 @@ export const pl = {
   usErrAlreadyBound: 'Ta karta jest już powiązana z dokumentem UniWork. Zapisuj jak zwykle.',
   usErrNotFound:
     'Nie znaleziono pliku do zapisania ani wybranego folderu. Wybierz ponownie miejsce zapisu i spróbuj jeszcze raz.',
+  usShareToggle: 'Share with workspace',
+  usShareHint: 'Everyone in this workspace can view this document',
+  usShareAlready: 'Already shared with the workspace',
+  usShareFailed: 'Could not share. Check the principal and the level.',
 } satisfies Record<keyof typeof zh, string>
