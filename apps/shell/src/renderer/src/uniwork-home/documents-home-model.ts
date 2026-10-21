@@ -8,9 +8,13 @@ import type {
   UniworkFolderNode,
   UniworkFolderQuery,
   UniworkResult,
+  UniworkSourceFile,
+  UniworkSourceListPage,
+  UniworkSourceListQuery,
 } from '../../../shared/home-api'
 import type { Lang } from '@genoffice/i18n'
 import type { StringKey, TFunc } from '../locale'
+import { folderPath, type FolderIndex } from '../uniwork-folders/uniwork-folders-model'
 
 export type UniworkDocVisibility = 'private' | 'workspace' | 'restricted'
 export type UniworkDocAccessLevel = 'view' | 'comment' | 'edit' | 'manage'
@@ -48,6 +52,7 @@ export type DocumentsHomeDataSource =
   | 'shared-with-me'
   | 'shared-by-me'
   | 'trash'
+  | 'shelved'
   | 'none'
 
 export interface DocumentsHomeNavEntry {
@@ -103,8 +108,9 @@ export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
   {
     id: 'archive',
     labelKey: 'uhNavArchive',
-    available: false,
-    source: 'none',
+    // UNI-1961: the Lưu trữ shelf (ARCHIVE-01), as the web's sidebar lists it
+    available: true,
+    source: 'shelved',
   },
   {
     id: 'trash',
@@ -411,6 +417,14 @@ export interface DocumentsHomeApiAdapter {
   uniworkListTrash?: (
     q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
   ) => Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-1961: the Lưu trữ shelf (only the type filter applies there) */
+  uniworkListShelved?: (q: {
+    workspaceId: string
+    cursor?: string
+    limit?: number
+    format?: UniworkDocFormat
+  }) => Promise<UniworkResult<UniworkDocListPage>>
+  uniworkListSources?: (q: UniworkSourceListQuery) => Promise<UniworkResult<UniworkSourceListPage>>
 }
 
 function mapDocListPageResult(
@@ -527,8 +541,18 @@ export async function fetchDocumentsHomePage(
       cursor,
       ...filters,
     })
+    const page = mapDocListPageResult(res)
+    // UNI-1974: folders are not shareable; an older share the server still returns is no row here
     return {
-      result: mapDocListPageResult(res),
+      result: page.ok
+        ? {
+            ok: true,
+            value: {
+              ...page.value,
+              items: page.value.items.filter((doc) => doc.kind !== 'folder'),
+            },
+          }
+        : page,
     }
   }
 
@@ -546,5 +570,322 @@ export async function fetchDocumentsHomePage(
     }
   }
 
+  if (subView === 'archive') {
+    if (typeof api.uniworkListShelved !== 'function') {
+      return { result: { ok: true, value: { items: [], nextCursor: null } } }
+    }
+    // UNI-1961: the shelf takes the type filter only (the web sends `format`
+    // alone; the live views' updater/date filters never reach it)
+    const res = await api.uniworkListShelved({
+      workspaceId,
+      ...(cursor ? { cursor } : {}),
+      ...(filters.format ? { format: filters.format } : {}),
+    })
+    return {
+      result: mapDocListPageResult(res),
+    }
+  }
+
   return { result: { ok: true, value: { items: [], nextCursor: null } } }
+}
+
+// ── UNI-1961: the Lưu trữ (Archive) shelf ──────────────────────────────
+
+/** the "Lưu trữ bởi" value of rows shelved by nobody (`shelved_by` null) */
+export const SHELVED_BY_SYSTEM = ' system'
+/** the "Lưu trữ bởi" value of rows whose shelver left the workspace */
+export const SHELVED_BY_FORMER = ' former'
+
+/** the "Lưu trữ bởi" key of one row: a member id, former or system; null = unknown (no member list) */
+export function shelverKeyOf(doc: DocumentsHomeDoc): string | null {
+  if (!doc.shelvedById) return SHELVED_BY_SYSTEM
+  if (doc.shelvedByName?.trim()) return doc.shelvedById
+  if (doc.shelvedByFormer) return SHELVED_BY_FORMER
+  return null
+}
+
+/** the "Lưu trữ bởi" cell: the member's name, the former-member / system line, or null ("—") */
+export function shelverLabelOf(doc: DocumentsHomeDoc, t: TFunc): string | null {
+  const key = shelverKeyOf(doc)
+  if (key === SHELVED_BY_SYSTEM) return t('uhShelvedBySystem')
+  if (key === SHELVED_BY_FORMER) return t('uhShelvedByFormer')
+  return key ? (doc.shelvedByName?.trim() ?? null) : null
+}
+
+/**
+ * The "Lưu trữ bởi" options the loaded rows name, in first-seen order: the
+ * members, then one former-member entry, then the system (the web lists the
+ * same three groups; the shelf has no `shelved_by` parameter, so the filter
+ * narrows the loaded pages only).
+ */
+export function shelvedByOptionsOf(
+  docs: readonly DocumentsHomeDoc[],
+  t: TFunc,
+): readonly UpdatedByOption[] {
+  const members = new Map<string, string>()
+  let former = false
+  let system = false
+  for (const doc of docs) {
+    const key = shelverKeyOf(doc)
+    if (key === SHELVED_BY_SYSTEM) system = true
+    else if (key === SHELVED_BY_FORMER) former = true
+    else if (key && !members.has(key)) members.set(key, doc.shelvedByName!.trim())
+  }
+  return [
+    ...Array.from(members.entries()).map(([id, name]) => ({ id, name })),
+    ...(former ? [{ id: SHELVED_BY_FORMER, name: t('uhShelvedByFormer') }] : []),
+    ...(system ? [{ id: SHELVED_BY_SYSTEM, name: t('uhShelvedBySystem') }] : []),
+  ]
+}
+
+/** the web's canManageTrashed: `my_level` manage, or the admin_scope of a restricted row */
+export function canManageShelved(doc: DocumentsHomeDoc): boolean {
+  return doc.canManage === true || doc.myLevel === 'manage' || doc.adminScope === true
+}
+
+/**
+ * The web's `formatShortWhen` (D documents/document-format.ts): the time for
+ * today, else a short day (+ year when not this year); vi is written out
+ * dd/MM[/yyyy] because ICU versions disagree on its separator.
+ */
+export function formatShortWhen(
+  at: string | null | undefined,
+  locale: string,
+  now: Date = new Date(),
+): string {
+  if (!at) return ''
+  const date = new Date(at)
+  if (Number.isNaN(date.getTime())) return ''
+  const sameYear = date.getFullYear() === now.getFullYear()
+  if (sameYear && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()) {
+    return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date)
+  }
+  if (locale.toLowerCase().startsWith('vi')) {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const day = `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`
+    return sameYear ? day : `${day}/${date.getFullYear()}`
+  }
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  }).format(date)
+}
+
+/**
+ * UNI-1961: one row of the documents table: a workspace document or a file
+ * that lives in another module (chat, task, meeting, email), as the web's
+ * library rows (D library-rows.ts `LibraryRow`).
+ */
+export type DocumentsHomeTableRow =
+  | { type: 'doc'; id: string; doc: DocumentsHomeDoc }
+  | { type: 'source'; id: string; source: UniworkSourceFile }
+
+function rowTime(row: DocumentsHomeTableRow): number {
+  const time = Date.parse(row.type === 'doc' ? row.doc.updatedAt : row.source.updatedAt)
+  return Number.isNaN(time) ? 0 : time
+}
+
+/**
+ * UNI-1961: the web home root's merge (D library-rows.ts `mergeNewestFirst`):
+ * two independently paged lists as one newest-first table. A row shows only
+ * when it is at least as new as the oldest loaded row of every list that still
+ * has pages, so "Load more" never slots a row above what is on screen; a list
+ * that is exhausted (or empty) sets no bound. A row with no date sinks.
+ */
+export function mergeNewestFirst(
+  docs: readonly DocumentsHomeDoc[],
+  sources: readonly UniworkSourceFile[],
+  more: { docs: boolean; sources: boolean },
+): DocumentsHomeTableRow[] {
+  const rows: DocumentsHomeTableRow[] = [
+    ...docs.map((doc) => ({ type: 'doc' as const, id: doc.id, doc })),
+    ...sources.map((source) => ({ type: 'source' as const, id: `source:${source.id}`, source })),
+  ]
+  const oldest = (list: DocumentsHomeTableRow[], paged: boolean): number =>
+    paged && list.length > 0 ? Math.min(...list.map(rowTime)) : Number.NEGATIVE_INFINITY
+  const cutoff = Math.max(
+    oldest(
+      rows.filter((row) => row.type === 'doc'),
+      more.docs,
+    ),
+    oldest(
+      rows.filter((row) => row.type === 'source'),
+      more.sources,
+    ),
+  )
+  return rows.filter((row) => rowTime(row) >= cutoff).sort((a, b) => rowTime(b) - rowTime(a))
+}
+
+/**
+ * UNI-1961: the home filters a source row cannot get from the server (the web
+ * runs them on merged source rows, use-documents-library.ts): the editor is the
+ * file's owner, the date its `updated_at`. The type went to the server as `type`.
+ */
+export function sourceMatchesFilters(
+  source: UniworkSourceFile,
+  filters: UniworkListFilters,
+): boolean {
+  if (filters.updatedBy && source.owner?.id !== filters.updatedBy) return false
+  if (filters.updatedFrom) {
+    const since = Date.parse(filters.updatedFrom)
+    const at = Date.parse(source.updatedAt)
+    if (!Number.isNaN(since) && (Number.isNaN(at) || at < since)) return false
+  }
+  return true
+}
+
+/**
+ * UNI-1961: one page of the root's source files, with the home's format filter
+ * as the sources `type`. Null when the bridge has no sources call.
+ */
+export async function fetchDocumentsHomeSources(
+  api: DocumentsHomeApiAdapter,
+  params: { workspaceId: string; filters: UniworkListFilters; cursor?: string },
+): Promise<UniworkResult<UniworkSourceListPage> | null> {
+  if (typeof api.uniworkListSources !== 'function') return null
+  return api.uniworkListSources({
+    workspaceId: params.workspaceId,
+    ...(params.filters.format ? { type: params.filters.format } : {}),
+    ...(params.cursor ? { cursor: params.cursor } : {}),
+  })
+}
+
+/**
+ * UNI-1961: the web's Size cell (D library-rows.ts `rowSizeBytes`): a file
+ * document's bytes when it has any, every source file's; pages and folders
+ * say nothing.
+ */
+export function rowSizeBytes(row: DocumentsHomeTableRow): number | null {
+  if (row.type === 'source') return row.source.sizeBytes
+  return row.doc.kind === 'file' && (row.doc.sizeBytes ?? 0) > 0
+    ? (row.doc.sizeBytes ?? null)
+    : null
+}
+
+/** UNI-1961: the web's byte formatter (D library-rows.ts `formatBytes`): "318 KB", "1.2 MB" */
+export function formatBytes(bytes: number | null | undefined, locale: string): string {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes < 0) return ''
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  const digits = unit === 0 || value >= 10 ? 0 : 1
+  return `${new Intl.NumberFormat(locale || undefined, { maximumFractionDigits: digits }).format(value)} ${units[unit]}`
+}
+
+/** UNI-1961: the web's library date (documents-library-row.tsx): Intl dateStyle short */
+export function formatShortDate(iso: string, locale: string): string {
+  const date = new Date(iso)
+  if (!iso || Number.isNaN(date.getTime())) return ''
+  try {
+    return new Intl.DateTimeFormat(locale || undefined, { dateStyle: 'short' }).format(date)
+  } catch {
+    return date.toISOString().slice(0, 10)
+  }
+}
+
+/** UNI-1961: the web's "Group by" options, in its order (D library-rows.ts `GROUP_BY`) */
+export const DOCUMENTS_HOME_GROUP_BY = ['folder', 'source', 'type', 'none'] as const
+export type DocumentsHomeGroupBy = (typeof DOCUMENTS_HOME_GROUP_BY)[number]
+
+/** the web's default (documents-page-view.tsx) */
+export const DEFAULT_DOCUMENTS_HOME_GROUP_BY: DocumentsHomeGroupBy = 'folder'
+
+export const DOCUMENTS_HOME_GROUP_BY_KEYS: Record<DocumentsHomeGroupBy, StringKey> = {
+  folder: 'uhGroupByFolder',
+  source: 'uhGroupBySource',
+  type: 'uhGroupByType',
+  none: 'uhGroupByNone',
+}
+
+/**
+ * UNI-1961: where the web offers "Group by" - its list views (Recent, Shared
+ * with me, Shared by me). The home root and a folder never group, and the
+ * trash has its own table.
+ */
+export function documentsHomeGroupable(subView: DocumentsHomeSubViewId): boolean {
+  return subView === 'recent' || subView === 'shared-with-me' || subView === 'shared-by-me'
+}
+
+export interface DocumentsHomeRowGroup {
+  /** stable id; also what the built-in groups are translated from */
+  key: string
+  /** a folder path (the only user-visible title); empty for the built-in groups */
+  title: string
+  rows: DocumentsHomeDoc[]
+}
+
+/** the format a row groups by: page, the file format, else its title's extension, else "file" */
+function groupFormatOf(doc: DocumentsHomeDoc): string {
+  if (doc.kind === 'page' || doc.kind === 'folder') return doc.kind
+  if (doc.format) return doc.format
+  const dot = doc.title.lastIndexOf('.')
+  return (dot > 0 ? doc.title.slice(dot + 1).toLowerCase() : '') || 'file'
+}
+
+/**
+ * UNI-1961: the web's `groupRows` (D library-rows.ts) over the table's rows,
+ * in first-seen order of the (already sorted) rows. Folder: the deepest folder
+ * above the row, titled by its path (My Folder takes its label), else
+ * `unfiled`; source: `origin:upload|created`, else `origin:documents`; type:
+ * `type:<format>`; none: one group, which draws no header.
+ */
+export function groupDocumentsHomeRows(
+  rows: readonly DocumentsHomeDoc[],
+  groupBy: DocumentsHomeGroupBy,
+  index: FolderIndex,
+  myFolder?: { id: string | null; label: string },
+): DocumentsHomeRowGroup[] {
+  if (groupBy === 'none') return [{ key: 'all', title: '', rows: [...rows] }]
+  const groups = new Map<string, DocumentsHomeRowGroup>()
+  const add = (key: string, title: string, row: DocumentsHomeDoc) => {
+    const group = groups.get(key) ?? { key, title, rows: [] }
+    group.rows.push(row)
+    groups.set(key, group)
+  }
+  for (const row of rows) {
+    if (groupBy === 'source') add(`origin:${row.origin ?? 'documents'}`, '', row)
+    else if (groupBy === 'type') add(`type:${groupFormatOf(row)}`, '', row)
+    else {
+      const path = folderPath(index, row.parentId ?? null)
+      const last = path.at(-1)
+      if (last) {
+        const title = path
+          .map((part) => (myFolder && part.id === myFolder.id ? myFolder.label : part.title))
+          .join(' / ')
+        add(`folder:${last.id}`, title, row)
+      } else add('unfiled', '', row)
+    }
+  }
+  return [...groups.values()]
+}
+
+/** the product names the web's type groups use in every language */
+const GROUP_TYPE_NAMES: Record<string, string> = {
+  page: 'UniNote',
+  docx: 'Docs',
+  xlsx: 'Sheets',
+  pptx: 'Slides',
+  pdf: 'PDF',
+  md: 'Markdown',
+  html: 'HTML',
+}
+
+/** UNI-1961: a group header's words (D documents-library-list.tsx `groupTitle`) */
+export function documentsHomeGroupLabel(group: DocumentsHomeRowGroup, t: TFunc): string {
+  if (group.title) return group.title
+  if (group.key === 'unfiled') return t('uhGroupUnfiled')
+  if (group.key === 'origin:upload') return t('uhOriginUpload')
+  if (group.key === 'origin:created') return t('uhOriginCreated')
+  if (group.key === 'origin:documents') return t('uhSectionDocuments')
+  if (group.key.startsWith('type:')) {
+    const format = group.key.slice(5)
+    if (format === 'folder') return t('uhSectionFolders')
+    return GROUP_TYPE_NAMES[format] ?? t('uhGroupTypeOther')
+  }
+  return ''
 }

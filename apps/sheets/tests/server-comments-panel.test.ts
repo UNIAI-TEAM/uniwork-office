@@ -40,6 +40,8 @@ interface Row {
   revision: number
   anchor: Record<string, unknown> | null
   anchor_state: string | null
+  anchor_version_id?: string | null
+  anchor_version_no?: number | null
   resolved_at: string | null
   deleted_at: string | null
   created_at: string
@@ -127,6 +129,9 @@ function fakeServer(
       },
     ),
     searchMentions: vi.fn(() => ok({ candidates: [] })),
+    openVersion: vi.fn((_i: { path: string; commentId: string; versionNo: number }) =>
+      Promise.resolve({ opened: true }),
+    ),
     context: vi.fn(() =>
       opts.context === 'not_found'
         ? Promise.resolve({ ok: false as const, error: { code: 'not_found' } })
@@ -401,7 +406,104 @@ describe('server mode: anchors after Save', () => {
     const lists = server.calls.list.mock.calls.length
     await server.saved('v2')
     expect(server.calls.anchors).toHaveBeenCalledTimes(1)
-    expect(server.calls.list.mock.calls.length).toBe(lists)
+    // the one list is the receipt's own refresh (G819-A02b); the refused PUT adds no reload after it
+    expect(server.calls.list.mock.calls.length).toBe(lists + 1)
+  })
+
+  it('a comment made on the server after the first list is in the PUT after the receipt, panel closed (G819-A02b)', async () => {
+    const server = fakeServer()
+    const first = server.add({
+      body: 'first',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-1', range: 'A1' },
+      anchor_state: 'exact',
+    })
+    await mount(server)
+    // the other host comments after this editor listed; nothing here lists again while closed
+    const later = server.add({
+      body: 'from the other host',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+      anchor_state: 'exact',
+    })
+    await server.saved('v2')
+    expect(server.calls.anchors).toHaveBeenCalledTimes(1)
+    const sent = server.calls.anchors.mock.calls[0]![0]
+    expect(sent.versionId).toBe('v2')
+    expect(sent.anchors.map((a) => a.commentId).sort()).toEqual([first.id, later.id].sort())
+    expect(sent.anchors.every((a) => a.state === 'exact')).toBe(true)
+  })
+
+  it('a comment made on the opened version after the first list, then a row insert above it, panel closed: B8 (G819-A02c)', async () => {
+    const server = fakeServer()
+    await mount(server)
+    // the other host comments on the opened version v1 after this editor listed
+    const later = server.add({
+      body: 'from the other host',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+      anchor_state: 'exact',
+      anchor_version_id: 'v1',
+    })
+    // the desktop then inserts a row above B7; nothing lists in between
+    act(() =>
+      serverAnchorStore.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 3, count: 1 }),
+    )
+    await server.saved('v2')
+    expect(server.calls.anchors).toHaveBeenCalledTimes(1)
+    expect(server.calls.anchors.mock.calls[0]![0]).toEqual({
+      path: PATH,
+      versionId: 'v2',
+      anchors: [
+        {
+          commentId: later.id,
+          anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B8' },
+          state: 'exact',
+        },
+      ],
+    })
+  })
+
+  it('a comment on a version the editor never held goes out as listed (G819-A02c)', async () => {
+    const server = fakeServer()
+    await mount(server)
+    const foreign = server.add({
+      body: 'made on a newer version',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+      anchor_state: 'exact',
+      anchor_version_id: 'v-newer',
+    })
+    act(() =>
+      serverAnchorStore.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 3, count: 1 }),
+    )
+    await server.saved('v2')
+    expect(server.calls.anchors.mock.calls[0]![0].anchors).toEqual([
+      {
+        commentId: foreign.id,
+        anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+        state: 'exact',
+      },
+    ])
+  })
+
+  it('a comment this editor makes after a row insert is not shifted again at the Save (G819-A02c)', async () => {
+    const server = fakeServer()
+    const { view, state } = fakeView()
+    state.active = 'sheet-2'
+    await mount(server, view)
+    act(() =>
+      serverAnchorStore.applyStructuralOp('sheet-2', { kind: 'insert-rows', index: 3, count: 1 }),
+    )
+    // the user selects B8 (live, after the insert) and comments there; the server stores it on v1
+    state.selection = { sheetId: 'sheet-2', range: cell(7, 1) }
+    await act(async () => serverComments.handle!.startThread())
+    await flush()
+    await typeAndSend(el.querySelector<HTMLTextAreaElement>('.collab-thread--new textarea')!, 'B8')
+    await server.saved('v2')
+    expect(server.calls.anchors.mock.calls[0]![0].anchors).toEqual([
+      {
+        commentId: server.rows[0]!.id,
+        anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B8' },
+        state: 'exact',
+      },
+    ])
   })
 
   it('server comments never touch the thread store (the file parts stay byte-identical)', async () => {
@@ -477,6 +579,78 @@ describe('server mode: comments.reveal', () => {
     expect(await server.reveal(c.id)).toEqual([true])
     expect(state.selected).toEqual([])
     expect(await server.reveal('nope')).toEqual([false])
+  })
+})
+
+describe('a lost comment and its older version (UNI-2033)', () => {
+  const LOST = { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' }
+  const VIEW = 'View in version 2'
+  const buttons = (text: string) =>
+    [...el.querySelectorAll<HTMLButtonElement>('button')].filter((b) => b.textContent === text)
+
+  it('offers "View in version N" and asks the shell once, with the path, id and N', async () => {
+    const server = fakeServer()
+    const c = server.add({
+      body: 'Lost one',
+      anchor: LOST,
+      anchor_state: 'lost',
+      anchor_version_id: 'v0',
+      anchor_version_no: 2,
+    })
+    await mount(server)
+    act(() => threadPane.show())
+    await flush()
+    expect(buttons(VIEW)).toHaveLength(1)
+    await act(async () => buttons(VIEW)[0]!.click())
+    await flush()
+    expect(server.calls.openVersion.mock.calls).toEqual([
+      [{ path: PATH, commentId: c.id, versionNo: 2 }],
+    ])
+    expect(el.textContent).not.toContain(EN.collabVersionViewUnavailable!)
+  })
+
+  it('shows the unavailable line when the shell could not open it', async () => {
+    const server = fakeServer()
+    server.calls.openVersion.mockImplementation(() => Promise.resolve({ opened: false }))
+    server.add({
+      body: 'Lost one',
+      anchor: LOST,
+      anchor_state: 'lost',
+      anchor_version_id: 'v0',
+      anchor_version_no: 2,
+    })
+    await mount(server)
+    act(() => threadPane.show())
+    await flush()
+    await act(async () => buttons(VIEW)[0]!.click())
+    await flush()
+    expect(el.textContent).toContain(EN.collabVersionViewUnavailable!)
+  })
+
+  it('no action without a version number', async () => {
+    const server = fakeServer()
+    server.add({ body: 'Lost one', anchor: LOST, anchor_state: 'lost', anchor_version_id: 'v0' })
+    await mount(server)
+    act(() => threadPane.show())
+    await flush()
+    expect(el.textContent).not.toContain('View in version')
+  })
+
+  it('in the version it was last anchored on, a lost thread reveals at its cell', async () => {
+    // the editor's open version id is the context's: v1
+    const server = fakeServer({ versionId: 'v1' })
+    const c = server.add({
+      body: 'Lost one',
+      anchor: LOST,
+      anchor_state: 'lost',
+      anchor_version_id: 'v1',
+      anchor_version_no: 1,
+    })
+    const { view, state } = fakeView()
+    await mount(server, view)
+    expect(await server.reveal(c.id)).toEqual([true])
+    expect(state.selected).toEqual([['sheet-2', cell(6, 1)]])
+    expect(el.textContent).not.toContain('View in version')
   })
 })
 
@@ -775,5 +949,94 @@ describe('the anchor store follows a reopen that is not a Save (FE13-4)', () => 
     await flush()
     expect(server.calls.list.mock.calls.length).toBe(lists)
     expect(serverAnchorStore.hasMarker('sheet-2', 6, 1)).toBe(true)
+  })
+})
+
+describe('server mode: reveal focus guard against the editor refocus', () => {
+  let univer: HTMLDivElement
+  let editor: HTMLDivElement
+
+  beforeEach(() => {
+    // stands in for Univer's hidden cell editor, which takes focus back shortly after a selection
+    univer = document.createElement('div')
+    univer.id = 'univer-container'
+    editor = document.createElement('div')
+    editor.tabIndex = 0
+    univer.append(editor)
+    document.body.append(univer)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    univer.remove()
+  })
+
+  async function revealed() {
+    const server = fakeServer()
+    const c = server.add({
+      body: 'Look here',
+      anchor: { format: 'xlsx', v: 1, sheet: 'sheet-2', range: 'B7' },
+      anchor_state: 'exact',
+    })
+    await mount(server, fakeView().view)
+    expect(await server.reveal(c.id)).toEqual([true])
+    const heading = el.querySelector<HTMLElement>(
+      `[data-thread-id="${c.id}"] [data-thread-heading]`,
+    )!
+    expect(document.activeElement).toBe(heading)
+    return { heading, server, c }
+  }
+
+  it('gives focus back to the thread heading when the sheet editor takes it after the reveal', async () => {
+    const { heading } = await revealed()
+    act(() => editor.focus())
+    expect(document.activeElement).toBe(heading)
+  })
+
+  it('stops guarding at the first user pointer / key / wheel input', async () => {
+    for (const type of ['pointerdown', 'keydown', 'wheel']) {
+      act(() => root.unmount())
+      root = createRoot(el)
+      const { heading } = await revealed()
+      act(() => void document.dispatchEvent(new Event(type, { bubbles: true })))
+      act(() => editor.focus())
+      expect(document.activeElement, type).toBe(editor)
+      act(() => heading.focus())
+    }
+  })
+
+  it('stops guarding after about 1.5 s', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const { heading } = await revealed()
+    act(() => void vi.advanceTimersByTime(1600))
+    act(() => editor.focus())
+    expect(document.activeElement).not.toBe(heading)
+    expect(document.activeElement).toBe(editor)
+  })
+
+  it('is still guarding at 1.4 s, when a late editor refocus lands', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const { heading } = await revealed()
+    act(() => void vi.advanceTimersByTime(1400))
+    act(() => editor.focus())
+    expect(document.activeElement).toBe(heading)
+  })
+
+  it('leaves focus alone when the thread heading is gone (panel closed)', async () => {
+    await revealed()
+    act(() => threadPane.close())
+    await flush()
+    act(() => editor.focus())
+    expect(document.activeElement).toBe(editor)
+  })
+
+  it('does not steal focus from anything outside the sheet editor', async () => {
+    const { heading } = await revealed()
+    const other = document.createElement('input')
+    document.body.append(other)
+    act(() => other.focus())
+    expect(document.activeElement).toBe(other)
+    other.remove()
+    act(() => heading.focus())
   })
 })

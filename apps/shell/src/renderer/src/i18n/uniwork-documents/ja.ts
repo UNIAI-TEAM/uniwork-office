@@ -140,9 +140,10 @@ export const ja = {
   uwDocType: '種類',
   uwDocLocation: '保存先',
   uwDocRename: '名前を変更',
-  uwDocArchive: 'アーカイブ',
+  uwDocArchive: 'ごみ箱に移動',
   uwDocRestore: '復元',
-  uwDocArchiveConfirm: '「{name}」をアーカイブしますか？後で復元できます。',
+  uwDocArchiveConfirm:
+    '「{name}」とそのサブツリー全体は、完全に削除される前に 30 日間ごみ箱に残ります。管理者はこの期間中に復元できます。',
   uwDocNameEmpty: 'ドキュメント名を入力してください。',
   uwDocNameTooLong: '名前が長すぎます（最大500文字）。',
   uwDocRenamedAnnounce: 'ドキュメントの名前が {name} に変更されました。',
@@ -153,7 +154,7 @@ export const ja = {
   uwDocUploadPick: 'ファイルを選択',
   uwDocUploading: '「{name}」をアップロードしています…',
   uwDocLocationTop: '最上位',
-  uwDocArchived: 'アーカイブ済み',
+  uwDocArchived: 'ごみ箱に移動しました',
   uwSizeWarnChip: '上限 {max} に近づいています（現在 {size}）。',
   uwSizeWarnDismiss: 'サイズ警告を閉じる',
   uwSaveBlockTitle: 'UniWork に保存できませんでした',
@@ -189,4 +190,14 @@ export const ja = {
   uwLockLostGeneric: 'あなたはもう編集していません。未保存の変更はまだ残っています。',
   uwLockLostHeldBy: '{name} が現在編集しています。未保存の変更はまだ残っています。',
   uwLockAcquireFailed: '編集アクセスを取得できませんでした。数分後にもう一度お試しください。',
+  uwChipSourceView: '閲覧のみ · {origin}から',
+  uwTipSourceView:
+    'このファイルは{origin}{parent}に添付されています。変更は保存されません。コピーが必要な場合は、ドキュメント一覧の「ダウンロード」を使ってください。',
+  uwSourceViewSaveHint: 'このファイルは閲覧専用です — 変更は保存されません。',
+  uwSourceViewCopyHint:
+    'コピーが必要な場合は、ドキュメント一覧の「ダウンロード」を使ってください。',
+  uwSourceOriginChat: 'チャット',
+  uwSourceOriginTask: 'タスク',
+  uwSourceOriginMeeting: '会議',
+  uwSourceOriginEmail: 'メール',
 } satisfies Record<keyof typeof zh, string>

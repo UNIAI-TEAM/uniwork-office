@@ -21,6 +21,23 @@ import type {
   UniworkConflictReply,
   UniworkConflictView,
 } from './uniwork-conflict'
+import type {
+  OpenSourceInput,
+  OpenSourceValue,
+  SourceViewHint,
+  SourceViewResult,
+  SourceViewState,
+} from './source-view'
+
+export { SOURCE_VIEW_CHANNELS } from './source-view'
+export type {
+  OpenSourceInput,
+  OpenSourceValue,
+  SourceViewErrorCode,
+  SourceViewHint,
+  SourceViewResult,
+  SourceViewState,
+} from './source-view'
 
 export type {
   UniworkConflictAction,
@@ -132,7 +149,7 @@ export interface McpStatus {
   error?: string
 }
 
-export type UniworkDocFormat = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'html'
+export type UniworkDocFormat = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'html'
 export type UniworkDocAccess = 'edit' | 'view'
 export type UniworkSaveState =
   | 'ready'
@@ -280,6 +297,36 @@ export interface UniworkDocSummary {
   path?: { id: string; title: string }[]
   /** EL-1(b): list-row edit_lock summary (DH-2); absent when the server sent none */
   editLock?: UniworkDocEditLock
+  /**
+   * UNI-1961 (ARCHIVE-01): the row sits in Lưu trữ (the server's `shelved_at`).
+   * Read leniently: an odd value drops the field, never the row.
+   */
+  shelvedAt?: string
+  /** UNI-1961: the server's `shelved_by` id; absent when null (the system shelved it) */
+  shelvedById?: string
+  /** UNI-1961: the shelver's display name, resolved by main from the workspace members */
+  shelvedByName?: string
+  /** UNI-1961: `shelved_by` names someone the workspace member list no longer holds */
+  shelvedByFormer?: boolean
+  /**
+   * UNI-1961: the server's `admin_scope` - a workspace admin on a restricted row
+   * administers it without a `my_level` (the web's canManageTrashed)
+   */
+  adminScope?: boolean
+  /** UNI-1961: a file row's `size_bytes` (the web's Size column); absent on pages/folders or 0 */
+  sizeBytes?: number
+  /** UNI-1961: the server's `origin` when it is one the web names (Group by Source) */
+  origin?: 'upload' | 'created'
+}
+
+/**
+ * UNI-1961 (ARCHIVE-01): the answer of an unshelve or shelve - the item, and
+ * the ids the batch touched (a folder unshelve may leave descendants the
+ * caller does not manage on the shelf).
+ */
+export interface UniworkDocShelveResult {
+  document: UniworkDocSummary
+  affected: string[]
 }
 
 /** FD-11: the three entry kinds the folder tree holds */
@@ -301,6 +348,57 @@ export interface UniworkListFilters {
   format?: UniworkDocFormat
   updatedBy?: string
   updatedFrom?: string
+}
+
+/**
+ * UNI-1961: one file of the Documents home's "other sources" list
+ * (`GET /workspaces/{ws}/documents/sources`): a document file attached in
+ * chat, a task, a meeting or email (UNI-1967: docx/xlsx/pptx/pdf/md/html/txt).
+ * The web's lenient shape (sources-schema.ts): every field but the ids, the
+ * source, the parent and the name takes a default when the server omits it.
+ */
+export interface UniworkSourceFile {
+  id: string
+  /** chat | task | meeting | email; kept as sent (a new module is not dropped) */
+  source: string
+  parent: { kind: string; id: string; title: string }
+  name: string
+  mimeType: string
+  extension: string
+  sizeBytes: number
+  updatedAt: string
+  owner: { id: string; name: string } | null
+  canOpenInApp: boolean
+  canSave: boolean
+}
+
+/**
+ * UNI-1961: the type filter the sources list takes (the web's `type`). A txt filter is
+ * accepted here (it follows UniworkDocFormat) but the client does not send it: the
+ * sources list has no txt type.
+ */
+export type UniworkSourceType = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'html'
+
+export interface UniworkSourceListQuery {
+  workspaceId: string
+  source?: string
+  type?: UniworkSourceType
+  q?: string
+  cursor?: string
+  limit?: number
+}
+
+export interface UniworkSourceListPage {
+  items: UniworkSourceFile[]
+  nextCursor: string | null
+}
+
+/** UNI-1961: download one source file to a path the person picks */
+export interface UniworkSourceDownloadInput {
+  workspaceId: string
+  sourceId: string
+  /** the suggested file name (the row's name; only its last segment is used) */
+  name: string
 }
 
 /**
@@ -489,8 +587,8 @@ export type UniworkDocActionResult<T> =
       endpointMissing?: boolean
     }
 
-/** the file formats D's blank route generates (UNI-1953: the Office three plus md / html / pdf) */
-export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'html' | 'pdf'
+/** the file formats D's blank route generates (UNI-1953: the Office three plus md / html / pdf; UNI-2046: txt) */
+export type UniworkDocNewFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'txt' | 'html' | 'pdf'
 
 /**
  * UNI-1959: "Share with workspace" on a create. `workspace` is the only value
@@ -1064,6 +1162,8 @@ export interface HomeApi {
   submitAgentIntent(intent: AgentIntentDto): Promise<boolean>
   /** open a blank markdown editor tab */
   newMarkdown(opts?: NewFileOpts & { projectId?: string }): Promise<void>
+  /** a blank .txt in the default folder, opened in the markdown module as plain source */
+  newTxt(opts?: NewFileOpts & { projectId?: string }): Promise<void>
   /** open a blank html editor tab */
   newHtml(opts?: NewFileOpts & { projectId?: string }): Promise<void>
   /** drop entries from the recent list (does not touch the files) */
@@ -1275,6 +1375,18 @@ export interface HomeApi {
   uniworkListTrash(
     q: { workspaceId: string; cursor?: string; limit?: number } & UniworkListFilters,
   ): Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-1961: the Documents home's "other sources" files (paged) */
+  uniworkListSources(q: UniworkSourceListQuery): Promise<UniworkResult<UniworkSourceListPage>>
+  /** UNI-1961: save one source file through the save dialog; `path` null = cancelled */
+  uniworkDownloadSource(
+    input: UniworkSourceDownloadInput,
+  ): Promise<UniworkResult<{ path: string | null }>>
+  /** UNI-1993: open a source row's file as a view-only tab (no document, no sync) */
+  uniworkOpenSource(input: OpenSourceInput): Promise<SourceViewResult<OpenSourceValue>>
+  /** UNI-1993: the tab chip's state of a path; null unless the path is a view-only source */
+  uniworkSourceViewState(path: string): Promise<SourceViewState | null>
+  /** UNI-1993: an explicit Save hit a view-only source path (the "view only" hint) */
+  onUniworkSourceViewHint(cb: (payload: SourceViewHint) => void): () => void
   /** the document properties panel (S17); nulls where the server sends no value */
   uniworkDocumentProperties(documentId: string): Promise<UniworkResult<UniworkDocProperties>>
   /** S18: create a blank document (docx/xlsx/pptx) in a workspace/folder */
@@ -1335,6 +1447,23 @@ export interface HomeApi {
   onUniworkTreeChanged(cb: (event: UniworkTreeChangedEvent) => void): () => void
   /** a document was renamed (here or elsewhere); returns an unsubscribe */
   onUniworkDocRenamed(cb: (event: UniworkDocRenamedEvent) => void): () => void
+  /** UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf, shelved_at newest first (paged) */
+  uniworkListShelved(q: {
+    workspaceId: string
+    cursor?: string
+    limit?: number
+    format?: UniworkDocFormat
+  }): Promise<UniworkResult<UniworkDocListPage>>
+  /** UNI-1961: Bỏ lưu trữ - the item and its same-batch descendants the caller manages */
+  uniworkUnshelveDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<UniworkDocShelveResult>>
+  /** UNI-1961: Chuyển vào thùng rác from Lưu trữ (any kind: file, page or folder) */
+  uniworkTrashShelvedDocument(
+    documentId: string,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /** UNI-1961: Lưu trữ - shelve a live item the caller manages (the row ⋯; files and pages) */
+  uniworkShelveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocShelveResult>>
   uniworkOpenDocument(documentId: string): Promise<UniworkResult<{ path: string }>>
   uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
   uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
@@ -1828,6 +1957,7 @@ export const HOME_CHANNELS = {
   newSheet: 'home:new-sheet',
   newSlide: 'home:new-slide',
   newMarkdown: 'home:new-markdown',
+  newTxt: 'home:new-txt',
   newHtml: 'home:new-html',
   newPdf: 'home:new-pdf',
   removeRecent: 'home:remove-recent',
@@ -1924,6 +2054,10 @@ export const UNIWORK_DOC_CHANNELS = {
   listSharedByMe: 'uniwork-doc:list-shared-by-me',
   /** invoke(q) -> archived documents in one workspace's trash (DESKTOP-HOME) */
   listTrash: 'uniwork-doc:list-trash',
+  /** invoke(q) -> the Documents home's "other sources" files (UNI-1961) */
+  listSources: 'uniwork-doc:list-sources',
+  /** invoke(input) -> save one source file through the save dialog (UNI-1961) */
+  downloadSource: 'uniwork-doc:download-source',
   /** invoke(documentId) -> the properties panel of one document */
   documentProperties: 'uniwork-doc:document-properties',
   /** invoke(input) -> create a blank document (S18) */
@@ -2024,6 +2158,14 @@ export const UNIWORK_DOC_CHANNELS = {
   signOutPromptAnswer: 'uniwork-doc:sign-out-prompt-answer',
   /** invoke(path) -> save the bound working copy to a user-chosen local path ("Lưu bản sao về máy") */
   saveLocalCopy: 'uniwork-doc:save-local-copy',
+  /** invoke(q) -> the workspace's Lưu trữ shelf, shelved_at DESC (UNI-1961) */
+  listShelved: 'uniwork-doc:list-shelved',
+  /** invoke(documentId) -> Bỏ lưu trữ (UNI-1961) */
+  unshelveDocument: 'uniwork-doc:unshelve-document',
+  /** invoke(documentId) -> move a shelved item of any kind to the trash (UNI-1961) */
+  trashShelvedDocument: 'uniwork-doc:trash-shelved-document',
+  /** invoke(documentId) -> Lưu trữ a live item (UNI-1961) */
+  shelveDocument: 'uniwork-doc:shelve-document',
 } as const
 
 export const PROJECT_CHANNELS = {

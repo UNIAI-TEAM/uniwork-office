@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const hi = {
-  ufRoot: 'UniWork',
+  ufRoot: 'दस्तावेज़ (रूट)',
   ufTreeLabel: 'फ़ोल्डर',
   ufContentsLabel: 'फ़ोल्डर की सामग्री',
   ufRecent: 'हाल के',

@@ -141,9 +141,10 @@ export const es = {
   uwDocType: 'Tipo',
   uwDocLocation: 'Ubicación',
   uwDocRename: 'Cambiar nombre',
-  uwDocArchive: 'Archivar',
+  uwDocArchive: 'Mover a la papelera',
   uwDocRestore: 'Restaurar',
-  uwDocArchiveConfirm: '¿Archivar «{name}»? Puedes restaurarlo más tarde.',
+  uwDocArchiveConfirm:
+    '“{name}” y todo su subárbol permanecerán 30 días en la papelera antes de eliminarse de forma permanente. Los gestores pueden restaurarlos durante ese plazo.',
   uwDocNameEmpty: 'Escribe un nombre para el documento.',
   uwDocNameTooLong: 'El nombre es demasiado largo (500 caracteres como máximo).',
   uwDocRenamedAnnounce: 'El documento se renombró a {name}.',
@@ -154,7 +155,7 @@ export const es = {
   uwDocUploadPick: 'Elegir un archivo',
   uwDocUploading: 'Subiendo «{name}»…',
   uwDocLocationTop: 'Nivel superior',
-  uwDocArchived: 'Archivado',
+  uwDocArchived: 'Movido a la papelera',
   uwSizeWarnChip: 'Acercándose al límite de {max} (actualmente {size}).',
   uwSizeWarnDismiss: 'Cerrar aviso de tamaño',
   uwSaveBlockTitle: 'No se pudo guardar en UniWork',
@@ -192,4 +193,13 @@ export const es = {
   uwLockLostHeldBy: '{name} está editando ahora. Tus cambios sin guardar siguen aquí.',
   uwLockAcquireFailed:
     'No se pudo obtener el acceso de edición. Inténtalo de nuevo en unos minutos.',
+  uwChipSourceView: 'Solo lectura · De {origin}',
+  uwTipSourceView:
+    'Este archivo está adjunto en {origin}{parent}. Los cambios no se guardarán. Para obtener una copia, usa Descargar en la lista de documentos.',
+  uwSourceViewSaveHint: 'Este archivo es de solo lectura — los cambios no se guardan.',
+  uwSourceViewCopyHint: 'Para obtener una copia, usa Descargar en la lista de documentos.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Tareas',
+  uwSourceOriginMeeting: 'Reuniones',
+  uwSourceOriginEmail: 'Correo',
 } satisfies Record<keyof typeof zh, string>

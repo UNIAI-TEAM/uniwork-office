@@ -17,6 +17,7 @@ export const NEW_KIND_EXT: Record<NewDocKind, string> = {
   xlsx: '.xlsx',
   pptx: '.pptx',
   md: '.md',
+  txt: '.txt',
   html: '.html',
   pdf: '.pdf',
 }
@@ -28,6 +29,7 @@ export const NEW_MENU_LABEL_KEY: Record<NewMenuKind, StringKey> = {
   xlsx: 'uhNewMenuXlsx',
   pptx: 'uhNewMenuPptx',
   md: 'uhNewMenuMd',
+  txt: 'uhNewMenuTxt',
   html: 'uhNewMenuHtml',
   pdf: 'uhNewMenuPdf',
   folder: 'uhNewMenuFolder',
@@ -40,6 +42,7 @@ export const NEW_DEFAULT_NAME_KEY: Record<NewMenuKind, StringKey> = {
   xlsx: 'uhDefaultNameXlsx',
   pptx: 'uhDefaultNamePptx',
   md: 'uhDefaultNameMd',
+  txt: 'uhDefaultNameTxt',
   html: 'uhDefaultNameHtml',
   pdf: 'uhDefaultNamePdf',
   folder: 'uhDefaultNameFolder',

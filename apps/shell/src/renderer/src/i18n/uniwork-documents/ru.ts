@@ -141,9 +141,10 @@ export const ru = {
   uwDocType: 'Тип',
   uwDocLocation: 'Расположение',
   uwDocRename: 'Переименовать',
-  uwDocArchive: 'Архивировать',
+  uwDocArchive: 'Переместить в корзину',
   uwDocRestore: 'Восстановить',
-  uwDocArchiveConfirm: 'Архивировать «{name}»? Позже его можно восстановить.',
+  uwDocArchiveConfirm:
+    '«{name}» и всё его содержимое останутся в корзине на 30 дней до окончательного удаления. Менеджеры могут восстановить их в этот период.',
   uwDocNameEmpty: 'Введите имя документа.',
   uwDocNameTooLong: 'Имя слишком длинное (не более 500 символов).',
   uwDocRenamedAnnounce: 'Документ переименован в {name}.',
@@ -154,7 +155,7 @@ export const ru = {
   uwDocUploadPick: 'Выбрать файл',
   uwDocUploading: 'Загрузка «{name}»…',
   uwDocLocationTop: 'Верхний уровень',
-  uwDocArchived: 'В архиве',
+  uwDocArchived: 'Перемещено в корзину',
   uwSizeWarnChip: 'Приближается к лимиту {max} (сейчас {size}).',
   uwSizeWarnDismiss: 'Закрыть предупреждение о размере',
   uwSaveBlockTitle: 'Не удалось сохранить в UniWork',
@@ -194,4 +195,13 @@ export const ru = {
   uwLockLostHeldBy: '{name} сейчас редактирует. Ваши несохранённые изменения всё ещё здесь.',
   uwLockAcquireFailed:
     'Не удалось получить доступ к редактированию. Повторите попытку через несколько минут.',
+  uwChipSourceView: 'Только просмотр · Из раздела «{origin}»',
+  uwTipSourceView:
+    'Этот файл прикреплён в разделе «{origin}»{parent}. Изменения не будут сохранены. Чтобы получить копию, нажмите «Скачать» в списке документов.',
+  uwSourceViewSaveHint: 'Этот файл только для просмотра — изменения не сохраняются.',
+  uwSourceViewCopyHint: 'Чтобы получить копию, нажмите «Скачать» в списке документов.',
+  uwSourceOriginChat: 'Чат',
+  uwSourceOriginTask: 'Задачи',
+  uwSourceOriginMeeting: 'Встречи',
+  uwSourceOriginEmail: 'Почта',
 } satisfies Record<keyof typeof zh, string>

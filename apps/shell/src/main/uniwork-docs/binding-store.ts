@@ -102,6 +102,8 @@ export interface Binding {
   baseVersionId?: string
   /** G8-12: the caller's effective level (`my_level`) last read from the server */
   level?: UniworkDocLevel
+  /** UNI-1961: true while the document is shelved in Archive (Lưu trữ); forces read-only without altering `level` */
+  shelved?: true
 }
 
 export type UniworkDocLevel = 'view' | 'comment' | 'edit' | 'manage'
@@ -118,8 +120,8 @@ export function docLevelOf(value: unknown): UniworkDocLevel | undefined {
  * binding) or edit-or-better. A level below edit (`view`, `comment`) or a word this build does not
  * know never rides on a stale `edit` access, so nothing here reads an unknown level upward.
  */
-export function bindingCanEdit(binding: Pick<Binding, 'access' | 'level'>): boolean {
-  if (binding.access !== 'edit') return false
+export function bindingCanEdit(binding: Pick<Binding, 'access' | 'level' | 'shelved'>): boolean {
+  if (binding.shelved || binding.access !== 'edit') return false
   const level: unknown = binding.level
   return level === undefined || level === 'edit' || level === 'manage'
 }
@@ -237,7 +239,7 @@ export function hasLegacyIntentFiles(dir: string): boolean {
 }
 
 const SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$/
-const FORMATS: ReadonlySet<string> = new Set(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'])
+const FORMATS: ReadonlySet<string> = new Set(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'txt', 'html'])
 const STATES: ReadonlySet<string> = new Set([
   'ready',
   'dirty',
@@ -349,6 +351,7 @@ export function parseBinding(raw: unknown): Binding | null {
       ? { baseVersionId: r.baseVersionId }
       : {}),
     ...(docLevelOf(r.level) ? { level: docLevelOf(r.level) } : {}),
+    ...(r.shelved === true ? { shelved: true } : {}),
   }
 }
 

@@ -188,4 +188,13 @@ export const en = {
   uwLockLostGeneric: 'You’re no longer editing. Your unsaved changes are still here.',
   uwLockLostHeldBy: '{name} is editing now. Your unsaved changes are still here.',
   uwLockAcquireFailed: 'Couldn’t get editing access. Try again in a few minutes.',
+  uwChipSourceView: 'View only · From {origin}',
+  uwTipSourceView:
+    "This file is attached in {origin}{parent}. Changes won't be saved. To get a copy, use Download in the Documents list.",
+  uwSourceViewSaveHint: "This file is view only — changes aren't saved.",
+  uwSourceViewCopyHint: 'To get a copy, use Download in the Documents list.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Tasks',
+  uwSourceOriginMeeting: 'Meetings',
+  uwSourceOriginEmail: 'Email',
 } satisfies Record<keyof typeof zh, string>

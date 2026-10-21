@@ -521,6 +521,26 @@ describe('tear-off', () => {
   })
 })
 
+describe('docking a decorated window back', () => {
+  it('hands the raw file name to the tab strip, not the decorated window title', () => {
+    detached.setDetachedTitleDecorator((_p, title) => `${title} · version 2, read-only`)
+    const h = { band: vi.fn(() => null), preview: vi.fn(), dock: vi.fn() }
+    detached.setDockHost(h)
+    detached.createDetachedEditorWindow({
+      view: fakeView(31) as never,
+      kind: 'docs',
+      title: 'Q4 plan.docx',
+      filePath: '/store/x@v2/Q4 plan.docx',
+      applyMenuFor: () => {},
+      tearOffAt: { x: 5, y: 5 },
+    })
+    expect(instances[0]!.title).toBe('Q4 plan.docx · version 2, read-only')
+    const tab = detached.takeTornTab()
+    expect(tab!.title).toBe('Q4 plan.docx')
+    detached.setDetachedTitleDecorator((_p, title) => title)
+  })
+})
+
 describe('docking a natively dragged window', () => {
   const band = { x: 100, y: 200 - 8, width: 1000, height: 56 }
 
@@ -632,5 +652,40 @@ describe('dockBandFor', () => {
     win.shown = false
     expect(detached.dockBandFor(win as never)).toBeNull()
     expect(detached.dockBandFor(null)).toBeNull()
+  })
+})
+
+describe('window title decoration (UNI-2033)', () => {
+  const decorate = (filePath: string | undefined, title: string) =>
+    filePath?.includes('@v2') ? `${title} · v2` : title
+
+  it('a window opened on a version copy carries the decorated title, and follows Save As / rename', () => {
+    detached.setDetachedTitleDecorator(decorate)
+    detached.createDetachedEditorWindow({
+      view: fakeView(41) as never,
+      kind: 'docs',
+      title: 'Plan.docx',
+      filePath: '/store/DOC@v2/Plan.docx',
+      applyMenuFor: () => {},
+    })
+    const win = instances.at(-1)!
+    expect(win.title).toBe('Plan.docx · v2')
+    detached.detachedSetFileFor(41, '/store/DOC/Plan.docx')
+    expect(win.title).toBe('Plan.docx')
+    detached.detachedSetFileFor(41, '/store/DOC@v2/Copy.docx')
+    expect(win.title).toBe('Copy.docx · v2')
+    detached.detachedRetitleFile('/store/DOC@v2/Copy.docx', 'Renamed.docx')
+    expect(win.title).toBe('Renamed.docx · v2')
+  })
+
+  it('without a decorator the window title is the plain title', () => {
+    detached.createDetachedEditorWindow({
+      view: fakeView(42) as never,
+      kind: 'docs',
+      title: 'Plan.docx',
+      filePath: '/store/DOC@v2/Plan.docx',
+      applyMenuFor: () => {},
+    })
+    expect(instances.at(-1)!.title).toBe('Plan.docx')
   })
 })

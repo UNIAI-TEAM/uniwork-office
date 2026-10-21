@@ -20,7 +20,7 @@ import { useI18n } from './locale'
 import { needsSignIn, type AccountView } from './account-model'
 import { publishLocalRename, publishUniworkNotice } from './uniwork-notice-bus'
 import {
-  NEW_DOC_FORMATS,
+  NEW_DIALOG_FORMATS,
   PICKER_PAGE_SIZE,
   PICKER_SEARCH_DEBOUNCE_MS,
   SHARED_SOURCE_VALUE,
@@ -1025,7 +1025,7 @@ export function UniworkOpenDialog({
         {form === 'new' && (
           <NewDocDialog
             workspaces={state.workspaces.items}
-            kinds={NEW_DOC_FORMATS}
+            kinds={NEW_DIALOG_FORMATS}
             initialTarget={defaultTarget()}
             loadTree={loadFolderTree}
             onCreate={createDoc}

@@ -2447,6 +2447,12 @@ export function Home() {
       action: () => window.aiOffice.newMarkdown(newFileOpts),
     },
     {
+      ext: 'txt',
+      title: t('newTxt'),
+      sub: '.txt',
+      action: () => window.aiOffice.newTxt(newFileOpts),
+    },
+    {
       ext: 'html',
       title: t('newHtml'),
       sub: '.html',
@@ -2460,10 +2466,13 @@ export function Home() {
     },
   ]
 
+  // the AI quick-create cards stay as they were; Plain text lives only in the New dropdown
+  const QUICK_CARD_ITEMS = NEW_ITEMS.filter((item) => item.ext !== 'txt')
+
   function renderQuickCards() {
     return (
       <div className="quick-cards">
-        {NEW_ITEMS.map((item) => (
+        {QUICK_CARD_ITEMS.map((item) => (
           <button key={item.ext} className="quick-card" onClick={() => void item.action()}>
             <FileBadge ext={item.ext} size={30} />
             <span className="quick-text">

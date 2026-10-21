@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const ar = {
-  ufRoot: 'UniWork',
+  ufRoot: 'المستندات (الجذر)',
   ufTreeLabel: 'المجلدات',
   ufContentsLabel: 'محتوى المجلد',
   ufRecent: 'الأخيرة',

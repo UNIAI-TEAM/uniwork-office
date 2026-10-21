@@ -879,6 +879,15 @@
   document.addEventListener(
     'click',
     (e) => {
+      // view = a copy the person may only read: links stay inert like in inspect mode, nothing else reacts
+      if (mode === 'view') {
+        const link = e.target && e.target.closest && e.target.closest('a[href]')
+        if (link) {
+          e.preventDefault()
+          if (e.metaKey || e.ctrlKey) post({ type: 'gx:navigateBlocked', href: link.href })
+        }
+        return
+      }
       if (!selecting()) return
       if (swallowClick) {
         swallowClick = false
@@ -1064,7 +1073,7 @@
   document.addEventListener(
     'wheel',
     (e) => {
-      if (mode !== 'inspect' || (!e.ctrlKey && !e.metaKey)) return
+      if (mode === 'browse' || (!e.ctrlKey && !e.metaKey)) return
       e.preventDefault()
       post({ type: 'gx:zoom', delta: e.deltaY })
     },
@@ -1154,7 +1163,7 @@
         if (slide) endSlide(false)
         mode = msg.mode
         rehover()
-        if (mode === 'browse') select(null, false)
+        if (mode !== 'inspect') select(null, false)
         break
       case 'gx:beginTextEdit':
         select(bySid(msg.sid), false)

@@ -46,6 +46,9 @@ const PANEL_KEYS = [
   'collabAnchorStale',
   'collabAnchorLost',
   'collabGoToAnchor',
+  'collabAnchorViewVersion',
+  'collabVersionViewBanner',
+  'collabVersionViewUnavailable',
   // Thread, thao tác, lịch sử
   'collabResolved',
   'collabResolve',
@@ -283,6 +286,30 @@ describe('collab strings: spine text', () => {
       "Sharing now won't notify them about this comment; mention them in a new comment to notify.",
     )
     expect(p.en.collabDismissNotice).toBe('Dismiss')
+  })
+
+  it('says the lost passage and the old-version action in vi, en and zh', () => {
+    const p = collabPanelStrings
+    expect(p.vi.collabAnchorLost).toBe('Đoạn được bình luận không còn trong bản hiện tại')
+    expect(p.en.collabAnchorLost).toBe('The commented passage is not in the current version')
+    expect(p.zh.collabAnchorLost).toBe('被评论的内容已不在当前版本中')
+    expect(p.vi.collabAnchorViewVersion).toBe('Xem ở phiên bản {n}')
+    expect(p.en.collabAnchorViewVersion).toBe('View in version {n}')
+    expect(p.zh.collabAnchorViewVersion).toBe('查看第 {n} 版')
+    expect(p.vi.collabVersionViewBanner).toBe('Bạn đang xem phiên bản {n} (chỉ đọc)')
+    expect(p.en.collabVersionViewBanner).toBe('You are viewing version {n} (read-only)')
+    expect(p.zh.collabVersionViewBanner).toBe('您正在查看第 {n} 版（只读）')
+    expect(p.vi.collabVersionViewUnavailable).toBe('Không mở được phiên bản này')
+    expect(p.en.collabVersionViewUnavailable).toBe('This version could not be opened')
+    expect(p.zh.collabVersionViewUnavailable).toBe('无法打开此版本')
+    expect(collabPanelText('en', 'collabAnchorViewVersion', { n: 3 })).toBe('View in version 3')
+  })
+
+  it.each([...LANGS])('locale %s carries {n} in the version strings', (lang) => {
+    const t = collabPanelStrings[lang] as Record<string, string>
+    expect(t.collabAnchorViewVersion).toContain('{n}')
+    expect(t.collabVersionViewBanner).toContain('{n}')
+    expect(t.collabVersionViewUnavailable).not.toContain('{')
   })
 
   it('uses the fork sign-in verb in en (spine: fork writes "Sign in", D writes "Log in")', () => {

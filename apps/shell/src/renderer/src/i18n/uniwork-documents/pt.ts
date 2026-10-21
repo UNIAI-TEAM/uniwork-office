@@ -140,9 +140,10 @@ export const pt = {
   uwDocType: 'Tipo',
   uwDocLocation: 'Local',
   uwDocRename: 'Renomear',
-  uwDocArchive: 'Arquivar',
+  uwDocArchive: 'Mover para a lixeira',
   uwDocRestore: 'Restaurar',
-  uwDocArchiveConfirm: 'Arquivar “{name}”? Você pode restaurá-lo depois.',
+  uwDocArchiveConfirm:
+    '“{name}” e toda a sua subárvore ficarão 30 dias na lixeira antes da exclusão permanente. Os gestores podem restaurá-los durante esse período.',
   uwDocNameEmpty: 'Digite um nome para o documento.',
   uwDocNameTooLong: 'O nome é longo demais (no máximo 500 caracteres).',
   uwDocRenamedAnnounce: 'O documento foi renomeado para {name}.',
@@ -153,7 +154,7 @@ export const pt = {
   uwDocUploadPick: 'Escolher um arquivo',
   uwDocUploading: 'Carregando “{name}”…',
   uwDocLocationTop: 'Nível superior',
-  uwDocArchived: 'Arquivado',
+  uwDocArchived: 'Movido para a lixeira',
   uwSizeWarnChip: 'Aproximando-se do limite de {max} (atualmente {size}).',
   uwSizeWarnDismiss: 'Fechar aviso de tamanho',
   uwSaveBlockTitle: 'Não foi possível salvar no UniWork',
@@ -194,4 +195,13 @@ export const pt = {
     '{name} está a editar agora. As suas alterações não guardadas ainda estão aqui.',
   uwLockAcquireFailed:
     'Não foi possível obter acesso de edição. Tente novamente dentro de alguns minutos.',
+  uwChipSourceView: 'Somente leitura · De {origin}',
+  uwTipSourceView:
+    'Este arquivo está anexado em {origin}{parent}. As alterações não serão salvas. Para obter uma cópia, use Baixar na lista de documentos.',
+  uwSourceViewSaveHint: 'Este arquivo é somente leitura — as alterações não são salvas.',
+  uwSourceViewCopyHint: 'Para obter uma cópia, use Baixar na lista de documentos.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Tarefas',
+  uwSourceOriginMeeting: 'Reuniões',
+  uwSourceOriginEmail: 'E-mail',
 } satisfies Record<keyof typeof zh, string>

@@ -1,7 +1,7 @@
 import type { zh } from './zh'
 
 export const ms = {
-  ufRoot: 'UniWork',
+  ufRoot: 'Dokumen (akar)',
   ufAreaUniwork: 'UniWork',
   ufTreeLabel: 'Folder',
   ufContentsLabel: 'Kandungan folder',

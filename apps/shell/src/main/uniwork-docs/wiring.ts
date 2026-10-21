@@ -29,9 +29,12 @@ import {
   type UniworkMoveDocumentInput,
   type UniworkRemoteAction,
   type UniworkSearchQuery,
+  type UniworkSourceDownloadInput,
+  type UniworkSourceListQuery,
   type UniworkUploadDocInput,
   type UniworkSharedQuery,
 } from '../../shared/home-api'
+import { SOURCE_VIEW_CHANNELS } from '../../shared/source-view'
 import { createLaunchPusher, createPushHolder, type LaunchPushTarget } from './launch'
 import {
   applyUniworkProfile,
@@ -91,7 +94,7 @@ import { createTreeChangedCoalescer } from './tree-changed'
 import { registerFirstSaveOpenAck } from './first-save-open'
 import { createFirstSaveNameBroker, registerFirstSaveNameAnswer } from './first-save-name'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
-import { createWiredSyncCenter } from '../uniwork-sync/sync-center'
+import { createWiredSyncCenter, startPreviewStartupSweep } from '../uniwork-sync/sync-center'
 import { createOfflineCopies } from '../uniwork-sync/offline-library/copies'
 import {
   createOfflineLibraryApi,
@@ -728,6 +731,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   // it) but the service needs it for the launch-ticket reveal: a holder breaks
   // the cycle, and the reveal only runs once both exist
   let comments: UniworkCommentsHandle | null = null
+  // UNI-1993: the draft-preview root is emptied ONCE per start; the sync center's
+  // draft previews and the view-only source files both wait for this same promise
+  const previewStartupSweep = startPreviewStartupSweep(app.getPath('userData'))
   const service = new UniworkDocsService({
     userDataDir: app.getPath('userData'),
     syncStore,
@@ -771,6 +777,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     stopRuntime: () => stopFeed(),
     openPaths: () => wiring.openPaths(),
     closePathNow: (path) => wiring.closePathNow(path),
+    sourceViewStartupSweep: previewStartupSweep,
     aiHistoryPaths: () => wiring.aiHistoryPaths(),
     forgetAiHistory: (paths) => wiring.forgetAiHistory(paths),
     // ADVISOR D4 (a): the dev-only fixture gate; index.ts passes app.isPackaged
@@ -888,6 +895,23 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listTrash, (_event, query: unknown) =>
     service.listTrash((query ?? {}) as UniworkDocListQuery),
   )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listSources, (_event, query: unknown) =>
+    service.listSources((query ?? {}) as UniworkSourceListQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.downloadSource, (_event, input: unknown) =>
+    service.downloadSource((input ?? {}) as UniworkSourceDownloadInput),
+  )
+  // UNI-1993: a source row's primary action opens a view-only tab; never throws across IPC
+  ipcMain.handle(SOURCE_VIEW_CHANNELS.openSource, async (_event, input: unknown) => {
+    try {
+      return await service.openSource(input)
+    } catch {
+      return { ok: false, error: 'open_failed' }
+    }
+  })
+  ipcMain.handle(SOURCE_VIEW_CHANNELS.sourceViewState, (_event, path: unknown) =>
+    typeof path === 'string' ? service.sourceViewState(path) : null,
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.documentProperties, (_event, documentId: unknown) =>
     service.documentProperties(documentId as string),
   )
@@ -916,6 +940,19 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.restoreDocument, (_event, documentId: unknown) =>
     service.restoreDocument(documentId as string),
+  )
+  // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf, Bỏ lưu trữ and trash from Lưu trữ
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.listShelved, (_event, query: unknown) =>
+    service.listShelved((query ?? {}) as UniworkDocListQuery),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.unshelveDocument, (_event, documentId: unknown) =>
+    service.unshelveDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.trashShelvedDocument, (_event, documentId: unknown) =>
+    service.trashShelvedDocument(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.shelveDocument, (_event, documentId: unknown) =>
+    service.shelveDocument(documentId as string),
   )
   // FD-11: the folder-tree surface
   ipcMain.handle(UNIWORK_DOC_CHANNELS.folderTree, (_event, workspaceId: unknown) =>
@@ -1171,6 +1208,11 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       return picked.canceled || !picked.filePath ? null : picked.filePath
     },
     pushChanged: (snapshot) => push(UNIWORK_SYNC_CENTER_CHANNELS.changedEvent, snapshot),
+    // UNI-1993: the view-only source files share the preview root, its startup sweep,
+    // the poll cadence of the closed-tab sweep and the account boundary
+    startupSweep: previewStartupSweep,
+    sweepSources: () => service.sweepSourceViews(),
+    dropSources: () => service.dropSourceViews(),
     // G5-05u B1/B7: the S3 block, and the head-offline set the S5 gate reads
     offline: async () => {
       const block = await offlineApi.snapshot()

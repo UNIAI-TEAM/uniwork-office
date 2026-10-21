@@ -334,7 +334,7 @@ export function PillFitScope({ children }: { children: ReactNode }) {
  * tab opens or closes or the holder gains or loses a part. A host with no layout to measure keeps the
  * full pill. The effect runs before paint, so the steps are never seen.
  */
-function usePillFit(
+export function usePillFit(
   groupRef: RefObject<HTMLDivElement | null>,
   key: string,
   hasShort: boolean,

@@ -186,4 +186,13 @@ export const vi = {
   uwLockLostGeneric: 'Bạn không còn giữ quyền sửa. Thay đổi chưa lưu của bạn vẫn ở đây.',
   uwLockLostHeldBy: '{name} đang sửa. Thay đổi chưa lưu của bạn vẫn ở đây.',
   uwLockAcquireFailed: 'Chưa lấy được quyền sửa. Thử lại sau ít phút.',
+  uwChipSourceView: 'Chỉ xem · Từ {origin}',
+  uwTipSourceView:
+    'Đây là tệp đính kèm trong {origin}{parent}. Thay đổi sẽ không được lưu. Muốn có bản sao, dùng Tải xuống ở danh sách Tài liệu.',
+  uwSourceViewSaveHint: 'Tệp này chỉ để xem — thay đổi không được lưu.',
+  uwSourceViewCopyHint: 'Muốn có bản sao, dùng Tải xuống ở danh sách Tài liệu.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Công việc',
+  uwSourceOriginMeeting: 'Cuộc họp',
+  uwSourceOriginEmail: 'Email',
 } satisfies Record<keyof typeof zh, string>

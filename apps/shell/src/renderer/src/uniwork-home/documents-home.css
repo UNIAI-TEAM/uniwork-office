@@ -612,7 +612,8 @@
   white-space: nowrap;
 }
 
-.dh-filter-select {
+.dh-filter-select,
+.dh-group-select {
   height: 28px;
   padding: 0 4px;
   border: 0;
@@ -625,7 +626,8 @@
   outline: none;
 }
 
-.dh-filter-select:focus-visible {
+.dh-filter-select:focus-visible,
+.dh-group-select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -807,7 +809,8 @@
   white-space: nowrap;
 }
 
-/* Documents table (5 columns: Tên | Truy cập | Người sửa gần nhất | Cập nhật | Thao tác) */
+/* Documents table (6 columns: Tên | Truy cập | Người sửa gần nhất | Cập nhật | Dung lượng | Thao tác;
+   UNI-1961: the web's Size column, right aligned) */
 .dh-doc-table {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -823,6 +826,7 @@
     minmax(130px, 1fr)
     minmax(150px, 1.1fr)
     minmax(110px, 0.9fr)
+    90px
     72px;
   align-items: center;
   gap: 12px;
@@ -858,6 +862,40 @@
   cursor: progress;
 }
 
+/* UNI-1961: a Group by header (the web's group heading) spans the table */
+.dh-group-row {
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+
+.dh-group-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 12px;
+}
+
+.dh-group-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-group-count {
+  color: var(--text-secondary);
+}
+
+.dh-doc-table.grid-mode .dh-group-row {
+  grid-column: 1 / -1;
+  border-bottom: 0;
+  border-radius: 8px;
+}
+
 /* Grid view mode for documents */
 .dh-doc-table.grid-mode {
   display: grid;
@@ -887,8 +925,11 @@
   min-width: 0;
 }
 
+/* the button sits in a block wrapper (not a flex container): as a block capped at the
+   wrapper's width the ellipsis applies, instead of the text printing over the next column */
 .dh-doc-open {
-  flex: 1;
+  display: block;
+  max-width: 100%;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -981,6 +1022,17 @@
 
 .dh-cell-empty {
   color: var(--text-secondary);
+}
+
+.dh-col-size,
+.dh-cell-size {
+  text-align: right;
+}
+
+.dh-cell-size {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  white-space: nowrap;
 }
 
 .dh-cell-actions {
@@ -1082,14 +1134,16 @@
   }
 }
 
-/* VDH-4: below ~1100 px the five columns cannot fit — collapse the two
-   lowest-priority columns (Truy cập + Người sửa) so Tên / Cập nhật / Thao tác
-   always stay visible; grid cards keep every cell */
+/* VDH-4: below ~1100 px the columns cannot fit — collapse the lowest-priority
+   ones (Truy cập + Người sửa, and Dung lượng, which the web drops before the
+   editor) so Tên / Cập nhật / Thao tác always stay visible; grid cards keep every cell */
 @media (max-width: 1100px) {
   .dh-doc-table:not(.grid-mode) .dh-col-access,
   .dh-doc-table:not(.grid-mode) .dh-col-person,
+  .dh-doc-table:not(.grid-mode) .dh-col-size,
   .dh-doc-table:not(.grid-mode) .dh-cell-access,
-  .dh-doc-table:not(.grid-mode) .dh-cell-person {
+  .dh-doc-table:not(.grid-mode) .dh-cell-person,
+  .dh-doc-table:not(.grid-mode) .dh-cell-size {
     display: none;
   }
 
@@ -1099,5 +1153,156 @@
       minmax(200px, 2.2fr)
       minmax(110px, 0.9fr)
       72px;
+  }
+}
+
+/* UNI-1961 (ARCHIVE-01): the Lưu trữ / Archive shelf, as the web's
+   DocumentsShelvedView: intro, toolbar (type, Lưu trữ bởi, fixed sort) and a
+   Tên / Truy cập / Lưu trữ bởi / Lưu trữ lúc / actions table. Narrow widths
+   drop Truy cập + Lưu trữ bởi, then Lưu trữ lúc; their values move under the
+   name as the web's ladder does. */
+.dh-shelved-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dh-shelved-intro {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.dh-shelved-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dh-shelved-by {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dh-shelved-loaded-only {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.dh-shelved-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.dh-shelved-table .dh-doc-head,
+.dh-shelved-table .dh-doc-row {
+  grid-template-columns:
+    minmax(220px, 2.2fr)
+    minmax(110px, 0.8fr)
+    minmax(150px, 1.1fr)
+    minmax(100px, 0.8fr)
+    150px;
+}
+
+.dh-shelved-name {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.dh-shelved-title {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-shelved-meta-at,
+.dh-shelved-meta-by {
+  display: none;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-shelved-access {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+
+.dh-shelved-lock {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.dh-shelved-avatar::before {
+  content: attr(data-initial);
+}
+
+.dh-shelved-actions {
+  gap: 6px;
+}
+
+.dh-shelved-unshelve {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.dh-shelved-empty-title {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.dh-shelved-empty-desc {
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .dh-doc-table.dh-shelved-table:not(.grid-mode) .dh-doc-head,
+  .dh-doc-table.dh-shelved-table:not(.grid-mode) .dh-doc-row {
+    grid-template-columns:
+      minmax(200px, 2.2fr)
+      minmax(100px, 0.8fr)
+      150px;
+  }
+
+  .dh-shelved-table .dh-shelved-meta-by {
+    display: block;
+  }
+}
+
+@media (max-width: 760px) {
+  .dh-doc-table.dh-shelved-table:not(.grid-mode) .dh-doc-head,
+  .dh-doc-table.dh-shelved-table:not(.grid-mode) .dh-doc-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dh-shelved-table .dh-col-time,
+  .dh-shelved-table .dh-cell-time {
+    display: none;
+  }
+
+  .dh-shelved-table .dh-shelved-meta-at {
+    display: block;
+  }
+
+  .dh-shelved-sort {
+    margin-left: 0;
   }
 }

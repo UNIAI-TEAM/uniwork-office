@@ -145,9 +145,10 @@ export const fr = {
   uwDocType: 'Type',
   uwDocLocation: 'Emplacement',
   uwDocRename: 'Renommer',
-  uwDocArchive: 'Archiver',
+  uwDocArchive: 'Mettre à la corbeille',
   uwDocRestore: 'Restaurer',
-  uwDocArchiveConfirm: 'Archiver « {name} » ? Vous pourrez le restaurer plus tard.',
+  uwDocArchiveConfirm:
+    '« {name} » et toute sa sous-arborescence resteront 30 jours dans la corbeille avant la suppression définitive. Les gestionnaires peuvent les restaurer pendant ce délai.',
   uwDocNameEmpty: 'Saisissez un nom de document.',
   uwDocNameTooLong: 'Le nom est trop long (500 caractères au maximum).',
   uwDocRenamedAnnounce: 'Le document a été renommé en {name}.',
@@ -159,7 +160,7 @@ export const fr = {
   uwDocUploadPick: 'Choisir un fichier',
   uwDocUploading: 'Importation de « {name} »…',
   uwDocLocationTop: 'Niveau supérieur',
-  uwDocArchived: 'Archivé',
+  uwDocArchived: 'Mis à la corbeille',
   uwSizeWarnChip: 'Approche de la limite de {max} (actuellement {size}).',
   uwSizeWarnDismiss: 'Fermer l’avertissement de taille',
   uwSaveBlockTitle: 'Impossible d’enregistrer dans UniWork',
@@ -200,4 +201,15 @@ export const fr = {
     '{name} modifie actuellement. Vos changements non enregistrés sont toujours là.',
   uwLockAcquireFailed:
     'Impossible d’obtenir l’accès en modification. Réessayez dans quelques minutes.',
+  uwChipSourceView: 'Lecture seule · Depuis {origin}',
+  uwTipSourceView:
+    'Ce fichier est joint dans {origin}{parent}. Les modifications ne seront pas enregistrées. Pour en obtenir une copie, utilisez Télécharger dans la liste des documents.',
+  uwSourceViewSaveHint:
+    'Ce fichier est en lecture seule — les modifications ne sont pas enregistrées.',
+  uwSourceViewCopyHint:
+    'Pour en obtenir une copie, utilisez Télécharger dans la liste des documents.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Tâches',
+  uwSourceOriginMeeting: 'Réunions',
+  uwSourceOriginEmail: 'E-mail',
 } satisfies Record<keyof typeof zh, string>

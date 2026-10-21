@@ -276,7 +276,7 @@ describe('S18 new document', () => {
     await click(contracts)
     await click(buttonByText(picker as HTMLElement, folderEn.ufChoose))
     expect(host.querySelector('.uwf-picker')).toBeNull()
-    expect(location.textContent).toContain('UniWork › Contracts')
+    expect(location.textContent).toContain('Documents (root) › Contracts')
     await click(buttonByText(dialog, en.uwDocCreate))
     expect(api.uniworkCreateDocument).toHaveBeenCalledWith({
       workspaceId: 'w1',
@@ -310,8 +310,10 @@ describe('S18 new document', () => {
     )!
     await click(contracts)
     await click(buttonByText(picker as HTMLElement, folderEn.ufChoose))
-    expect(btn.querySelector('.uwf-location-path')?.textContent).toBe('UniWork › Contracts')
-    expect(btn.getAttribute('title')).toBe('UniWork › Contracts')
+    expect(btn.querySelector('.uwf-location-path')?.textContent).toBe(
+      'Documents (root) › Contracts',
+    )
+    expect(btn.getAttribute('title')).toBe('Documents (root) › Contracts')
 
     const homeCss = readFileSync(join(__dirname, '../src/renderer/src/home.css'), 'utf8')
     const foldersCss = readFileSync(

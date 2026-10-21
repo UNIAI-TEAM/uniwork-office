@@ -32,8 +32,11 @@ export const zh = {
   collabAnchorSlide: '幻灯片 {slide}',
   collabAnchorPage: '第 {page} 页',
   collabAnchorStale: '位置可能已发生变化',
-  collabAnchorLost: '再也找不到被评论的位置',
+  collabAnchorLost: '被评论的内容已不在当前版本中',
   collabGoToAnchor: '转到该位置',
+  collabAnchorViewVersion: '查看第 {n} 版',
+  collabVersionViewBanner: '您正在查看第 {n} 版（只读）',
+  collabVersionViewUnavailable: '无法打开此版本',
 
   // thread, actions, history
   collabResolved: '已解决',

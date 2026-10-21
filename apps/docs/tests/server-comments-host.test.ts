@@ -34,6 +34,8 @@ interface Row {
   revision: number
   anchor: Record<string, unknown> | null
   anchor_state: string | null
+  anchor_version_id?: string | null
+  anchor_version_no?: number | null
   resolved_at: string | null
   deleted_at: string | null
   created_at: string
@@ -137,6 +139,9 @@ function fakeServer() {
       },
     ),
     searchMentions: vi.fn(() => ok({ candidates: [] })),
+    openVersion: vi.fn((_i: { path: string; commentId: string; versionNo: number }) =>
+      Promise.resolve({ opened: true }),
+    ),
     context: vi.fn(() =>
       ok({ documentId: 'doc1', versionId: 'v1', level: 'edit', myUserId: 'me' }),
     ),
@@ -465,7 +470,8 @@ describe('server mode: anchors after Save', () => {
     const lists = server.calls.list.mock.calls.length
     await act(async () => server.saved('v2'))
     await flush()
-    expect(server.calls.list.mock.calls.length).toBe(lists)
+    // the one list is the receipt's own refresh (G819-A02b); the refused PUT adds no reload after it
+    expect(server.calls.list.mock.calls.length).toBe(lists + 1)
     await act(async () => server.saved('v3'))
     await flush()
     expect(server.calls.anchors).toHaveBeenCalledTimes(2)
@@ -588,6 +594,119 @@ describe('server mode: reveal', () => {
     expect(editor.state.selection.from).toBe(1)
     expect(editor.state.selection.empty).toBe(true)
     expect(thread(row.id).textContent).toContain(EN.collabAnchorLost!)
+  })
+})
+
+describe('server mode: a lost comment and its older version (UNI-2033)', () => {
+  const GONE = {
+    format: 'docx',
+    v: 1,
+    path: [7],
+    start: 0,
+    end: 4,
+    quote: 'nope',
+    prefix: '',
+    suffix: '',
+  }
+  const VIEW = 'View in version 2'
+
+  it('offers "View in version N" on a lost thread and asks the shell once, with the path, id and N', async () => {
+    const server = fakeServer()
+    const row = server.add({
+      body: 'gone',
+      anchor: GONE,
+      anchor_state: 'lost',
+      anchor_version_id: 'v0',
+      anchor_version_no: 2,
+    })
+    await mount(server)
+    expect(buttons(VIEW)).toHaveLength(1)
+    await click(buttons(VIEW)[0])
+    expect(server.calls.openVersion.mock.calls).toEqual([
+      [{ path: PATH, commentId: row.id, versionNo: 2 }],
+    ])
+    // the shell opened it: no unavailable line
+    expect(el.textContent).not.toContain(EN.collabVersionViewUnavailable!)
+  })
+
+  it('shows the unavailable line when the shell could not open the version', async () => {
+    const server = fakeServer()
+    server.calls.openVersion.mockImplementation(() => Promise.resolve({ opened: false }))
+    server.add({
+      body: 'gone',
+      anchor: GONE,
+      anchor_state: 'lost',
+      anchor_version_id: 'v0',
+      anchor_version_no: 2,
+    })
+    await mount(server)
+    await click(buttons(VIEW)[0])
+    expect(el.textContent).toContain(EN.collabVersionViewUnavailable!)
+  })
+
+  it('no action without a version number, or on a host that cannot open a version', async () => {
+    const server = fakeServer()
+    server.add({ body: 'gone', anchor: GONE, anchor_state: 'lost', anchor_version_id: 'v0' })
+    await mount(server)
+    expect(el.textContent).not.toContain('View in version')
+
+    const bare = fakeServer()
+    bare.add({
+      body: 'gone',
+      anchor: GONE,
+      anchor_state: 'lost',
+      anchor_version_id: 'v0',
+      anchor_version_no: 2,
+    })
+    delete (bare.api as { openVersion?: unknown }).openVersion
+    act(() => root.unmount())
+    root = createRoot(el)
+    await mount(bare)
+    expect(el.textContent).not.toContain('View in version')
+  })
+
+  it('in the version the comment was last anchored on, a lost thread reveals at its anchor', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!
+    const row = server.add({
+      body: 'note',
+      anchor,
+      anchor_state: 'lost',
+      anchor_version_id: 'ver_2',
+      anchor_version_no: 2,
+    })
+    // this editor shows version ver_2 (the read-only copy of it)
+    await mount(server, false, 'ver_2')
+    let answer: unknown
+    await act(async () => {
+      answer = await server.reveal(row.id)[0]
+    })
+    await flush()
+    expect(answer).toBe(true)
+    const { from, to } = editor.state.selection
+    expect(editor.state.doc.textBetween(from, to)).toBe('third quarter')
+    // and no "View in version" action: it is that version
+    expect(el.textContent).not.toContain('View in version')
+  })
+
+  it('in another version, the same lost thread does not move the selection', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!
+    const row = server.add({
+      body: 'note',
+      anchor,
+      anchor_state: 'lost',
+      anchor_version_id: 'ver_2',
+      anchor_version_no: 2,
+    })
+    await mount(server, false, 'ver_5')
+    editor.commands.setTextSelection(1)
+    await act(async () => {
+      await server.reveal(row.id)[0]
+    })
+    await flush()
+    expect(editor.state.selection.from).toBe(1)
+    expect(editor.state.selection.empty).toBe(true)
   })
 })
 
@@ -783,5 +902,118 @@ describe('server mode: the new-comment composer scrolls into view (V12-4)', () =
     } finally {
       delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView
     }
+  })
+})
+
+describe('server mode: anchors survive the reload after a Save (G819-A02a)', () => {
+  /** what saveOnce does once the saved bytes are re-parsed: a whole-document setContent */
+  const reloadFromSavedBytes = () => {
+    const json = editor.getJSON()
+    json.content?.forEach((n, i) => {
+      n.attrs = { ...n.attrs, docxIndex: i }
+    })
+    editor.commands.setContent(json)
+  }
+
+  it('a comment range that still exists after the reload goes out exact with its range', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!
+    const row = server.add({ body: 'note', anchor, anchor_state: 'exact' })
+    await mount(server, false)
+    reloadFromSavedBytes()
+    await act(async () => server.saved('v2'))
+    await flush()
+    expect(server.calls.anchors).toHaveBeenCalledTimes(1)
+    expect(server.calls.anchors.mock.calls[0]![0].anchors).toEqual([
+      {
+        commentId: row.id,
+        state: 'exact',
+        anchor: expect.objectContaining({ path: [1], quote: 'third quarter' }),
+      },
+    ])
+  })
+
+  it('an edit before the Save moves the range; the reload keeps the moved range, not the old anchor', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!
+    const row = server.add({ body: 'note', anchor, anchor_state: 'exact' })
+    await mount(server, false)
+    editor.commands.insertContentAt(rangeOf('Revenue').from, 'Total ')
+    reloadFromSavedBytes()
+    await act(async () => server.saved('v2'))
+    await flush()
+    const sent = server.calls.anchors.mock.calls[0]![0].anchors
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toMatchObject({ commentId: row.id, state: 'exact' })
+    expect(sent[0].anchor).toMatchObject({
+      path: [1],
+      start: 'Total Revenue grew in the '.length,
+      quote: 'third quarter',
+    })
+  })
+
+  it('a range whose text is gone after the reload still goes out lost', async () => {
+    const server = fakeServer()
+    const anchor = encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!
+    const row = server.add({ body: 'note', anchor, anchor_state: 'exact' })
+    await mount(server, false)
+    const block = editor.state.doc.child(0).nodeSize
+    editor.commands.deleteRange({ from: block, to: block + editor.state.doc.child(1).nodeSize })
+    reloadFromSavedBytes()
+    await act(async () => server.saved('v2'))
+    await flush()
+    expect(server.calls.anchors.mock.calls[0]![0].anchors).toEqual([
+      { commentId: row.id, state: 'lost', anchor },
+    ])
+  })
+})
+
+describe('server mode: a comment that appears with the panel closed is re-anchored on Save (G819-A02b)', () => {
+  it('a thread created on the server after the first list is in the next anchor PUT', async () => {
+    const server = fakeServer()
+    const first = server.add({
+      body: 'first',
+      anchor: encodeDocxAnchor(editor.state.doc, rangeOf('Intro'))!,
+      anchor_state: 'exact',
+    })
+    await mount(server, false)
+    // the other host comments after this editor listed; nothing here lists again while closed
+    const later = server.add({
+      body: 'from the other host',
+      anchor: encodeDocxAnchor(editor.state.doc, rangeOf('third quarter'))!,
+      anchor_state: 'exact',
+    })
+    await act(async () => server.saved('v2'))
+    await flush()
+    expect(server.calls.anchors).toHaveBeenCalledTimes(1)
+    const sent = server.calls.anchors.mock.calls[0]![0]
+    expect(sent.versionId).toBe('v2')
+    expect(sent.anchors.map((a) => a.commentId).sort()).toEqual([first.id, later.id].sort())
+    expect(sent.anchors.every((a) => a.state === 'exact')).toBe(true)
+  })
+
+  it('two receipts while the receipt list is loading send one PUT with the latest version (G819-A02 RF-4)', async () => {
+    const server = fakeServer()
+    server.add({
+      body: 'first',
+      anchor: encodeDocxAnchor(editor.state.doc, rangeOf('Intro'))!,
+      anchor_state: 'exact',
+    })
+    await mount(server, false)
+    const real = server.calls.list.getMockImplementation()!
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    server.calls.list.mockImplementationOnce((async (...args: unknown[]) => {
+      await gate
+      return (real as (...a: unknown[]) => unknown)(...args)
+    }) as never)
+    await act(async () => server.saved('v2'))
+    await act(async () => server.saved('v3'))
+    await act(async () => release())
+    await flush()
+    expect(server.calls.anchors).toHaveBeenCalledTimes(1)
+    expect(server.calls.anchors.mock.calls[0]![0].versionId).toBe('v3')
   })
 })

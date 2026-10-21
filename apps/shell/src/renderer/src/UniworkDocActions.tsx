@@ -149,13 +149,14 @@ export function ActionModal({
   )
 }
 
-/** the label of each kind the New document dialog and the Quick create strip offer (the web's names) */
+/** the label of each kind the New document dialog and the Quick create strip offer (the web's names); Plain text is in neither (New menu only), so its entry is the New menu's label and only satisfies the Record type */
 export const NEW_KIND_LABEL_KEY: Record<NewDocKind, StringKey> = {
   page: 'uhQuickPage',
   docx: 'uhQuickDocx',
   xlsx: 'uhQuickXlsx',
   pptx: 'uhQuickPptx',
   md: 'uhQuickMd',
+  txt: 'uhNewMenuTxt',
   html: 'uhQuickHtml',
   pdf: 'uhQuickPdf',
 }
@@ -832,9 +833,12 @@ export function ActionToast({
   message,
   onDone,
   tone = 'error',
+  action,
 }: {
   message: string
   onDone: () => void
+  /** UNI-1961: one command beside the text (the web's toast action, e.g. Hoàn tác) */
+  action?: { label: string; onClick: () => void }
   /**
    * FD-11 'ok': a done note (moved, created). It has no live role: the caller
    * says it once through the shell's uniwork-live region instead.
@@ -863,6 +867,18 @@ export function ActionToast({
         <circle cx="8" cy="11.1" r="0.9" fill="currentColor" />
       </svg>
       <span className="uw-act-toast-text">{message}</span>
+      {action && (
+        <button
+          type="button"
+          className="uw-act-toast-action"
+          onClick={() => {
+            onDone()
+            action.onClick()
+          }}
+        >
+          {action.label}
+        </button>
+      )}
       <button
         type="button"
         className="uw-act-toast-close"

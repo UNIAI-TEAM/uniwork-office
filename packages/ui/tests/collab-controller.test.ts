@@ -178,6 +178,61 @@ describe('reload', () => {
   })
 })
 
+describe('freshComments', () => {
+  it('lists again and returns the changed list', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })], 'tok-1'))
+    await mount(src)
+    src.list.mockResolvedValueOnce(list([cm({ id: 'a' }), cm({ id: 'b' })], 'tok-2'))
+    let out: readonly { id: string }[] = []
+    await act(async () => {
+      out = await ctl.freshComments()
+    })
+    expect(src.list).toHaveBeenLastCalledWith({ kind: 'comment', since_token: 'tok-1' })
+    expect(out.map((c) => c.id)).toEqual(['a', 'b'])
+  })
+
+  it('an unchanged list keeps the data', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })], 'tok-1'))
+    await mount(src)
+    src.list.mockResolvedValueOnce(UNCHANGED)
+    let out: readonly { id: string }[] = []
+    await act(async () => {
+      out = await ctl.freshComments()
+    })
+    expect(out.map((c) => c.id)).toEqual(['a'])
+  })
+
+  it('a failed list returns the last data and does not reject', async () => {
+    const src = fakeSource(list([cm({ id: 'a' })], 'tok-1'))
+    await mount(src)
+    src.list.mockRejectedValueOnce(err('network'))
+    let out: readonly { id: string }[] = []
+    await act(async () => {
+      out = await ctl.freshComments()
+    })
+    expect(out.map((c) => c.id)).toEqual(['a'])
+  })
+
+  it('joins the first list while it is still in flight', async () => {
+    let resolve!: (v: unknown) => void
+    const src = fakeSource()
+    src.list.mockReturnValueOnce(new Promise((r) => (resolve = r)))
+    src.list.mockResolvedValue(UNCHANGED)
+    await mount(src)
+    let out: readonly { id: string }[] | undefined
+    await act(async () => {
+      void ctl.freshComments().then((v) => (out = v))
+      await flush()
+    })
+    expect(out).toBeUndefined()
+    await act(async () => {
+      resolve(list([cm({ id: 'a' })], 'tok-1'))
+      await flush()
+    })
+    expect(out?.map((c) => c.id)).toEqual(['a'])
+  })
+})
+
 describe('writes', () => {
   it('403 on a write -> view only from then on', async () => {
     const src = fakeSource(list([cm({ id: 'a', author_id: 'me' })]))
@@ -491,6 +546,83 @@ describe('reveal', () => {
     expect(answer).toEqual({ revealed: true })
     expect(ad.goTo).not.toHaveBeenCalled()
     expect(ctl.focus).toMatchObject({ threadId: 'a', target: 'heading' })
+  })
+
+  it('lost + the open version is the anchor version: located by the adapter, reveal calls goTo', async () => {
+    const lost = cm({
+      id: 'a',
+      anchor: docx(1),
+      anchor_state: 'lost',
+      anchor_version_id: 'v-old',
+      anchor_version_no: 2,
+    })
+    const src = fakeSource(list([lost, cm({ id: 'b', anchor: docx(2), anchor_state: 'lost' })]))
+    const ad = adapter([2])
+    await mount(src, host(), { adapter: ad, openVersionId: 'v-old' })
+    expect(ctl.threads.find((t) => t.id === 'a')?.anchorState).toBe('exact')
+    await act(async () => {
+      await ctl.reveal('a')
+    })
+    expect(ad.goTo).toHaveBeenCalledWith(docx(1))
+    expect(src.list).toHaveBeenCalledTimes(1)
+    expect(src.create).not.toHaveBeenCalled()
+    expect(src.update).not.toHaveBeenCalled()
+  })
+
+  it('lost + the open version is the anchor version, adapter cannot locate it: stale, no goTo', async () => {
+    const src = fakeSource(
+      list([cm({ id: 'a', anchor: docx(1), anchor_state: 'lost', anchor_version_id: 'v-old' })]),
+    )
+    const ad = adapter([1])
+    await mount(src, host(), { adapter: ad, openVersionId: 'v-old' })
+    expect(ctl.threads[0]?.anchorState).toBe('stale')
+    await act(async () => {
+      await ctl.reveal('a')
+    })
+    expect(ad.goTo).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['another version is open', 'v-head', 'v-old'],
+    ['no version is open', undefined, 'v-old'],
+    ['the comment has no anchor version', 'v-head', undefined],
+  ])('lost stays lost, no goTo: %s', async (_name, openVersionId, anchorVersionId) => {
+    const src = fakeSource(
+      list([
+        cm({
+          id: 'a',
+          anchor: docx(1),
+          anchor_state: 'lost',
+          ...(anchorVersionId ? { anchor_version_id: anchorVersionId } : {}),
+        }),
+      ]),
+    )
+    const ad = adapter()
+    await mount(src, host(), { adapter: ad, ...(openVersionId ? { openVersionId } : {}) })
+    expect(ctl.threads[0]?.anchorState).toBe('lost')
+    await act(async () => {
+      await ctl.reveal('a')
+    })
+    expect(ad.goTo).not.toHaveBeenCalled()
+    expect(ctl.focus).toMatchObject({ threadId: 'a', target: 'heading' })
+  })
+
+  it('the open version id moving to the anchor version re-locates the thread without a new list', async () => {
+    const src = fakeSource(
+      list([cm({ id: 'a', anchor: docx(1), anchor_state: 'lost', anchor_version_id: 'v-old' })]),
+    )
+    const ad = adapter()
+    await mount(src, host(), { adapter: ad, openVersionId: 'v-head' })
+    expect(ctl.threads[0]?.anchorState).toBe('lost')
+    await mount(src, host(), { adapter: ad, openVersionId: 'v-old' })
+    expect(ctl.threads[0]?.anchorState).toBe('exact')
+  })
+
+  it('exposes the host version inputs on the controller', async () => {
+    const onViewVersion = vi.fn()
+    await mount(fakeSource(), host(), { openVersionId: 'v1', onViewVersion })
+    expect(ctl.openVersionId).toBe('v1')
+    expect(ctl.onViewVersion).toBe(onViewVersion)
   })
 
   it('missing -> revealed false + the notice line takes focus; tombstone -> deleted frame', async () => {

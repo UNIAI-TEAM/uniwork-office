@@ -286,7 +286,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     sidebarSlot.remove()
   })
 
-  it('renders the board sub-nav in sidebarHost (omitting Gắn sao & Lưu trữ), toolbar controls, Tạo nhanh pills + My Folder link, 3-col folder grid, and 5-column Tài liệu table with zero Đồng bộ / Kích thước columns', async () => {
+  it('renders the board sub-nav in sidebarHost (omitting Gắn sao; UNI-1961: Lưu trữ shown), toolbar controls, Tạo nhanh pills + My Folder link, 3-col folder grid, and 5-column Tài liệu table with zero Đồng bộ / Kích thước columns', async () => {
     const onWorkspaceChange = vi.fn()
     const onOpenDocument = vi.fn()
 
@@ -316,6 +316,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'recent',
       'shared-with-me',
       'shared-by-me',
+      'archive',
       'trash',
     ])
     expect(navButtons.map((b) => b.textContent?.trim())).toEqual([
@@ -323,10 +324,10 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'Gần đây',
       'Được chia sẻ với tôi',
       'Tôi đã chia sẻ',
+      'Lưu trữ',
       'Thùng rác',
     ])
     expect(sidebarSlot.textContent).not.toContain('Gắn sao')
-    expect(sidebarSlot.textContent).not.toContain('Lưu trữ')
 
     // 2. Top toolbar: h1 title, workspace switcher, search input, Tải lên, Tạo mới
     const h1 = host.querySelector<HTMLHeadingElement>('h1.dh-title')
@@ -1623,10 +1624,12 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(docRow).not.toBeNull()
     const docSubpath = docRow.querySelector<HTMLElement>('.dh-doc-subpath')!
     expect(docSubpath).not.toBeNull()
-    expect(docSubpath.getAttribute('title')).toBe('UniWork › Division › Region › Country › Branch')
+    expect(docSubpath.getAttribute('title')).toBe(
+      'Tài liệu (gốc) › Division › Region › Country › Branch',
+    )
     expect(docSubpath.querySelector('[aria-hidden="true"]')?.textContent).toBe('… › Branch ›')
     expect(docSubpath.querySelector('.uw-sr-only')?.textContent).toBe(
-      'Đường dẫn: UniWork › Division › Region › Country › Branch',
+      'Đường dẫn: Tài liệu (gốc) › Division › Region › Country › Branch',
     )
 
     // Folder search card also has aria-hidden short path + .uw-sr-only full path + title attribute
@@ -1636,10 +1639,10 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(folderCard).not.toBeNull()
     const folderSubpath = folderCard.querySelector<HTMLElement>('.dh-doc-subpath')!
     expect(folderSubpath).not.toBeNull()
-    expect(folderSubpath.getAttribute('title')).toBe('UniWork › Finance › FY2026')
+    expect(folderSubpath.getAttribute('title')).toBe('Tài liệu (gốc) › Finance › FY2026')
     expect(folderSubpath.querySelector('[aria-hidden="true"]')?.textContent).toBe('… › FY2026 ›')
     expect(folderSubpath.querySelector('.uw-sr-only')?.textContent).toBe(
-      'Đường dẫn: UniWork › Finance › FY2026',
+      'Đường dẫn: Tài liệu (gốc) › Finance › FY2026',
     )
   })
 
@@ -2325,7 +2328,8 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
     ).map((el) => el.textContent?.trim())
     expect(items).toContain('Chuyển vào thùng rác')
-    expect(items).not.toContain('Lưu trữ')
+    // UNI-1961: a managed row also offers the web's Lưu trữ (shelve), a different command
+    expect(items.filter((label) => label === 'Lưu trữ')).toHaveLength(1)
     const item = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
     ).find((el) => el.textContent?.trim() === 'Chuyển vào thùng rác')!
@@ -2718,14 +2722,14 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     await mountHome()
 
     // root: no parentId -> picker opens at the (null) open folder, i.e. the root
-    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: UniWork')
+    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: Tài liệu (gốc)')
     await act(async () => {
       document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
     })
     await flush()
 
     // folder card without parentId -> falls back to the open folder (root) too
-    expect(await openMovePickerFor('f-orphan')).toBe('Đường dẫn: UniWork')
+    expect(await openMovePickerFor('f-orphan')).toBe('Đường dẫn: Tài liệu (gốc)')
     await act(async () => {
       document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
     })
@@ -2734,7 +2738,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     // Shared with me (entered from the root): the row lists, and Move does not crash or invent a parent
     await clickNavItem('shared-with-me')
     expect(host.querySelector('.dh-doc-row[data-doc-id="doc-orphan"]')).not.toBeNull()
-    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: UniWork')
+    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: Tài liệu (gốc)')
     await act(async () => {
       document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
     })
@@ -2751,10 +2755,136 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     await flush()
     expect(host.querySelector('.dh-doc-row[data-doc-id="doc-orphan"]')).not.toBeNull()
-    expect(await openMovePickerFor('doc-orphan')).toBe('Đường dẫn: UniWork › Báo cáo HĐQT Q4')
+    expect(await openMovePickerFor('doc-orphan')).toBe(
+      'Đường dẫn: Tài liệu (gốc) › Báo cáo HĐQT Q4',
+    )
     await act(async () => {
       document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
     })
     await flush()
+  })
+
+  it("Shared with me: Move never starts at the folder browsed before it, nor at the owner's folder (UNI-1961 FS2-1)", async () => {
+    const shared = {
+      id: 'doc-shared',
+      workspaceId: 'ws-1',
+      title: 'Được chia sẻ.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T08:00:00.000Z',
+      kind: 'file',
+      visibility: 'restricted',
+      myLevel: 'edit',
+    } satisfies DocumentsHomeDoc
+    // the same row once with no parent, once carrying the owner's folder id (not the recipient's place)
+    const sharedUnder = { ...shared, id: 'doc-shared-under', parentId: 'f-legal' }
+    api.uniworkListChildren!.mockImplementation(async (q: { parentId: string | null }) =>
+      ok({ items: q.parentId === 'f-board' ? [] : rootItems, nextCursor: null }),
+    )
+    api.uniworkListSharedWithMe!.mockImplementation(async () =>
+      ok({ documents: [shared, sharedUnder], nextCursor: null }),
+    )
+    await mountHome()
+
+    // browse a folder first, then switch to Shared with me: the open folder id stays in state
+    await act(async () => {
+      host
+        .querySelector<HTMLButtonElement>(
+          '.dh-folder-card[data-folder-id="f-board"] .dh-folder-open',
+        )!
+        .click()
+    })
+    await flush()
+    await clickNavItem('shared-with-me')
+    expect(host.querySelector('.dh-doc-row[data-doc-id="doc-shared"]')).not.toBeNull()
+
+    expect(await openMovePickerFor('doc-shared')).toBe('Đường dẫn: Tài liệu (gốc)')
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
+    })
+    await flush()
+    expect(await openMovePickerFor('doc-shared-under')).toBe('Đường dẫn: Tài liệu (gốc)')
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
+    })
+    await flush()
+  })
+
+  it('Recent and Shared by me: Move never starts at the folder browsed before them (UNI-1961 FS2-1)', async () => {
+    const orphan = {
+      id: 'doc-flat',
+      workspaceId: 'ws-1',
+      title: 'Không thư mục cha.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T08:00:00.000Z',
+      kind: 'file',
+      visibility: 'restricted',
+      myLevel: 'manage',
+      canManage: true,
+    } satisfies DocumentsHomeDoc
+    api.uniworkListChildren!.mockImplementation(async (q: { parentId: string | null }) =>
+      ok({ items: q.parentId === 'f-board' ? [] : rootItems, nextCursor: null }),
+    )
+    api.uniworkListDocuments!.mockImplementation(async () =>
+      ok({ documents: [orphan], nextCursor: null }),
+    )
+    api.uniworkListSharedByMe!.mockImplementation(async () =>
+      ok({ documents: [orphan], nextCursor: null }),
+    )
+    await mountHome()
+
+    // browse a folder first: its id stays in state while the other views show
+    await act(async () => {
+      host
+        .querySelector<HTMLButtonElement>(
+          '.dh-folder-card[data-folder-id="f-board"] .dh-folder-open',
+        )!
+        .click()
+    })
+    await flush()
+
+    for (const view of ['recent', 'shared-by-me']) {
+      await clickNavItem(view)
+      expect(host.querySelector('.dh-doc-row[data-doc-id="doc-flat"]')).not.toBeNull()
+      expect(await openMovePickerFor('doc-flat')).toBe('Đường dẫn: Tài liệu (gốc)')
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>('.uwf-picker .btn-secondary')!.click()
+      })
+      await flush()
+    }
+  })
+
+  it('Shared by me lists no folder row, even when the server still sends one from an older share (UNI-1974)', async () => {
+    const file = {
+      id: 'doc-out',
+      workspaceId: 'ws-1',
+      title: 'Đã chia sẻ đi.docx',
+      format: 'docx',
+      updatedAt: '2026-10-18T08:00:00.000Z',
+      kind: 'file',
+      visibility: 'restricted',
+      myLevel: 'manage',
+    } satisfies DocumentsHomeDoc
+    const folder = {
+      id: 'f-shared-old',
+      workspaceId: 'ws-1',
+      title: 'Thư mục chia sẻ cũ',
+      format: null,
+      updatedAt: '2026-10-18T09:00:00.000Z',
+      kind: 'folder',
+      visibility: 'restricted',
+    } satisfies DocumentsHomeDoc
+    api.uniworkListSharedByMe!.mockImplementation(async () =>
+      ok({ documents: [folder, file], nextCursor: null }),
+    )
+    await mountHome()
+    await clickNavItem('shared-by-me')
+
+    expect(host.querySelector('.dh-doc-row[data-doc-id="doc-out"]')).not.toBeNull()
+    expect(
+      host.querySelector('[data-doc-id="f-shared-old"], [data-folder-id="f-shared-old"]'),
+    ).toBeNull()
+    expect(host.querySelector('.dh-folders-section')).toBeNull()
+    // the count says what the table shows
+    expect(host.querySelector('.dh-docs-section .dh-section-count')?.textContent).toBe('1')
   })
 })

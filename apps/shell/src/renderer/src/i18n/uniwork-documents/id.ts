@@ -138,9 +138,10 @@ export const id = {
   uwDocType: 'Jenis',
   uwDocLocation: 'Lokasi',
   uwDocRename: 'Ganti nama',
-  uwDocArchive: 'Arsipkan',
+  uwDocArchive: 'Pindahkan ke sampah',
   uwDocRestore: 'Pulihkan',
-  uwDocArchiveConfirm: 'Arsipkan “{name}”? Anda dapat memulihkannya nanti.',
+  uwDocArchiveConfirm:
+    '“{name}” beserta seluruh isinya akan tersimpan di sampah selama 30 hari sebelum dihapus permanen. Pengelola dapat memulihkannya selama periode ini.',
   uwDocNameEmpty: 'Masukkan nama dokumen.',
   uwDocNameTooLong: 'Nama terlalu panjang (maksimal 500 karakter).',
   uwDocRenamedAnnounce: 'Dokumen diganti namanya menjadi {name}.',
@@ -151,7 +152,7 @@ export const id = {
   uwDocUploadPick: 'Pilih file',
   uwDocUploading: 'Mengunggah “{name}”…',
   uwDocLocationTop: 'Tingkat teratas',
-  uwDocArchived: 'Diarsipkan',
+  uwDocArchived: 'Dipindahkan ke sampah',
   uwSizeWarnChip: 'Mendekati batas {max} (saat ini {size}).',
   uwSizeWarnDismiss: 'Tutup peringatan ukuran',
   uwSaveBlockTitle: 'Tidak dapat menyimpan ke UniWork',
@@ -191,4 +192,13 @@ export const id = {
   uwLockLostHeldBy:
     '{name} sedang mengedit sekarang. Perubahan Anda yang belum disimpan masih di sini.',
   uwLockAcquireFailed: 'Tidak dapat memperoleh akses pengeditan. Coba lagi dalam beberapa menit.',
+  uwChipSourceView: 'Hanya lihat · Dari {origin}',
+  uwTipSourceView:
+    'File ini dilampirkan di {origin}{parent}. Perubahan tidak akan disimpan. Untuk mendapatkan salinan, gunakan Unduh di daftar Dokumen.',
+  uwSourceViewSaveHint: 'File ini hanya untuk dilihat — perubahan tidak disimpan.',
+  uwSourceViewCopyHint: 'Untuk mendapatkan salinan, gunakan Unduh di daftar Dokumen.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Tugas',
+  uwSourceOriginMeeting: 'Rapat',
+  uwSourceOriginEmail: 'Email',
 } satisfies Record<keyof typeof zh, string>

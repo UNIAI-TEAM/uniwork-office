@@ -277,8 +277,8 @@ export function toStatus(doc: BoundDocument, pendingNext = false): UniworkDocSta
     workspaceId: b.workspaceId,
     title: b.title,
     format: b.format,
-    access: b.access,
-    ...(b.level ? { commentsLevel: b.level } : {}),
+    access: b.shelved ? 'view' : b.access,
+    ...(b.shelved ? { commentsLevel: 'view' } : b.level ? { commentsLevel: b.level } : {}),
     state: b.state,
     ...(b.error ? { error: b.error } : {}),
     ...(b.state === 'edit_locked' && b.editLock ? { editLock: b.editLock } : {}),
@@ -1799,6 +1799,34 @@ export class SaveCoordinator {
         return Promise.resolve(latest ?? doc)
       }
       return this.writeBinding(latest, binding)
+    })
+  }
+
+  /**
+   * Mutate `doc`'s binding against the latest stored binding inside the
+   * per-key serialized chain (`serializeBinding`). Returns `null` when the
+   * document is no longer bound, or the current `BoundDocument` without
+   * writing when `patch` returns `null`. Propagates persistence failures
+   * rather than swallowing them (R3-5).
+   */
+  async updateBinding(
+    doc: BoundDocument,
+    patch: (latest: Binding) => Binding | null,
+  ): Promise<BoundDocument | null> {
+    return this.serializeBinding(doc.key, async () => {
+      const latest = this.deps.store.lookup(doc.path)
+      if (!latest || latest.binding.documentId !== doc.binding.documentId) return null
+      const next = patch(latest.binding)
+      if (!next) return latest
+      const written = await this.deps.store.write(latest.dir, next)
+      if (!written) {
+        this.activeSizeWarns.delete(latest.path)
+        this.publish(latest)
+        throw new Error('binding_write_refused')
+      }
+      const updated: BoundDocument = { ...latest, binding: next }
+      this.publish(updated)
+      return updated
     })
   }
 

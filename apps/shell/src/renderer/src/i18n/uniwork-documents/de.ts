@@ -145,9 +145,10 @@ export const de = {
   uwDocType: 'Typ',
   uwDocLocation: 'Speicherort',
   uwDocRename: 'Umbenennen',
-  uwDocArchive: 'Archivieren',
+  uwDocArchive: 'In den Papierkorb',
   uwDocRestore: 'Wiederherstellen',
-  uwDocArchiveConfirm: '„{name}“ archivieren? Sie können es später wiederherstellen.',
+  uwDocArchiveConfirm:
+    '„{name}“ und alle untergeordneten Elemente bleiben 30 Tage im Papierkorb, bevor sie endgültig gelöscht werden. Verwalter können sie in diesem Zeitraum wiederherstellen.',
   uwDocNameEmpty: 'Geben Sie einen Dokumentnamen ein.',
   uwDocNameTooLong: 'Der Name ist zu lang (höchstens 500 Zeichen).',
   uwDocRenamedAnnounce: 'Das Dokument wurde in {name} umbenannt.',
@@ -159,7 +160,7 @@ export const de = {
   uwDocUploadPick: 'Datei auswählen',
   uwDocUploading: '„{name}“ wird hochgeladen…',
   uwDocLocationTop: 'Oberste Ebene',
-  uwDocArchived: 'Archiviert',
+  uwDocArchived: 'In den Papierkorb verschoben',
   uwSizeWarnChip: 'Nähert sich dem Limit von {max} (aktuell {size}).',
   uwSizeWarnDismiss: 'Größenwarnung schließen',
   uwSaveBlockTitle: 'Konnte nicht in UniWork gespeichert werden',
@@ -199,4 +200,13 @@ export const de = {
   uwLockLostHeldBy: '{name} bearbeitet gerade. Ihre ungespeicherten Änderungen sind noch da.',
   uwLockAcquireFailed:
     'Bearbeitungszugriff konnte nicht angefordert werden. Versuchen Sie es in ein paar Minuten erneut.',
+  uwChipSourceView: 'Nur Ansicht · Aus {origin}',
+  uwTipSourceView:
+    'Diese Datei ist in {origin}{parent} angehängt. Änderungen werden nicht gespeichert. Für eine Kopie nutzen Sie „Herunterladen“ in der Dokumentenliste.',
+  uwSourceViewSaveHint: 'Diese Datei ist nur zur Ansicht — Änderungen werden nicht gespeichert.',
+  uwSourceViewCopyHint: 'Für eine Kopie nutzen Sie „Herunterladen“ in der Dokumentenliste.',
+  uwSourceOriginChat: 'Chat',
+  uwSourceOriginTask: 'Aufgaben',
+  uwSourceOriginMeeting: 'Meetings',
+  uwSourceOriginEmail: 'E-Mail',
 } satisfies Record<keyof typeof zh, string>

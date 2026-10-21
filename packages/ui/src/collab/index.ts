@@ -26,6 +26,7 @@ export {
   type CollabPermissions,
   type CollabStrings,
   type CollabThreadView,
+  type CollabViewVersion,
 } from './use-collab-threads'
 export { CollabPanel, type CollabInFileSlot, type CollabPanelProps } from './CollabPanel'
 export {

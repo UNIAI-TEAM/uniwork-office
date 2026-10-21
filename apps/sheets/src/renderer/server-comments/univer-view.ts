@@ -2,6 +2,7 @@
  * G8-13 (UNI-1408): the open Univer workbook as the server-comment panel sees it (`SheetsEditorView`).
  * Thin on purpose: every rule lives in the anchor store / adapter, which the tests drive with a fake.
  */
+import { focusWorksheet } from '../sheet-focus'
 import { revealCellBelowFreeze } from '../univer-sync'
 import type { UniverRuntime } from '../univer-state'
 import type { WorkbookFile } from '../../shared/desktop-api'
@@ -54,7 +55,10 @@ export function createUniverEditorView(
       // the panel item that asked keeps the keyboard focus (spine S12: goTo never steals it)
       const focused = document.activeElement as HTMLElement | null
       try {
-        if (wb.getActiveSheet()?.getSheetId() !== sheetId) wb.setActiveSheet(sheet)
+        if (wb.getActiveSheet()?.getSheetId() !== sheetId) {
+          // explicit navigation: a background load's keepActiveSheet restore must not undo it
+          focusWorksheet(sheet, () => wb.setActiveSheet(sheet))
+        }
         sheet
           .getRange(
             range.startRow,

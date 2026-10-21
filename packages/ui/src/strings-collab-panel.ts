@@ -50,7 +50,7 @@ export type CollabPanelStringKey = keyof (typeof collabPanelStrings)['zh']
 
 const translate = createI18n(collabPanelStrings)
 
-// params fill the {panel}, {label}, {count}, {quote}, {cell}, {slide}, {page}, {shortcut}, {name}, {time}, {names}, {unshareable}, {failedNames} and {sharedNames} slots
+// params fill the {panel}, {label}, {count}, {quote}, {cell}, {slide}, {page}, {shortcut}, {n}, {name}, {time}, {names}, {unshareable}, {failedNames} and {sharedNames} slots
 export function collabPanelText(lang: Lang, key: CollabPanelStringKey, params?: Params): string {
   return translate(lang, key, params)
 }

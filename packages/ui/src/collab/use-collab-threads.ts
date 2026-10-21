@@ -49,6 +49,12 @@ export interface CollabThreadView {
   anchorState?: CollabAnchorState
 }
 
+/** the host opens version `versionNo` read-only; `opened: false` (or a throw) shows the unavailable line, `void` = fire and forget */
+export type CollabViewVersion = (req: {
+  commentId: string
+  versionNo: number
+}) => Promise<{ opened: boolean }> | { opened: boolean } | void
+
 export interface CollabFocusRequest {
   /** null: focus the panel-level notice */
   threadId: string | null
@@ -98,6 +104,10 @@ export interface CollabController {
   source: CollabSource
   host: CollabHostState
   adapter?: CollabAnchorAdapter
+  /** the id of the version the editor shows (host input, passed through for the panel) */
+  openVersionId?: string
+  /** host input, passed through for the panel: absent = no "View in version N" action */
+  onViewVersion?: CollabViewVersion
   state: CollabLoadState
   /** open threads, in anchor order (comment) or time order (discussion) */
   threads: CollabThreadView[]
@@ -119,6 +129,12 @@ export interface CollabController {
   cancelThread(): void
   dismissNotice(): void
   reload(): Promise<void>
+  /**
+   * lists once more (`since_token`, joins a list already in flight) and resolves with the list as it is
+   * afterwards: the changed list, or the last one when nothing changed or the list failed. Never rejects.
+   * For a host that must act on the server's current rows even while the panel is closed (Save receipts).
+   */
+  freshComments(): Promise<readonly CollabComment[]>
   retry(): Promise<void>
   /** answers `comments.reveal`; rejects `{code: 'not_ready', retryable: true}` when the first list is late */
   reveal(commentId: string): Promise<{ revealed: boolean }>
@@ -128,6 +144,13 @@ export interface CollabController {
 export interface CollabControllerOptions {
   /** pass a stable object (useMemo): a new one each render recomputes the thread views and re-renders unchanged lists */
   adapter?: CollabAnchorAdapter
+  /**
+   * The id of the version the editor shows. A `lost` comment whose `anchor_version_id` equals it is located
+   * by the adapter like any other (the anchor is valid in that version), so the thread can jump to it.
+   */
+  openVersionId?: string
+  /** opens version N read-only for a lost comment; absent: the panel shows no "View in version N" action */
+  onViewVersion?: CollabViewVersion
   /** read for `collabUpdatedAnnounce` only */
   strings?: CollabStrings
   /** default: the window's polite live region */
@@ -170,9 +193,15 @@ function anchorStateOf(
   root: CollabComment,
   kind: CollabKind,
   adapter: CollabAnchorAdapter | undefined,
+  openVersionId?: string,
 ): CollabAnchorState | undefined {
   if (kind !== 'comment' || !root.anchor) return undefined
-  if (root.anchor_state === 'lost') return 'lost'
+  // a lost anchor is still valid in the version it was kept on: viewing that version locates it again
+  if (
+    root.anchor_state === 'lost' &&
+    !(root.anchor_version_id && root.anchor_version_id === openVersionId)
+  )
+    return 'lost'
   if (adapter) return adapter.locate(root.anchor) ? 'exact' : 'stale'
   return root.anchor_state === 'stale' ? 'stale' : 'exact'
 }
@@ -196,6 +225,7 @@ export function buildCollabThreads(
   kind: CollabKind,
   adapter: CollabAnchorAdapter | undefined,
   marked: ReadonlyMap<string, CollabComment> = new Map(),
+  openVersionId?: string,
 ): { open: CollabThreadView[]; resolved: CollabThreadView[] } {
   const asDeleted = (c: CollabComment): CollabComment =>
     marked.has(c.id) && !c.deleted_at ? { ...c, deleted_at: c.updated_at ?? 'deleted' } : c
@@ -223,7 +253,7 @@ export function buildCollabThreads(
       replies: (replies.get(root.id) ?? []).sort(byCreated),
       resolved: !!root.resolved_at,
       deleted: !!root.deleted_at,
-      anchorState: anchorStateOf(root, kind, adapter),
+      anchorState: anchorStateOf(root, kind, adapter, openVersionId),
     }
   })
   const order = (t: CollabThreadView) =>
@@ -313,7 +343,7 @@ export function useCollabThreads(
   host: CollabHostState,
   opts: CollabControllerOptions = {},
 ): CollabController {
-  const { adapter } = opts
+  const { adapter, openVersionId, onViewVersion } = opts
   const kind = host.kind
   const [state, setState] = useState<CollabLoadState>('loading')
   const [data, setData] = useState<ListData>(EMPTY)
@@ -376,8 +406,13 @@ export function useCollabThreads(
         return next
       })
       if (root.resolved_at) setResolvedOpen(true)
-      const anchorState = anchorStateOf(root, kind, optsRef.current.adapter)
-      // lost (and an anchor the editor cannot locate) only opens the thread
+      const anchorState = anchorStateOf(
+        root,
+        kind,
+        optsRef.current.adapter,
+        optsRef.current.openVersionId,
+      )
+      // lost in another version (and an anchor the editor cannot locate) only opens the thread
       if (anchorState === 'exact' && root.anchor) optsRef.current.adapter?.goTo(root.anchor)
       setFocus({ threadId: rootId, commentId, target: deleted ? 'deleted' : 'heading', seq })
       return { revealed: true }
@@ -451,6 +486,12 @@ export function useCollabThreads(
     inFlightRef.current = p
     return p
   }, [runList])
+
+  const freshComments = useCallback(async (): Promise<readonly CollabComment[]> => {
+    await reload().catch(() => undefined)
+    // the ref, not React state: threads lag one render behind the list that just landed
+    return dataRef.current.comments
+  }, [reload])
 
   const retry = useCallback((): Promise<void> => {
     if (!loadedRef.current) setState('loading')
@@ -612,8 +653,8 @@ export function useCollabThreads(
   )
 
   const grouped = useMemo(
-    () => buildCollabThreads(data.comments, kind, adapter, marked),
-    [data, kind, adapter, marked],
+    () => buildCollabThreads(data.comments, kind, adapter, marked, openVersionId),
+    [data, kind, adapter, marked, openVersionId],
   )
 
   const can = useMemo(
@@ -638,6 +679,8 @@ export function useCollabThreads(
     source,
     host,
     adapter,
+    openVersionId,
+    onViewVersion,
     state,
     threads: grouped.open,
     resolved: grouped.resolved,
@@ -657,6 +700,7 @@ export function useCollabThreads(
     cancelThread: useCallback(() => setNewThread(null), []),
     dismissNotice: useCallback(() => setNotice(null), []),
     reload,
+    freshComments,
     retry,
     reveal,
     actions,

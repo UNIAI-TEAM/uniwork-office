@@ -158,6 +158,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     'comments.anchors': unsupportedComments('comments.anchors'),
     'mentions.search': unsupportedComments('mentions.search'),
     'comments.shareView': unsupportedComments('comments.shareView'),
+    'comments.viewVersion': unsupportedComments('comments.viewVersion'),
   }
 
   const initSession: PortSession = { documentId: session.documentId ?? 'missing', ...session }

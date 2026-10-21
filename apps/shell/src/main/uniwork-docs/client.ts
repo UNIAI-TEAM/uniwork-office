@@ -6,6 +6,8 @@ import type {
   UniworkDocSummary,
   UniworkFolderNode,
   UniworkListFilters,
+  UniworkSourceListPage,
+  UniworkSourceListQuery,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
 import { TransportError } from '../uniwork-auth/transport'
@@ -26,6 +28,7 @@ import {
   parseOrgMembers,
   parseProperties,
   parseSharedWithMe,
+  parseSourceList,
   parseUpload,
 } from './parse'
 import type {
@@ -43,6 +46,8 @@ import type {
   UploadSessionState,
 } from './parse'
 import { parseUploadSession, parseUploadSessionComplete } from './parse'
+import { parseDocumentManageRef, parseDocumentShelveResult, type DocumentManageRef } from './parse'
+import type { UniworkDocShelveResult } from '../../shared/home-api'
 
 /**
  * Main-process client for the UniWork documents routes this app uses, and
@@ -69,6 +74,7 @@ export const STREAM_CEILING_MS = 60 * 60_000
 /** the server stages at most 50 MiB per upload; a download far past that is refused */
 const MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 const ID = /^[A-Za-z0-9_-]{1,128}$/
+const SOURCE_ID = /^(?:chat|task|meeting|email):[A-Za-z0-9_-]{1,64}$/
 
 export interface UniworkDocsClientOptions {
   /** normalized deployment origin (no trailing slash), validated by the profile */
@@ -152,6 +158,13 @@ export interface UniworkDocsClient {
       limit?: number
     } & UniworkListFilters,
   ): Promise<DocumentListResult>
+  /**
+   * UNI-1961: the Documents home's "other sources" files
+   * (`GET /workspaces/{ws}/documents/sources`, paged like the web's list)
+   */
+  listSources(input: UniworkSourceListQuery): Promise<UniworkSourceListPage>
+  /** UNI-1961: one source file's bytes through its download proxy */
+  downloadSource(workspaceId: string, sourceId: string): Promise<DownloadResult>
   /** DESKTOP-HOME: workspace members (`GET /workspaces/{ws}/members`) for row updater names */
   listWorkspaceMembers(workspaceId: string): Promise<OrgMemberName[]>
   /** the properties panel of one document (ids/times/level/version, no names) */
@@ -264,6 +277,22 @@ export interface UniworkDocsClient {
   /** restore an archived document (S18) */
   restore(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
   /**
+   * UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf (`shelved=true`,
+   * shelved_at DESC, the flat list's cursor); only the type filter applies
+   */
+  listShelved(input: {
+    workspaceId: string
+    cursor?: string
+    limit?: number
+    format?: UniworkDocFormat
+  }): Promise<DocumentListResult>
+  /** UNI-1961: the level fields of one document of any kind (folder/page/file) */
+  documentManageRef(documentId: string): Promise<DocumentManageRef>
+  /** UNI-1961: bring a shelved item (and its same-batch descendants the caller manages) back */
+  unshelve(documentId: string, idempotencyKey: string): Promise<UniworkDocShelveResult>
+  /** UNI-1961: shelve a live item and its live subtree into Lưu trữ (one batch) */
+  shelve(documentId: string, idempotencyKey: string): Promise<UniworkDocShelveResult>
+  /**
    * one page of org members (id + display name) for resolving the properties
    * panel's names; `cursor` is D's opaque `next_cursor` and `limit` is capped
    * at D's maximum (100)
@@ -274,6 +303,12 @@ export interface UniworkDocsClient {
     limit?: number
   }): Promise<OrgMemberPage>
   getDocument(documentId: string): Promise<DocumentDetail>
+  /**
+   * UNI-2033: the server id of version `versionNo` (>= 1) of a document
+   * (`GET /documents/{id}/versions/{N}`), which names the version a read-only
+   * copy of it shows to the comments seam
+   */
+  getVersionId(documentId: string, versionNo: number): Promise<string>
   download(documentId: string, version?: number): Promise<DownloadResult>
   /**
    * G5-05: the same download read chunk by chunk, with progress and cancel.
@@ -400,6 +435,33 @@ export function uniworkId(value: string): string {
   return encodeURIComponent(value)
 }
 const id = uniworkId
+
+/** `{ version: { id, version } }` of one numbered version; the number must be the one asked for */
+function parseVersionId(raw: unknown, versionNo: number): string {
+  const version = (raw as { version?: unknown } | null)?.version as
+    { id?: unknown; version?: unknown } | null | undefined
+  if (
+    !version ||
+    typeof version !== 'object' ||
+    typeof version.id !== 'string' ||
+    version.id.length === 0 ||
+    version.id.length > 128 ||
+    version.version !== versionNo
+  ) {
+    throw new UniworkDocError('malformed_response')
+  }
+  return version.id
+}
+
+/** a compound `<source>:<rowId>` segment the sources routes issue (document_sources.go:352-355) */
+export function uniworkSourceId(value: string): string {
+  if (typeof value !== 'string' || !SOURCE_ID.test(value)) throw new UniworkDocError('not_found')
+  return encodeURIComponent(value)
+}
+
+/** UNI-1961: the sources list's filter values (D sources-schema.ts); anything else is not sent */
+const SOURCE_KINDS: ReadonlySet<string> = new Set(['chat', 'task', 'meeting', 'email'])
+const SOURCE_TYPES: ReadonlySet<string> = new Set(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'])
 /**
  * SAVE-01 r2 (S01-R1-5): a `parent_id` that reaches the wire. Absent/null is
  * the caller's "no folder" (the field is then omitted - the absence IS the
@@ -615,6 +677,63 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
     if (ref.id !== documentId) throw new UniworkDocError('malformed_response')
     return ref
   }
+  const readBoundedStream = async (
+    response: Response,
+    progress?: () => void,
+    streamOptions: {
+      signal?: AbortSignal
+      onProgress?: (progress: { receivedBytes: number; totalBytes: number | null }) => void
+    } = {},
+  ): Promise<{ bytes: Uint8Array }> => {
+    const { signal, onProgress } = streamOptions
+    const header = response.headers.get('Content-Length')
+    const declared = header === null ? NaN : Number(header)
+    if (declared > MAX_DOWNLOAD_BYTES) {
+      void response.body?.cancel().catch(() => undefined)
+      throw new UniworkDocError('too_large')
+    }
+    const totalBytes = Number.isSafeInteger(declared) && declared >= 0 ? declared : null
+    // R5BE-8: a 200 with no readable body is refused, never buffered
+    // whole (the cap could only be checked after the bytes were in memory)
+    if (!response.body) throw new UniworkDocError('malformed_response')
+    const reader = response.body.getReader()
+    // send() detaches the caller's abort once the server answered: the
+    // body read listens to it itself, so a cancel ends the stream too
+    const stop = () => void reader.cancel().catch(() => undefined)
+    signal?.addEventListener('abort', stop, { once: true })
+    const chunks: Uint8Array[] = []
+    let receivedBytes = 0
+    try {
+      for (;;) {
+        if (signal?.aborted) throw new UniworkDocError('network')
+        let step: ReadableStreamReadResult<Uint8Array>
+        try {
+          step = await reader.read()
+        } catch {
+          throw new UniworkDocError('network')
+        }
+        if (signal?.aborted) throw new UniworkDocError('network')
+        if (step.done) break
+        receivedBytes += step.value.byteLength
+        if (receivedBytes > MAX_DOWNLOAD_BYTES) {
+          stop()
+          throw new UniworkDocError('too_large')
+        }
+        chunks.push(step.value)
+        progress?.()
+        onProgress?.({ receivedBytes, totalBytes })
+      }
+    } finally {
+      signal?.removeEventListener('abort', stop)
+    }
+    const bytes = new Uint8Array(receivedBytes)
+    let offset = 0
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return { bytes }
+  }
 
   return {
     async listWorkspaces(orgId) {
@@ -723,6 +842,40 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         read: json,
       })
       return parseDocumentList(raw, input.workspaceId)
+    },
+
+    async listSources(input) {
+      const params = new URLSearchParams()
+      if (typeof input.source === 'string' && SOURCE_KINDS.has(input.source)) {
+        params.set('source', input.source)
+      }
+      if (typeof input.type === 'string' && SOURCE_TYPES.has(input.type)) {
+        params.set('type', input.type)
+      }
+      const q = typeof input.q === 'string' ? input.q.trim().slice(0, 200) : ''
+      if (q) params.set('q', q)
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      // the server's page is 50 by default and 100 at most (document_sources.go)
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
+      params.set('limit', String(limit))
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${id(input.workspaceId)}/documents/sources`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseSourceList(raw)
+    },
+
+    async downloadSource(workspaceId, sourceId) {
+      return send({
+        method: 'GET',
+        route: `/workspaces/${id(workspaceId)}/documents/sources/${uniworkSourceId(sourceId)}/download`,
+        timeoutMs: transferTimeout,
+        idle: { ceilingMs: streamCeiling },
+        read: readBoundedStream,
+      })
     },
 
     async listWorkspaceMembers(workspaceId) {
@@ -974,6 +1127,87 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       return parseDocumentSummary(raw)
     },
 
+    async listShelved(input) {
+      const params = new URLSearchParams()
+      params.set('shelved', 'true')
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
+      params.set('limit', String(limit))
+      if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      // the shelf never sends parent_id or archived (shelved+archived is 400)
+      applyListFilters(params, { format: input.format })
+      const ws = id(input.workspaceId)
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${ws}/documents`,
+        query: params,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseDocumentList(raw, input.workspaceId)
+    },
+
+    async documentManageRef(documentId) {
+      const targetId = id(documentId)
+      let raw: unknown
+      try {
+        raw = await send({
+          method: 'GET',
+          route: `/documents/${targetId}`,
+          timeoutMs: metadataTimeout,
+          read: json,
+        })
+      } catch (error) {
+        if (!(error instanceof UniworkDocError) || error.serverCode !== 'document_restricted') {
+          throw error
+        }
+        try {
+          raw = await send({
+            method: 'GET',
+            route: `/documents/${targetId}/admin-summary`,
+            timeoutMs: metadataTimeout,
+            read: json,
+          })
+        } catch (summaryError) {
+          if (
+            summaryError instanceof UniworkDocError &&
+            summaryError.code === 'permission_revoked'
+          ) {
+            throw new UniworkDocError('forbidden', { status: summaryError.status })
+          }
+          throw summaryError
+        }
+      }
+      const ref = parseDocumentManageRef(raw)
+      if (ref.id !== documentId) throw new UniworkDocError('malformed_response')
+      return ref
+    },
+
+    async unshelve(documentId, idempotencyKey) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(documentId)}/unshelve`,
+        idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      const res = parseDocumentShelveResult(raw)
+      if (res.document.id !== documentId) throw new UniworkDocError('malformed_response')
+      return res
+    },
+
+    async shelve(documentId, idempotencyKey) {
+      const raw = await send({
+        method: 'POST',
+        route: `/documents/${id(documentId)}/shelve`,
+        idempotencyKey,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      const res = parseDocumentShelveResult(raw)
+      if (res.document.id !== documentId) throw new UniworkDocError('malformed_response')
+      return res
+    },
+
     async listOrgMembers(input) {
       // a slug is lowercase alphanumerics and dashes; anything else never leaves
       if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(input.orgSlug)) throw new UniworkDocError('not_found')
@@ -1042,6 +1276,17 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       return detail
     },
 
+    async getVersionId(documentId, versionNo) {
+      if (!Number.isSafeInteger(versionNo) || versionNo < 1) throw new UniworkDocError('not_found')
+      const raw = await send({
+        method: 'GET',
+        route: `/documents/${id(documentId)}/versions/${versionNo}`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseVersionId(raw, versionNo)
+    },
+
     async download(documentId, version) {
       const query = new URLSearchParams()
       if (version !== undefined && version > 0) query.set('version', String(Math.floor(version)))
@@ -1072,52 +1317,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         timeoutMs: transferTimeout,
         idle: { ceilingMs: streamCeiling },
         ...(signal ? { signal } : {}),
-        async read(response, progress) {
-          const header = response.headers.get('Content-Length')
-          const declared = header === null ? NaN : Number(header)
-          if (declared > MAX_DOWNLOAD_BYTES) throw new UniworkDocError('too_large')
-          const totalBytes = Number.isSafeInteger(declared) && declared >= 0 ? declared : null
-          // R5BE-8: a 200 with no readable body is refused, never buffered
-          // whole (the cap could only be checked after the bytes were in memory)
-          if (!response.body) throw new UniworkDocError('malformed_response')
-          const reader = response.body.getReader()
-          // send() detaches the caller's abort once the server answered: the
-          // body read listens to it itself, so a cancel ends the stream too
-          const stop = () => void reader.cancel().catch(() => undefined)
-          signal?.addEventListener('abort', stop, { once: true })
-          const chunks: Uint8Array[] = []
-          let receivedBytes = 0
-          try {
-            for (;;) {
-              if (signal?.aborted) throw new UniworkDocError('network')
-              let step: ReadableStreamReadResult<Uint8Array>
-              try {
-                step = await reader.read()
-              } catch {
-                throw new UniworkDocError('network')
-              }
-              if (signal?.aborted) throw new UniworkDocError('network')
-              if (step.done) break
-              receivedBytes += step.value.byteLength
-              if (receivedBytes > MAX_DOWNLOAD_BYTES) {
-                stop()
-                throw new UniworkDocError('too_large')
-              }
-              chunks.push(step.value)
-              progress?.()
-              onProgress?.({ receivedBytes, totalBytes })
-            }
-          } finally {
-            signal?.removeEventListener('abort', stop)
-          }
-          const bytes = new Uint8Array(receivedBytes)
-          let offset = 0
-          for (const chunk of chunks) {
-            bytes.set(chunk, offset)
-            offset += chunk.byteLength
-          }
-          return { bytes }
-        },
+        read: (response, progress) => readBoundedStream(response, progress, { signal, onProgress }),
       })
     },
 

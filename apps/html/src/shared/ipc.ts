@@ -103,6 +103,11 @@ export type SaveMode = 'save' | 'saveAs'
 export interface UniworkViewState {
   bound: boolean
   readOnly: boolean
+  /**
+   * The shell locked this copy (revoked, deleted, or a source view): nothing is saved, exported
+   * or printed from it. With readOnly it also means the preview must not run the page's scripts.
+   */
+  locked?: boolean
 }
 
 export interface SaveHtmlRequest {

@@ -138,9 +138,10 @@ export const th = {
   uwDocType: 'ประเภท',
   uwDocLocation: 'ตำแหน่งที่บันทึก',
   uwDocRename: 'เปลี่ยนชื่อ',
-  uwDocArchive: 'เก็บถาวร',
+  uwDocArchive: 'ย้ายไปถังขยะ',
   uwDocRestore: 'กู้คืน',
-  uwDocArchiveConfirm: 'เก็บถาวร “{name}” หรือไม่ คุณกู้คืนได้ภายหลัง',
+  uwDocArchiveConfirm:
+    '“{name}” และรายการย่อยทั้งหมดจะอยู่ในถังขยะ 30 วันก่อนถูกลบถาวร ผู้จัดการสามารถกู้คืนได้ในช่วงนี้',
   uwDocNameEmpty: 'โปรดป้อนชื่อเอกสาร',
   uwDocNameTooLong: 'ชื่อยาวเกินไป (ไม่เกิน 500 อักขระ)',
   uwDocRenamedAnnounce: 'เปลี่ยนชื่อเอกสารเป็น {name} แล้ว',
@@ -151,7 +152,7 @@ export const th = {
   uwDocUploadPick: 'เลือกไฟล์',
   uwDocUploading: 'กำลังอัปโหลด “{name}”…',
   uwDocLocationTop: 'ระดับบนสุด',
-  uwDocArchived: 'เก็บถาวรแล้ว',
+  uwDocArchived: 'ย้ายไปถังขยะแล้ว',
   uwSizeWarnChip: 'ใกล้ถึงขีดจำกัด {max} (ปัจจุบัน {size})',
   uwSizeWarnDismiss: 'ปิดคำเตือนขนาดไฟล์',
   uwSaveBlockTitle: 'ไม่สามารถบันทึกลงใน UniWork ได้',
@@ -191,4 +192,13 @@ export const th = {
   uwLockLostHeldBy:
     '{name} กำลังแก้ไขอยู่ในขณะนี้ การเปลี่ยนแปลงที่ยังไม่บันทึกของคุณยังอยู่ที่นี่',
   uwLockAcquireFailed: 'ไม่สามารถรับสิทธิ์แก้ไขได้ ลองอีกครั้งในอีกไม่กี่นาที',
+  uwChipSourceView: 'ดูได้อย่างเดียว · จาก{origin}',
+  uwTipSourceView:
+    'ไฟล์นี้แนบอยู่ใน{origin}{parent} การเปลี่ยนแปลงจะไม่ถูกบันทึก หากต้องการสำเนา ให้ใช้ดาวน์โหลดในรายการเอกสาร',
+  uwSourceViewSaveHint: 'ไฟล์นี้ดูได้อย่างเดียว — การเปลี่ยนแปลงจะไม่ถูกบันทึก',
+  uwSourceViewCopyHint: 'หากต้องการสำเนา ให้ใช้ดาวน์โหลดในรายการเอกสาร',
+  uwSourceOriginChat: 'แชต',
+  uwSourceOriginTask: 'งาน',
+  uwSourceOriginMeeting: 'การประชุม',
+  uwSourceOriginEmail: 'อีเมล',
 } satisfies Record<keyof typeof zh, string>

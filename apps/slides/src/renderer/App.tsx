@@ -164,7 +164,7 @@ import type {
 import type { PathCmd } from './edit-points'
 import { createPreviewTracker, type EditPointsCommit } from './edit-points-actions'
 import { FIT_WIDTH, NARROW_FRAME_PX } from './app-constants'
-import { aiDockShouldYield, useWindowWidth } from './narrow-dock'
+import { aiDockShouldYield, COMMENTS_PANE_PX, useWindowWidth } from './narrow-dock'
 import { StageRuler } from './components/StageRuler'
 import { formatRulerValue, type RulerUnit } from './ruler-ticks'
 import * as fileActions from './file-actions'
@@ -987,7 +987,7 @@ export function App() {
       // Fetch the layout list asynchronously (doesn't block opening)
       void window.slidesApi.getLayouts().then((r) => setLayoutsResult(r))
     },
-    [fitZoom],
+    [],
   )
 
   const setSelectedId = useCallback((id: string | null, additive = false) => {
@@ -3874,84 +3874,97 @@ export function App() {
               (() => {
                 // Reading view: page fills the available area, click/arrow keys to turn pages, Esc to exit
                 const availH = Math.max(240, winSize.h - 40 - 112 - 24 - 76)
-                const availW = Math.max(320, winSize.w - 120)
+                const availW = Math.max(
+                  320,
+                  winSize.w - 120 - (showComments && serverComments ? COMMENTS_PANE_PX : 0),
+                )
                 const readW = Math.round(
                   Math.min(availW, availH * (slide.widthPx / slide.heightPx)),
                 )
                 return (
-                  <div className="reading-view">
-                    <div
-                      className="reading-slide"
-                      data-tip={t('appReadingSlideTitle')}
-                      onClick={() => setCurrent((c) => Math.min(c + 1, slides.length - 1))}
-                    >
-                      <SlideThumb slide={slide} images={images} width={readW} />
-                    </div>
-                    <div className="reading-bar">
-                      <button
-                        disabled={current === 0}
-                        onClick={() => setCurrent((c) => Math.max(c - 1, 0))}
-                      >
-                        {t('appReadingPrev')}
-                      </button>
-                      <span className="reading-page">
-                        {current + 1} / {slides.length}
-                      </span>
-                      <button
-                        disabled={current === slides.length - 1}
+                  <>
+                    <div className="reading-view">
+                      <div
+                        className="reading-slide"
+                        data-tip={t('appReadingSlideTitle')}
                         onClick={() => setCurrent((c) => Math.min(c + 1, slides.length - 1))}
                       >
-                        {t('appReadingNext')}
-                      </button>
-                      {!uniwork.readOnly && (
-                        <button className="reading-exit" onClick={() => onViewMode('normal')}>
-                          {t('appReadingExit')}
+                        <SlideThumb slide={slide} images={images} width={readW} />
+                      </div>
+                      <div className="reading-bar">
+                        <button
+                          disabled={current === 0}
+                          onClick={() => setCurrent((c) => Math.max(c - 1, 0))}
+                        >
+                          {t('appReadingPrev')}
                         </button>
-                      )}
+                        <span className="reading-page">
+                          {current + 1} / {slides.length}
+                        </span>
+                        <button
+                          disabled={current === slides.length - 1}
+                          onClick={() => setCurrent((c) => Math.min(c + 1, slides.length - 1))}
+                        >
+                          {t('appReadingNext')}
+                        </button>
+                        {!uniwork.readOnly && (
+                          <button className="reading-exit" onClick={() => onViewMode('normal')}>
+                            {t('appReadingExit')}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                    {showComments && serverComments && (
+                      <div className="comments-slot" ref={setServerCommentsSlot} />
+                    )}
+                  </>
                 )
               })()
             ) : viewMode === 'sorter' ? (
-              <div
-                className="sorter-view"
-                role="listbox"
-                tabIndex={0}
-                ref={sorterViewRef}
-                onContextMenu={(e) => onGapContextMenu(e, true)}
-              >
-                {slides.map((s, i) => (
-                  <div
-                    key={i}
-                    data-index={i}
-                    role="option"
-                    aria-selected={selectedSlides.includes(i)}
-                    className={`sorter-item ${i === current ? 'active' : selectedSlides.includes(i) ? 'selected' : ''} ${s.hidden ? 'thumb-hidden' : ''}${thumbDragCls(i)}`}
-                    data-tip={s.hidden ? t('appSorterHiddenTitle') : t('appSorterItemTitle')}
-                    {...thumbDragProps(i, true)}
-                    onClick={(e) => selectThumb(i, e)}
-                    onDoubleClick={() => {
-                      selectThumb(i)
-                      onViewMode('normal')
-                    }}
-                    onContextMenu={(e) => openThumbMenu(i, e)}
-                  >
-                    {visibleSorterItems.has(i) ? (
-                      <SlideThumb slide={s} images={images} width={208} />
-                    ) : (
-                      <div className="thumb-placeholder" style={thumbBox(s, 208)} />
-                    )}
-                    <span className="sorter-num">{i + 1}</span>
-                    {pasteFloater?.index === i && (
-                      <PasteOptionsFloater
-                        mode={pasteFloater.mode}
-                        onSelect={repasteSlideAs}
-                        onDismiss={() => setPasteFloater(null)}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
+              <>
+                <div
+                  className="sorter-view"
+                  role="listbox"
+                  tabIndex={0}
+                  ref={sorterViewRef}
+                  onContextMenu={(e) => onGapContextMenu(e, true)}
+                >
+                  {slides.map((s, i) => (
+                    <div
+                      key={i}
+                      data-index={i}
+                      role="option"
+                      aria-selected={selectedSlides.includes(i)}
+                      className={`sorter-item ${i === current ? 'active' : selectedSlides.includes(i) ? 'selected' : ''} ${s.hidden ? 'thumb-hidden' : ''}${thumbDragCls(i)}`}
+                      data-tip={s.hidden ? t('appSorterHiddenTitle') : t('appSorterItemTitle')}
+                      {...thumbDragProps(i, true)}
+                      onClick={(e) => selectThumb(i, e)}
+                      onDoubleClick={() => {
+                        selectThumb(i)
+                        onViewMode('normal')
+                      }}
+                      onContextMenu={(e) => openThumbMenu(i, e)}
+                    >
+                      {visibleSorterItems.has(i) ? (
+                        <SlideThumb slide={s} images={images} width={208} />
+                      ) : (
+                        <div className="thumb-placeholder" style={thumbBox(s, 208)} />
+                      )}
+                      <span className="sorter-num">{i + 1}</span>
+                      {pasteFloater?.index === i && (
+                        <PasteOptionsFloater
+                          mode={pasteFloater.mode}
+                          onSelect={repasteSlideAs}
+                          onDismiss={() => setPasteFloater(null)}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {showComments && serverComments && (
+                  <div className="comments-slot" ref={setServerCommentsSlot} />
+                )}
+              </>
             ) : (
               <>
                 {viewMode === 'outline' ? (

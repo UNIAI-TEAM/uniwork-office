@@ -14,6 +14,7 @@ const KEY = {
   xlsx: 'uhDefaultNameXlsx',
   pptx: 'uhDefaultNamePptx',
   md: 'uhDefaultNameMd',
+  txt: 'uhDefaultNameTxt',
   html: 'uhDefaultNameHtml',
   pdf: 'uhDefaultNamePdf',
 } as const
@@ -23,6 +24,7 @@ describe('blank default names', () => {
     it(`main's ${lang} table matches the renderer's uhDefaultName strings`, () => {
       const strings = uniworkHomeStrings[lang] as Record<string, string>
       for (const [kind, key] of Object.entries(KEY)) {
+        expect(strings[key], `${lang} ${key}`).toBeTruthy()
         expect(strings[key], `${lang} ${key}`).toBe(
           BLANK_DEFAULT_NAMES[lang][kind as keyof typeof KEY],
         )

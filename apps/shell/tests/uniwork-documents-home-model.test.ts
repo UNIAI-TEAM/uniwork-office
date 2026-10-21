@@ -63,7 +63,7 @@ function makeDoc(overrides: Partial<DocumentsHomeDoc> = {}): DocumentsHomeDoc {
 }
 
 describe('DH1-W2 documents-home-model', () => {
-  it('defines the 8 board sub-nav entries in exact order and hides starred + archive while available: false', () => {
+  it('defines the 8 board sub-nav entries in exact order and hides starred while available: false (UNI-1961: archive shown)', () => {
     expect(DOCUMENTS_HOME_NAV_ENTRIES.map((e) => e.id)).toEqual([
       'workspace',
       'my-folder',
@@ -78,14 +78,21 @@ describe('DH1-W2 documents-home-model', () => {
     const starred = getDocumentsHomeNavEntry('starred')
     const archive = getDocumentsHomeNavEntry('archive')
     expect(starred.available).toBe(false)
-    expect(archive.available).toBe(false)
+    expect(archive.available).toBe(true)
+    expect(archive.source).toBe('shelved')
 
     // UNI-1957: My Folder is the tree row (or its stand-in), not a sub-nav entry
     expect(getDocumentsHomeNavEntry('my-folder').available).toBe(false)
     const visibleIds = visibleDocumentsHomeNavEntries().map((e) => e.id)
-    expect(visibleIds).toEqual(['workspace', 'recent', 'shared-with-me', 'shared-by-me', 'trash'])
+    expect(visibleIds).toEqual([
+      'workspace',
+      'recent',
+      'shared-with-me',
+      'shared-by-me',
+      'archive',
+      'trash',
+    ])
     expect(visibleIds).not.toContain('starred')
-    expect(visibleIds).not.toContain('archive')
   })
 
   it('converts UI filter state (format, updatedBy, updatedPreset) to UniworkListFilters', () => {
@@ -557,5 +564,35 @@ describe('DH1-W2 documents-home-model', () => {
         `${code}.uhVisWorkspace non-empty`,
       ).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('UNI-1961 documents-home-model: the Lưu trữ (Archive) shelf', () => {
+  it('routes the archive sub-view to uniworkListShelved with the cursor and the type filter only', async () => {
+    const shelvedDoc = makeDoc({ id: 'shelved-doc', shelvedAt: '2026-10-18T09:00:00Z' })
+    const api: DocumentsHomeApiAdapter = {
+      uniworkListShelved: vi.fn(async () => ({
+        ok: true as const,
+        value: { documents: [shelvedDoc], nextCursor: 'shelf-next' },
+      })),
+      uniworkListTrash: vi.fn(),
+    }
+    const res = await fetchDocumentsHomePage(api, {
+      workspaceId: 'ws-1',
+      subView: 'archive',
+      folderId: null,
+      cursor: 'c-1',
+      filters: { format: 'pdf', updatedBy: 'u-1', updatedFrom: '2026-10-01T00:00:00Z' },
+    })
+    expect(api.uniworkListShelved).toHaveBeenCalledWith({
+      workspaceId: 'ws-1',
+      cursor: 'c-1',
+      format: 'pdf',
+    })
+    expect(api.uniworkListTrash).not.toHaveBeenCalled()
+    expect(res.result).toEqual({
+      ok: true,
+      value: { items: [shelvedDoc], nextCursor: 'shelf-next' },
+    })
   })
 })
