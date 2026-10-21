@@ -324,8 +324,10 @@ export interface UniworkDocSummary {
    */
   /** trash rows: the server's `archived_at` timestamp (`archived` stays the flag) */
   archivedAt?: string
-  /** trash rows: the server's `archived_by` id (the name is resolved later, like `shelvedById`) */
+  /** trash rows: the server's `archived_by` id */
   archivedById?: string
+  /** trash rows: who trashed it, resolved by main from the workspace members like `shelvedByName` */
+  archivedByName?: string
   /** trash rows: when the server purges the row (`purge_after`); "N days left" counts to it */
   purgeAfter?: string
   /** the caller owns the row (`is_owner`) */
@@ -550,8 +552,15 @@ export interface UniworkDocListPage {
   nextCursor: string | null
 }
 
-/** paged "shared with me" query; main aggregates the selected org's workspaces */
-export interface UniworkSharedQuery {
+/**
+ * paged "shared with me" query; main aggregates the selected org's workspaces.
+ * UNI-2047: the type / updater / date filters and the sort go to every
+ * workspace; a value outside the vocabulary is dropped, unset = today's call.
+ */
+export interface UniworkSharedQuery extends Pick<
+  UniworkListFilters,
+  'format' | 'updatedBy' | 'updatedFrom' | 'sort' | 'order'
+> {
   /** opaque cursor from the previous page; omit for the first page */
   cursor?: string
   /** page size, default 50, max 100 */
@@ -561,6 +570,16 @@ export interface UniworkSharedQuery {
 }
 
 export type UniworkSharedPage = UniworkDocListPage
+
+/**
+ * UNI-1961 / UNI-2047: the Lưu trữ shelf query. Only the type filter and the
+ * sort apply (`updatedBy` / `updatedFrom` / `activity` are never forwarded).
+ */
+export interface UniworkShelvedQuery extends Pick<UniworkListFilters, 'format' | 'sort' | 'order'> {
+  workspaceId: string
+  cursor?: string
+  limit?: number
+}
 
 /**
  * The document properties panel (S17). Every name/time the server does not
@@ -1514,12 +1533,7 @@ export interface HomeApi {
   /** a document was renamed (here or elsewhere); returns an unsubscribe */
   onUniworkDocRenamed(cb: (event: UniworkDocRenamedEvent) => void): () => void
   /** UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf, shelved_at newest first (paged) */
-  uniworkListShelved(q: {
-    workspaceId: string
-    cursor?: string
-    limit?: number
-    format?: UniworkDocFormat
-  }): Promise<UniworkResult<UniworkDocListPage>>
+  uniworkListShelved(q: UniworkShelvedQuery): Promise<UniworkResult<UniworkDocListPage>>
   /** UNI-1961: Bỏ lưu trữ - the item and its same-batch descendants the caller manages */
   uniworkUnshelveDocument(
     documentId: string,
