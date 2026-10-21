@@ -420,7 +420,8 @@ const manual: readonly ShortcutAction[] = [
     match: 'key',
     guard: {},
   },
-  // Dialogs: Enter confirms, Esc cancels
+  // Dialogs: Enter confirms, Esc cancels. The id is the CSV's own (shortcuts.csv line 329),
+  // not a `pdf-<n>`: a trace that keys on a numeric suffix must not assume one.
   {
     id: 'pdf-dialog-keys',
     scope: 'pdf',
