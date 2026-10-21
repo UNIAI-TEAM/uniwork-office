@@ -10,14 +10,17 @@ import {
   syncProblems,
   type InTrayRow,
 } from './desk-model'
-import { FileBadge } from './FileBadge'
+import { DocPickerList } from './doclist/PickerList'
 import { useI18n, type StringKey } from './locale'
-import { docExtension, formatWhen } from './uniwork-docs-model'
 import { openUniworkDocument } from './uniwork-open'
 import { WorkbenchIcon } from './WorkbenchIcons'
 import { notificationKey, type OverviewView } from './work-home'
 import type { WorkLoad } from './work-cache'
 import { WorkSkeleton, WorkStatePanel, WorkspacePickerContext } from './WorkErrorState'
+
+/** px the picker keeps clear at a row's end: the pill (and, on a sync problem, Resolve) */
+const TRAIL_PILL = 128
+const TRAIL_RESOLVE = 232
 
 const TRAY_ROWS = 8
 /** working copies whose sync state is asked for (one stat each in main) */
@@ -46,7 +49,7 @@ export function DeskInTray({
   onReload,
   refreshTick,
 }: Props): ReactElement {
-  const { t, dateLocale } = useI18n()
+  const { t } = useI18n()
   const pickWorkspace = useContext(WorkspacePickerContext)
   const titleId = useId()
   const [shared, setShared] = useState<UniworkDocSummary[]>([])
@@ -139,11 +142,13 @@ export function DeskInTray({
     r: InTrayRow,
   ): {
     key: string
-    icon: ReactNode
+    /** the row as the picker list's document: its date, editor and file type */
+    doc: UniworkDocSummary
+    /** what stands in for the file badge (a person or the inbox mark); null = the file's badge */
+    icon: ReactNode | null
     title: string
     sub: string
     pill: { tone: 'danger' | 'info' | 'neutral'; label: StringKey }
-    at: string
     /** a sync problem's visible next step; other rows show their time */
     resolve: boolean
     open: () => void
@@ -154,12 +159,14 @@ export function DeskInTray({
       const actor = n.params.actor ?? ''
       return {
         key: `n:${n.id}`,
+        // a notification names a document but not its type: the person (or the inbox mark) is the icon
+        doc: { id: `n:${n.id}`, workspaceId: '', title, format: null, updatedAt: n.created_at },
         icon: actor ? (
           <span className="wb-desk-avatar" aria-hidden="true">
             {initials(actor)}
           </span>
         ) : (
-          <WorkbenchIcon id="inbox" size={28} tint="blue" />
+          <WorkbenchIcon id="inbox" size={24} tint="blue" />
         ),
         title,
         sub: t(notificationKey(n.kind), n.params),
@@ -167,7 +174,6 @@ export function DeskInTray({
           tone: 'info',
           label: n.kind === 'document_mentioned' ? 'wbDeskPillMention' : 'wbDeskPillComment',
         },
-        at: n.created_at,
         resolve: false,
         open: () => void openNote(n.id, n.resource_id, title),
       }
@@ -176,11 +182,11 @@ export function DeskInTray({
       const d = r.doc
       return {
         key: `s:${d.id}`,
-        icon: <FileBadge ext={docExtension(d)} size={24} />,
+        doc: d,
+        icon: null,
         title: d.title,
         sub: [t('wbDeskReasonShared'), d.workspaceName].filter(Boolean).join(' · '),
         pill: { tone: 'neutral', label: 'wbDeskPillShared' },
-        at: d.updatedAt,
         resolve: false,
         open: () => void openUniworkDocument({ documentId: d.id, title: d.title }, window.aiOffice),
       }
@@ -189,16 +195,25 @@ export function DeskInTray({
     const conflict = s.state === 'conflict'
     return {
       key: `y:${s.path}`,
-      icon: <FileBadge ext={s.format} size={24} />,
+      doc: {
+        id: `y:${s.path}`,
+        workspaceId: s.workspaceId,
+        title: s.title,
+        format: s.format as UniworkDocSummary['format'],
+        updatedAt: s.lastSavedAt ?? '',
+      },
+      icon: null,
       title: s.title,
       sub: t(conflict ? 'wbDeskReasonConflict' : 'wbDeskReasonSync'),
       pill: { tone: 'danger', label: conflict ? 'wbDeskPillConflict' : 'wbDeskPillSync' },
-      at: s.lastSavedAt ?? '',
       resolve: true,
       open: () =>
         void openUniworkDocument({ documentId: s.documentId, title: s.title }, window.aiOffice),
     }
   }
+
+  const described = visible.map(describe)
+  const byId = new Map(described.map((d) => [d.doc.id, d]))
 
   // an empty tray only says "nothing waiting" when the notifications really loaded;
   // signed out, offline or locked out, the Desk banner (or Today) already says why
@@ -245,52 +260,65 @@ export function DeskInTray({
       {rows.length === 0 ? (
         empty()
       ) : (
-        <ul ref={listRef} className="wb-ov-list">
-          {visible.map((r, i) => {
-            const d = describe(r)
-            const rowTitleId = `${titleId}-row${i}`
-            return (
-              <li key={d.key} className="wb-row wb-desk-row">
-                {d.icon}
-                <span className="wb-desk-row-main">
-                  <button
-                    type="button"
-                    id={rowTitleId}
-                    className="wb-row-title wb-desk-row-title"
-                    onClick={d.open}
+        <>
+          <DocPickerList
+            docs={described.map((d) => d.doc)}
+            label={t('wbDeskInTray')}
+            activeId={null}
+            listRef={listRef}
+            reserve={described.some((d) => d.resolve) ? TRAIL_RESOLVE : TRAIL_PILL}
+            iconFor={(doc) => byId.get(doc.id)?.icon ?? null}
+            sublineFor={(doc) => {
+              const sub = byId.get(doc.id)?.sub
+              return sub ? { short: sub, full: sub } : null
+            }}
+            nameFor={(doc) => {
+              const d = byId.get(doc.id)
+              if (!d) return null
+              return (
+                <button
+                  type="button"
+                  id={`${titleId}-row${described.indexOf(d)}`}
+                  className="wb-row-title wb-desk-row-title"
+                >
+                  {d.title}
+                </button>
+              )
+            }}
+            // the whole row opens (the title button's click bubbles here, so it opens once)
+            optionProps={(doc) => ({ onClick: byId.get(doc.id)?.open })}
+            trailing={(doc) => {
+              const d = byId.get(doc.id)
+              if (!d) return null
+              return (
+                <span className="wb-desk-trail">
+                  <span
+                    className={`wb-pill${d.pill.tone === 'neutral' ? '' : ` is-${d.pill.tone}`}`}
                   >
-                    {d.title}
-                  </button>
-                  {d.sub ? <span className="wb-desk-reason">{d.sub}</span> : null}
-                </span>
-                <span className={`wb-pill${d.pill.tone === 'neutral' ? '' : ` is-${d.pill.tone}`}`}>
-                  {t(d.pill.label)}
-                </span>
-                {d.resolve ? (
-                  <button
-                    type="button"
-                    className="wb-btn wb-btn-secondary wb-btn-sm wb-desk-row-act"
-                    aria-describedby={rowTitleId}
-                    onClick={d.open}
-                  >
-                    {t('wbDeskResolve')}
-                  </button>
-                ) : (
-                  <span className="wb-desk-when wb-num">
-                    {d.at ? formatWhen(d.at, dateLocale) : null}
+                    {t(d.pill.label)}
                   </span>
-                )}
-              </li>
-            )
-          })}
+                  {d.resolve ? (
+                    <button
+                      type="button"
+                      className="wb-btn wb-btn-secondary wb-btn-sm wb-desk-row-act"
+                      aria-describedby={`${titleId}-row${described.indexOf(d)}`}
+                      onClick={d.open}
+                    >
+                      {t('wbDeskResolve')}
+                    </button>
+                  ) : null}
+                </span>
+              )
+            }}
+          />
           {rows.length > visible.length ? (
-            <li className="wb-row">
+            <div className="wb-desk-more">
               <button type="button" className="wb-link" onClick={() => setExpanded(true)}>
                 {t('wbDeskMore', { count: rows.length - visible.length })}
               </button>
-            </li>
+            </div>
           ) : null}
-        </ul>
+        </>
       )}
     </section>
   )

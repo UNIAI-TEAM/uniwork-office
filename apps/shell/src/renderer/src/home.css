@@ -4686,6 +4686,34 @@ body.vib .home {
   flex: none;
 }
 
+/* In tray rows on the picker list: the pill (and Resolve) sit at the row's end, in the room the list
+   keeps clear for them, so the date column lines up from row to row */
+.wb-desk-trail {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  /* the row's height centres the pill and Resolve without a transform */
+  pointer-events: none;
+}
+
+.wb-desk-trail > * {
+  pointer-events: auto;
+}
+
+/* the commenter's initials take the badge's 24px so Tên stays under its header */
+.dh-pick-name > .wb-desk-avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.wb-desk-more {
+  padding: 8px 8px 0;
+}
+
 .wb-desk-drawer-head {
   display: flex;
   flex-wrap: wrap;

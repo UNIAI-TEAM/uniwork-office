@@ -226,6 +226,17 @@ describe('DocPickerList: the compact picker variant (UNI-2047 B2)', () => {
     expect(cell('report', 'name')!.querySelector('.uw-pick-row-title')).toBeNull()
   })
 
+  it('iconFor stands in for the file badge of a row that is not a file', async () => {
+    await mount(DOCS, {
+      iconFor: (d) => (d.id === 'note' ? createElement('i', { className: 'mark' }) : null),
+    })
+    expect(cell('note', 'name')!.querySelector('i.mark')).not.toBeNull()
+    expect(cell('note', 'name')!.querySelector('svg, img')).toBeNull()
+    // a null keeps the badge
+    expect(cell('report', 'name')!.querySelector('i.mark')).toBeNull()
+    expect(cell('report', 'name')!.querySelector('img, svg')).not.toBeNull()
+  })
+
   it('marks only the active option selected', async () => {
     await mount(DOCS, { activeId: 'budget' })
     expect(options().map((el) => el.getAttribute('aria-selected'))).toEqual([
