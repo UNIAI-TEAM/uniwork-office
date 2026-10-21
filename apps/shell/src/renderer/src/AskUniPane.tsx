@@ -186,9 +186,10 @@ export function AskUniPane({ visible = true }: { visible?: boolean }): ReactElem
     wasVisibleRef.current = visible
   }, [visible, reloadContext])
 
+  // a hidden pane has no layout box: scroll again when it is shown
   useEffect(() => {
-    bottomRef.current?.scrollIntoView?.({ block: 'end' })
-  }, [turns, pending])
+    if (visible) bottomRef.current?.scrollIntoView?.({ block: 'end' })
+  }, [turns, pending, visible])
 
   // the composer is disabled while an ask is pending: focus moves to Stop, and comes back to the
   // composer when the ask settles, unless the user has put it somewhere else meanwhile
@@ -460,9 +461,7 @@ export function AskUniPane({ visible = true }: { visible?: boolean }): ReactElem
             })}
             {pending ? <p className="askuni-note is-quiet">{t('askUniThinking')}</p> : null}
             {openFailed ? (
-              <p className="askuni-note is-quiet askuni-open-note" role="status">
-                {t('askUniOpenFailed')}
-              </p>
+              <p className="askuni-note is-quiet askuni-open-note">{t('askUniOpenFailed')}</p>
             ) : null}
             <div ref={bottomRef} />
           </div>

@@ -78,7 +78,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  padding: 0 20px;
+  padding: 16px 28px;
 }
 
 .askuni-failed .askuni-note {
@@ -133,6 +133,11 @@
   line-height: 1.65;
   color: var(--text);
   overflow-wrap: anywhere;
+}
+
+/* the shared chat rule indents assistant paragraphs; the body already carries that indent */
+.new-chat-msg.is-assistant.askuni-answer .askuni-answer-body p {
+  padding-inline-start: 0;
 }
 
 .askuni-notice {
@@ -276,7 +281,8 @@
     padding-inline: 16px;
   }
 
-  .askuni-note {
+  .askuni-note,
+  .askuni-failed {
     padding-inline: 16px;
   }
 
