@@ -68,7 +68,7 @@ function showOf(id: string, e: ShortcutKeyEvent): ShowKey | null {
       return 'exit'
     case 'slides-30': {
       const k = typesAscii(e) ? e.key.toLowerCase() : e.code
-      return k === 'b' || k === '.' || k === 'KeyB' ? 'black' : 'white'
+      return k === 'b' || k === '.' || k === 'KeyB' || k === 'Period' ? 'black' : 'white'
     }
     default:
       return null
