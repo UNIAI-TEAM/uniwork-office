@@ -36,6 +36,8 @@ export function screenOfSubView(subView: DocumentsHomeSubViewId): DocListScreen 
       return 'shelved'
     case 'trash':
       return 'trash'
+    case 'elsewhere':
+      return 'elsewhere'
     case 'workspace':
     case 'my-folder':
     default:

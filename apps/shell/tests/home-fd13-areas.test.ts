@@ -532,7 +532,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
     expect(host.querySelector('.folder-panel')).toBeNull()
     expect(host.textContent).toContain('Root Cloud Doc.docx')
 
-    // DocumentsHome sub-nav in UniWork area renders the 7 available entries (My Folder is a tree row; Lưu trữ since UNI-1961; Gắn sao since UNI-2047 B6)
+    // DocumentsHome sub-nav in UniWork area renders the 8 available entries (My Folder is a tree row; Lưu trữ since UNI-1961; Gắn sao since UNI-2047 B6)
     const uwNavIds = Array.from(host.querySelectorAll<HTMLElement>('.home-area-nav .nav-item')).map(
       (el) => el.getAttribute('data-nav'),
     )
@@ -544,6 +544,7 @@ describe('FD-13 Home two-area frame (UniWork / On this device)', () => {
       'shared-by-me',
       'archive',
       'trash',
+      'elsewhere',
     ])
 
     // Open "Alpha Folder" in the UniWork tree

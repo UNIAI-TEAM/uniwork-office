@@ -50,6 +50,11 @@ export const it = {
   dlSegEdited: 'Modificati',
   dlRecentSubtitle: 'Documenti che hai aperto o modificato negli ultimi 30 giorni',
   dlSearchIn: 'Cerca in {name}',
+  dlNavElsewhere: 'Da altrove',
+  dlElsewhereSubtitle:
+    'File inviati nella chat, nelle riunioni, nelle e-mail e nelle attività di questo spazio di lavoro',
+  dlElsewhereEmpty:
+    'Ancora nessun file. Qui compaiono i file di chat, attività, riunioni ed e-mail che puoi vedere.',
   dlContinueTitle: 'Continua',
   dlGroupCountOne: '{n} documento',
   dlGroupCountOther: '{n} documenti',

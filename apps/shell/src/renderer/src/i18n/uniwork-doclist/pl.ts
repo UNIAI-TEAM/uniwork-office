@@ -50,6 +50,11 @@ export const pl = {
   dlSegEdited: 'Edytowane',
   dlRecentSubtitle: 'Dokumenty otwarte lub edytowane przez Ciebie w ciągu ostatnich 30 dni',
   dlSearchIn: 'Szukaj w: {name}',
+  dlNavElsewhere: 'Z innych miejsc',
+  dlElsewhereSubtitle:
+    'Pliki wysłane na czacie, w spotkaniach, poczcie i zadaniach tej przestrzeni roboczej',
+  dlElsewhereEmpty:
+    'Nie ma jeszcze plików. Pojawią się tu pliki z czatu, zadań, spotkań i poczty, do których masz dostęp.',
   dlContinueTitle: 'Kontynuuj',
   dlGroupCountOne: 'Dokumenty: {n}',
   dlGroupCountOther: 'Dokumenty: {n}',

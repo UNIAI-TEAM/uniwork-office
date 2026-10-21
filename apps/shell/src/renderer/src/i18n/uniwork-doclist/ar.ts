@@ -50,6 +50,11 @@ export const ar = {
   dlSegEdited: 'معدّل',
   dlRecentSubtitle: 'المستندات التي فتحتها أو عدّلتها خلال آخر 30 يومًا',
   dlSearchIn: 'البحث في {name}',
+  dlNavElsewhere: 'من أماكن أخرى',
+  dlElsewhereSubtitle:
+    'الملفات المرسلة في الدردشة والاجتماعات والبريد الإلكتروني والمهام في مساحة العمل هذه',
+  dlElsewhereEmpty:
+    'لا توجد ملفات بعد. تظهر هنا ملفات الدردشة والمهام والاجتماعات والبريد الإلكتروني التي يمكنك الاطلاع عليها.',
   dlContinueTitle: 'المتابعة',
   dlGroupCountOne: 'المستندات: {n}',
   dlGroupCountOther: 'المستندات: {n}',

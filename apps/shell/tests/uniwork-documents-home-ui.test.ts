@@ -319,6 +319,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'shared-by-me',
       'archive',
       'trash',
+      'elsewhere',
     ])
     expect(navButtons.map((b) => b.textContent?.trim())).toEqual([
       'Tài liệu của workspace',
@@ -328,6 +329,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       'Tôi đã chia sẻ',
       'Lưu trữ',
       'Thùng rác',
+      'Từ nơi khác',
     ])
 
     // 2. Top toolbar: h1 title, workspace switcher, search input, Tải lên, Tạo mới

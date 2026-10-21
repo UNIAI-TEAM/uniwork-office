@@ -88,6 +88,7 @@ import {
   hasActiveFilters,
   mergeNewestFirst,
   rowMatchesType,
+  sourceAuthorsOf,
   sourceMatchesFilters,
   splitAndSortItems,
   toUniworkListFilters,
@@ -253,6 +254,23 @@ function SubNavIcon({ id }: { id: DocumentsHomeSubViewId }) {
           <path d="M10 12h4" />
         </svg>
       )
+    case 'elsewhere':
+      // an inbox tray: files that arrived from the other modules
+      return (
+        <svg
+          className="dh-nav-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+          <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+        </svg>
+      )
     case 'trash':
     default:
       return (
@@ -355,10 +373,13 @@ export function DocumentsHome({
   // UNI-1961: the workspace root also lists the files of the other modules
   // (the web's "other sources"), paged on their own
   const [sources, setSources] = useState<{
+    /** the read of the first page: Từ nơi khác shows it; the root merge ignores a failed one */
+    status: 'idle' | 'loading' | 'ready' | 'error'
+    error?: UniworkDocErrorCode
     items: UniworkSourceFile[]
     nextCursor: string | null
     loadingMore: boolean
-  }>({ items: [], nextCursor: null, loadingMore: false })
+  }>({ status: 'idle', items: [], nextCursor: null, loadingMore: false })
   const [knownAuthors, setKnownAuthors] = useState<readonly UpdatedByOption[]>([])
 
   // Dialogs & inline actions
@@ -713,26 +734,62 @@ export function DocumentsHome({
   // UNI-1961: as on the web, the sources merge only at the workspace root (no
   // folder, no search); a failed sources read (an older server's 404/501 or any
   // other) leaves the documents as they are
-  const sourcesWanted =
+  const rootSourcesWanted =
     subView === 'workspace' &&
     folderId === null &&
     query.length === 0 &&
     // UniNote is no file: the other-source list has nothing to show under it
     filters.format !== 'page'
+  // UNI-2047 B4: the Từ nơi khác page lists the same rows on their own (a search lists the
+  // workspace hits, as on every screen)
+  const elsewhereView = subView === 'elsewhere' && query.length === 0
+  const sourcesWanted = rootSourcesWanted || elsewhereView
   const sourcesSeqRef = useRef(0)
   useEffect(() => {
     const seq = ++sourcesSeqRef.current
-    setSources({ items: [], nextCursor: null, loadingMore: false })
+    setSources({
+      status: sourcesWanted ? 'loading' : 'idle',
+      items: [],
+      nextCursor: null,
+      loadingMore: false,
+    })
     if (!sourcesWanted) return
     const api = window.aiOffice as unknown as DocumentsHomeApiAdapter
     void fetchDocumentsHomeSources(api, { workspaceId, filters: wireFilters })
       .then((res) => {
-        if (sourcesSeqRef.current !== seq || !res?.ok) return
-        setSources({ items: res.value.items, nextCursor: res.value.nextCursor, loadingMore: false })
+        if (sourcesSeqRef.current !== seq) return
+        setSources(
+          res?.ok
+            ? {
+                status: 'ready',
+                items: res.value.items,
+                nextCursor: res.value.nextCursor,
+                loadingMore: false,
+              }
+            : {
+                status: 'error',
+                // a bridge without the call reads as a server that cannot answer
+                error: res ? res.error : 'server_error',
+                items: [],
+                nextCursor: null,
+                loadingMore: false,
+              },
+        )
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (sourcesSeqRef.current !== seq) return
+        setSources({
+          status: 'error',
+          error: 'network',
+          items: [],
+          nextCursor: null,
+          loadingMore: false,
+        })
+      })
   }, [workspaceId, sourcesWanted, wireFilters, listTick])
-  const sourcesMerged = sourcesWanted && sources.items.length > 0
+  const sourcesMerged = rootSourcesWanted && sources.items.length > 0
+  // the source rows have a next page to ask for: merged into the root, or the whole page
+  const sourcesPaged = sourcesMerged || elsewhereView
 
   const loadMoreSources = () => {
     const cursor = sources.nextCursor
@@ -746,6 +803,7 @@ export function DocumentsHome({
         setSources((prev) =>
           res?.ok
             ? {
+                ...prev,
                 items: [...prev.items, ...res.value.items],
                 nextCursor: res.value.nextCursor,
                 loadingMore: false,
@@ -760,7 +818,7 @@ export function DocumentsHome({
 
   const loadMore = () => {
     // UNI-1961: "Load more" asks both lists for their next page (the web's rule)
-    if (sourcesMerged) loadMoreSources()
+    if (sourcesPaged) loadMoreSources()
     if (!page.nextCursor || page.loadingMore || page.status !== 'ready') return
     const cursor = page.nextCursor
     const seq = listSeqRef.current
@@ -1244,7 +1302,16 @@ export function DocumentsHome({
   const starredView = subView === 'starred' && query.length === 0
   // the trash list proper (a search inside it lists live hits on the plain table)
   const trashView = subView === 'trash' && query.length === 0
-  const pageShown = page.status !== 'error' && (page.status === 'ready' || page.items.length > 0)
+  const pageShown = elsewhereView
+    ? page.status !== 'error' && sources.status === 'ready'
+    : page.status !== 'error' && (page.status === 'ready' || page.items.length > 0)
+  // the read that failed, for the error state: the sources' on Từ nơi khác, else the page's
+  const listError: UniworkDocErrorCode | null =
+    elsewhereView && sources.status === 'error'
+      ? (sources.error ?? 'server_error')
+      : page.status === 'error'
+        ? (page.error ?? 'server_error')
+        : null
   const [shelvedBy, setShelvedBy] = useState<string | null>(null)
   useEffect(() => {
     setShelvedBy(null)
@@ -1655,6 +1722,14 @@ export function DocumentsHome({
     // Người sửa / Cập nhật run on what is loaded
     const typed = (rows: DocumentsHomeTableRow[]) =>
       rows.filter((row) => rowMatchesType(row, filters.format))
+    // Từ nơi khác: the source files alone; Người sửa / Cập nhật run on what is loaded
+    if (elsewhereView) {
+      return typed(
+        sources.items
+          .filter((source) => sourceMatchesFilters(source, wireFilters))
+          .map((source) => ({ type: 'source' as const, id: `source:${source.id}`, source })),
+      )
+    }
     if (shelfView) {
       return typed(
         filterByShelver(page.items, shelvedBy)
@@ -1686,6 +1761,7 @@ export function DocumentsHome({
   }, [
     shelfView,
     starredView,
+    elsewhereView,
     shelvedBy,
     sourcesMerged,
     files,
@@ -1746,6 +1822,8 @@ export function DocumentsHome({
         return 'uhEmptySharedByMe'
       case 'trash':
         return 'uhEmptyTrash'
+      case 'elsewhere':
+        return 'dlElsewhereEmpty'
       case 'workspace':
       default:
         return folderId ? 'uhEmptyFolder' : 'uhEmptyWorkspace'
@@ -1886,6 +1964,11 @@ export function DocumentsHome({
   const searchLabel = recentView
     ? t('dlSearchIn', { name: currentHeading })
     : t('uhSearchPlaceholder')
+  const subtitleKey = recentView
+    ? 'dlRecentSubtitle'
+    : subView === 'elsewhere'
+      ? 'dlElsewhereSubtitle'
+      : null
   const continueDocs =
     recentView && !query && !hasActiveFilters(filters) && recentSegment === 'all'
       ? continueDocsOf(page.status === 'error' ? [] : page.items)
@@ -1950,9 +2033,9 @@ export function DocumentsHome({
               }
             />
           ) : (
-            <div className={`dh-title-group${recentView ? ' dh-title-stack' : ''}`}>
+            <div className={`dh-title-group${subtitleKey ? ' dh-title-stack' : ''}`}>
               <h1 className="dh-title">{currentHeading}</h1>
-              {recentView && <p className="dh-subtitle">{t('dlRecentSubtitle')}</p>}
+              {subtitleKey && <p className="dh-subtitle">{t(subtitleKey)}</p>}
             </div>
           )}
           {workspaces.length > 0 && (
@@ -2051,7 +2134,7 @@ export function DocumentsHome({
           </div>
         </div>
 
-        {subView !== 'trash' && subView !== 'archive' && (
+        {subView !== 'trash' && subView !== 'archive' && subView !== 'elsewhere' && (
           <div className="dh-quick-row">
             <span className="dh-quick-label">{t('uhQuickCreate')}</span>
             {QUICK_CREATE_KINDS.map((kind) => (
@@ -2127,8 +2210,13 @@ export function DocumentsHome({
           filters={filters}
           onChange={setFilters}
           authors={
-            subView === 'shared-with-me' ? collectUpdatedByOptions(page.items) : knownAuthors
+            subView === 'shared-with-me'
+              ? collectUpdatedByOptions(page.items)
+              : subView === 'elsewhere'
+                ? sourceAuthorsOf(sources.items)
+                : knownAuthors
           }
+          hideTypes={subView === 'elsewhere' ? ['page'] : undefined}
           lead={
             // the segment needs the server's last_activity: without it (or an empty pick) it is not offered
             recentView && (recentSegment !== 'all' || specialPresent('recent', page.items)) ? (
@@ -2141,7 +2229,8 @@ export function DocumentsHome({
           }
         />
 
-        {page.status === 'loading' && page.items.length === 0 && (
+        {((page.status === 'loading' && page.items.length === 0) ||
+          (elsewhereView && sources.status === 'loading')) && (
           <div className="uw-pick-skeleton" role="status" aria-busy="true">
             <span className="uw-sr-only">{t('uwPickLoading')}</span>
             {[0, 1, 2].map((i) => (
@@ -2155,12 +2244,10 @@ export function DocumentsHome({
           </div>
         )}
 
-        {page.status === 'error' && (
+        {listError && (
           <div className="uw-pick-state" role="alert">
-            <p className="uw-pick-state-title">
-              {t(UNIWORK_ERROR_KEYS[page.error ?? 'server_error'])}
-            </p>
-            {errorActionOf(page.error ?? 'server_error') === 'retry' && (
+            <p className="uw-pick-state-title">{t(UNIWORK_ERROR_KEYS[listError])}</p>
+            {errorActionOf(listError) === 'retry' && (
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -2250,7 +2337,7 @@ export function DocumentsHome({
               className={`dh-section dh-docs-section${shelfView ? ' dh-shelved-section' : ''} uwf-list`}
               aria-label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
             >
-              {!shelfView && !recentView && (
+              {!shelfView && !recentView && !elsewhereView && (
                 <div className="dh-section-head">
                   <span className="dh-section-title">{t('uhSectionDocuments')}</span>
                   <span className="dh-section-count">{tableRows.length}</span>
@@ -2292,7 +2379,13 @@ export function DocumentsHome({
                     onSortChange={setDocSort}
                     selected={selected}
                     onSelectedChange={setSelected}
-                    label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
+                    label={
+                      shelfView
+                        ? t('uhNavArchive')
+                        : elsewhereView
+                          ? currentHeading
+                          : t('uhSectionDocuments')
+                    }
                     openingId={trashView ? null : openingId}
                     openMenuId={openMenuId}
                     onOpenMenuChange={setOpenMenuId}
@@ -2337,7 +2430,7 @@ export function DocumentsHome({
                 </p>
               )}
 
-              {(page.nextCursor || (sourcesMerged && sources.nextCursor)) && (
+              {(page.nextCursor || (sourcesPaged && sources.nextCursor)) && (
                 <div className="dh-load-more-row">
                   <button
                     type="button"

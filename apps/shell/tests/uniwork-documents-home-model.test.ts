@@ -53,7 +53,7 @@ function makeDoc(overrides: Partial<DocumentsHomeDoc> = {}): DocumentsHomeDoc {
 }
 
 describe('DH1-W2 documents-home-model', () => {
-  it('defines the 8 board sub-nav entries in exact order (UNI-1961: archive shown; UNI-2047 B6: starred shown)', () => {
+  it('defines the 9 sub-nav entries in exact order (UNI-1961: archive shown; UNI-2047 B6: starred shown)', () => {
     expect(DOCUMENTS_HOME_NAV_ENTRIES.map((e) => e.id)).toEqual([
       'workspace',
       'my-folder',
@@ -63,6 +63,7 @@ describe('DH1-W2 documents-home-model', () => {
       'shared-by-me',
       'archive',
       'trash',
+      'elsewhere',
     ])
 
     const starred = getDocumentsHomeNavEntry('starred')
@@ -83,6 +84,7 @@ describe('DH1-W2 documents-home-model', () => {
       'shared-by-me',
       'archive',
       'trash',
+      'elsewhere',
     ])
   })
 

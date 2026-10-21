@@ -50,6 +50,11 @@ export const cs = {
   dlSegEdited: 'Upravené',
   dlRecentSubtitle: 'Dokumenty, které jste za posledních 30 dní otevřeli nebo upravili',
   dlSearchIn: 'Hledat v: {name}',
+  dlNavElsewhere: 'Odjinud',
+  dlElsewhereSubtitle:
+    'Soubory odeslané v chatu, schůzkách, e-mailu a úkolech tohoto pracovního prostoru',
+  dlElsewhereEmpty:
+    'Zatím žádné soubory. Zobrazí se tu soubory z chatu, úkolů, schůzek a e-mailu, které můžete číst.',
   dlContinueTitle: 'Pokračovat',
   dlGroupCountOne: 'Dokumenty: {n}',
   dlGroupCountOther: 'Dokumenty: {n}',

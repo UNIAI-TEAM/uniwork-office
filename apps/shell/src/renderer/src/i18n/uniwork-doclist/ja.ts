@@ -50,6 +50,10 @@ export const ja = {
   dlSegEdited: '編集した項目',
   dlRecentSubtitle: '過去 30 日間に開いた、または編集したドキュメント',
   dlSearchIn: '{name} 内を検索',
+  dlNavElsewhere: '他の場所から',
+  dlElsewhereSubtitle: 'このワークスペースのチャット、会議、メール、タスクで送られたファイル',
+  dlElsewhereEmpty:
+    'ファイルはまだありません。閲覧できるチャット、タスク、会議、メールのファイルがここに表示されます。',
   dlContinueTitle: '続きから',
   dlGroupCountOne: '{n} 件のドキュメント',
   dlGroupCountOther: '{n} 件のドキュメント',
