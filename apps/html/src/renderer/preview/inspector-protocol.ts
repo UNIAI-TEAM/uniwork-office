@@ -20,6 +20,17 @@ export type ToInspector =
   | { type: 'gx:scrollTo'; y: number }
   /** claim = relay mod+P as the 'print' key command and suppress the browser's own dialog */
   | { type: 'gx:printKey'; claim: boolean }
+  /** chords the host replays for a key pressed in the frame: the frame cancels the browser's own action for them (web) */
+  | {
+      type: 'gx:keyClaims'
+      claims: Array<{
+        key: string
+        ctrlKey: boolean
+        altKey: boolean
+        shiftKey: boolean
+        metaKey: boolean
+      }>
+    }
 
 /** effective styles of the selected element (px numbers without unit, colours as #rrggbb, '' when transparent) */
 export interface ComputedSnapshot {

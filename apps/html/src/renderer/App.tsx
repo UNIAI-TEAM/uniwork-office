@@ -19,7 +19,12 @@ import {
 } from '@genoffice/electron-utils/headless-export'
 import { useI18n } from './i18n/locale'
 import { cap, platform } from './capabilities'
-import { htmlFrameKeyReplay, htmlWindowCommand, type HtmlShortcutCommand } from './shortcuts'
+import {
+  createHtmlFrameKeyReplay,
+  htmlFrameKeyClaims,
+  htmlWindowCommand,
+  type HtmlShortcutCommand,
+} from './shortcuts'
 import { LinkPopover } from './components/LinkPopover'
 import { uniworkBoundForAi } from '@genoffice/ui/capabilities'
 import { useNarrowFrame } from './narrow-frame'
@@ -745,6 +750,7 @@ export default function App() {
 
   // runPrint is declared further down; the inspector's relayed mod+P reaches it through this ref
   const runPrintRef = useRef<() => Promise<boolean>>(async () => false)
+  const frameKeyReplayRef = useRef(createHtmlFrameKeyReplay())
   const onInspectorMessage = useCallback(
     (msg: FromInspector) => {
       // a click that lands while the frame is reloading carries sids from the previous copy
@@ -773,6 +779,7 @@ export default function App() {
             type: 'gx:printKey',
             claim: !!window.htmlApi.connectPreview && cap('print'),
           })
+          previewRef.current?.post({ type: 'gx:keyClaims', claims: htmlFrameKeyClaims() })
           // an edit reloaded the page under the reader: put it back where it was before selecting
           if (frameScrollRef.current !== null)
             previewRef.current?.post({ type: 'gx:scrollTo', y: frameScrollRef.current })
@@ -877,8 +884,12 @@ export default function App() {
           if (canvasModeRef.current !== 'present') setZoom((z) => clampZoom(z - msg.delta * 0.6))
           return
         case 'gx:keyEvent': {
-          // focus is inside the frame: replay the table's app-level keys on the window
-          const replay = htmlFrameKeyReplay(msg)
+          // focus is inside the frame: replay the table's app-level keys on the window; a page can
+          // forge this message, so it needs the frame to hold focus and is rate-limited (shortcuts.ts)
+          const replay = frameKeyReplayRef.current(msg, {
+            frameFocused: !!previewRef.current?.hasFocus(),
+            saving: savingRef.current,
+          })
           if (replay) window.dispatchEvent(replay)
           return
         }

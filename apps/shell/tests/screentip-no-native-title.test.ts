@@ -1,6 +1,7 @@
 // UNI-2011 fix-win1 #3: hovering the Open card's extension line showed the ScreenTip and a native OS
-// tooltip, because a child span still carried `title=`. A ScreenTip owner (`data-tip`) and anything
-// inside it must not carry a native title: one tooltip only.
+// tooltip, because a child span still carried `title=`. A ScreenTip owner (`data-tip`), anything
+// inside it and any element around it must not carry a native title (the OS shows an ancestor's title
+// too): one tooltip only.
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import ts from 'typescript'
@@ -13,7 +14,7 @@ type Opening = ts.JsxOpeningElement | ts.JsxSelfClosingElement
 const attrNames = (el: Opening) =>
   el.attributes.properties.flatMap((p) => (ts.isJsxAttribute(p) ? [p.name.getText()] : []))
 
-/** `file:line <tag>` of every intrinsic element with a native `title` attribute inside a `data-tip` element */
+/** `file:line <tag>` of every intrinsic element with a native `title` attribute on, inside or around a `data-tip` element */
 export function nativeTitlesInsideScreenTips(file: string, source: string): string[] {
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   const found: string[] = []
@@ -32,12 +33,19 @@ export function nativeTitlesInsideScreenTips(file: string, source: string): stri
     visit(root)
   }
 
-  const walk = (n: ts.Node) => {
-    if (ts.isJsxElement(n) && attrNames(n.openingElement).includes('data-tip')) scan(n)
-    else if (ts.isJsxSelfClosingElement(n) && attrNames(n).includes('data-tip')) scan(n)
-    ts.forEachChild(n, walk)
+  const hasNativeTitle = (el: Opening) =>
+    /^[a-z]/.test(el.tagName.getText()) && attrNames(el).includes('title')
+  // intrinsic ancestors with a native title, outermost first
+  const walk = (n: ts.Node, titled: Opening[]) => {
+    const opening = ts.isJsxElement(n) ? n.openingElement : ts.isJsxSelfClosingElement(n) ? n : null
+    if (opening && attrNames(opening).includes('data-tip')) {
+      scan(n)
+      for (const el of titled) found.push(`${file}:${lineOf(el)} <${el.tagName.getText()}>`)
+    }
+    const next = opening && hasNativeTitle(opening) ? [...titled, opening] : titled
+    ts.forEachChild(n, (child) => walk(child, next))
   }
-  walk(sf)
+  walk(sf, [])
   return [...new Set(found)]
 }
 
@@ -45,15 +53,20 @@ describe('a ScreenTip card carries no native title', () => {
   it('the detector sees a title on a ScreenTip owner and on a descendant', () => {
     const src = `const a = <button data-tip="x"><span title="y">z</span></button>
 const b = <button data-tip="x" title="y" />
-const c = <button title="only native"><span title="y" /></button>`
+const c = <button title="only native"><span title="y" /></button>
+const d = <div title="around"><p><button data-tip="x" /></p></div>`
     expect(nativeTitlesInsideScreenTips('t.tsx', src)).toEqual([
       't.tsx:1 <span>',
       't.tsx:2 <button>',
+      't.tsx:4 <div>',
     ])
   })
 
   it('no renderer file puts a native title on or under a data-tip element', () => {
-    const files = readdirSync(RENDERER).filter((f) => f.endsWith('.tsx'))
+    const files = (readdirSync(RENDERER, { recursive: true }) as string[]).filter((f) =>
+      f.endsWith('.tsx'),
+    )
+    expect(files.length).toBeGreaterThan(5)
     const found = files.flatMap((f) =>
       nativeTitlesInsideScreenTips(f, readFileSync(join(RENDERER, f), 'utf8')),
     )
