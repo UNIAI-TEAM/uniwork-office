@@ -29,7 +29,9 @@ import {
   isBrowserReserved,
   isValidChord,
   mergeRows,
+  pruneUnmapped,
   type ShortcutAction,
+  type UnmappedShortcut,
   type ShortcutPlatform,
   type ShortcutSurface,
 } from '../src/index'
@@ -163,6 +165,38 @@ describe('table locks', () => {
     expect(notes).toEqual([])
   })
 
+  it('no generated unmapped entry names a part the merged table maps (a row entry: no chord anywhere)', () => {
+    const modules = {
+      ...commonTable,
+      ...docsTable,
+      ...htmlTable,
+      ...markdownTable,
+      ...pdfTable,
+      ...sheetsTable,
+      ...shellTable,
+      ...slidesTable,
+    } as unknown as Record<string, readonly UnmappedShortcut[] | undefined>
+    const covered = Object.entries(SHORTCUT_UNMAPPED).flatMap(([scope, entries]) =>
+      entries
+        .filter((entry) => !modules[`${scope}ManualUnmapped`]?.includes(entry))
+        .filter((entry) => {
+          const action = SHORTCUT_TABLES[scope as keyof typeof SHORTCUT_TABLES].find(
+            (a) => a.id === entry.id,
+          )
+          if (action === undefined) return false
+          if (entry.part === 'row') {
+            return SURFACES.some((surface) =>
+              PLATFORMS.some((platform) => chordsFor(action, platform, surface).length > 0),
+            )
+          }
+          const [surface, platform] = entry.part.split('.') as [ShortcutSurface, ShortcutPlatform]
+          return chordsFor(action, platform, surface).length > 0
+        })
+        .map((entry) => `${scope} ${entry.id} ${entry.part}`),
+    )
+    expect(covered).toEqual([])
+  })
+
   it('reserves the Chromium tab and exit keys on both platforms (RS-table L2)', () => {
     expect(isBrowserReserved('Ctrl+Shift+Q', 'win')).toBe(true)
     for (const chord of [
@@ -223,7 +257,10 @@ describe('table locks', () => {
         ...slidesTable,
       } as unknown as Record<string, readonly unknown[]>
       expect(SHORTCUT_UNMAPPED[scope]).toEqual([
-        ...(t[`${scope}Unmapped`] ?? []),
+        ...pruneUnmapped(
+          (t[`${scope}Unmapped`] ?? []) as readonly UnmappedShortcut[],
+          SHORTCUT_TABLES[scope],
+        ),
         ...(t[`${scope}ManualUnmapped`] ?? ['missing export']),
       ])
       expect(SHORTCUT_NOTES[scope]).toEqual([
@@ -242,6 +279,12 @@ describe('table locks', () => {
     expect(find('slides', 'slides-14')).toMatchObject({ win: ['Ctrl+M'], mac: ['Shift+Cmd+N'] })
     // Excel web: the browser keeps Ctrl+PgDn, Microsoft documents Ctrl+Alt+PgDn.
     expect(find('sheets', 'sheets-39')?.webAlt?.win).toBe('Ctrl+Alt+PageDown')
+  })
+
+  it('common-09 (F6 region cycle) ignores a held key (RS-delta-core L3)', () => {
+    const f6 = SHORTCUT_TABLES.common.find((action) => action.id === 'common-09')
+    expect(f6?.win).toEqual(['F6', 'Shift+F6'])
+    expect(f6?.guard.noRepeat).toBe(true)
   })
 })
 
@@ -474,6 +517,66 @@ describe('generator', () => {
       web: { win: [], mac: [] },
       webAlt: { win: 'Alt+Shift+N' },
     })
+  })
+})
+
+describe('pruneUnmapped', () => {
+  const row = (id: string, web: ShortcutAction['web']): ShortcutAction => ({
+    id,
+    scope: 'docs',
+    win: ['Ctrl+O'],
+    mac: ['Cmd+O'],
+    ...(web ? { web } : {}),
+    match: 'key',
+    guard: {},
+  })
+  const entry = (id: string, part: UnmappedShortcut['part']): UnmappedShortcut => ({
+    id,
+    part,
+    reason: 'x',
+  })
+
+  it('drops a generated entry whose surface and platform the table now maps', () => {
+    const table = [row('a', { win: ['Ctrl+O'], mac: [] }), row('b', { win: [], mac: [] })]
+    const generated = [
+      entry('a', 'web.win'),
+      entry('a', 'web.mac'),
+      entry('b', 'web.win'),
+      entry('a', 'desktop.win'),
+      entry('a', 'row'),
+      entry('gone', 'web.win'),
+    ]
+    expect(pruneUnmapped(generated, table)).toEqual([
+      entry('a', 'web.mac'),
+      entry('b', 'web.win'),
+      entry('gone', 'web.win'),
+    ])
+  })
+
+  it('drops a row entry once the merged row has a chord anywhere (RS-delta-core L1)', () => {
+    const webOnly: ShortcutAction = {
+      id: 'w',
+      scope: 'docs',
+      win: [],
+      mac: [],
+      web: { win: [], mac: ['Cmd+K'] },
+      match: 'key',
+      guard: {},
+    }
+    const none: ShortcutAction = { ...webOnly, id: 'n', web: { win: [], mac: [] } }
+    expect(
+      pruneUnmapped(
+        [entry('a', 'row'), entry('w', 'row'), entry('n', 'row')],
+        [row('a', undefined), webOnly, none],
+      ),
+    ).toEqual([entry('n', 'row')])
+  })
+
+  it('counts a webAlt chord as a web key', () => {
+    const alt = { ...row('a', { win: [], mac: [] }), webAlt: { win: 'Ctrl+Alt+O' } }
+    expect(pruneUnmapped([entry('a', 'web.win'), entry('a', 'web.mac')], [alt])).toEqual([
+      entry('a', 'web.mac'),
+    ])
   })
 })
 
