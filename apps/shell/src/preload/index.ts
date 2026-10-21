@@ -92,6 +92,7 @@ import type {
   SignOutProgress,
   SignOutPromptRequest,
 } from '../shared/home-api'
+import { ASKUNI_CHANNELS, asAskUniContext, asAskUniResult } from '../shared/askuni-api'
 import {
   HOME_CHANNELS,
   PROJECT_CHANNELS,
@@ -1218,6 +1219,12 @@ const homeApi: HomeApi = {
         canceled?: boolean
       }
     },
+  },
+  async uniworkAskUni(req) {
+    return asAskUniResult(await ipcRenderer.invoke(ASKUNI_CHANNELS.ask, req))
+  },
+  async uniworkAskUniContext() {
+    return asAskUniContext(await ipcRenderer.invoke(ASKUNI_CHANNELS.context))
   },
   async uniworkListWorkspaces() {
     return asUniworkResult<UniworkWorkspaceRef[]>(

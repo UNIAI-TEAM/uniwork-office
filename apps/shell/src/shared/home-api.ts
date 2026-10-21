@@ -15,6 +15,7 @@ import type {
   OpenRouterKeyStatus,
   UniworkCloudStatus,
 } from '@genoffice/ai-provider'
+import type { AskUniContext, AskUniRequest, AskUniResult } from './askuni-api'
 import type { UpdateChannel, UpdateUiState } from './update-api'
 import type {
   UniworkConflictAction,
@@ -1471,6 +1472,9 @@ export interface HomeApi {
   }): Promise<AiConnectionTestResult>
   /** Local Workbench SQLite store (main-process source of truth) */
   wb: WorkbenchStoreApi
+  /** UNI-2069: Ask UNI over the workspace's documents (shell main, device bearer); see askuni-api.ts */
+  uniworkAskUni(req: AskUniRequest): Promise<AskUniResult>
+  uniworkAskUniContext(): Promise<AskUniContext>
   uniworkListWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>>
   uniworkListDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>>
   /** documents shared directly with me, aggregated across the selected org's workspaces (S17) */
