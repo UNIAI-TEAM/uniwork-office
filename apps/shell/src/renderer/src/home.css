@@ -7646,6 +7646,23 @@ html[dir='rtl'] .quick-title-row {
   outline: none;
 }
 
+/* a divider between the groups of the shared row menu */
+.uw-row-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-subtle);
+}
+
+/* the destructive entry (Move to trash) */
+.uw-row-menu-item.danger {
+  color: var(--danger-text);
+}
+
+.uw-row-menu-item.danger:hover,
+.uw-row-menu-item.danger:focus-visible {
+  background: var(--danger-bg);
+}
+
 /* rename in place */
 .uw-rename {
   display: flex;

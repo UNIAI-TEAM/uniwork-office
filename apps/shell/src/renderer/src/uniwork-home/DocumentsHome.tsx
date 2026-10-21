@@ -103,9 +103,17 @@ import {
   type DocumentsHomeUpdatedPreset,
   type UpdatedByOption,
 } from './documents-home-model'
-import { shelveDocument, trashShelvedDocument, unshelveDocument } from '../uniwork-library-api'
+import {
+  loadDocProperties,
+  shelveDocument,
+  trashShelvedDocument,
+  unshelveDocument,
+} from '../uniwork-library-api'
+import { UniworkDocInfoPanel, type DocInfoLoad } from '../UniworkDocInfoPanel'
 import { ShelvedToolbar, filterByShelver, shelvedDescendantIds } from './ShelvedDocumentsView'
 import { DocList } from '../doclist/DocList'
+import { copyDocLink } from '../doclist/copy-link'
+import { buildRowMenu } from '../doclist/row-menu'
 import type { DocSubline } from '../doclist/DocRow'
 import { screenOfSubView, wireSortOf } from '../doclist/table-model'
 import { useDocListSort } from '../doclist/use-doc-list-sort'
@@ -1395,101 +1403,69 @@ export function DocumentsHome({
     return items
   }
 
-  const docMenuFor = (doc: DocumentsHomeDoc): FolderMenuItem[] => {
-    const items: FolderMenuItem[] = []
-    const archived = doc.archived === true || subView === 'trash'
-    if (archived) {
-      if (doc.canManage) {
-        items.push({
-          id: 'restore',
-          label: t('uwDocRestore'),
-          onSelect: () => void handleRestoreDoc(doc),
-        })
-      }
-      return items
-    }
-    // NET-OFF-01: Open first, then the pin/unpin item (hidden while the capability is off)
-    items.push({
-      id: 'open',
-      label: t('open'),
-      onSelect: () => void openDoc(doc),
-    })
-    // a shelved search hit is read-only: the server refuses its rename / move (409 document_shelved)
-    const shelved = Boolean(doc.shelvedAt)
-    // a page has no file to keep offline
-    const offlineLabel = doc.kind === 'page' || shelved ? null : offlineToggle.labelOf(doc.id)
-    if (offlineLabel) {
-      items.push({
-        id: 'offline',
-        label: offlineLabel,
-        onSelect: () =>
+  // UNI-2047 A4: every row menu comes from the shared rules (doclist/row-menu.ts): the model owns
+  // order, permissions, the delete-last rule; this host only says what it can run
+  const rowMenuFor = (doc: DocumentsHomeDoc): FolderMenuItem[] =>
+    buildRowMenu({
+      screen,
+      doc,
+      label: t,
+      offlineLabel: offlineToggle.labelOf(doc.id),
+      run: {
+        open: () => void openDoc(doc),
+        offline: () =>
           offlineToggle.toggle({
             documentId: doc.id,
             workspaceId: doc.workspaceId ?? workspaceId,
             name: doc.title,
           }),
-      })
-    }
-    if (doc.canEdit !== false && !shelved) {
-      if (doc.canEdit === true) {
-        items.push({
-          id: 'rename',
-          label: t('uwDocRename'),
-          onSelect: () => setDocRename({ doc, error: null, busy: false }),
-        })
-      }
-      items.push({
-        id: 'move',
-        label: t('ufMoveTo'),
-        onSelect: () =>
+        'copy-link': () => void handleCopyLink(doc),
+        rename: () => setDocRename({ doc, error: null, busy: false }),
+        move: () =>
           folderActions.startMove({
             id: doc.id,
-            kind: 'file',
+            kind: doc.kind === 'folder' ? 'folder' : 'file',
             parentId: currentParentOf(doc),
             title: doc.title,
           }),
-      })
-    }
-    // UNI-1961: the web's row Lưu trữ (files and pages here; folder shelve is a residual)
-    if (doc.canManage === true && (doc.kind === 'file' || doc.kind === 'page') && !shelved) {
-      items.push({
-        id: 'shelve',
-        label: t('uhShelvedShelve'),
-        onSelect: () => void handleShelve(doc),
-      })
-    }
-    if (doc.canManage === true) {
-      items.push({
-        id: 'archive',
-        label: t('uwDocArchive'),
-        onSelect: () => setArchiveTarget(doc),
-      })
-    }
-    return items
+        shelve: () => void handleShelve(doc),
+        unshelve: () => void handleUnshelve(doc),
+        // both confirm first: the dialog of the screen the row is on
+        trash: () => (screen === 'shelved' ? setShelvedTrashTarget(doc) : setArchiveTarget(doc)),
+        restore: () => void handleRestoreDoc(doc),
+        details: () => showDetails(doc),
+      },
+    })
+
+  const handleCopyLink = async (doc: DocumentsHomeDoc) => {
+    const copied = await copyDocLink(workspaces, doc.workspaceId || workspaceId, doc.id)
+    const message = t(copied ? 'dlLinkCopied' : 'dlLinkCopyFailed')
+    if (copied) announce(message)
+    setToast({ message, tone: copied ? 'ok' : 'error' })
   }
 
-  // the shelf's ⋯ menu: reading is allowed on a shelved item (a shelved folder never browses);
-  // putting it back or into the trash needs manage or admin scope
-  const shelfMenuFor = (doc: DocumentsHomeDoc): FolderMenuItem[] => {
-    const menu: FolderMenuItem[] = []
-    if (doc.kind !== 'folder') {
-      menu.push({ id: 'open', label: t('open'), onSelect: () => void openDoc(doc) })
-    }
-    if (canManageShelved(doc)) {
-      menu.push(
-        {
-          id: 'unshelve',
-          label: t('uhShelvedUnshelve'),
-          onSelect: () => void handleUnshelve(doc),
-        },
-        {
-          id: 'trash',
-          label: t('uhShelvedMoveToTrash'),
-          onSelect: () => setShelvedTrashTarget(doc),
-        },
-      )
-    }
-    return menu
+  // the row's Xem chi tiết: the properties panel beside the table (read-only, one at a time)
+  const detailsRequest = useRef(0)
+  const [details, setDetails] = useState<{ id: string; title: string; load: DocInfoLoad } | null>(
+    null,
+  )
+  const showDetails = (doc: DocumentsHomeDoc) => {
+    const request = ++detailsRequest.current
+    setDetails({ id: doc.id, title: doc.title, load: { status: 'loading' } })
+    void loadDocProperties(doc.id).then((result) => {
+      if (request !== detailsRequest.current) return
+      setDetails({
+        id: doc.id,
+        title: doc.title,
+        load: result.ok
+          ? { status: 'ready', info: result.value }
+          : { status: 'error', error: result.error },
+      })
+    })
+  }
+  const closeDetails = () => {
+    detailsRequest.current++
+    setDetails(null)
   }
 
   const shelfActionsFor = (doc: DocumentsHomeDoc) => {
@@ -2205,7 +2181,7 @@ export function DocumentsHome({
                   openingId={openingId}
                   openMenuId={openMenuId}
                   onOpenMenuChange={setOpenMenuId}
-                  menuFor={shelfView ? shelfMenuFor : docMenuFor}
+                  menuFor={rowMenuFor}
                   actionsFor={shelfView ? shelfActionsFor : undefined}
                   onOpen={(doc) => void openDoc(doc)}
                   sublineFor={sublineFor}
@@ -2279,6 +2255,21 @@ export function DocumentsHome({
             setUploadModal(false)
           }}
         />
+      )}
+
+      {details && (
+        <aside className="dl-details">
+          <UniworkDocInfoPanel
+            key={details.id}
+            title={details.title}
+            load={details.load}
+            onClose={closeDetails}
+            onRetry={() => {
+              const target = tableRows.find((r) => r.type === 'doc' && r.doc.id === details.id)
+              if (target?.type === 'doc') showDetails(target.doc)
+            }}
+          />
+        </aside>
       )}
 
       {archiveTarget && (

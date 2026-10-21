@@ -641,8 +641,22 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(noManageRow).not.toBeNull()
     expect(canManageRow).not.toBeNull()
 
-    // Row with canManage: false has no action menu trigger at all
-    expect(noManageRow!.querySelector('.uw-row-menu-btn')).toBeNull()
+    // Row with canManage: false has no Khôi phục: its menu is Xem chi tiết only (A4)
+    const readerKebab = noManageRow!.querySelector<HTMLButtonElement>('.uw-row-menu-btn')
+    expect(readerKebab).not.toBeNull()
+    await act(async () => {
+      readerKebab!.click()
+    })
+    await flush()
+    expect(
+      Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
+      ).map((el) => el.textContent?.trim()),
+    ).toEqual(['Xem chi tiết'])
+    await act(async () => {
+      document.body.click()
+    })
+    await flush()
 
     // Row with canManage: true has the action menu trigger with "Khôi phục"
     const manageKebab = canManageRow!.querySelector<HTMLButtonElement>('.uw-row-menu-btn')
@@ -2642,7 +2656,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     await flush()
     const move = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.uw-row-menu-list [role="menuitem"]'),
-    ).find((el) => el.textContent?.trim() === 'Di chuyển tới…')
+    ).find((el) => ['Di chuyển', 'Di chuyển tới…'].includes(el.textContent?.trim() ?? ''))
     expect(move).toBeDefined()
     await act(async () => {
       move!.click()

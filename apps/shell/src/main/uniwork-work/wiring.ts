@@ -112,17 +112,27 @@ export function registerUniworkWork(ipcMain: IpcMain, deps: UniworkWorkDeps): vo
     if (!org?.slug) throw new UniworkDocError('server_error')
     return api().person(org.slug, who.accountId)
   })
-  ipcMain.handle(C.openWeb, async (_event, target: unknown): Promise<boolean> => {
+  /** the full URL of a renderer target, or null (no profile, a bad target, an unparsable origin) */
+  const webUrlOf = (target: unknown): string | null => {
     const profile = deps.profile()
     const path = webPathOf(target)
-    if (!profile || !path) return false
+    if (!profile || !path) return null
     try {
       // shortcut: web origin = API origin (true on the prod edge); dev web runs elsewhere. Upgrade when the server exposes a web origin (C6).
-      const url = `${new URL(profile.apiOrigin).origin}${path}`
+      return `${new URL(profile.apiOrigin).origin}${path}`
+    } catch {
+      return null
+    }
+  }
+  ipcMain.handle(C.openWeb, async (_event, target: unknown): Promise<boolean> => {
+    const url = webUrlOf(target)
+    if (!url) return false
+    try {
       await deps.openExternal(url)
       return true
     } catch {
       return false
     }
   })
+  ipcMain.handle(C.webUrl, (_event, target: unknown): string | null => webUrlOf(target))
 }

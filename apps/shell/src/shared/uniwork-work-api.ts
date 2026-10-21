@@ -191,6 +191,7 @@ export const UNIWORK_WORK_CHANNELS = {
   myProfile: 'uniwork-work:my-profile',
   markNotificationsRead: 'uniwork-work:mark-notifications-read',
   openWeb: 'uniwork-work:open-web',
+  webUrl: 'uniwork-work:web-url',
 } as const
 
 /**
@@ -216,4 +217,6 @@ export interface UniworkWorkApi {
   markNotificationsRead(ids: string[]): Promise<UniworkWorkResult<null>>
   /** false when the target fails validation or no deployment profile is set */
   openWeb(target: WorkWebTarget): Promise<boolean>
+  /** the URL openWeb would open (for Copy link), or null on the same conditions */
+  webUrl(target: WorkWebTarget): Promise<string | null>
 }
