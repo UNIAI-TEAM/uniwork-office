@@ -100,11 +100,12 @@ describe('accessible-name strings carry no chord, in any locale', () => {
 
   it('the Read Mode exit button keeps its whole visible label in every locale', () => {
     for (const lang of LANGS) {
-      const hint = keyHintAfterName(
-        translate(lang, 'appExitReadMode'),
-        translate(lang, 'appExitReadModeName'),
-      )
-      expect(hint, lang).not.toBe('')
+      const label = translate(lang, 'appExitReadMode')
+      const name = translate(lang, 'appExitReadModeName')
+      const hint = keyHintAfterName(label, name)
+      expect(hint.trim(), lang).not.toBe('')
+      // the name plus the aria-hidden hint is the visible label, character for character
+      expect(name + hint, lang).toBe(label)
     }
   })
 })

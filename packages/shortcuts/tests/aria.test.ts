@@ -250,12 +250,23 @@ describe('accessibleShortcutProblems', () => {
 })
 
 describe('keyHintAfterName', () => {
-  it('returns the hint a label carries after its plain name', () => {
-    expect(keyHintAfterName('Exit Read Mode (Esc)', 'Exit Read Mode')).toBe('(Esc)')
+  it('returns the rest of the label after its plain name, leading whitespace included', () => {
+    expect(keyHintAfterName('Exit Read Mode (Esc)', 'Exit Read Mode')).toBe(' (Esc)')
     expect(keyHintAfterName('Quitter le mode Lecture (Échap)', 'Quitter le mode Lecture')).toBe(
-      '(Échap)',
+      ' (Échap)',
     )
+    // no space before a full-width bracket: none is added
     expect(keyHintAfterName('退出演示（Esc）', '退出演示')).toBe('（Esc）')
+  })
+
+  it('name plus hint reproduces the label byte for byte', () => {
+    for (const [label, name] of [
+      ['Exit Read Mode (Esc)', 'Exit Read Mode'],
+      ['退出演示（Esc）', '退出演示'],
+      ['프레젠테이션 종료 (Esc)', '프레젠테이션 종료'],
+    ]) {
+      expect(name + keyHintAfterName(label, name)).toBe(label)
+    }
   })
 
   it('is empty when the label is the name, or does not start with it', () => {

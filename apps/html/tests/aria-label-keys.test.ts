@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { createI18n, LANGS } from '@genoffice/i18n'
-import { findDisplayChord } from '@genoffice/shortcuts'
+import { findDisplayChord, keyHintAfterName } from '@genoffice/shortcuts'
 import { strings } from '../src/renderer/i18n/strings'
 import { htmlPlainLabel } from '../src/renderer/shortcuts'
 
@@ -111,6 +111,17 @@ describe('accessible-name strings carry no chord, in any locale', () => {
       }
     }
     expect(offenders.join('\n')).toBe('')
+  })
+
+  it('the Exit presentation button keeps its whole visible label in every locale', () => {
+    for (const lang of LANGS) {
+      const label = translate(lang, 'presentExit')
+      const name = translate(lang, 'presentExitName')
+      const hint = keyHintAfterName(label, name)
+      expect(hint.trim(), lang).not.toBe('')
+      // the name plus the aria-hidden hint is the visible label, character for character
+      expect(name + hint, lang).toBe(label)
+    }
   })
 
   it('keys wrapped in the plain-label helper are plain once it has run', () => {
