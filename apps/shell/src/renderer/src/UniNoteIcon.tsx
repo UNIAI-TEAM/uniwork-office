@@ -1,0 +1,86 @@
+import { useId, type SVGProps } from 'react'
+
+// The UniNote tile, option J (card UNINOTE-ICON-J, 2026-10-21): the gradient tile,
+// a folded white page, the compact UniWork mark and two text lines. Copied from the
+// web's packages/views/documents/uninote-icon.tsx (web root commit 8be093cdb) so the
+// two apps draw the same pixels. It is a product mark like the Office file marks: fixed
+// brand colours in both themes, never theme tokens.
+
+const RAMP = [
+  { offset: '0', color: '#0044E3' },
+  { offset: '.52', color: '#00B4FC' },
+  { offset: '1', color: '#02DEF5' },
+] as const
+
+// the compact art of the UniWork mark (the web's MARK_COMPACT): always compact, the
+// largest tile in the app is 36px
+const MARK_WIDTH = 128
+const MARK_COMPACT = {
+  heads: [
+    { cx: 15, cy: 14, r: 14 },
+    { cx: 113, cy: 14, r: 14 },
+  ],
+  bodies: [
+    { x: 0, y: 32.6, width: 30, height: 45.4, rx: 15 },
+    { x: 98, y: 32.6, width: 30, height: 45.4, rx: 15 },
+  ],
+  ribbon:
+    'M0 53.552C5.704 56.61 10.55 60.734 15.864 64.353C17.998 65.8 21.289 67.983 23.988 68C26.662 68 29.956 65.83 32.069 64.399C33.694 63.298 35.273 62.127 36.853 60.961C45.141 54.842 53.231 49.244 64 49.2C74.769 49.244 82.859 54.842 91.147 60.961C92.727 62.127 94.306 63.298 95.931 64.399C98.044 65.83 101.338 68 104.012 68C106.711 67.983 110.002 65.8 112.136 64.353C117.45 60.734 122.296 56.61 128 53.552L128 82.541C124.694 84.916 121.302 87.128 117.601 88.844C113.271 90.825 108.847 91.969 104.068 92C93.289 91.981 85.188 86.393 76.893 80.269C75.311 79.101 73.73 77.928 72.103 76.824C69.978 75.382 66.689 73.211 64 73.2C61.311 73.211 58.022 75.382 55.897 76.824C54.27 77.928 52.689 79.101 51.107 80.269C42.812 86.393 34.711 91.981 23.932 92C19.153 91.969 14.729 90.825 10.399 88.844C6.698 87.128 3.306 84.916 0 82.541Z',
+} as const
+
+// where the mark sits on the page, on the 240 grid the Office marks share
+const MARK_X = 76
+const MARK_Y = 82
+const MARK_SCALE = 88 / MARK_WIDTH
+
+export function UniNoteIcon(props: Omit<SVGProps<SVGSVGElement>, 'viewBox' | 'fill'>) {
+  // useId keeps the gradient ids unique, so several icons on one page do not clash
+  const id = useId()
+  const stops = RAMP.map((s) => <stop key={s.offset} offset={s.offset} stopColor={s.color} />)
+  return (
+    <svg aria-hidden="true" focusable="false" {...props} viewBox="0 0 240 240" fill="none">
+      <defs>
+        <linearGradient
+          id={`${id}-tile`}
+          x1={0}
+          y1={240}
+          x2={240}
+          y2={0}
+          gradientUnits="userSpaceOnUse"
+        >
+          {stops}
+        </linearGradient>
+        <linearGradient
+          id={`${id}-mark`}
+          x1={0}
+          y1={0}
+          x2={MARK_WIDTH}
+          y2={0}
+          gradientUnits="userSpaceOnUse"
+        >
+          {stops}
+        </linearGradient>
+      </defs>
+      <rect width="240" height="240" rx="48" fill={`url(#${id}-tile)`} />
+      <path
+        d="M72 36H144L184 76V188a16 16 0 0 1-16 16H72a16 16 0 0 1-16-16V52a16 16 0 0 1 16-16Z"
+        fill="#fff"
+      />
+      <path d="M144 36V64a12 12 0 0 0 12 12H184Z" fill="#A8E4FF" />
+      <g
+        transform={`translate(${MARK_X} ${MARK_Y}) scale(${MARK_SCALE})`}
+        fill={`url(#${id}-mark)`}
+      >
+        {MARK_COMPACT.heads.map((h, i) => (
+          <circle key={`h${i}`} cx={h.cx} cy={h.cy} r={h.r} />
+        ))}
+        {MARK_COMPACT.bodies.map((b, i) => (
+          <rect key={`b${i}`} x={b.x} y={b.y} width={b.width} height={b.height} rx={b.rx} />
+        ))}
+        <path d={MARK_COMPACT.ribbon} />
+      </g>
+      <rect x="76" y="160" width="88" height="12" rx="6" fill="#4FA8FF" opacity={0.7} />
+      <rect x="76" y="180" width="58" height="12" rx="6" fill="#2E7CF0" opacity={0.75} />
+    </svg>
+  )
+}
