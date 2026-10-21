@@ -557,3 +557,65 @@ describe('the sequential fallback (no folder_upload block)', () => {
     expect(out[0].skipped).toContainEqual({ path: 'b.odt', reason: 'unsupported_format' })
   })
 })
+
+describe('FU-FIX1 m1: bounded pre-flights and runs', () => {
+  async function startOne(service: ReturnType<typeof setup>['service'], name: string) {
+    const path = file(name)
+    const out = await service.preflight({ workspaceId: 'w', folderId: 'f1', paths: [path] })
+    const result = service.start(
+      { preflightId: out[0]?.preflightId, shareWithWorkspace: false },
+      () => undefined,
+    )
+    if (!result.ok) throw new Error('start failed')
+    return result.runId
+  }
+
+  it('caps the folders of one drop and reports the rest as one refusal, evicting none of the drop', async () => {
+    const { service } = setup()
+    const dirs: string[] = []
+    for (let i = 0; i < 40; i += 1) {
+      file(`Drop${i}/a.docx`)
+      dirs.push(join(root, `Drop${i}`))
+    }
+    const out = await service.preflight({ workspaceId: 'w', folderId: 'f1', paths: dirs })
+
+    expect(out).toHaveLength(33)
+    expect(out[32]?.refusal).toEqual({ code: 'too_many_folders', limit: 32, actual: 40 })
+    // every pre-flight the renderer got still answers its start
+    for (const sdo of out.slice(0, 32)) {
+      expect(sdo.refusal).toBeNull()
+      expect(
+        service.start({ preflightId: sdo.preflightId, shareWithWorkspace: false }, () => undefined)
+          .ok,
+      ).toBe(true)
+    }
+  })
+
+  it('never evicts a run that is still running', async () => {
+    const { service, batch } = setup()
+    const first = await startOne(service, 'one0.docx')
+    for (let i = 1; i < 34; i += 1) await startOne(service, `one${i}.docx`)
+    service.cancel(first)
+    expect(batch.calls).toEqual([`cancel:${first}`])
+  })
+
+  it('evicts the oldest finished run instead of a running one', async () => {
+    const { service, batch } = setup()
+    const first = await startOne(service, 'one0.docx')
+    const second = await startOne(service, 'one1.docx')
+    // finished with failures: kept for retry / dismiss, but the first to go when full
+    batch.started[1]?.opts.onProgress({
+      phase: 'done',
+      done: 0,
+      failed: 1,
+      total: 1,
+      sentBytes: 0,
+      totalBytes: 10,
+      failures: [{ path: 'one1.docx', code: 'network', retryable: true }],
+    })
+    for (let i = 2; i < 33; i += 1) await startOne(service, `one${i}.docx`)
+    service.cancel(first)
+    service.retry(second)
+    expect(batch.calls).toEqual([`cancel:${first}`])
+  })
+})

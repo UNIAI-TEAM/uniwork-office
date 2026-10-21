@@ -86,6 +86,8 @@ interface PreflightRecord {
 
 interface RunRecord {
   port: FolderUploadRunnerPort
+  /** false after a done/failed report (kept for retry) until a retry reports progress again */
+  running: boolean
 }
 
 interface Target {
@@ -128,9 +130,14 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
   const preflights = new Map<string, PreflightRecord>()
   const runs = new Map<string, RunRecord>()
 
-  function sweep(): void {
+  function expire(): void {
     const at = now()
     for (const [id, held] of preflights) if (held.expiresAt <= at) preflights.delete(id)
+  }
+
+  /** room for one more pre-flight: the expired go, then the oldest */
+  function sweep(): void {
+    expire()
     while (preflights.size >= MAX_PREFLIGHTS) {
       const oldest = preflights.keys().next().value
       if (oldest === undefined) break
@@ -311,7 +318,9 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
           : unavailable('files'),
       )
     }
-    for (const dir of groups.dirs) {
+    // a drop never holds more pre-flights than the store keeps, or its own earliest ones would be evicted
+    const room = MAX_PREFLIGHTS - (groups.files.length > 0 ? 1 : 0)
+    for (const dir of groups.dirs.slice(0, room)) {
       if (limits === null) {
         out.push(
           refused('folder', workspaceId, folderId, { code: 'folder_upload_unavailable' }, false),
@@ -321,6 +330,17 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
           target ? await folderPreflight(workspaceId, target, dir, limits) : unavailable('folder'),
         )
       }
+    }
+    if (groups.dirs.length > room) {
+      out.push(
+        refused(
+          'folder',
+          workspaceId,
+          folderId,
+          { code: 'too_many_folders', limit: room, actual: groups.dirs.length },
+          shareAvailable,
+        ),
+      )
     }
     return out
   }
@@ -394,7 +414,7 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
     ) {
       return { ok: false, error: 'invalid_input' }
     }
-    sweep()
+    expire()
     const held = preflights.get(body.preflightId)
     if (!held || held.expiresAt <= now()) return { ok: false, error: 'unknown_preflight' }
     // one Upload press per pre-flight
@@ -417,17 +437,21 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
         progress.phase === 'canceled' ||
         ((progress.phase === 'done' || progress.phase === 'failed') && !progress.failures?.length)
       if (settled) runs.delete(runId)
+      else {
+        const held = runs.get(runId)
+        if (held) held.running = progress.phase !== 'done' && progress.phase !== 'failed'
+      }
       try {
         sink(event)
       } catch {
         // the window that started the run is gone; the run goes on without a view
       }
     }
-    runs.set(runId, { port })
-    while (runs.size > MAX_RUNS) {
-      const oldest = runs.keys().next().value
-      if (oldest === undefined) break
-      runs.delete(oldest)
+    runs.set(runId, { port, running: true })
+    // only a run that finished (kept for its report) can be forgotten: a running one must stay cancellable
+    for (const [id, held] of runs) {
+      if (runs.size <= MAX_RUNS) break
+      if (!held.running) runs.delete(id)
     }
     emit({
       phase: 'planning',

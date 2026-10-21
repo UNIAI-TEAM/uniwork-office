@@ -16,6 +16,12 @@ const INVALIDATE_EVERY_MS = 2_000
 export const BUSY_WAIT_DEFAULT_S = 30
 /** A 429 on complete/status without Retry-After. */
 const RATE_LIMIT_WAIT_DEFAULT_S = 1
+/** The longest the runner sleeps on a server-sent Retry-After; the value shown to the user is not clamped. */
+const MAX_RETRY_AFTER_S = 120
+
+/** A server-sent wait in seconds as the sleep it earns: never more than MAX_RETRY_AFTER_S. */
+export const retryAfterMs = (seconds: number): number =>
+  Math.min(seconds, MAX_RETRY_AFTER_S) * 1_000
 
 function abortError(): DOMException {
   return new DOMException('Aborted', 'AbortError')
@@ -24,15 +30,15 @@ function abortError(): DOMException {
 export function sleep(ms: number, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.reject(abortError())
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms)
-    signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer)
-        reject(abortError())
-      },
-      { once: true },
-    )
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(abortError())
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal.addEventListener('abort', onAbort, { once: true })
   })
 }
 
@@ -112,7 +118,7 @@ export function batchEnd(err: unknown): 'expired' | 'canceled' | null {
 
 /** How long a 429 asks to wait: its Retry-After, else a second. */
 export function rateLimitWaitMs(err: FolderUploadApiError): number {
-  return (err.retryAfterSeconds ?? RATE_LIMIT_WAIT_DEFAULT_S) * 1_000
+  return retryAfterMs(err.retryAfterSeconds ?? RATE_LIMIT_WAIT_DEFAULT_S)
 }
 
 /**

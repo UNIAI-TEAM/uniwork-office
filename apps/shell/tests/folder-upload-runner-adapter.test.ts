@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -361,6 +361,30 @@ describe('partial failure, retry and dismiss', () => {
     expect(h.transport.calls.filter((c) => c.method === 'status')).toHaveLength(0)
   })
 
+  it('dismiss of a run with failures cancels its open batch on the server, once', async () => {
+    const { h, runId } = await failedRun()
+    const cancels = () => h.transport.calls.filter((c) => c.method === 'cancel')
+    expect(cancels()).toHaveLength(0)
+    const count = h.events.length
+    h.service.dismiss(runId)
+    await vi.waitFor(() => expect(cancels()).toHaveLength(1))
+    h.service.dismiss(runId)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(cancels()).toHaveLength(1)
+    // the dismissed report is not followed by a second terminal event
+    expect(h.events).toHaveLength(count)
+  })
+
+  it('dismiss of a clean done run sends no cancel', async () => {
+    const h = setup()
+    file('Docs/a.docx')
+    const runId = startRun(h, await pickFolder(h))
+    await settled(h)
+    h.service.dismiss(runId)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(h.transport.calls.some((c) => c.method === 'cancel')).toBe(false)
+  })
+
   it('a file deleted after the pre-flight fails as retryable unreadable', async () => {
     const h = setup()
     file('Docs/a.docx')
@@ -625,5 +649,59 @@ describe('port contract', () => {
       opts,
     )
     expect(handle).toEqual({ runId: 'r1' })
+  })
+})
+
+describe('a file that changes after the pre-flight', () => {
+  const puts = (h: Harness) => h.transport.calls.filter((c) => c.method === 'put')
+
+  it('a file replaced by a symlink is never followed: unreadable, not retryable, no bytes sent', async () => {
+    const h = setup()
+    file('Docs/a.docx')
+    const swapped = file('Docs/b.docx')
+    const outside = file('outside.docx', 10)
+    const preflight = await pickFolder(h)
+    rmSync(swapped)
+    symlinkSync(outside, swapped)
+    startRun(h, preflight)
+
+    const last = await settled(h)
+
+    expect(last).toMatchObject({ phase: 'done', done: 1, failed: 1 })
+    expect(last.failures).toEqual([{ path: 'Docs/b.docx', code: 'unreadable', retryable: false }])
+    expect(puts(h)).toHaveLength(1)
+  })
+
+  it('a large file replaced by a symlink is refused at the probe, never read', async () => {
+    const h = setup({ runLimits: { ...RUN_LIMITS, chunkedThresholdBytes: 5 } })
+    file('Docs/a.txt', 10)
+    const swapped = file('Docs/b.txt', 10)
+    const outside = file('outside.txt', 10)
+    const preflight = await pickFolder(h)
+    rmSync(swapped)
+    symlinkSync(outside, swapped)
+    startRun(h, preflight)
+
+    const last = await settled(h)
+
+    expect(last.failures).toEqual([{ path: 'Docs/b.txt', code: 'unreadable', retryable: false }])
+    expect(last).toMatchObject({ phase: 'done', done: 1, failed: 1 })
+    const plan = planBody(h)
+    expect(plan.files.map((f) => f.filename)).toEqual(['a.txt'])
+  })
+
+  it('a file that grew is a final size_changed failure, not a PUT that fails at complete', async () => {
+    const h = setup()
+    file('Docs/a.docx', 10)
+    const grown = file('Docs/b.docx', 10)
+    const preflight = await pickFolder(h)
+    writeFileSync(grown, Buffer.alloc(25, 1))
+    startRun(h, preflight)
+
+    const last = await settled(h)
+
+    expect(last).toMatchObject({ phase: 'done', done: 1, failed: 1 })
+    expect(last.failures).toEqual([{ path: 'Docs/b.docx', code: 'size_changed', retryable: false }])
+    expect(puts(h)).toHaveLength(1)
   })
 })
