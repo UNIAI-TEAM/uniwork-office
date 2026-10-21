@@ -13,6 +13,7 @@ import { Ribbon } from '../src/renderer/components/Ribbon'
 import { parseFromInspector } from '../src/renderer/preview/inspector-validate'
 import {
   createHtmlFrameKeyReplay,
+  hostHasUserActivation,
   htmlFrameKeyClaims,
   htmlFrameKeyReplay,
 } from '../src/renderer/shortcuts'
@@ -119,6 +120,10 @@ describe('the inspector relays app-level keys from inside the frame', () => {
   it('cancels the browser default for a chord the host claimed, and only that one', () => {
     const { press, send } = makeFrame()
     const claims = [
+      null,
+      'f',
+      { ctrlKey: true },
+      { key: 7 },
       { key: 'f', ctrlKey: true, altKey: false, shiftKey: false, metaKey: false },
       { key: '\\', ctrlKey: true, altKey: false, shiftKey: false, metaKey: false },
     ]
@@ -250,12 +255,44 @@ describe('a forged key message cannot drive the app', () => {
   const ctrlShiftS = relayed({ key: 'S', code: 'KeyS', ctrlKey: true, shiftKey: true })
   const f12 = relayed({ key: 'F12', code: 'F12' })
   const ctrlF = relayed({ key: 'f', code: 'KeyF', ctrlKey: true })
-  const web = { platform: 'win', surface: 'web', saving: false, frameFocused: true } as const
+  const web = {
+    platform: 'win',
+    surface: 'web',
+    saving: false,
+    frameFocused: true,
+    userActive: true,
+  } as const
 
   it('is dropped unless the preview frame holds the focus', () => {
     const replay = createHtmlFrameKeyReplay()
     expect(replay(f12, { ...web, frameFocused: false, now: 1000 })).toBeNull()
     expect(replay(f12, { ...web, now: 1001 })).not.toBeNull()
+  })
+
+  it('is dropped unless the host window has transient user activation', () => {
+    const replay = createHtmlFrameKeyReplay()
+    expect(replay(f12, { ...web, userActive: false, now: 1000 })).toBeNull()
+    expect(replay(ctrlF, { ...web, userActive: false, now: 1001 })).toBeNull()
+    // a dropped attempt does not start the gap
+    expect(replay(f12, { ...web, now: 1002 })).not.toBeNull()
+  })
+
+  it('treats a missing userActivation API as active, and reads isActive when present', () => {
+    const nav = navigator as Navigator & { userActivation?: unknown }
+    const had = Object.getOwnPropertyDescriptor(nav, 'userActivation')
+    const set = (value: unknown) =>
+      Object.defineProperty(nav, 'userActivation', { value, configurable: true })
+    try {
+      set(undefined)
+      expect(hostHasUserActivation()).toBe(true)
+      set({ isActive: true })
+      expect(hostHasUserActivation()).toBe(true)
+      set({ isActive: false })
+      expect(hostHasUserActivation()).toBe(false)
+    } finally {
+      if (had) Object.defineProperty(nav, 'userActivation', had)
+      else delete (nav as { userActivation?: unknown }).userActivation
+    }
   })
 
   it('two forged F12 in a row replay once; the same key later replays again', () => {
@@ -265,10 +302,19 @@ describe('a forged key message cannot drive the app', () => {
     expect(replay(f12, { ...web, now: 1400 })).not.toBeNull()
   })
 
-  it('the limit is per command: another command is not held back', () => {
+  it('the limit covers the dialogs only: Save and Save As share it, other commands are not held back', () => {
     const replay = createHtmlFrameKeyReplay()
     expect(replay(f12, { ...web, now: 1000 })).not.toBeNull()
-    expect(replay(ctrlF, { ...web, now: 1001 })).not.toBeNull()
+    expect(replay(ctrlShiftS, { ...web, now: 1001 })).toBeNull()
+    expect(replay(ctrlF, { ...web, now: 1002 })).not.toBeNull()
+  })
+
+  it('real fast taps of Find, Find next and view cycling all replay', () => {
+    const replay = createHtmlFrameKeyReplay()
+    const findNext = relayed({ key: 'g', code: 'KeyG', ctrlKey: true })
+    const cycle = relayed({ key: '\\', code: 'Backslash', ctrlKey: true })
+    for (const [i, key] of [ctrlF, ctrlF, findNext, findNext, cycle, cycle].entries())
+      expect(replay(key, { ...web, now: 1000 + i * 10 })).not.toBeNull()
   })
 
   it('the desktop Ctrl+Shift+S alias is limited the same way', () => {

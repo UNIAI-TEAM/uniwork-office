@@ -21,6 +21,7 @@ import { useI18n } from './i18n/locale'
 import { cap, platform } from './capabilities'
 import {
   createHtmlFrameKeyReplay,
+  hostHasUserActivation,
   htmlFrameKeyClaims,
   htmlWindowCommand,
   type HtmlShortcutCommand,
@@ -885,9 +886,11 @@ export default function App() {
           return
         case 'gx:keyEvent': {
           // focus is inside the frame: replay the table's app-level keys on the window; a page can
-          // forge this message, so it needs the frame to hold focus and is rate-limited (shortcuts.ts)
+          // forge this message, so it needs the frame to hold focus, a real key's user activation on the
+          // host, and Save / Save As are rate-limited (shortcuts.ts)
           const replay = frameKeyReplayRef.current(msg, {
             frameFocused: !!previewRef.current?.hasFocus(),
+            userActive: hostHasUserActivation(),
             saving: savingRef.current,
           })
           if (replay) window.dispatchEvent(replay)

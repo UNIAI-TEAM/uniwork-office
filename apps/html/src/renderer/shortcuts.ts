@@ -210,36 +210,60 @@ export function htmlFrameKeyReplay(
   return (command && FRAME_REPLAYED.has(command)) || collapse ? event : null
 }
 
-/** shortest time between two replays of one command; a page script can forge the relay message */
+/**
+ * shortest time between two replays of Save / Save As (the commands that open a dialog); a page
+ * script can forge the relay message. Find next, find and view cycling are not limited: a person
+ * taps them faster than this, and the host's own window handler has no limit either.
+ */
 const REPLAY_MIN_GAP_MS = 250
 
 /**
+ * Whether the host window has transient user activation (a real key or click in the last few
+ * seconds). A key typed inside the cross-origin preview frame counts: HTML Standard, "activation
+ * notification steps" (user activation processing model): on an activation triggering input event
+ * ("keydown" that is trusted, not Esc and not a user-agent reserved shortcut) the user agent sets
+ * the last activation timestamp of the document's window AND "the active window of each of
+ * document's ancestor navigables", with no origin check (only descendants are filtered by origin).
+ * Chromium and Electron implement this, so the host window is active for every key a person types in
+ * the frame, while a page script firing on a timer gets none. A missing API (jsdom, old engines) is
+ * treated as active.
+ */
+export function hostHasUserActivation(): boolean {
+  return (
+    (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation
+      ?.isActive !== false
+  )
+}
+
+/**
  * The host side of the relay: `htmlFrameKeyReplay` behind the checks a real keystroke passes and a
- * forged message does not. The keystroke put focus on the iframe element, so a page script cannot
- * drive a command while the user is elsewhere; Save / Save As are dropped while a save is
- * running; and a command replays at most once per `REPLAY_MIN_GAP_MS`.
+ * forged message does not. The keystroke put focus on the iframe element and gave the host window
+ * transient user activation, so a page script can neither drive a command while the user is
+ * elsewhere nor on a timer while they read; Save / Save As are dropped while a save is running and
+ * replay at most once per `REPLAY_MIN_GAP_MS`.
  */
 export function createHtmlFrameKeyReplay() {
-  const lastAt = new Map<string, number>()
+  let lastDialogAt: number | undefined
   return (
     relayed: Parameters<typeof htmlFrameKeyReplay>[0],
     ctx: {
       frameFocused: boolean
+      userActive: boolean
       saving: boolean
       now?: number
       platform?: ShortcutPlatform
       surface?: ShortcutSurface
     },
   ): KeyboardEvent | null => {
-    if (!ctx.frameFocused) return null
+    if (!ctx.frameFocused || !ctx.userActive) return null
     const event = htmlFrameKeyReplay(relayed, ctx.platform, ctx.surface)
     if (!event) return null
     const command = htmlShortcutCommand(event, ctx.platform, ctx.surface) ?? 'collapse'
-    if (ctx.saving && (command === 'save' || command === 'saveAs')) return null
+    if (command !== 'save' && command !== 'saveAs') return event
+    if (ctx.saving) return null
     const now = ctx.now ?? Date.now()
-    const last = lastAt.get(command)
-    if (last !== undefined && now - last < REPLAY_MIN_GAP_MS) return null
-    lastAt.set(command, now)
+    if (lastDialogAt !== undefined && now - lastDialogAt < REPLAY_MIN_GAP_MS) return null
+    lastDialogAt = now
     return event
   }
 }

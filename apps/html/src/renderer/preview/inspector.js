@@ -1248,7 +1248,9 @@
         claimPrint = msg.claim === true
         break
       case 'gx:keyClaims':
-        keyClaims = Array.isArray(msg.claims) ? msg.claims.slice(0, 32) : []
+        keyClaims = Array.isArray(msg.claims)
+          ? msg.claims.filter((c) => c && typeof c.key === 'string').slice(0, 32)
+          : []
         break
       case 'gx:theme':
         dark = !!msg.dark
