@@ -18,8 +18,13 @@ type PageResult = UniworkWorkResult<WorkNotificationDocumentPage> | null
 
 /** a failed or throwing bridge call reads as no page */
 const fetchPage = (id: string, cursor: string | null): Promise<PageResult> =>
-  window.uniworkWork
-    .notificationDocuments(id, cursor ? { cursor, limit: PAGE_LIMIT } : { limit: PAGE_LIMIT })
+  Promise.resolve()
+    .then(() =>
+      window.uniworkWork.notificationDocuments(
+        id,
+        cursor ? { cursor, limit: PAGE_LIMIT } : { limit: PAGE_LIMIT },
+      ),
+    )
     .catch(() => null)
 
 const AlertGlyph = (
@@ -47,10 +52,13 @@ const AlertGlyph = (
 export function DocChangeDialog({
   notificationId,
   onClose,
+  onLoaded,
   returnFocus,
 }: {
   notificationId: string
   onClose: () => void
+  /** the first page arrived: the notice may be marked read (a failed page leaves it unread) */
+  onLoaded?: () => void
   /** where focus lands when the control that opened the list is gone (its row was marked read) */
   returnFocus?: () => HTMLElement | null
 }): ReactElement {
@@ -67,6 +75,8 @@ export function DocChangeDialog({
   onCloseRef.current = onClose
   const returnFocusRef = useRef(returnFocus)
   returnFocusRef.current = returnFocus
+  const onLoadedRef = useRef(onLoaded)
+  onLoadedRef.current = onLoaded
   // the control that opened it, captured before anything inside moves focus
   const [opener] = useState(() =>
     document.activeElement instanceof HTMLElement && document.activeElement !== document.body
@@ -97,6 +107,7 @@ export function DocChangeDialog({
         setDocs(r.value.documents)
         setCursor(r.value.next_cursor)
         setPhase('ready')
+        onLoadedRef.current?.()
       } else setPhase('error')
     })
     return () => {
@@ -137,6 +148,7 @@ export function DocChangeDialog({
       type="button"
       className="wb-btn wb-btn-secondary wb-docchange-more"
       aria-disabled={more === 'busy'}
+      aria-busy={more === 'busy'}
       onClick={loadMore}
     >
       {t(more === 'busy' ? 'wbDocChangeLoadingMore' : 'wbDocChangeLoadMore')}

@@ -396,6 +396,6 @@ export const vi = {
   wbDocChangeDeleted: 'Đã xóa vĩnh viễn',
   wbDocChangeInTrash: 'Đã chuyển vào thùng rác',
   wbDocChangeUntitled: 'Tài liệu chưa có tiêu đề',
-  wbDocChangeViewList: 'Xem {count} tài liệu',
   wbDocChangeMore: 'và {count} tài liệu khác',
+  wbNoticeNoAccess: 'Bạn không có quyền truy cập tài liệu này.',
 } satisfies Record<keyof typeof zh, string>

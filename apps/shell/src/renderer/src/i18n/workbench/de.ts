@@ -63,6 +63,6 @@ export const de = {
   wbDocChangeDeleted: 'Endgültig gelöscht',
   wbDocChangeInTrash: 'In den Papierkorb verschoben',
   wbDocChangeUntitled: 'Unbenanntes Dokument',
-  wbDocChangeViewList: '{count} Dokumente ansehen',
   wbDocChangeMore: 'und {count} weitere',
+  wbNoticeNoAccess: 'Sie haben keinen Zugriff auf dieses Dokument.',
 } satisfies Record<keyof typeof zh, string>

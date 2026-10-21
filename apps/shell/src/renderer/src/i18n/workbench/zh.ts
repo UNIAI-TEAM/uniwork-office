@@ -391,6 +391,6 @@ export const zh = {
   wbDocChangeDeleted: '已永久删除',
   wbDocChangeInTrash: '已移入回收站',
   wbDocChangeUntitled: '未命名文档',
-  wbDocChangeViewList: '查看 {count} 个文档',
   wbDocChangeMore: '还有 {count} 个',
+  wbNoticeNoAccess: '你没有访问此文档的权限。',
 }

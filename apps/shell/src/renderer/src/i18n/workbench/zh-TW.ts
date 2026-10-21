@@ -55,6 +55,6 @@ export const zhTW = {
   wbDocChangeDeleted: '已永久刪除',
   wbDocChangeInTrash: '已移至垃圾桶',
   wbDocChangeUntitled: '未命名文件',
-  wbDocChangeViewList: '檢視 {count} 份文件',
   wbDocChangeMore: '還有 {count} 份',
+  wbNoticeNoAccess: '你沒有存取此文件的權限。',
 } satisfies Record<keyof typeof zh, string>

@@ -57,6 +57,6 @@ export const pt = {
   wbDocChangeDeleted: 'Excluído permanentemente',
   wbDocChangeInTrash: 'Movido para a lixeira',
   wbDocChangeUntitled: 'Documento sem título',
-  wbDocChangeViewList: 'Ver {count} documentos',
   wbDocChangeMore: 'e mais {count}',
+  wbNoticeNoAccess: 'Você não tem acesso a este documento.',
 } satisfies Record<keyof typeof zh, string>

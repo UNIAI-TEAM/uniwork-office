@@ -58,6 +58,6 @@ export const hi = {
   wbDocChangeDeleted: 'हमेशा के लिए हटाया गया',
   wbDocChangeInTrash: 'ट्रैश में भेजा गया',
   wbDocChangeUntitled: 'बिना शीर्षक का दस्तावेज़',
-  wbDocChangeViewList: '{count} दस्तावेज़ देखें',
   wbDocChangeMore: 'और {count}',
+  wbNoticeNoAccess: 'आपके पास इस दस्तावेज़ तक पहुँच नहीं है।',
 } satisfies Record<keyof typeof zh, string>

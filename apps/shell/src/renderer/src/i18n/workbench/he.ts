@@ -55,6 +55,6 @@ export const he = {
   wbDocChangeDeleted: 'נמחק לצמיתות',
   wbDocChangeInTrash: 'הועבר לסל המחזור',
   wbDocChangeUntitled: 'מסמך ללא שם',
-  wbDocChangeViewList: 'הצג {count} מסמכים',
   wbDocChangeMore: 'ועוד {count}',
+  wbNoticeNoAccess: 'אין לך גישה למסמך זה.',
 } satisfies Record<keyof typeof zh, string>

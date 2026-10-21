@@ -57,6 +57,6 @@ export const es = {
   wbDocChangeDeleted: 'Eliminado definitivamente',
   wbDocChangeInTrash: 'Movido a la papelera',
   wbDocChangeUntitled: 'Documento sin título',
-  wbDocChangeViewList: 'Ver {count} documentos',
   wbDocChangeMore: 'y {count} más',
+  wbNoticeNoAccess: 'No tienes acceso a este documento.',
 } satisfies Record<keyof typeof zh, string>

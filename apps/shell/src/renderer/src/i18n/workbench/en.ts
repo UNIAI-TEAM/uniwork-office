@@ -390,6 +390,6 @@ export const en = {
   wbDocChangeDeleted: 'Permanently deleted',
   wbDocChangeInTrash: 'Moved to trash',
   wbDocChangeUntitled: 'Untitled document',
-  wbDocChangeViewList: 'View {count} documents',
   wbDocChangeMore: 'and {count} more',
+  wbNoticeNoAccess: 'You don’t have access to this document.',
 } satisfies Record<keyof typeof zh, string>

@@ -57,6 +57,6 @@ export const ms = {
   wbDocChangeDeleted: 'Dipadam secara kekal',
   wbDocChangeInTrash: 'Dipindahkan ke tong sampah',
   wbDocChangeUntitled: 'Dokumen tanpa tajuk',
-  wbDocChangeViewList: 'Lihat {count} dokumen',
   wbDocChangeMore: 'dan {count} lagi',
+  wbNoticeNoAccess: 'Anda tidak mempunyai akses kepada dokumen ini.',
 } satisfies Record<keyof typeof zh, string>

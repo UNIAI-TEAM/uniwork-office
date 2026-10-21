@@ -55,6 +55,6 @@ export const ar = {
   wbDocChangeDeleted: 'حُذف نهائيًا',
   wbDocChangeInTrash: 'نُقل إلى سلة المحذوفات',
   wbDocChangeUntitled: 'مستند بلا عنوان',
-  wbDocChangeViewList: 'عرض {count} مستندات',
   wbDocChangeMore: 'و{count} أخرى',
+  wbNoticeNoAccess: 'ليست لديك صلاحية الوصول إلى هذا المستند.',
 } satisfies Record<keyof typeof zh, string>

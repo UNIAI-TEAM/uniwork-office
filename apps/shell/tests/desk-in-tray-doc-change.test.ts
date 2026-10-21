@@ -209,7 +209,40 @@ describe('document_changed tray row (G6)', () => {
     expect(dialog()!.getAttribute('aria-modal')).toBe('true')
     expect(dialog()!.textContent).toContain('Changed documents')
     expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
-    // read when the list opens, not after a document was picked
+    // read once the first page is loaded, not after a document was picked
+    expect(work.markNotificationsRead).toHaveBeenCalledWith(['n1'])
+  })
+
+  it('keeps the notice unread while the first page is loading or failed, and reads it once loaded', async () => {
+    let release!: (v: ReturnType<typeof page>) => void
+    work.notificationDocuments
+      .mockResolvedValueOnce({ ok: false, error: 'server' })
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          release = resolve
+        }),
+      )
+    await tray([changedMany()])
+    await click(button('Lan renamed 5 documents'))
+    expect(dialog()!.textContent).toContain("Couldn't load the documents")
+    expect(work.markNotificationsRead).not.toHaveBeenCalled()
+    await click(button('Retry'))
+    expect(work.markNotificationsRead).not.toHaveBeenCalled()
+    await act(async () => release(page([docRow('a')])))
+    await flush()
+    expect(work.markNotificationsRead).toHaveBeenCalledTimes(1)
+    expect(work.markNotificationsRead).toHaveBeenCalledWith(['n1'])
+  })
+
+  it('clears a one-document change with no title even when its open fails', async () => {
+    api.uniworkOpenDocument.mockResolvedValueOnce({ ok: false, error: 'forbidden' })
+    await tray([
+      changedOne({ params: { actor: 'Lan', verb: 'access_changed' }, sample_documents: [] }),
+    ])
+    await click(
+      host.querySelector<HTMLElement>('.wb-desk-row-title, .uw-pick-row button, .uw-pick-row'),
+    )
+    expect(api.uniworkOpenDocument).toHaveBeenCalled()
     expect(work.markNotificationsRead).toHaveBeenCalledWith(['n1'])
   })
 
@@ -275,6 +308,31 @@ describe('DocChangeDialog (G7)', () => {
     work.notificationDocuments.mockRejectedValueOnce(new Error('ipc'))
     await openList()
     expect(dialog()!.textContent).toContain("Couldn't load the documents")
+  })
+
+  it('treats a synchronous throw from the bridge as the error state', async () => {
+    work.notificationDocuments.mockImplementationOnce(() => {
+      throw new Error('no bridge')
+    })
+    await openList()
+    expect(dialog()!.textContent).toContain("Couldn't load the documents")
+  })
+
+  it('marks Load more busy while the next page loads', async () => {
+    let release!: (v: ReturnType<typeof page>) => void
+    work.notificationDocuments.mockResolvedValueOnce(page([docRow('a')], 'c1')).mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve
+      }),
+    )
+    await openList()
+    const more = () => dialog()!.querySelector<HTMLElement>('.wb-docchange-more')!
+    expect(more().getAttribute('aria-busy')).not.toBe('true')
+    await click(more())
+    expect(more().getAttribute('aria-busy')).toBe('true')
+    await act(async () => release(page([docRow('b')])))
+    await flush()
+    expect(dialog()!.querySelector('.wb-docchange-more')).toBeNull()
   })
 
   it('says so when no readable document is left', async () => {
@@ -491,7 +549,8 @@ describe('deleted and no-access rows (G9)', () => {
     await tray([comment({ resource_access_lost: true })])
     const row = rowOf('Contract-012')!
     expect(row.className).toContain('is-gone')
-    expect(row.textContent).toContain('You don’t have permission to do that.')
+    expect(row.textContent).toContain('You don’t have access to this document.')
+    expect(row.textContent).not.toContain('permission to do that')
     await click(button('Contract-012'))
     expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
     expect(work.markNotificationsRead).toHaveBeenCalledWith(['c1'])

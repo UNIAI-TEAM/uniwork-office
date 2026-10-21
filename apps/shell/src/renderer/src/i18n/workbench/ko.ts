@@ -59,6 +59,6 @@ export const ko = {
   wbDocChangeDeleted: '영구 삭제됨',
   wbDocChangeInTrash: '휴지통으로 이동됨',
   wbDocChangeUntitled: '제목 없는 문서',
-  wbDocChangeViewList: '문서 {count}개 보기',
   wbDocChangeMore: '외 {count}개',
+  wbNoticeNoAccess: '이 문서에 접근할 권한이 없습니다.',
 } satisfies Record<keyof typeof zh, string>

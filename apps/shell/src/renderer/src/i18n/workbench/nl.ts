@@ -65,6 +65,6 @@ export const nl = {
   wbDocChangeDeleted: 'Definitief verwijderd',
   wbDocChangeInTrash: 'Naar de prullenbak verplaatst',
   wbDocChangeUntitled: 'Naamloos document',
-  wbDocChangeViewList: 'Bekijk {count} documenten',
   wbDocChangeMore: 'en {count} meer',
+  wbNoticeNoAccess: 'Je hebt geen toegang tot dit document.',
 } satisfies Record<keyof typeof zh, string>

@@ -56,6 +56,6 @@ export const cs = {
   wbDocChangeDeleted: 'Trvale smazáno',
   wbDocChangeInTrash: 'Přesunuto do koše',
   wbDocChangeUntitled: 'Dokument bez názvu',
-  wbDocChangeViewList: 'Zobrazit dokumenty: {count}',
   wbDocChangeMore: 'a dalších {count}',
+  wbNoticeNoAccess: 'K tomuto dokumentu nemáte přístup.',
 } satisfies Record<keyof typeof zh, string>

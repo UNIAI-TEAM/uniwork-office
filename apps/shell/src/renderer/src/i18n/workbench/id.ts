@@ -57,6 +57,6 @@ export const id = {
   wbDocChangeDeleted: 'Dihapus permanen',
   wbDocChangeInTrash: 'Dipindahkan ke sampah',
   wbDocChangeUntitled: 'Dokumen tanpa judul',
-  wbDocChangeViewList: 'Lihat {count} dokumen',
   wbDocChangeMore: 'dan {count} lainnya',
+  wbNoticeNoAccess: 'Anda tidak memiliki akses ke dokumen ini.',
 } satisfies Record<keyof typeof zh, string>

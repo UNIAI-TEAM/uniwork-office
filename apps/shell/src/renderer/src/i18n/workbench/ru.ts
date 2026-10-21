@@ -56,6 +56,6 @@ export const ru = {
   wbDocChangeDeleted: 'Удалён окончательно',
   wbDocChangeInTrash: 'Перемещён в корзину',
   wbDocChangeUntitled: 'Документ без названия',
-  wbDocChangeViewList: 'Показать документы: {count}',
   wbDocChangeMore: 'и ещё {count}',
+  wbNoticeNoAccess: 'У вас нет доступа к этому документу.',
 } satisfies Record<keyof typeof zh, string>

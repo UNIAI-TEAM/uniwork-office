@@ -36,6 +36,8 @@ interface NoteState {
   notice: 'deleted' | 'forbidden' | null
   /** no page to open (deleted, trashed or out of reach): the click only marks it read */
   gone: boolean
+  /** a count-1 change with no title: the reader may be unable to open it, so a failed open still clears it */
+  untitled: boolean
 }
 
 /** px the picker keeps clear at a row's end: the pill (and, on a sync problem, Resolve) */
@@ -161,9 +163,8 @@ export function DeskInTray({
 
   const openNote = async (n: WorkNotification, state: NoteState, title: string) => {
     if (state.list) {
-      // the list reads the documents itself; the notice is read as it opens
+      // the list reads the documents itself and marks the notice read once its first page is loaded
       setListFor(n.id)
-      void markRead(n.id)
       return
     }
     if (state.notice) {
@@ -176,9 +177,9 @@ export function DeskInTray({
       await markRead(n.id)
       return
     }
-    // a failed open keeps the reminder
-    if (!(await openUniworkDocument({ documentId: n.resource_id, title }, window.aiOffice))) return
-    await markRead(n.id)
+    // a failed open keeps the reminder, unless nothing says the document is still reachable
+    const opened = await openUniworkDocument({ documentId: n.resource_id, title }, window.aiOffice)
+    if (opened || state.untitled) await markRead(n.id)
   }
 
   const describe = (
@@ -214,6 +215,7 @@ export function DeskInTray({
         list,
         notice: verdict === 'deleted' ? 'deleted' : verdict === 'no_access' ? 'forbidden' : null,
         gone: verdict !== 'open' || (changed && !documentChangedHasPage(n)),
+        untitled: !!facts && facts.count === 1 && facts.titles.length === 0,
       }
       // the document's name for the open notice and the row's title
       const named = facts ? (facts.titles[0] ?? '') : (n.params.document ?? '')
@@ -230,7 +232,7 @@ export function DeskInTray({
       const sentenceIsTitle = changed || !named
       const title = sentenceIsTitle ? sentence : named
       const sub = state.notice
-        ? t(state.notice === 'deleted' ? 'uwErrDeleted' : 'uwErrForbidden')
+        ? t(state.notice === 'deleted' ? 'uwErrDeleted' : 'wbNoticeNoAccess')
         : sentenceIsTitle
           ? titles
           : sentence
@@ -411,6 +413,7 @@ export function DeskInTray({
           key={listFor}
           notificationId={listFor}
           onClose={() => setListFor(null)}
+          onLoaded={() => void markRead(listFor)}
           returnFocus={() =>
             listRef.current?.querySelector<HTMLElement>('.wb-desk-row-title') ?? sectionRef.current
           }

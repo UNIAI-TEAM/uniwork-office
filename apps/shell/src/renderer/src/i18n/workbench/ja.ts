@@ -67,6 +67,6 @@ export const ja = {
   wbDocChangeDeleted: '完全に削除済み',
   wbDocChangeInTrash: 'ゴミ箱に移動済み',
   wbDocChangeUntitled: '無題のドキュメント',
-  wbDocChangeViewList: '{count} 件のドキュメントを表示',
   wbDocChangeMore: '他 {count} 件',
+  wbNoticeNoAccess: 'このドキュメントにアクセスする権限がありません。',
 } satisfies Record<keyof typeof zh, string>

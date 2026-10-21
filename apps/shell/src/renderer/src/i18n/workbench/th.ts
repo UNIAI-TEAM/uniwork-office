@@ -59,6 +59,6 @@ export const th = {
   wbDocChangeDeleted: 'ลบถาวรแล้ว',
   wbDocChangeInTrash: 'ย้ายไปที่ถังขยะแล้ว',
   wbDocChangeUntitled: 'เอกสารไม่มีชื่อ',
-  wbDocChangeViewList: 'ดูเอกสาร {count} รายการ',
   wbDocChangeMore: 'และอีก {count} รายการ',
+  wbNoticeNoAccess: 'คุณไม่มีสิทธิ์เข้าถึงเอกสารนี้',
 } satisfies Record<keyof typeof zh, string>
