@@ -3,15 +3,19 @@ import { GROUP_LABEL_KEY, type GroupId } from './groups'
 
 /**
  * The header row of a day / week group: a full-width toggle that collapses or
- * opens the rows under it (`aria-expanded`). Its name says which group it is.
+ * opens the rows under it (`aria-expanded`). Its name says which group it is;
+ * the Trash adds how many rows the group holds.
  */
 export function GroupHeader({
   id,
   open,
+  count,
   onToggle,
 }: {
   id: GroupId
   open: boolean
+  /** how many rows the group holds, when the screen shows it */
+  count?: number
   onToggle: (id: GroupId) => void
 }) {
   const { t } = useI18n()
@@ -41,6 +45,7 @@ export function GroupHeader({
             <path d="M2.5 3.5L5 6.5l2.5-3" />
           </svg>
           <span>{label}</span>
+          {count !== undefined && <span className="dh-group-count">· {count}</span>}
         </button>
       </div>
     </div>

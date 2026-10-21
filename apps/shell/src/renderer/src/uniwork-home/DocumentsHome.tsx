@@ -123,7 +123,6 @@ import type { DocSubline } from '../doclist/DocRow'
 import { pruneSelection, selectedDocsOf } from '../doclist/selection'
 import { screenOfSubView, specialPresent, wireSortOf } from '../doclist/table-model'
 import { RecentSegmentControl, useRecentSegment } from '../doclist/RecentSegment'
-import { TrashList } from '../doclist/trash'
 import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
@@ -2182,62 +2181,49 @@ export function DocumentsHome({
                     onAction={onBulkAction}
                     onClear={() => setSelected(new Set())}
                   />
-                  {trashView ? (
-                    <TrashList
-                      rows={tableRows}
-                      sort={docSort}
-                      onSortChange={setDocSort}
-                      selected={selected}
-                      onSelectedChange={setSelected}
-                      label={t('uhSectionDocuments')}
-                      openMenuId={openMenuId}
-                      onOpenMenuChange={setOpenMenuId}
-                      menuFor={rowMenuFor}
-                      actionsFor={trashActionsFor}
-                      onOpen={(doc) => void openDoc(doc)}
-                    />
-                  ) : (
-                    <DocList
-                      screen={screen}
-                      rows={tableRows}
-                      sort={docSort}
-                      onSortChange={setDocSort}
-                      selected={selected}
-                      onSelectedChange={setSelected}
-                      label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
-                      openingId={openingId}
-                      openMenuId={openMenuId}
-                      onOpenMenuChange={setOpenMenuId}
-                      menuFor={rowMenuFor}
-                      actionsFor={shelfView ? shelfActionsFor : undefined}
-                      onOpen={(doc) => void openDoc(doc)}
-                      sublineFor={sublineFor}
-                      rename={
-                        docRename
-                          ? {
-                              docId: docRename.doc.id,
-                              error: docRename.error,
-                              busy: docRename.busy,
-                              onSave: (value) => void handleSaveDocRename(docRename.doc, value),
-                              onCancel: () => setDocRename(null),
-                              onEdit: () =>
-                                setDocRename((prev) => (prev ? { ...prev, error: null } : null)),
-                            }
-                          : undefined
-                      }
-                      renderSource={(source, columns) => (
-                        <DocumentsSourceRow
-                          key={`source:${source.id}`}
-                          source={source}
-                          columns={columns}
-                          menuOpen={openMenuId === `source:${source.id}`}
-                          onMenuOpenChange={(o) => setOpenMenuId(o ? `source:${source.id}` : null)}
-                          onOpen={(src) => void openSourceFile(src)}
-                          onDownload={(src) => void downloadSourceFile(src)}
-                        />
-                      )}
-                    />
-                  )}
+                  <DocList
+                    screen={screen}
+                    rows={tableRows}
+                    sort={docSort}
+                    onSortChange={setDocSort}
+                    selected={selected}
+                    onSelectedChange={setSelected}
+                    label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
+                    openingId={trashView ? null : openingId}
+                    openMenuId={openMenuId}
+                    onOpenMenuChange={setOpenMenuId}
+                    menuFor={rowMenuFor}
+                    actionsFor={
+                      shelfView ? shelfActionsFor : trashView ? trashActionsFor : undefined
+                    }
+                    onOpen={(doc) => void openDoc(doc)}
+                    sublineFor={trashView ? undefined : sublineFor}
+                    groups={subView !== 'trash' || trashView}
+                    rename={
+                      docRename
+                        ? {
+                            docId: docRename.doc.id,
+                            error: docRename.error,
+                            busy: docRename.busy,
+                            onSave: (value) => void handleSaveDocRename(docRename.doc, value),
+                            onCancel: () => setDocRename(null),
+                            onEdit: () =>
+                              setDocRename((prev) => (prev ? { ...prev, error: null } : null)),
+                          }
+                        : undefined
+                    }
+                    renderSource={(source, columns) => (
+                      <DocumentsSourceRow
+                        key={`source:${source.id}`}
+                        source={source}
+                        columns={columns}
+                        menuOpen={openMenuId === `source:${source.id}`}
+                        onMenuOpenChange={(o) => setOpenMenuId(o ? `source:${source.id}` : null)}
+                        onOpen={(src) => void openSourceFile(src)}
+                        onDownload={(src) => void downloadSourceFile(src)}
+                      />
+                    )}
+                  />
                 </>
               )}
 

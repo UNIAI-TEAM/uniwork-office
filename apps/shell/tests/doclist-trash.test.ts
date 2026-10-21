@@ -335,7 +335,10 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
       resolve(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
       'utf8',
     )
-    expect(css).toMatch(/\[data-group-body\][^{]*\{[^}]*28px/)
+    // the shared group rule (also Recent / Shared): the Tên cell takes the indent, so every other
+    // column stays under its header
+    expect(css).toMatch(/\.dh-doc-row\.grouped\s*\{[^}]*28px/)
+    expect(css).toMatch(/\.dh-doc-row\.grouped \.dh-cell-name\s*\{[^}]*--dh-group-indent/)
   })
 
   it('shows the 30-day notice instead of the old note, and not on another screen', async () => {
