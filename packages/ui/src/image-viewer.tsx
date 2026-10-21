@@ -18,7 +18,11 @@ export interface ImageViewerLabels {
   actualSize: string
   fitToWindow: string
   save: string
+  /** close tooltip; may name its key (`Close (Esc)`) */
   close: string
+  /** close button's accessible name when `close` names a key: the plain command (`Close`); the key
+   * is announced through aria-keyshortcuts instead. Absent: `close` is the name. */
+  closeName?: string
 }
 
 const MIN_SCALE = 0.05
@@ -162,7 +166,11 @@ export function ImageViewer({
     onClick: () => void,
     icon: ReactNode,
     active = false,
-    extra: { 'data-imgview-close'?: true } = {},
+    extra: {
+      'data-imgview-close'?: true
+      'aria-label'?: string
+      'aria-keyshortcuts'?: string
+    } = {},
   ) => (
     <button
       type="button"
@@ -247,7 +255,12 @@ export function ImageViewer({
             <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
           </Svg>,
           false,
-          { 'data-imgview-close': true },
+          {
+            'data-imgview-close': true,
+            ...(labels.closeName
+              ? { 'aria-label': labels.closeName, 'aria-keyshortcuts': 'Escape' }
+              : {}),
+          },
         )}
       </div>
       <img
