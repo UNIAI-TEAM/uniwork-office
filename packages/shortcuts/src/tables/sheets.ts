@@ -1166,13 +1166,25 @@ const manual: readonly ShortcutAction[] = [
     guard: {},
   },
   // Find: Univer binds Ctrl+F / Cmd+F on desktop (the Excel Windows page prints no Find key);
-  // Excel for the web's Ctrl+F in the frame. Excel for Mac's Shift+F5 is not wired
+  // Excel for the web's Ctrl+F in the frame. Excel for Mac's Shift+F5 is not added: Cmd+F
+  // stays Univer's
   {
     id: 'sheets-43',
     scope: 'sheets',
     win: ['Ctrl+F'],
     mac: ['Cmd+F'],
     web: { win: ['Ctrl+F'], mac: ['Ctrl+F'] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
+  // Help: apps/sheets has no help or shortcut-sheet command, so the row promises no key
+  // (the generated F1 / Cmd+/ would show in a hint and do nothing)
+  {
+    id: 'sheets-86',
+    scope: 'sheets',
+    win: [],
+    mac: [],
+    web: { win: [], mac: [] },
     match: 'key',
     guard: { noRepeat: true },
   },
@@ -1664,29 +1676,18 @@ export const sheetsManualUnmapped: readonly UnmappedShortcut[] = [
   {
     id: 'sheets-86',
     part: 'desktop.win',
-    reason: 'F1 help: the key is in the table, but nothing listens',
+    reason: 'no help command in apps/sheets yet (F1)',
   },
   {
     id: 'sheets-86',
     part: 'desktop.mac',
-    reason: 'F1 / Cmd+/ help: the keys are in the table, but nothing listens',
+    reason: 'no help command in apps/sheets yet (F1 / Cmd+/)',
   },
   {
     id: 'sheets-87',
     part: 'row',
     reason:
       'zoom stays on Univer (Ctrl+= and the wheel); Ctrl+Alt+= / Ctrl+Alt+- is AltGr on many layouts',
-  },
-  {
-    id: 'sheets-46',
-    part: 'web.win',
-    reason:
-      'Alt+F1 chart is in the table, but no chart command is bound to it; F11 clashes with the Electron fullscreen role on desktop',
-  },
-  {
-    id: 'sheets-43',
-    part: 'desktop.mac',
-    reason: "Excel for Mac's Shift+F5 Find is not added; Cmd+F stays Univer's",
   },
 ]
 export const sheetsManualNotes: readonly ShortcutNote[] = []
