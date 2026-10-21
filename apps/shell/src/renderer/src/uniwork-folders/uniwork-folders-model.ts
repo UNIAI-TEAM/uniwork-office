@@ -32,6 +32,8 @@ export interface FolderInfo {
   /** levels this folder occupies with its subtree (1 = no subfolders) */
   height: number
   childIds: string[]
+  /** UNI-2066: `'my_folder'` on the caller's personal folder; the key is absent on every other folder */
+  systemKind?: UniworkSystemKind
 }
 
 export type FolderIndex = ReadonlyMap<string, FolderInfo>
@@ -46,6 +48,7 @@ export function buildFolderIndex(nodes: UniworkFolderNode[]): FolderIndex {
       depth,
       height: 1,
       childIds: node.children.map((c) => c.id),
+      ...(node.systemKind ? { systemKind: node.systemKind } : {}),
     }
     index.set(node.id, info)
     for (const child of node.children) {

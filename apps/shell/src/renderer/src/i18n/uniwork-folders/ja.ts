@@ -27,6 +27,8 @@ export const ja = {
   ufCycle: 'フォルダーをそれ自身やそのサブフォルダーに移動することはできません。',
   ufParentKind: 'フォルダーはルートか別のフォルダーの中にのみ置けます。',
   ufNotShareable: 'フォルダーは共有できません。ドキュメントを個別に共有してください。',
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: 'このフォルダーはもうここにありません。',
   ufFolderNoAccess: 'このフォルダーへのアクセス権がなくなりました。',
   ufNoPermission: 'このフォルダーを変更する権限がありません。',

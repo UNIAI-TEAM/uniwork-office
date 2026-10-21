@@ -27,6 +27,8 @@ export const es = {
   ufCycle: 'Una carpeta no se puede mover a sí misma ni a una de sus subcarpetas.',
   ufParentKind: 'Una carpeta está en la raíz o dentro de otra carpeta.',
   ufNotShareable: 'Las carpetas no se pueden compartir. Comparte cada documento por separado.',
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: 'Esta carpeta ya no está aquí.',
   ufFolderNoAccess: 'Ya no tienes acceso a esta carpeta.',
   ufNoPermission: 'No tienes permiso para cambiar esta carpeta.',

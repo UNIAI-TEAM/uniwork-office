@@ -27,6 +27,8 @@ export const pt = {
   ufCycle: 'Uma pasta não pode ser movida para dentro de si mesma nem de uma de suas subpastas.',
   ufParentKind: 'Uma pasta fica na raiz ou dentro de outra pasta.',
   ufNotShareable: 'As pastas não podem ser compartilhadas. Compartilhe cada documento.',
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: 'Esta pasta não está mais aqui.',
   ufFolderNoAccess: 'Você não tem mais acesso a esta pasta.',
   ufNoPermission: 'Você não tem permissão para alterar esta pasta.',

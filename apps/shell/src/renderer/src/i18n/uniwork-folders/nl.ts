@@ -28,6 +28,8 @@ export const nl = {
   ufCycle: 'Een map kan niet naar zichzelf of naar een van zijn submappen worden verplaatst.',
   ufParentKind: 'Een map staat in de hoofdmap of in een andere map.',
   ufNotShareable: 'Mappen kunnen niet worden gedeeld. Deel in plaats daarvan elk document.',
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: 'Deze map is hier niet meer.',
   ufFolderNoAccess: 'Je hebt geen toegang meer tot deze map.',
   ufNoPermission: 'Je hebt geen toestemming om deze map te wijzigen.',

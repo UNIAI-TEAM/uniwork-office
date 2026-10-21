@@ -27,6 +27,8 @@ export const it = {
   ufCycle: 'Una cartella non può essere spostata in sé stessa o in una delle sue sottocartelle.',
   ufParentKind: "Una cartella si trova nella radice o in un'altra cartella.",
   ufNotShareable: 'Le cartelle non possono essere condivise. Condividi invece ogni documento.',
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: 'Questa cartella non è più qui.',
   ufFolderNoAccess: 'Non hai più accesso a questa cartella.',
   ufNoPermission: 'Non hai l’autorizzazione per modificare questa cartella.',

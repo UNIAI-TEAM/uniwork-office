@@ -949,6 +949,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.archiveDocument, (_event, documentId: unknown) =>
     service.archiveDocument(documentId as string),
   )
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.archiveImpact, (_event, documentId: unknown) =>
+    service.getArchiveImpact(documentId as string),
+  )
   ipcMain.handle(UNIWORK_DOC_CHANNELS.restoreDocument, (_event, documentId: unknown) =>
     service.restoreDocument(documentId as string),
   )

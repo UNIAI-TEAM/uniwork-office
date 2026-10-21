@@ -26,6 +26,8 @@ export const ar = {
   ufCycle: 'لا يمكن نقل مجلد إلى نفسه أو إلى أحد مجلداته الفرعية.',
   ufParentKind: 'يوجد المجلد في الجذر أو داخل مجلد آخر.',
   ufNotShareable: 'لا يمكن مشاركة المجلدات. شارك كل مستند على حدة.',
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: 'لم يعد هذا المجلد هنا.',
   ufFolderNoAccess: 'لم تعد لديك صلاحية الوصول إلى هذا المجلد.',
   ufNoPermission: 'ليس لديك إذن لتغيير هذا المجلد.',

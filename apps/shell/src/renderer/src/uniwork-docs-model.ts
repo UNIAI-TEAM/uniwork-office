@@ -56,6 +56,8 @@ export const UNIWORK_ERROR_KEYS: Record<UniworkDocErrorCode, StringKey> = {
   document_cycle: 'ufCycle',
   document_parent_kind: 'ufParentKind',
   folder_not_shareable: 'ufNotShareable',
+  // UNI-2066: a workspace folder can't move into My Folder (422 folder_into_my_folder)
+  folder_into_my_folder: 'ufIntoMyFolder',
   // refusals before anything is queued: the keychain is locked, or the account's store is full
   keystore_locked: 'uwReasonKeystore',
   store_full: 'uwQueueFull',

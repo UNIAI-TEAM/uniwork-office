@@ -25,6 +25,7 @@ export const zh = {
   ufCycle: '文件夹不能移动到自身或其子文件夹中。',
   ufParentKind: '文件夹只能位于根目录或其他文件夹中。',
   ufNotShareable: '文件夹不能共享。请逐个共享文档。',
+  ufIntoMyFolder: '工作区文件夹不能移动到“我的文件夹”中。请刷新列表后重试。',
   ufFolderGone: '此文件夹已不在这里。',
   ufFolderNoAccess: '你已无权访问此文件夹。',
   ufNoPermission: '你没有权限更改此文件夹。',

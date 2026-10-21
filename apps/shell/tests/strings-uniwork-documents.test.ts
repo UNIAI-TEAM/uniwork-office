@@ -110,6 +110,8 @@ describe('uniwork documents string shards', () => {
         'document_parent_kind',
         // UNI-1975: a folder can't be shared
         'folder_not_shareable',
+        // UNI-2066: a workspace folder can't move into My Folder
+        'folder_into_my_folder',
       ].sort(),
     )
     // the G5-04 / G5-06 refusals reuse the sync shard's sentences, FD-11's the folders shard's

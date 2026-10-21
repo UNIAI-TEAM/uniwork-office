@@ -61,7 +61,11 @@ import type {
   UniworkUploadProgress,
   UniworkWorkspaceRef,
 } from '../../shared/home-api'
-import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../../shared/home-api'
+import type {
+  UniworkArchiveImpact,
+  UniworkDocFavoriteResult,
+  UniworkDocShelveResult,
+} from '../../shared/home-api'
 import type {
   UniworkConflictAction,
   UniworkConflictIntentBlock,
@@ -6362,6 +6366,20 @@ export class UniworkDocsService {
     } catch {
       // a record left behind is only a stale one: nothing is lost by it
     }
+  }
+
+  /**
+   * UNI-2066: what trashing a folder would move, for the confirmation. Like archive it needs
+   * manage, but the gate is the kind-agnostic read (the archive route is file-only here;
+   * a folder's own detail has no file block). A refused level never reaches the impact route.
+   */
+  getArchiveImpact(documentId: string): Promise<UniworkDocActionResult<UniworkArchiveImpact>> {
+    return actionResult(async () => {
+      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      await this.requireManageAnyKind(documentId)
+      return this.api().getArchiveImpact(documentId)
+    })
   }
 
   /** S18: restore an archived document (only its own archive batch comes back) */

@@ -303,6 +303,11 @@ export function errorFromResponse(
   // UNI-1975: the server refuses sharing a folder (only documents are shared). The
   // app never sends it today; a user-facing refusal, not retried, not terminal.
   if (serverCode === 'folder_not_shareable') return new UniworkDocError('folder_not_shareable', at)
+  // UNI-2066: the server's 422 for a workspace folder moved into My Folder (or under it): its own
+  // user-facing refusal, never retried and not terminal
+  if (serverCode === 'folder_into_my_folder') {
+    return new UniworkDocError('folder_into_my_folder', at)
+  }
   // G5-06 (UNI-1352): the server's own verdicts, kept apart from the generic
   // forbidden/deleted a caller would otherwise act on. A capability kill
   // switch is a pause, not a permission denial; a swept intent is unknown,

@@ -1,4 +1,5 @@
 import type {
+  UniworkArchiveImpact,
   UniworkDocErrorCode,
   UniworkDocFormat,
   UniworkDocNewFormat,
@@ -22,6 +23,7 @@ import {
   parseDocumentFavorite,
   parseDocumentList,
   parseDocumentRef,
+  parseArchiveImpact,
   parseDocumentSummary,
   parseExchange,
   parseFolderTree,
@@ -289,6 +291,11 @@ export interface UniworkDocsClient {
   }): Promise<{ summary: UniworkDocSummary; revision: string }>
   /** archive a document (S18); there is no hard-delete route */
   archive(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
+  /**
+   * UNI-2066: what archiving this folder's subtree would move
+   * (`GET /documents/{id}/archive-impact`); a read, no idempotency key
+   */
+  getArchiveImpact(documentId: string): Promise<UniworkArchiveImpact>
   /** restore an archived document (S18) */
   restore(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
   /**
@@ -1225,6 +1232,16 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         read: json,
       })
       return parseDocumentSummary(raw)
+    },
+
+    async getArchiveImpact(documentId) {
+      const raw = await send({
+        method: 'GET',
+        route: `/documents/${id(documentId)}/archive-impact`,
+        timeoutMs: metadataTimeout,
+        read: json,
+      })
+      return parseArchiveImpact(raw)
     },
 
     async restore(documentId, idempotencyKey) {

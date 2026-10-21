@@ -28,6 +28,8 @@ export const ms = {
   ufCycle: 'Folder tidak boleh dialihkan ke dalam dirinya sendiri atau salah satu subfoldernya.',
   ufParentKind: 'Folder terletak di akar atau di dalam folder lain.',
   ufNotShareable: 'Folder tidak boleh dikongsi. Kongsi setiap dokumen satu demi satu.',
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: 'Folder ini tiada lagi di sini.',
   ufFolderNoAccess: 'Anda tidak lagi mempunyai akses kepada folder ini.',
   ufNoPermission: 'Anda tiada kebenaran untuk mengubah folder ini.',

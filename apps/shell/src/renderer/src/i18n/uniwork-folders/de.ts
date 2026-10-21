@@ -27,6 +27,8 @@ export const de = {
   ufCycle: 'Ein Ordner kann nicht in sich selbst oder einen seiner Unterordner verschoben werden.',
   ufParentKind: 'Ein Ordner liegt im Stammverzeichnis oder in einem anderen Ordner.',
   ufNotShareable: 'Ordner können nicht geteilt werden. Teile stattdessen jedes Dokument einzeln.',
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: 'Dieser Ordner ist nicht mehr hier.',
   ufFolderNoAccess: 'Du hast keinen Zugriff mehr auf diesen Ordner.',
   ufNoPermission: 'Du hast keine Berechtigung, diesen Ordner zu ändern.',

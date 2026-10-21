@@ -1,4 +1,5 @@
 import type {
+  UniworkArchiveImpact,
   UniworkCreateFolderInput,
   UniworkDocErrorCode,
   UniworkDocListPage,
@@ -127,6 +128,7 @@ interface ActionsBridge {
     name: string,
   ): Promise<DocActionResult<UniworkDocSummary>>
   uniworkArchiveDocument?(documentId: string): Promise<DocActionResult<unknown>>
+  uniworkArchiveImpact?(documentId: string): Promise<DocActionResult<UniworkArchiveImpact>>
   uniworkRestoreDocument?(documentId: string): Promise<DocActionResult<unknown>>
   uniworkFolderTree?(workspaceId: string): Promise<UniworkResult<UniworkFolderNode[]>>
   uniworkListChildren?(q: UniworkFolderQuery): Promise<UniworkResult<UniworkFolderChildren>>
@@ -183,6 +185,13 @@ export function renameDocument(
 
 export function archiveDocument(documentId: string): Promise<DocActionResult<unknown>> {
   return actions().uniworkArchiveDocument?.(documentId) ?? Promise.resolve(unavailable)
+}
+
+/** UNI-2066: what trashing this folder moves; a missing bridge (an older main) is server_error */
+export function getArchiveImpact(
+  documentId: string,
+): Promise<DocActionResult<UniworkArchiveImpact>> {
+  return actions().uniworkArchiveImpact?.(documentId) ?? Promise.resolve(unavailable)
 }
 
 export function restoreDocument(documentId: string): Promise<DocActionResult<unknown>> {

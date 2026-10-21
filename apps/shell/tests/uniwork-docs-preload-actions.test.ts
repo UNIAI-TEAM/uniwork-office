@@ -15,6 +15,7 @@ import { UNIWORK_DOC_CHANNELS } from '../src/shared/home-api'
 interface ActionsBridge {
   uniworkRenameDocument(documentId: string, name: string): Promise<unknown>
   uniworkArchiveDocument(documentId: string): Promise<unknown>
+  uniworkArchiveImpact(documentId: string): Promise<unknown>
   uniworkCancelUploadDocument(uploadId: string): Promise<void>
   onUniworkUploadProgress(cb: (event: unknown) => void): () => void
   uniworkFolderTree(workspaceId: string): Promise<unknown>
@@ -366,5 +367,71 @@ describe('the document sources bridge (UNI-1961)', () => {
       ok: false,
       error: 'malformed_response',
     })
+  })
+})
+
+// UNI-2066 WS-A: the trash confirmation reads the impact of a folder through
+// uniwork-doc:archive-impact; the renderer dereferences the counts directly, so
+// the preload narrows the reply to exactly the typed shape.
+describe('the archive-impact bridge (UNI-2066)', () => {
+  it('routes uniworkArchiveImpact through its IPC channel with the id', async () => {
+    const reply = {
+      ok: true,
+      value: { tooLarge: false, folders: 1, documents: 4, relocatedCount: 2 },
+    }
+    const { bridge, invoked } = await loadBridge(reply)
+    invoked.length = 0
+    expect(await bridge.uniworkArchiveImpact('fold_1')).toEqual(reply)
+    expect(invoked).toEqual([{ channel: UNIWORK_DOC_CHANNELS.archiveImpact, args: ['fold_1'] }])
+    expect(UNIWORK_DOC_CHANNELS.archiveImpact).toBe('uniwork-doc:archive-impact')
+  })
+
+  it('passes a too-large answer and a refusal through', async () => {
+    const tooLarge = { ok: true, value: { tooLarge: true } }
+    expect(await (await loadBridge(tooLarge)).bridge.uniworkArchiveImpact('f')).toEqual(tooLarge)
+    const refused = { ok: false, error: 'forbidden' }
+    expect(await (await loadBridge(refused)).bridge.uniworkArchiveImpact('f')).toEqual(refused)
+  })
+
+  it('drops keys the type does not name', async () => {
+    const { bridge } = await loadBridge({
+      ok: true,
+      value: { tooLarge: false, folders: 1, documents: 2, relocatedCount: 0, names: ['secret'] },
+    })
+    expect(await bridge.uniworkArchiveImpact('f')).toEqual({
+      ok: true,
+      value: { tooLarge: false, folders: 1, documents: 2, relocatedCount: 0 },
+    })
+  })
+
+  it.each([
+    undefined,
+    null,
+    'x',
+    7,
+    { ok: true },
+    { ok: true, value: null },
+    { ok: true, value: [] },
+    { ok: true, value: {} },
+    { ok: true, value: { tooLarge: false, folders: 1 } },
+    { ok: true, value: { tooLarge: false, folders: -1, documents: 2, relocatedCount: 0 } },
+    { ok: true, value: { tooLarge: false, folders: 1.5, documents: 2, relocatedCount: 0 } },
+    { ok: true, value: { tooLarge: false, folders: 1, documents: 2, relocatedCount: '1' } },
+    { ok: true, value: { tooLarge: 'no', folders: 1, documents: 2, relocatedCount: 0 } },
+    { ok: false },
+    { ok: false, error: '' },
+  ])('answers malformed_response for the reply %j', async (reply) => {
+    const { bridge } = await loadBridge(reply)
+    expect(await bridge.uniworkArchiveImpact('f')).toEqual({
+      ok: false,
+      error: 'malformed_response',
+    })
+  })
+
+  it('does not call main for an empty id', async () => {
+    const { bridge, invoked } = await loadBridge({ ok: true, value: { tooLarge: true } })
+    invoked.length = 0
+    expect(await bridge.uniworkArchiveImpact('')).toEqual({ ok: false, error: 'not_found' })
+    expect(invoked).toEqual([])
   })
 })

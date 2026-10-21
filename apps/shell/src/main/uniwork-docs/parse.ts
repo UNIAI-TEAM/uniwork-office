@@ -1,4 +1,5 @@
 import type {
+  UniworkArchiveImpact,
   UniworkDocFormat,
   UniworkDocShelveResult,
   UniworkDocSummary,
@@ -172,6 +173,14 @@ function systemKindOf(value: unknown): UniworkSystemKind | undefined {
 }
 
 /**
+ * UNI-2066: `is_empty` marks a folder with nothing the caller can see in it. Only a real
+ * boolean is kept; anything else reads as unknown (absent) so a card never says "empty" on a guess.
+ */
+function isEmptyOf(value: unknown): { isEmpty: boolean } | Record<string, never> {
+  return typeof value === 'boolean' ? { isEmpty: value } : {}
+}
+
+/**
  * FD-11: `parent_id` as the renderer's `parentId`. Absent, `null` and `''` all
  * mean the workspace root; a malformed one fails closed.
  */
@@ -278,6 +287,7 @@ function summaryRow(
     parentId: parentIdOf(row.parent_id),
     ...(path ? { path } : {}),
     ...(systemKindOf(row.system_kind) ? { systemKind: 'my_folder' as const } : {}),
+    ...isEmptyOf(row.is_empty),
     ...editLockOf(row.edit_lock),
     ...shelvedFieldsOf(row),
     ...doclistFieldsOf(row),
@@ -886,6 +896,7 @@ export function parseDocumentSummary(raw: unknown): UniworkDocSummary {
     ...(kind ? { kind } : {}),
     ...(doc.parent_id === undefined ? {} : { parentId: parentIdOf(doc.parent_id) }),
     ...(systemKindOf(doc.system_kind) ? { systemKind: 'my_folder' as const } : {}),
+    ...isEmptyOf(doc.is_empty),
   }
 }
 
@@ -912,6 +923,7 @@ function folderNode(value: unknown, depth: number): UniworkFolderNode {
     position,
     children: children.map((child) => folderNode(child, depth + 1)),
     ...(systemKindOf(node.system_kind) ? { systemKind: 'my_folder' as const } : {}),
+    ...isEmptyOf(node.is_empty),
   }
 }
 
@@ -919,6 +931,28 @@ export function parseFolderTree(raw: unknown): UniworkFolderNode[] {
   const body = record(raw)
   if (!Array.isArray(body.documents)) bad()
   return body.documents.map((value) => folderNode(value, 1))
+}
+
+/**
+ * UNI-2066: `GET /documents/{id}/archive-impact`, read like the web's schema. A subtree past the
+ * cap (`too_large`) has no counts; otherwise `folders` and `documents` must be real non-negative
+ * integers or the answer is malformed (never counts guessed). `relocated_count` only words one
+ * sentence, so an absent or unreadable value reads as 0 instead of failing the impact.
+ */
+export function parseArchiveImpact(raw: unknown): UniworkArchiveImpact {
+  const body = record(raw)
+  if (body.too_large === true) return { tooLarge: true }
+  const count = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+  const folders = count(body.folders)
+  const documents = count(body.documents)
+  if (folders === null || documents === null) bad()
+  return {
+    tooLarge: false,
+    folders,
+    documents,
+    relocatedCount: count(body.relocated_count) ?? 0,
+  }
 }
 
 /**

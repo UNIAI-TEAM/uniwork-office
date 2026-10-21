@@ -53,6 +53,7 @@ import type {
   FileSearchPage,
   FileSearchRerank,
   FileSearchSettings,
+  UniworkArchiveImpact,
   UniworkConflictReply,
   UniworkConflictView,
   UniworkCreateDocInput,
@@ -321,6 +322,34 @@ function asUniworkActionResult<T>(result: unknown): UniworkDocActionResult<T> {
     }
     if (r.ok === false && typeof r.error === 'string' && r.error) {
       return result as UniworkDocActionResult<T>
+    }
+  }
+  return { ok: false, error: 'malformed_response' }
+}
+
+/**
+ * UNI-2066: the archive-impact reply. The confirmation dereferences the counts and the relocated
+ * flag directly, so a success is rebuilt from exactly the typed keys (nothing else crosses) and any
+ * other shape is `malformed_response`; a refusal passes through as every action result does.
+ */
+function asUniworkArchiveImpactResult(
+  result: unknown,
+): UniworkDocActionResult<UniworkArchiveImpact> {
+  const base = asUniworkActionResult<unknown>(result)
+  if (!base.ok) return base
+  const v = base.value as Record<string, unknown>
+  if (v.tooLarge === true) return { ok: true, value: { tooLarge: true } }
+  const count = (n: unknown): n is number =>
+    typeof n === 'number' && Number.isSafeInteger(n) && n >= 0
+  if (v.tooLarge === false && count(v.folders) && count(v.documents) && count(v.relocatedCount)) {
+    return {
+      ok: true,
+      value: {
+        tooLarge: false,
+        folders: v.folders,
+        documents: v.documents,
+        relocatedCount: v.relocatedCount,
+      },
     }
   }
   return { ok: false, error: 'malformed_response' }
@@ -1314,6 +1343,14 @@ const homeApi: HomeApi = {
   async uniworkArchiveDocument(documentId: string) {
     return asUniworkActionResult<UniworkDocSummary>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.archiveDocument, documentId),
+    )
+  },
+  async uniworkArchiveImpact(documentId: string) {
+    if (typeof documentId !== 'string' || !documentId) {
+      return { ok: false, error: 'not_found' } as const
+    }
+    return asUniworkArchiveImpactResult(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.archiveImpact, documentId),
     )
   },
   async uniworkRestoreDocument(documentId: string) {

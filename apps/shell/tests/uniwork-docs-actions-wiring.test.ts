@@ -187,6 +187,8 @@ describe('the S18 action IPC', () => {
       UNIWORK_DOC_CHANNELS.cancelUpload,
       UNIWORK_DOC_CHANNELS.renameDocument,
       UNIWORK_DOC_CHANNELS.archiveDocument,
+      // UNI-2066 WS-A: the trash confirmation's impact read
+      UNIWORK_DOC_CHANNELS.archiveImpact,
       UNIWORK_DOC_CHANNELS.restoreDocument,
     ]) {
       expect(handlers.has(channel)).toBe(true)
@@ -266,6 +268,10 @@ describe('the S18 action IPC', () => {
       await handlers.get(UNIWORK_DOC_CHANNELS.renameDocument)!(null, 'doc_1', 'Nope.docx'),
     ).toEqual({ ok: false, error: 'not_signed_in' })
     expect(await handlers.get(UNIWORK_DOC_CHANNELS.archiveDocument)!(null, 'doc_1')).toEqual({
+      ok: false,
+      error: 'not_signed_in',
+    })
+    expect(await handlers.get(UNIWORK_DOC_CHANNELS.archiveImpact)!(null, 'doc_1')).toEqual({
       ok: false,
       error: 'not_signed_in',
     })

@@ -26,6 +26,8 @@ export const en = {
   ufCycle: "A folder can't move into itself or into one of its subfolders.",
   ufParentKind: 'A folder sits at the root or in another folder.',
   ufNotShareable: "Folders can't be shared. Share each document instead.",
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: 'This folder is no longer here.',
   ufFolderNoAccess: 'You no longer have access to this folder.',
   ufNoPermission: "You don't have permission to change this folder.",

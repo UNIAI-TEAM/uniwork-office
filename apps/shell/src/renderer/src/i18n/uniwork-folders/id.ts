@@ -27,6 +27,8 @@ export const id = {
   ufCycle: 'Folder tidak dapat dipindahkan ke dirinya sendiri atau ke salah satu subfoldernya.',
   ufParentKind: 'Folder berada di root atau di dalam folder lain.',
   ufNotShareable: 'Folder tidak dapat dibagikan. Bagikan setiap dokumen satu per satu.',
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: 'Folder ini sudah tidak ada di sini.',
   ufFolderNoAccess: 'Anda tidak lagi memiliki akses ke folder ini.',
   ufNoPermission: 'Anda tidak memiliki izin untuk mengubah folder ini.',

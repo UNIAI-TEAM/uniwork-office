@@ -204,6 +204,9 @@ export type UniworkDocErrorCode =
   // UNI-1975: the server's 422 `folder_not_shareable` - a folder can't be shared,
   // only documents are (user-facing, never retried)
   | 'folder_not_shareable'
+  // UNI-2066: the server's 422 `folder_into_my_folder` - a workspace folder can't
+  // move into My Folder or under it (user-facing, never retried)
+  | 'folder_into_my_folder'
   // the account's durable sync store could not be opened (locked keychain) or
   // refused the pending intent (budget full)
   | 'keystore_locked'
@@ -290,6 +293,11 @@ export interface UniworkDocSummary {
    * `'my_folder'` marker (unknown values are dropped at parse).
    */
   systemKind?: UniworkSystemKind
+  /**
+   * UNI-2066: a folder row's `is_empty` - nothing in it is visible to this
+   * viewer. Only a real boolean is kept; absent = unknown (the card says nothing).
+   */
+  isEmpty?: boolean
   /**
    * FD-11: the ancestors of a search row, root first. Only the title search
    * sends one (cut at the first unreadable ancestor).
@@ -489,6 +497,17 @@ export interface UniworkSourceDownloadInput {
 }
 
 /**
+ * UNI-2066: what putting a folder in the trash would move
+ * (`GET /documents/{id}/archive-impact`, behind the same manage gate). A subtree
+ * past the server's cap carries no counts. `relocatedCount` (documents other
+ * people own that the trash hands back to their owners) only words one
+ * sentence and is never shown as a number; an unreadable value reads as 0.
+ */
+export type UniworkArchiveImpact =
+  | { tooLarge: true }
+  | { tooLarge: false; folders: number; documents: number; relocatedCount: number }
+
+/**
  * FD-11: one node of `GET /workspaces/{ws}/documents/tree?folders_only=true`,
  * to depth 20 (the server's own cap).
  */
@@ -500,6 +519,11 @@ export interface UniworkFolderNode {
   children: UniworkFolderNode[]
   /** MYFOLDER-01 / SAVE-01: `'my_folder'` on the caller's personal folder row */
   systemKind?: UniworkSystemKind
+  /**
+   * UNI-2066: the server's `is_empty` - nothing in the folder is visible to this
+   * viewer. Only a real boolean is kept; absent = unknown (never a count).
+   */
+  isEmpty?: boolean
 }
 
 /** FD-11: one contents page of a folder (folders + files + pages, server order) */
@@ -1521,6 +1545,11 @@ export interface HomeApi {
   ): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /** S18: archive a document (never a hard delete) */
   uniworkArchiveDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /**
+   * UNI-2066: what trashing this folder would move (counts, and whether other
+   * people's documents inside go back to their owners); needs manage on the folder
+   */
+  uniworkArchiveImpact(documentId: string): Promise<UniworkDocActionResult<UniworkArchiveImpact>>
   /** S18: restore an archived document */
   uniworkRestoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /**
@@ -2189,6 +2218,8 @@ export const UNIWORK_DOC_CHANNELS = {
   renameDocument: 'uniwork-doc:rename-document',
   /** invoke(documentId) -> archive (S18; there is no delete) */
   archiveDocument: 'uniwork-doc:archive-document',
+  /** invoke(documentId) -> the impact of trashing a folder (UNI-2066) */
+  archiveImpact: 'uniwork-doc:archive-impact',
   /** invoke(documentId) -> restore an archived document (S18) */
   restoreDocument: 'uniwork-doc:restore-document',
   /** invoke(workspaceId) -> the workspace's folder tree, root nodes first (FD-11) */

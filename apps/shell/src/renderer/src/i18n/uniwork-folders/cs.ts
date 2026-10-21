@@ -27,6 +27,8 @@ export const cs = {
   ufCycle: 'Složku nelze přesunout do sebe samé ani do některé z jejích podsložek.',
   ufParentKind: 'Složka je v kořeni nebo v jiné složce.',
   ufNotShareable: 'Složky nelze sdílet. Sdílejte raději jednotlivé dokumenty.',
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: 'Tato složka tu už není.',
   ufFolderNoAccess: 'K této složce již nemáte přístup.',
   ufNoPermission: 'Nemáte oprávnění tuto složku měnit.',

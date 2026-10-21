@@ -26,6 +26,8 @@ export const vi = {
   ufCycle: 'Không thể chuyển thư mục vào chính nó hoặc thư mục con của nó.',
   ufParentKind: 'Thư mục chỉ nằm ở gốc hoặc trong thư mục khác.',
   ufNotShareable: 'Thư mục không chia sẻ được. Hãy chia sẻ từng tài liệu.',
+  ufIntoMyFolder:
+    'Thư mục của workspace không thể chuyển vào Thư mục của tôi. Hãy tải lại danh sách rồi thử lại.',
   ufFolderGone: 'Thư mục này không còn ở đây.',
   ufFolderNoAccess: 'Bạn không còn quyền truy cập thư mục này.',
   ufNoPermission: 'Bạn không có quyền thay đổi thư mục này.',

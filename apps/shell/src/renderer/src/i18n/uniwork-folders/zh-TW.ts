@@ -26,6 +26,8 @@ export const zhTW = {
   ufCycle: '資料夾無法移動到自身或其子資料夾中。',
   ufParentKind: '資料夾只能位於根目錄或其他資料夾中。',
   ufNotShareable: '資料夾無法共用。請逐一共用文件。',
+  ufIntoMyFolder:
+    "A workspace folder can't be moved into My Folder. Refresh the list and try again.",
   ufFolderGone: '此資料夾已不在這裡。',
   ufFolderNoAccess: '你已無權存取此資料夾。',
   ufNoPermission: '你沒有權限變更此資料夾。',
