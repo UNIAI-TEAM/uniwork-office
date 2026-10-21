@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, expect } from '@playwright/test'
-import { launchShell, closeAndSaveVideo, waitForPageWithUrl } from './helpers'
+import { launchShell, closeAndSaveVideo, waitForPageWithUrl, homeRowName } from './helpers'
 
 /**
  * A `.txt` / `.json` file has no document model behind it, so the shell route
@@ -34,7 +34,7 @@ test.describe('source text files', () => {
       await expect(rootRow).toContainText(dir.split('/').pop()!)
       await rootRow.locator('.tree-name').click()
 
-      const row = page.locator('.recent-list .recent-name', { hasText: 'notes.txt' })
+      const row = homeRowName(page, 'notes.txt')
       await expect(row).toBeVisible()
       await row.click()
 
