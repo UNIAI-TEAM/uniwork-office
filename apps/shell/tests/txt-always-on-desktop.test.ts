@@ -85,10 +85,20 @@ describe('Plain text in the desktop New menu', () => {
   })
 
   it('is labelled in vi and en, and in every other language', () => {
-    expect(strings.vi.newTxt).toBe('Văn bản')
+    expect(strings.vi.newTxt).toBe('Văn bản thuần')
     expect(strings.en.newTxt).toBe('Plain text')
     for (const [lang, table] of Object.entries(strings)) {
       expect((table as Record<string, string>).newTxt, `${lang} newTxt`).toBeTruthy()
+    }
+  })
+
+  it('uses the same translated Plain text label in the UniWork New menu shard of every language', () => {
+    const dir = resolve(import.meta.dirname, '../src/renderer/src/i18n/uniwork-home')
+    for (const [lang, table] of Object.entries(strings)) {
+      const shard = readFileSync(join(dir, `${lang}.ts`), 'utf8')
+      const label = shard.match(/uhNewMenuTxt: '([^']*)'/)?.[1]
+      expect(label, `${lang} uhNewMenuTxt`).toBe((table as Record<string, string>).newTxt)
+      if (lang !== 'en') expect(label, `${lang} is not the English leftover`).not.toBe('Plain text')
     }
   })
 
@@ -139,11 +149,11 @@ describe('Plain text in the native New menus', () => {
     expect(Math.max(at, alt)).toBeGreaterThan(-1)
   })
 
-  it('is labelled in every main-process string table (vi Văn bản, en Plain text)', () => {
+  it('is labelled in every main-process string table (vi Văn bản thuần, en Plain text)', () => {
     const labels = [...main.matchAll(/menuNewTxt: '([^']*)'/g)].map((match) => match[1])
     expect(labels).toHaveLength(21)
     expect(labels.every(Boolean)).toBe(true)
-    expect(main).toMatch(/vi: \{[\s\S]*?menuNewTxt: 'Văn bản'/)
+    expect(main).toMatch(/vi: \{[\s\S]*?menuNewTxt: 'Văn bản thuần'/)
     expect(main).toMatch(/en: \{[\s\S]*?menuNewTxt: 'Plain text'/)
   })
 })

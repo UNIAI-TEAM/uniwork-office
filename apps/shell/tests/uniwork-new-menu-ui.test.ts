@@ -44,7 +44,7 @@ const LABELS_VI = [
   'Bảng tính Sheets',
   'Trình chiếu Slides',
   'Tệp Markdown',
-  'Văn bản',
+  'Văn bản thuần',
   'HTML',
   'PDF',
 ]
