@@ -488,6 +488,8 @@ export function DocumentsHome({
   const uploadRunRef = useRef(0)
   // canEdit of every folder card the page has listed: how the host knows whether the open folder takes uploads
   const folderEditableRef = useRef(new Map<string, boolean>())
+  // the manage level of a folder known from its card (the trash entry needs it known; unknown = not offered)
+  const folderManageRef = useRef(new Map<string, boolean>())
   // UNI-2066: the folder cards seen so far, so the create note can judge an open folder the tree has not delivered yet
   const folderRowRef = useRef(new Map<string, WorkspaceFolderCandidate>())
   // DH1-R4-8: an in-flight upload must never call onOpenDocument after unmount
@@ -1413,6 +1415,9 @@ export function DocumentsHome({
     if (item.kind === 'folder' && typeof item.canEdit === 'boolean') {
       folderEditableRef.current.set(item.id, item.canEdit)
     }
+    if (item.kind === 'folder' && typeof item.canManage === 'boolean') {
+      folderManageRef.current.set(item.id, item.canManage)
+    }
     if (item.kind === 'folder') {
       folderRowRef.current.set(item.id, {
         id: item.id,
@@ -1502,6 +1507,10 @@ export function DocumentsHome({
     const res = await trashDocument(doc)
     if (res.ok) {
       announce(t('uwDocArchived'))
+      // the open folder is gone: back to the folder it sat in
+      if (doc.kind === 'folder' && doc.id === folderIdRef.current) {
+        openFolderInWorkspace(doc.parentId ?? index.get(doc.id)?.parentId ?? null)
+      }
       refreshAll()
       return
     }
@@ -1801,6 +1810,10 @@ export function DocumentsHome({
           }),
       },
     )
+    // the web's card menu: Move to trash for the manage level, through the same confirm as a row
+    if (folder.canManage === true) {
+      items.push({ id: 'trash', label: t('dlActTrash'), onSelect: () => setArchiveTarget(folder) })
+    }
     return items
   }
 
@@ -1850,6 +1863,23 @@ export function DocumentsHome({
           }),
       },
     )
+    // as on the card: only a folder known to be manageable (opened from its card) offers the trash
+    if (folderManageRef.current.get(id) === true) {
+      items.push({
+        id: 'trash',
+        label: t('dlActTrash'),
+        onSelect: () =>
+          setArchiveTarget({
+            id,
+            workspaceId,
+            title: node.title,
+            format: null,
+            updatedAt: '',
+            kind: 'folder',
+            parentId: node.parentId,
+          }),
+      })
+    }
     return items
   }
 
@@ -2437,73 +2467,79 @@ export function DocumentsHome({
               </button>
             )}
           </div>
-          <div className="dh-toolbar-actions">
-            {folderUpload.available && folderUpload.foldersAvailable ? (
-              <UploadMenu
-                className="btn btn-secondary dh-toolbar-btn dh-btn-upload"
-                label={t('uhUpload')}
-                withIcon
-                onPickFiles={() => setUploadModal(true)}
-                onPickFolder={() => void folderUpload.pick(activeTargetFolder, 'folder')}
-              />
-            ) : (
-              <button
-                type="button"
-                className="btn btn-secondary dh-toolbar-btn dh-btn-upload"
-                onClick={() => setUploadModal(true)}
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+          {/* the web hides New and Upload where the create rule says no (a viewer in a workspace folder) */}
+          {openFolderCreatable && (
+            <div className="dh-toolbar-actions">
+              {folderUpload.available && folderUpload.foldersAvailable ? (
+                <UploadMenu
+                  className="btn btn-secondary dh-toolbar-btn dh-btn-upload"
+                  label={t('uhUpload')}
+                  withIcon
+                  onPickFiles={() => setUploadModal(true)}
+                  onPickFolder={() => void folderUpload.pick(activeTargetFolder, 'folder')}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-secondary dh-toolbar-btn dh-btn-upload"
+                  onClick={() => setUploadModal(true)}
                 >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                {t('uhUpload')}
-              </button>
-            )}
-            <NewMenu
-              label={t('uhCreateNew')}
-              hasFolderRow={hasFolderRow}
-              unavailable={unavailableKinds}
-              unavailableHint={t('uhCreateUnavailableHint')}
-              busy={creating}
-              onPick={(kind) => {
-                if (kind === 'folder') createFolderHere()
-                else void createNow(kind)
-              }}
-            />
-          </div>
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  {t('uhUpload')}
+                </button>
+              )}
+              <NewMenu
+                label={t('uhCreateNew')}
+                hasFolderRow={hasFolderRow}
+                unavailable={unavailableKinds}
+                unavailableHint={t('uhCreateUnavailableHint')}
+                busy={creating}
+                onPick={(kind) => {
+                  if (kind === 'folder') createFolderHere()
+                  else void createNow(kind)
+                }}
+              />
+            </div>
+          )}
         </div>
 
-        {subView !== 'trash' && subView !== 'archive' && subView !== 'elsewhere' && (
-          <div className="dh-quick-row">
-            <span className="dh-quick-label">{t('uhQuickCreate')}</span>
-            {QUICK_CREATE_KINDS.map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                className="dh-quick-pill"
-                data-quick-format={kind}
-                aria-disabled={creating || unavailableKinds.has(kind) || undefined}
-                title={unavailableKinds.has(kind) ? t('uhCreateUnavailableHint') : undefined}
-                onClick={() => void createNow(kind)}
-              >
-                <FileBadge ext={kind} size={18} />
-                <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
-                <span className="dh-quick-ext">{NEW_KIND_EXT[kind]}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        {subView !== 'trash' &&
+          subView !== 'archive' &&
+          subView !== 'elsewhere' &&
+          openFolderCreatable && (
+            <div className="dh-quick-row">
+              <span className="dh-quick-label">{t('uhQuickCreate')}</span>
+              {QUICK_CREATE_KINDS.map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  className="dh-quick-pill"
+                  data-quick-format={kind}
+                  aria-disabled={creating || unavailableKinds.has(kind) || undefined}
+                  title={unavailableKinds.has(kind) ? t('uhCreateUnavailableHint') : undefined}
+                  onClick={() => void createNow(kind)}
+                >
+                  <FileBadge ext={kind} size={18} />
+                  <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
+                  <span className="dh-quick-ext">{NEW_KIND_EXT[kind]}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
         {subView === 'trash' && <p className="dh-subview-banner">{t('dlTrashBanner30')}</p>}
         {folderNotice && (

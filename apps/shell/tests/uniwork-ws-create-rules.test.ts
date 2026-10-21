@@ -688,6 +688,10 @@ describe('DocumentsHome: cards, header, New menu and drop for workspace folders'
         },
       })),
       uniworkListWorkspaces: vi.fn(async () => ok([])),
+      uniworkArchiveImpact: vi.fn(async () =>
+        ok({ tooLarge: false as const, folders: 1, documents: 0, relocatedCount: 0 }),
+      ),
+      uniworkTrashShelvedDocument: vi.fn(async (id: string) => ok(entry(id, 'Trashed'))),
       uniworkFolderTree: vi.fn(async () => ok(homeTree)),
       uniworkEnsureMyFolder: vi.fn(async () => ok({ ...homeTree[0]! })),
       uniworkListChildren: vi.fn(
@@ -741,7 +745,7 @@ describe('DocumentsHome: cards, header, New menu and drop for workspace folders'
 
   it('A4 card: an editable folder keeps its full menu', async () => {
     await mountHome('viewer')
-    expect(await cardMenuActions('f-rw')).toEqual(['open', 'new', 'rename', 'move'])
+    expect(await cardMenuActions('f-rw')).toEqual(['open', 'new', 'rename', 'move', 'trash'])
   })
 
   it('A2 card: New subfolder on a workspace folder card shows the note', async () => {
@@ -814,6 +818,130 @@ describe('DocumentsHome: cards, header, New menu and drop for workspace folders'
     await flush()
     expect(viewerDrop.defaultPrevented).toBe(false)
     expect(bridge.preflight).not.toHaveBeenCalled()
+  })
+
+  // ── WS-V2: new content follows the create rule in the toolbar too ──
+
+  const toolbarOffers = () => ({
+    create: host.querySelector('button.dh-btn-create') !== null,
+    upload: host.querySelector('.dh-btn-upload') !== null,
+    quick: host.querySelector('.dh-quick-row') !== null,
+  })
+  const OFFERED = { create: true, upload: true, quick: true }
+  const WITHHELD = { create: false, upload: false, quick: false }
+  const openCard = async (id: string) => click(card(id)!.querySelector('.dh-folder-open'))
+
+  it('WS-V2: a human member, admin and owner see New, Upload and Quick create in a view-level workspace folder', async () => {
+    for (const role of ['member', 'admin', 'owner']) {
+      await mountHome(role)
+      await openCard('f-ws')
+      expect(toolbarOffers(), role).toEqual(OFFERED)
+      await act(async () => root.unmount())
+      root = createRoot(host)
+    }
+  })
+
+  it('WS-V2: a viewer, guest, agent or unknown role sees none of them in a view-level workspace folder', async () => {
+    for (const role of ['viewer', 'guest', 'agent', null]) {
+      await mountHome(role)
+      await openCard('f-ws')
+      expect(toolbarOffers(), String(role)).toEqual(WITHHELD)
+      await act(async () => root.unmount())
+      root = createRoot(host)
+    }
+  })
+
+  it('WS-V2: an editable folder and the workspace root keep them for a viewer', async () => {
+    await mountHome('viewer')
+    expect(toolbarOffers()).toEqual(OFFERED)
+    await openCard('f-rw')
+    expect(toolbarOffers()).toEqual(OFFERED)
+  })
+
+  it('WS-V2: leaving the view-only folder brings them back', async () => {
+    await mountHome('viewer')
+    await openCard('f-ws')
+    expect(toolbarOffers()).toEqual(WITHHELD)
+    await click(sidebarSlot.querySelector('[data-nav="workspace"]'))
+    expect(toolbarOffers()).toEqual(OFFERED)
+  })
+
+  // ── WS-V4: the web's folder card and open-folder menus offer the trash for manage ──
+
+  it('WS-V4 card: Move to trash only where the level is manage (the web gate), never on a view-level folder', async () => {
+    await mountHome('admin')
+    expect(await cardMenuActions('f-rw')).toEqual(['open', 'new', 'rename', 'move', 'trash'])
+    // edit without manage, and a view-level folder: no trash
+    expect(await cardMenuActions('f-empty')).toEqual(['open', 'new', 'rename', 'move'])
+    expect(await cardMenuActions('f-ws')).toEqual(['open', 'new'])
+  })
+
+  it('WS-V4 card: the entry reads "Move to trash" and opens the confirm', async () => {
+    await mountHome('member')
+    await click(card('f-rw')!.querySelector('[data-folder-menu-for]'))
+    const entryEl = $('[role="menuitem"][data-folder-action="trash"]')
+    expect(entryEl?.textContent).toContain(uniworkDocListStrings.en.dlActTrash)
+    await click(entryEl)
+    expect($('.modal.uw-act')).not.toBeNull()
+    expect($('.modal.uw-act .uw-act-heading')?.textContent).toContain('Editable')
+  })
+
+  it('WS-V4 card: confirming reads the impact, trashes through the folder call and refreshes', async () => {
+    await mountHome('member')
+    await click(card('f-rw')!.querySelector('[data-folder-menu-for]'))
+    await click($('[role="menuitem"][data-folder-action="trash"]'))
+    await flush()
+    expect(homeApi.uniworkArchiveImpact).toHaveBeenCalledWith('f-rw')
+    await click($('.modal.uw-act .btn-primary'))
+    expect(homeApi.uniworkTrashShelvedDocument).toHaveBeenCalledTimes(1)
+    expect(homeApi.uniworkTrashShelvedDocument!.mock.calls[0]![0]).toBe('f-rw')
+  })
+
+  it('WS-V4 card: Cancel trashes nothing', async () => {
+    await mountHome('member')
+    await click(card('f-rw')!.querySelector('[data-folder-menu-for]'))
+    await click($('[role="menuitem"][data-folder-action="trash"]'))
+    await click($('.modal.uw-act .btn-secondary'))
+    expect($('.modal.uw-act')).toBeNull()
+    expect(homeApi.uniworkTrashShelvedDocument).not.toHaveBeenCalled()
+  })
+
+  it('WS-V4 card: a relocated count shows the sentence in the confirm', async () => {
+    homeApi.uniworkArchiveImpact!.mockResolvedValueOnce(
+      ok({ tooLarge: false, folders: 1, documents: 3, relocatedCount: 2 }),
+    )
+    await mountHome('member')
+    await click(card('f-rw')!.querySelector('[data-folder-menu-for]'))
+    await click($('[role="menuitem"][data-folder-action="trash"]'))
+    await flush()
+    expect($('.modal.uw-act .uw-act-note')?.textContent).toBe(uf.ufTrashRelocated)
+  })
+
+  it('WS-V4 header: the open folder menu has Move to trash for manage, and a trashed open folder returns to the parent list', async () => {
+    await mountHome('member')
+    await openCard('f-rw')
+    await click(host.querySelector('[data-folder-menu-for="open-folder"]'))
+    expect(menuActions()).toEqual(['new', 'rename', 'move', 'trash'])
+    await click($('[role="menuitem"][data-folder-action="trash"]'))
+    await flush()
+    expect(homeApi.uniworkArchiveImpact).toHaveBeenCalledWith('f-rw')
+    await click($('.modal.uw-act .btn-primary'))
+    expect(homeApi.uniworkTrashShelvedDocument!.mock.calls[0]![0]).toBe('f-rw')
+    // back at the workspace root: the cards of the root show again
+    expect(card('f-ws')).not.toBeNull()
+  })
+
+  it('WS-V4 header: no trash in the header of a folder the level does not manage', async () => {
+    await mountHome('member')
+    await openCard('f-ws')
+    await click(host.querySelector('[data-folder-menu-for="open-folder"]'))
+    expect(menuActions()).toEqual(['new'])
+    await click($('[role="menuitem"][data-folder-action="new"]'))
+    await click($('.modal.uw-act .btn-secondary'))
+    await click(sidebarSlot.querySelector('[data-nav="workspace"]'))
+    await openCard('f-empty')
+    await click(host.querySelector('[data-folder-menu-for="open-folder"]'))
+    expect(menuActions()).toEqual(['new', 'rename', 'move'])
   })
 
   it('A9: a card says "Empty" only for isEmpty === true; absent or false says nothing', async () => {

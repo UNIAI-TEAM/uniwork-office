@@ -165,7 +165,8 @@ describe('UNI-2047 B0 subfolders on workspace and folder pages', () => {
   it('starts the card menu with Mở, then the folder commands in the shared order', async () => {
     await mount()
     const items = await menuOf('.dh-folder-card[data-folder-id="fold-m"]')
-    expect(ids(items)).toEqual(['open', 'new', 'rename', 'move'])
+    // the trash closes the list for a manageable folder, as the web's card menu does (UNI-2066 WS-V4)
+    expect(ids(items)).toEqual(['open', 'new', 'rename', 'move', 'trash'])
     expect(items[0]!.textContent?.trim()).toBe('Mở')
     api.uniworkListChildren.mockClear()
     await act(async () => {
