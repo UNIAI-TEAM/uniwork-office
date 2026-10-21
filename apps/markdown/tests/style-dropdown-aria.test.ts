@@ -73,41 +73,49 @@ const BOUND: ReadonlyArray<{ value: string; command: MarkdownCommand }> = [
   { value: 'paragraph', command: 'paragraph' },
 ]
 
-describe.each<ShortcutPlatform>(['win', 'mac'])('Markdown block-style dropdown (%s)', (platform) => {
-  beforeEach(() => {
-    vi.spyOn(navigator, 'platform', 'get').mockReturnValue(
-      platform === 'mac' ? 'MacIntel' : 'Win32',
-    )
-  })
+describe.each<ShortcutPlatform>(['win', 'mac'])(
+  'Markdown block-style dropdown (%s)',
+  (platform) => {
+    beforeEach(() => {
+      vi.spyOn(navigator, 'platform', 'get').mockReturnValue(
+        platform === 'mac' ? 'MacIntel' : 'Win32',
+      )
+    })
 
-  it('table-bound rows carry the platform aria-keyshortcuts', () => {
-    const container = openStyleDropdown()
-    for (const { value, command } of BOUND) {
-      const option = container.querySelector(`[role="option"][data-value="${value}"]`)!
-      const want = markdownAria(command, platform, markdownSurface())
-      expect(option.getAttribute('aria-keyshortcuts'), `${value} on ${platform}`).toBe(want || null)
-    }
-    // the headings have a chord on both platforms, so the check above is not vacuous
-    expect(markdownAria('heading1', platform, markdownSurface())).not.toBe('')
-  })
+    it('table-bound rows carry the platform aria-keyshortcuts', () => {
+      const container = openStyleDropdown()
+      for (const { value, command } of BOUND) {
+        const option = container.querySelector(`[role="option"][data-value="${value}"]`)!
+        const want = markdownAria(command, platform, markdownSurface())
+        expect(option.getAttribute('aria-keyshortcuts'), `${value} on ${platform}`).toBe(
+          want || null,
+        )
+      }
+      // the headings have a chord on both platforms, so the check above is not vacuous
+      expect(markdownAria('heading1', platform, markdownSurface())).not.toBe('')
+    })
 
-  it('rows without a table row announce no chord', () => {
-    const container = openStyleDropdown()
-    for (const value of ['h4', 'h5', 'h6', 'quote', 'codeBlock']) {
-      const option = container.querySelector(`[role="option"][data-value="${value}"]`)!
-      expect(option.getAttribute('aria-keyshortcuts'), value).toBeNull()
-    }
-  })
+    it('rows without a table row announce no chord', () => {
+      const container = openStyleDropdown()
+      for (const value of ['h4', 'h5', 'h6', 'quote', 'codeBlock']) {
+        const option = container.querySelector(`[role="option"][data-value="${value}"]`)!
+        expect(option.getAttribute('aria-keyshortcuts'), value).toBeNull()
+      }
+    })
 
-  it('option names carry no chord', () => {
-    const container = openStyleDropdown()
-    const options = [...container.querySelectorAll('[role="option"]')]
-    expect(options.length).toBeGreaterThan(5)
-    for (const option of options) {
-      expect(findDisplayChord(option.getAttribute('aria-label') ?? ''), option.outerHTML).toBeNull()
-    }
-  })
-})
+    it('option names carry no chord', () => {
+      const container = openStyleDropdown()
+      const options = [...container.querySelectorAll('[role="option"]')]
+      expect(options.length).toBeGreaterThan(5)
+      for (const option of options) {
+        expect(
+          findDisplayChord(option.getAttribute('aria-label') ?? ''),
+          option.outerHTML,
+        ).toBeNull()
+      }
+    })
+  },
+)
 
 describe('Markdown block-style labels in every locale', () => {
   it('carry no chord', () => {

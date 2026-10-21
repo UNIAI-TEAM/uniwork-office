@@ -89,7 +89,9 @@ describe('markdown find panel step buttons', () => {
 
   it.each(LANGS.map((lang) => [lang]))('%s: names carry no chord, chords are announced', (lang) => {
     const s = stringsFor(lang)
-    act(() => root.render(createElement(FindPanel, { target: TARGET, strings: s, onClose: () => {} })))
+    act(() =>
+      root.render(createElement(FindPanel, { target: TARGET, strings: s, onClose: () => {} })),
+    )
     const prev = host.querySelector<HTMLElement>('[data-find-step="prev"]')!
     const next = host.querySelector<HTMLElement>('[data-find-step="next"]')!
     const close = host.querySelector<HTMLElement>('.find-close')!
