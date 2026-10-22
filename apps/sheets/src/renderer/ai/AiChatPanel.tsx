@@ -408,6 +408,7 @@ export function AiChatPanel({
 }): React.JSX.Element {
   const { t, lang } = useI18n()
   const askUni = useAskUniMode(lang, askUniBindingKey)
+  const leaveAskUni = askUni.leave
   const needModelHint = useAiModelNeedHint()
   // the UniWork disclosure gate of every send entry: the composer feeds it, the queue pump asks it
   // silently, and retry (and, through ExcelShell, presets and ribbon runs) refuse through it
@@ -643,10 +644,18 @@ export function AiChatPanel({
   )
   uniworkGate.setPanelBlocked(isUniwork && !uniworkDisclosureAcked)
   // a refusal while collapsed expands the panel; once open it announces and focuses the disclosure
-  uniworkGate.setPanelOpen(isOpen, onExpand)
+  uniworkGate.setPanelOpen(isOpen, () => {
+    // the refusal's disclosure sits in the chat composer
+    leaveAskUni()
+    onExpand()
+  })
   useEffect(() => {
     if (isOpen) uniworkGate.flushPendingRefusal()
   }, [isOpen, uniworkGate])
+  // a ribbon / menu run starts without the composer: it runs in the chat, so leave Ask UNI for it
+  useEffect(() => {
+    if (aiBusy) leaveAskUni()
+  }, [aiBusy, leaveAskUni])
 
   if (!isOpen) {
     // the sidebar setting is off: nothing to show until an explicit AI action opens the panel

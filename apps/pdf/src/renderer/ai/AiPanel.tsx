@@ -771,6 +771,8 @@ export function AiPanel({
   // preset lands in the composer instead of being dropped silently (markdown parity)
   useEffect(() => {
     if (!preset) return
+    // the run lands in the chat: leave Ask UNI so it is the one on screen
+    askUni.leave()
     if (loopRef.current?.busy) setPrompt(preset.text)
     else send(preset.text)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per nonce

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, createElement as h, useState } from 'react'
+import { act, createElement as h, useEffect, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AskUniDocBridge, AskUniDocFlags } from '@genoffice/ai-provider/askuni'
@@ -34,10 +34,25 @@ function fakeBridge(flags: AskUniDocFlags) {
 
 const DOC: AskUniDocFlags = { streamEnabled: true, bound: 'document' }
 
-function Panel(props: { lang?: 'en' | 'vi'; bindingKey?: string | null }) {
+interface PanelProps {
+  lang?: 'en' | 'vi'
+  bindingKey?: string | null
+  /** false = the dock is collapsed: like the real panels, a rail replaces the whole tree */
+  open?: boolean
+  /** a ribbon / menu AI action: a new nonce runs it in the chat */
+  preset?: number
+}
+
+function Panel(props: PanelProps) {
   const lang = props.lang ?? 'en'
   const mode = useAskUniMode(lang, props.bindingKey)
   const [draft, setDraft] = useState('')
+  // what each panel's preset effect does: the run lands in the chat, so the chat has to show
+  useEffect(() => {
+    if (props.preset) mode.leave()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per nonce
+  }, [props.preset])
+  if (props.open === false) return h('button', { className: 'ai-rail' }, 'rail')
   return h(
     'aside',
     null,
@@ -64,7 +79,7 @@ describe('Ask UNI as a mode of an editor AI panel', () => {
   let host: HTMLDivElement
   let root: Root
 
-  const mount = async (props: { lang?: 'en' | 'vi'; bindingKey?: string | null } = {}) => {
+  const mount = async (props: PanelProps = {}) => {
     await act(async () => {
       root.render(h(Panel, props))
     })
@@ -184,6 +199,106 @@ describe('Ask UNI as a mode of an editor AI panel', () => {
       expect(bridge.askUniDocFlags.mock.calls.length).toBe(first)
       await mount({ bindingKey: '/uniwork/plan.docx' })
       expect(bridge.askUniDocFlags.mock.calls.length).toBeGreaterThan(first)
+    })
+  })
+
+  describe('collapsing the dock', () => {
+    const ev = (e: Record<string, unknown>) => e as never
+
+    function streamingBridge() {
+      const bridge = fakeBridge(DOC)
+      let emit: (e: never) => void = () => undefined
+      bridge.onAskUniDocStreamEvent = vi.fn((cb: (e: never) => void) => {
+        emit = cb
+        return () => undefined
+      }) as never
+      bridge.askUniDocMessages = vi.fn(async () => ({
+        ok: true as const,
+        messages: [
+          { id: 'u1', role: 'user', content: 'Who owns billing?', citations: [] },
+          { id: 'a1', role: 'assistant', content: 'Dana owns it.', citations: [] },
+        ],
+      })) as never
+      ;(window as unknown as Win).uniworkAskUniDoc = bridge
+      return { bridge, emit: (e: Record<string, unknown>) => emit(ev(e)) }
+    }
+    const ask = async (question: string) => {
+      const box = host.querySelector('textarea[aria-label]') as HTMLTextAreaElement
+      await act(async () => {
+        const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        set?.call(box, question)
+        box.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      await act(async () => {
+        box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+        await Promise.resolve()
+      })
+      await act(async () => {
+        for (let i = 0; i < 5; i++) await Promise.resolve()
+      })
+    }
+    const stopButton = () => host.querySelector('button[aria-label="Stop"]')
+
+    it('keeps a running turn: nothing is cancelled and the answer is still being written', async () => {
+      const { bridge, emit } = streamingBridge()
+      await mount()
+      await click(toggle())
+      await ask('Who owns billing?')
+      expect(stopButton()).not.toBeNull()
+      await mount({ open: false })
+      expect(host.querySelector('.ai-rail')).not.toBeNull()
+      expect(bridge.askUniDocStreamCancel).not.toHaveBeenCalled()
+      // an event that arrives while the dock is collapsed still lands
+      await act(async () => {
+        emit({ type: 'run', requestId: 'r1', conversationId: 'c1', runId: 'x' })
+        emit({ type: 'delta', requestId: 'r1', text: 'Dana' })
+      })
+      await mount({ open: true })
+      expect(stopButton()).not.toBeNull()
+      expect(host.textContent).toContain('Dana')
+    })
+
+    it('keeps the conversation and the draft: expanding again is not a new empty chat', async () => {
+      const { emit } = streamingBridge()
+      await mount()
+      await click(toggle())
+      await ask('Who owns billing?')
+      await act(async () => {
+        emit({ type: 'run', requestId: 'r1', conversationId: 'c1', runId: 'x' })
+        emit({
+          type: 'done',
+          requestId: 'r1',
+          message: { id: 'a1', role: 'assistant', content: 'Dana owns it.', citations: [] },
+        })
+      })
+      const box = host.querySelector('textarea[aria-label]') as HTMLTextAreaElement
+      await act(async () => {
+        const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        set?.call(box, 'and the follow-up')
+        box.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      await mount({ open: false })
+      await mount({ open: true })
+      expect(host.querySelector('.askuni-doc-empty')).toBeNull()
+      expect(host.textContent).toContain('Dana owns it.')
+      expect((host.querySelector('textarea[aria-label]') as HTMLTextAreaElement).value).toBe(
+        'and the follow-up',
+      )
+      expect(toggle()?.getAttribute('aria-pressed')).toBe('true')
+    })
+  })
+
+  describe('an AI preset while Ask UNI shows', () => {
+    it('leaves Ask UNI so the chat that runs it is the one on screen, and the Ask conversation stays', async () => {
+      ;(window as unknown as Win).uniworkAskUniDoc = fakeBridge(DOC)
+      await mount()
+      await click(toggle())
+      expect((host.querySelector('.ai-askuni-chat-pane') as HTMLElement).hidden).toBe(true)
+      await mount({ preset: 1 })
+      expect((host.querySelector('.ai-askuni-chat-pane') as HTMLElement).hidden).toBe(false)
+      expect(toggle()?.getAttribute('aria-pressed')).toBe('false')
+      expect((host.querySelector('.ai-askuni-pane') as HTMLElement).hidden).toBe(true)
+      expect(host.querySelector('.ai-sr-status')?.textContent).toBe('chat says')
     })
   })
 

@@ -189,6 +189,14 @@ describe('AskUniThread (adapter)', () => {
       expect(host.textContent).not.toContain(en('askUniErrDefault'))
     })
 
+    it('announces a failed first load to assistive tech (role alert on the error line)', async () => {
+      fake.loadMessages.mockResolvedValueOnce({ ok: false, error: 'offline' })
+      await mount()
+      const line = host.querySelector('li.askuni-v2-error')
+      expect(line?.getAttribute('role')).toBe('alert')
+      expect(line?.textContent).toContain(en('askUniErrDefault'))
+    })
+
     it('a rejected first load reads the same, and a failed reload after a good load shows no error', async () => {
       fake.loadMessages.mockRejectedValueOnce(new Error('x'))
       await mount()

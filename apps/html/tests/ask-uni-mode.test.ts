@@ -38,4 +38,14 @@ describe('html panel wiring (source)', () => {
   it('names the file by its base name only', () => {
     expect(panel).toContain('askUniFileName(filePath')
   })
+
+  it('leaves Ask UNI when an AI action runs, so the chat that carries the run is on screen', () => {
+    expect(panel).toMatch(/\b(askUni\.leave|leaveAskUni)\(\)/)
+  })
+
+  it('ignores file drops on the panel while Ask UNI shows (the chat composer is hidden)', () => {
+    const start = panel.indexOf('onDragOver={')
+    const handlers = panel.slice(start, panel.indexOf('onDrop={', start) + 60)
+    expect(handlers.match(/askUni\.active/g)?.length).toBeGreaterThanOrEqual(2)
+  })
 })

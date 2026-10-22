@@ -5304,7 +5304,7 @@ export function App({
         {...(workbookFile
           ? {
               askUniDocumentName: workbookFile.name,
-              askUniBindingKey: workbookFile.path ?? workbookFile.name,
+              askUniBindingKey: `${workbookFile.path ?? workbookFile.name}|${workbookFile.uniworkBound ? 'u' : 'l'}`,
             }
           : {})}
         prompt={prompt}

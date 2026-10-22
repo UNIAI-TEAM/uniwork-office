@@ -12,7 +12,12 @@ export {
   AskUniComposerBox,
   type AskUniComposerBoxProps,
 } from './AskUniComposerBox'
-export { AskUniEditorBody, type AskUniEditorBodyProps } from './AskUniEditorBody'
+export {
+  AskUniEditorBody,
+  useAskUniSession,
+  type AskUniEditorBodyProps,
+  type AskUniSession,
+} from './AskUniEditorBody'
 export { AskUniActions, answerPlainText, clearAskUniRatings } from './AskUniActions'
 export { AskUniTurn, type AskUniTurnMessage } from './AskUniAnswer'
 export { CitationMarker, KindIcon, SourceChips, knownKind } from './AskUniCitation'

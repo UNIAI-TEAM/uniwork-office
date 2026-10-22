@@ -225,7 +225,7 @@ export function AskUniThread({
           />
         ))}
         {firstLoad && loadFailed ? (
-          <li className="askuni-v2-error">
+          <li className="askuni-v2-error" role="alert">
             <p>{t('askUniErrDefault')}</p>
             <button
               type="button"
