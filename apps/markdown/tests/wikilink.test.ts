@@ -383,6 +383,9 @@ describe('resolution', () => {
     expect(state('[[b|Bee]]')).toContain('wiki-link-resolved')
     expect(state('[[b]]')).toContain('wiki-link-resolved')
     expect(state('[[missing]]')).toContain('wiki-link-unresolved')
+    expect(state('[[sub/c]]')).toContain('wiki-link-resolved')
+    expect(state('[[#Heading]]')).toContain('wiki-link-resolved')
+    expect(state('[[b#Heading]]')).toContain('wiki-link-resolved')
   })
 
   it('decorates a new link that shares a target already answered, without asking again', async () => {

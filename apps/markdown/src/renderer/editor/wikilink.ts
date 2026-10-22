@@ -19,7 +19,8 @@ const WIKI_LINK_RE = /^\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+))?\]\]/
 export function wikiTarget(raw: string): string {
   const inner = raw.replace(/^\[\[/, '').replace(/\]\]$/, '')
   const bar = inner.indexOf('|')
-  return (bar < 0 ? inner : inner.slice(0, bar)).trim()
+  // a table cell writes the alias bar as `\|`; the backslash is not part of the name
+  return (bar < 0 ? inner : inner.slice(0, bar)).replace(/\\$/, '').trim()
 }
 
 /**
@@ -200,30 +201,8 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
     /** what the last resolution asked for; a pause that asks the same thing again is not a new question */
     let asked = ''
 
-    const resolveNow = async (view: EditorView) => {
-      const targets = collectWikiTargets(view.state.doc)
-      if (targets.length === 0) {
-        asked = ''
-        if (view.isDestroyed) return
-        view.dispatch(view.state.tr.setMeta(key, { decorations: DecorationSet.empty, answers: {} }))
-        return
-      }
-      const fromPath = options.getDocumentPath()
-      const question = `${fromPath}\u0000${targets.join('\u0000')}`
-      // the walk it triggers can read twenty thousand entries; typing prose
-      // around an unresolved link changes no target, so it asks nothing
-      if (question === asked) return
-      const mine = ++generation
-      let answers: Record<string, WikiLinkResolved>
-      try {
-        answers = await options.resolve(fromPath, targets)
-      } catch {
-        return // an unavailable resolver must not break editing
-      }
-      // a later keystroke started a newer resolution; its answer is the current one
-      if (mine !== generation || view.isDestroyed) return
-      asked = question
-
+    /** paint every link in the document from the answers at hand */
+    const decorate = (view: EditorView, answers: Record<string, WikiLinkResolved>) => {
       const decorations = wikiSpans(view.state.doc).map((span) =>
         Decoration.inline(span.from, span.to, {
           class: answers[wikiTarget(span.raw)]?.found
@@ -238,6 +217,38 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
           answers,
         }),
       )
+    }
+
+    const resolveNow = async (view: EditorView) => {
+      const targets = collectWikiTargets(view.state.doc)
+      if (targets.length === 0) {
+        asked = ''
+        if (view.isDestroyed) return
+        view.dispatch(view.state.tr.setMeta(key, { decorations: DecorationSet.empty, answers: {} }))
+        return
+      }
+      const fromPath = options.getDocumentPath()
+      const question = `${fromPath}\u0000${targets.join('\u0000')}`
+      // the walk it triggers can read twenty thousand entries; typing prose
+      // around an unresolved link changes no target, so it asks nothing; a link
+      // that is new but shares a target already answered is painted from the
+      // answers in hand
+      if (question === asked) {
+        if (!view.isDestroyed) decorate(view, key.getState(view.state)?.answers ?? {})
+        return
+      }
+      const mine = ++generation
+      let answers: Record<string, WikiLinkResolved>
+      try {
+        answers = await options.resolve(fromPath, targets)
+      } catch {
+        return // an unavailable resolver must not break editing
+      }
+      // a later keystroke started a newer resolution; its answer is the current one
+      if (mine !== generation || view.isDestroyed) return
+      asked = question
+
+      decorate(view, answers)
     }
 
     const schedule = (view: EditorView) => {
