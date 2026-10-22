@@ -225,6 +225,7 @@ export const zh = {
   wbDeskReasonConflict: '本机版本与 UniWork 上的版本不一致',
   wbDeskReasonSync: '本机的更改尚未同步到 UniWork',
   wbDeskMore: '再显示 {count} 项',
+  wbDeskInTrayViewAll: '查看全部',
   wbDeskInProgress: '进行中',
   wbDeskInProgressEmpty: '暂无进行中的文档',
   wbDeskUnsaved: '未保存',

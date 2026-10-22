@@ -43,6 +43,8 @@ interface Props {
   local: readonly RecentEntry[]
   /** reload the workspace list and every server section (the top bar's Refresh) */
   onReload?: () => void
+  /** "View all" opens the Inbox tab, which pages every notice */
+  onOpenInbox?: () => void
   /** bumped by the top bar's Refresh: "Shared with you" reloads too */
   refreshTick?: number
 }
@@ -55,6 +57,7 @@ export function DeskInTray({
   view,
   local,
   onReload,
+  onOpenInbox,
   refreshTick,
 }: Props): ReactElement {
   const { t, dateLocale } = useI18n()
@@ -281,6 +284,10 @@ export function DeskInTray({
     )
   }
 
+  // the unread list is one page: older unread notices (document changes too) wait in the Inbox;
+  // a stale flag from an earlier load stays hidden while the tray shows a failure or a sign-in note
+  const showViewAll = notices.more && !!onOpenInbox && view === 'ready' && !notices.error
+
   return (
     <section
       ref={sectionRef}
@@ -351,15 +358,22 @@ export function DeskInTray({
               )
             }}
           />
-          {rows.length > visible.length ? (
-            <div className="wb-desk-more">
-              <button type="button" className="wb-link" onClick={() => setExpanded(true)}>
-                {t('wbDeskMore', { count: rows.length - visible.length })}
-              </button>
-            </div>
-          ) : null}
         </>
       )}
+      {rows.length > visible.length || showViewAll ? (
+        <div className="wb-desk-more">
+          {rows.length > visible.length ? (
+            <button type="button" className="wb-link" onClick={() => setExpanded(true)}>
+              {t('wbDeskMore', { count: rows.length - visible.length })}
+            </button>
+          ) : null}
+          {showViewAll ? (
+            <button type="button" className="wb-link" onClick={onOpenInbox}>
+              {t('wbDeskInTrayViewAll')}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {listFor ? (
         <DocChangeDialog
           key={listFor}
