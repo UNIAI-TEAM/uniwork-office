@@ -236,6 +236,8 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
       // that is new but shares a target already answered is painted from the
       // answers in hand
       if (question === asked) {
+        // a resolution still in flight answers an older question; drop it
+        generation++
         if (!view.isDestroyed) decorate(view, key.getState(view.state)?.answers ?? {})
         return
       }
