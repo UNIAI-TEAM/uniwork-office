@@ -1428,6 +1428,21 @@ describe('the raw scan reads a shadowed table and a re-exported ipcMain', () => 
   })
 })
 
+/** HGB-2: an editor view reaches home:open-path only for the notes its wiki links resolve to */
+describe('the home:open-path handler narrows the editor side', () => {
+  const index = sources.find((s) => isIndex(s.file))!
+
+  it('checks a non-shell sender against editorMayOpenPath before opening', () => {
+    const text = code(index.text)
+    const start = text.indexOf('guardedIpc.handle(HOME_CHANNELS.openPath')
+    expect(start).toBeGreaterThan(-1)
+    const body = text.slice(start, text.indexOf('\n  })', start))
+    expect(body).toMatch(/event\.sender\s*!==\s*shellWindow\??\.webContents/)
+    expect(body).toMatch(/!editorMayOpenPath\(path\)/)
+    expect(body.indexOf('editorMayOpenPath')).toBeLessThan(body.indexOf('openDocumentPath'))
+  })
+})
+
 describe('registrars under the real guard', () => {
   it('registers every channel of the small registrars without a refused registration', () => {
     const guard = createIpcSenderGuard({

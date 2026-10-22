@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { TEXT_RE, appForPath, renameStaysInApp } from '../src/main/app-routing'
+import { TEXT_RE, appForPath, editorMayOpenPath, renameStaysInApp } from '../src/main/app-routing'
 
 describe('appForPath', () => {
   it('routes the markdown app at every extension it opens', () => {
@@ -75,5 +75,28 @@ describe('renameStaysInApp', () => {
   it('stays put when the file was never openable to begin with', () => {
     // no app to stay in, so this gate is not what blocks it
     expect(renameStaysInApp('/x/a.xyz', 'a.anything')).toBe(true)
+  })
+})
+
+describe('editorMayOpenPath', () => {
+  it('accepts the notes a markdown wiki link resolves to', () => {
+    for (const name of ['a.md', 'a.markdown', 'a.TXT', 'a.json']) {
+      expect(editorMayOpenPath(`/x/${name}`), name).toBe(true)
+    }
+  })
+
+  it('refuses every other document type and paths no app routes to', () => {
+    for (const name of [
+      'a.docx',
+      'a.xlsx',
+      'a.pptx',
+      'a.pdf',
+      'a.html',
+      'a.png',
+      'a',
+      'a.md.exe',
+    ]) {
+      expect(editorMayOpenPath(`/x/${name}`), name).toBe(false)
+    }
   })
 })
