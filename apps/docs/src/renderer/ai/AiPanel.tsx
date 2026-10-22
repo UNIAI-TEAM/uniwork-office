@@ -113,7 +113,7 @@ import {
   askUniFileName,
   askUniLiveText,
   useAskUniMode,
-} from './ask-uni-mode'
+} from '@genoffice/ui'
 import {
   AI_RUN_DONE_EVENT,
   AI_SAVE_OFFER_EVENT,
@@ -511,7 +511,7 @@ export function AiPanel({
   sideState,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
-  const askUni = useAskUniMode(lang)
+  const askUni = useAskUniMode(lang, filePath)
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
   const isRtl = lang === 'ar' || lang === 'he'
   // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
@@ -1820,7 +1820,7 @@ export function AiPanel({
             onMove={(side) => window.desktop.setAiPanelPrefs({ side })}
           />
           <AskUniModeToggle mode={askUni} lang={lang} />
-          {(chat.length > 0 || historicChat.length > 0) && (
+          {(chat.length > 0 || historicChat.length > 0) && !askUni.active && (
             <button
               className="ai-header-btn"
               onClick={newChat}

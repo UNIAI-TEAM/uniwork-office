@@ -54,7 +54,7 @@ import {
   askUniChatPaneProps,
   askUniLiveText,
   useAskUniMode,
-} from './ask-uni-mode'
+} from '@genoffice/ui'
 
 function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
   return (window as Window & { uniworkCloudStatus?: UniworkCloudStatusBridge }).uniworkCloudStatus
@@ -404,7 +404,7 @@ export function AiChatPanel({
   } | null
 }): React.JSX.Element {
   const { t, lang } = useI18n()
-  const askUni = useAskUniMode(lang)
+  const askUni = useAskUniMode(lang, askUniDocumentName)
   const needModelHint = useAiModelNeedHint()
   // the UniWork disclosure gate of every send entry: the composer feeds it, the queue pump asks it
   // silently, and retry (and, through ExcelShell, presets and ribbon runs) refuse through it
@@ -779,7 +779,7 @@ export function AiChatPanel({
             onMove={(side) => window.desktopApi.setAiPanelPrefs({ side })}
           />
           <AskUniModeToggle mode={askUni} lang={lang} />
-          {(chat.length > 0 || historicChat.length > 0) && (
+          {(chat.length > 0 || historicChat.length > 0) && !askUni.active && (
             <button
               className="ai-header-btn"
               onClick={() => {

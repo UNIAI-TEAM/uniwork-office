@@ -54,7 +54,7 @@ function DocIcon(): ReactElement {
 
 function Chat(props: {
   documentName: string
-  onLiveStatus?: (text: string) => void
+  onLiveStatus?: ((text: string) => void) | undefined
 }): ReactElement {
   const adapter = useAskUniAdapter()
   const { t } = adapter

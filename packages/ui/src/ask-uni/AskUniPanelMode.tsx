@@ -1,18 +1,15 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import type { AskUniDocBridge, AskUniDocFlags } from '@genoffice/ai-provider/askuni'
-import {
-  AskUniEditorBody,
-  askUniText,
-  createAskUniDocAdapter,
-  useAskUniDocFlags,
-  type AskUniAdapter,
-} from '@genoffice/ui'
-import './ask-uni-mode.css'
+import { askUniText } from '../strings-ask-uni'
+import { createAskUniDocAdapter, type AskUniAdapter } from './adapter'
+import { AskUniEditorBody } from './AskUniEditorBody'
+import { useAskUniDocFlags } from './use-ask-uni-doc-flags'
+import './ask-uni-panel-mode.css'
 
-// Ask UNI as a mode of the AI panel (contract E1): a toggle in the panel header, a body that takes the
-// place of the chat while it is on, and the panel's one polite live region. The chat stays mounted but
+// Ask UNI as a mode of an editor AI panel (contract E1; one component for every editor): a toggle in
+// the panel header, a body that takes the place of the chat while it is on, and the panel's one polite live region. The chat stays mounted but
 // hidden, so its draft, scroll and any running turn survive. Everything is behind the editor bridge
 // (`window.uniworkAskUniDoc`, installed by the preload): without it, as in the web build, the toggle
 // is not there. The renderer never names a workspace or a document: main derives both from the tab.
@@ -45,14 +42,22 @@ export function askUniFileName(path: string | null | undefined): string {
   return parts[parts.length - 1] ?? ''
 }
 
-export function useAskUniMode(lang: Lang): AskUniMode {
+/**
+ * Panel mode state. `bindingKey` is whatever names the file the tab shows (its path): what the tab is
+ * bound to (a UniWork document, a local file, ...) is read from main again when the key changes and each
+ * time the mode is turned on, so a file saved to UniWork in between is picked up.
+ */
+export function useAskUniMode(lang: Lang, bindingKey?: string | null): AskUniMode {
   const bridge = askUniDocBridge()
   const [on, setOn] = useState(false)
   const [opened, setOpened] = useState(false)
-  // the binding can change while the panel lives (the file is saved to UniWork): ask again on each open
   const [tick, setTick] = useState(0)
   const [status, setStatus] = useState('')
-  const flags = useAskUniDocFlags(bridge, tick)
+  const bound = useRef({ value: bindingKey, changes: 0 })
+  if (bound.current.value !== bindingKey) {
+    bound.current = { value: bindingKey, changes: bound.current.changes + 1 }
+  }
+  const flags = useAskUniDocFlags(bridge, bound.current.changes + tick)
   const adapter = useMemo(
     () =>
       bridge

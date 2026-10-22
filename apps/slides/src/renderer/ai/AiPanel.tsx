@@ -97,7 +97,7 @@ import {
   askUniFileName,
   askUniLiveText,
   useAskUniMode,
-} from './ask-uni-mode'
+} from '@genoffice/ui'
 import { useI18n, t as tGlobal, aiLangDirective, getLang, type TFunc } from '../i18n/locale'
 import {
   AiErrorAction,
@@ -477,7 +477,7 @@ export function AiPanel({
   uniworkBound = false,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
-  const askUni = useAskUniMode(lang)
+  const askUni = useAskUniMode(lang, currentFilePath)
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
   const isRtl = lang === 'ar' || lang === 'he'
   const [input, setInput] = useState('')
@@ -2406,7 +2406,7 @@ export function AiPanel({
             onMove={(side) => window.slidesApi.setAiPanelPrefs({ side })}
           />
           <AskUniModeToggle mode={askUni} lang={lang} />
-          {(chat.length > 0 || historicChat.length > 0) && (
+          {(chat.length > 0 || historicChat.length > 0) && !askUni.active && (
             <button
               className="ai-header-btn"
               onClick={newChat}

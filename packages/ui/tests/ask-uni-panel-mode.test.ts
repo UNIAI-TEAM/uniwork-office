@@ -34,9 +34,9 @@ function fakeBridge(flags: AskUniDocFlags) {
 
 const DOC: AskUniDocFlags = { streamEnabled: true, bound: 'document' }
 
-function Panel(props: { lang?: 'en' | 'vi' }) {
+function Panel(props: { lang?: 'en' | 'vi'; bindingKey?: string | null }) {
   const lang = props.lang ?? 'en'
-  const mode = useAskUniMode(lang)
+  const mode = useAskUniMode(lang, props.bindingKey)
   const [draft, setDraft] = useState('')
   return h(
     'aside',
@@ -64,7 +64,7 @@ describe('Ask UNI as a mode of an editor AI panel', () => {
   let host: HTMLDivElement
   let root: Root
 
-  const mount = async (props: { lang?: 'en' | 'vi' } = {}) => {
+  const mount = async (props: { lang?: 'en' | 'vi'; bindingKey?: string | null } = {}) => {
     await act(async () => {
       root.render(h(Panel, props))
     })
@@ -173,6 +173,16 @@ describe('Ask UNI as a mode of an editor AI panel', () => {
       await mount()
       const first = bridge.askUniDocFlags.mock.calls.length
       await click(toggle())
+      expect(bridge.askUniDocFlags.mock.calls.length).toBeGreaterThan(first)
+    })
+
+    it('reads the flags again when the binding key changes (the tab now shows another file) and not on an unrelated render', async () => {
+      const bridge = (window as unknown as Win).uniworkAskUniDoc as ReturnType<typeof fakeBridge>
+      await mount({ bindingKey: '/a/plan.docx' })
+      const first = bridge.askUniDocFlags.mock.calls.length
+      await mount({ bindingKey: '/a/plan.docx', lang: 'en' })
+      expect(bridge.askUniDocFlags.mock.calls.length).toBe(first)
+      await mount({ bindingKey: '/uniwork/plan.docx' })
       expect(bridge.askUniDocFlags.mock.calls.length).toBeGreaterThan(first)
     })
   })
