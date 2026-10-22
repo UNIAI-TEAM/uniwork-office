@@ -46,9 +46,9 @@ has_apt_source=false
 if [ "$(dpkg-deb --fsys-tarfile "$deb" | tar -tf - | grep -cx './opt/UniWork Office/resources/apt/uniwork-office.sources')" = 1 ]; then
   has_apt_source=true
 fi
-# Version 0.11.0-dev.1 -> channel dev
+# electron-builder writes the deb Version with "~" for "-": 0.11.0~dev.1 -> channel dev
 version="$(dpkg-deb -f "$deb" Version)"
-channel="${version#*-}"
+channel="${version#*[-~]}"
 channel="${channel%%.*}"
 expected_sources="$(printf '%s\n' \
   '# managed by uniwork-office' \
