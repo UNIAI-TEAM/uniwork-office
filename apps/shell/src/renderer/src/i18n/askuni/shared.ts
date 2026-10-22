@@ -1,3 +1,4 @@
+import type { Lang } from '@genoffice/i18n'
 import { askUniUiStrings } from '@genoffice/ui'
 
 /**
@@ -48,7 +49,7 @@ export const SHARED_ASKUNI_KEYS = [
 
 export type SharedAskUniKey = (typeof SHARED_ASKUNI_KEYS)[number]
 
-export function sharedAskUni(lang: 'zh' | 'en' | 'vi'): Record<SharedAskUniKey, string> {
+export function sharedAskUni(lang: Lang): Record<SharedAskUniKey, string> {
   const dict = askUniUiStrings[lang] as Record<string, string>
   return Object.fromEntries(SHARED_ASKUNI_KEYS.map((k) => [k, dict[k]!])) as Record<
     SharedAskUniKey,

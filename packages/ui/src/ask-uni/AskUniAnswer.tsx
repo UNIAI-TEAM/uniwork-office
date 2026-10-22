@@ -90,9 +90,9 @@ export function AskUniTurn({
   conversationId?: string | null
   /** summed step counts, for the live turn and the one just finished */
   counts?: Record<string, number>
-  onRegenerate?: () => void
-  regenerateDisabled?: boolean
-  feedback?: AskUniFeedbackApi
+  onRegenerate?: (() => void) | undefined
+  regenerateDisabled?: boolean | undefined
+  feedback?: AskUniFeedbackApi | undefined
   /** open a cited source; false = it did not open. Defaults to the adapter's opener, if it has one */
   onOpenCitation?: (c: AskUniCitation) => Promise<boolean>
 }): ReactElement {

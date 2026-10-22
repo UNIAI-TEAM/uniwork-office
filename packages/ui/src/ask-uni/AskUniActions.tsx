@@ -90,9 +90,9 @@ const DOWN_ICON = (
 
 function ActionButton(props: {
   label: string
-  pressed?: boolean
-  disabled?: boolean
-  onClick?: () => void
+  pressed?: boolean | undefined
+  disabled?: boolean | undefined
+  onClick?: (() => void) | undefined
   children: ReactNode
   buttonRef?: React.Ref<HTMLButtonElement>
 }): ReactElement {
@@ -226,10 +226,10 @@ export function AskUniActions(props: {
   messageId: string
   content: string
   citations: AskUniCitation[]
-  onRegenerate?: () => void
-  regenerateDisabled?: boolean
+  onRegenerate?: (() => void) | undefined
+  regenerateDisabled?: boolean | undefined
   /** defaults to the adapter's feedback calls */
-  feedback?: AskUniFeedbackApi
+  feedback?: AskUniFeedbackApi | undefined
 }): ReactElement | null {
   const adapter = useAskUniAdapter()
   const { t } = adapter
