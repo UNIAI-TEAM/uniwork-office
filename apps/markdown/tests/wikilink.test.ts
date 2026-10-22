@@ -494,6 +494,34 @@ describe('resolution', () => {
     expect(resolve).toHaveBeenCalledTimes(2)
   })
 
+  it('a stale in-flight answer does not repaint links the edit has since restored', async () => {
+    let release: (answers: Record<string, WikiLinkResolved>) => void = () => {}
+    const resolve = vi.fn(async (_from: string, targets: string[]) => {
+      if (targets.length === 1)
+        return new Promise<Record<string, WikiLinkResolved>>((r) => (release = r))
+      return {
+        a: { path: '/notes/a.md', fragment: '', found: true },
+        b: { path: '/notes/b.md', fragment: '', found: true },
+      }
+    })
+    const { editor } = open('[[a]] [[b]]', { resolve })
+    await settled()
+    // deleting ' [[b]]' asks about {a} alone, and that answer stays in flight
+    const at = editor.state.doc.textContent.indexOf(' [[b]]') + 1
+    editor.view.dispatch(editor.state.tr.delete(at, at + ' [[b]]'.length))
+    await settled()
+    expect(resolve).toHaveBeenCalledTimes(2)
+    // undo restores the question that was already answered, so nothing is asked
+    editor.commands.undo()
+    await settled()
+    expect(editor.state.doc.textContent).toBe('[[a]] [[b]]')
+    release({ a: { path: '/notes/a.md', fragment: '', found: true } })
+    await settled()
+    const el = editor.view.dom.querySelector('[data-wiki-target="[[b]]"]')
+    expect(el?.className).toContain('wiki-link-resolved')
+    expect(resolve).toHaveBeenCalledTimes(2)
+  })
+
   it('a resolver that throws leaves the editor working', async () => {
     const { editor } = open('[[Alpha]]')
     // replace the seam with a failing one
