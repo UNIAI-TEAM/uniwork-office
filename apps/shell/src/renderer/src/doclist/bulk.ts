@@ -7,6 +7,7 @@ import { UNIWORK_ERROR_KEYS } from '../uniwork-docs-model'
 import type { UniworkDocErrorCode } from '../../../shared/home-api'
 import type { DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
 import {
+  moveDocument,
   restoreDocument,
   shelveDocument,
   trashDocument,
@@ -20,22 +21,25 @@ export const BULK_CONCURRENCY = 4
 /** pause before the single retry of a throttled call */
 const RETRY_DELAY_MS = 1000
 
-/** the row-menu actions a batch can run on many rows (Move takes one row in the app) */
+/** the row-menu actions a batch can run on many rows */
 export type BulkActionId = Extract<
   RowMenuActionId,
-  'share' | 'restore' | 'unshelve' | 'download' | 'shelve' | 'trash'
+  'share' | 'move' | 'restore' | 'unshelve' | 'download' | 'shelve' | 'trash'
 >
 
 /**
  * the ones that fan out over single-document calls here; Chia sẻ opens its own dialog and runs the
- * bridge's bulk, Tải xuống plans one file or one zip (uniwork-zip-download)
+ * bridge's bulk, Tải xuống plans one file or one zip (uniwork-zip-download). Di chuyển fans out too,
+ * but only after the folder picker chose its one target (`bulkWorkFor`'s third argument).
  */
 export type BulkWorkActionId = Exclude<BulkActionId, 'share' | 'download'>
 
-// Rules board §3 order: Chia sẻ first (the web's bar), the keep actions with Tải xuống before the
-// archive entry (live: Share · Download · Archive · Trash; shelf: Unarchive · Download · Trash), the delete entry last
+// Rules board §3 order: Chia sẻ first (the web's bar), Di chuyển next, the keep actions with Tải xuống
+// before the archive entry (live: Share · Move · Download · Archive · Trash; shelf: Unarchive ·
+// Download · Trash), the delete entry last
 const BULK_ORDER: readonly BulkActionId[] = [
   'share',
+  'move',
   'restore',
   'unshelve',
   'download',
@@ -168,13 +172,19 @@ export function bulkActionsFor(
   })
 }
 
-/** the single-document call one batch item runs: the same calls the row menu uses */
+/**
+ * the single-document call one batch item runs: the same calls the row menu uses. `targetParentId`
+ * is the folder a Di chuyển batch moves into (null = the workspace root); no other action reads it.
+ */
 export function bulkWorkFor(
   action: BulkWorkActionId,
   screen: DocListScreen,
+  targetParentId: string | null = null,
 ): (doc: DocumentsHomeDoc) => Promise<BulkWorkResult> {
   const call = (doc: DocumentsHomeDoc) => {
     switch (action) {
+      case 'move':
+        return moveDocument({ documentId: doc.id, parentId: targetParentId })
       case 'shelve':
         return shelveDocument(doc.id)
       case 'unshelve':
@@ -196,6 +206,7 @@ export function bulkWorkFor(
 }
 
 const DONE_KEYS: Record<BulkWorkActionId, StringKey> = {
+  move: 'dlBulkDoneMove',
   shelve: 'dlBulkDoneShelve',
   unshelve: 'dlBulkDoneUnshelve',
   restore: 'dlBulkDoneRestore',

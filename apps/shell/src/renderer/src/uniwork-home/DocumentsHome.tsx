@@ -152,6 +152,7 @@ import { RecentSegmentControl, useRecentSegment } from '../doclist/RecentSegment
 import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
 import { useDocCopy } from './use-doc-copy'
+import { useBulkMove } from './use-bulk-move'
 import { ListState } from '../doclist/ListState'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
@@ -1629,6 +1630,7 @@ export function DocumentsHome({
   const zipAvailable = zipDownloadBridge() !== null
   const onBulkAction = (action: BulkActionId) => {
     if (action === 'trash') setBulkTrashConfirm(true)
+    else if (action === 'move') bulkMove.open(selectedDocs)
     else if (action === 'download') {
       void runZipDownload({
         bridge: zipDownloadBridge(),
@@ -1860,6 +1862,20 @@ export function DocumentsHome({
     if (subView === 'workspace') return folderId
     return subView === 'my-folder' ? resolvedMyFolderId : null
   }
+
+  // UNI-2078: Di chuyển of the bulk bar: one folder picker for the selection, then one batch
+  const bulkMove = useBulkMove({
+    workspaceId,
+    screen,
+    nodes: tree.status === 'ready' ? tree.nodes : undefined,
+    currentParentOf,
+    refresh: refreshAll,
+    onSettled: ({ message, tone }) => {
+      setSelected(new Set())
+      if (tone === 'ok') announce(message)
+      setToast({ message, tone })
+    },
+  })
 
   /** the open folder's own menu in its header (UNI-1979): the card menu minus the card, no Share */
   const openFolderMenu = (id: string): FolderMenuItem[] => {
@@ -2774,7 +2790,7 @@ export function DocumentsHome({
                   <BulkBar
                     screen={screen}
                     docs={selectedDocs}
-                    busy={bulkBusy || zipBusy}
+                    busy={bulkBusy || zipBusy || bulkMove.busy}
                     canShare={shareAvailable}
                     canDownload={zipAvailable}
                     onAction={onBulkAction}
@@ -2913,6 +2929,8 @@ export function DocumentsHome({
       )}
 
       {docCopy.dialog}
+
+      {bulkMove.dialog}
 
       {shelvedTrashTarget && (
         <ArchiveConfirm

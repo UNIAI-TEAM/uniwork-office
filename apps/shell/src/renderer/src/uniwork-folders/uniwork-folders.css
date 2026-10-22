@@ -520,6 +520,13 @@
   background: var(--surface);
 }
 
+.uw-act .uwf-picker-desc {
+  margin: 0 0 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .uw-act .uwf-picker-state {
   margin: 12px;
   color: var(--text-secondary);

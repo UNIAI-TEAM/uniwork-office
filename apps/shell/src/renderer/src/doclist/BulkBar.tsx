@@ -7,6 +7,7 @@ import { bulkActionsFor, type BulkActionId } from './bulk'
 
 const ACTION_LABEL: Record<BulkActionId, StringKey> = {
   share: 'dlActShare',
+  move: 'dlActMove',
   restore: 'dlActRestore',
   unshelve: 'dlActUnshelve',
   download: 'dlActDownload',
