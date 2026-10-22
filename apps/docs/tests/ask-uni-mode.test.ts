@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { act, createElement as h, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,6 +13,8 @@ import {
   askUniLiveText,
   useAskUniMode,
 } from '../src/renderer/ai/ask-uni-mode'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
 
 // Ask UNI as a mode of the docs AI panel (contract E1): a header toggle that exists only when the
 // editor bridge is there and the stream is on, a body that replaces the chat without unmounting it,
@@ -164,7 +168,8 @@ describe('docs panel: Ask UNI mode', () => {
       expect((host.querySelector('#chat-input') as HTMLTextAreaElement).value).toBe(
         'half a thought',
       )
-      expect(host.querySelector('[data-slot="askuni-doc-chip"]')).toBeNull()
+      // the Ask UNI body stays mounted (hidden) so its conversation survives the toggle
+      expect((host.querySelector('.ai-askuni-pane') as HTMLElement).hidden).toBe(true)
     })
 
     it('reads the flags again each time the mode is turned on (the file may have been saved to UniWork)', async () => {
@@ -235,7 +240,7 @@ describe('docs panel: Ask UNI mode', () => {
 })
 
 describe('docs panel wiring (source)', () => {
-  const panel = readFileSync(new URL('../src/renderer/ai/AiPanel.tsx', import.meta.url), 'utf8')
+  const panel = readFileSync(resolve(HERE, '../src/renderer/ai/AiPanel.tsx'), 'utf8')
 
   it('mounts the toggle in the header actions, the body and the hidden chat pane, and routes the live text', () => {
     expect(panel).toContain("from './ask-uni-mode'")

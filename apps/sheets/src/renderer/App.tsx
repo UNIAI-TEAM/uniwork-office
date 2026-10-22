@@ -5301,6 +5301,7 @@ export function App({
       <ExcelShell
         onAiPanelOpen={refreshGskStatus}
         openingWorkbook={openingWorkbook}
+        {...(workbookFile ? { askUniDocumentName: workbookFile.name } : {})}
         prompt={prompt}
         aiPreset={aiPreset}
         preview={preview}
