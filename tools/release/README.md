@@ -300,7 +300,7 @@ GitHub value until the route answers.
 | `apt/pool/main/u/uniwork-office/`        | `uniwork-office_<version>_amd64.deb`                            |
 | `apt/dists/<channel>/`                   | `InRelease`, `Release`, `Release.gpg` (one suite per channel)   |
 | `apt/dists/<channel>/main/binary-amd64/` | `Packages`, `.gz`, `.xz` and `by-hash/SHA256/<hash>` copies     |
-| `apt/latest/<channel>/`                  | `uniwork-office_amd64.deb`, the newest deb under a stable name  |
+| `apt/latest/`, `apt/latest/<channel>/`   | `uniwork-office_amd64.deb`, the newest deb under a stable name  |
 | `update/<channel>/`                      | generic electron-updater feed: the feed yml and the files named |
 | `releases.json`                          | public manifest of every kept version (schema 1, below)         |
 
@@ -328,6 +328,30 @@ upgrade`. Check the key before trusting it:
 `gpg --show-keys /usr/share/keyrings/uniwork-office-archive-keyring.gpg` must print
 `58A9 0232 2C8D 45C4 33B5  25F5 1198 D109 26F3 4831`.
 
+### One-command install
+
+Each channel's newest deb is also published under a stable name, so a fresh machine needs one
+command (the deb's postinst adds the apt source, later builds arrive with `apt upgrade`):
+
+| Channel  | URL (below `https://uniworkos.com/downloads/office/`) |
+| -------- | ----------------------------------------------------- |
+| `stable` | `apt/latest/uniwork-office_amd64.deb`                 |
+| `beta`   | `apt/latest/beta/uniwork-office_amd64.deb`            |
+| `dev`    | `apt/latest/dev/uniwork-office_amd64.deb`             |
+
+```sh
+wget -nv -O /tmp/uniwork-office.deb https://uniworkos.com/downloads/office/apt/latest/uniwork-office_amd64.deb \
+  && sudo apt install /tmp/uniwork-office.deb
+```
+
+The stable channel has no channel segment; `releases.json` `channels.<channel>.latest_deb_url`
+carries the same URL. The copy is published (and `latest_deb_url` written) only when the deb
+contains `./opt/UniWork Office/resources/apt/uniwork-office.sources`, i.e. it was built with
+`UNIWORK_APT_SOURCE=true`; a deb without the source would install without apt updates, so the
+run logs one `::notice::` line and skips both. The apt repository, pool, indexes and installers
+still publish, a deb with the source later starts the copy, and an older copy is left in place
+(never deleted).
+
 ### Signing key
 
 RSA 4096, fingerprint `58A902322C8D45C433B525F51198D10926F34831`, uid
@@ -343,7 +367,7 @@ the same version and keeps the newest 5 versions (`--keep`, compared with
 `dpkg --compare-versions`). Each step must succeed before the next, so a client never sees an
 index naming a missing file: installers, pool deb, `by-hash` + `Packages*`, `Release` /
 `Release.gpg` / `InRelease` (with `Cache-Control: no-cache`, like `Packages*`, the feed yml and
-`releases.json`), feed files, feed yml, `releases.json`, then prune. Prune keeps one run of
+`releases.json`), the latest deb (when it has the apt source), feed files, feed yml, `releases.json`, then prune. Prune keeps one run of
 grace: a pool deb, a `by-hash` file, a feed file or a `<channel>/<version>/` directory is
 deleted only when neither the new nor the previous index / Release / feed yml / manifest names
 it. Re-running the same version is idempotent.

@@ -107,7 +107,11 @@ export function buildRelease({
 }
 
 /** The manifest after publishing `release` on its channel; other channels stay as they are. */
-export function updateManifest(previous, release, { keepVersions, baseUrl, now }) {
+export function updateManifest(
+  previous,
+  release,
+  { keepVersions, baseUrl, now, latestDeb = true },
+) {
   const manifest =
     previous &&
     previous.schema === SCHEMA &&
@@ -133,10 +137,12 @@ export function updateManifest(previous, release, { keepVersions, baseUrl, now }
       [channel]: {
         latest: releases[0].version,
         apt_suite: channel,
-        // the stable name of the channel's newest deb, for the one-command install
-        ...(release.apt && {
-          latest_deb_url: `${baseUrl}/apt/latest/${channel}/uniwork-office_amd64.deb`,
-        }),
+        // the stable name of the channel's newest deb, for the one-command install; only for a
+        // deb that carries the apt source (apt-repo.sh uploads the copy under the same rule)
+        ...(release.apt &&
+          latestDeb && {
+            latest_deb_url: `${baseUrl}/apt/latest/${channel === 'stable' ? '' : `${channel}/`}uniwork-office_amd64.deb`,
+          }),
         releases,
       },
     },
@@ -207,6 +213,7 @@ function main(argv) {
     keepVersions,
     baseUrl: options['base-url'],
     now,
+    latestDeb: options['latest-deb'] !== 'false',
   })
   process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`)
 }

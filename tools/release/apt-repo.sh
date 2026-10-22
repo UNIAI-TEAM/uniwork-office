@@ -17,7 +17,8 @@
 #   apt/pool/main/u/uniwork-office/<deb>             the debs every index names
 #   apt/dists/<channel>/main/binary-amd64/Packages{,.gz,.xz} + by-hash/SHA256/<hash>
 #   apt/dists/<channel>/{Release,Release.gpg,InRelease}
-#   apt/latest/<channel>/uniwork-office_amd64.deb    this run's deb under a stable name
+#   apt/latest/uniwork-office_amd64.deb (stable) or apt/latest/<channel>/uniwork-office_amd64.deb (dev, beta)
+#                                                    this run's deb under a stable name, only when it carries the apt source
 #   <channel>/<version>/<release files> + SHA256SUMS
 #   update/<channel>/<files the feed yml name>, then the feed yml
 #   releases.json                                    public manifest, schema 1 (release-manifest.mjs)
@@ -301,6 +302,13 @@ deb_arch="$(dpkg-deb -f "$deb" Architecture)"
 tilde='~'
 expect_deb_version="${version//-/$tilde}"
 [ "$deb_version" = "$expect_deb_version" ] || die "the deb is version $deb_version, expected $expect_deb_version"
+# The one-command install (apt/latest) is only honest for a deb that adds the apt source
+# (built with UNIWORK_APT_SOURCE=true); any other deb would install without apt updates.
+deb_contents="$(dpkg-deb -c "$deb")"
+has_apt_source=false
+if grep -qE ' \./opt/UniWork Office/resources/apt/uniwork-office\.sources$' <<<"$deb_contents"; then
+  has_apt_source=true
+fi
 pool_name="${PACKAGE}_${deb_version#*:}_amd64.deb"
 [[ "$pool_name" =~ $SAFE_NAME ]] || die "pool file name not allowed: $pool_name"
 
@@ -458,6 +466,7 @@ cp "$work/SHA256SUMS" "$work/assets/SHA256SUMS"
 node "$manifest_tool" update --previous "$work/prev/releases.json" --dir "$work/assets" \
   --channel "$channel" --version "$version" --tag "$tag" --git-sha "$git_sha" \
   --notes-file "$notes_file" --deb-version "$deb_version" --base-url "$base_url" \
+  --latest-deb "$has_apt_source" \
   --keep-versions "$(paste -sd, "$work/keep-versions")" >"$work/releases.json"
 
 # --- uploads, in order ------------------------------------------------------
@@ -485,9 +494,19 @@ put "$work/dists/Release.gpg" "$dists/Release.gpg" "$NO_CACHE"
 put "$work/dists/InRelease" "$dists/InRelease" "$NO_CACHE"
 
 # The stable name of the channel's newest deb (the one-command install). Only now:
-# its postinst adds the source, whose index must already list this version.
-# Overwritten every run, never pruned.
-put "$deb" "apt/latest/$channel/${PACKAGE}_amd64.deb" "$NO_CACHE" application/vnd.debian.binary-package
+# its postinst adds the source, whose index must already list this version. The stable
+# channel has no channel segment. Overwritten every run, never pruned; a deb without the
+# apt source leaves an older copy alone.
+if [ "$channel" = stable ]; then
+  latest_key="apt/latest/${PACKAGE}_amd64.deb"
+else
+  latest_key="apt/latest/$channel/${PACKAGE}_amd64.deb"
+fi
+if [ "$has_apt_source" = true ]; then
+  put "$deb" "$latest_key" "$NO_CACHE" application/vnd.debian.binary-package
+else
+  echo "::notice::apt-repo: the deb has no apt source (UNIWORK_APT_SOURCE was not true), so $latest_key and latest_deb_url are skipped"
+fi
 
 for name in "${feed_files[@]}"; do
   put "$dir/$name" "update/$channel/$name"

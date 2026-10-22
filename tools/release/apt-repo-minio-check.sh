@@ -151,6 +151,9 @@ make_release() {
   mkdir -p "$out" "$pkg/DEBIAN" "$pkg/opt/uniwork-office/resources/apt"
   cp "$root/pubkey.gpg" "$pkg/opt/uniwork-office/resources/apt/uniwork-office-archive-keyring.gpg"
   cp "$root/uniwork-office.sources" "$pkg/opt/uniwork-office/resources/apt/uniwork-office.sources"
+  # the path apt-repo.sh looks for before it publishes the latest copy (a deb built with UNIWORK_APT_SOURCE=true)
+  mkdir -p "$pkg/opt/UniWork Office/resources/apt"
+  cp "$root/uniwork-office.sources" "$pkg/opt/UniWork Office/resources/apt/uniwork-office.sources"
   # like the real postinst: the keyring first, the source only when it is in place
   cat >"$pkg/DEBIAN/postinst" <<'POSTINST'
 #!/bin/sh

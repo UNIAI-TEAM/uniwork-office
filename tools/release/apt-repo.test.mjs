@@ -65,12 +65,18 @@ function debVersion(version) {
 }
 
 /** A release directory like the merged installers-* artifacts, with a tiny real deb. */
-function makeRelease(version, channel) {
+function makeRelease(version, channel, { aptSource = true } = {}) {
   const dir = mkdtempSync(join(root, `release-${version}-`))
   const pkg = join(dir, 'pkg')
   mkdirSync(join(pkg, 'DEBIAN'), { recursive: true })
   mkdirSync(join(pkg, 'opt', 'uniwork-office'), { recursive: true })
   writeFileSync(join(pkg, 'opt', 'uniwork-office', 'VERSION'), `${version}\n`)
+  if (aptSource) {
+    // built with UNIWORK_APT_SOURCE=true: the deb ships the apt source its postinst installs
+    const apt = join(pkg, 'opt', 'UniWork Office', 'resources', 'apt')
+    mkdirSync(apt, { recursive: true })
+    writeFileSync(join(apt, 'uniwork-office.sources'), 'Types: deb\n')
+  }
   writeFileSync(
     join(pkg, 'DEBIAN', 'control'),
     [
@@ -495,6 +501,59 @@ describe('apt-repo.sh', { skip }, () => {
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /the deb is version 0\.11\.0~dev\.1, expected 0\.11\.0~dev\.2/)
     assert.deepEqual(files(target), [])
+  })
+
+  it('puts the stable latest deb at apt/latest without a channel segment', () => {
+    const target = join(root, 'stable-latest')
+    publish(target, '1.0.0', 'stable')
+    const key = 'apt/latest/uniwork-office_amd64.deb'
+    assert.equal(
+      sha256(join(target, key)),
+      sha256(join(target, POOL, 'uniwork-office_1.0.0_amd64.deb')),
+    )
+    assert.ok(!files(target).some((name) => name.startsWith('apt/latest/stable/')))
+    assert.equal(manifestOf(target).channels.stable.latest_deb_url, `${BASE}/${key}`)
+  })
+
+  it('skips the latest deb and latest_deb_url for a deb without the apt source, and keeps an older copy', () => {
+    const target = join(root, 'no-source')
+    const latest = 'apt/latest/dev/uniwork-office_amd64.deb'
+    const dir = makeRelease('0.11.0-dev.1', 'dev', { aptSource: false })
+    const first = publish(target, '0.11.0-dev.1', 'dev', [], dir)
+    assert.match(first.stdout, /::notice::.*no apt source/)
+    assert.ok(!existsSync(join(target, latest)))
+    assert.ok(!('latest_deb_url' in manifestOf(target).channels.dev))
+    // everything else still publishes
+    for (const key of [
+      `${POOL}/uniwork-office_0.11.0~dev.1_amd64.deb`,
+      'apt/dists/dev/InRelease',
+      'dev/0.11.0-dev.1/dev.yml',
+      'update/dev/dev.yml',
+      'releases.json',
+    ]) {
+      assert.ok(existsSync(join(target, key)), key)
+    }
+
+    // a deb with the source starts the latest copy and the field
+    publish(target, '0.11.0-dev.2')
+    assert.equal(
+      sha256(join(target, latest)),
+      sha256(join(target, POOL, 'uniwork-office_0.11.0~dev.2_amd64.deb')),
+    )
+    assert.equal(manifestOf(target).channels.dev.latest_deb_url, `${BASE}/${latest}`)
+
+    // a later deb without the source leaves the older copy alone
+    publish(
+      target,
+      '0.11.0-dev.3',
+      'dev',
+      [],
+      makeRelease('0.11.0-dev.3', 'dev', { aptSource: false }),
+    )
+    assert.equal(
+      sha256(join(target, latest)),
+      sha256(join(target, POOL, 'uniwork-office_0.11.0~dev.2_amd64.deb')),
+    )
   })
 
   it('prints the plan on --dry-run and writes nothing', () => {
