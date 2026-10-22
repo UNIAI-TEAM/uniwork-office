@@ -101,7 +101,7 @@ describe('inspector Escape relay in inspect mode (UNI-1876 SVF-5)', () => {
     pressEscape()
     expect(messages).toEqual([
       { type: 'gx:textEditCancel', version: 1 },
-      { type: 'gx:keyCommand', command: 'escape', version: 1 },
+      { type: 'gx:keyCommand', command: 'escape', sid: 1, version: 1 },
     ])
   })
 
