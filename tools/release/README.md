@@ -177,8 +177,21 @@ feed points at).
 
 Not updated in place: the unsigned mac app (Squirrel.Mac installs updates only into a signed
 app, so the mac build has no feed and a manual check opens https://uniworkos.com/office) and the
-deb (upgrade with `apt install ./<new>.deb`). Any other HTTPS `UNIWORK_UPDATE_URL` is a
-generic feed prefix, meant for a stable CDN later.
+deb, which updates through apt: every Linux build ships the repository key, and a release deb built
+with `UNIWORK_APT_SOURCE=true` also ships a deb822 source for its channel (`resources/apt/`). The flag
+is off until the repository is live (the workflow sets it from the repository variable
+`UNIWORK_APT_REPO_ENABLED`): a source for a repository that answers 404 would break `apt update` on
+the user's machine, and a deb without the source file writes nothing. When the source ships, the postinst installs it with the keyring (`/usr/share/keyrings/uniwork-office-archive-keyring.gpg`,
+`/etc/apt/sources.list.d/uniwork-office.sources`; `UNIWORK_OFFICE_APT_REPO=false` in
+`/etc/default/uniwork-office` opts out, an admin's own source file is left alone, `apt purge`
+removes both), and the manual check says `sudo apt update && sudo apt upgrade`.
+
+`UNIWORK_UPDATE_URL=https://uniworkos.com/downloads/office/update` is the self-hosted generic feed:
+`apps/shell/electron-builder.cjs` appends the channel directory (`update/dev`, `update/beta`,
+`update/stable`, the last one reading the default `latest.yml`), and
+`check-build-brand.mjs --update-feed generic:<that url>` requires exactly it in `app-update.yml`
+(the mac app still carries no feed). Any other HTTPS `UNIWORK_UPDATE_URL` is a generic feed
+prefix as given. The workflow still refuses stable.
 
 ## Mac signing
 

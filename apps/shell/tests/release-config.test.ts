@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
@@ -28,7 +28,12 @@ interface BuilderConfig {
   mac: Record<string, unknown> & { target: { target: string; arch: string[] }[] }
   dmg: Record<string, unknown>
   win: { extraResources: { from: string; to: string }[] }
-  linux: { target: { target: string; arch: string[] }[]; maintainer: string; vendor: string }
+  linux: {
+    target: { target: string; arch: string[] }[]
+    maintainer: string
+    vendor: string
+    extraResources: { from: string; to: string }[]
+  }
   deb: Record<string, unknown>
   appImage?: Record<string, unknown>
   protocols: { name: string; schemes: string[] }[]
@@ -154,6 +159,47 @@ describe('dev / beta release builds', () => {
     ])
   })
 
+  it('ship the apt keyring in every Linux build and the channel source only when UNIWORK_APT_SOURCE=true', async () => {
+    const aptEntries = (config: BuilderConfig) =>
+      config.linux.extraResources.filter((entry) => entry.to.startsWith('apt/')).map((e) => e.to)
+    const keyring = 'apt/uniwork-office-archive-keyring.gpg'
+    expect(aptEntries(loadConfig({}))).toEqual([keyring])
+    // the repository is not live: the flag is off, so a release build registers no source
+    const sourcesFile = resolve(shellRoot, 'build/apt/uniwork-office.sources')
+    rmSync(sourcesFile, { force: true })
+    for (const flag of [undefined, '', 'false', '1', 'TRUE']) {
+      const env = { UNIWORK_RELEASE_CHANNEL: 'dev', UNIWORK_APT_SOURCE: flag }
+      const version = `${shellPackage.version}-dev.1`
+      const config = withVersion(loadConfig(env, version), version)
+      expect(aptEntries(config), String(flag)).toEqual([keyring])
+      await config.beforePack({ electronPlatformName: 'linux' })
+      expect(existsSync(sourcesFile), String(flag)).toBe(false)
+    }
+    // the flag alone, without a release channel, ships nothing either
+    expect(aptEntries(loadConfig({ UNIWORK_APT_SOURCE: 'true' }))).toEqual([keyring])
+    for (const channel of ['dev', 'beta']) {
+      const version = `${shellPackage.version}-${channel}.1`
+      const env = { UNIWORK_RELEASE_CHANNEL: channel, UNIWORK_APT_SOURCE: 'true' }
+      const config = withVersion(loadConfig(env, version), version)
+      expect(aptEntries(config)).toEqual([keyring, 'apt/uniwork-office.sources'])
+      await config.beforePack({ electronPlatformName: 'linux' })
+      // deb822: the managed marker first, the channel as suite, the shipped keyring as Signed-By
+      expect(readFileSync(sourcesFile, 'utf8')).toBe(
+        [
+          '# managed by uniwork-office',
+          'Types: deb',
+          'URIs: https://uniworkos.com/downloads/office/apt',
+          `Suites: ${channel}`,
+          'Components: main',
+          'Architectures: amd64',
+          'Signed-By: /usr/share/keyrings/uniwork-office-archive-keyring.gpg',
+          '',
+        ].join('\n'),
+      )
+    }
+    rmSync(sourcesFile, { force: true })
+  })
+
   it('declare every sign-in callback scheme for the Linux desktop entry', () => {
     const schemes = (config: BuilderConfig) => config.protocols.flatMap((entry) => entry.schemes)
     expect(schemes(loadConfig({ UNIWORK_RELEASE_CHANNEL: 'dev' }))).toEqual([
@@ -229,6 +275,28 @@ describe('dev / beta release builds', () => {
     })
     expect(beta.publish).toEqual([
       { provider: 'github', owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'beta' },
+    ])
+  })
+
+  it('read the self-hosted generic feed from the channel directory of UNIWORK_UPDATE_URL', () => {
+    const base = 'https://uniworkos.com/downloads/office/update'
+    for (const channel of ['dev', 'beta']) {
+      const config = loadConfig({ UNIWORK_RELEASE_CHANNEL: channel, UNIWORK_UPDATE_URL: `${base}/` })
+      expect(config.publish).toEqual([{ provider: 'generic', url: `${base}/${channel}`, channel }])
+      // electron-updater's github-only mac notice has nothing to read from a generic feed
+      expect(config.extraMetadata?.uniworkReleaseFeed).toBeUndefined()
+      expect(config.mac.publish).toBeNull()
+    }
+  })
+
+  it('keep stable on its own directory and the default latest channel file', () => {
+    const base = 'https://uniworkos.com/downloads/office/update'
+    expect(loadConfig({ UNIWORK_UPDATE_URL: base }).publish).toEqual([
+      { provider: 'generic', url: `${base}/stable`, channel: 'latest' },
+    ])
+    // another generic URL stays the prefix as given
+    expect(loadConfig({ UNIWORK_UPDATE_URL: `${base}/x` }).publish).toEqual([
+      { provider: 'generic', url: `${base}/x`, channel: 'latest' },
     ])
   })
 
