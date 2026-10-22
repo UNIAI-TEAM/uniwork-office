@@ -164,6 +164,7 @@ export const zhTW = {
   fuDlgRefusalTitleFiles: '無法上傳這些檔案',
   fuDlgShare: '與工作區共用',
   fuDlgShareHintFolder: '套用於本次上傳的每個檔案。資料夾保持私人。',
+  fuDlgShareHintWorkspace: '套用於本次上傳的每個檔案。新建的資料夾將對整個工作區可見。',
   fuDlgShareHintFiles: '套用於本次上傳的每個檔案。',
   fuDlgShareInherited: '目標資料夾已與工作區共用，因此這些檔案也會共用。',
   fuDlgStarting: '準備中…',

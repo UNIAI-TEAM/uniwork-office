@@ -170,6 +170,8 @@ export const fr = {
   fuDlgShare: 'Partager avec l’espace de travail',
   fuDlgShareHintFolder:
     'S’applique à chaque fichier de ce téléversement. Les dossiers restent privés.',
+  fuDlgShareHintWorkspace:
+    'S’applique à chaque fichier de ce téléversement. Les nouveaux dossiers sont visibles par tout l’espace de travail.',
   fuDlgShareHintFiles: 'S’applique à chaque fichier de ce téléversement.',
   fuDlgShareInherited:
     'Le dossier de destination est partagé avec l’espace de travail, les fichiers le sont donc aussi.',

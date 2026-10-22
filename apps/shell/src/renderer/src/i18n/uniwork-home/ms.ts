@@ -168,6 +168,8 @@ export const ms = {
   fuDlgRefusalTitleFiles: 'Fail-fail ini tidak boleh dimuat naik',
   fuDlgShare: 'Kongsi dengan ruang kerja',
   fuDlgShareHintFolder: 'Terpakai untuk setiap fail dalam muat naik ini. Folder kekal peribadi.',
+  fuDlgShareHintWorkspace:
+    'Terpakai untuk setiap fail dalam muat naik ini. Folder baharu kelihatan kepada seluruh ruang kerja.',
   fuDlgShareHintFiles: 'Terpakai untuk setiap fail dalam muat naik ini.',
   fuDlgShareInherited: 'Folder destinasi dikongsi dengan ruang kerja, jadi fail juga begitu.',
   fuDlgStarting: 'Menyediakan…',

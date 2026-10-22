@@ -66,6 +66,8 @@ export interface PreflightSDO {
     label: string
     /** the destination is the caller's My Folder (`systemKind` my_folder): the screen translates its name */
     myFolder?: true
+    /** the destination is My Folder or a folder anywhere under it: the folders it gets stay private (ADR 0037) */
+    inMyFolder?: true
   }
   totals: { files: number; bytes: number }
   skipped: BatchUploadSkip[]
