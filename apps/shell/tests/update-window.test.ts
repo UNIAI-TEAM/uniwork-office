@@ -11,6 +11,13 @@ import type { UpdateUiState } from '../src/shared/update-api'
 type Handler = (event?: unknown, input?: unknown) => unknown
 
 const handlers = new Map<string, Handler>()
+/** whatever lands on the global ipcMain: the module must register nothing there */
+const rawHandlers = new Map<string, Handler>()
+const fakeIpc = {
+  handle: (channel: string, handler: Handler) => {
+    handlers.set(channel, handler)
+  },
+}
 const sent: Array<{ channel: string; state: UpdateUiState | null }> = []
 const winOptions: Array<Record<string, unknown>> = []
 const shown = vi.fn()
@@ -50,9 +57,18 @@ class FakeBrowserWindow {
 vi.mock('electron', () => ({
   BrowserWindow: FakeBrowserWindow,
   ipcMain: {
-    handle: (channel: string, handler: Handler) => handlers.set(channel, handler),
+    handle: (channel: string, handler: Handler) => rawHandlers.set(channel, handler),
   },
 }))
+
+const UPDATE_CHANNELS_REGISTERED = [
+  'update:get-state',
+  'update:open-for-update',
+  'update:download',
+  'update:install',
+  'update:later',
+  'update:open-download',
+]
 
 const state = (phase: UpdateUiState['phase']): UpdateUiState =>
   ({
@@ -90,14 +106,18 @@ const parent = new FakeBrowserWindow() as unknown as Electron.BrowserWindow
 beforeEach(() => {
   vi.resetModules()
   handlers.clear()
+  rawHandlers.clear()
   sent.length = 0
   winOptions.length = 0
   shown.mockClear()
   focused.mockClear()
 })
 
+/** a fresh module with the six update:* channels registered on the fake ipc, as the shell composition does */
 async function loadModule() {
-  return import('../src/main/update-window')
+  const mod = await import('../src/main/update-window')
+  mod.registerUpdateIpc(fakeIpc)
+  return mod
 }
 
 describe('update window — settings-facing surface', () => {
@@ -186,5 +206,37 @@ describe('update window — settings-facing surface', () => {
     const s = state('available')
     mod.showUpdateWindow(parent, s, actions())
     expect(mod.currentUpdateUiState()).toBe(s)
+  })
+
+  it('registers every update:* channel on the given ipc and nothing on the global ipcMain', async () => {
+    await loadModule()
+    expect([...handlers.keys()].sort()).toEqual(Object.values(UPDATE_CHANNELS_REGISTERED).sort())
+    expect(rawHandlers.size).toBe(0)
+  })
+
+  it('does not register at module load or on the first showUpdateWindow', async () => {
+    const mod = await import('../src/main/update-window')
+    mod.showUpdateWindow(parent, state('available'), actions())
+    expect(handlers.size).toBe(0)
+    expect(rawHandlers.size).toBe(0)
+  })
+
+  it('keeps the dialog channels total while no actions were ever set', async () => {
+    await loadModule()
+    for (const channel of ['update:download', 'update:install', 'update:later']) {
+      expect(handlers.get(channel)!()).toBeUndefined()
+    }
+    expect(handlers.get('update:open-download')!()).toBeUndefined()
+  })
+
+  it('updateWindowContents is null with no window and the live webContents while shown', async () => {
+    const mod = await loadModule()
+    expect(mod.updateWindowContents()).toBeNull()
+    mod.showUpdateWindow(parent, state('available'), actions())
+    const live = mod.updateWindowContents()
+    expect(live).toBeInstanceOf(FakeWebContents)
+    expect(mod.updateWindowContents()).toBe(live)
+    mod.closeUpdateWindow()
+    expect(mod.updateWindowContents()).toBeNull()
   })
 })

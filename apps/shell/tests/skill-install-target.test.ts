@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  */
 const h = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
+  /** whatever lands on the global ipcMain: the registrar must register nothing there */
+  rawHandlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
   installed: [] as string[],
   dialogResult: { canceled: true, filePaths: [] as string[] },
 }))
@@ -23,7 +25,7 @@ vi.mock('electron', () => ({
   },
   ipcMain: {
     handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) => {
-      h.handlers.set(channel, fn)
+      h.rawHandlers.set(channel, fn)
     },
   },
 }))
@@ -59,16 +61,23 @@ function invoke(channel: string, ...args: unknown[]): unknown {
   return handler(null, ...args)
 }
 
+const fakeIpc = {
+  handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) => {
+    h.handlers.set(channel, fn)
+  },
+}
+
 let dir = ''
 
 beforeEach(() => {
   h.handlers.clear()
+  h.rawHandlers.clear()
   h.installed.length = 0
   h.dialogResult = { canceled: true, filePaths: [] }
   dir = mkdtempSync(join(tmpdir(), 'genoffice-integrations-'))
   writeFileSync(join(dir, 'SKILL.md'), '---\nname: genoffice\n---\n')
   writeFileSync(join(dir, 'package.json'), JSON.stringify({ version: '0.0.0' }))
-  registerIntegrationsIpc({
+  registerIntegrationsIpc(fakeIpc, {
     settingsPath: () => join(dir, 'app-settings.json'),
     window: () => null,
     cliDir: dir,
@@ -102,5 +111,12 @@ describe('integrations:install-skill', () => {
       ),
     ).rejects.toThrow('unknown skill target')
     expect(h.installed).toEqual([])
+  })
+})
+
+describe('registerIntegrationsIpc', () => {
+  it('registers every integrations:* channel on the given ipc and nothing on the global ipcMain', () => {
+    expect([...h.handlers.keys()].sort()).toEqual(Object.values(INTEGRATIONS_CHANNELS).sort())
+    expect(h.rawHandlers.size).toBe(0)
   })
 })
