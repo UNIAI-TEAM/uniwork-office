@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const css = readFileSync('src/renderer/styles.css', 'utf8')
 const rule = (selector: string) =>
-  new RegExp(`(?:^|\\n)${selector.replace('.', '\\.')} \\{([^}]*)\\}`).exec(css)?.[1] ?? ''
+  new RegExp(`(?:^|\\n)${selector.replaceAll('.', '\\.')} \\{([^}]*)\\}`).exec(css)?.[1] ?? ''
 
 describe('toast placement (UNI-2111)', () => {
   it('sits above the status bar, never over the ribbon at the top', () => {
