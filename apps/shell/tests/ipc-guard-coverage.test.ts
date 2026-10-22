@@ -224,6 +224,8 @@ const REGISTRAR_FILES: Record<string, string> = {
     'registerAskUniRestIpc (in registerUniworkAskUni, in createUniworkDocs)',
   'apps/shell/src/main/uniwork-askuni/doc-service.ts':
     'registerAskUniDocIpc, the editor family (in registerUniworkAskUni, in createUniworkDocs)',
+  'apps/shell/src/main/uniwork-docs/doc-history-service.ts':
+    'registerDocHistoryIpc (in createUniworkDocs)',
   'apps/shell/src/main/uniwork-sync/sync-center.ts': 'registerSyncCenterIpc (in createUniworkDocs)',
   'apps/shell/src/main/uniwork-sync/offline-library/api.ts':
     'registerOfflineLibraryIpc (in createUniworkDocs)',

@@ -7027,6 +7027,67 @@ export class UniworkDocsService {
     }
   }
 
+  /**
+   * UNI-2077: one version of a document saved where the user picks - the same dialog, target
+   * rule and temp-file write as `downloadDocumentFile`, from `download?version=N`. Null = the
+   * dialog was canceled (nothing was asked of the server); a server failure throws.
+   */
+  async downloadDocumentVersion(
+    documentId: string,
+    versionNo: number,
+    suggestedName: string,
+  ): Promise<{ path: string } | 'forbidden_target' | null> {
+    // a refused id never opens the dialog
+    uniworkId(documentId)
+    if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+    const target = (await this.deps.pickDownloadPath?.(sourceFileName(suggestedName))) ?? null
+    if (!target) return null
+    const forbidden = (): Promise<boolean> =>
+      this.isForbiddenDownloadTarget(target).catch((error: unknown) => {
+        // the target check refuses with a status-less `forbidden`; it is a folder problem
+        if (error instanceof UniworkDocError && error.status === undefined) return true
+        throw error
+      })
+    if (await forbidden()) return 'forbidden_target'
+    const { bytes } = await this.api().downloadStream(documentId, versionNo)
+    if (await forbidden()) return 'forbidden_target'
+    try {
+      await this.writeBytesViaTemp(target, bytes)
+    } catch (error) {
+      // the last target check inside the write carries no status; same mapping as the file download
+      if (
+        error instanceof UniworkDocError &&
+        error.code === 'forbidden' &&
+        error.status === undefined
+      ) {
+        return 'forbidden_target'
+      }
+      throw error
+    }
+    return { path: target }
+  }
+
+  /**
+   * UNI-2077: the open tab of a document in this session, for a restore: the edit lock this app
+   * holds on it and the base revision of its working copy. Null when it is not open here.
+   */
+  async historyOpenCopy(
+    documentId: string,
+  ): Promise<{ editLockId: string | null; baseRevision: string | null } | null> {
+    uniworkId(documentId)
+    const doc = await this.boundDocFor(documentId)
+    if (!doc || !this.deps.isPathOpen(doc.path)) return null
+    return {
+      editLockId: this.editLockIdOf(doc.path),
+      baseRevision: doc.binding.baseRevision || null,
+    }
+  }
+
+  /** UNI-2077: a restore landed on the server; an open tab takes it like any newer revision (S6) */
+  noteVersionRestored(notice: RemoteNotice): void {
+    void this.noteRemoteChange(notice).catch(() => undefined)
+  }
+
   /** UNI-2068: the zip download's target check - the same rule as every download here */
   isDownloadTargetForbidden(target: string): Promise<boolean> {
     return this.isForbiddenDownloadTarget(target)
@@ -9541,14 +9602,15 @@ export class UniworkDocsService {
   }
 
   /**
-   * UNI-2033 "View in version N": the read-only `@vN` copy of a document, opened like a view
-   * ticket but without one (the shell already holds the account session), then the thread of
-   * `commentId` is revealed in it through the same held reveal a launch ticket uses.
+   * UNI-2033 "View in version N" (and the UNI-2077 version preview): the read-only `@vN` copy
+   * of a document, opened like a view ticket but without one (the shell already holds the
+   * account session), then the thread of `commentId`, when one is named, is revealed in it
+   * through the same held reveal a launch ticket uses.
    */
   async openVersionView(
     documentId: string,
     versionNo: number,
-    commentId: string,
+    commentId?: string,
   ): Promise<{ path: string; title: string }> {
     if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
     const detail = await this.api().getDocument(documentId)
@@ -9565,7 +9627,8 @@ export class UniworkDocsService {
       version: versionNo,
       revision: detail.revision,
     })
-    this.deps.revealComment?.(opened.path, commentId)
+    // UNI-2077: the version history opens the same copy with no thread to reveal
+    if (commentId) this.deps.revealComment?.(opened.path, commentId)
     return opened
   }
 

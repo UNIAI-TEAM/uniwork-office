@@ -1,8 +1,9 @@
 name: Release installers
 
 # Builds the UniWork Office desktop installers for the dev and beta channels:
-# Windows x64 (NSIS), macOS arm64 + x64 (dmg) and Linux x64 (AppImage, deb),
-# unsigned while no certificates exist. See tools/release/README.md.
+# Windows x64 (NSIS), macOS arm64 + x64 (dmg) and Linux x64 (AppImage, deb).
+# The mac dmgs can be signed and notarized (mac signing below); Windows and
+# Linux stay unsigned. See tools/release/README.md.
 #
 #   tag push v<version>-dev.<n> / v<version>-beta.<n>
 #       build every platform, then publish a pre-release for the tag (never
@@ -38,16 +39,25 @@ name: Release installers
 # code: it downloads the built files and calls gh release. Everything else
 # (build jobs, the URL map) runs with contents: read.
 #
-# Signing hooks (off): set the repository variable UNIWORK_SIGNING_ENABLED to
-# 'true' once certificates exist. Secrets used then (names only):
-#   macOS    CSC_LINK, CSC_KEY_PASSWORD (Developer ID Application .p12),
-#            APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID (notarization)
-#   Windows  variable GENOFFICE_WIN_SIGN_MODE (test | production) and the
-#            secrets scripts/win-sign.cjs reads; that script is not in this
-#            repository yet and must be added before the hook can run.
-# Before flipping the variable, move the signing steps behind a GitHub
-# environment restricted to release tags: a workflow_dispatch run from any
-# branch would otherwise receive the secrets.
+# Mac signing: the repository variable UNIWORK_MAC_SIGNING_ENABLED = 'true'
+# signs the mac app with the Developer ID Application identity, notarizes it
+# and staples the dmgs. Only runs of main (a tag push, which meta checks is on
+# main, or a dispatch from main) sign; any other ref builds the ad-hoc signed
+# app as before. A signing run builds the mac dmgs in the macos_signed job
+# (every other run in the macos job, which has no environment), and that job
+# uses the GitHub environment mac-signing, which holds the secrets (names
+# only): CSC_LINK, CSC_KEY_PASSWORD (the .p12, base64), APPLE_ID,
+# APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID. The job imports the .p12 into a
+# temporary keychain of its own and deletes it at the end.
+# Restrict that environment's deployment refs to main and v* tags and keep the
+# secrets out of the repository-level list, so a workflow on another branch
+# cannot read them.
+#
+# Windows signing hook (off): UNIWORK_SIGNING_ENABLED = 'true' with the
+# variable GENOFFICE_WIN_SIGN_MODE (test | production) and the secrets
+# scripts/win-sign.cjs reads; that script is not in this repository yet and
+# must be added before the hook can run. Stable stays refused until both
+# platforms sign.
 
 on:
   push:
@@ -89,6 +99,7 @@ jobs:
       tag: ${{ steps.resolve.outputs.tag }}
       publish: ${{ steps.resolve.outputs.publish }}
       create_tag: ${{ steps.resolve.outputs.create_tag }}
+      mac_signed: ${{ steps.resolve.outputs.mac_signed }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -111,6 +122,7 @@ jobs:
           INPUT_CHANNEL: ${{ inputs.channel }}
           INPUT_PUBLISH: ${{ inputs.publish }}
           RUN_NUMBER: ${{ github.run_number }}
+          MAC_SIGNING_ENABLED: ${{ vars.UNIWORK_MAC_SIGNING_ENABLED }}
         run: |
           set -euo pipefail
           base="$(node -p "require('./apps/shell/package.json').version")"
@@ -175,14 +187,24 @@ jobs:
               create_tag=false
             fi
           fi
+          # a tag push reaching this line is on main (checked above)
+          mac_signed=false
+          if [ "$MAC_SIGNING_ENABLED" = "true" ]; then
+            if [ "$EVENT_NAME" = "push" ] || { [ "$REF_TYPE" = "branch" ] && [ "$REF_NAME" = "main" ]; }; then
+              mac_signed=true
+            else
+              echo "::notice::mac signing runs from main only; $REF_NAME builds the ad-hoc signed mac app"
+            fi
+          fi
           {
             echo "channel=$channel"
             echo "version=$version"
             echo "tag=$tag"
             echo "publish=$publish"
             echo "create_tag=$create_tag"
+            echo "mac_signed=$mac_signed"
           } >> "$GITHUB_OUTPUT"
-          echo "Release $version (channel $channel, publish $publish)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release $version (channel $channel, publish $publish, mac signed $mac_signed)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check the baked default server
         env:
@@ -352,8 +374,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # No environment, so no signing secret can reach this job once the secrets
+  # live in mac-signing: it builds the ad-hoc signed app.
   macos:
     needs: meta
+    if: needs.meta.outputs.mac_signed != 'true'
     runs-on: macos-latest
     timeout-minutes: 120
     permissions:
@@ -368,7 +393,6 @@ jobs:
       UNIWORK_UPDATE_URL: https://github.com/${{ github.repository }}
       # both arches: arm64 + x64 dmg from one fat sidecar / OCR helper
       GENOFFICE_MAC_X64: '1'
-      SIGNING_ENABLED: ${{ vars.UNIWORK_SIGNING_ENABLED == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -413,49 +437,15 @@ jobs:
       - name: Build the universal xlsx sidecar
         run: npm run native:build:universal -w @genoffice/sheets
 
-      # Signing hook (off): with UNIWORK_SIGNING_ENABLED the package step gets
-      # the certificate and Apple credentials; electron-builder then signs with
-      # the Developer ID identity, notarizes the app, and build/notarize-dmg.js
-      # notarizes and staples the dmgs. Without it the app is ad-hoc signed.
-      - name: Check the signing secrets (signing hook)
-        if: vars.UNIWORK_SIGNING_ENABLED == 'true'
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          missing=""
-          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
-            [ -n "${!name}" ] || missing="$missing $name"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::signing is enabled but these secrets are empty:$missing"
-            exit 1
-          fi
-
       # Unsigned: no signing variable may reach electron-builder, not even an
       # empty one (CSC_LINK="" is taken as a certificate path and fails).
       - name: Package the dmgs
-        if: vars.UNIWORK_SIGNING_ENABLED != 'true'
         working-directory: apps/shell
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           unset CSC_LINK CSC_KEY_PASSWORD CSC_NAME APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
           npx electron-builder --mac --publish never "-c.extraMetadata.version=$RELEASE_VERSION"
-
-      - name: Package the dmgs (signing hook)
-        if: vars.UNIWORK_SIGNING_ENABLED == 'true'
-        working-directory: apps/shell
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-builder --mac --publish never "-c.extraMetadata.version=$RELEASE_VERSION"
 
       # Apple Silicon refuses to launch an app without a valid signature; an
       # unsigned build must therefore carry an intact ad-hoc one.
@@ -468,11 +458,7 @@ jobs:
             codesign --verify --deep --strict --verbose=2 "$app"
             details="$(codesign -dv --verbose=2 "$app" 2>&1)"
             echo "$details"
-            if [ "$SIGNING_ENABLED" = "true" ]; then
-              grep -q '^Authority=Developer ID Application' <<<"$details"
-            else
-              grep -q '^Signature=adhoc' <<<"$details"
-            fi
+            grep -q '^Signature=adhoc' <<<"$details"
             archs="$(lipo -archs "$app/Contents/MacOS/UniWork Office")"
             if [ "$archs" != "$want" ]; then
               echo "::error::$app is $archs, expected $want"
@@ -513,6 +499,227 @@ jobs:
           path: upload/*
           if-no-files-found: error
           retention-days: 14
+
+  # Mac signing run: the only job that sees the signing secrets, which live in
+  # the GitHub environment mac-signing (see the header). Same build as the
+  # unsigned macos job above, with the sign + notarize package step.
+  macos_signed:
+    needs: meta
+    if: needs.meta.outputs.mac_signed == 'true'
+    runs-on: macos-latest
+    environment: mac-signing
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    env:
+      UNIWORK_RELEASE_CHANNEL: ${{ needs.meta.outputs.channel }}
+      UNIWORK_DEFAULT_API_ORIGIN: ${{ inputs.default_api_origin || vars.UNIWORK_DEFAULT_API_ORIGIN }}
+      UNIWORK_DEFAULT_DEPLOYMENT_ID: ${{ inputs.default_deployment_id || vars.UNIWORK_DEFAULT_DEPLOYMENT_ID }}
+      RELEASE_VERSION: ${{ needs.meta.outputs.version }}
+      BUILD_DIR: ${{ github.workspace }}/release-out
+      # the update feed: this repository's GitHub releases (Windows, Linux AppImage)
+      UNIWORK_UPDATE_URL: https://github.com/${{ github.repository }}
+      # both arches: arm64 + x64 dmg from one fat sidecar / OCR helper
+      GENOFFICE_MAC_X64: '1'
+      # the company Developer ID team; the verify steps refuse any other signer
+      EXPECTED_TEAM_ID: XJAM488A6D
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # First, so a missing environment or an empty secret fails in a minute
+      # rather than after the build. The secrets are step env only (here and in
+      # the package step): npm ci and the build never see them.
+      - name: Check the signing secrets
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::signing is enabled but these secrets are empty:$missing"
+            exit 1
+          fi
+
+      # Own keychain instead of electron-builder's CSC_LINK import: electron-builder
+      # 26.15 runs `security set-key-partition-list -k <p12 password>` against a
+      # keychain it created with a random password, which macOS 26 rejects
+      # ("SecKeychainUnlock: The user name or passphrase you entered is not
+      # correct"; fixed upstream in 26.18). Here the keychain password is ours, and
+      # electron-builder only gets the keychain (CSC_KEYCHAIN) and the identity
+      # name (CSC_NAME, which also makes it name the dmgs without `unsigned`).
+      - name: Import the signing certificate
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/uniwork-signing.keychain-db"
+          p12="$RUNNER_TEMP/uniwork-signing.p12"
+          trap 'rm -f "$p12"' EXIT
+          password="$(openssl rand -base64 24)"
+          echo "::add-mask::$password"
+          printf '%s' "${CSC_LINK#base64:}" | base64 --decode > "$p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$p12" -k "$keychain" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
+          # codesign finds the keychain and the intermediates in it through the search list
+          existing="$(security list-keychains -d user | tr -d '"' | xargs)"
+          # shellcheck disable=SC2086
+          security list-keychains -d user -s "$keychain" $existing
+          echo "CSC_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          identities="$(security find-identity -v -p codesigning "$keychain")"
+          if ! grep -q 'Developer ID Application' <<<"$identities"; then
+            echo "No valid Developer ID identity yet; adding Apple's Developer ID G2 intermediate to the keychain"
+            curl -fsSL --retry 3 -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+            security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$keychain"
+          fi
+          identities="$(security find-identity -v -p codesigning "$keychain")"
+          echo "Code signing identities in the temporary keychain:"
+          echo "$identities"
+          names="$(sed -n "s/.*\"Developer ID Application: \(.*($EXPECTED_TEAM_ID)\)\".*/\1/p" <<<"$identities")"
+          if [ "$(printf '%s\n' "$names" | wc -l | tr -d ' ')" != 1 ] || [ -z "$names" ]; then
+            echo "::error::expected exactly one valid Developer ID Application identity of team $EXPECTED_TEAM_ID in the certificate"
+            exit 1
+          fi
+          echo "CSC_NAME=$names" >> "$GITHUB_ENV"
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable branch, 2026-07
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo (xlsx-sidecar)
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: apps/sheets/native/xlsx-engine
+
+      - name: Cache electron binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: release-electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: release-electron-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build apps
+        run: |
+          npm run notices
+          npm run build:all
+
+      - name: Build the universal xlsx sidecar
+        run: npm run native:build:universal -w @genoffice/sheets
+
+      # electron-builder signs with the identity and keychain the import step
+      # exported (CSC_NAME, CSC_KEYCHAIN) and notarizes the app;
+      # build/notarize-dmg.js notarizes and staples the dmgs.
+      - name: Package, sign and notarize the dmgs
+        working-directory: apps/shell
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx electron-builder --mac --publish never "-c.extraMetadata.version=$RELEASE_VERSION"
+
+      # Developer ID identity of the company team, the hardened runtime and a
+      # stapled ticket that Gatekeeper accepts.
+      - name: Verify the app signatures
+        run: |
+          set -euo pipefail
+          for dir in mac-arm64:arm64 mac:x86_64; do
+            app="$BUILD_DIR/${dir%%:*}/UniWork Office.app"
+            want="${dir##*:}"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            details="$(codesign -dv --verbose=2 "$app" 2>&1)"
+            echo "$details"
+            grep -q '^Authority=Developer ID Application' <<<"$details"
+            grep -q "^TeamIdentifier=$EXPECTED_TEAM_ID\$" <<<"$details"
+            grep -q 'flags=.*(runtime)' <<<"$details"
+            xcrun stapler validate "$app"
+            spctl --assess --type execute --verbose=2 "$app"
+            archs="$(lipo -archs "$app/Contents/MacOS/UniWork Office")"
+            if [ "$archs" != "$want" ]; then
+              echo "::error::$app is $archs, expected $want"
+              exit 1
+            fi
+          done
+
+      - name: Check the build output brand
+        run: node tools/release/check-build-brand.mjs --dir "$BUILD_DIR" --expect mac-arm64,mac --update-feed "github:$GITHUB_REPOSITORY"
+
+      - name: Collect the dmgs and their SHA-256 sums
+        run: |
+          set -euo pipefail
+          mkdir -p upload
+          shopt -s nullglob
+          files=("$BUILD_DIR"/UniWork-Office_"$RELEASE_VERSION"_*darwin_arm64.dmg "$BUILD_DIR"/UniWork-Office_"$RELEASE_VERSION"_*darwin_x64.dmg)
+          if [ "${#files[@]}" != 2 ]; then
+            echo "::error::expected the arm64 and x64 dmgs for $RELEASE_VERSION, found ${#files[@]}"
+            ls -la "$BUILD_DIR"
+            exit 1
+          fi
+          for file in "${files[@]}"; do
+            case "$file" in
+              *_unsigned_*)
+                echo "::error::$file carries the unsigned label in a signing run"
+                exit 1
+                ;;
+            esac
+            details="$(codesign -dv --verbose=2 "$file" 2>&1)"
+            grep -q "^TeamIdentifier=$EXPECTED_TEAM_ID\$" <<<"$details"
+            xcrun stapler validate "$file"
+            spctl --assess --type open --context context:primary-signature --verbose=2 "$file"
+          done
+          cp "${files[@]}" upload/
+          cd upload
+          shasum -a 256 -- * > SHA256SUMS-darwin.txt
+          cat SHA256SUMS-darwin.txt
+          {
+            echo "### macOS"
+            echo
+            for file in *; do
+              printf -- '- %s (%s bytes)\n' "$file" "$(wc -c < "$file" | tr -d ' ')"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the dmgs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: installers-darwin
+          path: upload/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Delete the signing keychain
+        if: always()
+        run: |
+          if [ -n "${CSC_KEYCHAIN:-}" ]; then
+            security delete-keychain "$CSC_KEYCHAIN" || true
+          fi
+          rm -f "$RUNNER_TEMP"/uniwork-signing.p12
 
   linux:
     needs: meta
@@ -624,11 +831,17 @@ jobs:
           retention-days: 14
 
   # Read-only: runs the repository's URL helper on the built files. A file it
-  # refuses (no unsigned label, another channel) stops the release before
-  # anything is published.
+  # refuses (no unsigned label outside the mac dmgs, another channel) stops the
+  # release before anything is published.
   urls:
-    needs: [meta, windows, macos, linux]
-    if: needs.meta.outputs.publish == 'true'
+    # exactly one of the two mac jobs runs (meta's mac_signed); a skipped one
+    # must not stop the release, a failed or cancelled one must
+    needs: [meta, windows, macos, macos_signed, linux]
+    if: >-
+      !cancelled() && needs.meta.outputs.publish == 'true'
+      && needs.windows.result == 'success' && needs.linux.result == 'success'
+      && ((needs.meta.outputs.mac_signed == 'true' && needs.macos_signed.result == 'success')
+      || (needs.meta.outputs.mac_signed != 'true' && needs.macos.result == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -685,7 +898,11 @@ jobs:
   # code: download the built files, create the pre-release, upload them.
   publish:
     needs: [meta, urls]
-    if: needs.meta.outputs.publish == 'true'
+    # urls runs although one mac job is skipped; without a status function the
+    # implicit success() here could treat that skipped ancestor as a failure
+    if: >-
+      !cancelled() && needs.meta.outputs.publish == 'true'
+      && needs.urls.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -694,6 +911,7 @@ jobs:
       TAG: ${{ needs.meta.outputs.tag }}
       CHANNEL: ${{ needs.meta.outputs.channel }}
       CREATE_TAG: ${{ needs.meta.outputs.create_tag }}
+      MAC_SIGNED: ${{ needs.meta.outputs.mac_signed }}
       TARGET_SHA: ${{ github.sha }}
     steps:
       - name: Download the installers
@@ -722,24 +940,57 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # a re-run of an existing tag must not put dmgs of the other signing
+            # state next to the ones already attached (the release title, body and
+            # the update notice would then describe the wrong build)
+            want=unsigned
+            if [ "$MAC_SIGNED" = "true" ]; then want=signed; fi
+            assets="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+            while read -r name; do
+              case "$name" in
+                *_unsigned_darwin_*.dmg) old=unsigned ;;
+                *_darwin_*.dmg) old=signed ;;
+                *) continue ;;
+              esac
+              if [ "$old" != "$want" ]; then
+                echo "::error::release $TAG already holds the $old dmg $name; this run builds $want dmgs. Cut the next tag number instead of re-running this one"
+                exit 1
+              fi
+            done <<<"$assets"
+          else
             # the body is the install note people read before the first launch
             NOTES="$(cat <<'NOTES_END'
-          Unsigned CHANNEL_PLACEHOLDER build of UniWork Office for Windows x64, macOS (Apple Silicon and Intel) and Linux x64 (deb, AppImage). The Windows app and the Linux AppImage update themselves from these releases; the macOS app tells you when a newer build is out and downloads its dmg to install by hand; with the deb, install the next build from https://uniworkos.com/office. SHA-256 sums are attached.
+          BUILD_PLACEHOLDER of UniWork Office for Windows x64, macOS (Apple Silicon and Intel) and Linux x64 (deb, AppImage). The Windows app and the Linux AppImage update themselves from these releases; the macOS app tells you when a newer build is out and downloads its dmg to install by hand; with the deb, install the next build from https://uniworkos.com/office. SHA-256 sums are attached.
 
           Install and first launch
 
           Windows: SmartScreen > More info > Run anyway.
 
+          MAC_INSTALL_PLACEHOLDER
+
+          Linux: sudo apt install ./<file>.deb, or chmod +x the AppImage and run it.
+          NOTES_END
+            )"
+            if [ "$MAC_SIGNED" = "true" ]; then
+              build="A $CHANNEL build (macOS signed and notarized by Apple; Windows and Linux unsigned)"
+              mac_install="macOS: open the .dmg and drag UniWork Office to Applications."
+              title_signing="mac signed, Windows/Linux unsigned"
+            else
+              build="Unsigned $CHANNEL build"
+              mac_install="$(cat <<'MAC_END'
           macOS: a .dmg downloaded in a browser can show "is damaged and can't be opened. You should move it to the Trash." The file is fine; macOS blocks it because the build is not signed yet. Open Terminal and run:
 
               xattr -d com.apple.quarantine <path to the .dmg>
 
           (for example xattr -d com.apple.quarantine ~/Downloads/<file>.dmg), then open the .dmg again and drag UniWork Office to Applications. If macOS then says it could not verify the app, right-click the app > Open, or on macOS 15 and later open it once, then System Settings > Privacy & Security > scroll to the UniWork Office message > Open Anyway, and enter your password.
-
-          Linux: sudo apt install ./<file>.deb, or chmod +x the AppImage and run it.
-          NOTES_END
-            )"
+          MAC_END
+              )"
+              title_signing="unsigned"
+            fi
+            # quoted replacements: bash 5.2 otherwise expands & to the match
+            NOTES="${NOTES//BUILD_PLACEHOLDER/"$build"}"
+            NOTES="${NOTES//MAC_INSTALL_PLACEHOLDER/"$mac_install"}"
             # a tag push has its tag; a dispatch run creates it on its commit
             if [ "$CREATE_TAG" = "true" ]; then
               tag_args=(--target "$TARGET_SHA")
@@ -747,7 +998,7 @@ jobs:
               tag_args=(--verify-tag)
             fi
             gh release create "$TAG" "${tag_args[@]}" --prerelease --latest=false \
-              --title "UniWork Office $TAG ($CHANNEL, unsigned)" \
-              --notes "${NOTES//CHANNEL_PLACEHOLDER/$CHANNEL}"
+              --title "UniWork Office $TAG ($CHANNEL, $title_signing)" \
+              --notes "$NOTES"
           fi
           gh release upload "$TAG" release-files/* --clobber

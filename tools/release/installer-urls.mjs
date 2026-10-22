@@ -8,9 +8,10 @@
 //
 // The platform keys, their order and the file extension per key mirror the
 // server's installer contract. Only dev and beta exist (stable waits for signed
-// builds). An installer-shaped file without the `unsigned` label, or one that
-// carries another channel's version, is refused rather than skipped, so a beta
-// asset can never end up in the dev variable. Anything else in the directory
+// builds on every platform). Only the mac dmgs may come signed, i.e. without the
+// `unsigned` label; any other installer-shaped file without it, one that carries
+// another channel's version, or a release mixing signed and unsigned dmgs is
+// refused rather than skipped, so a beta asset can never end up in the dev variable. Anything else in the directory
 // (checksums, mac zips, url files) is ignored. See tools/release/README.md.
 import { readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -27,6 +28,8 @@ export const INSTALLER_PLATFORMS = [
   'linux-x64-appimage',
 ]
 export const INSTALLER_CHANNELS = ['dev', 'beta']
+/** Platforms the release workflow can sign (Developer ID + notarization); the rest always carry the label. */
+const SIGNABLE_PLATFORMS = ['darwin-arm64', 'darwin-x64']
 
 /** The file-name ending per platform key (the release artifact names end this way). */
 export const PLATFORM_SUFFIX = {
@@ -51,16 +54,17 @@ function assertChannel(channel) {
 
 /**
  * The platform key of an installer file for `channel`, or undefined when the
- * file is not an installer. Throws for an installer that is unsigned-unlabelled,
- * of another channel, or has a name the server would not accept.
+ * file is not an installer. Throws for an installer that lacks the unsigned
+ * label on a platform that is never signed, is of another channel, or has a
+ * name the server would not accept.
  */
 export function installerPlatformOf(fileName, channel) {
   assertChannel(channel)
   const platform = INSTALLER_PLATFORMS.find((key) => fileName.endsWith(PLATFORM_SUFFIX[key]))
   if (!platform) return undefined
   if (!SAFE_FILE_NAME.test(fileName)) throw new Error(`unsafe installer file name: ${fileName}`)
-  if (!fileName.includes('_unsigned_')) {
-    throw new Error(`${fileName} has no "unsigned" label (signed builds are not released yet)`)
+  if (!fileName.includes('_unsigned_') && !SIGNABLE_PLATFORMS.includes(platform)) {
+    throw new Error(`${fileName} has no "unsigned" label (only the mac dmgs are signed)`)
   }
   const version = VERSION.exec(fileName)?.[1]
   if (!version) throw new Error(`${fileName} carries no _<version>_`)
@@ -86,6 +90,7 @@ export function buildInstallerUrls({ channel, baseUrl, files }) {
   const prefix = base.href.replace(/\/+$/, '')
   const urls = {}
   const versions = new Set()
+  const macSigned = new Set()
   for (const file of files) {
     const platform = installerPlatformOf(file, channel)
     if (!platform) continue
@@ -96,9 +101,13 @@ export function buildInstallerUrls({ channel, baseUrl, files }) {
     }
     urls[platform] = `${prefix}/${file}`
     versions.add(VERSION.exec(file)[1])
+    if (SIGNABLE_PLATFORMS.includes(platform)) macSigned.add(!file.includes('_unsigned_'))
   }
   if (Object.keys(urls).length === 0) {
-    throw new Error(`no unsigned ${channel} installer among ${files.length} file(s)`)
+    throw new Error(`no ${channel} installer among ${files.length} file(s)`)
+  }
+  if (macSigned.size > 1) {
+    throw new Error('signed and unsigned mac installers in one release')
   }
   if (versions.size > 1) {
     throw new Error(`installers of different versions: ${[...versions].join(', ')}`)
