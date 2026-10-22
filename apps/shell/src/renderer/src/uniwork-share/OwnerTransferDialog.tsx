@@ -32,6 +32,9 @@ export function resetOwnerTransferSession(): void {
 
 type Failure = Extract<ShareResult<never>, { ok: false }>
 
+/** a bridge call that rejects (a main without the channel, a handler that threw) is a network failure */
+const bridgeFailed = (): Failure => ({ ok: false, error: 'network' })
+
 /** every refusal has a sentence of ours: the server's own text is English (or internal) */
 function refusalKey(failure: Failure): StringKey {
   if (failure.endpointMissing) return 'shrOwnerUnavailable'
@@ -135,14 +138,17 @@ function OwnerTransferDialog({
 
   useEffect(() => {
     let live = true
-    void api.ownerCandidates(documentId).then((res) => {
-      if (!live) return
-      if (res.ok) setCandidates(res.value)
-      else {
-        setCandidates([])
-        setError({ key: refusalKey(res), name: '' })
-      }
-    })
+    void api
+      .ownerCandidates(documentId)
+      .catch(bridgeFailed)
+      .then((res) => {
+        if (!live) return
+        if (res.ok) setCandidates(res.value)
+        else {
+          setCandidates([])
+          setError({ key: refusalKey(res), name: '' })
+        }
+      })
     return () => {
       live = false
     }
@@ -198,11 +204,9 @@ function OwnerTransferDialog({
     setBusy(true)
     setError(null)
     const person = picked
-    const res = await api.transferOwner({
-      documentId,
-      userId: person.userId,
-      previousOwnerLevel: keep,
-    })
+    const res = await api
+      .transferOwner({ documentId, userId: person.userId, previousOwnerLevel: keep })
+      .catch(bridgeFailed)
     sending.current = false
     setBusy(false)
     if (res.ok) {
@@ -225,7 +229,10 @@ function OwnerTransferDialog({
       describedBy={`${id}-note`}
       className="uw-owner-transfer"
       restoreFocus={false}
-      onCancel={() => onClose(missing)}
+      // Escape and the overlay wait for the answer like the Cancel button does
+      onCancel={() => {
+        if (!busy) onClose(missing)
+      }}
     >
       <h3 id={`${id}-title`} className="uw-act-heading">
         {title ? t('shrOwnerTransferTitle', { document: title }) : t('shrOwnerTitleUntitled')}
@@ -234,7 +241,14 @@ function OwnerTransferDialog({
         {t('shrOwnerTransferNote')}
       </p>
 
-      <div className="uw-act-field">
+      <div
+        className="uw-act-field"
+        onBlur={(event) => {
+          // the list stays open while focus is inside the field or the list, as in ShareCandidatePicker
+          const next = event.relatedTarget as Node | null
+          if (!next || !event.currentTarget.contains(next)) setListOpen(false)
+        }}
+      >
         <label htmlFor={`${id}-person`} className="uw-act-label">
           {t('shrOwnerNewOwnerLabel')}
         </label>
@@ -245,7 +259,7 @@ function OwnerTransferDialog({
           autoComplete="off"
           aria-autocomplete="list"
           aria-expanded={listOpen}
-          aria-controls={listId}
+          aria-controls={listOpen ? listId : undefined}
           aria-activedescendant={listOpen && options[active] ? optionId(active) : undefined}
           placeholder={t('shrOwnerSearchPlaceholder')}
           value={query}
