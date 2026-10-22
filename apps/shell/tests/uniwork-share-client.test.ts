@@ -489,6 +489,12 @@ describe('transferDocumentOwner', () => {
       [envelope(422, 'owner_target_not_member'), 'owner_target_not_member', 422],
       [envelope(403, 'break_glass_required'), 'break_glass_required', 403],
       [envelope(409, 'document_owned_by_work_product'), 'document_owned_by_work_product', 409],
+      // UNI-2105: the rest of the merged UNI-2084 refusals
+      [envelope(409, 'my_folder_locked'), 'my_folder_locked', 409],
+      [envelope(409, 'document_shelved'), 'document_shelved', 409],
+      [envelope(400, 'invalid_input'), 'invalid_input', 400],
+      [envelope(403, 'forbidden'), 'forbidden', 403],
+      [envelope(404, 'not_found'), 'not_found', 404],
       [new Response('404 page not found', { status: 404 }), undefined, 404],
       [new Response('', { status: 405 }), undefined, 405],
     ]
@@ -498,6 +504,25 @@ describe('transferDocumentOwner', () => {
       expect(err.serverCode).toBe(serverCode)
       expect(err.status).toBe(status)
     }
+  })
+
+  it('UNI-2105: a 200 with empty previous_* (keep none, a folder, the owner again) is the transfer', async () => {
+    const { client } = setup(() =>
+      json(200, {
+        document_id: 'doc_1',
+        acl_owner_id: 'u_an',
+        previous_owner_id: '',
+        previous_owner_share_id: '',
+      }),
+    )
+    expect(
+      await client.transferDocumentOwner('doc_1', { userId: 'u_an', previousOwnerLevel: 'none' }),
+    ).toEqual({
+      documentId: 'doc_1',
+      aclOwnerId: 'u_an',
+      previousOwnerId: '',
+      previousOwnerShareId: '',
+    })
   })
 })
 

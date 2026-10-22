@@ -457,6 +457,8 @@ describe('owner transfer', () => {
       ['owner_target_not_member', 422],
       ['break_glass_required', 403],
       ['document_owned_by_work_product', 409],
+      ['my_folder_locked', 409],
+      ['document_shelved', 409],
       ['server_error', 500],
     ] as const
     for (const [code, status] of cases) {

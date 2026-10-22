@@ -1107,6 +1107,9 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
       ['owner_target_not_member', 422, 'shrOwnerTargetNotMember'],
       ['break_glass_required', 403, 'shrOwnerSelfTransferError'],
       ['document_owned_by_work_product', 409, 'shrOwnerOwnedByWorkProduct'],
+      // UNI-2105: the real route answers these two; the Share dialog's own sentences say them
+      ['my_folder_locked', 409, 'shrErrMyFolderLocked'],
+      ['document_shelved', 409, 'shrShelvedBlocked'],
       ['server_error', 500, 'shrOwnerFailed'],
       ['malformed_response', undefined, 'shrOwnerFailed'],
     ] as const)(
