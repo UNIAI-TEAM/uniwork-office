@@ -36,6 +36,12 @@ const PERSON = {
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown
 
+/** an IPC event from the shell window's main frame */
+function shellEvent(destroyed = false) {
+  const mainFrame = { url: 'app://shell' }
+  return { sender: { isDestroyed: () => destroyed, mainFrame }, senderFrame: mainFrame }
+}
+
 function setup(
   over: Partial<UniworkWorkDeps> = {},
   fetch: FetchLike = vi.fn<FetchLike>(async () => json(200, HOME)),
@@ -53,8 +59,10 @@ function setup(
     ...over,
   })
   const call = (channel: string, ...args: unknown[]) =>
-    Promise.resolve(handlers.get(channel)!({}, ...args))
-  return { handlers, call, openExternal }
+    Promise.resolve(handlers.get(channel)!(shellEvent(), ...args))
+  const callFrom = (event: unknown, channel: string, ...args: unknown[]) =>
+    Promise.resolve(handlers.get(channel)!(event, ...args))
+  return { handlers, call, callFrom, openExternal }
 }
 
 describe('uniwork-work IPC', () => {
@@ -242,5 +250,122 @@ describe('uniwork-work IPC: notification documents (G3)', () => {
       ok: false,
       error: 'signed-out',
     })
+  })
+})
+
+describe('uniwork-work IPC: the inbox (UNI-2079)', () => {
+  const NOTE = {
+    id: 'n_1',
+    kind: 'task_assigned',
+    workspace_id: 'ws_1',
+    resource_type: 'task',
+    resource_id: 't_1',
+    actor_kind: 'human',
+    title_key: 'notifications.kind.task_assigned',
+    params: {},
+    created_at: '2026-10-13T07:00:00Z',
+  }
+  /** one body per route path; a POST answers its route's body too */
+  const inboxServer = () =>
+    vi.fn<FetchLike>(async (url) => {
+      const path = new URL(url).pathname.replace('/api/v1', '')
+      const bodies: Record<string, unknown> = {
+        '/me/notifications': { notifications: [NOTE], next_before: 'n_1' },
+        '/me/notifications/unread-count': { total: 2, by_workspace: { ws_1: 2 } },
+        '/me/notifications/read': { status: 'ok', ids: ['n_1'] },
+        '/me/notifications/unread': { status: 'ok' },
+        '/me/notifications/archive': { status: 'ok' },
+        '/me/notifications/unarchive': { status: 'ok' },
+      }
+      return path in bodies
+        ? json(200, bodies[path])
+        : json(404, { error: { code: 'not_found', message: 'x' } })
+    })
+  const NEW = [
+    C.listNotifications,
+    C.unreadCount,
+    C.markNotificationsUnread,
+    C.archiveNotifications,
+    C.unarchiveNotifications,
+    C.markAllNotificationsRead,
+  ]
+
+  it('names every new channel under uniwork-work:', () => {
+    for (const channel of NEW) expect(channel).toMatch(/^uniwork-work:/)
+  })
+
+  it('answers each inbox call with {ok, value}', async () => {
+    const fetch = inboxServer()
+    const { call } = setup({}, fetch)
+    expect(await call(C.listNotifications, { unread: true })).toMatchObject({
+      ok: true,
+      value: { notifications: [{ id: 'n_1' }], next_before: 'n_1' },
+    })
+    expect(await call(C.unreadCount)).toEqual({
+      ok: true,
+      value: { total: 2, by_workspace: { ws_1: 2 } },
+    })
+    expect(await call(C.markNotificationsUnread, ['n_1'])).toEqual({ ok: true, value: null })
+    expect(await call(C.archiveNotifications, ['n_1'])).toEqual({ ok: true, value: null })
+    expect(await call(C.unarchiveNotifications, ['n_1'])).toEqual({ ok: true, value: null })
+    expect(await call(C.markAllNotificationsRead, { workspaceId: 'ws_1' })).toEqual({
+      ok: true,
+      value: ['n_1'],
+    })
+    expect(
+      fetch.mock.calls.map(([url, init]) => `${init.method} ${new URL(url).pathname}`),
+    ).toEqual([
+      'GET /api/v1/me/notifications',
+      'GET /api/v1/me/notifications/unread-count',
+      'POST /api/v1/me/notifications/unread',
+      'POST /api/v1/me/notifications/archive',
+      'POST /api/v1/me/notifications/unarchive',
+      'POST /api/v1/me/notifications/read',
+    ])
+  })
+
+  it('a null list query or mark-all query reads as none', async () => {
+    const fetch = inboxServer()
+    const { call } = setup({}, fetch)
+    expect(await call(C.listNotifications, null)).toMatchObject({ ok: true })
+    expect(await call(C.markAllNotificationsRead, null)).toMatchObject({ ok: true })
+    expect(JSON.parse(fetch.mock.calls[1]![1].body as string)).toEqual({ all: true })
+  })
+
+  it('maps failures to the work errors; bad renderer input never reaches the network', async () => {
+    const failing = (status: number, code: string) =>
+      setup(
+        {},
+        vi.fn<FetchLike>(async () => json(status, { error: { code, message: 'x' } })),
+      ).call(C.archiveNotifications, ['n_1'])
+    // someone else's id: 404, nothing changed
+    expect(await failing(404, 'not_found')).toEqual({ ok: false, error: 'forbidden' })
+    expect(await failing(500, 'internal')).toEqual({ ok: false, error: 'server' })
+    expect(await setup({ identity: () => null }).call(C.unreadCount)).toEqual({
+      ok: false,
+      error: 'signed-out',
+    })
+    const fetch = inboxServer()
+    const { call } = setup({}, fetch)
+    expect(await call(C.listNotifications, { limit: 500 })).toEqual({ ok: false, error: 'server' })
+    expect(await call(C.markNotificationsUnread, [])).toEqual({ ok: false, error: 'server' })
+    expect(await call(C.unarchiveNotifications, 'n_1')).toEqual({ ok: false, error: 'server' })
+    expect(await call(C.markAllNotificationsRead, { workspaceId: 7 })).toEqual({
+      ok: false,
+      error: 'server',
+    })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('refuses a sender that is not the shell main frame, before any request', async () => {
+    const fetch = inboxServer()
+    const { callFrom } = setup({}, fetch)
+    const subframe = { ...shellEvent(), senderFrame: { url: 'https://evil.example' } }
+    for (const event of [{}, null, shellEvent(true), subframe]) {
+      for (const channel of NEW) {
+        expect(await callFrom(event, channel, ['n_1'])).toEqual({ ok: false, error: 'forbidden' })
+      }
+    }
+    expect(fetch).not.toHaveBeenCalled()
   })
 })
