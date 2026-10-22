@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AskUniDocBridge, AskUniDocFlags } from '@genoffice/ai-provider/askuni'
 import { askUniText } from '../src/strings-ask-uni'
-import { createAskUniDocAdapter, useAskUniDocFlags } from '../src/ask-uni'
+import { AskUniEditorBody, createAskUniDocAdapter, useAskUniDocFlags } from '../src/ask-uni'
 
 // The adapter an editor builds from window.uniworkAskUniDoc, and the hook that reads its flags.
 
@@ -124,5 +124,74 @@ describe('useAskUniDocFlags', () => {
     expect(seen).toEqual({ streamEnabled: false, bound: 'signed_out' })
     await mount(undefined)
     expect(seen).toBeNull()
+  })
+})
+
+describe('a refused sender (every bridge call rejects, as with ipc_sender_refused)', () => {
+  let host: HTMLDivElement
+  let root: Root
+  let unhandled: unknown[]
+  const onUnhandled = (reason: unknown) => unhandled.push(reason)
+
+  beforeEach(() => {
+    unhandled = []
+    process.on('unhandledRejection', onUnhandled)
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    host.remove()
+    process.off('unhandledRejection', onUnhandled)
+  })
+
+  const refused = () => Promise.reject(new Error('ipc_sender_refused'))
+
+  it('shows the normal error state with a retry, and Stop and feedback fail quietly', async () => {
+    const bridge = fakeBridge()
+    bridge.askUniDocStream.mockImplementation(refused)
+    bridge.askUniDocStreamCancel.mockImplementation(refused)
+    bridge.askUniDocFeedbackSet.mockImplementation(refused)
+    const adapter = createAskUniDocAdapter(bridge, (k) => askUniText('en', k), 'en')
+    await act(async () => {
+      root.render(
+        h(AskUniEditorBody, {
+          adapter,
+          flags: { streamEnabled: true, bound: 'document' },
+          documentName: 'Q3 plan.docx',
+        }),
+      )
+    })
+    const box = host.querySelector('textarea') as HTMLTextAreaElement
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(box, 'Q')
+      box.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      for (let i = 0; i < 6; i++) await Promise.resolve()
+    })
+    expect(host.textContent).toContain(askUniText('en', 'askUniErrDefault'))
+    expect(host.textContent).toContain(askUniText('en', 'askUniV2Retry'))
+    expect(host.querySelector('textarea')?.hasAttribute('disabled')).toBe(false)
+    // a rejected stream start never became a request, so there is nothing to cancel; a rejected
+    // cancel (a request that did start) must be swallowed as well
+    bridge.askUniDocStream.mockImplementation(async () => ({ ok: true as const, requestId: 'r9' }))
+    const retry = [...host.querySelectorAll('button')].find(
+      (b) => b.textContent === askUniText('en', 'askUniV2Retry'),
+    )
+    await act(async () => retry!.click())
+    await act(async () => {
+      for (let i = 0; i < 6; i++) await Promise.resolve()
+    })
+    const stop = host.querySelector('button[aria-label="Stop"]') as HTMLButtonElement
+    await act(async () => {
+      stop.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+      for (let i = 0; i < 6; i++) await Promise.resolve()
+    })
+    expect(bridge.askUniDocStreamCancel).toHaveBeenCalledWith({ requestId: 'r9' })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(unhandled).toEqual([])
   })
 })
