@@ -142,4 +142,17 @@ export const ru = {
   dlCopyFailed: 'Не удалось создать копию. Ничего не изменилось.',
   dlCopyDone: 'Создана копия "{title}"',
   dlCopyUnavailable: 'В этой версии пока нет функции копирования.',
+  dlPurgeTitle: 'Удалить {title} навсегда?',
+  dlPurgeDescription: 'Этот элемент будет удалён навсегда. Отменить это действие будет нельзя.',
+  dlPurgeFolderDescription:
+    'Эта папка будет удалена навсегда, и отменить это действие будет нельзя. Элементы внутри, которыми вы не управляете, останутся в корзине.',
+  dlPurgeSubmit: 'Удалить навсегда',
+  dlPurgeSubmitting: 'Удаление навсегда…',
+  dlPurgeDone: '{title} удалён навсегда',
+  dlPurgeFailed: 'Не удалось удалить. Ничего не изменилось.',
+  dlBulkPurgeTitleOne: 'Удалить {n} документ навсегда?',
+  dlBulkPurgeTitleOther: 'Удалить {n} документов навсегда?',
+  dlBulkPurgeDescription:
+    'Отменить это действие будет нельзя. Элементы, которыми вы не можете управлять, будут пропущены.',
+  dlBulkDonePurge: 'Удалено навсегда документов: {ok} из {total}',
 } satisfies Record<keyof typeof zh, string>

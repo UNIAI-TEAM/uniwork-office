@@ -139,4 +139,16 @@ export const zhTW = {
   dlCopyFailed: '無法建立副本。未做任何變更。',
   dlCopyDone: '已建立副本「{title}」',
   dlCopyUnavailable: '此部署暫不支援建立副本。',
+  dlPurgeTitle: '永久刪除 {title}？',
+  dlPurgeDescription: '此項目將被永久刪除，且無法復原。',
+  dlPurgeFolderDescription:
+    '此資料夾將被永久刪除，且無法復原。其中您無權管理的項目會保留在資源回收筒。',
+  dlPurgeSubmit: '永久刪除',
+  dlPurgeSubmitting: '正在永久刪除…',
+  dlPurgeDone: '已永久刪除 {title}',
+  dlPurgeFailed: '無法刪除，未做任何變更。',
+  dlBulkPurgeTitleOne: '永久刪除 {n} 份文件？',
+  dlBulkPurgeTitleOther: '永久刪除 {n} 份文件？',
+  dlBulkPurgeDescription: '無法復原。您無權管理的項目將被略過。',
+  dlBulkDonePurge: '已永久刪除 {ok}/{total} 份文件',
 } satisfies Record<keyof typeof zh, string>

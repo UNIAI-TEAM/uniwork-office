@@ -177,6 +177,97 @@ describe('the copy dialog strings (UNI-2078)', () => {
   })
 })
 
+// UNI-2078 slice 2: Delete forever (web documents.trash.purge*, documents.list.bulk.*purge*)
+describe('the delete-forever strings (UNI-2078)', () => {
+  const PURGE_KEYS = [
+    'dlPurgeTitle',
+    'dlPurgeDescription',
+    'dlPurgeFolderDescription',
+    'dlPurgeSubmit',
+    'dlPurgeSubmitting',
+    'dlPurgeDone',
+    'dlPurgeFailed',
+    'dlBulkPurgeTitleOne',
+    'dlBulkPurgeTitleOther',
+    'dlBulkPurgeDescription',
+    'dlBulkDonePurge',
+  ]
+
+  it.each([...LANGS])('locale %s has every purge key with copy', (lang) => {
+    for (const key of PURGE_KEYS) expect(table(lang)[key]?.trim(), `${lang}.${key}`).toBeTruthy()
+  })
+
+  it('the placeholders are the same in every locale', () => {
+    const vars: Record<string, string[]> = {
+      dlPurgeTitle: ['{title}'],
+      dlPurgeDone: ['{title}'],
+      dlBulkPurgeTitleOne: ['{n}'],
+      dlBulkPurgeTitleOther: ['{n}'],
+      dlBulkDonePurge: ['{ok}', '{total}'],
+    }
+    for (const lang of LANGS) {
+      for (const [key, want] of Object.entries(vars)) {
+        expect(placeholdersOf(table(lang)[key]!), `${lang}.${key}`).toBe(want.sort().join(','))
+      }
+      for (const key of PURGE_KEYS.filter((k) => !(k in vars))) {
+        expect(placeholdersOf(table(lang)[key]!), `${lang}.${key}`).toBe('')
+      }
+    }
+  })
+
+  it('vi is the web wording, verbatim', () => {
+    const vi = table('vi')
+    expect(vi.dlPurgeTitle).toBe('Xóa vĩnh viễn {title}?')
+    expect(vi.dlPurgeDescription).toBe('Mục này sẽ bị xóa vĩnh viễn và không thể hoàn tác.')
+    expect(vi.dlPurgeFolderDescription).toBe(
+      'Thư mục này sẽ bị xóa vĩnh viễn và không thể hoàn tác. Mục con bạn không quản lý vẫn ở lại thùng rác.',
+    )
+    expect(vi.dlPurgeSubmit).toBe('Xóa vĩnh viễn')
+    expect(vi.dlPurgeSubmitting).toBe('Đang xóa vĩnh viễn…')
+    expect(vi.dlPurgeDone).toBe('Đã xóa vĩnh viễn {title}')
+    expect(vi.dlPurgeFailed).toBe('Không xóa được. Chưa có gì thay đổi.')
+    expect(vi.dlBulkPurgeTitleOne).toBe('Xóa vĩnh viễn {n} tài liệu?')
+    expect(vi.dlBulkPurgeTitleOther).toBe('Xóa vĩnh viễn {n} tài liệu?')
+    expect(vi.dlBulkPurgeDescription).toBe(
+      'Không thể hoàn tác. Mục bạn không có quyền sẽ được bỏ qua.',
+    )
+    expect(vi.dlBulkDonePurge).toBe('Đã xóa vĩnh viễn {ok}/{total} tài liệu')
+  })
+
+  it('en is the web wording, verbatim', () => {
+    const en = table('en')
+    expect(en.dlPurgeTitle).toBe('Delete {title} forever?')
+    expect(en.dlPurgeDescription).toBe(
+      'This item will be permanently deleted and cannot be undone.',
+    )
+    expect(en.dlPurgeFolderDescription).toBe(
+      'This folder will be permanently deleted and cannot be undone. Items inside it that you do not manage stay in the trash.',
+    )
+    expect(en.dlPurgeSubmit).toBe('Delete forever')
+    expect(en.dlPurgeSubmitting).toBe('Deleting forever…')
+    expect(en.dlPurgeDone).toBe('{title} deleted forever')
+    expect(en.dlPurgeFailed).toBe('Could not delete. Nothing changed.')
+    expect(en.dlBulkPurgeTitleOne).toBe('Delete {n} document forever?')
+    expect(en.dlBulkPurgeTitleOther).toBe('Delete {n} documents forever?')
+    expect(en.dlBulkPurgeDescription).toBe(
+      'This cannot be undone. Items you cannot manage are skipped.',
+    )
+    expect(en.dlBulkDonePurge).toBe('Deleted {ok}/{total} documents forever')
+  })
+
+  it('the other 19 locales are translated, not an English copy', () => {
+    const en = table('en')
+    for (const key of [
+      'dlPurgeDescription',
+      'dlPurgeFolderDescription',
+      'dlBulkPurgeDescription',
+    ]) {
+      const same = LANGS.filter((l) => l !== 'en').filter((l) => table(l)[key] === en[key])
+      expect(same, key).toEqual([])
+    }
+  })
+})
+
 describe('bulk Move strings (UNI-2078 slice 3)', () => {
   const KEYS = [
     'dlBulkMoveTitleOne',

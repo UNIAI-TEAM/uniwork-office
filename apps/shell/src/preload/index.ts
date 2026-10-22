@@ -133,6 +133,8 @@ import type {
   ShareCandidatePage,
   ShareLinkCreated,
   ShareMemberPage,
+  ShareOwnerCandidate,
+  ShareOwnerTransfer,
   ShareLinkRevokeInput,
   ShareRejectedItem,
   ShareRequestDecision,
@@ -148,9 +150,11 @@ import type {
   WorkHomeSummary,
   WorkNotificationDocument,
   WorkNotificationDocumentPage,
+  WorkNotificationPage,
   WorkPerson,
   WorkTask,
   WorkTaskStatus,
+  WorkUnreadCount,
 } from '../shared/uniwork-work-api'
 import { asSyncCenterSnapshot, UNIWORK_SYNC_CENTER_CHANNELS } from '../shared/sync-center'
 import type { SyncCenterActionResult, UniworkSyncCenterApi } from '../shared/sync-center'
@@ -1519,6 +1523,15 @@ const homeApi: HomeApi = {
       }),
     )
   },
+  // UNI-2078: delete forever; the id only crosses, the reply is narrowed like any action
+  async uniworkPurgeDocument(documentId: string) {
+    if (typeof documentId !== 'string' || !documentId) {
+      return { ok: false, error: 'not_found' } as const
+    }
+    return asUniworkActionResult<{ id: string }>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.purgeDocument, documentId),
+    )
+  },
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf
   async uniworkListShelved(q) {
     return asUniworkResult<UniworkDocListPage>(
@@ -1580,6 +1593,11 @@ const homeApi: HomeApi = {
   async uniworkOpenDocument(documentId) {
     return asUniworkResult<{ path: string }>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.openDocument, documentId),
+    )
+  },
+  async uniworkOpenDocumentAt(input) {
+    return asUniworkResult<{ path: string }>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.openDocumentAt, input),
     )
   },
   async uniworkDocStatus(path) {
@@ -2002,6 +2020,36 @@ const workApi: UniworkWorkApi = {
     const page = narrowNotificationDocumentPage(reply.value)
     return page ? { ok: true, value: page } : { ok: false, error: 'server' }
   },
+  async listNotifications(q) {
+    return asWorkResult<WorkNotificationPage>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.listNotifications, q),
+    )
+  },
+  async unreadCount() {
+    return asWorkResult<WorkUnreadCount>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.unreadCount),
+    )
+  },
+  async markNotificationsUnread(ids) {
+    return asWorkResult<null>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.markNotificationsUnread, ids),
+    )
+  },
+  async archiveNotifications(ids) {
+    return asWorkResult<null>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.archiveNotifications, ids),
+    )
+  },
+  async unarchiveNotifications(ids) {
+    return asWorkResult<null>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.unarchiveNotifications, ids),
+    )
+  },
+  async markAllNotificationsRead(q) {
+    return asWorkResult<string[]>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.markAllNotificationsRead, q),
+    )
+  },
   async openWeb(target) {
     return (await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.openWeb, target)) === true
   },
@@ -2027,6 +2075,7 @@ function asShareResult<T>(result: unknown): ShareResult<T> {
       status?: unknown
       rejected?: unknown
       retryable?: unknown
+      endpointMissing?: unknown
     }
     if (r.ok === true) return { ok: true, value: r.value as T }
     if (r.ok === false && typeof r.error === 'string' && r.error) {
@@ -2036,6 +2085,7 @@ function asShareResult<T>(result: unknown): ShareResult<T> {
         ...(typeof r.status === 'number' ? { status: r.status } : {}),
         ...(Array.isArray(r.rejected) ? { rejected: r.rejected as ShareRejectedItem[] } : {}),
         ...(r.retryable === true ? { retryable: true } : {}),
+        ...(r.endpointMissing === true ? { endpointMissing: true } : {}),
       }
     }
   }
@@ -2104,6 +2154,16 @@ const shareApi: UniworkShareApi = {
   async members(input) {
     return asShareResult<ShareMemberPage>(
       await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.members, input),
+    )
+  },
+  async ownerCandidates(documentId) {
+    return asShareResult<ShareOwnerCandidate[]>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.ownerCandidates, documentId),
+    )
+  },
+  async transferOwner(input) {
+    return asShareResult<ShareOwnerTransfer>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.transferOwner, input),
     )
   },
 }

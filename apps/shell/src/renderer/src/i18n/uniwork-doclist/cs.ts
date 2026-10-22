@@ -142,4 +142,17 @@ export const cs = {
   dlCopyFailed: 'Kopii se nepodařilo vytvořit. Nic se nezměnilo.',
   dlCopyDone: 'Vytvořena kopie "{title}"',
   dlCopyUnavailable: 'Tato verze zatím nemá funkci kopírování.',
+  dlPurgeTitle: 'Trvale smazat {title}?',
+  dlPurgeDescription: 'Tato položka bude trvale smazána a nelze to vrátit zpět.',
+  dlPurgeFolderDescription:
+    'Tato složka bude trvale smazána a nelze to vrátit zpět. Položky uvnitř, které nespravujete, zůstanou v koši.',
+  dlPurgeSubmit: 'Smazat trvale',
+  dlPurgeSubmitting: 'Trvale se maže…',
+  dlPurgeDone: '{title} byl trvale smazán',
+  dlPurgeFailed: 'Nepodařilo se smazat. Nic se nezměnilo.',
+  dlBulkPurgeTitleOne: 'Trvale smazat {n} dokument?',
+  dlBulkPurgeTitleOther: 'Trvale smazat {n} dokumentů?',
+  dlBulkPurgeDescription:
+    'Tuto akci nelze vrátit zpět. Položky, které nelze spravovat, budou přeskočeny.',
+  dlBulkDonePurge: 'Trvale smazáno dokumentů: {ok} z {total}',
 } satisfies Record<keyof typeof zh, string>

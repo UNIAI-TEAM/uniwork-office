@@ -209,4 +209,7 @@ export const pt = {
   uwErrPageCopyNotSupported:
     'Nesta etapa, só é possível copiar documentos de arquivo. As cópias do UniNote virão depois.',
   uwErrCopyConsentRequired: 'É necessária uma confirmação explícita antes de copiar.',
+  uwErrDocumentNotInTrash: 'Este item não está mais na lixeira.',
+  uwErrFolderTooLarge:
+    'A pasta contém itens demais para excluir de uma vez. Exclua primeiro o conteúdo em partes.',
 } satisfies Record<keyof typeof zh, string>

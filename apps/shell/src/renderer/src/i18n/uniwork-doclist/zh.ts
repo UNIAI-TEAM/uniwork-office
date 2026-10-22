@@ -138,4 +138,16 @@ export const zh = {
   dlCopyFailed: '无法创建副本。未做任何更改。',
   dlCopyDone: '已创建副本“{title}”',
   dlCopyUnavailable: '此部署暂不支持创建副本。',
+  dlPurgeTitle: '永久删除 {title}？',
+  dlPurgeDescription: '此项将被永久删除，且无法撤销。',
+  dlPurgeFolderDescription:
+    '此文件夹将被永久删除，且无法撤销。其中您无权管理的项目会保留在回收站。',
+  dlPurgeSubmit: '永久删除',
+  dlPurgeSubmitting: '正在永久删除…',
+  dlPurgeDone: '已永久删除 {title}',
+  dlPurgeFailed: '无法删除，未做任何更改。',
+  dlBulkPurgeTitleOne: '永久删除 {n} 个文档？',
+  dlBulkPurgeTitleOther: '永久删除 {n} 个文档？',
+  dlBulkPurgeDescription: '无法撤销。您无权管理的项目将被跳过。',
+  dlBulkDonePurge: '已永久删除 {ok}/{total} 个文档',
 }

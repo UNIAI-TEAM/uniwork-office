@@ -393,6 +393,11 @@ export function errorFromResponse(
   ) {
     return new UniworkDocError('page_copy_not_supported', at)
   }
+  // UNI-2078: the purge route's refusals: the item left the trash meanwhile (400), or the folder
+  // holds more than 1000 nodes (400, 422 in older builds) - each its own user-facing code
+  if (serverCode === 'document_not_in_trash')
+    return new UniworkDocError('document_not_in_trash', at)
+  if (serverCode === 'folder_too_large') return new UniworkDocError('folder_too_large', at)
   // UNI-2047 SD-A: an access update the server refused item by item; the list rides the error so
   // the share dialog can name each refused person (a bare 422 stays the generic server_error)
   if (serverCode === 'document_access_rejected') {

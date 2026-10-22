@@ -21,6 +21,7 @@ interface ActionsBridge {
   uniworkArchiveDocument(documentId: string): Promise<unknown>
   uniworkArchiveImpact(documentId: string): Promise<unknown>
   uniworkCopyDocument(input: unknown): Promise<unknown>
+  uniworkPurgeDocument(documentId: unknown): Promise<unknown>
   uniworkCancelUploadDocument(uploadId: string): Promise<void>
   onUniworkUploadProgress(cb: (event: unknown) => void): () => void
   uniworkFolderTree(workspaceId: string): Promise<unknown>
@@ -522,6 +523,46 @@ describe('the copy-document bridge (UNI-2078)', () => {
       ok: false,
       error: 'not_found',
     })
+    expect(invoked).toEqual([])
+  })
+})
+
+// UNI-2078: the purge bridge. It forwards the id only and narrows the reply to the action result.
+describe('the purge-document bridge (UNI-2078)', () => {
+  it('routes uniworkPurgeDocument through its IPC channel with the id only', async () => {
+    const reply = { ok: true, value: { id: 'doc_1' } }
+    const { bridge, invoked } = await loadBridge(reply)
+    invoked.length = 0
+    expect(await bridge.uniworkPurgeDocument('doc_1')).toEqual(reply)
+    expect(invoked).toEqual([{ channel: UNIWORK_DOC_CHANNELS.purgeDocument, args: ['doc_1'] }])
+    expect(UNIWORK_DOC_CHANNELS.purgeDocument).toBe('uniwork-doc:purge-document')
+  })
+
+  it('a refusal passes through and a reply of the wrong shape is malformed_response', async () => {
+    const refused = { ok: false, error: 'document_not_in_trash' }
+    expect(await (await loadBridge(refused)).bridge.uniworkPurgeDocument('d')).toEqual(refused)
+    for (const bad of [
+      undefined,
+      null,
+      'x',
+      7,
+      { ok: true },
+      { ok: true, value: [] },
+      { ok: false },
+    ]) {
+      expect(await (await loadBridge(bad)).bridge.uniworkPurgeDocument('d')).toEqual({
+        ok: false,
+        error: 'malformed_response',
+      })
+    }
+  })
+
+  it('a non-string or empty id is refused before any IPC call', async () => {
+    const { bridge, invoked } = await loadBridge({ ok: true, value: { id: 'c' } })
+    invoked.length = 0
+    for (const bad of [undefined, null, 7, '', {}]) {
+      expect(await bridge.uniworkPurgeDocument(bad)).toEqual({ ok: false, error: 'not_found' })
+    }
     expect(invoked).toEqual([])
   })
 })

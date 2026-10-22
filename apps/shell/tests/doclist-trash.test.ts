@@ -16,6 +16,11 @@ import type {
 import { readCollapsedGroups } from '../src/renderer/src/doclist/persist'
 import * as shelvedView from '../src/renderer/src/uniwork-home/ShelvedDocumentsView'
 import { wbStoreWrite } from '../src/renderer/src/workbench-store-client'
+import {
+  resetDocumentsIntentBusForTests,
+  revealInTrash,
+} from '../src/renderer/src/documents-intent-bus'
+import { onUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -135,6 +140,7 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
       uniworkListSources: vi.fn(async () => ok({ items: [], nextCursor: null })),
       uniworkSearchDocuments: vi.fn(async () => ok({ items: [], nextCursor: null })),
       uniworkRestoreDocument: vi.fn(async (id: string) => ok({ id })),
+      uniworkPurgeDocument: vi.fn(async (id: string) => ({ ok: true, value: { id } })),
       uniworkUnshelveDocument: vi.fn(async (id: string) =>
         ok({
           document: { ...shelf.find((d) => d.id === id)!, shelvedAt: undefined },
@@ -380,13 +386,126 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
     expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(before)
   })
 
-  it('has the menu Khôi phục · Xem chi tiết and no permanent delete', async () => {
-    await mount()
-    await click(host.querySelector('[data-doc-id="t-a"] .uw-row-menu-btn'))
-    const labels = Array.from(document.querySelectorAll('.uw-row-menu-list [role="menuitem"]')).map(
-      (el) => el.textContent?.trim(),
+  const menuLabels = () =>
+    Array.from(document.querySelectorAll('.uw-row-menu-list [role="menuitem"]')).map((el) =>
+      el.textContent?.trim(),
     )
-    expect(labels).toEqual(['Khôi phục', 'Xem chi tiết'])
+  const menuItem = (label: string) =>
+    Array.from(document.querySelectorAll<HTMLElement>('.uw-row-menu-list [role="menuitem"]')).find(
+      (el) => el.textContent?.trim() === label,
+    )
+  const toast = () => document.body.querySelector('.uw-act-toast')?.textContent ?? ''
+  const openMenu = (id: string) =>
+    click(host.querySelector(`[data-doc-id="${id}"] .uw-row-menu-btn`))
+
+  it('has the menu Khôi phục · Xem chi tiết · Xóa vĩnh viễn (UNI-2078)', async () => {
+    await mount()
+    await openMenu('t-a')
+    expect(menuLabels()).toEqual(['Khôi phục', 'Xem chi tiết', 'Xóa vĩnh viễn'])
+    // the delete entry sits in its own group after a divider, red
+    const purge = menuItem('Xóa vĩnh viễn')!
+    expect(purge.classList.contains('danger')).toBe(true)
+    expect(
+      document.querySelectorAll('.uw-row-menu-list [role="separator"]').length,
+    ).toBeGreaterThan(0)
+  })
+
+  describe('Xóa vĩnh viễn on a trash row (UNI-2078)', () => {
+    const dialog = () => document.body.querySelector('[role="dialog"]')
+    const confirm = () => document.body.querySelector<HTMLElement>('[data-purge-confirm]')
+
+    it('is hidden for an edit-level row, kept for an admin_scope row that cannot restore', async () => {
+      trash = [
+        trashed('t-a', iso(2026, 9, 22), iso(2026, 10, 22), {
+          canManage: false,
+          canEdit: true,
+          myLevel: 'edit',
+        }),
+        trashed('t-b', iso(2026, 9, 28), iso(2026, 10, 28), {
+          canManage: false,
+          canEdit: false,
+          myLevel: 'view',
+          adminScope: true,
+        }),
+      ]
+      await mount()
+      await openMenu('t-a')
+      expect(menuLabels()).toEqual(['Xem chi tiết'])
+      await click(document.body)
+      await openMenu('t-b')
+      expect(menuLabels()).toEqual(['Xem chi tiết', 'Xóa vĩnh viễn'])
+    })
+
+    it('has no entry in a shell without the purge call', async () => {
+      delete api.uniworkPurgeDocument
+      await mount()
+      await openMenu('t-a')
+      expect(menuLabels()).toEqual(['Khôi phục', 'Xem chi tiết'])
+    })
+
+    it('is never in the menu of a live row or a shelved row', async () => {
+      await remount('archive')
+      await openMenu('s-a')
+      expect(menuLabels()).not.toContain('Xóa vĩnh viễn')
+    })
+
+    it('opens the confirm with the item name and sends nothing before it', async () => {
+      await mount()
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      expect(dialog()!.textContent).toContain('Xóa vĩnh viễn t-a?')
+      expect(api.uniworkPurgeDocument).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(document.body.querySelector('[data-purge-cancel]'))
+    })
+
+    it('Hủy closes without a call', async () => {
+      await mount()
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(document.body.querySelector('[data-purge-cancel]'))
+      expect(dialog()).toBeNull()
+      expect(api.uniworkPurgeDocument).not.toHaveBeenCalled()
+    })
+
+    it('confirm: one call, the "purged" toast, the dialog closes and the list is read again', async () => {
+      await mount()
+      const before = api.uniworkListTrash!.mock.calls.length
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(confirm())
+      expect(api.uniworkPurgeDocument).toHaveBeenCalledTimes(1)
+      expect(api.uniworkPurgeDocument!.mock.calls[0]![0]).toBe('t-a')
+      expect(dialog()).toBeNull()
+      expect(toast()).toContain('Đã xóa vĩnh viễn t-a')
+      expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(before)
+    })
+
+    it('a failure stays inside the dialog and refreshes nothing', async () => {
+      api.uniworkPurgeDocument!.mockResolvedValueOnce({ ok: false, error: 'server_error' })
+      await mount()
+      const before = api.uniworkListTrash!.mock.calls.length
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(confirm())
+      expect(dialog()).not.toBeNull()
+      expect(dialog()!.querySelector('[role="alert"]')?.textContent).toBe(
+        'Không xóa được. Chưa có gì thay đổi.',
+      )
+      expect(api.uniworkListTrash!.mock.calls.length).toBe(before)
+      expect(toast()).toBe('')
+    })
+
+    it('document_not_in_trash: toasts the error, refreshes the list and closes the dialog', async () => {
+      api.uniworkPurgeDocument!.mockResolvedValueOnce({ ok: false, error: 'document_not_in_trash' })
+      await mount()
+      const before = api.uniworkListTrash!.mock.calls.length
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(confirm())
+      expect(dialog()).toBeNull()
+      expect(toast()).toContain('Mục này không còn trong thùng rác.')
+      expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(before)
+    })
   })
 
   it('keeps select-all and the row checkboxes working across the groups', async () => {
@@ -457,6 +576,101 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
     ).find((el) => el.textContent?.includes('Xem chi tiết'))
     await click(details)
     expect(api.uniworkDocumentProperties).toHaveBeenCalledTimes(1)
+  })
+
+  describe('revealInTrash (UNI-2079: a notice names a trashed document)', () => {
+    let scrolled: Element[]
+    let notices: unknown[]
+    let offNotice: () => void
+
+    beforeEach(() => {
+      resetDocumentsIntentBusForTests()
+      scrolled = []
+      notices = []
+      Element.prototype.scrollIntoView = function (this: Element) {
+        scrolled.push(this)
+      }
+      offNotice = onUniworkNotice((event) => notices.push(event))
+    })
+    afterEach(() => {
+      offNotice()
+      resetDocumentsIntentBusForTests()
+    })
+
+    const selectedIds = () =>
+      Array.from(host.querySelectorAll('.dh-doc-table [role="row"][aria-selected="true"]')).map(
+        (el) => el.getAttribute('data-doc-id'),
+      )
+    const trashNavCurrent = () =>
+      sidebarSlot.querySelector('[data-nav="trash"]')?.getAttribute('aria-current') === 'page'
+
+    it('switches a mounted Documents home to the Trash and selects + scrolls to the row', async () => {
+      await mount('workspace')
+      expect(trashNavCurrent()).toBe(false)
+      await act(async () => revealInTrash({ documentId: 't-c', workspaceId: 'ws-1' }))
+      await flush()
+      expect(trashNavCurrent()).toBe(true)
+      expect(selectedIds()).toEqual(['t-c'])
+      expect(scrolled).toContain(host.querySelector('[data-doc-id="t-c"]'))
+      expect(notices).toEqual([])
+    })
+
+    it('selects the row when the Trash is already showing', async () => {
+      await mount('trash')
+      await act(async () => revealInTrash({ documentId: 't-b', workspaceId: 'ws-1' }))
+      await flush()
+      expect(selectedIds()).toEqual(['t-b'])
+      expect(scrolled).toContain(host.querySelector('[data-doc-id="t-b"]'))
+    })
+
+    it('a cold Documents home still gets an intent published before it mounted', async () => {
+      revealInTrash({ documentId: 't-e', workspaceId: 'ws-1' })
+      await mount('workspace')
+      await flush()
+      expect(trashNavCurrent()).toBe(true)
+      expect(selectedIds()).toEqual(['t-e'])
+    })
+
+    it("leaves another workspace's intent alone", async () => {
+      await mount('workspace')
+      await act(async () => revealInTrash({ documentId: 't-c', workspaceId: 'ws-9' }))
+      await flush()
+      expect(trashNavCurrent()).toBe(false)
+      expect(selectedIds()).toEqual([])
+    })
+
+    it('a row no longer in the trash opens the Trash and says the document is gone', async () => {
+      await mount('workspace')
+      await act(async () =>
+        revealInTrash({ documentId: 'restored-or-purged', workspaceId: 'ws-1' }),
+      )
+      await flush()
+      expect(trashNavCurrent()).toBe(true)
+      expect(selectedIds()).toEqual([])
+      expect(notices).toEqual([{ phase: 'failed', error: 'not_found' }])
+    })
+
+    it('looks on the next page when the row is not on the first one', async () => {
+      const late = trashed('t-late', iso(2026, 9, 1), iso(2026, 10, 30))
+      api.uniworkListTrash!.mockImplementation(async (q: { cursor?: string }) =>
+        q.cursor
+          ? ok({ documents: [late], nextCursor: null })
+          : ok({ documents: trash, nextCursor: 'c2' }),
+      )
+      await mount('workspace')
+      await act(async () => revealInTrash({ documentId: 't-late', workspaceId: 'ws-1' }))
+      await flush()
+      expect(selectedIds()).toEqual(['t-late'])
+      expect(notices).toEqual([])
+    })
+
+    it('delivers an intent once: a remount does not select the row again', async () => {
+      await mount('trash')
+      await act(async () => revealInTrash({ documentId: 't-b', workspaceId: 'ws-1' }))
+      await flush()
+      await remount('trash')
+      expect(selectedIds()).toEqual([])
+    })
   })
 })
 

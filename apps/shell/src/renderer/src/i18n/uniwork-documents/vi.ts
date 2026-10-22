@@ -199,4 +199,7 @@ export const vi = {
   uwErrPageCopyNotSupported:
     'Chỉ tài liệu tệp có bản sao ở bước này. UniNote sao chép ở giai đoạn sau.',
   uwErrCopyConsentRequired: 'Cần xác nhận rõ trước khi tạo bản sao.',
+  uwErrDocumentNotInTrash: 'Mục này không còn trong thùng rác.',
+  uwErrFolderTooLarge:
+    'Thư mục có quá nhiều mục nên chưa xóa hết được một lần. Hãy xóa từng phần bên trong trước.',
 } satisfies Record<keyof typeof zh, string>

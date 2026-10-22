@@ -116,6 +116,9 @@ describe('uniwork documents string shards', () => {
         'owner_requires_copy',
         'page_copy_not_supported',
         'copy_consent_required',
+        // UNI-2078: the purge route's refusals
+        'document_not_in_trash',
+        'folder_too_large',
       ].sort(),
     )
     // the G5-04 / G5-06 refusals reuse the sync shard's sentences, FD-11's the folders shard's

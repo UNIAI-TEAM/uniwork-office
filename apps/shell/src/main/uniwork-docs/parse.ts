@@ -1119,6 +1119,10 @@ export interface DocumentManageRef {
   kind: UniworkEntryKind
   myLevel: string | null
   adminScope: boolean
+  /** `archived_at`: present while the document sits in the trash (the purge gate reads it) */
+  archivedAt: string | null
+  /** the workspace the document sits in ('' when the answer did not name it) */
+  workspaceId: string
 }
 
 export function parseDocumentManageRef(raw: unknown): DocumentManageRef {
@@ -1133,6 +1137,11 @@ export function parseDocumentManageRef(raw: unknown): DocumentManageRef {
     kind,
     myLevel: typeof myLevel === 'string' && myLevel.length > 0 ? myLevel : null,
     adminScope: doc.admin_scope === true || env.admin_scope === true,
+    archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
+    workspaceId:
+      typeof doc.workspace_id === 'string' && doc.workspace_id.length <= 128
+        ? doc.workspace_id
+        : '',
   }
 }
 

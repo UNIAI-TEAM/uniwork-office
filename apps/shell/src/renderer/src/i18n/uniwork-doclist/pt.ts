@@ -142,4 +142,17 @@ export const pt = {
   dlCopyFailed: 'Não foi possível criar a cópia. Nada foi alterado.',
   dlCopyDone: 'Cópia "{title}" criada',
   dlCopyUnavailable: 'Esta implantação ainda não tem o recurso de cópia.',
+  dlPurgeTitle: 'Excluir {title} permanentemente?',
+  dlPurgeDescription: 'Este item será excluído permanentemente e não poderá ser desfeito.',
+  dlPurgeFolderDescription:
+    'Esta pasta será excluída permanentemente e não poderá ser desfeita. Os itens dentro dela que você não gerencia permanecerão na lixeira.',
+  dlPurgeSubmit: 'Excluir permanentemente',
+  dlPurgeSubmitting: 'Excluindo permanentemente…',
+  dlPurgeDone: '{title} excluído permanentemente',
+  dlPurgeFailed: 'Não foi possível excluir. Nada foi alterado.',
+  dlBulkPurgeTitleOne: 'Excluir {n} documento permanentemente?',
+  dlBulkPurgeTitleOther: 'Excluir {n} documentos permanentemente?',
+  dlBulkPurgeDescription:
+    'Esta ação não pode ser desfeita. Os itens que você não pode gerenciar serão ignorados.',
+  dlBulkDonePurge: '{ok}/{total} documentos excluídos permanentemente',
 } satisfies Record<keyof typeof zh, string>

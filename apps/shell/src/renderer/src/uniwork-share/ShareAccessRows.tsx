@@ -32,6 +32,8 @@ export interface ShareAccessRowContext {
     beforeLevel: ShareLevel | null,
     nextLevel: ShareLevel | null,
   ) => Promise<void>
+  /** UNI-2078: the owner row's action (Transfer ownership), when the viewer may administer */
+  ownerAction?: (owner: SharePersonAccess) => ReactNode
 }
 
 export interface ShareAccessHomeRow {
@@ -78,6 +80,7 @@ export function AclOwnerRow({
         <NameOrSkeleton name={ctx.resolveMemberName(owner.userId)} />
         <span className="uw-share-muted">{t('shrAclOwner')}</span>
       </span>
+      {ctx.ownerAction && <span className="uw-share-row-controls">{ctx.ownerAction(owner)}</span>}
     </li>
   )
 }

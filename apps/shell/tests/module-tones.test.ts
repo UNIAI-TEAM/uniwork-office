@@ -15,6 +15,7 @@ describe('module tones', () => {
   it('follows the spec table (6.1)', () => {
     expect(MODULE_TONES).toEqual({
       desk: 'gray',
+      inbox: 'blue',
       tasks: 'green',
       calendar: 'yellow',
       personal: 'pink',

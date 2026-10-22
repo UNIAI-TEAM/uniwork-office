@@ -66,7 +66,7 @@ async function mount(over: Partial<Props> = {}): Promise<void> {
   })
 }
 
-// pinned module tabs first (core order desk, tasks, calendar), then pinned pillars
+// pinned module tabs first (core order desk, inbox, tasks, calendar), then pinned pillars
 const tabs = () => Array.from(host.querySelectorAll<HTMLButtonElement>('.wb-tab-module'))
 
 describe('Workbench tab counts', () => {
@@ -77,8 +77,9 @@ describe('Workbench tab counts', () => {
         calendar: { n: 2, key: 'wbTabCountMeetings', tone: 'muted' },
       },
     })
-    const [desk, tasks, calendar] = tabs()
+    const [desk, inbox, tasks, calendar] = tabs()
     expect(desk!.querySelector('.wb-tab-count')).toBeNull()
+    expect(inbox!.querySelector('.wb-tab-count')).toBeNull()
     const badge = tasks!.querySelector('.wb-tab-count')!
     expect(badge.textContent).toBe('3')
     // a pill: danger when tasks are overdue, neutral otherwise
@@ -87,6 +88,34 @@ describe('Workbench tab counts', () => {
     expect(tasks!.querySelector('.uw-sr-only')?.textContent).toBe('Overdue tasks: 3')
     expect(calendar!.querySelector('.wb-tab-count')?.className).toBe('wb-tab-count wb-num is-muted')
     expect(calendar!.querySelector('.uw-sr-only')?.textContent).toBe('Meetings today: 2')
+  })
+
+  it('shows the unread notices on the Inbox tab as an info pill with a sentence for screen readers', async () => {
+    await mount({
+      counts: { inbox: { n: 4, key: 'wbTabCountUnread', tone: 'info' } },
+    })
+    const inbox = tabs()[1]!
+    expect(inbox.dataset.tabId).toBe('inbox')
+    expect(inbox.textContent).toContain('Inbox')
+    const badge = inbox.querySelector('.wb-tab-count')!
+    expect(badge.textContent).toBe('4')
+    expect(badge.className).toBe('wb-tab-count wb-num is-info')
+    expect(inbox.querySelector('.uw-sr-only')?.textContent).toBe('Unread notifications: 4')
+    // the other tabs stay without a count
+    expect(tabs().filter((b) => b.querySelector('.wb-tab-count'))).toHaveLength(1)
+  })
+
+  it('pins the Inbox after the Desk for pins saved before it existed, and it cannot be unpinned', async () => {
+    store.set('uniwork.wb.pins.sales', JSON.stringify(['desk', 'tasks', 'calendar', 'notes']))
+    await mount()
+    expect(tabs().map((b) => b.dataset.tabId)).toEqual([
+      'desk',
+      'inbox',
+      'tasks',
+      'calendar',
+      'notes',
+    ])
+    expect(tabs()[1]!.parentElement!.querySelector(':scope > .wb-tab-unpin')).toBeNull()
   })
 
   it('shows no count when it is given none', async () => {
@@ -102,12 +131,12 @@ describe('Workbench tab unpin', () => {
     store.set('uniwork.wb.pillarPins.sales', JSON.stringify(['knowledge']))
     await mount()
     const all = tabs()
-    expect(all).toHaveLength(5)
+    expect(all).toHaveLength(6)
     const unpinOf = (tab: HTMLButtonElement) =>
       tab.parentElement!.querySelector<HTMLButtonElement>(':scope > .wb-tab-unpin')
-    expect(all.slice(0, 3).map(unpinOf)).toEqual([null, null, null])
-    expect(unpinOf(all[3]!)?.getAttribute('aria-label')).toBe('Unpin tab: Profile')
-    expect(unpinOf(all[4]!)?.getAttribute('aria-label')).toBe('Unpin tab: Knowledge')
+    expect(all.slice(0, 4).map(unpinOf)).toEqual([null, null, null, null])
+    expect(unpinOf(all[4]!)?.getAttribute('aria-label')).toBe('Unpin tab: Profile')
+    expect(unpinOf(all[5]!)?.getAttribute('aria-label')).toBe('Unpin tab: Knowledge')
   })
 
   it('unpin is its own button beside the tab, never nested inside the tab button', async () => {
@@ -136,7 +165,7 @@ describe('Workbench tab unpin', () => {
   it('Alt+arrow moves a focused non-core tab; core tabs stay put', async () => {
     store.set(
       'uniwork.wb.pins.sales',
-      JSON.stringify(['desk', 'tasks', 'calendar', 'personal', 'notes']),
+      JSON.stringify(['desk', 'inbox', 'tasks', 'calendar', 'personal', 'notes']),
     )
     await mount()
     const ids = () => tabs().map((b) => b.dataset.tabId)
@@ -144,38 +173,54 @@ describe('Workbench tab unpin', () => {
       act(() => {
         el.dispatchEvent(new KeyboardEvent('keydown', { key, altKey: true, bubbles: true }))
       })
-    const notes = tabs()[4]!
+    const settled = ['desk', 'inbox', 'tasks', 'calendar', 'personal', 'notes']
+    const notes = tabs()[5]!
     notes.focus()
     press(notes, 'ArrowLeft')
-    expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'notes', 'personal'])
+    expect(ids()).toEqual(['desk', 'inbox', 'tasks', 'calendar', 'notes', 'personal'])
     expect(JSON.parse(store.get('uniwork.wb.pins.sales')!)).toEqual([
       'desk',
+      'inbox',
       'tasks',
       'calendar',
       'notes',
       'personal',
     ])
     // focus stays on the moved tab
-    expect(document.activeElement).toBe(tabs()[3])
-    press(tabs()[3]!, 'ArrowRight')
-    expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'personal', 'notes'])
-    // nor does a non-core tab swap places with a core neighbour (spec 3)
-    press(tabs()[3]!, 'ArrowLeft')
-    expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'personal', 'notes'])
-    // a core tab does not move
-    press(tabs()[1]!, 'ArrowRight')
-    expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'personal', 'notes'])
-    // the last tab has no right neighbour
+    expect(document.activeElement).toBe(tabs()[4])
     press(tabs()[4]!, 'ArrowRight')
-    expect(ids()).toEqual(['desk', 'tasks', 'calendar', 'personal', 'notes'])
+    expect(ids()).toEqual(settled)
+    // nor does a non-core tab swap places with a core neighbour (spec 3)
+    press(tabs()[4]!, 'ArrowLeft')
+    expect(ids()).toEqual(settled)
+    // a core tab does not move (the Inbox included)
+    press(tabs()[1]!, 'ArrowRight')
+    expect(ids()).toEqual(settled)
+    press(tabs()[2]!, 'ArrowRight')
+    expect(ids()).toEqual(settled)
+    // the last tab has no right neighbour
+    press(tabs()[5]!, 'ArrowRight')
+    expect(ids()).toEqual(settled)
   })
 
   it('marks only the active tab, module or pillar, with aria-current="page"', async () => {
     store.set('uniwork.wb.pillarPins.sales', JSON.stringify(['knowledge']))
     await mount({ active: 'tasks' })
-    expect(tabs().map((b) => b.getAttribute('aria-current'))).toEqual([null, 'page', null, null])
+    expect(tabs().map((b) => b.getAttribute('aria-current'))).toEqual([
+      null,
+      null,
+      'page',
+      null,
+      null,
+    ])
     await mount({ active: 'knowledge' })
-    expect(tabs().map((b) => b.getAttribute('aria-current'))).toEqual([null, null, null, 'page'])
+    expect(tabs().map((b) => b.getAttribute('aria-current'))).toEqual([
+      null,
+      null,
+      null,
+      null,
+      'page',
+    ])
   })
 
   it('CSS hides unpin and the grip until hover, focus or selection, and rounds the underline', () => {
@@ -222,7 +267,7 @@ describe('Workbench tab row (one row, scrolls sideways)', () => {
       scrollIntoView.mockClear()
       await mount({ active: 'calendar' })
       expect(scrollIntoView).toHaveBeenCalledTimes(1)
-      expect(scrollIntoView.mock.contexts[0]).toBe(tabs()[2])
+      expect(scrollIntoView.mock.contexts[0]).toBe(tabs()[3])
       expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' })
     } finally {
       if (had) Object.defineProperty(Element.prototype, 'scrollIntoView', had)

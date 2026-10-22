@@ -144,4 +144,17 @@ export const es = {
   dlCopyFailed: 'No se pudo crear la copia. No se cambió nada.',
   dlCopyDone: 'Se creó la copia "{title}"',
   dlCopyUnavailable: 'Esta instalación todavía no tiene la función de copia.',
+  dlPurgeTitle: '¿Eliminar {title} para siempre?',
+  dlPurgeDescription: 'Este elemento se eliminará de forma permanente y no se puede deshacer.',
+  dlPurgeFolderDescription:
+    'Esta carpeta se eliminará de forma permanente y no se puede deshacer. Los elementos que contiene y que no puedes gestionar permanecerán en la papelera.',
+  dlPurgeSubmit: 'Eliminar para siempre',
+  dlPurgeSubmitting: 'Eliminando para siempre…',
+  dlPurgeDone: '{title} eliminado para siempre',
+  dlPurgeFailed: 'No se pudo eliminar. No se ha cambiado nada.',
+  dlBulkPurgeTitleOne: '¿Eliminar {n} documento para siempre?',
+  dlBulkPurgeTitleOther: '¿Eliminar {n} documentos para siempre?',
+  dlBulkPurgeDescription:
+    'Esta acción no se puede deshacer. Los elementos que no puedes gestionar se omitirán.',
+  dlBulkDonePurge: 'Se eliminaron {ok}/{total} documentos para siempre',
 } satisfies Record<keyof typeof zh, string>

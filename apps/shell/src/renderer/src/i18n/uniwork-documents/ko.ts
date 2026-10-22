@@ -202,4 +202,7 @@ export const ko = {
   uwErrPageCopyNotSupported:
     '이 단계에서는 파일 문서만 복사할 수 있습니다. UniNote 사본은 추후 지원됩니다.',
   uwErrCopyConsentRequired: '복사하기 전에 명시적인 확인이 필요합니다.',
+  uwErrDocumentNotInTrash: '이 항목은 더 이상 휴지통에 없습니다.',
+  uwErrFolderTooLarge:
+    '폴더의 항목이 너무 많아 한 번에 삭제할 수 없습니다. 먼저 내용을 나누어 삭제하세요.',
 } satisfies Record<keyof typeof zh, string>

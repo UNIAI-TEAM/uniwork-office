@@ -72,6 +72,7 @@ import {
 import { useFolderActions } from '../uniwork-folders/use-folder-actions'
 import { canCreateInsideFolder, type WorkspaceFolderCandidate } from '../uniwork-folders/ws-folder'
 import {
+  canPurgeDocuments,
   cancelUploadDocument,
   createDocument,
   createPage,
@@ -97,7 +98,16 @@ import { AccessLogSheet } from '../uniwork-doc-history/AccessLogSheet'
 import { getDocHistoryBridge } from '../uniwork-doc-history/bridge'
 import { VersionHistorySheet } from '../uniwork-doc-history/VersionHistorySheet'
 import { ShareDialog } from '../uniwork-share/ShareDialog'
-import { rowShareTarget, shareBridgeAvailable } from '../uniwork-share/share-dialog-target'
+import {
+  rowShareTarget,
+  shareBridgeAvailable,
+  type ShareDialogTarget,
+} from '../uniwork-share/share-dialog-target'
+import {
+  onDocumentsIntent,
+  type DocumentsIntent,
+  type DocumentsShareSection,
+} from '../documents-intent-bus'
 import {
   canManageShelved,
   collectUpdatedByOptions,
@@ -131,6 +141,7 @@ import {
 import { UniworkDocInfoPanel, type DocInfoLoad } from '../UniworkDocInfoPanel'
 import { ShelvedToolbar, filterByShelver, shelvedDescendantIds } from './ShelvedDocumentsView'
 import { BulkBar, BulkTrashConfirm } from '../doclist/BulkBar'
+import { BulkPurgeConfirm } from '../doclist/BulkPurgeConfirm'
 import {
   bulkActionsFor,
   bulkSummary,
@@ -153,6 +164,7 @@ import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
 import { useDocCopy } from './use-doc-copy'
 import { useBulkMove } from './use-bulk-move'
+import { useDocPurge } from './use-doc-purge'
 import { ListState } from '../doclist/ListState'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
@@ -1555,6 +1567,21 @@ export function DocumentsHome({
     },
   })
 
+  // UNI-2078: Xóa vĩnh viễn from a trash row's menu: toast, refresh; an item that already left the
+  // trash says so (the server's 400) and the list is read again
+  const docPurge = useDocPurge({
+    onPurged: (title) => {
+      const message = t('dlPurgeDone', { title })
+      announce(message)
+      setToast({ message, tone: 'ok' })
+      refreshAll()
+    },
+    onNotInTrash: () => {
+      setToast({ message: t('uwErrDocumentNotInTrash'), tone: 'error' })
+      refreshAll()
+    },
+  })
+
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf's member filter and row commands.
   // The filter narrows the loaded pages only (the server has no shelved_by).
   const shelfView = subView === 'archive' && query.length === 0
@@ -1594,13 +1621,19 @@ export function DocumentsHome({
   // UNI-2047 A5: the bulk bar acts on the selected rows (`selectedDocs`, set once the table's rows
   // are known below); the destructive one asks once first
   const [bulkTrashConfirm, setBulkTrashConfirm] = useState(false)
+  const [bulkPurgeConfirm, setBulkPurgeConfirm] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
   const bulkBusyRef = useRef(false)
   const runBulkById = async (action: BulkWorkActionId) => {
     // the ref answers a second click that lands before React re-renders
     if (bulkBusyRef.current) return
     const docs = selectedDocs
-    if (docs.length === 0 || !bulkActionsFor(screen, docs, shareBridgeAvailable()).includes(action))
+    if (
+      docs.length === 0 ||
+      !bulkActionsFor(screen, docs, shareBridgeAvailable(), false, canPurgeDocuments()).includes(
+        action,
+      )
+    )
       return
     bulkBusyRef.current = true
     setBulkBusy(true)
@@ -1617,7 +1650,13 @@ export function DocumentsHome({
     setToast({ message, tone })
   }
   // UNI-2047 SD-C: the Share dialogs of a row and of the selection (see the mount below)
-  const [shareRow, setShareRow] = useState<DocumentsHomeDoc | null>(null)
+  // the document the Share dialog is open for; `section` is set when a notice opened it
+  const [share, setShare] = useState<{
+    row: ShareDialogTarget
+    section?: DocumentsShareSection
+  } | null>(null)
+  const openRowShare = (doc: DocumentsHomeDoc) =>
+    setShare({ row: rowShareTarget(doc, organizationName) })
   const [bulkShareDocs, setBulkShareDocs] = useState<BulkShareDoc[] | null>(null)
   const shareAvailable = shareBridgeAvailable()
   // UNI-2077: the Access log sheet of a row; no entry when this main has no doc history bridge
@@ -1631,6 +1670,7 @@ export function DocumentsHome({
   const onBulkAction = (action: BulkActionId) => {
     if (action === 'trash') setBulkTrashConfirm(true)
     else if (action === 'move') bulkMove.open(selectedDocs)
+    else if (action === 'purge') setBulkPurgeConfirm(true)
     else if (action === 'download') {
       void runZipDownload({
         bridge: zipDownloadBridge(),
@@ -1659,6 +1699,90 @@ export function DocumentsHome({
     window.addEventListener(DOC_SHARE_CHANGED_EVENT, onShareChanged)
     return () => window.removeEventListener(DOC_SHARE_CHANGED_EVENT, onShareChanged)
   }, [])
+
+  // UNI-2079: a notice names a document's Share section or its row in the Trash (documents-intent-bus).
+  // The intent is taken only by the Documents home of its workspace; the host switched the surface.
+  const pageRef = useRef(page)
+  pageRef.current = page
+  // the Trash row a notice named, waiting for the Trash list to load; `stalePage` is the list that
+  // was showing when the intent came in (another sub-view's rows), which must not answer it
+  const [trashReveal, setTrashReveal] = useState<{
+    documentId: string
+    stalePage: PageState | null
+  } | null>(null)
+  const takeIntent = (intent: DocumentsIntent): boolean => {
+    if (intent.workspaceId !== workspaceId) return false
+    if (intent.kind === 'trash') {
+      const stalePage = subViewRef.current === 'trash' ? null : pageRef.current
+      resetFilters()
+      selectSubView('trash')
+      setTrashReveal({ documentId: intent.documentId, stalePage })
+      return true
+    }
+    // a stale preload has no Share bridge: nothing to open
+    if (!shareBridgeAvailable()) return true
+    const listed = pageRef.current.items.find((d) => d.id === intent.documentId)
+    if (listed) {
+      setShare({ row: rowShareTarget(listed, organizationName), section: intent.section })
+      return true
+    }
+    void loadDocProperties(intent.documentId)
+      .then((res) => {
+        if (!res.ok) {
+          publishUniworkNotice({ phase: 'failed', error: res.error })
+          return
+        }
+        const level = res.value.myLevel
+        setShare({
+          row: {
+            id: res.value.documentId,
+            workspaceId: res.value.workspaceId,
+            title: res.value.title,
+            workspaceName: workspaces.find((w) => w.id === res.value.workspaceId)?.name,
+            myLevel:
+              level === 'view' || level === 'comment' || level === 'edit' || level === 'manage'
+                ? level
+                : undefined,
+            organizationName,
+          },
+          section: intent.section,
+        })
+      })
+      .catch(() => publishUniworkNotice({ phase: 'failed', error: 'network' }))
+    return true
+  }
+  const takeIntentRef = useRef(takeIntent)
+  takeIntentRef.current = takeIntent
+  useEffect(() => onDocumentsIntent((intent) => takeIntentRef.current(intent)), [])
+
+  useEffect(() => {
+    if (!trashReveal || subView !== 'trash' || query.length > 0) return
+    if (page === trashReveal.stalePage) return
+    const done = () => setTrashReveal(null)
+    if (page.status === 'error') return done()
+    if (page.status !== 'ready') return
+    const hit = page.items.find((d) => d.id === trashReveal.documentId)
+    if (hit) {
+      setSelected(new Set([hit.id]))
+      Array.from(document.querySelectorAll('[data-doc-id]'))
+        .find((el) => el.getAttribute('data-doc-id') === hit.id)
+        ?.scrollIntoView?.({ block: 'center' })
+      return done()
+    }
+    if (page.moreError) {
+      done()
+      publishUniworkNotice({ phase: 'failed', error: page.moreError })
+      return
+    }
+    if (page.nextCursor) {
+      if (!page.loadingMore) loadMore()
+      return
+    }
+    // restored or purged since the notice: the Trash is open, the launch notice says why
+    done()
+    publishUniworkNotice({ phase: 'failed', error: 'not_found' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trashReveal, subView, query, page])
   const [shelvedTrashTarget, setShelvedTrashTarget] = useState<DocumentsHomeDoc | null>(null)
   // the ref answers a second click that lands before React re-renders
   const unshelvingRef = useRef<Set<string>>(new Set())
@@ -1966,7 +2090,7 @@ export function DocumentsHome({
             name: doc.title,
           }),
         // no entry when this shell has no Share bridge (a stale preload)
-        ...(shareAvailable ? { share: () => setShareRow(doc) } : {}),
+        ...(shareAvailable ? { share: () => openRowShare(doc) } : {}),
         ...(docHistoryAvailable ? { logs: () => setLogsRow(doc) } : {}),
         ...(docHistoryAvailable ? { versions: () => setVersionsRow(doc) } : {}),
         'copy-link': () => void handleCopyLink(doc),
@@ -1992,6 +2116,8 @@ export function DocumentsHome({
         // both confirm first: the dialog of the screen the row is on
         trash: () => (screen === 'shelved' ? setShelvedTrashTarget(doc) : setArchiveTarget(doc)),
         restore: () => void handleRestoreDoc(doc),
+        // UNI-2078: no entry when this shell has no purge call; the dialog asks first
+        ...(docPurge.available ? { purge: () => docPurge.open(doc) } : {}),
         details: () => showDetails(doc),
       },
     })
@@ -2793,6 +2919,7 @@ export function DocumentsHome({
                     busy={bulkBusy || zipBusy || bulkMove.busy}
                     canShare={shareAvailable}
                     canDownload={zipAvailable}
+                    canPurge={canPurgeDocuments()}
                     onAction={onBulkAction}
                     onClear={() => setSelected(new Set())}
                   />
@@ -2815,7 +2942,7 @@ export function DocumentsHome({
                     openMenuId={openMenuId}
                     onOpenMenuChange={setOpenMenuId}
                     menuFor={rowMenuFor}
-                    onShare={shareAvailable ? setShareRow : undefined}
+                    onShare={shareAvailable ? openRowShare : undefined}
                     actionsFor={
                       shelfView ? shelfActionsFor : trashView ? trashActionsFor : undefined
                     }
@@ -2931,6 +3058,7 @@ export function DocumentsHome({
       {docCopy.dialog}
 
       {bulkMove.dialog}
+      {docPurge.dialog}
 
       {shelvedTrashTarget && (
         <ArchiveConfirm
@@ -2952,12 +3080,24 @@ export function DocumentsHome({
         />
       )}
 
-      {shareRow && (
+      {bulkPurgeConfirm && (
+        <BulkPurgeConfirm
+          count={selectedDocs.length}
+          onConfirm={() => {
+            setBulkPurgeConfirm(false)
+            void runBulkById('purge')
+          }}
+          onCancel={() => setBulkPurgeConfirm(false)}
+        />
+      )}
+
+      {share && (
         <ShareDialog
           open
-          row={rowShareTarget(shareRow, organizationName)}
+          row={share.row}
+          initialSection={share.section}
           workspaces={workspaces}
-          onClose={() => setShareRow(null)}
+          onClose={() => setShare(null)}
           onChanged={() => setListTick((n) => n + 1)}
         />
       )}

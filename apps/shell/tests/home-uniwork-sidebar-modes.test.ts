@@ -17,6 +17,12 @@ import type {
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { Home } from '../src/renderer/src/Home'
 import { wbStoreSetRaw } from '../src/renderer/src/workbench-store-client'
+import {
+  openDocumentShare,
+  resetDocumentsIntentBusForTests,
+  revealInTrash,
+} from '../src/renderer/src/documents-intent-bus'
+import { onUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 
 // Workbench body (Desk / drafts / work APIs) is out of scope here: only Home's own mode switch is under test
 vi.mock('../src/renderer/src/PracticeHome', () => ({
@@ -316,5 +322,113 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
     await mountHome()
     expect(uwNav()).toBeNull()
     expect(host.querySelector('.folder-panel')).not.toBeNull()
+  })
+
+  // UNI-2079: a notice names a document's Share section or its Trash row; Home brings the
+  // Documents home on screen (the Documents home itself does the rest, see doclist-trash tests)
+  describe('documents intents (UNI-2079)', () => {
+    let notices: unknown[]
+    let offNotice: () => void
+    const trashNavCurrent = () => uwNavItem('trash')?.getAttribute('aria-current') === 'page'
+
+    beforeEach(() => {
+      resetDocumentsIntentBusForTests()
+      notices = []
+      Element.prototype.scrollIntoView = () => {}
+      offNotice = onUniworkNotice((event) => notices.push(event))
+      api.uniworkListTrash = vi.fn(async () =>
+        ok({
+          documents: [
+            {
+              id: 'doc-trashed',
+              workspaceId: 'ws-1',
+              title: 'Gone.docx',
+              format: 'docx' as const,
+              updatedAt: '2026-10-10T06:00:00.000Z',
+              kind: 'file' as const,
+              parentId: null,
+              archived: true,
+            },
+          ],
+          nextCursor: null,
+        }),
+      )
+    })
+    afterEach(() => {
+      offNotice()
+      resetDocumentsIntentBusForTests()
+    })
+
+    it.each([
+      ['My AI', enterMyAi],
+      ['Workbench', enterWorkbench],
+    ])(
+      'a Trash intent in %s leaves the mode, opens the Trash and selects the row',
+      async (_l, enter) => {
+        await mountHome()
+        await enter()
+        await act(async () => revealInTrash({ documentId: 'doc-trashed', workspaceId: 'ws-1' }))
+        await flush(8)
+
+        expect(myAiNav()!.getAttribute('aria-current')).toBeNull()
+        expect(workbenchNav()!.getAttribute('aria-current')).toBeNull()
+        expect(uwPaneShown()).toBe(true)
+        expect(trashNavCurrent()).toBe(true)
+        expect(
+          uwPane()!.querySelector('[data-doc-id="doc-trashed"]')!.getAttribute('aria-selected'),
+        ).toBe('true')
+      },
+    )
+
+    it('a Share intent leaves the Workbench and shows the Documents home', async () => {
+      await mountHome()
+      await enterWorkbench()
+      await act(async () =>
+        openDocumentShare({ documentId: 'doc-root-1', workspaceId: 'ws-1', section: 'requests' }),
+      )
+      await flush(8)
+      expect(workbenchNav()!.getAttribute('aria-current')).toBeNull()
+      expect(uwPaneShown()).toBe(true)
+    })
+
+    it('from the device area it switches to the UniWork area', async () => {
+      wbStoreSetRaw('uniwork.wb.homeArea', 'device')
+      await mountHome()
+      expect(uwNav()).toBeNull()
+      await act(async () => revealInTrash({ documentId: 'doc-trashed', workspaceId: 'ws-1' }))
+      await flush(8)
+      expect(uwPaneShown()).toBe(true)
+      expect(trashNavCurrent()).toBe(true)
+    })
+
+    it('an intent published before Home mounted is applied once the workspaces are in', async () => {
+      revealInTrash({ documentId: 'doc-trashed', workspaceId: 'ws-1' })
+      await mountHome()
+      await flush(8)
+      expect(uwPaneShown()).toBe(true)
+      expect(trashNavCurrent()).toBe(true)
+    })
+
+    it("switches to the intent's workspace", async () => {
+      workspaces.push({ id: 'ws-2', name: 'Finance' })
+      try {
+        await mountHome()
+        await act(async () => revealInTrash({ documentId: 'doc-trashed', workspaceId: 'ws-2' }))
+        await flush(8)
+        expect(api.uniworkListTrash!.mock.calls.some((c) => c[0].workspaceId === 'ws-2')).toBe(true)
+        expect(trashNavCurrent()).toBe(true)
+      } finally {
+        workspaces.pop()
+      }
+    })
+
+    it('a workspace the person is not in is not opened: the notice says no access', async () => {
+      await mountHome()
+      await enterWorkbench()
+      await act(async () => revealInTrash({ documentId: 'doc-trashed', workspaceId: 'ws-9' }))
+      await flush(8)
+      expect(workbenchNav()!.getAttribute('aria-current')).toBe('page')
+      expect(notices).toEqual([{ phase: 'failed', error: 'forbidden' }])
+    })
   })
 })

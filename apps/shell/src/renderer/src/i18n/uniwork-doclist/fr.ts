@@ -146,4 +146,17 @@ export const fr = {
   dlCopyFailed: "Impossible de créer la copie. Rien n'a été modifié.",
   dlCopyDone: 'Copie "{title}" créée',
   dlCopyUnavailable: 'Cette installation ne dispose pas encore de la fonction de copie.',
+  dlPurgeTitle: 'Supprimer définitivement {title} ?',
+  dlPurgeDescription: 'Cet élément sera supprimé définitivement et ne pourra pas être restauré.',
+  dlPurgeFolderDescription:
+    "Ce dossier sera supprimé définitivement et ne pourra pas être restauré. Les éléments qu'il contient et que vous ne gérez pas restent dans la corbeille.",
+  dlPurgeSubmit: 'Supprimer définitivement',
+  dlPurgeSubmitting: 'Suppression définitive…',
+  dlPurgeDone: '{title} supprimé définitivement',
+  dlPurgeFailed: "Impossible de supprimer. Rien n'a été modifié.",
+  dlBulkPurgeTitleOne: 'Supprimer définitivement {n} document ?',
+  dlBulkPurgeTitleOther: 'Supprimer définitivement {n} documents ?',
+  dlBulkPurgeDescription:
+    'Cette action est irréversible. Les éléments que vous ne pouvez pas gérer seront ignorés.',
+  dlBulkDonePurge: '{ok}/{total} documents supprimés définitivement',
 } satisfies Record<keyof typeof zh, string>

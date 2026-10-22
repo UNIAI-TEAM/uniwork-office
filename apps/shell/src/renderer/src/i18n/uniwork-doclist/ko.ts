@@ -141,4 +141,16 @@ export const ko = {
   dlCopyFailed: '사본을 만들 수 없습니다. 아무것도 변경되지 않았습니다.',
   dlCopyDone: '"{title}" 사본을 만들었습니다',
   dlCopyUnavailable: '이 배포 환경에는 아직 사본 기능이 없습니다.',
+  dlPurgeTitle: '{title}을(를) 영구적으로 삭제할까요?',
+  dlPurgeDescription: '이 항목은 영구적으로 삭제되며 되돌릴 수 없습니다.',
+  dlPurgeFolderDescription:
+    '이 폴더는 영구적으로 삭제되며 되돌릴 수 없습니다. 폴더 안의 항목 중 관리 권한이 없는 항목은 휴지통에 남습니다.',
+  dlPurgeSubmit: '영구 삭제',
+  dlPurgeSubmitting: '영구적으로 삭제하는 중…',
+  dlPurgeDone: '{title}을(를) 영구적으로 삭제했습니다',
+  dlPurgeFailed: '삭제할 수 없습니다. 변경된 것은 없습니다.',
+  dlBulkPurgeTitleOne: '문서 {n}개를 영구적으로 삭제할까요?',
+  dlBulkPurgeTitleOther: '문서 {n}개를 영구적으로 삭제할까요?',
+  dlBulkPurgeDescription: '이 작업은 되돌릴 수 없습니다. 관리할 수 없는 항목은 건너뜁니다.',
+  dlBulkDonePurge: '문서 {ok}/{total}개를 영구적으로 삭제했습니다',
 } satisfies Record<keyof typeof zh, string>

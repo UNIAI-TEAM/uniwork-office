@@ -3,7 +3,11 @@
 // access overview, atomic updates with per-item rejections, a dry run that writes nothing, the
 // public-links policy and limit, and an access request that can be handled once. Seeded with
 // one document: an owner, three people, the home workspace row, one link and one request.
-import { BREAK_GLASS_REASON_MAX, BREAK_GLASS_REASON_MIN } from '../../../shared/share-api'
+import {
+  BREAK_GLASS_REASON_MAX,
+  BREAK_GLASS_REASON_MIN,
+  SHARE_OWNER_KEEP_LEVELS,
+} from '../../../shared/share-api'
 import type {
   ShareAccess,
   ShareAccessRequest,
@@ -15,6 +19,7 @@ import type {
   ShareGrant,
   ShareLevel,
   ShareLink,
+  ShareOwnerCandidate,
   ShareRejectedItem,
   ShareResult,
   ShareResultStatus,
@@ -41,6 +46,21 @@ export interface FakeShareOptions {
   requestsAvailable?: boolean
   /** documents `bulk` refuses, with the code (the seeded document is not changed by a bulk run) */
   bulkRefuses?: Record<string, ShareErrorCode>
+  /** UNI-2078: the document is owned by a work product (`owner_kind`) */
+  ownerKind?: string
+  /** UNI-2078: the document sits in Archive (main refuses an owner transfer) */
+  shelved?: boolean
+  /** UNI-2078: the document's visibility is `restricted` */
+  restricted?: boolean
+  /** UNI-2078: the signed-in user (default `u_admin`, the break-glass actor) */
+  selfUserId?: string
+  /** UNI-2078: the owner transfer answers this refusal; `endpoint_missing` = a server without the route */
+  ownerTransferRefuses?:
+    | 'owner_target_not_member'
+    | 'break_glass_required'
+    | 'document_owned_by_work_product'
+    | 'server_error'
+    | 'endpoint_missing'
 }
 
 type Failure = Extract<ShareResult<never>, { ok: false }>
@@ -74,6 +94,21 @@ const MEMBERS = [
   { id: 'u_owner', name: 'Hoa Nguyễn' },
   ...PEOPLE.map((p) => ({ id: p.id, name: p.name })),
 ]
+
+// UNI-2078: the document's workspace (the owner, three people, the admin and a deactivated person)
+// and the organization's active people who may own a document
+const WORKSPACE_MEMBER_IDS = ['u_owner', 'u_minh', 'u_an', 'u_binh', 'u_admin', 'u_off'] as const
+const ACTIVE_PEOPLE: ShareOwnerCandidate[] = [
+  { userId: 'u_owner', name: 'Hoa Nguyễn', email: 'hoa@acme.test' },
+  ...PEOPLE.map((p) => ({ userId: p.id, name: p.name, email: p.email })),
+  { userId: 'u_admin', name: 'Admin An', email: 'admin@acme.test' },
+]
+const OWNER_REFUSAL_STATUS = {
+  owner_target_not_member: 422,
+  break_glass_required: 403,
+  document_owned_by_work_product: 409,
+  server_error: 500,
+} as const
 
 const keyOf = (type: string, id: string) => `${type}:${id}`
 
@@ -129,6 +164,8 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
   ]
 
   let breakGlass: ShareBreakGlassGrant[] = []
+  let ownerId = 'u_owner'
+  const selfUserId = options.selfUserId ?? 'u_admin'
 
   const calls: FakeShareApi['calls'] = []
   const failures = new Map<keyof UniworkShareApi, Failure>()
@@ -182,7 +219,7 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
           workspaceName: 'Team',
           level: levelOf('workspace', HOME_WORKSPACE),
         },
-        owner: { userId: 'u_owner', level: 'manage', via: 'member' },
+        owner: { userId: ownerId, level: 'manage', via: 'member' },
         shares: [...grants.values()].map((g) => ({ ...g })),
         links: links.map((l) => ({ ...l })),
         breakGlass: breakGlass.map((g) => ({ ...g })),
@@ -339,6 +376,73 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
     return { ok: true, value: { id: row.id, status: 'approved', shareId } }
   }
 
+  /** main's owner gate: manage or admin scope, not a work product, not shelved */
+  const ownerGate = (id: string): Failure | { selfExcluded: boolean } => {
+    if (!known(id)) return fail('not_found')
+    if (!manages) return fail('forbidden', 403)
+    if (options.ownerKind) return fail('document_owned_by_work_product')
+    if (options.shelved) return fail('document_shelved')
+    return { selfExcluded: adminScope && myLevel !== 'manage' && options.restricted === true }
+  }
+
+  const ownerCandidates = (id: string): ShareResult<ShareOwnerCandidate[]> => {
+    const gate = ownerGate(id)
+    if ('ok' in gate) return gate
+    const value = WORKSPACE_MEMBER_IDS.flatMap((userId) => {
+      const person = ACTIVE_PEOPLE.find((p) => p.userId === userId)
+      if (!person || userId === ownerId) return []
+      if (gate.selfExcluded && userId === selfUserId) return []
+      return [{ ...person }]
+    })
+    return { ok: true, value }
+  }
+
+  const transferOwner = (input: {
+    documentId: string
+    userId: string
+    previousOwnerLevel?: string
+  }): ShareResult<{
+    documentId: string
+    aclOwnerId: string
+    previousOwnerId: string
+    previousOwnerShareId: string
+  }> => {
+    const gate = ownerGate(input.documentId)
+    if ('ok' in gate) return gate
+    const keep = input.previousOwnerLevel ?? 'edit'
+    if (!(SHARE_OWNER_KEEP_LEVELS as readonly string[]).includes(keep)) {
+      return fail('invalid_request')
+    }
+    if (input.userId === ownerId) return fail('invalid_request')
+    if (gate.selfExcluded && input.userId === selfUserId) return fail('break_glass_required', 403)
+    const refusal = options.ownerTransferRefuses
+    if (refusal === 'endpoint_missing') {
+      return { ok: false, error: 'not_found', status: 404, endpointMissing: true }
+    }
+    if (refusal) return fail(refusal, OWNER_REFUSAL_STATUS[refusal])
+    if (!ACTIVE_PEOPLE.some((p) => p.userId === input.userId)) {
+      return fail('owner_target_not_member', 422)
+    }
+    const previous = ownerId
+    ownerId = input.userId
+    // the new owner needs no grant of their own; the previous one keeps what was asked
+    grants.delete(keyOf('user', input.userId))
+    let shareId = ''
+    if (keep !== 'none') {
+      shareId = grants.get(keyOf('user', previous))?.id ?? nextId('sh')
+      grant('user', previous, keep as ShareLevel, shareId)
+    }
+    return {
+      ok: true,
+      value: {
+        documentId: input.documentId,
+        aclOwnerId: input.userId,
+        previousOwnerId: previous,
+        previousOwnerShareId: shareId,
+      },
+    }
+  }
+
   const api: FakeShareApi = {
     calls,
     failNext: (method, failure) => void failures.set(method, failure),
@@ -452,6 +556,10 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
         const next = start + limit < MEMBERS.length ? String(start + limit) : ''
         return { ok: true, value: { members: page, nextCursor: next } }
       }),
+
+    ownerCandidates: (id) => call('ownerCandidates', [id], () => ownerCandidates(id)),
+
+    transferOwner: (input) => call('transferOwner', [input], () => transferOwner(input)),
 
     bulk: (plan: ShareBulkPlan) =>
       call('bulk', [plan], () => {

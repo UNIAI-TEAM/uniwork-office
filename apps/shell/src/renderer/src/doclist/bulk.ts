@@ -8,6 +8,7 @@ import type { UniworkDocErrorCode } from '../../../shared/home-api'
 import type { DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
 import {
   moveDocument,
+  purgeDocument,
   restoreDocument,
   shelveDocument,
   trashDocument,
@@ -24,7 +25,7 @@ const RETRY_DELAY_MS = 1000
 /** the row-menu actions a batch can run on many rows */
 export type BulkActionId = Extract<
   RowMenuActionId,
-  'share' | 'move' | 'restore' | 'unshelve' | 'download' | 'shelve' | 'trash'
+  'share' | 'move' | 'restore' | 'unshelve' | 'download' | 'shelve' | 'trash' | 'purge'
 >
 
 /**
@@ -36,7 +37,7 @@ export type BulkWorkActionId = Exclude<BulkActionId, 'share' | 'download'>
 
 // Rules board §3 order: Chia sẻ first (the web's bar), Di chuyển next, the keep actions with Tải xuống
 // before the archive entry (live: Share · Move · Download · Archive · Trash; shelf: Unarchive ·
-// Download · Trash), the delete entry last
+// Download · Trash), the delete entry last (trash: Restore · Delete forever, UNI-2078)
 const BULK_ORDER: readonly BulkActionId[] = [
   'share',
   'move',
@@ -45,6 +46,7 @@ const BULK_ORDER: readonly BulkActionId[] = [
   'download',
   'shelve',
   'trash',
+  'purge',
 ]
 
 /** `retryable`: main marked the failure a throttle (429 / 503); nothing else is worth a second call */
@@ -148,12 +150,14 @@ function canShareWrite(doc: DocumentsHomeDoc): boolean {
  * manageable and the shell's Share bridge (`canShare`): never a dead button.
  * Tải xuống is the exception (the web's rule): it shows when at least ONE selected row is a file
  * (the rest are skipped and listed), and only with the zip bridge (`canDownload`).
+ * Xóa vĩnh viễn (UNI-2078) needs the shell's purge call (`canPurge`) and every row to offer it.
  */
 export function bulkActionsFor(
   screen: DocListScreen,
   docs: readonly DocumentsHomeDoc[],
   canShare = false,
   canDownload = false,
+  canPurge = false,
 ): BulkActionId[] {
   if (docs.length === 0) return []
   const stub = () => {}
@@ -167,6 +171,7 @@ export function bulkActionsFor(
     if (id === 'download') return canDownload && docs.some((doc) => offers(doc, id))
     return (
       (id !== 'share' || canShare) &&
+      (id !== 'purge' || canPurge) &&
       docs.every((doc) => (id !== 'share' || canShareWrite(doc)) && offers(doc, id))
     )
   })
@@ -191,6 +196,8 @@ export function bulkWorkFor(
         return unshelveDocument(doc.id)
       case 'restore':
         return restoreDocument(doc.id)
+      case 'purge':
+        return purgeDocument(doc.id)
       case 'trash':
         // a shelved row has its own trash call; every other screen archives (a folder or a page
         // through the kind-agnostic call, since the archive call is file-only)
@@ -211,6 +218,7 @@ const DONE_KEYS: Record<BulkWorkActionId, StringKey> = {
   unshelve: 'dlBulkDoneUnshelve',
   restore: 'dlBulkDoneRestore',
   trash: 'dlBulkDoneTrash',
+  purge: 'dlBulkDonePurge',
 }
 
 /** the toast of a finished batch: "3/5" counts, plus the commonest reason when some failed */

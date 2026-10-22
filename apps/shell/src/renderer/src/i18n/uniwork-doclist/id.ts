@@ -140,4 +140,17 @@ export const id = {
   dlCopyFailed: 'Tidak dapat membuat salinan. Tidak ada yang berubah.',
   dlCopyDone: 'Salinan "{title}" dibuat',
   dlCopyUnavailable: 'Instalasi ini belum memiliki fitur salinan.',
+  dlPurgeTitle: 'Hapus {title} secara permanen?',
+  dlPurgeDescription: 'Item ini akan dihapus secara permanen dan tidak dapat dipulihkan.',
+  dlPurgeFolderDescription:
+    'Folder ini akan dihapus secara permanen dan tidak dapat dipulihkan. Item di dalamnya yang tidak Anda kelola tetap berada di sampah.',
+  dlPurgeSubmit: 'Hapus permanen',
+  dlPurgeSubmitting: 'Menghapus secara permanen…',
+  dlPurgeDone: '{title} dihapus secara permanen',
+  dlPurgeFailed: 'Tidak dapat menghapus. Tidak ada yang berubah.',
+  dlBulkPurgeTitleOne: 'Hapus {n} dokumen secara permanen?',
+  dlBulkPurgeTitleOther: 'Hapus {n} dokumen secara permanen?',
+  dlBulkPurgeDescription:
+    'Tindakan ini tidak dapat dibatalkan. Item yang tidak dapat Anda kelola akan dilewati.',
+  dlBulkDonePurge: '{ok}/{total} dokumen dihapus secara permanen',
 } satisfies Record<keyof typeof zh, string>

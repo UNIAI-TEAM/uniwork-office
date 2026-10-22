@@ -140,4 +140,16 @@ export const en = {
   dlCopyFailed: 'Could not create the copy. Nothing changed.',
   dlCopyDone: 'Created the copy "{title}"',
   dlCopyUnavailable: 'This deployment does not have the copy feature yet.',
+  dlPurgeTitle: 'Delete {title} forever?',
+  dlPurgeDescription: 'This item will be permanently deleted and cannot be undone.',
+  dlPurgeFolderDescription:
+    'This folder will be permanently deleted and cannot be undone. Items inside it that you do not manage stay in the trash.',
+  dlPurgeSubmit: 'Delete forever',
+  dlPurgeSubmitting: 'Deleting forever…',
+  dlPurgeDone: '{title} deleted forever',
+  dlPurgeFailed: 'Could not delete. Nothing changed.',
+  dlBulkPurgeTitleOne: 'Delete {n} document forever?',
+  dlBulkPurgeTitleOther: 'Delete {n} documents forever?',
+  dlBulkPurgeDescription: 'This cannot be undone. Items you cannot manage are skipped.',
+  dlBulkDonePurge: 'Deleted {ok}/{total} documents forever',
 } satisfies Record<keyof typeof zh, string>

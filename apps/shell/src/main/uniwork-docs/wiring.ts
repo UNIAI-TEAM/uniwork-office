@@ -98,7 +98,12 @@ import {
   NEVER_READ_CAPABILITIES,
   type CapabilityRead,
 } from '../uniwork-sync/capability/cache'
-import { createUniworkDocsClient, type FetchLike, type UniworkDocsClient } from './client'
+import {
+  createUniworkDocsClient,
+  uniworkId,
+  type FetchLike,
+  type UniworkDocsClient,
+} from './client'
 import {
   UniworkDocsService,
   type ConflictUi,
@@ -834,6 +839,16 @@ async function noticeSwitchLossFallback(
   else await dialog.showMessageBox(options)
 }
 
+/** a document or comment id the routes may carry (uniworkId's shape) */
+function isOpenId(value: unknown): value is string {
+  try {
+    uniworkId(value as string)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
 export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): UniworkDocsHandle {
   // told as a document status or the lock list is pushed (the sync center re-reads its snapshot)
@@ -1079,6 +1094,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isSignedIn: () => uniworkSessionIdentity() !== null,
     selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
     selectedOrgSlug: () => uniworkAccount().status().org?.slug ?? null,
+    selfUserId: () => uniworkSessionIdentity()?.accountId ?? null,
   })
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.get, (_event, documentId: unknown) =>
     shareService.get(documentId as string),
@@ -1113,6 +1129,13 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.members, (_event, input: unknown) =>
     shareService.members(input as Parameters<typeof shareService.members>[0]),
+  )
+  // UNI-2078: owner transfer (main re-checks the gate before the PUT)
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.ownerCandidates, (_event, documentId: unknown) =>
+    shareService.ownerCandidates(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.transferOwner, (_event, input: unknown) =>
+    shareService.transferOwner(input as Parameters<typeof shareService.transferOwner>[0]),
   )
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.bulk, (_event, plan: unknown) =>
     shareService.bulk(plan as Parameters<typeof shareService.bulk>[0]),
@@ -1256,6 +1279,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       idempotencyKey: body.idempotencyKey as string | undefined,
     })
   })
+  // UNI-2078: delete forever from the trash; the service re-checks the gate and the trash state
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.purgeDocument, (_event, documentId: unknown) =>
+    service.purgeDocument(documentId as string),
+  )
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf, Bỏ lưu trữ and trash from Lưu trữ
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listShelved, (_event, query: unknown) =>
     service.listShelved((query ?? {}) as UniworkShelvedQuery),
@@ -1288,6 +1315,17 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocument, (_event, documentId: unknown) =>
     service.openDocument(documentId as string),
   )
+  // UNI-2079: a notice's target (open + held reveal); both ids are checked before any request
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocumentAt, (_event, input: unknown) => {
+    const { documentId, commentId } = (input && typeof input === 'object' ? input : {}) as {
+      documentId?: unknown
+      commentId?: unknown
+    }
+    if (!isOpenId(documentId) || (commentId !== undefined && !isOpenId(commentId))) {
+      return { ok: false, error: 'not_found' }
+    }
+    return service.openDocumentAt(documentId, commentId)
+  })
   ipcMain.handle(UNIWORK_DOC_CHANNELS.docStatus, (_event, path: unknown) =>
     service.docStatus(path as string),
   )

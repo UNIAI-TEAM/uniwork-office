@@ -410,3 +410,153 @@ describe('error answers', () => {
     expect((await failure(bare.client.getDocumentShares('doc_1'))).code).toBe('server_error')
   })
 })
+
+/**
+ * UNI-2078 slice 4: owner transfer, the web's `documents-owner.ts` exactly
+ * (`PUT /documents/{id}/owner`, `{user_id, previous_owner_level}`), plus the
+ * reads main needs to gate it and to list who can take the document.
+ */
+describe('transferDocumentOwner', () => {
+  const ANSWER = {
+    document_id: 'doc_1',
+    acl_owner_id: 'u_an',
+    previous_owner_id: 'u_owner',
+    previous_owner_share_id: 'sh_9',
+  }
+
+  it('PUTs /documents/{id}/owner with user_id and previous_owner_level, reads the answer', async () => {
+    const { client, seen } = setup(() => json(200, ANSWER))
+    const res = await client.transferDocumentOwner('doc_1', {
+      userId: 'u_an',
+      previousOwnerLevel: 'view',
+    })
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toMatchObject({ url: `${API}/documents/doc_1/owner`, method: 'PUT' })
+    expect(seen[0]!.body).toEqual({ user_id: 'u_an', previous_owner_level: 'view' })
+    expect(res).toEqual({
+      documentId: 'doc_1',
+      aclOwnerId: 'u_an',
+      previousOwnerId: 'u_owner',
+      previousOwnerShareId: 'sh_9',
+    })
+  })
+
+  it('the previous owner keeps edit when nothing is asked; none is sent as none', async () => {
+    const { client, seen } = setup(() => json(200, ANSWER))
+    await client.transferDocumentOwner('doc_1', { userId: 'u_an' })
+    await client.transferDocumentOwner('doc_1', { userId: 'u_an', previousOwnerLevel: 'none' })
+    expect(seen.map((s) => s.body)).toEqual([
+      { user_id: 'u_an', previous_owner_level: 'edit' },
+      { user_id: 'u_an', previous_owner_level: 'none' },
+    ])
+  })
+
+  it('refuses a keep level outside edit/view/none and a user id that is not an id before any request', async () => {
+    const { client, seen } = setup(() => json(200, ANSWER))
+    for (const level of ['comment', 'manage', 'owner', '']) {
+      const err = await failure(
+        client.transferDocumentOwner('doc_1', {
+          userId: 'u_an',
+          previousOwnerLevel: level as never,
+        }),
+      )
+      expect(err.serverCode).toBe('invalid_input')
+    }
+    for (const userId of ['', '../x', 'a b']) {
+      expect((await failure(client.transferDocumentOwner('doc_1', { userId }))).serverCode).toBe(
+        'invalid_input',
+      )
+    }
+    expect(seen).toHaveLength(0)
+  })
+
+  it('an answer that does not name the requested owner (or document) is not proof of the write', async () => {
+    for (const body of [
+      { ...ANSWER, acl_owner_id: 'u_other' },
+      { ...ANSWER, document_id: 'doc_2' },
+      { document_id: 'doc_1' },
+      {},
+    ]) {
+      const { client } = setup(() => json(200, body))
+      expect((await failure(client.transferDocumentOwner('doc_1', { userId: 'u_an' }))).code).toBe(
+        'malformed_response',
+      )
+    }
+  })
+
+  it('keeps the server verdicts and the status of a missing route', async () => {
+    const cases: Array<[Response, string | undefined, number]> = [
+      [envelope(422, 'owner_target_not_member'), 'owner_target_not_member', 422],
+      [envelope(403, 'break_glass_required'), 'break_glass_required', 403],
+      [envelope(409, 'document_owned_by_work_product'), 'document_owned_by_work_product', 409],
+      [new Response('404 page not found', { status: 404 }), undefined, 404],
+      [new Response('', { status: 405 }), undefined, 405],
+    ]
+    for (const [answer, serverCode, status] of cases) {
+      const { client } = setup(() => answer)
+      const err = await failure(client.transferDocumentOwner('doc_1', { userId: 'u_an' }))
+      expect(err.serverCode).toBe(serverCode)
+      expect(err.status).toBe(status)
+    }
+  })
+})
+
+describe('owner transfer reads', () => {
+  it('getOwnerGate GETs /documents/{id} and reads the workspace, owner kind, shelf and visibility', async () => {
+    const { client, seen } = setup(() =>
+      json(200, {
+        document: {
+          id: 'doc_1',
+          workspace_id: 'ws_1',
+          owner_kind: '',
+          shelved_at: null,
+          visibility: 'restricted',
+        },
+      }),
+    )
+    expect(await client.getOwnerGate('doc_1')).toEqual({
+      id: 'doc_1',
+      workspaceId: 'ws_1',
+      ownerKind: '',
+      shelved: false,
+      visibility: 'restricted',
+    })
+    expect(seen[0]).toMatchObject({ url: `${API}/documents/doc_1`, method: 'GET' })
+  })
+
+  it('listWorkspaceMemberIds GETs /workspaces/{ws}/members and keeps every user id', async () => {
+    const { client, seen } = setup(() =>
+      json(200, {
+        members: [
+          { user_id: 'u_1', display_name: 'Minh' },
+          { user_id: 'u_2', display_name: '' },
+          { display_name: 'no id' },
+        ],
+      }),
+    )
+    expect(await client.listWorkspaceMemberIds('ws_1')).toEqual(['u_1', 'u_2'])
+    expect(seen[0]).toMatchObject({ url: `${API}/workspaces/ws_1/members`, method: 'GET' })
+  })
+
+  it('listActiveOrgMembers asks for status=active and drops anyone not active', async () => {
+    const { client, seen } = setup(() =>
+      json(200, {
+        members: [
+          { user_id: 'u_1', display_name: 'Minh Trần', email: 'minh@acme.test', status: 'active' },
+          { user_id: 'u_2', display_name: '', email: 'an@acme.test' },
+          { user_id: 'u_3', display_name: 'Gone', email: 'g@acme.test', status: 'deactivated' },
+        ],
+        next_cursor: 'c2',
+      }),
+    )
+    const page = await client.listActiveOrgMembers({ orgSlug: 'acme', cursor: 'c1' })
+    expect(seen[0]!.url).toBe(`${API}/orgs/acme/members?status=active&limit=100&cursor=c1`)
+    expect(page).toEqual({
+      members: [
+        { userId: 'u_1', name: 'Minh Trần', email: 'minh@acme.test' },
+        { userId: 'u_2', name: 'an@acme.test', email: 'an@acme.test' },
+      ],
+      nextCursor: 'c2',
+    })
+  })
+})

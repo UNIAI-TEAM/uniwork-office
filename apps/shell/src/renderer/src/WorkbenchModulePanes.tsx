@@ -3,6 +3,7 @@ import type { FormEvent, ReactElement } from 'react'
 import { getWorkbenchModule, type PracticeId, type WorkbenchModuleId } from '@uniwork/practice-core'
 import type { UniworkWorkspaceRef } from '../../shared/home-api'
 import type { UniworkWorkError } from '../../shared/uniwork-work-api'
+import { InboxPane } from './InboxPane'
 import { NotesPane } from './NotesPane'
 import { MODULE_TONES } from './module-tones'
 import { WbGlyph, WorkbenchIcon } from './WorkbenchIcons'
@@ -71,7 +72,7 @@ export function WorkbenchModulePane({
 }: Props): ReactElement {
   const mod = getWorkbenchModule(moduleId)
   const { t } = useI18n()
-  // what every server tab gets (Tasks, Calendar, Profile)
+  // what every server tab gets (Inbox, Tasks, Calendar, Profile)
   const server: WorkPaneProps = { workspace, workspaceError, onReload }
 
   if (!mod) {
@@ -106,6 +107,7 @@ export function WorkbenchModulePane({
   return (
     <section className="wb-pane" aria-label={title}>
       {/* each tab draws its own toolbar: its summary counts what it loads, Profile adds Edit on the web */}
+      {moduleId === 'inbox' && <InboxPane {...server} head={head} />}
       {moduleId === 'calendar' && <WorkCalendarPane {...server} head={head} />}
       {moduleId === 'tasks' && <WorkTasksPane {...server} head={head} onWritten={onTasksWritten} />}
       {moduleId === 'notes' && <NotesPane practiceId={practiceId} head={head} />}
@@ -128,6 +130,7 @@ export function WorkbenchModulePane({
 }
 
 const SKELETON: Partial<Record<WorkbenchModuleId, WorkSkeletonShape>> = {
+  inbox: 'rows',
   calendar: 'agenda',
   personal: 'card',
 }

@@ -142,4 +142,17 @@ export const ms = {
   dlCopyFailed: 'Tidak dapat mencipta salinan. Tiada perubahan dibuat.',
   dlCopyDone: 'Salinan "{title}" dicipta',
   dlCopyUnavailable: 'Pelaksanaan ini belum mempunyai ciri salinan.',
+  dlPurgeTitle: 'Padam {title} selama-lamanya?',
+  dlPurgeDescription: 'Item ini akan dipadam selama-lamanya dan tidak boleh dibatalkan.',
+  dlPurgeFolderDescription:
+    'Folder ini akan dipadam selama-lamanya dan tidak boleh dibatalkan. Item di dalamnya yang tidak anda urus akan kekal dalam tong sampah.',
+  dlPurgeSubmit: 'Padam selama-lamanya',
+  dlPurgeSubmitting: 'Memadam selama-lamanya…',
+  dlPurgeDone: '{title} dipadam selama-lamanya',
+  dlPurgeFailed: 'Tidak dapat memadam. Tiada perubahan dibuat.',
+  dlBulkPurgeTitleOne: 'Padam {n} dokumen selama-lamanya?',
+  dlBulkPurgeTitleOther: 'Padam {n} dokumen selama-lamanya?',
+  dlBulkPurgeDescription:
+    'Tindakan ini tidak boleh dibatalkan. Item yang tidak dapat anda urus akan dilangkau.',
+  dlBulkDonePurge: '{ok}/{total} dokumen dipadam selama-lamanya',
 } satisfies Record<keyof typeof zh, string>

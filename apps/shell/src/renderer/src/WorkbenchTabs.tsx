@@ -12,7 +12,7 @@ import {
 import { WbMenu, WbMenuItem, WbMenuLabel } from './WbMenu'
 import { WbGlyph, WorkbenchIcon } from './WorkbenchIcons'
 import { useI18n } from './locale'
-import type { tabCounts } from './work-home'
+import type { TabCount, tabCounts } from './work-home'
 import {
   pinModule,
   pinPillar,
@@ -33,8 +33,8 @@ interface WorkbenchTabsProps {
   vi: boolean
   /** Called when pinned modules or pillars change (parent may clear active if unpinned). */
   onPinsChange?: (pins: WorkbenchModuleId[], pillarPins: PracticePillarId[]) => void
-  /** Tasks and Calendar counts from the cached Overview summary (tabCounts) */
-  counts?: ReturnType<typeof tabCounts>
+  /** Tasks and Calendar counts from the cached Overview summary (tabCounts), the Inbox's unread count */
+  counts?: ReturnType<typeof tabCounts> & { inbox?: TabCount }
 }
 
 function notifyPinsChanged(): void {
@@ -264,7 +264,8 @@ export function WorkbenchTabs({
           if (!mod) return null
           const dragging = dragId === id
           const over = overId === id && dragId !== id
-          const count = id === 'tasks' || id === 'calendar' ? counts?.[id] : undefined
+          const count =
+            id === 'tasks' || id === 'calendar' || id === 'inbox' ? counts?.[id] : undefined
           const core = isCorePinnedModule(id)
           const name = vi ? mod.labelVi : mod.labelEn
           return (

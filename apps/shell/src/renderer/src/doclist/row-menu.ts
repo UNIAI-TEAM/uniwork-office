@@ -26,6 +26,7 @@ export type RowMenuActionId =
   | 'unshelve'
   | 'trash'
   | 'restore'
+  | 'purge'
   | 'download'
   | 'versions'
   | 'logs'
@@ -79,6 +80,14 @@ export function rowCanCopy(doc: DocumentsHomeDoc): boolean {
   )
 }
 
+/**
+ * UNI-2078: a trashed row Delete forever can take: manage or `admin_scope`, the web's
+ * canManageTrashed (decision Q4). Restore keeps its own, narrower gate (`canManage`).
+ */
+export function rowCanPurge(doc: DocumentsHomeDoc): boolean {
+  return doc.canManage === true || doc.adminScope === true
+}
+
 // groups of the live screens: open | link | edit | keep (and the delete entry)
 const OPEN = 0
 const LINK = 1
@@ -109,6 +118,8 @@ export function buildRowMenu({
   if (screen === 'trash' || doc.archived === true) {
     if (doc.canManage === true) add('restore', label('dlActRestore'), OPEN)
     add('details', label('dlActDetails'), OPEN)
+    // Xóa vĩnh viễn (UNI-2078): its own group after a divider, red, and it asks first
+    if (rowCanPurge(doc)) add('purge', label('dlActPurge'), KEEP, { danger: true, confirm: true })
     return items
   }
 

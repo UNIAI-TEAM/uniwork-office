@@ -6412,6 +6412,26 @@ export class UniworkDocsService {
   }
 
   /**
+   * UNI-2078: delete a trashed document forever (the web's purge). Main never trusts the renderer:
+   * the document is re-read and refused BEFORE any POST unless the caller manages it (or holds
+   * `admin_scope`, decision Q4 - the web's canManageTrashed) and it is in the trash. The server
+   * purges the item and the trashed descendants the caller manages, in one transaction.
+   */
+  purgeDocument(documentId: string): Promise<UniworkDocActionResult<{ id: string }>> {
+    return actionResult(async () => {
+      const session = this.captureActionSession()
+      if (typeof documentId !== 'string' || !documentId) throw new UniworkDocError('not_found')
+      const ref = await this.api().documentManageRef(documentId)
+      if (!this.sessionLive(session)) throw new UniworkDocError('not_signed_in')
+      if (ref.myLevel !== 'manage' && !ref.adminScope) throw new UniworkDocError('forbidden')
+      if (!ref.archivedAt) throw new UniworkDocError('document_not_in_trash')
+      await this.api().purgeDocument(documentId)
+      if (ref.workspaceId) this.pushTreeChangedFor(session, ref.workspaceId)
+      return { id: documentId }
+    })
+  }
+
+  /**
    * UNI-2078: a plain copy of a file document (the web's "Create a copy"): a new document at the
    * workspace root that keeps the source's access. Main never trusts the renderer: the document is
    * re-read and refused BEFORE any POST unless it is a live file the caller can edit and no other
@@ -7211,6 +7231,19 @@ export class UniworkDocsService {
       const { path } = await this.openFromServer(documentId)
       return { path }
     })
+  }
+
+  /**
+   * UNI-2079: a notice's "open at the comment". The plain open, then the thread of `commentId`
+   * revealed in the opened copy through the same held reveal a launch ticket uses.
+   */
+  async openDocumentAt(
+    documentId: string,
+    commentId?: string,
+  ): Promise<UniworkResult<{ path: string }>> {
+    const opened = await this.openDocument(documentId)
+    if (opened.ok && commentId) this.deps.revealComment?.(opened.value.path, commentId)
+    return opened
   }
 
   /**
