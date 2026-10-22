@@ -178,6 +178,7 @@ describe('wikiTarget', () => {
     ['spaces trimmed', '[[  Note  | Alias ]]', 'Note'],
     ['nothing left', '[[ ]]', ''],
     ['nothing left before an alias', '[[ |Alias]]', ''],
+    ['the table-cell escape of the bar dropped', '[[a\\|b]]', 'a'],
   ])('%s', (_label, raw, bare) => {
     expect(wikiTarget(raw)).toBe(bare)
   })
@@ -355,6 +356,32 @@ describe('resolution', () => {
     expect(state('[[b|Bee]]')).toContain('wiki-link-resolved')
     expect(state('[[b]]')).toContain('wiki-link-resolved')
     expect(state('[[missing]]')).toContain('wiki-link-unresolved')
+  })
+
+  it('decorates a new link that shares a target already answered, without asking again', async () => {
+    const resolve = vi.fn(async (_from: string, targets: string[]) => {
+      const out: Record<string, WikiLinkResolved> = {}
+      for (const t of targets) out[t] = { path: `/notes/${t}.md`, fragment: '', found: true }
+      return out
+    })
+    const onOpen = vi.fn()
+    const { editor } = open('[[b]] end', { resolve, onOpen })
+    await settled()
+    expect(resolve).toHaveBeenCalledTimes(1)
+    // a second spelling of the same target (undo of a delete, paste as markdown)
+    // arrives as a marked literal; the target set does not change
+    editor.view.dispatch(
+      editor.state.tr.insert(
+        editor.state.doc.content.size - 1,
+        editor.schema.text('[[b|Bee]]', [editor.schema.marks.wikiLink!.create()]),
+      ),
+    )
+    await settled()
+    const link = editor.view.dom.querySelector('[data-wiki-target="[[b|Bee]]"]')
+    expect(link?.className).toContain('wiki-link-resolved')
+    expect(resolve).toHaveBeenCalledTimes(1)
+    expect(clickWikiLink(editor, '[[b|Bee]]')).toBe(true)
+    expect(onOpen).toHaveBeenCalledWith('/notes/b.md', '')
   })
 
   it('opens the resolved note for an aliased link', async () => {
