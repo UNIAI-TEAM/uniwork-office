@@ -151,6 +151,16 @@ describe('DocCopyDialog: opening', () => {
     )
   })
 
+  it('the checkbox is named by the label alone; the hint is its description (as the web)', async () => {
+    await open('vi')
+    const byId = (attr: string) =>
+      host.ownerDocument.getElementById(consent().getAttribute(attr) ?? '')?.textContent
+    expect(byId('aria-labelledby')).toBe('Tôi hiểu bản sao giữ nguyên quyền của nguồn')
+    expect(byId('aria-describedby')).toBe(
+      'Bản sao không mở rộng quyền cho ai và không sửa tài liệu gốc.',
+    )
+  })
+
   it('Cancel and Escape close without calling the bridge', async () => {
     await open()
     await press(cancelButton())

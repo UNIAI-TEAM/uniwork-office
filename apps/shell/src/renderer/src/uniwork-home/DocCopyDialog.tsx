@@ -131,11 +131,18 @@ export function DocCopyDialog({
             type="checkbox"
             checked={consent}
             disabled={busy}
+            // the wrapping label would name it label + hint: name it by the label, describe by the hint
+            aria-labelledby={`${id}-consent-label`}
+            aria-describedby={`${id}-consent-hint`}
             onChange={(e) => setConsent(e.target.checked)}
           />
           <span className="uw-copy-consent-text">
-            <span className="uw-copy-consent-label">{t('dlCopyConsentLabel')}</span>
-            <span className="uw-copy-consent-hint">{t('dlCopyConsentHint')}</span>
+            <span id={`${id}-consent-label`} className="uw-copy-consent-label">
+              {t('dlCopyConsentLabel')}
+            </span>
+            <span id={`${id}-consent-hint`} className="uw-copy-consent-hint">
+              {t('dlCopyConsentHint')}
+            </span>
           </span>
         </label>
         {error && (
