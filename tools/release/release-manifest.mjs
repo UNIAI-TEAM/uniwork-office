@@ -130,7 +130,15 @@ export function updateManifest(previous, release, { keepVersions, baseUrl, now }
     base_url: baseUrl,
     channels: {
       ...manifest.channels,
-      [channel]: { latest: releases[0].version, apt_suite: channel, releases },
+      [channel]: {
+        latest: releases[0].version,
+        apt_suite: channel,
+        // the stable name of the channel's newest deb, for the one-command install
+        ...(release.apt && {
+          latest_deb_url: `${baseUrl}/apt/latest/${channel}/uniwork-office_amd64.deb`,
+        }),
+        releases,
+      },
     },
   }
 }

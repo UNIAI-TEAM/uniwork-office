@@ -212,6 +212,7 @@ describe('apt-repo.sh', { skip }, () => {
       'apt/dists/dev/Release',
       'apt/dists/dev/Release.gpg',
       'apt/dists/dev/InRelease',
+      'apt/latest/dev/uniwork-office_amd64.deb',
       'dev/0.11.0-dev.1/UniWork-Office_0.11.0-dev.1_unsigned_linux_x64.deb',
       'dev/0.11.0-dev.1/UniWork-Office_0.11.0-dev.1_unsigned_darwin_arm64.dmg',
       'dev/0.11.0-dev.1/SHA256SUMS-linux-x64.txt',
@@ -264,6 +265,11 @@ describe('apt-repo.sh', { skip }, () => {
         'm',
       ),
     )
+    // the stable name of the newest deb (one-command install): the same bytes as the pool deb
+    assert.equal(
+      sha256(join(target, 'apt/latest/dev/uniwork-office_amd64.deb')),
+      sha256(join(target, POOL, 'uniwork-office_0.11.0~dev.1_amd64.deb')),
+    )
   })
 
   it('signs InRelease and Release.gpg with the key, and Release names the Packages files it ships', () => {
@@ -312,6 +318,11 @@ describe('apt-repo.sh', { skip }, () => {
     const dir = makeRelease('0.11.0-dev.2', 'dev')
     publish(target, '0.11.0-dev.2', 'dev', [], dir)
     assert.deepEqual(versionsIn(target), ['0.11.0~dev.2', '0.11.0~dev.1'])
+    // the latest object is overwritten with the new version's deb
+    assert.equal(
+      sha256(join(target, 'apt/latest/dev/uniwork-office_amd64.deb')),
+      sha256(join(target, POOL, 'uniwork-office_0.11.0~dev.2_amd64.deb')),
+    )
     const packages = readFileSync(join(target, 'apt/dists/dev/main/binary-amd64/Packages'), 'utf8')
     const before = files(target)
 
@@ -413,6 +424,8 @@ describe('apt-repo.sh', { skip }, () => {
     const dev = manifest.channels.dev
     assert.equal(dev.latest, '0.11.0-dev.2')
     assert.equal(dev.apt_suite, 'dev')
+    assert.equal(dev.latest_deb_url, `${BASE}/apt/latest/dev/uniwork-office_amd64.deb`)
+    assert.equal(beta.latest_deb_url, `${BASE}/apt/latest/beta/uniwork-office_amd64.deb`)
     assert.deepEqual(manifestVersions(target), ['0.11.0-dev.2', '0.11.0-dev.1'])
 
     const [second, first] = dev.releases
@@ -503,6 +516,7 @@ describe('apt-repo.sh', { skip }, () => {
       `PUT ${POOL}/uniwork-office_0.11.0~dev.3_amd64.deb`,
       'PUT apt/dists/dev/main/binary-amd64/Packages (Cache-Control: no-cache)',
       'PUT apt/dists/dev/InRelease (Cache-Control: no-cache)',
+      'PUT apt/latest/dev/uniwork-office_amd64.deb (Cache-Control: no-cache) (Content-Type: application/vnd.debian.binary-package)',
       'PUT update/dev/dev-linux.yml (Cache-Control: no-cache)',
       'PUT releases.json (Cache-Control: no-cache) (Content-Type: application/json; charset=utf-8)',
     ].map((line) => lines.indexOf(line))

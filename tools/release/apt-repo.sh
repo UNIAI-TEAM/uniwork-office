@@ -17,6 +17,7 @@
 #   apt/pool/main/u/uniwork-office/<deb>             the debs every index names
 #   apt/dists/<channel>/main/binary-amd64/Packages{,.gz,.xz} + by-hash/SHA256/<hash>
 #   apt/dists/<channel>/{Release,Release.gpg,InRelease}
+#   apt/latest/<channel>/uniwork-office_amd64.deb    this run's deb under a stable name
 #   <channel>/<version>/<release files> + SHA256SUMS
 #   update/<channel>/<files the feed yml name>, then the feed yml
 #   releases.json                                    public manifest, schema 1 (release-manifest.mjs)
@@ -24,10 +25,10 @@
 # Stateless: the suite's current Packages is the manifest. The new deb's stanza
 # replaces one of the same version, the newest --keep versions stay. Uploads go
 # in an order that never lets a client see an index naming a missing file
-# (installers, pool, by-hash + Packages, Release files, feed files, feed yml,
-# releases.json), then prune removes what neither the new indexes and manifest
-# nor the previous ones name (one run of grace for clients holding the
-# previous index or manifest).
+# (installers, pool, by-hash + Packages, Release files, latest deb, feed files,
+# feed yml, releases.json), then prune removes what neither the new indexes
+# and manifest nor the previous ones name (one run of grace for clients holding
+# the previous index or manifest).
 #
 # Env: OFFICE_S3_ENDPOINT, OFFICE_S3_BUCKET, OFFICE_S3_ACCESS_KEY_ID,
 # OFFICE_S3_SECRET_ACCESS_KEY, OFFICE_S3_REGION (optional, default hn-2),
@@ -482,6 +483,11 @@ done
 put "$work/dists/Release" "$dists/Release" "$NO_CACHE"
 put "$work/dists/Release.gpg" "$dists/Release.gpg" "$NO_CACHE"
 put "$work/dists/InRelease" "$dists/InRelease" "$NO_CACHE"
+
+# The stable name of the channel's newest deb (the one-command install). Only now:
+# its postinst adds the source, whose index must already list this version.
+# Overwritten every run, never pruned.
+put "$deb" "apt/latest/$channel/${PACKAGE}_amd64.deb" "$NO_CACHE" application/vnd.debian.binary-package
 
 for name in "${feed_files[@]}"; do
   put "$dir/$name" "update/$channel/$name"
