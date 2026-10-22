@@ -403,7 +403,8 @@ describe('askUniStream: errors before the first event', () => {
   it('askUniV2CodeOfError keeps the P1 codes', () => {
     expect(askUniV2CodeOfError(new UniworkDocError('not_signed_in'))).toBe('signed_out')
     expect(askUniV2CodeOfError(new UniworkDocError('network'))).toBe('offline')
-    expect(askUniV2CodeOfError(new UniworkDocError('timeout'))).toBe('provider_timeout')
+    // RB-6: a REST / lookup timeout is no provider timeout (only the stream's own idle deadline is)
+    expect(askUniV2CodeOfError(new UniworkDocError('timeout'))).toBe('error')
     expect(askUniV2CodeOfError(new Error('x'))).toBe('error')
   })
 })
@@ -448,5 +449,107 @@ describe('askUniStream: idle deadline and cancel', () => {
     controller.abort()
     const { terminal } = await run(async () => sse([frame('done', DONE)]), REQ, controller.signal)
     expect(terminal).toEqual({ type: 'error', code: 'cancelled' })
+  })
+})
+
+describe('s1f (reviewer_be r1)', () => {
+  it('RB-5: at most 50 citations per message or citations event, sourceId must be S<digits> up to 16 chars', async () => {
+    const cit = (source_id: string) => ({
+      source_id,
+      kind: 'task',
+      title: 't',
+      quote: 'q',
+      href: '/a/b/tasks/1',
+    })
+    const many = Array.from({ length: 80 }, (_, i) => cit(`S${i + 1}`))
+    const mixed = [
+      cit('S1'),
+      cit('s2'),
+      cit('x'.repeat(2000)),
+      cit('S'.repeat(17)),
+      cit('S12'),
+      cit('S123456789012345'),
+      cit('S12345678901234567'),
+    ]
+    const { events, terminal } = await run(async () =>
+      sse([
+        frame('citations', { citations: many }),
+        frame('citations', { citations: mixed }),
+        frame('done', { ...DONE, message: { ...DONE.message, citations: many } }),
+      ]),
+    )
+    const cits = (i: number) =>
+      (events[i] as Extract<AskUniStreamPayload, { type: 'citations' }>).citations
+    expect(cits(0)).toHaveLength(50)
+    expect(cits(0)[49].sourceId).toBe('S50')
+    expect(cits(1).map((c) => c.sourceId)).toEqual(['S1', 'S12', 'S123456789012345'])
+    expect(terminal.type === 'done' && terminal.message.citations).toHaveLength(50)
+  })
+
+  it('RB-6: the stream client keeps provider_timeout for its own send deadline', async () => {
+    vi.useFakeTimers()
+    const fetch: FetchLike = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')))
+      })
+    const done = client(fetch).stream(REQ, {
+      signal: new AbortController().signal,
+      onEvent: () => undefined,
+    })
+    await vi.advanceTimersByTimeAsync(ASKUNI_STREAM_IDLE_MS + 1_000)
+    expect(await done).toEqual({ type: 'error', code: 'provider_timeout' })
+  })
+
+  it('RB-7: an abort while the first read is pending ends as cancelled at once, no timer advance', async () => {
+    vi.useFakeTimers()
+    const open = openSse()
+    const controller = new AbortController()
+    const done = client(async () => open.response).stream(REQ, {
+      signal: controller.signal,
+      onEvent: () => undefined,
+    })
+    await vi.advanceTimersByTimeAsync(1_000)
+    controller.abort()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(await done).toEqual({ type: 'error', code: 'cancelled' })
+  })
+
+  it('RB-7: an abort while the fetch is still pending ends as cancelled and aborts the fetch', async () => {
+    vi.useFakeTimers()
+    let fetchSignal: AbortSignal | undefined
+    const fetch: FetchLike = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        fetchSignal = init.signal ?? undefined
+        init.signal?.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')))
+      })
+    const controller = new AbortController()
+    const done = client(fetch).stream(REQ, { signal: controller.signal, onEvent: () => undefined })
+    await vi.advanceTimersByTimeAsync(1_000)
+    controller.abort()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(await done).toEqual({ type: 'error', code: 'cancelled' })
+    expect(fetchSignal?.aborted).toBe(true)
+  })
+
+  it('RB-7: more than 1 MB without a frame break is an error, not an endless buffer', async () => {
+    const chunk = 'x'.repeat(250_000)
+    const { terminal } = await run(async () => sse([chunk, chunk, chunk, chunk, chunk]))
+    expect(terminal).toEqual({ type: 'error', code: 'error' })
+  })
+
+  it('RB-7: a fetch that never answers is provider_timeout after 45 s', async () => {
+    vi.useFakeTimers()
+    const fetch: FetchLike = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')))
+      })
+    let settled = false
+    const done = client(fetch)
+      .stream(REQ, { signal: new AbortController().signal, onEvent: () => undefined })
+      .finally(() => void (settled = true))
+    await vi.advanceTimersByTimeAsync(ASKUNI_STREAM_IDLE_MS - 1_000)
+    expect(settled).toBe(false)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(await done).toEqual({ type: 'error', code: 'provider_timeout' })
   })
 })

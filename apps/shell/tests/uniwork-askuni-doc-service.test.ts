@@ -334,7 +334,11 @@ describe('askuni-doc stream', () => {
     await ownRun(t, a)
     await t.doc.start(a, { question: 'x', conversationId: CONV })
     await flush()
+    const before = a.sent.length
     a.navigate()
+    // RB-8: nothing reaches the navigated page, not even a cancelled terminal
+    await flush()
+    expect(a.sent).toHaveLength(before)
     expect(t.calls[1].signal.aborted).toBe(true)
     expect(t.doc.active()).toBe(0)
     expect(await t.doc.messages(a, { conversationId: CONV })).toEqual({
@@ -373,6 +377,40 @@ describe('askuni-doc stream', () => {
     await new Promise((r) => setTimeout(r, 30))
     expect(t.calls[0].signal.aborted).toBe(true)
     expect(a.sent.at(-1)).toMatchObject({ type: 'error', code: 'cancelled' })
+  })
+})
+
+describe('askuni-doc s1f (reviewer_be r1)', () => {
+  it('RB-1: a done that lands after an account switch (before the next scope tick) is cancelled', async () => {
+    const t = setup({ scopeCheckMs: 60_000 })
+    const a = editor(7)
+    const start = await t.doc.start(a, { question: 'x' })
+    await flush()
+    t.switchScope('acc_2:org_a')
+    t.calls[0].end(DONE)
+    await flush()
+    const requestId = (start as { requestId: string }).requestId
+    expect(a.sent).toEqual([{ type: 'error', code: 'cancelled', requestId }])
+  })
+
+  it('RB-8: after an account switch the forgotten conversations are forbidden for messages, feedback and follow-ups', async () => {
+    const t = setup({ scopeCheckMs: 60_000 })
+    const a = editor(7)
+    await ownRun(t, a)
+    t.switchScope('acc_2:org_a')
+    const forbidden = { ok: false, error: 'forbidden' }
+    expect(await t.doc.messages(a, { conversationId: CONV })).toEqual(forbidden)
+    expect(
+      await t.doc.feedbackSet(a, { conversationId: CONV, messageId: MSG, rating: 'up' }),
+    ).toEqual(forbidden)
+    expect(await t.doc.feedbackClear(a, { conversationId: CONV, messageId: MSG })).toEqual(
+      forbidden,
+    )
+    expect(await t.doc.start(a, { question: 'x', conversationId: CONV })).toEqual(forbidden)
+    expect(t.rest.messages).not.toHaveBeenCalled()
+    expect(t.rest.feedbackSet).not.toHaveBeenCalled()
+    expect(t.rest.feedbackClear).not.toHaveBeenCalled()
+    expect(t.calls).toHaveLength(1)
   })
 })
 

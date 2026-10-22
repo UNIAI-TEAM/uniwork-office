@@ -64,28 +64,41 @@ function sender(id: number) {
   const sent: AskUniStreamEvent[] = []
   const channels: string[] = []
   const listeners = new Set<() => void>()
+  const navListeners = new Set<() => void>()
   let destroyed = false
-  const s: AskUniStreamSender & { sent: AskUniStreamEvent[]; channels: string[]; destroy(): void } =
-    {
-      id,
-      sent,
-      channels,
-      isDestroyed: () => destroyed,
-      send: (channel: string, ev: AskUniStreamEvent) => {
-        channels.push(channel)
-        sent.push(ev)
-      },
-      once: (_name: 'destroyed', fn: () => void) => {
-        listeners.add(fn)
-      },
-      removeListener: (_name: 'destroyed', fn: () => void) => {
-        listeners.delete(fn)
-      },
-      destroy() {
-        destroyed = true
-        for (const fn of [...listeners]) fn()
-      },
-    }
+  const s: AskUniStreamSender & {
+    sent: AskUniStreamEvent[]
+    channels: string[]
+    destroy(): void
+    navigate(): void
+    listenerCount(): number
+  } = {
+    id,
+    sent,
+    channels,
+    isDestroyed: () => destroyed,
+    send: (channel: string, ev: AskUniStreamEvent) => {
+      channels.push(channel)
+      sent.push(ev)
+    },
+    once: (_name: 'destroyed', fn: () => void) => {
+      listeners.add(fn)
+    },
+    on: (_name: 'did-navigate', fn: () => void) => {
+      navListeners.add(fn)
+    },
+    removeListener: (name: 'destroyed' | 'did-navigate', fn: () => void) => {
+      ;(name === 'destroyed' ? listeners : navListeners).delete(fn)
+    },
+    destroy() {
+      destroyed = true
+      for (const fn of [...listeners]) fn()
+    },
+    navigate() {
+      for (const fn of [...navListeners]) fn()
+    },
+    listenerCount: () => listeners.size + navListeners.size,
+  }
   return s
 }
 
@@ -344,6 +357,109 @@ describe('cancel', () => {
     await flush()
     expect(calls[0].signal.aborted).toBe(true)
     expect(a.sent).toEqual([{ type: 'error', requestId: 'req_1', code: 'cancelled' }])
+  })
+})
+
+describe('s1f: terminals and watchers (reviewer_be r1)', () => {
+  it('RB-1: a done that lands after an account switch (before the next scope tick) is cancelled', async () => {
+    const { service, calls, setScope } = setup({ scopeCheckMs: 60_000 })
+    const a = sender(1)
+    await service.start(a, valid())
+    await flush()
+    calls[0].emit({ type: 'run', runId: 'r1', conversationId: CONV })
+    setScope('acc_2:org_a')
+    calls[0].end(DONE)
+    await flush()
+    expect(a.sent).toEqual([
+      { type: 'run', requestId: 'req_1', runId: 'r1', conversationId: CONV },
+      { type: 'error', requestId: 'req_1', code: 'cancelled' },
+    ])
+    expect(calls[0].signal.aborted).toBe(true)
+    expect(service.active()).toBe(0)
+  })
+
+  it('RB-1: an error terminal after a sign-out is cancelled too, and a rejection after a switch', async () => {
+    const { service, calls, setScope } = setup({ scopeCheckMs: 60_000 })
+    const a = sender(1)
+    await service.start(a, valid())
+    await flush()
+    setScope(null)
+    calls[0].end({ type: 'error', code: 'provider_error' })
+    await flush()
+    expect(a.sent).toEqual([{ type: 'error', requestId: 'req_1', code: 'cancelled' }])
+
+    let scope = 'acc_1:org_a'
+    const b = sender(2)
+    const rejecting = createAskUniStreamService({
+      isSignedIn: () => true,
+      scopeKey: () => scope,
+      checkWorkspace: async () => null,
+      client: {
+        stream: async () => {
+          scope = 'acc_2:org_a'
+          throw new Error('boom')
+        },
+      },
+      newRequestId: () => 'req_x',
+      scopeCheckMs: 60_000,
+    })
+    await rejecting.start(b, valid())
+    await flush()
+    expect(b.sent).toEqual([{ type: 'error', requestId: 'req_x', code: 'cancelled' }])
+  })
+
+  it('RB-1: a terminal in an unchanged scope is still delivered as is', async () => {
+    const { service, calls } = setup({ scopeCheckMs: 60_000 })
+    const a = sender(1)
+    await service.start(a, valid())
+    await flush()
+    calls[0].end(DONE)
+    await flush()
+    expect(a.sent).toEqual([{ ...DONE, requestId: 'req_1' }])
+  })
+
+  it('RB-3: the shell page navigating (reload) aborts its stream, sends nothing and drops its listeners', async () => {
+    const { service, calls } = setup()
+    const a = sender(1)
+    await service.start(a, valid())
+    await flush()
+    expect(a.listenerCount()).toBe(2)
+    a.navigate()
+    await flush()
+    expect(calls[0].signal.aborted).toBe(true)
+    expect(a.sent).toEqual([])
+    expect(service.active()).toBe(0)
+    expect(a.listenerCount()).toBe(0)
+  })
+
+  it('RB-8: a sender destroyed while the workspace check is pending never starts a stream', async () => {
+    let release!: (code: null) => void
+    const { service, calls } = setup({
+      checkWorkspace: () => new Promise((resolve) => (release = resolve)),
+    })
+    const a = sender(1)
+    const started = service.start(a, valid())
+    a.destroy()
+    release(null)
+    expect(await started).toEqual({ ok: false, error: 'error' })
+    await flush()
+    expect(calls).toHaveLength(0)
+    expect(service.active()).toBe(0)
+  })
+
+  it('RB-8: an account switch while the workspace check is pending is cancelled with no stream', async () => {
+    let release!: (code: null) => void
+    const { service, calls, setScope } = setup({
+      checkWorkspace: () => new Promise((resolve) => (release = resolve)),
+    })
+    const a = sender(1)
+    const started = service.start(a, valid())
+    setScope('acc_2:org_a')
+    release(null)
+    expect(await started).toEqual({ ok: false, error: 'cancelled' })
+    await flush()
+    expect(calls).toHaveLength(0)
+    expect(a.sent).toEqual([])
   })
 })
 

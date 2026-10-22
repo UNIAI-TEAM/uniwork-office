@@ -150,3 +150,38 @@ describe('registerUniworkAskUni: the editor family (UNI-2076 s7b)', () => {
     expect(await docFlags(FROM_EDITOR)).toEqual({ ok: false, error: 'forbidden' })
   })
 })
+
+describe('registerUniworkAskUni: a stream client that throws synchronously (UNI-2076 s1f RB-4)', () => {
+  it('a profile with an unusable apiOrigin ends the editor run with one error terminal', async () => {
+    const sent: unknown[] = []
+    const EDITOR = {
+      id: 7,
+      mainFrame: { url: 'genoffice-app://docs/index.html' },
+      isDestroyed: () => false,
+      send: (_channel: string, ev: unknown) => void sent.push(ev),
+      once: () => undefined,
+      on: () => undefined,
+      removeListener: () => undefined,
+    }
+    registerUniworkAskUni(
+      ipcMain,
+      wiring({
+        packaged: false,
+        env: {},
+        profile: () => ({ ...PROFILE, apiOrigin: 'not a url' }),
+        isEditorContents: (id) => id === 7,
+        editorPath: () => '/w/plan.docx',
+        docBinding: () => ({ workspaceId: WS, documentId: '01J8DOC0000000000000000001' }),
+      }),
+    )
+    const start = await handlers.get(ASKUNI_DOC_CHANNELS.stream)!(
+      { sender: EDITOR, senderFrame: EDITOR.mainFrame },
+      { question: 'hi', locale: 'en' },
+    )
+    expect(start).toMatchObject({ ok: true })
+    await new Promise((r) => setTimeout(r, 20))
+    expect(sent).toEqual([
+      { type: 'error', code: 'error', requestId: (start as { requestId: string }).requestId },
+    ])
+  })
+})

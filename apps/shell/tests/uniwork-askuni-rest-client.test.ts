@@ -397,3 +397,35 @@ describe('lookup', () => {
     ).toEqual({ ok: false, error: 'forbidden' })
   })
 })
+
+describe('s1f RB-6: a REST / lookup timeout is no provider timeout', () => {
+  const hanging: FetchLike = (_url, init) =>
+    new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(new DOMException('x', 'AbortError')))
+    })
+  const shortOptions = { ...options(hanging), metadataTimeoutMs: 20 }
+
+  it('a slow capabilities call is the P1 error, never provider_timeout', async () => {
+    expect(await createAskUniRestClient(shortOptions).capabilities(WS)).toEqual({
+      ok: false,
+      error: 'error',
+    })
+  })
+
+  it('a slow picker lookup is the P1 error, never provider_timeout', async () => {
+    expect(
+      await createAskUniLookupClient(shortOptions).lookup({
+        workspaceId: WS,
+        kind: 'task',
+        query: 'a',
+      }),
+    ).toEqual({ ok: false, error: 'error' })
+  })
+
+  it('a server ai_provider_timeout code still maps to provider_timeout', async () => {
+    expect(await rest(async () => envelope(504, 'ai_provider_timeout')).capabilities(WS)).toEqual({
+      ok: false,
+      error: 'provider_timeout',
+    })
+  })
+})
