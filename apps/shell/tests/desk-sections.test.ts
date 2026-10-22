@@ -96,7 +96,7 @@ function home(inbox: WorkHomeSummary['inbox']): WorkLoad<WorkHomeSummary> {
 }
 /** the unread list the Desk loads (UNI-2079): the same rows the old home preview carried */
 function unread(rows: WorkHomeSummary['inbox']) {
-  return { rows, error: null, drop: vi.fn(), reload: vi.fn() }
+  return { rows, more: false, error: null, drop: vi.fn(), reload: vi.fn() }
 }
 const comment = {
   id: 'n1',
