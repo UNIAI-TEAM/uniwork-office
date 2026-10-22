@@ -17,6 +17,7 @@ import {
   notePillKey,
   syncProblems,
 } from '../src/renderer/src/desk-model'
+import { DOCUMENT_KINDS } from '../src/renderer/src/notices-model'
 
 const note = (over: Partial<WorkNotification> = {}): WorkNotification => ({
   id: 'n1',
@@ -73,7 +74,7 @@ describe('applicableTools', () => {
 })
 
 describe('in-tray sources', () => {
-  it('keeps unread document comments and mentions only', () => {
+  it('keeps unread document notices only', () => {
     const inbox = [
       note(),
       note({ id: 'n2', kind: 'document_mentioned' }),
@@ -88,9 +89,19 @@ describe('in-tray sources', () => {
       note({ id: 'c1', kind: 'document_changed' }),
       note({ id: 'c2', kind: 'document_comment_resolved' }),
       note({ id: 'c3', kind: 'document_changed', read_at: '2026-10-14T02:00:00Z' }),
-      note({ id: 'c4', kind: 'document_shared' }),
+      note({ id: 'c4', kind: 'task_assigned', resource_type: 'task' }),
+      note({ id: 'c5', kind: 'document_shared', resource_type: 'task' }),
     ]
     expect(docNotifications(inbox).map((n) => n.id)).toEqual(['c1', 'c2'])
+  })
+
+  it('keeps every document kind the server sends, unread, on a document', () => {
+    const inbox = DOCUMENT_KINDS.map((kind, i) => note({ id: `k${i}`, kind }))
+    expect(docNotifications(inbox)).toHaveLength(DOCUMENT_KINDS.length)
+    expect(docNotifications(inbox.map((n) => ({ ...n, read_at: '2026-10-14T02:00:00Z' })))).toEqual(
+      [],
+    )
+    expect(docNotifications([note({ kind: 'document_access_approved' })])).toHaveLength(1)
   })
 
   it('counts a folded change row once: the Today foot is unread minus the tray notes', () => {
@@ -125,6 +136,8 @@ describe('in-tray sources', () => {
     expect(notePillKey(note({ kind: 'document_mentioned' }))).toBe('wbDeskPillMention')
     expect(notePillKey(note({ kind: 'document_changed' }))).toBe('wbDeskPillChanged')
     expect(notePillKey(note({ kind: 'document_comment_resolved' }))).toBe('wbDeskPillResolved')
+    expect(notePillKey(note({ kind: 'document_comment_replied' }))).toBe('wbDeskPillReply')
+    expect(notePillKey(note({ kind: 'document_access_requested' }))).toBe('wbDeskPillAccess')
   })
 
   it('keeps shared documents from the last 7 days that were never opened here', () => {

@@ -2792,4 +2792,35 @@ describe('the version view copy (UNI-2033)', () => {
       await expect(ctx.service.historyOpenCopy('../x')).rejects.toMatchObject({ code: 'not_found' })
     })
   })
+
+  describe('openDocumentAt (UNI-2079)', () => {
+    it('opens the document like openDocument, then holds the reveal of the comment for it', async () => {
+      const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+      const ctx = setup(server)
+      const revealComment = vi.fn()
+      ;(ctx.deps as Record<string, unknown>).revealComment = revealComment
+      const result = await ctx.service.openDocumentAt(DOC, 'cmt_1')
+      if (!result.ok) throw new Error(result.error)
+      expect(ctx.deps.openPath).toHaveBeenLastCalledWith(result.value.path)
+      expect(revealComment.mock.calls).toEqual([[result.value.path, 'cmt_1']])
+    })
+
+    it('without a comment id it is a plain open and reveals nothing', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server)
+      const revealComment = vi.fn()
+      ;(ctx.deps as Record<string, unknown>).revealComment = revealComment
+      expect(await ctx.service.openDocumentAt(DOC)).toMatchObject({ ok: true })
+      expect(revealComment).not.toHaveBeenCalled()
+    })
+
+    it('a failed open answers the open error and reveals nothing', async () => {
+      const server = fakeServer({ bytes: enc('v3') })
+      const ctx = setup(server, { signedIn: false })
+      const revealComment = vi.fn()
+      ;(ctx.deps as Record<string, unknown>).revealComment = revealComment
+      expect(await ctx.service.openDocumentAt(DOC, 'cmt_1')).toMatchObject({ ok: false })
+      expect(revealComment).not.toHaveBeenCalled()
+    })
+  })
 })

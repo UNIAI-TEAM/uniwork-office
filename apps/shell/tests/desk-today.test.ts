@@ -120,6 +120,7 @@ const base = (home: WorkLoad<WorkHomeSummary>) => ({
   workspace: WS,
   onReload: vi.fn(),
   onOpenTasks: vi.fn(),
+  onOpenInbox: vi.fn(),
 })
 const button = (label: string) =>
   Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes(label))
@@ -136,14 +137,33 @@ describe('DeskToday', () => {
     expect(text).toContain('Other notifications on UniWork: 1')
     // the card's footer line (bell + link at body size), not a bare flex child
     expect(button('Other notifications')!.parentElement!.className).toBe('wb-desk-today-foot')
+    // UNI-2079: the Inbox pane of the app, not the web inbox
+    const props = base(load(summary()))
+    await render(props)
     await act(async () => button('Other notifications')!.click())
-    expect(work.openWeb).toHaveBeenCalledWith({ kind: 'inbox', orgSlug: 'acme', wsSlug: 'team' })
+    expect(props.onOpenInbox).toHaveBeenCalledTimes(1)
+    expect(work.openWeb).not.toHaveBeenCalled()
   })
 
   it('counts other notifications from the unread total, not the capped inbox preview', async () => {
     const s = summary()
     await render(base(load({ ...s, counts: { ...s.counts, unread: 30 } })))
     expect(host.textContent).toContain('Other notifications on UniWork: 29')
+  })
+
+  it("subtracts the tray's unread document rows from the unread total (UNI-2079)", async () => {
+    const s = summary()
+    await render({
+      ...base(load({ ...s, counts: { ...s.counts, unread: 30 } })),
+      trayDocs: 12,
+    })
+    expect(host.textContent).toContain('Other notifications on UniWork: 18')
+  })
+
+  it('shows no other-notifications line when the tray holds every unread notification', async () => {
+    const s = summary()
+    await render({ ...base(load({ ...s, counts: { ...s.counts, unread: 4 } })), trayDocs: 4 })
+    expect(host.textContent).not.toContain('Other notifications')
   })
 
   it('ticks a task through the server and reloads; a refusal puts it back and offers Retry', async () => {

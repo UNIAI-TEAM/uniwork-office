@@ -3,10 +3,11 @@ import type { PracticeId } from './types.js'
 /**
  * Optional Workbench modules (pinned via Tab +).
  * Pillars (knowledge / materials / skills / compose) are also opt-in via Tab +.
- * Core always-on modules: Desk / Tasks / Calendar.
+ * Core always-on modules: Desk / Inbox / Tasks / Calendar.
  * "Projects" is intentionally omitted — it maps to the Knowledge pillar.
  */
-export type WorkbenchModuleId = 'desk' | 'tasks' | 'calendar' | 'forms' | 'notes' | 'personal'
+export type WorkbenchModuleId =
+  'desk' | 'inbox' | 'tasks' | 'calendar' | 'forms' | 'notes' | 'personal'
 
 export interface WorkbenchModuleDef {
   id: WorkbenchModuleId
@@ -25,6 +26,14 @@ export const WORKBENCH_MODULES: readonly WorkbenchModuleDef[] = [
     labelEn: 'Desk',
     hintVi: 'Tài liệu cần xử lý, đang làm dở và dụng cụ',
     hintEn: 'Documents to handle, work in progress and tools',
+    available: true,
+  },
+  {
+    id: 'inbox',
+    labelVi: 'Thông báo',
+    labelEn: 'Inbox',
+    hintVi: 'Thông báo từ UniWork: nhắc đến bạn, được giao, chia sẻ, bình luận',
+    hintEn: 'UniWork notifications: mentions, assignments, shares and comments',
     available: true,
   },
   {
@@ -71,9 +80,14 @@ export const WORKBENCH_MODULES: readonly WorkbenchModuleDef[] = [
 
 /**
  * Always-on Workbench tabs (cannot be removed via Tab ×).
- * Order: My Space → Tasks → Calendar. Everything else is opt-in via +.
+ * Order: My Space → Inbox → Tasks → Calendar. Everything else is opt-in via +.
  */
-export const CORE_PINNED_MODULES: readonly WorkbenchModuleId[] = ['desk', 'tasks', 'calendar']
+export const CORE_PINNED_MODULES: readonly WorkbenchModuleId[] = [
+  'desk',
+  'inbox',
+  'tasks',
+  'calendar',
+]
 
 /** Suggested pins when a practice has never customized Tab +. */
 export function defaultPinnedModules(_practiceId: PracticeId): WorkbenchModuleId[] {
@@ -85,21 +99,20 @@ export function isCorePinnedModule(id: WorkbenchModuleId): boolean {
 }
 
 /**
- * Ensure core tabs are present. Preserves existing pin order; inserts any
- * missing cores after the last already-pinned core (or at the front).
+ * Ensure core tabs are present. Preserves existing pin order; each missing core goes right after
+ * the core that precedes it in CORE_PINNED_MODULES (or at the front), so pins saved before a core
+ * existed get it next to its neighbour, not at the end of the cores.
  */
 export function ensureCorePinnedModules(pins: readonly WorkbenchModuleId[]): WorkbenchModuleId[] {
-  const valid = pins.filter(isWorkbenchModuleId)
-  const have = new Set(valid)
-  const missing = CORE_PINNED_MODULES.filter((id) => !have.has(id))
-  if (missing.length === 0) return valid
-  if (valid.length === 0) return [...CORE_PINNED_MODULES]
-  let insertAt = 0
-  for (let i = 0; i < valid.length; i++) {
-    if (isCorePinnedModule(valid[i]!)) insertAt = i + 1
-  }
-  const out = [...valid]
-  out.splice(insertAt, 0, ...missing)
+  const out = pins.filter(isWorkbenchModuleId)
+  CORE_PINNED_MODULES.forEach((id, i) => {
+    if (out.includes(id)) return
+    const before = CORE_PINNED_MODULES.slice(0, i).reduce(
+      (at, core) => Math.max(at, out.indexOf(core)),
+      -1,
+    )
+    out.splice(before + 1, 0, id)
+  })
   return out
 }
 

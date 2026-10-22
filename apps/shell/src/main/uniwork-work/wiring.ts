@@ -4,6 +4,7 @@ import {
   workErrorOfDocCode,
   type UniworkWorkResult,
   type WorkCreateTaskInput,
+  type WorkNotificationQuery,
 } from '../../shared/uniwork-work-api'
 import type { DeploymentProfile } from '../uniwork-auth/deployment'
 import type { FetchLike } from '../uniwork-docs/client'
@@ -111,6 +112,15 @@ export function registerUniworkWork(ipcMain: IpcMain, deps: UniworkWorkDeps): vo
     if (limit !== undefined && typeof limit !== 'number') throw new UniworkDocError('server_error')
     return api().notificationDocuments(str(notificationId), { cursor, limit })
   })
+  // UNI-2079: the inbox. The client checks every renderer value before a request.
+  handle(C.listNotifications, (q) => api().listNotifications(q as WorkNotificationQuery))
+  handle(C.unreadCount, () => api().unreadCount())
+  handle(C.markNotificationsUnread, (ids) => api().markNotificationsUnread(ids as string[]))
+  handle(C.archiveNotifications, (ids) => api().archiveNotifications(ids as string[]))
+  handle(C.unarchiveNotifications, (ids) => api().unarchiveNotifications(ids as string[]))
+  handle(C.markAllNotificationsRead, (q) =>
+    api().markAllNotificationsRead(q as { workspaceId?: string }),
+  )
   handle(C.createTask, (input) => api().createTask(input as WorkCreateTaskInput))
   handle(C.calendarEvents, (input) =>
     api().calendarEvents(input as { workspaceId: string; from: string; to: string }),

@@ -4,9 +4,11 @@ import type {
   WorkHomeSummary,
   WorkMeeting,
   WorkNotification,
+  WorkNotificationPage,
   WorkPerson,
   WorkTask,
   WorkTaskStatus,
+  WorkUnreadCount,
 } from '../../shared/uniwork-work-api'
 import { UniworkDocError } from '../uniwork-docs/errors'
 
@@ -125,6 +127,10 @@ function parseNotification(value: unknown): WorkNotification {
   if (commentGone !== undefined) extra.comment_deleted = commentGone
   const samples = sampleDocuments(r.sample_documents)
   if (samples !== undefined) extra.sample_documents = samples
+  if (typeof r.resource_parent_id === 'string' && r.resource_parent_id) {
+    extra.resource_parent_id = r.resource_parent_id
+  }
+  if (typeof r.actor_id === 'string' && r.actor_id) extra.actor_id = r.actor_id
   return {
     id: id(r.id),
     kind: text(r.kind),
@@ -248,4 +254,34 @@ export function parsePerson(raw: unknown): WorkPerson {
       : null,
     timezone: optional(r.timezone) ?? '',
   }
+}
+
+/** `{notifications, next_before?}` (GET /me/notifications); an empty or missing next_before is the end */
+export function parseNotificationPage(raw: unknown): WorkNotificationPage {
+  const notifications = rows(raw, 'notifications', parseNotification)
+  const next = record(raw).next_before
+  return { notifications, next_before: typeof next === 'string' && next ? next : null }
+}
+
+/** `{total, by_workspace}`; a null map is {}, a drifted entry is dropped */
+export function parseUnreadCount(raw: unknown): WorkUnreadCount {
+  const r = record(raw)
+  const total = count(r.total)
+  if (total === null) bad()
+  const by_workspace: Record<string, number> = {}
+  if (r.by_workspace !== undefined && r.by_workspace !== null) {
+    for (const [ws, n] of Object.entries(record(r.by_workspace))) {
+      const v = count(n)
+      if (v !== null) by_workspace[ws] = v
+    }
+  }
+  return { total, by_workspace }
+}
+
+/** `{status, ids}` of POST /me/notifications/read {all: true}: the rows it read (missing is none) */
+export function parseReadIds(raw: unknown): string[] {
+  const ids = record(raw).ids
+  if (ids === undefined || ids === null) return []
+  if (!Array.isArray(ids)) bad()
+  return ids.map(id)
 }

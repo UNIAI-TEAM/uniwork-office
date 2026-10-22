@@ -26,12 +26,24 @@ interface Props {
   /** reload the workspace list and every server section (the top bar's Refresh) */
   onReload: () => void
   onOpenTasks: () => void
+  /** "N other notifications" opens the Inbox tab */
+  onOpenInbox: () => void
+  /** the tray's unread document rows (the unread list the Desk loaded); null until it answers */
+  trayDocs?: number | null
 }
 
 const TODAY_TASKS = 6
 
 /** The Desk's Today card (redesign spec 4.1): the date, due tasks, meetings, other notifications. */
-export function DeskToday({ home, view, workspace, onReload, onOpenTasks }: Props): ReactElement {
+export function DeskToday({
+  home,
+  view,
+  workspace,
+  onReload,
+  onOpenTasks,
+  onOpenInbox,
+  trayDocs = null,
+}: Props): ReactElement {
   const { t, dateLocale } = useI18n()
   const toasts = useWbToast()
   const titleId = useId()
@@ -172,21 +184,17 @@ export function DeskToday({ home, view, workspace, onReload, onOpenTasks }: Prop
   }
 
   const others = (s: WorkHomeSummary) => {
-    // document comments and mentions sit in the tray; the rest live on the web inbox
-    // the inbox is a capped preview; counts.unread is the true total when it loaded
+    // document comments, shares and the like sit in the tray; the rest live in the Inbox tab
+    // the home inbox is a capped preview; counts.unread is the true total when it loaded
     const unread =
       !s.partial.includes('notifications') && s.counts.unread !== null
         ? s.counts.unread
         : s.inbox.filter((x) => !x.read_at).length
-    const n = Math.max(0, unread - docNotifications(s.inbox).length)
-    return n > 0 && base ? (
+    const n = Math.max(0, unread - (trayDocs ?? docNotifications(s.inbox).length))
+    return n > 0 ? (
       <div className="wb-desk-today-foot">
         <WbGlyph id="bell" />
-        <button
-          type="button"
-          className="wb-link"
-          onClick={() => openWeb({ kind: 'inbox', ...base })}
-        >
+        <button type="button" className="wb-link" onClick={onOpenInbox}>
           {t('wbDeskOtherNotifs', { count: n })}
         </button>
       </div>
