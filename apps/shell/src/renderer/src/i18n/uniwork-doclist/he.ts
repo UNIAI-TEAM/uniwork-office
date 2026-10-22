@@ -136,4 +136,16 @@ export const he = {
   dlCopyFailed: 'לא ניתן ליצור את העותק. דבר לא השתנה.',
   dlCopyDone: 'נוצר העותק "{title}"',
   dlCopyUnavailable: 'הפריסה הזו עדיין אינה כוללת את תכונת יצירת העותק.',
+  dlPurgeTitle: 'למחוק את {title} לצמיתות?',
+  dlPurgeDescription: 'הפריט יימחק לצמיתות ולא ניתן לבטל פעולה זו.',
+  dlPurgeFolderDescription:
+    'התיקייה תימחק לצמיתות ולא ניתן לבטל פעולה זו. פריטים שבתוכה שאין לך הרשאה לנהל יישארו בסל המחזור.',
+  dlPurgeSubmit: 'מחק לצמיתות',
+  dlPurgeSubmitting: 'מוחק לצמיתות…',
+  dlPurgeDone: '{title} נמחק לצמיתות',
+  dlPurgeFailed: 'לא ניתן למחוק. שום דבר לא השתנה.',
+  dlBulkPurgeTitleOne: 'למחוק לצמיתות מסמך {n}?',
+  dlBulkPurgeTitleOther: 'למחוק לצמיתות {n} מסמכים?',
+  dlBulkPurgeDescription: 'לא ניתן לבטל פעולה זו. פריטים שאין לך הרשאה לנהל ידולגו.',
+  dlBulkDonePurge: 'נמחקו {ok} מתוך {total} מסמכים לצמיתות',
 } satisfies Record<keyof typeof zh, string>

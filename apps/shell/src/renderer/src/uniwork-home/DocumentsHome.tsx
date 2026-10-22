@@ -72,6 +72,7 @@ import {
 import { useFolderActions } from '../uniwork-folders/use-folder-actions'
 import { canCreateInsideFolder, type WorkspaceFolderCandidate } from '../uniwork-folders/ws-folder'
 import {
+  canPurgeDocuments,
   cancelUploadDocument,
   createDocument,
   createPage,
@@ -131,6 +132,7 @@ import {
 import { UniworkDocInfoPanel, type DocInfoLoad } from '../UniworkDocInfoPanel'
 import { ShelvedToolbar, filterByShelver, shelvedDescendantIds } from './ShelvedDocumentsView'
 import { BulkBar, BulkTrashConfirm } from '../doclist/BulkBar'
+import { BulkPurgeConfirm } from '../doclist/BulkPurgeConfirm'
 import {
   bulkActionsFor,
   bulkSummary,
@@ -152,6 +154,7 @@ import { RecentSegmentControl, useRecentSegment } from '../doclist/RecentSegment
 import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
 import { useDocCopy } from './use-doc-copy'
+import { useDocPurge } from './use-doc-purge'
 import { ListState } from '../doclist/ListState'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
@@ -1554,6 +1557,21 @@ export function DocumentsHome({
     },
   })
 
+  // UNI-2078: Xóa vĩnh viễn from a trash row's menu: toast, refresh; an item that already left the
+  // trash says so (the server's 400) and the list is read again
+  const docPurge = useDocPurge({
+    onPurged: (title) => {
+      const message = t('dlPurgeDone', { title })
+      announce(message)
+      setToast({ message, tone: 'ok' })
+      refreshAll()
+    },
+    onNotInTrash: () => {
+      setToast({ message: t('uwErrDocumentNotInTrash'), tone: 'error' })
+      refreshAll()
+    },
+  })
+
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf's member filter and row commands.
   // The filter narrows the loaded pages only (the server has no shelved_by).
   const shelfView = subView === 'archive' && query.length === 0
@@ -1593,13 +1611,19 @@ export function DocumentsHome({
   // UNI-2047 A5: the bulk bar acts on the selected rows (`selectedDocs`, set once the table's rows
   // are known below); the destructive one asks once first
   const [bulkTrashConfirm, setBulkTrashConfirm] = useState(false)
+  const [bulkPurgeConfirm, setBulkPurgeConfirm] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
   const bulkBusyRef = useRef(false)
   const runBulkById = async (action: BulkWorkActionId) => {
     // the ref answers a second click that lands before React re-renders
     if (bulkBusyRef.current) return
     const docs = selectedDocs
-    if (docs.length === 0 || !bulkActionsFor(screen, docs, shareBridgeAvailable()).includes(action))
+    if (
+      docs.length === 0 ||
+      !bulkActionsFor(screen, docs, shareBridgeAvailable(), false, canPurgeDocuments()).includes(
+        action,
+      )
+    )
       return
     bulkBusyRef.current = true
     setBulkBusy(true)
@@ -1629,6 +1653,7 @@ export function DocumentsHome({
   const zipAvailable = zipDownloadBridge() !== null
   const onBulkAction = (action: BulkActionId) => {
     if (action === 'trash') setBulkTrashConfirm(true)
+    else if (action === 'purge') setBulkPurgeConfirm(true)
     else if (action === 'download') {
       void runZipDownload({
         bridge: zipDownloadBridge(),
@@ -1976,6 +2001,8 @@ export function DocumentsHome({
         // both confirm first: the dialog of the screen the row is on
         trash: () => (screen === 'shelved' ? setShelvedTrashTarget(doc) : setArchiveTarget(doc)),
         restore: () => void handleRestoreDoc(doc),
+        // UNI-2078: no entry when this shell has no purge call; the dialog asks first
+        ...(docPurge.available ? { purge: () => docPurge.open(doc) } : {}),
         details: () => showDetails(doc),
       },
     })
@@ -2777,6 +2804,7 @@ export function DocumentsHome({
                     busy={bulkBusy || zipBusy}
                     canShare={shareAvailable}
                     canDownload={zipAvailable}
+                    canPurge={canPurgeDocuments()}
                     onAction={onBulkAction}
                     onClear={() => setSelected(new Set())}
                   />
@@ -2914,6 +2942,8 @@ export function DocumentsHome({
 
       {docCopy.dialog}
 
+      {docPurge.dialog}
+
       {shelvedTrashTarget && (
         <ArchiveConfirm
           name={shelvedTrashTarget.title}
@@ -2931,6 +2961,17 @@ export function DocumentsHome({
             void runBulkById('trash')
           }}
           onCancel={() => setBulkTrashConfirm(false)}
+        />
+      )}
+
+      {bulkPurgeConfirm && (
+        <BulkPurgeConfirm
+          count={selectedDocs.length}
+          onConfirm={() => {
+            setBulkPurgeConfirm(false)
+            void runBulkById('purge')
+          }}
+          onCancel={() => setBulkPurgeConfirm(false)}
         />
       )}
 

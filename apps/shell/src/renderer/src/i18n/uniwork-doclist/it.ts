@@ -139,4 +139,18 @@ export const it = {
   dlCopyFailed: 'Impossibile creare la copia. Nessuna modifica è stata applicata.',
   dlCopyDone: 'Copia "{title}" creata',
   dlCopyUnavailable: 'Questa installazione non include ancora la funzione di copia.',
+  dlPurgeTitle: 'Eliminare definitivamente {title}?',
+  dlPurgeDescription:
+    'Questo elemento verrà eliminato definitivamente e non potrà essere ripristinato.',
+  dlPurgeFolderDescription:
+    'Questa cartella verrà eliminata definitivamente e non potrà essere ripristinata. Gli elementi al suo interno che non gestisci restano nel cestino.',
+  dlPurgeSubmit: 'Elimina definitivamente',
+  dlPurgeSubmitting: 'Eliminazione definitiva…',
+  dlPurgeDone: '{title} eliminato definitivamente',
+  dlPurgeFailed: 'Impossibile eliminare. Nulla è stato modificato.',
+  dlBulkPurgeTitleOne: 'Eliminare definitivamente {n} documento?',
+  dlBulkPurgeTitleOther: 'Eliminare definitivamente {n} documenti?',
+  dlBulkPurgeDescription:
+    'Questa operazione non può essere annullata. Gli elementi che non puoi gestire verranno saltati.',
+  dlBulkDonePurge: '{ok}/{total} documenti eliminati definitivamente',
 } satisfies Record<keyof typeof zh, string>

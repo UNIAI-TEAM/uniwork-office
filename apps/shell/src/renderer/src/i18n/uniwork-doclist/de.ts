@@ -141,4 +141,18 @@ export const de = {
   dlCopyFailed: 'Die Kopie konnte nicht erstellt werden. Es wurde nichts geändert.',
   dlCopyDone: 'Kopie "{title}" erstellt',
   dlCopyUnavailable: 'Diese Bereitstellung unterstützt die Kopierfunktion noch nicht.',
+  dlPurgeTitle: '{title} endgültig löschen?',
+  dlPurgeDescription:
+    'Dieses Element wird endgültig gelöscht und kann nicht wiederhergestellt werden.',
+  dlPurgeFolderDescription:
+    'Dieser Ordner wird endgültig gelöscht und kann nicht wiederhergestellt werden. Enthaltene Elemente, die du nicht verwaltest, bleiben im Papierkorb.',
+  dlPurgeSubmit: 'Endgültig löschen',
+  dlPurgeSubmitting: 'Wird endgültig gelöscht…',
+  dlPurgeDone: '{title} endgültig gelöscht',
+  dlPurgeFailed: 'Löschen fehlgeschlagen. Es wurde nichts geändert.',
+  dlBulkPurgeTitleOne: '{n} Dokument endgültig löschen?',
+  dlBulkPurgeTitleOther: '{n} Dokumente endgültig löschen?',
+  dlBulkPurgeDescription:
+    'Dies kann nicht rückgängig gemacht werden. Elemente, die du nicht verwalten kannst, werden übersprungen.',
+  dlBulkDonePurge: '{ok}/{total} Dokumente endgültig gelöscht',
 } satisfies Record<keyof typeof zh, string>

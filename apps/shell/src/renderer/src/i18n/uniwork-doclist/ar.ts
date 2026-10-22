@@ -137,4 +137,17 @@ export const ar = {
   dlCopyFailed: 'تعذّر إنشاء النسخة. لم يتغيّر أي شيء.',
   dlCopyDone: 'تم إنشاء النسخة "{title}"',
   dlCopyUnavailable: 'هذا الإصدار لا يتضمن ميزة النسخ بعد.',
+  dlPurgeTitle: 'حذف {title} نهائيًا؟',
+  dlPurgeDescription: 'سيُحذف هذا العنصر نهائيًا ولا يمكن التراجع عن ذلك.',
+  dlPurgeFolderDescription:
+    'سيُحذف هذا المجلد نهائيًا ولا يمكن التراجع عن ذلك. ستبقى العناصر الموجودة داخله والتي لا تملك صلاحية إدارتها في سلة المهملات.',
+  dlPurgeSubmit: 'حذف نهائي',
+  dlPurgeSubmitting: 'جارٍ الحذف نهائيًا…',
+  dlPurgeDone: 'تم حذف {title} نهائيًا',
+  dlPurgeFailed: 'تعذّر الحذف. لم يتغير شيء.',
+  dlBulkPurgeTitleOne: 'حذف مستند ({n}) نهائيًا؟',
+  dlBulkPurgeTitleOther: 'حذف {n} مستندًا نهائيًا؟',
+  dlBulkPurgeDescription:
+    'لا يمكن التراجع عن هذا الإجراء. سيتم تخطي العناصر التي لا تملك صلاحية إدارتها.',
+  dlBulkDonePurge: 'تم حذف {ok} من أصل {total} مستندات نهائيًا',
 } satisfies Record<keyof typeof zh, string>

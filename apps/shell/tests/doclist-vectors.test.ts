@@ -192,6 +192,14 @@ const WEB_TO_APP_KEYS: Record<string, string> = {
   'documents.list.bulk.confirm.trash_description': 'dlBulkConfirmBody',
   'documents.list.bulk.confirm.trash_title_one': 'dlBulkConfirmTitleOne',
   'documents.list.bulk.confirm.trash_title_other': 'dlBulkConfirmTitleOther',
+  // UNI-2078: Delete forever on the trash bar (the bar's button reuses the row menu's label, the
+  // confirm button the purge dialog's)
+  'documents.list.bulk.action.purge': 'dlActPurge',
+  'documents.list.bulk.confirm.purge_action': 'dlPurgeSubmit',
+  'documents.list.bulk.confirm.purge_description': 'dlBulkPurgeDescription',
+  'documents.list.bulk.confirm.purge_title_one': 'dlBulkPurgeTitleOne',
+  'documents.list.bulk.confirm.purge_title_other': 'dlBulkPurgeTitleOther',
+  'documents.list.bulk.done.purge': 'dlBulkDonePurge',
   'documents.list.bulk.done.restore': 'dlBulkDoneRestore',
   'documents.list.bulk.done.shelve': 'dlBulkDoneShelve',
   'documents.list.bulk.done.trash': 'dlBulkDoneTrash',
@@ -248,7 +256,7 @@ const WEB_TO_APP_ERROR_KEYS: Record<string, string> = {
 }
 
 /**
- * web keys for features the app does not have yet (zip download, purge,
+ * web keys for features the app does not have yet (zip download,
  * share and move as bulk actions, per-row error lines). Listed on purpose:
  * no dead dl* string is added until the feature lands, and a new web key
  * that is neither mapped nor listed here fails the test below.
@@ -256,15 +264,9 @@ const WEB_TO_APP_ERROR_KEYS: Record<string, string> = {
 const NOT_IN_THE_APP_YET = [
   'documents.list.bulk.action.download',
   'documents.list.bulk.action.move',
-  'documents.list.bulk.action.purge',
   'documents.list.bulk.action.share',
-  'documents.list.bulk.confirm.purge_action',
-  'documents.list.bulk.confirm.purge_description',
-  'documents.list.bulk.confirm.purge_title_one',
-  'documents.list.bulk.confirm.purge_title_other',
   'documents.list.bulk.done.download',
   'documents.list.bulk.done.move',
-  'documents.list.bulk.done.purge',
   'documents.list.bulk.error.folder_too_large',
   'documents.list.bulk.error.not_a_file',
   'documents.list.bulk.error.not_verifiable',
@@ -307,7 +309,7 @@ describe('documents.list.* keys map onto the app strings', () => {
   it('does not give a dead dl* string to a feature the app lacks', () => {
     const keys = Object.keys(uniworkDocListStrings.zh)
     expect(
-      keys.filter((k) => /^dl(Zip|Purge|Move|Download|Share)(Done|Action|Title|Confirm)/.test(k)),
+      keys.filter((k) => /^dl(Zip|Move|Download|Share)(Done|Action|Title|Confirm)/.test(k)),
     ).toEqual([])
   })
 })

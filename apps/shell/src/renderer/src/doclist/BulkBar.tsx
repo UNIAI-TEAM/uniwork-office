@@ -12,6 +12,7 @@ const ACTION_LABEL: Record<BulkActionId, StringKey> = {
   download: 'dlActDownload',
   shelve: 'dlActShelve',
   trash: 'dlActTrash',
+  purge: 'dlActPurge',
 }
 
 /**
@@ -25,6 +26,7 @@ export function BulkBar({
   busy,
   canShare = false,
   canDownload = false,
+  canPurge = false,
   onAction,
   onClear,
 }: {
@@ -36,12 +38,14 @@ export function BulkBar({
   canShare?: boolean
   /** this shell has the zip-download bridge: Tải xuống may show */
   canDownload?: boolean
+  /** this shell has the purge call: Xóa vĩnh viễn may show on the trash (UNI-2078) */
+  canPurge?: boolean
   onAction: (id: BulkActionId) => void
   onClear: () => void
 }) {
   const { t } = useI18n()
   if (docs.length === 0) return null
-  const actions = bulkActionsFor(screen, docs, canShare, canDownload)
+  const actions = bulkActionsFor(screen, docs, canShare, canDownload, canPurge)
   return (
     <div className="dl-bulk-bar" data-bulk-bar role="toolbar" aria-label={t('dlBulkToolbar')}>
       <span className="dl-bulk-count" data-bulk-count>
@@ -52,7 +56,7 @@ export function BulkBar({
           <button
             key={id}
             type="button"
-            className={`btn btn-secondary dl-bulk-action${id === 'trash' ? ' danger' : ''}`}
+            className={`btn btn-secondary dl-bulk-action${id === 'trash' || id === 'purge' ? ' danger' : ''}`}
             data-bulk-action={id}
             disabled={busy}
             onClick={() => onAction(id)}

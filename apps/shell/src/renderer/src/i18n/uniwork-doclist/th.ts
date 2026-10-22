@@ -136,4 +136,16 @@ export const th = {
   dlCopyFailed: 'ไม่สามารถสร้างสำเนาได้ ไม่มีการเปลี่ยนแปลงใด ๆ',
   dlCopyDone: 'สร้างสำเนา "{title}" แล้ว',
   dlCopyUnavailable: 'การติดตั้งนี้ยังไม่มีฟีเจอร์สร้างสำเนา',
+  dlPurgeTitle: 'ลบ {title} ถาวรใช่ไหม',
+  dlPurgeDescription: 'รายการนี้จะถูกลบถาวรและไม่สามารถยกเลิกได้',
+  dlPurgeFolderDescription:
+    'โฟลเดอร์นี้จะถูกลบถาวรและไม่สามารถยกเลิกได้ รายการภายในที่คุณไม่มีสิทธิ์จัดการจะยังคงอยู่ในถังขยะ',
+  dlPurgeSubmit: 'ลบถาวร',
+  dlPurgeSubmitting: 'กำลังลบถาวร…',
+  dlPurgeDone: 'ลบ {title} ถาวรแล้ว',
+  dlPurgeFailed: 'ไม่สามารถลบได้ ไม่มีการเปลี่ยนแปลงใดๆ',
+  dlBulkPurgeTitleOne: 'ลบเอกสาร {n} รายการถาวรใช่ไหม',
+  dlBulkPurgeTitleOther: 'ลบเอกสาร {n} รายการถาวรใช่ไหม',
+  dlBulkPurgeDescription: 'การดำเนินการนี้ไม่สามารถยกเลิกได้ รายการที่คุณจัดการไม่ได้จะถูกข้าม',
+  dlBulkDonePurge: 'ลบเอกสารถาวรแล้ว {ok}/{total} รายการ',
 } satisfies Record<keyof typeof zh, string>

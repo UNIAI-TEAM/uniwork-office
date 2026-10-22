@@ -137,4 +137,16 @@ export const vi = {
   dlCopyFailed: 'Không tạo được bản sao. Chưa có gì thay đổi.',
   dlCopyDone: 'Đã tạo bản sao "{title}"',
   dlCopyUnavailable: 'Bản triển khai này chưa có chức năng tạo bản sao.',
+  dlPurgeTitle: 'Xóa vĩnh viễn {title}?',
+  dlPurgeDescription: 'Mục này sẽ bị xóa vĩnh viễn và không thể hoàn tác.',
+  dlPurgeFolderDescription:
+    'Thư mục này sẽ bị xóa vĩnh viễn và không thể hoàn tác. Mục con bạn không quản lý vẫn ở lại thùng rác.',
+  dlPurgeSubmit: 'Xóa vĩnh viễn',
+  dlPurgeSubmitting: 'Đang xóa vĩnh viễn…',
+  dlPurgeDone: 'Đã xóa vĩnh viễn {title}',
+  dlPurgeFailed: 'Không xóa được. Chưa có gì thay đổi.',
+  dlBulkPurgeTitleOne: 'Xóa vĩnh viễn {n} tài liệu?',
+  dlBulkPurgeTitleOther: 'Xóa vĩnh viễn {n} tài liệu?',
+  dlBulkPurgeDescription: 'Không thể hoàn tác. Mục bạn không có quyền sẽ được bỏ qua.',
+  dlBulkDonePurge: 'Đã xóa vĩnh viễn {ok}/{total} tài liệu',
 } satisfies Record<keyof typeof zh, string>

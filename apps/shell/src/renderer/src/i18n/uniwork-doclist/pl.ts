@@ -138,4 +138,17 @@ export const pl = {
   dlCopyFailed: 'Nie udało się utworzyć kopii. Nic nie zostało zmienione.',
   dlCopyDone: 'Utworzono kopię "{title}"',
   dlCopyUnavailable: 'Ta wersja jeszcze nie ma funkcji kopiowania.',
+  dlPurgeTitle: 'Trwale usunąć {title}?',
+  dlPurgeDescription: 'Ten element zostanie trwale usunięty i nie będzie można tego cofnąć.',
+  dlPurgeFolderDescription:
+    'Ten folder zostanie trwale usunięty i nie będzie można tego cofnąć. Elementy w nim, których nie zarządzasz, pozostaną w koszu.',
+  dlPurgeSubmit: 'Usuń trwale',
+  dlPurgeSubmitting: 'Trwałe usuwanie…',
+  dlPurgeDone: 'Trwale usunięto: {title}',
+  dlPurgeFailed: 'Nie udało się usunąć. Nic nie zostało zmienione.',
+  dlBulkPurgeTitleOne: 'Trwale usunąć {n} dokument?',
+  dlBulkPurgeTitleOther: 'Trwale usunąć {n} dokumentów?',
+  dlBulkPurgeDescription:
+    'Tej operacji nie można cofnąć. Elementy, których nie możesz zarządzać, zostaną pominięte.',
+  dlBulkDonePurge: 'Trwale usunięto dokumenty: {ok}/{total}',
 } satisfies Record<keyof typeof zh, string>

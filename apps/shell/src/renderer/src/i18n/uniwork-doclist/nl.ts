@@ -141,4 +141,17 @@ export const nl = {
   dlCopyFailed: 'De kopie kon niet worden gemaakt. Er is niets gewijzigd.',
   dlCopyDone: 'Kopie "{title}" gemaakt',
   dlCopyUnavailable: 'Deze implementatie heeft de kopieerfunctie nog niet.',
+  dlPurgeTitle: '{title} definitief verwijderen?',
+  dlPurgeDescription: 'Dit item wordt definitief verwijderd en kan niet ongedaan worden gemaakt.',
+  dlPurgeFolderDescription:
+    'Deze map wordt definitief verwijderd en kan niet ongedaan worden gemaakt. Items erin die je niet beheert, blijven in de prullenbak.',
+  dlPurgeSubmit: 'Definitief verwijderen',
+  dlPurgeSubmitting: 'Definitief verwijderen…',
+  dlPurgeDone: '{title} definitief verwijderd',
+  dlPurgeFailed: 'Verwijderen mislukt. Er is niets gewijzigd.',
+  dlBulkPurgeTitleOne: '{n} document definitief verwijderen?',
+  dlBulkPurgeTitleOther: '{n} documenten definitief verwijderen?',
+  dlBulkPurgeDescription:
+    'Dit kan niet ongedaan worden gemaakt. Items die je niet kunt beheren, worden overgeslagen.',
+  dlBulkDonePurge: '{ok}/{total} documenten definitief verwijderd',
 } satisfies Record<keyof typeof zh, string>

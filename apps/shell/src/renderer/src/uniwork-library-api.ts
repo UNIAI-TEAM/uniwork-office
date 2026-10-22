@@ -250,6 +250,29 @@ export function copyDocument(
   return settleAct(bridge.uniworkCopyDocument(input))
 }
 
+// ── UNI-2078: Delete forever (trash) ────────────────────
+
+interface PurgeBridge {
+  uniworkPurgeDocument?(documentId: string): Promise<DocActionResult<{ id: string }>>
+}
+
+function purgeActions(): PurgeBridge | undefined {
+  return window.aiOffice as unknown as PurgeBridge | undefined
+}
+
+/** whether this shell has the purge call (an older preload has no Delete forever entry at all) */
+export function canPurgeDocuments(): boolean {
+  return typeof purgeActions()?.uniworkPurgeDocument === 'function'
+}
+
+/**
+ * Delete a trashed document forever (manage or admin_scope; main re-checks). A shell without the
+ * call answers a plain failure, a rejected call is `network`.
+ */
+export function purgeDocument(documentId: string): Promise<DocActionResult<{ id: string }>> {
+  return settleAct(purgeActions()?.uniworkPurgeDocument?.(documentId))
+}
+
 // ── Folder tree (FD-11) ─────────────────────────────────
 // A missing bridge (an older main) answers server_error and a rejected call
 // answers network, like every other read here: the UI shows its error state.

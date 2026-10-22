@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   BULK_CONCURRENCY,
   bulkActionsFor,
+  bulkSummary,
+  bulkWorkFor,
   runBulk,
   runBulkAction,
   type BulkWorkResult,
@@ -299,5 +301,146 @@ describe('selection helpers (UNI-2047 A5)', () => {
     expect(pruneSelection(same, items)).toBe(same)
     const pruned = pruneSelection(new Set(['d1', 'gone']), items)
     expect([...pruned]).toEqual(['d1'])
+  })
+})
+
+// UNI-2078 slice 2: Xóa vĩnh viễn on the trash bar
+describe('bulk: delete forever (UNI-2078)', () => {
+  // the library API reads `window.aiOffice`; this file runs in the node environment
+  const setBridge = (bridge: Record<string, unknown>) => {
+    ;(globalThis as { window?: unknown }).window = { aiOffice: bridge }
+  }
+  afterEach(() => {
+    delete (globalThis as { window?: unknown }).window
+  })
+  const trashed = (id: string, partial: Partial<DocumentsHomeDoc> = {}) =>
+    doc(id, { archived: true, archivedAt: '2026-10-19T08:00:00.000Z', ...partial })
+  const admin = (id: string) =>
+    trashed(id, { canManage: false, canEdit: false, myLevel: 'view', adminScope: true })
+
+  it('trash bar order is Khôi phục, then Xóa vĩnh viễn (the shell has the purge call)', () => {
+    expect(bulkActionsFor('trash', [trashed('a'), trashed('b')], false, false, true)).toEqual([
+      'restore',
+      'purge',
+    ])
+  })
+
+  it('stays out of the bar while this shell has no purge call (never a dead button)', () => {
+    expect(bulkActionsFor('trash', [trashed('a')])).toEqual(['restore'])
+    expect(bulkActionsFor('trash', [trashed('a')], false, false, false)).toEqual(['restore'])
+  })
+
+  it('every selected row must offer it: one row below manage (and no admin scope) hides it', () => {
+    const edit = trashed('e', { canManage: false, canEdit: true, myLevel: 'edit' })
+    expect(bulkActionsFor('trash', [trashed('a'), edit], false, false, true)).toEqual([])
+  })
+
+  it('admin_scope rows offer purge but not restore (the web’s canManageTrashed)', () => {
+    expect(bulkActionsFor('trash', [admin('a'), admin('b')], false, false, true)).toEqual(['purge'])
+    // a mixed manager + admin selection keeps only what both can do
+    expect(bulkActionsFor('trash', [trashed('a'), admin('b')], false, false, true)).toEqual([
+      'purge',
+    ])
+  })
+
+  it('a mixed selection of live and trashed rows has no purge', () => {
+    expect(bulkActionsFor('workspace', [doc('a'), trashed('b')], false, false, true)).toEqual([])
+    expect(bulkActionsFor('workspace', [doc('a')], false, false, true)).not.toContain('purge')
+    expect(
+      bulkActionsFor('shelved', [doc('a', { shelvedAt: 'x' })], false, true, true),
+    ).not.toContain('purge')
+  })
+
+  it('a folder in the trash is purgeable like any row', () => {
+    expect(bulkActionsFor('trash', [trashed('f', { kind: 'folder' })], false, false, true)).toEqual(
+      ['restore', 'purge'],
+    )
+  })
+
+  it('no rows, no actions', () => {
+    expect(bulkActionsFor('trash', [], false, false, true)).toEqual([])
+  })
+
+  it('bulkWorkFor("purge") fans out purgeDocument by id and carries retryable', async () => {
+    const purge = vi.fn(async (id: string) =>
+      id === 'b'
+        ? { ok: false as const, error: 'server_error', retryable: true }
+        : id === 'c'
+          ? { ok: false as const, error: 'document_not_in_trash' }
+          : { ok: true as const, value: { id } },
+    )
+    setBridge({ uniworkPurgeDocument: purge })
+    const work = bulkWorkFor('purge', 'trash')
+    expect(await work(trashed('a'))).toEqual({ ok: true })
+    expect(await work(trashed('b'))).toEqual({ ok: false, error: 'server_error', retryable: true })
+    expect(await work(trashed('c'))).toEqual({ ok: false, error: 'document_not_in_trash' })
+    expect(purge.mock.calls.map((c) => c[0])).toEqual(['a', 'b', 'c'])
+  })
+
+  it('a throttled purge is retried once through runBulk, a refusal is not', async () => {
+    const calls: Record<string, number> = {}
+    const purge = vi.fn(async (id: string) => {
+      calls[id] = (calls[id] ?? 0) + 1
+      if (id === 'a') {
+        return calls[id] === 1
+          ? { ok: false as const, error: 'server_error', retryable: true }
+          : { ok: true as const, value: { id } }
+      }
+      return { ok: false as const, error: 'forbidden' }
+    })
+    setBridge({ uniworkPurgeDocument: purge })
+    const result = await runBulk([trashed('a'), trashed('b')], bulkWorkFor('purge', 'trash'), {
+      sleep: noSleep,
+    })
+    expect(calls).toEqual({ a: 2, b: 1 })
+    expect(result.ok).toEqual(['a'])
+    expect(result.failed).toEqual([{ id: 'b', error: 'forbidden' }])
+  })
+
+  it('a shell without the call answers a failure per row, never throws', async () => {
+    setBridge({})
+    expect(await bulkWorkFor('purge', 'trash')(trashed('a'))).toMatchObject({ ok: false })
+  })
+
+  describe('bulkSummary', () => {
+    const t = ((key: string, vars?: Record<string, unknown>) =>
+      `${key}:${JSON.stringify(vars ?? {})}`) as never
+    it('all ok: the done sentence with ok/total and an ok tone', () => {
+      const { message, tone } = bulkSummary(
+        'purge',
+        { total: 3, ok: ['a', 'b', 'c'], failed: [] },
+        t,
+      )
+      expect(tone).toBe('ok')
+      expect(message).toBe('dlBulkDonePurge:{"ok":3,"total":3}')
+    })
+
+    it('partial failure: the counts plus the commonest reason', () => {
+      const { message, tone } = bulkSummary(
+        'purge',
+        {
+          total: 5,
+          ok: ['a', 'b'],
+          failed: [
+            { id: 'c', error: 'document_not_in_trash' },
+            { id: 'd', error: 'forbidden' },
+            { id: 'e', error: 'forbidden' },
+          ],
+        },
+        t,
+      )
+      expect(tone).toBe('error')
+      expect(message).toContain('dlBulkDonePurge:{"ok":2,"total":5}')
+      expect(message).toContain('uwErrForbidden')
+    })
+
+    it('names the purge refusals with their own sentence', () => {
+      const { message } = bulkSummary(
+        'purge',
+        { total: 1, ok: [], failed: [{ id: 'a', error: 'folder_too_large' }] },
+        t,
+      )
+      expect(message).toContain('uwErrFolderTooLarge')
+    })
   })
 })

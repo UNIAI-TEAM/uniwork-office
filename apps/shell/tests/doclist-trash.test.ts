@@ -135,6 +135,7 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
       uniworkListSources: vi.fn(async () => ok({ items: [], nextCursor: null })),
       uniworkSearchDocuments: vi.fn(async () => ok({ items: [], nextCursor: null })),
       uniworkRestoreDocument: vi.fn(async (id: string) => ok({ id })),
+      uniworkPurgeDocument: vi.fn(async (id: string) => ({ ok: true, value: { id } })),
       uniworkUnshelveDocument: vi.fn(async (id: string) =>
         ok({
           document: { ...shelf.find((d) => d.id === id)!, shelvedAt: undefined },
@@ -380,13 +381,126 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
     expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(before)
   })
 
-  it('has the menu Khôi phục · Xem chi tiết and no permanent delete', async () => {
-    await mount()
-    await click(host.querySelector('[data-doc-id="t-a"] .uw-row-menu-btn'))
-    const labels = Array.from(document.querySelectorAll('.uw-row-menu-list [role="menuitem"]')).map(
-      (el) => el.textContent?.trim(),
+  const menuLabels = () =>
+    Array.from(document.querySelectorAll('.uw-row-menu-list [role="menuitem"]')).map((el) =>
+      el.textContent?.trim(),
     )
-    expect(labels).toEqual(['Khôi phục', 'Xem chi tiết'])
+  const menuItem = (label: string) =>
+    Array.from(document.querySelectorAll<HTMLElement>('.uw-row-menu-list [role="menuitem"]')).find(
+      (el) => el.textContent?.trim() === label,
+    )
+  const toast = () => document.body.querySelector('.uw-act-toast')?.textContent ?? ''
+  const openMenu = (id: string) =>
+    click(host.querySelector(`[data-doc-id="${id}"] .uw-row-menu-btn`))
+
+  it('has the menu Khôi phục · Xem chi tiết · Xóa vĩnh viễn (UNI-2078)', async () => {
+    await mount()
+    await openMenu('t-a')
+    expect(menuLabels()).toEqual(['Khôi phục', 'Xem chi tiết', 'Xóa vĩnh viễn'])
+    // the delete entry sits in its own group after a divider, red
+    const purge = menuItem('Xóa vĩnh viễn')!
+    expect(purge.classList.contains('danger')).toBe(true)
+    expect(
+      document.querySelectorAll('.uw-row-menu-list [role="separator"]').length,
+    ).toBeGreaterThan(0)
+  })
+
+  describe('Xóa vĩnh viễn on a trash row (UNI-2078)', () => {
+    const dialog = () => document.body.querySelector('[role="dialog"]')
+    const confirm = () => document.body.querySelector<HTMLElement>('[data-purge-confirm]')
+
+    it('is hidden for an edit-level row, kept for an admin_scope row that cannot restore', async () => {
+      trash = [
+        trashed('t-a', iso(2026, 9, 22), iso(2026, 10, 22), {
+          canManage: false,
+          canEdit: true,
+          myLevel: 'edit',
+        }),
+        trashed('t-b', iso(2026, 9, 28), iso(2026, 10, 28), {
+          canManage: false,
+          canEdit: false,
+          myLevel: 'view',
+          adminScope: true,
+        }),
+      ]
+      await mount()
+      await openMenu('t-a')
+      expect(menuLabels()).toEqual(['Xem chi tiết'])
+      await click(document.body)
+      await openMenu('t-b')
+      expect(menuLabels()).toEqual(['Xem chi tiết', 'Xóa vĩnh viễn'])
+    })
+
+    it('has no entry in a shell without the purge call', async () => {
+      delete api.uniworkPurgeDocument
+      await mount()
+      await openMenu('t-a')
+      expect(menuLabels()).toEqual(['Khôi phục', 'Xem chi tiết'])
+    })
+
+    it('is never in the menu of a live row or a shelved row', async () => {
+      await remount('archive')
+      await openMenu('s-a')
+      expect(menuLabels()).not.toContain('Xóa vĩnh viễn')
+    })
+
+    it('opens the confirm with the item name and sends nothing before it', async () => {
+      await mount()
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      expect(dialog()!.textContent).toContain('Xóa vĩnh viễn t-a?')
+      expect(api.uniworkPurgeDocument).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(document.body.querySelector('[data-purge-cancel]'))
+    })
+
+    it('Hủy closes without a call', async () => {
+      await mount()
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(document.body.querySelector('[data-purge-cancel]'))
+      expect(dialog()).toBeNull()
+      expect(api.uniworkPurgeDocument).not.toHaveBeenCalled()
+    })
+
+    it('confirm: one call, the "purged" toast, the dialog closes and the list is read again', async () => {
+      await mount()
+      const before = api.uniworkListTrash!.mock.calls.length
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(confirm())
+      expect(api.uniworkPurgeDocument).toHaveBeenCalledTimes(1)
+      expect(api.uniworkPurgeDocument!.mock.calls[0]![0]).toBe('t-a')
+      expect(dialog()).toBeNull()
+      expect(toast()).toContain('Đã xóa vĩnh viễn t-a')
+      expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(before)
+    })
+
+    it('a failure stays inside the dialog and refreshes nothing', async () => {
+      api.uniworkPurgeDocument!.mockResolvedValueOnce({ ok: false, error: 'server_error' })
+      await mount()
+      const before = api.uniworkListTrash!.mock.calls.length
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(confirm())
+      expect(dialog()).not.toBeNull()
+      expect(dialog()!.querySelector('[role="alert"]')?.textContent).toBe(
+        'Không xóa được. Chưa có gì thay đổi.',
+      )
+      expect(api.uniworkListTrash!.mock.calls.length).toBe(before)
+      expect(toast()).toBe('')
+    })
+
+    it('document_not_in_trash: toasts the error, refreshes the list and closes the dialog', async () => {
+      api.uniworkPurgeDocument!.mockResolvedValueOnce({ ok: false, error: 'document_not_in_trash' })
+      await mount()
+      const before = api.uniworkListTrash!.mock.calls.length
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(confirm())
+      expect(dialog()).toBeNull()
+      expect(toast()).toContain('Mục này không còn trong thùng rác.')
+      expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(before)
+    })
   })
 
   it('keeps select-all and the row checkboxes working across the groups', async () => {

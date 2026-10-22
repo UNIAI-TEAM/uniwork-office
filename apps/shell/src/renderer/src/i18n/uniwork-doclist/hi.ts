@@ -138,4 +138,17 @@ export const hi = {
   dlCopyFailed: 'प्रतिलिपि नहीं बनाई जा सकी। कुछ भी नहीं बदला गया।',
   dlCopyDone: 'प्रतिलिपि "{title}" बनाई गई',
   dlCopyUnavailable: 'इस डिप्लॉयमेंट में अभी प्रतिलिपि सुविधा उपलब्ध नहीं है।',
+  dlPurgeTitle: '{title} को हमेशा के लिए हटाएं?',
+  dlPurgeDescription: 'यह आइटम स्थायी रूप से हटा दिया जाएगा और इसे वापस नहीं लाया जा सकता।',
+  dlPurgeFolderDescription:
+    'यह फ़ोल्डर स्थायी रूप से हटा दिया जाएगा और इसे वापस नहीं लाया जा सकता। इसके अंदर के वे आइटम जिन्हें आप प्रबंधित नहीं करते, ट्रैश में रहेंगे।',
+  dlPurgeSubmit: 'हमेशा के लिए हटाएं',
+  dlPurgeSubmitting: 'हमेशा के लिए हटाया जा रहा है…',
+  dlPurgeDone: '{title} हमेशा के लिए हटा दिया गया',
+  dlPurgeFailed: 'हटाया नहीं जा सका। कुछ भी नहीं बदला।',
+  dlBulkPurgeTitleOne: '{n} दस्तावेज़ को हमेशा के लिए हटाएं?',
+  dlBulkPurgeTitleOther: '{n} दस्तावेज़ों को हमेशा के लिए हटाएं?',
+  dlBulkPurgeDescription:
+    'इसे वापस नहीं लाया जा सकता। जिन आइटम को आप प्रबंधित नहीं कर सकते, उन्हें छोड़ दिया जाएगा।',
+  dlBulkDonePurge: '{ok}/{total} दस्तावेज़ हमेशा के लिए हटाए गए',
 } satisfies Record<keyof typeof zh, string>

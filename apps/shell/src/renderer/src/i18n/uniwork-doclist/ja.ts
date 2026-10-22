@@ -139,4 +139,16 @@ export const ja = {
   dlCopyFailed: 'コピーを作成できませんでした。何も変更されていません。',
   dlCopyDone: 'コピー "{title}" を作成しました',
   dlCopyUnavailable: 'このデプロイ環境では、コピー機能はまだ利用できません。',
+  dlPurgeTitle: '{title} を完全に削除しますか?',
+  dlPurgeDescription: 'この項目は完全に削除され、元に戻すことはできません。',
+  dlPurgeFolderDescription:
+    'このフォルダーは完全に削除され、元に戻すことはできません。内容のうち管理権限のない項目はごみ箱に残ります。',
+  dlPurgeSubmit: '完全に削除',
+  dlPurgeSubmitting: '完全に削除しています…',
+  dlPurgeDone: '{title} を完全に削除しました',
+  dlPurgeFailed: '削除できませんでした。何も変更されていません。',
+  dlBulkPurgeTitleOne: '{n} 件のドキュメントを完全に削除しますか?',
+  dlBulkPurgeTitleOther: '{n} 件のドキュメントを完全に削除しますか?',
+  dlBulkPurgeDescription: 'この操作は元に戻せません。管理できない項目はスキップされます。',
+  dlBulkDonePurge: '{ok}/{total} 件のドキュメントを完全に削除しました',
 } satisfies Record<keyof typeof zh, string>
