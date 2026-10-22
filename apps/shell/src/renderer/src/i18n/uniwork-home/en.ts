@@ -165,6 +165,8 @@ export const en = {
   fuDlgRefusalTitleFiles: 'These files can’t be uploaded',
   fuDlgShare: 'Share with workspace',
   fuDlgShareHintFolder: 'Applies to every file in this upload. The folders stay private.',
+  fuDlgShareHintWorkspace:
+    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
   fuDlgShareHintFiles: 'Applies to every file in this upload.',
   fuDlgShareInherited: 'The destination folder is shared with the workspace, so the files are too.',
   fuDlgStarting: 'Preparing…',

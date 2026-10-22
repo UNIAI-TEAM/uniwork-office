@@ -167,6 +167,8 @@ export const pt = {
   fuDlgRefusalTitleFiles: 'Não é possível enviar estes arquivos',
   fuDlgShare: 'Compartilhar com o espaço de trabalho',
   fuDlgShareHintFolder: 'Vale para todos os arquivos deste envio. As pastas continuam privadas.',
+  fuDlgShareHintWorkspace:
+    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
   fuDlgShareHintFiles: 'Vale para todos os arquivos deste envio.',
   fuDlgShareInherited:
     'A pasta de destino está compartilhada com o espaço de trabalho, então os arquivos também estão.',

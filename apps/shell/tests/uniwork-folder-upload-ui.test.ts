@@ -246,7 +246,8 @@ describe('folder / multi-file upload screens', () => {
       )
       const share = d.querySelector<HTMLElement>('[role="switch"]')!
       expect(share.getAttribute('aria-checked')).toBe('false')
-      expect(d.textContent).toContain('Thư mục vẫn riêng tư.')
+      // the default destination is a plain folder of the workspace area
+      expect(d.textContent).toContain('Thư mục mới sẽ hiện với cả workspace.')
       expect(buttonNamed('Hủy', d)).toBeTruthy()
       expect(buttonNamed('Tải lên', d)).toBeTruthy()
       expect(d.querySelector('[data-testid="folder-upload-renamed"]')).toBeNull()
@@ -1259,6 +1260,65 @@ describe('folder / multi-file upload screens', () => {
       await act(async () => controller.retry('run-1'))
       await act(async () => bridge.emit(progressOf({ phase: 'done', done: 40 })))
       expect(announce).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('the share hint follows the destination (UNI-2075, ADR 0037)', () => {
+    const hintOf = () => {
+      const share = dialog()!.querySelector<HTMLElement>('[role="switch"]')!
+      return document.getElementById(share.getAttribute('aria-describedby')!)?.textContent
+    }
+    const target = (extra: { myFolder?: true; inMyFolder?: true }) => ({
+      workspaceId: 'ws-1',
+      folderId: 'f-x',
+      label: 'Báo cáo HĐQT Q4',
+      ...extra,
+    })
+
+    it.each([
+      ['vi', 'Áp dụng cho mọi tệp trong lần tải lên này. Thư mục vẫn riêng tư.'],
+      ['en', 'Applies to every file in this upload. The folders stay private.'],
+    ] as const)('My Folder itself keeps the private-folders sentence (%s)', async (lang, text) => {
+      await mount(lang)
+      await stage(preflightOf({ target: target({ myFolder: true, inMyFolder: true }) }))
+      expect(hintOf()).toBe(text)
+    })
+
+    it('a folder inside My Folder keeps the private-folders sentence', async () => {
+      await mount('en')
+      await stage(preflightOf({ target: target({ inMyFolder: true }) }))
+      expect(hintOf()).toBe('Applies to every file in this upload. The folders stay private.')
+    })
+
+    it.each([
+      ['vi', 'Áp dụng cho mọi tệp trong lần tải lên này. Thư mục mới sẽ hiện với cả workspace.'],
+      [
+        'en',
+        'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+      ],
+    ] as const)(
+      'a destination in the workspace area says the folders are visible (%s)',
+      async (lang, text) => {
+        await mount(lang)
+        await stage(preflightOf({ target: target({}) }))
+        expect(hintOf()).toBe(text)
+      },
+    )
+
+    it('an already shared destination keeps the inherited sentence over both hints', async () => {
+      await mount('en')
+      await stage(preflightOf({ target: target({}), parentShared: true }))
+      expect(hintOf()).toBe(
+        'The destination folder is shared with the workspace, so the files are too.',
+      )
+      await stage(preflightOf({ target: target({ inMyFolder: true }), parentShared: true }))
+      expect(hintOf()).toContain('is shared with the workspace')
+    })
+
+    it('files mode keeps the files sentence whatever the destination', async () => {
+      await mount('en')
+      await stage(preflightOf({ mode: 'files', rootName: undefined, target: target({}) }))
+      expect(hintOf()).toBe('Applies to every file in this upload.')
     })
   })
 

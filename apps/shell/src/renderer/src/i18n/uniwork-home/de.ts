@@ -171,6 +171,8 @@ export const de = {
   fuDlgRefusalTitleFiles: 'Diese Dateien können nicht hochgeladen werden',
   fuDlgShare: 'Mit Arbeitsbereich teilen',
   fuDlgShareHintFolder: 'Gilt für jede Datei in diesem Upload. Die Ordner bleiben privat.',
+  fuDlgShareHintWorkspace:
+    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
   fuDlgShareHintFiles: 'Gilt für jede Datei in diesem Upload.',
   fuDlgShareInherited: 'Der Zielordner ist mit dem Arbeitsbereich geteilt, daher auch die Dateien.',
   fuDlgStarting: 'Wird vorbereitet…',

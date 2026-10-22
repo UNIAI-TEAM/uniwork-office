@@ -169,6 +169,8 @@ export const hi = {
   fuDlgRefusalTitleFiles: 'ये फ़ाइलें अपलोड नहीं की जा सकतीं',
   fuDlgShare: 'कार्यस्थान के साथ साझा करें',
   fuDlgShareHintFolder: 'इस अपलोड की हर फ़ाइल पर लागू होगा। फ़ोल्डर निजी रहेंगे।',
+  fuDlgShareHintWorkspace:
+    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
   fuDlgShareHintFiles: 'इस अपलोड की हर फ़ाइल पर लागू होगा।',
   fuDlgShareInherited: 'गंतव्य फ़ोल्डर कार्यस्थान के साथ साझा है, इसलिए फ़ाइलें भी साझा होंगी।',
   fuDlgStarting: 'तैयार हो रहा है…',

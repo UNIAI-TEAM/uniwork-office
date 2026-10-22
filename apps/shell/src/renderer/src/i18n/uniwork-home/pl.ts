@@ -169,6 +169,8 @@ export const pl = {
   fuDlgRefusalTitleFiles: 'Nie można przesłać tych plików',
   fuDlgShare: 'Udostępnij obszarowi roboczemu',
   fuDlgShareHintFolder: 'Dotyczy każdego pliku w tym przesłaniu. Foldery pozostają prywatne.',
+  fuDlgShareHintWorkspace:
+    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
   fuDlgShareHintFiles: 'Dotyczy każdego pliku w tym przesłaniu.',
   fuDlgShareInherited: 'Folder docelowy jest udostępniony obszarowi roboczemu, więc pliki również.',
   fuDlgStarting: 'Przygotowywanie…',
