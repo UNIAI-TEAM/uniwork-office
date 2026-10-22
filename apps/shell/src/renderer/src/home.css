@@ -6959,6 +6959,7 @@ html[dir='rtl'] .quick-title-row {
 .wb-inbox-row {
   gap: 0;
   align-items: stretch;
+  padding-block: 0;
   padding-inline: 0 8px;
 }
 
