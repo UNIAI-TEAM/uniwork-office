@@ -208,7 +208,12 @@ export function createIpcSenderGuard(deps: IpcSenderGuardDeps): IpcSenderGuard {
           return overrides[prop]
         }
         const value: unknown = Reflect.get(target, prop, receiver)
-        return typeof value === 'function' ? value.bind(target) : value
+        if (typeof value !== 'function') return value
+        // Chainable methods (removeAllListeners, setMaxListeners) return the raw target: keep the guard.
+        return (...args: unknown[]) => {
+          const result: unknown = value.apply(target, args)
+          return result === target ? proxy : result
+        }
       },
     })
     return proxy
