@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { app, clipboard, dialog, type BrowserWindow } from 'electron'
+import { app, clipboard, dialog, type BrowserWindow, type IpcMain } from 'electron'
 import {
   agentTarget,
   bundledSkillFrom,
@@ -17,7 +17,6 @@ import {
 import { CLI_COMMAND, inspectCliLink, linkTarget } from '@genoffice/cli/install'
 import { readAppSettings, writeAppSetting } from './app-settings'
 import { isEphemeralInstall } from './cli-link'
-import type { IpcMainLike } from './ipc-sender-guard'
 import { isInstallableSkillDir } from './skill-target'
 import {
   INTEGRATIONS_CHANNELS,
@@ -39,7 +38,10 @@ export interface IntegrationsDeps {
 }
 
 /** Settings → Integrations: probe, install, uninstall, zip. No write happens without a click in that pane. */
-export function registerIntegrationsIpc(ipc: IpcMainLike, deps: IntegrationsDeps): void {
+export function registerIntegrationsIpc(
+  ipc: Pick<IpcMain, 'handle'>,
+  deps: IntegrationsDeps,
+): void {
   const bundled = (): BundledSkill => bundledSkillFrom(readFileSync(deps.skillPath))
   const ledger = (): SkillLedger => ledgerFromSettings(readAppSettings(deps.settingsPath()))
   const saveLedger = (l: SkillLedger) => writeAppSetting(deps.settingsPath(), LEDGER_KEY, l)
@@ -52,7 +54,7 @@ export function registerIntegrationsIpc(ipc: IpcMainLike, deps: IntegrationsDeps
   const stateOf = (skillsDir: string): SkillInstallState =>
     readInstallState(skillsDir, bundled(), ledger())
 
-  ipc.handle?.(INTEGRATIONS_CHANNELS.status, (): IntegrationsStatus => {
+  ipc.handle(INTEGRATIONS_CHANNELS.status, (): IntegrationsStatus => {
     const skill = bundled()
     const l = ledger()
     const launcher = join(deps.cliDir, process.platform === 'win32' ? 'genoffice.cmd' : 'genoffice')
@@ -71,7 +73,7 @@ export function registerIntegrationsIpc(ipc: IpcMainLike, deps: IntegrationsDeps
     }
   })
 
-  ipc.handle?.(
+  ipc.handle(
     INTEGRATIONS_CHANNELS.installSkill,
     (_e, target: { agentId?: AgentId; dir?: string }): SkillInstallState => {
       const skillsDir = target.dir ?? agentTarget(target.agentId!)?.skillsDir
@@ -86,7 +88,7 @@ export function registerIntegrationsIpc(ipc: IpcMainLike, deps: IntegrationsDeps
     },
   )
 
-  ipc.handle?.(INTEGRATIONS_CHANNELS.uninstallSkill, (_e, agentId: AgentId): SkillInstallState => {
+  ipc.handle(INTEGRATIONS_CHANNELS.uninstallSkill, (_e, agentId: AgentId): SkillInstallState => {
     const target = agentTarget(agentId)
     if (!target) throw new Error('unknown skill target')
     const l = ledger()
@@ -95,7 +97,7 @@ export function registerIntegrationsIpc(ipc: IpcMainLike, deps: IntegrationsDeps
   })
 
   // dialog titles come from the renderer, which owns the UI language
-  ipc.handle?.(
+  ipc.handle(
     INTEGRATIONS_CHANNELS.pickSkillDir,
     async (_e, title: string): Promise<string | null> => {
       const opts: Electron.OpenDialogOptions = {
@@ -110,7 +112,7 @@ export function registerIntegrationsIpc(ipc: IpcMainLike, deps: IntegrationsDeps
     },
   )
 
-  ipc.handle?.(
+  ipc.handle(
     INTEGRATIONS_CHANNELS.saveSkillZip,
     async (_e, title: string): Promise<string | null> => {
       const skill = bundled()
@@ -127,7 +129,7 @@ export function registerIntegrationsIpc(ipc: IpcMainLike, deps: IntegrationsDeps
     },
   )
 
-  ipc.handle?.(INTEGRATIONS_CHANNELS.copyText, (_e, text: string): void => {
+  ipc.handle(INTEGRATIONS_CHANNELS.copyText, (_e, text: string): void => {
     if (typeof text === 'string') clipboard.writeText(text)
   })
 }

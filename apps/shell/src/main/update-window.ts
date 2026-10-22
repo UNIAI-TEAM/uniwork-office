@@ -1,8 +1,7 @@
 import { join } from 'node:path'
-import { BrowserWindow, type WebContents } from 'electron'
+import { BrowserWindow, type IpcMain, type WebContents } from 'electron'
 import type { UpdateUiState } from '../shared/update-api'
 import { UPDATE_CHANNELS } from '../shared/update-api'
-import type { IpcMainLike } from './ipc-sender-guard'
 
 /**
  * The update window: a frameless card centered over the shell window —
@@ -57,13 +56,13 @@ function broadcastState(): void {
  * error. The dialog's own channels read `actions`, which is only assigned
  * alongside the window, so their handlers tolerate `actions == null`.
  */
-export function registerUpdateIpc(ipc: IpcMainLike): void {
-  ipc.handle?.(UPDATE_CHANNELS.getState, () => currentState)
+export function registerUpdateIpc(ipc: Pick<IpcMain, 'handle'>): void {
+  ipc.handle(UPDATE_CHANNELS.getState, () => currentState)
   // Settings → About "update to vX": surface the dialog again (it may have
   // been minimized) and, when nothing has started yet, start the download.
   // Returns false while no update is known — the settings button stays
   // hidden in that state, so callers treat it as a no-op.
-  ipc.handle?.(UPDATE_CHANNELS.openForUpdate, (): boolean => {
+  ipc.handle(UPDATE_CHANNELS.openForUpdate, (): boolean => {
     if (!currentState) return false
     if (updateWin && !updateWin.isDestroyed()) {
       updateWin.show()
@@ -75,10 +74,10 @@ export function registerUpdateIpc(ipc: IpcMainLike): void {
     if (currentState.phase === 'available' || currentState.phase === 'error') actions?.onDownload()
     return true
   })
-  ipc.handle?.(UPDATE_CHANNELS.download, () => actions?.onDownload())
-  ipc.handle?.(UPDATE_CHANNELS.install, () => actions?.onInstall())
-  ipc.handle?.(UPDATE_CHANNELS.later, () => actions?.onLater())
-  ipc.handle?.(UPDATE_CHANNELS.openDownload, () => actions?.onOpenDownload())
+  ipc.handle(UPDATE_CHANNELS.download, () => actions?.onDownload())
+  ipc.handle(UPDATE_CHANNELS.install, () => actions?.onInstall())
+  ipc.handle(UPDATE_CHANNELS.later, () => actions?.onLater())
+  ipc.handle(UPDATE_CHANNELS.openDownload, () => actions?.onOpenDownload())
 }
 
 /** the live update window's webContents, read per call (null while it is closed); the own-window sender policy uses it */

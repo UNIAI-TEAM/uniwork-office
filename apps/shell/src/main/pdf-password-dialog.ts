@@ -1,8 +1,7 @@
 import { join } from 'node:path'
-import { BrowserWindow, type WebContents } from 'electron'
+import { BrowserWindow, type IpcMain, type WebContents } from 'electron'
 import type { PdfPasswordUiState } from '../shared/pdf-password-api'
 import { PDF_PASSWORD_CHANNELS } from '../shared/pdf-password-api'
-import type { IpcMainLike } from './ipc-sender-guard'
 
 /**
  * Password prompt for encrypted PDFs (P23): a frameless modal card centered
@@ -29,14 +28,14 @@ function settle(password: string | null): void {
  * composition passes the sender-guarded object). Every handler is safe with no
  * pending prompt: state is null and settle() is a no-op.
  */
-export function registerPdfPasswordIpc(ipc: IpcMainLike): void {
-  ipc.handle?.(PDF_PASSWORD_CHANNELS.getState, () => currentState)
-  ipc.handle?.(PDF_PASSWORD_CHANNELS.submit, (_event, password: unknown) => {
+export function registerPdfPasswordIpc(ipc: Pick<IpcMain, 'handle'>): void {
+  ipc.handle(PDF_PASSWORD_CHANNELS.getState, () => currentState)
+  ipc.handle(PDF_PASSWORD_CHANNELS.submit, (_event, password: unknown) => {
     if (typeof password !== 'string') return
     pushState({ busy: true })
     settle(password)
   })
-  ipc.handle?.(PDF_PASSWORD_CHANNELS.cancel, () => {
+  ipc.handle(PDF_PASSWORD_CHANNELS.cancel, () => {
     settle(null)
     closePdfPasswordDialog()
   })
