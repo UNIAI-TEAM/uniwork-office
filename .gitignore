@@ -23,6 +23,7 @@ electron-builder.env
 /probe*.mjs
 /apps/shell/build/THIRD-PARTY-NOTICES.txt
 /apps/shell/build/deployment-defaults.json
+/apps/shell/build/apt/uniwork-office.sources
 /example/
 /.task/
 /docs-archive/

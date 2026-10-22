@@ -7,13 +7,21 @@
  * https://github.com/<owner>/<repo> URL selects electron-updater's github
  * provider (the GitHub Releases of that repository, where the dev / beta
  * installers are published); any other HTTPS base URL is a generic provider
- * prefix that serves latest.yml / latest-mac.yml (a CDN). The release workflow
+ * prefix that serves latest.yml / latest-mac.yml (a CDN); the self-hosted feed
+ * https://uniworkos.com/downloads/office/update gets the channel directory
+ * appended (update/dev, update/beta, update/stable). The release workflow
  * sets it; for local builds put it in apps/shell/electron-builder.env
  * (gitignored) — the electron-builder CLI loads that file automatically.
  *
  * When the variable is unset (forks, PR smoke builds, plain local packaging)
  * the publish config is omitted: electron-builder then bakes no
  * app-update.yml into the app and in-app auto-update stays disabled.
+ *
+ * UNIWORK_APT_SOURCE — "true" makes a dev / beta release deb ship the apt source
+ * for its channel (resources/apt/uniwork-office.sources) that its postinst
+ * installs. Off (unset or any other value) until the apt repository is live:
+ * a deb that registered a source for a repository that answers 404 would break
+ * `apt update` on the user's machine. The apt keyring ships either way.
  *
  * GENOFFICE_FONT_CDN_URL — base URL for the curated downloadable-font catalog.
  * Official release jobs inject it through extraMetadata so the endpoint stays
@@ -683,6 +691,12 @@ const config = {
         from: '../sheets/native/xlsx-engine/target/release/xlsx-sidecar',
         to: 'native/xlsx-sidecar',
       },
+      // public key of the signed apt repository; the deb postinst installs it
+      // under /usr/share/keyrings (build/linux-after-install.sh)
+      {
+        from: 'build/apt/uniwork-office-archive-keyring.gpg',
+        to: 'apt/uniwork-office-archive-keyring.gpg',
+      },
     ],
   },
   // Same scoped-name problem as executableName above: the default deb
@@ -731,6 +745,7 @@ const config = {
   },
   beforePack: async (context) => {
     writeDeploymentDefaults()
+    writeAptSources()
     ensurePlatformHelpers()
     assertExtraResourceSources()
     ensureThirdPartyNotices()
@@ -809,6 +824,7 @@ const RELEASE_SIGNING_ENV = [
   'APPLE_KEYCHAIN_PROFILE',
 ]
 const releaseChannel = process.env.UNIWORK_RELEASE_CHANNEL
+const aptSourceEnabled = Boolean(releaseChannel) && process.env.UNIWORK_APT_SOURCE === 'true'
 if (releaseChannel) {
   if (!RELEASE_CHANNELS.includes(releaseChannel)) {
     throw new Error(
@@ -860,6 +876,16 @@ if (releaseChannel) {
   config.linux.target = config.linux.target.filter((entry) => entry.target !== 'rpm')
   config.appImage = { artifactName: 'UniWork-Office_${version}_unsigned_linux_x64.${ext}' }
   config.deb.artifactName = 'UniWork-Office_${version}_unsigned_linux_x64.${ext}'
+  // With UNIWORK_APT_SOURCE=true release debs also ship the apt source for
+  // their channel; the postinst installs it, so `apt upgrade` delivers the next
+  // build. Without it (repository not live yet) and in local builds the deb
+  // ships none and its postinst finds no file and writes nothing.
+  if (aptSourceEnabled) {
+    config.linux.extraResources.push({
+      from: 'build/apt/uniwork-office.sources',
+      to: 'apt/uniwork-office.sources',
+    })
+  }
   // A dev / beta build signs in with the scheme of its deployment profile's
   // channel (uniwork-office-dev for dev profiles), so it declares that scheme
   // too: on Linux the .desktop MimeType is what routes the callback.
@@ -879,6 +905,30 @@ function writeDeploymentDefaults() {
   )
 }
 
+/** The apt repository the release debs update from (tools/release/apt-repo.sh fills it). */
+const APT_REPO_URL = 'https://uniworkos.com/downloads/office/apt'
+const APT_KEYRING_PATH = '/usr/share/keyrings/uniwork-office-archive-keyring.gpg'
+
+/** deb822 source for one channel (suite = channel). The first line marks the file as ours for the postinst / postrm. */
+function aptSourcesText(channel) {
+  return [
+    '# managed by uniwork-office',
+    'Types: deb',
+    `URIs: ${APT_REPO_URL}`,
+    `Suites: ${channel}`,
+    'Components: main',
+    'Architectures: amd64',
+    `Signed-By: ${APT_KEYRING_PATH}`,
+    '',
+  ].join('\n')
+}
+
+/** resources/apt/uniwork-office.sources, only with UNIWORK_APT_SOURCE=true (see the release block). */
+function writeAptSources() {
+  if (!aptSourceEnabled) return
+  writeFileSync(join(__dirname, 'build/apt/uniwork-office.sources'), aptSourcesText(releaseChannel))
+}
+
 /** A release build must ship `<apps/shell version>-<channel>.<n>` (-c.extraMetadata.version). */
 function assertReleaseVersion() {
   if (!releaseChannel) return
@@ -893,6 +943,8 @@ function assertReleaseVersion() {
   }
 }
 
+// The self-hosted update feed (object storage behind the uniworkos.com edge route).
+const OFFICE_UPDATE_FEED_URL = 'https://uniworkos.com/downloads/office/update'
 const GITHUB_REPOSITORY_URL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)$/
 
 /**
@@ -901,11 +953,19 @@ const GITHUB_REPOSITORY_URL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z
  * <channel>.yml / <channel>-linux.yml next to the installers and app-update.yml
  * carries the channel, so a dev build only ever reads dev feeds. On GitHub the
  * updater picks the newest release whose tag has the same pre-release id
- * (v<version>-dev.<n>), so beta and stable never pick a dev build.
+ * (v<version>-dev.<n>), so beta and stable never pick a dev build. The
+ * self-hosted OFFICE_UPDATE_FEED_URL gets its channel directory appended; any
+ * other generic URL is the feed prefix as given.
  */
 function updatePublishConfig(url, channel) {
   const github = GITHUB_REPOSITORY_URL.exec(url)
   if (github) return { provider: 'github', owner: github[1], repo: github[2], channel }
+  if (url === OFFICE_UPDATE_FEED_URL) {
+    // one directory per channel: update/<channel>/<channel>.yml (dev.yml, beta.yml) and, for
+    // stable, update/stable/latest.yml (the file electron-updater reads when no channel is set)
+    const dir = channel === 'latest' ? 'stable' : channel
+    return { provider: 'generic', url: `${url}/${dir}`, channel }
+  }
   return { provider: 'generic', url, channel }
 }
 

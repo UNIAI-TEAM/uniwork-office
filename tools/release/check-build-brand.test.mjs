@@ -387,6 +387,89 @@ describe('checkBuildDir', () => {
     })
   })
 
+  describe('with --update-feed generic:https://uniworkos.com/downloads/office/update/dev', () => {
+    const feedUrl = 'https://uniworkos.com/downloads/office/update/dev'
+    const feed = parseUpdateFeed(`generic:${feedUrl}`)
+    const genericYml = (url = feedUrl) =>
+      `provider: generic\nurl: ${url}\nchannel: dev\nupdaterCacheDirName: uniwork-office-updater\n`
+    const installer = 'UniWork-Office_0.11.0-dev.0_unsigned_win32_x64-setup.exe'
+    const channelYml = `version: 0.11.0-dev.0\nfiles:\n  - url: ${installer}\n    sha512: x\n    size: 1\npath: ${installer}\n`
+
+    it('parses the generic feed and drops a trailing slash', () => {
+      assert.deepEqual(feed, { provider: 'generic', url: feedUrl })
+      assert.deepEqual(parseUpdateFeed(`generic:${feedUrl}/`), feed)
+    })
+
+    it('passes a generic app-update.yml on exactly that url and a channel file listing the installer', async () => {
+      const root = await fakeWindowsOutput({ updateFeed: genericYml() })
+      writeFileSync(join(root, 'dev.yml'), channelYml)
+      const result = checkBuildDir(root, { updateFeed: feed })
+      assert.deepEqual(result.problems, [])
+      assert.ok(result.checked.includes('win-unpacked app-update.yml'))
+    })
+
+    it('flags a missing feed, another url, the channel directory missing and a github feed', async () => {
+      for (const [updateFeed, expected] of [
+        [false, 'hold no app-update.yml (expected the generic feed)'],
+        [
+          genericYml('https://uniworkos.com/downloads/office/update/beta'),
+          `expected generic:${feedUrl}`,
+        ],
+        [
+          genericYml('https://uniworkos.com/downloads/office/update'),
+          `expected generic:${feedUrl}`,
+        ],
+        [
+          'owner: UNIAI-TEAM\nrepo: uniwork-office\nprovider: github\n',
+          `expected generic:${feedUrl}`,
+        ],
+      ]) {
+        const result = checkBuildDir(await fakeWindowsOutput({ updateFeed }), { updateFeed: feed })
+        assert.ok(
+          result.problems.some((p) => p.includes(expected)),
+          `${expected}: ${result.problems}`,
+        )
+      }
+    })
+
+    it('flags a channel file listing a name that is not in the output', async () => {
+      const root = await fakeWindowsOutput({ updateFeed: genericYml() })
+      writeFileSync(join(root, 'dev.yml'), channelYml.replaceAll(installer, 'other-setup.exe'))
+      const result = checkBuildDir(root, { updateFeed: feed })
+      assert.ok(result.problems.some((p) => p.includes('which is not in the output')))
+    })
+
+    it('expects no feed and no release feed in the mac app', async () => {
+      const clean = checkBuildDir(await fakeMacOutput({ arches: ['arm64'] }), { updateFeed: feed })
+      assert.deepEqual(clean.problems, [])
+      const withFeed = checkBuildDir(await fakeMacOutput({ arches: ['arm64'], updateFeed: true }), {
+        updateFeed: feed,
+      })
+      assert.ok(withFeed.problems.some((p) => p.includes('auto-update must stay off')))
+      const withNotice = checkBuildDir(
+        await fakeMacOutput({
+          arches: ['arm64'],
+          pkg: {
+            uniworkReleaseFeed: { owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'dev' },
+          },
+        }),
+        { updateFeed: feed },
+      )
+      assert.ok(withNotice.problems.some((p) => p.includes('carries uniworkReleaseFeed')))
+    })
+
+    it('refuses a generic feed that is not a plain https url', () => {
+      for (const value of [
+        'generic:http://uniworkos.com/downloads/office/update/dev',
+        'generic:https://user:pass@uniworkos.com/update',
+        'generic:https://uniworkos.com/update?x=1',
+        'generic:',
+      ]) {
+        assert.throws(() => parseUpdateFeed(value), /--update-feed/)
+      }
+    })
+  })
+
   it('flags a dev channel file when no feed is expected', async () => {
     const root = await fakeWindowsOutput()
     writeFileSync(join(root, 'dev.yml'), 'version: 0.11.0-dev.0\n')
