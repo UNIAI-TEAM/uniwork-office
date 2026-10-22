@@ -329,6 +329,43 @@ describe('Ask UNI as a mode of an editor AI panel', () => {
       expect(count()).toBe(1)
     })
 
+    it('stop, ask the same question again, stop: the live turn stays visible until the reload', async () => {
+      const { bridge, emit } = streamingBridge()
+      await mount()
+      await click(toggle())
+      const stopped = (content: string) =>
+        (bridge.askUniDocMessages as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+          async () => ({
+            ok: true as const,
+            messages: [
+              { id: 'u1', role: 'user', content: 'Who owns billing?', citations: [] },
+              { id: 'a1', role: 'assistant', content, citations: [], notice: 'stopped' },
+            ],
+          }),
+        )
+      const stopTurn = async (requestId: string, partial: string) => {
+        await act(async () => {
+          emit({ type: 'run', requestId, conversationId: 'c1', runId: 'x' })
+          emit({ type: 'delta', requestId, text: partial })
+        })
+        // the Stop button ignores a press right after it took the send button's place
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 350))
+        })
+        await click(stopButton())
+      }
+      await ask('Who owns billing?')
+      stopped('First partial')
+      await stopTurn('r1', 'First partial')
+      // the post-Stop reload lands: the store now ends with the first stopped turn
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 1800))
+      })
+      await ask('Who owns billing?')
+      await stopTurn('r2', 'Second partial')
+      expect(host.textContent).toContain('Second partial')
+    })
+
     it('a whole-panel unmount cancels a running turn', async () => {
       const { bridge } = streamingBridge()
       await mount()
