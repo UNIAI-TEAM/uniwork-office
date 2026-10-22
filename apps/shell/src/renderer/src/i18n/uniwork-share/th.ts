@@ -208,6 +208,7 @@ export const th = {
   shrOwnerNoCandidates: 'ไม่มีสมาชิกคนอื่นที่รับเอกสารนี้ได้',
   shrOwnerLoading: 'กำลังโหลด…',
   shrOwnerFailed: 'โอนความเป็นเจ้าของไม่สำเร็จ โปรดลองอีกครั้ง',
+  shrOwnerCandidatesFailed: 'โหลดรายชื่อสมาชิกไม่สำเร็จ ปิดแล้วลองอีกครั้ง',
   shrOwnerOwnedByWorkProduct: 'เอกสารนี้เป็นของผลงาน จึงเปลี่ยนเจ้าของไม่ได้',
   shrOwnerUnavailable: 'เซิร์ฟเวอร์นี้ยังไม่รองรับการโอนความเป็นเจ้าของ',
 } satisfies Record<keyof typeof zh, string>

@@ -36,6 +36,9 @@ export const pt = {
   wbNotif_document_shared_untitled: '{actor} compartilhou um documento com você ({level}).',
   wbNotif_document_shared_nolevel: '{actor} compartilhou “{document}” com você.',
   wbNotif_document_shared_untitled_nolevel: '{actor} compartilhou um documento com você.',
+  wbNotif_document_owner_transferred: '{actor} transferiu a você a propriedade de “{document}”.',
+  wbNotif_document_owner_transferred_untitled:
+    '{actor} transferiu a você a propriedade de um documento.',
   wbNotif_document_trashed_by_other:
     '{actor} moveu seu documento para a lixeira. Restaure-o antes de {date}',
   wbNotif_document_trashed_by_other_untitled:

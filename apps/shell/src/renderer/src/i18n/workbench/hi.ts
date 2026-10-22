@@ -38,6 +38,9 @@ export const hi = {
   wbNotif_document_shared_untitled: '{actor} ने एक दस्तावेज़ आपके साथ साझा किया ({level})।',
   wbNotif_document_shared_nolevel: '{actor} ने “{document}” आपके साथ साझा किया।',
   wbNotif_document_shared_untitled_nolevel: '{actor} ने एक दस्तावेज़ आपके साथ साझा किया।',
+  wbNotif_document_owner_transferred: '{actor} ने “{document}” का स्वामित्व आपको सौंप दिया।',
+  wbNotif_document_owner_transferred_untitled:
+    '{actor} ने एक दस्तावेज़ का स्वामित्व आपको सौंप दिया।',
   wbNotif_document_trashed_by_other:
     '{actor} ने आपका दस्तावेज़ ट्रैश में डाल दिया। {date} से पहले उसे पुनर्स्थापित करें',
   wbNotif_document_trashed_by_other_untitled:

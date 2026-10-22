@@ -212,6 +212,7 @@ export const ms = {
   shrOwnerNoCandidates: 'Tiada ahli lain yang boleh menerima dokumen ini.',
   shrOwnerLoading: 'Memuatkan…',
   shrOwnerFailed: 'Tidak dapat memindahkan pemilikan. Cuba lagi.',
+  shrOwnerCandidatesFailed: 'Tidak dapat memuatkan senarai ahli. Tutup dan cuba lagi.',
   shrOwnerOwnedByWorkProduct:
     'Dokumen ini milik produk kerja, jadi pemiliknya tidak boleh ditukar.',
   shrOwnerUnavailable: 'Pindah milik belum tersedia pada pelayan ini.',

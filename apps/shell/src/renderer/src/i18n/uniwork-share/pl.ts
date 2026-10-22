@@ -215,6 +215,7 @@ export const pl = {
   shrOwnerNoCandidates: 'Żaden inny członek nie może przejąć tego dokumentu.',
   shrOwnerLoading: 'Wczytywanie…',
   shrOwnerFailed: 'Nie udało się przenieść własności. Spróbuj ponownie.',
+  shrOwnerCandidatesFailed: 'Nie udało się załadować członków. Zamknij i spróbuj ponownie.',
   shrOwnerOwnedByWorkProduct:
     'Ten dokument należy do produktu pracy, więc nie można zmienić jego właściciela.',
   shrOwnerUnavailable: 'Przenoszenie własności nie jest jeszcze dostępne na tym serwerze.',

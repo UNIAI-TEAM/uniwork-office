@@ -3027,6 +3027,87 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       )
     })
 
+    describe('UNI-2105: the fetched target carries owner_kind and shelved_at like a listed row', () => {
+      const unlisted = (extra: Record<string, unknown>) => {
+        api.uniworkDocumentProperties = vi.fn(async () =>
+          ok({
+            documentId: 'doc-far',
+            workspaceId: 'ws-1',
+            title: 'Far away.docx',
+            myLevel: 'manage',
+            ownerKind: null,
+            shelvedAt: null,
+            ...extra,
+          }),
+        )
+      }
+      const open = async (documentOptions: { ownerKind?: string; shelved?: boolean }) => {
+        ;(window as unknown as { uniworkShare: unknown }).uniworkShare = createFakeShareApi({
+          documentId: 'doc-far',
+          ...documentOptions,
+        })
+        await mountHome()
+        await act(async () =>
+          openDocumentShare({ documentId: 'doc-far', workspaceId: 'ws-1', section: 'requests' }),
+        )
+        await flush()
+        await flush()
+      }
+      const transferButton = () =>
+        document.querySelector<HTMLButtonElement>('.uw-share [data-owner-transfer]')
+
+      it('an ordinary unlisted document still offers Transfer ownership', async () => {
+        unlisted({})
+        await open({})
+        expect(dialogTitle()).toContain('Far away.docx')
+        expect(transferButton()).not.toBeNull()
+        expect(transferButton()!.getAttribute('aria-disabled')).toBeNull()
+      })
+
+      it('an unlisted work-product document shows no Transfer ownership', async () => {
+        unlisted({ ownerKind: 'work_product' })
+        await open({ ownerKind: 'work_product' })
+        expect(dialogTitle()).toContain('Far away.docx')
+        expect(transferButton()).toBeNull()
+      })
+
+      it('an unlisted shelved document: the button is aria-disabled and the shelved note shows', async () => {
+        unlisted({ shelvedAt: '2026-10-01T09:00:00Z' })
+        await open({ shelved: true })
+        expect(transferButton()).not.toBeNull()
+        expect(transferButton()!.getAttribute('aria-disabled')).toBe('true')
+        const note = document.querySelector('.uw-share .uw-share-note')
+        expect(note?.textContent).toContain('Archived document')
+        expect(transferButton()!.getAttribute('aria-describedby')).toBe(note?.id)
+      })
+    })
+
+    it('UNI-2105: an unlisted trashed document opened from a notice shows no access requests', async () => {
+      api.uniworkDocumentProperties = vi.fn(async () =>
+        ok({
+          documentId: 'doc-far',
+          workspaceId: 'ws-1',
+          title: 'Far away.docx',
+          myLevel: 'manage',
+          ownerKind: null,
+          shelvedAt: null,
+          adminScope: false,
+          archivedAt: '2026-10-02T09:00:00Z',
+        }),
+      )
+      ;(window as unknown as { uniworkShare: unknown }).uniworkShare = createFakeShareApi({
+        documentId: 'doc-far',
+      })
+      await mountHome()
+      await act(async () =>
+        openDocumentShare({ documentId: 'doc-far', workspaceId: 'ws-1', section: 'requests' }),
+      )
+      await flush()
+      await flush()
+      expect(dialogTitle()).toContain('Far away.docx')
+      expect(document.querySelector('.uw-share [data-share-section="requests"]')).toBeNull()
+    })
+
     it('a cold Documents home still gets an intent published before it mounted', async () => {
       useShareFor('doc-far')
       openDocumentShare({ documentId: 'doc-far', workspaceId: 'ws-1', section: 'requests' })

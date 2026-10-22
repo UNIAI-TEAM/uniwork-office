@@ -37,6 +37,8 @@ export const ms = {
   wbNotif_document_shared_untitled: '{actor} berkongsi dokumen dengan anda ({level}).',
   wbNotif_document_shared_nolevel: '{actor} berkongsi “{document}” dengan anda.',
   wbNotif_document_shared_untitled_nolevel: '{actor} berkongsi dokumen dengan anda.',
+  wbNotif_document_owner_transferred: '{actor} memindahkan pemilikan “{document}” kepada anda.',
+  wbNotif_document_owner_transferred_untitled: '{actor} memindahkan pemilikan dokumen kepada anda.',
   wbNotif_document_trashed_by_other:
     '{actor} mengalihkan dokumen anda ke tong sampah. Pulihkan sebelum {date}',
   wbNotif_document_trashed_by_other_untitled:

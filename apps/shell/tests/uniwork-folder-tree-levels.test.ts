@@ -137,6 +137,8 @@ function props(id: string, myLevel: string | null): UniworkDocProperties {
     ownerId: null,
     createdById: null,
     updatedById: null,
+    ownerKind: null,
+    shelvedAt: null,
   }
 }
 

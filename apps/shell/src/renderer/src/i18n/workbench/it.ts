@@ -37,6 +37,9 @@ export const it = {
   wbNotif_document_shared_untitled: '{actor} ha condiviso un documento con te ({level}).',
   wbNotif_document_shared_nolevel: '{actor} ha condiviso «{document}» con te.',
   wbNotif_document_shared_untitled_nolevel: '{actor} ha condiviso un documento con te.',
+  wbNotif_document_owner_transferred: '{actor} ti ha trasferito la proprietà di «{document}».',
+  wbNotif_document_owner_transferred_untitled:
+    '{actor} ti ha trasferito la proprietà di un documento.',
   wbNotif_document_trashed_by_other:
     '{actor} ha spostato il tuo documento nel cestino. Ripristinalo prima del {date}',
   wbNotif_document_trashed_by_other_untitled:

@@ -59,6 +59,8 @@ export interface FakeShareOptions {
     | 'owner_target_not_member'
     | 'break_glass_required'
     | 'document_owned_by_work_product'
+    | 'my_folder_locked'
+    | 'document_shelved'
     | 'server_error'
     | 'endpoint_missing'
 }
@@ -107,6 +109,8 @@ const OWNER_REFUSAL_STATUS = {
   owner_target_not_member: 422,
   break_glass_required: 403,
   document_owned_by_work_product: 409,
+  my_folder_locked: 409,
+  document_shelved: 409,
   server_error: 500,
 } as const
 

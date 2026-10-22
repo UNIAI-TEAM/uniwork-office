@@ -212,6 +212,7 @@ export const hi = {
   shrOwnerNoCandidates: 'कोई अन्य सदस्य यह दस्तावेज़ नहीं ले सकता।',
   shrOwnerLoading: 'लोड हो रहा है…',
   shrOwnerFailed: 'स्वामित्व स्थानांतरित नहीं हो सका। फिर से कोशिश करें।',
+  shrOwnerCandidatesFailed: 'सदस्यों की सूची लोड नहीं हो सकी। बंद करके फिर से कोशिश करें।',
   shrOwnerOwnedByWorkProduct:
     'यह दस्तावेज़ एक कार्य-उत्पाद का है, इसलिए इसका स्वामी नहीं बदला जा सकता।',
   shrOwnerUnavailable: 'इस सर्वर पर स्वामित्व स्थानांतरण अभी उपलब्ध नहीं है।',

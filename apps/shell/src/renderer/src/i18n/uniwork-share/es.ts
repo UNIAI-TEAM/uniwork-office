@@ -214,6 +214,7 @@ export const es = {
   shrOwnerNoCandidates: 'Ningún otro miembro puede recibir este documento.',
   shrOwnerLoading: 'Cargando…',
   shrOwnerFailed: 'No se pudo transferir la propiedad. Inténtalo de nuevo.',
+  shrOwnerCandidatesFailed: 'No se pudieron cargar los miembros. Cierra e inténtalo de nuevo.',
   shrOwnerOwnedByWorkProduct:
     'Este documento pertenece a un producto de trabajo, así que no se puede cambiar su propietario.',
   shrOwnerUnavailable: 'La transferencia de propiedad aún no está disponible en este servidor.',

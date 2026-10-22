@@ -218,6 +218,8 @@ export const de = {
   shrOwnerNoCandidates: 'Kein anderes Mitglied kann dieses Dokument übernehmen.',
   shrOwnerLoading: 'Wird geladen…',
   shrOwnerFailed: 'Eigentümerschaft konnte nicht übertragen werden. Bitte erneut versuchen.',
+  shrOwnerCandidatesFailed:
+    'Die Mitglieder konnten nicht geladen werden. Schließe das Fenster und versuche es erneut.',
   shrOwnerOwnedByWorkProduct:
     'Dieses Dokument gehört zu einem Arbeitsergebnis, daher kann der Eigentümer nicht geändert werden.',
   shrOwnerUnavailable:

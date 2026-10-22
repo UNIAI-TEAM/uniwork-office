@@ -40,6 +40,10 @@ export const de = {
   wbNotif_document_shared_untitled: '{actor} hat ein Dokument mit dir geteilt ({level}).',
   wbNotif_document_shared_nolevel: '{actor} hat „{document}“ mit dir geteilt.',
   wbNotif_document_shared_untitled_nolevel: '{actor} hat ein Dokument mit dir geteilt.',
+  wbNotif_document_owner_transferred:
+    '{actor} hat dir die Inhaberschaft an „{document}“ übertragen.',
+  wbNotif_document_owner_transferred_untitled:
+    '{actor} hat dir die Inhaberschaft an einem Dokument übertragen.',
   wbNotif_document_trashed_by_other:
     '{actor} hat dein Dokument in den Papierkorb verschoben. Stelle es vor dem {date} wieder her',
   wbNotif_document_trashed_by_other_untitled:

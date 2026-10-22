@@ -204,6 +204,7 @@ export const he = {
   shrOwnerNoCandidates: 'אין חבר אחר שיכול לקבל את המסמך הזה.',
   shrOwnerLoading: 'טוען…',
   shrOwnerFailed: 'לא ניתן היה להעביר את הבעלות. נסו שוב.',
+  shrOwnerCandidatesFailed: 'לא ניתן היה לטעון את החברים. סגרו ונסו שוב.',
   shrOwnerOwnedByWorkProduct: 'המסמך הזה שייך לתוצר עבודה, ולכן לא ניתן לשנות את הבעלים שלו.',
   shrOwnerUnavailable: 'העברת בעלות עדיין אינה זמינה בשרת הזה.',
 } satisfies Record<keyof typeof zh, string>

@@ -213,6 +213,7 @@ export const fr = {
   shrOwnerNoCandidates: 'Aucun autre membre ne peut recevoir ce document.',
   shrOwnerLoading: 'Chargement…',
   shrOwnerFailed: 'Impossible de transférer la propriété. Réessayez.',
+  shrOwnerCandidatesFailed: 'Impossible de charger les membres. Fermez et réessayez.',
   shrOwnerOwnedByWorkProduct:
     'Ce document appartient à un livrable, son propriétaire ne peut donc pas être changé.',
   shrOwnerUnavailable: "Le transfert de propriété n'est pas encore disponible sur ce serveur.",

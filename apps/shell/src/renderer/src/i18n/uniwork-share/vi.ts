@@ -212,6 +212,7 @@ export const vi = {
   shrOwnerNoCandidates: 'Không có thành viên nào khác nhận được tài liệu này.',
   shrOwnerLoading: 'Đang tải…',
   shrOwnerFailed: 'Chưa chuyển được quyền sở hữu. Hãy thử lại.',
+  shrOwnerCandidatesFailed: 'Không tải được danh sách thành viên. Hãy đóng và thử lại.',
   shrOwnerOwnedByWorkProduct:
     'Tài liệu này thuộc về một sản phẩm công việc nên không đổi được chủ sở hữu.',
   shrOwnerUnavailable: 'Máy chủ này chưa hỗ trợ chuyển quyền sở hữu.',

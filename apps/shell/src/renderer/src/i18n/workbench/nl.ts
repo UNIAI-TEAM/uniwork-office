@@ -40,6 +40,10 @@ export const nl = {
   wbNotif_document_shared_untitled: '{actor} heeft een document met je gedeeld ({level}).',
   wbNotif_document_shared_nolevel: '{actor} heeft “{document}” met je gedeeld.',
   wbNotif_document_shared_untitled_nolevel: '{actor} heeft een document met je gedeeld.',
+  wbNotif_document_owner_transferred:
+    '{actor} heeft het eigendom van “{document}” aan je overgedragen.',
+  wbNotif_document_owner_transferred_untitled:
+    '{actor} heeft het eigendom van een document aan je overgedragen.',
   wbNotif_document_trashed_by_other:
     '{actor} heeft je document naar de prullenbak verplaatst. Zet het terug vóór {date}',
   wbNotif_document_trashed_by_other_untitled:

@@ -39,6 +39,9 @@ export const fr = {
   wbNotif_document_shared_untitled: '{actor} a partagé un document avec vous ({level}).',
   wbNotif_document_shared_nolevel: '{actor} a partagé « {document} » avec vous.',
   wbNotif_document_shared_untitled_nolevel: '{actor} a partagé un document avec vous.',
+  wbNotif_document_owner_transferred: '{actor} vous a transféré la propriété de « {document} ».',
+  wbNotif_document_owner_transferred_untitled:
+    '{actor} vous a transféré la propriété d’un document.',
   wbNotif_document_trashed_by_other:
     '{actor} a placé votre document dans la corbeille. Restaurez-le avant le {date}',
   wbNotif_document_trashed_by_other_untitled:

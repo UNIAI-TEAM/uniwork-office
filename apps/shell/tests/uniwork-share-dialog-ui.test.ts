@@ -1107,6 +1107,9 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
       ['owner_target_not_member', 422, 'shrOwnerTargetNotMember'],
       ['break_glass_required', 403, 'shrOwnerSelfTransferError'],
       ['document_owned_by_work_product', 409, 'shrOwnerOwnedByWorkProduct'],
+      // UNI-2105: the real route answers these two; the Share dialog's own sentences say them
+      ['my_folder_locked', 409, 'shrErrMyFolderLocked'],
+      ['document_shelved', 409, 'shrShelvedBlocked'],
       ['server_error', 500, 'shrOwnerFailed'],
       ['malformed_response', undefined, 'shrOwnerFailed'],
     ] as const)(
@@ -1185,10 +1188,32 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
       }
       await open({}, target(), 'en', () => broken as unknown as UniworkShareApi)
       await openTransfer()
-      expect(alertText()).toBe(t('shrOwnerFailed', { name: '' }))
+      // FE-10: the list failed to load, which is not a failed transfer
+      expect(alertText()).toBe(t('shrOwnerCandidatesFailed'))
+      expect(alertText()).not.toBe(t('shrOwnerFailed'))
       await click(personInput())
       expect(transferDialog()!.textContent).not.toContain(t('shrOwnerLoading'))
       expect(transferDialog()!.textContent).toContain(t('shrOwnerNoCandidates'))
+    })
+
+    it.each([
+      ['server_error', 500, 'shrOwnerCandidatesFailed'],
+      ['forbidden', 403, 'shrOwnerCandidatesFailed'],
+      ['network', undefined, 'shrOwnerCandidatesFailed'],
+      ['document_owned_by_work_product', 409, 'shrOwnerOwnedByWorkProduct'],
+      ['document_shelved', 409, 'shrShelvedBlocked'],
+      ['my_folder_locked', 409, 'shrErrMyFolderLocked'],
+    ] as const)('FE-10: a refused ownerCandidates (%s) shows %s', async (code, status, k) => {
+      const api = createFakeShareApi()
+      api.failNext('ownerCandidates', {
+        ok: false,
+        error: code,
+        ...(status === undefined ? {} : { status }),
+      })
+      await open({}, target(), 'en', () => api)
+      await openTransfer()
+      expect(alertText()).toBe(t(k))
+      expect(alertText()).not.toBe(t('shrOwnerFailed'))
     })
 
     it('FE-2: Escape and the overlay do nothing while the transfer is in flight', async () => {

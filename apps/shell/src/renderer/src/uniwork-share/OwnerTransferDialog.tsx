@@ -8,7 +8,7 @@ import {
 } from '../../../shared/share-api'
 import { ActionModal } from '../UniworkDocActions'
 import { useI18n, type StringKey } from '../locale'
-import { levelLabel } from './share-model'
+import { levelLabel, shareErrorKey } from './share-model'
 
 /**
  * UNI-2078 slice 4: "Transfer ownership" on the Share dialog's owner row, a clone of the web's
@@ -36,7 +36,7 @@ type Failure = Extract<ShareResult<never>, { ok: false }>
 const bridgeFailed = (): Failure => ({ ok: false, error: 'network' })
 
 /** every refusal has a sentence of ours: the server's own text is English (or internal) */
-function refusalKey(failure: Failure): StringKey {
+function refusalKey(failure: Failure, fallback: StringKey = 'shrOwnerFailed'): StringKey {
   if (failure.endpointMissing) return 'shrOwnerUnavailable'
   switch (failure.error) {
     case 'owner_target_not_member':
@@ -45,8 +45,12 @@ function refusalKey(failure: Failure): StringKey {
       return 'shrOwnerSelfTransferError'
     case 'document_owned_by_work_product':
       return 'shrOwnerOwnedByWorkProduct'
+    case 'my_folder_locked':
+    case 'document_shelved':
+      // the real route answers both (UNI-2084): the Share dialog's own sentence says them
+      return shareErrorKey(failure.error) ?? fallback
     default:
-      return 'shrOwnerFailed'
+      return fallback
   }
 }
 
@@ -146,7 +150,8 @@ function OwnerTransferDialog({
         if (res.ok) setCandidates(res.value)
         else {
           setCandidates([])
-          setError({ key: refusalKey(res), name: '' })
+          // the member list failed to load: that is not a failed transfer
+          setError({ key: refusalKey(res, 'shrOwnerCandidatesFailed'), name: '' })
         }
       })
     return () => {

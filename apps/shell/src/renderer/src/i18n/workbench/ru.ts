@@ -37,6 +37,9 @@ export const ru = {
   wbNotif_document_shared_untitled: '{actor} открыл(а) вам доступ к документу ({level}).',
   wbNotif_document_shared_nolevel: '{actor} открыл(а) вам доступ к «{document}».',
   wbNotif_document_shared_untitled_nolevel: '{actor} открыл(а) вам доступ к документу.',
+  wbNotif_document_owner_transferred: '{actor} передал(а) вам права владельца на «{document}».',
+  wbNotif_document_owner_transferred_untitled:
+    '{actor} передал(а) вам права владельца на документ.',
   wbNotif_document_trashed_by_other:
     '{actor} переместил(а) ваш документ в корзину. Восстановите его до {date}',
   wbNotif_document_trashed_by_other_untitled:

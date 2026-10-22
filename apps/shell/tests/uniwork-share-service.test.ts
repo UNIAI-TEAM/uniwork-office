@@ -1000,3 +1000,127 @@ describe('owner transfer through the real client, admin on a restricted document
     expect(seen.some((line) => line.startsWith('PUT '))).toBe(false)
   })
 })
+
+/**
+ * UNI-2105 (BE-5 folded in): the REAL client + service against the answer shapes the merged UNI-2084
+ * route sends (`PUT /documents/{id}/owner`, D root 098585e7f). Every coded refusal is a plain
+ * failure with its own ShareErrorCode; only the chi router's envelope-less 404 / 405 / 501 means
+ * "this server has no owner route".
+ */
+describe('owner transfer against the merged UNI-2084 answers (UNI-2105)', () => {
+  const ORIGIN = 'https://uniwork.example'
+  const API = `${ORIGIN}/api/v1`
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  const coded = (status: number, code: string) => json(status, { error: { code, message: 'x' } })
+
+  function putAnswering(answer: Response) {
+    const fetch = vi.fn<FetchLike>(async (url, init) => {
+      const path = url.replace(API, '').replace(/\?.*$/, '')
+      if (init?.method === 'PUT' && path === '/documents/doc_1/owner') return answer.clone()
+      if (path === '/documents/doc_1/shares') {
+        return json(200, {
+          my_level: 'manage',
+          admin_scope: false,
+          acl_owner: { user_id: 'u_owner', level: 'manage', via: 'owner' },
+          shares: [],
+          links: [],
+        })
+      }
+      if (path === '/documents/doc_1') {
+        return json(200, {
+          document: { id: 'doc_1', workspace_id: 'ws_1', visibility: 'workspace' },
+        })
+      }
+      return coded(404, 'not_found')
+    })
+    const client = createUniworkShareClient({
+      apiOrigin: ORIGIN,
+      authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
+      isSignedIn: () => true,
+      fetch,
+    })
+    return service(client)
+  }
+  const transfer = (answer: Response) =>
+    putAnswering(answer).transferOwner({ documentId: 'doc_1', userId: 'u_an' })
+
+  it('200 with the full answer is the transfer', async () => {
+    expect(
+      await transfer(
+        json(200, {
+          document_id: 'doc_1',
+          acl_owner_id: 'u_an',
+          previous_owner_id: 'u_owner',
+          previous_owner_share_id: 'sh_9',
+        }),
+      ),
+    ).toEqual({
+      ok: true,
+      value: {
+        documentId: 'doc_1',
+        aclOwnerId: 'u_an',
+        previousOwnerId: 'u_owner',
+        previousOwnerShareId: 'sh_9',
+      },
+    })
+  })
+
+  it('200 with empty previous_* (keep none, a folder, or the owner again) is still the transfer', async () => {
+    expect(
+      await transfer(
+        json(200, {
+          document_id: 'doc_1',
+          acl_owner_id: 'u_an',
+          previous_owner_id: '',
+          previous_owner_share_id: '',
+        }),
+      ),
+    ).toEqual({
+      ok: true,
+      value: {
+        documentId: 'doc_1',
+        aclOwnerId: 'u_an',
+        previousOwnerId: '',
+        previousOwnerShareId: '',
+      },
+    })
+  })
+
+  it.each([
+    ['400 invalid_input', coded(400, 'invalid_input'), 'invalid_request', 400],
+    ['403 forbidden', coded(403, 'forbidden'), 'forbidden', 403],
+    ['404 not_found', coded(404, 'not_found'), 'not_found', 404],
+    ['403 break_glass_required', coded(403, 'break_glass_required'), 'break_glass_required', 403],
+    [
+      '409 document_owned_by_work_product',
+      coded(409, 'document_owned_by_work_product'),
+      'document_owned_by_work_product',
+      409,
+    ],
+    ['409 my_folder_locked', coded(409, 'my_folder_locked'), 'my_folder_locked', 409],
+    ['409 document_shelved', coded(409, 'document_shelved'), 'document_shelved', 409],
+    [
+      '422 owner_target_not_member',
+      coded(422, 'owner_target_not_member'),
+      'owner_target_not_member',
+      422,
+    ],
+  ] as const)(
+    '%s keeps its ShareErrorCode and is never endpointMissing',
+    async (_n, answer, error, status) => {
+      const res = await transfer(answer)
+      expect(res).toMatchObject({ ok: false, error })
+      if (error !== 'invalid_request') expect(res).toMatchObject({ status })
+      expect(res).not.toHaveProperty('endpointMissing')
+    },
+  )
+
+  it.each([
+    ['plain 404 page not found', () => new Response('404 page not found', { status: 404 }), 404],
+    ['plain 405', () => new Response('', { status: 405 }), 405],
+    ['plain 501', () => new Response('', { status: 501 }), 501],
+  ] as const)('%s is a server without the route', async (_n, make, status) => {
+    expect(await transfer(make())).toMatchObject({ ok: false, endpointMissing: true, status })
+  })
+})

@@ -197,6 +197,7 @@ export const zh = {
   shrOwnerNoCandidates: '没有其他成员可以接收此文档。',
   shrOwnerLoading: '正在加载…',
   shrOwnerFailed: '未能转移所有权。请重试。',
+  shrOwnerCandidatesFailed: '无法加载成员列表。请关闭后重试。',
   shrOwnerOwnedByWorkProduct: '此文档属于某个工作成果，因此无法更改所有者。',
   shrOwnerUnavailable: '此服务器暂不支持转移所有权。',
 }

@@ -423,6 +423,9 @@ export const en = {
   wbNotif_document_shared_untitled: '{actor} shared a document with you ({level}).',
   wbNotif_document_shared_nolevel: '{actor} shared “{document}” with you.',
   wbNotif_document_shared_untitled_nolevel: '{actor} shared a document with you.',
+  wbNotif_document_owner_transferred: '{actor} transferred ownership of “{document}” to you.',
+  wbNotif_document_owner_transferred_untitled:
+    '{actor} transferred ownership of a document to you.',
   wbNotif_document_trashed_by_other:
     '{actor} moved your document to trash. Restore it before {date}',
   wbNotif_document_trashed_by_other_untitled:

@@ -1738,6 +1738,7 @@ export function DocumentsHome({
           return
         }
         const level = res.value.myLevel
+        const { ownerKind, shelvedAt, adminScope, archivedAt } = res.value
         setShare({
           row: {
             id: res.value.documentId,
@@ -1748,6 +1749,11 @@ export function DocumentsHome({
               level === 'view' || level === 'comment' || level === 'edit' || level === 'manage'
                 ? level
                 : undefined,
+            // same shape as rowShareTarget: a work product shows no transfer, a shelved one the note
+            ...(ownerKind ? { ownerKind } : {}),
+            ...(shelvedAt ? { shelvedAt } : {}),
+            ...(adminScope ? { adminScope: true } : {}),
+            ...(archivedAt ? { archived: true, archivedAt } : {}),
             organizationName,
           },
           section: intent.section,

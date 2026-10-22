@@ -695,6 +695,14 @@ export interface UniworkDocProperties {
   ownerId: string | null
   createdById: string | null
   updatedById: string | null
+  /** `owner_kind` (`work_product` for an owned document); null for an ordinary one */
+  ownerKind: string | null
+  /** `shelved_at` while the document sits in Archive (Lưu trữ); null otherwise */
+  shelvedAt: string | null
+  /** `admin_scope`: the person reaches the document as a workspace admin, not through a grant */
+  adminScope: boolean
+  /** `archived_at` while the document sits in the trash; null otherwise */
+  archivedAt: string | null
 }
 
 /**
