@@ -234,10 +234,17 @@ for (const app of readdirSync(join(root, 'apps')))
 for (const full of sharedFiles) readConstants(readFileSync(full, 'utf8'))
 
 /** the channels an argument expression can name; empty when it is a runtime value */
-function resolveChannels(arg: string, aliases: ReadonlyMap<string, string>): string[] {
+function resolveChannels(
+  arg: string,
+  aliases: ReadonlyMap<string, string>,
+  shadowed: ReadonlySet<string> = new Set(),
+): string[] {
   const text = arg
     .trim()
     .replace(/^([A-Za-z_]\w*)\./, (_all, name: string) => `${aliases.get(name) ?? name}.`)
+  // a table or constant the file declares itself may differ from the exported one of that name
+  const head = /^[A-Z][A-Z0-9_]*/.exec(text)?.[0]
+  if (head !== undefined && shadowed.has(head)) return []
   const literal = /^'([^']*)'$|^"([^"]*)"$|^`([^`$]*)`$/.exec(text)
   if (literal) return [literal[1] ?? literal[2] ?? literal[3] ?? '']
   const member = /^([A-Z][A-Z0-9_]*)\.([A-Za-z0-9_]+)$/.exec(text)
@@ -568,9 +575,14 @@ function rawRegistrations(file: string, rawText: string): RawRegistration[] {
       (m) => [m[1]!, m[2]!] as const,
     ),
   )
+  const shadowed = new Set(
+    [...text.matchAll(/(?<!export\s+)\b(?:const|let|var)\s+([A-Z][A-Z0-9_]*)\b/g)].map(
+      (m) => m[1]!,
+    ),
+  )
   return [...text.matchAll(call)].map((match) => {
     const arg = firstArgument(text, match.index! + match[0].length)
-    const channels = resolveChannels(arg, aliases)
+    const channels = resolveChannels(arg, aliases, shadowed)
     return {
       file,
       receiver: match[1]!,
@@ -646,6 +658,10 @@ function rawUseOffenders(
       )
     }
     for (const m of found) allowed.push([m.index!, m.index! + m[0].length])
+  }
+  // a re-export hands the raw ipcMain to importers this scan would never read as raw
+  for (const m of text.matchAll(/\bexport\s*(?:type\s*)?\{[^}]*\bipcMain\b[^}]*\}/g)) {
+    offenders.push(`${file}:${lineOf(text, m.index!)}: ipcMain is re-exported`)
   }
   // `require('electron').ipcMain` / `(await import('electron')).ipcMain`: a use no import names
   for (const m of text.matchAll(/\)\s*\.\s*ipcMain\b/g)) {

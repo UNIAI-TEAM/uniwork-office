@@ -5596,7 +5596,8 @@ function registerHomeIpc(): void {
     return next
   }
   guardedIpc.handle(HOME_CHANNELS.setAiPanelPrefs, (_event, patch) => setAiPanelPrefs(patch))
-  ipcMain.handle('app:set-ai-panel-prefs', (_event, patch) => setAiPanelPrefs(patch))
+  // the app:get-* getters above stay on the raw ipcMain: read-only, and headless export windows outside the editor registry may read them
+  guardedIpc.handle('app:set-ai-panel-prefs', (_event, patch) => setAiPanelPrefs(patch))
 
   // effective folder where new/untitled files land; the editor mains resolve
   // the same setting themselves (configuredDefaultSaveDir via docs' defaultSaveDir)

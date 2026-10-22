@@ -9,8 +9,8 @@
 // - Policy comes from `policyForChannel`: a new `uniwork*` or `home:*` channel
 //   defaults to `shell`; a channel an editor window calls needs an explicit entry
 //   there (`home:open-path` is `shell-or-editor` for the markdown wiki links).
-//   Anything out of scope throws at registration, so editor-alias channels such as
-//   `app:get-theme` stay on the raw ipcMain.
+//   Anything out of scope throws at registration, so the read-only editor-alias getters
+//   such as `app:get-theme` stay on the raw ipcMain (`app:set-ai-panel-prefs`, a setter, is in scope).
 // - Register through the `guardedIpc` object in apps/shell/src/main/index.ts, never
 //   the raw `ipcMain`, and add a new registrar file to `REGISTRAR_FILES` in
 //   tests/ipc-guard-coverage.test.ts.
@@ -35,7 +35,14 @@ export function policyForChannel(channel: string): IpcSenderPolicy | null {
   ) {
     return 'editor'
   }
-  if (channel === 'uniwork:ai-flag' || channel === 'home:open-path') return 'shell-or-editor'
+  // the six editor preloads call the app-wide alias of home:set-ai-panel-prefs
+  if (
+    channel === 'uniwork:ai-flag' ||
+    channel === 'home:open-path' ||
+    channel === 'app:set-ai-panel-prefs'
+  ) {
+    return 'shell-or-editor'
+  }
   if (/^uniwork:./.test(channel) || /^uniwork-[^:]+:/.test(channel) || /^home:./.test(channel)) {
     return 'shell'
   }
