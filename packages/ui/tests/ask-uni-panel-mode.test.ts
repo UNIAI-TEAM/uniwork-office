@@ -343,7 +343,8 @@ describe('Ask UNI as a mode of an editor AI panel', () => {
             ],
           }),
         )
-      const stopTurn = async (requestId: string, partial: string) => {
+      const stopTurn = async (partial: string) => {
+        const requestId = 'r1'
         await act(async () => {
           emit({ type: 'run', requestId, conversationId: 'c1', runId: 'x' })
           emit({ type: 'delta', requestId, text: partial })
@@ -356,13 +357,13 @@ describe('Ask UNI as a mode of an editor AI panel', () => {
       }
       await ask('Who owns billing?')
       stopped('First partial')
-      await stopTurn('r1', 'First partial')
+      await stopTurn('First partial')
       // the post-Stop reload lands: the store now ends with the first stopped turn
       await act(async () => {
         await new Promise((r) => setTimeout(r, 1800))
       })
       await ask('Who owns billing?')
-      await stopTurn('r2', 'Second partial')
+      await stopTurn('Second partial')
       expect(host.textContent).toContain('Second partial')
     })
 

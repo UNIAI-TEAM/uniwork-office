@@ -129,6 +129,13 @@ export function AskUniThread({
     if (base === null && loaded && state.status !== 'idle') setBase(stored.length)
   }, [base, loaded, stored.length, state.status])
 
+  // the content match is only for a thread that mounted with the turn already stopped; a turn stopped while mounted
+  // is told apart by the count above (the same question asked again would match the previous stopped turn)
+  const mountedStopped = useRef(state.status === 'stopped')
+  useEffect(() => {
+    if (streaming) mountedStopped.current = false
+  }, [streaming, state.question])
+
   const inStore = state.message ? stored.some((m) => m.id === state.message?.id) : false
   // a stopped turn has no message of its own: it is stored once the history grew by its question and partial answer,
   // or, for a thread mounted after that (the dock was collapsed and expanded), when the history already ends with them
@@ -137,7 +144,8 @@ export function AskUniThread({
     state.status === 'stopped' &&
     !state.message &&
     ((base !== null && stored.length >= base + 2) ||
-      (storedEnd.length === 2 &&
+      (mountedStopped.current &&
+        storedEnd.length === 2 &&
         storedEnd[0]?.role === 'user' &&
         storedEnd[0].content === state.question &&
         storedEnd[1]?.role === 'assistant' &&
