@@ -6,7 +6,7 @@
 //
 //   node tools/release/check-build-brand.mjs --dir apps/shell/release
 //     [--expect win-unpacked | --expect mac-arm64,mac | --expect linux-unpacked]
-//     [--update-feed github:<owner>/<repo>] [--json]
+//     [--update-feed github:<owner>/<repo> | --update-feed generic:<https url>] [--json]
 //
 // The unpacked app directories are required, never optional: the ones named
 // with --expect, and the ones the installers imply (a Windows setup .exe needs
@@ -36,7 +36,11 @@
 //     mac app holds none (unsigned apps cannot install updates) but names the
 //     repository in package.json uniworkReleaseFeed (its update notice; none
 //     without --update-feed), and every file a channel file lists sits next to
-//     it, so the uploaded names match
+//     it, so the uploaded names match. With --update-feed generic:<url> (the
+//     self-hosted feed): the Windows and Linux resources hold an app-update.yml
+//     with provider generic and exactly that url (channel directory included),
+//     the mac app holds no feed and no uniworkReleaseFeed, and the channel
+//     files are checked the same way
 // The uninstall entry, shortcuts and file-association names come from the
 // packaging config, which apps/shell/tests/release-config.test.ts asserts.
 // Exit code 1 on any problem or when the directory holds nothing to check.
@@ -298,11 +302,18 @@ export function checkReleaseFeed(where, pkg, feed, report) {
 
 const CHANNEL_FILE = /^(?:latest|alpha|beta|dev)(?:-[a-z0-9]+)?\.yml$/i
 
-/** github:<owner>/<repo> -> { owner, repo }; throws on anything else. */
+/**
+ * github:<owner>/<repo> -> { provider: 'github', owner, repo };
+ * generic:<https url> -> { provider: 'generic', url }; throws on anything else.
+ */
 export function parseUpdateFeed(value) {
-  const match = /^github:([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)$/.exec(value ?? '')
-  if (!match) throw new Error(`--update-feed ${value}: expected github:<owner>/<repo>`)
-  return { owner: match[1], repo: match[2] }
+  const github = /^github:([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)$/.exec(value ?? '')
+  if (github) return { provider: 'github', owner: github[1], repo: github[2] }
+  const generic = /^generic:(https:\/\/[^\s?#@]+)$/.exec(value ?? '')
+  if (generic) return { provider: 'generic', url: generic[1].replace(/\/+$/, '') }
+  throw new Error(
+    `--update-feed ${value}: expected github:<owner>/<repo> or generic:<https url without credentials, query or fragment>`,
+  )
 }
 
 /** Top-level `key: value` pairs of a flat yml file (app-update.yml). */
@@ -317,7 +328,8 @@ function ymlFields(text) {
 
 /**
  * The app's resources/app-update.yml. feed null: there must be none. Otherwise
- * it must name the github provider on exactly that repository.
+ * it must name that feed: the github provider on exactly that repository, or
+ * the generic provider on exactly that url.
  */
 function checkUpdateFeed(where, resourcesDir, report, feed) {
   const path = join(resourcesDir, 'app-update.yml')
@@ -328,11 +340,21 @@ function checkUpdateFeed(where, resourcesDir, report, feed) {
     return
   }
   if (!existsSync(path)) {
-    report.problem(`${where}: resources hold no app-update.yml (expected the github feed)`)
+    report.problem(
+      `${where}: resources hold no app-update.yml (expected the ${feed.provider} feed)`,
+    )
     return
   }
   report.checked(`${where} app-update.yml`)
   const fields = ymlFields(readFileSync(path, 'utf8'))
+  if (feed.provider === 'generic') {
+    if (fields.provider !== 'generic' || fields.url?.replace(/\/+$/, '') !== feed.url) {
+      report.problem(
+        `${where}: app-update.yml names ${fields.provider}:${fields.url}, expected generic:${feed.url}`,
+      )
+    }
+    return
+  }
   if (fields.provider !== 'github' || fields.owner !== feed.owner || fields.repo !== feed.repo) {
     report.problem(
       `${where}: app-update.yml names ${fields.provider}:${fields.owner}/${fields.repo}, ` +
@@ -426,7 +448,8 @@ function checkMacApp(appDir, report, feed) {
   // never a feed: Squirrel.Mac installs updates only into a signed app; the
   // unsigned app reads the release repository from package.json instead
   checkUpdateFeed(where, resources, report, null)
-  if (pkg) checkReleaseFeed(where, pkg, feed, report)
+  // only a github feed gives the mac app its update notice; a generic feed has none
+  if (pkg) checkReleaseFeed(where, pkg, feed?.provider === 'github' ? feed : null, report)
 }
 
 function checkLinuxUnpacked(dir, report, feed) {
@@ -639,7 +662,7 @@ function main(argv) {
   if (!dir) {
     throw new Error(
       'usage: check-build-brand.mjs --dir <electron-builder output> [--expect <dir>[,<dir>]] ' +
-        '[--update-feed github:<owner>/<repo>] [--json]',
+        '[--update-feed github:<owner>/<repo> | generic:<https url>] [--json]',
     )
   }
   for (const name of expect) {

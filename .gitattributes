@@ -8,6 +8,7 @@
 *.xlsx binary
 *.pptx binary
 *.pdf binary
+*.gpg binary
 *.png binary
 *.ico binary
 *.icns binary

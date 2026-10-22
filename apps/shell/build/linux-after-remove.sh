@@ -42,4 +42,15 @@ for link in /usr/bin/uniwork-office-cli /usr/bin/genoffice; do
     esac
   fi
 done
+
+# apt source + keyring: only a purge drops them (remove / upgrade keep them, so
+# apt update keeps verifying). The source goes only while it still carries our
+# first-line marker; the keyring goes with it, or when the source is gone, and
+# stays next to an admin's own source file, which may point Signed-By at it.
+if [ "$1" = purge ]; then
+  apt_list=/etc/apt/sources.list.d/uniwork-office.sources
+  if [ ! -e "$apt_list" ] || [ "$(head -n 1 "$apt_list" 2>/dev/null)" = '# managed by uniwork-office' ]; then
+    rm -f "$apt_list" /usr/share/keyrings/uniwork-office-archive-keyring.gpg
+  fi
+fi
 exit 0
