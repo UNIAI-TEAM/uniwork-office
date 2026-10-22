@@ -95,9 +95,16 @@ import type {
 } from '../shared/home-api'
 import {
   ASKUNI_CHANNELS,
+  ASKUNI_V2_CHANNELS,
   asAskUniContext,
+  asAskUniFlags,
+  asAskUniOkResult,
   asAskUniOpenResult,
   asAskUniResult,
+  asAskUniStreamEvent,
+  asAskUniStreamStart,
+  type AskUniStreamEvent,
+  type AskUniStreamRequest,
 } from '../shared/askuni-api'
 import {
   HOME_CHANNELS,
@@ -1303,6 +1310,41 @@ const homeApi: HomeApi = {
     return asAskUniOpenResult(
       await ipcRenderer.invoke(ASKUNI_CHANNELS.openCitation, { kind: req?.kind, href: req?.href }),
     )
+  },
+  async askUniStream(req) {
+    // only contract fields cross; main validates them again
+    const r = (req ?? {}) as Partial<AskUniStreamRequest>
+    const ref = (o: { kind?: unknown; id?: unknown } | undefined) =>
+      o && typeof o === 'object' ? { kind: o.kind, id: o.id } : o
+    const forwarded: Record<string, unknown> = {
+      workspaceId: r.workspaceId,
+      ...(r.conversationId !== undefined ? { conversationId: r.conversationId } : {}),
+      question: r.question,
+      locale: r.locale,
+      ...(r.focus !== undefined ? { focus: ref(r.focus) } : {}),
+      ...(r.mentions !== undefined
+        ? { mentions: Array.isArray(r.mentions) ? r.mentions.map(ref) : r.mentions }
+        : {}),
+      ...(r.model !== undefined ? { model: r.model } : {}),
+      ...(r.effort !== undefined ? { effort: r.effort } : {}),
+    }
+    return asAskUniStreamStart(await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.stream, forwarded))
+  },
+  async askUniStreamCancel(req) {
+    return asAskUniOkResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.streamCancel, { requestId: req?.requestId }),
+    )
+  },
+  onAskUniStreamEvent(cb: (ev: AskUniStreamEvent) => void) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const ev = asAskUniStreamEvent(raw)
+      if (ev) cb(ev)
+    }
+    ipcRenderer.on(ASKUNI_V2_CHANNELS.streamEvent, listener)
+    return () => ipcRenderer.removeListener(ASKUNI_V2_CHANNELS.streamEvent, listener)
+  },
+  async askUniFlags() {
+    return asAskUniFlags(await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.flags))
   },
   async uniworkListWorkspaces() {
     return asUniworkResult<UniworkWorkspaceRef[]>(

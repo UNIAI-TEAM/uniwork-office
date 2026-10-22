@@ -20,7 +20,8 @@ export function askUniFakeEnabled(env: NodeJS.ProcessEnv, packaged: boolean): bo
   return !packaged && env[ASKUNI_FAKE_ENV] === '1'
 }
 
-const DOCS: AskUniCitation[] = [
+/** the canned sources (shared with the streaming fake) */
+export const FAKE_CITATIONS: AskUniCitation[] = [
   {
     sourceId: 'S1',
     kind: 'document',
@@ -86,7 +87,7 @@ export function createFakeAskUni(options: { delayMs?: number } = {}): FakeAskUni
           return answer(
             req,
             'The budget is capped at 120M [S1], two backend roles open in November [S2], the vendor renews on 15 December [S3] and the budget goes to finance by 30 October [S4].',
-            DOCS,
+            FAKE_CITATIONS,
           )
         }
         if (q.startsWith('none:')) {

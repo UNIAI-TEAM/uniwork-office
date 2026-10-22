@@ -304,6 +304,8 @@ describe('RB-4: the workspace cache follows the scope and the sign-in', () => {
 })
 
 describe('ipc registration', () => {
+  // UNI-2076: the sender rule itself is pinned in uniwork-askuni-stream-ipc.test.ts
+  const ALLOW = () => true
   const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
   const ipcMain = {
     handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>
@@ -314,7 +316,7 @@ describe('ipc registration', () => {
 
   it('answers uniwork:askuni:ask and uniwork:askuni:context from the service', async () => {
     const { service, ask } = setup()
-    registerAskUniIpc(ipcMain, service)
+    registerAskUniIpc(ipcMain, service, ALLOW)
     expect([...handlers.keys()].sort()).toEqual(
       [ASKUNI_CHANNELS.ask, ASKUNI_CHANNELS.context].sort(),
     )
@@ -333,7 +335,7 @@ describe('ipc registration', () => {
 
   it('refuses a malformed payload through the channel without a request', async () => {
     const { service, ask } = setup()
-    registerAskUniIpc(ipcMain, service)
+    registerAskUniIpc(ipcMain, service, ALLOW)
     expect(await handlers.get(ASKUNI_CHANNELS.ask)!({}, { question: '' })).toEqual({
       ok: false,
       code: 'error',
@@ -350,7 +352,7 @@ describe('ipc registration', () => {
         },
       },
     })
-    registerAskUniIpc(ipcMain, service)
+    registerAskUniIpc(ipcMain, service, ALLOW)
     expect(await handlers.get(ASKUNI_CHANNELS.ask)!({}, valid())).toEqual({
       ok: false,
       code: 'error',

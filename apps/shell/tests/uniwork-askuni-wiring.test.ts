@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { IpcMain } from 'electron'
+import type { IpcMain, WebContents } from 'electron'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { registerUniworkAskUni, type UniworkAskUniWiring } from '../src/main/uniwork-askuni/index'
 import { ASKUNI_CHANNELS } from '../src/shared/askuni-api'
@@ -17,6 +17,9 @@ const PROFILE: DeploymentProfile = {
   clientId: 'uniwork-office',
   channel: 'stable',
 }
+// UNI-2076: only the shell's main frame reaches the handlers (sender.ts)
+const SHELL = { mainFrame: {}, isDestroyed: () => false }
+const FROM_SHELL = { sender: SHELL, senderFrame: SHELL.mainFrame }
 const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
 const ipcMain = {
   handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>
@@ -41,13 +44,14 @@ function wiring(over: Partial<UniworkAskUniWiring> = {}): UniworkAskUniWiring {
     env: { UNIWORK_ASKUNI_FAKE: '1' },
     openDocument: async () => ({ ok: true, value: { path: '/tmp/doc.docx' } }),
     openExternal: async () => undefined,
+    shellContents: () => SHELL as unknown as WebContents,
     ...over,
   }
 }
 
 const ask = (question: string) =>
-  handlers.get(ASKUNI_CHANNELS.ask)!({}, { workspaceId: WS, question, locale: 'en' })
-const context = () => handlers.get(ASKUNI_CHANNELS.context)!({})
+  handlers.get(ASKUNI_CHANNELS.ask)!(FROM_SHELL, { workspaceId: WS, question, locale: 'en' })
+const context = () => handlers.get(ASKUNI_CHANNELS.context)!(FROM_SHELL)
 
 beforeEach(() => handlers.clear())
 afterEach(() => vi.unstubAllGlobals())
@@ -82,10 +86,11 @@ describe('registerUniworkAskUni', () => {
     vi.stubGlobal('fetch', fetch)
     registerUniworkAskUni(ipcMain, wiring({ packaged: false }))
     const ctx = (await context()) as { workspaces: Array<{ id: string }> }
-    const result = await handlers.get(ASKUNI_CHANNELS.ask)!(
-      {},
-      { workspaceId: ctx.workspaces[0].id, question: 'none: x', locale: 'en' },
-    )
+    const result = await handlers.get(ASKUNI_CHANNELS.ask)!(FROM_SHELL, {
+      workspaceId: ctx.workspaces[0].id,
+      question: 'none: x',
+      locale: 'en',
+    })
     expect(result).toMatchObject({ ok: true, message: { notice: 'no_sources' } })
     expect(fetch).not.toHaveBeenCalled()
   })

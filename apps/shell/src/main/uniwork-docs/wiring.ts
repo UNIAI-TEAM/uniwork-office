@@ -1129,6 +1129,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     env: process.env,
     openDocument: (documentId) => service.openDocument(documentId),
     openExternal: (url) => shell.openExternal(url),
+    shellContents: () => wiring.shellContents(),
   })
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listSources, (_event, query: unknown) =>
     service.listSources((query ?? {}) as UniworkSourceListQuery),
