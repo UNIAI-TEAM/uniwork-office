@@ -285,6 +285,18 @@ describe('noticeSentence', () => {
     expect(
       noticeSentence(kindRow('document_owner_transferred', { level: 'owner', document: '' })).key,
     ).toBe('wbNotif_document_owner_transferred_untitled')
+    expect(en.wbNotif_document_owner_transferred).toBe(
+      '{actor} transferred ownership of “{document}” to you.',
+    )
+    expect(en.wbNotif_document_owner_transferred_untitled).toBe(
+      '{actor} transferred ownership of a document to you.',
+    )
+    expect(vi.wbNotif_document_owner_transferred).toBe(
+      '{actor} đã chuyển cho bạn quyền sở hữu tài liệu “{document}”.',
+    )
+    expect(vi.wbNotif_document_owner_transferred_untitled).toBe(
+      '{actor} đã chuyển cho bạn quyền sở hữu một tài liệu.',
+    )
   })
 
   it('says no deadline for a trash notice whose date cannot be read', () => {
