@@ -139,7 +139,8 @@ export function showUpdateWindow(
 
   win.once('ready-to-show', () => win.show())
   win.on('closed', () => {
-    updateWin = null
+    // a replaced window's late event must not drop the window that took its place
+    if (updateWin === win) updateWin = null
     if (!closingProgrammatically) actions?.onLater()
     closingProgrammatically = false
   })
