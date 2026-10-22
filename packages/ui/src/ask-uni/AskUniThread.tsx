@@ -29,7 +29,7 @@ export interface AskUniThreadProps {
    * The host's one polite live region (an editor panel has exactly one): the turn status goes
    * there, and the thread renders no region of its own. It is cleared when the thread goes away.
    */
-  onStatus?: (text: string) => void
+  onStatus?: ((text: string) => void) | undefined
 }
 
 /** the reader counts as "at the bottom" within this many pixels */
