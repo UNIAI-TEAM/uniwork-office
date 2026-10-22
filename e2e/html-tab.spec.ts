@@ -177,10 +177,15 @@ test.describe('html editor', () => {
       await editorPage.locator('.rb-view', { hasText: /Source/ }).click()
       const content = editorPage.locator('.source-editor .cm-content')
       // like the open-and-save test: the pane holds the document before the key goes to it, and the
-      // click's focus has landed (the window handler takes ⌘/Ctrl+S from the focused editor)
+      // click's focus has landed (the window handler takes ⌘/Ctrl+S from the focused editor).
+      // A click a few frames after the Source switch can still be routed to the preview iframe that
+      // sat under that point (Chromium's browser-side hit test lags the layout; the page sees no
+      // mousedown and the iframe becomes the active element), so click until the focus sticks.
       await expect(content).toContainText('café')
-      await content.click()
-      await expect(content).toBeFocused()
+      await expect(async () => {
+        await content.click()
+        await expect(content).toBeFocused({ timeout: 1000 })
+      }).toPass()
       await editorPage.keyboard.press('ControlOrMeta+s')
       await expect(editorPage.locator('.status-save')).toHaveText(/Saved/)
       expect(await readFile(htmlPath, 'utf8')).toBe(source)
