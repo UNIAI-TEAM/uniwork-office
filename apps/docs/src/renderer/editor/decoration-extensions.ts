@@ -445,13 +445,16 @@ class TabLayoutView {
     this.measure()
   }
 
+  // keep the document from construction: a deferred destroy can run after the global is gone
+  private readonly doc = document
+
   constructor(
     private view: EditorView,
     private storage: TabStopStorage,
   ) {
     this.measure()
-    document.fonts?.addEventListener('loadingdone', this.onFontsLoaded)
-    document.addEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
+    this.doc.fonts?.addEventListener('loadingdone', this.onFontsLoaded)
+    this.doc.addEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
     if (typeof ResizeObserver !== 'undefined') {
       // width-only trigger: height changes on every keystroke
       this.resizeObserver = new ResizeObserver(() => {
@@ -485,8 +488,8 @@ class TabLayoutView {
   }
 
   destroy() {
-    document.fonts?.removeEventListener('loadingdone', this.onFontsLoaded)
-    document.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
+    this.doc.fonts?.removeEventListener('loadingdone', this.onFontsLoaded)
+    this.doc.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
     this.resizeObserver?.disconnect()
     if (this.retryRaf) cancelAnimationFrame(this.retryRaf)
   }

@@ -32,7 +32,7 @@ export const it = {
   vhsNameFailed:
     'Impossibile creare il punto di controllo. Quanto hai digitato è stato conservato.',
   vhsNameUnchanged:
-    'Nulla è cambiato dall’ultima versione, quindi non è stato creato un nuovo punto di controllo.',
+    'Nulla è cambiato dall’ultima versione, quindi non è stata creata una nuova versione.',
   vhsRestore: 'Ripristina la versione {no}',
   vhsRestoreConfirmTitle: 'Ripristinare la versione {no}?',
   vhsRestoreConfirmDescription:

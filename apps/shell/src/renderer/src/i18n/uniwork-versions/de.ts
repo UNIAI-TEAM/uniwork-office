@@ -32,7 +32,7 @@ export const de = {
   vhsNameDone: 'Version {no} erstellt',
   vhsNameFailed: 'Der Versionsstand konnte nicht erstellt werden. Ihre Eingabe bleibt erhalten.',
   vhsNameUnchanged:
-    'Seit der letzten Version hat sich nichts geändert, deshalb wurde kein neuer Versionsstand erstellt.',
+    'Seit der letzten Version hat sich nichts geändert, deshalb wurde keine neue Version erstellt.',
   vhsRestore: 'Version {no} wiederherstellen',
   vhsRestoreConfirmTitle: 'Version {no} wiederherstellen?',
   vhsRestoreConfirmDescription:

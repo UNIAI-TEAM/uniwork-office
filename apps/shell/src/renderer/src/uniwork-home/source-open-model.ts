@@ -32,11 +32,25 @@ export function sourceOriginLine(
   source: Pick<UniworkSourceFile, 'source' | 'parent'>,
   t: TFunc,
 ): string | null {
+  const parts = sourceOriginParts(source, t)
+  return parts ? [parts.module, parts.parent].filter(Boolean).join(' · ') : null
+}
+
+/**
+ * The same line in its two pieces, so a screen can set the parent in its own `<bdi>`: in an RTL
+ * line (ar, he) the neutral "#" between the module name and a Latin channel name would otherwise
+ * resolve to RTL and draw "general#" (UNI-2080 RV-12).
+ */
+export function sourceOriginParts(
+  source: Pick<UniworkSourceFile, 'source' | 'parent'>,
+  t: TFunc,
+): { module: string; parent: string } | null {
   const key = sourceOriginKeyOf(source.source)
   const title = source.parent.title.trim()
   const parent =
     source.parent.kind === 'chat_channel' && title && !title.startsWith('#') ? `#${title}` : title
-  return [key ? t(key) : '', parent].filter(Boolean).join(' · ') || null
+  const module = key ? t(key) : ''
+  return module || parent ? { module, parent } : null
 }
 
 /**

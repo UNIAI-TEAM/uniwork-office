@@ -135,7 +135,11 @@
   cursor: default;
 }
 
-.uwf-tree-row.blocked .uwf-tree-title,
+/* title: --text-muted was 4.17:1 on the dark hover surface; the glyph is not text and keeps the dimmer tone (UNI-2080 FU-2066-3) */
+.uwf-tree-row.blocked .uwf-tree-title {
+  color: var(--text-secondary);
+}
+
 .uwf-tree-row.blocked .uwf-glyph {
   color: var(--text-muted);
 }

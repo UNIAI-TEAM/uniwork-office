@@ -374,14 +374,17 @@ class CjkPunctShrinkView {
     this.measure()
   }
 
+  // keep the document from construction: a deferred destroy can run after the global is gone
+  private readonly doc = document
+
   constructor(
     private view: EditorView,
     private storage: CjkPunctShrinkStorage,
   ) {
     this.measure()
-    document.fonts?.addEventListener('loadingdone', this.onFontsLoaded)
-    document.addEventListener(DOC_CSS_COMMITTED_EVENT, this.onDocCss)
-    document.addEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
+    this.doc.fonts?.addEventListener('loadingdone', this.onFontsLoaded)
+    this.doc.addEventListener(DOC_CSS_COMMITTED_EVENT, this.onDocCss)
+    this.doc.addEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(() => {
         const w = this.view.dom.offsetWidth
@@ -419,9 +422,9 @@ class CjkPunctShrinkView {
   }
 
   destroy() {
-    document.fonts?.removeEventListener('loadingdone', this.onFontsLoaded)
-    document.removeEventListener(DOC_CSS_COMMITTED_EVENT, this.onDocCss)
-    document.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
+    this.doc.fonts?.removeEventListener('loadingdone', this.onFontsLoaded)
+    this.doc.removeEventListener(DOC_CSS_COMMITTED_EVENT, this.onDocCss)
+    this.doc.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, this.onPhasedSettled)
     this.resizeObserver?.disconnect()
     if (this.retryRaf) cancelAnimationFrame(this.retryRaf)
   }

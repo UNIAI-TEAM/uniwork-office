@@ -4746,8 +4746,11 @@ body.vib .home {
   background: var(--surface-subtle);
 }
 
+/* dimmed by losing its tone fill, not by opacity (text was 2.46:1 in light; UNI-2080 FU-2067-1) */
 .uw-pick-row.is-gone ~ .wb-desk-trail .wb-pill {
-  opacity: 0.6;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--text-secondary);
 }
 
 /* a notice sentence wraps to two lines like the web inbox (line-clamp-2), so the verb and count
@@ -7563,7 +7566,8 @@ html[dir='rtl'] .quick-title-row {
   opacity: 0.7;
 }
 
-.uw-act-error {
+/* scoped under the dialog (0,2,0): .modal p (0,1,1) would otherwise zero the margin and enlarge the type (UNI-2080 FU-2066-1) */
+.uw-act .uw-act-error {
   min-height: 0;
   margin: 4px 0 0;
   color: var(--danger-text);

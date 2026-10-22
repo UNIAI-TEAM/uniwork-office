@@ -30,7 +30,7 @@ export const vi = {
   vhsNameSubmitting: 'Đang tạo mốc…',
   vhsNameDone: 'Đã tạo phiên bản {no}',
   vhsNameFailed: 'Không tạo được mốc. Nội dung đã nhập vẫn giữ nguyên.',
-  vhsNameUnchanged: 'Chưa có thay đổi nào kể từ phiên bản mới nhất nên chưa tạo mốc mới.',
+  vhsNameUnchanged: 'Chưa có thay đổi nào kể từ phiên bản mới nhất nên chưa tạo phiên bản mới.',
   vhsRestore: 'Khôi phục phiên bản {no}',
   vhsRestoreConfirmTitle: 'Khôi phục phiên bản {no}?',
   vhsRestoreConfirmDescription:

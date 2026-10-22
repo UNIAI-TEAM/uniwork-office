@@ -29,7 +29,7 @@ export const zhTW = {
   vhsNameSubmitting: '正在建立…',
   vhsNameDone: '已建立版本 {no}',
   vhsNameFailed: '無法建立檢查點。你輸入的內容已保留。',
-  vhsNameUnchanged: '自最新版本以來沒有任何變更，因此未建立新的檢查點。',
+  vhsNameUnchanged: '自最新版本以來沒有任何變更，因此未建立新版本。',
   vhsRestore: '還原版本 {no}',
   vhsRestoreConfirmTitle: '還原版本 {no}？',
   vhsRestoreConfirmDescription:

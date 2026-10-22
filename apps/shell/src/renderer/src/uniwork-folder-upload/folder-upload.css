@@ -208,7 +208,8 @@
   opacity: 0.6;
 }
 
-.fu-error {
+/* .uw-act .uw-act-error (0,2,0, home.css) sets margin 4px; one more class wins whatever the load order */
+.uw-act .uw-act-error.fu-error {
   margin-top: 10px;
 }
 

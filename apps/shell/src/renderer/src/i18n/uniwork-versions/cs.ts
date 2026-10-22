@@ -30,7 +30,7 @@ export const cs = {
   vhsNameSubmitting: 'Vytváření…',
   vhsNameDone: 'Vytvořena verze {no}',
   vhsNameFailed: 'Kontrolní bod se nepodařilo vytvořit. Zadaný text zůstal zachován.',
-  vhsNameUnchanged: 'Od poslední verze se nic nezměnilo, proto nebyl vytvořen nový kontrolní bod.',
+  vhsNameUnchanged: 'Od poslední verze se nic nezměnilo, proto nebyla vytvořena nová verze.',
   vhsRestore: 'Obnovit verzi {no}',
   vhsRestoreConfirmTitle: 'Obnovit verzi {no}?',
   vhsRestoreConfirmDescription:
