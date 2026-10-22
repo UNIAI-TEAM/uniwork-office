@@ -146,9 +146,10 @@ trap cleanup EXIT
 aws_config="$work/aws-config"
 printf '[default]\ns3 =\n    addressing_style = path\n' >"$aws_config"
 
-# The credentials go to the aws process only, as environment.
+# The endpoint and the credentials go to the aws process only, as environment.
 aws_cli() {
-  AWS_ACCESS_KEY_ID="${OFFICE_S3_ACCESS_KEY_ID:-}" \
+  AWS_ENDPOINT_URL="${OFFICE_S3_ENDPOINT:-}" \
+    AWS_ACCESS_KEY_ID="${OFFICE_S3_ACCESS_KEY_ID:-}" \
     AWS_SECRET_ACCESS_KEY="${OFFICE_S3_SECRET_ACCESS_KEY:-}" \
     AWS_DEFAULT_REGION="${OFFICE_S3_REGION:-hn-2}" \
     AWS_CONFIG_FILE="$aws_config" \
@@ -157,7 +158,7 @@ aws_cli() {
     AWS_REQUEST_CHECKSUM_CALCULATION=when_required \
     AWS_RESPONSE_CHECKSUM_VALIDATION=when_required \
     AWS_PAGER='' \
-    aws --endpoint-url "$OFFICE_S3_ENDPOINT" "$@"
+    aws "$@"
 }
 
 # put <local file> <key> [cache-control] [content-type]
