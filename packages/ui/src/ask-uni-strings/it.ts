@@ -54,6 +54,8 @@ export const it = {
   askUniV2NotePlaceholder: 'Raccontaci di più a UNI…',
   askUniV2NoticeEmptyAnswer: 'UNI non aveva nulla da rispondere. Riprova o sii più preciso.',
   askUniV2NoticeStopped: 'Interrotta prima che la risposta fosse completa.',
+  askUniV2NoticeInterrupted: 'La risposta è stata interrotta, quindi è incompleta.',
+  askUniV2NoticeAgentFailed: 'UNI ha riscontrato un problema nella ricerca dei tuoi dati. Riprova.',
   askUniV2ReasonMissingSources: 'Fonti mancanti',
   askUniV2ReasonNotHelpful: 'Non utile',
   askUniV2ReasonOther: 'Altro motivo',

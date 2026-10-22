@@ -8,6 +8,8 @@ import { askUniUiStrings } from '@genoffice/ui'
  */
 export const SHARED_ASKUNI_KEYS = [
   'askUniV2NoticeStopped',
+  'askUniV2NoticeInterrupted',
+  'askUniV2NoticeAgentFailed',
   'askUniV2NoticeEmptyAnswer',
   'askUniV2ErrProviderError',
   'askUniV2ErrProviderTimeout',

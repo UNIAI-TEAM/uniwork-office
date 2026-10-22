@@ -58,6 +58,9 @@ export const fr = {
   askUniV2NoticeEmptyAnswer:
     "UNI n'avait rien à répondre. Reposez la question ou soyez plus précis.",
   askUniV2NoticeStopped: 'Arrêté avant la fin de la réponse.',
+  askUniV2NoticeInterrupted: 'La réponse a été interrompue, elle est donc incomplète.',
+  askUniV2NoticeAgentFailed:
+    'UNI a rencontré un problème lors de la recherche de vos données. Réessayez.',
   askUniV2ReasonMissingSources: 'Sources manquantes',
   askUniV2ReasonNotHelpful: 'Pas utile',
   askUniV2ReasonOther: 'Autre raison',

@@ -59,6 +59,9 @@ export const nl = {
   askUniV2NotePlaceholder: 'Vertel UNI meer…',
   askUniV2NoticeEmptyAnswer: 'UNI had niets te melden. Vraag het opnieuw of wees specifieker.',
   askUniV2NoticeStopped: 'Gestopt voordat het antwoord klaar was.',
+  askUniV2NoticeInterrupted: 'Het antwoord is onderbroken, dus het is onvolledig.',
+  askUniV2NoticeAgentFailed:
+    'UNI had een probleem bij het zoeken naar je gegevens. Probeer het opnieuw.',
   askUniV2ReasonMissingSources: 'Bronnen ontbreken',
   askUniV2ReasonNotHelpful: 'Niet nuttig',
   askUniV2ReasonOther: 'Andere reden',

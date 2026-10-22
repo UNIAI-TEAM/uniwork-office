@@ -53,6 +53,8 @@ export const th = {
   askUniV2NotePlaceholder: 'บอก UNI เพิ่มเติม…',
   askUniV2NoticeEmptyAnswer: 'UNI ไม่มีอะไรจะตอบ ลองถามอีกครั้งหรือระบุให้ชัดเจนขึ้น',
   askUniV2NoticeStopped: 'หยุดก่อนคำตอบจะเสร็จ',
+  askUniV2NoticeInterrupted: 'คำตอบถูกขัดจังหวะ จึงยังไม่สมบูรณ์',
+  askUniV2NoticeAgentFailed: 'UNI พบปัญหาขณะค้นหาข้อมูลของคุณ ลองอีกครั้ง',
   askUniV2ReasonMissingSources: 'ไม่มีแหล่งที่มา',
   askUniV2ReasonNotHelpful: 'ไม่เป็นประโยชน์',
   askUniV2ReasonOther: 'เหตุผลอื่น',

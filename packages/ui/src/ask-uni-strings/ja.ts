@@ -57,6 +57,8 @@ export const ja = {
   askUniV2NoticeEmptyAnswer:
     'UNI に答えられる内容がありませんでした。もう一度質問するか、より具体的に書いてください。',
   askUniV2NoticeStopped: '回答が完了する前に停止しました。',
+  askUniV2NoticeInterrupted: '回答が中断されたため、不完全です。',
+  askUniV2NoticeAgentFailed: 'UNI がデータの検索中に問題が発生しました。もう一度お試しください。',
   askUniV2ReasonMissingSources: '出典がない',
   askUniV2ReasonNotHelpful: '役に立たない',
   askUniV2ReasonOther: 'その他',

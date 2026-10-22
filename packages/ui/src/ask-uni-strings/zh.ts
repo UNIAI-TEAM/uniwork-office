@@ -32,6 +32,8 @@ export const zh = {
   // answer, steps, citations, actions and the composer
   askUniV2ComposerLabel: '向 UNI 提问',
   askUniV2NoticeStopped: '已在回答完成前停止。',
+  askUniV2NoticeInterrupted: '回答被中断，因此不完整。',
+  askUniV2NoticeAgentFailed: 'UNI 在查找你的数据时遇到问题。请重试。',
   askUniV2NoticeEmptyAnswer: 'UNI 没有可回答的内容。请再问一次，或说得更具体些。',
   askUniV2ErrProviderError: 'AI 服务暂时没有响应，请几分钟后再试。',
   askUniV2ErrProviderTimeout: 'UNI 回答用时过长，请再试一次。',
