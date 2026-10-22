@@ -4,8 +4,18 @@
 // the call comes from its main frame, the webContents is the shell window or a
 // trusted editor view (per the channel's policy), and the main frame URL is one
 // the main itself loads. The raw ipcMain is never patched.
+//
+// Adding a channel (other lanes):
+// - Policy comes from `policyForChannel`: a new `uniwork*` / `home:uniwork-*` /
+//   `home:account-*` channel defaults to `shell`; an editor-facing channel needs an
+//   explicit entry there. Anything out of scope throws at registration.
+// - Register through the `guardedIpc` object in apps/shell/src/main/index.ts, never
+//   the raw `ipcMain`, and add a new registrar file to `REGISTRAR_FILES` in
+//   tests/ipc-guard-coverage.test.ts.
+// - Only handle/on (and removeHandler/removeListener/off) exist on the guarded
+//   object: handleOnce/once and addListener/prependListener/prependOnceListener throw.
 import type { IpcMain, WebContents } from 'electron'
-import { resolve, sep } from 'node:path'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { RENDERER_SCHEME, type RendererHost } from '@genoffice/electron-utils/renderer-scheme'
 
@@ -57,7 +67,7 @@ export type IpcMainLike = Partial<
 export type IpcSenderCheck = { ok: true } | { ok: false; reason: IpcRefusalReason }
 
 export interface IpcSenderGuard {
-  /** an IpcMain-like object whose handle/handleOnce/on/once/removeHandler/removeListener guard every listener */
+  /** an IpcMain-like object whose handle/on guard every listener; once-style and add/prepend registrations throw */
   guarded<T extends IpcMainLike>(ipc: T): T
   check(event: unknown, channel: string): IpcSenderCheck
 }
@@ -158,14 +168,18 @@ export function createIpcSenderGuard(deps: IpcSenderGuardDeps): IpcSenderGuard {
     }
     const raw = ipc as unknown as Record<string, (...args: unknown[]) => unknown>
 
+    const unguardedAdd = (method: string) => () => {
+      throw new Error(`guarded ipc: ${method} would register unguarded, use on()`)
+    }
+
     const overrides: Record<string, (...args: never[]) => unknown> = {
       handle: (channel: string, handler: Listener) => {
         assertInScope(channel)
         return raw.handle.call(ipc, channel, guardInvoke(channel, handler))
       },
-      handleOnce: (channel: string, handler: Listener) => {
-        assertInScope(channel)
-        return raw.handleOnce.call(ipc, channel, guardInvoke(channel, handler))
+      // A refused first call would consume a one-shot listener, so they are not offered.
+      handleOnce: () => {
+        throw new Error('guarded ipc: handleOnce is not supported, use handle()')
       },
       on: (channel: string, listener: Listener) => {
         assertInScope(channel)
@@ -174,23 +188,19 @@ export function createIpcSenderGuard(deps: IpcSenderGuardDeps): IpcSenderGuard {
         raw.on.call(ipc, channel, wrapped)
         return proxy
       },
-      once: (channel: string, listener: Listener) => {
-        assertInScope(channel)
-        const inner = guardEvent(channel, listener)
-        const wrapped = ((event: never, ...args: never[]) => {
-          forget(channel, listener)
-          inner(event, ...args)
-        }) as Listener
-        remember(channel, listener, wrapped)
-        raw.once.call(ipc, channel, wrapped)
-        return proxy
+      once: () => {
+        throw new Error('guarded ipc: once is not supported, use on()')
       },
+      addListener: unguardedAdd('addListener'),
+      prependListener: unguardedAdd('prependListener'),
+      prependOnceListener: unguardedAdd('prependOnceListener'),
       removeHandler: (channel: string) => raw.removeHandler.call(ipc, channel),
       removeListener: (channel: string, listener: Listener) => {
         raw.removeListener.call(ipc, channel, forget(channel, listener) ?? listener)
         return proxy
       },
     }
+    overrides.off = overrides.removeListener
 
     const proxy: T = new Proxy(ipc, {
       get(target, prop, receiver) {
@@ -260,7 +270,9 @@ export function trustedUrlRules(input: { env: NodeJS.ProcessEnv; shellRendererDi
     if (origin) editorOrigins.add(origin)
   }
 
-  const shellRoot = resolve(input.shellRendererDir)
+  // The packaged shell loads exactly one page; the platform is read per call.
+  const fold = (path: string) => (process.platform === 'win32' ? path.toLowerCase() : path)
+  const shellPage = resolve(input.shellRendererDir, 'index.html')
 
   return {
     isTrustedShellUrl(value) {
@@ -276,7 +288,7 @@ export function trustedUrlRules(input: { env: NodeJS.ProcessEnv; shellRendererDi
         return false
       }
       if (path.includes('\0')) return false
-      return resolve(path).startsWith(shellRoot + sep)
+      return fold(resolve(path)) === fold(shellPage)
     },
     isTrustedEditorUrl(value) {
       const url = parseUrl(value)
