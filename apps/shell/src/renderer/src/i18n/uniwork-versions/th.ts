@@ -30,7 +30,7 @@ export const th = {
   vhsNameSubmitting: 'กำลังสร้าง…',
   vhsNameDone: 'สร้างเวอร์ชัน {no} แล้ว',
   vhsNameFailed: 'สร้างจุดบันทึกไม่ได้ ข้อความที่พิมพ์ยังคงอยู่',
-  vhsNameUnchanged: 'ไม่มีอะไรเปลี่ยนแปลงตั้งแต่เวอร์ชันล่าสุด จึงไม่ได้สร้างจุดบันทึกใหม่',
+  vhsNameUnchanged: 'ไม่มีอะไรเปลี่ยนแปลงตั้งแต่เวอร์ชันล่าสุด จึงไม่ได้สร้างเวอร์ชันใหม่',
   vhsRestore: 'กู้คืนเวอร์ชัน {no}',
   vhsRestoreConfirmTitle: 'กู้คืนเวอร์ชัน {no} หรือไม่',
   vhsRestoreConfirmDescription:

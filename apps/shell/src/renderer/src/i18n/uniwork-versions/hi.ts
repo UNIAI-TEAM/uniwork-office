@@ -30,7 +30,7 @@ export const hi = {
   vhsNameSubmitting: 'बनाया जा रहा है…',
   vhsNameDone: 'संस्करण {no} बन गया',
   vhsNameFailed: 'चेकपॉइंट नहीं बन सका। आपने जो लिखा था वह बना रहेगा।',
-  vhsNameUnchanged: 'नवीनतम संस्करण के बाद कुछ नहीं बदला, इसलिए नया चेकपॉइंट नहीं बनाया गया।',
+  vhsNameUnchanged: 'नवीनतम संस्करण के बाद कुछ नहीं बदला, इसलिए नया संस्करण नहीं बनाया गया।',
   vhsRestore: 'संस्करण {no} पुनर्स्थापित करें',
   vhsRestoreConfirmTitle: 'संस्करण {no} पुनर्स्थापित करें?',
   vhsRestoreConfirmDescription:

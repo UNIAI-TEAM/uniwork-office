@@ -29,7 +29,7 @@ export const he = {
   vhsNameSubmitting: 'יוצר…',
   vhsNameDone: 'גרסה {no} נוצרה',
   vhsNameFailed: 'לא ניתן ליצור את נקודת הגרסה. מה שהקלדת נשמר.',
-  vhsNameUnchanged: 'דבר לא השתנה מאז הגרסה האחרונה, ולכן לא נוצרה נקודת גרסה חדשה.',
+  vhsNameUnchanged: 'דבר לא השתנה מאז הגרסה האחרונה, ולכן לא נוצרה גרסה חדשה.',
   vhsRestore: 'שחזר גרסה {no}',
   vhsRestoreConfirmTitle: 'לשחזר גרסה {no}?',
   vhsRestoreConfirmDescription:
