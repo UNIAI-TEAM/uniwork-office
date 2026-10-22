@@ -62,6 +62,7 @@ import {
 import { AccountBoundary } from './account-boundary'
 import { createShareClientProvider, createUniworkShareService } from './share-service'
 import { registerUniworkAskUni } from '../uniwork-askuni'
+import { askUniDocBinding } from '../uniwork-askuni/doc-binding'
 import {
   createUniworkComments,
   type DiscussionPushTarget,
@@ -174,6 +175,11 @@ export interface UniworkDocsWiring {
    * pulled for exactly that path; undefined when nothing shows one.
    */
   commentsPathFor?(sender: { id: number }): string | undefined
+  /**
+   * UNI-2076 S7b: true for the view of an editor tab or of a detached editor
+   * window (never the shell page), the editors Ask UNI in a panel answers
+   */
+  isEditorContents?(webContentsId: number): boolean
   /**
    * G8-11: the file paths open as tabs of the window whose shell webContents
    * is `sender`; null for any other sender (the discussion bridge is refused).
@@ -1130,6 +1136,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     openDocument: (documentId) => service.openDocument(documentId),
     openExternal: (url) => shell.openExternal(url),
     shellContents: () => wiring.shellContents(),
+    // UNI-2076 S7b: the editor panels ask about the document their own view shows
+    isEditorContents: (id) => wiring.isEditorContents?.(id) === true,
+    editorPath: (sender) => wiring.commentsPathFor?.(sender) ?? null,
+    docBinding: (path) => askUniDocBinding(service, path),
   })
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listSources, (_event, query: unknown) =>
     service.listSources((query ?? {}) as UniworkSourceListQuery),

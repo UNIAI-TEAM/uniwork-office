@@ -4341,6 +4341,12 @@ function uniworkDocsWiring() {
       }
       return undefined
     },
+    // UNI-2076 S7b: Ask UNI in an editor panel answers an editor tab's view
+    // (Home has none) or a detached editor window, never the shell page
+    isEditorContents: (id: number) => {
+      const tab = tabManager?.describeWebContents(id)
+      return tab ? tab.kind !== 'home' : detachedWindowForWebContents(id) !== undefined
+    },
     // G8-11: the shell Discussion panel's bridge answers only the shell
     // window's own webContents, and only for the paths open as its tabs
     // (detached editor windows have no panel)

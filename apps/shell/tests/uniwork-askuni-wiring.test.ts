@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IpcMain, WebContents } from 'electron'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { registerUniworkAskUni, type UniworkAskUniWiring } from '../src/main/uniwork-askuni/index'
-import { ASKUNI_CHANNELS } from '../src/shared/askuni-api'
+import { ASKUNI_CHANNELS, ASKUNI_DOC_CHANNELS, ASKUNI_V2_CHANNELS } from '../src/shared/askuni-api'
 
 /**
  * UNI-2069 s1f (RB-6): the registration that wires the real client, the real
@@ -111,5 +111,42 @@ describe('registerUniworkAskUni', () => {
     expect(await context()).toEqual({ workspaces: [], currentWorkspaceId: null, signedIn: true })
     expect(await ask('hello')).toEqual({ ok: false, code: 'error' })
     expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('registerUniworkAskUni: the editor family (UNI-2076 s7b)', () => {
+  const EDITOR = {
+    id: 7,
+    mainFrame: { url: 'genoffice-app://docs/index.html' },
+    isDestroyed: () => false,
+  }
+  const FROM_EDITOR = { sender: EDITOR, senderFrame: EDITOR.mainFrame }
+  const editorWiring = (over: Partial<UniworkAskUniWiring> = {}) =>
+    wiring({
+      packaged: false,
+      isEditorContents: (id) => id === 7,
+      editorPath: (sender) => (sender.id === 7 ? '/w/plan.docx' : null),
+      docBinding: () => ({ workspaceId: WS, documentId: '01J8DOC0000000000000000001' }),
+      ...over,
+    })
+  const docFlags = (event: unknown) => handlers.get(ASKUNI_DOC_CHANNELS.flags)!(event)
+
+  it('an editor main frame reaches the doc family with its bound state', async () => {
+    registerUniworkAskUni(ipcMain, editorWiring())
+    expect(await docFlags(FROM_EDITOR)).toEqual({ streamEnabled: true, bound: 'document' })
+  })
+
+  it('the shell page is refused on the doc family; an editor on the shell family', async () => {
+    registerUniworkAskUni(ipcMain, editorWiring({ isEditorContents: () => true }))
+    expect(await docFlags(FROM_SHELL)).toEqual({ ok: false, error: 'forbidden' })
+    expect(await handlers.get(ASKUNI_V2_CHANNELS.flags)!(FROM_EDITOR)).toEqual({
+      ok: false,
+      error: 'forbidden',
+    })
+  })
+
+  it('without the editor wiring every editor call is refused', async () => {
+    registerUniworkAskUni(ipcMain, wiring({ packaged: false }))
+    expect(await docFlags(FROM_EDITOR)).toEqual({ ok: false, error: 'forbidden' })
   })
 })
