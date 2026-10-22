@@ -30,7 +30,7 @@ export const ar = {
   vhsNameSubmitting: 'جارٍ الإنشاء…',
   vhsNameDone: 'تم إنشاء الإصدار {no}',
   vhsNameFailed: 'تعذّر إنشاء نقطة الحفظ. ما كتبته لا يزال محفوظًا.',
-  vhsNameUnchanged: 'لم يتغير شيء منذ آخر إصدار، لذلك لم تُنشأ نقطة حفظ جديدة.',
+  vhsNameUnchanged: 'لم يتغير شيء منذ آخر إصدار، لذلك لم يُنشأ إصدار جديد.',
   vhsRestore: 'استعادة الإصدار {no}',
   vhsRestoreConfirmTitle: 'استعادة الإصدار {no}؟',
   vhsRestoreConfirmDescription:

@@ -30,12 +30,19 @@ import {
 } from '../../../packages/electron-utils/src/uniwork-cloud-status'
 
 /**
- * UNI-2073 coverage: every channel the sender guard has a policy for must be registered through
- * `guard.guarded(ipcMain)`, never on the raw `ipcMain`. The scan reads the main-process sources
- * (apps/shell/src/main, every editor main bundled into the shell, packages/electron-utils/src),
- * resolves the channel constants from their declarations and checks (1) raw registrations,
- * (2) registrar calls handed the raw `ipcMain`, (3) the composition in index.ts, (4) that no new
- * registrar file appears without being listed here, and (5) the policy of every channel constant.
+ * UNI-2073 / UNI-2082 coverage: every channel the sender guard has a policy for must be registered
+ * through `guard.guarded(ipcMain)`, never on the raw `ipcMain`. The scan reads the main-process
+ * sources (apps/shell/src/main, every editor main bundled into the shell,
+ * packages/electron-utils/src), resolves the channel constants from their declarations and checks
+ * (1) raw registrations, (2) registrar calls handed the raw `ipcMain`, (3) the composition in
+ * index.ts, (4) that no new registrar file appears without being listed here, (5) the policy of
+ * every channel constant and (6) that every `home:*` channel is registered on the guarded object.
+ *
+ * Two rules keep the scan from needing one regex per spelling:
+ * - a file that imports electron's `ipcMain` may only use it as a direct `ipcMain.<method>(` call
+ *   (judged by channel) or at a site listed in RAW_PASS_THROUGH; any other occurrence fails;
+ * - a registration whose channel resolves to a guarded one is found whatever its receiver is
+ *   called, and a parameter declared `IpcMain` / `IpcMainLike` is a receiver too.
  */
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -76,6 +83,124 @@ interface Source {
   text: string
 }
 
+/**
+ * The same text with every comment blanked: length and line breaks are kept, so offsets and line
+ * numbers still point into the original. Strings, templates and regex literals are skipped over,
+ * so a `//` inside `'http://x'` or a quote inside a regex does not confuse it.
+ */
+function stripComments(text: string): string {
+  const n = text.length
+  const out: string[] = []
+  const templates: number[] = [] // the brace depth each open `${` was entered at
+  let depth = 0
+  let inTemplate = false
+  let prev = '' // the last significant character in code: tells a regex literal from a division
+  let i = 0
+  const blank = (s: string): string => s.replace(/[^\n]/g, ' ')
+  while (i < n) {
+    const ch = text[i]!
+    if (inTemplate) {
+      if (ch === '\\') {
+        out.push(text.slice(i, i + 2))
+        i += 2
+      } else if (ch === '`') {
+        out.push(ch)
+        i++
+        inTemplate = false
+        prev = ch
+      } else if (ch === '$' && text[i + 1] === '{') {
+        out.push('${')
+        i += 2
+        templates.push(depth)
+        inTemplate = false
+        prev = '{'
+      } else {
+        out.push(ch)
+        i++
+      }
+      continue
+    }
+    const next = text[i + 1]
+    if (ch === '/' && next === '/') {
+      const end = text.indexOf('\n', i)
+      const stop = end < 0 ? n : end
+      out.push(blank(text.slice(i, stop)))
+      i = stop
+      continue
+    }
+    if (ch === '/' && next === '*') {
+      const end = text.indexOf('*/', i + 2)
+      const stop = end < 0 ? n : end + 2
+      out.push(blank(text.slice(i, stop)))
+      i = stop
+      continue
+    }
+    if (ch === "'" || ch === '"') {
+      let j = i + 1
+      while (j < n && text[j] !== ch && text[j] !== '\n') {
+        if (text[j] === '\\') j++
+        j++
+      }
+      out.push(text.slice(i, j + 1))
+      i = j + 1
+      prev = ch
+      continue
+    }
+    if (ch === '`') {
+      out.push(ch)
+      i++
+      inTemplate = true
+      continue
+    }
+    if (ch === '/' && (prev === '' || '(,=:[!&|?{};'.includes(prev))) {
+      let j = i + 1
+      let inClass = false
+      while (j < n && text[j] !== '\n') {
+        const c = text[j]!
+        if (c === '\\') j++
+        else if (c === '[') inClass = true
+        else if (c === ']') inClass = false
+        else if (c === '/' && !inClass) break
+        j++
+      }
+      if (text[j] === '/') {
+        out.push(text.slice(i, j + 1))
+        i = j + 1
+        prev = ')'
+        continue
+      }
+    }
+    if (ch === '{') depth++
+    if (ch === '}') {
+      if (templates.length > 0 && templates[templates.length - 1] === depth) {
+        templates.pop()
+        out.push(ch)
+        i++
+        inTemplate = true
+        continue
+      }
+      depth--
+    }
+    out.push(ch)
+    i++
+    if (!/\s/.test(ch)) prev = ch
+  }
+  return out.join('')
+}
+
+const strippedCache = new Map<string, string>()
+/** the code of a file without its comments (memoised: the same text is scanned by several rules) */
+function code(text: string): string {
+  let stripped = strippedCache.get(text)
+  if (stripped === undefined) {
+    stripped = stripComments(text)
+    strippedCache.set(text, stripped)
+  }
+  return stripped
+}
+
+const lineOf = (text: string, offset: number): number => text.slice(0, offset).split('\n').length
+
 const sources: Source[] = scannedFiles().map((full) => ({
   file: relative(root, full).replace(/\\/g, '/'),
   text: readFileSync(full, 'utf8'),
@@ -109,10 +234,17 @@ for (const app of readdirSync(join(root, 'apps')))
 for (const full of sharedFiles) readConstants(readFileSync(full, 'utf8'))
 
 /** the channels an argument expression can name; empty when it is a runtime value */
-function resolveChannels(arg: string, aliases: ReadonlyMap<string, string>): string[] {
+function resolveChannels(
+  arg: string,
+  aliases: ReadonlyMap<string, string>,
+  shadowed: ReadonlySet<string> = new Set(),
+): string[] {
   const text = arg
     .trim()
     .replace(/^([A-Za-z_]\w*)\./, (_all, name: string) => `${aliases.get(name) ?? name}.`)
+  // a table or constant the file declares itself may differ from the exported one of that name
+  const head = /^[A-Z][A-Z0-9_]*/.exec(text)?.[0]
+  if (head !== undefined && shadowed.has(head)) return []
   const literal = /^'([^']*)'$|^"([^"]*)"$|^`([^`$]*)`$/.exec(text)
   if (literal) return [literal[1] ?? literal[2] ?? literal[3] ?? '']
   const member = /^([A-Z][A-Z0-9_]*)\.([A-Za-z0-9_]+)$/.exec(text)
@@ -137,10 +269,18 @@ interface Registration {
   channels: string[]
 }
 
-/** `ipcMain`, a registrar's `ipc` parameter, or a guarded alias (`...Ipc`); never `wc.on` or `ipcRenderer` */
+/**
+ * `ipcMain`, a registrar's `ipc` parameter, or a guarded alias (`...Ipc`); never `wc.on` or `ipcRenderer`.
+ * Receivers outside this shape still count when they are declared `IpcMain` / `IpcMainLike` in the
+ * file or when the call names a guarded channel (see `registrations`).
+ */
 const IPC_LIKE = /^(ipcMain|ipc|\w+Ipc|guarded\w*)$/
 
-const REGISTER_CALL = /\b([A-Za-z_$][\w$]*)\.(handle|handleOnce|on|once)\(\s*([^,()]+?)\s*,/g
+/** `bus: IpcMain`, `ipc?: IpcMainLike`, `{ bus: IpcMain }`: the name a registrar gives its ipc parameter */
+const IPC_PARAMETER = /\b([A-Za-z_$][\w$]*)\s*\??:\s*(?:IpcMain|IpcMainLike)\b/g
+
+const REGISTER_CALL =
+  /\b([A-Za-z_$][\w$]*)\s*\??\.\s*(handle|handleOnce|on|once)\(\s*([^,()]+?)\s*,/g
 
 /** a registrar's local helper, called as `handle(CHANNEL, ...)` / `handleDiscussion(CHANNEL, ...)` */
 const LOCAL_HELPER_CALL = /(?<![.\w$])(handle\w*)\(\s*([^,()]+?)\s*,/g
@@ -148,21 +288,38 @@ const LOCAL_HELPER_CALL = /(?<![.\w$])(handle\w*)\(\s*([^,()]+?)\s*,/g
 /** a preload-side bridge: imports ipcRenderer from electron and never names ipcMain, so it registers nothing in main */
 function isRendererOnly(text: string): boolean {
   return (
-    /import\s*\{[^}]*\bipcRenderer\b[^}]*\}\s*from\s*'electron'/.test(text) &&
+    /import\s*\{[^}]*\bipcRenderer\b[^}]*\}\s*from\s*['"]electron['"]/.test(text) &&
     !/\bipcMain\b/.test(text)
   )
 }
 
+/**
+ * A channel the guard covers: it has a policy, or the table written down in this file says it
+ * must have one. The second half keeps a channel the guard's own table forgot from slipping out of
+ * the scan; the policy tests below then fail on the table.
+ */
+const inScope = (channel: string): boolean =>
+  policyForChannel(channel) !== null || expectedPolicy(channel) !== null
+
+/**
+ * Every registration call in a file, on any receiver that is ipc-like, declared `IpcMain` /
+ * `IpcMainLike`, an alias of the raw `ipcMain`, or that names a guarded channel.
+ */
 function registrations(source: Source): Registration[] {
-  if (isRendererOnly(source.text)) return []
+  const text = code(source.text)
+  if (isRendererOnly(text)) return []
   // `const C = UNIWORK_WORK_CHANNELS` style aliases of a constants table
   const aliases = new Map(
-    [...source.text.matchAll(/const\s+(\w+)\s*=\s*([A-Z][A-Z0-9_]*)\s*$/gm)].map(
+    [...text.matchAll(/const\s+(\w+)\s*=\s*([A-Z][A-Z0-9_]*)\s*$/gm)].map(
       (m) => [m[1]!, m[2]!] as const,
     ),
   )
-  const direct = [...source.text.matchAll(REGISTER_CALL)]
-    .filter((match) => IPC_LIKE.test(match[1]!))
+  const receivers = new Set([
+    ...[...text.matchAll(IPC_PARAMETER)].map((m) => m[1]!),
+    ...rawReceivers(text),
+    ...guardedAliases(text),
+  ])
+  const direct = [...text.matchAll(REGISTER_CALL)]
     .map((match) => ({
       file: source.file,
       receiver: match[1]!,
@@ -170,7 +327,11 @@ function registrations(source: Source): Registration[] {
       arg: match[3]!,
       channels: resolveChannels(match[3]!, aliases),
     }))
-  const viaHelper = [...source.text.matchAll(LOCAL_HELPER_CALL)].map((match) => ({
+    .filter(
+      (reg) =>
+        IPC_LIKE.test(reg.receiver) || receivers.has(reg.receiver) || reg.channels.some(inScope),
+    )
+  const viaHelper = [...text.matchAll(LOCAL_HELPER_CALL)].map((match) => ({
     file: source.file,
     receiver: '(local helper)',
     method: match[1]!,
@@ -180,7 +341,26 @@ function registrations(source: Source): Registration[] {
   return [...direct, ...viaHelper]
 }
 
-const scoped = (reg: Registration): string[] => reg.channels.filter((c) => policyForChannel(c))
+const scoped = (reg: Registration): string[] => reg.channels.filter(inScope)
+
+/**
+ * The files that register a guarded channel against the files listed as allowed to: a new one is
+ * `unlisted`, a listed one that no longer registers any is `stale`.
+ */
+function registrarFileDiff(
+  files: readonly Source[],
+  listed: Readonly<Record<string, string>>,
+): { unlisted: string[]; stale: string[] } {
+  const registering = files
+    .filter((source) => registrations(source).some((reg) => scoped(reg).length > 0))
+    .map((source) => source.file)
+    .sort()
+  const names = Object.keys(listed).sort()
+  return {
+    unlisted: registering.filter((file) => !names.includes(file)),
+    stale: names.filter((file) => !registering.includes(file)),
+  }
+}
 
 /**
  * Registrars of in-scope channels: they take the ipc object as their first argument, and the
@@ -240,34 +420,100 @@ const isIndex = (file: string): boolean => file === 'apps/shell/src/main/index.t
 
 const RAW_METHODS = 'handle|handleOnce|on|once|addListener|prependListener|prependOnceListener'
 
+const IDENT = '[A-Za-z_$][\\w$]*'
+/** the module specifier of electron, either quote, main-process entry included */
+const ELECTRON_MODULE = `(?:'electron(?:/main)?'|"electron(?:/main)?")`
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+interface ElectronImports {
+  /** the names electron's `ipcMain` is reachable under because this file imports it */
+  names: string[]
+  /** the import statements themselves: reading them is not a use of `ipcMain` */
+  spans: Array<[number, number]>
+}
+
 /**
- * Every name the global `ipcMain` can be reached under in this file: `import { ipcMain }`,
- * `import { ipcMain as x }`, `const { ipcMain } = require('electron')`, `electron.ipcMain`, and
- * `const bus = <raw name>` aliases of any of those. A parameter that merely happens to be called
+ * How a file imports electron's `ipcMain`: `import { ipcMain }` (any quote, `electron` or
+ * `electron/main`, `as x`), a default or `* as` namespace (`e.ipcMain`), and the `require(...)` /
+ * `await import(...)` destructure or namespace forms. A parameter that merely happens to be called
  * `ipcMain` (a registrar's guarded object) is not an import and is not raw.
  */
-function rawReceivers(text: string): string[] {
+function electronImports(text: string): ElectronImports {
   const names = new Set<string>()
-  for (const imp of text.matchAll(/import\s*\{([^}]*)\}\s*from\s*'electron'/g)) {
-    for (const spec of imp[1]!.split(',')) {
-      const m = /^\s*(?:type\s+)?ipcMain(?:\s+as\s+([A-Za-z_$][\w$]*))?\s*$/.exec(spec)
-      if (m) names.add(m[1] ?? 'ipcMain')
+  const namespaces = new Set<string>()
+  const spans: Array<[number, number]> = []
+  const take = (m: RegExpMatchArray): void => {
+    spans.push([m.index!, m.index! + m[0].length])
+  }
+  const specifiers = (list: string): void => {
+    for (const spec of list.split(',')) {
+      const m = new RegExp(
+        `^\\s*(?:type\\s+)?ipcMain(?:\\s+as\\s+(${IDENT})|\\s*:\\s*(${IDENT}))?\\s*$`,
+      ).exec(spec)
+      if (m) names.add(m[1] ?? m[2] ?? 'ipcMain')
     }
+  }
+  const loaded = `(?:await\\s+)?(?:require|import)\\(\\s*${ELECTRON_MODULE}\\s*\\)`
+  for (const m of text.matchAll(
+    new RegExp(
+      `import\\s*(?:(${IDENT})\\s*,\\s*)?\\{([^}]*)\\}\\s*from\\s*${ELECTRON_MODULE}`,
+      'g',
+    ),
+  )) {
+    take(m)
+    if (m[1]) namespaces.add(m[1])
+    specifiers(m[2]!)
   }
   for (const m of text.matchAll(
-    /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*(?:require\(\s*'electron'\s*\)|electron)\b/g,
+    new RegExp(`import\\s+(${IDENT})\\s+from\\s*${ELECTRON_MODULE}`, 'g'),
   )) {
-    for (const spec of m[1]!.split(',')) {
-      const part = /^\s*ipcMain(?:\s*:\s*([A-Za-z_$][\w$]*))?\s*$/.exec(spec)
-      if (part) names.add(part[1] ?? 'ipcMain')
+    take(m)
+    namespaces.add(m[1]!)
+  }
+  for (const m of text.matchAll(
+    new RegExp(`import\\s*\\*\\s*as\\s+(${IDENT})\\s+from\\s*${ELECTRON_MODULE}`, 'g'),
+  )) {
+    take(m)
+    namespaces.add(m[1]!)
+  }
+  for (const m of text.matchAll(
+    new RegExp(`\\b(?:const|let|var)\\s*\\{([^}]*)\\}\\s*=\\s*${loaded}`, 'g'),
+  )) {
+    take(m)
+    specifiers(m[1]!)
+  }
+  for (const m of text.matchAll(
+    new RegExp(`\\b(?:const|let|var)\\s+(${IDENT})\\s*=\\s*${loaded}`, 'g'),
+  )) {
+    take(m)
+    namespaces.add(m[1]!)
+  }
+  if (/\belectron\s*\.\s*ipcMain\b/.test(text)) namespaces.add('electron')
+  for (const ns of namespaces) {
+    for (const m of text.matchAll(
+      new RegExp(`\\b(?:const|let|var)\\s*\\{([^}]*)\\}\\s*=\\s*${escapeRegExp(ns)}\\b`, 'g'),
+    )) {
+      take(m)
+      specifiers(m[1]!)
+    }
+    if (new RegExp(`(?<![\\w$.])${escapeRegExp(ns)}\\s*\\.\\s*ipcMain\\b`).test(text)) {
+      names.add(`${ns}.ipcMain`)
     }
   }
-  if (/\belectron\.ipcMain\b/.test(text)) names.add('electron.ipcMain')
+  return { names: [...names], spans }
+}
+
+/**
+ * Every name the raw `ipcMain` can be reached under in this file: the import names above and
+ * `const bus = <raw name>` aliases of any of those (a type annotation or an `as` cast included).
+ */
+function rawReceivers(text: string): string[] {
+  const names = new Set(electronImports(text).names)
   if (names.size === 0) return []
   // `const bus = ipcMain` and `const other = bus`: two passes reach a chain of three
   for (let pass = 0; pass < 2; pass++) {
     for (const m of text.matchAll(
-      /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([\w$.]+)\s*[;\n]/g,
+      /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=;\n]+)?=\s*\(?\s*([\w$.]+)\s*(?:as\s+[^;\n)]+)?\)?\s*[;\n]/g,
     )) {
       if (names.has(m[2]!)) names.add(m[1]!)
     }
@@ -320,19 +566,25 @@ interface RawRegistration extends Registration {
 }
 
 /** every `<raw ipcMain>.<registration method>(...)` call in one file */
-function rawRegistrations(file: string, text: string): RawRegistration[] {
+function rawRegistrations(file: string, rawText: string): RawRegistration[] {
+  const text = code(rawText)
   const receivers = rawReceivers(text)
   if (receivers.length === 0) return []
-  const escaped = receivers.map((name) => name.replace(/\./g, '\\.')).join('|')
-  const call = new RegExp(`(?<![\\w$.])(${escaped})\\.(${RAW_METHODS})\\(`, 'g')
+  const escaped = receivers.map(escapeRegExp).join('|')
+  const call = new RegExp(`(?<![\\w$.])(${escaped})\\s*\\.\\s*(${RAW_METHODS})\\s*\\(`, 'g')
   const aliases = new Map(
     [...text.matchAll(/const\s+(\w+)\s*=\s*([A-Z][A-Z0-9_]*)\s*$/gm)].map(
       (m) => [m[1]!, m[2]!] as const,
     ),
   )
+  const shadowed = new Set(
+    [...text.matchAll(/(?<!export\s+)\b(?:const|let|var)\s+([A-Z][A-Z0-9_]*)\b/g)].map(
+      (m) => m[1]!,
+    ),
+  )
   return [...text.matchAll(call)].map((match) => {
     const arg = firstArgument(text, match.index! + match[0].length)
-    const channels = resolveChannels(arg, aliases)
+    const channels = resolveChannels(arg, aliases, shadowed)
     return {
       file,
       receiver: match[1]!,
@@ -344,40 +596,175 @@ function rawRegistrations(file: string, text: string): RawRegistration[] {
   })
 }
 
-/**
- * Raw registrations whose channel is decided at run time. Each is out of the sender guard's
- * scope today (it cannot name a guarded channel); a new one needs a reason here, i.e. someone
- * decided it. Key: `<file>: <channel expression>`.
- */
-const DYNAMIC_RAW_CHANNELS: Record<string, string> = {
-  'apps/slides/src/main/slides-main.ts: channel':
-    'the slides document-session handlers: the keys of sessionHandlers, typed `slides:${string}`, never a guarded channel',
+interface PassThrough {
+  file: string
+  /** the call the raw `ipcMain` is handed to, as written (whitespace is free) */
+  text: string
+  /** exactly this many occurrences: a further one fails, a missing one is stale */
+  count: number
+  reason: string
 }
 
-const squash = (arg: string): string => arg.replace(/\s+/g, ' ')
+/**
+ * The only places a raw `ipcMain` may appear other than as `ipcMain.<method>(...)`: it is handed on
+ * as a value. Each entry names the call, so a new hand-over (or a copy of one) fails until
+ * someone decided it here.
+ */
+const RAW_PASS_THROUGH: readonly PassThrough[] = [
+  {
+    file: 'apps/shell/src/main/index.ts',
+    text: 'ipcSenderGuard.guarded(ipcMain)',
+    count: 1,
+    reason:
+      'the one place the guard wraps the raw ipcMain; every registrar gets the wrapped object',
+  },
+  ...[
+    'apps/docs/src/main/docs-main.ts',
+    'apps/html/src/main/html-main.ts',
+    'apps/markdown/src/main/markdown-main.ts',
+    'apps/pdf/src/main/pdf-main.ts',
+    'apps/sheets/src/main/sheets-main.ts',
+    'apps/slides/src/main/slides-main.ts',
+  ].flatMap((file) =>
+    ['answerUniworkAiFlagOff(ipcMain)', 'answerUniworkCloudStatusOff(ipcMain)'].map((text) => ({
+      file,
+      text,
+      count: 1,
+      reason:
+        'a standalone editor answers the pulls with a constant "off"; the guard lives in the shell',
+    })),
+  ),
+]
 
-/** what the coverage rule rejects in one file: a guarded channel on the raw ipcMain, or an unreadable channel */
-function rawOffenders(
+/**
+ * Rule R1. In a file that imports electron's `ipcMain`, every occurrence of the raw name has to be
+ * the import, a direct `<raw>.<method>(` call (judged by its channel by `rawOffenders`) or one
+ * of the listed pass-through sites. Optional chaining, a cast, a computed method name, an alias, a
+ * destructure, a registrar call, an object property: none of them needs its own pattern, they all
+ * fail here.
+ */
+function rawUseOffenders(
   file: string,
-  text: string,
-  allow: Readonly<Record<string, string>> = DYNAMIC_RAW_CHANNELS,
+  rawText: string,
+  passThrough: readonly PassThrough[],
 ): string[] {
+  const text = code(rawText)
   const offenders: string[] = []
-  for (const reg of rawRegistrations(file, text)) {
-    if (!reg.resolved) {
-      if (allow[`${file}: ${squash(reg.arg)}`]) continue
+  const allowed: Array<[number, number]> = []
+  for (const entry of passThrough.filter((p) => p.file === file)) {
+    const pattern = new RegExp(escapeRegExp(entry.text).replace(/\s+/g, '\\s+'), 'g')
+    const found = [...text.matchAll(pattern)]
+    if (found.length !== entry.count) {
       offenders.push(
-        `${file}: ${reg.receiver}.${reg.method}(${squash(reg.arg)}) has a channel the scan cannot read`,
+        `${file}: pass-through \`${entry.text}\` is listed ${entry.count} time(s), found ${found.length}`,
       )
-      continue
     }
-    for (const channel of scoped(reg)) {
+    for (const m of found) allowed.push([m.index!, m.index! + m[0].length])
+  }
+  // a re-export hands the raw ipcMain to importers this scan would never read as raw
+  for (const m of text.matchAll(/\bexport\s*(?:type\s*)?\{[^}]*\bipcMain\b[^}]*\}/g)) {
+    offenders.push(`${file}:${lineOf(text, m.index!)}: ipcMain is re-exported`)
+  }
+  // `require('electron').ipcMain` / `(await import('electron')).ipcMain`: a use no import names
+  for (const m of text.matchAll(/\)\s*\.\s*ipcMain\b/g)) {
+    offenders.push(`${file}:${lineOf(text, m.index!)}: ipcMain taken from a call result`)
+  }
+  const { names, spans } = electronImports(text)
+  if (names.length === 0) return offenders
+  let body = text
+  for (const [from, to] of spans) {
+    body = body.slice(0, from) + body.slice(from, to).replace(/[^\n]/g, ' ') + body.slice(to)
+  }
+  for (const name of names) {
+    for (const m of body.matchAll(new RegExp(`(?<![\\w$.])${escapeRegExp(name)}(?![\\w$])`, 'g'))) {
+      const at = m.index!
+      if (allowed.some(([from, to]) => at >= from && at < to)) continue
+      if (/^\s*\.\s*[A-Za-z_$][\w$]*\s*\(/.test(body.slice(at + m[0].length))) continue
+      const line = body.slice(body.lastIndexOf('\n', at) + 1, body.indexOf('\n', at)).trim()
       offenders.push(
-        `${file}: ${reg.receiver}.${reg.method}(${squash(reg.arg)}) -> ${channel} (${policyForChannel(channel)})`,
+        `${file}:${lineOf(body, at)}: ${name} is not a direct ipcMain.<method>(...) call: ${line}`,
       )
     }
   }
   return offenders
+}
+
+interface DynamicRaw {
+  reason: string
+  /** exactly this many unreadable registrations under the key: a further one fails, a missing one is stale */
+  count: number
+}
+
+/**
+ * Raw registrations whose channel is decided at run time. Each is out of the sender guard's
+ * scope today (it cannot name a guarded channel); a new one needs a reason here, i.e. someone
+ * decided it. Key: `<file>: <channel expression>`; the count is how many there are.
+ */
+const DYNAMIC_RAW_CHANNELS: Record<string, DynamicRaw> = {
+  'apps/slides/src/main/slides-main.ts: channel': {
+    reason:
+      'the slides document-session handlers: the keys of sessionHandlers, typed `slides:${string}`, never a guarded channel',
+    count: 1,
+  },
+}
+
+const squash = (arg: string): string => arg.replace(/\s+/g, ' ')
+
+/** what the coverage rule rejects in one file: a guarded channel on the raw ipcMain, an unreadable channel, a raw use */
+function rawOffenders(
+  file: string,
+  text: string,
+  allow: Readonly<Record<string, DynamicRaw>> = DYNAMIC_RAW_CHANNELS,
+  passThrough: readonly PassThrough[] = RAW_PASS_THROUGH,
+): string[] {
+  const offenders = rawUseOffenders(file, text, passThrough)
+  const unreadable = new Map<string, RawRegistration[]>()
+  for (const reg of rawRegistrations(file, text)) {
+    if (!reg.resolved) {
+      const key = `${file}: ${squash(reg.arg)}`
+      unreadable.set(key, [...(unreadable.get(key) ?? []), reg])
+      continue
+    }
+    for (const channel of scoped(reg)) {
+      offenders.push(
+        `${file}: ${reg.receiver}.${reg.method}(${squash(reg.arg)}) -> ${channel} (${String(policyForChannel(channel))})`,
+      )
+    }
+  }
+  for (const [key, regs] of unreadable) {
+    const allowance = allow[key]?.count ?? 0
+    if (regs.length <= allowance) continue
+    if (allowance === 0) {
+      for (const reg of regs) {
+        offenders.push(
+          `${file}: ${reg.receiver}.${reg.method}(${squash(reg.arg)}) has a channel the scan cannot read`,
+        )
+      }
+    } else {
+      offenders.push(
+        `${key}: ${regs.length} registrations the scan cannot read, ${allowance} allowed`,
+      )
+    }
+  }
+  return offenders
+}
+
+/** allow-list entries whose live count differs from the listed one (a lower count is as stale as none) */
+function dynamicRawMismatches(
+  files: readonly Source[],
+  allow: Readonly<Record<string, DynamicRaw>>,
+): string[] {
+  const live = new Map<string, number>()
+  for (const source of files) {
+    for (const reg of rawRegistrations(source.file, source.text)) {
+      if (reg.resolved) continue
+      const key = `${source.file}: ${squash(reg.arg)}`
+      live.set(key, (live.get(key) ?? 0) + 1)
+    }
+  }
+  return Object.entries(allow)
+    .filter(([key, entry]) => (live.get(key) ?? 0) !== entry.count)
+    .map(([key, entry]) => `${key}: allows ${entry.count}, found ${live.get(key) ?? 0}`)
 }
 
 describe('raw ipcMain registrations of guarded channels', () => {
@@ -386,25 +773,24 @@ describe('raw ipcMain registrations of guarded channels', () => {
     expect(offenders).toEqual([])
   })
 
-  it('lists only dynamic raw channels that still exist', () => {
-    const live = new Set(
-      sources.flatMap((source) =>
-        rawRegistrations(source.file, source.text)
-          .filter((reg) => !reg.resolved)
-          .map((reg) => `${source.file}: ${squash(reg.arg)}`),
-      ),
-    )
-    expect(Object.keys(DYNAMIC_RAW_CHANNELS).filter((key) => !live.has(key))).toEqual([])
+  it('lists only dynamic raw channels that still exist, as often as they exist', () => {
+    expect(dynamicRawMismatches(sources, DYNAMIC_RAW_CHANNELS)).toEqual([])
+  })
+
+  it('lists only pass-through files the scan reads', () => {
+    const files = new Set(sources.map((source) => source.file))
+    expect(RAW_PASS_THROUGH.filter((entry) => !files.has(entry.file))).toEqual([])
   })
 
   it('hands no registrar of guarded channels the raw ipcMain', () => {
     const offenders: string[] = []
     for (const source of sources) {
-      const receivers = rawReceivers(source.text)
+      const text = code(source.text)
+      const receivers = rawReceivers(text)
       if (receivers.length === 0) continue
-      const escaped = receivers.map((name) => name.replace(/\./g, '\\.')).join('|')
+      const escaped = receivers.map(escapeRegExp).join('|')
       const call = new RegExp(`\\b(${REGISTRARS.join('|')})\\(\\s*(${escaped})\\b`, 'g')
-      for (const match of source.text.matchAll(call)) {
+      for (const match of text.matchAll(call)) {
         offenders.push(`${source.file}: ${match[1]}(${match[2]}, ...)`)
       }
     }
@@ -420,7 +806,7 @@ describe('the raw registration scan catches the forms that used to slip through'
   const header = "import { ipcMain } from 'electron'\n"
   const file = 'apps/shell/src/main/x.ts'
   const offendersOf = (body: string, imports = header, name = file) =>
-    rawOffenders(name, `${imports}${body}\n`, {})
+    rawOffenders(name, `${imports}${body}\n`, {}, [])
 
   it('control: a plain literal on the raw ipcMain', () => {
     expect(offendersOf("ipcMain.handle('uniwork-doc:save', () => 1)")).toHaveLength(1)
@@ -456,9 +842,10 @@ describe('the raw registration scan catches the forms that used to slip through'
   })
 
   it('another receiver name for the same object', () => {
+    // the alias itself is a raw use, and the registration on it is a guarded channel on the raw object
     expect(
       offendersOf("const bus = ipcMain\nbus.handle('uniwork-doc:save', () => 1)"),
-    ).toHaveLength(1)
+    ).toHaveLength(2)
   })
 
   it('electron.ipcMain on a default import', () => {
@@ -468,7 +855,7 @@ describe('the raw registration scan catches the forms that used to slip through'
 
   it('a *-bridge.ts under a main directory is scanned like any other file', () => {
     const text = `${header}ipcMain.on('uniwork-doc:save', () => 1)\n`
-    expect(rawOffenders('apps/shell/src/main/mcp/x-bridge.ts', text, {})).toHaveLength(1)
+    expect(rawOffenders('apps/shell/src/main/mcp/x-bridge.ts', text, {}, [])).toHaveLength(1)
     // and the walk really reaches the ones that exist
     expect(sources.map((s) => s.file)).toContain('apps/shell/src/main/mcp/docs-bridge.ts')
   })
@@ -479,16 +866,11 @@ describe('the raw registration scan catches the forms that used to slip through'
     )
   })
 
-  it('an unreadable channel passes only when it is allow-listed with a reason', () => {
-    const text = `${header}for (const ch of names) ipcMain.handle(ch, () => 1)\n`
-    expect(rawOffenders(file, text, { [`${file}: ch`]: 'reason' })).toEqual([])
-    expect(rawOffenders(file, text, {})).toHaveLength(1)
-  })
-
   it('leaves a guarded object alone: a parameter named ipcMain and an out-of-scope literal', () => {
     const param = 'export function register(ipcMain: Guarded) {\n  ipcMain.handle(c, () => 1)\n}\n'
-    expect(rawOffenders(file, param, {})).toEqual([])
-    expect(offendersOf("ipcMain.handle('home:open-path', () => 1)")).toEqual([])
+    expect(rawOffenders(file, param, {}, [])).toEqual([])
+    expect(offendersOf("ipcMain.handle('app:get-theme', () => 1)")).toEqual([])
+    expect(offendersOf("ipcMain.removeHandler('home:recents')")).toEqual([])
   })
 
   it('reads a call argument across nested brackets, strings and templates', () => {
@@ -497,19 +879,247 @@ describe('the raw registration scan catches the forms that used to slip through'
   })
 })
 
+/** RBG2-2: the spellings the reviewer found, each one on a guarded home channel and each turning red */
+describe('every way to spell the raw ipcMain turns red', () => {
+  const header = "import { ipcMain } from 'electron'\n"
+  const file = 'apps/shell/src/main/x.ts'
+  const offendersOf = (body: string, imports = header) =>
+    rawOffenders(file, `${imports}${body}\n`, {}, [])
+
+  it.each([
+    ['optional chaining', "ipcMain?.handle('home:recents', () => 1)"],
+    ['a cast around the receiver', "(ipcMain as IpcMain).handle('home:recents', () => 1)"],
+    [
+      'a double cast around the receiver',
+      "(ipcMain as unknown as IpcMain).handle('home:recents', () => 1)",
+    ],
+    ['a computed method name', "ipcMain['handle']('home:recents', () => 1)"],
+    ['a cast alias', "const bus = ipcMain as IpcMain\nbus.handle('home:recents', () => 1)"],
+    ['a typed alias', "const bus: IpcMain = ipcMain\nbus.handle('home:recents', () => 1)"],
+    ['a registrar call, whatever its parameter is called', 'registerHome(ipcMain)'],
+    ['a destructured method', "const { handle } = ipcMain\nhandle('home:recents', () => 1)"],
+    ['a method reference', "const handle = ipcMain.handle\nhandle('home:recents', () => 1)"],
+    ['an object property', 'const deps = { ipcMain }'],
+    ['an inline require', "require('electron').ipcMain.handle('home:recents', () => 1)"],
+    ['an inline dynamic import', "(await import('electron')).ipcMain.handle('home:recents', f)"],
+  ])('%s', (_label, body) => {
+    expect(offendersOf(body).length).toBeGreaterThan(0)
+  })
+
+  const imports: Array<[string, string, string]> = [
+    ['a double-quoted import', 'import { ipcMain } from "electron"\n', 'ipcMain'],
+    ['an electron/main import', "import { ipcMain } from 'electron/main'\n", 'ipcMain'],
+    [
+      'a double-quoted electron/main import',
+      'import { ipcMain } from "electron/main"\n',
+      'ipcMain',
+    ],
+    [
+      'a multi-line import',
+      "import {\n  app,\n  ipcMain,\n  shell,\n} from 'electron'\n",
+      'ipcMain',
+    ],
+    ['an import with an alias', "import { ipcMain as raw } from 'electron'\n", 'raw'],
+    ['a default import', "import electron from 'electron'\n", 'electron.ipcMain'],
+    ['a namespace import', "import * as e from 'electron'\n", 'e.ipcMain'],
+    ['a require destructure', "const { ipcMain } = require('electron')\n", 'ipcMain'],
+    ['a double-quoted require', 'const { ipcMain } = require("electron")\n', 'ipcMain'],
+    [
+      'a require destructure with a rename',
+      "const { ipcMain: raw } = require('electron')\n",
+      'raw',
+    ],
+    ['a dynamic import destructure', "const { ipcMain } = await import('electron')\n", 'ipcMain'],
+    [
+      'a require namespace',
+      "const electron = require('electron')\nconst { ipcMain } = electron\n",
+      'ipcMain',
+    ],
+  ]
+  it.each(imports)('%s: a guarded literal and a template channel', (_label, importText, name) => {
+    expect(offendersOf(`${name}.handle('home:recents', () => 1)`, importText)).toHaveLength(1)
+    expect(offendersOf(`${name}.handle(\`home:\${key}\`, () => 1)`, importText)).toHaveLength(1)
+    // the same import used for an out-of-scope literal is fine, so the offender above is the channel
+    expect(offendersOf(`${name}.handle('app:get-theme', () => 1)`, importText)).toEqual([])
+  })
+
+  it('a pass-through is listed by call text and count, never by file alone', () => {
+    const entry: PassThrough = { file, text: 'wrap(ipcMain)', count: 1, reason: 'test' }
+    const offenders = (body: string) => rawOffenders(file, `${header}${body}\n`, {}, [entry])
+    expect(offenders('const g = wrap(ipcMain)')).toEqual([])
+    // a second hand-over of the same call, a different call, and a listed call that vanished
+    expect(offenders('wrap(ipcMain)\nwrap(ipcMain)')).toHaveLength(1)
+    expect(offenders('wrap(ipcMain)\nother(ipcMain)')).toHaveLength(1)
+    expect(offenders('const g = 1')).toHaveLength(1)
+    // another file with the same text is not covered
+    expect(
+      rawOffenders('apps/shell/src/main/y.ts', `${header}wrap(ipcMain)\n`, {}, [entry]),
+    ).toHaveLength(1)
+  })
+
+  it('the pass-through list of the real tree is the 13 hand-overs and nothing else', () => {
+    expect(RAW_PASS_THROUGH).toHaveLength(13)
+    expect(RAW_PASS_THROUGH.every((entry) => entry.count === 1 && entry.reason.length > 0)).toBe(
+      true,
+    )
+  })
+
+  it('does not read a raw ipcMain out of a comment', () => {
+    const text = `${header}// ipcMain?.handle('home:recents', f)\n/* registerHome(ipcMain) */\n`
+    expect(rawOffenders(file, text, {}, [])).toEqual([])
+  })
+})
+
+/** RBG2-4: the allow-list entry is a count, not a licence for the expression */
+describe('an allow-listed unreadable channel is counted', () => {
+  const header = "import { ipcMain } from 'electron'\n"
+  const file = 'apps/slides/src/main/slides-main.ts'
+  const key = `${file}: channel`
+  const body = (calls: number): string =>
+    `${header}${Array.from({ length: calls }, () => 'ipcMain.handle(channel, () => 1)').join('\n')}\n`
+  const allow = (count: number): Record<string, DynamicRaw> => ({
+    [key]: { reason: 'the session handlers', count },
+  })
+
+  it('passes up to the allowed count', () => {
+    expect(rawOffenders(file, body(1), allow(1), [])).toEqual([])
+    expect(rawOffenders(file, body(2), allow(2), [])).toEqual([])
+  })
+
+  it('fails a second unresolved handle with the same expression', () => {
+    expect(rawOffenders(file, body(2), allow(1), [])).toHaveLength(1)
+    expect(rawOffenders(file, body(3), allow(1), [])).toHaveLength(1)
+  })
+
+  it('fails every unreadable registration without an entry', () => {
+    expect(rawOffenders(file, body(2), {}, [])).toHaveLength(2)
+  })
+
+  it('calls an entry stale when fewer than its count are live', () => {
+    const files = [{ file, text: body(1) }]
+    expect(dynamicRawMismatches(files, allow(1))).toEqual([])
+    expect(dynamicRawMismatches(files, allow(2))).toHaveLength(1)
+    expect(dynamicRawMismatches([{ file, text: body(2) }], allow(1))).toHaveLength(1)
+    expect(dynamicRawMismatches([{ file, text: header }], allow(1))).toHaveLength(1)
+  })
+
+  it('the one entry of the real tree is the slides session loop, exactly once', () => {
+    expect(Object.keys(DYNAMIC_RAW_CHANNELS)).toEqual([key])
+    expect(DYNAMIC_RAW_CHANNELS[key]!.count).toBe(1)
+  })
+})
+
+/** RBG2-2 (registrar side): a registrar parameter is found whatever it is called */
+describe('a registrar file is found whatever its ipc parameter is called', () => {
+  const importIpc = "import type { IpcMain, IpcMainLike } from 'electron'\n"
+  const diff = (text: string, name = 'apps/shell/src/main/y.ts') =>
+    registrarFileDiff([{ file: name, text: `${importIpc}${text}\n` }], {})
+
+  it('control: the ipc-like names the scan always knew', () => {
+    for (const receiver of ['ipcMain', 'ipc', 'homeIpc', 'guardedIpc']) {
+      expect(diff(`${receiver}.handle('home:recents', f)`).unlisted, receiver).toHaveLength(1)
+    }
+  })
+
+  it('a parameter named bus, declared IpcMain or IpcMainLike, is a receiver', () => {
+    const receivers = (text: string) =>
+      registrations({ file: 'apps/shell/src/main/y.ts', text: `${importIpc}${text}\n` }).map(
+        (reg) => reg.receiver,
+      )
+    expect(receivers('export function reg(bus: IpcMain) { bus.handle(name, f) }')).toEqual(['bus'])
+    expect(receivers('export function reg(bus?: IpcMainLike) { bus?.on(name, f) }')).toEqual([
+      'bus',
+    ])
+    expect(
+      receivers('export function reg(deps: { bus: IpcMain }) { deps.bus.once(name, f) }'),
+    ).toEqual(['bus'])
+    // the same call on a name nobody declared is not a registration
+    expect(receivers('export function reg(bus: Thing) { bus.handle(name, f) }')).toEqual([])
+    expect(
+      diff("export function reg(bus: IpcMain) { bus.handle('home:recents', f) }").unlisted,
+    ).toEqual(['apps/shell/src/main/y.ts'])
+  })
+
+  it('a receiver nobody declared, as soon as the channel is a guarded one', () => {
+    expect(diff("thing.handle('uniwork-doc:save', f)").unlisted).toHaveLength(1)
+    expect(diff('thing.handle(HOME_CHANNELS.recents, f)').unlisted).toHaveLength(1)
+  })
+
+  it('does not take a webContents listener or an out-of-scope channel for a registration', () => {
+    expect(diff("wc.on('did-finish-load', f)").unlisted).toEqual([])
+    expect(diff("bus.handle('app:get-theme', f)").unlisted).toEqual([])
+  })
+
+  it('reports a listed file that no longer registers anything as stale', () => {
+    const files = [{ file: 'apps/shell/src/main/y.ts', text: 'export const x = 1\n' }]
+    expect(registrarFileDiff(files, { 'apps/shell/src/main/y.ts': 'gone' }).stale).toEqual([
+      'apps/shell/src/main/y.ts',
+    ])
+  })
+})
+
+describe('the comment stripper', () => {
+  it('keeps length and line breaks, so offsets and line numbers still hold', () => {
+    const text = "a // x\n/* b\nc */ d 'e // f'\n`g ${h /* i */} // j`\nk\n"
+    const stripped = stripComments(text)
+    expect(stripped).toHaveLength(text.length)
+    expect([...stripped].filter((ch) => ch === '\n')).toHaveLength(5)
+    expect(stripped).toContain("d 'e // f'")
+    expect(stripped).toContain('// j`')
+    expect(stripped).not.toMatch(/[xbci]\b/)
+  })
+
+  it('skips a regex literal with quotes, and a division', () => {
+    const text = 'const r = /[\'"]electron/g // ipcMain\nconst q = a / b / c // ipcMain\n'
+    const stripped = stripComments(text)
+    expect(stripped).toContain('/[\'"]electron/g')
+    expect(stripped).not.toContain('ipcMain')
+  })
+})
+
 // ---- 2. the composition in index.ts ----
+
+/** the names a file gives the guarded wrappers of the raw ipcMain: `const guardedIpc = guard.guarded(ipcMain)` */
+function guardedAliases(text: string): string[] {
+  return [...code(text).matchAll(/\bconst\s+(\w+)\s*=\s*[\w.]+\.guarded\(\s*ipcMain\s*\)/g)].map(
+    (m) => m[1]!,
+  )
+}
+
+/**
+ * Registrations on a guarded alias that the guard would not accept: a channel it has no policy for
+ * (it throws at registration, and the app stops at start) or one the scan cannot read. index.ts
+ * registers hundreds of other channels on the raw ipcMain, so this is the check that stops an
+ * over-eager search-and-replace of `ipcMain.handle(` from taking an out-of-scope `app:*` line along.
+ */
+function guardedRegistrationOffenders(source: Source): string[] {
+  const aliases = new Set(guardedAliases(source.text))
+  return registrations(source)
+    .filter((reg) => aliases.has(reg.receiver))
+    .flatMap((reg) => {
+      if (reg.channels.length === 0) {
+        return [
+          `${reg.file}: ${reg.receiver}.${reg.method}(${squash(reg.arg)}) has a channel the scan cannot read`,
+        ]
+      }
+      return reg.channels
+        .filter((channel) => policyForChannel(channel) === null)
+        .map(
+          (channel) =>
+            `${reg.file}: ${reg.receiver}.${reg.method}(${squash(reg.arg)}) -> ${channel} has no guard policy`,
+        )
+    })
+}
 
 describe('composition in apps/shell/src/main/index.ts', () => {
   const index = sources.find((s) => isIndex(s.file))!
 
   it('builds the guards from the raw ipcMain and uses only those for the registrars', () => {
-    const aliases = [
-      ...index.text.matchAll(/const\s+(\w+)\s*=\s*[\w.]+\.guarded\(\s*ipcMain\s*\)/g),
-    ].map((m) => m[1]!)
+    const aliases = guardedAliases(index.text)
     expect(aliases.length).toBeGreaterThan(0)
     for (const name of COMPOSED_IN_INDEX) {
       const calls = [
-        ...index.text.matchAll(new RegExp(`\\b${name}\\(\\s*([A-Za-z_$][\\w$.]*)`, 'g')),
+        ...code(index.text).matchAll(new RegExp(`\\b${name}\\(\\s*([A-Za-z_$][\\w$.]*)`, 'g')),
       ]
       expect(calls.length, `${name} is called from index.ts`).toBeGreaterThan(0)
       for (const call of calls) {
@@ -528,9 +1138,31 @@ describe('composition in apps/shell/src/main/index.ts', () => {
   })
 
   it('reads the shell window lazily (a function, never a captured webContents)', () => {
-    expect(/createIpcSenderGuard\(\{[\s\S]{0,300}shellContents:\s*\(\)\s*=>/.test(index.text)).toBe(
-      true,
+    expect(
+      /createIpcSenderGuard\(\{[\s\S]{0,300}shellContents:\s*\(\)\s*=>/.test(code(index.text)),
+    ).toBe(true)
+  })
+
+  it('registers only channels the guard accepts on its guarded objects', () => {
+    expect(guardedRegistrationOffenders(index)).toEqual([])
+    // and it really sees them: bar-inset plus the home channels once they are wired
+    const guarded = new Set(guardedAliases(index.text))
+    expect(registrations(index).filter((reg) => guarded.has(reg.receiver)).length).toBeGreaterThan(
+      0,
     )
+  })
+
+  it('the guarded-receiver check turns red on an out-of-scope or unreadable channel', () => {
+    const file = 'apps/shell/src/main/index.ts'
+    const offenders = (body: string) =>
+      guardedRegistrationOffenders({
+        file,
+        text: `import { ipcMain } from 'electron'\nconst g = guard.guarded(ipcMain)\n${body}\n`,
+      })
+    expect(offenders("g.handle('uniwork-doc:save', f)")).toEqual([])
+    expect(offenders("g.handle('app:get-theme', f)")).toHaveLength(1)
+    expect(offenders('g.handle(someChannel, f)')).toHaveLength(1)
+    expect(offenders("ipcMain.handle('app:get-theme', f)")).toEqual([])
   })
 })
 
@@ -538,10 +1170,7 @@ describe('composition in apps/shell/src/main/index.ts', () => {
 
 describe('registrar files', () => {
   it('lists every file that registers a guarded channel, and only those', () => {
-    const files = sources
-      .filter((source) => registrations(source).some((reg) => scoped(reg).length > 0))
-      .map((source) => source.file)
-    expect(files.sort()).toEqual(Object.keys(REGISTRAR_FILES).sort())
+    expect(registrarFileDiff(sources, REGISTRAR_FILES)).toEqual({ unlisted: [], stale: [] })
   })
 
   it('has no channel in a registrar file that the guard would refuse to register', () => {
@@ -571,6 +1200,11 @@ function expectedPolicy(channel: string): IpcSenderPolicy | null {
   if (channel === 'uniwork:ai-flag') return 'shell-or-editor'
   if (/^uniwork[:-]/.test(channel)) return 'shell'
   if (channel.startsWith('home:uniwork-') || channel.startsWith('home:account-')) return 'shell'
+  // the markdown editor's wiki links open a path through the shell, so the editor side may call it too
+  if (channel === 'home:open-path') return 'shell-or-editor'
+  // the six editor preloads call the app-wide alias of home:set-ai-panel-prefs, so the editor side too
+  if (channel === 'app:set-ai-panel-prefs') return 'shell-or-editor'
+  if (/^home:./.test(channel)) return 'shell'
   return null
 }
 
@@ -638,12 +1272,178 @@ describe('policy of every uniwork* and home account channel constant', () => {
 
   it('finds the channels it claims to scan (the scan itself is not empty)', () => {
     const all = sources.flatMap((s) => registrations(s)).flatMap((r) => scoped(r))
-    // 135 uniwork channels and 11 home account/cloud ones are registered across the shell main
-    expect(all.length).toBeGreaterThan(120)
+    // 135 uniwork channels, 11 home account/cloud ones and the 81 other home channels
+    expect(all.length).toBeGreaterThan(200)
   })
 })
 
-// ---- 5. the real guard accepts what the registrars register ----
+// ---- 5. the home channels (UNI-2082) ----
+
+/** the HOME_CHANNELS constants main sends to a renderer: nothing registers them, so they need no policy */
+const HOME_PUSH_ONLY: readonly string[] = [
+  HOME_CHANNELS.folderChanged,
+  HOME_CHANNELS.accountLoginEvent,
+  HOME_CHANNELS.openSettings,
+  HOME_CHANNELS.accountStatusEvent,
+  HOME_CHANNELS.uniworkCloudStatusEvent,
+  HOME_CHANNELS.openSettingsEvent,
+  HOME_CHANNELS.agentIntentEvent,
+  HOME_CHANNELS.wbBucketChanged,
+]
+
+const HOME_VALUES: readonly string[] = Object.values(HOME_CHANNELS)
+
+/** raw registrations (any spelling the scan resolves) of a HOME_CHANNELS value */
+function rawHomeRegistrations(files: readonly Source[]): string[] {
+  return files.flatMap((source) =>
+    rawRegistrations(source.file, source.text)
+      .filter((reg) => reg.channels.some((channel) => HOME_VALUES.includes(channel)))
+      .map((reg) => `${reg.file}: ${reg.receiver}.${reg.method}(${squash(reg.arg)})`),
+  )
+}
+
+describe('every home channel is accounted for and guarded', () => {
+  const registered = new Map<string, number>()
+  for (const source of sources) {
+    for (const reg of registrations(source)) {
+      for (const channel of reg.channels) {
+        if (HOME_VALUES.includes(channel))
+          registered.set(channel, (registered.get(channel) ?? 0) + 1)
+      }
+    }
+  }
+
+  it('is either registered or listed as push-only, never both', () => {
+    expect({
+      neither: HOME_VALUES.filter((c) => !registered.has(c) && !HOME_PUSH_ONLY.includes(c)),
+      both: HOME_PUSH_ONLY.filter((c) => registered.has(c)),
+    }).toEqual({ neither: [], both: [] })
+    expect(registered.size).toBe(HOME_VALUES.length - HOME_PUSH_ONLY.length)
+  })
+
+  it('is registered once', () => {
+    expect([...registered].filter(([, count]) => count !== 1)).toEqual([])
+  })
+
+  it('has its intended policy on every registered channel', () => {
+    const wrong: string[] = []
+    for (const channel of registered.keys()) {
+      const expected = expectedPolicy(channel)
+      if (expected === null || policyForChannel(channel) !== expected) {
+        wrong.push(
+          `${channel}: expected ${String(expected)}, guard says ${String(policyForChannel(channel))}`,
+        )
+      }
+    }
+    expect(wrong).toEqual([])
+  })
+
+  it('is shell-only except home:open-path, which the markdown editor also calls', () => {
+    const others = [...registered.keys()].filter((channel) => expectedPolicy(channel) !== 'shell')
+    expect(others).toEqual(['home:open-path'])
+    expect(expectedPolicy('home:open-path')).toBe('shell-or-editor')
+  })
+
+  it('is registered on no raw ipcMain: no channel with a HOME_CHANNELS value stays unguarded', () => {
+    expect(rawHomeRegistrations(sources)).toEqual([])
+  })
+
+  it('the raw home check turns red on a constant, a literal and an alias', () => {
+    const header = "import { ipcMain } from 'electron'\n"
+    const files = (body: string): Source[] => [
+      { file: 'apps/shell/src/main/x.ts', text: `${header}${body}\n` },
+    ]
+    expect(rawHomeRegistrations(files('ipcMain.handle(HOME_CHANNELS.recents, f)'))).toHaveLength(1)
+    expect(rawHomeRegistrations(files("ipcMain.handle('home:open-path', f)"))).toHaveLength(1)
+    expect(
+      rawHomeRegistrations(files('const bus = ipcMain\nbus.handle(HOME_CHANNELS.deleteFiles, f)')),
+    ).toHaveLength(1)
+    expect(rawHomeRegistrations(files("ipcMain.handle('app:get-theme', f)"))).toEqual([])
+    expect(rawHomeRegistrations(files('guardedIpc.handle(HOME_CHANNELS.recents, f)'))).toEqual([])
+  })
+})
+
+// ---- 6. the real guard accepts what the registrars register ----
+
+/** HGB-1: the setter alias of a guarded home setter is guarded; the read-only getters stay raw */
+describe('the app: ai panel prefs aliases', () => {
+  const index = sources.find((s) => isIndex(s.file))!
+  const onReceiver = (channel: string) =>
+    registrations(index)
+      .filter((reg) => reg.channels.includes(channel))
+      .map((reg) => reg.receiver)
+  const guarded = new Set(guardedAliases(index.text))
+
+  it('registers app:set-ai-panel-prefs once, on a guarded object', () => {
+    const receivers = onReceiver('app:set-ai-panel-prefs')
+    expect(receivers).toHaveLength(1)
+    expect(guarded.has(receivers[0]!)).toBe(true)
+  })
+
+  it('leaves the four read-only app:get-* getters on the raw ipcMain', () => {
+    for (const channel of [
+      'app:get-theme',
+      'app:get-document-theme',
+      'app:get-auto-save-default',
+      'app:get-ai-panel-prefs',
+    ]) {
+      expect(onReceiver(channel), channel).toEqual(['ipcMain'])
+      expect(policyForChannel(channel), channel).toBeNull()
+    }
+  })
+
+  it('no editor main registers the setter on its own ipcMain', () => {
+    const standalone = sources
+      .filter((source) => !isIndex(source.file))
+      .flatMap((source) => registrations(source))
+      .filter((reg) => reg.channels.includes('app:set-ai-panel-prefs'))
+    expect(standalone).toEqual([])
+  })
+})
+
+/** HGB-4: two false-greens of the raw scan, each a fixture that has to turn red */
+describe('the raw scan reads a shadowed table and a re-exported ipcMain', () => {
+  const header = "import { ipcMain } from 'electron'\n"
+
+  it('a local table that shadows an exported *_CHANNELS name is not read as the exported one', () => {
+    const body =
+      "const PDF_CHANNELS = { save: 'home:delete-files' }\nipcMain.handle(PDF_CHANNELS.save, f)\n"
+    expect(rawOffenders('apps/shell/src/main/x.ts', header + body, {}, [])).not.toEqual([])
+  })
+
+  it('an exported table declared in the file itself still resolves', () => {
+    const body =
+      "export const X_CHANNELS = { a: 'home:delete-files' }\nipcMain.handle(X_CHANNELS.a, f)\n"
+    expect(rawOffenders('apps/shell/src/main/x.ts', header + body, {}, [])).toHaveLength(1)
+  })
+
+  it('a module that re-exports electron ipcMain is flagged, from or after an import', () => {
+    const from = "export { ipcMain } from 'electron'\n"
+    const after = "import { ipcMain } from 'electron'\nexport { ipcMain }\n"
+    const renamed = "import { ipcMain } from 'electron'\nexport { ipcMain as rawIpc }\n"
+    for (const text of [from, after, renamed]) {
+      expect(rawUseOffenders('apps/shell/src/main/raw-ipc.ts', text, [])).not.toEqual([])
+    }
+    expect(
+      rawUseOffenders('apps/shell/src/main/x.ts', "export { app } from 'electron'\n", []),
+    ).toEqual([])
+  })
+})
+
+/** HGB-2: an editor view reaches home:open-path only for the notes its wiki links resolve to */
+describe('the home:open-path handler narrows the editor side', () => {
+  const index = sources.find((s) => isIndex(s.file))!
+
+  it('checks a non-shell sender against editorMayOpenPath before opening', () => {
+    const text = code(index.text)
+    const start = text.indexOf('guardedIpc.handle(HOME_CHANNELS.openPath')
+    expect(start).toBeGreaterThan(-1)
+    const body = text.slice(start, text.indexOf('\n  })', start))
+    expect(body).toMatch(/event\.sender\s*!==\s*shellWindow\??\.webContents/)
+    expect(body).toMatch(/!editorMayOpenPath\(path\)/)
+    expect(body.indexOf('editorMayOpenPath')).toBeLessThan(body.indexOf('openDocumentPath'))
+  })
+})
 
 describe('registrars under the real guard', () => {
   it('registers every channel of the small registrars without a refused registration', () => {

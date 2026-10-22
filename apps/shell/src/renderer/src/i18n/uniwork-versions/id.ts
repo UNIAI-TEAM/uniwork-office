@@ -30,8 +30,7 @@ export const id = {
   vhsNameSubmitting: 'Membuat…',
   vhsNameDone: 'Versi {no} dibuat',
   vhsNameFailed: 'Titik pemeriksaan tidak dapat dibuat. Yang Anda ketik tetap tersimpan.',
-  vhsNameUnchanged:
-    'Tidak ada perubahan sejak versi terbaru, jadi titik pemeriksaan baru tidak dibuat.',
+  vhsNameUnchanged: 'Tidak ada perubahan sejak versi terbaru, jadi versi baru tidak dibuat.',
   vhsRestore: 'Pulihkan versi {no}',
   vhsRestoreConfirmTitle: 'Pulihkan versi {no}?',
   vhsRestoreConfirmDescription:

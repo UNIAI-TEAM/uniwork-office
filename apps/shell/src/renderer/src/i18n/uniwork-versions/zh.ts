@@ -28,7 +28,7 @@ export const zh = {
   vhsNameSubmitting: '正在创建…',
   vhsNameDone: '已创建版本 {no}',
   vhsNameFailed: '无法创建检查点。你输入的内容已保留。',
-  vhsNameUnchanged: '自最新版本以来没有任何更改，因此未创建新的检查点。',
+  vhsNameUnchanged: '自最新版本以来没有任何更改，因此未创建新版本。',
   vhsRestore: '恢复版本 {no}',
   vhsRestoreConfirmTitle: '恢复版本 {no}？',
   vhsRestoreConfirmDescription:

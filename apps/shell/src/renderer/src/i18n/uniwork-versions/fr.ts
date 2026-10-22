@@ -33,7 +33,7 @@ export const fr = {
   vhsNameDone: 'Version {no} créée',
   vhsNameFailed: 'Impossible de créer le point de contrôle. Ce que vous avez saisi est conservé.',
   vhsNameUnchanged:
-    'Rien n’a changé depuis la dernière version, aucun nouveau point de contrôle n’a donc été créé.',
+    'Rien n’a changé depuis la dernière version, aucune nouvelle version n’a donc été créée.',
   vhsRestore: 'Restaurer la version {no}',
   vhsRestoreConfirmTitle: 'Restaurer la version {no} ?',
   vhsRestoreConfirmDescription:

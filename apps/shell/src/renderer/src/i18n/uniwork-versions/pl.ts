@@ -30,8 +30,7 @@ export const pl = {
   vhsNameSubmitting: 'Tworzenie…',
   vhsNameDone: 'Utworzono wersję {no}',
   vhsNameFailed: 'Nie udało się utworzyć punktu kontrolnego. To, co wpisano, zostało zachowane.',
-  vhsNameUnchanged:
-    'Od ostatniej wersji nic się nie zmieniło, więc nie utworzono nowego punktu kontrolnego.',
+  vhsNameUnchanged: 'Od ostatniej wersji nic się nie zmieniło, więc nie utworzono nowej wersji.',
   vhsRestore: 'Przywróć wersję {no}',
   vhsRestoreConfirmTitle: 'Przywrócić wersję {no}?',
   vhsRestoreConfirmDescription:

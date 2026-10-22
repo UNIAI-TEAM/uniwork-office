@@ -5,7 +5,7 @@ import { FolderMenu } from '../uniwork-folders/FolderMenu'
 import { Cell, DOC_ICON_SIZE, Empty, Person, trackOf, useCompactTable } from '../doclist/cells'
 import type { ColumnId } from '../doclist/columns'
 import { formatBytes, formatListDate } from '../doclist/format'
-import { openable, sourceOriginLine } from './source-open-model'
+import { openable, sourceOriginLine, sourceOriginParts } from './source-open-model'
 
 /** UNI-1961: a source file's badge format: its extension, else its name's */
 function sourceExtension(source: UniworkSourceFile): string {
@@ -43,7 +43,7 @@ export function DocumentsSourceRow({
   const { t, dateLocale } = useI18n()
   const compact = useCompactTable()
   const owner = source.owner?.name.trim() ?? ''
-  const origin = sourceOriginLine(source, t)
+  const origin = sourceOriginParts(source, t)
   const download = () => onDownload(source)
   const canOpen = openable(source)
   const open = () => onOpen(source)
@@ -59,8 +59,10 @@ export function DocumentsSourceRow({
                 {source.name}
               </button>
               {origin && (
-                <span className="dh-doc-subpath" title={origin}>
-                  {origin}
+                <span className="dh-doc-subpath" title={sourceOriginLine(source, t) ?? undefined}>
+                  {origin.module}
+                  {origin.module && origin.parent && ' · '}
+                  {origin.parent && <bdi>{origin.parent}</bdi>}
                 </span>
               )}
             </div>

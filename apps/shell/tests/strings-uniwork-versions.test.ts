@@ -93,6 +93,47 @@ describe('uniwork versions string shard', () => {
     )
   })
 
+  // UNI-2080 (Advisor, 2026-10-22): a refused create says "version", as the web does, not checkpoint
+  it('vhsNameUnchanged names the version in vi and en, as the web does', () => {
+    expect(table('vi').vhsNameUnchanged).toBe(
+      'Chưa có thay đổi nào kể từ phiên bản mới nhất nên chưa tạo phiên bản mới.',
+    )
+    expect(table('en').vhsNameUnchanged).toBe(
+      'Nothing has changed since the latest version, so no new version was created.',
+    )
+  })
+
+  it('vhsNameUnchanged says version twice (the latest one, the new one) in every locale', () => {
+    // the locale's own word for "version", as in its vhsRestore
+    const stem: Record<(typeof LANGS)[number], string> = {
+      ar: 'إصدار',
+      cs: 'verz',
+      de: 'Version',
+      en: 'version',
+      es: 'versión',
+      fr: 'version',
+      he: 'גרס',
+      hi: 'संस्करण',
+      id: 'versi',
+      it: 'version',
+      ja: 'バージョン',
+      ko: '버전',
+      ms: 'versi',
+      nl: 'versie',
+      pl: 'wersj',
+      pt: 'versão',
+      ru: 'верси',
+      th: 'เวอร์ชัน',
+      vi: 'phiên bản',
+      zh: '版本',
+      'zh-TW': '版本',
+    }
+    for (const lang of LANGS) {
+      const text = table(lang).vhsNameUnchanged!
+      expect(text.split(stem[lang]).length - 1, lang).toBeGreaterThanOrEqual(2)
+    }
+  })
+
   it('no git word or internal code in the vi/en copy', () => {
     const text = [...Object.values(table('vi')), ...Object.values(table('en'))].join('\n')
     expect(text).not.toMatch(/\b(git|github|commit|branch)\b/i)

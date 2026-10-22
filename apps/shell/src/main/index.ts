@@ -357,6 +357,7 @@ import {
   PPTX_RE,
   TEXT_RE,
   XLSX_RE,
+  editorMayOpenPath,
   renameStaysInApp,
 } from './app-routing'
 import { isSameFile, pdfSaveAsTarget, isValidRawRenameName } from './rename-validation'
@@ -3316,9 +3317,9 @@ let tabManager: TabManager | null = null
 const SHELL_RENDERER_DIR = join(__dirname, '../renderer')
 
 /**
- * UNI-2073: the sender guard for every uniwork*, home:uniwork-* and home:account-* channel. It is
- * handed to those registrars in place of the raw `ipcMain`; the window and view registries are read
- * at call time because the handlers register before the shell window exists.
+ * UNI-2073 / UNI-2082: the sender guard for every uniwork* and home:* channel. It is handed to those
+ * registrars (registerHomeIpc included) in place of the raw `ipcMain`; the window and view
+ * registries are read at call time because the handlers register before the shell window exists.
  */
 const ipcSenderGuard = createIpcSenderGuard({
   shellContents: () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null),
@@ -4895,14 +4896,14 @@ function registerHomeIpc(): void {
   })
 
   // Reserved for the Hub result channel; the ack is not reported anywhere today.
-  ipcMain.handle(HOME_CHANNELS.agentIntentAck, () => undefined)
+  guardedIpc.handle(HOME_CHANNELS.agentIntentAck, () => undefined)
 
-  ipcMain.handle(HOME_CHANNELS.resolveAgentIntent, (_event, text: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.resolveAgentIntent, (_event, text: unknown) => {
     if (typeof text !== 'string') return null
     return resolveAgentIntentFromText(text, 'desktop')
   })
 
-  ipcMain.handle(HOME_CHANNELS.submitAgentIntent, (_event, raw: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.submitAgentIntent, (_event, raw: unknown) => {
     if (!raw || typeof raw !== 'object') return false
     const body = raw as Partial<AgentIntent>
     if (!body.target || !body.action) return false
@@ -4925,18 +4926,18 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.getAppVersion, (): string => app.getVersion())
+  guardedIpc.handle(HOME_CHANNELS.getAppVersion, (): string => app.getVersion())
 
   // Settings > About: the shipped legal files, opened locally (never a URL)
-  ipcMain.handle(HOME_CHANNELS.openLegalDoc, (_event, doc: unknown): Promise<boolean> =>
+  guardedIpc.handle(HOME_CHANNELS.openLegalDoc, (_event, doc: unknown): Promise<boolean> =>
     openLegalDoc(doc, legalDocEnv(), { openPath: (path) => shell.openPath(path) }),
   )
 
-  ipcMain.handle(HOME_CHANNELS.recents, (_event, query: unknown): RecentPage =>
+  guardedIpc.handle(HOME_CHANNELS.recents, (_event, query: unknown): RecentPage =>
     pageRecentPaths(readRecentFiles(), query, new Set(readStarredFiles()), uniworkRecentLookup),
   )
 
-  ipcMain.handle(HOME_CHANNELS.searchFiles, (_event, raw: unknown): FileSearchPage => {
+  guardedIpc.handle(HOME_CHANNELS.searchFiles, (_event, raw: unknown): FileSearchPage => {
     const query = (raw && typeof raw === 'object' ? raw : {}) as Partial<FileSearchQuery>
     const indexer = ensureFileIndexer()
     if (!indexer || !fileIndexStore) {
@@ -4963,7 +4964,7 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(
+  guardedIpc.handle(
     HOME_CHANNELS.rerankSearch,
     async (_event, raw: unknown): Promise<FileSearchRerank | null> => {
       const settings = readFileSearchSettings()
@@ -4979,11 +4980,11 @@ function registerHomeIpc(): void {
     },
   )
 
-  ipcMain.handle(HOME_CHANNELS.getFileSearchSettings, (): FileSearchSettings =>
+  guardedIpc.handle(HOME_CHANNELS.getFileSearchSettings, (): FileSearchSettings =>
     readFileSearchSettings(),
   )
 
-  ipcMain.handle(
+  guardedIpc.handle(
     HOME_CHANNELS.setFileSearchSettings,
     (_event, patch: unknown): FileSearchSettings => {
       const current = readFileSearchSettings()
@@ -4998,7 +4999,7 @@ function registerHomeIpc(): void {
     },
   )
 
-  ipcMain.handle(HOME_CHANNELS.testFileSearchRerank, async (_event, input: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.testFileSearchRerank, async (_event, input: unknown) => {
     const result = await probeDecision(normalizeFileSearchSettings(input))
     if (!result.ok) console.warn('[file-index] rerank test failed:', result.error)
     return result
@@ -5007,40 +5008,42 @@ function registerHomeIpc(): void {
   // Starred files sort by mtime, which requires stat-ing them all first; they
   // are hand-picked and few, so this is fine. The Starred view's group pills
   // scope the whole query (totals included) through the group map.
-  ipcMain.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage =>
+  guardedIpc.handle(HOME_CHANNELS.starred, (_event, query: unknown): RecentPage =>
     pageStarredPaths(readStarredFiles(), query, uniworkRecentLookup, readStarredGroupMap()),
   )
 
-  ipcMain.handle(HOME_CHANNELS.starredGroups, (): string[] => readStarredGroups())
+  guardedIpc.handle(HOME_CHANNELS.starredGroups, (): string[] => readStarredGroups())
 
-  ipcMain.handle(HOME_CHANNELS.setStarredGroup, (_event, paths: unknown, group: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.setStarredGroup, (_event, paths: unknown, group: unknown) => {
     setStarredGroup(stringPaths(paths), typeof group === 'string' && group ? group : null)
   })
 
-  ipcMain.handle(HOME_CHANNELS.statPaths, (_event, paths: unknown): RecentEntry[] =>
+  guardedIpc.handle(HOME_CHANNELS.statPaths, (_event, paths: unknown): RecentEntry[] =>
     statEntries(capStatPaths(stringPaths(paths))),
   )
 
-  ipcMain.handle(HOME_CHANNELS.toggleStar, (_event, path: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.toggleStar, (_event, path: unknown) => {
     if (typeof path === 'string') toggleStarredFile(path)
   })
 
-  ipcMain.handle(HOME_CHANNELS.openPath, (_event, path: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.openPath, (event, path: unknown) => {
     if (typeof path !== 'string' || !path || path.length > 4096) return
+    // an editor view (markdown wiki links) opens notes only; the shell keeps every document type
+    if (event.sender !== shellWindow?.webContents && !editorMayOpenPath(path)) return
     openDocumentPath(path)
     fileIndexer?.refresh()
   })
 
-  ipcMain.handle(HOME_CHANNELS.fileExcerpts, (_event, paths: unknown) =>
+  guardedIpc.handle(HOME_CHANNELS.fileExcerpts, (_event, paths: unknown) =>
     extractAllowedFileExcerpts(paths, tabManager?.openFilePaths() ?? []),
   )
 
-  ipcMain.handle(HOME_CHANNELS.wbLoadAll, () =>
+  guardedIpc.handle(HOME_CHANNELS.wbLoadAll, () =>
     loadWorkbenchSnapshot(workbenchAccounts(), syncWorkbenchOwner),
   )
 
   // every call names the bucket it was loaded from; another account's bucket gets nothing
-  ipcMain.handle(HOME_CHANNELS.wbGetKey, (_event, key: unknown, bucket: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.wbGetKey, (_event, key: unknown, bucket: unknown) => {
     try {
       if (typeof key !== 'string' || !isAllowedWbKey(key)) return null
       return workbenchAccounts().dbFor(bucket)?.get(key) ?? null
@@ -5050,7 +5053,7 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(
+  guardedIpc.handle(
     HOME_CHANNELS.wbSetKey,
     (_event, key: unknown, value: unknown, bucket: unknown) => {
       try {
@@ -5062,7 +5065,7 @@ function registerHomeIpc(): void {
     },
   )
 
-  ipcMain.handle(HOME_CHANNELS.wbRemoveKey, (_event, key: unknown, bucket: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.wbRemoveKey, (_event, key: unknown, bucket: unknown) => {
     try {
       if (typeof key !== 'string' || !isAllowedWbKey(key)) return
       workbenchAccounts().dbFor(bucket)?.remove(key)
@@ -5071,7 +5074,7 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.wbImportKeys, (_event, keys: unknown, bucket: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.wbImportKeys, (_event, keys: unknown, bucket: unknown) => {
     try {
       if (!keys || typeof keys !== 'object' || Array.isArray(keys)) return { imported: 0 }
       const db = workbenchAccounts().dbFor(bucket)
@@ -5083,7 +5086,7 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.wbLegacyDone, (_event, bucket: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.wbLegacyDone, (_event, bucket: unknown) => {
     try {
       workbenchAccounts().markLegacyRendererDone(bucket)
     } catch (err) {
@@ -5091,23 +5094,26 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.wbExportBackup, async (event, media: unknown, bucket: unknown) => {
-    try {
-      const win = BrowserWindow.fromWebContents(event.sender)
-      return await exportWorkbenchBackup(
-        win,
-        () => workbenchAccounts().dbFor(bucket),
-        media && typeof media === 'object'
-          ? (media as import('../shared/home-api').WorkbenchIdbMediaDump)
-          : null,
-      )
-    } catch (err) {
-      console.error('[workbench-db] exportBackup failed', err)
-      return { ok: false as const, error: err instanceof Error ? err.message : String(err) }
-    }
-  })
+  guardedIpc.handle(
+    HOME_CHANNELS.wbExportBackup,
+    async (event, media: unknown, bucket: unknown) => {
+      try {
+        const win = BrowserWindow.fromWebContents(event.sender)
+        return await exportWorkbenchBackup(
+          win,
+          () => workbenchAccounts().dbFor(bucket),
+          media && typeof media === 'object'
+            ? (media as import('../shared/home-api').WorkbenchIdbMediaDump)
+            : null,
+        )
+      } catch (err) {
+        console.error('[workbench-db] exportBackup failed', err)
+        return { ok: false as const, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
 
-  ipcMain.handle(HOME_CHANNELS.wbImportBackup, async (event, bucket: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.wbImportBackup, async (event, bucket: unknown) => {
     try {
       const win = BrowserWindow.fromWebContents(event.sender)
       return await importWorkbenchBackup(win, () => workbenchAccounts().dbFor(bucket))
@@ -5117,7 +5123,7 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.activeOfficeTab, () => {
+  guardedIpc.handle(HOME_CHANNELS.activeOfficeTab, () => {
     const tab = tabManager?.activeOfficeTab()
     if (!tab) return null
     return {
@@ -5128,7 +5134,7 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(
+  guardedIpc.handle(
     HOME_CHANNELS.pushAiPreset,
     (
       _event,
@@ -5155,7 +5161,7 @@ function registerHomeIpc(): void {
     },
   )
 
-  ipcMain.handle(HOME_CHANNELS.browse, async (event) => {
+  guardedIpc.handle(HOME_CHANNELS.browse, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? shellWindow
     if (!win) return
     const result = await showOpenDialogWithMemory(dialog, win, {
@@ -5174,7 +5180,7 @@ function registerHomeIpc(): void {
     if (!result.canceled) for (const path of result.filePaths) openDocumentPath(path)
   })
 
-  ipcMain.handle(HOME_CHANNELS.newDoc, (_event, opts?: HomeNewOpts) => {
+  guardedIpc.handle(HOME_CHANNELS.newDoc, (_event, opts?: HomeNewOpts) => {
     rememberPendingDir('doc', opts)
     rememberPendingProject('doc', opts)
     const preset = normalizeAiPreset(opts?.aiPreset)
@@ -5198,13 +5204,13 @@ function registerHomeIpc(): void {
     newDocTab()
   })
 
-  ipcMain.handle(HOME_CHANNELS.newSheet, (_event, opts?: HomeNewOpts) => {
+  guardedIpc.handle(HOME_CHANNELS.newSheet, (_event, opts?: HomeNewOpts) => {
     rememberPendingDir('sheet', opts)
     rememberPendingProject('sheet', opts)
     void newSheetTab(undefined, { aiPreset: opts?.aiPreset })
   })
 
-  ipcMain.handle(HOME_CHANNELS.newSlide, (_event, opts?: HomeNewOpts) => {
+  guardedIpc.handle(HOME_CHANNELS.newSlide, (_event, opts?: HomeNewOpts) => {
     rememberPendingDir('slide', opts)
     rememberPendingProject('slide', opts)
     const preset = normalizeAiPreset(opts?.aiPreset)
@@ -5215,31 +5221,31 @@ function registerHomeIpc(): void {
     newSlideTab()
   })
 
-  ipcMain.handle(HOME_CHANNELS.newMarkdown, (_event, opts?: HomeNewOpts) => {
+  guardedIpc.handle(HOME_CHANNELS.newMarkdown, (_event, opts?: HomeNewOpts) => {
     rememberPendingDir('markdown', opts)
     rememberPendingProject('markdown', opts)
     newMarkdownTab()
   })
 
-  ipcMain.handle(HOME_CHANNELS.newTxt, (_event, opts?: HomeNewOpts) => {
+  guardedIpc.handle(HOME_CHANNELS.newTxt, (_event, opts?: HomeNewOpts) => {
     rememberPendingDir('txt', opts)
     rememberPendingProject('txt', opts)
     newTxtTab()
   })
 
-  ipcMain.handle(HOME_CHANNELS.newHtml, (_event, opts?: HomeNewOpts) => {
+  guardedIpc.handle(HOME_CHANNELS.newHtml, (_event, opts?: HomeNewOpts) => {
     rememberPendingDir('html', opts)
     rememberPendingProject('html', opts)
     newHtmlTab()
   })
 
-  ipcMain.handle(HOME_CHANNELS.newPdf, (_event, opts?: HomeNewOpts) => {
+  guardedIpc.handle(HOME_CHANNELS.newPdf, (_event, opts?: HomeNewOpts) => {
     rememberPendingDir('pdf', opts)
     rememberPendingProject('pdf', opts)
     void newPdfTab({ aiPreset: opts?.aiPreset })
   })
 
-  ipcMain.handle(HOME_CHANNELS.removeRecent, (_event, paths: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.removeRecent, (_event, paths: unknown) => {
     const list = stringPaths(paths)
     removeRecentFiles(list)
     // an unavailable entry's star must go with it, or the Starred view keeps
@@ -5251,15 +5257,15 @@ function registerHomeIpc(): void {
   // selection action is "unstar", not "remove from recents" — removeRecent
   // keeps existing files' stars on purpose, which made the Starred view's
   // bulk removal a no-op for anything still on disk
-  ipcMain.handle(HOME_CHANNELS.unstarPaths, (_event, paths: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.unstarPaths, (_event, paths: unknown) => {
     removeStarredFiles(stringPaths(paths))
   })
 
-  ipcMain.handle(HOME_CHANNELS.revealPath, (_event, path: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.revealPath, (_event, path: unknown) => {
     if (typeof path === 'string' && existsSync(path)) shell.showItemInFolder(path)
   })
 
-  ipcMain.handle(HOME_CHANNELS.listDrafts, () =>
+  guardedIpc.handle(HOME_CHANNELS.listDrafts, () =>
     listDeskDrafts({
       openTabs: async () => [
         ...(tabManager ? await tabManager.openDocuments() : []),
@@ -5274,7 +5280,7 @@ function registerHomeIpc(): void {
     }),
   )
 
-  ipcMain.handle(HOME_CHANNELS.runDeskTool, async (event, req: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.runDeskTool, async (event, req: unknown) => {
     const host = BrowserWindow.fromWebContents(event.sender) ?? shellWindow
     if (!host) return { ok: false, error: 'failed' }
     return runDeskTool(req, {
@@ -5343,7 +5349,7 @@ function registerHomeIpc(): void {
     })
   })
 
-  ipcMain.handle(
+  guardedIpc.handle(
     HOME_CHANNELS.renameFile,
     (_event, path: unknown, newName: unknown): RenameResult => {
       if (typeof path !== 'string' || typeof newName !== 'string')
@@ -5380,7 +5386,7 @@ function registerHomeIpc(): void {
     },
   )
 
-  ipcMain.handle(HOME_CHANNELS.duplicateFile, async (_event, path: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.duplicateFile, async (_event, path: unknown) => {
     if (typeof path !== 'string' || !existsSync(path)) return
     if (!isUserVisibleFile(path, fileTargetSources())) return
     const ext = extname(path)
@@ -5400,7 +5406,7 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.deleteFiles, async (_event, paths: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.deleteFiles, async (_event, paths: unknown) => {
     const targets = fileTargetSources()
     // a missing path still passes so the ghost recent/star entry gets cleaned up
     const list = stringPaths(paths).filter(
@@ -5418,7 +5424,7 @@ function registerHomeIpc(): void {
     removeStarredFiles(list)
   })
 
-  ipcMain.handle(HOME_CHANNELS.openTrash, () => {
+  guardedIpc.handle(HOME_CHANNELS.openTrash, () => {
     if (process.platform === 'darwin') {
       void shell.openPath(join(app.getPath('home'), '.Trash'))
     } else if (process.platform === 'win32') {
@@ -5428,9 +5434,9 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.getLanguage, (): Lang => currentLang())
+  guardedIpc.handle(HOME_CHANNELS.getLanguage, (): Lang => currentLang())
 
-  ipcMain.handle(HOME_CHANNELS.setLanguage, (_event, lang: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.setLanguage, (_event, lang: unknown) => {
     if (!isLang(lang) || lang === currentLang()) return
     persistLang(lang)
     // an open conflict dialog keeps the old language: it closes as "Decide later"
@@ -5442,13 +5448,13 @@ function registerHomeIpc(): void {
     for (const wc of webContents.getAllWebContents()) wc.send('app:language-changed', lang)
   })
 
-  ipcMain.handle(HOME_CHANNELS.getUpdateChannel, (): UpdateChannel => currentUpdateChannel())
+  guardedIpc.handle(HOME_CHANNELS.getUpdateChannel, (): UpdateChannel => currentUpdateChannel())
 
-  ipcMain.handle(HOME_CHANNELS.getPinnedUpdateChannel, (): string | null =>
+  guardedIpc.handle(HOME_CHANNELS.getPinnedUpdateChannel, (): string | null =>
     getPinnedUpdateChannel(),
   )
 
-  ipcMain.handle(HOME_CHANNELS.setUpdateChannel, (_event, channel: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.setUpdateChannel, (_event, channel: unknown) => {
     // a pinned build always follows its own channel; the choice is not stored
     if (getPinnedUpdateChannel() !== null) return
     if (!isUpdateChannel(channel) || channel === currentUpdateChannel()) return
@@ -5457,12 +5463,12 @@ function registerHomeIpc(): void {
     applyUpdateChannel(channel)
   })
 
-  ipcMain.handle(
+  guardedIpc.handle(
     HOME_CHANNELS.onboardingSeen,
     (): boolean => readAppSettings(APP_SETTINGS_PATH()).onboardingSeen === true,
   )
 
-  ipcMain.handle(HOME_CHANNELS.setOnboardingSeen, (): boolean => {
+  guardedIpc.handle(HOME_CHANNELS.setOnboardingSeen, (): boolean => {
     try {
       writeAppSetting(APP_SETTINGS_PATH(), 'onboardingSeen', true)
       return true
@@ -5471,11 +5477,11 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.getTheme, (): UiTheme => currentTheme())
+  guardedIpc.handle(HOME_CHANNELS.getTheme, (): UiTheme => currentTheme())
   // editor tabs ask via the app-wide channel (symmetric with app:get-language)
   ipcMain.handle('app:get-theme', (): UiTheme => currentTheme())
 
-  ipcMain.handle(HOME_CHANNELS.setTheme, (_event, theme: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.setTheme, (_event, theme: unknown) => {
     if (theme !== 'light' && theme !== 'dark' && theme !== 'system') return
     if (theme === currentTheme()) return
     cachedTheme = theme
@@ -5485,11 +5491,11 @@ function registerHomeIpc(): void {
     for (const wc of webContents.getAllWebContents()) wc.send('app:theme-changed', theme)
   })
 
-  ipcMain.handle(HOME_CHANNELS.getDocumentTheme, (): DocTheme => currentDocTheme())
+  guardedIpc.handle(HOME_CHANNELS.getDocumentTheme, (): DocTheme => currentDocTheme())
   // editor tabs ask via the app-wide channel (symmetric with app:get-theme)
   ipcMain.handle('app:get-document-theme', (): DocTheme => currentDocTheme())
 
-  ipcMain.handle(HOME_CHANNELS.setDocumentTheme, (_event, theme: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.setDocumentTheme, (_event, theme: unknown) => {
     if (theme !== 'light' && theme !== 'dark' && theme !== 'follow') return
     if (theme === currentDocTheme()) return
     cachedDocTheme = theme
@@ -5498,10 +5504,12 @@ function registerHomeIpc(): void {
     for (const wc of webContents.getAllWebContents()) wc.send('app:document-theme-changed', theme)
   })
 
-  ipcMain.handle(HOME_CHANNELS.getAutoSaveDefault, (): AutoSaveDefault => currentAutoSaveDefault())
+  guardedIpc.handle(HOME_CHANNELS.getAutoSaveDefault, (): AutoSaveDefault =>
+    currentAutoSaveDefault(),
+  )
   ipcMain.handle('app:get-auto-save-default', (): AutoSaveDefault => currentAutoSaveDefault())
 
-  ipcMain.handle(HOME_CHANNELS.setAutoSaveDefault, (_event, on: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.setAutoSaveDefault, (_event, on: unknown) => {
     if (typeof on !== 'boolean') return
     if (on === currentAutoSaveDefault().on) return
     const next: AutoSaveDefault = { on, updatedAt: Date.now() }
@@ -5513,9 +5521,9 @@ function registerHomeIpc(): void {
     for (const wc of webContents.getAllWebContents()) wc.send('app:auto-save-default-changed', next)
   })
 
-  ipcMain.handle(HOME_CHANNELS.getMcpStatus, () => mcpStatus())
+  guardedIpc.handle(HOME_CHANNELS.getMcpStatus, () => mcpStatus())
 
-  ipcMain.handle(HOME_CHANNELS.setMcpSettings, async (_event, patch: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.setMcpSettings, async (_event, patch: unknown) => {
     if (!patch || typeof patch !== 'object') return mcpStatus()
     const request = patch as {
       enabled?: unknown
@@ -5549,19 +5557,19 @@ function registerHomeIpc(): void {
     }
   })
 
-  ipcMain.handle(HOME_CHANNELS.getMcpLogs, () => getMcpRecentLogs())
+  guardedIpc.handle(HOME_CHANNELS.getMcpLogs, () => getMcpRecentLogs())
 
-  ipcMain.handle(HOME_CHANNELS.clearMcpLogs, () => {
+  guardedIpc.handle(HOME_CHANNELS.clearMcpLogs, () => {
     clearMcpLogs()
   })
 
-  ipcMain.handle(HOME_CHANNELS.openMcpLogFile, () => {
+  guardedIpc.handle(HOME_CHANNELS.openMcpLogFile, () => {
     revealMcpLogFile()
     const logPath = mcpLogFilePath()
     if (logPath) shell.showItemInFolder(logPath)
   })
 
-  ipcMain.handle(HOME_CHANNELS.getAiPanelPrefs, (): AiPanelPrefs => currentAiPanelPrefs())
+  guardedIpc.handle(HOME_CHANNELS.getAiPanelPrefs, (): AiPanelPrefs => currentAiPanelPrefs())
   ipcMain.handle('app:get-ai-panel-prefs', (): AiPanelPrefs => currentAiPanelPrefs())
 
   const setAiPanelPrefs = (patch: unknown): AiPanelPrefs => {
@@ -5590,8 +5598,9 @@ function registerHomeIpc(): void {
     for (const wc of webContents.getAllWebContents()) wc.send('app:ai-panel-prefs-changed', next)
     return next
   }
-  ipcMain.handle(HOME_CHANNELS.setAiPanelPrefs, (_event, patch) => setAiPanelPrefs(patch))
-  ipcMain.handle('app:set-ai-panel-prefs', (_event, patch) => setAiPanelPrefs(patch))
+  guardedIpc.handle(HOME_CHANNELS.setAiPanelPrefs, (_event, patch) => setAiPanelPrefs(patch))
+  // the app:get-* getters above stay on the raw ipcMain: read-only, and headless export windows outside the editor registry may read them
+  guardedIpc.handle('app:set-ai-panel-prefs', (_event, patch) => setAiPanelPrefs(patch))
 
   // effective folder where new/untitled files land; the editor mains resolve
   // the same setting themselves (configuredDefaultSaveDir via docs' defaultSaveDir)
@@ -5607,7 +5616,7 @@ function registerHomeIpc(): void {
     typeof path === 'string' && insideAnyRoot(path)
   const isRoot = (path: string) => isAnyRoot(path)
 
-  ipcMain.handle(HOME_CHANNELS.folderRoots, (): FolderRoot[] => {
+  guardedIpc.handle(HOME_CHANNELS.folderRoots, (): FolderRoot[] => {
     // a missing default folder stays missing until the first save; the tree lists it as empty
     const roots = [
       describeRoot(viewSaveDir(), { create: false }),
@@ -5627,7 +5636,7 @@ function registerHomeIpc(): void {
     return describeExtraRoot(path)
   }
 
-  ipcMain.handle(HOME_CHANNELS.addFolderRoot, async (): Promise<FolderRoot | null> => {
+  guardedIpc.handle(HOME_CHANNELS.addFolderRoot, async (): Promise<FolderRoot | null> => {
     const result = await showOpenDialogWithMemory(dialog, shellWindow, {
       title: tm('dlgAddFolderRoot'),
       properties: ['openDirectory'],
@@ -5641,7 +5650,7 @@ function registerHomeIpc(): void {
     return addFolderRoot(picked)
   })
 
-  ipcMain.handle(HOME_CHANNELS.dropFolderRoots, (_event, paths: unknown): FolderRoot[] => {
+  guardedIpc.handle(HOME_CHANNELS.dropFolderRoots, (_event, paths: unknown): FolderRoot[] => {
     const added: FolderRoot[] = []
     const files: string[] = []
     for (const path of stringPaths(paths)) {
@@ -5656,7 +5665,7 @@ function registerHomeIpc(): void {
     return added
   })
 
-  ipcMain.handle(HOME_CHANNELS.removeFolderRoot, (_event, path: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.removeFolderRoot, (_event, path: unknown) => {
     if (typeof path !== 'string') return
     const extras = withoutExtraRoot(extraFolderRoots(), path)
     writeAppSetting(APP_SETTINGS_PATH(), FOLDER_ROOTS_KEY, extras)
@@ -5664,12 +5673,12 @@ function registerHomeIpc(): void {
     fileIndexer?.refresh()
   })
 
-  ipcMain.handle(HOME_CHANNELS.listFolder, (_event, dir: unknown): FolderListing => {
+  guardedIpc.handle(HOME_CHANNELS.listFolder, (_event, dir: unknown): FolderListing => {
     if (!insideRoot(dir)) return { dir: String(dir), folders: [], files: [] }
     return listFolder(dir, new Set(readStarredFiles()))
   })
 
-  ipcMain.handle(
+  guardedIpc.handle(
     HOME_CHANNELS.createFolder,
     (_event, parent: unknown, name: unknown): RenameResult => {
       if (!insideRoot(parent) || typeof name !== 'string')
@@ -5678,7 +5687,7 @@ function registerHomeIpc(): void {
     },
   )
 
-  ipcMain.handle(
+  guardedIpc.handle(
     HOME_CHANNELS.renameFolder,
     (_event, dir: unknown, newName: unknown): RenameResult => {
       if (!insideRoot(dir) || isRoot(dir) || typeof newName !== 'string')
@@ -5692,7 +5701,7 @@ function registerHomeIpc(): void {
     },
   )
 
-  ipcMain.handle(
+  guardedIpc.handle(
     HOME_CHANNELS.movePaths,
     async (_event, paths: unknown, targetDir: unknown, policy: unknown): Promise<MoveResult> => {
       const list = stringPaths(paths)
@@ -5749,7 +5758,7 @@ function registerHomeIpc(): void {
     },
   )
 
-  ipcMain.handle(HOME_CHANNELS.deleteFolder, async (_event, dir: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.deleteFolder, async (_event, dir: unknown) => {
     if (!insideRoot(dir) || isRoot(dir)) return
     const files = trackedFilesUnder(dir)
     try {
@@ -5761,7 +5770,7 @@ function registerHomeIpc(): void {
     removeStarredFiles(files)
   })
 
-  ipcMain.handle(HOME_CHANNELS.getDefaultSaveDir, (): string => viewSaveDir())
+  guardedIpc.handle(HOME_CHANNELS.getDefaultSaveDir, (): string => viewSaveDir())
 
   const defaultApp = createDefaultAppService({
     platform: process.platform,
@@ -5770,12 +5779,14 @@ function registerHomeIpc(): void {
     run: execFileRunner,
     openExternal: (url) => shell.openExternal(url),
   })
-  ipcMain.handle(HOME_CHANNELS.getDefaultAppStatus, () => defaultApp.status())
-  ipcMain.handle(HOME_CHANNELS.setDefaultApp, () => defaultApp.set())
-  ipcMain.handle(HOME_CHANNELS.getCliLinkStatus, () => cliLinkStatus())
-  ipcMain.handle(HOME_CHANNELS.installCliLink, () => installCliLinkOnRequest(APP_SETTINGS_PATH()))
+  guardedIpc.handle(HOME_CHANNELS.getDefaultAppStatus, () => defaultApp.status())
+  guardedIpc.handle(HOME_CHANNELS.setDefaultApp, () => defaultApp.set())
+  guardedIpc.handle(HOME_CHANNELS.getCliLinkStatus, () => cliLinkStatus())
+  guardedIpc.handle(HOME_CHANNELS.installCliLink, () =>
+    installCliLinkOnRequest(APP_SETTINGS_PATH()),
+  )
 
-  ipcMain.handle(HOME_CHANNELS.pickDefaultSaveDir, async (): Promise<string | null> => {
+  guardedIpc.handle(HOME_CHANNELS.pickDefaultSaveDir, async (): Promise<string | null> => {
     const result = await showOpenDialogWithMemory(dialog, shellWindow, {
       title: tm('dlgPickSaveDir'),
       defaultPath: viewSaveDir(),
@@ -5792,7 +5803,7 @@ function registerHomeIpc(): void {
     return picked
   })
 
-  ipcMain.handle(HOME_CHANNELS.openCreditUsage, () => {
+  guardedIpc.handle(HOME_CHANNELS.openCreditUsage, () => {
     shell.openExternal(CREDIT_USAGE_URL).catch(() => {
       // no browser handler available; nothing actionable for the user here
     })

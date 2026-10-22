@@ -7,7 +7,7 @@ import type {
 } from '../../../shared/home-api'
 import type { StringKey } from '../locale'
 import { isOpenable, type DocNameError } from '../uniwork-docs-model'
-import { workspaceFolderIntoMyFolder } from './ws-folder'
+import { canCreateInsideFolder, workspaceFolderIntoMyFolder } from './ws-folder'
 
 /**
  * FD-11 (UNI-1809) folder tree model: what UniworkFolderTree, UniworkBrowser
@@ -511,6 +511,37 @@ export function entryTitleOf(doc: UniworkDocSummary, label: string): string {
 /** rename / move / archive are offered on every row but My Folder (Q2) */
 export function folderEditActionsOffered(entry: { systemKind?: UniworkSystemKind }): boolean {
   return !isMyFolder(entry)
+}
+
+/** what the server says I may do with a folder (`my_level`) */
+export type FolderLevel = 'view' | 'edit' | 'manage'
+
+/** the server's level word, or undefined for anything else (unknown reads as view, see treeRowAccess) */
+export function folderLevelOf(value: string | null | undefined): FolderLevel | undefined {
+  return value === 'view' || value === 'edit' || value === 'manage' ? value : undefined
+}
+
+/**
+ * What a folder row of a tree menu offers, as the web's DocumentTreeRowMenu: rename and move need
+ * the edit level, a new sub-folder follows the create rule (the edit level, or a human member in a
+ * workspace folder). A tree node carries no level, so `level` is what the folder's properties
+ * answered; an unknown level reads as view, so a command the server would refuse stays hidden.
+ * My Folder is the caller's own: a place to create in, never renamed or moved. The root row
+ * (`id` null) always takes a new folder.
+ */
+export function treeRowAccess(
+  row: { id: string | null; systemKind?: UniworkSystemKind },
+  level: FolderLevel | undefined,
+  index: FolderIndex,
+  role: string | null | undefined,
+): { create: boolean; edit: boolean } {
+  if (row.id === null) return { create: true, edit: false }
+  if (isMyFolder(row)) return { create: true, edit: false }
+  const canEdit = level === 'edit' || level === 'manage'
+  return {
+    create: canCreateInsideFolder({ ...row, id: row.id, kind: 'folder', canEdit }, index, role),
+    edit: canEdit,
+  }
 }
 
 /**

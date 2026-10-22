@@ -93,6 +93,10 @@ function makeApi() {
       ok({ summary: entry(i.documentId, 'Beta', { parentId: i.parentId }), renamedTo: null }),
     ),
     uniworkRenameDocument: vi.fn(),
+    // the tree row menu reads the folder's level when it opens (UNI-2080)
+    uniworkDocumentProperties: vi.fn(async (id: string) =>
+      ok({ documentId: id, workspaceId: 'w1', title: id, myLevel: 'edit' }),
+    ),
     onUniworkTreeChanged: vi.fn(() => () => undefined),
   }
   window.aiOffice = fns as unknown as HomeApi
@@ -208,7 +212,7 @@ describe('My Folder in the browser (tree + contents + breadcrumb)', () => {
   it('the tree row menu of My Folder offers New subfolder only (no rename / move)', async () => {
     await mount(browser())
     await contextMenu(treeItem(us.usMyFolder))
-    expect(menuActions()).toEqual(['new'])
+    expect(menuActions()).toEqual(['open', 'new'])
     await click($('[data-folder-action="new"]'))
     // still a valid create target
     expect($('.uw-act-heading')?.textContent).toBe(uf.ufNewSubfolder)
@@ -227,7 +231,7 @@ describe('My Folder in the browser (tree + contents + breadcrumb)', () => {
   it('other folders keep rename and move', async () => {
     await mount(browser())
     await contextMenu(treeItem('Alpha'))
-    expect(menuActions()).toEqual(['new', 'rename', 'move'])
+    expect(menuActions()).toEqual(['open', 'new', 'rename', 'move'])
   })
 
   it('the contents row menu of My Folder hides rename / move', async () => {

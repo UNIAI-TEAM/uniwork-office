@@ -65,11 +65,13 @@ import {
   myFolderFirst,
   myFolderIdOf,
   shortPath,
+  treeRowAccess,
   type FolderIndex,
   type PathPart,
   type TreeRow,
 } from '../uniwork-folders/uniwork-folders-model'
 import { useFolderActions } from '../uniwork-folders/use-folder-actions'
+import { useFolderLevels } from '../uniwork-folders/use-folder-levels'
 import { canCreateInsideFolder, type WorkspaceFolderCandidate } from '../uniwork-folders/ws-folder'
 import {
   canPurgeDocuments,
@@ -502,6 +504,9 @@ export function DocumentsHome({
   const [unavailableKinds, setUnavailableKinds] = useState<ReadonlySet<NewDocKind>>(new Set())
   const [creating, setCreating] = useState(false)
   const creatingRef = useRef(false)
+  // the search box takes focus back when a control inside the list unmounts (Retry, Clear search, ×)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const focusSearch = () => searchInputRef.current?.focus()
   const [uploadModal, setUploadModal] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const uploadIdRef = useRef<string | null>(null)
@@ -1909,20 +1914,34 @@ export function DocumentsHome({
     })
   }
 
+  // UNI-2080: a tree node has no level; the folder's menu reads it when it opens (as the web does)
+  const folderLevels = useFolderLevels(workspaceId)
   const treeMenuFor = (row: TreeRow): FolderMenuItem[] => {
+    const id = row.id
+    // the dialog renders inside this pane, which is hidden while My AI / Workbench owns the view
+    const newFolder: FolderMenuItem = {
+      id: 'new',
+      label: id ? t('ufNewSubfolder') : t('ufNewFolder'),
+      onSelect: () => {
+        onSidebarNavigate?.()
+        folderActions.openCreate(id, id !== null)
+      },
+    }
+    if (id === null) return [newFolder]
+    const access = treeRowAccess(row, folderLevels.levelOf(id), index, myRole)
+    // Mở leads the menu: a viewer's folder still has this read action
     const items: FolderMenuItem[] = [
       {
-        id: 'new',
-        label: row.id ? t('ufNewSubfolder') : t('ufNewFolder'),
+        id: 'open',
+        label: t('dlActOpen'),
         onSelect: () => {
-          // the dialog renders inside this pane, which is hidden while My AI / Workbench owns the view
           onSidebarNavigate?.()
-          folderActions.openCreate(row.id, row.id !== null)
+          openFolderInWorkspace(id)
         },
       },
     ]
-    if (!row.id || !folderEditActionsOffered(row)) return items
-    const id = row.id
+    if (access.create) items.push(newFolder)
+    if (!access.edit) return items
     const parentId = index.get(id)?.parentId ?? null
     items.push(
       { id: 'rename', label: t('ufRename'), onSelect: () => folderActions.startTreeRename(id) },
@@ -2443,6 +2462,12 @@ export function DocumentsHome({
                 openFolderInWorkspace(id)
               }}
               menuFor={treeMenuFor}
+              onMenuIntent={(row, focus) => {
+                // My Folder is the caller's own: its menu needs no level; a bare focus asks only while the level is unknown
+                if (!row.id || isMyFolder(row)) return
+                if (focus && folderLevels.levelOf(row.id) !== undefined) return
+                folderLevels.load(row.id)
+              }}
               rename={folderActions.treeRename}
               onRenameSave={(id, value) =>
                 folderActions.saveTreeRename(id, value, index.get(id)?.title ?? '')
@@ -2622,6 +2647,7 @@ export function DocumentsHome({
               <path d="m20 20-3.5-3.5" />
             </svg>
             <input
+              ref={searchInputRef}
               className="dh-search-input uwf-own-search"
               type="search"
               aria-label={searchLabel}
@@ -2642,7 +2668,10 @@ export function DocumentsHome({
                 type="button"
                 className="dh-search-clear"
                 aria-label={t('searchClear')}
-                onClick={() => setSearchDraft('')}
+                onClick={() => {
+                  setSearchDraft('')
+                  focusSearch()
+                }}
               >
                 ×
               </button>
@@ -2784,6 +2813,7 @@ export function DocumentsHome({
           <ListState
             kind="error"
             glyph={unavailablePage === 'starred' ? 'star' : 'error'}
+            returnFocus={focusSearch}
             title={unavailableKeys ? t(unavailableKeys.title) : t(UNIWORK_ERROR_KEYS[listError])}
             hint={unavailableKeys ? t(unavailableKeys.hint) : undefined}
             // Thử lại where asking again can help: a missing route (the server may be updated) and
@@ -2904,6 +2934,7 @@ export function DocumentsHome({
                   <ListState
                     kind="empty"
                     glyph="search"
+                    returnFocus={focusSearch}
                     title={t('dlSearchNoResults', { query })}
                     action={{ label: t('searchClear'), onClick: () => setSearchDraft('') }}
                   />

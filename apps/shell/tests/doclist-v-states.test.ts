@@ -217,6 +217,20 @@ describe('DocumentsHome: the states of the lists', () => {
       expect(host.querySelector('[data-doc-id="a"]')).not.toBeNull()
     })
 
+    // UNI-2080 RV-7: the Retry button unmounts with the error, which used to drop focus to <body>
+    it('Retry hands keyboard focus to the search box instead of dropping it to the body', async () => {
+      favorites = async () => ({ ok: false, error: 'not_found' })
+      await mount('starred')
+      favorites = async () => ok({ documents: [], nextCursor: null })
+      const button = Array.from(stateOf()!.querySelectorAll('button')).find(
+        (b) => b.textContent === 'Retry',
+      )!
+      button.focus()
+      expect(document.activeElement).toBe(button)
+      await click(button)
+      expect(document.activeElement).toBe(host.querySelector('.dh-search-input'))
+    })
+
     it.each(['server_error', 'network'] as const)(
       'any other error (%s) is the generic list error with its own sentence and Retry',
       async (error) => {
@@ -434,6 +448,23 @@ describe('DocumentsHome: the states of the lists', () => {
       expect(subline('s-mail')).toBe('Từ email · Re: Báo giá Q4')
     })
 
+    // UNI-2080 RV-12: in an RTL line the neutral "#" between the Arabic run and the Latin name resolved
+    // to RTL and drew "general#"; the parent sits in its own <bdi> so "#" stays with the name
+    it.each(['ar', 'he'] as const)(
+      '%s: the parent label is isolated (bdi), so "#" stays with the channel name',
+      async (lang) => {
+        sources = async () => ok({ items: SOURCES, nextCursor: null })
+        await mount('elsewhere', lang as unknown as 'en')
+        const line = host.querySelector(`[data-source-id="s-chat"] .dh-doc-subpath`)!
+        const parent = line.querySelector('bdi')
+        expect(parent, 'the parent label').not.toBeNull()
+        expect(parent!.textContent).toBe('#phap-che')
+        // the module name stays outside the isolate, and the plain text is unchanged
+        expect(line.textContent).toMatch(/ · #phap-che$/)
+        expect(line.textContent!.replace(/ · #phap-che$/, '')).not.toBe('')
+      },
+    )
+
     it('a blank parent title leaves the module alone; a module this build has no name for shows its parent only', async () => {
       sources = async () => ok({ items: SOURCES, nextCursor: null })
       await mount('elsewhere', 'en')
@@ -490,6 +521,28 @@ describe('DocumentsHome: the states of the lists', () => {
         expect(stateOf()?.querySelector('.dl-state-title')?.textContent).not.toBe(title)
       },
     )
+
+    // UNI-2080 RV-7: both clear controls unmount with the no-hit state / the typed text
+    it('Clear search in the empty state returns focus to the search box', async () => {
+      await mount('workspace', 'en')
+      await type('zzzz')
+      const button = Array.from(stateOf()!.querySelectorAll('button')).find(
+        (b) => b.textContent === 'Clear search',
+      )!
+      button.focus()
+      await click(button)
+      expect(document.activeElement).toBe(host.querySelector('.dh-search-input'))
+    })
+
+    it('the × in the search box returns focus to the search box', async () => {
+      await mount('workspace', 'en')
+      await type('zzzz')
+      const clear = host.querySelector<HTMLButtonElement>('.dh-search-box button')!
+      clear.focus()
+      await click(clear)
+      expect(host.querySelector('.dh-search-box button')).toBeNull()
+      expect(document.activeElement).toBe(host.querySelector('.dh-search-input'))
+    })
 
     it('the search field has exactly one clear button, and the native one is hidden', async () => {
       await mount('workspace', 'en')
