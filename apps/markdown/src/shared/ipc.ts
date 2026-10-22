@@ -64,7 +64,7 @@ export const MARKDOWN_CHANNELS = {
   aiPanelPrefsChanged: 'app:ai-panel-prefs-changed',
 } as const
 
-/** the raw text between `[[ ]]`, verbatim, as the editor holds it */
+/** bare target: no brackets, no alias (`name`, `name#Heading`, `#Heading`) */
 export interface WikiLinkResolveRequest {
   /** absolute path of the document holding the links; '' when untitled */
   fromPath: string

@@ -13,6 +13,16 @@ import type { WikiLinkResolved } from '../../shared/ipc'
 const WIKI_LINK_RE = /^\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+))?\]\]/
 
 /**
+ * `[[Note#Head|Alias]]` -> `Note#Head`: the bare target the resolver documents.
+ * The `#fragment` stays (the resolver splits it); '' when nothing is left.
+ */
+export function wikiTarget(raw: string): string {
+  const inner = raw.replace(/^\[\[/, '').replace(/\]\]$/, '')
+  const bar = inner.indexOf('|')
+  return (bar < 0 ? inner : inner.slice(0, bar)).trim()
+}
+
+/**
  * Index of the first unescaped `[[`. The stock link tokenizer opens on a
  * single `[`, so both candidates start at the same offset and marked breaks
  * that tie by extension order — pointing `start` at the first bracket is what
@@ -101,14 +111,15 @@ function wikiSpans(doc: PmNode): WikiSpan[] {
   return spans
 }
 
-/** every distinct wiki target in the document, in document order */
+/** every distinct bare wiki target in the document, in document order */
 export function collectWikiTargets(doc: PmNode): string[] {
   const seen = new Set<string>()
   const out: string[] = []
   for (const span of wikiSpans(doc)) {
-    if (seen.has(span.raw)) continue
-    seen.add(span.raw)
-    out.push(span.raw)
+    const target = wikiTarget(span.raw)
+    if (!target || seen.has(target)) continue
+    seen.add(target)
+    out.push(target)
   }
   return out
 }
@@ -208,7 +219,9 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
 
       const decorations = wikiSpans(view.state.doc).map((span) =>
         Decoration.inline(span.from, span.to, {
-          class: answers[span.raw]?.found ? 'wiki-link-resolved' : 'wiki-link-unresolved',
+          class: answers[wikiTarget(span.raw)]?.found
+            ? 'wiki-link-resolved'
+            : 'wiki-link-unresolved',
           'data-wiki-target': span.raw,
         }),
       )
@@ -245,7 +258,7 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
             )
             if (!el) return false
             const raw = el.getAttribute('data-wiki-target') ?? ''
-            const answer = (key.getState(view.state) ?? EMPTY).answers[raw]
+            const answer = (key.getState(view.state) ?? EMPTY).answers[wikiTarget(raw)]
             if (answer?.found) options.onOpen(answer.path, answer.fragment)
             else options.onUnresolved(raw)
             return true
