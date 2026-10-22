@@ -194,4 +194,25 @@ export const id = {
   shrBulkCopyFailed: 'Tautan tidak dapat disalin. Coba lagi.',
   shrAccessManageFor: 'Kelola akses untuk {title}',
   shrAccessViewFor: 'Lihat akses untuk {title}',
+  shrOwnerTransferButton: 'Transfer kepemilikan',
+  shrOwnerTransferTitle: 'Transfer kepemilikan “{document}”',
+  shrOwnerTitleUntitled: 'Transfer kepemilikan dokumen',
+  shrOwnerNewOwnerLabel: 'Pemilik baru',
+  shrOwnerPreviousLevelLabel: 'Akses {name} setelah transfer',
+  shrOwnerPreviousLevelNone: 'Tanpa akses',
+  shrOwnerTransferNote:
+    'Pemilik baru dapat mengelola dokumen: membagikan, mengubah siapa yang dapat melihat, dan memindahkannya ke sampah.',
+  shrOwnerTransferConfirm: 'Transfer',
+  shrOwnerTransferred: 'Kepemilikan ditransfer ke {name}',
+  shrOwnerTargetNotMember:
+    '{name} bukan anggota workspace ini, jadi tidak dapat memiliki dokumen ini.',
+  shrOwnerSelfTransferError:
+    'Admin tidak dapat mengambil kepemilikan dokumen pribadi untuk dirinya sendiri. Minta admin lain untuk mentransfernya, atau buka akses darurat untuk memeriksanya.',
+  shrOwnerSearchPlaceholder: 'Cari anggota workspace',
+  shrOwnerNoCandidates: 'Tidak ada anggota lain yang dapat menerima dokumen ini.',
+  shrOwnerLoading: 'Memuat…',
+  shrOwnerFailed: 'Gagal mentransfer kepemilikan. Coba lagi.',
+  shrOwnerOwnedByWorkProduct:
+    'Dokumen ini milik sebuah produk kerja, jadi pemiliknya tidak dapat diubah.',
+  shrOwnerUnavailable: 'Transfer kepemilikan belum tersedia di server ini.',
 } satisfies Record<keyof typeof zh, string>

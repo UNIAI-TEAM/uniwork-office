@@ -194,4 +194,25 @@ export const hi = {
   shrBulkCopyFailed: 'लिंक कॉपी नहीं हो सका। फिर से प्रयास करें।',
   shrAccessManageFor: '{title} की पहुँच प्रबंधित करें',
   shrAccessViewFor: '{title} की पहुँच देखें',
+  shrOwnerTransferButton: 'स्वामित्व स्थानांतरित करें',
+  shrOwnerTransferTitle: '“{document}” का स्वामित्व स्थानांतरित करें',
+  shrOwnerTitleUntitled: 'दस्तावेज़ का स्वामित्व स्थानांतरित करें',
+  shrOwnerNewOwnerLabel: 'नया स्वामी',
+  shrOwnerPreviousLevelLabel: 'स्थानांतरण के बाद {name} की पहुँच',
+  shrOwnerPreviousLevelNone: 'कोई पहुँच नहीं',
+  shrOwnerTransferNote:
+    'नया स्वामी दस्तावेज़ प्रबंधित कर सकता है: साझा करना, कौन देख सकता है यह बदलना और ट्रैश में ले जाना।',
+  shrOwnerTransferConfirm: 'स्थानांतरित करें',
+  shrOwnerTransferred: 'स्वामित्व {name} को स्थानांतरित किया गया',
+  shrOwnerTargetNotMember:
+    '{name} इस वर्कस्पेस के सदस्य नहीं हैं, इसलिए वे इस दस्तावेज़ के स्वामी नहीं हो सकते।',
+  shrOwnerSelfTransferError:
+    'एडमिन किसी निजी दस्तावेज़ का स्वामित्व स्वयं नहीं ले सकते। किसी दूसरे एडमिन से स्थानांतरित करने को कहें, या जाँच के लिए आपातकालीन पहुँच खोलें।',
+  shrOwnerSearchPlaceholder: 'वर्कस्पेस सदस्य खोजें',
+  shrOwnerNoCandidates: 'कोई अन्य सदस्य यह दस्तावेज़ नहीं ले सकता।',
+  shrOwnerLoading: 'लोड हो रहा है…',
+  shrOwnerFailed: 'स्वामित्व स्थानांतरित नहीं हो सका। फिर से कोशिश करें।',
+  shrOwnerOwnedByWorkProduct:
+    'यह दस्तावेज़ एक कार्य-उत्पाद का है, इसलिए इसका स्वामी नहीं बदला जा सकता।',
+  shrOwnerUnavailable: 'इस सर्वर पर स्वामित्व स्थानांतरण अभी उपलब्ध नहीं है।',
 } satisfies Record<keyof typeof zh, string>

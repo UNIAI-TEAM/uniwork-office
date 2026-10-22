@@ -197,4 +197,25 @@ export const pl = {
   shrBulkCopyFailed: 'Nie udało się skopiować linku. Spróbuj ponownie.',
   shrAccessManageFor: 'Zarządzaj dostępem do: {title}',
   shrAccessViewFor: 'Pokaż dostęp do: {title}',
+  shrOwnerTransferButton: 'Przenieś własność',
+  shrOwnerTransferTitle: 'Przenieś własność „{document}”',
+  shrOwnerTitleUntitled: 'Przenieś własność dokumentu',
+  shrOwnerNewOwnerLabel: 'Nowy właściciel',
+  shrOwnerPreviousLevelLabel: 'Dostęp {name} po przeniesieniu',
+  shrOwnerPreviousLevelNone: 'Brak dostępu',
+  shrOwnerTransferNote:
+    'Nowy właściciel może zarządzać dokumentem: udostępniać go, zmieniać, kto go widzi, i przenosić do kosza.',
+  shrOwnerTransferConfirm: 'Przenieś',
+  shrOwnerTransferred: 'Przeniesiono własność na {name}',
+  shrOwnerTargetNotMember:
+    '{name} nie jest członkiem tego obszaru roboczego, więc nie może być właścicielem tego dokumentu.',
+  shrOwnerSelfTransferError:
+    'Administratorzy nie mogą sami przejąć własności prywatnego dokumentu. Poproś innego administratora o przeniesienie lub otwórz dostęp awaryjny, aby go sprawdzić.',
+  shrOwnerSearchPlaceholder: 'Szukaj członków obszaru roboczego',
+  shrOwnerNoCandidates: 'Żaden inny członek nie może przejąć tego dokumentu.',
+  shrOwnerLoading: 'Wczytywanie…',
+  shrOwnerFailed: 'Nie udało się przenieść własności. Spróbuj ponownie.',
+  shrOwnerOwnedByWorkProduct:
+    'Ten dokument należy do produktu pracy, więc nie można zmienić jego właściciela.',
+  shrOwnerUnavailable: 'Przenoszenie własności nie jest jeszcze dostępne na tym serwerze.',
 } satisfies Record<keyof typeof zh, string>

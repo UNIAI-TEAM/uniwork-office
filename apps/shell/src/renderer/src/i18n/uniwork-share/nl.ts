@@ -193,4 +193,25 @@ export const nl = {
   shrBulkCopyFailed: 'De link kon niet worden gekopieerd. Probeer het opnieuw.',
   shrAccessManageFor: 'Toegang tot {title} beheren',
   shrAccessViewFor: 'Toegang tot {title} bekijken',
+  shrOwnerTransferButton: 'Eigendom overdragen',
+  shrOwnerTransferTitle: 'Eigendom van “{document}” overdragen',
+  shrOwnerTitleUntitled: 'Eigendom van document overdragen',
+  shrOwnerNewOwnerLabel: 'Nieuwe eigenaar',
+  shrOwnerPreviousLevelLabel: 'Toegang van {name} na de overdracht',
+  shrOwnerPreviousLevelNone: 'Geen toegang',
+  shrOwnerTransferNote:
+    'De nieuwe eigenaar kan het document beheren: delen, wijzigen wie het kan zien en naar de prullenbak verplaatsen.',
+  shrOwnerTransferConfirm: 'Overdragen',
+  shrOwnerTransferred: 'Eigendom overgedragen aan {name}',
+  shrOwnerTargetNotMember:
+    '{name} is geen lid van deze werkruimte en kan dit document dus niet bezitten.',
+  shrOwnerSelfTransferError:
+    'Beheerders kunnen het eigendom van een privédocument niet zelf overnemen. Vraag een andere beheerder om het over te dragen of open noodtoegang om het te inspecteren.',
+  shrOwnerSearchPlaceholder: 'Werkruimteleden zoeken',
+  shrOwnerNoCandidates: 'Geen ander lid kan dit document overnemen.',
+  shrOwnerLoading: 'Laden…',
+  shrOwnerFailed: 'Eigendom kon niet worden overgedragen. Probeer het opnieuw.',
+  shrOwnerOwnedByWorkProduct:
+    'Dit document hoort bij een werkproduct, dus de eigenaar kan niet worden gewijzigd.',
+  shrOwnerUnavailable: 'Eigendom overdragen is nog niet beschikbaar op deze server.',
 } satisfies Record<keyof typeof zh, string>
