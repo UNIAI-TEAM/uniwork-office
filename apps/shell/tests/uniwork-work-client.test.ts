@@ -636,6 +636,24 @@ describe('uniwork work client: the inbox routes (UNI-2079)', () => {
     ])
   })
 
+  it('sends each id once when the list repeats one', async () => {
+    const ok = () => json(200, { status: 'ok' })
+    const fetch = server({
+      '/me/notifications/unread': ok,
+      '/me/notifications/archive': ok,
+      '/me/notifications/unarchive': ok,
+    })
+    const api = client(fetch)
+    await api.markNotificationsUnread(['n_1', 'n_1'])
+    await api.archiveNotifications(['n_1', 'n_2', 'n_1'])
+    await api.unarchiveNotifications(['n_2', 'n_2'])
+    expect([0, 1, 2].map((i) => sent(fetch, i).body)).toEqual([
+      { ids: ['n_1'] },
+      { ids: ['n_1', 'n_2'] },
+      { ids: ['n_2'] },
+    ])
+  })
+
   it('refuses an empty, oversized or bad id list on every ids route', async () => {
     const fetch = server()
     const api = client(fetch)

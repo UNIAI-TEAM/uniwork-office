@@ -107,11 +107,11 @@ function query(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
-/** 1-100 ids of the right shape, else refused */
+/** 1-100 ids of the right shape, else refused; repeats are sent once (the server counts rows against the list) */
 function idList(ids: unknown): string[] {
   if (!Array.isArray(ids) || ids.length === 0 || ids.length > IDS_MAX) refuse()
   if (!ids.every(isId)) refuse()
-  return ids
+  return [...new Set(ids)]
 }
 
 export function createUniworkWorkClient(options: UniworkDocsClientOptions): UniworkWorkClient {

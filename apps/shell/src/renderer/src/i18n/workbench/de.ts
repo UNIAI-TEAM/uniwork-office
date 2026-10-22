@@ -4,6 +4,75 @@ import { en } from './en'
 // shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
 export const de = {
   ...en,
+  wbNotif_document_commented_untitled: '{actor} hat ein Dokument kommentiert',
+  wbNotif_document_mentioned: '{actor} hat dich in einem Kommentar zu „{document}“ erwähnt.',
+  wbNotif_document_mentioned_untitled:
+    '{actor} hat dich in einem Kommentar zu einem Dokument erwähnt.',
+  wbNotif_document_body_mentioned: '{actor} hat dich in „{document}“ erwähnt.',
+  wbNotif_document_body_mentioned_untitled: '{actor} hat dich in einem Dokument erwähnt.',
+  wbNotif_document_comment_replied: '{actor} hat auf deinen Kommentar in „{document}“ geantwortet.',
+  wbNotif_document_comment_replied_untitled:
+    '{actor} hat auf deinen Kommentar in einem Dokument geantwortet.',
+  wbNotif_document_discussion_mentioned:
+    '{actor} hat dich in einer Diskussion zu „{document}“ erwähnt.',
+  wbNotif_document_discussion_mentioned_untitled:
+    '{actor} hat dich in einer Diskussion zu einem Dokument erwähnt.',
+  wbNotif_document_discussion_replied:
+    '{actor} hat auf deinen Diskussionsbeitrag in „{document}“ geantwortet.',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor} hat auf deinen Diskussionsbeitrag in einem Dokument geantwortet.',
+  wbNotif_document_edit_requested: '{actor} möchte „{document}“ bearbeiten',
+  wbNotif_document_edit_request_answered:
+    '{actor} hat dir die Bearbeitung von „{document}“ übergeben',
+  wbNotif_document_edit_request_answered_declined: '{actor} bearbeitet „{document}“ noch',
+  wbNotif_document_edit_taken_over:
+    '{actor} hat die Bearbeitung von „{document}“ übernommen. Deine nicht gespeicherten Änderungen sind weiterhin im geöffneten Dokument.',
+  wbNotif_document_break_glass:
+    '{actor} hat den Notfall-Lesezugriff (24 Std.) auf „{document}“ geöffnet.',
+  wbNotif_document_break_glass_untitled:
+    '{actor} hat den Notfall-Lesezugriff (24 Std.) auf ein Dokument geöffnet.',
+  wbNotif_document_access_requested: '{actor} hat Zugriff auf „{document}“ angefragt.',
+  wbNotif_document_access_requested_untitled: '{actor} hat Zugriff auf ein Dokument angefragt.',
+  wbNotif_document_access_approved: '{actor} hat dir Zugriff auf „{document}“ gegeben.',
+  wbNotif_document_access_approved_untitled: '{actor} hat dir Zugriff auf ein Dokument gegeben.',
+  wbNotif_document_access_declined: 'Deine Zugriffsanfrage für ein Dokument wurde abgelehnt.',
+  wbNotif_document_shared: '{actor} hat „{document}“ mit dir geteilt ({level}).',
+  wbNotif_document_shared_untitled: '{actor} hat ein Dokument mit dir geteilt ({level}).',
+  wbNotif_document_shared_nolevel: '{actor} hat „{document}“ mit dir geteilt.',
+  wbNotif_document_shared_untitled_nolevel: '{actor} hat ein Dokument mit dir geteilt.',
+  wbNotif_document_trashed_by_other:
+    '{actor} hat dein Dokument in den Papierkorb verschoben. Stelle es vor dem {date} wieder her',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor} hat eins deiner Dokumente in den Papierkorb verschoben. Stelle es vor dem {date} wieder her',
+  wbNotif_document_trashed_by_other_nodate:
+    '{actor} hat dein Dokument in den Papierkorb verschoben',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor} hat eins deiner Dokumente in den Papierkorb verschoben',
+  wbNotif_chat_call_incoming: '{actor} ruft an',
+  wbNotifFallback: 'Neue Benachrichtigung',
+  wbNotif_audit_export_ready: 'Dein Audit-Export ist fertig',
+  wbNotif_chat_dm: '{actor} hat dir eine Nachricht geschickt',
+  wbNotif_chat_follow_up: 'Du hast eine Nachricht zur Wiedervorlage gespeichert',
+  wbNotif_chat_mentioned: '{actor} hat dich in {room} erwähnt',
+  wbNotif_chat_reminder: 'Erinnerung: {body}',
+  wbNotif_chat_thread_replied: '{actor} hat in {room} auf einen Thread geantwortet',
+  wbNotif_document_commented: '{actor} hat „{document}“ kommentiert',
+  wbNotif_email_hub_new_mail: 'Ungelesene Nachrichten: {count} · {mailbox}',
+  wbNotif_meeting_invited: '{actor} hat dich zu „{meeting}“ eingeladen',
+  wbNotif_meeting_starting: '„{meeting}“ beginnt in {minutes} Min.',
+  wbNotif_meeting_summary_reminder:
+    '„{meeting}“ ist beendet · Zusammenfassen und Aufgaben erstellen',
+  wbNotif_member_added: '{actor} hat dich zum Workspace {workspace} hinzugefügt',
+  wbNotif_mentioned: '{actor} hat dich in „{task}“ erwähnt',
+  wbNotif_role_changed: '{actor} hat deine Rolle auf {role} geändert',
+  wbNotif_task_assigned: '{actor} hat dir „{task}“ zugewiesen',
+  wbNotif_task_commented: '{actor} hat „{task}“ kommentiert',
+  wbNotif_task_status_changed: '{actor} hat „{task}“ auf {status} verschoben',
+  wbDeskPillReply: 'Antwort',
+  wbDeskPillEdit: 'Wird bearbeitet',
+  wbDeskPillAccess: 'Zugriff',
+  wbDeskPillTrash: 'Im Papierkorb',
+  wbDeskPillBreakGlass: 'Notfall',
   wbNotif_document_changed: '{actor} hat {count} Dokumente geändert',
   wbNotif_document_changed_renamed_many: '{actor} hat {count} Dokumente umbenannt',
   wbNotif_document_changed_renamed_one: '{actor} hat “{document}” umbenannt',

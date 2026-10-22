@@ -6,11 +6,15 @@
  * which the callers drop this helper.
  */
 export function isMainFrameSender(event: unknown): boolean {
-  if (!event || typeof event !== 'object') return false
-  const e = event as {
-    sender?: { isDestroyed?: () => boolean; mainFrame?: unknown }
-    senderFrame?: unknown
+  try {
+    if (!event || typeof event !== 'object') return false
+    const e = event as {
+      sender?: { isDestroyed?: () => boolean; mainFrame?: unknown }
+      senderFrame?: unknown
+    }
+    if (!e.sender || e.sender.isDestroyed?.()) return false
+    return Boolean(e.senderFrame && e.senderFrame === e.sender.mainFrame)
+  } catch {
+    return false
   }
-  if (!e.sender || e.sender.isDestroyed?.()) return false
-  return Boolean(e.senderFrame && e.senderFrame === e.sender.mainFrame)
 }
