@@ -3,6 +3,8 @@ import {
   DOC_ACCESS_LOG_PAGE_SIZE,
   type DocAccessLog,
   type DocAccessLogAction,
+  type DocAccessLogPage,
+  type DocHistoryResult,
   type UniworkDocHistoryApi,
 } from '../../../shared/doc-history-api'
 
@@ -17,6 +19,9 @@ export interface AccessLogsState {
   retry: () => void
   loadMore: () => void
 }
+
+/** a bridge call that rejects (a handler that threw, a channel the main side lacks) reads as offline */
+const rejected = (): DocHistoryResult<DocAccessLogPage> => ({ ok: false, error: 'network' })
 
 /**
  * The access log of one document under one action filter, newest first. A change of document or
@@ -52,16 +57,19 @@ export function useAccessLogs(
       setStatus('error')
       return
     }
-    void api.accessLogs({ documentId, limit: DOC_ACCESS_LOG_PAGE_SIZE, action }).then((result) => {
-      if (current.current !== mine) return
-      if (result.ok) {
-        setRows(result.value.logs)
-        setCursor(result.value.next_cursor)
-        setStatus('ready')
-      } else {
-        setStatus(result.error === 'forbidden' ? 'forbidden' : 'error')
-      }
-    })
+    void api
+      .accessLogs({ documentId, limit: DOC_ACCESS_LOG_PAGE_SIZE, action })
+      .catch(rejected)
+      .then((result) => {
+        if (current.current !== mine) return
+        if (result.ok) {
+          setRows(result.value.logs)
+          setCursor(result.value.next_cursor)
+          setStatus('ready')
+        } else {
+          setStatus(result.error === 'forbidden' ? 'forbidden' : 'error')
+        }
+      })
   }, [api, documentId, action, enabled, attempt])
 
   const loadMore = useCallback(() => {
@@ -72,6 +80,7 @@ export function useAccessLogs(
     setMoreFailed(false)
     void api
       .accessLogs({ documentId, limit: DOC_ACCESS_LOG_PAGE_SIZE, action, cursor })
+      .catch(rejected)
       .then((result) => {
         if (current.current !== mine) return
         moreInFlight.current = false

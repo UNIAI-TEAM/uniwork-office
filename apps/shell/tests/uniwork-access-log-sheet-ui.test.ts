@@ -185,6 +185,17 @@ describe('AccessLogSheet (UNI-2077)', () => {
       expect(q('[role="alert"]')).toBeNull()
       expect(rows()).toHaveLength(1)
     })
+    it('a bridge call that rejects reads as an error with Retry, never a skeleton forever', async () => {
+      const bridge = createFakeDocHistoryBridge()
+      bridge.accessLogs.mockRejectedValueOnce(new Error('handler missing'))
+      await open(bridge)
+      expect(q('[role="alert"]')!.textContent).toContain(en.algError)
+      expect(q('[aria-busy="true"]')).toBeNull()
+      await click(button('Retry'))
+      expect(bridge.accessLogs).toHaveBeenCalledTimes(2)
+      expect(q('[role="alert"]')).toBeNull()
+      expect(rows()).toHaveLength(1)
+    })
     it('asks for the first page with the web page size and no action', async () => {
       const bridge = createFakeDocHistoryBridge()
       await open(bridge)
@@ -370,6 +381,27 @@ describe('AccessLogSheet (UNI-2077)', () => {
       expect(rows()).toHaveLength(1)
       expect(q('[role="alert"]')!.textContent).toContain(en.algError)
       expect(button('Load more')).toBeTruthy()
+    })
+    it('a next page that rejects keeps the rows and Load more usable', async () => {
+      const bridge = createFakeDocHistoryBridge()
+      bridge.accessLogs
+        .mockResolvedValueOnce({
+          ok: true,
+          value: { logs: [accessLogOf({ id: 'p1' })], next_cursor: 'c1' },
+        })
+        .mockRejectedValueOnce(new Error('channel closed'))
+        .mockResolvedValueOnce({
+          ok: true,
+          value: { logs: [accessLogOf({ id: 'p2' })], next_cursor: null },
+        })
+      await open(bridge)
+      await click(button('Load more'))
+      expect(rows()).toHaveLength(1)
+      expect(q('[role="alert"]')!.textContent).toContain(en.algError)
+      const more = button('Load more') as HTMLButtonElement
+      expect(more.disabled).toBe(false)
+      await click(more)
+      expect(rows().map((r) => r.getAttribute('data-access-log-row'))).toEqual(['p1', 'p2'])
     })
     it('the button is disabled and busy while the next page loads (no double fetch)', async () => {
       const bridge = createFakeDocHistoryBridge()
