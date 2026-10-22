@@ -4,7 +4,7 @@
  * save, rewrote `[[my_note]]` to a different target and split a table cell at
  * the pipe of `[[x\|y]]`.
  */
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
 import { parseDocText } from '../src/renderer/markdown/docText'
@@ -12,6 +12,9 @@ import { buildSourceMap, spliceMarkdown } from '../src/renderer/markdown/sourceS
 import { collectWikiTargets } from '../src/renderer/editor/wikilink'
 
 ;(globalThis as { CSS?: unknown }).CSS ??= { escape: (v: string) => v }
+
+beforeAll(() => vi.stubGlobal('ClipboardEvent', Event))
+afterAll(() => vi.unstubAllGlobals())
 
 const editors: Editor[] = []
 afterEach(() => {
@@ -181,5 +184,177 @@ describe('wiki link literals are saved verbatim', () => {
     const { saved } = editAndSave(source)
     expect(saved).toBe(`${source} z`)
     expect(open(source).editor.getMarkdown()).toBe(source)
+  })
+})
+
+/** a paste through the editor's own paste handlers (plain text only) */
+function paste(editor: Editor, text: string) {
+  const event = new Event('paste', { bubbles: true, cancelable: true })
+  Object.defineProperty(event, 'clipboardData', {
+    value: {
+      getData: (t: string) => (t === 'text/plain' ? text : ''),
+      files: [],
+      items: [],
+      types: ['text/plain'],
+    },
+  })
+  editor.view.dom.dispatchEvent(event)
+}
+
+function caretAfter(editor: Editor, needle: string) {
+  let pos = -1
+  editor.state.doc.descendants((node, p) => {
+    if (pos < 0 && node.isText && node.text!.includes(needle)) {
+      pos = p + node.text!.indexOf(needle) + needle.length
+    }
+  })
+  expect(pos, `no text ${needle}`).toBeGreaterThan(-1)
+  editor.commands.setTextSelection(pos)
+}
+
+function marksOf(editor: Editor): string[] {
+  const names = new Set<string>()
+  editor.state.doc.descendants((node) => {
+    if (node.isText) node.marks.forEach((m) => names.add(m.type.name))
+  })
+  return [...names].sort()
+}
+
+function tableShape(editor: Editor): number[] {
+  const rows: number[] = []
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === 'tableRow') rows.push(node.childCount)
+  })
+  return rows
+}
+
+/** save the live document, then reopen and re-save three times: the bytes must not move */
+function reopenThrice(editor: Editor) {
+  const first = editor.getMarkdown()
+  let current = first
+  let reopened = open(current).editor
+  for (let i = 1; i <= 3; i++) {
+    reopened = open(current).editor
+    const next = reopened.getMarkdown()
+    expect(next, `cycle ${i}`).toBe(first)
+    current = next
+  }
+  return { saved: first, reopened }
+}
+
+const TABLE = '| a | b |\n| - | - |\n| c | d |'
+
+function inCell(how: 'type' | 'paste', text: string) {
+  const { editor } = open(TABLE)
+  caretAfter(editor, 'c')
+  if (how === 'type') type(editor, ' ' + text)
+  else paste(editor, ' ' + text)
+  return editor
+}
+
+describe('an even run of backslashes before a pipe in a table cell', () => {
+  for (const how of ['type', 'paste'] as const) {
+    it(`${how}d [[x\\\\|y]] keeps the row, the bytes and the key`, () => {
+      const editor = inCell(how, '[[x\\\\|y]]')
+      expect(markedTexts(editor)).toEqual(['[[x\\\\|y]]'])
+      const live = collectWikiTargets(editor.state.doc)
+      const { saved, reopened } = reopenThrice(editor)
+      expect(tableShape(reopened)).toEqual([2, 2])
+      expect(saved.split('\n')[2]).toMatch(/^\| c \[\[x\\\\\\\|y\]\] +\| d +\|$/)
+      expect(collectWikiTargets(reopened.state.doc)).toEqual(live)
+    })
+  }
+
+  it('a file cell [[p\\\\\\|q]] keeps the row, the bytes and the key', () => {
+    const { editor } = open('| a | b |\n| - | - |\n| [[p\\\\\\|q]] | d |')
+    const live = collectWikiTargets(editor.state.doc)
+    const { reopened } = reopenThrice(editor)
+    expect(tableShape(reopened)).toEqual([2, 2])
+    expect(collectWikiTargets(reopened.state.doc)).toEqual(live)
+  })
+})
+
+describe('text inside a link is not source', () => {
+  const inside = (extra: (editor: Editor) => void) => {
+    const { editor } = open('a  b')
+    editor.commands.setTextSelection(3)
+    type(editor, '[[ab]]')
+    caretAfter(editor, '[[a')
+    extra(editor)
+    return editor
+  }
+  const dangling = (extra: (editor: Editor) => void) => {
+    const { editor } = open('a [[ab]] b')
+    caretAfter(editor, '[[ab')
+    editor.view.dispatch(
+      editor.state.tr.delete(editor.state.selection.from, editor.state.selection.from + 2),
+    )
+    caretAfter(editor, '[[a')
+    extra(editor)
+    return editor
+  }
+  const cases: Array<[string, () => Editor]> = [
+    ['typed ](x) inside a link', () => inside((e) => type(e, '](x)'))],
+    ['pasted markdown inside a link', () => inside((e) => paste(e, '*x* [l](http://z)'))],
+    ['](q) typed after deleting the closing brackets', () => dangling((e) => type(e, '](q)'))],
+    ['*x* z* typed into a dangling [[ab', () => dangling((e) => type(e, '*x* z*'))],
+  ]
+  for (const [name, make] of cases) {
+    it(`${name}: stable bytes, no new link or italic on reopen`, () => {
+      const editor = make()
+      const live = marksOf(editor).filter((m) => m !== 'wikiLink')
+      const { reopened } = reopenThrice(editor)
+      // the paste case already holds the marks its markdown made; the save must add none
+      expect(marksOf(reopened)).toEqual(live)
+    })
+  }
+})
+
+describe('entity-looking text in a literal', () => {
+  for (const literal of [
+    '[[a&amp;b]]',
+    '[[a&lt;b]]',
+    '[[a&nbsp;b]]',
+    '[[a&#65;b]]',
+    '[[a&copy;b]]',
+  ]) {
+    for (const how of ['type', 'paste'] as const) {
+      it(`${how}d ${literal} keeps its bytes and its key`, () => {
+        const { editor } = open('a  b')
+        editor.commands.setTextSelection(3)
+        if (how === 'type') type(editor, literal)
+        else paste(editor, literal)
+        expect(markedTexts(editor)).toEqual([literal])
+        const live = collectWikiTargets(editor.state.doc)
+        const { reopened } = reopenThrice(editor)
+        expect(markedTexts(reopened)).toEqual([literal])
+        expect(collectWikiTargets(reopened.state.doc)).toEqual(live)
+      })
+    }
+  }
+
+  it('a plain & inside a literal is written as it is', () => {
+    for (const source of ['a [[a&b]] b', 'a [[R&D|r&d]] b']) {
+      expect(open(source).editor.getMarkdown()).toBe(source)
+    }
+  })
+})
+
+describe('a literal with an inline code run inside', () => {
+  it('saves the code fence and keeps the bytes stable', () => {
+    const { editor } = open('a  b')
+    editor.commands.setTextSelection(3)
+    type(editor, '[[acb]]')
+    caretAfter(editor, '[[a')
+    const from = editor.state.selection.from
+    // the code mark is added over `c`, which keeps the wiki mark on the same text node
+    editor.commands.setTextSelection({ from, to: from + 1 })
+    editor.commands.setMark('code')
+    expect(marksOf(editor)).toContain('code')
+    const { saved, reopened } = reopenThrice(editor)
+    // the fence is written (a wiki-first check would save [[acb]]); the reader takes the whole
+    // `[[a`c`b]]` back as one literal, so the code mark itself does not come back
+    expect(saved).toBe('a [[a`c`b]] b')
+    expect(markedTexts(reopened)).toEqual(['[[a`c`b]]'])
   })
 })
