@@ -134,10 +134,10 @@ function VersionHistoryView({
     if (!version.created_by) return null
     if (version.created_by_kind === 'system') return t('vhsAuthorSystem')
     if (directory.namesPending) return null
-    return (
-      directory.userName(version.created_by) ??
-      (version.created_by_kind === 'agent' ? t('vhsAuthorAgent') : t('vhsAuthorFormer'))
-    )
+    const name = directory.userName(version.created_by)
+    if (name) return name
+    // an agent that is not a member keeps only its badge: no second "Agent" next to it
+    return version.created_by_kind === 'agent' ? '' : t('vhsAuthorFormer')
   }
 
   const newestNo = list.rows[0]?.version
@@ -182,6 +182,8 @@ function VersionHistoryView({
     if (!restoreTarget || restoring) return
     setRestoring(true)
     setRestoreError(null)
+    // a checkpoint's "Created version N" line is not about this restore
+    setNotice('')
     restoreKey.current ??= newIntentKey()
     const result = await api
       .restore({
@@ -237,7 +239,10 @@ function VersionHistoryView({
     setBusy(null)
     if (!result.ok) {
       setRowError(result.error === 'unsupported_format' ? 'vhsOpenUnsupported' : 'vhsPreviewError')
+      return
     }
+    // the copy opened in a tab behind the sheet: leave it so the tab is what the person sees
+    onClose()
   }
 
   const download = async (version: DocVersion) => {
@@ -399,7 +404,7 @@ function VersionHistoryView({
                       </p>
                       {author !== null && (
                         <p className="uw-versions-row-author" data-testid="version-author">
-                          <span className="uw-versions-author-name">{author}</span>
+                          {author && <span className="uw-versions-author-name">{author}</span>}
                           {version.created_by_kind === 'agent' && (
                             <span className="uw-versions-agent">{t('vhsAuthorAgent')}</span>
                           )}
@@ -410,7 +415,7 @@ function VersionHistoryView({
                       <button
                         type="button"
                         className="uw-versions-icon-btn"
-                        aria-label={t('vhsView')}
+                        aria-label={t('vhsPreviewTitle', { no: version.version })}
                         title={t('vhsView')}
                         disabled={busy !== null}
                         aria-busy={

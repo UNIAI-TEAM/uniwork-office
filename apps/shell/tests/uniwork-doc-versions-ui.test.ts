@@ -192,6 +192,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
   }
+  const viewButton = (no: number) => button(sheet(), t('vhsPreviewTitle', { no }))
   const labelInput = () => sheet().querySelector<HTMLInputElement>('input[type="text"]')!
   const submitForm = async () => {
     await act(async () => {
@@ -260,6 +261,18 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
         createFakeDocHistoryBridge({ versions: [versionOf({ reason: 'imported-by-robot' })] }),
       )
       expect(rows()[0]!.textContent).toContain(t('vhsReasonUnknown'))
+    })
+
+    it('an agent that is not a member keeps its badge and does not read Agent twice', async () => {
+      await open(
+        target(),
+        createFakeDocHistoryBridge({
+          versions: [versionOf({ created_by: 'agent_x', created_by_kind: 'agent' })],
+        }),
+      )
+      const author = rows()[0]!.querySelector('[data-testid="version-author"]')!
+      expect(author.textContent).toBe(t('vhsAuthorAgent'))
+      expect(author.querySelector('.uw-versions-author-name')).toBeNull()
     })
 
     it('an old row with no author draws no author line', async () => {
@@ -341,6 +354,67 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       expect(bridge.versions).toHaveBeenLastCalledWith({ documentId: 'doc-1', cursor: 'c1' })
       expect(rows()).toHaveLength(3)
       expect(button(sheet(), t('vhsLoadMore'))).toBeUndefined()
+    })
+
+    it('a checkpoint reload is not cancelled by Load more, and the new row shows', async () => {
+      const bridge = createFakeDocHistoryBridge()
+      const page1 = [versionOf({ id: 'v3', version: 3 }), versionOf({ id: 'v2', version: 2 })]
+      let release: () => void = () => {}
+      bridge.versions
+        .mockResolvedValueOnce({ ok: true, value: { versions: page1, next_cursor: 'c1' } })
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              release = () =>
+                resolve({
+                  ok: true,
+                  value: {
+                    versions: [versionOf({ id: 'v4', version: 4 }), ...page1],
+                    next_cursor: 'c1',
+                  },
+                })
+            }),
+        )
+      await open(target(), bridge)
+      await submitForm()
+      // the reload is pending: Load more waits for it instead of overtaking it
+      await click(button(sheet(), t('vhsLoadMore')))
+      expect(bridge.versions).toHaveBeenCalledTimes(2)
+      await act(async () => release())
+      await flush()
+      expect(rows().map((r) => r.getAttribute('data-version-row'))).toEqual(['4', '3', '2'])
+    })
+
+    it('a page read in flight is dropped when a reload lands, so the list never mixes pages', async () => {
+      const bridge = createFakeDocHistoryBridge()
+      const page1 = [versionOf({ id: 'v3', version: 3 }), versionOf({ id: 'v2', version: 2 })]
+      let releaseMore: () => void = () => {}
+      bridge.versions
+        .mockResolvedValueOnce({ ok: true, value: { versions: page1, next_cursor: 'c1' } })
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              releaseMore = () =>
+                resolve({
+                  ok: true,
+                  value: { versions: [versionOf({ id: 'v1', version: 1 })], next_cursor: null },
+                })
+            }),
+        )
+        .mockResolvedValueOnce({
+          ok: true,
+          value: {
+            versions: [versionOf({ id: 'v4', version: 4 }), ...page1],
+            next_cursor: 'c2',
+          },
+        })
+      await open(target(), bridge)
+      await click(button(sheet(), t('vhsLoadMore')))
+      await submitForm()
+      await act(async () => releaseMore())
+      await flush()
+      expect(rows().map((r) => r.getAttribute('data-version-row'))).toEqual(['4', '3', '2'])
+      expect(button(sheet(), t('vhsLoadMore'))).toBeDefined()
     })
 
     it('a failed page keeps the rows and offers the same button again', async () => {
@@ -622,6 +696,28 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       expect(second).not.toBe(first)
     })
 
+    it('a lost edit lock says it could not restore and the retry mints a new key', async () => {
+      const bridge = createFakeDocHistoryBridge({ versions: threeVersions() })
+      bridge.restore.mockResolvedValueOnce(failure('edit_lock_lost', { status: 409 }))
+      await open(target(), bridge)
+      await click(restoreButton(2))
+      await click(confirmButton())
+      expect(top().querySelector('[role="alert"]')?.textContent).toBe(t('vhsRestoreFailed'))
+      await click(confirmButton())
+      const [first, second] = bridge.restore.mock.calls.map((c) => c[0].idempotencyKey)
+      expect(second).not.toBe(first)
+    })
+
+    it('a restore clears the success line of an earlier checkpoint', async () => {
+      const bridge = await open()
+      await submitForm()
+      expect(sheet().querySelector('[role="status"]')?.textContent).toBe(t('vhsNameDone', { no: 4 }))
+      await click(restoreButton(2))
+      await click(confirmButton())
+      expect(sheet().querySelector('[role="status"]')).toBeNull()
+      expect(bridge.restore).toHaveBeenCalledTimes(1)
+    })
+
     it('any other failure says it could not restore and a retry keeps the key', async () => {
       const bridge = createFakeDocHistoryBridge({ versions: threeVersions() })
       bridge.restore.mockResolvedValueOnce(failure('network'))
@@ -668,18 +764,26 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
   })
 
   describe('preview and download', () => {
-    it('a file version opens its read-only copy in a tab', async () => {
+    it('a file version opens its read-only copy in a tab and the sheet closes to show it', async () => {
       const bridge = await open()
-      await click(button(sheet(), t('vhsView')))
+      await click(viewButton(3))
       expect(bridge.openVersion).toHaveBeenCalledWith({ documentId: 'doc-1', versionNo: 3 })
-      expect(dialogs()).toHaveLength(1)
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('every row names its own View button by version', async () => {
+      await open()
+      for (const no of [3, 2, 1]) {
+        expect(viewButton(no)?.getAttribute('aria-label')).toBe(t('vhsPreviewTitle', { no }))
+      }
     })
 
     it('a version the app cannot open says so and points at the download', async () => {
       const bridge = createFakeDocHistoryBridge({ versions: threeVersions() })
       bridge.openVersion.mockResolvedValueOnce(failure('unsupported_format'))
       await open(target(), bridge)
-      await click(button(sheet(), t('vhsView')))
+      await click(viewButton(3))
+      expect(onClose).not.toHaveBeenCalled()
       expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(
         t('vhsOpenUnsupported'),
       )
@@ -689,7 +793,8 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       const bridge = createFakeDocHistoryBridge({ versions: threeVersions() })
       bridge.openVersion.mockResolvedValueOnce(failure('network'))
       await open(target(), bridge)
-      await click(button(sheet(), t('vhsView')))
+      await click(viewButton(3))
+      expect(onClose).not.toHaveBeenCalled()
       expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(t('vhsPreviewError'))
     })
 
@@ -709,7 +814,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
         }),
       })
       await open(target({ kind: 'page' }), bridge)
-      await click(button(sheet(), t('vhsView')))
+      await click(viewButton(1))
       expect(bridge.version).toHaveBeenCalledWith({ documentId: 'doc-1', versionNo: 1 })
       expect(bridge.openVersion).not.toHaveBeenCalled()
       expect(top().textContent).toContain(t('vhsPreviewTitle', { no: 1 }))
@@ -728,11 +833,11 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
         value: versionOf({ version: 1, kind: 'page', content: { type: 'doc', content: [] } }),
       })
       await open(target({ kind: 'page' }), bridge)
-      await click(button(sheet(), t('vhsView')))
+      await click(viewButton(1))
       expect(top().textContent).toContain(t('vhsPreviewEmpty'))
       await click(button(top(), t('vhsClose')))
       bridge.version.mockResolvedValueOnce(failure('network'))
-      await click(button(sheet(), t('vhsView')))
+      await click(viewButton(1))
       expect(top().querySelector('[role="alert"]')?.textContent).toContain(t('vhsPreviewError'))
     })
 

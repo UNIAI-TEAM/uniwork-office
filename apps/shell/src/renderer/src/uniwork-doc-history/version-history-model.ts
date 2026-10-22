@@ -142,5 +142,7 @@ export function restoreRefusal(failed: Failed): RestoreRefusal {
     }
   }
   if (failed.error === 'conflict') return { key: 'vhsRestoreConflict', dropKey: true }
+  // a key is only valid for the lock id it was minted under (web: version-history-sheet)
+  if (failed.error === 'edit_lock_lost') return { key: 'vhsRestoreFailed', dropKey: true }
   return { key: writeRefusalKey(failed.error) ?? 'vhsRestoreFailed', dropKey: false }
 }

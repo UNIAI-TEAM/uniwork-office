@@ -35,12 +35,19 @@ export function useDocVersions(
   const [cursor, setCursor] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreFailed, setMoreFailed] = useState(false)
-  const sequence = useRef(0)
+  // a reload and a page read each have their own sequence: a page read must never cancel the
+  // reload a checkpoint or a restore just started (its new row would never show)
+  const reloadSeq = useRef(0)
+  const moreSeq = useRef(0)
+  const reloading = useRef(false)
   const cursorRef = useRef<string | null>(null)
   cursorRef.current = cursor
 
   const reload = useCallback(() => {
-    const mine = ++sequence.current
+    const mine = ++reloadSeq.current
+    reloading.current = true
+    // the first page replaces the list: a page read in flight belongs to the old one
+    moreSeq.current++
     setLoadingMore(false)
     setMoreFailed(false)
     // Retry after a failed first read shows the loading state again
@@ -49,7 +56,8 @@ export function useDocVersions(
       .versions({ documentId })
       .catch((): DocHistoryResult<DocVersionPage> => ({ ok: false, error: 'network' }))
       .then((result) => {
-        if (mine !== sequence.current) return
+        if (mine !== reloadSeq.current) return
+        reloading.current = false
         if (!result.ok) {
           // a failed refresh keeps what is on screen; only an empty screen turns into the error
           setStatus((now) => (now === 'ready' ? now : 'error'))
@@ -68,21 +76,23 @@ export function useDocVersions(
     setCursor(null)
     reload()
     return () => {
-      sequence.current++
+      reloadSeq.current++
+      moreSeq.current++
+      reloading.current = false
     }
   }, [enabled, reload])
 
   const loadMore = useCallback(() => {
     const next = cursorRef.current
-    if (!next) return
-    const mine = ++sequence.current
+    if (!next || reloading.current) return
+    const mine = ++moreSeq.current
     setLoadingMore(true)
     setMoreFailed(false)
     void bridge
       .versions({ documentId, cursor: next })
       .catch((): DocHistoryResult<DocVersionPage> => ({ ok: false, error: 'network' }))
       .then((result) => {
-        if (mine !== sequence.current) return
+        if (mine !== moreSeq.current) return
         setLoadingMore(false)
         if (!result.ok) {
           setMoreFailed(true)
