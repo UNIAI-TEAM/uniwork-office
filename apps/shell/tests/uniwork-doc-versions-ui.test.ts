@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -103,6 +105,25 @@ describe('version history gates (model)', () => {
     expect(pageText(null)).toBe('')
     expect(pageText({ type: 'doc', content: [] })).toBe('')
     expect(pageText('nope')).toBe('')
+  })
+})
+
+describe('version history sheet layout', () => {
+  const css = readFileSync(
+    join(__dirname, '../src/renderer/src/uniwork-doc-history/version-history.css'),
+    'utf8',
+  )
+
+  it('docks to the inline end like the access log sheet; confirm and preview stay centered', () => {
+    expect(css).toMatch(
+      /\.uw-act-overlay:has\(> \.uw-versions\) \{[^}]*align-items:\s*stretch;[^}]*justify-content:\s*flex-end;/,
+    )
+    expect(css).toMatch(/\.modal\.uw-act\.uw-versions \{[^}]*height:\s*100%;/)
+    expect(css).not.toMatch(/has\(> \.uw-versions-(confirm|preview)\)/)
+  })
+
+  it('uses theme tokens only (no raw colours)', () => {
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/)
   })
 })
 

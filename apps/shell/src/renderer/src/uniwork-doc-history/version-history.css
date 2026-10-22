@@ -2,11 +2,20 @@
    theming rules): the sheet follows the light / dark / system theme like every other dialog.
    Text rules are scoped under .uw-act (0,2,0) so `.modal p` (0,1,1) does not zero them. */
 
+/* the sheet docks to the inline end of the window like the Access log sheet (and the web's
+   version sheet), so it reads right in rtl locales too; its confirm and preview stay centered */
+.uw-act-overlay:has(> .uw-versions) {
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
 .modal.uw-act.uw-versions {
-  width: min(520px, calc(var(--ui-vw) * 92));
-  max-height: 85vh;
+  width: min(520px, calc(var(--ui-vw) * 100));
+  height: 100%;
+  max-height: none;
   overflow-y: auto;
   padding: 20px;
+  border-radius: 0;
 }
 
 .modal.uw-act.uw-versions-confirm {
