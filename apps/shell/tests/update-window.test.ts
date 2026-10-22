@@ -20,6 +20,8 @@ const fakeIpc = {
 }
 const sent: Array<{ channel: string; state: UpdateUiState | null }> = []
 const winOptions: Array<Record<string, unknown>> = []
+/** every window the module created, in order, so a test can fire a given window's `closed` late */
+const created: FakeBrowserWindow[] = []
 const shown = vi.fn()
 const focused = vi.fn()
 
@@ -31,8 +33,10 @@ class FakeWebContents {
 
 class FakeBrowserWindow {
   webContents = new FakeWebContents()
+  closedListeners: Array<() => void> = []
   constructor(options: Record<string, unknown>) {
     winOptions.push(options)
+    created.push(this)
   }
   isDestroyed(): boolean {
     return false
@@ -44,7 +48,9 @@ class FakeBrowserWindow {
     focused()
   }
   once(): void {}
-  on(): void {}
+  on(event: string, listener: () => void): void {
+    if (event === 'closed') this.closedListeners.push(listener)
+  }
   close(): void {}
   loadURL(): Promise<void> {
     return Promise.resolve()
@@ -109,6 +115,7 @@ beforeEach(() => {
   rawHandlers.clear()
   sent.length = 0
   winOptions.length = 0
+  created.length = 0
   shown.mockClear()
   focused.mockClear()
 })
@@ -238,5 +245,21 @@ describe('update window — settings-facing surface', () => {
     expect(mod.updateWindowContents()).toBe(live)
     mod.closeUpdateWindow()
     expect(mod.updateWindowContents()).toBeNull()
+  })
+
+  it('a late `closed` of a closed window keeps the reopened window tracked', async () => {
+    const mod = await loadModule()
+    const act = actions()
+    mod.showUpdateWindow(parent, state('available'), act)
+    const first = created.at(-1)!
+    mod.closeUpdateWindow()
+    mod.showUpdateWindow(parent, state('available'), act)
+    const second = created.at(-1)!
+    expect(second).not.toBe(first)
+    for (const fire of first.closedListeners) fire()
+    expect(mod.updateWindowContents()).toBe(second.webContents)
+    expect(mod.isUpdateWindowOpen()).toBe(true)
+    // the programmatic close of the first window is not a "later" click on the second
+    expect(act.onLater).not.toHaveBeenCalled()
   })
 })

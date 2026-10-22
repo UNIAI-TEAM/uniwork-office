@@ -25,15 +25,24 @@ class FakeWebContents {
   }
 }
 
+/** every window the module created, in order, so a test can fire a given window's `closed` late */
+const created: FakeBrowserWindow[] = []
+
 class FakeBrowserWindow {
   webContents = new FakeWebContents()
+  closedListeners: Array<() => void> = []
+  constructor() {
+    created.push(this)
+  }
   isDestroyed(): boolean {
     return false
   }
   show(): void {}
   focus(): void {}
   once(): void {}
-  on(): void {}
+  on(event: string, listener: () => void): void {
+    if (event === 'closed') this.closedListeners.push(listener)
+  }
   close(): void {}
   loadURL(): Promise<void> {
     return Promise.resolve()
@@ -57,6 +66,7 @@ beforeEach(() => {
   handlers.clear()
   rawHandlers.clear()
   sent.length = 0
+  created.length = 0
 })
 
 async function loadModule() {
@@ -101,5 +111,23 @@ describe('pdf password dialog — ipc registrar', () => {
     await expect(pending).resolves.toBe('pw')
     mod.closePdfPasswordDialog()
     expect(mod.pdfPasswordWindowContents()).toBeNull()
+  })
+
+  it('a late `closed` of a closed window keeps the reopened prompt tracked and pending', async () => {
+    const mod = await loadModule()
+    const firstPending = mod.promptPdfPassword(null, state)
+    const first = created.at(-1)!
+    handlers.get('pdf-password:submit')!({}, 'wrong')
+    await expect(firstPending).resolves.toBe('wrong')
+    mod.closePdfPasswordDialog()
+
+    const secondPending = mod.promptPdfPassword(null, state)
+    const second = created.at(-1)!
+    expect(second).not.toBe(first)
+    for (const fire of first.closedListeners) fire()
+
+    expect(mod.pdfPasswordWindowContents()).toBe(second.webContents)
+    handlers.get('pdf-password:submit')!({}, 'right')
+    await expect(secondPending).resolves.toBe('right')
   })
 })
