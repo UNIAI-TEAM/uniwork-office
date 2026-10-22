@@ -246,13 +246,13 @@ function body(type: string, m: Obj): FromInspectorBody | undefined {
     }
     case 'gx:textEditCancel':
       return { type }
-    case 'gx:keyCommand':
-      return typeof m.command === 'string' && KEY_COMMANDS.has(m.command)
-        ? {
-            type,
-            command: m.command as Extract<FromInspectorBody, { type: 'gx:keyCommand' }>['command'],
-          }
-        : undefined
+    case 'gx:keyCommand': {
+      if (typeof m.command !== 'string' || !KEY_COMMANDS.has(m.command)) return undefined
+      const command = m.command as Extract<FromInspectorBody, { type: 'gx:keyCommand' }>['command']
+      if (m.sid === undefined) return { type, command }
+      const id = sid(m.sid)
+      return id === undefined ? undefined : { type, command, sid: id }
+    }
     case 'gx:keyEvent': {
       const key = str(m.key, MAX_KEY)
       const code = str(m.code, MAX_KEY)

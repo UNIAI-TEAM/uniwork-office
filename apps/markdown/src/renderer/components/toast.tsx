@@ -1,5 +1,5 @@
-/** Transient feedback for user-triggered actions: a fixed top-center pill
- * that auto-dismisses. The status bar stays the durable log.
+/** Transient feedback for user-triggered actions: a fixed bottom-center pill
+ * above the status bar that auto-dismisses. The status bar stays the durable log.
  * Trigger via showToast from './toast-bus' (kept component-only here so React
  * Fast Refresh works in dev). */
 import { useEffect, useState } from 'react'

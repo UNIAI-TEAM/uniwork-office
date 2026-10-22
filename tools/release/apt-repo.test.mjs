@@ -17,6 +17,7 @@ import { after, before, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const SCRIPT = fileURLToPath(new URL('./apt-repo.sh', import.meta.url))
+const INSTALL_SCRIPT = fileURLToPath(new URL('./install.sh', import.meta.url))
 const TOOLS = ['apt-ftparchive', 'dpkg-deb', 'gpg', 'gpgv', 'xz']
 const missing = TOOLS.filter((tool) => spawnSync('sh', ['-c', `command -v ${tool}`]).status !== 0)
 const skip =
@@ -515,6 +516,17 @@ describe('apt-repo.sh', { skip }, () => {
     assert.equal(manifestOf(target).channels.stable.latest_deb_url, `${BASE}/${key}`)
   })
 
+  it('publishes install.sh at the bucket root, byte-identical, on every run and for every channel', () => {
+    const target = join(root, 'install-script')
+    publish(target, '0.11.0-dev.1')
+    assert.equal(sha256(join(target, 'install.sh')), sha256(INSTALL_SCRIPT))
+    // a stale copy is replaced by the next run, whatever channel it publishes
+    writeFileSync(join(target, 'install.sh'), 'stale\n')
+    publish(target, '1.0.0', 'stable')
+    assert.equal(sha256(join(target, 'install.sh')), sha256(INSTALL_SCRIPT))
+    assert.ok(!files(target).some((name) => name.endsWith('install.sh') && name !== 'install.sh'))
+  })
+
   it('skips the latest deb and latest_deb_url for a deb without the apt source, and keeps an older copy', () => {
     const target = join(root, 'no-source')
     const latest = 'apt/latest/dev/uniwork-office_amd64.deb'
@@ -576,6 +588,7 @@ describe('apt-repo.sh', { skip }, () => {
       'PUT apt/dists/dev/main/binary-amd64/Packages (Cache-Control: no-cache)',
       'PUT apt/dists/dev/InRelease (Cache-Control: no-cache)',
       'PUT apt/latest/dev/uniwork-office_amd64.deb (Cache-Control: no-cache) (Content-Type: application/vnd.debian.binary-package)',
+      'PUT install.sh (Cache-Control: no-cache) (Content-Type: text/plain; charset=utf-8)',
       'PUT update/dev/dev-linux.yml (Cache-Control: no-cache)',
       'PUT releases.json (Cache-Control: no-cache) (Content-Type: application/json; charset=utf-8)',
     ].map((line) => lines.indexOf(line))
