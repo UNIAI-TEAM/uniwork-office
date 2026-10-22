@@ -501,7 +501,7 @@ jobs:
 
   # Mac signing run: the only job that sees the signing secrets, which live in
   # the GitHub environment mac-signing (see the header). Same build as the
-  # unsigned macos job below, with the sign + notarize package step.
+  # unsigned macos job above, with the sign + notarize package step.
   macos_signed:
     needs: meta
     if: needs.meta.outputs.mac_signed == 'true'
@@ -527,6 +527,27 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # First, so a missing environment or an empty secret fails in a minute
+      # rather than after the build. The secrets are step env only (here and in
+      # the package step): npm ci and the build never see them.
+      - name: Check the signing secrets
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::signing is enabled but these secrets are empty:$missing"
+            exit 1
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -566,28 +587,8 @@ jobs:
       - name: Build the universal xlsx sidecar
         run: npm run native:build:universal -w @genoffice/sheets
 
-      # The package step gets the certificate and Apple credentials;
-      # electron-builder then signs with the Developer ID identity, notarizes
-      # the app, and build/notarize-dmg.js notarizes and staples the dmgs. The
-      # secrets are step env only: npm ci and the build never see them.
-      - name: Check the signing secrets
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          missing=""
-          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
-            [ -n "${!name}" ] || missing="$missing $name"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::signing is enabled but these secrets are empty:$missing"
-            exit 1
-          fi
-
+      # electron-builder signs with the Developer ID identity and notarizes the
+      # app; build/notarize-dmg.js notarizes and staples the dmgs.
       - name: Package, sign and notarize the dmgs
         working-directory: apps/shell
         env:
@@ -844,7 +845,11 @@ jobs:
   # code: download the built files, create the pre-release, upload them.
   publish:
     needs: [meta, urls]
-    if: needs.meta.outputs.publish == 'true'
+    # urls runs although one mac job is skipped; without a status function the
+    # implicit success() here could treat that skipped ancestor as a failure
+    if: >-
+      !cancelled() && needs.meta.outputs.publish == 'true'
+      && needs.urls.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
