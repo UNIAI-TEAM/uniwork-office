@@ -16,6 +16,12 @@ import type {
 import { DeskInTray } from '../src/renderer/src/DeskInTray'
 import { DeskToday } from '../src/renderer/src/DeskToday'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { useUnreadNotices } from '../src/renderer/src/notices-data'
+import {
+  onDocumentsIntent,
+  resetDocumentsIntentBusForTests,
+  type DocumentsIntent,
+} from '../src/renderer/src/documents-intent-bus'
 import { onUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 import type { WorkLoad } from '../src/renderer/src/work-cache'
 
@@ -26,10 +32,12 @@ let host: HTMLDivElement
 let root: Root
 let api: Record<string, ReturnType<typeof vi.fn>>
 let work: {
+  listNotifications: ReturnType<typeof vi.fn>
   markNotificationsRead: ReturnType<typeof vi.fn>
   notificationDocuments: ReturnType<typeof vi.fn>
   openWeb: ReturnType<typeof vi.fn>
 }
+let listed: WorkNotification[]
 let notices: UniworkLaunchEvent[]
 let offNotice: () => void
 
@@ -47,8 +55,17 @@ beforeEach(() => {
     uniworkOpenDocument: vi.fn(async () => ({ ok: true, value: { path: '/c/x.docx' } })),
   }
   window.aiOffice = api as unknown as HomeApi
+  // the server's unread list: what is marked read leaves it
+  listed = []
   work = {
-    markNotificationsRead: vi.fn(async () => ({ ok: true, value: null })),
+    listNotifications: vi.fn(async () => ({
+      ok: true,
+      value: { notifications: listed, next_before: null },
+    })),
+    markNotificationsRead: vi.fn(async (ids: string[]) => {
+      listed = listed.filter((n) => !ids.includes(n.id))
+      return { ok: true, value: null }
+    }),
     notificationDocuments: vi.fn(async () => ({
       ok: true,
       value: { documents: [], next_cursor: null },
@@ -135,9 +152,10 @@ function summary(inbox: WorkNotification[], unread = inbox.length): WorkHomeSumm
   } as WorkHomeSummary
 }
 
-/** the tray with a live home: marking a row read really removes it, as the page's cache does */
+/** the tray with a live home and the unread list the Desk loads: marking a row read removes it */
 function Harness({ inbox }: { inbox: WorkNotification[] }): ReactElement {
   const [value, setValue] = useState(summary(inbox))
+  const unread = useUnreadNotices({ workspaceId: 'w' })
   const home: WorkLoad<WorkHomeSummary> = {
     value,
     updatedAt: 1,
@@ -146,7 +164,13 @@ function Harness({ inbox }: { inbox: WorkNotification[] }): ReactElement {
     reload: vi.fn(),
     update: (edit) => setValue(edit),
   }
-  return createElement(DeskInTray, { home, signedIn: true, view: 'ready', local: [] })
+  return createElement(DeskInTray, {
+    home,
+    notices: unread,
+    signedIn: true,
+    view: 'ready',
+    local: [],
+  })
 }
 
 async function render(el: ReactElement, lang: 'en' | 'vi' = 'en') {
@@ -155,8 +179,10 @@ async function render(el: ReactElement, lang: 'en' | 'vi' = 'en') {
   })
   await flush()
 }
-const tray = (inbox: WorkNotification[], lang: 'en' | 'vi' = 'en') =>
-  render(createElement(Harness, { inbox }), lang)
+const tray = (inbox: WorkNotification[], lang: 'en' | 'vi' = 'en') => {
+  listed = [...inbox]
+  return render(createElement(Harness, { inbox }), lang)
+}
 
 const buttons = () => Array.from(host.ownerDocument.querySelectorAll('button'))
 const button = (label: string) => buttons().find((b) => b.textContent?.includes(label))
@@ -621,8 +647,101 @@ describe('Today foot count (G10)', () => {
         workspace: ws as unknown as UniworkWorkspaceRef,
         onReload: vi.fn(),
         onOpenTasks: vi.fn(),
+        onOpenInbox: vi.fn(),
       }),
     )
     expect(host.textContent).toContain('Other notifications on UniWork: 1')
+  })
+})
+
+describe('the tray reads the unread list (UNI-2079)', () => {
+  const kinds = (over: Partial<WorkNotification>) =>
+    note({
+      id: 'k1',
+      resource_id: 'd5',
+      params: { actor: 'Lan', document: 'Plan' },
+      ...over,
+    })
+
+  it("asks the server for this workspace's unread notices, 30 of them, not the home preview", async () => {
+    await tray([comment()])
+    expect(work.listNotifications).toHaveBeenCalledWith({
+      workspaceId: 'w',
+      unread: true,
+      limit: 30,
+    })
+  })
+
+  it('shows a document notice the 8-row home preview never held, whatever its kind', async () => {
+    // the home preview is empty (a newer notice of another kind pushed it out); the list has it
+    const rows = [
+      kinds({ kind: 'document_access_requested' }),
+      kinds({ id: 'k2', kind: 'document_trashed_by_other' }),
+      kinds({ id: 'k3', kind: 'task_assigned', resource_type: 'task', resource_id: 't1' }),
+    ]
+    listed = rows
+    await render(
+      createElement(() => {
+        const unread = useUnreadNotices({ workspaceId: 'w' })
+        const home: WorkLoad<WorkHomeSummary> = {
+          value: summary([]),
+          updatedAt: 1,
+          error: null,
+          stale: false,
+          reload: vi.fn(),
+          update: vi.fn(),
+        }
+        return createElement(DeskInTray, {
+          home,
+          notices: unread,
+          signedIn: true,
+          view: 'ready',
+          local: [],
+        })
+      }),
+    )
+    expect(rowOf('Lan requested access to “Plan”.')).toBeTruthy()
+    expect(rowOf('Plan')).toBeTruthy()
+    // a task notice is not a document row
+    expect(host.querySelectorAll('.uw-pick-item')).toHaveLength(2)
+  })
+
+  it('opens a comment at its thread, a share request on its Share section', async () => {
+    api.uniworkOpenDocumentAt = vi.fn(async () => ({ ok: true, value: { path: '/c/x.docx' } }))
+    resetDocumentsIntentBusForTests()
+    const taken: DocumentsIntent[] = []
+    const off = onDocumentsIntent((intent) => {
+      taken.push(intent)
+      return true
+    })
+    try {
+      await tray([
+        comment({ params: { actor: 'Minh', document: 'Contract-012', comment_id: 'c77' } }),
+        kinds({ kind: 'document_access_requested' }),
+      ])
+      await click(button('Contract-012'))
+      expect(api.uniworkOpenDocumentAt).toHaveBeenCalledWith({
+        documentId: 'd9',
+        commentId: 'c77',
+      })
+      expect(work.markNotificationsRead).toHaveBeenCalledWith(['c1'])
+      await click(button('Plan'))
+      expect(taken).toEqual([
+        { kind: 'share', documentId: 'd5', workspaceId: 'w', section: 'requests' },
+      ])
+      expect(work.markNotificationsRead).toHaveBeenCalledWith(['k1'])
+    } finally {
+      off()
+      resetDocumentsIntentBusForTests()
+    }
+  })
+
+  it('says the list could not load, with Retry, when the first load fails', async () => {
+    work.listNotifications.mockResolvedValueOnce({ ok: false, error: 'offline' })
+    await tray([comment()])
+    expect(host.textContent).toContain('Retry')
+    await click(button('Retry'))
+    expect(work.listNotifications).toHaveBeenCalledTimes(2)
+    expect(rowOf('Contract-012')).toBeTruthy()
   })
 })

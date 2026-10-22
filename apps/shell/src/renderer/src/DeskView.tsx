@@ -6,6 +6,8 @@ import { DeskDrawer } from './DeskDrawer'
 import { DeskInProgress } from './DeskInProgress'
 import { DeskInTray } from './DeskInTray'
 import { DeskToday } from './DeskToday'
+import { docNotifications } from './desk-model'
+import { useUnreadNotices } from './notices-data'
 import { DeskTools } from './DeskTools'
 import { getWorkbenchModule, type PracticeId } from '@uniwork/practice-core'
 import { useI18n } from './locale'
@@ -29,7 +31,7 @@ interface Props {
   onReload: () => void
   /** each summary on screen (null before one exists): the page redraws the tab counts on it */
   onSummary?: (summary: WorkHomeSummary | null) => void
-  onOpenTab: (id: 'tasks' | 'forms') => void
+  onOpenTab: (id: 'tasks' | 'forms' | 'inbox') => void
   /** a Drawer draft linked a form to a pack: refresh the packs */
   onPackLinked?: () => void
   /** the signed-in person's display name ('' when unknown): the toolbar greets them */
@@ -131,6 +133,8 @@ export function DeskView({
     { refreshTick, intervalMs: HOME_REFRESH_MS },
   )
   const view = overviewView({ workspaces, workspaceError, summary: home.value, error: home.error })
+  // the unread notices the tray lists and the Today card counts from (UNI-2079)
+  const unread = useUnreadNotices({ workspaceId: wsId, refreshTick })
   const recents = useRecentDocuments(wsId, refreshTick, IN_PROGRESS_ROWS)
   // null until listDrafts answers: an empty list before that is not "nothing in progress"
   const [drafts, setDrafts] = useState<DeskDraft[] | null>(null)
@@ -240,6 +244,7 @@ export function DeskView({
           />
           <DeskInTray
             home={home}
+            notices={unread}
             signedIn={workspace !== null}
             view={view}
             local={recents.local}
@@ -274,6 +279,8 @@ export function DeskView({
           workspace={workspace}
           onReload={onReload}
           onOpenTasks={() => onOpenTab('tasks')}
+          onOpenInbox={() => onOpenTab('inbox')}
+          trayDocs={unread.rows ? docNotifications(unread.rows).length : null}
         />
       </div>
     </>

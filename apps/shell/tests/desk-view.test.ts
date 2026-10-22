@@ -40,6 +40,11 @@ beforeEach(() => {
   window.aiOffice = api as unknown as HomeApi
   window.uniworkWork = {
     homeSummary: vi.fn(async () => ({ ok: false, error: 'signed-out' })),
+    // the tray's unread list (UNI-2079): nothing unread
+    listNotifications: vi.fn(async () => ({
+      ok: true,
+      value: { notifications: [], next_before: null },
+    })),
   } as unknown as UniworkWorkApi
   window.aiOfficeTabs = {
     onChanged: vi.fn(() => () => undefined),
@@ -221,6 +226,58 @@ describe('DeskView', () => {
       for (let i = 0; i < 5; i++) await Promise.resolve()
     })
     expect(retry().textContent).toBe('Retry')
+  })
+
+  it('lists the tray from the unread list and sends "other notifications" to the Inbox tab (UNI-2079)', async () => {
+    const doc = (id: string, kind: string) => ({
+      id,
+      kind,
+      workspace_id: 'w-in',
+      resource_type: 'document',
+      resource_id: `d-${id}`,
+      actor_kind: 'user',
+      title_key: 'x',
+      params: { actor: 'Lan', document: `Doc ${id}` },
+      created_at: '2026-10-15T07:00:00Z',
+    })
+    window.uniworkWork.homeSummary = vi.fn(async () => ({
+      ok: true,
+      value: {
+        today: '2026-10-15',
+        timezone: '',
+        // five unread in all; the home preview holds none of them
+        counts: { open: 0, overdue: 0, due_today: 0, meetings_today: 0, unread: 5 },
+        my_work: [],
+        upcoming_meetings: [],
+        inbox: [],
+        partial: [],
+        generated_at: '2026-10-15T08:00:00Z',
+      },
+    })) as never
+    window.uniworkWork.listNotifications = vi.fn(async () => ({
+      ok: true,
+      value: {
+        notifications: [doc('a', 'document_shared'), doc('b', 'document_commented')],
+        next_before: null,
+      },
+    })) as never
+    const onOpenTab = vi.fn()
+    const ws = { id: 'w-in', name: 'Ops', orgId: 'o1', slug: 'ops', orgSlug: 'acme' }
+    await mount({ workspaces: [ws], workspaceId: 'w-in', workspaceError: null, onOpenTab })
+    expect(window.uniworkWork.listNotifications).toHaveBeenCalledWith({
+      workspaceId: 'w-in',
+      unread: true,
+      limit: 30,
+    })
+    expect(host.textContent).toContain('Doc a')
+    expect(host.textContent).toContain('Doc b')
+    // two of the five sit in the tray: three are left for the Inbox
+    const other = Array.from(host.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Other notifications'),
+    )!
+    expect(other.textContent).toContain('3')
+    await act(async () => other.click())
+    expect(onOpenTab).toHaveBeenCalledWith('inbox')
   })
 
   it('drops the greeting when no name is known', async () => {

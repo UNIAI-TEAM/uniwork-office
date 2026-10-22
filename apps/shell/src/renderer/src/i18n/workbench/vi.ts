@@ -17,7 +17,6 @@ export const vi = {
   wbNotif_chat_reminder: 'Nhắc hẹn: {body}',
   wbNotif_email_hub_new_mail: 'Bạn có {count} thư chưa đọc · {mailbox}',
   wbNotif_document_commented: '{actor} đã bình luận trong “{document}”',
-  wbNotif_document_mentioned: '{actor} đã nhắc đến bạn trong “{document}”',
   wbNotif_chat_mentioned: '{actor} đã nhắc đến bạn trong {room}',
   wbNotif_chat_dm: '{actor} đã nhắn tin cho bạn',
   wbNotif_chat_thread_replied: '{actor} đã trả lời một chuỗi tin nhắn trong {room}',
@@ -161,6 +160,7 @@ export const vi = {
   wbTabCountOverdue: 'Việc quá hạn: {count}',
   wbTabCountDueToday: 'Việc đến hạn hôm nay: {count}',
   wbTabCountMeetings: 'Cuộc họp hôm nay: {count}',
+  wbTabCountUnread: 'Thông báo chưa đọc: {count}',
   wbSkTabsNav: 'Lĩnh vực kỹ năng chuyên môn',
   wbSkTabsAdd: 'Thêm lĩnh vực',
   wbSkTabsMenuTitle: 'Thêm lĩnh vực kỹ năng',
@@ -398,4 +398,52 @@ export const vi = {
   wbDocChangeUntitled: 'Tài liệu chưa có tiêu đề',
   wbDocChangeMore: 'và {count} tài liệu khác',
   wbNoticeNoAccess: 'Bạn không có quyền truy cập tài liệu này.',
+  wbNotif_document_commented_untitled: '{actor} đã bình luận trong một tài liệu',
+  wbNotif_document_mentioned: '{actor} đã nhắc đến bạn trong bình luận tại tài liệu “{document}”.',
+  wbNotif_document_mentioned_untitled: '{actor} đã nhắc đến bạn trong bình luận tại một tài liệu.',
+  wbNotif_document_body_mentioned: '{actor} đã nhắc đến bạn trong tài liệu “{document}”.',
+  wbNotif_document_body_mentioned_untitled: '{actor} đã nhắc đến bạn trong một tài liệu.',
+  wbNotif_document_comment_replied:
+    '{actor} đã phản hồi bình luận của bạn trong tài liệu “{document}”.',
+  wbNotif_document_comment_replied_untitled:
+    '{actor} đã phản hồi bình luận của bạn trong một tài liệu.',
+  wbNotif_document_discussion_mentioned:
+    '{actor} đã nhắc đến bạn trong thảo luận của tài liệu “{document}”.',
+  wbNotif_document_discussion_mentioned_untitled:
+    '{actor} đã nhắc đến bạn trong thảo luận của một tài liệu.',
+  wbNotif_document_discussion_replied:
+    '{actor} đã phản hồi nội dung thảo luận của bạn trong tài liệu “{document}”.',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor} đã phản hồi nội dung thảo luận của bạn trong một tài liệu.',
+  wbNotif_document_edit_requested: '{actor} muốn sửa “{document}”',
+  wbNotif_document_edit_request_answered: '{actor} đã nhường quyền sửa “{document}” cho bạn',
+  wbNotif_document_edit_request_answered_declined: '{actor} chưa nhả quyền sửa “{document}”',
+  wbNotif_document_edit_taken_over:
+    '{actor} đã lấy quyền sửa “{document}”. Thay đổi chưa lưu của bạn vẫn còn trong tài liệu đang mở.',
+  wbNotif_document_break_glass:
+    '{actor} đã mở truy cập khẩn cấp (chỉ xem, 24 giờ) vào tài liệu “{document}”.',
+  wbNotif_document_break_glass_untitled:
+    '{actor} đã mở truy cập khẩn cấp (chỉ xem, 24 giờ) vào một tài liệu.',
+  wbNotif_document_access_requested: '{actor} xin quyền truy cập tài liệu “{document}”.',
+  wbNotif_document_access_requested_untitled: '{actor} xin quyền truy cập một tài liệu.',
+  wbNotif_document_access_approved: '{actor} đã cấp cho bạn quyền truy cập “{document}”.',
+  wbNotif_document_access_approved_untitled: '{actor} đã cấp cho bạn quyền truy cập một tài liệu.',
+  wbNotif_document_access_declined: 'Yêu cầu truy cập tài liệu của bạn đã bị từ chối.',
+  wbNotif_document_shared: '{actor} đã chia sẻ tài liệu “{document}” với bạn. Quyền: {level}.',
+  wbNotif_document_shared_untitled: '{actor} đã chia sẻ một tài liệu với bạn. Quyền: {level}.',
+  wbNotif_document_shared_nolevel: '{actor} đã chia sẻ tài liệu “{document}” với bạn.',
+  wbNotif_document_shared_untitled_nolevel: '{actor} đã chia sẻ một tài liệu với bạn.',
+  wbNotif_document_trashed_by_other:
+    '{actor} đã chuyển tài liệu của bạn vào thùng rác, khôi phục trước {date}',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor} đã chuyển một tài liệu của bạn vào thùng rác, khôi phục trước {date}',
+  wbNotif_document_trashed_by_other_nodate: '{actor} đã chuyển tài liệu của bạn vào thùng rác',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor} đã chuyển một tài liệu của bạn vào thùng rác',
+  wbNotif_chat_call_incoming: '{actor} đang gọi',
+  wbDeskPillReply: 'Phản hồi',
+  wbDeskPillEdit: 'Quyền sửa',
+  wbDeskPillAccess: 'Quyền truy cập',
+  wbDeskPillTrash: 'Thùng rác',
+  wbDeskPillBreakGlass: 'Khẩn cấp',
 } satisfies Record<keyof typeof zh, string>

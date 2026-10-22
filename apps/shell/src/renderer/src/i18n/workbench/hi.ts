@@ -4,6 +4,74 @@ import { en } from './en'
 // shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
 export const hi = {
   ...en,
+  wbNotif_document_commented_untitled: '{actor} ने एक दस्तावेज़ पर टिप्पणी की',
+  wbNotif_document_mentioned: '{actor} ने “{document}” पर एक टिप्पणी में आपका उल्लेख किया।',
+  wbNotif_document_mentioned_untitled: '{actor} ने एक दस्तावेज़ की टिप्पणी में आपका उल्लेख किया।',
+  wbNotif_document_body_mentioned: '{actor} ने “{document}” में आपका उल्लेख किया।',
+  wbNotif_document_body_mentioned_untitled: '{actor} ने एक दस्तावेज़ में आपका उल्लेख किया।',
+  wbNotif_document_comment_replied: '{actor} ने “{document}” में आपकी टिप्पणी का जवाब दिया।',
+  wbNotif_document_comment_replied_untitled:
+    '{actor} ने एक दस्तावेज़ में आपकी टिप्पणी का जवाब दिया।',
+  wbNotif_document_discussion_mentioned: '{actor} ने “{document}” की चर्चा में आपका उल्लेख किया।',
+  wbNotif_document_discussion_mentioned_untitled:
+    '{actor} ने एक दस्तावेज़ की चर्चा में आपका उल्लेख किया।',
+  wbNotif_document_discussion_replied:
+    '{actor} ने “{document}” की चर्चा में आपकी पोस्ट का जवाब दिया।',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor} ने एक दस्तावेज़ की चर्चा में आपकी पोस्ट का जवाब दिया।',
+  wbNotif_document_edit_requested: '{actor} “{document}” को संपादित करना चाहते हैं',
+  wbNotif_document_edit_request_answered: '{actor} ने “{document}” का संपादन आपको सौंप दिया',
+  wbNotif_document_edit_request_answered_declined:
+    '{actor} अभी भी “{document}” का संपादन कर रहे हैं',
+  wbNotif_document_edit_taken_over:
+    '{actor} ने “{document}” का संपादन अपने हाथ में ले लिया है। आपके बिना सहेजे गए बदलाव खुले दस्तावेज़ में अब भी हैं।',
+  wbNotif_document_break_glass:
+    '{actor} ने “{document}” के लिए आपातकालीन देखने की पहुँच (24 घंटे) खोली है।',
+  wbNotif_document_break_glass_untitled:
+    '{actor} ने एक दस्तावेज़ के लिए आपातकालीन देखने की पहुँच (24 घंटे) खोली है।',
+  wbNotif_document_access_requested: '{actor} ने “{document}” तक पहुँच का अनुरोध किया है।',
+  wbNotif_document_access_requested_untitled: '{actor} ने एक दस्तावेज़ तक पहुँच का अनुरोध किया है।',
+  wbNotif_document_access_approved: '{actor} ने आपको “{document}” तक पहुँच दी है।',
+  wbNotif_document_access_approved_untitled: '{actor} ने आपको एक दस्तावेज़ तक पहुँच दी है।',
+  wbNotif_document_access_declined: 'दस्तावेज़ तक पहुँच के लिए आपका अनुरोध अस्वीकार कर दिया गया।',
+  wbNotif_document_shared: '{actor} ने “{document}” आपके साथ साझा किया ({level})।',
+  wbNotif_document_shared_untitled: '{actor} ने एक दस्तावेज़ आपके साथ साझा किया ({level})।',
+  wbNotif_document_shared_nolevel: '{actor} ने “{document}” आपके साथ साझा किया।',
+  wbNotif_document_shared_untitled_nolevel: '{actor} ने एक दस्तावेज़ आपके साथ साझा किया।',
+  wbNotif_document_trashed_by_other:
+    '{actor} ने आपका दस्तावेज़ ट्रैश में डाल दिया। {date} से पहले उसे पुनर्स्थापित करें',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor} ने आपका एक दस्तावेज़ ट्रैश में डाल दिया। {date} से पहले उसे पुनर्स्थापित करें',
+  wbNotif_document_trashed_by_other_nodate: '{actor} ने आपका दस्तावेज़ ट्रैश में डाल दिया',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor} ने आपका एक दस्तावेज़ ट्रैश में डाल दिया',
+  wbNotif_chat_call_incoming: '{actor} कॉल कर रहे हैं',
+  wbNotifFallback: 'नई सूचना',
+  wbNotif_audit_export_ready: 'आपका ऑडिट एक्सपोर्ट तैयार है',
+  wbNotif_chat_dm: '{actor} ने आपको एक संदेश भेजा',
+  wbNotif_chat_follow_up: 'आपने एक संदेश पर फ़ॉलो-अप सहेजा',
+  wbNotif_chat_mentioned: '{actor} ने {room} में आपका ज़िक्र किया',
+  wbNotif_chat_reminder: 'याद दिलाना: {body}',
+  wbNotif_chat_thread_replied: '{actor} ने {room} में एक थ्रेड का जवाब दिया',
+  wbNotif_document_commented: '{actor} ने “{document}” पर टिप्पणी की',
+  wbNotif_email_hub_new_mail: 'बिना पढ़े संदेश: {count} · {mailbox}',
+  wbNotif_meeting_invited: '{actor} ने आपको “{meeting}” में आमंत्रित किया',
+  wbNotif_meeting_starting: '“{meeting}” {minutes} मिनट में शुरू होगी',
+  wbNotif_meeting_summary_reminder: '“{meeting}” खत्म हो गई · इसका सारांश बनाएँ और कार्य बनाएँ',
+  wbNotif_member_added: '{actor} ने आपको वर्कस्पेस {workspace} में जोड़ा',
+  wbNotif_mentioned: '{actor} ने “{task}” में आपका ज़िक्र किया',
+  wbNotif_role_changed: '{actor} ने आपकी भूमिका बदलकर {role} कर दी',
+  wbNotif_task_assigned: '{actor} ने आपको “{task}” सौंपा',
+  wbNotif_task_commented: '{actor} ने “{task}” पर टिप्पणी की',
+  wbNotif_task_status_changed: '{actor} ने “{task}” की स्थिति {status} कर दी',
+  wbDeskPillComment: 'टिप्पणी',
+  wbDeskPillMention: 'उल्लेख',
+  wbDeskPillShared: 'नया साझा',
+  wbDeskPillReply: 'जवाब',
+  wbDeskPillEdit: 'संपादन में',
+  wbDeskPillAccess: 'पहुँच',
+  wbDeskPillTrash: 'ट्रैश में',
+  wbDeskPillBreakGlass: 'आपातकाल',
   wbNotif_document_changed: '{actor} ने {count} दस्तावेज़ बदले',
   wbNotif_document_changed_renamed_many: '{actor} ने {count} दस्तावेज़ों का नाम बदला',
   wbNotif_document_changed_renamed_one: '{actor} ने “{document}” का नाम बदला',
@@ -60,4 +128,5 @@ export const hi = {
   wbDocChangeUntitled: 'बिना शीर्षक का दस्तावेज़',
   wbDocChangeMore: 'और {count}',
   wbNoticeNoAccess: 'आपके पास इस दस्तावेज़ तक पहुँच नहीं है।',
+  wbTabCountUnread: 'बिना पढ़ी सूचनाएँ: {count}',
 } satisfies Record<keyof typeof zh, string>

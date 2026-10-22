@@ -7153,6 +7153,19 @@ export class UniworkDocsService {
   }
 
   /**
+   * UNI-2079: a notice's "open at the comment". The plain open, then the thread of `commentId`
+   * revealed in the opened copy through the same held reveal a launch ticket uses.
+   */
+  async openDocumentAt(
+    documentId: string,
+    commentId?: string,
+  ): Promise<UniworkResult<{ path: string }>> {
+    const opened = await this.openDocument(documentId)
+    if (opened.ok && commentId) this.deps.revealComment?.(opened.value.path, commentId)
+    return opened
+  }
+
+  /**
    * G703B-P3: the S11 lock of an offline open the locked keychain refused. The
    * tab never opened, so the lock names where the offline copy of the document
    * would sit: under the saved owner's scope when one is known, else under the
