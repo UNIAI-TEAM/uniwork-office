@@ -70,3 +70,49 @@ describe('folder dialog paragraphs beat .modal p', () => {
     expect(body).toMatch(/font-size:\s*12px/)
   })
 })
+
+/** relative luminance contrast of two #rrggbb / #rgb colours */
+function contrast(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const full = hex.length === 4 ? `#${[...hex.slice(1)].map((c) => c + c).join('')}` : hex
+    const [r, g, bl] = [1, 3, 5].map((i) => {
+      const v = parseInt(full.slice(i, i + 2), 16) / 255
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * bl!
+  }
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+  return (hi! + 0.05) / (lo! + 0.05)
+}
+
+/** the value of `--name` inside the first rule of tokens.css whose selector list has `selector` */
+function token(selector: string, name: string): string {
+  const css = readFileSync(join(__dirname, '../../../packages/ui/src/tokens.css'), 'utf8')
+  const body = rule(css, selector)
+  return new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,6})`).exec(body)![1]!
+}
+
+/**
+ * UNI-2080 FU-2066-3: the locked rows of the move picker dimmed their title with --text-muted, which on
+ * the dark hover surface (#333) is 4.17:1. --text-secondary clears 4.5 on every row surface in both themes.
+ */
+describe('move picker locked rows stay legible', () => {
+  const locked = '.uwf-tree-row.blocked .uwf-tree-title'
+
+  it('dims the title with --text-secondary, not --text-muted', () => {
+    const body = rule(read('uniwork-folders/uniwork-folders.css'), locked)
+    expect(body).toContain('color: var(--text-secondary)')
+    expect(body).not.toContain('--text-muted')
+  })
+
+  it('--text-secondary reaches 4.5:1 on the row, hover and current-location surfaces (dark and light)', () => {
+    for (const theme of [':root', "[data-theme='dark']"]) {
+      const text = token(theme, '--text-secondary')
+      for (const surface of ['--surface', '--hover', '--tint-blue']) {
+        expect(contrast(text, token(theme, surface)), `${theme} ${surface}`).toBeGreaterThanOrEqual(
+          4.5,
+        )
+      }
+    }
+  })
+})
