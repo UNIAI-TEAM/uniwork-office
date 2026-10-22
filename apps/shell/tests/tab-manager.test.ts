@@ -505,6 +505,34 @@ describe('spare sheets view', () => {
   })
 })
 
+describe('hasWebContents (IPC sender guard registry)', () => {
+  it('knows tab views, the warm spare sheets view, and nothing else', async () => {
+    vi.useFakeTimers()
+    try {
+      manager.openDocsTab('/tmp/a.docx')
+      const docsView = lastCreatedView(createDocsView)
+      manager.openSheetsTab('/tmp/b.xlsx')
+      const sheetsView = lastCreatedView(createSheetsView)
+      expect(manager.hasWebContents(docsView.webContents.id)).toBe(true)
+      expect(manager.hasWebContents(sheetsView.webContents.id)).toBe(true)
+      expect(manager.hasWebContents(987654)).toBe(false)
+
+      // the spare is not a tab yet, and is trusted before a sheets tab takes it
+      vi.advanceTimersByTime(3000)
+      const spare = lastCreatedView(createSheetsView)
+      expect(spare).not.toBe(sheetsView)
+      expect(manager.list()).toHaveLength(3)
+      expect(manager.hasWebContents(spare.webContents.id)).toBe(true)
+
+      // once its tab closes the view is no longer a trusted editor view
+      await manager.closeTab('t2')
+      expect(manager.hasWebContents(sheetsView.webContents.id)).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('activation', () => {
   it('shows only the activated tab view and lays it out below the tab strip', () => {
     const docsId = manager.openDocsTab()

@@ -435,6 +435,24 @@ describe('focused window as menu target', () => {
   })
 })
 
+describe('isDetachedWebContents (IPC sender guard registry)', () => {
+  it('is true for the view of a live detached window and false after it closes', async () => {
+    expect(detached.isDetachedWebContents(21)).toBe(false)
+    const view = fakeView(21)
+    detached.createDetachedEditorWindow({
+      view: view as never,
+      kind: 'docs',
+      title: 'a.docx',
+      applyMenuFor: () => {},
+    })
+    expect(detached.isDetachedWebContents(21)).toBe(true)
+    expect(detached.isDetachedWebContents(22)).toBe(false)
+    instances[0]!.emit('close', { preventDefault: vi.fn() })
+    await flush()
+    expect(detached.isDetachedWebContents(21)).toBe(false)
+  })
+})
+
 describe('tear-off', () => {
   it('creates the window under the pointer without focus and steers it with the pointer', () => {
     const view = fakeView(10)

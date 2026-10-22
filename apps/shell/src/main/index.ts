@@ -247,6 +247,7 @@ import {
   discardSlidesRecovery,
   exportSlidesPdfHeadless,
   installSlidesMenu,
+  isSlidesAudienceWebContents,
   readSlidesRecentFiles,
   replaceSlidesRecentFile,
   setSlidesCloseTabHook,
@@ -391,6 +392,7 @@ import { clearAiRun, isAiRunning, registerAiRunIpc } from './ai-run-registry'
 import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
 import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
 import { canonicalPath, TabManager } from './tab-manager'
+import { createIpcSenderGuard, trustedUrlRules } from './ipc-sender-guard'
 import { reloadPathTarget } from './reload-view'
 import { listDeskDrafts } from './desk-drafts'
 import { runDeskTool } from './desk-tools'
@@ -426,6 +428,7 @@ import {
   focusedDetachedTab,
   isDetachedEditorWindow,
   isDetachedTabId,
+  isDetachedWebContents,
   isTearingOff,
   setDetachedChangedListener,
   setDockHost,
@@ -3309,6 +3312,28 @@ function syncWorkbenchOwner(): void {
 }
 let tabManager: TabManager | null = null
 
+/** the renderer bundle of the shell window (and the update / password windows): `loadFile` reads it from here */
+const SHELL_RENDERER_DIR = join(__dirname, '../renderer')
+
+/**
+ * UNI-2073: the sender guard for every uniwork*, home:uniwork-* and home:account-* channel. It is
+ * handed to those registrars in place of the raw `ipcMain`; the window and view registries are read
+ * at call time because the handlers register before the shell window exists.
+ */
+const ipcSenderGuard = createIpcSenderGuard({
+  shellContents: () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null),
+  // tab views (Present views and the spare sheets view included), the view of a detached window
+  // (detach and dock keep the webContents id) and the slides audience window. Not in the registry:
+  // the html Present fallback window (html-main.ts presentNewTab when openTab returns false) and
+  // the headless export windows; their calls are refused, by design (no comments panel there)
+  isTrustedEditorContents: (id) =>
+    tabManager?.hasWebContents(id) === true ||
+    isDetachedWebContents(id) ||
+    isSlidesAudienceWebContents(id),
+  ...trustedUrlRules({ env: process.env, shellRendererDir: SHELL_RENDERER_DIR }),
+})
+const guardedIpc = ipcSenderGuard.guarded(ipcMain)
+
 /**
  * When the user creates a file from a specific project view, the project waits
  * (per kind) until the new editor tab exists, is bound to that tab, and the
@@ -4021,7 +4046,7 @@ function createShellWindow(): void {
   if (process.env.ELECTRON_RENDERER_URL) {
     void win.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'))
+    void win.loadFile(join(SHELL_RENDERER_DIR, 'index.html'))
   }
 }
 
@@ -4798,16 +4823,16 @@ function registerHomeIpc(): void {
   // tokens and state; the renderer only gets AccountStatus pushes.
   configureUniworkAccount({ settingsPath: APP_SETTINGS_PATH })
   registerAccountIpc(
-    ipcMain,
+    guardedIpc,
     () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null),
     () => tabManager?.openHomeTab(),
   )
   // UniWork documents (open from UniWork, launch links, Save to UniWork); logic in ./uniwork-docs
-  uniworkDocs = createUniworkDocs(ipcMain, uniworkDocsWiring())
+  uniworkDocs = createUniworkDocs(guardedIpc, uniworkDocsWiring())
   powerMonitor.on('resume', () => uniworkDocs?.service.notePowerResume())
   app.on('browser-window-focus', () => uniworkDocs?.service.noteWindowFocus())
   // UniWork work data for the Workbench (home, tasks, calendar, profile); logic in ./uniwork-work
-  registerUniworkWork(ipcMain, {
+  registerUniworkWork(guardedIpc, {
     profile: () => uniworkDeploymentProfile(),
     identity: () => uniworkSessionIdentity(),
     org: () => uniworkAccount().status().org ?? null,
@@ -4862,7 +4887,7 @@ function registerHomeIpc(): void {
   // G5-03a: the S6 bar's unscaled CSS-px height under the tab strip (TabManager
   // scales it by the interface scale); the shell renderer reports it for the
   // active tab only and resends on every tab switch (0 hides it)
-  ipcMain.handle(UNIWORK_DOC_CHANNELS.barInset, (event, heightPx: unknown) => {
+  guardedIpc.handle(UNIWORK_DOC_CHANNELS.barInset, (event, heightPx: unknown) => {
     if (typeof heightPx !== 'number' || !Number.isFinite(heightPx)) return
     if (!shellWindow || shellWindow.isDestroyed()) return
     if (shellWindow.webContents.id !== event.sender.id) return
@@ -6956,9 +6981,9 @@ registerIntegrationsIpc({
 registerTabsIpc()
 registerDroppedFilesIpc()
 // editors report a running AI turn per webContents (TabManager.editorDirtyStates reads it)
-registerAiRunIpc(ipcMain)
+registerAiRunIpc(guardedIpc)
 // the renderers' own provider lists learn whether UniWork AI is offered (pull + push)
-registerUniworkAiFlagIpc(ipcMain)
+registerUniworkAiFlagIpc(guardedIpc)
 // "UniWork AI" is picked per account (the account store), BYOK settings stay in ai-settings.json
 setUniworkAiChoiceStore(createUniworkAiChoiceStore(workbenchAccounts()))
 setUniworkAiFlagListener((available) =>
