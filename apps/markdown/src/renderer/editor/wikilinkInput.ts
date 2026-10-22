@@ -28,6 +28,11 @@ export const WikiMarkOnInput = Extension.create({
         find: TYPED,
         handler: ({ state, range, match }) => {
           if (!state.selection.empty) return null
+          // not over a hyperlink or inline code (a literal split by a code run
+          // still has the code mark in its range)
+          const { link, code } = state.schema.marks
+          if (link && state.doc.rangeHasMark(range.from, range.to, link)) return null
+          if (code && state.doc.rangeHasMark(range.from, range.to, code)) return null
           // the closing `]` is not in the doc yet; after a composition it is
           const typed = match[0].slice(range.to - range.from)
           const { tr } = state
@@ -65,7 +70,12 @@ export const WikiMarkOnInput = Extension.create({
           for (const [from, to] of ranges) {
             state.doc.nodesBetween(from, to, (node, pos, parent) => {
               if (parent?.type.spec.code) return
-              if (!node.isText || node.marks.some((m) => m.type.spec.code || m.type === wikiLink)) {
+              if (
+                !node.isText ||
+                node.marks.some(
+                  (m) => m.type.spec.code || m.type.name === 'link' || m.type === wikiLink,
+                )
+              ) {
                 return
               }
               for (const m of node.text!.matchAll(PASTED)) {
