@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { IpcMain, WebContents } from 'electron'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import {
@@ -10,6 +9,7 @@ import {
 import { registerUniworkAskUni, type UniworkAskUniWiring } from '../src/main/uniwork-askuni/index'
 import { ASKUNI_CHANNELS } from '../src/shared/askuni-api'
 import type { UniworkResult } from '../src/shared/home-api'
+import { SHELL_URL, createGuardedFakeIpc } from './uniwork-askuni-guard-fixture'
 
 /**
  * UNI-2069 s4: `uniwork:askuni:open-citation` - a document citation opens in the app through the
@@ -269,14 +269,10 @@ describe('signed out and bad input', () => {
 })
 
 describe('registration', () => {
-  // UNI-2076: only the shell's main frame reaches the handler (sender.ts)
-  const SHELL = { mainFrame: {}, isDestroyed: () => false }
+  // UNI-2076: only the shell's main frame reaches the handler (the guard's `shell` policy)
+  const SHELL = { id: 1, mainFrame: { url: SHELL_URL }, isDestroyed: () => false }
   const FROM_SHELL = { sender: SHELL, senderFrame: SHELL.mainFrame }
-  const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
-  const ipcMain = {
-    handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>
-      void handlers.set(channel, fn),
-  } as unknown as IpcMain
+  const { ipcMain, handlers } = createGuardedFakeIpc({ shell: () => SHELL })
   beforeEach(() => handlers.clear())
 
   it('has its own channel name', () => {
@@ -285,12 +281,12 @@ describe('registration', () => {
 
   it('registers one channel that answers an open result', async () => {
     const { opener, openExternal } = setup()
-    registerAskUniOpenIpc(ipcMain, opener, () => true)
+    registerAskUniOpenIpc(ipcMain, opener)
     expect([...handlers.keys()]).toEqual([ASKUNI_CHANNELS.openCitation])
     const handler = handlers.get(ASKUNI_CHANNELS.openCitation)!
-    expect(await handler({}, { kind: 'task', href: '/a/b/tasks/1' })).toEqual({ ok: true })
+    expect(await handler(FROM_SHELL, { kind: 'task', href: '/a/b/tasks/1' })).toEqual({ ok: true })
     expect(openExternal).toHaveBeenCalledTimes(1)
-    expect(await handler({})).toEqual({ ok: false, code: 'error' })
+    expect(await handler(FROM_SHELL)).toEqual({ ok: false, code: 'error' })
   })
 
   it('registerUniworkAskUni wires the opener to the shell open paths', async () => {
@@ -310,7 +306,6 @@ describe('registration', () => {
       env: {},
       openDocument,
       openExternal,
-      shellContents: () => SHELL as unknown as WebContents,
     }
     registerUniworkAskUni(ipcMain, wiring)
     const handler = handlers.get(ASKUNI_CHANNELS.openCitation)!

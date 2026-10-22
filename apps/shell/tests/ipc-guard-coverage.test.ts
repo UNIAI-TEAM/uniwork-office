@@ -12,7 +12,8 @@ import { registerUniworkAiFlagIpc } from '../src/main/uniwork-ai-flag'
 import { registerUniworkCloudStatusIpc } from '../src/main/uniwork-cloud-status'
 import { registerUniworkWork } from '../src/main/uniwork-work/wiring'
 import { HOME_CHANNELS, UNIWORK_DOC_CHANNELS, UNIWORK_SHARE_CHANNELS } from '../src/shared/home-api'
-import { ASKUNI_CHANNELS } from '../src/shared/askuni-api'
+import { registerUniworkAskUni } from '../src/main/uniwork-askuni'
+import { ASKUNI_CHANNELS, ASKUNI_DOC_CHANNELS, ASKUNI_V2_CHANNELS } from '../src/shared/askuni-api'
 import { SOURCE_VIEW_CHANNELS } from '../src/shared/source-view'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../src/shared/sync-center'
 import { UNIWORK_WORK_CHANNELS } from '../src/shared/uniwork-work-api'
@@ -106,6 +107,8 @@ for (const source of sources) readConstants(source.text)
 const sharedFiles: string[] = []
 for (const app of readdirSync(join(root, 'apps')))
   walk(join(root, 'apps', app, 'src/shared'), sharedFiles)
+// the Ask UNI v2 and editor channel tables live in the ai-provider package (shared with the editor preloads)
+walk(join(root, 'packages/ai-provider/src'), sharedFiles)
 for (const full of sharedFiles) readConstants(readFileSync(full, 'utf8'))
 
 /** the channels an argument expression can name; empty when it is a runtime value */
@@ -564,6 +567,8 @@ describe('registrar files', () => {
 /** the intended policy, written down independently of the guard's own table */
 function expectedPolicy(channel: string): IpcSenderPolicy | null {
   if (channel.startsWith('uniwork:comments:')) return 'editor'
+  // Ask UNI in the editor AI panels (UNI-2076 S7): editor views only; `uniwork:askuni:*` stays shell
+  if (channel.startsWith('uniwork:askuni-doc:')) return 'editor'
   if (channel.startsWith('uniwork:cloud-status')) return 'editor'
   if (channel === 'uniwork:ai-run') return 'editor'
   if (channel === 'uniwork:ai-flag') return 'shell-or-editor'
@@ -581,6 +586,7 @@ describe('policy of every uniwork* and home account channel constant', () => {
     ZIP_DOWNLOAD_CHANNELS,
     SOURCE_VIEW_CHANNELS,
     ASKUNI_CHANNELS,
+    ASKUNI_V2_CHANNELS,
     DISCUSSION_CHANNELS,
   }
 
@@ -591,6 +597,12 @@ describe('policy of every uniwork* and home account channel constant', () => {
       for (const channel of values) expect(policyForChannel(channel), channel).toBe('shell')
     })
   }
+
+  it('ASKUNI_DOC_CHANNELS: editor', () => {
+    const values = Object.values(ASKUNI_DOC_CHANNELS)
+    expect(values.length).toBeGreaterThan(0)
+    for (const channel of values) expect(policyForChannel(channel), channel).toBe('editor')
+  })
 
   it('COMMENTS_CHANNELS: editor', () => {
     for (const channel of Object.values(COMMENTS_CHANNELS)) {
@@ -682,5 +694,44 @@ describe('registrars under the real guard', () => {
         ...Object.values(UNIWORK_WORK_CHANNELS),
       ].sort(),
     )
+  })
+
+  it('registers every Ask UNI channel (shell family and editor family) without a refused registration', () => {
+    const guard = createIpcSenderGuard({
+      shellContents: () => null,
+      isTrustedEditorContents: () => false,
+      isTrustedShellUrl: () => false,
+      isTrustedEditorUrl: () => false,
+      log: () => {},
+    })
+    const registered: string[] = []
+    const guarded = guard.guarded({
+      handle: (channel: string) => void registered.push(channel),
+    } as never)
+    registerUniworkAskUni(guarded as never, {
+      profile: () => null,
+      authorized: async () => {
+        throw new Error('unused')
+      },
+      isSignedIn: () => false,
+      scopeKey: () => null,
+      selectedOrgId: () => null,
+      activeWorkspaceId: () => null,
+      packaged: true,
+      env: {},
+      openDocument: async () => {
+        throw new Error('unused')
+      },
+      openExternal: async () => undefined,
+    })
+    // the stream-event channels are main -> renderer pushes, not handlers
+    expect(registered.sort()).toEqual(
+      [
+        ...Object.values(ASKUNI_CHANNELS),
+        ...Object.values(ASKUNI_V2_CHANNELS).filter((c) => c !== ASKUNI_V2_CHANNELS.streamEvent),
+        ...Object.values(ASKUNI_DOC_CHANNELS).filter((c) => c !== ASKUNI_DOC_CHANNELS.streamEvent),
+      ].sort(),
+    )
+    expect(registered).toHaveLength(20)
   })
 })

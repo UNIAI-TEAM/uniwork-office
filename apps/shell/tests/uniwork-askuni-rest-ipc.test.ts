@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { IpcMain, WebContents } from 'electron'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { registerUniworkAskUni, type UniworkAskUniWiring } from '../src/main/uniwork-askuni/index'
-import { createShellSenderCheck } from '../src/main/uniwork-askuni/sender'
 import {
   registerAskUniRestIpc,
   type AskUniRestService,
 } from '../src/main/uniwork-askuni/rest-service'
+import { IPC_SENDER_REFUSED } from '../src/main/ipc-sender-guard'
 import { ASKUNI_V2_CHANNELS } from '../src/shared/askuni-api'
+import { SHELL_URL, createGuardedFakeIpc } from './uniwork-askuni-guard-fixture'
 
 /**
  * UNI-2076 s2: the REST channels of Ask UNI v2: registration, the shell
- * main-frame sender rule on each one, and the real wiring against a stubbed
- * global fetch.
+ * sender rule on each one (the UNI-2073 guard's `shell` policy since
+ * s8-guard), and the real wiring against a stubbed global fetch.
  */
 
 const ORIGIN = 'https://uniwork.example'
@@ -25,20 +25,13 @@ const PROFILE: DeploymentProfile = {
   channel: 'stable',
 }
 
-const shell = { id: 1, mainFrame: { n: 'main' }, isDestroyed: () => false }
-const other = { id: 2, mainFrame: { n: 'other' }, isDestroyed: () => false }
+const shell = { id: 1, mainFrame: { n: 'main', url: SHELL_URL }, isDestroyed: () => false }
+const other = { id: 2, mainFrame: { n: 'other', url: SHELL_URL }, isDestroyed: () => false }
 const fromShell = { sender: shell, senderFrame: shell.mainFrame }
-const fromSubframe = { sender: shell, senderFrame: { n: 'iframe' } }
+const fromSubframe = { sender: shell, senderFrame: { n: 'iframe', url: SHELL_URL } }
 const fromOther = { sender: other, senderFrame: other.mainFrame }
-const isShell = createShellSenderCheck(() => shell as unknown as WebContents)
 
-const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
-const ipcMain = {
-  handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>
-    void handlers.set(channel, fn),
-} as unknown as IpcMain
-const call = (channel: string, event: unknown, ...args: unknown[]) =>
-  handlers.get(channel)!(event, ...args)
+const { ipcMain, handlers, call } = createGuardedFakeIpc({ shell: () => shell })
 
 const REST_CHANNELS: Array<[string, keyof AskUniRestService]> = [
   [ASKUNI_V2_CHANNELS.capabilities, 'capabilities'],
@@ -59,10 +52,7 @@ describe('registerAskUniRestIpc', () => {
     const service = Object.fromEntries(
       REST_CHANNELS.map(([, method]) => [method, vi.fn(async () => ({ ok: true }))]),
     ) as unknown as Record<keyof AskUniRestService, ReturnType<typeof vi.fn>>
-    registerAskUniRestIpc(ipcMain, {
-      rest: service as unknown as AskUniRestService,
-      isShellSender: isShell,
-    })
+    registerAskUniRestIpc(ipcMain, { rest: service as unknown as AskUniRestService })
     return service
   }
 
@@ -79,13 +69,10 @@ describe('registerAskUniRestIpc', () => {
   it.each([
     ['a subframe', fromSubframe],
     ['another webContents', fromOther],
-  ])('refuses %s on every channel with forbidden and no side effect', async (_n, event) => {
+  ])('refuses %s on every channel through the guard with no side effect', async (_n, event) => {
     const service = register()
     for (const [channel, method] of REST_CHANNELS) {
-      expect(await call(channel, event, { workspaceId: WS })).toEqual({
-        ok: false,
-        error: 'forbidden',
-      })
+      await expect(call(channel, event, { workspaceId: WS })).rejects.toThrow(IPC_SENDER_REFUSED)
       expect(service[method]).not.toHaveBeenCalled()
     }
   })
@@ -110,7 +97,6 @@ describe('registerUniworkAskUni (REST wiring)', () => {
       env: { UNIWORK_ASKUNI_FAKE: '1' },
       openDocument: async () => ({ ok: true, value: { path: '/tmp/doc.docx' } }),
       openExternal: async () => undefined,
-      shellContents: () => shell as unknown as WebContents,
       ...over,
     }
   }

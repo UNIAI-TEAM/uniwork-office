@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { IpcMain, WebContents } from 'electron'
+import type { WebContents } from 'electron'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { registerUniworkAskUni, type UniworkAskUniWiring } from '../src/main/uniwork-askuni/index'
 import { createShellSenderCheck } from '../src/main/uniwork-askuni/sender'
@@ -10,16 +10,19 @@ import {
   type AskUniFlagsReader,
   type AskUniStreamService,
 } from '../src/main/uniwork-askuni/stream-service'
+import { IPC_SENDER_REFUSED } from '../src/main/ipc-sender-guard'
 import {
   ASKUNI_CHANNELS,
   ASKUNI_V2_CHANNELS,
   type AskUniStreamEvent,
 } from '../src/shared/askuni-api'
+import { SHELL_URL, createGuardedFakeIpc } from './uniwork-askuni-guard-fixture'
 
 /**
- * UNI-2076 s1: the shell-main-frame sender rule on every Ask UNI handler (the
- * new v2 ones and the three P1 ones), the v2 IPC registration, and the wiring
- * (fake switch, flag read from GET /api/v1/config, the real stream path).
+ * UNI-2076 s1: the shell sender rule on every Ask UNI handler (the new v2 ones
+ * and the three P1 ones; since s8-guard it is the UNI-2073 guard's `shell`
+ * policy, not a helper of ours), the v2 IPC registration, and the wiring (fake
+ * switch, flag read from GET /api/v1/config, the real stream path).
  */
 
 const ORIGIN = 'https://uniwork.example'
@@ -37,7 +40,7 @@ function contents(id: number) {
   const listeners = new Set<() => void>()
   const wc = {
     id,
-    mainFrame: { name: `main-${id}` },
+    mainFrame: { name: `main-${id}`, url: SHELL_URL },
     sent,
     isDestroyed: () => destroyed,
     send: (_channel: string, ev: AskUniStreamEvent) => void sent.push(ev),
@@ -56,20 +59,17 @@ type FakeContents = ReturnType<typeof contents>
 const shell = contents(1)
 const other = contents(2)
 const fromShell = () => ({ sender: shell, senderFrame: shell.mainFrame })
-const fromSubframe = () => ({ sender: shell, senderFrame: { name: 'iframe' } })
+const fromSubframe = () => ({ sender: shell, senderFrame: { name: 'iframe', url: SHELL_URL } })
 const fromOther = () => ({ sender: other, senderFrame: other.mainFrame })
 const isShell = createShellSenderCheck(() => shell as unknown as WebContents)
 
-const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
-const ipcMain = {
-  handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>
-    void handlers.set(channel, fn),
-} as unknown as IpcMain
-const call = (channel: string, event: unknown, ...args: unknown[]) =>
-  handlers.get(channel)!(event, ...args)
+// the shell window the guard reads on every call
+let shellContents: unknown = shell
+const { ipcMain, handlers, call } = createGuardedFakeIpc({ shell: () => shellContents })
 
 beforeEach(() => {
   handlers.clear()
+  shellContents = shell
   shell.sent.length = 0
 })
 afterEach(() => {
@@ -104,7 +104,7 @@ describe('registerAskUniStreamIpc', () => {
       active: () => 0,
     }
     const flags: AskUniFlagsReader = { flags: vi.fn(async () => ({ streamEnabled: true })) }
-    registerAskUniStreamIpc(ipcMain, { stream, flags, isShellSender: isShell })
+    registerAskUniStreamIpc(ipcMain, { stream, flags })
     return { stream, flags }
   }
 
@@ -132,14 +132,13 @@ describe('registerAskUniStreamIpc', () => {
   it.each([
     ['a subframe', fromSubframe],
     ['another webContents', fromOther],
-  ])('refuses %s with forbidden and no side effect', async (_name, event) => {
+  ])('refuses %s through the guard with no side effect', async (_name, event) => {
     const { stream, flags } = register()
-    const forbidden = { ok: false, error: 'forbidden' }
-    expect(await call(ASKUNI_V2_CHANNELS.stream, event(), { question: 'q' })).toEqual(forbidden)
-    expect(await call(ASKUNI_V2_CHANNELS.streamCancel, event(), { requestId: 'r' })).toEqual(
-      forbidden,
-    )
-    expect(await call(ASKUNI_V2_CHANNELS.flags, event())).toEqual(forbidden)
+    const refused = (promise: Promise<unknown>) =>
+      expect(promise).rejects.toThrow(IPC_SENDER_REFUSED)
+    await refused(call(ASKUNI_V2_CHANNELS.stream, event(), { question: 'q' }))
+    await refused(call(ASKUNI_V2_CHANNELS.streamCancel, event(), { requestId: 'r' }))
+    await refused(call(ASKUNI_V2_CHANNELS.flags, event()))
     expect(stream.start).not.toHaveBeenCalled()
     expect(stream.cancel).not.toHaveBeenCalled()
     expect(flags.flags).not.toHaveBeenCalled()
@@ -154,21 +153,16 @@ describe('P1 handlers get the same sender rule', () => {
       checkWorkspace: vi.fn(async () => null),
     }
     const opener: AskUniOpener = { open: vi.fn(async () => ({ ok: true as const })) }
-    registerAskUniIpc(ipcMain, service, isShell)
-    registerAskUniOpenIpc(ipcMain, opener, isShell)
+    registerAskUniIpc(ipcMain, service)
+    registerAskUniOpenIpc(ipcMain, opener)
     for (const event of [fromSubframe(), fromOther()]) {
-      expect(await call(ASKUNI_CHANNELS.ask, event, { question: 'q' })).toEqual({
-        ok: false,
-        code: 'forbidden',
-      })
-      expect(await call(ASKUNI_CHANNELS.context, event)).toEqual({
-        workspaces: [],
-        currentWorkspaceId: null,
-        signedIn: false,
-      })
-      expect(
-        await call(ASKUNI_CHANNELS.openCitation, event, { kind: 'task', href: '/a/b/tasks/1' }),
-      ).toEqual({ ok: false, code: 'forbidden' })
+      await expect(call(ASKUNI_CHANNELS.ask, event, { question: 'q' })).rejects.toThrow(
+        IPC_SENDER_REFUSED,
+      )
+      await expect(call(ASKUNI_CHANNELS.context, event)).rejects.toThrow(IPC_SENDER_REFUSED)
+      await expect(
+        call(ASKUNI_CHANNELS.openCitation, event, { kind: 'task', href: '/a/b/tasks/1' }),
+      ).rejects.toThrow(IPC_SENDER_REFUSED)
     }
     expect(service.ask).not.toHaveBeenCalled()
     expect(service.context).not.toHaveBeenCalled()
@@ -202,7 +196,6 @@ describe('registerUniworkAskUni (v2 wiring)', () => {
       env: {},
       openDocument: async () => ({ ok: true, value: { path: '/tmp/doc.docx' } }),
       openExternal: async () => undefined,
-      shellContents: () => shell as unknown as WebContents,
       ...over,
     }
   }
@@ -309,14 +302,8 @@ describe('registerUniworkAskUni (v2 wiring)', () => {
 
   it('a destroyed shell window ends its stream', async () => {
     const wc: FakeContents = contents(7)
-    registerUniworkAskUni(
-      ipcMain,
-      wiring({
-        packaged: false,
-        env: { UNIWORK_ASKUNI_FAKE: '1' },
-        shellContents: () => wc as unknown as WebContents,
-      }),
-    )
+    shellContents = wc
+    registerUniworkAskUni(ipcMain, wiring({ packaged: false, env: { UNIWORK_ASKUNI_FAKE: '1' } }))
     const start = (await call(
       ASKUNI_V2_CHANNELS.stream,
       { sender: wc, senderFrame: wc.mainFrame },

@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { IpcMain, WebContents } from 'electron'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { registerUniworkAskUni, type UniworkAskUniWiring } from '../src/main/uniwork-askuni/index'
+import { IPC_SENDER_REFUSED } from '../src/main/ipc-sender-guard'
 import { ASKUNI_CHANNELS, ASKUNI_DOC_CHANNELS, ASKUNI_V2_CHANNELS } from '../src/shared/askuni-api'
+import { EDITOR_URL, SHELL_URL, createGuardedFakeIpc } from './uniwork-askuni-guard-fixture'
 
 /**
  * UNI-2069 s1f (RB-6): the registration that wires the real client, the real
@@ -17,14 +18,14 @@ const PROFILE: DeploymentProfile = {
   clientId: 'uniwork-office',
   channel: 'stable',
 }
-// UNI-2076: only the shell's main frame reaches the handlers (sender.ts)
-const SHELL = { mainFrame: {}, isDestroyed: () => false }
+// UNI-2076: only the shell's main frame reaches the shell handlers (the guard's `shell` policy)
+// and only a trusted editor view's main frame the doc ones (policy `editor`)
+const SHELL = { id: 1, mainFrame: { url: SHELL_URL }, isDestroyed: () => false }
 const FROM_SHELL = { sender: SHELL, senderFrame: SHELL.mainFrame }
-const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
-const ipcMain = {
-  handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>
-    void handlers.set(channel, fn),
-} as unknown as IpcMain
+const { ipcMain, handlers } = createGuardedFakeIpc({
+  shell: () => SHELL,
+  editors: new Set([7]),
+})
 
 const json = (body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -44,7 +45,6 @@ function wiring(over: Partial<UniworkAskUniWiring> = {}): UniworkAskUniWiring {
     env: { UNIWORK_ASKUNI_FAKE: '1' },
     openDocument: async () => ({ ok: true, value: { path: '/tmp/doc.docx' } }),
     openExternal: async () => undefined,
-    shellContents: () => SHELL as unknown as WebContents,
     ...over,
   }
 }
@@ -115,16 +115,11 @@ describe('registerUniworkAskUni', () => {
 })
 
 describe('registerUniworkAskUni: the editor family (UNI-2076 s7b)', () => {
-  const EDITOR = {
-    id: 7,
-    mainFrame: { url: 'genoffice-app://docs/index.html' },
-    isDestroyed: () => false,
-  }
+  const EDITOR = { id: 7, mainFrame: { url: EDITOR_URL }, isDestroyed: () => false }
   const FROM_EDITOR = { sender: EDITOR, senderFrame: EDITOR.mainFrame }
   const editorWiring = (over: Partial<UniworkAskUniWiring> = {}) =>
     wiring({
       packaged: false,
-      isEditorContents: (id) => id === 7,
       editorPath: (sender) => (sender.id === 7 ? '/w/plan.docx' : null),
       docBinding: () => ({ workspaceId: WS, documentId: '01J8DOC0000000000000000001' }),
       ...over,
@@ -137,17 +132,18 @@ describe('registerUniworkAskUni: the editor family (UNI-2076 s7b)', () => {
   })
 
   it('the shell page is refused on the doc family; an editor on the shell family', async () => {
-    registerUniworkAskUni(ipcMain, editorWiring({ isEditorContents: () => true }))
-    expect(await docFlags(FROM_SHELL)).toEqual({ ok: false, error: 'forbidden' })
-    expect(await handlers.get(ASKUNI_V2_CHANNELS.flags)!(FROM_EDITOR)).toEqual({
-      ok: false,
-      error: 'forbidden',
-    })
+    registerUniworkAskUni(ipcMain, editorWiring())
+    await expect(Promise.resolve().then(() => docFlags(FROM_SHELL))).rejects.toThrow(
+      IPC_SENDER_REFUSED,
+    )
+    await expect(
+      Promise.resolve().then(() => handlers.get(ASKUNI_V2_CHANNELS.flags)!(FROM_EDITOR)),
+    ).rejects.toThrow(IPC_SENDER_REFUSED)
   })
 
-  it('without the editor wiring every editor call is refused', async () => {
+  it('without the editor path wiring an editor is a local file: no workspace, no document', async () => {
     registerUniworkAskUni(ipcMain, wiring({ packaged: false }))
-    expect(await docFlags(FROM_EDITOR)).toEqual({ ok: false, error: 'forbidden' })
+    expect(await docFlags(FROM_EDITOR)).toEqual({ streamEnabled: true, bound: 'local' })
   })
 })
 
@@ -156,7 +152,7 @@ describe('registerUniworkAskUni: a stream client that throws synchronously (UNI-
     const sent: unknown[] = []
     const EDITOR = {
       id: 7,
-      mainFrame: { url: 'genoffice-app://docs/index.html' },
+      mainFrame: { url: EDITOR_URL },
       isDestroyed: () => false,
       send: (_channel: string, ev: unknown) => void sent.push(ev),
       once: () => undefined,
@@ -169,7 +165,6 @@ describe('registerUniworkAskUni: a stream client that throws synchronously (UNI-
         packaged: false,
         env: {},
         profile: () => ({ ...PROFILE, apiOrigin: 'not a url' }),
-        isEditorContents: (id) => id === 7,
         editorPath: () => '/w/plan.docx',
         docBinding: () => ({ workspaceId: WS, documentId: '01J8DOC0000000000000000001' }),
       }),

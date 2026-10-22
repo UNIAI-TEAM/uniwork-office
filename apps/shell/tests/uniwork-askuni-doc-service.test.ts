@@ -12,11 +12,13 @@ import type {
   AskUniStreamPayload,
   AskUniStreamTerminal,
 } from '../src/main/uniwork-askuni/stream-client'
+import { IPC_SENDER_REFUSED } from '../src/main/ipc-sender-guard'
 import {
   ASKUNI_DOC_CHANNELS,
   type AskUniStreamEvent,
   type AskUniStreamRequest,
 } from '../src/shared/askuni-api'
+import { EDITOR_URL, createGuardedFakeIpc } from './uniwork-askuni-guard-fixture'
 
 /**
  * UNI-2076 s7b: Ask UNI in an editor panel (`uniwork:askuni-doc:*`). Main
@@ -525,22 +527,20 @@ describe('askuni-doc flags', () => {
 })
 
 describe('registerAskUniDocIpc', () => {
-  function registry() {
-    const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
-    return {
-      ipcMain: {
-        handle: (ch: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>
-          handlers.set(ch, fn),
-      },
-      handlers,
-    }
+  // the sender rule is the guard's `editor` policy (uniwork-askuni-guard.test.ts pins every refusal)
+  const eventOf = (wc: Fake) => {
+    const view = Object.assign(wc, { mainFrame: { url: EDITOR_URL } })
+    return { sender: view, senderFrame: view.mainFrame }
   }
 
-  it('registers the doc family; every handler checks the sender once and refuses others', async () => {
+  function guarded(editors: number[] = [7]) {
+    return createGuardedFakeIpc({ shell: () => null, editors: new Set(editors) })
+  }
+
+  it('registers the doc family and every handler refuses a sender the guard does not trust', async () => {
     const t = setup()
-    const { ipcMain, handlers } = registry()
-    const isEditorSender = vi.fn((event: unknown) => (event as { ok?: boolean }).ok === true)
-    registerAskUniDocIpc(ipcMain as never, { doc: t.doc, isEditorSender })
+    const { ipcMain, handlers, call } = guarded()
+    registerAskUniDocIpc(ipcMain, { doc: t.doc })
     const channels = [
       ASKUNI_DOC_CHANNELS.stream,
       ASKUNI_DOC_CHANNELS.streamCancel,
@@ -551,12 +551,7 @@ describe('registerAskUniDocIpc', () => {
     ]
     expect([...handlers.keys()].sort()).toEqual([...channels].sort())
     for (const ch of channels) {
-      isEditorSender.mockClear()
-      expect(await handlers.get(ch)!({ ok: false, sender: editor(7) }, {})).toEqual({
-        ok: false,
-        error: 'forbidden',
-      })
-      expect(isEditorSender).toHaveBeenCalledTimes(1)
+      await expect(call(ch, eventOf(editor(8)), {})).rejects.toThrow(IPC_SENDER_REFUSED)
     }
     await flush()
     expect(t.calls).toHaveLength(0)
@@ -565,16 +560,14 @@ describe('registerAskUniDocIpc', () => {
 
   it('an allowed editor reaches the service with its own webContents', async () => {
     const t = setup()
-    const { ipcMain, handlers } = registry()
-    registerAskUniDocIpc(ipcMain as never, { doc: t.doc, isEditorSender: () => true })
+    const { ipcMain, call } = guarded()
+    registerAskUniDocIpc(ipcMain, { doc: t.doc })
     const wc = editor(7)
-    expect(await handlers.get(ASKUNI_DOC_CHANNELS.flags)!({ sender: wc })).toEqual({
+    expect(await call(ASKUNI_DOC_CHANNELS.flags, eventOf(wc))).toEqual({
       streamEnabled: true,
       bound: 'document',
     })
-    expect(
-      await handlers.get(ASKUNI_DOC_CHANNELS.stream)!({ sender: wc }, { question: 'x' }),
-    ).toEqual({
+    expect(await call(ASKUNI_DOC_CHANNELS.stream, eventOf(wc), { question: 'x' })).toEqual({
       ok: true,
       requestId: 'req_1',
     })
