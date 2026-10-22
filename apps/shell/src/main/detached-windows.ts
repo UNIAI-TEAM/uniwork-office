@@ -157,6 +157,11 @@ export function detachedWindowForWebContents(wcId: number): BrowserWindow | unde
   return rec && !rec.window.isDestroyed() ? rec.window : undefined
 }
 
+/** true while `wcId` is the view of a detached editor window (detach and dock keep the id) */
+export function isDetachedWebContents(wcId: number): boolean {
+  return detached.has(wcId)
+}
+
 /** editor kind of the focused detached window, if a detached window has focus */
 export function focusedDetachedKind(): TabKind | undefined {
   return focusedDetachedTab()?.kind
