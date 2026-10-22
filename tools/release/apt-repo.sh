@@ -19,6 +19,7 @@
 #   apt/dists/<channel>/{Release,Release.gpg,InRelease}
 #   apt/latest/uniwork-office_amd64.deb (stable) or apt/latest/<channel>/uniwork-office_amd64.deb (dev, beta)
 #                                                    this run's deb under a stable name, only when it carries the apt source
+#   install.sh                                       the curl | sh install script (tools/release/install.sh, every run)
 #   <channel>/<version>/<release files> + SHA256SUMS
 #   update/<channel>/<files the feed yml name>, then the feed yml
 #   releases.json                                    public manifest, schema 1 (release-manifest.mjs)
@@ -26,8 +27,8 @@
 # Stateless: the suite's current Packages is the manifest. The new deb's stanza
 # replaces one of the same version, the newest --keep versions stay. Uploads go
 # in an order that never lets a client see an index naming a missing file
-# (installers, pool, by-hash + Packages, Release files, latest deb, feed files,
-# feed yml, releases.json), then prune removes what neither the new indexes
+# (installers, pool, by-hash + Packages, Release files, latest deb, install.sh,
+# feed files, feed yml, releases.json), then prune removes what neither the new indexes
 # and manifest nor the previous ones name (one run of grace for clients holding
 # the previous index or manifest).
 #
@@ -133,6 +134,8 @@ fi
 
 manifest_tool="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/release-manifest.mjs"
 [ -f "$manifest_tool" ] || die "release-manifest.mjs is missing next to the script"
+install_script="$(dirname "$manifest_tool")/install.sh"
+[ -f "$install_script" ] || die "install.sh is missing next to the script"
 
 work="$(mktemp -d)"
 cleanup() {
@@ -507,6 +510,10 @@ if [ "$has_apt_source" = true ]; then
 else
   echo "::notice::apt-repo: the deb has no apt source (UNIWORK_APT_SOURCE was not true), so $latest_key and latest_deb_url are skipped"
 fi
+
+# The install script is the same for every channel and is uploaded every run, so it always
+# matches the tools of the release that was just published. A browser shows it as text.
+put "$install_script" install.sh "$NO_CACHE" 'text/plain; charset=utf-8'
 
 for name in "${feed_files[@]}"; do
   put "$dir/$name" "update/$channel/$name"
