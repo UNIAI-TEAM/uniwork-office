@@ -25,7 +25,7 @@ describe('sheets panel wiring (source)', () => {
   })
 
   it("re-reads the binding when the file changes and hides the chat's new-chat button while Ask UNI shows", () => {
-    expect(panel).toContain('useAskUniMode(lang, askUniDocumentName)')
+    expect(panel).toContain('useAskUniMode(lang, askUniBindingKey)')
     expect(panel).toContain('!askUni.active && (')
   })
 
@@ -33,6 +33,19 @@ describe('sheets panel wiring (source)', () => {
     const start = panel.indexOf('ref={asideRef}')
     const render = panel.slice(start, panel.indexOf('</aside>', start))
     expect(render.match(/aria-live="polite"/g)).toHaveLength(1)
+  })
+
+  it('keys the binding on the workbook path (a save to UniWork changes it, the name does not)', () => {
+    for (const file of [
+      '../src/renderer/ai/AiChatPanel.tsx',
+      '../src/renderer/ExcelShell.tsx',
+      '../src/renderer/App.tsx',
+    ]) {
+      const src = readFileSync(resolve(HERE, file), 'utf8')
+      expect(src, file).toContain('askUniBindingKey')
+    }
+    const app = readFileSync(resolve(HERE, '../src/renderer/App.tsx'), 'utf8')
+    expect(app).toContain('askUniBindingKey: workbookFile.path ?? workbookFile.name')
   })
 
   it('gets the workbook name from the shell, not from a path or id', () => {

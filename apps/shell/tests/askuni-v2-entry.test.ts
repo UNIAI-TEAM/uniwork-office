@@ -11,6 +11,8 @@ import type { AskUniContext, AskUniFlags } from '../src/shared/askuni-api'
 const mocks = vi.hoisted(() => ({
   panelProps: { current: null as Record<string, unknown> | null },
   paneProps: { current: null as Record<string, unknown> | null },
+  /** a feedback-card note field that sits before the composer in the DOM */
+  noteBefore: { current: false },
 }))
 vi.mock('../src/renderer/src/askuni-v2/AskUniPanel', async () => {
   const { createElement } = await import('react')
@@ -20,7 +22,12 @@ vi.mock('../src/renderer/src/askuni-v2/AskUniPanel', async () => {
       return createElement(
         'section',
         { 'data-testid': 'v2-panel', 'data-ws': String(props.workspaceId), hidden: !props.visible },
-        createElement('textarea', { 'aria-label': 'composer' }),
+        mocks.noteBefore.current ? createElement('textarea', { 'aria-label': 'note' }) : null,
+        createElement(
+          'footer',
+          { 'data-slot': 'askuni-composer' },
+          createElement('textarea', { 'aria-label': 'composer' }),
+        ),
       )
     },
   }
@@ -37,7 +44,11 @@ vi.mock('../src/renderer/src/AskUniPane', async () => {
       return createElement(
         'section',
         { 'data-testid': 'p1-pane', hidden: props.visible === false },
-        createElement('textarea', { 'aria-label': 'p1-composer' }),
+        createElement(
+          'footer',
+          { className: 'new-chat-composer askuni-composer' },
+          createElement('textarea', { 'aria-label': 'p1-composer' }),
+        ),
       )
     },
   }
@@ -106,6 +117,7 @@ describe('Ask UNI v2 entry points', () => {
     resetAskUniEntryForTests()
     mocks.panelProps.current = null
     mocks.paneProps.current = null
+    mocks.noteBefore.current = false
     flags = vi.fn(async () => ({ streamEnabled: true }))
     context = vi.fn(async () => ctx())
     activate = vi.fn(async () => undefined)
@@ -366,6 +378,28 @@ describe('Ask UNI v2 entry points', () => {
       expect(document.activeElement).toBe(host.querySelector('textarea'))
     })
 
+    it('puts the caret in the composer, not in an earlier textarea such as a feedback note', async () => {
+      mocks.noteBefore.current = true
+      await mountHost({ focusToken: 1 })
+      expect((document.activeElement as HTMLElement | null)?.getAttribute('aria-label')).toBe(
+        'composer',
+      )
+    })
+
+    it('stops waiting for the composer after a couple of seconds', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      let release: (c: AskUniContext) => void = () => undefined
+      context.mockImplementationOnce(() => new Promise((res) => (release = res)))
+      await mountHost({ focusToken: 1 })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500)
+      })
+      await act(async () => release(ctx()))
+      await flush()
+      expect(host.querySelector('textarea')).not.toBeNull()
+      expect(document.activeElement).not.toBe(host.querySelector('textarea'))
+    })
+
     it('does not focus a hidden pane', async () => {
       await mountHost({ focusToken: 0, visible: false })
       await mountHost({ focusToken: 1, visible: false })
@@ -474,6 +508,24 @@ describe('Ask UNI v2 entry points', () => {
         keydown({ key: 'j', code: 'KeyJ', metaKey: true })
       })
       expect(seen.at(-1)).toBeGreaterThan(0)
+    })
+
+    it('leaves the key alone while a modal dialog is open (Settings, onboarding)', async () => {
+      const seen: (number | null)[] = []
+      await render(
+        h('div', null, h(Shortcut, { platform: 'win' }), h(Probe, { onSeen: (s) => seen.push(s) })),
+      )
+      const modal = document.createElement('div')
+      modal.setAttribute('aria-modal', 'true')
+      document.body.appendChild(modal)
+      let ev: KeyboardEvent
+      await act(async () => {
+        ev = keydown({ key: 'j', code: 'KeyJ', ctrlKey: true })
+      })
+      modal.remove()
+      expect(ev!.defaultPrevented).toBe(false)
+      expect(activate).not.toHaveBeenCalled()
+      expect(seen.at(-1)).toBeNull()
     })
 
     it('does nothing when the shell has no Ask UNI (no bridge): the key keeps its default', async () => {

@@ -82,7 +82,7 @@ describe('Ask UNI v2 header and history', () => {
     })
     await flush()
   }
-  const trigger = () => host.querySelector('button[aria-haspopup="true"]') as HTMLButtonElement
+  const trigger = () => host.querySelector('button.askuni2-title-btn') as HTMLButtonElement
   const popover = () => host.querySelector('[data-slot="askuni-history"]') as HTMLElement | null
   const rows = () => [...host.querySelectorAll('[data-slot="askuni-history"] li')] as HTMLElement[]
   const byLabel = (root_: ParentNode, label: string) =>
@@ -207,6 +207,14 @@ describe('Ask UNI v2 header and history', () => {
         expect.stringContaining('Budget review'),
         expect.stringContaining(en.askUniV2Untitled),
       ])
+    })
+
+    it('the title button declares a dialog and the popover is one (it is not a menu)', async () => {
+      await mount()
+      expect(trigger().getAttribute('aria-haspopup')).toBe('dialog')
+      await open()
+      expect(popover()?.getAttribute('role')).toBe('dialog')
+      expect(popover()?.getAttribute('aria-label')).toBe(en.askUniV2History)
     })
 
     it('highlights the current conversation', async () => {

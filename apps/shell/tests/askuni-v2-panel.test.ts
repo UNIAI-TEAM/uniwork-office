@@ -104,7 +104,7 @@ describe('Ask UNI v2 panel', () => {
   }
   const box = () => host.querySelector('textarea') as HTMLTextAreaElement
   const thread = () => host.querySelector('[data-testid="thread"]')
-  const trigger = () => host.querySelector('button[aria-haspopup="true"]') as HTMLButtonElement
+  const trigger = () => host.querySelector('button.askuni2-title-btn') as HTMLButtonElement
   async function typeAndSend(q: string): Promise<void> {
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(box(), q)
@@ -433,6 +433,15 @@ describe('Ask UNI v2 panel', () => {
       })
       expect(host.querySelector('[data-chip="focus"]')?.textContent).toContain('Q3 plan.docx')
       expect(consumed).toHaveBeenCalledTimes(1)
+    })
+
+    it('a workspace switch drops the scope chip, so it is never sent to the other workspace', async () => {
+      await mount({ pendingFocus: { kind: 'document', id: 'doc-7', label: 'Q3 plan.docx' } })
+      expect(host.querySelector('[data-chip="focus"]')).not.toBeNull()
+      await mount({ workspaceId: 'ws-2' })
+      expect(host.querySelector('[data-chip="focus"]')).toBeNull()
+      await typeAndSend('hi')
+      expect(mocks.stream.ask.mock.calls[0]![0]).not.toHaveProperty('focus')
     })
   })
 })

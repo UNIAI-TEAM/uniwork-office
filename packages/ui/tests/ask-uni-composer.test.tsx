@@ -190,6 +190,34 @@ describe('AskUniComposerBox', () => {
     })
   })
 
+  describe('Enter right after a send', () => {
+    it('does not stop the new turn: a keyboard click on Stop within 300 ms is ignored', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        await mount({ initial: 'What is blocked?' })
+        await mount({ initial: 'What is blocked?', streaming: true })
+        expect(document.activeElement).toBe(stop())
+        // the second Enter of a double tap or a key repeat lands on the focused Stop button
+        await act(async () => stop()!.click())
+        expect(fn.onStop).not.toHaveBeenCalled()
+        vi.setSystemTime(Date.now() + 400)
+        await act(async () => stop()!.click())
+        expect(fn.onStop).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('a pointer click on Stop is never held back', async () => {
+      await mount({ initial: 'What is blocked?' })
+      await mount({ initial: 'What is blocked?', streaming: true })
+      await act(async () => {
+        stop()!.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+      })
+      expect(fn.onStop).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe('wording and slots', () => {
     it('labels the box and shows the default placeholder; the host can override both', async () => {
       await mount()
