@@ -98,7 +98,12 @@ import {
   NEVER_READ_CAPABILITIES,
   type CapabilityRead,
 } from '../uniwork-sync/capability/cache'
-import { createUniworkDocsClient, type FetchLike, type UniworkDocsClient } from './client'
+import {
+  createUniworkDocsClient,
+  uniworkId,
+  type FetchLike,
+  type UniworkDocsClient,
+} from './client'
 import {
   UniworkDocsService,
   type ConflictUi,
@@ -834,6 +839,16 @@ async function noticeSwitchLossFallback(
   else await dialog.showMessageBox(options)
 }
 
+/** a document or comment id the routes may carry (uniworkId's shape) */
+function isOpenId(value: unknown): value is string {
+  try {
+    uniworkId(value as string)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Registers the IPC handlers (safe before app ready: nothing touches the account yet). */
 export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): UniworkDocsHandle {
   // told as a document status or the lock list is pushed (the sync center re-reads its snapshot)
@@ -1300,6 +1315,17 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocument, (_event, documentId: unknown) =>
     service.openDocument(documentId as string),
   )
+  // UNI-2079: a notice's target (open + held reveal); both ids are checked before any request
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocumentAt, (_event, input: unknown) => {
+    const { documentId, commentId } = (input && typeof input === 'object' ? input : {}) as {
+      documentId?: unknown
+      commentId?: unknown
+    }
+    if (!isOpenId(documentId) || (commentId !== undefined && !isOpenId(commentId))) {
+      return { ok: false, error: 'not_found' }
+    }
+    return service.openDocumentAt(documentId, commentId)
+  })
   ipcMain.handle(UNIWORK_DOC_CHANNELS.docStatus, (_event, path: unknown) =>
     service.docStatus(path as string),
   )

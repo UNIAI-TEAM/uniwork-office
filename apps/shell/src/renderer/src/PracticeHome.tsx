@@ -50,6 +50,7 @@ import {
   settleWork,
   workCacheSlot,
 } from './work-cache'
+import { useInboxUnread } from './notices-data'
 import { tabCounts } from './work-home'
 import {
   WorkErrorState,
@@ -240,6 +241,8 @@ export function PracticeHome({
   const [wsState, setWsState] = useState<WorkspaceListState>(cachedWorkspaceListState)
   const { workspaces, workspaceId, workspaceError } = wsState
   const workspace = workspaces?.find((w) => w.id === workspaceId) ?? null
+  // the Inbox tab's badge: unread notices of the workspace on screen
+  const inboxUnread = useInboxUnread(workspace?.id ?? null)
   const [refreshTick, setRefreshTick] = useState(0)
   // set by the Overview when its summary changes, only to redraw the tab counts (they read the cache)
   const [, setHomeSummary] = useState<WorkHomeSummary | null>(null)
@@ -300,7 +303,7 @@ export function PracticeHome({
     setRefreshTick((n) => n + 1)
   }
 
-  const openDeskTab = (id: 'tasks' | 'forms') => {
+  const openDeskTab = (id: 'tasks' | 'forms' | 'inbox') => {
     // Forms is opt-in on the tab bar; the Desk's "Manage" pins it first
     if (id === 'forms') {
       pinModule(practice.id, 'forms')
@@ -1039,9 +1042,22 @@ export function PracticeHome({
           active={tab}
           onSelect={setTab}
           vi={vi}
-          counts={tabCounts(
-            workspace ? (cachedWork<WorkHomeSummary>(`home:${workspace.id}`)?.value ?? null) : null,
-          )}
+          counts={{
+            ...tabCounts(
+              workspace
+                ? (cachedWork<WorkHomeSummary>(`home:${workspace.id}`)?.value ?? null)
+                : null,
+            ),
+            ...(inboxUnread
+              ? {
+                  inbox: {
+                    n: inboxUnread,
+                    key: 'wbTabCountUnread' as const,
+                    tone: 'info' as const,
+                  },
+                }
+              : {}),
+          }}
           onPinsChange={(pins, pillarPins) => {
             if (isWorkbenchModuleId(tab) && !pins.includes(tab)) setTab('desk')
             if (isPracticePillarId(tab) && !pillarPins.includes(tab)) setTab('desk')

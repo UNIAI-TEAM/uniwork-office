@@ -100,8 +100,22 @@ describe('Workbench module pane frame (redesign spec 3: the tab toolbar)', () =>
     expect(host.querySelector('.wb-toolbar-text')?.textContent).not.toMatch(/Open:/)
   })
 
+  it('the Inbox gets exactly one toolbar, drawn by the Inbox pane (the hint, and sign-in without a workspace)', async () => {
+    await mount('inbox')
+    expect(host.querySelector('section.wb-pane')?.getAttribute('aria-label')).toBe('Inbox')
+    expect(host.querySelectorAll('.wb-toolbar')).toHaveLength(1)
+    expect(host.querySelector('.wb-toolbar h2')?.textContent).toBe('Inbox')
+    expect(host.querySelector('.wb-toolbar-text')?.textContent).toBe(
+      'UniWork notifications: mentions, assignments, shares and comments',
+    )
+    // no workspace: the pane says so instead of loading
+    expect(host.querySelector('.wb-state')).not.toBeNull()
+    expect(host.querySelector('.wb-inbox')).toBeNull()
+  })
+
   // the workspace list is still loading (PracticeHome passes workspaces === null)
   it.each([
+    ['inbox', 'Inbox', 'rows'],
     ['tasks', 'Tasks', 'rows'],
     ['calendar', 'Calendar', 'agenda'],
     ['personal', 'Profile', 'card'],

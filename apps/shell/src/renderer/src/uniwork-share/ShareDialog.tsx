@@ -24,8 +24,8 @@ export interface ShareDialogProps {
   api?: UniworkShareApi
   /** an access change landed: the list refetches its row (share scope pill) */
   onChanged?: () => void
-  /** opened from the inbox link: the access-requests heading takes focus */
-  focusRequests?: boolean
+  /** opened from a notice: that section's heading takes focus and scrolls into view */
+  initialSection?: 'requests' | 'break_glass'
   /**
    * Names of workspaces other than the document's own (the list that opened the dialog knows
    * them); the member list the dialog reads names people from has no workspaces
@@ -51,7 +51,7 @@ function ShareDialogBody({
   row,
   api,
   onChanged,
-  focusRequests = false,
+  initialSection,
   workspaces,
 }: ShareDialogProps) {
   const { t } = useI18n()
@@ -257,6 +257,7 @@ function ShareDialogBody({
               grants={data.breakGlass ?? []}
               resolveName={memberName}
               canGrant={adminOnly}
+              focusOnOpen={initialSection === 'break_glass'}
               onMutated={onMutated}
             />
           )}
@@ -265,7 +266,7 @@ function ShareDialogBody({
             <AccessRequestsSection
               api={shareApi}
               documentId={row.id}
-              focusOnOpen={focusRequests}
+              focusOnOpen={initialSection === 'requests'}
               onDecided={async (changedAccess) => {
                 if (changedAccess) await onMutated('')
               }}

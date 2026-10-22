@@ -5,7 +5,9 @@ import {
   createPracticeMeta,
   defaultPinnedModules,
   ensureCorePinnedModules,
+  getWorkbenchModule,
   isCorePinnedModule,
+  isWorkbenchModuleId,
   defaultPinnedSkillDomains,
   isPracticeMeta,
   isSkillDomainId,
@@ -79,29 +81,65 @@ describe('practice-core', () => {
   it('exposes workbench modules and role defaults', () => {
     expect(WORKBENCH_MODULES.map((m) => m.id)).toEqual([
       'desk',
+      'inbox',
       'calendar',
       'tasks',
       'notes',
       'forms',
       'personal',
     ])
-    const core = ['desk', 'tasks', 'calendar']
+    // the Inbox sits right after the Desk (UNI-2079)
+    const core = ['desk', 'inbox', 'tasks', 'calendar']
     expect(defaultPinnedModules('legal')).toEqual(core)
     expect(defaultPinnedModules('construction')).toEqual(core)
     expect(isCorePinnedModule('desk')).toBe(true)
+    expect(isCorePinnedModule('inbox')).toBe(true)
     expect(isCorePinnedModule('forms')).toBe(false)
     expect(ensureCorePinnedModules(['desk', 'forms'])).toEqual([
       'desk',
+      'inbox',
       'tasks',
       'calendar',
       'forms',
     ])
     expect(ensureCorePinnedModules(['desk', 'health' as never, 'notes'])).toEqual([
       'desk',
+      'inbox',
       'tasks',
       'calendar',
       'notes',
     ])
+  })
+
+  it('adds the Inbox next to the Desk for pins saved before it existed', () => {
+    expect(ensureCorePinnedModules(['desk', 'tasks', 'calendar'])).toEqual([
+      'desk',
+      'inbox',
+      'tasks',
+      'calendar',
+    ])
+    expect(ensureCorePinnedModules(['desk', 'tasks', 'calendar', 'personal', 'notes'])).toEqual([
+      'desk',
+      'inbox',
+      'tasks',
+      'calendar',
+      'personal',
+      'notes',
+    ])
+    // an Inbox the person already placed stays where it is
+    expect(ensureCorePinnedModules(['desk', 'tasks', 'calendar', 'inbox', 'notes'])).toEqual([
+      'desk',
+      'tasks',
+      'calendar',
+      'inbox',
+      'notes',
+    ])
+    expect(getWorkbenchModule('inbox')).toMatchObject({
+      labelVi: 'Thông báo',
+      labelEn: 'Inbox',
+      available: true,
+    })
+    expect(isWorkbenchModuleId('inbox')).toBe(true)
   })
 
   it('exposes skill domains with starter skills and role-based defaults', () => {

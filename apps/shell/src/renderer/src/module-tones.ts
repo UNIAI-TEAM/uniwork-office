@@ -6,6 +6,7 @@ export type Tint = 'gray' | 'green' | 'yellow' | 'orange' | 'violet' | 'blue' | 
 /** module identity color (spec 6.1); the 4 pillars are "Tri thức" and share blue */
 export const MODULE_TONES: Record<WorkbenchModuleId | PracticePillarId, Tint> = {
   desk: 'gray',
+  inbox: 'blue',
   tasks: 'green',
   calendar: 'yellow',
   personal: 'pink',

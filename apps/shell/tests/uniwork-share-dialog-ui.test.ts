@@ -70,6 +70,7 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
     row: ShareDialogTarget = target(),
     lang: 'en' | 'vi' = 'en',
     wrap: (fake: FakeShareApi) => UniworkShareApi = (fake) => fake,
+    extra: { initialSection?: 'requests' | 'break_glass' } = {},
   ): Promise<FakeShareApi> {
     const api = createFakeShareApi(options)
     const bridge = wrap(api)
@@ -78,7 +79,14 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
         createElement(
           LocaleProvider,
           { initial: lang },
-          createElement(ShareDialog, { open: true, onClose, onChanged, row, api: bridge }),
+          createElement(ShareDialog, {
+            open: true,
+            onClose,
+            onChanged,
+            row,
+            api: bridge,
+            ...extra,
+          }),
         ),
       )
     })
@@ -398,6 +406,45 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
     await open()
     expect(section('break-glass')).toBeNull()
     expect(q('[role="dialog"]')!.textContent).not.toContain(t('shrAdminScopeNote'))
+  })
+
+  describe('initialSection (a notice sends the person to one section)', () => {
+    it('requests: the requests heading takes focus and scrolls into view', async () => {
+      const scroll = vi.fn()
+      Element.prototype.scrollIntoView = scroll
+      await open({}, target(), 'en', (fake) => fake, { initialSection: 'requests' })
+      const heading = section('requests')!.querySelector('h3')!
+      expect(document.activeElement).toBe(heading)
+      expect(scroll).toHaveBeenCalled()
+    })
+
+    it('break_glass: the emergency access heading takes focus and scrolls into view', async () => {
+      const scroll = vi.fn()
+      Element.prototype.scrollIntoView = scroll
+      await open(
+        { adminScope: true, myLevel: '' },
+        target({ myLevel: undefined, adminScope: true }),
+        'en',
+        (fake) => fake,
+        { initialSection: 'break_glass' },
+      )
+      const heading = section('break-glass')!.querySelector('h3')!
+      expect(document.activeElement).toBe(heading)
+      expect(scroll).toHaveBeenCalled()
+    })
+
+    it('without a section the search box keeps the first focus, as before', async () => {
+      await open()
+      expect(document.activeElement).toBe(q('[data-share-section="add"] input'))
+    })
+
+    it('a viewer who cannot manage just sees the read-only list (no section to focus)', async () => {
+      await open({ myLevel: 'view' }, target({ myLevel: 'view' }), 'en', (fake) => fake, {
+        initialSection: 'requests',
+      })
+      expect(section('requests')).toBeNull()
+      expect(q('[role="dialog"]')).toBeTruthy()
+    })
   })
 
   it('a shelved document says so and only lets access be taken away', async () => {

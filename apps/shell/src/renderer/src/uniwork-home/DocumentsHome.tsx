@@ -98,7 +98,16 @@ import { AccessLogSheet } from '../uniwork-doc-history/AccessLogSheet'
 import { getDocHistoryBridge } from '../uniwork-doc-history/bridge'
 import { VersionHistorySheet } from '../uniwork-doc-history/VersionHistorySheet'
 import { ShareDialog } from '../uniwork-share/ShareDialog'
-import { rowShareTarget, shareBridgeAvailable } from '../uniwork-share/share-dialog-target'
+import {
+  rowShareTarget,
+  shareBridgeAvailable,
+  type ShareDialogTarget,
+} from '../uniwork-share/share-dialog-target'
+import {
+  onDocumentsIntent,
+  type DocumentsIntent,
+  type DocumentsShareSection,
+} from '../documents-intent-bus'
 import {
   canManageShelved,
   collectUpdatedByOptions,
@@ -1640,7 +1649,13 @@ export function DocumentsHome({
     setToast({ message, tone })
   }
   // UNI-2047 SD-C: the Share dialogs of a row and of the selection (see the mount below)
-  const [shareRow, setShareRow] = useState<DocumentsHomeDoc | null>(null)
+  // the document the Share dialog is open for; `section` is set when a notice opened it
+  const [share, setShare] = useState<{
+    row: ShareDialogTarget
+    section?: DocumentsShareSection
+  } | null>(null)
+  const openRowShare = (doc: DocumentsHomeDoc) =>
+    setShare({ row: rowShareTarget(doc, organizationName) })
   const [bulkShareDocs, setBulkShareDocs] = useState<BulkShareDoc[] | null>(null)
   const shareAvailable = shareBridgeAvailable()
   // UNI-2077: the Access log sheet of a row; no entry when this main has no doc history bridge
@@ -1682,6 +1697,90 @@ export function DocumentsHome({
     window.addEventListener(DOC_SHARE_CHANGED_EVENT, onShareChanged)
     return () => window.removeEventListener(DOC_SHARE_CHANGED_EVENT, onShareChanged)
   }, [])
+
+  // UNI-2079: a notice names a document's Share section or its row in the Trash (documents-intent-bus).
+  // The intent is taken only by the Documents home of its workspace; the host switched the surface.
+  const pageRef = useRef(page)
+  pageRef.current = page
+  // the Trash row a notice named, waiting for the Trash list to load; `stalePage` is the list that
+  // was showing when the intent came in (another sub-view's rows), which must not answer it
+  const [trashReveal, setTrashReveal] = useState<{
+    documentId: string
+    stalePage: PageState | null
+  } | null>(null)
+  const takeIntent = (intent: DocumentsIntent): boolean => {
+    if (intent.workspaceId !== workspaceId) return false
+    if (intent.kind === 'trash') {
+      const stalePage = subViewRef.current === 'trash' ? null : pageRef.current
+      resetFilters()
+      selectSubView('trash')
+      setTrashReveal({ documentId: intent.documentId, stalePage })
+      return true
+    }
+    // a stale preload has no Share bridge: nothing to open
+    if (!shareBridgeAvailable()) return true
+    const listed = pageRef.current.items.find((d) => d.id === intent.documentId)
+    if (listed) {
+      setShare({ row: rowShareTarget(listed, organizationName), section: intent.section })
+      return true
+    }
+    void loadDocProperties(intent.documentId)
+      .then((res) => {
+        if (!res.ok) {
+          publishUniworkNotice({ phase: 'failed', error: res.error })
+          return
+        }
+        const level = res.value.myLevel
+        setShare({
+          row: {
+            id: res.value.documentId,
+            workspaceId: res.value.workspaceId,
+            title: res.value.title,
+            workspaceName: workspaces.find((w) => w.id === res.value.workspaceId)?.name,
+            myLevel:
+              level === 'view' || level === 'comment' || level === 'edit' || level === 'manage'
+                ? level
+                : undefined,
+            organizationName,
+          },
+          section: intent.section,
+        })
+      })
+      .catch(() => publishUniworkNotice({ phase: 'failed', error: 'network' }))
+    return true
+  }
+  const takeIntentRef = useRef(takeIntent)
+  takeIntentRef.current = takeIntent
+  useEffect(() => onDocumentsIntent((intent) => takeIntentRef.current(intent)), [])
+
+  useEffect(() => {
+    if (!trashReveal || subView !== 'trash' || query.length > 0) return
+    if (page === trashReveal.stalePage) return
+    const done = () => setTrashReveal(null)
+    if (page.status === 'error') return done()
+    if (page.status !== 'ready') return
+    const hit = page.items.find((d) => d.id === trashReveal.documentId)
+    if (hit) {
+      setSelected(new Set([hit.id]))
+      Array.from(document.querySelectorAll('[data-doc-id]'))
+        .find((el) => el.getAttribute('data-doc-id') === hit.id)
+        ?.scrollIntoView?.({ block: 'center' })
+      return done()
+    }
+    if (page.moreError) {
+      done()
+      publishUniworkNotice({ phase: 'failed', error: page.moreError })
+      return
+    }
+    if (page.nextCursor) {
+      if (!page.loadingMore) loadMore()
+      return
+    }
+    // restored or purged since the notice: the Trash is open, the launch notice says why
+    done()
+    publishUniworkNotice({ phase: 'failed', error: 'not_found' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trashReveal, subView, query, page])
   const [shelvedTrashTarget, setShelvedTrashTarget] = useState<DocumentsHomeDoc | null>(null)
   // the ref answers a second click that lands before React re-renders
   const unshelvingRef = useRef<Set<string>>(new Set())
@@ -1975,7 +2074,7 @@ export function DocumentsHome({
             name: doc.title,
           }),
         // no entry when this shell has no Share bridge (a stale preload)
-        ...(shareAvailable ? { share: () => setShareRow(doc) } : {}),
+        ...(shareAvailable ? { share: () => openRowShare(doc) } : {}),
         ...(docHistoryAvailable ? { logs: () => setLogsRow(doc) } : {}),
         ...(docHistoryAvailable ? { versions: () => setVersionsRow(doc) } : {}),
         'copy-link': () => void handleCopyLink(doc),
@@ -2827,7 +2926,7 @@ export function DocumentsHome({
                     openMenuId={openMenuId}
                     onOpenMenuChange={setOpenMenuId}
                     menuFor={rowMenuFor}
-                    onShare={shareAvailable ? setShareRow : undefined}
+                    onShare={shareAvailable ? openRowShare : undefined}
                     actionsFor={
                       shelfView ? shelfActionsFor : trashView ? trashActionsFor : undefined
                     }
@@ -2975,12 +3074,13 @@ export function DocumentsHome({
         />
       )}
 
-      {shareRow && (
+      {share && (
         <ShareDialog
           open
-          row={rowShareTarget(shareRow, organizationName)}
+          row={share.row}
+          initialSection={share.section}
           workspaces={workspaces}
-          onClose={() => setShareRow(null)}
+          onClose={() => setShare(null)}
           onChanged={() => setListTick((n) => n + 1)}
         />
       )}

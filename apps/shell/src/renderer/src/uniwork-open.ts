@@ -9,13 +9,20 @@ type OpenApi = Pick<HomeApi, 'openPath' | 'uniworkOpenDocument'>
  * land in the tab strip's notice. True only when the document opened.
  */
 export async function openUniworkDocument(
-  source: { documentId: string; title: string },
-  api: Pick<HomeApi, 'uniworkOpenDocument'>,
+  source: { documentId: string; title: string; commentId?: string },
+  api: Pick<HomeApi, 'uniworkOpenDocument'> & Partial<Pick<HomeApi, 'uniworkOpenDocumentAt'>>,
   notify: (event: UniworkLaunchEvent) => void = publishUniworkNotice,
 ): Promise<boolean> {
   notify({ phase: 'opening', title: source.title })
   try {
-    const result = await api.uniworkOpenDocument(source.documentId)
+    // a notice about one comment opens the document at that thread
+    const result =
+      source.commentId && api.uniworkOpenDocumentAt
+        ? await api.uniworkOpenDocumentAt({
+            documentId: source.documentId,
+            commentId: source.commentId,
+          })
+        : await api.uniworkOpenDocument(source.documentId)
     notify(
       result.ok
         ? { phase: 'opened', path: result.value.path, title: source.title }
