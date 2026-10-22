@@ -401,7 +401,12 @@ describe('Ask UNI v2 composer', () => {
       }))
       lookup.mockImplementation(async (req) => ({
         ok: true,
-        items: req.kind === 'member' ? members : [],
+        items:
+          req.kind === 'member'
+            ? members
+            : req.kind === 'task'
+              ? [{ kind: 'task' as const, id: 't9', title: 'Plan the launch' }]
+              : [],
       }))
       await mount()
       for (let i = 0; i < 5; i++) {
@@ -411,7 +416,12 @@ describe('Ask UNI v2 composer', () => {
         await type('')
       }
       expect(host.querySelectorAll('[data-chip="mention"]')).toHaveLength(5)
-      await type('@')
+      // a sixth distinct object (a task, found with a query) is refused
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      await type('@p')
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250)
+      })
       for (let j = 0; j < 5; j++) await key('ArrowDown')
       await key('Enter')
       expect(host.querySelectorAll('[data-chip="mention"]')).toHaveLength(5)

@@ -331,7 +331,7 @@ describe('Ask UNI v2 header and history', () => {
 
   describe('rename', () => {
     async function startRename(index = 0): Promise<HTMLInputElement> {
-      await open()
+      if (!popover()) await open()
       const btn = byLabel(rows()[index]!, en.askUniV2RenameConversation)!
       await act(async () => btn.click())
       return host.querySelector('[data-slot="askuni-history"] input') as HTMLInputElement
