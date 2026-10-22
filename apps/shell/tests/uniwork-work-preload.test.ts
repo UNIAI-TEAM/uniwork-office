@@ -10,6 +10,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { UNIWORK_WORK_CHANNELS } from '../src/shared/uniwork-work-api'
 import type { UniworkWorkApi } from '../src/shared/uniwork-work-api'
+import type { HomeApi } from '../src/shared/home-api'
 
 async function loadBridge(reply: unknown) {
   vi.resetModules()
@@ -31,7 +32,11 @@ async function loadBridge(reply: unknown) {
     webUtils: { getPathForFile: () => '' },
   }))
   await import('../src/preload/index')
-  return { work: exposed.uniworkWork as UniworkWorkApi, invoked }
+  return {
+    work: exposed.uniworkWork as UniworkWorkApi,
+    office: exposed.aiOffice as HomeApi,
+    invoked,
+  }
 }
 
 afterEach(() => {
@@ -105,5 +110,64 @@ describe('window.uniworkWork.notificationDocuments (preload)', () => {
       const { work } = await loadBridge(reply)
       expect(await work.notificationDocuments('n_9')).toEqual({ ok: false, error: 'server' })
     }
+  })
+})
+
+describe('window.uniworkWork inbox calls (preload, UNI-2079)', () => {
+  it('each call invokes its own channel with the renderer arguments', async () => {
+    const { work, invoked } = await loadBridge({ ok: true, value: null })
+    await work.listNotifications({ unread: true, before: 'n_9', limit: 30 })
+    await work.unreadCount()
+    await work.markNotificationsUnread(['n_1'])
+    await work.archiveNotifications(['n_1'])
+    await work.unarchiveNotifications(['n_2'])
+    await work.markAllNotificationsRead({ workspaceId: 'ws_1' })
+    const C = UNIWORK_WORK_CHANNELS
+    expect(invoked.filter((c) => c.channel.startsWith('uniwork-work:'))).toEqual([
+      { channel: C.listNotifications, args: [{ unread: true, before: 'n_9', limit: 30 }] },
+      { channel: C.unreadCount, args: [] },
+      { channel: C.markNotificationsUnread, args: [['n_1']] },
+      { channel: C.archiveNotifications, args: [['n_1']] },
+      { channel: C.unarchiveNotifications, args: [['n_2']] },
+      { channel: C.markAllNotificationsRead, args: [{ workspaceId: 'ws_1' }] },
+    ])
+  })
+
+  it('passes the envelope through and turns a broken reply into the server error', async () => {
+    const value = { total: 1, by_workspace: { ws_1: 1 } }
+    expect(await (await loadBridge({ ok: true, value })).work.unreadCount()).toEqual({
+      ok: true,
+      value,
+    })
+    expect(await (await loadBridge(undefined)).work.archiveNotifications(['n_1'])).toEqual({
+      ok: false,
+      error: 'server',
+    })
+  })
+})
+
+describe('aiOffice.uniworkOpenDocumentAt (preload, UNI-2079)', () => {
+  it('invokes uniwork-doc:open-document-at with the ids and passes the result through', async () => {
+    const { UNIWORK_DOC_CHANNELS } = await import('../src/shared/home-api')
+    const { invoked, office } = await loadBridge({ ok: true, value: { path: '/p/Plan.docx' } })
+    expect(await office.uniworkOpenDocumentAt({ documentId: 'd_1', commentId: 'c_1' })).toEqual({
+      ok: true,
+      value: { path: '/p/Plan.docx' },
+    })
+    expect(UNIWORK_DOC_CHANNELS.openDocumentAt).toBe('uniwork-doc:open-document-at')
+    expect(invoked.filter((c) => c.channel === UNIWORK_DOC_CHANNELS.openDocumentAt)).toEqual([
+      {
+        channel: UNIWORK_DOC_CHANNELS.openDocumentAt,
+        args: [{ documentId: 'd_1', commentId: 'c_1' }],
+      },
+    ])
+  })
+
+  it('a broken reply is malformed_response', async () => {
+    const { office } = await loadBridge(null)
+    expect(await office.uniworkOpenDocumentAt({ documentId: 'd_1' })).toEqual({
+      ok: false,
+      error: 'malformed_response',
+    })
   })
 })

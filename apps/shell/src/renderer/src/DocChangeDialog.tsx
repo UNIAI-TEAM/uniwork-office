@@ -181,7 +181,7 @@ export function DocChangeDialog({
       return (
         <WorkStatePanel
           tone="gray"
-          icon={<WorkbenchIcon id="inbox" size={20} />}
+          icon={<WorkbenchIcon id="inbox" size={20} tint="gray" />}
           title={t('wbDocChangeEmptyTitle')}
           body={t('wbDocChangeEmptyDesc')}
           role="status"

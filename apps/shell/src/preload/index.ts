@@ -147,9 +147,11 @@ import type {
   WorkHomeSummary,
   WorkNotificationDocument,
   WorkNotificationDocumentPage,
+  WorkNotificationPage,
   WorkPerson,
   WorkTask,
   WorkTaskStatus,
+  WorkUnreadCount,
 } from '../shared/uniwork-work-api'
 import { asSyncCenterSnapshot, UNIWORK_SYNC_CENTER_CHANNELS } from '../shared/sync-center'
 import type { SyncCenterActionResult, UniworkSyncCenterApi } from '../shared/sync-center'
@@ -1566,6 +1568,11 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.openDocument, documentId),
     )
   },
+  async uniworkOpenDocumentAt(input) {
+    return asUniworkResult<{ path: string }>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.openDocumentAt, input),
+    )
+  },
   async uniworkDocStatus(path) {
     return asUniworkStatus(await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.docStatus, path))
   },
@@ -1985,6 +1992,36 @@ const workApi: UniworkWorkApi = {
     if (!reply.ok) return reply
     const page = narrowNotificationDocumentPage(reply.value)
     return page ? { ok: true, value: page } : { ok: false, error: 'server' }
+  },
+  async listNotifications(q) {
+    return asWorkResult<WorkNotificationPage>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.listNotifications, q),
+    )
+  },
+  async unreadCount() {
+    return asWorkResult<WorkUnreadCount>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.unreadCount),
+    )
+  },
+  async markNotificationsUnread(ids) {
+    return asWorkResult<null>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.markNotificationsUnread, ids),
+    )
+  },
+  async archiveNotifications(ids) {
+    return asWorkResult<null>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.archiveNotifications, ids),
+    )
+  },
+  async unarchiveNotifications(ids) {
+    return asWorkResult<null>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.unarchiveNotifications, ids),
+    )
+  },
+  async markAllNotificationsRead(q) {
+    return asWorkResult<string[]>(
+      await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.markAllNotificationsRead, q),
+    )
   },
   async openWeb(target) {
     return (await ipcRenderer.invoke(UNIWORK_WORK_CHANNELS.openWeb, target)) === true

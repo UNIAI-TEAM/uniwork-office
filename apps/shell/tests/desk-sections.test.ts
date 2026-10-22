@@ -94,6 +94,10 @@ function home(inbox: WorkHomeSummary['inbox']): WorkLoad<WorkHomeSummary> {
   } as WorkHomeSummary
   return { value, updatedAt: 1, error: null, stale: false, reload: vi.fn(), update: vi.fn() }
 }
+/** the unread list the Desk loads (UNI-2079): the same rows the old home preview carried */
+function unread(rows: WorkHomeSummary['inbox']) {
+  return { rows, error: null, drop: vi.fn(), reload: vi.fn() }
+}
 const comment = {
   id: 'n1',
   kind: 'document_commented',
@@ -109,7 +113,15 @@ const comment = {
 describe('DeskInTray', () => {
   it('opens a commented document, then marks the notification read and drops it', async () => {
     const h = home([comment])
-    await render(createElement(DeskInTray, { home: h, signedIn: true, view: 'ready', local: [] }))
+    await render(
+      createElement(DeskInTray, {
+        home: h,
+        notices: unread(h.value!.inbox),
+        signedIn: true,
+        view: 'ready',
+        local: [],
+      }),
+    )
     expect(host.textContent).toContain('Contract-012')
     // a person's comment: an info pill; the date is the picker list's Cập nhật cell (shared formatter)
     expect(host.querySelector('.wb-pill.is-info')!.textContent).toBe('Comment')
@@ -135,7 +147,15 @@ describe('DeskInTray', () => {
   it('keeps the row quietly when marking read fails', async () => {
     work.markNotificationsRead.mockResolvedValueOnce({ ok: false, error: 'offline' })
     const h = home([comment])
-    await render(createElement(DeskInTray, { home: h, signedIn: true, view: 'ready', local: [] }))
+    await render(
+      createElement(DeskInTray, {
+        home: h,
+        notices: unread(h.value!.inbox),
+        signedIn: true,
+        view: 'ready',
+        local: [],
+      }),
+    )
     await act(async () => button('Contract-012')!.click())
     await act(async () => {
       for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -148,7 +168,15 @@ describe('DeskInTray', () => {
   it('keeps the reminder when the document fails to open', async () => {
     api.uniworkOpenDocument.mockResolvedValueOnce({ ok: false, error: 'not_found' })
     const h = home([comment])
-    await render(createElement(DeskInTray, { home: h, signedIn: true, view: 'ready', local: [] }))
+    await render(
+      createElement(DeskInTray, {
+        home: h,
+        notices: unread(h.value!.inbox),
+        signedIn: true,
+        view: 'ready',
+        local: [],
+      }),
+    )
     await act(async () => button('Contract-012')!.click())
     await act(async () => {
       for (let i = 0; i < 10; i++) await Promise.resolve()
@@ -165,7 +193,13 @@ describe('DeskInTray', () => {
       params: { actor: 'Lan', document: `Doc-${i}` },
     }))
     await render(
-      createElement(DeskInTray, { home: home(notes), signedIn: true, view: 'ready', local: [] }),
+      createElement(DeskInTray, {
+        home: home(notes),
+        notices: unread(notes as WorkHomeSummary['inbox']),
+        signedIn: true,
+        view: 'ready',
+        local: [],
+      }),
     )
     const titles = () => host.querySelectorAll<HTMLButtonElement>('.wb-desk-row-title')
     expect(titles()).toHaveLength(8)
@@ -211,7 +245,13 @@ describe('DeskInTray', () => {
       } as RecentEntry,
     ]
     await render(
-      createElement(DeskInTray, { home: home([comment]), signedIn: true, view: 'ready', local }),
+      createElement(DeskInTray, {
+        home: home([comment]),
+        notices: unread([comment]),
+        signedIn: true,
+        view: 'ready',
+        local,
+      }),
     )
     // a plain list: the title button is the control, so no listbox / option / aria-selected
     expect(host.querySelector('[role="listbox"], [role="option"], [aria-selected]')).toBeNull()
@@ -257,6 +297,7 @@ describe('DeskInTray', () => {
     await render(
       createElement(DeskInTray, {
         home: home([comment]),
+        notices: unread([comment]),
         signedIn: true,
         view: 'ready',
         local: [],
@@ -298,7 +339,13 @@ describe('DeskInTray', () => {
       } as RecentEntry,
     ]
     await render(
-      createElement(DeskInTray, { home: home([]), signedIn: true, view: 'ready', local }),
+      createElement(DeskInTray, {
+        home: home([]),
+        notices: unread([]),
+        signedIn: true,
+        view: 'ready',
+        local,
+      }),
     )
     expect(host.textContent).toContain('Proposal')
     expect(host.textContent).toContain('This copy and the one on UniWork differ')
@@ -339,7 +386,13 @@ describe('DeskInTray', () => {
       } as RecentEntry,
     ]
     await render(
-      createElement(DeskInTray, { home: home([]), signedIn: true, view: 'ready', local }),
+      createElement(DeskInTray, {
+        home: home([]),
+        notices: unread([]),
+        signedIn: true,
+        view: 'ready',
+        local,
+      }),
     )
     expect(host.querySelector('.wb-pill.is-danger')!.textContent).toBe('Not synced')
     expect(button('Resolve')).toBeDefined()
@@ -364,6 +417,7 @@ describe('DeskInTray', () => {
     await render(
       createElement(DeskInTray, {
         home: home([{ ...comment, kind: 'document_mentioned' }]),
+        notices: unread([{ ...comment, kind: 'document_mentioned' }]),
         signedIn: true,
         view: 'ready',
         local: [],
@@ -380,7 +434,13 @@ describe('DeskInTray', () => {
   })
 
   it('reloads "Shared with you" on the top bar Refresh', async () => {
-    const props = { home: home([]), signedIn: true, view: 'ready' as const, local: [] }
+    const props = {
+      home: home([]),
+      notices: unread([]),
+      signedIn: true,
+      view: 'ready' as const,
+      local: [],
+    }
     await render(createElement(DeskInTray, { ...props, refreshTick: 0 }))
     expect(api.uniworkListSharedWithMe).toHaveBeenCalledTimes(1)
     await render(createElement(DeskInTray, { ...props, refreshTick: 1 }))
@@ -391,6 +451,7 @@ describe('DeskInTray', () => {
     await render(
       createElement(DeskInTray, {
         home: { ...home([]), value: null },
+        notices: { ...unread([]), rows: null },
         signedIn: false,
         view: 'signed-out',
         local: [],
@@ -407,7 +468,9 @@ describe('DeskInTray', () => {
     const onReload = vi.fn()
     await render(
       createElement(DeskInTray, {
-        home: { ...h, value: { ...h.value!, partial: ['notifications'] } },
+        home: h,
+        // the unread list failed to load: the same Retry as before, now on the list itself
+        notices: { ...unread([]), rows: null, error: 'server' as const },
         signedIn: true,
         view: 'ready',
         local: [],
@@ -424,6 +487,7 @@ describe('DeskInTray', () => {
     await render(
       createElement(DeskInTray, {
         home: { ...home([]), value: null },
+        notices: { ...unread([]), rows: null },
         signedIn: false,
         view: 'loading',
         local: [],
@@ -443,6 +507,7 @@ describe('DeskInTray', () => {
     await render(
       createElement(DeskInTray, {
         home: { ...home([]), value: null },
+        notices: { ...unread([]), rows: null },
         signedIn: false,
         view: 'no-workspace',
         local: [],

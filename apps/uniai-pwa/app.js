@@ -96,6 +96,13 @@ const WORKBENCH_TABS = [
     icon: '<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   },
   {
+    id: 'inbox',
+    label: 'Thông báo',
+    hint: 'Thông báo từ UniWork: nhắc đến bạn, được giao, chia sẻ, bình luận',
+    color: '#6366f1',
+    icon: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15l1.5-2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 21h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  },
+  {
     id: 'calendar',
     label: 'Lịch',
     hint: 'Việc có hạn và cuộc họp trong 14 ngày tới',

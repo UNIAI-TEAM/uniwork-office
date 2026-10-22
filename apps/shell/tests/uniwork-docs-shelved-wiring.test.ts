@@ -1398,3 +1398,52 @@ describe('UNI-1961 live-row Lưu trữ (shelve)', () => {
     }
   })
 })
+
+describe('UNI-2079 open a document at a comment (uniwork-doc:open-document-at)', () => {
+  /** an IPC event from the shell window's main frame (sender checks live in ipc-sender-guard) */
+  const shellEvent = () => {
+    const mainFrame = { url: 'app://shell' }
+    return { sender: { isDestroyed: () => false, mainFrame }, senderFrame: mainFrame }
+  }
+
+  it('is a uniwork-doc: channel', () => {
+    expect(UNIWORK_DOC_CHANNELS.openDocumentAt).toBe('uniwork-doc:open-document-at')
+  })
+
+  it('opens the document and asks the service for the reveal of the comment', async () => {
+    const { handlers, service } = await setup()
+    stubServer()
+    const openAt = vi.spyOn(service, 'openDocumentAt')
+    try {
+      const handler = handlers.get(UNIWORK_DOC_CHANNELS.openDocumentAt)!
+      const opened = (await handler(shellEvent(), {
+        documentId: 'doc_live',
+        commentId: 'cmt_1',
+      })) as { ok: boolean; value: { path: string } }
+      expect(opened.ok).toBe(true)
+      expect(opened.value.path).toContain('doc_live')
+      expect(openAt).toHaveBeenCalledWith('doc_live', 'cmt_1')
+      expect(await handler(shellEvent(), { documentId: 'doc_live' })).toMatchObject({ ok: true })
+      expect(openAt).toHaveBeenLastCalledWith('doc_live', undefined)
+    } finally {
+      await service.releaseAllEditLocks()
+    }
+  })
+
+  it('refuses bad ids without a request', async () => {
+    const { handlers } = await setup()
+    const seen = stubServer()
+    const handler = handlers.get(UNIWORK_DOC_CHANNELS.openDocumentAt)!
+    for (const input of [
+      { documentId: '../x' },
+      { documentId: 7 },
+      { documentId: 'doc_live', commentId: 'c/1' },
+      { documentId: 'doc_live', commentId: 5 },
+      'doc_live',
+      null,
+    ]) {
+      expect(await handler(shellEvent(), input)).toEqual({ ok: false, error: 'not_found' })
+    }
+    expect(seen).toEqual([])
+  })
+})

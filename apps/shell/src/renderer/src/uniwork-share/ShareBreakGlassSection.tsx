@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   BREAK_GLASS_REASON_MAX,
   BREAK_GLASS_REASON_MIN,
@@ -24,6 +24,7 @@ export function ShareBreakGlassSection({
   grants,
   resolveName,
   canGrant,
+  focusOnOpen = false,
   onMutated,
 }: {
   api: UniworkShareApi
@@ -33,11 +34,25 @@ export function ShareBreakGlassSection({
   resolveName: (userId: string) => string | null
   /** the administering admin: the reason form and Revoke */
   canGrant: boolean
+  /** opened from a notice: the heading takes focus and scrolls into view */
+  focusOnOpen?: boolean
   /** a grant was opened or ended: the dialog reloads the access overview */
   onMutated: (note: string) => Promise<void>
 }) {
   const { t, dateLocale } = useI18n()
   const reasonId = useId()
+  const headingRef = useRef<HTMLHeadingElement>(null)
+
+  useEffect(() => {
+    if (!focusOnOpen) return
+    const focus = () => {
+      headingRef.current?.focus()
+      headingRef.current?.scrollIntoView?.({ block: 'nearest' })
+    }
+    focus()
+    const frame = requestAnimationFrame(focus)
+    return () => cancelAnimationFrame(frame)
+  }, [focusOnOpen])
   const hintId = useId()
   const problemId = useId()
   const [reason, setReason] = useState('')
@@ -128,7 +143,12 @@ export function ShareBreakGlassSection({
           <path d="M8 1.8l5.5 10.7h-11z" />
           <path d="M8 6.2v3M8 11.2v.1" />
         </svg>
-        <h3 id="share-break-glass-title" className="uw-share-heading">
+        <h3
+          id="share-break-glass-title"
+          ref={headingRef}
+          tabIndex={-1}
+          className="uw-share-heading"
+        >
           {t('shrBgAccessPanelSection')}
         </h3>
       </div>

@@ -1663,6 +1663,14 @@ export interface HomeApi {
     documentId: string,
   ): Promise<UniworkDocActionResult<{ documentId: string }>>
   uniworkOpenDocument(documentId: string): Promise<UniworkResult<{ path: string }>>
+  /**
+   * UNI-2079: a notice's target. Opens like uniworkOpenDocument, then (with a commentId)
+   * reveals that thread in the opened document, as a launch ticket does.
+   */
+  uniworkOpenDocumentAt(input: {
+    documentId: string
+    commentId?: string
+  }): Promise<UniworkResult<{ path: string }>>
   uniworkDocStatus(path: string): Promise<UniworkDocStatus | null>
   uniworkActiveDocStatus(): Promise<UniworkDocStatus | null>
   onUniworkDocStatus(cb: (status: UniworkDocStatus) => void): () => void
@@ -2309,6 +2317,8 @@ export const UNIWORK_DOC_CHANNELS = {
   /** push -> a document's title changed (S18 renamed-elsewhere announce) */
   docRenamed: 'uniwork-doc:doc-renamed',
   openDocument: 'uniwork-doc:open-document',
+  /** invoke({ documentId, commentId? }) -> open, then reveal the comment thread (UNI-2079) */
+  openDocumentAt: 'uniwork-doc:open-document-at',
   docStatus: 'uniwork-doc:status',
   activeDocStatus: 'uniwork-doc:active-status',
   docStatusEvent: 'uniwork-doc:status-event',

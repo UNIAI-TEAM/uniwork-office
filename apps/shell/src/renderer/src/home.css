@@ -4221,6 +4221,12 @@ body.vib .home {
   color: var(--danger-text);
 }
 
+/* unread notices: informational, not an alarm */
+.wb-tab-count.is-info {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
 .wb-tab:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
@@ -6816,6 +6822,293 @@ html[dir='rtl'] .quick-title-row {
 
 .wb-agenda-row.is-past .wb-agenda-bar {
   opacity: 0.5;
+}
+
+/* ── Inbox tab (UNI-2079): filters, day groups, one row per notice ── */
+.wb-inbox-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.wb-inbox-seg {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-8);
+  background: var(--surface-subtle);
+}
+
+.wb-inbox-seg-btn {
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.wb-inbox-seg-btn[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.wb-inbox-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wb-inbox-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.wb-inbox-chip:hover {
+  background: var(--wb-row-hover);
+}
+
+.wb-inbox-chip[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.wb-inbox-chip-count {
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--info-bg);
+  color: var(--info);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+
+.wb-inbox-chip[aria-pressed='true'] .wb-inbox-chip-count {
+  background: var(--surface);
+}
+
+/* every control of the pane shows the 2px accent ring on keyboard focus (spec 2.3) */
+.wb-inbox-seg-btn:focus-visible,
+.wb-inbox-chip:focus-visible,
+.wb-inbox-main:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* a sticky head per group, like an agenda day */
+.wb-inbox-group-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 16px;
+  border-block: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.wb-inbox-group:first-child .wb-inbox-group-head {
+  border-top: 0;
+}
+
+.wb-inbox-group-head strong {
+  font-weight: 600;
+}
+
+.wb-inbox-group-count {
+  margin-inline-start: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* clip, not hidden, so the group heads stick to the page scroll */
+.wb-inbox-body {
+  overflow: clip;
+}
+
+.wb-inbox-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* the row: one button that opens (icon, sentence, pill, time, dot) and the hover actions beside it */
+.wb-inbox-row {
+  gap: 0;
+  align-items: stretch;
+  padding-block: 0;
+  padding-inline: 0 8px;
+}
+
+.wb-inbox-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding-block: 10px;
+  padding-inline: 16px 8px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.wb-inbox-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.wb-inbox-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wb-inbox-sentence {
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-inbox-row.is-unread .wb-inbox-sentence {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.wb-inbox-time {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.wb-inbox-web {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.wb-inbox-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* deleted or out of reach: dimmed, it only clears itself */
+.wb-inbox-row.is-gone :is(.wb-inbox-icon, .wb-pill, .wb-inbox-sentence) {
+  opacity: 0.6;
+}
+
+.wb-inbox-actions {
+  align-self: center;
+}
+
+/* pill, opens-in-browser mark, time and dot: part of the one flex line on a wide pane */
+.wb-inbox-meta {
+  display: contents;
+}
+
+/* a narrow pane (the app's minimum window): the sentence keeps the full width of the row, up to
+   two lines, and the meta line sits under it, aligned with the sentence rather than the icon */
+@container wb-home (max-width: 640px) {
+  .wb-inbox-row {
+    position: relative;
+    padding-inline-end: 0;
+  }
+
+  .wb-inbox-main {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: start;
+    gap: 6px 12px;
+    padding-inline-end: 16px;
+  }
+
+  .wb-inbox-meta {
+    display: flex;
+    grid-column: 2;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    min-width: 0;
+  }
+
+  .wb-inbox-sentence {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* the actions float over the end of the meta line while shown, so they take no width when hidden */
+  .wb-inbox-actions {
+    position: absolute;
+    inset-block-end: 8px;
+    inset-inline-end: 8px;
+    align-self: auto;
+    border-radius: var(--radius-6);
+    background: var(--wb-row-hover);
+  }
+}
+
+.wb-inbox-more {
+  display: flex;
+  justify-content: center;
+}
+
+.wb-inbox-end {
+  margin: 0;
+  text-align: center;
+}
+
+.wb-inbox-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .wb-agenda-legend {
