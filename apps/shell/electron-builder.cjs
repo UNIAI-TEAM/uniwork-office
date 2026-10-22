@@ -683,6 +683,12 @@ const config = {
         from: '../sheets/native/xlsx-engine/target/release/xlsx-sidecar',
         to: 'native/xlsx-sidecar',
       },
+      // public key of the signed apt repository; the deb postinst installs it
+      // under /usr/share/keyrings (build/linux-after-install.sh)
+      {
+        from: 'build/apt/uniwork-office-archive-keyring.gpg',
+        to: 'apt/uniwork-office-archive-keyring.gpg',
+      },
     ],
   },
   // Same scoped-name problem as executableName above: the default deb
@@ -731,6 +737,7 @@ const config = {
   },
   beforePack: async (context) => {
     writeDeploymentDefaults()
+    writeAptSources()
     ensurePlatformHelpers()
     assertExtraResourceSources()
     ensureThirdPartyNotices()
@@ -860,6 +867,13 @@ if (releaseChannel) {
   config.linux.target = config.linux.target.filter((entry) => entry.target !== 'rpm')
   config.appImage = { artifactName: 'UniWork-Office_${version}_unsigned_linux_x64.${ext}' }
   config.deb.artifactName = 'UniWork-Office_${version}_unsigned_linux_x64.${ext}'
+  // Release debs also ship the apt source for their channel; the postinst
+  // installs it, so `apt upgrade` delivers the next build. Local builds ship
+  // none (their postinst finds no file and writes nothing).
+  config.linux.extraResources.push({
+    from: 'build/apt/uniwork-office.sources',
+    to: 'apt/uniwork-office.sources',
+  })
   // A dev / beta build signs in with the scheme of its deployment profile's
   // channel (uniwork-office-dev for dev profiles), so it declares that scheme
   // too: on Linux the .desktop MimeType is what routes the callback.
@@ -877,6 +891,30 @@ function writeDeploymentDefaults() {
     `${JSON.stringify(defaults, null, 2)}
 `,
   )
+}
+
+/** The apt repository the release debs update from (tools/release/apt-repo.sh fills it). */
+const APT_REPO_URL = 'https://uniworkos.com/downloads/office/apt'
+const APT_KEYRING_PATH = '/usr/share/keyrings/uniwork-office-archive-keyring.gpg'
+
+/** deb822 source for one channel (suite = channel). The first line marks the file as ours for the postinst / postrm. */
+function aptSourcesText(channel) {
+  return [
+    '# managed by uniwork-office',
+    'Types: deb',
+    `URIs: ${APT_REPO_URL}`,
+    `Suites: ${channel}`,
+    'Components: main',
+    'Architectures: amd64',
+    `Signed-By: ${APT_KEYRING_PATH}`,
+    '',
+  ].join('\n')
+}
+
+/** resources/apt/uniwork-office.sources, release builds only (see the release block). */
+function writeAptSources() {
+  if (!releaseChannel) return
+  writeFileSync(join(__dirname, 'build/apt/uniwork-office.sources'), aptSourcesText(releaseChannel))
 }
 
 /** A release build must ship `<apps/shell version>-<channel>.<n>` (-c.extraMetadata.version). */

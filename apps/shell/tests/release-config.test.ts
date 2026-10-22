@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
@@ -28,7 +28,12 @@ interface BuilderConfig {
   mac: Record<string, unknown> & { target: { target: string; arch: string[] }[] }
   dmg: Record<string, unknown>
   win: { extraResources: { from: string; to: string }[] }
-  linux: { target: { target: string; arch: string[] }[]; maintainer: string; vendor: string }
+  linux: {
+    target: { target: string; arch: string[] }[]
+    maintainer: string
+    vendor: string
+    extraResources: { from: string; to: string }[]
+  }
   deb: Record<string, unknown>
   appImage?: Record<string, unknown>
   protocols: { name: string; schemes: string[] }[]
@@ -152,6 +157,36 @@ describe('dev / beta release builds', () => {
       'deb',
       'rpm',
     ])
+  })
+
+  it('ship the apt keyring in every Linux build and the channel source only in release builds', async () => {
+    const aptEntries = (config: BuilderConfig) =>
+      config.linux.extraResources.filter((entry) => entry.to.startsWith('apt/')).map((e) => e.to)
+    expect(aptEntries(loadConfig({}))).toEqual(['apt/uniwork-office-archive-keyring.gpg'])
+    const sourcesFile = resolve(shellRoot, 'build/apt/uniwork-office.sources')
+    for (const channel of ['dev', 'beta']) {
+      const version = `${shellPackage.version}-${channel}.1`
+      const config = withVersion(loadConfig({ UNIWORK_RELEASE_CHANNEL: channel }, version), version)
+      expect(aptEntries(config)).toEqual([
+        'apt/uniwork-office-archive-keyring.gpg',
+        'apt/uniwork-office.sources',
+      ])
+      await config.beforePack({ electronPlatformName: 'linux' })
+      // deb822: the managed marker first, the channel as suite, the shipped keyring as Signed-By
+      expect(readFileSync(sourcesFile, 'utf8')).toBe(
+        [
+          '# managed by uniwork-office',
+          'Types: deb',
+          'URIs: https://uniworkos.com/downloads/office/apt',
+          `Suites: ${channel}`,
+          'Components: main',
+          'Architectures: amd64',
+          'Signed-By: /usr/share/keyrings/uniwork-office-archive-keyring.gpg',
+          '',
+        ].join('\n'),
+      )
+    }
+    rmSync(sourcesFile, { force: true })
   })
 
   it('declare every sign-in callback scheme for the Linux desktop entry', () => {
