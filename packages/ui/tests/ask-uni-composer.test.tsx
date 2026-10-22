@@ -188,6 +188,17 @@ describe('AskUniComposerBox', () => {
       await mount({ streaming: false })
       expect(document.activeElement).toBe(box())
     })
+
+    it('leaves focus alone when the reader moved it somewhere else meanwhile', async () => {
+      const other = document.createElement('button')
+      document.body.appendChild(other)
+      await mount()
+      await mount({ streaming: true })
+      other.focus()
+      await mount({ streaming: false })
+      expect(document.activeElement).toBe(other)
+      other.remove()
+    })
   })
 
   describe('Enter right after a send', () => {

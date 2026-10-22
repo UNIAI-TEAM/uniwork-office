@@ -1,5 +1,6 @@
 import {
   ASKUNI_MAX_RETRY_AFTER_SEC,
+  ASKUNI_V2_NOTICES,
   type AskUniCitation,
   type AskUniMessage,
   type AskUniStreamEvent,
@@ -63,11 +64,6 @@ const SERVER_CODES: Record<string, AskUniV2ErrorCode> = {
   ai_disabled: 'disabled',
   ai_context_forbidden: 'forbidden',
 }
-const NOTICES: ReadonlySet<string> = new Set<AskUniV2Notice>([
-  'no_sources',
-  'empty_answer',
-  'stopped',
-])
 
 /** a failed call -> the v2 code: the P1 map plus the gateway codes (REST and lookups use this one) */
 export function askUniV2CodeOfError(error: unknown): AskUniV2ErrorCode {
@@ -165,7 +161,7 @@ export function parseMessage(raw: unknown): AskUniMessage | null {
     role: raw.role === 'user' ? 'user' : 'assistant',
     content: raw.content.slice(0, MAX_CONTENT),
     citations: citationsOf(raw.citations),
-    ...(typeof raw.notice === 'string' && NOTICES.has(raw.notice)
+    ...(typeof raw.notice === 'string' && ASKUNI_V2_NOTICES.has(raw.notice)
       ? { notice: raw.notice as AskUniV2Notice }
       : {}),
     createdAt: typeof raw.created_at === 'string' ? raw.created_at : '',

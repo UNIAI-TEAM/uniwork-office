@@ -83,7 +83,7 @@ export function AskUniPanel({
   workspaces?: AskUniWorkspace[]
   onWorkspaceChange?: (id: string) => void
   visible?: boolean
-  /** a focus an entry point wants on the next question (the document tab entry) */
+  /** a focus an entry point wants on the next question; no caller passes one today (kept for a document entry) */
   pendingFocus?: { kind: AskUniFocusKind; id: string; label?: string }
   onPendingFocusConsumed?: () => void
 }): ReactElement {
@@ -158,6 +158,8 @@ export function AskUniPanel({
         )}
       </div>
       <AskUniComposer
+        // a scope chip, mentions and the draft belong to one workspace: another one starts clean
+        key={workspaceId}
         workspaceId={workspaceId}
         conversationId={conversationId}
         streaming={streaming}

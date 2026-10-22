@@ -213,7 +213,7 @@ export function AskUniHistory({
           ref={anchorRef}
           type="button"
           className="askuni2-title-btn"
-          aria-haspopup="true"
+          aria-haspopup="dialog"
           aria-expanded={open}
           aria-label={t('askUniV2HistoryWith', { title })}
           onClick={() => (open ? close() : setOpen(true))}
@@ -224,6 +224,7 @@ export function AskUniHistory({
         {open ? (
           <div
             ref={popRef}
+            role="dialog"
             className="askuni2-popover askuni2-history-pop"
             data-slot="askuni-history"
             aria-label={t('askUniV2History')}

@@ -20,7 +20,6 @@ export { AskUniSteps } from './AskUniSteps'
 export { AskUniThread, type AskUniThreadProps } from './AskUniThread'
 export {
   useAskUniStream,
-  useStreamFocus,
   type AskStreamApi,
   type AskStreamState,
   type AskStreamStatus,

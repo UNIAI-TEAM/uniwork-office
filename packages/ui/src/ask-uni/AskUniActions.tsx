@@ -34,10 +34,11 @@ export function answerPlainText(content: string, citations: AskUniCitation[]): s
 }
 
 // The server never returns a rating, so it is kept for the session: the bar is rebuilt when a live
-// turn becomes a stored one, and must still show what the user pressed.
+// turn becomes a stored one, and must still show what the user pressed. Ids are server-unique, so
+// another account never sees a rating of this one.
 const ratings = new Map<string, AskUniFeedbackRating>()
 
-/** forgets every rating of this session (sign-out, account switch, tests) */
+/** forgets every rating of this session (tests) */
 export function clearAskUniRatings(): void {
   ratings.clear()
 }

@@ -334,10 +334,13 @@ export function AiChatPanel({
   onCollapse,
   clarify = null,
   askUniDocumentName,
+  askUniBindingKey,
 }: {
   readonly isOpen: boolean
   /** the open workbook's file name: the Ask UNI chip shows it (never an id) */
   readonly askUniDocumentName?: string
+  /** names the open file for the Ask UNI binding: the workbook path, which a save to UniWork changes */
+  readonly askUniBindingKey?: string
   /** true suppresses even the collapsed rail (the "show the AI sidebar" setting is off) */
   readonly hideRail?: boolean
   /** the workbook has cells with content — empty workbooks get "build me a sheet" copy instead */
@@ -404,7 +407,7 @@ export function AiChatPanel({
   } | null
 }): React.JSX.Element {
   const { t, lang } = useI18n()
-  const askUni = useAskUniMode(lang, askUniDocumentName)
+  const askUni = useAskUniMode(lang, askUniBindingKey)
   const needModelHint = useAiModelNeedHint()
   // the UniWork disclosure gate of every send entry: the composer feeds it, the queue pump asks it
   // silently, and retry (and, through ExcelShell, presets and ribbon runs) refuse through it

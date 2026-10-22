@@ -79,6 +79,9 @@ export function AskUniThread({
   const { state } = stream
   const [stored, setStored] = useState<AskUniMessage[]>([])
   const [loaded, setLoaded] = useState(false)
+  // the first load of a stored conversation failed (a later reload that fails keeps what is shown)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [retryTick, setRetryTick] = useState(0)
   const loadRef = useRef(loadMessages ?? ((id: string) => adapter.loadMessages(id)))
   loadRef.current = loadMessages ?? ((id: string) => adapter.loadMessages(id))
   const loadedFor = useRef<string | null>(null)
@@ -91,6 +94,7 @@ export function AskUniThread({
       setStored([])
       setLoaded(false)
     }
+    setLoadFailed(false)
     if (conversationId === null) return
     let alive = true
     loadRef
@@ -100,14 +104,18 @@ export function AskUniThread({
         () => null,
       )
       .then((messages) => {
-        if (!alive || messages === null) return
+        if (!alive) return
+        if (messages === null) {
+          setLoadFailed(true)
+          return
+        }
         setStored(messages)
         setLoaded(true)
       })
     return () => {
       alive = false
     }
-  }, [workspaceId, conversationId, state.reloadTick])
+  }, [workspaceId, conversationId, state.reloadTick, retryTick])
 
   const streaming = state.status === 'streaming'
   // how many stored turns there were when the live turn started (null until the history has loaded)
@@ -127,6 +135,10 @@ export function AskUniThread({
     state.status === 'stopped' && !state.message && base !== null && stored.length >= base + 2
   const sameConversation = state.conversationId === conversationId
   const live = state.status !== 'idle' && sameConversation && !inStore && !storedStopped
+
+  // a stored conversation that has not loaded yet: busy while it loads, an error with Retry if it failed
+  const firstLoad = conversationId !== null && !loaded && !live
+  const loading = firstLoad && !loadFailed
 
   const lastAssistant = [...stored]
     .reverse()
@@ -197,7 +209,7 @@ export function AskUniThread({
           {status}
         </p>
       )}
-      <ul className="askuni-v2-turns" aria-busy={streaming}>
+      <ul className="askuni-v2-turns" aria-busy={streaming || loading}>
         {stored.map((m) => (
           <AskUniTurn
             key={m.id}
@@ -212,6 +224,18 @@ export function AskUniThread({
             feedback={onFeedback}
           />
         ))}
+        {firstLoad && loadFailed ? (
+          <li className="askuni-v2-error">
+            <p>{t('askUniErrDefault')}</p>
+            <button
+              type="button"
+              className="askuni-v2-retry"
+              onClick={() => setRetryTick((n) => n + 1)}
+            >
+              {t('askUniV2Retry')}
+            </button>
+          </li>
+        ) : null}
         {live ? (
           <>
             <AskUniTurn

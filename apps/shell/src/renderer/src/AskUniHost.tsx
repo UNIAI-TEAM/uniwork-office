@@ -112,6 +112,9 @@ function AskUniV2Gate({ visible }: { visible: boolean }): ReactElement {
   )
 }
 
+/** how long a requested caret waits for the composer to appear */
+const FOCUS_WAIT_MS = 2000
+
 /**
  * What the My AI pane mounts in Ask UNI mode (contract D3): the v2 panel when the public
  * `ask_uni_stream` flag is on, the P1 pane exactly as before when it is off or the bridge has no
@@ -144,7 +147,10 @@ export function AskUniHost({
     const root = rootRef.current
     if (!root || !visible || !wantFocus.current) return
     const tryFocus = (): boolean => {
-      const box = root.querySelector<HTMLTextAreaElement>('textarea:not(:disabled)')
+      // the composer itself: a feedback note field earlier in the DOM must not win
+      const box = root.querySelector<HTMLTextAreaElement>(
+        '[data-slot="askuni-composer"] textarea:not(:disabled), .askuni-composer textarea:not(:disabled)',
+      )
       if (!box) return false
       box.focus()
       wantFocus.current = false
@@ -155,7 +161,15 @@ export function AskUniHost({
       if (tryFocus()) observer.disconnect()
     })
     observer.observe(root, { childList: true, subtree: true })
-    return () => observer.disconnect()
+    // give up after a moment: a sign-in that finishes much later must not steal the caret
+    const giveUp = setTimeout(() => {
+      wantFocus.current = false
+      observer.disconnect()
+    }, FOCUS_WAIT_MS)
+    return () => {
+      clearTimeout(giveUp)
+      observer.disconnect()
+    }
   }, [focusToken, visible, flag.loaded, flag.enabled])
 
   let body: ReactElement

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import type { AskUniDocBridge, AskUniDocFlags } from '@genoffice/ai-provider/askuni'
@@ -53,11 +53,8 @@ export function useAskUniMode(lang: Lang, bindingKey?: string | null): AskUniMod
   const [opened, setOpened] = useState(false)
   const [tick, setTick] = useState(0)
   const [status, setStatus] = useState('')
-  const bound = useRef({ value: bindingKey, changes: 0 })
-  if (bound.current.value !== bindingKey) {
-    bound.current = { value: bindingKey, changes: bound.current.changes + 1 }
-  }
-  const flags = useAskUniDocFlags(bridge, bound.current.changes + tick)
+  // another file in the tab, or the mode turned on again, reads the binding from main again
+  const flags = useAskUniDocFlags(bridge, `${tick}:${bindingKey ?? ''}`)
   const adapter = useMemo(
     () =>
       bridge
