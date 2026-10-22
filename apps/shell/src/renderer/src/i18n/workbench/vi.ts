@@ -222,6 +222,7 @@ export const vi = {
   wbDeskReasonConflict: 'Bản trên máy và bản trên UniWork khác nhau',
   wbDeskReasonSync: 'Thay đổi trên máy chưa lên được UniWork',
   wbDeskMore: 'Xem thêm {count}',
+  wbDeskInTrayViewAll: 'Xem tất cả',
   wbDeskInProgress: 'Đang làm dở',
   wbDeskInProgressEmpty: 'Chưa có tài liệu đang làm',
   wbDeskUnsaved: 'Chưa lưu',

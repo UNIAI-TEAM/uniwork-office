@@ -43,6 +43,8 @@ interface Props {
   local: readonly RecentEntry[]
   /** reload the workspace list and every server section (the top bar's Refresh) */
   onReload?: () => void
+  /** "View all" opens the Inbox tab, which pages every notice */
+  onOpenInbox?: () => void
   /** bumped by the top bar's Refresh: "Shared with you" reloads too */
   refreshTick?: number
 }
@@ -55,6 +57,7 @@ export function DeskInTray({
   view,
   local,
   onReload,
+  onOpenInbox,
   refreshTick,
 }: Props): ReactElement {
   const { t, dateLocale } = useI18n()
@@ -360,6 +363,14 @@ export function DeskInTray({
           ) : null}
         </>
       )}
+      {/* the unread list is one page: older unread notices (document changes too) wait in the Inbox */}
+      {notices.more && onOpenInbox ? (
+        <div className="wb-desk-more">
+          <button type="button" className="wb-link" onClick={onOpenInbox}>
+            {t('wbDeskInTrayViewAll')}
+          </button>
+        </div>
+      ) : null}
       {listFor ? (
         <DocChangeDialog
           key={listFor}
