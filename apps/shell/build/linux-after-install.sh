@@ -49,6 +49,27 @@ if apparmor_status --enabled >/dev/null 2>&1; then
   fi
 fi
 
+# The signed apt repository: release debs ship the repository's public key and a
+# deb822 source for their channel under resources/apt, so `apt upgrade` delivers
+# the next build (local builds ship no source and write nothing). Skipped when
+# /etc/default/uniwork-office sets UNIWORK_OFFICE_APT_REPO=false, and a source
+# file without our first-line marker is the admin's own and stays as it is. Both
+# files outlive `apt remove` (apt update keeps working against a valid key); the
+# post-remove drops them on purge. Never fails the install.
+apt_res='/opt/${sanitizedProductName}/resources/apt'
+apt_list=/etc/apt/sources.list.d/uniwork-office.sources
+apt_keyring=/usr/share/keyrings/uniwork-office-archive-keyring.gpg
+if [ -f "$apt_res/uniwork-office.sources" ] && [ -d /etc/apt/sources.list.d ] \
+  && ! ( [ -r /etc/default/uniwork-office ] && . /etc/default/uniwork-office \
+    && [ "$UNIWORK_OFFICE_APT_REPO" = false ] ) 2>/dev/null; then
+  if [ -e "$apt_list" ] && [ "$(head -n 1 "$apt_list" 2>/dev/null)" != '# managed by uniwork-office' ]; then
+    echo "uniwork-office: $apt_list is not managed by this package, left as is" >&2
+  else
+    install -D -m 0644 "$apt_res/uniwork-office-archive-keyring.gpg" "$apt_keyring" || true
+    install -m 0644 "$apt_res/uniwork-office.sources" "$apt_list" || true
+  fi
+fi
+
 # The command line, /usr/bin/uniwork-office-cli. Only an absent name, a dead link
 # or a link into our own install dir is taken over; anything else at that name
 # belongs to another program (genoffice#893). This link is also the stable
