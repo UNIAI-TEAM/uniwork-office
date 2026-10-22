@@ -13,7 +13,7 @@ import {
   type UpdatedByOption,
 } from '../uniwork-home/documents-home-model'
 import type { DocListScreen } from './columns'
-import { TypeFilter, typePickLabel } from './TypeFilter'
+import { TypeFilter, typeGroupName, typePickLabel } from './TypeFilter'
 
 type FiltersByScreen = Partial<Record<DocListScreen, DocumentsHomeFilterState>>
 
@@ -110,7 +110,7 @@ export function FilterBar({ filters, onChange, authors, lead, hideTypes }: Filte
       </div>
 
       {filters.types.length > 0 && (
-        <div className="dh-filter-chips">
+        <div className="dh-filter-chips" role="group" aria-label={typeGroupName(t('uhFilterType'))}>
           {filters.types.map((pick) => {
             const name = typePickLabel(t, pick)
             return (

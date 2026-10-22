@@ -197,14 +197,32 @@ export function toggleTypePick(
  */
 export const TYPE_PICK_HIDES_FOLDERS = false
 
+/** the Q0 rule, in one place: folders of a flat list go while a pick is set and the switch is on */
+export function typePickHidesFolders(
+  types: readonly DocumentsHomeTypePick[],
+  hidesFolders: boolean = TYPE_PICK_HIDES_FOLDERS,
+): boolean {
+  return hidesFolders && types.length > 0
+}
+
 /** the Q0 switch, applied to the rows of a flat list (no row is narrowed by type here: the server did) */
 export function rowsUnderTypePick(
   rows: DocumentsHomeTableRow[],
   types: readonly DocumentsHomeTypePick[],
   hidesFolders: boolean = TYPE_PICK_HIDES_FOLDERS,
 ): DocumentsHomeTableRow[] {
-  if (!hidesFolders || types.length === 0) return rows
+  if (!typePickHidesFolders(types, hidesFolders)) return rows
   return rows.filter((row) => !(row.type === 'doc' && row.doc.kind === 'folder'))
+}
+
+/** the Q0 switch, applied to the folder cards; the cards of the tree level are navigation and stay */
+export function folderCardsUnderTypePick<T>(
+  cards: readonly T[],
+  types: readonly DocumentsHomeTypePick[],
+  treeLevel: boolean,
+  hidesFolders: boolean = TYPE_PICK_HIDES_FOLDERS,
+): readonly T[] {
+  return treeLevel || !typePickHidesFolders(types, hidesFolders) ? cards : []
 }
 
 export const DOCUMENTS_HOME_UPDATED_OPTIONS: readonly {

@@ -15,6 +15,19 @@ import type {
 } from '../src/renderer/src/uniwork-home/documents-home-model'
 import { matchesExtFamily } from '../src/main/recent-files'
 
+// UNI-2113 fix1 (T-R1-2): the Q0 switch is a constant of the model; a test flips what the screen reads
+const q0 = vi.hoisted(() => ({ hidesFolders: false }))
+vi.mock('../src/renderer/src/uniwork-home/documents-home-model', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../src/renderer/src/uniwork-home/documents-home-model')>()
+  return {
+    ...actual,
+    get TYPE_PICK_HIDES_FOLDERS() {
+      return q0.hidesFolders
+    },
+  }
+})
+
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
@@ -684,6 +697,126 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
       await click(last)
       expect(chips()).toHaveLength(0)
       expect(document.activeElement).toBe(trigger())
+    })
+  })
+
+  describe('the Type picks reach the title search (UNI-2113 fix1, T-R1-1)', () => {
+    const typeIntoSearch = async (text: string) => {
+      const input = host.querySelector<HTMLInputElement>('.dh-search-input')!
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+        setter.call(input, text)
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      await flush()
+    }
+
+    it('a pick set before the search is in the first search request', async () => {
+      await mount('workspace')
+      await chip('page')
+      await typeIntoSearch('hop dong')
+      expect(lastCall('uniworkSearchDocuments')).toEqual(
+        expect.objectContaining({ workspaceId: 'ws-1', query: 'hop dong', types: ['page'] }),
+      )
+    })
+
+    it('a pick made while a search is active searches again with it, in menu order', async () => {
+      await mount('workspace')
+      await typeIntoSearch('hop dong')
+      expect(lastCall('uniworkSearchDocuments')).not.toHaveProperty('types')
+      await chip('xlsx')
+      await chip('page')
+      expect(lastCall('uniworkSearchDocuments').types).toEqual(['page', 'xlsx'])
+      // the search never carries the other filters (it is the title search)
+      expect(lastCall('uniworkSearchDocuments')).not.toHaveProperty('updatedBy')
+    })
+
+    it('Load more of the search keeps the picks', async () => {
+      api.uniworkSearchDocuments.mockResolvedValue(ok({ items, nextCursor: 'cur-2' }))
+      await mount('workspace')
+      await chip('docx')
+      await typeIntoSearch('hop dong')
+      await click(host.querySelector('.dh-load-more-row button'))
+      expect(lastCall('uniworkSearchDocuments')).toEqual(
+        expect.objectContaining({ cursor: 'cur-2', types: ['docx'] }),
+      )
+    })
+  })
+
+  describe('the Q0 switch moves the folder cards too (UNI-2113 fix1, T-R1-2)', () => {
+    const FOLDER_CARD = '.dh-folder-card[data-folder-id]'
+    const cardIds = () =>
+      Array.from(host.querySelectorAll(FOLDER_CARD)).map((el) => el.getAttribute('data-folder-id'))
+    beforeEach(() => {
+      items.push(row({ id: 'fold-x', title: 'Hồ sơ', kind: 'folder', format: null }))
+    })
+    afterEach(() => {
+      q0.hidesFolders = false
+    })
+
+    it('ships with the switch off: a pick keeps the folder cards of every list', async () => {
+      for (const subView of ['workspace', 'recent', 'trash'] as const) {
+        await remount(subView)
+        await chip('docx')
+        expect(cardIds(), subView).toEqual(['fold-x'])
+      }
+    })
+
+    it.each(['recent', 'shared-with-me', 'trash'] as const)(
+      'with the switch on, %s drops the folder cards under a pick and brings them back',
+      async (subView) => {
+        q0.hidesFolders = true
+        await remount(subView)
+        expect(cardIds()).toEqual(['fold-x'])
+        await chip('docx')
+        expect(cardIds()).toEqual([])
+        expect(host.querySelector('.dh-folders-section')).toBeNull()
+        await chip('docx')
+        expect(cardIds()).toEqual(['fold-x'])
+      },
+    )
+
+    it('with the switch on, the tree level keeps its folder cards under a pick', async () => {
+      q0.hidesFolders = true
+      await remount('workspace')
+      await chip('docx')
+      expect(cardIds()).toEqual(['fold-x'])
+    })
+  })
+
+  describe('the Type control details (UNI-2113 fix1, T-R1-3 / T-R1-4a)', () => {
+    it('choosing All types while nothing is picked reads the list again nowhere', async () => {
+      await mount('workspace')
+      const before = api.uniworkListChildren.mock.calls.length
+      await chip('all')
+      expect(api.uniworkListChildren.mock.calls.length).toBe(before)
+      expect(checked()).toEqual(['all'])
+    })
+
+    it('choosing All types after a pick still clears it and reads once', async () => {
+      await mount('workspace')
+      await chip('docx')
+      const before = api.uniworkListChildren.mock.calls.length
+      await chip('all')
+      expect(api.uniworkListChildren.mock.calls.length).toBe(before + 1)
+      expect(lastCall('uniworkListChildren').types).toBeUndefined()
+    })
+
+    it.each([
+      ['vi', 'Loại'],
+      ['en', 'Type'],
+    ] as const)('the chip group is named from the Type label (%s)', async (lang, name) => {
+      await act(async () => {
+        root.unmount()
+      })
+      root = createRoot(host)
+      await mount('workspace', lang)
+      await chip('docx')
+      const group = host.querySelector('.dh-filter-bar .dh-filter-chips')!
+      expect(group.getAttribute('role')).toBe('group')
+      expect(group.getAttribute('aria-label')).toBe(name)
+      // the same name the menu carries
+      expect(menu()!.getAttribute('aria-label')).toBe(name)
     })
   })
 

@@ -115,6 +115,7 @@ import {
   collectUpdatedByOptions,
   fetchDocumentsHomePage,
   fetchDocumentsHomeSources,
+  folderCardsUnderTypePick,
   getDocumentsHomeNavEntry,
   docMatchesUpdated,
   hasActiveFilters,
@@ -123,6 +124,7 @@ import {
   sourceMatchesFilters,
   splitAndSortItems,
   toUniworkListFilters,
+  TYPE_PICK_HIDES_FOLDERS,
   visibleDocumentsHomeNavEntries,
   type DocumentsHomeApiAdapter,
   type DocumentsHomeDoc,
@@ -740,7 +742,12 @@ export function DocumentsHome({
     }))
 
     if (query.length > 0) {
-      void searchDocuments({ workspaceId, query, kind: 'all' })
+      void searchDocuments({
+        workspaceId,
+        query,
+        kind: 'all',
+        ...(wireFilters.types ? { types: wireFilters.types } : {}),
+      })
         .then((res) => {
           if (listSeqRef.current !== seq) return
           if (res.ok) {
@@ -985,7 +992,13 @@ export function DocumentsHome({
     setPage((prev) => ({ ...prev, loadingMore: true, moreError: undefined }))
 
     if (query.length > 0) {
-      void searchDocuments({ workspaceId, query, cursor, kind: 'all' })
+      void searchDocuments({
+        workspaceId,
+        query,
+        cursor,
+        kind: 'all',
+        ...(wireFilters.types ? { types: wireFilters.types } : {}),
+      })
         .then((res) => {
           if (listSeqRef.current !== seq) return
           if (res.ok) {
@@ -2251,11 +2264,19 @@ export function DocumentsHome({
   // the folder cards keep their own order: the server's position, or the name when the table sorts by it
   const folderOrder = docSort?.column === 'name' ? 'name' : 'recent'
   const folderDesc = folderOrder === 'name' && docSort?.dir === 'desc'
-  const { folders, files } = useMemo(() => {
+  const { folders: allFolders, files } = useMemo(() => {
     const split = splitAndSortItems(page.items, folderOrder, dateLocale)
     const ordered = folderDesc ? [...split.folders].reverse() : split.folders
     return { folders: myFolderFirst(ordered), files: split.files }
   }, [page.items, folderOrder, folderDesc, dateLocale])
+  // Q0: the tree level (workspace root, My Folder, an open folder) keeps its cards, they navigate;
+  // on a flat list the same switch as the rows hides them under a Type pick
+  const folders = folderCardsUnderTypePick(
+    allFolders,
+    filters.types,
+    subView === 'workspace' || subView === 'my-folder',
+    TYPE_PICK_HIDES_FOLDERS,
+  )
 
   // UNI-1961: the table's rows: the documents, or on Từ nơi khác the source files, where the home
   // filters the server could not apply to them run here (the web's use-documents-library.ts).
@@ -2263,7 +2284,8 @@ export function DocumentsHome({
   const tableRows = useMemo<DocumentsHomeTableRow[]>(() => {
     // every row is the server's answer to the Type picks; only the Q0 switch (folder rows of a flat
     // list under a pick) runs here, and on the shelf Người sửa / Cập nhật run on what is loaded
-    const typed = (rows: DocumentsHomeTableRow[]) => rowsUnderTypePick(rows, filters.types)
+    const typed = (rows: DocumentsHomeTableRow[]) =>
+      rowsUnderTypePick(rows, filters.types, TYPE_PICK_HIDES_FOLDERS)
     // Từ nơi khác: the source files alone; Người sửa / Cập nhật run on what is loaded
     if (elsewhereView) {
       return typed(

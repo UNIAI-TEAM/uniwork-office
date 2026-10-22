@@ -9,6 +9,11 @@ import {
 
 const BADGE = 16
 
+/** the Type label without its trailing colon: the accessible name of the menu and of the chip group */
+export function typeGroupName(label: string): string {
+  return label.replace(/[:：]\s*$/, '')
+}
+
 /** the visible label of one type (UniNote is a string, the formats are their extension) */
 export function typePickLabel(t: TFunc, pick: DocumentsHomeTypePick): string {
   const option = DOCUMENTS_HOME_TYPE_OPTIONS.find((o) => o.value === pick)
@@ -182,7 +187,7 @@ export function TypeFilter({ types, onChange, hideTypes, triggerRef }: TypeFilte
           ref={menuRef}
           id={menuId}
           role="menu"
-          aria-label={label.replace(/[:：]\s*$/, '')}
+          aria-label={typeGroupName(label)}
           className="dh-type-menu"
           onKeyDown={onMenuKeyDown}
         >
@@ -193,7 +198,10 @@ export function TypeFilter({ types, onChange, hideTypes, triggerRef }: TypeFilte
             tabIndex={-1}
             data-type="all"
             className="dh-type-item"
-            onClick={() => onChange([])}
+            onClick={() => {
+              // nothing is picked already: the same list would only be read again
+              if (types.length > 0) onChange([])
+            }}
           >
             <span className="dh-type-spacer" aria-hidden="true" />
             <span className="dh-type-item-label">{t('uhFilterTypeAll')}</span>

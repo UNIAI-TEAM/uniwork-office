@@ -8,10 +8,12 @@ import {
   docMatchesUpdated,
   fetchDocumentsHomePage,
   fetchDocumentsHomeSources,
+  folderCardsUnderTypePick,
   getDocumentsHomeNavEntry,
   hasActiveFilters,
   rowsUnderTypePick,
   splitAndSortItems,
+  typePickHidesFolders,
   toggleTypePick,
   TYPE_PICK_HIDES_FOLDERS,
   toUniworkListFilters,
@@ -689,6 +691,25 @@ describe('the Type multi-select model (UNI-2113)', () => {
       expect(rowsUnderTypePick(rows, ['docx'], true).map((r) => r.id)).toEqual(['a', 'p'])
       // no pick = nothing is dropped
       expect(rowsUnderTypePick(rows, [], true).map((r) => r.id)).toEqual(['f', 'a', 'p'])
+    })
+
+    // UNI-2113 fix1 (T-R1-2): the same rule decides the folder cards, so one switch moves both
+    it('names the rule once: hidden only with the switch on and a pick set', () => {
+      expect(typePickHidesFolders(['docx'], true)).toBe(true)
+      expect(typePickHidesFolders(['docx'], false)).toBe(false)
+      expect(typePickHidesFolders([], true)).toBe(false)
+      expect(typePickHidesFolders(['docx'])).toBe(TYPE_PICK_HIDES_FOLDERS)
+    })
+    const cards = [doc({ id: 'c1', kind: 'folder' }), doc({ id: 'c2', kind: 'folder' })]
+    it('drops the folder cards of a flat list under a pick with the switch on', () => {
+      expect(folderCardsUnderTypePick(cards, ['docx'], false, true)).toEqual([])
+      expect(folderCardsUnderTypePick(cards, [], false, true)).toEqual(cards)
+      expect(folderCardsUnderTypePick(cards, ['docx'], false, false)).toEqual(cards)
+      expect(folderCardsUnderTypePick(cards, ['docx'], false)).toEqual(cards)
+    })
+    it('keeps the folder cards of the tree level whatever the switch says', () => {
+      expect(folderCardsUnderTypePick(cards, ['docx'], true, true)).toEqual(cards)
+      expect(folderCardsUnderTypePick(cards, ['docx'], true, false)).toEqual(cards)
     })
   })
 
