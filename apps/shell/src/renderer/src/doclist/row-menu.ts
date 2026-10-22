@@ -6,6 +6,7 @@
 import type { StringKey } from '../locale'
 import type { FolderMenuItem } from '../uniwork-folders/FolderMenu'
 import { canManageShelved, type DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
+import { versionsEntryAllowed } from '../uniwork-doc-history/version-history-model'
 import { canOfferAccessLog } from '../uniwork-doc-history/access-log-model'
 import type { DocListScreen } from './columns'
 import { canShareRow } from './share-gate'
@@ -25,6 +26,7 @@ export type RowMenuActionId =
   | 'trash'
   | 'restore'
   | 'download'
+  | 'versions'
   | 'logs'
   | 'details'
 
@@ -97,6 +99,8 @@ export function buildRowMenu({
   if (screen === 'shelved') {
     if (doc.kind !== 'folder') add('open', label('dlActOpen'), OPEN)
     if (rowCanDownload(screen, doc)) add('download', label('dlActDownload'), OPEN)
+    // Lịch sử phiên bản (UNI-2077): a shelved document keeps its history readable
+    if (versionsEntryAllowed(doc)) add('versions', label('vhsMenuEntry'), OPEN)
     if (canManageShelved(doc)) {
       add('unshelve', label('dlActUnshelve'), OPEN)
       add('trash', label('dlActTrash'), KEEP, { danger: true, confirm: true })
@@ -109,6 +113,8 @@ export function buildRowMenu({
   add('open', label('dlActOpen'), OPEN)
   // a page and a folder have no file to keep offline
   if (offlineLabel && doc.kind === 'file' && !shelved) add('offline', offlineLabel, OPEN)
+  // Lịch sử phiên bản (UNI-2077): every reader of a file or page, like the web's menu (no folder)
+  if (versionsEntryAllowed(doc)) add('versions', label('vhsMenuEntry'), OPEN)
   // Chia sẻ (UNI-2047 SD-C): any reader opens the dialog, the gate keeps folders, other modules'
   // documents, trashed rows and My Folder out; it sits just before Sao chép link like the web's
   if (canShareRow(doc)) add('share', label('dlActShare'), LINK)

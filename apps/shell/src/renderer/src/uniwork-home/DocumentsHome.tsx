@@ -95,6 +95,7 @@ import { DOC_SHARE_CHANGED_EVENT } from '../uniwork-folders/first-save-share'
 import { BulkShareDialog, type BulkShareDoc } from '../uniwork-share/BulkShareDialog'
 import { AccessLogSheet } from '../uniwork-doc-history/AccessLogSheet'
 import { getDocHistoryBridge } from '../uniwork-doc-history/bridge'
+import { VersionHistorySheet } from '../uniwork-doc-history/VersionHistorySheet'
 import { ShareDialog } from '../uniwork-share/ShareDialog'
 import { rowShareTarget, shareBridgeAvailable } from '../uniwork-share/share-dialog-target'
 import {
@@ -1610,6 +1611,8 @@ export function DocumentsHome({
   // UNI-2077: the Access log sheet of a row; no entry when this main has no doc history bridge
   const [logsRow, setLogsRow] = useState<DocumentsHomeDoc | null>(null)
   const logsAvailable = getDocHistoryBridge() !== null
+  // UNI-2077: the Version history sheet of a row (same bridge, same availability)
+  const [versionsRow, setVersionsRow] = useState<DocumentsHomeDoc | null>(null)
   // UNI-2068: Tải xuống plans one file or one zip in main; the bar and the result live in the zip store
   const zipBusy = useZipDownloadBusy()
   const zipAvailable = zipDownloadBridge() !== null
@@ -1938,6 +1941,7 @@ export function DocumentsHome({
         // no entry when this shell has no Share bridge (a stale preload)
         ...(shareAvailable ? { share: () => setShareRow(doc) } : {}),
         ...(logsAvailable ? { logs: () => setLogsRow(doc) } : {}),
+        ...(logsAvailable ? { versions: () => setVersionsRow(doc) } : {}),
         'copy-link': () => void handleCopyLink(doc),
         rename: () => setDocRename({ doc, error: null, busy: false }),
         move: () =>
@@ -2926,6 +2930,15 @@ export function DocumentsHome({
       )}
 
       {logsRow && <AccessLogSheet open row={logsRow} onClose={() => setLogsRow(null)} />}
+
+      {versionsRow && (
+        <VersionHistorySheet
+          open
+          row={versionsRow}
+          onClose={() => setVersionsRow(null)}
+          onChanged={() => setListTick((n) => n + 1)}
+        />
+      )}
 
       {bulkShareDocs && (
         <BulkShareDialog
