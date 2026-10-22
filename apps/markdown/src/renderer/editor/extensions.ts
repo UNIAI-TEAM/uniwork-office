@@ -40,6 +40,7 @@ import {
 } from './markdownStyleRenderers'
 import { boundOrderedList, boundTable, boundTaskList } from './boundedTokenizers'
 import { WikiLink, WikiLinkResolve } from './wikilink'
+import { WikiMarkOnInput } from './wikilinkInput'
 import type { WikiLinkOptions } from './wikilink'
 import type { SlashController, SlashItem } from './slashCommand'
 import { t } from '../i18n/locale'
@@ -143,6 +144,7 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     // links open externally via main-process guard
     ImageAwareLink.configure({ openOnClick: false }),
     WikiLink,
+    WikiMarkOnInput,
     WikiLinkResolve.configure(options.wikiLink ?? {}),
     BlockDragHandle,
     BlockKeymap,
