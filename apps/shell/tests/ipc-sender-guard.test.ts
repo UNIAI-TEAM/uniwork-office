@@ -230,13 +230,17 @@ describe.each(FAMILIES)('%s channel %s (%s)', (_family, channel, policy) => {
             throw new Error('Render frame was disposed before WebFrameMain could be accessed')
           },
         }
-        return { sender: { ...s, mainFrame: frame }, senderFrame: frame }
+        s.mainFrame = frame
+        return { sender: s, senderFrame: frame }
       },
       'destroyed',
     ],
     [
       'foreign origin in the trusted window',
-      (s: FakeSender) => mainFrameEvent({ ...s, mainFrame: fakeFrame(FOREIGN_URL) }),
+      (s: FakeSender) => {
+        s.mainFrame = fakeFrame(FOREIGN_URL)
+        return mainFrameEvent(s)
+      },
       'origin',
     ],
     ['other window', () => mainFrameEvent(fakeSender(OTHER_ID, SHELL_URL)), 'unknown-sender'],
@@ -333,7 +337,8 @@ describe('refusal shapes and logging', () => {
   it('logs channel and reason only, once per channel+reason per 60 s', async () => {
     const ctx = registerHandle('uniwork-doc:list')
     const secret = { path: '/home/user/secret.docx', accountId: 'acc_1' }
-    const foreign = mainFrameEvent({ ...ctx.shell, mainFrame: fakeFrame(FOREIGN_URL) })
+    ctx.shell.mainFrame = fakeFrame(FOREIGN_URL)
+    const foreign = mainFrameEvent(ctx.shell)
     const refuse = () =>
       expect(async () => ctx.call(foreign, secret)).rejects.toThrow(IPC_SENDER_REFUSED)
 
