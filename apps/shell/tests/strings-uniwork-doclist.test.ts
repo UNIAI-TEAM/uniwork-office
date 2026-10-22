@@ -104,3 +104,75 @@ describe('uniwork doclist string shard', () => {
     expect(all.filter((v) => /\b(UNI|GO)-\d+\b|\bgit(hub)?\b/i.test(v))).toEqual([])
   })
 })
+
+// UNI-2078 slice 1: the copy dialog's copy (web documents.copy.*, vi/en verbatim)
+describe('the copy dialog strings (UNI-2078)', () => {
+  const COPY_KEYS = [
+    'dlCopyTitle',
+    'dlCopyDescription',
+    'dlCopyTitleLabel',
+    'dlCopyTitlePlaceholder',
+    'dlCopyConsentLabel',
+    'dlCopyConsentHint',
+    'dlCopySubmit',
+    'dlCopySubmitting',
+    'dlCopyFailed',
+    'dlCopyDone',
+    'dlCopyUnavailable',
+  ]
+
+  it.each([...LANGS])('locale %s has every copy key with copy', (lang) => {
+    for (const key of COPY_KEYS) expect(table(lang)[key]?.trim(), `${lang}.${key}`).toBeTruthy()
+  })
+
+  it('the placeholder carries {title} and done carries {title} in every locale', () => {
+    for (const lang of LANGS) {
+      expect(table(lang).dlCopyTitlePlaceholder).toContain('{title}')
+      expect(table(lang).dlCopyDone).toContain('{title}')
+    }
+  })
+
+  it('vi is the web wording, verbatim', () => {
+    const vi = table('vi')
+    expect(vi.dlCopyTitle).toBe('Tạo bản sao')
+    expect(vi.dlCopyDescription).toBe(
+      'Bản sao là tài liệu mới, giữ nguyên quyền và nguồn gốc của tài liệu này; bytes dùng chung nên không tính dung lượng lần hai.',
+    )
+    expect(vi.dlCopyTitleLabel).toBe('Tên bản sao')
+    expect(vi.dlCopyTitlePlaceholder).toBe('{title} (bản sao)')
+    expect(vi.dlCopyConsentLabel).toBe('Tôi hiểu bản sao giữ nguyên quyền của nguồn')
+    expect(vi.dlCopyConsentHint).toBe(
+      'Bản sao không mở rộng quyền cho ai và không sửa tài liệu gốc.',
+    )
+    expect(vi.dlCopySubmit).toBe('Tạo bản sao')
+    expect(vi.dlCopySubmitting).toBe('Đang tạo bản sao…')
+    expect(vi.dlCopyFailed).toBe('Không tạo được bản sao. Chưa có gì thay đổi.')
+    expect(vi.dlCopyDone).toBe('Đã tạo bản sao "{title}"')
+    expect(vi.dlCopyUnavailable).toBe('Bản triển khai này chưa có chức năng tạo bản sao.')
+  })
+
+  it('en is the web wording, verbatim', () => {
+    const en = table('en')
+    expect(en.dlCopyTitle).toBe('Create a copy')
+    expect(en.dlCopyDescription).toBe(
+      "The copy is a new document that keeps this document's access and provenance; the bytes are shared, so storage is counted once.",
+    )
+    expect(en.dlCopyTitleLabel).toBe('Copy title')
+    expect(en.dlCopyTitlePlaceholder).toBe('{title} (copy)')
+    expect(en.dlCopyConsentLabel).toBe("I understand the copy keeps the source's access")
+    expect(en.dlCopyConsentHint).toBe("The copy widens nobody's access and never edits the source.")
+    expect(en.dlCopySubmit).toBe('Create copy')
+    expect(en.dlCopySubmitting).toBe('Creating the copy…')
+    expect(en.dlCopyFailed).toBe('Could not create the copy. Nothing changed.')
+    expect(en.dlCopyDone).toBe('Created the copy "{title}"')
+    expect(en.dlCopyUnavailable).toBe('This deployment does not have the copy feature yet.')
+  })
+
+  it('the other 19 locales are translated, not an English copy', () => {
+    const en = table('en')
+    const same = LANGS.filter((l) => l !== 'en').filter(
+      (l) => table(l).dlCopyDescription === en.dlCopyDescription,
+    )
+    expect(same).toEqual([])
+  })
+})

@@ -125,4 +125,16 @@ export const ko = {
   dlSideSourceEmail: '이메일',
   dlSideSourceTask: '작업',
   dlSearchNoResults: '“{query}”에 대한 결과가 없습니다',
+  dlCopyTitle: '사본 만들기',
+  dlCopyDescription:
+    '사본은 원본 문서의 접근 권한과 출처를 유지하는 새 문서입니다. 데이터는 공유되므로 저장 공간은 한 번만 계산됩니다.',
+  dlCopyTitleLabel: '사본 제목',
+  dlCopyTitlePlaceholder: '{title} (사본)',
+  dlCopyConsentLabel: '사본이 원본의 접근 권한을 유지한다는 것을 이해합니다',
+  dlCopyConsentHint: '사본은 누구의 접근 권한도 넓히지 않으며, 원본을 편집하지도 않습니다.',
+  dlCopySubmit: '사본 만들기',
+  dlCopySubmitting: '사본을 만드는 중…',
+  dlCopyFailed: '사본을 만들 수 없습니다. 아무것도 변경되지 않았습니다.',
+  dlCopyDone: '"{title}" 사본을 만들었습니다',
+  dlCopyUnavailable: '이 배포 환경에는 아직 사본 기능이 없습니다.',
 } satisfies Record<keyof typeof zh, string>

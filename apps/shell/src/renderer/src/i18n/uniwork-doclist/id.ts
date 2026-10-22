@@ -124,4 +124,16 @@ export const id = {
   dlSideSourceEmail: 'Email',
   dlSideSourceTask: 'Tugas',
   dlSearchNoResults: 'Tidak ada hasil untuk “{query}”',
+  dlCopyTitle: 'Buat salinan',
+  dlCopyDescription:
+    'Salinan adalah dokumen baru yang mempertahankan akses dan asal-usul dokumen ini; datanya dibagikan, sehingga penyimpanan hanya dihitung sekali.',
+  dlCopyTitleLabel: 'Judul salinan',
+  dlCopyTitlePlaceholder: '{title} (salinan)',
+  dlCopyConsentLabel: 'Saya memahami bahwa salinan mempertahankan akses sumber',
+  dlCopyConsentHint: 'Salinan tidak memperluas akses siapa pun dan tidak pernah mengubah sumber.',
+  dlCopySubmit: 'Buat salinan',
+  dlCopySubmitting: 'Membuat salinan…',
+  dlCopyFailed: 'Tidak dapat membuat salinan. Tidak ada yang berubah.',
+  dlCopyDone: 'Salinan "{title}" dibuat',
+  dlCopyUnavailable: 'Instalasi ini belum memiliki fitur salinan.',
 } satisfies Record<keyof typeof zh, string>

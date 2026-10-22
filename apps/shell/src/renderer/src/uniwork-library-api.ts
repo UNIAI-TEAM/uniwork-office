@@ -8,6 +8,7 @@ import type {
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkFolderQuery,
+  UniworkCopyDocumentInput,
   UniworkMoveDocumentInput,
   UniworkMoveResult,
   UniworkResult,
@@ -218,6 +219,35 @@ export function getArchiveImpact(
 
 export function restoreDocument(documentId: string): Promise<DocActionResult<unknown>> {
   return actions().uniworkRestoreDocument?.(documentId) ?? Promise.resolve(unavailable)
+}
+
+// ── UNI-2078: Make a copy ───────────────────────────────
+
+interface CopyBridge {
+  uniworkCopyDocument?(input: UniworkCopyDocumentInput): Promise<DocActionResult<UniworkDocSummary>>
+}
+
+function copyActions(): CopyBridge | undefined {
+  return window.aiOffice as unknown as CopyBridge | undefined
+}
+
+/** whether this shell has the copy call (an older preload has no Make a copy entry at all) */
+export function canCopyDocuments(): boolean {
+  return typeof copyActions()?.uniworkCopyDocument === 'function'
+}
+
+/**
+ * Make a plain copy of a file document (workspace root, the source's access). A shell without the
+ * call answers like a deployment without the route (`endpointMissing`), a rejected call is `network`.
+ */
+export function copyDocument(
+  input: UniworkCopyDocumentInput,
+): Promise<DocActionResult<UniworkDocSummary>> {
+  const bridge = copyActions()
+  if (typeof bridge?.uniworkCopyDocument !== 'function') {
+    return Promise.resolve({ ok: false, error: 'server_error', endpointMissing: true })
+  }
+  return settleAct(bridge.uniworkCopyDocument(input))
 }
 
 // ── Folder tree (FD-11) ─────────────────────────────────

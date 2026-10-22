@@ -128,4 +128,16 @@ export const es = {
   dlSideSourceEmail: 'Correo',
   dlSideSourceTask: 'Tareas',
   dlSearchNoResults: 'Sin resultados para «{query}»',
+  dlCopyTitle: 'Crear una copia',
+  dlCopyDescription:
+    'La copia es un documento nuevo que mantiene los permisos de acceso y el origen de este documento; los datos se comparten, así que el almacenamiento se cuenta una sola vez.',
+  dlCopyTitleLabel: 'Título de la copia',
+  dlCopyTitlePlaceholder: '{title} (copia)',
+  dlCopyConsentLabel: 'Entiendo que la copia mantiene los permisos del original',
+  dlCopyConsentHint: 'La copia no amplía el acceso de nadie y nunca modifica el original.',
+  dlCopySubmit: 'Crear copia',
+  dlCopySubmitting: 'Creando la copia…',
+  dlCopyFailed: 'No se pudo crear la copia. No se cambió nada.',
+  dlCopyDone: 'Se creó la copia "{title}"',
+  dlCopyUnavailable: 'Esta instalación todavía no tiene la función de copia.',
 } satisfies Record<keyof typeof zh, string>

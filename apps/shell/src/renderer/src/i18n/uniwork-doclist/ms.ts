@@ -126,4 +126,16 @@ export const ms = {
   dlSideSourceEmail: 'E-mel',
   dlSideSourceTask: 'Tugasan',
   dlSearchNoResults: 'Tiada hasil untuk “{query}”',
+  dlCopyTitle: 'Cipta salinan',
+  dlCopyDescription:
+    'Salinan ialah dokumen baharu yang mengekalkan akses dan asal usul dokumen ini; data dikongsi, jadi storan dikira sekali sahaja.',
+  dlCopyTitleLabel: 'Tajuk salinan',
+  dlCopyTitlePlaceholder: '{title} (salinan)',
+  dlCopyConsentLabel: 'Saya faham salinan itu mengekalkan akses sumber',
+  dlCopyConsentHint: 'Salinan tidak meluaskan akses sesiapa dan tidak sekali-kali mengedit sumber.',
+  dlCopySubmit: 'Cipta salinan',
+  dlCopySubmitting: 'Mencipta salinan…',
+  dlCopyFailed: 'Tidak dapat mencipta salinan. Tiada perubahan dibuat.',
+  dlCopyDone: 'Salinan "{title}" dicipta',
+  dlCopyUnavailable: 'Pelaksanaan ini belum mempunyai ciri salinan.',
 } satisfies Record<keyof typeof zh, string>

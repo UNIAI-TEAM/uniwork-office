@@ -124,4 +124,16 @@ export const th = {
   dlSideSourceEmail: 'อีเมล',
   dlSideSourceTask: 'งาน',
   dlSearchNoResults: 'ไม่พบผลลัพธ์สำหรับ “{query}”',
+  dlCopyTitle: 'สร้างสำเนา',
+  dlCopyDescription:
+    'สำเนาคือเอกสารใหม่ที่คงสิทธิ์การเข้าถึงและประวัติที่มาของเอกสารนี้ไว้ ข้อมูลจะใช้ร่วมกัน จึงนับพื้นที่จัดเก็บเพียงครั้งเดียว',
+  dlCopyTitleLabel: 'ชื่อสำเนา',
+  dlCopyTitlePlaceholder: '{title} (สำเนา)',
+  dlCopyConsentLabel: 'ฉันเข้าใจว่าสำเนาจะคงสิทธิ์การเข้าถึงของต้นฉบับไว้',
+  dlCopyConsentHint: 'สำเนาไม่ได้เพิ่มสิทธิ์การเข้าถึงให้ใคร และจะไม่แก้ไขต้นฉบับเลย',
+  dlCopySubmit: 'สร้างสำเนา',
+  dlCopySubmitting: 'กำลังสร้างสำเนา…',
+  dlCopyFailed: 'ไม่สามารถสร้างสำเนาได้ ไม่มีการเปลี่ยนแปลงใด ๆ',
+  dlCopyDone: 'สร้างสำเนา "{title}" แล้ว',
+  dlCopyUnavailable: 'การติดตั้งนี้ยังไม่มีฟีเจอร์สร้างสำเนา',
 } satisfies Record<keyof typeof zh, string>

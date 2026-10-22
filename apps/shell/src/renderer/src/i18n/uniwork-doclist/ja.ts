@@ -126,4 +126,17 @@ export const ja = {
   dlSideSourceEmail: 'メール',
   dlSideSourceTask: 'タスク',
   dlSearchNoResults: '「{query}」に一致する結果はありません',
+  dlCopyTitle: 'コピーの作成',
+  dlCopyDescription:
+    'コピーは、このドキュメントのアクセス権と出所を引き継いだ新しいドキュメントです。データは共有されるため、ストレージは一度だけ計上されます。',
+  dlCopyTitleLabel: 'コピーのタイトル',
+  dlCopyTitlePlaceholder: '{title}（コピー）',
+  dlCopyConsentLabel: 'コピーは元のドキュメントのアクセス権を引き継ぐことを理解しました',
+  dlCopyConsentHint:
+    'コピーによって誰のアクセス権も広がることはなく、元のドキュメントが編集されることもありません。',
+  dlCopySubmit: 'コピーを作成',
+  dlCopySubmitting: 'コピーを作成しています…',
+  dlCopyFailed: 'コピーを作成できませんでした。何も変更されていません。',
+  dlCopyDone: 'コピー "{title}" を作成しました',
+  dlCopyUnavailable: 'このデプロイ環境では、コピー機能はまだ利用できません。',
 } satisfies Record<keyof typeof zh, string>

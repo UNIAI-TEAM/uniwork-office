@@ -258,3 +258,92 @@ describe('row menu: the destructive item is last, red, and asks first', () => {
     expect(menu('workspace', doc({ canEdit: true })).some((i) => i.danger)).toBe(false)
   })
 })
+
+// UNI-2078 slice 1: Make a copy (web row-menu id `duplicate`)
+describe('row menu: Make a copy (UNI-2078)', () => {
+  const WITH_COPY: RowMenuActionId[] = [...ALL, 'duplicate']
+  const EDITOR = doc({ canEdit: true, myLevel: 'edit' })
+
+  it('sits in the edit group right after Move, before Shelve and Trash', () => {
+    const items = menu('workspace', MANAGER, { run: WITH_COPY })
+    expect(ids(items)).toEqual([
+      'open',
+      'offline',
+      'copy-link',
+      'rename',
+      'move',
+      'duplicate',
+      'shelve',
+      'trash',
+    ])
+    const of = (id: string) => items.find((i) => i.id === id)!.group
+    expect(of('duplicate')).toBe(of('move'))
+  })
+
+  it('uses the existing "Make a copy" label key and is neither danger nor confirm', () => {
+    const item = menu('workspace', EDITOR, { run: WITH_COPY }).find((i) => i.id === 'duplicate')!
+    expect(item.label).toBe('dlActDuplicate')
+    expect(item.danger).toBeUndefined()
+    expect(item.confirm).toBeUndefined()
+  })
+
+  it.each<DocListScreen>(['workspace', 'recent', 'shared', 'shared-by-me'])(
+    '%s: an editor of a live file is offered it',
+    (screen) => {
+      expect(ids(menu(screen, EDITOR, { run: WITH_COPY }))).toContain('duplicate')
+    },
+  )
+
+  it('is offered to an edit-level person who cannot manage', () => {
+    expect(ids(menu('workspace', EDITOR, { run: WITH_COPY }))).toContain('duplicate')
+  })
+
+  it('is hidden for a view-level row and for an unknown level', () => {
+    expect(
+      ids(menu('workspace', doc({ canEdit: false, myLevel: 'view' }), { run: WITH_COPY })),
+    ).not.toContain('duplicate')
+    expect(ids(menu('workspace', doc(), { run: WITH_COPY }))).not.toContain('duplicate')
+  })
+
+  it.each(['folder', 'page'] as const)('is hidden for a %s', (kind) => {
+    expect(ids(menu('workspace', { ...MANAGER, kind }, { run: WITH_COPY }))).not.toContain(
+      'duplicate',
+    )
+  })
+
+  it('is hidden for another module’s document (ownerKind set): the server needs the owner seam', () => {
+    expect(
+      ids(menu('workspace', { ...MANAGER, ownerKind: 'work_product' }, { run: WITH_COPY })),
+    ).not.toContain('duplicate')
+  })
+
+  it('is hidden for a shelved row on the workspace screen and on the shelf screen', () => {
+    const shelved = { ...MANAGER, shelvedAt: '2026-10-20T00:00:00Z' }
+    expect(ids(menu('workspace', shelved, { run: WITH_COPY }))).not.toContain('duplicate')
+    expect(ids(menu('shelved', MANAGER, { run: WITH_COPY }))).not.toContain('duplicate')
+  })
+
+  it('is hidden on the trash screen and for a trashed row anywhere', () => {
+    expect(ids(menu('trash', MANAGER, { run: WITH_COPY }))).not.toContain('duplicate')
+    expect(
+      ids(menu('workspace', { ...MANAGER, archived: true }, { run: WITH_COPY })),
+    ).not.toContain('duplicate')
+  })
+
+  it('has no entry when the host gives the menu no handler', () => {
+    expect(ids(menu('workspace', MANAGER))).not.toContain('duplicate')
+  })
+
+  it('runs the handler on select', () => {
+    const run = { open: vi.fn(), duplicate: vi.fn() }
+    const items = buildRowMenu({
+      screen: 'workspace',
+      doc: EDITOR,
+      run,
+      offlineLabel: null,
+      label: (key: StringKey) => key,
+    })
+    items.find((i) => i.id === 'duplicate')!.onSelect()
+    expect(run.duplicate).toHaveBeenCalledTimes(1)
+  })
+})

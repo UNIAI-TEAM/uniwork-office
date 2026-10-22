@@ -125,4 +125,17 @@ export const hi = {
   dlSideSourceEmail: 'ईमेल',
   dlSideSourceTask: 'कार्य',
   dlSearchNoResults: '“{query}” के लिए कोई परिणाम नहीं मिला',
+  dlCopyTitle: 'प्रतिलिपि बनाएं',
+  dlCopyDescription:
+    'प्रतिलिपि एक नया दस्तावेज़ है जो इस दस्तावेज़ की पहुँच और मूल स्रोत को बनाए रखता है; डेटा साझा होता है, इसलिए स्टोरेज एक बार ही गिना जाता है।',
+  dlCopyTitleLabel: 'प्रतिलिपि का शीर्षक',
+  dlCopyTitlePlaceholder: '{title} (प्रतिलिपि)',
+  dlCopyConsentLabel: 'मैं समझता हूँ कि प्रतिलिपि स्रोत की पहुँच बनाए रखती है',
+  dlCopyConsentHint:
+    'प्रतिलिपि किसी की पहुँच नहीं बढ़ाती और स्रोत दस्तावेज़ को कभी संपादित नहीं करती।',
+  dlCopySubmit: 'प्रतिलिपि बनाएं',
+  dlCopySubmitting: 'प्रतिलिपि बनाई जा रही है…',
+  dlCopyFailed: 'प्रतिलिपि नहीं बनाई जा सकी। कुछ भी नहीं बदला गया।',
+  dlCopyDone: 'प्रतिलिपि "{title}" बनाई गई',
+  dlCopyUnavailable: 'इस डिप्लॉयमेंट में अभी प्रतिलिपि सुविधा उपलब्ध नहीं है।',
 } satisfies Record<keyof typeof zh, string>

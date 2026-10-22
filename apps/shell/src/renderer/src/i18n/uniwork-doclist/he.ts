@@ -124,4 +124,16 @@ export const he = {
   dlSideSourceEmail: 'אימייל',
   dlSideSourceTask: 'משימות',
   dlSearchNoResults: 'אין תוצאות עבור “{query}”',
+  dlCopyTitle: 'יצירת עותק',
+  dlCopyDescription:
+    'העותק הוא מסמך חדש ששומר על ההרשאות ועל מקור המסמך; התוכן משותף, ולכן נפח האחסון נספר פעם אחת.',
+  dlCopyTitleLabel: 'כותרת העותק',
+  dlCopyTitlePlaceholder: '{title} (עותק)',
+  dlCopyConsentLabel: 'אני מבין שהעותק שומר על ההרשאות של המקור',
+  dlCopyConsentHint: 'העותק אינו מרחיב את ההרשאות של איש ואינו משנה את המקור.',
+  dlCopySubmit: 'צור עותק',
+  dlCopySubmitting: 'יוצר את העותק…',
+  dlCopyFailed: 'לא ניתן ליצור את העותק. דבר לא השתנה.',
+  dlCopyDone: 'נוצר העותק "{title}"',
+  dlCopyUnavailable: 'הפריסה הזו עדיין אינה כוללת את תכונת יצירת העותק.',
 } satisfies Record<keyof typeof zh, string>

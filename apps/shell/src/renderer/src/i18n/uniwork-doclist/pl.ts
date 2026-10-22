@@ -126,4 +126,16 @@ export const pl = {
   dlSideSourceEmail: 'E-mail',
   dlSideSourceTask: 'Zadania',
   dlSearchNoResults: 'Brak wyników dla „{query}”',
+  dlCopyTitle: 'Utwórz kopię',
+  dlCopyDescription:
+    'Kopia to nowy dokument, który zachowuje dostęp i pochodzenie tego dokumentu; dane są współdzielone, więc miejsce na dysku liczy się tylko raz.',
+  dlCopyTitleLabel: 'Tytuł kopii',
+  dlCopyTitlePlaceholder: '{title} (kopia)',
+  dlCopyConsentLabel: 'Rozumiem, że kopia zachowuje dostęp źródła',
+  dlCopyConsentHint: 'Kopia nie rozszerza niczyjego dostępu i nigdy nie edytuje źródła.',
+  dlCopySubmit: 'Utwórz kopię',
+  dlCopySubmitting: 'Tworzenie kopii…',
+  dlCopyFailed: 'Nie udało się utworzyć kopii. Nic nie zostało zmienione.',
+  dlCopyDone: 'Utworzono kopię "{title}"',
+  dlCopyUnavailable: 'Ta wersja jeszcze nie ma funkcji kopiowania.',
 } satisfies Record<keyof typeof zh, string>

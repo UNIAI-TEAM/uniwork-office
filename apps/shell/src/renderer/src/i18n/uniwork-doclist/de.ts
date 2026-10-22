@@ -129,4 +129,16 @@ export const de = {
   dlSideSourceEmail: 'E-Mail',
   dlSideSourceTask: 'Aufgaben',
   dlSearchNoResults: 'Keine Treffer für „{query}“',
+  dlCopyTitle: 'Kopie erstellen',
+  dlCopyDescription:
+    'Die Kopie ist ein neues Dokument, das Zugriffsrechte und Herkunft dieses Dokuments übernimmt. Die Inhalte werden gemeinsam genutzt, daher wird der Speicherplatz nur einmal gezählt.',
+  dlCopyTitleLabel: 'Titel der Kopie',
+  dlCopyTitlePlaceholder: '{title} (Kopie)',
+  dlCopyConsentLabel: 'Mir ist bewusst, dass die Kopie die Zugriffsrechte des Originals behält',
+  dlCopyConsentHint: 'Die Kopie erweitert niemandes Zugriffsrechte und verändert das Original nie.',
+  dlCopySubmit: 'Kopie erstellen',
+  dlCopySubmitting: 'Kopie wird erstellt…',
+  dlCopyFailed: 'Die Kopie konnte nicht erstellt werden. Es wurde nichts geändert.',
+  dlCopyDone: 'Kopie "{title}" erstellt',
+  dlCopyUnavailable: 'Diese Bereitstellung unterstützt die Kopierfunktion noch nicht.',
 } satisfies Record<keyof typeof zh, string>

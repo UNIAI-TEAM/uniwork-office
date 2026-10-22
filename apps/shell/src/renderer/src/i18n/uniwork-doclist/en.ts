@@ -124,4 +124,16 @@ export const en = {
   dlSideSourceEmail: 'Email',
   dlSideSourceTask: 'Tasks',
   dlSearchNoResults: 'No results for “{query}”',
+  dlCopyTitle: 'Create a copy',
+  dlCopyDescription:
+    "The copy is a new document that keeps this document's access and provenance; the bytes are shared, so storage is counted once.",
+  dlCopyTitleLabel: 'Copy title',
+  dlCopyTitlePlaceholder: '{title} (copy)',
+  dlCopyConsentLabel: "I understand the copy keeps the source's access",
+  dlCopyConsentHint: "The copy widens nobody's access and never edits the source.",
+  dlCopySubmit: 'Create copy',
+  dlCopySubmitting: 'Creating the copy…',
+  dlCopyFailed: 'Could not create the copy. Nothing changed.',
+  dlCopyDone: 'Created the copy "{title}"',
+  dlCopyUnavailable: 'This deployment does not have the copy feature yet.',
 } satisfies Record<keyof typeof zh, string>

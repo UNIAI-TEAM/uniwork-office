@@ -126,4 +126,16 @@ export const ru = {
   dlSideSourceEmail: 'Почта',
   dlSideSourceTask: 'Задачи',
   dlSearchNoResults: 'Ничего не найдено по запросу «{query}»',
+  dlCopyTitle: 'Создать копию',
+  dlCopyDescription:
+    'Копия — это новый документ, который сохраняет доступ и происхождение исходного документа; данные общие, поэтому место в хранилище учитывается один раз.',
+  dlCopyTitleLabel: 'Название копии',
+  dlCopyTitlePlaceholder: '{title} (копия)',
+  dlCopyConsentLabel: 'Я понимаю, что копия сохраняет доступ исходного документа',
+  dlCopyConsentHint: 'Копия никому не расширяет доступ и никогда не изменяет исходный документ.',
+  dlCopySubmit: 'Создать копию',
+  dlCopySubmitting: 'Создание копии…',
+  dlCopyFailed: 'Не удалось создать копию. Ничего не изменилось.',
+  dlCopyDone: 'Создана копия "{title}"',
+  dlCopyUnavailable: 'В этой версии пока нет функции копирования.',
 } satisfies Record<keyof typeof zh, string>

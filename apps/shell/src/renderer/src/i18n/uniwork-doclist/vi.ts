@@ -125,4 +125,16 @@ export const vi = {
   dlSideSourceEmail: 'Email',
   dlSideSourceTask: 'Công việc',
   dlSearchNoResults: 'Không có kết quả cho “{query}”',
+  dlCopyTitle: 'Tạo bản sao',
+  dlCopyDescription:
+    'Bản sao là tài liệu mới, giữ nguyên quyền và nguồn gốc của tài liệu này; bytes dùng chung nên không tính dung lượng lần hai.',
+  dlCopyTitleLabel: 'Tên bản sao',
+  dlCopyTitlePlaceholder: '{title} (bản sao)',
+  dlCopyConsentLabel: 'Tôi hiểu bản sao giữ nguyên quyền của nguồn',
+  dlCopyConsentHint: 'Bản sao không mở rộng quyền cho ai và không sửa tài liệu gốc.',
+  dlCopySubmit: 'Tạo bản sao',
+  dlCopySubmitting: 'Đang tạo bản sao…',
+  dlCopyFailed: 'Không tạo được bản sao. Chưa có gì thay đổi.',
+  dlCopyDone: 'Đã tạo bản sao "{title}"',
+  dlCopyUnavailable: 'Bản triển khai này chưa có chức năng tạo bản sao.',
 } satisfies Record<keyof typeof zh, string>

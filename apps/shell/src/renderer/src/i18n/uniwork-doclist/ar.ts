@@ -125,4 +125,16 @@ export const ar = {
   dlSideSourceEmail: 'البريد الإلكتروني',
   dlSideSourceTask: 'المهام',
   dlSearchNoResults: 'لا توجد نتائج لـ “{query}”',
+  dlCopyTitle: 'إنشاء نسخة',
+  dlCopyDescription:
+    'النسخة مستند جديد يحتفظ بصلاحيات الوصول وبيانات المصدر لهذا المستند؛ البيانات مشتركة، لذا تُحتسب مساحة التخزين مرة واحدة.',
+  dlCopyTitleLabel: 'عنوان النسخة',
+  dlCopyTitlePlaceholder: '{title} (نسخة)',
+  dlCopyConsentLabel: 'أفهم أن النسخة تحتفظ بصلاحيات وصول المصدر',
+  dlCopyConsentHint: 'لا توسّع النسخة صلاحيات أي شخص، ولا تعدّل المصدر أبدًا.',
+  dlCopySubmit: 'إنشاء نسخة',
+  dlCopySubmitting: 'جارٍ إنشاء النسخة…',
+  dlCopyFailed: 'تعذّر إنشاء النسخة. لم يتغيّر أي شيء.',
+  dlCopyDone: 'تم إنشاء النسخة "{title}"',
+  dlCopyUnavailable: 'هذا الإصدار لا يتضمن ميزة النسخ بعد.',
 } satisfies Record<keyof typeof zh, string>

@@ -151,6 +151,7 @@ import { screenOfSubView, specialPresent, wireSortOf } from '../doclist/table-mo
 import { RecentSegmentControl, useRecentSegment } from '../doclist/RecentSegment'
 import { useDocListSort } from '../doclist/use-doc-list-sort'
 import { DocumentsSourceRow } from './DocumentsSourceRow'
+import { useDocCopy } from './use-doc-copy'
 import { ListState } from '../doclist/ListState'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
@@ -1543,6 +1544,16 @@ export function DocumentsHome({
     setToast({ message: key ? t(key) : t('uwDocActionFailed'), tone: 'error' })
   }
 
+  // UNI-2078: Tạo bản sao from the row menu: toast the copy's title and refresh, no navigation
+  const docCopy = useDocCopy({
+    onCopied: (title) => {
+      const message = t('dlCopyDone', { title })
+      announce(message)
+      setToast({ message, tone: 'ok' })
+      refreshAll()
+    },
+  })
+
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf's member filter and row commands.
   // The filter narrows the loaded pages only (the server has no shelved_by).
   const shelfView = subView === 'archive' && query.length === 0
@@ -1951,6 +1962,8 @@ export function DocumentsHome({
             parentId: currentParentOf(doc),
             title: doc.title,
           }),
+        // no entry when this shell has no copy IPC or the deployment has no copy route
+        ...(docCopy.available ? { duplicate: () => docCopy.open(doc) } : {}),
         // UNI-2047 B6: no entry when this shell has no star IPC
         ...(canFavoriteDocuments()
           ? {
@@ -2898,6 +2911,8 @@ export function DocumentsHome({
           onCancel={() => setArchiveTarget(null)}
         />
       )}
+
+      {docCopy.dialog}
 
       {shelvedTrashTarget && (
         <ArchiveConfirm

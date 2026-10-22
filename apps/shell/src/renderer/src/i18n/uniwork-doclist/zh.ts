@@ -122,4 +122,16 @@ export const zh = {
   dlSideSourceEmail: '邮件',
   dlSideSourceTask: '任务',
   dlSearchNoResults: '没有找到“{query}”的结果',
+  dlCopyTitle: '创建副本',
+  dlCopyDescription:
+    '副本是一份新文档，沿用本文档的访问权限和来源；文件内容共用，因此存储空间只计一次。',
+  dlCopyTitleLabel: '副本标题',
+  dlCopyTitlePlaceholder: '{title}（副本）',
+  dlCopyConsentLabel: '我了解副本会沿用原文档的访问权限',
+  dlCopyConsentHint: '副本不会扩大任何人的访问权限，也不会修改原文档。',
+  dlCopySubmit: '创建副本',
+  dlCopySubmitting: '正在创建副本…',
+  dlCopyFailed: '无法创建副本。未做任何更改。',
+  dlCopyDone: '已创建副本“{title}”',
+  dlCopyUnavailable: '此部署暂不支持创建副本。',
 }

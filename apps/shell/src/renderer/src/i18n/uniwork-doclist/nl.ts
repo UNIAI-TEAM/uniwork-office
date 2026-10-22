@@ -129,4 +129,16 @@ export const nl = {
   dlSideSourceEmail: 'E-mail',
   dlSideSourceTask: 'Taken',
   dlSearchNoResults: 'Geen resultaten voor “{query}”',
+  dlCopyTitle: 'Kopie maken',
+  dlCopyDescription:
+    'De kopie is een nieuw document dat de toegang en herkomst van dit document behoudt; de inhoud wordt gedeeld, dus opslagruimte wordt één keer geteld.',
+  dlCopyTitleLabel: 'Titel van de kopie',
+  dlCopyTitlePlaceholder: '{title} (kopie)',
+  dlCopyConsentLabel: 'Ik begrijp dat de kopie de toegang van het origineel behoudt',
+  dlCopyConsentHint: 'De kopie vergroot niemands toegang en wijzigt het origineel nooit.',
+  dlCopySubmit: 'Kopie maken',
+  dlCopySubmitting: 'Kopie wordt gemaakt…',
+  dlCopyFailed: 'De kopie kon niet worden gemaakt. Er is niets gewijzigd.',
+  dlCopyDone: 'Kopie "{title}" gemaakt',
+  dlCopyUnavailable: 'Deze implementatie heeft de kopieerfunctie nog niet.',
 } satisfies Record<keyof typeof zh, string>

@@ -126,4 +126,16 @@ export const pt = {
   dlSideSourceEmail: 'E-mail',
   dlSideSourceTask: 'Tarefas',
   dlSearchNoResults: 'Nenhum resultado para “{query}”',
+  dlCopyTitle: 'Criar cópia',
+  dlCopyDescription:
+    'A cópia é um novo documento que mantém o acesso e a procedência deste documento; os dados são compartilhados, então o armazenamento é contado uma única vez.',
+  dlCopyTitleLabel: 'Título da cópia',
+  dlCopyTitlePlaceholder: '{title} (cópia)',
+  dlCopyConsentLabel: 'Entendo que a cópia mantém o acesso da origem',
+  dlCopyConsentHint: 'A cópia não amplia o acesso de ninguém e nunca altera a origem.',
+  dlCopySubmit: 'Criar cópia',
+  dlCopySubmitting: 'Criando a cópia…',
+  dlCopyFailed: 'Não foi possível criar a cópia. Nada foi alterado.',
+  dlCopyDone: 'Cópia "{title}" criada',
+  dlCopyUnavailable: 'Esta implantação ainda não tem o recurso de cópia.',
 } satisfies Record<keyof typeof zh, string>

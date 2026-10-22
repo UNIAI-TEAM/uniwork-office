@@ -126,4 +126,16 @@ export const cs = {
   dlSideSourceEmail: 'E-mail',
   dlSideSourceTask: 'Úkoly',
   dlSearchNoResults: 'Nic nenalezeno pro „{query}“',
+  dlCopyTitle: 'Vytvořit kopii',
+  dlCopyDescription:
+    'Kopie je nový dokument, který zachovává přístup a původ tohoto dokumentu; obsah je sdílený, takže úložiště se počítá jednou.',
+  dlCopyTitleLabel: 'Název kopie',
+  dlCopyTitlePlaceholder: '{title} (kopie)',
+  dlCopyConsentLabel: 'Rozumím, že kopie zachovává přístup zdrojového dokumentu',
+  dlCopyConsentHint: 'Kopie nikomu nerozšiřuje přístup a zdrojový dokument nikdy neupravuje.',
+  dlCopySubmit: 'Vytvořit kopii',
+  dlCopySubmitting: 'Vytváření kopie…',
+  dlCopyFailed: 'Kopii se nepodařilo vytvořit. Nic se nezměnilo.',
+  dlCopyDone: 'Vytvořena kopie "{title}"',
+  dlCopyUnavailable: 'Tato verze zatím nemá funkci kopírování.',
 } satisfies Record<keyof typeof zh, string>

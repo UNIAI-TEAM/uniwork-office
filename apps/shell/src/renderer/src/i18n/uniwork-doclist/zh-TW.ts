@@ -123,4 +123,16 @@ export const zhTW = {
   dlSideSourceEmail: '電子郵件',
   dlSideSourceTask: '工作',
   dlSearchNoResults: '找不到「{query}」的結果',
+  dlCopyTitle: '建立副本',
+  dlCopyDescription:
+    '副本是一份新文件，沿用本文件的存取權限和來源；檔案內容共用，因此儲存空間只計一次。',
+  dlCopyTitleLabel: '副本標題',
+  dlCopyTitlePlaceholder: '{title}（副本）',
+  dlCopyConsentLabel: '我了解副本會沿用原文件的存取權限',
+  dlCopyConsentHint: '副本不會擴大任何人的存取權限，也不會修改原文件。',
+  dlCopySubmit: '建立副本',
+  dlCopySubmitting: '正在建立副本…',
+  dlCopyFailed: '無法建立副本。未做任何變更。',
+  dlCopyDone: '已建立副本「{title}」',
+  dlCopyUnavailable: '此部署暫不支援建立副本。',
 } satisfies Record<keyof typeof zh, string>
