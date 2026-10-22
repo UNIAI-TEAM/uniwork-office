@@ -41,6 +41,10 @@ export const ko = {
   wbNotif_document_shared_untitled: '{actor}님이 문서를 회원님과 공유했습니다({level}).',
   wbNotif_document_shared_nolevel: '{actor}님이 “{document}”을(를) 회원님과 공유했습니다.',
   wbNotif_document_shared_untitled_nolevel: '{actor}님이 문서를 회원님과 공유했습니다.',
+  wbNotif_document_owner_transferred:
+    '{actor}님이 “{document}”의 소유권을 회원님에게 이전했습니다.',
+  wbNotif_document_owner_transferred_untitled:
+    '{actor}님이 문서의 소유권을 회원님에게 이전했습니다.',
   wbNotif_document_trashed_by_other:
     '{actor}님이 회원님의 문서를 휴지통으로 옮겼습니다. {date}까지 복원하세요',
   wbNotif_document_trashed_by_other_untitled:

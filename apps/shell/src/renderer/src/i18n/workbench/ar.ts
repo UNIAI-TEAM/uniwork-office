@@ -31,6 +31,8 @@ export const ar = {
   wbNotif_document_shared_untitled: 'شارك {actor} مستندًا معك ({level}).',
   wbNotif_document_shared_nolevel: 'شارك {actor} «{document}» معك.',
   wbNotif_document_shared_untitled_nolevel: 'شارك {actor} مستندًا معك.',
+  wbNotif_document_owner_transferred: 'نقل {actor} ملكية «{document}» إليك.',
+  wbNotif_document_owner_transferred_untitled: 'نقل {actor} ملكية مستند إليك.',
   wbNotif_document_trashed_by_other: 'نقل {actor} مستندك إلى سلة المهملات. استعِده قبل {date}',
   wbNotif_document_trashed_by_other_untitled:
     'نقل {actor} أحد مستنداتك إلى سلة المهملات. استعِده قبل {date}',

@@ -20,6 +20,7 @@ export const DOCUMENT_KINDS = [
   'document_access_approved',
   'document_access_declined',
   'document_shared',
+  'document_owner_transferred',
   'document_trashed_by_other',
   'document_changed',
 ] as const
@@ -77,6 +78,7 @@ const KIND_CATEGORY: Readonly<Record<string, InboxCategory>> = {
   document_access_approved: 'updates',
   document_access_declined: 'updates',
   document_shared: 'updates',
+  document_owner_transferred: 'updates',
 }
 
 export function inboxCategory(kind: string): InboxCategory {
@@ -251,6 +253,7 @@ export function notePillKey(n: WorkNotification): StringKey {
     case 'document_access_declined':
       return 'wbDeskPillAccess'
     case 'document_shared':
+    case 'document_owner_transferred':
       return 'wbDeskPillShared'
     case 'document_trashed_by_other':
       return 'wbDeskPillTrash'

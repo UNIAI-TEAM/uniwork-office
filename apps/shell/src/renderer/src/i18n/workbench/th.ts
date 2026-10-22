@@ -31,6 +31,8 @@ export const th = {
   wbNotif_document_shared_untitled: '{actor} แชร์เอกสารกับคุณ ({level})',
   wbNotif_document_shared_nolevel: '{actor} แชร์ “{document}” กับคุณ',
   wbNotif_document_shared_untitled_nolevel: '{actor} แชร์เอกสารกับคุณ',
+  wbNotif_document_owner_transferred: '{actor} โอนความเป็นเจ้าของ “{document}” ให้คุณ',
+  wbNotif_document_owner_transferred_untitled: '{actor} โอนความเป็นเจ้าของเอกสารให้คุณ',
   wbNotif_document_trashed_by_other: '{actor} ย้ายเอกสารของคุณไปถังขยะ กู้คืนก่อนวันที่ {date}',
   wbNotif_document_trashed_by_other_untitled:
     '{actor} ย้ายเอกสารของคุณบางฉบับไปถังขยะ กู้คืนก่อนวันที่ {date}',

@@ -37,6 +37,9 @@ export const cs = {
   wbNotif_document_shared_untitled: '{actor} s vámi sdílel(a) dokument ({level}).',
   wbNotif_document_shared_nolevel: '{actor} s vámi sdílel(a) dokument „{document}“.',
   wbNotif_document_shared_untitled_nolevel: '{actor} s vámi sdílel(a) dokument.',
+  wbNotif_document_owner_transferred:
+    '{actor} na vás převedl(a) vlastnictví dokumentu „{document}“.',
+  wbNotif_document_owner_transferred_untitled: '{actor} na vás převedl(a) vlastnictví dokumentu.',
   wbNotif_document_trashed_by_other:
     '{actor} přesunul(a) váš dokument do koše. Obnovte jej před {date}',
   wbNotif_document_trashed_by_other_untitled:

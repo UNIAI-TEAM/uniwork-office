@@ -31,6 +31,8 @@ export const he = {
   wbNotif_document_shared_untitled: '{actor} שיתף/שיתפה איתך מסמך ({level}).',
   wbNotif_document_shared_nolevel: '{actor} שיתף/שיתפה איתך את “{document}”.',
   wbNotif_document_shared_untitled_nolevel: '{actor} שיתף/שיתפה איתך מסמך.',
+  wbNotif_document_owner_transferred: '{actor} העביר/ה אליך את הבעלות על “{document}”.',
+  wbNotif_document_owner_transferred_untitled: '{actor} העביר/ה אליך את הבעלות על מסמך.',
   wbNotif_document_trashed_by_other: '{actor} העביר/ה את המסמך שלך לאשפה. שחזר/י אותו לפני {date}',
   wbNotif_document_trashed_by_other_untitled:
     '{actor} העביר/ה אחד מהמסמכים שלך לאשפה. שחזר/י אותו לפני {date}',

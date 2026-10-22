@@ -46,6 +46,10 @@ export const ja = {
   wbNotif_document_shared_untitled: '{actor} さんがドキュメントをあなたと共有しました（{level}）。',
   wbNotif_document_shared_nolevel: '{actor} さんが “{document}” をあなたと共有しました。',
   wbNotif_document_shared_untitled_nolevel: '{actor} さんがドキュメントをあなたと共有しました。',
+  wbNotif_document_owner_transferred:
+    '{actor} さんが “{document}” の所有権をあなたに譲渡しました。',
+  wbNotif_document_owner_transferred_untitled:
+    '{actor} さんがドキュメントの所有権をあなたに譲渡しました。',
   wbNotif_document_trashed_by_other:
     '{actor} さんがあなたのドキュメントをゴミ箱に移動しました。{date} までに復元してください',
   wbNotif_document_trashed_by_other_untitled:

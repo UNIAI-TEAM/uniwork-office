@@ -51,6 +51,7 @@ const SERVER_DOCUMENT_KINDS = [
   'document_access_approved',
   'document_access_declined',
   'document_shared',
+  'document_owner_transferred',
   'document_trashed_by_other',
   'document_changed',
 ]
@@ -59,7 +60,7 @@ const en = workbenchStrings.en as Record<string, string>
 const vi = workbenchStrings.vi as Record<string, string>
 
 describe('DOCUMENT_KINDS', () => {
-  it('is the 17 document kinds the server sends', () => {
+  it('is the 18 document kinds the server sends', () => {
     expect([...DOCUMENT_KINDS].sort()).toEqual([...SERVER_DOCUMENT_KINDS].sort())
   })
 })
@@ -80,6 +81,7 @@ describe('inboxCategory', () => {
     ['document_access_approved', 'updates'],
     ['document_access_declined', 'updates'],
     ['document_shared', 'updates'],
+    ['document_owner_transferred', 'updates'],
     ['document_changed', 'updates'],
     ['document_break_glass', 'workspace'],
     ['document_trashed_by_other', 'workspace'],
@@ -273,6 +275,18 @@ describe('noticeSentence', () => {
     )
   })
 
+  it('words an ownership transfer titled and untitled, with no level clause', () => {
+    expect(noticeSentence(kindRow('document_owner_transferred')).key).toBe(
+      'wbNotif_document_owner_transferred',
+    )
+    expect(noticeSentence(kindRow('document_owner_transferred', { document: '' })).key).toBe(
+      'wbNotif_document_owner_transferred_untitled',
+    )
+    expect(
+      noticeSentence(kindRow('document_owner_transferred', { level: 'owner', document: '' })).key,
+    ).toBe('wbNotif_document_owner_transferred_untitled')
+  })
+
   it('says no deadline for a trash notice whose date cannot be read', () => {
     const date = '2026-10-30T00:00:00Z'
     expect(noticeSentence(kindRow('document_trashed_by_other', { date })).key).toBe(
@@ -340,6 +354,7 @@ describe('notePillKey', () => {
     ['document_access_approved', 'wbDeskPillAccess'],
     ['document_access_declined', 'wbDeskPillAccess'],
     ['document_shared', 'wbDeskPillShared'],
+    ['document_owner_transferred', 'wbDeskPillShared'],
     ['document_trashed_by_other', 'wbDeskPillTrash'],
     ['document_break_glass', 'wbDeskPillBreakGlass'],
   ])('%s -> %s', (kind, pill) => {
@@ -394,6 +409,7 @@ describe('noticeTarget', () => {
       'document_edit_request_answered',
       'document_edit_taken_over',
       'document_shared',
+      'document_owner_transferred',
       'document_access_approved',
     ]) {
       expect(noticeTarget(kindRow(kind, { comment_id: 'c9' }))).toEqual({
