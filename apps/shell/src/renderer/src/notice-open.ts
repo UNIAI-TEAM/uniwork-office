@@ -109,6 +109,7 @@ export async function openNotice(
       return
     }
     case 'document': {
+      // no `discussion` flag: the held reveal reaches both the editor comments panel and the shell Discussion panel
       const opened = await openUniworkDocument(
         { documentId: target.documentId, title: named, commentId: target.commentId },
         window.aiOffice,

@@ -6939,7 +6939,7 @@ html[dir='rtl'] .quick-title-row {
 }
 
 .wb-inbox-group-count {
-  margin-left: auto;
+  margin-inline-start: auto;
   color: var(--text-secondary);
   font-size: 12px;
 }
@@ -6959,7 +6959,7 @@ html[dir='rtl'] .quick-title-row {
 .wb-inbox-row {
   gap: 0;
   align-items: stretch;
-  padding: 0 8px 0 0;
+  padding-inline: 0 8px;
 }
 
 .wb-inbox-main {
@@ -6968,7 +6968,8 @@ html[dir='rtl'] .quick-title-row {
   min-width: 0;
   align-items: center;
   gap: 12px;
-  padding: 10px 8px 10px 16px;
+  padding-block: 10px;
+  padding-inline: 16px 8px;
   border: none;
   background: none;
   color: inherit;

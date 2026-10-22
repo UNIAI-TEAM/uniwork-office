@@ -152,6 +152,8 @@ function InboxList({
   filterRef.current = filter
   // a write or a new filter outdates every request that is already on its way
   const epoch = useRef(0)
+  // counts filter switches only, so a request can tell a write from a switch
+  const filterEpoch = useRef(0)
   const want = useRef({ refresh: false, older: false })
   const busy = useRef(false)
 
@@ -185,15 +187,17 @@ function InboxList({
     const cursor = stateRef.current.next
     if (!stateRef.current.rows || cursor === null) return
     const mine = epoch.current
+    const filterMine = filterEpoch.current
     setState((s) => ({ ...s, loadingOlder: true, olderError: false }))
     const result = await callWork(() =>
       window.uniworkWork.listNotifications(query({ before: cursor })),
     )
     if (!alive()) return
     if (mine !== epoch.current) {
-      // a write landed meanwhile: the list reloads first, then this page is asked for again
+      // a write landed meanwhile: the list reloads first, then this page is asked for again;
+      // a filter switch drops the request, nobody asked the new list for its second page
       setState((s) => ({ ...s, loadingOlder: false }))
-      want.current.older = true
+      if (filterMine === filterEpoch.current) want.current.older = true
       return
     }
     setState((s) =>
@@ -236,6 +240,8 @@ function InboxList({
     if (next === filter) return
     filterRef.current = next
     epoch.current++
+    filterEpoch.current++
+    want.current.older = false
     setFilter(next)
     setPins(new Map())
     setState({ ...INITIAL, switching: true })
