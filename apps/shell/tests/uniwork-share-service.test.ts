@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
-import type { UniworkShareClient } from '../src/main/uniwork-docs/share-client'
+import type { FetchLike } from '../src/main/uniwork-docs/client'
+import {
+  createUniworkShareClient,
+  type UniworkShareClient,
+} from '../src/main/uniwork-docs/share-client'
 import {
   createUniworkShareService,
   shareErrorOf,
@@ -836,10 +840,9 @@ describe('owner transfer (UNI-2078 slice 4)', () => {
       }
     })
 
-    it('a server without the route (404 / 405 / 501) is endpointMissing', async () => {
+    it('a server without the route (an envelope-less 404 / 405 / 501) is endpointMissing', async () => {
       for (const thrown of [
         new UniworkDocError('server_error', { status: 404 }),
-        new UniworkDocError('not_found', { status: 404, serverCode: 'not_found' }),
         new UniworkDocError('server_error', { status: 405 }),
         new UniworkDocError('server_error', { status: 501 }),
       ]) {
@@ -851,6 +854,25 @@ describe('owner transfer (UNI-2078 slice 4)', () => {
         })
         const res = await service(client).transferOwner({ documentId: 'doc_1', userId: 'u_an' })
         expect(res).toMatchObject({ ok: false, endpointMissing: true, status: thrown.status })
+      }
+    })
+
+    it('a coded 404 (the route is there, the document is not) is a plain failure, never endpointMissing', async () => {
+      for (const thrown of [
+        new UniworkDocError('not_found', { status: 404, serverCode: 'not_found' }),
+        new UniworkDocError('server_error', { status: 404, serverCode: 'document_not_found' }),
+        new UniworkDocError('server_error', { status: 405, serverCode: 'method_not_allowed' }),
+      ]) {
+        const client = fakeClient({
+          getDocumentShares: shares(OWNED),
+          transferDocumentOwner: vi.fn(async () => {
+            throw thrown
+          }),
+        })
+        const res = await service(client).transferOwner({ documentId: 'doc_1', userId: 'u_an' })
+        expect(res.ok).toBe(false)
+        expect(res).not.toHaveProperty('endpointMissing')
+        expect(res).toMatchObject({ status: thrown.status })
       }
     })
 
@@ -895,5 +917,86 @@ describe('owner transfer (UNI-2078 slice 4)', () => {
       expect(client.getDocumentShares).not.toHaveBeenCalled()
       expect(client.transferDocumentOwner).not.toHaveBeenCalled()
     })
+  })
+})
+
+/**
+ * BE-2 (UNI-2078 fix 1): the owner gate on the REAL share client. An admin who reaches a restricted
+ * document only through admin_scope cannot `GET /documents/{id}` (403 document_restricted); the gate
+ * reads /admin-summary instead, so the selfExcluded rule is live on the real path.
+ */
+describe('owner transfer through the real client, admin on a restricted document (BE-2)', () => {
+  const ORIGIN = 'https://uniwork.example'
+  const API = `${ORIGIN}/api/v1`
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+  function realService() {
+    const seen: string[] = []
+    const fetch = vi.fn<FetchLike>(async (url, init) => {
+      const path = url.replace(API, '').replace(/\?.*$/, '')
+      seen.push(`${init?.method ?? 'GET'} ${path}`)
+      switch (path) {
+        case '/documents/doc_1/shares':
+          return json(200, {
+            my_level: '',
+            admin_scope: true,
+            acl_owner: { user_id: 'u_owner', level: 'manage', via: 'owner' },
+            shares: [],
+            links: [],
+          })
+        case '/documents/doc_1':
+          return json(403, { error: { code: 'document_restricted', message: 'x' } })
+        case '/documents/doc_1/admin-summary':
+          return json(200, {
+            document: {
+              id: 'doc_1',
+              workspace_id: 'ws_1',
+              visibility: 'restricted',
+              archived_at: null,
+            },
+            admin_scope: true,
+            my_level: '',
+          })
+        case '/workspaces/ws_1/members':
+          return json(200, {
+            members: [{ user_id: 'u_owner' }, { user_id: 'u_an' }, { user_id: 'u_me' }],
+          })
+        case '/orgs/acme/members':
+          return json(200, {
+            members: [
+              { user_id: 'u_owner', display_name: 'Hoa', email: 'hoa@acme.test' },
+              { user_id: 'u_an', display_name: 'An Lê', email: 'an@acme.test' },
+              { user_id: 'u_me', display_name: 'Me Admin', email: 'me@acme.test' },
+            ],
+          })
+        default:
+          return json(404, { error: { code: 'not_found', message: path } })
+      }
+    })
+    const client = createUniworkShareClient({
+      apiOrigin: ORIGIN,
+      authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
+      isSignedIn: () => true,
+      fetch,
+    })
+    return { seen, svc: service(client) }
+  }
+
+  it('ownerCandidates lists the workspace members minus the owner and minus self', async () => {
+    const { svc, seen } = realService()
+    const res = await svc.ownerCandidates('doc_1')
+    expect(res).toEqual({
+      ok: true,
+      value: [{ userId: 'u_an', name: 'An Lê', email: 'an@acme.test' }],
+    })
+    expect(seen).toContain('GET /documents/doc_1/admin-summary')
+  })
+
+  it('transferOwner to self is break_glass_required and nothing is PUT', async () => {
+    const { svc, seen } = realService()
+    const res = await svc.transferOwner({ documentId: 'doc_1', userId: 'u_me' })
+    expect(res).toMatchObject({ ok: false, error: 'break_glass_required' })
+    expect(seen.some((line) => line.startsWith('PUT '))).toBe(false)
   })
 })

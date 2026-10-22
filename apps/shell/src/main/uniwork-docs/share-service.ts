@@ -450,7 +450,13 @@ export function createUniworkShareService(deps: UniworkShareServiceDeps): Uniwor
             false,
           )
         } catch (error) {
-          if (error instanceof UniworkDocError && MISSING_ROUTE_STATUSES.has(error.status ?? 0)) {
+          // a missing route answers a plain 404/405 (the router has no custom NotFound handler); a
+          // coded one came from a handler that ran, a normal failure
+          if (
+            error instanceof UniworkDocError &&
+            !error.serverCode &&
+            MISSING_ROUTE_STATUSES.has(error.status ?? 0)
+          ) {
             throw new MissingRoute(error)
           }
           throw error

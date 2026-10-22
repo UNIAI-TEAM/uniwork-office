@@ -524,6 +524,67 @@ describe('owner transfer reads', () => {
     expect(seen[0]).toMatchObject({ url: `${API}/documents/doc_1`, method: 'GET' })
   })
 
+  describe('getOwnerGate for a restricted document (BE-1)', () => {
+    const SUMMARY = {
+      document: {
+        id: 'doc_1',
+        workspace_id: 'ws_1',
+        visibility: 'restricted',
+        archived_at: null,
+      },
+      admin_scope: true,
+      my_level: '',
+    }
+    const route = (seen: Seen) =>
+      seen.url.endsWith('/admin-summary')
+        ? json(200, SUMMARY)
+        : envelope(403, 'document_restricted')
+
+    it('a 403 document_restricted falls back to /admin-summary for the workspace and visibility', async () => {
+      const { client, seen } = setup(route)
+      expect(await client.getOwnerGate('doc_1')).toEqual({
+        id: 'doc_1',
+        workspaceId: 'ws_1',
+        // the summary has no owner_kind / shelved_at: the server answers those two
+        ownerKind: '',
+        shelved: false,
+        visibility: 'restricted',
+      })
+      expect(seen.map((s) => `${s.method} ${s.url}`)).toEqual([
+        `GET ${API}/documents/doc_1`,
+        `GET ${API}/documents/doc_1/admin-summary`,
+      ])
+    })
+
+    it('only document_restricted falls back; any other refusal of the read is the failure', async () => {
+      for (const answer of [envelope(403, 'forbidden'), envelope(404, 'not_found')]) {
+        const { client, seen } = setup(() => answer)
+        await failure(client.getOwnerGate('doc_1'))
+        expect(seen).toHaveLength(1)
+      }
+    })
+
+    it('a summary the caller may not read is forbidden, not a retry loop', async () => {
+      const { client, seen } = setup((s) =>
+        s.url.endsWith('/admin-summary')
+          ? envelope(403, 'forbidden')
+          : envelope(403, 'document_restricted'),
+      )
+      expect((await failure(client.getOwnerGate('doc_1'))).code).toBe('forbidden')
+      expect(seen).toHaveLength(2)
+    })
+  })
+
+  it('a gate answer for another document is malformed_response (BE-4), on both reads', async () => {
+    const other = { document: { id: 'doc_2', workspace_id: 'ws_1', visibility: 'workspace' } }
+    const direct = setup(() => json(200, other))
+    expect((await failure(direct.client.getOwnerGate('doc_1'))).code).toBe('malformed_response')
+    const summary = setup((s) =>
+      s.url.endsWith('/admin-summary') ? json(200, other) : envelope(403, 'document_restricted'),
+    )
+    expect((await failure(summary.client.getOwnerGate('doc_1'))).code).toBe('malformed_response')
+  })
+
   it('listWorkspaceMemberIds GETs /workspaces/{ws}/members and keeps every user id', async () => {
     const { client, seen } = setup(() =>
       json(200, {
