@@ -28,6 +28,7 @@ import type { DocumentsHomeSubViewId } from '../src/renderer/src/uniwork-home/do
 import { UniworkFolderTree } from '../src/renderer/src/uniwork-folders/UniworkFolderTree'
 import { UniworkFolderPicker } from '../src/renderer/src/uniwork-folders/UniworkFolderPicker'
 import { ROOT_KEY } from '../src/renderer/src/uniwork-folders/uniwork-folders-model'
+import { pickType } from './doclist-type-filter-fixture'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -374,11 +375,11 @@ describe('the Từ nơi khác section: four source rows (web SOURCE_KINDS)', () 
     ])
 
     // the page's type chip and the source travel together
-    await click(host.querySelector('[data-chip="pdf"]'))
+    await pickType(host, 'pdf')
     expect(lastCall('uniworkListSources')).toEqual({
       workspaceId: 'ws-1',
       source: 'chat',
-      type: 'pdf',
+      types: ['pdf'],
     })
 
     // another nav item: no source row is current

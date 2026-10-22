@@ -18,6 +18,7 @@ import type {
   DocumentsHomeDoc,
   DocumentsHomeSubViewId,
 } from '../src/renderer/src/uniwork-home/documents-home-model'
+import { pickType } from './doclist-type-filter-fixture'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -284,9 +285,9 @@ describe('DocumentsHome: the Recent screen on the recent-canvas layout (UNI-2047
     it('is not there while a filter, a segment pick or a search narrows the list', async () => {
       await mount('recent')
       expect(strip()).not.toBeNull()
-      await click(host.querySelector('[data-chip="docx"]'))
+      await pickType(host, 'docx')
       expect(strip()).toBeNull()
-      await click(host.querySelector('[data-chip="all"]'))
+      await pickType(host, 'all')
       expect(strip()).not.toBeNull()
       await pick('updatedFrom', '7d')
       expect(strip()).toBeNull()
@@ -315,13 +316,13 @@ describe('DocumentsHome: the Recent screen on the recent-canvas layout (UNI-2047
   })
 
   describe('the filter row', () => {
-    it('puts the segment first in the same row as the type chips and the Người sửa / Cập nhật selects', async () => {
+    it('puts the segment first in the same row as the Type control and the Người sửa / Cập nhật selects', async () => {
       await mount('recent')
       const bar = host.querySelector<HTMLElement>('.dh-filter-bar')!
       expect(bar.classList.contains('has-lead')).toBe(true)
       const kids = Array.from(bar.children).map((el) => el.className.split(' ')[0])
       // N-04: the two selects are one group, so they never split across the row
-      expect(kids.slice(0, 3)).toEqual(['dh-segment', 'dh-filter-chips', 'dh-filter-selects'])
+      expect(kids.slice(0, 3)).toEqual(['dh-segment', 'dh-type-filter', 'dh-filter-selects'])
       expect(bar.querySelectorAll('.dh-filter-selects > .dh-filter-chip')).toHaveLength(2)
       // no second row of its own for the segment
       expect(host.querySelectorAll('.dh-segment').length).toBe(1)

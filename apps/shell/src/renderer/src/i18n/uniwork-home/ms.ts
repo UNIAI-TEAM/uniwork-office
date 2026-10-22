@@ -45,6 +45,8 @@ export const ms = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: 'Jenis:',
   uhFilterTypeAll: 'Semua',
+  uhFilterTypeCount: '{count} jenis',
+  uhFilterTypeRemove: 'Alih keluar penapis {type}',
   uhFilterModifiedBy: 'Diubah suai oleh:',
   uhFilterAnyPerson: 'Sesiapa sahaja',
   uhFilterUpdated: 'Dikemas kini:',

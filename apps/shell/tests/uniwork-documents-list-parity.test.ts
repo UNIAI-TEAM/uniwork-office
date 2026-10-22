@@ -20,6 +20,7 @@ import {
   type DocumentsHomeApiAdapter,
   type DocumentsHomeDoc,
 } from '../src/renderer/src/uniwork-home/documents-home-model'
+import { pickType } from './doclist-type-filter-fixture'
 
 /**
  * UNI-1961 UW-LIST-PARITY: the app's Workspace documents list follows the web
@@ -64,19 +65,19 @@ const source = (over: Partial<UniworkSourceFile> & { id: string }): UniworkSourc
 })
 
 describe('fetchDocumentsHomeSources (UNI-1961 item 1)', () => {
-  it('sends the format filter as the source type, and the cursor', async () => {
+  it('sends the Type picks as the source types, and the cursor', async () => {
     const uniworkListSources = vi.fn(async () =>
       ok({ items: [source({ id: 's1' })], nextCursor: 'n' }),
     )
     const api = { uniworkListSources } as DocumentsHomeApiAdapter
     const res = await fetchDocumentsHomeSources(api, {
       workspaceId: 'ws-1',
-      filters: { format: 'pdf', updatedBy: 'u-1' },
+      filters: { types: ['pdf'], updatedBy: 'u-1' },
       cursor: 'c-1',
     })
     expect(uniworkListSources).toHaveBeenCalledWith({
       workspaceId: 'ws-1',
-      type: 'pdf',
+      types: ['pdf'],
       cursor: 'c-1',
     })
     expect(res).toEqual(ok({ items: [source({ id: 's1' })], nextCursor: 'n' }))
@@ -95,7 +96,7 @@ describe('fetchDocumentsHomeSources (UNI-1961 item 1)', () => {
     expect(sourceMatchesFilters(row, { updatedFrom: '2026-10-18T00:00:00.000Z' })).toBe(true)
     expect(sourceMatchesFilters(row, { updatedFrom: '2026-10-19T00:00:00.000Z' })).toBe(false)
     // the type went to the server already
-    expect(sourceMatchesFilters(row, { format: 'pdf' })).toBe(true)
+    expect(sourceMatchesFilters(row, { types: ['pdf'] })).toBe(true)
   })
 })
 
@@ -365,11 +366,8 @@ describe('DocumentsHome source rows at the workspace root (UNI-1961 item 1)', ()
 
   it('applies the home filters to source rows: type on the server, editor and date here', async () => {
     await renderHome('vi', 'elsewhere')
-    await act(async () => {
-      host.querySelector<HTMLButtonElement>('.dh-filter-bar [data-chip="pdf"]')!.click()
-    })
-    await flush()
-    expect(api.uniworkListSources).toHaveBeenLastCalledWith({ workspaceId: 'ws-1', type: 'pdf' })
+    await pickType(host, 'pdf')
+    expect(api.uniworkListSources).toHaveBeenLastCalledWith({ workspaceId: 'ws-1', types: ['pdf'] })
   })
 
   it('Load more on From elsewhere pages the source list only', async () => {

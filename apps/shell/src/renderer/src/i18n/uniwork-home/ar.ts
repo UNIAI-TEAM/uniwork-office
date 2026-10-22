@@ -45,6 +45,8 @@ export const ar = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: 'النوع:',
   uhFilterTypeAll: 'الكل',
+  uhFilterTypeCount: '{count} أنواع',
+  uhFilterTypeRemove: 'إزالة عامل التصفية {type}',
   uhFilterModifiedBy: 'تم التعديل بواسطة:',
   uhFilterAnyPerson: 'أي شخص',
   uhFilterUpdated: 'التحديث:',

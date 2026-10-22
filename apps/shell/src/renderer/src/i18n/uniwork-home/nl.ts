@@ -45,6 +45,8 @@ export const nl = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: 'Type:',
   uhFilterTypeAll: 'Alle',
+  uhFilterTypeCount: '{count} typen',
+  uhFilterTypeRemove: 'Filter {type} verwijderen',
   uhFilterModifiedBy: 'Gewijzigd door:',
   uhFilterAnyPerson: 'Iedereen',
   uhFilterUpdated: 'Bijgewerkt:',

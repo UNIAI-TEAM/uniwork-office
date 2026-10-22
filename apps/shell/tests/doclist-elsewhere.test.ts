@@ -29,6 +29,7 @@ import {
 import { columnsFor, defaultSort, isSortable } from '../src/renderer/src/doclist/columns'
 import { DOCLIST_SORT_KEY } from '../src/renderer/src/doclist/persist'
 import { screenOfSubView } from '../src/renderer/src/doclist/table-model'
+import { pickType, typeItem } from './doclist-type-filter-fixture'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -302,18 +303,18 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
     expect(localStorage.getItem(DOCLIST_SORT_KEY) ?? '').not.toContain('"workspace"')
   })
 
-  it('a type chip goes to the server as `type`; UniNote is not offered here; Người sửa and Cập nhật narrow the loaded rows', async () => {
+  it('a type pick goes to the server as `types`; UniNote is not offered here; Người sửa and Cập nhật narrow the loaded rows', async () => {
     await mount('elsewhere')
-    expect(host.querySelector('[data-chip="page"]')).toBeNull()
-    expect(host.querySelector('[data-chip="pdf"]')).not.toBeNull()
-    await click(host.querySelector('[data-chip="pdf"]'))
-    expect(lastCall('uniworkListSources')).toMatchObject({ workspaceId: 'ws-1', type: 'pdf' })
+    await pickType(host, 'pdf')
+    expect(typeItem(host, 'page')).toBeNull()
+    expect(typeItem(host, 'docx')).not.toBeNull()
+    expect(lastCall('uniworkListSources')).toMatchObject({ workspaceId: 'ws-1', types: ['pdf'] })
     // the authors are the file owners
     const options = Array.from(
       host.querySelectorAll<HTMLOptionElement>('select[data-filter="updatedBy"] option'),
     ).map((o) => o.textContent)
     expect(options).toEqual(expect.arrayContaining(['Minh Trần', 'Lan Nguyễn']))
-    await click(host.querySelector('[data-chip="all"]'))
+    await pickType(host, 'all')
     await pick('updatedBy', 'u-lan')
     expect(sourceIds()).toEqual(['s-old'])
     expect(lastCall('uniworkListSources')).not.toHaveProperty('updatedBy')
@@ -358,7 +359,7 @@ describe('DocumentsHome: the Từ nơi khác screen', () => {
   it('an empty list under a filter says nothing matches, not that there are no files', async () => {
     sources = async () => ok({ items: [], nextCursor: null })
     await mount('elsewhere')
-    await click(host.querySelector('[data-chip="pdf"]'))
+    await pickType(host, 'pdf')
     expect(host.textContent).toContain('Không có tài liệu nào khớp bộ lọc')
   })
 

@@ -118,7 +118,7 @@ import {
   getDocumentsHomeNavEntry,
   docMatchesUpdated,
   hasActiveFilters,
-  rowMatchesType,
+  rowsUnderTypePick,
   sourceAuthorsOf,
   sourceMatchesFilters,
   splitAndSortItems,
@@ -712,7 +712,7 @@ export function DocumentsHome({
       ...(recentActivity ? { activity: recentActivity } : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filters.format, filters.updatedBy, filters.updatedPreset, recentActivity],
+    [filters.types, filters.updatedBy, filters.updatedPreset, recentActivity],
   )
   // the header sort goes to the server too: nothing until the person sorts (the server's own
   // order), except the Trash, which asks for Đã xóa oldest first from the first read like the web
@@ -2261,10 +2261,9 @@ export function DocumentsHome({
   // filters the server could not apply to them run here (the web's use-documents-library.ts).
   // The table orders them itself (UNI-2047: header sort); the shelf lists folders as rows too.
   const tableRows = useMemo<DocumentsHomeTableRow[]>(() => {
-    // the type chips the server cannot apply (UniNote, .txt on source files) and, on the shelf,
-    // Người sửa / Cập nhật run on what is loaded
-    const typed = (rows: DocumentsHomeTableRow[]) =>
-      rows.filter((row) => rowMatchesType(row, filters.format))
+    // every row is the server's answer to the Type picks; only the Q0 switch (folder rows of a flat
+    // list under a pick) runs here, and on the shelf Người sửa / Cập nhật run on what is loaded
+    const typed = (rows: DocumentsHomeTableRow[]) => rowsUnderTypePick(rows, filters.types)
     // Từ nơi khác: the source files alone; Người sửa / Cập nhật run on what is loaded
     if (elsewhereView) {
       return typed(
@@ -2298,11 +2297,11 @@ export function DocumentsHome({
     page.items,
     sources,
     wireFilters,
-    filters.format,
+    filters.types,
   ])
 
   // UNI-2047: the selection and the bulk bar act on the rows the person sees, not on everything
-  // loaded: the shelf's Lưu trữ bởi, the type chips and the source rows narrow the table
+  // loaded: the shelf's Lưu trữ bởi and the source rows narrow the table
   const visibleDocs = useMemo(
     () => tableRows.flatMap((row) => (row.type === 'doc' ? [row.doc] : [])),
     [tableRows],

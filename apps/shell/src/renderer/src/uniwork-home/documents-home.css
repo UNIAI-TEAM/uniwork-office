@@ -582,21 +582,25 @@
   background: var(--hover);
 }
 
-/* UNI-2047: the type chips every screen shares (doclist/FilterBar). V-LAYOUT F-07: the group
-   dissolves into the bar, so the chips and the two selects are items of one wrapping row (the
-   board's), not a chip block with the selects pushed under it */
+/* UNI-2113: the one Type control (doclist/TypeFilter) and one chip per picked type. The chip group
+   dissolves into the bar, so the control, the two selects and the chips are items of one wrapping
+   row: the controls never move when a chip appears (chips come last) and nothing scrolls sideways */
 .dh-filter-chips {
   display: contents;
 }
 
-.dh-filter-type {
+.dh-type-filter {
+  position: relative;
+}
+
+.dh-type-trigger {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  height: 34px;
   padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 8px;
   background: var(--surface);
   color: var(--text-secondary);
   font: inherit;
@@ -605,31 +609,126 @@
   cursor: pointer;
 }
 
-/* a chip with its 18px type badge starts closer to the badge (doclist-canvas chip) */
-.dh-filter-type.has-icon {
-  padding-inline-start: 7px;
+.dh-type-trigger:hover {
+  background: var(--hover);
 }
 
-.dh-filter-type > :is(img, svg) {
+.dh-type-trigger[aria-expanded='true'] {
+  border-color: var(--accent);
+}
+
+.dh-type-trigger:focus-visible,
+.dh-type-item:focus-visible,
+.dh-type-chip-x:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dh-type-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.dh-type-value > :is(img, svg),
+.dh-type-item > :is(img, svg),
+.dh-type-chip > :is(img, svg) {
   flex: none;
 }
 
-.dh-filter-type:hover {
+.dh-type-chevron {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+/* the menu opens BELOW the trigger: the picks and the live count behind the bar stay readable */
+.dh-type-menu {
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-start: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.dh-type-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.dh-type-item:hover,
+.dh-type-item:focus-visible {
+  background: var(--hover);
+}
+
+/* All types has no badge: a same-size spacer keeps the labels on one line */
+.dh-type-spacer {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.dh-type-item-label {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.dh-type-check {
+  flex: none;
+  color: var(--accent);
+}
+
+.dh-type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-subtle);
+  color: var(--text);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.dh-type-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.dh-type-chip-x:hover {
   background: var(--hover);
   color: var(--text);
-}
-
-.dh-filter-type.on {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  /* V7-2: --accent on --accent-soft was 4.28:1 in dark; the text token is AA in both themes */
-  color: var(--accent-text);
-  font-weight: 500;
-}
-
-.dh-filter-type:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 
 /* Sections */
@@ -1249,6 +1348,19 @@
   /* the card's "…" is 44px here (.uw-pick-info-btn) + the actions box's 12px: keep the name clear of both */
   .dh-folder-open {
     padding-right: 60px;
+  }
+
+  .dh-type-trigger {
+    height: 44px;
+  }
+
+  .dh-type-item {
+    min-height: 44px;
+  }
+
+  .dh-type-chip-x {
+    width: 44px;
+    height: 44px;
   }
 }
 

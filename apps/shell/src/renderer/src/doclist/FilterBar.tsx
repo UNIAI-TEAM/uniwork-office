@@ -1,18 +1,19 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { FileBadge } from '../FileBadge'
 import { useI18n } from '../locale'
 import {
   DEFAULT_DOCUMENTS_HOME_FILTERS,
-  DOCUMENTS_HOME_TYPE_CHIPS,
   DOCUMENTS_HOME_UPDATED_OPTIONS,
   hasActiveFilters,
+  toggleTypePick,
   updatedByOptionsForSelect,
   type DocumentsHomeFilterState,
-  type DocumentsHomeTypeFilter,
+  type DocumentsHomeTypePick,
   type DocumentsHomeUpdatedPreset,
   type UpdatedByOption,
 } from '../uniwork-home/documents-home-model'
 import type { DocListScreen } from './columns'
+import { TypeFilter, typePickLabel } from './TypeFilter'
 
 type FiltersByScreen = Partial<Record<DocListScreen, DocumentsHomeFilterState>>
 
@@ -38,49 +39,35 @@ export interface FilterBarProps {
   onChange: (next: DocumentsHomeFilterState) => void
   /** the people the loaded rows name as last editor (never a raw id) */
   authors: readonly UpdatedByOption[]
-  /** a control that leads the row, before the type chips (Recent's Tất cả / Đã mở / Đã sửa) */
+  /** a control that leads the row, before the Type control (Recent's Tất cả / Đã mở / Đã sửa) */
   lead?: ReactNode
-  /** type chips this screen's rows can never match (Từ nơi khác lists files only: no UniNote) */
-  hideTypes?: readonly DocumentsHomeTypeFilter[]
+  /** types this screen's rows can never match (Từ nơi khác lists files only: no UniNote) */
+  hideTypes?: readonly DocumentsHomeTypePick[]
 }
 
 /**
- * The quick filters every UniWork screen shares (Rules board): the type chips in one fixed order,
- * then Người sửa and Cập nhật. The list reloads from its first page on every change. A screen
- * with a `lead` (Recent's segment) keeps it in this row, and the two selects sit at the far end.
+ * The quick filters every UniWork screen shares: the one Type control (a menu of checkable types),
+ * then Người sửa and Cập nhật, then one removable chip per picked type. The list reloads from its
+ * first page on every change. A screen with a `lead` (Recent's segment) keeps it first in this row.
  */
 export function FilterBar({ filters, onChange, authors, lead, hideTypes }: FilterBarProps) {
   const { t } = useI18n()
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const patch = (part: Partial<DocumentsHomeFilterState>) => onChange({ ...filters, ...part })
+  const removePick = (pick: DocumentsHomeTypePick) => {
+    patch({ types: toggleTypePick(filters.types, pick) })
+    // the chip is about to be gone: focus goes to the Type trigger, never to the body
+    triggerRef.current?.focus()
+  }
   return (
     <div className={`dh-filter-bar${lead ? ' has-lead' : ''}`}>
       {lead}
-      <div
-        className="dh-filter-chips"
-        role="group"
-        aria-label={t('uhFilterType').replace(/[:：]\s*$/, '')}
-      >
-        {DOCUMENTS_HOME_TYPE_CHIPS.filter((chip) => !hideTypes?.includes(chip.value)).map(
-          (chip) => {
-            const on = filters.format === chip.value
-            // every type but Mọi loại leads with its 18px badge (doclist-canvas chip)
-            const icon = chip.value !== 'all'
-            return (
-              <button
-                key={chip.value}
-                type="button"
-                className={`dh-filter-type${icon ? ' has-icon' : ''}${on ? ' on' : ''}`}
-                data-chip={chip.value}
-                aria-pressed={on}
-                onClick={() => patch({ format: chip.value as DocumentsHomeTypeFilter })}
-              >
-                {icon && <FileBadge ext={chip.value} size={18} />}
-                {chip.labelKey ? t(chip.labelKey) : chip.literal}
-              </button>
-            )
-          },
-        )}
-      </div>
+      <TypeFilter
+        types={filters.types}
+        onChange={(types) => patch({ types })}
+        hideTypes={hideTypes}
+        triggerRef={triggerRef}
+      />
 
       {/* one group, so the two selects wrap together and render at one width (N-04) */}
       <div className="dh-filter-selects">
@@ -121,6 +108,40 @@ export function FilterBar({ filters, onChange, authors, lead, hideTypes }: Filte
           </select>
         </label>
       </div>
+
+      {filters.types.length > 0 && (
+        <div className="dh-filter-chips">
+          {filters.types.map((pick) => {
+            const name = typePickLabel(t, pick)
+            return (
+              <span key={pick} className="dh-type-chip" data-chip={pick}>
+                <FileBadge ext={pick} size={16} />
+                {name}
+                <button
+                  type="button"
+                  className="dh-type-chip-x"
+                  aria-label={t('uhFilterTypeRemove', { type: name })}
+                  onClick={() => removePick(pick)}
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="12"
+                    height="12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path d="m4 4 8 8M12 4l-8 8" />
+                  </svg>
+                </button>
+              </span>
+            )
+          })}
+        </div>
+      )}
 
       {hasActiveFilters(filters) && (
         <button
