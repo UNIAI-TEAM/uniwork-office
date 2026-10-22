@@ -252,6 +252,17 @@ describe('InboxPane list (UNI-2079)', () => {
     expect(time.textContent).toBe('1 hour ago')
   })
 
+  it('keeps the pill, the web mark, the time and the dot in one meta group beside the sentence', async () => {
+    await show([row('n1')])
+    const meta = itemOf('n1').querySelector('.wb-inbox-meta')!
+    // the narrow layout moves this group under the sentence, so the sentence must stay outside it
+    expect(meta.querySelector('.wb-pill')).not.toBeNull()
+    expect(meta.querySelector('time')).not.toBeNull()
+    expect(meta.querySelector('.wb-inbox-dot')).not.toBeNull()
+    expect(meta.querySelector('.wb-inbox-sentence')).toBeNull()
+    expect(itemOf('n1').querySelector('.wb-inbox-sentence')).not.toBeNull()
+  })
+
   it('sends only the keys it has: no before, no unread, on the first page', async () => {
     await show([row('n1')])
     expect(Object.keys(work.listNotifications.mock.calls[0]![0] as object).sort()).toEqual([

@@ -723,21 +723,24 @@ function InboxRow({
           <span className="wb-inbox-sentence">{line.sentence}</span>
           {sub ? <span className="wb-row-sub">{sub}</span> : null}
         </span>
-        {isDocument ? (
-          <span className={`wb-pill${line.changed ? '' : ' is-info'}`}>{t(notePillKey(n))}</span>
-        ) : null}
-        {web ? (
-          <span className="wb-inbox-web" title={t('inboxOpensInBrowser')}>
-            <WbGlyph id="external" size={14} />
-            <span className="uw-sr-only">{t('inboxOpensInBrowser')}</span>
-          </span>
-        ) : null}
-        {time ? (
-          <time className="wb-inbox-time wb-num" dateTime={n.created_at}>
-            {time}
-          </time>
-        ) : null}
-        {unread ? <span className="wb-inbox-dot" aria-hidden="true" /> : null}
+        {/* inline with the sentence on a wide pane; a second line under it on a narrow one */}
+        <span className="wb-inbox-meta">
+          {isDocument ? (
+            <span className={`wb-pill${line.changed ? '' : ' is-info'}`}>{t(notePillKey(n))}</span>
+          ) : null}
+          {web ? (
+            <span className="wb-inbox-web" title={t('inboxOpensInBrowser')}>
+              <WbGlyph id="external" size={14} />
+              <span className="uw-sr-only">{t('inboxOpensInBrowser')}</span>
+            </span>
+          ) : null}
+          {time ? (
+            <time className="wb-inbox-time wb-num" dateTime={n.created_at}>
+              {time}
+            </time>
+          ) : null}
+          {unread ? <span className="wb-inbox-dot" aria-hidden="true" /> : null}
+        </span>
       </button>
       <div className="wb-row-actions wb-inbox-actions">
         <WbIconBtn label={markLabel} onClick={onToggleRead}>

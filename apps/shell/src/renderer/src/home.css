@@ -7039,6 +7039,56 @@ html[dir='rtl'] .quick-title-row {
   align-self: center;
 }
 
+/* pill, opens-in-browser mark, time and dot: part of the one flex line on a wide pane */
+.wb-inbox-meta {
+  display: contents;
+}
+
+/* a narrow pane (the app's minimum window): the sentence keeps the full width of the row, up to
+   two lines, and the meta line sits under it, aligned with the sentence rather than the icon */
+@container wb-home (max-width: 640px) {
+  .wb-inbox-row {
+    position: relative;
+    padding-inline-end: 0;
+  }
+
+  .wb-inbox-main {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: start;
+    gap: 6px 12px;
+    padding-inline-end: 16px;
+  }
+
+  .wb-inbox-meta {
+    display: flex;
+    grid-column: 2;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    min-width: 0;
+  }
+
+  .wb-inbox-sentence {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* the actions float over the end of the meta line while shown, so they take no width when hidden */
+  .wb-inbox-actions {
+    position: absolute;
+    inset-block-end: 8px;
+    inset-inline-end: 8px;
+    align-self: auto;
+    border-radius: var(--radius-6);
+    background: var(--wb-row-hover);
+  }
+}
+
 .wb-inbox-more {
   display: flex;
   justify-content: center;
