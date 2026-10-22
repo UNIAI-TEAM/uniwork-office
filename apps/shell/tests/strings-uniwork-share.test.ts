@@ -139,6 +139,14 @@ describe('uniwork share string shard', () => {
     expect(vi.shrOwnerUnavailable).toBeTruthy()
   })
 
+  // UNI-2078 FE-8b: the de share shard addresses the reader as du; the owner-transfer keys follow it
+  it('de owner-transfer strings use the du register, not Sie', () => {
+    const formal = /\b(Sie|Ihnen|Ihre[mnrs]?|Ihr)\b/
+    expect(
+      Object.entries(table('de')).filter(([k, v]) => k.startsWith('shrOwner') && formal.test(v)),
+    ).toEqual([])
+  })
+
   it('no git word or internal code in the vi/en copy', () => {
     const text = [...Object.values(table('vi')), ...Object.values(table('en'))].join('\n')
     expect(text).not.toMatch(/\b(git|github|commit|branch)\b/i)

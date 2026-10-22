@@ -213,7 +213,7 @@ export const de = {
   shrOwnerTargetNotMember:
     '{name} ist kein Mitglied dieses Workspace und kann daher nicht Eigentümer dieses Dokuments sein.',
   shrOwnerSelfTransferError:
-    'Administratoren können die Eigentümerschaft eines privaten Dokuments nicht selbst übernehmen. Bitten Sie einen anderen Administrator um die Übertragung oder öffnen Sie den Notfallzugriff zur Prüfung.',
+    'Administratoren können die Eigentümerschaft eines privaten Dokuments nicht selbst übernehmen. Bitte einen anderen Administrator um die Übertragung oder öffne den Notfallzugriff zur Prüfung.',
   shrOwnerSearchPlaceholder: 'Workspace-Mitglieder suchen',
   shrOwnerNoCandidates: 'Kein anderes Mitglied kann dieses Dokument übernehmen.',
   shrOwnerLoading: 'Wird geladen…',
