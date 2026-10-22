@@ -119,24 +119,28 @@ async function mountApp() {
     act(async () => {
       previewMessage!({ version: 0, ...data })
     })
-  const select = (sid: number) =>
-    send({
-      type: 'gx:select',
-      dynamic: false,
-      element: {
-        sid,
-        tag: 'p',
-        className: '',
-        text: sid === sidOfText('Hello') ? 'Hello' : 'World',
-        childElementCount: 0,
-        rect: { x: 0, y: 0, width: 10, height: 10 },
-        computed: COMPUTED,
-        textRun: null,
-        textRunIndex: -1,
-        inlineEditable: false,
-      },
+  const selectMessage = (sid: number) => ({
+    type: 'gx:select',
+    dynamic: false,
+    element: {
+      sid,
+      tag: 'p',
+      className: '',
+      text: sid === sidOfText('Hello') ? 'Hello' : 'World',
+      childElementCount: 0,
+      rect: { x: 0, y: 0, width: 10, height: 10 },
+      computed: COMPUTED,
+      textRun: null,
+      textRunIndex: -1,
+      inlineEditable: false,
+    },
+  })
+  const select = (sid: number) => send(selectMessage(sid))
+  const sendBatch = (messages: Array<Record<string, unknown>>) =>
+    act(async () => {
+      for (const data of messages) previewMessage!({ version: 0, ...data })
     })
-  return { text: () => view.state.doc.toString(), send, select }
+  return { text: () => view.state.doc.toString(), send, select, selectMessage, sendBatch }
 }
 
 describe('the host acts on the sid a frame key command carries (UNI-2117)', () => {
@@ -144,6 +148,17 @@ describe('the host acts on the sid a frame key command carries (UNI-2117)', () =
     const { text, send } = await mountApp()
     expect(text()).toContain('Hello')
     await send({ type: 'gx:keyCommand', command: 'delete', sid: sidOfText('Hello') })
+    expect(text()).not.toContain('Hello')
+    expect(text()).toContain('World')
+  })
+
+  it('deletes the element when gx:select and Delete arrive before the host renders', async () => {
+    const { text, selectMessage, sendBatch } = await mountApp()
+    // Replays the click-then-Delete race: both messages are handled before React renders.
+    await sendBatch([
+      selectMessage(sidOfText('Hello')),
+      { type: 'gx:keyCommand', command: 'delete', sid: sidOfText('Hello') },
+    ])
     expect(text()).not.toContain('Hello')
     expect(text()).toContain('World')
   })
