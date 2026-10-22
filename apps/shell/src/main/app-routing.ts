@@ -21,6 +21,11 @@ export function appForPath(path: string): DocumentTabKind | undefined {
   return undefined
 }
 
+/** An editor view reaches home:open-path for markdown wiki links only, so only the notes they resolve to. */
+export function editorMayOpenPath(path: string): boolean {
+  return appForPath(path) === 'markdown'
+}
+
 /** A legal name in an extension no app routes to would turn an openable file into an unopenable one. */
 export function renameStaysInApp(from: string, newName: string): boolean {
   const current = appForPath(from)

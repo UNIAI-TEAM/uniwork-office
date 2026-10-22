@@ -357,6 +357,7 @@ import {
   PPTX_RE,
   TEXT_RE,
   XLSX_RE,
+  editorMayOpenPath,
   renameStaysInApp,
 } from './app-routing'
 import { isSameFile, pdfSaveAsTarget, isValidRawRenameName } from './rename-validation'
@@ -5025,8 +5026,10 @@ function registerHomeIpc(): void {
     if (typeof path === 'string') toggleStarredFile(path)
   })
 
-  guardedIpc.handle(HOME_CHANNELS.openPath, (_event, path: unknown) => {
+  guardedIpc.handle(HOME_CHANNELS.openPath, (event, path: unknown) => {
     if (typeof path !== 'string' || !path || path.length > 4096) return
+    // an editor view (markdown wiki links) opens notes only; the shell keeps every document type
+    if (event.sender !== shellWindow?.webContents && !editorMayOpenPath(path)) return
     openDocumentPath(path)
     fileIndexer?.refresh()
   })
