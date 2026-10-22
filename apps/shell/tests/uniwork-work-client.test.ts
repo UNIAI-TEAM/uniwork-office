@@ -481,3 +481,205 @@ describe('uniwork work client: document-change rows in the home inbox', () => {
     expect(inbox[1]).not.toHaveProperty('sample_documents')
   })
 })
+
+describe('uniwork work client: the inbox routes (UNI-2079)', () => {
+  const page = (body: unknown) => server({ '/me/notifications': () => json(200, body) })
+  const sent = (fetch: ReturnType<typeof server>, i = 0) => {
+    const [url, init] = fetch.mock.calls[i]!
+    const u = new URL(url)
+    return {
+      line: `${init.method} ${u.origin}${u.pathname}`,
+      query: Object.fromEntries(u.searchParams),
+      body: init.body === undefined ? undefined : JSON.parse(init.body as string),
+    }
+  }
+
+  it('GET /me/notifications: 30 newest by default, next_before kept for Load older', async () => {
+    const fetch = page({ notifications: [NOTE], next_before: 'n_1' })
+    expect(await client(fetch).listNotifications()).toEqual({
+      notifications: [
+        {
+          id: 'n_1',
+          kind: 'task_assigned',
+          workspace_id: 'ws_1',
+          resource_type: 'task',
+          resource_id: 't_1',
+          actor_kind: 'human',
+          title_key: 'notifications.kind.task_assigned',
+          params: { task: 'Call supplier' },
+          read_at: undefined,
+          created_at: '2026-10-13T07:00:00Z',
+        },
+      ],
+      next_before: 'n_1',
+    })
+    expect(sent(fetch)).toMatchObject({
+      line: `GET ${ORIGIN}/api/v1/me/notifications`,
+      query: { limit: '30' },
+    })
+  })
+
+  it('carries workspace, unread=1, before and limit; unread false is left out', async () => {
+    const fetch = page({ notifications: [] })
+    const api = client(fetch)
+    await api.listNotifications({ workspaceId: 'ws_1', unread: true, before: 'n_9', limit: 100 })
+    await api.listNotifications({ unread: false, limit: 1 })
+    expect(sent(fetch, 0).query).toEqual({
+      workspace_id: 'ws_1',
+      unread: '1',
+      before: 'n_9',
+      limit: '100',
+    })
+    expect(sent(fetch, 1).query).toEqual({ limit: '1' })
+  })
+
+  it('a missing or empty next_before is the last page (null)', async () => {
+    for (const tail of [{}, { next_before: '' }, { next_before: null }]) {
+      const result = await client(page({ notifications: [], ...tail })).listNotifications()
+      expect(result.next_before).toBeNull()
+    }
+  })
+
+  it('keeps resource_parent_id and actor_id, and leaves them out when absent', async () => {
+    const chat = {
+      ...NOTE,
+      id: 'n_2',
+      kind: 'chat_mention',
+      resource_type: 'chat_message',
+      resource_id: 'msg_1',
+      resource_parent_id: 'room_1',
+      actor_id: 'u_7',
+    }
+    const { notifications } = await client(
+      page({ notifications: [chat, NOTE] }),
+    ).listNotifications()
+    expect(notifications[0]).toMatchObject({ resource_parent_id: 'room_1', actor_id: 'u_7' })
+    expect(notifications[1]).not.toHaveProperty('resource_parent_id')
+    expect(notifications[1]).not.toHaveProperty('actor_id')
+  })
+
+  it('a page without its list, or with an unreadable row, is malformed', async () => {
+    expect(await codeOf(client(page({})).listNotifications())).toBe('malformed_response')
+    expect(await codeOf(client(page({ notifications: [{ id: 'n_1' }] })).listNotifications())).toBe(
+      'malformed_response',
+    )
+  })
+
+  it('refuses a bad list query without calling the server', async () => {
+    const fetch = page({ notifications: [] })
+    const api = client(fetch)
+    for (const q of [
+      { limit: 0 },
+      { limit: 101 },
+      { limit: 2.5 },
+      { limit: '10' },
+      { before: '../x' },
+      { before: '' },
+      { workspaceId: 'ws/1' },
+      { unread: 'yes' },
+      'unread',
+      [],
+    ]) {
+      expect(await codeOf(api.listNotifications(q as never))).toBe('server_error')
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('GET /me/notifications/unread-count: the total and the per-workspace counts', async () => {
+    const fetch = server({
+      '/me/notifications/unread-count': () =>
+        json(200, { total: 5, by_workspace: { ws_1: 2, ws_2: 3 } }),
+    })
+    expect(await client(fetch).unreadCount()).toEqual({
+      total: 5,
+      by_workspace: { ws_1: 2, ws_2: 3 },
+    })
+    expect(sent(fetch).line).toBe(`GET ${ORIGIN}/api/v1/me/notifications/unread-count`)
+  })
+
+  it('unread-count: a null or missing by_workspace is {}, a drifted entry is dropped, no total is malformed', async () => {
+    const count = (body: unknown) =>
+      client(server({ '/me/notifications/unread-count': () => json(200, body) })).unreadCount()
+    expect(await count({ total: 0, by_workspace: null })).toEqual({ total: 0, by_workspace: {} })
+    expect(await count({ total: 1 })).toEqual({ total: 1, by_workspace: {} })
+    expect(await count({ total: 1, by_workspace: { ws_1: 1, ws_2: 'x', ws_3: -1 } })).toEqual({
+      total: 1,
+      by_workspace: { ws_1: 1 },
+    })
+    expect(await codeOf(count({ by_workspace: {} }))).toBe('malformed_response')
+    expect(await codeOf(count({ total: -1 }))).toBe('malformed_response')
+  })
+
+  it('POST unread / archive / unarchive send only the ids', async () => {
+    const ok = () => json(200, { status: 'ok' })
+    const fetch = server({
+      '/me/notifications/unread': ok,
+      '/me/notifications/archive': ok,
+      '/me/notifications/unarchive': ok,
+    })
+    const api = client(fetch)
+    expect(await api.markNotificationsUnread(['n_1'])).toBeNull()
+    expect(await api.archiveNotifications(['n_1', 'n_2'])).toBeNull()
+    expect(await api.unarchiveNotifications(['n_2'])).toBeNull()
+    expect([0, 1, 2].map((i) => sent(fetch, i))).toEqual([
+      { line: `POST ${ORIGIN}/api/v1/me/notifications/unread`, query: {}, body: { ids: ['n_1'] } },
+      {
+        line: `POST ${ORIGIN}/api/v1/me/notifications/archive`,
+        query: {},
+        body: { ids: ['n_1', 'n_2'] },
+      },
+      {
+        line: `POST ${ORIGIN}/api/v1/me/notifications/unarchive`,
+        query: {},
+        body: { ids: ['n_2'] },
+      },
+    ])
+  })
+
+  it('refuses an empty, oversized or bad id list on every ids route', async () => {
+    const fetch = server()
+    const api = client(fetch)
+    const many = Array.from({ length: 101 }, (_, i) => `n_${i}`)
+    for (const call of [
+      api.markNotificationsUnread,
+      api.archiveNotifications,
+      api.unarchiveNotifications,
+    ]) {
+      for (const ids of [[], many, ['n_1', '../x'], ['n_1', 7], 'n_1', null]) {
+        expect(await codeOf(call(ids as never))).toBe('server_error')
+      }
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('markAllNotificationsRead sends all=true (with the workspace when given) and answers the ids for Undo', async () => {
+    const fetch = server({
+      '/me/notifications/read': () => json(200, { status: 'ok', ids: ['n_1', 'n_2'] }),
+    })
+    const api = client(fetch)
+    expect(await api.markAllNotificationsRead({ workspaceId: 'ws_1' })).toEqual(['n_1', 'n_2'])
+    expect(await api.markAllNotificationsRead()).toEqual(['n_1', 'n_2'])
+    expect(sent(fetch, 0)).toEqual({
+      line: `POST ${ORIGIN}/api/v1/me/notifications/read`,
+      query: {},
+      body: { all: true, workspace_id: 'ws_1' },
+    })
+    expect(sent(fetch, 1).body).toEqual({ all: true })
+  })
+
+  it('markAllNotificationsRead: no ids in the reply is [], a bad workspace never reaches the server', async () => {
+    const reply = (body: unknown) =>
+      client(server({ '/me/notifications/read': () => json(200, body) })).markAllNotificationsRead()
+    expect(await reply({ status: 'ok' })).toEqual([])
+    expect(await reply({ status: 'ok', ids: null })).toEqual([])
+    expect(await codeOf(reply({ status: 'ok', ids: 'n_1' }))).toBe('malformed_response')
+    const fetch = server()
+    expect(await codeOf(client(fetch).markAllNotificationsRead({ workspaceId: '../ws' }))).toBe(
+      'server_error',
+    )
+    expect(await codeOf(client(fetch).markAllNotificationsRead('ws_1' as never))).toBe(
+      'server_error',
+    )
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})

@@ -3,9 +3,12 @@ import type {
   WorkCreateTaskInput,
   WorkHomeSummary,
   WorkNotificationDocumentPage,
+  WorkNotificationPage,
+  WorkNotificationQuery,
   WorkPerson,
   WorkTask,
   WorkTaskStatus,
+  WorkUnreadCount,
 } from '../../shared/uniwork-work-api'
 import {
   METADATA_TIMEOUT_MS,
@@ -17,10 +20,13 @@ import { UniworkDocError } from '../uniwork-docs/errors'
 import {
   parseCalendarEvents,
   parseHome,
+  parseNotificationPage,
   parseOneTask,
   parsePerson,
+  parseReadIds,
   parseTaskList,
   parseTaskStatuses,
+  parseUnreadCount,
 } from './parse'
 import {
   NOTIFICATION_CURSOR_MAX,
@@ -59,10 +65,21 @@ export interface UniworkWorkClient {
     id: string,
     q?: { cursor?: string; limit?: number },
   ): Promise<WorkNotificationDocumentPage>
+  /** GET /me/notifications: 30 rows by default; `before` is the previous `next_before` */
+  listNotifications(q?: WorkNotificationQuery): Promise<WorkNotificationPage>
+  unreadCount(): Promise<WorkUnreadCount>
+  /** POST /me/notifications/unread|archive|unarchive: the caller's own ids (1-100) */
+  markNotificationsUnread(ids: string[]): Promise<null>
+  archiveNotifications(ids: string[]): Promise<null>
+  unarchiveNotifications(ids: string[]): Promise<null>
+  /** POST /me/notifications/read {all: true, workspace_id?}: the ids it read, for Undo */
+  markAllNotificationsRead(q?: { workspaceId?: string }): Promise<string[]>
 }
 
 const DOCUMENTS_PAGE_DEFAULT = 50
 const DOCUMENTS_PAGE_MAX = 100
+const INBOX_PAGE_DEFAULT = 30
+const IDS_MAX = 100
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const STATUS_KEY = /^[A-Za-z0-9_-]{1,64}$/
@@ -73,12 +90,38 @@ function refuse(): never {
   throw new UniworkDocError('server_error')
 }
 
+/** an id the routes may carry (uniworkId's shape) */
+function isId(value: unknown): value is string {
+  try {
+    uniworkId(value as string)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** a renderer query object: absent and null are {}, anything else but a plain object is refused */
+function query(value: unknown): Record<string, unknown> {
+  if (value === undefined || value === null) return {}
+  if (typeof value !== 'object' || Array.isArray(value)) refuse()
+  return value as Record<string, unknown>
+}
+
+/** 1-100 ids of the right shape, else refused */
+function idList(ids: unknown): string[] {
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > IDS_MAX) refuse()
+  if (!ids.every(isId)) refuse()
+  return ids
+}
+
 export function createUniworkWorkClient(options: UniworkDocsClientOptions): UniworkWorkClient {
   const send = createUniworkSend(options)
   const timeoutMs = options.metadataTimeoutMs ?? METADATA_TIMEOUT_MS
   const read = (response: Response): Promise<unknown> => response.json()
   const get = (route: string, query?: URLSearchParams) =>
     send({ method: 'GET', route, query, timeoutMs, read })
+  const post = (route: string, json: unknown) =>
+    send({ method: 'POST', route, json, timeoutMs, read })
 
   return {
     async homeSummary(workspaceId) {
@@ -168,6 +211,54 @@ export function createUniworkWorkClient(options: UniworkDocsClientOptions): Uniw
       // the sealed token goes back untouched; an empty one is a first page
       if (cursor) query.set('cursor', cursor)
       return parseNotificationDocumentPage(await get(route, query))
+    },
+
+    async listNotifications(q) {
+      const { workspaceId, unread, before, limit } = query(q)
+      if (workspaceId !== undefined && !isId(workspaceId)) refuse()
+      if (unread !== undefined && typeof unread !== 'boolean') refuse()
+      if (before !== undefined && !isId(before)) refuse()
+      if (
+        limit !== undefined &&
+        (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > IDS_MAX)
+      ) {
+        refuse()
+      }
+      const params = new URLSearchParams()
+      if (workspaceId) params.set('workspace_id', workspaceId)
+      if (unread) params.set('unread', '1')
+      if (before) params.set('before', before)
+      params.set('limit', String(limit ?? INBOX_PAGE_DEFAULT))
+      return parseNotificationPage(await get('/me/notifications', params))
+    },
+
+    async unreadCount() {
+      return parseUnreadCount(await get('/me/notifications/unread-count'))
+    },
+
+    async markNotificationsUnread(ids) {
+      await post('/me/notifications/unread', { ids: idList(ids) })
+      return null
+    },
+
+    async archiveNotifications(ids) {
+      await post('/me/notifications/archive', { ids: idList(ids) })
+      return null
+    },
+
+    async unarchiveNotifications(ids) {
+      await post('/me/notifications/unarchive', { ids: idList(ids) })
+      return null
+    },
+
+    async markAllNotificationsRead(q) {
+      const { workspaceId } = query(q)
+      if (workspaceId !== undefined && !isId(workspaceId)) refuse()
+      const raw = await post('/me/notifications/read', {
+        all: true,
+        ...(workspaceId ? { workspace_id: workspaceId } : {}),
+      })
+      return parseReadIds(raw)
     },
   }
 }
