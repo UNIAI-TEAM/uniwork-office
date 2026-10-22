@@ -117,4 +117,5 @@ export const th = {
   wbDocChangeUntitled: 'เอกสารไม่มีชื่อ',
   wbDocChangeMore: 'และอีก {count} รายการ',
   wbNoticeNoAccess: 'คุณไม่มีสิทธิ์เข้าถึงเอกสารนี้',
+  wbTabCountUnread: 'การแจ้งเตือนที่ยังไม่ได้อ่าน: {count}',
 } satisfies Record<keyof typeof zh, string>

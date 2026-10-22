@@ -143,4 +143,5 @@ export const ja = {
   wbDocChangeUntitled: '無題のドキュメント',
   wbDocChangeMore: '他 {count} 件',
   wbNoticeNoAccess: 'このドキュメントにアクセスする権限がありません。',
+  wbTabCountUnread: '未読の通知: {count}',
 } satisfies Record<keyof typeof zh, string>

@@ -122,4 +122,5 @@ export const cs = {
   wbDocChangeUntitled: 'Dokument bez názvu',
   wbDocChangeMore: 'a dalších {count}',
   wbNoticeNoAccess: 'K tomuto dokumentu nemáte přístup.',
+  wbTabCountUnread: 'Nepřečtená oznámení: {count}',
 } satisfies Record<keyof typeof zh, string>

@@ -135,4 +135,5 @@ export const nl = {
   wbDocChangeUntitled: 'Naamloos document',
   wbDocChangeMore: 'en {count} meer',
   wbNoticeNoAccess: 'Je hebt geen toegang tot dit document.',
+  wbTabCountUnread: 'Ongelezen meldingen: {count}',
 } satisfies Record<keyof typeof zh, string>

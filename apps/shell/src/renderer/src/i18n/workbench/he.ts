@@ -113,4 +113,5 @@ export const he = {
   wbDocChangeUntitled: 'מסמך ללא שם',
   wbDocChangeMore: 'ועוד {count}',
   wbNoticeNoAccess: 'אין לך גישה למסמך זה.',
+  wbTabCountUnread: 'התראות שלא נקראו: {count}',
 } satisfies Record<keyof typeof zh, string>

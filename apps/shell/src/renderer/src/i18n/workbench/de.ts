@@ -134,4 +134,5 @@ export const de = {
   wbDocChangeUntitled: 'Unbenanntes Dokument',
   wbDocChangeMore: 'und {count} weitere',
   wbNoticeNoAccess: 'Sie haben keinen Zugriff auf dieses Dokument.',
+  wbTabCountUnread: 'Ungelesene Benachrichtigungen: {count}',
 } satisfies Record<keyof typeof zh, string>

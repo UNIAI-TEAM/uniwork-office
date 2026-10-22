@@ -123,4 +123,5 @@ export const ru = {
   wbDocChangeUntitled: 'Документ без названия',
   wbDocChangeMore: 'и ещё {count}',
   wbNoticeNoAccess: 'У вас нет доступа к этому документу.',
+  wbTabCountUnread: 'Непрочитанные уведомления: {count}',
 } satisfies Record<keyof typeof zh, string>

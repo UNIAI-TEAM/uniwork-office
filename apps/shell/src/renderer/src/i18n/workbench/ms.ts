@@ -123,4 +123,5 @@ export const ms = {
   wbDocChangeUntitled: 'Dokumen tanpa tajuk',
   wbDocChangeMore: 'dan {count} lagi',
   wbNoticeNoAccess: 'Anda tidak mempunyai akses kepada dokumen ini.',
+  wbTabCountUnread: 'Pemberitahuan belum dibaca: {count}',
 } satisfies Record<keyof typeof zh, string>

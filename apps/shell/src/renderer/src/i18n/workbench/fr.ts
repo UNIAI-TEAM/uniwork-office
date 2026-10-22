@@ -127,4 +127,5 @@ export const fr = {
   wbDocChangeUntitled: 'Document sans titre',
   wbDocChangeMore: 'et {count} autres',
   wbNoticeNoAccess: 'Vous n’avez pas accès à ce document.',
+  wbTabCountUnread: 'Notifications non lues : {count}',
 } satisfies Record<keyof typeof zh, string>

@@ -113,4 +113,5 @@ export const ar = {
   wbDocChangeUntitled: 'مستند بلا عنوان',
   wbDocChangeMore: 'و{count} أخرى',
   wbNoticeNoAccess: 'ليست لديك صلاحية الوصول إلى هذا المستند.',
+  wbTabCountUnread: 'إشعارات غير مقروءة: {count}',
 } satisfies Record<keyof typeof zh, string>

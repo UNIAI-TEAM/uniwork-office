@@ -125,4 +125,5 @@ export const hi = {
   wbDocChangeUntitled: 'बिना शीर्षक का दस्तावेज़',
   wbDocChangeMore: 'और {count}',
   wbNoticeNoAccess: 'आपके पास इस दस्तावेज़ तक पहुँच नहीं है।',
+  wbTabCountUnread: 'बिना पढ़ी सूचनाएँ: {count}',
 } satisfies Record<keyof typeof zh, string>

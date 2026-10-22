@@ -118,4 +118,5 @@ export const id = {
   wbDocChangeUntitled: 'Dokumen tanpa judul',
   wbDocChangeMore: 'dan {count} lainnya',
   wbNoticeNoAccess: 'Anda tidak memiliki akses ke dokumen ini.',
+  wbTabCountUnread: 'Notifikasi belum dibaca: {count}',
 } satisfies Record<keyof typeof zh, string>

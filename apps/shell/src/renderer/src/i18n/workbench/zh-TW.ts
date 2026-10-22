@@ -113,4 +113,5 @@ export const zhTW = {
   wbDocChangeUntitled: '未命名文件',
   wbDocChangeMore: '還有 {count} 份',
   wbNoticeNoAccess: '你沒有存取此文件的權限。',
+  wbTabCountUnread: '未讀通知：{count}',
 } satisfies Record<keyof typeof zh, string>

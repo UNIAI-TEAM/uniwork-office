@@ -129,4 +129,5 @@ export const ko = {
   wbDocChangeUntitled: '제목 없는 문서',
   wbDocChangeMore: '외 {count}개',
   wbNoticeNoAccess: '이 문서에 접근할 권한이 없습니다.',
+  wbTabCountUnread: '읽지 않은 알림: {count}',
 } satisfies Record<keyof typeof zh, string>
