@@ -19,7 +19,8 @@ import { fileURLToPath } from 'node:url'
 const SCRIPT = fileURLToPath(new URL('./apt-repo.sh', import.meta.url))
 const TOOLS = ['apt-ftparchive', 'dpkg-deb', 'gpg', 'gpgv', 'xz']
 const missing = TOOLS.filter((tool) => spawnSync('sh', ['-c', `command -v ${tool}`]).status !== 0)
-const skip = missing.length > 0 ? `needs ${missing.join(', ')} (apt-utils provides apt-ftparchive)` : false
+const skip =
+  missing.length > 0 ? `needs ${missing.join(', ')} (apt-utils provides apt-ftparchive)` : false
 if (skip) console.log(`apt-repo tests skipped: ${skip}`)
 
 const PASSPHRASE = 'test-only passphrase 7c1f'
@@ -36,17 +37,24 @@ let keyring
 const outputs = []
 
 function gpg(args, options = {}) {
-  return execFileSync('gpg', ['--batch', '--homedir', gnupg, '--pinentry-mode', 'loopback', ...args], {
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-    ...options,
-  })
+  return execFileSync(
+    'gpg',
+    ['--batch', '--homedir', gnupg, '--pinentry-mode', 'loopback', ...args],
+    {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      ...options,
+    },
+  )
 }
 
 function makeKey(uid) {
   gpg(['--passphrase', PASSPHRASE, '--quick-gen-key', uid, 'ed25519', 'sign', 'never'])
   const listing = gpg(['--with-colons', '--list-secret-keys', uid])
-  const fpr = listing.split('\n').find((line) => line.startsWith('fpr:')).split(':')[9]
+  const fpr = listing
+    .split('\n')
+    .find((line) => line.startsWith('fpr:'))
+    .split(':')[9]
   const secret = gpg(['--passphrase', PASSPHRASE, '--armor', '--export-secret-keys', fpr])
   return { fpr, secret }
 }
@@ -70,9 +78,13 @@ function makeRelease(version, channel) {
     ].join('\n'),
   )
   const prefix = `UniWork-Office_${version}_unsigned`
-  execFileSync('dpkg-deb', ['--root-owner-group', '--build', pkg, join(dir, `${prefix}_linux_x64.deb`)], {
-    stdio: 'pipe',
-  })
+  execFileSync(
+    'dpkg-deb',
+    ['--root-owner-group', '--build', pkg, join(dir, `${prefix}_linux_x64.deb`)],
+    {
+      stdio: 'pipe',
+    },
+  )
   rmSync(pkg, { recursive: true })
   const exe = `${prefix}_win32_x64-setup.exe`
   const appImage = `${prefix}_linux_x64.AppImage`
@@ -107,8 +119,16 @@ function run(args, { target, secret = secretKey, extraEnv = {} } = {}) {
   return result
 }
 
-function publish(target, version, channel = 'dev', extra = [], dir = makeRelease(version, channel)) {
-  const result = run(['--dir', dir, '--channel', channel, '--version', version, ...extra], { target })
+function publish(
+  target,
+  version,
+  channel = 'dev',
+  extra = [],
+  dir = makeRelease(version, channel),
+) {
+  const result = run(['--dir', dir, '--channel', channel, '--version', version, ...extra], {
+    target,
+  })
   assert.equal(result.status, 0, `${version}: ${result.stdout}\n${result.stderr}`)
   return result
 }
@@ -127,7 +147,10 @@ function files(target) {
 }
 
 function versionsIn(target, channel = 'dev') {
-  const packages = readFileSync(join(target, `apt/dists/${channel}/main/binary-amd64/Packages`), 'utf8')
+  const packages = readFileSync(
+    join(target, `apt/dists/${channel}/main/binary-amd64/Packages`),
+    'utf8',
+  )
   return [...packages.matchAll(/^Version: (.+)$/gm)].map((match) => match[1])
 }
 
@@ -199,29 +222,55 @@ describe('apt-repo.sh', { skip }, () => {
     assert.ok(!all.some((key) => key.startsWith('update/dev/') && key.endsWith('.dmg')))
     assert.ok(!all.some((key) => key.endsWith('.part')))
 
-    const keyListing = execFileSync('gpg', ['--batch', '--with-colons', '--show-keys', join(target, 'apt/key.gpg')], {
-      encoding: 'utf8',
-    })
+    const keyListing = execFileSync(
+      'gpg',
+      ['--batch', '--with-colons', '--show-keys', join(target, 'apt/key.gpg')],
+      {
+        encoding: 'utf8',
+      },
+    )
     assert.match(keyListing, new RegExp(`^fpr:+${keyFpr}:`, 'm'))
-    assert.match(readFileSync(join(target, 'apt/key.asc'), 'utf8'), /^-----BEGIN PGP PUBLIC KEY BLOCK-----/)
+    assert.match(
+      readFileSync(join(target, 'apt/key.asc'), 'utf8'),
+      /^-----BEGIN PGP PUBLIC KEY BLOCK-----/,
+    )
     assert.doesNotMatch(readFileSync(join(target, 'apt/key.asc'), 'utf8'), /PRIVATE/)
 
     const sums = readFileSync(join(target, 'dev/0.11.0-dev.1/SHA256SUMS'), 'utf8')
     const deb = 'UniWork-Office_0.11.0-dev.1_unsigned_linux_x64.deb'
-    assert.match(sums, new RegExp(`^${sha256(join(target, 'dev/0.11.0-dev.1', deb))}  ${deb}$`, 'm'))
+    assert.match(
+      sums,
+      new RegExp(`^${sha256(join(target, 'dev/0.11.0-dev.1', deb))}  ${deb}$`, 'm'),
+    )
 
     const packages = readFileSync(join(target, 'apt/dists/dev/main/binary-amd64/Packages'), 'utf8')
-    assert.match(packages, new RegExp(`^Filename: pool/main/u/uniwork-office/uniwork-office_0.11.0-dev.1_amd64.deb$`, 'm'))
-    assert.match(packages, new RegExp(`^SHA256: ${sha256(join(target, POOL, 'uniwork-office_0.11.0-dev.1_amd64.deb'))}$`, 'm'))
+    assert.match(
+      packages,
+      new RegExp(
+        `^Filename: pool/main/u/uniwork-office/uniwork-office_0.11.0-dev.1_amd64.deb$`,
+        'm',
+      ),
+    )
+    assert.match(
+      packages,
+      new RegExp(
+        `^SHA256: ${sha256(join(target, POOL, 'uniwork-office_0.11.0-dev.1_amd64.deb'))}$`,
+        'm',
+      ),
+    )
   })
 
   it('signs InRelease and Release.gpg with the key, and Release names the Packages files it ships', () => {
     const target = join(root, 'first')
     const dists = join(target, 'apt/dists/dev')
     execFileSync('gpgv', ['--keyring', keyring, join(dists, 'InRelease')], { stdio: 'pipe' })
-    execFileSync('gpgv', ['--keyring', keyring, join(dists, 'Release.gpg'), join(dists, 'Release')], {
-      stdio: 'pipe',
-    })
+    execFileSync(
+      'gpgv',
+      ['--keyring', keyring, join(dists, 'Release.gpg'), join(dists, 'Release')],
+      {
+        stdio: 'pipe',
+      },
+    )
     const release = readFileSync(join(dists, 'Release'), 'utf8')
     assert.match(release, /^Origin: UniWork$/m)
     assert.match(release, /^Label: UniWork Office$/m)
@@ -244,7 +293,11 @@ describe('apt-repo.sh', { skip }, () => {
     for (const { hash, size, path } of entries) {
       assert.equal(sha256(join(dists, path)), hash, path)
       assert.equal(readFileSync(join(dists, path)).length, size, path)
-      assert.equal(sha256(join(dists, 'main/binary-amd64/by-hash/SHA256', hash)), hash, `by-hash ${path}`)
+      assert.equal(
+        sha256(join(dists, 'main/binary-amd64/by-hash/SHA256', hash)),
+        hash,
+        `by-hash ${path}`,
+      )
     }
   })
 
@@ -259,14 +312,19 @@ describe('apt-repo.sh', { skip }, () => {
     // a re-run of the same build (same artifacts)
     publish(target, '0.11.0-dev.2', 'dev', [], dir)
     assert.deepEqual(versionsIn(target), ['0.11.0-dev.2', '0.11.0-dev.1'])
-    assert.equal(readFileSync(join(target, 'apt/dists/dev/main/binary-amd64/Packages'), 'utf8'), packages)
+    assert.equal(
+      readFileSync(join(target, 'apt/dists/dev/main/binary-amd64/Packages'), 'utf8'),
+      packages,
+    )
     // the re-run only ends the grace of what the run before named
     const now = files(target)
     assert.ok(now.every((key) => before.includes(key)))
     for (const key of before.filter((entry) => !now.includes(entry))) {
       assert.match(key, /\/by-hash\/SHA256\/|^update\/dev\/UniWork-Office_0\.11\.0-dev\.1_/)
     }
-    execFileSync('gpgv', ['--keyring', keyring, join(target, 'apt/dists/dev/InRelease')], { stdio: 'pipe' })
+    execFileSync('gpgv', ['--keyring', keyring, join(target, 'apt/dists/dev/InRelease')], {
+      stdio: 'pipe',
+    })
   })
 
   it('keeps --keep versions and deletes pool files one run after they leave the index', () => {
@@ -280,15 +338,24 @@ describe('apt-repo.sh', { skip }, () => {
     assert.deepEqual(versionsIn(target), ['0.11.0-dev.10', '0.11.0-dev.2'])
     let all = files(target)
     assert.ok(all.includes(dev1), 'grace: dev.1 stays one run')
-    assert.ok(all.some((key) => key.startsWith('dev/0.11.0-dev.1/')), 'grace: the previous manifest lists dev.1')
+    assert.ok(
+      all.some((key) => key.startsWith('dev/0.11.0-dev.1/')),
+      'grace: the previous manifest lists dev.1',
+    )
     assert.deepEqual(manifestVersions(target), ['0.11.0-dev.10', '0.11.0-dev.2'])
 
     publish(target, '0.11.0-dev.11', 'dev', ['--keep', '2'])
     assert.deepEqual(versionsIn(target), ['0.11.0-dev.11', '0.11.0-dev.10'])
     all = files(target)
     assert.ok(!all.includes(dev1), 'dev.1 is gone after its grace run')
-    assert.ok(!all.some((key) => key.startsWith('dev/0.11.0-dev.1/')), 'installers beyond --keep are pruned')
-    assert.ok(all.some((key) => key.startsWith('dev/0.11.0-dev.2/')), 'grace: dev.2 installers stay one run')
+    assert.ok(
+      !all.some((key) => key.startsWith('dev/0.11.0-dev.1/')),
+      'installers beyond --keep are pruned',
+    )
+    assert.ok(
+      all.some((key) => key.startsWith('dev/0.11.0-dev.2/')),
+      'grace: dev.2 installers stay one run',
+    )
     assert.ok(all.includes(dev2), 'grace: dev.2 stays one run')
     assert.ok(!all.includes('update/dev/UniWork-Office_0.11.0-dev.2_unsigned_win32_x64-setup.exe'))
     assert.ok(all.includes('update/dev/UniWork-Office_0.11.0-dev.10_unsigned_win32_x64-setup.exe'))
@@ -319,9 +386,12 @@ describe('apt-repo.sh', { skip }, () => {
     writeFileSync(join(dir, 'SHA256SUMS-darwin.txt'), 'sums\n')
     const notes = join(root, 'notes.md')
     writeFileSync(notes, 'Fixes **things** <script>alert(1)</script>\n')
-    const result = run(['--dir', dir, '--channel', 'dev', '--version', '0.11.0-dev.1', '--notes-file', notes], {
-      target,
-    })
+    const result = run(
+      ['--dir', dir, '--channel', 'dev', '--version', '0.11.0-dev.1', '--notes-file', notes],
+      {
+        target,
+      },
+    )
     assert.equal(result.status, 0, result.stderr)
     publish(target, '0.11.0-beta.1', 'beta')
     const beta = manifestOf(target).channels.beta
@@ -348,9 +418,15 @@ describe('apt-repo.sh', { skip }, () => {
     assert.match(first.published_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
     assert.deepEqual(first.signed, { windows: false, macos: true, linux: false })
     assert.deepEqual(second.signed, { windows: false, macos: false, linux: false })
-    assert.deepEqual(first.apt, { suite: 'dev', package: 'uniwork-office', version: '0.11.0-dev.1' })
+    assert.deepEqual(first.apt, {
+      suite: 'dev',
+      package: 'uniwork-office',
+      version: '0.11.0-dev.1',
+    })
 
-    const rows = first.assets.map(({ platform, arch, kind, signed }) => `${platform}/${arch}/${kind}/${signed}`)
+    const rows = first.assets.map(
+      ({ platform, arch, kind, signed }) => `${platform}/${arch}/${kind}/${signed}`,
+    )
     assert.deepEqual(rows.sort(), [
       'all/all/checksums/false',
       'darwin/all/checksums/false',
@@ -405,11 +481,14 @@ describe('apt-repo.sh', { skip }, () => {
     const target = join(root, 'first')
     const before = files(target)
     const dir = makeRelease('0.11.0-dev.3', 'dev')
-    const result = run(['--dir', dir, '--channel', 'dev', '--version', '0.11.0-dev.3', '--keep', '1', '--dry-run'], {
-      target,
-      secret: '',
-      extraEnv: { APT_GPG_PASSPHRASE: '' },
-    })
+    const result = run(
+      ['--dir', dir, '--channel', 'dev', '--version', '0.11.0-dev.3', '--keep', '1', '--dry-run'],
+      {
+        target,
+        secret: '',
+        extraEnv: { APT_GPG_PASSPHRASE: '' },
+      },
+    )
     assert.equal(result.status, 0, result.stderr)
     const lines = result.stdout.split('\n')
     const order = [
@@ -420,8 +499,14 @@ describe('apt-repo.sh', { skip }, () => {
       'PUT update/dev/dev-linux.yml (Cache-Control: no-cache)',
       'PUT releases.json (Cache-Control: no-cache) (Content-Type: application/json; charset=utf-8)',
     ].map((line) => lines.indexOf(line))
-    assert.ok(order.every((index) => index >= 0), result.stdout)
-    assert.deepEqual([...order].sort((a, b) => a - b), order)
+    assert.ok(
+      order.every((index) => index >= 0),
+      result.stdout,
+    )
+    assert.deepEqual(
+      [...order].sort((a, b) => a - b),
+      order,
+    )
     // --keep 1, but the previous manifest still lists dev.1 and dev.2: one run of grace
     assert.ok(!lines.some((line) => line.startsWith('DELETE dev/')), result.stdout)
     assert.deepEqual(files(target), before)

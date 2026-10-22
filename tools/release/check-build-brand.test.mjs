@@ -411,9 +411,18 @@ describe('checkBuildDir', () => {
     it('flags a missing feed, another url, the channel directory missing and a github feed', async () => {
       for (const [updateFeed, expected] of [
         [false, 'hold no app-update.yml (expected the generic feed)'],
-        [genericYml('https://uniworkos.com/downloads/office/update/beta'), `expected generic:${feedUrl}`],
-        [genericYml('https://uniworkos.com/downloads/office/update'), `expected generic:${feedUrl}`],
-        ['owner: UNIAI-TEAM\nrepo: uniwork-office\nprovider: github\n', `expected generic:${feedUrl}`],
+        [
+          genericYml('https://uniworkos.com/downloads/office/update/beta'),
+          `expected generic:${feedUrl}`,
+        ],
+        [
+          genericYml('https://uniworkos.com/downloads/office/update'),
+          `expected generic:${feedUrl}`,
+        ],
+        [
+          'owner: UNIAI-TEAM\nrepo: uniwork-office\nprovider: github\n',
+          `expected generic:${feedUrl}`,
+        ],
       ]) {
         const result = checkBuildDir(await fakeWindowsOutput({ updateFeed }), { updateFeed: feed })
         assert.ok(
@@ -440,7 +449,9 @@ describe('checkBuildDir', () => {
       const withNotice = checkBuildDir(
         await fakeMacOutput({
           arches: ['arm64'],
-          pkg: { uniworkReleaseFeed: { owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'dev' } },
+          pkg: {
+            uniworkReleaseFeed: { owner: 'UNIAI-TEAM', repo: 'uniwork-office', channel: 'dev' },
+          },
         }),
         { updateFeed: feed },
       )

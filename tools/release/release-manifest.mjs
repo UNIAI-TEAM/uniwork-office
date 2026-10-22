@@ -47,7 +47,12 @@ export function assetKindOf(file) {
   if (checksums) return { ...checksums, kind: 'checksums', signed: false }
   const match = ASSET_KINDS.find((entry) => file.endsWith(entry.suffix))
   if (!match) return undefined
-  return { platform: match.platform, arch: match.arch, kind: match.kind, signed: !file.includes('_unsigned_') }
+  return {
+    platform: match.platform,
+    arch: match.arch,
+    kind: match.kind,
+    signed: !file.includes('_unsigned_'),
+  }
 }
 
 function sha256Of(path) {
@@ -55,7 +60,17 @@ function sha256Of(path) {
 }
 
 /** One `releases[]` entry for the files in `dir`. */
-export function buildRelease({ dir, channel, version, tag, gitSha, notes, debVersion, baseUrl, publishedAt }) {
+export function buildRelease({
+  dir,
+  channel,
+  version,
+  tag,
+  gitSha,
+  notes,
+  debVersion,
+  baseUrl,
+  publishedAt,
+}) {
   const assets = []
   for (const file of readdirSync(dir).sort()) {
     const path = join(dir, file)
@@ -94,7 +109,10 @@ export function buildRelease({ dir, channel, version, tag, gitSha, notes, debVer
 /** The manifest after publishing `release` on its channel; other channels stay as they are. */
 export function updateManifest(previous, release, { keepVersions, baseUrl, now }) {
   const manifest =
-    previous && previous.schema === SCHEMA && previous.channels && typeof previous.channels === 'object'
+    previous &&
+    previous.schema === SCHEMA &&
+    previous.channels &&
+    typeof previous.channels === 'object'
       ? previous
       : { schema: SCHEMA, channels: {} }
   const channel = release.channel
@@ -134,15 +152,19 @@ export function parseArguments(argv) {
     if (!name.startsWith('--') || i + 1 >= rest.length) throw new Error(`bad argument: ${name}`)
     options[name.slice(2)] = rest[i + 1]
   }
-  if (!['update', 'versions'].includes(command)) throw new Error('command must be update or versions')
-  if (!CHANNELS.includes(options.channel)) throw new Error(`--channel must be one of ${CHANNELS.join(', ')}`)
+  if (!['update', 'versions'].includes(command))
+    throw new Error('command must be update or versions')
+  if (!CHANNELS.includes(options.channel))
+    throw new Error(`--channel must be one of ${CHANNELS.join(', ')}`)
   if (command === 'update') {
     for (const name of ['dir', 'version', 'tag', 'git-sha', 'keep-versions']) {
       if (!options[name]) throw new Error(`--${name} is required`)
     }
-    if (!/^[0-9a-f]{40}$/.test(options['git-sha'])) throw new Error('--git-sha must be 40 hex characters')
+    if (!/^[0-9a-f]{40}$/.test(options['git-sha']))
+      throw new Error('--git-sha must be 40 hex characters')
     const baseUrl = options['base-url'] ?? DEFAULT_BASE_URL
-    if (!/^https:\/\/[^/]+(\/[^?#]*[^/?#])?$/.test(baseUrl)) throw new Error('--base-url must be https without a trailing /')
+    if (!/^https:\/\/[^/]+(\/[^?#]*[^/?#])?$/.test(baseUrl))
+      throw new Error('--base-url must be https without a trailing /')
     options['base-url'] = baseUrl
   }
   return { command, options }
@@ -152,7 +174,8 @@ function main(argv) {
   const { command, options } = parseArguments(argv)
   const previous = readJson(options.previous)
   if (command === 'versions') {
-    for (const entry of previous?.channels?.[options.channel]?.releases ?? []) console.log(entry.version)
+    for (const entry of previous?.channels?.[options.channel]?.releases ?? [])
+      console.log(entry.version)
     return
   }
   const now = isoSeconds(new Date())
@@ -170,8 +193,13 @@ function main(argv) {
     publishedAt: now,
   })
   const keepVersions = options['keep-versions'].split(',').filter(Boolean)
-  if (!keepVersions.includes(options.version)) throw new Error('--keep-versions must include --version')
-  const manifest = updateManifest(previous, release, { keepVersions, baseUrl: options['base-url'], now })
+  if (!keepVersions.includes(options.version))
+    throw new Error('--keep-versions must include --version')
+  const manifest = updateManifest(previous, release, {
+    keepVersions,
+    baseUrl: options['base-url'],
+    now,
+  })
   process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`)
 }
 

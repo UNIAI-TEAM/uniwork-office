@@ -281,7 +281,10 @@ describe('dev / beta release builds', () => {
   it('read the self-hosted generic feed from the channel directory of UNIWORK_UPDATE_URL', () => {
     const base = 'https://uniworkos.com/downloads/office/update'
     for (const channel of ['dev', 'beta']) {
-      const config = loadConfig({ UNIWORK_RELEASE_CHANNEL: channel, UNIWORK_UPDATE_URL: `${base}/` })
+      const config = loadConfig({
+        UNIWORK_RELEASE_CHANNEL: channel,
+        UNIWORK_UPDATE_URL: `${base}/`,
+      })
       expect(config.publish).toEqual([{ provider: 'generic', url: `${base}/${channel}`, channel }])
       // electron-updater's github-only mac notice has nothing to read from a generic feed
       expect(config.extraMetadata?.uniworkReleaseFeed).toBeUndefined()

@@ -340,7 +340,9 @@ function checkUpdateFeed(where, resourcesDir, report, feed) {
     return
   }
   if (!existsSync(path)) {
-    report.problem(`${where}: resources hold no app-update.yml (expected the ${feed.provider} feed)`)
+    report.problem(
+      `${where}: resources hold no app-update.yml (expected the ${feed.provider} feed)`,
+    )
     return
   }
   report.checked(`${where} app-update.yml`)
