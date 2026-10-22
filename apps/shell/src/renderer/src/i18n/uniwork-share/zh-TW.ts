@@ -198,6 +198,7 @@ export const zhTW = {
   shrOwnerNoCandidates: '沒有其他成員可以接收此文件。',
   shrOwnerLoading: '載入中…',
   shrOwnerFailed: '無法轉移擁有權。請再試一次。',
+  shrOwnerCandidatesFailed: '無法載入成員清單。請關閉後再試一次。',
   shrOwnerOwnedByWorkProduct: '此文件屬於某個工作成果，因此無法變更擁有者。',
   shrOwnerUnavailable: '此伺服器尚不支援轉移擁有權。',
 } satisfies Record<keyof typeof zh, string>

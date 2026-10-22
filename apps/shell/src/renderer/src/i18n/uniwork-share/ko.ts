@@ -211,6 +211,7 @@ export const ko = {
   shrOwnerNoCandidates: '이 문서를 받을 수 있는 다른 멤버가 없습니다.',
   shrOwnerLoading: '불러오는 중…',
   shrOwnerFailed: '소유권을 이전하지 못했습니다. 다시 시도하세요.',
+  shrOwnerCandidatesFailed: '구성원을 불러오지 못했습니다. 닫고 다시 시도하세요.',
   shrOwnerOwnedByWorkProduct: '이 문서는 작업 결과물에 속해 있어 소유자를 변경할 수 없습니다.',
   shrOwnerUnavailable: '이 서버에서는 아직 소유권 이전을 사용할 수 없습니다.',
 } satisfies Record<keyof typeof zh, string>

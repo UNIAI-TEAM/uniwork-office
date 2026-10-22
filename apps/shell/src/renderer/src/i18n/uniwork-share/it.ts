@@ -217,6 +217,7 @@ export const it = {
   shrOwnerNoCandidates: 'Nessun altro membro può ricevere questo documento.',
   shrOwnerLoading: 'Caricamento…',
   shrOwnerFailed: 'Impossibile trasferire la proprietà. Riprova.',
+  shrOwnerCandidatesFailed: 'Impossibile caricare i membri. Chiudi e riprova.',
   shrOwnerOwnedByWorkProduct:
     'Questo documento appartiene a un prodotto di lavoro, quindi il proprietario non può essere cambiato.',
   shrOwnerUnavailable:

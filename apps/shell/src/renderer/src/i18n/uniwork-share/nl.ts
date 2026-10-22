@@ -211,6 +211,7 @@ export const nl = {
   shrOwnerNoCandidates: 'Geen ander lid kan dit document overnemen.',
   shrOwnerLoading: 'Laden…',
   shrOwnerFailed: 'Eigendom kon niet worden overgedragen. Probeer het opnieuw.',
+  shrOwnerCandidatesFailed: 'De leden konden niet worden geladen. Sluit en probeer het opnieuw.',
   shrOwnerOwnedByWorkProduct:
     'Dit document hoort bij een werkproduct, dus de eigenaar kan niet worden gewijzigd.',
   shrOwnerUnavailable: 'Eigendom overdragen is nog niet beschikbaar op deze server.',

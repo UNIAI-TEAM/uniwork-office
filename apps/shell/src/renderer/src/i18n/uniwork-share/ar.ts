@@ -210,6 +210,7 @@ export const ar = {
   shrOwnerNoCandidates: 'لا يوجد عضو آخر يمكنه استلام هذا المستند.',
   shrOwnerLoading: 'جارٍ التحميل…',
   shrOwnerFailed: 'تعذّر نقل الملكية. حاول مرة أخرى.',
+  shrOwnerCandidatesFailed: 'تعذّر تحميل الأعضاء. أغلق النافذة وحاول مرة أخرى.',
   shrOwnerOwnedByWorkProduct: 'هذا المستند تابع لمنتج عمل، لذا لا يمكن تغيير مالكه.',
   shrOwnerUnavailable: 'نقل الملكية غير متاح بعد على هذا الخادم.',
 } satisfies Record<keyof typeof zh, string>

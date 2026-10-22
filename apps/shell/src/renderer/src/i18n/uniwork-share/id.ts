@@ -212,6 +212,7 @@ export const id = {
   shrOwnerNoCandidates: 'Tidak ada anggota lain yang dapat menerima dokumen ini.',
   shrOwnerLoading: 'Memuat…',
   shrOwnerFailed: 'Gagal mentransfer kepemilikan. Coba lagi.',
+  shrOwnerCandidatesFailed: 'Tidak dapat memuat daftar anggota. Tutup dan coba lagi.',
   shrOwnerOwnedByWorkProduct:
     'Dokumen ini milik sebuah produk kerja, jadi pemiliknya tidak dapat diubah.',
   shrOwnerUnavailable: 'Transfer kepemilikan belum tersedia di server ini.',

@@ -139,6 +139,21 @@ describe('uniwork share string shard', () => {
     expect(vi.shrOwnerUnavailable).toBeTruthy()
   })
 
+  it('UNI-2105 FE-10: the members-failed line is its own key, in every locale', () => {
+    expect(table('vi').shrOwnerCandidatesFailed).toBe(
+      'Không tải được danh sách thành viên. Hãy đóng và thử lại.',
+    )
+    expect(table('en').shrOwnerCandidatesFailed).toBe(
+      "Couldn't load the members. Close and try again.",
+    )
+    for (const lang of LANGS) {
+      const text = table(lang).shrOwnerCandidatesFailed
+      expect(text, lang).toBeTruthy()
+      // a translated line, not the transfer failure copied over
+      expect(text, lang).not.toBe(table(lang).shrOwnerFailed)
+    }
+  })
+
   // UNI-2078 FE-8b: the de share shard addresses the reader as du; the owner-transfer keys follow it
   it('de owner-transfer strings use the du register, not Sie', () => {
     const formal = /\b(Sie|Ihnen|Ihre[mnrs]?|Ihr)\b/

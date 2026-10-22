@@ -214,6 +214,7 @@ export const ja = {
   shrOwnerNoCandidates: 'このドキュメントを引き継げる他のメンバーはいません。',
   shrOwnerLoading: '読み込み中…',
   shrOwnerFailed: 'オーナー権限を移譲できませんでした。もう一度お試しください。',
+  shrOwnerCandidatesFailed: 'メンバーを読み込めませんでした。閉じてもう一度お試しください。',
   shrOwnerOwnedByWorkProduct:
     'このドキュメントは作業成果物に属しているため、オーナーを変更できません。',
   shrOwnerUnavailable: 'このサーバーではまだオーナー権限の移譲を利用できません。',

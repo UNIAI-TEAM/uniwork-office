@@ -213,6 +213,7 @@ export const cs = {
   shrOwnerNoCandidates: 'Žádný jiný člen nemůže tento dokument převzít.',
   shrOwnerLoading: 'Načítání…',
   shrOwnerFailed: 'Vlastnictví se nepodařilo převést. Zkuste to znovu.',
+  shrOwnerCandidatesFailed: 'Členy se nepodařilo načíst. Zavřete okno a zkuste to znovu.',
   shrOwnerOwnedByWorkProduct:
     'Tento dokument patří k pracovnímu výstupu, proto nelze změnit jeho vlastníka.',
   shrOwnerUnavailable: 'Převod vlastnictví zatím není na tomto serveru k dispozici.',

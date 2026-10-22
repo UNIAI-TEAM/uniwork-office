@@ -210,6 +210,7 @@ export const en = {
   shrOwnerNoCandidates: 'No other member can take this document.',
   shrOwnerLoading: 'Loading…',
   shrOwnerFailed: "Couldn't transfer ownership. Try again.",
+  shrOwnerCandidatesFailed: "Couldn't load the members. Close and try again.",
   shrOwnerOwnedByWorkProduct:
     "This document belongs to a work product, so its owner can't be changed.",
   shrOwnerUnavailable: "Ownership transfer isn't available on this server yet.",

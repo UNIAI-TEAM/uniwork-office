@@ -36,7 +36,7 @@ type Failure = Extract<ShareResult<never>, { ok: false }>
 const bridgeFailed = (): Failure => ({ ok: false, error: 'network' })
 
 /** every refusal has a sentence of ours: the server's own text is English (or internal) */
-function refusalKey(failure: Failure): StringKey {
+function refusalKey(failure: Failure, fallback: StringKey = 'shrOwnerFailed'): StringKey {
   if (failure.endpointMissing) return 'shrOwnerUnavailable'
   switch (failure.error) {
     case 'owner_target_not_member':
@@ -48,9 +48,9 @@ function refusalKey(failure: Failure): StringKey {
     case 'my_folder_locked':
     case 'document_shelved':
       // the real route answers both (UNI-2084): the Share dialog's own sentence says them
-      return shareErrorKey(failure.error) ?? 'shrOwnerFailed'
+      return shareErrorKey(failure.error) ?? fallback
     default:
-      return 'shrOwnerFailed'
+      return fallback
   }
 }
 
@@ -150,7 +150,8 @@ function OwnerTransferDialog({
         if (res.ok) setCandidates(res.value)
         else {
           setCandidates([])
-          setError({ key: refusalKey(res), name: '' })
+          // the member list failed to load: that is not a failed transfer
+          setError({ key: refusalKey(res, 'shrOwnerCandidatesFailed'), name: '' })
         }
       })
     return () => {
