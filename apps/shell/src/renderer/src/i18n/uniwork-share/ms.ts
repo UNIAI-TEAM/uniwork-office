@@ -194,4 +194,25 @@ export const ms = {
   shrBulkCopyFailed: 'Pautan tidak dapat disalin. Cuba lagi.',
   shrAccessManageFor: 'Urus akses untuk {title}',
   shrAccessViewFor: 'Lihat akses untuk {title}',
+  shrOwnerTransferButton: 'Pindah milik',
+  shrOwnerTransferTitle: 'Pindah milik “{document}”',
+  shrOwnerTitleUntitled: 'Pindah milik dokumen',
+  shrOwnerNewOwnerLabel: 'Pemilik baharu',
+  shrOwnerPreviousLevelLabel: 'Akses {name} selepas pemindahan',
+  shrOwnerPreviousLevelNone: 'Tiada akses',
+  shrOwnerTransferNote:
+    'Pemilik baharu boleh mengurus dokumen: berkongsi, menukar siapa yang boleh melihat dan memindahkannya ke tong sampah.',
+  shrOwnerTransferConfirm: 'Pindah',
+  shrOwnerTransferred: 'Pemilikan dipindahkan kepada {name}',
+  shrOwnerTargetNotMember:
+    '{name} bukan ahli ruang kerja ini, jadi tidak boleh memiliki dokumen ini.',
+  shrOwnerSelfTransferError:
+    'Pentadbir tidak boleh mengambil pemilikan dokumen peribadi untuk diri sendiri. Minta pentadbir lain memindahkannya, atau buka akses kecemasan untuk memeriksanya.',
+  shrOwnerSearchPlaceholder: 'Cari ahli ruang kerja',
+  shrOwnerNoCandidates: 'Tiada ahli lain yang boleh menerima dokumen ini.',
+  shrOwnerLoading: 'Memuatkan…',
+  shrOwnerFailed: 'Tidak dapat memindahkan pemilikan. Cuba lagi.',
+  shrOwnerOwnedByWorkProduct:
+    'Dokumen ini milik produk kerja, jadi pemiliknya tidak boleh ditukar.',
+  shrOwnerUnavailable: 'Pindah milik belum tersedia pada pelayan ini.',
 } satisfies Record<keyof typeof zh, string>

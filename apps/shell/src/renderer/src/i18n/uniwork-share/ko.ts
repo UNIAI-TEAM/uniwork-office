@@ -194,4 +194,23 @@ export const ko = {
   shrBulkCopyFailed: '링크를 복사할 수 없습니다. 다시 시도하세요.',
   shrAccessManageFor: '{title}의 액세스 관리',
   shrAccessViewFor: '{title}의 액세스 보기',
+  shrOwnerTransferButton: '소유권 이전',
+  shrOwnerTransferTitle: '“{document}” 소유권 이전',
+  shrOwnerTitleUntitled: '문서 소유권 이전',
+  shrOwnerNewOwnerLabel: '새 소유자',
+  shrOwnerPreviousLevelLabel: '이전 후 {name}의 권한',
+  shrOwnerPreviousLevelNone: '권한 유지 안 함',
+  shrOwnerTransferNote:
+    '새 소유자는 문서를 관리할 수 있습니다: 공유, 공개 범위 변경, 휴지통으로 이동.',
+  shrOwnerTransferConfirm: '이전',
+  shrOwnerTransferred: '{name}님에게 소유권을 이전했습니다',
+  shrOwnerTargetNotMember: '{name}님은 이 워크스페이스의 멤버가 아니므로 소유자가 될 수 없습니다.',
+  shrOwnerSelfTransferError:
+    '관리자는 비공개 문서의 소유권을 직접 가져올 수 없습니다. 다른 관리자에게 이전을 요청하거나 긴급 액세스를 열어 확인하세요.',
+  shrOwnerSearchPlaceholder: '워크스페이스 멤버 검색',
+  shrOwnerNoCandidates: '이 문서를 받을 수 있는 다른 멤버가 없습니다.',
+  shrOwnerLoading: '불러오는 중…',
+  shrOwnerFailed: '소유권을 이전하지 못했습니다. 다시 시도하세요.',
+  shrOwnerOwnedByWorkProduct: '이 문서는 작업 결과물에 속해 있어 소유자를 변경할 수 없습니다.',
+  shrOwnerUnavailable: '이 서버에서는 아직 소유권 이전을 사용할 수 없습니다.',
 } satisfies Record<keyof typeof zh, string>

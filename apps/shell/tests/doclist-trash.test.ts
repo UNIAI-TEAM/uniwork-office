@@ -140,6 +140,7 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
       uniworkListSources: vi.fn(async () => ok({ items: [], nextCursor: null })),
       uniworkSearchDocuments: vi.fn(async () => ok({ items: [], nextCursor: null })),
       uniworkRestoreDocument: vi.fn(async (id: string) => ok({ id })),
+      uniworkPurgeDocument: vi.fn(async (id: string) => ({ ok: true, value: { id } })),
       uniworkUnshelveDocument: vi.fn(async (id: string) =>
         ok({
           document: { ...shelf.find((d) => d.id === id)!, shelvedAt: undefined },
@@ -385,13 +386,221 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
     expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(before)
   })
 
-  it('has the menu Khôi phục · Xem chi tiết and no permanent delete', async () => {
-    await mount()
-    await click(host.querySelector('[data-doc-id="t-a"] .uw-row-menu-btn'))
-    const labels = Array.from(document.querySelectorAll('.uw-row-menu-list [role="menuitem"]')).map(
-      (el) => el.textContent?.trim(),
+  const menuLabels = () =>
+    Array.from(document.querySelectorAll('.uw-row-menu-list [role="menuitem"]')).map((el) =>
+      el.textContent?.trim(),
     )
-    expect(labels).toEqual(['Khôi phục', 'Xem chi tiết'])
+  const menuItem = (label: string) =>
+    Array.from(document.querySelectorAll<HTMLElement>('.uw-row-menu-list [role="menuitem"]')).find(
+      (el) => el.textContent?.trim() === label,
+    )
+  const toast = () => document.body.querySelector('.uw-act-toast')?.textContent ?? ''
+  const openMenu = (id: string) =>
+    click(host.querySelector(`[data-doc-id="${id}"] .uw-row-menu-btn`))
+
+  it('has the menu Khôi phục · Xem chi tiết · Xóa vĩnh viễn (UNI-2078)', async () => {
+    await mount()
+    await openMenu('t-a')
+    expect(menuLabels()).toEqual(['Khôi phục', 'Xem chi tiết', 'Xóa vĩnh viễn'])
+    // the delete entry sits in its own group after a divider, red
+    const purge = menuItem('Xóa vĩnh viễn')!
+    expect(purge.classList.contains('danger')).toBe(true)
+    expect(
+      document.querySelectorAll('.uw-row-menu-list [role="separator"]').length,
+    ).toBeGreaterThan(0)
+  })
+
+  describe('Xóa vĩnh viễn on a trash row (UNI-2078)', () => {
+    const dialog = () => document.body.querySelector('[role="dialog"]')
+    const confirm = () => document.body.querySelector<HTMLElement>('[data-purge-confirm]')
+
+    it('is hidden for an edit-level row, kept for an admin_scope row that cannot restore', async () => {
+      trash = [
+        trashed('t-a', iso(2026, 9, 22), iso(2026, 10, 22), {
+          canManage: false,
+          canEdit: true,
+          myLevel: 'edit',
+        }),
+        trashed('t-b', iso(2026, 9, 28), iso(2026, 10, 28), {
+          canManage: false,
+          canEdit: false,
+          myLevel: 'view',
+          adminScope: true,
+        }),
+      ]
+      await mount()
+      await openMenu('t-a')
+      expect(menuLabels()).toEqual(['Xem chi tiết'])
+      await click(document.body)
+      await openMenu('t-b')
+      expect(menuLabels()).toEqual(['Xem chi tiết', 'Xóa vĩnh viễn'])
+    })
+
+    it('has no entry in a shell without the purge call', async () => {
+      delete api.uniworkPurgeDocument
+      await mount()
+      await openMenu('t-a')
+      expect(menuLabels()).toEqual(['Khôi phục', 'Xem chi tiết'])
+    })
+
+    it('is never in the menu of a live row or a shelved row', async () => {
+      await remount('archive')
+      await openMenu('s-a')
+      expect(menuLabels()).not.toContain('Xóa vĩnh viễn')
+    })
+
+    it('opens the confirm with the item name and sends nothing before it', async () => {
+      await mount()
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      expect(dialog()!.textContent).toContain('Xóa vĩnh viễn t-a?')
+      expect(api.uniworkPurgeDocument).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(document.body.querySelector('[data-purge-cancel]'))
+    })
+
+    it('Hủy closes without a call', async () => {
+      await mount()
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(document.body.querySelector('[data-purge-cancel]'))
+      expect(dialog()).toBeNull()
+      expect(api.uniworkPurgeDocument).not.toHaveBeenCalled()
+    })
+
+    it('confirm: one call, the "purged" toast, the dialog closes and the list is read again', async () => {
+      await mount()
+      const before = api.uniworkListTrash!.mock.calls.length
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(confirm())
+      expect(api.uniworkPurgeDocument).toHaveBeenCalledTimes(1)
+      expect(api.uniworkPurgeDocument!.mock.calls[0]![0]).toBe('t-a')
+      expect(dialog()).toBeNull()
+      expect(toast()).toContain('Đã xóa vĩnh viễn t-a')
+      expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(before)
+    })
+
+    it('a failure stays inside the dialog and refreshes nothing', async () => {
+      api.uniworkPurgeDocument!.mockResolvedValueOnce({ ok: false, error: 'server_error' })
+      await mount()
+      const before = api.uniworkListTrash!.mock.calls.length
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(confirm())
+      expect(dialog()).not.toBeNull()
+      expect(dialog()!.querySelector('[role="alert"]')?.textContent).toBe(
+        'Không xóa được. Chưa có gì thay đổi.',
+      )
+      expect(api.uniworkListTrash!.mock.calls.length).toBe(before)
+      expect(toast()).toBe('')
+    })
+
+    it('document_not_in_trash: toasts the error, refreshes the list and closes the dialog', async () => {
+      api.uniworkPurgeDocument!.mockResolvedValueOnce({ ok: false, error: 'document_not_in_trash' })
+      await mount()
+      const before = api.uniworkListTrash!.mock.calls.length
+      await openMenu('t-a')
+      await click(menuItem('Xóa vĩnh viễn'))
+      await click(confirm())
+      expect(dialog()).toBeNull()
+      expect(toast()).toContain('Mục này không còn trong thùng rác.')
+      expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(before)
+    })
+  })
+
+  // UNI-2078 fix3 (VS-1): a trashed folder card carries the trash row menu of a folder (web:
+  // Restore | Delete forever, no "Xem chi tiết"), never the live folder menu
+  describe('the trashed folder card menu (UNI-2078 VS-1)', () => {
+    const folderCard = (id: string) => `.dh-folder-card[data-folder-id="${id}"]`
+    const trashedFolder = (id: string, extra: Partial<DocumentsHomeDoc> = {}) =>
+      trashed(id, iso(2026, 9, 22), iso(2026, 10, 22), {
+        kind: 'folder',
+        format: null,
+        title: 'Hồ sơ cũ',
+        ...extra,
+      })
+    const openFolderMenu = (id: string) =>
+      click(host.querySelector(`${folderCard(id)} .uw-row-menu-btn`))
+    const dialog = () => document.body.querySelector('[role="dialog"]')
+    const separators = () => document.querySelectorAll('.uw-row-menu-list [role="separator"]')
+
+    it('manage level: Khôi phục, a divider, Xóa vĩnh viễn (danger) and nothing else', async () => {
+      trash = [trashedFolder('t-f')]
+      await mount()
+      await openFolderMenu('t-f')
+      expect(menuLabels()).toEqual(['Khôi phục', 'Xóa vĩnh viễn'])
+      expect(separators()).toHaveLength(1)
+      expect(menuItem('Xóa vĩnh viễn')!.classList.contains('danger')).toBe(true)
+    })
+
+    it('admin_scope only: Xóa vĩnh viễn alone, like the file row minus its details', async () => {
+      trash = [
+        trashedFolder('t-f', {
+          canManage: false,
+          canEdit: false,
+          myLevel: 'view',
+          adminScope: true,
+        }),
+      ]
+      await mount()
+      await openFolderMenu('t-f')
+      expect(menuLabels()).toEqual(['Xóa vĩnh viễn'])
+    })
+
+    it('view level without admin_scope: no menu on the card', async () => {
+      trash = [trashedFolder('t-f', { canManage: false, canEdit: false, myLevel: 'view' })]
+      await mount()
+      expect(host.querySelector(folderCard('t-f'))).not.toBeNull()
+      expect(host.querySelector(`${folderCard('t-f')} .uw-row-menu-btn`)).toBeNull()
+    })
+
+    it('a shell without the purge call keeps Khôi phục only', async () => {
+      delete api.uniworkPurgeDocument
+      trash = [trashedFolder('t-f')]
+      await mount()
+      await openFolderMenu('t-f')
+      expect(menuLabels()).toEqual(['Khôi phục'])
+    })
+
+    it('Khôi phục restores the folder through the same call as a file', async () => {
+      trash = [trashedFolder('t-f')]
+      await mount()
+      const before = api.uniworkListTrash!.mock.calls.length
+      await openFolderMenu('t-f')
+      await click(menuItem('Khôi phục'))
+      expect(api.uniworkRestoreDocument).toHaveBeenCalledTimes(1)
+      expect(api.uniworkRestoreDocument!.mock.calls[0]![0]).toBe('t-f')
+      expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(before)
+    })
+
+    it('Xóa vĩnh viễn opens the folder confirm, sends nothing before it, then purges the folder', async () => {
+      trash = [trashedFolder('t-f')]
+      await mount()
+      await openFolderMenu('t-f')
+      await click(menuItem('Xóa vĩnh viễn'))
+      expect(dialog()!.textContent).toContain('Xóa vĩnh viễn Hồ sơ cũ?')
+      expect(dialog()!.textContent).toContain(
+        'Thư mục này sẽ bị xóa vĩnh viễn và không thể hoàn tác. Mục con bạn không quản lý vẫn ở lại thùng rác.',
+      )
+      expect(api.uniworkPurgeDocument).not.toHaveBeenCalled()
+      await click(document.body.querySelector('[data-purge-confirm]'))
+      expect(api.uniworkPurgeDocument).toHaveBeenCalledTimes(1)
+      expect(api.uniworkPurgeDocument!.mock.calls[0]![0]).toBe('t-f')
+      expect(dialog()).toBeNull()
+    })
+  })
+
+  it('.btn-danger fills with --danger (white on it >= 4.5:1), hover keeps --color-error-hover (UNI-2078 VS-2)', () => {
+    const css = readFileSync(resolve(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    // the declaration block of the rule that starts a line with exactly this selector
+    const rule = (selector: string) => {
+      const at = css.indexOf(`\n${selector} {`)
+      return at < 0 ? '' : css.slice(at, css.indexOf('}', at))
+    }
+    expect(rule('.btn-danger')).toMatch(/background:\s*var\(--danger\);/)
+    expect(rule(".btn-danger:hover:not(:disabled):not([aria-disabled='true'])")).toMatch(
+      /background:\s*var\(--color-error-hover\);/,
+    )
   })
 
   it('keeps select-all and the row checkboxes working across the groups', async () => {

@@ -194,4 +194,25 @@ export const vi = {
   shrBulkCopyFailed: 'Không sao chép được link. Thử lại.',
   shrAccessManageFor: 'Quản lý quyền truy cập của {title}',
   shrAccessViewFor: 'Xem quyền truy cập của {title}',
+  shrOwnerTransferButton: 'Chuyển quyền sở hữu',
+  shrOwnerTransferTitle: 'Chuyển quyền sở hữu “{document}”',
+  shrOwnerTitleUntitled: 'Chuyển quyền sở hữu tài liệu',
+  shrOwnerNewOwnerLabel: 'Chủ sở hữu mới',
+  shrOwnerPreviousLevelLabel: 'Quyền của {name} sau khi chuyển',
+  shrOwnerPreviousLevelNone: 'Không giữ quyền',
+  shrOwnerTransferNote:
+    'Chủ sở hữu mới quản lý được tài liệu: chia sẻ, đổi chế độ hiển thị và chuyển vào thùng rác.',
+  shrOwnerTransferConfirm: 'Chuyển',
+  shrOwnerTransferred: 'Đã chuyển quyền sở hữu cho {name}',
+  shrOwnerTargetNotMember:
+    '{name} chưa là thành viên của workspace này nên không thể làm chủ sở hữu.',
+  shrOwnerSelfTransferError:
+    'Quản trị viên không thể tự nhận quyền sở hữu tài liệu riêng tư. Hãy nhờ một quản trị viên khác chuyển, hoặc mở truy cập khẩn cấp để kiểm tra.',
+  shrOwnerSearchPlaceholder: 'Tìm thành viên của workspace',
+  shrOwnerNoCandidates: 'Không có thành viên nào khác nhận được tài liệu này.',
+  shrOwnerLoading: 'Đang tải…',
+  shrOwnerFailed: 'Chưa chuyển được quyền sở hữu. Hãy thử lại.',
+  shrOwnerOwnedByWorkProduct:
+    'Tài liệu này thuộc về một sản phẩm công việc nên không đổi được chủ sở hữu.',
+  shrOwnerUnavailable: 'Máy chủ này chưa hỗ trợ chuyển quyền sở hữu.',
 } satisfies Record<keyof typeof zh, string>

@@ -284,10 +284,12 @@ export interface UniworkDocsClient {
    * source's ACL and provenance. `consent: "copy"` is the only accepted value
    * (an explicit choice). The answer is the new document and its revision
    * (the copy's version 1), the base of the commit that follows.
+   * UNI-2078: a blank `title` is left out of the body (the server names the copy); the conflict
+   * flow keeps passing its own title and parent.
    */
   copyDocument(input: {
     documentId: string
-    title: string
+    title?: string
     parentId: string | null
     idempotencyKey: string
   }): Promise<{ summary: UniworkDocSummary; revision: string }>
@@ -300,6 +302,11 @@ export interface UniworkDocsClient {
   getArchiveImpact(documentId: string): Promise<UniworkArchiveImpact>
   /** restore an archived document (S18) */
   restore(documentId: string, idempotencyKey: string): Promise<UniworkDocSummary>
+  /**
+   * UNI-2078: delete a trashed document forever (`POST /documents/{id}/purge`). No body and no
+   * Idempotency-Key (the web sends neither); the server answers 204 with nothing to read.
+   */
+  purgeDocument(documentId: string): Promise<void>
   /**
    * UNI-1961 (ARCHIVE-01): the workspace's Lưu trữ shelf (`shelved=true`,
    * shelved_at DESC, the flat list's cursor); only the type filter and sort/order apply
@@ -1229,7 +1236,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         route: `/documents/${id(input.documentId)}/copies`,
         json: {
           consent: 'copy',
-          title: input.title,
+          ...(input.title?.trim() ? { title: input.title } : {}),
           ...(parentOf(input.parentId) ? { parent_id: parentOf(input.parentId) } : {}),
         },
         idempotencyKey: input.idempotencyKey,
@@ -1269,6 +1276,16 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
         read: json,
       })
       return parseDocumentSummary(raw)
+    },
+
+    async purgeDocument(documentId) {
+      await send({
+        method: 'POST',
+        route: `/documents/${id(documentId)}/purge`,
+        timeoutMs: metadataTimeout,
+        // the one answer with no JSON: a 204 has no body to parse
+        read: () => Promise.resolve(undefined),
+      })
     },
 
     async listShelved(input) {

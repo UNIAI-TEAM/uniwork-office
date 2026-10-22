@@ -192,4 +192,25 @@ export const en = {
   shrBulkCopyFailed: 'Could not copy the link. Try again.',
   shrAccessManageFor: 'Manage access for {title}',
   shrAccessViewFor: 'View access for {title}',
+  shrOwnerTransferButton: 'Transfer ownership',
+  shrOwnerTransferTitle: 'Transfer ownership of “{document}”',
+  shrOwnerTitleUntitled: 'Transfer document ownership',
+  shrOwnerNewOwnerLabel: 'New owner',
+  shrOwnerPreviousLevelLabel: "{name}'s access after the transfer",
+  shrOwnerPreviousLevelNone: 'No access',
+  shrOwnerTransferNote:
+    'The new owner can manage the document: share it, change who can see it and move it to trash.',
+  shrOwnerTransferConfirm: 'Transfer',
+  shrOwnerTransferred: 'Ownership transferred to {name}',
+  shrOwnerTargetNotMember:
+    "{name} isn't a member of this workspace, so they can't own this document.",
+  shrOwnerSelfTransferError:
+    "Admins can't take ownership of a private document themselves. Ask another admin to transfer it, or open emergency access to inspect it.",
+  shrOwnerSearchPlaceholder: 'Search workspace members',
+  shrOwnerNoCandidates: 'No other member can take this document.',
+  shrOwnerLoading: 'Loading…',
+  shrOwnerFailed: "Couldn't transfer ownership. Try again.",
+  shrOwnerOwnedByWorkProduct:
+    "This document belongs to a work product, so its owner can't be changed.",
+  shrOwnerUnavailable: "Ownership transfer isn't available on this server yet.",
 } satisfies Record<keyof typeof zh, string>

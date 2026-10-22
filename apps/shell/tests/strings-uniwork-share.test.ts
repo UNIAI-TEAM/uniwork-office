@@ -74,6 +74,79 @@ describe('uniwork share string shard', () => {
     expect(en.shrAccessViewFor).toBe('View access for {title}')
   })
 
+  it('UNI-2078: the owner transfer copy is the web documents.share.owner.* verbatim', () => {
+    const vi = table('vi')
+    const en = table('en')
+    const web: Array<[string, string, string]> = [
+      ['shrOwnerTransferButton', 'Chuyển quyền sở hữu', 'Transfer ownership'],
+      [
+        'shrOwnerTransferTitle',
+        'Chuyển quyền sở hữu “{document}”',
+        'Transfer ownership of “{document}”',
+      ],
+      ['shrOwnerNewOwnerLabel', 'Chủ sở hữu mới', 'New owner'],
+      [
+        'shrOwnerPreviousLevelLabel',
+        'Quyền của {name} sau khi chuyển',
+        "{name}'s access after the transfer",
+      ],
+      ['shrOwnerPreviousLevelNone', 'Không giữ quyền', 'No access'],
+      [
+        'shrOwnerTransferNote',
+        'Chủ sở hữu mới quản lý được tài liệu: chia sẻ, đổi chế độ hiển thị và chuyển vào thùng rác.',
+        'The new owner can manage the document: share it, change who can see it and move it to trash.',
+      ],
+      ['shrOwnerTransferConfirm', 'Chuyển', 'Transfer'],
+      [
+        'shrOwnerTransferred',
+        'Đã chuyển quyền sở hữu cho {name}',
+        'Ownership transferred to {name}',
+      ],
+      [
+        'shrOwnerTargetNotMember',
+        '{name} chưa là thành viên của workspace này nên không thể làm chủ sở hữu.',
+        "{name} isn't a member of this workspace, so they can't own this document.",
+      ],
+      [
+        'shrOwnerSelfTransferError',
+        'Quản trị viên không thể tự nhận quyền sở hữu tài liệu riêng tư. Hãy nhờ một quản trị viên khác chuyển, hoặc mở truy cập khẩn cấp để kiểm tra.',
+        "Admins can't take ownership of a private document themselves. Ask another admin to transfer it, or open emergency access to inspect it.",
+      ],
+      ['shrOwnerTitleUntitled', 'Chuyển quyền sở hữu tài liệu', 'Transfer document ownership'],
+      ['shrOwnerSearchPlaceholder', 'Tìm thành viên của workspace', 'Search workspace members'],
+      [
+        'shrOwnerNoCandidates',
+        'Không có thành viên nào khác nhận được tài liệu này.',
+        'No other member can take this document.',
+      ],
+      [
+        'shrOwnerFailed',
+        'Chưa chuyển được quyền sở hữu. Hãy thử lại.',
+        "Couldn't transfer ownership. Try again.",
+      ],
+      [
+        'shrOwnerOwnedByWorkProduct',
+        'Tài liệu này thuộc về một sản phẩm công việc nên không đổi được chủ sở hữu.',
+        "This document belongs to a work product, so its owner can't be changed.",
+      ],
+    ]
+    for (const [key, viText, enText] of web) {
+      expect(vi[key], key).toBe(viText)
+      expect(en[key], key).toBe(enText)
+    }
+    // the app's own line for a server without the route
+    expect(en.shrOwnerUnavailable).toBeTruthy()
+    expect(vi.shrOwnerUnavailable).toBeTruthy()
+  })
+
+  // UNI-2078 FE-8b: the de share shard addresses the reader as du; the owner-transfer keys follow it
+  it('de owner-transfer strings use the du register, not Sie', () => {
+    const formal = /\b(Sie|Ihnen|Ihre[mnrs]?|Ihr)\b/
+    expect(
+      Object.entries(table('de')).filter(([k, v]) => k.startsWith('shrOwner') && formal.test(v)),
+    ).toEqual([])
+  })
+
   it('no git word or internal code in the vi/en copy', () => {
     const text = [...Object.values(table('vi')), ...Object.values(table('en'))].join('\n')
     expect(text).not.toMatch(/\b(git|github|commit|branch)\b/i)

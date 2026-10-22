@@ -196,4 +196,25 @@ export const ru = {
   shrBulkCopyFailed: 'Не удалось скопировать ссылку. Попробуйте ещё раз.',
   shrAccessManageFor: 'Управление доступом к «{title}»',
   shrAccessViewFor: 'Просмотр доступа к «{title}»',
+  shrOwnerTransferButton: 'Передать владение',
+  shrOwnerTransferTitle: 'Передать владение «{document}»',
+  shrOwnerTitleUntitled: 'Передать владение документом',
+  shrOwnerNewOwnerLabel: 'Новый владелец',
+  shrOwnerPreviousLevelLabel: 'Доступ {name} после передачи',
+  shrOwnerPreviousLevelNone: 'Без доступа',
+  shrOwnerTransferNote:
+    'Новый владелец сможет управлять документом: делиться им, менять, кто его видит, и перемещать в корзину.',
+  shrOwnerTransferConfirm: 'Передать',
+  shrOwnerTransferred: 'Владение передано: {name}',
+  shrOwnerTargetNotMember:
+    '{name} не участник этого рабочего пространства и не может владеть этим документом.',
+  shrOwnerSelfTransferError:
+    'Администратор не может сам стать владельцем личного документа. Попросите другого администратора передать его или откройте экстренный доступ для проверки.',
+  shrOwnerSearchPlaceholder: 'Поиск участников рабочего пространства',
+  shrOwnerNoCandidates: 'Нет других участников, которые могут принять этот документ.',
+  shrOwnerLoading: 'Загрузка…',
+  shrOwnerFailed: 'Не удалось передать владение. Попробуйте ещё раз.',
+  shrOwnerOwnedByWorkProduct:
+    'Этот документ принадлежит рабочему результату, поэтому владельца нельзя изменить.',
+  shrOwnerUnavailable: 'Передача владения пока недоступна на этом сервере.',
 } satisfies Record<keyof typeof zh, string>

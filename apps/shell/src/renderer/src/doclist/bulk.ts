@@ -7,6 +7,8 @@ import { UNIWORK_ERROR_KEYS } from '../uniwork-docs-model'
 import type { UniworkDocErrorCode } from '../../../shared/home-api'
 import type { DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
 import {
+  moveDocument,
+  purgeDocument,
   restoreDocument,
   shelveDocument,
   trashDocument,
@@ -20,27 +22,31 @@ export const BULK_CONCURRENCY = 4
 /** pause before the single retry of a throttled call */
 const RETRY_DELAY_MS = 1000
 
-/** the row-menu actions a batch can run on many rows (Move takes one row in the app) */
+/** the row-menu actions a batch can run on many rows */
 export type BulkActionId = Extract<
   RowMenuActionId,
-  'share' | 'restore' | 'unshelve' | 'download' | 'shelve' | 'trash'
+  'share' | 'move' | 'restore' | 'unshelve' | 'download' | 'shelve' | 'trash' | 'purge'
 >
 
 /**
  * the ones that fan out over single-document calls here; Chia sẻ opens its own dialog and runs the
- * bridge's bulk, Tải xuống plans one file or one zip (uniwork-zip-download)
+ * bridge's bulk, Tải xuống plans one file or one zip (uniwork-zip-download). Di chuyển fans out too,
+ * but only after the folder picker chose its one target (`bulkWorkFor`'s third argument).
  */
 export type BulkWorkActionId = Exclude<BulkActionId, 'share' | 'download'>
 
-// Rules board §3 order: Chia sẻ first (the web's bar), the keep actions with Tải xuống before the
-// archive entry (live: Share · Download · Archive · Trash; shelf: Unarchive · Download · Trash), the delete entry last
+// Rules board §3 order: Chia sẻ first (the web's bar), Di chuyển next, the keep actions with Tải xuống
+// before the archive entry (live: Share · Move · Download · Archive · Trash; shelf: Unarchive ·
+// Download · Trash), the delete entry last (trash: Restore · Delete forever, UNI-2078)
 const BULK_ORDER: readonly BulkActionId[] = [
   'share',
+  'move',
   'restore',
   'unshelve',
   'download',
   'shelve',
   'trash',
+  'purge',
 ]
 
 /** `retryable`: main marked the failure a throttle (429 / 503); nothing else is worth a second call */
@@ -144,12 +150,14 @@ function canShareWrite(doc: DocumentsHomeDoc): boolean {
  * manageable and the shell's Share bridge (`canShare`): never a dead button.
  * Tải xuống is the exception (the web's rule): it shows when at least ONE selected row is a file
  * (the rest are skipped and listed), and only with the zip bridge (`canDownload`).
+ * Xóa vĩnh viễn (UNI-2078) needs the shell's purge call (`canPurge`) and every row to offer it.
  */
 export function bulkActionsFor(
   screen: DocListScreen,
   docs: readonly DocumentsHomeDoc[],
   canShare = false,
   canDownload = false,
+  canPurge = false,
 ): BulkActionId[] {
   if (docs.length === 0) return []
   const stub = () => {}
@@ -163,24 +171,33 @@ export function bulkActionsFor(
     if (id === 'download') return canDownload && docs.some((doc) => offers(doc, id))
     return (
       (id !== 'share' || canShare) &&
+      (id !== 'purge' || canPurge) &&
       docs.every((doc) => (id !== 'share' || canShareWrite(doc)) && offers(doc, id))
     )
   })
 }
 
-/** the single-document call one batch item runs: the same calls the row menu uses */
+/**
+ * the single-document call one batch item runs: the same calls the row menu uses. `targetParentId`
+ * is the folder a Di chuyển batch moves into (null = the workspace root); no other action reads it.
+ */
 export function bulkWorkFor(
   action: BulkWorkActionId,
   screen: DocListScreen,
+  targetParentId: string | null = null,
 ): (doc: DocumentsHomeDoc) => Promise<BulkWorkResult> {
   const call = (doc: DocumentsHomeDoc) => {
     switch (action) {
+      case 'move':
+        return moveDocument({ documentId: doc.id, parentId: targetParentId })
       case 'shelve':
         return shelveDocument(doc.id)
       case 'unshelve':
         return unshelveDocument(doc.id)
       case 'restore':
         return restoreDocument(doc.id)
+      case 'purge':
+        return purgeDocument(doc.id)
       case 'trash':
         // a shelved row has its own trash call; every other screen archives (a folder or a page
         // through the kind-agnostic call, since the archive call is file-only)
@@ -196,10 +213,12 @@ export function bulkWorkFor(
 }
 
 const DONE_KEYS: Record<BulkWorkActionId, StringKey> = {
+  move: 'dlBulkDoneMove',
   shelve: 'dlBulkDoneShelve',
   unshelve: 'dlBulkDoneUnshelve',
   restore: 'dlBulkDoneRestore',
   trash: 'dlBulkDoneTrash',
+  purge: 'dlBulkDonePurge',
 }
 
 /** the toast of a finished batch: "3/5" counts, plus the commonest reason when some failed */

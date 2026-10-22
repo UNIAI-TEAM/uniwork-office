@@ -200,4 +200,12 @@ export const ja = {
   uwSourceOriginTask: 'タスク',
   uwSourceOriginMeeting: '会議',
   uwSourceOriginEmail: 'メール',
+  uwErrOwnerRequiresCopy:
+    'このドキュメントは作業成果物に属しています。所有元の画面からコピーしてください。',
+  uwErrPageCopyNotSupported:
+    'この段階でコピーできるのはファイル形式のドキュメントのみです。UniNote のコピーは今後対応予定です。',
+  uwErrCopyConsentRequired: 'コピーの前に、明示的な確認が必要です。',
+  uwErrDocumentNotInTrash: 'この項目はもうごみ箱にありません。',
+  uwErrFolderTooLarge:
+    'フォルダーの項目が多すぎるため、一度に削除できません。先に中身を分けて削除してください。',
 } satisfies Record<keyof typeof zh, string>

@@ -349,6 +349,36 @@ export interface ShareMemberPage {
 }
 
 /**
+ * UNI-2078: what the previous owner keeps after an owner transfer (the web's
+ * `KEEP_LEVELS`; `comment` joins once the server ships it). The server defaults to edit.
+ */
+export type ShareOwnerKeepLevel = 'edit' | 'view' | 'none'
+export const SHARE_OWNER_KEEP_LEVELS: readonly ShareOwnerKeepLevel[] = ['edit', 'view', 'none']
+
+/** one person who may take a document: a workspace member active in the organization */
+export interface ShareOwnerCandidate {
+  userId: string
+  /** the display name, else the email */
+  name: string
+  email: string
+}
+
+export interface ShareOwnerTransferInput {
+  documentId: string
+  userId: string
+  /** omitted = edit */
+  previousOwnerLevel?: ShareOwnerKeepLevel
+}
+
+/** `DocumentOwnerSDO`: the share id is empty when the previous owner kept nothing */
+export interface ShareOwnerTransfer {
+  documentId: string
+  aclOwnerId: string
+  previousOwnerId: string
+  previousOwnerShareId: string
+}
+
+/**
  * What a share call may fail with. The server's own verdicts keep their names
  * (`document_access_rejected` carries `rejected`); the transport / permission
  * failures are the app's usual ones.
@@ -374,6 +404,8 @@ export type ShareErrorCode =
   | 'break_glass_required'
   | 'break_glass_reason_invalid'
   | 'access_request_closed'
+  | 'owner_target_not_member'
+  | 'document_owned_by_work_product'
 
 export type ShareResult<T> =
   | { ok: true; value: T }
@@ -386,6 +418,8 @@ export type ShareResult<T> =
       rejected?: ShareRejectedItem[]
       /** a throttle (429 / 503): the same call may be repeated once */
       retryable?: boolean
+      /** the server has no such route (404 / 405 / 501): the action is hidden for the session */
+      endpointMissing?: boolean
     }
 
 /** one method per `uniwork-share:*` channel */
@@ -410,4 +444,8 @@ export interface UniworkShareApi {
   ): Promise<ShareResult<ShareBreakGlassRevokeInput>>
   /** one page of the selected organization's members (the names of the people in the access list) */
   members(input: ShareMembersInput): Promise<ShareResult<ShareMemberPage>>
+  /** UNI-2078: who may take the document (main gates it and filters the people) */
+  ownerCandidates(documentId: string): Promise<ShareResult<ShareOwnerCandidate[]>>
+  /** UNI-2078: hand the ACL owner to another member (`PUT /documents/{id}/owner`) */
+  transferOwner(input: ShareOwnerTransferInput): Promise<ShareResult<ShareOwnerTransfer>>
 }
