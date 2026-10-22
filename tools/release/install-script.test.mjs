@@ -60,6 +60,10 @@ const STUB_ENV_HELP = {
   gpg: [
     '#!/bin/sh',
     'printf "pub:-:4096:1:AAAA:1:::::scESC:::::::\\nfpr:::::::::%s:\\n" "${STUB_FPR}"',
+    // STUB_FPR2 appends a second primary key, as a key.gpg with an extra key would list
+    'if [ -n "${STUB_FPR2:-}" ]; then',
+    '  printf "pub:-:4096:1:BBBB:1:::::scESC:::::::\\nfpr:::::::::%s:\\n" "${STUB_FPR2}"',
+    'fi',
     '',
   ].join('\n'),
   'apt-get': '#!/bin/sh\necho "apt-get $*" >>"$STUB_LOG"\n',
@@ -191,6 +195,14 @@ describe('install.sh', () => {
     const result = runScript(['dev'], { STUB_FPR: '0000000000000000000000000000000000000000' })
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, new RegExp(`expected ${FPR}; nothing was changed`))
+    assert.deepEqual(written(), [])
+    assert.ok(!result.log.includes('apt-get'))
+  })
+
+  it('refuses a key.gpg that holds a second key after the release key and writes nothing', () => {
+    const result = runScript(['dev'], { STUB_FPR2: '1111111111111111111111111111111111111111' })
+    assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`)
+    assert.match(result.stderr, new RegExp(`expected exactly one key ${FPR}; nothing was changed`))
     assert.deepEqual(written(), [])
     assert.ok(!result.log.includes('apt-get'))
   })
