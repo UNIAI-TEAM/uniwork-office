@@ -174,124 +174,23 @@ test.describe('html editor', () => {
     try {
       const editorPage = await waitForPageWithUrl(app, '://html/')
       await expect(editorPage.locator('.ribbon-body')).toBeVisible()
-      // DIAG-162 (temporary): focus timeline around the click
-      editorPage.on('console', (m) => {
-        if (m.text().startsWith('DIAG162')) console.log(m.text())
-      })
-      await editorPage.evaluate(() => {
-        const t0 = performance.now()
-        const d = (s: string) => {
-          const el = document.activeElement as HTMLElement | null
-          const a = el ? `${el.tagName}.${el.className}#${el.id}` : 'null'
-          console.log(
-            `DIAG162 +${Math.round(performance.now() - t0)}ms ${s} active=${a} hasFocus=${document.hasFocus()}`,
-          )
-        }
-        ;(window as unknown as { __d: typeof d }).__d = d
-        for (const ev of ['focus', 'blur']) window.addEventListener(ev, () => d(`window ${ev}`))
-        for (const ev of ['focusin', 'focusout']) {
-          document.addEventListener(
-            ev,
-            (e) => {
-              const t = e.target as HTMLElement
-              d(`${ev} target=${t.tagName}.${t.className}`)
-            },
-            true,
-          )
-        }
-        document.addEventListener(
-          'mousedown',
-          (e) => {
-            const t = e.target as HTMLElement
-            d(
-              `mousedown target=${t.tagName}.${t.className} dp=${e.defaultPrevented} x=${e.clientX} y=${e.clientY}`,
-            )
-          },
-          true,
-        )
-        document.addEventListener('mouseup', () => d('mouseup'), true)
-        new MutationObserver((recs) => {
-          for (const r of recs)
-            for (const n of Array.from(r.removedNodes))
-              if (
-                n instanceof HTMLElement &&
-                (n.matches('.cm-content,.cm-editor') || n.querySelector('.cm-content'))
-              )
-                d(`REMOVED ${n.className}`)
-        }).observe(document.body, { childList: true, subtree: true })
-        d('listeners installed')
-      })
       await editorPage.locator('.rb-view', { hasText: /Source/ }).click()
       const content = editorPage.locator('.source-editor .cm-content')
       // like the open-and-save test: the pane holds the document before the key goes to it, and the
-      // click's focus has landed (the window handler takes ⌘/Ctrl+S from the focused editor)
+      // click's focus has landed (the window handler takes ⌘/Ctrl+S from the focused editor).
+      // A click a few frames after the Source switch can still be routed to the preview iframe that
+      // sat under that point (Chromium's browser-side hit test lags the layout; the page sees no
+      // mousedown and the iframe becomes the active element), so click until the focus sticks.
       await expect(content).toContainText('café')
-      await content.evaluate((el) => {
-        ;(el as unknown as { __tag: string }).__tag = 'orig'
-        const r = el.getBoundingClientRect()
-        const hit = document.elementFromPoint(
-          r.left + r.width / 2,
-          r.top + r.height / 2,
-        ) as HTMLElement | null
-        ;(window as unknown as { __d: (s: string) => void }).__d(
-          `before click rect=${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)}x${Math.round(r.height)} hit=${hit?.tagName}.${hit?.className}`,
-        )
-      })
-      await content.click()
-      await editorPage.evaluate(() =>
-        (window as unknown as { __d: (s: string) => void }).__d('after click'),
-      )
-      try {
-        await expect(content).toBeFocused({ timeout: 2000 })
-      } catch (err) {
-        await editorPage.evaluate(() => {
-          const f = document.querySelector('.preview-frame') as HTMLElement
-          const r = f.getBoundingClientRect()
-          ;(window as unknown as { __d: (s: string) => void }).__d(
-            `iframe display=${getComputedStyle(f.closest('.pane')!).display} rect=${Math.round(r.width)}x${Math.round(r.height)}`,
-          )
-        })
+      await expect(async () => {
         await content.click()
-        await editorPage.evaluate(() =>
-          (window as unknown as { __d: (s: string) => void }).__d('after RETRY click'),
-        )
-        await expect(content).toBeFocused({ timeout: 2000 })
-        await editorPage.evaluate(() =>
-          (window as unknown as { __d: (s: string) => void }).__d('RETRY focused ok'),
-        )
-        throw err
-      }
+        await expect(content).toBeFocused({ timeout: 1000 })
+      }).toPass()
       await editorPage.keyboard.press('ControlOrMeta+s')
       await expect(editorPage.locator('.status-save')).toHaveText(/Saved/)
       expect(await readFile(htmlPath, 'utf8')).toBe(source)
     } finally {
       await closeAndSaveVideo(launched, 'html-identity-save')
-    }
-  })
-
-  test('byte-identical DIAG162 immediate click after the Source switch', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'genoffice-html-'))
-    const htmlPath = join(dir, 'legacy.htm')
-    await writeFile(htmlPath, '<html>\r\n<body>\r\n<p>café</p>\r\n</body>\r\n</html>', 'utf8')
-    const launched = await launchShell({
-      onboardingSeen: true,
-      videoDir: 'html-identity-save-diag',
-      openFile: htmlPath,
-    })
-    try {
-      const editorPage = await waitForPageWithUrl(launched.app, '://html/')
-      await expect(editorPage.locator('.ribbon-body')).toBeVisible()
-      await expect(editorPage.locator('.preview-frame')).toBeVisible()
-      await editorPage.locator('.rb-view', { hasText: /Source/ }).click()
-      await editorPage.mouse.click(835, 498)
-      const active = await editorPage.evaluate(() => {
-        const el = document.activeElement as HTMLElement
-        return `${el.tagName}.${el.className}`
-      })
-      console.log(`DIAG162 immediate click active=${active}`)
-      expect(active).toContain('cm-content')
-    } finally {
-      await closeAndSaveVideo(launched, 'html-identity-save-diag')
     }
   })
 
