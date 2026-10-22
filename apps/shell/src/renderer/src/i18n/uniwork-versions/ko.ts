@@ -30,7 +30,7 @@ export const ko = {
   vhsNameSubmitting: '만드는 중…',
   vhsNameDone: '버전 {no}을(를) 만들었습니다',
   vhsNameFailed: '체크포인트를 만들지 못했습니다. 입력한 내용은 그대로 유지됩니다.',
-  vhsNameUnchanged: '최신 버전 이후 변경된 내용이 없어 새 체크포인트를 만들지 않았습니다.',
+  vhsNameUnchanged: '최신 버전 이후 변경된 내용이 없어 새 버전을 만들지 않았습니다.',
   vhsRestore: '버전 {no} 복원',
   vhsRestoreConfirmTitle: '버전 {no}을(를) 복원할까요?',
   vhsRestoreConfirmDescription:

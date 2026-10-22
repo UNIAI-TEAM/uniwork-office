@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { PHASED_APPEND, touchesStreamingTail } from '../src/renderer/editor/streaming-tail-guard'
@@ -154,5 +154,22 @@ describe('a refused chunk during a phased open', () => {
     // the remount discarded the mid-stream edit, so the history goes with it:
     // an undo must not bring the truncated document back
     expect(resets).toBe(1)
+  })
+})
+
+describe('a late destroy', () => {
+  it('is a no-op once the global document is gone', () => {
+    const editor = createEditor()
+    liveEditors.splice(liveEditors.indexOf(editor), 1)
+    // tiptap's own unmount reads the global document after the plugin views are
+    // gone, so the view teardown (where the plugin destroys run) is what must
+    // survive the missing global
+    vi.stubGlobal('document', undefined)
+    try {
+      expect(() => editor.view.destroy()).not.toThrow()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    editor.destroy()
   })
 })

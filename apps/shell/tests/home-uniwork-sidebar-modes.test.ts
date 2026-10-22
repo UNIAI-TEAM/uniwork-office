@@ -121,6 +121,10 @@ describe('Home UniWork sidebar in My AI / Workbench mode (UNI-1932)', () => {
       accountLogin: vi.fn(async () => true),
       uniworkListWorkspaces: vi.fn(async () => ok(workspaces)),
       uniworkFolderTree: vi.fn(async () => ok(tree)),
+      // UNI-2080: a tree menu reads the folder's level when it opens; these folders are manageable
+      uniworkDocumentProperties: vi.fn(async (id: string) =>
+        ok({ documentId: id, workspaceId: 'ws-1', title: id, myLevel: 'manage' }),
+      ),
       uniworkListChildren: vi.fn(
         async (q: UniworkFolderQuery): Promise<UniworkResult<UniworkFolderChildren>> => {
           const items = children[q.parentId ?? '']

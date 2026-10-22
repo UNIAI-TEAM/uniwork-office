@@ -405,6 +405,10 @@ let api: ReturnType<typeof makeApi>
 function makeApi() {
   const fns = {
     uniworkFolderTree: vi.fn(async (_ws: string) => ok(tree)),
+    // UNI-2080: a tree menu reads the folder's level when it opens; these rows are all manageable
+    uniworkDocumentProperties: vi.fn(async (id: string) =>
+      ok({ documentId: id, workspaceId: 'w1', title: id, myLevel: 'manage' }),
+    ),
     uniworkListChildren: vi.fn(
       async (q: UniworkFolderQuery): Promise<UniworkResult<UniworkFolderChildren>> => {
         const items = children[q.parentId ?? '']
@@ -588,6 +592,7 @@ describe('DocumentsHome: cards, header, New menu and drop for workspace folders'
   let homeApi: Record<string, ReturnType<typeof vi.fn>>
   let workspaces: UniworkWorkspaceRef[]
   let rootItems: DocumentsHomeDoc[]
+  let homeLevels: Record<string, string>
 
   const card = (id: string) =>
     host.querySelector<HTMLElement>(`.dh-folder-card[data-folder-id="${id}"]`)
@@ -666,6 +671,7 @@ describe('DocumentsHome: cards, header, New menu and drop for workspace folders'
       node('f-full', 'Full one'),
       node('f-unknown', 'Unknown one'),
     ]
+    homeLevels = { 'f-ws': 'view', 'f-rw': 'manage', 'f-mine-sub': 'manage' }
     rootItems = [
       folderRow('f-ws', 'View only', { canEdit: false, canManage: false, myLevel: 'view' }),
       folderRow('f-rw', 'Editable', { canEdit: true, canManage: true, myLevel: 'manage' }),
@@ -693,6 +699,12 @@ describe('DocumentsHome: cards, header, New menu and drop for workspace folders'
       ),
       uniworkTrashShelvedDocument: vi.fn(async (id: string) => ok(entry(id, 'Trashed'))),
       uniworkFolderTree: vi.fn(async () => ok(homeTree)),
+      // UNI-2080: the sidebar tree menu reads each folder's level when it opens; f-unknown has none
+      uniworkDocumentProperties: vi.fn(async (id: string) =>
+        id in homeLevels
+          ? ok({ documentId: id, workspaceId: 'ws-1', title: id, myLevel: homeLevels[id] })
+          : ({ ok: false, error: 'network' } as const),
+      ),
       uniworkEnsureMyFolder: vi.fn(async () => ok({ ...homeTree[0]! })),
       uniworkListChildren: vi.fn(
         async (q: UniworkFolderQuery): Promise<UniworkResult<UniworkFolderChildren>> => {
@@ -723,6 +735,40 @@ describe('DocumentsHome: cards, header, New menu and drop for workspace folders'
   afterEach(() => {
     delete (window as unknown as Record<string, unknown>).uniworkFolderUpload
     sidebarSlot.remove()
+  })
+
+  // UNI-2080 (FU-2066-2): the sidebar tree row menu follows the level like the card does
+  const treeMenuActions = async (id: string): Promise<string[] | null> => {
+    const button = sidebarSlot.querySelector(`.uwf-tree [data-folder-menu-for="${id}"]`)
+    if (!button) return null
+    await click(button)
+    const actions = menuActions() as string[]
+    await click(button) // close
+    return actions
+  }
+
+  it('sidebar tree: a viewer gets Open only on a view-level folder, a human member also New subfolder', async () => {
+    await mountHome('viewer')
+    expect(await treeMenuActions('f-ws')).toEqual(['open'])
+    await act(async () => root.unmount())
+    root = createRoot(host)
+    await mountHome('member')
+    expect(await treeMenuActions('f-ws')).toEqual(['open', 'new'])
+  })
+
+  it('sidebar tree: an editable folder keeps New subfolder, Rename and Move to', async () => {
+    await mountHome('viewer')
+    expect(await treeMenuActions('f-rw')).toEqual(['open', 'new', 'rename', 'move'])
+  })
+
+  it('sidebar tree: a folder whose level cannot be read offers Open only', async () => {
+    await mountHome('viewer')
+    expect(await treeMenuActions('f-unknown')).toEqual(['open'])
+  })
+
+  it('sidebar tree: My Folder keeps New subfolder and never Rename or Move', async () => {
+    await mountHome('viewer')
+    expect(await treeMenuActions('f-mine')).toEqual(['open', 'new'])
   })
 
   it('A4 card: a human member of any grade sees Open + New subfolder on a view-level workspace folder', async () => {

@@ -30,8 +30,7 @@ export const en = {
   vhsNameSubmitting: 'Creating…',
   vhsNameDone: 'Created version {no}',
   vhsNameFailed: 'Could not create the checkpoint. What you typed is kept.',
-  vhsNameUnchanged:
-    'Nothing has changed since the latest version, so no new checkpoint was created.',
+  vhsNameUnchanged: 'Nothing has changed since the latest version, so no new version was created.',
   vhsRestore: 'Restore version {no}',
   vhsRestoreConfirmTitle: 'Restore version {no}?',
   vhsRestoreConfirmDescription:

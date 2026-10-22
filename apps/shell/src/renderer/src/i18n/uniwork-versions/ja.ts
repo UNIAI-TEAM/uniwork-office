@@ -30,8 +30,7 @@ export const ja = {
   vhsNameSubmitting: '作成中…',
   vhsNameDone: 'バージョン {no} を作成しました',
   vhsNameFailed: 'チェックポイントを作成できませんでした。入力した内容はそのまま残っています。',
-  vhsNameUnchanged:
-    '最新バージョン以降に変更がないため、新しいチェックポイントは作成されませんでした。',
+  vhsNameUnchanged: '最新バージョン以降に変更がないため、新しいバージョンは作成されませんでした。',
   vhsRestore: 'バージョン {no} を復元',
   vhsRestoreConfirmTitle: 'バージョン {no} を復元しますか？',
   vhsRestoreConfirmDescription:

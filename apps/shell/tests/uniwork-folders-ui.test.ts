@@ -80,6 +80,10 @@ function makeApi() {
   let treeChanged: ((e: UniworkTreeChangedEvent) => void) | null = null
   const fns = {
     uniworkFolderTree: vi.fn(async (_ws: string) => ok(tree)),
+    // UNI-2080: a tree menu reads the folder's level when it opens; these rows are all manageable
+    uniworkDocumentProperties: vi.fn(async (id: string) =>
+      ok({ documentId: id, workspaceId: 'w1', title: id, myLevel: 'manage' }),
+    ),
     uniworkListChildren: vi.fn(
       async (q: UniworkFolderQuery): Promise<UniworkResult<UniworkFolderChildren>> => {
         const items = children[q.parentId ?? '']
@@ -782,6 +786,9 @@ describe('UniworkBrowser: folder actions (S3)', () => {
 
   it('renames a folder in place with F2; a taken name stays at the field', async () => {
     await render()
+    // the row takes focus first: that is when its level is read (UNI-2080)
+    await act(async () => treeItem('Beta').focus())
+    await flush()
     await key(treeItem('Beta'), 'F2')
     const input = $<HTMLInputElement>('.uwf-tree .uw-rename-input')!
     expect(input.value).toBe('Beta')
@@ -861,6 +868,9 @@ describe('UniworkBrowser: folder actions (S3)', () => {
 
     // 2. Rejected inline rename clears busy and shows an error toast
     api.uniworkRenameDocument.mockImplementationOnce(() => Promise.reject(new Error('ipc crash')))
+    // the row takes focus first: that is when its level is read (UNI-2080)
+    await act(async () => treeItem('Beta').focus())
+    await flush()
     await key(treeItem('Beta'), 'F2')
     const input = $<HTMLInputElement>('.uwf-tree .uw-rename-input')!
     await type(input, 'BetaRenamed')

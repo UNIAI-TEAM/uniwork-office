@@ -1,14 +1,16 @@
-// Shared IPC sender guard (UNI-2073). Every uniwork*, home:uniwork-* and
-// home:account-* channel is registered through `guard.guarded(ipcMain)` at the
+// Shared IPC sender guard (UNI-2073, widened by UNI-2082). Every uniwork* and
+// home:* channel is registered through `guard.guarded(ipcMain)` at the
 // composition point, so each call is checked at call time: the sender is live,
 // the call comes from its main frame, the webContents is the shell window or a
 // trusted editor view (per the channel's policy), and the main frame URL is one
 // the main itself loads. The raw ipcMain is never patched.
 //
 // Adding a channel (other lanes):
-// - Policy comes from `policyForChannel`: a new `uniwork*` / `home:uniwork-*` /
-//   `home:account-*` channel defaults to `shell`; an editor-facing channel needs an
-//   explicit entry there. Anything out of scope throws at registration.
+// - Policy comes from `policyForChannel`: a new `uniwork*` or `home:*` channel
+//   defaults to `shell`; a channel an editor window calls needs an explicit entry
+//   there (`home:open-path` is `shell-or-editor` for the markdown wiki links).
+//   Anything out of scope throws at registration, so the read-only editor-alias getters
+//   such as `app:get-theme` stay on the raw ipcMain (`app:set-ai-panel-prefs`, a setter, is in scope).
 // - Register through the `guardedIpc` object in apps/shell/src/main/index.ts, never
 //   the raw `ipcMain`, and add a new registrar file to `REGISTRAR_FILES` in
 //   tests/ipc-guard-coverage.test.ts.
@@ -33,13 +35,15 @@ export function policyForChannel(channel: string): IpcSenderPolicy | null {
   ) {
     return 'editor'
   }
-  if (channel === 'uniwork:ai-flag') return 'shell-or-editor'
+  // the six editor preloads call the app-wide alias of home:set-ai-panel-prefs
   if (
-    /^uniwork:./.test(channel) ||
-    /^uniwork-[^:]+:/.test(channel) ||
-    channel.startsWith('home:uniwork-') ||
-    channel.startsWith('home:account-')
+    channel === 'uniwork:ai-flag' ||
+    channel === 'home:open-path' ||
+    channel === 'app:set-ai-panel-prefs'
   ) {
+    return 'shell-or-editor'
+  }
+  if (/^uniwork:./.test(channel) || /^uniwork-[^:]+:/.test(channel) || /^home:./.test(channel)) {
     return 'shell'
   }
   return null
