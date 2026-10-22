@@ -202,10 +202,12 @@ when it is. The `urls` and `publish` jobs wait for whichever ran.
   the environment's rules are the barrier.
 - **Set it up in this order**, before the first signed run:
   1. Settings > Environments > New environment `mac-signing`. Deployment branches and tags:
-     Selected, add `main` (branch) and `v*` (tag). Required reviewers: recommended (a person
-     approves every signed run, and a tag pushed by someone with write access cannot sign on
-     its own). A workflow that names a missing environment creates it with no protection, so
-     do not skip this step.
+     Selected, add `main` as a **branch** rule and `v*` as a **tag** rule (with only `v*`, a
+     dispatch from main is refused at job start). Required reviewers: recommended (a person
+     approves every signed run, including a dispatch, and a tag pushed by someone with write
+     access cannot sign on its own); with "Prevent self-review" on, the person who started the
+     run cannot approve it, so name a second reviewer. A workflow that names a missing
+     environment creates it with no protection, so do not skip this step.
   2. Add the five secrets to that environment.
   3. Delete the same five from the repository-level list (an environment also sees the
      repository secrets, so a leftover copy defeats step 1).
@@ -213,7 +215,11 @@ when it is. The `urls` and `publish` jobs wait for whichever ran.
      `v*-dev.*` / `v*-beta.*` tags to the maintainers. The workflow checks a release tag is on
      main, but that check lives in the tagged commit's own workflow file; the `v*` rule of the
      environment alone admits a tag on any commit.
-  5. Only then set the variable `UNIWORK_MAC_SIGNING_ENABLED` to `true`.
+  5. Only then set `UNIWORK_MAC_SIGNING_ENABLED` to `true` as a **repository variable**
+     (Settings > Secrets and variables > Actions > Variables > Repository variables). The meta
+     job reads it and has no environment, so a copy that lives only in the `mac-signing`
+     environment is invisible to it: `mac_signed` stays false and an ad-hoc build runs, with a
+     notice only when the ref is not main.
 - With signing off no signing variable reaches electron-builder, not even an empty one (the
   unsigned mac step unsets them, and the release config drops empty `CSC_*` / `APPLE_*`
   values; `CSC_LINK=""` would otherwise be read as a certificate path and fail the build).
