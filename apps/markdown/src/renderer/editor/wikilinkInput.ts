@@ -8,12 +8,12 @@ import { Plugin } from '@tiptap/pm/state'
  * mark (only the mark: the text never changes) when the closing `]]` is typed
  * and to the links of a paste or drop.
  *
- * Same literal as `WIKI_LINK_RE` in wikilink.ts, minus the backslash. A marked
- * literal with a backslash doubles it on every serialize, so those stay plain
- * (as they are today) rather than widening that.
+ * Same literal as `WIKI_LINK_RE` in wikilink.ts, backslash included: the
+ * serializer writes a wiki-marked literal verbatim (F8), so a backslash in it
+ * no longer doubles on save.
  */
-const TYPED = /\[\[([^[\]|\\\n]+?)(?:\|([^[\]\\\n]+))?\]\]$/
-const PASTED = /\[\[[^[\]|\\\n]+?(?:\|[^[\]\\\n]+)?\]\]/g
+const TYPED = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+))?\]\]$/
+const PASTED = /\[\[[^[\]|\n]+?(?:\|[^[\]\n]+)?\]\]/g
 
 export const WikiMarkOnInput = Extension.create({
   name: 'wikiMarkOnInput',
