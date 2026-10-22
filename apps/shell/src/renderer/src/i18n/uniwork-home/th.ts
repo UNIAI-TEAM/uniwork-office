@@ -45,6 +45,8 @@ export const th = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: 'ประเภท:',
   uhFilterTypeAll: 'ทั้งหมด',
+  uhFilterTypeCount: '{count} ประเภท',
+  uhFilterTypeRemove: 'ลบตัวกรอง {type}',
   uhFilterModifiedBy: 'แก้ไขโดย:',
   uhFilterAnyPerson: 'ทุกคน',
   uhFilterUpdated: 'อัปเดต:',

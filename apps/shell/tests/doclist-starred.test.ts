@@ -22,6 +22,7 @@ import {
 } from '../src/renderer/src/uniwork-home/documents-home-model'
 import { buildRowMenu, type RowMenuActionId } from '../src/renderer/src/doclist/row-menu'
 import type { StringKey } from '../src/renderer/src/locale'
+import { pickType } from './doclist-type-filter-fixture'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -72,7 +73,11 @@ describe('the nav entry', () => {
 })
 
 describe('fetchDocumentsHomePage: starred', () => {
-  const filters = { format: 'docx' as const, updatedBy: 'u-1', updatedFrom: '2026-10-01T00:00:00Z' }
+  const filters = {
+    types: ['docx' as const],
+    updatedBy: 'u-1',
+    updatedFrom: '2026-10-01T00:00:00Z',
+  }
 
   it('reads the favorites route with the type and the sort, and with no editor / date filter', async () => {
     const uniworkListFavorites = vi.fn(async () => ok({ documents: STARRED, nextCursor: 'next-1' }))
@@ -87,7 +92,7 @@ describe('fetchDocumentsHomePage: starred', () => {
     expect(uniworkListFavorites).toHaveBeenCalledWith({
       workspaceId: 'ws-1',
       cursor: 'c0',
-      format: 'docx',
+      types: ['docx'],
       sort: 'starred',
       order: 'desc',
     })
@@ -349,10 +354,10 @@ describe('DocumentsHome: the Starred screen', () => {
     )
   })
 
-  it('a type chip goes to the server; Người sửa / Cập nhật narrow the loaded rows and are not sent', async () => {
+  it('a type pick goes to the server; Người sửa / Cập nhật narrow the loaded rows and are not sent', async () => {
     await mount('starred')
-    await click(host.querySelector('[data-chip="docx"]'))
-    expect(lastCall('uniworkListFavorites')).toMatchObject({ format: 'docx' })
+    await pickType(host, 'docx')
+    expect(lastCall('uniworkListFavorites')).toMatchObject({ types: ['docx'] })
     await pick('updatedBy', 'u-lan')
     const call = lastCall('uniworkListFavorites')
     expect(call).not.toHaveProperty('updatedBy')

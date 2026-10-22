@@ -45,6 +45,8 @@ export const id = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: 'Jenis:',
   uhFilterTypeAll: 'Semua',
+  uhFilterTypeCount: '{count} jenis',
+  uhFilterTypeRemove: 'Hapus filter {type}',
   uhFilterModifiedBy: 'Diubah oleh:',
   uhFilterAnyPerson: 'Siapa saja',
   uhFilterUpdated: 'Diperbarui:',

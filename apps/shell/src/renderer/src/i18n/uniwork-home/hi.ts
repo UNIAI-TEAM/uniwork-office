@@ -45,6 +45,8 @@ export const hi = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: 'प्रकार:',
   uhFilterTypeAll: 'सभी',
+  uhFilterTypeCount: '{count} प्रकार',
+  uhFilterTypeRemove: '{type} फ़िल्टर हटाएँ',
   uhFilterModifiedBy: 'संशोधितकर्ता:',
   uhFilterAnyPerson: 'कोई भी',
   uhFilterUpdated: 'अपडेट किया गया:',

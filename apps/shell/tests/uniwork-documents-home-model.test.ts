@@ -1,15 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
+import * as homeModel from '../src/renderer/src/uniwork-home/documents-home-model'
 import {
   collectUpdatedByOptions,
   DEFAULT_DOCUMENTS_HOME_FILTERS,
   DOCUMENTS_HOME_NAV_ENTRIES,
-  DOCUMENTS_HOME_TYPE_CHIPS,
+  DOCUMENTS_HOME_TYPE_OPTIONS,
   docMatchesUpdated,
   fetchDocumentsHomePage,
+  fetchDocumentsHomeSources,
+  folderCardsUnderTypePick,
   getDocumentsHomeNavEntry,
   hasActiveFilters,
-  rowMatchesType,
+  rowsUnderTypePick,
   splitAndSortItems,
+  typePickHidesFolders,
+  toggleTypePick,
+  TYPE_PICK_HIDES_FOLDERS,
   toUniworkListFilters,
   updatedByOptionsForSelect,
   updatedFromIsoOf,
@@ -17,6 +23,7 @@ import {
   type DocumentsHomeApiAdapter,
   type DocumentsHomeDoc,
 } from '../src/renderer/src/uniwork-home/documents-home-model'
+import { uniworkHomeStrings } from '../src/renderer/src/i18n/strings-uniwork-home'
 import { zh } from '../src/renderer/src/i18n/uniwork-home/zh'
 import { zhTW } from '../src/renderer/src/i18n/uniwork-home/zh-TW'
 import { vi as viLocale } from '../src/renderer/src/i18n/uniwork-home/vi'
@@ -88,7 +95,7 @@ describe('DH1-W2 documents-home-model', () => {
     ])
   })
 
-  it('converts UI filter state (format, updatedBy, updatedPreset) to UniworkListFilters', () => {
+  it('converts UI filter state (types, updatedBy, updatedPreset) to UniworkListFilters', () => {
     const fixedNow = Date.parse('2026-10-17T12:00:00.000Z')
     expect(hasActiveFilters(DEFAULT_DOCUMENTS_HOME_FILTERS)).toBe(false)
     expect(toUniworkListFilters(DEFAULT_DOCUMENTS_HOME_FILTERS, fixedNow)).toEqual({})
@@ -99,13 +106,13 @@ describe('DH1-W2 documents-home-model', () => {
     expect(updatedFromIsoOf('30d', fixedNow)).toBe('2026-09-17T12:00:00.000Z')
 
     const active = {
-      format: 'xlsx' as const,
+      types: ['xlsx' as const],
       updatedBy: 'user-42',
       updatedPreset: '7d' as const,
     }
     expect(hasActiveFilters(active)).toBe(true)
     expect(toUniworkListFilters(active, fixedNow)).toEqual({
-      format: 'xlsx',
+      types: ['xlsx'],
       updatedBy: 'user-42',
       updatedFrom: '2026-10-10T12:00:00.000Z',
     })
@@ -537,12 +544,12 @@ describe('UNI-1961 documents-home-model: the Lưu trữ (Archive) shelf', () => 
       subView: 'archive',
       folderId: null,
       cursor: 'c-1',
-      filters: { format: 'pdf', updatedBy: 'u-1', updatedFrom: '2026-10-01T00:00:00Z' },
+      filters: { types: ['pdf', 'txt'], updatedBy: 'u-1', updatedFrom: '2026-10-01T00:00:00Z' },
     })
     expect(api.uniworkListShelved).toHaveBeenCalledWith({
       workspaceId: 'ws-1',
       cursor: 'c-1',
-      format: 'pdf',
+      types: ['pdf', 'txt'],
     })
     expect(api.uniworkListTrash).not.toHaveBeenCalled()
     expect(res.result).toEqual({
@@ -552,7 +559,7 @@ describe('UNI-1961 documents-home-model: the Lưu trữ (Archive) shelf', () => 
   })
 })
 
-describe('the shared type chips (UNI-2047 A3)', () => {
+describe('the Type multi-select model (UNI-2113)', () => {
   const doc = (partial: Partial<DocumentsHomeDoc>): DocumentsHomeDoc => ({
     id: 'd',
     workspaceId: 'ws-1',
@@ -564,12 +571,9 @@ describe('the shared type chips (UNI-2047 A3)', () => {
     ...partial,
   })
   const asRow = (d: DocumentsHomeDoc) => ({ type: 'doc' as const, id: d.id, doc: d })
-  const source = (extension: string) =>
-    ({ type: 'source' as const, id: 's', source: { extension } }) as never
 
-  it('lists the chips in the one shared order', () => {
-    expect(DOCUMENTS_HOME_TYPE_CHIPS.map((c) => c.value)).toEqual([
-      'all',
+  it('lists the menu options in the one shared order, All types is no option', () => {
+    expect(DOCUMENTS_HOME_TYPE_OPTIONS.map((c) => c.value)).toEqual([
       'page',
       'docx',
       'xlsx',
@@ -581,32 +585,132 @@ describe('the shared type chips (UNI-2047 A3)', () => {
     ])
   })
 
-  it('sends a file format and .txt as format, and UniNote as kind', () => {
+  it('starts with no pick (= all types)', () => {
+    expect(DEFAULT_DOCUMENTS_HOME_FILTERS.types).toEqual([])
+    expect(DEFAULT_DOCUMENTS_HOME_FILTERS).not.toHaveProperty('format')
+  })
+
+  it('sends the picks as `types` in menu order, and no format / kind', () => {
     const at = Date.UTC(2026, 9, 21)
-    expect(toUniworkListFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'txt' }, at)).toEqual({
-      format: 'txt',
-    })
-    // UniNote is a kind, not a format: the server takes `kind=page` (and 400s on format + page)
-    expect(toUniworkListFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'page' }, at)).toEqual(
-      { kind: 'page' },
+    expect(
+      toUniworkListFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, types: ['page', 'docx'] }, at),
+    ).toEqual({ types: ['page', 'docx'] })
+    expect(toUniworkListFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, types: ['txt'] }, at)).toEqual(
+      {
+        types: ['txt'],
+      },
     )
-    // UniNote still counts as an active filter (the Xóa bộ lọc button and the no-match state)
-    expect(hasActiveFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, format: 'page' })).toBe(true)
+    expect(toUniworkListFilters(DEFAULT_DOCUMENTS_HOME_FILTERS, at)).toEqual({})
   })
 
-  it('narrows UniNote on the loaded rows and drops every source file under it', () => {
-    expect(rowMatchesType(asRow(doc({ kind: 'page', format: null })), 'page')).toBe(true)
-    expect(rowMatchesType(asRow(doc({})), 'page')).toBe(false)
-    expect(rowMatchesType(asRow(doc({ kind: 'folder', format: null })), 'page')).toBe(false)
-    expect(rowMatchesType(source('pdf'), 'page')).toBe(false)
-    expect(rowMatchesType(asRow(doc({})), 'all')).toBe(true)
+  it('counts a pick as an active filter (the clear button and the no-match state)', () => {
+    expect(hasActiveFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, types: ['page'] })).toBe(true)
+    expect(hasActiveFilters({ ...DEFAULT_DOCUMENTS_HOME_FILTERS, types: [] })).toBe(false)
   })
 
-  it('keeps only .txt source files under .txt (the sources route may not apply it)', () => {
-    expect(rowMatchesType(source('txt'), 'txt')).toBe(true)
-    expect(rowMatchesType(source('.TXT'), 'txt')).toBe(true)
-    expect(rowMatchesType(source('md'), 'txt')).toBe(false)
-    expect(rowMatchesType(source('md'), 'md')).toBe(true)
+  it('toggles a pick on and off and keeps menu order, never click order', () => {
+    expect(toggleTypePick([], 'pdf')).toEqual(['pdf'])
+    expect(toggleTypePick(['pdf'], 'docx')).toEqual(['docx', 'pdf'])
+    expect(toggleTypePick(['docx', 'pdf'], 'page')).toEqual(['page', 'docx', 'pdf'])
+    expect(toggleTypePick(['docx', 'pdf'], 'docx')).toEqual(['pdf'])
+    expect(toggleTypePick(['pdf'], 'pdf')).toEqual([])
+  })
+
+  it('narrows no row on the client any more: every row is the server answer', () => {
+    expect(homeModel).not.toHaveProperty('rowMatchesType')
+  })
+
+  it('forwards the picks as types to every list route, never as format or kind', async () => {
+    const docs = { ok: true as const, value: { documents: [], nextCursor: null } }
+    const children = { ok: true as const, value: { items: [], nextCursor: null } }
+    const fn = (page: unknown) => vi.fn(async (..._args: unknown[]) => page)
+    const api = {
+      uniworkListChildren: fn(children),
+      uniworkListDocuments: fn(docs),
+      uniworkListSharedWithMe: fn(docs),
+      uniworkListSharedByMe: fn(docs),
+      uniworkListTrash: fn(docs),
+      uniworkListShelved: fn(docs),
+      uniworkListFavorites: fn(docs),
+    }
+    const calls = [
+      ['workspace', 'uniworkListChildren'],
+      ['recent', 'uniworkListDocuments'],
+      ['starred', 'uniworkListFavorites'],
+      ['shared-with-me', 'uniworkListSharedWithMe'],
+      ['shared-by-me', 'uniworkListSharedByMe'],
+      ['trash', 'uniworkListTrash'],
+      ['archive', 'uniworkListShelved'],
+    ] as const
+    for (const [subView, name] of calls) {
+      await fetchDocumentsHomePage(api as unknown as DocumentsHomeApiAdapter, {
+        subView,
+        workspaceId: 'ws-1',
+        folderId: null,
+        myFolderId: null,
+        filters: { types: ['page', 'docx', 'txt'] },
+      })
+      const sent = api[name].mock.calls.at(-1)?.[0] as Record<string, unknown>
+      expect(sent.types, subView).toEqual(['page', 'docx', 'txt'])
+      expect(sent, subView).not.toHaveProperty('format')
+      expect(sent, subView).not.toHaveProperty('kind')
+    }
+  })
+
+  it('sends the picks to the sources route as types', async () => {
+    const uniworkListSources = vi.fn(async () => ({
+      ok: true as const,
+      value: { items: [], nextCursor: null },
+    }))
+    await fetchDocumentsHomeSources({ uniworkListSources } as unknown as DocumentsHomeApiAdapter, {
+      workspaceId: 'ws-1',
+      filters: { types: ['pdf', 'txt'] },
+    })
+    expect(uniworkListSources).toHaveBeenCalledWith({ workspaceId: 'ws-1', types: ['pdf', 'txt'] })
+    await fetchDocumentsHomeSources({ uniworkListSources } as unknown as DocumentsHomeApiAdapter, {
+      workspaceId: 'ws-1',
+      filters: {},
+    })
+    expect(uniworkListSources).toHaveBeenLastCalledWith({ workspaceId: 'ws-1' })
+  })
+
+  describe('Q0: folders under a Type pick, one switch', () => {
+    const rows = [
+      asRow(doc({ id: 'f', kind: 'folder', format: null })),
+      asRow(doc({ id: 'a' })),
+      asRow(doc({ id: 'p', kind: 'page', format: null })),
+    ]
+    it('ships with folders kept (the server behaviour)', () => {
+      expect(TYPE_PICK_HIDES_FOLDERS).toBe(false)
+    })
+    it('keeps every row with the switch off', () => {
+      expect(rowsUnderTypePick(rows, ['docx'], false).map((r) => r.id)).toEqual(['f', 'a', 'p'])
+      expect(rowsUnderTypePick(rows, ['docx']).map((r) => r.id)).toEqual(['f', 'a', 'p'])
+    })
+    it('drops folder rows of a flat list under a pick with the switch on', () => {
+      expect(rowsUnderTypePick(rows, ['docx'], true).map((r) => r.id)).toEqual(['a', 'p'])
+      // no pick = nothing is dropped
+      expect(rowsUnderTypePick(rows, [], true).map((r) => r.id)).toEqual(['f', 'a', 'p'])
+    })
+
+    // UNI-2113 fix1 (T-R1-2): the same rule decides the folder cards, so one switch moves both
+    it('names the rule once: hidden only with the switch on and a pick set', () => {
+      expect(typePickHidesFolders(['docx'], true)).toBe(true)
+      expect(typePickHidesFolders(['docx'], false)).toBe(false)
+      expect(typePickHidesFolders([], true)).toBe(false)
+      expect(typePickHidesFolders(['docx'])).toBe(TYPE_PICK_HIDES_FOLDERS)
+    })
+    const cards = [doc({ id: 'c1', kind: 'folder' }), doc({ id: 'c2', kind: 'folder' })]
+    it('drops the folder cards of a flat list under a pick with the switch on', () => {
+      expect(folderCardsUnderTypePick(cards, ['docx'], false, true)).toEqual([])
+      expect(folderCardsUnderTypePick(cards, [], false, true)).toEqual(cards)
+      expect(folderCardsUnderTypePick(cards, ['docx'], false, false)).toEqual(cards)
+      expect(folderCardsUnderTypePick(cards, ['docx'], false)).toEqual(cards)
+    })
+    it('keeps the folder cards of the tree level whatever the switch says', () => {
+      expect(folderCardsUnderTypePick(cards, ['docx'], true, true)).toEqual(cards)
+      expect(folderCardsUnderTypePick(cards, ['docx'], true, false)).toEqual(cards)
+    })
   })
 
   it('matches Người sửa and Cập nhật on a loaded row, a row without the field does not match', () => {
@@ -620,5 +724,33 @@ describe('the shared type chips (UNI-2047 A3)', () => {
     expect(
       docMatchesUpdated(doc({ updatedAt: 'garbage' }), { updatedFrom: '2026-10-19T00:00:00.000Z' }),
     ).toBe(false)
+  })
+})
+
+describe('the Type filter strings (UNI-2113)', () => {
+  const langs = Object.keys(uniworkHomeStrings) as (keyof typeof uniworkHomeStrings)[]
+
+  it('says the web vi/en words verbatim', () => {
+    expect(viLocale.uhFilterType).toBe('Loại:')
+    expect(en.uhFilterType).toBe('Type:')
+    expect(viLocale.uhFilterTypeAll).toBe('Tất cả')
+    expect(en.uhFilterTypeAll).toBe('All types')
+    expect(viLocale.uhFilterTypeCount).toBe('{count} loại')
+    expect(en.uhFilterTypeCount).toBe('{count} types')
+    expect(viLocale.uhFilterTypeRemove).toBe('Bỏ lọc {type}')
+    expect(en.uhFilterTypeRemove).toBe('Remove {type} filter')
+  })
+
+  it.each(langs)('locale %s carries the count and remove keys with their placeholders', (lang) => {
+    const table = uniworkHomeStrings[lang] as Record<string, string>
+    expect(table.uhFilterTypeCount, lang).toContain('{count}')
+    expect(table.uhFilterTypeRemove, lang).toContain('{type}')
+  })
+
+  it('translates the remove key outside en and vi (not the English copy)', () => {
+    for (const lang of langs.filter((l) => !['en', 'vi'].includes(l))) {
+      const table = uniworkHomeStrings[lang] as Record<string, string>
+      expect(table.uhFilterTypeRemove, lang).not.toBe(en.uhFilterTypeRemove)
+    }
   })
 })

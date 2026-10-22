@@ -234,32 +234,36 @@ describe('the chips carry the type icon (doclist-canvas chip)', () => {
     host.remove()
   })
 
-  it('every type chip but Mọi loại has an 18px badge before its label', async () => {
+  it('every Type menu item but All types has a 16px badge before its label, the chips too', async () => {
     await act(async () => {
       root.render(
         createElement(
           LocaleProvider,
           { initial: 'vi' },
           createElement(FilterBar, {
-            filters: DEFAULT_DOCUMENTS_HOME_FILTERS,
+            filters: { ...DEFAULT_DOCUMENTS_HOME_FILTERS, types: ['docx'] },
             onChange: () => {},
             authors: [],
           }),
         ),
       )
     })
-    const all = host.querySelector('[data-chip="all"]')!
-    expect(all.querySelector('img, svg')).toBeNull()
-    expect(all.classList.contains('has-icon')).toBe(false)
-    for (const chip of ['page', 'docx', 'xlsx', 'pptx', 'pdf', 'md', 'html', 'txt']) {
-      const el = host.querySelector(`[data-chip="${chip}"]`)!
-      const badge = el.querySelector('img, svg')
-      expect(badge, chip).not.toBeNull()
-      expect(badge!.getAttribute('width'), chip).toBe('18')
-      expect(el.classList.contains('has-icon'), chip).toBe(true)
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button[data-filter="type"]')!.click()
+    })
+    const all = host.querySelector('[role="menuitemcheckbox"][data-type="all"]')!
+    expect(all.querySelector('img, svg:not(.dh-type-check)')).toBeNull()
+    expect(all.querySelector('.dh-type-spacer')).not.toBeNull()
+    for (const type of ['page', 'docx', 'xlsx', 'pptx', 'pdf', 'md', 'html', 'txt']) {
+      const el = host.querySelector(`[role="menuitemcheckbox"][data-type="${type}"]`)!
+      const badge = el.querySelector('img, svg:not(.dh-type-check)')
+      expect(badge, type).not.toBeNull()
+      expect(badge!.getAttribute('width'), type).toBe('16')
     }
-    // the badge adds no text: the chip still reads its label only
-    expect(host.querySelector('[data-chip="docx"]')!.textContent).toBe('.docx')
+    // the badge adds no text: an item reads its label only
+    expect(host.querySelector('[data-type="docx"]')!.textContent).toBe('.docx')
+    const chipBadge = host.querySelector('.dh-type-chip[data-chip="docx"] img, .dh-type-chip svg')
+    expect(chipBadge!.getAttribute('width')).toBe('16')
   })
 })
 
@@ -609,16 +613,17 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
     expect(on).toMatch(/box-shadow:\s*var\(--/)
   })
 
-  it('type chips 32px / 13px, pressed in the accent at 500; the selects 34px / 13px', () => {
-    const chip = ruleOf(css, '.dh-filter-type')
-    expect(chip).toMatch(/height:\s*32px;/)
-    expect(chip).toMatch(/border-radius:\s*16px;/)
-    expect(chip).toMatch(/font-size:\s*13px;/)
-    expect(ruleOf(css, '.dh-filter-type.has-icon')).toMatch(/padding-inline-start:\s*7px;/)
-    expect(ruleOf(css, '.dh-filter-type.on')).toMatch(/font-weight:\s*500;/)
-    // an unpressed label is the quieter text token and hover returns to --text (RV7-4)
-    expect(chip).toMatch(/color:\s*var\(--text-secondary\);/)
-    expect(ruleOf(css, '.dh-filter-type:hover')).toMatch(/color:\s*var\(--text\);/)
+  it('the Type trigger 34px / 13px, its chips 28px / 12.5px; the selects 34px / 13px', () => {
+    const trigger = ruleOf(css, '.dh-type-trigger')
+    expect(trigger).toMatch(/height:\s*34px;/)
+    expect(trigger).toMatch(/font-size:\s*13px;/)
+    // the label is the quieter text token, the value returns to --text
+    expect(trigger).toMatch(/color:\s*var\(--text-secondary\);/)
+    expect(ruleOf(css, '.dh-type-value')).toMatch(/color:\s*var\(--text\);/)
+    const chip = ruleOf(css, '.dh-type-chip')
+    expect(chip).toMatch(/height:\s*28px;/)
+    expect(chip).toMatch(/border-radius:\s*14px;/)
+    expect(chip).toMatch(/font-size:\s*12\.5px;/)
     const select = ruleOf(css, '.dh-filter-chip')
     expect(select).toMatch(/height:\s*34px;/)
     expect(select).toMatch(/padding:\s*0 12px;/)

@@ -45,6 +45,8 @@ export const ja = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: '種類:',
   uhFilterTypeAll: 'すべて',
+  uhFilterTypeCount: '{count} 種類',
+  uhFilterTypeRemove: '{type} の絞り込みを解除',
   uhFilterModifiedBy: '更新者:',
   uhFilterAnyPerson: 'すべて',
   uhFilterUpdated: '更新日:',

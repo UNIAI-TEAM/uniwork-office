@@ -1,6 +1,6 @@
 import type {
-  UniworkDocFormat,
   UniworkDocShareScope,
+  UniworkDocTypePick,
   UniworkDocListPage,
   UniworkDocListQuery,
   UniworkDocSummary,
@@ -19,9 +19,8 @@ export type UniworkDocVisibility = 'private' | 'workspace' | 'restricted'
 export type UniworkDocAccessLevel = 'view' | 'comment' | 'edit' | 'manage'
 
 export interface UniworkListFilters {
-  format?: UniworkDocFormat | 'txt'
-  /** UniNote chip: the server's `kind=page` (never together with `format`) */
-  kind?: 'page'
+  /** the Type picks: one repeated `type=` each (OR); unset = every type */
+  types?: UniworkDocTypePick[]
   updatedBy?: string
   updatedFrom?: string
 }
@@ -144,32 +143,32 @@ export function getDocumentsHomeNavEntry(id: DocumentsHomeSubViewId): DocumentsH
 }
 
 /**
- * The type chips of the shared list rules. `page` (UniNote) is no server format: the server only
- * knows the file formats (and `txt`), so a UniNote pick sends no type and narrows the loaded rows.
+ * One value of the Type multi-select: UniNote (`page`) or a file format, the server's `?type=`
+ * vocabulary. "All types" is no value: an empty pick list means every type.
  */
-export type DocumentsHomeTypeFilter = 'all' | 'page' | UniworkDocFormat | 'txt'
+export type DocumentsHomeTypePick = UniworkDocTypePick
 export type DocumentsHomeUpdatedPreset = 'any' | '24h' | '7d' | '30d'
 export type DocumentsHomeSort = 'recent' | 'name'
 
 export interface DocumentsHomeFilterState {
-  format: DocumentsHomeTypeFilter
+  /** the picked types in menu order (never click order); empty = all types */
+  types: DocumentsHomeTypePick[]
   updatedBy: string
   updatedPreset: DocumentsHomeUpdatedPreset
 }
 
 export const DEFAULT_DOCUMENTS_HOME_FILTERS: DocumentsHomeFilterState = {
-  format: 'all',
+  types: [],
   updatedBy: '',
   updatedPreset: 'any',
 }
 
-/** the type chips, in the shared order of every screen (Rules board: Mọi loại · UniNote · .docx … .txt) */
-export const DOCUMENTS_HOME_TYPE_CHIPS: readonly {
-  value: DocumentsHomeTypeFilter
+/** the Type menu options after All types, in the shared order of every screen (UniNote · .docx … .txt) */
+export const DOCUMENTS_HOME_TYPE_OPTIONS: readonly {
+  value: DocumentsHomeTypePick
   labelKey?: StringKey
   literal?: string
 }[] = [
-  { value: 'all', labelKey: 'dlFilterAllTypes' },
   { value: 'page', labelKey: 'dlFilterUniNote' },
   { value: 'docx', literal: '.docx' },
   { value: 'xlsx', literal: '.xlsx' },
@@ -179,6 +178,52 @@ export const DOCUMENTS_HOME_TYPE_CHIPS: readonly {
   { value: 'html', literal: '.html' },
   { value: 'txt', literal: '.txt' },
 ]
+
+/** a pick added or removed, kept in menu order whatever order the person clicked in */
+export function toggleTypePick(
+  types: readonly DocumentsHomeTypePick[],
+  pick: DocumentsHomeTypePick,
+): DocumentsHomeTypePick[] {
+  const next = new Set(types)
+  if (next.has(pick)) next.delete(pick)
+  else next.add(pick)
+  return DOCUMENTS_HOME_TYPE_OPTIONS.map((o) => o.value).filter((v) => next.has(v))
+}
+
+/**
+ * Q0 (open with the user): do folders stay in a flat list under a Type pick? The server keeps them
+ * (as `format=` always did), so this ships `false`. `true` hides folder rows of flat lists under a
+ * pick; the folder cards of the tree level always stay, they are navigation.
+ */
+export const TYPE_PICK_HIDES_FOLDERS = false
+
+/** the Q0 rule, in one place: folders of a flat list go while a pick is set and the switch is on */
+export function typePickHidesFolders(
+  types: readonly DocumentsHomeTypePick[],
+  hidesFolders: boolean = TYPE_PICK_HIDES_FOLDERS,
+): boolean {
+  return hidesFolders && types.length > 0
+}
+
+/** the Q0 switch, applied to the rows of a flat list (no row is narrowed by type here: the server did) */
+export function rowsUnderTypePick(
+  rows: DocumentsHomeTableRow[],
+  types: readonly DocumentsHomeTypePick[],
+  hidesFolders: boolean = TYPE_PICK_HIDES_FOLDERS,
+): DocumentsHomeTableRow[] {
+  if (!typePickHidesFolders(types, hidesFolders)) return rows
+  return rows.filter((row) => !(row.type === 'doc' && row.doc.kind === 'folder'))
+}
+
+/** the Q0 switch, applied to the folder cards; the cards of the tree level are navigation and stay */
+export function folderCardsUnderTypePick<T>(
+  cards: readonly T[],
+  types: readonly DocumentsHomeTypePick[],
+  treeLevel: boolean,
+  hidesFolders: boolean = TYPE_PICK_HIDES_FOLDERS,
+): readonly T[] {
+  return treeLevel || !typePickHidesFolders(types, hidesFolders) ? cards : []
+}
 
 export const DOCUMENTS_HOME_UPDATED_OPTIONS: readonly {
   value: DocumentsHomeUpdatedPreset
@@ -216,11 +261,7 @@ export function toUniworkListFilters(
   nowMs: number = Date.now(),
 ): UniworkListFilters {
   const filters: UniworkListFilters = {}
-  if (state.format === 'page') {
-    filters.kind = 'page'
-  } else if (state.format !== 'all') {
-    filters.format = state.format
-  }
+  if (state.types.length > 0) filters.types = [...state.types]
   const updatedBy = state.updatedBy.trim()
   if (updatedBy) {
     filters.updatedBy = updatedBy
@@ -233,7 +274,7 @@ export function toUniworkListFilters(
 }
 
 export function hasActiveFilters(state: DocumentsHomeFilterState): boolean {
-  return state.format !== 'all' || state.updatedBy.trim() !== '' || state.updatedPreset !== 'any'
+  return state.types.length > 0 || state.updatedBy.trim() !== '' || state.updatedPreset !== 'any'
 }
 
 export interface UpdatedByOption {
@@ -364,24 +405,22 @@ export interface DocumentsHomeApiAdapter {
     } & UniworkListFilters &
       DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
-  /** UNI-2047 B6: Gắn sao - the SV-2 route reads the type, the kind and the sort only */
+  /** UNI-2047 B6: Gắn sao - the SV-2 route reads the types and the sort only */
   uniworkListFavorites?: (
     q: {
       workspaceId: string
       cursor?: string
       limit?: number
-      format?: UniworkListFilters['format']
-      kind?: UniworkListFilters['kind']
+      types?: UniworkListFilters['types']
     } & DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
-  /** UNI-1961: the Lưu trữ shelf (only the type filter applies there, and the sort) */
+  /** UNI-1961: the Lưu trữ shelf (only the types apply there, and the sort) */
   uniworkListShelved?: (
     q: {
       workspaceId: string
       cursor?: string
       limit?: number
-      format?: UniworkListFilters['format']
-      kind?: UniworkListFilters['kind']
+      types?: UniworkListFilters['types']
     } & DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListSources?: (q: UniworkSourceListQuery) => Promise<UniworkResult<UniworkSourceListPage>>
@@ -553,8 +592,7 @@ export async function fetchDocumentsHomePage(
     const res = await api.uniworkListFavorites({
       workspaceId,
       ...(cursor ? { cursor } : {}),
-      ...(filters.format ? { format: filters.format } : {}),
-      ...(filters.kind ? { kind: filters.kind } : {}),
+      ...(filters.types?.length ? { types: filters.types } : {}),
       ...sortArgs,
     })
     return {
@@ -566,13 +604,12 @@ export async function fetchDocumentsHomePage(
     if (typeof api.uniworkListShelved !== 'function') {
       return { result: { ok: true, value: { items: [], nextCursor: null } } }
     }
-    // UNI-1961: the shelf takes the type filter only (the web sends `format`
-    // alone; the live views' updater/date filters never reach it)
+    // UNI-1961: the shelf takes the type picks only (the web sends the
+    // type alone; the live views' updater/date filters never reach it)
     const res = await api.uniworkListShelved({
       workspaceId,
       ...(cursor ? { cursor } : {}),
-      ...(filters.format ? { format: filters.format } : {}),
-      ...(filters.kind ? { kind: filters.kind } : {}),
+      ...(filters.types?.length ? { types: filters.types } : {}),
       ...sortArgs,
     })
     return {
@@ -649,7 +686,7 @@ export type DocumentsHomeTableRow =
 /**
  * UNI-1961: the home filters a source row cannot get from the server (the web
  * runs them on merged source rows, use-documents-library.ts): the editor is the
- * file's owner, the date its `updated_at`. The type went to the server as `type`.
+ * file's owner, the date its `updated_at`. The picks went to the server as `types`.
  */
 export function sourceMatchesFilters(
   source: UniworkSourceFile,
@@ -660,22 +697,6 @@ export function sourceMatchesFilters(
     const since = Date.parse(filters.updatedFrom)
     const at = Date.parse(source.updatedAt)
     if (!Number.isNaN(since) && (Number.isNaN(at) || at < since)) return false
-  }
-  return true
-}
-
-/**
- * UNI-2047: the type chips the server cannot apply. UniNote is no file format, so the loaded rows
- * are narrowed here and no source file (always a file) stays; `.txt` is applied to the source files
- * here as well, whatever the sources route does with it.
- */
-export function rowMatchesType(
-  row: DocumentsHomeTableRow,
-  format: DocumentsHomeTypeFilter,
-): boolean {
-  if (format === 'page') return row.type === 'doc' && row.doc.kind === 'page'
-  if (format === 'txt' && row.type === 'source') {
-    return row.source.extension.toLowerCase().replace(/^\./, '') === 'txt'
   }
   return true
 }
@@ -695,8 +716,8 @@ export function docMatchesUpdated(doc: DocumentsHomeDoc, filters: UniworkListFil
 }
 
 /**
- * UNI-1961: one page of the root's source files, with the home's format filter
- * as the sources `type`. Null when the bridge has no sources call. `source` narrows to one
+ * UNI-1961: one page of the root's source files, with the home's Type picks
+ * as the sources `types`. Null when the bridge has no sources call. `source` narrows to one
  * module (a sidebar row of Từ nơi khác); `limit` is the sidebar's availability probe.
  */
 export async function fetchDocumentsHomeSources(
@@ -713,7 +734,7 @@ export async function fetchDocumentsHomeSources(
   return api.uniworkListSources({
     workspaceId: params.workspaceId,
     ...(params.source ? { source: params.source } : {}),
-    ...(params.filters.format ? { type: params.filters.format } : {}),
+    ...(params.filters.types?.length ? { types: params.filters.types } : {}),
     ...(params.cursor ? { cursor: params.cursor } : {}),
     ...(params.limit ? { limit: params.limit } : {}),
   })

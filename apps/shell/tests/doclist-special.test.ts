@@ -28,6 +28,7 @@ import type {
   DocumentsHomeSubViewId,
   DocumentsHomeTableRow,
 } from '../src/renderer/src/uniwork-home/documents-home-model'
+import { pickType } from './doclist-type-filter-fixture'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -582,9 +583,9 @@ describe('DocumentsHome: the Recent segment sends activity (UNI-2047 A2c)', () =
 
   it('keeps the other filters when the segment changes', async () => {
     await mount('recent')
-    await click(host.querySelector('[data-chip="xlsx"]'))
+    await pickType(host, 'xlsx')
     await click(seg('edited'))
-    expect(lastCall('uniworkListDocuments')).toMatchObject({ activity: 'edited', format: 'xlsx' })
+    expect(lastCall('uniworkListDocuments')).toMatchObject({ activity: 'edited', types: ['xlsx'] })
   })
 
   it('remembers the choice: a restart opens Recent on it and the first request already carries it', async () => {

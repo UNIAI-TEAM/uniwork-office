@@ -45,6 +45,8 @@ export const es = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: 'Tipo:',
   uhFilterTypeAll: 'Todos',
+  uhFilterTypeCount: '{count} tipos',
+  uhFilterTypeRemove: 'Quitar el filtro {type}',
   uhFilterModifiedBy: 'Modificado por:',
   uhFilterAnyPerson: 'Cualquiera',
   uhFilterUpdated: 'Actualizado:',

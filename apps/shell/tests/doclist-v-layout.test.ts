@@ -284,10 +284,20 @@ describe('F-11: the search field keeps room for its placeholder', () => {
   })
 })
 
-describe('V7-2: the pressed type chip in dark', () => {
-  it('uses the accent text token (AA on the accent tint), not the plain accent', () => {
-    const rule = ruleOf(src('uniwork-home/documents-home.css'), '.dh-filter-type.on')
-    expect(rule).toMatch(/color:\s*var\(--accent-text\);/)
+describe('UNI-2113: the Type control and its chips use semantic tokens only', () => {
+  const css = src('uniwork-home/documents-home.css')
+  it('paints the trigger, the menu and the chips with tokens, in light and dark', () => {
+    expect(ruleOf(css, '.dh-type-trigger')).toMatch(/background:\s*var\(--surface\);/)
+    expect(ruleOf(css, '.dh-type-menu')).toMatch(/box-shadow:\s*var\(--shadow-menu\);/)
+    expect(ruleOf(css, '.dh-type-menu')).toMatch(/background:\s*var\(--surface\);/)
+    expect(ruleOf(css, '.dh-type-chip')).toMatch(/background:\s*var\(--surface-subtle\);/)
+    expect(ruleOf(css, '.dh-type-check')).toMatch(/color:\s*var\(--accent\);/)
+    const block = css.slice(css.indexOf('.dh-type-filter {'), css.indexOf('/* Sections */'))
+    expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/)
+  })
+  it('opens the menu below the trigger and lets the bar wrap (no sideways scroll)', () => {
+    expect(ruleOf(css, '.dh-type-menu')).toMatch(/inset-block-start:\s*calc\(100% \+ 4px\);/)
+    expect(ruleOf(css, '.dh-filter-bar')).toMatch(/flex-wrap:\s*wrap;/)
   })
 })
 

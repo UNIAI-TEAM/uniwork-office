@@ -45,6 +45,8 @@ export const ru = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: 'Тип:',
   uhFilterTypeAll: 'Все',
+  uhFilterTypeCount: 'Типов: {count}',
+  uhFilterTypeRemove: 'Убрать фильтр {type}',
   uhFilterModifiedBy: 'Кем изменено:',
   uhFilterAnyPerson: 'Кто угодно',
   uhFilterUpdated: 'Обновлено:',

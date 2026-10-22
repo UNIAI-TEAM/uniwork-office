@@ -45,6 +45,8 @@ export const zhTW = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: '類型：',
   uhFilterTypeAll: '全部',
+  uhFilterTypeCount: '{count} 種類型',
+  uhFilterTypeRemove: '移除 {type} 篩選',
   uhFilterModifiedBy: '修改者：',
   uhFilterAnyPerson: '任何人',
   uhFilterUpdated: '更新時間：',

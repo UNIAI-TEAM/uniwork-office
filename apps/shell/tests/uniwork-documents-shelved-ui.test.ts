@@ -8,6 +8,7 @@ import type { UniworkResult, UniworkWorkspaceRef } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/documents-home-model'
+import { pickType } from './doclist-type-filter-fixture'
 
 /**
  * UNI-1961 slice B: the Lưu trữ / Archive view of the Documents home, as the
@@ -231,7 +232,7 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
     )
     // the live views' quick-create row and folder cards are not on the shelf; the shared filter bar is
     expect(host.querySelector('.dh-quick-row')).toBeNull()
-    expect(host.querySelectorAll('.dh-filter-bar [data-chip]')).toHaveLength(9)
+    expect(host.querySelectorAll('.dh-filter-bar button[data-filter="type"]')).toHaveLength(1)
     expect(host.querySelector('.dh-folders-section')).toBeNull()
     // the fixed-sort label is gone: the headers sort (UNI-2047)
     expect(host.querySelector('.dh-shelved-sort')).toBeNull()
@@ -475,12 +476,9 @@ describe('UNI-1961 Documents home Lưu trữ (Archive) view', () => {
       ok({ documents: shelvedRows().slice(0, 1), nextCursor: null }),
     )
     // the type filter goes to the server
-    await act(async () => {
-      host.querySelector<HTMLButtonElement>('.dh-filter-bar [data-chip="xlsx"]')!.click()
-    })
-    await flush()
+    await pickType(host, 'xlsx')
     expect(api.uniworkListShelved).toHaveBeenLastCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1', format: 'xlsx' }),
+      expect.objectContaining({ workspaceId: 'ws-1', types: ['xlsx'] }),
     )
     const empty = host.querySelector('.dh-empty')
     expect(empty?.textContent).toContain('Không có mục nào khớp')

@@ -24,6 +24,7 @@ import { createFakeShareApi } from '../src/renderer/src/uniwork-share/fake-share
 import { onUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 import { SaveDialog } from '../src/renderer/src/uniwork-folders/SaveDialog'
 import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/documents-home-model'
+import { pickType } from './doclist-type-filter-fixture'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -447,15 +448,12 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.textContent).toContain('Báo cáo kết quả kinh doanh Q3-2026.docx')
     expect(host.textContent).toContain('Kế hoạch ngân sách 2027.xlsx')
 
-    // Filter by type = .xlsx chip -> forwards format: 'xlsx' to uniworkListDocuments
+    // Filter by type = .xlsx -> forwards types: ['xlsx'] to uniworkListDocuments
     const filterSelects = host.querySelectorAll<HTMLSelectElement>('.dh-filter-select')
     expect(filterSelects).toHaveLength(2)
-    await act(async () => {
-      host.querySelector<HTMLButtonElement>('.dh-filter-bar [data-chip="xlsx"]')!.click()
-    })
-    await flush()
+    await pickType(host, 'xlsx')
     expect(api.uniworkListDocuments).toHaveBeenLastCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1', format: 'xlsx' }),
+      expect.objectContaining({ workspaceId: 'ws-1', types: ['xlsx'] }),
     )
 
     // Filter by Người sửa = u-minh -> forwards updatedBy: 'u-minh'
@@ -465,7 +463,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     await flush()
     expect(api.uniworkListDocuments).toHaveBeenLastCalledWith(
-      expect.objectContaining({ workspaceId: 'ws-1', format: 'xlsx', updatedBy: 'u-minh' }),
+      expect.objectContaining({ workspaceId: 'ws-1', types: ['xlsx'], updatedBy: 'u-minh' }),
     )
 
     // Filter by Cập nhật = 7d -> forwards updatedFrom ISO timestamp
@@ -477,7 +475,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(api.uniworkListDocuments).toHaveBeenLastCalledWith(
       expect.objectContaining({
         workspaceId: 'ws-1',
-        format: 'xlsx',
+        types: ['xlsx'],
         updatedBy: 'u-minh',
         updatedFrom: expect.any(String),
       }),
@@ -553,7 +551,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(api.uniworkListSharedByMe).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: 'ws-1' }),
     )
-    expect(api.uniworkListSharedByMe.mock.calls.at(-1)![0]).not.toHaveProperty('format')
+    expect(api.uniworkListSharedByMe.mock.calls.at(-1)![0]).not.toHaveProperty('types')
     expect(api.uniworkListSharedByMe.mock.calls.at(-1)![0]).not.toHaveProperty('updatedBy')
     expect(host.textContent).toContain('Bản thảo hợp đồng.docx')
     expect(host.querySelector('.dh-vis-badge')?.textContent?.trim()).toBe('Được chia sẻ')
