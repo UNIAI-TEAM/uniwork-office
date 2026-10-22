@@ -67,6 +67,8 @@ export const fr = {
   askUniV2ReasonWrongFacts: 'Faits erronés',
   askUniV2Regenerate: 'Régénérer',
   askUniV2Retry: 'Réessayer',
+  askUniV2ThreadLoading: 'Chargement…',
+  askUniV2ThreadLoadFailed: 'Impossible de charger cette conversation.',
   askUniV2SendFeedback: 'Envoyer le commentaire',
   askUniV2StepChatMany: '{count} conversations',
   askUniV2StepChatOne: '{count} conversation',

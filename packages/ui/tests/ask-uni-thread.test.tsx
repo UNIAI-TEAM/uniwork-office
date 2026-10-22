@@ -166,7 +166,8 @@ describe('AskUniThread (adapter)', () => {
       )
       await mount()
       expect(host.querySelector('.askuni-v2-turns')?.getAttribute('aria-busy')).toBe('true')
-      expect(turns()).toHaveLength(0)
+      // no turn yet: the only row is the loading line
+      expect(host.querySelectorAll('.askuni-v2-turn')).toHaveLength(0)
       await act(async () => resolve({ ok: true, messages: stored }))
       await flush()
       expect(host.querySelector('.askuni-v2-turns')?.getAttribute('aria-busy')).toBe('false')

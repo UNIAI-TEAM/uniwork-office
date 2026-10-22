@@ -68,6 +68,8 @@ export const nl = {
   askUniV2ReasonWrongFacts: 'Onjuiste feiten',
   askUniV2Regenerate: 'Opnieuw genereren',
   askUniV2Retry: 'Opnieuw proberen',
+  askUniV2ThreadLoading: 'Laden…',
+  askUniV2ThreadLoadFailed: 'Dit gesprek kon niet worden geladen.',
   askUniV2SendFeedback: 'Feedback verzenden',
   askUniV2StepChatMany: '{count} chats',
   askUniV2StepChatOne: '{count} chat',

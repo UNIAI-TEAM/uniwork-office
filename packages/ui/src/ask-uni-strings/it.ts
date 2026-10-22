@@ -62,6 +62,8 @@ export const it = {
   askUniV2ReasonWrongFacts: 'Dati errati',
   askUniV2Regenerate: 'Rigenera',
   askUniV2Retry: 'Riprova',
+  askUniV2ThreadLoading: 'Caricamento…',
+  askUniV2ThreadLoadFailed: 'Impossibile caricare questa conversazione.',
   askUniV2SendFeedback: 'Invia feedback',
   askUniV2StepChatMany: '{count} chat',
   askUniV2StepChatOne: '{count} chat',

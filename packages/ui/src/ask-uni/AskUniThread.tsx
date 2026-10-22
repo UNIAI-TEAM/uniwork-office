@@ -241,9 +241,10 @@ export function AskUniThread({
             feedback={onFeedback}
           />
         ))}
+        {loading ? <li className="askuni-v2-loading">{t('askUniV2ThreadLoading')}</li> : null}
         {firstLoad && loadFailed ? (
           <li className="askuni-v2-error" role="alert">
-            <p>{t('askUniErrDefault')}</p>
+            <p>{t('askUniV2ThreadLoadFailed')}</p>
             <button
               type="button"
               className="askuni-v2-retry"

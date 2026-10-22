@@ -61,6 +61,8 @@ export const zhTW = {
   askUniV2ReasonWrongFacts: '資訊有誤',
   askUniV2Regenerate: '重新回答',
   askUniV2Retry: '重試',
+  askUniV2ThreadLoading: '載入中…',
+  askUniV2ThreadLoadFailed: '無法載入這段對話。',
   askUniV2SendFeedback: '送出回饋',
   askUniV2StepChatMany: '{count} 個聊天',
   askUniV2StepChatOne: '{count} 個聊天',

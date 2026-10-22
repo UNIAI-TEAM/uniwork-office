@@ -61,6 +61,8 @@ export const ar = {
   askUniV2ReasonWrongFacts: 'معلومات خاطئة',
   askUniV2Regenerate: 'إعادة الإنشاء',
   askUniV2Retry: 'حاول مرة أخرى',
+  askUniV2ThreadLoading: 'جارٍ التحميل…',
+  askUniV2ThreadLoadFailed: 'تعذّر تحميل هذه المحادثة.',
   askUniV2SendFeedback: 'إرسال الملاحظات',
   askUniV2StepChatMany: 'المحادثات: {count}',
   askUniV2StepChatOne: '{count} محادثة',

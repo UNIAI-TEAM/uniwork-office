@@ -149,8 +149,8 @@
   inset-block-start: calc(100% + 4px);
   inset-inline-start: 50%;
   transform: translateX(-50%);
-  inline-size: min(320px, calc(var(--ui-vw, 100vw) * 0.9));
-  max-block-size: min(360px, calc(var(--ui-vh, 100vh) * 0.6));
+  inline-size: min(320px, calc(var(--ui-vw, 1vw) * 90));
+  max-block-size: min(360px, calc(var(--ui-vh, 1vh) * 60));
   overflow-y: auto;
 }
 
@@ -161,16 +161,16 @@
 .askuni2-model-menu {
   inset-block-end: calc(100% + 6px);
   inset-inline-end: 0;
-  inline-size: min(300px, calc(var(--ui-vw, 100vw) * 0.9));
-  max-block-size: min(420px, calc(var(--ui-vh, 100vh) * 0.7));
+  inline-size: min(300px, calc(var(--ui-vw, 1vw) * 90));
+  max-block-size: min(420px, calc(var(--ui-vh, 1vh) * 70));
   overflow-y: auto;
 }
 
 .askuni2-scope {
   inset-block-end: calc(100% + 6px);
   inset-inline-start: 0;
-  inline-size: min(300px, calc(var(--ui-vw, 100vw) * 0.9));
-  max-block-size: min(360px, calc(var(--ui-vh, 100vh) * 0.6));
+  inline-size: min(300px, calc(var(--ui-vw, 1vw) * 90));
+  max-block-size: min(360px, calc(var(--ui-vh, 1vh) * 60));
   overflow-y: auto;
 }
 

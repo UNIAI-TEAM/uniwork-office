@@ -65,6 +65,8 @@ export const ru = {
   askUniV2ReasonWrongFacts: 'Неверные факты',
   askUniV2Regenerate: 'Сгенерировать заново',
   askUniV2Retry: 'Повторить',
+  askUniV2ThreadLoading: 'Загрузка…',
+  askUniV2ThreadLoadFailed: 'Не удалось загрузить этот разговор.',
   askUniV2SendFeedback: 'Отправить отзыв',
   askUniV2StepChatMany: 'чатов: {count}',
   askUniV2StepChatOne: 'чатов: {count}',

@@ -46,6 +46,8 @@ export const en = {
   askUniV2ErrStreamEnded: 'The connection dropped before the answer finished. Try again.',
   askUniV2AnswerReady: 'UNI has answered.',
   askUniV2Retry: 'Try again',
+  askUniV2ThreadLoading: 'Loading…',
+  askUniV2ThreadLoadFailed: "Couldn't load this conversation.",
   askUniV2StepsSeen: 'Looked at {list}',
   askUniV2StepTaskOne: '{count} task',
   askUniV2StepTaskMany: '{count} tasks',

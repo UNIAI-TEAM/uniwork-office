@@ -66,6 +66,8 @@ export const hi = {
   askUniV2ReasonWrongFacts: 'गलत तथ्य',
   askUniV2Regenerate: 'फिर से बनाएँ',
   askUniV2Retry: 'फिर से कोशिश करें',
+  askUniV2ThreadLoading: 'लोड हो रहा है…',
+  askUniV2ThreadLoadFailed: 'यह बातचीत लोड नहीं हो सकी।',
   askUniV2SendFeedback: 'फ़ीडबैक भेजें',
   askUniV2StepChatMany: '{count} चैट',
   askUniV2StepChatOne: '{count} चैट',

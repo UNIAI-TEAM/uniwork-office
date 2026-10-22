@@ -67,6 +67,8 @@ export const pt = {
   askUniV2ReasonWrongFacts: 'Fatos incorretos',
   askUniV2Regenerate: 'Gerar de novo',
   askUniV2Retry: 'Tentar de novo',
+  askUniV2ThreadLoading: 'A carregar…',
+  askUniV2ThreadLoadFailed: 'Não foi possível carregar esta conversa.',
   askUniV2SendFeedback: 'Enviar feedback',
   askUniV2StepChatMany: '{count} conversas',
   askUniV2StepChatOne: '{count} conversa',

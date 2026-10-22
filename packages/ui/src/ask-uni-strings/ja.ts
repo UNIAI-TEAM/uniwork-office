@@ -65,6 +65,8 @@ export const ja = {
   askUniV2ReasonWrongFacts: '事実が間違っている',
   askUniV2Regenerate: '回答を作り直す',
   askUniV2Retry: 'もう一度試す',
+  askUniV2ThreadLoading: '読み込み中…',
+  askUniV2ThreadLoadFailed: 'この会話を読み込めませんでした。',
   askUniV2SendFeedback: 'フィードバックを送信',
   askUniV2StepChatMany: '{count} 件のチャット',
   askUniV2StepChatOne: '{count} 件のチャット',

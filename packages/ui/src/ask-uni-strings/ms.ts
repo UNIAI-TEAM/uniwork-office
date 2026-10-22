@@ -65,6 +65,8 @@ export const ms = {
   askUniV2ReasonWrongFacts: 'Fakta salah',
   askUniV2Regenerate: 'Jana semula',
   askUniV2Retry: 'Cuba lagi',
+  askUniV2ThreadLoading: 'Memuatkan…',
+  askUniV2ThreadLoadFailed: 'Tidak dapat memuatkan perbualan ini.',
   askUniV2SendFeedback: 'Hantar maklum balas',
   askUniV2StepChatMany: '{count} sembang',
   askUniV2StepChatOne: '{count} sembang',

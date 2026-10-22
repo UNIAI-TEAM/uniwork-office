@@ -47,6 +47,8 @@ export const vi = {
   askUniV2ErrStreamEnded: 'Kết nối bị ngắt trước khi trả lời xong. Hãy thử lại.',
   askUniV2AnswerReady: 'UNI đã trả lời.',
   askUniV2Retry: 'Thử lại',
+  askUniV2ThreadLoading: 'Đang tải…',
+  askUniV2ThreadLoadFailed: 'Không tải được hội thoại này.',
   askUniV2StepsSeen: 'Đã xem {list}',
   askUniV2StepTaskOne: '{count} task',
   askUniV2StepTaskMany: '{count} task',

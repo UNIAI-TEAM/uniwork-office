@@ -61,6 +61,8 @@ export const he = {
   askUniV2ReasonWrongFacts: 'עובדות שגויות',
   askUniV2Regenerate: 'צור מחדש',
   askUniV2Retry: 'נסה שוב',
+  askUniV2ThreadLoading: 'טוען…',
+  askUniV2ThreadLoadFailed: 'לא ניתן לטעון את השיחה הזו.',
   askUniV2SendFeedback: 'שלח משוב',
   askUniV2StepChatMany: "{count} צ'אטים",
   askUniV2StepChatOne: "צ'אט אחד ({count})",

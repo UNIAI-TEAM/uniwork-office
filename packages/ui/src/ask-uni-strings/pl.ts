@@ -65,6 +65,8 @@ export const pl = {
   askUniV2ReasonWrongFacts: 'Błędne fakty',
   askUniV2Regenerate: 'Wygeneruj ponownie',
   askUniV2Retry: 'Spróbuj ponownie',
+  askUniV2ThreadLoading: 'Ładowanie…',
+  askUniV2ThreadLoadFailed: 'Nie udało się wczytać tej rozmowy.',
   askUniV2SendFeedback: 'Wyślij opinię',
   askUniV2StepChatMany: 'Czaty: {count}',
   askUniV2StepChatOne: '{count} czat',

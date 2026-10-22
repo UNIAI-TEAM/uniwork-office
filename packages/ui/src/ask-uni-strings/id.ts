@@ -62,6 +62,8 @@ export const id = {
   askUniV2ReasonWrongFacts: 'Fakta keliru',
   askUniV2Regenerate: 'Buat ulang',
   askUniV2Retry: 'Coba lagi',
+  askUniV2ThreadLoading: 'Memuat…',
+  askUniV2ThreadLoadFailed: 'Tidak dapat memuat percakapan ini.',
   askUniV2SendFeedback: 'Kirim masukan',
   askUniV2StepChatMany: '{count} chat',
   askUniV2StepChatOne: '{count} chat',

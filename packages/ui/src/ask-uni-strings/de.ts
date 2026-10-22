@@ -68,6 +68,8 @@ export const de = {
   askUniV2ReasonWrongFacts: 'Falsche Fakten',
   askUniV2Regenerate: 'Neu generieren',
   askUniV2Retry: 'Erneut versuchen',
+  askUniV2ThreadLoading: 'Wird geladen…',
+  askUniV2ThreadLoadFailed: 'Diese Unterhaltung konnte nicht geladen werden.',
   askUniV2SendFeedback: 'Feedback senden',
   askUniV2StepChatMany: '{count} Chats',
   askUniV2StepChatOne: '{count} Chat',

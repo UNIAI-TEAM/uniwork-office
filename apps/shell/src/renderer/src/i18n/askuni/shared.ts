@@ -20,6 +20,8 @@ export const SHARED_ASKUNI_KEYS = [
   'askUniV2ErrStreamEnded',
   'askUniV2AnswerReady',
   'askUniV2Retry',
+  'askUniV2ThreadLoading',
+  'askUniV2ThreadLoadFailed',
   'askUniV2StepsSeen',
   'askUniV2StepTaskOne',
   'askUniV2StepTaskMany',

@@ -61,6 +61,8 @@ export const th = {
   askUniV2ReasonWrongFacts: 'ข้อมูลไม่ถูกต้อง',
   askUniV2Regenerate: 'สร้างคำตอบใหม่',
   askUniV2Retry: 'ลองอีกครั้ง',
+  askUniV2ThreadLoading: 'กำลังโหลด…',
+  askUniV2ThreadLoadFailed: 'โหลดการสนทนานี้ไม่ได้',
   askUniV2SendFeedback: 'ส่งความคิดเห็น',
   askUniV2StepChatMany: '{count} แชท',
   askUniV2StepChatOne: '{count} แชท',

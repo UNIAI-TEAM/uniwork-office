@@ -84,6 +84,8 @@ function Chat(props: {
   const { t } = useAskUniAdapter()
   const { conversationId, setConversationId, value, setValue, stream } = props.session
   const box = useRef<HTMLTextAreaElement>(null)
+  // a document with no name yet (an unsaved or still-loading file) gets no chip rather than an empty pill
+  const name = props.documentName.trim()
 
   const ask = (question: string) =>
     stream.ask({ question, ...(conversationId ? { conversationId } : {}) })
@@ -103,16 +105,18 @@ function Chat(props: {
   return (
     <section className="askuni-doc" aria-label={t('askUniDocRegion')}>
       <header className="askuni-doc-head">
-        <span
-          className="askuni-doc-chip"
-          role="group"
-          data-slot="askuni-doc-chip"
-          title={props.documentName}
-          aria-label={t('askUniDocChipAria', { name: props.documentName })}
-        >
-          <DocIcon />
-          <span className="askuni-doc-chip-name">{props.documentName}</span>
-        </span>
+        {name ? (
+          <span
+            className="askuni-doc-chip"
+            role="group"
+            data-slot="askuni-doc-chip"
+            title={name}
+            aria-label={t('askUniDocChipAria', { name })}
+          >
+            <DocIcon />
+            <span className="askuni-doc-chip-name">{name}</span>
+          </span>
+        ) : null}
         <button
           type="button"
           className="askuni-doc-new"

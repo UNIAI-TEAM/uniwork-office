@@ -61,6 +61,8 @@ export const cs = {
   askUniV2ReasonWrongFacts: 'Chybná fakta',
   askUniV2Regenerate: 'Vygenerovat znovu',
   askUniV2Retry: 'Zkusit znovu',
+  askUniV2ThreadLoading: 'Načítání…',
+  askUniV2ThreadLoadFailed: 'Tuto konverzaci se nepodařilo načíst.',
   askUniV2SendFeedback: 'Odeslat zpětnou vazbu',
   askUniV2StepChatMany: 'Chaty: {count}',
   askUniV2StepChatOne: '{count} chat',

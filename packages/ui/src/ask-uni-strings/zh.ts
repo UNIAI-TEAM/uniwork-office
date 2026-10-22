@@ -44,6 +44,8 @@ export const zh = {
   askUniV2ErrStreamEnded: '连接在回答完成前中断了，请再试一次。',
   askUniV2AnswerReady: 'UNI 已回答。',
   askUniV2Retry: '重试',
+  askUniV2ThreadLoading: '加载中…',
+  askUniV2ThreadLoadFailed: '无法加载这段对话。',
   askUniV2StepsSeen: '已查看 {list}',
   askUniV2StepTaskOne: '{count} 个任务',
   askUniV2StepTaskMany: '{count} 个任务',

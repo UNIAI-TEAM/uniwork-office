@@ -62,6 +62,8 @@ export const ko = {
   askUniV2ReasonWrongFacts: '사실이 틀림',
   askUniV2Regenerate: '다시 답변 받기',
   askUniV2Retry: '다시 시도',
+  askUniV2ThreadLoading: '불러오는 중…',
+  askUniV2ThreadLoadFailed: '이 대화를 불러오지 못했습니다.',
   askUniV2SendFeedback: '피드백 보내기',
   askUniV2StepChatMany: '채팅 {count}개',
   askUniV2StepChatOne: '채팅 {count}개',

@@ -62,6 +62,8 @@
 }
 
 .askuni-v2-answer {
+  /* the containing block of the citation card: it stays inside the answer at any width, LTR and RTL */
+  position: relative;
   min-inline-size: 0;
 }
 
@@ -190,7 +192,7 @@
 
 /* [Sn] marker + quote card */
 .askuni-v2-cite-wrap {
-  position: relative;
+  position: static;
   margin-inline: 2px;
   line-height: 0;
 }
@@ -240,11 +242,11 @@
 }
 
 .askuni-v2-cite-card {
+  /* no block offset: the card keeps the static position, i.e. under the line of its marker */
   position: absolute;
   z-index: 20;
-  inset-block-start: calc(100% + 6px);
   inset-inline-start: 0;
-  inline-size: min(288px, 72vw);
+  inline-size: min(288px, 100%);
   font-weight: 400;
 }
 
@@ -467,6 +469,14 @@
   background: var(--hover);
 }
 
+/* the first load of a stored conversation */
+.askuni-v2-loading {
+  padding: 4px 2px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
 /* a failed turn */
 .askuni-v2-error {
   display: flex;
@@ -686,6 +696,8 @@
 
 .askuni-doc-new {
   flex-shrink: 0;
+  /* stays at the inline-end when the chip is not shown */
+  margin-inline-start: auto;
   padding: 4px 10px;
   border: none;
   border-radius: var(--radius-8, 8px);
