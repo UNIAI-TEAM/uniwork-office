@@ -1,4 +1,5 @@
-import type { AskUniCitation, AskUniStreamRequest } from '../../shared/askuni-api'
+import type { AskUniCitation, AskUniMessage, AskUniStreamRequest } from '../../shared/askuni-api'
+import type { FakeAskUniStore } from './rest-fake'
 import { FAKE_CITATIONS } from './fake'
 import type { AskUniStreamClient, AskUniStreamPayload, AskUniStreamTerminal } from './stream-client'
 
@@ -9,7 +10,8 @@ import type { AskUniStreamClient, AskUniStreamPayload, AskUniStreamTerminal } fr
  * steps, word deltas every `delayMs`, citations, done. The question prefix
  * picks the case: the P1 ones (`docs:`, `none:`, `quota:`, `rate:`,
  * `forbidden:`, `offline:`, `disabled:`) plus `slow:` (a long answer to
- * Stop), `drop:` (ends without done) and `err:` (an error mid-stream).
+ * Stop), `drop:` (ends without done) and `err:` (an error mid-stream). With a
+ * `store`, each finished answer is kept in the REST fake's history.
  */
 
 /** UNIWORK_ASKUNI_FAKE_STREAM=0 shows the P1 pane under the fake */
@@ -29,7 +31,10 @@ const SLOW_ANSWER = Array.from(
 
 const CANCELLED: AskUniStreamTerminal = { type: 'error', code: 'cancelled' }
 
-export function createFakeAskUniStream(options: { delayMs?: number } = {}): AskUniStreamClient {
+export function createFakeAskUniStream(
+  options: { delayMs?: number; store?: FakeAskUniStore } = {},
+): AskUniStreamClient {
+  const store = options.store
   const delayMs = options.delayMs ?? 80
   let counter = 0
 
@@ -60,7 +65,14 @@ export function createFakeAskUniStream(options: { delayMs?: number } = {}): AskU
       if (q.startsWith('disabled:')) return { type: 'error', code: 'disabled' }
 
       counter += 1
-      const conversationId = req.conversationId ?? 'fakeconv0000000000000001'
+      const conversationId = store
+        ? store.conversationFor(req)
+        : (req.conversationId ?? 'fakeconv0000000000000001')
+      /** a finished answer goes to the REST fake's history (rest-fake.ts) */
+      const done = (msg: AskUniMessage): AskUniStreamTerminal => {
+        store?.record(req, conversationId, msg)
+        return { type: 'done', message: msg }
+      }
       const emit = async (ev: AskUniStreamPayload): Promise<boolean> => {
         if (signal.aborted) return false
         onEvent(ev)
@@ -84,10 +96,7 @@ export function createFakeAskUniStream(options: { delayMs?: number } = {}): AskU
       ]
       for (const ev of script) if (!(await emit(ev))) return CANCELLED
       if (none) {
-        return {
-          type: 'done',
-          message: message(counter, '', [], 'no_sources'),
-        }
+        return done(message(counter, '', [], 'no_sources'))
       }
       // word by word, the spaces kept, so the deltas join to the stored content
       const words = answer.match(/\S+\s*/g) ?? []
@@ -99,7 +108,7 @@ export function createFakeAskUniStream(options: { delayMs?: number } = {}): AskU
         if (i === 4 && q.startsWith('err:')) return { type: 'error', code: 'provider_error' }
       }
       if (citations.length && !(await emit({ type: 'citations', citations }))) return CANCELLED
-      return { type: 'done', message: message(counter, streamed, citations) }
+      return done(message(counter, streamed, citations))
     },
   }
 }

@@ -1523,6 +1523,15 @@ export interface HomeApi {
   onAskUniStreamEvent: AskUniV2Bridge['onAskUniStreamEvent']
   /** the public `ask_uni_stream` flag: v2 pane on, P1 pane off */
   askUniFlags: AskUniV2Bridge['askUniFlags']
+  /** UNI-2076 s2: Ask UNI v2 conversation REST and picker lookups (main, device bearer) */
+  askUniCapabilities: AskUniV2Bridge['askUniCapabilities']
+  askUniConversations: AskUniV2Bridge['askUniConversations']
+  askUniMessages: AskUniV2Bridge['askUniMessages']
+  askUniRename: AskUniV2Bridge['askUniRename']
+  askUniDelete: AskUniV2Bridge['askUniDelete']
+  askUniFeedbackSet: AskUniV2Bridge['askUniFeedbackSet']
+  askUniFeedbackClear: AskUniV2Bridge['askUniFeedbackClear']
+  askUniLookup: AskUniV2Bridge['askUniLookup']
   uniworkListWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>>
   uniworkListDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>>
   /** documents shared directly with me, aggregated across the selected org's workspaces (S17) */

@@ -298,6 +298,7 @@ describe('lookup', () => {
             id: 'doc_1',
             workspace_id: WS,
             title: 'Kế hoạch ngân sách',
+            kind: 'file',
             format: 'docx',
             updated_at: '2026-10-21T08:00:00Z',
             revision: 1,

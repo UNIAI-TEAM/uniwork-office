@@ -146,7 +146,8 @@ const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isF
 const citationsOf = (raw: unknown): AskUniCitation[] =>
   Array.isArray(raw) ? raw.map(parseCitation).filter((c): c is AskUniCitation => c !== null) : []
 
-function parseMessage(raw: unknown): AskUniMessage | null {
+/** a server message (stream `done`, the messages route) -> the contract's, bounded; null drops it */
+export function parseMessage(raw: unknown): AskUniMessage | null {
   if (!isObj(raw)) return null
   if (typeof raw.id !== 'string' || !ID.test(raw.id) || typeof raw.content !== 'string') return null
   return {

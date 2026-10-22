@@ -97,7 +97,11 @@ import {
   ASKUNI_CHANNELS,
   ASKUNI_V2_CHANNELS,
   asAskUniContext,
+  asAskUniCapabilitiesResult,
+  asAskUniConversationsResult,
   asAskUniFlags,
+  asAskUniLookupResult,
+  asAskUniMessagesResult,
   asAskUniOkResult,
   asAskUniOpenResult,
   asAskUniResult,
@@ -1345,6 +1349,65 @@ const homeApi: HomeApi = {
   },
   async askUniFlags() {
     return asAskUniFlags(await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.flags))
+  },
+  // UNI-2076 s2: the conversation REST + picker lookups; only contract fields cross
+  async askUniCapabilities(req) {
+    return asAskUniCapabilitiesResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.capabilities, { workspaceId: req?.workspaceId }),
+    )
+  },
+  async askUniConversations(req) {
+    return asAskUniConversationsResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.conversations, { workspaceId: req?.workspaceId }),
+    )
+  },
+  async askUniMessages(req) {
+    return asAskUniMessagesResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.messages, {
+        conversationId: req?.conversationId,
+      }),
+    )
+  },
+  async askUniRename(req) {
+    return asAskUniOkResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.rename, {
+        conversationId: req?.conversationId,
+        title: req?.title,
+      }),
+    )
+  },
+  async askUniDelete(req) {
+    return asAskUniOkResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.delete, { conversationId: req?.conversationId }),
+    )
+  },
+  async askUniFeedbackSet(req) {
+    return asAskUniOkResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.feedbackSet, {
+        conversationId: req?.conversationId,
+        messageId: req?.messageId,
+        rating: req?.rating,
+        ...(req?.reason !== undefined ? { reason: req.reason } : {}),
+        ...(req?.note !== undefined ? { note: req.note } : {}),
+      }),
+    )
+  },
+  async askUniFeedbackClear(req) {
+    return asAskUniOkResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.feedbackClear, {
+        conversationId: req?.conversationId,
+        messageId: req?.messageId,
+      }),
+    )
+  },
+  async askUniLookup(req) {
+    return asAskUniLookupResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.lookup, {
+        workspaceId: req?.workspaceId,
+        kind: req?.kind,
+        query: req?.query,
+      }),
+    )
   },
   async uniworkListWorkspaces() {
     return asUniworkResult<UniworkWorkspaceRef[]>(

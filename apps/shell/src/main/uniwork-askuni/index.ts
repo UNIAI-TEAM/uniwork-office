@@ -9,6 +9,10 @@ import {
 import { createAskUniClient } from './client'
 import { askUniFakeEnabled, createFakeAskUni } from './fake'
 import { createAskUniOpener, registerAskUniOpenIpc, type AskUniOpenDeps } from './open-citation'
+import { createAskUniLookupClient, type AskUniLookupClient } from './lookup-client'
+import { createAskUniRestClient, type AskUniRestClient } from './rest-client'
+import { createFakeAskUniRest, createFakeAskUniStore } from './rest-fake'
+import { createAskUniRestService, registerAskUniRestIpc } from './rest-service'
 import { createShellSenderCheck } from './sender'
 import { createAskUniService, registerAskUniIpc, type AskUniService } from './service'
 import { createAskUniStreamClient, type AskUniStreamClient } from './stream-client'
@@ -67,7 +71,7 @@ async function readStreamFlag(
  * the workbench key the doclist writes; a citation opens through `uniwork:askuni:open-citation`
  * (the docs open-by-id for a document, the web origin for the rest); UNIWORK_ASKUNI_FAKE=1 (never in a
  * packaged build) swaps both and the answers for canned ones. UNI-2076 adds the v2 stream
- * (`uniwork:askuni:stream*`) and its flag; every handler takes the shell's main frame only.
+ * (`uniwork:askuni:stream*`), its flag and the conversation REST + picker lookups; every handler takes the shell's main frame only.
  */
 export function registerUniworkAskUni(
   ipcMain: IpcMain,
@@ -78,8 +82,13 @@ export function registerUniworkAskUni(
   let flags: AskUniFlagsReader
   let isSignedIn: () => boolean
   let scopeKey: () => string | null
+  let rest: AskUniRestClient
+  let lookup: AskUniLookupClient
   if (askUniFakeEnabled(wiring.env, wiring.packaged)) {
     const fake = createFakeAskUni()
+    // one store: a fake streamed answer shows up in the fake history
+    const store = createFakeAskUniStore()
+    ;({ rest, lookup } = createFakeAskUniRest(store))
     isSignedIn = () => true
     scopeKey = () => 'fake'
     service = createAskUniService({
@@ -89,9 +98,10 @@ export function registerUniworkAskUni(
       activeWorkspaceId: () => null,
       client: fake.client,
     })
-    streamClient = createFakeAskUniStream(
-      wiring.fakeStreamDelayMs !== undefined ? { delayMs: wiring.fakeStreamDelayMs } : {},
-    )
+    streamClient = createFakeAskUniStream({
+      store,
+      ...(wiring.fakeStreamDelayMs !== undefined ? { delayMs: wiring.fakeStreamDelayMs } : {}),
+    })
     const on = askUniFakeStreamFlag(wiring.env)
     flags = { flags: async () => ({ streamEnabled: on }) }
   } else {
@@ -144,6 +154,33 @@ export function registerUniworkAskUni(
         return opts ? readStreamFlag(opts, wiring.selectedOrgId()) : false
       },
     })
+    // the service checks the sign-in first; a profile lost on the way is signed_out
+    const signedOut = { ok: false as const, error: 'signed_out' as const }
+    const via =
+      <A extends unknown[], R>(
+        call: (client: AskUniRestClient, ...args: A) => Promise<R>,
+      ): ((...args: A) => Promise<R | typeof signedOut>) =>
+      async (...args) => {
+        const opts = options()
+        return opts ? call(createAskUniRestClient(opts), ...args) : signedOut
+      }
+    rest = {
+      capabilities: via((c, ws: string) => c.capabilities(ws)),
+      conversations: via((c, ws: string) => c.conversations(ws)),
+      messages: via((c, cid: string) => c.messages(cid)),
+      rename: via((c, cid: string, title: string) => c.rename(cid, title)),
+      remove: via((c, cid: string) => c.remove(cid)),
+      feedbackSet: via((c, req: Parameters<AskUniRestClient['feedbackSet']>[0]) =>
+        c.feedbackSet(req),
+      ),
+      feedbackClear: via((c, cid: string, mid: string) => c.feedbackClear(cid, mid)),
+    }
+    lookup = {
+      lookup: async (req) => {
+        const opts = options()
+        return opts ? createAskUniLookupClient(opts).lookup(req) : signedOut
+      },
+    }
   }
   const isShellSender = createShellSenderCheck(() => wiring.shellContents())
   registerAskUniIpc(ipcMain, service, isShellSender)
@@ -155,6 +192,15 @@ export function registerUniworkAskUni(
       client: streamClient,
     }),
     flags,
+    isShellSender,
+  })
+  registerAskUniRestIpc(ipcMain, {
+    rest: createAskUniRestService({
+      isSignedIn,
+      checkWorkspace: (id) => service.checkWorkspace(id),
+      rest,
+      lookup,
+    }),
     isShellSender,
   })
   registerAskUniOpenIpc(
