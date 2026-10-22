@@ -716,8 +716,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -1681,7 +1681,10 @@
   white-space: nowrap;
 }
 
+/* order: 1 keeps the DOM order but lets the Type chips and Clear filters (order 0) follow the Type
+   control, while the select pair stays pinned to the far end of the row */
 .dh-filter-bar.has-lead .dh-filter-selects {
+  order: 1;
   margin-inline-start: auto;
 }
 
