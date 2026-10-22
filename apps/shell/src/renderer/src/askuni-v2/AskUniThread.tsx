@@ -1,0 +1,232 @@
+import { useEffect, useRef, useState } from 'react'
+import type { ReactElement } from 'react'
+import { useI18n, type StringKey } from '../locale'
+import { AskUniTurn, type AskUniTurnMessage } from './AskUniAnswer'
+import type { AskUniFeedbackApi } from './bridge'
+import type { AskUniStreamHandle } from './use-ask-uni-stream'
+import type {
+  AskUniMessage,
+  AskUniMessagesResult,
+  AskUniV2ErrorCode,
+} from '../../../shared/askuni-api'
+import './askuni-v2.css'
+
+export type { AskUniStreamHandle }
+
+export interface AskUniThreadProps {
+  workspaceId: string
+  /** null = a new conversation (nothing stored yet; the live turn shows until `run` names it) */
+  conversationId: string | null
+  /** the stored messages of a conversation; a failed load keeps what is shown */
+  loadMessages: (conversationId: string) => Promise<AskUniMessagesResult | AskUniMessage[]>
+  stream: AskUniStreamHandle
+  /** the panel resends this question (the last stored one) in the same conversation */
+  onRegenerate: (question: string) => void
+  /** defaults to the bridge's feedback calls */
+  onFeedback?: AskUniFeedbackApi
+}
+
+/** the reader counts as "at the bottom" within this many pixels */
+const NEAR_BOTTOM_PX = 80
+
+const ERROR_KEYS: Partial<Record<AskUniV2ErrorCode, StringKey>> = {
+  forbidden: 'askUniErrForbidden',
+  quota: 'askUniErrQuota',
+  rate_limited: 'askUniErrRateLimited',
+  disabled: 'askUniErrDisabled',
+  offline: 'askUniErrOffline',
+  session: 'askUniErrSession',
+  signed_out: 'askUniSignedOut',
+  error: 'askUniErrDefault',
+  provider_error: 'askUniV2ErrProviderError',
+  provider_timeout: 'askUniV2ErrProviderTimeout',
+  output_invalid: 'askUniV2ErrOutputInvalid',
+  tool_not_allowed: 'askUniV2ErrToolNotAllowed',
+  refused: 'askUniV2ErrRefused',
+  cancelled: 'askUniV2ErrCancelled',
+  stream_ended: 'askUniV2ErrStreamEnded',
+}
+/** asking again would fail the same way: no retry button */
+const NO_RETRY: ReadonlySet<string> = new Set([
+  'signed_out',
+  'session',
+  'disabled',
+  'forbidden',
+  'quota',
+])
+
+/**
+ * The scrollable message area of Ask UNI: the stored turns of the conversation, then the live
+ * question and answer until a reload holds them. The header and the composer belong to the panel.
+ */
+export function AskUniThread({
+  workspaceId,
+  conversationId,
+  loadMessages,
+  stream,
+  onRegenerate,
+  onFeedback,
+}: AskUniThreadProps): ReactElement {
+  const { t } = useI18n()
+  const { state } = stream
+  const [stored, setStored] = useState<AskUniMessage[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const loadRef = useRef(loadMessages)
+  loadRef.current = loadMessages
+  const loadedFor = useRef<string | null>(null)
+
+  // load on a new conversation or workspace, and again whenever the stream says the store changed
+  useEffect(() => {
+    const scope = `${workspaceId}/${conversationId ?? ''}`
+    if (loadedFor.current !== scope) {
+      loadedFor.current = scope
+      setStored([])
+      setLoaded(false)
+    }
+    if (conversationId === null) return
+    let alive = true
+    loadRef
+      .current(conversationId)
+      .then(
+        (res) => (Array.isArray(res) ? res : res.ok ? res.messages : null),
+        () => null,
+      )
+      .then((messages) => {
+        if (!alive || messages === null) return
+        setStored(messages)
+        setLoaded(true)
+      })
+    return () => {
+      alive = false
+    }
+  }, [workspaceId, conversationId, state.reloadTick])
+
+  const streaming = state.status === 'streaming'
+  // how many stored turns there were when the live turn started (null until the history has loaded)
+  const [base, setBase] = useState<number | null>(null)
+  useEffect(() => {
+    if (streaming) setBase(conversationId === null ? 0 : loaded ? stored.length : null)
+    // only a new question starts a turn; later loads must not move the base
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streaming, state.question])
+  useEffect(() => {
+    if (base === null && loaded && state.status !== 'idle') setBase(stored.length)
+  }, [base, loaded, stored.length, state.status])
+
+  const inStore = state.message ? stored.some((m) => m.id === state.message?.id) : false
+  // a stopped turn has no message of its own: it is stored once the history grew by its question and partial answer
+  const storedStopped =
+    state.status === 'stopped' && !state.message && base !== null && stored.length >= base + 2
+  const sameConversation = state.conversationId === conversationId
+  const live = state.status !== 'idle' && sameConversation && !inStore && !storedStopped
+
+  const lastAssistant = [...stored]
+    .reverse()
+    .find((m) => m.role === 'assistant' && !m.id.startsWith('pending-'))
+  const lastQuestion = [...stored].reverse().find((m) => m.role === 'user')?.content ?? ''
+  // a finished live turn carries the regenerate itself; while one runs the stored one shows disabled
+  const canRegenerate = lastQuestion !== '' && !(live && state.status !== 'streaming')
+
+  // follow the answer as it grows, but only while the reader is at the bottom
+  const scroller = useRef<HTMLDivElement>(null)
+  const pinned = useRef(true)
+  const onScroll = () => {
+    const el = scroller.current
+    if (el) pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX
+  }
+  useEffect(() => {
+    if (streaming) pinned.current = true
+  }, [streaming, state.question])
+  useEffect(() => {
+    const el = scroller.current
+    if (el && pinned.current) el.scrollTop = el.scrollHeight
+  }, [stored.length, state.draft, state.status, state.counts, live])
+
+  const errorText = (): string => {
+    const code = state.errorCode
+    if (code === 'rate_limited' && state.retryAfterSeconds && state.retryAfterSeconds > 0) {
+      return t('askUniErrRateLimitedIn', { seconds: String(Math.ceil(state.retryAfterSeconds)) })
+    }
+    return t((code && ERROR_KEYS[code]) || 'askUniErrDefault')
+  }
+
+  // the one polite live region: the turn status, never every delta of the answer
+  let status = ''
+  if (sameConversation) {
+    if (state.status === 'streaming') status = t('askUniThinking')
+    else if (state.status === 'done') status = t('askUniV2AnswerReady')
+    else if (state.status === 'stopped') status = t('askUniV2NoticeStopped')
+    else if (state.status === 'error') status = errorText()
+  }
+
+  const liveMessage: AskUniTurnMessage = {
+    id: state.message?.id ?? 'live',
+    role: 'assistant',
+    content: state.message?.content ?? state.draft,
+    citations: state.message?.citations ?? state.citations,
+    ...(state.message?.notice
+      ? { notice: state.message.notice }
+      : state.status === 'stopped'
+        ? { notice: 'stopped' as const }
+        : {}),
+  }
+  const showLiveAnswer =
+    streaming || state.message !== null || state.draft !== '' || state.status === 'stopped'
+  const liveFinished = state.status === 'done' || state.status === 'stopped'
+
+  return (
+    <div ref={scroller} onScroll={onScroll} className="askuni-v2-thread">
+      <p className="askuni-v2-sr" aria-live="polite" aria-atomic="true">
+        {status}
+      </p>
+      <ul className="askuni-v2-turns" aria-busy={streaming}>
+        {stored.map((m) => (
+          <AskUniTurn
+            key={m.id}
+            message={m}
+            conversationId={conversationId}
+            onRegenerate={
+              canRegenerate && m.id === lastAssistant?.id
+                ? () => onRegenerate(lastQuestion)
+                : undefined
+            }
+            regenerateDisabled={streaming}
+            feedback={onFeedback}
+          />
+        ))}
+        {live ? (
+          <>
+            <AskUniTurn
+              message={{
+                id: 'live-question',
+                role: 'user',
+                content: state.question,
+                citations: [],
+              }}
+            />
+            {showLiveAnswer ? (
+              <AskUniTurn
+                message={liveMessage}
+                streaming={streaming}
+                conversationId={conversationId}
+                counts={state.counts}
+                onRegenerate={liveFinished ? () => onRegenerate(state.question) : undefined}
+                feedback={onFeedback}
+              />
+            ) : null}
+            {state.status === 'error' ? (
+              <li className="askuni-v2-error">
+                <p>{errorText()}</p>
+                {state.errorCode && NO_RETRY.has(state.errorCode) ? null : (
+                  <button type="button" className="askuni-v2-retry" onClick={stream.retry}>
+                    {t('askUniV2Retry')}
+                  </button>
+                )}
+              </li>
+            ) : null}
+          </>
+        ) : null}
+      </ul>
+    </div>
+  )
+}
