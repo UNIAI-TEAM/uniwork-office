@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import {
   parseAccessRequests,
+  parseActiveOrgMembers,
+  parseOwnerGate,
+  parseOwnerTransfer,
+  parseWorkspaceMemberIds,
   parseRejectedItems,
   parseRequestDecision,
   parseShareAccess,
@@ -490,5 +494,94 @@ describe('parseRejectedItems (document_access_rejected fields)', () => {
   it('anything that is not a list is an empty list', () => {
     expect(parseRejectedItems(undefined)).toEqual([])
     expect(parseRejectedItems('x')).toEqual([])
+  })
+})
+
+describe('owner transfer (UNI-2078 slice 4)', () => {
+  it('parseOwnerTransfer reads DocumentOwnerSDO; the previous owner fields default to empty', () => {
+    expect(
+      parseOwnerTransfer({
+        document_id: 'doc_1',
+        acl_owner_id: 'u_an',
+        previous_owner_id: 'u_owner',
+        previous_owner_share_id: 'sh_9',
+        extra: true,
+      }),
+    ).toEqual({
+      documentId: 'doc_1',
+      aclOwnerId: 'u_an',
+      previousOwnerId: 'u_owner',
+      previousOwnerShareId: 'sh_9',
+    })
+    expect(
+      parseOwnerTransfer({ document_id: 'doc_1', acl_owner_id: 'u_an', previous_owner_id: 7 }),
+    ).toEqual({
+      documentId: 'doc_1',
+      aclOwnerId: 'u_an',
+      previousOwnerId: '',
+      previousOwnerShareId: '',
+    })
+    malformed(() => parseOwnerTransfer({ document_id: 'doc_1' }))
+    malformed(() => parseOwnerTransfer({ acl_owner_id: 'u_an' }))
+    malformed(() => parseOwnerTransfer(null))
+  })
+
+  it('parseOwnerGate reads the document (enveloped), fails closed without an id or workspace', () => {
+    expect(
+      parseOwnerGate({
+        document: {
+          id: 'doc_1',
+          workspace_id: 'ws_1',
+          owner_kind: 'work_product',
+          shelved_at: '2026-10-20T01:00:00Z',
+          visibility: 'workspace',
+        },
+      }),
+    ).toEqual({
+      id: 'doc_1',
+      workspaceId: 'ws_1',
+      ownerKind: 'work_product',
+      shelved: true,
+      visibility: 'workspace',
+    })
+    expect(parseOwnerGate({ document: { id: 'doc_1', workspace_id: 'ws_1' } })).toEqual({
+      id: 'doc_1',
+      workspaceId: 'ws_1',
+      ownerKind: '',
+      shelved: false,
+      visibility: '',
+    })
+    malformed(() => parseOwnerGate({ document: { id: 'doc_1' } }))
+    malformed(() => parseOwnerGate({ id: 'doc_1', workspace_id: 'ws_1' }))
+  })
+
+  it('parseWorkspaceMemberIds keeps each row with a user id, nameless ones too', () => {
+    expect(
+      parseWorkspaceMemberIds({
+        members: [{ user_id: 'u_1' }, { user_id: '' }, 'x', { user_id: 'u_2', display_name: '' }],
+      }),
+    ).toEqual(['u_1', 'u_2'])
+    malformed(() => parseWorkspaceMemberIds({ members: 'x' }))
+  })
+
+  it('parseActiveOrgMembers keeps active people (no status = active), name falls back to the email', () => {
+    expect(
+      parseActiveOrgMembers({
+        members: [
+          { user_id: 'u_1', display_name: 'Minh', email: 'm@a.test', status: 'active' },
+          { user_id: 'u_2', display_name: ' ', email: 'an@a.test' },
+          { user_id: 'u_3', display_name: 'Off', email: 'o@a.test', status: 'deactivated' },
+          { user_id: 'u_4', display_name: '', email: '' },
+        ],
+        next_cursor: null,
+      }),
+    ).toEqual({
+      members: [
+        { userId: 'u_1', name: 'Minh', email: 'm@a.test' },
+        { userId: 'u_2', name: 'an@a.test', email: 'an@a.test' },
+      ],
+      nextCursor: '',
+    })
+    malformed(() => parseActiveOrgMembers({ members: [], next_cursor: 3 }))
   })
 })

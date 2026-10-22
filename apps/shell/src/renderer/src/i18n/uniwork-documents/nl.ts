@@ -207,4 +207,12 @@ export const nl = {
   uwSourceOriginTask: 'Taken',
   uwSourceOriginMeeting: 'Vergaderingen',
   uwSourceOriginEmail: 'E-mail',
+  uwErrOwnerRequiresCopy:
+    'Dit document hoort bij een werkresultaat: kopieer het via het scherm waarin het beheerd wordt.',
+  uwErrPageCopyNotSupported:
+    'In deze stap kunnen alleen bestandsdocumenten worden gekopieerd. UniNote-kopieën volgen later.',
+  uwErrCopyConsentRequired: 'Voor het kopiëren is een expliciete bevestiging vereist.',
+  uwErrDocumentNotInTrash: 'Dit item staat niet meer in de prullenbak.',
+  uwErrFolderTooLarge:
+    'De map bevat te veel items om in één keer te verwijderen. Verwijder eerst de inhoud in delen.',
 } satisfies Record<keyof typeof zh, string>

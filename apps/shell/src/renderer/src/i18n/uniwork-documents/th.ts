@@ -201,4 +201,11 @@ export const th = {
   uwSourceOriginTask: 'งาน',
   uwSourceOriginMeeting: 'การประชุม',
   uwSourceOriginEmail: 'อีเมล',
+  uwErrOwnerRequiresCopy: 'เอกสารนี้เป็นของผลลัพธ์งาน: ให้คัดลอกผ่านหน้าจอของเจ้าของ',
+  uwErrPageCopyNotSupported:
+    'ในขั้นตอนนี้คัดลอกได้เฉพาะเอกสารไฟล์เท่านั้น การคัดลอก UniNote จะเปิดให้ใช้ในภายหลัง',
+  uwErrCopyConsentRequired: 'ต้องยืนยันอย่างชัดเจนก่อนคัดลอก',
+  uwErrDocumentNotInTrash: 'รายการนี้ไม่ได้อยู่ในถังขยะแล้ว',
+  uwErrFolderTooLarge:
+    'โฟลเดอร์มีรายการมากเกินไปที่จะลบพร้อมกันได้ กรุณาลบเนื้อหาข้างในทีละส่วนก่อน',
 } satisfies Record<keyof typeof zh, string>

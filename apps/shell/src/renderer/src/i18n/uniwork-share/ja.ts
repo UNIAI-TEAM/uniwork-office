@@ -196,4 +196,25 @@ export const ja = {
   shrBulkCopyFailed: 'リンクをコピーできませんでした。もう一度お試しください。',
   shrAccessManageFor: '{title} のアクセス権を管理',
   shrAccessViewFor: '{title} のアクセス権を表示',
+  shrOwnerTransferButton: 'オーナー権限を移譲',
+  shrOwnerTransferTitle: '「{document}」のオーナー権限を移譲',
+  shrOwnerTitleUntitled: 'ドキュメントのオーナー権限を移譲',
+  shrOwnerNewOwnerLabel: '新しいオーナー',
+  shrOwnerPreviousLevelLabel: '移譲後の {name} の権限',
+  shrOwnerPreviousLevelNone: '権限を残さない',
+  shrOwnerTransferNote:
+    '新しいオーナーはドキュメントを管理できます：共有、公開範囲の変更、ゴミ箱への移動。',
+  shrOwnerTransferConfirm: '移譲',
+  shrOwnerTransferred: '{name} にオーナー権限を移譲しました',
+  shrOwnerTargetNotMember:
+    '{name} はこのワークスペースのメンバーではないため、オーナーになれません。',
+  shrOwnerSelfTransferError:
+    '管理者は非公開ドキュメントのオーナー権限を自分で取得できません。別の管理者に移譲を依頼するか、緊急アクセスを開いて確認してください。',
+  shrOwnerSearchPlaceholder: 'ワークスペースのメンバーを検索',
+  shrOwnerNoCandidates: 'このドキュメントを引き継げる他のメンバーはいません。',
+  shrOwnerLoading: '読み込み中…',
+  shrOwnerFailed: 'オーナー権限を移譲できませんでした。もう一度お試しください。',
+  shrOwnerOwnedByWorkProduct:
+    'このドキュメントは作業成果物に属しているため、オーナーを変更できません。',
+  shrOwnerUnavailable: 'このサーバーではまだオーナー権限の移譲を利用できません。',
 } satisfies Record<keyof typeof zh, string>

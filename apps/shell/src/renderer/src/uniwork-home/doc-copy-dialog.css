@@ -1,0 +1,47 @@
+/* UNI-2078: the Make a copy dialog's consent row (tokens only; the modal, input and error use the shared uw-act-* rules) */
+.uw-copy-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 14px 0 0;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.uw-copy-consent input[type='checkbox'] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.uw-copy-consent input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.uw-copy-consent-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.uw-copy-consent-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.uw-copy-consent-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.uw-act .uw-copy-desc {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}

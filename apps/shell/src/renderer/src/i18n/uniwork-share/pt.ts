@@ -196,4 +196,25 @@ export const pt = {
   shrBulkCopyFailed: 'Não foi possível copiar o link. Tente novamente.',
   shrAccessManageFor: 'Gerenciar acesso a {title}',
   shrAccessViewFor: 'Ver acesso a {title}',
+  shrOwnerTransferButton: 'Transferir propriedade',
+  shrOwnerTransferTitle: 'Transferir a propriedade de “{document}”',
+  shrOwnerTitleUntitled: 'Transferir a propriedade do documento',
+  shrOwnerNewOwnerLabel: 'Novo proprietário',
+  shrOwnerPreviousLevelLabel: 'Acesso de {name} após a transferência',
+  shrOwnerPreviousLevelNone: 'Sem acesso',
+  shrOwnerTransferNote:
+    'O novo proprietário pode gerenciar o documento: compartilhá-lo, alterar quem pode vê-lo e movê-lo para a lixeira.',
+  shrOwnerTransferConfirm: 'Transferir',
+  shrOwnerTransferred: 'Propriedade transferida para {name}',
+  shrOwnerTargetNotMember:
+    '{name} não é membro deste espaço de trabalho, por isso não pode ser proprietário deste documento.',
+  shrOwnerSelfTransferError:
+    'Administradores não podem assumir sozinhos a propriedade de um documento privado. Peça a outro administrador para transferi-lo ou abra o acesso de emergência para inspecioná-lo.',
+  shrOwnerSearchPlaceholder: 'Pesquisar membros do espaço de trabalho',
+  shrOwnerNoCandidates: 'Nenhum outro membro pode receber este documento.',
+  shrOwnerLoading: 'Carregando…',
+  shrOwnerFailed: 'Não foi possível transferir a propriedade. Tente novamente.',
+  shrOwnerOwnedByWorkProduct:
+    'Este documento pertence a um produto de trabalho, por isso o proprietário não pode ser alterado.',
+  shrOwnerUnavailable: 'A transferência de propriedade ainda não está disponível neste servidor.',
 } satisfies Record<keyof typeof zh, string>

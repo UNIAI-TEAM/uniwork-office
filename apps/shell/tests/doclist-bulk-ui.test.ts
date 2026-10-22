@@ -6,10 +6,13 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UniworkResult, UniworkWorkspaceRef } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
+import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
 import { resetZipDownloadStore } from '../src/renderer/src/uniwork-zip-download/zip-download-store'
 import { fakeZipBridge, type FakeZipBridge } from './uniwork-zip-fake-bridge'
 import { BulkBar, BulkTrashConfirm } from '../src/renderer/src/doclist/BulkBar'
+import { BulkPurgeConfirm } from '../src/renderer/src/doclist/BulkPurgeConfirm'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
+import { DOC_SHARE_CHANGED_EVENT } from '../src/renderer/src/uniwork-folders/first-save-share'
 import type {
   DocumentsHomeDoc,
   DocumentsHomeSubViewId,
@@ -95,7 +98,7 @@ describe('BulkBar: visible from one selected row, actions = what every row allow
     expect(bar).not.toBeNull()
     expect(bar!.getAttribute('role')).toBe('toolbar')
     expect(bar!.querySelector('[data-bulk-count]')?.textContent).toBe('1 đã chọn')
-    expect(actionIds()).toEqual(['shelve', 'trash'])
+    expect(actionIds()).toEqual(['move', 'shelve', 'trash'])
     expect(host.querySelector('[data-bulk-action="trash"]')?.textContent).toBe(
       'Chuyển vào thùng rác',
     )
@@ -115,7 +118,7 @@ describe('BulkBar: visible from one selected row, actions = what every row allow
         onClear: vi.fn(),
       }),
     )
-    expect(actionIds()).toEqual(['trash'])
+    expect(actionIds()).toEqual(['move', 'trash'])
     expect(host.querySelector('[data-bulk-count]')?.textContent).toBe('2 đã chọn')
 
     await render(
@@ -158,6 +161,58 @@ describe('BulkBar: visible from one selected row, actions = what every row allow
     await act(async () => document.body.querySelector<HTMLElement>('[data-bulk-confirm]')!.click())
     expect(onConfirm).toHaveBeenCalledTimes(1)
     expect(onCancel).not.toHaveBeenCalled()
+  })
+})
+
+describe('BulkPurgeConfirm (UNI-2078)', () => {
+  let host: HTMLDivElement
+  let root: Root
+  beforeEach(() => {
+    localStorage.setItem('genoffice.lang', 'vi')
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    host.remove()
+  })
+  const render = (props: { count: number; onConfirm: () => void; onCancel: () => void }) =>
+    act(async () => {
+      root.render(
+        createElement(LocaleProvider, { initial: 'vi' }, createElement(BulkPurgeConfirm, props)),
+      )
+    })
+
+  it('names the count and asks once', async () => {
+    const onConfirm = vi.fn()
+    const onCancel = vi.fn()
+    await render({ count: 3, onConfirm, onCancel })
+    expect(document.body.querySelector('[role="dialog"]')!.textContent).toContain(
+      'Xóa vĩnh viễn 3 tài liệu?',
+    )
+    await act(async () => document.body.querySelector<HTMLElement>('[data-bulk-confirm]')!.click())
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(onCancel).not.toHaveBeenCalled()
+  })
+
+  it('the confirm fires once even on two clicks before a re-render', async () => {
+    const onConfirm = vi.fn()
+    await render({ count: 2, onConfirm, onCancel: vi.fn() })
+    const confirm = document.body.querySelector<HTMLElement>('[data-bulk-confirm]')!
+    await act(async () => {
+      confirm.click()
+      confirm.click()
+    })
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('is a labelled, described dialog with the focus on cancel', async () => {
+    await render({ count: 2, onConfirm: vi.fn(), onCancel: vi.fn() })
+    const dialog = document.body.querySelector('[role="dialog"]')!
+    expect(dialog.getAttribute('aria-labelledby')).toBeTruthy()
+    expect(dialog.getAttribute('aria-describedby')).toBeTruthy()
+    expect(document.activeElement).toBe(document.body.querySelector('[data-bulk-cancel]'))
   })
 })
 
@@ -213,6 +268,7 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
         ok({ tooLarge: false, folders: 0, documents: 1, relocatedCount: 1 }),
       ),
       uniworkRestoreDocument: vi.fn(async () => ({ ok: true, value: {} })),
+      uniworkPurgeDocument: vi.fn(async (id: string) => ({ ok: true, value: { id } })),
       uniworkShelveDocument: vi.fn(async (id: string) => ({
         ok: true,
         value: { document: { id, title: id }, affected: [id] },
@@ -413,7 +469,7 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
     expect(api.uniworkTrashShelvedDocument!.mock.calls.map((c) => c[0])).toEqual(['doc-a'])
   })
 
-  it('trash screen: Khôi phục only', async () => {
+  it('trash screen: Khôi phục, then Xóa vĩnh viễn', async () => {
     await mount('trash')
     await click(box('doc-a'))
     await click(box('doc-b'))
@@ -421,10 +477,141 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
       Array.from(host.querySelectorAll('[data-bulk-action]')).map((e) =>
         e.getAttribute('data-bulk-action'),
       ),
-    ).toEqual(['restore'])
+    ).toEqual(['restore', 'purge'])
     await click(bulk('restore'))
     expect(api.uniworkRestoreDocument).toHaveBeenCalledTimes(2)
+    expect(api.uniworkPurgeDocument).not.toHaveBeenCalled()
     expect(toast()).toContain('Đã khôi phục 2/2 tài liệu')
+  })
+
+  describe('Xóa vĩnh viễn (UNI-2078)', () => {
+    const confirmDialog = () => document.body.querySelector('[role="dialog"]')
+    const pick = async (...ids: string[]) => {
+      for (const id of ids) await click(box(id))
+    }
+
+    it('is a danger button labelled Xóa vĩnh viễn, after Khôi phục', async () => {
+      await mount('trash')
+      await pick('doc-a')
+      expect(bulk('purge')!.textContent).toBe('Xóa vĩnh viễn')
+      expect(bulk('purge')!.classList.contains('danger')).toBe(true)
+      expect(bulk('restore')!.classList.contains('danger')).toBe(false)
+    })
+
+    it('is absent from a shell without the purge call, Khôi phục stays', async () => {
+      delete api.uniworkPurgeDocument
+      await mount('trash')
+      await pick('doc-a')
+      expect(bulk('purge')).toBeNull()
+      expect(bulk('restore')).not.toBeNull()
+    })
+
+    it('is absent on the live list and on the shelf', async () => {
+      await mount()
+      await pick('doc-a')
+      expect(bulk('purge')).toBeNull()
+      await act(async () => root.unmount())
+      root = createRoot(host)
+      await mount('archive')
+      await pick('doc-a')
+      expect(bulk('purge')).toBeNull()
+    })
+
+    it('a mixed selection hides it: one row the person cannot manage takes it away', async () => {
+      items = [
+        row({ id: 'doc-a' }),
+        row({ id: 'doc-b', canManage: false, canEdit: true, myLevel: 'edit' }),
+      ]
+      await mount('trash')
+      await pick('doc-a', 'doc-b')
+      expect(bulk('purge')).toBeNull()
+      expect(host.querySelectorAll('[data-bulk-action]')).toHaveLength(0)
+    })
+
+    it('an admin_scope row below manage offers purge but not restore', async () => {
+      items = [
+        row({ id: 'doc-a', canManage: false, canEdit: false, myLevel: 'view', adminScope: true }),
+      ]
+      await mount('trash')
+      await pick('doc-a')
+      expect(bulk('purge')).not.toBeNull()
+      expect(bulk('restore')).toBeNull()
+    })
+
+    it('one confirm with the count and the web wording, nothing runs before it', async () => {
+      await mount('trash')
+      await pick('doc-a', 'doc-b')
+      await click(bulk('purge'))
+      expect(api.uniworkPurgeDocument).not.toHaveBeenCalled()
+      expect(document.body.querySelectorAll('[role="dialog"]')).toHaveLength(1)
+      const text = confirmDialog()!.textContent!
+      expect(text).toContain('Xóa vĩnh viễn 2 tài liệu?')
+      expect(text).toContain('Không thể hoàn tác. Mục bạn không có quyền sẽ được bỏ qua.')
+      const confirm = document.body.querySelector('[data-bulk-confirm]')!
+      expect(confirm.textContent).toBe('Xóa vĩnh viễn')
+      expect(confirm.classList.contains('btn-danger')).toBe(true)
+    })
+
+    it('the focus starts on Hủy (a destructive dialog)', async () => {
+      await mount('trash')
+      await pick('doc-a')
+      await click(bulk('purge'))
+      expect(document.activeElement).toBe(document.body.querySelector('[data-bulk-cancel]'))
+    })
+
+    it('confirm: one call per row, "2/2" toast, one refresh, selection cleared', async () => {
+      await mount('trash')
+      await pick('doc-a', 'doc-b')
+      const lists = api.uniworkListTrash!.mock.calls.length
+      await click(bulk('purge'))
+      await click(document.body.querySelector('[data-bulk-confirm]'))
+      expect(api.uniworkPurgeDocument!.mock.calls.map((c) => c[0]).sort()).toEqual([
+        'doc-a',
+        'doc-b',
+      ])
+      expect(toast()).toContain('Đã xóa vĩnh viễn 2/2 tài liệu')
+      expect(api.uniworkListTrash!.mock.calls.length - lists).toBe(1)
+      expect(confirmDialog()).toBeNull()
+      expect(bar()).toBeNull()
+    })
+
+    it('a double click on the confirm sends each row once', async () => {
+      await mount('trash')
+      await pick('doc-a', 'doc-b')
+      await click(bulk('purge'))
+      const confirm = document.body.querySelector<HTMLElement>('[data-bulk-confirm]')!
+      await act(async () => {
+        confirm.click()
+        confirm.click()
+      })
+      await flush()
+      expect(api.uniworkPurgeDocument).toHaveBeenCalledTimes(2)
+    })
+
+    it('cancel runs nothing and keeps the selection', async () => {
+      await mount('trash')
+      await pick('doc-a')
+      await click(bulk('purge'))
+      await click(document.body.querySelector('[data-bulk-cancel]'))
+      expect(api.uniworkPurgeDocument).not.toHaveBeenCalled()
+      expect(confirmDialog()).toBeNull()
+      expect(bar()).not.toBeNull()
+    })
+
+    it('a refused row does not stop the batch: 2/3 and the commonest reason', async () => {
+      api.uniworkPurgeDocument!.mockImplementation(async (id: string) =>
+        id === 'doc-b'
+          ? { ok: false, error: 'document_not_in_trash' }
+          : { ok: true, value: { id } },
+      )
+      await mount('trash')
+      await pick('doc-a', 'doc-b', 'doc-c')
+      await click(bulk('purge'))
+      await click(document.body.querySelector('[data-bulk-confirm]'))
+      expect(api.uniworkPurgeDocument).toHaveBeenCalledTimes(3)
+      expect(toast()).toContain('Đã xóa vĩnh viễn 2/3 tài liệu')
+      expect(toast()).toContain('Mục này không còn trong thùng rác.')
+    })
   })
 
   it('a viewer’s selection shows the bar without any action', async () => {
@@ -433,6 +620,188 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
     await click(box('doc-a'))
     expect(bar()).not.toBeNull()
     expect(host.querySelectorAll('[data-bulk-action]')).toHaveLength(0)
+  })
+
+  describe('Di chuyển (UNI-2078 slice 3)', () => {
+    const folderNode = (
+      id: string,
+      children: unknown[] = [],
+      extra: Record<string, unknown> = {},
+    ) => ({ id, parentId: null, title: id, position: 0, children, ...extra })
+    const moved = (id: string) => ({ ok: true, value: { id, title: id, renamedTo: null } })
+    const pickerEl = () => document.body.querySelector('.uwf-picker')
+    // the picker's own tree (the sidebar tree lists the same folders)
+    const treeItem = (title: string) =>
+      Array.from(pickerEl()?.querySelectorAll('[role="treeitem"]') ?? []).find(
+        (el) => el.querySelector('.uwf-tree-title')?.textContent === title,
+      )
+    const confirmPick = () => document.body.querySelector('.uwf-picker-confirm')
+    const cancelPick = () =>
+      Array.from(pickerEl()!.querySelectorAll('button')).find((b) => b.textContent === 'Hủy')
+    const moveCalls = () =>
+      api
+        .uniworkMoveDocument!.mock.calls.map(
+          (c) => c[0] as { documentId: string; parentId: string | null },
+        )
+        .sort((a, b) => a.documentId.localeCompare(b.documentId))
+
+    beforeEach(() => {
+      api.uniworkMoveDocument = vi.fn(async (input: { documentId: string }) =>
+        moved(input.documentId),
+      )
+      api.uniworkFolderTree!.mockImplementation(async () =>
+        ok([folderNode('WS1'), folderNode('WS2')]),
+      )
+    })
+
+    it('opens one picker for the selection, titled with the count and describing the move', async () => {
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(bulk('move'))
+      expect(document.body.querySelectorAll('.uwf-picker')).toHaveLength(1)
+      expect(pickerEl()!.querySelector('.uw-act-heading')?.textContent).toBe('Di chuyển 2 tài liệu')
+      expect(pickerEl()!.textContent).toContain('Chọn thư mục đích cho các tài liệu đã chọn.')
+      expect(confirmPick()?.textContent).toBe('Di chuyển')
+      // nothing is sent before a folder is picked
+      expect(api.uniworkMoveDocument).not.toHaveBeenCalled()
+    })
+
+    it('one selected row reads "1 tài liệu"', async () => {
+      await mount()
+      await click(box('doc-a'))
+      await click(bulk('move'))
+      expect(pickerEl()!.querySelector('.uw-act-heading')?.textContent).toBe('Di chuyển 1 tài liệu')
+    })
+
+    it('a row that stops offering Di chuyển while the picker is open: the pick sends nothing', async () => {
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(bulk('move'))
+      await click(treeItem('WS2'))
+      // a background refresh drops doc-b to a read-only level under the open picker
+      items = items.map((d) =>
+        d.id === 'doc-b' ? { ...d, myLevel: 'view', canEdit: false, canManage: false } : d,
+      )
+      await act(async () => {
+        window.dispatchEvent(new Event(DOC_SHARE_CHANGED_EVENT))
+      })
+      await flush()
+      await click(confirmPick())
+      expect(api.uniworkMoveDocument).not.toHaveBeenCalled()
+      expect(pickerEl()).toBeNull()
+    })
+
+    it('one move per row into the picked folder, "2/2" toast, one refresh, selection cleared', async () => {
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      const lists = api.uniworkListChildren!.mock.calls.length
+      const trees = api.uniworkFolderTree!.mock.calls.length
+      await click(bulk('move'))
+      await click(treeItem('WS2'))
+      await click(confirmPick())
+      expect(moveCalls()).toEqual([
+        { documentId: 'doc-a', parentId: 'WS2' },
+        { documentId: 'doc-b', parentId: 'WS2' },
+      ])
+      expect(toast()).toContain('Đã di chuyển 2/2 tài liệu')
+      expect(api.uniworkListChildren!.mock.calls.length - lists).toBe(1)
+      expect(api.uniworkFolderTree!.mock.calls.length - trees).toBe(1)
+      expect(pickerEl()).toBeNull()
+      expect(bar()).toBeNull()
+    })
+
+    it('the workspace root is a target: parent_id null', async () => {
+      // rows that sit in a folder: the root is not their current location
+      items = items.map((d) => ({ ...d, parentId: 'WS1' }))
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(bulk('move'))
+      await click(treeItem(uniworkFolderStrings.vi.ufRoot))
+      await click(confirmPick())
+      expect(moveCalls().map((c) => c.parentId)).toEqual([null, null])
+    })
+
+    it('Hủy sends nothing and keeps the selection', async () => {
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(bulk('move'))
+      await click(treeItem('WS1'))
+      await click(cancelPick())
+      expect(pickerEl()).toBeNull()
+      expect(api.uniworkMoveDocument).not.toHaveBeenCalled()
+      expect(bar()!.querySelector('[data-bulk-count]')?.textContent).toBe('2 đã chọn')
+    })
+
+    it('a refused row does not stop the batch: "2/3" and the commonest reason', async () => {
+      api.uniworkMoveDocument!.mockImplementation(async (input: { documentId: string }) =>
+        input.documentId === 'doc-b'
+          ? { ok: false, error: 'folder_into_my_folder' }
+          : moved(input.documentId),
+      )
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(box('doc-c'))
+      await click(bulk('move'))
+      await click(treeItem('WS1'))
+      await click(confirmPick())
+      expect(api.uniworkMoveDocument).toHaveBeenCalledTimes(3)
+      expect(toast()).toContain('Đã di chuyển 2/3 tài liệu')
+      expect(toast()).toContain(uniworkFolderStrings.vi.ufIntoMyFolder)
+      expect(bar()).toBeNull()
+    })
+
+    it('a second press while the batch runs does not send twice', async () => {
+      let release: () => void = () => {}
+      api.uniworkMoveDocument!.mockImplementation(
+        (input: { documentId: string }) =>
+          new Promise((resolve) => {
+            release = () => resolve(moved(input.documentId))
+          }),
+      )
+      await mount()
+      await click(box('doc-a'))
+      await click(bulk('move'))
+      await click(treeItem('WS1'))
+      await click(confirmPick())
+      expect(api.uniworkMoveDocument).toHaveBeenCalledTimes(1)
+      for (const el of host.querySelectorAll<HTMLButtonElement>('[data-bulk-action]')) {
+        expect(el.disabled).toBe(true)
+      }
+      await act(async () => release())
+      await flush()
+      expect(api.uniworkMoveDocument).toHaveBeenCalledTimes(1)
+    })
+
+    // folders are cards, not table rows, on the live screens, so a live selection holds files and
+    // pages only: the host never needs the My Folder out-confirm (the picker asks once for a batch
+    // that has folders: uniwork-folder-picker-batch.test.ts)
+    it('documents leaving My Folder move straight away: no out-confirm', async () => {
+      api.uniworkFolderTree!.mockImplementation(async () =>
+        ok([
+          folderNode('MY', [folderNode('MY_A')], { systemKind: 'my_folder' }),
+          folderNode('WS2'),
+        ]),
+      )
+      items = items.map((d) => ({ ...d, parentId: 'MY_A' }))
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(bulk('move'))
+      await click(treeItem('WS2'))
+      await click(confirmPick())
+      expect(
+        Array.from(document.body.querySelectorAll('[role="dialog"]')).filter((d) =>
+          d.textContent?.includes(uniworkFolderStrings.vi.ufMoveOutTitle),
+        ),
+      ).toHaveLength(0)
+      expect(moveCalls().map((c) => c.documentId)).toEqual(['doc-a', 'doc-b'])
+    })
   })
 
   describe('Tải xuống (UNI-2068 ZB)', () => {
@@ -452,14 +821,14 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
       expect(bulk('shelve')).not.toBeNull()
     })
 
-    it('is a button between Lưu trữ and the rest once the bridge is there', async () => {
+    it('is a button between Di chuyển and Lưu trữ once the bridge is there', async () => {
       await mount()
       await click(box('doc-a'))
       expect(
         Array.from(host.querySelectorAll('[data-bulk-action]')).map((e) =>
           e.getAttribute('data-bulk-action'),
         ),
-      ).toEqual(['download', 'shelve', 'trash'])
+      ).toEqual(['move', 'download', 'shelve', 'trash'])
       expect(bulk('download')!.textContent).toBe('Tải xuống')
     })
 

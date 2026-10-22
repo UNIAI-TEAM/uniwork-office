@@ -378,6 +378,26 @@ export function errorFromResponse(
   if (serverCode === 'folder_into_my_folder') {
     return new UniworkDocError('folder_into_my_folder', at)
   }
+  // UNI-2078: the copy route's refusals, each its own user-facing code (a 409 would otherwise read
+  // as a revision conflict path or a bare server_error): an owned document copies through its
+  // owning screen, the copy needs the explicit consent, and a page has no copy yet - the server
+  // words that one as a 400 `invalid_request` whose `fields.reason` names it
+  if (serverCode === 'owner_requires_copy') return new UniworkDocError('owner_requires_copy', at)
+  if (serverCode === 'copy_consent_required') {
+    return new UniworkDocError('copy_consent_required', at)
+  }
+  if (
+    status === 400 &&
+    serverCode === 'invalid_request' &&
+    envelope?.fields?.reason === 'page_copy_not_supported'
+  ) {
+    return new UniworkDocError('page_copy_not_supported', at)
+  }
+  // UNI-2078: the purge route's refusals: the item left the trash meanwhile (400), or the folder
+  // holds more than 1000 nodes (400, 422 in older builds) - each its own user-facing code
+  if (serverCode === 'document_not_in_trash')
+    return new UniworkDocError('document_not_in_trash', at)
+  if (serverCode === 'folder_too_large') return new UniworkDocError('folder_too_large', at)
   // UNI-2047 SD-A: an access update the server refused item by item; the list rides the error so
   // the share dialog can name each refused person (a bare 422 stays the generic server_error)
   if (serverCode === 'document_access_rejected') {
