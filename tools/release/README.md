@@ -192,8 +192,13 @@ when it is. The `urls` and `publish` jobs wait for whichever ran.
 - Secrets: `CSC_LINK` (the Developer ID Application `.p12`, base64), `CSC_KEY_PASSWORD`,
   `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. electron-builder signs with the
   hardened runtime and notarizes the app; `apps/shell/build/notarize-dmg.js` notarizes and
-  staples the dmgs. A "Check the signing secrets" step fails early when one is empty, and the
-  signed package step is a separate step that alone receives the secrets. The verify steps
+  staples the dmgs. A "Check the signing secrets" step fails early when one is empty. An "Import
+  the signing certificate" step puts the `.p12` into a temporary keychain with a random
+  password, lists the identities it holds (names only) and exports `CSC_KEYCHAIN` and
+  `CSC_NAME` for electron-builder; the package step gets only the Apple credentials, and the
+  keychain is deleted in a last step. (electron-builder 26.15's own `CSC_LINK` import fails on
+  macOS 26 at `security set-key-partition-list`: it passes the `.p12` password where the
+  keychain password belongs; fixed upstream in 26.18.) The verify steps
   refuse any signer other than team `XJAM488A6D` (`EXPECTED_TEAM_ID` in the job env).
 - Keep the secrets **in the `mac-signing` environment, not in the repository list**. A
   repository secret is readable by any workflow on any branch; an environment secret only by a
