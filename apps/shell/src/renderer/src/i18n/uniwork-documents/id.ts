@@ -201,4 +201,11 @@ export const id = {
   uwSourceOriginTask: 'Tugas',
   uwSourceOriginMeeting: 'Rapat',
   uwSourceOriginEmail: 'Email',
+  uwErrOwnerRequiresCopy: 'Dokumen ini milik sebuah hasil kerja: salin melalui layar pemiliknya.',
+  uwErrPageCopyNotSupported:
+    'Pada tahap ini hanya dokumen file yang dapat disalin. Salinan UniNote akan tersedia nanti.',
+  uwErrCopyConsentRequired: 'Konfirmasi eksplisit diperlukan sebelum menyalin.',
+  uwErrDocumentNotInTrash: 'Item ini tidak lagi berada di sampah.',
+  uwErrFolderTooLarge:
+    'Folder berisi terlalu banyak item untuk dihapus sekaligus. Hapus isinya secara bertahap terlebih dahulu.',
 } satisfies Record<keyof typeof zh, string>

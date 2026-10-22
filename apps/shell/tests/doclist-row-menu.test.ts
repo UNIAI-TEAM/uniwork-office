@@ -258,3 +258,185 @@ describe('row menu: the destructive item is last, red, and asks first', () => {
     expect(menu('workspace', doc({ canEdit: true })).some((i) => i.danger)).toBe(false)
   })
 })
+
+// UNI-2078 slice 1: Make a copy (web row-menu id `duplicate`)
+describe('row menu: Make a copy (UNI-2078)', () => {
+  const WITH_COPY: RowMenuActionId[] = [...ALL, 'duplicate']
+  const EDITOR = doc({ canEdit: true, myLevel: 'edit' })
+
+  it('sits in the edit group right after Move, before Shelve and Trash', () => {
+    const items = menu('workspace', MANAGER, { run: WITH_COPY })
+    expect(ids(items)).toEqual([
+      'open',
+      'offline',
+      'copy-link',
+      'rename',
+      'move',
+      'duplicate',
+      'shelve',
+      'trash',
+    ])
+    const of = (id: string) => items.find((i) => i.id === id)!.group
+    expect(of('duplicate')).toBe(of('move'))
+  })
+
+  it('uses the existing "Make a copy" label key and is neither danger nor confirm', () => {
+    const item = menu('workspace', EDITOR, { run: WITH_COPY }).find((i) => i.id === 'duplicate')!
+    expect(item.label).toBe('dlActDuplicate')
+    expect(item.danger).toBeUndefined()
+    expect(item.confirm).toBeUndefined()
+  })
+
+  it.each<DocListScreen>(['workspace', 'recent', 'shared', 'shared-by-me'])(
+    '%s: an editor of a live file is offered it',
+    (screen) => {
+      expect(ids(menu(screen, EDITOR, { run: WITH_COPY }))).toContain('duplicate')
+    },
+  )
+
+  it('is offered to an edit-level person who cannot manage', () => {
+    expect(ids(menu('workspace', EDITOR, { run: WITH_COPY }))).toContain('duplicate')
+  })
+
+  it('is hidden for a view-level row and for an unknown level', () => {
+    expect(
+      ids(menu('workspace', doc({ canEdit: false, myLevel: 'view' }), { run: WITH_COPY })),
+    ).not.toContain('duplicate')
+    expect(ids(menu('workspace', doc(), { run: WITH_COPY }))).not.toContain('duplicate')
+  })
+
+  it.each(['folder', 'page'] as const)('is hidden for a %s', (kind) => {
+    expect(ids(menu('workspace', { ...MANAGER, kind }, { run: WITH_COPY }))).not.toContain(
+      'duplicate',
+    )
+  })
+
+  it('is hidden for another module’s document (ownerKind set): the server needs the owner seam', () => {
+    expect(
+      ids(menu('workspace', { ...MANAGER, ownerKind: 'work_product' }, { run: WITH_COPY })),
+    ).not.toContain('duplicate')
+  })
+
+  it('is hidden for a shelved row on the workspace screen and on the shelf screen', () => {
+    const shelved = { ...MANAGER, shelvedAt: '2026-10-20T00:00:00Z' }
+    expect(ids(menu('workspace', shelved, { run: WITH_COPY }))).not.toContain('duplicate')
+    expect(ids(menu('shelved', MANAGER, { run: WITH_COPY }))).not.toContain('duplicate')
+  })
+
+  it('is hidden on the trash screen and for a trashed row anywhere', () => {
+    expect(ids(menu('trash', MANAGER, { run: WITH_COPY }))).not.toContain('duplicate')
+    expect(
+      ids(menu('workspace', { ...MANAGER, archived: true }, { run: WITH_COPY })),
+    ).not.toContain('duplicate')
+  })
+
+  it('has no entry when the host gives the menu no handler', () => {
+    expect(ids(menu('workspace', MANAGER))).not.toContain('duplicate')
+  })
+
+  it('runs the handler on select', () => {
+    const run = { open: vi.fn(), duplicate: vi.fn() }
+    const items = buildRowMenu({
+      screen: 'workspace',
+      doc: EDITOR,
+      run,
+      offlineLabel: null,
+      label: (key: StringKey) => key,
+    })
+    items.find((i) => i.id === 'duplicate')!.onSelect()
+    expect(run.duplicate).toHaveBeenCalledTimes(1)
+  })
+})
+
+// UNI-2078 slice 2: Delete forever (web row-menu id `purge`) on the trash rows
+describe('row menu: Delete forever on the trash (UNI-2078)', () => {
+  const trashRow = (partial: Partial<DocumentsHomeDoc> = {}) =>
+    doc({ archived: true, canManage: true, myLevel: 'manage', ...partial })
+  const withPurge = (screen: DocListScreen, d: DocumentsHomeDoc) =>
+    menu(screen, d, { run: [...ALL, 'purge'], offlineLabel: null })
+
+  it('trash: Restore, Details | Delete forever, the purge in its own group after a divider', () => {
+    const items = withPurge('trash', trashRow())
+    expect(ids(items)).toEqual(['restore', 'details', 'purge'])
+    expect(items[2]!.group).toBeGreaterThan(items[1]!.group)
+    expect(items[0]!.group).toBe(items[1]!.group)
+  })
+
+  it('uses the existing "Delete permanently" label key, is danger and asks first', () => {
+    const purge = withPurge('trash', trashRow()).find((i) => i.id === 'purge')!
+    expect(purge.label).toBe('dlActPurge')
+    expect(purge.danger).toBe(true)
+    expect(purge.confirm).toBe(true)
+  })
+
+  it('is offered to a manager', () => {
+    expect(ids(withPurge('trash', trashRow()))).toContain('purge')
+  })
+
+  it('is offered to an admin_scope row below manage (decision Q4), which still cannot restore', () => {
+    const admin = trashRow({ canManage: false, myLevel: 'view', adminScope: true })
+    expect(ids(withPurge('trash', admin))).toEqual(['details', 'purge'])
+  })
+
+  it.each([
+    ['edit', { canManage: false, canEdit: true, myLevel: 'edit' }],
+    ['view', { canManage: false, canEdit: false, myLevel: 'view' }],
+    ['unknown', { canManage: false, canEdit: undefined, myLevel: undefined }],
+  ] as const)('is hidden for a %s-level row with no admin scope', (_name, extra) => {
+    expect(ids(withPurge('trash', trashRow(extra)))).toEqual(['details'])
+  })
+
+  it('adminScope false is no scope', () => {
+    const none = trashRow({ canManage: false, adminScope: false })
+    expect(ids(withPurge('trash', none))).toEqual(['details'])
+  })
+
+  it('a trashed row listed anywhere (a search hit) behaves as the trash row', () => {
+    expect(ids(withPurge('workspace', trashRow()))).toEqual(['restore', 'details', 'purge'])
+  })
+
+  it('is never offered on a live row, the shelf or a folder-less live menu', () => {
+    for (const screen of ['workspace', 'recent', 'shared', 'shared-by-me'] as const) {
+      expect(ids(withPurge(screen, MANAGER))).not.toContain('purge')
+    }
+    expect(
+      ids(withPurge('shelved', doc({ canManage: true, shelvedAt: '2026-10-20T00:00:00.000Z' }))),
+    ).not.toContain('purge')
+  })
+
+  it('a trashed folder gets it too (the web gates all trash rows alike)', () => {
+    expect(ids(withPurge('trash', trashRow({ kind: 'folder' })))).toEqual([
+      'restore',
+      'details',
+      'purge',
+    ])
+  })
+
+  it('has no entry when the host gives the menu no handler', () => {
+    expect(ids(menu('trash', trashRow()))).toEqual(['restore', 'details'])
+  })
+
+  it('runs only its own handler on select', () => {
+    const purge = vi.fn()
+    const restore = vi.fn()
+    const items = buildRowMenu({
+      screen: 'trash',
+      doc: trashRow(),
+      run: { restore, purge },
+      offlineLabel: null,
+      label: (k) => k,
+    })
+    items.find((i) => i.id === 'purge')!.onSelect()
+    expect(purge).toHaveBeenCalledTimes(1)
+    expect(restore).not.toHaveBeenCalled()
+  })
+
+  it('no other trash entry is danger or asks for a confirm', () => {
+    for (const item of withPurge('trash', trashRow())) {
+      if (item.id !== 'purge') {
+        expect(item.danger).toBeUndefined()
+        expect(item.confirm).toBeUndefined()
+      }
+    }
+  })
+})

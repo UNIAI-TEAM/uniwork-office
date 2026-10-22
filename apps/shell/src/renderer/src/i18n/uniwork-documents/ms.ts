@@ -202,4 +202,11 @@ export const ms = {
   uwSourceOriginTask: 'Tugasan',
   uwSourceOriginMeeting: 'Mesyuarat',
   uwSourceOriginEmail: 'E-mel',
+  uwErrOwnerRequiresCopy: 'Dokumen ini milik hasil kerja: salin melalui skrin pemiliknya.',
+  uwErrPageCopyNotSupported:
+    'Pada langkah ini hanya dokumen fail boleh disalin. Salinan UniNote akan datang kemudian.',
+  uwErrCopyConsentRequired: 'Pengesahan yang jelas diperlukan sebelum menyalin.',
+  uwErrDocumentNotInTrash: 'Item ini tidak lagi berada dalam tong sampah.',
+  uwErrFolderTooLarge:
+    'Folder ini mengandungi terlalu banyak item untuk dipadam sekaligus. Padam kandungannya secara berperingkat dahulu.',
 } satisfies Record<keyof typeof zh, string>

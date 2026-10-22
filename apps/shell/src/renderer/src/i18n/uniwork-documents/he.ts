@@ -193,4 +193,10 @@ export const he = {
   uwSourceOriginTask: 'משימות',
   uwSourceOriginMeeting: 'פגישות',
   uwSourceOriginEmail: 'אימייל',
+  uwErrOwnerRequiresCopy: 'מסמך זה שייך לתוצר עבודה: יש להעתיק אותו דרך המסך של הבעלים.',
+  uwErrPageCopyNotSupported: 'בשלב זה ניתן להעתיק רק מסמכי קבצים. העתקת UniNote תגיע בהמשך.',
+  uwErrCopyConsentRequired: 'נדרש אישור מפורש לפני ההעתקה.',
+  uwErrDocumentNotInTrash: 'הפריט כבר אינו נמצא בסל המחזור.',
+  uwErrFolderTooLarge:
+    'התיקייה מכילה יותר מדי פריטים כדי למחוק בפעם אחת. מחק קודם את התוכן בחלקים.',
 } satisfies Record<keyof typeof zh, string>

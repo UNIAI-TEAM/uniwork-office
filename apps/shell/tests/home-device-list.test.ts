@@ -452,7 +452,8 @@ describe('Home local file list shares the list formats, sort and columns (UNI-20
       'Copy path',
       'Move to folder…',
       'Rename',
-      'Make a copy',
+      // one label with the Documents row menu (dlActDuplicate = the web "Create a copy", UNI-2078)
+      'Create a copy',
       'Remove from list',
       'Delete files',
     ])

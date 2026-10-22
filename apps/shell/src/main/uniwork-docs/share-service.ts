@@ -1,10 +1,13 @@
 import {
   SHARE_LEVELS,
+  SHARE_OWNER_KEEP_LEVELS,
   SHARE_PRINCIPAL_TYPES,
+  type ShareAccess,
   type ShareBulkFailure,
   type ShareBulkPlan,
   type ShareBulkResult,
   type ShareErrorCode,
+  type ShareOwnerCandidate,
   type ShareResult,
   type ShareUpdateItem,
   type UniworkShareApi,
@@ -12,6 +15,7 @@ import {
 import type { FetchLike, UniworkDocsClientOptions } from './client'
 import { UniworkDocError } from './errors'
 import { createUniworkShareClient, type UniworkShareClient } from './share-client'
+import type { ShareOwnerGate } from './share-parse'
 
 /**
  * UNI-2047 SD-A: the service behind the `uniwork-share:*` channels. It resolves
@@ -30,6 +34,8 @@ export interface UniworkShareServiceDeps {
   selectedOrgId(): string | null
   /** the selected organization's slug (its member list is read by it) */
   selectedOrgSlug(): string | null
+  /** UNI-2078: the signed-in user's id (an admin may not take a restricted document for themselves) */
+  selfUserId?(): string | null
   /** waits out a throttle between the two tries of one call; a test seam */
   wait?(ms: number): Promise<void>
 }
@@ -47,6 +53,8 @@ const KEPT_SERVER_CODES: ReadonlySet<string> = new Set<ShareErrorCode>([
   'break_glass_required',
   'break_glass_reason_invalid',
   'access_request_closed',
+  'owner_target_not_member',
+  'document_owned_by_work_product',
 ])
 
 /** the app's transport / session codes, kept as they are */
@@ -72,6 +80,11 @@ const NOT_FOUND_DOC_CODES: ReadonlySet<string> = new Set([
   'deleted',
   'document_deleted',
 ])
+
+/** UNI-2078: the answers of a server that has no owner route yet (UNI-2084 lands it) */
+const MISSING_ROUTE_STATUSES: ReadonlySet<number> = new Set([404, 405, 501])
+/** UNI-2078: the active-member walk stops here (the web's bound: 40 pages) */
+const MAX_MEMBER_PAGES = 40
 
 const DEFAULT_THROTTLE_WAIT_MS = 1000
 const MAX_THROTTLE_WAIT_MS = 5000
@@ -125,6 +138,13 @@ export function shareErrorOf(error: unknown): Failure {
 
 const invalidRequest = (): Failure => ({ ok: false, error: 'invalid_request' })
 
+/** UNI-2078: the owner route is not on this server (the button hides for the session) */
+class MissingRoute extends Error {
+  constructor(readonly refusal: UniworkDocError) {
+    super('endpoint_missing')
+  }
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -159,6 +179,26 @@ function isBulkPlan(plan: unknown): plan is ShareBulkPlan {
   )
 }
 
+/** a refusal of the owner gate, by the code shareErrorOf keeps */
+const refused = (serverCode: string): UniworkDocError =>
+  new UniworkDocError('server_error', { serverCode })
+
+/**
+ * UNI-2078: the owner transfer gate the web applies (canAdministerDocument), checked in main
+ * because the renderer is not trusted: manage or admin_scope, not owned by a work product, not
+ * shelved. `selfExcluded` = an admin reaching a restricted document only through admin_scope,
+ * who may not take it (the server answers break_glass_required).
+ */
+function ownerGateOf(access: ShareAccess, doc: ShareOwnerGate): { selfExcluded: boolean } {
+  if (access.myLevel !== 'manage' && !access.adminScope) throw new UniworkDocError('forbidden')
+  if (doc.ownerKind) throw refused('document_owned_by_work_product')
+  if (doc.shelved) throw refused('document_shelved')
+  return {
+    selfExcluded:
+      access.adminScope && access.myLevel !== 'manage' && doc.visibility === 'restricted',
+  }
+}
+
 /** the access items one document gets: the same people, then its own home-workspace row */
 function bulkItems(plan: ShareBulkPlan, workspaceId: string): ShareUpdateItem[] {
   const items: ShareUpdateItem[] = plan.people.map((person) => ({
@@ -188,6 +228,9 @@ export function createUniworkShareService(deps: UniworkShareServiceDeps): Uniwor
       if (!deps.isSignedIn()) return { ok: false, error: 'not_signed_in' }
       return { ok: true, value: await call(deps.client()) }
     } catch (error) {
+      if (error instanceof MissingRoute) {
+        return { ...shareErrorOf(error.refusal), endpointMissing: true }
+      }
       return shareErrorOf(error)
     }
   }
@@ -206,6 +249,13 @@ export function createUniworkShareService(deps: UniworkShareServiceDeps): Uniwor
       await wait(Math.min(asked ?? DEFAULT_THROTTLE_WAIT_MS, MAX_THROTTLE_WAIT_MS))
       return call()
     }
+  }
+
+  /** the overview (level, admin scope, owner) and the document, both read fresh */
+  async function readOwnerGate(client: UniworkShareClient, documentId: string) {
+    const access = await withRetry(() => client.getDocumentShares(documentId))
+    const doc = await withRetry(() => client.getOwnerGate(documentId))
+    return { access, doc, ...ownerGateOf(access, doc) }
   }
 
   async function shareOne(
@@ -340,6 +390,77 @@ export function createUniworkShareService(deps: UniworkShareServiceDeps): Uniwor
           ...(typeof cursor === 'string' ? { cursor } : {}),
           ...(typeof limit === 'number' ? { limit } : {}),
         })
+      })
+    },
+
+    ownerCandidates(documentId) {
+      if (!isText(documentId)) return Promise.resolve(invalidRequest())
+      return run(async (client) => {
+        const orgSlug = deps.selectedOrgSlug()
+        if (!orgSlug) throw new UniworkDocError('not_found')
+        const { access, doc, selfExcluded } = await readOwnerGate(client, documentId)
+        const memberIds = await withRetry(() => client.listWorkspaceMemberIds(doc.workspaceId))
+        // agents are never workspace members; a deactivated person is absent from the active list
+        const active = new Map<string, ShareOwnerCandidate>()
+        let cursor = ''
+        for (let page = 0; page < MAX_MEMBER_PAGES; page++) {
+          const at = cursor
+          const next = await withRetry(() =>
+            client.listActiveOrgMembers({ orgSlug, ...(at ? { cursor: at } : {}) }),
+          )
+          for (const member of next.members) active.set(member.userId, member)
+          cursor = next.nextCursor
+          if (!cursor) break
+        }
+        const self = deps.selfUserId?.() ?? null
+        const ownerId = access.owner?.userId
+        return [...new Set(memberIds)].flatMap((userId) => {
+          const member = active.get(userId)
+          if (!member || userId === ownerId) return []
+          if (selfExcluded && userId === self) return []
+          return [{ ...member }]
+        })
+      })
+    },
+
+    transferOwner(input) {
+      if (
+        !isObject(input) ||
+        !isText(input.documentId) ||
+        !isText(input.userId) ||
+        (input.previousOwnerLevel !== undefined &&
+          !(SHARE_OWNER_KEEP_LEVELS as readonly string[]).includes(input.previousOwnerLevel))
+      ) {
+        return Promise.resolve(invalidRequest())
+      }
+      const { documentId, userId, previousOwnerLevel } = input
+      return run(async (client) => {
+        const { access, selfExcluded } = await readOwnerGate(client, documentId)
+        // the owner already owns it: nothing to transfer
+        if (userId === access.owner?.userId) throw refused('invalid_input')
+        if (selfExcluded && userId === deps.selfUserId?.()) throw refused('break_glass_required')
+        try {
+          // a 503 may come after the commit: only a 429 is repeated
+          return await withRetry(
+            () =>
+              client.transferDocumentOwner(documentId, {
+                userId,
+                ...(previousOwnerLevel ? { previousOwnerLevel } : {}),
+              }),
+            false,
+          )
+        } catch (error) {
+          // a missing route answers a plain 404/405 (the router has no custom NotFound handler); a
+          // coded one came from a handler that ran, a normal failure
+          if (
+            error instanceof UniworkDocError &&
+            !error.serverCode &&
+            MISSING_ROUTE_STATUSES.has(error.status ?? 0)
+          ) {
+            throw new MissingRoute(error)
+          }
+          throw error
+        }
       })
     },
 

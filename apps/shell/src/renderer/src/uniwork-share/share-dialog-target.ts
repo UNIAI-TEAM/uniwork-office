@@ -6,7 +6,13 @@ export type ShareDialogTarget = Pick<UniworkDocSummary, 'id' | 'workspaceId' | '
   Partial<
     Pick<
       UniworkDocSummary,
-      'workspaceName' | 'myLevel' | 'adminScope' | 'shelvedAt' | 'archived' | 'archivedAt'
+      | 'workspaceName'
+      | 'myLevel'
+      | 'adminScope'
+      | 'shelvedAt'
+      | 'archived'
+      | 'archivedAt'
+      | 'ownerKind'
     >
   > & {
     /** the selected organization's name, for the "via organization" source lines */
@@ -28,6 +34,7 @@ export function rowShareTarget(
     shelvedAt: row.shelvedAt,
     archived: row.archived,
     archivedAt: row.archivedAt,
+    ownerKind: row.ownerKind,
     organizationName,
   }
 }
