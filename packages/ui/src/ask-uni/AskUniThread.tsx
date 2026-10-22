@@ -130,9 +130,18 @@ export function AskUniThread({
   }, [base, loaded, stored.length, state.status])
 
   const inStore = state.message ? stored.some((m) => m.id === state.message?.id) : false
-  // a stopped turn has no message of its own: it is stored once the history grew by its question and partial answer
+  // a stopped turn has no message of its own: it is stored once the history grew by its question and partial answer,
+  // or, for a thread mounted after that (the dock was collapsed and expanded), when the history already ends with them
+  const storedEnd = stored.slice(-2)
   const storedStopped =
-    state.status === 'stopped' && !state.message && base !== null && stored.length >= base + 2
+    state.status === 'stopped' &&
+    !state.message &&
+    ((base !== null && stored.length >= base + 2) ||
+      (storedEnd.length === 2 &&
+        storedEnd[0]?.role === 'user' &&
+        storedEnd[0].content === state.question &&
+        storedEnd[1]?.role === 'assistant' &&
+        storedEnd[1].notice === 'stopped'))
   const sameConversation = state.conversationId === conversationId
   const live = state.status !== 'idle' && sameConversation && !inStore && !storedStopped
 

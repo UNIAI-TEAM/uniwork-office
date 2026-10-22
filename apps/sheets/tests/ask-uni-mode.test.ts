@@ -63,8 +63,9 @@ describe('sheets panel wiring (source)', () => {
   })
 
   it('a refusal replayed on an open panel leaves Ask UNI first, then announces and focuses in the chat composer', () => {
-    expect(panel).toMatch(
-      /registerBlockedHandler: \(handler\) =>\s*uniworkGate\.registerBlockedHandler\(handler \? \(\) => leaveAskUni\(handler\) : null\)/,
+    expect(panel).toContain(
+      'uniworkGate.registerBlockedHandler(handler ? () => leaveAskUni(handler) : null)',
     )
+    expect(panel).toMatch(/uniwork=\{[\s\S]*?\n\s+registerBlockedHandler,\n/)
   })
 })

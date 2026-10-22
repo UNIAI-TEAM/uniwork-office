@@ -9,7 +9,7 @@ import {
   useOverlayDock,
 } from '@genoffice/ui'
 import { NARROW_VIEWPORT_MAX_PX } from '../narrow-layout'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import {
   AiComposer,
@@ -414,6 +414,12 @@ export function AiChatPanel({
   // silently, and retry (and, through ExcelShell, presets and ribbon runs) refuse through it
   const ownGate = useUniworkSendGate()
   const uniworkGate = sendGate ?? ownGate
+  // a refusal on an open panel announces and focuses in the chat composer: leave Ask UNI first
+  const registerBlockedHandler = useCallback(
+    (handler: (() => void) | null) =>
+      uniworkGate.registerBlockedHandler(handler ? () => leaveAskUni(handler) : null),
+    [uniworkGate, leaveAskUni],
+  )
   /** messages queued while a reply runs; the pump re-sends them through onSend on settle */
   const msgQueue = useChatRunQueue<readonly AttachmentMeta[]>({
     busy: aiBusy,
@@ -1260,7 +1266,7 @@ export function AiChatPanel({
                     onChooseProvider: () => void window.desktopApi?.openAiSettings?.(),
                     onAnnounce: setComposerAnnouncement,
                     onSendBlockedChange: uniworkGate.onSendBlockedChange,
-                    registerBlockedHandler: uniworkGate.registerBlockedHandler,
+                    registerBlockedHandler,
                     disclosure: {
                       orgName: cloudSnapshot?.orgName ?? undefined,
                       ackKey: {

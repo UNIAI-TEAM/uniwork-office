@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { Lang } from '@genoffice/i18n'
 import type { AskUniDocBridge, AskUniDocFlags } from '@genoffice/ai-provider/askuni'
@@ -22,8 +22,12 @@ export interface AskUniMode {
   /** Ask UNI is showing in place of the chat */
   active: boolean
   toggle: () => void
-  /** back to the chat (an AI action runs there); the Ask UNI conversation stays */
-  leave: () => void
+  /**
+   * back to the chat (an AI action runs there); the Ask UNI conversation stays. `then` runs once the
+   * chat pane is shown (at once when it already is): focus calls belong there, the pane is hidden
+   * until the state change has rendered.
+   */
+  leave: (then?: () => void) => void
   flags: AskUniDocFlags | null
   adapter: AskUniAdapter | null
   /** the Ask UNI body's status for the panel's one live region */
@@ -81,6 +85,18 @@ export function useAskUniMode(lang: Lang, bindingKey?: string | null): AskUniMod
     [bridge, lang],
   )
   const session = useAskUniSession(adapter ?? NO_HOST)
+  // a tab that is not a chat (local file, signed out, hidden, stream off) must not keep a conversation
+  // or a running turn for the next binding: the next document or account starts empty
+  const chatUnavailable =
+    flags !== null && (flags.bound !== 'document' || flags.streamEnabled !== true)
+  const { reset: resetStream } = session.stream
+  const { setConversationId, setValue } = session
+  useEffect(() => {
+    if (!chatUnavailable) return
+    resetStream()
+    setConversationId(null)
+    setValue('')
+  }, [chatUnavailable, resetStream, setConversationId, setValue])
   const offered = adapter !== null && flags?.streamEnabled === true
   const active = on && offered
   const toggle = useCallback(() => {
@@ -90,7 +106,24 @@ export function useAskUniMode(lang: Lang, bindingKey?: string | null): AskUniMod
     }
     setOn(!on)
   }, [on])
-  const leave = useCallback(() => setOn(false), [])
+  const onRef = useRef(on)
+  onRef.current = on
+  const afterLeave = useRef<Array<() => void>>([])
+  const leave = useCallback((then?: () => void) => {
+    if (!onRef.current) {
+      then?.()
+      return
+    }
+    if (then) afterLeave.current.push(then)
+    setOn(false)
+  }, [])
+  // the chat pane is shown again once this commit is out: what was waiting for it runs now
+  useEffect(() => {
+    if (on) return
+    const pending = afterLeave.current
+    afterLeave.current = []
+    for (const run of pending) run()
+  }, [on])
   return {
     offered,
     active,

@@ -1670,8 +1670,9 @@ export function AiPanel({
 
   useEffect(() => {
     if (!preset) return
-    // the run lands in the chat: leave Ask UNI so it is the one on screen
-    askUni.leave()
+    // the run lands in the chat: leave Ask UNI so it is the one on screen (a prefilled composer takes
+    // focus once the chat pane is shown again)
+    askUni.leave(preset.autoRun ? undefined : () => inputRef.current?.focus())
     // Attachments from the start screen: merge into attachments first (ref updated synchronously so this runWith can read them),
     // then trigger the run. Deduplicated by path, safe under StrictMode double runs.
     if (preset.attachments && preset.attachments.length > 0) {
@@ -1690,7 +1691,6 @@ export function AiPanel({
       })
     else {
       setInput(preset.text)
-      inputRef.current?.focus()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset?.nonce])
@@ -2325,10 +2325,9 @@ export function AiPanel({
     if (!pendingRefusalRef.current || !open) return
     pendingRefusalRef.current = false
     if (!disclosureUnacked) return
-    // the disclosure sits in the chat composer
-    leaveAskUni()
+    // the disclosure sits in the chat composer: focus it once the chat pane is shown
+    leaveAskUni(() => disclosureRegionRef.current?.focus())
     setRefusalAnnouncement(aiUniworkText(lang, 'aiUniworkSendNeedsAck'))
-    disclosureRegionRef.current?.focus()
   }, [open, disclosureUnacked, lang, leaveAskUni])
   useEffect(() => {
     if (!disclosureUnacked) setRefusalAnnouncement('')

@@ -61,7 +61,6 @@ function Panel(props: PanelProps) {
         document.getElementById('chat-input')?.focus()
       })
     } else mode.leave()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per nonce
   }, [props.preset])
   if (props.open === false) return h('button', { className: 'ai-rail' }, 'rail')
   return h(
@@ -308,13 +307,19 @@ describe('Ask UNI as a mode of an editor AI panel', () => {
         emit({ type: 'delta', requestId: 'r1', text: 'Dana par' })
       })
       // the server stores the question and the partial answer with the stopped notice
-      bridge.askUniDocMessages = vi.fn(async () => ({
-        ok: true as const,
-        messages: [
-          { id: 'u1', role: 'user', content: 'Who owns billing?', citations: [] },
-          { id: 'a1', role: 'assistant', content: 'Dana par', citations: [], notice: 'stopped' },
-        ],
-      })) as never
+      ;(bridge.askUniDocMessages as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+        async () => ({
+          ok: true as const,
+          messages: [
+            { id: 'u1', role: 'user', content: 'Who owns billing?', citations: [] },
+            { id: 'a1', role: 'assistant', content: 'Dana par', citations: [], notice: 'stopped' },
+          ],
+        }),
+      )
+      // the Stop button ignores a press right after it took the send button's place
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 350))
+      })
       await click(stopButton())
       const thread = () => host.querySelector('.askuni-v2-thread')?.textContent ?? ''
       const count = () => thread().split('Who owns billing?').length - 1
