@@ -731,6 +731,69 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
     setUiLang('zh')
   })
 
+  describe('on a Linux deb install', () => {
+    const APT_SOURCE = '/etc/apt/sources.list.d/uniwork-office.sources'
+    const manualCheckMessage = async (lang: 'en' | 'vi' | 'zh'): Promise<string> => {
+      const { initAutoUpdater, checkForUpdatesNow } = await loadUpdater()
+      const { setUiLang } = await import('@genoffice/i18n')
+      initAutoUpdater(() => null)
+      setUiLang(lang)
+      try {
+        await checkForUpdatesNow()
+      } finally {
+        setUiLang('zh')
+      }
+      expect(showMessageBox).toHaveBeenCalledTimes(1)
+      expect(checkForUpdates).not.toHaveBeenCalled()
+      return lastDialogOpts().message
+    }
+
+    beforeEach(() => {
+      platformSpy?.restore()
+      setPlatform('linux')
+      delete process.env.APPIMAGE
+      existsSyncMock.mockImplementation((file) => file === APT_SOURCE)
+    })
+
+    afterEach(() => {
+      delete process.env.APPIMAGE
+    })
+
+    it('says updates arrive through apt once the apt source exists', async () => {
+      expect(await manualCheckMessage('en')).toBe(
+        'Updates for this version arrive through apt. Run: sudo apt update && sudo apt upgrade',
+      )
+      expect(existsSyncMock).toHaveBeenCalledWith(APT_SOURCE)
+    })
+
+    it('says it in Vietnamese too, with the command untranslated', async () => {
+      const message = await manualCheckMessage('vi')
+      expect(message).toContain('apt')
+      expect(message).toContain('sudo apt update && sudo apt upgrade')
+      expect(message).not.toContain('Updates for this version')
+    })
+
+    it('keeps the established text without the apt source (a deb from a local build)', async () => {
+      existsSyncMock.mockReturnValue(false)
+      expect(await manualCheckMessage('zh')).toBe(
+        '自动更新失败，请从下载页面获取最新版本并手动安装。',
+      )
+    })
+
+    it('does not mention apt in an unpacked run', async () => {
+      appState.isPackaged = false
+      expect(await manualCheckMessage('zh')).toBe(
+        '自动更新失败，请从下载页面获取最新版本并手动安装。',
+      )
+    })
+
+    it('does not mention apt for an AppImage run (it self-updates from its own feed)', async () => {
+      process.env.APPIMAGE = '/home/me/UniWork-Office.AppImage'
+      // no app-update.yml next to the AppImage build: the no-feed answer, not the apt one
+      expect(await manualCheckMessage('zh')).toBe('此版本的更新需从下载页面获取并安装。')
+    })
+  })
+
   it("shows you're-up-to-date (with the current version) when nothing newer exists", async () => {
     const { initAutoUpdater, checkForUpdatesNow } = await loadUpdater()
     initAutoUpdater(() => null)

@@ -43,8 +43,11 @@ import {
  * signed app): it checks its channel's GitHub releases itself and offers the
  * newer dmg to install by hand (release-notifier.ts). On Linux only
  * AppImage runs self-update (electron-updater replaces the .AppImage file in
- * place, no root needed); deb installs have no updater — users upgrade via
- * `apt install ./<new>.deb`.
+ * place, no root needed); deb installs have no updater — a release deb
+ * registers the signed apt repository (/etc/apt/sources.list.d/
+ * uniwork-office.sources, written by its postinst) and users upgrade with
+ * `sudo apt update && sudo apt upgrade`; without that source file the
+ * manual check points at the download page.
  *
  * Dev preview: GENOFFICE_FAKE_UPDATE=<version> in an unpacked run opens the
  * window with a simulated download so the UI can be exercised end to end.
@@ -68,6 +71,7 @@ const tUpd = createI18n({
     updNoFeed: '此版本的更新需从下载页面获取并安装。',
     updNotify: '下载新版本后覆盖安装当前版本即可。',
     updNotifyDownload: '下载安装包',
+    updApt: '此版本的更新通过 apt 提供。请运行：sudo apt update && sudo apt upgrade',
   },
   en: {
     updTitle: 'Software Update',
@@ -88,6 +92,7 @@ const tUpd = createI18n({
     updNoFeed: 'Updates for this version are installed from the download page.',
     updNotify: 'Download the new version and install it over the current one.',
     updNotifyDownload: 'Download Installer',
+    updApt: 'Updates for this version arrive through apt. Run: sudo apt update && sudo apt upgrade',
   },
   vi: {
     updTitle: 'Cập nhật phần mềm',
@@ -108,6 +113,8 @@ const tUpd = createI18n({
     updNoFeed: 'Bản cập nhật cho phiên bản này được cài từ trang tải về.',
     updNotify: 'Tải phiên bản mới về và cài đè lên bản hiện tại.',
     updNotifyDownload: 'Tải bộ cài đặt',
+    updApt:
+      'Bản cập nhật cho phiên bản này được gửi qua apt. Hãy chạy: sudo apt update && sudo apt upgrade',
   },
   ja: {
     updTitle: 'ソフトウェアアップデート',
@@ -129,6 +136,8 @@ const tUpd = createI18n({
     updNotify:
       '新しいバージョンをダウンロードし、現在のバージョンに上書きしてインストールしてください。',
     updNotifyDownload: 'インストーラーをダウンロード',
+    updApt:
+      'このバージョンの更新は apt から届きます。次を実行してください：sudo apt update && sudo apt upgrade',
   },
   ko: {
     updTitle: '소프트웨어 업데이트',
@@ -149,6 +158,8 @@ const tUpd = createI18n({
     updNoFeed: '이 버전의 업데이트는 다운로드 페이지에서 받아 설치합니다.',
     updNotify: '새 버전을 다운로드하여 현재 버전 위에 설치하세요.',
     updNotifyDownload: '설치 파일 다운로드',
+    updApt:
+      '이 버전의 업데이트는 apt를 통해 제공됩니다. 다음을 실행하세요: sudo apt update && sudo apt upgrade',
   },
   fr: {
     updTitle: 'Mise à jour logicielle',
@@ -171,6 +182,8 @@ const tUpd = createI18n({
       'Les mises à jour de cette version sont installées depuis la page de téléchargement.',
     updNotify: 'Téléchargez la nouvelle version et installez-la par-dessus la version actuelle.',
     updNotifyDownload: "Télécharger l'installateur",
+    updApt:
+      'Les mises à jour de cette version arrivent via apt. Exécutez : sudo apt update && sudo apt upgrade',
   },
   de: {
     updTitle: 'Softwareaktualisierung',
@@ -193,6 +206,8 @@ const tUpd = createI18n({
     updNoFeed: 'Updates für diese Version werden über die Download-Seite installiert.',
     updNotify: 'Laden Sie die neue Version herunter und installieren Sie sie über die aktuelle.',
     updNotifyDownload: 'Installer herunterladen',
+    updApt:
+      'Updates für diese Version kommen über apt. Führen Sie aus: sudo apt update && sudo apt upgrade',
   },
   es: {
     updTitle: 'Actualización de software',
@@ -213,6 +228,8 @@ const tUpd = createI18n({
     updNoFeed: 'Las actualizaciones de esta versión se instalan desde la página de descargas.',
     updNotify: 'Descargue la nueva versión e instálela sobre la actual.',
     updNotifyDownload: 'Descargar instalador',
+    updApt:
+      'Las actualizaciones de esta versión llegan a través de apt. Ejecute: sudo apt update && sudo apt upgrade',
   },
   th: {
     updTitle: 'อัปเดตซอฟต์แวร์',
@@ -232,6 +249,7 @@ const tUpd = createI18n({
     updNoFeed: 'การอัปเดตของเวอร์ชันนี้ติดตั้งจากหน้าดาวน์โหลด',
     updNotify: 'ดาวน์โหลดเวอร์ชันใหม่แล้วติดตั้งทับเวอร์ชันปัจจุบัน',
     updNotifyDownload: 'ดาวน์โหลดตัวติดตั้ง',
+    updApt: 'การอัปเดตของเวอร์ชันนี้มาทาง apt เรียกใช้: sudo apt update && sudo apt upgrade',
   },
   id: {
     updTitle: 'Pembaruan Perangkat Lunak',
@@ -252,6 +270,8 @@ const tUpd = createI18n({
     updNoFeed: 'Pembaruan untuk versi ini dipasang dari halaman unduhan.',
     updNotify: 'Unduh versi baru dan pasang di atas versi saat ini.',
     updNotifyDownload: 'Unduh Penginstal',
+    updApt:
+      'Pembaruan untuk versi ini datang melalui apt. Jalankan: sudo apt update && sudo apt upgrade',
   },
   ru: {
     updTitle: 'Обновление программы',
@@ -272,6 +292,8 @@ const tUpd = createI18n({
     updNoFeed: 'Обновления для этой версии устанавливаются со страницы загрузки.',
     updNotify: 'Скачайте новую версию и установите её поверх текущей.',
     updNotifyDownload: 'Скачать установщик',
+    updApt:
+      'Обновления для этой версии приходят через apt. Выполните: sudo apt update && sudo apt upgrade',
   },
   ar: {
     updTitle: 'تحديث البرنامج',
@@ -290,6 +312,7 @@ const tUpd = createI18n({
     updNoFeed: 'تُثبَّت تحديثات هذا الإصدار من صفحة التنزيل.',
     updNotify: 'نزّل الإصدار الجديد وثبّته فوق الإصدار الحالي.',
     updNotifyDownload: 'تنزيل المثبّت',
+    updApt: 'تصل تحديثات هذا الإصدار عبر apt. نفّذ: sudo apt update && sudo apt upgrade',
   },
   pt: {
     updTitle: 'Atualização de Software',
@@ -310,6 +333,8 @@ const tUpd = createI18n({
     updNoFeed: 'As atualizações desta versão são instaladas a partir da página de download.',
     updNotify: 'Baixe a nova versão e instale-a sobre a atual.',
     updNotifyDownload: 'Baixar instalador',
+    updApt:
+      'As atualizações desta versão chegam pelo apt. Execute: sudo apt update && sudo apt upgrade',
   },
   it: {
     updTitle: 'Aggiornamento software',
@@ -330,6 +355,8 @@ const tUpd = createI18n({
     updNoFeed: 'Gli aggiornamenti di questa versione si installano dalla pagina di download.',
     updNotify: 'Scarica la nuova versione e installala sopra quella attuale.',
     updNotifyDownload: 'Scarica il programma di installazione',
+    updApt:
+      'Gli aggiornamenti di questa versione arrivano tramite apt. Esegui: sudo apt update && sudo apt upgrade',
   },
   pl: {
     updTitle: 'Aktualizacja oprogramowania',
@@ -350,6 +377,8 @@ const tUpd = createI18n({
     updNoFeed: 'Aktualizacje tej wersji instaluje się ze strony pobierania.',
     updNotify: 'Pobierz nową wersję i zainstaluj ją na obecnej.',
     updNotifyDownload: 'Pobierz instalator',
+    updApt:
+      'Aktualizacje tej wersji docierają przez apt. Uruchom: sudo apt update && sudo apt upgrade',
   },
   cs: {
     updTitle: 'Aktualizace softwaru',
@@ -370,6 +399,8 @@ const tUpd = createI18n({
     updNoFeed: 'Aktualizace této verze se instalují ze stránky pro stažení.',
     updNotify: 'Stáhněte novou verzi a nainstalujte ji přes současnou.',
     updNotifyDownload: 'Stáhnout instalátor',
+    updApt:
+      'Aktualizace této verze přicházejí přes apt. Spusťte: sudo apt update && sudo apt upgrade',
   },
   nl: {
     updTitle: 'Software-update',
@@ -391,6 +422,7 @@ const tUpd = createI18n({
     updNoFeed: 'Updates voor deze versie installeert u via de downloadpagina.',
     updNotify: 'Download de nieuwe versie en installeer deze over de huidige heen.',
     updNotifyDownload: 'Installatieprogramma downloaden',
+    updApt: 'Updates voor deze versie komen via apt. Voer uit: sudo apt update && sudo apt upgrade',
   },
   ms: {
     updTitle: 'Kemas Kini Perisian',
@@ -411,6 +443,8 @@ const tUpd = createI18n({
     updNoFeed: 'Kemas kini untuk versi ini dipasang dari halaman muat turun.',
     updNotify: 'Muat turun versi baharu dan pasang di atas versi semasa.',
     updNotifyDownload: 'Muat Turun Pemasang',
+    updApt:
+      'Kemas kini untuk versi ini diterima melalui apt. Jalankan: sudo apt update && sudo apt upgrade',
   },
   he: {
     updTitle: 'עדכון תוכנה',
@@ -429,6 +463,7 @@ const tUpd = createI18n({
     updNoFeed: 'עדכונים לגרסה זו מותקנים מדף ההורדות.',
     updNotify: 'הורד את הגרסה החדשה והתקן אותה מעל הגרסה הנוכחית.',
     updNotifyDownload: 'הורד את תוכנית ההתקנה',
+    updApt: 'עדכונים לגרסה זו מגיעים דרך apt. הריצו: sudo apt update && sudo apt upgrade',
   },
   hi: {
     updTitle: 'सॉफ़्टवेयर अपडेट',
@@ -449,6 +484,8 @@ const tUpd = createI18n({
     updNoFeed: 'इस संस्करण के अपडेट डाउनलोड पृष्ठ से इंस्टॉल किए जाते हैं।',
     updNotify: 'नया संस्करण डाउनलोड करें और उसे मौजूदा संस्करण के ऊपर इंस्टॉल करें।',
     updNotifyDownload: 'इंस्टॉलर डाउनलोड करें',
+    updApt:
+      'इस संस्करण के अपडेट apt के माध्यम से आते हैं। चलाएँ: sudo apt update && sudo apt upgrade',
   },
   'zh-TW': {
     updTitle: '軟體更新',
@@ -467,6 +504,7 @@ const tUpd = createI18n({
     updNoFeed: '此版本的更新需從下載頁面取得並安裝。',
     updNotify: '下載新版本後覆蓋安裝目前版本即可。',
     updNotifyDownload: '下載安裝程式',
+    updApt: '此版本的更新透過 apt 提供。請執行：sudo apt update && sudo apt upgrade',
   },
 })
 
@@ -591,6 +629,19 @@ export function getPinnedUpdateChannel(): string | null {
 // unsigned mac release app, local packs): the manual check then explains where updates come
 // from instead of reporting a failed automatic update
 let noUpdateFeed = false
+
+/** The apt source a release deb's postinst writes (build/linux-after-install.sh). */
+export const APT_SOURCE_PATH = '/etc/apt/sources.list.d/uniwork-office.sources'
+
+/** A deb install (not an AppImage run) whose updates arrive through the apt repository. */
+function updatesThroughApt(): boolean {
+  return (
+    process.platform === 'linux' &&
+    !process.env.APPIMAGE &&
+    app.isPackaged &&
+    existsSync(APT_SOURCE_PATH)
+  )
+}
 // the unsigned mac release app's release check (see release-notifier.ts):
 // resolves true when it found a newer release and showed the window
 let macReleaseCheck: ((manual: boolean) => Promise<boolean>) | null = null
@@ -674,7 +725,10 @@ export async function checkForUpdatesNow(): Promise<void> {
         type: 'info',
         title: tUpd(lang, 'updTitle'),
         // nothing failed in a build without a feed: say where updates come from
-        message: tUpd(lang, noUpdateFeed ? 'updNoFeed' : 'updManual'),
+        message: tUpd(
+          lang,
+          updatesThroughApt() ? 'updApt' : noUpdateFeed ? 'updNoFeed' : 'updManual',
+        ),
         buttons: ['OK', tUpd(lang, 'updOpenDownload')],
         defaultId: 0,
         cancelId: 0,
