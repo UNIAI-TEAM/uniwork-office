@@ -102,13 +102,32 @@ const hasMark = (node: JsonNode, name: string): boolean =>
 const hasCodeMark = (node: JsonNode): boolean => hasMark(node, 'code')
 const hasWikiMark = (node: JsonNode): boolean => hasMark(node, 'wikiLink')
 
+const WIKI_LITERAL = /\[\[[^[\]|\n]+?(?:\|[^[\]\n]+)?\]\]/g
+
 /**
  * A wiki literal is source: the tokenizer took it raw, so it is written raw.
  * Escaping it again grew `\` on every save and turned `my_note` into another
- * target. Only a bare `|` in a table cell is escaped (once), as the cell syntax needs.
+ * target. Only what the reader would change is adjusted: a table pipe with an
+ * even run of backslashes before it gets one more (an odd run already escapes
+ * it), and an `&` that starts an entity is kept (the reader decodes entities).
  */
-function wikiLiteral(text: string): string {
-  return renderingTable() ? text.replace(/(?<!\\)\|/g, '\\|') : text
+function wikiLiteral(literal: string): string {
+  const piped = renderingTable()
+    ? literal.replace(/(\\*)\|/g, (all, bs: string) => (bs.length % 2 ? all : `${bs}\\|`))
+    : literal
+  return piped.replace(/&(?=#?\w+;)/g, '&amp;')
+}
+
+/** only the `[[...]]` literals of the marked text are source; the rest of what the mark covers is prose */
+function wikiText(text: string, encode: (text: string) => string): string {
+  let out = ''
+  let at = 0
+  for (const m of text.matchAll(WIKI_LITERAL)) {
+    if (m.index > at) out += encode(text.slice(at, m.index))
+    out += wikiLiteral(m[0])
+    at = m.index + m[0].length
+  }
+  return at < text.length ? out + encode(text.slice(at)) : out
 }
 
 export const SelectiveEscapeMarkdown = Markdown.extend({
@@ -122,7 +141,7 @@ export const SelectiveEscapeMarkdown = Markdown.extend({
       hasCodeMark(node)
         ? fenceCodeSpan(text)
         : hasWikiMark(node)
-          ? wikiLiteral(text)
+          ? wikiText(text, (part) => encode(part, node, parent))
           : encode(text, node, parent)
     patchInlineParsing(manager)
   },
