@@ -112,6 +112,35 @@ export interface WorkNotification {
   comment_deleted?: boolean
   /** `document_changed`: up to 3 documents the reader can still read (ids and titles); [] when the field arrived unreadable */
   sample_documents?: { id: string; title: string }[]
+  /** where a resource with no page of its own lives (a chat message's room) */
+  resource_parent_id?: string
+  /** who caused the row; absent for system rows */
+  actor_id?: string
+}
+
+/** GET /me/notifications -> one page, newest first */
+export interface WorkNotificationPage {
+  notifications: WorkNotification[]
+  /** pass back as `before` for the older page; null at the end */
+  next_before: string | null
+}
+
+/** GET /me/notifications/unread-count (organization-level rows count only in `total`) */
+export interface WorkUnreadCount {
+  total: number
+  /** workspace id -> unread rows */
+  by_workspace: Record<string, number>
+}
+
+/** the inbox list query; every field is checked in main */
+export interface WorkNotificationQuery {
+  workspaceId?: string
+  /** true = unread rows only */
+  unread?: boolean
+  /** the previous page's `next_before` */
+  before?: string
+  /** 1-100, default 30 */
+  limit?: number
 }
 
 /** GET /me/notifications/{id}/documents -> `documents[]` (title and kind are '' when the server leaves them out) */
@@ -222,6 +251,12 @@ export const UNIWORK_WORK_CHANNELS = {
   myProfile: 'uniwork-work:my-profile',
   markNotificationsRead: 'uniwork-work:mark-notifications-read',
   notificationDocuments: 'uniwork-work:notification-documents',
+  listNotifications: 'uniwork-work:list-notifications',
+  unreadCount: 'uniwork-work:unread-count',
+  markNotificationsUnread: 'uniwork-work:mark-notifications-unread',
+  archiveNotifications: 'uniwork-work:archive-notifications',
+  unarchiveNotifications: 'uniwork-work:unarchive-notifications',
+  markAllNotificationsRead: 'uniwork-work:mark-all-notifications-read',
   openWeb: 'uniwork-work:open-web',
   webUrl: 'uniwork-work:web-url',
 } as const
@@ -255,6 +290,21 @@ export interface UniworkWorkApi {
     id: string,
     q?: { cursor?: string; limit?: number },
   ): Promise<UniworkWorkResult<WorkNotificationDocumentPage>>
+  /** GET /me/notifications: the caller's inbox, newest first, archived rows left out */
+  listNotifications(q?: WorkNotificationQuery): Promise<UniworkWorkResult<WorkNotificationPage>>
+  /** GET /me/notifications/unread-count: for the badges */
+  unreadCount(): Promise<UniworkWorkResult<WorkUnreadCount>>
+  /** POST /me/notifications/unread: the caller's own ids (1-100) */
+  markNotificationsUnread(ids: string[]): Promise<UniworkWorkResult<null>>
+  /** POST /me/notifications/archive: hides the rows (no delete); undo with unarchiveNotifications */
+  archiveNotifications(ids: string[]): Promise<UniworkWorkResult<null>>
+  /** POST /me/notifications/unarchive: back into the inbox */
+  unarchiveNotifications(ids: string[]): Promise<UniworkWorkResult<null>>
+  /**
+   * POST /me/notifications/read {all: true}: every unread row, or one workspace's. Answers the
+   * ids it read, so Undo can send them to markNotificationsUnread.
+   */
+  markAllNotificationsRead(q?: { workspaceId?: string }): Promise<UniworkWorkResult<string[]>>
   /** false when the target fails validation or no deployment profile is set */
   openWeb(target: WorkWebTarget): Promise<boolean>
   /** the URL openWeb would open (for Copy link), or null on the same conditions */

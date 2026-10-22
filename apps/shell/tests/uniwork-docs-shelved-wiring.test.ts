@@ -1423,9 +1423,7 @@ describe('UNI-2079 open a document at a comment (uniwork-doc:open-document-at)',
       expect(opened.ok).toBe(true)
       expect(opened.value.path).toContain('doc_live')
       expect(openAt).toHaveBeenCalledWith('doc_live', 'cmt_1')
-      expect(
-        await handler(shellEvent(), { documentId: 'doc_live' }),
-      ).toMatchObject({ ok: true })
+      expect(await handler(shellEvent(), { documentId: 'doc_live' })).toMatchObject({ ok: true })
       expect(openAt).toHaveBeenLastCalledWith('doc_live', undefined)
     } finally {
       await service.releaseAllEditLocks()

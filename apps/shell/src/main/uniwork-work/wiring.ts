@@ -4,7 +4,9 @@ import {
   workErrorOfDocCode,
   type UniworkWorkResult,
   type WorkCreateTaskInput,
+  type WorkNotificationQuery,
 } from '../../shared/uniwork-work-api'
+import { isMainFrameSender } from '../main-frame-sender'
 import type { DeploymentProfile } from '../uniwork-auth/deployment'
 import type { FetchLike } from '../uniwork-docs/client'
 import { UniworkDocError } from '../uniwork-docs/errors'
@@ -79,8 +81,14 @@ export function registerUniworkWork(ipcMain: IpcMain, deps: UniworkWorkDeps): vo
     }
     return cached.client
   }
-  const handle = <T>(channel: string, run: (...args: unknown[]) => Promise<T>): void => {
-    ipcMain.handle(channel, async (_event, ...args: unknown[]): Promise<UniworkWorkResult<T>> => {
+  const handle = <T>(
+    channel: string,
+    run: (...args: unknown[]) => Promise<T>,
+    opts: { mainFrameOnly?: boolean } = {},
+  ): void => {
+    ipcMain.handle(channel, async (event, ...args: unknown[]): Promise<UniworkWorkResult<T>> => {
+      // UNI-2079 channels only; UNI-2073's guarded ipcMain takes this over for every channel
+      if (opts.mainFrameOnly && !isMainFrameSender(event)) return { ok: false, error: 'forbidden' }
       try {
         return { ok: true, value: await run(...args) }
       } catch (error) {
@@ -111,6 +119,18 @@ export function registerUniworkWork(ipcMain: IpcMain, deps: UniworkWorkDeps): vo
     if (limit !== undefined && typeof limit !== 'number') throw new UniworkDocError('server_error')
     return api().notificationDocuments(str(notificationId), { cursor, limit })
   })
+  // UNI-2079: the inbox. The client checks every renderer value before a request.
+  const inbox = { mainFrameOnly: true }
+  handle(C.listNotifications, (q) => api().listNotifications(q as WorkNotificationQuery), inbox)
+  handle(C.unreadCount, () => api().unreadCount(), inbox)
+  handle(C.markNotificationsUnread, (ids) => api().markNotificationsUnread(ids as string[]), inbox)
+  handle(C.archiveNotifications, (ids) => api().archiveNotifications(ids as string[]), inbox)
+  handle(C.unarchiveNotifications, (ids) => api().unarchiveNotifications(ids as string[]), inbox)
+  handle(
+    C.markAllNotificationsRead,
+    (q) => api().markAllNotificationsRead(q as { workspaceId?: string }),
+    inbox,
+  )
   handle(C.createTask, (input) => api().createTask(input as WorkCreateTaskInput))
   handle(C.calendarEvents, (input) =>
     api().calendarEvents(input as { workspaceId: string; from: string; to: string }),

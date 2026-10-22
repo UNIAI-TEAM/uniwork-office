@@ -560,9 +560,9 @@ describe('uniwork work client: the inbox routes (UNI-2079)', () => {
 
   it('a page without its list, or with an unreadable row, is malformed', async () => {
     expect(await codeOf(client(page({})).listNotifications())).toBe('malformed_response')
-    expect(
-      await codeOf(client(page({ notifications: [{ id: 'n_1' }] })).listNotifications()),
-    ).toBe('malformed_response')
+    expect(await codeOf(client(page({ notifications: [{ id: 'n_1' }] })).listNotifications())).toBe(
+      'malformed_response',
+    )
   })
 
   it('refuses a bad list query without calling the server', async () => {
