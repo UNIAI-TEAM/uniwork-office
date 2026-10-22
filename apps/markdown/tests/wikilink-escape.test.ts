@@ -358,3 +358,112 @@ describe('a literal with an inline code run inside', () => {
     expect(markedTexts(reopened)).toEqual(['[[a`c`b]]'])
   })
 })
+
+/** the wiki mark put over a text range, as an edit inside a link or a wide paste leaves it */
+function markRange(editor: Editor, needle: string) {
+  let from = -1
+  editor.state.doc.descendants((node, p) => {
+    if (from < 0 && node.isTextblock) {
+      const at = node.textContent.indexOf(needle)
+      if (at >= 0) from = p + 1 + at
+    }
+  })
+  expect(from, `no text ${needle}`).toBeGreaterThan(-1)
+  editor
+    .chain()
+    .setTextSelection({ from, to: from + needle.length })
+    .setMark('wikiLink')
+    .run()
+}
+
+/** insert plain text at the caret without any input rule or paste parsing */
+function insertPlain(editor: Editor, text: string) {
+  const { from, to } = editor.state.selection
+  editor.view.dispatch(editor.state.tr.insertText(text, from, to))
+}
+
+function openPlainInParagraph(text: string) {
+  const { editor } = open('a  b')
+  editor.commands.setTextSelection(3)
+  insertPlain(editor, text)
+  markRange(editor, text)
+  return editor
+}
+
+function openPlainInCell(text: string) {
+  const { editor } = open(TABLE)
+  caretAfter(editor, 'c')
+  insertPlain(editor, ' ' + text)
+  markRange(editor, text)
+  return editor
+}
+
+describe('a wiki mark that covers more than one literal', () => {
+  // The mark is wider than one literal: the literals stay source, the prose between
+  // them is still text and is encoded, and nothing the reader could take as markup
+  // (italic, a link, a table cell edge) appears on any later save.
+  const PROSE = '[[a_1]] _x_ | [[b|c_2]]'
+
+  it('a paragraph keeps its text, its bytes and its marks for three cycles', () => {
+    const editor = openPlainInParagraph(PROSE)
+    const text = editor.state.doc.textContent
+    const live = marksOf(editor)
+    const { saved, reopened } = reopenThrice(editor)
+    // literals raw, prose between them encoded
+    expect(saved).toBe('a [[a_1]] \\_x\\_ | [[b|c_2]] b')
+    expect(reopened.state.doc.textContent).toBe(text)
+    expect(marksOf(reopened)).toEqual(live)
+    expect(marksOf(reopened)).not.toContain('italic')
+    expect(marksOf(reopened)).not.toContain('link')
+  })
+
+  it('a table cell keeps its row, its text and its bytes, the prose pipe is escaped', () => {
+    const editor = openPlainInCell(PROSE)
+    const text = editor.state.doc.textContent
+    const live = marksOf(editor)
+    const { saved, reopened } = reopenThrice(editor)
+    expect(saved.split('\n')[2]).toMatch(
+      /^\| c \[\[a_1\]\] \\_x\\_ \\\| \[\[b\\\|c_2\]\] +\| d +\|$/,
+    )
+    expect(tableShape(reopened)).toEqual([2, 2])
+    expect(reopened.state.doc.textContent).toBe(text)
+    expect(marksOf(reopened)).toEqual(live)
+    expect(marksOf(reopened)).not.toContain('italic')
+    expect(marksOf(reopened)).not.toContain('link')
+  })
+})
+
+describe('prose around the literals of a marked run', () => {
+  it('the head before a literal is encoded and the text between two literals is kept', () => {
+    const head = openPlainInParagraph('head_x* [[a_1]] and [[b_2]]')
+    const { saved: headSaved, reopened } = reopenThrice(head)
+    expect(headSaved).toBe('a head\\_x\\* [[a_1]] and [[b_2]] b')
+    expect(reopened.state.doc.textContent).toBe(head.state.doc.textContent)
+    expect(marksOf(reopened)).not.toContain('italic')
+  })
+
+  it('a soft break inside a marked run does not turn `_` into italic on reopen', () => {
+    const { editor } = open('a [[a_b\nc_d]] y')
+    markRange(editor, '[[a_b\nc_d]]')
+    const text = editor.state.doc.textContent
+    const { saved, reopened } = reopenThrice(editor)
+    expect(saved).toBe('a [[a\\_b\nc\\_d]] y')
+    expect(reopened.state.doc.textContent).toBe(text)
+    expect(marksOf(reopened)).not.toContain('italic')
+    expect(marksOf(reopened)).not.toContain('link')
+  })
+
+  it('an entity literal typed in a table cell keeps the row, the bytes and the key', () => {
+    const { editor } = open(TABLE)
+    caretAfter(editor, 'c')
+    type(editor, ' [[a&amp;|b]]')
+    expect(markedTexts(editor)).toEqual(['[[a&amp;|b]]'])
+    const live = collectWikiTargets(editor.state.doc)
+    expect(live).toEqual(['a&amp;'])
+    const { saved, reopened } = reopenThrice(editor)
+    expect(saved.split('\n')[2]).toMatch(/^\| c \[\[a&amp;amp;\\\|b\]\] +\| d +\|$/)
+    expect(tableShape(reopened)).toEqual([2, 2])
+    expect(markedTexts(reopened)).toEqual(['[[a&amp;|b]]'])
+    expect(collectWikiTargets(reopened.state.doc)).toEqual(live)
+  })
+})
