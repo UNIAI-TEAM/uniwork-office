@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { after, before, describe, it } from 'node:test'
@@ -15,6 +24,8 @@ if (skip) console.log(`apt-repo tests skipped: ${skip}`)
 
 const PASSPHRASE = 'test-only passphrase 7c1f'
 const POOL = 'apt/pool/main/u/uniwork-office'
+const GIT_SHA = '70840f8d3c0ffee0000000000000000000000001'
+const BASE = 'https://uniworkos.com/downloads/office'
 
 let root
 let gnupg
@@ -90,7 +101,8 @@ function run(args, { target, secret = secretKey, extraEnv = {} } = {}) {
     APT_GPG_PASSPHRASE: PASSPHRASE,
     ...extraEnv,
   }
-  const result = spawnSync('bash', [SCRIPT, ...args], { env, encoding: 'utf8' })
+  const shaArgs = args.includes('--git-sha') ? [] : ['--git-sha', GIT_SHA]
+  const result = spawnSync('bash', [SCRIPT, ...args, ...shaArgs], { env, encoding: 'utf8' })
   outputs.push(result.stdout, result.stderr)
   return result
 }
@@ -117,6 +129,14 @@ function files(target) {
 function versionsIn(target, channel = 'dev') {
   const packages = readFileSync(join(target, `apt/dists/${channel}/main/binary-amd64/Packages`), 'utf8')
   return [...packages.matchAll(/^Version: (.+)$/gm)].map((match) => match[1])
+}
+
+function manifestOf(target) {
+  return JSON.parse(readFileSync(join(target, 'releases.json'), 'utf8'))
+}
+
+function manifestVersions(target, channel = 'dev') {
+  return manifestOf(target).channels[channel].releases.map((entry) => entry.version)
 }
 
 function sha256(path) {
@@ -258,15 +278,16 @@ describe('apt-repo.sh', { skip }, () => {
     assert.deepEqual(versionsIn(target), ['0.11.0-dev.10', '0.11.0-dev.2'])
     let all = files(target)
     assert.ok(all.includes(dev1), 'grace: dev.1 stays one run')
-    assert.ok(!all.some((key) => key.startsWith('dev/0.11.0-dev.1/')), 'installers beyond --keep are pruned')
-    assert.ok(all.some((key) => key.startsWith('dev/0.11.0-dev.2/')))
+    assert.ok(all.some((key) => key.startsWith('dev/0.11.0-dev.1/')), 'grace: the previous manifest lists dev.1')
+    assert.deepEqual(manifestVersions(target), ['0.11.0-dev.10', '0.11.0-dev.2'])
 
     publish(target, '0.11.0-dev.11', 'dev', ['--keep', '2'])
     assert.deepEqual(versionsIn(target), ['0.11.0-dev.11', '0.11.0-dev.10'])
     all = files(target)
     assert.ok(!all.includes(dev1), 'dev.1 is gone after its grace run')
+    assert.ok(!all.some((key) => key.startsWith('dev/0.11.0-dev.1/')), 'installers beyond --keep are pruned')
+    assert.ok(all.some((key) => key.startsWith('dev/0.11.0-dev.2/')), 'grace: dev.2 installers stay one run')
     assert.ok(all.includes(dev2), 'grace: dev.2 stays one run')
-    assert.ok(!all.some((key) => key.startsWith('dev/0.11.0-dev.2/')))
     assert.ok(!all.includes('update/dev/UniWork-Office_0.11.0-dev.2_unsigned_win32_x64-setup.exe'))
     assert.ok(all.includes('update/dev/UniWork-Office_0.11.0-dev.10_unsigned_win32_x64-setup.exe'))
 
@@ -281,6 +302,68 @@ describe('apt-repo.sh', { skip }, () => {
     assert.ok(all.includes(`${POOL}/uniwork-office_0.11.0-dev.10_amd64.deb`))
     assert.deepEqual(versionsIn(target), ['0.11.0-dev.11', '0.11.0-dev.10'])
     assert.deepEqual(versionsIn(target, 'beta'), ['0.11.0-beta.1'])
+    assert.deepEqual(manifestVersions(target), ['0.11.0-dev.11', '0.11.0-dev.10'])
+    assert.deepEqual(manifestVersions(target, 'beta'), ['0.11.0-beta.1'])
+  })
+
+  it('writes releases.json: schema 1, newest first, other channels untouched', () => {
+    const target = join(root, 'manifest')
+    const dir = makeRelease('0.11.0-dev.1', 'dev')
+    // a mac signing run drops the unsigned label from the dmg name
+    renameSync(
+      join(dir, 'UniWork-Office_0.11.0-dev.1_unsigned_darwin_arm64.dmg'),
+      join(dir, 'UniWork-Office_0.11.0-dev.1_darwin_arm64.dmg'),
+    )
+    writeFileSync(join(dir, 'SHA256SUMS-darwin.txt'), 'sums\n')
+    const notes = join(root, 'notes.md')
+    writeFileSync(notes, 'Fixes **things** <script>alert(1)</script>\n')
+    const result = run(['--dir', dir, '--channel', 'dev', '--version', '0.11.0-dev.1', '--notes-file', notes], {
+      target,
+    })
+    assert.equal(result.status, 0, result.stderr)
+    publish(target, '0.11.0-beta.1', 'beta')
+    const beta = manifestOf(target).channels.beta
+    publish(target, '0.11.0-dev.2')
+
+    const manifest = manifestOf(target)
+    assert.equal(manifest.schema, 1)
+    assert.match(manifest.generated_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
+    assert.equal(manifest.base_url, BASE)
+    assert.deepEqual(Object.keys(manifest.channels).sort(), ['beta', 'dev'])
+    assert.deepEqual(manifest.channels.beta, beta)
+    const dev = manifest.channels.dev
+    assert.equal(dev.latest, '0.11.0-dev.2')
+    assert.equal(dev.apt_suite, 'dev')
+    assert.deepEqual(manifestVersions(target), ['0.11.0-dev.2', '0.11.0-dev.1'])
+
+    const [second, first] = dev.releases
+    assert.equal(second.notes_markdown, null)
+    assert.equal(first.notes_markdown, 'Fixes **things** <script>alert(1)</script>\n')
+    assert.equal(first.channel, 'dev')
+    assert.equal(first.tag, 'v0.11.0-dev.1')
+    assert.equal(first.git_sha, GIT_SHA)
+    assert.equal(first.notes_url, null)
+    assert.match(first.published_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
+    assert.deepEqual(first.signed, { windows: false, macos: true, linux: false })
+    assert.deepEqual(second.signed, { windows: false, macos: false, linux: false })
+    assert.deepEqual(first.apt, { suite: 'dev', package: 'uniwork-office', version: '0.11.0-dev.1' })
+
+    const rows = first.assets.map(({ platform, arch, kind, signed }) => `${platform}/${arch}/${kind}/${signed}`)
+    assert.deepEqual(rows.sort(), [
+      'all/all/checksums/false',
+      'darwin/all/checksums/false',
+      'darwin/arm64/dmg/true',
+      'linux/x64/appimage/false',
+      'linux/x64/checksums/false',
+      'linux/x64/deb/false',
+      'win32/x64/nsis/false',
+    ])
+    for (const asset of first.assets) {
+      const key = `dev/0.11.0-dev.1/${asset.file}`
+      assert.equal(asset.url, `${BASE}/${key}`)
+      assert.equal(asset.sha256, sha256(join(target, key)), key)
+      assert.equal(asset.size, readFileSync(join(target, key)).length, key)
+    }
   })
 
   it('refuses a key with another fingerprint before uploading anything', () => {
@@ -333,10 +416,12 @@ describe('apt-repo.sh', { skip }, () => {
       'PUT apt/dists/dev/main/binary-amd64/Packages (Cache-Control: no-cache)',
       'PUT apt/dists/dev/InRelease (Cache-Control: no-cache)',
       'PUT update/dev/dev-linux.yml (Cache-Control: no-cache)',
+      'PUT releases.json (Cache-Control: no-cache) (Content-Type: application/json; charset=utf-8)',
     ].map((line) => lines.indexOf(line))
     assert.ok(order.every((index) => index >= 0), result.stdout)
     assert.deepEqual([...order].sort((a, b) => a - b), order)
-    assert.ok(lines.includes('DELETE dev/0.11.0-dev.1/SHA256SUMS'), result.stdout)
+    // --keep 1, but the previous manifest still lists dev.1 and dev.2: one run of grace
+    assert.ok(!lines.some((line) => line.startsWith('DELETE dev/')), result.stdout)
     assert.deepEqual(files(target), before)
   })
 

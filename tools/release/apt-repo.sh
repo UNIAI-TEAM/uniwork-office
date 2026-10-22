@@ -5,10 +5,12 @@
 # "Download server and apt repository" in tools/release/README.md.
 #
 #   tools/release/apt-repo.sh --dir <release files> --channel dev|beta|stable \
-#     --version <version> [--keep N] [--dry-run]
+#     --version <version> --git-sha <40 hex> [--tag v<version>] [--notes-file <md>] \
+#     [--keep N] [--base-url https://uniworkos.com/downloads/office] [--dry-run]
 #
 # <release files> is the merged installers-* artifacts: the deb, the AppImage,
-# the exe, the dmgs, <channel>.yml, <channel>-linux.yml and SHA256SUMS-*.txt.
+# the exe, the dmgs, the update feed yml (<channel>.yml, <channel>-linux.yml;
+# latest*.yml on stable) and SHA256SUMS-*.txt.
 #
 # Object keys (bucket root; the edge maps /downloads/office/* to the bucket):
 #   apt/key.gpg, apt/key.asc                         the signing key (binary, armored)
@@ -16,14 +18,16 @@
 #   apt/dists/<channel>/main/binary-amd64/Packages{,.gz,.xz} + by-hash/SHA256/<hash>
 #   apt/dists/<channel>/{Release,Release.gpg,InRelease}
 #   <channel>/<version>/<release files> + SHA256SUMS
-#   update/<channel>/<files the two feed yml name>, then the two yml
+#   update/<channel>/<files the feed yml name>, then the feed yml
+#   releases.json                                    public manifest, schema 1 (release-manifest.mjs)
 #
 # Stateless: the suite's current Packages is the manifest. The new deb's stanza
 # replaces one of the same version, the newest --keep versions stay. Uploads go
 # in an order that never lets a client see an index naming a missing file
-# (installers, pool, by-hash + Packages, Release files, feed files, feed yml),
-# then prune removes what neither the new indexes nor the previous index of
-# this suite name (one run of grace for clients holding the previous index).
+# (installers, pool, by-hash + Packages, Release files, feed files, feed yml,
+# releases.json), then prune removes what neither the new indexes and manifest
+# nor the previous ones name (one run of grace for clients holding the
+# previous index or manifest).
 #
 # Env: OFFICE_S3_ENDPOINT, OFFICE_S3_BUCKET, OFFICE_S3_ACCESS_KEY_ID,
 # OFFICE_S3_SECRET_ACCESS_KEY, OFFICE_S3_REGION (optional, default hn-2),
@@ -42,7 +46,7 @@ readonly NO_CACHE='no-cache'
 readonly SAFE_NAME='^[A-Za-z0-9][A-Za-z0-9._+~-]*$'
 
 usage() {
-  sed -n '7,8p' "$0" | sed 's/^# \{0,1\}//' >&2
+  sed -n '7,9p' "$0" | sed 's/^# \{0,1\}//' >&2
   exit 2
 }
 
@@ -59,6 +63,10 @@ dir=''
 channel=''
 version=''
 keep=5
+tag=''
+git_sha=''
+notes_file=''
+base_url=https://uniworkos.com/downloads/office
 dry_run=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -66,6 +74,10 @@ while [ "$#" -gt 0 ]; do
     --channel) channel="${2:-}"; shift 2 ;;
     --version) version="${2:-}"; shift 2 ;;
     --keep) keep="${2:-}"; shift 2 ;;
+    --tag) tag="${2:-}"; shift 2 ;;
+    --git-sha) git_sha="${2:-}"; shift 2 ;;
+    --notes-file) notes_file="${2:-}"; shift 2 ;;
+    --base-url) base_url="${2:-}"; shift 2 ;;
     --dry-run) dry_run=true; shift ;;
     -h | --help) usage ;;
     *) die "unknown argument: $1" ;;
@@ -78,6 +90,10 @@ case "$channel" in
 esac
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || die "--version must look like 0.11.0-dev.1"
 [[ "$keep" =~ ^[1-9][0-9]*$ ]] || die "--keep must be a positive number"
+tag="${tag:-v$version}"
+[ "$tag" = "v$version" ] || die "--tag must be v$version"
+[[ "$git_sha" =~ ^[0-9a-f]{40}$ ]] || die "--git-sha must be the 40-hex commit of the build"
+if [ -n "$notes_file" ] && [ ! -f "$notes_file" ]; then die "--notes-file $notes_file does not exist"; fi
 if [ -z "$dir" ] || [ ! -d "$dir" ]; then die "--dir must name the directory holding the release files"; fi
 
 expect_fpr="$RELEASE_FPR"
@@ -106,12 +122,15 @@ if ! $dry_run; then
     [ -n "${!name:-}" ] || die "$name is not set"
   done
 fi
-for tool in apt-ftparchive dpkg dpkg-deb gpg gzip xz sha256sum; do
+for tool in apt-ftparchive dpkg dpkg-deb gpg gzip xz sha256sum node; do
   command -v "$tool" >/dev/null || die "$tool is missing (apt-utils provides apt-ftparchive)"
 done
 if [ "$backend" = s3 ]; then
   command -v aws >/dev/null || die "aws (AWS CLI v2) is missing"
 fi
+
+manifest_tool="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/release-manifest.mjs"
+[ -f "$manifest_tool" ] || die "release-manifest.mjs is missing next to the script"
 
 work="$(mktemp -d)"
 cleanup() {
@@ -141,11 +160,11 @@ aws_cli() {
     aws --endpoint-url "$OFFICE_S3_ENDPOINT" "$@"
 }
 
-# put <local file> <key> [cache-control]
+# put <local file> <key> [cache-control] [content-type]
 put() {
-  local src="$1" key="$2" cache="${3:-}"
+  local src="$1" key="$2" cache="${3:-}" type="${4:-}"
   if $dry_run; then
-    echo "PUT $key${cache:+ (Cache-Control: $cache)}"
+    echo "PUT $key${cache:+ (Cache-Control: $cache)}${type:+ (Content-Type: $type)}"
     return
   fi
   case "$backend" in
@@ -157,6 +176,7 @@ put() {
     s3)
       local args=(--only-show-errors --no-progress)
       if [ -n "$cache" ]; then args+=(--cache-control "$cache"); fi
+      if [ -n "$type" ]; then args+=(--content-type "$type"); fi
       aws_cli s3 cp "${args[@]}" "$src" "s3://$OFFICE_S3_BUCKET/$key"
       ;;
   esac
@@ -275,10 +295,13 @@ deb_arch="$(dpkg-deb -f "$deb" Architecture)"
 pool_name="${PACKAGE}_${deb_version#*:}_amd64.deb"
 [[ "$pool_name" =~ $SAFE_NAME ]] || die "pool file name not allowed: $pool_name"
 
-feeds=("$channel.yml" "$channel-linux.yml")
+feeds=()
+for name in "${release_files[@]}"; do
+  case "$name" in *.yml) feeds+=("$name") ;; esac
+done
+[ "${#feeds[@]}" -gt 0 ] || die "no update feed yml in $dir"
 feed_files=()
 for feed in "${feeds[@]}"; do
-  [ -f "$dir/$feed" ] || die "update feed file $feed is missing in $dir"
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     [[ "$name" =~ $SAFE_NAME ]] || die "$feed names a file not allowed: $name"
@@ -306,9 +329,27 @@ else
 fi
 prev_release="$work/prev/Release"
 get "$dists/Release" "$prev_release" || : >"$prev_release"
-for feed in "${feeds[@]}"; do
-  get "update/$channel/$feed" "$work/prev/$feed" || : >"$work/prev/$feed"
-done
+mkdir -p "$work/prev/feed"
+while IFS= read -r key; do
+  name="${key##*/}"
+  case "$name" in *.yml) ;; *) continue ;; esac
+  [[ "$name" =~ $SAFE_NAME ]] || continue
+  get "$key" "$work/prev/feed/$name" || true
+done < <(list "update/$channel/")
+get releases.json "$work/prev/releases.json" || : >"$work/prev/releases.json"
+node "$manifest_tool" versions --previous "$work/prev/releases.json" --channel "$channel" >"$work/prev/versions"
+
+# Installers: the newest --keep version directories (always this one) stay
+# and are what the manifest lists.
+mapfile -t channel_keys < <(list "$channel/")
+{
+  printf '%s\t-\n' "$version"
+  for key in "${channel_keys[@]}"; do
+    rest="${key#"$channel"/}"
+    if [[ "$rest" == */* ]]; then printf '%s\t-\n' "${rest%%/*}"; fi
+  done
+} | sort -u | sort_by_version_desc | cut -f1 | head -n "$keep" >"$work/keep-versions"
+grep -qxF "$version" "$work/keep-versions" || echo "$version" >>"$work/keep-versions"
 
 cp "$deb" "$work/repo/$POOL/$pool_name"
 (cd "$work/repo" && apt-ftparchive packages "$POOL") >"$work/new.stanza"
@@ -391,12 +432,22 @@ else
   log "signed with $expect_fpr"
 fi
 
+(cd "$dir" && sha256sum -- "${release_files[@]}") >"$work/SHA256SUMS"
+mkdir -p "$work/assets"
+for name in "${release_files[@]}"; do
+  ln -s "$dir/$name" "$work/assets/$name"
+done
+cp "$work/SHA256SUMS" "$work/assets/SHA256SUMS"
+node "$manifest_tool" update --previous "$work/prev/releases.json" --dir "$work/assets" \
+  --channel "$channel" --version "$version" --tag "$tag" --git-sha "$git_sha" \
+  --notes-file "$notes_file" --deb-version "$deb_version" --base-url "$base_url" \
+  --keep-versions "$(paste -sd, "$work/keep-versions")" >"$work/releases.json"
+
 # --- uploads, in order ------------------------------------------------------
 
 put "$work/key.gpg" apt/key.gpg "$NO_CACHE"
 put "$work/key.asc" apt/key.asc "$NO_CACHE"
 
-(cd "$dir" && sha256sum -- "${release_files[@]}") >"$work/SHA256SUMS"
 for name in "${release_files[@]}"; do
   put "$dir/$name" "$channel/$version/$name"
 done
@@ -422,6 +473,8 @@ done
 for feed in "${feeds[@]}"; do
   put "$dir/$feed" "update/$channel/$feed" "$NO_CACHE"
 done
+
+put "$work/releases.json" releases.json "$NO_CACHE" 'application/json; charset=utf-8'
 
 # --- prune -------------------------------------------------------------------
 
@@ -452,26 +505,22 @@ done < <(list "$bin/by-hash/SHA256/")
 # Feed: keep the files the new and the previous feed yml name.
 {
   printf '%s\n' "${feeds[@]}" "${feed_files[@]}"
-  for feed in "${feeds[@]}"; do feed_names_of "$work/prev/$feed"; done
+  for feed in "$work/prev/feed"/*.yml; do
+    [ -f "$feed" ] || continue
+    echo "${feed##*/}"
+    feed_names_of "$feed"
+  done
 } | sort -u >"$work/keep-feed"
 while IFS= read -r key; do
   grep -qxF "${key##*/}" "$work/keep-feed" || remove "$key"
 done < <(list "update/$channel/")
 
-# Installers: keep the newest --keep version directories (always this one).
-mapfile -t channel_keys < <(list "$channel/")
-{
-  printf '%s\t-\n' "$version"
-  for key in "${channel_keys[@]}"; do
-    rest="${key#"$channel"/}"
-    if [[ "$rest" == */* ]]; then printf '%s\t-\n' "${rest%%/*}"; fi
-  done
-} | sort -u | sort_by_version_desc | cut -f1 | head -n "$keep" >"$work/keep-versions"
-echo "$version" >>"$work/keep-versions"
+# Installers: keep the kept versions and what the previous manifest listed.
+cat "$work/keep-versions" "$work/prev/versions" | sort -u >"$work/keep-dirs"
 for key in "${channel_keys[@]}"; do
   rest="${key#"$channel"/}"
   [[ "$rest" == */* ]] || continue
-  grep -qxF "${rest%%/*}" "$work/keep-versions" || remove "$key"
+  grep -qxF "${rest%%/*}" "$work/keep-dirs" || remove "$key"
 done
 
 log "done: $channel $version"
