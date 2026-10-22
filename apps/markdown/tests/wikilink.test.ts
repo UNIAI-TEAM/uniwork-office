@@ -11,6 +11,7 @@ import {
   collectWikiTargets,
   wikilinkStart,
   wikiFragmentPosition,
+  wikiTarget,
 } from '../src/renderer/editor/wikilink'
 import { parseDocText } from '../src/renderer/markdown/docText'
 import { buildSourceMap, spliceMarkdown } from '../src/renderer/markdown/sourceSplice'
@@ -25,10 +26,10 @@ afterEach(() => {
 })
 
 const ANSWERS: Record<string, WikiLinkResolved> = {
-  '[[Alpha]]': { path: '/notes/Alpha.md', fragment: '', found: true },
-  '[[Beta|Bee]]': { path: '/notes/Beta.md', fragment: '', found: true },
-  '[[Gamma#Section]]': { path: '/notes/Gamma.md', fragment: 'Section', found: true },
-  '[[Nowhere]]': { path: '', fragment: '', found: false },
+  Alpha: { path: '/notes/Alpha.md', fragment: '', found: true },
+  Beta: { path: '/notes/Beta.md', fragment: '', found: true },
+  'Gamma#Section': { path: '/notes/Gamma.md', fragment: 'Section', found: true },
+  Nowhere: { path: '', fragment: '', found: false },
 }
 
 function open(
@@ -108,7 +109,23 @@ describe('syntax', () => {
 
   it('collects each distinct target once, in document order', () => {
     const { editor } = open('[[A]] then [[A]] then [[B]]')
-    expect(collectWikiTargets(editor.state.doc)).toEqual(['[[A]]', '[[B]]'])
+    expect(collectWikiTargets(editor.state.doc)).toEqual(['A', 'B'])
+  })
+
+  it('collects the bare target, one per distinct canonical form', () => {
+    const { editor } = open('[[b]] [[b#Heading]] [[b|Bee]] [[sub/c]] [[#Heading]] [[missing]]')
+    expect(collectWikiTargets(editor.state.doc)).toEqual([
+      'b',
+      'b#Heading',
+      'sub/c',
+      '#Heading',
+      'missing',
+    ])
+  })
+
+  it('does not collect a literal with nothing between the brackets', () => {
+    const { editor } = open('a [[ ]] b')
+    expect(collectWikiTargets(editor.state.doc)).toEqual([])
   })
 
   it.each([
@@ -119,6 +136,7 @@ describe('syntax', () => {
     ['a same-file ref', 'Same file [[#Section]].'],
     ['an embed', 'Embed ![[Note]] inline.'],
     ['two in one line', 'before [[A]] middle [[B]] after'],
+    ['all six forms', 'a [[b]] [[b#Heading]] [[b|Bee]] [[sub/c]] [[#Heading]] [[b#^a1]]'],
   ])('parses %s and writes it back byte for byte', (_label, src) => {
     const { editor, envelope } = open(src)
     const map = buildSourceMap(editor, editor.state.doc, envelope.body)
@@ -145,6 +163,27 @@ describe('syntax', () => {
   ])('does not link inside %s', (_label, src) => {
     const { editor } = open(src)
     expect(collectWikiTargets(editor.state.doc)).toEqual([])
+  })
+})
+
+describe('wikiTarget', () => {
+  it.each([
+    ['a bare link', '[[Note]]', 'Note'],
+    ['an alias dropped', '[[Note|Display text]]', 'Note'],
+    ['a heading kept', '[[Note#Some Heading]]', 'Note#Some Heading'],
+    ['a heading kept and the alias dropped', '[[Note#Head|Alias]]', 'Note#Head'],
+    ['a block ref kept', '[[Note#^a1b2c3]]', 'Note#^a1b2c3'],
+    ['a same-file ref', '[[#Section]]', '#Section'],
+    ['a path', '[[sub/c]]', 'sub/c'],
+    ['spaces trimmed', '[[  Note  | Alias ]]', 'Note'],
+    ['nothing left', '[[ ]]', ''],
+    ['nothing left before an alias', '[[ |Alias]]', ''],
+  ])('%s', (_label, raw, bare) => {
+    expect(wikiTarget(raw)).toBe(bare)
+  })
+
+  it('leaves an already bare target alone', () => {
+    expect(wikiTarget('Note#Head')).toBe('Note#Head')
   })
 })
 
@@ -202,26 +241,26 @@ describe('editing', () => {
     })
     const { editor } = open('[[Alpha]]', { resolve })
     await settled()
-    expect(resolve).toHaveBeenLastCalledWith('/notes/Index.md', ['[[Alpha]]'])
+    expect(resolve).toHaveBeenLastCalledWith('/notes/Index.md', ['Alpha'])
     editor.view.dispatch(editor.state.tr.insertText('b', after(editor, 'Alpha')))
     await settled()
     // the target is the text the user sees, so the edit follows the link
-    expect(resolve).toHaveBeenLastCalledWith('/notes/Index.md', ['[[Alphab]]'])
+    expect(resolve).toHaveBeenLastCalledWith('/notes/Index.md', ['Alphab'])
   })
 
   it('resolves two adjacent links as two links, not one run', () => {
     const { editor } = open('[[Alpha]][[Beta]]')
-    expect(collectWikiTargets(editor.state.doc)).toEqual(['[[Alpha]]', '[[Beta]]'])
+    expect(collectWikiTargets(editor.state.doc)).toEqual(['Alpha', 'Beta'])
   })
 
   it('resolves a link split by an inline mark inside its brackets', () => {
     const { editor } = open('[[Note *emphasis*]]')
-    expect(collectWikiTargets(editor.state.doc)).toEqual(['[[Note *emphasis*]]'])
+    expect(collectWikiTargets(editor.state.doc)).toEqual(['Note *emphasis*'])
   })
 
   it('stops resolving a link once the edit takes its brackets away', async () => {
     const { editor } = open('See [[Note]] here.', { answers: ANSWERS })
-    expect(collectWikiTargets(editor.state.doc)).toEqual(['[[Note]]'])
+    expect(collectWikiTargets(editor.state.doc)).toEqual(['Note'])
     editor.view.dispatch(editor.state.tr.delete(after(editor, 'Not'), after(editor, ']]')))
     expect(collectWikiTargets(editor.state.doc)).toEqual([])
     await settled()
@@ -273,6 +312,70 @@ describe('fragments', () => {
 })
 
 describe('resolution', () => {
+  it.each([
+    ['a bare link', '[[b]]', ['b']],
+    ['a heading ref', '[[b#Heading]]', ['b#Heading']],
+    ['an alias', '[[b|Bee]]', ['b']],
+    ['a path', '[[sub/c]]', ['sub/c']],
+    ['a same-file ref', '[[#Heading]]', ['#Heading']],
+    ['a block ref', '[[b#^a1]]', ['b#^a1']],
+  ])('asks the resolver for the bare target of %s', async (_label, src, bare) => {
+    const resolve = vi.fn(async () => ({}))
+    open(`a ${src} z`, { resolve })
+    await settled()
+    expect(resolve).toHaveBeenCalledTimes(1)
+    expect(resolve).toHaveBeenLastCalledWith('/notes/Index.md', bare)
+  })
+
+  it('asks once for all six forms, deduped, and decorates each from its answer', async () => {
+    const source = 'a [[b]] [[b#Heading]] [[b|Bee]] [[sub/c]] [[#Heading]] [[missing]]'
+    const resolve = vi.fn(async (_from: string, targets: string[]) => {
+      const out: Record<string, WikiLinkResolved> = {}
+      for (const t of targets) {
+        out[t] =
+          t === 'missing'
+            ? { path: '', fragment: '', found: false }
+            : { path: `/notes/${t}.md`, fragment: '', found: true }
+      }
+      return out
+    })
+    const { editor } = open(source, { resolve })
+    await settled()
+    expect(resolve).toHaveBeenCalledTimes(1)
+    expect(resolve).toHaveBeenLastCalledWith('/notes/Index.md', [
+      'b',
+      'b#Heading',
+      'sub/c',
+      '#Heading',
+      'missing',
+    ])
+    const state = (raw: string) =>
+      (editor.view.dom.querySelector(`[data-wiki-target="${CSS.escape(raw)}"]`) as HTMLElement)
+        .className
+    expect(state('[[b|Bee]]')).toContain('wiki-link-resolved')
+    expect(state('[[b]]')).toContain('wiki-link-resolved')
+    expect(state('[[missing]]')).toContain('wiki-link-unresolved')
+  })
+
+  it('opens the resolved note for an aliased link', async () => {
+    const onOpen = vi.fn()
+    const { editor } = open('[[Beta|Bee]]', { onOpen, answers: ANSWERS })
+    await settled()
+    expect(clickWikiLink(editor, '[[Beta|Bee]]')).toBe(true)
+    expect(onOpen).toHaveBeenCalledWith('/notes/Beta.md', '')
+  })
+
+  it('writes the source back byte for byte once the links are resolved', async () => {
+    const source = 'a [[b]] [[b#Heading]] [[b|Bee]] [[sub/c]] [[#Heading]] [[missing]]'
+    const { editor, envelope } = open(source, {
+      answers: { b: { path: '/notes/b.md', fragment: '', found: true } },
+    })
+    await settled()
+    const map = buildSourceMap(editor, editor.state.doc, envelope.body)
+    const out = map ? spliceMarkdown(editor, editor.state.doc, map) : editor.getMarkdown()
+    expect(out).toBe(source)
+  })
+
   it('marks a resolved link and leaves an unresolved one dimmed', async () => {
     const { editor } = open('See [[Alpha]] and [[Nowhere]].', { answers: ANSWERS })
     await settled()
@@ -330,7 +433,7 @@ describe('resolution', () => {
     const inside = editor.state.doc.textContent.indexOf('Nowhere') + 'Nowhere'.length + 1
     editor.view.dispatch(editor.state.tr.insertText('s', inside))
     await settled()
-    expect(resolve).toHaveBeenLastCalledWith('/notes/Index.md', ['[[Nowheres]]'])
+    expect(resolve).toHaveBeenLastCalledWith('/notes/Index.md', ['Nowheres'])
     expect(resolve).toHaveBeenCalledTimes(2)
   })
 
