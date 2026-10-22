@@ -1,5 +1,5 @@
 import { Mark, Extension } from '@tiptap/core'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { EditorView } from '@tiptap/pm/view'
 import type { Node as PmNode } from '@tiptap/pm/model'
@@ -11,6 +11,17 @@ import type { WikiLinkResolved } from '../../shared/ipc'
  * to the closing brackets. `[[]]` carries no name and is not a link.
  */
 const WIKI_LINK_RE = /^\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+))?\]\]/
+
+/**
+ * `[[Note#Head|Alias]]` -> `Note#Head`: the bare target the resolver documents.
+ * The `#fragment` stays (the resolver splits it); '' when nothing is left.
+ */
+export function wikiTarget(raw: string): string {
+  const inner = raw.replace(/^\[\[/, '').replace(/\]\]$/, '')
+  const bar = inner.indexOf('|')
+  // a table cell writes the alias bar as `\|`; the backslash is not part of the name
+  return (bar < 0 ? inner : inner.slice(0, bar)).replace(/\\$/, '').trim()
+}
 
 /**
  * Index of the first unescaped `[[`. The stock link tokenizer opens on a
@@ -101,14 +112,15 @@ function wikiSpans(doc: PmNode): WikiSpan[] {
   return spans
 }
 
-/** every distinct wiki target in the document, in document order */
+/** every distinct bare wiki target in the document, in document order */
 export function collectWikiTargets(doc: PmNode): string[] {
   const seen = new Set<string>()
   const out: string[] = []
   for (const span of wikiSpans(doc)) {
-    if (seen.has(span.raw)) continue
-    seen.add(span.raw)
-    out.push(span.raw)
+    const target = wikiTarget(span.raw)
+    if (!target || seen.has(target)) continue
+    seen.add(target)
+    out.push(target)
   }
   return out
 }
@@ -127,6 +139,15 @@ export function wikiFragmentPosition(doc: PmNode, fragment: string): number | nu
     if (node.textContent.replace(/\s+/g, ' ').trim().toLowerCase() === want) found = pos + 1
   })
   return found
+}
+
+/** Put the caret at `pos` (from {@link wikiFragmentPosition}) and bring it into view. */
+export function revealWikiFragment(view: EditorView, pos: number): void {
+  const selection = TextSelection.near(view.state.doc.resolve(pos))
+  // focus first: ProseMirror anchors the scroll on the DOM selection, which
+  // stays where it was until the view has focus, and then scrolls nothing
+  view.focus()
+  view.dispatch(view.state.tr.setSelection(selection).scrollIntoView())
 }
 
 export interface WikiLinkOptions {
@@ -182,6 +203,24 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
     /** what the last resolution asked for; a pause that asks the same thing again is not a new question */
     let asked = ''
 
+    /** paint every link in the document from the answers at hand */
+    const decorate = (view: EditorView, answers: Record<string, WikiLinkResolved>) => {
+      const decorations = wikiSpans(view.state.doc).map((span) =>
+        Decoration.inline(span.from, span.to, {
+          class: answers[wikiTarget(span.raw)]?.found
+            ? 'wiki-link-resolved'
+            : 'wiki-link-unresolved',
+          'data-wiki-target': span.raw,
+        }),
+      )
+      view.dispatch(
+        view.state.tr.setMeta(key, {
+          decorations: DecorationSet.create(view.state.doc, decorations),
+          answers,
+        }),
+      )
+    }
+
     const resolveNow = async (view: EditorView) => {
       const targets = collectWikiTargets(view.state.doc)
       if (targets.length === 0) {
@@ -193,8 +232,13 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
       const fromPath = options.getDocumentPath()
       const question = `${fromPath}\u0000${targets.join('\u0000')}`
       // the walk it triggers can read twenty thousand entries; typing prose
-      // around an unresolved link changes no target, so it asks nothing
-      if (question === asked) return
+      // around an unresolved link changes no target, so it asks nothing; a link
+      // that is new but shares a target already answered is painted from the
+      // answers in hand
+      if (question === asked) {
+        if (!view.isDestroyed) decorate(view, key.getState(view.state)?.answers ?? {})
+        return
+      }
       const mine = ++generation
       let answers: Record<string, WikiLinkResolved>
       try {
@@ -206,18 +250,7 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
       if (mine !== generation || view.isDestroyed) return
       asked = question
 
-      const decorations = wikiSpans(view.state.doc).map((span) =>
-        Decoration.inline(span.from, span.to, {
-          class: answers[span.raw]?.found ? 'wiki-link-resolved' : 'wiki-link-unresolved',
-          'data-wiki-target': span.raw,
-        }),
-      )
-      view.dispatch(
-        view.state.tr.setMeta(key, {
-          decorations: DecorationSet.create(view.state.doc, decorations),
-          answers,
-        }),
-      )
+      decorate(view, answers)
     }
 
     const schedule = (view: EditorView) => {
@@ -245,7 +278,7 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
             )
             if (!el) return false
             const raw = el.getAttribute('data-wiki-target') ?? ''
-            const answer = (key.getState(view.state) ?? EMPTY).answers[raw]
+            const answer = (key.getState(view.state) ?? EMPTY).answers[wikiTarget(raw)]
             if (answer?.found) options.onOpen(answer.path, answer.fragment)
             else options.onUnresolved(raw)
             return true
