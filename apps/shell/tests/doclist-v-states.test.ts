@@ -448,6 +448,23 @@ describe('DocumentsHome: the states of the lists', () => {
       expect(subline('s-mail')).toBe('Từ email · Re: Báo giá Q4')
     })
 
+    // UNI-2080 RV-12: in an RTL line the neutral "#" between the Arabic run and the Latin name resolved
+    // to RTL and drew "general#"; the parent sits in its own <bdi> so "#" stays with the name
+    it.each(['ar', 'he'] as const)(
+      '%s: the parent label is isolated (bdi), so "#" stays with the channel name',
+      async (lang) => {
+        sources = async () => ok({ items: SOURCES, nextCursor: null })
+        await mount('elsewhere', lang as unknown as 'en')
+        const line = host.querySelector(`[data-source-id="s-chat"] .dh-doc-subpath`)!
+        const parent = line.querySelector('bdi')
+        expect(parent, 'the parent label').not.toBeNull()
+        expect(parent!.textContent).toBe('#phap-che')
+        // the module name stays outside the isolate, and the plain text is unchanged
+        expect(line.textContent).toMatch(/ · #phap-che$/)
+        expect(line.textContent!.replace(/ · #phap-che$/, '')).not.toBe('')
+      },
+    )
+
     it('a blank parent title leaves the module alone; a module this build has no name for shows its parent only', async () => {
       sources = async () => ok({ items: SOURCES, nextCursor: null })
       await mount('elsewhere', 'en')
