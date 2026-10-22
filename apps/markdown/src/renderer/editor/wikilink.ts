@@ -144,8 +144,10 @@ export function wikiFragmentPosition(doc: PmNode, fragment: string): number | nu
 /** Put the caret at `pos` (from {@link wikiFragmentPosition}) and bring it into view. */
 export function revealWikiFragment(view: EditorView, pos: number): void {
   const selection = TextSelection.near(view.state.doc.resolve(pos))
-  view.dispatch(view.state.tr.setSelection(selection).scrollIntoView())
+  // focus first: ProseMirror anchors the scroll on the DOM selection, which
+  // stays where it was until the view has focus, and then scrolls nothing
   view.focus()
+  view.dispatch(view.state.tr.setSelection(selection).scrollIntoView())
 }
 
 export interface WikiLinkOptions {
