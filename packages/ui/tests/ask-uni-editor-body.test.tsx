@@ -94,6 +94,16 @@ describe('AskUniEditorBody', () => {
     })
   })
 
+  describe('a document with no name yet', () => {
+    it.each(['', '   '])('shows no empty chip for the name %j', async (name) => {
+      await mount(DOC, { documentName: name })
+      expect(host.querySelector('[data-slot="askuni-doc-chip"]')).toBeNull()
+      expect(host.innerHTML).not.toMatch(/aria-label="[^"]*:\s*"/)
+      expect(box()).not.toBeNull()
+      expect(buttonByLabel('New chat')).not.toBeNull()
+    })
+  })
+
   describe('the other bindings', () => {
     it.each([
       ['local', 'Save to UniWork first'],

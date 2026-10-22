@@ -39,6 +39,22 @@ describe('Ask UNI ui strings', () => {
     }
   })
 
+  it('has the stored-conversation load lines: en and vi as decided, a real translation elsewhere', () => {
+    const en = askUniStrings.en as Record<string, string>
+    const vi = askUniStrings.vi as Record<string, string>
+    expect(en.askUniV2ThreadLoading).toBe('Loading…')
+    expect(vi.askUniV2ThreadLoading).toBe('Đang tải…')
+    expect(en.askUniV2ThreadLoadFailed).toBe("Couldn't load this conversation.")
+    expect(vi.askUniV2ThreadLoadFailed).toBe('Không tải được hội thoại này.')
+    for (const lang of LANGS) {
+      const dict = askUniStrings[lang] as Record<string, string>
+      for (const k of ['askUniV2ThreadLoading', 'askUniV2ThreadLoadFailed']) {
+        expect(dict[k], `${lang}.${k}`).toBeTruthy()
+        if (lang !== 'en') expect(dict[k], `${lang}.${k}`).not.toBe(en[k])
+      }
+    }
+  })
+
   it('falls back to English for a key a locale has not been given yet', () => {
     expect(askUniText('de', 'askUniDocNewChat')).toBeTruthy()
   })

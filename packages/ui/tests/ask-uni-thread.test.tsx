@@ -173,10 +173,46 @@ describe('AskUniThread (adapter)', () => {
       expect(turns()).toHaveLength(4)
     })
 
+    it('shows a visible loading line while a stored conversation loads, and drops it after', async () => {
+      let resolve: (r: AskUniMessagesResult) => void = () => undefined
+      fake.loadMessages.mockImplementationOnce(
+        () =>
+          new Promise<AskUniMessagesResult>((r) => {
+            resolve = r
+          }),
+      )
+      await mount()
+      const line = host.querySelector('li.askuni-v2-loading')
+      expect(line?.textContent).toBe('Loading…')
+      expect(line?.textContent).toBe(en('askUniV2ThreadLoading'))
+      expect(host.querySelector('.askuni-v2-turns')?.getAttribute('aria-busy')).toBe('true')
+      await act(async () => resolve({ ok: true, messages: stored }))
+      await flush()
+      expect(host.querySelector('li.askuni-v2-loading')).toBeNull()
+      expect(host.textContent).not.toContain('Loading…')
+    })
+
+    it('shows no loading line for a new conversation or after a failed load', async () => {
+      await mount({ conversationId: null })
+      expect(host.querySelector('li.askuni-v2-loading')).toBeNull()
+      fake.loadMessages.mockResolvedValueOnce({ ok: false, error: 'offline' })
+      await mount({ conversationId: 'conv-2' })
+      expect(host.querySelector('li.askuni-v2-loading')).toBeNull()
+    })
+
+    it('words a failed first load as a load failure, not as a failed ask', async () => {
+      fake.loadMessages.mockResolvedValueOnce({ ok: false, error: 'offline' })
+      await mount()
+      expect(host.querySelector('li.askuni-v2-error')?.textContent).toContain(
+        "Couldn't load this conversation.",
+      )
+      expect(host.textContent).not.toContain(en('askUniErrDefault'))
+    })
+
     it('a first load that fails shows the error and a Retry that loads again', async () => {
       fake.loadMessages.mockResolvedValueOnce({ ok: false, error: 'offline' })
       await mount()
-      expect(host.textContent).toContain(en('askUniErrDefault'))
+      expect(host.textContent).toContain(en('askUniV2ThreadLoadFailed'))
       expect(host.querySelector('.askuni-v2-turns')?.getAttribute('aria-busy')).toBe('false')
       const retry = [...host.querySelectorAll('button')].find(
         (b) => b.textContent === en('askUniV2Retry'),
@@ -186,7 +222,7 @@ describe('AskUniThread (adapter)', () => {
       await flush()
       expect(fake.loadMessages).toHaveBeenCalledTimes(2)
       expect(turns()).toHaveLength(4)
-      expect(host.textContent).not.toContain(en('askUniErrDefault'))
+      expect(host.textContent).not.toContain(en('askUniV2ThreadLoadFailed'))
     })
 
     it('announces a failed first load to assistive tech (role alert on the error line)', async () => {
@@ -194,19 +230,19 @@ describe('AskUniThread (adapter)', () => {
       await mount()
       const line = host.querySelector('li.askuni-v2-error')
       expect(line?.getAttribute('role')).toBe('alert')
-      expect(line?.textContent).toContain(en('askUniErrDefault'))
+      expect(line?.textContent).toContain(en('askUniV2ThreadLoadFailed'))
     })
 
     it('a rejected first load reads the same, and a failed reload after a good load shows no error', async () => {
       fake.loadMessages.mockRejectedValueOnce(new Error('x'))
       await mount()
-      expect(host.textContent).toContain(en('askUniErrDefault'))
+      expect(host.textContent).toContain(en('askUniV2ThreadLoadFailed'))
       await mount({ state: { reloadTick: 1 } })
       expect(turns()).toHaveLength(4)
       fake.loadMessages.mockResolvedValueOnce({ ok: false, error: 'offline' })
       await mount({ state: { reloadTick: 2 } })
       expect(turns()).toHaveLength(4)
-      expect(host.textContent).not.toContain(en('askUniErrDefault'))
+      expect(host.textContent).not.toContain(en('askUniV2ThreadLoadFailed'))
     })
 
     it('drops the answer of a load that finished after the conversation changed', async () => {
