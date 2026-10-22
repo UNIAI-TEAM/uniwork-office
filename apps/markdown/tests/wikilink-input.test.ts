@@ -206,12 +206,12 @@ describe('typed link', () => {
     expect(editor.state.doc.textContent).toBe('bl[[r]]ock')
   })
 
-  it('does not mark a literal with a backslash (the serializer escapes those)', () => {
+  it('marks a literal with a backslash (the serializer writes it verbatim)', () => {
     const { editor } = open('x')
     editor.commands.setTextSelection(2)
     type(editor, '[[a\\b]]')
     expect(editor.state.doc.textContent).toBe('x[[a\\b]]')
-    expect(wikiTexts(editor)).toEqual([])
+    expect(wikiTexts(editor)).toEqual(['[[a\\b]]'])
   })
 
   it('leaves a link plain when the closing bracket replaces a selection', () => {
@@ -340,12 +340,12 @@ describe('typed link in a table cell', () => {
     expect(save()).toContain('c [[x\\|y]]')
   })
 
-  it('does not mark a pasted source-escaped literal (backslash)', () => {
+  it('marks a pasted source-escaped literal (backslash)', () => {
     const { editor } = open(TABLE)
     caretAfter(editor, 'c')
     paste(editor, ' [[x\\|y]]')
     expect(editor.state.doc.textContent).toContain('[[x\\|y]]')
-    expect(wikiTexts(editor)).toEqual([])
+    expect(wikiTexts(editor)).toEqual(['[[x\\|y]]'])
   })
 })
 
@@ -415,11 +415,11 @@ describe('pasted link', () => {
     expect(wikiTexts(editor)).toEqual(['[[b]]'])
   })
 
-  it('does not mark a pasted literal with a backslash', () => {
+  it('marks a pasted literal with a backslash', () => {
     const { editor } = open('hello')
     editor.commands.setTextSelection(6)
     paste(editor, ' [[a\\b]] and [[c]]')
-    expect(wikiTexts(editor)).toEqual(['[[c]]'])
+    expect(wikiTexts(editor)).toEqual(['[[a\\b]]', '[[c]]'])
   })
 
   it('does not mark an empty or single-bracket literal', () => {
@@ -557,5 +557,65 @@ describe('decoration and save', () => {
       .setContent(parseDocText(saved).body, { contentType: 'markdown' })
       .run()
     expect(runs(editor)).toEqual(runs(again.editor))
+  })
+})
+
+describe('a literal with a backslash, typed or pasted, saves stable', () => {
+  /**
+   * Edit + save through the splice, reopen from what was saved, three cycles:
+   * the bytes never change and the reopen keeps the same marks.
+   */
+  function threeCycles(first: string, literal: string, firstEditor: Editor) {
+    expect(wikiTexts(firstEditor)).toEqual([literal])
+    expect(firstEditor.getMarkdown()).toBe(first)
+    let current = first
+    for (let i = 1; i <= 3; i++) {
+      const { editor, save } = saver(current)
+      expect(wikiTexts(editor), `reopen ${i}`).toEqual([literal])
+      editor.view.dispatch(editor.state.tr.insertText(' z', editor.state.doc.content.size - 1))
+      expect(save(), `save ${i}`).toBe(first.replace(/ b$/, ' b z'))
+      editor.view.dispatch(
+        editor.state.tr.delete(
+          editor.state.doc.content.size - 3,
+          editor.state.doc.content.size - 1,
+        ),
+      )
+      expect(save(), `save back ${i}`).toBe(first)
+      current = save()
+    }
+  }
+
+  for (const literal of ['[[x\\y]]', '[[x\\\\y]]', '[[my_note]]', '[[a\\_b]]']) {
+    it(`typed ${literal}`, () => {
+      const { editor } = open('a  b')
+      editor.commands.setTextSelection(3)
+      type(editor, literal)
+      threeCycles(`a ${literal} b`, literal, editor)
+    })
+    it(`pasted ${literal}`, () => {
+      const { editor } = open('a  b')
+      editor.commands.setTextSelection(3)
+      paste(editor, literal)
+      threeCycles(`a ${literal} b`, literal, editor)
+    })
+  }
+
+  it('a source-escaped literal pasted into a table cell saves stable', () => {
+    const TABLE = '| a | b |\n| - | - |\n| c | d |'
+    const { editor } = open(TABLE)
+    caretAfter(editor, 'c')
+    paste(editor, ' [[b\\|Bee]]')
+    expect(wikiTexts(editor)).toEqual(['[[b\\|Bee]]'])
+    const first = editor.getMarkdown()
+    expect(first).toContain('c [[b\\|Bee]]')
+    let current = first
+    for (let i = 1; i <= 3; i++) {
+      const again = saver(current)
+      // in a cell the file's `\|` is the escaped pipe, so a reopen reads `[[b|Bee]]`
+      expect(wikiTexts(again.editor), `reopen ${i}`).toEqual(['[[b|Bee]]'])
+      expect(again.save(), `save ${i}`).toBe(current)
+      expect(again.editor.getMarkdown(), `full ${i}`).toBe(first)
+      current = again.save()
+    }
   })
 })
