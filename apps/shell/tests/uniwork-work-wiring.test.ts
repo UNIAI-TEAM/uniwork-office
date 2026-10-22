@@ -36,10 +36,10 @@ const PERSON = {
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown
 
-/** an IPC event from the shell window's main frame */
-function shellEvent(destroyed = false) {
+/** an IPC event from the shell window's main frame (sender checks live in ipc-sender-guard) */
+function shellEvent() {
   const mainFrame = { url: 'app://shell' }
-  return { sender: { isDestroyed: () => destroyed, mainFrame }, senderFrame: mainFrame }
+  return { sender: { isDestroyed: () => false, mainFrame }, senderFrame: mainFrame }
 }
 
 function setup(
@@ -60,9 +60,7 @@ function setup(
   })
   const call = (channel: string, ...args: unknown[]) =>
     Promise.resolve(handlers.get(channel)!(shellEvent(), ...args))
-  const callFrom = (event: unknown, channel: string, ...args: unknown[]) =>
-    Promise.resolve(handlers.get(channel)!(event, ...args))
-  return { handlers, call, callFrom, openExternal }
+  return { handlers, call, openExternal }
 }
 
 describe('uniwork-work IPC', () => {
@@ -355,44 +353,5 @@ describe('uniwork-work IPC: the inbox (UNI-2079)', () => {
       error: 'server',
     })
     expect(fetch).not.toHaveBeenCalled()
-  })
-
-  it('refuses a sender that is not the shell main frame, before any request', async () => {
-    const fetch = inboxServer()
-    const { callFrom } = setup({}, fetch)
-    const subframe = { ...shellEvent(), senderFrame: { url: 'https://evil.example' } }
-    for (const event of [{}, null, shellEvent(true), subframe]) {
-      for (const channel of NEW) {
-        expect(await callFrom(event, channel, ['n_1'])).toEqual({ ok: false, error: 'forbidden' })
-      }
-    }
-    expect(fetch).not.toHaveBeenCalled()
-  })
-
-  it('refuses a torn-down sender whose getters throw instead of throwing', async () => {
-    const fetch = inboxServer()
-    const { callFrom } = setup({}, fetch)
-    const torn = {
-      sender: {
-        isDestroyed: () => false,
-        get mainFrame(): unknown {
-          throw new Error('Object has been destroyed')
-        },
-      },
-      senderFrame: {},
-    }
-    for (const channel of NEW) {
-      expect(await callFrom(torn, channel, ['n_1'])).toEqual({ ok: false, error: 'forbidden' })
-    }
-    expect(fetch).not.toHaveBeenCalled()
-  })
-
-  it('still answers the old channels for a plain {} event (no main-frame check)', async () => {
-    expect(await setup().callFrom({}, C.homeSummary, 'ws_1')).toMatchObject({ ok: true })
-    const tasks = setup(
-      {},
-      vi.fn<FetchLike>(async () => json(200, { tasks: [], total: 0, limit: 200, offset: 0 })),
-    )
-    expect(await tasks.callFrom({}, C.myTasks, 'ws_1')).toMatchObject({ ok: true })
   })
 })

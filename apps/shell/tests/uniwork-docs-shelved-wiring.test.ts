@@ -1400,10 +1400,10 @@ describe('UNI-1961 live-row Lưu trữ (shelve)', () => {
 })
 
 describe('UNI-2079 open a document at a comment (uniwork-doc:open-document-at)', () => {
-  /** an IPC event from the shell window's main frame */
-  const shellEvent = (destroyed = false) => {
+  /** an IPC event from the shell window's main frame (sender checks live in ipc-sender-guard) */
+  const shellEvent = () => {
     const mainFrame = { url: 'app://shell' }
-    return { sender: { isDestroyed: () => destroyed, mainFrame }, senderFrame: mainFrame }
+    return { sender: { isDestroyed: () => false, mainFrame }, senderFrame: mainFrame }
   }
 
   it('is a uniwork-doc: channel', () => {
@@ -1430,7 +1430,7 @@ describe('UNI-2079 open a document at a comment (uniwork-doc:open-document-at)',
     }
   })
 
-  it('refuses bad ids and a sender other than the shell main frame without a request', async () => {
+  it('refuses bad ids without a request', async () => {
     const { handlers } = await setup()
     const seen = stubServer()
     const handler = handlers.get(UNIWORK_DOC_CHANNELS.openDocumentAt)!
@@ -1443,13 +1443,6 @@ describe('UNI-2079 open a document at a comment (uniwork-doc:open-document-at)',
       null,
     ]) {
       expect(await handler(shellEvent(), input)).toEqual({ ok: false, error: 'not_found' })
-    }
-    const subframe = { ...shellEvent(), senderFrame: { url: 'https://evil.example' } }
-    for (const event of [null, {}, shellEvent(true), subframe]) {
-      expect(await handler(event, { documentId: 'doc_live' })).toEqual({
-        ok: false,
-        error: 'forbidden',
-      })
     }
     expect(seen).toEqual([])
   })

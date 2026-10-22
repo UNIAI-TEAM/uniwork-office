@@ -62,7 +62,6 @@ import {
 import { AccountBoundary } from './account-boundary'
 import { createShareClientProvider, createUniworkShareService } from './share-service'
 import { registerUniworkAskUni } from '../uniwork-askuni'
-import { isMainFrameSender } from '../main-frame-sender'
 import {
   createUniworkComments,
   type DiscussionPushTarget,
@@ -1272,10 +1271,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocument, (_event, documentId: unknown) =>
     service.openDocument(documentId as string),
   )
-  // UNI-2079: a notice's target (open + held reveal). Main-frame senders only until UNI-2073's
-  // guarded ipcMain covers every uniwork-doc:* channel; both ids are checked before any request.
-  ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocumentAt, (event, input: unknown) => {
-    if (!isMainFrameSender(event)) return { ok: false, error: 'forbidden' }
+  // UNI-2079: a notice's target (open + held reveal); both ids are checked before any request
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.openDocumentAt, (_event, input: unknown) => {
     const { documentId, commentId } = (input && typeof input === 'object' ? input : {}) as {
       documentId?: unknown
       commentId?: unknown
