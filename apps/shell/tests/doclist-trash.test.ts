@@ -16,6 +16,11 @@ import type {
 import { readCollapsedGroups } from '../src/renderer/src/doclist/persist'
 import * as shelvedView from '../src/renderer/src/uniwork-home/ShelvedDocumentsView'
 import { wbStoreWrite } from '../src/renderer/src/workbench-store-client'
+import {
+  resetDocumentsIntentBusForTests,
+  revealInTrash,
+} from '../src/renderer/src/documents-intent-bus'
+import { onUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -609,5 +614,100 @@ describe('Lưu trữ on the shared table (UNI-2047 A2b)', () => {
     await click(host.querySelector('[data-doc-id="s-a"] button.dh-shelved-unshelve'))
     expect(api.uniworkUnshelveDocument).toHaveBeenCalledTimes(1)
     expect(api.uniworkUnshelveDocument!.mock.calls[0]![0]).toBe('s-a')
+  })
+
+  describe('revealInTrash (UNI-2079: a notice names a trashed document)', () => {
+    let scrolled: Element[]
+    let notices: unknown[]
+    let offNotice: () => void
+
+    beforeEach(() => {
+      resetDocumentsIntentBusForTests()
+      scrolled = []
+      notices = []
+      Element.prototype.scrollIntoView = function (this: Element) {
+        scrolled.push(this)
+      }
+      offNotice = onUniworkNotice((event) => notices.push(event))
+    })
+    afterEach(() => {
+      offNotice()
+      resetDocumentsIntentBusForTests()
+    })
+
+    const selectedIds = () =>
+      Array.from(host.querySelectorAll('.dh-doc-table [role="row"][aria-selected="true"]')).map(
+        (el) => el.getAttribute('data-doc-id'),
+      )
+    const trashNavCurrent = () =>
+      sidebarSlot.querySelector('[data-nav="trash"]')?.getAttribute('aria-current') === 'page'
+
+    it('switches a mounted Documents home to the Trash and selects + scrolls to the row', async () => {
+      await mount('workspace')
+      expect(trashNavCurrent()).toBe(false)
+      await act(async () => revealInTrash({ documentId: 't-c', workspaceId: 'ws-1' }))
+      await flush()
+      expect(trashNavCurrent()).toBe(true)
+      expect(selectedIds()).toEqual(['t-c'])
+      expect(scrolled).toContain(host.querySelector('[data-doc-id="t-c"]'))
+      expect(notices).toEqual([])
+    })
+
+    it('selects the row when the Trash is already showing', async () => {
+      await mount('trash')
+      await act(async () => revealInTrash({ documentId: 't-b', workspaceId: 'ws-1' }))
+      await flush()
+      expect(selectedIds()).toEqual(['t-b'])
+      expect(scrolled).toContain(host.querySelector('[data-doc-id="t-b"]'))
+    })
+
+    it('a cold Documents home still gets an intent published before it mounted', async () => {
+      revealInTrash({ documentId: 't-e', workspaceId: 'ws-1' })
+      await mount('workspace')
+      await flush()
+      expect(trashNavCurrent()).toBe(true)
+      expect(selectedIds()).toEqual(['t-e'])
+    })
+
+    it("leaves another workspace's intent alone", async () => {
+      await mount('workspace')
+      await act(async () => revealInTrash({ documentId: 't-c', workspaceId: 'ws-9' }))
+      await flush()
+      expect(trashNavCurrent()).toBe(false)
+      expect(selectedIds()).toEqual([])
+    })
+
+    it('a row no longer in the trash opens the Trash and says the document is gone', async () => {
+      await mount('workspace')
+      await act(async () =>
+        revealInTrash({ documentId: 'restored-or-purged', workspaceId: 'ws-1' }),
+      )
+      await flush()
+      expect(trashNavCurrent()).toBe(true)
+      expect(selectedIds()).toEqual([])
+      expect(notices).toEqual([{ phase: 'failed', error: 'not_found' }])
+    })
+
+    it('looks on the next page when the row is not on the first one', async () => {
+      const late = trashed('t-late', iso(2026, 9, 1), iso(2026, 10, 30))
+      api.uniworkListTrash!.mockImplementation(async (q: { cursor?: string }) =>
+        q.cursor
+          ? ok({ documents: [late], nextCursor: null })
+          : ok({ documents: trash, nextCursor: 'c2' }),
+      )
+      await mount('workspace')
+      await act(async () => revealInTrash({ documentId: 't-late', workspaceId: 'ws-1' }))
+      await flush()
+      expect(selectedIds()).toEqual(['t-late'])
+      expect(notices).toEqual([])
+    })
+
+    it('delivers an intent once: a remount does not select the row again', async () => {
+      await mount('trash')
+      await act(async () => revealInTrash({ documentId: 't-b', workspaceId: 'ws-1' }))
+      await flush()
+      await remount('trash')
+      expect(selectedIds()).toEqual([])
+    })
   })
 })

@@ -16,6 +16,12 @@ import type {
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
+import {
+  openDocumentShare,
+  resetDocumentsIntentBusForTests,
+} from '../src/renderer/src/documents-intent-bus'
+import { createFakeShareApi } from '../src/renderer/src/uniwork-share/fake-share-api'
+import { onUniworkNotice } from '../src/renderer/src/uniwork-notice-bus'
 import { SaveDialog } from '../src/renderer/src/uniwork-folders/SaveDialog'
 import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/documents-home-model'
 
@@ -2934,5 +2940,108 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
     await flush()
     expect(document.querySelector('.uw-act-note')).not.toBeNull()
+  })
+
+  describe("openDocumentShare (UNI-2079: a notice names a document's Share section)", () => {
+    let notices: unknown[]
+    let offNotice: () => void
+    let scrolled: Element[]
+
+    const mountHome = async (workspaceId = 'ws-1') => {
+      await act(async () => {
+        root.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'en' },
+            createElement(DocumentsHome, {
+              workspaceId,
+              workspaces,
+              onWorkspaceChange: vi.fn(),
+              onOpenDocument: vi.fn(),
+              sidebarHost: sidebarSlot,
+            }),
+          ),
+        )
+      })
+      await flush()
+    }
+    const dialogTitle = () => document.querySelector('.uw-share .uw-share-title')?.textContent ?? ''
+
+    beforeEach(() => {
+      resetDocumentsIntentBusForTests()
+      notices = []
+      scrolled = []
+      Element.prototype.scrollIntoView = function (this: Element) {
+        scrolled.push(this)
+      }
+      offNotice = onUniworkNotice((event) => notices.push(event))
+      ;(window as unknown as { uniworkShare: unknown }).uniworkShare = createFakeShareApi({})
+      api.uniworkDocumentProperties = vi.fn(async (id: string) =>
+        id === 'doc-far'
+          ? ok({
+              documentId: 'doc-far',
+              workspaceId: 'ws-1',
+              title: 'Far away.docx',
+              myLevel: 'manage',
+            })
+          : { ok: false, error: 'not_found' },
+      )
+    })
+    afterEach(async () => {
+      offNotice()
+      resetDocumentsIntentBusForTests()
+      delete (window as unknown as { uniworkShare?: unknown }).uniworkShare
+    })
+
+    it('opens the Share dialog of a listed document on its Requests section, without a fetch', async () => {
+      await mountHome()
+      await act(async () =>
+        openDocumentShare({ documentId: 'doc-1', workspaceId: 'ws-1', section: 'requests' }),
+      )
+      await flush()
+      expect(dialogTitle()).toContain('Báo cáo kết quả kinh doanh Q3-2026.docx')
+      expect(document.activeElement).toBe(
+        document.querySelector('[data-share-section="requests"] h3'),
+      )
+      expect(api.uniworkDocumentProperties).not.toHaveBeenCalled()
+    })
+
+    it('fetches the document when its row is not in the loaded list', async () => {
+      await mountHome()
+      await act(async () =>
+        openDocumentShare({ documentId: 'doc-far', workspaceId: 'ws-1', section: 'requests' }),
+      )
+      await flush()
+      expect(api.uniworkDocumentProperties).toHaveBeenCalledWith('doc-far')
+      expect(dialogTitle()).toContain('Far away.docx')
+      expect(document.activeElement).toBe(
+        document.querySelector('[data-share-section="requests"] h3'),
+      )
+    })
+
+    it('a cold Documents home still gets an intent published before it mounted', async () => {
+      openDocumentShare({ documentId: 'doc-far', workspaceId: 'ws-1', section: 'requests' })
+      await mountHome()
+      expect(dialogTitle()).toContain('Far away.docx')
+    })
+
+    it('a document that cannot be read says so on the launch notice and opens no dialog', async () => {
+      await mountHome()
+      await act(async () =>
+        openDocumentShare({ documentId: 'doc-gone', workspaceId: 'ws-1', section: 'requests' }),
+      )
+      await flush()
+      expect(document.querySelector('.uw-share')).toBeNull()
+      expect(notices).toEqual([{ phase: 'failed', error: 'not_found' }])
+    })
+
+    it("leaves another workspace's intent for that workspace's Documents home", async () => {
+      await mountHome()
+      await act(async () =>
+        openDocumentShare({ documentId: 'doc-1', workspaceId: 'ws-9', section: 'requests' }),
+      )
+      await flush()
+      expect(document.querySelector('.uw-share')).toBeNull()
+    })
   })
 })
