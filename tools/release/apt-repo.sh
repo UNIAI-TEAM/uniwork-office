@@ -292,7 +292,11 @@ deb_version="$(dpkg-deb -f "$deb" Version)"
 deb_arch="$(dpkg-deb -f "$deb" Architecture)"
 [ "$deb_package" = "$PACKAGE" ] || die "the deb is package $deb_package, expected $PACKAGE"
 [ "$deb_arch" = amd64 ] || die "the deb is for $deb_arch, expected amd64"
-[ "$deb_version" = "$version" ] || die "the deb is version $deb_version, expected $version"
+# electron-builder writes the deb Version with every '-' as '~' (0.11.0-dev.3 -> 0.11.0~dev.3);
+# the real deb Version is what the pool name, Packages and releases.json carry.
+tilde='~'
+expect_deb_version="${version//-/$tilde}"
+[ "$deb_version" = "$expect_deb_version" ] || die "the deb is version $deb_version, expected $expect_deb_version"
 pool_name="${PACKAGE}_${deb_version#*:}_amd64.deb"
 [[ "$pool_name" =~ $SAFE_NAME ]] || die "pool file name not allowed: $pool_name"
 

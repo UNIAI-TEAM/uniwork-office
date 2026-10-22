@@ -23,6 +23,9 @@ readonly CLIENTS=(ubuntu:24.04 ubuntu:22.04)
 readonly CHANNEL=dev
 readonly V1=0.11.0-dev.1
 readonly V2=0.11.0-dev.2
+# electron-builder writes the deb Version with every '-' as '~'; apt sees this form
+readonly D1=0.11.0~dev.1
+readonly D2=0.11.0~dev.2
 readonly GIT_SHA=0000000000000000000000000000000000000001
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -133,8 +136,10 @@ make_release() {
   local prefix="UniWork-Office_${version}_unsigned"
   mkdir -p "$out" "$pkg/DEBIAN" "$pkg/opt/uniwork-office"
   echo "$version" >"$pkg/opt/uniwork-office/VERSION"
+  local tilde='~' deb_version
+  deb_version="${version//-/$tilde}"
   printf 'Package: uniwork-office\nVersion: %s\nArchitecture: amd64\nMaintainer: Check <check@example.invalid>\nDescription: apt repository check package\n' \
-    "$version" >"$pkg/DEBIAN/control"
+    "$deb_version" >"$pkg/DEBIAN/control"
   dpkg-deb --root-owner-group --build "$pkg" "$out/${prefix}_linux_x64.deb" >/dev/null
   echo "exe $version" >"$out/${prefix}_win32_x64-setup.exe"
   echo "appimage $version" >"$out/${prefix}_linux_x64.AppImage"
@@ -191,8 +196,8 @@ for image in "${CLIENTS[@]}"; do
   clients+=("$id")
   step "$image: add the source, apt-get update, install $V1"
   in_client "$id" 'bash /check/setup.sh && apt-get update -q'
-  in_client "$id" "DEBIAN_FRONTEND=noninteractive apt-get install -y -q uniwork-office:amd64=$V1 >/dev/null"
-  [ "$(installed_version "$id")" = "$V1" ] || { echo "minio-check: $image did not install $V1" >&2; exit 1; }
+  in_client "$id" "DEBIAN_FRONTEND=noninteractive apt-get install -y -q uniwork-office:amd64=$D1 >/dev/null"
+  [ "$(installed_version "$id")" = "$D1" ] || { echo "minio-check: $image did not install $D1" >&2; exit 1; }
 done
 
 publish "$V2"
@@ -200,7 +205,7 @@ for i in "${!clients[@]}"; do
   id="${clients[i]}"
   step "${CLIENTS[i]}: apt-get update + upgrade to $V2"
   in_client "$id" 'apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q >/dev/null'
-  [ "$(installed_version "$id")" = "$V2" ] || { echo "minio-check: ${CLIENTS[i]} did not upgrade to $V2" >&2; exit 1; }
+  [ "$(installed_version "$id")" = "$D2" ] || { echo "minio-check: ${CLIENTS[i]} did not upgrade to $D2" >&2; exit 1; }
 done
 
 # --- tampering ------------------------------------------------------------------------

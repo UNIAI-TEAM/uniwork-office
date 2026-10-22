@@ -59,6 +59,11 @@ function makeKey(uid) {
   return { fpr, secret }
 }
 
+/** electron-builder writes the deb Version with every '-' as '~'. */
+function debVersion(version) {
+  return version.replaceAll('-', '~')
+}
+
 /** A release directory like the merged installers-* artifacts, with a tiny real deb. */
 function makeRelease(version, channel) {
   const dir = mkdtempSync(join(root, `release-${version}-`))
@@ -70,7 +75,7 @@ function makeRelease(version, channel) {
     join(pkg, 'DEBIAN', 'control'),
     [
       'Package: uniwork-office',
-      `Version: ${version}`,
+      `Version: ${debVersion(version)}`,
       'Architecture: amd64',
       'Maintainer: Test <test@example.invalid>',
       'Description: test package',
@@ -200,7 +205,7 @@ describe('apt-repo.sh', { skip }, () => {
     for (const key of [
       'apt/key.gpg',
       'apt/key.asc',
-      `${POOL}/uniwork-office_0.11.0-dev.1_amd64.deb`,
+      `${POOL}/uniwork-office_0.11.0~dev.1_amd64.deb`,
       'apt/dists/dev/main/binary-amd64/Packages',
       'apt/dists/dev/main/binary-amd64/Packages.gz',
       'apt/dists/dev/main/binary-amd64/Packages.xz',
@@ -247,14 +252,15 @@ describe('apt-repo.sh', { skip }, () => {
     assert.match(
       packages,
       new RegExp(
-        `^Filename: pool/main/u/uniwork-office/uniwork-office_0.11.0-dev.1_amd64.deb$`,
+        `^Filename: pool/main/u/uniwork-office/uniwork-office_0.11.0~dev.1_amd64.deb$`,
         'm',
       ),
     )
+    assert.match(packages, /^Version: 0\.11\.0~dev\.1$/m)
     assert.match(
       packages,
       new RegExp(
-        `^SHA256: ${sha256(join(target, POOL, 'uniwork-office_0.11.0-dev.1_amd64.deb'))}$`,
+        `^SHA256: ${sha256(join(target, POOL, 'uniwork-office_0.11.0~dev.1_amd64.deb'))}$`,
         'm',
       ),
     )
@@ -305,13 +311,13 @@ describe('apt-repo.sh', { skip }, () => {
     const target = join(root, 'first')
     const dir = makeRelease('0.11.0-dev.2', 'dev')
     publish(target, '0.11.0-dev.2', 'dev', [], dir)
-    assert.deepEqual(versionsIn(target), ['0.11.0-dev.2', '0.11.0-dev.1'])
+    assert.deepEqual(versionsIn(target), ['0.11.0~dev.2', '0.11.0~dev.1'])
     const packages = readFileSync(join(target, 'apt/dists/dev/main/binary-amd64/Packages'), 'utf8')
     const before = files(target)
 
     // a re-run of the same build (same artifacts)
     publish(target, '0.11.0-dev.2', 'dev', [], dir)
-    assert.deepEqual(versionsIn(target), ['0.11.0-dev.2', '0.11.0-dev.1'])
+    assert.deepEqual(versionsIn(target), ['0.11.0~dev.2', '0.11.0~dev.1'])
     assert.equal(
       readFileSync(join(target, 'apt/dists/dev/main/binary-amd64/Packages'), 'utf8'),
       packages,
@@ -329,13 +335,13 @@ describe('apt-repo.sh', { skip }, () => {
 
   it('keeps --keep versions and deletes pool files one run after they leave the index', () => {
     const target = join(root, 'keep')
-    const dev1 = `${POOL}/uniwork-office_0.11.0-dev.1_amd64.deb`
-    const dev2 = `${POOL}/uniwork-office_0.11.0-dev.2_amd64.deb`
+    const dev1 = `${POOL}/uniwork-office_0.11.0~dev.1_amd64.deb`
+    const dev2 = `${POOL}/uniwork-office_0.11.0~dev.2_amd64.deb`
     publish(target, '0.11.0-dev.1', 'dev', ['--keep', '2'])
     publish(target, '0.11.0-dev.2', 'dev', ['--keep', '2'])
     publish(target, '0.11.0-dev.10', 'dev', ['--keep', '2'])
     // dev.1 left the index in this run; the previous index still names it
-    assert.deepEqual(versionsIn(target), ['0.11.0-dev.10', '0.11.0-dev.2'])
+    assert.deepEqual(versionsIn(target), ['0.11.0~dev.10', '0.11.0~dev.2'])
     let all = files(target)
     assert.ok(all.includes(dev1), 'grace: dev.1 stays one run')
     assert.ok(
@@ -345,7 +351,7 @@ describe('apt-repo.sh', { skip }, () => {
     assert.deepEqual(manifestVersions(target), ['0.11.0-dev.10', '0.11.0-dev.2'])
 
     publish(target, '0.11.0-dev.11', 'dev', ['--keep', '2'])
-    assert.deepEqual(versionsIn(target), ['0.11.0-dev.11', '0.11.0-dev.10'])
+    assert.deepEqual(versionsIn(target), ['0.11.0~dev.11', '0.11.0~dev.10'])
     all = files(target)
     assert.ok(!all.includes(dev1), 'dev.1 is gone after its grace run')
     assert.ok(
@@ -367,10 +373,10 @@ describe('apt-repo.sh', { skip }, () => {
     // another suite never prunes this one's pool files
     publish(target, '0.11.0-beta.1', 'beta', ['--keep', '2'])
     all = files(target)
-    assert.ok(all.includes(`${POOL}/uniwork-office_0.11.0-dev.11_amd64.deb`))
-    assert.ok(all.includes(`${POOL}/uniwork-office_0.11.0-dev.10_amd64.deb`))
-    assert.deepEqual(versionsIn(target), ['0.11.0-dev.11', '0.11.0-dev.10'])
-    assert.deepEqual(versionsIn(target, 'beta'), ['0.11.0-beta.1'])
+    assert.ok(all.includes(`${POOL}/uniwork-office_0.11.0~dev.11_amd64.deb`))
+    assert.ok(all.includes(`${POOL}/uniwork-office_0.11.0~dev.10_amd64.deb`))
+    assert.deepEqual(versionsIn(target), ['0.11.0~dev.11', '0.11.0~dev.10'])
+    assert.deepEqual(versionsIn(target, 'beta'), ['0.11.0~beta.1'])
     assert.deepEqual(manifestVersions(target), ['0.11.0-dev.11', '0.11.0-dev.10'])
     assert.deepEqual(manifestVersions(target, 'beta'), ['0.11.0-beta.1'])
   })
@@ -421,7 +427,7 @@ describe('apt-repo.sh', { skip }, () => {
     assert.deepEqual(first.apt, {
       suite: 'dev',
       package: 'uniwork-office',
-      version: '0.11.0-dev.1',
+      version: '0.11.0~dev.1',
     })
 
     const rows = first.assets.map(
@@ -473,7 +479,7 @@ describe('apt-repo.sh', { skip }, () => {
     const dir = makeRelease('0.11.0-dev.1', 'dev')
     const result = run(['--dir', dir, '--channel', 'dev', '--version', '0.11.0-dev.2'], { target })
     assert.notEqual(result.status, 0)
-    assert.match(result.stderr, /expected 0\.11\.0-dev\.2/)
+    assert.match(result.stderr, /the deb is version 0\.11\.0~dev\.1, expected 0\.11\.0~dev\.2/)
     assert.deepEqual(files(target), [])
   })
 
@@ -493,7 +499,7 @@ describe('apt-repo.sh', { skip }, () => {
     const lines = result.stdout.split('\n')
     const order = [
       'PUT dev/0.11.0-dev.3/SHA256SUMS (Cache-Control: no-cache)',
-      `PUT ${POOL}/uniwork-office_0.11.0-dev.3_amd64.deb`,
+      `PUT ${POOL}/uniwork-office_0.11.0~dev.3_amd64.deb`,
       'PUT apt/dists/dev/main/binary-amd64/Packages (Cache-Control: no-cache)',
       'PUT apt/dists/dev/InRelease (Cache-Control: no-cache)',
       'PUT update/dev/dev-linux.yml (Cache-Control: no-cache)',
