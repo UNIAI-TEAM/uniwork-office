@@ -349,10 +349,7 @@ describe('AccessLogSheet (UNI-2077)', () => {
   describe('manage-only note', () => {
     it('reads in the primary text colour so dark mode keeps 4.5:1 (UNI-2077 TV F-1)', () => {
       const css = readFileSync(
-        join(
-          __dirname,
-          '../src/renderer/src/uniwork-doc-history/access-log-sheet.css',
-        ),
+        join(__dirname, '../src/renderer/src/uniwork-doc-history/access-log-sheet.css'),
         'utf8',
       )
       const rule = /\.modal\.uw-act \.alg-note \{([^}]*)\}/.exec(css)![1]!

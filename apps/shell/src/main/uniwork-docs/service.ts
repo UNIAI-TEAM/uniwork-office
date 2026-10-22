@@ -7055,7 +7055,11 @@ export class UniworkDocsService {
       await this.writeBytesViaTemp(target, bytes)
     } catch (error) {
       // the last target check inside the write carries no status; same mapping as the file download
-      if (error instanceof UniworkDocError && error.code === 'forbidden' && error.status === undefined) {
+      if (
+        error instanceof UniworkDocError &&
+        error.code === 'forbidden' &&
+        error.status === undefined
+      ) {
         return 'forbidden_target'
       }
       throw error

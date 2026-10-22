@@ -755,7 +755,9 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
     it('a restore clears the success line of an earlier checkpoint', async () => {
       const bridge = await open()
       await submitForm()
-      expect(sheet().querySelector('[role="status"]')?.textContent).toBe(t('vhsNameDone', { no: 4 }))
+      expect(sheet().querySelector('[role="status"]')?.textContent).toBe(
+        t('vhsNameDone', { no: 4 }),
+      )
       await click(restoreButton(2))
       await click(confirmButton())
       expect(sheet().querySelector('[role="status"]')).toBeNull()
