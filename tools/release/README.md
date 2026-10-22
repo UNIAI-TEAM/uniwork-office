@@ -257,6 +257,104 @@ in this repository yet**: add it, then pass the secrets it reads (for KeyLocker 
 `SM_CODE_SIGNING_CERT_SHA1_HASH`; for a PFX the file and its password) to the "Sign the
 helper binaries" and "Package the installer" steps.
 
+## Download server and apt repository
+
+Every published release is also copied to `https://uniworkos.com/downloads/office/`: the edge
+maps `/downloads/office/*` to a dedicated public-read bucket (object GET only, no listing; never
+the `uniwork` user-data bucket). The `mirror` job runs after `publish` and calls
+`tools/release/apt-repo.sh`, which uploads the installers, updates the signed apt repository and
+the generic update feed, and writes `releases.json`. The run summary then shows a second
+`OFFICE_INSTALLER_<CHANNEL>_URLS` value whose URLs point at this server; the server keeps the
+GitHub value until the route answers.
+
+- **Environment `release-publish`** (deployment refs: `main` and `v*`), secrets (names only):
+  `OFFICE_S3_ENDPOINT`, `OFFICE_S3_BUCKET`, `OFFICE_S3_ACCESS_KEY_ID`,
+  `OFFICE_S3_SECRET_ACCESS_KEY`, `APT_GPG_PRIVATE_KEY` (armored), `APT_GPG_PASSPHRASE`. Only the
+  mirror step gets them. The optional repository variable `OFFICE_S3_REGION` defaults to `hn-2`.
+  The job uses path-style addressing and the AWS CLI's `when_required` checksum mode (newer
+  checksum headers break several S3-compatible providers).
+- **Repository variable `UNIWORK_APT_REPO_ENABLED`** (`'true'`): the Linux build then ships the
+  apt source in the deb. Leave it off until the repository answers on uniworkos.com.
+- All mirror runs share one concurrency group: the apt indexes and `releases.json` are
+  read-modify-write.
+
+### Layout
+
+| Key (below `downloads/office/`)          | Content                                                         |
+| ---------------------------------------- | --------------------------------------------------------------- |
+| `<channel>/<version>/`                   | every release file, plus a combined `SHA256SUMS`                |
+| `apt/key.gpg`, `apt/key.asc`             | the signing key, binary (for `Signed-By`) and armored           |
+| `apt/pool/main/u/uniwork-office/`        | `uniwork-office_<version>_amd64.deb`                            |
+| `apt/dists/<channel>/`                   | `InRelease`, `Release`, `Release.gpg` (one suite per channel)   |
+| `apt/dists/<channel>/main/binary-amd64/` | `Packages`, `.gz`, `.xz` and `by-hash/SHA256/<hash>` copies     |
+| `update/<channel>/`                      | generic electron-updater feed: the feed yml and the files named |
+| `releases.json`                          | public manifest of every kept version (schema 1, below)         |
+
+The suites are `dev`, `beta` and `stable` (component `main`, architecture `amd64`, `Origin:
+UniWork`, `Label: UniWork Office`, `Acquire-By-Hash: yes`, no `Valid-Until`).
+
+### Installing from the apt repository
+
+```sh
+curl -fsSL https://uniworkos.com/downloads/office/apt/key.gpg \
+  | sudo tee /usr/share/keyrings/uniwork-office-archive-keyring.gpg >/dev/null
+sudo tee /etc/apt/sources.list.d/uniwork-office.sources >/dev/null <<'SOURCES'
+Types: deb
+URIs: https://uniworkos.com/downloads/office/apt
+Suites: dev
+Components: main
+Architectures: amd64
+Signed-By: /usr/share/keyrings/uniwork-office-archive-keyring.gpg
+SOURCES
+sudo apt update && sudo apt install uniwork-office
+```
+
+Use `Suites: beta` for the beta channel. Later builds arrive with `sudo apt update && sudo apt
+upgrade`. Check the key before trusting it:
+`gpg --show-keys /usr/share/keyrings/uniwork-office-archive-keyring.gpg` must print
+`58A9 0232 2C8D 45C4 33B5  25F5 1198 D109 26F3 4831`.
+
+### Signing key
+
+RSA 4096, fingerprint `58A902322C8D45C433B525F51198D10926F34831`, uid
+`UniWork Office Releases <contact@uniworkos.com>`, expires 2029-10-21; extend or rotate it
+before then. The private key, its passphrase and the revocation certificate are in the company
+vault, never in the repository. The script imports the key into a throwaway `GNUPGHOME`,
+refuses any other fingerprint, and signs before it uploads anything.
+
+### Upload order and retention
+
+Stateless: the suite's current `Packages` is the manifest; the script replaces the stanza of
+the same version and keeps the newest 5 versions (`--keep`, compared with
+`dpkg --compare-versions`). Each step must succeed before the next, so a client never sees an
+index naming a missing file: installers, pool deb, `by-hash` + `Packages*`, `Release` /
+`Release.gpg` / `InRelease` (with `Cache-Control: no-cache`, like `Packages*`, the feed yml and
+`releases.json`), feed files, feed yml, `releases.json`, then prune. Prune keeps one run of
+grace: a pool deb, a `by-hash` file, a feed file or a `<channel>/<version>/` directory is
+deleted only when neither the new nor the previous index / Release / feed yml / manifest names
+it. Re-running the same version is idempotent.
+
+### releases.json
+
+`release-manifest.mjs` writes it (schema 1; field names never change within the schema, new
+optional fields may appear). `channels.<channel>` holds `latest`, `apt_suite` and `releases`
+(newest first, the kept versions only); each release has `version`, `channel`, `tag`,
+`published_at`, `git_sha`, `notes_markdown` (the GitHub release body, untrusted markdown),
+`notes_url` (null for now), `signed` (`windows` / `macos` / `linux`), `apt` and `assets` (one row
+per installer and checksum file: `platform`, `arch`, `kind`, `file`, absolute `url`, `size`,
+`sha256`, `signed`). A run replaces only its own channel's entry.
+
+### Checking it locally
+
+- `node --test tools/release/apt-repo.test.mjs` runs the script against a directory instead of
+  S3 (`APT_REPO_TARGET_DIR`) with a throwaway key (`APT_REPO_EXPECT_FPR`, refused on GitHub
+  Actions). It needs `apt-ftparchive` (apt-utils), `dpkg-deb`, `gpg`, `gpgv` and skips without.
+- `bash tools/release/apt-repo-minio-check.sh` is the end-to-end check: a throwaway MinIO
+  (`bitnamilegacy/minio`), two published versions, and Ubuntu 24.04 and 22.04 containers that
+  add the deb822 source, install the first version, upgrade to the second and refuse a tampered
+  `InRelease` and `Packages`. It needs docker and removes everything it started.
+- `--dry-run` prints the uploads and deletions without the key or any write.
+
 ## Building locally
 
 Windows (PowerShell or Git Bash, from the repository root):
