@@ -1072,7 +1072,11 @@
       if (!command || inField) return
       if (!selected && command !== 'escape') return
       if (selected) e.preventDefault()
-      post({ type: 'gx:keyCommand', command })
+      // name the element acted on: the host's own selection state lags the click that chose it
+      const sid = sidOf(selected)
+      post(
+        sid === null ? { type: 'gx:keyCommand', command } : { type: 'gx:keyCommand', command, sid },
+      )
     },
     true,
   )
