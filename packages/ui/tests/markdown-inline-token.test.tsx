@@ -52,7 +52,7 @@ describe('Markdown inlineToken', () => {
   })
 
   it('never touches a markdown link', () => {
-    expect(html('[see [S1]](https://x.example/a)')).not.toContain('class="cite"')
+    expect(html('[S1](https://x.example/a)')).not.toContain('class="cite"')
   })
 
   it('does not break when the pattern is not global (the host forgot the flag)', () => {

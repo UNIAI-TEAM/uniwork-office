@@ -11,6 +11,16 @@ import { Fragment, type ReactNode } from 'react'
  * URLs never turn into clickable links here.
  */
 
+/**
+ * A host-owned pattern in the plain text (e.g. a `[S1]` citation marker). `render` returns the node
+ * for a match, or the matched text itself to leave it alone. Only plain-text runs are scanned: code
+ * spans, bold/italic runs and links are never touched.
+ */
+export interface MarkdownInlineToken {
+  pattern: RegExp
+  render: (match: RegExpMatchArray, key: number) => ReactNode
+}
+
 export interface MarkdownNav {
   /** href prefix that renders as an in-app navigation link (e.g. 'docnav://') */
   scheme: string
@@ -26,13 +36,30 @@ const INLINE_RE = new RegExp(
 )
 const LINK_RE = new RegExp(`^\\[([^\\]]+)\\]\\((${HREF})\\)$`)
 
-function renderInline(text: string, nav?: MarkdownNav): ReactNode[] {
+function renderInline(text: string, nav?: MarkdownNav, token?: MarkdownInlineToken): ReactNode[] {
   const out: ReactNode[] = []
   let last = 0
   let key = 0
+  // a plain run is split on the host's pattern (always scanned globally, whatever flags it came with)
+  const pushPlain = (run: string): void => {
+    if (!run) return
+    if (!token) {
+      out.push(run)
+      return
+    }
+    const re = new RegExp(token.pattern.source, token.pattern.flags.replace('g', '') + 'g')
+    let from = 0
+    for (const m of run.matchAll(re)) {
+      const at = m.index ?? 0
+      if (at > from) out.push(run.slice(from, at))
+      out.push(token.render(m, key++))
+      from = at + m[0].length
+    }
+    if (from < run.length) out.push(run.slice(from))
+  }
   for (const m of text.matchAll(INLINE_RE)) {
     const i = m.index ?? 0
-    if (i > last) out.push(text.slice(last, i))
+    if (i > last) pushPlain(text.slice(last, i))
     const tok = m[0] ?? ''
     if (tok.startsWith('`')) out.push(<code key={key++}>{tok.slice(1, -1)}</code>)
     else if (tok.startsWith('**')) out.push(<strong key={key++}>{tok.slice(2, -2)}</strong>)
@@ -59,7 +86,7 @@ function renderInline(text: string, nav?: MarkdownNav): ReactNode[] {
     } else out.push(<em key={key++}>{tok.slice(1, -1)}</em>)
     last = i + tok.length
   }
-  if (last < text.length) out.push(text.slice(last))
+  if (last < text.length) pushPlain(text.slice(last))
   return out
 }
 
@@ -205,10 +232,12 @@ export function Markdown({
   text,
   nav,
   lead,
+  inlineToken,
 }: {
   text: string
   nav?: MarkdownNav
   lead?: ReactNode
+  inlineToken?: MarkdownInlineToken
 }): React.JSX.Element {
   const blocks = parseBlocks(text)
   const leadsFirstBlock = lead != null && blocks[0]?.kind === 'p'
@@ -219,12 +248,14 @@ export function Markdown({
         if (b.kind === 'h') {
           return (
             <p key={i} className="ai-md-h">
-              {renderInline(b.text, nav)}
+              {renderInline(b.text, nav, inlineToken)}
             </p>
           )
         }
         if (b.kind === 'ul' || b.kind === 'ol') {
-          const items = b.items.map((it, j) => <li key={j}>{renderInline(it, nav)}</li>)
+          const items = b.items.map((it, j) => (
+            <li key={j}>{renderInline(it, nav, inlineToken)}</li>
+          ))
           return b.kind === 'ul' ? <ul key={i}>{items}</ul> : <ol key={i}>{items}</ol>
         }
         if (b.kind === 'code') {
@@ -244,7 +275,7 @@ export function Markdown({
                   <tr>
                     {b.head.map((c, j) => (
                       <th key={j} style={cellStyle(j)}>
-                        {renderInline(c, nav)}
+                        {renderInline(c, nav, inlineToken)}
                       </th>
                     ))}
                   </tr>
@@ -254,7 +285,7 @@ export function Markdown({
                     <tr key={r}>
                       {row.map((c, j) => (
                         <td key={j} style={cellStyle(j)}>
-                          {renderInline(c, nav)}
+                          {renderInline(c, nav, inlineToken)}
                         </td>
                       ))}
                     </tr>
@@ -270,7 +301,7 @@ export function Markdown({
             {b.lines.map((ln, j) => (
               <Fragment key={j}>
                 {j > 0 && <br />}
-                {renderInline(ln, nav)}
+                {renderInline(ln, nav, inlineToken)}
               </Fragment>
             ))}
           </p>
