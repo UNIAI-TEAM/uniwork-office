@@ -536,6 +536,16 @@ describe('own-window policies', () => {
     expect(names.every((n) => n === 'update')).toBe(true)
   })
 
+  it.each(['update:download', 'pdf-password:submit'])(
+    '%s refuses an event with no sender while the own window is closed (null is not a match)',
+    (channel) => {
+      const ctx = setup({ ownWindowContents: () => null })
+      for (const event of [{ senderFrame: {} }, { sender: null, senderFrame: null }, {}]) {
+        expect(ctx.guard.check(event, channel)).toEqual({ ok: false, reason: 'destroyed' })
+      }
+    },
+  )
+
   it('asks for the pdf-password window by name for pdf-password:*', () => {
     const asked = vi.fn((_name: OwnWindow) => null)
     const ctx = setup({ ownWindowContents: asked })
