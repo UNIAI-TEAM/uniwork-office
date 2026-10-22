@@ -39,6 +39,8 @@ export interface ShareAccessListProps {
   organizationName?: string
   shelved: boolean
   onMutated: (note: string) => Promise<void>
+  /** UNI-2078: the owner row's action (Transfer ownership) */
+  ownerAction?: ShareAccessRowContext['ownerAction']
 }
 
 interface PendingRowConfirm {
@@ -64,6 +66,7 @@ export function ShareAccessList({
   organizationName,
   shelved,
   onMutated,
+  ownerAction,
 }: ShareAccessListProps) {
   const { t } = useI18n()
   const [filterQuery, setFilterQuery] = useState('')
@@ -322,6 +325,7 @@ export function ShareAccessList({
       else openerEls.current.delete(key)
     },
     requestRowChange,
+    ...(ownerAction ? { ownerAction } : {}),
   }
 
   const hasAnyRow = Boolean(owner || homeRow || orderedShares.length > 0)

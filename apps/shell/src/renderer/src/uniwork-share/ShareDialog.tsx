@@ -8,6 +8,7 @@ import { ShareAddSection } from './ShareAddSection'
 import { ShareBreakGlassSection } from './ShareBreakGlassSection'
 import { ShareLinksSection } from './ShareLinksSection'
 import { ShareMembersError } from './ShareMembersError'
+import { OwnerTransferAction, ownerTransferAvailable } from './OwnerTransferDialog'
 import { canManageTarget, type ShareDialogTarget } from './share-dialog-target'
 import { useShareAccess, useShareDirectory, useShareSettings } from './use-share'
 import './share-dialog.css'
@@ -78,6 +79,9 @@ function ShareDialogBody({
   const shelved = !!row.shelvedAt
   const archived = row.archived === true || !!row.archivedAt
   const lockedBy = shelved ? shelvedNoteId : undefined
+  // UNI-2078: a work product's owner never changes; a server without the route hides it for the session
+  const [transferAvailable, setTransferAvailable] = useState(ownerTransferAvailable)
+  const canTransfer = canAdminister && !row.ownerKind && transferAvailable
 
   // the first time a manager's overview lands, the search box takes focus (the dialog itself
   // opened on its Close button, so nothing is stolen from a person who already moved)
@@ -229,6 +233,21 @@ function ShareDialogBody({
             organizationName={row.organizationName}
             shelved={shelved}
             onMutated={onMutated}
+            ownerAction={
+              canTransfer
+                ? (owner) => (
+                    <OwnerTransferAction
+                      api={shareApi}
+                      documentId={row.id}
+                      documentTitle={row.title}
+                      ownerName={memberName(owner.userId) ?? t('shrPersonUnknown')}
+                      lockedBy={lockedBy}
+                      onTransferred={(name) => onMutated(t('shrOwnerTransferred', { name }))}
+                      onUnavailable={() => setTransferAvailable(false)}
+                    />
+                  )
+                : undefined
+            }
           />
 
           {(adminOnly || (data.breakGlass?.length ?? 0) > 0) && (

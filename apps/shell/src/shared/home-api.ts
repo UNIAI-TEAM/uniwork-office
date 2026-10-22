@@ -2459,6 +2459,10 @@ export const UNIWORK_SHARE_CHANNELS = {
   breakGlassRevoke: 'uniwork-share:break-glass-revoke',
   /** invoke({cursor?, limit?}) -> one page of the selected organization's members */
   members: 'uniwork-share:members',
+  /** UNI-2078: invoke(documentId) -> the people who may take the document */
+  ownerCandidates: 'uniwork-share:owner-candidates',
+  /** UNI-2078: invoke({documentId, userId, previousOwnerLevel?}) -> transfer the ownership */
+  transferOwner: 'uniwork-share:owner-transfer',
 } as const
 
 export const PROJECT_CHANNELS = {

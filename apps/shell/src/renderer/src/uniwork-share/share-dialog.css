@@ -350,6 +350,11 @@
   outline: none;
 }
 
+.uw-share-option.active {
+  /* UNI-2078: the owner transfer combobox's keyboard row (aria-activedescendant) */
+  background: var(--hover);
+}
+
 .uw-share-option[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: 0.5;

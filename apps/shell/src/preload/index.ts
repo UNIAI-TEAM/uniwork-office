@@ -133,6 +133,8 @@ import type {
   ShareCandidatePage,
   ShareLinkCreated,
   ShareMemberPage,
+  ShareOwnerCandidate,
+  ShareOwnerTransfer,
   ShareLinkRevokeInput,
   ShareRejectedItem,
   ShareRequestDecision,
@@ -2036,6 +2038,7 @@ function asShareResult<T>(result: unknown): ShareResult<T> {
       status?: unknown
       rejected?: unknown
       retryable?: unknown
+      endpointMissing?: unknown
     }
     if (r.ok === true) return { ok: true, value: r.value as T }
     if (r.ok === false && typeof r.error === 'string' && r.error) {
@@ -2045,6 +2048,7 @@ function asShareResult<T>(result: unknown): ShareResult<T> {
         ...(typeof r.status === 'number' ? { status: r.status } : {}),
         ...(Array.isArray(r.rejected) ? { rejected: r.rejected as ShareRejectedItem[] } : {}),
         ...(r.retryable === true ? { retryable: true } : {}),
+        ...(r.endpointMissing === true ? { endpointMissing: true } : {}),
       }
     }
   }
@@ -2113,6 +2117,16 @@ const shareApi: UniworkShareApi = {
   async members(input) {
     return asShareResult<ShareMemberPage>(
       await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.members, input),
+    )
+  },
+  async ownerCandidates(documentId) {
+    return asShareResult<ShareOwnerCandidate[]>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.ownerCandidates, documentId),
+    )
+  },
+  async transferOwner(input) {
+    return asShareResult<ShareOwnerTransfer>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.transferOwner, input),
     )
   },
 }

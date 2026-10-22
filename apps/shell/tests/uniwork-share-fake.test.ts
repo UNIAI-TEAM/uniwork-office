@@ -381,3 +381,100 @@ describe('break-glass and members', () => {
     expect(all.members.find((m) => m.userId === 'u_minh')!.displayName).toBe('Minh Trần')
   })
 })
+
+/**
+ * UNI-2078 slice 4: the owner transfer half of the fake. Its candidates are the
+ * workspace's members who are active in the organization, minus the owner (and
+ * minus the caller when an admin reaches a restricted document only through
+ * admin_scope); a transfer moves the owner like the server, and each refusal
+ * (and a server without the route) can be simulated.
+ */
+describe('owner transfer', () => {
+  type Candidate = { userId: string; name: string; email: string }
+
+  it('candidates: workspace members active in the organization, never the owner or a deactivated person', async () => {
+    const api = createFakeShareApi()
+    const ids = ok<Candidate[]>(await api.ownerCandidates(DOC)).map((c) => c.userId)
+    expect(ids).toEqual(['u_minh', 'u_an', 'u_binh', 'u_admin'])
+    expect(ids).not.toContain('u_owner')
+    expect(ids).not.toContain('u_off')
+  })
+
+  it('an admin reaching a restricted document only through admin_scope is not offered to themselves', async () => {
+    const api = createFakeShareApi({ myLevel: '', adminScope: true, restricted: true })
+    const ids = ok<Candidate[]>(await api.ownerCandidates(DOC)).map((c) => c.userId)
+    expect(ids).not.toContain('u_admin')
+    expect(await api.transferOwner({ documentId: DOC, userId: 'u_admin' })).toMatchObject({
+      ok: false,
+      error: 'break_glass_required',
+    })
+  })
+
+  it('a transfer moves the owner; the previous owner keeps edit by default, nothing with none', async () => {
+    const api = createFakeShareApi()
+    expect(await api.transferOwner({ documentId: DOC, userId: 'u_binh' })).toEqual({
+      ok: true,
+      value: {
+        documentId: DOC,
+        aclOwnerId: 'u_binh',
+        previousOwnerId: 'u_owner',
+        previousOwnerShareId: expect.any(String),
+      },
+    })
+    const access = ok<ShareAccess>(await api.get(DOC))
+    expect(access.owner?.userId).toBe('u_binh')
+    expect(access.shares?.find((g) => g.principalId === 'u_owner')?.level).toBe('edit')
+
+    const none = createFakeShareApi()
+    const res = ok<{ previousOwnerShareId: string }>(
+      await none.transferOwner({ documentId: DOC, userId: 'u_an', previousOwnerLevel: 'none' }),
+    )
+    expect(res.previousOwnerShareId).toBe('')
+    const after = ok<ShareAccess>(await none.get(DOC))
+    expect(after.shares?.some((g) => g.principalId === 'u_owner')).toBe(false)
+  })
+
+  it('refuses below manage, on a work product and on a shelved document, like main', async () => {
+    expect(
+      await createFakeShareApi({ myLevel: 'edit' }).transferOwner({
+        documentId: DOC,
+        userId: 'u_an',
+      }),
+    ).toMatchObject({ ok: false, error: 'forbidden' })
+    expect(
+      await createFakeShareApi({ ownerKind: 'work_product' }).ownerCandidates(DOC),
+    ).toMatchObject({ ok: false, error: 'document_owned_by_work_product' })
+    expect(
+      await createFakeShareApi({ shelved: true }).transferOwner({
+        documentId: DOC,
+        userId: 'u_an',
+      }),
+    ).toMatchObject({ ok: false, error: 'document_shelved' })
+  })
+
+  it('simulates each server refusal, and a server without the route as endpointMissing', async () => {
+    const cases = [
+      ['owner_target_not_member', 422],
+      ['break_glass_required', 403],
+      ['document_owned_by_work_product', 409],
+      ['server_error', 500],
+    ] as const
+    for (const [code, status] of cases) {
+      const api = createFakeShareApi({ ownerTransferRefuses: code })
+      expect(await api.transferOwner({ documentId: DOC, userId: 'u_an' })).toEqual({
+        ok: false,
+        error: code,
+        status,
+      })
+      // nothing was written
+      expect(ok<ShareAccess>(await api.get(DOC)).owner?.userId).toBe('u_owner')
+    }
+    const missing = createFakeShareApi({ ownerTransferRefuses: 'endpoint_missing' })
+    expect(await missing.transferOwner({ documentId: DOC, userId: 'u_an' })).toEqual({
+      ok: false,
+      error: 'not_found',
+      status: 404,
+      endpointMissing: true,
+    })
+  })
+})
