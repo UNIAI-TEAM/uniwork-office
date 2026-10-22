@@ -223,6 +223,111 @@ describe('typed link', () => {
   })
 })
 
+describe('links and code are not wiki links', () => {
+  const LINKED = '[foo bar](https://x.test/p)'
+
+  it('does not mark a literal typed inside hyperlink text', () => {
+    const { editor } = open(LINKED)
+    caretAfter(editor, 'foo')
+    type(editor, ' [[a]]')
+    expect(editor.state.doc.textContent).toBe('foo [[a]] bar')
+    expect(wikiTexts(editor)).toEqual([])
+  })
+
+  it('does not mark a literal pasted inside hyperlink text', () => {
+    const { editor } = open(LINKED)
+    caretAfter(editor, 'foo')
+    paste(editor, ' [[a]]')
+    expect(editor.state.doc.textContent).toBe('foo [[a]] bar')
+    expect(wikiTexts(editor)).toEqual([])
+  })
+
+  it('does not mark a literal whose brackets are split by a code run', () => {
+    const { editor } = open('a `code` b')
+    caretAfter(editor, 'code')
+    type(editor, '[[x')
+    // leave the code run, as the Right arrow does
+    editor.view.dispatch(editor.state.tr.setStoredMarks([]))
+    type(editor, ']]')
+    expect(editor.state.doc.textContent).toBe('a code[[x]] b')
+    expect(wikiTexts(editor)).toEqual([])
+  })
+})
+
+describe('what a paste or drop may mark', () => {
+  it('leaves a plain literal the user kept (Backspace) alone when a paste lands next to it', () => {
+    const { editor } = open('hello')
+    editor.commands.setTextSelection(6)
+    type(editor, '[[z]]')
+    editor.view.dom.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }),
+    )
+    expect(wikiTexts(editor)).toEqual([])
+    paste(editor, ' and more')
+    expect(editor.state.doc.textContent).toBe('hello[[z]] and more')
+    expect(wikiTexts(editor)).toEqual([])
+  })
+
+  it('marks the link of a drop', () => {
+    const { editor } = open('hello')
+    editor.view.dispatch(editor.state.tr.insertText(' [[a]]', 6).setMeta('uiEvent', 'drop'))
+    expect(editor.state.doc.textContent).toBe('hello [[a]]')
+    expect(wikiTexts(editor)).toEqual(['[[a]]'])
+  })
+
+  it('never marks an insert that is neither a paste nor a drop', () => {
+    const { editor } = open('hello')
+    editor.view.dispatch(editor.state.tr.insertText(' [[a]]', 6))
+    expect(editor.state.doc.textContent).toBe('hello [[a]]')
+    expect(wikiTexts(editor)).toEqual([])
+  })
+})
+
+describe('the mark stops at its literal', () => {
+  const caretAtEnd = (editor: Editor) =>
+    editor.commands.setTextSelection(editor.state.doc.content.size - 1)
+
+  it('a pasted link at a block end does not take the text typed after it', () => {
+    const { editor } = open('hello')
+    editor.commands.setTextSelection(6)
+    paste(editor, ' [[b]]')
+    type(editor, ' after')
+    expect(editor.state.doc.textContent).toBe('hello [[b]] after')
+    expect(wikiTexts(editor)).toEqual(['[[b]]'])
+  })
+
+  it('a pasted link at a block end does not mark the next line', () => {
+    const { editor } = open('hello')
+    editor.commands.setTextSelection(6)
+    paste(editor, ' [[b]]')
+    editor.commands.splitBlock()
+    type(editor, 'next')
+    expect(editor.state.doc.textContent).toBe('hello [[b]]next')
+    expect(wikiTexts(editor)).toEqual(['[[b]]'])
+  })
+
+  it('a link loaded from a file does not take the text typed after it', () => {
+    const { editor } = open('see [[Việt]]')
+    caretAtEnd(editor)
+    type(editor, ' after')
+    editor.commands.splitBlock()
+    type(editor, 'next')
+    expect(editor.state.doc.textContent).toBe('see [[Việt]] afternext')
+    expect(wikiTexts(editor)).toEqual(['[[Việt]]'])
+  })
+
+  it('an edit inside a link (before the closing brackets, in the alias) keeps the mark', () => {
+    const { editor, save } = saver('see [[b|Bee]] end')
+    caretAfter(editor, 'Be')
+    type(editor, 'XY')
+    expect(wikiTexts(editor)).toEqual(['[[b|BeXYe]]'])
+    caretAfter(editor, 'BeXYe')
+    type(editor, 'Z')
+    expect(wikiTexts(editor)).toEqual(['[[b|BeXYeZ]]'])
+    expect(save()).toBe('see [[b|BeXYeZ]] end')
+  })
+})
+
 describe('typed link in a table cell', () => {
   const TABLE = '| a | b |\n| - | - |\n| c | d |'
 
