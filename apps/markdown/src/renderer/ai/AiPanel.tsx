@@ -1136,6 +1136,8 @@ export function AiPanel({
   useEffect(() => {
     if (!preset || preset.nonce === presetNonceRef.current) return
     presetNonceRef.current = preset.nonce
+    // the run lands in the chat: leave Ask UNI so it is the one on screen
+    askUni.leave()
     if (loopRef.current?.busy) setPrompt(preset.text)
     else send(preset.text)
     // eslint-disable-next-line react-hooks/exhaustive-deps

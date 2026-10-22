@@ -1,14 +1,38 @@
 import { useRef, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import type { ReactElement } from 'react'
 import type { AskUniDocFlags } from '@genoffice/ai-provider/askuni'
 import { AskUniAdapterProvider, useAskUniAdapter, type AskUniAdapter } from './adapter'
 import { AskUniComposerBox } from './AskUniComposerBox'
 import { AskUniThread } from './AskUniThread'
-import { useAskUniStream } from './use-ask-uni-stream'
+import { useAskUniStream, type AskUniStreamHandle } from './use-ask-uni-stream'
 import './ask-uni.css'
+
+/**
+ * What the body keeps between visits: the conversation, the draft and the running turn. A panel
+ * that unmounts the body (a collapsed dock swaps its whole tree for a rail) holds the session
+ * itself, so none of it is lost; without one the body keeps its own.
+ */
+export interface AskUniSession {
+  conversationId: string | null
+  setConversationId: Dispatch<SetStateAction<string | null>>
+  value: string
+  setValue: Dispatch<SetStateAction<string>>
+  stream: AskUniStreamHandle
+}
+
+export function useAskUniSession(adapter: AskUniAdapter): AskUniSession {
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [value, setValue] = useState('')
+  // an editor has no workspace to name: the hook adds none, and main derives it from the tab
+  const stream = useAskUniStream(adapter, { onConversation: setConversationId })
+  return { conversationId, setConversationId, value, setValue, stream }
+}
 
 export interface AskUniEditorBodyProps {
   adapter: AskUniAdapter
+  /** the panel's own session; left out, the body keeps one for as long as it is mounted */
+  session?: AskUniSession
   /** from useAskUniDocFlags; null = not known yet */
   flags: AskUniDocFlags | null
   /** the open file's name, as the editor already shows it; never an id */
@@ -54,15 +78,12 @@ function DocIcon(): ReactElement {
 
 function Chat(props: {
   documentName: string
+  session: AskUniSession
   onLiveStatus?: ((text: string) => void) | undefined
 }): ReactElement {
-  const adapter = useAskUniAdapter()
-  const { t } = adapter
-  const [conversationId, setConversationId] = useState<string | null>(null)
-  const [value, setValue] = useState('')
+  const { t } = useAskUniAdapter()
+  const { conversationId, setConversationId, value, setValue, stream } = props.session
   const box = useRef<HTMLTextAreaElement>(null)
-  // an editor has no workspace to name: the hook adds none, and main derives it from the tab
-  const stream = useAskUniStream(adapter, { onConversation: setConversationId })
 
   const ask = (question: string) =>
     stream.ask({ question, ...(conversationId ? { conversationId } : {}) })
@@ -156,5 +177,24 @@ function EditorState(props: AskUniEditorBodyProps): ReactElement {
     return <Notice title={t('askUniDocLocalTitle')} body={t('askUniDocLocalBody')} />
   }
   if (!flags.streamEnabled) return <Notice title={t('askUniErrDisabled')} />
-  return <Chat documentName={props.documentName} onLiveStatus={props.onLiveStatus} />
+  if (props.session) {
+    return (
+      <Chat
+        documentName={props.documentName}
+        session={props.session}
+        onLiveStatus={props.onLiveStatus}
+      />
+    )
+  }
+  return <OwnSessionChat documentName={props.documentName} onLiveStatus={props.onLiveStatus} />
+}
+
+function OwnSessionChat(props: {
+  documentName: string
+  onLiveStatus?: ((text: string) => void) | undefined
+}): ReactElement {
+  const session = useAskUniSession(useAskUniAdapter())
+  return (
+    <Chat documentName={props.documentName} session={session} onLiveStatus={props.onLiveStatus} />
+  )
 }

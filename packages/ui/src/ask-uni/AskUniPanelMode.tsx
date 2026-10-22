@@ -4,13 +4,15 @@ import type { Lang } from '@genoffice/i18n'
 import type { AskUniDocBridge, AskUniDocFlags } from '@genoffice/ai-provider/askuni'
 import { askUniText } from '../strings-ask-uni'
 import { createAskUniDocAdapter, type AskUniAdapter } from './adapter'
-import { AskUniEditorBody } from './AskUniEditorBody'
+import { AskUniEditorBody, useAskUniSession, type AskUniSession } from './AskUniEditorBody'
 import { useAskUniDocFlags } from './use-ask-uni-doc-flags'
 import './ask-uni-panel-mode.css'
 
 // Ask UNI as a mode of an editor AI panel (contract E1; one component for every editor): a toggle in
 // the panel header, a body that takes the place of the chat while it is on, and the panel's one polite live region. The chat stays mounted but
-// hidden, so its draft, scroll and any running turn survive. Everything is behind the editor bridge
+// hidden, so its draft, scroll and any running turn survive. The Ask UNI side survives too, also when
+// the dock collapses and the panel renders a rail in place of everything: its conversation, draft and
+// running turn live in the mode (the panel instance outlives the collapse), not in the body. Everything is behind the editor bridge
 // (`window.uniworkAskUniDoc`, installed by the preload): without it, as in the web build, the toggle
 // is not there. The renderer never names a workspace or a document: main derives both from the tab.
 
@@ -20,13 +22,29 @@ export interface AskUniMode {
   /** Ask UNI is showing in place of the chat */
   active: boolean
   toggle: () => void
+  /** back to the chat (an AI action runs there); the Ask UNI conversation stays */
+  leave: () => void
   flags: AskUniDocFlags | null
   adapter: AskUniAdapter | null
   /** the Ask UNI body's status for the panel's one live region */
   status: string
   setStatus: (text: string) => void
-  /** the body has been opened once: it stays mounted (hidden) so its conversation survives */
+  /** the body has been opened once: it stays mounted (hidden) so its thread view survives a toggle */
   opened: boolean
+  /** the conversation, draft and running turn: owned here so a collapsed dock does not drop them */
+  session: AskUniSession
+}
+
+/** what the session talks to while there is no editor bridge (nothing is offered then) */
+const NO_HOST: AskUniAdapter = {
+  stream: async () => ({ ok: false, error: 'error' }),
+  cancel: () => undefined,
+  onEvent: () => undefined,
+  loadMessages: async () => [],
+  feedbackSet: async () => ({ ok: false, error: 'error' }),
+  feedbackClear: async () => ({ ok: false, error: 'error' }),
+  t: (key) => String(key),
+  lang: 'en',
 }
 
 function askUniDocBridge(): AskUniDocBridge | undefined {
@@ -62,6 +80,7 @@ export function useAskUniMode(lang: Lang, bindingKey?: string | null): AskUniMod
         : null,
     [bridge, lang],
   )
+  const session = useAskUniSession(adapter ?? NO_HOST)
   const offered = adapter !== null && flags?.streamEnabled === true
   const active = on && offered
   const toggle = useCallback(() => {
@@ -71,7 +90,19 @@ export function useAskUniMode(lang: Lang, bindingKey?: string | null): AskUniMod
     }
     setOn(!on)
   }, [on])
-  return { offered, active, toggle, flags, adapter, status, setStatus, opened: opened && offered }
+  const leave = useCallback(() => setOn(false), [])
+  return {
+    offered,
+    active,
+    toggle,
+    leave,
+    flags,
+    adapter,
+    status,
+    setStatus,
+    opened: opened && offered,
+    session,
+  }
 }
 
 function AskUniIcon(): ReactElement {
@@ -114,7 +145,7 @@ export function AskUniModeToggle(props: { mode: AskUniMode; lang: Lang }): React
   )
 }
 
-/** the Ask UNI body; kept mounted (hidden) after the first open so its conversation survives a toggle */
+/** the Ask UNI body; kept mounted (hidden) after the first open so its view survives a toggle */
 export function AskUniModeBody(props: {
   mode: AskUniMode
   documentName: string
@@ -127,6 +158,7 @@ export function AskUniModeBody(props: {
         adapter={mode.adapter}
         flags={mode.flags}
         documentName={props.documentName}
+        session={mode.session}
         onLiveStatus={mode.setStatus}
       />
     </div>

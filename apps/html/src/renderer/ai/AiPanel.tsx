@@ -1256,6 +1256,8 @@ export function AiPanel({
   useEffect(() => {
     if (!preset || preset.nonce === presetNonceRef.current) return
     presetNonceRef.current = preset.nonce
+    // the run lands in the chat: leave Ask UNI so it is the one on screen
+    askUni.leave()
     // while a run is active the request lands in the composer as the user phrased it, never as protocol text
     if (loopRef.current?.busy) setPrompt(preset.displayText ?? preset.text)
     else send(preset.text, preset.displayText, false, undefined, preset.scope, preset.fenceSids)
@@ -1428,7 +1430,8 @@ export function AiPanel({
       style={{ width: '100%' }}
       dir={lang === 'ar' || lang === 'he' ? 'rtl' : undefined}
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes('Files')) {
+        // while Ask UNI shows the chat composer is hidden: a dropped file would attach to nothing visible
+        if (!askUni.active && e.dataTransfer.types.includes('Files')) {
           e.preventDefault()
           e.stopPropagation()
           setDragOver(true)
@@ -1437,7 +1440,9 @@ export function AiPanel({
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false)
       }}
-      onDrop={(e) => void onDrop(e)}
+      onDrop={(e) => {
+        if (!askUni.active) void onDrop(e)
+      }}
     >
       <div
         className="ai-panel-resizer"

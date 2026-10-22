@@ -1210,6 +1210,8 @@ export function AiPanel({
 
   useEffect(() => {
     if (!preset) return
+    // the run lands in the chat: leave Ask UNI so it is the one on screen
+    askUni.leave()
     if (preset.autoRun) runWith(preset.text)
     else {
       setInput(preset.text)

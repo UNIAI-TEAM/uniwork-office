@@ -157,6 +157,10 @@ export function AskUniComposerBox(props: AskUniComposerBoxProps): ReactElement {
                 ref={stopRef}
                 type="button"
                 className={`${sendClassName} is-stop`}
+                onKeyDown={(e) => {
+                  // a held Enter repeats keydown; each repeat would click Stop again once the 300 ms are over
+                  if (e.repeat) e.preventDefault()
+                }}
                 onClick={(e) => {
                   // a key repeat or a second Enter right after the send must not stop the new turn
                   // (a pointer click has detail >= 1 and is never held back)

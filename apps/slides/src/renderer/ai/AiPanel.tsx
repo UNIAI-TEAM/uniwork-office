@@ -478,6 +478,7 @@ export function AiPanel({
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   const askUni = useAskUniMode(lang, currentFilePath)
+  const leaveAskUni = askUni.leave
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
   const isRtl = lang === 'ar' || lang === 'he'
   const [input, setInput] = useState('')
@@ -1669,6 +1670,8 @@ export function AiPanel({
 
   useEffect(() => {
     if (!preset) return
+    // the run lands in the chat: leave Ask UNI so it is the one on screen
+    askUni.leave()
     // Attachments from the start screen: merge into attachments first (ref updated synchronously so this runWith can read them),
     // then trigger the run. Deduplicated by path, safe under StrictMode double runs.
     if (preset.attachments && preset.attachments.length > 0) {
@@ -2322,9 +2325,11 @@ export function AiPanel({
     if (!pendingRefusalRef.current || !open) return
     pendingRefusalRef.current = false
     if (!disclosureUnacked) return
+    // the disclosure sits in the chat composer
+    leaveAskUni()
     setRefusalAnnouncement(aiUniworkText(lang, 'aiUniworkSendNeedsAck'))
     disclosureRegionRef.current?.focus()
-  }, [open, disclosureUnacked, lang])
+  }, [open, disclosureUnacked, lang, leaveAskUni])
   useEffect(() => {
     if (!disclosureUnacked) setRefusalAnnouncement('')
   }, [disclosureUnacked])
