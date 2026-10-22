@@ -1210,12 +1210,12 @@ export function AiPanel({
 
   useEffect(() => {
     if (!preset) return
-    // the run lands in the chat: leave Ask UNI so it is the one on screen
-    askUni.leave()
+    // the run lands in the chat: leave Ask UNI so it is the one on screen (a prefilled composer takes
+    // focus once the chat pane is shown again)
+    askUni.leave(preset.autoRun ? undefined : () => inputRef.current?.focus())
     if (preset.autoRun) runWith(preset.text)
     else {
       setInput(preset.text)
-      inputRef.current?.focus()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset?.nonce])
