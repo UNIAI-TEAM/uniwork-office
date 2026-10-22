@@ -1,8 +1,9 @@
 # Dev / beta installer releases
 
 UniWork Office ships desktop installers on two channels, `dev` and `beta`, built by
-`.github/workflows/release-installers.yml`. Builds are **unsigned** until the company has
-code-signing certificates; `stable` is refused until then. Auto-update is off in these builds.
+`.github/workflows/release-installers.yml`. The mac dmgs are signed and notarized when mac
+signing is on (see "Mac signing"); Windows and Linux builds are **unsigned**, and `stable` is
+refused until every platform signs. Auto-update is off in these builds.
 
 | File                     | Role                                                                                    |
 | ------------------------ | --------------------------------------------------------------------------------------- |
@@ -65,7 +66,8 @@ plain local `npm run dist:win` / `dist:mac` keeps `UniWork-Office-<version>-<arc
 
 The server reads the version from `_<version>_` and the `unsigned` flag from the name. The
 `_unsigned` token disappears by itself once a signing identity is configured for that
-platform (see "Signing hooks"). Release builds produce no mac zips (they only feed an
+platform: a mac signing run ships `UniWork-Office_<version>_darwin_arm64.dmg` /
+`_darwin_x64.dmg` (see "Mac signing"). Release builds produce no mac zips (they only feed an
 updater, which is off); plain local `dist:mac` still builds them.
 
 Linux packages are never signed, so their names always carry `_unsigned`, and the arch is
@@ -97,15 +99,16 @@ redirects, mirror the files to a host that serves them directly and regenerate t
 node tools/release/installer-urls.mjs --channel dev --base-url https://downloads.example/office/dev --dir <folder with the installers>
 ```
 
-The helper refuses an installer without the `unsigned` label or with another channel's
-version, two installers for one platform, mixed versions and a non-HTTPS base URL.
+The helper refuses an installer without the `unsigned` label (only the mac dmgs may come
+signed), a release mixing signed and unsigned dmgs, another channel's version, two installers
+for one platform, mixed versions and a non-HTTPS base URL.
 
 ## Unsigned builds: first launch
 
 - **Windows:** SmartScreen shows "Windows protected your PC". Choose **More info** >
   **Run anyway**. Machines with Smart App Control or an application allow-list may block the
   unsigned app or its helper processes outright; those need the signed builds.
-- **macOS:** the app is ad-hoc signed (Apple Silicon refuses to run an app with no valid
+- **macOS (signing off):** the app is ad-hoc signed (Apple Silicon refuses to run an app with no valid
   signature) but not notarized, so Gatekeeper blocks the first open. Right-click the app in
   Applications > **Open** > **Open**, or on macOS 15 and later open it once, then
   **System Settings** > **Privacy & Security** > **Open Anyway**. From a terminal:
@@ -120,8 +123,13 @@ version, two installers for one platform, mixed versions and a non-HTTPS base UR
   `libfuse2t64` on Ubuntu). Nothing is signed on Linux, so no prompt appears. The deb
   installs an AppArmor profile on Ubuntu 24.04 and later, where the sandbox needs it.
 
+With mac signing on, the dmg opens without a prompt: the release body then says so instead of
+the steps above.
+
 The mac job checks every app with `codesign --verify --deep --strict` and `codesign -dv`
-(expects `Signature=adhoc` while unsigned) and checks each app's architecture with `lipo`.
+(expects `Signature=adhoc` while unsigned) and checks each app's architecture with `lipo`. A
+signing run instead expects the `Developer ID Application` authority and the hardened runtime
+flag, and runs `xcrun stapler validate` and `spctl --assess` on every app and dmg.
 
 ## Which server the app connects to (deployment profile)
 
@@ -172,32 +180,44 @@ app, so the mac build has no feed and a manual check opens https://uniworkos.com
 deb (upgrade with `apt install ./<new>.deb`). Any other HTTPS `UNIWORK_UPDATE_URL` is a
 generic feed prefix, meant for a stable CDN later.
 
-## Signing hooks
+## Mac signing
 
-All signing steps are gated by the repository variable `UNIWORK_SIGNING_ENABLED` (`'true'`
-turns them on). With it unset nothing below runs and no signing variable reaches
-electron-builder, not even an empty one (the unsigned mac step unsets them, and the release
-config drops empty `CSC_*` / `APPLE_*` values; `CSC_LINK=""` would otherwise be read as a
-certificate path and fail the build).
+The repository variable `UNIWORK_MAC_SIGNING_ENABLED` (`'true'`) turns it on. The meta job
+then sets `mac_signed` for runs of main only (a tag push, which it checks is on main, or a
+`workflow_dispatch` from main); any other ref builds the ad-hoc signed app as before and says
+so in a notice. A signing run puts the mac job in the GitHub environment `mac-signing`.
 
-**Before flipping the variable**, move the signing steps (or the build jobs) behind a GitHub
-environment whose deployment branches are restricted to the release tags, and keep the secrets
-in that environment. Otherwise a `workflow_dispatch` run from any branch receives them.
-
-- **macOS:** secrets `CSC_LINK` (base64 Developer ID Application `.p12`), `CSC_KEY_PASSWORD`,
+- Secrets: `CSC_LINK` (the Developer ID Application `.p12`, base64), `CSC_KEY_PASSWORD`,
   `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. electron-builder signs with the
   hardened runtime and notarizes the app; `apps/shell/build/notarize-dmg.js` notarizes and
   staples the dmgs. A "Check the signing secrets" step fails early when one is empty, and the
   signed package step is a separate step that alone receives the secrets.
-- **Windows:** repository variable `GENOFFICE_WIN_SIGN_MODE` (`test` = self-signed PFX,
-  `production` = DigiCert KeyLocker). The config routes every binary electron-builder signs
-  through `scripts/win-sign.cjs`, and the workflow signs the helper binaries
-  (`xlsx-sidecar.exe`, `win-ocr.exe`) with it before packaging. A "Check the signing mode" step
-  fails early unless the mode is `test` or `production`. **That script does not exist
-  in this repository yet**: add it, then pass the secrets it reads (for KeyLocker typically
-  `SM_HOST`, `SM_API_KEY`, `SM_CLIENT_CERT_FILE_B64`, `SM_CLIENT_CERT_PASSWORD`,
-  `SM_CODE_SIGNING_CERT_SHA1_HASH`; for a PFX the file and its password) to the "Sign the
-  helper binaries" and "Package the installer" steps.
+- Keep the secrets **in the `mac-signing` environment, not in the repository list**, and set
+  the environment's deployment branches and tags to `main` and `v*`. A repository secret is
+  readable by any workflow on any branch; an environment secret only by a job the environment
+  admits.
+- With signing off no signing variable reaches electron-builder, not even an empty one (the
+  unsigned mac step unsets them, and the release config drops empty `CSC_*` / `APPLE_*`
+  values; `CSC_LINK=""` would otherwise be read as a certificate path and fail the build).
+- Still unsigned-shaped on the mac side: no zips and no update feed (Squirrel.Mac could now
+  install updates; turning that on is its own change), so the app keeps the manual
+  newer-release notice.
+
+The certificate is the company's (UNICOM TECHNOLOGY SOLUTIONS COMPANY LIMITED, team
+`XJAM488A6D`) and valid until 2027-11-21; renew it before then. Notarized builds keep running
+after it expires.
+
+## Windows signing hook
+
+Gated by the repository variable `UNIWORK_SIGNING_ENABLED` (`'true'`) and off. Repository variable `GENOFFICE_WIN_SIGN_MODE` (`test` = self-signed PFX,
+`production` = DigiCert KeyLocker). The config routes every binary electron-builder signs
+through `scripts/win-sign.cjs`, and the workflow signs the helper binaries
+(`xlsx-sidecar.exe`, `win-ocr.exe`) with it before packaging. A "Check the signing mode" step
+fails early unless the mode is `test` or `production`. **That script does not exist
+in this repository yet**: add it, then pass the secrets it reads (for KeyLocker typically
+`SM_HOST`, `SM_API_KEY`, `SM_CLIENT_CERT_FILE_B64`, `SM_CLIENT_CERT_PASSWORD`,
+`SM_CODE_SIGNING_CERT_SHA1_HASH`; for a PFX the file and its password) to the "Sign the
+helper binaries" and "Package the installer" steps.
 
 ## Building locally
 
@@ -231,4 +251,4 @@ bash tools/release/linux-install-check.sh apps/shell/release-local/UniWork-Offic
 - Linux: arm64 packages, the rpm, and the `packaging/` recipes (flatpak, nix, docker), which
   are untouched and still point at the upstream builds.
 - Windows ARM64 and the Windows zip (`win32-x64-zip`).
-- Signed / notarized builds and the stable channel.
+- Signed Windows builds, mac auto-update (zips + feed for Squirrel.Mac) and the stable channel.
