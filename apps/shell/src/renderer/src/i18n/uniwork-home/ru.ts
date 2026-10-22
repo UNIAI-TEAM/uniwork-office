@@ -167,7 +167,7 @@ export const ru = {
   fuDlgShare: 'Открыть доступ рабочему пространству',
   fuDlgShareHintFolder: 'Относится ко всем файлам этой загрузки. Папки останутся приватными.',
   fuDlgShareHintWorkspace:
-    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+    'Относится ко всем файлам этой загрузки. Новые папки видны всему рабочему пространству.',
   fuDlgShareHintFiles: 'Относится ко всем файлам этой загрузки.',
   fuDlgShareInherited: 'Папка назначения доступна рабочему пространству, поэтому файлы тоже.',
   fuDlgStarting: 'Подготовка…',

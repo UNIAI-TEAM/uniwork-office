@@ -168,7 +168,7 @@ export const cs = {
   fuDlgShare: 'Sdílet s pracovním prostorem',
   fuDlgShareHintFolder: 'Platí pro všechny soubory v tomto nahrávání. Složky zůstanou soukromé.',
   fuDlgShareHintWorkspace:
-    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+    'Platí pro všechny soubory v tomto nahrávání. Nové složky jsou viditelné pro celý pracovní prostor.',
   fuDlgShareHintFiles: 'Platí pro všechny soubory v tomto nahrávání.',
   fuDlgShareInherited: 'Cílová složka je sdílena s pracovním prostorem, takže jsou i soubory.',
   fuDlgStarting: 'Připravuje se…',

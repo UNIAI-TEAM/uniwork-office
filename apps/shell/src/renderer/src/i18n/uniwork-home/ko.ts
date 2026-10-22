@@ -167,7 +167,7 @@ export const ko = {
   fuDlgShare: '워크스페이스와 공유',
   fuDlgShareHintFolder: '이번 업로드의 모든 파일에 적용됩니다. 폴더는 비공개로 유지됩니다.',
   fuDlgShareHintWorkspace:
-    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+    '이번 업로드의 모든 파일에 적용됩니다. 새 폴더는 워크스페이스 전체에 보입니다.',
   fuDlgShareHintFiles: '이번 업로드의 모든 파일에 적용됩니다.',
   fuDlgShareInherited: '대상 폴더가 워크스페이스와 공유되어 있어 파일도 함께 공유됩니다.',
   fuDlgStarting: '준비 중…',

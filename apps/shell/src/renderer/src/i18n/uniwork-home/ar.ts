@@ -166,7 +166,7 @@ export const ar = {
   fuDlgShare: 'المشاركة مع مساحة العمل',
   fuDlgShareHintFolder: 'ينطبق على كل ملف في هذا الرفع. تبقى المجلدات خاصة.',
   fuDlgShareHintWorkspace:
-    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+    'ينطبق على كل ملف في هذا الرفع. المجلدات الجديدة تظهر لمساحة العمل كلها.',
   fuDlgShareHintFiles: 'ينطبق على كل ملف في هذا الرفع.',
   fuDlgShareInherited: 'المجلد الوجهة مشارَك مع مساحة العمل، لذا الملفات كذلك.',
   fuDlgStarting: 'جارٍ التحضير…',

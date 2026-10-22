@@ -169,7 +169,7 @@ export const ms = {
   fuDlgShare: 'Kongsi dengan ruang kerja',
   fuDlgShareHintFolder: 'Terpakai untuk setiap fail dalam muat naik ini. Folder kekal peribadi.',
   fuDlgShareHintWorkspace:
-    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+    'Terpakai untuk setiap fail dalam muat naik ini. Folder baharu kelihatan kepada seluruh ruang kerja.',
   fuDlgShareHintFiles: 'Terpakai untuk setiap fail dalam muat naik ini.',
   fuDlgShareInherited: 'Folder destinasi dikongsi dengan ruang kerja, jadi fail juga begitu.',
   fuDlgStarting: 'Menyediakan…',

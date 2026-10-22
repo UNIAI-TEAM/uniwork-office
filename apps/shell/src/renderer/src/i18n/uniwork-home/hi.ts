@@ -170,7 +170,7 @@ export const hi = {
   fuDlgShare: 'कार्यस्थान के साथ साझा करें',
   fuDlgShareHintFolder: 'इस अपलोड की हर फ़ाइल पर लागू होगा। फ़ोल्डर निजी रहेंगे।',
   fuDlgShareHintWorkspace:
-    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+    'इस अपलोड की हर फ़ाइल पर लागू होगा। नए फ़ोल्डर पूरे वर्कस्पेस को दिखेंगे।',
   fuDlgShareHintFiles: 'इस अपलोड की हर फ़ाइल पर लागू होगा।',
   fuDlgShareInherited: 'गंतव्य फ़ोल्डर कार्यस्थान के साथ साझा है, इसलिए फ़ाइलें भी साझा होंगी।',
   fuDlgStarting: 'तैयार हो रहा है…',

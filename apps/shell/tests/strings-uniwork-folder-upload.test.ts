@@ -81,8 +81,6 @@ describe('folder-upload strings (uniwork-home shard)', () => {
     const sameAsEn: Record<string, string[] | undefined> = {
       fuDlgRoot: ['id', 'ms', 'pl'],
       fuDlgSummaryOne: ['id', 'it'],
-      // UNI-2075: English until the translation pass lands; drop this line with it
-      fuDlgShareHintWorkspace: [...OTHER_LOCALES],
     }
     for (const lang of OTHER_LOCALES) {
       const same = fuKeys.filter((k) => table(lang)[k] === en[k])

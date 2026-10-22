@@ -166,7 +166,7 @@ export const it = {
   fuDlgShare: 'Condividi con lo spazio di lavoro',
   fuDlgShareHintFolder: 'Vale per ogni file di questo caricamento. Le cartelle restano private.',
   fuDlgShareHintWorkspace:
-    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+    'Vale per ogni file di questo caricamento. Le nuove cartelle sono visibili a tutto il workspace.',
   fuDlgShareHintFiles: 'Vale per ogni file di questo caricamento.',
   fuDlgShareInherited:
     'La cartella di destinazione è condivisa con lo spazio di lavoro, quindi lo sono anche i file.',

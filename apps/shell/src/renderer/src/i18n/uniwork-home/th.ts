@@ -166,7 +166,7 @@ export const th = {
   fuDlgShare: 'แชร์กับเวิร์กสเปซ',
   fuDlgShareHintFolder: 'ใช้กับทุกไฟล์ในการอัปโหลดครั้งนี้ โฟลเดอร์จะยังเป็นส่วนตัว',
   fuDlgShareHintWorkspace:
-    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+    'ใช้กับทุกไฟล์ในการอัปโหลดครั้งนี้ โฟลเดอร์ใหม่จะมองเห็นได้ทั่วทั้ง workspace',
   fuDlgShareHintFiles: 'ใช้กับทุกไฟล์ในการอัปโหลดครั้งนี้',
   fuDlgShareInherited: 'โฟลเดอร์ปลายทางแชร์กับเวิร์กสเปซอยู่แล้ว ไฟล์จึงถูกแชร์ด้วย',
   fuDlgStarting: 'กำลังเตรียม…',

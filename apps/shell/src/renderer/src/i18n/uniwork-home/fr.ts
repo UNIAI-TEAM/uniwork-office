@@ -171,7 +171,7 @@ export const fr = {
   fuDlgShareHintFolder:
     'S’applique à chaque fichier de ce téléversement. Les dossiers restent privés.',
   fuDlgShareHintWorkspace:
-    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+    'S’applique à chaque fichier de ce téléversement. Les nouveaux dossiers sont visibles par tout l’espace de travail.',
   fuDlgShareHintFiles: 'S’applique à chaque fichier de ce téléversement.',
   fuDlgShareInherited:
     'Le dossier de destination est partagé avec l’espace de travail, les fichiers le sont donc aussi.',

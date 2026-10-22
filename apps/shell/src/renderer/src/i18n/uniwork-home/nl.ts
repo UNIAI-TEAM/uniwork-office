@@ -169,7 +169,7 @@ export const nl = {
   fuDlgShare: 'Delen met werkruimte',
   fuDlgShareHintFolder: 'Geldt voor elk bestand in deze upload. De mappen blijven privé.',
   fuDlgShareHintWorkspace:
-    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+    'Geldt voor elk bestand in deze upload. De nieuwe mappen zijn zichtbaar voor de hele werkruimte.',
   fuDlgShareHintFiles: 'Geldt voor elk bestand in deze upload.',
   fuDlgShareInherited: 'De doelmap is gedeeld met de werkruimte, dus de bestanden ook.',
   fuDlgStarting: 'Voorbereiden…',

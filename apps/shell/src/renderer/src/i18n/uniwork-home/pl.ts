@@ -170,7 +170,7 @@ export const pl = {
   fuDlgShare: 'Udostępnij obszarowi roboczemu',
   fuDlgShareHintFolder: 'Dotyczy każdego pliku w tym przesłaniu. Foldery pozostają prywatne.',
   fuDlgShareHintWorkspace:
-    'Applies to every file in this upload. The new folders are visible to the whole workspace.',
+    'Dotyczy każdego pliku w tym przesłaniu. Nowe foldery są widoczne dla całej przestrzeni roboczej.',
   fuDlgShareHintFiles: 'Dotyczy każdego pliku w tym przesłaniu.',
   fuDlgShareInherited: 'Folder docelowy jest udostępniony obszarowi roboczemu, więc pliki również.',
   fuDlgStarting: 'Przygotowywanie…',
