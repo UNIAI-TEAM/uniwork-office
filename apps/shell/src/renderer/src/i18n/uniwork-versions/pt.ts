@@ -1,0 +1,59 @@
+import type { zh } from './zh'
+
+export const pt = {
+  vhsMenuEntry: 'Histórico de versões',
+  vhsTitle: 'Histórico de versões',
+  vhsDescription:
+    'Os pontos de controle de versão guardados no servidor. Restaurar grava uma nova versão; o histórico nunca é apagado.',
+  vhsLoading: 'Carregando histórico…',
+  vhsError: 'Não foi possível carregar o histórico de versões.',
+  vhsRetry: 'Tentar novamente',
+  vhsEmpty:
+    'Ainda não há versões. Crie o primeiro ponto de controle a partir da cópia de trabalho.',
+  vhsLoadMore: 'Carregar mais',
+  vhsRowVersion: 'Versão {no}',
+  vhsAuthorSystem: 'Sistema',
+  vhsAuthorFormer: 'Ex-membro',
+  vhsAuthorAgent: 'Agent',
+  vhsCurrentBadge: 'Atual',
+  vhsView: 'Ver conteúdo',
+  vhsPreviewTitle: 'Conteúdo da versão {no}',
+  vhsPreviewError: 'Não foi possível carregar o conteúdo desta versão.',
+  vhsPreviewEmpty: 'Esta versão não tem conteúdo.',
+  vhsOpenUnsupported: 'Esta versão não pode ser aberta no aplicativo. Baixe-a em vez disso.',
+  vhsDownload: 'Baixar esta versão',
+  vhsDownloadVersion: 'Baixar a versão {no}',
+  vhsDownloadFailed: 'Não foi possível baixar o arquivo',
+  vhsNameLabel: 'Nome do ponto de controle',
+  vhsNamePlaceholder: 'ex.: Antes das alterações da revisão',
+  vhsNameHint: 'O ponto de controle salva a cópia de trabalho; o nome é opcional.',
+  vhsNameSubmit: 'Criar ponto de controle',
+  vhsNameSubmitting: 'Criando…',
+  vhsNameDone: 'Versão {no} criada',
+  vhsNameFailed: 'Não foi possível criar o ponto de controle. O que você digitou foi mantido.',
+  vhsNameUnchanged:
+    'Nada mudou desde a última versão, então nenhum novo ponto de controle foi criado.',
+  vhsRestore: 'Restaurar a versão {no}',
+  vhsRestoreConfirmTitle: 'Restaurar a versão {no}?',
+  vhsRestoreConfirmDescription:
+    'A cópia de trabalho assume o conteúdo desta versão e uma nova versão de restauração é adicionada. O histórico permanece.',
+  vhsRestoreConfirmSubmit: 'Restaurar',
+  vhsRestoreSubmitting: 'Restaurando…',
+  vhsRestoreFailed: 'Não foi possível restaurar. A cópia de trabalho não foi alterada.',
+  vhsRestoreConflict:
+    'A cópia de trabalho acabou de mudar. Abra o histórico novamente e tente de novo.',
+  vhsManageOnly: 'Você precisa de acesso de edição para restaurar uma versão.',
+  vhsShelvedBlocked: 'Este documento está arquivado e é somente leitura.',
+  vhsLockedByOther:
+    'Outra pessoa está editando este documento. Aguarde até que ela termine ou assuma a edição e tente novamente.',
+  vhsLockedByMe:
+    'Você está editando este documento em outra janela. Salve ou feche lá e tente novamente.',
+  vhsReasonUpload: 'enviada',
+  vhsReasonManual: 'ponto de controle manual',
+  vhsReasonAuto: 'automática',
+  vhsReasonRestore: 'restauração',
+  vhsReasonAgent: 'agent',
+  vhsReasonUnknown: 'outra',
+  vhsClose: 'Fechar',
+  vhsCancel: 'Cancelar',
+} satisfies Record<keyof typeof zh, string>

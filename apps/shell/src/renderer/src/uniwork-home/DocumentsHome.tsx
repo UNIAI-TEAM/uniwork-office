@@ -93,6 +93,9 @@ import { publishUniworkNotice } from '../uniwork-notice-bus'
 import { announce } from '../uniwork-live'
 import { DOC_SHARE_CHANGED_EVENT } from '../uniwork-folders/first-save-share'
 import { BulkShareDialog, type BulkShareDoc } from '../uniwork-share/BulkShareDialog'
+import { AccessLogSheet } from '../uniwork-doc-history/AccessLogSheet'
+import { getDocHistoryBridge } from '../uniwork-doc-history/bridge'
+import { VersionHistorySheet } from '../uniwork-doc-history/VersionHistorySheet'
 import { ShareDialog } from '../uniwork-share/ShareDialog'
 import {
   rowShareTarget,
@@ -1620,6 +1623,11 @@ export function DocumentsHome({
     setShare({ row: rowShareTarget(doc, organizationName) })
   const [bulkShareDocs, setBulkShareDocs] = useState<BulkShareDoc[] | null>(null)
   const shareAvailable = shareBridgeAvailable()
+  // UNI-2077: the Access log sheet of a row; no entry when this main has no doc history bridge
+  const [logsRow, setLogsRow] = useState<DocumentsHomeDoc | null>(null)
+  const docHistoryAvailable = getDocHistoryBridge() !== null
+  // UNI-2077: the Version history sheet of a row (same bridge, same availability)
+  const [versionsRow, setVersionsRow] = useState<DocumentsHomeDoc | null>(null)
   // UNI-2068: Tải xuống plans one file or one zip in main; the bar and the result live in the zip store
   const zipBusy = useZipDownloadBusy()
   const zipAvailable = zipDownloadBridge() !== null
@@ -2031,6 +2039,8 @@ export function DocumentsHome({
           }),
         // no entry when this shell has no Share bridge (a stale preload)
         ...(shareAvailable ? { share: () => openRowShare(doc) } : {}),
+        ...(docHistoryAvailable ? { logs: () => setLogsRow(doc) } : {}),
+        ...(docHistoryAvailable ? { versions: () => setVersionsRow(doc) } : {}),
         'copy-link': () => void handleCopyLink(doc),
         rename: () => setDocRename({ doc, error: null, busy: false }),
         move: () =>
@@ -3015,6 +3025,17 @@ export function DocumentsHome({
           initialSection={share.section}
           workspaces={workspaces}
           onClose={() => setShare(null)}
+          onChanged={() => setListTick((n) => n + 1)}
+        />
+      )}
+
+      {logsRow && <AccessLogSheet open row={logsRow} onClose={() => setLogsRow(null)} />}
+
+      {versionsRow && (
+        <VersionHistorySheet
+          open
+          row={versionsRow}
+          onClose={() => setVersionsRow(null)}
           onChanged={() => setListTick((n) => n + 1)}
         />
       )}
