@@ -7270,7 +7270,8 @@ html[dir='rtl'] .quick-title-row {
   opacity: 0.7;
 }
 
-.uw-act-error {
+/* scoped under the dialog (0,2,0): .modal p (0,1,1) would otherwise zero the margin and enlarge the type (UNI-2080 FU-2066-1) */
+.uw-act .uw-act-error {
   min-height: 0;
   margin: 4px 0 0;
   color: var(--danger-text);

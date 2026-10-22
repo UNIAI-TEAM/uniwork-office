@@ -24,6 +24,8 @@ function rule(css: string, selector: string): string {
 describe('folder dialog paragraphs beat .modal p', () => {
   const cases: Array<[string, string, string, RegExp]> = [
     ['home.css', '.uw-act .uw-act-note', '.uw-act-note', /margin:\s*8px 0 0/],
+    // UNI-2080 FU-2066-1: the field/dialog error paragraph, shared with the Share dialogs
+    ['home.css', '.uw-act .uw-act-error', '.uw-act-error', /margin:\s*4px 0 0/],
     ['uniwork-folders/first-save-name.css', '.uw-act .ufs-hint', '.ufs-hint', /margin:\s*8px 0 0/],
     ['uniwork-folders/save-dialog.css', '.uw-act .uws-hint', '.uws-hint', /margin:\s*4px 0 8px/],
     [
