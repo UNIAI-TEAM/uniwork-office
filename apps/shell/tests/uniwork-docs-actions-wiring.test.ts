@@ -613,7 +613,7 @@ describe('the SAVE-01 first-save IPC (S01-R1-7)', () => {
     try {
       const sharedByMe = (await handlers.get(UNIWORK_DOC_CHANNELS.listSharedByMe)!(null, {
         workspaceId: 'ws_1',
-        format: 'docx',
+        types: ['docx'],
       })) as { ok: boolean; value?: { documents: Array<{ id: string; updatedByName?: string }> } }
       expect(sharedByMe.ok).toBe(true)
       expect(sharedByMe.value?.documents[0]).toMatchObject({
@@ -630,9 +630,15 @@ describe('the SAVE-01 first-save IPC (S01-R1-7)', () => {
         updatedByName: 'Alice',
       })
 
-      expect(seen.some((u) => u.includes('shared_by_me=true') && u.includes('format=docx'))).toBe(
-        true,
-      )
+      expect(
+        seen.some((u) => {
+          const url = new URL(u)
+          return (
+            url.searchParams.get('shared_by_me') === 'true' &&
+            url.searchParams.getAll('type').join() === 'docx'
+          )
+        }),
+      ).toBe(true)
       expect(seen.some((u) => u.includes('archived=1'))).toBe(true)
     } finally {
       vi.unstubAllGlobals()
@@ -643,7 +649,7 @@ describe('the SAVE-01 first-save IPC (S01-R1-7)', () => {
   // future edit that drops `listFiltersOf` from one of these methods leaves the
   // direct-client URL tests passing, so this asserts the OUTGOING request the
   // fake HTTP layer receives for each list method through the IPC path.
-  it('forwards format, updated_by and updated_from through the service for listChildren, listDocuments and listTrash (DH1-BE-3)', async () => {
+  it('forwards types, updated_by and updated_from through the service for listChildren, listDocuments and listTrash (DH1-BE-3)', async () => {
     const { handlers } = await setup()
     const seen: string[] = []
     vi.stubGlobal(
@@ -664,7 +670,7 @@ describe('the SAVE-01 first-save IPC (S01-R1-7)', () => {
       }),
     )
     const filters = {
-      format: 'docx',
+      types: ['docx'],
       updatedBy: 'u_9',
       updatedFrom: '2026-10-01T00:00:00Z',
     }
@@ -694,19 +700,19 @@ describe('the SAVE-01 first-save IPC (S01-R1-7)', () => {
       }
       // listChildren: the folder route, filters plus the empty-root parent_id
       const childParams = queryOf((u) => u.searchParams.get('parent_id') === '')
-      expect(childParams.get('format')).toBe('docx')
+      expect(childParams.getAll('type')).toEqual(['docx'])
       expect(childParams.get('updated_by')).toBe('u_9')
       expect(childParams.get('updated_from')).toBe('2026-10-01T00:00:00Z')
       // listDocuments: updater/date force the flat workspace list, filters included
       const docParams = queryOf(
         (u) => u.pathname === '/api/v1/workspaces/ws_1/documents' && u.searchParams.has('kind'),
       )
-      expect(docParams.get('format')).toBe('docx')
+      expect(docParams.getAll('type')).toEqual(['docx'])
       expect(docParams.get('updated_by')).toBe('u_9')
       expect(docParams.get('updated_from')).toBe('2026-10-01T00:00:00Z')
       // listTrash: the archived route, filters included
       const trashParams = queryOf((u) => u.searchParams.get('archived') === '1')
-      expect(trashParams.get('format')).toBe('docx')
+      expect(trashParams.getAll('type')).toEqual(['docx'])
       expect(trashParams.get('updated_by')).toBe('u_9')
       expect(trashParams.get('updated_from')).toBe('2026-10-01T00:00:00Z')
     } finally {
@@ -749,7 +755,7 @@ describe('the document sources IPC (UNI-1961)', () => {
     try {
       const page = (await handlers.get(UNIWORK_DOC_CHANNELS.listSources)!(null, {
         workspaceId: 'ws_1',
-        type: 'docx',
+        types: ['docx'],
         cursor: 'c_1',
       })) as { ok: boolean; value?: { items: Array<{ id: string }>; nextCursor: string | null } }
       expect(page.ok).toBe(true)
