@@ -106,6 +106,7 @@ export function UniworkFolderTree({
   onOpen,
   blockOf,
   menuFor,
+  onMenuIntent,
   rename,
   onRenameSave,
   onRenameCancel,
@@ -125,6 +126,11 @@ export function UniworkFolderTree({
   onOpen: (id: string | null) => void
   blockOf?: (id: string | null) => MoveBlock
   menuFor?: (row: TreeRow) => FolderMenuItem[]
+  /**
+   * a row's menu may be needed: it opened, or the row took focus (F2 renames from a focused
+   * row). UNI-2080: the host reads the level its entries depend on.
+   */
+  onMenuIntent?: (row: TreeRow) => void
   rename?: TreeRename | null
   onRenameSave?: (id: string, value: string) => void
   onRenameCancel?: (id: string) => void
@@ -177,6 +183,11 @@ export function UniworkFolderTree({
       ?.focus()
   }, [tabKey])
 
+  const openMenu = (row: TreeRow) => {
+    setMenuKey(row.key)
+    onMenuIntent?.(row)
+  }
+
   const toggle = (key: string, open: boolean) => {
     const next = new Set(expanded)
     if (open) next.add(key)
@@ -200,7 +211,7 @@ export function UniworkFolderTree({
     else if ('open' in result) {
       if (!blockOf?.(row.id)) onOpen(row.id)
     } else if ('menu' in result) {
-      if (menuFor && menuFor(row).length > 0) setMenuKey(row.key)
+      if (menuFor && menuFor(row).length > 0) openMenu(row)
     } else if ('rename' in result) {
       menuFor?.(row)
         .find((item) => item.id === 'rename')
@@ -242,7 +253,9 @@ export function UniworkFolderTree({
             style={{ paddingInlineStart: `${4 + (row.level - 1) * 14}px` }}
             onKeyDown={(e) => onKeyDown(e, row)}
             onFocus={(e) => {
-              if (e.target === e.currentTarget) setFocusKey(row.key)
+              if (e.target !== e.currentTarget) return
+              setFocusKey(row.key)
+              onMenuIntent?.(row)
             }}
             onClick={() => {
               setFocusKey(row.key)
@@ -252,7 +265,7 @@ export function UniworkFolderTree({
               if (items.length === 0) return
               e.preventDefault()
               setFocusKey(row.key)
-              setMenuKey(row.key)
+              openMenu(row)
             }}
           >
             <span
@@ -332,7 +345,7 @@ export function UniworkFolderTree({
                 items={items}
                 dataFor={row.key}
                 open={menuKey === row.key}
-                onOpenChange={(open) => setMenuKey(open ? row.key : null)}
+                onOpenChange={(open) => (open ? openMenu(row) : setMenuKey(null))}
               />
             )}
           </li>

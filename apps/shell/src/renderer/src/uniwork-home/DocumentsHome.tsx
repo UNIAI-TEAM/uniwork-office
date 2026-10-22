@@ -65,11 +65,13 @@ import {
   myFolderFirst,
   myFolderIdOf,
   shortPath,
+  treeRowAccess,
   type FolderIndex,
   type PathPart,
   type TreeRow,
 } from '../uniwork-folders/uniwork-folders-model'
 import { useFolderActions } from '../uniwork-folders/use-folder-actions'
+import { useFolderLevels } from '../uniwork-folders/use-folder-levels'
 import { canCreateInsideFolder, type WorkspaceFolderCandidate } from '../uniwork-folders/ws-folder'
 import {
   cancelUploadDocument,
@@ -1775,20 +1777,34 @@ export function DocumentsHome({
     })
   }
 
+  // UNI-2080: a tree node has no level; the folder's menu reads it when it opens (as the web does)
+  const folderLevels = useFolderLevels(workspaceId)
   const treeMenuFor = (row: TreeRow): FolderMenuItem[] => {
+    const id = row.id
+    // the dialog renders inside this pane, which is hidden while My AI / Workbench owns the view
+    const newFolder: FolderMenuItem = {
+      id: 'new',
+      label: id ? t('ufNewSubfolder') : t('ufNewFolder'),
+      onSelect: () => {
+        onSidebarNavigate?.()
+        folderActions.openCreate(id, id !== null)
+      },
+    }
+    if (id === null) return [newFolder]
+    const access = treeRowAccess(row, folderLevels.levelOf(id), index, myRole)
+    // Mở leads the menu: a viewer's folder still has this read action
     const items: FolderMenuItem[] = [
       {
-        id: 'new',
-        label: row.id ? t('ufNewSubfolder') : t('ufNewFolder'),
+        id: 'open',
+        label: t('dlActOpen'),
         onSelect: () => {
-          // the dialog renders inside this pane, which is hidden while My AI / Workbench owns the view
           onSidebarNavigate?.()
-          folderActions.openCreate(row.id, row.id !== null)
+          openFolderInWorkspace(id)
         },
       },
     ]
-    if (!row.id || !folderEditActionsOffered(row)) return items
-    const id = row.id
+    if (access.create) items.push(newFolder)
+    if (!access.edit) return items
     const parentId = index.get(id)?.parentId ?? null
     items.push(
       { id: 'rename', label: t('ufRename'), onSelect: () => folderActions.startTreeRename(id) },
@@ -2290,6 +2306,10 @@ export function DocumentsHome({
                 openFolderInWorkspace(id)
               }}
               menuFor={treeMenuFor}
+              onMenuIntent={(row) => {
+                // My Folder is the caller's own: its menu needs no level
+                if (row.id && !isMyFolder(row)) folderLevels.load(row.id)
+              }}
               rename={folderActions.treeRename}
               onRenameSave={(id, value) =>
                 folderActions.saveTreeRename(id, value, index.get(id)?.title ?? '')

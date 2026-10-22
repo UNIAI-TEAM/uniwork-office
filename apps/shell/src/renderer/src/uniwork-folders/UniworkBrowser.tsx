@@ -18,15 +18,18 @@ import {
   contentsView,
   folderEditActionsOffered,
   isFolderEntry,
+  isMyFolder,
   labelMyFolderPath,
   myFolderIdOf,
   readSortMode,
+  treeRowAccess,
   writeSortMode,
   type PathPart,
   type SortMode,
   type TreeRow,
 } from './uniwork-folders-model'
 import { useFolderActions } from './use-folder-actions'
+import { useFolderLevels } from './use-folder-levels'
 import { canCreateInsideFolder } from './ws-folder'
 import { useFolderBrowser, type SearchKind } from './use-folder-browser'
 import './uniwork-folders.css'
@@ -146,17 +149,28 @@ export function UniworkBrowser({
     browser.openFolder(id)
   }
 
+  // UNI-2080: a tree node has no level; the folder's menu reads it when it opens (as the web does)
+  const folderLevels = useFolderLevels(workspaceId)
   const treeMenu = (row: TreeRow): FolderMenuItem[] => {
-    const items: FolderMenuItem[] = [
-      {
-        id: 'new',
-        label: row.id ? t('ufNewSubfolder') : t('ufNewFolder'),
-        onSelect: () => actions.openCreate(row.id, row.id !== null),
-      },
-    ]
-    // My Folder: still a place to create in, never renamed or moved (Q2)
-    if (!row.id || !folderEditActionsOffered(row)) return items
     const id = row.id
+    if (id === null) {
+      return [
+        { id: 'new', label: t('ufNewFolder'), onSelect: () => actions.openCreate(null, false) },
+      ]
+    }
+    const access = treeRowAccess(row, folderLevels.levelOf(id), browser.index, myRole)
+    // Mở leads the menu: a viewer's folder still has this read action
+    const items: FolderMenuItem[] = [
+      { id: 'open', label: t('dlActOpen'), onSelect: () => openFolder(id) },
+    ]
+    if (access.create) {
+      items.push({
+        id: 'new',
+        label: t('ufNewSubfolder'),
+        onSelect: () => actions.openCreate(id, true),
+      })
+    }
+    if (!access.edit) return items
     const parentId = browser.index.get(id)?.parentId ?? null
     items.push(
       { id: 'rename', label: t('ufRename'), onSelect: () => actions.startTreeRename(id) },
@@ -255,6 +269,10 @@ export function UniworkBrowser({
         selectedKey={folderSelected ? (browser.folderId ?? ROOT_KEY) : '\u0000none'}
         onOpen={openFolder}
         menuFor={treeMenu}
+        onMenuIntent={(row) => {
+          // My Folder is the caller's own: its menu needs no level
+          if (row.id && !isMyFolder(row)) folderLevels.load(row.id)
+        }}
         rename={actions.treeRename}
         onRenameSave={(id, value) =>
           actions.saveTreeRename(id, value, browser.index.get(id)?.title ?? '')
