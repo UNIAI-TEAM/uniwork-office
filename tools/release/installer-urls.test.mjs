@@ -18,6 +18,8 @@ const BASE = 'https://github.com/OWNER/REPO/releases/download/v0.11.0-dev.3'
 const WIN = 'UniWork-Office_0.11.0-dev.3_unsigned_win32_x64-setup.exe'
 const MAC_ARM = 'UniWork-Office_0.11.0-dev.3_unsigned_darwin_arm64.dmg'
 const MAC_X64 = 'UniWork-Office_0.11.0-dev.3_unsigned_darwin_x64.dmg'
+const SIGNED_MAC_ARM = 'UniWork-Office_0.11.0-dev.3_darwin_arm64.dmg'
+const SIGNED_MAC_X64 = 'UniWork-Office_0.11.0-dev.3_darwin_x64.dmg'
 
 describe('installerPlatformOf', () => {
   it('maps the release artifact names to the server platform keys', () => {
@@ -41,11 +43,20 @@ describe('installerPlatformOf', () => {
     }
   })
 
-  it('refuses an installer without the unsigned label', () => {
-    assert.throws(
-      () => installerPlatformOf('UniWork-Office_0.11.0-dev.3_win32_x64-setup.exe', 'dev'),
-      /no "unsigned" label/,
-    )
+  it('refuses a Windows or Linux installer without the unsigned label', () => {
+    for (const name of [
+      'UniWork-Office_0.11.0-dev.3_win32_x64-setup.exe',
+      'UniWork-Office_0.11.0-dev.3_linux_x64.deb',
+      'UniWork-Office_0.11.0-dev.3_linux_x64.AppImage',
+    ]) {
+      assert.throws(() => installerPlatformOf(name, 'dev'), /no "unsigned" label/, name)
+    }
+  })
+
+  it('accepts a signed mac dmg, which carries no label', () => {
+    assert.equal(installerPlatformOf(SIGNED_MAC_ARM, 'dev'), 'darwin-arm64')
+    assert.equal(installerPlatformOf(SIGNED_MAC_X64, 'dev'), 'darwin-x64')
+    assert.throws(() => installerPlatformOf(SIGNED_MAC_ARM, 'beta'), /not a beta build/)
   })
 
   it('refuses an installer of another channel', () => {
@@ -94,6 +105,23 @@ describe('buildInstallerUrls', () => {
     ])
   })
 
+  it('lists signed mac dmgs beside unsigned Windows and Linux installers', () => {
+    const urls = buildInstallerUrls({
+      channel: 'dev',
+      baseUrl: BASE,
+      files: [WIN, SIGNED_MAC_ARM, SIGNED_MAC_X64],
+    })
+    assert.equal(urls['darwin-arm64'], `${BASE}/${SIGNED_MAC_ARM}`)
+    assert.equal(urls['darwin-x64'], `${BASE}/${SIGNED_MAC_X64}`)
+  })
+
+  it('refuses a signed and an unsigned mac dmg in one release', () => {
+    assert.throws(
+      () => buildInstallerUrls({ channel: 'dev', baseUrl: BASE, files: [SIGNED_MAC_ARM, MAC_X64] }),
+      /signed and unsigned mac installers/,
+    )
+  })
+
   it('refuses two installers for one platform', () => {
     assert.throws(
       () =>
@@ -121,7 +149,7 @@ describe('buildInstallerUrls', () => {
   it('refuses an empty result', () => {
     assert.throws(
       () => buildInstallerUrls({ channel: 'dev', baseUrl: BASE, files: ['SHA256SUMS-x.txt'] }),
-      /no unsigned dev installer/,
+      /no dev installer/,
     )
   })
 
