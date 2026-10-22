@@ -102,6 +102,27 @@ describe('preload: Ask UNI v2 REST bridge', () => {
     expect(invoked()[0].args).toEqual([{ conversationId: 'c1', messageId: 'm1', rating: 'up' }])
   })
 
+  it('keeps every notice the server stores on a message and drops an unknown one', async () => {
+    const m = (id: string, notice: string) => ({
+      id,
+      role: 'assistant',
+      content: 'half an answ',
+      citations: [],
+      notice,
+      createdAt: 'a',
+    })
+    const notices = ['stopped', 'interrupted', 'agent_failed', 'refused']
+    const { bridge } = await loadPreload({
+      ok: true,
+      messages: [...notices.map((n) => m(`m-${n}`, n)), m('m-odd', 'weird')],
+    })
+    const res = await bridge.askUniMessages({ conversationId: 'c1' })
+    expect(res.ok && res.messages.map((x) => [x.id, x.notice])).toEqual([
+      ...notices.map((n) => [`m-${n}`, n]),
+      ['m-odd', undefined],
+    ])
+  })
+
   it('validates each reply shape', async () => {
     const conv = { id: 'c1', title: 'T', createdAt: 'a', updatedAt: 'b' }
     const list = await loadPreload({ ok: true, conversations: [conv, { id: 5 }] })

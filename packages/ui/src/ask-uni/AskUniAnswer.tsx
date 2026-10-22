@@ -20,7 +20,12 @@ const NOTICE_KEYS: Record<string, AskUniStringKey> = {
   no_sources: 'askUniNoticeNoSources',
   empty_answer: 'askUniV2NoticeEmptyAnswer',
   stopped: 'askUniV2NoticeStopped',
+  interrupted: 'askUniV2NoticeInterrupted',
+  agent_failed: 'askUniV2NoticeAgentFailed',
+  refused: 'askUniV2ErrRefused',
 }
+/** the run was cut short but what it wrote is real: the text stays and the note follows it */
+const PARTIAL: ReadonlySet<string> = new Set(['stopped', 'interrupted'])
 
 /**
  * The model-written answer as markdown: raw HTML inert, links never clickable, and `[Sn]` markers
@@ -125,10 +130,10 @@ export function AskUniTurn({
     : undefined
   const hasText = message.content.trim() !== ''
   const notice = message.notice
-  // a partial answer that was stopped keeps its text and gets the note; any other notice stands in
-  // for an empty answer, and a finished answer with neither text nor notice says UNI could not answer
+  // a partial answer (stopped or interrupted) keeps its text and gets the note; any other notice
+  // stands in for an empty answer, and a finished answer with neither text nor notice says UNI could not answer
   let noticeKey: AskUniStringKey | null = null
-  if (notice && (!hasText || notice === 'stopped')) {
+  if (notice && (!hasText || PARTIAL.has(notice))) {
     noticeKey = NOTICE_KEYS[notice] ?? 'askUniNoticeUnavailable'
   } else if (!notice && !hasText && !streaming) {
     noticeKey = 'askUniNoticeUnavailable'

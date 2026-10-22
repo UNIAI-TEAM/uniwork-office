@@ -13,8 +13,8 @@ import { Fragment, type ReactNode } from 'react'
 
 /**
  * A host-owned pattern in the plain text (e.g. a `[S1]` citation marker). `render` returns the node
- * for a match, or the matched text itself to leave it alone. Only plain-text runs are scanned: code
- * spans, bold/italic runs and links are never touched.
+ * for a match, or the matched text itself to leave it alone. Plain-text runs are scanned, and so is
+ * the text inside a bold or italic run; code spans and links are never touched.
  */
 export interface MarkdownInlineToken {
   pattern: RegExp
@@ -41,29 +41,33 @@ function renderInline(text: string, nav?: MarkdownNav, token?: MarkdownInlineTok
   let last = 0
   let key = 0
   // a plain run is split on the host's pattern (always scanned globally, whatever flags it came with)
-  const pushPlain = (run: string): void => {
-    if (!run) return
-    if (!token) {
-      out.push(run)
-      return
-    }
+  const plainRuns = (run: string): ReactNode[] => {
+    if (!run) return []
+    if (!token) return [run]
+    const parts: ReactNode[] = []
     const re = new RegExp(token.pattern.source, token.pattern.flags.replace('g', '') + 'g')
     let from = 0
     for (const m of run.matchAll(re)) {
       const at = m.index ?? 0
-      if (at > from) out.push(run.slice(from, at))
-      out.push(token.render(m, key++))
+      if (at > from) parts.push(run.slice(from, at))
+      parts.push(token.render(m, key++))
       from = at + m[0].length
     }
-    if (from < run.length) out.push(run.slice(from))
+    if (from < run.length) parts.push(run.slice(from))
+    return parts
+  }
+  const pushPlain = (run: string): void => {
+    out.push(...plainRuns(run))
   }
   for (const m of text.matchAll(INLINE_RE)) {
     const i = m.index ?? 0
     if (i > last) pushPlain(text.slice(last, i))
     const tok = m[0] ?? ''
     if (tok.startsWith('`')) out.push(<code key={key++}>{tok.slice(1, -1)}</code>)
-    else if (tok.startsWith('**')) out.push(<strong key={key++}>{tok.slice(2, -2)}</strong>)
-    else if (tok.startsWith('[')) {
+    else if (tok.startsWith('**')) {
+      const inner = tok.slice(2, -2)
+      out.push(<strong key={key++}>{token ? plainRuns(inner) : inner}</strong>)
+    } else if (tok.startsWith('[')) {
       const link = LINK_RE.exec(tok)
       const href = link?.[2] ?? ''
       if (link && nav && href.startsWith(nav.scheme)) {
@@ -83,7 +87,10 @@ function renderInline(text: string, nav?: MarkdownNav, token?: MarkdownInlineTok
       } else {
         out.push(tok) // non-nav links keep today's literal rendering
       }
-    } else out.push(<em key={key++}>{tok.slice(1, -1)}</em>)
+    } else {
+      const inner = tok.slice(1, -1)
+      out.push(<em key={key++}>{token ? plainRuns(inner) : inner}</em>)
+    }
     last = i + tok.length
   }
   if (last < text.length) pushPlain(text.slice(last))

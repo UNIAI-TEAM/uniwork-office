@@ -13,7 +13,7 @@ import {
  */
 export function useAskUniDocFlags(
   bridge: Pick<AskUniDocBridge, 'askUniDocFlags'> | undefined,
-  refreshKey = 0,
+  refreshKey: number | string = 0,
 ): AskUniDocFlags | null {
   const [flags, setFlags] = useState<AskUniDocFlags | null>(null)
   useEffect(() => {

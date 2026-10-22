@@ -15,6 +15,8 @@ import './ask-uni.css'
 export const ASKUNI_MAX_QUESTION = 2000
 /** the counter only shows near the cap, so a short question stays uncluttered */
 export const ASKUNI_COUNTER_FROM = 1800
+/** a key press that lands on Stop this soon after a send is the tail of the Enter that sent */
+const STOP_GUARD_MS = 300
 
 export interface AskUniComposerBoxProps {
   /** the host owns the text (it also owns pickers, chips and what a send hands over) */
@@ -70,11 +72,13 @@ export function AskUniComposerBox(props: AskUniComposerBoxProps): ReactElement {
   const ownCaret = useRef<number | null>(null)
   const nextCaret = props.nextCaretRef ?? ownCaret
   const wasStreaming = useRef(streaming)
+  const stopFocusedAt = useRef(0)
 
   // the box is disabled while a turn streams: focus moves to Stop, and comes back when it ends unless
   // the reader has put it somewhere else meanwhile
   useEffect(() => {
     if (streaming && !wasStreaming.current) {
+      stopFocusedAt.current = Date.now()
       stopRef.current?.focus()
     } else if (!streaming && wasStreaming.current) {
       const active = document.activeElement
@@ -153,7 +157,12 @@ export function AskUniComposerBox(props: AskUniComposerBoxProps): ReactElement {
                 ref={stopRef}
                 type="button"
                 className={`${sendClassName} is-stop`}
-                onClick={onStop}
+                onClick={(e) => {
+                  // a key repeat or a second Enter right after the send must not stop the new turn
+                  // (a pointer click has detail >= 1 and is never held back)
+                  if (e.detail === 0 && Date.now() - stopFocusedAt.current < STOP_GUARD_MS) return
+                  onStop()
+                }}
                 title={t('askUniStop')}
                 aria-label={t('askUniStop')}
               >

@@ -317,6 +317,16 @@ describe('askUniStream: events', () => {
     expect(odd.terminal.type === 'done' && odd.terminal.message).not.toHaveProperty('notice')
   })
 
+  it.each(['interrupted', 'agent_failed', 'refused'])(
+    'keeps the %s notice the server ends a run with',
+    async (notice) => {
+      const r = await run(async () =>
+        sse([frame('done', { ...DONE, message: { ...DONE.message, notice } })]),
+      )
+      expect(r.terminal).toMatchObject({ type: 'done', message: { notice } })
+    },
+  )
+
   it('a done with a bad message id is dropped and the stream then ends as stream_ended', async () => {
     const { terminal } = await run(async () =>
       sse([frame('done', { ...DONE, message: { ...DONE.message, id: 'a b' } })]),

@@ -381,6 +381,12 @@ describe('Ask UNI v2 pickers', () => {
       expect(host.textContent).toContain(en.askUniV2LookupFailed)
     })
 
+    it('a rejected lookup call (refused sender) reads as a failed lookup', async () => {
+      lookup.mockRejectedValue(new Error('ipc_sender_refused'))
+      await openScope()
+      expect(host.textContent).toContain(en.askUniV2LookupFailed)
+    })
+
     it('keeps the groups that did answer when one kind failed', async () => {
       lookup.mockImplementation(async (req) =>
         req.kind === 'room' ? { ok: false, error: 'error' } : { ok: true, items: DATA[req.kind] },
@@ -526,6 +532,20 @@ describe('Ask UNI v2 pickers', () => {
       expect(options()).toHaveLength(0)
       expect(host.textContent).toContain(en.askUniV2LookupEmpty)
       expect(box().hasAttribute('aria-activedescendant')).toBe(false)
+    })
+
+    it('says the lookup failed, not "no results", when the server could not be reached', async () => {
+      lookup.mockResolvedValue({ ok: false, error: 'offline' })
+      await render(h(Harness, { query: '', onPick: vi.fn(), onDismiss: vi.fn() }))
+      expect(host.textContent).toContain(en.askUniV2LookupFailed)
+      expect(host.textContent).not.toContain(en.askUniV2LookupEmpty)
+    })
+
+    it('the textarea only claims an expanded popup while the listbox has options', async () => {
+      lookup.mockResolvedValue({ ok: true, items: [] })
+      await render(h(Harness, { query: '', onPick: vi.fn(), onDismiss: vi.fn() }))
+      expect(host.querySelector('[role="listbox"]')?.hasAttribute('hidden')).toBe(true)
+      expect(box().getAttribute('aria-expanded')).toBe('false')
     })
 
     it('labels the listbox and groups with a heading', async () => {

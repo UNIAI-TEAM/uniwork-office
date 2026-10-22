@@ -190,7 +190,10 @@ describe('AskUniEditorBody', () => {
       await mount()
       await ask('Slow one')
       expect(box()!.disabled).toBe(true)
-      await act(async () => buttonByLabel('Stop')!.click())
+      // a pointer click (detail 1): a bare .click() looks like the tail of the Enter that sent
+      await act(async () => {
+        buttonByLabel('Stop')!.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+      })
       expect(fake.cancel).toHaveBeenCalledWith('r1')
     })
 

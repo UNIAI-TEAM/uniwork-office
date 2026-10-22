@@ -14,7 +14,11 @@ vi.mock('../src/renderer/src/askuni-v2/AskUniPanel', async () => {
       createElement(
         'section',
         { 'data-testid': 'v2-panel', hidden: !props.visible },
-        createElement('textarea', { 'aria-label': 'composer' }),
+        createElement(
+          'footer',
+          { 'data-slot': 'askuni-composer' },
+          createElement('textarea', { 'aria-label': 'composer' }),
+        ),
       ),
   }
 })

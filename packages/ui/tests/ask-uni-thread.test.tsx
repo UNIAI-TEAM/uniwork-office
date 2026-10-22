@@ -156,6 +156,51 @@ describe('AskUniThread (adapter)', () => {
       expect(turns()).toHaveLength(4)
     })
 
+    it('marks the list busy while a stored conversation is loading', async () => {
+      let resolve: (r: AskUniMessagesResult) => void = () => undefined
+      fake.loadMessages.mockImplementationOnce(
+        () =>
+          new Promise<AskUniMessagesResult>((res) => {
+            resolve = res
+          }),
+      )
+      await mount()
+      expect(host.querySelector('.askuni-v2-turns')?.getAttribute('aria-busy')).toBe('true')
+      expect(turns()).toHaveLength(0)
+      await act(async () => resolve({ ok: true, messages: stored }))
+      await flush()
+      expect(host.querySelector('.askuni-v2-turns')?.getAttribute('aria-busy')).toBe('false')
+      expect(turns()).toHaveLength(4)
+    })
+
+    it('a first load that fails shows the error and a Retry that loads again', async () => {
+      fake.loadMessages.mockResolvedValueOnce({ ok: false, error: 'offline' })
+      await mount()
+      expect(host.textContent).toContain(en('askUniErrDefault'))
+      expect(host.querySelector('.askuni-v2-turns')?.getAttribute('aria-busy')).toBe('false')
+      const retry = [...host.querySelectorAll('button')].find(
+        (b) => b.textContent === en('askUniV2Retry'),
+      )
+      expect(retry).toBeDefined()
+      await act(async () => retry!.click())
+      await flush()
+      expect(fake.loadMessages).toHaveBeenCalledTimes(2)
+      expect(turns()).toHaveLength(4)
+      expect(host.textContent).not.toContain(en('askUniErrDefault'))
+    })
+
+    it('a rejected first load reads the same, and a failed reload after a good load shows no error', async () => {
+      fake.loadMessages.mockRejectedValueOnce(new Error('x'))
+      await mount()
+      expect(host.textContent).toContain(en('askUniErrDefault'))
+      await mount({ state: { reloadTick: 1 } })
+      expect(turns()).toHaveLength(4)
+      fake.loadMessages.mockResolvedValueOnce({ ok: false, error: 'offline' })
+      await mount({ state: { reloadTick: 2 } })
+      expect(turns()).toHaveLength(4)
+      expect(host.textContent).not.toContain(en('askUniErrDefault'))
+    })
+
     it('drops the answer of a load that finished after the conversation changed', async () => {
       let resolveOld: (r: AskUniMessagesResult) => void = () => undefined
       fake.loadMessages.mockImplementationOnce(

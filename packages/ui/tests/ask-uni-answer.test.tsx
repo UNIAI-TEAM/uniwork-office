@@ -251,6 +251,33 @@ describe('Ask UNI answer (adapter)', () => {
       expect(host.textContent).toContain(en('askUniV2NoticeStopped'))
     })
 
+    it('interrupted keeps the partial text and adds its own note (the run was cut by a server restart)', async () => {
+      await mount(turn({ content: 'Half an answ', citations: [], notice: 'interrupted' }))
+      expect(host.textContent).toContain('Half an answ')
+      const note = host.querySelector('.askuni-v2-notice')
+      expect(note?.textContent).toBe(en('askUniV2NoticeInterrupted'))
+      expect(note?.textContent).not.toBe(en('askUniV2NoticeStopped'))
+    })
+
+    it('agent_failed with no text says so in its own words, not the generic could-not-answer', async () => {
+      await mount(turn({ content: '', citations: [], notice: 'agent_failed' }))
+      expect(host.querySelector('.askuni-v2-notice')?.textContent).toBe(
+        en('askUniV2NoticeAgentFailed'),
+      )
+    })
+
+    it('refused with no text uses the refused wording of the error states', async () => {
+      await mount(turn({ content: '', citations: [], notice: 'refused' }))
+      expect(host.querySelector('.askuni-v2-notice')?.textContent).toBe(en('askUniV2ErrRefused'))
+    })
+
+    it('agent_failed and refused never replace text the answer already has', async () => {
+      await mount(turn({ content: 'Has text', citations: [], notice: 'agent_failed' }))
+      expect(host.querySelector('.askuni-v2-notice')).toBeNull()
+      await mount(turn({ content: 'Has text', citations: [], notice: 'refused' }))
+      expect(host.querySelector('.askuni-v2-notice')).toBeNull()
+    })
+
     it('shows the working state before the first text and none once there is text', async () => {
       await mount(turn({ id: 'live', content: '', citations: [] }), { streaming: true })
       expect(host.querySelector('.askuni-v2-working')).not.toBeNull()

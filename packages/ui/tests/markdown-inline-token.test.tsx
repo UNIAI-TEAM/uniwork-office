@@ -46,6 +46,21 @@ describe('Markdown inlineToken', () => {
     )
   })
 
+  it('turns a marker inside bold or italic into the host element too', () => {
+    expect(html('**Task A [S1]** done')).toBe(
+      '<div class="ai-md"><p><strong>Task A <b class="cite">1</b></strong> done</p></div>',
+    )
+    expect(html('*see [S1]* ok')).toBe(
+      '<div class="ai-md"><p><em>see <b class="cite">1</b></em> ok</p></div>',
+    )
+  })
+
+  it('does not look for markers inside bold or italic without a token', () => {
+    expect(html('**Task A [S1]**', false)).toBe(
+      '<div class="ai-md"><p><strong>Task A [S1]</strong></p></div>',
+    )
+  })
+
   it('never touches inline code or a fenced block', () => {
     expect(html('use `[S1]` now')).toBe('<div class="ai-md"><p>use <code>[S1]</code> now</p></div>')
     expect(html('```\n[S1]\n```')).toContain('<code>[S1]</code>')

@@ -1,6 +1,5 @@
 import {
   useAskUniStream as useSharedAskUniStream,
-  useStreamFocus,
   type AskStreamApi,
   type AskStreamState,
   type AskStreamStatus,
@@ -10,7 +9,6 @@ import {
 } from '@genoffice/ui'
 import { useShellAskUniAdapter } from './shell-adapter'
 
-export { useStreamFocus }
 export type { AskStreamApi, AskStreamState, AskStreamStatus, AskUniAskInput, AskUniStreamHandle }
 
 export interface UseAskUniStreamOptions extends Omit<SharedOptions, 'workspaceId'> {

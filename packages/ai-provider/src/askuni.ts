@@ -159,8 +159,22 @@ export type AskUniV2ErrorCode =
   /** an editor asked about a local file that is not a UniWork document (askuni-doc only) */
   | 'not_bound'
 
-/** `stopped`: the answer was cut by a Stop and stored as far as it got */
-export type AskUniV2Notice = AskUniNotice | 'stopped'
+/**
+ * `stopped`: the answer was cut by a Stop and stored as far as it got. `interrupted`: the server
+ * ended the run (a restart) and kept the partial text. `agent_failed` / `refused`: the run produced
+ * no usable answer.
+ */
+export type AskUniV2Notice = AskUniNotice | 'stopped' | 'interrupted' | 'agent_failed' | 'refused'
+
+/** every notice a v2 message may carry; main and the preload both validate against this one set */
+export const ASKUNI_V2_NOTICES: ReadonlySet<string> = new Set<AskUniV2Notice>([
+  'no_sources',
+  'empty_answer',
+  'stopped',
+  'interrupted',
+  'agent_failed',
+  'refused',
+])
 
 export interface AskUniMessage {
   id: string
@@ -309,11 +323,6 @@ const V2_CODES: ReadonlySet<string> = new Set<AskUniV2ErrorCode>([
   'stream_ended',
   'not_bound',
 ])
-const V2_NOTICES: ReadonlySet<string> = new Set<AskUniV2Notice>([
-  'no_sources',
-  'empty_answer',
-  'stopped',
-])
 const OBJECT_KINDS: ReadonlySet<string> = new Set<AskUniObjectKind>([
   ...ASKUNI_FOCUS_KINDS,
   ...ASKUNI_MENTION_KINDS,
@@ -347,7 +356,7 @@ export function asAskUniMessage(raw: unknown): AskUniMessage | null {
     citations: Array.isArray(raw.citations)
       ? raw.citations.map(asAskUniCitation).filter((c): c is AskUniCitation => c !== null)
       : [],
-    ...(isStr(raw.notice) && V2_NOTICES.has(raw.notice)
+    ...(isStr(raw.notice) && ASKUNI_V2_NOTICES.has(raw.notice)
       ? { notice: raw.notice as AskUniV2Notice }
       : {}),
     createdAt: raw.createdAt,

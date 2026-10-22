@@ -82,7 +82,7 @@ describe('Ask UNI v2 header and history', () => {
     })
     await flush()
   }
-  const trigger = () => host.querySelector('button[aria-haspopup="true"]') as HTMLButtonElement
+  const trigger = () => host.querySelector('button.askuni2-title-btn') as HTMLButtonElement
   const popover = () => host.querySelector('[data-slot="askuni-history"]') as HTMLElement | null
   const rows = () => [...host.querySelectorAll('[data-slot="askuni-history"] li')] as HTMLElement[]
   const byLabel = (root_: ParentNode, label: string) =>
@@ -209,6 +209,14 @@ describe('Ask UNI v2 header and history', () => {
       ])
     })
 
+    it('the title button declares a dialog and the popover is one (it is not a menu)', async () => {
+      await mount()
+      expect(trigger().getAttribute('aria-haspopup')).toBe('dialog')
+      await open()
+      expect(popover()?.getAttribute('role')).toBe('dialog')
+      expect(popover()?.getAttribute('aria-label')).toBe(en.askUniV2History)
+    })
+
     it('highlights the current conversation', async () => {
       await mount({ activeId: 'c2' })
       await open()
@@ -232,6 +240,17 @@ describe('Ask UNI v2 header and history', () => {
       await open()
       expect(popover()!.textContent).toContain(en.askUniV2HistoryEmpty)
       expect(rows()).toHaveLength(0)
+    })
+
+    it('a rejected list call (refused sender) is the same failed state, with the retry', async () => {
+      list.mockRejectedValueOnce(new Error('ipc_sender_refused'))
+      await mount()
+      await open()
+      expect(popover()!.textContent).toContain(en.askUniV2HistoryFailed)
+      const retry = popover()!.querySelector('[data-action="retry"]') as HTMLButtonElement
+      await act(async () => retry.click())
+      await flush()
+      expect(rows()).toHaveLength(3)
     })
 
     it('shows an error with a retry that loads again', async () => {
@@ -395,6 +414,19 @@ describe('Ask UNI v2 header and history', () => {
       await key(input, 'Enter', { isComposing: true })
       await key(input, 'Enter', { keyCode: 229 })
       expect(rename).not.toHaveBeenCalled()
+    })
+
+    it('a rejected rename call (refused sender) keeps editing and says so', async () => {
+      rename.mockRejectedValueOnce(new Error('ipc_sender_refused'))
+      await mount()
+      const input = await startRename()
+      await typeInto(input, 'Late tasks')
+      await key(input, 'Enter')
+      await flush()
+      expect(host.querySelector('[data-slot="askuni-history"] input')).not.toBeNull()
+      expect(popover()!.querySelector('[role="alert"]')?.textContent).toContain(
+        en.askUniV2RenameFailed,
+      )
     })
 
     it('keeps editing and says so when the server refuses', async () => {

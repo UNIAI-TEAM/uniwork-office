@@ -161,6 +161,8 @@ export function useAskUniShortcut(platform?: ShortcutPlatform): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!hasAskUniBridge() || !isAskUniShortcut(e, platform)) return
+      // a modal dialog (Settings, onboarding) owns the keys: switching Home behind it would surprise
+      if (document.querySelector('[aria-modal="true"]')) return
       e.preventDefault()
       // the tab strip keeps focus in the shell page: bring Home forward, then ask it to open
       void window.aiOfficeTabs?.activate('home')?.catch?.(() => undefined)

@@ -188,6 +188,45 @@ describe('AskUniComposerBox', () => {
       await mount({ streaming: false })
       expect(document.activeElement).toBe(box())
     })
+
+    it('leaves focus alone when the reader moved it somewhere else meanwhile', async () => {
+      const other = document.createElement('button')
+      document.body.appendChild(other)
+      await mount()
+      await mount({ streaming: true })
+      other.focus()
+      await mount({ streaming: false })
+      expect(document.activeElement).toBe(other)
+      other.remove()
+    })
+  })
+
+  describe('Enter right after a send', () => {
+    it('does not stop the new turn: a keyboard click on Stop within 300 ms is ignored', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        await mount({ initial: 'What is blocked?' })
+        await mount({ initial: 'What is blocked?', streaming: true })
+        expect(document.activeElement).toBe(stop())
+        // the second Enter of a double tap or a key repeat lands on the focused Stop button
+        await act(async () => stop()!.click())
+        expect(fn.onStop).not.toHaveBeenCalled()
+        vi.setSystemTime(Date.now() + 400)
+        await act(async () => stop()!.click())
+        expect(fn.onStop).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('a pointer click on Stop is never held back', async () => {
+      await mount({ initial: 'What is blocked?' })
+      await mount({ initial: 'What is blocked?', streaming: true })
+      await act(async () => {
+        stop()!.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+      })
+      expect(fn.onStop).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('wording and slots', () => {

@@ -4,7 +4,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   useAskUniStream,
-  useStreamFocus,
   type AskStreamApi,
   type UseAskUniStreamOptions,
 } from '../src/renderer/src/askuni-v2/use-ask-uni-stream'
@@ -479,57 +478,5 @@ describe('Ask UNI v2 stream hook', () => {
       await act(async () => api.retry())
       expect(askUniStream).not.toHaveBeenCalled()
     })
-  })
-})
-
-describe('Ask UNI v2 stream focus', () => {
-  let host: HTMLDivElement
-  let root: Root
-
-  function Focus(props: { streaming: boolean }) {
-    useStreamFocus(
-      props.streaming,
-      () => document.getElementById('stop'),
-      () => document.getElementById('composer'),
-    )
-    return h(
-      'div',
-      null,
-      h('textarea', { id: 'composer' }),
-      props.streaming ? h('button', { id: 'stop' }, 'Stop') : null,
-      h('button', { id: 'other' }, 'Other'),
-    )
-  }
-
-  async function render(streaming: boolean): Promise<void> {
-    await act(async () => {
-      root.render(h(Focus, { streaming }))
-    })
-  }
-
-  beforeEach(() => {
-    host = document.createElement('div')
-    document.body.appendChild(host)
-    root = createRoot(host)
-  })
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    host.remove()
-  })
-
-  it('moves focus to Stop while streaming and back to the composer after', async () => {
-    await render(false)
-    await render(true)
-    expect(document.activeElement?.id).toBe('stop')
-    await render(false)
-    expect(document.activeElement?.id).toBe('composer')
-  })
-
-  it('leaves focus alone when the user moved it somewhere else meanwhile', async () => {
-    await render(false)
-    await render(true)
-    document.getElementById('other')?.focus()
-    await render(false)
-    expect(document.activeElement?.id).toBe('other')
   })
 })

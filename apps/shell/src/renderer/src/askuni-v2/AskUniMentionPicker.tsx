@@ -206,7 +206,7 @@ export function AskUniMentionPicker({
 }): ReactElement {
   const { t } = useI18n()
   const uid = useId()
-  const { groups, loading } = useLookupGroups(
+  const { groups, loading, failed } = useLookupGroups(
     workspaceId,
     query === '' ? KINDS_EMPTY : KINDS_QUERY,
     query,
@@ -255,6 +255,11 @@ export function AskUniMentionPicker({
     return () => el.removeEventListener('keydown', onKey)
   }, [inputRef, flat, active, loading, onPick, onDismiss])
 
+  // the box only claims an expanded popup while the listbox shows options (it is hidden when empty)
+  useEffect(() => {
+    inputRef.current?.setAttribute('aria-expanded', flat.length > 0 ? 'true' : 'false')
+  }, [inputRef, flat.length])
+
   // the textarea names the highlighted option for assistive tech
   useEffect(() => {
     const el = inputRef.current
@@ -277,14 +282,16 @@ export function AskUniMentionPicker({
       />
       {flat.length === 0 && !loading ? (
         <p aria-hidden="true" className="askuni2-note">
-          {t('askUniV2LookupEmpty')}
+          {failed ? t('askUniV2LookupFailed') : t('askUniV2LookupEmpty')}
         </p>
       ) : null}
       <p role="status" className="askuni-sr-only">
         {loading
           ? ''
           : flat.length === 0
-            ? t('askUniV2LookupEmpty')
+            ? failed
+              ? t('askUniV2LookupFailed')
+              : t('askUniV2LookupEmpty')
             : t('askUniV2MentionCount', { count: String(flat.length) })}
       </p>
     </div>

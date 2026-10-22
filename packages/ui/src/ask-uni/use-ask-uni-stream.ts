@@ -277,26 +277,3 @@ export function useAskUniStream(adapter: AskUniAdapter, options: UseAskUniStream
 /** the hook's return, for the panel and the thread to share */
 export type AskUniStreamHandle = ReturnType<typeof useAskUniStream>
 export type AskStreamApi = AskUniStreamHandle
-
-/**
- * The composer is disabled while a turn streams: focus moves to Stop, and comes back to the
- * composer when the turn ends, unless the user has put it somewhere else meanwhile.
- */
-export function useStreamFocus(
-  streaming: boolean,
-  getStop: () => HTMLElement | null,
-  getComposer: () => HTMLElement | null,
-): void {
-  const was = useRef(false)
-  const getters = useRef({ getStop, getComposer })
-  getters.current = { getStop, getComposer }
-  useEffect(() => {
-    if (streaming && !was.current) {
-      getters.current.getStop()?.focus()
-    } else if (!streaming && was.current) {
-      const active = document.activeElement
-      if (!active || active === document.body) getters.current.getComposer()?.focus()
-    }
-    was.current = streaming
-  }, [streaming])
-}
