@@ -150,7 +150,8 @@ export function registerUniworkAskUni(
       },
     })
     streamClient = {
-      stream: (req, streamOpts) => {
+      // async: a synchronous throw (an unusable apiOrigin) becomes the run's one error terminal
+      stream: async (req, streamOpts) => {
         const opts = options()
         return opts
           ? createAskUniStreamClient(opts).stream(req, streamOpts)

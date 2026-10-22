@@ -36,7 +36,9 @@ export interface AskUniStreamSender {
   isDestroyed(): boolean
   send(channel: string, ev: AskUniStreamEvent): void
   once(event: 'destroyed', listener: () => void): unknown
-  removeListener(event: 'destroyed', listener: () => void): unknown
+  /** the page navigating (reload) ends the run like a destroyed one */
+  on(event: 'did-navigate', listener: () => void): unknown
+  removeListener(event: 'destroyed' | 'did-navigate', listener: () => void): unknown
 }
 
 export interface AskUniStreamServiceDeps {
@@ -138,9 +140,9 @@ export function createAskUniStreamService(deps: AskUniStreamServiceDeps): AskUni
   }
 
   /** the request's one terminal: sent (when the sender is still there), then forgotten */
-  const finish = (run: Running, terminal: AskUniStreamTerminal) => {
+  const finish = (run: Running, terminal: AskUniStreamTerminal, quiet = false) => {
     if (run.ended) return
-    deliver(run, terminal)
+    if (!quiet) deliver(run, terminal)
     run.ended = true
     run.unwatch()
     if (running.get(run.requestId) === run) running.delete(run.requestId)
@@ -156,6 +158,16 @@ export function createAskUniStreamService(deps: AskUniStreamServiceDeps): AskUni
   }
 
   const scopeChanged = (run: Running) => !deps.isSignedIn() || deps.scopeKey() !== run.scope
+
+  /**
+   * the client's terminal, unless the run was cancelled or the account / org
+   * changed before the next scope tick: then it is `cancelled`, so the old
+   * account's answer is never pushed after a sign-out or switch
+   */
+  const settle = (run: Running, terminal: AskUniStreamTerminal) => {
+    if (scopeChanged(run)) run.controller.abort()
+    finish(run, run.controller.signal.aborted ? { type: 'error', code: 'cancelled' } : terminal)
+  }
 
   const checkScopes = () => {
     for (const run of [...running.values()]) if (scopeChanged(run)) cancelRun(run)
@@ -180,8 +192,12 @@ export function createAskUniStreamService(deps: AskUniStreamServiceDeps): AskUni
       const controller = new AbortController()
       const onDestroyed = () => {
         controller.abort()
-        // nothing to send to: the run just ends
         finish(run, { type: 'error', code: 'cancelled' })
+      }
+      // a reloaded page has no listener for this request any more: the run just ends
+      const onNavigate = () => {
+        controller.abort()
+        finish(run, { type: 'error', code: 'cancelled' }, true)
       }
       const run: Running = {
         requestId: newId(),
@@ -189,9 +205,13 @@ export function createAskUniStreamService(deps: AskUniStreamServiceDeps): AskUni
         scope,
         controller,
         ended: false,
-        unwatch: () => sender.removeListener('destroyed', onDestroyed),
+        unwatch: () => {
+          sender.removeListener('destroyed', onDestroyed)
+          sender.removeListener('did-navigate', onNavigate)
+        },
       }
       sender.once('destroyed', onDestroyed)
+      sender.on('did-navigate', onNavigate)
       running.set(run.requestId, run)
       if (!scopeTimer) {
         scopeTimer = setInterval(checkScopes, scopeCheckMs)
@@ -211,16 +231,8 @@ export function createAskUniStreamService(deps: AskUniStreamServiceDeps): AskUni
             },
           })
           .then(
-            (terminal) =>
-              finish(
-                run,
-                controller.signal.aborted ? { type: 'error', code: 'cancelled' } : terminal,
-              ),
-            () =>
-              finish(run, {
-                type: 'error',
-                code: controller.signal.aborted ? 'cancelled' : 'error',
-              }),
+            (terminal) => settle(run, terminal),
+            () => settle(run, { type: 'error', code: 'error' }),
           )
       }, 0)
       return { ok: true, requestId: run.requestId }

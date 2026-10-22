@@ -327,6 +327,7 @@ import { UNIWORK_DOC_CHANNELS } from '../shared/home-api'
 import { OPEN_DIALOG_EXTENSIONS } from '../shared/open-extensions'
 import { extractAllowedFileExcerpts } from './file-excerpts'
 import { isAllowedWbKey, type WbKvMap } from './workbench-db'
+import { isAskUniEditorView } from './uniwork-askuni/doc-sender'
 import { ACTIVE_WORKSPACE_STORE_KEY } from './uniwork-askuni/service'
 import { WorkbenchAccounts, loadWorkbenchSnapshot } from './workbench-accounts'
 import { exportWorkbenchBackup, importWorkbenchBackup } from './workbench-backup'
@@ -4343,10 +4344,11 @@ function uniworkDocsWiring() {
     },
     // UNI-2076 S7b: Ask UNI in an editor panel answers an editor tab's view
     // (Home has none) or a detached editor window, never the shell page
-    isEditorContents: (id: number) => {
-      const tab = tabManager?.describeWebContents(id)
-      return tab ? tab.kind !== 'home' : detachedWindowForWebContents(id) !== undefined
-    },
+    isEditorContents: (id: number) =>
+      isAskUniEditorView(
+        tabManager?.describeWebContents(id),
+        detachedWindowForWebContents(id) !== undefined,
+      ),
     // G8-11: the shell Discussion panel's bridge answers only the shell
     // window's own webContents, and only for the paths open as its tabs
     // (detached editor windows have no panel)

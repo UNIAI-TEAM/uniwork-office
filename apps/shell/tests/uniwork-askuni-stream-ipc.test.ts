@@ -42,6 +42,7 @@ function contents(id: number) {
     isDestroyed: () => destroyed,
     send: (_channel: string, ev: AskUniStreamEvent) => void sent.push(ev),
     once: (_n: string, fn: () => void) => void listeners.add(fn),
+    on: () => undefined,
     removeListener: (_n: string, fn: () => void) => void listeners.delete(fn),
     destroy() {
       destroyed = true

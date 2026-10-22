@@ -89,6 +89,11 @@ function failure(error: unknown): AskUniResult {
 
 const text = (value: unknown): string | null => (typeof value === 'string' ? value : null)
 
+/** a message never carries more citations than this (shared with the v2 stream) */
+export const ASKUNI_MAX_CITATIONS = 50
+/** the server's source ids are S1, S2, ...; anything else is not a citation */
+const SOURCE_ID = /^S\d{1,15}$/
+
 /** one server citation -> the contract's, bounded (shared with the v2 stream) */
 export function parseCitation(raw: unknown): AskUniCitation | null {
   if (!raw || typeof raw !== 'object') return null
@@ -100,6 +105,7 @@ export function parseCitation(raw: unknown): AskUniCitation | null {
   const quote = text(c.quote)
   const href = text(c.href)
   if (sourceId === null || title === null || quote === null || href === null) return null
+  if (!SOURCE_ID.test(sourceId)) return null
   return {
     sourceId,
     kind,
@@ -122,7 +128,10 @@ function parseAnswer(raw: unknown): AskUniResult {
     throw new UniworkDocError('malformed_response')
   }
   const citations = Array.isArray(message.citations)
-    ? message.citations.map(parseCitation).filter((c): c is AskUniCitation => c !== null)
+    ? message.citations
+        .map(parseCitation)
+        .filter((c): c is AskUniCitation => c !== null)
+        .slice(0, ASKUNI_MAX_CITATIONS)
     : []
   const notice = typeof message.notice === 'string' && NOTICES.has(message.notice)
   return {

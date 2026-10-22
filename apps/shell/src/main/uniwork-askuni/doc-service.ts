@@ -165,7 +165,11 @@ export function createAskUniDocService(deps: AskUniDocServiceDeps): AskUniDocSer
         sender.send(ASKUNI_DOC_CHANNELS.streamEvent, ev)
       },
       once: (_event, listener) => void track.aborts.add(listener),
-      removeListener: (_event, listener) => void track.aborts.delete(listener),
+      // the editor's own did-navigate watch already retires the track
+      on: () => undefined,
+      removeListener: (event, listener) => {
+        if (event === 'destroyed') track.aborts.delete(listener)
+      },
     }
     return view
   }

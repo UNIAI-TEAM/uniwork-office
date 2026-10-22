@@ -10,7 +10,7 @@ import {
 } from '../../shared/askuni-api'
 import { createUniworkSend, type UniworkDocsClientOptions } from '../uniwork-docs/client'
 import { UniworkDocError } from '../uniwork-docs/errors'
-import { askUniCodeOfError, parseCitation } from './client'
+import { ASKUNI_MAX_CITATIONS, askUniCodeOfError, parseCitation } from './client'
 
 /**
  * Ask UNI v2 in the shell main process: `POST /workspaces/{ws}/ai/ask/stream`
@@ -69,19 +69,24 @@ const NOTICES: ReadonlySet<string> = new Set<AskUniV2Notice>([
   'stopped',
 ])
 
-/** a failed call -> the v2 code: the P1 map plus the gateway codes; our idle deadline is provider_timeout */
+/** a failed call -> the v2 code: the P1 map plus the gateway codes (REST and lookups use this one) */
 export function askUniV2CodeOfError(error: unknown): AskUniV2ErrorCode {
-  if (error instanceof UniworkDocError) {
-    if (error.serverCode && Object.hasOwn(SERVER_CODES, error.serverCode)) {
-      return SERVER_CODES[error.serverCode]
-    }
-    if (error.code === 'timeout') return 'provider_timeout'
+  if (
+    error instanceof UniworkDocError &&
+    error.serverCode &&
+    Object.hasOwn(SERVER_CODES, error.serverCode)
+  ) {
+    return SERVER_CODES[error.serverCode]
   }
   return askUniCodeOfError(error)
 }
 
+/** the stream's failure: our own idle deadline is provider_timeout, a metadata timeout is not */
 function failure(error: unknown): AskUniStreamTerminal {
-  const code = askUniV2CodeOfError(error)
+  const code =
+    error instanceof UniworkDocError && error.code === 'timeout'
+      ? 'provider_timeout'
+      : askUniV2CodeOfError(error)
   if (
     code === 'rate_limited' &&
     error instanceof UniworkDocError &&
@@ -144,7 +149,12 @@ const isObj = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v)
 const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0
 const citationsOf = (raw: unknown): AskUniCitation[] =>
-  Array.isArray(raw) ? raw.map(parseCitation).filter((c): c is AskUniCitation => c !== null) : []
+  Array.isArray(raw)
+    ? raw
+        .map(parseCitation)
+        .filter((c): c is AskUniCitation => c !== null)
+        .slice(0, ASKUNI_MAX_CITATIONS)
+    : []
 
 /** a server message (stream `done`, the messages route) -> the contract's, bounded; null drops it */
 export function parseMessage(raw: unknown): AskUniMessage | null {

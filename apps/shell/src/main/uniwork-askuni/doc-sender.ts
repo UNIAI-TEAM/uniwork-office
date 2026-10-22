@@ -55,6 +55,18 @@ export function askUniEditorUrlRule(env: NodeJS.ProcessEnv): (url: string) => bo
   }
 }
 
+/**
+ * An Ask UNI editor view: an editor tab's view (any tab kind but Home, whose
+ * view is the shell page) or, when no tab owns the id, a detached editor
+ * window. Anything else is not one.
+ */
+export function isAskUniEditorView(
+  tab: { kind: string } | null | undefined,
+  isDetachedWindow: boolean,
+): boolean {
+  return tab ? tab.kind !== 'home' : isDetachedWindow
+}
+
 export function createEditorSenderCheck(deps: {
   shellContents(): WebContents | null
   /** a tab manager view of an editor tab or the view of a detached editor window */
