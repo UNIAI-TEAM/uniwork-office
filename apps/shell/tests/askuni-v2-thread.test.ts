@@ -308,6 +308,9 @@ describe('AskUniThread', () => {
     })
 
     it('a stopped turn disappears once the reload brought its question and partial answer', async () => {
+      await mount({ state: live({ draft: 'Half an ans' }) })
+      await mount({ state: live({ status: 'stopped', draft: 'Half an ans' }) })
+      expect(turns()).toHaveLength(6)
       loadMessages.mockResolvedValue({
         ok: true,
         messages: [
@@ -316,9 +319,9 @@ describe('AskUniThread', () => {
           msg('a3', 'assistant', 'Half an ans', { notice: 'stopped' }),
         ],
       })
-      await mount({ state: live({ draft: 'Half an ans' }) })
       await mount({ state: live({ status: 'stopped', draft: 'Half an ans', reloadTick: 1 }) })
       expect(turns()).toHaveLength(6)
+      expect(host.textContent?.match(/Half an ans/g)).toHaveLength(1)
     })
   })
 

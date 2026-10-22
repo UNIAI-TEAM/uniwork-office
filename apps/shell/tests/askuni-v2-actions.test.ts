@@ -258,7 +258,7 @@ describe('AskUniActions', () => {
       await click(btn('Not right'))
       await click(radio('wrong_facts'))
       await type(note(), '  The date is wrong  ')
-      expect(menu()?.textContent).toContain('20/500')
+      expect(menu()?.textContent).toContain('21/500')
       await click(
         [...host.querySelectorAll('button')].find((b) => b.textContent === 'Send feedback')!,
       )
