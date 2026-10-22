@@ -117,8 +117,7 @@ describe('buildInstallerUrls', () => {
 
   it('refuses a signed and an unsigned mac dmg in one release', () => {
     assert.throws(
-      () =>
-        buildInstallerUrls({ channel: 'dev', baseUrl: BASE, files: [SIGNED_MAC_ARM, MAC_X64] }),
+      () => buildInstallerUrls({ channel: 'dev', baseUrl: BASE, files: [SIGNED_MAC_ARM, MAC_X64] }),
       /signed and unsigned mac installers/,
     )
   })
