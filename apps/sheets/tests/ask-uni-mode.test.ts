@@ -61,4 +61,10 @@ describe('sheets panel wiring (source)', () => {
   it('leaves Ask UNI when an AI action runs, so the chat that carries the run is on screen', () => {
     expect(panel).toMatch(/\b(askUni\.leave|leaveAskUni)\(\)/)
   })
+
+  it('a refusal replayed on an open panel leaves Ask UNI first, then announces and focuses in the chat composer', () => {
+    expect(panel).toMatch(
+      /registerBlockedHandler: \(handler\) =>\s*uniworkGate\.registerBlockedHandler\(handler \? \(\) => leaveAskUni\(handler\) : null\)/,
+    )
+  })
 })

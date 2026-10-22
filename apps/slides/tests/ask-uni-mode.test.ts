@@ -42,4 +42,11 @@ describe('slides panel wiring (source)', () => {
   it('leaves Ask UNI when an AI action runs, so the chat that carries the run is on screen', () => {
     expect(panel).toMatch(/\b(askUni\.leave|leaveAskUni)\(\)/)
   })
+
+  it('focuses the prefilled composer and the refused-send disclosure only after Ask UNI has left', () => {
+    expect(panel).toContain(
+      'askUni.leave(preset.autoRun ? undefined : () => inputRef.current?.focus())',
+    )
+    expect(panel).toContain('leaveAskUni(() => disclosureRegionRef.current?.focus())')
+  })
 })

@@ -41,7 +41,12 @@ interface PanelProps {
   open?: boolean
   /** a ribbon / menu AI action: a new nonce runs it in the chat */
   preset?: number
+  /** the preset also moves focus into the chat (a prefilled composer, a refused send) */
+  focusChat?: boolean
 }
+
+/** whether the chat pane was still hidden when the panel moved focus into it (null = never called) */
+let paneHiddenAtFocus: boolean | null = null
 
 function Panel(props: PanelProps) {
   const lang = props.lang ?? 'en'
@@ -49,7 +54,13 @@ function Panel(props: PanelProps) {
   const [draft, setDraft] = useState('')
   // what each panel's preset effect does: the run lands in the chat, so the chat has to show
   useEffect(() => {
-    if (props.preset) mode.leave()
+    if (!props.preset) return
+    if (props.focusChat) {
+      mode.leave(() => {
+        paneHiddenAtFocus = (document.querySelector('.ai-askuni-chat-pane') as HTMLElement).hidden
+        document.getElementById('chat-input')?.focus()
+      })
+    } else mode.leave()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per nonce
   }, [props.preset])
   if (props.open === false) return h('button', { className: 'ai-rail' }, 'rail')
@@ -286,9 +297,150 @@ describe('Ask UNI as a mode of an editor AI panel', () => {
       )
       expect(toggle()?.getAttribute('aria-pressed')).toBe('true')
     })
+
+    it('Stop, reload, collapse, expand shows the turn once', async () => {
+      const { bridge, emit } = streamingBridge()
+      await mount()
+      await click(toggle())
+      await ask('Who owns billing?')
+      await act(async () => {
+        emit({ type: 'run', requestId: 'r1', conversationId: 'c1', runId: 'x' })
+        emit({ type: 'delta', requestId: 'r1', text: 'Dana par' })
+      })
+      // the server stores the question and the partial answer with the stopped notice
+      bridge.askUniDocMessages = vi.fn(async () => ({
+        ok: true as const,
+        messages: [
+          { id: 'u1', role: 'user', content: 'Who owns billing?', citations: [] },
+          { id: 'a1', role: 'assistant', content: 'Dana par', citations: [], notice: 'stopped' },
+        ],
+      })) as never
+      await click(stopButton())
+      const thread = () => host.querySelector('.askuni-v2-thread')?.textContent ?? ''
+      const count = () => thread().split('Who owns billing?').length - 1
+      expect(count()).toBe(1)
+      await mount({ open: false })
+      await mount({ open: true })
+      expect(count()).toBe(1)
+    })
+
+    it('a whole-panel unmount cancels a running turn', async () => {
+      const { bridge } = streamingBridge()
+      await mount()
+      await click(toggle())
+      await ask('Who owns billing?')
+      expect(stopButton()).not.toBeNull()
+      expect(bridge.askUniDocStreamCancel).not.toHaveBeenCalled()
+      await act(async () => {
+        root.render(h('div'))
+      })
+      expect(bridge.askUniDocStreamCancel).toHaveBeenCalledWith({ requestId: 'r1' })
+    })
+  })
+
+  describe('a binding that is not a chat drops the session', () => {
+    const ev = (e: Record<string, unknown>) => e as never
+    const flagsOf = (bridge: ReturnType<typeof fakeBridge>, next: AskUniDocFlags) => {
+      bridge.askUniDocFlags = vi.fn(async () => next) as never
+    }
+    const setBox = async (text: string) => {
+      const box = host.querySelector('textarea[aria-label]') as HTMLTextAreaElement
+      await act(async () => {
+        const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        set?.call(box, text)
+        box.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      return box
+    }
+    const send = async (text: string) => {
+      const box = await setBox(text)
+      await act(async () => {
+        box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+        await Promise.resolve()
+      })
+      await act(async () => {
+        for (let i = 0; i < 5; i++) await Promise.resolve()
+      })
+    }
+    function bridgeWithEvents() {
+      const bridge = fakeBridge(DOC)
+      let emit: (e: never) => void = () => undefined
+      bridge.onAskUniDocStreamEvent = vi.fn((cb: (e: never) => void) => {
+        emit = cb
+        return () => undefined
+      }) as never
+      ;(window as unknown as Win).uniworkAskUniDoc = bridge
+      return { bridge, emit: (e: Record<string, unknown>) => emit(ev(e)) }
+    }
+
+    it('a local binding notice drops the conversation and cancels a running turn', async () => {
+      const { bridge, emit } = bridgeWithEvents()
+      await mount({ bindingKey: '/a/plan.docx' })
+      await click(toggle())
+      await send('Who owns billing?')
+      await act(async () => {
+        emit({ type: 'run', requestId: 'r1', conversationId: 'c-A', runId: 'x' })
+      })
+      // the next question is drafted but not sent
+      await setBox('half a follow-up')
+      flagsOf(bridge, { streamEnabled: true, bound: 'local' })
+      await mount({ bindingKey: '/local/plan.docx' })
+      expect(host.textContent).toContain('Save to UniWork first')
+      expect(bridge.askUniDocStreamCancel).toHaveBeenCalledWith({ requestId: 'r1' })
+      // back on a UniWork document: an empty chat, no old conversation, no old text
+      flagsOf(bridge, DOC)
+      await mount({ bindingKey: '/uniwork/other.docx' })
+      expect(host.querySelector('.askuni-doc-empty')).not.toBeNull()
+      expect((host.querySelector('textarea[aria-label]') as HTMLTextAreaElement).value).toBe('')
+      await send('And now?')
+      const calls = bridge.askUniDocStream.mock.calls as unknown as Array<[Record<string, unknown>]>
+      expect(calls[calls.length - 1]?.[0]).toEqual({ question: 'And now?', locale: 'en' })
+    })
+
+    it('signing out drops the conversation too', async () => {
+      const { bridge, emit } = bridgeWithEvents()
+      await mount({ bindingKey: '/a/plan.docx' })
+      await click(toggle())
+      await send('Who owns billing?')
+      await act(async () => {
+        emit({ type: 'run', requestId: 'r1', conversationId: 'c-A', runId: 'x' })
+        emit({
+          type: 'done',
+          requestId: 'r1',
+          message: { id: 'a1', role: 'assistant', content: 'Dana owns it.', citations: [] },
+        })
+      })
+      flagsOf(bridge, { streamEnabled: true, bound: 'signed_out' })
+      await mount({ bindingKey: '/a/plan.docx|out' })
+      flagsOf(bridge, DOC)
+      await mount({ bindingKey: '/a/plan.docx|in' })
+      expect(host.querySelector('.askuni-doc-empty')).not.toBeNull()
+      await send('And now?')
+      const calls = bridge.askUniDocStream.mock.calls as unknown as Array<[Record<string, unknown>]>
+      expect(calls[calls.length - 1]?.[0]).toEqual({ question: 'And now?', locale: 'en' })
+    })
   })
 
   describe('an AI preset while Ask UNI shows', () => {
+    it('moves focus into the chat only once its pane is shown again', async () => {
+      ;(window as unknown as Win).uniworkAskUniDoc = fakeBridge(DOC)
+      paneHiddenAtFocus = null
+      await mount()
+      await click(toggle())
+      await mount({ preset: 1, focusChat: true })
+      expect(paneHiddenAtFocus).toBe(false)
+      expect(document.activeElement?.id).toBe('chat-input')
+    })
+
+    it('still runs the callback at once when the chat is already showing', async () => {
+      ;(window as unknown as Win).uniworkAskUniDoc = fakeBridge(DOC)
+      paneHiddenAtFocus = null
+      await mount()
+      await mount({ preset: 1, focusChat: true })
+      expect(paneHiddenAtFocus).toBe(false)
+      expect(document.activeElement?.id).toBe('chat-input')
+    })
+
     it('leaves Ask UNI so the chat that runs it is the one on screen, and the Ask conversation stays', async () => {
       ;(window as unknown as Win).uniworkAskUniDoc = fakeBridge(DOC)
       await mount()
