@@ -33,6 +33,11 @@ describe('folder-upload.css', () => {
     expect(rule('.fu-note')).toBe('')
   })
 
+  it('the folder-upload error keeps its 10px gap above .uw-act .uw-act-error (0,2,0)', () => {
+    expect(rule('.uw-act .uw-act-error.fu-error')).toMatch(/margin-top:\s*10px/)
+    expect(rule('.fu-error')).toBe('')
+  })
+
   it('FU-V3: the bars keep a fixed corner as the fallback until the pane is measured', () => {
     expect(rule('.fu-bars')).toContain('position: fixed')
   })

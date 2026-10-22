@@ -269,9 +269,11 @@ export function UniworkBrowser({
         selectedKey={folderSelected ? (browser.folderId ?? ROOT_KEY) : '\u0000none'}
         onOpen={openFolder}
         menuFor={treeMenu}
-        onMenuIntent={(row) => {
-          // My Folder is the caller's own: its menu needs no level
-          if (row.id && !isMyFolder(row)) folderLevels.load(row.id)
+        onMenuIntent={(row, focus) => {
+          // My Folder is the caller's own: its menu needs no level; a bare focus asks only while the level is unknown
+          if (!row.id || isMyFolder(row)) return
+          if (focus && folderLevels.levelOf(row.id) !== undefined) return
+          folderLevels.load(row.id)
         }}
         rename={actions.treeRename}
         onRenameSave={(id, value) =>

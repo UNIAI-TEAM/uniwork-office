@@ -26,13 +26,14 @@ export function useFolderLevels(workspaceId: string): {
   }, [workspaceId])
 
   const load = useCallback((id: string) => {
-    if (inflight.current.has(id)) return
+    const pending = inflight.current
+    if (pending.has(id)) return
     const asked = workspaceRef.current
-    inflight.current.add(id)
+    pending.add(id)
     void Promise.resolve()
       .then(() => loadDocProperties(id))
       .then((res) => {
-        inflight.current.delete(id)
+        pending.delete(id)
         if (workspaceRef.current !== asked || !res.ok) return
         const level = folderLevelOf(res.value.myLevel)
         setLevels((prev) => {
@@ -43,7 +44,7 @@ export function useFolderLevels(workspaceId: string): {
         })
       })
       .catch(() => {
-        inflight.current.delete(id)
+        pending.delete(id)
       })
   }, [])
 

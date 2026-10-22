@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, createElement } from 'react'
+import { act, createElement, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +17,7 @@ import type {
 } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { UniworkBrowser } from '../src/renderer/src/uniwork-folders/UniworkBrowser'
+import { useFolderLevels } from '../src/renderer/src/uniwork-folders/use-folder-levels'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import {
   buildFolderIndex,
@@ -322,5 +323,63 @@ describe('UniworkBrowser tree row menu follows the folder level (UNI-2080)', () 
     expect(api.uniworkDocumentProperties.mock.calls.filter(([id]) => id === 'editf')).toHaveLength(
       2,
     )
+  })
+
+  it('focus reads a level only while it is unknown: three rows, three reads, again none', async () => {
+    await render('viewer')
+    const focusAll = async () => {
+      for (const title of ['ViewerFolder', 'EditFolder', 'ManageFolder']) {
+        await act(async () => treeItem(title).focus())
+        await flush()
+      }
+    }
+    await focusAll()
+    expect(api.uniworkDocumentProperties).toHaveBeenCalledTimes(3)
+    await act(async () => treeItem('ViewerFolder').blur())
+    await focusAll()
+    expect(api.uniworkDocumentProperties).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('useFolderLevels (UNI-2080 stale answers)', () => {
+  it('a read answered after the workspace switched writes no level for the old workspace', async () => {
+    let answer: (v: UniworkResult<UniworkDocProperties>) => void = () => {}
+    api.uniworkDocumentProperties.mockImplementationOnce(
+      () => new Promise((resolve) => (answer = resolve)),
+    )
+    const seen: Array<string | undefined> = []
+    const Probe = ({ ws }: { ws: string }) => {
+      const { levelOf, load } = useFolderLevels(ws)
+      seen.push(levelOf('f1'))
+      useEffect(() => load('f1'), [load])
+      return null
+    }
+    await act(async () => root.render(createElement(Probe, { ws: 'w1' })))
+    await act(async () => root.render(createElement(Probe, { ws: 'w2' })))
+    await act(async () => answer(ok(props('f1', 'edit'))))
+    await flush()
+    expect(seen.every((level) => level === undefined)).toBe(true)
+  })
+
+  it('an old read finishing does not clear the new workspace inflight mark', async () => {
+    let answer: (v: UniworkResult<UniworkDocProperties>) => void = () => {}
+    api.uniworkDocumentProperties.mockImplementationOnce(
+      () => new Promise((resolve) => (answer = resolve)),
+    )
+    let loadNow: (id: string) => void = () => {}
+    const Probe = ({ ws }: { ws: string }) => {
+      loadNow = useFolderLevels(ws).load
+      return null
+    }
+    await act(async () => root.render(createElement(Probe, { ws: 'w1' })))
+    await act(async () => loadNow('f1'))
+    await act(async () => root.render(createElement(Probe, { ws: 'w2' })))
+    // new workspace asks the same id (pending), then the old answer lands
+    api.uniworkDocumentProperties.mockImplementationOnce(() => new Promise(() => {}))
+    await act(async () => loadNow('f1'))
+    await act(async () => answer(ok(props('f1', 'edit'))))
+    await flush()
+    await act(async () => loadNow('f1'))
+    expect(api.uniworkDocumentProperties).toHaveBeenCalledTimes(2)
   })
 })

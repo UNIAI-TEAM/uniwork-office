@@ -130,7 +130,8 @@ export function UniworkFolderTree({
    * a row's menu may be needed: it opened, or the row took focus (F2 renames from a focused
    * row). UNI-2080: the host reads the level its entries depend on.
    */
-  onMenuIntent?: (row: TreeRow) => void
+  /** `focus`: a row only took focus (not a menu opening) */
+  onMenuIntent?: (row: TreeRow, focus?: boolean) => void
   rename?: TreeRename | null
   onRenameSave?: (id: string, value: string) => void
   onRenameCancel?: (id: string) => void
@@ -255,7 +256,7 @@ export function UniworkFolderTree({
             onFocus={(e) => {
               if (e.target !== e.currentTarget) return
               setFocusKey(row.key)
-              onMenuIntent?.(row)
+              onMenuIntent?.(row, true)
             }}
             onClick={() => {
               setFocusKey(row.key)
