@@ -8,8 +8,9 @@
 #   curl -fsSL https://uniworkos.com/downloads/office/install.sh | sudo sh
 #   curl -fsSL https://uniworkos.com/downloads/office/install.sh | sudo sh -s -- dev|beta|stable
 #
-# The channel defaults to stable. Nothing is written until the platform, the
-# channel and the key fingerprint have been checked. The key and the source are
+# The channel defaults to stable. No repository key or source is written until
+# the platform, the channel and the key fingerprint have been checked (gpg
+# itself may be installed first through apt). The key and the source are
 # the files the deb's postinst writes (same bytes), so a later deb upgrade or
 # purge treats them as its own and the two never fight. Re-running changes
 # nothing. A source file at the same path that does not start with the
@@ -87,10 +88,10 @@ main() {
   mkdir -m 700 "$tmp/gnupg"
   found_fpr="$(
     GNUPGHOME="$tmp/gnupg" gpg --batch --show-keys --with-colons "$tmp/key.gpg" </dev/null 2>/dev/null |
-      awk -F: '$1 == "pub" { want = 1; next } want && $1 == "fpr" { print $10; exit }'
+      awk -F: '$1 == "pub" { n++; want = 1; next } want && $1 == "fpr" { f = $10; want = 0 } END { if (n == 1) print f }'
   )"
   if [ "$found_fpr" != "$release_fpr" ]; then
-    die "the repository key is ${found_fpr:-unreadable}, expected $release_fpr; nothing was changed"
+    die "the repository key is ${found_fpr:-unreadable or not a single key}, expected exactly one key $release_fpr; nothing was changed"
   fi
   say "repository key $release_fpr verified"
 

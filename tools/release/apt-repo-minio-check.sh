@@ -272,6 +272,7 @@ untouched() {
   in_client "$1" "! [ -e $KEYRING ] && ! [ -e $LIST ]" || fail "$2: a refused run wrote the keyring or the source"
 }
 # script_cmd <channel> [raw]: the piped command; the release fingerprint is swapped for the test key's unless raw
+# (raw keeps the same pipe shape with a sed that matches nothing: the string @@none@@ is not in install.sh)
 script_cmd() {
   if [ "${2:-}" = raw ]; then
     echo "export UNIWORK_OFFICE_REPO_URL=$bucket_url; set -o pipefail; curl -fsSL $install_url | sed -e 's/@@none@@/x/' $arch_sed | sh -s -- $1"

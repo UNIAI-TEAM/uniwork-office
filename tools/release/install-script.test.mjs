@@ -194,7 +194,7 @@ describe('install.sh', () => {
   it('refuses a key with another fingerprint and writes nothing', () => {
     const result = runScript(['dev'], { STUB_FPR: '0000000000000000000000000000000000000000' })
     assert.notEqual(result.status, 0)
-    assert.match(result.stderr, new RegExp(`expected ${FPR}; nothing was changed`))
+    assert.match(result.stderr, new RegExp(`expected exactly one key ${FPR}; nothing was changed`))
     assert.deepEqual(written(), [])
     assert.ok(!result.log.includes('apt-get'))
   })
