@@ -212,6 +212,22 @@ describe('error codes', () => {
     })
   })
 
+  it('s1f RB-5: at most 50 citations, sourceId must be S<digits> up to 16 chars', async () => {
+    const cit = (source_id: string) => ({
+      source_id,
+      kind: 'task',
+      title: 't',
+      quote: 'q',
+      href: '/a/b/tasks/1',
+    })
+    const many = Array.from({ length: 80 }, (_, i) => cit(`S${i + 1}`))
+    const result = await client(async () => json(200, answer({ citations: many }))).ask(REQ)
+    expect(result.ok && result.message.citations).toHaveLength(50)
+    const odd = [cit('S1'), cit('s2'), cit('x'.repeat(2000)), cit('S12'), cit('S12345678901234567')]
+    const second = await client(async () => json(200, answer({ citations: odd }))).ask(REQ)
+    expect(second.ok && second.message.citations.map((c) => c.sourceId)).toEqual(['S1', 'S12'])
+  })
+
   it('anything else (500, 400, malformed body) -> error', async () => {
     expect(await failing(envelope(500, 'internal'))).toEqual({ ok: false, code: 'error' })
     expect(await failing(envelope(400, 'validation_failed'))).toEqual({ ok: false, code: 'error' })

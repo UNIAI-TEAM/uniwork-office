@@ -2,6 +2,7 @@ import type { IpcMain } from 'electron'
 import {
   ASKUNI_CHANNELS,
   type AskUniContext,
+  type AskUniErrorCode,
   type AskUniRequest,
   type AskUniResult,
   type AskUniWorkspace,
@@ -38,6 +39,8 @@ export interface AskUniServiceDeps {
 export interface AskUniService {
   ask(input: unknown): Promise<AskUniResult>
   context(): Promise<AskUniContext>
+  /** null when the workspace is one of the signed-in account's (cached list), else why not */
+  checkWorkspace(workspaceId: string): Promise<AskUniErrorCode | null>
 }
 
 const error = (): AskUniResult => ({ ok: false, code: 'error' })
@@ -87,6 +90,20 @@ export function createAskUniService(deps: AskUniServiceDeps): AskUniService {
     return workspaces
   }
 
+  const checkWorkspace = async (workspaceId: string): Promise<AskUniErrorCode | null> => {
+    if (!deps.isSignedIn()) {
+      cached = null
+      return 'signed_out'
+    }
+    let workspaces: AskUniWorkspace[]
+    try {
+      workspaces = await readList()
+    } catch (failure) {
+      return askUniCodeOfError(failure)
+    }
+    return workspaces.some((w) => w.id === workspaceId) ? null : 'error'
+  }
+
   return {
     async context() {
       if (!deps.isSignedIn()) {
@@ -110,27 +127,23 @@ export function createAskUniService(deps: AskUniServiceDeps): AskUniService {
     async ask(input) {
       const req = parseRequest(input)
       if (!req) return error()
-      if (!deps.isSignedIn()) {
-        cached = null
-        return { ok: false, code: 'signed_out' }
-      }
-      let workspaces: AskUniWorkspace[]
-      try {
-        workspaces = await readList()
-      } catch (failure) {
-        return { ok: false, code: askUniCodeOfError(failure) }
-      }
-      if (!workspaces.some((w) => w.id === req.workspaceId)) return error()
+      const refused = await checkWorkspace(req.workspaceId)
+      if (refused) return { ok: false, code: refused }
       try {
         return await deps.client.ask(req)
       } catch {
         return error()
       }
     },
+    checkWorkspace,
   }
 }
 
-export function registerAskUniIpc(ipcMain: IpcMain, service: AskUniService): void {
+/**
+ * Registered on the guarded ipc object (UNI-2073, policy `shell`): the guard has already refused
+ * every sender but the shell page's main frame, so nothing here checks the sender again.
+ */
+export function registerAskUniIpc(ipcMain: Pick<IpcMain, 'handle'>, service: AskUniService): void {
   ipcMain.handle(ASKUNI_CHANNELS.ask, (_event, req: unknown) => service.ask(req))
   ipcMain.handle(ASKUNI_CHANNELS.context, () => service.context())
 }

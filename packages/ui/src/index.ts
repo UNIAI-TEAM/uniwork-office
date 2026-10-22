@@ -76,7 +76,7 @@ export {
 export { AiTypingIndicator } from './AiTypingIndicator'
 export { IconSend, IconStop, type IconProps } from './icons'
 export { UniAiMark } from './UniAiMark'
-export { Markdown, type MarkdownNav } from './Markdown'
+export { Markdown, type MarkdownInlineToken, type MarkdownNav } from './Markdown'
 export { isSymbolFontFamily } from './symbol-fonts'
 export {
   BUILTIN_FONT_FAMILIES,
@@ -214,3 +214,9 @@ export type {
   AiModelPickerCloudState,
   AiModelPickerCloudStatus,
 } from './AiModelPicker'
+export * from './ask-uni'
+export {
+  askUniStrings as askUniUiStrings,
+  askUniText,
+  type AskUniStringKey,
+} from './strings-ask-uni'

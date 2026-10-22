@@ -140,6 +140,7 @@ import {
 import type { ChartPresetDef, IconDef, SmartArtDef } from './insert-presets'
 import { IconAiBeautify, IconAiFactCheck, IconAiImage } from './components/icons'
 import { ToastHost } from './components/toast'
+import { toastBottomPx } from './toast-offset'
 import { showToast } from './components/toast-bus'
 import { t, useI18n } from './i18n/locale'
 import { cap, isViewOnly, isWeb } from './capabilities'
@@ -3427,7 +3428,14 @@ export function App() {
   })
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      style={
+        {
+          '--slides-toast-bottom': `${toastBottomPx(showNotes, notesHeight)}px`,
+        } as React.CSSProperties
+      }
+    >
       <ToastHost />
       {serverComments && commentsContext && commentsBridgeApi && path && (
         <ServerCommentsHost

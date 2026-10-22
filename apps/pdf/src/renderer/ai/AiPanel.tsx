@@ -56,6 +56,14 @@ import {
 } from '@genoffice/ui'
 import { cap, platform } from '../capabilities'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
+import {
+  AskUniModeBody,
+  AskUniModeToggle,
+  askUniChatPaneProps,
+  askUniFileName,
+  askUniLiveText,
+  useAskUniMode,
+} from '@genoffice/ui'
 import { Markdown } from '@genoffice/ui'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
@@ -198,6 +206,8 @@ export function AiPanel({
   readOnly?: boolean
 }): ReactElement | null {
   const { lang, t } = useI18n()
+  // the "Ask UNI" panel mode: only offered when the preload bridge exists and the flag is on
+  const askUni = useAskUniMode(lang, filePath)
   // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
   // send entry closed - presets, retry, continue and queue runs included - the hint says why
   const needModelHint = useAiModelNeedHint()
@@ -761,6 +771,8 @@ export function AiPanel({
   // preset lands in the composer instead of being dropped silently (markdown parity)
   useEffect(() => {
     if (!preset) return
+    // the run lands in the chat: leave Ask UNI so it is the one on screen
+    askUni.leave()
     if (loopRef.current?.busy) setPrompt(preset.text)
     else send(preset.text)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per nonce
@@ -976,7 +988,8 @@ export function AiPanel({
             lang={lang}
             onMove={(side) => window.pdfApi?.setAiPanelPrefs?.({ side })}
           />
-          {chat.length > 0 && (
+          <AskUniModeToggle mode={askUni} lang={lang} />
+          {chat.length > 0 && !askUni.active && (
             <button
               className="ai-header-btn"
               onClick={() => {
@@ -1008,375 +1021,380 @@ export function AiPanel({
       </header>
 
       <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
-        {liveText}
+        {askUniLiveText(askUni, liveText)}
       </div>
-      <div
-        className="ai-chat"
-        ref={chatRef}
-        aria-busy={busy ? 'true' : undefined}
-        onScroll={onChatScroll}
-      >
-        {chat.length === 0 && (
-          <div className="ai-chat-empty">
-            <div className="ai-chat-empty-title">{t('aiEmptyTitle')}</div>
-            <div className="ai-chat-empty-body">{t('aiEmptyBody')}</div>
-            <div className="ai-quick-actions">
-              <button
-                className="ai-quick-btn"
-                onClick={() =>
-                  send(t(hasScopeSelection ? 'aiQuickSummarySelPrompt' : 'aiQuickSummaryPrompt'))
-                }
-              >
-                {t('aiQuickSummary')}
-              </button>
-              <button
-                className="ai-quick-btn"
-                onClick={() =>
-                  send(
-                    t(hasScopeSelection ? 'aiQuickKeyPointsSelPrompt' : 'aiQuickKeyPointsPrompt'),
-                  )
-                }
-              >
-                {t('aiQuickKeyPoints')}
-              </button>
+      <AskUniModeBody mode={askUni} documentName={askUniFileName(filePath)} />
+      <div {...askUniChatPaneProps(askUni)}>
+        <div
+          className="ai-chat"
+          ref={chatRef}
+          aria-busy={busy ? 'true' : undefined}
+          onScroll={onChatScroll}
+        >
+          {chat.length === 0 && (
+            <div className="ai-chat-empty">
+              <div className="ai-chat-empty-title">{t('aiEmptyTitle')}</div>
+              <div className="ai-chat-empty-body">{t('aiEmptyBody')}</div>
+              <div className="ai-quick-actions">
+                <button
+                  className="ai-quick-btn"
+                  onClick={() =>
+                    send(t(hasScopeSelection ? 'aiQuickSummarySelPrompt' : 'aiQuickSummaryPrompt'))
+                  }
+                >
+                  {t('aiQuickSummary')}
+                </button>
+                <button
+                  className="ai-quick-btn"
+                  onClick={() =>
+                    send(
+                      t(hasScopeSelection ? 'aiQuickKeyPointsSelPrompt' : 'aiQuickKeyPointsPrompt'),
+                    )
+                  }
+                >
+                  {t('aiQuickKeyPoints')}
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-        {chat.map((entry, i) => {
-          if (entry.role === 'user') {
-            // a UniWork error turn carries its own labelled S9 action (Retry only where the table allows
-            // it), so the "not sent" bubble adds no Retry of its own; failures of other providers keep it
-            const next = chat[i + 1]
-            const uniworkErrorFollows =
-              next?.role === 'assistant' && Boolean(next.isError) && next.errorKey !== undefined
+          )}
+          {chat.map((entry, i) => {
+            if (entry.role === 'user') {
+              // a UniWork error turn carries its own labelled S9 action (Retry only where the table allows
+              // it), so the "not sent" bubble adds no Retry of its own; failures of other providers keep it
+              const next = chat[i + 1]
+              const uniworkErrorFollows =
+                next?.role === 'assistant' && Boolean(next.isError) && next.errorKey !== undefined
+              return (
+                <div key={i} className="ai-msg ai-msg-user">
+                  {entry.scope && <AiScopeQuote scope={entry.scope} />}
+                  <span dir="auto">{entry.text}</span>
+                  {clarify.receipts
+                    .filter((r) => r.afterIdx === i)
+                    .map((r, k) => (
+                      <div key={`ca${k}`} className="ai-clarify-answered">
+                        {r.qa.map((pair, m) => (
+                          <div key={m} className="ai-clarify-answered-row">
+                            <div className="ai-clarify-answered-q">{pair.q}</div>
+                            <div className="ai-clarify-answered-a">{pair.a}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  {entry.undelivered && (
+                    <div className="ai-msg-undelivered">
+                      {t('aiUndelivered')}
+                      {!busy && !uniworkErrorFollows && (
+                        <button
+                          className="ai-retry-btn"
+                          onClick={() => send(entry.text, entry.scope ?? null)}
+                        >
+                          {t('aiRetry')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+            const hasTools = (entry.tools?.length ?? 0) > 0
+            // a streaming bubble stays mounted while empty: its live region must exist before a
+            // notice arrives, or a screen reader may not announce the note
+            if (
+              !entry.text &&
+              !hasTools &&
+              !entry.notes?.length &&
+              !entry.waitLine &&
+              !entry.streaming &&
+              !entry.stopped &&
+              !entry.mutated
+            )
+              return null
+            const chipView = getEntryResultChipView(
+              chat,
+              i,
+              busy,
+              (key, vars) => aiUniworkText(lang, key, vars),
+              {
+                provider: provider ?? settingsRef.current?.provider ?? null,
+                mutated: Boolean(entry.mutated),
+                stopped: Boolean(entry.stopped),
+                hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
+                clarifyAsked: clarify.receipts.length > 0,
+                droppedToolCalls: droppedCallsOfNotes(entry.notes),
+                toolExecutions: entry.tools,
+                isError: Boolean(entry.isError),
+                error: entry.isError ? uniworkErrorForEntry(entry.errorKey, entry.text) : null,
+              },
+            )
+            const chip = chipView?.chip ?? null
+            const chipLabel = chipView?.labelText ?? null
+            const stoppedText = chipView?.stoppedText ?? null
+            // a stop before the first token leaves only the stop filler as body: the stopped line replaces it
+            const bodyText =
+              stoppedText && entry.stopped && entry.streamedText === false ? '' : entry.text
+            // the chip is the first word of the answer paragraph, in the same node as the text
+            const chipLead =
+              chip && chipLabel ? (
+                <>
+                  <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
+                    {chipLabel}
+                  </span>
+                  {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
+                </>
+              ) : undefined
+            // Retry resends the question this reply answered, like the "not sent" retry above
+            const asked = chat
+              .slice(0, i)
+              .reverse()
+              .find((e) => e.role === 'user')
+            const isLast = i === chat.length - 1
             return (
-              <div key={i} className="ai-msg ai-msg-user">
-                {entry.scope && <AiScopeQuote scope={entry.scope} />}
-                <span dir="auto">{entry.text}</span>
-                {clarify.receipts
-                  .filter((r) => r.afterIdx === i)
-                  .map((r, k) => (
-                    <div key={`ca${k}`} className="ai-clarify-answered">
-                      {r.qa.map((pair, m) => (
-                        <div key={m} className="ai-clarify-answered-row">
-                          <div className="ai-clarify-answered-q">{pair.q}</div>
-                          <div className="ai-clarify-answered-a">{pair.a}</div>
-                        </div>
-                      ))}
+              <div
+                key={i}
+                className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}`}
+              >
+                <div className="ai-msg-live">
+                  {entry.notes?.map((note, k) => (
+                    <div key={`un${k}`} className="ai-msg-notice">
+                      {note.text}
                     </div>
                   ))}
-                {entry.undelivered && (
-                  <div className="ai-msg-undelivered">
-                    {t('aiUndelivered')}
-                    {!busy && !uniworkErrorFollows && (
-                      <button
-                        className="ai-retry-btn"
-                        onClick={() => send(entry.text, entry.scope ?? null)}
-                      >
-                        {t('aiRetry')}
-                      </button>
+                  {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
+                </div>
+                {hasTools && <ToolChipList tools={entry.tools!} />}
+                {entry.usage && (
+                  <div className="ai-message-usage">
+                    <AiUsageChip usage={entry.usage} lang={lang} />
+                  </div>
+                )}
+                {(bodyText || chip) && (
+                  <div className="ai-msg-answer" dir="auto">
+                    {(bodyText || chipLead) && (
+                      <Markdown
+                        text={bodyText ? aiNoticeBody(bodyText) : ''}
+                        nav={pdfNav}
+                        lead={chipLead}
+                      />
+                    )}
+                    {chip?.chip === 'edited' && (
+                      <div className="ai-result-actions">
+                        <button
+                          type="button"
+                          className="ai-result-view-changes"
+                          onClick={() => apiRef.current.gotoPage(apiRef.current.currentPage())}
+                        >
+                          {aiUniworkText(lang, 'aiResultViewChanges')}
+                        </button>
+                        <span className="ai-result-edited-hint">
+                          {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
+                        </span>
+                      </div>
                     )}
                   </div>
                 )}
-              </div>
-            )
-          }
-          const hasTools = (entry.tools?.length ?? 0) > 0
-          // a streaming bubble stays mounted while empty: its live region must exist before a
-          // notice arrives, or a screen reader may not announce the note
-          if (
-            !entry.text &&
-            !hasTools &&
-            !entry.notes?.length &&
-            !entry.waitLine &&
-            !entry.streaming &&
-            !entry.stopped &&
-            !entry.mutated
-          )
-            return null
-          const chipView = getEntryResultChipView(
-            chat,
-            i,
-            busy,
-            (key, vars) => aiUniworkText(lang, key, vars),
-            {
-              provider: provider ?? settingsRef.current?.provider ?? null,
-              mutated: Boolean(entry.mutated),
-              stopped: Boolean(entry.stopped),
-              hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
-              clarifyAsked: clarify.receipts.length > 0,
-              droppedToolCalls: droppedCallsOfNotes(entry.notes),
-              toolExecutions: entry.tools,
-              isError: Boolean(entry.isError),
-              error: entry.isError ? uniworkErrorForEntry(entry.errorKey, entry.text) : null,
-            },
-          )
-          const chip = chipView?.chip ?? null
-          const chipLabel = chipView?.labelText ?? null
-          const stoppedText = chipView?.stoppedText ?? null
-          // a stop before the first token leaves only the stop filler as body: the stopped line replaces it
-          const bodyText =
-            stoppedText && entry.stopped && entry.streamedText === false ? '' : entry.text
-          // the chip is the first word of the answer paragraph, in the same node as the text
-          const chipLead =
-            chip && chipLabel ? (
-              <>
-                <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
-                  {chipLabel}
-                </span>
-                {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
-              </>
-            ) : undefined
-          // Retry resends the question this reply answered, like the "not sent" retry above
-          const asked = chat
-            .slice(0, i)
-            .reverse()
-            .find((e) => e.role === 'user')
-          const isLast = i === chat.length - 1
-          return (
-            <div
-              key={i}
-              className={`ai-msg ai-msg-assistant${entry.isError && !aiNoticeKind(entry.text) ? ' ai-msg-error' : ''}`}
-            >
-              <div className="ai-msg-live">
-                {entry.notes?.map((note, k) => (
-                  <div key={`un${k}`} className="ai-msg-notice">
-                    {note.text}
-                  </div>
-                ))}
-                {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
-              </div>
-              {hasTools && <ToolChipList tools={entry.tools!} />}
-              {entry.usage && (
-                <div className="ai-message-usage">
-                  <AiUsageChip usage={entry.usage} lang={lang} />
-                </div>
-              )}
-              {(bodyText || chip) && (
-                <div className="ai-msg-answer" dir="auto">
-                  {(bodyText || chipLead) && (
-                    <Markdown
-                      text={bodyText ? aiNoticeBody(bodyText) : ''}
-                      nav={pdfNav}
-                      lead={chipLead}
-                    />
-                  )}
-                  {chip?.chip === 'edited' && (
-                    <div className="ai-result-actions">
-                      <button
-                        type="button"
-                        className="ai-result-view-changes"
-                        onClick={() => apiRef.current.gotoPage(apiRef.current.currentPage())}
-                      >
-                        {aiUniworkText(lang, 'aiResultViewChanges')}
-                      </button>
-                      <span className="ai-result-edited-hint">
-                        {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-              {entry.runId && !entry.isError && (
-                <RunUndoAction
-                  runId={entry.runId}
-                  state={apiRef.current.runUndoState?.(entry.runId) ?? 'none'}
-                  busy={busy}
-                  onUndo={() => apiRef.current.undoRun?.(entry.runId!)}
+                {entry.runId && !entry.isError && (
+                  <RunUndoAction
+                    runId={entry.runId}
+                    state={apiRef.current.runUndoState?.(entry.runId) ?? 'none'}
+                    busy={busy}
+                    onUndo={() => apiRef.current.undoRun?.(entry.runId!)}
+                  />
+                )}
+                <AiErrorAction
+                  chip={chip}
+                  lang={lang}
+                  waiting={Boolean(entry.waitLine)}
+                  onRetry={
+                    isLast && !busy && asked
+                      ? () => send(asked.text, asked.scope ?? null)
+                      : undefined
+                  }
+                  onChooseProvider={() => void window.pdfApi?.openAiModelSettings?.()}
+                  onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
+                  onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
                 />
-              )}
-              <AiErrorAction
-                chip={chip}
-                lang={lang}
-                waiting={Boolean(entry.waitLine)}
-                onRetry={
-                  isLast && !busy && asked ? () => send(asked.text, asked.scope ?? null) : undefined
-                }
-                onChooseProvider={() => void window.pdfApi?.openAiModelSettings?.()}
-                onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
-                onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
-              />
-              {stoppedText && (
-                <div className="ai-run-stopped" dir="auto">
-                  {stoppedText}
-                </div>
-              )}
-            </div>
-          )
-        })}
-        {saveOffer && !busy && (
-          <AiSaveDraftCard
-            lang={lang}
-            name={saveOffer.name}
-            onSave={() => {
-              const { name } = saveOffer
-              setSaveOffer(null)
-              onSaveOfferRef.current?.(name)
-            }}
-            onLater={() => setSaveOffer(null)}
-          />
-        )}
-        {fileOpConfirm && (
-          <div className="ai-confirm-card" role="group" aria-label={t('aiFileOpConfirmTitle')}>
-            <div className="ai-confirm-title">{t('aiFileOpConfirmTitle')}</div>
-            <div className="ai-confirm-summary">{fileOpConfirm.summary}</div>
-            {fileOpConfirm.detail && (
-              <div className="ai-confirm-detail">{fileOpConfirm.detail}</div>
-            )}
-            <div className="ai-confirm-warning">{t('aiFileOpConfirmWarning')}</div>
-            <div className="ai-confirm-actions">
-              <button
-                type="button"
-                className="pdf-modal-btn"
-                onClick={() => confirmRef.current?.settle(false)}
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                className="pdf-modal-btn primary"
-                onClick={() => confirmRef.current?.settle(true)}
-              >
-                {t('aiFileOpConfirm')}
-              </button>
-            </div>
-          </div>
-        )}
-        {/* In-progress state: a standalone three-dot row at the end of the stream, kept until done */}
-        {busy && <AiTypingIndicator label={typingLabel} />}
-      </div>
-
-      {clarify.active && (
-        <div className="ai-composer">
-          <ClarifyCard
-            questions={clarify.active}
-            onSubmit={(answers, qa) =>
-              clarify.submit(answers, qa, chat.map((c) => c.role).lastIndexOf('user'))
-            }
-            onSkip={clarify.skip}
-          />
-        </div>
-      )}
-      <div className="ai-composer" style={clarify.active ? { display: 'none' } : undefined}>
-        {readOnly && !isUniwork && (
-          <div className="ai-readonly-notice" role="note">
-            {t('aiViewOnlyNotice')}
-          </div>
-        )}
-        <AiComposer
-          textareaRef={inputRef}
-          queueStrip={
-            <AiQueueStrip
-              items={msgQueue.queued}
-              labels={AI_QUEUE_LABELS[lang]}
-              onUpdate={msgQueue.update}
-              onRemove={msgQueue.remove}
-              onClear={msgQueue.clear}
-              paused={msgQueue.paused}
-              onTogglePause={msgQueue.togglePaused}
-              onMove={msgQueue.move}
-            />
-          }
-          onQueue={enqueueDraft}
-          queuePlaceholder={AI_QUEUE_LABELS[lang].queuePlaceholder}
-          value={prompt}
-          busy={busy}
-          lang={lang}
-          viewOnly={isUniwork && readOnly ? true : undefined}
-          uniwork={
-            isUniwork
-              ? {
-                  provider: provider ?? 'uniwork',
-                  lang,
-                  note: composerNoteState,
-                  onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
-                  onChooseProvider: () => void window.pdfApi?.openAiModelSettings?.(),
-                  onAnnounce: setComposerAnnouncement,
-                  onSendBlockedChange: uniworkGate.onSendBlockedChange,
-                  registerBlockedHandler: uniworkGate.registerBlockedHandler,
-                  disclosure: {
-                    orgName: cloudSnapshot?.orgName ?? undefined,
-                    ackKey: {
-                      account: cloudSnapshot?.accountId ?? '',
-                      org: cloudSnapshot?.orgId ?? '',
-                      document: filePath ?? 'local',
-                    },
-                    variant: filePath ? 'document' : 'local',
-                  },
-                }
-              : undefined
-          }
-          header={
-            hasScopeSelection && (
-              <div className="ai-scope-row">
-                <span className="ai-scope-hint">
-                  <button
-                    className="ai-scope-label"
-                    onClick={() => setScopePreviewOpen((v) => !v)}
-                    aria-expanded={scopePreviewOpen}
-                    data-tip={t('aiScopeSelectionTip')}
-                  >
-                    {t('aiScopeSelection', {
-                      page:
-                        scopeSel!.lastPage > scopeSel!.page
-                          ? `${scopeSel!.page}-${scopeSel!.lastPage}`
-                          : scopeSel!.page,
-                      words: countWords(scopeSel!.text),
-                    })}
-                  </button>
-                  <button
-                    className="ai-scope-clear"
-                    onClick={() => {
-                      setScopePreviewOpen(false)
-                      onClearSelection?.()
-                    }}
-                    data-tip={t('aiScopeClearTitle')}
-                    aria-label={t('aiScopeClearTitle')}
-                  >
-                    <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
-                      <path
-                        d="M4 4l8 8M12 4l-8 8"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </button>
-                </span>
-                {scopePreviewOpen && (
-                  <div className="ai-scope-preview">
-                    {scopeSel!.text.length > 400
-                      ? `${scopeSel!.text.slice(0, 400)}…`
-                      : scopeSel!.text}
+                {stoppedText && (
+                  <div className="ai-run-stopped" dir="auto">
+                    {stoppedText}
                   </div>
                 )}
               </div>
             )
-          }
-          placeholder={t('aiComposerPlaceholder')}
-          hintIdle={t('aiHintIdle')}
-          hintBusy={t('aiHintBusy')}
-          sendLabel={t('aiSend')}
-          stopLabel={t('aiStop')}
-          iconOnly
-          footerStart={
-            <>
-              <AiModelPicker
-                bridge={MODEL_BRIDGE}
-                lang={lang}
-                onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
+          })}
+          {saveOffer && !busy && (
+            <AiSaveDraftCard
+              lang={lang}
+              name={saveOffer.name}
+              onSave={() => {
+                const { name } = saveOffer
+                setSaveOffer(null)
+                onSaveOfferRef.current?.(name)
+              }}
+              onLater={() => setSaveOffer(null)}
+            />
+          )}
+          {fileOpConfirm && (
+            <div className="ai-confirm-card" role="group" aria-label={t('aiFileOpConfirmTitle')}>
+              <div className="ai-confirm-title">{t('aiFileOpConfirmTitle')}</div>
+              <div className="ai-confirm-summary">{fileOpConfirm.summary}</div>
+              {fileOpConfirm.detail && (
+                <div className="ai-confirm-detail">{fileOpConfirm.detail}</div>
+              )}
+              <div className="ai-confirm-warning">{t('aiFileOpConfirmWarning')}</div>
+              <div className="ai-confirm-actions">
+                <button
+                  type="button"
+                  className="pdf-modal-btn"
+                  onClick={() => confirmRef.current?.settle(false)}
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="button"
+                  className="pdf-modal-btn primary"
+                  onClick={() => confirmRef.current?.settle(true)}
+                >
+                  {t('aiFileOpConfirm')}
+                </button>
+              </div>
+            </div>
+          )}
+          {/* In-progress state: a standalone three-dot row at the end of the stream, kept until done */}
+          {busy && <AiTypingIndicator label={typingLabel} />}
+        </div>
+
+        {clarify.active && (
+          <div className="ai-composer">
+            <ClarifyCard
+              questions={clarify.active}
+              onSubmit={(answers, qa) =>
+                clarify.submit(answers, qa, chat.map((c) => c.role).lastIndexOf('user'))
+              }
+              onSkip={clarify.skip}
+            />
+          </div>
+        )}
+        <div className="ai-composer" style={clarify.active ? { display: 'none' } : undefined}>
+          {readOnly && !isUniwork && (
+            <div className="ai-readonly-notice" role="note">
+              {t('aiViewOnlyNotice')}
+            </div>
+          )}
+          <AiComposer
+            textareaRef={inputRef}
+            queueStrip={
+              <AiQueueStrip
+                items={msgQueue.queued}
+                labels={AI_QUEUE_LABELS[lang]}
+                onUpdate={msgQueue.update}
+                onRemove={msgQueue.remove}
+                onClear={msgQueue.clear}
+                paused={msgQueue.paused}
+                onTogglePause={msgQueue.togglePaused}
+                onMove={msgQueue.move}
               />
-              {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
-            </>
-          }
-          sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
-          sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
-          stopIcon={<img src={sendStop} alt="" aria-hidden />}
-          onChange={setPrompt}
-          onSend={() => send(prompt)}
-          onStop={stop}
-        />
+            }
+            onQueue={enqueueDraft}
+            queuePlaceholder={AI_QUEUE_LABELS[lang].queuePlaceholder}
+            value={prompt}
+            busy={busy}
+            lang={lang}
+            viewOnly={isUniwork && readOnly ? true : undefined}
+            uniwork={
+              isUniwork
+                ? {
+                    provider: provider ?? 'uniwork',
+                    lang,
+                    note: composerNoteState,
+                    onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
+                    onChooseProvider: () => void window.pdfApi?.openAiModelSettings?.(),
+                    onAnnounce: setComposerAnnouncement,
+                    onSendBlockedChange: uniworkGate.onSendBlockedChange,
+                    registerBlockedHandler: uniworkGate.registerBlockedHandler,
+                    disclosure: {
+                      orgName: cloudSnapshot?.orgName ?? undefined,
+                      ackKey: {
+                        account: cloudSnapshot?.accountId ?? '',
+                        org: cloudSnapshot?.orgId ?? '',
+                        document: filePath ?? 'local',
+                      },
+                      variant: filePath ? 'document' : 'local',
+                    },
+                  }
+                : undefined
+            }
+            header={
+              hasScopeSelection && (
+                <div className="ai-scope-row">
+                  <span className="ai-scope-hint">
+                    <button
+                      className="ai-scope-label"
+                      onClick={() => setScopePreviewOpen((v) => !v)}
+                      aria-expanded={scopePreviewOpen}
+                      data-tip={t('aiScopeSelectionTip')}
+                    >
+                      {t('aiScopeSelection', {
+                        page:
+                          scopeSel!.lastPage > scopeSel!.page
+                            ? `${scopeSel!.page}-${scopeSel!.lastPage}`
+                            : scopeSel!.page,
+                        words: countWords(scopeSel!.text),
+                      })}
+                    </button>
+                    <button
+                      className="ai-scope-clear"
+                      onClick={() => {
+                        setScopePreviewOpen(false)
+                        onClearSelection?.()
+                      }}
+                      data-tip={t('aiScopeClearTitle')}
+                      aria-label={t('aiScopeClearTitle')}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
+                        <path
+                          d="M4 4l8 8M12 4l-8 8"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
+                  </span>
+                  {scopePreviewOpen && (
+                    <div className="ai-scope-preview">
+                      {scopeSel!.text.length > 400
+                        ? `${scopeSel!.text.slice(0, 400)}…`
+                        : scopeSel!.text}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+            placeholder={t('aiComposerPlaceholder')}
+            hintIdle={t('aiHintIdle')}
+            hintBusy={t('aiHintBusy')}
+            sendLabel={t('aiSend')}
+            stopLabel={t('aiStop')}
+            iconOnly
+            footerStart={
+              <>
+                <AiModelPicker
+                  bridge={MODEL_BRIDGE}
+                  lang={lang}
+                  onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
+                />
+                {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
+              </>
+            }
+            sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
+            sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
+            stopIcon={<img src={sendStop} alt="" aria-hidden />}
+            onChange={setPrompt}
+            onSend={() => send(prompt)}
+            onStop={stop}
+          />
+        </div>
       </div>
     </aside>
   )

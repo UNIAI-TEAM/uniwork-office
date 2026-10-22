@@ -107,6 +107,14 @@ import { AiErrorAction, Markdown, uniworkErrorForEntry, useAiModelNeedHint } fro
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import { AiSaveDraftCard } from '@genoffice/ui'
 import {
+  AskUniModeBody,
+  AskUniModeToggle,
+  askUniChatPaneProps,
+  askUniFileName,
+  askUniLiveText,
+  useAskUniMode,
+} from '@genoffice/ui'
+import {
   AI_RUN_DONE_EVENT,
   AI_SAVE_OFFER_EVENT,
   type AiRunDoneDetail,
@@ -503,6 +511,7 @@ export function AiPanel({
   sideState,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
+  const askUni = useAskUniMode(lang, filePath)
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
   const isRtl = lang === 'ar' || lang === 'he'
   // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
@@ -1201,10 +1210,12 @@ export function AiPanel({
 
   useEffect(() => {
     if (!preset) return
+    // the run lands in the chat: leave Ask UNI so it is the one on screen (a prefilled composer takes
+    // focus once the chat pane is shown again)
+    askUni.leave(preset.autoRun ? undefined : () => inputRef.current?.focus())
     if (preset.autoRun) runWith(preset.text)
     else {
       setInput(preset.text)
-      inputRef.current?.focus()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset?.nonce])
@@ -1810,7 +1821,8 @@ export function AiPanel({
             lang={lang}
             onMove={(side) => window.desktop.setAiPanelPrefs({ side })}
           />
-          {(chat.length > 0 || historicChat.length > 0) && (
+          <AskUniModeToggle mode={askUni} lang={lang} />
+          {(chat.length > 0 || historicChat.length > 0) && !askUni.active && (
             <button
               className="ai-header-btn"
               onClick={newChat}
@@ -1845,655 +1857,659 @@ export function AiPanel({
 
       {/* Single panel-level polite live region: announces transport notices while running and the finished answer once when it ends */}
       <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
-        {liveText}
+        {askUniLiveText(askUni, liveText)}
       </div>
 
-      <div
-        ref={logRef}
-        className="ai-chat"
-        aria-busy={busy ? 'true' : undefined}
-        onScroll={onLogScroll}
-      >
-        {/* past conversation (read-only transcript, not fed to the model), shown continuously with the current turn */}
-        {historicChat.length > 0 && (
-          <>
-            {historicChat.map((entry, i) => (
-              <div key={`h${i}`} className={`ai-msg ai-msg-${entry.role} ai-msg-historic`}>
+      <AskUniModeBody mode={askUni} documentName={askUniFileName(filePath ?? null)} />
+
+      <div {...askUniChatPaneProps(askUni)}>
+        <div
+          ref={logRef}
+          className="ai-chat"
+          aria-busy={busy ? 'true' : undefined}
+          onScroll={onLogScroll}
+        >
+          {/* past conversation (read-only transcript, not fed to the model), shown continuously with the current turn */}
+          {historicChat.length > 0 && (
+            <>
+              {historicChat.map((entry, i) => (
+                <div key={`h${i}`} className={`ai-msg ai-msg-${entry.role} ai-msg-historic`}>
+                  {entry.role === 'user' && entry.scope && <AiScopeQuote scope={entry.scope} />}
+                  {entry.role === 'user' && entry.attachments && entry.attachments.length > 0 && (
+                    <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
+                  )}
+                  {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
+                  {entry.text && (
+                    <div dir="auto">
+                      <Markdown text={entry.text} nav={docNav} />
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div className="ai-history-sep">{t('aiHistorySep')}</div>
+            </>
+          )}
+          {chat.length === 0 && historicChat.length === 0 && (
+            <div className="ai-chat-empty">
+              <div className="ai-chat-empty-title">
+                {t(docEmpty ? 'aiEmptyDraftTitle' : 'aiEmptyTitle')}
+              </div>
+              <div className="ai-chat-empty-body">
+                {t(docEmpty ? 'aiEmptyDraftBody1' : 'aiEmptyBody1')}
+                <br />
+                {t(docEmpty ? 'aiEmptyDraftBody2' : 'aiEmptyBody2')}
+              </div>
+              <div className="ai-starter-list">
+                {(readOnly
+                  ? docEmpty
+                    ? []
+                    : READ_ONLY_STARTER_PROMPTS
+                  : docEmpty
+                    ? DRAFT_STARTER_PROMPTS
+                    : EDIT_STARTER_PROMPTS
+                ).map((p) => (
+                  <button
+                    key={p}
+                    className="ai-starter"
+                    onClick={() => {
+                      setInput(t(p))
+                      inputRef.current?.focus()
+                    }}
+                  >
+                    {t(p)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {chat.map((entry, i) => {
+            if (
+              entry.role === 'assistant' &&
+              !entry.text &&
+              !entry.streaming &&
+              !entry.error &&
+              !entry.notes?.length &&
+              !entry.tools?.length &&
+              !entry.stopped &&
+              !entry.snapshot &&
+              !entry.rollbackKept
+            ) {
+              return null
+            }
+            const isLast = i === chat.length - 1
+            // Action row appears once per completed reply: on the turn's final segment only
+            // (mid-turn segments have a following assistant entry; the live turn ends when !busy)
+            const turnEnded = isTurnEnded(chat, i, busy)
+            const showToolbar =
+              entry.role === 'assistant' &&
+              !entry.streaming &&
+              turnEnded &&
+              // edits-only turns have no text but still carry the rollback point
+              !!(entry.text || entry.error || entry.snapshot)
+            const chipView = getEntryResultChipView(
+              chat,
+              i,
+              busy,
+              (key, vars) => aiUniworkText(lang, key, vars),
+              {
+                provider: settings.provider,
+                mutated: Boolean(entry.snapshot),
+                stopped: Boolean(entry.stopped),
+                hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
+                clarifyAsked: Boolean(entry.clarifyReceipts?.length),
+                droppedToolCalls: droppedCallsOfNotes(entry.notes),
+                toolExecutions: entry.tools,
+                error: uniworkErrorForEntry(entry.errorKey, entry.error),
+              },
+            )
+            const chip = chipView?.chip ?? null
+            const chipLabel = chipView?.labelText ?? null
+            const stoppedText = chipView?.stoppedText ?? null
+            // a stop before the first token leaves only the stop filler as body: the stopped line replaces it
+            const bodyText =
+              stoppedText && entry.stopped && entry.streamedText === false ? '' : entry.text
+            // the chip is the first word of the answer paragraph, in the same node as the text
+            const chipLead =
+              chip && chipLabel ? (
+                <>
+                  <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
+                    {chipLabel}
+                  </span>
+                  {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
+                </>
+              ) : undefined
+            return (
+              <div
+                key={i}
+                className={`ai-msg ai-msg-${entry.role}${entry.role === 'assistant' && entry.streaming ? ' ai-msg-streaming' : ''}`}
+              >
                 {entry.role === 'user' && entry.scope && <AiScopeQuote scope={entry.scope} />}
                 {entry.role === 'user' && entry.attachments && entry.attachments.length > 0 && (
                   <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
                 )}
-                {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
-                {entry.text && (
-                  <div dir="auto">
-                    <Markdown text={entry.text} nav={docNav} />
+                {entry.role === 'assistant' && Boolean(entry.notes?.length || entry.waitLine) && (
+                  <div className="ai-msg-live">
+                    {entry.notes?.map((note, k) => (
+                      <div key={`un${k}`} className="ai-msg-notice">
+                        {note.text}
+                      </div>
+                    ))}
+                    {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
                   </div>
                 )}
-              </div>
-            ))}
-            <div className="ai-history-sep">{t('aiHistorySep')}</div>
-          </>
-        )}
-        {chat.length === 0 && historicChat.length === 0 && (
-          <div className="ai-chat-empty">
-            <div className="ai-chat-empty-title">
-              {t(docEmpty ? 'aiEmptyDraftTitle' : 'aiEmptyTitle')}
-            </div>
-            <div className="ai-chat-empty-body">
-              {t(docEmpty ? 'aiEmptyDraftBody1' : 'aiEmptyBody1')}
-              <br />
-              {t(docEmpty ? 'aiEmptyDraftBody2' : 'aiEmptyBody2')}
-            </div>
-            <div className="ai-starter-list">
-              {(readOnly
-                ? docEmpty
-                  ? []
-                  : READ_ONLY_STARTER_PROMPTS
-                : docEmpty
-                  ? DRAFT_STARTER_PROMPTS
-                  : EDIT_STARTER_PROMPTS
-              ).map((p) => (
-                <button
-                  key={p}
-                  className="ai-starter"
-                  onClick={() => {
-                    setInput(t(p))
-                    inputRef.current?.focus()
-                  }}
-                >
-                  {t(p)}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {chat.map((entry, i) => {
-          if (
-            entry.role === 'assistant' &&
-            !entry.text &&
-            !entry.streaming &&
-            !entry.error &&
-            !entry.notes?.length &&
-            !entry.tools?.length &&
-            !entry.stopped &&
-            !entry.snapshot &&
-            !entry.rollbackKept
-          ) {
-            return null
-          }
-          const isLast = i === chat.length - 1
-          // Action row appears once per completed reply: on the turn's final segment only
-          // (mid-turn segments have a following assistant entry; the live turn ends when !busy)
-          const turnEnded = isTurnEnded(chat, i, busy)
-          const showToolbar =
-            entry.role === 'assistant' &&
-            !entry.streaming &&
-            turnEnded &&
-            // edits-only turns have no text but still carry the rollback point
-            !!(entry.text || entry.error || entry.snapshot)
-          const chipView = getEntryResultChipView(
-            chat,
-            i,
-            busy,
-            (key, vars) => aiUniworkText(lang, key, vars),
-            {
-              provider: settings.provider,
-              mutated: Boolean(entry.snapshot),
-              stopped: Boolean(entry.stopped),
-              hasStreamedText: entry.streamedText ?? Boolean(entry.text?.trim()),
-              clarifyAsked: Boolean(entry.clarifyReceipts?.length),
-              droppedToolCalls: droppedCallsOfNotes(entry.notes),
-              toolExecutions: entry.tools,
-              error: uniworkErrorForEntry(entry.errorKey, entry.error),
-            },
-          )
-          const chip = chipView?.chip ?? null
-          const chipLabel = chipView?.labelText ?? null
-          const stoppedText = chipView?.stoppedText ?? null
-          // a stop before the first token leaves only the stop filler as body: the stopped line replaces it
-          const bodyText =
-            stoppedText && entry.stopped && entry.streamedText === false ? '' : entry.text
-          // the chip is the first word of the answer paragraph, in the same node as the text
-          const chipLead =
-            chip && chipLabel ? (
-              <>
-                <span className="ai-result-chip" data-chip={chip.chip} data-tone={chip.tone}>
-                  {chipLabel}
-                </span>
-                {bodyText ? <span className="ai-result-chip-sep">: </span> : null}
-              </>
-            ) : undefined
-          return (
-            <div
-              key={i}
-              className={`ai-msg ai-msg-${entry.role}${entry.role === 'assistant' && entry.streaming ? ' ai-msg-streaming' : ''}`}
-            >
-              {entry.role === 'user' && entry.scope && <AiScopeQuote scope={entry.scope} />}
-              {entry.role === 'user' && entry.attachments && entry.attachments.length > 0 && (
-                <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
-              )}
-              {entry.role === 'assistant' && Boolean(entry.notes?.length || entry.waitLine) && (
-                <div className="ai-msg-live">
-                  {entry.notes?.map((note, k) => (
-                    <div key={`un${k}`} className="ai-msg-notice">
-                      {note.text}
-                    </div>
-                  ))}
-                  {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
-                </div>
-              )}
-              {entry.role === 'assistant' && !entry.text && entry.streaming ? (
-                <span className="ai-typing-row">
-                  <AiTypingIndicator
-                    label={entry.tools?.length ? t('aiWorking') : t('aiThinking')}
-                  />
-                </span>
-              ) : entry.role === 'assistant' ? (
-                <div className="ai-msg-answer" dir="auto">
-                  {(bodyText || chipLead) && (
-                    <Markdown text={bodyText || ''} nav={docNav} lead={chipLead} />
-                  )}
-                </div>
-              ) : (
-                <span dir="auto">{entry.text}</span>
-              )}
-              {stoppedText && (
-                <div className="ai-run-stopped" dir="auto">
-                  {stoppedText}
-                </div>
-              )}
-              {entry.rollbackKept && (
-                <div className="ai-run-stopped ai-rollback-kept" role="status" dir="auto">
-                  {t('aiRollbackKept', {
-                    parts: entry.rollbackKept
-                      .map((part) => t(SIDE_PART_KEYS[part]))
-                      .join(t('aiSidePartSep')),
-                  })}
-                </div>
-              )}
-              {(chip?.chip === 'edited' || i === acceptAt) && (
-                <div className="ai-result-actions">
-                  <button
-                    type="button"
-                    className="ai-result-view-changes"
-                    onClick={focusFirstAiChange}
-                  >
-                    {aiUniworkText(lang, 'aiResultViewChanges')}
-                  </button>
-                  {i === acceptAt && (
+                {entry.role === 'assistant' && !entry.text && entry.streaming ? (
+                  <span className="ai-typing-row">
+                    <AiTypingIndicator
+                      label={entry.tools?.length ? t('aiWorking') : t('aiThinking')}
+                    />
+                  </span>
+                ) : entry.role === 'assistant' ? (
+                  <div className="ai-msg-answer" dir="auto">
+                    {(bodyText || chipLead) && (
+                      <Markdown text={bodyText || ''} nav={docNav} lead={chipLead} />
+                    )}
+                  </div>
+                ) : (
+                  <span dir="auto">{entry.text}</span>
+                )}
+                {stoppedText && (
+                  <div className="ai-run-stopped" dir="auto">
+                    {stoppedText}
+                  </div>
+                )}
+                {entry.rollbackKept && (
+                  <div className="ai-run-stopped ai-rollback-kept" role="status" dir="auto">
+                    {t('aiRollbackKept', {
+                      parts: entry.rollbackKept
+                        .map((part) => t(SIDE_PART_KEYS[part]))
+                        .join(t('aiSidePartSep')),
+                    })}
+                  </div>
+                )}
+                {(chip?.chip === 'edited' || i === acceptAt) && (
+                  <div className="ai-result-actions">
                     <button
                       type="button"
-                      className="ai-result-view-changes ai-accept-changes"
-                      data-tip={t('aiAcceptMarkedTitle')}
-                      onClick={() => {
-                        clearAiHighlights()
-                        setScopeTick((n) => n + 1)
-                      }}
+                      className="ai-result-view-changes"
+                      onClick={focusFirstAiChange}
                     >
-                      {t('aiAcceptMarked')}
+                      {aiUniworkText(lang, 'aiResultViewChanges')}
                     </button>
-                  )}
-                  {chip?.chip === 'edited' && (
-                    <span className="ai-result-edited-hint">
-                      {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
-                    </span>
-                  )}
-                </div>
-              )}
-              {entry.role === 'assistant' && entry.usage && (
-                <div className="ai-message-usage">
-                  <AiUsageChip usage={entry.usage} lang={lang} />
-                </div>
-              )}
-              {entry.clarifyReceipts?.map((qa, k) => (
-                <div key={`ca${k}`} className="ai-clarify-answered">
-                  {qa.map((pair, m) => (
-                    <div key={m} className="ai-clarify-answered-row">
-                      <div className="ai-clarify-answered-q">{pair.q}</div>
-                      <div className="ai-clarify-answered-a">{pair.a}</div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-              {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
-              {entry.mindmap && (
-                <MindMapCard
-                  tree={entry.mindmap}
-                  onAsk={(label) => {
-                    setInput(t('aiMindMapAskPrompt', { label }))
-                    inputRef.current?.focus()
-                  }}
-                  onJumpBlock={(index) => navigateToBlock(editorRef.current, index)}
-                />
-              )}
-              {entry.error &&
-                (aiNoticeKind(entry.error) ? (
-                  // "nothing to chat with" is a setup / plan state: a plain notice, not a red error
-                  <div className="ai-msg-notice">{aiNoticeBody(entry.error)}</div>
-                ) : (
-                  <div className="ai-msg-error">
-                    {uniworkErrorLineText(chip, entry.error, (error) =>
-                      t('aiErrorPrefix', { error }),
+                    {i === acceptAt && (
+                      <button
+                        type="button"
+                        className="ai-result-view-changes ai-accept-changes"
+                        data-tip={t('aiAcceptMarkedTitle')}
+                        onClick={() => {
+                          clearAiHighlights()
+                          setScopeTick((n) => n + 1)
+                        }}
+                      >
+                        {t('aiAcceptMarked')}
+                      </button>
                     )}
+                    {chip?.chip === 'edited' && (
+                      <span className="ai-result-edited-hint">
+                        {singleShortcutHint(aiUniworkText(lang, 'aiResultEditedHint'))}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {entry.role === 'assistant' && entry.usage && (
+                  <div className="ai-message-usage">
+                    <AiUsageChip usage={entry.usage} lang={lang} />
+                  </div>
+                )}
+                {entry.clarifyReceipts?.map((qa, k) => (
+                  <div key={`ca${k}`} className="ai-clarify-answered">
+                    {qa.map((pair, m) => (
+                      <div key={m} className="ai-clarify-answered-row">
+                        <div className="ai-clarify-answered-q">{pair.q}</div>
+                        <div className="ai-clarify-answered-a">{pair.a}</div>
+                      </div>
+                    ))}
                   </div>
                 ))}
-              {entry.error && (
-                <AiErrorAction
-                  chip={chip}
-                  lang={lang}
-                  waiting={Boolean(entry.waitLine)}
-                  onRetry={isLast && !busy && lastInstructionRef.current ? retry : undefined}
-                  onChooseProvider={() => void window.desktop?.openAiModelSettings?.()}
-                  onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
-                  onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
-                />
-              )}
-              {cap('billing') && entry.error && aiNoticeKind(entry.error) && (
-                <div className="ai-msg-actions">
-                  <button
-                    className="ai-login-btn"
-                    onClick={() => void window.desktop.aiOpenBilling?.()}
-                  >
-                    {t('aiOpenSettingsBtn')}
-                  </button>
-                </div>
-              )}
-              {showToolbar && (
-                <div className="ai-msg-toolbar">
-                  {entry.text && (
-                    <button
-                      className="ai-msg-tool-btn"
-                      onClick={() => copyMessage(entry.text, i)}
-                      aria-label={t('aiCopyReplyTitle')}
-                      data-tip={t('aiCopyReplyTitle')}
-                    >
-                      {copiedIdx === i ? (
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      ) : (
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                          <path
-                            d="M14.6113 5.34253C16.0608 5.3428 17.2363 6.518 17.2363 7.96753V15.5066C17.2361 16.956 16.0607 18.1313 14.6113 18.1316H7.07227C5.62267 18.1316 4.44751 16.9561 4.44727 15.5066V7.96753C4.44732 6.51783 5.62255 5.34253 7.07227 5.34253H14.6113ZM7.07227 6.59253C6.31291 6.59253 5.69732 7.20819 5.69727 7.96753V15.5066C5.69751 16.2658 6.31302 16.8816 7.07227 16.8816H14.6113C15.3703 16.8813 15.9861 16.2656 15.9863 15.5066V7.96753C15.9863 7.20835 15.3705 6.5928 14.6113 6.59253H7.07227ZM10.0176 2.8689C10.3626 2.86905 10.6426 3.14882 10.6426 3.4939C10.6425 3.83888 10.3626 4.11874 10.0176 4.1189H4.59961C3.84022 4.1189 3.22461 4.73451 3.22461 5.4939V11.324C3.22433 11.6689 2.94461 11.949 2.59961 11.949C2.25461 11.949 1.97489 11.6689 1.97461 11.324V5.4939C1.97461 4.04415 3.14987 2.8689 4.59961 2.8689H10.0176Z"
-                            fill="currentColor"
-                          />
-                        </svg>
+                {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
+                {entry.mindmap && (
+                  <MindMapCard
+                    tree={entry.mindmap}
+                    onAsk={(label) => {
+                      setInput(t('aiMindMapAskPrompt', { label }))
+                      inputRef.current?.focus()
+                    }}
+                    onJumpBlock={(index) => navigateToBlock(editorRef.current, index)}
+                  />
+                )}
+                {entry.error &&
+                  (aiNoticeKind(entry.error) ? (
+                    // "nothing to chat with" is a setup / plan state: a plain notice, not a red error
+                    <div className="ai-msg-notice">{aiNoticeBody(entry.error)}</div>
+                  ) : (
+                    <div className="ai-msg-error">
+                      {uniworkErrorLineText(chip, entry.error, (error) =>
+                        t('aiErrorPrefix', { error }),
                       )}
+                    </div>
+                  ))}
+                {entry.error && (
+                  <AiErrorAction
+                    chip={chip}
+                    lang={lang}
+                    waiting={Boolean(entry.waitLine)}
+                    onRetry={isLast && !busy && lastInstructionRef.current ? retry : undefined}
+                    onChooseProvider={() => void window.desktop?.openAiModelSettings?.()}
+                    onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
+                    onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
+                  />
+                )}
+                {cap('billing') && entry.error && aiNoticeKind(entry.error) && (
+                  <div className="ai-msg-actions">
+                    <button
+                      className="ai-login-btn"
+                      onClick={() => void window.desktop.aiOpenBilling?.()}
+                    >
+                      {t('aiOpenSettingsBtn')}
                     </button>
-                  )}
-                  {isLast &&
-                    !busy &&
-                    lastInstructionRef.current &&
-                    !aiNoticeKind(entry.error) &&
-                    !isUniworkRefusalErrorKey(entry.errorKey) &&
-                    // the labelled "Thử lại" under the error line is the retry of an error turn
-                    chip?.errorLine?.action !== 'retry' && (
+                  </div>
+                )}
+                {showToolbar && (
+                  <div className="ai-msg-toolbar">
+                    {entry.text && (
                       <button
                         className="ai-msg-tool-btn"
-                        onClick={retry}
-                        aria-label={t('aiRegenerateTitle')}
-                        data-tip={t('aiRegenerateTitle')}
+                        onClick={() => copyMessage(entry.text, i)}
+                        aria-label={t('aiCopyReplyTitle')}
+                        data-tip={t('aiCopyReplyTitle')}
                       >
-                        {/* 24-canvas glyph at 18px (near-full-bleed paths, sized for optical
+                        {copiedIdx === i ? (
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        ) : (
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path
+                              d="M14.6113 5.34253C16.0608 5.3428 17.2363 6.518 17.2363 7.96753V15.5066C17.2361 16.956 16.0607 18.1313 14.6113 18.1316H7.07227C5.62267 18.1316 4.44751 16.9561 4.44727 15.5066V7.96753C4.44732 6.51783 5.62255 5.34253 7.07227 5.34253H14.6113ZM7.07227 6.59253C6.31291 6.59253 5.69732 7.20819 5.69727 7.96753V15.5066C5.69751 16.2658 6.31302 16.8816 7.07227 16.8816H14.6113C15.3703 16.8813 15.9861 16.2656 15.9863 15.5066V7.96753C15.9863 7.20835 15.3705 6.5928 14.6113 6.59253H7.07227ZM10.0176 2.8689C10.3626 2.86905 10.6426 3.14882 10.6426 3.4939C10.6425 3.83888 10.3626 4.11874 10.0176 4.1189H4.59961C3.84022 4.1189 3.22461 4.73451 3.22461 5.4939V11.324C3.22433 11.6689 2.94461 11.949 2.59961 11.949C2.25461 11.949 1.97489 11.6689 1.97461 11.324V5.4939C1.97461 4.04415 3.14987 2.8689 4.59961 2.8689H10.0176Z"
+                              fill="currentColor"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                    {isLast &&
+                      !busy &&
+                      lastInstructionRef.current &&
+                      !aiNoticeKind(entry.error) &&
+                      !isUniworkRefusalErrorKey(entry.errorKey) &&
+                      // the labelled "Thử lại" under the error line is the retry of an error turn
+                      chip?.errorLine?.action !== 'retry' && (
+                        <button
+                          className="ai-msg-tool-btn"
+                          onClick={retry}
+                          aria-label={t('aiRegenerateTitle')}
+                          data-tip={t('aiRegenerateTitle')}
+                        >
+                          {/* 24-canvas glyph at 18px (near-full-bleed paths, sized for optical
                           parity with the copy icon): stroke 1.5 paints 1.125px (1:16) */}
+                          <svg
+                            style={{ width: 18, height: 18 }}
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden
+                          >
+                            <path d="M3.68881 9.85339C4.1791 8.0054 5.28205 6.30704 6.9459 5.09101C10.8046 2.27085 16.2188 3.11279 19.0389 6.97147C19.7242 7.90904 20.1932 8.93842 20.4553 10.0001" />
+                            <path d="M2.00452 8.46411L2.87229 10.7059C2.96814 10.9535 3.24658 11.0765 3.4942 10.9807L5.73594 10.1129" />
+                            <path d="M20.3308 14.4908C19.8405 16.3388 18.7376 18.0372 17.0738 19.2532C13.215 22.0734 7.80083 21.2314 4.98071 17.3728C4.22167 16.3342 3.72792 15.183 3.48686 13.9999" />
+                            <path d="M22.0151 15.8801L21.1474 13.6384C21.0515 13.3908 20.7731 13.2677 20.5255 13.3636L18.2837 14.2314" />
+                          </svg>
+                        </button>
+                      )}
+                    {entry.snapshot && (
+                      <>
+                        {/* hairline between reply actions (icons) and the document action (icon+label);
+                          CSS shows it only when an icon button actually precedes it */}
+                        <span className="ai-rollback-sep" aria-hidden />
+                        <RollbackButton
+                          disabled={busy}
+                          onClick={() => rollback(i, entry.snapshot!)}
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
+                {entry.turnLimit && isLast && !busy && (
+                  <button className="ai-continue-btn" onClick={continueRun}>
+                    {t('aiContinue')}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+          {saveOffer && !busy && (
+            <AiSaveDraftCard
+              lang={lang}
+              name={saveOffer.name}
+              onSave={() => {
+                setSaveOffer(null)
+                const detail: AiSaveOfferDetail = { name: saveOffer.name }
+                window.dispatchEvent(new CustomEvent(AI_SAVE_OFFER_EVENT, { detail }))
+              }}
+              onLater={() => setSaveOffer(null)}
+            />
+          )}
+        </div>
+
+        {activeClarify && (
+          <div className="ai-composer">
+            <ClarifyCard
+              questions={activeClarify}
+              onSubmit={(answers, qa) => {
+                setChat((prev) => withReceipt(prev, qa))
+                clarifyResolverRef.current?.({ answers })
+                clarifyResolverRef.current = null
+                setActiveClarify(null)
+              }}
+              onSkip={dismissClarify}
+            />
+          </div>
+        )}
+        <div className="ai-composer" style={activeClarify ? { display: 'none' } : undefined}>
+          {readOnly && !isUniwork && (
+            <div className="ai-readonly-notice">{t('aiViewOnlyNotice')}</div>
+          )}
+          {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
+          {activePartial && (
+            <div className="ai-queue ai-partial-card" role="group" aria-label={t('aiPartialTitle')}>
+              <div className="ai-queue-head">
+                <span className="ai-queue-title">{t('aiPartialTitle')}</span>
+              </div>
+              <div className="ai-queue-hint">
+                {t('aiPartialBody', { blocks: activePartial.blocks })}
+              </div>
+              <div className="ai-queue-foot">
+                <button
+                  type="button"
+                  className="ai-queue-discard"
+                  onClick={() => decidePartial(false)}
+                >
+                  {t('aiPartialDiscard')}
+                </button>
+                <button type="button" className="ai-queue-send" onClick={() => decidePartial(true)}>
+                  {t('aiPartialAdopt')}
+                </button>
+              </div>
+            </div>
+          )}
+          {busy && editsPaused && (
+            <div className="ai-edits-paused" role="status">
+              {t('aiEditsPaused')}
+            </div>
+          )}
+          <EditQueueCard
+            items={editQueue}
+            editor={editor}
+            busy={busy}
+            onEditInstruction={(qid, text) => onQueueEditInstruction?.(qid, text)}
+            onRemove={(qid) => onQueueRemove?.(qid)}
+            onDiscardAll={() => onQueueClear?.()}
+            onSend={sendQueue}
+            onFocus={(qid) => onQueueFocus?.(qid)}
+          />
+          <AiComposer
+            queueStrip={
+              <AiQueueStrip
+                items={msgQueue.queued}
+                labels={AI_QUEUE_LABELS[lang]}
+                onUpdate={msgQueue.update}
+                onRemove={msgQueue.remove}
+                onClear={msgQueue.clear}
+                paused={msgQueue.paused}
+                onTogglePause={msgQueue.togglePaused}
+                onMove={msgQueue.move}
+              />
+            }
+            onQueue={enqueueDraft}
+            queuePlaceholder={AI_QUEUE_LABELS[lang].queuePlaceholder}
+            header={
+              (hasScopeSelection || attachments.length > 0) && (
+                <>
+                  {hasScopeSelection && (
+                    <div className="ai-scope-row">
+                      <span className="ai-scope-hint">
+                        <button
+                          type="button"
+                          className="ai-scope-label"
+                          onClick={() => setScopePreviewOpen((v) => !v)}
+                          aria-expanded={scopePreviewOpen}
+                          data-tip={t('aiScopeSelectionTip')}
+                        >
+                          {t('aiScopeSelection', { words: countWords(selectionText) })}
+                        </button>
+                        <button
+                          type="button"
+                          className="ai-scope-clear"
+                          onClick={clearScopeSelection}
+                          data-tip={t('aiScopeClearTitle')}
+                          aria-label={t('aiScopeClearTitle')}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 32 32" aria-hidden>
+                            <path
+                              d="M24 9.4L22.6 8L16 14.6L9.4 8L8 9.4l6.6 6.6L8 22.6L9.4 24l6.6-6.6l6.6 6.6l1.4-1.4l-6.6-6.6L24 9.4z"
+                              fill="currentColor"
+                            />
+                          </svg>
+                        </button>
+                      </span>
+                      {scopePreviewOpen && (
+                        <div className="ai-scope-preview">
+                          {selectionText.length > 400
+                            ? `${selectionText.slice(0, 400)}…`
+                            : selectionText}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {attachments.length > 0 && (
+                    <div className="ai-attachments" onScroll={onAttachmentsScroll}>
+                      {attachments.map((a) =>
+                        ATTACHMENT_IMAGE_EXTS.has(a.ext) ? (
+                          <span key={a.path} className="ai-attachment-thumb" data-tip={a.path}>
+                            {attachmentPreviews[a.path] ? (
+                              <img src={attachmentPreviews[a.path]} alt={a.name} />
+                            ) : (
+                              <span className="ai-attachment-thumb-pending" aria-hidden>
+                                <img src={fileImageIcon} alt="" />
+                              </span>
+                            )}
+                            <button
+                              className="ai-attachment-thumb-remove"
+                              onClick={() => removeAttachment(a.path)}
+                              data-tip={t('aiRemoveAttachmentTitle')}
+                              aria-label={t('aiRemoveAttachmentTitle')}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 32 32" aria-hidden>
+                                <path
+                                  d="M24 9.4L22.6 8L16 14.6L9.4 8L8 9.4l6.6 6.6L8 22.6L9.4 24l6.6-6.6l6.6 6.6l1.4-1.4l-6.6-6.6L24 9.4z"
+                                  fill="currentColor"
+                                  stroke="currentColor"
+                                  strokeWidth="0.25"
+                                />
+                              </svg>
+                            </button>
+                          </span>
+                        ) : (
+                          <span key={a.path} className="ai-attachment-card" data-tip={a.path}>
+                            <span className="ai-attachment-card-icon">
+                              <AttachmentCardIcon ext={a.ext} />
+                            </span>
+                            <span className="ai-attachment-card-meta">
+                              <span className="ai-attachment-card-name">
+                                {truncateCardName(a.name)}
+                              </span>
+                              <span className="ai-attachment-card-size">
+                                {formatAttachmentSize(a.sizeBytes)}
+                              </span>
+                            </span>
+                            <button
+                              className="ai-attachment-thumb-remove"
+                              onClick={() => removeAttachment(a.path)}
+                              data-tip={t('aiRemoveAttachmentTitle')}
+                              aria-label={t('aiRemoveAttachmentTitle')}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 32 32" aria-hidden>
+                                <path
+                                  d="M24 9.4L22.6 8L16 14.6L9.4 8L8 9.4l6.6 6.6L8 22.6L9.4 24l6.6-6.6l6.6 6.6l1.4-1.4l-6.6-6.6L24 9.4z"
+                                  fill="currentColor"
+                                  stroke="currentColor"
+                                  strokeWidth="0.25"
+                                />
+                              </svg>
+                            </button>
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  )}
+                </>
+              )
+            }
+            value={input}
+            busy={busy}
+            placeholder={t('aiInputPlaceholder')}
+            hintIdle={t('aiHintIdle')}
+            hintBusy={t('aiHintBusy')}
+            hintIdleTitle={t('aiHintIdleTitle')}
+            sendLabel={t('aiSend')}
+            stopLabel={t('aiStop')}
+            iconOnly
+            sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
+            sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
+            stopIcon={<img src={sendStop} alt="" aria-hidden />}
+            textareaRef={inputRef}
+            onChange={setInput}
+            onSend={run}
+            onStop={cancel}
+            onPasteFiles={(files) => void onPasteFiles(files)}
+            lang={lang}
+            viewOnly={isUniwork && readOnly ? true : undefined}
+            uniwork={
+              isUniwork
+                ? {
+                    provider: settings.provider,
+                    lang,
+                    note: composerNoteState,
+                    onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
+                    onChooseProvider: () => void window.desktop?.openAiModelSettings?.(),
+                    onAnnounce: setComposerAnnouncement,
+                    onSendBlockedChange: uniworkGate.onSendBlockedChange,
+                    registerBlockedHandler: uniworkGate.registerBlockedHandler,
+                    disclosure: {
+                      orgName: cloudSnapshot?.orgName ?? undefined,
+                      ackKey: {
+                        account: cloudSnapshot?.accountId ?? '',
+                        org: cloudSnapshot?.orgId ?? '',
+                        document: filePath ?? 'local',
+                      },
+                      variant: filePath ? 'document' : 'local',
+                    },
+                  }
+                : undefined
+            }
+            footerStart={
+              <>
+                <AiModelPicker
+                  bridge={MODEL_BRIDGE}
+                  lang={lang}
+                  onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
+                />
+                {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
+                <button
+                  className="ai-attach-btn"
+                  onClick={pickAttachments}
+                  data-tip={t('aiAttachTitle')}
+                  aria-label={t('aiAttachTitle')}
+                >
+                  <img src={attachIcon} alt="" aria-hidden />
+                </button>
+                {!readOnly && (
+                  // under tracked-changes protection the pill is on and locked: aria-disabled (not
+                  // disabled) keeps it in the Tab order, and the reason is an in-panel tip that opens on
+                  // hover and on keyboard focus (the global ScreenTip overflowed the panel)
+                  <span
+                    className={`ai-track-wrap${trackForced ? ' forced' : ''}`}
+                    onMouseEnter={trackForced ? () => setTrackTipHover(true) : undefined}
+                    onMouseLeave={trackForced ? () => setTrackTipHover(false) : undefined}
+                  >
+                    <button
+                      className={`ai-track-btn${trackShown ? ' on' : ''}${trackForced ? ' locked' : ''}`}
+                      onClick={toggleTrackChanges}
+                      aria-disabled={trackForced ? true : undefined}
+                      aria-describedby={trackForced ? 'ai-track-forced-reason' : undefined}
+                      onFocus={trackForced ? () => setTrackTipFocus(true) : undefined}
+                      onBlur={trackForced ? () => setTrackTipFocus(false) : undefined}
+                      onKeyDown={
+                        trackForced
+                          ? (e) => {
+                              if (e.key === 'Escape') {
+                                setTrackTipFocus(false)
+                                setTrackTipHover(false)
+                              }
+                            }
+                          : undefined
+                      }
+                      data-tip={
+                        trackForced
+                          ? undefined
+                          : trackShown
+                            ? t('aiTrackOnTitle')
+                            : t('aiTrackOffTitle')
+                      }
+                    >
+                      {trackForced ? (
                         <svg
-                          style={{ width: 18, height: 18 }}
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                          className="ai-track-lock"
+                          width="10"
+                          height="10"
+                          viewBox="0 0 16 16"
+                          fill="currentColor"
                           aria-hidden
                         >
-                          <path d="M3.68881 9.85339C4.1791 8.0054 5.28205 6.30704 6.9459 5.09101C10.8046 2.27085 16.2188 3.11279 19.0389 6.97147C19.7242 7.90904 20.1932 8.93842 20.4553 10.0001" />
-                          <path d="M2.00452 8.46411L2.87229 10.7059C2.96814 10.9535 3.24658 11.0765 3.4942 10.9807L5.73594 10.1129" />
-                          <path d="M20.3308 14.4908C19.8405 16.3388 18.7376 18.0372 17.0738 19.2532C13.215 22.0734 7.80083 21.2314 4.98071 17.3728C4.22167 16.3342 3.72792 15.183 3.48686 13.9999" />
-                          <path d="M22.0151 15.8801L21.1474 13.6384C21.0515 13.3908 20.7731 13.2677 20.5255 13.3636L18.2837 14.2314" />
+                          <path d="M4 7V5a4 4 0 1 1 8 0v2h.5A1.5 1.5 0 0 1 14 8.5v5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-5A1.5 1.5 0 0 1 3.5 7H4Zm1.5 0h5V5a2.5 2.5 0 0 0-5 0v2Z" />
                         </svg>
-                      </button>
-                    )}
-                  {entry.snapshot && (
-                    <>
-                      {/* hairline between reply actions (icons) and the document action (icon+label);
-                          CSS shows it only when an icon button actually precedes it */}
-                      <span className="ai-rollback-sep" aria-hidden />
-                      <RollbackButton
-                        disabled={busy}
-                        onClick={() => rollback(i, entry.snapshot!)}
-                      />
-                    </>
-                  )}
-                </div>
-              )}
-              {entry.turnLimit && isLast && !busy && (
-                <button className="ai-continue-btn" onClick={continueRun}>
-                  {t('aiContinue')}
-                </button>
-              )}
-            </div>
-          )
-        })}
-        {saveOffer && !busy && (
-          <AiSaveDraftCard
-            lang={lang}
-            name={saveOffer.name}
-            onSave={() => {
-              setSaveOffer(null)
-              const detail: AiSaveOfferDetail = { name: saveOffer.name }
-              window.dispatchEvent(new CustomEvent(AI_SAVE_OFFER_EVENT, { detail }))
-            }}
-            onLater={() => setSaveOffer(null)}
-          />
-        )}
-      </div>
-
-      {activeClarify && (
-        <div className="ai-composer">
-          <ClarifyCard
-            questions={activeClarify}
-            onSubmit={(answers, qa) => {
-              setChat((prev) => withReceipt(prev, qa))
-              clarifyResolverRef.current?.({ answers })
-              clarifyResolverRef.current = null
-              setActiveClarify(null)
-            }}
-            onSkip={dismissClarify}
-          />
-        </div>
-      )}
-      <div className="ai-composer" style={activeClarify ? { display: 'none' } : undefined}>
-        {readOnly && !isUniwork && (
-          <div className="ai-readonly-notice">{t('aiViewOnlyNotice')}</div>
-        )}
-        {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
-        {activePartial && (
-          <div className="ai-queue ai-partial-card" role="group" aria-label={t('aiPartialTitle')}>
-            <div className="ai-queue-head">
-              <span className="ai-queue-title">{t('aiPartialTitle')}</span>
-            </div>
-            <div className="ai-queue-hint">
-              {t('aiPartialBody', { blocks: activePartial.blocks })}
-            </div>
-            <div className="ai-queue-foot">
-              <button
-                type="button"
-                className="ai-queue-discard"
-                onClick={() => decidePartial(false)}
-              >
-                {t('aiPartialDiscard')}
-              </button>
-              <button type="button" className="ai-queue-send" onClick={() => decidePartial(true)}>
-                {t('aiPartialAdopt')}
-              </button>
-            </div>
-          </div>
-        )}
-        {busy && editsPaused && (
-          <div className="ai-edits-paused" role="status">
-            {t('aiEditsPaused')}
-          </div>
-        )}
-        <EditQueueCard
-          items={editQueue}
-          editor={editor}
-          busy={busy}
-          onEditInstruction={(qid, text) => onQueueEditInstruction?.(qid, text)}
-          onRemove={(qid) => onQueueRemove?.(qid)}
-          onDiscardAll={() => onQueueClear?.()}
-          onSend={sendQueue}
-          onFocus={(qid) => onQueueFocus?.(qid)}
-        />
-        <AiComposer
-          queueStrip={
-            <AiQueueStrip
-              items={msgQueue.queued}
-              labels={AI_QUEUE_LABELS[lang]}
-              onUpdate={msgQueue.update}
-              onRemove={msgQueue.remove}
-              onClear={msgQueue.clear}
-              paused={msgQueue.paused}
-              onTogglePause={msgQueue.togglePaused}
-              onMove={msgQueue.move}
-            />
-          }
-          onQueue={enqueueDraft}
-          queuePlaceholder={AI_QUEUE_LABELS[lang].queuePlaceholder}
-          header={
-            (hasScopeSelection || attachments.length > 0) && (
-              <>
-                {hasScopeSelection && (
-                  <div className="ai-scope-row">
-                    <span className="ai-scope-hint">
-                      <button
-                        type="button"
-                        className="ai-scope-label"
-                        onClick={() => setScopePreviewOpen((v) => !v)}
-                        aria-expanded={scopePreviewOpen}
-                        data-tip={t('aiScopeSelectionTip')}
-                      >
-                        {t('aiScopeSelection', { words: countWords(selectionText) })}
-                      </button>
-                      <button
-                        type="button"
-                        className="ai-scope-clear"
-                        onClick={clearScopeSelection}
-                        data-tip={t('aiScopeClearTitle')}
-                        aria-label={t('aiScopeClearTitle')}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 32 32" aria-hidden>
-                          <path
-                            d="M24 9.4L22.6 8L16 14.6L9.4 8L8 9.4l6.6 6.6L8 22.6L9.4 24l6.6-6.6l6.6 6.6l1.4-1.4l-6.6-6.6L24 9.4z"
-                            fill="currentColor"
-                          />
-                        </svg>
-                      </button>
-                    </span>
-                    {scopePreviewOpen && (
-                      <div className="ai-scope-preview">
-                        {selectionText.length > 400
-                          ? `${selectionText.slice(0, 400)}…`
-                          : selectionText}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {attachments.length > 0 && (
-                  <div className="ai-attachments" onScroll={onAttachmentsScroll}>
-                    {attachments.map((a) =>
-                      ATTACHMENT_IMAGE_EXTS.has(a.ext) ? (
-                        <span key={a.path} className="ai-attachment-thumb" data-tip={a.path}>
-                          {attachmentPreviews[a.path] ? (
-                            <img src={attachmentPreviews[a.path]} alt={a.name} />
-                          ) : (
-                            <span className="ai-attachment-thumb-pending" aria-hidden>
-                              <img src={fileImageIcon} alt="" />
-                            </span>
-                          )}
-                          <button
-                            className="ai-attachment-thumb-remove"
-                            onClick={() => removeAttachment(a.path)}
-                            data-tip={t('aiRemoveAttachmentTitle')}
-                            aria-label={t('aiRemoveAttachmentTitle')}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 32 32" aria-hidden>
-                              <path
-                                d="M24 9.4L22.6 8L16 14.6L9.4 8L8 9.4l6.6 6.6L8 22.6L9.4 24l6.6-6.6l6.6 6.6l1.4-1.4l-6.6-6.6L24 9.4z"
-                                fill="currentColor"
-                                stroke="currentColor"
-                                strokeWidth="0.25"
-                              />
-                            </svg>
-                          </button>
-                        </span>
                       ) : (
-                        <span key={a.path} className="ai-attachment-card" data-tip={a.path}>
-                          <span className="ai-attachment-card-icon">
-                            <AttachmentCardIcon ext={a.ext} />
-                          </span>
-                          <span className="ai-attachment-card-meta">
-                            <span className="ai-attachment-card-name">
-                              {truncateCardName(a.name)}
-                            </span>
-                            <span className="ai-attachment-card-size">
-                              {formatAttachmentSize(a.sizeBytes)}
-                            </span>
-                          </span>
-                          <button
-                            className="ai-attachment-thumb-remove"
-                            onClick={() => removeAttachment(a.path)}
-                            data-tip={t('aiRemoveAttachmentTitle')}
-                            aria-label={t('aiRemoveAttachmentTitle')}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 32 32" aria-hidden>
-                              <path
-                                d="M24 9.4L22.6 8L16 14.6L9.4 8L8 9.4l6.6 6.6L8 22.6L9.4 24l6.6-6.6l6.6 6.6l1.4-1.4l-6.6-6.6L24 9.4z"
-                                fill="currentColor"
-                                stroke="currentColor"
-                                strokeWidth="0.25"
-                              />
-                            </svg>
-                          </button>
-                        </span>
-                      ),
+                        <span className="ai-track-dot" aria-hidden />
+                      )}
+                      <span className="ai-track-label">{t('aiTrackChanges')}</span>
+                    </button>
+                    {trackForced && (
+                      <span
+                        id="ai-track-forced-reason"
+                        className="ai-track-tip"
+                        role="tooltip"
+                        data-open={trackTipHover || trackTipFocus ? 'true' : 'false'}
+                      >
+                        {t('aiTrackForced')}
+                      </span>
                     )}
-                  </div>
+                  </span>
                 )}
               </>
-            )
-          }
-          value={input}
-          busy={busy}
-          placeholder={t('aiInputPlaceholder')}
-          hintIdle={t('aiHintIdle')}
-          hintBusy={t('aiHintBusy')}
-          hintIdleTitle={t('aiHintIdleTitle')}
-          sendLabel={t('aiSend')}
-          stopLabel={t('aiStop')}
-          iconOnly
-          sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
-          sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
-          stopIcon={<img src={sendStop} alt="" aria-hidden />}
-          textareaRef={inputRef}
-          onChange={setInput}
-          onSend={run}
-          onStop={cancel}
-          onPasteFiles={(files) => void onPasteFiles(files)}
-          lang={lang}
-          viewOnly={isUniwork && readOnly ? true : undefined}
-          uniwork={
-            isUniwork
-              ? {
-                  provider: settings.provider,
-                  lang,
-                  note: composerNoteState,
-                  onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
-                  onChooseProvider: () => void window.desktop?.openAiModelSettings?.(),
-                  onAnnounce: setComposerAnnouncement,
-                  onSendBlockedChange: uniworkGate.onSendBlockedChange,
-                  registerBlockedHandler: uniworkGate.registerBlockedHandler,
-                  disclosure: {
-                    orgName: cloudSnapshot?.orgName ?? undefined,
-                    ackKey: {
-                      account: cloudSnapshot?.accountId ?? '',
-                      org: cloudSnapshot?.orgId ?? '',
-                      document: filePath ?? 'local',
-                    },
-                    variant: filePath ? 'document' : 'local',
-                  },
-                }
-              : undefined
-          }
-          footerStart={
-            <>
-              <AiModelPicker
-                bridge={MODEL_BRIDGE}
-                lang={lang}
-                onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
-              />
-              {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
-              <button
-                className="ai-attach-btn"
-                onClick={pickAttachments}
-                data-tip={t('aiAttachTitle')}
-                aria-label={t('aiAttachTitle')}
-              >
-                <img src={attachIcon} alt="" aria-hidden />
-              </button>
-              {!readOnly && (
-                // under tracked-changes protection the pill is on and locked: aria-disabled (not
-                // disabled) keeps it in the Tab order, and the reason is an in-panel tip that opens on
-                // hover and on keyboard focus (the global ScreenTip overflowed the panel)
-                <span
-                  className={`ai-track-wrap${trackForced ? ' forced' : ''}`}
-                  onMouseEnter={trackForced ? () => setTrackTipHover(true) : undefined}
-                  onMouseLeave={trackForced ? () => setTrackTipHover(false) : undefined}
-                >
-                  <button
-                    className={`ai-track-btn${trackShown ? ' on' : ''}${trackForced ? ' locked' : ''}`}
-                    onClick={toggleTrackChanges}
-                    aria-disabled={trackForced ? true : undefined}
-                    aria-describedby={trackForced ? 'ai-track-forced-reason' : undefined}
-                    onFocus={trackForced ? () => setTrackTipFocus(true) : undefined}
-                    onBlur={trackForced ? () => setTrackTipFocus(false) : undefined}
-                    onKeyDown={
-                      trackForced
-                        ? (e) => {
-                            if (e.key === 'Escape') {
-                              setTrackTipFocus(false)
-                              setTrackTipHover(false)
-                            }
-                          }
-                        : undefined
-                    }
-                    data-tip={
-                      trackForced
-                        ? undefined
-                        : trackShown
-                          ? t('aiTrackOnTitle')
-                          : t('aiTrackOffTitle')
-                    }
-                  >
-                    {trackForced ? (
-                      <svg
-                        className="ai-track-lock"
-                        width="10"
-                        height="10"
-                        viewBox="0 0 16 16"
-                        fill="currentColor"
-                        aria-hidden
-                      >
-                        <path d="M4 7V5a4 4 0 1 1 8 0v2h.5A1.5 1.5 0 0 1 14 8.5v5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-5A1.5 1.5 0 0 1 3.5 7H4Zm1.5 0h5V5a2.5 2.5 0 0 0-5 0v2Z" />
-                      </svg>
-                    ) : (
-                      <span className="ai-track-dot" aria-hidden />
-                    )}
-                    <span className="ai-track-label">{t('aiTrackChanges')}</span>
-                  </button>
-                  {trackForced && (
-                    <span
-                      id="ai-track-forced-reason"
-                      className="ai-track-tip"
-                      role="tooltip"
-                      data-open={trackTipHover || trackTipFocus ? 'true' : 'false'}
-                    >
-                      {t('aiTrackForced')}
-                    </span>
-                  )}
-                </span>
-              )}
-            </>
-          }
-        />
+            }
+          />
+        </div>
       </div>
     </aside>
   )

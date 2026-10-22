@@ -5837,12 +5837,17 @@ textarea:focus {
 }
 
 /* ================= transient toast (save feedback) ================= */
+/* bottom-centre, 8px over Univer's 36px sheet-tab strip, which sits above the 24px status bar:
+   the ribbon is taller than any fixed top offset. The status bar follows --ui-scale (zoom), the
+   Univer footer does not, so only the status part is scaled (68px at 1x, 80px at 1.5x). */
 
 .app-toast {
+  --toast-status-bar-h: 24px;
+  --toast-tab-strip-h: 36px;
   position: fixed;
-  top: 64px;
+  bottom: calc(var(--toast-status-bar-h) * var(--ui-scale, 1) + var(--toast-tab-strip-h) + 8px);
   left: 50%;
-  transform: translate(-50%, -8px);
+  transform: translate(-50%, 8px);
   z-index: 2000;
   display: flex;
   align-items: center;

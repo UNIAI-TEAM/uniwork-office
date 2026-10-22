@@ -44,6 +44,16 @@ const generated: readonly ShortcutAction[] = [
     match: 'key',
     guard: { noRepeat: true },
   },
+  // Ask UNI: open My AI in Ask UNI mode (ours-only; fires only while the shell page has focus)
+  {
+    id: 'shell-21',
+    scope: 'shell',
+    win: ['Ctrl+J'],
+    mac: ['Cmd+J'],
+    web: { win: [], mac: [] },
+    match: 'key',
+    guard: { noRepeat: true },
+  },
 ]
 
 export const shellUnmapped: readonly UnmappedShortcut[] = [
@@ -166,6 +176,16 @@ export const shellUnmapped: readonly UnmappedShortcut[] = [
     part: 'row',
     reason:
       'desktop: proposal has prose: "See common-21 and common-22"; web: proposal has prose: "n/a (desktop shell)"',
+  },
+  {
+    id: 'shell-21',
+    part: 'web.win',
+    reason: 'proposal has prose: "n/a (no shell page on web)"',
+  },
+  {
+    id: 'shell-21',
+    part: 'web.mac',
+    reason: 'proposal has prose: "n/a (no shell page on web)"',
   },
   {
     id: 'shell-dialog-keys',

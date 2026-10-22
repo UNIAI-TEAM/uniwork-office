@@ -248,6 +248,11 @@ function ToolSymbol({ symbol }: { readonly symbol: string }): React.JSX.Element 
 
 interface ExcelShellProps {
   readonly openingWorkbook: boolean
+  /// The open workbook's file name, for the Ask UNI chip in the AI panel.
+  readonly askUniDocumentName?: string
+  /// What names the open file for the Ask UNI binding: its path, which changes when the workbook is
+  /// saved to UniWork (the name does not).
+  readonly askUniBindingKey?: string
   readonly prompt: string
   readonly preview: ChangePlan | null
   readonly selectionFormat: SelectionFormat | null
@@ -545,6 +550,8 @@ export function ExcelShell({
   onCommand,
   onIsCellEditing,
   openingWorkbook,
+  askUniDocumentName,
+  askUniBindingKey,
   statusMessage,
   emptyCsvNotice,
   onOpenWorkbook,
@@ -1122,6 +1129,8 @@ export function ExcelShell({
         {cap('ai') && (
           <AiChatPanel
             isOpen={isCopilotOpen}
+            {...(askUniDocumentName !== undefined ? { askUniDocumentName } : {})}
+            {...(askUniBindingKey !== undefined ? { askUniBindingKey } : {})}
             hideRail={!aiSidebarEnabled}
             hasContent={sheetHasContent}
             chat={chat}
