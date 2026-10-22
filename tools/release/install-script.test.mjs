@@ -35,11 +35,10 @@ function builderSourcesText(channel) {
   const source = readFileSync(BUILDER, 'utf8')
   const constant = (name) => source.match(new RegExp(`const ${name} = '([^']+)'`))[1]
   const fn = source.match(/function aptSourcesText\(channel\) \{[\s\S]*?\n\}\n/)[0]
-  return new Function(
-    'APT_REPO_URL',
-    'APT_KEYRING_PATH',
-    `${fn}\nreturn aptSourcesText`,
-  )(constant('APT_REPO_URL'), constant('APT_KEYRING_PATH'))(channel)
+  return new Function('APT_REPO_URL', 'APT_KEYRING_PATH', `${fn}\nreturn aptSourcesText`)(
+    constant('APT_REPO_URL'),
+    constant('APT_KEYRING_PATH'),
+  )(channel)
 }
 
 let root
@@ -121,9 +120,7 @@ describe('install.sh', () => {
     assert.equal(lines[0], '#!/bin/sh')
     assert.equal(lines.at(-1), 'main "$@"')
     // no top-level command besides `set` and the function definitions: a cut-off download runs nothing
-    const topLevel = lines.filter(
-      (line) => /^[^\s#}]/.test(line) && !/^[a-z_]+\(\) \{$/.test(line),
-    )
+    const topLevel = lines.filter((line) => /^[^\s#}]/.test(line) && !/^[a-z_]+\(\) \{$/.test(line))
     assert.deepEqual(topLevel, ['set -eu', 'main "$@"'])
   })
 
