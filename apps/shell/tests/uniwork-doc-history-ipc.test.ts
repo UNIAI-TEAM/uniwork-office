@@ -2,13 +2,14 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DOC_HISTORY_CHANNELS } from '../src/shared/doc-history-api'
+import { createIpcSenderGuard, IPC_SENDER_REFUSED } from '../src/main/ipc-sender-guard'
+import { DOC_HISTORY_CHANNELS, docHistoryRejectionOf } from '../src/shared/doc-history-api'
 
 /**
  * UNI-2077: the history channels end to end on the main side
  * (`uniwork-doc-history:*` registered by the documents wiring, answered by the
- * history service through the real client against a stubbed server), and only
- * for the shell window's main frame.
+ * history service through the real client against a stubbed server), registered on the
+ * UNI-2073 guarded ipc object so only the shell window's main frame is answered.
  */
 
 let dir: string
@@ -66,7 +67,7 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-const mainFrame = { frame: 'main' }
+const mainFrame = { frame: 'main', url: 'app://shell/index.html' }
 const shell = {
   isDestroyed: () => false,
   isLoadingMainFrame: () => false,
@@ -78,11 +79,18 @@ const fromShell = { sender: shell, senderFrame: mainFrame }
 async function setup() {
   const { createUniworkDocs } = await import('../src/main/uniwork-docs/wiring')
   const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
+  const guard = createIpcSenderGuard({
+    shellContents: () => shell as never,
+    isTrustedEditorContents: () => false,
+    isTrustedShellUrl: (url) => url === mainFrame.url,
+    isTrustedEditorUrl: () => false,
+    log: () => undefined,
+  })
   createUniworkDocs(
-    {
+    guard.guarded({
       handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>
         handlers.set(channel, fn),
-    } as never,
+    }) as never,
     {
       shellWindow: () => null,
       shellContents: () => shell as never,
@@ -197,28 +205,35 @@ describe('main: the history handlers', () => {
     )
   })
 
-  it('refuses any sender but the shell main frame, before any request', async () => {
+  it('refuses any sender but the shell main frame through the guard, before any request', async () => {
     const { call } = await setup()
     const seen = stubServer(() => reply(200, { versions: [] }))
     const editor = { ...shell }
-    expect(
-      await call(
+    await expect(
+      call(
         DOC_HISTORY_CHANNELS.versions,
         { sender: editor, senderFrame: mainFrame },
-        {
-          documentId: 'doc_1',
-        },
+        { documentId: 'doc_1' },
       ),
-    ).toEqual({ ok: false, error: 'forbidden' })
-    expect(
-      await call(
+    ).rejects.toThrow(IPC_SENDER_REFUSED)
+    await expect(
+      call(
         DOC_HISTORY_CHANNELS.versions,
-        { sender: shell, senderFrame: {} },
-        {
-          documentId: 'doc_1',
-        },
+        { sender: shell, senderFrame: { url: mainFrame.url } },
+        { documentId: 'doc_1' },
       ),
-    ).toEqual({ ok: false, error: 'forbidden' })
+    ).rejects.toThrow(IPC_SENDER_REFUSED)
     expect(seen).toHaveLength(0)
+  })
+
+  it('the preload reads a refused sender as a forbidden result', async () => {
+    const { call } = await setup()
+    const refused = await call(
+      DOC_HISTORY_CHANNELS.versions,
+      { sender: { ...shell }, senderFrame: mainFrame },
+      { documentId: 'doc_1' },
+    ).catch((error: unknown) => docHistoryRejectionOf(error))
+    expect(refused).toEqual({ ok: false, error: 'forbidden', status: 403 })
+    expect(docHistoryRejectionOf(new Error('boom'))).toEqual({ ok: false, error: 'server_error' })
   })
 })

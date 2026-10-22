@@ -306,44 +306,26 @@ export function createDocHistoryService(deps: DocHistoryServiceDeps): UniworkDoc
 }
 
 /**
- * The shell window's main frame, as uniwork-auth checks it: the live sender is the shell's
- * webContents and the call comes from its main frame, never a subframe or an editor view.
- */
-export function isShellMainFrame(event: unknown, shell: unknown): boolean {
-  if (!event || typeof event !== 'object' || !shell) return false
-  const e = event as {
-    sender?: { isDestroyed?: () => boolean; mainFrame?: unknown }
-    senderFrame?: unknown
-  }
-  if (!e.sender || e.sender !== shell || e.sender.isDestroyed?.()) return false
-  return Boolean(e.senderFrame && e.senderFrame === e.sender.mainFrame)
-}
-
-/**
- * The channels, each answered only for the shell window's main frame (the
- * temporary rule until the UNI-2073 sender guard covers `uniwork-*` channels
- * at the composition point); any other sender gets `forbidden`.
+ * The channels. `ipc` is the guarded object from the composition (UNI-2073): `uniwork-doc-history:*`
+ * falls under the default `shell` policy, so only the shell window's main frame is answered. A
+ * refused sender makes the guard throw `ipc_sender_refused`; the preload turns that into `forbidden`.
  */
 export function registerDocHistoryIpc(
   ipc: Pick<IpcMain, 'handle'>,
   service: UniworkDocHistoryApi,
-  isShellMainFrame: (event: unknown) => boolean,
 ): void {
-  const refused: DocHistoryResult<never> = { ok: false, error: 'forbidden' }
-  const on = <K extends keyof UniworkDocHistoryApi>(name: K): void => {
-    ipc.handle(DOC_HISTORY_CHANNELS[name], (event, input: unknown) =>
-      isShellMainFrame(event)
-        ? (service[name] as (input: unknown) => Promise<unknown>)(input)
-        : Promise.resolve(refused),
+  const handle = (channel: string, name: keyof UniworkDocHistoryApi): void => {
+    ipc.handle(channel, (_event, input: unknown) =>
+      (service[name] as (input: unknown) => Promise<unknown>)(input),
     )
   }
-  on('versions')
-  on('version')
-  on('createVersion')
-  on('restore')
-  on('openVersion')
-  on('downloadVersion')
-  on('accessLogs')
+  handle(DOC_HISTORY_CHANNELS.versions, 'versions')
+  handle(DOC_HISTORY_CHANNELS.version, 'version')
+  handle(DOC_HISTORY_CHANNELS.createVersion, 'createVersion')
+  handle(DOC_HISTORY_CHANNELS.restore, 'restore')
+  handle(DOC_HISTORY_CHANNELS.openVersion, 'openVersion')
+  handle(DOC_HISTORY_CHANNELS.downloadVersion, 'downloadVersion')
+  handle(DOC_HISTORY_CHANNELS.accessLogs, 'accessLogs')
 }
 
 /**

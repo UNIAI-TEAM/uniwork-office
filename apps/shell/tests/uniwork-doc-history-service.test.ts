@@ -3,7 +3,6 @@ import type { DocHistoryClient } from '../src/main/uniwork-docs/doc-history-clie
 import {
   createDocHistoryService,
   docHistoryErrorOf,
-  isShellMainFrame,
   registerDocHistoryIpc,
   type DocHistoryServiceDeps,
 } from '../src/main/uniwork-docs/doc-history-service'
@@ -363,34 +362,13 @@ describe('docHistoryErrorOf', () => {
 })
 
 describe('registerDocHistoryIpc', () => {
-  it('answers the shell main frame only', async () => {
+  it('registers every channel on the ipc object it is given', async () => {
     const handlers = new Map<string, (event: unknown, input: unknown) => Promise<unknown>>()
     const ipc = { handle: vi.fn((ch: string, fn: never) => void handlers.set(ch, fn)) }
     const { service } = setup()
-    const shell = { id: 'shell' }
-    registerDocHistoryIpc(ipc as never, service, (event) => event === shell)
+    registerDocHistoryIpc(ipc as never, service)
     expect([...handlers.keys()].sort()).toEqual(Object.values(DOC_HISTORY_CHANNELS).sort())
     const call = handlers.get(DOC_HISTORY_CHANNELS.versions)!
-    expect(await call(shell, { documentId: 'doc_1' })).toMatchObject({ ok: true })
-    expect(await call({ id: 'editor' }, { documentId: 'doc_1' })).toEqual({
-      ok: false,
-      error: 'forbidden',
-    })
-  })
-})
-
-describe('isShellMainFrame', () => {
-  const mainFrame = { frame: 'main' }
-  const shell = { isDestroyed: () => false, mainFrame }
-
-  it('is the shell webContents main frame only', () => {
-    expect(isShellMainFrame({ sender: shell, senderFrame: mainFrame }, shell)).toBe(true)
-    expect(isShellMainFrame({ sender: shell, senderFrame: { frame: 'sub' } }, shell)).toBe(false)
-    const editor = { isDestroyed: () => false, mainFrame }
-    expect(isShellMainFrame({ sender: editor, senderFrame: mainFrame }, shell)).toBe(false)
-    expect(isShellMainFrame({ sender: shell, senderFrame: mainFrame }, null)).toBe(false)
-    const gone = { isDestroyed: () => true, mainFrame }
-    expect(isShellMainFrame({ sender: gone, senderFrame: mainFrame }, gone)).toBe(false)
-    expect(isShellMainFrame(undefined, shell)).toBe(false)
+    expect(await call({}, { documentId: 'doc_1' })).toMatchObject({ ok: true })
   })
 })

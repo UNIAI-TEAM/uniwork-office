@@ -110,6 +110,8 @@ import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../shared
 import {
   asDocHistoryResult,
   DOC_HISTORY_CHANNELS,
+  docHistoryRejectionOf,
+  type DocHistoryResult,
   type UniworkDocHistoryApi,
 } from '../shared/doc-history-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
@@ -2096,27 +2098,35 @@ contextBridge.exposeInMainWorld('uniworkShare', shareApi)
  * UNI-2077: the Version history and Access log sheets. Main answers every call
  * with a `DocHistoryResult`; the guard keeps its known fields only.
  */
+async function invokeDocHistory<T>(channel: string, input: unknown): Promise<DocHistoryResult<T>> {
+  try {
+    return asDocHistoryResult<T>(await ipcRenderer.invoke(channel, input))
+  } catch (error) {
+    return docHistoryRejectionOf(error)
+  }
+}
+
 const docHistoryApi: UniworkDocHistoryApi = {
   async versions(input) {
-    return asDocHistoryResult(await ipcRenderer.invoke(DOC_HISTORY_CHANNELS.versions, input))
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.versions, input)
   },
   async version(input) {
-    return asDocHistoryResult(await ipcRenderer.invoke(DOC_HISTORY_CHANNELS.version, input))
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.version, input)
   },
   async createVersion(input) {
-    return asDocHistoryResult(await ipcRenderer.invoke(DOC_HISTORY_CHANNELS.createVersion, input))
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.createVersion, input)
   },
   async restore(input) {
-    return asDocHistoryResult(await ipcRenderer.invoke(DOC_HISTORY_CHANNELS.restore, input))
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.restore, input)
   },
   async openVersion(input) {
-    return asDocHistoryResult(await ipcRenderer.invoke(DOC_HISTORY_CHANNELS.openVersion, input))
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.openVersion, input)
   },
   async downloadVersion(input) {
-    return asDocHistoryResult(await ipcRenderer.invoke(DOC_HISTORY_CHANNELS.downloadVersion, input))
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.downloadVersion, input)
   },
   async accessLogs(input) {
-    return asDocHistoryResult(await ipcRenderer.invoke(DOC_HISTORY_CHANNELS.accessLogs, input))
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.accessLogs, input)
   },
 }
 

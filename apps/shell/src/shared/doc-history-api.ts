@@ -320,3 +320,15 @@ export function asDocHistoryResult<T>(result: unknown): DocHistoryResult<T> {
       : {}),
   }
 }
+
+/**
+ * A rejected `ipcRenderer.invoke` as a result, so the preload never throws: the sender guard
+ * (UNI-2073) refuses a call by throwing `ipc_sender_refused`, which reads `forbidden` (403, the
+ * same code a refused sender gets from the server-side checks); any other rejection is `server_error`.
+ */
+export function docHistoryRejectionOf(error: unknown): DocHistoryResult<never> {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.includes('ipc_sender_refused')
+    ? { ok: false, error: 'forbidden', status: 403 }
+    : { ok: false, error: 'server_error' }
+}

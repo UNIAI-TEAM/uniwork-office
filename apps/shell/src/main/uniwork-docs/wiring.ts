@@ -64,7 +64,6 @@ import { createShareClientProvider, createUniworkShareService } from './share-se
 import {
   createDocHistoryClientProvider,
   createDocHistoryService,
-  isShellMainFrame,
   registerDocHistoryIpc,
 } from './doc-history-service'
 import { registerUniworkAskUni } from '../uniwork-askuni'
@@ -1118,8 +1117,8 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.bulk, (_event, plan: unknown) =>
     shareService.bulk(plan as Parameters<typeof shareService.bulk>[0]),
   )
-  // UNI-2077: the Version history and Access log sheets (`uniwork-doc-history:*`), answered for
-  // the shell window's main frame only
+  // UNI-2077: the Version history and Access log sheets (`uniwork-doc-history:*`); `ipcMain` is
+  // the guarded object (UNI-2073), which answers the shell window's main frame only
   registerDocHistoryIpc(
     ipcMain,
     createDocHistoryService({
@@ -1135,7 +1134,6 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       downloadVersion: (documentId, versionNo, name) =>
         service.downloadDocumentVersion(documentId, versionNo, name),
     }),
-    (event) => isShellMainFrame(event, wiring.shellContents()),
   )
   // UNI-2069: Ask UNI (`uniwork:askuni:*`); its workspace list and current pick are the doclist's
   registerUniworkAskUni(ipcMain, {
