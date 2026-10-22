@@ -1,6 +1,6 @@
-// Shared IPC sender guard (UNI-2073): channel policy table, call-time sender checks
-// (destroyed / sub-frame / unknown sender / origin), refusal shapes for handle and on,
-// the rate-limited log line, and the dev / packaged trusted URL rules.
+// Shared IPC sender guard (UNI-2073, own windows UNI-2096): channel policy table, call-time
+// sender checks (destroyed / sub-frame / unknown sender / origin), refusal shapes for handle
+// and on, the rate-limited log line, and the dev / packaged trusted URL rules.
 import { EventEmitter } from 'node:events'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -17,9 +17,15 @@ import {
 const SHELL_URL = 'http://localhost:5199/'
 const EDITOR_URL = 'genoffice-app://docs/index.html?mode=tab'
 const FOREIGN_URL = 'https://evil.example/'
+const UPDATE_URL = 'file:///renderer/update.html'
+const PDF_PASSWORD_URL = 'file:///renderer/pdf-password.html'
 const SHELL_ID = 1
 const EDITOR_ID = 7
+const UPDATE_ID = 11
+const PDF_PASSWORD_ID = 12
 const OTHER_ID = 99
+
+type OwnWindow = 'update' | 'pdf-password'
 
 interface FakeSender {
   id: number
@@ -48,6 +54,8 @@ function subframeEvent(sender: FakeSender) {
 function setup(overrides: Partial<IpcSenderGuardDeps> = {}) {
   const shell = fakeSender(SHELL_ID, SHELL_URL)
   const editor = fakeSender(EDITOR_ID, EDITOR_URL)
+  const update = fakeSender(UPDATE_ID, UPDATE_URL)
+  const pdfPassword = fakeSender(PDF_PASSWORD_ID, PDF_PASSWORD_URL)
   const log = vi.fn()
   let clock = 1_000_000
   const deps: IpcSenderGuardDeps = {
@@ -55,6 +63,9 @@ function setup(overrides: Partial<IpcSenderGuardDeps> = {}) {
     isTrustedEditorContents: (id) => id === EDITOR_ID,
     isTrustedShellUrl: (url) => url === SHELL_URL,
     isTrustedEditorUrl: (url) => url === EDITOR_URL,
+    ownWindowContents: (name) => (name === 'update' ? update : pdfPassword) as never,
+    isTrustedOwnWindowUrl: (name, url) =>
+      url === (name === 'update' ? UPDATE_URL : PDF_PASSWORD_URL),
     log,
     now: () => clock,
     ...overrides,
@@ -64,6 +75,8 @@ function setup(overrides: Partial<IpcSenderGuardDeps> = {}) {
     guard,
     shell,
     editor,
+    update,
+    pdfPassword,
     log,
     tick: (ms: number) => {
       clock += ms
@@ -90,7 +103,26 @@ const FAMILIES: ReadonlyArray<[family: string, channel: string, policy: IpcSende
   ['cloud-status', 'uniwork:cloud-status', 'editor'],
   ['ai-run', 'uniwork:ai-run', 'editor'],
   ['ai-flag', 'uniwork:ai-flag', 'shell-or-editor'],
+  ['tabs:* (close)', 'tabs:close', 'shell'],
+  ['tabs:* (tear-off)', 'tabs:tear-off', 'shell'],
+  ['tabs:* (menu)', 'tabs:show-tab-menu', 'shell'],
+  ['integrations:* (skill write)', 'integrations:install-skill', 'shell'],
+  ['integrations:* (clipboard)', 'integrations:copy-text', 'shell'],
+  ['dropped files', 'app:open-dropped-files', 'shell-or-editor'],
+  ['ai model settings', 'ai:open-model-settings', 'editor'],
+  ['update opener', 'update:open-for-update', 'shell'],
+  ['update state', 'update:get-state', 'shell-or-own-window:update'],
+  ['update:* (download)', 'update:download', 'own-window:update'],
+  ['update:* (install)', 'update:install', 'own-window:update'],
+  ['pdf-password:* (submit)', 'pdf-password:submit', 'own-window:pdf-password'],
+  ['pdf-password:* (state)', 'pdf-password:get-state', 'own-window:pdf-password'],
 ]
+
+const OWN_WINDOW_OF: Partial<Record<IpcSenderPolicy, OwnWindow>> = {
+  'own-window:update': 'update',
+  'shell-or-own-window:update': 'update',
+  'own-window:pdf-password': 'pdf-password',
+}
 
 describe('policyForChannel', () => {
   it.each(FAMILIES)('%s (%s) -> %s', (_family, channel, policy) => {
@@ -120,14 +152,47 @@ describe('policyForChannel', () => {
     ['home:x', 'shell'],
     ['home:open-path', 'shell-or-editor'],
     ['app:set-ai-panel-prefs', 'shell-or-editor'],
+    ['tabs:activate', 'shell'],
+    ['tabs:list', 'shell'],
+    ['tabs:detach', 'shell'],
+    ['tabs:dock-torn-window', 'shell'],
+    ['tabs:x', 'shell'],
+    ['integrations:status', 'shell'],
+    ['integrations:uninstall-skill', 'shell'],
+    ['integrations:save-skill-zip', 'shell'],
+    ['integrations:pick-skill-dir', 'shell'],
+    ['update:later', 'own-window:update'],
+    ['update:open-download', 'own-window:update'],
+    ['update:check', 'own-window:update'],
+    ['update:x', 'own-window:update'],
+    ['pdf-password:cancel', 'own-window:pdf-password'],
+    ['pdf-password:x', 'own-window:pdf-password'],
   ] as const)('%s -> %s', (channel, policy) => {
     expect(policyForChannel(channel)).toBe(policy)
   })
 
   it.each([
     'docs:save',
-    'tabs:open',
     'ai:chat',
+    'ai:open-model-settings-x',
+    'ai:open-model-settingsx',
+    'app:open-dropped-files-x',
+    'app:open-dropped-filesx',
+    'tabs',
+    'tabs:',
+    'tabsx:a',
+    'Tabs:close',
+    'integrations',
+    'integrations:',
+    'integrationsx:a',
+    'update',
+    'update:',
+    'updatex:y',
+    'Update:download',
+    'pdf-password',
+    'pdf-password:',
+    'pdf-passwordx:a',
+    'pdf:password',
     'app:get-theme',
     'app:get-ai-panel-prefs',
     'app:get-document-theme',
@@ -140,7 +205,6 @@ describe('policyForChannel', () => {
     'Home:recents',
     'home-open-path',
     'settings:get',
-    'update:check',
     'sheets:uniwork-state',
     'xuniwork:doc',
     'uniwork',
@@ -157,8 +221,8 @@ describe('guarded(ipc) registration', () => {
     const g = guard.guarded(ipc)
     expect(() => g.handle('docs:save', () => 1)).toThrow(/docs:save/)
     expect(() => g.handleOnce('docs:save', () => 1)).toThrow()
-    expect(() => g.on('tabs:open', () => {})).toThrow()
-    expect(() => g.once('tabs:open', () => {})).toThrow()
+    expect(() => g.on('docs:open', () => {})).toThrow()
+    expect(() => g.once('docs:open', () => {})).toThrow()
     expect(ipc.handle).not.toHaveBeenCalled()
     expect(ipc.on).not.toHaveBeenCalled()
   })
@@ -272,8 +336,12 @@ function registerHandle(channel: string, deps: Partial<IpcSenderGuardDeps> = {})
 }
 
 describe.each(FAMILIES)('%s channel %s (%s)', (_family, channel, policy) => {
-  const allowsShell = policy !== 'editor'
-  const allowsEditor = policy !== 'shell'
+  const allowsShell =
+    policy === 'shell' || policy === 'shell-or-editor' || policy === 'shell-or-own-window:update'
+  const allowsEditor = policy === 'editor' || policy === 'shell-or-editor'
+  const ownWindow = OWN_WINDOW_OF[policy]
+  const ownSender = (ctx: ReturnType<typeof setup>, name: OwnWindow) =>
+    name === 'update' ? ctx.update : ctx.pdfPassword
 
   if (allowsShell) {
     it('passes the shell main frame with args and return value untouched', async () => {
@@ -283,7 +351,7 @@ describe.each(FAMILIES)('%s channel %s (%s)', (_family, channel, policy) => {
       expect(inner).toHaveBeenCalledWith(event, 'a', 2)
     })
   } else {
-    it('refuses the shell calling an editor-only channel', async () => {
+    it('refuses the shell calling a channel it may not call', async () => {
       const { call, shell, inner } = registerHandle(channel)
       await expect(async () => call(mainFrameEvent(shell))).rejects.toThrow(IPC_SENDER_REFUSED)
       expect(inner).not.toHaveBeenCalled()
@@ -297,14 +365,39 @@ describe.each(FAMILIES)('%s channel %s (%s)', (_family, channel, policy) => {
       expect(inner).toHaveBeenCalledTimes(1)
     })
   } else {
-    it('refuses an editor calling a shell-only channel', async () => {
-      const { call, editor, inner } = registerHandle(channel)
+    it('refuses an editor calling a channel it may not call', async () => {
+      const { call, editor, inner, guard } = registerHandle(channel)
+      expect(guard.check(mainFrameEvent(editor), channel)).toEqual({
+        ok: false,
+        reason: 'unknown-sender',
+      })
       await expect(async () => call(mainFrameEvent(editor))).rejects.toThrow(IPC_SENDER_REFUSED)
       expect(inner).not.toHaveBeenCalled()
     })
   }
 
-  const trusted = (ctx: ReturnType<typeof setup>) => (allowsShell ? ctx.shell : ctx.editor)
+  for (const name of ['update', 'pdf-password'] as const) {
+    if (ownWindow === name) {
+      it(`passes the live ${name} window main frame`, async () => {
+        const ctx = registerHandle(channel)
+        expect(await ctx.call(mainFrameEvent(ownSender(ctx, name)), 'y')).toEqual({
+          answered: ['y'],
+        })
+        expect(ctx.inner).toHaveBeenCalledTimes(1)
+      })
+    } else {
+      it(`refuses the ${name} window`, async () => {
+        const ctx = registerHandle(channel)
+        const event = mainFrameEvent(ownSender(ctx, name))
+        expect(ctx.guard.check(event, channel)).toEqual({ ok: false, reason: 'unknown-sender' })
+        await expect(async () => ctx.call(event)).rejects.toThrow(IPC_SENDER_REFUSED)
+        expect(ctx.inner).not.toHaveBeenCalled()
+      })
+    }
+  }
+
+  const trusted = (ctx: ReturnType<typeof setup>) =>
+    allowsShell ? ctx.shell : allowsEditor ? ctx.editor : ownSender(ctx, ownWindow!)
 
   it.each([
     ['sub-frame', (s: FakeSender) => subframeEvent(s), 'subframe'],
@@ -388,6 +481,141 @@ describe('check() reads every input at call time', () => {
     g.handle('uniwork-doc:get', async () => 42)
     expect(() => handlers.get('uniwork-doc:list')!(mainFrameEvent(shell))).toThrow(boom)
     expect(await handlers.get('uniwork-doc:get')!(mainFrameEvent(shell))).toBe(42)
+  })
+})
+
+describe('own-window policies', () => {
+  it.each(['update:download', 'update:get-state', 'pdf-password:submit'])(
+    '%s refuses an own window as unknown-sender when ownWindowContents is absent',
+    (channel) => {
+      const ctx = setup({ ownWindowContents: undefined })
+      const own = channel.startsWith('update:') ? ctx.update : ctx.pdfPassword
+      expect(ctx.guard.check(mainFrameEvent(own), channel)).toEqual({
+        ok: false,
+        reason: 'unknown-sender',
+      })
+    },
+  )
+
+  it('refuses as unknown-sender when isTrustedOwnWindowUrl is absent', () => {
+    const ctx = setup({ isTrustedOwnWindowUrl: undefined })
+    expect(ctx.guard.check(mainFrameEvent(ctx.update), 'update:download')).toEqual({
+      ok: false,
+      reason: 'unknown-sender',
+    })
+  })
+
+  it('keeps update:get-state working for the shell without the own-window deps', () => {
+    const ctx = setup({ ownWindowContents: undefined, isTrustedOwnWindowUrl: undefined })
+    expect(ctx.guard.check(mainFrameEvent(ctx.shell), 'update:get-state')).toEqual({ ok: true })
+  })
+
+  it('follows ownWindowContents() lazily (null while closed, a new webContents when re-opened)', () => {
+    let current: FakeSender | null = null
+    const names: string[] = []
+    const ctx = setup({
+      ownWindowContents: (name) => {
+        names.push(name)
+        return current as never
+      },
+    })
+    const first = fakeSender(UPDATE_ID, UPDATE_URL)
+    expect(ctx.guard.check(mainFrameEvent(first), 'update:install')).toEqual({
+      ok: false,
+      reason: 'unknown-sender',
+    })
+    current = first
+    expect(ctx.guard.check(mainFrameEvent(first), 'update:install')).toEqual({ ok: true })
+    const second = fakeSender(UPDATE_ID + 100, UPDATE_URL)
+    current = second
+    expect(ctx.guard.check(mainFrameEvent(first), 'update:install')).toEqual({
+      ok: false,
+      reason: 'unknown-sender',
+    })
+    expect(ctx.guard.check(mainFrameEvent(second), 'update:install')).toEqual({ ok: true })
+    expect(names.every((n) => n === 'update')).toBe(true)
+  })
+
+  it.each(['update:download', 'pdf-password:submit'])(
+    '%s refuses an event with no sender while the own window is closed (null is not a match)',
+    (channel) => {
+      const ctx = setup({ ownWindowContents: () => null })
+      for (const event of [{ senderFrame: {} }, { sender: null, senderFrame: null }, {}]) {
+        expect(ctx.guard.check(event, channel)).toEqual({ ok: false, reason: 'destroyed' })
+      }
+    },
+  )
+
+  it('asks for the pdf-password window by name for pdf-password:*', () => {
+    const asked = vi.fn((_name: OwnWindow) => null)
+    const ctx = setup({ ownWindowContents: asked })
+    ctx.guard.check(mainFrameEvent(ctx.pdfPassword), 'pdf-password:cancel')
+    expect(asked).toHaveBeenCalledWith('pdf-password')
+  })
+
+  it('composite update:get-state: the shell and the live update window pass, nothing else', () => {
+    const ctx = setup()
+    const ch = 'update:get-state'
+    expect(ctx.guard.check(mainFrameEvent(ctx.shell), ch)).toEqual({ ok: true })
+    expect(ctx.guard.check(mainFrameEvent(ctx.update), ch)).toEqual({ ok: true })
+    for (const other of [ctx.editor, ctx.pdfPassword]) {
+      expect(ctx.guard.check(mainFrameEvent(other), ch)).toEqual({
+        ok: false,
+        reason: 'unknown-sender',
+      })
+    }
+  })
+
+  it('the update window passes update:download but not tabs:* or pdf-password:*', () => {
+    const ctx = setup()
+    const event = mainFrameEvent(ctx.update)
+    expect(ctx.guard.check(event, 'update:download')).toEqual({ ok: true })
+    for (const ch of [
+      'tabs:close',
+      'tabs:show-menu',
+      'pdf-password:submit',
+      'integrations:copy-text',
+    ]) {
+      expect(ctx.guard.check(event, ch)).toEqual({ ok: false, reason: 'unknown-sender' })
+    }
+  })
+
+  it('the shell is refused for update:download, an editor for tabs:*', () => {
+    const ctx = setup()
+    expect(ctx.guard.check(mainFrameEvent(ctx.shell), 'update:download')).toEqual({
+      ok: false,
+      reason: 'unknown-sender',
+    })
+    expect(ctx.guard.check(mainFrameEvent(ctx.editor), 'tabs:close')).toEqual({
+      ok: false,
+      reason: 'unknown-sender',
+    })
+    expect(ctx.guard.check(mainFrameEvent(ctx.editor), 'tabs:tear-off')).toEqual({
+      ok: false,
+      reason: 'unknown-sender',
+    })
+  })
+
+  it.each([
+    ['update window on the pdf-password page', 'update', 'update:download', PDF_PASSWORD_URL],
+    ['update window on the shell page', 'update', 'update:get-state', SHELL_URL],
+    ['pdf-password window on the update page', 'pdf-password', 'pdf-password:submit', UPDATE_URL],
+    ['pdf-password window on a foreign origin', 'pdf-password', 'pdf-password:submit', FOREIGN_URL],
+  ] as const)('refuses the %s as origin', (_name, win, channel, url) => {
+    const ctx = setup()
+    const sender = win === 'update' ? ctx.update : ctx.pdfPassword
+    sender.mainFrame = fakeFrame(url)
+    expect(ctx.guard.check(mainFrameEvent(sender), channel)).toEqual({
+      ok: false,
+      reason: 'origin',
+    })
+  })
+
+  it('passes the window name to isTrustedOwnWindowUrl', () => {
+    const urlCheck = vi.fn((_name: OwnWindow, _url: string) => true)
+    const ctx = setup({ isTrustedOwnWindowUrl: urlCheck })
+    ctx.guard.check(mainFrameEvent(ctx.pdfPassword), 'pdf-password:get-state')
+    expect(urlCheck).toHaveBeenCalledWith('pdf-password', PDF_PASSWORD_URL)
   })
 })
 
@@ -559,6 +787,103 @@ describe('trustedUrlRules', () => {
       'devtools://devtools/',
     ])('editor refuses %s', (url) => {
       expect(rules.isTrustedEditorUrl(url)).toBe(false)
+    })
+  })
+
+  describe('own windows, packaged (no dev env)', () => {
+    const rules = trustedUrlRules({ env: {}, shellRendererDir })
+    const pages = { update: 'update.html', 'pdf-password': 'pdf-password.html' } as const
+
+    it.each(['update', 'pdf-password'] as const)('%s trusts exactly its own page', (name) => {
+      const page = fileUrl(pages[name])
+      expect(rules.isTrustedOwnWindowUrl(name, page)).toBe(true)
+      expect(rules.isTrustedOwnWindowUrl(name, `${page}?x=1#y`)).toBe(true)
+      expect(rules.isTrustedShellUrl(page)).toBe(false)
+      expect(rules.isTrustedEditorUrl(page)).toBe(false)
+    })
+
+    it.each(['update', 'pdf-password'] as const)('%s refuses every other page', (name) => {
+      const other = name === 'update' ? 'pdf-password.html' : 'update.html'
+      for (const url of [
+        fileUrl(other),
+        fileUrl('index.html'),
+        fileUrl('assets', pages[name]),
+        pathToFileURL(join(shellRendererDir, '..', pages[name])).href,
+        `${pathToFileURL(shellRendererDir).href}/..%2f${pages[name]}`,
+        pathToFileURL(`${shellRendererDir}-evil/${pages[name]}`).href,
+        `file://evil.host/share/${pages[name]}`,
+        `http://localhost:5199/${pages[name]}`,
+        `genoffice-app://docs/${pages[name]}`,
+        'about:blank',
+        'not a url',
+        '',
+      ]) {
+        expect(rules.isTrustedOwnWindowUrl(name, url)).toBe(false)
+      }
+    })
+
+    it('compares own-window paths case-insensitively on win32 only', () => {
+      const original = process.platform
+      const upper = fileUrl('UPDATE.HTML')
+      try {
+        Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+        expect(rules.isTrustedOwnWindowUrl('update', upper)).toBe(false)
+        Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+        expect(rules.isTrustedOwnWindowUrl('update', upper)).toBe(true)
+        expect(rules.isTrustedOwnWindowUrl('pdf-password', upper)).toBe(false)
+        expect(rules.isTrustedShellUrl(upper)).toBe(false)
+      } finally {
+        Object.defineProperty(process, 'platform', { value: original, configurable: true })
+      }
+    })
+  })
+
+  describe('own windows, dev (ELECTRON_RENDERER_URL)', () => {
+    const rules = trustedUrlRules({
+      env: {
+        ELECTRON_RENDERER_URL: 'http://localhost:5199',
+        DOCS_RENDERER_URL: 'http://localhost:5173',
+      },
+      shellRendererDir,
+    })
+
+    it.each([
+      ['update', 'http://localhost:5199/update.html'],
+      ['update', 'http://localhost:5199/update.html?x=1#y'],
+      ['pdf-password', 'http://localhost:5199/pdf-password.html'],
+    ] as const)('%s trusts %s', (name, url) => {
+      expect(rules.isTrustedOwnWindowUrl(name, url)).toBe(true)
+    })
+
+    it.each([
+      ['update', 'http://localhost:5199/'],
+      ['update', 'http://localhost:5199/index.html'],
+      ['update', 'http://localhost:5199/pdf-password.html'],
+      ['update', 'http://localhost:5199/update.html/x'],
+      ['update', 'http://localhost:5199/x/update.html'],
+      ['update', 'http://localhost:5199/UPDATE.HTML'],
+      ['update', 'http://localhost:5198/update.html'],
+      ['update', 'https://localhost:5199/update.html'],
+      ['update', 'http://127.0.0.1:5199/update.html'],
+      ['update', 'http://localhost:5173/update.html'],
+      ['update', 'http://localhost:5199@evil.example/update.html'],
+      ['pdf-password', 'http://localhost:5199/update.html'],
+      ['pdf-password', 'http://localhost:5199/'],
+    ] as const)('%s refuses %s', (name, url) => {
+      expect(rules.isTrustedOwnWindowUrl(name, url)).toBe(false)
+    })
+
+    it('keeps the packaged own-window pages trusted next to the dev origin', () => {
+      expect(rules.isTrustedOwnWindowUrl('update', fileUrl('update.html'))).toBe(true)
+      expect(rules.isTrustedOwnWindowUrl('pdf-password', fileUrl('pdf-password.html'))).toBe(true)
+    })
+
+    it('trusts no own-window dev page without ELECTRON_RENDERER_URL', () => {
+      const bare = trustedUrlRules({
+        env: { DOCS_RENDERER_URL: 'http://localhost:5173' },
+        shellRendererDir,
+      })
+      expect(bare.isTrustedOwnWindowUrl('update', 'http://localhost:5173/update.html')).toBe(false)
     })
   })
 

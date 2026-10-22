@@ -1,16 +1,22 @@
-// Shared IPC sender guard (UNI-2073, widened by UNI-2082). Every uniwork* and
-// home:* channel is registered through `guard.guarded(ipcMain)` at the
-// composition point, so each call is checked at call time: the sender is live,
-// the call comes from its main frame, the webContents is the shell window or a
-// trusted editor view (per the channel's policy), and the main frame URL is one
-// the main itself loads. The raw ipcMain is never patched.
+// Shared IPC sender guard (UNI-2073, widened by UNI-2082 and UNI-2096). Every
+// uniwork*, home:*, tabs:*, integrations:*, update:* and pdf-password:* channel
+// is registered through `guard.guarded(ipcMain)` at the composition point, so
+// each call is checked at call time: the sender is live, the call comes from its
+// main frame, the webContents is the shell window, a trusted editor view or the
+// live update / pdf-password window (per the channel's policy), and the main
+// frame URL is one the main itself loads. The raw ipcMain is never patched.
 //
 // Adding a channel (other lanes):
-// - Policy comes from `policyForChannel`: a new `uniwork*` or `home:*` channel
-//   defaults to `shell`; a channel an editor window calls needs an explicit entry
-//   there (`home:open-path` is `shell-or-editor` for the markdown wiki links).
+// - Policy comes from `policyForChannel`: a new `uniwork*`, `home:*`, `tabs:*` or
+//   `integrations:*` channel defaults to `shell`; a new `update:*` channel defaults
+//   to `own-window:update` (only the update window) and `pdf-password:*` to
+//   `own-window:pdf-password`. A channel another window calls needs an explicit
+//   entry there (`home:open-path` is `shell-or-editor` for the markdown wiki links,
+//   `update:get-state` is `shell-or-own-window:update` for Settings > About).
 //   Anything out of scope throws at registration, so the read-only editor-alias getters
 //   such as `app:get-theme` stay on the raw ipcMain (`app:set-ai-panel-prefs`, a setter, is in scope).
+// - An own-window kind needs `ownWindowContents` + `isTrustedOwnWindowUrl` in the
+//   deps; without them (or while that window is closed) its callers are refused.
 // - Register through the `guardedIpc` object in apps/shell/src/main/index.ts, never
 //   the raw `ipcMain`, and add a new registrar file to `REGISTRAR_FILES` in
 //   tests/ipc-guard-coverage.test.ts.
@@ -23,7 +29,15 @@ import { RENDERER_SCHEME, type RendererHost } from '@genoffice/electron-utils/re
 
 export const IPC_SENDER_REFUSED = 'ipc_sender_refused'
 
-export type IpcSenderPolicy = 'shell' | 'editor' | 'shell-or-editor'
+export type IpcSenderPolicy =
+  | 'shell'
+  | 'editor'
+  | 'shell-or-editor'
+  | 'own-window:update'
+  | 'own-window:pdf-password'
+  | 'shell-or-own-window:update'
+/** the main-owned single-page windows with their own preload */
+export type IpcOwnWindow = 'update' | 'pdf-password'
 export type IpcRefusalReason = 'destroyed' | 'subframe' | 'unknown-sender' | 'origin'
 
 /** the policy of a guarded channel, or null when the channel is not in the guard's scope */
@@ -33,7 +47,9 @@ export function policyForChannel(channel: string): IpcSenderPolicy | null {
     // Ask UNI in the editor AI panels (UNI-2076 S7); `uniwork:askuni:*` stays shell
     channel.startsWith('uniwork:askuni-doc:') ||
     channel.startsWith('uniwork:cloud-status') ||
-    channel === 'uniwork:ai-run'
+    channel === 'uniwork:ai-run' ||
+    // the editor AI panels open the shell's model settings
+    channel === 'ai:open-model-settings'
   ) {
     return 'editor'
   }
@@ -41,11 +57,24 @@ export function policyForChannel(channel: string): IpcSenderPolicy | null {
   if (
     channel === 'uniwork:ai-flag' ||
     channel === 'home:open-path' ||
-    channel === 'app:set-ai-panel-prefs'
+    channel === 'app:set-ai-panel-prefs' ||
+    // the shell and the editor preloads both forward dropped files
+    channel === 'app:open-dropped-files'
   ) {
     return 'shell-or-editor'
   }
-  if (/^uniwork:./.test(channel) || /^uniwork-[^:]+:/.test(channel) || /^home:./.test(channel)) {
+  // the shell opens the update window; Settings > About and the window read the state
+  if (channel === 'update:open-for-update') return 'shell'
+  if (channel === 'update:get-state') return 'shell-or-own-window:update'
+  if (/^update:./.test(channel)) return 'own-window:update'
+  if (/^pdf-password:./.test(channel)) return 'own-window:pdf-password'
+  if (
+    /^uniwork:./.test(channel) ||
+    /^uniwork-[^:]+:/.test(channel) ||
+    /^home:./.test(channel) ||
+    /^tabs:./.test(channel) ||
+    /^integrations:./.test(channel)
+  ) {
     return 'shell'
   }
   return null
@@ -58,6 +87,12 @@ export interface IpcSenderGuardDeps {
   isTrustedEditorContents(webContentsId: number): boolean
   isTrustedShellUrl(url: string): boolean
   isTrustedEditorUrl(url: string): boolean
+  /**
+   * read lazily on every call: the live webContents of that window, null while it is closed
+   * (each open creates a new one). Absent = the own-window kinds refuse every own window.
+   */
+  ownWindowContents?(name: IpcOwnWindow): WebContents | null
+  isTrustedOwnWindowUrl?(name: IpcOwnWindow, url: string): boolean
   /** default console.warn */
   log?(line: string): void
   /** for the log rate limit in tests */
@@ -79,6 +114,21 @@ export interface IpcSenderGuard {
 }
 
 const LOG_WINDOW_MS = 60_000
+
+const SHELL_POLICIES: ReadonlySet<IpcSenderPolicy> = new Set<IpcSenderPolicy>([
+  'shell',
+  'shell-or-editor',
+  'shell-or-own-window:update',
+])
+const EDITOR_POLICIES: ReadonlySet<IpcSenderPolicy> = new Set<IpcSenderPolicy>([
+  'editor',
+  'shell-or-editor',
+])
+const OWN_WINDOW_OF: Readonly<Partial<Record<IpcSenderPolicy, IpcOwnWindow>>> = {
+  'own-window:update': 'update',
+  'own-window:pdf-password': 'pdf-password',
+  'shell-or-own-window:update': 'update',
+}
 
 interface SenderLike {
   id?: unknown
@@ -115,12 +165,18 @@ export function createIpcSenderGuard(deps: IpcSenderGuardDeps): IpcSenderGuard {
       const frame = (event as { senderFrame?: unknown }).senderFrame as { url?: unknown } | null
       if (!frame || frame !== sender.mainFrame) return refuse(channel, 'subframe')
 
-      const isShell = policy !== 'editor' && sender === deps.shellContents()
+      const isShell = SHELL_POLICIES.has(policy) && sender === deps.shellContents()
       const isEditor =
-        policy !== 'shell' &&
+        EDITOR_POLICIES.has(policy) &&
         typeof sender.id === 'number' &&
         deps.isTrustedEditorContents(sender.id)
-      if (!isShell && !isEditor) return refuse(channel, 'unknown-sender')
+      const ownWindow = OWN_WINDOW_OF[policy]
+      const isOwnWindow =
+        ownWindow !== undefined &&
+        deps.ownWindowContents !== undefined &&
+        deps.isTrustedOwnWindowUrl !== undefined &&
+        sender === deps.ownWindowContents(ownWindow)
+      if (!isShell && !isEditor && !isOwnWindow) return refuse(channel, 'unknown-sender')
 
       let url: unknown
       try {
@@ -130,7 +186,9 @@ export function createIpcSenderGuard(deps: IpcSenderGuardDeps): IpcSenderGuard {
       }
       if (typeof url !== 'string') return refuse(channel, 'destroyed')
       const trusted =
-        (isShell && deps.isTrustedShellUrl(url)) || (isEditor && deps.isTrustedEditorUrl(url))
+        (isShell && deps.isTrustedShellUrl(url)) ||
+        (isEditor && deps.isTrustedEditorUrl(url)) ||
+        (isOwnWindow && deps.isTrustedOwnWindowUrl!(ownWindow, url))
       return trusted ? { ok: true } : refuse(channel, 'origin')
     } catch {
       // A getter on a torn-down sender threw: treat it as gone.
@@ -266,10 +324,16 @@ function isHttpOriginIn(url: URL, origins: ReadonlySet<string>): boolean {
   return (url.protocol === 'http:' || url.protocol === 'https:') && origins.has(url.origin)
 }
 
+const OWN_WINDOW_PAGES: Readonly<Record<IpcOwnWindow, string>> = {
+  update: 'update.html',
+  'pdf-password': 'pdf-password.html',
+}
+
 /** dev and packaged URL rules built from the same env/consts the main uses to load the windows */
 export function trustedUrlRules(input: { env: NodeJS.ProcessEnv; shellRendererDir: string }): {
   isTrustedShellUrl(url: string): boolean
   isTrustedEditorUrl(url: string): boolean
+  isTrustedOwnWindowUrl(name: IpcOwnWindow, url: string): boolean
 } {
   const shellOrigins = new Set<string>()
   const shellDev = devOrigin(input.env.ELECTRON_RENDERER_URL)
@@ -281,25 +345,37 @@ export function trustedUrlRules(input: { env: NodeJS.ProcessEnv; shellRendererDi
     if (origin) editorOrigins.add(origin)
   }
 
-  // The packaged shell loads exactly one page; the platform is read per call.
+  // Each packaged window loads exactly one page; the platform is read per call.
   const fold = (path: string) => (process.platform === 'win32' ? path.toLowerCase() : path)
   const shellPage = resolve(input.shellRendererDir, 'index.html')
+
+  function isFilePage(url: URL, page: string): boolean {
+    if (url.protocol !== 'file:' || url.host !== '') return false
+    let path: string
+    try {
+      // Rejects encoded separators (%2f) and non-local hosts.
+      path = fileURLToPath(url)
+    } catch {
+      return false
+    }
+    if (path.includes('\0')) return false
+    return fold(resolve(path)) === fold(page)
+  }
 
   return {
     isTrustedShellUrl(value) {
       const url = parseUrl(value)
       if (!url) return false
       if (isHttpOriginIn(url, shellOrigins)) return true
-      if (url.protocol !== 'file:' || url.host !== '') return false
-      let path: string
-      try {
-        // Rejects encoded separators (%2f) and non-local hosts.
-        path = fileURLToPath(url)
-      } catch {
-        return false
-      }
-      if (path.includes('\0')) return false
-      return fold(resolve(path)) === fold(shellPage)
+      return isFilePage(url, shellPage)
+    },
+    isTrustedOwnWindowUrl(name, value) {
+      const page = OWN_WINDOW_PAGES[name]
+      const url = parseUrl(value)
+      if (!url || !page) return false
+      // dev: the shell's dev server, that window's page only (not the whole origin)
+      if (isHttpOriginIn(url, shellOrigins)) return url.pathname === `/${page}`
+      return isFilePage(url, resolve(input.shellRendererDir, page))
     },
     isTrustedEditorUrl(value) {
       const url = parseUrl(value)

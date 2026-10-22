@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createIpcSenderGuard,
   policyForChannel,
+  trustedUrlRules,
   type IpcSenderPolicy,
 } from '../src/main/ipc-sender-guard'
 import { registerAiRunIpc } from '../src/main/ai-run-registry'
@@ -12,6 +13,10 @@ import { registerUniworkAiFlagIpc } from '../src/main/uniwork-ai-flag'
 import { registerUniworkCloudStatusIpc } from '../src/main/uniwork-cloud-status'
 import { registerUniworkWork } from '../src/main/uniwork-work/wiring'
 import { HOME_CHANNELS, UNIWORK_DOC_CHANNELS, UNIWORK_SHARE_CHANNELS } from '../src/shared/home-api'
+import { INTEGRATIONS_CHANNELS } from '../src/shared/integrations-api'
+import { PDF_PASSWORD_CHANNELS } from '../src/shared/pdf-password-api'
+import { TABS_CHANNELS } from '../src/shared/tabs-api'
+import { UPDATE_CHANNELS } from '../src/shared/update-api'
 import { registerUniworkAskUni } from '../src/main/uniwork-askuni'
 import { ASKUNI_CHANNELS, ASKUNI_DOC_CHANNELS, ASKUNI_V2_CHANNELS } from '../src/shared/askuni-api'
 import { SOURCE_VIEW_CHANNELS } from '../src/shared/source-view'
@@ -31,13 +36,15 @@ import {
 } from '../../../packages/electron-utils/src/uniwork-cloud-status'
 
 /**
- * UNI-2073 / UNI-2082 coverage: every channel the sender guard has a policy for must be registered
+ * UNI-2073 / UNI-2082 / UNI-2096 coverage: every channel the sender guard has a policy for must be registered
  * through `guard.guarded(ipcMain)`, never on the raw `ipcMain`. The scan reads the main-process
  * sources (apps/shell/src/main, every editor main bundled into the shell,
  * packages/electron-utils/src), resolves the channel constants from their declarations and checks
  * (1) raw registrations, (2) registrar calls handed the raw `ipcMain`, (3) the composition in
  * index.ts, (4) that no new registrar file appears without being listed here, (5) the policy of
- * every channel constant and (6) that every `home:*` channel is registered on the guarded object.
+ * every channel constant, (6) that every `home:*` channel is registered on the guarded object and
+ * (7) that every channel of the remaining shell families (tabs, integrations, drop, model settings,
+ * update, pdf-password) is registered on a guarded object too.
  *
  * Two rules keep the scan from needing one regex per spelling:
  * - a file that imports electron's `ipcMain` may only use it as a direct `ipcMain.<method>(` call
@@ -283,10 +290,10 @@ const IPC_LIKE = /^(ipcMain|ipc|\w+Ipc|guarded\w*)$/
 const IPC_PARAMETER = /\b([A-Za-z_$][\w$]*)\s*\??:\s*(?:IpcMain|IpcMainLike)\b/g
 
 const REGISTER_CALL =
-  /\b([A-Za-z_$][\w$]*)\s*\??\.\s*(handle|handleOnce|on|once)\(\s*([^,()]+?)\s*,/g
+  /\b([A-Za-z_$][\w$]*)\s*\??\.\s*(handle|handleOnce|on|once)\s*(?:\?\.\s*)?\(\s*([^,()]+?)\s*,/g
 
 /** a registrar's local helper, called as `handle(CHANNEL, ...)` / `handleDiscussion(CHANNEL, ...)` */
-const LOCAL_HELPER_CALL = /(?<![.\w$])(handle\w*)\(\s*([^,()]+?)\s*,/g
+const LOCAL_HELPER_CALL = /(?<![.\w$])(handle\w*)\s*(?:\?\.\s*)?\(\s*([^,()]+?)\s*,/g
 
 /** a preload-side bridge: imports ipcRenderer from electron and never names ipcMain, so it registers nothing in main */
 function isRendererOnly(text: string): boolean {
@@ -376,6 +383,10 @@ const REGISTRARS = [
   'registerAiRunIpc',
   'registerUniworkAiFlagIpc',
   'registerUniworkCloudStatusIpc',
+  // UNI-2096: they take the guarded ipc object as their FIRST argument, before any deps
+  'registerIntegrationsIpc',
+  'registerUpdateIpc',
+  'registerPdfPasswordIpc',
 ] as const
 
 /** the registrars index.ts composes itself (registerUniworkCloudStatusIpc runs inside registerAccountIpc) */
@@ -387,7 +398,8 @@ const COMPOSED_IN_INDEX = REGISTRARS.filter((name) => name !== 'registerUniworkC
  * gets guarded.
  */
 const REGISTRAR_FILES: Record<string, string> = {
-  'apps/shell/src/main/index.ts': 'uniwork-doc:bar-inset, registered on the guarded object',
+  'apps/shell/src/main/index.ts':
+    'uniwork-doc:bar-inset, the home channels, tabs:*, app:open-dropped-files and ai:open-model-settings, registered on the guarded object',
   'apps/shell/src/main/uniwork-docs/wiring.ts': 'createUniworkDocs',
   'apps/shell/src/main/uniwork-docs/comments-wiring.ts':
     'createUniworkComments (in createUniworkDocs)',
@@ -415,6 +427,9 @@ const REGISTRAR_FILES: Record<string, string> = {
     'registerUniworkCloudStatusIpc (in registerAccountIpc)',
   'apps/shell/src/main/uniwork-ai-flag.ts': 'registerUniworkAiFlagIpc',
   'apps/shell/src/main/ai-run-registry.ts': 'registerAiRunIpc',
+  'apps/shell/src/main/integrations-ipc.ts': 'registerIntegrationsIpc',
+  'apps/shell/src/main/update-window.ts': 'registerUpdateIpc',
+  'apps/shell/src/main/pdf-password-dialog.ts': 'registerPdfPasswordIpc',
   // a standalone editor (no shell, never run inside it) answers the pulls with a constant "off";
   // it has no data to protect and the guard lives in the shell
   'packages/electron-utils/src/uniwork-ai-flag.ts':
@@ -580,7 +595,10 @@ function rawRegistrations(file: string, rawText: string): RawRegistration[] {
   const receivers = rawReceivers(text)
   if (receivers.length === 0) return []
   const escaped = receivers.map(escapeRegExp).join('|')
-  const call = new RegExp(`(?<![\\w$.])(${escaped})\\s*\\.\\s*(${RAW_METHODS})\\s*\\(`, 'g')
+  const call = new RegExp(
+    `(?<![\\w$.])(${escaped})\\s*(?:\\?\\s*)?\\.\\s*(${RAW_METHODS})\\s*(?:\\?\\.\\s*)?\\(`,
+    'g',
+  )
   const aliases = new Map(
     [...text.matchAll(/const\s+(\w+)\s*=\s*([A-Z][A-Z0-9_]*)\s*$/gm)].map(
       (m) => [m[1]!, m[2]!] as const,
@@ -776,6 +794,16 @@ function dynamicRawMismatches(
     .map(([key, entry]) => `${key}: allows ${entry.count}, found ${live.get(key) ?? 0}`)
 }
 
+/** every `<registrar>(<raw ipcMain>, ...)` call in one file: the registrar would register its channels unguarded */
+function rawHandedRegistrars(file: string, rawText: string): string[] {
+  const text = code(rawText)
+  const receivers = rawReceivers(text)
+  if (receivers.length === 0) return []
+  const escaped = receivers.map(escapeRegExp).join('|')
+  const call = new RegExp(`\\b(${REGISTRARS.join('|')})\\(\\s*(${escaped})\\b`, 'g')
+  return [...text.matchAll(call)].map((match) => `${file}: ${match[1]}(${match[2]}, ...)`)
+}
+
 describe('raw ipcMain registrations of guarded channels', () => {
   it('registers no channel with a guard policy on the raw ipcMain, and no channel the scan cannot read', () => {
     const offenders = sources.flatMap((source) => rawOffenders(source.file, source.text))
@@ -792,18 +820,7 @@ describe('raw ipcMain registrations of guarded channels', () => {
   })
 
   it('hands no registrar of guarded channels the raw ipcMain', () => {
-    const offenders: string[] = []
-    for (const source of sources) {
-      const text = code(source.text)
-      const receivers = rawReceivers(text)
-      if (receivers.length === 0) continue
-      const escaped = receivers.map(escapeRegExp).join('|')
-      const call = new RegExp(`\\b(${REGISTRARS.join('|')})\\(\\s*(${escaped})\\b`, 'g')
-      for (const match of text.matchAll(call)) {
-        offenders.push(`${source.file}: ${match[1]}(${match[2]}, ...)`)
-      }
-    }
-    expect(offenders).toEqual([])
+    expect(sources.flatMap((source) => rawHandedRegistrars(source.file, source.text))).toEqual([])
   })
 })
 
@@ -831,6 +848,22 @@ describe('the raw registration scan catches the forms that used to slip through'
 
   it('a loop variable', () => {
     expect(offendersOf('for (const ch of names) ipcMain.handle(ch, () => 1)')).toHaveLength(1)
+  })
+
+  it('optional chaining on the method or the receiver: handle?.( and ipcMain?.handle(', () => {
+    // the registration itself must be read, not only the raw use of the object
+    const registered = (body: string) => offendersOf(body).filter((o) => o.includes(' -> '))
+    expect(registered("ipcMain.handle?.('uniwork-doc:save', () => 1)")).toHaveLength(1)
+    expect(registered("ipcMain.on?.('uniwork-doc:save', () => 1)")).toHaveLength(1)
+    expect(registered("ipcMain?.handle('uniwork-doc:save', () => 1)")).toHaveLength(1)
+    expect(registered("ipcMain?.handle?.('uniwork-doc:save', () => 1)")).toHaveLength(1)
+  })
+
+  it('the registrar scan reads x.handle?.( and a helper called as handle?.( as registrations', () => {
+    const text =
+      "bus.handle?.('home:recents', f)\nbus.on?.('uniwork-doc:save', f)\nhandle?.('home:recents', f)\n"
+    const found = registrations({ file: 'apps/shell/src/main/y.ts', text })
+    expect(found.map((reg) => reg.method)).toEqual(['handle', 'on', 'handle'])
   })
 
   it('addListener, prependListener, prependOnceListener, handleOnce and once', () => {
@@ -1120,6 +1153,43 @@ function guardedRegistrationOffenders(source: Source): string[] {
     })
 }
 
+/**
+ * What is wrong with how a file builds its `createIpcSenderGuard({...})`: the own windows (update,
+ * pdf password) come and go, so `ownWindowContents` has to be a function the guard calls (an arrow, a
+ * `function` or a method), never a webContents or a reference captured when the guard is built, and
+ * the guard needs the URL rule for them, given as a property or by spreading `trustedUrlRules(...)`
+ * (the `trustedUrlRules` test below proves the spread carries it).
+ */
+function ownWindowCompositionProblems(rawText: string): string[] {
+  const text = code(rawText)
+  const call = /\bcreateIpcSenderGuard\(\s*(?=\{)/.exec(text)
+  if (!call) return ['no createIpcSenderGuard({...}) call']
+  const body = firstArgument(text, call.index + call[0].length)
+  const problems: string[] = []
+  if (
+    !/\bownWindowContents\s*(?::\s*(?:async\s+)?(?:\([^)]*\)|\w+)\s*=>|:\s*function\b|\([^)]*\)\s*\{)/.test(
+      body,
+    )
+  ) {
+    problems.push('ownWindowContents is not passed as an arrow function, a function or a method')
+  }
+  const spread = /\.\.\.\s*trustedUrlRules\(/.test(body)
+  const explicit = /\bisTrustedOwnWindowUrl\s*(?::|,|\})/.test(body)
+  if (!spread && !explicit) {
+    problems.push(
+      'the guard gets no isTrustedOwnWindowUrl (neither a property nor ...trustedUrlRules())',
+    )
+  }
+  if (
+    /\bisTrustedOwnWindowUrl\s*:\s*(?:\([^)]*\)|\w+)\s*=>\s*(?:true|\{\s*return\s+true\b)/.test(
+      body,
+    )
+  ) {
+    problems.push('isTrustedOwnWindowUrl always agrees')
+  }
+  return problems
+}
+
 describe('composition in apps/shell/src/main/index.ts', () => {
   const index = sources.find((s) => isIndex(s.file))!
 
@@ -1150,6 +1220,48 @@ describe('composition in apps/shell/src/main/index.ts', () => {
     expect(
       /createIpcSenderGuard\(\{[\s\S]{0,300}shellContents:\s*\(\)\s*=>/.test(code(index.text)),
     ).toBe(true)
+  })
+
+  it('reads the own windows lazily and hands the guard their URL rule (UNI-2096)', () => {
+    expect(ownWindowCompositionProblems(index.text)).toEqual([])
+  })
+
+  it('the composition check turns red on a captured window and a missing rule', () => {
+    const rules = '...trustedUrlRules({ env: process.env, shellRendererDir: DIR })'
+    const guard = (body: string) => `const g = createIpcSenderGuard({\n${body}\n})\n`
+    const arrow =
+      'ownWindowContents: (name) => (name === "update" ? updateWindowContents() : null),'
+    // control: the arrow plus the spread of the url rules, and the explicit property form
+    expect(ownWindowCompositionProblems(guard(`${arrow}\n${rules}`))).toEqual([])
+    expect(
+      ownWindowCompositionProblems(
+        guard(
+          `ownWindowContents(name) { return null },\nisTrustedOwnWindowUrl: (n, u) => rule(n, u),`,
+        ),
+      ),
+    ).toEqual([])
+    // a webContents captured when the guard is built, a reference, a missing member, a rule that always agrees
+    expect(
+      ownWindowCompositionProblems(guard(`ownWindowContents: updateWin.webContents,\n${rules}`)),
+    ).toHaveLength(1)
+    expect(ownWindowCompositionProblems(guard(`ownWindowContents: pick,\n${rules}`))).toHaveLength(
+      1,
+    )
+    expect(ownWindowCompositionProblems(guard(rules))).toHaveLength(1)
+    expect(ownWindowCompositionProblems(guard(arrow))).toHaveLength(1)
+    expect(
+      ownWindowCompositionProblems(guard(`${arrow}\nisTrustedOwnWindowUrl: () => true,`)),
+    ).toHaveLength(1)
+    // no createIpcSenderGuard call at all
+    expect(ownWindowCompositionProblems('const x = 1')).toHaveLength(1)
+  })
+
+  it('the url rules it spreads include the own-window rule', () => {
+    const rules = trustedUrlRules({ env: {}, shellRendererDir: '/app/renderer' }) as Record<
+      string,
+      unknown
+    >
+    expect(typeof rules.isTrustedOwnWindowUrl).toBe('function')
   })
 
   it('registers only channels the guard accepts on its guarded objects', () => {
@@ -1201,8 +1313,15 @@ describe('registrar files', () => {
 
 // ---- 4. the policy of every channel constant ----
 
+/**
+ * the own-window kinds of UNI-2096 (the update window and the pdf password dialog), written down
+ * here so this file does not depend on the guard's type for them
+ */
+type ExpectedPolicy =
+  IpcSenderPolicy | 'own-window:update' | 'own-window:pdf-password' | 'shell-or-own-window:update'
+
 /** the intended policy, written down independently of the guard's own table */
-function expectedPolicy(channel: string): IpcSenderPolicy | null {
+function expectedPolicy(channel: string): ExpectedPolicy | null {
   if (channel.startsWith('uniwork:comments:')) return 'editor'
   // Ask UNI in the editor AI panels (UNI-2076 S7): editor views only; `uniwork:askuni:*` stays shell
   if (channel.startsWith('uniwork:askuni-doc:')) return 'editor'
@@ -1216,6 +1335,17 @@ function expectedPolicy(channel: string): IpcSenderPolicy | null {
   // the six editor preloads call the app-wide alias of home:set-ai-panel-prefs, so the editor side too
   if (channel === 'app:set-ai-panel-prefs') return 'shell-or-editor'
   if (/^home:./.test(channel)) return 'shell'
+  // UNI-2096: the remaining shell families. Every caller is in the shell renderer except where noted
+  if (channel.startsWith('tabs:') || channel.startsWith('integrations:')) return 'shell'
+  // the shell preload and the six editor preloads install the drop bridge
+  if (channel === 'app:open-dropped-files') return 'shell-or-editor'
+  // only the six editor preloads call it; the shell never does
+  if (channel === 'ai:open-model-settings') return 'editor'
+  // Settings > About (shell) opens the update dialog, and reads the state the update window reads too
+  if (channel === 'update:open-for-update') return 'shell'
+  if (channel === 'update:get-state') return 'shell-or-own-window:update'
+  if (channel.startsWith('update:')) return 'own-window:update'
+  if (channel.startsWith('pdf-password:')) return 'own-window:pdf-password'
   return null
 }
 
@@ -1541,5 +1671,270 @@ describe('registrars under the real guard', () => {
       ].sort(),
     )
     expect(registered).toHaveLength(20)
+  })
+})
+
+// ---- 7. the remaining shell families (UNI-2096) ----
+
+/** the constants main sends to a renderer: nothing registers them, so they need no policy */
+const FAMILY_PUSH_ONLY: readonly string[] = [
+  TABS_CHANNELS.changed,
+  TABS_CHANNELS.dockPreview,
+  UPDATE_CHANNELS.changed,
+  UPDATE_CHANNELS.stateChanged,
+  PDF_PASSWORD_CHANNELS.changed,
+]
+
+/** the two channels of these families that are plain strings, not table entries */
+const DROP_CHANNEL = 'app:open-dropped-files'
+const MODEL_SETTINGS_CHANNEL = 'ai:open-model-settings'
+
+const FAMILY_TABLES = {
+  TABS_CHANNELS,
+  INTEGRATIONS_CHANNELS,
+  UPDATE_CHANNELS,
+  PDF_PASSWORD_CHANNELS,
+} as const
+
+const FAMILY_VALUES: readonly string[] = [
+  ...Object.values(FAMILY_TABLES).flatMap((table) => Object.values(table) as string[]),
+  DROP_CHANNEL,
+  MODEL_SETTINGS_CHANNEL,
+]
+
+/** what main registers a handler for: every constant of the families but the pushes */
+const FAMILY_REGISTERED: readonly string[] = FAMILY_VALUES.filter(
+  (channel) => !FAMILY_PUSH_ONLY.includes(channel),
+)
+
+/** raw registrations (any spelling the scan resolves) of a channel of these families */
+function rawFamilyRegistrations(files: readonly Source[]): string[] {
+  return files.flatMap((source) =>
+    rawRegistrations(source.file, source.text)
+      .filter((reg) => reg.channels.some((channel) => FAMILY_VALUES.includes(channel)))
+      .map((reg) => `${reg.file}:${reg.receiver}.${reg.method}(${squash(reg.arg)})`),
+  )
+}
+
+describe('every channel of the remaining shell families is accounted for and guarded', () => {
+  const registered = new Map<string, number>()
+  for (const source of sources) {
+    for (const reg of registrations(source)) {
+      for (const channel of reg.channels) {
+        if (FAMILY_VALUES.includes(channel)) {
+          registered.set(channel, (registered.get(channel) ?? 0) + 1)
+        }
+      }
+    }
+  }
+
+  it('is either registered or listed as push-only, never both', () => {
+    expect({
+      neither: FAMILY_VALUES.filter((c) => !registered.has(c) && !FAMILY_PUSH_ONLY.includes(c)),
+      both: FAMILY_PUSH_ONLY.filter((c) => registered.has(c)),
+    }).toEqual({ neither: [], both: [] })
+    // tabs 16, integrations 6, update 6, pdf-password 3, the drop and the model settings opener
+    expect(FAMILY_REGISTERED).toHaveLength(33)
+    expect(registered.size).toBe(33)
+  })
+
+  it('is registered once', () => {
+    expect([...registered].filter(([, count]) => count !== 1)).toEqual([])
+  })
+
+  it('has its intended policy on every registered channel', () => {
+    const wrong: string[] = []
+    for (const channel of registered.keys()) {
+      const expected = expectedPolicy(channel)
+      if (expected === null || policyForChannel(channel) !== expected) {
+        wrong.push(
+          `${channel}: expected ${String(expected)}, guard says ${String(policyForChannel(channel))}`,
+        )
+      }
+    }
+    expect(wrong).toEqual([])
+  })
+
+  it('is registered on no raw ipcMain: none of the 33 channels stays unguarded', () => {
+    expect(rawFamilyRegistrations(sources)).toEqual([])
+  })
+
+  it('registers the tabs, the drop and the model settings opener in index.ts on a guarded object', () => {
+    const index = sources.find((s) => isIndex(s.file))!
+    const guarded = new Set(guardedAliases(index.text))
+    const raw: string[] = []
+    for (const reg of registrations(index)) {
+      for (const channel of reg.channels) {
+        if (FAMILY_REGISTERED.includes(channel) && !guarded.has(reg.receiver)) {
+          raw.push(`${channel} on ${reg.receiver}`)
+        }
+      }
+    }
+    expect(raw).toEqual([])
+  })
+
+  it('leaves pdf:convert-office raw: it checks the active pdf tab itself and is no shell family', () => {
+    const index = sources.find((s) => isIndex(s.file))!
+    const receivers = registrations(index)
+      .filter((reg) => reg.channels.includes('pdf:convert-office'))
+      .map((reg) => reg.receiver)
+    expect(receivers).toEqual(['ipcMain'])
+    expect(policyForChannel('pdf:convert-office')).toBeNull()
+    expect(expectedPolicy('pdf:convert-office')).toBeNull()
+  })
+})
+
+describe('policy of every channel of the remaining shell families', () => {
+  const policyOf = (table: Record<string, string>, push: readonly string[] = []): string[] =>
+    Object.values(table).filter((channel) => !push.includes(channel))
+
+  it('TABS_CHANNELS: shell (16 handlers; changed and dockPreview are pushes)', () => {
+    const values = policyOf(TABS_CHANNELS, FAMILY_PUSH_ONLY)
+    expect(values).toHaveLength(16)
+    for (const channel of values) expect(policyForChannel(channel), channel).toBe('shell')
+  })
+
+  it('INTEGRATIONS_CHANNELS: shell', () => {
+    const values = policyOf(INTEGRATIONS_CHANNELS)
+    expect(values).toHaveLength(6)
+    for (const channel of values) expect(policyForChannel(channel), channel).toBe('shell')
+  })
+
+  it('app:open-dropped-files is shell or editor, ai:open-model-settings is editor', () => {
+    expect(policyForChannel(DROP_CHANNEL)).toBe('shell-or-editor')
+    expect(policyForChannel(MODEL_SETTINGS_CHANNEL)).toBe('editor')
+  })
+
+  it('update:*: the shell opens it and reads its state, only the update window drives it', () => {
+    expect(policyForChannel(UPDATE_CHANNELS.openForUpdate)).toBe('shell')
+    expect(policyForChannel(UPDATE_CHANNELS.getState)).toBe('shell-or-own-window:update')
+    for (const channel of [
+      UPDATE_CHANNELS.download,
+      UPDATE_CHANNELS.install,
+      UPDATE_CHANNELS.later,
+      UPDATE_CHANNELS.openDownload,
+    ]) {
+      expect(policyForChannel(channel), channel).toBe('own-window:update')
+    }
+  })
+
+  it('pdf-password:*: only the password window', () => {
+    for (const channel of [
+      PDF_PASSWORD_CHANNELS.getState,
+      PDF_PASSWORD_CHANNELS.submit,
+      PDF_PASSWORD_CHANNELS.cancel,
+    ]) {
+      expect(policyForChannel(channel), channel).toBe('own-window:pdf-password')
+    }
+  })
+
+  it('the table in this file agrees with the one above, channel by channel', () => {
+    expect(FAMILY_REGISTERED.map((channel) => [channel, expectedPolicy(channel)])).toEqual(
+      FAMILY_REGISTERED.map((channel) => [channel, policyForChannel(channel)]),
+    )
+  })
+
+  it('a new channel under update: or pdf-password: defaults to its own window, never to the shell', () => {
+    expect(expectedPolicy('update:force-install')).toBe('own-window:update')
+    expect(expectedPolicy('pdf-password:reveal')).toBe('own-window:pdf-password')
+    expect(policyForChannel('update:force-install')).toBe('own-window:update')
+    expect(policyForChannel('pdf-password:reveal')).toBe('own-window:pdf-password')
+  })
+})
+
+/** the fixtures for the new families: each spelling of a raw registration has to turn red */
+describe('the scan catches a raw registration of the remaining shell families', () => {
+  const header = "import { ipcMain } from 'electron'\n"
+  const offendersOf = (body: string, file = 'apps/shell/src/main/other.ts') =>
+    rawOffenders(file, `${header}${body}\n`, {}, [])
+
+  it.each([
+    ['a tabs literal', "ipcMain.handle('tabs:close', f)"],
+    ['a tabs constant', 'ipcMain.on(TABS_CHANNELS.chromePressed, f)'],
+    ['a tabs once-registration', 'ipcMain.once(TABS_CHANNELS.detach, f)'],
+    ['an aliased tabs constant', 'const bus = ipcMain\nbus.handle(TABS_CHANNELS.tearOff, f)'],
+    ['an integrations constant', 'ipcMain.handle(INTEGRATIONS_CHANNELS.installSkill, f)'],
+    ['an integrations literal', "ipcMain.handle('integrations:copy-text', f)"],
+    ['the drop constant', 'ipcMain.on(DROP_OPEN_CHANNEL, f)'],
+    ['the drop literal', "ipcMain.on('app:open-dropped-files', f)"],
+    ['the model settings opener', "ipcMain.handle('ai:open-model-settings', f)"],
+    ['an update constant', 'ipcMain.handle(UPDATE_CHANNELS.install, f)'],
+    ['an update literal', "ipcMain.handle('update:open-for-update', f)"],
+    ['a pdf-password constant', 'ipcMain.handle(PDF_PASSWORD_CHANNELS.submit, f)'],
+    ['a pdf-password literal', "ipcMain.handle('pdf-password:cancel', f)"],
+    ['a tabs template channel', 'ipcMain.handle(`tabs:${name}`, f)'],
+    ['a new update channel', "ipcMain.handle('update:force-install', f)"],
+    ['a cast receiver', "(ipcMain as IpcMain).handle('tabs:close', f)"],
+  ])('%s', (_label, body) => {
+    expect(offendersOf(body).length).toBeGreaterThan(0)
+  })
+
+  it('in another file of the shell main and in an editor main', () => {
+    const body = "ipcMain.handle('tabs:close', f)"
+    expect(offendersOf(body, 'apps/shell/src/main/tabs/other-tabs.ts')).toHaveLength(1)
+    expect(offendersOf(body, 'apps/docs/src/main/docs-main.ts')).toHaveLength(1)
+    expect(offendersOf(body, 'packages/electron-utils/src/x.ts')).toHaveLength(1)
+  })
+
+  it('the family check names the file and the call, and ignores an out-of-scope channel', () => {
+    const files = (body: string): Source[] => [
+      { file: 'apps/shell/src/main/other.ts', text: `${header}${body}\n` },
+    ]
+    expect(rawFamilyRegistrations(files('ipcMain.handle(TABS_CHANNELS.close, f)'))).toEqual([
+      'apps/shell/src/main/other.ts:ipcMain.handle(TABS_CHANNELS.close)',
+    ])
+    expect(rawFamilyRegistrations(files("ipcMain.handle('app:get-theme', f)"))).toEqual([])
+    expect(rawFamilyRegistrations(files("ipcMain.handle('pdf:convert-office', f)"))).toEqual([])
+    expect(rawFamilyRegistrations(files('guardedIpc.handle(TABS_CHANNELS.close, f)'))).toEqual([])
+  })
+
+  it('a registrar handed the raw ipcMain, whatever its parameter is called', () => {
+    for (const registrar of [
+      'registerIntegrationsIpc',
+      'registerUpdateIpc',
+      'registerPdfPasswordIpc',
+    ]) {
+      expect(REGISTRARS).toContain(registrar)
+      expect(
+        rawHandedRegistrars(
+          'apps/shell/src/main/index.ts',
+          `${header}${registrar}(ipcMain, deps)\n`,
+        ),
+      ).toHaveLength(1)
+      const aliased = `${header}const bus = ipcMain\n${registrar}(bus)\n`
+      expect(rawHandedRegistrars('apps/shell/src/main/index.ts', aliased)).toHaveLength(1)
+      // the guarded object is what index.ts has to hand over
+      const guarded = `${header}const guardedIpc = ipcSenderGuard.guarded(ipcMain)\n${registrar}(guardedIpc, deps)\n`
+      expect(rawHandedRegistrars('apps/shell/src/main/index.ts', guarded)).toEqual([])
+    }
+  })
+
+  it('a new registrar file taking an ipc parameter has to be listed', () => {
+    const importIpc = "import type { IpcMainLike } from 'electron'\n"
+    const text = `${importIpc}export function registerTabs(ipcMain: IpcMainLike) {\n  ipcMain.handle(TABS_CHANNELS.close, f)\n}\n`
+    const diff = registrarFileDiff(
+      [{ file: 'apps/shell/src/main/tabs-registrar.ts', text }],
+      REGISTRAR_FILES,
+    )
+    expect(diff.unlisted).toEqual(['apps/shell/src/main/tabs-registrar.ts'])
+    // and the three files this card lists are listed, so their registration is a known one
+    for (const file of [
+      'apps/shell/src/main/integrations-ipc.ts',
+      'apps/shell/src/main/update-window.ts',
+      'apps/shell/src/main/pdf-password-dialog.ts',
+    ]) {
+      expect(Object.keys(REGISTRAR_FILES), file).toContain(file)
+    }
+  })
+
+  it('every one of the three registrar files is read by the scan', () => {
+    const files = new Set(sources.map((source) => source.file))
+    for (const file of [
+      'apps/shell/src/main/integrations-ipc.ts',
+      'apps/shell/src/main/update-window.ts',
+      'apps/shell/src/main/pdf-password-dialog.ts',
+    ]) {
+      expect(files.has(file), file).toBe(true)
+    }
   })
 })
