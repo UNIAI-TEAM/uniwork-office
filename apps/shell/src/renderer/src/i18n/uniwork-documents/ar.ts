@@ -193,4 +193,8 @@ export const ar = {
   uwSourceOriginTask: 'المهام',
   uwSourceOriginMeeting: 'الاجتماعات',
   uwSourceOriginEmail: 'البريد الإلكتروني',
+  uwErrOwnerRequiresCopy: 'هذا المستند تابع لنتاج عمل: انسخه من خلال الشاشة المالكة له.',
+  uwErrPageCopyNotSupported:
+    'لا يمكن نسخ إلا مستندات الملفات في هذه المرحلة. ستتوفر نسخ UniNote لاحقًا.',
+  uwErrCopyConsentRequired: 'يلزم تأكيد صريح قبل النسخ.',
 } satisfies Record<keyof typeof zh, string>

@@ -201,4 +201,8 @@ export const id = {
   uwSourceOriginTask: 'Tugas',
   uwSourceOriginMeeting: 'Rapat',
   uwSourceOriginEmail: 'Email',
+  uwErrOwnerRequiresCopy: 'Dokumen ini milik sebuah hasil kerja: salin melalui layar pemiliknya.',
+  uwErrPageCopyNotSupported:
+    'Pada tahap ini hanya dokumen file yang dapat disalin. Salinan UniNote akan tersedia nanti.',
+  uwErrCopyConsentRequired: 'Konfirmasi eksplisit diperlukan sebelum menyalin.',
 } satisfies Record<keyof typeof zh, string>

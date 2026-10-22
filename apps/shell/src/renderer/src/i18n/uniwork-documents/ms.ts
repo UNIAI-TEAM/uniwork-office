@@ -202,4 +202,8 @@ export const ms = {
   uwSourceOriginTask: 'Tugasan',
   uwSourceOriginMeeting: 'Mesyuarat',
   uwSourceOriginEmail: 'E-mel',
+  uwErrOwnerRequiresCopy: 'Dokumen ini milik hasil kerja: salin melalui skrin pemiliknya.',
+  uwErrPageCopyNotSupported:
+    'Pada langkah ini hanya dokumen fail boleh disalin. Salinan UniNote akan datang kemudian.',
+  uwErrCopyConsentRequired: 'Pengesahan yang jelas diperlukan sebelum menyalin.',
 } satisfies Record<keyof typeof zh, string>

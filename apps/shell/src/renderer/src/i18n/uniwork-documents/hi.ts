@@ -196,4 +196,9 @@ export const hi = {
   uwSourceOriginTask: 'कार्य',
   uwSourceOriginMeeting: 'मीटिंग',
   uwSourceOriginEmail: 'ईमेल',
+  uwErrOwnerRequiresCopy:
+    'यह दस्तावेज़ एक कार्य परिणाम का हिस्सा है: इसे मूल स्क्रीन के माध्यम से कॉपी करें।',
+  uwErrPageCopyNotSupported:
+    'इस चरण में केवल फ़ाइल दस्तावेज़ों की कॉपी की जा सकती है। UniNote कॉपी बाद में आएगी।',
+  uwErrCopyConsentRequired: 'कॉपी करने से पहले स्पष्ट पुष्टि आवश्यक है।',
 } satisfies Record<keyof typeof zh, string>

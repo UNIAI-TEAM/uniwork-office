@@ -1247,6 +1247,15 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_DOC_CHANNELS.restoreDocument, (_event, documentId: unknown) =>
     service.restoreDocument(documentId as string),
   )
+  // UNI-2078: a plain copy of a file document; the service re-checks every gate
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.copyDocument, (_event, input: unknown) => {
+    const body = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+    return service.copyDocument({
+      documentId: body.documentId as string,
+      title: body.title as string | undefined,
+      idempotencyKey: body.idempotencyKey as string | undefined,
+    })
+  })
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf, Bỏ lưu trữ and trash from Lưu trữ
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listShelved, (_event, query: unknown) =>
     service.listShelved((query ?? {}) as UniworkShelvedQuery),

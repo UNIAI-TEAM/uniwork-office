@@ -204,4 +204,9 @@ export const pt = {
   uwSourceOriginTask: 'Tarefas',
   uwSourceOriginMeeting: 'Reuniões',
   uwSourceOriginEmail: 'E-mail',
+  uwErrOwnerRequiresCopy:
+    'Este documento pertence a um entregável: copie-o pela tela do proprietário.',
+  uwErrPageCopyNotSupported:
+    'Nesta etapa, só é possível copiar documentos de arquivo. As cópias do UniNote virão depois.',
+  uwErrCopyConsentRequired: 'É necessária uma confirmação explícita antes de copiar.',
 } satisfies Record<keyof typeof zh, string>

@@ -198,4 +198,8 @@ export const ko = {
   uwSourceOriginTask: '작업',
   uwSourceOriginMeeting: '회의',
   uwSourceOriginEmail: '이메일',
+  uwErrOwnerRequiresCopy: '이 문서는 작업 산출물에 속해 있습니다. 소유 화면에서 복사하세요.',
+  uwErrPageCopyNotSupported:
+    '이 단계에서는 파일 문서만 복사할 수 있습니다. UniNote 사본은 추후 지원됩니다.',
+  uwErrCopyConsentRequired: '복사하기 전에 명시적인 확인이 필요합니다.',
 } satisfies Record<keyof typeof zh, string>

@@ -200,4 +200,9 @@ export const it = {
   uwSourceOriginTask: 'Attività',
   uwSourceOriginMeeting: 'Riunioni',
   uwSourceOriginEmail: 'Email',
+  uwErrOwnerRequiresCopy:
+    'Questo documento appartiene a un deliverable: copialo dalla schermata che lo gestisce.',
+  uwErrPageCopyNotSupported:
+    'In questa fase è possibile copiare solo i documenti file. Le copie UniNote arriveranno in seguito.',
+  uwErrCopyConsentRequired: 'Prima di copiare è richiesta una conferma esplicita.',
 } satisfies Record<keyof typeof zh, string>

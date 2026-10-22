@@ -195,4 +195,8 @@ export const vi = {
   uwSourceOriginTask: 'Công việc',
   uwSourceOriginMeeting: 'Cuộc họp',
   uwSourceOriginEmail: 'Email',
+  uwErrOwnerRequiresCopy: 'Tài liệu thuộc Kết quả công việc: bản sao đi qua màn hình sở hữu.',
+  uwErrPageCopyNotSupported:
+    'Chỉ tài liệu tệp có bản sao ở bước này. UniNote sao chép ở giai đoạn sau.',
+  uwErrCopyConsentRequired: 'Cần xác nhận rõ trước khi tạo bản sao.',
 } satisfies Record<keyof typeof zh, string>

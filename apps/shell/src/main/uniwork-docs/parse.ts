@@ -444,6 +444,10 @@ export interface DocumentRef {
   format: UniworkDocFormat | null
   /** the document's `visibility` when the server sent a known one (SD-D2 first-save share rule) */
   visibility: UniworkDocSummary['visibility'] | null
+  /** UNI-2078: `shelved_at` while the document sits in Archive (Lưu trữ); absent otherwise */
+  shelvedAt?: string
+  /** UNI-2078: `owner_kind` of an owned (work-product) document; absent for an ordinary one */
+  ownerKind?: string
 }
 
 export function parseDocumentRef(raw: unknown): DocumentRef {
@@ -453,6 +457,8 @@ export function parseDocumentRef(raw: unknown): DocumentRef {
   const title = str(doc.title)
   const myLevel = doc.my_level
   if (myLevel !== undefined && myLevel !== null && typeof myLevel !== 'string') bad()
+  const shelvedAt = optId(doc.shelved_at, 64)
+  const ownerKind = optId(doc.owner_kind, 64)
   return {
     id: str(doc.id, 128),
     workspaceId: str(doc.workspace_id, 128),
@@ -464,6 +470,8 @@ export function parseDocumentRef(raw: unknown): DocumentRef {
     archivedAt: typeof doc.archived_at === 'string' && doc.archived_at ? doc.archived_at : null,
     format: kind === 'folder' ? null : formatOf(doc, title),
     visibility: visibilityOf(doc.visibility) ?? null,
+    ...(shelvedAt ? { shelvedAt } : {}),
+    ...(ownerKind ? { ownerKind } : {}),
   }
 }
 

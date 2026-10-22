@@ -223,6 +223,13 @@ export type UniworkDocErrorCode =
   // UNI-2066: the server's 422 `folder_into_my_folder` - a workspace folder can't
   // move into My Folder or under it (user-facing, never retried)
   | 'folder_into_my_folder'
+  // UNI-2078: the copy route's own refusals - a work-product document copies only through its
+  // owning screen (409 `owner_requires_copy`), a page has no copy yet (400 `invalid_request`,
+  // reason `page_copy_not_supported`) and the copy needs the explicit consent (409
+  // `copy_consent_required`); each is user-facing, never retried
+  | 'owner_requires_copy'
+  | 'page_copy_not_supported'
+  | 'copy_consent_required'
   // the account's durable sync store could not be opened (locked keychain) or
   // refused the pending intent (budget full)
   | 'keystore_locked'
@@ -577,6 +584,16 @@ export interface UniworkCreateFolderInput {
   workspaceId: string
   parentId: string | null
   title: string
+}
+
+/**
+ * UNI-2078: the input of a plain copy. A blank `title` is left out (the server names the copy);
+ * `idempotencyKey` is minted per dialog open so a retry of the same open replays safely.
+ */
+export interface UniworkCopyDocumentInput {
+  documentId: string
+  title?: string
+  idempotencyKey?: string
 }
 
 /** FD-11: move a document/folder under another folder (null = the workspace root) */
@@ -1609,6 +1626,13 @@ export interface HomeApi {
   /** S18: restore an archived document */
   uniworkRestoreDocument(documentId: string): Promise<UniworkDocActionResult<UniworkDocSummary>>
   /**
+   * UNI-2078: make a copy of a file document you can edit (workspace root, the source's access).
+   * A 404 / 501 answers `endpointMissing: true` (the deployment has no copy route yet).
+   */
+  uniworkCopyDocument(
+    input: UniworkCopyDocumentInput,
+  ): Promise<UniworkDocActionResult<UniworkDocSummary>>
+  /**
    * FD-11: the workspace's whole folder tree (`folders_only=true`), root nodes
    * first, to the server's depth 20.
    */
@@ -2294,6 +2318,8 @@ export const UNIWORK_DOC_CHANNELS = {
   archiveImpact: 'uniwork-doc:archive-impact',
   /** invoke(documentId) -> restore an archived document (S18) */
   restoreDocument: 'uniwork-doc:restore-document',
+  /** invoke({ documentId, title?, idempotencyKey? }) -> a plain copy of a file document (UNI-2078) */
+  copyDocument: 'uniwork-doc:copy-document',
   /** invoke(workspaceId) -> the workspace's folder tree, root nodes first (FD-11) */
   folderTree: 'uniwork-doc:folder-tree',
   /** invoke(q) -> one folder's contents: folders + files + pages (FD-11) */

@@ -212,4 +212,9 @@ export const fr = {
   uwSourceOriginTask: 'Tâches',
   uwSourceOriginMeeting: 'Réunions',
   uwSourceOriginEmail: 'E-mail',
+  uwErrOwnerRequiresCopy:
+    "Ce document appartient à un livrable : copiez-le depuis l'écran qui le gère.",
+  uwErrPageCopyNotSupported:
+    'Seuls les documents de fichier peuvent être copiés à cette étape. Les copies UniNote arriveront plus tard.',
+  uwErrCopyConsentRequired: 'Une confirmation explicite est requise avant la copie.',
 } satisfies Record<keyof typeof zh, string>

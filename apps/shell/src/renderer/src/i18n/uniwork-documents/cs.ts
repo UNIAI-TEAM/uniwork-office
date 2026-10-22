@@ -197,4 +197,9 @@ export const cs = {
   uwSourceOriginTask: 'Úkoly',
   uwSourceOriginMeeting: 'Schůzky',
   uwSourceOriginEmail: 'E-mail',
+  uwErrOwnerRequiresCopy:
+    'Tento dokument patří k pracovnímu výstupu: zkopírujte ho na obrazovce, která ho spravuje.',
+  uwErrPageCopyNotSupported:
+    'V tomto kroku lze kopírovat pouze souborové dokumenty. Kopírování v UniNote přijde později.',
+  uwErrCopyConsentRequired: 'Před kopírováním je vyžadováno výslovné potvrzení.',
 } satisfies Record<keyof typeof zh, string>

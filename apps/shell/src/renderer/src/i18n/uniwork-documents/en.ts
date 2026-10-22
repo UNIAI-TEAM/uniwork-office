@@ -197,4 +197,9 @@ export const en = {
   uwSourceOriginTask: 'Tasks',
   uwSourceOriginMeeting: 'Meetings',
   uwSourceOriginEmail: 'Email',
+  uwErrOwnerRequiresCopy:
+    'This document belongs to a Work Product: copy it through the owning screen.',
+  uwErrPageCopyNotSupported:
+    'Only file documents can be copied at this step. UniNote copies come later.',
+  uwErrCopyConsentRequired: 'An explicit confirmation is required before copying.',
 } satisfies Record<keyof typeof zh, string>

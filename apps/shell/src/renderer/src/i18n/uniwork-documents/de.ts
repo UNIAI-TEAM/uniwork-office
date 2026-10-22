@@ -209,4 +209,9 @@ export const de = {
   uwSourceOriginTask: 'Aufgaben',
   uwSourceOriginMeeting: 'Meetings',
   uwSourceOriginEmail: 'E-Mail',
+  uwErrOwnerRequiresCopy:
+    'Dieses Dokument gehört zu einem Arbeitsergebnis: Kopieren Sie es über die zuständige Ansicht.',
+  uwErrPageCopyNotSupported:
+    'In diesem Schritt können nur Dateidokumente kopiert werden. UniNote-Kopien folgen später.',
+  uwErrCopyConsentRequired: 'Vor dem Kopieren ist eine ausdrückliche Bestätigung erforderlich.',
 } satisfies Record<keyof typeof zh, string>

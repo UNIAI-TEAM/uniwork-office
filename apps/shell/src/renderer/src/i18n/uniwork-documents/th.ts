@@ -201,4 +201,8 @@ export const th = {
   uwSourceOriginTask: 'งาน',
   uwSourceOriginMeeting: 'การประชุม',
   uwSourceOriginEmail: 'อีเมล',
+  uwErrOwnerRequiresCopy: 'เอกสารนี้เป็นของผลลัพธ์งาน: ให้คัดลอกผ่านหน้าจอของเจ้าของ',
+  uwErrPageCopyNotSupported:
+    'ในขั้นตอนนี้คัดลอกได้เฉพาะเอกสารไฟล์เท่านั้น การคัดลอก UniNote จะเปิดให้ใช้ในภายหลัง',
+  uwErrCopyConsentRequired: 'ต้องยืนยันอย่างชัดเจนก่อนคัดลอก',
 } satisfies Record<keyof typeof zh, string>

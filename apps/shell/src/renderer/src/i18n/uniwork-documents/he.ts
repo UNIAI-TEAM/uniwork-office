@@ -193,4 +193,7 @@ export const he = {
   uwSourceOriginTask: 'משימות',
   uwSourceOriginMeeting: 'פגישות',
   uwSourceOriginEmail: 'אימייל',
+  uwErrOwnerRequiresCopy: 'מסמך זה שייך לתוצר עבודה: יש להעתיק אותו דרך המסך של הבעלים.',
+  uwErrPageCopyNotSupported: 'בשלב זה ניתן להעתיק רק מסמכי קבצים. העתקת UniNote תגיע בהמשך.',
+  uwErrCopyConsentRequired: 'נדרש אישור מפורש לפני ההעתקה.',
 } satisfies Record<keyof typeof zh, string>

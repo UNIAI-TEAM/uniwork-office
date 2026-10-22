@@ -204,4 +204,9 @@ export const ru = {
   uwSourceOriginTask: 'Задачи',
   uwSourceOriginMeeting: 'Встречи',
   uwSourceOriginEmail: 'Почта',
+  uwErrOwnerRequiresCopy:
+    'Этот документ относится к результату работы: скопируйте его через экран, которому он принадлежит.',
+  uwErrPageCopyNotSupported:
+    'На этом этапе можно копировать только файловые документы. Копирование UniNote появится позже.',
+  uwErrCopyConsentRequired: 'Перед копированием требуется явное подтверждение.',
 } satisfies Record<keyof typeof zh, string>

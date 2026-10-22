@@ -1208,6 +1208,9 @@ const COPY_LOOKUP_WAIT_MS = 1500
 /** the notices that make step 2 of Save as a copy the "Download my version" step */
 type DownloadStepNotice = 'save_copy_no_seat' | 'save_copy_folder_refused' | 'download_failed'
 
+/** UNI-2078: the shape of a dialog-open Idempotency-Key main accepts from the renderer */
+const COPY_KEY_SHAPE = /^[A-Za-z0-9._:-]{8,128}$/
+
 /** BE-12-201: the server's refusal of a copy for a caller with no seat in the source's workspace */
 const COPY_NO_SEAT_CODE = 'workspace_seat_required'
 
@@ -6406,6 +6409,64 @@ export class UniworkDocsService {
       await this.requireManageAnyKind(documentId, session)
       return this.api().restore(documentId, this.newIdempotencyKey())
     })
+  }
+
+  /**
+   * UNI-2078: a plain copy of a file document (the web's "Create a copy"): a new document at the
+   * workspace root that keeps the source's access. Main never trusts the renderer: the document is
+   * re-read and refused BEFORE any POST unless it is a live file the caller can edit and no other
+   * module owns. `title` blank = the server names the copy. The renderer's `idempotencyKey` (one
+   * per dialog open) is kept across a retry of the same open when it has the expected shape;
+   * anything else is replaced by a key minted here. No `parent_id` (workspace root, web parity).
+   * 404 / 501 of the copy route (not the re-read) answer `endpointMissing`.
+   */
+  copyDocument(input: {
+    documentId: string
+    title?: string
+    idempotencyKey?: string
+  }): Promise<UniworkDocActionResult<UniworkDocSummary>> {
+    return actionResult(
+      async () => {
+        const session = this.captureActionSession()
+        const documentId = typeof input?.documentId === 'string' ? input.documentId : ''
+        if (!documentId) throw new UniworkDocError('not_found')
+        const title =
+          typeof input.title === 'string' && input.title.trim()
+            ? requireName(input.title)
+            : undefined
+        const ref = await this.api()
+          .documentRef(documentId)
+          // the re-read failing (a vanished document) says nothing about the copy route: drop the
+          // status so a 404 here never hides the action for the session
+          .catch((error: unknown) => {
+            if (error instanceof UniworkDocError) {
+              throw new UniworkDocError(error.code, { serverCode: error.serverCode })
+            }
+            throw error
+          })
+        if (!this.sessionLive(session)) throw new UniworkDocError('not_signed_in')
+        if (ref.myLevel !== 'edit' && ref.myLevel !== 'manage') {
+          throw new UniworkDocError('forbidden')
+        }
+        if (ref.archivedAt) throw new UniworkDocError('document_deleted')
+        if (ref.shelvedAt) throw new UniworkDocError('document_archived')
+        if (ref.kind === 'folder') throw new UniworkDocError('unsupported_format')
+        if (ref.kind === 'page') throw new UniworkDocError('page_copy_not_supported')
+        if (ref.ownerKind) throw new UniworkDocError('owner_requires_copy')
+        const given = typeof input.idempotencyKey === 'string' ? input.idempotencyKey : ''
+        const created = await this.api().copyDocument({
+          documentId,
+          ...(title ? { title } : {}),
+          parentId: null,
+          idempotencyKey: COPY_KEY_SHAPE.test(given)
+            ? `uniwork-doc-copy-${given}`
+            : this.newIdempotencyKey(),
+        })
+        this.pushTreeChangedFor(session, created.summary.workspaceId)
+        return created.summary
+      },
+      { flagMissingEndpoint: true },
+    )
   }
 
   /** the workspace + create target of a create or upload, validated before any call */

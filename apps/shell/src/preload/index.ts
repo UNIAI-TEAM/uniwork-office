@@ -74,6 +74,7 @@ import type {
   UniworkFolderQuery,
   UniworkLaunchEvent,
   UniworkLockReason,
+  UniworkCopyDocumentInput,
   UniworkMoveDocumentInput,
   UniworkMoveResult,
   UniworkQueuePopoverRequest,
@@ -1501,6 +1502,21 @@ const homeApi: HomeApi = {
   async uniworkRestoreDocument(documentId: string) {
     return asUniworkActionResult<UniworkDocSummary>(
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.restoreDocument, documentId),
+    )
+  },
+  // UNI-2078: a plain copy; only the three typed keys cross, the reply is narrowed like any action
+  async uniworkCopyDocument(input: UniworkCopyDocumentInput) {
+    if (!input || typeof input !== 'object' || typeof input.documentId !== 'string') {
+      return { ok: false, error: 'not_found' } as const
+    }
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.copyDocument, {
+        documentId: input.documentId,
+        ...(typeof input.title === 'string' ? { title: input.title } : {}),
+        ...(typeof input.idempotencyKey === 'string'
+          ? { idempotencyKey: input.idempotencyKey }
+          : {}),
+      }),
     )
   },
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf
