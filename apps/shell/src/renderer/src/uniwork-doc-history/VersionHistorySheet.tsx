@@ -8,6 +8,7 @@ import { ActionModal } from '../UniworkDocActions'
 import { useShareDirectory } from '../uniwork-share/use-share'
 import { getDocHistoryBridge } from './bridge'
 import { useDocVersions } from './use-doc-versions'
+import { useFocusAfterLastPage } from './use-focus-after-last-page'
 import {
   canWriteVersions,
   createErrorKey,
@@ -98,6 +99,13 @@ function VersionHistoryView({
   const shelved = !!row.shelvedAt
   const list = useDocVersions(api, row.id, true)
   const directory = useShareDirectory(shareApi ?? NO_MEMBERS, true)
+  const listRef = useRef<HTMLUListElement>(null)
+  const markLoadMore = useFocusAfterLastPage(
+    listRef,
+    list.rows.length,
+    list.hasMore,
+    list.loadingMore,
+  )
 
   const [label, setLabel] = useState('')
   const [creating, setCreating] = useState(false)
@@ -367,7 +375,7 @@ function VersionHistoryView({
           <p className="uw-versions-muted uw-versions-empty">{t('vhsEmpty')}</p>
         ) : (
           <>
-            <ul className="uw-versions-list">
+            <ul className="uw-versions-list" ref={listRef}>
               {list.rows.map((version) => {
                 const author = authorName(version)
                 return (
@@ -375,6 +383,7 @@ function VersionHistoryView({
                     key={version.id}
                     className="uw-versions-row"
                     data-version-row={version.version}
+                    tabIndex={-1}
                   >
                     <div className="uw-versions-row-main">
                       <p className="uw-versions-row-head">
@@ -506,7 +515,10 @@ function VersionHistoryView({
                   className="btn"
                   disabled={list.loadingMore}
                   aria-busy={list.loadingMore || undefined}
-                  onClick={list.loadMore}
+                  onClick={() => {
+                    markLoadMore()
+                    list.loadMore()
+                  }}
                 >
                   {t('vhsLoadMore')}
                 </button>

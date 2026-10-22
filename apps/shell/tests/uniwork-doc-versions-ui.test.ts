@@ -417,6 +417,29 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       expect(button(sheet(), t('vhsLoadMore'))).toBeDefined()
     })
 
+    it('the last page moves the focus to its first row instead of dropping it to the body', async () => {
+      const bridge = createFakeDocHistoryBridge()
+      bridge.versions
+        .mockResolvedValueOnce({
+          ok: true,
+          value: { versions: [versionOf({ id: 'v3', version: 3 })], next_cursor: 'c1' },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          value: {
+            versions: [versionOf({ id: 'v2', version: 2 }), versionOf({ id: 'v1', version: 1 })],
+            next_cursor: null,
+          },
+        })
+      await open(target(), bridge)
+      const more = button(sheet(), t('vhsLoadMore')) as HTMLButtonElement
+      more.focus()
+      await click(more)
+      expect(button(sheet(), t('vhsLoadMore'))).toBeUndefined()
+      expect(document.activeElement).toBe(rows()[1])
+      expect(rows()[1]!.getAttribute('data-version-row')).toBe('2')
+    })
+
     it('a failed page keeps the rows and offers the same button again', async () => {
       const bridge = createFakeDocHistoryBridge()
       bridge.versions

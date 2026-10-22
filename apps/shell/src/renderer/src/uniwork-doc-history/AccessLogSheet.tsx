@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type {
   DocAccessLog,
   DocAccessLogAction,
@@ -16,6 +16,7 @@ import {
 } from './access-log-model'
 import { getDocHistoryBridge } from './bridge'
 import { useAccessLogs } from './use-access-logs'
+import { useFocusAfterLastPage } from './use-focus-after-last-page'
 import './access-log-sheet.css'
 
 /** what the sheet reads of a document: a list row satisfies it as is */
@@ -76,6 +77,13 @@ function AccessLogSheetBody({ onClose, row, api }: AccessLogSheetProps) {
   const [action, setAction] = useState<'' | DocAccessLogAction>('')
   const logs = useAccessLogs(bridge, row.id, action, canRead)
   const manageOnly = !canRead || logs.status === 'forbidden'
+  const listRef = useRef<HTMLUListElement>(null)
+  const markLoadMore = useFocusAfterLastPage(
+    listRef,
+    logs.rows.length,
+    logs.hasMore,
+    logs.loadingMore,
+  )
 
   return (
     <ActionModal
@@ -162,15 +170,15 @@ function AccessLogSheetBody({ onClose, row, api }: AccessLogSheetProps) {
             </p>
           ) : (
             <>
-              <ul className="alg-list">
+              <ul className="alg-list" ref={listRef}>
                 {logs.rows.map((log) => {
                   const actor = accessLogActor(log)
-                  const breakGlass = log.via === 'break_glass'
                   return (
                     <li
                       key={log.id}
                       className="alg-row"
                       data-access-log-row={log.id}
+                      tabIndex={-1}
                       data-via={log.via || undefined}
                     >
                       <div className="alg-row-main">
@@ -180,15 +188,6 @@ function AccessLogSheetBody({ onClose, row, api }: AccessLogSheetProps) {
                         <p className="alg-meta" data-access-log-meta>
                           {metaLine(log, t)}
                         </p>
-                        {breakGlass ? (
-                          <span
-                            className="alg-break-glass"
-                            data-access-log-break-glass
-                            aria-hidden="true"
-                          >
-                            {t('shrBgViaBreakGlass')}
-                          </span>
-                        ) : null}
                       </div>
                       <time className="alg-time" dateTime={log.occurred_at}>
                         {formatWhen(log.occurred_at, dateLocale)}
@@ -209,7 +208,10 @@ function AccessLogSheetBody({ onClose, row, api }: AccessLogSheetProps) {
                     className="btn"
                     disabled={logs.loadingMore}
                     aria-busy={logs.loadingMore || undefined}
-                    onClick={logs.loadMore}
+                    onClick={() => {
+                      markLoadMore()
+                      logs.loadMore()
+                    }}
                   >
                     {t('shrCandidatesMore')}
                   </button>

@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -326,7 +328,7 @@ describe('AccessLogSheet (UNI-2077)', () => {
         `${en.algActionUnknown} · teleport`,
       )
     })
-    it('marks a break-glass row (emergency access) so it stands out', async () => {
+    it('a break-glass row says Emergency access once, in its meta line, like the web', async () => {
       await open(
         createFakeDocHistoryBridge({
           logs: [
@@ -337,10 +339,24 @@ describe('AccessLogSheet (UNI-2077)', () => {
       )
       const [bg, member] = rows()
       expect(bg!.getAttribute('data-via')).toBe('break_glass')
-      expect(bg!.querySelector('[data-access-log-break-glass]')!.textContent).toBe(
-        'Emergency access',
+      expect(bg!.querySelector('[data-access-log-break-glass]')).toBeNull()
+      expect(bg!.querySelector('[data-access-log-meta]')!.textContent).toContain('Emergency access')
+      expect(bg!.textContent!.split('Emergency access')).toHaveLength(2)
+      expect(member!.textContent).not.toContain('Emergency access')
+    })
+  })
+
+  describe('manage-only note', () => {
+    it('reads in the primary text colour so dark mode keeps 4.5:1 (UNI-2077 TV F-1)', () => {
+      const css = readFileSync(
+        join(
+          __dirname,
+          '../src/renderer/src/uniwork-doc-history/access-log-sheet.css',
+        ),
+        'utf8',
       )
-      expect(member!.querySelector('[data-access-log-break-glass]')).toBeNull()
+      const rule = /\.modal\.uw-act \.alg-note \{([^}]*)\}/.exec(css)![1]!
+      expect(rule).toMatch(/color:\s*var\(--text\);/)
     })
   })
 
@@ -381,6 +397,46 @@ describe('AccessLogSheet (UNI-2077)', () => {
       expect(rows()).toHaveLength(1)
       expect(q('[role="alert"]')!.textContent).toContain(en.algError)
       expect(button('Load more')).toBeTruthy()
+    })
+    it('the last page moves the focus to its first row instead of dropping it to the body', async () => {
+      const bridge = createFakeDocHistoryBridge()
+      bridge.accessLogs
+        .mockResolvedValueOnce({
+          ok: true,
+          value: { logs: [accessLogOf({ id: 'p1' })], next_cursor: 'c1' },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          value: {
+            logs: [accessLogOf({ id: 'p2' }), accessLogOf({ id: 'p3' })],
+            next_cursor: null,
+          },
+        })
+      await open(bridge)
+      const more = button('Load more') as HTMLButtonElement
+      more.focus()
+      expect(document.activeElement).toBe(more)
+      await click(more)
+      expect(button('Load more')).toBeUndefined()
+      expect(document.activeElement).toBe(rows()[1])
+      expect(rows()[1]!.getAttribute('data-access-log-row')).toBe('p2')
+    })
+    it('a page that leaves the button in place keeps the focus on it', async () => {
+      const bridge = createFakeDocHistoryBridge()
+      bridge.accessLogs
+        .mockResolvedValueOnce({
+          ok: true,
+          value: { logs: [accessLogOf({ id: 'p1' })], next_cursor: 'c1' },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          value: { logs: [accessLogOf({ id: 'p2' })], next_cursor: 'c2' },
+        })
+      await open(bridge)
+      const more = button('Load more') as HTMLButtonElement
+      more.focus()
+      await click(more)
+      expect(document.activeElement).toBe(button('Load more'))
     })
     it('a next page that rejects keeps the rows and Load more usable', async () => {
       const bridge = createFakeDocHistoryBridge()

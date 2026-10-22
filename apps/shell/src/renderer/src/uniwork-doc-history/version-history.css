@@ -187,6 +187,11 @@
   padding: 10px 12px;
 }
 
+.uw-versions-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .uw-versions-row + .uw-versions-row {
   border-top: 1px solid var(--border);
 }

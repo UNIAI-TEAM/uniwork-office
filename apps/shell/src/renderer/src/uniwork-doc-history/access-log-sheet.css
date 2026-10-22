@@ -103,7 +103,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-hover-strong);
-  color: var(--text-secondary);
+  color: var(--text);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -184,11 +184,17 @@
   padding: 10px 12px;
 }
 
+.alg-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .alg-row + .alg-row {
   border-top: 1px solid var(--border);
 }
 
-/* an emergency (break-glass) access is the row an owner must not miss */
+/* an emergency (break-glass) access is the row an owner must not miss; the meta line says it
+   in words (as the web does), the tint is the only extra */
 .alg-row[data-via='break_glass'] {
   background: var(--warning-bg);
   box-shadow: inset 3px 0 0 var(--warning-text);
@@ -214,18 +220,6 @@
   font-size: 12px;
   line-height: 1.4;
   overflow-wrap: anywhere;
-}
-
-.alg-break-glass {
-  display: inline-block;
-  margin-top: 4px;
-  padding: 1px 8px;
-  border: 1px solid var(--warning-border);
-  border-radius: 999px;
-  background: var(--warning-bg);
-  color: var(--warning-text);
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .alg-time {
