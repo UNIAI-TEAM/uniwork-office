@@ -4,6 +4,56 @@ import { en } from './en'
 // shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
 export const nl = {
   ...en,
+  wbNotif_document_commented_untitled: '{actor} heeft een document becommentarieerd',
+  wbNotif_document_mentioned: '{actor} heeft je genoemd in een reactie op “{document}”.',
+  wbNotif_document_mentioned_untitled: '{actor} heeft je genoemd in een reactie op een document.',
+  wbNotif_document_body_mentioned: '{actor} heeft je genoemd in “{document}”.',
+  wbNotif_document_body_mentioned_untitled: '{actor} heeft je genoemd in een document.',
+  wbNotif_document_comment_replied: '{actor} heeft gereageerd op je reactie in “{document}”.',
+  wbNotif_document_comment_replied_untitled:
+    '{actor} heeft gereageerd op je reactie in een document.',
+  wbNotif_document_discussion_mentioned:
+    '{actor} heeft je genoemd in een discussie over “{document}”.',
+  wbNotif_document_discussion_mentioned_untitled:
+    '{actor} heeft je genoemd in een discussie over een document.',
+  wbNotif_document_discussion_replied:
+    '{actor} heeft gereageerd op je bericht in de discussie over “{document}”.',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor} heeft gereageerd op je bericht in de discussie over een document.',
+  wbNotif_document_edit_requested: '{actor} wil “{document}” bewerken',
+  wbNotif_document_edit_request_answered:
+    '{actor} heeft het bewerken van “{document}” aan jou overgedragen',
+  wbNotif_document_edit_request_answered_declined:
+    '{actor} is “{document}” nog steeds aan het bewerken',
+  wbNotif_document_edit_taken_over:
+    '{actor} heeft het bewerken van “{document}” overgenomen. Je niet-opgeslagen wijzigingen staan nog in het geopende document.',
+  wbNotif_document_break_glass:
+    '{actor} heeft noodtoegang tot alleen-lezen (24 u) tot “{document}” geopend.',
+  wbNotif_document_break_glass_untitled:
+    '{actor} heeft noodtoegang tot alleen-lezen (24 u) tot een document geopend.',
+  wbNotif_document_access_requested: '{actor} heeft toegang tot “{document}” aangevraagd.',
+  wbNotif_document_access_requested_untitled: '{actor} heeft toegang tot een document aangevraagd.',
+  wbNotif_document_access_approved: '{actor} heeft je toegang tot “{document}” gegeven.',
+  wbNotif_document_access_approved_untitled: '{actor} heeft je toegang tot een document gegeven.',
+  wbNotif_document_access_declined: 'Je verzoek om toegang tot een document is afgewezen.',
+  wbNotif_document_shared: '{actor} heeft “{document}” met je gedeeld ({level}).',
+  wbNotif_document_shared_untitled: '{actor} heeft een document met je gedeeld ({level}).',
+  wbNotif_document_shared_nolevel: '{actor} heeft “{document}” met je gedeeld.',
+  wbNotif_document_shared_untitled_nolevel: '{actor} heeft een document met je gedeeld.',
+  wbNotif_document_trashed_by_other:
+    '{actor} heeft je document naar de prullenbak verplaatst. Zet het terug vóór {date}',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor} heeft een van je documenten naar de prullenbak verplaatst. Zet het terug vóór {date}',
+  wbNotif_document_trashed_by_other_nodate:
+    '{actor} heeft je document naar de prullenbak verplaatst',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor} heeft een van je documenten naar de prullenbak verplaatst',
+  wbNotif_chat_call_incoming: '{actor} belt',
+  wbDeskPillReply: 'Antwoord',
+  wbDeskPillEdit: 'Bewerken',
+  wbDeskPillAccess: 'Toegang',
+  wbDeskPillTrash: 'In prullenbak',
+  wbDeskPillBreakGlass: 'Nood',
   wbNotif_document_changed: '{actor} heeft {count} documenten gewijzigd',
   wbNotif_document_changed_renamed_many: '{actor} heeft {count} documenten hernoemd',
   wbNotif_document_changed_renamed_one: '{actor} heeft “{document}” hernoemd',

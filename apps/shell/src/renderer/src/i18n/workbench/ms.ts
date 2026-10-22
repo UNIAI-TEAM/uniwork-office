@@ -4,6 +4,52 @@ import { en } from './en'
 // shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
 export const ms = {
   ...en,
+  wbNotif_document_commented_untitled: '{actor} mengulas dokumen',
+  wbNotif_document_mentioned: '{actor} menyebut anda dalam ulasan pada “{document}”.',
+  wbNotif_document_mentioned_untitled: '{actor} menyebut anda dalam ulasan pada dokumen.',
+  wbNotif_document_body_mentioned: '{actor} menyebut anda dalam “{document}”.',
+  wbNotif_document_body_mentioned_untitled: '{actor} menyebut anda dalam dokumen.',
+  wbNotif_document_comment_replied: '{actor} membalas ulasan anda dalam “{document}”.',
+  wbNotif_document_comment_replied_untitled: '{actor} membalas ulasan anda dalam dokumen.',
+  wbNotif_document_discussion_mentioned:
+    '{actor} menyebut anda dalam perbincangan mengenai “{document}”.',
+  wbNotif_document_discussion_mentioned_untitled:
+    '{actor} menyebut anda dalam perbincangan mengenai dokumen.',
+  wbNotif_document_discussion_replied:
+    '{actor} membalas catatan perbincangan anda dalam “{document}”.',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor} membalas catatan perbincangan anda dalam dokumen.',
+  wbNotif_document_edit_requested: '{actor} mahu menyunting “{document}”',
+  wbNotif_document_edit_request_answered: '{actor} menyerahkan suntingan “{document}” kepada anda',
+  wbNotif_document_edit_request_answered_declined: '{actor} masih menyunting “{document}”',
+  wbNotif_document_edit_taken_over:
+    '{actor} mengambil alih suntingan “{document}”. Perubahan anda yang belum disimpan kekal dalam dokumen yang dibuka.',
+  wbNotif_document_break_glass:
+    '{actor} membuka akses lihat kecemasan (24 jam) kepada “{document}”.',
+  wbNotif_document_break_glass_untitled:
+    '{actor} membuka akses lihat kecemasan (24 jam) kepada dokumen.',
+  wbNotif_document_access_requested: '{actor} memohon akses kepada “{document}”.',
+  wbNotif_document_access_requested_untitled: '{actor} memohon akses kepada dokumen.',
+  wbNotif_document_access_approved: '{actor} memberi anda akses kepada “{document}”.',
+  wbNotif_document_access_approved_untitled: '{actor} memberi anda akses kepada dokumen.',
+  wbNotif_document_access_declined: 'Permohonan akses anda kepada dokumen telah ditolak.',
+  wbNotif_document_shared: '{actor} berkongsi “{document}” dengan anda ({level}).',
+  wbNotif_document_shared_untitled: '{actor} berkongsi dokumen dengan anda ({level}).',
+  wbNotif_document_shared_nolevel: '{actor} berkongsi “{document}” dengan anda.',
+  wbNotif_document_shared_untitled_nolevel: '{actor} berkongsi dokumen dengan anda.',
+  wbNotif_document_trashed_by_other:
+    '{actor} mengalihkan dokumen anda ke tong sampah. Pulihkan sebelum {date}',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor} mengalihkan salah satu dokumen anda ke tong sampah. Pulihkan sebelum {date}',
+  wbNotif_document_trashed_by_other_nodate: '{actor} mengalihkan dokumen anda ke tong sampah',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor} mengalihkan salah satu dokumen anda ke tong sampah',
+  wbNotif_chat_call_incoming: '{actor} sedang menelefon',
+  wbDeskPillReply: 'Balasan',
+  wbDeskPillEdit: 'Sedang disunting',
+  wbDeskPillAccess: 'Akses',
+  wbDeskPillTrash: 'Dalam tong sampah',
+  wbDeskPillBreakGlass: 'Kecemasan',
   wbNotif_document_changed: '{actor} mengubah {count} dokumen',
   wbNotif_document_changed_renamed_many: '{actor} menamakan semula {count} dokumen',
   wbNotif_document_changed_renamed_one: '{actor} menamakan semula “{document}”',

@@ -4,6 +4,52 @@ import { en } from './en'
 // shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
 export const pl = {
   ...en,
+  wbNotif_document_commented_untitled: '{actor} skomentował(a) dokument',
+  wbNotif_document_mentioned: '{actor} wspomniał(a) o Tobie w komentarzu do „{document}”.',
+  wbNotif_document_mentioned_untitled: '{actor} wspomniał(a) o Tobie w komentarzu do dokumentu.',
+  wbNotif_document_body_mentioned: '{actor} wspomniał(a) o Tobie w „{document}”.',
+  wbNotif_document_body_mentioned_untitled: '{actor} wspomniał(a) o Tobie w dokumencie.',
+  wbNotif_document_comment_replied: '{actor} odpowiedział(a) na Twój komentarz w „{document}”.',
+  wbNotif_document_comment_replied_untitled:
+    '{actor} odpowiedział(a) na Twój komentarz w dokumencie.',
+  wbNotif_document_discussion_mentioned: '{actor} wspomniał(a) o Tobie w dyskusji w „{document}”.',
+  wbNotif_document_discussion_mentioned_untitled:
+    '{actor} wspomniał(a) o Tobie w dyskusji w dokumencie.',
+  wbNotif_document_discussion_replied:
+    '{actor} odpowiedział(a) na Twój wpis w dyskusji w „{document}”.',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor} odpowiedział(a) na Twój wpis w dyskusji w dokumencie.',
+  wbNotif_document_edit_requested: '{actor} chce edytować „{document}”',
+  wbNotif_document_edit_request_answered: '{actor} przekazał(a) Ci edycję „{document}”',
+  wbNotif_document_edit_request_answered_declined: '{actor} nadal edytuje „{document}”',
+  wbNotif_document_edit_taken_over:
+    '{actor} przejął(ła) edycję „{document}”. Twoje niezapisane zmiany nadal są w otwartym dokumencie.',
+  wbNotif_document_break_glass:
+    '{actor} otworzył(a) awaryjny dostęp do podglądu (24 h) do „{document}”.',
+  wbNotif_document_break_glass_untitled:
+    '{actor} otworzył(a) awaryjny dostęp do podglądu (24 h) do dokumentu.',
+  wbNotif_document_access_requested: '{actor} poprosił(a) o dostęp do „{document}”.',
+  wbNotif_document_access_requested_untitled: '{actor} poprosił(a) o dostęp do dokumentu.',
+  wbNotif_document_access_approved: '{actor} przyznał(a) Ci dostęp do „{document}”.',
+  wbNotif_document_access_approved_untitled: '{actor} przyznał(a) Ci dostęp do dokumentu.',
+  wbNotif_document_access_declined: 'Twoja prośba o dostęp do dokumentu została odrzucona.',
+  wbNotif_document_shared: '{actor} udostępnił(a) Ci „{document}” ({level}).',
+  wbNotif_document_shared_untitled: '{actor} udostępnił(a) Ci dokument ({level}).',
+  wbNotif_document_shared_nolevel: '{actor} udostępnił(a) Ci „{document}”.',
+  wbNotif_document_shared_untitled_nolevel: '{actor} udostępnił(a) Ci dokument.',
+  wbNotif_document_trashed_by_other:
+    '{actor} przeniósł(-osła) Twój dokument do kosza. Przywróć go przed {date}',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor} przeniósł(-osła) jeden z Twoich dokumentów do kosza. Przywróć go przed {date}',
+  wbNotif_document_trashed_by_other_nodate: '{actor} przeniósł(-osła) Twój dokument do kosza',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor} przeniósł(-osła) jeden z Twoich dokumentów do kosza',
+  wbNotif_chat_call_incoming: '{actor} dzwoni',
+  wbDeskPillReply: 'Odpowiedź',
+  wbDeskPillEdit: 'Edycja',
+  wbDeskPillAccess: 'Dostęp',
+  wbDeskPillTrash: 'W koszu',
+  wbDeskPillBreakGlass: 'Awaryjny',
   wbNotif_document_changed: '{actor} zmienił(a) dokumenty: {count}',
   wbNotif_document_changed_renamed_many: '{actor} zmienił(a) nazwy dokumentów: {count}',
   wbNotif_document_changed_renamed_one: '{actor} zmienił(a) nazwę “{document}”',

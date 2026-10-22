@@ -4,6 +4,52 @@ import { en } from './en'
 // shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
 export const cs = {
   ...en,
+  wbNotif_document_commented_untitled: '{actor} okomentoval(a) dokument',
+  wbNotif_document_mentioned: '{actor} vás zmínil(a) v komentáři k dokumentu „{document}“.',
+  wbNotif_document_mentioned_untitled: '{actor} vás zmínil(a) v komentáři k dokumentu.',
+  wbNotif_document_body_mentioned: '{actor} vás zmínil(a) v dokumentu „{document}“.',
+  wbNotif_document_body_mentioned_untitled: '{actor} vás zmínil(a) v dokumentu.',
+  wbNotif_document_comment_replied:
+    '{actor} odpověděl(a) na váš komentář v dokumentu „{document}“.',
+  wbNotif_document_comment_replied_untitled: '{actor} odpověděl(a) na váš komentář v dokumentu.',
+  wbNotif_document_discussion_mentioned:
+    '{actor} vás zmínil(a) v diskusi k dokumentu „{document}“.',
+  wbNotif_document_discussion_mentioned_untitled: '{actor} vás zmínil(a) v diskusi k dokumentu.',
+  wbNotif_document_discussion_replied:
+    '{actor} odpověděl(a) na váš příspěvek v diskusi k dokumentu „{document}“.',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor} odpověděl(a) na váš příspěvek v diskusi k dokumentu.',
+  wbNotif_document_edit_requested: '{actor} chce upravovat „{document}“',
+  wbNotif_document_edit_request_answered: '{actor} vám předal(a) úpravy dokumentu „{document}“',
+  wbNotif_document_edit_request_answered_declined: '{actor} dokument „{document}“ stále upravuje',
+  wbNotif_document_edit_taken_over:
+    '{actor} převzal(a) úpravy dokumentu „{document}“. Vaše neuložené změny zůstávají v otevřeném dokumentu.',
+  wbNotif_document_break_glass:
+    '{actor} otevřel(a) nouzový přístup k zobrazení (24 h) k dokumentu „{document}“.',
+  wbNotif_document_break_glass_untitled:
+    '{actor} otevřel(a) nouzový přístup k zobrazení (24 h) k dokumentu.',
+  wbNotif_document_access_requested: '{actor} požádal(a) o přístup k dokumentu „{document}“.',
+  wbNotif_document_access_requested_untitled: '{actor} požádal(a) o přístup k dokumentu.',
+  wbNotif_document_access_approved: '{actor} vám udělil(a) přístup k dokumentu „{document}“.',
+  wbNotif_document_access_approved_untitled: '{actor} vám udělil(a) přístup k dokumentu.',
+  wbNotif_document_access_declined: 'Vaše žádost o přístup k dokumentu byla zamítnuta.',
+  wbNotif_document_shared: '{actor} s vámi sdílel(a) dokument „{document}“ ({level}).',
+  wbNotif_document_shared_untitled: '{actor} s vámi sdílel(a) dokument ({level}).',
+  wbNotif_document_shared_nolevel: '{actor} s vámi sdílel(a) dokument „{document}“.',
+  wbNotif_document_shared_untitled_nolevel: '{actor} s vámi sdílel(a) dokument.',
+  wbNotif_document_trashed_by_other:
+    '{actor} přesunul(a) váš dokument do koše. Obnovte jej před {date}',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor} přesunul(a) jeden z vašich dokumentů do koše. Obnovte jej před {date}',
+  wbNotif_document_trashed_by_other_nodate: '{actor} přesunul(a) váš dokument do koše',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor} přesunul(a) jeden z vašich dokumentů do koše',
+  wbNotif_chat_call_incoming: '{actor} volá',
+  wbDeskPillReply: 'Odpověď',
+  wbDeskPillEdit: 'Úpravy',
+  wbDeskPillAccess: 'Přístup',
+  wbDeskPillTrash: 'V koši',
+  wbDeskPillBreakGlass: 'Nouzové',
   wbNotif_document_changed: '{actor} změnil(a) dokumenty: {count}',
   wbNotif_document_changed_renamed_many: '{actor} přejmenoval(a) dokumenty: {count}',
   wbNotif_document_changed_renamed_one: '{actor} přejmenoval(a) “{document}”',

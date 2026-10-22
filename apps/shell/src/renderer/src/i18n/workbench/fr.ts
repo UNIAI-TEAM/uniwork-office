@@ -4,6 +4,54 @@ import { en } from './en'
 // shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
 export const fr = {
   ...en,
+  wbNotif_document_commented_untitled: '{actor} a commenté un document',
+  wbNotif_document_mentioned: '{actor} vous a mentionné dans un commentaire sur « {document} ».',
+  wbNotif_document_mentioned_untitled:
+    '{actor} vous a mentionné dans un commentaire sur un document.',
+  wbNotif_document_body_mentioned: '{actor} vous a mentionné dans « {document} ».',
+  wbNotif_document_body_mentioned_untitled: '{actor} vous a mentionné dans un document.',
+  wbNotif_document_comment_replied: '{actor} a répondu à votre commentaire dans « {document} ».',
+  wbNotif_document_comment_replied_untitled:
+    '{actor} a répondu à votre commentaire dans un document.',
+  wbNotif_document_discussion_mentioned:
+    '{actor} vous a mentionné dans une discussion sur « {document} ».',
+  wbNotif_document_discussion_mentioned_untitled:
+    '{actor} vous a mentionné dans une discussion sur un document.',
+  wbNotif_document_discussion_replied:
+    '{actor} a répondu à votre message de discussion dans « {document} ».',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor} a répondu à votre message de discussion dans un document.',
+  wbNotif_document_edit_requested: '{actor} souhaite modifier « {document} »',
+  wbNotif_document_edit_request_answered: '{actor} vous a cédé la modification de « {document} »',
+  wbNotif_document_edit_request_answered_declined: '{actor} modifie toujours « {document} »',
+  wbNotif_document_edit_taken_over:
+    '{actor} a repris la modification de « {document} ». Vos modifications non enregistrées restent dans le document ouvert.',
+  wbNotif_document_break_glass:
+    '{actor} a ouvert un accès de consultation d’urgence (24 h) à « {document} ».',
+  wbNotif_document_break_glass_untitled:
+    '{actor} a ouvert un accès de consultation d’urgence (24 h) à un document.',
+  wbNotif_document_access_requested: '{actor} a demandé l’accès à « {document} ».',
+  wbNotif_document_access_requested_untitled: '{actor} a demandé l’accès à un document.',
+  wbNotif_document_access_approved: '{actor} vous a donné accès à « {document} ».',
+  wbNotif_document_access_approved_untitled: '{actor} vous a donné accès à un document.',
+  wbNotif_document_access_declined: 'Votre demande d’accès à un document a été refusée.',
+  wbNotif_document_shared: '{actor} a partagé « {document} » avec vous ({level}).',
+  wbNotif_document_shared_untitled: '{actor} a partagé un document avec vous ({level}).',
+  wbNotif_document_shared_nolevel: '{actor} a partagé « {document} » avec vous.',
+  wbNotif_document_shared_untitled_nolevel: '{actor} a partagé un document avec vous.',
+  wbNotif_document_trashed_by_other:
+    '{actor} a placé votre document dans la corbeille. Restaurez-le avant le {date}',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor} a placé l’un de vos documents dans la corbeille. Restaurez-le avant le {date}',
+  wbNotif_document_trashed_by_other_nodate: '{actor} a placé votre document dans la corbeille',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor} a placé l’un de vos documents dans la corbeille',
+  wbNotif_chat_call_incoming: '{actor} vous appelle',
+  wbDeskPillReply: 'Réponse',
+  wbDeskPillEdit: 'Modification',
+  wbDeskPillAccess: 'Accès',
+  wbDeskPillTrash: 'Corbeille',
+  wbDeskPillBreakGlass: 'Urgence',
   wbNotif_document_changed: '{actor} a modifié {count} documents',
   wbNotif_document_changed_renamed_many: '{actor} a renommé {count} documents',
   wbNotif_document_changed_renamed_one: '{actor} a renommé “{document}”',

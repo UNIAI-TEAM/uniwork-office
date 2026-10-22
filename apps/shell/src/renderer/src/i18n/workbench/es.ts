@@ -4,6 +4,51 @@ import { en } from './en'
 // shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
 export const es = {
   ...en,
+  wbNotif_document_commented_untitled: '{actor} comentó en un documento',
+  wbNotif_document_mentioned: '{actor} te mencionó en un comentario en «{document}».',
+  wbNotif_document_mentioned_untitled: '{actor} te mencionó en un comentario en un documento.',
+  wbNotif_document_body_mentioned: '{actor} te mencionó en «{document}».',
+  wbNotif_document_body_mentioned_untitled: '{actor} te mencionó en un documento.',
+  wbNotif_document_comment_replied: '{actor} respondió a tu comentario en «{document}».',
+  wbNotif_document_comment_replied_untitled: '{actor} respondió a tu comentario en un documento.',
+  wbNotif_document_discussion_mentioned: '{actor} te mencionó en un debate sobre «{document}».',
+  wbNotif_document_discussion_mentioned_untitled:
+    '{actor} te mencionó en un debate sobre un documento.',
+  wbNotif_document_discussion_replied:
+    '{actor} respondió a tu publicación del debate en «{document}».',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor} respondió a tu publicación del debate en un documento.',
+  wbNotif_document_edit_requested: '{actor} quiere editar «{document}»',
+  wbNotif_document_edit_request_answered: '{actor} te cedió la edición de «{document}»',
+  wbNotif_document_edit_request_answered_declined: '{actor} sigue editando «{document}»',
+  wbNotif_document_edit_taken_over:
+    '{actor} tomó la edición de «{document}». Tus cambios sin guardar siguen en el documento abierto.',
+  wbNotif_document_break_glass:
+    '{actor} abrió acceso de visualización de emergencia (24 h) a «{document}».',
+  wbNotif_document_break_glass_untitled:
+    '{actor} abrió acceso de visualización de emergencia (24 h) a un documento.',
+  wbNotif_document_access_requested: '{actor} solicitó acceso a «{document}».',
+  wbNotif_document_access_requested_untitled: '{actor} solicitó acceso a un documento.',
+  wbNotif_document_access_approved: '{actor} te dio acceso a «{document}».',
+  wbNotif_document_access_approved_untitled: '{actor} te dio acceso a un documento.',
+  wbNotif_document_access_declined: 'Se rechazó tu solicitud de acceso a un documento.',
+  wbNotif_document_shared: '{actor} compartió «{document}» contigo ({level}).',
+  wbNotif_document_shared_untitled: '{actor} compartió un documento contigo ({level}).',
+  wbNotif_document_shared_nolevel: '{actor} compartió «{document}» contigo.',
+  wbNotif_document_shared_untitled_nolevel: '{actor} compartió un documento contigo.',
+  wbNotif_document_trashed_by_other:
+    '{actor} movió tu documento a la papelera. Restáuralo antes del {date}',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor} movió uno de tus documentos a la papelera. Restáuralo antes del {date}',
+  wbNotif_document_trashed_by_other_nodate: '{actor} movió tu documento a la papelera',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor} movió uno de tus documentos a la papelera',
+  wbNotif_chat_call_incoming: '{actor} te está llamando',
+  wbDeskPillReply: 'Respuesta',
+  wbDeskPillEdit: 'Editando',
+  wbDeskPillAccess: 'Acceso',
+  wbDeskPillTrash: 'En la papelera',
+  wbDeskPillBreakGlass: 'Emergencia',
   wbNotif_document_changed: '{actor} cambió {count} documentos',
   wbNotif_document_changed_renamed_many: '{actor} cambió el nombre de {count} documentos',
   wbNotif_document_changed_renamed_one: '{actor} cambió el nombre de “{document}”',

@@ -4,6 +4,52 @@ import { en } from './en'
 // shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
 export const ru = {
   ...en,
+  wbNotif_document_commented_untitled: '{actor} оставил(а) комментарий к документу',
+  wbNotif_document_mentioned: '{actor} упомянул(а) вас в комментарии к документу «{document}».',
+  wbNotif_document_mentioned_untitled: '{actor} упомянул(а) вас в комментарии к документу.',
+  wbNotif_document_body_mentioned: '{actor} упомянул(а) вас в документе «{document}».',
+  wbNotif_document_body_mentioned_untitled: '{actor} упомянул(а) вас в документе.',
+  wbNotif_document_comment_replied:
+    '{actor} ответил(а) на ваш комментарий в документе «{document}».',
+  wbNotif_document_comment_replied_untitled: '{actor} ответил(а) на ваш комментарий в документе.',
+  wbNotif_document_discussion_mentioned:
+    '{actor} упомянул(а) вас в обсуждении документа «{document}».',
+  wbNotif_document_discussion_mentioned_untitled: '{actor} упомянул(а) вас в обсуждении документа.',
+  wbNotif_document_discussion_replied:
+    '{actor} ответил(а) на ваше сообщение в обсуждении документа «{document}».',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor} ответил(а) на ваше сообщение в обсуждении документа.',
+  wbNotif_document_edit_requested: '{actor} хочет редактировать «{document}»',
+  wbNotif_document_edit_request_answered: '{actor} передал(а) вам редактирование «{document}»',
+  wbNotif_document_edit_request_answered_declined: '{actor} всё ещё редактирует «{document}»',
+  wbNotif_document_edit_taken_over:
+    '{actor} перехватил(а) редактирование «{document}». Ваши несохранённые изменения остаются в открытом документе.',
+  wbNotif_document_break_glass:
+    '{actor} открыл(а) экстренный доступ на просмотр (24 ч) к «{document}».',
+  wbNotif_document_break_glass_untitled:
+    '{actor} открыл(а) экстренный доступ на просмотр (24 ч) к документу.',
+  wbNotif_document_access_requested: '{actor} запросил(а) доступ к «{document}».',
+  wbNotif_document_access_requested_untitled: '{actor} запросил(а) доступ к документу.',
+  wbNotif_document_access_approved: '{actor} открыл(а) вам доступ к «{document}».',
+  wbNotif_document_access_approved_untitled: '{actor} открыл(а) вам доступ к документу.',
+  wbNotif_document_access_declined: 'Ваш запрос на доступ к документу отклонён.',
+  wbNotif_document_shared: '{actor} открыл(а) вам доступ к «{document}» ({level}).',
+  wbNotif_document_shared_untitled: '{actor} открыл(а) вам доступ к документу ({level}).',
+  wbNotif_document_shared_nolevel: '{actor} открыл(а) вам доступ к «{document}».',
+  wbNotif_document_shared_untitled_nolevel: '{actor} открыл(а) вам доступ к документу.',
+  wbNotif_document_trashed_by_other:
+    '{actor} переместил(а) ваш документ в корзину. Восстановите его до {date}',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor} переместил(а) один из ваших документов в корзину. Восстановите его до {date}',
+  wbNotif_document_trashed_by_other_nodate: '{actor} переместил(а) ваш документ в корзину',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor} переместил(а) один из ваших документов в корзину',
+  wbNotif_chat_call_incoming: '{actor} звонит вам',
+  wbDeskPillReply: 'Ответ',
+  wbDeskPillEdit: 'Редактирование',
+  wbDeskPillAccess: 'Доступ',
+  wbDeskPillTrash: 'В корзине',
+  wbDeskPillBreakGlass: 'Экстренный',
   wbNotif_document_changed: '{actor} изменил(а) документы: {count}',
   wbNotif_document_changed_renamed_many: '{actor} переименовал(а) документы: {count}',
   wbNotif_document_changed_renamed_one: '{actor} переименовал(а) “{document}”',

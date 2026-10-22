@@ -4,6 +4,56 @@ import { en } from './en'
 // shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
 export const ko = {
   ...en,
+  wbNotif_document_commented_untitled: '{actor}님이 문서에 댓글을 남겼습니다',
+  wbNotif_document_mentioned: '{actor}님이 “{document}”의 댓글에서 회원님을 멘션했습니다.',
+  wbNotif_document_mentioned_untitled: '{actor}님이 문서의 댓글에서 회원님을 멘션했습니다.',
+  wbNotif_document_body_mentioned: '{actor}님이 “{document}”에서 회원님을 멘션했습니다.',
+  wbNotif_document_body_mentioned_untitled: '{actor}님이 문서에서 회원님을 멘션했습니다.',
+  wbNotif_document_comment_replied: '{actor}님이 “{document}”의 회원님 댓글에 답글을 남겼습니다.',
+  wbNotif_document_comment_replied_untitled: '{actor}님이 문서의 회원님 댓글에 답글을 남겼습니다.',
+  wbNotif_document_discussion_mentioned:
+    '{actor}님이 “{document}”의 토론에서 회원님을 멘션했습니다.',
+  wbNotif_document_discussion_mentioned_untitled:
+    '{actor}님이 문서의 토론에서 회원님을 멘션했습니다.',
+  wbNotif_document_discussion_replied:
+    '{actor}님이 “{document}”의 회원님 토론 글에 답글을 남겼습니다.',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor}님이 문서의 회원님 토론 글에 답글을 남겼습니다.',
+  wbNotif_document_edit_requested: '{actor}님이 “{document}”을(를) 편집하고 싶어 합니다',
+  wbNotif_document_edit_request_answered:
+    '{actor}님이 “{document}”의 편집 권한을 회원님께 넘겼습니다',
+  wbNotif_document_edit_request_answered_declined:
+    '{actor}님이 아직 “{document}”을(를) 편집 중입니다',
+  wbNotif_document_edit_taken_over:
+    '{actor}님이 “{document}”의 편집을 이어받았습니다. 저장하지 않은 변경 사항은 열린 문서에 그대로 남아 있습니다.',
+  wbNotif_document_break_glass:
+    '{actor}님이 “{document}”에 대한 긴급 보기 권한(24시간)을 열었습니다.',
+  wbNotif_document_break_glass_untitled:
+    '{actor}님이 문서에 대한 긴급 보기 권한(24시간)을 열었습니다.',
+  wbNotif_document_access_requested: '{actor}님이 “{document}”에 대한 접근을 요청했습니다.',
+  wbNotif_document_access_requested_untitled: '{actor}님이 문서에 대한 접근을 요청했습니다.',
+  wbNotif_document_access_approved:
+    '{actor}님이 “{document}”에 대한 접근 권한을 회원님께 주었습니다.',
+  wbNotif_document_access_approved_untitled:
+    '{actor}님이 문서에 대한 접근 권한을 회원님께 주었습니다.',
+  wbNotif_document_access_declined: '문서 접근 요청이 거절되었습니다.',
+  wbNotif_document_shared: '{actor}님이 “{document}”을(를) 회원님과 공유했습니다({level}).',
+  wbNotif_document_shared_untitled: '{actor}님이 문서를 회원님과 공유했습니다({level}).',
+  wbNotif_document_shared_nolevel: '{actor}님이 “{document}”을(를) 회원님과 공유했습니다.',
+  wbNotif_document_shared_untitled_nolevel: '{actor}님이 문서를 회원님과 공유했습니다.',
+  wbNotif_document_trashed_by_other:
+    '{actor}님이 회원님의 문서를 휴지통으로 옮겼습니다. {date}까지 복원하세요',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor}님이 회원님의 문서 중 하나를 휴지통으로 옮겼습니다. {date}까지 복원하세요',
+  wbNotif_document_trashed_by_other_nodate: '{actor}님이 회원님의 문서를 휴지통으로 옮겼습니다',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor}님이 회원님의 문서 중 하나를 휴지통으로 옮겼습니다',
+  wbNotif_chat_call_incoming: '{actor}님이 전화를 걸고 있습니다',
+  wbDeskPillReply: '답글',
+  wbDeskPillEdit: '편집 중',
+  wbDeskPillAccess: '접근',
+  wbDeskPillTrash: '휴지통',
+  wbDeskPillBreakGlass: '긴급',
   wbNotif_document_changed: '{actor} 님이 문서 {count}개를 변경했습니다',
   wbNotif_document_changed_renamed_many: '{actor} 님이 문서 {count}개의 이름을 바꿨습니다',
   wbNotif_document_changed_renamed_one: '{actor} 님이 “{document}” 의 이름을 바꿨습니다',

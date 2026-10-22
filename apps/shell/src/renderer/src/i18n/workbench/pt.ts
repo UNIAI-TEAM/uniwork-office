@@ -4,6 +4,51 @@ import { en } from './en'
 // shortcut: English copy for every key not yet translated (spec 6.8); override keys after the spread
 export const pt = {
   ...en,
+  wbNotif_document_commented_untitled: '{actor} comentou em um documento',
+  wbNotif_document_mentioned: '{actor} mencionou você em um comentário em “{document}”.',
+  wbNotif_document_mentioned_untitled: '{actor} mencionou você em um comentário em um documento.',
+  wbNotif_document_body_mentioned: '{actor} mencionou você em “{document}”.',
+  wbNotif_document_body_mentioned_untitled: '{actor} mencionou você em um documento.',
+  wbNotif_document_comment_replied: '{actor} respondeu ao seu comentário em “{document}”.',
+  wbNotif_document_comment_replied_untitled: '{actor} respondeu ao seu comentário em um documento.',
+  wbNotif_document_discussion_mentioned: '{actor} mencionou você em uma discussão em “{document}”.',
+  wbNotif_document_discussion_mentioned_untitled:
+    '{actor} mencionou você em uma discussão em um documento.',
+  wbNotif_document_discussion_replied:
+    '{actor} respondeu à sua publicação na discussão em “{document}”.',
+  wbNotif_document_discussion_replied_untitled:
+    '{actor} respondeu à sua publicação na discussão em um documento.',
+  wbNotif_document_edit_requested: '{actor} quer editar “{document}”',
+  wbNotif_document_edit_request_answered: '{actor} passou a edição de “{document}” para você',
+  wbNotif_document_edit_request_answered_declined: '{actor} ainda está editando “{document}”',
+  wbNotif_document_edit_taken_over:
+    '{actor} assumiu a edição de “{document}”. Suas alterações não salvas continuam no documento aberto.',
+  wbNotif_document_break_glass:
+    '{actor} abriu acesso de visualização de emergência (24 h) a “{document}”.',
+  wbNotif_document_break_glass_untitled:
+    '{actor} abriu acesso de visualização de emergência (24 h) a um documento.',
+  wbNotif_document_access_requested: '{actor} solicitou acesso a “{document}”.',
+  wbNotif_document_access_requested_untitled: '{actor} solicitou acesso a um documento.',
+  wbNotif_document_access_approved: '{actor} deu a você acesso a “{document}”.',
+  wbNotif_document_access_approved_untitled: '{actor} deu a você acesso a um documento.',
+  wbNotif_document_access_declined: 'Sua solicitação de acesso a um documento foi recusada.',
+  wbNotif_document_shared: '{actor} compartilhou “{document}” com você ({level}).',
+  wbNotif_document_shared_untitled: '{actor} compartilhou um documento com você ({level}).',
+  wbNotif_document_shared_nolevel: '{actor} compartilhou “{document}” com você.',
+  wbNotif_document_shared_untitled_nolevel: '{actor} compartilhou um documento com você.',
+  wbNotif_document_trashed_by_other:
+    '{actor} moveu seu documento para a lixeira. Restaure-o antes de {date}',
+  wbNotif_document_trashed_by_other_untitled:
+    '{actor} moveu um dos seus documentos para a lixeira. Restaure-o antes de {date}',
+  wbNotif_document_trashed_by_other_nodate: '{actor} moveu seu documento para a lixeira',
+  wbNotif_document_trashed_by_other_untitled_nodate:
+    '{actor} moveu um dos seus documentos para a lixeira',
+  wbNotif_chat_call_incoming: '{actor} está ligando',
+  wbDeskPillReply: 'Resposta',
+  wbDeskPillEdit: 'Editando',
+  wbDeskPillAccess: 'Acesso',
+  wbDeskPillTrash: 'Na lixeira',
+  wbDeskPillBreakGlass: 'Emergência',
   wbNotif_document_changed: '{actor} alterou {count} documentos',
   wbNotif_document_changed_renamed_many: '{actor} renomeou {count} documentos',
   wbNotif_document_changed_renamed_one: '{actor} renomeou “{document}”',
