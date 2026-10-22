@@ -32,7 +32,7 @@ export const nl = {
   vhsNameDone: 'Versie {no} gemaakt',
   vhsNameFailed: 'Het controlepunt kon niet worden gemaakt. Wat je hebt getypt blijft behouden.',
   vhsNameUnchanged:
-    'Er is niets veranderd sinds de laatste versie, dus er is geen nieuw controlepunt gemaakt.',
+    'Er is niets veranderd sinds de laatste versie, dus er is geen nieuwe versie gemaakt.',
   vhsRestore: 'Versie {no} herstellen',
   vhsRestoreConfirmTitle: 'Versie {no} herstellen?',
   vhsRestoreConfirmDescription:

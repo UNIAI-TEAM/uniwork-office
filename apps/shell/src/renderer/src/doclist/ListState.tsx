@@ -48,12 +48,15 @@ export function ListState({
   title,
   hint,
   action,
+  returnFocus,
 }: {
   kind: 'error' | 'empty'
   glyph: ListStateGlyph
   title: string
   hint?: string
   action?: { label: string; onClick: () => void }
+  /** the action's button unmounts when the state clears; this moves focus somewhere that stays (RV-7) */
+  returnFocus?: () => void
 }): ReactNode {
   return (
     <div className="uw-pick-state dl-state" role={kind === 'error' ? 'alert' : 'status'}>
@@ -61,7 +64,14 @@ export function ListState({
       <p className="uw-pick-state-title dl-state-title">{title}</p>
       {hint && <p className="uw-pick-state-hint dl-state-hint">{hint}</p>}
       {action && (
-        <button type="button" className="btn btn-secondary" onClick={action.onClick}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => {
+            returnFocus?.()
+            action.onClick()
+          }}
+        >
           {action.label}
         </button>
       )}

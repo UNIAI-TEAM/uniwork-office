@@ -30,7 +30,7 @@ export const ms = {
   vhsNameSubmitting: 'Mencipta…',
   vhsNameDone: 'Versi {no} dicipta',
   vhsNameFailed: 'Titik semak tidak dapat dicipta. Apa yang anda taip dikekalkan.',
-  vhsNameUnchanged: 'Tiada perubahan sejak versi terkini, jadi titik semak baharu tidak dicipta.',
+  vhsNameUnchanged: 'Tiada perubahan sejak versi terkini, jadi versi baharu tidak dicipta.',
   vhsRestore: 'Pulihkan versi {no}',
   vhsRestoreConfirmTitle: 'Pulihkan versi {no}?',
   vhsRestoreConfirmDescription:

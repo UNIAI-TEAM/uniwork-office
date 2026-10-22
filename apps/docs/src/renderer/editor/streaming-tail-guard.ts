@@ -112,9 +112,12 @@ export const StreamingTailGuardExtension = Extension.create({
         },
         view: (view) => {
           const onSettled = (): void => insertHeld(view)
-          document.addEventListener(PHASED_CONTENT_SETTLED_EVENT, onSettled)
+          // keep the document from setup: a deferred destroy can run after the
+          // global is gone (test teardown), and must then be a no-op
+          const doc = document
+          doc.addEventListener(PHASED_CONTENT_SETTLED_EVENT, onSettled)
           return {
-            destroy: () => document.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, onSettled),
+            destroy: () => doc.removeEventListener(PHASED_CONTENT_SETTLED_EVENT, onSettled),
           }
         },
       }),
