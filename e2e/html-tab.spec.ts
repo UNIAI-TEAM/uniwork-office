@@ -242,18 +242,23 @@ test.describe('html editor', () => {
         (window as unknown as { __d: (s: string) => void }).__d('after click'),
       )
       try {
-        await expect(content).toBeFocused()
+        await expect(content).toBeFocused({ timeout: 2000 })
       } catch (err) {
-        for (let i = 0; i < 6; i++) {
-          await editorPage.waitForTimeout(500)
-          await content
-            .evaluate((el) => {
-              ;(window as unknown as { __d: (s: string) => void }).__d(
-                `late+${el.isConnected} sameNode=${(el as unknown as { __tag?: string }).__tag}`,
-              )
-            })
-            .catch(() => {})
-        }
+        await editorPage.evaluate(() => {
+          const f = document.querySelector('.preview-frame') as HTMLElement
+          const r = f.getBoundingClientRect()
+          ;(window as unknown as { __d: (s: string) => void }).__d(
+            `iframe display=${getComputedStyle(f.closest('.pane')!).display} rect=${Math.round(r.width)}x${Math.round(r.height)}`,
+          )
+        })
+        await content.click()
+        await editorPage.evaluate(() =>
+          (window as unknown as { __d: (s: string) => void }).__d('after RETRY click'),
+        )
+        await expect(content).toBeFocused({ timeout: 2000 })
+        await editorPage.evaluate(() =>
+          (window as unknown as { __d: (s: string) => void }).__d('RETRY focused ok'),
+        )
         throw err
       }
       await editorPage.keyboard.press('ControlOrMeta+s')
@@ -261,6 +266,32 @@ test.describe('html editor', () => {
       expect(await readFile(htmlPath, 'utf8')).toBe(source)
     } finally {
       await closeAndSaveVideo(launched, 'html-identity-save')
+    }
+  })
+
+  test('byte-identical DIAG162 immediate click after the Source switch', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'genoffice-html-'))
+    const htmlPath = join(dir, 'legacy.htm')
+    await writeFile(htmlPath, '<html>\r\n<body>\r\n<p>café</p>\r\n</body>\r\n</html>', 'utf8')
+    const launched = await launchShell({
+      onboardingSeen: true,
+      videoDir: 'html-identity-save-diag',
+      openFile: htmlPath,
+    })
+    try {
+      const editorPage = await waitForPageWithUrl(launched.app, '://html/')
+      await expect(editorPage.locator('.ribbon-body')).toBeVisible()
+      await expect(editorPage.locator('.preview-frame')).toBeVisible()
+      await editorPage.locator('.rb-view', { hasText: /Source/ }).click()
+      await editorPage.mouse.click(835, 498)
+      const active = await editorPage.evaluate(() => {
+        const el = document.activeElement as HTMLElement
+        return `${el.tagName}.${el.className}`
+      })
+      console.log(`DIAG162 immediate click active=${active}`)
+      expect(active).toContain('cm-content')
+    } finally {
+      await closeAndSaveVideo(launched, 'html-identity-save-diag')
     }
   })
 
