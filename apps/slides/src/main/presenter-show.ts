@@ -22,6 +22,11 @@ const presenterShows = new Map<number, PresenterShow>()
 /** Audience wc.id -> presenter wc.id (routing for navigation actions sent back) */
 const audiencePresenter = new Map<number, number>()
 
+/** true for the webContents of a live slides audience window (the shell IPC guard trusts it as an editor view) */
+export function isSlidesAudienceWebContents(wcId: number): boolean {
+  return audiencePresenter.has(wcId)
+}
+
 /** Host window of the presenter renderer (in tab mode, the shell's single window) */
 function presenterHostWindow(wc: WebContents): BrowserWindow | null {
   return BrowserWindow.fromWebContents(wc) ?? windowRefs.shellWindow

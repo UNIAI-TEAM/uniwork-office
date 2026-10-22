@@ -155,6 +155,7 @@ export {
   setSlidesShowBleed,
 } from './session-state'
 export { registerAiIpc } from './ai-ipc'
+export { isSlidesAudienceWebContents } from './presenter-show'
 export { applySessionTxn } from '../session'
 
 /** standalone: path queued before window creation (argv/open-file) */
