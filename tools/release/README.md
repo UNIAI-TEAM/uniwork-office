@@ -177,8 +177,11 @@ feed points at).
 
 Not updated in place: the unsigned mac app (Squirrel.Mac installs updates only into a signed
 app, so the mac build has no feed and a manual check opens https://uniworkos.com/office) and the
-deb, which updates through apt: a release deb ships the repository key and a deb822 source for
-its channel (`resources/apt/`), its postinst installs both (`/usr/share/keyrings/uniwork-office-archive-keyring.gpg`,
+deb, which updates through apt: every Linux build ships the repository key, and a release deb built
+with `UNIWORK_APT_SOURCE=true` also ships a deb822 source for its channel (`resources/apt/`). The flag
+is off until the repository is live (the workflow sets it from the repository variable
+`UNIWORK_APT_REPO_ENABLED`): a source for a repository that answers 404 would break `apt update` on
+the user's machine, and a deb without the source file writes nothing. When the source ships, the postinst installs it with the keyring (`/usr/share/keyrings/uniwork-office-archive-keyring.gpg`,
 `/etc/apt/sources.list.d/uniwork-office.sources`; `UNIWORK_OFFICE_APT_REPO=false` in
 `/etc/default/uniwork-office` opts out, an admin's own source file is left alone, `apt purge`
 removes both), and the manual check says `sudo apt update && sudo apt upgrade`.

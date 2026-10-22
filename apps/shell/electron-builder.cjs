@@ -17,6 +17,12 @@
  * the publish config is omitted: electron-builder then bakes no
  * app-update.yml into the app and in-app auto-update stays disabled.
  *
+ * UNIWORK_APT_SOURCE — "true" makes a dev / beta release deb ship the apt source
+ * for its channel (resources/apt/uniwork-office.sources) that its postinst
+ * installs. Off (unset or any other value) until the apt repository is live:
+ * a deb that registered a source for a repository that answers 404 would break
+ * `apt update` on the user's machine. The apt keyring ships either way.
+ *
  * GENOFFICE_FONT_CDN_URL — base URL for the curated downloadable-font catalog.
  * Official release jobs inject it through extraMetadata so the endpoint stays
  * out of source. Without it, font download prompts/catalog entries are hidden;
@@ -818,6 +824,7 @@ const RELEASE_SIGNING_ENV = [
   'APPLE_KEYCHAIN_PROFILE',
 ]
 const releaseChannel = process.env.UNIWORK_RELEASE_CHANNEL
+const aptSourceEnabled = Boolean(releaseChannel) && process.env.UNIWORK_APT_SOURCE === 'true'
 if (releaseChannel) {
   if (!RELEASE_CHANNELS.includes(releaseChannel)) {
     throw new Error(
@@ -869,13 +876,16 @@ if (releaseChannel) {
   config.linux.target = config.linux.target.filter((entry) => entry.target !== 'rpm')
   config.appImage = { artifactName: 'UniWork-Office_${version}_unsigned_linux_x64.${ext}' }
   config.deb.artifactName = 'UniWork-Office_${version}_unsigned_linux_x64.${ext}'
-  // Release debs also ship the apt source for their channel; the postinst
-  // installs it, so `apt upgrade` delivers the next build. Local builds ship
-  // none (their postinst finds no file and writes nothing).
-  config.linux.extraResources.push({
-    from: 'build/apt/uniwork-office.sources',
-    to: 'apt/uniwork-office.sources',
-  })
+  // With UNIWORK_APT_SOURCE=true release debs also ship the apt source for
+  // their channel; the postinst installs it, so `apt upgrade` delivers the next
+  // build. Without it (repository not live yet) and in local builds the deb
+  // ships none and its postinst finds no file and writes nothing.
+  if (aptSourceEnabled) {
+    config.linux.extraResources.push({
+      from: 'build/apt/uniwork-office.sources',
+      to: 'apt/uniwork-office.sources',
+    })
+  }
   // A dev / beta build signs in with the scheme of its deployment profile's
   // channel (uniwork-office-dev for dev profiles), so it declares that scheme
   // too: on Linux the .desktop MimeType is what routes the callback.
@@ -913,9 +923,9 @@ function aptSourcesText(channel) {
   ].join('\n')
 }
 
-/** resources/apt/uniwork-office.sources, release builds only (see the release block). */
+/** resources/apt/uniwork-office.sources, only with UNIWORK_APT_SOURCE=true (see the release block). */
 function writeAptSources() {
-  if (!releaseChannel) return
+  if (!aptSourceEnabled) return
   writeFileSync(join(__dirname, 'build/apt/uniwork-office.sources'), aptSourcesText(releaseChannel))
 }
 

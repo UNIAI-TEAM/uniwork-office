@@ -1,4 +1,4 @@
-import { readFileSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
@@ -159,18 +159,29 @@ describe('dev / beta release builds', () => {
     ])
   })
 
-  it('ship the apt keyring in every Linux build and the channel source only in release builds', async () => {
+  it('ship the apt keyring in every Linux build and the channel source only when UNIWORK_APT_SOURCE=true', async () => {
     const aptEntries = (config: BuilderConfig) =>
       config.linux.extraResources.filter((entry) => entry.to.startsWith('apt/')).map((e) => e.to)
-    expect(aptEntries(loadConfig({}))).toEqual(['apt/uniwork-office-archive-keyring.gpg'])
+    const keyring = 'apt/uniwork-office-archive-keyring.gpg'
+    expect(aptEntries(loadConfig({}))).toEqual([keyring])
+    // the repository is not live: the flag is off, so a release build registers no source
     const sourcesFile = resolve(shellRoot, 'build/apt/uniwork-office.sources')
+    rmSync(sourcesFile, { force: true })
+    for (const flag of [undefined, '', 'false', '1', 'TRUE']) {
+      const env = { UNIWORK_RELEASE_CHANNEL: 'dev', UNIWORK_APT_SOURCE: flag }
+      const version = `${shellPackage.version}-dev.1`
+      const config = withVersion(loadConfig(env, version), version)
+      expect(aptEntries(config), String(flag)).toEqual([keyring])
+      await config.beforePack({ electronPlatformName: 'linux' })
+      expect(existsSync(sourcesFile), String(flag)).toBe(false)
+    }
+    // the flag alone, without a release channel, ships nothing either
+    expect(aptEntries(loadConfig({ UNIWORK_APT_SOURCE: 'true' }))).toEqual([keyring])
     for (const channel of ['dev', 'beta']) {
       const version = `${shellPackage.version}-${channel}.1`
-      const config = withVersion(loadConfig({ UNIWORK_RELEASE_CHANNEL: channel }, version), version)
-      expect(aptEntries(config)).toEqual([
-        'apt/uniwork-office-archive-keyring.gpg',
-        'apt/uniwork-office.sources',
-      ])
+      const env = { UNIWORK_RELEASE_CHANNEL: channel, UNIWORK_APT_SOURCE: 'true' }
+      const config = withVersion(loadConfig(env, version), version)
+      expect(aptEntries(config)).toEqual([keyring, 'apt/uniwork-office.sources'])
       await config.beforePack({ electronPlatformName: 'linux' })
       // deb822: the managed marker first, the channel as suite, the shipped keyring as Signed-By
       expect(readFileSync(sourcesFile, 'utf8')).toBe(
