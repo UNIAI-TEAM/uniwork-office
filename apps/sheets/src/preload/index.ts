@@ -60,6 +60,7 @@ import {
 } from '../shared/ipc-channels'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
 import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
+import { installUniworkAskUniDocBridge } from '@genoffice/ai-provider/askuni'
 import { installUniworkCloudStatusBridge } from '@genoffice/electron-utils/uniwork-cloud-status-bridge'
 import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
@@ -821,6 +822,8 @@ installAiRunBridge()
 // window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's provider list mirrors it)
 installUniworkAiFlagBridge()
 installUniworkCloudStatusBridge()
+// window.uniworkAskUniDoc: Ask UNI about the open document (main derives the document from this tab)
+installUniworkAskUniDocBridge({ contextBridge, ipcRenderer })
 
 function parseWorkbookFile(input: unknown): WorkbookFile {
   if (!isRecord(input)) throw new Error('Invalid workbook response.')

@@ -67,7 +67,9 @@ export default defineConfig({
   },
   preload: {
     // electron-utils ships raw TS source — must be bundled, not left external
-    plugins: [externalizeDepsPlugin({ exclude: ['@genoffice/electron-utils'] })],
+    plugins: [
+      externalizeDepsPlugin({ exclude: ['@genoffice/electron-utils', '@genoffice/ai-provider'] }),
+    ],
   },
   renderer: {
     resolve: { alias: workspaceAlias },

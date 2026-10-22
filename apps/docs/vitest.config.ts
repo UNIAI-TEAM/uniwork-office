@@ -56,6 +56,7 @@ export default defineConfig({
         '../../packages/electron-utils/src/drop-open.ts',
       ),
       '@genoffice/electron-utils': local('../../packages/electron-utils/src/index.ts'),
+      '@genoffice/ai-provider/askuni': local('../../packages/ai-provider/src/askuni.ts'),
       '@genoffice/ai-provider/browser': local('../../packages/ai-provider/src/browser.ts'),
       '@genoffice/ai-provider/codex-app-server': local(
         '../../packages/ai-provider/src/codex-app-server.ts',

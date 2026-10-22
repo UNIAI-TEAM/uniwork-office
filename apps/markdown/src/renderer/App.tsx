@@ -52,7 +52,7 @@ import { collectOutline, type OutlineItem } from './editor/outline'
 import { rewriteRawHtmlImages } from './editor/rawHtml'
 import { buildSlashItems } from './editor/slashCommand'
 import type { SlashController, SlashMenuState } from './editor/slashCommand'
-import { wikiFragmentPosition } from './editor/wikilink'
+import { revealWikiFragment, wikiFragmentPosition } from './editor/wikilink'
 import { dirOf, refreshWebPictures, setImageBaseDir, VIEW_IMAGE_EVENT } from './editor/localImage'
 import { Ribbon } from './components/Ribbon'
 import type { MarkdownTheme } from '../shared/markdown-theme'
@@ -329,11 +329,20 @@ export default function App() {
       if (!fragment || filePathRef.current !== path) return
       const pos = wikiFragmentPosition(current.state.doc, fragment)
       if (pos === null) return
-      const selection = TextSelection.near(current.state.doc.resolve(pos))
-      current.view.dispatch(current.state.tr.setSelection(selection).scrollIntoView())
-      current.view.focus()
+      revealWikiFragment(current.view, pos)
     })
   }, [])
+
+  // A wiki link into a note this view already shows only activates its tab, so
+  // main says the fragment is waiting. A view still loading that path takes it
+  // from its load instead.
+  useEffect(
+    () =>
+      window.markdownApi.onWikiFragmentReady?.((path) => {
+        if (filePathRef.current === path) jumpToWikiFragment(path)
+      }),
+    [jumpToWikiFragment],
+  )
 
   const extensions = useMemo(() => {
     const controller: SlashController = {

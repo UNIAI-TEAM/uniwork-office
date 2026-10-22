@@ -77,11 +77,37 @@ describe('askuni string shard', () => {
       // the shell vi copy says "workspace" (72 uses), like the web
       'askUniWorkspace',
     ])
+    // Per-locale allowances for S6 keys whose text is the same as English in only some locales:
+    // the word really is the same in those locales (a loan word or a symbol), so no translation is due.
+    const ALL = [...LANGS]
+    const sameAsEnglish: Partial<Record<string, readonly string[]>> = {
+      askUniV2NoteCount: ALL, // the '{count}/{max}' counter has no words
+      askUniV2ModelBar: ALL, // the '{label} {value}/5' score bar has no words
+      askUniV2ModelHaiku: ALL, // product model names, kept in every locale
+      askUniV2ModelSonnet: ALL,
+      askUniV2ModelOpus: ALL,
+      askUniV2KindTask: ['vi'], // vi keeps the loan word "task" (web wording, as in the ui shard)
+      askUniV2StepTaskOne: ['vi'],
+      askUniV2StepChatOne: ['cs', 'es', 'id', 'it', 'nl'], // "chat" is the same word here
+      askUniV2StepChatMany: ['es', 'nl'],
+      askUniV2KindEmail: ['it', 'id', 'vi'], // "Email" is the same word here
+      askUniV2KindDocument: ['fr', 'nl'], // "document" / "project" are the same words here
+      askUniV2StepDocumentOne: ['fr', 'nl'],
+      askUniV2GroupDocuments: ['fr'],
+      askUniV2StepDocumentMany: ['fr'],
+      askUniV2KindProject: ['nl'],
+      askUniV2StepProjectOne: ['nl'],
+      askUniV2MentionCount: ['fr'], // "suggestions" is the same word in fr
+      askUniV2ModelEffort: ['fr'], // "Effort" and "Intelligence" are the same words in fr
+      askUniV2ModelIntelligence: ['fr'],
+    }
     for (const lang of LANGS) {
       if (lang === 'en') continue
       const same = referenceKeys.filter(
         (k) =>
-          !allowed.has(k) && table(lang)[k] === (askUniStrings.en as Record<string, string>)[k],
+          !allowed.has(k) &&
+          !sameAsEnglish[k]?.includes(lang) &&
+          table(lang)[k] === (askUniStrings.en as Record<string, string>)[k],
       )
       expect(same, `${lang} copies English for: ${same.join(', ')}`).toEqual([])
     }

@@ -5301,6 +5301,12 @@ export function App({
       <ExcelShell
         onAiPanelOpen={refreshGskStatus}
         openingWorkbook={openingWorkbook}
+        {...(workbookFile
+          ? {
+              askUniDocumentName: workbookFile.name,
+              askUniBindingKey: `${workbookFile.path ?? workbookFile.name}|${workbookFile.uniworkBound ? 'u' : 'l'}`,
+            }
+          : {})}
         prompt={prompt}
         aiPreset={aiPreset}
         preview={preview}

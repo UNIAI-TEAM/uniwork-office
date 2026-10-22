@@ -304,6 +304,7 @@ describe('RB-4: the workspace cache follows the scope and the sign-in', () => {
 })
 
 describe('ipc registration', () => {
+  // UNI-2076: the sender rule is the guard's (uniwork-askuni-guard.test.ts, uniwork-askuni-stream-ipc.test.ts)
   const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
   const ipcMain = {
     handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>

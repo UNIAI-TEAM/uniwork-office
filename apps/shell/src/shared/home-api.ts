@@ -21,6 +21,7 @@ import type {
   AskUniOpenResult,
   AskUniRequest,
   AskUniResult,
+  AskUniV2Bridge,
 } from './askuni-api'
 import type { UpdateChannel, UpdateUiState } from './update-api'
 import type {
@@ -1537,6 +1538,21 @@ export interface HomeApi {
   uniworkAskUniContext(): Promise<AskUniContext>
   /** UNI-2069 s4: open a citation (a document in the app, other kinds as the web page) */
   uniworkAskUniOpenCitation(req: AskUniOpenRequest): Promise<AskUniOpenResult>
+  /** UNI-2076: Ask UNI v2 streamed answer (main holds the session, events to this window only) */
+  askUniStream: AskUniV2Bridge['askUniStream']
+  askUniStreamCancel: AskUniV2Bridge['askUniStreamCancel']
+  onAskUniStreamEvent: AskUniV2Bridge['onAskUniStreamEvent']
+  /** the public `ask_uni_stream` flag: v2 pane on, P1 pane off */
+  askUniFlags: AskUniV2Bridge['askUniFlags']
+  /** UNI-2076 s2: Ask UNI v2 conversation REST and picker lookups (main, device bearer) */
+  askUniCapabilities: AskUniV2Bridge['askUniCapabilities']
+  askUniConversations: AskUniV2Bridge['askUniConversations']
+  askUniMessages: AskUniV2Bridge['askUniMessages']
+  askUniRename: AskUniV2Bridge['askUniRename']
+  askUniDelete: AskUniV2Bridge['askUniDelete']
+  askUniFeedbackSet: AskUniV2Bridge['askUniFeedbackSet']
+  askUniFeedbackClear: AskUniV2Bridge['askUniFeedbackClear']
+  askUniLookup: AskUniV2Bridge['askUniLookup']
   uniworkListWorkspaces(): Promise<UniworkResult<UniworkWorkspaceRef[]>>
   uniworkListDocuments(query: UniworkDocListQuery): Promise<UniworkResult<UniworkDocListPage>>
   /** documents shared directly with me, aggregated across the selected org's workspaces (S17) */

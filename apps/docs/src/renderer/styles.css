@@ -13365,12 +13365,13 @@ tr > .page-gap-cut {
 }
 
 /* ================= transient toast (save feedback) ================= */
+/* bottom-centre, 8px over the 24px status bar: the ribbon is taller than any fixed top offset */
 
 .app-toast {
   position: fixed;
-  top: 64px;
+  bottom: 32px;
   left: 50%;
-  transform: translate(-50%, -8px);
+  transform: translate(-50%, 8px);
   z-index: 2000;
   display: flex;
   align-items: center;
@@ -13407,14 +13408,10 @@ tr > .page-gap-cut {
   }
 }
 
-/* a phone: the status bar drops its message, so toasts sit just above the bar (24px) where the
-   message would have been, and wrap instead of clipping at 60vw (screen only: a paper narrower than
+/* a phone: toasts wrap instead of clipping at 60vw (screen only: a paper narrower than
    640px during a print job is not a phone) */
 @media screen and (max-width: 640px) {
   .app-toast {
-    top: auto;
-    bottom: 32px;
-    transform: translate(-50%, 8px);
     max-width: calc(100vw - 24px);
     white-space: normal;
   }
