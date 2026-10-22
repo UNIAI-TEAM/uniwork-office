@@ -205,4 +205,7 @@ export const it = {
   uwErrPageCopyNotSupported:
     'In questa fase è possibile copiare solo i documenti file. Le copie UniNote arriveranno in seguito.',
   uwErrCopyConsentRequired: 'Prima di copiare è richiesta una conferma esplicita.',
+  uwErrDocumentNotInTrash: 'Questo elemento non è più nel cestino.',
+  uwErrFolderTooLarge:
+    'La cartella contiene troppi elementi per eliminarli in una sola volta. Elimina prima il contenuto a parti.',
 } satisfies Record<keyof typeof zh, string>

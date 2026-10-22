@@ -205,4 +205,7 @@ export const ja = {
   uwErrPageCopyNotSupported:
     'この段階でコピーできるのはファイル形式のドキュメントのみです。UniNote のコピーは今後対応予定です。',
   uwErrCopyConsentRequired: 'コピーの前に、明示的な確認が必要です。',
+  uwErrDocumentNotInTrash: 'この項目はもうごみ箱にありません。',
+  uwErrFolderTooLarge:
+    'フォルダーの項目が多すぎるため、一度に削除できません。先に中身を分けて削除してください。',
 } satisfies Record<keyof typeof zh, string>

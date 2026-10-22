@@ -62,6 +62,9 @@ export const UNIWORK_ERROR_KEYS: Record<UniworkDocErrorCode, StringKey> = {
   owner_requires_copy: 'uwErrOwnerRequiresCopy',
   page_copy_not_supported: 'uwErrPageCopyNotSupported',
   copy_consent_required: 'uwErrCopyConsentRequired',
+  // UNI-2078: the purge route's refusals
+  document_not_in_trash: 'uwErrDocumentNotInTrash',
+  folder_too_large: 'uwErrFolderTooLarge',
   // refusals before anything is queued: the keychain is locked, or the account's store is full
   keystore_locked: 'uwReasonKeystore',
   store_full: 'uwQueueFull',

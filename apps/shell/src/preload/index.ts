@@ -1519,6 +1519,15 @@ const homeApi: HomeApi = {
       }),
     )
   },
+  // UNI-2078: delete forever; the id only crosses, the reply is narrowed like any action
+  async uniworkPurgeDocument(documentId: string) {
+    if (typeof documentId !== 'string' || !documentId) {
+      return { ok: false, error: 'not_found' } as const
+    }
+    return asUniworkActionResult<{ id: string }>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.purgeDocument, documentId),
+    )
+  },
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf
   async uniworkListShelved(q) {
     return asUniworkResult<UniworkDocListPage>(

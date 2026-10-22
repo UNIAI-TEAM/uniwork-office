@@ -209,4 +209,7 @@ export const ru = {
   uwErrPageCopyNotSupported:
     'На этом этапе можно копировать только файловые документы. Копирование UniNote появится позже.',
   uwErrCopyConsentRequired: 'Перед копированием требуется явное подтверждение.',
+  uwErrDocumentNotInTrash: 'Этого элемента больше нет в корзине.',
+  uwErrFolderTooLarge:
+    'В папке слишком много элементов, чтобы удалить их за один раз. Сначала удалите содержимое по частям.',
 } satisfies Record<keyof typeof zh, string>

@@ -1256,6 +1256,10 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       idempotencyKey: body.idempotencyKey as string | undefined,
     })
   })
+  // UNI-2078: delete forever from the trash; the service re-checks the gate and the trash state
+  ipcMain.handle(UNIWORK_DOC_CHANNELS.purgeDocument, (_event, documentId: unknown) =>
+    service.purgeDocument(documentId as string),
+  )
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf, Bỏ lưu trữ and trash from Lưu trữ
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listShelved, (_event, query: unknown) =>
     service.listShelved((query ?? {}) as UniworkShelvedQuery),

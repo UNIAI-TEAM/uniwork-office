@@ -214,4 +214,7 @@ export const de = {
   uwErrPageCopyNotSupported:
     'In diesem Schritt können nur Dateidokumente kopiert werden. UniNote-Kopien folgen später.',
   uwErrCopyConsentRequired: 'Vor dem Kopieren ist eine ausdrückliche Bestätigung erforderlich.',
+  uwErrDocumentNotInTrash: 'Dieses Element befindet sich nicht mehr im Papierkorb.',
+  uwErrFolderTooLarge:
+    'Der Ordner enthält zu viele Elemente, um sie auf einmal zu löschen. Lösche zuerst den Inhalt in Teilen.',
 } satisfies Record<keyof typeof zh, string>
