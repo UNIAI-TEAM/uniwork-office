@@ -522,7 +522,12 @@ jobs:
     if: needs.meta.outputs.mac_signed == 'true'
     runs-on: macos-latest
     environment: mac-signing
-    timeout-minutes: 120
+    # Apple's notary queue is the long pole: the first submission of the first
+    # signed run took ~106 min (run 39736465340 attempt 1, cancelled at 120 min
+    # while the dmgs were still to go); the second attempt finished in ~25 min.
+    # Four submissions (2 apps, 2 dmgs) run one after another, so leave room
+    # for one slow queue wait plus the build. Hosted runners allow up to 360.
+    timeout-minutes: 180
     permissions:
       contents: read
     env:
