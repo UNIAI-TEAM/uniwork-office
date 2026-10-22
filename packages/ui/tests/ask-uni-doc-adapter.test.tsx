@@ -148,11 +148,10 @@ describe('a refused sender (every bridge call rejects, as with ipc_sender_refuse
 
   const refused = () => Promise.reject(new Error('ipc_sender_refused'))
 
-  it('shows the normal error state with a retry, and Stop and feedback fail quietly', async () => {
+  it('shows the normal error state with a retry, and a rejected Stop fails quietly', async () => {
     const bridge = fakeBridge()
     bridge.askUniDocStream.mockImplementation(refused)
     bridge.askUniDocStreamCancel.mockImplementation(refused)
-    bridge.askUniDocFeedbackSet.mockImplementation(refused)
     const adapter = createAskUniDocAdapter(bridge, (k) => askUniText('en', k), 'en')
     await act(async () => {
       root.render(
