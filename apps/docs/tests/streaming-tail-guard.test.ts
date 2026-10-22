@@ -161,11 +161,15 @@ describe('a late destroy', () => {
   it('is a no-op once the global document is gone', () => {
     const editor = createEditor()
     liveEditors.splice(liveEditors.indexOf(editor), 1)
+    // tiptap's own unmount reads the global document after the plugin views are
+    // gone, so the view teardown (where the plugin destroys run) is what must
+    // survive the missing global
     vi.stubGlobal('document', undefined)
     try {
-      expect(() => editor.destroy()).not.toThrow()
+      expect(() => editor.view.destroy()).not.toThrow()
     } finally {
       vi.unstubAllGlobals()
     }
+    editor.destroy()
   })
 })

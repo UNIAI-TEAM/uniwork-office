@@ -240,7 +240,9 @@ function tableHandlePlugin(): Plugin {
       handle.addEventListener('mousedown', onMouseDown)
       handle.addEventListener('click', onClick)
       handle.addEventListener('dragstart', onDragStart)
-      document.addEventListener('scroll', onScroll, true)
+      // keep the document from setup: a deferred destroy can run after the global is gone
+      const doc = document
+      doc.addEventListener('scroll', onScroll, true)
 
       return {
         update(_view, prevState) {
@@ -252,7 +254,7 @@ function tableHandlePlugin(): Plugin {
           cancelHide()
           view.dom.removeEventListener('mousemove', onMouseMove)
           view.dom.removeEventListener('mouseleave', scheduleHide)
-          document.removeEventListener('scroll', onScroll, true)
+          doc.removeEventListener('scroll', onScroll, true)
           handle.remove()
         },
       }
