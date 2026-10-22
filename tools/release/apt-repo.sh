@@ -513,7 +513,8 @@ fi
 
 # The install script is the same for every channel and is uploaded every run, so it always
 # matches the tools of the release that was just published. A browser shows it as text.
-put "$install_script" install.sh "$NO_CACHE" 'text/plain; charset=utf-8'
+cp "$install_script" "$work/install.sh"
+put "$work/install.sh" install.sh "$NO_CACHE" 'text/plain; charset=utf-8'
 
 for name in "${feed_files[@]}"; do
   put "$dir/$name" "update/$channel/$name"
