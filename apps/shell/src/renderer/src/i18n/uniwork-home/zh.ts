@@ -163,6 +163,7 @@ export const zh = {
   fuDlgRefusalTitleFiles: '无法上传这些文件',
   fuDlgShare: '与工作区共享',
   fuDlgShareHintFolder: '适用于本次上传的所有文件，文件夹保持私密。',
+  fuDlgShareHintWorkspace: '适用于本次上传的所有文件，新建的文件夹将对整个工作区可见。',
   fuDlgShareHintFiles: '适用于本次上传的所有文件。',
   fuDlgShareInherited: '目标文件夹已与工作区共享，因此这些文件也会被共享。',
   fuDlgStarting: '正在准备…',

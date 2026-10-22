@@ -167,6 +167,8 @@ export const cs = {
   fuDlgRefusalTitleFiles: 'Tyto soubory nelze nahrát',
   fuDlgShare: 'Sdílet s pracovním prostorem',
   fuDlgShareHintFolder: 'Platí pro všechny soubory v tomto nahrávání. Složky zůstanou soukromé.',
+  fuDlgShareHintWorkspace:
+    'Platí pro všechny soubory v tomto nahrávání. Nové složky jsou viditelné pro celý pracovní prostor.',
   fuDlgShareHintFiles: 'Platí pro všechny soubory v tomto nahrávání.',
   fuDlgShareInherited: 'Cílová složka je sdílena s pracovním prostorem, takže jsou i soubory.',
   fuDlgStarting: 'Připravuje se…',

@@ -100,6 +100,8 @@ interface Target {
   shared: boolean
   /** My Folder: the screen shows its localised name instead of the stored title */
   myFolder: boolean
+  /** My Folder or anything under it: the new folders stay private (ADR 0037) */
+  inMyFolder: boolean
 }
 
 type Groups = { files: string[]; dirs: string[] }
@@ -114,15 +116,17 @@ function record(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-/** the node with `id` and its level (a root node is level 1), or null */
+/** the node with `id`, its level (a root node is level 1) and whether My Folder is on its path, or null */
 function locate(
   nodes: readonly UniworkFolderNode[],
   id: string,
   level = 1,
-): { node: UniworkFolderNode; level: number } | null {
+  underMyFolder = false,
+): { node: UniworkFolderNode; level: number; inMyFolder: boolean } | null {
   for (const node of nodes) {
-    if (node.id === id) return { node, level }
-    const inside = locate(node.children, id, level + 1)
+    const mine = underMyFolder || node.systemKind === 'my_folder'
+    if (node.id === id) return { node, level, inMyFolder: mine }
+    const inside = locate(node.children, id, level + 1, mine)
     if (inside) return inside
   }
   return null
@@ -172,6 +176,7 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
           siblingNames: hit.node.children.map((child) => child.title),
           shared: false,
           myFolder: hit.node.systemKind === 'my_folder' || folderId === null,
+          inMyFolder: hit.inMyFolder || folderId === null,
         }
       }
       // a My Folder the tree does not list yet is a root-level folder with nothing in it
@@ -183,6 +188,7 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
             siblingNames: [],
             shared: false,
             myFolder: true,
+            inMyFolder: true,
           }
         : null
     } catch {
@@ -196,6 +202,7 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
       folderId: target.folderId,
       label: target.label,
       ...(target.myFolder ? { myFolder: true as const } : {}),
+      ...(target.inMyFolder ? { inMyFolder: true as const } : {}),
     }
   }
 

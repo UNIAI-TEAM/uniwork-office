@@ -167,6 +167,8 @@ export const id = {
   fuDlgRefusalTitleFiles: 'File ini tidak dapat diunggah',
   fuDlgShare: 'Bagikan dengan ruang kerja',
   fuDlgShareHintFolder: 'Berlaku untuk setiap file dalam unggahan ini. Folder tetap pribadi.',
+  fuDlgShareHintWorkspace:
+    'Berlaku untuk setiap file dalam unggahan ini. Folder baru terlihat oleh seluruh ruang kerja.',
   fuDlgShareHintFiles: 'Berlaku untuk setiap file dalam unggahan ini.',
   fuDlgShareInherited: 'Folder tujuan dibagikan dengan ruang kerja, jadi file-nya juga.',
   fuDlgStarting: 'Menyiapkan…',

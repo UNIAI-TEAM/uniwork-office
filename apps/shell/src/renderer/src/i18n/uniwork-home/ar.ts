@@ -165,6 +165,8 @@ export const ar = {
   fuDlgRefusalTitleFiles: 'لا يمكن رفع هذه الملفات',
   fuDlgShare: 'المشاركة مع مساحة العمل',
   fuDlgShareHintFolder: 'ينطبق على كل ملف في هذا الرفع. تبقى المجلدات خاصة.',
+  fuDlgShareHintWorkspace:
+    'ينطبق على كل ملف في هذا الرفع. المجلدات الجديدة تظهر لمساحة العمل كلها.',
   fuDlgShareHintFiles: 'ينطبق على كل ملف في هذا الرفع.',
   fuDlgShareInherited: 'المجلد الوجهة مشارَك مع مساحة العمل، لذا الملفات كذلك.',
   fuDlgStarting: 'جارٍ التحضير…',

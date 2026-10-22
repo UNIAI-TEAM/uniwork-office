@@ -169,6 +169,8 @@ export const ja = {
   fuDlgShare: 'ワークスペースと共有',
   fuDlgShareHintFolder:
     'このアップロードのすべてのファイルに適用されます。フォルダーは非公開のままです。',
+  fuDlgShareHintWorkspace:
+    'このアップロードのすべてのファイルに適用されます。新しいフォルダーはワークスペース全体に表示されます。',
   fuDlgShareHintFiles: 'このアップロードのすべてのファイルに適用されます。',
   fuDlgShareInherited:
     'アップロード先のフォルダーはワークスペースと共有されているため、ファイルも共有されます。',

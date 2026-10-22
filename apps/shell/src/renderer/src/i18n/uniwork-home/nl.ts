@@ -168,6 +168,8 @@ export const nl = {
   fuDlgRefusalTitleFiles: 'Deze bestanden kunnen niet worden geüpload',
   fuDlgShare: 'Delen met werkruimte',
   fuDlgShareHintFolder: 'Geldt voor elk bestand in deze upload. De mappen blijven privé.',
+  fuDlgShareHintWorkspace:
+    'Geldt voor elk bestand in deze upload. De nieuwe mappen zijn zichtbaar voor de hele werkruimte.',
   fuDlgShareHintFiles: 'Geldt voor elk bestand in deze upload.',
   fuDlgShareInherited: 'De doelmap is gedeeld met de werkruimte, dus de bestanden ook.',
   fuDlgStarting: 'Voorbereiden…',

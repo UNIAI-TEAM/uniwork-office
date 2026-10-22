@@ -55,6 +55,14 @@ export function FolderUploadDialog({
     !!preflight.rootNamePreview &&
     preflight.rootNamePreview !== preflight.rootName
   const groups = groupSkipped(preflight.skipped)
+  // a shared destination wins; else folders land private in My Folder, workspace-visible elsewhere
+  const shareHintKey = parentShared
+    ? 'fuDlgShareInherited'
+    : !folderMode
+      ? 'fuDlgShareHintFiles'
+      : preflight.target.inMyFolder || preflight.target.myFolder
+        ? 'fuDlgShareHintFolder'
+        : 'fuDlgShareHintWorkspace'
 
   const toggleGroup = (reason: string) =>
     setExpanded((prev) => {
@@ -201,9 +209,7 @@ export function FolderUploadDialog({
               />
             </label>
             <p id={`${id}-share-hint`} className="fu-note">
-              {parentShared
-                ? t('fuDlgShareInherited')
-                : t(folderMode ? 'fuDlgShareHintFolder' : 'fuDlgShareHintFiles')}
+              {t(shareHintKey)}
             </p>
           </div>
         )}
