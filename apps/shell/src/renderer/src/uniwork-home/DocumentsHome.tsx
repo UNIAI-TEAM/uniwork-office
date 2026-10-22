@@ -488,6 +488,9 @@ export function DocumentsHome({
   const [unavailableKinds, setUnavailableKinds] = useState<ReadonlySet<NewDocKind>>(new Set())
   const [creating, setCreating] = useState(false)
   const creatingRef = useRef(false)
+  // the search box takes focus back when a control inside the list unmounts (Retry, Clear search, ×)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const focusSearch = () => searchInputRef.current?.focus()
   const [uploadModal, setUploadModal] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const uploadIdRef = useRef<string | null>(null)
@@ -2466,6 +2469,7 @@ export function DocumentsHome({
               <path d="m20 20-3.5-3.5" />
             </svg>
             <input
+              ref={searchInputRef}
               className="dh-search-input uwf-own-search"
               type="search"
               aria-label={searchLabel}
@@ -2486,7 +2490,10 @@ export function DocumentsHome({
                 type="button"
                 className="dh-search-clear"
                 aria-label={t('searchClear')}
-                onClick={() => setSearchDraft('')}
+                onClick={() => {
+                  setSearchDraft('')
+                  focusSearch()
+                }}
               >
                 ×
               </button>
@@ -2628,6 +2635,7 @@ export function DocumentsHome({
           <ListState
             kind="error"
             glyph={unavailablePage === 'starred' ? 'star' : 'error'}
+            returnFocus={focusSearch}
             title={unavailableKeys ? t(unavailableKeys.title) : t(UNIWORK_ERROR_KEYS[listError])}
             hint={unavailableKeys ? t(unavailableKeys.hint) : undefined}
             // Thử lại where asking again can help: a missing route (the server may be updated) and
@@ -2748,6 +2756,7 @@ export function DocumentsHome({
                   <ListState
                     kind="empty"
                     glyph="search"
+                    returnFocus={focusSearch}
                     title={t('dlSearchNoResults', { query })}
                     action={{ label: t('searchClear'), onClick: () => setSearchDraft('') }}
                   />
