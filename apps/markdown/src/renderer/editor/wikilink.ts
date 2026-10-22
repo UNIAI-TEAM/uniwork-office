@@ -307,6 +307,9 @@ export const WikiLink = Mark.create({
   // above Link (1000): a wiki link must open before a markdown link claims the
   // same bracket, and ProseMirror derives mark ranks from this order
   priority: 1100,
+  // a link ends where its literal ends: text typed after it, or the next line
+  // after Enter, must not grow it
+  inclusive: false,
 
   markdownTokenizer: {
     name: 'wikiLink',
