@@ -150,7 +150,7 @@ export function myWorkGroups(
     .map((key) => ({ key, tasks: groups[key] }))
 }
 
-export type TabCount = { n: number; key: StringKey; tone: 'danger' | 'muted' }
+export type TabCount = { n: number; key: StringKey; tone: 'danger' | 'muted' | 'info' }
 
 /**
  * The Tasks and Calendar tab counts from the Overview summary. A failed source

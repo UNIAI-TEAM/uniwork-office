@@ -725,7 +725,7 @@ describe('the tray reads the unread list (UNI-2079)', () => {
         commentId: 'c77',
       })
       expect(work.markNotificationsRead).toHaveBeenCalledWith(['c1'])
-      await click(button('Lan requested access'))
+      await click(button('Plan'))
       expect(taken).toEqual([
         { kind: 'share', documentId: 'd5', workspaceId: 'w', section: 'requests' },
       ])

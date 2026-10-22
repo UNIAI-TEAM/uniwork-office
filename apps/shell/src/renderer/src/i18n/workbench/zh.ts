@@ -164,6 +164,7 @@ export const zh = {
   wbTabCountOverdue: '逾期任务：{count}',
   wbTabCountDueToday: '今天到期的任务：{count}',
   wbTabCountMeetings: '今日会议：{count}',
+  wbTabCountUnread: '未读通知：{count}',
   wbSkTabsNav: '专业技能领域',
   wbSkTabsAdd: '添加领域',
   wbSkTabsMenuTitle: '添加技能领域',

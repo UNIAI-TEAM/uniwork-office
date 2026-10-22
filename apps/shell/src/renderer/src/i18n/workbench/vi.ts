@@ -160,6 +160,7 @@ export const vi = {
   wbTabCountOverdue: 'Việc quá hạn: {count}',
   wbTabCountDueToday: 'Việc đến hạn hôm nay: {count}',
   wbTabCountMeetings: 'Cuộc họp hôm nay: {count}',
+  wbTabCountUnread: 'Thông báo chưa đọc: {count}',
   wbSkTabsNav: 'Lĩnh vực kỹ năng chuyên môn',
   wbSkTabsAdd: 'Thêm lĩnh vực',
   wbSkTabsMenuTitle: 'Thêm lĩnh vực kỹ năng',

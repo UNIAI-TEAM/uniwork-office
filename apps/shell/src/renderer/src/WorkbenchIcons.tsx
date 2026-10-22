@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import type { PracticePillarId, WorkbenchModuleId } from '@uniwork/practice-core'
 import { MODULE_TONES, tintStyle, type Tint } from './module-tones'
 
-type IconId = PracticePillarId | WorkbenchModuleId | 'add' | 'inbox'
+type IconId = PracticePillarId | WorkbenchModuleId | 'add'
 
 /**
  * Line glyphs on a 24-unit box, 1.5 stroke in currentColor (redesign spec 2.3):
@@ -93,7 +93,7 @@ export function WorkbenchIcon({
   tint?: Tint
   bare?: boolean
 }): ReactElement {
-  const tone = tint ?? (id === 'add' || id === 'inbox' ? 'gray' : MODULE_TONES[id])
+  const tone = tint ?? (id === 'add' ? 'gray' : MODULE_TONES[id])
   const style = bare ? { color: `var(--tint-${tone}-fg)` } : tintStyle(tone)
   return (
     <span
@@ -207,6 +207,14 @@ const UI_GLYPH = {
     </>
   ),
   trash: <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.5 8.5h6l.5-8.5" />,
+  check: <path d="M3.5 8.5l3 3 6-6.5" />,
+  dot: <circle cx="8" cy="8" r="3" />,
+  archive: (
+    <>
+      <rect x="2.5" y="3.5" width="11" height="3" rx="1" />
+      <path d="M3.5 6.5v6h9v-6M6.5 9h3" />
+    </>
+  ),
   grip: (
     <>
       <circle cx="6" cy="4" r="0.6" />

@@ -275,9 +275,6 @@ export type NoticeTarget =
   | { to: 'web'; target: NoticeWebTarget }
   | { to: 'none' }
 
-/** the row as the server sends it; `resource_parent_id` is a chat message's room */
-type NoticeRow = WorkNotification & { resource_parent_id?: string }
-
 /** the kinds that point at one comment or discussion post to reveal */
 const COMMENT_KINDS: ReadonlySet<string> = new Set([
   'document_commented',
@@ -293,7 +290,7 @@ const COMMENT_KINDS: ReadonlySet<string> = new Set([
  * resource that is gone or out of reach opens nothing: the caller says why (`noticeState`) and marks it read.
  * A change row always answers `changed` because its click depends on the count and the verb.
  */
-export function noticeTarget(n: NoticeRow): NoticeTarget {
+export function noticeTarget(n: WorkNotification): NoticeTarget {
   if (n.kind === 'document_changed') return { to: 'changed' }
   if (n.resource_deleted || n.resource_access_lost) return { to: 'none' }
 

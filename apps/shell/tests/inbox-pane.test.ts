@@ -112,7 +112,13 @@ const flush = async () =>
 async function mount(
   over: Partial<Parameters<typeof InboxPane>[0]> = {},
   lang: 'en' | 'vi' = 'en',
+  fresh = true,
 ) {
+  if (fresh && host.childNodes.length > 0) {
+    // a new pane, not a re-render of the one on screen
+    act(() => root.unmount())
+    root = createRoot(host)
+  }
   await act(async () => {
     root.render(
       createElement(
@@ -134,8 +140,50 @@ async function mount(
   })
   await flush()
 }
+
+/** a server that keeps its rows: reads, archives and mark all change what the next list says */
+function serve(initial: WorkNotification[], next: string | null = null): WorkNotification[] {
+  const rows = initial.map((n) => ({ ...n }))
+  const archived = new Map<string, { at: number; row: WorkNotification }>()
+  const pick = (ids: string[]) => rows.filter((r) => ids.includes(r.id))
+  work.listNotifications.mockImplementation(async (q?: { unread?: boolean }) =>
+    page(
+      rows.filter((r) => !q?.unread || !r.read_at).map((r) => ({ ...r })),
+      next,
+    ),
+  )
+  work.markNotificationsRead.mockImplementation(async (ids: string[]) => {
+    for (const r of pick(ids)) r.read_at ??= NOW
+    return ok(null)
+  })
+  work.markNotificationsUnread.mockImplementation(async (ids: string[]) => {
+    for (const r of pick(ids)) delete r.read_at
+    return ok(null)
+  })
+  work.archiveNotifications.mockImplementation(async (ids: string[]) => {
+    for (const id of ids) {
+      const at = rows.findIndex((r) => r.id === id)
+      if (at >= 0) archived.set(id, { at, row: rows.splice(at, 1)[0]! })
+    }
+    return ok(null)
+  })
+  work.unarchiveNotifications.mockImplementation(async (ids: string[]) => {
+    for (const id of ids) {
+      const hit = archived.get(id)
+      if (hit) rows.splice(Math.min(hit.at, rows.length), 0, hit.row)
+      archived.delete(id)
+    }
+    return ok(null)
+  })
+  work.markAllNotificationsRead.mockImplementation(async () => {
+    const ids = rows.filter((r) => !r.read_at).map((r) => r.id)
+    for (const r of rows) r.read_at ??= NOW
+    return ok(ids)
+  })
+  return rows
+}
 const show = async (rows: WorkNotification[], next: string | null = null) => {
-  work.listNotifications.mockResolvedValue(page(rows, next))
+  serve(rows, next)
   await mount()
 }
 
@@ -327,6 +375,28 @@ describe('InboxPane filters', () => {
     expect(work.listNotifications).toHaveBeenLastCalledWith({ workspaceId: 'w', limit: 30 })
   })
 
+  it('keeps the filters on screen, over a skeleton, while the other filter loads', async () => {
+    await show([row('n1'), seen('n2')])
+    let release!: (v: ReturnType<typeof page>) => void
+    work.listNotifications.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve
+      }),
+    )
+    const unread = button('Unread')!
+    unread.focus()
+    await click(unread)
+    expect(host.querySelector('.wb-work-skeleton')).not.toBeNull()
+    // the same button, still focused: the bar was not rebuilt
+    expect(button('Unread')).toBe(unread)
+    expect(document.activeElement).toBe(unread)
+    expect(unread.getAttribute('aria-pressed')).toBe('true')
+    await act(async () => release(page([row('n1')])))
+    await flush()
+    expect(host.querySelector('.wb-work-skeleton')).toBeNull()
+    expect(ids()).toEqual(['n1'])
+  })
+
   it('counts the unread rows of each category on its chip and filters the list by it', async () => {
     await show([
       row('m1'),
@@ -405,15 +475,11 @@ describe('InboxPane triage', () => {
   })
 
   it('archives a row with an Undo toast; Undo brings it back', async () => {
-    const rows = [row('n1'), row('n2')]
-    work.listNotifications.mockImplementation(async () => page(rows))
-    await mount()
+    await show([row('n1'), row('n2')])
     await click(labelled(itemOf('n1'), 'Archive'))
     expect(work.archiveNotifications).toHaveBeenCalledWith(['n1'])
-    rows.shift()
     expect(ids()).toEqual(['n2'])
     expect(toastText()).toContain('Archived 1 notification')
-    rows.unshift(row('n1'))
     await click(button('Undo'))
     expect(work.unarchiveNotifications).toHaveBeenCalledWith(['n1'])
     expect(ids()).toEqual(['n1', 'n2'])
@@ -437,7 +503,6 @@ describe('InboxPane triage', () => {
   })
 
   it('marks the whole workspace read with an Undo through the returned ids', async () => {
-    work.markAllNotificationsRead.mockResolvedValueOnce(ok(['n1', 'n2']))
     await show([row('n1'), row('n2'), seen('n3')])
     await click(button('Mark all as read'))
     expect(work.markAllNotificationsRead).toHaveBeenCalledWith({ workspaceId: 'w' })
@@ -478,7 +543,7 @@ describe('InboxPane triage', () => {
     const changed = vi.fn()
     window.addEventListener(NOTICES_CHANGED_EVENT, changed)
     try {
-      await show([row('n1'), row('n2')])
+      await show([row('n1'), row('n2'), row('n3')])
       await click(labelled(itemOf('n1'), 'Mark as read'))
       expect(changed).toHaveBeenCalledTimes(1)
       await click(labelled(itemOf('n2'), 'Archive'))
@@ -703,7 +768,7 @@ describe('InboxPane opens a notice', () => {
     expect(itemOf('c1').textContent).toContain('Lan renamed “Plan”')
     expect(itemOf('c2').textContent).toContain('Lan renamed 5 documents')
     await click(mainOf('c1'))
-    expect(api.uniworkOpenDocument).toHaveBeenCalledWith('d1')
+    expect(api.uniworkOpenDocument).toHaveBeenCalledWith('d-c1')
     await click(mainOf('c2'))
     expect(work.notificationDocuments).toHaveBeenCalledWith('c2', { limit: 50 })
     expect(document.querySelector('[role="dialog"]')).not.toBeNull()
@@ -799,7 +864,7 @@ describe('InboxPane states', () => {
     )
     await mount()
     work.listNotifications.mockResolvedValueOnce(page([row('b1', { workspace_id: 'w2' })]))
-    await mount({ workspace: { ...WS, id: 'w2' } as UniworkWorkspaceRef })
+    await mount({ workspace: { ...WS, id: 'w2' } as UniworkWorkspaceRef }, 'en', false)
     expect(work.listNotifications).toHaveBeenLastCalledWith({ workspaceId: 'w2', limit: 30 })
     await act(async () => releaseA(page([row('a1')])))
     await flush()

@@ -160,6 +160,7 @@ export const en = {
   wbTabCountOverdue: 'Overdue tasks: {count}',
   wbTabCountDueToday: 'Tasks due today: {count}',
   wbTabCountMeetings: 'Meetings today: {count}',
+  wbTabCountUnread: 'Unread notifications: {count}',
   wbSkTabsNav: 'Skill fields',
   wbSkTabsAdd: 'Add a field',
   wbSkTabsMenuTitle: 'Add a skill field',

@@ -1,19 +1,12 @@
 import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import type { RecentEntry, UniworkDocStatus, UniworkDocSummary } from '../../shared/home-api'
-import type { WorkHomeSummary, WorkNotification } from '../../shared/uniwork-work-api'
-import {
-  documentChangedFacts,
-  documentChangedHasPage,
-  noticeState,
-  opensDocumentList,
-} from './desk-doc-change'
+import type { WorkHomeSummary } from '../../shared/uniwork-work-api'
 import {
   docNotifications,
   freshShared,
   initials,
   inTrayRows,
-  noteSentence,
   notePillKey,
   syncProblems,
   type InTrayRow,
@@ -21,24 +14,13 @@ import {
 import { DocChangeDialog } from './DocChangeDialog'
 import { DocPickerList } from './doclist/PickerList'
 import { useI18n, type StringKey } from './locale'
-import { publishUniworkNotice } from './uniwork-notice-bus'
+import { noticeLine, openNotice } from './notice-open'
+import { notifyNoticesChanged, type UnreadNotices } from './notices-data'
 import { openUniworkDocument } from './uniwork-open'
 import { WorkbenchIcon } from './WorkbenchIcons'
 import type { OverviewView } from './work-home'
 import type { WorkLoad } from './work-cache'
 import { WorkSkeleton, WorkStatePanel, WorkspacePickerContext } from './WorkErrorState'
-
-/** what a click on a note does, decided from the notice (see openNote) */
-interface NoteState {
-  /** a several-document change: opens the list of its documents */
-  list: boolean
-  /** deleted or out of reach: say why in the launch notice instead of opening */
-  notice: 'deleted' | 'forbidden' | null
-  /** no page to open (deleted, trashed or out of reach): the click only marks it read */
-  gone: boolean
-  /** a count-1 change with no title: the reader may be unable to open it, so a failed open still clears it */
-  untitled: boolean
-}
 
 /** px the picker keeps clear at a row's end: the pill (and, on a sync problem, Resolve) */
 const TRAIL_PILL = 128
@@ -49,7 +31,10 @@ const TRAY_ROWS = 8
 const SYNC_PROBES = 20
 
 interface Props {
+  /** the Desk's summary: its unread total follows a note read here */
   home: WorkLoad<WorkHomeSummary>
+  /** the workspace's unread notices (30 newest), loaded by the Desk: the Today card counts from the same list */
+  notices: UnreadNotices
   /** a workspace is selected: the server sources can load */
   signedIn: boolean
   /** the page's server state: which note an empty tray shows */
@@ -65,13 +50,14 @@ interface Props {
 /** "Cần bạn xử lý" (office desk spec §3.1): sync problems, comments and mentions, new shares. */
 export function DeskInTray({
   home,
+  notices,
   signedIn,
   view,
   local,
   onReload,
   refreshTick,
 }: Props): ReactElement {
-  const { t } = useI18n()
+  const { t, dateLocale } = useI18n()
   const pickWorkspace = useContext(WorkspacePickerContext)
   const titleId = useId()
   const [shared, setShared] = useState<UniworkDocSummary[]>([])
@@ -141,16 +127,17 @@ export function DeskInTray({
   }, [expanded])
 
   const rows = inTrayRows({
-    notes: home.value ? docNotifications(home.value.inbox) : [],
+    notes: notices.rows ? docNotifications(notices.rows) : [],
     shared: freshShared(shared, local, Date.now()),
     sync: syncProblems(Object.values(statuses)),
   })
   const visible = expanded ? rows : rows.slice(0, TRAY_ROWS)
 
-  /** mark one notice read; a refusal is quiet: the row comes back with the next summary */
+  /** mark one notice read; a refusal is quiet: the row comes back with the next load */
   const markRead = async (id: string) => {
     const r = await window.uniworkWork.markNotificationsRead([id]).catch(() => null)
-    if (r?.ok)
+    if (r?.ok) {
+      notices.drop(id)
       home.update((s) => ({
         ...s,
         inbox: s.inbox.filter((n) => n.id !== id),
@@ -159,27 +146,8 @@ export function DeskInTray({
           unread: s.counts.unread === null ? null : Math.max(0, s.counts.unread - 1),
         },
       }))
-  }
-
-  const openNote = async (n: WorkNotification, state: NoteState, title: string) => {
-    if (state.list) {
-      // the list reads the documents itself and marks the notice read once its first page is loaded
-      setListFor(n.id)
-      return
+      notifyNoticesChanged()
     }
-    if (state.notice) {
-      // gone or out of reach: nothing to open, so say why and clear the reminder
-      publishUniworkNotice({ phase: 'failed', error: state.notice })
-      await markRead(n.id)
-      return
-    }
-    if (state.gone) {
-      await markRead(n.id)
-      return
-    }
-    // a failed open keeps the reminder, unless nothing says the document is still reachable
-    const opened = await openUniworkDocument({ documentId: n.resource_id, title }, window.aiOffice)
-    if (opened || state.untitled) await markRead(n.id)
   }
 
   const describe = (
@@ -202,32 +170,8 @@ export function DeskInTray({
     if (r.kind === 'note') {
       const n = r.note
       const actor = n.params.actor ?? ''
-      const changed = n.kind === 'document_changed'
-      const facts = changed ? documentChangedFacts(n) : null
-      const sentence = (() => {
-        const { key, params } = noteSentence(n)
-        return t(key, params)
-      })()
-      const list = opensDocumentList(n)
-      // a several-document change always opens its list; any other notice says when its document is gone
-      const verdict = list ? 'open' : noticeState(n)
-      const state: NoteState = {
-        list,
-        notice: verdict === 'deleted' ? 'deleted' : verdict === 'no_access' ? 'forbidden' : null,
-        gone: verdict !== 'open' || (changed && !documentChangedHasPage(n)),
-        untitled: !!facts && facts.count === 1 && facts.titles.length === 0,
-      }
-      // the document's name for the open notice and the row's title
-      const named = facts ? (facts.titles[0] ?? '') : (n.params.document ?? '')
-      const titles =
-        facts && facts.count > 1 && facts.titles.length > 0
-          ? [
-              facts.titles.join(', '),
-              facts.more > 0 ? t('wbDocChangeMore', { count: facts.more }) : '',
-            ]
-              .filter(Boolean)
-              .join(' ')
-          : ''
+      const line = noticeLine(n, t, dateLocale)
+      const { sentence, named, titles, state, changed } = line
       // a change reads as its sentence; a comment, mention or resolved note names the document
       const sentenceIsTitle = changed || !named
       const title = sentenceIsTitle ? sentence : named
@@ -252,7 +196,12 @@ export function DeskInTray({
         pill: { tone: changed ? 'neutral' : 'info', label: notePillKey(n) },
         resolve: false,
         gone: state.gone,
-        open: () => void openNote(n, state, named),
+        open: () =>
+          void openNotice(n, line, {
+            workspace: null,
+            markRead,
+            openList: setListFor,
+          }),
       }
     }
     if (r.kind === 'shared') {
@@ -310,19 +259,21 @@ export function DeskInTray({
     if (view === 'signed-out' || view === 'unreachable' || view === 'forbidden')
       return <p className="wb-ov-note">{t('wbDeskNoServerData')}</p>
     if (view === 'no-workspace') return <p className="wb-ov-note">{t('wbOvNoWorkspaceTitle')}</p>
-    if (home.error || home.value?.partial.includes('notifications'))
+    if (notices.error)
       return (
         <p className="wb-ov-partial">
           {t('wbOvLoadFailed')} ·{' '}
-          <button type="button" className="wb-link" onClick={onReload ?? home.reload}>
+          <button type="button" className="wb-link" onClick={onReload ?? notices.reload}>
             {t('acctRetry')}
           </button>
         </p>
       )
+    // the unread list is still on its way: the same skeleton as the page's own loading
+    if (signedIn && notices.rows === null) return <WorkSkeleton rows={2} />
     return (
       <WorkStatePanel
         tone="gray"
-        icon={<WorkbenchIcon id="inbox" size={20} />}
+        icon={<WorkbenchIcon id="inbox" size={20} tint="gray" />}
         title={t('wbDeskInTrayEmpty')}
         role="status"
         compact
