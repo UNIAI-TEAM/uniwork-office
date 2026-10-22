@@ -76,32 +76,38 @@ describe('askuni string shard', () => {
       'askUniCitationLabel',
       // the shell vi copy says "workspace" (72 uses), like the web
       'askUniWorkspace',
-      // S6 additions that are the same text in the locales that use them, not English copies:
-      'askUniV2NoteCount', // the '{count}/{max}' counter has no words
-      'askUniV2ModelBar', // the '{label} {value}/5' score bar has no words
-      'askUniV2ModelHaiku', // product model names, kept in every locale
-      'askUniV2ModelSonnet',
-      'askUniV2ModelOpus',
-      'askUniV2KindTask', // vi keeps the loan word "task" (web wording, as in the ui shard)
-      'askUniV2StepTaskOne',
-      'askUniV2StepChatOne', // "chat" is the same word in cs, es, id, it, nl
-      'askUniV2StepChatMany',
-      'askUniV2KindEmail', // "Email" is the same word in it and id
-      'askUniV2KindDocument', // "document" / "project" are the same words in fr and nl
-      'askUniV2GroupDocuments',
-      'askUniV2StepDocumentOne',
-      'askUniV2StepDocumentMany',
-      'askUniV2KindProject',
-      'askUniV2StepProjectOne',
-      'askUniV2MentionCount', // "suggestions" is the same word in fr
-      'askUniV2ModelEffort', // "Effort" and "Intelligence" are the same words in fr
-      'askUniV2ModelIntelligence',
     ])
+    // Per-locale allowances for S6 keys whose text is the same as English in only some locales:
+    // the word really is the same in those locales (a loan word or a symbol), so no translation is due.
+    const ALL = [...LANGS]
+    const sameAsEnglish: Partial<Record<string, readonly string[]>> = {
+      askUniV2NoteCount: ALL, // the '{count}/{max}' counter has no words
+      askUniV2ModelBar: ALL, // the '{label} {value}/5' score bar has no words
+      askUniV2ModelHaiku: ALL, // product model names, kept in every locale
+      askUniV2ModelSonnet: ALL,
+      askUniV2ModelOpus: ALL,
+      askUniV2KindTask: ['vi'], // vi keeps the loan word "task" (web wording, as in the ui shard)
+      askUniV2StepTaskOne: ['vi'],
+      askUniV2StepChatOne: ['cs', 'es', 'id', 'it', 'nl'], // "chat" is the same word here
+      askUniV2StepChatMany: ['es', 'nl'],
+      askUniV2KindEmail: ['it', 'id', 'vi'], // "Email" is the same word here
+      askUniV2KindDocument: ['fr', 'nl'], // "document" / "project" are the same words here
+      askUniV2StepDocumentOne: ['fr', 'nl'],
+      askUniV2GroupDocuments: ['fr'],
+      askUniV2StepDocumentMany: ['fr'],
+      askUniV2KindProject: ['nl'],
+      askUniV2StepProjectOne: ['nl'],
+      askUniV2MentionCount: ['fr'], // "suggestions" is the same word in fr
+      askUniV2ModelEffort: ['fr'], // "Effort" and "Intelligence" are the same words in fr
+      askUniV2ModelIntelligence: ['fr'],
+    }
     for (const lang of LANGS) {
       if (lang === 'en') continue
       const same = referenceKeys.filter(
         (k) =>
-          !allowed.has(k) && table(lang)[k] === (askUniStrings.en as Record<string, string>)[k],
+          !allowed.has(k) &&
+          !sameAsEnglish[k]?.includes(lang) &&
+          table(lang)[k] === (askUniStrings.en as Record<string, string>)[k],
       )
       expect(same, `${lang} copies English for: ${same.join(', ')}`).toEqual([])
     }
