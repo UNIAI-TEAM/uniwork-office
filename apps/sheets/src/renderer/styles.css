@@ -5837,12 +5837,13 @@ textarea:focus {
 }
 
 /* ================= transient toast (save feedback) ================= */
+/* bottom-centre, 8px over the 24px status bar: the ribbon is taller than any fixed top offset */
 
 .app-toast {
   position: fixed;
-  top: 64px;
+  bottom: 32px;
   left: 50%;
-  transform: translate(-50%, -8px);
+  transform: translate(-50%, 8px);
   z-index: 2000;
   display: flex;
   align-items: center;
