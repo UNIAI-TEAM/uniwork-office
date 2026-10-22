@@ -328,8 +328,39 @@ export function createUniworkShareClient(options: UniworkDocsClientOptions): Uni
     },
 
     async getOwnerGate(documentId) {
-      const raw = await send({ method: 'GET', route: docRoute(documentId), timeoutMs, read: json })
-      return parseOwnerGate(raw)
+      const route = docRoute(documentId)
+      let raw: unknown
+      try {
+        raw = await send({ method: 'GET', route, timeoutMs, read: json })
+      } catch (error) {
+        if (!(error instanceof UniworkDocError) || error.serverCode !== 'document_restricted') {
+          throw error
+        }
+        // an admin who reaches a restricted document only through admin_scope cannot read it (the
+        // same fallback as client.ts documentManageRef). The summary carries workspace_id and
+        // visibility but no owner_kind / shelved_at: for this read those two stay '' / false and the
+        // server decides (409 document_owned_by_work_product / document_shelved, both kept).
+        try {
+          raw = await send({
+            method: 'GET',
+            route: `${route}/admin-summary`,
+            timeoutMs,
+            read: json,
+          })
+        } catch (summaryError) {
+          if (
+            summaryError instanceof UniworkDocError &&
+            summaryError.code === 'permission_revoked'
+          ) {
+            throw new UniworkDocError('forbidden', { status: summaryError.status })
+          }
+          throw summaryError
+        }
+      }
+      const gate = parseOwnerGate(raw)
+      // another document's flags must not gate this transfer
+      if (gate.id !== documentId) throw new UniworkDocError('malformed_response')
+      return gate
     },
 
     async listWorkspaceMemberIds(workspaceId) {

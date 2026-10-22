@@ -1150,6 +1150,99 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
       expect(transferButton()).toBeNull()
     })
 
+    it('FE-1: a rejected transferOwner is the failed sentence, the controls unlock and a retry sends', async () => {
+      const api = createFakeShareApi()
+      const flaky = {
+        ...api,
+        transferOwner: vi
+          .fn()
+          .mockRejectedValueOnce(new Error('ipc: no handler'))
+          .mockImplementation((input: never) => api.transferOwner(input)),
+      }
+      await open({}, target(), 'en', () => flaky as unknown as UniworkShareApi)
+      await openTransfer()
+      await pickPerson('An Lê')
+      await click(confirmButton())
+      expect(flaky.transferOwner).toHaveBeenCalledTimes(1)
+      expect(transferDialog()).toBeTruthy()
+      expect(alertText()).toBe(t('shrOwnerFailed', { name: 'An Lê' }))
+      expect(confirmButton()!.getAttribute('aria-busy')).toBeNull()
+      expect(cancelButton()!.hasAttribute('disabled')).toBe(false)
+      expect(personInput().disabled).toBe(false)
+      expect(keepSelect().disabled).toBe(false)
+      await click(confirmButton())
+      expect(flaky.transferOwner).toHaveBeenCalledTimes(2)
+      expect(transferDialog()).toBeNull()
+    })
+
+    it('FE-1: a rejected ownerCandidates is an error line, not "Loading…" for ever', async () => {
+      const api = createFakeShareApi()
+      const broken = {
+        ...api,
+        ownerCandidates: vi.fn(async () => {
+          throw new Error('ipc: no handler')
+        }),
+      }
+      await open({}, target(), 'en', () => broken as unknown as UniworkShareApi)
+      await openTransfer()
+      expect(alertText()).toBe(t('shrOwnerFailed', { name: '' }))
+      await click(personInput())
+      expect(transferDialog()!.textContent).not.toContain(t('shrOwnerLoading'))
+      expect(transferDialog()!.textContent).toContain(t('shrOwnerNoCandidates'))
+    })
+
+    it('FE-2: Escape and the overlay do nothing while the transfer is in flight', async () => {
+      const api = createFakeShareApi()
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      const slow = {
+        ...api,
+        transferOwner: vi.fn(async (input: never) => {
+          await gate
+          return api.transferOwner(input)
+        }),
+      }
+      await open({}, target(), 'en', () => slow as unknown as UniworkShareApi)
+      await openTransfer()
+      await pickPerson('An Lê')
+      await click(confirmButton())
+      expect(confirmButton()!.getAttribute('aria-busy')).toBe('true')
+      await key(transferDialog()!, 'Escape')
+      expect(transferDialog()).toBeTruthy()
+      const overlay = transferDialog()!.parentElement!
+      await click(overlay)
+      expect(transferDialog()).toBeTruthy()
+      await act(async () => release())
+      await flush()
+      expect(transferDialog()).toBeNull()
+    })
+
+    it('FE-3: the list closes when focus leaves the field and the list; aria-controls only while it is open', async () => {
+      await open()
+      await openTransfer()
+      const input = personInput()
+      expect(input.hasAttribute('aria-controls')).toBe(false)
+      await click(input)
+      expect(input.getAttribute('aria-expanded')).toBe('true')
+      const list = transferDialog()!.querySelector('[role="listbox"]')!
+      expect(input.getAttribute('aria-controls')).toBe(list.id)
+      const leave = async (to: Element | null) =>
+        act(async () => {
+          input.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: to }))
+        })
+      // focus moving inside the field or the list keeps it open
+      await leave(list.querySelector('[role="option"]'))
+      expect(input.getAttribute('aria-expanded')).toBe('true')
+      // Tab to the keep select closes it
+      await leave(keepSelect())
+      expect(input.getAttribute('aria-expanded')).toBe('false')
+      expect(transferDialog()!.querySelector('[role="listbox"]')).toBeNull()
+      expect(input.hasAttribute('aria-controls')).toBe(false)
+      // and it opens again from the keyboard
+      await key(input, 'ArrowDown')
+      expect(input.getAttribute('aria-expanded')).toBe('true')
+    })
+
     it('Cancel and Escape close it and focus goes back to the button', async () => {
       await open()
       await openTransfer()
