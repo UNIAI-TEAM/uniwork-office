@@ -23,6 +23,7 @@ import { workbenchStrings } from './i18n/strings-workbench'
 import { discussionStrings } from './i18n/strings-discussion'
 import { settingsStrings } from './i18n/strings-settings'
 import { askUniStrings } from './i18n/strings-askuni'
+import { inboxStrings } from './i18n/strings-inbox'
 
 export type StringKey =
   | keyof typeof strings.zh
@@ -39,6 +40,7 @@ export type StringKey =
   | keyof typeof discussionStrings.zh
   | keyof typeof settingsStrings.zh
   | keyof typeof askUniStrings.zh
+  | keyof typeof inboxStrings.zh
 
 // the home table plus the sharded domains (each shard type-checks its own key set;
 // widening to Record<Lang, Record<string, string>> here avoids a 21 * 2^N union
@@ -58,6 +60,7 @@ const shards: readonly Record<Lang, Record<string, string>>[] = [
   discussionStrings,
   settingsStrings,
   askUniStrings,
+  inboxStrings,
 ]
 
 const dicts = Object.fromEntries(
