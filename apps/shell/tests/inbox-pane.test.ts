@@ -383,6 +383,28 @@ describe('InboxPane filters', () => {
     expect(work.listNotifications).toHaveBeenLastCalledWith({ workspaceId: 'w', limit: 30 })
   })
 
+  it('drops a pending Load older when the filter switches, the new filter asks for its first page only', async () => {
+    let releaseOlder!: (v: ReturnType<typeof page>) => void
+    work.listNotifications
+      .mockResolvedValueOnce(page([row('n1')], 'c1'))
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          releaseOlder = resolve
+        }),
+      )
+      // the Unread first page still has an older page behind it
+      .mockResolvedValueOnce(page([row('n1')], 'c2'))
+    await mount()
+    await click(button('Show older notifications'))
+    await click(button('Unread'))
+    await act(async () => releaseOlder(page([row('n0')], null)))
+    await flush()
+    const asked = work.listNotifications.mock.calls.map((c) => c[0] as { before?: string })
+    expect(asked.filter((q) => q.before !== undefined)).toHaveLength(1)
+    expect(asked).toHaveLength(3)
+    expect(ids()).toEqual(['n1'])
+  })
+
   it('keeps the filters on screen, over a skeleton, while the other filter loads', async () => {
     await show([row('n1'), seen('n2')])
     let release!: (v: ReturnType<typeof page>) => void
