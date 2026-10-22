@@ -43,6 +43,12 @@ describe('Ask UNI citation polish (UNI-2116)', () => {
     expect(rule('.askuni-v2-cite-card')).not.toMatch(/pointer-events/)
   })
 
+  it('the hover preview hides its Open button, a pinned card keeps it (F7)', () => {
+    // the preview takes no pointer events, so Open there could not be clicked
+    expect(rule('.askuni-v2-cite-card.is-preview .askuni-v2-cite-open')).toMatch(/display:\s*none;/)
+    expect(rule('.askuni-v2-cite-open')).not.toMatch(/display:\s*none/)
+  })
+
   it('keeps the card placement of the F2 fix', () => {
     const card = rule('.askuni-v2-cite-card')
     expect(card).toMatch(/position:\s*absolute;/)
