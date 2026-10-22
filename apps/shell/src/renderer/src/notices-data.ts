@@ -23,6 +23,18 @@ export const NOTICES_PAGE = 30
 export const callWork = <T>(call: () => Promise<UniworkWorkResult<T>>) =>
   settleWork((async () => call())())
 
+/** ids per write call: the server takes at most 100 */
+export const NOTICES_ID_BATCH = 100
+
+/** a batch of ids as write calls: no id twice, at most NOTICES_ID_BATCH to a call */
+export function idBatches(ids: readonly string[]): string[][] {
+  const unique = [...new Set(ids)]
+  const out: string[][] = []
+  for (let i = 0; i < unique.length; i += NOTICES_ID_BATCH)
+    out.push(unique.slice(i, i + NOTICES_ID_BATCH))
+  return out
+}
+
 export function notifyNoticesChanged(): void {
   window.dispatchEvent(new Event(NOTICES_CHANGED_EVENT))
 }

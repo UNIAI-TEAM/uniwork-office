@@ -9,6 +9,7 @@ import { relativeNoticeTime } from './notice-time'
 import {
   NOTICES_PAGE,
   callWork,
+  idBatches,
   notifyNoticesChanged,
   useAlive,
   useNoticesRefresh,
@@ -64,9 +65,6 @@ const GROUP_LABEL: Record<InboxGroupKey, StringKey> = {
   week: 'inboxGroupWeek',
   older: 'inboxGroupOlder',
 }
-
-/** ids per "mark as unread" call: the server takes at most 100 */
-const UNDO_CHUNK = 100
 
 interface ListState {
   /** the loaded rows, newest first; null until the first page */
@@ -386,9 +384,9 @@ function InboxList({
             onClick: () => {
               void (async () => {
                 let ok = true
-                for (let i = 0; i < ids.length; i += UNDO_CHUNK) {
+                for (const batch of idBatches(ids)) {
                   const undone = await callWork(() =>
-                    window.uniworkWork.markNotificationsUnread(ids.slice(i, i + UNDO_CHUNK)),
+                    window.uniworkWork.markNotificationsUnread(batch),
                   )
                   if (!undone.ok) ok = false
                 }

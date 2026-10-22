@@ -252,6 +252,14 @@ describe('InboxPane list (UNI-2079)', () => {
     expect(time.textContent).toBe('1 hour ago')
   })
 
+  it('sends only the keys it has: no before, no unread, on the first page', async () => {
+    await show([row('n1')])
+    expect(Object.keys(work.listNotifications.mock.calls[0]![0] as object).sort()).toEqual([
+      'limit',
+      'workspaceId',
+    ])
+  })
+
   it('marks an unread row with a dot a screen reader can name, and a read row without', async () => {
     await show([row('n1'), seen('n2')])
     expect(itemOf('n1').querySelector('.wb-inbox-dot')).not.toBeNull()
@@ -513,9 +521,10 @@ describe('InboxPane triage', () => {
     expect(work.markNotificationsUnread).toHaveBeenCalledWith(['n1', 'n2'])
   })
 
-  it('undoes a mark-all of 250 in chunks of 100 and reports a chunk that failed', async () => {
+  it('undoes a mark-all of 250 ids in calls of at most 100, each id once, and reports a call that failed', async () => {
     const all = Array.from({ length: 250 }, (_, i) => `n${i}`)
-    work.markAllNotificationsRead.mockResolvedValueOnce(ok(all))
+    // the server may repeat an id: it is sent once
+    work.markAllNotificationsRead.mockResolvedValueOnce(ok([...all, 'n0', 'n7']))
     work.markNotificationsUnread
       .mockResolvedValueOnce(ok(null))
       .mockResolvedValueOnce({ ok: false, error: 'server' })
@@ -523,9 +532,9 @@ describe('InboxPane triage', () => {
     await show([row('n0')])
     await click(button('Mark all as read'))
     await click(button('Undo'))
-    const sent = work.markNotificationsUnread.mock.calls.map((c) => (c[0] as string[]).length)
-    expect(sent[0]).toBe(100)
-    expect(sent[1]).toBe(100)
+    const sent = work.markNotificationsUnread.mock.calls.map((c) => c[0] as string[])
+    expect(sent.map((c) => c.length)).toEqual([100, 100, 50])
+    expect(sent.flat()).toEqual(all)
     expect(toastText()).toContain('Could not undo, try again')
   })
 
@@ -638,6 +647,22 @@ describe('InboxPane opens a notice', () => {
     await click(mainOf('n1'))
     expect(api.uniworkOpenDocumentAt).toHaveBeenCalledWith({ documentId: 'd-n1', commentId: 'c1' })
     expect(work.markNotificationsRead).toHaveBeenCalledWith(['n1'])
+  })
+
+  it('sends the comment id only when the notice has one', async () => {
+    await show([
+      row('n1', { params: { actor: 'Minh', document: 'Plan', comment_id: 'c1' } }),
+      row('n2', { params: { actor: 'Minh', document: 'Plan', comment_id: '' } }),
+    ])
+    await click(mainOf('n1'))
+    expect(Object.keys(api.uniworkOpenDocumentAt.mock.calls[0]![0] as object).sort()).toEqual([
+      'commentId',
+      'documentId',
+    ])
+    // an empty comment id is none: the plain open call, no comment key anywhere
+    await click(mainOf('n2'))
+    expect(api.uniworkOpenDocumentAt).toHaveBeenCalledTimes(1)
+    expect(api.uniworkOpenDocument).toHaveBeenCalledWith('d-n2')
   })
 
   it('opens a document with no comment plainly', async () => {
