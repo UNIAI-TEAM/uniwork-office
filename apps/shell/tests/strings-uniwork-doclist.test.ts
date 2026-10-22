@@ -40,6 +40,30 @@ describe('uniwork doclist string shard', () => {
     ).toEqual([])
   })
 
+  // UNI-2078 FE-6: the row-menu items say what the dialogs they open say, and the web's words
+  it('en menu labels are the web wording: "Create a copy" and "Delete forever"', () => {
+    const en = table('en')
+    expect(en.dlActDuplicate).toBe('Create a copy')
+    expect(en.dlActPurge).toBe('Delete forever')
+    expect(en.dlCopyTitle).toBe(en.dlActDuplicate)
+    expect(en.dlPurgeSubmit).toBe(en.dlActPurge)
+  })
+
+  // UNI-2078 FE-8: the ja shard asks with the full-width question mark
+  it('ja has no ASCII question mark', () => {
+    expect(Object.entries(table('ja')).filter(([, v]) => v.includes('?'))).toEqual([])
+  })
+
+  // UNI-2078 FE-8: the de doclist shard addresses the reader as Sie, not du
+  it('de copy / purge / bulk strings use the Sie register', () => {
+    const informal = /\b(du|dich|dir|dein\w*)\b/i
+    expect(
+      Object.entries(table('de')).filter(
+        ([k, v]) => /^dl(Copy|Purge|BulkPurge|BulkMove)/.test(k) && informal.test(v),
+      ),
+    ).toEqual([])
+  })
+
   it('vi and en carry the glossary words', () => {
     const vi = table('vi')
     const en = table('en')

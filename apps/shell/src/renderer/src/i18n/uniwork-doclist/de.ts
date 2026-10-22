@@ -150,7 +150,7 @@ export const de = {
   dlPurgeDescription:
     'Dieses Element wird endgültig gelöscht und kann nicht wiederhergestellt werden.',
   dlPurgeFolderDescription:
-    'Dieser Ordner wird endgültig gelöscht und kann nicht wiederhergestellt werden. Enthaltene Elemente, die du nicht verwaltest, bleiben im Papierkorb.',
+    'Dieser Ordner wird endgültig gelöscht und kann nicht wiederhergestellt werden. Enthaltene Elemente, die Sie nicht verwalten, bleiben im Papierkorb.',
   dlPurgeSubmit: 'Endgültig löschen',
   dlPurgeSubmitting: 'Wird endgültig gelöscht…',
   dlPurgeDone: '{title} endgültig gelöscht',
@@ -158,6 +158,6 @@ export const de = {
   dlBulkPurgeTitleOne: '{n} Dokument endgültig löschen?',
   dlBulkPurgeTitleOther: '{n} Dokumente endgültig löschen?',
   dlBulkPurgeDescription:
-    'Dies kann nicht rückgängig gemacht werden. Elemente, die du nicht verwalten kannst, werden übersprungen.',
+    'Dies kann nicht rückgängig gemacht werden. Elemente, die Sie nicht verwalten können, werden übersprungen.',
   dlBulkDonePurge: '{ok}/{total} Dokumente endgültig gelöscht',
 } satisfies Record<keyof typeof zh, string>
