@@ -3,6 +3,7 @@ import {
   BREAK_GLASS_REASON_MAX,
   BREAK_GLASS_REASON_MIN,
   SHARE_LEVELS,
+  SHARE_OWNER_KEEP_LEVELS,
   SHARE_PRINCIPAL_TYPES,
   type ShareAccess,
   type ShareAccessRequest,
@@ -10,6 +11,9 @@ import {
   type ShareCandidatePage,
   type ShareLinkCreated,
   type ShareMemberPage,
+  type ShareOwnerCandidate,
+  type ShareOwnerKeepLevel,
+  type ShareOwnerTransfer,
   type ShareRequestDecision,
   type ShareRequestLevel,
   type ShareSettings,
@@ -25,6 +29,11 @@ import {
 import { UniworkDocError } from './errors'
 import {
   parseAccessRequests,
+  parseActiveOrgMembers,
+  parseOwnerGate,
+  parseOwnerTransfer,
+  parseWorkspaceMemberIds,
+  type ShareOwnerGate,
   parseBreakGlassGrant,
   parseBreakGlassRevoke,
   parseShareMembers,
@@ -95,6 +104,23 @@ export interface UniworkShareClient {
     cursor?: string
     limit?: number
   }): Promise<ShareMemberPage>
+  /**
+   * UNI-2078: `PUT /documents/{id}/owner` (the web's documents-owner.ts). An answer that does
+   * not name the requested document and owner is not proof of the write: malformed_response.
+   */
+  transferDocumentOwner(
+    documentId: string,
+    body: { userId: string; previousOwnerLevel?: ShareOwnerKeepLevel },
+  ): Promise<ShareOwnerTransfer>
+  /** UNI-2078: `GET /documents/{id}`, what the owner gate reads */
+  getOwnerGate(documentId: string): Promise<ShareOwnerGate>
+  /** UNI-2078: `GET /workspaces/{ws}/members` as user ids */
+  listWorkspaceMemberIds(workspaceId: string): Promise<string[]>
+  /** UNI-2078: one page of `GET /orgs/{slug}/members?status=active` */
+  listActiveOrgMembers(input: {
+    orgSlug: string
+    cursor?: string
+  }): Promise<{ members: ShareOwnerCandidate[]; nextCursor: string }>
 }
 
 /** a call this client will not send */
@@ -281,6 +307,54 @@ export function createUniworkShareClient(options: UniworkDocsClientOptions): Uni
         read: json,
       })
       return parseShareMembers(raw)
+    },
+
+    async transferDocumentOwner(documentId, body) {
+      const level = body?.previousOwnerLevel ?? 'edit'
+      if (!(SHARE_OWNER_KEEP_LEVELS as readonly string[]).includes(level)) invalid()
+      if (typeof body.userId !== 'string' || !PRINCIPAL_ID.test(body.userId)) invalid()
+      const raw = await send({
+        method: 'PUT',
+        route: `${docRoute(documentId)}/owner`,
+        json: { user_id: body.userId, previous_owner_level: level },
+        timeoutMs,
+        read: json,
+      })
+      const transfer = parseOwnerTransfer(raw)
+      if (transfer.documentId !== documentId || transfer.aclOwnerId !== body.userId) {
+        throw new UniworkDocError('malformed_response')
+      }
+      return transfer
+    },
+
+    async getOwnerGate(documentId) {
+      const raw = await send({ method: 'GET', route: docRoute(documentId), timeoutMs, read: json })
+      return parseOwnerGate(raw)
+    },
+
+    async listWorkspaceMemberIds(workspaceId) {
+      const raw = await send({
+        method: 'GET',
+        route: `/workspaces/${uniworkId(workspaceId)}/members`,
+        timeoutMs,
+        read: json,
+      })
+      return parseWorkspaceMemberIds(raw)
+    },
+
+    async listActiveOrgMembers(input) {
+      if (!ORG_SLUG.test(input.orgSlug)) throw new UniworkDocError('not_found')
+      // only active people may own a document (the web reads the same list)
+      const query = new URLSearchParams({ status: 'active', limit: String(MAX_MEMBERS_LIMIT) })
+      if (input.cursor) query.set('cursor', input.cursor.slice(0, 512))
+      const raw = await send({
+        method: 'GET',
+        route: `/orgs/${input.orgSlug}/members`,
+        query,
+        timeoutMs,
+        read: json,
+      })
+      return parseActiveOrgMembers(raw)
     },
 
     async declineAccessRequest(documentId, requestId) {

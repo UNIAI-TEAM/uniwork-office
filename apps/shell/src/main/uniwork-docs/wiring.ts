@@ -1079,6 +1079,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isSignedIn: () => uniworkSessionIdentity() !== null,
     selectedOrgId: () => uniworkAccount().status().org?.id ?? null,
     selectedOrgSlug: () => uniworkAccount().status().org?.slug ?? null,
+    selfUserId: () => uniworkSessionIdentity()?.accountId ?? null,
   })
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.get, (_event, documentId: unknown) =>
     shareService.get(documentId as string),
@@ -1113,6 +1114,13 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.members, (_event, input: unknown) =>
     shareService.members(input as Parameters<typeof shareService.members>[0]),
+  )
+  // UNI-2078: owner transfer (main re-checks the gate before the PUT)
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.ownerCandidates, (_event, documentId: unknown) =>
+    shareService.ownerCandidates(documentId as string),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.transferOwner, (_event, input: unknown) =>
+    shareService.transferOwner(input as Parameters<typeof shareService.transferOwner>[0]),
   )
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.bulk, (_event, plan: unknown) =>
     shareService.bulk(plan as Parameters<typeof shareService.bulk>[0]),

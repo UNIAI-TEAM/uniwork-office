@@ -71,6 +71,28 @@ function fakeClient(over: Partial<UniworkShareClient> = {}): UniworkShareClient 
       members: [{ userId: 'u_1', displayName: 'Minh Trần' }],
       nextCursor: '',
     })),
+    transferDocumentOwner: vi.fn(async (documentId: string, body: { userId: string }) => ({
+      documentId,
+      aclOwnerId: body.userId,
+      previousOwnerId: 'u_owner',
+      previousOwnerShareId: 'sh_9',
+    })),
+    getOwnerGate: vi.fn(async (documentId: string) => ({
+      id: documentId,
+      workspaceId: 'ws_1',
+      ownerKind: '',
+      shelved: false,
+      visibility: 'workspace',
+    })),
+    listWorkspaceMemberIds: vi.fn(async () => ['u_owner', 'u_an', 'u_off', 'u_me']),
+    listActiveOrgMembers: vi.fn(async () => ({
+      members: [
+        { userId: 'u_owner', name: 'Hoa', email: 'hoa@acme.test' },
+        { userId: 'u_an', name: 'An Lê', email: 'an@acme.test' },
+        { userId: 'u_me', name: 'Me Admin', email: 'me@acme.test' },
+      ],
+      nextCursor: '',
+    })),
     ...over,
   }
 }
@@ -81,6 +103,7 @@ function service(client: UniworkShareClient, over: Partial<UniworkShareServiceDe
     isSignedIn: () => true,
     selectedOrgId: () => 'org_1',
     selectedOrgSlug: () => 'acme',
+    selfUserId: () => 'u_me',
     wait: async () => undefined,
     ...over,
   })
@@ -617,6 +640,260 @@ describe('bulk: per document, one after another', () => {
     expect(res).toMatchObject({
       ok: true,
       value: { ok: [], failed: [{ id: 'd1', error: 'malformed_response' }], links: [] },
+    })
+  })
+})
+
+describe('owner transfer (UNI-2078 slice 4)', () => {
+  const OWNED: ShareAccess = {
+    myLevel: 'manage',
+    adminScope: false,
+    via: 'member',
+    owner: { userId: 'u_owner', level: 'manage', via: 'member' },
+  }
+  const ADMIN_ONLY: ShareAccess = { ...OWNED, myLevel: '', adminScope: true, via: '' }
+  const gate = (over: Record<string, unknown> = {}) =>
+    vi.fn(async (documentId: string) => ({
+      id: documentId,
+      workspaceId: 'ws_1',
+      ownerKind: '',
+      shelved: false,
+      visibility: 'workspace',
+      ...over,
+    }))
+  const throttle = (status: number) =>
+    new UniworkDocError('server_error', { status, serverCode: 'rate_limited' })
+  const shares = (access: ShareAccess) => vi.fn(async () => access)
+
+  describe('ownerCandidates', () => {
+    it('workspace members who are active in the organization, minus the current owner', async () => {
+      const client = fakeClient({ getDocumentShares: shares(OWNED) })
+      const res = await service(client).ownerCandidates('doc_1')
+      expect(res).toEqual({
+        ok: true,
+        value: [
+          { userId: 'u_an', name: 'An Lê', email: 'an@acme.test' },
+          { userId: 'u_me', name: 'Me Admin', email: 'me@acme.test' },
+        ],
+      })
+      expect(client.listWorkspaceMemberIds).toHaveBeenCalledWith('ws_1')
+      expect(client.listActiveOrgMembers).toHaveBeenCalledWith({ orgSlug: 'acme' })
+    })
+
+    it('walks every page of active members, cursor by cursor', async () => {
+      const pages = vi
+        .fn()
+        .mockResolvedValueOnce({
+          members: [{ userId: 'u_an', name: 'An', email: 'an@acme.test' }],
+          nextCursor: 'c2',
+        })
+        .mockResolvedValueOnce({
+          members: [{ userId: 'u_off', name: 'Back', email: 'b@acme.test' }],
+          nextCursor: '',
+        })
+      const client = fakeClient({ getDocumentShares: shares(OWNED), listActiveOrgMembers: pages })
+      const res = await service(client).ownerCandidates('doc_1')
+      expect(res.ok && res.value.map((c) => c.userId)).toEqual(['u_an', 'u_off'])
+      expect(pages.mock.calls).toEqual([[{ orgSlug: 'acme' }], [{ orgSlug: 'acme', cursor: 'c2' }]])
+    })
+
+    it('an admin reaching a restricted document only through admin_scope is not a candidate', async () => {
+      const client = fakeClient({
+        getDocumentShares: shares(ADMIN_ONLY),
+        getOwnerGate: gate({ visibility: 'restricted' }),
+      })
+      const res = await service(client).ownerCandidates('doc_1')
+      expect(res.ok && res.value.map((c) => c.userId)).toEqual(['u_an'])
+      // on a workspace-visible document the same admin may take it
+      const open = fakeClient({ getDocumentShares: shares(ADMIN_ONLY) })
+      const all = await service(open).ownerCandidates('doc_1')
+      expect(all.ok && all.value.map((c) => c.userId)).toEqual(['u_an', 'u_me'])
+    })
+
+    it('the gate is checked in main: no member read below manage, on a work product or a shelved document', async () => {
+      const cases: Array<[Partial<UniworkShareClient>, string]> = [
+        [{ getDocumentShares: shares({ ...OWNED, myLevel: 'edit' }) }, 'forbidden'],
+        [
+          { getDocumentShares: shares(OWNED), getOwnerGate: gate({ ownerKind: 'work_product' }) },
+          'document_owned_by_work_product',
+        ],
+        [
+          { getDocumentShares: shares(OWNED), getOwnerGate: gate({ shelved: true }) },
+          'document_shelved',
+        ],
+      ]
+      for (const [over, error] of cases) {
+        const client = fakeClient(over)
+        expect(await service(client).ownerCandidates('doc_1')).toMatchObject({ ok: false, error })
+        expect(client.listWorkspaceMemberIds).not.toHaveBeenCalled()
+        expect(client.listActiveOrgMembers).not.toHaveBeenCalled()
+      }
+    })
+
+    it('a bad id is invalid_request; no organization selected is not_found', async () => {
+      const client = fakeClient({ getDocumentShares: shares(OWNED) })
+      expect(await service(client).ownerCandidates('')).toEqual({
+        ok: false,
+        error: 'invalid_request',
+      })
+      expect(
+        await service(client, { selectedOrgSlug: () => null }).ownerCandidates('doc_1'),
+      ).toMatchObject({ ok: false, error: 'not_found' })
+    })
+  })
+
+  describe('transferOwner', () => {
+    it('re-checks the gate, then PUTs the owner with the keep level and answers the transfer', async () => {
+      const client = fakeClient({ getDocumentShares: shares(OWNED) })
+      const res = await service(client).transferOwner({
+        documentId: 'doc_1',
+        userId: 'u_an',
+        previousOwnerLevel: 'view',
+      })
+      expect(res).toEqual({
+        ok: true,
+        value: {
+          documentId: 'doc_1',
+          aclOwnerId: 'u_an',
+          previousOwnerId: 'u_owner',
+          previousOwnerShareId: 'sh_9',
+        },
+      })
+      expect(client.getOwnerGate).toHaveBeenCalledWith('doc_1')
+      expect(client.transferDocumentOwner).toHaveBeenCalledWith('doc_1', {
+        userId: 'u_an',
+        previousOwnerLevel: 'view',
+      })
+    })
+
+    it('refuses in main without a PUT: below manage, work product, shelved, the owner again, self under admin_scope', async () => {
+      const cases: Array<[Partial<UniworkShareClient>, string, string]> = [
+        [{ getDocumentShares: shares({ ...OWNED, myLevel: 'edit' }) }, 'u_an', 'forbidden'],
+        [
+          { getDocumentShares: shares(OWNED), getOwnerGate: gate({ ownerKind: 'work_product' }) },
+          'u_an',
+          'document_owned_by_work_product',
+        ],
+        [
+          { getDocumentShares: shares(OWNED), getOwnerGate: gate({ shelved: true }) },
+          'u_an',
+          'document_shelved',
+        ],
+        [{ getDocumentShares: shares(OWNED) }, 'u_owner', 'invalid_request'],
+        [
+          {
+            getDocumentShares: shares(ADMIN_ONLY),
+            getOwnerGate: gate({ visibility: 'restricted' }),
+          },
+          'u_me',
+          'break_glass_required',
+        ],
+      ]
+      for (const [over, userId, error] of cases) {
+        const client = fakeClient(over)
+        expect(await service(client).transferOwner({ documentId: 'doc_1', userId })).toMatchObject({
+          ok: false,
+          error,
+        })
+        expect(client.transferDocumentOwner).not.toHaveBeenCalled()
+      }
+    })
+
+    it('maps the refusals the dialog names; anything else stays generic', async () => {
+      const cases: Array<[UniworkDocError, Record<string, unknown>]> = [
+        [
+          new UniworkDocError('server_error', {
+            status: 422,
+            serverCode: 'owner_target_not_member',
+          }),
+          { error: 'owner_target_not_member', status: 422 },
+        ],
+        [
+          new UniworkDocError('forbidden', { status: 403, serverCode: 'break_glass_required' }),
+          { error: 'break_glass_required', status: 403 },
+        ],
+        [
+          new UniworkDocError('server_error', {
+            status: 409,
+            serverCode: 'document_owned_by_work_product',
+          }),
+          { error: 'document_owned_by_work_product', status: 409 },
+        ],
+        [
+          new UniworkDocError('server_error', { status: 500 }),
+          { error: 'server_error', status: 500 },
+        ],
+      ]
+      for (const [thrown, expected] of cases) {
+        const client = fakeClient({
+          getDocumentShares: shares(OWNED),
+          transferDocumentOwner: vi.fn(async () => {
+            throw thrown
+          }),
+        })
+        const res = await service(client).transferOwner({ documentId: 'doc_1', userId: 'u_an' })
+        expect(res).toEqual({ ok: false, ...expected })
+      }
+    })
+
+    it('a server without the route (404 / 405 / 501) is endpointMissing', async () => {
+      for (const thrown of [
+        new UniworkDocError('server_error', { status: 404 }),
+        new UniworkDocError('not_found', { status: 404, serverCode: 'not_found' }),
+        new UniworkDocError('server_error', { status: 405 }),
+        new UniworkDocError('server_error', { status: 501 }),
+      ]) {
+        const client = fakeClient({
+          getDocumentShares: shares(OWNED),
+          transferDocumentOwner: vi.fn(async () => {
+            throw thrown
+          }),
+        })
+        const res = await service(client).transferOwner({ documentId: 'doc_1', userId: 'u_an' })
+        expect(res).toMatchObject({ ok: false, endpointMissing: true, status: thrown.status })
+      }
+    })
+
+    it('a 429 is repeated once after the wait; a 503 (may have committed) is not', async () => {
+      const put = vi.fn().mockRejectedValueOnce(throttle(429)).mockResolvedValueOnce({
+        documentId: 'doc_1',
+        aclOwnerId: 'u_an',
+        previousOwnerId: 'u_owner',
+        previousOwnerShareId: '',
+      })
+      const wait = vi.fn(async () => undefined)
+      const client = fakeClient({ getDocumentShares: shares(OWNED), transferDocumentOwner: put })
+      const res = await service(client, { wait }).transferOwner({
+        documentId: 'doc_1',
+        userId: 'u_an',
+      })
+      expect(res.ok).toBe(true)
+      expect(put).toHaveBeenCalledTimes(2)
+      expect(wait).toHaveBeenCalledTimes(1)
+
+      const busy = vi.fn().mockRejectedValue(throttle(503))
+      const again = fakeClient({ getDocumentShares: shares(OWNED), transferDocumentOwner: busy })
+      expect(
+        await service(again).transferOwner({ documentId: 'doc_1', userId: 'u_an' }),
+      ).toMatchObject({ ok: false, error: 'server_error', retryable: true })
+      expect(busy).toHaveBeenCalledTimes(1)
+    })
+
+    it('wrong-shaped input is invalid_request without any read', async () => {
+      const client = fakeClient()
+      for (const input of [
+        null,
+        { documentId: 'doc_1' },
+        { documentId: '', userId: 'u_an' },
+        { documentId: 'doc_1', userId: 'u_an', previousOwnerLevel: 'comment' },
+      ]) {
+        expect(await service(client).transferOwner(input as never)).toEqual({
+          ok: false,
+          error: 'invalid_request',
+        })
+      }
+      expect(client.getDocumentShares).not.toHaveBeenCalled()
+      expect(client.transferDocumentOwner).not.toHaveBeenCalled()
     })
   })
 })
