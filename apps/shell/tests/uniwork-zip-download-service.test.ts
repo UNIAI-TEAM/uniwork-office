@@ -29,7 +29,18 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 const files = () => readdirSync(dir).sort()
 const tmpFiles = () => files().filter((name) => name.startsWith('.uw-dl-') && name.endsWith('.tmp'))
+// grace period for a NEGATIVE assertion only (nothing was scheduled, so nothing can lag)
 const settleTick = () => new Promise((resolve) => setTimeout(resolve, 20))
+// A run ends when the service drops it: the runner has pushed its last event AND closed/removed
+// the temp file (the sink abort runs after the final event). Real file I/O sits in between, so a
+// fixed sleep is too short on a loaded CI box; wait on the service's own condition instead.
+const runSettled = (h: Harness) =>
+  vi.waitFor(() => expect(h.service.activeRuns()).toBe(0), { timeout: 10_000, interval: 10 })
+const gateOf = () => {
+  let open!: () => void
+  const opened = new Promise<void>((resolve) => (open = resolve))
+  return { open, opened }
+}
 
 interface Harness {
   push: ReturnType<typeof vi.fn<(event: ZipDownloadProgress) => void>>
@@ -148,7 +159,7 @@ describe('a run', () => {
     })
     const result = await h.service.start(input, h.push)
     expect(result).toEqual({ ok: true, runId: 'run_1' })
-    await settleTick()
+    await runSettled(h)
     expect(seenDuringDownload).toHaveLength(1)
     expect(seenDuringDownload[0]).toMatch(/^\.uw-dl-[0-9a-f]+\.tmp$/)
     expect(files()).toEqual(['documents.zip'])
@@ -160,7 +171,7 @@ describe('a run', () => {
   it('adds .zip when the chosen name has no extension', async () => {
     const h = harness({ target: join(dir, 'mine') })
     await h.service.start(input, h.push)
-    await settleTick()
+    await runSettled(h)
     expect(files()).toEqual(['mine.zip'])
   })
 
@@ -173,7 +184,7 @@ describe('a run', () => {
       },
     })
     await h.service.start(input, h.push)
-    await settleTick()
+    await runSettled(h)
     expect(last(h)).toMatchObject({ phase: 'failed', error: { code: 'zip_expired' } })
     expect(files()).toEqual(['documents.zip'])
     expect(readFileSync(join(dir, 'documents.zip'), 'utf8')).toBe('old')
@@ -182,20 +193,22 @@ describe('a run', () => {
   it('cancel stops a running download, removes the temp file and ends as canceled', async () => {
     let release!: () => void
     const gate = new Promise<void>((resolve) => (release = resolve))
+    const writing = gateOf()
     const h = harness({
       fetch: async (_t, write, options) => {
         await write(new Uint8Array([1]))
+        writing.open()
         await gate
         if (options?.signal?.aborted) throw new UniworkDocError('network')
         return { bytes: 1 }
       },
     })
     await h.service.start(input, h.push)
-    await settleTick()
+    await writing.opened
     expect(tmpFiles()).toHaveLength(1)
     h.service.cancel('run_1')
     release()
-    await settleTick()
+    await runSettled(h)
     expect(last(h)).toMatchObject({ phase: 'canceled' })
     expect(files()).toEqual([])
   })
@@ -207,37 +220,47 @@ describe('a run', () => {
   })
 
   it('sign-out aborts the run, tells the renderer signed_out and removes the temp file', async () => {
+    const listening = gateOf()
     const h = harness({
       fetch: async (_t, write, options) => {
         await write(new Uint8Array([1]))
-        await new Promise((resolve) => options?.signal?.addEventListener('abort', resolve))
+        const aborted = new Promise((resolve) =>
+          options?.signal?.addEventListener('abort', resolve),
+        )
+        listening.open()
+        await aborted
         throw new UniworkDocError('network')
       },
     })
     await h.service.start(input, h.push)
-    await settleTick()
+    await listening.opened
     h.service.abortAll('signed_out')
-    await settleTick()
+    await runSettled(h)
     expect(last(h)).toMatchObject({ phase: 'failed', error: { code: 'signed_out' } })
     expect(files()).toEqual([])
   })
 
   it('dispose (quit) removes the temp file synchronously and aborts the run', async () => {
     let aborted = false
+    const listening = gateOf()
     const h = harness({
       fetch: async (_t, write, options) => {
         await write(new Uint8Array([1]))
-        await new Promise((resolve) => options?.signal?.addEventListener('abort', resolve))
+        const abortSeen = new Promise((resolve) =>
+          options?.signal?.addEventListener('abort', resolve),
+        )
+        listening.open()
+        await abortSeen
         aborted = true
         throw new UniworkDocError('network')
       },
     })
     await h.service.start(input, h.push)
-    await settleTick()
+    await listening.opened
     expect(tmpFiles()).toHaveLength(1)
     h.service.dispose()
     expect(tmpFiles()).toHaveLength(0)
-    await settleTick()
+    await runSettled(h)
     expect(aborted).toBe(true)
     expect(files()).toEqual([])
   })
@@ -251,7 +274,7 @@ describe('a run', () => {
       },
     })
     await h.service.start(input, h.push)
-    await settleTick()
+    await runSettled(h)
     expect(last(h)).toMatchObject({ phase: 'failed', error: { code: 'forbidden_target' } })
     expect(files()).toEqual([])
   })
@@ -259,7 +282,7 @@ describe('a run', () => {
   it('an unwritable folder fails with write_failed before any job is created', async () => {
     const h = harness({ target: join(dir, 'missing-folder', 'documents.zip') })
     await h.service.start(input, h.push)
-    await settleTick()
+    await runSettled(h)
     expect(last(h)).toMatchObject({ phase: 'failed', error: { code: 'write_failed' } })
     expect(h.createJob).not.toHaveBeenCalled()
     expect(existsSync(join(dir, 'missing-folder'))).toBe(false)
@@ -268,7 +291,8 @@ describe('a run', () => {
   it('forgets a settled run: its id can no longer be canceled', async () => {
     const h = harness()
     await h.service.start(input, h.push)
-    await settleTick()
-    expect(h.service.activeRuns()).toBe(0)
+    expect(h.service.activeRuns()).toBe(1)
+    await runSettled(h)
+    expect(last(h)).toMatchObject({ phase: 'done' })
   })
 })
