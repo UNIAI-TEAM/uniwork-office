@@ -185,23 +185,50 @@ generic feed prefix, meant for a stable CDN later.
 The repository variable `UNIWORK_MAC_SIGNING_ENABLED` (`'true'`) turns it on. The meta job
 then sets `mac_signed` for runs of main only (a tag push, which it checks is on main, or a
 `workflow_dispatch` from main); any other ref builds the ad-hoc signed app as before and says
-so in a notice. A signing run puts the mac job in the GitHub environment `mac-signing`.
+so in a notice. Two mac jobs exist and exactly one runs: `macos` (no environment, ad-hoc
+signed) when `mac_signed` is not `true`, `macos_signed` (GitHub environment `mac-signing`)
+when it is. The `urls` and `publish` jobs wait for whichever ran.
 
 - Secrets: `CSC_LINK` (the Developer ID Application `.p12`, base64), `CSC_KEY_PASSWORD`,
   `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. electron-builder signs with the
   hardened runtime and notarizes the app; `apps/shell/build/notarize-dmg.js` notarizes and
   staples the dmgs. A "Check the signing secrets" step fails early when one is empty, and the
-  signed package step is a separate step that alone receives the secrets.
-- Keep the secrets **in the `mac-signing` environment, not in the repository list**, and set
-  the environment's deployment branches and tags to `main` and `v*`. A repository secret is
-  readable by any workflow on any branch; an environment secret only by a job the environment
-  admits.
+  signed package step is a separate step that alone receives the secrets. The verify steps
+  refuse any signer other than team `XJAM488A6D` (`EXPECTED_TEAM_ID` in the job env).
+- Keep the secrets **in the `mac-signing` environment, not in the repository list**. A
+  repository secret is readable by any workflow on any branch; an environment secret only by a
+  job the environment admits. The workflow expression that picks the signing job is a
+  convenience, not a barrier (a branch can carry a workflow that names the environment itself);
+  the environment's rules are the barrier.
+- **Set it up in this order**, before the first signed run:
+  1. Settings > Environments > New environment `mac-signing`. Deployment branches and tags:
+     Selected, add `main` (branch) and `v*` (tag). Required reviewers: recommended (a person
+     approves every signed run, and a tag pushed by someone with write access cannot sign on
+     its own). A workflow that names a missing environment creates it with no protection, so
+     do not skip this step.
+  2. Add the five secrets to that environment.
+  3. Delete the same five from the repository-level list (an environment also sees the
+     repository secrets, so a leftover copy defeats step 1).
+  4. Settings > Rules > Rulesets > New tag ruleset: restrict creating and updating
+     `v*-dev.*` / `v*-beta.*` tags to the maintainers. The workflow checks a release tag is on
+     main, but that check lives in the tagged commit's own workflow file; the `v*` rule of the
+     environment alone admits a tag on any commit.
+  5. Only then set the variable `UNIWORK_MAC_SIGNING_ENABLED` to `true`.
 - With signing off no signing variable reaches electron-builder, not even an empty one (the
   unsigned mac step unsets them, and the release config drops empty `CSC_*` / `APPLE_*`
   values; `CSC_LINK=""` would otherwise be read as a certificate path and fail the build).
+- Do not re-run a release tag after switching the variable: the publish job refuses to add
+  dmgs of the other signing state to an existing release. Cut the next tag number instead.
 - Still unsigned-shaped on the mac side: no zips and no update feed (Squirrel.Mac could now
   install updates; turning that on is its own change), so the app keeps the manual
   newer-release notice.
+
+Troubleshooting the certificate: a `.p12` exported with OpenSSL 3 defaults (AES-256, PBKDF2)
+can fail to import into the runner's keychain ("MAC verification failed ... wrong password?"),
+and the file should carry the Developer ID intermediate. Re-export with
+`openssl pkcs12 -export -legacy -inkey key.pem -in cert.pem -certfile intermediate.pem -out cert.p12`
+(or `-keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1` instead of `-legacy`), then
+base64 it again for `CSC_LINK`.
 
 The certificate is the company's (UNICOM TECHNOLOGY SOLUTIONS COMPANY LIMITED, team
 `XJAM488A6D`) and valid until 2027-11-21; renew it before then. Notarized builds keep running
