@@ -226,10 +226,10 @@ export function createDocHistoryService(deps: DocHistoryServiceDeps): UniworkDoc
       const { documentId, versionNo, baseRevision } = input
       return run(async (client) => {
         const open = await deps.openCopy(documentId)
-        // the web's base is `doc.kind === 'file' ? doc.revision : undefined`; an open tab is
-        // always a file, and a document not open here is asked for its kind and revision
+        // the web's base is `doc.kind === 'file' ? doc.revision : undefined`; when neither the
+        // renderer nor an open tab names one, the document is asked for its kind and revision
         let base = baseRevision ?? open?.baseRevision ?? undefined
-        if (base === undefined && !open) {
+        if (base === undefined) {
           const head = await client.getDocumentHead(documentId)
           if (head.kind === 'file') base = head.revision
         }

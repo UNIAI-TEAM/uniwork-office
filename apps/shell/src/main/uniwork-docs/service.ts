@@ -7051,7 +7051,15 @@ export class UniworkDocsService {
     if (await forbidden()) return 'forbidden_target'
     const { bytes } = await this.api().downloadStream(documentId, versionNo)
     if (await forbidden()) return 'forbidden_target'
-    await this.writeBytesViaTemp(target, bytes)
+    try {
+      await this.writeBytesViaTemp(target, bytes)
+    } catch (error) {
+      // the last target check inside the write carries no status; same mapping as the file download
+      if (error instanceof UniworkDocError && error.code === 'forbidden' && error.status === undefined) {
+        return 'forbidden_target'
+      }
+      throw error
+    }
     return { path: target }
   }
 

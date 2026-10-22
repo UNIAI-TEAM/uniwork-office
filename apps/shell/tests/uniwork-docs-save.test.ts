@@ -2742,6 +2742,25 @@ describe('the version view copy (UNI-2033)', () => {
       expect(await ctx.service.downloadDocumentVersion(DOC, 2, 'x.docx')).toBe('forbidden_target')
     })
 
+    it('a target that turns forbidden during the write is forbidden_target', async () => {
+      const server = fakeServer({ bytes: enc('v2') })
+      const ctx = setup(server)
+      const target = join(dir, 'x.docx')
+      ;(ctx.deps as Record<string, unknown>).pickDownloadPath = vi.fn(async () => target)
+      // the checks before and after the read pass, the one inside the write (the third) fails
+      const check = vi
+        .spyOn(
+          ctx.service as unknown as { isForbiddenDownloadTarget: (t: string) => Promise<boolean> },
+          'isForbiddenDownloadTarget',
+        )
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true)
+      expect(await ctx.service.downloadDocumentVersion(DOC, 2, 'x.docx')).toBe('forbidden_target')
+      expect(check).toHaveBeenCalledTimes(3)
+      expect(existsSync(target)).toBe(false)
+    })
+
     it('a server refusal throws its coded error', async () => {
       const server = fakeServer({ bytes: enc('v2') })
       const ctx = setup(server)

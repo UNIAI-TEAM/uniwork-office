@@ -207,6 +207,19 @@ describe('restore', () => {
     expect(api.restoreVersion).toHaveBeenLastCalledWith('doc_1', 2, { idempotencyKey: KEY })
   })
 
+  it('an open tab without a base revision still takes the server current revision', async () => {
+    const { service, api } = setup({
+      openCopy: vi.fn(async () => ({ editLockId: 'lock_1', baseRevision: null })),
+    })
+    await service.restore({ documentId: 'doc_1', versionNo: 2, idempotencyKey: KEY })
+    expect(api.getDocumentHead).toHaveBeenCalledTimes(1)
+    expect(api.restoreVersion).toHaveBeenCalledWith('doc_1', 2, {
+      idempotencyKey: KEY,
+      baseRevision: '42',
+      editLockId: 'lock_1',
+    })
+  })
+
   it('a refusal tells the open tab nothing', async () => {
     const { service, deps } = setup(
       {},
