@@ -66,6 +66,10 @@ export interface DocumentProperties {
   ownerKind: string | null
   /** `shelved_at`: set while the document sits in Archive (Lưu trữ) */
   shelvedAt: string | null
+  /** `admin_scope`: reached as a workspace admin, not through a grant */
+  adminScope: boolean
+  /** `archived_at`: set while the document sits in the trash */
+  archivedAt: string | null
   createdById: string | null
   createdByKind: string | null
   createdAt: string | null
@@ -794,6 +798,8 @@ export function parseProperties(raw: unknown): DocumentProperties {
     ownerId: optId(doc.owner_id),
     ownerKind: optId(doc.owner_kind, 32),
     shelvedAt: optTimestamp(doc.shelved_at),
+    adminScope: doc.admin_scope === true,
+    archivedAt: optTimestamp(doc.archived_at),
     createdById: optId(doc.created_by),
     createdByKind: optId(doc.created_by_kind, 16),
     createdAt: optTimestamp(doc.created_at),

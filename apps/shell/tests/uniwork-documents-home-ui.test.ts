@@ -3082,6 +3082,32 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       })
     })
 
+    it('UNI-2105: an unlisted trashed document opened from a notice shows no access requests', async () => {
+      api.uniworkDocumentProperties = vi.fn(async () =>
+        ok({
+          documentId: 'doc-far',
+          workspaceId: 'ws-1',
+          title: 'Far away.docx',
+          myLevel: 'manage',
+          ownerKind: null,
+          shelvedAt: null,
+          adminScope: false,
+          archivedAt: '2026-10-02T09:00:00Z',
+        }),
+      )
+      ;(window as unknown as { uniworkShare: unknown }).uniworkShare = createFakeShareApi({
+        documentId: 'doc-far',
+      })
+      await mountHome()
+      await act(async () =>
+        openDocumentShare({ documentId: 'doc-far', workspaceId: 'ws-1', section: 'requests' }),
+      )
+      await flush()
+      await flush()
+      expect(dialogTitle()).toContain('Far away.docx')
+      expect(document.querySelector('.uw-share [data-share-section="requests"]')).toBeNull()
+    })
+
     it('a cold Documents home still gets an intent published before it mounted', async () => {
       useShareFor('doc-far')
       openDocumentShare({ documentId: 'doc-far', workspaceId: 'ws-1', section: 'requests' })

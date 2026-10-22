@@ -353,7 +353,6 @@ describe('document properties (S17)', () => {
     revision: '41',
     current_version: 3,
     my_level: 'edit',
-    owner_kind: 'work_product',
     owner_id: 'u_owner',
     created_by: 'u_creator',
     created_by_kind: 'human',
@@ -365,7 +364,7 @@ describe('document properties (S17)', () => {
 
   it('resolves a member id to a name', async () => {
     const server = fakeServer({
-      document: { ...document, owner_kind: 'human' },
+      document,
       members: [
         { user_id: 'u_owner', display_name: 'Owner Name' },
         { user_id: 'u_creator', display_name: 'Creator Name' },
@@ -380,7 +379,8 @@ describe('document properties (S17)', () => {
         documentId: 'd1',
         workspaceId: 'ws_1',
         title: 'Plan.docx',
-        ownerName: 'Owner Name',
+        // the server never sends owner_kind for a person-owned document: no owner kind, no resolved owner name
+        ownerName: null,
         createdByName: 'Creator Name',
         createdAt: '2026-03-01T09:00:00Z',
         updatedByName: 'Updater Name',
@@ -393,10 +393,39 @@ describe('document properties (S17)', () => {
         createdById: 'u_creator',
         updatedById: 'u_updater',
         // UNI-2105: the notice Share path reads these two like a list row does
-        ownerKind: 'human',
+        ownerKind: null,
         shelvedAt: null,
+        adminScope: false,
+        archivedAt: null,
       },
     })
+  })
+
+  it('the explicit human owner_kind branch still resolves the owner name', async () => {
+    const server = fakeServer({
+      document: { ...document, owner_kind: 'human' },
+      members: [{ user_id: 'u_owner', display_name: 'Owner Name' }],
+    })
+    const result = await serviceWith(server).service.documentProperties('d1')
+    expect(result.ok && result.value.ownerName).toBe('Owner Name')
+  })
+
+  it('UNI-2105: admin_scope and archived_at ride on the properties for the Share dialog', async () => {
+    const trashed = fakeServer({
+      document: { ...document, admin_scope: true, archived_at: '2026-10-02T09:00:00Z' },
+      members: [],
+    })
+    const first = await serviceWith(trashed).service.documentProperties('d1')
+    expect(first.ok && first.value.adminScope).toBe(true)
+    expect(first.ok && first.value.archivedAt).toBe('2026-10-02T09:00:00Z')
+    // absent / not exactly true / malformed: false and null
+    const plain = fakeServer({
+      document: { ...document, admin_scope: 'yes', archived_at: 'not a time' },
+      members: [],
+    })
+    const second = await serviceWith(plain).service.documentProperties('d1')
+    expect(second.ok && second.value.adminScope).toBe(false)
+    expect(second.ok && second.value.archivedAt).toBeNull()
   })
 
   it('UNI-2105: owner_kind and shelved_at ride on the properties for the Share dialog', async () => {
