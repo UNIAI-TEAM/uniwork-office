@@ -1,6 +1,6 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import type { ClipboardEvent, ReactElement } from 'react'
-import { IconSend, IconStop } from '@genoffice/ui'
+import { useEffect, useId, useRef, useState } from 'react'
+import type { ReactElement } from 'react'
+import { ASKUNI_MAX_QUESTION as MAX_QUESTION, AskUniComposerBox } from '@genoffice/ui'
 import { useI18n, type StringKey } from '../locale'
 import {
   ASKUNI_MAX_MENTIONS,
@@ -13,10 +13,8 @@ import { AskUniMentionPicker, type MentionPick } from './AskUniMentionPicker'
 import { AskUniModelPicker } from './AskUniModelPicker'
 import { AskUniScopePicker } from './AskUniScopePicker'
 import type { AskUniModelSelection } from './model-choice'
+import { ShellAskUniScope } from './shell-adapter'
 
-const MAX_QUESTION = 2000
-/** the counter only shows near the cap, so a short question stays uncluttered */
-const COUNTER_FROM = 1800
 const TRIGGER = /(^|\s)@([^\s@]*)$/
 
 const KIND_KEYS: Record<string, StringKey> = {
@@ -95,9 +93,9 @@ function Chip({
 }
 
 /**
- * Ask UNI composer (web P2): Enter sends, Shift+Enter breaks the line, an IME's Enter never sends,
- * paste is plain text, 2000 characters. Row: "+" scope left; model pick and Send/Stop right.
- * The box is disabled while a turn streams (only Stop works) and focus follows that.
+ * Ask UNI composer (web P2): the shared plain box (Enter / Shift+Enter / IME, plain-text paste, the
+ * 2000 cap, Send and Stop, focus that follows a running turn) plus what only Home has: the "+" scope
+ * picker, @-mentions, the focus and mention chips and the model pick.
  */
 export function AskUniComposer({
   workspaceId,
@@ -111,9 +109,7 @@ export function AskUniComposer({
 }: AskUniComposerProps): ReactElement {
   const { t, lang } = useI18n()
   const box = useRef<HTMLTextAreaElement>(null)
-  const stopRef = useRef<HTMLButtonElement>(null)
   const listId = useId()
-  const wasStreaming = useRef(streaming)
   const nextCaret = useRef<number | null>(null)
   const [value, setValue] = useState('')
   const [caret, setCaret] = useState(0)
@@ -136,18 +132,6 @@ export function AskUniComposer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId])
 
-  // the box is disabled while a turn streams: focus moves to Stop, and comes back when it ends unless
-  // the reader has put it somewhere else meanwhile
-  useEffect(() => {
-    if (streaming && !wasStreaming.current) {
-      stopRef.current?.focus()
-    } else if (!streaming && wasStreaming.current) {
-      const active = document.activeElement
-      if (!active || active === document.body || active === stopRef.current) box.current?.focus()
-    }
-    wasStreaming.current = streaming
-  }, [streaming])
-
   // an entry point's focus becomes the chip once
   const consumedRef = useRef(onPendingFocusConsumed)
   consumedRef.current = onPendingFocusConsumed
@@ -164,13 +148,6 @@ export function AskUniComposer({
     // kindLabel only reads the language, which a pending focus does not outlive
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingFocus])
-
-  // after a pick the caret belongs after the inserted name
-  useLayoutEffect(() => {
-    if (nextCaret.current === null || !box.current) return
-    box.current.setSelectionRange(nextCaret.current, nextCaret.current)
-    nextCaret.current = null
-  })
 
   const pick = (p: MentionPick) => {
     if (!trigger) return
@@ -207,102 +184,82 @@ export function AskUniComposer({
     setNotice('')
   }
 
-  // plain text only, at the caret, within the cap
-  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
-    e.preventDefault()
-    const text = e.clipboardData.getData('text/plain')
-    if (!text) return
-    const el = e.currentTarget
-    const from = el.selectionStart
-    const to = el.selectionEnd
-    const room = MAX_QUESTION - (value.length - (to - from))
-    if (room <= 0) return
-    const piece = text.slice(0, room)
-    setValue(value.slice(0, from) + piece + value.slice(to))
-    nextCaret.current = from + piece.length
-    setCaret(nextCaret.current)
-  }
-
-  const canSend = value.trim() !== ''
   return (
-    <footer className="askuni2-composer" data-slot="askuni-composer">
-      <div className="askuni2-composer-box">
-        {pickerOpen && trigger ? (
-          <AskUniMentionPicker
-            workspaceId={workspaceId}
-            query={trigger.query}
-            listId={listId}
-            inputRef={box}
-            onPick={pick}
-            onDismiss={() => setDismissedAt(trigger.start)}
-          />
-        ) : null}
-        {focus || mentions.length > 0 ? (
-          <div className="askuni2-chips">
-            {focus ? (
-              <Chip
-                kind="focus"
-                label={focus.label}
-                remove={t('askUniV2ScopeRemove', { name: focus.label })}
-                onRemove={() => {
-                  setFocus(null)
-                  box.current?.focus()
-                }}
-              />
-            ) : null}
-            {mentions.map((m) => (
-              <Chip
-                key={`${m.kind}:${m.id}`}
-                kind="mention"
-                label={m.label}
-                remove={t('askUniV2MentionRemove', { name: m.label })}
-                onRemove={() => {
-                  setMentions((all) => all.filter((x) => x !== m))
-                  box.current?.focus()
-                }}
-              />
-            ))}
-          </div>
-        ) : null}
-        {notice ? (
-          <p role="alert" className="askuni2-notice-error">
-            {notice}
-          </p>
-        ) : null}
-        <textarea
-          ref={box}
-          rows={1}
-          value={value}
-          maxLength={MAX_QUESTION}
-          disabled={streaming}
-          aria-label={t('askUniV2ComposerLabel')}
-          placeholder={t('askUniPlaceholder')}
-          {...(pickerOpen
+    <ShellAskUniScope>
+      <AskUniComposerBox
+        slot="askuni-composer"
+        value={value}
+        streaming={streaming}
+        inputRef={box}
+        nextCaretRef={nextCaret}
+        sendClassName="new-chat-send"
+        textareaProps={
+          pickerOpen
             ? {
                 role: 'combobox',
                 'aria-expanded': true,
-                'aria-haspopup': 'listbox' as const,
+                'aria-haspopup': 'listbox',
                 'aria-controls': listId,
-                'aria-autocomplete': 'list' as const,
+                'aria-autocomplete': 'list',
               }
-            : {})}
-          onChange={(e) => {
-            const next = findTrigger(e.target.value, e.target.selectionStart)
-            if (next?.start !== dismissedAt) setDismissedAt(null)
-            setValue(e.target.value)
-            setCaret(e.target.selectionStart)
-          }}
-          onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
-          onPaste={onPaste}
-          onKeyDown={(e) => {
-            // an IME commits its syllable on Enter; that keydown must not send
-            if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing || e.keyCode === 229)
-              return
-            e.preventDefault()
-            send()
-          }}
-        />
-        <div className="askuni2-composer-row">
+            : undefined
+        }
+        onValueChange={(next, at) => {
+          const found = findTrigger(next, at)
+          if (found?.start !== dismissedAt) setDismissedAt(null)
+          setValue(next)
+          setCaret(at)
+        }}
+        onCaretChange={setCaret}
+        onSend={send}
+        onStop={onStop}
+        above={
+          <>
+            {pickerOpen && trigger ? (
+              <AskUniMentionPicker
+                workspaceId={workspaceId}
+                query={trigger.query}
+                listId={listId}
+                inputRef={box}
+                onPick={pick}
+                onDismiss={() => setDismissedAt(trigger.start)}
+              />
+            ) : null}
+            {focus || mentions.length > 0 ? (
+              <div className="askuni2-chips">
+                {focus ? (
+                  <Chip
+                    kind="focus"
+                    label={focus.label}
+                    remove={t('askUniV2ScopeRemove', { name: focus.label })}
+                    onRemove={() => {
+                      setFocus(null)
+                      box.current?.focus()
+                    }}
+                  />
+                ) : null}
+                {mentions.map((m) => (
+                  <Chip
+                    key={`${m.kind}:${m.id}`}
+                    kind="mention"
+                    label={m.label}
+                    remove={t('askUniV2MentionRemove', { name: m.label })}
+                    onRemove={() => {
+                      setMentions((all) => all.filter((x) => x !== m))
+                      box.current?.focus()
+                    }}
+                  />
+                ))}
+              </div>
+            ) : null}
+            {notice ? (
+              <p role="alert" className="askuni2-notice-error">
+                {notice}
+              </p>
+            ) : null}
+          </>
+        }
+        rowStart={
           <AskUniScopePicker
             workspaceId={workspaceId}
             finalFocus={box}
@@ -311,42 +268,9 @@ export function AskUniComposer({
               setFocus({ kind: p.kind, id: p.id, label: `${kindLabel(p.kind)}: ${p.title}` })
             }
           />
-          <span className="askuni2-composer-end">
-            {value.length >= COUNTER_FROM ? (
-              <span className="askuni-counter">
-                {t('askUniCounter', { used: String(value.length), max: String(MAX_QUESTION) })}
-              </span>
-            ) : null}
-            <AskUniModelPicker selection={selection} disabled={streaming} />
-            {streaming ? (
-              <button
-                // distinct keys: the Send button must not reuse the focused Stop node
-                key="stop"
-                ref={stopRef}
-                type="button"
-                className="new-chat-send is-stop"
-                onClick={onStop}
-                title={t('askUniStop')}
-                aria-label={t('askUniStop')}
-              >
-                <IconStop size={14} />
-              </button>
-            ) : (
-              <button
-                key="send"
-                type="button"
-                className="new-chat-send"
-                disabled={!canSend}
-                onClick={send}
-                title={t('askUniSend')}
-                aria-label={t('askUniSend')}
-              >
-                <IconSend size={16} />
-              </button>
-            )}
-          </span>
-        </div>
-      </div>
-    </footer>
+        }
+        rowEnd={<AskUniModelPicker selection={selection} disabled={streaming} />}
+      />
+    </ShellAskUniScope>
   )
 }

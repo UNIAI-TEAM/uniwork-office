@@ -154,7 +154,9 @@ describe('Ask UNI answer (adapter)', () => {
         marker(2, 'Fix invoice export')?.focus()
       })
       expect(card()?.textContent).toContain('Due Friday')
-      await click(marker(1, 'Q3 plan.docx'))
+      await act(async () => {
+        marker(1, 'Q3 plan.docx')?.focus()
+      })
       expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1)
       await act(async () => {
         marker(1, 'Q3 plan.docx')?.dispatchEvent(

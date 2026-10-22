@@ -1,11 +1,12 @@
+import type { AskUniFeedbackApi } from '@genoffice/ui'
 import type {
   AskUniBridge,
   AskUniCitationKind,
-  AskUniFeedbackClearRequest,
-  AskUniFeedbackRequest,
   AskUniOkResult,
   AskUniV2Bridge,
 } from '../../../shared/askuni-api'
+
+export type { AskUniFeedbackApi }
 
 /** the v2 methods plus the P1 citation opener, all optional: an older preload has none of them */
 type AskUniWindowBridge = Partial<AskUniV2Bridge & AskUniBridge>
@@ -22,12 +23,6 @@ export function hasAskUniV2Bridge(): boolean {
     typeof b.askUniStreamCancel === 'function' &&
     typeof b.onAskUniStreamEvent === 'function'
   )
-}
-
-/** feedback calls the actions bar uses; the panel may inject its own (tests, a fake) */
-export interface AskUniFeedbackApi {
-  set(req: AskUniFeedbackRequest): Promise<AskUniOkResult>
-  clear(req: AskUniFeedbackClearRequest): Promise<AskUniOkResult>
 }
 
 const FAILED: AskUniOkResult = { ok: false, error: 'error' }

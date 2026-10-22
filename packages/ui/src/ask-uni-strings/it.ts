@@ -1,0 +1,35 @@
+import type { zh } from './zh'
+
+export const it = {
+  // copy shared with the Home Ask UNI pane
+  askUniThinking: 'UNI sta pensando…',
+  askUniYou: 'Tu',
+  askUniUni: 'UNI',
+  askUniSources: 'Fonti',
+  askUniKindDocument: 'Documento',
+  askUniKindTask: 'Attività',
+  askUniKindMeeting: 'Riunione',
+  askUniKindChat: 'Conversazione',
+  askUniKindMember: 'Membro',
+  askUniKindOther: 'Altro',
+  askUniOpenDocument: 'Apri il documento',
+  askUniOpenBrowser: 'Apri nel browser',
+  askUniCitationLabel: '{kind}: {title} — {action}',
+  askUniOpenFailed: 'Impossibile aprire questa fonte. Riprova o aprila sul web.',
+  askUniErrForbidden: 'Non hai accesso a questi dati.',
+  askUniErrQuota: 'L’organizzazione ha esaurito la quota di token IA di questo mese.',
+  askUniErrRateLimited: 'Stai facendo domande troppo in fretta; riprova tra un minuto.',
+  askUniErrRateLimitedIn: 'Stai facendo domande troppo in fretta; riprova tra {seconds} secondi.',
+  askUniErrDisabled: 'L’IA non è configurata su questo server.',
+  askUniErrOffline: 'Sei offline. Chiedi a UNI richiede una connessione per cercare i documenti.',
+  askUniErrSession: 'La tua sessione UniWork è scaduta. Accedi di nuovo per continuare a chiedere.',
+  askUniErrDefault: 'Impossibile fare la domanda in questo momento; riprova più tardi.',
+  askUniSignedOut: 'Accedi al tuo account UniWork per chiedere a UNI della tua area di lavoro.',
+  askUniNoticeNoSources:
+    'Nulla di ciò che puoi vedere in questa area di lavoro corrisponde ancora a questa domanda.',
+  askUniNoticeUnavailable: 'UNI non è riuscito a rispondere a questa domanda.',
+  askUniStop: 'Interrompi',
+  askUniSend: 'Invia',
+  askUniCounter: '{used}/{max} caratteri',
+  askUniPlaceholder: 'Chiedi a UNI del tuo lavoro…',
+} satisfies Record<keyof typeof zh, string>

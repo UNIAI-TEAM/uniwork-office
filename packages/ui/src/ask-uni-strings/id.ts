@@ -1,0 +1,35 @@
+import type { zh } from './zh'
+
+export const id = {
+  // copy shared with the Home Ask UNI pane
+  askUniThinking: 'UNI sedang berpikir…',
+  askUniYou: 'Anda',
+  askUniUni: 'UNI',
+  askUniSources: 'Sumber',
+  askUniKindDocument: 'Dokumen',
+  askUniKindTask: 'Tugas',
+  askUniKindMeeting: 'Rapat',
+  askUniKindChat: 'Obrolan',
+  askUniKindMember: 'Anggota',
+  askUniKindOther: 'Lainnya',
+  askUniOpenDocument: 'Buka dokumen',
+  askUniOpenBrowser: 'Buka di browser',
+  askUniCitationLabel: '{kind}: {title} — {action}',
+  askUniOpenFailed: 'Sumber ini tidak dapat dibuka. Coba lagi atau buka di web.',
+  askUniErrForbidden: 'Anda tidak memiliki akses ke data ini.',
+  askUniErrQuota: 'Organisasi telah menghabiskan kuota token AI bulan ini.',
+  askUniErrRateLimited: 'Anda bertanya terlalu cepat; coba lagi dalam satu menit.',
+  askUniErrRateLimitedIn: 'Anda bertanya terlalu cepat; coba lagi dalam {seconds} detik.',
+  askUniErrDisabled: 'AI belum dikonfigurasi di server ini.',
+  askUniErrOffline: 'Anda sedang offline. Tanya UNI membutuhkan koneksi untuk mencari dokumen.',
+  askUniErrSession: 'Sesi UniWork Anda telah berakhir. Masuk lagi untuk terus bertanya.',
+  askUniErrDefault: 'Tidak dapat bertanya saat ini; coba lagi nanti.',
+  askUniSignedOut: 'Masuk ke akun UniWork Anda untuk bertanya kepada UNI tentang ruang kerja Anda.',
+  askUniNoticeNoSources:
+    'Belum ada data yang dapat Anda lihat di ruang kerja ini yang cocok dengan pertanyaan ini.',
+  askUniNoticeUnavailable: 'UNI tidak dapat menjawab pertanyaan ini.',
+  askUniStop: 'Berhenti',
+  askUniSend: 'Kirim',
+  askUniCounter: '{used}/{max} karakter',
+  askUniPlaceholder: 'Tanya UNI tentang pekerjaan Anda…',
+} satisfies Record<keyof typeof zh, string>
