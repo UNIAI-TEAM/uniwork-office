@@ -131,6 +131,48 @@ describe('guarded(ipc) registration', () => {
     expect(ipc.on).not.toHaveBeenCalled()
   })
 
+  it('throws at registration for handleOnce and once, in scope or not (a refused first call would consume the one-shot)', () => {
+    const { guard } = setup()
+    const ipc = { handleOnce: vi.fn(), once: vi.fn() }
+    const g = guard.guarded(ipc)
+    expect(() => g.handleOnce('uniwork-share:create-link', () => 1)).toThrow(/handleOnce/)
+    expect(() => g.once('uniwork:discussion:panel', () => {})).toThrow(/once/)
+    expect(ipc.handleOnce).not.toHaveBeenCalled()
+    expect(ipc.once).not.toHaveBeenCalled()
+  })
+
+  it.each(['addListener', 'prependListener', 'prependOnceListener'])(
+    '%s on the guarded object throws instead of registering unguarded',
+    (method) => {
+      const { guard } = setup()
+      const fn = vi.fn()
+      const ipc = { [method]: fn, on: vi.fn() }
+      const g = guard.guarded(ipc) as unknown as Record<string, (...args: unknown[]) => unknown>
+      expect(() => g[method]('uniwork-doc:save', () => {})).toThrow(/use on\(\)/)
+      expect(fn).not.toHaveBeenCalled()
+    },
+  )
+
+  it('off maps to the guarded removeListener', () => {
+    const { guard } = setup()
+    const ipc = { on: vi.fn(), off: vi.fn(), removeListener: vi.fn() }
+    const g = guard.guarded(ipc) as typeof ipc
+    const listener = vi.fn()
+    g.on('uniwork:ai-run', listener)
+    const wrapped = ipc.on.mock.calls[0][1]
+    g.off('uniwork:ai-run', listener)
+    expect(ipc.removeListener).toHaveBeenCalledWith('uniwork:ai-run', wrapped)
+    expect(ipc.off).not.toHaveBeenCalled()
+  })
+
+  it('removeAllListeners stays a pass-through (it only removes)', () => {
+    const { guard } = setup()
+    const ipc = { removeAllListeners: vi.fn() }
+    const g = guard.guarded(ipc) as typeof ipc
+    g.removeAllListeners('uniwork:ai-run')
+    expect(ipc.removeAllListeners).toHaveBeenCalledWith('uniwork:ai-run')
+  })
+
   it('leaves the raw ipc object untouched', () => {
     const { guard } = setup()
     const handle = vi.fn()
@@ -296,16 +338,14 @@ describe('check() reads every input at call time', () => {
 })
 
 describe('refusal shapes and logging', () => {
-  it('on/once drop a refused call without calling the listener or setting returnValue', () => {
+  it('on drops a refused call without calling the listener or setting returnValue', () => {
     const { guard, editor, shell } = setup()
     const listeners = new Map<string, (event: unknown, ...args: unknown[]) => void>()
     const add = (ch: string, fn: (event: unknown, ...args: unknown[]) => void) =>
       listeners.set(ch, fn)
-    const g = guard.guarded({ on: add, once: add })
+    const g = guard.guarded({ on: add })
     const onListener = vi.fn()
-    const onceListener = vi.fn()
     g.on('uniwork:ai-run', onListener)
-    g.once('uniwork:discussion:panel', onceListener)
 
     const refused: Record<string, unknown> = { ...mainFrameEvent(shell), reply: vi.fn() }
     expect(listeners.get('uniwork:ai-run')!(refused, { state: 'running' })).toBeUndefined()
@@ -313,25 +353,9 @@ describe('refusal shapes and logging', () => {
     expect(refused.reply).not.toHaveBeenCalled()
     expect('returnValue' in refused).toBe(false)
 
-    listeners.get('uniwork:discussion:panel')!(mainFrameEvent(editor))
-    expect(onceListener).not.toHaveBeenCalled()
-
     const allowed = mainFrameEvent(editor)
     listeners.get('uniwork:ai-run')!(allowed, { state: 'idle' })
     expect(onListener).toHaveBeenCalledWith(allowed, { state: 'idle' })
-  })
-
-  it('handleOnce rejects a refused invoke with ipc_sender_refused', async () => {
-    const { guard, editor } = setup()
-    const handlers = new Map<string, (event: unknown) => unknown>()
-    guard
-      .guarded({
-        handleOnce: (ch: string, fn: (event: unknown) => unknown) => handlers.set(ch, fn),
-      })
-      .handleOnce('uniwork-share:create-link', () => 'ok')
-    await expect(async () =>
-      handlers.get('uniwork-share:create-link')!(mainFrameEvent(editor)),
-    ).rejects.toThrow(new Error(IPC_SENDER_REFUSED))
   })
 
   it('logs channel and reason only, once per channel+reason per 60 s', async () => {
@@ -405,13 +429,14 @@ describe('trustedUrlRules', () => {
   describe('packaged (no dev env)', () => {
     const rules = trustedUrlRules({ env: {}, shellRendererDir })
 
-    it.each([fileUrl('index.html'), fileUrl('update.html'), `${fileUrl('index.html')}#/home?x=1`])(
-      'shell trusts %s',
-      (url) => {
-        expect(rules.isTrustedShellUrl(url)).toBe(true)
-        expect(rules.isTrustedEditorUrl(url)).toBe(false)
-      },
-    )
+    it.each([
+      fileUrl('index.html'),
+      `${fileUrl('index.html')}?mode=tab`,
+      `${fileUrl('index.html')}#/home?x=1`,
+    ])('shell trusts %s', (url) => {
+      expect(rules.isTrustedShellUrl(url)).toBe(true)
+      expect(rules.isTrustedEditorUrl(url)).toBe(false)
+    })
 
     it.each([
       pathToFileURL(join(shellRendererDir, '..', 'x.html')).href,
@@ -431,8 +456,25 @@ describe('trustedUrlRules', () => {
       'html-preview://view-7/',
       'not a url',
       '',
+      fileUrl('update.html'),
+      fileUrl('assets', 'index.html'),
     ])('shell refuses %s', (url) => {
       expect(rules.isTrustedShellUrl(url)).toBe(false)
+    })
+
+    it('compares paths case-insensitively on win32 only', () => {
+      const original = process.platform
+      const upper = fileUrl('index.html').replace('/opt/', '/OPT/').replace('renderer', 'RENDERER')
+      try {
+        Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+        expect(rules.isTrustedShellUrl(upper)).toBe(false)
+        Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+        expect(rules.isTrustedShellUrl(upper)).toBe(true)
+        expect(rules.isTrustedShellUrl(fileUrl('INDEX.HTML'))).toBe(true)
+        expect(rules.isTrustedShellUrl(fileUrl('update.html'))).toBe(false)
+      } finally {
+        Object.defineProperty(process, 'platform', { value: original, configurable: true })
+      }
     })
 
     it.each(['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html'])(
