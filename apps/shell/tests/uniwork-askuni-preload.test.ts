@@ -160,24 +160,77 @@ describe('preload: window.aiOffice Ask UNI bridge', () => {
     },
   )
 
-  it('is exposed on the shell preload only', async () => {
-    const { readFileSync, readdirSync } = await import('node:fs')
-    const { join } = await import('node:path')
-    const preloads = join(__dirname, '../../')
-    const offenders = readdirSync(preloads, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && d.name !== 'shell')
-      .flatMap((d) => {
-        try {
-          return readdirSync(join(preloads, d.name, 'src/preload')).map((f) =>
-            join(preloads, d.name, 'src/preload', f),
-          )
-        } catch {
-          return []
-        }
-      })
-      .filter(
-        (file) => file.endsWith('.ts') && /uniworkAskUni|askuni/i.test(readFileSync(file, 'utf8')),
+  /**
+   * UNI-2076 s8-guard. The shell bridge (window.aiOffice Ask UNI, `uniwork:askuni:*`) is shell-only.
+   * Since S7c/S7d the six editor preloads install window.uniworkAskUniDoc (`uniwork:askuni-doc:*`,
+   * contract E4) through the shared installer, and nothing else Ask UNI.
+   */
+  describe('which preloads carry which Ask UNI bridge', () => {
+    const EDITORS = ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']
+    const INSTALL_IMPORT =
+      /import\s*\{\s*installUniworkAskUniDocBridge\s*\}\s*from\s*['"]@genoffice\/ai-provider\/askuni['"]\s*;?/g
+    const INSTALL_CALL =
+      /installUniworkAskUniDocBridge\(\s*\{\s*contextBridge,\s*ipcRenderer\s*\}\s*\)\s*;?/g
+
+    async function preloadsOutsideShell() {
+      const { readFileSync, readdirSync } = await import('node:fs')
+      const { join } = await import('node:path')
+      const apps = join(__dirname, '../../')
+      return readdirSync(apps, { withFileTypes: true })
+        .filter((d) => d.isDirectory() && d.name !== 'shell')
+        .flatMap((d) => {
+          try {
+            return readdirSync(join(apps, d.name, 'src/preload'))
+              .filter((f) => f.endsWith('.ts'))
+              .map((f) => ({
+                app: d.name,
+                file: `${d.name}/src/preload/${f}`,
+                text: readFileSync(join(apps, d.name, 'src/preload', f), 'utf8'),
+              }))
+          } catch {
+            return []
+          }
+        })
+    }
+    const withoutComments = (text: string) =>
+      text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+    it('no editor preload carries the shell bridge or anything Ask UNI beyond the doc installer', async () => {
+      const offenders = (await preloadsOutsideShell())
+        .filter((p) => {
+          const rest = withoutComments(p.text).replace(INSTALL_IMPORT, '').replace(INSTALL_CALL, '')
+          return /uniworkAskUni|askuni/i.test(rest)
+        })
+        .map((p) => p.file)
+      expect(offenders).toEqual([])
+    })
+
+    it('each of the six editor preloads installs the doc bridge exactly once, through the shared installer', async () => {
+      const preloads = await preloadsOutsideShell()
+      for (const app of EDITORS) {
+        const index = preloads.find((p) => p.file === `${app}/src/preload/index.ts`)
+        expect(index, app).toBeDefined()
+        const code = withoutComments(index!.text)
+        expect(code.match(INSTALL_IMPORT), `${app}: import`).toHaveLength(1)
+        expect(code.match(INSTALL_CALL), `${app}: call`).toHaveLength(1)
+      }
+      // and no other app preload installs it
+      const installers = preloads
+        .filter((p) => /installUniworkAskUniDocBridge/.test(withoutComments(p.text)))
+        .map((p) => p.app)
+      expect(installers.sort()).toEqual([...EDITORS].sort())
+    })
+
+    it('the shell preload exposes the shell bridge and never the editor doc bridge', async () => {
+      const { readFileSync } = await import('node:fs')
+      const { join } = await import('node:path')
+      const shell = withoutComments(
+        readFileSync(join(__dirname, '../src/preload/index.ts'), 'utf8'),
       )
-    expect(offenders).toEqual([])
+      expect(shell).toContain('ASKUNI_CHANNELS.ask')
+      expect(shell).not.toMatch(
+        /installUniworkAskUniDocBridge|ASKUNI_DOC_CHANNELS|askuni-doc|uniworkAskUniDoc/i,
+      )
+    })
   })
 })

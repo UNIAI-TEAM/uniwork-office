@@ -67,6 +67,7 @@ import {
   registerDocHistoryIpc,
 } from './doc-history-service'
 import { registerUniworkAskUni } from '../uniwork-askuni'
+import { askUniDocBinding } from '../uniwork-askuni/doc-binding'
 import {
   createUniworkComments,
   type DiscussionPushTarget,
@@ -1175,6 +1176,9 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     env: process.env,
     openDocument: (documentId) => service.openDocument(documentId),
     openExternal: (url) => shell.openExternal(url),
+    // UNI-2076 S7b: the editor panels ask about the document their own view shows
+    editorPath: (sender) => wiring.commentsPathFor?.(sender) ?? null,
+    docBinding: (path) => askUniDocBinding(service, path),
   })
   ipcMain.handle(UNIWORK_DOC_CHANNELS.listSources, (_event, query: unknown) =>
     service.listSources((query ?? {}) as UniworkSourceListQuery),

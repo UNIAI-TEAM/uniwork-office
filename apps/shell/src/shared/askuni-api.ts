@@ -1,5 +1,20 @@
 // IPC contract for Ask UNI (workspace question answering over UniWork documents).
-// Shared by the shell main client and the Home renderer; keep it dependency-free.
+// The P1 shapes live here (shell only); everything the editors share too (v2
+// stream + REST, citations, error sets, validators) is in
+// @genoffice/ai-provider/askuni and re-exported, so shell imports stay as they are.
+
+import {
+  ASKUNI_ERROR_CODES,
+  asAskUniCitation,
+  type AskUniCitation,
+  type AskUniCitationKind,
+  type AskUniErrorCode,
+  type AskUniLocale,
+  type AskUniNotice,
+  ASKUNI_MAX_RETRY_AFTER_SEC,
+} from '@genoffice/ai-provider/askuni'
+
+export * from '@genoffice/ai-provider/askuni'
 
 export const ASKUNI_CHANNELS = {
   ask: 'uniwork:askuni:ask',
@@ -7,40 +22,12 @@ export const ASKUNI_CHANNELS = {
   openCitation: 'uniwork:askuni:open-citation',
 } as const
 
-export type AskUniLocale = 'vi' | 'en'
-
 export interface AskUniRequest {
   workspaceId: string
   conversationId?: string
   question: string
   locale: AskUniLocale
 }
-
-/** `other`: any kind the app has no row for (project, workload, email thread, ...) */
-export type AskUniCitationKind = 'document' | 'task' | 'meeting' | 'chat' | 'member' | 'other'
-
-export interface AskUniCitation {
-  sourceId: string
-  kind: AskUniCitationKind
-  title: string
-  quote: string
-  href: string
-}
-
-/** the longest wait a rate-limit reply can ask the composer to count down */
-export const ASKUNI_MAX_RETRY_AFTER_SEC = 3600
-
-export type AskUniNotice = 'no_sources' | 'empty_answer'
-
-export type AskUniErrorCode =
-  | 'offline'
-  | 'signed_out'
-  | 'forbidden'
-  | 'quota'
-  | 'rate_limited'
-  | 'disabled'
-  | 'session'
-  | 'error'
 
 export type AskUniResult =
   | {
@@ -81,39 +68,9 @@ export interface AskUniBridge {
   uniworkAskUniOpenCitation(req: AskUniOpenRequest): Promise<AskUniOpenResult>
 }
 
-const KINDS: ReadonlySet<string> = new Set<AskUniCitationKind>([
-  'document',
-  'task',
-  'meeting',
-  'chat',
-  'member',
-  'other',
-])
-const CODES: ReadonlySet<string> = new Set<AskUniErrorCode>([
-  'offline',
-  'signed_out',
-  'forbidden',
-  'quota',
-  'rate_limited',
-  'disabled',
-  'session',
-  'error',
-])
+const CODES = ASKUNI_ERROR_CODES
 const isStr = (v: unknown): v is string => typeof v === 'string'
-
-function asCitation(raw: unknown): AskUniCitation | null {
-  if (!raw || typeof raw !== 'object') return null
-  const c = raw as Record<string, unknown>
-  if (!isStr(c.kind) || !KINDS.has(c.kind)) return null
-  if (!isStr(c.sourceId) || !isStr(c.title) || !isStr(c.quote) || !isStr(c.href)) return null
-  return {
-    sourceId: c.sourceId,
-    kind: c.kind as AskUniCitationKind,
-    title: c.title,
-    quote: c.quote,
-    href: c.href,
-  }
-}
+const asCitation = asAskUniCitation
 
 /** the preload's check of a main reply: anything not shaped like an AskUniResult is an `error` */
 export function asAskUniResult(raw: unknown): AskUniResult {

@@ -30,6 +30,8 @@ export type IpcRefusalReason = 'destroyed' | 'subframe' | 'unknown-sender' | 'or
 export function policyForChannel(channel: string): IpcSenderPolicy | null {
   if (
     channel.startsWith('uniwork:comments:') ||
+    // Ask UNI in the editor AI panels (UNI-2076 S7); `uniwork:askuni:*` stays shell
+    channel.startsWith('uniwork:askuni-doc:') ||
     channel.startsWith('uniwork:cloud-status') ||
     channel === 'uniwork:ai-run'
   ) {

@@ -115,6 +115,10 @@ export function createAskUniOpener(deps: AskUniOpenDeps): AskUniOpener {
   }
 }
 
-export function registerAskUniOpenIpc(ipcMain: IpcMain, opener: AskUniOpener): void {
+/** Registered on the guarded ipc object (UNI-2073, policy `shell`): the guard refuses every other sender first. */
+export function registerAskUniOpenIpc(
+  ipcMain: Pick<IpcMain, 'handle'>,
+  opener: AskUniOpener,
+): void {
   ipcMain.handle(ASKUNI_CHANNELS.openCitation, (_event, req: unknown) => opener.open(req))
 }
