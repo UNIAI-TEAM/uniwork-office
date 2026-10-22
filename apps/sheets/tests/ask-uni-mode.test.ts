@@ -35,7 +35,7 @@ describe('sheets panel wiring (source)', () => {
     expect(render.match(/aria-live="polite"/g)).toHaveLength(1)
   })
 
-  it('keys the binding on the workbook path (a save to UniWork changes it, the name does not)', () => {
+  it('keys the binding on the workbook path and its UniWork state (a save to UniWork flips the state, the path may stay)', () => {
     for (const file of [
       '../src/renderer/ai/AiChatPanel.tsx',
       '../src/renderer/ExcelShell.tsx',
@@ -45,7 +45,9 @@ describe('sheets panel wiring (source)', () => {
       expect(src, file).toContain('askUniBindingKey')
     }
     const app = readFileSync(resolve(HERE, '../src/renderer/App.tsx'), 'utf8')
-    expect(app).toContain('askUniBindingKey: workbookFile.path ?? workbookFile.name')
+    expect(app).toContain(
+      "askUniBindingKey: `${workbookFile.path ?? workbookFile.name}|${workbookFile.uniworkBound ? 'u' : 'l'}`",
+    )
   })
 
   it('gets the workbook name from the shell, not from a path or id', () => {
@@ -54,5 +56,9 @@ describe('sheets panel wiring (source)', () => {
       const src = readFileSync(resolve(HERE, file), 'utf8')
       expect(src, file).toContain('askUniDocumentName')
     }
+  })
+
+  it('leaves Ask UNI when an AI action runs, so the chat that carries the run is on screen', () => {
+    expect(panel).toContain('askUni.leave()')
   })
 })

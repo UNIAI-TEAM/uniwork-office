@@ -219,6 +219,38 @@ describe('AskUniComposerBox', () => {
       }
     })
 
+    it('a held Enter (keydown repeats) on Stop never stops the turn, at any time', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        await mount({ initial: 'What is blocked?' })
+        await mount({ initial: 'What is blocked?', streaming: true })
+        vi.setSystemTime(Date.now() + 2000)
+        const repeat = new KeyboardEvent('keydown', {
+          key: 'Enter',
+          repeat: true,
+          bubbles: true,
+          cancelable: true,
+        })
+        await act(async () => {
+          stop()!.dispatchEvent(repeat)
+        })
+        // the default action of a keydown on a button is the click: cancelling it is the guard
+        expect(repeat.defaultPrevented).toBe(true)
+        const first = new KeyboardEvent('keydown', {
+          key: 'Enter',
+          bubbles: true,
+          cancelable: true,
+        })
+        await act(async () => {
+          stop()!.dispatchEvent(first)
+        })
+        expect(first.defaultPrevented).toBe(false)
+        expect(fn.onStop).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
     it('a pointer click on Stop is never held back', async () => {
       await mount({ initial: 'What is blocked?' })
       await mount({ initial: 'What is blocked?', streaming: true })
