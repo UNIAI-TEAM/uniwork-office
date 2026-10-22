@@ -96,8 +96,20 @@ type Serializer = {
   encodeTextForMarkdown: (text: string, node: JsonNode, parent?: JsonNode) => string
 }
 
-const hasCodeMark = (node: JsonNode): boolean =>
-  (node.marks ?? []).some((m) => (typeof m === 'string' ? m : m.type) === 'code')
+const hasMark = (node: JsonNode, name: string): boolean =>
+  (node.marks ?? []).some((m) => (typeof m === 'string' ? m : m.type) === name)
+
+const hasCodeMark = (node: JsonNode): boolean => hasMark(node, 'code')
+const hasWikiMark = (node: JsonNode): boolean => hasMark(node, 'wikiLink')
+
+/**
+ * A wiki literal is source: the tokenizer took it raw, so it is written raw.
+ * Escaping it again grew `\` on every save and turned `my_note` into another
+ * target. Only a bare `|` in a table cell is escaped (once), as the cell syntax needs.
+ */
+function wikiLiteral(text: string): string {
+  return renderingTable() ? text.replace(/(?<!\\)\|/g, '\\|') : text
+}
 
 export const SelectiveEscapeMarkdown = Markdown.extend({
   onBeforeCreate(props) {
@@ -107,7 +119,11 @@ export const SelectiveEscapeMarkdown = Markdown.extend({
     manager.escapeMarkdownSyntax = escapeMarkdownText
     const encode = manager.encodeTextForMarkdown.bind(manager)
     manager.encodeTextForMarkdown = (text, node, parent) =>
-      hasCodeMark(node) ? fenceCodeSpan(text) : encode(text, node, parent)
+      hasCodeMark(node)
+        ? fenceCodeSpan(text)
+        : hasWikiMark(node)
+          ? wikiLiteral(text)
+          : encode(text, node, parent)
     patchInlineParsing(manager)
   },
 })
