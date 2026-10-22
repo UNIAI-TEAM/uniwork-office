@@ -347,7 +347,8 @@ jobs:
           key: doc-fonts-debs-jammy-${{ hashFiles('tools/ci/install-doc-fonts.sh') }}
 
       - name: Install document fonts (visual baselines)
-        timeout-minutes: 5
+        # backstop above the script's own bound (2 mirrors x 2 attempts x 75 s)
+        timeout-minutes: 6
         run: tools/ci/install-doc-fonts.sh ~/.cache/doc-fonts-debs
 
       # CSS layout tests use standalone Chromium in addition to Electron.
