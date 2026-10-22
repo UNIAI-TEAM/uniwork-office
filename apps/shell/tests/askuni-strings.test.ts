@@ -76,6 +76,26 @@ describe('askuni string shard', () => {
       'askUniCitationLabel',
       // the shell vi copy says "workspace" (72 uses), like the web
       'askUniWorkspace',
+      // S6 additions that are the same text in the locales that use them, not English copies:
+      'askUniV2NoteCount', // the '{count}/{max}' counter has no words
+      'askUniV2ModelBar', // the '{label} {value}/5' score bar has no words
+      'askUniV2ModelHaiku', // product model names, kept in every locale
+      'askUniV2ModelSonnet',
+      'askUniV2ModelOpus',
+      'askUniV2KindTask', // vi keeps the loan word "task" (web wording, as in the ui shard)
+      'askUniV2StepTaskOne',
+      'askUniV2StepChatOne', // "chat" is the same word in cs, es, id, it, nl
+      'askUniV2StepChatMany',
+      'askUniV2KindEmail', // "Email" is the same word in it and id
+      'askUniV2KindDocument', // "document" / "project" are the same words in fr and nl
+      'askUniV2GroupDocuments',
+      'askUniV2StepDocumentOne',
+      'askUniV2StepDocumentMany',
+      'askUniV2KindProject',
+      'askUniV2StepProjectOne',
+      'askUniV2MentionCount', // "suggestions" is the same word in fr
+      'askUniV2ModelEffort', // "Effort" and "Intelligence" are the same words in fr
+      'askUniV2ModelIntelligence',
     ])
     for (const lang of LANGS) {
       if (lang === 'en') continue
