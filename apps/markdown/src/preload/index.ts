@@ -6,6 +6,7 @@ import type { ProjectApi } from '@genoffice/project-store'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
 import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
 import { installUniworkCloudStatusBridge } from '@genoffice/electron-utils/uniwork-cloud-status-bridge'
+import { installUniworkAskUniDocBridge } from '@genoffice/ai-provider/askuni'
 import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { AI_CHANNELS, MARKDOWN_CHANNELS } from '../shared/ipc'
@@ -196,3 +197,5 @@ installAiRunBridge()
 // window.uniworkAiFlag: whether the shell offers UniWork AI (this renderer's provider list mirrors it)
 installUniworkAiFlagBridge()
 installUniworkCloudStatusBridge()
+// window.uniworkAskUniDoc: Ask UNI about this document (ids are derived in main, never sent from here)
+installUniworkAskUniDocBridge({ contextBridge, ipcRenderer })

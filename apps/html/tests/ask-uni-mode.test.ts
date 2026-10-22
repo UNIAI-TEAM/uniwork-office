@@ -1,5 +1,7 @@
 // UNI-2076 S7d (html panel): the "Ask UNI" mode in the AI panel header swaps the body for the shared
 // editor body behind window.uniworkAskUniDoc; chat state, the single live region and the no-id rule.
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -33,10 +35,10 @@ const settle = async (): Promise<void> => {
   await act(async () => {})
 }
 
-/** the element or one of its ancestors is not rendered (display none / hidden attribute) */
+/** the element or one of its ancestors is not rendered (the app stylesheet is loaded, see beforeAll) */
 function isHidden(el: Element | null): boolean {
   for (let n: Element | null = el; n; n = n.parentElement) {
-    if ((n as HTMLElement).hidden || (n as HTMLElement).style?.display === 'none') return true
+    if ((n as HTMLElement).hidden || getComputedStyle(n).display === 'none') return true
   }
   return false
 }
@@ -123,6 +125,10 @@ async function mount(bridge: ReturnType<typeof fakeBridge> | null): Promise<HTML
 describe('Ask UNI mode (html panel)', () => {
   beforeAll(() => {
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    // the chat steps aside by a rule of the app stylesheet, so jsdom needs it to know what is hidden
+    const css = document.createElement('style')
+    css.textContent = readFileSync(join(__dirname, '../src/renderer/styles.css'), 'utf8')
+    document.head.appendChild(css)
   })
   afterEach(() => {
     if (root) act(() => root!.unmount())

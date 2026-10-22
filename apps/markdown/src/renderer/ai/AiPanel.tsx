@@ -61,6 +61,7 @@ import {
 } from '@genoffice/ui'
 import type { Editor } from '@tiptap/core'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
+import { AskUniModeBody, AskUniModeToggle, useAskUniMode } from './ask-uni-mode'
 import { cap, platform } from '../capabilities'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
@@ -293,6 +294,9 @@ export function AiPanel({
   onExpand?: () => void
 }): ReactElement {
   const { lang, t } = useI18n()
+  // the "Ask UNI" panel mode: only offered when the preload bridge exists and the flag is on
+  const askMode = useAskUniMode(filePath)
+  const [askLive, setAskLive] = useState('')
   // a picked UniWork AI that is not offered (or any provider still missing a model) keeps every
   // send entry closed - presets, retry, continue and queue runs included - the hint says why
   const needModelHint = useAiModelNeedHint()
@@ -1304,7 +1308,7 @@ export function AiPanel({
   return (
     <aside
       ref={asideRef}
-      className={`copilot${resizing ? ' ai-panel-resizing' : ''}`}
+      className={`copilot${resizing ? ' ai-panel-resizing' : ''}${askMode.on ? ' ai-askuni-on' : ''}`}
       style={{ width: '100%' }}
       dir={lang === 'ar' || lang === 'he' ? 'rtl' : undefined}
     >
@@ -1325,7 +1329,8 @@ export function AiPanel({
             lang={lang}
             onMove={(side) => window.markdownApi.setAiPanelPrefs({ side })}
           />
-          {chat.length > 0 && (
+          {askMode.available && <AskUniModeToggle mode={askMode} lang={lang} />}
+          {chat.length > 0 && !askMode.on && (
             <button
               className="ai-header-btn"
               onClick={() => {
@@ -1365,7 +1370,7 @@ export function AiPanel({
       </header>
 
       <div className="ai-sr-status" aria-live="polite" aria-atomic="true">
-        {liveText}
+        {askMode.on ? askLive : liveText}
       </div>
       <div
         className="ai-chat"
@@ -1828,6 +1833,16 @@ export function AiPanel({
           onStop={stop}
         />
       </div>
+      {askMode.opened && (
+        <div className="ai-askuni-slot" style={{ display: askMode.on ? 'contents' : 'none' }}>
+          <AskUniModeBody
+            mode={askMode}
+            filePath={filePath}
+            lang={lang}
+            onLiveStatus={setAskLive}
+          />
+        </div>
+      )}
     </aside>
   )
 }

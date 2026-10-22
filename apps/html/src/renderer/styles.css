@@ -4042,3 +4042,15 @@ html.genoffice-popover-open .ribbon-tabs {
   font-size: 11px;
   color: var(--text-dim);
 }
+
+/* Ask UNI mode (S7d): the chat steps aside but stays mounted (state, draft, scroll kept); the header,
+ * the panel's one live region and the Ask UNI body remain */
+.copilot.ai-askuni-on
+  > :not(.ai-panel-resizer):not(.ai-panel-header):not(.ai-sr-status):not(.ai-askuni-slot) {
+  display: none;
+}
+
+.ai-header-btn.ai-askuni-mode[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
