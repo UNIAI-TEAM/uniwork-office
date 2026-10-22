@@ -182,7 +182,7 @@ const SHARED_2 = '/api/v1/workspaces/ws_2/documents/shared-with-me'
 describe('UNI-2047 A1b: the flat / folder / shared-by-me / trash lists forward sort, order and activity', () => {
   const full = {
     workspaceId: 'ws_1',
-    format: 'docx',
+    types: ['docx'],
     updatedBy: 'u_1',
     updatedFrom: '2026-10-01T00:00:00Z',
     sort: 'name',
@@ -210,7 +210,8 @@ describe('UNI-2047 A1b: the flat / folder / shared-by-me / trash lists forward s
       expect(params.get('activity')).toBe(
         channel === UNIWORK_DOC_CHANNELS.listDocuments ? null : 'edited',
       )
-      expect(params.get('format')).toBe('docx')
+      expect(params.getAll('type')).toEqual(['docx'])
+      expect(params.has('format')).toBe(false)
       expect(params.get('updated_by')).toBe('u_1')
       expect(params.get('updated_from')).toBe('2026-10-01T00:00:00Z')
     },
@@ -254,64 +255,113 @@ describe('UNI-2047 A1b: the flat / folder / shared-by-me / trash lists forward s
   })
 })
 
-describe('UNI-2047 A-FIX2: the UniNote kind filter', () => {
-  it.each([
+describe('UNI-2113: the Type picks at the IPC boundary', () => {
+  const routes = [
     ['listDocuments', UNIWORK_DOC_CHANNELS.listDocuments, {}],
     ['listChildren', UNIWORK_DOC_CHANNELS.listChildren, { parentId: 'fold_1' }],
     ['listSharedByMe', UNIWORK_DOC_CHANNELS.listSharedByMe, {}],
     ['listTrash', UNIWORK_DOC_CHANNELS.listTrash, {}],
     ['listShelved', UNIWORK_DOC_CHANNELS.listShelved, {}],
-  ])('%s sends kind=page to the server when asked', async (_name, channel, extra) => {
+  ] as const
+
+  it.each(routes)('%s sends one type= per pick in menu order', async (_name, channel, extra) => {
     const call = await setup()
     const server = stubServer()
-    await call(channel, { workspaceId: 'ws_1', kind: 'page', ...extra })
+    await call(channel, { workspaceId: 'ws_1', types: ['txt', 'page', 'docx'], ...extra })
     const [req] = server.lists()
     expect(req, 'a list request').toBeDefined()
-    expect(req!.searchParams.get('kind')).toBe('page')
+    expect(req!.searchParams.getAll('type')).toEqual(['page', 'docx', 'txt'])
     expect(req!.searchParams.has('format')).toBe(false)
+    expect(req!.searchParams.has('kind') ? req!.searchParams.get('kind') : null).not.toBe('page')
   })
 
-  // A-FIX4 n3: a UniNote has no file format, the server answers 400 invalid_filter to both
-  it.each([
-    ['listDocuments', UNIWORK_DOC_CHANNELS.listDocuments, {}],
-    ['listChildren', UNIWORK_DOC_CHANNELS.listChildren, { parentId: 'fold_1' }],
-    ['listSharedByMe', UNIWORK_DOC_CHANNELS.listSharedByMe, {}],
-    ['listTrash', UNIWORK_DOC_CHANNELS.listTrash, {}],
-    ['listShelved', UNIWORK_DOC_CHANNELS.listShelved, {}],
-  ])('%s drops format when the kind is page', async (_name, channel, extra) => {
+  // main never trusts the renderer: only the server's vocabulary leaves, once each, never empty
+  it.each(routes)('%s drops unknown, empty and repeated picks', async (_name, channel, extra) => {
+    const call = await setup()
+    const server = stubServer()
+    await call(channel, {
+      workspaceId: 'ws_1',
+      types: ['pdf', 'pdf', '', 'PDF', 'exe', 7, null, 'md'],
+      ...extra,
+    })
+    await call(channel, { workspaceId: 'ws_1', types: [], ...extra })
+    await call(channel, { workspaceId: 'ws_1', types: 'docx', ...extra })
+    await call(channel, { workspaceId: 'ws_1', types: [''], ...extra })
+    const [odd, ...plain] = server.lists()
+    expect(odd!.searchParams.getAll('type')).toEqual(['pdf', 'md'])
+    expect(plain).toHaveLength(3)
+    for (const req of plain) expect(req.searchParams.has('type')).toBe(false)
+  })
+
+  it.each(routes)('%s forwards at most 8 picks', async (_name, channel, extra) => {
+    const call = await setup()
+    const server = stubServer()
+    await call(channel, {
+      workspaceId: 'ws_1',
+      types: ['page', 'docx', 'xlsx', 'pptx', 'pdf', 'md', 'html', 'txt', 'docx', 'page'],
+      ...extra,
+    })
+    const [req] = server.lists()
+    expect(req!.searchParams.getAll('type')).toEqual([
+      'page',
+      'docx',
+      'xlsx',
+      'pptx',
+      'pdf',
+      'md',
+      'html',
+      'txt',
+    ])
+  })
+
+  // the single-format / kind=page filter the picks replace never leaves
+  it.each(routes)('%s no longer forwards format or kind', async (_name, channel, extra) => {
     const call = await setup()
     const server = stubServer()
     await call(channel, { workspaceId: 'ws_1', kind: 'page', format: 'docx', ...extra })
-    const [req] = server.lists()
-    expect(req!.searchParams.get('kind')).toBe('page')
-    expect(req!.searchParams.has('format')).toBe(false)
+    await call(channel, { workspaceId: 'ws_1', kind: 'folder', ...extra })
+    for (const req of server.lists()) {
+      expect(req.searchParams.has('format')).toBe(false)
+      expect(req.searchParams.get('kind')).not.toBe('page')
+      expect(req.searchParams.get('kind')).not.toBe('folder')
+    }
   })
 
-  it('drops a kind other than page at the IPC boundary', async () => {
+  it('shared with me forwards the picks to every workspace', async () => {
     const call = await setup()
     const server = stubServer()
-    await call(UNIWORK_DOC_CHANNELS.listTrash, { workspaceId: 'ws_1', kind: 'folder' })
-    await call(UNIWORK_DOC_CHANNELS.listTrash, { workspaceId: 'ws_1', kind: 7 })
-    for (const req of server.lists()) expect(req.searchParams.has('kind')).toBe(false)
-  })
-
-  it("shared with me has no kind on the server's route: it never leaves", async () => {
-    const call = await setup()
-    const server = stubServer()
-    await call(UNIWORK_DOC_CHANNELS.listSharedWithMe, { kind: 'page' })
+    await call(UNIWORK_DOC_CHANNELS.listSharedWithMe, { types: ['xlsx', 'page', '', 'bogus'] })
     for (const path of [SHARED_1, SHARED_2]) {
       const [req] = server.at(path)
+      expect(req!.searchParams.getAll('type'), path).toEqual(['page', 'xlsx'])
       expect(req!.searchParams.has('kind'), path).toBe(false)
     }
+  })
+
+  it('sources: the picks (txt and page included) go in menu order, junk dropped', async () => {
+    const call = await setup()
+    const server = stubServer()
+    const sources = `${WS1_DOCS}/sources`
+    await call(UNIWORK_DOC_CHANNELS.listSources, {
+      workspaceId: 'ws_1',
+      types: ['txt', 'docx', 'docx', '', 'bogus', 'page'],
+    })
+    await call(UNIWORK_DOC_CHANNELS.listSources, { workspaceId: 'ws_1', types: [''] })
+    await call(UNIWORK_DOC_CHANNELS.listSources, { workspaceId: 'ws_1', type: 'docx' })
+    const [picked, empty, legacy] = server.at(sources)
+    expect(picked!.searchParams.getAll('type')).toEqual(['page', 'docx', 'txt'])
+    expect(empty!.searchParams.has('type')).toBe(false)
+    // the old single `type` field is gone from the wire
+    expect(legacy!.searchParams.has('type')).toBe(false)
   })
 })
 
 describe('UNI-2047 A1b: shared with me', () => {
-  it('forwards format, updated_by, updated_from, sort and order to every workspace', async () => {
+  it('forwards types, updated_by, updated_from, sort and order to every workspace', async () => {
     const call = await setup()
     const server = stubServer()
     await call(UNIWORK_DOC_CHANNELS.listSharedWithMe, {
-      format: 'xlsx',
+      types: ['xlsx'],
       updatedBy: 'u_2',
       updatedFrom: '2026-10-05T00:00:00Z',
       sort: 'name',
@@ -321,7 +371,8 @@ describe('UNI-2047 A1b: shared with me', () => {
       const [req] = server.at(path)
       expect(req, path).toBeDefined()
       const params = req!.searchParams
-      expect(params.get('format')).toBe('xlsx')
+      expect(params.getAll('type')).toEqual(['xlsx'])
+      expect(params.has('format')).toBe(false)
       expect(params.get('updated_by')).toBe('u_2')
       expect(params.get('updated_from')).toBe('2026-10-05T00:00:00Z')
       expect(params.get('sort')).toBe('name')
@@ -337,7 +388,7 @@ describe('UNI-2047 A1b: shared with me', () => {
       sort: 'bogus',
       order: 'up',
       activity: 'edited',
-      format: 42,
+      types: 42,
       updatedBy: ['u_1'],
     })
     for (const path of [SHARED_1, SHARED_2]) {
@@ -393,12 +444,12 @@ describe('UNI-2047 A1b: shared with me', () => {
 })
 
 describe('UNI-2047 A1b: the shelf', () => {
-  it('forwards format, sort and order, and nothing else', async () => {
+  it('forwards types, sort and order, and nothing else', async () => {
     const call = await setup()
     const server = stubServer()
     await call(UNIWORK_DOC_CHANNELS.listShelved, {
       workspaceId: 'ws_1',
-      format: 'pdf',
+      types: ['pdf'],
       sort: 'shelved',
       order: 'asc',
       activity: 'edited',
@@ -408,7 +459,8 @@ describe('UNI-2047 A1b: the shelf', () => {
     const [req] = server.lists()
     const params = req!.searchParams
     expect(params.get('shelved')).toBe('true')
-    expect(params.get('format')).toBe('pdf')
+    expect(params.getAll('type')).toEqual(['pdf'])
+    expect(params.has('format')).toBe(false)
     expect(params.get('sort')).toBe('shelved')
     expect(params.get('order')).toBe('asc')
     expect(params.has('activity')).toBe(false)

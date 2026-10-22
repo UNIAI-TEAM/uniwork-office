@@ -57,12 +57,12 @@ describe('listFavorites: the query string', () => {
       workspaceId: 'ws_1',
       cursor: 'c1',
       limit: 500,
-      format: 'docx',
+      types: ['docx'],
       sort: 'starred',
       order: 'asc',
     })
     expect(seen[0]!.url).toBe(
-      `${BASE}/favorites?cursor=c1&limit=100&kind=document&format=docx&sort=starred&order=asc`,
+      `${BASE}/favorites?cursor=c1&limit=100&kind=document&type=docx&sort=starred&order=asc`,
     )
   })
 
@@ -90,10 +90,31 @@ describe('listFavorites: the query string', () => {
     ])
   })
 
-  it('UniNote chip: kind=page, and a format never rides with it', async () => {
+  // UNI-2113: the route's own kind=document (files and pages, no folders) stays and is AND-ed with
+  // the picks, so a page pick and the formats all work together; kind=page / format= never ride
+  it('type picks: one type= each in menu order after kind=document, never kind=page or format=', async () => {
     const { api, seen } = setup()
-    await api.listFavorites({ workspaceId: 'ws_1', kind: 'page', format: 'docx' })
-    expect(seen[0]!.url).toBe(`${BASE}/favorites?limit=50&kind=page`)
+    await api.listFavorites({ workspaceId: 'ws_1', types: ['xlsx', 'page'] })
+    await api.listFavorites({ workspaceId: 'ws_1', types: ['page'] })
+    await api.listFavorites({
+      workspaceId: 'ws_1',
+      kind: 'page',
+      format: 'docx',
+    } as never)
+    expect(seen.map((s) => s.url)).toEqual([
+      `${BASE}/favorites?limit=50&kind=document&type=page&type=xlsx`,
+      `${BASE}/favorites?limit=50&kind=document&type=page`,
+      `${BASE}/favorites?limit=50&kind=document`,
+    ])
+  })
+
+  it('type picks: de-duplicated, vocabulary only, never an empty value', async () => {
+    const { api, seen } = setup()
+    await api.listFavorites({
+      workspaceId: 'ws_1',
+      types: ['pdf', 'pdf', '', 'bogus', 'md'] as never,
+    })
+    expect(seen[0]!.url).toBe(`${BASE}/favorites?limit=50&kind=document&type=pdf&type=md`)
   })
 
   it('refuses a malformed workspace id before any request', async () => {

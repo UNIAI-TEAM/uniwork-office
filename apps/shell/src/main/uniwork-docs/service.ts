@@ -135,6 +135,7 @@ import { DRAFT_PREVIEW_DIR } from '@genoffice/electron-utils/draft-preview'
 import type { OpenSourceValue, SourceViewResult, SourceViewState } from '../../shared/source-view'
 import { SourceViewRegistry, createSourceViewOpener, type SourceViewOpener } from './source-view'
 import { tUniworkDocs } from './strings'
+import { normalizeTypePicks } from './type-picks'
 import {
   abortUploadSession,
   readLocalFileProbe,
@@ -4719,9 +4720,9 @@ export class UniworkDocsService {
       if (!org) return { documents: [], nextCursor: null }
       const api = this.api()
       // UNI-2047: type / updater / date filters and the sort go to every workspace
-      const { format, updatedBy, updatedFrom, sort, order } = this.listFiltersOf(query)
+      const { types, updatedBy, updatedFrom, sort, order } = this.listFiltersOf(query)
       const filters: UniworkListFilters = {
-        ...(format ? { format } : {}),
+        ...(types ? { types } : {}),
         ...(updatedBy ? { updatedBy } : {}),
         ...(updatedFrom ? { updatedFrom } : {}),
         ...(sort ? { sort } : {}),
@@ -6717,16 +6718,14 @@ export class UniworkDocsService {
 
   /**
    * The IPC boundary of the list filters: a value outside the server's
-   * vocabulary (sort / order / activity) or of the wrong type is dropped, so an
-   * unset query stays today's request and a stray value never leaves.
+   * vocabulary (type / sort / order / activity) or of the wrong type is dropped, so an
+   * unset query stays today's request and a stray value never leaves. UNI-2113: the Type picks
+   * replace the single `format` / `kind=page` filter, which no longer crosses the boundary.
    */
   private listFiltersOf(q: UniworkListFilters): UniworkListFilters {
+    const types = normalizeTypePicks(q.types)
     return {
-      // a UniNote has no file format: the server answers 400 invalid_filter to both together
-      ...(typeof q.format === 'string' && q.format && q.kind !== 'page'
-        ? { format: q.format }
-        : {}),
-      ...(q.kind === 'page' ? { kind: q.kind } : {}),
+      ...(types.length > 0 ? { types } : {}),
       ...(typeof q.updatedBy === 'string' && q.updatedBy ? { updatedBy: q.updatedBy } : {}),
       ...(typeof q.updatedFrom === 'string' && q.updatedFrom ? { updatedFrom: q.updatedFrom } : {}),
       ...(isListSort(q.sort) ? { sort: q.sort } : {}),
@@ -6816,13 +6815,12 @@ export class UniworkDocsService {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
-      const { format, kind, sort, order } = this.listFiltersOf(q)
+      const { types, sort, order } = this.listFiltersOf(q)
       const page = await this.api().listFavorites({
         workspaceId: q.workspaceId,
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
-        ...(format ? { format } : {}),
-        ...(kind ? { kind } : {}),
+        ...(types ? { types } : {}),
         ...(sort ? { sort } : {}),
         ...(order ? { order } : {}),
       })
@@ -6857,13 +6855,12 @@ export class UniworkDocsService {
         throw new UniworkDocError('not_found')
       }
       // UNI-2047: the shelf takes the type filter and the sort, nothing else
-      const { format, kind, sort, order } = this.listFiltersOf(q)
+      const { types, sort, order } = this.listFiltersOf(q)
       const page = await this.api().listShelved({
         workspaceId: q.workspaceId,
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
-        ...(format ? { format } : {}),
-        ...(kind ? { kind } : {}),
+        ...(types ? { types } : {}),
         ...(sort ? { sort } : {}),
         ...(order ? { order } : {}),
       })
@@ -6878,10 +6875,11 @@ export class UniworkDocsService {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
+      const types = normalizeTypePicks(q.types)
       return this.api().listSources({
         workspaceId: q.workspaceId,
         ...(typeof q.source === 'string' ? { source: q.source } : {}),
-        ...(typeof q.type === 'string' ? { type: q.type } : {}),
+        ...(types.length > 0 ? { types } : {}),
         ...(typeof q.q === 'string' ? { q: q.q } : {}),
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),

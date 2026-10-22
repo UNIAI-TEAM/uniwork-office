@@ -938,30 +938,30 @@ describe('401: one shared refresh, one retry (real account session)', () => {
     await api.listChildren({ workspaceId: 'ws_1', parentId: null })
     await api.listDocuments({ workspaceId: 'ws_1' })
 
-    // Set filters append format, updated_by, updated_from
+    // Set filters append type, updated_by, updated_from
     await api.listSharedByMe({
       workspaceId: 'ws_1',
-      format: 'docx',
+      types: ['docx'],
       updatedBy: 'u_1',
       updatedFrom: '2026-10-01T00:00:00Z',
     })
     await api.listTrash({
       workspaceId: 'ws_1',
-      format: 'xlsx',
+      types: ['xlsx'],
       updatedBy: 'u_2',
       updatedFrom: '2026-10-10T00:00:00Z',
     })
     await api.listChildren({
       workspaceId: 'ws_1',
       parentId: 'fold_1',
-      format: 'pptx',
+      types: ['pptx'],
       updatedBy: 'u_3',
       updatedFrom: '2026-10-15T00:00:00Z',
     })
     // DH1-BE-1: the server forwards `format` to `/documents/recent`, so a
     // format-only Recent keeps the caller's recent scope. Only the filters
     // that route cannot forward (updater, date) need the flat workspace list.
-    await api.listDocuments({ workspaceId: 'ws_1', format: 'pdf' })
+    await api.listDocuments({ workspaceId: 'ws_1', types: ['pdf'] })
     await api.listDocuments({ workspaceId: 'ws_1', updatedBy: 'u_4' })
     await api.listDocuments({
       workspaceId: 'ws_1',
@@ -977,10 +977,10 @@ describe('401: one shared refresh, one retry (real account session)', () => {
       `${ORIGIN}/api/v1/workspaces/ws_1/documents?archived=1&limit=25&cursor=c_trash`,
       `${ORIGIN}/api/v1/workspaces/ws_1/documents?parent_id=&limit=50`,
       `${ORIGIN}/api/v1/workspaces/ws_1/documents/recent?limit=50&kind=file`,
-      `${ORIGIN}/api/v1/workspaces/ws_1/documents?shared_by_me=true&limit=50&format=docx&updated_by=u_1&updated_from=2026-10-01T00%3A00%3A00Z`,
-      `${ORIGIN}/api/v1/workspaces/ws_1/documents?archived=1&limit=50&format=xlsx&updated_by=u_2&updated_from=2026-10-10T00%3A00%3A00Z`,
-      `${ORIGIN}/api/v1/workspaces/ws_1/documents?parent_id=fold_1&limit=50&format=pptx&updated_by=u_3&updated_from=2026-10-15T00%3A00%3A00Z`,
-      `${ORIGIN}/api/v1/workspaces/ws_1/documents/recent?limit=50&kind=file&format=pdf`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?shared_by_me=true&limit=50&type=docx&updated_by=u_1&updated_from=2026-10-01T00%3A00%3A00Z`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?archived=1&limit=50&type=xlsx&updated_by=u_2&updated_from=2026-10-10T00%3A00%3A00Z`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents?parent_id=fold_1&limit=50&type=pptx&updated_by=u_3&updated_from=2026-10-15T00%3A00%3A00Z`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/recent?limit=50&kind=file&type=pdf`,
       `${ORIGIN}/api/v1/workspaces/ws_1/documents?limit=50&kind=file&updated_by=u_4`,
       `${ORIGIN}/api/v1/workspaces/ws_1/documents?limit=50&kind=file&updated_by=u_4&updated_from=2026-10-16T00%3A00%3A00Z`,
       `${ORIGIN}/api/v1/workspaces/ws_1/members`,
@@ -1080,21 +1080,21 @@ describe('document sources (UNI-1961)', () => {
     ...over,
   })
 
-  it('lists sources with source/type/q/cursor/limit only when set', async () => {
+  it('lists sources with source/types/q/cursor/limit only when set', async () => {
     const fetch = vi.fn<FetchLike>(async () => json(200, { items: [], next_cursor: null }))
     const api = client(fetch)
     await api.listSources({ workspaceId: 'ws_1' })
     await api.listSources({
       workspaceId: 'ws_1',
       source: 'task',
-      type: 'docx',
+      types: ['docx', 'txt', 'page'],
       q: ' plan ',
       cursor: 'c_2',
       limit: 500,
     })
     expect(fetch.mock.calls.map(([url]) => url)).toEqual([
       `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources?limit=50`,
-      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources?source=task&type=docx&q=plan&cursor=c_2&limit=100`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/documents/sources?source=task&type=page&type=docx&type=txt&q=plan&cursor=c_2&limit=100`,
     ])
     expect(fetch.mock.calls[0]![1].method).toBe('GET')
   })

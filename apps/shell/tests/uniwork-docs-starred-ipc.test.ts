@@ -205,7 +205,7 @@ describe('UNI-2047 B6: the Starred list over IPC', () => {
       workspaceId: 'ws_1',
       cursor: 'c9',
       limit: 25,
-      format: 'docx',
+      types: ['xlsx', 'page', '', 'bogus', 'xlsx'],
       sort: 'starred',
       order: 'desc',
       activity: 'edited',
@@ -214,7 +214,8 @@ describe('UNI-2047 B6: the Starred list over IPC', () => {
     })
     const [req] = seen.filter((s) => s.url.pathname === FAV)
     const params = req!.url.searchParams
-    expect(params.get('format')).toBe('docx')
+    expect(params.getAll('type')).toEqual(['page', 'xlsx'])
+    expect(params.has('format')).toBe(false)
     expect(params.get('sort')).toBe('starred')
     expect(params.get('order')).toBe('desc')
     expect(params.get('cursor')).toBe('c9')
