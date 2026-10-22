@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { DiscussionPanel } from './DiscussionPanel'
 import { Home } from './Home'
+import { useAskUniShortcut } from './askuni-entry'
 import { Onboarding } from './Onboarding'
 import { TabBar } from './TabBar'
 import { UniworkLockHost } from './UniworkLockPanel'
@@ -14,6 +15,7 @@ interface AppFrameProps {
 export function AppFrame({ initialOnboardingSeen }: AppFrameProps) {
   const [homeActive, setHomeActive] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(!initialOnboardingSeen)
+  useAskUniShortcut()
 
   useEffect(() => {
     const applyTabs = (tabs: Awaited<ReturnType<typeof window.aiOfficeTabs.list>>) => {

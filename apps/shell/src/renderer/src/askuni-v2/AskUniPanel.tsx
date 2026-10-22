@@ -88,7 +88,7 @@ export function AskUniPanel({
   onPendingFocusConsumed?: () => void
 }): ReactElement {
   const { t, lang } = useI18n()
-  const [conversationId, setConversationId] = useState<string | undefined>(undefined)
+  const [conversationId, setConversationId] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const conversations = useAskUniConversations(workspaceId, refreshKey)
   const selection = useAskModelSelection(workspaceId)
@@ -108,7 +108,7 @@ export function AskUniPanel({
     if (lastWorkspace.current === workspaceId) return
     lastWorkspace.current = workspaceId
     streamRef.current.reset()
-    setConversationId(undefined)
+    setConversationId(null)
   }, [workspaceId])
 
   const loadMessages = useCallback(async (id: string): Promise<AskUniMessagesResult> => {
@@ -117,21 +117,21 @@ export function AskUniPanel({
   }, [])
 
   const locale = lang === 'vi' ? 'vi' : 'en'
-  const ask = (input: AskUniComposerInput, conversation: string | undefined) =>
+  const ask = (input: AskUniComposerInput, conversation: string | null) =>
     stream.ask({
       ...input,
-      conversationId: conversation,
+      conversationId: conversation ?? undefined,
       ...(selection.model ? { model: selection.model } : {}),
       ...(selection.effort ? { effort: selection.effort } : {}),
     })
 
-  const open = (id: string | undefined) => {
+  const open = (id: string | null) => {
     stream.reset()
     setConversationId(id)
   }
 
   const streaming = stream.state.status === 'streaming'
-  const showEmpty = conversationId === undefined && stream.state.status === 'idle'
+  const showEmpty = conversationId === null && stream.state.status === 'idle'
 
   return (
     <section className="askuni2-panel" aria-label={t('askUniTitle')} hidden={!visible}>
@@ -142,11 +142,11 @@ export function AskUniPanel({
         activeId={conversationId}
         conversations={conversations}
         onSelect={open}
-        onNew={() => open(undefined)}
+        onNew={() => open(null)}
       />
       <div className="askuni2-body">
         {showEmpty ? (
-          <EmptyState onAsk={(question) => ask({ question, locale }, undefined)} />
+          <EmptyState onAsk={(question) => ask({ question, locale }, null)} />
         ) : (
           <AskUniThread
             workspaceId={workspaceId}

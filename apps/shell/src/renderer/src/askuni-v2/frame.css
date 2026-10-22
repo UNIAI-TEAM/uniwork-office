@@ -390,83 +390,13 @@
   padding-inline: 4px;
 }
 
-/* composer */
+/* composer: the box, its textarea, row and counter live in @genoffice/ui (ask-uni.css); Home sets its width and padding */
 .askuni2-composer {
   padding: 0 20px 16px;
 }
 
 .askuni2-composer-box {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-inline-size: var(--new-chat-col, 760px);
-  margin-inline: auto;
-  padding: 10px;
-  padding-inline-start: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-16, 16px);
-  background: var(--surface);
-  box-shadow: var(--shadow-btn);
-}
-
-.askuni2-composer-box:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
-  box-shadow:
-    var(--shadow-btn),
-    0 0 0 3px var(--accent-soft);
-}
-
-.askuni2-composer-box textarea {
-  display: block;
-  inline-size: 100%;
-  min-block-size: 24px;
-  max-block-size: 220px;
-  resize: none;
-  overflow-y: auto;
-  field-sizing: content;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  padding: 2px 6px 2px 0;
-  padding-inline: 0 6px;
-  font: inherit;
-  font-size: 15px;
-  line-height: 1.55;
-  box-sizing: border-box;
-}
-
-.askuni2-composer-box textarea:focus {
-  outline: none;
-}
-
-.askuni2-composer-box textarea::placeholder {
-  color: var(--text-secondary);
-  opacity: 0.85;
-}
-
-.askuni2-composer-box textarea:disabled {
-  opacity: 0.6;
-}
-
-.askuni2-composer-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.askuni2-composer-end {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  min-width: 0;
-}
-
-.askuni2-composer-end .askuni-counter {
-  font-size: 12px;
-  color: var(--text-secondary);
+  --askuni-composer-max: var(--new-chat-col, 760px);
 }
 
 .askuni2-chips {

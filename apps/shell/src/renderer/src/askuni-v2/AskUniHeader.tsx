@@ -19,9 +19,9 @@ export function AskUniHeader({
   workspaceId: string
   workspaces?: AskUniWorkspace[]
   onWorkspaceChange?: (id: string) => void
-  activeId: string | undefined
+  activeId: string | null
   conversations: AskUniConversationsApi
-  onSelect: (id: string | undefined) => void
+  onSelect: (id: string | null) => void
   onNew: () => void
 }): ReactElement {
   const { t } = useI18n()

@@ -168,10 +168,10 @@ export function AskUniHistory({
   onSelect,
 }: {
   title: string
-  activeId: string | undefined
+  activeId: string | null
   conversations: AskUniConversationsApi
-  /** undefined = start a new conversation (the open one was deleted) */
-  onSelect: (id: string | undefined) => void
+  /** null = start a new conversation (the open one was deleted) */
+  onSelect: (id: string | null) => void
 }): ReactElement {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
@@ -353,7 +353,7 @@ export function AskUniHistory({
                 setProblem('delete')
                 return
               }
-              if (target.id === activeId) onSelect(undefined)
+              if (target.id === activeId) onSelect(null)
               // the row that held focus is gone
               anchorRef.current?.focus()
             })

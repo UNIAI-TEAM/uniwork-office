@@ -7,7 +7,9 @@ import { emitAgentIntentNavigate } from './agent-intent-bus'
 import { buildMyAiContextPack, type MyAiContextPack } from './context-manager'
 import { useI18n } from './locale'
 import { useUniworkCloudStatus } from './UniworkCloudPane'
-import { AskUniPane, hasAskUniBridge } from './AskUniPane'
+import { hasAskUniBridge } from './AskUniPane'
+import { AskUniHost } from './AskUniHost'
+import { consumeAskUniOpen, useAskUniOpenRequest } from './askuni-entry'
 import { recordAiTurnUsage } from './ai-usage-ledger'
 import { appendMyAiAudit } from './my-ai-audit'
 import {
@@ -389,6 +391,9 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
   const [mode, setMode] = useState<'chat' | 'ask'>('chat')
   // once opened, the Ask UNI pane stays mounted (hidden) so its conversation survives the toggle
   const [askOpened, setAskOpened] = useState(false)
+  // Ctrl/Cmd+J (or a request from elsewhere): switch to Ask UNI and put the caret in the composer
+  const [askFocusToken, setAskFocusToken] = useState(0)
+  const askOpenRequest = useAskUniOpenRequest()
   const groupBtnRefs = useRef<Partial<Record<GroupId, HTMLButtonElement | null>>>({})
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [continueFiles, setContinueFiles] = useState<RecentEntry[]>([])
@@ -1954,6 +1959,14 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
   )
 
   const askAvailable = hasAskUniBridge()
+  const askRequestSeq = askOpenRequest?.seq ?? null
+  useEffect(() => {
+    if (askRequestSeq === null || !askAvailable) return
+    setMode('ask')
+    setAskOpened(true)
+    setAskFocusToken((n) => n + 1)
+    consumeAskUniOpen(askRequestSeq)
+  }, [askRequestSeq, askAvailable])
   const askMode = askAvailable && mode === 'ask'
 
   const modeToggle = askAvailable ? (
@@ -2227,7 +2240,9 @@ export function NewChatPane({ practiceId, ensureWorkbench }: Props): ReactElemen
     >
       {bar}
       {askMode ? null : chatContent}
-      {askAvailable && askOpened ? <AskUniPane visible={askMode} /> : null}
+      {askAvailable && askOpened ? (
+        <AskUniHost visible={askMode} focusToken={askFocusToken} />
+      ) : null}
     </main>
   )
 }
