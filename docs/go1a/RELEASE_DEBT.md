@@ -4,8 +4,8 @@ Not required to set `GO1_READY = YES` under GO-1A §XVIII.
 
 | Item                                                           | Status                                                             |
 | -------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `MACOS_SIGNING`                                                | `DEFERRED_GO1R`                                                    |
-| `MACOS_NOTARIZATION`                                           | `DEFERRED_GO1R`                                                    |
+| `MACOS_SIGNING`                                                | dev / beta: signed from main, first signed run pending             |
+| `MACOS_NOTARIZATION`                                           | dev / beta: signed from main, first signed run pending             |
 | `WINDOWS_PACKAGE`                                              | `DEFERRED_GO1R`                                                    |
 | `WINDOWS_SIGNING`                                              | `DEFERRED_GO1R`                                                    |
 | `LINUX_PACKAGE`                                                | `DEFERRED_GO1R`                                                    |
