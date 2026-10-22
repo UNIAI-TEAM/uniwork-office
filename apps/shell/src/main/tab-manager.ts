@@ -837,6 +837,16 @@ export class TabManager {
     return { kind: tab.kind, title: tab.title, ...(tab.filePath ? { filePath: tab.filePath } : {}) }
   }
 
+  /**
+   * true for the webContents of any tab view (Present views included) and for the
+   * spare sheets view, which is not in `tabs` until a sheets tab takes it; the IPC
+   * sender guard reads this to tell an editor view from a stranger
+   */
+  hasWebContents(webContentsId: number): boolean {
+    if (this.spareSheetsView?.webContents.id === webContentsId) return true
+    return this.tabs.some((t) => t.view?.webContents.id === webContentsId)
+  }
+
   tabIdForWebContents(webContentsId: number): string | undefined {
     return this.tabs.find((t) => t.view?.webContents.id === webContentsId)?.id
   }

@@ -2,7 +2,15 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { policyForChannel, type IpcSenderPolicy } from '../src/main/ipc-sender-guard'
+import {
+  createIpcSenderGuard,
+  policyForChannel,
+  type IpcSenderPolicy,
+} from '../src/main/ipc-sender-guard'
+import { registerAiRunIpc } from '../src/main/ai-run-registry'
+import { registerUniworkAiFlagIpc } from '../src/main/uniwork-ai-flag'
+import { registerUniworkCloudStatusIpc } from '../src/main/uniwork-cloud-status'
+import { registerUniworkWork } from '../src/main/uniwork-work/wiring'
 import { HOME_CHANNELS, UNIWORK_DOC_CHANNELS, UNIWORK_SHARE_CHANNELS } from '../src/shared/home-api'
 import { ASKUNI_CHANNELS } from '../src/shared/askuni-api'
 import { SOURCE_VIEW_CHANNELS } from '../src/shared/source-view'
@@ -405,5 +413,49 @@ describe('policy of every uniwork* and home account channel constant', () => {
     const all = sources.flatMap((s) => registrations(s)).flatMap((r) => scoped(r))
     // 135 uniwork channels and 11 home account/cloud ones are registered across the shell main
     expect(all.length).toBeGreaterThan(120)
+  })
+})
+
+// ---- 5. the real guard accepts what the registrars register ----
+
+describe('registrars under the real guard', () => {
+  it('registers every channel of the small registrars without a refused registration', () => {
+    const guard = createIpcSenderGuard({
+      shellContents: () => null,
+      isTrustedEditorContents: () => false,
+      isTrustedShellUrl: () => false,
+      isTrustedEditorUrl: () => false,
+      log: () => {},
+    })
+    const registered: string[] = []
+    const record = (channel: string) => {
+      registered.push(channel)
+    }
+    const guarded = guard.guarded({ handle: record, on: record } as never) as {
+      handle(channel: string, fn: () => unknown): void
+      on(channel: string, fn: () => unknown): void
+    }
+    registerAiRunIpc(guarded as never)
+    registerUniworkAiFlagIpc(guarded as never)
+    registerUniworkCloudStatusIpc(guarded as never, { get: () => null })
+    registerUniworkWork(guarded as never, {
+      profile: () => null,
+      identity: () => null,
+      org: () => null,
+      authorized: async () => {
+        throw new Error('unused')
+      },
+      openExternal: async () => undefined,
+    })
+    expect(registered.sort()).toEqual(
+      [
+        AI_RUN_CHANNEL,
+        UNIWORK_AI_FLAG_GET,
+        UNIWORK_CLOUD_STATUS_GET,
+        UNIWORK_CLOUD_STATUS_OPEN_ACCOUNT,
+        UNIWORK_CLOUD_STATUS_SIGN_IN,
+        ...Object.values(UNIWORK_WORK_CHANNELS),
+      ].sort(),
+    )
   })
 })
