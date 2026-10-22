@@ -35,3 +35,38 @@ describe('Ask UNI citation card placement', () => {
     expect(card).not.toMatch(/72vw/)
   })
 })
+
+describe('Ask UNI citation polish (UNI-2116)', () => {
+  it('a hover preview takes no pointer events, so what is under it stays hoverable and clickable', () => {
+    expect(rule('.askuni-v2-cite-card.is-preview')).toMatch(/pointer-events:\s*none;/)
+    // a pinned card is interactive: nothing turns its pointer events off
+    expect(rule('.askuni-v2-cite-card')).not.toMatch(/pointer-events/)
+  })
+
+  it('the hover preview hides its Open button, a pinned card keeps it (F7)', () => {
+    // the preview takes no pointer events, so Open there could not be clicked
+    expect(rule('.askuni-v2-cite-card.is-preview .askuni-v2-cite-open')).toMatch(/display:\s*none;/)
+    expect(rule('.askuni-v2-cite-open')).not.toMatch(/display:\s*none/)
+  })
+
+  it('keeps the card placement of the F2 fix', () => {
+    const card = rule('.askuni-v2-cite-card')
+    expect(card).toMatch(/position:\s*absolute;/)
+    expect(card).toMatch(/inset-inline-start:\s*0;/)
+    expect(card).toMatch(/inline-size:\s*min\(288px,\s*100%\);/)
+    expect(rule('.askuni-v2-answer')).toMatch(/position:\s*relative;/)
+    expect(rule('.askuni-v2-cite-wrap')).toMatch(/position:\s*static;/)
+  })
+
+  it('the pending placeholder is inert', () => {
+    expect(rule('.askuni-v2-cite.is-pending')).toMatch(/pointer-events:\s*none;/)
+  })
+
+  it('a marker has space only before it, so punctuation after it stays tight (logical, LTR + RTL)', () => {
+    const wrap = rule('.askuni-v2-cite-wrap')
+    expect(wrap).toMatch(/margin-inline-start:\s*2px;/)
+    expect(wrap).toMatch(/margin-inline-end:\s*0;/)
+    expect(wrap).not.toMatch(/margin-inline:/)
+    expect(wrap).not.toMatch(/\b(?:margin-left|margin-right)\b/)
+  })
+})
