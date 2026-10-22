@@ -1,0 +1,242 @@
+/* Access log sheet (UNI-2077). Chrome colors are semantic tokens only; the sheet follows the
+   light / dark / system theme like every other app surface. It docks to the inline end of the
+   window (a sheet, like the web's), so it reads right in rtl locales too. */
+
+.uw-act-overlay:has(> .alg-sheet) {
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+.modal.uw-act.alg-sheet {
+  width: min(440px, calc(var(--ui-vw) * 100));
+  height: 100%;
+  max-height: none;
+  overflow-y: auto;
+  padding: 20px;
+  border-radius: 0;
+}
+
+.alg-header {
+  position: sticky;
+  /* the modal pads 20px: pin to its outer edge and cover the padding so scrolled rows never show
+     above the title and Close stays reachable */
+  top: -20px;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -20px -20px 14px;
+  padding: 20px 20px 8px;
+  background: var(--surface);
+}
+
+.alg-header-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.alg-title {
+  margin: 0;
+}
+
+.alg-muted {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.alg-doc {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alg-close {
+  display: inline-flex;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.alg-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.alg-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.alg-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.modal.uw-act .alg-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-hover-strong);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.alg-filter {
+  display: block;
+  margin: 0 0 12px;
+}
+
+.alg-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alg-skeleton {
+  display: block;
+  width: 100%;
+  height: 40px;
+  border-radius: 6px;
+  background: var(--bg-hover-strong);
+}
+
+.alg-skeleton.short {
+  width: 66%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .alg-skeleton {
+    animation: alg-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes alg-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.alg-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.modal.uw-act .alg-error-text {
+  margin: 0;
+  color: var(--danger-text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.modal.uw-act .alg-more-error {
+  margin-top: 8px;
+}
+
+.modal.uw-act .alg-empty {
+  padding: 0 2px;
+}
+
+.alg-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.alg-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.alg-row + .alg-row {
+  border-top: 1px solid var(--border);
+}
+
+/* an emergency (break-glass) access is the row an owner must not miss */
+.alg-row[data-via='break_glass'] {
+  background: var(--warning-bg);
+  box-shadow: inset 3px 0 0 var(--warning-text);
+}
+
+.alg-row-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.modal.uw-act .alg-actor {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal.uw-act .alg-meta {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.alg-break-glass {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--warning-border);
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.alg-time {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.alg-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}

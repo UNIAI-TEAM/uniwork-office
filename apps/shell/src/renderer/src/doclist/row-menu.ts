@@ -6,6 +6,7 @@
 import type { StringKey } from '../locale'
 import type { FolderMenuItem } from '../uniwork-folders/FolderMenu'
 import { canManageShelved, type DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
+import { canOfferAccessLog } from '../uniwork-doc-history/access-log-model'
 import type { DocListScreen } from './columns'
 import { canShareRow } from './share-gate'
 
@@ -24,6 +25,7 @@ export type RowMenuActionId =
   | 'trash'
   | 'restore'
   | 'download'
+  | 'logs'
   | 'details'
 
 export interface RowMenuItem extends FolderMenuItem {
@@ -114,6 +116,8 @@ export function buildRowMenu({
   // Tải xuống (UNI-2068): the bulk bar reads this entry for its gate; a host that gives the row
   // menu no handler leaves the visible menu as it was
   if (rowCanDownload(screen, doc)) add('download', label('dlActDownload'), LINK)
+  // Nhật ký truy cập (UNI-2077): managers only, never another module's, trashed or shelved row
+  if (canOfferAccessLog(doc)) add('logs', label('algMenu'), LINK)
   // Gắn sao / Bỏ gắn sao (UNI-2047 B6): only the Starred list carries the star time, so a row that
   // has one offers Bỏ gắn sao and any other row Gắn sao (idempotent on the server); a viewer may star
   if (doc.kind !== 'folder') {
