@@ -8,6 +8,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { ShareDialog } from '../src/renderer/src/uniwork-share/ShareDialog'
+import { resetOwnerTransferSession } from '../src/renderer/src/uniwork-share/OwnerTransferDialog'
 import type { ShareDialogTarget } from '../src/renderer/src/uniwork-share/share-dialog-target'
 import {
   createFakeShareApi,
@@ -949,5 +950,324 @@ describe('ShareDialog (UNI-2047 SD-B)', () => {
       expect(q('[role="dialog"]')).toBeNull()
       expect(api.calls).toHaveLength(0)
     })
+  })
+  describe('owner transfer (UNI-2078 slice 4)', () => {
+    beforeEach(() => resetOwnerTransferSession())
+
+    const transferButton = () => q<HTMLButtonElement>('[data-owner-transfer]')
+    const transferDialog = () => q('.uw-owner-transfer[role="dialog"]')
+    const confirmButton = () => button(transferDialog()!, t('shrOwnerTransferConfirm'))
+    const keepSelect = () => transferDialog()!.querySelector<HTMLSelectElement>('select')!
+    const personInput = () =>
+      transferDialog()!.querySelector<HTMLInputElement>('input[role="combobox"]')!
+    const alertText = () => transferDialog()!.querySelector('[role="alert"]')?.textContent ?? ''
+    async function openTransfer() {
+      await click(transferButton())
+      expect(transferDialog()).toBeTruthy()
+    }
+    async function key(el: Element, k: string) {
+      await act(async () => {
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }))
+      })
+      await flush()
+    }
+    async function pickPerson(name: string) {
+      await click(personInput())
+      const option = Array.from(
+        transferDialog()!.querySelectorAll<HTMLElement>('[role="option"]'),
+      ).find((o) => o.textContent?.includes(name))
+      await click(option)
+    }
+
+    it('shows Transfer ownership on the owner row only to someone who may administer', async () => {
+      await open()
+      expect(transferButton()!.textContent).toBe(t('shrOwnerTransferButton'))
+      expect(row('owner:u_owner')!.contains(transferButton())).toBe(true)
+      expect(transferButton()!.getAttribute('aria-haspopup')).toBe('dialog')
+    })
+
+    it('an administering admin (admin_scope, no level) gets it too', async () => {
+      await open(
+        { myLevel: '', adminScope: true },
+        target({ myLevel: undefined, adminScope: true }),
+      )
+      expect(transferButton()).toBeTruthy()
+    })
+
+    it('no button below manage, nor on a document owned by a work product', async () => {
+      await open({ myLevel: 'edit' }, target({ myLevel: 'edit' }))
+      expect(transferButton()).toBeNull()
+      await act(async () => root.unmount())
+      root = createRoot(host)
+      await open({}, target({ ownerKind: 'work_product' }))
+      expect(row('owner:u_owner')).toBeTruthy()
+      expect(transferButton()).toBeNull()
+    })
+
+    it('a shelved document: aria-disabled, described by the shelved note, opens nothing', async () => {
+      const api = await open({}, target({ shelvedAt: '2026-10-01T00:00:00Z' }))
+      const btn = transferButton()!
+      expect(btn.getAttribute('aria-disabled')).toBe('true')
+      const note = q('#' + btn.getAttribute('aria-describedby'))
+      expect(note?.textContent).toBe(t('shrShelvedNote'))
+      await click(btn)
+      expect(transferDialog()).toBeNull()
+      expect(calls(api, 'ownerCandidates')).toHaveLength(0)
+    })
+
+    it('the dialog: title, note, keep level defaults to edit (edit / view / none), Transfer off until a person is picked', async () => {
+      const api = await open()
+      await openTransfer()
+      const dialog = transferDialog()!
+      expect(dialog.getAttribute('role')).toBe('dialog')
+      expect(q('#' + dialog.getAttribute('aria-labelledby'))!.textContent).toBe(
+        t('shrOwnerTransferTitle', { document: 'Q3 plan' }),
+      )
+      expect(dialog.textContent).toContain(t('shrOwnerTransferNote'))
+      expect(dialog.textContent).toContain(t('shrOwnerPreviousLevelLabel', { name: 'Hoa Nguyễn' }))
+      expect(keepSelect().value).toBe('edit')
+      expect(Array.from(keepSelect().options).map((o) => [o.value, o.textContent])).toEqual([
+        ['edit', t('shrLevelEdit')],
+        ['view', t('shrLevelView')],
+        ['none', t('shrOwnerPreviousLevelNone')],
+      ])
+      expect(confirmButton()!.getAttribute('aria-disabled')).toBe('true')
+      await click(confirmButton())
+      expect(calls(api, 'transferOwner')).toHaveLength(0)
+      expect(calls(api, 'ownerCandidates')).toEqual([
+        { method: 'ownerCandidates', args: ['doc_1'] },
+      ])
+    })
+
+    it('the person combobox works from the keyboard and lists only the candidates main sent', async () => {
+      await open()
+      await openTransfer()
+      const input = personInput()
+      expect(input.getAttribute('aria-expanded')).toBe('false')
+      await key(input, 'ArrowDown')
+      expect(input.getAttribute('aria-expanded')).toBe('true')
+      const names = Array.from(transferDialog()!.querySelectorAll('[role="option"]')).map(
+        (o) => o.textContent,
+      )
+      expect(names.join('|')).not.toContain('Hoa Nguyễn')
+      expect(names.join('|')).toContain('Minh Trần')
+      const active = input.getAttribute('aria-activedescendant')
+      expect(active && document.getElementById(active)?.textContent).toContain('Minh Trần')
+      await key(input, 'ArrowDown')
+      await key(input, 'Enter')
+      expect(input.getAttribute('aria-expanded')).toBe('false')
+      expect(input.value).toBe('An Lê')
+      expect(confirmButton()!.getAttribute('aria-disabled')).toBeNull()
+      // typing filters the list
+      await typeInto(input, 'bình')
+      expect(
+        Array.from(transferDialog()!.querySelectorAll('[role="option"]')).map((o) => o.textContent),
+      ).toEqual([expect.stringContaining('Bình Phạm')])
+    })
+
+    it('transfers once, closes, says so and reads the access list again (no optimistic owner)', async () => {
+      const api = await open()
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      const slow = {
+        ...api,
+        transferOwner: vi.fn(async (input: never) => {
+          await gate
+          return api.transferOwner(input)
+        }),
+      }
+      await act(async () => root.unmount())
+      root = createRoot(host)
+      await open({}, target(), 'en', () => slow as unknown as UniworkShareApi)
+      const getsBefore = calls(api, 'get').length
+      await openTransfer()
+      await pickPerson('An Lê')
+      await choose(keepSelect(), 'view')
+      await click(confirmButton())
+      await click(confirmButton())
+      expect(slow.transferOwner).toHaveBeenCalledTimes(1)
+      expect(slow.transferOwner).toHaveBeenCalledWith({
+        documentId: 'doc_1',
+        userId: 'u_an',
+        previousOwnerLevel: 'view',
+      })
+      expect(confirmButton()!.getAttribute('aria-busy')).toBe('true')
+      // still the old owner while the server works
+      expect(row('owner:u_owner')).toBeTruthy()
+      await act(async () => release())
+      await flush()
+      expect(transferDialog()).toBeNull()
+      expect(q('[role="status"]')!.textContent).toBe(t('shrOwnerTransferred', { name: 'An Lê' }))
+      expect(calls(api, 'get').length).toBeGreaterThan(getsBefore)
+      expect(row('owner:u_an')).toBeTruthy()
+      expect(onChanged).toHaveBeenCalled()
+    })
+
+    it.each([
+      ['owner_target_not_member', 422, 'shrOwnerTargetNotMember'],
+      ['break_glass_required', 403, 'shrOwnerSelfTransferError'],
+      ['document_owned_by_work_product', 409, 'shrOwnerOwnedByWorkProduct'],
+      ['server_error', 500, 'shrOwnerFailed'],
+      ['malformed_response', undefined, 'shrOwnerFailed'],
+    ] as const)(
+      'a %s refusal shows its own sentence inside the dialog',
+      async (code, status, k) => {
+        const api = await open()
+        await openTransfer()
+        await pickPerson('An Lê')
+        api.failNext('transferOwner', {
+          ok: false,
+          error: code,
+          ...(status === undefined ? {} : { status }),
+        })
+        await click(confirmButton())
+        expect(transferDialog()).toBeTruthy()
+        expect(alertText()).toBe(t(k, { name: 'An Lê' }))
+        expect(row('owner:u_owner')).toBeTruthy()
+      },
+    )
+
+    it('a server without the route: the dialog says so and the button is gone for the session', async () => {
+      const api = await open()
+      await openTransfer()
+      await pickPerson('An Lê')
+      api.failNext('transferOwner', {
+        ok: false,
+        error: 'not_found',
+        status: 404,
+        endpointMissing: true,
+      })
+      await click(confirmButton())
+      expect(alertText()).toBe(t('shrOwnerUnavailable'))
+      await click(cancelButton())
+      expect(transferDialog()).toBeNull()
+      expect(transferButton()).toBeNull()
+      // the next Share dialog of this session has no button either
+      await act(async () => root.unmount())
+      root = createRoot(host)
+      await open()
+      expect(row('owner:u_owner')).toBeTruthy()
+      expect(transferButton()).toBeNull()
+    })
+
+    it('FE-1: a rejected transferOwner is the failed sentence, the controls unlock and a retry sends', async () => {
+      const api = createFakeShareApi()
+      const flaky = {
+        ...api,
+        transferOwner: vi
+          .fn()
+          .mockRejectedValueOnce(new Error('ipc: no handler'))
+          .mockImplementation((input: never) => api.transferOwner(input)),
+      }
+      await open({}, target(), 'en', () => flaky as unknown as UniworkShareApi)
+      await openTransfer()
+      await pickPerson('An Lê')
+      await click(confirmButton())
+      expect(flaky.transferOwner).toHaveBeenCalledTimes(1)
+      expect(transferDialog()).toBeTruthy()
+      expect(alertText()).toBe(t('shrOwnerFailed', { name: 'An Lê' }))
+      expect(confirmButton()!.getAttribute('aria-busy')).toBeNull()
+      expect(cancelButton()!.hasAttribute('disabled')).toBe(false)
+      expect(personInput().disabled).toBe(false)
+      expect(keepSelect().disabled).toBe(false)
+      await click(confirmButton())
+      expect(flaky.transferOwner).toHaveBeenCalledTimes(2)
+      expect(transferDialog()).toBeNull()
+    })
+
+    it('FE-1: a rejected ownerCandidates is an error line, not "Loading…" for ever', async () => {
+      const api = createFakeShareApi()
+      const broken = {
+        ...api,
+        ownerCandidates: vi.fn(async () => {
+          throw new Error('ipc: no handler')
+        }),
+      }
+      await open({}, target(), 'en', () => broken as unknown as UniworkShareApi)
+      await openTransfer()
+      expect(alertText()).toBe(t('shrOwnerFailed', { name: '' }))
+      await click(personInput())
+      expect(transferDialog()!.textContent).not.toContain(t('shrOwnerLoading'))
+      expect(transferDialog()!.textContent).toContain(t('shrOwnerNoCandidates'))
+    })
+
+    it('FE-2: Escape and the overlay do nothing while the transfer is in flight', async () => {
+      const api = createFakeShareApi()
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      const slow = {
+        ...api,
+        transferOwner: vi.fn(async (input: never) => {
+          await gate
+          return api.transferOwner(input)
+        }),
+      }
+      await open({}, target(), 'en', () => slow as unknown as UniworkShareApi)
+      await openTransfer()
+      await pickPerson('An Lê')
+      await click(confirmButton())
+      expect(confirmButton()!.getAttribute('aria-busy')).toBe('true')
+      await key(transferDialog()!, 'Escape')
+      expect(transferDialog()).toBeTruthy()
+      const overlay = transferDialog()!.parentElement!
+      await click(overlay)
+      expect(transferDialog()).toBeTruthy()
+      await act(async () => release())
+      await flush()
+      expect(transferDialog()).toBeNull()
+    })
+
+    it('FE-3: the list closes when focus leaves the field and the list; aria-controls only while it is open', async () => {
+      await open()
+      await openTransfer()
+      const input = personInput()
+      expect(input.hasAttribute('aria-controls')).toBe(false)
+      await click(input)
+      expect(input.getAttribute('aria-expanded')).toBe('true')
+      const list = transferDialog()!.querySelector('[role="listbox"]')!
+      expect(input.getAttribute('aria-controls')).toBe(list.id)
+      const leave = async (to: Element | null) =>
+        act(async () => {
+          input.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: to }))
+        })
+      // focus moving inside the field or the list keeps it open
+      await leave(list.querySelector('[role="option"]'))
+      expect(input.getAttribute('aria-expanded')).toBe('true')
+      // Tab to the keep select closes it
+      await leave(keepSelect())
+      expect(input.getAttribute('aria-expanded')).toBe('false')
+      expect(transferDialog()!.querySelector('[role="listbox"]')).toBeNull()
+      expect(input.hasAttribute('aria-controls')).toBe(false)
+      // and it opens again from the keyboard
+      await key(input, 'ArrowDown')
+      expect(input.getAttribute('aria-expanded')).toBe('true')
+    })
+
+    it('Cancel and Escape close it and focus goes back to the button', async () => {
+      await open()
+      await openTransfer()
+      await click(cancelButton())
+      expect(transferDialog()).toBeNull()
+      expect(document.activeElement).toBe(transferButton())
+      await openTransfer()
+      await key(transferDialog()!, 'Escape')
+      expect(transferDialog()).toBeNull()
+      // Escape closed only the transfer dialog, not the Share dialog under it
+      expect(onClose).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(transferButton())
+    })
+
+    it('vi copy is the web copy', async () => {
+      await open({}, target(), 'vi')
+      expect(transferButton()!.textContent).toBe('Chuyển quyền sở hữu')
+      await openTransfer()
+      expect(transferDialog()!.textContent).toContain('Chủ sở hữu mới')
+      expect(button(transferDialog()!, 'Chuyển')).toBeTruthy()
+    })
+
+    const cancelButton = () =>
+      Array.from(transferDialog()!.querySelectorAll<HTMLElement>('button')).find((b) =>
+        b.hasAttribute('data-owner-transfer-cancel'),
+      )
   })
 })

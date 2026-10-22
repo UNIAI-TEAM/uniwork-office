@@ -190,4 +190,9 @@ export const zh = {
   uwSourceOriginTask: '任务',
   uwSourceOriginMeeting: '会议',
   uwSourceOriginEmail: '邮件',
+  uwErrOwnerRequiresCopy: '此文档属于工作成果：请通过其所属页面创建副本。',
+  uwErrPageCopyNotSupported: '此步骤仅支持复制文件文档，UniNote 的副本将在后续提供。',
+  uwErrCopyConsentRequired: '创建副本前需要明确确认。',
+  uwErrDocumentNotInTrash: '此项已不在回收站中。',
+  uwErrFolderTooLarge: '文件夹中的项目过多，无法一次删除。请先分批删除其中的内容。',
 }

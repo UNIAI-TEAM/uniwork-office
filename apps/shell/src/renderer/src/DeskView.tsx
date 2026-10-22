@@ -249,6 +249,7 @@ export function DeskView({
             view={view}
             local={recents.local}
             onReload={onReload}
+            onOpenInbox={() => onOpenTab('inbox')}
             refreshTick={refreshTick}
           />
           <DeskInProgress

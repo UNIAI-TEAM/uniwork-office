@@ -90,6 +90,10 @@ export const it = {
   dlBulkConfirmBody:
     'Gli elementi restano nel cestino per 30 giorni, poi vengono eliminati definitivamente.',
   dlBulkDoneDownload: 'Scaricati {ok}/{total} documenti',
+  dlBulkMoveTitleOne: 'Sposta {count} documento',
+  dlBulkMoveTitleOther: 'Sposta {count} documenti',
+  dlBulkMoveDescription: 'Scegli la cartella in cui spostare i documenti selezionati.',
+  dlBulkDoneMove: 'Spostati {ok}/{total} documenti',
   dlZipPreparing: 'Preparazione del file ZIP…',
   dlZipTooLarge: 'I file selezionati superano complessivamente 1 GB. Selezionane meno.',
   dlZipFailed: 'Impossibile creare il file ZIP. Riprova.',
@@ -127,4 +131,30 @@ export const it = {
   dlSideSourceEmail: 'Email',
   dlSideSourceTask: 'Attività',
   dlSearchNoResults: 'Nessun risultato per “{query}”',
+  dlCopyTitle: 'Crea copia',
+  dlCopyDescription:
+    'La copia è un nuovo documento che mantiene accessi e provenienza di questo documento; i dati sono condivisi, quindi lo spazio di archiviazione viene conteggiato una sola volta.',
+  dlCopyTitleLabel: 'Titolo della copia',
+  dlCopyTitlePlaceholder: '{title} (copia)',
+  dlCopyConsentLabel: "Capisco che la copia mantiene gli accessi dell'originale",
+  dlCopyConsentHint: "La copia non amplia l'accesso a nessuno e non modifica mai l'originale.",
+  dlCopySubmit: 'Crea copia',
+  dlCopySubmitting: 'Creazione della copia…',
+  dlCopyFailed: 'Impossibile creare la copia. Nessuna modifica è stata applicata.',
+  dlCopyDone: 'Copia "{title}" creata',
+  dlCopyUnavailable: 'Questa installazione non include ancora la funzione di copia.',
+  dlPurgeTitle: 'Eliminare definitivamente {title}?',
+  dlPurgeDescription:
+    'Questo elemento verrà eliminato definitivamente e non potrà essere ripristinato.',
+  dlPurgeFolderDescription:
+    'Questa cartella verrà eliminata definitivamente e non potrà essere ripristinata. Gli elementi al suo interno che non gestisci restano nel cestino.',
+  dlPurgeSubmit: 'Elimina definitivamente',
+  dlPurgeSubmitting: 'Eliminazione definitiva…',
+  dlPurgeDone: '{title} eliminato definitivamente',
+  dlPurgeFailed: 'Impossibile eliminare. Nulla è stato modificato.',
+  dlBulkPurgeTitleOne: 'Eliminare definitivamente {n} documento?',
+  dlBulkPurgeTitleOther: 'Eliminare definitivamente {n} documenti?',
+  dlBulkPurgeDescription:
+    'Questa operazione non può essere annullata. Gli elementi che non puoi gestire verranno saltati.',
+  dlBulkDonePurge: '{ok}/{total} documenti eliminati definitivamente',
 } satisfies Record<keyof typeof zh, string>

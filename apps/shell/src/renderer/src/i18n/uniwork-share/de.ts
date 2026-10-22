@@ -200,4 +200,26 @@ export const de = {
   shrBulkCopyFailed: 'Der Link konnte nicht kopiert werden. Versuche es erneut.',
   shrAccessManageFor: 'Zugriff für {title} verwalten',
   shrAccessViewFor: 'Zugriff für {title} anzeigen',
+  shrOwnerTransferButton: 'Eigentümerschaft übertragen',
+  shrOwnerTransferTitle: 'Eigentümerschaft von „{document}“ übertragen',
+  shrOwnerTitleUntitled: 'Dokument-Eigentümerschaft übertragen',
+  shrOwnerNewOwnerLabel: 'Neuer Eigentümer',
+  shrOwnerPreviousLevelLabel: 'Zugriff von {name} nach der Übertragung',
+  shrOwnerPreviousLevelNone: 'Kein Zugriff',
+  shrOwnerTransferNote:
+    'Der neue Eigentümer kann das Dokument verwalten: teilen, die Sichtbarkeit ändern und in den Papierkorb verschieben.',
+  shrOwnerTransferConfirm: 'Übertragen',
+  shrOwnerTransferred: 'Eigentümerschaft an {name} übertragen',
+  shrOwnerTargetNotMember:
+    '{name} ist kein Mitglied dieses Workspace und kann daher nicht Eigentümer dieses Dokuments sein.',
+  shrOwnerSelfTransferError:
+    'Administratoren können die Eigentümerschaft eines privaten Dokuments nicht selbst übernehmen. Bitte einen anderen Administrator um die Übertragung oder öffne den Notfallzugriff zur Prüfung.',
+  shrOwnerSearchPlaceholder: 'Workspace-Mitglieder suchen',
+  shrOwnerNoCandidates: 'Kein anderes Mitglied kann dieses Dokument übernehmen.',
+  shrOwnerLoading: 'Wird geladen…',
+  shrOwnerFailed: 'Eigentümerschaft konnte nicht übertragen werden. Bitte erneut versuchen.',
+  shrOwnerOwnedByWorkProduct:
+    'Dieses Dokument gehört zu einem Arbeitsergebnis, daher kann der Eigentümer nicht geändert werden.',
+  shrOwnerUnavailable:
+    'Die Übertragung der Eigentümerschaft ist auf diesem Server noch nicht verfügbar.',
 } satisfies Record<keyof typeof zh, string>

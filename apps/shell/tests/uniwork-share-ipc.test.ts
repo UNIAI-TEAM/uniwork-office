@@ -80,10 +80,12 @@ const CHANNEL_NAMES = {
   breakGlassGrant: 'uniwork-share:break-glass-grant',
   breakGlassRevoke: 'uniwork-share:break-glass-revoke',
   members: 'uniwork-share:members',
+  ownerCandidates: 'uniwork-share:owner-candidates',
+  transferOwner: 'uniwork-share:owner-transfer',
 } as const
 
 describe('the channel table', () => {
-  it('has exactly the thirteen uniwork-share channels', () => {
+  it('has exactly the fifteen uniwork-share channels', () => {
     expect(UNIWORK_SHARE_CHANNELS).toEqual(CHANNEL_NAMES)
   })
 })
@@ -309,6 +311,89 @@ describe('main: the handlers', () => {
     expect(seen[0]!.body).toEqual({ reason: 'Audit of the Q3 file' })
   })
 
+  it('UNI-2078 owner transfer: candidates read the gate and members, transfer re-reads the gate then PUTs', async () => {
+    const { call } = await setup()
+    const seen = stubServer((s) => {
+      const path = s.path.slice('/api/v1'.length)
+      if (path === '/documents/doc_1/shares') {
+        return reply(200, {
+          my_level: 'manage',
+          acl_owner: { user_id: 'u_owner', level: 'manage', via: 'member' },
+        })
+      }
+      if (path === '/documents/doc_1') {
+        return reply(200, {
+          document: { id: 'doc_1', workspace_id: 'ws_1', visibility: 'workspace' },
+        })
+      }
+      if (path === '/workspaces/ws_1/members') {
+        return reply(200, {
+          members: [{ user_id: 'u_owner' }, { user_id: 'u_an' }, { user_id: 'u_gone' }],
+        })
+      }
+      if (path === '/orgs/acme/members') {
+        return reply(200, {
+          members: [
+            { user_id: 'u_owner', display_name: 'Hoa', email: 'h@acme.test', status: 'active' },
+            { user_id: 'u_an', display_name: 'An Lê', email: 'an@acme.test', status: 'active' },
+            {
+              user_id: 'u_gone',
+              display_name: 'Gone',
+              email: 'g@acme.test',
+              status: 'deactivated',
+            },
+          ],
+          next_cursor: '',
+        })
+      }
+      return reply(200, {
+        document_id: 'doc_1',
+        acl_owner_id: 'u_an',
+        previous_owner_id: 'u_owner',
+        previous_owner_share_id: 'sh_9',
+      })
+    })
+    expect(await call(CHANNEL_NAMES.ownerCandidates, 'doc_1')).toEqual({
+      ok: true,
+      value: [{ userId: 'u_an', name: 'An Lê', email: 'an@acme.test' }],
+    })
+    expect(
+      await call(CHANNEL_NAMES.transferOwner, {
+        documentId: 'doc_1',
+        userId: 'u_an',
+        previousOwnerLevel: 'none',
+      }),
+    ).toMatchObject({ ok: true, value: { aclOwnerId: 'u_an', previousOwnerShareId: 'sh_9' } })
+    const put = seen.find((s) => s.method === 'PUT')
+    expect(put).toMatchObject({
+      path: '/api/v1/documents/doc_1/owner',
+      body: { user_id: 'u_an', previous_owner_level: 'none' },
+    })
+    // the PUT comes after main read the gate again
+    const routes = seen.map((s) => `${s.method} ${s.path.slice('/api/v1'.length)}`)
+    expect(routes.slice(-3)).toEqual([
+      'GET /documents/doc_1/shares',
+      'GET /documents/doc_1',
+      'PUT /documents/doc_1/owner',
+    ])
+    expect(seen.find((s) => s.path.endsWith('/orgs/acme/members'))?.search).toContain(
+      'status=active',
+    )
+  })
+
+  it('UNI-2078: a server without the owner route answers endpointMissing', async () => {
+    const { call } = await setup()
+    stubServer((s) => {
+      if (s.path.endsWith('/shares'))
+        return reply(200, { my_level: 'manage', acl_owner: { user_id: 'u_owner' } })
+      if (s.method === 'GET') return reply(200, { document: { id: 'doc_1', workspace_id: 'ws_1' } })
+      return new Response('404 page not found', { status: 404 })
+    })
+    expect(
+      await call(CHANNEL_NAMES.transferOwner, { documentId: 'doc_1', userId: 'u_an' }),
+    ).toMatchObject({ ok: false, endpointMissing: true, status: 404 })
+  })
+
   it('a refused reason comes back as break_glass_reason_invalid (the 422 verdict)', async () => {
     const { call } = await setup()
     stubServer(() => reply(422, { error: { code: 'break_glass_reason_invalid', message: 'x' } }))
@@ -373,6 +458,8 @@ interface ShareBridge {
   breakGlassGrant(input: unknown): Promise<unknown>
   breakGlassRevoke(input: unknown): Promise<unknown>
   members(input: unknown): Promise<unknown>
+  ownerCandidates(documentId: string): Promise<unknown>
+  transferOwner(input: unknown): Promise<unknown>
 }
 
 async function loadPreload(replyValue: unknown) {
@@ -421,6 +508,8 @@ describe('preload: window.uniworkShare', () => {
     await share!.breakGlassGrant(input)
     await share!.breakGlassRevoke(input)
     await share!.members(input)
+    await share!.ownerCandidates('doc_1')
+    await share!.transferOwner(input)
     expect(invoked.filter((i) => i.channel.startsWith('uniwork-share:'))).toEqual([
       { channel: CHANNEL_NAMES.get, args: ['doc_1'] },
       { channel: CHANNEL_NAMES.update, args: [input] },
@@ -435,6 +524,8 @@ describe('preload: window.uniworkShare', () => {
       { channel: CHANNEL_NAMES.breakGlassGrant, args: [input] },
       { channel: CHANNEL_NAMES.breakGlassRevoke, args: [input] },
       { channel: CHANNEL_NAMES.members, args: [input] },
+      { channel: CHANNEL_NAMES.ownerCandidates, args: ['doc_1'] },
+      { channel: CHANNEL_NAMES.transferOwner, args: [input] },
     ])
   })
 
@@ -458,6 +549,26 @@ describe('preload: window.uniworkShare', () => {
       const { share } = await loadPreload(bad)
       expect(await share!.get('doc_1')).toEqual({ ok: false, error: 'malformed_response' })
     }
+  })
+
+  it('UNI-2078: keeps endpointMissing on a failure, only when it is true', async () => {
+    const { share } = await loadPreload({
+      ok: false,
+      error: 'not_found',
+      status: 404,
+      endpointMissing: true,
+    })
+    expect(await share!.transferOwner({ documentId: 'doc_1', userId: 'u_an' })).toEqual({
+      ok: false,
+      error: 'not_found',
+      status: 404,
+      endpointMissing: true,
+    })
+    const odd = await loadPreload({ ok: false, error: 'not_found', endpointMissing: 'yes' })
+    expect(await odd.share!.transferOwner({ documentId: 'doc_1', userId: 'u_an' })).toEqual({
+      ok: false,
+      error: 'not_found',
+    })
   })
 
   it('keeps only the known failure fields', async () => {

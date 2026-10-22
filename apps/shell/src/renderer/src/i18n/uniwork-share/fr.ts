@@ -195,4 +195,25 @@ export const fr = {
   shrBulkCopyFailed: 'Impossible de copier le lien. Réessayez.',
   shrAccessManageFor: 'Gérer l’accès à {title}',
   shrAccessViewFor: 'Voir l’accès à {title}',
+  shrOwnerTransferButton: 'Transférer la propriété',
+  shrOwnerTransferTitle: 'Transférer la propriété de « {document} »',
+  shrOwnerTitleUntitled: 'Transférer la propriété du document',
+  shrOwnerNewOwnerLabel: 'Nouveau propriétaire',
+  shrOwnerPreviousLevelLabel: 'Accès de {name} après le transfert',
+  shrOwnerPreviousLevelNone: 'Aucun accès',
+  shrOwnerTransferNote:
+    'Le nouveau propriétaire peut gérer le document : le partager, changer qui peut le voir et le placer dans la corbeille.',
+  shrOwnerTransferConfirm: 'Transférer',
+  shrOwnerTransferred: 'Propriété transférée à {name}',
+  shrOwnerTargetNotMember:
+    "{name} n'est pas membre de cet espace de travail et ne peut donc pas être propriétaire de ce document.",
+  shrOwnerSelfTransferError:
+    "Les administrateurs ne peuvent pas s'attribuer eux-mêmes la propriété d'un document privé. Demandez à un autre administrateur de le transférer ou ouvrez un accès d'urgence pour l'examiner.",
+  shrOwnerSearchPlaceholder: "Rechercher des membres de l'espace de travail",
+  shrOwnerNoCandidates: 'Aucun autre membre ne peut recevoir ce document.',
+  shrOwnerLoading: 'Chargement…',
+  shrOwnerFailed: 'Impossible de transférer la propriété. Réessayez.',
+  shrOwnerOwnedByWorkProduct:
+    'Ce document appartient à un livrable, son propriétaire ne peut donc pas être changé.',
+  shrOwnerUnavailable: "Le transfert de propriété n'est pas encore disponible sur ce serveur.",
 } satisfies Record<keyof typeof zh, string>

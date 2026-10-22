@@ -116,6 +116,8 @@ export function useAlive(): () => boolean {
 export interface UnreadNotices {
   /** the unread notices of the workspace, newest first; null until the first answer */
   rows: WorkNotification[] | null
+  /** the server has older unread notices than `rows` holds (the page came back with a next_before) */
+  more: boolean
   /** the last load's failure (the rows on screen are kept) */
   error: UniworkWorkError | null
   /** a row the caller just marked read leaves the list at once */
@@ -135,15 +137,16 @@ export function useUnreadNotices(opts: {
   const [state, setState] = useState<{
     key: string | null
     rows: WorkNotification[] | null
+    more: boolean
     error: UniworkWorkError | null
-  }>({ key: workspaceId, rows: null, error: null })
+  }>({ key: workspaceId, rows: null, more: false, error: null })
   // a drop (or another workspace) outdates a request that is already on its way
   const epoch = useRef(0)
   const keyRef = useRef(workspaceId)
   keyRef.current = workspaceId
   if (state.key !== workspaceId) {
     epoch.current++
-    setState({ key: workspaceId, rows: null, error: null })
+    setState({ key: workspaceId, rows: null, more: false, error: null })
   }
 
   const alive = useAlive()
@@ -163,7 +166,12 @@ export function useUnreadNotices(opts: {
       if (!alive() || mine !== epoch.current || ws !== keyRef.current) return
       setState((s) =>
         result.ok
-          ? { key: ws, rows: result.value.notifications, error: null }
+          ? {
+              key: ws,
+              rows: result.value.notifications,
+              more: result.value.next_before !== null,
+              error: null,
+            }
           : { ...s, error: result.error },
       )
     }, alive)
@@ -180,7 +188,7 @@ export function useUnreadNotices(opts: {
     setState((s) => (s.rows ? { ...s, rows: s.rows.filter((n) => n.id !== id) } : s))
   }, [])
   const reload = useCallback(() => flight.current?.trigger(), [])
-  return { rows: state.rows, error: state.error, drop, reload }
+  return { rows: state.rows, more: state.more, error: state.error, drop, reload }
 }
 
 /**

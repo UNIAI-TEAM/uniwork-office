@@ -190,9 +190,15 @@ describe('the S18 action IPC', () => {
       // UNI-2066 WS-A: the trash confirmation's impact read
       UNIWORK_DOC_CHANNELS.archiveImpact,
       UNIWORK_DOC_CHANNELS.restoreDocument,
+      // UNI-2078: a plain copy of a document
+      UNIWORK_DOC_CHANNELS.copyDocument,
+      // UNI-2078: delete forever from the trash
+      UNIWORK_DOC_CHANNELS.purgeDocument,
     ]) {
       expect(handlers.has(channel)).toBe(true)
     }
+    expect(UNIWORK_DOC_CHANNELS.copyDocument).toBe('uniwork-doc:copy-document')
+    expect(UNIWORK_DOC_CHANNELS.purgeDocument).toBe('uniwork-doc:purge-document')
     // the pushes are not invoke handlers
     expect(handlers.has(UNIWORK_DOC_CHANNELS.uploadProgress)).toBe(false)
     expect(handlers.has(UNIWORK_DOC_CHANNELS.docRenamed)).toBe(false)
@@ -283,6 +289,31 @@ describe('the S18 action IPC', () => {
         format: 'docx',
       }),
     ).toEqual({ ok: false, error: 'not_signed_in' })
+  })
+
+  // UNI-2078: the copy channel reaches service.copyDocument; main never trusts the input
+  it('answers the copy channel with the action-result shape, before any request', async () => {
+    const { handlers } = await setup()
+    const copy = handlers.get(UNIWORK_DOC_CHANNELS.copyDocument)!
+    for (const bad of [undefined, null, 7, 'doc_1', {}, { documentId: 7 }, { documentId: '' }]) {
+      expect(await copy(null, bad)).toEqual({ ok: false, error: 'not_found' })
+    }
+    identity = null
+    expect(await copy(null, { documentId: 'doc_1', title: 'x' })).toEqual({
+      ok: false,
+      error: 'not_signed_in',
+    })
+  })
+
+  // UNI-2078: the purge channel reaches service.purgeDocument; main never trusts the input
+  it('answers the purge channel with the action-result shape, before any request', async () => {
+    const { handlers } = await setup()
+    const purge = handlers.get(UNIWORK_DOC_CHANNELS.purgeDocument)!
+    for (const bad of [undefined, null, 7, '', {}, { documentId: 'doc_1' }]) {
+      expect(await purge(null, bad)).toEqual({ ok: false, error: 'not_found' })
+    }
+    identity = null
+    expect(await purge(null, 'doc_1')).toEqual({ ok: false, error: 'not_signed_in' })
   })
 
   it('registers the FD-11 folder channels and answers them from the service', async () => {

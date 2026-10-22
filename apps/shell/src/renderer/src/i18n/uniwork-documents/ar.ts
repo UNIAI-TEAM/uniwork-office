@@ -193,4 +193,11 @@ export const ar = {
   uwSourceOriginTask: 'المهام',
   uwSourceOriginMeeting: 'الاجتماعات',
   uwSourceOriginEmail: 'البريد الإلكتروني',
+  uwErrOwnerRequiresCopy: 'هذا المستند تابع لنتاج عمل: انسخه من خلال الشاشة المالكة له.',
+  uwErrPageCopyNotSupported:
+    'لا يمكن نسخ إلا مستندات الملفات في هذه المرحلة. ستتوفر نسخ UniNote لاحقًا.',
+  uwErrCopyConsentRequired: 'يلزم تأكيد صريح قبل النسخ.',
+  uwErrDocumentNotInTrash: 'لم يعد هذا العنصر في سلة المهملات.',
+  uwErrFolderTooLarge:
+    'يحتوي المجلد على عدد كبير جدًا من العناصر بحيث لا يمكن حذفها دفعة واحدة. احذف محتوياته على أجزاء أولًا.',
 } satisfies Record<keyof typeof zh, string>

@@ -20,8 +20,9 @@ import {
   filterFolderTree,
   folderPath,
   moveBlockOf,
+  movingItemsOf,
   withMyFolderLabel,
-  type MovingItem,
+  type MovingItems,
   type PathPart,
   type TreeRow,
 } from './uniwork-folders-model'
@@ -57,6 +58,7 @@ export function UniworkFolderPicker({
   workspaceId,
   loadTree,
   nodes: givenNodes,
+  description,
   moving = null,
   initialFolderId,
   onPick,
@@ -79,8 +81,10 @@ export function UniworkFolderPicker({
   /** reads the tree when the host has none in hand */
   loadTree: (workspaceId: string) => Promise<UniworkResult<UniworkFolderNode[]>>
   nodes?: UniworkFolderNode[]
-  /** the item being moved; null = a new document being placed */
-  moving?: MovingItem | null
+  /** a sentence under the title (the bulk Move's) */
+  description?: string
+  /** the item being moved, or the batch of them; null = a new document being placed */
+  moving?: MovingItems
   initialFolderId: string | null
   onPick: (picked: PickedFolder) => void
   onCancel: () => void
@@ -189,6 +193,7 @@ export function UniworkFolderPicker({
     <>
       <ActionModal
         labelledBy={`${id}-title`}
+        describedBy={description ? `${id}-desc` : undefined}
         className={`uwf-picker${className ? ` ${className}` : ''}`}
         onCancel={onCancel}
       >
@@ -218,6 +223,11 @@ export function UniworkFolderPicker({
           </div>
         ) : (
           heading
+        )}
+        {description && (
+          <p id={`${id}-desc`} className="uwf-picker-desc">
+            {description}
+          </p>
         )}
         {searchLabel && nodes && (
           <div className="uwf-picker-search-wrap">
@@ -309,7 +319,11 @@ export function UniworkFolderPicker({
               if (blocked) return
               const picked = { folderId: chosenId, path }
               // a folder out of My Folder becomes visible to the workspace: ask before it is sent
-              if (moving?.kind === 'folder' && folderLeavesMyFolder([moving.id], chosenId, index)) {
+              // (once for a batch, with every folder of it)
+              const folderIds = movingItemsOf(moving)
+                .filter((item) => item.kind === 'folder')
+                .map((item) => item.id)
+              if (folderIds.length > 0 && folderLeavesMyFolder(folderIds, chosenId, index)) {
                 setConfirmingOut(picked)
                 return
               }

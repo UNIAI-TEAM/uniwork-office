@@ -16,7 +16,7 @@ import type {
 import { DeskInTray } from '../src/renderer/src/DeskInTray'
 import { DeskToday } from '../src/renderer/src/DeskToday'
 import { LocaleProvider } from '../src/renderer/src/locale'
-import { useUnreadNotices } from '../src/renderer/src/notices-data'
+import { notifyNoticesChanged, useUnreadNotices } from '../src/renderer/src/notices-data'
 import {
   onDocumentsIntent,
   resetDocumentsIntentBusForTests,
@@ -38,6 +38,9 @@ let work: {
   openWeb: ReturnType<typeof vi.fn>
 }
 let listed: WorkNotification[]
+/** the unread list's next_before: set while the server has older unread rows than it sent */
+let nextBefore: string | null
+let openInbox: ReturnType<typeof vi.fn>
 let notices: UniworkLaunchEvent[]
 let offNotice: () => void
 
@@ -57,10 +60,12 @@ beforeEach(() => {
   window.aiOffice = api as unknown as HomeApi
   // the server's unread list: what is marked read leaves it
   listed = []
+  nextBefore = null
+  openInbox = vi.fn()
   work = {
     listNotifications: vi.fn(async () => ({
       ok: true,
-      value: { notifications: listed, next_before: null },
+      value: { notifications: listed, next_before: nextBefore },
     })),
     markNotificationsRead: vi.fn(async (ids: string[]) => {
       listed = listed.filter((n) => !ids.includes(n.id))
@@ -170,6 +175,7 @@ function Harness({ inbox }: { inbox: WorkNotification[] }): ReactElement {
     signedIn: true,
     view: 'ready',
     local: [],
+    onOpenInbox: openInbox,
   })
 }
 
@@ -749,5 +755,64 @@ describe('the tray reads the unread list (UNI-2079)', () => {
     await click(button('Retry'))
     expect(work.listNotifications).toHaveBeenCalledTimes(2)
     expect(rowOf('Contract-012')).toBeTruthy()
+  })
+})
+
+describe('tray and the unread list cap (UNI-2110)', () => {
+  const eight = () =>
+    Array.from({ length: 8 }, (_, i) =>
+      changedOne({
+        id: `n${i}`,
+        created_at: `2026-10-14T03:0${i}:00Z`,
+        sample_documents: [{ id: `d${i}`, title: `Plan ${i}` }],
+      }),
+    )
+
+  it('offers "View all", which opens the Inbox tab, while the server has older unread rows', async () => {
+    nextBefore = 'cursor-1'
+    await tray(eight())
+    await click(button('View all'))
+    expect(openInbox).toHaveBeenCalledTimes(1)
+  })
+
+  it('says it in Vietnamese too', async () => {
+    nextBefore = 'cursor-1'
+    await tray(eight(), 'vi')
+    expect(button('Xem tất cả')).toBeTruthy()
+  })
+
+  it('shows no "View all" when every unread row is already in the list', async () => {
+    await tray(eight())
+    expect(button('View all')).toBeUndefined()
+    expect(openInbox).not.toHaveBeenCalled()
+  })
+
+  it('still offers it with no document row in the first page: the older ones may hold some', async () => {
+    nextBefore = 'cursor-1'
+    await tray([])
+    expect(button('View all')).toBeTruthy()
+  })
+
+  it('puts "Show more" and "View all" in one row when both apply', async () => {
+    nextBefore = 'cursor-1'
+    await tray([
+      ...eight(),
+      changedOne({ id: 'n8', sample_documents: [{ id: 'd8', title: 'Plan 8' }] }),
+    ])
+    const more = host.querySelectorAll('.wb-desk-more')
+    expect(more).toHaveLength(1)
+    const labels = Array.from(more[0].querySelectorAll('button')).map((b) => b.textContent)
+    expect(labels).toEqual(['Show 1 more', 'View all'])
+  })
+
+  it('hides "View all" once a later load fails: the flag is from an older page', async () => {
+    nextBefore = 'cursor-1'
+    await tray([])
+    expect(button('View all')).toBeTruthy()
+    work.listNotifications.mockResolvedValueOnce({ ok: false, error: 'offline' })
+    await act(async () => notifyNoticesChanged())
+    await flush()
+    expect(host.textContent).toContain('Retry')
+    expect(button('View all')).toBeUndefined()
   })
 })

@@ -191,4 +191,9 @@ export const zhTW = {
   uwSourceOriginTask: '工作',
   uwSourceOriginMeeting: '會議',
   uwSourceOriginEmail: '電子郵件',
+  uwErrOwnerRequiresCopy: '此文件屬於工作成果：請透過其所屬頁面建立副本。',
+  uwErrPageCopyNotSupported: '此步驟僅支援複製檔案文件，UniNote 的副本將於後續提供。',
+  uwErrCopyConsentRequired: '建立副本前需要明確確認。',
+  uwErrDocumentNotInTrash: '此項目已不在資源回收筒中。',
+  uwErrFolderTooLarge: '資料夾中的項目過多，無法一次刪除。請先分批刪除其中的內容。',
 } satisfies Record<keyof typeof zh, string>

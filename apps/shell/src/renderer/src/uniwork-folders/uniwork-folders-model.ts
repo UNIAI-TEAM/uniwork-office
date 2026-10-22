@@ -224,29 +224,48 @@ export const MOVE_BLOCK_KEYS: Record<Exclude<MoveBlock, null>, StringKey> = {
   my_folder: 'ufDisabledWsFolder',
 }
 
+/** one item being moved, or a batch of them (the Documents list's bulk Move) */
+export type MovingItems = MovingItem | readonly MovingItem[] | null
+
+/** the items as a list: a single item is a batch of one, null is an empty batch */
+export function movingItemsOf(moving: MovingItems | undefined): readonly MovingItem[] {
+  if (!moving) return []
+  return 'id' in moving ? [moving] : moving
+}
+
 /**
- * Whether `targetId` (null = the root) can take the item. `moving` null is a
- * new document being placed (New / Upload / Save a copy): only depth applies.
+ * Whether `targetId` (null = the root) can take the item, or every item of a batch. `moving` null
+ * (or an empty batch) is a new document being placed (New / Upload / Save a copy): only depth
+ * applies. A batch is judged item by item: a target inside or equal to any moving folder, a
+ * workspace folder into My Folder, and depth with the tallest moving folder all block it; "current
+ * location" blocks only when every item sits in that parent (the web passes none for a batch).
  */
 export function moveBlockOf(
   index: FolderIndex,
-  moving: MovingItem | null,
+  moving: MovingItems,
   targetId: string | null,
   maxDepth: number = FOLDER_MAX_DEPTH,
 ): MoveBlock {
-  if (moving?.kind === 'folder' && targetId !== null) {
-    if (folderPath(index, targetId).some((p) => p.id === moving.id)) return 'inside'
+  const items = movingItemsOf(moving)
+  const folders = items.filter((item) => item.kind === 'folder')
+  if (targetId !== null) {
+    const path = folderPath(index, targetId)
+    if (folders.some((folder) => path.some((p) => p.id === folder.id))) return 'inside'
   }
-  if (moving && targetId === moving.parentId) return 'current'
+  if (items.length > 0 && items.every((item) => item.parentId === targetId)) return 'current'
   // UNI-2066: a workspace folder never lands in My Folder or under it (the server answers 422)
   if (
-    moving?.kind === 'folder' &&
     targetId !== null &&
-    workspaceFolderIntoMyFolder([moving.id], targetId, index)
+    folders.length > 0 &&
+    workspaceFolderIntoMyFolder(
+      folders.map((folder) => folder.id),
+      targetId,
+      index,
+    )
   ) {
     return 'my_folder'
   }
-  const height = moving?.kind === 'folder' ? (index.get(moving.id)?.height ?? 1) : 1
+  const height = Math.max(1, ...folders.map((folder) => index.get(folder.id)?.height ?? 1))
   const targetDepth = targetId === null ? 0 : (index.get(targetId)?.depth ?? 0)
   return targetDepth + height > maxDepth ? 'deep' : null
 }

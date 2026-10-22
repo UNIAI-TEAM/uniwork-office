@@ -21,10 +21,12 @@ export type RowMenuActionId =
   | 'new-subfolder'
   | 'rename'
   | 'move'
+  | 'duplicate'
   | 'shelve'
   | 'unshelve'
   | 'trash'
   | 'restore'
+  | 'purge'
   | 'download'
   | 'versions'
   | 'logs'
@@ -63,6 +65,29 @@ export function rowCanDownload(screen: DocListScreen, doc: DocumentsHomeDoc): bo
   return screen !== 'trash' && doc.archived !== true && doc.kind === 'file'
 }
 
+/**
+ * UNI-2078: a row the plain copy can take: a live file the person can edit (an unknown level has
+ * no entry), not in the trash or the shelf, and not owned by another module (a work product copies
+ * only through its owning screen).
+ */
+export function rowCanCopy(doc: DocumentsHomeDoc): boolean {
+  return (
+    doc.kind === 'file' &&
+    doc.canEdit === true &&
+    !doc.ownerKind &&
+    !doc.shelvedAt &&
+    doc.archived !== true
+  )
+}
+
+/**
+ * UNI-2078: a trashed row Delete forever can take: manage or `admin_scope`, the web's
+ * canManageTrashed (decision Q4). Restore keeps its own, narrower gate (`canManage`).
+ */
+export function rowCanPurge(doc: DocumentsHomeDoc): boolean {
+  return doc.canManage === true || doc.adminScope === true
+}
+
 // groups of the live screens: open | link | edit | keep (and the delete entry)
 const OPEN = 0
 const LINK = 1
@@ -93,6 +118,8 @@ export function buildRowMenu({
   if (screen === 'trash' || doc.archived === true) {
     if (doc.canManage === true) add('restore', label('dlActRestore'), OPEN)
     add('details', label('dlActDetails'), OPEN)
+    // Xóa vĩnh viễn (UNI-2078): its own group after a divider, red, and it asks first
+    if (rowCanPurge(doc)) add('purge', label('dlActPurge'), KEEP, { danger: true, confirm: true })
     return items
   }
 
@@ -137,6 +164,10 @@ export function buildRowMenu({
   if (doc.canEdit !== false && !shelved) {
     if (doc.canEdit === true) add('rename', label('dlActRename'), EDIT)
     add('move', label('dlActMove'), EDIT)
+    // Tạo bản sao (UNI-2078): a live file the person edits and no other module owns, like the web's
+    // row menu (file + known level + no owner_kind); the server refuses a page, a folder and an
+    // owned document by name, so they never see the entry
+    if (rowCanCopy(doc)) add('duplicate', label('dlActDuplicate'), EDIT)
   }
   if (doc.canManage === true) {
     // folder shelve is a residual of the app (files and pages only)

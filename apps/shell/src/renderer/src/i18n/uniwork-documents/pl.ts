@@ -199,4 +199,12 @@ export const pl = {
   uwSourceOriginTask: 'Zadania',
   uwSourceOriginMeeting: 'Spotkania',
   uwSourceOriginEmail: 'E-mail',
+  uwErrOwnerRequiresCopy:
+    'Ten dokument należy do wyniku pracy: skopiuj go na ekranie, który nim zarządza.',
+  uwErrPageCopyNotSupported:
+    'Na tym etapie można kopiować wyłącznie dokumenty plikowe. Kopiowanie w UniNote pojawi się później.',
+  uwErrCopyConsentRequired: 'Przed kopiowaniem wymagane jest wyraźne potwierdzenie.',
+  uwErrDocumentNotInTrash: 'Ten element nie znajduje się już w koszu.',
+  uwErrFolderTooLarge:
+    'Folder zawiera zbyt wiele elementów, aby usunąć je naraz. Najpierw usuń zawartość w częściach.',
 } satisfies Record<keyof typeof zh, string>
