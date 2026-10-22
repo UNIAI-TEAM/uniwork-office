@@ -218,6 +218,12 @@ const REGISTRAR_FILES: Record<string, string> = {
   'apps/shell/src/main/uniwork-askuni/service.ts': 'registerAskUniIpc (in createUniworkDocs)',
   'apps/shell/src/main/uniwork-askuni/open-citation.ts':
     'registerAskUniOpenIpc (in createUniworkDocs)',
+  'apps/shell/src/main/uniwork-askuni/stream-service.ts':
+    'registerAskUniStreamIpc (in registerUniworkAskUni, in createUniworkDocs)',
+  'apps/shell/src/main/uniwork-askuni/rest-service.ts':
+    'registerAskUniRestIpc (in registerUniworkAskUni, in createUniworkDocs)',
+  'apps/shell/src/main/uniwork-askuni/doc-service.ts':
+    'registerAskUniDocIpc, the editor family (in registerUniworkAskUni, in createUniworkDocs)',
   'apps/shell/src/main/uniwork-sync/sync-center.ts': 'registerSyncCenterIpc (in createUniworkDocs)',
   'apps/shell/src/main/uniwork-sync/offline-library/api.ts':
     'registerOfflineLibraryIpc (in createUniworkDocs)',

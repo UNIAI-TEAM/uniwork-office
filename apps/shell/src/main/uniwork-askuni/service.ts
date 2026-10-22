@@ -139,18 +139,11 @@ export function createAskUniService(deps: AskUniServiceDeps): AskUniService {
   }
 }
 
-const SIGNED_OUT: AskUniContext = { workspaces: [], currentWorkspaceId: null, signedIn: false }
-
-/** `isShellSender`: the shell-main-frame rule (sender.ts); anyone else is refused with no side effect */
-export function registerAskUniIpc(
-  ipcMain: Pick<IpcMain, 'handle'>,
-  service: AskUniService,
-  isShellSender: (event: unknown) => boolean,
-): void {
-  ipcMain.handle(ASKUNI_CHANNELS.ask, (event, req: unknown) =>
-    isShellSender(event) ? service.ask(req) : { ok: false, code: 'forbidden' },
-  )
-  ipcMain.handle(ASKUNI_CHANNELS.context, (event) =>
-    isShellSender(event) ? service.context() : { ...SIGNED_OUT },
-  )
+/**
+ * Registered on the guarded ipc object (UNI-2073, policy `shell`): the guard has already refused
+ * every sender but the shell page's main frame, so nothing here checks the sender again.
+ */
+export function registerAskUniIpc(ipcMain: Pick<IpcMain, 'handle'>, service: AskUniService): void {
+  ipcMain.handle(ASKUNI_CHANNELS.ask, (_event, req: unknown) => service.ask(req))
+  ipcMain.handle(ASKUNI_CHANNELS.context, () => service.context())
 }

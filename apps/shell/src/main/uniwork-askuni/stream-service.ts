@@ -296,23 +296,20 @@ export function createAskUniFlags(deps: {
   }
 }
 
-const FORBIDDEN = { ok: false, error: 'forbidden' } as const
-
+/**
+ * Registered on the guarded ipc object (UNI-2073, policy `shell`): only the shell page's main
+ * frame gets here. What the guard does not do stays in the service: the run belongs to
+ * `event.sender` (its events go there only, one cancel per own request).
+ */
 export function registerAskUniStreamIpc(
   ipcMain: Pick<IpcMain, 'handle'>,
-  deps: {
-    stream: AskUniStreamService
-    flags: AskUniFlagsReader
-    isShellSender(event: unknown): boolean
-  },
+  deps: { stream: AskUniStreamService; flags: AskUniFlagsReader },
 ): void {
   ipcMain.handle(ASKUNI_V2_CHANNELS.stream, (event, req: unknown) =>
-    deps.isShellSender(event) ? deps.stream.start(event.sender, req) : FORBIDDEN,
+    deps.stream.start(event.sender, req),
   )
   ipcMain.handle(ASKUNI_V2_CHANNELS.streamCancel, (event, req: unknown) =>
-    deps.isShellSender(event) ? deps.stream.cancel(event.sender, req) : FORBIDDEN,
+    deps.stream.cancel(event.sender, req),
   )
-  ipcMain.handle(ASKUNI_V2_CHANNELS.flags, (event) =>
-    deps.isShellSender(event) ? deps.flags.flags() : FORBIDDEN,
-  )
+  ipcMain.handle(ASKUNI_V2_CHANNELS.flags, () => deps.flags.flags())
 }

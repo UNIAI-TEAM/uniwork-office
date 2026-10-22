@@ -115,13 +115,10 @@ export function createAskUniOpener(deps: AskUniOpenDeps): AskUniOpener {
   }
 }
 
-/** `isShellSender`: the shell-main-frame rule (sender.ts); anyone else is refused with no side effect */
+/** Registered on the guarded ipc object (UNI-2073, policy `shell`): the guard refuses every other sender first. */
 export function registerAskUniOpenIpc(
   ipcMain: Pick<IpcMain, 'handle'>,
   opener: AskUniOpener,
-  isShellSender: (event: unknown) => boolean,
 ): void {
-  ipcMain.handle(ASKUNI_CHANNELS.openCitation, (event, req: unknown) =>
-    isShellSender(event) ? opener.open(req) : { ok: false, code: 'forbidden' },
-  )
+  ipcMain.handle(ASKUNI_CHANNELS.openCitation, (_event, req: unknown) => opener.open(req))
 }

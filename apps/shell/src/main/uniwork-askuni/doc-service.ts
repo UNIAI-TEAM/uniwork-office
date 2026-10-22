@@ -276,27 +276,22 @@ export function createAskUniDocService(deps: AskUniDocServiceDeps): AskUniDocSer
   }
 }
 
-/** `isEditorSender`: the temporary editor rule (doc-sender.ts), one call per handler */
+/**
+ * Registered on the guarded ipc object (UNI-2073, policy `editor`): only a trusted editor view's
+ * main frame on an editor origin gets here. What the guard does not do stays in the service: the
+ * document comes from the sender's own bound path, conversations and feedback answer only for ids
+ * this sender saw, events go to `event.sender` only.
+ */
 export function registerAskUniDocIpc(
   ipcMain: Pick<IpcMain, 'handle'>,
-  deps: { doc: AskUniDocService; isEditorSender(event: unknown): boolean },
+  deps: { doc: AskUniDocService },
 ): void {
-  const { doc, isEditorSender } = deps
+  const { doc } = deps
   const C = ASKUNI_DOC_CHANNELS
-  ipcMain.handle(C.stream, (event, input: unknown) =>
-    isEditorSender(event) ? doc.start(event.sender, input) : FORBIDDEN,
-  )
-  ipcMain.handle(C.streamCancel, (event, input: unknown) =>
-    isEditorSender(event) ? doc.cancel(event.sender, input) : FORBIDDEN,
-  )
-  ipcMain.handle(C.messages, (event, input: unknown) =>
-    isEditorSender(event) ? doc.messages(event.sender, input) : FORBIDDEN,
-  )
-  ipcMain.handle(C.feedbackSet, (event, input: unknown) =>
-    isEditorSender(event) ? doc.feedbackSet(event.sender, input) : FORBIDDEN,
-  )
-  ipcMain.handle(C.feedbackClear, (event, input: unknown) =>
-    isEditorSender(event) ? doc.feedbackClear(event.sender, input) : FORBIDDEN,
-  )
-  ipcMain.handle(C.flags, (event) => (isEditorSender(event) ? doc.flags(event.sender) : FORBIDDEN))
+  ipcMain.handle(C.stream, (event, input: unknown) => doc.start(event.sender, input))
+  ipcMain.handle(C.streamCancel, (event, input: unknown) => doc.cancel(event.sender, input))
+  ipcMain.handle(C.messages, (event, input: unknown) => doc.messages(event.sender, input))
+  ipcMain.handle(C.feedbackSet, (event, input: unknown) => doc.feedbackSet(event.sender, input))
+  ipcMain.handle(C.feedbackClear, (event, input: unknown) => doc.feedbackClear(event.sender, input))
+  ipcMain.handle(C.flags, (event) => doc.flags(event.sender))
 }

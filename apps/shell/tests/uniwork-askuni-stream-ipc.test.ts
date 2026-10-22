@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WebContents } from 'electron'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { registerUniworkAskUni, type UniworkAskUniWiring } from '../src/main/uniwork-askuni/index'
-import { createShellSenderCheck } from '../src/main/uniwork-askuni/sender'
 import { registerAskUniIpc, type AskUniService } from '../src/main/uniwork-askuni/service'
 import { registerAskUniOpenIpc, type AskUniOpener } from '../src/main/uniwork-askuni/open-citation'
 import {
@@ -61,7 +59,6 @@ const other = contents(2)
 const fromShell = () => ({ sender: shell, senderFrame: shell.mainFrame })
 const fromSubframe = () => ({ sender: shell, senderFrame: { name: 'iframe', url: SHELL_URL } })
 const fromOther = () => ({ sender: other, senderFrame: other.mainFrame })
-const isShell = createShellSenderCheck(() => shell as unknown as WebContents)
 
 // the shell window the guard reads on every call
 let shellContents: unknown = shell
@@ -75,24 +72,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.useRealTimers()
-})
-
-describe('createShellSenderCheck', () => {
-  it('accepts only the shell webContents main frame', () => {
-    expect(isShell(fromShell())).toBe(true)
-    expect(isShell(fromSubframe())).toBe(false)
-    expect(isShell(fromOther())).toBe(false)
-    expect(isShell({})).toBe(false)
-    expect(isShell(null)).toBe(false)
-    expect(createShellSenderCheck(() => null)(fromShell())).toBe(false)
-  })
-
-  it('refuses a destroyed shell', () => {
-    const gone = contents(3)
-    const check = createShellSenderCheck(() => gone as unknown as WebContents)
-    gone.destroy()
-    expect(check({ sender: gone, senderFrame: gone.mainFrame })).toBe(false)
-  })
 })
 
 describe('registerAskUniStreamIpc', () => {

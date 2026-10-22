@@ -1,4 +1,4 @@
-import type { IpcMain, WebContents } from 'electron'
+import type { IpcMain } from 'electron'
 import type { DeploymentProfile } from '../uniwork-auth/deployment'
 import {
   createUniworkDocsClient,
@@ -8,14 +8,12 @@ import {
 } from '../uniwork-docs/client'
 import { createAskUniClient } from './client'
 import { createAskUniDocService, registerAskUniDocIpc, type AskUniDocBinding } from './doc-service'
-import { askUniEditorUrlRule, createEditorSenderCheck } from './doc-sender'
 import { askUniFakeEnabled, createFakeAskUni } from './fake'
 import { createAskUniOpener, registerAskUniOpenIpc, type AskUniOpenDeps } from './open-citation'
 import { createAskUniLookupClient, type AskUniLookupClient } from './lookup-client'
 import { createAskUniRestClient, type AskUniRestClient } from './rest-client'
 import { createFakeAskUniRest, createFakeAskUniStore } from './rest-fake'
 import { createAskUniRestService, registerAskUniRestIpc } from './rest-service'
-import { createShellSenderCheck } from './sender'
 import { createAskUniService, registerAskUniIpc, type AskUniService } from './service'
 import { createAskUniStreamClient, type AskUniStreamClient } from './stream-client'
 import { askUniFakeStreamFlag, createFakeAskUniStream } from './stream-fake'
@@ -42,14 +40,11 @@ export interface UniworkAskUniWiring {
   openDocument: AskUniOpenDeps['openDocument']
   /** shell.openExternal; the opener hands it only URLs on the deployment's web origin */
   openExternal(url: string): Promise<void>
-  /** the shell window's webContents: only its main frame may call `uniwork:askuni:*` */
-  shellContents(): WebContents | null
   /**
-   * UNI-2076 S7b, the editor panels (`uniwork:askuni-doc:*`): an editor tab
-   * view or detached editor window, the path it shows, that path's binding.
-   * Absent = every editor call is refused.
+   * UNI-2076 S7b, the editor panels (`uniwork:askuni-doc:*`): the path an
+   * editor webContents shows and that path's binding (who may call is the
+   * UNI-2073 guard's `editor` policy). Absent = every editor is a local file.
    */
-  isEditorContents?(webContentsId: number): boolean
   editorPath?(sender: { id: number }): string | null
   docBinding?(path: string): AskUniDocBinding
   /** test seam: the streaming fake's tick (default 80 ms) */
@@ -76,13 +71,15 @@ async function readStreamFlag(
 }
 
 /**
- * Registers `uniwork:askuni:*`. The workspaces come from the same
+ * Registers `uniwork:askuni:*`. `ipcMain` is the UNI-2073 guarded object (index.ts hands
+ * createUniworkDocs `guardedIpc`): the shell channels carry policy `shell`, the editor family
+ * `editor`, so no handler checks its sender itself. The workspaces come from the same
  * `GET /orgs/{org}/workspaces` the Home doclist reads, the current one from
  * the workbench key the doclist writes; a citation opens through `uniwork:askuni:open-citation`
  * (the docs open-by-id for a document, the web origin for the rest); UNIWORK_ASKUNI_FAKE=1 (never in a
  * packaged build) swaps both and the answers for canned ones. UNI-2076 adds the v2 stream
- * (`uniwork:askuni:stream*`), its flag and the conversation REST + picker lookups; every handler takes the shell's main frame only.
- * S7b adds the editor family `uniwork:askuni-doc:*` (doc-service.ts), which takes editor main frames only.
+ * (`uniwork:askuni:stream*`), its flag and the conversation REST + picker lookups.
+ * S7b adds the editor family `uniwork:askuni-doc:*` (doc-service.ts).
  */
 export function registerUniworkAskUni(
   ipcMain: IpcMain,
@@ -194,8 +191,7 @@ export function registerUniworkAskUni(
       },
     }
   }
-  const isShellSender = createShellSenderCheck(() => wiring.shellContents())
-  registerAskUniIpc(ipcMain, service, isShellSender)
+  registerAskUniIpc(ipcMain, service)
   registerAskUniStreamIpc(ipcMain, {
     stream: createAskUniStreamService({
       isSignedIn,
@@ -204,7 +200,6 @@ export function registerUniworkAskUni(
       client: streamClient,
     }),
     flags,
-    isShellSender,
   })
   const restService = createAskUniRestService({
     isSignedIn,
@@ -212,8 +207,8 @@ export function registerUniworkAskUni(
     rest,
     lookup,
   })
-  registerAskUniRestIpc(ipcMain, { rest: restService, isShellSender })
-  // the editor family: its own sender rule; workspace and focus come from the editor's bound path
+  registerAskUniRestIpc(ipcMain, { rest: restService })
+  // the editor family: workspace and focus come from the editor's bound path
   registerAskUniDocIpc(ipcMain, {
     doc: createAskUniDocService({
       isSignedIn,
@@ -224,11 +219,6 @@ export function registerUniworkAskUni(
       rest: restService,
       flags,
     }),
-    isEditorSender: createEditorSenderCheck({
-      shellContents: () => wiring.shellContents(),
-      isEditorContents: (id) => wiring.isEditorContents?.(id) === true,
-      isEditorUrl: askUniEditorUrlRule(wiring.env),
-    }),
   })
   registerAskUniOpenIpc(
     ipcMain,
@@ -238,7 +228,6 @@ export function registerUniworkAskUni(
       openDocument: (id) => wiring.openDocument(id),
       openExternal: (url) => wiring.openExternal(url),
     }),
-    isShellSender,
   )
   return service
 }

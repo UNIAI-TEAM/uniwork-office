@@ -162,36 +162,26 @@ export function createAskUniRestService(deps: AskUniRestServiceDeps): AskUniRest
   }
 }
 
-const FORBIDDEN = { ok: false, error: 'forbidden' } as const
-
-/** `isShellSender`: the shell-main-frame rule (sender.ts), one call per handler */
+/** Registered on the guarded ipc object (UNI-2073, policy `shell`): the guard refuses every other sender first. */
 export function registerAskUniRestIpc(
   ipcMain: Pick<IpcMain, 'handle'>,
-  deps: { rest: AskUniRestService; isShellSender(event: unknown): boolean },
+  deps: { rest: AskUniRestService },
 ): void {
-  const { rest, isShellSender } = deps
-  ipcMain.handle(ASKUNI_V2_CHANNELS.capabilities, (event, input: unknown) =>
-    isShellSender(event) ? rest.capabilities(input) : FORBIDDEN,
+  const { rest } = deps
+  ipcMain.handle(ASKUNI_V2_CHANNELS.capabilities, (_event, input: unknown) =>
+    rest.capabilities(input),
   )
-  ipcMain.handle(ASKUNI_V2_CHANNELS.conversations, (event, input: unknown) =>
-    isShellSender(event) ? rest.conversations(input) : FORBIDDEN,
+  ipcMain.handle(ASKUNI_V2_CHANNELS.conversations, (_event, input: unknown) =>
+    rest.conversations(input),
   )
-  ipcMain.handle(ASKUNI_V2_CHANNELS.messages, (event, input: unknown) =>
-    isShellSender(event) ? rest.messages(input) : FORBIDDEN,
+  ipcMain.handle(ASKUNI_V2_CHANNELS.messages, (_event, input: unknown) => rest.messages(input))
+  ipcMain.handle(ASKUNI_V2_CHANNELS.rename, (_event, input: unknown) => rest.rename(input))
+  ipcMain.handle(ASKUNI_V2_CHANNELS.delete, (_event, input: unknown) => rest.remove(input))
+  ipcMain.handle(ASKUNI_V2_CHANNELS.feedbackSet, (_event, input: unknown) =>
+    rest.feedbackSet(input),
   )
-  ipcMain.handle(ASKUNI_V2_CHANNELS.rename, (event, input: unknown) =>
-    isShellSender(event) ? rest.rename(input) : FORBIDDEN,
+  ipcMain.handle(ASKUNI_V2_CHANNELS.feedbackClear, (_event, input: unknown) =>
+    rest.feedbackClear(input),
   )
-  ipcMain.handle(ASKUNI_V2_CHANNELS.delete, (event, input: unknown) =>
-    isShellSender(event) ? rest.remove(input) : FORBIDDEN,
-  )
-  ipcMain.handle(ASKUNI_V2_CHANNELS.feedbackSet, (event, input: unknown) =>
-    isShellSender(event) ? rest.feedbackSet(input) : FORBIDDEN,
-  )
-  ipcMain.handle(ASKUNI_V2_CHANNELS.feedbackClear, (event, input: unknown) =>
-    isShellSender(event) ? rest.feedbackClear(input) : FORBIDDEN,
-  )
-  ipcMain.handle(ASKUNI_V2_CHANNELS.lookup, (event, input: unknown) =>
-    isShellSender(event) ? rest.lookup(input) : FORBIDDEN,
-  )
+  ipcMain.handle(ASKUNI_V2_CHANNELS.lookup, (_event, input: unknown) => rest.lookup(input))
 }
