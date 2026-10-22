@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import type { UniworkFolderNode } from '../../../shared/home-api'
 import { useI18n } from '../locale'
-import { bulkSummary, bulkWorkFor, runBulkAction } from '../doclist/bulk'
+import { bulkActionsFor, bulkSummary, bulkWorkFor, runBulkAction } from '../doclist/bulk'
 import type { DocListScreen } from '../doclist/columns'
 import { UniworkFolderPicker } from '../uniwork-folders/UniworkFolderPicker'
 import type { MovingItem } from '../uniwork-folders/uniwork-folders-model'
@@ -36,6 +36,7 @@ export function useBulkMove({
   screen,
   nodes,
   currentParentOf,
+  currentDocs,
   refresh,
   onSettled,
 }: {
@@ -45,6 +46,8 @@ export function useBulkMove({
   nodes?: UniworkFolderNode[]
   /** the folder the row sits in now (null = the root): the picker's "current location" */
   currentParentOf: (doc: DocumentsHomeDoc) => string | null
+  /** the host's selection as it is now: the pick re-checks the gate against it (like `runBulkById`) */
+  currentDocs: () => readonly DocumentsHomeDoc[]
   refresh: () => void
   onSettled: (summary: { message: string; tone: 'ok' | 'error' }) => void
 }): BulkMoveHandle {
@@ -101,7 +104,11 @@ export function useBulkMove({
         initialFolderId={sharedParent(batch.moving)}
         onPick={(picked) => {
           setBatch(null)
-          void run(batch.docs, picked.folderId)
+          // rows may have changed level under the open picker: run only while every one still
+          // offers Move (the same guard the other bulk actions re-run at execution)
+          const docs = currentDocs()
+          if (docs.length === 0 || !bulkActionsFor(screen, docs).includes('move')) return
+          void run(docs, picked.folderId)
         }}
         onCancel={() => setBatch(null)}
       />

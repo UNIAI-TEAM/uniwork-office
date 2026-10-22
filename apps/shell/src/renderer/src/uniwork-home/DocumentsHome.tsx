@@ -1993,6 +1993,7 @@ export function DocumentsHome({
     screen,
     nodes: tree.status === 'ready' ? tree.nodes : undefined,
     currentParentOf,
+    currentDocs: () => selectedDocs,
     refresh: refreshAll,
     onSettled: ({ message, tone }) => {
       setSelected(new Set())

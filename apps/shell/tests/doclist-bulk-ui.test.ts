@@ -12,6 +12,7 @@ import { fakeZipBridge, type FakeZipBridge } from './uniwork-zip-fake-bridge'
 import { BulkBar, BulkTrashConfirm } from '../src/renderer/src/doclist/BulkBar'
 import { BulkPurgeConfirm } from '../src/renderer/src/doclist/BulkPurgeConfirm'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
+import { DOC_SHARE_CHANGED_EVENT } from '../src/renderer/src/uniwork-folders/first-save-share'
 import type {
   DocumentsHomeDoc,
   DocumentsHomeSubViewId,
@@ -671,6 +672,25 @@ describe('DocumentsHome wires the bulk bar (UNI-2047 A5)', () => {
       await click(box('doc-a'))
       await click(bulk('move'))
       expect(pickerEl()!.querySelector('.uw-act-heading')?.textContent).toBe('Di chuyển 1 tài liệu')
+    })
+
+    it('a row that stops offering Di chuyển while the picker is open: the pick sends nothing', async () => {
+      await mount()
+      await click(box('doc-a'))
+      await click(box('doc-b'))
+      await click(bulk('move'))
+      await click(treeItem('WS2'))
+      // a background refresh drops doc-b to a read-only level under the open picker
+      items = items.map((d) =>
+        d.id === 'doc-b' ? { ...d, myLevel: 'view', canEdit: false, canManage: false } : d,
+      )
+      await act(async () => {
+        window.dispatchEvent(new Event(DOC_SHARE_CHANGED_EVENT))
+      })
+      await flush()
+      await click(confirmPick())
+      expect(api.uniworkMoveDocument).not.toHaveBeenCalled()
+      expect(pickerEl()).toBeNull()
     })
 
     it('one move per row into the picked folder, "2/2" toast, one refresh, selection cleared', async () => {
