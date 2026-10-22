@@ -7,7 +7,9 @@
  * https://github.com/<owner>/<repo> URL selects electron-updater's github
  * provider (the GitHub Releases of that repository, where the dev / beta
  * installers are published); any other HTTPS base URL is a generic provider
- * prefix that serves latest.yml / latest-mac.yml (a CDN). The release workflow
+ * prefix that serves latest.yml / latest-mac.yml (a CDN); the self-hosted feed
+ * https://uniworkos.com/downloads/office/update gets the channel directory
+ * appended (update/dev, update/beta, update/stable). The release workflow
  * sets it; for local builds put it in apps/shell/electron-builder.env
  * (gitignored) — the electron-builder CLI loads that file automatically.
  *
@@ -931,6 +933,8 @@ function assertReleaseVersion() {
   }
 }
 
+// The self-hosted update feed (object storage behind the uniworkos.com edge route).
+const OFFICE_UPDATE_FEED_URL = 'https://uniworkos.com/downloads/office/update'
 const GITHUB_REPOSITORY_URL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)$/
 
 /**
@@ -939,11 +943,19 @@ const GITHUB_REPOSITORY_URL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z
  * <channel>.yml / <channel>-linux.yml next to the installers and app-update.yml
  * carries the channel, so a dev build only ever reads dev feeds. On GitHub the
  * updater picks the newest release whose tag has the same pre-release id
- * (v<version>-dev.<n>), so beta and stable never pick a dev build.
+ * (v<version>-dev.<n>), so beta and stable never pick a dev build. The
+ * self-hosted OFFICE_UPDATE_FEED_URL gets its channel directory appended; any
+ * other generic URL is the feed prefix as given.
  */
 function updatePublishConfig(url, channel) {
   const github = GITHUB_REPOSITORY_URL.exec(url)
   if (github) return { provider: 'github', owner: github[1], repo: github[2], channel }
+  if (url === OFFICE_UPDATE_FEED_URL) {
+    // one directory per channel: update/<channel>/<channel>.yml (dev.yml, beta.yml) and, for
+    // stable, update/stable/latest.yml (the file electron-updater reads when no channel is set)
+    const dir = channel === 'latest' ? 'stable' : channel
+    return { provider: 'generic', url: `${url}/${dir}`, channel }
+  }
   return { provider: 'generic', url, channel }
 }
 
