@@ -290,10 +290,10 @@ const IPC_LIKE = /^(ipcMain|ipc|\w+Ipc|guarded\w*)$/
 const IPC_PARAMETER = /\b([A-Za-z_$][\w$]*)\s*\??:\s*(?:IpcMain|IpcMainLike)\b/g
 
 const REGISTER_CALL =
-  /\b([A-Za-z_$][\w$]*)\s*\??\.\s*(handle|handleOnce|on|once)\(\s*([^,()]+?)\s*,/g
+  /\b([A-Za-z_$][\w$]*)\s*\??\.\s*(handle|handleOnce|on|once)\s*(?:\?\.\s*)?\(\s*([^,()]+?)\s*,/g
 
 /** a registrar's local helper, called as `handle(CHANNEL, ...)` / `handleDiscussion(CHANNEL, ...)` */
-const LOCAL_HELPER_CALL = /(?<![.\w$])(handle\w*)\(\s*([^,()]+?)\s*,/g
+const LOCAL_HELPER_CALL = /(?<![.\w$])(handle\w*)\s*(?:\?\.\s*)?\(\s*([^,()]+?)\s*,/g
 
 /** a preload-side bridge: imports ipcRenderer from electron and never names ipcMain, so it registers nothing in main */
 function isRendererOnly(text: string): boolean {
@@ -595,7 +595,10 @@ function rawRegistrations(file: string, rawText: string): RawRegistration[] {
   const receivers = rawReceivers(text)
   if (receivers.length === 0) return []
   const escaped = receivers.map(escapeRegExp).join('|')
-  const call = new RegExp(`(?<![\\w$.])(${escaped})\\s*\\.\\s*(${RAW_METHODS})\\s*\\(`, 'g')
+  const call = new RegExp(
+    `(?<![\\w$.])(${escaped})\\s*(?:\\?\\s*)?\\.\\s*(${RAW_METHODS})\\s*(?:\\?\\.\\s*)?\\(`,
+    'g',
+  )
   const aliases = new Map(
     [...text.matchAll(/const\s+(\w+)\s*=\s*([A-Z][A-Z0-9_]*)\s*$/gm)].map(
       (m) => [m[1]!, m[2]!] as const,
@@ -845,6 +848,22 @@ describe('the raw registration scan catches the forms that used to slip through'
 
   it('a loop variable', () => {
     expect(offendersOf('for (const ch of names) ipcMain.handle(ch, () => 1)')).toHaveLength(1)
+  })
+
+  it('optional chaining on the method or the receiver: handle?.( and ipcMain?.handle(', () => {
+    // the registration itself must be read, not only the raw use of the object
+    const registered = (body: string) => offendersOf(body).filter((o) => o.includes(' -> '))
+    expect(registered("ipcMain.handle?.('uniwork-doc:save', () => 1)")).toHaveLength(1)
+    expect(registered("ipcMain.on?.('uniwork-doc:save', () => 1)")).toHaveLength(1)
+    expect(registered("ipcMain?.handle('uniwork-doc:save', () => 1)")).toHaveLength(1)
+    expect(registered("ipcMain?.handle?.('uniwork-doc:save', () => 1)")).toHaveLength(1)
+  })
+
+  it('the registrar scan reads x.handle?.( and a helper called as handle?.( as registrations', () => {
+    const text =
+      "bus.handle?.('home:recents', f)\nbus.on?.('uniwork-doc:save', f)\nhandle?.('home:recents', f)\n"
+    const found = registrations({ file: 'apps/shell/src/main/y.ts', text })
+    expect(found.map((reg) => reg.method)).toEqual(['handle', 'on', 'handle'])
   })
 
   it('addListener, prependListener, prependOnceListener, handleOnce and once', () => {
