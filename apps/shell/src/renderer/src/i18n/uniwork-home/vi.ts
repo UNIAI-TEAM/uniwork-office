@@ -165,6 +165,8 @@ export const vi = {
   fuDlgRefusalTitleFiles: 'Chưa tải lên được các tệp này',
   fuDlgShare: 'Chia sẻ với workspace',
   fuDlgShareHintFolder: 'Áp dụng cho mọi tệp trong lần tải lên này. Thư mục vẫn riêng tư.',
+  fuDlgShareHintWorkspace:
+    'Áp dụng cho mọi tệp trong lần tải lên này. Thư mục mới sẽ hiện với cả workspace.',
   fuDlgShareHintFiles: 'Áp dụng cho mọi tệp trong lần tải lên này.',
   fuDlgShareInherited: 'Thư mục đích đang chia sẻ với workspace nên các tệp cũng vậy.',
   fuDlgStarting: 'Đang chuẩn bị…',

@@ -34,4 +34,24 @@ describe('asPreflightSDO target', () => {
       expect(sdo?.target).toEqual({ workspaceId: 'w', folderId: 'f1', label: 'Contracts' })
     }
   })
+
+  it('keeps the inside-My-Folder marker and drops an odd value (UNI-2075)', () => {
+    const sdo = asPreflightSDO({
+      ...base,
+      target: { workspaceId: 'w', folderId: 's1', label: 'Case', inMyFolder: true },
+    })
+    expect(sdo?.target).toEqual({
+      workspaceId: 'w',
+      folderId: 's1',
+      label: 'Case',
+      inMyFolder: true,
+    })
+    for (const inMyFolder of [undefined, false, 'yes']) {
+      const odd = asPreflightSDO({
+        ...base,
+        target: { workspaceId: 'w', folderId: 'f1', label: 'Contracts', inMyFolder },
+      })
+      expect(odd?.target).toEqual({ workspaceId: 'w', folderId: 'f1', label: 'Contracts' })
+    }
+  })
 })

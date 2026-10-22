@@ -164,6 +164,7 @@ export const he = {
   fuDlgRefusalTitleFiles: 'לא ניתן להעלות את הקבצים האלה',
   fuDlgShare: 'שיתוף עם סביבת העבודה',
   fuDlgShareHintFolder: 'חל על כל קובץ בהעלאה הזו. התיקיות נשארות פרטיות.',
+  fuDlgShareHintWorkspace: 'חל על כל קובץ בהעלאה הזו. התיקיות החדשות גלויות לכל מרחב העבודה.',
   fuDlgShareHintFiles: 'חל על כל קובץ בהעלאה הזו.',
   fuDlgShareInherited: 'תיקיית היעד משותפת עם סביבת העבודה, ולכן גם הקבצים.',
   fuDlgStarting: 'מכין…',

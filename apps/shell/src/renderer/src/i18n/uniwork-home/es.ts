@@ -168,6 +168,8 @@ export const es = {
   fuDlgShare: 'Compartir con el espacio de trabajo',
   fuDlgShareHintFolder:
     'Se aplica a todos los archivos de esta subida. Las carpetas siguen siendo privadas.',
+  fuDlgShareHintWorkspace:
+    'Se aplica a todos los archivos de esta subida. Las carpetas nuevas son visibles para todo el espacio de trabajo.',
   fuDlgShareHintFiles: 'Se aplica a todos los archivos de esta subida.',
   fuDlgShareInherited:
     'La carpeta de destino está compartida con el espacio de trabajo, así que los archivos también.',

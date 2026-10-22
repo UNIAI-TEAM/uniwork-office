@@ -233,6 +233,7 @@ describe('destination', () => {
       folderId: 'my1',
       label: 'My Folder',
       myFolder: true,
+      inMyFolder: true,
     })
   })
 
@@ -248,6 +249,27 @@ describe('destination', () => {
     expect(root0?.target.myFolder).toBe(true)
     const plain = await service.pick({ workspaceId: 'w', folderId: 'f1', mode: 'folder' })
     expect(plain?.target).toEqual({ workspaceId: 'w', folderId: 'f1', label: 'Contracts' })
+  })
+
+  it('UNI-2075: inMyFolder marks My Folder and everything under it, not a workspace folder', async () => {
+    file('Case/a.docx')
+    const { service } = setup({
+      picked: { dir: join(root, 'Case') },
+      tree: [
+        node('my1', 'My Folder', [node('s1', 'Sub', [node('s2', 'Deep')])], 'my_folder'),
+        node('f1', 'Contracts', [node('f2', 'Nested')]),
+      ],
+    })
+    const ask = async (folderId: string | null) =>
+      (await service.pick({ workspaceId: 'w', folderId, mode: 'folder' }))?.target
+    expect((await ask(null))?.inMyFolder).toBe(true)
+    expect((await ask('my1'))?.inMyFolder).toBe(true)
+    const sub = await ask('s1')
+    expect(sub?.inMyFolder).toBe(true)
+    expect(sub?.myFolder).toBeUndefined()
+    expect((await ask('s2'))?.inMyFolder).toBe(true)
+    expect((await ask('f1'))?.inMyFolder).toBeUndefined()
+    expect((await ask('f2'))?.inMyFolder).toBeUndefined()
   })
 
   it('an open folder is the target as it is: My Folder is not ensured', async () => {
