@@ -336,11 +336,20 @@ jobs:
       # Pixel baselines (docs-visual.spec.ts) depend on the font stack: pin
       # Calibri/Cambria metric-compatible faces and CJK glyphs so renders are
       # reproducible across runner images and contributor machines.
+      # The script pins the three jammy debs by sha256 and bounds every
+      # download (apt has no low-speed abort: a slow mirror cost 16-29 min on
+      # fonts-noto-cjk). The cache key follows the script, so a version bump
+      # there refreshes it.
+      - name: Cache document font debs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/doc-fonts-debs
+          key: doc-fonts-debs-jammy-${{ hashFiles('tools/ci/install-doc-fonts.sh') }}
+
       - name: Install document fonts (visual baselines)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            fonts-crosextra-carlito fonts-crosextra-caladea fonts-noto-cjk
+        # backstop above the script's own bound (2 mirrors x 2 attempts x 75 s)
+        timeout-minutes: 6
+        run: tools/ci/install-doc-fonts.sh ~/.cache/doc-fonts-debs
 
       # CSS layout tests use standalone Chromium in addition to Electron.
       # Keep the pinned document font stack unchanged: --with-deps adds fonts
