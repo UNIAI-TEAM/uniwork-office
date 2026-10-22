@@ -52,9 +52,9 @@ const fontCdnUrl = normalizeHttpsBaseUrl(
 
 // GENOFFICE_MAC_X64=1 — opt into packaging the Intel (x64) dmg/zip alongside
 // arm64. Off by default so a plain local `dist:mac` stays arm64-only. The
-// UniWork release workflow sets it: this fork ships unsigned dev/beta builds
-// for both arches (ad-hoc signed, see the release block below) until a company
-// certificate exists. Dual-arch packs share one fat xlsx-sidecar / vision-ocr
+// UniWork release workflow sets it: this fork ships dev/beta builds for both
+// arches, ad-hoc signed unless the workflow supplies the company certificate
+// (see the release block below). Dual-arch packs share one fat xlsx-sidecar / vision-ocr
 // (assertUniversalSidecar / assertUniversalVisionOcr).
 const includeMacX64 = process.env.GENOFFICE_MAC_X64 === '1'
 
@@ -831,7 +831,7 @@ if (releaseChannel) {
   // and Squirrel.Mac installs an update only into a signed app. The mac build
   // therefore carries no feed; with a github UNIWORK_UPDATE_URL it reads the
   // repository's releases itself (uniworkReleaseFeed below) and offers the
-  // newer dmg. Restore the zip and drop this once mac builds are signed.
+  // newer dmg. Signed mac builds could restore the zip and the feed; that is its own change.
   config.mac.target = config.mac.target.filter((entry) => entry.target === 'dmg')
   config.mac.publish = null
   const macSigned = Boolean(process.env.CSC_LINK || process.env.CSC_NAME)
