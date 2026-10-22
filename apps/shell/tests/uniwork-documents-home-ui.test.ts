@@ -2965,6 +2965,12 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       })
       await flush()
     }
+    // the fake share bridge knows one document id: the one the test names
+    const useShareFor = (documentId: string) => {
+      ;(window as unknown as { uniworkShare: unknown }).uniworkShare = createFakeShareApi({
+        documentId,
+      })
+    }
     const dialogTitle = () => document.querySelector('.uw-share .uw-share-title')?.textContent ?? ''
 
     beforeEach(() => {
@@ -2975,7 +2981,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         scrolled.push(this)
       }
       offNotice = onUniworkNotice((event) => notices.push(event))
-      ;(window as unknown as { uniworkShare: unknown }).uniworkShare = createFakeShareApi({})
+      useShareFor('doc-1')
       api.uniworkDocumentProperties = vi.fn(async (id: string) =>
         id === 'doc-far'
           ? ok({
@@ -2999,6 +3005,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         openDocumentShare({ documentId: 'doc-1', workspaceId: 'ws-1', section: 'requests' }),
       )
       await flush()
+      await flush()
       expect(dialogTitle()).toContain('Báo cáo kết quả kinh doanh Q3-2026.docx')
       expect(document.activeElement).toBe(
         document.querySelector('[data-share-section="requests"] h3'),
@@ -3007,6 +3014,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
 
     it('fetches the document when its row is not in the loaded list', async () => {
+      useShareFor('doc-far')
       await mountHome()
       await act(async () =>
         openDocumentShare({ documentId: 'doc-far', workspaceId: 'ws-1', section: 'requests' }),
@@ -3020,6 +3028,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
 
     it('a cold Documents home still gets an intent published before it mounted', async () => {
+      useShareFor('doc-far')
       openDocumentShare({ documentId: 'doc-far', workspaceId: 'ws-1', section: 'requests' })
       await mountHome()
       expect(dialogTitle()).toContain('Far away.docx')

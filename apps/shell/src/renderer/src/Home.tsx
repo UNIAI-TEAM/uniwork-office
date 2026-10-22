@@ -59,6 +59,11 @@ import { FileBadge } from './FileBadge'
 import { shortcutAria, shortcutHint, withShortcutHint } from './home-shortcut-hints'
 import { UniworkOpenCard } from './UniworkOpenCard'
 import { publishUniworkNotice } from './uniwork-notice-bus'
+import {
+  dropDocumentsIntent,
+  onDocumentsIntentRoute,
+  type DocumentsIntent,
+} from './documents-intent-bus'
 import { openRecentEntry, openUniworkDocument } from './uniwork-open'
 import { subscribeUniworkOpened } from './uniwork-recents-refresh'
 import {
@@ -1499,6 +1504,29 @@ export function Home() {
         setOpeningDocId(null)
       })
   }
+
+  // UNI-2079: a notice names a document's Share section or its Trash row. The Documents home does
+  // the work (documents-intent-bus); this host brings it on screen: the Documents area, out of
+  // the Workbench / My AI, in the intent's workspace. It waits for the account and workspace
+  // list on a cold start, and drops an intent for a workspace the person is not in.
+  const [docsRoute, setDocsRoute] = useState<DocumentsIntent | null>(null)
+  useEffect(() => onDocumentsIntentRoute(setDocsRoute), [])
+  useEffect(() => {
+    if (!docsRoute) return
+    if (acctView === 'loading') return
+    const workspaces = uwWsState.workspaces
+    const failed = !isSignedIn || !!uwWsState.workspaceError
+    if (!failed && workspaces === null) return
+    setDocsRoute(null)
+    if (failed || !workspaces?.some((w) => w.id === docsRoute.workspaceId)) {
+      dropDocumentsIntent(docsRoute)
+      publishUniworkNotice({ phase: 'failed', error: failed ? 'not_signed_in' : 'forbidden' })
+      return
+    }
+    selectArea('uniwork')
+    selectUniworkWorkspace(docsRoute.workspaceId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docsRoute, acctView, isSignedIn, uwWsState.workspaces, uwWsState.workspaceError])
 
   const goHomeList = (next: 'recent' | 'starred' = 'recent') => {
     setView(next)
