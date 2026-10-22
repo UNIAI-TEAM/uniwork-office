@@ -393,13 +393,24 @@ describe('service.copyDocument: server refusals', () => {
     })
   })
 
-  it.each([404, 501])('%i on the copy route -> endpointMissing', async (status) => {
-    const res = await failWith(
-      status === 404 ? envelope(404, 'not_found') : envelope(501, 'unsupported_operation'),
-    )
+  // the server router has no custom NotFound handler: a missing route answers a plain, envelope-less
+  // 404 (or a gateway's 501), never `{error:{code}}`
+  it.each([404, 501])('an uncoded %i on the copy route -> endpointMissing', async (status) => {
+    const res = await failWith(new Response('404 page not found', { status }))
     expect(res.ok).toBe(false)
     if (res.ok) return
     expect(res.endpointMissing).toBe(true)
+  })
+
+  it('a coded 404 not_found (the source went between the re-read and the POST) is a plain failure', async () => {
+    const res = await failWith(envelope(404, 'not_found'))
+    expect(res).toEqual({ ok: false, error: 'not_found' })
+    expect(res.ok === false && res.endpointMissing).toBeUndefined()
+  })
+
+  it('a coded 501 is a plain failure too', async () => {
+    const res = await failWith(envelope(501, 'unsupported_operation'))
+    expect(res.ok === false && res.endpointMissing).toBeUndefined()
   })
 
   it('a plain 500 is a failure, not endpointMissing', async () => {

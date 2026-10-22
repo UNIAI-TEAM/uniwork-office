@@ -855,7 +855,12 @@ function requireName(raw: string, max = MAX_DOC_NAME_RUNES): string {
  */
 async function actionResult<T>(
   run: () => Promise<T>,
-  options: { nameField?: boolean; flagMissingEndpoint?: boolean } = {},
+  options: {
+    nameField?: boolean
+    flagMissingEndpoint?: boolean
+    /** the flag needs an envelope-less answer (a router/gateway 404/501, no server `code`) */
+    uncodedOnly?: boolean
+  } = {},
 ): Promise<UniworkDocActionResult<T>> {
   try {
     return { ok: true, value: await run() }
@@ -881,7 +886,8 @@ async function actionResult<T>(
     const endpointMissing =
       options.flagMissingEndpoint === true &&
       error instanceof UniworkDocError &&
-      (error.status === 404 || error.status === 501)
+      (error.status === 404 || error.status === 501) &&
+      !(options.uncodedOnly === true && error.serverCode)
     // UNI-2047: a throttle (429 / 503) is the one failure a batch may repeat once
     const retryable =
       error instanceof UniworkDocError && (error.status === 429 || error.status === 503)
@@ -6438,7 +6444,8 @@ export class UniworkDocsService {
    * module owns. `title` blank = the server names the copy. The renderer's `idempotencyKey` (one
    * per dialog open) is kept across a retry of the same open when it has the expected shape;
    * anything else is replaced by a key minted here. No `parent_id` (workspace root, web parity).
-   * 404 / 501 of the copy route (not the re-read) answer `endpointMissing`.
+   * An envelope-less 404 / 501 of the copy route (not the re-read) answers `endpointMissing`; a
+   * coded one (`404 not_found`: the source went between the re-read and the POST) is a normal failure.
    */
   copyDocument(input: {
     documentId: string
@@ -6485,7 +6492,7 @@ export class UniworkDocsService {
         this.pushTreeChangedFor(session, created.summary.workspaceId)
         return created.summary
       },
-      { flagMissingEndpoint: true },
+      { flagMissingEndpoint: true, uncodedOnly: true },
     )
   }
 
