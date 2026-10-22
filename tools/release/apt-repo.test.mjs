@@ -231,6 +231,8 @@ describe('apt-repo.sh', { skip }, () => {
     assert.match(release, /^Components: main$/m)
     assert.match(release, /^Acquire-By-Hash: yes$/m)
     assert.doesNotMatch(release, /^Valid-Until:/m)
+    // apt fetches by-hash with the strongest hash listed; only by-hash/SHA256 exists
+    assert.doesNotMatch(release, /^(MD5Sum|SHA1|SHA512):/m)
     assert.ok(readFileSync(join(dists, 'InRelease'), 'utf8').includes(release.trimEnd()))
 
     const entries = releaseSha256(release)

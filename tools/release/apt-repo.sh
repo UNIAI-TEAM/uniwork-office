@@ -384,7 +384,12 @@ log "new index: $count version(s): $(sed -n 's/^Version: *//p' "$work/dists/main
 )
 (
   cd "$work/dists"
+  # SHA256 only: apt fetches by-hash with the strongest hash Release lists,
+  # and only by-hash/SHA256 is published
   apt-ftparchive \
+    -o APT::FTPArchive::Release::MD5=false \
+    -o APT::FTPArchive::Release::SHA1=false \
+    -o APT::FTPArchive::Release::SHA512=false \
     -o APT::FTPArchive::Release::Origin=UniWork \
     -o "APT::FTPArchive::Release::Label=UniWork Office" \
     -o "APT::FTPArchive::Release::Suite=$channel" \
