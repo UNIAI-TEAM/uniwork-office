@@ -4,7 +4,11 @@
  * in main, keyed by path, until a renderer loads that path.
  */
 import { describe, expect, it } from 'vitest'
-import { rememberWikiFragment, takeWikiFragment } from '../src/main/wiki-fragment'
+import {
+  rememberWikiFragment,
+  takeWikiFragment,
+  viewsShowingNote,
+} from '../src/main/wiki-fragment'
 
 const PATH = '/notes/Index.md'
 
@@ -44,5 +48,26 @@ describe('wiki fragments', () => {
   it('an untitled document has no path to wait on', () => {
     rememberWikiFragment('', 'Heading')
     expect(takeWikiFragment('')).toBe('')
+  })
+})
+
+describe('views already showing the note', () => {
+  // the shell only activates a note's open tab and tells its view nothing, so
+  // main has to tell the view the fragment is waiting
+
+  it('finds the other views that show the path, never the one that followed the link', () => {
+    const views = new Map([
+      [1, '/notes/A.md'],
+      [2, '/notes/B.md'],
+      [3, '/notes/B.md'],
+    ])
+    expect(viewsShowingNote(views, '/notes/B.md', 3)).toEqual([2])
+    expect(viewsShowingNote(views, '/notes/B.md', 1)).toEqual([2, 3])
+  })
+
+  it('finds none for a note no view shows, or for an untitled link target', () => {
+    const views = new Map([[1, '/notes/A.md']])
+    expect(viewsShowingNote(views, '/notes/Z.md', 9)).toEqual([])
+    expect(viewsShowingNote(views, '', 9)).toEqual([])
   })
 })
