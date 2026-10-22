@@ -95,9 +95,20 @@ import type {
 } from '../shared/home-api'
 import {
   ASKUNI_CHANNELS,
+  ASKUNI_V2_CHANNELS,
   asAskUniContext,
+  asAskUniCapabilitiesResult,
+  asAskUniConversationsResult,
+  asAskUniFlags,
+  asAskUniLookupResult,
+  asAskUniMessagesResult,
+  asAskUniOkResult,
   asAskUniOpenResult,
   asAskUniResult,
+  asAskUniStreamEvent,
+  asAskUniStreamStart,
+  type AskUniStreamEvent,
+  type AskUniStreamRequest,
 } from '../shared/askuni-api'
 import {
   HOME_CHANNELS,
@@ -1302,6 +1313,100 @@ const homeApi: HomeApi = {
     // only kind + href cross: main resolves them, a URL from here is never read
     return asAskUniOpenResult(
       await ipcRenderer.invoke(ASKUNI_CHANNELS.openCitation, { kind: req?.kind, href: req?.href }),
+    )
+  },
+  async askUniStream(req) {
+    // only contract fields cross; main validates them again
+    const r = (req ?? {}) as Partial<AskUniStreamRequest>
+    const ref = (o: { kind?: unknown; id?: unknown } | undefined) =>
+      o && typeof o === 'object' ? { kind: o.kind, id: o.id } : o
+    const forwarded: Record<string, unknown> = {
+      workspaceId: r.workspaceId,
+      ...(r.conversationId !== undefined ? { conversationId: r.conversationId } : {}),
+      question: r.question,
+      locale: r.locale,
+      ...(r.focus !== undefined ? { focus: ref(r.focus) } : {}),
+      ...(r.mentions !== undefined
+        ? { mentions: Array.isArray(r.mentions) ? r.mentions.map(ref) : r.mentions }
+        : {}),
+      ...(r.model !== undefined ? { model: r.model } : {}),
+      ...(r.effort !== undefined ? { effort: r.effort } : {}),
+    }
+    return asAskUniStreamStart(await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.stream, forwarded))
+  },
+  async askUniStreamCancel(req) {
+    return asAskUniOkResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.streamCancel, { requestId: req?.requestId }),
+    )
+  },
+  onAskUniStreamEvent(cb: (ev: AskUniStreamEvent) => void) {
+    const listener = (_event: IpcRendererEvent, raw: unknown) => {
+      const ev = asAskUniStreamEvent(raw)
+      if (ev) cb(ev)
+    }
+    ipcRenderer.on(ASKUNI_V2_CHANNELS.streamEvent, listener)
+    return () => ipcRenderer.removeListener(ASKUNI_V2_CHANNELS.streamEvent, listener)
+  },
+  async askUniFlags() {
+    return asAskUniFlags(await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.flags))
+  },
+  // UNI-2076 s2: the conversation REST + picker lookups; only contract fields cross
+  async askUniCapabilities(req) {
+    return asAskUniCapabilitiesResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.capabilities, { workspaceId: req?.workspaceId }),
+    )
+  },
+  async askUniConversations(req) {
+    return asAskUniConversationsResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.conversations, { workspaceId: req?.workspaceId }),
+    )
+  },
+  async askUniMessages(req) {
+    return asAskUniMessagesResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.messages, {
+        conversationId: req?.conversationId,
+      }),
+    )
+  },
+  async askUniRename(req) {
+    return asAskUniOkResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.rename, {
+        conversationId: req?.conversationId,
+        title: req?.title,
+      }),
+    )
+  },
+  async askUniDelete(req) {
+    return asAskUniOkResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.delete, { conversationId: req?.conversationId }),
+    )
+  },
+  async askUniFeedbackSet(req) {
+    return asAskUniOkResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.feedbackSet, {
+        conversationId: req?.conversationId,
+        messageId: req?.messageId,
+        rating: req?.rating,
+        ...(req?.reason !== undefined ? { reason: req.reason } : {}),
+        ...(req?.note !== undefined ? { note: req.note } : {}),
+      }),
+    )
+  },
+  async askUniFeedbackClear(req) {
+    return asAskUniOkResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.feedbackClear, {
+        conversationId: req?.conversationId,
+        messageId: req?.messageId,
+      }),
+    )
+  },
+  async askUniLookup(req) {
+    return asAskUniLookupResult(
+      await ipcRenderer.invoke(ASKUNI_V2_CHANNELS.lookup, {
+        workspaceId: req?.workspaceId,
+        kind: req?.kind,
+        query: req?.query,
+      }),
     )
   },
   async uniworkListWorkspaces() {

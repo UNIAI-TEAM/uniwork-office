@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { IpcMain } from 'electron'
+import type { IpcMain, WebContents } from 'electron'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import {
@@ -269,6 +269,9 @@ describe('signed out and bad input', () => {
 })
 
 describe('registration', () => {
+  // UNI-2076: only the shell's main frame reaches the handler (sender.ts)
+  const SHELL = { mainFrame: {}, isDestroyed: () => false }
+  const FROM_SHELL = { sender: SHELL, senderFrame: SHELL.mainFrame }
   const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>()
   const ipcMain = {
     handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) =>
@@ -282,7 +285,7 @@ describe('registration', () => {
 
   it('registers one channel that answers an open result', async () => {
     const { opener, openExternal } = setup()
-    registerAskUniOpenIpc(ipcMain, opener)
+    registerAskUniOpenIpc(ipcMain, opener, () => true)
     expect([...handlers.keys()]).toEqual([ASKUNI_CHANNELS.openCitation])
     const handler = handlers.get(ASKUNI_CHANNELS.openCitation)!
     expect(await handler({}, { kind: 'task', href: '/a/b/tasks/1' })).toEqual({ ok: true })
@@ -307,14 +310,17 @@ describe('registration', () => {
       env: {},
       openDocument,
       openExternal,
+      shellContents: () => SHELL as unknown as WebContents,
     }
     registerUniworkAskUni(ipcMain, wiring)
     const handler = handlers.get(ASKUNI_CHANNELS.openCitation)!
-    expect(await handler({}, { kind: 'document', href: `/a/b/documents/${DOC}` })).toEqual({
+    expect(await handler(FROM_SHELL, { kind: 'document', href: `/a/b/documents/${DOC}` })).toEqual({
       ok: true,
     })
     expect(openDocument).toHaveBeenCalledWith(DOC)
-    expect(await handler({}, { kind: 'meeting', href: '/a/b/meetings/9' })).toEqual({ ok: true })
+    expect(await handler(FROM_SHELL, { kind: 'meeting', href: '/a/b/meetings/9' })).toEqual({
+      ok: true,
+    })
     expect(openExternal).toHaveBeenCalledWith(`${ORIGIN}/a/b/meetings/9`)
   })
 })

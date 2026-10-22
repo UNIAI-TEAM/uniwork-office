@@ -115,6 +115,13 @@ export function createAskUniOpener(deps: AskUniOpenDeps): AskUniOpener {
   }
 }
 
-export function registerAskUniOpenIpc(ipcMain: IpcMain, opener: AskUniOpener): void {
-  ipcMain.handle(ASKUNI_CHANNELS.openCitation, (_event, req: unknown) => opener.open(req))
+/** `isShellSender`: the shell-main-frame rule (sender.ts); anyone else is refused with no side effect */
+export function registerAskUniOpenIpc(
+  ipcMain: Pick<IpcMain, 'handle'>,
+  opener: AskUniOpener,
+  isShellSender: (event: unknown) => boolean,
+): void {
+  ipcMain.handle(ASKUNI_CHANNELS.openCitation, (event, req: unknown) =>
+    isShellSender(event) ? opener.open(req) : { ok: false, code: 'forbidden' },
+  )
 }

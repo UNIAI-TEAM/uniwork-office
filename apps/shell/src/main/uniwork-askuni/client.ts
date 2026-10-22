@@ -89,7 +89,8 @@ function failure(error: unknown): AskUniResult {
 
 const text = (value: unknown): string | null => (typeof value === 'string' ? value : null)
 
-function parseCitation(raw: unknown): AskUniCitation | null {
+/** one server citation -> the contract's, bounded (shared with the v2 stream) */
+export function parseCitation(raw: unknown): AskUniCitation | null {
   if (!raw || typeof raw !== 'object') return null
   const c = raw as Record<string, unknown>
   if (typeof c.kind !== 'string') return null
