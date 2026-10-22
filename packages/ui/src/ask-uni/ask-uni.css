@@ -264,6 +264,11 @@
   pointer-events: none;
 }
 
+/* a preview cannot be clicked, so it carries no Open button; a click or focus pins the card with it */
+.askuni-v2-cite-card.is-preview .askuni-v2-cite-open {
+  display: none;
+}
+
 .askuni-v2-cite-head {
   display: flex;
   align-items: flex-start;
