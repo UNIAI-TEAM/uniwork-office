@@ -65,8 +65,9 @@ if [ -f "$apt_res/uniwork-office.sources" ] && [ -d /etc/apt/sources.list.d ] \
   if [ -e "$apt_list" ] && [ "$(head -n 1 "$apt_list" 2>/dev/null)" != '# managed by uniwork-office' ]; then
     echo "uniwork-office: $apt_list is not managed by this package, left as is" >&2
   else
-    install -D -m 0644 "$apt_res/uniwork-office-archive-keyring.gpg" "$apt_keyring" || true
-    install -m 0644 "$apt_res/uniwork-office.sources" "$apt_list" || true
+    # the source only goes in when the keyring is in place: Signed-By would point at nothing
+    install -D -m 0644 "$apt_res/uniwork-office-archive-keyring.gpg" "$apt_keyring" \
+      && install -m 0644 "$apt_res/uniwork-office.sources" "$apt_list" || true
   fi
 fi
 
