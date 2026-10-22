@@ -15,6 +15,7 @@ import {
   type AccessLogGateRow,
 } from './access-log-model'
 import { getDocHistoryBridge } from './bridge'
+import { formatWhen } from './version-history-model'
 import { useAccessLogs } from './use-access-logs'
 import { useFocusAfterLastPage } from './use-focus-after-last-page'
 import './access-log-sheet.css'
@@ -42,20 +43,6 @@ export interface AccessLogSheetProps {
 export function AccessLogSheet(props: AccessLogSheetProps) {
   if (!props.open) return null
   return <AccessLogSheetBody {...props} />
-}
-
-function formatWhen(at: string, locale: string): string {
-  const date = new Date(at)
-  if (Number.isNaN(date.getTime())) return ''
-  const now = new Date()
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  return new Intl.DateTimeFormat(
-    locale,
-    sameDay ? { hour: '2-digit', minute: '2-digit' } : { dateStyle: 'medium', timeStyle: 'short' },
-  ).format(date)
 }
 
 function metaLine(log: DocAccessLog, t: TFunc): string {

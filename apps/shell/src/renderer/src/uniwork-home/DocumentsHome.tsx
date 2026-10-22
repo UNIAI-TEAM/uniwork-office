@@ -1610,7 +1610,7 @@ export function DocumentsHome({
   const shareAvailable = shareBridgeAvailable()
   // UNI-2077: the Access log sheet of a row; no entry when this main has no doc history bridge
   const [logsRow, setLogsRow] = useState<DocumentsHomeDoc | null>(null)
-  const logsAvailable = getDocHistoryBridge() !== null
+  const docHistoryAvailable = getDocHistoryBridge() !== null
   // UNI-2077: the Version history sheet of a row (same bridge, same availability)
   const [versionsRow, setVersionsRow] = useState<DocumentsHomeDoc | null>(null)
   // UNI-2068: Tải xuống plans one file or one zip in main; the bar and the result live in the zip store
@@ -1940,8 +1940,8 @@ export function DocumentsHome({
           }),
         // no entry when this shell has no Share bridge (a stale preload)
         ...(shareAvailable ? { share: () => setShareRow(doc) } : {}),
-        ...(logsAvailable ? { logs: () => setLogsRow(doc) } : {}),
-        ...(logsAvailable ? { versions: () => setVersionsRow(doc) } : {}),
+        ...(docHistoryAvailable ? { logs: () => setLogsRow(doc) } : {}),
+        ...(docHistoryAvailable ? { versions: () => setVersionsRow(doc) } : {}),
         'copy-link': () => void handleCopyLink(doc),
         rename: () => setDocRename({ doc, error: null, busy: false }),
         move: () =>
