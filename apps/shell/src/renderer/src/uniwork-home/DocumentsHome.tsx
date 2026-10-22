@@ -1963,6 +1963,12 @@ export function DocumentsHome({
     canCreateInsideFolder({ ...folder, kind: 'folder' }, index, myRole)
 
   const folderCardMenuFor = (folder: DocumentsHomeDoc): FolderMenuItem[] => {
+    // UNI-2078: a trashed folder card is the web's trash row menu of a folder: Restore | Delete
+    // forever, through the row menu's own gates and handlers; no details (not for folders) and no
+    // live-folder command (the card of a trashed folder has no Open / Rename / Move / Trash either)
+    if (screen === 'trash' || folder.archived === true) {
+      return rowMenuFor(folder).filter((item) => item.id !== 'details')
+    }
     const canCreate = canCreateIn(folder)
     // Mở leads every row menu (Rules board section 3); a viewer-only folder has no menu, the card opens it
     if (folder.canEdit === false && !canCreate) return []

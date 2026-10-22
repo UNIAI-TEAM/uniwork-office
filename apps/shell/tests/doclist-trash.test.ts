@@ -508,6 +508,101 @@ describe('Trash on the shared table (UNI-2047 A2b)', () => {
     })
   })
 
+  // UNI-2078 fix3 (VS-1): a trashed folder card carries the trash row menu of a folder (web:
+  // Restore | Delete forever, no "Xem chi tiết"), never the live folder menu
+  describe('the trashed folder card menu (UNI-2078 VS-1)', () => {
+    const folderCard = (id: string) => `.dh-folder-card[data-folder-id="${id}"]`
+    const trashedFolder = (id: string, extra: Partial<DocumentsHomeDoc> = {}) =>
+      trashed(id, iso(2026, 9, 22), iso(2026, 10, 22), {
+        kind: 'folder',
+        format: null,
+        title: 'Hồ sơ cũ',
+        ...extra,
+      })
+    const openFolderMenu = (id: string) =>
+      click(host.querySelector(`${folderCard(id)} .uw-row-menu-btn`))
+    const dialog = () => document.body.querySelector('[role="dialog"]')
+    const separators = () => document.querySelectorAll('.uw-row-menu-list [role="separator"]')
+
+    it('manage level: Khôi phục, a divider, Xóa vĩnh viễn (danger) and nothing else', async () => {
+      trash = [trashedFolder('t-f')]
+      await mount()
+      await openFolderMenu('t-f')
+      expect(menuLabels()).toEqual(['Khôi phục', 'Xóa vĩnh viễn'])
+      expect(separators()).toHaveLength(1)
+      expect(menuItem('Xóa vĩnh viễn')!.classList.contains('danger')).toBe(true)
+    })
+
+    it('admin_scope only: Xóa vĩnh viễn alone, like the file row minus its details', async () => {
+      trash = [
+        trashedFolder('t-f', {
+          canManage: false,
+          canEdit: false,
+          myLevel: 'view',
+          adminScope: true,
+        }),
+      ]
+      await mount()
+      await openFolderMenu('t-f')
+      expect(menuLabels()).toEqual(['Xóa vĩnh viễn'])
+    })
+
+    it('view level without admin_scope: no menu on the card', async () => {
+      trash = [trashedFolder('t-f', { canManage: false, canEdit: false, myLevel: 'view' })]
+      await mount()
+      expect(host.querySelector(folderCard('t-f'))).not.toBeNull()
+      expect(host.querySelector(`${folderCard('t-f')} .uw-row-menu-btn`)).toBeNull()
+    })
+
+    it('a shell without the purge call keeps Khôi phục only', async () => {
+      delete api.uniworkPurgeDocument
+      trash = [trashedFolder('t-f')]
+      await mount()
+      await openFolderMenu('t-f')
+      expect(menuLabels()).toEqual(['Khôi phục'])
+    })
+
+    it('Khôi phục restores the folder through the same call as a file', async () => {
+      trash = [trashedFolder('t-f')]
+      await mount()
+      const before = api.uniworkListTrash!.mock.calls.length
+      await openFolderMenu('t-f')
+      await click(menuItem('Khôi phục'))
+      expect(api.uniworkRestoreDocument).toHaveBeenCalledTimes(1)
+      expect(api.uniworkRestoreDocument!.mock.calls[0]![0]).toBe('t-f')
+      expect(api.uniworkListTrash!.mock.calls.length).toBeGreaterThan(before)
+    })
+
+    it('Xóa vĩnh viễn opens the folder confirm, sends nothing before it, then purges the folder', async () => {
+      trash = [trashedFolder('t-f')]
+      await mount()
+      await openFolderMenu('t-f')
+      await click(menuItem('Xóa vĩnh viễn'))
+      expect(dialog()!.textContent).toContain('Xóa vĩnh viễn Hồ sơ cũ?')
+      expect(dialog()!.textContent).toContain(
+        'Thư mục này sẽ bị xóa vĩnh viễn và không thể hoàn tác. Mục con bạn không quản lý vẫn ở lại thùng rác.',
+      )
+      expect(api.uniworkPurgeDocument).not.toHaveBeenCalled()
+      await click(document.body.querySelector('[data-purge-confirm]'))
+      expect(api.uniworkPurgeDocument).toHaveBeenCalledTimes(1)
+      expect(api.uniworkPurgeDocument!.mock.calls[0]![0]).toBe('t-f')
+      expect(dialog()).toBeNull()
+    })
+  })
+
+  it('.btn-danger fills with --danger (white on it >= 4.5:1), hover keeps --color-error-hover (UNI-2078 VS-2)', () => {
+    const css = readFileSync(resolve(__dirname, '../src/renderer/src/home.css'), 'utf8')
+    // the declaration block of the rule that starts a line with exactly this selector
+    const rule = (selector: string) => {
+      const at = css.indexOf(`\n${selector} {`)
+      return at < 0 ? '' : css.slice(at, css.indexOf('}', at))
+    }
+    expect(rule('.btn-danger')).toMatch(/background:\s*var\(--danger\);/)
+    expect(rule(".btn-danger:hover:not(:disabled):not([aria-disabled='true'])")).toMatch(
+      /background:\s*var\(--color-error-hover\);/,
+    )
+  })
+
   it('keeps select-all and the row checkboxes working across the groups', async () => {
     await mount()
     const all = host.querySelector<HTMLInputElement>(
