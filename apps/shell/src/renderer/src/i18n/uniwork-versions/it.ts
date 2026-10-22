@@ -1,0 +1,58 @@
+import type { zh } from './zh'
+
+export const it = {
+  vhsMenuEntry: 'Cronologia versioni',
+  vhsTitle: 'Cronologia versioni',
+  vhsDescription:
+    'I punti di controllo delle versioni conservati sul server. Il ripristino scrive una nuova versione; la cronologia non viene mai cancellata.',
+  vhsLoading: 'Caricamento della cronologia…',
+  vhsError: 'Impossibile caricare la cronologia delle versioni.',
+  vhsRetry: 'Riprova',
+  vhsEmpty: 'Nessuna versione per ora. Crea il primo punto di controllo dalla copia di lavoro.',
+  vhsLoadMore: 'Carica altro',
+  vhsRowVersion: 'Versione {no}',
+  vhsAuthorSystem: 'Sistema',
+  vhsAuthorFormer: 'Ex membro',
+  vhsAuthorAgent: 'Agent',
+  vhsCurrentBadge: 'Attuale',
+  vhsView: 'Visualizza contenuto',
+  vhsPreviewTitle: 'Contenuto della versione {no}',
+  vhsPreviewError: 'Impossibile caricare il contenuto di questa versione.',
+  vhsPreviewEmpty: 'Questa versione non ha contenuto.',
+  vhsOpenUnsupported: 'Questa versione non può essere aperta nell’app. Scaricala invece.',
+  vhsDownload: 'Scarica questa versione',
+  vhsDownloadVersion: 'Scarica la versione {no}',
+  vhsDownloadFailed: 'Impossibile scaricare il file',
+  vhsNameLabel: 'Nome del punto di controllo',
+  vhsNamePlaceholder: 'es. Prima delle modifiche della revisione',
+  vhsNameHint: 'Il punto di controllo salva la copia di lavoro; il nome è facoltativo.',
+  vhsNameSubmit: 'Crea punto di controllo',
+  vhsNameSubmitting: 'Creazione…',
+  vhsNameDone: 'Versione {no} creata',
+  vhsNameFailed:
+    'Impossibile creare il punto di controllo. Quanto hai digitato è stato conservato.',
+  vhsNameUnchanged:
+    'Nulla è cambiato dall’ultima versione, quindi non è stato creato un nuovo punto di controllo.',
+  vhsRestore: 'Ripristina la versione {no}',
+  vhsRestoreConfirmTitle: 'Ripristinare la versione {no}?',
+  vhsRestoreConfirmDescription:
+    'La copia di lavoro assume il contenuto di questa versione e viene aggiunta una nuova versione di ripristino. La cronologia resta.',
+  vhsRestoreConfirmSubmit: 'Ripristina',
+  vhsRestoreSubmitting: 'Ripristino…',
+  vhsRestoreFailed: 'Impossibile ripristinare. La copia di lavoro non è cambiata.',
+  vhsRestoreConflict: 'La copia di lavoro è appena cambiata. Riapri la cronologia e riprova.',
+  vhsManageOnly: 'Serve l’accesso in modifica per ripristinare una versione.',
+  vhsShelvedBlocked: 'Questo documento è archiviato e in sola lettura.',
+  vhsLockedByOther:
+    'Un’altra persona sta modificando questo documento. Attendi che finisca o prendi il controllo della modifica, poi riprova.',
+  vhsLockedByMe:
+    'Stai modificando questo documento in un’altra finestra. Salvalo o chiudilo lì, poi riprova.',
+  vhsReasonUpload: 'caricata',
+  vhsReasonManual: 'punto di controllo manuale',
+  vhsReasonAuto: 'automatica',
+  vhsReasonRestore: 'ripristino',
+  vhsReasonAgent: 'agent',
+  vhsReasonUnknown: 'altro',
+  vhsClose: 'Chiudi',
+  vhsCancel: 'Annulla',
+} satisfies Record<keyof typeof zh, string>

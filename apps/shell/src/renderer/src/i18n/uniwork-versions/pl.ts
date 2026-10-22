@@ -1,0 +1,58 @@
+import type { zh } from './zh'
+
+export const pl = {
+  vhsMenuEntry: 'Historia wersji',
+  vhsTitle: 'Historia wersji',
+  vhsDescription:
+    'Punkty kontrolne wersji przechowywane na serwerze. Przywrócenie zapisuje nową wersję; historia nigdy nie jest usuwana.',
+  vhsLoading: 'Wczytywanie historii…',
+  vhsError: 'Nie udało się wczytać historii wersji.',
+  vhsRetry: 'Spróbuj ponownie',
+  vhsEmpty: 'Nie ma jeszcze żadnych wersji. Utwórz pierwszy punkt kontrolny z kopii roboczej.',
+  vhsLoadMore: 'Wczytaj więcej',
+  vhsRowVersion: 'Wersja {no}',
+  vhsAuthorSystem: 'System',
+  vhsAuthorFormer: 'Były członek',
+  vhsAuthorAgent: 'Agent',
+  vhsCurrentBadge: 'Bieżąca',
+  vhsView: 'Pokaż zawartość',
+  vhsPreviewTitle: 'Zawartość wersji {no}',
+  vhsPreviewError: 'Nie udało się wczytać zawartości tej wersji.',
+  vhsPreviewEmpty: 'Ta wersja nie ma zawartości.',
+  vhsOpenUnsupported: 'Tej wersji nie można otworzyć w aplikacji. Pobierz ją zamiast tego.',
+  vhsDownload: 'Pobierz tę wersję',
+  vhsDownloadVersion: 'Pobierz wersję {no}',
+  vhsDownloadFailed: 'Nie udało się pobrać pliku',
+  vhsNameLabel: 'Nazwa punktu kontrolnego',
+  vhsNamePlaceholder: 'np. Przed zmianami po recenzji',
+  vhsNameHint: 'Punkt kontrolny zapisuje kopię roboczą; nazwa jest opcjonalna.',
+  vhsNameSubmit: 'Utwórz punkt kontrolny',
+  vhsNameSubmitting: 'Tworzenie…',
+  vhsNameDone: 'Utworzono wersję {no}',
+  vhsNameFailed: 'Nie udało się utworzyć punktu kontrolnego. To, co wpisano, zostało zachowane.',
+  vhsNameUnchanged:
+    'Od ostatniej wersji nic się nie zmieniło, więc nie utworzono nowego punktu kontrolnego.',
+  vhsRestore: 'Przywróć wersję {no}',
+  vhsRestoreConfirmTitle: 'Przywrócić wersję {no}?',
+  vhsRestoreConfirmDescription:
+    'Kopia robocza przejmie zawartość tej wersji i zostanie dodana nowa wersja przywracania. Historia pozostaje.',
+  vhsRestoreConfirmSubmit: 'Przywróć',
+  vhsRestoreSubmitting: 'Przywracanie…',
+  vhsRestoreFailed: 'Nie udało się przywrócić. Kopia robocza nie została zmieniona.',
+  vhsRestoreConflict:
+    'Kopia robocza właśnie się zmieniła. Otwórz historię ponownie i spróbuj jeszcze raz.',
+  vhsManageOnly: 'Do przywrócenia wersji potrzebny jest dostęp do edycji.',
+  vhsShelvedBlocked: 'Ten dokument jest zarchiwizowany i tylko do odczytu.',
+  vhsLockedByOther:
+    'Ktoś inny edytuje ten dokument. Poczekaj, aż skończy, lub przejmij edycję, a potem spróbuj ponownie.',
+  vhsLockedByMe:
+    'Edytujesz ten dokument w innym oknie. Zapisz go lub zamknij tam, a potem spróbuj ponownie.',
+  vhsReasonUpload: 'przesłana',
+  vhsReasonManual: 'ręczny punkt kontrolny',
+  vhsReasonAuto: 'automatyczna',
+  vhsReasonRestore: 'przywrócenie',
+  vhsReasonAgent: 'agent',
+  vhsReasonUnknown: 'inna',
+  vhsClose: 'Zamknij',
+  vhsCancel: 'Anuluj',
+} satisfies Record<keyof typeof zh, string>
