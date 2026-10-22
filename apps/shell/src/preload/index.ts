@@ -107,6 +107,13 @@ import {
   UNIWORK_LOCK_REASONS,
 } from '../shared/home-api'
 import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../shared/home-api'
+import {
+  asDocHistoryResult,
+  DOC_HISTORY_CHANNELS,
+  docHistoryRejectionOf,
+  type DocHistoryResult,
+  type UniworkDocHistoryApi,
+} from '../shared/doc-history-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
 import type {
   IntegrationsApi,
@@ -2086,6 +2093,44 @@ const shareApi: UniworkShareApi = {
 }
 
 contextBridge.exposeInMainWorld('uniworkShare', shareApi)
+
+/**
+ * UNI-2077: the Version history and Access log sheets. Main answers every call
+ * with a `DocHistoryResult`; the guard keeps its known fields only.
+ */
+async function invokeDocHistory<T>(channel: string, input: unknown): Promise<DocHistoryResult<T>> {
+  try {
+    return asDocHistoryResult<T>(await ipcRenderer.invoke(channel, input))
+  } catch (error) {
+    return docHistoryRejectionOf(error)
+  }
+}
+
+const docHistoryApi: UniworkDocHistoryApi = {
+  async versions(input) {
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.versions, input)
+  },
+  async version(input) {
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.version, input)
+  },
+  async createVersion(input) {
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.createVersion, input)
+  },
+  async restore(input) {
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.restore, input)
+  },
+  async openVersion(input) {
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.openVersion, input)
+  },
+  async downloadVersion(input) {
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.downloadVersion, input)
+  },
+  async accessLogs(input) {
+    return invokeDocHistory(DOC_HISTORY_CHANNELS.accessLogs, input)
+  },
+}
+
+contextBridge.exposeInMainWorld('uniworkDocHistory', docHistoryApi)
 
 // open documents dragged from the OS anywhere over Home or the tab strip
 installDropOpenBridge()

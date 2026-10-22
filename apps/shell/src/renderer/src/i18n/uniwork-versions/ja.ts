@@ -1,0 +1,58 @@
+import type { zh } from './zh'
+
+export const ja = {
+  vhsMenuEntry: 'バージョン履歴',
+  vhsTitle: 'バージョン履歴',
+  vhsDescription:
+    'サーバーに保存されたバージョンのチェックポイントです。復元すると新しいバージョンが書き込まれ、履歴は消えません。',
+  vhsLoading: '履歴を読み込み中…',
+  vhsError: 'バージョン履歴を読み込めませんでした。',
+  vhsRetry: '再試行',
+  vhsEmpty: 'まだバージョンがありません。作業コピーから最初のチェックポイントを作成してください。',
+  vhsLoadMore: 'さらに読み込む',
+  vhsRowVersion: 'バージョン {no}',
+  vhsAuthorSystem: 'システム',
+  vhsAuthorFormer: '元メンバー',
+  vhsAuthorAgent: 'Agent',
+  vhsCurrentBadge: '現在',
+  vhsView: '内容を表示',
+  vhsPreviewTitle: 'バージョン {no} の内容',
+  vhsPreviewError: 'このバージョンの内容を読み込めませんでした。',
+  vhsPreviewEmpty: 'このバージョンには内容がありません。',
+  vhsOpenUnsupported: 'このバージョンはアプリで開けません。代わりにダウンロードしてください。',
+  vhsDownload: 'このバージョンをダウンロード',
+  vhsDownloadVersion: 'バージョン {no} をダウンロード',
+  vhsDownloadFailed: 'ファイルをダウンロードできませんでした',
+  vhsNameLabel: 'チェックポイント名',
+  vhsNamePlaceholder: '例: レビュー修正の前',
+  vhsNameHint: 'チェックポイントは作業コピーを保存します。名前は任意です。',
+  vhsNameSubmit: 'チェックポイントを作成',
+  vhsNameSubmitting: '作成中…',
+  vhsNameDone: 'バージョン {no} を作成しました',
+  vhsNameFailed: 'チェックポイントを作成できませんでした。入力した内容はそのまま残っています。',
+  vhsNameUnchanged:
+    '最新バージョン以降に変更がないため、新しいチェックポイントは作成されませんでした。',
+  vhsRestore: 'バージョン {no} を復元',
+  vhsRestoreConfirmTitle: 'バージョン {no} を復元しますか？',
+  vhsRestoreConfirmDescription:
+    '作業コピーはこのバージョンの内容になり、新しい復元バージョンが追加されます。履歴はそのまま残ります。',
+  vhsRestoreConfirmSubmit: '復元',
+  vhsRestoreSubmitting: '復元中…',
+  vhsRestoreFailed: '復元できませんでした。作業コピーは変更されていません。',
+  vhsRestoreConflict:
+    '作業コピーがちょうど変更されました。履歴を開き直してもう一度お試しください。',
+  vhsManageOnly: 'バージョンを復元するには編集権限が必要です。',
+  vhsShelvedBlocked: 'このドキュメントはアーカイブ済みで、読み取り専用です。',
+  vhsLockedByOther:
+    '他のユーザーがこのドキュメントを編集中です。終わるまで待つか、編集を引き継いでからもう一度お試しください。',
+  vhsLockedByMe:
+    'このドキュメントは別のウィンドウで編集中です。そこで保存するか閉じてから、もう一度お試しください。',
+  vhsReasonUpload: 'アップロード',
+  vhsReasonManual: '手動チェックポイント',
+  vhsReasonAuto: '自動',
+  vhsReasonRestore: '復元',
+  vhsReasonAgent: 'agent',
+  vhsReasonUnknown: 'その他',
+  vhsClose: '閉じる',
+  vhsCancel: 'キャンセル',
+} satisfies Record<keyof typeof zh, string>

@@ -46,8 +46,9 @@ name: Release installers
 # app as before. A signing run builds the mac dmgs in the macos_signed job
 # (every other run in the macos job, which has no environment), and that job
 # uses the GitHub environment mac-signing, which holds the secrets (names
-# only): CSC_LINK, CSC_KEY_PASSWORD
-# (the .p12, base64), APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID.
+# only): CSC_LINK, CSC_KEY_PASSWORD (the .p12, base64), APPLE_ID,
+# APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID. The job imports the .p12 into a
+# temporary keychain of its own and deletes it at the end.
 # Restrict that environment's deployment refs to main and v* tags and keep the
 # secrets out of the repository-level list, so a workflow on another branch
 # cannot read them.
@@ -549,6 +550,51 @@ jobs:
             exit 1
           fi
 
+      # Own keychain instead of electron-builder's CSC_LINK import: electron-builder
+      # 26.15 runs `security set-key-partition-list -k <p12 password>` against a
+      # keychain it created with a random password, which macOS 26 rejects
+      # ("SecKeychainUnlock: The user name or passphrase you entered is not
+      # correct"; fixed upstream in 26.18). Here the keychain password is ours, and
+      # electron-builder only gets the keychain (CSC_KEYCHAIN) and the identity
+      # name (CSC_NAME, which also makes it name the dmgs without `unsigned`).
+      - name: Import the signing certificate
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/uniwork-signing.keychain-db"
+          p12="$RUNNER_TEMP/uniwork-signing.p12"
+          trap 'rm -f "$p12"' EXIT
+          password="$(openssl rand -base64 24)"
+          echo "::add-mask::$password"
+          printf '%s' "${CSC_LINK#base64:}" | base64 --decode > "$p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$p12" -k "$keychain" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
+          # codesign finds the keychain and the intermediates in it through the search list
+          existing="$(security list-keychains -d user | tr -d '"' | xargs)"
+          # shellcheck disable=SC2086
+          security list-keychains -d user -s "$keychain" $existing
+          echo "CSC_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          identities="$(security find-identity -v -p codesigning "$keychain")"
+          if ! grep -q 'Developer ID Application' <<<"$identities"; then
+            echo "No valid Developer ID identity yet; adding Apple's Developer ID G2 intermediate to the keychain"
+            curl -fsSL --retry 3 -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+            security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$keychain"
+          fi
+          identities="$(security find-identity -v -p codesigning "$keychain")"
+          echo "Code signing identities in the temporary keychain:"
+          echo "$identities"
+          names="$(sed -n "s/.*\"Developer ID Application: \(.*($EXPECTED_TEAM_ID)\)\".*/\1/p" <<<"$identities")"
+          if [ "$(printf '%s\n' "$names" | wc -l | tr -d ' ')" != 1 ] || [ -z "$names" ]; then
+            echo "::error::expected exactly one valid Developer ID Application identity of team $EXPECTED_TEAM_ID in the certificate"
+            exit 1
+          fi
+          echo "CSC_NAME=$names" >> "$GITHUB_ENV"
+
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -587,13 +633,12 @@ jobs:
       - name: Build the universal xlsx sidecar
         run: npm run native:build:universal -w @genoffice/sheets
 
-      # electron-builder signs with the Developer ID identity and notarizes the
-      # app; build/notarize-dmg.js notarizes and staples the dmgs.
+      # electron-builder signs with the identity and keychain the import step
+      # exported (CSC_NAME, CSC_KEYCHAIN) and notarizes the app;
+      # build/notarize-dmg.js notarizes and staples the dmgs.
       - name: Package, sign and notarize the dmgs
         working-directory: apps/shell
         env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -667,6 +712,14 @@ jobs:
           path: upload/*
           if-no-files-found: error
           retention-days: 14
+
+      - name: Delete the signing keychain
+        if: always()
+        run: |
+          if [ -n "${CSC_KEYCHAIN:-}" ]; then
+            security delete-keychain "$CSC_KEYCHAIN" || true
+          fi
+          rm -f "$RUNNER_TEMP"/uniwork-signing.p12
 
   linux:
     needs: meta

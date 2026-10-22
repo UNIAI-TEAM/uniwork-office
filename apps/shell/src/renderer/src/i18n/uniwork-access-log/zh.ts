@@ -1,0 +1,21 @@
+/** Access log sheet copy (the web's documents.accessLog.* strings); zh defines the key set. */
+export const zh = {
+  algMenu: '访问日志',
+  algTitle: '访问日志',
+  algDescription: '谁查看、下载或通过链接打开了此文档。只有管理者可以查看。',
+  algManageOnly: '你需要管理权限才能查看访问日志。',
+  algLoading: '正在加载日志…',
+  algError: '无法加载访问日志。',
+  algEmpty: '尚无访问记录。',
+  algFilterLabel: '操作',
+  algFilterAll: '所有操作',
+  algActionView: '查看',
+  algActionDownload: '下载',
+  algActionExport: '导出',
+  algActionLinkView: '通过链接打开',
+  algActionUnknown: '其他',
+  algActorAnonymous: '匿名',
+  algActorSystem: '系统',
+  algActorUnknown: '未知',
+  algVersion: '版本 {no}',
+}

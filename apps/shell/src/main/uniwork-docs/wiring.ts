@@ -61,6 +61,11 @@ import {
 } from '../uniwork-auth'
 import { AccountBoundary } from './account-boundary'
 import { createShareClientProvider, createUniworkShareService } from './share-service'
+import {
+  createDocHistoryClientProvider,
+  createDocHistoryService,
+  registerDocHistoryIpc,
+} from './doc-history-service'
 import { registerUniworkAskUni } from '../uniwork-askuni'
 import {
   createUniworkComments,
@@ -1111,6 +1116,24 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   )
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.bulk, (_event, plan: unknown) =>
     shareService.bulk(plan as Parameters<typeof shareService.bulk>[0]),
+  )
+  // UNI-2077: the Version history and Access log sheets (`uniwork-doc-history:*`); `ipcMain` is
+  // the guarded object (UNI-2073), which answers the shell window's main frame only
+  registerDocHistoryIpc(
+    ipcMain,
+    createDocHistoryService({
+      client: createDocHistoryClientProvider({
+        profile: () => uniworkDeploymentProfile(),
+        authorized: (call) => authorizedRequest(call),
+        isSignedIn: () => uniworkSessionIdentity() !== null,
+      }),
+      isSignedIn: () => uniworkSessionIdentity() !== null,
+      openCopy: (documentId) => service.historyOpenCopy(documentId),
+      noteRestored: (notice) => service.noteVersionRestored(notice),
+      openVersionView: (documentId, versionNo) => service.openVersionView(documentId, versionNo),
+      downloadVersion: (documentId, versionNo, name) =>
+        service.downloadDocumentVersion(documentId, versionNo, name),
+    }),
   )
   // UNI-2069: Ask UNI (`uniwork:askuni:*`); its workspace list and current pick are the doclist's
   registerUniworkAskUni(ipcMain, {

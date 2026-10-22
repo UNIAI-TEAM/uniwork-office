@@ -2694,5 +2694,102 @@ describe('the version view copy (UNI-2033)', () => {
       await expect(ctx.service.openVersionView(DOC, 2, 'cmt_1')).rejects.toBeDefined()
       expect(revealComment).not.toHaveBeenCalled()
     })
+
+    it('UNI-2077: the version history opens the same copy with no thread to reveal', async () => {
+      const server = fakeServer({ bytes: enc('v3'), myLevel: 'view' })
+      const ctx = setup(server)
+      const revealComment = vi.fn()
+      ;(ctx.deps as Record<string, unknown>).revealComment = revealComment
+      const result = await ctx.service.openVersionView(DOC, 2)
+      expect(result.path).toContain(`${DOC}@v2`)
+      expect(binding(result.path)).toMatchObject({ access: 'view', baseVersion: 2 })
+      expect(revealComment).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('UNI-2077 downloadDocumentVersion', () => {
+    it('saves download?version=N to the picked file', async () => {
+      const server = fakeServer({ bytes: enc('v2 bytes') })
+      const ctx = setup(server)
+      const target = join(dir, 'picked', 'Báo cáo (v2).docx')
+      mkdirSync(dirname(target), { recursive: true })
+      const pick = vi.fn(async () => target)
+      ;(ctx.deps as Record<string, unknown>).pickDownloadPath = pick
+      expect(await ctx.service.downloadDocumentVersion(DOC, 2, 'a/../Báo cáo (v2).docx')).toEqual({
+        path: target,
+      })
+      // the suggested name loses any folder part before it reaches the dialog
+      expect(pick).toHaveBeenCalledWith('Báo cáo (v2).docx')
+      expect(server.calls.some((c) => c.url.endsWith('/download?version=2'))).toBe(true)
+      expect(readFileSync(target, 'utf8')).toBe('v2 bytes')
+    })
+
+    it('a canceled dialog asks nothing of the server', async () => {
+      const server = fakeServer({ bytes: enc('v2') })
+      const ctx = setup(server)
+      ;(ctx.deps as Record<string, unknown>).pickDownloadPath = vi.fn(async () => null)
+      expect(await ctx.service.downloadDocumentVersion(DOC, 2, 'a.docx')).toBeNull()
+      expect(server.calls.some((c) => c.url.includes('/download'))).toBe(false)
+    })
+
+    it('a target inside the working copies is forbidden_target', async () => {
+      const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+      const ctx = setup(server)
+      const path = await openDoc(ctx)
+      ;(ctx.deps as Record<string, unknown>).pickDownloadPath = vi.fn(async () =>
+        join(dirname(path), 'x.docx'),
+      )
+      expect(await ctx.service.downloadDocumentVersion(DOC, 2, 'x.docx')).toBe('forbidden_target')
+    })
+
+    it('a target that turns forbidden during the write is forbidden_target', async () => {
+      const server = fakeServer({ bytes: enc('v2') })
+      const ctx = setup(server)
+      const target = join(dir, 'x.docx')
+      ;(ctx.deps as Record<string, unknown>).pickDownloadPath = vi.fn(async () => target)
+      // the checks before and after the read pass, the one inside the write (the third) fails
+      const check = vi
+        .spyOn(
+          ctx.service as unknown as { isForbiddenDownloadTarget: (t: string) => Promise<boolean> },
+          'isForbiddenDownloadTarget',
+        )
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true)
+      expect(await ctx.service.downloadDocumentVersion(DOC, 2, 'x.docx')).toBe('forbidden_target')
+      expect(check).toHaveBeenCalledTimes(3)
+      expect(existsSync(target)).toBe(false)
+    })
+
+    it('a server refusal throws its coded error', async () => {
+      const server = fakeServer({ bytes: enc('v2') })
+      const ctx = setup(server)
+      ;(ctx.deps as Record<string, unknown>).pickDownloadPath = vi.fn(async () =>
+        join(dir, 'x.docx'),
+      )
+      server.faults.push({ route: 'download', kind: 404, code: 'not_found' })
+      await expect(ctx.service.downloadDocumentVersion(DOC, 2, 'x.docx')).rejects.toMatchObject({
+        code: 'not_found',
+      })
+    })
+  })
+
+  describe('UNI-2077 historyOpenCopy', () => {
+    it('names the open tab base revision; null when the document is not open here', async () => {
+      const server = fakeServer({ bytes: enc('v3'), myLevel: 'manage' })
+      const ctx = setup(server)
+      expect(await ctx.service.historyOpenCopy(DOC)).toBeNull()
+      const path = await openDoc(ctx)
+      expect(await ctx.service.historyOpenCopy(DOC)).toBeNull()
+      ctx.deps.isPathOpen.mockImplementation((p: string) => p === path)
+      const open = await ctx.service.historyOpenCopy(DOC)
+      expect(open).toMatchObject({ baseRevision: binding(path).baseRevision })
+      expect(open?.editLockId === null || typeof open?.editLockId === 'string').toBe(true)
+    })
+
+    it('refuses an id that is not an id', async () => {
+      const ctx = setup(fakeServer({ bytes: enc('v3') }))
+      await expect(ctx.service.historyOpenCopy('../x')).rejects.toMatchObject({ code: 'not_found' })
+    })
   })
 })
