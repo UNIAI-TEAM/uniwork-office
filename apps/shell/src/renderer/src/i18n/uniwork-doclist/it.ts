@@ -90,6 +90,10 @@ export const it = {
   dlBulkConfirmBody:
     'Gli elementi restano nel cestino per 30 giorni, poi vengono eliminati definitivamente.',
   dlBulkDoneDownload: 'Scaricati {ok}/{total} documenti',
+  dlBulkMoveTitleOne: 'Sposta {count} documento',
+  dlBulkMoveTitleOther: 'Sposta {count} documenti',
+  dlBulkMoveDescription: 'Scegli la cartella in cui spostare i documenti selezionati.',
+  dlBulkDoneMove: 'Spostati {ok}/{total} documenti',
   dlZipPreparing: 'Preparazione del file ZIP…',
   dlZipTooLarge: 'I file selezionati superano complessivamente 1 GB. Selezionane meno.',
   dlZipFailed: 'Impossibile creare il file ZIP. Riprova.',

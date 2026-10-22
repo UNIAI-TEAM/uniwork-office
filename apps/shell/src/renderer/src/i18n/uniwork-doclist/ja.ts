@@ -88,6 +88,10 @@ export const ja = {
   dlBulkConfirmTitleOther: '{n} 件のドキュメントをゴミ箱に移動しますか？',
   dlBulkConfirmBody: '項目はゴミ箱に 30 日間残り、その後完全に削除されます。',
   dlBulkDoneDownload: '{ok}/{total} 件のドキュメントをダウンロードしました',
+  dlBulkMoveTitleOne: '{count} 件のドキュメントを移動',
+  dlBulkMoveTitleOther: '{count} 件のドキュメントを移動',
+  dlBulkMoveDescription: '選択したドキュメントの移動先フォルダーを選んでください。',
+  dlBulkDoneMove: '{ok}/{total} 件のドキュメントを移動しました',
   dlZipPreparing: 'ZIP ファイルを準備しています…',
   dlZipTooLarge:
     '選択したファイルの合計が 1 GB を超えています。ファイルを減らして選択してください。',

@@ -89,6 +89,11 @@ export const de = {
   dlBulkConfirmTitleOther: '{n} Dokumente in den Papierkorb verschieben?',
   dlBulkConfirmBody: 'Elemente bleiben 30 Tage im Papierkorb und werden dann endgültig gelöscht.',
   dlBulkDoneDownload: '{ok}/{total} Dokumente heruntergeladen',
+  dlBulkMoveTitleOne: '{count} Dokument verschieben',
+  dlBulkMoveTitleOther: '{count} Dokumente verschieben',
+  dlBulkMoveDescription:
+    'Wählen Sie den Ordner, in den die ausgewählten Dokumente verschoben werden.',
+  dlBulkDoneMove: '{ok}/{total} Dokumente verschoben',
   dlZipPreparing: 'Die ZIP-Datei wird vorbereitet…',
   dlZipTooLarge:
     'Die ausgewählten Dateien ergeben zusammen mehr als 1 GB. Wählen Sie weniger Dateien aus.',

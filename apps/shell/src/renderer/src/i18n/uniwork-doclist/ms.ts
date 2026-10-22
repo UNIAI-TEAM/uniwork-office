@@ -90,6 +90,10 @@ export const ms = {
   dlBulkConfirmBody:
     'Item kekal dalam tong sampah selama 30 hari, kemudian dipadam selama-lamanya.',
   dlBulkDoneDownload: '{ok}/{total} dokumen dimuat turun',
+  dlBulkMoveTitleOne: 'Alihkan {count} dokumen',
+  dlBulkMoveTitleOther: 'Alihkan {count} dokumen',
+  dlBulkMoveDescription: 'Pilih folder tempat dokumen yang dipilih akan dialihkan.',
+  dlBulkDoneMove: '{ok}/{total} dokumen dialihkan',
   dlZipPreparing: 'Menyediakan fail zip…',
   dlZipTooLarge: 'Fail yang dipilih berjumlah lebih daripada 1 GB. Pilih lebih sedikit fail.',
   dlZipFailed: 'Fail zip tidak dapat dibuat. Cuba lagi.',

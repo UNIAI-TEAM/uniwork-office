@@ -176,3 +176,49 @@ describe('the copy dialog strings (UNI-2078)', () => {
     expect(same).toEqual([])
   })
 })
+
+describe('bulk Move strings (UNI-2078 slice 3)', () => {
+  const KEYS = [
+    'dlBulkMoveTitleOne',
+    'dlBulkMoveTitleOther',
+    'dlBulkMoveDescription',
+    'dlBulkDoneMove',
+  ] as const
+
+  it.each([...LANGS])('locale %s has the 4 keys', (lang) => {
+    for (const key of KEYS) expect(table(lang)[key]?.trim(), `${lang}.${key}`).toBeTruthy()
+  })
+
+  it('vi is the web wording, verbatim ({{x}} -> {x})', () => {
+    const vi = table('vi')
+    expect(vi.dlBulkMoveTitleOne).toBe('Di chuyển {count} tài liệu')
+    expect(vi.dlBulkMoveTitleOther).toBe('Di chuyển {count} tài liệu')
+    expect(vi.dlBulkMoveDescription).toBe('Chọn thư mục đích cho các tài liệu đã chọn.')
+    expect(vi.dlBulkDoneMove).toBe('Đã di chuyển {ok}/{total} tài liệu')
+  })
+
+  it('en is the web wording, verbatim', () => {
+    const en = table('en')
+    expect(en.dlBulkMoveTitleOne).toBe('Move {count} document')
+    expect(en.dlBulkMoveTitleOther).toBe('Move {count} documents')
+    expect(en.dlBulkMoveDescription).toBe('Choose the folder the selected documents move to.')
+    expect(en.dlBulkDoneMove).toBe('Moved {ok}/{total} documents')
+  })
+
+  it('the title keys carry {count}, the done key {ok} and {total}', () => {
+    for (const lang of LANGS) {
+      expect(table(lang).dlBulkMoveTitleOne, lang).toContain('{count}')
+      expect(table(lang).dlBulkMoveTitleOther, lang).toContain('{count}')
+      expect(table(lang).dlBulkDoneMove, lang).toContain('{ok}')
+      expect(table(lang).dlBulkDoneMove, lang).toContain('{total}')
+    }
+  })
+
+  it('the other 19 locales are translated, not an English copy', () => {
+    const en = table('en')
+    for (const key of KEYS) {
+      const same = LANGS.filter((l) => l !== 'en').filter((l) => table(l)[key] === en[key])
+      expect(same, key).toEqual([])
+    }
+  })
+})

@@ -90,6 +90,10 @@ export const es = {
   dlBulkConfirmBody:
     'Los elementos permanecen 30 días en la papelera y luego se eliminan para siempre.',
   dlBulkDoneDownload: 'Descargados {ok}/{total} documentos',
+  dlBulkMoveTitleOne: 'Mover {count} documento',
+  dlBulkMoveTitleOther: 'Mover {count} documentos',
+  dlBulkMoveDescription: 'Elige la carpeta a la que se moverán los documentos seleccionados.',
+  dlBulkDoneMove: 'Movidos {ok}/{total} documentos',
   dlZipPreparing: 'Preparando el archivo ZIP…',
   dlZipTooLarge: 'Los archivos seleccionados suman más de 1 GB. Seleccione menos archivos.',
   dlZipFailed: 'No se pudo crear el archivo ZIP. Vuelva a intentarlo.',

@@ -90,6 +90,10 @@ export const nl = {
   dlBulkConfirmBody:
     'Items blijven 30 dagen in de prullenbak en worden daarna definitief verwijderd.',
   dlBulkDoneDownload: '{ok}/{total} documenten gedownload',
+  dlBulkMoveTitleOne: '{count} document verplaatsen',
+  dlBulkMoveTitleOther: '{count} documenten verplaatsen',
+  dlBulkMoveDescription: 'Kies de map waarnaar de geselecteerde documenten worden verplaatst.',
+  dlBulkDoneMove: '{ok}/{total} documenten verplaatst',
   dlZipPreparing: 'Zipbestand wordt voorbereid…',
   dlZipTooLarge: 'De geselecteerde bestanden zijn samen meer dan 1 GB. Selecteer minder bestanden.',
   dlZipFailed: 'Het zipbestand kon niet worden gemaakt. Probeer het opnieuw.',

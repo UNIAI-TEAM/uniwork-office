@@ -90,6 +90,10 @@ export const fr = {
   dlBulkConfirmBody:
     'Les éléments restent 30 jours dans la corbeille, puis sont supprimés définitivement.',
   dlBulkDoneDownload: '{ok}/{total} documents téléchargés',
+  dlBulkMoveTitleOne: 'Déplacer {count} document',
+  dlBulkMoveTitleOther: 'Déplacer {count} documents',
+  dlBulkMoveDescription: 'Choisissez le dossier vers lequel déplacer les documents sélectionnés.',
+  dlBulkDoneMove: '{ok}/{total} documents déplacés',
   dlZipPreparing: 'Préparation du fichier ZIP…',
   dlZipTooLarge:
     'Les fichiers sélectionnés dépassent 1 Go au total. Sélectionnez moins de fichiers.',
