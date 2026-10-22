@@ -266,7 +266,13 @@ describe('document_changed tray row (G6)', () => {
     expect(row.matches('.uw-pick-row.is-gone ~ .wb-desk-trail')).toBe(false)
     expect(row.nextElementSibling!.querySelector('.wb-pill')).not.toBeNull()
     const css = readFileSync(resolve(process.cwd(), 'src/renderer/src/home.css'), 'utf8')
-    expect(css).toMatch(/\.uw-pick-row\.is-gone ~ \.wb-desk-trail \.wb-pill \{\s*opacity: 0\.6;/)
+    // UNI-2080 FU-2067-1: dimmed by dropping the tone (outlined, no fill), not by opacity, which left the
+    // text at 2.46:1 in light; --text-secondary on the row surface is >= 4.5:1 in both themes
+    const gone = /\.uw-pick-row\.is-gone ~ \.wb-desk-trail \.wb-pill \{([^}]*)\}/.exec(css)![1]!
+    expect(gone).not.toContain('opacity')
+    expect(gone).toContain('color: var(--text-secondary)')
+    expect(gone).toContain('background: transparent')
+    expect(gone).toMatch(/box-shadow: inset 0 0 0 1px var\(--border\)/)
     await click(button('Lan moved “Plan” to trash'))
     expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
     expect(dialog()).toBeNull()
