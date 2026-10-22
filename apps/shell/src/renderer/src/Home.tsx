@@ -75,6 +75,7 @@ import {
 import type { DocumentsHomeDoc, DocumentsHomeSubViewId } from './uniwork-home/documents-home-model'
 import type { FolderMenuItem } from './uniwork-folders/FolderMenu'
 import { useOfflineToggle } from './OfflineToggle'
+import { useAskUniOpenRequest } from './askuni-entry'
 
 export const HOME_AREA_KEY = 'uniwork.wb.homeArea'
 export type HomeArea = 'uniwork' | 'device'
@@ -1520,6 +1521,13 @@ export function Home() {
     setSelected(new Set())
     setRowMenu(null)
   }
+
+  // Ctrl/Cmd+J asks for My AI in Ask UNI mode; NewChatPane applies and consumes the request
+  const askOpenRequest = useAskUniOpenRequest()
+  useEffect(() => {
+    if (askOpenRequest && !chatMode) goNewChat()
+    // goNewChat only sets state, so the request alone drives this
+  }, [askOpenRequest, chatMode])
 
   useEffect(() => {
     const openMyAi = () => goNewChat()
