@@ -4,6 +4,7 @@ import type {
   UniworkDocFormat,
   UniworkDocNewFormat,
   UniworkDocSummary,
+  UniworkDocTypePick,
   UniworkFolderNode,
   UniworkListFilters,
   UniworkListSort,
@@ -217,6 +218,7 @@ export interface UniworkDocsClient {
     workspaceId: string
     query: string
     kind: 'all' | 'folder' | 'document'
+    types?: UniworkDocTypePick[]
     cursor?: string
     limit?: number
   }): Promise<DocumentListResult>
@@ -1083,6 +1085,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
       params.set('limit', String(limit))
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      applyTypePicks(params, input.types)
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',

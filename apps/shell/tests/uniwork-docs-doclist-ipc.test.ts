@@ -511,3 +511,54 @@ describe('UNI-2047 A1b: archivedByName', () => {
     for (const doc of res.value.documents) expect(doc.archivedByName).toBeUndefined()
   })
 })
+
+describe('UNI-2113 fix1: the Type picks on the title search at the IPC boundary', () => {
+  it('searchDocuments sends one type= per pick in menu order beside match=title', async () => {
+    const call = await setup()
+    const server = stubServer()
+    await call(UNIWORK_DOC_CHANNELS.searchDocuments, {
+      workspaceId: 'ws_1',
+      query: 'plan',
+      kind: 'all',
+      types: ['txt', 'page', 'docx'],
+    })
+    const [req] = server.lists()
+    expect(req, 'a search request').toBeDefined()
+    expect(req!.searchParams.get('match')).toBe('title')
+    expect(req!.searchParams.get('q')).toBe('plan')
+    expect(req!.searchParams.getAll('type')).toEqual(['page', 'docx', 'txt'])
+  })
+
+  it('searchDocuments drops unknown, empty and repeated picks and sends nothing for no pick', async () => {
+    const call = await setup()
+    const server = stubServer()
+    const base = { workspaceId: 'ws_1', query: 'plan', kind: 'all' }
+    await call(UNIWORK_DOC_CHANNELS.searchDocuments, {
+      ...base,
+      types: ['pdf', 'pdf', '', 'PDF', 'exe', 7, null, 'md'],
+    })
+    await call(UNIWORK_DOC_CHANNELS.searchDocuments, { ...base, types: [] })
+    await call(UNIWORK_DOC_CHANNELS.searchDocuments, { ...base, types: 'docx' })
+    await call(UNIWORK_DOC_CHANNELS.searchDocuments, base)
+    const [odd, ...plain] = server.lists()
+    expect(odd!.searchParams.getAll('type')).toEqual(['pdf', 'md'])
+    expect(plain).toHaveLength(3)
+    for (const req of plain) expect(req.searchParams.has('type')).toBe(false)
+  })
+
+  it('searchDocuments forwards at most 8 picks and never format or kind=page', async () => {
+    const call = await setup()
+    const server = stubServer()
+    await call(UNIWORK_DOC_CHANNELS.searchDocuments, {
+      workspaceId: 'ws_1',
+      query: 'plan',
+      kind: 'all',
+      format: 'docx',
+      types: ['page', 'docx', 'xlsx', 'pptx', 'pdf', 'md', 'html', 'txt', 'docx', 'page'],
+    })
+    const [req] = server.lists()
+    expect(req!.searchParams.getAll('type')).toHaveLength(8)
+    expect(req!.searchParams.has('format')).toBe(false)
+    expect(req!.searchParams.get('kind')).not.toBe('page')
+  })
+})

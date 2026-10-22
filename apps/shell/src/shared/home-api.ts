@@ -579,6 +579,8 @@ export interface UniworkSearchQuery {
   workspaceId: string
   query: string
   kind: 'all' | 'folder' | 'document'
+  /** UNI-2113: the Type picks narrow the search like the lists (one `type=` each, OR across picks) */
+  types?: UniworkDocTypePick[]
   cursor?: string
   limit?: number
 }

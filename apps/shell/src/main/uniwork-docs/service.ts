@@ -4855,10 +4855,12 @@ export class UniworkDocsService {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
+      const types = normalizeTypePicks(q.types)
       const page = await this.api().searchDocuments({
         workspaceId: q.workspaceId,
         query: typeof q.query === 'string' ? q.query : '',
         kind: q.kind === 'folder' || q.kind === 'document' ? q.kind : 'all',
+        ...(types.length > 0 ? { types } : {}),
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
       })

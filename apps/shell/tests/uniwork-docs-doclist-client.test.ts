@@ -290,3 +290,58 @@ describe('Type picks: one type= per pick (UNI-2113)', () => {
     expect(seen[0]!.match(/type=/g)).toHaveLength(8)
   })
 })
+
+/**
+ * UNI-2113 fix1 (T-R1-1): the title search carries the Type picks too, the same `type=` loop as
+ * the list routes (the server's `/documents` list takes `match=title&q=` and `type=` together).
+ */
+describe('Type picks on the title search (UNI-2113 fix1)', () => {
+  it('sends one type= per pick after the query, in menu order, de-duplicated', async () => {
+    const { api, seen } = setup()
+    await api.searchDocuments({
+      workspaceId: 'ws_1',
+      query: 'plan',
+      kind: 'all',
+      types: ['xlsx', 'page', 'docx', 'page'],
+    })
+    expect(seen).toEqual([`${BASE}?match=title&q=plan&limit=50&type=page&type=docx&type=xlsx`])
+  })
+
+  it('keeps today’s request when no pick is set, and drops values outside the vocabulary', async () => {
+    const { api, seen } = setup()
+    await api.searchDocuments({ workspaceId: 'ws_1', query: 'plan', kind: 'all' })
+    await api.searchDocuments({ workspaceId: 'ws_1', query: 'plan', kind: 'all', types: [] })
+    await api.searchDocuments({
+      workspaceId: 'ws_1',
+      query: 'plan',
+      kind: 'all',
+      types: ['', 'PDF', 'exe', 'pdf'] as never,
+    })
+    await api.searchDocuments({
+      workspaceId: 'ws_1',
+      query: 'plan',
+      kind: 'all',
+      types: 'docx' as never,
+    })
+    expect(seen).toEqual([
+      `${BASE}?match=title&q=plan&limit=50`,
+      `${BASE}?match=title&q=plan&limit=50`,
+      `${BASE}?match=title&q=plan&limit=50&type=pdf`,
+      `${BASE}?match=title&q=plan&limit=50`,
+    ])
+  })
+
+  it('a page pick never becomes kind=page or format= on the search either', async () => {
+    const { api, seen } = setup()
+    await api.searchDocuments({
+      workspaceId: 'ws_1',
+      query: 'plan',
+      kind: 'document',
+      cursor: 'c1',
+      types: ['page'],
+    })
+    expect(seen).toEqual([`${BASE}?match=title&q=plan&kind=document&limit=50&cursor=c1&type=page`])
+    expect(seen[0]).not.toContain('format=')
+    expect(seen[0]).not.toContain('kind=page')
+  })
+})
