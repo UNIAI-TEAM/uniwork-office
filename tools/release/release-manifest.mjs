@@ -123,8 +123,8 @@ export function updateManifest(previous, release, { keepVersions, baseUrl, now }
   const byVersion = new Map(old.map((entry) => [entry.version, entry]))
   byVersion.set(current.version, current)
   const releases = keepVersions.map((version) => byVersion.get(version)).filter(Boolean)
+  // the key order of the frozen schema 1 sample
   return {
-    ...manifest,
     schema: SCHEMA,
     generated_at: now,
     base_url: baseUrl,

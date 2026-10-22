@@ -404,6 +404,7 @@ describe('apt-repo.sh', { skip }, () => {
     publish(target, '0.11.0-dev.2')
 
     const manifest = manifestOf(target)
+    assert.deepEqual(Object.keys(manifest), ['schema', 'generated_at', 'base_url', 'channels'])
     assert.equal(manifest.schema, 1)
     assert.match(manifest.generated_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
     assert.equal(manifest.base_url, BASE)
