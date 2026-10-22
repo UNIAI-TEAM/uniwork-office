@@ -53,6 +53,8 @@ export const he = {
   askUniV2NotePlaceholder: 'ספר ל-UNI עוד…',
   askUniV2NoticeEmptyAnswer: 'ל-UNI לא היה מה לענות. שאל שוב או נסח את השאלה בצורה מדויקת יותר.',
   askUniV2NoticeStopped: 'נעצר לפני שהתשובה הסתיימה.',
+  askUniV2NoticeInterrupted: 'התשובה הופסקה ולכן היא לא שלמה.',
+  askUniV2NoticeAgentFailed: 'ל-UNI הייתה בעיה בחיפוש הנתונים שלך. נסה שוב.',
   askUniV2ReasonMissingSources: 'חסרים מקורות',
   askUniV2ReasonNotHelpful: 'לא מועיל',
   askUniV2ReasonOther: 'סיבה אחרת',

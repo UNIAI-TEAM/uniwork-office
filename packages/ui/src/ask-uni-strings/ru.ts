@@ -57,6 +57,8 @@ export const ru = {
   askUniV2NotePlaceholder: 'Расскажите UNI подробнее…',
   askUniV2NoticeEmptyAnswer: 'UNI нечего было ответить. Спросите ещё раз или уточните вопрос.',
   askUniV2NoticeStopped: 'Остановлено до окончания ответа.',
+  askUniV2NoticeInterrupted: 'Ответ прервали, поэтому он неполный.',
+  askUniV2NoticeAgentFailed: 'UNI не смог найти ваши данные из-за ошибки. Попробуйте ещё раз.',
   askUniV2ReasonMissingSources: 'Нет источников',
   askUniV2ReasonNotHelpful: 'Не помогло',
   askUniV2ReasonOther: 'Другая причина',

@@ -54,6 +54,8 @@ export const ko = {
   askUniV2NoticeEmptyAnswer:
     'UNI가 답할 내용이 없었습니다. 다시 질문하거나 더 구체적으로 물어보세요.',
   askUniV2NoticeStopped: '답변이 끝나기 전에 중지되었습니다.',
+  askUniV2NoticeInterrupted: '답변이 중단되어 불완전합니다.',
+  askUniV2NoticeAgentFailed: 'UNI가 데이터를 찾는 중 문제가 발생했습니다. 다시 시도해 주세요.',
   askUniV2ReasonMissingSources: '출처 누락',
   askUniV2ReasonNotHelpful: '도움이 되지 않음',
   askUniV2ReasonOther: '기타',

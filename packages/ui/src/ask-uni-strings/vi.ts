@@ -34,6 +34,8 @@ export const vi = {
   // answer, steps, citations, actions and the composer
   askUniV2ComposerLabel: 'Câu hỏi cho UNI',
   askUniV2NoticeStopped: 'Đã dừng trước khi trả lời xong.',
+  askUniV2NoticeInterrupted: 'Câu trả lời bị gián đoạn nên chưa đầy đủ.',
+  askUniV2NoticeAgentFailed: 'UNI gặp sự cố khi tìm dữ liệu. Hãy thử lại.',
   askUniV2NoticeEmptyAnswer:
     'UNI không có nội dung nào để trả lời. Hãy hỏi lại hoặc nêu cụ thể hơn.',
   askUniV2ErrProviderError: 'Dịch vụ AI đang gặp sự cố, thử lại sau ít phút.',
@@ -75,7 +77,7 @@ export const vi = {
   // editor panel body
   askUniDocRegion: 'Hỏi UNI',
   askUniDocChipAria: 'Đang hỏi về tài liệu này: {name}',
-  askUniDocNewChat: 'Cuộc trò chuyện mới',
+  askUniDocNewChat: 'Hội thoại mới',
   askUniDocEmptyTitle: 'Hỏi UNI về tài liệu này',
   askUniDocEmptyBody: 'UNI bắt đầu từ tài liệu này và dẫn nguồn cho mọi câu trả lời.',
   askUniDocPlaceholder: 'Hỏi về tài liệu này…',

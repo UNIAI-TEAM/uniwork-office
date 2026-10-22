@@ -53,6 +53,8 @@ export const zhTW = {
   askUniV2NotePlaceholder: '告訴 UNI 更多…',
   askUniV2NoticeEmptyAnswer: 'UNI 沒有可回答的內容。請再問一次，或說得更具體些。',
   askUniV2NoticeStopped: '已在回答完成前停止。',
+  askUniV2NoticeInterrupted: '回答被中斷，因此不完整。',
+  askUniV2NoticeAgentFailed: 'UNI 在查詢你的資料時遇到問題。請再試一次。',
   askUniV2ReasonMissingSources: '缺少來源',
   askUniV2ReasonNotHelpful: '沒有幫助',
   askUniV2ReasonOther: '其他原因',

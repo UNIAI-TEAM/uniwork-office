@@ -54,6 +54,8 @@ export const id = {
   askUniV2NotePlaceholder: 'Ceritakan lebih banyak kepada UNI…',
   askUniV2NoticeEmptyAnswer: 'UNI tidak punya jawaban. Tanyakan lagi atau buat lebih spesifik.',
   askUniV2NoticeStopped: 'Dihentikan sebelum jawaban selesai.',
+  askUniV2NoticeInterrupted: 'Jawaban terputus, jadi belum lengkap.',
+  askUniV2NoticeAgentFailed: 'UNI mengalami masalah saat mencari datamu. Coba lagi.',
   askUniV2ReasonMissingSources: 'Sumber tidak ada',
   askUniV2ReasonNotHelpful: 'Tidak membantu',
   askUniV2ReasonOther: 'Alasan lain',

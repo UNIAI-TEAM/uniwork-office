@@ -34,6 +34,8 @@ export const en = {
   // answer, steps, citations, actions and the composer
   askUniV2ComposerLabel: 'Question for UNI',
   askUniV2NoticeStopped: 'Stopped before the answer was finished.',
+  askUniV2NoticeInterrupted: 'The answer was interrupted, so it is incomplete.',
+  askUniV2NoticeAgentFailed: 'UNI ran into a problem looking up your data. Try again.',
   askUniV2NoticeEmptyAnswer: 'UNI had nothing to say. Ask again or be more specific.',
   askUniV2ErrProviderError: "The AI service isn't responding. Try again in a few minutes.",
   askUniV2ErrProviderTimeout: 'UNI took too long to answer. Try again.',

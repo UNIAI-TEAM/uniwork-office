@@ -60,6 +60,8 @@ export const de = {
   askUniV2NotePlaceholder: 'Erzähl UNI mehr…',
   askUniV2NoticeEmptyAnswer: 'UNI hatte nichts zu sagen. Frag noch einmal oder formuliere genauer.',
   askUniV2NoticeStopped: 'Vor Abschluss der Antwort gestoppt.',
+  askUniV2NoticeInterrupted: 'Die Antwort wurde unterbrochen und ist daher unvollständig.',
+  askUniV2NoticeAgentFailed: 'UNI hatte beim Suchen deiner Daten ein Problem. Versuch es erneut.',
   askUniV2ReasonMissingSources: 'Quellen fehlen',
   askUniV2ReasonNotHelpful: 'Nicht hilfreich',
   askUniV2ReasonOther: 'Anderer Grund',

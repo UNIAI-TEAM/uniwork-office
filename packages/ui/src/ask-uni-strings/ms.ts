@@ -57,6 +57,8 @@ export const ms = {
   askUniV2NoticeEmptyAnswer:
     'UNI tiada apa-apa untuk dijawab. Tanya semula atau nyatakan dengan lebih khusus.',
   askUniV2NoticeStopped: 'Dihentikan sebelum jawapan selesai.',
+  askUniV2NoticeInterrupted: 'Jawapan terganggu, jadi ia tidak lengkap.',
+  askUniV2NoticeAgentFailed: 'UNI menghadapi masalah semasa mencari data anda. Cuba lagi.',
   askUniV2ReasonMissingSources: 'Sumber tiada',
   askUniV2ReasonNotHelpful: 'Tidak membantu',
   askUniV2ReasonOther: 'Sebab lain',

@@ -58,6 +58,8 @@ export const hi = {
   askUniV2NoticeEmptyAnswer:
     'UNI के पास बताने को कुछ नहीं था। फिर से पूछें या सवाल को और स्पष्ट करें।',
   askUniV2NoticeStopped: 'जवाब पूरा होने से पहले रोक दिया गया।',
+  askUniV2NoticeInterrupted: 'जवाब बीच में रुक गया, इसलिए यह अधूरा है।',
+  askUniV2NoticeAgentFailed: 'आपका डेटा खोजते समय UNI को समस्या आई। फिर से कोशिश करें।',
   askUniV2ReasonMissingSources: 'स्रोत नहीं हैं',
   askUniV2ReasonNotHelpful: 'मददगार नहीं',
   askUniV2ReasonOther: 'कोई और कारण',
