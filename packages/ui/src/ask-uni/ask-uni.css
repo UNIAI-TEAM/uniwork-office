@@ -193,7 +193,9 @@
 /* [Sn] marker + quote card */
 .askuni-v2-cite-wrap {
   position: static;
-  margin-inline: 2px;
+  /* space only before the marker: punctuation after it stays tight, LTR and RTL */
+  margin-inline-start: 2px;
+  margin-inline-end: 0;
   line-height: 0;
 }
 
@@ -226,6 +228,13 @@
   border-color: var(--border-hover, var(--border));
 }
 
+/* an unmatched marker while the turn streams: the marker look, nothing to hover or press */
+.askuni-v2-cite.is-pending {
+  display: inline-block;
+  text-align: center;
+  pointer-events: none;
+}
+
 .askuni-v2-card {
   display: flex;
   flex-direction: column;
@@ -248,6 +257,11 @@
   inset-inline-start: 0;
   inline-size: min(288px, 100%);
   font-weight: 400;
+}
+
+/* opened by hover: a preview that never blocks the markers, chips and icons under it */
+.askuni-v2-cite-card.is-preview {
+  pointer-events: none;
 }
 
 .askuni-v2-cite-head {

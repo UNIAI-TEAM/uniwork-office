@@ -6,11 +6,13 @@ import '../markdown.css'
 import type { AskUniStringKey } from '../strings-ask-uni'
 import { useAskUniAdapter, type AskUniFeedbackApi } from './adapter'
 import { AskUniActions } from './AskUniActions'
-import { CitationMarker, SourceChips } from './AskUniCitation'
+import { CitationMarker, PendingMarker, SourceChips } from './AskUniCitation'
 import { AskUniSteps } from './AskUniSteps'
 import './ask-uni.css'
 
-const CITE_TOKEN = /\[S(\d+)\]/gi
+// the space before a marker is part of the token: a superscript sits tight on its word (and on the
+// punctuation after it); a marker that stays plain text gives the space back
+const CITE_TOKEN = /[ \t]*\[S(\d+)\]/gi
 
 /** a question or an answer; `notice` is optional so a live turn can carry what it knows so far */
 export type AskUniTurnMessage = Pick<AskUniMessage, 'id' | 'role' | 'content' | 'citations'> &
@@ -30,15 +32,19 @@ const PARTIAL: ReadonlySet<string> = new Set(['stopped', 'interrupted'])
 /**
  * The model-written answer as markdown: raw HTML inert, links never clickable, and `[Sn]` markers
  * that match a citation as small buttons with a quote card (one card open at a time). A marker that
- * matches no citation stays plain text.
+ * matches no citation stays plain text, except while the turn streams: its citations are not here
+ * yet, so it shows as an inert placeholder instead of raw `[Sn]`.
  */
 function AnswerBody({
   content,
   citations,
+  streaming,
   onOpen,
 }: {
   content: string
   citations: AskUniCitation[]
+  /** the turn is still live: an unmatched marker is a placeholder, not text */
+  streaming: boolean
   /** undefined = the host cannot open sources: the card has no Open action */
   onOpen: ((c: AskUniCitation) => void) | undefined
 }): ReactElement {
@@ -54,8 +60,8 @@ function AnswerBody({
     pattern: CITE_TOKEN,
     render: (m, key) => {
       const c = byN.get(`S${m[1]}`)
-      if (!c) return m[0]
       const n = m[1] ?? ''
+      if (!c) return streaming ? <PendingMarker key={key} n={n} /> : m[0]
       const id = seq++
       return (
         <CitationMarker
@@ -146,7 +152,12 @@ export function AskUniTurn({
       <div className="askuni-v2-answer">
         {counts ? <AskUniSteps counts={counts} /> : null}
         {hasText ? (
-          <AnswerBody content={message.content} citations={message.citations} onOpen={open} />
+          <AnswerBody
+            content={message.content}
+            citations={message.citations}
+            streaming={streaming}
+            onOpen={open}
+          />
         ) : null}
         {noticeKey ? <p className="askuni-v2-notice">{t(noticeKey)}</p> : null}
         {streaming && !hasText ? (

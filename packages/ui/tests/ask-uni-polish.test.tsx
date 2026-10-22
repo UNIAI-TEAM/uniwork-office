@@ -134,8 +134,9 @@ describe('Ask UNI answer polish', () => {
 
     it('a pinned card closes on Escape, and the next hover is a preview again', async () => {
       await mount(turn())
+      // keyboard focus pins the card; Escape only reaches it while the marker has focus
       await act(async () => {
-        marker().click()
+        marker().focus()
       })
       await act(async () => {
         marker().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))

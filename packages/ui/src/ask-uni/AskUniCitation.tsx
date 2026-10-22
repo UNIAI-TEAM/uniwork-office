@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { AskUniCitation, AskUniCitationKind } from '@genoffice/ai-provider/askuni'
 import type { AskUniStringKey } from '../strings-ask-uni'
@@ -102,8 +102,9 @@ export function CitationMarker({
   const cardId = useId()
   const buttonRef = useRef<HTMLButtonElement>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // a card opened by the pointer closes when it leaves; one opened by focus or click stays until Escape/blur
-  const byHover = useRef(false)
+  // a card opened by the pointer is a preview (no pointer events, closes when the pointer leaves);
+  // one opened by focus or click is pinned and interactive until Escape/blur
+  const [pinned, setPinned] = useState(false)
   const kind = knownKind(citation.kind)
   const title = citation.title || t(KIND_KEYS[kind])
 
@@ -113,6 +114,10 @@ export function CitationMarker({
     },
     [],
   )
+  // the next hover after a close is a preview again
+  useEffect(() => {
+    if (!open) setPinned(false)
+  }, [open])
   const later = (next: boolean) => {
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => onOpenChange(next), HOVER_DELAY_MS)
@@ -126,11 +131,10 @@ export function CitationMarker({
     <sup
       className="askuni-v2-cite-wrap"
       onMouseEnter={() => {
-        byHover.current = true
-        later(true)
+        if (!pinned) later(true)
       }}
       onMouseLeave={() => {
-        if (byHover.current) later(false)
+        if (!pinned) later(false)
       }}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) now(false)
@@ -151,11 +155,11 @@ export function CitationMarker({
         aria-expanded={open}
         aria-controls={open ? cardId : undefined}
         onFocus={() => {
-          byHover.current = false
+          setPinned(true)
           now(true)
         }}
         onClick={() => {
-          byHover.current = false
+          setPinned(true)
           now(true)
         }}
       >
@@ -166,7 +170,7 @@ export function CitationMarker({
           id={cardId}
           role="dialog"
           aria-label={title}
-          className="askuni-v2-card askuni-v2-cite-card"
+          className={`askuni-v2-card askuni-v2-cite-card${pinned ? '' : ' is-preview'}`}
         >
           <span className="askuni-v2-cite-head">
             <KindIcon kind={kind} />
@@ -180,6 +184,20 @@ export function CitationMarker({
           ) : null}
         </span>
       ) : null}
+    </sup>
+  )
+}
+
+/**
+ * A marker whose citation has not arrived yet (citations come with the done event): the same
+ * superscript look as a marker, but inert (no button, no card) and hidden from assistive tech.
+ */
+export function PendingMarker({ n }: { n: string }): ReactElement {
+  return (
+    <sup className="askuni-v2-cite-wrap">
+      <span className="askuni-v2-cite is-pending" aria-hidden="true">
+        {n}
+      </span>
     </sup>
   )
 }
