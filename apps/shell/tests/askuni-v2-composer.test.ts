@@ -454,7 +454,7 @@ describe('Ask UNI v2 composer', () => {
     })
 
     it('focuses the box when a conversation is chosen', async () => {
-      await mount({ conversationId: undefined })
+      await mount({ conversationId: null })
       const other = document.createElement('button')
       document.body.appendChild(other)
       other.focus()

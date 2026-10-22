@@ -43,7 +43,7 @@ describe('Ask UNI v2 header and history', () => {
   >
   let rename: ReturnType<typeof vi.fn<(req: AskUniRenameRequest) => Promise<AskUniOkResult>>>
   let remove: ReturnType<typeof vi.fn<(req: AskUniConversationRequest) => Promise<AskUniOkResult>>>
-  let onSelect: ReturnType<typeof vi.fn<(id: string | undefined) => void>>
+  let onSelect: ReturnType<typeof vi.fn<(id: string | null) => void>>
   let onNew: ReturnType<typeof vi.fn<() => void>>
   let bump: () => void = () => undefined
 
@@ -61,7 +61,7 @@ describe('Ask UNI v2 header and history', () => {
       workspaceId,
       workspaces: props.workspaces,
       onWorkspaceChange: props.onWorkspaceChange,
-      activeId: props.activeId,
+      activeId: props.activeId ?? null,
       conversations,
       onSelect,
       onNew,
@@ -490,7 +490,7 @@ describe('Ask UNI v2 header and history', () => {
       ) as HTMLButtonElement
       await act(async () => yes.click())
       await flush()
-      expect(onSelect).toHaveBeenCalledWith(undefined)
+      expect(onSelect).toHaveBeenCalledWith(null)
     })
 
     it('keeps the row and says so when the server refuses', async () => {

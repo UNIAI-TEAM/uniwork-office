@@ -39,7 +39,7 @@ export interface AskUniComposerInput {
 export interface AskUniComposerProps {
   workspaceId: string
   /** a newly chosen conversation puts the caret in the box */
-  conversationId?: string
+  conversationId?: string | null
   streaming: boolean
   selection: AskUniModelSelection
   /** an entry point's focus (the document tab) that becomes the chip once */

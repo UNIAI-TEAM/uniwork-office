@@ -17,7 +17,7 @@ import type {
 // S3 owns the stream hook and the thread: the panel is tested against their agreed shapes.
 const mocks = vi.hoisted(() => {
   const stream = {
-    state: { status: 'idle' as string, conversationId: undefined as string | undefined },
+    state: { status: 'idle' as string, conversationId: null as string | null },
     ask: vi.fn(),
     stop: vi.fn(),
     reset: vi.fn(),
@@ -126,7 +126,7 @@ describe('Ask UNI v2 panel', () => {
     document.body.appendChild(host)
     root = createRoot(host)
     localStorage.clear()
-    mocks.stream.state = { status: 'idle', conversationId: undefined }
+    mocks.stream.state = { status: 'idle', conversationId: null }
     mocks.stream.ask.mockReset()
     mocks.stream.stop.mockReset()
     mocks.stream.reset.mockReset()
@@ -268,7 +268,7 @@ describe('Ask UNI v2 panel', () => {
 
     it('is replaced by the thread as soon as a turn is running', async () => {
       await mount()
-      mocks.stream.state = { status: 'streaming', conversationId: undefined }
+      mocks.stream.state = { status: 'streaming', conversationId: null }
       await mount()
       expect(thread()).not.toBeNull()
       expect(host.textContent).not.toContain(en.askUniEmptyTitle)
@@ -303,7 +303,7 @@ describe('Ask UNI v2 panel', () => {
       mocks.stream.state = { status: 'done', conversationId: 'c1' }
       await mount()
       await adopt('c1')
-      mocks.stream.state = { status: 'idle', conversationId: undefined }
+      mocks.stream.state = { status: 'idle', conversationId: null }
       const btn = host.querySelector(
         `button[aria-label="${en.askUniV2NewConversation}"]`,
       ) as HTMLElement
@@ -339,7 +339,7 @@ describe('Ask UNI v2 panel', () => {
       mocks.stream.state = { status: 'done', conversationId: 'c1' }
       await mount({ workspaceId: 'ws-1' })
       await adopt('c1')
-      mocks.stream.state = { status: 'idle', conversationId: undefined }
+      mocks.stream.state = { status: 'idle', conversationId: null }
       mocks.stream.reset.mockClear()
       await mount({ workspaceId: 'ws-2' })
       expect(mocks.stream.reset).toHaveBeenCalled()
