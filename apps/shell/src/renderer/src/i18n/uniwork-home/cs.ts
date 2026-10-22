@@ -45,6 +45,8 @@ export const cs = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: 'Typ:',
   uhFilterTypeAll: 'Vše',
+  uhFilterTypeCount: 'Typy: {count}',
+  uhFilterTypeRemove: 'Odebrat filtr {type}',
   uhFilterModifiedBy: 'Upravil:',
   uhFilterAnyPerson: 'Kdokoli',
   uhFilterUpdated: 'Aktualizováno:',

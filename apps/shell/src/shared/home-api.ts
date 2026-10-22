@@ -454,20 +454,24 @@ export type UniworkEntryKind = 'folder' | 'file' | 'page'
 export type UniworkSystemKind = 'my_folder'
 
 /**
+ * UNI-2113: one value of the server's `?type=` vocabulary: `page` (a UniNote) or a file format.
+ * The menu order is page, docx, xlsx, pptx, pdf, md, html, txt (the renderer owns the order).
+ */
+export type UniworkDocTypePick = 'page' | UniworkDocFormat
+
+/**
  * DESKTOP-HOME: optional list filters for `listChildren`, `listDocuments`,
  * `listSharedByMe`, `listTrash`, `listSharedWithMe`, `listShelved` and (UNI-2047 B6, only the type,
  * the kind and the sort) `listFavorites`.
  * Unset = parameter omitted.
  */
 export interface UniworkListFilters {
-  /** a file format; the server takes it on every list route */
-  format?: UniworkDocFormat
   /**
-   * UNI-2047: `page` = UniNote only (the flat `/documents` route's `kind`; a UniNote has no file
-   * format, so it never rides with `format`). Recent and Shared with me have no such param: the
-   * renderer narrows their loaded rows.
+   * UNI-2113: the Documents home Type multi-select, one repeated `?type=` per pick (OR across the
+   * picks, AND with the route's own `kind`). Unset or empty = no type filter. It replaces the
+   * single `format` / `kind=page` filter of UNI-2047: a UniNote is the `page` pick.
    */
-  kind?: 'page'
+  types?: UniworkDocTypePick[]
   updatedBy?: string
   updatedFrom?: string
   /** UNI-2047: server-side sort key; unset = the route's own order, nothing sent */
@@ -500,17 +504,14 @@ export interface UniworkSourceFile {
   canSave: boolean
 }
 
-/**
- * UNI-1961: the type filter the sources list takes (the web's `type`). A txt filter is
- * accepted here (it follows UniworkDocFormat) but the client does not send it: the
- * sources list has no txt type.
- */
-export type UniworkSourceType = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'html'
-
 export interface UniworkSourceListQuery {
   workspaceId: string
   source?: string
-  type?: UniworkSourceType
+  /**
+   * UNI-2113: the Type picks, one `?type=` each. The sources list holds every format (txt too);
+   * `page` is accepted and adds nothing (a page-only pick is an empty page).
+   */
+  types?: UniworkDocTypePick[]
   q?: string
   cursor?: string
   limit?: number
@@ -578,6 +579,8 @@ export interface UniworkSearchQuery {
   workspaceId: string
   query: string
   kind: 'all' | 'folder' | 'document'
+  /** UNI-2113: the Type picks narrow the search like the lists (one `type=` each, OR across picks) */
+  types?: UniworkDocTypePick[]
   cursor?: string
   limit?: number
 }
@@ -643,7 +646,7 @@ export interface UniworkDocListPage {
  */
 export interface UniworkSharedQuery extends Pick<
   UniworkListFilters,
-  'format' | 'updatedBy' | 'updatedFrom' | 'sort' | 'order'
+  'types' | 'updatedBy' | 'updatedFrom' | 'sort' | 'order'
 > {
   /** opaque cursor from the previous page; omit for the first page */
   cursor?: string
@@ -659,10 +662,7 @@ export type UniworkSharedPage = UniworkDocListPage
  * UNI-1961 / UNI-2047: the Lưu trữ shelf query. Only the type filter and the
  * sort apply (`updatedBy` / `updatedFrom` / `activity` are never forwarded).
  */
-export interface UniworkShelvedQuery extends Pick<
-  UniworkListFilters,
-  'format' | 'kind' | 'sort' | 'order'
-> {
+export interface UniworkShelvedQuery extends Pick<UniworkListFilters, 'types' | 'sort' | 'order'> {
   workspaceId: string
   cursor?: string
   limit?: number

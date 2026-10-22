@@ -44,6 +44,8 @@ export const zh = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: '类型：',
   uhFilterTypeAll: '全部',
+  uhFilterTypeCount: '{count} 种类型',
+  uhFilterTypeRemove: '移除 {type} 筛选',
   uhFilterModifiedBy: '修改人：',
   uhFilterAnyPerson: '任何人',
   uhFilterUpdated: '更新时间：',

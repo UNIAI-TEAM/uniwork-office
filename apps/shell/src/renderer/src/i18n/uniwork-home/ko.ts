@@ -45,6 +45,8 @@ export const ko = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: '유형:',
   uhFilterTypeAll: '전체',
+  uhFilterTypeCount: '{count}개 유형',
+  uhFilterTypeRemove: '{type} 필터 제거',
   uhFilterModifiedBy: '수정자:',
   uhFilterAnyPerson: '모든 사람',
   uhFilterUpdated: '수정일:',

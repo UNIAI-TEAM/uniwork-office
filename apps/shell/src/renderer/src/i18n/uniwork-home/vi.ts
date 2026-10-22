@@ -45,6 +45,8 @@ export const vi = {
   uhCreateFailed: 'Không thể tạo tài liệu. Thử lại.',
   uhFilterType: 'Loại:',
   uhFilterTypeAll: 'Tất cả',
+  uhFilterTypeCount: '{count} loại',
+  uhFilterTypeRemove: 'Bỏ lọc {type}',
   uhFilterModifiedBy: 'Người sửa:',
   uhFilterAnyPerson: 'Bất kỳ',
   uhFilterUpdated: 'Cập nhật:',

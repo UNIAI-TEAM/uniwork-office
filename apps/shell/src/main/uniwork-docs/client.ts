@@ -4,6 +4,7 @@ import type {
   UniworkDocFormat,
   UniworkDocNewFormat,
   UniworkDocSummary,
+  UniworkDocTypePick,
   UniworkFolderNode,
   UniworkListFilters,
   UniworkListSort,
@@ -51,6 +52,7 @@ import type {
 import { parseUploadSession, parseUploadSessionComplete } from './parse'
 import { parseDocumentManageRef, parseDocumentShelveResult, type DocumentManageRef } from './parse'
 import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../../shared/home-api'
+import { normalizeTypePicks } from './type-picks'
 
 /**
  * Main-process client for the UniWork documents routes this app uses, and
@@ -216,6 +218,7 @@ export interface UniworkDocsClient {
     workspaceId: string
     query: string
     kind: 'all' | 'folder' | 'document'
+    types?: UniworkDocTypePick[]
     cursor?: string
     limit?: number
   }): Promise<DocumentListResult>
@@ -315,8 +318,7 @@ export interface UniworkDocsClient {
     workspaceId: string
     cursor?: string
     limit?: number
-    format?: UniworkListFilters['format']
-    kind?: UniworkListFilters['kind']
+    types?: UniworkListFilters['types']
     /** UNI-2047: SV-0 lets the shelf sort like the other lists */
     sort?: UniworkListFilters['sort']
     order?: UniworkListFilters['order']
@@ -496,7 +498,6 @@ export function uniworkSourceId(value: string): string {
 
 /** UNI-1961: the sources list's filter values (D sources-schema.ts); anything else is not sent */
 const SOURCE_KINDS: ReadonlySet<string> = new Set(['chat', 'task', 'meeting', 'email'])
-const SOURCE_TYPES: ReadonlySet<string> = new Set(['docx', 'xlsx', 'pptx', 'pdf', 'md', 'html'])
 /** UNI-2047: the sort keys the doclist routes accept (S3 plus the per-list SV-0..SV-3 keys) */
 const LIST_SORTS: ReadonlySet<string> = new Set([
   'updated',
@@ -704,13 +705,14 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
    * (`internal/service/document_search.go:650,665-675`), but not `updated_by` or
    * `updated_from`, so only those two force the wider workspace list.
    */
+  const applyTypePicks = (params: URLSearchParams, types: unknown): void => {
+    for (const pick of normalizeTypePicks(types)) params.append('type', pick)
+  }
   const applyListFilters = (params: URLSearchParams, input: UniworkListFilters): boolean => {
     let flatRequired = false
-    if (typeof input.format === 'string' && input.format) {
-      params.set('format', input.format)
-    }
-    // UNI-2047: the flat list's kind for the UniNote chip (overrides listDocuments' own kind)
-    if (input.kind === 'page') params.set('kind', 'page')
+    // UNI-2113: one `type=` per Type pick (the server ORs them and ANDs them with the route's own
+    // `kind`); a UniNote pick is `type=page`, so it needs no kind or format of its own
+    applyTypePicks(params, input.types)
     const updatedBy =
       typeof input.updatedBy === 'string' ? input.updatedBy.trim().slice(0, 128) : ''
     if (updatedBy) {
@@ -937,12 +939,10 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
       const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
       params.set('limit', String(limit))
-      // files and pages, no folders; a UniNote has no file format, so `format` stays off with it
-      const pages = input.kind === 'page'
-      params.set('kind', pages ? 'page' : 'document')
-      if (!pages && typeof input.format === 'string' && input.format) {
-        params.set('format', input.format)
-      }
+      // files and pages, no folders; the server ANDs the kind with the Type picks, so a `page`
+      // pick and the formats all work beside it
+      params.set('kind', 'document')
+      applyTypePicks(params, input.types)
       // the route's own `starred` key and the four column keys; any other key is a 400 there, and
       // so is an order without a sort
       if (isListSort(input.sort) && (input.sort === 'starred' || FLAT_LIST_SORTS.has(input.sort))) {
@@ -988,9 +988,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       if (typeof input.source === 'string' && SOURCE_KINDS.has(input.source)) {
         params.set('source', input.source)
       }
-      if (typeof input.type === 'string' && SOURCE_TYPES.has(input.type)) {
-        params.set('type', input.type)
-      }
+      // UNI-2113: the sources list takes every pick; `page` adds nothing (a page-only pick is an
+      // empty page) and `txt` is a source type
+      applyTypePicks(params, input.types)
       const q = typeof input.q === 'string' ? input.q.trim().slice(0, 200) : ''
       if (q) params.set('q', q)
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
@@ -1085,6 +1085,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
       params.set('limit', String(limit))
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
+      applyTypePicks(params, input.types)
       const ws = id(input.workspaceId)
       const raw = await send({
         method: 'GET',
@@ -1296,8 +1297,7 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))
       // the shelf never sends parent_id or archived (shelved+archived is 400)
       applyListFilters(params, {
-        format: input.format,
-        kind: input.kind,
+        types: input.types,
         sort: input.sort,
         order: input.order,
       })

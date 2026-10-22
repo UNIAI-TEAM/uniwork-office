@@ -378,7 +378,7 @@ describe('UNI-1961 Archive (shelved) IPC: list', () => {
     await call(UNIWORK_DOC_CHANNELS.listShelved, {
       workspaceId: 'ws_1',
       cursor: 'c_next',
-      format: 'xlsx',
+      types: ['xlsx'],
     })
     const lists = seen.filter((s) => s.url.pathname === '/api/v1/workspaces/ws_1/documents')
     expect(lists).toHaveLength(2)
@@ -386,10 +386,11 @@ describe('UNI-1961 Archive (shelved) IPC: list', () => {
     expect(first!.get('shelved')).toBe('true')
     expect(first!.get('limit')).toBe('50')
     expect(first!.has('cursor')).toBe(false)
-    expect(first!.has('format')).toBe(false)
+    expect(first!.has('type')).toBe(false)
     expect(second!.get('shelved')).toBe('true')
     expect(second!.get('cursor')).toBe('c_next')
-    expect(second!.get('format')).toBe('xlsx')
+    expect(second!.getAll('type')).toEqual(['xlsx'])
+    expect(second!.has('format')).toBe(false)
     for (const params of [first!, second!]) {
       expect(params.has('archived')).toBe(false)
       expect(params.has('parent_id')).toBe(false)

@@ -45,6 +45,8 @@ export const he = {
   uhCreateFailed: 'Could not create the document. Try again.',
   uhFilterType: 'סוג:',
   uhFilterTypeAll: 'הכל',
+  uhFilterTypeCount: '{count} סוגים',
+  uhFilterTypeRemove: 'הסר את המסנן {type}',
   uhFilterModifiedBy: 'שונה על ידי:',
   uhFilterAnyPerson: 'כל אחד',
   uhFilterUpdated: 'עודכן:',
