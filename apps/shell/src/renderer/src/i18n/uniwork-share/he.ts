@@ -186,4 +186,24 @@ export const he = {
   shrBulkCopyFailed: 'לא ניתן להעתיק את הקישור. נסה שוב.',
   shrAccessManageFor: 'ניהול הרשאות עבור {title}',
   shrAccessViewFor: 'צפייה בהרשאות עבור {title}',
+  shrOwnerTransferButton: 'העברת בעלות',
+  shrOwnerTransferTitle: 'העברת הבעלות על "{document}"',
+  shrOwnerTitleUntitled: 'העברת בעלות על המסמך',
+  shrOwnerNewOwnerLabel: 'בעלים חדשים',
+  shrOwnerPreviousLevelLabel: 'ההרשאה של {name} אחרי ההעברה',
+  shrOwnerPreviousLevelNone: 'ללא הרשאה',
+  shrOwnerTransferNote:
+    'הבעלים החדשים יכולים לנהל את המסמך: לשתף, לשנות מי יכול לראות אותו ולהעביר לאשפה.',
+  shrOwnerTransferConfirm: 'העברה',
+  shrOwnerTransferred: 'הבעלות הועברה אל {name}',
+  shrOwnerTargetNotMember:
+    '{name} אינו חבר בסביבת העבודה הזו, ולכן אינו יכול להיות הבעלים של המסמך.',
+  shrOwnerSelfTransferError:
+    'מנהלים אינם יכולים לקחת לעצמם בעלות על מסמך פרטי. בקשו ממנהל אחר להעביר אותו, או פתחו גישת חירום כדי לבדוק אותו.',
+  shrOwnerSearchPlaceholder: 'חיפוש חברי סביבת העבודה',
+  shrOwnerNoCandidates: 'אין חבר אחר שיכול לקבל את המסמך הזה.',
+  shrOwnerLoading: 'טוען…',
+  shrOwnerFailed: 'לא ניתן היה להעביר את הבעלות. נסו שוב.',
+  shrOwnerOwnedByWorkProduct: 'המסמך הזה שייך לתוצר עבודה, ולכן לא ניתן לשנות את הבעלים שלו.',
+  shrOwnerUnavailable: 'העברת בעלות עדיין אינה זמינה בשרת הזה.',
 } satisfies Record<keyof typeof zh, string>

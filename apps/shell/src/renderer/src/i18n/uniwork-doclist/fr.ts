@@ -90,6 +90,10 @@ export const fr = {
   dlBulkConfirmBody:
     'Les éléments restent 30 jours dans la corbeille, puis sont supprimés définitivement.',
   dlBulkDoneDownload: '{ok}/{total} documents téléchargés',
+  dlBulkMoveTitleOne: 'Déplacer {count} document',
+  dlBulkMoveTitleOther: 'Déplacer {count} documents',
+  dlBulkMoveDescription: 'Choisissez le dossier vers lequel déplacer les documents sélectionnés.',
+  dlBulkDoneMove: '{ok}/{total} documents déplacés',
   dlZipPreparing: 'Préparation du fichier ZIP…',
   dlZipTooLarge:
     'Les fichiers sélectionnés dépassent 1 Go au total. Sélectionnez moins de fichiers.',
@@ -130,4 +134,29 @@ export const fr = {
   dlSideSourceEmail: 'E-mail',
   dlSideSourceTask: 'Tâches',
   dlSearchNoResults: 'Aucun résultat pour « {query} »',
+  dlCopyTitle: 'Créer une copie',
+  dlCopyDescription:
+    "La copie est un nouveau document qui conserve les accès et l'origine de ce document ; les données sont partagées, donc l'espace de stockage n'est compté qu'une fois.",
+  dlCopyTitleLabel: 'Titre de la copie',
+  dlCopyTitlePlaceholder: '{title} (copie)',
+  dlCopyConsentLabel: 'Je comprends que la copie conserve les accès de la source',
+  dlCopyConsentHint: "La copie n'élargit l'accès de personne et ne modifie jamais la source.",
+  dlCopySubmit: 'Créer la copie',
+  dlCopySubmitting: 'Création de la copie…',
+  dlCopyFailed: "Impossible de créer la copie. Rien n'a été modifié.",
+  dlCopyDone: 'Copie "{title}" créée',
+  dlCopyUnavailable: 'Cette installation ne dispose pas encore de la fonction de copie.',
+  dlPurgeTitle: 'Supprimer définitivement {title} ?',
+  dlPurgeDescription: 'Cet élément sera supprimé définitivement et ne pourra pas être restauré.',
+  dlPurgeFolderDescription:
+    "Ce dossier sera supprimé définitivement et ne pourra pas être restauré. Les éléments qu'il contient et que vous ne gérez pas restent dans la corbeille.",
+  dlPurgeSubmit: 'Supprimer définitivement',
+  dlPurgeSubmitting: 'Suppression définitive…',
+  dlPurgeDone: '{title} supprimé définitivement',
+  dlPurgeFailed: "Impossible de supprimer. Rien n'a été modifié.",
+  dlBulkPurgeTitleOne: 'Supprimer définitivement {n} document ?',
+  dlBulkPurgeTitleOther: 'Supprimer définitivement {n} documents ?',
+  dlBulkPurgeDescription:
+    'Cette action est irréversible. Les éléments que vous ne pouvez pas gérer seront ignorés.',
+  dlBulkDonePurge: '{ok}/{total} documents supprimés définitivement',
 } satisfies Record<keyof typeof zh, string>

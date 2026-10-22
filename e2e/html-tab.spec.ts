@@ -175,7 +175,12 @@ test.describe('html editor', () => {
       const editorPage = await waitForPageWithUrl(app, '://html/')
       await expect(editorPage.locator('.ribbon-body')).toBeVisible()
       await editorPage.locator('.rb-view', { hasText: /Source/ }).click()
-      await editorPage.locator('.source-editor .cm-content').click()
+      const content = editorPage.locator('.source-editor .cm-content')
+      // like the open-and-save test: the pane holds the document before the key goes to it, and the
+      // click's focus has landed (the window handler takes ⌘/Ctrl+S from the focused editor)
+      await expect(content).toContainText('café')
+      await content.click()
+      await expect(content).toBeFocused()
       await editorPage.keyboard.press('ControlOrMeta+s')
       await expect(editorPage.locator('.status-save')).toHaveText(/Saved/)
       expect(await readFile(htmlPath, 'utf8')).toBe(source)
@@ -464,6 +469,11 @@ test.describe('html editor', () => {
 
       // Delete inside the frame removes the element; the frame reloads without it
       await frame.locator('p.note').click()
+      // the frame's Delete is a command for the host's selection: a key that lands before the host
+      // took the click's selection (its toolbar shows) is dropped, so wait for the host to hold it
+      await expect(
+        editorPage.locator('.hx-float').getByRole('button', { name: /Delete element/ }),
+      ).toBeEnabled()
       await frame.locator('body').press('Delete')
       await expect(frame.locator('p.note')).toHaveCount(0)
       await expect(undoBtn).toBeEnabled()

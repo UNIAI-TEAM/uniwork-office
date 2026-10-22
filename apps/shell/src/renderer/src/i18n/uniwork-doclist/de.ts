@@ -89,6 +89,11 @@ export const de = {
   dlBulkConfirmTitleOther: '{n} Dokumente in den Papierkorb verschieben?',
   dlBulkConfirmBody: 'Elemente bleiben 30 Tage im Papierkorb und werden dann endgültig gelöscht.',
   dlBulkDoneDownload: '{ok}/{total} Dokumente heruntergeladen',
+  dlBulkMoveTitleOne: '{count} Dokument verschieben',
+  dlBulkMoveTitleOther: '{count} Dokumente verschieben',
+  dlBulkMoveDescription:
+    'Wählen Sie den Ordner, in den die ausgewählten Dokumente verschoben werden.',
+  dlBulkDoneMove: '{ok}/{total} Dokumente verschoben',
   dlZipPreparing: 'Die ZIP-Datei wird vorbereitet…',
   dlZipTooLarge:
     'Die ausgewählten Dateien ergeben zusammen mehr als 1 GB. Wählen Sie weniger Dateien aus.',
@@ -129,4 +134,30 @@ export const de = {
   dlSideSourceEmail: 'E-Mail',
   dlSideSourceTask: 'Aufgaben',
   dlSearchNoResults: 'Keine Treffer für „{query}“',
+  dlCopyTitle: 'Kopie erstellen',
+  dlCopyDescription:
+    'Die Kopie ist ein neues Dokument, das Zugriffsrechte und Herkunft dieses Dokuments übernimmt. Die Inhalte werden gemeinsam genutzt, daher wird der Speicherplatz nur einmal gezählt.',
+  dlCopyTitleLabel: 'Titel der Kopie',
+  dlCopyTitlePlaceholder: '{title} (Kopie)',
+  dlCopyConsentLabel: 'Mir ist bewusst, dass die Kopie die Zugriffsrechte des Originals behält',
+  dlCopyConsentHint: 'Die Kopie erweitert niemandes Zugriffsrechte und verändert das Original nie.',
+  dlCopySubmit: 'Kopie erstellen',
+  dlCopySubmitting: 'Kopie wird erstellt…',
+  dlCopyFailed: 'Die Kopie konnte nicht erstellt werden. Es wurde nichts geändert.',
+  dlCopyDone: 'Kopie "{title}" erstellt',
+  dlCopyUnavailable: 'Diese Bereitstellung unterstützt die Kopierfunktion noch nicht.',
+  dlPurgeTitle: '{title} endgültig löschen?',
+  dlPurgeDescription:
+    'Dieses Element wird endgültig gelöscht und kann nicht wiederhergestellt werden.',
+  dlPurgeFolderDescription:
+    'Dieser Ordner wird endgültig gelöscht und kann nicht wiederhergestellt werden. Enthaltene Elemente, die Sie nicht verwalten, bleiben im Papierkorb.',
+  dlPurgeSubmit: 'Endgültig löschen',
+  dlPurgeSubmitting: 'Wird endgültig gelöscht…',
+  dlPurgeDone: '{title} endgültig gelöscht',
+  dlPurgeFailed: 'Löschen fehlgeschlagen. Es wurde nichts geändert.',
+  dlBulkPurgeTitleOne: '{n} Dokument endgültig löschen?',
+  dlBulkPurgeTitleOther: '{n} Dokumente endgültig löschen?',
+  dlBulkPurgeDescription:
+    'Dies kann nicht rückgängig gemacht werden. Elemente, die Sie nicht verwalten können, werden übersprungen.',
+  dlBulkDonePurge: '{ok}/{total} Dokumente endgültig gelöscht',
 } satisfies Record<keyof typeof zh, string>

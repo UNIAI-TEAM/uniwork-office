@@ -101,6 +101,7 @@ describe('bulk bar: Chia sẻ', () => {
   it('is offered first when every selected row passes the gate and is manageable', () => {
     expect(bulkActionsFor('workspace', [manage('a'), manage('b')], true)).toEqual([
       'share',
+      'move',
       'shelve',
       'trash',
     ])

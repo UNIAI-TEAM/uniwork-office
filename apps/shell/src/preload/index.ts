@@ -74,6 +74,7 @@ import type {
   UniworkFolderQuery,
   UniworkLaunchEvent,
   UniworkLockReason,
+  UniworkCopyDocumentInput,
   UniworkMoveDocumentInput,
   UniworkMoveResult,
   UniworkQueuePopoverRequest,
@@ -132,6 +133,8 @@ import type {
   ShareCandidatePage,
   ShareLinkCreated,
   ShareMemberPage,
+  ShareOwnerCandidate,
+  ShareOwnerTransfer,
   ShareLinkRevokeInput,
   ShareRejectedItem,
   ShareRequestDecision,
@@ -1505,6 +1508,30 @@ const homeApi: HomeApi = {
       await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.restoreDocument, documentId),
     )
   },
+  // UNI-2078: a plain copy; only the three typed keys cross, the reply is narrowed like any action
+  async uniworkCopyDocument(input: UniworkCopyDocumentInput) {
+    if (!input || typeof input !== 'object' || typeof input.documentId !== 'string') {
+      return { ok: false, error: 'not_found' } as const
+    }
+    return asUniworkActionResult<UniworkDocSummary>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.copyDocument, {
+        documentId: input.documentId,
+        ...(typeof input.title === 'string' ? { title: input.title } : {}),
+        ...(typeof input.idempotencyKey === 'string'
+          ? { idempotencyKey: input.idempotencyKey }
+          : {}),
+      }),
+    )
+  },
+  // UNI-2078: delete forever; the id only crosses, the reply is narrowed like any action
+  async uniworkPurgeDocument(documentId: string) {
+    if (typeof documentId !== 'string' || !documentId) {
+      return { ok: false, error: 'not_found' } as const
+    }
+    return asUniworkActionResult<{ id: string }>(
+      await ipcRenderer.invoke(UNIWORK_DOC_CHANNELS.purgeDocument, documentId),
+    )
+  },
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf
   async uniworkListShelved(q) {
     return asUniworkResult<UniworkDocListPage>(
@@ -2048,6 +2075,7 @@ function asShareResult<T>(result: unknown): ShareResult<T> {
       status?: unknown
       rejected?: unknown
       retryable?: unknown
+      endpointMissing?: unknown
     }
     if (r.ok === true) return { ok: true, value: r.value as T }
     if (r.ok === false && typeof r.error === 'string' && r.error) {
@@ -2057,6 +2085,7 @@ function asShareResult<T>(result: unknown): ShareResult<T> {
         ...(typeof r.status === 'number' ? { status: r.status } : {}),
         ...(Array.isArray(r.rejected) ? { rejected: r.rejected as ShareRejectedItem[] } : {}),
         ...(r.retryable === true ? { retryable: true } : {}),
+        ...(r.endpointMissing === true ? { endpointMissing: true } : {}),
       }
     }
   }
@@ -2125,6 +2154,16 @@ const shareApi: UniworkShareApi = {
   async members(input) {
     return asShareResult<ShareMemberPage>(
       await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.members, input),
+    )
+  },
+  async ownerCandidates(documentId) {
+    return asShareResult<ShareOwnerCandidate[]>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.ownerCandidates, documentId),
+    )
+  },
+  async transferOwner(input) {
+    return asShareResult<ShareOwnerTransfer>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.transferOwner, input),
     )
   },
 }

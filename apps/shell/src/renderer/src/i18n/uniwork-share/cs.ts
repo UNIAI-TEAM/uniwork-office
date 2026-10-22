@@ -195,4 +195,25 @@ export const cs = {
   shrBulkCopyFailed: 'Odkaz se nepodařilo zkopírovat. Zkuste to znovu.',
   shrAccessManageFor: 'Spravovat přístup k dokumentu {title}',
   shrAccessViewFor: 'Zobrazit přístup k dokumentu {title}',
+  shrOwnerTransferButton: 'Převést vlastnictví',
+  shrOwnerTransferTitle: 'Převést vlastnictví „{document}“',
+  shrOwnerTitleUntitled: 'Převést vlastnictví dokumentu',
+  shrOwnerNewOwnerLabel: 'Nový vlastník',
+  shrOwnerPreviousLevelLabel: 'Přístup uživatele {name} po převodu',
+  shrOwnerPreviousLevelNone: 'Bez přístupu',
+  shrOwnerTransferNote:
+    'Nový vlastník může dokument spravovat: sdílet ho, měnit, kdo ho vidí, a přesunout ho do koše.',
+  shrOwnerTransferConfirm: 'Převést',
+  shrOwnerTransferred: 'Vlastnictví převedeno na {name}',
+  shrOwnerTargetNotMember:
+    '{name} není členem tohoto pracovního prostoru, a proto nemůže tento dokument vlastnit.',
+  shrOwnerSelfTransferError:
+    'Správci nemohou sami převzít vlastnictví soukromého dokumentu. Požádejte jiného správce o převod nebo otevřete nouzový přístup ke kontrole.',
+  shrOwnerSearchPlaceholder: 'Hledat členy pracovního prostoru',
+  shrOwnerNoCandidates: 'Žádný jiný člen nemůže tento dokument převzít.',
+  shrOwnerLoading: 'Načítání…',
+  shrOwnerFailed: 'Vlastnictví se nepodařilo převést. Zkuste to znovu.',
+  shrOwnerOwnedByWorkProduct:
+    'Tento dokument patří k pracovnímu výstupu, proto nelze změnit jeho vlastníka.',
+  shrOwnerUnavailable: 'Převod vlastnictví zatím není na tomto serveru k dispozici.',
 } satisfies Record<keyof typeof zh, string>

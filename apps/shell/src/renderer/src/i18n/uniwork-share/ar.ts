@@ -193,4 +193,23 @@ export const ar = {
   shrBulkCopyFailed: 'تعذّر نسخ الرابط. حاول مرة أخرى.',
   shrAccessManageFor: 'إدارة الصلاحيات لـ {title}',
   shrAccessViewFor: 'عرض الصلاحيات لـ {title}',
+  shrOwnerTransferButton: 'نقل الملكية',
+  shrOwnerTransferTitle: 'نقل ملكية "{document}"',
+  shrOwnerTitleUntitled: 'نقل ملكية المستند',
+  shrOwnerNewOwnerLabel: 'المالك الجديد',
+  shrOwnerPreviousLevelLabel: 'صلاحية {name} بعد النقل',
+  shrOwnerPreviousLevelNone: 'بلا صلاحية',
+  shrOwnerTransferNote:
+    'يمكن للمالك الجديد إدارة المستند: مشاركته وتغيير من يمكنه رؤيته ونقله إلى المهملات.',
+  shrOwnerTransferConfirm: 'نقل',
+  shrOwnerTransferred: 'تم نقل الملكية إلى {name}',
+  shrOwnerTargetNotMember: '{name} ليس عضوًا في مساحة العمل هذه، لذا لا يمكنه امتلاك هذا المستند.',
+  shrOwnerSelfTransferError:
+    'لا يمكن للمسؤولين تولي ملكية مستند خاص بأنفسهم. اطلب من مسؤول آخر نقله، أو افتح وصول الطوارئ لفحصه.',
+  shrOwnerSearchPlaceholder: 'البحث عن أعضاء مساحة العمل',
+  shrOwnerNoCandidates: 'لا يوجد عضو آخر يمكنه استلام هذا المستند.',
+  shrOwnerLoading: 'جارٍ التحميل…',
+  shrOwnerFailed: 'تعذّر نقل الملكية. حاول مرة أخرى.',
+  shrOwnerOwnedByWorkProduct: 'هذا المستند تابع لمنتج عمل، لذا لا يمكن تغيير مالكه.',
+  shrOwnerUnavailable: 'نقل الملكية غير متاح بعد على هذا الخادم.',
 } satisfies Record<keyof typeof zh, string>

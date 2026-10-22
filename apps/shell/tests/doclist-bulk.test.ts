@@ -1,14 +1,23 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   BULK_CONCURRENCY,
   bulkActionsFor,
+  bulkSummary,
+  bulkWorkFor,
   runBulk,
   runBulkAction,
   type BulkWorkResult,
 } from '../src/renderer/src/doclist/bulk'
+import { moveDocument } from '../src/renderer/src/uniwork-library-api'
+import type { TFunc } from '../src/renderer/src/locale'
 import { pruneSelection, selectedDocsOf } from '../src/renderer/src/doclist/selection'
 import type { DocListScreen } from '../src/renderer/src/doclist/columns'
 import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/documents-home-model'
+
+vi.mock('../src/renderer/src/uniwork-library-api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/renderer/src/uniwork-library-api')>()),
+  moveDocument: vi.fn(),
+}))
 
 const doc = (id: string, partial: Partial<DocumentsHomeDoc> = {}): DocumentsHomeDoc => ({
   id,
@@ -194,6 +203,7 @@ describe('bulkActionsFor: Tải xuống takes the any-row rule (UNI-2068 ZB)', (
 
   it('sits before Lưu trữ on the live list', () => {
     expect(bulkActionsFor('workspace', [doc('a'), doc('b')], false, true)).toEqual([
+      'move',
       'download',
       'shelve',
       'trash',
@@ -206,7 +216,7 @@ describe('bulkActionsFor: Tải xuống takes the any-row rule (UNI-2068 ZB)', (
 
   it('one file among folders and pages is enough; the other actions still need every row', () => {
     const mixed = [doc('a'), folder('f'), page('p')]
-    expect(bulkActionsFor('workspace', mixed, false, true)).toEqual(['download', 'trash'])
+    expect(bulkActionsFor('workspace', mixed, false, true)).toEqual(['move', 'download', 'trash'])
     // the rest of the rule is untouched: trash needs a manager on every row, download does not
     expect(
       bulkActionsFor('workspace', [doc('a'), viewer('v', { kind: 'file' })], false, true),
@@ -243,7 +253,11 @@ describe('bulkActionsFor: the actions every selected row has (UNI-2047 A5)', () 
   const live: DocListScreen[] = ['workspace', 'recent', 'shared', 'shared-by-me']
 
   it.each(live)('%s: managers of every row get Lưu trữ + Chuyển vào thùng rác', (screen) => {
-    expect(bulkActionsFor(screen, [MANAGER('a'), MANAGER('b')])).toEqual(['shelve', 'trash'])
+    expect(bulkActionsFor(screen, [MANAGER('a'), MANAGER('b')])).toEqual([
+      'move',
+      'shelve',
+      'trash',
+    ])
   })
 
   it('one row without the right takes the action away from the whole batch', () => {
@@ -252,8 +266,9 @@ describe('bulkActionsFor: the actions every selected row has (UNI-2047 A5)', () 
     expect(bulkActionsFor('workspace', [viewer])).toEqual([])
   })
 
-  it('a folder cannot be shelved, so a batch with a folder keeps only the trash', () => {
+  it('a folder cannot be shelved, so a batch with a folder keeps Move and the trash', () => {
     expect(bulkActionsFor('workspace', [MANAGER('a'), doc('f', { kind: 'folder' })])).toEqual([
+      'move',
       'trash',
     ])
   })
@@ -283,6 +298,137 @@ describe('bulkActionsFor: the actions every selected row has (UNI-2047 A5)', () 
   })
 })
 
+describe('bulkActionsFor: Di chuyển (UNI-2078 slice 3)', () => {
+  const editor = (id: string, partial: Partial<DocumentsHomeDoc> = {}) =>
+    doc(id, { canManage: false, canEdit: true, myLevel: 'edit', ...partial })
+  const viewer = (id: string) => doc(id, { canManage: false, canEdit: false })
+
+  it("is offered when every selected row's menu offers move (an editor moves without managing)", () => {
+    expect(bulkActionsFor('workspace', [editor('a'), editor('b')])).toEqual(['move'])
+    expect(bulkActionsFor('workspace', [doc('a'), editor('b')])).toEqual(['move'])
+  })
+
+  it('one row without move takes it away from the batch: a viewer, a shelved hit', () => {
+    expect(bulkActionsFor('workspace', [editor('a'), viewer('v')])).toEqual([])
+    const hit = doc('h', { shelvedAt: '2026-10-19T08:00:00.000Z' })
+    expect(bulkActionsFor('workspace', [doc('a'), hit])).not.toContain('move')
+    expect(bulkActionsFor('workspace', [viewer('v')])).not.toContain('move')
+  })
+
+  it('a folder row can move along with files and pages', () => {
+    const rows = [doc('a'), doc('f', { kind: 'folder' }), doc('p', { kind: 'page' })]
+    expect(bulkActionsFor('workspace', rows)).toEqual(['move', 'trash'])
+  })
+
+  it('sits right after Chia sẻ on the live bar: Share, Move, Download, Archive, Trash', () => {
+    const managed = (id: string) => doc(id, { myLevel: 'manage' })
+    expect(bulkActionsFor('workspace', [managed('a'), managed('b')], true, true)).toEqual([
+      'share',
+      'move',
+      'download',
+      'shelve',
+      'trash',
+    ])
+  })
+
+  it('the shelf, the trash and a trashed row have none', () => {
+    const shelved = (id: string) => doc(id, { shelvedAt: '2026-10-19T08:00:00.000Z' })
+    const trashed = (id: string) =>
+      doc(id, { archived: true, archivedAt: '2026-10-19T08:00:00.000Z' })
+    expect(bulkActionsFor('shelved', [shelved('a'), shelved('b')], true, true)).not.toContain(
+      'move',
+    )
+    expect(bulkActionsFor('trash', [trashed('a'), trashed('b')], true, true)).not.toContain('move')
+    expect(bulkActionsFor('workspace', [doc('a'), trashed('t')])).not.toContain('move')
+  })
+})
+
+describe('bulkWorkFor("move") and its summary (UNI-2078 slice 3)', () => {
+  const move = vi.mocked(moveDocument)
+  const moved = (id = 'x') => ({ ok: true, value: { id, title: id, renamedTo: null } }) as never
+  const t: TFunc = (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key)
+
+  it('moves each row into the one chosen folder, null = the workspace root', async () => {
+    move.mockReset()
+    move.mockResolvedValue(moved())
+    expect(await bulkWorkFor('move', 'workspace', 'target-folder')(doc('d1'))).toEqual({ ok: true })
+    expect(move).toHaveBeenCalledWith({ documentId: 'd1', parentId: 'target-folder' })
+    await bulkWorkFor('move', 'workspace', null)(doc('d2'))
+    expect(move).toHaveBeenLastCalledWith({ documentId: 'd2', parentId: null })
+    await bulkWorkFor('move', 'workspace')(doc('d3'))
+    expect(move).toHaveBeenLastCalledWith({ documentId: 'd3', parentId: null })
+  })
+
+  it('passes the refusal on, with the throttle mark', async () => {
+    move.mockReset()
+    move.mockResolvedValueOnce({ ok: false, error: 'document_too_deep' } as never)
+    move.mockResolvedValueOnce({ ok: false, error: 'server_error', retryable: true } as never)
+    const work = bulkWorkFor('move', 'workspace', 'f')
+    expect(await work(doc('a'))).toEqual({ ok: false, error: 'document_too_deep' })
+    expect(await work(doc('b'))).toEqual({ ok: false, error: 'server_error', retryable: true })
+  })
+
+  it('fans out with the target, one failure keeps the batch going, and the list is read once', async () => {
+    move.mockReset()
+    move.mockImplementation((async ({ documentId }: { documentId: string }) =>
+      documentId === 'd2'
+        ? { ok: false, error: 'folder_into_my_folder' }
+        : moved(documentId)) as never)
+    const refresh = vi.fn()
+    const result = await runBulkAction({
+      docs: docs(5),
+      work: bulkWorkFor('move', 'workspace', 'dest'),
+      refresh,
+      sleep: noSleep,
+    })
+    expect(move).toHaveBeenCalledTimes(5)
+    for (const call of move.mock.calls) expect(call[0].parentId).toBe('dest')
+    expect(result.ok).toEqual(['d1', 'd3', 'd4', 'd5'])
+    expect(result.failed).toEqual([{ id: 'd2', error: 'folder_into_my_folder' }])
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries a throttled move once', async () => {
+    move.mockReset()
+    move
+      .mockResolvedValueOnce({ ok: false, error: 'server_error', retryable: true } as never)
+      .mockResolvedValueOnce(moved('d1'))
+    const result = await runBulk([doc('d1')], bulkWorkFor('move', 'workspace', 'dest'), {
+      sleep: noSleep,
+    })
+    expect(move).toHaveBeenCalledTimes(2)
+    expect(result.ok).toEqual(['d1'])
+  })
+
+  it('summarises "ok/total" with its own key', () => {
+    const summary = bulkSummary('move', { total: 3, ok: ['a', 'b', 'c'], failed: [] }, t)
+    expect(summary.tone).toBe('ok')
+    expect(summary.message).toBe('dlBulkDoneMove {"ok":3,"total":3}')
+  })
+
+  it.each([
+    ['folder_into_my_folder', 'ufIntoMyFolder'],
+    ['document_too_deep', 'ufTooDeep'],
+    ['document_cycle', 'ufCycle'],
+  ])('names the commonest failure reason: %s', (error, key) => {
+    const summary = bulkSummary(
+      'move',
+      {
+        total: 4,
+        ok: ['a'],
+        failed: [
+          { id: 'b', error: 'forbidden' },
+          { id: 'c', error },
+          { id: 'd', error },
+        ],
+      },
+      t,
+    )
+    expect(summary.tone).toBe('error')
+    expect(summary.message).toBe(`dlBulkDoneMove {"ok":1,"total":4}. ${key}`)
+  })
+})
+
 describe('selection helpers (UNI-2047 A5)', () => {
   const items = docs(4)
 
@@ -299,5 +445,146 @@ describe('selection helpers (UNI-2047 A5)', () => {
     expect(pruneSelection(same, items)).toBe(same)
     const pruned = pruneSelection(new Set(['d1', 'gone']), items)
     expect([...pruned]).toEqual(['d1'])
+  })
+})
+
+// UNI-2078 slice 2: Xóa vĩnh viễn on the trash bar
+describe('bulk: delete forever (UNI-2078)', () => {
+  // the library API reads `window.aiOffice`; this file runs in the node environment
+  const setBridge = (bridge: Record<string, unknown>) => {
+    ;(globalThis as { window?: unknown }).window = { aiOffice: bridge }
+  }
+  afterEach(() => {
+    delete (globalThis as { window?: unknown }).window
+  })
+  const trashed = (id: string, partial: Partial<DocumentsHomeDoc> = {}) =>
+    doc(id, { archived: true, archivedAt: '2026-10-19T08:00:00.000Z', ...partial })
+  const admin = (id: string) =>
+    trashed(id, { canManage: false, canEdit: false, myLevel: 'view', adminScope: true })
+
+  it('trash bar order is Khôi phục, then Xóa vĩnh viễn (the shell has the purge call)', () => {
+    expect(bulkActionsFor('trash', [trashed('a'), trashed('b')], false, false, true)).toEqual([
+      'restore',
+      'purge',
+    ])
+  })
+
+  it('stays out of the bar while this shell has no purge call (never a dead button)', () => {
+    expect(bulkActionsFor('trash', [trashed('a')])).toEqual(['restore'])
+    expect(bulkActionsFor('trash', [trashed('a')], false, false, false)).toEqual(['restore'])
+  })
+
+  it('every selected row must offer it: one row below manage (and no admin scope) hides it', () => {
+    const edit = trashed('e', { canManage: false, canEdit: true, myLevel: 'edit' })
+    expect(bulkActionsFor('trash', [trashed('a'), edit], false, false, true)).toEqual([])
+  })
+
+  it('admin_scope rows offer purge but not restore (the web’s canManageTrashed)', () => {
+    expect(bulkActionsFor('trash', [admin('a'), admin('b')], false, false, true)).toEqual(['purge'])
+    // a mixed manager + admin selection keeps only what both can do
+    expect(bulkActionsFor('trash', [trashed('a'), admin('b')], false, false, true)).toEqual([
+      'purge',
+    ])
+  })
+
+  it('a mixed selection of live and trashed rows has no purge', () => {
+    expect(bulkActionsFor('workspace', [doc('a'), trashed('b')], false, false, true)).toEqual([])
+    expect(bulkActionsFor('workspace', [doc('a')], false, false, true)).not.toContain('purge')
+    expect(
+      bulkActionsFor('shelved', [doc('a', { shelvedAt: 'x' })], false, true, true),
+    ).not.toContain('purge')
+  })
+
+  it('a folder in the trash is purgeable like any row', () => {
+    expect(bulkActionsFor('trash', [trashed('f', { kind: 'folder' })], false, false, true)).toEqual(
+      ['restore', 'purge'],
+    )
+  })
+
+  it('no rows, no actions', () => {
+    expect(bulkActionsFor('trash', [], false, false, true)).toEqual([])
+  })
+
+  it('bulkWorkFor("purge") fans out purgeDocument by id and carries retryable', async () => {
+    const purge = vi.fn(async (id: string) =>
+      id === 'b'
+        ? { ok: false as const, error: 'server_error', retryable: true }
+        : id === 'c'
+          ? { ok: false as const, error: 'document_not_in_trash' }
+          : { ok: true as const, value: { id } },
+    )
+    setBridge({ uniworkPurgeDocument: purge })
+    const work = bulkWorkFor('purge', 'trash')
+    expect(await work(trashed('a'))).toEqual({ ok: true })
+    expect(await work(trashed('b'))).toEqual({ ok: false, error: 'server_error', retryable: true })
+    expect(await work(trashed('c'))).toEqual({ ok: false, error: 'document_not_in_trash' })
+    expect(purge.mock.calls.map((c) => c[0])).toEqual(['a', 'b', 'c'])
+  })
+
+  it('a throttled purge is retried once through runBulk, a refusal is not', async () => {
+    const calls: Record<string, number> = {}
+    const purge = vi.fn(async (id: string) => {
+      calls[id] = (calls[id] ?? 0) + 1
+      if (id === 'a') {
+        return calls[id] === 1
+          ? { ok: false as const, error: 'server_error', retryable: true }
+          : { ok: true as const, value: { id } }
+      }
+      return { ok: false as const, error: 'forbidden' }
+    })
+    setBridge({ uniworkPurgeDocument: purge })
+    const result = await runBulk([trashed('a'), trashed('b')], bulkWorkFor('purge', 'trash'), {
+      sleep: noSleep,
+    })
+    expect(calls).toEqual({ a: 2, b: 1 })
+    expect(result.ok).toEqual(['a'])
+    expect(result.failed).toEqual([{ id: 'b', error: 'forbidden' }])
+  })
+
+  it('a shell without the call answers a failure per row, never throws', async () => {
+    setBridge({})
+    expect(await bulkWorkFor('purge', 'trash')(trashed('a'))).toMatchObject({ ok: false })
+  })
+
+  describe('bulkSummary', () => {
+    const t = ((key: string, vars?: Record<string, unknown>) =>
+      `${key}:${JSON.stringify(vars ?? {})}`) as never
+    it('all ok: the done sentence with ok/total and an ok tone', () => {
+      const { message, tone } = bulkSummary(
+        'purge',
+        { total: 3, ok: ['a', 'b', 'c'], failed: [] },
+        t,
+      )
+      expect(tone).toBe('ok')
+      expect(message).toBe('dlBulkDonePurge:{"ok":3,"total":3}')
+    })
+
+    it('partial failure: the counts plus the commonest reason', () => {
+      const { message, tone } = bulkSummary(
+        'purge',
+        {
+          total: 5,
+          ok: ['a', 'b'],
+          failed: [
+            { id: 'c', error: 'document_not_in_trash' },
+            { id: 'd', error: 'forbidden' },
+            { id: 'e', error: 'forbidden' },
+          ],
+        },
+        t,
+      )
+      expect(tone).toBe('error')
+      expect(message).toContain('dlBulkDonePurge:{"ok":2,"total":5}')
+      expect(message).toContain('uwErrForbidden')
+    })
+
+    it('names the purge refusals with their own sentence', () => {
+      const { message } = bulkSummary(
+        'purge',
+        { total: 1, ok: [], failed: [{ id: 'a', error: 'folder_too_large' }] },
+        t,
+      )
+      expect(message).toContain('uwErrFolderTooLarge')
+    })
   })
 })

@@ -197,4 +197,12 @@ export const en = {
   uwSourceOriginTask: 'Tasks',
   uwSourceOriginMeeting: 'Meetings',
   uwSourceOriginEmail: 'Email',
+  uwErrOwnerRequiresCopy:
+    'This document belongs to a Work Product: copy it through the owning screen.',
+  uwErrPageCopyNotSupported:
+    'Only file documents can be copied at this step. UniNote copies come later.',
+  uwErrCopyConsentRequired: 'An explicit confirmation is required before copying.',
+  uwErrDocumentNotInTrash: 'This item is no longer in the trash.',
+  uwErrFolderTooLarge:
+    "The folder holds too many items to delete in one go. Delete what's inside in parts first.",
 } satisfies Record<keyof typeof zh, string>

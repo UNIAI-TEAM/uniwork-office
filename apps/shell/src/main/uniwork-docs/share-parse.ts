@@ -13,6 +13,8 @@ import {
   type ShareLinkCreated,
   type ShareMember,
   type ShareMemberPage,
+  type ShareOwnerCandidate,
+  type ShareOwnerTransfer,
   type SharePersonAccess,
   type SharePreview,
   type SharePreviewLevel,
@@ -423,6 +425,76 @@ export function parseRequestDecision(raw: unknown): ShareRequestDecision {
     status: required(body.status, 128),
     shareId: text(body.share_id),
   }
+}
+
+/** UNI-2078: `PUT /documents/{id}/owner` (DocumentOwnerSDO); the previous owner fields default to empty */
+export function parseOwnerTransfer(raw: unknown): ShareOwnerTransfer {
+  const body = record(raw)
+  return {
+    documentId: required(body.document_id),
+    aclOwnerId: required(body.acl_owner_id),
+    previousOwnerId: text(body.previous_owner_id),
+    previousOwnerShareId: text(body.previous_owner_share_id),
+  }
+}
+
+/** UNI-2078: what main checks of a document before an owner transfer (main only) */
+export interface ShareOwnerGate {
+  id: string
+  workspaceId: string
+  /** `owner_kind`: non-empty = owned by a work product, whose owner cannot change */
+  ownerKind: string
+  shelved: boolean
+  /** `restricted` matters: an admin there only through admin_scope may not take it */
+  visibility: string
+}
+
+/** UNI-2078: `GET /documents/{id}` read for the owner gate; fails closed without an id or workspace */
+export function parseOwnerGate(raw: unknown): ShareOwnerGate {
+  const doc = record(record(raw).document)
+  return {
+    id: required(doc.id),
+    workspaceId: required(doc.workspace_id),
+    ownerKind: text(doc.owner_kind),
+    shelved: typeof doc.shelved_at === 'string' && doc.shelved_at.length > 0,
+    visibility: text(doc.visibility),
+  }
+}
+
+/** UNI-2078: `GET /workspaces/{ws}/members` as user ids (the names come from the organization) */
+export function parseWorkspaceMemberIds(raw: unknown): string[] {
+  const body = record(raw)
+  if (!Array.isArray(body.members)) bad()
+  return body.members.flatMap((value) =>
+    isRecord(value) && typeof value.user_id === 'string' && value.user_id ? [value.user_id] : [],
+  )
+}
+
+/**
+ * UNI-2078: `GET /orgs/{org}/members?status=active`, one page of people who may own a document.
+ * A row the server marks anything but active is dropped (no status = active, as asked); the name
+ * is the display name, else the email; a row with neither is dropped.
+ */
+export function parseActiveOrgMembers(raw: unknown): {
+  members: ShareOwnerCandidate[]
+  nextCursor: string
+} {
+  const body = record(raw)
+  if (!Array.isArray(body.members)) bad()
+  const next = body.next_cursor
+  if (next !== null && next !== undefined && typeof next !== 'string') bad()
+  const members: ShareOwnerCandidate[] = []
+  for (const value of body.members) {
+    if (!isRecord(value)) continue
+    const userId = value.user_id
+    if (typeof userId !== 'string' || !userId) continue
+    if (value.status !== undefined && value.status !== 'active') continue
+    const email = text(value.email).trim()
+    const display = text(value.display_name).trim()
+    const name = display || email
+    if (name) members.push({ userId, name, email })
+  }
+  return { members, nextCursor: typeof next === 'string' ? next : '' }
 }
 
 export { parseRejectedItems } from './share-rejected'
