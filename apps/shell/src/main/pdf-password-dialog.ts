@@ -1,7 +1,8 @@
 import { join } from 'node:path'
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, type WebContents } from 'electron'
 import type { PdfPasswordUiState } from '../shared/pdf-password-api'
 import { PDF_PASSWORD_CHANNELS } from '../shared/pdf-password-api'
+import type { IpcMainLike } from './ipc-sender-guard'
 
 /**
  * Password prompt for encrypted PDFs (P23): a frameless modal card centered
@@ -16,7 +17,6 @@ import { PDF_PASSWORD_CHANNELS } from '../shared/pdf-password-api'
 let pwWin: BrowserWindow | null = null
 let currentState: PdfPasswordUiState | null = null
 let pendingResolve: ((password: string | null) => void) | null = null
-let ipcRegistered = false
 
 function settle(password: string | null): void {
   const resolve = pendingResolve
@@ -24,16 +24,19 @@ function settle(password: string | null): void {
   resolve?.(password)
 }
 
-function registerIpc(): void {
-  if (ipcRegistered) return
-  ipcRegistered = true
-  ipcMain.handle(PDF_PASSWORD_CHANNELS.getState, () => currentState)
-  ipcMain.handle(PDF_PASSWORD_CHANNELS.submit, (_event, password: unknown) => {
+/**
+ * Registers the window's three channels on `ipc` once, at main-process start (the
+ * composition passes the sender-guarded object). Every handler is safe with no
+ * pending prompt: state is null and settle() is a no-op.
+ */
+export function registerPdfPasswordIpc(ipc: IpcMainLike): void {
+  ipc.handle?.(PDF_PASSWORD_CHANNELS.getState, () => currentState)
+  ipc.handle?.(PDF_PASSWORD_CHANNELS.submit, (_event, password: unknown) => {
     if (typeof password !== 'string') return
     pushState({ busy: true })
     settle(password)
   })
-  ipcMain.handle(PDF_PASSWORD_CHANNELS.cancel, () => {
+  ipc.handle?.(PDF_PASSWORD_CHANNELS.cancel, () => {
     settle(null)
     closePdfPasswordDialog()
   })
@@ -57,7 +60,6 @@ export function promptPdfPassword(
   // path, but keeps the module safe on its own)
   settle(null)
   currentState = { ...state, busy: false }
-  registerIpc()
 
   const promise = new Promise<string | null>((resolve) => {
     pendingResolve = resolve
@@ -104,6 +106,11 @@ export function promptPdfPassword(
     void win.loadFile(join(__dirname, '../renderer/pdf-password.html'))
   }
   return promise
+}
+
+/** the live password window's webContents, read per call (null while it is closed); the own-window sender policy uses it */
+export function pdfPasswordWindowContents(): WebContents | null {
+  return pwWin && !pwWin.isDestroyed() ? pwWin.webContents : null
 }
 
 export function closePdfPasswordDialog(): void {

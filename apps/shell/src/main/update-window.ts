@@ -1,7 +1,8 @@
 import { join } from 'node:path'
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, type WebContents } from 'electron'
 import type { UpdateUiState } from '../shared/update-api'
 import { UPDATE_CHANNELS } from '../shared/update-api'
+import type { IpcMainLike } from './ipc-sender-guard'
 
 /**
  * The update window: a frameless card centered over the shell window —
@@ -9,9 +10,10 @@ import { UPDATE_CHANNELS } from '../shared/update-api'
  * "minimize" action folds it away and Settings → About re-opens it on demand.
  * Content lives in renderer/update.html; this module owns the window
  * lifecycle, the pushed UI state, and the download / install / later IPC
- * surface, plus the settings-facing get-state / open-for-update entry — the
- * last two are registered at module load, since the shell window invokes them
- * before any update is known (see registerSettingsIpc).
+ * surface, plus the settings-facing get-state / open-for-update entry. All six
+ * channels are registered once by registerUpdateIpc on the ipc object the shell
+ * composition passes in (the sender-guarded one), at main-process start, since
+ * the shell window invokes get-state before any update is known.
  */
 
 interface UpdateActions {
@@ -24,7 +26,6 @@ interface UpdateActions {
 let updateWin: BrowserWindow | null = null
 let currentState: UpdateUiState | null = null
 let actions: UpdateActions | null = null
-let ipcRegistered = false
 let parentGetter: () => BrowserWindow | null = () => null
 /** fallback when no getter was registered (tests, direct callers) */
 let lastParent: BrowserWindow | null = null
@@ -47,23 +48,22 @@ function broadcastState(): void {
 }
 
 /**
- * The two channels the shell window invokes from Settings → About. That call
- * happens on mount — long before any update is known, which on a fresh launch
- * is every launch — so these cannot live behind showUpdateWindow: a handler
- * that only exists once the dialog has opened cannot answer the very first
- * invoke, and ipcRenderer.invoke rejects with "No handler registered".
- * currentState is null until the updater reports something, and null is the
- * answer ("no update known"), not an error, so module load is the right
- * registration point: this module is pulled in statically by updater.ts at
- * main-process start, long before any renderer exists.
+ * Registers all six update:* channels on `ipc`, once, at main-process start.
+ * get-state / open-for-update are invoked by the shell window from Settings →
+ * About on mount — long before any update is known, which on a fresh launch
+ * is every launch — so they cannot wait for showUpdateWindow: ipcRenderer.invoke
+ * would reject with "No handler registered". currentState is null until the
+ * updater reports something, and null is the answer ("no update known"), not an
+ * error. The dialog's own channels read `actions`, which is only assigned
+ * alongside the window, so their handlers tolerate `actions == null`.
  */
-function registerSettingsIpc(): void {
-  ipcMain.handle(UPDATE_CHANNELS.getState, () => currentState)
+export function registerUpdateIpc(ipc: IpcMainLike): void {
+  ipc.handle?.(UPDATE_CHANNELS.getState, () => currentState)
   // Settings → About "update to vX": surface the dialog again (it may have
   // been minimized) and, when nothing has started yet, start the download.
   // Returns false while no update is known — the settings button stays
   // hidden in that state, so callers treat it as a no-op.
-  ipcMain.handle(UPDATE_CHANNELS.openForUpdate, (): boolean => {
+  ipc.handle?.(UPDATE_CHANNELS.openForUpdate, (): boolean => {
     if (!currentState) return false
     if (updateWin && !updateWin.isDestroyed()) {
       updateWin.show()
@@ -75,22 +75,15 @@ function registerSettingsIpc(): void {
     if (currentState.phase === 'available' || currentState.phase === 'error') actions?.onDownload()
     return true
   })
+  ipc.handle?.(UPDATE_CHANNELS.download, () => actions?.onDownload())
+  ipc.handle?.(UPDATE_CHANNELS.install, () => actions?.onInstall())
+  ipc.handle?.(UPDATE_CHANNELS.later, () => actions?.onLater())
+  ipc.handle?.(UPDATE_CHANNELS.openDownload, () => actions?.onOpenDownload())
 }
-registerSettingsIpc()
 
-/**
- * The dialog's own channels. They stay here: only renderer/update.html loads
- * preload/update.js, and that file exists solely because showUpdateWindow
- * created the window, so nothing can reach these handlers before then. Their
- * callbacks read `actions`, which is only assigned alongside that window.
- */
-function registerIpc(): void {
-  if (ipcRegistered) return
-  ipcRegistered = true
-  ipcMain.handle(UPDATE_CHANNELS.download, () => actions?.onDownload())
-  ipcMain.handle(UPDATE_CHANNELS.install, () => actions?.onInstall())
-  ipcMain.handle(UPDATE_CHANNELS.later, () => actions?.onLater())
-  ipcMain.handle(UPDATE_CHANNELS.openDownload, () => actions?.onOpenDownload())
+/** the live update window's webContents, read per call (null while it is closed); the own-window sender policy uses it */
+export function updateWindowContents(): WebContents | null {
+  return updateWin && !updateWin.isDestroyed() ? updateWin.webContents : null
 }
 
 /** keeps the handler total when actions are missing (cannot happen today) */
@@ -114,7 +107,6 @@ export function showUpdateWindow(
   currentState = state
   actions = windowActions
   if (parent && !parent.isDestroyed()) lastParent = parent
-  registerIpc()
   broadcastState()
 
   if (updateWin && !updateWin.isDestroyed()) {
