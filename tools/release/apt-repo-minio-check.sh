@@ -8,9 +8,11 @@
 # Starts bitnamilegacy/minio on a free port with a throwaway volume, makes a
 # public-read bucket, publishes two fake versions of uniwork-office with a
 # throwaway test key (same env names as the mirror job), and in each client:
-# adds the deb822 source (Signed-By the published key.gpg) over plain http,
-# installs v1, upgrades to v2 with apt-get upgrade, then proves apt-get update
-# refuses a tampered InRelease and a tampered Packages. Everything it started
+# runs the one-command install on a clean client (wget the apt/latest deb, apt
+# install it; the fake deb's postinst writes the keyring and the deb822 source,
+# like the real one, pointing at MinIO over plain http), mirrors v2 and proves
+# apt update && apt upgrade installs it, then proves apt-get update refuses a
+# tampered InRelease and a tampered Packages. Everything it started
 # (containers, volume, temp files) is removed by id at the end.
 #
 # Needs docker, apt-ftparchive (apt-utils), dpkg-deb, gpg, node, curl. Without
@@ -128,13 +130,36 @@ export APT_REPO_EXPECT_FPR
 APT_GPG_PRIVATE_KEY="$(gpg --batch --pinentry-mode loopback --passphrase-fd 3 --armor \
   --export-secret-keys "$APT_REPO_EXPECT_FPR" 3<<<"$APT_GPG_PASSPHRASE")"
 export APT_GPG_PRIVATE_KEY
+# the public key and the deb822 source the fake debs ship, like the real deb's resources/apt
+gpg --batch --export "$APT_REPO_EXPECT_FPR" >"$root/pubkey.gpg"
+repo_url="http://127.0.0.1:$port/$bucket/apt"
+cat >"$root/uniwork-office.sources" <<SOURCES
+# managed by uniwork-office
+Types: deb
+URIs: $repo_url
+Suites: $CHANNEL
+Components: main
+Architectures: amd64
+Signed-By: /usr/share/keyrings/uniwork-office-archive-keyring.gpg
+SOURCES
 gpgconf --kill all
 unset GNUPGHOME
 
 make_release() {
   local version="$1" out="$root/release-$1" pkg="$root/pkg-$1"
   local prefix="UniWork-Office_${version}_unsigned"
-  mkdir -p "$out" "$pkg/DEBIAN" "$pkg/opt/uniwork-office"
+  mkdir -p "$out" "$pkg/DEBIAN" "$pkg/opt/uniwork-office/resources/apt"
+  cp "$root/pubkey.gpg" "$pkg/opt/uniwork-office/resources/apt/uniwork-office-archive-keyring.gpg"
+  cp "$root/uniwork-office.sources" "$pkg/opt/uniwork-office/resources/apt/uniwork-office.sources"
+  # like the real postinst: the keyring first, the source only when it is in place
+  cat >"$pkg/DEBIAN/postinst" <<'POSTINST'
+#!/bin/sh
+res=/opt/uniwork-office/resources/apt
+install -D -m 0644 "$res/uniwork-office-archive-keyring.gpg" /usr/share/keyrings/uniwork-office-archive-keyring.gpg \
+  && install -D -m 0644 "$res/uniwork-office.sources" /etc/apt/sources.list.d/uniwork-office.sources || true
+exit 0
+POSTINST
+  chmod 0755 "$pkg/DEBIAN/postinst"
   echo "$version" >"$pkg/opt/uniwork-office/VERSION"
   local tilde='~' deb_version
   deb_version="${version//-/$tilde}"
@@ -157,29 +182,14 @@ publish() {
 }
 
 publish "$V1"
-repo_url="http://127.0.0.1:$port/$bucket/apt"
 curl -fsS "$repo_url/key.gpg" -o "$root/key.gpg"
+cmp "$root/key.gpg" "$root/pubkey.gpg"
 curl -fsS "http://127.0.0.1:$port/$bucket/releases.json" | node -e \
   'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const m = JSON.parse(s); if (m.channels.dev.latest !== process.argv[1]) process.exit(1) })' "$V1"
 
 # --- apt clients --------------------------------------------------------------------
 
-mkdir -p "$root/client"
-cp "$root/key.gpg" "$root/client/key.gpg"
-cat >"$root/client/setup.sh" <<CLIENT
-set -eu
-rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*
-if [ "\$(dpkg --print-architecture)" != amd64 ]; then dpkg --add-architecture amd64; fi
-install -m 0644 /check/key.gpg /usr/share/keyrings/uniwork-office-archive-keyring.gpg
-cat >/etc/apt/sources.list.d/uniwork-office.sources <<SOURCES
-Types: deb
-URIs: $repo_url
-Suites: $CHANNEL
-Components: main
-Architectures: amd64
-Signed-By: /usr/share/keyrings/uniwork-office-archive-keyring.gpg
-SOURCES
-CLIENT
+latest_url="http://127.0.0.1:$port/$bucket/apt/latest/$CHANNEL/uniwork-office_amd64.deb"
 
 in_client() {
   docker exec "$1" bash -c "$2"
@@ -191,20 +201,27 @@ installed_version() {
 
 clients=()
 for image in "${CLIENTS[@]}"; do
-  id="$(docker run -d --network host -v "$root/client:/check:ro" "$image" sleep infinity)"
+  id="$(docker run -d --network host "$image" sleep infinity)"
   containers+=("$id")
   clients+=("$id")
-  step "$image: add the source, apt-get update, install $V1"
-  in_client "$id" 'bash /check/setup.sh && apt-get update -q'
-  in_client "$id" "DEBIAN_FRONTEND=noninteractive apt-get install -y -q uniwork-office:amd64=$D1 >/dev/null"
+  step "$image: install wget, then the one command from apt/latest ($V1)"
+  in_client "$id" 'apt-get update -q >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -q wget >/dev/null'
+  # only the UniWork source from here on, so the upgrade below touches nothing else;
+  # on an arm64 host the amd64 package needs the foreign architecture (not part of the one command)
+  # shellcheck disable=SC2016
+  in_client "$id" 'rm -f /etc/apt/sources.list /etc/apt/sources.list.d/* && rm -rf /var/lib/apt/lists/*
+    if [ "$(dpkg --print-architecture)" != amd64 ]; then dpkg --add-architecture amd64; fi'
+  in_client "$id" "wget -qO /tmp/uniwork-office.deb $latest_url && DEBIAN_FRONTEND=noninteractive apt install -y /tmp/uniwork-office.deb >/dev/null"
   [ "$(installed_version "$id")" = "$D1" ] || { echo "minio-check: $image did not install $D1" >&2; exit 1; }
+  in_client "$id" 'head -n 1 /etc/apt/sources.list.d/uniwork-office.sources | grep -qx "# managed by uniwork-office"' ||
+    { echo "minio-check: $image: the postinst wrote no source" >&2; exit 1; }
 done
 
 publish "$V2"
 for i in "${!clients[@]}"; do
   id="${clients[i]}"
-  step "${CLIENTS[i]}: apt-get update + upgrade to $V2"
-  in_client "$id" 'apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q >/dev/null'
+  step "${CLIENTS[i]}: apt update && apt upgrade -y to $V2"
+  in_client "$id" 'apt update -q && DEBIAN_FRONTEND=noninteractive apt upgrade -y -q >/dev/null'
   [ "$(installed_version "$id")" = "$D2" ] || { echo "minio-check: ${CLIENTS[i]} did not upgrade to $D2" >&2; exit 1; }
 done
 

@@ -300,6 +300,7 @@ GitHub value until the route answers.
 | `apt/pool/main/u/uniwork-office/`        | `uniwork-office_<version>_amd64.deb`                            |
 | `apt/dists/<channel>/`                   | `InRelease`, `Release`, `Release.gpg` (one suite per channel)   |
 | `apt/dists/<channel>/main/binary-amd64/` | `Packages`, `.gz`, `.xz` and `by-hash/SHA256/<hash>` copies     |
+| `apt/latest/<channel>/`                  | `uniwork-office_amd64.deb`, the newest deb under a stable name  |
 | `update/<channel>/`                      | generic electron-updater feed: the feed yml and the files named |
 | `releases.json`                          | public manifest of every kept version (schema 1, below)         |
 
@@ -350,7 +351,7 @@ it. Re-running the same version is idempotent.
 ### releases.json
 
 `release-manifest.mjs` writes it (schema 1; field names never change within the schema, new
-optional fields may appear). `channels.<channel>` holds `latest`, `apt_suite` and `releases`
+optional fields may appear). `channels.<channel>` holds `latest`, `apt_suite`, `latest_deb_url` (optional) and `releases`
 (newest first, the kept versions only); each release has `version`, `channel`, `tag`,
 `published_at`, `git_sha`, `notes_markdown` (the GitHub release body, untrusted markdown),
 `notes_url` (null for now), `signed` (`windows` / `macos` / `linux`), `apt` and `assets` (one row
