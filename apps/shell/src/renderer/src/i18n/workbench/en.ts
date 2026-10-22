@@ -223,6 +223,7 @@ export const en = {
   wbDeskReasonConflict: 'This copy and the one on UniWork differ',
   wbDeskReasonSync: 'Changes on this device have not reached UniWork',
   wbDeskMore: 'Show {count} more',
+  wbDeskInTrayViewAll: 'View all',
   wbDeskInProgress: 'In progress',
   wbDeskInProgressEmpty: 'No documents in progress',
   wbDeskUnsaved: 'Unsaved',
