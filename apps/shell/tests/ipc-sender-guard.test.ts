@@ -1,6 +1,7 @@
 // Shared IPC sender guard (UNI-2073): channel policy table, call-time sender checks
 // (destroyed / sub-frame / unknown sender / origin), refusal shapes for handle and on,
 // the rate-limited log line, and the dev / packaged trusted URL rules.
+import { EventEmitter } from 'node:events'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
@@ -172,6 +173,28 @@ describe('guarded(ipc) registration', () => {
     g.removeAllListeners('uniwork:ai-run')
     expect(ipc.removeAllListeners).toHaveBeenCalledWith('uniwork:ai-run')
   })
+
+  it.each([
+    ['removeAllListeners', (g: EventEmitter) => g.removeAllListeners('x')],
+    ['setMaxListeners', (g: EventEmitter) => g.setMaxListeners(5)],
+  ])(
+    '%s hands back the guarded object, not the raw ipc, so a chained on() stays guarded',
+    (_name, call) => {
+      const { guard, shell } = setup()
+      const ipc = new EventEmitter()
+      const g = guard.guarded(ipc)
+      const chained = call(g)
+      expect(chained).toBe(g)
+      expect(chained).not.toBe(ipc)
+      const listener = vi.fn()
+      chained.on('uniwork-doc:x', listener)
+      expect(ipc.listeners('uniwork-doc:x')).not.toContain(listener)
+      ipc.emit('uniwork-doc:x', subframeEvent(shell))
+      expect(listener).not.toHaveBeenCalled()
+      ipc.emit('uniwork-doc:x', mainFrameEvent(shell))
+      expect(listener).toHaveBeenCalledTimes(1)
+    },
+  )
 
   it('leaves the raw ipc object untouched', () => {
     const { guard } = setup()
