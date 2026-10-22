@@ -196,7 +196,7 @@ export default function App() {
   const wrapSelectionRef = useRef<(tag: string) => void>(() => {})
   const openLinkRef = useRef<() => void>(() => {})
   const [linkSel, setLinkSel] = useState<TextSel | null>(null)
-  const moveSelectedRef = useRef<(dir: -1 | 1) => void>(() => {})
+  const moveSelectedRef = useRef<(dir: -1 | 1, sid?: number) => void>(() => {})
   // selected element as the preview sees it: drives the floating toolbar and the style panel
   const [selRect, setSelRect] = useState<ElementRect | null>(null)
   const [selComputed, setSelComputed] = useState<ComputedSnapshot | null>(null)
@@ -920,7 +920,10 @@ export default function App() {
             setZoom(100)
             return
           }
-          const sid = selectedSidRef.current
+          // the sid the frame acted on beats the ref: the ref is assigned in the render after a
+          // gx:select, so a key right behind the click would see no selection (UNI-2117)
+          if (msg.sid !== undefined && !getMap().bySid.has(msg.sid)) return
+          const sid = msg.sid ?? selectedSidRef.current
           if (sid === null) {
             if (msg.command === 'escape') {
               window.dispatchEvent(
@@ -933,7 +936,7 @@ export default function App() {
           const e = map.bySid.get(sid)
           if (!e) return
           if (msg.command === 'moveUp' || msg.command === 'moveDown')
-            moveSelectedRef.current(msg.command === 'moveUp' ? -1 : 1)
+            moveSelectedRef.current(msg.command === 'moveUp' ? -1 : 1, sid)
           else if (msg.command === 'delete') runManual([{ op: 'remove', sid }], 'clear')
           else if (msg.command === 'escape') selectSid(null)
           else if (msg.command === 'bold') wrapSelectionRef.current('strong')
@@ -995,10 +998,10 @@ export default function App() {
     const html = textRef.current.slice(selectedEntry.range[0], selectedEntry.range[1])
     runManual([{ op: 'insert_html', sid: selectedEntry.sid, position: 'after', html: `\n${html}` }])
   }
-  const moveSelected = (dir: -1 | 1) => {
-    if (!selectedEntry) return
-    const target = moveTarget(getMap(), selectedEntry.sid, dir)
-    if (target) runManual([{ op: 'move', sid: selectedEntry.sid, ...target }])
+  const moveSelected = (dir: -1 | 1, sid = selectedEntry?.sid) => {
+    if (sid === undefined) return
+    const target = moveTarget(getMap(), sid, dir)
+    if (target) runManual([{ op: 'move', sid, ...target }])
   }
   moveSelectedRef.current = moveSelected
   const wrapSelection = (tag: string, attrs?: Record<string, string>) => {

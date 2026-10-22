@@ -132,6 +132,8 @@ export type FromInspectorBody =
         | 'moveUp'
         | 'moveDown'
         | 'print'
+      /** the element the frame acted on (selection-bound commands); absent from older frames */
+      sid?: number
     }
   /**
    * a modifier chord or function key pressed while focus is inside the frame: the frame's keydown
