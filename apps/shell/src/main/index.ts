@@ -275,7 +275,13 @@ import { PDF_CHANNELS } from '../../../pdf/src/shared/ipc'
 import { convertPdfFileToDocxLocalWithPrompt, PdfLoadError } from './pdf2docx-local'
 import { convertPdfFileToPptxLocalWithPrompt } from './pdf2pptx-local'
 import { convertPdfFileToXlsxLocalWithPrompt } from './pdf2xlsx-local'
-import { closePdfPasswordDialog, promptPdfPassword } from './pdf-password-dialog'
+import {
+  closePdfPasswordDialog,
+  pdfPasswordWindowContents,
+  promptPdfPassword,
+  registerPdfPasswordIpc,
+} from './pdf-password-dialog'
+import { registerUpdateIpc, updateWindowContents } from './update-window'
 import {
   configureMarkdownRuntime,
   exportMarkdownPdfHeadless,
@@ -3317,9 +3323,11 @@ let tabManager: TabManager | null = null
 const SHELL_RENDERER_DIR = join(__dirname, '../renderer')
 
 /**
- * UNI-2073 / UNI-2082: the sender guard for every uniwork* and home:* channel. It is handed to those
- * registrars (registerHomeIpc included) in place of the raw `ipcMain`; the window and view
- * registries are read at call time because the handlers register before the shell window exists.
+ * UNI-2073 / UNI-2082 / UNI-2096: the sender guard for every uniwork*, home:*, tabs:*, integrations:*,
+ * update:* and pdf-password:* channel (plus the drop and model-settings channels). It is handed to
+ * those registrars (registerHomeIpc included) in place of the raw `ipcMain`; the window and view
+ * registries are read at call time because the handlers register before the shell window exists,
+ * and the update / password windows are read lazily too (each open creates a new webContents).
  */
 const ipcSenderGuard = createIpcSenderGuard({
   shellContents: () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null),
@@ -3331,9 +3339,14 @@ const ipcSenderGuard = createIpcSenderGuard({
     tabManager?.hasWebContents(id) === true ||
     isDetachedWebContents(id) ||
     isSlidesAudienceWebContents(id),
+  ownWindowContents: (name) =>
+    name === 'update' ? updateWindowContents() : pdfPasswordWindowContents(),
   ...trustedUrlRules({ env: process.env, shellRendererDir: SHELL_RENDERER_DIR }),
 })
 const guardedIpc = ipcSenderGuard.guarded(ipcMain)
+// the update window and the pdf password dialog register once at start: their handlers tolerate no window
+registerUpdateIpc(guardedIpc)
+registerPdfPasswordIpc(guardedIpc)
 
 /**
  * When the user creates a file from a specific project view, the project waits
@@ -4427,7 +4440,7 @@ function uniworkDocsWiring() {
 }
 
 function registerDroppedFilesIpc(): void {
-  ipcMain.on(DROP_OPEN_CHANNEL, (_event, raw: unknown) =>
+  guardedIpc.on(DROP_OPEN_CHANNEL, (_event, raw: unknown) =>
     handleDroppedFiles(raw, droppedFilesDeps()),
   )
 }
@@ -5937,32 +5950,32 @@ function activeHtmlTarget() {
 }
 
 function registerTabsIpc(): void {
-  ipcMain.on(TABS_CHANNELS.chromePressed, (event) => broadcastChromePressed(event.sender))
+  guardedIpc.on(TABS_CHANNELS.chromePressed, (event) => broadcastChromePressed(event.sender))
   // G5-06u: a shell popover opened for the editor gives focus back to it; only
   // the shell page of the tabbed window may ask
-  ipcMain.on(TABS_CHANNELS.focusActive, (event) => {
+  guardedIpc.on(TABS_CHANNELS.focusActive, (event) => {
     if (shellWindow && !shellWindow.isDestroyed() && event.sender === shellWindow.webContents) {
       tabManager?.focusActiveView()
     }
   })
-  ipcMain.handle(TABS_CHANNELS.list, () => tabManager?.list() ?? [])
-  ipcMain.handle(TABS_CHANNELS.activate, (_event, id: unknown) => {
+  guardedIpc.handle(TABS_CHANNELS.list, () => tabManager?.list() ?? [])
+  guardedIpc.handle(TABS_CHANNELS.activate, (_event, id: unknown) => {
     if (typeof id !== 'string' || !id) return
     const before = tabManager?.activeFilePath()
     if (!activateDetached(id)) tabManager?.activateTab(id)
     // a click on the tab that is already active is no tab switch: re-read it here
     if (tabManager?.activeFilePath() === before) activeDocRefresh.gainedFocus(before)
   })
-  ipcMain.handle(TABS_CHANNELS.close, (_event, id: unknown) => {
+  guardedIpc.handle(TABS_CHANNELS.close, (_event, id: unknown) => {
     if (typeof id !== 'string' || !id) return
     return tabManager?.closeTab(id)
   })
-  ipcMain.handle(TABS_CHANNELS.reorder, (_event, id: string, toIndex: number) => {
+  guardedIpc.handle(TABS_CHANNELS.reorder, (_event, id: string, toIndex: number) => {
     if (typeof id === 'string' && Number.isInteger(toIndex)) tabManager?.reorderTab(id, toIndex)
   })
   // "all tabs" overflow menu — native popup because the editors' WebContentsView
   // would cover any DOM dropdown the shell renderer draws below the tab strip
-  ipcMain.handle(TABS_CHANNELS.showAppMenu, (_event, x: unknown, y: unknown) => {
+  guardedIpc.handle(TABS_CHANNELS.showAppMenu, (_event, x: unknown, y: unknown) => {
     if (!shellWindow) return
     Menu.getApplicationMenu()?.popup({
       window: shellWindow,
@@ -5971,7 +5984,7 @@ function registerTabsIpc(): void {
         : {}),
     })
   })
-  ipcMain.handle(TABS_CHANNELS.showMenu, (_event, x: unknown, y: unknown) => {
+  guardedIpc.handle(TABS_CHANNELS.showMenu, (_event, x: unknown, y: unknown) => {
     if (!tabManager || !shellWindow) return
     const menu = Menu.buildFromTemplate(
       tabManager.list().map((tab) => ({
@@ -5989,27 +6002,27 @@ function registerTabsIpc(): void {
         : {}),
     })
   })
-  ipcMain.handle(TABS_CHANNELS.detach, (_event, id: unknown) => {
+  guardedIpc.handle(TABS_CHANNELS.detach, (_event, id: unknown) => {
     if (typeof id !== 'string' || !tabManager?.canDetachTab(id)) return
     detachTabToWindow(id)
   })
   // drag-to-tear-off: the strip drives the window until the pointer lifts
-  ipcMain.handle(TABS_CHANNELS.tearOff, (_event, id: unknown, x: unknown, y: unknown) => {
+  guardedIpc.handle(TABS_CHANNELS.tearOff, (_event, id: unknown, x: unknown, y: unknown) => {
     if (typeof id !== 'string' || typeof x !== 'number' || typeof y !== 'number') return false
     if (!Number.isFinite(x) || !Number.isFinite(y)) return false
     return tearOffTabToWindow(id, x, y)
   })
-  ipcMain.on(TABS_CHANNELS.dragTornWindow, (_event, x: unknown, y: unknown) => {
+  guardedIpc.on(TABS_CHANNELS.dragTornWindow, (_event, x: unknown, y: unknown) => {
     if (typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y))
       dragTornWindow(x, y)
   })
-  ipcMain.handle(TABS_CHANNELS.dockTornWindow, (_event, index: unknown) => {
+  guardedIpc.handle(TABS_CHANNELS.dockTornWindow, (_event, index: unknown) => {
     const tab = takeTornTab()
     if (!tab) return
     ensureTabManager().attachTab(tab, typeof index === 'number' ? index : undefined)
   })
-  ipcMain.handle(TABS_CHANNELS.endTornDrag, () => endTornDrag())
-  ipcMain.on(TABS_CHANNELS.dockIndex, (_event, index: unknown) => {
+  guardedIpc.handle(TABS_CHANNELS.endTornDrag, () => endTornDrag())
+  guardedIpc.on(TABS_CHANNELS.dockIndex, (_event, index: unknown) => {
     lastDockIndex = typeof index === 'number' && Number.isInteger(index) ? index : undefined
   })
   /**
@@ -6060,51 +6073,54 @@ function registerTabsIpc(): void {
     })
   }
   // per-tab context menu — native for the same reason as the tab list above
-  ipcMain.handle(TABS_CHANNELS.showTabMenu, async (_event, id: unknown, x: unknown, y: unknown) => {
-    if (!tabManager || !shellWindow || typeof id !== 'string') return
-    const tab = tabManager.list().find((t) => t.id === id)
-    if (!tab || tab.kind === 'home') return
-    const template: MenuItemConstructorOptions[] = []
-    // every document tab except a chrome-free Present tab (a live preview of
-    // another tab's document — it has nothing of its own to move)
-    if (tabManager.canDetachTab(id)) {
-      template.push({
-        label: tm('menuOpenInNewWindow'),
-        click: () => detachTabToWindow(id),
-      })
-      template.push({ type: 'separator' })
-    }
-    // G5-05u (B8): a UniWork-bound tab can be pinned for offline use here; a
-    // plain local file has no document to pin (and no item)
-    const offlineBinding = offlineBindingOf(tab.filePath)
-    const offline = uniworkDocs?.offline
-    if (offlineBinding && offline) {
-      const item = offlineTabMenuItem({
-        bound: offlineBinding,
-        state: await offline.state(offlineBinding.documentId),
-        labels: { pin: tm('uwOfflinePin'), unpin: tm('uwOfflineUnpin') },
-        pin: () => void offline.pin(offlineBinding),
-        unpin: () => void unpinFromTabMenu(offline, offlineBinding.documentId),
-      })
-      if (item) {
-        template.push(item)
+  guardedIpc.handle(
+    TABS_CHANNELS.showTabMenu,
+    async (_event, id: unknown, x: unknown, y: unknown) => {
+      if (!tabManager || !shellWindow || typeof id !== 'string') return
+      const tab = tabManager.list().find((t) => t.id === id)
+      if (!tab || tab.kind === 'home') return
+      const template: MenuItemConstructorOptions[] = []
+      // every document tab except a chrome-free Present tab (a live preview of
+      // another tab's document — it has nothing of its own to move)
+      if (tabManager.canDetachTab(id)) {
+        template.push({
+          label: tm('menuOpenInNewWindow'),
+          click: () => detachTabToWindow(id),
+        })
         template.push({ type: 'separator' })
       }
-    }
-    template.push({
-      label: tm('menuClose'),
-      enabled: tab.closable,
-      click: () => void tabManager?.closeTab(id),
-    })
-    Menu.buildFromTemplate(template).popup({
-      window: shellWindow,
-      ...(typeof x === 'number' && typeof y === 'number'
-        ? { x: Math.round(x), y: Math.round(y) }
-        : {}),
-    })
-  })
+      // G5-05u (B8): a UniWork-bound tab can be pinned for offline use here; a
+      // plain local file has no document to pin (and no item)
+      const offlineBinding = offlineBindingOf(tab.filePath)
+      const offline = uniworkDocs?.offline
+      if (offlineBinding && offline) {
+        const item = offlineTabMenuItem({
+          bound: offlineBinding,
+          state: await offline.state(offlineBinding.documentId),
+          labels: { pin: tm('uwOfflinePin'), unpin: tm('uwOfflineUnpin') },
+          pin: () => void offline.pin(offlineBinding),
+          unpin: () => void unpinFromTabMenu(offline, offlineBinding.documentId),
+        })
+        if (item) {
+          template.push(item)
+          template.push({ type: 'separator' })
+        }
+      }
+      template.push({
+        label: tm('menuClose'),
+        enabled: tab.closable,
+        click: () => void tabManager?.closeTab(id),
+      })
+      Menu.buildFromTemplate(template).popup({
+        window: shellWindow,
+        ...(typeof x === 'number' && typeof y === 'number'
+          ? { x: Math.round(x), y: Math.round(y) }
+          : {}),
+      })
+    },
+  )
   // "+" new-file menu — native for the same reason as the tab list above
-  ipcMain.handle(TABS_CHANNELS.showNewMenu, (_event, x: unknown, y: unknown) => {
+  guardedIpc.handle(TABS_CHANNELS.showNewMenu, (_event, x: unknown, y: unknown) => {
     if (!tabManager || !shellWindow) return
     const menu = Menu.buildFromTemplate([
       // enabled:false so pre-Sonoma macOS / Windows (no 'header' support) degrade
@@ -6963,7 +6979,7 @@ bindAuthCallbackEvents(app, authCallbacks, {
 installNavigationGuard(app)
 installContextMenu(app, () => contextMenuLabels(currentLang()))
 registerAiIpc()
-ipcMain.handle('ai:open-model-settings', () => {
+guardedIpc.handle('ai:open-model-settings', () => {
   const win = shellWindow
   if (!win || win.isDestroyed()) return
   // the request may come from a detached window or while the shell is minimized
@@ -6976,7 +6992,7 @@ ipcMain.handle('ai:open-model-settings', () => {
 registerProjectIpc()
 registerDocsIpc()
 registerHomeIpc()
-registerIntegrationsIpc({
+registerIntegrationsIpc(guardedIpc, {
   settingsPath: APP_SETTINGS_PATH,
   window: () => shellWindow,
   cliDir: app.isPackaged
