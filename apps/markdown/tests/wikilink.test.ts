@@ -9,6 +9,7 @@ import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
 import {
   collectWikiTargets,
+  revealWikiFragment,
   wikilinkStart,
   wikiFragmentPosition,
   wikiTarget,
@@ -309,6 +310,32 @@ describe('fragments', () => {
     const { editor } = open('## Setup\n')
     expect(wikiFragmentPosition(editor.state.doc, 'Nowhere')).toBeNull()
     expect(wikiFragmentPosition(editor.state.doc, '')).toBeNull()
+  })
+})
+
+describe('revealing a fragment', () => {
+  // jsdom has no layout, so the scroll itself is the visual stage's to prove.
+  // What a unit can hold is the order: ProseMirror anchors the scroll request
+  // on the DOM selection, which stays in the old place until the view has
+  // focus, so a request made before the focus never moves the scroller.
+  it('focuses the view before it asks ProseMirror to scroll the selection into view', () => {
+    const { editor } = open('# Title\n\nIntro.\n\n## Some Heading\n\nBody.\n')
+    const pos = wikiFragmentPosition(editor.state.doc, 'Some Heading')!
+    const calls: string[] = []
+    let scrolled = false
+    const dispatch = editor.view.dispatch.bind(editor.view)
+    vi.spyOn(editor.view, 'focus').mockImplementation(() => {
+      calls.push('focus')
+    })
+    vi.spyOn(editor.view, 'dispatch').mockImplementation((tr) => {
+      calls.push('dispatch')
+      scrolled = tr.scrolledIntoView
+      dispatch(tr)
+    })
+    revealWikiFragment(editor.view, pos)
+    expect(calls).toEqual(['focus', 'dispatch'])
+    expect(scrolled).toBe(true)
+    expect(editor.state.selection.$from.parent.textContent).toBe('Some Heading')
   })
 })
 

@@ -1,5 +1,5 @@
 import { Mark, Extension } from '@tiptap/core'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { EditorView } from '@tiptap/pm/view'
 import type { Node as PmNode } from '@tiptap/pm/model'
@@ -138,6 +138,13 @@ export function wikiFragmentPosition(doc: PmNode, fragment: string): number | nu
     if (node.textContent.replace(/\s+/g, ' ').trim().toLowerCase() === want) found = pos + 1
   })
   return found
+}
+
+/** Put the caret at `pos` (from {@link wikiFragmentPosition}) and bring it into view. */
+export function revealWikiFragment(view: EditorView, pos: number): void {
+  const selection = TextSelection.near(view.state.doc.resolve(pos))
+  view.dispatch(view.state.tr.setSelection(selection).scrollIntoView())
+  view.focus()
 }
 
 export interface WikiLinkOptions {
