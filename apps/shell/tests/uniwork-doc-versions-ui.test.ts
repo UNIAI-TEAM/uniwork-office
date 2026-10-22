@@ -610,12 +610,31 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       expect(labelInput().maxLength).toBe(200)
       await submitForm()
       const submit = sheet().querySelector<HTMLButtonElement>('form button[type="submit"]')!
-      expect(submit.disabled).toBe(true)
+      expect(submit.disabled).toBe(false)
+      expect(submit.getAttribute('aria-disabled')).toBe('true')
       expect(submit.getAttribute('aria-busy')).toBe('true')
       expect(submit.textContent).toContain(t('vhsNameSubmitting'))
       await act(async () => release())
       await flush()
-      expect(submit.disabled).toBe(false)
+      expect(submit.getAttribute('aria-disabled')).toBeNull()
+    })
+
+    it('keeps focus on the submit button after a failed create, and a second press while busy does nothing', async () => {
+      const bridge = createFakeDocHistoryBridge({ versions: threeVersions() })
+      let settle!: (result: ReturnType<typeof failure>) => void
+      bridge.createVersion.mockReturnValueOnce(new Promise((resolve) => (settle = resolve)))
+      await open(target(), bridge)
+      const submit = sheet().querySelector<HTMLButtonElement>('form button[type="submit"]')!
+      submit.focus()
+      await click(submit)
+      expect(submit.hasAttribute('disabled')).toBe(false)
+      expect(submit.getAttribute('aria-disabled')).toBe('true')
+      await click(submit)
+      expect(bridge.createVersion).toHaveBeenCalledTimes(1)
+      await act(async () => settle(failure('network')))
+      await flush()
+      expect(document.activeElement).toBe(submit)
+      expect(submit.getAttribute('aria-disabled')).toBeNull()
     })
   })
 
@@ -687,10 +706,40 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await click(restoreButton(2))
       await click(confirmButton())
       expect(top().textContent).toContain(t('vhsRestoreSubmitting'))
-      expect(button(top(), t('vhsCancel'))!.hasAttribute('disabled')).toBe(true)
+      const cancel = button(top(), t('vhsCancel'))!
+      expect(cancel.hasAttribute('disabled')).toBe(false)
+      expect(cancel.getAttribute('aria-disabled')).toBe('true')
+      await click(cancel)
+      expect(dialogs()).toHaveLength(2)
       await act(async () => release())
       await flush()
       expect(dialogs()).toHaveLength(1)
+    })
+
+    it('keeps focus on Restore after a failed restore, and Escape still closes the confirm', async () => {
+      const bridge = createFakeDocHistoryBridge({ versions: threeVersions() })
+      let settle!: (result: ReturnType<typeof failure>) => void
+      bridge.restore.mockReturnValueOnce(new Promise((resolve) => (settle = resolve)))
+      await open(target(), bridge)
+      await click(restoreButton(2))
+      const confirm = confirmButton()!
+      confirm.focus()
+      await click(confirm)
+      expect(confirm.hasAttribute('disabled')).toBe(false)
+      expect(confirm.getAttribute('aria-disabled')).toBe('true')
+      await click(confirm)
+      expect(bridge.restore).toHaveBeenCalledTimes(1)
+      await act(async () => settle(failure('network')))
+      await flush()
+      expect(dialogs()).toHaveLength(2)
+      expect(document.activeElement).toBe(confirm)
+      await act(async () => {
+        document.activeElement!.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+        )
+      })
+      expect(dialogs()).toHaveLength(1)
+      expect(onClose).not.toHaveBeenCalled()
     })
 
     it('an edit lock held by someone else keeps the confirm open with the lock sentence and a new key next time', async () => {

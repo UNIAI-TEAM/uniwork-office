@@ -338,7 +338,7 @@ function VersionHistoryView({
               <button
                 type="submit"
                 className="btn btn-primary uw-versions-submit"
-                disabled={creating}
+                aria-disabled={creating || undefined}
                 aria-busy={creating || undefined}
               >
                 {creating ? t('vhsNameSubmitting') : t('vhsNameSubmit')}
@@ -593,13 +593,13 @@ function RestoreConfirm({
         </p>
       )}
       <div className="modal-buttons">
-        <button type="button" className="btn" disabled={busy} onClick={onCancel}>
+        <button type="button" className="btn" aria-disabled={busy || undefined} onClick={onCancel}>
           {t('vhsCancel')}
         </button>
         <button
           type="button"
           className="btn btn-primary"
-          disabled={busy}
+          aria-disabled={busy || undefined}
           aria-busy={busy || undefined}
           onClick={onConfirm}
         >
