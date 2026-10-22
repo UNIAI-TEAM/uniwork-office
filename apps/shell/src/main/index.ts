@@ -3323,7 +3323,9 @@ const SHELL_RENDERER_DIR = join(__dirname, '../renderer')
 const ipcSenderGuard = createIpcSenderGuard({
   shellContents: () => (shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null),
   // tab views (Present views and the spare sheets view included), the view of a detached window
-  // (detach and dock keep the webContents id) and the slides audience window
+  // (detach and dock keep the webContents id) and the slides audience window. Not in the registry:
+  // the html Present fallback window (html-main.ts presentNewTab when openTab returns false) and
+  // the headless export windows; their calls are refused, by design (no comments panel there)
   isTrustedEditorContents: (id) =>
     tabManager?.hasWebContents(id) === true ||
     isDetachedWebContents(id) ||
