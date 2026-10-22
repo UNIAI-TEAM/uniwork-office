@@ -392,8 +392,33 @@ describe('document properties (S17)', () => {
         ownerId: 'u_owner',
         createdById: 'u_creator',
         updatedById: 'u_updater',
+        // UNI-2105: the notice Share path reads these two like a list row does
+        ownerKind: 'human',
+        shelvedAt: null,
       },
     })
+  })
+
+  it('UNI-2105: owner_kind and shelved_at ride on the properties for the Share dialog', async () => {
+    const shelved = fakeServer({
+      document: {
+        ...document,
+        owner_kind: 'work_product',
+        shelved_at: '2026-10-01T09:00:00Z',
+      },
+      members: [],
+    })
+    const first = await serviceWith(shelved).service.documentProperties('d1')
+    expect(first.ok && first.value.ownerKind).toBe('work_product')
+    expect(first.ok && first.value.shelvedAt).toBe('2026-10-01T09:00:00Z')
+    // an ordinary document: no owner kind, not on the shelf; a malformed timestamp is not trusted
+    const plain = fakeServer({
+      document: { ...document, owner_kind: '', shelved_at: 'not a time' },
+      members: [],
+    })
+    const second = await serviceWith(plain).service.documentProperties('d1')
+    expect(second.ok && second.value.ownerKind).toBeNull()
+    expect(second.ok && second.value.shelvedAt).toBeNull()
   })
 
   it('an id that is not a member resolves to null (person left / non-human)', async () => {

@@ -64,6 +64,8 @@ export interface DocumentProperties {
   ownerId: string | null
   /** D `owner_kind`; only a person owner resolves to a name */
   ownerKind: string | null
+  /** `shelved_at`: set while the document sits in Archive (Lưu trữ) */
+  shelvedAt: string | null
   createdById: string | null
   createdByKind: string | null
   createdAt: string | null
@@ -791,6 +793,7 @@ export function parseProperties(raw: unknown): DocumentProperties {
     title: str(doc.title),
     ownerId: optId(doc.owner_id),
     ownerKind: optId(doc.owner_kind, 32),
+    shelvedAt: optTimestamp(doc.shelved_at),
     createdById: optId(doc.created_by),
     createdByKind: optId(doc.created_by_kind, 16),
     createdAt: optTimestamp(doc.created_at),

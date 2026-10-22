@@ -695,6 +695,10 @@ export interface UniworkDocProperties {
   ownerId: string | null
   createdById: string | null
   updatedById: string | null
+  /** `owner_kind` (`work_product` for an owned document); null for an ordinary one */
+  ownerKind: string | null
+  /** `shelved_at` while the document sits in Archive (Lưu trữ); null otherwise */
+  shelvedAt: string | null
 }
 
 /**

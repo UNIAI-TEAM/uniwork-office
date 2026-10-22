@@ -4809,6 +4809,8 @@ export class UniworkDocsService {
         ownerId: properties.ownerId,
         createdById: properties.createdById,
         updatedById: properties.updatedById,
+        ownerKind: properties.ownerKind,
+        shelvedAt: properties.shelvedAt,
       }
     })
   }
