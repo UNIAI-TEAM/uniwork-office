@@ -227,8 +227,11 @@ list() {
       fi
       ;;
     s3)
-      aws_cli s3api list-objects-v2 --bucket "$OFFICE_S3_BUCKET" --prefix "$prefix" \
-        --query 'Contents[].Key' --output text | tr '\t' '\n' | grep -v '^None$' | sort || true
+      # a failed listing fails the run; an empty one prints "None" and is fine
+      local listing
+      listing="$(aws_cli s3api list-objects-v2 --bucket "$OFFICE_S3_BUCKET" --prefix "$prefix" \
+        --query 'Contents[].Key' --output text)" || die "could not list $prefix"
+      printf '%s\n' "$listing" | tr '\t' '\n' | { grep -v '^None$' || [ $? -eq 1 ]; } | sort
       ;;
   esac
 }
@@ -335,18 +338,21 @@ fi
 prev_release="$work/prev/Release"
 get "$dists/Release" "$prev_release" || : >"$prev_release"
 mkdir -p "$work/prev/feed"
+# (listed first: a failure in a process substitution would go unseen)
+prev_feed_keys="$(list "update/$channel/")"
 while IFS= read -r key; do
   name="${key##*/}"
   case "$name" in *.yml) ;; *) continue ;; esac
   [[ "$name" =~ $SAFE_NAME ]] || continue
   get "$key" "$work/prev/feed/$name" || true
-done < <(list "update/$channel/")
+done <<<"$prev_feed_keys"
 get releases.json "$work/prev/releases.json" || : >"$work/prev/releases.json"
 node "$manifest_tool" versions --previous "$work/prev/releases.json" --channel "$channel" >"$work/prev/versions"
 
 # Installers: the newest --keep version directories (always this one) stay
 # and are what the manifest lists.
-mapfile -t channel_keys < <(list "$channel/")
+channel_listing="$(list "$channel/")"
+mapfile -t channel_keys <<<"$channel_listing"
 {
   printf '%s\t-\n' "$version"
   for key in "${channel_keys[@]}"; do
