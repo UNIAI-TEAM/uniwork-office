@@ -193,9 +193,10 @@ function AccessLogSheetBody({ onClose, row, api }: AccessLogSheetProps) {
                   <button
                     type="button"
                     className="btn"
-                    disabled={logs.loadingMore}
+                    aria-disabled={logs.loadingMore || undefined}
                     aria-busy={logs.loadingMore || undefined}
                     onClick={() => {
+                      if (logs.loadingMore) return
                       markLoadMore()
                       logs.loadMore()
                     }}

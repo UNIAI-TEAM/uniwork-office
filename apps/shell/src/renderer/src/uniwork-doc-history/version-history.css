@@ -274,12 +274,12 @@
   cursor: pointer;
 }
 
-.uw-versions-icon-btn:hover:not(:disabled) {
+.uw-versions-icon-btn:hover:not([aria-disabled='true']) {
   background: var(--hover);
   color: var(--text);
 }
 
-.uw-versions-icon-btn:disabled {
+.uw-versions-icon-btn[aria-disabled='true'] {
   opacity: 0.5;
   cursor: default;
 }

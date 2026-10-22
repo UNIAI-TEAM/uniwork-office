@@ -844,6 +844,50 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(t('vhsPreviewError'))
     })
 
+    it('keeps focus on the clicked button after a failed open, and Escape still closes the sheet', async () => {
+      const bridge = createFakeDocHistoryBridge({ versions: threeVersions() })
+      let settle!: (result: ReturnType<typeof failure>) => void
+      bridge.openVersion.mockReturnValueOnce(new Promise((resolve) => (settle = resolve)))
+      await open(target(), bridge)
+      const view = viewButton(3)!
+      view.focus()
+      await click(view)
+      // busy: the buttons stay in the tab order (aria-disabled, not disabled) and a second press does nothing
+      expect(view.hasAttribute('disabled')).toBe(false)
+      expect(view.getAttribute('aria-disabled')).toBe('true')
+      await click(view)
+      expect(bridge.openVersion).toHaveBeenCalledTimes(1)
+      await act(async () => settle(failure('unsupported_format')))
+      await flush()
+      expect(sheet().contains(document.activeElement)).toBe(true)
+      expect(document.activeElement).toBe(view)
+      expect(view.getAttribute('aria-disabled')).toBeNull()
+      await act(async () => {
+        document.activeElement!.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+        )
+      })
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps focus on the clicked button after a failed download, and a second press while busy does nothing', async () => {
+      const bridge = createFakeDocHistoryBridge({ versions: threeVersions() })
+      let settle!: (result: ReturnType<typeof failure>) => void
+      bridge.downloadVersion.mockReturnValueOnce(new Promise((resolve) => (settle = resolve)))
+      await open(target(), bridge)
+      const download = button(sheet(), t('vhsDownloadVersion', { no: 2 }))!
+      download.focus()
+      await click(download)
+      expect(download.hasAttribute('disabled')).toBe(false)
+      expect(download.getAttribute('aria-disabled')).toBe('true')
+      await click(viewButton(3))
+      expect(bridge.openVersion).not.toHaveBeenCalled()
+      await act(async () => settle(failure('write_failed')))
+      await flush()
+      expect(document.activeElement).toBe(download)
+      expect(sheet().querySelector('[role="alert"]')?.textContent).toContain(t('vhsDownloadFailed'))
+    })
+
     it('a page version shows its text in a read-only dialog', async () => {
       const bridge = createFakeDocHistoryBridge({
         versions: [versionOf({ id: 'v1', version: 1, kind: 'page', file_id: null })],

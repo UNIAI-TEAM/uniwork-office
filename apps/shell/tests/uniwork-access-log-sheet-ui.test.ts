@@ -456,7 +456,7 @@ describe('AccessLogSheet (UNI-2077)', () => {
       await click(more)
       expect(rows().map((r) => r.getAttribute('data-access-log-row'))).toEqual(['p1', 'p2'])
     })
-    it('the button is disabled and busy while the next page loads (no double fetch)', async () => {
+    it('the button is aria-disabled and busy while the next page loads (keeps focus, no double fetch)', async () => {
       const bridge = createFakeDocHistoryBridge()
       let resolve!: () => void
       bridge.accessLogs
@@ -473,7 +473,8 @@ describe('AccessLogSheet (UNI-2077)', () => {
       await open(bridge)
       await click(button('Load more'))
       const more = button('Load more') as HTMLButtonElement
-      expect(more.disabled).toBe(true)
+      expect(more.disabled).toBe(false)
+      expect(more.getAttribute('aria-disabled')).toBe('true')
       expect(more.getAttribute('aria-busy')).toBe('true')
       await click(more)
       expect(bridge.accessLogs).toHaveBeenCalledTimes(2)

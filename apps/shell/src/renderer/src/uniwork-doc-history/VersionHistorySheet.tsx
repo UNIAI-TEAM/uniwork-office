@@ -224,6 +224,8 @@ function VersionHistoryView({
   }
 
   const view = async (version: DocVersion) => {
+    // the row buttons stay focusable while busy (aria-disabled): a press then does nothing
+    if (busy !== null) return
     setRowError(null)
     if (version.kind === 'page') {
       const request = ++previewRequest.current
@@ -254,6 +256,7 @@ function VersionHistoryView({
   }
 
   const download = async (version: DocVersion) => {
+    if (busy !== null) return
     setRowError(null)
     setBusy({ kind: 'download', no: version.version })
     const result = await api
@@ -426,7 +429,7 @@ function VersionHistoryView({
                         className="uw-versions-icon-btn"
                         aria-label={t('vhsPreviewTitle', { no: version.version })}
                         title={t('vhsView')}
-                        disabled={busy !== null}
+                        aria-disabled={busy !== null || undefined}
                         aria-busy={
                           (busy?.kind === 'open' && busy.no === version.version) || undefined
                         }
@@ -456,7 +459,7 @@ function VersionHistoryView({
                           className="uw-versions-icon-btn"
                           aria-label={t('vhsDownloadVersion', { no: version.version })}
                           title={t('vhsDownload')}
-                          disabled={busy !== null}
+                          aria-disabled={busy !== null || undefined}
                           aria-busy={
                             (busy?.kind === 'download' && busy.no === version.version) || undefined
                           }
@@ -513,9 +516,10 @@ function VersionHistoryView({
                 <button
                   type="button"
                   className="btn"
-                  disabled={list.loadingMore}
+                  aria-disabled={list.loadingMore || undefined}
                   aria-busy={list.loadingMore || undefined}
                   onClick={() => {
+                    if (list.loadingMore) return
                     markLoadMore()
                     list.loadMore()
                   }}
