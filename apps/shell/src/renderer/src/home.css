@@ -2425,7 +2425,7 @@ body.vib .home {
 }
 
 .btn-danger {
-  background: var(--color-error);
+  background: var(--danger);
   border: none;
   color: var(--on-danger);
   box-shadow: var(--shadow-btn);
