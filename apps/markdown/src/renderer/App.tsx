@@ -333,6 +333,17 @@ export default function App() {
     })
   }, [])
 
+  // A wiki link into a note this view already shows only activates its tab, so
+  // main says the fragment is waiting. A view still loading that path takes it
+  // from its load instead.
+  useEffect(
+    () =>
+      window.markdownApi.onWikiFragmentReady?.((path) => {
+        if (filePathRef.current === path) jumpToWikiFragment(path)
+      }),
+    [jumpToWikiFragment],
+  )
+
   const extensions = useMemo(() => {
     const controller: SlashController = {
       onOpen: setSlashState,

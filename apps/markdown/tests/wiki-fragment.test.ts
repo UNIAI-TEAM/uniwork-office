@@ -4,11 +4,7 @@
  * in main, keyed by path, until a renderer loads that path.
  */
 import { describe, expect, it } from 'vitest'
-import {
-  rememberWikiFragment,
-  takeWikiFragment,
-  viewsShowingNote,
-} from '../src/main/wiki-fragment'
+import { rememberWikiFragment, takeWikiFragment, viewsShowingNote } from '../src/main/wiki-fragment'
 
 const PATH = '/notes/Index.md'
 

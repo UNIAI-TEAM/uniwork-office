@@ -21,6 +21,7 @@ import {
   net,
   protocol,
   shell,
+  webContents,
 } from 'electron'
 import type { WebContents } from 'electron'
 import {
@@ -69,7 +70,7 @@ import { MARKDOWN_CHANNELS, MAX_PASTED_IMAGE_BYTES } from '../shared/ipc'
 import type { ImageHostConfig, WikiLinkResolveRequest, WikiLinkResolved } from '../shared/ipc'
 import { resolveWikiLinks } from './wiki-resolve'
 import { cleanDraftName } from '../shared/draft-name'
-import { rememberWikiFragment, takeWikiFragment } from './wiki-fragment'
+import { rememberWikiFragment, takeWikiFragment, viewsShowingNote } from './wiki-fragment'
 import { isImageHostUsable, normalizeImageHostConfig, uploadImageToHost } from './image-host'
 import {
   EXPORT_IMAGE_EXTS,
@@ -819,9 +820,16 @@ function registerMarkdownIpc(): void {
     },
   )
 
-  ipcMain.handle(MARKDOWN_CHANNELS.rememberWikiFragment, (_e, path: unknown, fragment: unknown) => {
+  ipcMain.handle(MARKDOWN_CHANNELS.rememberWikiFragment, (e, path: unknown, fragment: unknown) => {
     if (typeof path !== 'string' || typeof fragment !== 'string') return
     rememberWikiFragment(path, fragment)
+    // a view that already shows the note is only activated, never loaded, so
+    // it would not ask for the fragment; tell it
+    if (!fragment) return
+    for (const id of viewsShowingNote(savePathByWc, path, e.sender.id)) {
+      const view = webContents.fromId(id)
+      if (view && !view.isDestroyed()) view.send(MARKDOWN_CHANNELS.wikiFragmentReady, path)
+    }
   })
 
   ipcMain.handle(MARKDOWN_CHANNELS.takeWikiFragment, (_e, path: unknown): string =>

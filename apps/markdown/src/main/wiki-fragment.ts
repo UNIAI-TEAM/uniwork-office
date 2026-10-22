@@ -35,3 +35,19 @@ export function takeWikiFragment(path: string): string {
   pending.delete(path)
   return fragment
 }
+
+/**
+ * Ids of the views, other than `exceptId`, that already show `path`. Such a
+ * view is only activated by the shell and loads nothing, so it never asks for
+ * the fragment; main tells it instead.
+ */
+export function viewsShowingNote(
+  pathByView: ReadonlyMap<number, string>,
+  path: string,
+  exceptId: number,
+): number[] {
+  if (!path) return []
+  const ids: number[] = []
+  for (const [id, shown] of pathByView) if (shown === path && id !== exceptId) ids.push(id)
+  return ids
+}

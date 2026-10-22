@@ -19,6 +19,8 @@ export const MARKDOWN_CHANNELS = {
   rememberWikiFragment: 'markdown:remember-wiki-fragment',
   /** take the fragment remembered for a path, '' when there is none */
   takeWikiFragment: 'markdown:take-wiki-fragment',
+  /** main -> view: a fragment is waiting for the note this view already shows */
+  wikiFragmentReady: 'markdown:wiki-fragment-ready',
   save: 'markdown:save',
   uniworkState: 'markdown:uniwork-state',
   uniworkReadOnlySave: 'markdown:uniwork-read-only-save',
@@ -261,6 +263,11 @@ export interface MarkdownApi {
   rememberWikiFragment(path: string, fragment: string): Promise<void>
   /** Take the fragment remembered for `path`; '' when there is none (it is consumed) */
   takeWikiFragment(path: string): Promise<string>
+  /**
+   * A wiki link into the note this view already shows: the shell only
+   * activates the tab, so main says the fragment for `path` is waiting.
+   */
+  onWikiFragmentReady?(handler: (path: string) => void): () => void
   /** Headless export mode: the PDF path this hidden renderer must export to, null in normal use */
   consumeHeadlessExport(): Promise<string | null>
   /** Headless export mode: report the export outcome so the main process can quit */

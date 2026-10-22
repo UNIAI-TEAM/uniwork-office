@@ -26,6 +26,11 @@ const api: MarkdownApi = {
   rememberWikiFragment: (path, fragment) =>
     ipcRenderer.invoke(MARKDOWN_CHANNELS.rememberWikiFragment, path, fragment),
   takeWikiFragment: (path) => ipcRenderer.invoke(MARKDOWN_CHANNELS.takeWikiFragment, path),
+  onWikiFragmentReady: (handler) => {
+    const listener = (_e: Electron.IpcRendererEvent, path: string) => handler(path)
+    ipcRenderer.on(MARKDOWN_CHANNELS.wikiFragmentReady, listener)
+    return () => ipcRenderer.removeListener(MARKDOWN_CHANNELS.wikiFragmentReady, listener)
+  },
   consumeHeadlessExport: () => ipcRenderer.invoke(MARKDOWN_CHANNELS.consumeHeadlessExport),
   headlessExportDone: (result: { ok: boolean; error?: string }) =>
     ipcRenderer.send(MARKDOWN_CHANNELS.headlessExportDone, result),
