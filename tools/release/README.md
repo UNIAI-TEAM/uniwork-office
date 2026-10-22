@@ -301,6 +301,7 @@ GitHub value until the route answers.
 | `apt/dists/<channel>/`                   | `InRelease`, `Release`, `Release.gpg` (one suite per channel)   |
 | `apt/dists/<channel>/main/binary-amd64/` | `Packages`, `.gz`, `.xz` and `by-hash/SHA256/<hash>` copies     |
 | `apt/latest/`, `apt/latest/<channel>/`   | `uniwork-office_amd64.deb`, the newest deb under a stable name  |
+| `install.sh`                             | the `curl \| sh` install script (`tools/release/install.sh`)    |
 | `update/<channel>/`                      | generic electron-updater feed: the feed yml and the files named |
 | `releases.json`                          | public manifest of every kept version (schema 1, below)         |
 
@@ -352,6 +353,48 @@ run logs one `::notice::` line and skips both. The apt repository, pool, indexes
 still publish, a deb with the source later starts the copy, and an older copy is left in place
 (never deleted).
 
+### Install script
+
+The shortest way in on Debian and Ubuntu, one command for every channel (`stable` when no
+argument is given):
+
+```sh
+curl -fsSL https://uniworkos.com/downloads/office/install.sh | sudo sh
+curl -fsSL https://uniworkos.com/downloads/office/install.sh | sudo sh -s -- dev   # or beta, stable
+```
+
+`tools/release/install.sh` is POSIX sh (`set -eu`, `shellcheck -s sh` clean) and does all its work
+inside one function called on the last line, so a cut-off download runs nothing. Before it
+changes anything it refuses (non-zero exit, nothing written) when it is not root, when
+`/etc/os-release` names neither `debian` nor `ubuntu`, when `dpkg --print-architecture` is not
+`amd64`, when `dists/<channel>/InRelease` does not answer (the message names the channel and
+suggests `sh -s -- dev`), and when the downloaded `apt/key.gpg` has a primary fingerprint other
+than `58A902322C8D45C433B525F51198D10926F34831` (checked with `gpg --show-keys --with-colons`
+in a throwaway `GNUPGHOME`; gpg is installed first through apt when it is missing). Then it
+writes
+
+- `/usr/share/keyrings/uniwork-office-archive-keyring.gpg` (0644) and
+- `/etc/apt/sources.list.d/uniwork-office.sources` (0644, first line `# managed by uniwork-office`),
+
+byte for byte what the deb's postinst writes (`aptSourcesText` in
+`apps/shell/electron-builder.cjs`; `install-script.test.mjs` compares the two), only when the
+content differs, so a second run changes nothing and a later `apt upgrade` or `apt purge` of the
+deb treats both files as its own. A source file at that path without the first-line marker is
+the admin's own: it stays untouched, the script prints one line and goes on. Last come
+`apt-get update` and `apt-get install -y uniwork-office` (non-interactive, never reading stdin,
+which is the pipe). The deb keeps its own opt-out: `UNIWORK_OFFICE_APT_REPO=false` in
+`/etc/default/uniwork-office` stops the postinst from touching the source; the script is only
+run on purpose, so it has no opt-out of its own.
+
+The mirror job uploads `install.sh` to the bucket root on every run (`Cache-Control: no-cache`,
+`text/plain; charset=utf-8`, so a browser shows the text before anyone pipes it), after the
+signed indexes and the latest deb and before the feed files and `releases.json`. The script is
+the same for every channel.
+
+Test hook: `UNIWORK_OFFICE_REPO_URL` replaces the download base URL
+(`https://uniworkos.com/downloads/office`; the apt repository is `<base>/apt`, and the written
+source points there). `apt-repo-minio-check.sh` sets it to its local MinIO; leave it unset.
+
 ### Signing key
 
 RSA 4096, fingerprint `58A902322C8D45C433B525F51198D10926F34831`, uid
@@ -367,7 +410,7 @@ the same version and keeps the newest 5 versions (`--keep`, compared with
 `dpkg --compare-versions`). Each step must succeed before the next, so a client never sees an
 index naming a missing file: installers, pool deb, `by-hash` + `Packages*`, `Release` /
 `Release.gpg` / `InRelease` (with `Cache-Control: no-cache`, like `Packages*`, the feed yml and
-`releases.json`), the latest deb (when it has the apt source), feed files, feed yml, `releases.json`, then prune. Prune keeps one run of
+`releases.json`), the latest deb (when it has the apt source), `install.sh`, feed files, feed yml, `releases.json`, then prune. Prune keeps one run of
 grace: a pool deb, a `by-hash` file, a feed file or a `<channel>/<version>/` directory is
 deleted only when neither the new nor the previous index / Release / feed yml / manifest names
 it. Re-running the same version is idempotent.
@@ -387,10 +430,16 @@ per installer and checksum file: `platform`, `arch`, `kind`, `file`, absolute `u
 - `node --test tools/release/apt-repo.test.mjs` runs the script against a directory instead of
   S3 (`APT_REPO_TARGET_DIR`) with a throwaway key (`APT_REPO_EXPECT_FPR`, refused on GitHub
   Actions). It needs `apt-ftparchive` (apt-utils), `dpkg-deb`, `gpg`, `gpgv` and skips without.
+- `node --test tools/release/install-script.test.mjs` runs `install.sh` with stubbed system
+  commands: the source it writes equals `aptSourcesText` for each channel, and every refusal
+  leaves nothing written.
 - `bash tools/release/apt-repo-minio-check.sh` is the end-to-end check: a throwaway MinIO
   (`bitnamilegacy/minio`), two published versions, and Ubuntu 24.04 and 22.04 containers that
   add the deb822 source, install the first version, upgrade to the second and refuse a tampered
-  `InRelease` and `Packages`. It needs docker and removes everything it started.
+  `InRelease` and `Packages`. A second set of clean amd64 clients (curl only, no gpg) runs the
+  published `install.sh` through `curl | sh`: refusals (not root, unpublished channel, wrong
+  key), the install, a second run that changes nothing, an admin-owned source left alone and the
+  upgrade to the second version. It needs docker and removes everything it started.
 - `--dry-run` prints the uploads and deletions without the key or any write.
 
 ## Building locally
