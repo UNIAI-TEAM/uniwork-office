@@ -4728,6 +4728,9 @@ body.vib .home {
 }
 
 .wb-desk-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   padding: 8px 8px 0;
 }
 

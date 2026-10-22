@@ -284,6 +284,10 @@ export function DeskInTray({
     )
   }
 
+  // the unread list is one page: older unread notices (document changes too) wait in the Inbox;
+  // a stale flag from an earlier load stays hidden while the tray shows a failure or a sign-in note
+  const showViewAll = notices.more && !!onOpenInbox && view === 'ready' && !notices.error
+
   return (
     <section
       ref={sectionRef}
@@ -354,21 +358,20 @@ export function DeskInTray({
               )
             }}
           />
-          {rows.length > visible.length ? (
-            <div className="wb-desk-more">
-              <button type="button" className="wb-link" onClick={() => setExpanded(true)}>
-                {t('wbDeskMore', { count: rows.length - visible.length })}
-              </button>
-            </div>
-          ) : null}
         </>
       )}
-      {/* the unread list is one page: older unread notices (document changes too) wait in the Inbox */}
-      {notices.more && onOpenInbox ? (
+      {rows.length > visible.length || showViewAll ? (
         <div className="wb-desk-more">
-          <button type="button" className="wb-link" onClick={onOpenInbox}>
-            {t('wbDeskInTrayViewAll')}
-          </button>
+          {rows.length > visible.length ? (
+            <button type="button" className="wb-link" onClick={() => setExpanded(true)}>
+              {t('wbDeskMore', { count: rows.length - visible.length })}
+            </button>
+          ) : null}
+          {showViewAll ? (
+            <button type="button" className="wb-link" onClick={onOpenInbox}>
+              {t('wbDeskInTrayViewAll')}
+            </button>
+          ) : null}
         </div>
       ) : null}
       {listFor ? (

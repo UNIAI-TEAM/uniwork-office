@@ -16,7 +16,7 @@ import type {
 import { DeskInTray } from '../src/renderer/src/DeskInTray'
 import { DeskToday } from '../src/renderer/src/DeskToday'
 import { LocaleProvider } from '../src/renderer/src/locale'
-import { useUnreadNotices } from '../src/renderer/src/notices-data'
+import { notifyNoticesChanged, useUnreadNotices } from '../src/renderer/src/notices-data'
 import {
   onDocumentsIntent,
   resetDocumentsIntentBusForTests,
@@ -791,5 +791,28 @@ describe('tray and the unread list cap (UNI-2110)', () => {
     nextBefore = 'cursor-1'
     await tray([])
     expect(button('View all')).toBeTruthy()
+  })
+
+  it('puts "Show more" and "View all" in one row when both apply', async () => {
+    nextBefore = 'cursor-1'
+    await tray([
+      ...eight(),
+      changedOne({ id: 'n8', sample_documents: [{ id: 'd8', title: 'Plan 8' }] }),
+    ])
+    const more = host.querySelectorAll('.wb-desk-more')
+    expect(more).toHaveLength(1)
+    const labels = Array.from(more[0].querySelectorAll('button')).map((b) => b.textContent)
+    expect(labels).toEqual(['Show 1 more', 'View all'])
+  })
+
+  it('hides "View all" once a later load fails: the flag is from an older page', async () => {
+    nextBefore = 'cursor-1'
+    await tray([])
+    expect(button('View all')).toBeTruthy()
+    work.listNotifications.mockResolvedValueOnce({ ok: false, error: 'offline' })
+    await act(async () => notifyNoticesChanged())
+    await flush()
+    expect(host.textContent).toContain('Retry')
+    expect(button('View all')).toBeUndefined()
   })
 })
