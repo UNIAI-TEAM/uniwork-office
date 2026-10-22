@@ -1184,6 +1184,8 @@ function expectedPolicy(channel: string): IpcSenderPolicy | null {
   if (channel.startsWith('home:uniwork-') || channel.startsWith('home:account-')) return 'shell'
   // the markdown editor's wiki links open a path through the shell, so the editor side may call it too
   if (channel === 'home:open-path') return 'shell-or-editor'
+  // the six editor preloads call the app-wide alias of home:set-ai-panel-prefs, so the editor side too
+  if (channel === 'app:set-ai-panel-prefs') return 'shell-or-editor'
   if (/^home:./.test(channel)) return 'shell'
   return null
 }
@@ -1344,6 +1346,71 @@ describe('every home channel is accounted for and guarded', () => {
 })
 
 // ---- 6. the real guard accepts what the registrars register ----
+
+/** HGB-1: the setter alias of a guarded home setter is guarded; the read-only getters stay raw */
+describe('the app: ai panel prefs aliases', () => {
+  const index = sources.find((s) => isIndex(s.file))!
+  const onReceiver = (channel: string) =>
+    registrations(index)
+      .filter((reg) => reg.channels.includes(channel))
+      .map((reg) => reg.receiver)
+  const guarded = new Set(guardedAliases(index.text))
+
+  it('registers app:set-ai-panel-prefs once, on a guarded object', () => {
+    const receivers = onReceiver('app:set-ai-panel-prefs')
+    expect(receivers).toHaveLength(1)
+    expect(guarded.has(receivers[0]!)).toBe(true)
+  })
+
+  it('leaves the four read-only app:get-* getters on the raw ipcMain', () => {
+    for (const channel of [
+      'app:get-theme',
+      'app:get-document-theme',
+      'app:get-auto-save-default',
+      'app:get-ai-panel-prefs',
+    ]) {
+      expect(onReceiver(channel), channel).toEqual(['ipcMain'])
+      expect(policyForChannel(channel), channel).toBeNull()
+    }
+  })
+
+  it('no editor main registers the setter on its own ipcMain', () => {
+    const standalone = sources
+      .filter((source) => !isIndex(source.file))
+      .flatMap((source) => registrations(source))
+      .filter((reg) => reg.channels.includes('app:set-ai-panel-prefs'))
+    expect(standalone).toEqual([])
+  })
+})
+
+/** HGB-4: two false-greens of the raw scan, each a fixture that has to turn red */
+describe('the raw scan reads a shadowed table and a re-exported ipcMain', () => {
+  const header = "import { ipcMain } from 'electron'\n"
+
+  it('a local table that shadows an exported *_CHANNELS name is not read as the exported one', () => {
+    const body =
+      "const PDF_CHANNELS = { save: 'home:delete-files' }\nipcMain.handle(PDF_CHANNELS.save, f)\n"
+    expect(rawOffenders('apps/shell/src/main/x.ts', header + body, {}, [])).not.toEqual([])
+  })
+
+  it('an exported table declared in the file itself still resolves', () => {
+    const body =
+      "export const X_CHANNELS = { a: 'home:delete-files' }\nipcMain.handle(X_CHANNELS.a, f)\n"
+    expect(rawOffenders('apps/shell/src/main/x.ts', header + body, {}, [])).toHaveLength(1)
+  })
+
+  it('a module that re-exports electron ipcMain is flagged, from or after an import', () => {
+    const from = "export { ipcMain } from 'electron'\n"
+    const after = "import { ipcMain } from 'electron'\nexport { ipcMain }\n"
+    const renamed = "import { ipcMain } from 'electron'\nexport { ipcMain as rawIpc }\n"
+    for (const text of [from, after, renamed]) {
+      expect(rawUseOffenders('apps/shell/src/main/raw-ipc.ts', text, [])).not.toEqual([])
+    }
+    expect(
+      rawUseOffenders('apps/shell/src/main/x.ts', "export { app } from 'electron'\n", []),
+    ).toEqual([])
+  })
+})
 
 describe('registrars under the real guard', () => {
   it('registers every channel of the small registrars without a refused registration', () => {

@@ -85,6 +85,7 @@ const FAMILIES: ReadonlyArray<[family: string, channel: string, policy: IpcSende
   ['home:* (native dialog)', 'home:wb-export-backup', 'shell'],
   ['home:* (settings setter)', 'home:set-theme', 'shell'],
   ['home:open-path', 'home:open-path', 'shell-or-editor'],
+  ['app: ai panel prefs setter', 'app:set-ai-panel-prefs', 'shell-or-editor'],
   ['comments', 'uniwork:comments:list', 'editor'],
   ['cloud-status', 'uniwork:cloud-status', 'editor'],
   ['ai-run', 'uniwork:ai-run', 'editor'],
@@ -109,6 +110,7 @@ describe('policyForChannel', () => {
     ['home:folder-root-add', 'shell'],
     ['home:x', 'shell'],
     ['home:open-path', 'shell-or-editor'],
+    ['app:set-ai-panel-prefs', 'shell-or-editor'],
   ] as const)('%s -> %s', (channel, policy) => {
     expect(policyForChannel(channel)).toBe(policy)
   })
@@ -118,6 +120,9 @@ describe('policyForChannel', () => {
     'tabs:open',
     'ai:chat',
     'app:get-theme',
+    'app:get-ai-panel-prefs',
+    'app:get-document-theme',
+    'app:get-auto-save-default',
     'docs:x',
     'home',
     'home:',
