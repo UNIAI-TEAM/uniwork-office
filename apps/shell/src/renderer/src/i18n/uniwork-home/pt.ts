@@ -168,7 +168,7 @@ export const pt = {
   fuDlgShare: 'Compartilhar com o espaço de trabalho',
   fuDlgShareHintFolder: 'Vale para todos os arquivos deste envio. As pastas continuam privadas.',
   fuDlgShareHintWorkspace:
-    'Vale para todos os arquivos deste envio. As novas pastas ficam visíveis para todo o workspace.',
+    'Vale para todos os arquivos deste envio. As novas pastas ficam visíveis para todo o espaço de trabalho.',
   fuDlgShareHintFiles: 'Vale para todos os arquivos deste envio.',
   fuDlgShareInherited:
     'A pasta de destino está compartilhada com o espaço de trabalho, então os arquivos também estão.',

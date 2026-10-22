@@ -172,7 +172,7 @@ export const de = {
   fuDlgShare: 'Mit Arbeitsbereich teilen',
   fuDlgShareHintFolder: 'Gilt für jede Datei in diesem Upload. Die Ordner bleiben privat.',
   fuDlgShareHintWorkspace:
-    'Gilt für jede Datei in diesem Upload. Die neuen Ordner sind für den gesamten Workspace sichtbar.',
+    'Gilt für jede Datei in diesem Upload. Die neuen Ordner sind für den gesamten Arbeitsbereich sichtbar.',
   fuDlgShareHintFiles: 'Gilt für jede Datei in diesem Upload.',
   fuDlgShareInherited: 'Der Zielordner ist mit dem Arbeitsbereich geteilt, daher auch die Dateien.',
   fuDlgStarting: 'Wird vorbereitet…',
