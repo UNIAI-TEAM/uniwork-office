@@ -1,5 +1,6 @@
 import { constants, openAsBlob } from 'node:fs'
 import { lstat, open } from 'node:fs/promises'
+import { toNamespacedPath } from 'node:path'
 import { FolderUploadError } from './transport'
 
 /**
@@ -60,7 +61,9 @@ export async function openFileBlob(absolutePath: string): Promise<Blob> {
   try {
     const opened = await handle.stat({ bigint: true })
     if (!opened.isFile() || !sameFile(before, opened)) throw unreadable('file changed')
-    const blob = await openAsBlob(absolutePath)
+    // Node namespaces the path itself for lstat/open but not for openAsBlob: past
+    // MAX_PATH (260) on Windows it would throw. A no-op on POSIX.
+    const blob = await openAsBlob(toNamespacedPath(absolutePath))
     if (!sameFile(before, await plainFile(absolutePath)) || BigInt(blob.size) !== before.size) {
       throw unreadable('file changed')
     }

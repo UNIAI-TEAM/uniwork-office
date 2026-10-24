@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -21,6 +21,22 @@ describe('openFileBlob', () => {
     expect(await blob.text()).toBe('hello world')
     expect(await blob.slice(6, 11).text()).toBe('world')
   })
+
+  it.skipIf(process.platform !== 'win32')(
+    'reads a file whose Windows path is past MAX_PATH (260 chars)',
+    async () => {
+      const segment = 'Tài liệu kế toán năm 2022 - bản đã ký và đóng dấu của công ty'
+      const folder = join(dir, segment, segment, segment, segment)
+      mkdirSync(folder, { recursive: true })
+      const path = join(folder, 'Báo cáo tài chính hợp nhất quý IV.txt')
+      expect(path.length).toBeGreaterThan(260)
+      writeFileSync(path, 'hello long world')
+      const blob = await openFileBlob(path)
+      expect(blob.size).toBe(16)
+      expect(await blob.text()).toBe('hello long world')
+      expect(await blob.slice(6, 10).text()).toBe('long')
+    },
+  )
 
   it('rejects when the file is gone', async () => {
     await expect(openFileBlob(join(dir, 'missing.txt'))).rejects.toThrow()
