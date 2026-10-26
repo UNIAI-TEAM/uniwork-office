@@ -36,7 +36,12 @@ async function pausedConvertedIntent(server: ReturnType<typeof fakeServer>) {
   const stored = await storedIntent(ctx, path)
   expect(stored).not.toBeNull()
   expect(commitCalls(server)).toHaveLength(0)
-  return { ctx, path, edited, intent: (stored as { intent: Record<string, unknown> }).intent }
+  return {
+    ctx,
+    path,
+    edited,
+    intent: (stored as unknown as { intent: Record<string, unknown> }).intent,
+  }
 }
 
 describe('UNI-2212 a queued converted intent keeps its conversion', () => {
@@ -54,7 +59,7 @@ describe('UNI-2212 a queued converted intent keeps its conversion', () => {
     writeFileSync(path, await ooxml('xlsx', 'edit'))
     ctx.setCapabilityOffline(true)
     await ctx.service.save(path)
-    const stored = (await storedIntent(ctx, path)) as { intent: Record<string, unknown> }
+    const stored = (await storedIntent(ctx, path)) as unknown as { intent: Record<string, unknown> }
     expect(stored.intent.conversion).toBeNull()
   })
 
@@ -149,7 +154,7 @@ describe('UNI-2212 interrupted conversion commit recovered by a fresh service', 
     const server = fakeServer({ legacy: 'xls', title: 'Budget.xls' })
     const { path, edited } = await interruptedCommit(server, false)
     expect(server.versions).toHaveLength(1)
-    const before = (await storedIntent(setup(server, { queue: true }), path)) as {
+    const before = (await storedIntent(setup(server, { queue: true }), path)) as unknown as {
       intent: {
         idempotencyKey: string
         baseRevision: string
@@ -218,7 +223,7 @@ describe('UNI-2212 a refused conversion is parked for good', () => {
       reason: 'not_legacy',
     })
     await ctx.service.save(path)
-    const parked = (await storedIntent(ctx, path)) as {
+    const parked = (await storedIntent(ctx, path)) as unknown as {
       intent: { state: string; lastError?: string }
     }
     expect(parked.intent).toMatchObject({ state: 'failed', lastError: 'legacy_conversion_invalid' })
@@ -230,7 +235,7 @@ describe('UNI-2212 a refused conversion is parked for good', () => {
     expect(uploadCalls(server)).toHaveLength(uploads)
     expect(server.versions).toHaveLength(1)
     expect(Buffer.from(readFileSync(path)).equals(Buffer.from(edited))).toBe(true)
-    const still = (await storedIntent(again, path)) as {
+    const still = (await storedIntent(again, path)) as unknown as {
       intent: { state: string; lastError?: string }
     }
     expect(still.intent).toMatchObject({ state: 'failed', lastError: 'legacy_conversion_invalid' })

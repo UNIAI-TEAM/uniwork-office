@@ -84,7 +84,7 @@ describe('UNI-2212 a refused conversion in the failed-state surfaces', () => {
         expect(strings[model.tipKey]).toBe(sentence)
       }
       // popover: the first line is the sentence
-      const popover = queuePopoverModelOf(status, row, 'chip')
+      const popover = queuePopoverModelOf(status, row, 'pill')
       expect(popover.line1).toEqual({ key: 'uwErrLegacyConversion' })
       expect(strings[popover.line1.key]).toBe(sentence)
       // Sync Center row: the sub line is the sentence
