@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import JSZip from 'jszip'
 import { afterEach, beforeEach, vi } from 'vitest'
-import type { UniworkDocStatus, UniworkLaunchEvent } from '../src/shared/home-api'
+import type {
+  UniworkConflictReply,
+  UniworkConflictView,
+  UniworkDocStatus,
+  UniworkLaunchEvent,
+} from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
 import { BINDING_FILE } from '../src/main/uniwork-docs/binding-store'
@@ -91,6 +96,8 @@ interface Call {
 
 /** the c5 server rules, nothing else: enough to prove the app's side of the contract */
 export function fakeServer(initial: {
+  /** the document id this instance serves (default: DOC); a copy is a second instance */
+  id?: string
   legacy?: Legacy
   title?: string
   filename?: string
@@ -104,6 +111,7 @@ export function fakeServer(initial: {
   converted?: { bytes: Uint8Array; kind: Ooxml }
 }) {
   const kind = initial.legacy
+  const docId = initial.id ?? DOC
   const versions: VersionRow[] = [
     kind
       ? {
@@ -150,7 +158,7 @@ export function fakeServer(initial: {
   const refuse = (status: number, code: string, fields?: Record<string, unknown>) =>
     json(status, { error: { code, message: 'x', ...(fields ? { fields } : {}) } })
   const docJson = () => ({
-    id: DOC,
+    id: docId,
     organization_id: 'org_a',
     workspace_id: 'ws_1',
     title: state.title,
@@ -199,22 +207,22 @@ export function fakeServer(initial: {
     }
     calls.push(call)
     const key = headers['idempotency-key'] ?? ''
-    if (u.pathname === `/api/v1/documents/${DOC}` && call.method === 'GET') {
+    if (u.pathname === `/api/v1/documents/${docId}` && call.method === 'GET') {
       return json(200, { document: docJson() })
     }
-    const numbered = new RegExp(`^/api/v1/documents/${DOC}/versions/(\\d+)$`).exec(u.pathname)
+    const numbered = new RegExp(`^/api/v1/documents/${docId}/versions/(\\d+)$`).exec(u.pathname)
     if (numbered && call.method === 'GET') {
       const no = Number(numbered[1])
       if (no < 1 || no > versions.length) return refuse(404, 'not_found')
-      return json(200, { version: { id: `ver_${no}`, document_id: DOC, version: no } })
+      return json(200, { version: { id: `ver_${no}`, document_id: docId, version: no } })
     }
-    if (u.pathname === `/api/v1/documents/${DOC}/download`) {
+    if (u.pathname === `/api/v1/documents/${docId}/download`) {
       const no = Number(u.searchParams.get('version') ?? versions.length)
       const row = versions[no - 1]
       if (!row) return refuse(404, 'not_found')
       return new Response(row.bytes as BodyInit, { status: 200 })
     }
-    if (u.pathname === `/api/v1/documents/${DOC}/uploads`) {
+    if (u.pathname === `/api/v1/documents/${docId}/uploads`) {
       const file = (init.body as FormData).get('file') as Blob
       const bytes = new Uint8Array(await file.arrayBuffer())
       call.body = { bytes, name: (file as File).name }
@@ -237,13 +245,13 @@ export function fakeServer(initial: {
         claim_expires_at: '2026-10-30T00:00:00Z',
       })
     }
-    if (u.pathname === `/api/v1/documents/${DOC}/versions/commit` && call.method === 'GET') {
+    if (u.pathname === `/api/v1/documents/${docId}/versions/commit` && call.method === 'GET') {
       const stored = commits.get(key)
       return stored
         ? json(200, { outcome: 'committed', version_id: 'ver_2', version: 2, revision: '2' })
         : json(200, { outcome: 'not_committed' })
     }
-    if (u.pathname === `/api/v1/documents/${DOC}/versions/commit`) {
+    if (u.pathname === `/api/v1/documents/${docId}/versions/commit`) {
       const body = JSON.parse(String(init.body)) as {
         upload_id: string
         base_revision: string
@@ -318,7 +326,7 @@ export function fakeServer(initial: {
         document: docJson(),
         version: {
           id: `ver_${versions.length}`,
-          document_id: DOC,
+          document_id: docId,
           version: versions.length,
           kind: 'file',
           reason: head().reason,
@@ -334,6 +342,54 @@ export function fakeServer(initial: {
   })
 
   return { state, versions, calls, faults, fetch, uploads }
+}
+
+export const COPY = '01J8X4CPY0N1P2Q3R4S5T6U7'
+
+/**
+ * The server's copy route on top of a fake document: `POST .../copies` creates a second fake
+ * document (id COPY) that starts as a clone of the source's HEAD (version 1: the documented copy
+ * contract), and every call under it is served by that instance, so its commit rules are the
+ * same c5 rules. `archive` is recorded.
+ */
+export function attachCopy(server: ReturnType<typeof fakeServer>) {
+  const real = server.fetch.getMockImplementation()!
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  const state = { copy: null as ReturnType<typeof fakeServer> | null, archived: 0 }
+  server.fetch.mockImplementation(async (url, init) => {
+    const u = new URL(url)
+    const method = init.method ?? 'GET'
+    if (u.pathname === `/api/v1/documents/${DOC}/copies` && method === 'POST') {
+      const head = server.versions.at(-1)!
+      const legacy = (Object.keys(LEGACY_MIME) as Legacy[]).find(
+        (l) => LEGACY_MIME[l] === head.mime,
+      )
+      const family = (Object.keys(OOXML_MIME) as Ooxml[]).find((o) => OOXML_MIME[o] === head.mime)
+      const title = (JSON.parse(String(init.body)) as { title?: string }).title ?? 'Copy'
+      state.copy = fakeServer({
+        id: COPY,
+        title,
+        filename: head.filename,
+        bytes: head.bytes,
+        ...(legacy ? { legacy } : { ooxml: family ?? 'docx' }),
+      })
+      return state.copy
+        .fetch(`https://uniwork.example/api/v1/documents/${COPY}`, { method: 'GET' })
+        .then(async (res) => json(201, await res.json()))
+    }
+    if (u.pathname.startsWith(`/api/v1/documents/${COPY}`) && state.copy) {
+      if (u.pathname.endsWith('/archive') && method === 'POST') {
+        state.archived += 1
+        return state.copy.fetch(`https://uniwork.example/api/v1/documents/${COPY}`, {
+          method: 'GET',
+        })
+      }
+      return state.copy.fetch(url, init)
+    }
+    return real(url, init)
+  })
+  return state
 }
 
 /** the per-test user-data dir; call once at the top of a test file */
@@ -376,6 +432,7 @@ export function setup(
   opts: { converter?: Converter | null; queue?: boolean } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
+  const views: UniworkConflictView[] = []
   const launches: UniworkLaunchEvent[] = []
   let capabilityOffline = false
   const safeStorage = createLockableSafeStorage()
@@ -417,6 +474,8 @@ export function setup(
     activePath: () => undefined,
     ui,
     pushStatus: (s: UniworkDocStatus) => statuses.push(s),
+    pushConflict: (v: UniworkConflictView) => views.push(v),
+    lang: () => 'en',
     pushLaunch: (e: UniworkLaunchEvent) => launches.push(e),
     reveal: vi.fn(),
     sleep: async () => undefined,
@@ -433,6 +492,7 @@ export function setup(
     layer,
     converter,
     statuses,
+    views,
     isPathOpen,
     setCapabilityOffline: (value: boolean) => {
       capabilityOffline = value
@@ -460,3 +520,11 @@ export async function storedIntent(ctx: Ctx, path: string) {
     basename(dirname(path)),
   )
 }
+
+/** the conflict dialog's action entry (it is main-process API behind the S5 IPC) */
+export const conflictAct = (ctx: Ctx, sessionId: string, action: unknown) =>
+  (
+    ctx.service as unknown as {
+      conflictAct(sessionId: string, action: unknown): Promise<UniworkConflictReply>
+    }
+  ).conflictAct(sessionId, action)

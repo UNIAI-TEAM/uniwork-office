@@ -9051,6 +9051,13 @@ export class UniworkDocsService {
     }
     const copyId = created.summary.id
 
+    // UNI-2212: the copy starts as the source's head. A converted tab declares its conversion only
+    // when that head is still legacy (the source may have been converted by another device since)
+    const copyHead = chosen.binding.legacyFrom
+      ? await this.readLegacyHead(copyId, chosen.binding.format)
+      : null
+    const copyConversion = copyHead?.legacyFrom ? conversionFor(copyHead.legacyFrom) : undefined
+
     // step 2: the local bytes become version 2 of the copy; one retry, same keys
     const commitKey = this.newIdempotencyKey()
     // BE-12F-02 / FD11-C-R2-01 / R3-01: the account and session epoch that
@@ -9083,6 +9090,7 @@ export class UniworkDocsService {
           uploadId: upload.uploadId,
           baseRevision: created.revision,
           idempotencyKey: commitKey,
+          ...(copyConversion ? { conversion: copyConversion } : {}),
         })
         committed = true
       } catch (error) {
@@ -9261,6 +9269,27 @@ export class UniworkDocsService {
     }
   }
 
+  /**
+   * UNI-2212: the head of a document as it is now - its revision and the legacy format a copy
+   * bound as `format` still owes it (undefined when the head is OOXML, or another family). Null
+   * when the read cannot answer: the caller then keeps what it knew.
+   */
+  private async readLegacyHead(
+    documentId: string,
+    format: UniworkDocFormat,
+  ): Promise<{ revision: string; legacyFrom: LegacyFrom | undefined } | null> {
+    try {
+      const detail = await this.api().getDocument(documentId)
+      const legacy = legacyOfFile(detail.file, detail.title)
+      return {
+        revision: detail.revision,
+        legacyFrom: legacy && legacyTargetFormat(legacy) === format ? legacy : undefined,
+      }
+    } catch {
+      return null
+    }
+  }
+
   private async overwriteInConflict(
     open: ConflictSession,
     chosen: BoundDocument,
@@ -9316,6 +9345,17 @@ export class UniworkDocsService {
       }
     }
     if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
+    // UNI-2212: the head may have been converted by another device since this copy was opened,
+    // so what the commit owes follows the head as it is now, read with its revision: a head that
+    // is OOXML already takes an ordinary commit (a stale conversion would be refused not_legacy)
+    let legacyFrom = chosen.binding.legacyFrom
+    if (legacyFrom && currentView.online) {
+      const head = await this.readLegacyHead(chosen.binding.documentId, chosen.binding.format)
+      if (head) {
+        serverRevision = head.revision
+        legacyFrom = head.legacyFrom
+      }
+    }
     const next: Binding = {
       ...chosen.binding,
       baseRevision: serverRevision,
@@ -9325,6 +9365,8 @@ export class UniworkDocsService {
       baseChecksum: '',
       state: 'dirty',
     }
+    if (legacyFrom) next.legacyFrom = legacyFrom
+    else delete next.legacyFrom
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
