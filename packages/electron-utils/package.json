@@ -10,6 +10,7 @@
     "./ai-run": "./src/ai-run.ts",
     "./ai-run-bridge": "./src/ai-run-bridge.ts",
     "./comments-bridge": "./src/comments-bridge.ts",
+    "./converted-documents": "./src/converted-documents.ts",
     "./comments-ipc": "./src/comments-ipc.ts",
     "./comments-poll": "./src/comments-poll.ts",
     "./comments-reply": "./src/comments-reply.ts",

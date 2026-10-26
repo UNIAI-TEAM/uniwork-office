@@ -9,6 +9,11 @@ export interface OpenFileResult {
   encrypted?: boolean
   /** content came from a newer crash-recovery copy and still needs an explicit save */
   recovered?: boolean
+  /**
+   * The file is a converted copy of a legacy .doc (a temp .docx): the first Save is a
+   * Save As, suggested at this path next to the original. Absent for every ordinary document.
+   */
+  suggestSaveAs?: string
 }
 
 /** Password-protected (ECMA-376 encrypted) docx: the renderer prompts for the
@@ -125,6 +130,8 @@ export type MenuCommand =
   | 'open'
   | 'open-path'
   | 'save'
+  /** the shell's own flush of a converted document for the UniWork first save: write in place, no dialog */
+  | 'save-in-place'
   | 'save-as'
   | 'undo'
   | 'redo'

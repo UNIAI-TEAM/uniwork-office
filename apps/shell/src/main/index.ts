@@ -63,6 +63,8 @@ import {
   DROP_OPEN_CHANNEL,
   appMenuLabels,
   contextMenuLabels,
+  convertedDocumentFor,
+  forgetConvertedDocument,
   editMenuTemplate,
   installContextMenu,
   installNavigationGuard,
@@ -3586,6 +3588,8 @@ function applyPendingDir(wcId: number, filePath: string): string {
  * open tab (which re-grants the new path and refreshes its title).
  */
 function afterFileMoved(oldPath: string, newPath: string): void {
+  // a converted legacy copy that moved into the UniWork store has its real home now
+  forgetConvertedDocument(oldPath)
   replaceRecentFile(oldPath, newPath)
   projectFileRenamed(oldPath, newPath)
   if (/\.pptx$/i.test(newPath)) void replaceSlidesRecentFile(oldPath, newPath)
@@ -4348,6 +4352,8 @@ async function editorStateOfPath(
 /** each module's explicit Save, exactly what its File > Save runs */
 const requestUniworkModuleSave = createModuleSaveRequester({
   targetForPath: webContentsForPath,
+  // a converted legacy copy is flushed in place (its plain Save is a Save As); exact tab path only
+  isConvertedPath: (path) => convertedDocumentFor(path) !== undefined,
   sheetsMenuChannel: SHEETS_IPC_CHANNELS.menuAction,
   requestMarkdownSave,
   requestHtmlSave,

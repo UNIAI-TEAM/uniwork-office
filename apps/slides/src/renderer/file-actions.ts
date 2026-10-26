@@ -96,7 +96,7 @@ async function runSerialized<T>(pass: () => Promise<T>): Promise<T> {
 export async function save(
   getCtx: () => ActionCtx,
   quiet = false,
-  origin: 'user' | 'auto' = 'user',
+  origin: 'user' | 'auto' | 'in-place' = 'user',
 ): Promise<boolean> {
   // web frame without the host's save grant: the deck is view-only
   if (isViewOnly()) return false

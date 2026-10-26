@@ -2322,6 +2322,8 @@ export function App() {
                 ...prev,
                 filePath: newPath,
                 fileName: newPath.split(/[\\/]/).pop() ?? prev.fileName,
+                // moved into the UniWork store: no longer a converted temp copy
+                suggestSaveAs: undefined,
               }
             : prev,
         )
@@ -2504,18 +2506,25 @@ export function App() {
     }
   }
 
-  /** newDocName: the first-save name the AI ask card showed (a never-saved document only) */
-  const save = useCallback((saveAs: boolean, auto = false, newDocName?: string) => {
-    if (!(saveAs ? cap('saveAs') : cap('save'))) return Promise.resolve(false)
-    // UniWork seam: no autosave onto a UniWork document, no in-place Save of a view-only one
-    const filePath = fileCtxRef.current.doc?.filePath
-    const state = uniworkStateFor(uniworkRef.current, filePath)
-    if (!uniworkAllowsSave(state, saveAs, auto)) {
-      uniworkExplainReadOnlySave(window.desktop as UniworkLockSeam, state, saveAs, auto, filePath)
-      return Promise.resolve(false)
-    }
-    return saveImpl(fileCtxRef.current, saveAs, auto, newDocName)
-  }, [])
+  /**
+   * newDocName: the first-save name the AI ask card showed (a never-saved document only).
+   * inPlace: the shell's flush of a converted legacy document for the UniWork first save -
+   * write the temp copy, no Save As.
+   */
+  const save = useCallback(
+    (saveAs: boolean, auto = false, newDocName?: string, inPlace = false) => {
+      if (!(saveAs ? cap('saveAs') : cap('save'))) return Promise.resolve(false)
+      // UniWork seam: no autosave onto a UniWork document, no in-place Save of a view-only one
+      const filePath = fileCtxRef.current.doc?.filePath
+      const state = uniworkStateFor(uniworkRef.current, filePath)
+      if (!uniworkAllowsSave(state, saveAs, auto)) {
+        uniworkExplainReadOnlySave(window.desktop as UniworkLockSeam, state, saveAs, auto, filePath)
+        return Promise.resolve(false)
+      }
+      return saveImpl(fileCtxRef.current, saveAs, auto, newDocName, undefined, inPlace)
+    },
+    [],
+  )
 
   // inserting a section break needs one save for the new section to take effect; the
   // flag is consumed in the render after state commit, guaranteeing the save closure
@@ -5768,6 +5777,9 @@ export function App() {
           break
         case 'save':
           void save(false)
+          break
+        case 'save-in-place':
+          void save(false, false, undefined, true)
           break
         case 'save-as':
           void save(true)

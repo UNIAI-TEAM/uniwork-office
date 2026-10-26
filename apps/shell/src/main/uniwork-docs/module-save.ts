@@ -18,6 +18,12 @@ export type UniworkModuleSaveMode = 'save' | 'capture'
 export interface ModuleSaveDeps {
   /** the tab or detached window showing the path */
   targetForPath(path: string): ModuleSaveTarget | undefined
+  /**
+   * The tab path is a converted legacy copy: its own Save is a Save As, so the shell's
+   * flush for the UniWork first save asks the module to write it in place instead.
+   * Exact path identity only (never a file-name stem).
+   */
+  isConvertedPath?(path: string): boolean
   /** sheets' menu channel (IPC_CHANNELS.menuAction) */
   sheetsMenuChannel: string
   requestMarkdownSave(contents: WebContents, mode: 'save'): Promise<boolean>
@@ -50,18 +56,19 @@ export function createModuleSaveRequester(
         },
         () => onNotWritten?.(),
       )
+    const saveCommand = deps.isConvertedPath?.(path) ? 'save-in-place' : 'save'
     switch (target.kind) {
       case 'docs':
         if (mode === 'capture') deps.armCapture?.(path)
-        wc.send('menu:command', 'save')
+        wc.send('menu:command', saveCommand)
         return true
       case 'sheets':
         if (mode === 'capture') deps.armCapture?.(path)
-        wc.send(deps.sheetsMenuChannel, 'save')
+        wc.send(deps.sheetsMenuChannel, saveCommand)
         return true
       case 'slides':
         if (mode === 'capture') deps.armCapture?.(path)
-        wc.send('slides:menu', 'save')
+        wc.send('slides:menu', saveCommand)
         return true
       case 'markdown':
         if (mode === 'capture') deps.armCapture?.(path)

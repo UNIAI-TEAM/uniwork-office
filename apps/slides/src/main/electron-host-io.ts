@@ -8,7 +8,7 @@
 import { clipboard, dialog, nativeImage } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { savePptxToFile } from '@genoffice/pptx-engine'
-import { showOpenDialogWithMemory } from '@genoffice/electron-utils'
+import { convertedDocumentFor, showOpenDialogWithMemory } from '@genoffice/electron-utils'
 import type {
   HostIO,
   HostMessageBox,
@@ -141,6 +141,7 @@ export function createElectronHostIO(files: ElectronFileHooks): HostIO {
     saveTarget: {
       untitled: () => files.untitledTarget(),
       saveAs: (currentPath, defaultName) => files.saveAsTarget(currentPath, defaultName),
+      convertedSaveAs: (currentPath) => convertedDocumentFor(currentPath)?.suggestSaveAs,
     },
     writeDeck: (opened, target) => savePptxToFile(opened, target),
     saved: (event) => files.saved(event),

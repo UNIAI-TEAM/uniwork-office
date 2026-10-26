@@ -445,6 +445,7 @@ const desktopApi: DesktopApi = {
       if (
         action === 'open' ||
         action === 'save' ||
+        action === 'save-in-place' ||
         action === 'save-as' ||
         action === 'print' ||
         action === 'export-pdf' ||
@@ -2047,6 +2048,7 @@ function parseSaveRequest(input: WorkbookSaveRequest): WorkbookSaveRequest {
     invalid('restore flag')
   if (input.forceWrite !== undefined && typeof input.forceWrite !== 'boolean')
     invalid('force-write flag')
+  if (input.inPlace !== undefined && typeof input.inPlace !== 'boolean') invalid('in-place flag')
   if (input.origin !== undefined && input.origin !== 'user' && input.origin !== 'auto')
     invalid('origin')
   if (

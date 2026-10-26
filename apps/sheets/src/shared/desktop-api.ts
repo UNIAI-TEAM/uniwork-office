@@ -2006,6 +2006,10 @@ export const workbookSaveRequestSchema = z
     /// Explicit Save of a UniWork-bound workbook with nothing pending: writes
     /// the unchanged workbook so the shell can retry its upload.
     forceWrite: z.boolean().optional(),
+    /// The shell's flush of an unsaved converted copy for the UniWork first
+    /// save: write the backing file in place (no Save As) and report it as the
+    /// user's Save. Only an unsaved-new session honours it.
+    inPlace: z.boolean().optional(),
     /// CSV session in-place save: the active sheet serialized as CSV text.
     /// Written back to the session's original .csv after the xlsx save.
     csvContent: z.string().max(MAX_CSV_EXPORT_CHARS).optional(),
@@ -3057,7 +3061,15 @@ export interface DesktopApi {
 }
 
 export type MenuAction =
-  'open' | 'save' | 'save-as' | 'print' | 'export-pdf' | 'export-csv' | 'undo' | 'redo'
+  | 'open'
+  | 'save'
+  | 'save-in-place'
+  | 'save-as'
+  | 'print'
+  | 'export-pdf'
+  | 'export-csv'
+  | 'undo'
+  | 'redo'
 
 export interface WebSearchResult {
   results: Array<{ title: string; url: string; snippet: string }>

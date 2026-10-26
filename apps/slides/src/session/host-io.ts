@@ -79,6 +79,11 @@ export interface HostIO {
     untitled(): string
     /** Save As target; null = the user canceled */
     saveAs(currentPath: string, defaultName: string): Promise<string | null>
+    /**
+     * Desktop only: the deck at `currentPath` is a converted copy of a legacy .ppt
+     * (a temp .pptx). Its explicit Save is a Save As suggested at the returned path.
+     */
+    convertedSaveAs?(currentPath: string): string | undefined
   }
   /** Serialize the deck to `target` (throws on failure; the handler reports it) */
   writeDeck(opened: OpenedPptx, target: string): Promise<void>
@@ -109,6 +114,8 @@ export interface SaveEvent {
   kind: 'untitled' | 'save' | 'saveAs'
   session: Session
   path: string
+  /** Save As only: the path the session had before the write */
+  previousPath?: string
 }
 
 /** What every session handler receives: the calling client and its host. */

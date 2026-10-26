@@ -42,7 +42,9 @@ import {
   appMenuLabels,
   configuredDefaultSaveDir,
   contextMenuLabels,
+  convertedDocumentFor,
   fetchRemoteImage,
+  forgetConvertedDocument,
   installContextMenu,
   installNavigationGuard,
   isHeadlessMode,
@@ -669,7 +671,8 @@ function hostFor(wc: WebContents): HostIO {
         // a UniWork working copy's Save As starts outside its hidden folder
         defaultPath: uniworkIsBound(currentPath)
           ? defaultName
-          : saveAsSuggestion(currentPath, defaultName),
+          : (convertedDocumentFor(currentPath)?.suggestSaveAs ??
+            saveAsSuggestion(currentPath, defaultName)),
         filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
       }
       const r = await showSaveDialogWithMemory(dialog, dialogParent(), options, getDraftsDir())
@@ -677,7 +680,7 @@ function hostFor(wc: WebContents): HostIO {
     },
     saveGate: (input) => uniworkSaveDecision(input),
     userSaved: (path) => notifyUniworkUserSave(path),
-    saved: async ({ kind, session, path }) => {
+    saved: async ({ kind, session, path, previousPath }) => {
       if (kind === 'untitled') {
         await pushRecent(path)
         slidesOpenedHook?.(wc, path)
@@ -687,6 +690,8 @@ function hostFor(wc: WebContents): HostIO {
       if (kind === 'save') void rm(autosavePathFor(path), { force: true }).catch(() => {})
       dropUntitledRecovery(wc.id)
       if (kind === 'saveAs') {
+        // a converted legacy deck has its real home now
+        forgetConvertedDocument(previousPath)
         await pushRecent(path)
         syncAttachedPaths(session, path)
       }

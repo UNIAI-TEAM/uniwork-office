@@ -69,7 +69,9 @@ import {
   buildPrintableHtml,
   configuredDefaultSaveDir,
   contextMenuLabels,
+  convertedDocumentFor,
   fetchRemoteImage,
+  forgetConvertedDocument,
   installContextMenu,
   setContextMenuInterceptor,
   installNavigationGuard,
@@ -3705,6 +3707,8 @@ async function loadDocx(
     hash,
     encrypted,
     recovered: recovered || undefined,
+    // converted from a legacy .doc: Save is a Save As next to the original
+    suggestSaveAs: convertedDocumentFor(filePath)?.suggestSaveAs,
   }
 }
 
@@ -5311,7 +5315,8 @@ export function registerDocsIpc(): void {
         defaultPath:
           typeof sourcePath === 'string' && uniworkIsBound(sourcePath)
             ? defaultName
-            : saveAsSuggestion(typeof sourcePath === 'string' ? sourcePath : null, defaultName),
+            : (convertedDocumentFor(sourcePath)?.suggestSaveAs ??
+              saveAsSuggestion(typeof sourcePath === 'string' ? sourcePath : null, defaultName)),
         filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
       })
       if (result.canceled || !result.filePath) return { ok: false }
@@ -5351,6 +5356,10 @@ export function registerDocsIpc(): void {
           result.filePath,
         )
         pushRecent(result.filePath)
+        // the converted copy has its real home now
+        if (typeof sourcePath === 'string' && sourcePath !== result.filePath) {
+          forgetConvertedDocument(sourcePath)
+        }
         if (uniwork.fireHook) notifyUniworkUserSave(result.filePath)
         // the renderer has no path yet to match a rename notification against,
         // so the reply must carry the path it may save to next

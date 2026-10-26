@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
+import { forgetConvertedDocument, registerConvertedDocument } from '@genoffice/electron-utils'
 import {
   LegacyConvertError,
   legacyFormatForPath,
@@ -96,6 +97,7 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
    */
   async function removeTempDir(doc: ConvertedDocument): Promise<void> {
     documents.delete(doc.tempPath)
+    forgetConvertedDocument(doc.tempPath)
     if (doc.kind === 'sheets') return
     await rm(doc.tempDir, { recursive: true, force: true }).catch(() => undefined)
   }
@@ -124,11 +126,18 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
         suggestSaveAs: result.suggestedSaveAsPath,
       }
       documents.set(tempPath, doc)
+      // the editors read this table to turn Save into a Save As next to the original
+      registerConvertedDocument(tempPath, {
+        originalPath: filePath,
+        suggestSaveAs: doc.suggestSaveAs,
+        tempDir,
+      })
       endProgress()
       try {
         deps.openConverted(doc)
       } catch (err) {
         documents.delete(tempPath)
+        forgetConvertedDocument(tempPath)
         await rm(tempDir, { recursive: true, force: true }).catch(() => undefined)
         throw err
       }

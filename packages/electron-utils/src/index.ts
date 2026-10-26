@@ -51,6 +51,12 @@ export {
   OPENABLE_DOC_RE,
   partitionDropPayload,
 } from './drop-open'
+export {
+  convertedDocumentFor,
+  forgetConvertedDocument,
+  registerConvertedDocument,
+  type ConvertedDocumentInfo,
+} from './converted-documents'
 export { safeExternalUrl, type SafeExternalUrlOptions } from './safe-external-url'
 export {
   fetchWithSsrfGuard,

@@ -1258,6 +1258,8 @@ export type AudienceNavAction = 'next' | 'prev' | 'exit'
 export type MenuCommand =
   | 'open'
   | 'save'
+  /** the shell's flush of a converted legacy deck for the UniWork first save: write in place, no dialog */
+  | 'save-in-place'
   | 'save-as'
   | 'export-pdf'
   | 'export-images'
@@ -1702,7 +1704,7 @@ export interface SlidesApi {
   printSlides: (op: PrintSlidesOp) => Promise<{ ok: boolean; error?: string }>
   /** `origin` 'auto' = AutoSave pass (never writes a UniWork document); omitted = explicit Save */
   save: (
-    origin?: 'user' | 'auto',
+    origin?: 'user' | 'auto' | 'in-place',
   ) => Promise<{ ok: boolean; path?: string; error?: string; slides?: RenderSlide[] }>
   /** UniWork seam: this deck is a UniWork working copy (AutoSave off) / view-only (Save off) */
   uniworkState: () => Promise<{ bound: boolean; readOnly: boolean }>

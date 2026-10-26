@@ -41,10 +41,17 @@ export function applySheetsUniworkAnswer<T extends SheetsUniworkFile>(
   const converted = file.needsSaveAs === true && file.unsavedNew !== true
   const bound = !converted && answer.bound === true
   const readOnly = !converted && answer.readOnly === true
-  if (file.readOnly === readOnly && (file.uniworkBound === true) === bound) return file
+  // An unsaved new workbook (or converted copy) the shell just moved into a UniWork working
+  // copy is no longer a never-saved one: its next Save is a plain Save of the bound file.
+  const adopted = bound && file.unsavedNew === true
+  if (file.readOnly === readOnly && (file.uniworkBound === true) === bound && !adopted) return file
   const next: T = { ...file, readOnly }
   if (bound) next.uniworkBound = true
   else delete next.uniworkBound
+  if (adopted) {
+    delete next.unsavedNew
+    delete next.needsSaveAs
+  }
   return next
 }
 
