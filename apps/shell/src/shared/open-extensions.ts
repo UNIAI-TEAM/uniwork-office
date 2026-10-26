@@ -1,8 +1,7 @@
 /**
  * Single source of truth for the open-dialog filter, in shared so the renderer
- * can read it too (the Home hint). Includes the legacy .doc/.ppt binaries so
- * they are selectable and surface the explicit "not supported" dialog via
- * openDocumentPath instead of being grayed out.
+ * can read it too (the Home hint). Includes the legacy .doc/.xls/.ppt binaries:
+ * the desktop converts them to .docx/.xlsx/.pptx on open (legacy-open.ts).
  */
 export const OPEN_DIALOG_EXTENSIONS: readonly string[] = [
   'docx',
@@ -24,10 +23,10 @@ export const OPEN_DIALOG_EXTENSIONS: readonly string[] = [
 ]
 
 /**
- * The legacy binaries kept in the dialog list only so picking one shows the
- * "not supported" dialog. They do not open, so the Home hint leaves them out.
+ * Dialog entries that are listed but do not open, so the Home hint leaves them
+ * out. Empty since the legacy .doc/.ppt binaries open through the converter.
  */
-export const OPEN_DIALOG_UNSUPPORTED_EXTENSIONS: readonly string[] = ['doc', 'ppt']
+export const OPEN_DIALOG_UNSUPPORTED_EXTENSIONS: readonly string[] = []
 
 /** `.ext / .ext` text of the formats that actually open, derived from the dialog list */
 export function openLocalHint(): string {

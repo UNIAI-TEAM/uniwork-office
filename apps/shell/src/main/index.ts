@@ -376,6 +376,13 @@ import {
 } from './app-routing'
 import { isSameFile, pdfSaveAsTarget, isValidRawRenameName } from './rename-validation'
 import {
+  convertLegacyFile,
+  killAllActiveLegacyConversions,
+  legacyFormatForPath,
+} from './legacy-converter'
+import { createLegacyOpener } from './legacy-open'
+import { tLegacyOpen } from './legacy-open-strings'
+import {
   FolderWatcher,
   createFolder,
   describeRoot,
@@ -3874,6 +3881,8 @@ function createShellWindow(): void {
     () => {
       win.webContents.send(TABS_CHANNELS.changed, manager.list())
       publishOpenDocumentsIfOwner([...manager.openFilePaths(), ...detachedFilePaths()])
+      // a converted legacy document's temp copy goes once no tab shows it (closed, or saved elsewhere)
+      legacyOpener.sweep()
       // a UniWork copy written outside the save hook shows as dirty once its tab is active
       activeDocRefresh.tabsChanged(manager.activeFilePath())
     },
@@ -4510,6 +4519,88 @@ function recordRecentFile(filePath: string): void {
   recordRecentFileRaw(filePath)
 }
 
+/**
+ * Progress for a legacy conversion: the taskbar/dock shows busy right away and,
+ * when it takes longer than a blink, a box with Cancel (the file converts with
+ * a bundled LibreOffice, a few seconds for a typical document).
+ */
+const LEGACY_PROGRESS_DELAY_MS = 600
+function beginLegacyProgress(fileName: string, cancel: () => void): () => void {
+  const host = shellWindow && !shellWindow.isDestroyed() ? shellWindow : null
+  host?.setProgressBar(2, { mode: 'indeterminate' })
+  const box = new AbortController()
+  let finished = false
+  const timer = setTimeout(() => {
+    const options = {
+      type: 'info' as const,
+      message: tLegacyOpen(currentLang(), 'legacyConvertingMsg', { name: fileName }),
+      detail: tLegacyOpen(currentLang(), 'legacyConvertingDetail'),
+      buttons: [tm('btnCancel')],
+      cancelId: 0,
+      noLink: true,
+      signal: box.signal,
+    }
+    const shown = host ? dialog.showMessageBox(host, options) : dialog.showMessageBox(options)
+    // our own abort closes the box the same way a click on Cancel does
+    void shown.then(() => {
+      if (!finished) cancel()
+    })
+  }, LEGACY_PROGRESS_DELAY_MS)
+  return () => {
+    if (finished) return
+    finished = true
+    clearTimeout(timer)
+    box.abort()
+    if (host && !host.isDestroyed()) host.setProgressBar(-1)
+  }
+}
+
+const legacyOpener = createLegacyOpener({
+  convert: (path, options) => convertLegacyFile(path, options),
+  importRoot: () => join(app.getPath('temp'), 'genoffice-imports'),
+  openConverted: (doc) => {
+    if (!tabManager) throw new Error('the shell window is gone')
+    if (doc.kind === 'sheets') {
+      // the same unsaved-new workbook a "New spreadsheet" is: Save asks where to write it
+      markSheetsUnsavedNew(doc.tempPath, doc.suggestSaveAs, doc.tempDir)
+      try {
+        tabManager.openSheetsTab(doc.tempPath)
+      } catch (err) {
+        unmarkSheetsUnsavedNew(doc.tempPath)
+        throw err
+      }
+      startQueuedWorkbookNudge()
+    } else if (doc.kind === 'docs') {
+      tabManager.openDocsTab(doc.tempPath)
+    } else {
+      tabManager.openSlidesTab(doc.tempPath)
+    }
+  },
+  activateConverted: (doc) => {
+    const tab = tabManager?.findTabByPath(doc.tempPath)
+    if (!tab) return false
+    tabManager?.activateTab(tab.id)
+    return true
+  },
+  isPathOpen: (path) => webContentsForPath(path) !== undefined,
+  openXlsValuesOnly: (path) => {
+    if (!tabManager) return false
+    recordRecentFile(path)
+    const existing = tabManager.findSheetsTabByPath(path)
+    if (existing) {
+      tabManager.activateTab(existing)
+    } else {
+      tabManager.openSheetsTab(path)
+      startQueuedWorkbookNudge()
+    }
+    return true
+  },
+  recordRecent: recordRecentFile,
+  beginProgress: beginLegacyProgress,
+  notice: showAppWarning,
+  t: (key, params) => tLegacyOpen(currentLang(), key, params),
+})
+
 function routeDocumentPath(filePath: string): boolean {
   // G5-04g: every open route (File > Open, recents, argv, drag, MCP, a module
   // asking for another file) passes through here, so a working copy whose folder
@@ -4521,6 +4612,8 @@ function routeDocumentPath(filePath: string): boolean {
   // a detached editor window already shows this file — focus it, never a second copy
   if (focusDetachedByPath(filePath)) return true
   if (!tabManager) return false
+  // .doc / .xls / .ppt: converted in the background, then opened as an unsaved .docx / .xlsx / .pptx
+  if (legacyFormatForPath(filePath)) return legacyOpener.open(filePath)
   if (DOCX_RE.test(filePath)) {
     recordRecentFile(filePath)
     const existing = tabManager.findDocsTabByPath(filePath)
@@ -7437,6 +7530,8 @@ app.on('before-quit', () => {
   markSheetsShuttingDown()
   stopSheetsSidecar()
   killAllPdfConvertJobs()
+  killAllActiveLegacyConversions()
+  void legacyOpener.dispose()
   // release the MCP port synchronously (macOS keeps the process alive after
   // the last window closes, so window-all-closed is not enough)
   stopMcpSync()

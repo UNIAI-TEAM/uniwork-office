@@ -50,18 +50,25 @@ describe('handleDroppedFiles', () => {
 
   it('warns once with the combined extensions for known-unsupported drops', () => {
     const deps = fakeDeps()
-    handleDroppedFiles(['/tmp/old.doc', '/tmp/deck.pages', '/tmp/note.rtf'], deps)
+    handleDroppedFiles(['/tmp/old.odt', '/tmp/deck.pages', '/tmp/note.rtf'], deps)
     expect(deps.opened).toEqual([])
     expect(deps.revealed).not.toHaveBeenCalled()
-    expect(deps.warned).toEqual(['unsupported: doc, pages, rtf'])
+    expect(deps.warned).toEqual(['unsupported: odt, pages, rtf'])
   })
 
   it('opens the supported files and warns about the rest in a mixed drop', () => {
     const deps = fakeDeps()
-    handleDroppedFiles(['/tmp/new.docx', '/tmp/old.doc'], deps)
+    handleDroppedFiles(['/tmp/new.docx', '/tmp/old.odt'], deps)
     expect(deps.opened).toEqual(['/tmp/new.docx'])
     expect(deps.revealed).toHaveBeenCalledOnce()
-    expect(deps.warned).toEqual(['unsupported: doc'])
+    expect(deps.warned).toEqual(['unsupported: odt'])
+  })
+
+  it('sends a dropped legacy .doc / .xls / .ppt through the open pipeline (the converter)', () => {
+    const deps = fakeDeps()
+    handleDroppedFiles(['/tmp/old.doc', '/tmp/old.xls', '/tmp/old.ppt'], deps)
+    expect(deps.opened).toEqual(['/tmp/old.doc', '/tmp/old.xls', '/tmp/old.ppt'])
+    expect(deps.warned).toEqual([])
   })
 
   it('ignores junk payloads and unrecognized file types entirely', () => {

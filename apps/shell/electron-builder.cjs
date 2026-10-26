@@ -594,6 +594,23 @@ const config = {
       mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     },
     {
+      // opens as a converted .docx copy (legacy-open.ts)
+      ext: 'doc',
+      name: 'Word 97-2003 Document',
+      role: 'Editor',
+      rank: 'Alternate',
+      icon: 'docx',
+      mimeType: 'application/msword',
+    },
+    {
+      ext: 'ppt',
+      name: 'PowerPoint 97-2003 Presentation',
+      role: 'Editor',
+      rank: 'Alternate',
+      icon: 'pptx',
+      mimeType: 'application/vnd.ms-powerpoint',
+    },
+    {
       ext: 'xls',
       name: 'Excel 97-2003 Workbook',
       role: 'Editor',

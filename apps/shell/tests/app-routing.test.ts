@@ -18,6 +18,12 @@ describe('appForPath', () => {
     expect(appForPath('/x/a.html')).toBe('html')
   })
 
+  it('routes the legacy binaries to the app of the OOXML they convert to', () => {
+    expect(appForPath('/x/old.doc')).toBe('docs')
+    expect(appForPath('/x/old.xls')).toBe('sheets')
+    expect(appForPath('/x/old.ppt')).toBe('slides')
+  })
+
   it('has no app for an extension nothing opens', () => {
     expect(appForPath('/x/a.xyz')).toBeUndefined()
     expect(appForPath('/x/noextension')).toBeUndefined()

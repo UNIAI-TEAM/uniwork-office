@@ -1,5 +1,13 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -11,13 +19,7 @@ export type LegacySourceFormat = 'doc' | 'xls' | 'ppt'
 export type LegacyTargetFormat = 'docx' | 'xlsx' | 'pptx'
 
 export type LegacyConvertErrorCode =
-  | 'encrypted'
-  | 'corrupt'
-  | 'unsupported'
-  | 'timeout'
-  | 'converter_missing'
-  | 'cancelled'
-  | 'failed'
+  'encrypted' | 'corrupt' | 'unsupported' | 'timeout' | 'converter_missing' | 'cancelled' | 'failed'
 
 export class LegacyConvertError extends Error {
   readonly code: LegacyConvertErrorCode
@@ -245,11 +247,7 @@ export function readCfbStreams(bytes: Uint8Array): Map<string, Uint8Array> {
       : concatBytes(chain(firstMiniFat).map(sectorBytes))
   const miniStreamSectors =
     root.start === ENDOFCHAIN || root.start === FREESECT ? [] : chain(root.start)
-  const miniStreamLen = Math.min(
-    miniStreamSectors.length * sectorSize,
-    root.size,
-    bytes.byteLength,
-  )
+  const miniStreamLen = Math.min(miniStreamSectors.length * sectorSize, root.size, bytes.byteLength)
   const miniCount = Math.min(
     Math.floor(miniStreamLen / miniSectorSize),
     Math.floor(miniFat.byteLength / 4),
@@ -383,7 +381,10 @@ export function readSelectiveZipParts(
     if (usize > MAX_SELECTIVE_ZIP_PART_BYTES) {
       throw new Error(`zip: part ${name} exceeds size limit`)
     }
-    if (localOffset + 30 > bytes.byteLength || view.getUint32(localOffset, true) !== ZIP_LOCAL_SIG) {
+    if (
+      localOffset + 30 > bytes.byteLength ||
+      view.getUint32(localOffset, true) !== ZIP_LOCAL_SIG
+    ) {
       throw new Error(`zip: corrupt local header for ${name}`)
     }
     const localNameLen = view.getUint16(localOffset + 26, true)
@@ -518,9 +519,13 @@ function checkXlsStreams(streams: Map<string, Uint8Array>): void {
       })
     }
     if (type === XLS_FILEPASS) {
-      throw new LegacyConvertError('encrypted', 'Password-protected Excel 97-2003 workbook (.xls)', {
-        format: 'xls',
-      })
+      throw new LegacyConvertError(
+        'encrypted',
+        'Password-protected Excel 97-2003 workbook (.xls)',
+        {
+          format: 'xls',
+        },
+      )
     }
     at += 4 + length
     count++
@@ -940,6 +945,21 @@ export type ConvertLegacyResult =
       suggestedSaveAsPath: string
     }
 
+/** Promise.withResolvers is outside this target's lib (ES2022): the executor form is equivalent */
+function deferred<T>(): {
+  promise: Promise<T>
+  resolve: (value: T) => void
+  reject: (reason: unknown) => void
+} {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
 const activeSofficePids = new Set<number>()
 
 /** Kill every in-flight `soffice.bin` process tree (called on `before-quit` and test teardown). */
@@ -975,7 +995,7 @@ class ConcurrencyQueue {
         this.pump()
       }
     }
-    const { promise, resolve: resolveAcquire, reject } = Promise.withResolvers<() => void>()
+    const { promise, resolve: resolveAcquire, reject } = deferred<() => void>()
     const entry: (typeof this.waiters)[number] = {
       run: () => {
         if (entry.onAbort && signal) signal.removeEventListener('abort', entry.onAbort)
@@ -1062,7 +1082,7 @@ async function runSingleSofficeJob(opts: {
         promise,
         resolve: resolveRun,
         reject: rejectRun,
-      } = Promise.withResolvers<{ code: number | null; stderr: string }>()
+      } = deferred<{ code: number | null; stderr: string }>()
       if (signal?.aborted) {
         rejectRun(
           new LegacyConvertError('cancelled', 'Legacy conversion was cancelled', {
@@ -1170,11 +1190,10 @@ async function runSingleSofficeJob(opts: {
         cleanupListeners()
         terminateChild(false)
         rejectRun(
-          new LegacyConvertError(
-            'failed',
-            `LibreOffice converter process error: ${err.message}`,
-            { format: sourceFormat, cause: err },
-          ),
+          new LegacyConvertError('failed', `LibreOffice converter process error: ${err.message}`, {
+            format: sourceFormat,
+            cause: err,
+          }),
         )
       })
 
