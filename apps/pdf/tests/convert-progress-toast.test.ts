@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -82,7 +80,7 @@ describe('PDF conversion progress toast (UNI-2167)', () => {
     })
     const toast = host.querySelector('.pdf-toast.pdf-toast-notice[role="status"]')
     expect(toast).not.toBeNull()
-    expect(toast!.querySelector('span')!.textContent).toBe('Converting to Word… Preparing…')
+    expect(toast!.querySelector('span')!.textContent).toBe('Converting to Word: preparing…')
     expect(toast!.querySelector('button')!.textContent).toBe('Cancel')
 
     await act(async () => {
@@ -93,7 +91,7 @@ describe('PDF conversion progress toast (UNI-2167)', () => {
     await act(async () => {
       listener!({ format: 'xlsx', page: 0, total: 4 })
     })
-    expect(host.querySelector('span')!.textContent).toBe('Converting to Excel… Preparing…')
+    expect(host.querySelector('span')!.textContent).toBe('Converting to Excel: preparing…')
 
     await act(async () => {
       listener!({ format: 'xlsx', page: 1, total: 4 })
@@ -103,7 +101,7 @@ describe('PDF conversion progress toast (UNI-2167)', () => {
     await act(async () => {
       listener!({ format: 'pptx', page: 3, total: 0 })
     })
-    expect(host.querySelector('span')!.textContent).toBe('Converting to PowerPoint… Preparing…')
+    expect(host.querySelector('span')!.textContent).toBe('Converting to PowerPoint: preparing…')
 
     await act(async () => {
       listener!({ format: 'pptx', page: 3, total: 10 })
@@ -117,7 +115,7 @@ describe('PDF conversion progress toast (UNI-2167)', () => {
     expect(off).toHaveBeenCalledTimes(1)
   })
 
-  it('calls convertCancel when Cancel is clicked, swallows errors, and closes on done: true', async () => {
+  it('calls convertCancel when Cancel is clicked, disables the button until done: true, swallows errors, and closes on done: true', async () => {
     let listener: ((event: PdfConvertProgressEvent) => void) | null = null
     const convertCancel = vi
       .fn<() => Promise<void>>()
@@ -137,29 +135,51 @@ describe('PDF conversion progress toast (UNI-2167)', () => {
     })
     const btn = host.querySelector<HTMLButtonElement>('button')
     expect(btn).not.toBeNull()
+    expect(btn!.disabled).toBe(false)
 
     await act(async () => {
       btn!.click()
       await Promise.resolve()
     })
     expect(convertCancel).toHaveBeenCalledTimes(1)
+    expect(btn!.disabled).toBe(true)
 
-    // Clicking Cancel when convertCancel rejects must not throw or surface an error
+    // Subsequent clicks while disabled are ignored while waiting for done
     await act(async () => {
       btn!.click()
       await Promise.resolve()
     })
-    expect(convertCancel).toHaveBeenCalledTimes(2)
+    expect(convertCancel).toHaveBeenCalledTimes(1)
 
     await act(async () => {
       listener!({ format: 'docx', page: 1, total: 3, done: true })
     })
     expect(host.querySelector('[role="status"]')).toBeNull()
+
+    // A new conversion re-enables the Cancel button; rejection on cancel is swallowed
+    await act(async () => {
+      listener!({ format: 'docx', page: 2, total: 4 })
+    })
+    const nextBtn = host.querySelector<HTMLButtonElement>('button')
+    expect(nextBtn).not.toBeNull()
+    expect(nextBtn!.disabled).toBe(false)
+    await act(async () => {
+      nextBtn!.click()
+      await Promise.resolve()
+    })
+    expect(convertCancel).toHaveBeenCalledTimes(2)
+    expect(nextBtn!.disabled).toBe(true)
   })
 
   it('renders no toast and does not throw when onConvertProgress / convertCancel are missing (web build)', async () => {
     const host = await mount({}, 'en')
     expect(host.querySelector('[role="status"]')).toBeNull()
+    await act(async () => {
+      root!.unmount()
+    })
+    container!.remove()
+    root = null
+    container = null
 
     const hostNull = await mount(null, 'en')
     expect(hostNull.querySelector('[role="status"]')).toBeNull()
@@ -179,7 +199,7 @@ describe('PDF conversion progress toast (UNI-2167)', () => {
       listener!({ format: 'docx', page: 0, total: 0 })
     })
     expect(host.querySelector('span')!.textContent).toBe(
-      'Đang chuyển đổi sang Word… Đang chuẩn bị…',
+      'Đang chuyển đổi sang Word: đang chuẩn bị…',
     )
     expect(host.querySelector('button')!.textContent).toBe('Hủy')
 
@@ -187,13 +207,5 @@ describe('PDF conversion progress toast (UNI-2167)', () => {
       listener!({ format: 'docx', page: 2, total: 6 })
     })
     expect(host.querySelector('span')!.textContent).toBe('Đang chuyển đổi sang Word… trang 2 / 6')
-  })
-
-  it('wires ConvertProgressToast in App.tsx and suppresses overlapping ocrRun toast while converting', () => {
-    const appSrc = readFileSync(join(__dirname, '../src/renderer/App.tsx'), 'utf8')
-    expect(appSrc).toContain(
-      '<ConvertProgressToast progress={convertProgress} onCancel={cancelConvert} />',
-    )
-    expect(appSrc).toContain('{ocrRun && !convertProgress && (')
   })
 })

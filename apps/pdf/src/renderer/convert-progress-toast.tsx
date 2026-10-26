@@ -52,6 +52,11 @@ export function ConvertProgressToast({
   onCancel: () => void
 }): ReactElement | null {
   const { t } = useI18n()
+  const active = Boolean(progress && !progress.done)
+  const [cancelling, setCancelling] = useState(false)
+  useEffect(() => {
+    if (!active) setCancelling(false)
+  }, [active])
   if (!progress || progress.done) return null
   const hasPageProgress = progress.page > 0 && progress.total > 0
   const text =
@@ -69,7 +74,14 @@ export function ConvertProgressToast({
   return (
     <div className="pdf-toast pdf-toast-notice" role="status" data-testid="pdf-convert-toast">
       <span>{text}</span>
-      <button type="button" onClick={onCancel}>
+      <button
+        type="button"
+        disabled={cancelling}
+        onClick={() => {
+          setCancelling(true)
+          onCancel()
+        }}
+      >
         {t('cancel')}
       </button>
     </div>
