@@ -184,6 +184,9 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
     } catch (err) {
       endProgress()
       if (tempDir) await rm(tempDir, { recursive: true, force: true }).catch(() => undefined)
+      // a cancelled or disposed job ends silently, whatever error the converter raised after
+      // the stop (a missing converter must not open the values-only fallback or show a notice)
+      if (controller.signal.aborted || disposed) return
       if (err instanceof LegacyConvertError) {
         if (err.code === 'cancelled') return
         if (err.code === 'converter_missing' && source === 'xls') {

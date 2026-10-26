@@ -472,6 +472,31 @@ describe('temp ownership of a converted copy (R1-5, R1-6, R1-9, R1-11, R1-12, F4
     expect(convert).toHaveBeenCalledTimes(1)
   })
 
+  it.each(['cancel', 'dispose'] as const)(
+    'a %s that lands before converter_missing is delivered opens no fallback and shows no notice (R1-11/R1-12)',
+    async (how) => {
+      let fail: (() => void) | null = null
+      const h = harness(
+        () =>
+          new Promise<ConvertLegacyResult>((_, reject) => {
+            fail = () => reject(new LegacyConvertError('converter_missing', 'no converter'))
+          }),
+      )
+      const opener = createLegacyOpener(h.deps)
+      opener.open('/w/old.xls')
+      await vi.waitFor(() => expect(fail).not.toBeNull())
+
+      if (how === 'cancel') h.progress.cancel!()
+      else await opener.dispose()
+      fail!()
+      await settle()
+
+      expect(h.xlsOpened).toEqual([])
+      expect(h.notices).toEqual([])
+      expect(h.opened).toEqual([])
+    },
+  )
+
   it('a recents failure after the tab opened does not delete the open tab’s dir (F4)', async () => {
     const h = harness(async (p) => converted('docx', p), {
       recordRecent: () => {
