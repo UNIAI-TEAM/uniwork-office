@@ -920,6 +920,8 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
           baseVersion: old.baseVersion,
           checksum: old.checksum,
           length: old.length,
+          // the same snapshot, so "Save again" re-sends the conversion the bytes were made for
+          ...(old.conversion === undefined ? {} : { conversion: old.conversion }),
         },
         deps.now?.() ?? Date.now(),
       )

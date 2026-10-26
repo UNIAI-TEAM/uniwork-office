@@ -1,6 +1,7 @@
 import { isDecimalString } from '../../uniwork-docs/formats'
 import type { UniworkDocErrorCode } from '../../../shared/home-api'
 import type { SavedUploadSession } from '../../uniwork-docs/upload-session'
+import { isLegacyConversion, type LegacyConversion } from '../../uniwork-docs/legacy-cloud'
 
 /**
  * The durable save-queue record, version 2. The G5-04 record
@@ -88,6 +89,14 @@ export interface IntentRecordV2 {
    * part completes so a restart resumes at the next missing part.
    */
   uploadSession?: SavedUploadSession
+  /**
+   * UNI-2212: the conversion this intent's commit declares, snapshotted when the intent was minted
+   * (the staged bytes are the converted OOXML of a legacy live version). `null` = minted as an
+   * ordinary commit; absent = a record from before the snapshot existed, whose commit reads the
+   * working copy's binding instead. Every send and retry of the intent uses this one value, so
+   * the same Idempotency-Key never carries another conversion.
+   */
+  conversion?: LegacyConversion | null
 }
 
 /** what a caller knows about a legacy record's binding, used to upgrade v1 -> v2 */
@@ -214,6 +223,9 @@ function readV2(r: Record<string, unknown>): IntentRecordV2 | null {
     return null
   }
   const uploadSession = readUploadSession(r.uploadSession)
+  if (r.conversion !== undefined && r.conversion !== null && !isLegacyConversion(r.conversion)) {
+    return null
+  }
   return {
     v: 2,
     intentId: r.intentId,
@@ -237,6 +249,7 @@ function readV2(r: Record<string, unknown>): IntentRecordV2 | null {
     ...(isCount(r.maxBytes, 1) ? { maxBytes: r.maxBytes } : {}),
     ...(r.cancelReason === undefined ? {} : { cancelReason: r.cancelReason }),
     ...(uploadSession === undefined ? {} : { uploadSession }),
+    ...(r.conversion === undefined ? {} : { conversion: r.conversion as LegacyConversion | null }),
   }
 }
 

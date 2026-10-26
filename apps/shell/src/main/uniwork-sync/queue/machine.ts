@@ -1,4 +1,5 @@
 import type { UniworkDocErrorCode } from '../../../shared/home-api'
+import type { LegacyConversion } from '../../uniwork-docs/legacy-cloud'
 import { QUEUE_LIMITS, type QueueLimits } from './limits'
 import {
   isTerminalQueueState,
@@ -42,6 +43,8 @@ export interface NewIntentInput {
   length: number
   /** defaults to `ctx.now` */
   createdAt?: string
+  /** UNI-2212: the commit's conversion snapshot (null = ordinary; absent = read the binding) */
+  conversion?: LegacyConversion | null
 }
 
 export type QueueEffect =
@@ -295,6 +298,7 @@ function createFromSave(
     attempt: 0,
     createdAt: input.createdAt ?? iso(ctx.now),
     updatedAt: iso(ctx.now),
+    ...(input.conversion === undefined ? {} : { conversion: input.conversion }),
   }
 }
 

@@ -946,6 +946,9 @@ export class SaveCoordinator {
       attempt: 0,
       createdAt: at,
       updatedAt: at,
+      // UNI-2212: the conversion this commit declares is fixed with the intent, so a retry after
+      // the binding changed (a view launch, a reopen) still sends the same one
+      conversion: doc.binding.legacyFrom ? conversionFor(doc.binding.legacyFrom) : null,
     }
   }
 
@@ -1383,6 +1386,12 @@ export class SaveCoordinator {
           })
         }
         const editLockId = this.deps.editLockId?.(doc.path) ?? null
+        const conversion =
+          intent.conversion !== undefined
+            ? intent.conversion
+            : doc.binding.legacyFrom
+              ? conversionFor(doc.binding.legacyFrom)
+              : null
         // B70 + R2: the commit is about to be POSTed, so the durable record
         // must say `committing` BEFORE the request leaves - a crash or a lost
         // answer then reads `committing`, never `queued` (which the next poll
@@ -1410,10 +1419,9 @@ export class SaveCoordinator {
             baseRevision: intent.baseRevision,
             idempotencyKey: intent.idempotencyKey,
             ...(editLockId ? { editLockId } : {}),
-            // UNI-2212: a converted copy of a legacy document declares its conversion
-            ...(doc.binding.legacyFrom
-              ? { conversion: conversionFor(doc.binding.legacyFrom) }
-              : {}),
+            // UNI-2212: a converted copy of a legacy document declares its conversion, the one its
+            // intent was minted with (an intent from before the snapshot reads the binding)
+            ...(conversion ? { conversion } : {}),
           })
         } catch (error) {
           // only the COMMIT leg is tagged, and only for an answer the server
