@@ -57,6 +57,22 @@ PAGES = {
         '三、各方同意在十月底之前完成剩余工作',
         '四、会议决定下周再次召开评审会议',
     ]),
+    # a Vietnamese FORM: fill-in underscore lines, dong amounts, bullets, an e-mail
+    # address and `|`-ruled rows: the ASCII symbols the foreign-script gate must not
+    # mistake for another script (src/ocr-chain.ts)
+    'form': ('times.ttf', [
+        'ĐƠN ĐỀ NGHỊ CẤP KINH PHÍ',
+        'Họ và tên: ______________________   Ngày sinh: ____/____/______',
+        'Phòng ban: ______________________   Điện thoại: ____________',
+        'Email: nguyen.van.a@congty.vn',
+        '• Mua máy chủ dự phòng: 45.000.000 ₫',
+        '• Chi phí kiểm thử và đào tạo: 12.500.000 ₫',
+        '| STT | Nội dung | Số tiền (₫) |',
+        '| 1 | Máy chủ dự phòng | 45.000.000 |',
+        '| 2 | Kiểm thử và đào tạo | 12.500.000 |',
+        'Tổng cộng: 57.500.000 ₫',
+        'Người đề nghị ký tên: ______________________',
+    ]),
 }
 
 
