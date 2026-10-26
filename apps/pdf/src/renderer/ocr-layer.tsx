@@ -66,12 +66,20 @@ interface LineWord {
   box: [number, number, number, number]
   /** A real separator (space) preceded this word in the OCR stream. CJK scripts
       emit one word per character with no separators — joining them with spaces
-      would corrupt the searchable text (`使 用 价 值` never matches `使用价值`). */
+      would corrupt the searchable text (`S P A C E D` never matches unspaced). */
   gap: boolean
 }
 
-/** Split one OCR line into words: char boxes when present (chars of a word share
-    its box; separators carry degenerate boxes), whole-line fallback otherwise */
+/** Split one OCR line into words: runs of chars between separators (degenerate
+    box or whitespace), with x-extent = union of the word's char boxes and
+    y-extent = the line box so all words on a line share one baseline and font
+    size. Both shared-box engines (Vision / Windows) and per-glyph engines
+    (Tesseract alignChars) merge space-delimited words under the union rule.
+    No-space scripts (CJK / Kana) emit one char per box with no separators:
+    when consecutive chars do not share an identical box and either side is a
+    no-space script, each char stays its own word so `data.words` and per-char
+    search item offsets remain unchanged. Whole-line fallback when chars are
+    absent or incomplete. */
 function lineWords(line: PdfOcrLine): LineWord[] {
   if (!line.chars || line.chars.length === 0) {
     const text = line.text.trim()
@@ -80,6 +88,7 @@ function lineWords(line: PdfOcrLine): LineWord[] {
   const words: LineWord[] = []
   let cur: LineWord | null = null
   let sep = false
+  const [, ly0, , ly1] = line.box
   for (const c of line.chars) {
     if (isSeparatorBox(c.box) || c.text.trim() === '') {
       if (cur) words.push(cur)
@@ -87,10 +96,20 @@ function lineWords(line: PdfOcrLine): LineWord[] {
       sep = true
       continue
     }
-    if (cur && c.box[0] === cur.box[0] && c.box[2] === cur.box[2]) cur.text += c.text
-    else {
+    const sameBox = cur !== null && c.box[0] === cur.box[0] && c.box[2] === cur.box[2]
+    const canMerge =
+      cur !== null && (sameBox || (!endsNoSpaceScript(cur.text) && !startsNoSpaceScript(c.text)))
+    if (cur && canMerge) {
+      cur.text += c.text
+      cur.box[0] = Math.min(cur.box[0], c.box[0])
+      cur.box[2] = Math.max(cur.box[2], c.box[2])
+    } else {
       if (cur) words.push(cur)
-      cur = { text: c.text, box: [...c.box] as [number, number, number, number], gap: sep }
+      cur = {
+        text: c.text,
+        box: [c.box[0], ly0, c.box[2], ly1],
+        gap: sep,
+      }
       sep = false
     }
   }

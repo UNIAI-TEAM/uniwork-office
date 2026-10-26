@@ -3938,6 +3938,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 
 .pdf-ocr-layer span {
   position: absolute;
+  font-family: sans-serif;
   white-space: pre;
   color: transparent;
   cursor: text;
