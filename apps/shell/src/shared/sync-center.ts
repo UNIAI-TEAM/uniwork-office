@@ -96,6 +96,8 @@ export interface SyncCenterHeader {
   resyncFailed: boolean
   feedOff: boolean
   resynced: boolean
+  /** Org capability `drive_connector` (B10 / D1); true only when read and enabled. */
+  driveConnector?: boolean
 }
 
 export const SYNC_CENTER_ATTENTION_STATES = [

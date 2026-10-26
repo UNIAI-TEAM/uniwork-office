@@ -122,6 +122,8 @@ export interface SyncCenterFacts {
    * Unknown (`undefined`) is treated as on.
    */
   offlineLibrary?: boolean
+  /** The org capability `drive_connector`; `true` when Drive connector is enabled for the org. */
+  driveConnector?: boolean
   lastSyncAt?: string
   account?: SyncCenterAccountInfo
   org?: SyncCenterOrgInfo
@@ -338,6 +340,7 @@ export function buildSyncCenterSnapshot(facts: SyncCenterFacts): SyncCenterSnaps
     resyncFailed: facts.resyncFailed === true,
     feedOff: facts.feedOff === true,
     resynced: facts.resynced === true,
+    ...(facts.driveConnector === undefined ? {} : { driveConnector: facts.driveConnector }),
   }
 
   // Signed-out guard: expose only lockedCount, never document names or rows
@@ -1113,7 +1116,12 @@ export interface WiredSyncCenterDeps {
   activeDeploymentId(): string | null
   capabilityRead(orgId: string): Promise<{
     kind: string
-    capabilities: { sync_write: boolean; sync_feed?: boolean; offline_library?: boolean }
+    capabilities: {
+      sync_write: boolean
+      sync_feed?: boolean
+      offline_library?: boolean
+      drive_connector?: boolean
+    }
   }>
   /** the feed runtime's last pass verdict (resynced / resync refused past the cap) */
   feedVerdict(): SyncFeedVerdict
@@ -1319,6 +1327,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
       const adminPaused = cap ? cap.capabilities.sync_write === false : false
       const feedOff = cap ? cap.capabilities.sync_feed === false : false
       const offlineLibrary = cap ? cap.capabilities.offline_library !== false : undefined
+      const driveConnector = cap ? cap.capabilities.drive_connector === true : false
 
       const intents: SyncCenterIntentFact[] = []
       const drafts: SyncCenterDraftFact[] = []
@@ -1433,6 +1442,7 @@ export function createWiredSyncCenter(deps: WiredSyncCenterDeps): WiredSyncCente
         feedOff,
         ...feedFacts,
         ...(offlineLibrary === undefined ? {} : { offlineLibrary }),
+        driveConnector,
         ...(lastSyncAt ? { lastSyncAt } : {}),
         ...(account ? { account } : {}),
         ...(org ? { org } : {}),

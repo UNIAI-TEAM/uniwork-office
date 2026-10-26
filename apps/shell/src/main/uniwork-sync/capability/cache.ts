@@ -5,8 +5,9 @@
  *   the TTL answers from the cache without a request unless `force`.
  * - A failed refresh (5xx, malformed body, offline) inside the TTL keeps the
  *   cached value as is; after the TTL it keeps the last G5 capabilities
- *   (`sync_feed`, `sync_write`, `offline_library`) but turns `ai_uniwork` off.
- * - Never read -> `sync_write` on, feed / offline library / AI off.
+ *   (`sync_feed`, `sync_write`, `offline_library`) but turns `ai_uniwork` and
+ *   `drive_connector` off.
+ * - Never read -> `sync_write` on, feed / offline library / AI / Drive off.
  * - 401 -> `session_expired` (with the same degraded capabilities).
  * - Entries are keyed by org id and never applied to another org.
  */
@@ -17,6 +18,7 @@ export interface OfficeCapabilities {
   offline_library: boolean
   ai_uniwork: boolean
   ai_uniwork_formats: string[]
+  drive_connector: boolean
 }
 
 export type CapabilitySource = 'fresh' | 'cached' | 'stale' | 'default'
@@ -47,6 +49,7 @@ export const NEVER_READ_CAPABILITIES: Readonly<OfficeCapabilities> = Object.free
   offline_library: false,
   ai_uniwork: false,
   ai_uniwork_formats: [],
+  drive_connector: false,
 })
 
 interface Entry {
@@ -75,6 +78,7 @@ export function parseCapabilities(
       offline_library: raw.offline_library as boolean,
       ai_uniwork: raw.ai_uniwork as boolean,
       ai_uniwork_formats: [...(formats as string[])],
+      drive_connector: raw.drive_connector === true,
     },
     ttlSeconds,
   }
@@ -159,7 +163,12 @@ export class CapabilityCache {
       return { capabilities: copy(entry.capabilities), source: 'cached' }
     }
     return {
-      capabilities: { ...copy(entry.capabilities), ai_uniwork: false, ai_uniwork_formats: [] },
+      capabilities: {
+        ...copy(entry.capabilities),
+        ai_uniwork: false,
+        ai_uniwork_formats: [],
+        drive_connector: false,
+      },
       source: 'stale',
     }
   }

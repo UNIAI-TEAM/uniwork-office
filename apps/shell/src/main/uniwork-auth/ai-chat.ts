@@ -234,6 +234,7 @@ const ALL_FORMATS_ON: OfficeCapabilities = {
   offline_library: false,
   ai_uniwork: true,
   ai_uniwork_formats: [...UNIWORK_FORMATS],
+  drive_connector: false,
 }
 
 export interface UniworkAiAvailabilityDeps {
