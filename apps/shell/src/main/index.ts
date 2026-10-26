@@ -7544,12 +7544,6 @@ app.on('before-quit', () => {
   markSheetsShuttingDown()
   stopSheetsSidecar()
   killAllPdfConvertJobs()
-  // the opener first: it aborts its own pending conversions and refuses new staging, so nothing
-  // new starts after the running jobs are killed
-  void legacyOpener.dispose()
-  // Reject queued conversions and refuse new ones before the running soffice trees are killed
-  disposeLegacyConverter()
-  killAllActiveLegacyConversions()
   // release the MCP port synchronously (macOS keeps the process alive after
   // the last window closes, so window-all-closed is not enough)
   stopMcpSync()
@@ -7570,6 +7564,13 @@ app.on('will-quit', (event) => {
   // not in before-quit: a close prompt can still veto the quit, and the tabs would then
   // lose their files and read as plain local documents
   uniworkDocs?.service.disposeSourceViews()
+  // The same for the legacy converter: its opener and queue cannot be reopened, and the converted
+  // tabs read their backing files. The opener first: it aborts its own pending conversions and
+  // refuses new staging, so nothing new starts after the running jobs are killed
+  void legacyOpener.dispose()
+  // Reject queued conversions and refuse new ones before the running soffice trees are killed
+  disposeLegacyConverter()
+  killAllActiveLegacyConversions()
   // UNI-2068: a zip download in flight is abandoned; its temp file must not outlive the app
   uniworkDocs?.disposeZipDownloads()
   stopUniworkAccount()
