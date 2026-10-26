@@ -64,6 +64,7 @@ import {
   printHtmlToPdf,
   safeExternalUrl,
   showOpenDialogWithMemory,
+  assertModernSaveTarget,
   showSaveDialogWithMemory,
   helpMenuTemplate,
   viewMenuTemplate,
@@ -3435,6 +3436,9 @@ export function registerSheetsIpc(): void {
       if (!macroEnabled && selection.filePath.toLowerCase().endsWith('.csv')) {
         return { canceled: true, csvSaveAsPath: selection.filePath }
       }
+      // a typed .xls/.doc/.ppt answer is refused, never retargeted to `<name>.xls.xlsx`: the
+      // chooser's overwrite confirmation covered the path it returned, not that one
+      assertModernSaveTarget(selection.filePath, ext)
       targetPath = selection.filePath.toLowerCase().endsWith(`.${ext}`)
         ? selection.filePath
         : `${selection.filePath}.${ext}`

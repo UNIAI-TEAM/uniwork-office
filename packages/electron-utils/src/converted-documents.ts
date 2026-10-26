@@ -61,7 +61,10 @@ const LEGACY_EXTENSION_RE = /\.(doc|xls|ppt)$/i
  * a legacy name. Nor is the answer retargeted to `<name>.doc.docx`: the chooser's overwrite
  * confirmation covered the path it returned, not that one.
  */
-export function assertModernSaveTarget(chosen: string, ext: 'docx' | 'xlsx' | 'pptx'): string {
+export function assertModernSaveTarget(
+  chosen: string,
+  ext: 'docx' | 'xlsx' | 'xlsm' | 'pptx',
+): string {
   if (!LEGACY_EXTENSION_RE.test(chosen)) return chosen
   throw new Error(`Choose a name ending in .${ext}: a legacy .doc/.xls/.ppt name cannot be used`)
 }
