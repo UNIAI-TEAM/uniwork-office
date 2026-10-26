@@ -107,6 +107,35 @@ import type {
   PreflightSDO,
 } from './folder-upload-api'
 import type { ZipDownloadBridge } from './zip-download-api'
+import type {
+  DriveConnection,
+  DriveFileDetail,
+  DriveFileListPage,
+  DriveFileListQuery,
+  DriveFileTarget,
+  DriveHistoryEvent,
+  UniworkDriveResult,
+} from './uniwork-drive-api'
+export { UNIWORK_DRIVE_CHANNELS } from './uniwork-drive-api'
+export type {
+  DriveConnection,
+  DriveConnectionStatus,
+  DriveFile,
+  DriveFileDetail,
+  DriveFileListPage,
+  DriveFileListQuery,
+  DriveFileTarget,
+  DriveHistoryEvent,
+  DriveIconKind,
+  DriveLinkedTaskRef,
+  DriveSharingState,
+  DriveTaskCreationGroup,
+  DriveTasksCreatedSummary,
+  DriveViewerAccess,
+  UniworkDriveApi,
+  UniworkDriveErrorCode,
+  UniworkDriveResult,
+} from './uniwork-drive-api'
 
 /** UI language; kept self-contained here (mirrors Lang in @genoffice/i18n) */
 
@@ -1797,6 +1826,14 @@ export interface HomeApi {
   onSignOutPrompt?(cb: (request: SignOutPromptRequest) => void): () => void
   /** G5-11 D5: answer a main-initiated sign-out prompt */
   answerSignOutPrompt?(requestId: string, confirmed: boolean): Promise<void>
+  /** UNI-2194 (D1): Google Drive connector calls (also on `window.uniworkDrive`) */
+  uniworkDriveIsAvailable?(orgId?: string): Promise<boolean>
+  uniworkDriveListConnections?(workspaceId: string): Promise<UniworkDriveResult<DriveConnection[]>>
+  uniworkDriveListFiles?(query: DriveFileListQuery): Promise<UniworkDriveResult<DriveFileListPage>>
+  uniworkDriveGetFile?(input: DriveFileTarget): Promise<UniworkDriveResult<DriveFileDetail>>
+  uniworkDriveUnlink?(input: DriveFileTarget): Promise<UniworkDriveResult<null>>
+  uniworkDriveOpenOnGoogle?(input: DriveFileTarget): Promise<UniworkDriveResult<null>>
+  uniworkDriveGetHistory?(input: DriveFileTarget): Promise<UniworkDriveResult<DriveHistoryEvent[]>>
 }
 
 /** IndexedDB media blobs embedded in Workbench ZIP backup (optional). */
