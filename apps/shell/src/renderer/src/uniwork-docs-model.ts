@@ -116,6 +116,17 @@ export const UNIWORK_STATE_KEYS: Record<UniworkSaveState, StringKey> = {
 
 export type { UniworkLockReason }
 
+/**
+ * UNI-2212: the sentence of a refused legacy conversion. It already says the changes stay in this
+ * copy, so a failed save shows it in place of the "won't retry: {reason}" line.
+ */
+export const LEGACY_CONVERSION_KEY = 'uwErrLegacyConversion' as const
+
+/** the failed-save sentence: the generic one with its `{reason}`, or a reason that is a sentence */
+export function failedTipKeyOf(reasonKey: StringKey): StringKey {
+  return reasonKey === LEGACY_CONVERSION_KEY ? LEGACY_CONVERSION_KEY : 'uwTipFailed'
+}
+
 /** short reason shown after "Blocked:" */
 export function blockedReasonKey(
   error: UniworkDocErrorCode | UniworkLockReason | undefined,
@@ -155,6 +166,10 @@ export function blockedReasonKey(
     // reason, never the generic "unavailable"
     case 'edit_locked':
       return 'uwReasonEditLocked'
+    // UNI-2212: the refused conversion has no short fragment; its sentence stands on its own
+    // (`failedTipKeyOf`)
+    case 'legacy_conversion_invalid':
+      return LEGACY_CONVERSION_KEY
     default:
       return 'uwReasonOther'
   }
@@ -364,7 +379,7 @@ export function chipModelOf(
         ...(reasonKey === 'uwReasonTooLargeWithLimit' && limitBytes !== undefined
           ? { maxBytes: limitBytes }
           : {}),
-        tipKey: 'uwTipFailed',
+        tipKey: failedTipKeyOf(reasonKey),
         action: { kind: 'details', labelKey: 'uwActDetails' },
       }
     }

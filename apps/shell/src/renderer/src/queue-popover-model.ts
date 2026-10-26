@@ -7,7 +7,9 @@ import type {
 import type { StringKey } from './locale'
 import { blockedCopy } from './sync-center-model'
 import {
+  LEGACY_CONVERSION_KEY,
   blockedReasonKey,
+  failedTipKeyOf,
   formatSaveTime,
   isEditLockReadOnlyPhase,
   isTerminalLockLostReason,
@@ -134,6 +136,8 @@ const FAILED_REASON_KEY: Record<string, StringKey> = {
   too_large: 'uwReasonTooLarge',
   // EL-1(a) (UNI-1645c): a commit refused by someone else's edit lock
   edit_locked: 'uwReasonEditLocked',
+  // UNI-2212: a refused legacy conversion
+  legacy_conversion: LEGACY_CONVERSION_KEY,
   other: 'uwReasonOther',
 }
 
@@ -262,11 +266,16 @@ export function queuePopoverModelOf(
   let line1: PopoverLine
   if (failed) {
     const reasonKey = failedReasonKeyOf(status, row)
-    line1 = {
-      key: 'uwTipFailed',
-      reasonKey,
-      ...(reasonKey === 'uwReasonTooLargeWithLimit' && maxBytes !== undefined ? { maxBytes } : {}),
-    }
+    line1 =
+      failedTipKeyOf(reasonKey) === 'uwTipFailed'
+        ? {
+            key: 'uwTipFailed',
+            reasonKey,
+            ...(reasonKey === 'uwReasonTooLargeWithLimit' && maxBytes !== undefined
+              ? { maxBytes }
+              : {}),
+          }
+        : { key: LEGACY_CONVERSION_KEY }
   } else if (opener === 'ctrl-s' || !row) {
     line1 = { key: 'uwQueueBlockedSave' }
   } else {
