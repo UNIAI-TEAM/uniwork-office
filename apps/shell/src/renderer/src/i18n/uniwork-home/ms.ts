@@ -300,7 +300,8 @@ export const ms = {
   uhDriveBoundAccount: 'Akaun terikat',
   uhDriveReboundBy: '(diikat semula oleh {name})',
   uhDriveYouOpenWith: 'Anda buka dengan',
-  uhDriveOpensWithNote: 'Buka di Google Drive dan Tanya UNI kedua-duanya menggunakan akaun ini',
+  uhDriveOpensWithNote:
+    'Lihat dan edit kandungan di Google dengan akaun {email}. UniWork hanya menyimpan pautan, tugas yang menggunakan fail dan sejarah tindakan; kandungan kekal di Google Drive.',
   uhDriveViewerEmailMissing: 'Akaun belum diketahui',
   uhDriveViewerUnknownTitle: 'UniWork belum boleh membaca fail ini',
   uhDriveViewerUnknownBody:
@@ -347,6 +348,7 @@ export const ms = {
   uhDriveUnlinkConfirmKeep: 'Kekalkan',
   uhDriveUnlinkConfirmSubmit: 'Nyahpaut',
   uhDriveUnlinkConfirmWorking: 'Menyahpaut…',
+  uhDriveUnlinkFailed: 'Tidak dapat menyahpaut. Cuba lagi.',
   uhDriveNotFound: 'Fail ini tidak ditemui atau anda tiada kebenaran untuk melihatnya.',
   uhDriveErrAuthFailed:
     'Sambungan Google Drive telah tamat tempoh. Sambung semula untuk meneruskan.',

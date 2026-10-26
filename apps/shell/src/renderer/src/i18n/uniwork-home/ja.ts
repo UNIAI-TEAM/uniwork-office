@@ -305,7 +305,7 @@ export const ja = {
   uhDriveReboundBy: '（{name} が再度紐づけ）',
   uhDriveYouOpenWith: '開くアカウント',
   uhDriveOpensWithNote:
-    'Google ドライブで開く操作と UNI への質問はどちらもこのアカウントを使います',
+    'Google 上でコンテンツを表示・編集します（アカウント: {email}）。UniWork が保存するのはリンク、ファイルを使うタスク、操作履歴だけで、コンテンツは Google Drive に残ります。',
   uhDriveViewerEmailMissing: 'アカウントはまだ不明です',
   uhDriveViewerUnknownTitle: 'UniWork はまだこのファイルを読めません',
   uhDriveViewerUnknownBody:
@@ -352,6 +352,7 @@ export const ja = {
   uhDriveUnlinkConfirmKeep: '残す',
   uhDriveUnlinkConfirmSubmit: 'リンクを解除',
   uhDriveUnlinkConfirmWorking: 'リンクを解除中…',
+  uhDriveUnlinkFailed: 'リンクを解除できませんでした。もう一度お試しください。',
   uhDriveNotFound: 'このファイルが見つからないか、表示する権限がありません。',
   uhDriveErrAuthFailed: 'Google ドライブの接続の有効期限が切れました。再接続して続行してください。',
   uhDriveFeatureOff: 'この組織では Google ドライブを利用できなくなりました。',

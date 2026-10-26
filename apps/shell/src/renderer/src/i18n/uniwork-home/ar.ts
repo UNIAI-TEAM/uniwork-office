@@ -293,7 +293,8 @@ export const ar = {
   uhDriveBoundAccount: 'الحساب المرتبط',
   uhDriveReboundBy: '(أعاد {name} الربط)',
   uhDriveYouOpenWith: 'تفتحه بالحساب',
-  uhDriveOpensWithNote: 'يستخدم «فتح في Google Drive» و«اسأل UNI» هذا الحساب',
+  uhDriveOpensWithNote:
+    'اعرض المحتوى وعدّله على Google باستخدام الحساب {email}. يحتفظ UniWork بالرابط والمهام التي تستخدم الملف وسجل الإجراءات فقط؛ ويبقى المحتوى في Google Drive.',
   uhDriveViewerEmailMissing: 'الحساب غير معروف بعد',
   uhDriveViewerUnknownTitle: 'لم تسمح لـ UniWork بقراءة الملف بعد',
   uhDriveViewerUnknownBody:
@@ -310,7 +311,7 @@ export const ar = {
   uhDrivePermissionsValue: 'وفق المشاركة على Drive',
   uhDriveUsedInTitle: 'مستخدم في · {count}',
   uhDriveTasksCreatedTitle: 'المهام المنشأة من هذا المستند',
-  uhDriveTasksCreatedGroup: '{date} · {name} · {count} مهام',
+  uhDriveTasksCreatedGroup: '{date} · {name} · المهام: {count}',
   uhDriveTasksCreatedGroupOne: '{date} · {name} · مهمة واحدة',
   uhDriveActivityTitle: 'النشاط في UniWork',
   uhDriveActivityEmpty: 'لا يوجد نشاط بعد.',
@@ -332,7 +333,7 @@ export const ar = {
     'تم استخدام هذا المستند بالفعل لإنشاء مهام ({count} حتى الآن). قد يؤدي إنشاء المزيد إلى تكرارات.',
   uhDriveRecreateView: 'عرض المهام المنشأة',
   uhDriveRecreateContinue: 'الإرسال إلى UNI على أي حال',
-  uhDriveUnlinkConfirmTitle: 'إلغاء الربط من {count} مهام؟',
+  uhDriveUnlinkConfirmTitle: 'إلغاء الربط من المهام ({count})؟',
   uhDriveUnlinkConfirmTitleOne: 'إلغاء الربط من مهمة واحدة؟',
   uhDriveUnlinkConfirmTitleNone: 'إلغاء ربط هذا الملف؟',
   uhDriveUnlinkConfirmBody:
@@ -340,6 +341,7 @@ export const ar = {
   uhDriveUnlinkConfirmKeep: 'إبقاء',
   uhDriveUnlinkConfirmSubmit: 'إلغاء الربط',
   uhDriveUnlinkConfirmWorking: 'جارٍ إلغاء الربط…',
+  uhDriveUnlinkFailed: 'تعذّر إلغاء الربط. حاول مرة أخرى.',
   uhDriveNotFound: 'لم يتم العثور على هذا الملف أو ليس لديك صلاحية عرضه.',
   uhDriveErrAuthFailed: 'انتهت صلاحية اتصال Google Drive. أعد الاتصال للمتابعة.',
   uhDriveFeatureOff: 'لم يعد Google Drive متاحًا لهذه المؤسسة.',

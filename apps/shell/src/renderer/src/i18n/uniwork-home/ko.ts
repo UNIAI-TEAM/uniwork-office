@@ -297,7 +297,8 @@ export const ko = {
   uhDriveBoundAccount: '연결된 계정',
   uhDriveReboundBy: '({name}님이 다시 연결)',
   uhDriveYouOpenWith: '열기에 사용하는 계정',
-  uhDriveOpensWithNote: 'Google Drive에서 열기와 UNI에게 묻기 모두 이 계정을 사용합니다',
+  uhDriveOpensWithNote:
+    'Google에서 {email} 계정으로 콘텐츠를 보고 편집합니다. UniWork는 링크, 파일을 사용하는 작업, 작업 기록만 저장하며 콘텐츠는 Google Drive에 그대로 남습니다.',
   uhDriveViewerEmailMissing: '아직 계정을 알 수 없음',
   uhDriveViewerUnknownTitle: 'UniWork이 아직 이 파일을 읽을 수 없음',
   uhDriveViewerUnknownBody:
@@ -344,6 +345,7 @@ export const ko = {
   uhDriveUnlinkConfirmKeep: '유지',
   uhDriveUnlinkConfirmSubmit: '연결 해제',
   uhDriveUnlinkConfirmWorking: '연결 해제 중…',
+  uhDriveUnlinkFailed: '연결을 해제하지 못했습니다. 다시 시도하세요.',
   uhDriveNotFound: '이 파일을 찾을 수 없거나 볼 권한이 없습니다.',
   uhDriveErrAuthFailed: 'Google Drive 연결이 만료되었습니다. 계속하려면 다시 연결하세요.',
   uhDriveFeatureOff: '이 조직에서는 Google Drive를 더 이상 사용할 수 없습니다.',

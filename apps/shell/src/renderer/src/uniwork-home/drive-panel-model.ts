@@ -37,6 +37,12 @@ export function driveErrorKey(error: UniworkDriveErrorCode): StringKey {
   }
 }
 
+/** the sentence of a failed unlink: the list's load error would name the wrong action */
+export function driveUnlinkErrorKey(error: UniworkDriveErrorCode): StringKey {
+  const key = driveErrorKey(error)
+  return key === 'uhDriveLoadError' ? 'uhDriveUnlinkFailed' : key
+}
+
 /** errors after which the person has to sign in again: no retry would help */
 export function isDriveSessionError(error: UniworkDriveErrorCode): boolean {
   return error === 'not_signed_in' || error === 'session_expired'

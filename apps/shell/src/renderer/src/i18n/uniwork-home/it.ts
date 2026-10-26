@@ -301,7 +301,8 @@ export const it = {
   uhDriveBoundAccount: 'Account associato',
   uhDriveReboundBy: '(riassociato da {name})',
   uhDriveYouOpenWith: 'Lo apri con',
-  uhDriveOpensWithNote: 'Apri in Google Drive e Chiedi a UNI usano questo account',
+  uhDriveOpensWithNote:
+    "Visualizza e modifica il contenuto su Google con l'account {email}. UniWork conserva solo il link, le attività che usano il file e la cronologia delle azioni; il contenuto resta su Google Drive.",
   uhDriveViewerEmailMissing: 'Account non ancora noto',
   uhDriveViewerUnknownTitle: 'UniWork non può ancora leggere questo file',
   uhDriveViewerUnknownBody:
@@ -348,6 +349,7 @@ export const it = {
   uhDriveUnlinkConfirmKeep: 'Mantieni',
   uhDriveUnlinkConfirmSubmit: 'Scollega',
   uhDriveUnlinkConfirmWorking: 'Scollegamento…',
+  uhDriveUnlinkFailed: 'Impossibile scollegare. Riprova.',
   uhDriveNotFound: 'File non trovato oppure non hai il permesso di visualizzarlo.',
   uhDriveErrAuthFailed: 'La connessione Google Drive è scaduta. Riconnettiti per continuare.',
   uhDriveFeatureOff: 'Google Drive non è più disponibile per questa organizzazione.',

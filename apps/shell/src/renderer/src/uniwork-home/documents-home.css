@@ -1999,7 +1999,20 @@
   font: inherit;
   font-size: 12px;
   font-weight: 500;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.dh-drive-reconnect-link > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dh-drive-reconnect-link .dh-drive-warn-icon {
+  flex: none;
 }
 
 .dh-drive-reconnect-link:disabled,
@@ -2144,11 +2157,6 @@
     white-space: normal;
     line-height: 1.3;
   }
-
-  .dh-drive-reconnect-link {
-    white-space: normal;
-    text-align: start;
-  }
 }
 
 /* UNI-2196 (D3): Google Drive detail panel beside the list */
@@ -2179,7 +2187,9 @@
   color: var(--text-secondary);
 }
 
-/* the panel carries the details, so the list drops its two secondary columns and keeps the name legible */
+/* the panel carries the details, so the list keeps Name + Access and lets the badge wrap (D3-V1) */
+.dh-drive-view.has-panel .dh-drive-col-account,
+.dh-drive-view.has-panel .dh-drive-cell-account,
 .dh-drive-view.has-panel .dh-drive-col-used,
 .dh-drive-view.has-panel .dh-drive-cell-used,
 .dh-drive-view.has-panel .dh-drive-col-tasks,
@@ -2188,15 +2198,21 @@
 }
 
 .dh-drive-view.has-panel .dh-drive-col-name {
-  width: 46%;
-}
-
-.dh-drive-view.has-panel .dh-drive-col-account {
-  width: 30%;
+  width: 58%;
 }
 
 .dh-drive-view.has-panel .dh-drive-col-access {
-  width: 24%;
+  width: 42%;
+}
+
+.dh-drive-view.has-panel .dh-drive-th {
+  white-space: normal;
+  line-height: 1.3;
+}
+
+.dh-drive-view.has-panel .dh-drive-badge {
+  white-space: normal;
+  line-height: 1.3;
 }
 
 .dh-drive-panel {
@@ -2250,7 +2266,9 @@
   margin: 2px 0 0;
   color: var(--text-secondary);
   font-size: 12px;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dh-drive-panel-body {
@@ -2301,7 +2319,8 @@
 }
 
 .dh-drive-panel-link:focus-visible,
-.dh-drive-panel-task:focus-visible {
+.dh-drive-panel-task:focus-visible,
+.dh-drive-panel .btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
@@ -2465,10 +2484,19 @@ p.dh-drive-panel-muted {
   color: var(--danger-text);
 }
 
-/* at ~900 px the panel narrows and the list keeps only Name / Account / Access */
+/* at ~900 px the panel narrows and carries account + access, so the list keeps only Name (D3-V2) */
 @media (max-width: 1100px) {
   .dh-drive-panel {
     flex-basis: 300px;
+  }
+
+  .dh-drive-view.has-panel .dh-drive-col-access,
+  .dh-drive-view.has-panel .dh-drive-cell-access {
+    display: none;
+  }
+
+  .dh-drive-view.has-panel .dh-drive-col-name {
+    width: 100%;
   }
 }
 

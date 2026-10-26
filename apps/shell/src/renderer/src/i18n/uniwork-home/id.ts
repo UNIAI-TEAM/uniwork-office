@@ -298,7 +298,8 @@ export const id = {
   uhDriveBoundAccount: 'Akun terikat',
   uhDriveReboundBy: '(diikat ulang oleh {name})',
   uhDriveYouOpenWith: 'Anda membuka dengan',
-  uhDriveOpensWithNote: 'Buka di Google Drive dan Tanya UNI sama-sama memakai akun ini',
+  uhDriveOpensWithNote:
+    'Lihat dan edit konten di Google dengan akun {email}. UniWork hanya menyimpan tautan, tugas yang memakai berkas, dan riwayat tindakan; konten tetap berada di Google Drive.',
   uhDriveViewerEmailMissing: 'Akun belum diketahui',
   uhDriveViewerUnknownTitle: 'UniWork belum bisa membaca berkas ini',
   uhDriveViewerUnknownBody:
@@ -345,6 +346,7 @@ export const id = {
   uhDriveUnlinkConfirmKeep: 'Pertahankan',
   uhDriveUnlinkConfirmSubmit: 'Lepas tautan',
   uhDriveUnlinkConfirmWorking: 'Melepas tautan…',
+  uhDriveUnlinkFailed: 'Tidak dapat melepas tautan. Coba lagi.',
   uhDriveNotFound: 'Berkas ini tidak ditemukan atau Anda tidak punya izin untuk melihatnya.',
   uhDriveErrAuthFailed:
     'Koneksi Google Drive telah kedaluwarsa. Hubungkan ulang untuk melanjutkan.',

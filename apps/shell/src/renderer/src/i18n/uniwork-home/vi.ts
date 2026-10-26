@@ -295,7 +295,8 @@ export const vi = {
   uhDriveBoundAccount: 'Tài khoản gắn',
   uhDriveReboundBy: '(gắn lại bởi {name})',
   uhDriveYouOpenWith: 'Bạn mở bằng',
-  uhDriveOpensWithNote: 'Mở trên Google Drive và Hỏi UNI đều dùng tài khoản này',
+  uhDriveOpensWithNote:
+    'Xem và sửa nội dung trên Google, bằng tài khoản {email}. UniWork chỉ lưu liên kết, các việc dùng tệp và lịch sử thao tác; nội dung vẫn nằm trên Google Drive.',
   uhDriveViewerEmailMissing: 'Chưa rõ tài khoản',
   uhDriveViewerUnknownTitle: 'Chưa cho UniWork đọc tệp',
   uhDriveViewerUnknownBody:
@@ -342,6 +343,7 @@ export const vi = {
   uhDriveUnlinkConfirmKeep: 'Giữ lại',
   uhDriveUnlinkConfirmSubmit: 'Bỏ liên kết',
   uhDriveUnlinkConfirmWorking: 'Đang bỏ liên kết…',
+  uhDriveUnlinkFailed: 'Không bỏ liên kết được. Thử lại.',
   uhDriveNotFound: 'Không tìm thấy tệp này hoặc bạn không có quyền xem.',
   uhDriveErrAuthFailed: 'Kết nối Google Drive đã hết hạn. Hãy kết nối lại để tiếp tục.',
   uhDriveFeatureOff: 'Google Drive hiện không còn khả dụng cho tổ chức này.',

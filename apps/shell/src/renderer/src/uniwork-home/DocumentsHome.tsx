@@ -1163,6 +1163,18 @@ export function DocumentsHome({
     void openDriveWeb(build(driveWeb))
   }
 
+  /** closes the Drive panel; focus goes back to the row it was opened from */
+  const closeDrivePanel = () => {
+    const id = driveSel?.row.id
+    setDriveSel(null)
+    if (!id) return
+    window.requestAnimationFrame(() =>
+      Array.from(document.querySelectorAll<HTMLElement>('[data-drive-file-id]'))
+        .find((el) => el.dataset.driveFileId === id)
+        ?.focus(),
+    )
+  }
+
   const openFolderInWorkspace = (id: string | null) => {
     setSearchDraft('')
     setFolderNotice(null)
@@ -2864,6 +2876,7 @@ export function DocumentsHome({
               const row = drive.files.find((f) => f.id === driveFileId)
               if (row) setDriveSel({ row, focus: via === 'keyboard' })
             }}
+            onClosePanel={closeDrivePanel}
             onAddFromDrive={
               driveWeb?.orgSlug && driveWeb.wsSlug
                 ? (connectionId) =>
@@ -2891,20 +2904,19 @@ export function DocumentsHome({
                   row={drive.files.find((f) => f.id === driveSel.row.id) ?? driveSel.row}
                   web={driveWeb}
                   autoFocus={driveSel.focus}
-                  onClose={() => {
-                    const id = driveSel.row.id
-                    setDriveSel(null)
-                    // focus goes back to the row the panel was opened from
-                    window.requestAnimationFrame(() =>
-                      Array.from(document.querySelectorAll<HTMLElement>('[data-drive-file-id]'))
-                        .find((el) => el.dataset.driveFileId === id)
-                        ?.focus(),
-                    )
-                  }}
+                  onClose={closeDrivePanel}
                   onOpenOnGoogle={(driveFileId) => void drive.openOnGoogle(driveFileId)}
                   onUnlinked={() => {
                     setDriveSel(null)
                     drive.retry()
+                    // the row and the dialog are gone: focus goes to the first remaining row, else Add
+                    window.requestAnimationFrame(() => {
+                      const view = document.querySelector<HTMLElement>('[data-drive-view]')
+                      const target =
+                        view?.querySelector<HTMLElement>('[data-drive-file-id]') ??
+                        view?.querySelector<HTMLElement>('.dh-drive-add-btn')
+                      target?.focus()
+                    })
                   }}
                   onFeatureDisabled={() => leaveDrive('uhDriveFeatureOff')}
                   onGone={drive.retry}

@@ -330,6 +330,8 @@ export interface DriveListProps {
   selectedFileId?: string | null
   /** a row was picked: a click or Space (`keyboard`) selects, a double click or Enter opens on Google */
   onSelect?: (driveFileId: string, via: 'pointer' | 'keyboard') => void
+  /** Escape on a row closes the open panel */
+  onClosePanel?: () => void
   /** the detail panel, drawn beside the table */
   panel?: ReactNode
   /** Web hand-off seams (UNI-2196, D3); disabled when omitted */
@@ -373,6 +375,7 @@ export function DriveList({
   onOpenOnGoogle,
   selectedFileId = null,
   onSelect,
+  onClosePanel,
   panel,
   onAddFromDrive,
   onManageConnections,
@@ -406,6 +409,11 @@ export function DriveList({
   const onRowKeyDown = (event: ReactKeyboardEvent<HTMLTableRowElement>, driveFileId: string) => {
     if (event.nativeEvent.isComposing) return
     if (event.repeat) return
+    if (event.key === 'Escape' && selectedFileId && onClosePanel) {
+      event.preventDefault()
+      onClosePanel()
+      return
+    }
     if (event.key !== 'Enter' && event.key !== ' ') return
     const target = event.target as HTMLElement | null
     if (target && target !== event.currentTarget && target.closest('button, a, input')) return
@@ -570,7 +578,11 @@ export function DriveList({
                           aria-current={selectedFileId === file.id ? 'true' : undefined}
                           tabIndex={0}
                           onClick={() => onSelect?.(file.id, 'pointer')}
-                          onDoubleClick={() => onOpenOnGoogle(file.id)}
+                          onDoubleClick={(e) => {
+                            const target = e.target as HTMLElement | null
+                            if (target && target.closest('button, a, input')) return
+                            onOpenOnGoogle(file.id)
+                          }}
                           onKeyDown={(e) => onRowKeyDown(e, file.id)}
                         >
                           <td className="dh-drive-td dh-drive-cell-name">

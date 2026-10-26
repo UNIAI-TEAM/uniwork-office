@@ -300,7 +300,8 @@ export const ru = {
   uhDriveBoundAccount: 'Привязанный аккаунт',
   uhDriveReboundBy: '(перепривязан: {name})',
   uhDriveYouOpenWith: 'Вы открываете через',
-  uhDriveOpensWithNote: 'Открытие в Google Диске и «Спросить UNI» используют этот аккаунт',
+  uhDriveOpensWithNote:
+    'Просмотр и редактирование содержимого в Google с аккаунтом {email}. UniWork хранит только ссылку, задачи, использующие файл, и историю действий; содержимое остаётся в Google Диске.',
   uhDriveViewerEmailMissing: 'Аккаунт пока не известен',
   uhDriveViewerUnknownTitle: 'UniWork пока не может читать этот файл',
   uhDriveViewerUnknownBody:
@@ -347,6 +348,7 @@ export const ru = {
   uhDriveUnlinkConfirmKeep: 'Оставить',
   uhDriveUnlinkConfirmSubmit: 'Отвязать',
   uhDriveUnlinkConfirmWorking: 'Отвязываем…',
+  uhDriveUnlinkFailed: 'Не удалось отвязать. Повторите попытку.',
   uhDriveNotFound: 'Файл не найден, или у вас нет прав на его просмотр.',
   uhDriveErrAuthFailed: 'Подключение к Google Диску истекло. Подключитесь снова, чтобы продолжить.',
   uhDriveFeatureOff: 'Google Диск больше недоступен для этой организации.',

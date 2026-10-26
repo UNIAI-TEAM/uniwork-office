@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react'
 import type {
   DriveFile,
@@ -16,6 +17,7 @@ import {
   driveCreationRows,
   driveErrorKey,
   driveTypeLabel,
+  driveUnlinkErrorKey,
   formatDriveDay,
   reboundByName,
   showRebind,
@@ -171,7 +173,7 @@ function UnlinkConfirm({
     setError(null)
     try {
       const failed = await onConfirm()
-      if (failed) setError(driveErrorKey(failed))
+      if (failed) setError(driveUnlinkErrorKey(failed))
     } finally {
       sending.current = false
       setBusy(false)
@@ -333,6 +335,13 @@ export function DrivePanel({
       onFeatureDisabled()
       return null
     }
+    if (res.error === 'not_found') {
+      // someone else already unlinked it: nothing left to do but close and read the list again
+      setConfirming(false)
+      onGone()
+      onClose()
+      return null
+    }
     return res.error
   }
 
@@ -343,6 +352,21 @@ export function DrivePanel({
   }
 
   const name = file?.name ?? row.name
+  const subtitle = file
+    ? driveTypeLabel(file.iconKind, t) +
+      (file.driveModifiedAt
+        ? ` · ${
+            file.driveModifiedByDisplay
+              ? t('uhDriveModifiedBy', {
+                  name: file.driveModifiedByDisplay,
+                  when: formatFullWhen(file.driveModifiedAt, dateLocale),
+                })
+              : t('uhDriveModifiedAt', {
+                  when: formatFullWhen(file.driveModifiedAt, dateLocale),
+                })
+          }`
+        : '')
+    : ''
   const iconKind = file?.iconKind ?? row.iconKind
 
   return (
@@ -366,20 +390,8 @@ export function DrivePanel({
             {name}
           </h4>
           {file && (
-            <p className="dh-drive-panel-sub" data-drive-panel-sub="">
-              {driveTypeLabel(file.iconKind, t)}
-              {file.driveModifiedAt
-                ? ` · ${
-                    file.driveModifiedByDisplay
-                      ? t('uhDriveModifiedBy', {
-                          name: file.driveModifiedByDisplay,
-                          when: formatFullWhen(file.driveModifiedAt, dateLocale),
-                        })
-                      : t('uhDriveModifiedAt', {
-                          when: formatFullWhen(file.driveModifiedAt, dateLocale),
-                        })
-                  }`
-                : ''}
+            <p className="dh-drive-panel-sub" data-drive-panel-sub="" title={subtitle}>
+              {subtitle}
             </p>
           )}
         </div>
@@ -449,13 +461,16 @@ export function DrivePanel({
         />
       )}
 
-      {confirming && file && (
-        <UnlinkConfirm
-          count={Math.max(file.usedInCount, file.usedInTasks.length)}
-          onConfirm={unlink}
-          onCancel={() => setConfirming(false)}
-        />
-      )}
+      {confirming &&
+        file &&
+        createPortal(
+          <UnlinkConfirm
+            count={Math.max(file.usedInCount, file.usedInTasks.length)}
+            onConfirm={unlink}
+            onCancel={() => setConfirming(false)}
+          />,
+          document.body,
+        )}
     </aside>
   )
 }
@@ -531,29 +546,29 @@ function PanelBody({
         >
           {t('uhDriveOpenOnGoogle')}
         </button>
-        {file.canPropose && (
+        {file.canPropose && webReady && (
           <button
             type="button"
             className="btn btn-primary dh-toolbar-btn"
             data-drive-panel-create=""
-            {...lockedAttrs(webReady && !locked)}
+            {...lockedAttrs(!locked)}
             aria-describedby={warn ? warnId : locked ? viewerId : undefined}
             onClick={() => {
-              if (locked || !webReady) return
+              if (locked) return
               onCreateTasks()
             }}
           >
             {warn ? t('uhDriveRecreateContinue') : t('uhDriveCreateTasks')}
           </button>
         )}
-        {file.canAsk && (
+        {file.canAsk && webReady && (
           <button
             type="button"
             className="btn btn-secondary dh-toolbar-btn"
             data-drive-panel-ask=""
-            {...lockedAttrs(webReady && !locked)}
+            {...lockedAttrs(!locked)}
             onClick={() => {
-              if (locked || !webReady) return
+              if (locked) return
               onAsk()
             }}
           >
@@ -565,14 +580,16 @@ function PanelBody({
       {warn && (
         <div className="dh-drive-panel-warn" role="status" id={warnId} data-drive-recreate="">
           <p>{warning}</p>
-          <button
-            type="button"
-            className="dh-drive-panel-link"
-            data-drive-recreate-view=""
-            onClick={onShowCreated}
-          >
-            {t('uhDriveRecreateView')}
-          </button>
+          {creations.length > 0 && (
+            <button
+              type="button"
+              className="dh-drive-panel-link"
+              data-drive-recreate-view=""
+              onClick={onShowCreated}
+            >
+              {t('uhDriveRecreateView')}
+            </button>
+          )}
         </div>
       )}
 
@@ -598,8 +615,13 @@ function PanelBody({
           <dd id={viewerId}>
             {access === 'granted' && (
               <>
-                {viewerEmail || t('uhDriveViewerEmailMissing')}
-                <span className="dh-drive-panel-note">{t('uhDriveOpensWithNote')}</span>
+                {viewerEmail ? (
+                  <span data-drive-viewer-email="">
+                    {t('uhDriveOpensWithNote', { email: viewerEmail })}
+                  </span>
+                ) : (
+                  t('uhDriveViewerEmailMissing')
+                )}
               </>
             )}
             {access === 'unknown' && (

@@ -299,7 +299,8 @@ export const cs = {
   uhDriveBoundAccount: 'Svázaný účet',
   uhDriveReboundBy: '(znovu svázal(a) {name})',
   uhDriveYouOpenWith: 'Otevíráte pomocí',
-  uhDriveOpensWithNote: 'Otevření na Google Drive i Zeptat se UNI používají tento účet',
+  uhDriveOpensWithNote:
+    'Zobrazit a upravit obsah na Googlu pomocí účtu {email}. UniWork ukládá jen odkaz, úkoly, které soubor používají, a historii akcí; obsah zůstává na Google Drive.',
   uhDriveViewerEmailMissing: 'Účet zatím není znám',
   uhDriveViewerUnknownTitle: 'UniWork zatím nemůže soubor číst',
   uhDriveViewerUnknownBody:
@@ -316,7 +317,7 @@ export const cs = {
   uhDrivePermissionsValue: 'Podle sdílení na Drive',
   uhDriveUsedInTitle: 'Používá se v · {count}',
   uhDriveTasksCreatedTitle: 'Úkoly vytvořené z tohoto dokumentu',
-  uhDriveTasksCreatedGroup: '{date} · {name} · {count} úkolů',
+  uhDriveTasksCreatedGroup: '{date} · {name} · úkoly: {count}',
   uhDriveTasksCreatedGroupOne: '{date} · {name} · {count} úkol',
   uhDriveActivityTitle: 'Aktivita v UniWork',
   uhDriveActivityEmpty: 'Zatím žádná aktivita.',
@@ -338,7 +339,7 @@ export const cs = {
     'Tento dokument už byl použit k vytvoření úkolů ({count} dosud). Další vytváření může způsobit duplicity.',
   uhDriveRecreateView: 'Zobrazit vytvořené úkoly',
   uhDriveRecreateContinue: 'Přesto poslat UNI',
-  uhDriveUnlinkConfirmTitle: 'Zrušit propojení s {count} úkoly?',
+  uhDriveUnlinkConfirmTitle: 'Zrušit propojení s úkoly ({count})?',
   uhDriveUnlinkConfirmTitleOne: 'Zrušit propojení s {count} úkolem?',
   uhDriveUnlinkConfirmTitleNone: 'Zrušit propojení tohoto souboru?',
   uhDriveUnlinkConfirmBody:
@@ -346,6 +347,7 @@ export const cs = {
   uhDriveUnlinkConfirmKeep: 'Ponechat',
   uhDriveUnlinkConfirmSubmit: 'Zrušit propojení',
   uhDriveUnlinkConfirmWorking: 'Ruším propojení…',
+  uhDriveUnlinkFailed: 'Propojení se nepodařilo zrušit. Zkuste to znovu.',
   uhDriveNotFound: 'Tento soubor nebyl nalezen, nebo k jeho zobrazení nemáte oprávnění.',
   uhDriveErrAuthFailed: 'Připojení ke Google Drive vypršelo. Pro pokračování se znovu připojte.',
   uhDriveFeatureOff: 'Google Drive už pro tuto organizaci není dostupný.',

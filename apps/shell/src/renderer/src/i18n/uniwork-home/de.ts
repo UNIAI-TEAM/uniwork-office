@@ -306,7 +306,8 @@ export const de = {
   uhDriveBoundAccount: 'Verknüpftes Konto',
   uhDriveReboundBy: '(neu verknüpft von {name})',
   uhDriveYouOpenWith: 'Sie öffnen mit',
-  uhDriveOpensWithNote: '„In Google Drive öffnen“ und „UNI fragen“ verwenden dieses Konto',
+  uhDriveOpensWithNote:
+    'Inhalte auf Google ansehen und bearbeiten, mit dem Konto {email}. UniWork speichert nur den Link, die Aufgaben, die die Datei nutzen, und den Aktionsverlauf; der Inhalt bleibt in Google Drive.',
   uhDriveViewerEmailMissing: 'Konto noch nicht bekannt',
   uhDriveViewerUnknownTitle: 'UniWork darf diese Datei noch nicht lesen',
   uhDriveViewerUnknownBody:
@@ -353,6 +354,7 @@ export const de = {
   uhDriveUnlinkConfirmKeep: 'Behalten',
   uhDriveUnlinkConfirmSubmit: 'Verknüpfung aufheben',
   uhDriveUnlinkConfirmWorking: 'Verknüpfung wird aufgehoben …',
+  uhDriveUnlinkFailed: 'Verknüpfung konnte nicht aufgehoben werden. Versuche es erneut.',
   uhDriveNotFound: 'Diese Datei wurde nicht gefunden oder Sie dürfen sie nicht ansehen.',
   uhDriveErrAuthFailed:
     'Die Google-Drive-Verbindung ist abgelaufen. Verbinden Sie sich erneut, um fortzufahren.',

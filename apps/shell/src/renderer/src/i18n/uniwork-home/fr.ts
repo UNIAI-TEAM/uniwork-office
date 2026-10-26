@@ -304,7 +304,8 @@ export const fr = {
   uhDriveBoundAccount: 'Compte associé',
   uhDriveReboundBy: '(réassocié par {name})',
   uhDriveYouOpenWith: 'Vous ouvrez avec',
-  uhDriveOpensWithNote: 'Ouvrir dans Google Drive et Demander à UNI utilisent ce compte',
+  uhDriveOpensWithNote:
+    "Afficher et modifier le contenu sur Google, avec le compte {email}. UniWork ne conserve que le lien, les tâches qui utilisent le fichier et l'historique des actions ; le contenu reste dans Google Drive.",
   uhDriveViewerEmailMissing: 'Compte pas encore connu',
   uhDriveViewerUnknownTitle: 'UniWork ne peut pas encore lire ce fichier',
   uhDriveViewerUnknownBody:
@@ -351,6 +352,7 @@ export const fr = {
   uhDriveUnlinkConfirmKeep: 'Conserver',
   uhDriveUnlinkConfirmSubmit: 'Dissocier',
   uhDriveUnlinkConfirmWorking: 'Dissociation…',
+  uhDriveUnlinkFailed: 'Impossible de dissocier. Réessayez.',
   uhDriveNotFound: "Ce fichier est introuvable ou vous n'avez pas l'autorisation de le consulter.",
   uhDriveErrAuthFailed: 'La connexion Google Drive a expiré. Reconnectez-la pour continuer.',
   uhDriveFeatureOff: "Google Drive n'est plus disponible pour cette organisation.",

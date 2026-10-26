@@ -302,7 +302,8 @@ export const nl = {
   uhDriveBoundAccount: 'Gekoppeld account',
   uhDriveReboundBy: '(opnieuw gekoppeld door {name})',
   uhDriveYouOpenWith: 'U opent met',
-  uhDriveOpensWithNote: 'Openen in Google Drive en UNI vragen gebruiken beide dit account',
+  uhDriveOpensWithNote:
+    'Bekijk en bewerk de inhoud op Google met het account {email}. UniWork bewaart alleen de koppeling, de taken die het bestand gebruiken en de actiegeschiedenis; de inhoud blijft in Google Drive.',
   uhDriveViewerEmailMissing: 'Account nog niet bekend',
   uhDriveViewerUnknownTitle: 'UniWork mag dit bestand nog niet lezen',
   uhDriveViewerUnknownBody:
@@ -349,6 +350,7 @@ export const nl = {
   uhDriveUnlinkConfirmKeep: 'Behouden',
   uhDriveUnlinkConfirmSubmit: 'Loskoppelen',
   uhDriveUnlinkConfirmWorking: 'Loskoppelen…',
+  uhDriveUnlinkFailed: 'Loskoppelen mislukt. Probeer het opnieuw.',
   uhDriveNotFound: 'Dit bestand is niet gevonden of u mag het niet bekijken.',
   uhDriveErrAuthFailed: 'De Google Drive-verbinding is verlopen. Verbind opnieuw om door te gaan.',
   uhDriveFeatureOff: 'Google Drive is niet meer beschikbaar voor deze organisatie.',

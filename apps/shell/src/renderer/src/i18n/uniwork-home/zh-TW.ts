@@ -291,7 +291,8 @@ export const zhTW = {
   uhDriveBoundAccount: '綁定帳號',
   uhDriveReboundBy: '（由 {name} 重新綁定）',
   uhDriveYouOpenWith: '你使用此帳號開啟',
-  uhDriveOpensWithNote: '在 Google Drive 中開啟和詢問 UNI 都使用此帳號',
+  uhDriveOpensWithNote:
+    '使用帳號 {email} 在 Google 上檢視和編輯內容。UniWork 只儲存連結、使用該檔案的任務和操作記錄；內容仍保留在 Google Drive。',
   uhDriveViewerEmailMissing: '尚未確定帳號',
   uhDriveViewerUnknownTitle: '尚未允許 UniWork 讀取此檔案',
   uhDriveViewerUnknownBody:
@@ -338,6 +339,7 @@ export const zhTW = {
   uhDriveUnlinkConfirmKeep: '保留',
   uhDriveUnlinkConfirmSubmit: '取消關聯',
   uhDriveUnlinkConfirmWorking: '正在取消關聯…',
+  uhDriveUnlinkFailed: '無法取消關聯，請再試一次。',
   uhDriveNotFound: '找不到此檔案，或你沒有檢視權限。',
   uhDriveErrAuthFailed: 'Google Drive 連線已過期，請重新連線後繼續。',
   uhDriveFeatureOff: '此組織已無法使用 Google Drive。',

@@ -296,7 +296,8 @@ export const th = {
   uhDriveBoundAccount: 'บัญชีที่ผูกไว้',
   uhDriveReboundBy: '(ผูกใหม่โดย {name})',
   uhDriveYouOpenWith: 'คุณเปิดด้วย',
-  uhDriveOpensWithNote: 'การเปิดใน Google Drive และถาม UNI ใช้บัญชีนี้ทั้งคู่',
+  uhDriveOpensWithNote:
+    'ดูและแก้ไขเนื้อหาบน Google ด้วยบัญชี {email} UniWork เก็บเฉพาะลิงก์ งานที่ใช้ไฟล์ และประวัติการดำเนินการ เนื้อหายังอยู่ใน Google Drive',
   uhDriveViewerEmailMissing: 'ยังไม่ทราบบัญชี',
   uhDriveViewerUnknownTitle: 'UniWork ยังอ่านไฟล์นี้ไม่ได้',
   uhDriveViewerUnknownBody:
@@ -343,6 +344,7 @@ export const th = {
   uhDriveUnlinkConfirmKeep: 'เก็บไว้',
   uhDriveUnlinkConfirmSubmit: 'ยกเลิกลิงก์',
   uhDriveUnlinkConfirmWorking: 'กำลังยกเลิกลิงก์…',
+  uhDriveUnlinkFailed: 'ยกเลิกลิงก์ไม่สำเร็จ ลองอีกครั้ง',
   uhDriveNotFound: 'ไม่พบไฟล์นี้ หรือคุณไม่มีสิทธิ์ดู',
   uhDriveErrAuthFailed: 'การเชื่อมต่อ Google Drive หมดอายุ เชื่อมต่อใหม่เพื่อดำเนินการต่อ',
   uhDriveFeatureOff: 'Google Drive ไม่พร้อมใช้งานสำหรับองค์กรนี้อีกต่อไป',

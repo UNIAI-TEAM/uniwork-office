@@ -295,7 +295,8 @@ export const en = {
   uhDriveBoundAccount: 'Bound account',
   uhDriveReboundBy: '(rebound by {name})',
   uhDriveYouOpenWith: 'You open with',
-  uhDriveOpensWithNote: 'Open in Google Drive and Ask UNI both use this account',
+  uhDriveOpensWithNote:
+    'View and edit the content on Google, using the account {email}. UniWork only stores the link, the tasks that use the file and the action history; the content stays in Google Drive.',
   uhDriveViewerEmailMissing: 'Account not known yet',
   uhDriveViewerUnknownTitle: "UniWork can't read this file yet",
   uhDriveViewerUnknownBody:
@@ -342,6 +343,7 @@ export const en = {
   uhDriveUnlinkConfirmKeep: 'Keep',
   uhDriveUnlinkConfirmSubmit: 'Unlink',
   uhDriveUnlinkConfirmWorking: 'Unlinking…',
+  uhDriveUnlinkFailed: 'Could not unlink. Try again.',
   uhDriveNotFound: "This file was not found, or you don't have permission to view it.",
   uhDriveErrAuthFailed: 'The Google Drive connection has expired. Reconnect it to continue.',
   uhDriveFeatureOff: 'Google Drive is no longer available for this organization.',

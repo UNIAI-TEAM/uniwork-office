@@ -32,6 +32,7 @@ import {
   driveActivityRows,
   driveCreationRows,
   driveErrorKey,
+  driveUnlinkErrorKey,
   driveTypeLabel,
   reboundByName,
   showRebind,
@@ -1004,6 +1005,12 @@ describe('UNI-2196 (D3): Drive panel model', () => {
     expect(driveErrorKey('auth_failed')).toBe('uhDriveErrAuthFailed')
     expect(driveErrorKey('not_found')).toBe('uhDriveNotFound')
     expect(driveErrorKey('server_error')).toBe('uhDriveLoadError')
+  })
+
+  it('a failed unlink reads as an unlink error, the specific codes keep their sentence', () => {
+    expect(driveUnlinkErrorKey('server_error')).toBe('uhDriveUnlinkFailed')
+    expect(driveUnlinkErrorKey('network')).toBe('uhDriveOffline')
+    expect(driveUnlinkErrorKey('forbidden')).toBe('uwErrForbidden')
   })
 
   it('names the file type; plain text and unknown kinds read through the dictionary', () => {

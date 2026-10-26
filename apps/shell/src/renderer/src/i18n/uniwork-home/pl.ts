@@ -301,7 +301,8 @@ export const pl = {
   uhDriveBoundAccount: 'Powiązane konto',
   uhDriveReboundBy: '(ponownie powiązał(a) {name})',
   uhDriveYouOpenWith: 'Otwierasz kontem',
-  uhDriveOpensWithNote: 'Otwarcie w Google Drive i Zapytaj UNI używają tego konta',
+  uhDriveOpensWithNote:
+    'Wyświetl i edytuj zawartość w Google za pomocą konta {email}. UniWork przechowuje tylko link, zadania korzystające z pliku i historię działań; zawartość pozostaje na Dysku Google.',
   uhDriveViewerEmailMissing: 'Konto nie jest jeszcze znane',
   uhDriveViewerUnknownTitle: 'UniWork nie może jeszcze odczytać pliku',
   uhDriveViewerUnknownBody:
@@ -318,7 +319,7 @@ export const pl = {
   uhDrivePermissionsValue: 'Zgodnie z udostępnieniem na Dysku',
   uhDriveUsedInTitle: 'Używany w · {count}',
   uhDriveTasksCreatedTitle: 'Zadania utworzone z tego dokumentu',
-  uhDriveTasksCreatedGroup: '{date} · {name} · {count} zadań',
+  uhDriveTasksCreatedGroup: '{date} · {name} · zadania: {count}',
   uhDriveTasksCreatedGroupOne: '{date} · {name} · {count} zadanie',
   uhDriveActivityTitle: 'Aktywność w UniWork',
   uhDriveActivityEmpty: 'Brak aktywności.',
@@ -340,7 +341,7 @@ export const pl = {
     'Z tego dokumentu utworzono już zadania ({count} do tej pory). Tworzenie kolejnych może dać duplikaty.',
   uhDriveRecreateView: 'Zobacz utworzone zadania',
   uhDriveRecreateContinue: 'Wyślij mimo to do UNI',
-  uhDriveUnlinkConfirmTitle: 'Odłączyć od {count} zadań?',
+  uhDriveUnlinkConfirmTitle: 'Odłączyć od zadań ({count})?',
   uhDriveUnlinkConfirmTitleOne: 'Odłączyć od {count} zadania?',
   uhDriveUnlinkConfirmTitleNone: 'Odłączyć ten plik?',
   uhDriveUnlinkConfirmBody:
@@ -348,6 +349,7 @@ export const pl = {
   uhDriveUnlinkConfirmKeep: 'Zachowaj',
   uhDriveUnlinkConfirmSubmit: 'Odłącz',
   uhDriveUnlinkConfirmWorking: 'Odłączanie…',
+  uhDriveUnlinkFailed: 'Nie udało się odłączyć. Spróbuj ponownie.',
   uhDriveNotFound: 'Nie znaleziono tego pliku lub nie masz uprawnień do jego wyświetlenia.',
   uhDriveErrAuthFailed: 'Połączenie z Dyskiem Google wygasło. Połącz ponownie, aby kontynuować.',
   uhDriveFeatureOff: 'Dysk Google nie jest już dostępny dla tej organizacji.',

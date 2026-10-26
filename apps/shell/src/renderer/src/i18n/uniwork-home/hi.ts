@@ -300,7 +300,8 @@ export const hi = {
   uhDriveBoundAccount: 'बंधा हुआ खाता',
   uhDriveReboundBy: '({name} द्वारा दोबारा बाँधा गया)',
   uhDriveYouOpenWith: 'आप इससे खोलते हैं',
-  uhDriveOpensWithNote: 'Google Drive में खोलना और UNI से पूछें, दोनों इसी खाते का उपयोग करते हैं',
+  uhDriveOpensWithNote:
+    'Google पर सामग्री देखें और संपादित करें, खाता {email} से। UniWork केवल लिंक, फ़ाइल का उपयोग करने वाले कार्य और कार्रवाई का इतिहास सहेजता है; सामग्री Google Drive में ही रहती है।',
   uhDriveViewerEmailMissing: 'खाता अभी ज्ञात नहीं',
   uhDriveViewerUnknownTitle: 'UniWork अभी यह फ़ाइल नहीं पढ़ सकता',
   uhDriveViewerUnknownBody:
@@ -347,6 +348,7 @@ export const hi = {
   uhDriveUnlinkConfirmKeep: 'रखें',
   uhDriveUnlinkConfirmSubmit: 'लिंक हटाएँ',
   uhDriveUnlinkConfirmWorking: 'लिंक हटाया जा रहा है…',
+  uhDriveUnlinkFailed: 'लिंक नहीं हटाया जा सका। फिर से कोशिश करें।',
   uhDriveNotFound: 'यह फ़ाइल नहीं मिली, या आपके पास इसे देखने की अनुमति नहीं है।',
   uhDriveErrAuthFailed:
     'Google Drive कनेक्शन की अवधि समाप्त हो गई है। जारी रखने के लिए फिर से कनेक्ट करें।',

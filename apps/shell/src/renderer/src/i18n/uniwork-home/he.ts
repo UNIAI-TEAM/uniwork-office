@@ -291,7 +291,8 @@ export const he = {
   uhDriveBoundAccount: 'החשבון המשויך',
   uhDriveReboundBy: '(שויך מחדש על ידי {name})',
   uhDriveYouOpenWith: 'נפתח אצלך עם',
-  uhDriveOpensWithNote: 'גם הפתיחה ב-Google Drive וגם «שאל את UNI» משתמשים בחשבון הזה',
+  uhDriveOpensWithNote:
+    'צפייה ועריכה של התוכן ב-Google באמצעות החשבון {email}. UniWork שומר רק את הקישור, את המשימות שמשתמשות בקובץ ואת היסטוריית הפעולות; התוכן נשאר ב-Google Drive.',
   uhDriveViewerEmailMissing: 'החשבון עדיין לא ידוע',
   uhDriveViewerUnknownTitle: 'UniWork עדיין לא יכול לקרוא את הקובץ',
   uhDriveViewerUnknownBody:
@@ -338,6 +339,7 @@ export const he = {
   uhDriveUnlinkConfirmKeep: 'השאר',
   uhDriveUnlinkConfirmSubmit: 'בטל קישור',
   uhDriveUnlinkConfirmWorking: 'מבטל קישור…',
+  uhDriveUnlinkFailed: 'לא ניתן היה לבטל את הקישור. נסו שוב.',
   uhDriveNotFound: 'הקובץ לא נמצא או שאין לך הרשאה לצפות בו.',
   uhDriveErrAuthFailed: 'חיבור Google Drive פג תוקף. התחבר מחדש כדי להמשיך.',
   uhDriveFeatureOff: 'Google Drive אינו זמין עוד עבור הארגון הזה.',

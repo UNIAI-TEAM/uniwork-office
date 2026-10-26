@@ -299,7 +299,8 @@ export const pt = {
   uhDriveBoundAccount: 'Conta vinculada',
   uhDriveReboundBy: '(revinculado por {name})',
   uhDriveYouOpenWith: 'Você abre com',
-  uhDriveOpensWithNote: 'Abrir no Google Drive e Perguntar à UNI usam esta conta',
+  uhDriveOpensWithNote:
+    'Veja e edite o conteúdo no Google com a conta {email}. A UniWork guarda apenas o link, as tarefas que usam o arquivo e o histórico de ações; o conteúdo continua no Google Drive.',
   uhDriveViewerEmailMissing: 'Conta ainda desconhecida',
   uhDriveViewerUnknownTitle: 'A UniWork ainda não pode ler este arquivo',
   uhDriveViewerUnknownBody:
@@ -346,6 +347,7 @@ export const pt = {
   uhDriveUnlinkConfirmKeep: 'Manter',
   uhDriveUnlinkConfirmSubmit: 'Desvincular',
   uhDriveUnlinkConfirmWorking: 'Desvinculando…',
+  uhDriveUnlinkFailed: 'Não foi possível desvincular. Tente novamente.',
   uhDriveNotFound: 'Este arquivo não foi encontrado ou você não tem permissão para vê-lo.',
   uhDriveErrAuthFailed: 'A conexão do Google Drive expirou. Reconecte para continuar.',
   uhDriveFeatureOff: 'O Google Drive não está mais disponível para esta organização.',

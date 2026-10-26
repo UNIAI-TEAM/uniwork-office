@@ -173,6 +173,7 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
   let workspaces: UniworkWorkspaceRef[]
   let details: Record<string, DetailOverrides & typeof fileOne>
   let listFiles: ReturnType<typeof vi.fn>
+  let listConnections: ReturnType<typeof vi.fn>
   let getFile: ReturnType<typeof vi.fn>
   let getHistory: ReturnType<typeof vi.fn>
   let unlink: ReturnType<typeof vi.fn>
@@ -222,7 +223,7 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
     ;(window as unknown as { aiOffice: unknown; home: unknown }).home = api
     Reflect.set(window, 'uniworkDrive', {
       isAvailable: vi.fn(async () => true),
-      listConnections: vi.fn(async () => ({ ok: true as const, value: [activeConn, brokenConn] })),
+      listConnections,
       listFiles,
       getFile,
       getHistory,
@@ -285,6 +286,10 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
       },
     ]
     details = { 'df-1': detailOf({}), 'df-2': detailOf(fileTwo) }
+    listConnections = vi.fn(async () => ({
+      ok: true as const,
+      value: [activeConn, brokenConn],
+    }))
     listFiles = vi.fn(async (q: { connectionId?: string }) => {
       const files =
         q.connectionId === 'dc-active'
@@ -354,8 +359,9 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
     expect(text).toContain('Nguồn')
     expect(text).toContain('Google Drive · Google Docs')
     expect(p.querySelector('[data-drive-bound] dd')?.textContent).toContain('minh@company.vn')
-    expect(p.querySelector('[data-drive-viewer="granted"] dd')?.textContent).toContain(
-      'minh@company.vn',
+    // D3F-R1-11: the §7.7 explainer names the account
+    expect(p.querySelector('[data-drive-viewer="granted"] dd')?.textContent).toBe(
+      'Xem và sửa nội dung trên Google, bằng tài khoản minh@company.vn. UniWork chỉ lưu liên kết, các việc dùng tệp và lịch sử thao tác; nội dung vẫn nằm trên Google Drive.',
     )
     expect(text).toContain('Hùng')
     expect(text).toContain('Minh')
@@ -587,12 +593,16 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
     await selectRow('df-1')
     await click(panel()!.querySelector('[data-drive-unlink]'))
     const dialog = document.querySelector('[role="dialog"], [aria-modal="true"]')!
+    // D3F-R1-2: the overlay sits on document.body, outside the sticky panel's stacking context
+    expect(dialog.closest('.uw-act-overlay')!.parentElement).toBe(document.body)
+    expect(panel()!.contains(dialog)).toBe(false)
     expect(dialog.textContent).toContain('Bỏ liên kết khỏi 2 việc?')
     expect(dialog.textContent).toContain(
       'Chỉ xóa liên kết trong UniWork, tệp trên Google Drive giữ nguyên. Các việc đã tạo vẫn còn, chỉ mất liên kết về tài liệu.',
     )
     expect(unlink).not.toHaveBeenCalled()
     const listCallsBefore = listFiles.mock.calls.length
+    const connectionsBefore = listConnections.mock.calls.length
     const confirmBtn = dialog.querySelector<HTMLButtonElement>('[data-drive-unlink-confirm]')!
     // a double press sends one request
     await act(async () => {
@@ -605,6 +615,11 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
     expect(panel()).toBeNull()
     expect(document.querySelector('[data-drive-unlink-confirm]')).toBeNull()
     expect(listFiles.mock.calls.length).toBeGreaterThan(listCallsBefore)
+    // the sidebar counts come from listConnections: read again too
+    expect(listConnections.mock.calls.length).toBeGreaterThan(connectionsBefore)
+    // D3F-R1-5: focus lands in the Drive view, not on <body>
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    expect(document.querySelector('[data-drive-view]')!.contains(document.activeElement)).toBe(true)
   })
 
   it('an unlink error stays in the dialog with the mapped sentence', async () => {
@@ -616,12 +631,137 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
     expect(unlink).toHaveBeenCalledTimes(1)
     const error = document.querySelector('[data-drive-unlink-error]')!
     expect(error.getAttribute('role')).toBe('alert')
-    expect(error.textContent?.length).toBeGreaterThan(0)
+    expect(error.textContent).toBe('Bạn không có quyền thực hiện thao tác này.')
     expect(panel()).not.toBeNull()
     // Keep closes the dialog and leaves the panel
     await click(document.querySelector('[data-drive-unlink-keep]'))
     expect(document.querySelector('[data-drive-unlink-confirm]')).toBeNull()
     expect(panel()).not.toBeNull()
+  })
+
+  it('an unlink server_error says the unlink failed, not that the list could not load (D3-V3)', async () => {
+    unlink.mockResolvedValueOnce({ ok: false, error: 'server_error' })
+    await openDriveView()
+    await selectRow('df-1')
+    await click(panel()!.querySelector('[data-drive-unlink]'))
+    await click(document.querySelector('[data-drive-unlink-confirm]'))
+    expect(document.querySelector('[data-drive-unlink-error]')?.textContent).toBe(
+      'Không bỏ liên kết được. Thử lại.',
+    )
+    expect(panel()).not.toBeNull()
+  })
+
+  it('an unlink not_found means it is already gone: dialog and panel close, the list is read again', async () => {
+    unlink.mockResolvedValueOnce({ ok: false, error: 'not_found' })
+    await openDriveView()
+    await selectRow('df-1')
+    await click(panel()!.querySelector('[data-drive-unlink]'))
+    const listCallsBefore = listFiles.mock.calls.length
+    await click(document.querySelector('[data-drive-unlink-confirm]'))
+    expect(unlink).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('[data-drive-unlink-error]')).toBeNull()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(panel()).toBeNull()
+    expect(listFiles.mock.calls.length).toBeGreaterThan(listCallsBefore)
+  })
+
+  it('Escape while the unlink dialog is open closes only the dialog', async () => {
+    await openDriveView()
+    await selectRow('df-1')
+    await click(panel()!.querySelector('[data-drive-unlink]'))
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
+    await act(async () => {
+      dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    await flush()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(panel()).not.toBeNull()
+  })
+
+  it('"Xem các việc đã tạo" is absent when the creations block is not rendered (D3F-R1-4)', async () => {
+    details['df-1'] = detailOf({
+      tasksCreated: { count: 2, lastCreatedAt: '2026-10-15T10:00:00Z', lastCreatedByName: 'Minh' },
+    })
+    await openDriveView()
+    await selectRow('df-1')
+    await click(panel()!.querySelector('[data-drive-panel-create]'))
+    expect(panel()!.querySelector('[data-drive-recreate]')).not.toBeNull()
+    expect(panel()!.querySelector('[data-drive-created]')).toBeNull()
+    expect(panel()!.querySelector('[data-drive-recreate-view]')).toBeNull()
+  })
+
+  it('canPropose / canAsk false hide Create and Ask', async () => {
+    details['df-1'] = detailOf({ canPropose: false, canAsk: false })
+    await openDriveView()
+    await selectRow('df-1')
+    expect(panel()!.querySelector('[data-drive-panel-open]')).not.toBeNull()
+    expect(panel()!.querySelector('[data-drive-panel-create]')).toBeNull()
+    expect(panel()!.querySelector('[data-drive-panel-ask]')).toBeNull()
+  })
+
+  it('without workspace slugs the web controls are disabled or absent and nothing is handed off', async () => {
+    workspaces = [{ ...workspaces[0]!, slug: '', orgSlug: '' }]
+    details['df-1'] = detailOf({ viewerAccess: 'unknown', viewerAccountEmail: undefined })
+    await openDriveView()
+    expect(document.querySelector<HTMLButtonElement>('[data-drive-add]')?.disabled ?? true).toBe(
+      true,
+    )
+    await selectRow('df-1')
+    expect(panel()!.querySelector('[data-drive-panel-create]')).toBeNull()
+    expect(panel()!.querySelector('[data-drive-panel-ask]')).toBeNull()
+    const grant = panel()!.querySelector<HTMLButtonElement>('[data-drive-grant="grant"]')!
+    expect(grant.disabled).toBe(true)
+    await click(grant)
+    await click(panel()!.querySelector('[data-drive-task="t-1"]'))
+    expect(openWeb).not.toHaveBeenCalled()
+  })
+
+  it('a window focus reads the panel again', async () => {
+    await openDriveView()
+    await selectRow('df-1')
+    const before = getFile.mock.calls.length
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await flush()
+    expect(getFile.mock.calls.length).toBeGreaterThan(before)
+    expect(getHistory.mock.calls.length).toBeGreaterThan(1)
+  })
+
+  it('out-of-order getFile responses keep the file selected last', async () => {
+    let releaseFirst: (v: unknown) => void = () => {}
+    getFile.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirst = resolve
+        }),
+    )
+    await openDriveView()
+    await selectRow('df-1')
+    // the first response is still pending when the second file is selected
+    await selectRow('df-2')
+    expect(panel()!.querySelector('[data-drive-panel-title]')?.textContent).toBe(
+      'Ngân sách marketing 2026',
+    )
+    await act(async () => {
+      releaseFirst({ ok: true as const, value: details['df-1'] })
+    })
+    await flush()
+    expect(panel()!.querySelector('[data-drive-panel-title]')?.textContent).toBe(
+      'Ngân sách marketing 2026',
+    )
+    expect(panel()!.querySelector('[data-drive-viewer="connection_lost"]')).not.toBeNull()
+  })
+
+  it('Escape on a selected row also closes the panel (D3F-R1-10)', async () => {
+    await openDriveView()
+    await selectRow('df-1')
+    expect(panel()).not.toBeNull()
+    const row = document.querySelector<HTMLElement>('[data-drive-file-id="df-1"]')!
+    await act(async () => {
+      row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(panel()).toBeNull()
   })
 
   it('Add / Manage / Reconnect hand off to the web with the right targets', async () => {
@@ -645,6 +785,11 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
     expect(reconnect).not.toBeNull()
     await act(async () => {
       reconnect.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    expect(openOnGoogle).not.toHaveBeenCalled()
+    // D3F-R1-1: nor does a double click on it
+    await act(async () => {
+      reconnect.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
     })
     expect(openOnGoogle).not.toHaveBeenCalled()
     await click(reconnect)
