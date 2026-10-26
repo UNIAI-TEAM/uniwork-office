@@ -61,15 +61,15 @@ describe('uniwork versions string shard', () => {
     expect(en.vhsTitle).toBe('Version history')
     expect(vi.vhsMenuEntry).toBe('Lịch sử phiên bản')
     expect(en.vhsDescription).toBe(
-      'The version checkpoints kept on the server. Restoring writes a new version; history is never erased.',
+      'The versions kept on the server. Restoring writes a new version; history is never erased.',
     )
-    expect(vi.vhsEmpty).toBe('Chưa có phiên bản nào. Tạo mốc đầu tiên từ bản đang làm việc.')
+    expect(vi.vhsEmpty).toBe('Chưa có phiên bản nào. Tạo phiên bản đầu tiên từ bản đang làm việc.')
     expect(vi.vhsRowVersion).toBe('Phiên bản {no}')
     expect(en.vhsCurrentBadge).toBe('Current')
     expect(vi.vhsCurrentBadge).toBe('Bản hiện tại')
     expect(en.vhsNamePlaceholder).toBe('e.g. Before the review changes')
     expect(vi.vhsNameDone).toBe('Đã tạo phiên bản {no}')
-    expect(en.vhsNameFailed).toBe('Could not create the checkpoint. What you typed is kept.')
+    expect(en.vhsNameFailed).toBe('Could not create the version. What you typed is kept.')
     expect(vi.vhsRestore).toBe('Khôi phục phiên bản {no}')
     expect(en.vhsRestoreConfirmTitle).toBe('Restore version {no}?')
     expect(vi.vhsRestoreConfirmDescription).toBe(
@@ -82,7 +82,12 @@ describe('uniwork versions string shard', () => {
     expect(en.vhsShelvedBlocked).toBe('This document is archived and read-only.')
     expect(vi.vhsDownloadVersion).toBe('Tải phiên bản {no}')
     expect(en.vhsDownloadFailed).toBe('Could not download the file')
-    expect(vi.vhsReasonManual).toBe('mốc thủ công')
+    expect(vi.vhsReasonManual).toBe('phiên bản thủ công')
+    expect(vi.vhsNameSubmit).toBe('Tạo phiên bản')
+    expect(en.vhsNameSubmit).toBe('Create version')
+    for (const lang of ['vi', 'en'] as const) {
+      expect(Object.values(table(lang)).join('\n')).not.toMatch(/checkpoint|mốc/i)
+    }
     expect(en.vhsReasonUnknown).toBe('other')
     expect(vi.vhsAuthorFormer).toBe('Cựu thành viên')
     expect(en.vhsLockedByOther).toBe(
