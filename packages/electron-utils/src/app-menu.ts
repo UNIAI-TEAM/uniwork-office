@@ -703,7 +703,7 @@ export function appMenuTemplate(
   labels: AppMenuLabels,
   {
     extra = [],
-    appLabel = 'GenOffice',
+    appLabel = 'UniWork Office',
   }: { extra?: MenuItemConstructorOptions[]; appLabel?: string } = {},
 ): MenuItemConstructorOptions | undefined {
   if (platform !== 'darwin') return undefined

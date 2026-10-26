@@ -275,14 +275,14 @@ export const it = {
   appStatusRecordFailed: 'Impossibile salvare la registrazione',
   appStatusNarrationCleared: 'Commento cancellato',
   appSettingsTitle: 'Impostazioni IA',
-  appSettingsAccount: 'Account Genspark',
+  appSettingsAccount: 'Account UniWork',
   appSettingsChecking: 'Verifica in corso…',
   appSettingsLoggedIn: 'Accesso effettuato',
   appSettingsLoggedInEmail: 'Accesso effettuato: {email}',
   appSettingsLoggedOut:
-    'Accesso non effettuato (le funzionalità IA richiedono un account Genspark)',
+    'Accesso non effettuato (le funzionalità IA richiedono un account UniWork)',
   appSettingsLoginPending: "In attesa dell'accesso dal browser…",
-  appSettingsLogin: 'Accedi a Genspark',
+  appSettingsLogin: 'Accedi a UniWork',
   appSettingsModel: 'Modello',
 >>>>>>> theirs
   appSettingsCancel: 'Annulla',

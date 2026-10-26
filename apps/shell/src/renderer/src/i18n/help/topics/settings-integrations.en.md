@@ -23,7 +23,7 @@ Light / Dark / System. System follows the OS appearance, and the editors re-skin
 - **AI sidebar position** (left or right), **AI panel text size**, and **Spell check in AI chat**.
 - **Open the AI panel in new documents** — off, a new document starts with the panel collapsed and one click away.
 - **Auto-save all documents** turns AutoSave on by default in every editor; you can still switch it off for one window.
-- **Save Location** with a **Change** button, and **Default app for Office documents** to claim .docx / .xlsx / .pptx for GenOffice.
+- **Save Location** with a **Change** button, and **Default app for Office documents** to claim .docx / .xlsx / .pptx for UniWork Office.
 
 ## AI Media & Search
 
@@ -39,17 +39,17 @@ Not switches — each capability picks the vendor that serves it, and a vendor's
 
 ## Default app bindings
 
-Settings can register GenOffice as the handler for .docx / .xlsx / .pptx / .pdf and friends (platform-level default-app registration; confirm when prompted).
+Settings can register UniWork Office as the handler for .docx / .xlsx / .pptx / .pdf and friends (platform-level default-app registration; confirm when prompted).
 
 ## Third-party notices and updates
 
 - Help ▸ Third-party notices: the full OSS license inventory shipped with the app.
 - Help ▸ Check for updates: triggers a manual check; a newer version prompts to install.
 
-## Genspark sign-in
+## UniWork sign-in
 
-- The sign-in entry (settings or the cloud project list) uses a **device-code** flow: GenOffice shows a code and opens the browser login; it continues automatically once done.
-- Sign-in is used only for: the cloud project list and Genspark's hosted models. Without it, every local feature and custom models keep working.
+- The sign-in entry (settings or the cloud project list) uses a **device-code** flow: UniWork Office shows a code and opens the browser login; it continues automatically once done.
+- Sign-in is used only for: the cloud project list and UniWork's hosted models. Without it, every local feature and custom models keep working.
 - Sign out is one click in settings.
 
 ## MCP integration (for advanced users / AI clients)

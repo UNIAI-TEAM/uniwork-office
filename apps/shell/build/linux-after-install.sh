@@ -106,7 +106,7 @@ if [ -f "$mime" ] && grep -q '<icon name="x-office-document"' "$mime"; then
   sed -i '/<icon name="x-office-document"/d' "$mime"
   command -v update-mime-database >/dev/null 2>&1 && update-mime-database /usr/share/mime >/dev/null 2>&1 || true
 fi
-launcher="/opt/GenOffice/resources/cli/genoffice"
+launcher="/opt/UniWork Office/resources/cli/genoffice"
 link="/usr/bin/genoffice"
 >>>>>>> theirs
 [ -x "$launcher" ] || exit 0

@@ -679,7 +679,7 @@ export const BUNDLED_FONTS = new Set([
   'GenOffice Poppins',
   'GenOffice DM Sans',
   'GenOffice Tamil',
-  'GenOffice Bengali',
+  'UniWork Office Bengali',
   'GenOffice Fullwidth TC',
   'GenOffice Songti SC',
   'GenOffice Songti TC',
@@ -779,7 +779,7 @@ export function unloadedBundledPrimary(chain: string): string | null {
  * while layout later resolves the loaded alias (0.69/0.25em) as primary.
  */
 function isWebFace(family: string): boolean {
-  return isBundledFont(family) || / GO$/.test(family) || /^GenOffice /.test(family)
+  return isBundledFont(family) || / GO$/.test(family) || /^UniWork Office /.test(family)
 }
 
 /** bundled web face a chain resolves to before any installed family or generic */
@@ -1473,7 +1473,7 @@ export function cssFontFamily(font: string): string {
   // Nirmala-metric face (fonts.css) leads. On Windows the declared name
   // resolves natively ahead of the chain.
   if (/nirmala/i.test(nfkc)) {
-    return `${chain(font, 'GenOffice Bengali', 'Kohinoor Bangla', 'Bangla Sangam MN')},sans-serif`
+    return `${chain(font, 'UniWork Office Bengali', 'Kohinoor Bangla', 'Bangla Sangam MN')},sans-serif`
   }
   // Tamil: Latha renders through the bundled Latha-metric face (fonts.css);
   // Vijaya and missing Tamil names lay out as Vijaya on Word for Mac (probe

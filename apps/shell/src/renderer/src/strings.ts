@@ -35,7 +35,7 @@ export const strings = {
     askSavedAs: '已保存:{name}',
     askSaveFailed: '保存失败:{error}',
     askEmptyCorpus: '知识库还是空的:先收藏一些文件,再回来提问。',
-    askNeedsLogin: '登录 Genspark 后即可使用 AI 问答。',
+    askNeedsLogin: '登录 UniWork 后即可使用 AI 问答。',
     askPlaceholder: '问一个关于收藏文件的问题…',
     askHintIdle: 'Enter 发送',
     askHintBusy: 'AI 正在回答…',
@@ -54,14 +54,14 @@ export const strings = {
     askCtaRecents: '去最近文件收藏',
     askNoSave: '对话不会保存,重启应用后清空。',
     askUnknownError: 'AI 请求失败,请重试。',
-    navCloud: 'Genspark Projects',
-    cloudSubtitle: '在网页端用 Genspark AI 创建的项目。编辑在浏览器中继续——点击任意项目即可打开。',
+    navCloud: 'UniWork Projects',
+    cloudSubtitle: '在网页端用 UniWork AI 创建的项目。编辑在浏览器中继续——点击任意项目即可打开。',
     cloudSearchPlaceholder: '搜索 {n} 个项目…',
     cloudNoResults: '没有匹配的项目。',
     cloudSortRecent: '最近',
     cloudSortOldest: '最早',
     cloudRefresh: '刷新',
-    cloudLoginHint: '登录 Genspark 账号，查看你在网页端创建的项目。',
+    cloudLoginHint: '登录 UniWork 账号，查看你在网页端创建的项目。',
     cloudEmpty: '还没有网页端项目。',
     cloudError: '加载失败，请稍后重试。',
     cloudRetry: '重试',
@@ -198,7 +198,7 @@ export const strings = {
     docThemeFollowApp: '跟随应用主题',
     saveLocation: '默认保存位置',
     setRestoreSession: '启动时重新打开上次的文档',
-    setRestoreSessionDesc: '关闭 GenOffice 时打开的文档会在下次启动时自动重新打开。',
+    setRestoreSessionDesc: '关闭 UniWork Office 时打开的文档会在下次启动时自动重新打开。',
     setTabSleep: '休眠不活跃的标签页',
     setTabSleepDesc:
       '标签页多到一定数量后，长时间没有查看的会释放内存；回到它时会重新打开文件。有未保存修改或已固定的标签页不会休眠。',
@@ -283,7 +283,7 @@ export const strings = {
     intgHeroTitle: '在 AI 助手里使用 UniWork Office',
 =======
     setSecSkills: '技能',
-    intgHeroTitle: '在 AI 助手里使用 GenOffice',
+    intgHeroTitle: '在 AI 助手里使用 UniWork Office',
 >>>>>>> theirs
     intgHeroDesc:
       '接好后，Claude Code、Codex、Cursor、Claude Desktop 等助手就能替你创建、转换、读取和编辑 Word、Excel、PowerPoint、PDF 和 Markdown 文件。全部在本机完成，不会上传任何内容。',
@@ -384,7 +384,7 @@ export const strings = {
     setAiEndpointAdd: '添加端点',
     setAiEndpointRemove: '删除',
     setAiEndpointName: '名称',
-    setAiGensparkHint: '使用 Genspark 账号登录，无需 API key。',
+    setAiGensparkHint: '使用 UniWork 账号登录，无需 API key。',
 >>>>>>> theirs
     setAiCodexPath: 'Codex 可执行文件',
     setAiCodexPathHint: '仅自定义安装时填写；留空会自动检测。',
@@ -415,9 +415,9 @@ export const strings = {
       '无需 key：网页与图片搜索使用免费来源（用量有限）。如需更高配额，可改选其他服务商并填写自己的 key。',
     setAiSearchAuto: '自动（免费）',
 =======
-    setAiMediaGensparkHint: '生图与图片/视频解析使用 Genspark 账号登录。',
+    setAiMediaGensparkHint: '生图与图片/视频解析使用 UniWork 账号登录。',
     setAiSearchGensparkHint:
-      '网页与图片搜索使用 Genspark 账号登录；未登录或关闭云工具时改用免费来源。',
+      '网页与图片搜索使用 UniWork 账号登录；未登录或关闭云工具时改用免费来源。',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper 用你的 key 同时提供网页与图片搜索。',
     setAiSearchSerplyHint: 'Serply 用你的 key 同时提供网页与图片搜索。',
@@ -472,7 +472,7 @@ export const strings = {
     timelineCountOne: '{n} 条',
 =======
     intgSkillsDesc:
-      'GenOffice 只使用自己技能文件夹里的技能。从文件夹或 zip 导入会把整个技能复制进来；导入不会自动运行任何东西。',
+      'UniWork Office 只使用自己技能文件夹里的技能。从文件夹或 zip 导入会把整个技能复制进来；导入不会自动运行任何东西。',
     intgSkillsEmpty: '还没有安装技能。',
     intgSkillsImportFolder: '导入文件夹…',
     intgSkillsImportZip: '导入技能包（zip / .md）…',
@@ -481,7 +481,7 @@ export const strings = {
     intgSkillsImportDone: '已导入 {name}',
     intgSkillsImportFailed: '导入失败：{reason}',
     intgSkillsRemove: '移除',
-    intgSkillsRemoveConfirm: '移除技能「{name}」？其文件夹会从 GenOffice 中删除。',
+    intgSkillsRemoveConfirm: '移除技能「{name}」？其文件夹会从 UniWork Office 中删除。',
     intgSkillsRemoved: '已移除 {name}',
     intgSkillsRead: '详情',
     intgSkillsMine: '我的技能',
@@ -571,7 +571,7 @@ export const strings = {
     askSavedAs: 'Saved: {name}',
     askSaveFailed: 'Could not save: {error}',
     askEmptyCorpus: 'The knowledge base is empty: star some files first, then ask.',
-    askNeedsLogin: 'Sign in to Genspark to use AI chat.',
+    askNeedsLogin: 'Sign in to UniWork to use AI chat.',
     askPlaceholder: 'Ask about your starred files…',
     askHintIdle: 'Enter to send',
     askHintBusy: 'The AI is answering…',
@@ -591,15 +591,15 @@ export const strings = {
     askCtaRecents: 'Star files from Recents',
     askNoSave: 'The conversation is not saved; it clears when the app restarts.',
     askUnknownError: 'The AI request failed. Try again.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Projects created on the web with Genspark AI. Editing continues in your browser — click any project to open it.',
+      'Projects created on the web with UniWork AI. Editing continues in your browser — click any project to open it.',
     cloudSearchPlaceholder: 'Search {n} projects…',
     cloudNoResults: 'No matching projects.',
     cloudSortRecent: 'Recent',
     cloudSortOldest: 'Oldest',
     cloudRefresh: 'Refresh',
-    cloudLoginHint: 'Sign in to your Genspark account to see projects you created on the web.',
+    cloudLoginHint: 'Sign in to your UniWork account to see projects you created on the web.',
     cloudEmpty: 'No web projects yet.',
     cloudError: 'Failed to load. Try again later.',
     cloudRetry: 'Retry',
@@ -725,7 +725,7 @@ export const strings = {
 =======
     setAutoUpdateCheck: 'Check for updates automatically',
     setAutoUpdateCheckDesc:
-      'When off, GenOffice no longer checks for new versions at launch or in the background. You can still check from Help › Check for Updates.',
+      'When off, UniWork Office no longer checks for new versions at launch or in the background. You can still check from Help › Check for Updates.',
     updateChannel: 'Update Channel',
 >>>>>>> theirs
     channelStable: 'Stable',
@@ -744,7 +744,7 @@ export const strings = {
     saveLocation: 'Save Location',
     setRestoreSession: 'Reopen documents from last time',
     setRestoreSessionDesc:
-      'Documents open when GenOffice closes reopen automatically the next time it starts.',
+      'Documents open when UniWork Office closes reopen automatically the next time it starts.',
     setTabSleep: 'Sleep inactive tabs',
     setTabSleepDesc:
       'Once many tabs are open, ones you have not looked at for a while release their memory and reopen their file when you return. Tabs with unsaved changes or pinned tabs never sleep.',
@@ -835,7 +835,7 @@ export const strings = {
     intgHeroTitle: 'Use UniWork Office from your AI assistant',
 =======
     setSecSkills: 'Skills',
-    intgHeroTitle: 'Use GenOffice from your AI assistant',
+    intgHeroTitle: 'Use UniWork Office from your AI assistant',
 >>>>>>> theirs
     intgHeroDesc:
       'Once connected, Claude Code, Codex, Cursor, Claude Desktop and similar assistants can create, convert, read and edit Word, Excel, PowerPoint, PDF and Markdown files for you. Everything runs on this computer; nothing is uploaded.',
@@ -944,7 +944,7 @@ export const strings = {
     setAiEndpointAdd: 'Add endpoint',
     setAiEndpointRemove: 'Remove',
     setAiEndpointName: 'Name',
-    setAiGensparkHint: 'Uses your Genspark sign-in; no API key needed.',
+    setAiGensparkHint: 'Uses your UniWork sign-in; no API key needed.',
 >>>>>>> theirs
     setAiCodexPath: 'Codex executable',
     setAiCodexPathHint: 'Only set this for a custom install; leave blank to auto-detect.',
@@ -977,9 +977,9 @@ export const strings = {
     setAiSearchAuto: 'Auto (free)',
 =======
     setSecAiMedia: 'AI Media & Search',
-    setAiMediaGensparkHint: 'Image generation and image/video analysis use your Genspark sign-in.',
+    setAiMediaGensparkHint: 'Image generation and image/video analysis use your UniWork sign-in.',
     setAiSearchGensparkHint:
-      'Web and image search use your Genspark sign-in; signed out or with cloud tools off they fall back to free sources.',
+      'Web and image search use your UniWork sign-in; signed out or with cloud tools off they fall back to free sources.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper serves both web and image search with your key.',
     setAiSearchSerplyHint: 'Serply serves both web and image search with your key.',
@@ -1037,7 +1037,7 @@ export const strings = {
     timelineCountOne: '{n} item',
 =======
     intgSkillsDesc:
-      'GenOffice only uses skills in its own skills folder. Importing a folder or a zip copies the whole skill in; nothing runs on import.',
+      'UniWork Office only uses skills in its own skills folder. Importing a folder or a zip copies the whole skill in; nothing runs on import.',
     intgSkillsEmpty: 'No skills installed yet.',
     intgSkillsImportFolder: 'Import folder…',
     intgSkillsImportZip: 'Import skill package (zip / .md)…',
@@ -1046,7 +1046,7 @@ export const strings = {
     intgSkillsImportDone: 'Imported {name}',
     intgSkillsImportFailed: 'Import failed: {reason}',
     intgSkillsRemove: 'Remove',
-    intgSkillsRemoveConfirm: 'Remove the skill "{name}"? Its folder is deleted from GenOffice.',
+    intgSkillsRemoveConfirm: 'Remove the skill "{name}"? Its folder is deleted from UniWork Office.',
     intgSkillsRemoved: 'Removed {name}',
     intgSkillsRead: 'Details',
     intgSkillsMine: 'My skills',
@@ -1132,7 +1132,7 @@ export const strings = {
     askSavedAs: 'Đã lưu: {name}',
     askSaveFailed: 'Không thể lưu: {error}',
     askEmptyCorpus: 'Cơ sở tri thức trống: hãy đánh dấu tệp trước rồi hỏi.',
-    askNeedsLogin: 'Đăng nhập Genspark để dùng trò chuyện AI.',
+    askNeedsLogin: 'Đăng nhập UniWork để dùng trò chuyện AI.',
     askPlaceholder: 'Hỏi về các tệp đã đánh dấu…',
     askHintIdle: 'Enter để gửi',
     askHintBusy: 'AI đang trả lời…',
@@ -1152,15 +1152,15 @@ export const strings = {
     askCtaRecents: 'Gắn sao từ Gần đây',
     askNoSave: 'Cuộc trò chuyện không được lưu; sẽ bị xóa khi khởi động lại ứng dụng.',
     askUnknownError: 'Yêu cầu AI thất bại. Thử lại.',
-    navCloud: 'Dự án Genspark',
+    navCloud: 'Dự án UniWork',
     cloudSubtitle:
-      'Các dự án được tạo trên web với Genspark AI. Tiếp tục chỉnh sửa trên trình duyệt của bạn — nhấp vào bất kỳ dự án nào để mở.',
+      'Các dự án được tạo trên web với UniWork AI. Tiếp tục chỉnh sửa trên trình duyệt của bạn — nhấp vào bất kỳ dự án nào để mở.',
     cloudSearchPlaceholder: 'Tìm kiếm {n} dự án…',
     cloudNoResults: 'Không có dự án phù hợp.',
     cloudSortRecent: 'Gần đây',
     cloudSortOldest: 'Cũ nhất',
     cloudRefresh: 'Làm mới',
-    cloudLoginHint: 'Đăng nhập vào tài khoản Genspark để xem các dự án bạn đã tạo trên web.',
+    cloudLoginHint: 'Đăng nhập vào tài khoản UniWork để xem các dự án bạn đã tạo trên web.',
     cloudEmpty: 'Chưa có dự án web nào.',
     cloudError: 'Tải thất bại. Vui lòng thử lại sau.',
     cloudRetry: 'Thử lại',
@@ -1267,9 +1267,9 @@ export const strings = {
     untitled: 'Chưa có tiêu đề',
     account: 'Tài khoản',
     login: 'Đăng nhập',
-    loginGenspark: 'Đăng nhập bằng Genspark',
+    loginGenspark: 'Đăng nhập bằng UniWork',
     loggedIn: 'Đã đăng nhập',
-    loggedInGenspark: 'Đã đăng nhập vào Genspark',
+    loggedInGenspark: 'Đã đăng nhập vào UniWork',
     waitingLogin: 'Đang đợi đăng nhập trên trình duyệt… Nhấp để mở lại trang đăng nhập',
     loginTimeout: 'Hết thời gian chờ đăng nhập — nhấp để thử lại',
     loginLaunchFailed: 'Không thể mở trang đăng nhập — nhấp để thử lại',
@@ -1277,7 +1277,7 @@ export const strings = {
     loginOpenShort: 'Mở trang đăng nhập thủ công',
     loginCopyUrl: 'Sao chép liên kết đăng nhập',
     loginCopied: 'Đã sao chép',
-    loginNetworkError: 'Không thể kết nối tới Genspark — hãy kiểm tra cài đặt mạng hoặc proxy',
+    loginNetworkError: 'Không thể kết nối tới UniWork — hãy kiểm tra cài đặt mạng hoặc proxy',
     loginExpired: 'Phiên đăng nhập đã hết hạn — nhấp để thử lại',
     loginFailed: 'Đăng nhập thất bại — nhấp để thử lại',
     waitingShort: 'Đang đợi…',
@@ -1293,7 +1293,7 @@ export const strings = {
     setUpdateRestart: 'Khởi động lại và cài đặt',
     setAutoUpdateCheck: 'Tự động kiểm tra cập nhật',
     setAutoUpdateCheckDesc:
-      'Khi tắt, GenOffice không còn kiểm tra phiên bản mới khi khởi động hoặc chạy nền. Bạn vẫn có thể kiểm tra trong Trợ giúp › Kiểm tra bản cập nhật.',
+      'Khi tắt, UniWork Office không còn kiểm tra phiên bản mới khi khởi động hoặc chạy nền. Bạn vẫn có thể kiểm tra trong Trợ giúp › Kiểm tra bản cập nhật.',
     updateChannel: 'Kênh cập nhật',
     channelStable: 'Ổn định',
     channelBeta: 'Beta',
@@ -1306,7 +1306,7 @@ export const strings = {
     saveLocation: 'Vị trí lưu',
     setRestoreSession: 'Mở lại tài liệu của lần trước',
     setRestoreSessionDesc:
-      'Các tài liệu đang mở khi đóng GenOffice sẽ tự động mở lại vào lần khởi động tiếp theo.',
+      'Các tài liệu đang mở khi đóng UniWork Office sẽ tự động mở lại vào lần khởi động tiếp theo.',
     setTabSleep: 'Tạm ngủ các thẻ không hoạt động',
     setTabSleepDesc:
       'Khi mở nhiều thẻ, những thẻ lâu không xem sẽ giải phóng bộ nhớ và mở lại tệp khi bạn quay lại. Thẻ có thay đổi chưa lưu hoặc đã ghim sẽ không ngủ.',
@@ -1314,9 +1314,6 @@ export const strings = {
     setAutoSave: 'Tự động lưu tất cả tài liệu',
     setAutoSaveDesc:
       'Bật Tự động lưu theo mặc định trong mọi trình soạn thảo. Bạn vẫn có thể tắt tính năng này cho từng cửa sổ riêng lẻ.',
-    setAnalytics: 'Gửi số liệu thống kê sử dụng ẩn danh',
-    setAnalyticsDesc:
-      'Được bật theo mặc định và có thể tắt bất cứ lúc nào trong Cài đặt → Chung. Sử dụng Google Analytics 4; Google nhận địa chỉ IP công khai và siêu dữ liệu truyền tải của bạn, nhưng nội dung tài liệu và tên tệp không bao giờ bị thu thập.',
     setSearchRerank: 'Sắp xếp lại kết quả tìm kiếm Jev',
     setSearchRerankDesc:
       'Gửi đoạn trích của 20 kết quả hàng đầu cục bộ tới mô hình Jev của TypeSafe và sắp xếp lại theo mức độ liên quan. Tắt theo mặc định; khi bật, các đoạn trích sẽ được gửi ra ngoài thiết bị này.',
@@ -1336,8 +1333,8 @@ export const strings = {
     aiFontSizeCustom: 'Tùy chỉnh',
     setAiSpellcheck: 'Kiểm tra chính tả trong trò chuyện AI',
     setDefaultApp: 'Ứng dụng mặc định cho tài liệu Office',
-    setDefaultAppDesc: 'Mở các tệp .docx, .xlsx và .pptx bằng GenOffice khi bấm đúp.',
-    setDefaultAppIs: 'GenOffice đã là ứng dụng mặc định.',
+    setDefaultAppDesc: 'Mở các tệp .docx, .xlsx và .pptx bằng UniWork Office khi bấm đúp.',
+    setDefaultAppIs: 'UniWork Office đã là ứng dụng mặc định.',
     setDefaultAppOther: 'Mặc định hiện tại: {app}',
     setDefaultAppSet: 'Đặt làm mặc định',
     setDefaultAppOpenSettings: 'Mở cài đặt hệ thống',
@@ -1382,7 +1379,7 @@ export const strings = {
     setSecAbout: 'Giới thiệu',
     setSecIntegrations: 'Tích hợp',
     setSecSkills: 'Kỹ năng',
-    intgHeroTitle: 'Sử dụng GenOffice từ trợ lý AI của bạn',
+    intgHeroTitle: 'Sử dụng UniWork Office từ trợ lý AI của bạn',
     intgHeroDesc:
       'Sau khi kết nối, Claude Code, Codex, Cursor, Claude Desktop và các trợ lý tương tự có thể tạo, chuyển đổi, đọc và chỉnh sửa các tệp Word, Excel, PowerPoint, PDF và Markdown cho bạn. Mọi thứ đều chạy trên máy tính này; không có gì được tải lên.',
     intgHeroStep1:
@@ -1393,7 +1390,7 @@ export const strings = {
     intgStep1Desc:
       'Chỉ các trợ lý được tìm thấy trên máy tính này mới được liệt kê. Hãy cài đặt vào trợ lý bạn thực sự sử dụng; bạn không cần phải cài đặt tất cả.',
     intgStep1Update:
-      'Khi bản cập nhật GenOffice cung cấp kỹ năng mới hơn, nút Cập nhật sẽ xuất hiện bên cạnh trợ lý đó.',
+      'Khi bản cập nhật UniWork Office cung cấp kỹ năng mới hơn, nút Cập nhật sẽ xuất hiện bên cạnh trợ lý đó.',
     intgSkillVersion: 'kỹ năng {v}',
     intgStateMissing: 'Chưa cài đặt kỹ năng',
     intgStateInstalled: 'Đã cài đặt kỹ năng {v} · sẵn sàng cho cuộc trò chuyện tiếp theo của bạn',
@@ -1401,7 +1398,7 @@ export const strings = {
     intgOtherDesc:
       'Chọn bất kỳ cách nào trong ba cách này. Tất cả đều cài đặt cùng một kỹ năng, vì vậy không cần làm nhiều hơn một cách.',
     intgOtherFolderTitle: 'Bất kỳ trợ lý nào đọc thư mục SKILL.md',
-    intgOtherFolderDesc: 'Chọn thư mục kỹ năng của trợ lý và GenOffice sẽ ghi tệp vào đó.',
+    intgOtherFolderDesc: 'Chọn thư mục kỹ năng của trợ lý và UniWork Office sẽ ghi tệp vào đó.',
     intgOtherZipTitle: 'Giao tệp cho trợ lý',
     intgOtherZipDesc: 'Lưu kỹ năng dưới dạng zip, sau đó yêu cầu trợ lý cài đặt.',
     intgOtherNpxTitle: 'Bằng lệnh skills (yêu cầu Node.js)',
@@ -1414,22 +1411,22 @@ export const strings = {
       'Sau khi cài đặt, hãy mở một cuộc trò chuyện mới trong trợ lý của bạn và hỏi bằng ngôn ngữ tự nhiên, ví dụ:',
     intgExample1: 'Chuyển đổi ~/Downloads/report.md thành tài liệu Word',
     intgExample2: 'Tạo bài thuyết trình 6 trang trình bày về kết quả quý 3 của chúng tôi',
-    intgExample3: 'Chuyển đổi budget.xlsx sang PDF và mở trong GenOffice',
-    intgStep2Note: 'Trợ lý tự chạy dòng lệnh genoffice; bạn không bao giờ phải nhập lệnh.',
+    intgExample3: 'Chuyển đổi budget.xlsx sang PDF và mở trong UniWork Office',
+    intgStep2Note: 'Trợ lý tự chạy dòng lệnh UniWork Office (genoffice); bạn không bao giờ phải nhập lệnh.',
     intgCliPartTitle: 'CLI · dòng lệnh + kỹ năng',
     intgCliPartDesc:
-      'Dành cho các trợ lý có thể chạy lệnh terminal (Claude Code, Codex, Cursor và các trợ lý khác). Khi kỹ năng đã được cài đặt, trợ lý sẽ tự gọi dòng lệnh genoffice để tạo, chuyển đổi, đọc và chỉnh sửa tệp; bạn không cần nhập lệnh.',
+      'Dành cho các trợ lý có thể chạy lệnh terminal (Claude Code, Codex, Cursor và các trợ lý khác). Khi kỹ năng đã được cài đặt, trợ lý sẽ tự gọi dòng lệnh UniWork Office (genoffice) để tạo, chuyển đổi, đọc và chỉnh sửa tệp; bạn không cần nhập lệnh.',
     intgMcpPartTitle: 'MCP',
     intgMcpPartDesc:
-      'MCP là giao thức tiêu chuẩn mà các trợ lý AI dùng để gọi công cụ bên ngoài. Sử dụng khi trợ lý của bạn không thể chạy lệnh (ví dụ Claude Desktop) hoặc khi bạn muốn trợ lý điều khiển trực tiếp cửa sổ GenOffice. Chọn một trong hai cách bên dưới.',
+      'MCP là giao thức tiêu chuẩn mà các trợ lý AI dùng để gọi công cụ bên ngoài. Sử dụng khi trợ lý của bạn không thể chạy lệnh (ví dụ Claude Desktop) hoặc khi bạn muốn trợ lý điều khiển trực tiếp cửa sổ UniWork Office. Chọn một trong hai cách bên dưới.',
     intgMcpStdioTitle: 'Được khởi động bởi trợ lý (khuyến nghị)',
     intgMcpStdioDesc:
-      'Trợ lý sẽ tự khởi chạy genoffice mcp: không cần bật gì ở đây và GenOffice không cần phải mở. Có đầy đủ tính năng tương tự CLI.',
+      'Trợ lý sẽ tự khởi chạy UniWork Office (genoffice mcp): không cần bật gì ở đây và UniWork Office không cần phải mở. Có đầy đủ tính năng tương tự CLI.',
     intgMcpHttpTitle: 'Máy chủ HTTP cục bộ',
     intgMcpHttpDesc:
-      'Chạy bên trong GenOffice; trợ lý kết nối với một URL và bạn có thể theo dõi nó tạo tài liệu từng bước trong trình chỉnh sửa Word. GenOffice phải luôn mở; hiện tại chỉ hỗ trợ tài liệu Word.',
+      'Chạy bên trong UniWork Office; trợ lý kết nối với một URL và bạn có thể theo dõi nó tạo tài liệu từng bước trong trình chỉnh sửa Word. UniWork Office phải luôn mở; hiện tại chỉ hỗ trợ tài liệu Word.',
     intgMcpHttpAdvanced: 'Nâng cao: các điểm cuối khác và nhật ký',
-    intgMcpTryNote: 'Trợ lý gọi GenOffice thông qua MCP; bạn không bao giờ phải nhập lệnh.',
+    intgMcpTryNote: 'Trợ lý gọi UniWork Office thông qua MCP; bạn không bao giờ phải nhập lệnh.',
     intgMcpClaudeTitle: 'Claude Code',
     intgMcpClaudeDesc: 'Chạy lệnh này một lần trong terminal:',
     intgMcpOtherTitle: 'Cursor, Claude Desktop hoặc bất kỳ trợ lý hỗ trợ MCP nào khác',
@@ -1437,10 +1434,10 @@ export const strings = {
       'Thêm nội dung này vào cài đặt máy chủ MCP của trợ lý (tệp JSON hoặc "Add MCP server" trong phần cài đặt):',
     intgMcpNote:
       'Kỹ năng và MCP có thể được thiết lập song song; trợ lý sẽ chọn một trong hai. Chúng thực hiện chức năng hoàn toàn giống nhau.',
-    intgCliTitle: 'Nâng cao: dòng lệnh genoffice',
-    intgCliReady: 'genoffice {v} · đã sẵn sàng trong terminal của bạn ({path})',
+    intgCliTitle: 'Nâng cao: dòng lệnh UniWork Office',
+    intgCliReady: 'UniWork Office (genoffice) {v} · đã sẵn sàng trong terminal của bạn ({path})',
     intgCliNotOnPath:
-      'genoffice {v} · không có trong PATH của terminal. Trợ lý vẫn tìm thấy qua ~/.genoffice/launcher, vì vậy kỹ năng vẫn hoạt động. Để tự chạy lệnh genoffice, hãy thực hiện lệnh này một lần:',
+      'UniWork Office (genoffice) {v} · không có trong PATH của terminal. Trợ lý vẫn tìm thấy qua ~/.genoffice/launcher, vì vậy kỹ năng vẫn hoạt động. Để tự chạy lệnh genoffice, hãy thực hiện lệnh này một lần:',
     intgCliLauncher: 'Thư mục trình khởi chạy',
     intgStateOutdated: 'Đã cài đặt {v}, có bản cập nhật lên {next}',
     intgStateModified: 'Đã cài đặt {v} (đã sửa đổi)',
@@ -1465,10 +1462,10 @@ export const strings = {
     intgSavedTo: 'Đã lưu vào {path}',
     intgCopied: 'Đã sao chép',
     intgCliEphemeral:
-      'Trước tiên hãy kéo GenOffice vào Applications, sau đó mới sử dụng dòng lệnh.',
+      'Trước tiên hãy kéo UniWork Office vào Applications, sau đó mới sử dụng dòng lệnh.',
     intgCopyPath: 'Sao chép đường dẫn',
     intgCliNeedsUpdate:
-      'Kỹ năng này yêu cầu dòng lệnh {v} hoặc mới hơn; vui lòng cập nhật GenOffice.',
+      'Kỹ năng này yêu cầu dòng lệnh {v} hoặc mới hơn; vui lòng cập nhật UniWork Office.',
     intgLoading: 'Đang kiểm tra…',
     intgUpdateDue: 'Có bản cập nhật kỹ năng',
     setSecAiModel: 'Mô hình AI',
@@ -1484,14 +1481,14 @@ export const strings = {
     setAiEndpointAdd: 'Thêm điểm cuối',
     setAiEndpointRemove: 'Xóa',
     setAiEndpointName: 'Tên',
-    setAiGensparkHint: 'Sử dụng thông tin đăng nhập Genspark của bạn; không cần khóa API.',
+    setAiGensparkHint: 'Sử dụng thông tin đăng nhập UniWork của bạn; không cần khóa API.',
     setAiCodexPath: 'Tệp thực thi Codex',
     setAiCodexPathHint: 'Chỉ đặt mục này nếu cài đặt tùy chỉnh; để trống để tự động phát hiện.',
     setAiCodexAutoPlaceholder: 'Tự động phát hiện (khuyến nghị)',
     setAiCodexHint:
       'Tự động tìm CLI Codex đã đăng nhập hiện tại sau các bản cập nhật; đường dẫn tùy chỉnh là không bắt buộc. Không cần khóa API.',
     setAiByokNote:
-      'Các cuộc trò chuyện sử dụng khóa của riêng bạn. Việc tạo hình ảnh và phân tích phương tiện tuân theo phần Phương tiện AI; tìm kiếm web vẫn sử dụng đăng nhập Genspark hoặc các nguồn miễn phí.',
+      'Các cuộc trò chuyện sử dụng khóa của riêng bạn. Việc tạo hình ảnh và phân tích phương tiện tuân theo phần Phương tiện AI; tìm kiếm web vẫn sử dụng đăng nhập UniWork hoặc các nguồn miễn phí.',
     setAiSave: 'Lưu',
     setAiSaved: 'Đã lưu',
     setAiTest: 'Kiểm tra kết nối',
@@ -1503,9 +1500,9 @@ export const strings = {
       'Ngân sách đầu ra cho một lượt trao đổi. Các mô hình suy luận dành một phần trong đó để suy nghĩ, do đó câu trả lời có thể trống nếu hết ngân sách; hãy tăng giá trị này nếu gặp tình trạng trên.',
     setSecAiMedia: 'Phương tiện AI & Tìm kiếm',
     setAiMediaGensparkHint:
-      'Tạo hình ảnh và phân tích hình ảnh/video sử dụng thông tin đăng nhập Genspark của bạn.',
+      'Tạo hình ảnh và phân tích hình ảnh/video sử dụng thông tin đăng nhập UniWork của bạn.',
     setAiSearchGensparkHint:
-      'Tìm kiếm web và hình ảnh sử dụng thông tin đăng nhập Genspark của bạn; khi đăng xuất hoặc tắt công cụ đám mây, hệ thống sẽ chuyển sang dùng các nguồn miễn phí.',
+      'Tìm kiếm web và hình ảnh sử dụng thông tin đăng nhập UniWork của bạn; khi đăng xuất hoặc tắt công cụ đám mây, hệ thống sẽ chuyển sang dùng các nguồn miễn phí.',
     setAiSearchSerperHint: 'Serper cung cấp cả tìm kiếm web và hình ảnh bằng khóa của bạn.',
     setAiSearchSerplyHint: 'Serply cung cấp cả tìm kiếm web và hình ảnh bằng key của bạn.',
     setAiSearchTavilyHint:
@@ -1521,19 +1518,9 @@ export const strings = {
     setAiCapFileSearch: 'Tìm kiếm tệp cục bộ',
     setAiSharedKeyHint:
       'Khóa và URL cơ sở của nhà cung cấp được dùng chung cho các chức năng; chỉ cần nhập một lần.',
-    setAiGskTools: 'Công cụ đám mây Genspark',
+    setAiGskTools: 'Công cụ đám mây UniWork',
     setAiGskToolsDesc:
-      'Tìm kiếm web, tạo hình ảnh và phân tích phương tiện được xử lý qua Genspark và tiêu tốn credit khi nhà cung cấp được đặt là Genspark; khi tắt, tìm kiếm sẽ dùng các nguồn miễn phí và công cụ hình ảnh Genspark sẽ không khả dụng.',
-    setGithub: 'Mã nguồn mở',
-    starOnGitHub: 'Gắn sao trên GitHub',
-    starPromptTitle: 'Bạn thích GenOffice chứ?',
-    starPromptTitleN: 'Bạn đã mở {n} tài liệu với GenOffice',
-    starPromptBody:
-      'GenOffice là phần mềm nguồn mở và miễn phí. Tặng một sao trên GitHub là cách tuyệt vời nhất để ủng hộ đội ngũ phát triển.',
-    starPromptGo: 'Gắn sao trên GitHub',
-    starPromptDone: 'Đã gắn sao',
-    starPromptLater: 'Để sau',
-    onbStarHint: 'Nếu bạn yêu thích GenOffice, hãy tặng chúng tôi một sao trên GitHub.',
+      'Tìm kiếm web, tạo hình ảnh và phân tích phương tiện được xử lý qua UniWork và tiêu tốn credit khi nhà cung cấp được đặt là UniWork; khi tắt, tìm kiếm sẽ dùng các nguồn miễn phí và công cụ hình ảnh UniWork sẽ không khả dụng.',
     setEmail: 'Email',
     setNotLoggedIn: 'Chưa đăng nhập',
     setViewUsage: 'Xem mức sử dụng',
@@ -1546,25 +1533,23 @@ export const strings = {
     appMenu: 'Menu',
     newTab: 'Tab mới',
     // First-run onboarding
-    onbTitle1: 'Chào mừng đến với GenOffice',
-    onbSubtitle1: 'Bộ ứng dụng văn phòng AI nguồn mở đầu tiên',
-    onbBody1:
-      'Tạo tài liệu, xây dựng bảng tính, tạo bản trình bày và xem lại PDF. AI được tích hợp trong từng bước.',
-    onbTitle2: 'Đây mới chỉ là khởi đầu',
+    onbTitle1: 'Chào mừng đến với UniWork Office',
+    onbSubtitle1: 'Tài liệu, bảng tính, trình chiếu và PDF trong một ứng dụng',
+    onbBody1: 'Tạo tài liệu, lập bảng tính, làm trình chiếu và xem PDF ngay trên máy tính của bạn.',
+    onbTitle2: 'AI hỗ trợ từng bước',
     onbBody2:
-      'GenOffice vẫn đang trong giai đoạn alpha. Hãy tham gia nhóm trò chuyện trên GenTeam để chia sẻ phản hồi và định hình những bước phát triển tiếp theo.',
-    onbCredits: 'Thành viên đóng góp tích cực nhận được **1.000+ credit Genspark**',
-    onbJoinGenTeam: 'Tham gia GenTeam',
+      'Soạn thảo, viết lại và giải thích ngay trong tài liệu của bạn. Dùng tài khoản UniWork hoặc khóa AI của riêng bạn.',
     onbSkip: 'Bỏ qua',
     onbNext: 'Tiếp theo',
     onbStart: 'Bắt đầu',
     onbStepAria: 'Trang {n} / {total}',
-    onbTitle3: 'Miễn phí cho mọi người',
-    onbBody3: 'Không phí bản quyền. Không quảng cáo. Không hình mờ.',
-    onbNote3: 'Các tính năng AI có thể tiêu tốn credit Genspark.',
+    onbTitle3: 'Bạn đã sẵn sàng',
+    onbBody3: 'Mở một tệp hoặc tạo tài liệu mới để bắt đầu.',
+    onbNote3:
+      'AI là tùy chọn. Tài liệu được chỉnh sửa ngay trên máy tính của bạn; mở và lưu tệp không cần tài khoản hay khóa.',
     onbBack: 'Quay lại',
     intgSkillsDesc:
-      'GenOffice chỉ dùng kỹ năng trong thư mục kỹ năng của chính nó. Nhập từ thư mục hoặc zip sẽ sao chép toàn bộ kỹ năng vào; không có gì chạy khi nhập.',
+      'UniWork Office chỉ dùng kỹ năng trong thư mục kỹ năng của chính nó. Nhập từ thư mục hoặc zip sẽ sao chép toàn bộ kỹ năng vào; không có gì chạy khi nhập.',
     intgSkillsEmpty: 'Chưa cài kỹ năng nào.',
     intgSkillsImportFolder: 'Nhập thư mục…',
     intgSkillsImportZip: 'Nhập gói kỹ năng (zip / .md)…',
@@ -1573,7 +1558,7 @@ export const strings = {
     intgSkillsImportDone: 'Đã nhập {name}',
     intgSkillsImportFailed: 'Nhập thất bại: {reason}',
     intgSkillsRemove: 'Gỡ bỏ',
-    intgSkillsRemoveConfirm: 'Gỡ kỹ năng "{name}"? Thư mục của nó sẽ bị xóa khỏi GenOffice.',
+    intgSkillsRemoveConfirm: 'Gỡ kỹ năng "{name}"? Thư mục của nó sẽ bị xóa khỏi UniWork Office.',
     intgSkillsRemoved: 'Đã gỡ {name}',
     intgSkillsRead: 'Chi tiết',
     intgSkillsMine: 'Kỹ năng của tôi',
@@ -1668,7 +1653,7 @@ export const strings = {
     askSavedAs: '保存済み: {name}',
     askSaveFailed: '保存できませんでした: {error}',
     askEmptyCorpus: 'ナレッジベースは空です:先にファイルをスターしてから質問してください。',
-    askNeedsLogin: 'AI チャットには Genspark へのログインが必要です。',
+    askNeedsLogin: 'AI チャットには UniWork へのログインが必要です。',
     askPlaceholder: 'スター付きファイルについて質問…',
     askHintIdle: 'Enter で送信',
     askHintBusy: 'AI が回答中…',
@@ -1688,16 +1673,16 @@ export const strings = {
     askCtaRecents: '「最近」からスターを付ける',
     askNoSave: '会話は保存されません。アプリを再起動すると消えます。',
     askUnknownError: 'AI リクエストに失敗しました。もう一度お試しください。',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Web で Genspark AI を使って作成したプロジェクト。編集はブラウザで続行します。クリックで開きます。',
+      'Web で UniWork AI を使って作成したプロジェクト。編集はブラウザで続行します。クリックで開きます。',
     cloudSearchPlaceholder: '{n} 件のプロジェクトを検索…',
     cloudNoResults: '一致するプロジェクトはありません。',
     cloudSortRecent: '新しい順',
     cloudSortOldest: '古い順',
     cloudRefresh: '更新',
     cloudLoginHint:
-      'Genspark アカウントにサインインすると、Web で作成したプロジェクトを表示できます。',
+      'UniWork アカウントにサインインすると、Web で作成したプロジェクトを表示できます。',
     cloudEmpty: 'Web のプロジェクトはまだありません。',
     cloudError: '読み込みに失敗しました。後でもう一度お試しください。',
     cloudRetry: '再試行',
@@ -1837,7 +1822,7 @@ export const strings = {
     saveLocation: '保存先',
     setRestoreSession: '前回のドキュメントを再度開く',
     setRestoreSessionDesc:
-      'GenOffice を閉じたときに開いていたドキュメントを、次回起動時に自動で開き直します。',
+      'UniWork Office を閉じたときに開いていたドキュメントを、次回起動時に自動で開き直します。',
     setTabSleep: '非アクティブなタブをスリープ',
     setTabSleepDesc:
       '多くのタブを開いているとき、しばらく見ていないタブはメモリを解放し、戻ったときにファイルを再度開きます。未保存の変更があるタブやピン留めしたタブはスリープしません。',
@@ -1928,7 +1913,7 @@ export const strings = {
     intgHeroTitle: 'AI アシスタントから UniWork Office を使う',
 =======
     setSecSkills: 'スキル',
-    intgHeroTitle: 'AI アシスタントから GenOffice を使う',
+    intgHeroTitle: 'AI アシスタントから UniWork Office を使う',
 >>>>>>> theirs
     intgHeroDesc:
       '接続すると、Claude Code、Codex、Cursor、Claude Desktop などのアシスタントが Word、Excel、PowerPoint、PDF、Markdown ファイルの作成・変換・読み取り・編集を代行します。すべてこの PC 上で完結し、何もアップロードされません。',
@@ -2037,7 +2022,7 @@ export const strings = {
     setAiEndpointAdd: 'エンドポイントを追加',
     setAiEndpointRemove: '削除',
     setAiEndpointName: '名前',
-    setAiGensparkHint: 'Genspark アカウントでサインインするため、API キーは不要です。',
+    setAiGensparkHint: 'UniWork アカウントでサインインするため、API キーは不要です。',
 >>>>>>> theirs
     setAiCodexPath: 'Codex 実行ファイル',
     setAiCodexPathHint: 'カスタムインストール時のみ指定します。空欄なら自動検出します。',
@@ -2068,9 +2053,9 @@ export const strings = {
       'キー不要：Web 検索と画像検索は無料ソースを使用します（利用量に制限あり）。上限を上げるには、プロバイダーを選んで自分のキーを入力してください。',
     setAiSearchAuto: '自動（無料）',
 =======
-    setAiMediaGensparkHint: '画像生成と画像/動画解析は Genspark のサインインを使用します。',
+    setAiMediaGensparkHint: '画像生成と画像/動画解析は UniWork のサインインを使用します。',
     setAiSearchGensparkHint:
-      'Web 検索と画像検索は Genspark のサインインを使用します。サインアウト時やクラウドツールがオフのときは無料ソースにフォールバックします。',
+      'Web 検索と画像検索は UniWork のサインインを使用します。サインアウト時やクラウドツールがオフのときは無料ソースにフォールバックします。',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper はあなたのキーで Web 検索と画像検索の両方を提供します。',
     setAiSearchSerplyHint: 'Serply はあなたのキーで Web 検索と画像検索の両方を提供します。',
@@ -2133,7 +2118,7 @@ export const strings = {
     timelineCountOne: '{n} 件',
 =======
     intgSkillsDesc:
-      'GenOffice は自身のスキルフォルダ内のスキルのみ使用します。フォルダまたは zip からの読み込みはスキル全体をコピーします。読み込み時に何も実行されません。',
+      'UniWork Office は自身のスキルフォルダ内のスキルのみ使用します。フォルダまたは zip からの読み込みはスキル全体をコピーします。読み込み時に何も実行されません。',
     intgSkillsEmpty: 'スキルはまだインストールされていません。',
     intgSkillsImportFolder: 'フォルダを読み込む…',
     intgSkillsImportZip: 'スキルパッケージを読み込む（zip / .md）…',
@@ -2143,7 +2128,7 @@ export const strings = {
     intgSkillsImportFailed: '読み込みに失敗しました：{reason}',
     intgSkillsRemove: '削除',
     intgSkillsRemoveConfirm:
-      'スキル「{name}」を削除しますか？フォルダーは GenOffice から削除されます。',
+      'スキル「{name}」を削除しますか？フォルダーは UniWork Office から削除されます。',
     intgSkillsRemoved: '{name} を削除しました',
     intgSkillsRead: '詳細',
     intgSkillsMine: 'マイスキル',
@@ -2237,7 +2222,7 @@ export const strings = {
     askSavedAs: '저장됨: {name}',
     askSaveFailed: '저장하지 못했습니다: {error}',
     askEmptyCorpus: '지식 베이스가 비어 있습니다. 먼저 파일을 즐겨찾기한 후 질문해 주세요.',
-    askNeedsLogin: 'AI 채팅을 사용하려면 Genspark에 로그인하세요.',
+    askNeedsLogin: 'AI 채팅을 사용하려면 UniWork에 로그인하세요.',
     askPlaceholder: '즐겨찾기한 파일에 대해 질문…',
     askHintIdle: 'Enter로 보내기',
     askHintBusy: 'AI가 답변 중…',
@@ -2257,15 +2242,15 @@ export const strings = {
     askCtaRecents: '최근 파일에 별표하기',
     askNoSave: '대화는 저장되지 않으며, 앱을 다시 시작하면 지워집니다.',
     askUnknownError: 'AI 요청에 실패했습니다. 다시 시도해 주세요.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Genspark AI로 웹에서 만든 프로젝트입니다. 편집은 브라우저에서 계속됩니다. 프로젝트를 클릭하면 열립니다.',
+      'UniWork AI로 웹에서 만든 프로젝트입니다. 편집은 브라우저에서 계속됩니다. 프로젝트를 클릭하면 열립니다.',
     cloudSearchPlaceholder: '프로젝트 {n}개 검색…',
     cloudNoResults: '일치하는 프로젝트가 없습니다.',
     cloudSortRecent: '최신순',
     cloudSortOldest: '오래된순',
     cloudRefresh: '새로고침',
-    cloudLoginHint: 'Genspark 계정에 로그인하면 웹에서 만든 프로젝트를 볼 수 있습니다.',
+    cloudLoginHint: 'UniWork 계정에 로그인하면 웹에서 만든 프로젝트를 볼 수 있습니다.',
     cloudEmpty: '아직 웹 프로젝트가 없습니다.',
     cloudError: '불러오지 못했습니다. 나중에 다시 시도해 주세요.',
     cloudRetry: '다시 시도',
@@ -2404,7 +2389,7 @@ export const strings = {
     saveLocation: '저장 위치',
     setRestoreSession: '지난번 문서 다시 열기',
     setRestoreSessionDesc:
-      'GenOffice를 닫을 때 열려 있던 문서를 다음 실행 시 자동으로 다시 엽니다.',
+      'UniWork Office를 닫을 때 열려 있던 문서를 다음 실행 시 자동으로 다시 엽니다.',
     setTabSleep: '비활성 탭 절전',
     setTabSleepDesc:
       '탭이 많이 열려 있으면 한동안 보지 않은 탭은 메모리를 해제하고 돌아올 때 파일을 다시 엽니다. 저장하지 않은 변경이 있거나 고정된 탭은 절전되지 않습니다.',
@@ -2493,7 +2478,7 @@ export const strings = {
     intgHeroTitle: 'AI 어시스턴트에서 UniWork Office 사용하기',
 =======
     setSecSkills: '스킬',
-    intgHeroTitle: 'AI 어시스턴트에서 GenOffice 사용하기',
+    intgHeroTitle: 'AI 어시스턴트에서 UniWork Office 사용하기',
 >>>>>>> theirs
     intgHeroDesc:
       '연결하면 Claude Code, Codex, Cursor, Claude Desktop 등의 어시스턴트가 Word, Excel, PowerPoint, PDF, Markdown 파일을 대신 만들고 변환하고 읽고 편집합니다. 모두 이 컴퓨터에서 처리되며 어떤 내용도 업로드되지 않습니다.',
@@ -2597,7 +2582,7 @@ export const strings = {
     setAiEndpointAdd: '엔드포인트 추가',
     setAiEndpointRemove: '삭제',
     setAiEndpointName: '이름',
-    setAiGensparkHint: 'Genspark 로그인으로 사용하며 API 키가 필요 없습니다.',
+    setAiGensparkHint: 'UniWork 로그인으로 사용하며 API 키가 필요 없습니다.',
 >>>>>>> theirs
     setAiCodexPath: 'Codex 실행 파일',
     setAiCodexPathHint: '사용자 지정 설치에만 입력하세요. 비워 두면 자동 감지합니다.',
@@ -2628,9 +2613,9 @@ export const strings = {
       '키가 필요 없습니다. 웹 검색과 이미지 검색은 무료 소스를 사용합니다(사용량 제한). 한도를 늘리려면 제공업체를 선택하고 내 키를 입력하세요.',
     setAiSearchAuto: '자동(무료)',
 =======
-    setAiMediaGensparkHint: '이미지 생성과 이미지/동영상 분석은 Genspark 로그인을 사용합니다.',
+    setAiMediaGensparkHint: '이미지 생성과 이미지/동영상 분석은 UniWork 로그인을 사용합니다.',
     setAiSearchGensparkHint:
-      '웹 검색과 이미지 검색은 Genspark 로그인을 사용합니다. 로그아웃 상태거나 클라우드 도구가 꺼져 있으면 무료 소스로 대체됩니다.',
+      '웹 검색과 이미지 검색은 UniWork 로그인을 사용합니다. 로그아웃 상태거나 클라우드 도구가 꺼져 있으면 무료 소스로 대체됩니다.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper는 내 키로 웹 검색과 이미지 검색을 모두 제공합니다.',
     setAiSearchSerplyHint: 'Serply는 내 키로 웹 검색과 이미지 검색을 모두 제공합니다.',
@@ -2692,7 +2677,7 @@ export const strings = {
     timelineCountOne: '{n}건',
 =======
     intgSkillsDesc:
-      'GenOffice는 자체 스킬 폴더의 스킬만 사용합니다. 폴더나 zip에서 가져오면 스킬 전체가 복사되며, 가져오기 시 아무것도 실행되지 않습니다.',
+      'UniWork Office는 자체 스킬 폴더의 스킬만 사용합니다. 폴더나 zip에서 가져오면 스킬 전체가 복사되며, 가져오기 시 아무것도 실행되지 않습니다.',
     intgSkillsEmpty: '설치된 스킬이 없습니다.',
     intgSkillsImportFolder: '폴더 가져오기…',
     intgSkillsImportZip: '스킬 패키지 가져오기(zip / .md)…',
@@ -2702,7 +2687,7 @@ export const strings = {
     intgSkillsImportFailed: '가져오기 실패: {reason}',
     intgSkillsRemove: '제거',
     intgSkillsRemoveConfirm:
-      '스킬 "{name}"을(를) 제거할까요? 해당 폴더가 GenOffice에서 삭제됩니다.',
+      '스킬 "{name}"을(를) 제거할까요? 해당 폴더가 UniWork Office에서 삭제됩니다.',
     intgSkillsRemoved: '{name} 제거됨',
     intgSkillsRead: '상세',
     intgSkillsMine: '내 스킬',
@@ -2799,7 +2784,7 @@ export const strings = {
     askSavedAs: 'Enregistré : {name}',
     askSaveFailed: 'Enregistrement impossible : {error}',
     askEmptyCorpus: 'La base de connaissances est vide : ajoutez d’abord des fichiers favoris.',
-    askNeedsLogin: 'Connectez-vous à Genspark pour utiliser le chat IA.',
+    askNeedsLogin: 'Connectez-vous à UniWork pour utiliser le chat IA.',
     askPlaceholder: 'Posez une question sur vos fichiers…',
     askHintIdle: 'Entrée pour envoyer',
     askHintBusy: 'L’IA répond…',
@@ -2819,16 +2804,16 @@ export const strings = {
     askCtaRecents: 'Ajouter depuis Récents',
     askNoSave: 'La conversation n’est pas enregistrée ; elle s’efface au redémarrage de l’app.',
     askUnknownError: 'La requête IA a échoué. Réessayez.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      "Projets créés sur le web avec Genspark AI. L'édition continue dans votre navigateur — cliquez sur un projet pour l'ouvrir.",
+      "Projets créés sur le web avec UniWork AI. L'édition continue dans votre navigateur — cliquez sur un projet pour l'ouvrir.",
     cloudSearchPlaceholder: 'Rechercher parmi {n} projets…',
     cloudNoResults: 'Aucun projet correspondant.',
     cloudSortRecent: 'Récents',
     cloudSortOldest: 'Plus anciens',
     cloudRefresh: 'Actualiser',
     cloudLoginHint:
-      'Connectez-vous à votre compte Genspark pour voir les projets créés sur le web.',
+      'Connectez-vous à votre compte UniWork pour voir les projets créés sur le web.',
     cloudEmpty: 'Aucun projet web pour le moment.',
     cloudError: 'Échec du chargement. Réessayez plus tard.',
     cloudRetry: 'Réessayer',
@@ -2954,7 +2939,7 @@ export const strings = {
     setUpdateRestart: 'Redémarrer et installer',
     setAutoUpdateCheck: 'Rechercher automatiquement les mises à jour',
     setAutoUpdateCheckDesc:
-      'Désactivé, GenOffice ne recherche plus de nouvelle version au démarrage ni en arrière-plan. Vous pouvez toujours vérifier via Aide › Rechercher des mises à jour.',
+      'Désactivé, UniWork Office ne recherche plus de nouvelle version au démarrage ni en arrière-plan. Vous pouvez toujours vérifier via Aide › Rechercher des mises à jour.',
     updateChannel: 'Canal de mise à jour',
     channelStable: 'Stable',
     channelBeta: 'Bêta',
@@ -2969,7 +2954,7 @@ export const strings = {
     saveLocation: "Emplacement d'enregistrement",
     setRestoreSession: 'Rouvrir les documents de la dernière fois',
     setRestoreSessionDesc:
-      'Les documents ouverts à la fermeture de GenOffice se rouvrent automatiquement au prochain démarrage.',
+      'Les documents ouverts à la fermeture de UniWork Office se rouvrent automatiquement au prochain démarrage.',
     setTabSleep: 'Mettre en veille les onglets inactifs',
     setTabSleepDesc:
       'Lorsque de nombreux onglets sont ouverts, ceux que vous n’avez pas consultés depuis un moment libèrent leur mémoire et rouvrent leur fichier à votre retour. Les onglets avec des modifications non enregistrées ou épinglés ne sont jamais mis en veille.',
@@ -3061,7 +3046,7 @@ export const strings = {
     intgHeroTitle: 'Utiliser UniWork Office depuis votre assistant IA',
 =======
     setSecSkills: 'Compétences',
-    intgHeroTitle: 'Utiliser GenOffice depuis votre assistant IA',
+    intgHeroTitle: 'Utiliser UniWork Office depuis votre assistant IA',
 >>>>>>> theirs
     intgHeroDesc:
       'Une fois connectés, Claude Code, Codex, Cursor, Claude Desktop et les assistants similaires peuvent créer, convertir, lire et modifier vos fichiers Word, Excel, PowerPoint, PDF et Markdown. Tout se passe sur cet ordinateur ; rien n’est envoyé.',
@@ -3170,7 +3155,7 @@ export const strings = {
     setAiEndpointAdd: 'Ajouter un point de terminaison',
     setAiEndpointRemove: 'Supprimer',
     setAiEndpointName: 'Nom',
-    setAiGensparkHint: 'Utilise votre connexion Genspark ; aucune clé API requise.',
+    setAiGensparkHint: 'Utilise votre connexion UniWork ; aucune clé API requise.',
 >>>>>>> theirs
     setAiCodexPath: 'Exécutable Codex',
     setAiCodexPathHint:
@@ -3203,9 +3188,9 @@ export const strings = {
     setAiSearchAuto: 'Auto (gratuit)',
 =======
     setAiMediaGensparkHint:
-      "La génération d'images et l'analyse d'images/vidéos utilisent votre connexion Genspark.",
+      "La génération d'images et l'analyse d'images/vidéos utilisent votre connexion UniWork.",
     setAiSearchGensparkHint:
-      "La recherche web et d'images utilise votre connexion Genspark ; déconnecté ou avec les outils cloud désactivés, elle se rabat sur des sources gratuites.",
+      "La recherche web et d'images utilise votre connexion UniWork ; déconnecté ou avec les outils cloud désactivés, elle se rabat sur des sources gratuites.",
 >>>>>>> theirs
     setAiSearchSerperHint:
       "Serper assure la recherche web et la recherche d'images avec votre clé.",
@@ -3270,7 +3255,7 @@ export const strings = {
     timelineCountOne: '{n} élément',
 =======
     intgSkillsDesc:
-      'GenOffice n’utilise que les compétences de son propre dossier. Importer un dossier ou un zip copie toute la compétence ; rien ne s’exécute à l’import.',
+      'UniWork Office n’utilise que les compétences de son propre dossier. Importer un dossier ou un zip copie toute la compétence ; rien ne s’exécute à l’import.',
     intgSkillsEmpty: 'Aucune compétence installée.',
     intgSkillsImportFolder: 'Importer un dossier…',
     intgSkillsImportZip: 'Importer un paquet de compétence (zip / .md)…',
@@ -3280,7 +3265,7 @@ export const strings = {
     intgSkillsImportFailed: 'Échec de l’import : {reason}',
     intgSkillsRemove: 'Supprimer',
     intgSkillsRemoveConfirm:
-      'Supprimer la compétence « {name} » ? Son dossier sera supprimé de GenOffice.',
+      'Supprimer la compétence « {name} » ? Son dossier sera supprimé de UniWork Office.',
     intgSkillsRemoved: '{name} supprimée',
     intgSkillsRead: 'Détails',
     intgSkillsMine: 'Mes compétences',
@@ -3378,7 +3363,7 @@ export const strings = {
     askSavedAs: 'Gespeichert: {name}',
     askSaveFailed: 'Speichern fehlgeschlagen: {error}',
     askEmptyCorpus: 'Die Wissensbasis ist leer: markieren Sie zuerst Dateien, dann fragen Sie.',
-    askNeedsLogin: 'Melden Sie sich bei Genspark an, um den KI-Chat zu nutzen.',
+    askNeedsLogin: 'Melden Sie sich bei UniWork an, um den KI-Chat zu nutzen.',
     askPlaceholder: 'Fragen Sie zu Ihren Favoriten…',
     askHintIdle: 'Enter zum Senden',
     askHintBusy: 'Die KI antwortet…',
@@ -3398,16 +3383,16 @@ export const strings = {
     askCtaRecents: 'Aus Zuletzt verwendet markieren',
     askNoSave: 'Die Unterhaltung wird nicht gespeichert; sie wird beim Neustart der App gelöscht.',
     askUnknownError: 'Die KI-Anfrage ist fehlgeschlagen. Bitte erneut versuchen.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Mit Genspark AI im Web erstellte Projekte. Die Bearbeitung läuft im Browser weiter – klicken Sie auf ein Projekt, um es zu öffnen.',
+      'Mit UniWork AI im Web erstellte Projekte. Die Bearbeitung läuft im Browser weiter – klicken Sie auf ein Projekt, um es zu öffnen.',
     cloudSearchPlaceholder: '{n} Projekte durchsuchen…',
     cloudNoResults: 'Keine passenden Projekte.',
     cloudSortRecent: 'Neueste',
     cloudSortOldest: 'Älteste',
     cloudRefresh: 'Aktualisieren',
     cloudLoginHint:
-      'Melden Sie sich bei Ihrem Genspark-Konto an, um Ihre im Web erstellten Projekte zu sehen.',
+      'Melden Sie sich bei Ihrem UniWork-Konto an, um Ihre im Web erstellten Projekte zu sehen.',
     cloudEmpty: 'Noch keine Web-Projekte.',
     cloudError: 'Laden fehlgeschlagen. Bitte später erneut versuchen.',
     cloudRetry: 'Erneut versuchen',
@@ -3536,7 +3521,7 @@ export const strings = {
     setUpdateRestart: 'Neustarten & installieren',
     setAutoUpdateCheck: 'Automatisch nach Updates suchen',
     setAutoUpdateCheckDesc:
-      'Wenn aus, sucht GenOffice weder beim Start noch im Hintergrund nach neuen Versionen. Über Hilfe › Nach Updates suchen können Sie weiterhin selbst prüfen.',
+      'Wenn aus, sucht UniWork Office weder beim Start noch im Hintergrund nach neuen Versionen. Über Hilfe › Nach Updates suchen können Sie weiterhin selbst prüfen.',
     updateChannel: 'Update-Kanal',
     channelStable: 'Stabil',
     channelBeta: 'Beta',
@@ -3551,7 +3536,7 @@ export const strings = {
     saveLocation: 'Speicherort',
     setRestoreSession: 'Dokumente vom letzten Mal wieder öffnen',
     setRestoreSessionDesc:
-      'Dokumente, die beim Schließen von GenOffice geöffnet waren, werden beim nächsten Start automatisch wieder geöffnet.',
+      'Dokumente, die beim Schließen von UniWork Office geöffnet waren, werden beim nächsten Start automatisch wieder geöffnet.',
     setTabSleep: 'Inaktive Tabs schlafen legen',
     setTabSleepDesc:
       'Sind viele Tabs offen, geben länger nicht angesehene ihren Speicher frei und öffnen ihre Datei bei der Rückkehr neu. Tabs mit ungespeicherten Änderungen oder angeheftete Tabs schlafen nie.',
@@ -3642,7 +3627,7 @@ export const strings = {
     intgHeroTitle: 'UniWork Office aus Ihrem KI-Assistenten nutzen',
 =======
     setSecSkills: 'Skills',
-    intgHeroTitle: 'GenOffice aus Ihrem KI-Assistenten nutzen',
+    intgHeroTitle: 'UniWork Office aus Ihrem KI-Assistenten nutzen',
 >>>>>>> theirs
     intgHeroDesc:
       'Einmal verbunden, können Claude Code, Codex, Cursor, Claude Desktop und ähnliche Assistenten Word-, Excel-, PowerPoint-, PDF- und Markdown-Dateien für Sie erstellen, konvertieren, lesen und bearbeiten. Alles läuft auf diesem Rechner; nichts wird hochgeladen.',
@@ -3751,7 +3736,7 @@ export const strings = {
     setAiEndpointAdd: 'Endpunkt hinzufügen',
     setAiEndpointRemove: 'Entfernen',
     setAiEndpointName: 'Name',
-    setAiGensparkHint: 'Nutzt Ihre Genspark-Anmeldung; kein API-Schlüssel nötig.',
+    setAiGensparkHint: 'Nutzt Ihre UniWork-Anmeldung; kein API-Schlüssel nötig.',
 >>>>>>> theirs
     setAiCodexPath: 'Codex-Programmdatei',
     setAiCodexPathHint:
@@ -3784,9 +3769,9 @@ export const strings = {
     setAiSearchAuto: 'Automatisch (kostenlos)',
 =======
     setAiMediaGensparkHint:
-      'Bildgenerierung und Bild-/Videoanalyse nutzen deine Genspark-Anmeldung.',
+      'Bildgenerierung und Bild-/Videoanalyse nutzen deine UniWork-Anmeldung.',
     setAiSearchGensparkHint:
-      'Web- und Bildsuche nutzen deine Genspark-Anmeldung; abgemeldet oder mit ausgeschalteten Cloud-Tools greifen sie auf kostenlose Quellen zurück.',
+      'Web- und Bildsuche nutzen deine UniWork-Anmeldung; abgemeldet oder mit ausgeschalteten Cloud-Tools greifen sie auf kostenlose Quellen zurück.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper liefert mit deinem Schlüssel Web- und Bildsuche.',
     setAiSearchSerplyHint: 'Serply liefert mit deinem Schlüssel Web- und Bildsuche.',
@@ -3849,7 +3834,7 @@ export const strings = {
     timelineCountOne: '{n} Eintrag',
 =======
     intgSkillsDesc:
-      'GenOffice verwendet nur Skills aus seinem eigenen Skills-Ordner. Der Import eines Ordners oder einer ZIP kopiert den ganzen Skill; beim Import wird nichts ausgeführt.',
+      'UniWork Office verwendet nur Skills aus seinem eigenen Skills-Ordner. Der Import eines Ordners oder einer ZIP kopiert den ganzen Skill; beim Import wird nichts ausgeführt.',
     intgSkillsEmpty: 'Noch keine Skills installiert.',
     intgSkillsImportFolder: 'Ordner importieren…',
     intgSkillsImportZip: 'Skill-Paket importieren (ZIP / .md)…',
@@ -3858,7 +3843,7 @@ export const strings = {
     intgSkillsImportDone: '{name} importiert',
     intgSkillsImportFailed: 'Import fehlgeschlagen: {reason}',
     intgSkillsRemove: 'Entfernen',
-    intgSkillsRemoveConfirm: 'Skill „{name}“ entfernen? Sein Ordner wird aus GenOffice gelöscht.',
+    intgSkillsRemoveConfirm: 'Skill „{name}“ entfernen? Sein Ordner wird aus UniWork Office gelöscht.',
     intgSkillsRemoved: '{name} entfernt',
     intgSkillsRead: 'Details',
     intgSkillsMine: 'Meine Skills',
@@ -3955,7 +3940,7 @@ export const strings = {
     askSavedAs: 'Guardado: {name}',
     askSaveFailed: 'No se pudo guardar: {error}',
     askEmptyCorpus: 'La base de conocimientos está vacía: marca archivos primero y luego pregunta.',
-    askNeedsLogin: 'Inicia sesión en Genspark para usar el chat de IA.',
+    askNeedsLogin: 'Inicia sesión en UniWork para usar el chat de IA.',
     askPlaceholder: 'Pregunta sobre tus archivos favoritos…',
     askHintIdle: 'Enter para enviar',
     askHintBusy: 'La IA está respondiendo…',
@@ -3975,16 +3960,16 @@ export const strings = {
     askCtaRecents: 'Marcar desde Recientes',
     askNoSave: 'La conversación no se guarda; se borra al reiniciar la aplicación.',
     askUnknownError: 'La solicitud de IA falló. Inténtalo de nuevo.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Proyectos creados en la web con Genspark AI. La edición continúa en tu navegador: haz clic en un proyecto para abrirlo.',
+      'Proyectos creados en la web con UniWork AI. La edición continúa en tu navegador: haz clic en un proyecto para abrirlo.',
     cloudSearchPlaceholder: 'Buscar entre {n} proyectos…',
     cloudNoResults: 'No hay proyectos coincidentes.',
     cloudSortRecent: 'Recientes',
     cloudSortOldest: 'Más antiguos',
     cloudRefresh: 'Actualizar',
     cloudLoginHint:
-      'Inicia sesión en tu cuenta de Genspark para ver los proyectos creados en la web.',
+      'Inicia sesión en tu cuenta de UniWork para ver los proyectos creados en la web.',
     cloudEmpty: 'Aún no hay proyectos en la web.',
     cloudError: 'Error al cargar. Inténtalo más tarde.',
     cloudRetry: 'Reintentar',
@@ -4111,7 +4096,7 @@ export const strings = {
     setUpdateRestart: 'Reiniciar e instalar',
     setAutoUpdateCheck: 'Buscar actualizaciones automáticamente',
     setAutoUpdateCheckDesc:
-      'Si está desactivado, GenOffice deja de buscar nuevas versiones al iniciar y en segundo plano. Puede seguir comprobándolo en Ayuda › Buscar actualizaciones.',
+      'Si está desactivado, UniWork Office deja de buscar nuevas versiones al iniciar y en segundo plano. Puede seguir comprobándolo en Ayuda › Buscar actualizaciones.',
     updateChannel: 'Canal de actualización',
     channelStable: 'Estable',
     channelBeta: 'Beta',
@@ -4127,7 +4112,7 @@ export const strings = {
     saveLocation: 'Ubicación de guardado',
     setRestoreSession: 'Volver a abrir los documentos de la última vez',
     setRestoreSessionDesc:
-      'Los documentos abiertos al cerrar GenOffice se vuelven a abrir automáticamente la próxima vez que se inicie.',
+      'Los documentos abiertos al cerrar UniWork Office se vuelven a abrir automáticamente la próxima vez que se inicie.',
     setTabSleep: 'Suspender pestañas inactivas',
     setTabSleepDesc:
       'Con muchas pestañas abiertas, las que no has mirado durante un tiempo liberan su memoria y vuelven a abrir el archivo al regresar. Las pestañas con cambios sin guardar o fijadas nunca se suspenden.',
@@ -4219,7 +4204,7 @@ export const strings = {
     intgHeroTitle: 'Usa UniWork Office desde tu asistente de IA',
 =======
     setSecSkills: 'Habilidades',
-    intgHeroTitle: 'Usa GenOffice desde tu asistente de IA',
+    intgHeroTitle: 'Usa UniWork Office desde tu asistente de IA',
 >>>>>>> theirs
     intgHeroDesc:
       'Una vez conectados, Claude Code, Codex, Cursor, Claude Desktop y asistentes similares pueden crear, convertir, leer y editar archivos Word, Excel, PowerPoint, PDF y Markdown por ti. Todo ocurre en este equipo; no se sube nada.',
@@ -4327,7 +4312,7 @@ export const strings = {
     setAiEndpointAdd: 'Añadir endpoint',
     setAiEndpointRemove: 'Eliminar',
     setAiEndpointName: 'Nombre',
-    setAiGensparkHint: 'Usa tu inicio de sesión de Genspark; no se necesita clave de API.',
+    setAiGensparkHint: 'Usa tu inicio de sesión de UniWork; no se necesita clave de API.',
 >>>>>>> theirs
     setAiCodexPath: 'Ejecutable de Codex',
     setAiCodexPathHint:
@@ -4360,9 +4345,9 @@ export const strings = {
     setAiSearchAuto: 'Automático (gratis)',
 =======
     setAiMediaGensparkHint:
-      'La generación de imágenes y el análisis de imágenes/vídeos usan tu inicio de sesión de Genspark.',
+      'La generación de imágenes y el análisis de imágenes/vídeos usan tu inicio de sesión de UniWork.',
     setAiSearchGensparkHint:
-      'La búsqueda web y de imágenes usa tu inicio de sesión de Genspark; sin sesión o con las herramientas en la nube desactivadas recurre a fuentes gratuitas.',
+      'La búsqueda web y de imágenes usa tu inicio de sesión de UniWork; sin sesión o con las herramientas en la nube desactivadas recurre a fuentes gratuitas.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper ofrece búsqueda web y de imágenes con tu clave.',
     setAiSearchSerplyHint: 'Serply ofrece búsqueda web y de imágenes con tu clave.',
@@ -4425,7 +4410,7 @@ export const strings = {
     timelineCountOne: '{n} elemento',
 =======
     intgSkillsDesc:
-      'GenOffice solo usa habilidades de su propia carpeta. Importar una carpeta o un zip copia la habilidad completa; nada se ejecuta al importar.',
+      'UniWork Office solo usa habilidades de su propia carpeta. Importar una carpeta o un zip copia la habilidad completa; nada se ejecuta al importar.',
     intgSkillsEmpty: 'Aún no hay habilidades instaladas.',
     intgSkillsImportFolder: 'Importar carpeta…',
     intgSkillsImportZip: 'Importar paquete de habilidad (zip / .md)…',
@@ -4434,7 +4419,7 @@ export const strings = {
     intgSkillsImportDone: '{name} importada',
     intgSkillsImportFailed: 'Error al importar: {reason}',
     intgSkillsRemove: 'Quitar',
-    intgSkillsRemoveConfirm: '¿Quitar la habilidad "{name}"? Su carpeta se eliminará de GenOffice.',
+    intgSkillsRemoveConfirm: '¿Quitar la habilidad "{name}"? Su carpeta se eliminará de UniWork Office.',
     intgSkillsRemoved: '{name} quitada',
     intgSkillsRead: 'Detalles',
     intgSkillsMine: 'Mis habilidades',
@@ -4530,7 +4515,7 @@ export const strings = {
     askSavedAs: 'บันทึกแล้ว: {name}',
     askSaveFailed: 'บันทึกไม่สำเร็จ: {error}',
     askEmptyCorpus: 'คลังความรู้ว่างเปล่า: ติดดาวไฟล์ก่อนแล้วค่อยถาม',
-    askNeedsLogin: 'เข้าสู่ระบบ Genspark เพื่อใช้แชท AI',
+    askNeedsLogin: 'เข้าสู่ระบบ UniWork เพื่อใช้แชท AI',
     askPlaceholder: 'ถามเกี่ยวกับไฟล์ที่ติดดาว…',
     askHintIdle: 'Enter เพื่อส่ง',
     askHintBusy: 'AI กำลังตอบ…',
@@ -4550,15 +4535,15 @@ export const strings = {
     askCtaRecents: 'ให้ดาวจากเมนูล่าสุด',
     askNoSave: 'บทสนทนาจะไม่ถูกบันทึก และจะล้างเมื่อรีสตาร์ทแอป',
     askUnknownError: 'คำขอ AI ล้มเหลว โปรดลองอีกครั้ง',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'โปรเจกต์ที่สร้างบนเว็บด้วย Genspark AI แก้ไขต่อได้ในเบราว์เซอร์ — คลิกโปรเจกต์เพื่อเปิด',
+      'โปรเจกต์ที่สร้างบนเว็บด้วย UniWork AI แก้ไขต่อได้ในเบราว์เซอร์ — คลิกโปรเจกต์เพื่อเปิด',
     cloudSearchPlaceholder: 'ค้นหา {n} โปรเจกต์…',
     cloudNoResults: 'ไม่มีโปรเจกต์ที่ตรงกัน',
     cloudSortRecent: 'ล่าสุด',
     cloudSortOldest: 'เก่าสุด',
     cloudRefresh: 'รีเฟรช',
-    cloudLoginHint: 'ลงชื่อเข้าใช้บัญชี Genspark เพื่อดูโปรเจกต์ที่คุณสร้างบนเว็บ',
+    cloudLoginHint: 'ลงชื่อเข้าใช้บัญชี UniWork เพื่อดูโปรเจกต์ที่คุณสร้างบนเว็บ',
     cloudEmpty: 'ยังไม่มีโปรเจกต์บนเว็บ',
     cloudError: 'โหลดไม่สำเร็จ โปรดลองอีกครั้งภายหลัง',
     cloudRetry: 'ลองอีกครั้ง',
@@ -4682,7 +4667,7 @@ export const strings = {
     setUpdateRestart: 'รีสตาร์ตและติดตั้ง',
     setAutoUpdateCheck: 'ตรวจหาอัปเดตโดยอัตโนมัติ',
     setAutoUpdateCheckDesc:
-      'เมื่อปิด GenOffice จะไม่ตรวจหาเวอร์ชันใหม่ตอนเปิดโปรแกรมหรือในเบื้องหลัง คุณยังตรวจเองได้จาก วิธีใช้ › ตรวจหาการอัปเดต',
+      'เมื่อปิด UniWork Office จะไม่ตรวจหาเวอร์ชันใหม่ตอนเปิดโปรแกรมหรือในเบื้องหลัง คุณยังตรวจเองได้จาก วิธีใช้ › ตรวจหาการอัปเดต',
     updateChannel: 'ช่องทางอัปเดต',
     channelStable: 'เสถียร',
     channelBeta: 'เบต้า',
@@ -4697,7 +4682,7 @@ export const strings = {
     saveLocation: 'ตำแหน่งบันทึก',
     setRestoreSession: 'เปิดเอกสารจากครั้งที่แล้วอีกครั้ง',
     setRestoreSessionDesc:
-      'เอกสารที่เปิดอยู่ตอนปิด GenOffice จะเปิดขึ้นอีกครั้งโดยอัตโนมัติเมื่อเริ่มโปรแกรมครั้งถัดไป',
+      'เอกสารที่เปิดอยู่ตอนปิด UniWork Office จะเปิดขึ้นอีกครั้งโดยอัตโนมัติเมื่อเริ่มโปรแกรมครั้งถัดไป',
     setTabSleep: 'พักแท็บที่ไม่ได้ใช้งาน',
     setTabSleepDesc:
       'เมื่อเปิดแท็บจำนวนมาก แท็บที่ไม่ได้ดูสักพักจะคืนหน่วยความจำและเปิดไฟล์ใหม่เมื่อคุณกลับมา แท็บที่มีการเปลี่ยนแปลงที่ยังไม่บันทึกหรือปักหมุดไว้จะไม่พัก',
@@ -4785,7 +4770,7 @@ export const strings = {
     intgHeroTitle: 'ใช้ UniWork Office จากผู้ช่วย AI ของคุณ',
 =======
     setSecSkills: 'ทักษะ',
-    intgHeroTitle: 'ใช้ GenOffice จากผู้ช่วย AI ของคุณ',
+    intgHeroTitle: 'ใช้ UniWork Office จากผู้ช่วย AI ของคุณ',
 >>>>>>> theirs
     intgHeroDesc:
       'เมื่อเชื่อมต่อแล้ว Claude Code, Codex, Cursor, Claude Desktop และผู้ช่วยลักษณะเดียวกันจะสร้าง แปลง อ่าน และแก้ไขไฟล์ Word, Excel, PowerPoint, PDF และ Markdown แทนคุณได้ ทุกอย่างทำงานบนคอมพิวเตอร์เครื่องนี้ ไม่มีการอัปโหลดใด ๆ',
@@ -4887,7 +4872,7 @@ export const strings = {
     setAiEndpointAdd: 'เพิ่มปลายทาง',
     setAiEndpointRemove: 'ลบ',
     setAiEndpointName: 'ชื่อ',
-    setAiGensparkHint: 'ใช้การลงชื่อเข้าใช้ Genspark ไม่ต้องใช้คีย์ API',
+    setAiGensparkHint: 'ใช้การลงชื่อเข้าใช้ UniWork ไม่ต้องใช้คีย์ API',
 >>>>>>> theirs
     setAiCodexPath: 'ไฟล์ปฏิบัติการ Codex',
     setAiCodexPathHint: 'กรอกเฉพาะเมื่อติดตั้งแบบกำหนดเอง เว้นว่างไว้เพื่อค้นหาอัตโนมัติ',
@@ -4919,9 +4904,9 @@ export const strings = {
     setAiSearchAuto: 'อัตโนมัติ (ฟรี)',
 =======
     setAiMediaGensparkHint:
-      'การสร้างภาพและการวิเคราะห์ภาพ/วิดีโอใช้การลงชื่อเข้าใช้ Genspark ของคุณ',
+      'การสร้างภาพและการวิเคราะห์ภาพ/วิดีโอใช้การลงชื่อเข้าใช้ UniWork ของคุณ',
     setAiSearchGensparkHint:
-      'การค้นหาเว็บและภาพใช้การลงชื่อเข้าใช้ Genspark หากไม่ได้ลงชื่อเข้าใช้หรือปิดเครื่องมือคลาวด์ จะใช้แหล่งข้อมูลฟรีแทน',
+      'การค้นหาเว็บและภาพใช้การลงชื่อเข้าใช้ UniWork หากไม่ได้ลงชื่อเข้าใช้หรือปิดเครื่องมือคลาวด์ จะใช้แหล่งข้อมูลฟรีแทน',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper ให้บริการค้นหาเว็บและภาพด้วยคีย์ของคุณ',
     setAiSearchSerplyHint: 'Serply ให้บริการค้นหาเว็บและภาพด้วยคีย์ของคุณ',
@@ -4983,7 +4968,7 @@ export const strings = {
     timelineCountOne: '{n} รายการ',
 =======
     intgSkillsDesc:
-      'GenOffice ใช้เฉพาะทักษะในโฟลเดอร์ทักษะของตัวเอง การนำเข้าจากโฟลเดอร์หรือ zip จะคัดลอกทักษะทั้งชุด และไม่มีสิ่งใดทำงานเมื่อนำเข้า',
+      'UniWork Office ใช้เฉพาะทักษะในโฟลเดอร์ทักษะของตัวเอง การนำเข้าจากโฟลเดอร์หรือ zip จะคัดลอกทักษะทั้งชุด และไม่มีสิ่งใดทำงานเมื่อนำเข้า',
     intgSkillsEmpty: 'ยังไม่ได้ติดตั้งทักษะ',
     intgSkillsImportFolder: 'นำเข้าโฟลเดอร์…',
     intgSkillsImportZip: 'นำเข้าแพ็กเกจทักษะ (zip / .md)…',
@@ -4992,7 +4977,7 @@ export const strings = {
     intgSkillsImportDone: 'นำเข้า {name} แล้ว',
     intgSkillsImportFailed: 'นำเข้าไม่สำเร็จ: {reason}',
     intgSkillsRemove: 'ลบ',
-    intgSkillsRemoveConfirm: 'ลบทักษะ "{name}" หรือไม่ โฟลเดอร์ของทักษะจะถูกลบออกจาก GenOffice',
+    intgSkillsRemoveConfirm: 'ลบทักษะ "{name}" หรือไม่ โฟลเดอร์ของทักษะจะถูกลบออกจาก UniWork Office',
     intgSkillsRemoved: 'ลบ {name} แล้ว',
     intgSkillsRead: 'รายละเอียด',
     intgSkillsMine: 'สกิลของฉัน',
@@ -5087,7 +5072,7 @@ export const strings = {
     askSavedAs: 'Tersimpan: {name}',
     askSaveFailed: 'Gagal menyimpan: {error}',
     askEmptyCorpus: 'Basis pengetahuan kosong: tandai beberapa file dahulu, lalu bertanya.',
-    askNeedsLogin: 'Masuk ke Genspark untuk memakai obrolan AI.',
+    askNeedsLogin: 'Masuk ke UniWork untuk memakai obrolan AI.',
     askPlaceholder: 'Tanya tentang file berbintang anda…',
     askHintIdle: 'Enter untuk mengirim',
     askHintBusy: 'AI sedang menjawab…',
@@ -5107,15 +5092,15 @@ export const strings = {
     askCtaRecents: 'Tandai dari Terbaru',
     askNoSave: 'Percakapan tidak disimpan; akan hilang saat aplikasi dimulai ulang.',
     askUnknownError: 'Permintaan AI gagal. Coba lagi.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Proyek yang dibuat di web dengan Genspark AI. Pengeditan berlanjut di browser — klik proyek untuk membukanya.',
+      'Proyek yang dibuat di web dengan UniWork AI. Pengeditan berlanjut di browser — klik proyek untuk membukanya.',
     cloudSearchPlaceholder: 'Cari {n} proyek…',
     cloudNoResults: 'Tidak ada proyek yang cocok.',
     cloudSortRecent: 'Terbaru',
     cloudSortOldest: 'Terlama',
     cloudRefresh: 'Segarkan',
-    cloudLoginHint: 'Masuk ke akun Genspark untuk melihat proyek yang Anda buat di web.',
+    cloudLoginHint: 'Masuk ke akun UniWork untuk melihat proyek yang Anda buat di web.',
     cloudEmpty: 'Belum ada proyek web.',
     cloudError: 'Gagal memuat. Coba lagi nanti.',
     cloudRetry: 'Coba lagi',
@@ -5241,7 +5226,7 @@ export const strings = {
     setUpdateRestart: 'Mulai ulang & instal',
     setAutoUpdateCheck: 'Periksa pembaruan secara otomatis',
     setAutoUpdateCheckDesc:
-      'Jika dimatikan, GenOffice tidak lagi memeriksa versi baru saat dijalankan atau di latar belakang. Anda tetap bisa memeriksa dari Bantuan › Periksa Pembaruan.',
+      'Jika dimatikan, UniWork Office tidak lagi memeriksa versi baru saat dijalankan atau di latar belakang. Anda tetap bisa memeriksa dari Bantuan › Periksa Pembaruan.',
     updateChannel: 'Saluran Pembaruan',
     channelStable: 'Stabil',
     channelBeta: 'Beta',
@@ -5256,7 +5241,7 @@ export const strings = {
     saveLocation: 'Lokasi penyimpanan',
     setRestoreSession: 'Buka kembali dokumen dari sesi terakhir',
     setRestoreSessionDesc:
-      'Dokumen yang terbuka saat GenOffice ditutup akan dibuka kembali secara otomatis saat dijalankan berikutnya.',
+      'Dokumen yang terbuka saat UniWork Office ditutup akan dibuka kembali secara otomatis saat dijalankan berikutnya.',
     setTabSleep: 'Tidurkan tab tidak aktif',
     setTabSleepDesc:
       'Saat banyak tab terbuka, tab yang lama tidak dilihat melepaskan memorinya dan membuka kembali berkasnya saat Anda kembali. Tab dengan perubahan belum disimpan atau yang disematkan tidak pernah tidur.',
@@ -5347,7 +5332,7 @@ export const strings = {
     intgHeroTitle: 'Gunakan UniWork Office dari asisten AI Anda',
 =======
     setSecSkills: 'Keterampilan',
-    intgHeroTitle: 'Gunakan GenOffice dari asisten AI Anda',
+    intgHeroTitle: 'Gunakan UniWork Office dari asisten AI Anda',
 >>>>>>> theirs
     intgHeroDesc:
       'Setelah terhubung, Claude Code, Codex, Cursor, Claude Desktop, dan asisten serupa dapat membuat, mengonversi, membaca, dan mengedit file Word, Excel, PowerPoint, PDF, dan Markdown untuk Anda. Semuanya berjalan di komputer ini; tidak ada yang diunggah.',
@@ -5454,7 +5439,7 @@ export const strings = {
     setAiEndpointAdd: 'Tambah endpoint',
     setAiEndpointRemove: 'Hapus',
     setAiEndpointName: 'Nama',
-    setAiGensparkHint: 'Menggunakan login Genspark; tanpa kunci API.',
+    setAiGensparkHint: 'Menggunakan login UniWork; tanpa kunci API.',
 >>>>>>> theirs
     setAiCodexPath: 'Berkas eksekusi Codex',
     setAiCodexPathHint: 'Isi hanya untuk instalasi khusus; kosongkan agar terdeteksi otomatis.',
@@ -5486,9 +5471,9 @@ export const strings = {
     setAiSearchAuto: 'Otomatis (gratis)',
 =======
     setAiMediaGensparkHint:
-      'Pembuatan gambar dan analisis gambar/video menggunakan login Genspark Anda.',
+      'Pembuatan gambar dan analisis gambar/video menggunakan login UniWork Anda.',
     setAiSearchGensparkHint:
-      'Pencarian web dan gambar memakai login Genspark Anda; saat keluar atau alat cloud dimatikan, keduanya memakai sumber gratis.',
+      'Pencarian web dan gambar memakai login UniWork Anda; saat keluar atau alat cloud dimatikan, keduanya memakai sumber gratis.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper menyediakan pencarian web dan gambar dengan kunci Anda.',
     setAiSearchSerplyHint: 'Serply menyediakan pencarian web dan gambar dengan kunci Anda.',
@@ -5550,7 +5535,7 @@ export const strings = {
     timelineCountOne: '{n} item',
 =======
     intgSkillsDesc:
-      'GenOffice hanya memakai keterampilan di folder keterampilannya sendiri. Mengimpor folder atau zip menyalin seluruh keterampilan; tidak ada yang dijalankan saat impor.',
+      'UniWork Office hanya memakai keterampilan di folder keterampilannya sendiri. Mengimpor folder atau zip menyalin seluruh keterampilan; tidak ada yang dijalankan saat impor.',
     intgSkillsEmpty: 'Belum ada keterampilan terpasang.',
     intgSkillsImportFolder: 'Impor folder…',
     intgSkillsImportZip: 'Impor paket keterampilan (zip / .md)…',
@@ -5559,7 +5544,7 @@ export const strings = {
     intgSkillsImportDone: '{name} diimpor',
     intgSkillsImportFailed: 'Impor gagal: {reason}',
     intgSkillsRemove: 'Hapus',
-    intgSkillsRemoveConfirm: 'Hapus keterampilan "{name}"? Foldernya akan dihapus dari GenOffice.',
+    intgSkillsRemoveConfirm: 'Hapus keterampilan "{name}"? Foldernya akan dihapus dari UniWork Office.',
     intgSkillsRemoved: '{name} dihapus',
     intgSkillsRead: 'Detail',
     intgSkillsMine: 'Skill saya',
@@ -5655,7 +5640,7 @@ export const strings = {
     askSavedAs: 'Сохранено: {name}',
     askSaveFailed: 'Не удалось сохранить: {error}',
     askEmptyCorpus: 'База знаний пуста: сначала отметьте файлы, затем спрашивайте.',
-    askNeedsLogin: 'Войдите в Genspark, чтобы пользоваться чатом с ИИ.',
+    askNeedsLogin: 'Войдите в UniWork, чтобы пользоваться чатом с ИИ.',
     askPlaceholder: 'Спросите о своих файлах…',
     askHintIdle: 'Enter — отправить',
     askHintBusy: 'ИИ отвечает…',
@@ -5675,15 +5660,15 @@ export const strings = {
     askCtaRecents: 'Добавить из «Недавних»',
     askNoSave: 'Диалог не сохраняется и очищается при перезапуске приложения.',
     askUnknownError: 'Запрос к ИИ не удался. Попробуйте снова.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Проекты, созданные в вебе с Genspark AI. Редактирование продолжается в браузере — нажмите на проект, чтобы открыть его.',
+      'Проекты, созданные в вебе с UniWork AI. Редактирование продолжается в браузере — нажмите на проект, чтобы открыть его.',
     cloudSearchPlaceholder: 'Поиск среди {n} проектов…',
     cloudNoResults: 'Нет подходящих проектов.',
     cloudSortRecent: 'Сначала новые',
     cloudSortOldest: 'Сначала старые',
     cloudRefresh: 'Обновить',
-    cloudLoginHint: 'Войдите в аккаунт Genspark, чтобы увидеть проекты, созданные в вебе.',
+    cloudLoginHint: 'Войдите в аккаунт UniWork, чтобы увидеть проекты, созданные в вебе.',
     cloudEmpty: 'Пока нет веб-проектов.',
     cloudError: 'Не удалось загрузить. Повторите попытку позже.',
     cloudRetry: 'Повторить',
@@ -5808,7 +5793,7 @@ export const strings = {
     setUpdateRestart: 'Перезапустить и установить',
     setAutoUpdateCheck: 'Автоматически проверять обновления',
     setAutoUpdateCheckDesc:
-      'Если выключено, GenOffice не проверяет новые версии при запуске и в фоне. Проверить вручную можно через Справка › Проверить обновления.',
+      'Если выключено, UniWork Office не проверяет новые версии при запуске и в фоне. Проверить вручную можно через Справка › Проверить обновления.',
     updateChannel: 'Канал обновлений',
     channelStable: 'Стабильный',
     channelBeta: 'Бета',
@@ -5823,7 +5808,7 @@ export const strings = {
     saveLocation: 'Папка сохранения',
     setRestoreSession: 'Открывать документы прошлого сеанса',
     setRestoreSessionDesc:
-      'Документы, открытые при закрытии GenOffice, автоматически откроются при следующем запуске.',
+      'Документы, открытые при закрытии UniWork Office, автоматически откроются при следующем запуске.',
     setTabSleep: 'Усыплять неактивные вкладки',
     setTabSleepDesc:
       'Когда открыто много вкладок, давно не просматриваемые освобождают память и заново открывают файл при возврате. Вкладки с несохранёнными изменениями и закреплённые не усыпляются.',
@@ -5913,7 +5898,7 @@ export const strings = {
     intgHeroTitle: 'Используйте UniWork Office из своего ИИ-ассистента',
 =======
     setSecSkills: 'Навыки',
-    intgHeroTitle: 'Используйте GenOffice из своего ИИ-ассистента',
+    intgHeroTitle: 'Используйте UniWork Office из своего ИИ-ассистента',
 >>>>>>> theirs
     intgHeroDesc:
       'После подключения Claude Code, Codex, Cursor, Claude Desktop и похожие ассистенты смогут создавать, конвертировать, читать и редактировать файлы Word, Excel, PowerPoint, PDF и Markdown за вас. Всё выполняется на этом компьютере; ничего не загружается.',
@@ -6021,7 +6006,7 @@ export const strings = {
     setAiEndpointAdd: 'Добавить эндпоинт',
     setAiEndpointRemove: 'Удалить',
     setAiEndpointName: 'Название',
-    setAiGensparkHint: 'Использует вход в Genspark; ключ API не нужен.',
+    setAiGensparkHint: 'Использует вход в UniWork; ключ API не нужен.',
 >>>>>>> theirs
     setAiCodexPath: 'Исполняемый файл Codex',
     setAiCodexPathHint:
@@ -6054,9 +6039,9 @@ export const strings = {
     setAiSearchAuto: 'Авто (бесплатно)',
 =======
     setAiMediaGensparkHint:
-      'Генерация изображений и анализ изображений/видео используют ваш вход в Genspark.',
+      'Генерация изображений и анализ изображений/видео используют ваш вход в UniWork.',
     setAiSearchGensparkHint:
-      'Веб-поиск и поиск изображений используют ваш вход в Genspark; без входа или при выключенных облачных инструментах используются бесплатные источники.',
+      'Веб-поиск и поиск изображений используют ваш вход в UniWork; без входа или при выключенных облачных инструментах используются бесплатные источники.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper обеспечивает веб-поиск и поиск изображений с вашим ключом.',
     setAiSearchSerplyHint: 'Serply обеспечивает веб-поиск и поиск изображений с вашим ключом.',
@@ -6119,7 +6104,7 @@ export const strings = {
     timelineCountOne: '{n} запись',
 =======
     intgSkillsDesc:
-      'GenOffice использует только навыки из своей папки навыков. Импорт папки или zip копирует навык целиком; при импорте ничего не запускается.',
+      'UniWork Office использует только навыки из своей папки навыков. Импорт папки или zip копирует навык целиком; при импорте ничего не запускается.',
     intgSkillsEmpty: 'Навыки ещё не установлены.',
     intgSkillsImportFolder: 'Импорт папки…',
     intgSkillsImportZip: 'Импорт пакета навыка (zip / .md)…',
@@ -6128,7 +6113,7 @@ export const strings = {
     intgSkillsImportDone: 'Импортирован {name}',
     intgSkillsImportFailed: 'Ошибка импорта: {reason}',
     intgSkillsRemove: 'Удалить',
-    intgSkillsRemoveConfirm: 'Удалить навык «{name}»? Его папка будет удалена из GenOffice.',
+    intgSkillsRemoveConfirm: 'Удалить навык «{name}»? Его папка будет удалена из UniWork Office.',
     intgSkillsRemoved: '{name} удалён',
     intgSkillsRead: 'Подробнее',
     intgSkillsMine: 'Мои навыки',
@@ -6224,7 +6209,7 @@ export const strings = {
     askSavedAs: 'تم الحفظ: {name}',
     askSaveFailed: 'تعذر الحفظ: {error}',
     askEmptyCorpus: 'قاعدة المعارف فارغة: ضع نجمة على بعض الملفات أولاً ثم اسأل.',
-    askNeedsLogin: 'سجّل الدخول إلى Genspark لاستخدام محادثة الذكاء الاصطناعي.',
+    askNeedsLogin: 'سجّل الدخول إلى UniWork لاستخدام محادثة الذكاء الاصطناعي.',
     askPlaceholder: 'اسأل عن ملفاتك المفضلة…',
     askHintIdle: 'Enter للإرسال',
     askHintBusy: 'الذكاء الاصطناعي يجيب…',
@@ -6244,15 +6229,15 @@ export const strings = {
     askCtaRecents: 'أضف نجمة من الملفات الأخيرة',
     askNoSave: 'لا يتم حفظ المحادثة؛ تُمسح عند إعادة تشغيل التطبيق.',
     askUnknownError: 'فشل طلب الذكاء الاصطناعي. حاول مجدداً.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'مشاريع أُنشئت على الويب باستخدام Genspark AI. يستمر التحرير في المتصفح — انقر على أي مشروع لفتحه.',
+      'مشاريع أُنشئت على الويب باستخدام UniWork AI. يستمر التحرير في المتصفح — انقر على أي مشروع لفتحه.',
     cloudSearchPlaceholder: 'ابحث في {n} مشروعًا…',
     cloudNoResults: 'لا توجد مشاريع مطابقة.',
     cloudSortRecent: 'الأحدث',
     cloudSortOldest: 'الأقدم',
     cloudRefresh: 'تحديث',
-    cloudLoginHint: 'سجّل الدخول إلى حساب Genspark لعرض المشاريع التي أنشأتها على الويب.',
+    cloudLoginHint: 'سجّل الدخول إلى حساب UniWork لعرض المشاريع التي أنشأتها على الويب.',
     cloudEmpty: 'لا توجد مشاريع على الويب بعد.',
     cloudError: 'فشل التحميل. حاول مرة أخرى لاحقًا.',
     cloudRetry: 'إعادة المحاولة',
@@ -6376,7 +6361,7 @@ export const strings = {
     setUpdateRestart: 'إعادة التشغيل والتثبيت',
     setAutoUpdateCheck: 'التحقق من التحديثات تلقائيًا',
     setAutoUpdateCheckDesc:
-      'عند الإيقاف، لن يتحقق GenOffice من الإصدارات الجديدة عند التشغيل أو في الخلفية. يمكنك التحقق يدويًا من تعليمات › التحقق من التحديثات.',
+      'عند الإيقاف، لن يتحقق UniWork Office من الإصدارات الجديدة عند التشغيل أو في الخلفية. يمكنك التحقق يدويًا من تعليمات › التحقق من التحديثات.',
     updateChannel: 'قناة التحديث',
     channelStable: 'مستقر',
     channelBeta: 'تجريبي',
@@ -6391,7 +6376,7 @@ export const strings = {
     saveLocation: 'موقع الحفظ',
     setRestoreSession: 'إعادة فتح مستندات المرة السابقة',
     setRestoreSessionDesc:
-      'تُعاد فتح المستندات المفتوحة عند إغلاق GenOffice تلقائيًا في المرة التالية التي يبدأ فيها.',
+      'تُعاد فتح المستندات المفتوحة عند إغلاق UniWork Office تلقائيًا في المرة التالية التي يبدأ فيها.',
     setTabSleep: 'إسبات علامات التبويب غير النشطة',
     setTabSleepDesc:
       'عند فتح علامات تبويب كثيرة، تحرّر التي لم تطّلع عليها منذ فترة ذاكرتها وتعيد فتح ملفها عند عودتك. علامات التبويب ذات التغييرات غير المحفوظة أو المثبّتة لا تُسبَت أبدًا.',
@@ -6482,7 +6467,7 @@ export const strings = {
     intgHeroTitle: 'استخدم UniWork Office من مساعد الذكاء الاصطناعي',
 =======
     setSecSkills: 'المهارات',
-    intgHeroTitle: 'استخدم GenOffice من مساعد الذكاء الاصطناعي',
+    intgHeroTitle: 'استخدم UniWork Office من مساعد الذكاء الاصطناعي',
 >>>>>>> theirs
     intgHeroDesc:
       'بعد الربط، يمكن لـ Claude Code وCodex وCursor وClaude Desktop والمساعدين المشابهين إنشاء ملفات Word وExcel وPowerPoint وPDF وMarkdown وتحويلها وقراءتها وتحريرها نيابةً عنك. كل شيء يعمل على هذا الجهاز؛ لا يُرفع أي شيء.',
@@ -6585,7 +6570,7 @@ export const strings = {
     setAiEndpointAdd: 'إضافة نقطة نهاية',
     setAiEndpointRemove: 'إزالة',
     setAiEndpointName: 'الاسم',
-    setAiGensparkHint: 'يستخدم تسجيل الدخول إلى Genspark؛ لا حاجة لمفتاح API.',
+    setAiGensparkHint: 'يستخدم تسجيل الدخول إلى UniWork؛ لا حاجة لمفتاح API.',
 >>>>>>> theirs
     setAiCodexPath: 'ملف Codex التنفيذي',
     setAiCodexPathHint: 'حدده فقط للتثبيت المخصص؛ اتركه فارغًا للاكتشاف التلقائي.',
@@ -6616,9 +6601,9 @@ export const strings = {
       'لا حاجة إلى مفتاح: يستخدم البحث في الويب والصور مصادر مجانية (استخدام محدود). اختر مزوّدًا وأضف مفتاحك الخاص للحصول على حدود أعلى.',
     setAiSearchAuto: 'تلقائي (مجاني)',
 =======
-    setAiMediaGensparkHint: 'يستخدم توليد الصور وتحليل الصور/الفيديو تسجيل دخولك إلى Genspark.',
+    setAiMediaGensparkHint: 'يستخدم توليد الصور وتحليل الصور/الفيديو تسجيل دخولك إلى UniWork.',
     setAiSearchGensparkHint:
-      'يستخدم البحث في الويب والصور تسجيل دخولك إلى Genspark؛ وعند الخروج أو إيقاف الأدوات السحابية يعود إلى مصادر مجانية.',
+      'يستخدم البحث في الويب والصور تسجيل دخولك إلى UniWork؛ وعند الخروج أو إيقاف الأدوات السحابية يعود إلى مصادر مجانية.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'يوفّر Serper البحث في الويب والصور بمفتاحك.',
     setAiSearchSerplyHint: 'يوفّر Serply البحث في الويب والصور بمفتاحك.',
@@ -6680,7 +6665,7 @@ export const strings = {
     timelineCountOne: 'عنصر واحد',
 =======
     intgSkillsDesc:
-      'يستخدم GenOffice المهارات الموجودة في مجلد مهاراته فقط. استيراد مجلد أو ملف zip ينسخ المهارة كاملة؛ ولا يُشغَّل شيء عند الاستيراد.',
+      'يستخدم UniWork Office المهارات الموجودة في مجلد مهاراته فقط. استيراد مجلد أو ملف zip ينسخ المهارة كاملة؛ ولا يُشغَّل شيء عند الاستيراد.',
     intgSkillsEmpty: 'لم تُثبَّت أي مهارات بعد.',
     intgSkillsImportFolder: 'استيراد مجلد…',
     intgSkillsImportZip: 'استيراد حزمة مهارة (zip / .md)…',
@@ -6689,7 +6674,7 @@ export const strings = {
     intgSkillsImportDone: 'تم استيراد {name}',
     intgSkillsImportFailed: 'فشل الاستيراد: {reason}',
     intgSkillsRemove: 'إزالة',
-    intgSkillsRemoveConfirm: 'هل تريد إزالة المهارة "{name}"؟ سيتم حذف مجلدها من GenOffice.',
+    intgSkillsRemoveConfirm: 'هل تريد إزالة المهارة "{name}"؟ سيتم حذف مجلدها من UniWork Office.',
     intgSkillsRemoved: 'تمت إزالة {name}',
     intgSkillsRead: 'التفاصيل',
     intgSkillsMine: 'مهاراتي',
@@ -6785,7 +6770,7 @@ export const strings = {
     askSaveFailed: 'Não foi possível salvar: {error}',
     askEmptyCorpus:
       'A base de conhecimento está vazia: marque arquivos primeiro e depois pergunte.',
-    askNeedsLogin: 'Entre no Genspark para usar o chat de IA.',
+    askNeedsLogin: 'Entre no UniWork para usar o chat de IA.',
     askPlaceholder: 'Pergunte sobre seus arquivos favoritos…',
     askHintIdle: 'Enter para enviar',
     askHintBusy: 'A IA está respondendo…',
@@ -6805,15 +6790,15 @@ export const strings = {
     askCtaRecents: 'Marcar de Recentes',
     askNoSave: 'A conversa não é salva; ela é apagada quando o app reinicia.',
     askUnknownError: 'A solicitação de IA falhou. Tente novamente.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Projetos criados na web com o Genspark AI. A edição continua no navegador — clique em um projeto para abri-lo.',
+      'Projetos criados na web com o UniWork AI. A edição continua no navegador — clique em um projeto para abri-lo.',
     cloudSearchPlaceholder: 'Pesquisar {n} projetos…',
     cloudNoResults: 'Nenhum projeto correspondente.',
     cloudSortRecent: 'Recentes',
     cloudSortOldest: 'Mais antigos',
     cloudRefresh: 'Atualizar',
-    cloudLoginHint: 'Entre na sua conta Genspark para ver os projetos criados na web.',
+    cloudLoginHint: 'Entre na sua conta UniWork para ver os projetos criados na web.',
     cloudEmpty: 'Ainda não há projetos na web.',
     cloudError: 'Falha ao carregar. Tente novamente mais tarde.',
     cloudRetry: 'Tentar novamente',
@@ -6937,7 +6922,7 @@ export const strings = {
     setUpdateRestart: 'Reiniciar e instalar',
     setAutoUpdateCheck: 'Verificar atualizações automaticamente',
     setAutoUpdateCheckDesc:
-      'Desligado, o GenOffice deixa de procurar novas versões ao iniciar e em segundo plano. Você ainda pode verificar em Ajuda › Procurar atualizações.',
+      'Desligado, o UniWork Office deixa de procurar novas versões ao iniciar e em segundo plano. Você ainda pode verificar em Ajuda › Procurar atualizações.',
     updateChannel: 'Canal de atualização',
     channelStable: 'Estável',
     channelBeta: 'Beta',
@@ -6952,7 +6937,7 @@ export const strings = {
     saveLocation: 'Local de salvamento',
     setRestoreSession: 'Reabrir os documentos da última vez',
     setRestoreSessionDesc:
-      'Os documentos abertos ao fechar o GenOffice são reabertos automaticamente na próxima vez que ele for iniciado.',
+      'Os documentos abertos ao fechar o UniWork Office são reabertos automaticamente na próxima vez que ele for iniciado.',
     setTabSleep: 'Suspender separadores inativos',
     setTabSleepDesc:
       'Com muitos separadores abertos, os que não vê há algum tempo libertam a memória e reabrem o ficheiro quando regressa. Separadores com alterações por guardar ou fixados nunca são suspensos.',
@@ -7045,7 +7030,7 @@ export const strings = {
     intgHeroTitle: 'Use o UniWork Office a partir do seu assistente de IA',
 =======
     setSecSkills: 'Habilidades',
-    intgHeroTitle: 'Use o GenOffice a partir do seu assistente de IA',
+    intgHeroTitle: 'Use o UniWork Office a partir do seu assistente de IA',
 >>>>>>> theirs
     intgHeroDesc:
       'Depois de conectados, Claude Code, Codex, Cursor, Claude Desktop e assistentes semelhantes podem criar, converter, ler e editar arquivos Word, Excel, PowerPoint, PDF e Markdown por você. Tudo roda neste computador; nada é enviado.',
@@ -7152,7 +7137,7 @@ export const strings = {
     setAiEndpointAdd: 'Adicionar endpoint',
     setAiEndpointRemove: 'Remover',
     setAiEndpointName: 'Nome',
-    setAiGensparkHint: 'Usa seu login Genspark; nenhuma chave de API necessária.',
+    setAiGensparkHint: 'Usa seu login UniWork; nenhuma chave de API necessária.',
 >>>>>>> theirs
     setAiCodexPath: 'Executável do Codex',
     setAiCodexPathHint:
@@ -7185,9 +7170,9 @@ export const strings = {
     setAiSearchAuto: 'Automático (grátis)',
 =======
     setAiMediaGensparkHint:
-      'A geração de imagens e a análise de imagens/vídeos usam o seu login do Genspark.',
+      'A geração de imagens e a análise de imagens/vídeos usam o seu login do UniWork.',
     setAiSearchGensparkHint:
-      'A busca na web e de imagens usa o seu login do Genspark; desconectado ou com as ferramentas na nuvem desativadas, recorre a fontes gratuitas.',
+      'A busca na web e de imagens usa o seu login do UniWork; desconectado ou com as ferramentas na nuvem desativadas, recorre a fontes gratuitas.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'O Serper oferece busca na web e de imagens com a sua chave.',
     setAiSearchSerplyHint: 'O Serply oferece busca na web e de imagens com a sua chave.',
@@ -7248,7 +7233,7 @@ export const strings = {
     timelineCountOne: '{n} item',
 =======
     intgSkillsDesc:
-      'O GenOffice só usa habilidades da sua própria pasta. Importar uma pasta ou um zip copia a habilidade inteira; nada é executado na importação.',
+      'O UniWork Office só usa habilidades da sua própria pasta. Importar uma pasta ou um zip copia a habilidade inteira; nada é executado na importação.',
     intgSkillsEmpty: 'Nenhuma habilidade instalada.',
     intgSkillsImportFolder: 'Importar pasta…',
     intgSkillsImportZip: 'Importar pacote de habilidade (zip / .md)…',
@@ -7258,7 +7243,7 @@ export const strings = {
     intgSkillsImportFailed: 'Falha na importação: {reason}',
     intgSkillsRemove: 'Remover',
     intgSkillsRemoveConfirm:
-      'Remover a habilidade "{name}"? A pasta dela será excluída do GenOffice.',
+      'Remover a habilidade "{name}"? A pasta dela será excluída do UniWork Office.',
     intgSkillsRemoved: '{name} removida',
     intgSkillsRead: 'Detalhes',
     intgSkillsMine: 'As minhas competências',
@@ -7355,7 +7340,7 @@ export const strings = {
     askSavedAs: 'Salvato: {name}',
     askSaveFailed: 'Salvataggio non riuscito: {error}',
     askEmptyCorpus: 'La base di conoscenza è vuota: contrassegna prima alcuni file, poi chiedi.',
-    askNeedsLogin: 'Accedi a Genspark per usare la chat IA.',
+    askNeedsLogin: 'Accedi a UniWork per usare la chat IA.',
     askPlaceholder: 'Chiedi qualcosa sui tuoi file preferiti…',
     askHintIdle: 'Invio per inviare',
     askHintBusy: 'L’IA sta rispondendo…',
@@ -7375,15 +7360,15 @@ export const strings = {
     askCtaRecents: 'Stella da Recenti',
     askNoSave: 'La conversazione non viene salvata; si cancella al riavvio dell’app.',
     askUnknownError: 'La richiesta IA non è riuscita. Riprova.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Progetti creati sul web con Genspark AI. La modifica continua nel browser: fai clic su un progetto per aprirlo.',
+      'Progetti creati sul web con UniWork AI. La modifica continua nel browser: fai clic su un progetto per aprirlo.',
     cloudSearchPlaceholder: 'Cerca tra {n} progetti…',
     cloudNoResults: 'Nessun progetto corrispondente.',
     cloudSortRecent: 'Recenti',
     cloudSortOldest: 'Meno recenti',
     cloudRefresh: 'Aggiorna',
-    cloudLoginHint: 'Accedi al tuo account Genspark per vedere i progetti creati sul web.',
+    cloudLoginHint: 'Accedi al tuo account UniWork per vedere i progetti creati sul web.',
     cloudEmpty: 'Ancora nessun progetto web.',
     cloudError: 'Caricamento non riuscito. Riprova più tardi.',
     cloudRetry: 'Riprova',
@@ -7507,7 +7492,7 @@ export const strings = {
     setUpdateRestart: 'Riavvia e installa',
     setAutoUpdateCheck: 'Controlla automaticamente gli aggiornamenti',
     setAutoUpdateCheckDesc:
-      "Se disattivato, GenOffice non cerca più nuove versioni all'avvio o in background. Puoi comunque controllare da Aiuto › Controlla aggiornamenti.",
+      "Se disattivato, UniWork Office non cerca più nuove versioni all'avvio o in background. Puoi comunque controllare da Aiuto › Controlla aggiornamenti.",
     updateChannel: 'Canale di aggiornamento',
     channelStable: 'Stabile',
     channelBeta: 'Beta',
@@ -7522,7 +7507,7 @@ export const strings = {
     saveLocation: 'Posizione di salvataggio',
     setRestoreSession: "Riapri i documenti dell'ultima volta",
     setRestoreSessionDesc:
-      'I documenti aperti alla chiusura di GenOffice si riaprono automaticamente al successivo avvio.',
+      'I documenti aperti alla chiusura di UniWork Office si riaprono automaticamente al successivo avvio.',
     setTabSleep: 'Sospendi le schede inattive',
     setTabSleepDesc:
       'Con molte schede aperte, quelle che non guardi da un po’ liberano la memoria e riaprono il file al tuo ritorno. Le schede con modifiche non salvate o fissate non vengono mai sospese.',
@@ -7613,7 +7598,7 @@ export const strings = {
     intgHeroTitle: 'Usa UniWork Office dal tuo assistente IA',
 =======
     setSecSkills: 'Competenze',
-    intgHeroTitle: 'Usa GenOffice dal tuo assistente IA',
+    intgHeroTitle: 'Usa UniWork Office dal tuo assistente IA',
 >>>>>>> theirs
     intgHeroDesc:
       'Una volta collegati, Claude Code, Codex, Cursor, Claude Desktop e assistenti simili possono creare, convertire, leggere e modificare file Word, Excel, PowerPoint, PDF e Markdown per te. Tutto avviene su questo computer; nulla viene caricato.',
@@ -7720,7 +7705,7 @@ export const strings = {
     setAiEndpointAdd: 'Aggiungi endpoint',
     setAiEndpointRemove: 'Rimuovi',
     setAiEndpointName: 'Nome',
-    setAiGensparkHint: 'Usa il tuo accesso Genspark; nessuna chiave API richiesta.',
+    setAiGensparkHint: 'Usa il tuo accesso UniWork; nessuna chiave API richiesta.',
 >>>>>>> theirs
     setAiCodexPath: 'Eseguibile Codex',
     setAiCodexPathHint:
@@ -7753,9 +7738,9 @@ export const strings = {
     setAiSearchAuto: 'Automatico (gratuito)',
 =======
     setAiMediaGensparkHint:
-      "La generazione di immagini e l'analisi di immagini/video usano il tuo accesso Genspark.",
+      "La generazione di immagini e l'analisi di immagini/video usano il tuo accesso UniWork.",
     setAiSearchGensparkHint:
-      'La ricerca web e di immagini usa il tuo accesso Genspark; disconnesso o con gli strumenti cloud disattivati ricorre a fonti gratuite.',
+      'La ricerca web e di immagini usa il tuo accesso UniWork; disconnesso o con gli strumenti cloud disattivati ricorre a fonti gratuite.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper offre ricerca web e di immagini con la tua chiave.',
     setAiSearchSerplyHint: 'Serply offre ricerca web e di immagini con la tua chiave.',
@@ -7816,7 +7801,7 @@ export const strings = {
     timelineCountOne: '{n} elemento',
 =======
     intgSkillsDesc:
-      'GenOffice usa solo le competenze nella propria cartella. Importare una cartella o uno zip copia l’intera competenza; nulla viene eseguito all’importazione.',
+      'UniWork Office usa solo le competenze nella propria cartella. Importare una cartella o uno zip copia l’intera competenza; nulla viene eseguito all’importazione.',
     intgSkillsEmpty: 'Nessuna competenza installata.',
     intgSkillsImportFolder: 'Importa cartella…',
     intgSkillsImportZip: 'Importa pacchetto competenza (zip / .md)…',
@@ -7826,7 +7811,7 @@ export const strings = {
     intgSkillsImportFailed: 'Importazione non riuscita: {reason}',
     intgSkillsRemove: 'Rimuovi',
     intgSkillsRemoveConfirm:
-      'Rimuovere la competenza "{name}"? La sua cartella sarà eliminata da GenOffice.',
+      'Rimuovere la competenza "{name}"? La sua cartella sarà eliminata da UniWork Office.',
     intgSkillsRemoved: '{name} rimossa',
     intgSkillsRead: 'Dettagli',
     intgSkillsMine: 'Le mie competenze',
@@ -7921,7 +7906,7 @@ export const strings = {
     askSavedAs: 'Zapisano: {name}',
     askSaveFailed: 'Nie udało się zapisać: {error}',
     askEmptyCorpus: 'Baza wiedzy jest pusta: najpierw oznacz pliki, potem pytaj.',
-    askNeedsLogin: 'Zaloguj się do Genspark, aby korzystać z czatu AI.',
+    askNeedsLogin: 'Zaloguj się do UniWork, aby korzystać z czatu AI.',
     askPlaceholder: 'Zapytaj o swoje pliki…',
     askHintIdle: 'Enter wysyła',
     askHintBusy: 'AI odpowiada…',
@@ -7941,15 +7926,15 @@ export const strings = {
     askCtaRecents: 'Oznacz z Ostatnich',
     askNoSave: 'Rozmowa nie jest zapisywana; znika po ponownym uruchomieniu aplikacji.',
     askUnknownError: 'Żądanie AI nie powiodło się. Spróbuj ponownie.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Projekty utworzone w sieci za pomocą Genspark AI. Edycja jest kontynuowana w przeglądarce — kliknij projekt, aby go otworzyć.',
+      'Projekty utworzone w sieci za pomocą UniWork AI. Edycja jest kontynuowana w przeglądarce — kliknij projekt, aby go otworzyć.',
     cloudSearchPlaceholder: 'Szukaj wśród {n} projektów…',
     cloudNoResults: 'Brak pasujących projektów.',
     cloudSortRecent: 'Najnowsze',
     cloudSortOldest: 'Najstarsze',
     cloudRefresh: 'Odśwież',
-    cloudLoginHint: 'Zaloguj się na konto Genspark, aby zobaczyć projekty utworzone w sieci.',
+    cloudLoginHint: 'Zaloguj się na konto UniWork, aby zobaczyć projekty utworzone w sieci.',
     cloudEmpty: 'Brak projektów w sieci.',
     cloudError: 'Nie udało się wczytać. Spróbuj ponownie później.',
     cloudRetry: 'Spróbuj ponownie',
@@ -8073,7 +8058,7 @@ export const strings = {
     setUpdateRestart: 'Uruchom ponownie i zainstaluj',
     setAutoUpdateCheck: 'Automatycznie sprawdzaj aktualizacje',
     setAutoUpdateCheckDesc:
-      'Po wyłączeniu GenOffice nie sprawdza nowych wersji przy uruchomieniu ani w tle. Nadal możesz sprawdzić ręcznie w Pomoc › Sprawdź aktualizacje.',
+      'Po wyłączeniu UniWork Office nie sprawdza nowych wersji przy uruchomieniu ani w tle. Nadal możesz sprawdzić ręcznie w Pomoc › Sprawdź aktualizacje.',
     updateChannel: 'Kanał aktualizacji',
     channelStable: 'Stabilny',
     channelBeta: 'Beta',
@@ -8088,7 +8073,7 @@ export const strings = {
     saveLocation: 'Lokalizacja zapisu',
     setRestoreSession: 'Otwieraj ponownie dokumenty z ostatniej sesji',
     setRestoreSessionDesc:
-      'Dokumenty otwarte w chwili zamknięcia GenOffice zostaną automatycznie otwarte przy następnym uruchomieniu.',
+      'Dokumenty otwarte w chwili zamknięcia UniWork Office zostaną automatycznie otwarte przy następnym uruchomieniu.',
     setTabSleep: 'Usypiaj nieaktywne karty',
     setTabSleepDesc:
       'Gdy otwartych jest wiele kart, te dawno nieoglądane zwalniają pamięć i ponownie otwierają plik po powrocie. Karty z niezapisanymi zmianami lub przypięte nigdy nie są usypiane.',
@@ -8179,7 +8164,7 @@ export const strings = {
     intgHeroTitle: 'Używaj UniWork Office ze swojego asystenta AI',
 =======
     setSecSkills: 'Umiejętności',
-    intgHeroTitle: 'Używaj GenOffice ze swojego asystenta AI',
+    intgHeroTitle: 'Używaj UniWork Office ze swojego asystenta AI',
 >>>>>>> theirs
     intgHeroDesc:
       'Po połączeniu Claude Code, Codex, Cursor, Claude Desktop i podobni asystenci mogą tworzyć, konwertować, czytać i edytować pliki Word, Excel, PowerPoint, PDF i Markdown za Ciebie. Wszystko działa na tym komputerze; nic nie jest przesyłane.',
@@ -8286,7 +8271,7 @@ export const strings = {
     setAiEndpointAdd: 'Dodaj punkt końcowy',
     setAiEndpointRemove: 'Usuń',
     setAiEndpointName: 'Nazwa',
-    setAiGensparkHint: 'Korzysta z logowania Genspark; klucz API nie jest potrzebny.',
+    setAiGensparkHint: 'Korzysta z logowania UniWork; klucz API nie jest potrzebny.',
 >>>>>>> theirs
     setAiCodexPath: 'Plik wykonywalny Codex',
     setAiCodexPathHint:
@@ -8319,9 +8304,9 @@ export const strings = {
     setAiSearchAuto: 'Automatycznie (za darmo)',
 =======
     setAiMediaGensparkHint:
-      'Generowanie obrazów i analiza obrazów/wideo korzystają z logowania Genspark.',
+      'Generowanie obrazów i analiza obrazów/wideo korzystają z logowania UniWork.',
     setAiSearchGensparkHint:
-      'Wyszukiwanie w sieci i obrazów korzysta z logowania Genspark; po wylogowaniu lub przy wyłączonych narzędziach chmurowych używa darmowych źródeł.',
+      'Wyszukiwanie w sieci i obrazów korzysta z logowania UniWork; po wylogowaniu lub przy wyłączonych narzędziach chmurowych używa darmowych źródeł.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper zapewnia wyszukiwanie w sieci i obrazów z Twoim kluczem.',
     setAiSearchSerplyHint: 'Serply zapewnia wyszukiwanie w sieci i obrazów z Twoim kluczem.',
@@ -8382,7 +8367,7 @@ export const strings = {
     timelineCountOne: '{n} wpis',
 =======
     intgSkillsDesc:
-      'GenOffice używa tylko umiejętności z własnego folderu. Import folderu lub pliku zip kopiuje całą umiejętność; podczas importu nic nie jest uruchamiane.',
+      'UniWork Office używa tylko umiejętności z własnego folderu. Import folderu lub pliku zip kopiuje całą umiejętność; podczas importu nic nie jest uruchamiane.',
     intgSkillsEmpty: 'Brak zainstalowanych umiejętności.',
     intgSkillsImportFolder: 'Importuj folder…',
     intgSkillsImportZip: 'Importuj pakiet umiejętności (zip / .md)…',
@@ -8392,7 +8377,7 @@ export const strings = {
     intgSkillsImportFailed: 'Import nie powiódł się: {reason}',
     intgSkillsRemove: 'Usuń',
     intgSkillsRemoveConfirm:
-      'Usunąć umiejętność „{name}”? Jej folder zostanie usunięty z GenOffice.',
+      'Usunąć umiejętność „{name}”? Jej folder zostanie usunięty z UniWork Office.',
     intgSkillsRemoved: 'Usunięto {name}',
     intgSkillsRead: 'Szczegóły',
     intgSkillsMine: 'Moje umiejętności',
@@ -8486,7 +8471,7 @@ export const strings = {
     askSavedAs: 'Uloženo: {name}',
     askSaveFailed: 'Uložení se nezdařilo: {error}',
     askEmptyCorpus: 'Znalostní databáze je prázdná: nejprve označte soubory a pak se ptejte.',
-    askNeedsLogin: 'Pro používí AI chatu se přihlaste do Genspark.',
+    askNeedsLogin: 'Pro používí AI chatu se přihlaste do UniWork.',
     askPlaceholder: 'Zeptejte se na své soubory…',
     askHintIdle: 'Enter odesílá',
     askHintBusy: 'AI odpovídá…',
@@ -8506,16 +8491,16 @@ export const strings = {
     askCtaRecents: 'Označit z Nedávných',
     askNoSave: 'Konverzace se neukládá; po restartu aplikace se vymaže.',
     askUnknownError: 'Požadavek na AI selhal. Zkuste to znovu.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Projekty vytvořené na webu pomocí Genspark AI. Úpravy pokračují v prohlížeči — klikněte na projekt a otevřete ho.',
+      'Projekty vytvořené na webu pomocí UniWork AI. Úpravy pokračují v prohlížeči — klikněte na projekt a otevřete ho.',
     cloudSearchPlaceholder: 'Hledat mezi {n} projekty…',
     cloudNoResults: 'Žádné odpovídající projekty.',
     cloudSortRecent: 'Nejnovější',
     cloudSortOldest: 'Nejstarší',
     cloudRefresh: 'Obnovit',
     cloudLoginHint:
-      'Přihlaste se ke svému účtu Genspark a zobrazte projekty, které jste vytvořili na webu.',
+      'Přihlaste se ke svému účtu UniWork a zobrazte projekty, které jste vytvořili na webu.',
     cloudEmpty: 'Zatím žádné webové projekty.',
     cloudError: 'Načtení se nezdařilo. Zkuste to později.',
     cloudRetry: 'Zkusit znovu',
@@ -8637,7 +8622,7 @@ export const strings = {
     setUpdateRestart: 'Restartovat a nainstalovat',
     setAutoUpdateCheck: 'Automaticky kontrolovat aktualizace',
     setAutoUpdateCheckDesc:
-      'Po vypnutí GenOffice nekontroluje nové verze při spuštění ani na pozadí. Ručně můžete zkontrolovat v Nápověda › Zkontrolovat aktualizace.',
+      'Po vypnutí UniWork Office nekontroluje nové verze při spuštění ani na pozadí. Ručně můžete zkontrolovat v Nápověda › Zkontrolovat aktualizace.',
     updateChannel: 'Kanál aktualizací',
     channelStable: 'Stabilní',
     channelBeta: 'Beta',
@@ -8692,7 +8677,7 @@ export const strings = {
     intgHeroTitle: 'Používejte UniWork Office ze svého AI asistenta',
 =======
     setSecSkills: 'Dovednosti',
-    intgHeroTitle: 'Používejte GenOffice ze svého AI asistenta',
+    intgHeroTitle: 'Používejte UniWork Office ze svého AI asistenta',
 >>>>>>> theirs
     intgHeroDesc:
       'Po připojení mohou Claude Code, Codex, Cursor, Claude Desktop a podobní asistenti za vás vytvářet, převádět, číst a upravovat soubory Word, Excel, PowerPoint, PDF a Markdown. Vše běží na tomto počítači; nic se neodesílá.',
@@ -8798,7 +8783,7 @@ export const strings = {
     setAiEndpointAdd: 'Přidat koncový bod',
     setAiEndpointRemove: 'Odebrat',
     setAiEndpointName: 'Název',
-    setAiGensparkHint: 'Používá vaše přihlášení ke Genspark; klíč API není potřeba.',
+    setAiGensparkHint: 'Používá vaše přihlášení ke UniWork; klíč API není potřeba.',
 >>>>>>> theirs
     setAiCodexPath: 'Spustitelný soubor Codex',
     setAiCodexPathHint:
@@ -8832,9 +8817,9 @@ export const strings = {
     setAiSearchAuto: 'Automaticky (zdarma)',
 =======
     setAiMediaGensparkHint:
-      'Generování obrázků a analýza obrázků/videí používají vaše přihlášení ke Genspark.',
+      'Generování obrázků a analýza obrázků/videí používají vaše přihlášení ke UniWork.',
     setAiSearchGensparkHint:
-      'Webové a obrázkové vyhledávání používá vaše přihlášení ke Genspark; při odhlášení nebo vypnutých cloudových nástrojích se použijí bezplatné zdroje.',
+      'Webové a obrázkové vyhledávání používá vaše přihlášení ke UniWork; při odhlášení nebo vypnutých cloudových nástrojích se použijí bezplatné zdroje.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper zajišťuje webové i obrázkové vyhledávání s vaším klíčem.',
     setAiSearchSerplyHint: 'Serply zajišťuje webové i obrázkové vyhledávání s vaším klíčem.',
@@ -8878,7 +8863,7 @@ export const strings = {
     onbBack: 'Zpět',
     setRestoreSession: 'Znovu otevřít dokumenty z minula',
     setRestoreSessionDesc:
-      'Dokumenty otevřené při zavření GenOffice se při příštím spuštění automaticky znovu otevřou.',
+      'Dokumenty otevřené při zavření UniWork Office se při příštím spuštění automaticky znovu otevřou.',
     setTabSleep: 'Uspávat neaktivní karty',
     setTabSleepDesc:
       'Když je otevřeno mnoho karet, ty dlouho nezobrazené uvolní paměť a při návratu znovu otevřou soubor. Karty s neuloženými změnami nebo připnuté se nikdy neuspí.',
@@ -8942,7 +8927,7 @@ export const strings = {
     timelineCountOne: '{n} položka',
 =======
     intgSkillsDesc:
-      'GenOffice používá pouze dovednosti ze své vlastní složky. Import složky nebo zipu zkopíruje celou dovednost; při importu se nic nespouští.',
+      'UniWork Office používá pouze dovednosti ze své vlastní složky. Import složky nebo zipu zkopíruje celou dovednost; při importu se nic nespouští.',
     intgSkillsEmpty: 'Zatím nejsou nainstalovány žádné dovednosti.',
     intgSkillsImportFolder: 'Importovat složku…',
     intgSkillsImportZip: 'Importovat balíček dovednosti (zip / .md)…',
@@ -8951,7 +8936,7 @@ export const strings = {
     intgSkillsImportDone: 'Importováno: {name}',
     intgSkillsImportFailed: 'Import se nezdařil: {reason}',
     intgSkillsRemove: 'Odebrat',
-    intgSkillsRemoveConfirm: 'Odebrat dovednost „{name}“? Její složka bude z GenOffice smazána.',
+    intgSkillsRemoveConfirm: 'Odebrat dovednost „{name}“? Její složka bude z UniWork Office smazána.',
     intgSkillsRemoved: '{name} odebrána',
     intgSkillsRead: 'Podrobnosti',
     intgSkillsMine: 'Moje dovednosti',
@@ -9048,7 +9033,7 @@ export const strings = {
     askSavedAs: 'Opgeslagen: {name}',
     askSaveFailed: 'Opslaan mislukt: {error}',
     askEmptyCorpus: 'De kennisbank is leeg: markeer eerst bestanden en stel dan je vraag.',
-    askNeedsLogin: 'Log in bij Genspark om AI-chat te gebruiken.',
+    askNeedsLogin: 'Log in bij UniWork om AI-chat te gebruiken.',
     askPlaceholder: 'Vraag naar je favoriete bestanden…',
     askHintIdle: 'Enter om te verzenden',
     askHintBusy: 'De AI beantwoordt…',
@@ -9068,16 +9053,16 @@ export const strings = {
     askCtaRecents: 'Sterren vanuit Onlangs',
     askNoSave: 'Het gesprek wordt niet opgeslagen; het wordt gewist bij herstart van de app.',
     askUnknownError: 'De AI-aanvraag is mislukt. Probeer het opnieuw.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Projecten gemaakt op het web met Genspark AI. Bewerken gaat verder in je browser — klik op een project om het te openen.',
+      'Projecten gemaakt op het web met UniWork AI. Bewerken gaat verder in je browser — klik op een project om het te openen.',
     cloudSearchPlaceholder: 'Zoek in {n} projecten…',
     cloudNoResults: 'Geen overeenkomende projecten.',
     cloudSortRecent: 'Recent',
     cloudSortOldest: 'Oudste',
     cloudRefresh: 'Vernieuwen',
     cloudLoginHint:
-      'Log in op je Genspark-account om projecten te zien die je op het web hebt gemaakt.',
+      'Log in op je UniWork-account om projecten te zien die je op het web hebt gemaakt.',
     cloudEmpty: 'Nog geen webprojecten.',
     cloudError: 'Laden mislukt. Probeer het later opnieuw.',
     cloudRetry: 'Opnieuw proberen',
@@ -9200,7 +9185,7 @@ export const strings = {
     setUpdateRestart: 'Herstarten en installeren',
     setAutoUpdateCheck: 'Automatisch controleren op updates',
     setAutoUpdateCheckDesc:
-      'Uitgeschakeld controleert GenOffice niet meer op nieuwe versies bij het starten of op de achtergrond. Je kunt nog steeds controleren via Help › Controleren op updates.',
+      'Uitgeschakeld controleert UniWork Office niet meer op nieuwe versies bij het starten of op de achtergrond. Je kunt nog steeds controleren via Help › Controleren op updates.',
     updateChannel: 'Updatekanaal',
     channelStable: 'Stabiel',
     channelBeta: 'Bèta',
@@ -9215,7 +9200,7 @@ export const strings = {
     saveLocation: 'Opslaglocatie',
     setRestoreSession: 'Documenten van de vorige keer opnieuw openen',
     setRestoreSessionDesc:
-      'Documenten die open waren toen GenOffice werd gesloten, worden bij de volgende start automatisch opnieuw geopend.',
+      'Documenten die open waren toen UniWork Office werd gesloten, worden bij de volgende start automatisch opnieuw geopend.',
     setTabSleep: 'Inactieve tabbladen laten slapen',
     setTabSleepDesc:
       'Als er veel tabbladen open zijn, geven tabbladen die u een tijd niet hebt bekeken hun geheugen vrij en openen ze het bestand opnieuw als u terugkeert. Tabbladen met niet-opgeslagen wijzigingen of vastgemaakte tabbladen slapen nooit.',
@@ -9307,7 +9292,7 @@ export const strings = {
     intgHeroTitle: 'UniWork Office gebruiken vanuit uw AI-assistent',
 =======
     setSecSkills: 'Vaardigheden',
-    intgHeroTitle: 'GenOffice gebruiken vanuit uw AI-assistent',
+    intgHeroTitle: 'UniWork Office gebruiken vanuit uw AI-assistent',
 >>>>>>> theirs
     intgHeroDesc:
       'Eenmaal verbonden kunnen Claude Code, Codex, Cursor, Claude Desktop en vergelijkbare assistenten Word-, Excel-, PowerPoint-, PDF- en Markdown-bestanden voor je maken, converteren, lezen en bewerken. Alles draait op deze computer; er wordt niets geüpload.',
@@ -9414,7 +9399,7 @@ export const strings = {
     setAiEndpointAdd: 'Eindpunt toevoegen',
     setAiEndpointRemove: 'Verwijderen',
     setAiEndpointName: 'Naam',
-    setAiGensparkHint: 'Gebruikt je Genspark-login; geen API-sleutel nodig.',
+    setAiGensparkHint: 'Gebruikt je UniWork-login; geen API-sleutel nodig.',
 >>>>>>> theirs
     setAiCodexPath: 'Codex-uitvoerbaar bestand',
     setAiCodexPathHint:
@@ -9447,9 +9432,9 @@ export const strings = {
     setAiSearchAuto: 'Automatisch (gratis)',
 =======
     setAiMediaGensparkHint:
-      'Afbeeldingen genereren en afbeelding-/video-analyse gebruiken je Genspark-aanmelding.',
+      'Afbeeldingen genereren en afbeelding-/video-analyse gebruiken je UniWork-aanmelding.',
     setAiSearchGensparkHint:
-      'Web- en afbeeldingszoeken gebruiken je Genspark-aanmelding; afgemeld of met cloudtools uit vallen ze terug op gratis bronnen.',
+      'Web- en afbeeldingszoeken gebruiken je UniWork-aanmelding; afgemeld of met cloudtools uit vallen ze terug op gratis bronnen.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper levert web- en afbeeldingszoeken met je sleutel.',
     setAiSearchSerplyHint: 'Serply levert web- en afbeeldingszoeken met je sleutel.',
@@ -9510,7 +9495,7 @@ export const strings = {
     timelineCountOne: '{n} item',
 =======
     intgSkillsDesc:
-      'GenOffice gebruikt alleen vaardigheden uit zijn eigen map. Een map of zip importeren kopieert de hele vaardigheid; bij het importeren wordt niets uitgevoerd.',
+      'UniWork Office gebruikt alleen vaardigheden uit zijn eigen map. Een map of zip importeren kopieert de hele vaardigheid; bij het importeren wordt niets uitgevoerd.',
     intgSkillsEmpty: 'Nog geen vaardigheden geïnstalleerd.',
     intgSkillsImportFolder: 'Map importeren…',
     intgSkillsImportZip: 'Vaardigheidspakket importeren (zip / .md)…',
@@ -9520,7 +9505,7 @@ export const strings = {
     intgSkillsImportFailed: 'Importeren mislukt: {reason}',
     intgSkillsRemove: 'Verwijderen',
     intgSkillsRemoveConfirm:
-      'Vaardigheid "{name}" verwijderen? De map wordt uit GenOffice verwijderd.',
+      'Vaardigheid "{name}" verwijderen? De map wordt uit UniWork Office verwijderd.',
     intgSkillsRemoved: '{name} verwijderd',
     intgSkillsRead: 'Details',
     intgSkillsMine: 'Mijn vaardigheden',
@@ -9616,7 +9601,7 @@ export const strings = {
     askSavedAs: 'Disimpan: {name}',
     askSaveFailed: 'Gagal menyimpan: {error}',
     askEmptyCorpus: 'Pangkalan pengetahuan kosong: tanda beberapa fail dahulu, kemudian tanya.',
-    askNeedsLogin: 'Log masuk ke Genspark untuk menggunakan sembang AI.',
+    askNeedsLogin: 'Log masuk ke UniWork untuk menggunakan sembang AI.',
     askPlaceholder: 'Tanya tentang fail kegemaran anda…',
     askHintIdle: 'Enter untuk menghantar',
     askHintBusy: 'AI sedan menjawab…',
@@ -9636,15 +9621,15 @@ export const strings = {
     askCtaRecents: 'Tandakan dari Terkini',
     askNoSave: 'Perbualan tidak disimpan; ia dikosongkan apabila aplikasi dimulakan semula.',
     askUnknownError: 'Permintaan AI gagal. Cuba lagi.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Projek yang dicipta di web dengan Genspark AI. Penyuntingan diteruskan dalam pelayar — klik projek untuk membukanya.',
+      'Projek yang dicipta di web dengan UniWork AI. Penyuntingan diteruskan dalam pelayar — klik projek untuk membukanya.',
     cloudSearchPlaceholder: 'Cari {n} projek…',
     cloudNoResults: 'Tiada projek sepadan.',
     cloudSortRecent: 'Terbaru',
     cloudSortOldest: 'Terlama',
     cloudRefresh: 'Muat semula',
-    cloudLoginHint: 'Log masuk ke akaun Genspark untuk melihat projek yang anda cipta di web.',
+    cloudLoginHint: 'Log masuk ke akaun UniWork untuk melihat projek yang anda cipta di web.',
     cloudEmpty: 'Belum ada projek web.',
     cloudError: 'Gagal memuatkan. Cuba lagi kemudian.',
     cloudRetry: 'Cuba lagi',
@@ -9767,7 +9752,7 @@ export const strings = {
     setUpdateRestart: 'Mulakan semula dan pasang',
     setAutoUpdateCheck: 'Semak kemas kini secara automatik',
     setAutoUpdateCheckDesc:
-      'Apabila dimatikan, GenOffice tidak lagi menyemak versi baharu semasa dimulakan atau di latar belakang. Anda masih boleh menyemak melalui Bantuan › Semak Kemas Kini.',
+      'Apabila dimatikan, UniWork Office tidak lagi menyemak versi baharu semasa dimulakan atau di latar belakang. Anda masih boleh menyemak melalui Bantuan › Semak Kemas Kini.',
     updateChannel: 'Saluran Kemas Kini',
     channelStable: 'Stabil',
     channelBeta: 'Beta',
@@ -9782,7 +9767,7 @@ export const strings = {
     saveLocation: 'Lokasi simpanan',
     setRestoreSession: 'Buka semula dokumen dari kali terakhir',
     setRestoreSessionDesc:
-      'Dokumen yang dibuka semasa GenOffice ditutup akan dibuka semula secara automatik apabila ia dimulakan seterusnya.',
+      'Dokumen yang dibuka semasa UniWork Office ditutup akan dibuka semula secara automatik apabila ia dimulakan seterusnya.',
     setTabSleep: 'Tidurkan tab tidak aktif',
     setTabSleepDesc:
       'Apabila banyak tab dibuka, tab yang lama tidak dilihat melepaskan memorinya dan membuka semula failnya apabila anda kembali. Tab dengan perubahan belum disimpan atau yang disemat tidak akan tidur.',
@@ -9875,7 +9860,7 @@ export const strings = {
     intgHeroTitle: 'Gunakan UniWork Office daripada pembantu AI anda',
 =======
     setSecSkills: 'Kemahiran',
-    intgHeroTitle: 'Gunakan GenOffice daripada pembantu AI anda',
+    intgHeroTitle: 'Gunakan UniWork Office daripada pembantu AI anda',
 >>>>>>> theirs
     intgHeroDesc:
       'Setelah disambungkan, Claude Code, Codex, Cursor, Claude Desktop dan pembantu serupa boleh mencipta, menukar, membaca dan mengedit fail Word, Excel, PowerPoint, PDF dan Markdown untuk anda. Semuanya berjalan di komputer ini; tiada apa yang dimuat naik.',
@@ -9984,7 +9969,7 @@ export const strings = {
     setAiEndpointAdd: 'Tambah titik akhir',
     setAiEndpointRemove: 'Buang',
     setAiEndpointName: 'Nama',
-    setAiGensparkHint: 'Menggunakan log masuk Genspark; tiada kunci API diperlukan.',
+    setAiGensparkHint: 'Menggunakan log masuk UniWork; tiada kunci API diperlukan.',
 >>>>>>> theirs
     setAiCodexPath: 'Fail boleh laku Codex',
     setAiCodexPathHint:
@@ -10018,9 +10003,9 @@ export const strings = {
     setAiSearchAuto: 'Automatik (percuma)',
 =======
     setAiMediaGensparkHint:
-      'Penjanaan imej dan analisis imej/video menggunakan log masuk Genspark anda.',
+      'Penjanaan imej dan analisis imej/video menggunakan log masuk UniWork anda.',
     setAiSearchGensparkHint:
-      'Carian web dan imej menggunakan log masuk Genspark anda; apabila log keluar atau alat awan dimatikan, ia menggunakan sumber percuma.',
+      'Carian web dan imej menggunakan log masuk UniWork anda; apabila log keluar atau alat awan dimatikan, ia menggunakan sumber percuma.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper menyediakan carian web dan imej dengan kunci anda.',
     setAiSearchSerplyHint: 'Serply menyediakan carian web dan imej dengan kunci anda.',
@@ -10080,7 +10065,7 @@ export const strings = {
     timelineCountOne: '{n} item',
 =======
     intgSkillsDesc:
-      'GenOffice hanya menggunakan kemahiran dalam folder kemahirannya sendiri. Mengimport folder atau zip menyalin keseluruhan kemahiran; tiada apa yang dijalankan semasa import.',
+      'UniWork Office hanya menggunakan kemahiran dalam folder kemahirannya sendiri. Mengimport folder atau zip menyalin keseluruhan kemahiran; tiada apa yang dijalankan semasa import.',
     intgSkillsEmpty: 'Belum ada kemahiran dipasang.',
     intgSkillsImportFolder: 'Import folder…',
     intgSkillsImportZip: 'Import pakej kemahiran (zip / .md)…',
@@ -10089,7 +10074,7 @@ export const strings = {
     intgSkillsImportDone: '{name} diimport',
     intgSkillsImportFailed: 'Import gagal: {reason}',
     intgSkillsRemove: 'Buang',
-    intgSkillsRemoveConfirm: 'Buang kemahiran "{name}"? Foldernya akan dipadam daripada GenOffice.',
+    intgSkillsRemoveConfirm: 'Buang kemahiran "{name}"? Foldernya akan dipadam daripada UniWork Office.',
     intgSkillsRemoved: '{name} dibuang',
     intgSkillsRead: 'Detail',
     intgSkillsMine: 'Kemahiran saya',
@@ -10183,7 +10168,7 @@ export const strings = {
     askSavedAs: 'נשמר: {name}',
     askSaveFailed: 'השמירה נכשלה: {error}',
     askEmptyCorpus: 'בסיס הידע ריק: סמן קבצים תחילה ואז שאל.',
-    askNeedsLogin: 'התחבר ל-Genspark כדי להשתמש בצ׳אט AI.',
+    askNeedsLogin: 'התחבר ל-UniWork כדי להשתמש בצ׳אט AI.',
     askPlaceholder: 'שאל על הקבצים המסומנים שלך…',
     askHintIdle: 'Enter לשליחה',
     askHintBusy: 'ה-AI עונה…',
@@ -10203,15 +10188,15 @@ export const strings = {
     askCtaRecents: 'סימון מ״אחרונים״',
     askNoSave: 'השיחה אינה נשמרת; היא מתנקה כשהאפליקציה מופעלת מחדש.',
     askUnknownError: 'בקשת ה-AI נכשלה. נסה שוב.',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'פרויקטים שנוצרו באינטרנט עם Genspark AI. העריכה נמשכת בדפדפן — לחצו על פרויקט כדי לפתוח אותו.',
+      'פרויקטים שנוצרו באינטרנט עם UniWork AI. העריכה נמשכת בדפדפן — לחצו על פרויקט כדי לפתוח אותו.',
     cloudSearchPlaceholder: 'חיפוש בין {n} פרויקטים…',
     cloudNoResults: 'אין פרויקטים תואמים.',
     cloudSortRecent: 'החדשים ביותר',
     cloudSortOldest: 'הישנים ביותר',
     cloudRefresh: 'רענון',
-    cloudLoginHint: 'התחברו לחשבון Genspark כדי לראות פרויקטים שיצרתם באתר.',
+    cloudLoginHint: 'התחברו לחשבון UniWork כדי לראות פרויקטים שיצרתם באתר.',
     cloudEmpty: 'אין עדיין פרויקטים מהאתר.',
     cloudError: 'הטעינה נכשלה. נסו שוב מאוחר יותר.',
     cloudRetry: 'נסו שוב',
@@ -10333,7 +10318,7 @@ export const strings = {
     setUpdateRestart: 'הפעל מחדש והתקן',
     setAutoUpdateCheck: 'בדיקת עדכונים אוטומטית',
     setAutoUpdateCheckDesc:
-      'כשהאפשרות כבויה, GenOffice לא בודקת גרסאות חדשות בהפעלה או ברקע. עדיין אפשר לבדוק ידנית דרך עזרה › בדוק עדכונים.',
+      'כשהאפשרות כבויה, UniWork Office לא בודקת גרסאות חדשות בהפעלה או ברקע. עדיין אפשר לבדוק ידנית דרך עזרה › בדוק עדכונים.',
     updateChannel: 'ערוץ עדכונים',
     channelStable: 'יציב',
     channelBeta: 'בטא',
@@ -10348,7 +10333,7 @@ export const strings = {
     saveLocation: 'מיקום שמירה',
     setRestoreSession: 'פתיחה מחדש של המסמכים מהפעם הקודמת',
     setRestoreSessionDesc:
-      'מסמכים שהיו פתוחים כש-GenOffice נסגרה ייפתחו מחדש אוטומטית בהפעלה הבאה.',
+      'מסמכים שהיו פתוחים כש-UniWork Office נסגרה ייפתחו מחדש אוטומטית בהפעלה הבאה.',
     setTabSleep: 'השהה כרטיסיות לא פעילות',
     setTabSleepDesc:
       'כשפתוחות כרטיסיות רבות, כרטיסיות שלא נצפו זמן מה משחררות את הזיכרון ופותחות מחדש את הקובץ כשחוזרים אליהן. כרטיסיות עם שינויים שלא נשמרו או מוצמדות לעולם לא מושהות.',
@@ -10437,7 +10422,7 @@ export const strings = {
     intgHeroTitle: 'שימוש ב-UniWork Office מתוך עוזר ה-AI שלכם',
 =======
     setSecSkills: 'מיומנויות',
-    intgHeroTitle: 'שימוש ב-GenOffice מתוך עוזר ה-AI שלכם',
+    intgHeroTitle: 'שימוש ב-UniWork Office מתוך עוזר ה-AI שלכם',
 >>>>>>> theirs
     intgHeroDesc:
       'לאחר החיבור, Claude Code‏, Codex‏, Cursor‏, Claude Desktop ועוזרים דומים יכולים ליצור, להמיר, לקרוא ולערוך עבורך קובצי Word‏, Excel‏, PowerPoint‏, PDF ו‑Markdown. הכול פועל במחשב זה; דבר אינו נשלח.',
@@ -10539,7 +10524,7 @@ export const strings = {
     setAiEndpointAdd: 'הוספת נקודת קצה',
     setAiEndpointRemove: 'הסרה',
     setAiEndpointName: 'שם',
-    setAiGensparkHint: 'משתמש בכניסת Genspark שלך; אין צורך במפתח API.',
+    setAiGensparkHint: 'משתמש בכניסת UniWork שלך; אין צורך במפתח API.',
 >>>>>>> theirs
     setAiCodexPath: 'קובץ ההפעלה של Codex',
     setAiCodexPathHint: 'יש למלא רק בהתקנה מותאמת; השאר ריק לזיהוי אוטומטי.',
@@ -10570,9 +10555,9 @@ export const strings = {
       'אין צורך במפתח: חיפוש באינטרנט ובתמונות משתמש במקורות חינמיים (שימוש מוגבל). בחרו ספק והוסיפו מפתח משלכם למגבלות גבוהות יותר.',
     setAiSearchAuto: 'אוטומטי (חינם)',
 =======
-    setAiMediaGensparkHint: 'יצירת תמונות וניתוח תמונות/וידאו משתמשים בהתחברות Genspark שלך.',
+    setAiMediaGensparkHint: 'יצירת תמונות וניתוח תמונות/וידאו משתמשים בהתחברות UniWork שלך.',
     setAiSearchGensparkHint:
-      'חיפוש באינטרנט ובתמונות משתמש בהתחברות Genspark שלך; כשלא מחוברים או כשכלי הענן כבויים הוא חוזר למקורות חינמיים.',
+      'חיפוש באינטרנט ובתמונות משתמש בהתחברות UniWork שלך; כשלא מחוברים או כשכלי הענן כבויים הוא חוזר למקורות חינמיים.',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper מספק חיפוש באינטרנט ובתמונות עם המפתח שלך.',
     setAiSearchSerplyHint: 'Serply מספק חיפוש באינטרנט ובתמונות עם המפתח שלך.',
@@ -10630,7 +10615,7 @@ export const strings = {
     timelineCountOne: 'פריט אחד',
 =======
     intgSkillsDesc:
-      'GenOffice משתמש רק במיומנויות שבתיקיית המיומנויות שלו. ייבוא תיקייה או zip מעתיק את המיומנות כולה; שום דבר לא מופעל בייבוא.',
+      'UniWork Office משתמש רק במיומנויות שבתיקיית המיומנויות שלו. ייבוא תיקייה או zip מעתיק את המיומנות כולה; שום דבר לא מופעל בייבוא.',
     intgSkillsEmpty: 'עדיין לא הותקנו מיומנויות.',
     intgSkillsImportFolder: 'ייבוא תיקייה…',
     intgSkillsImportZip: 'ייבוא חבילת מיומנות (zip / .md)…',
@@ -10639,7 +10624,7 @@ export const strings = {
     intgSkillsImportDone: '{name} יובאה',
     intgSkillsImportFailed: 'הייבוא נכשל: {reason}',
     intgSkillsRemove: 'הסרה',
-    intgSkillsRemoveConfirm: 'להסיר את המיומנות "{name}"? התיקייה שלה תימחק מ-GenOffice.',
+    intgSkillsRemoveConfirm: 'להסיר את המיומנות "{name}"? התיקייה שלה תימחק מ-UniWork Office.',
     intgSkillsRemoved: '{name} הוסרה',
     intgSkillsRead: 'פרטים',
     intgSkillsMine: 'הכישורים שלי',
@@ -10732,7 +10717,7 @@ export const strings = {
     askSavedAs: 'सहेजा गया: {name}',
     askSaveFailed: 'सहेज नहीं सका: {error}',
     askEmptyCorpus: 'नॉलेज बेस खाली है: पहले फ़ाइलें स्टार करें, फिर पूछें।',
-    askNeedsLogin: 'AI चैट के लिए Genspark में साइन इन करें।',
+    askNeedsLogin: 'AI चैट के लिए UniWork में साइन इन करें।',
     askPlaceholder: 'अपनी फ़ाइलों के बारे में पूछें…',
     askHintIdle: 'भेजने के लिए Enter',
     askHintBusy: 'AI उत्तर दे रहा है…',
@@ -10752,15 +10737,15 @@ export const strings = {
     askCtaRecents: 'हाल की फ़ाइलों को तारांकित करें',
     askNoSave: 'बातचीत सहेजी नहीं जाती; ऐप पुनः आरंभ होने पर साफ़ हो जाती है।',
     askUnknownError: 'AI अनुरोध विफल रहा। फिर से प्रयास करें।',
-    navCloud: 'Genspark Projects',
+    navCloud: 'UniWork Projects',
     cloudSubtitle:
-      'Genspark AI के साथ वेब पर बनाए गए प्रोजेक्ट। संपादन ब्राउज़र में जारी रहता है — खोलने के लिए किसी प्रोजेक्ट पर क्लिक करें।',
+      'UniWork AI के साथ वेब पर बनाए गए प्रोजेक्ट। संपादन ब्राउज़र में जारी रहता है — खोलने के लिए किसी प्रोजेक्ट पर क्लिक करें।',
     cloudSearchPlaceholder: '{n} प्रोजेक्ट खोजें…',
     cloudNoResults: 'कोई मिलान वाला प्रोजेक्ट नहीं।',
     cloudSortRecent: 'हाल के',
     cloudSortOldest: 'सबसे पुराने',
     cloudRefresh: 'रीफ़्रेश',
-    cloudLoginHint: 'वेब पर बनाए गए प्रोजेक्ट देखने के लिए अपने Genspark खाते में साइन इन करें।',
+    cloudLoginHint: 'वेब पर बनाए गए प्रोजेक्ट देखने के लिए अपने UniWork खाते में साइन इन करें।',
     cloudEmpty: 'अभी तक कोई वेब प्रोजेक्ट नहीं है।',
     cloudError: 'लोड नहीं हो सका। बाद में फिर से कोशिश करें।',
     cloudRetry: 'फिर से कोशिश करें',
@@ -10884,7 +10869,7 @@ export const strings = {
     setUpdateRestart: 'रीस्टार्ट कर इंस्टॉल करें',
     setAutoUpdateCheck: 'अपडेट अपने-आप जाँचें',
     setAutoUpdateCheckDesc:
-      'बंद होने पर GenOffice शुरू होते समय या बैकग्राउंड में नए संस्करण नहीं जाँचता। आप फिर भी सहायता › अपडेट जांचें से जाँच सकते हैं।',
+      'बंद होने पर UniWork Office शुरू होते समय या बैकग्राउंड में नए संस्करण नहीं जाँचता। आप फिर भी सहायता › अपडेट जांचें से जाँच सकते हैं।',
     updateChannel: 'अपडेट चैनल',
     channelStable: 'स्थिर',
     channelBeta: 'बीटा',
@@ -10899,7 +10884,7 @@ export const strings = {
     saveLocation: 'सहेजने का स्थान',
     setRestoreSession: 'पिछली बार के दस्तावेज़ फिर से खोलें',
     setRestoreSessionDesc:
-      'GenOffice बंद करते समय खुले दस्तावेज़ अगली बार शुरू होने पर अपने-आप फिर से खुल जाते हैं।',
+      'UniWork Office बंद करते समय खुले दस्तावेज़ अगली बार शुरू होने पर अपने-आप फिर से खुल जाते हैं।',
     setTabSleep: 'निष्क्रिय टैब को सुलाएँ',
     setTabSleepDesc:
       'कई टैब खुले होने पर, जिन्हें आपने कुछ समय से नहीं देखा वे मेमोरी छोड़ देते हैं और लौटने पर फ़ाइल फिर खोलते हैं। बिना सहेजे बदलाव वाले या पिन किए गए टैब कभी नहीं सोते।',
@@ -10989,7 +10974,7 @@ export const strings = {
     intgHeroTitle: 'अपने AI असिस्टेंट से UniWork Office इस्तेमाल करें',
 =======
     setSecSkills: 'कौशल',
-    intgHeroTitle: 'अपने AI असिस्टेंट से GenOffice इस्तेमाल करें',
+    intgHeroTitle: 'अपने AI असिस्टेंट से UniWork Office इस्तेमाल करें',
 >>>>>>> theirs
     intgHeroDesc:
       'कनेक्ट होने के बाद Claude Code, Codex, Cursor, Claude Desktop और ऐसे ही सहायक आपके लिए Word, Excel, PowerPoint, PDF और Markdown फ़ाइलें बना, बदल, पढ़ और संपादित कर सकते हैं। सब कुछ इसी कंप्यूटर पर चलता है; कुछ भी अपलोड नहीं होता।',
@@ -11095,7 +11080,7 @@ export const strings = {
     setAiEndpointAdd: 'एंडपॉइंट जोड़ें',
     setAiEndpointRemove: 'हटाएँ',
     setAiEndpointName: 'नाम',
-    setAiGensparkHint: 'आपके Genspark साइन-इन का उपयोग करता है; API कुंजी की आवश्यकता नहीं।',
+    setAiGensparkHint: 'आपके UniWork साइन-इन का उपयोग करता है; API कुंजी की आवश्यकता नहीं।',
 >>>>>>> theirs
     setAiCodexPath: 'Codex निष्पादन फ़ाइल',
     setAiCodexPathHint: 'केवल कस्टम इंस्टॉलेशन के लिए भरें; स्वतः पहचान के लिए खाली छोड़ें।',
@@ -11128,9 +11113,9 @@ export const strings = {
     setAiSearchAuto: 'स्वचालित (मुफ़्त)',
 =======
     setAiMediaGensparkHint:
-      'इमेज जनरेशन और इमेज/वीडियो विश्लेषण आपके Genspark साइन-इन का उपयोग करते हैं।',
+      'इमेज जनरेशन और इमेज/वीडियो विश्लेषण आपके UniWork साइन-इन का उपयोग करते हैं।',
     setAiSearchGensparkHint:
-      'वेब और इमेज खोज आपके Genspark साइन-इन का उपयोग करती हैं; साइन-आउट होने पर या क्लाउड टूल बंद होने पर वे मुफ़्त स्रोतों पर लौट जाती हैं।',
+      'वेब और इमेज खोज आपके UniWork साइन-इन का उपयोग करती हैं; साइन-आउट होने पर या क्लाउड टूल बंद होने पर वे मुफ़्त स्रोतों पर लौट जाती हैं।',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper आपकी कुंजी से वेब और इमेज खोज दोनों देता है।',
     setAiSearchSerplyHint: 'Serply आपकी कुंजी से वेब और इमेज खोज दोनों देता है।',
@@ -11579,7 +11564,7 @@ export const strings = {
     setAiCapFileSearch: 'Tìm kiếm tệp trên máy',
 =======
     intgSkillsDesc:
-      'GenOffice केवल अपने कौशल फ़ोल्डर के कौशल उपयोग करता है। फ़ोल्डर या zip से आयात पूरा कौशल कॉपी करता है; आयात पर कुछ नहीं चलता।',
+      'UniWork Office केवल अपने कौशल फ़ोल्डर के कौशल उपयोग करता है। फ़ोल्डर या zip से आयात पूरा कौशल कॉपी करता है; आयात पर कुछ नहीं चलता।',
     intgSkillsEmpty: 'अभी कोई कौशल इंस्टॉल नहीं है।',
     intgSkillsImportFolder: 'फ़ोल्डर आयात करें…',
     intgSkillsImportZip: 'कौशल पैकेज आयात करें (zip / .md)…',
@@ -11588,7 +11573,7 @@ export const strings = {
     intgSkillsImportDone: '{name} आयात हुआ',
     intgSkillsImportFailed: 'आयात विफल: {reason}',
     intgSkillsRemove: 'हटाएँ',
-    intgSkillsRemoveConfirm: 'कौशल "{name}" हटाएँ? इसका फ़ोल्डर GenOffice से हटा दिया जाएगा।',
+    intgSkillsRemoveConfirm: 'कौशल "{name}" हटाएँ? इसका फ़ोल्डर UniWork Office से हटा दिया जाएगा।',
     intgSkillsRemoved: '{name} हटाया गया',
     intgSkillsRead: 'विवरण',
     intgSkillsMine: 'मेरे कौशल',
@@ -11680,7 +11665,7 @@ export const strings = {
     askSavedAs: '已儲存:{name}',
     askSaveFailed: '儲存失敗:{error}',
     askEmptyCorpus: '知識庫還是空的:先收藏一些檔案,再回來提問。',
-    askNeedsLogin: '登入 Genspark 後即可使用 AI 問答。',
+    askNeedsLogin: '登入 UniWork 後即可使用 AI 問答。',
     askPlaceholder: '問一個關於收藏檔案的問題…',
     askHintIdle: 'Enter 傳送',
     askHintBusy: 'AI 正在回答…',
@@ -11699,14 +11684,14 @@ export const strings = {
     askCtaRecents: '去最近檔案收藏',
     askNoSave: '對話不會保存,重啟應用程式後清空。',
     askUnknownError: 'AI 請求失敗,請重試。',
-    navCloud: 'Genspark Projects',
-    cloudSubtitle: '在網頁端用 Genspark AI 建立的專案。編輯在瀏覽器中繼續——點擊任意專案即可開啟。',
+    navCloud: 'UniWork Projects',
+    cloudSubtitle: '在網頁端用 UniWork AI 建立的專案。編輯在瀏覽器中繼續——點擊任意專案即可開啟。',
     cloudSearchPlaceholder: '搜尋 {n} 個專案…',
     cloudNoResults: '沒有符合的專案。',
     cloudSortRecent: '最近',
     cloudSortOldest: '最早',
     cloudRefresh: '重新整理',
-    cloudLoginHint: '登入 Genspark 帳號，查看你在網頁端建立的專案。',
+    cloudLoginHint: '登入 UniWork 帳號，查看你在網頁端建立的專案。',
     cloudEmpty: '還沒有網頁端專案。',
     cloudError: '載入失敗，請稍後再試。',
     cloudRetry: '重試',
@@ -11842,7 +11827,7 @@ export const strings = {
     docThemeFollowApp: '跟隨應用程式主題',
     saveLocation: '預設儲存位置',
     setRestoreSession: '啟動時重新開啟上次的文件',
-    setRestoreSessionDesc: '關閉 GenOffice 時開啟的文件會在下次啟動時自動重新開啟。',
+    setRestoreSessionDesc: '關閉 UniWork Office 時開啟的文件會在下次啟動時自動重新開啟。',
     setTabSleep: '休眠閒置的標籤頁',
     setTabSleepDesc:
       '開啟的標籤頁多到一定數量後，長時間未查看的會釋放記憶體；回到它時會重新開啟檔案。有未儲存變更或已釘選的標籤頁不會休眠。',
@@ -11928,7 +11913,7 @@ export const strings = {
     intgHeroTitle: '在 AI 助理中使用 UniWork Office',
 =======
     setSecSkills: '技能',
-    intgHeroTitle: '在 AI 助理中使用 GenOffice',
+    intgHeroTitle: '在 AI 助理中使用 UniWork Office',
 >>>>>>> theirs
     intgHeroDesc:
       '接好後，Claude Code、Codex、Cursor、Claude Desktop 等助理就能替你建立、轉換、讀取和編輯 Word、Excel、PowerPoint、PDF 和 Markdown 檔案。全部在本機完成，不會上傳任何內容。',
@@ -12029,7 +12014,7 @@ export const strings = {
     setAiEndpointAdd: '新增端點',
     setAiEndpointRemove: '刪除',
     setAiEndpointName: '名稱',
-    setAiGensparkHint: '使用 Genspark 帳號登入，無需 API key。',
+    setAiGensparkHint: '使用 UniWork 帳號登入，無需 API key。',
 >>>>>>> theirs
     setAiCodexPath: 'Codex 可執行檔',
     setAiCodexPathHint: '僅自訂安裝時填寫；留空會自動偵測。',
@@ -12060,9 +12045,9 @@ export const strings = {
       '無需 key：網頁與圖片搜尋使用免費來源（用量有限）。如需更高配額，可改選其他服務商並填寫自己的 key。',
     setAiSearchAuto: '自動（免費）',
 =======
-    setAiMediaGensparkHint: '生圖與圖片/影片解析使用 Genspark 帳號登入。',
+    setAiMediaGensparkHint: '生圖與圖片/影片解析使用 UniWork 帳號登入。',
     setAiSearchGensparkHint:
-      '網頁與圖片搜尋使用 Genspark 帳號登入；未登入或關閉雲端工具時改用免費來源。',
+      '網頁與圖片搜尋使用 UniWork 帳號登入；未登入或關閉雲端工具時改用免費來源。',
 >>>>>>> theirs
     setAiSearchSerperHint: 'Serper 用你的 key 同時提供網頁與圖片搜尋。',
     setAiSearchSerplyHint: 'Serply 用你的 key 同時提供網頁與圖片搜尋。',
@@ -12115,7 +12100,7 @@ export const strings = {
     timelineCountOne: '{n} 筆',
 =======
     intgSkillsDesc:
-      'GenOffice 只使用自己技能資料夾裡的技能。從資料夾或 zip 匯入會把整個技能複製進來；匯入不會自動執行任何東西。',
+      'UniWork Office 只使用自己技能資料夾裡的技能。從資料夾或 zip 匯入會把整個技能複製進來；匯入不會自動執行任何東西。',
     intgSkillsEmpty: '尚未安裝技能。',
     intgSkillsImportFolder: '匯入資料夾…',
     intgSkillsImportZip: '匯入技能包（zip / .md）…',
@@ -12124,7 +12109,7 @@ export const strings = {
     intgSkillsImportDone: '已匯入 {name}',
     intgSkillsImportFailed: '匯入失敗：{reason}',
     intgSkillsRemove: '移除',
-    intgSkillsRemoveConfirm: '移除技能「{name}」？其資料夾會從 GenOffice 中刪除。',
+    intgSkillsRemoveConfirm: '移除技能「{name}」？其資料夾會從 UniWork Office 中刪除。',
     intgSkillsRemoved: '已移除 {name}',
     intgSkillsRead: '詳情',
     intgSkillsMine: '我的技能',

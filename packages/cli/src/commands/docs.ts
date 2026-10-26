@@ -98,7 +98,7 @@ export const docsCommand: CommandDef = {
       name: 'author',
       value: 'name',
       description:
-        'apply --track / compare: author of the tracked changes (compare default: GenOffice)',
+        'apply --track / compare: author of the tracked changes (compare default: UniWork Office)',
     },
     {
       name: 'date',
@@ -132,7 +132,7 @@ export const docsCommand: CommandDef = {
 <<<<<<< ours
         'apply: overwrite an existing --out file, or write while UniWork Office has the file open',
 =======
-        'apply / compare: overwrite an existing --out file, or write while GenOffice has the file open',
+        'apply / compare: overwrite an existing --out file, or write while UniWork Office has the file open',
 >>>>>>> theirs
     },
   ],
