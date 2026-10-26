@@ -196,26 +196,31 @@ describe('docs real handlers on a converted legacy .doc', () => {
     expect(convertedDocumentFor(tempPath)).toBeUndefined()
   })
 
-  it('a Save As answered with the recorded original never writes it (R1-3)', async () => {
+  it('a Save As answered with the recorded original is refused: no retarget, nothing written (R1-3, R2-2)', async () => {
+    // an independent document already sits at the name a silent retarget would have used
+    const independent = `${original}.docx`
+    writeFileSync(independent, 'someone else')
     showSaveDialog.mockResolvedValue({ canceled: false, filePath: original })
 
     const r = await call('docs:save-as', wc, 'Memo.docx', bytes('edited'), tempPath)
 
+    expect(r).toMatchObject({ ok: false, error: expect.stringContaining('.docx') })
     expect(readFileSync(original, 'utf8')).toBe('legacy bytes')
-    expect(r).toMatchObject({ ok: true })
-    expect(existsSync(`${original}.docx`)).toBe(true)
-    expect(readFileSync(`${original}.docx`, 'utf8')).toBe('edited')
+    expect(readFileSync(independent, 'utf8')).toBe('someone else')
+    // still the converted copy: the edits have a home to be saved to later
+    expect(convertedDocumentFor(tempPath)).toBeDefined()
   })
 
-  it('any other legacy-extension answer is normalised too', async () => {
+  it('any other legacy-extension answer is refused too', async () => {
     const other = join(dir, 'Other.DOC')
     writeFileSync(other, 'someone else')
     showSaveDialog.mockResolvedValue({ canceled: false, filePath: other })
 
-    await call('docs:save-as', wc, 'Memo.docx', bytes('edited'), tempPath)
+    const r = await call('docs:save-as', wc, 'Memo.docx', bytes('edited'), tempPath)
 
+    expect(r).toMatchObject({ ok: false })
     expect(readFileSync(other, 'utf8')).toBe('someone else')
-    expect(readFileSync(`${other}.docx`, 'utf8')).toBe('edited')
+    expect(existsSync(`${other}.docx`)).toBe(false)
   })
 
   it("the UniWork first save's in-place flush writes the temp copy and reports the user save, no dialog", async () => {

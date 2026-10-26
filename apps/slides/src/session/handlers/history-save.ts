@@ -22,7 +22,13 @@ async function saveAs(ctx: HandlerContext, defaultName: string) {
   if (!session) return { ok: false, error: 'no file open' }
   // G5-03a: a locked working copy leaves as nothing, not even a Save As copy
   if (session.path && ctx.host.isLocked?.(session.path)) return { ok: false }
-  const target = await ctx.host.saveTarget.saveAs(session.path, defaultName)
+  let target: string | null
+  try {
+    target = await ctx.host.saveTarget.saveAs(session.path, defaultName)
+  } catch (err) {
+    // the host refused the chooser's answer (a legacy extension): nothing is written
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
   if (!target) return { ok: false }
   // A view-only UniWork path is refused (cancel shape); picking the deck's own
   // file is an explicit Save of it and reports a user save, any other target is

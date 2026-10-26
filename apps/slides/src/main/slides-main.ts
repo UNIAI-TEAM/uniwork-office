@@ -48,7 +48,7 @@ import {
   installContextMenu,
   installNavigationGuard,
   isHeadlessMode,
-  modernSaveTarget,
+  assertModernSaveTarget,
   safeExternalUrl,
   saveAsSuggestion,
   showOpenDialogWithMemory,
@@ -679,7 +679,7 @@ function hostFor(wc: WebContents): HostIO {
         filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
       }
       const r = await showSaveDialogWithMemory(dialog, dialogParent(), options, getDraftsDir())
-      return r.canceled || !r.filePath ? null : modernSaveTarget(r.filePath, 'pptx')
+      return r.canceled || !r.filePath ? null : assertModernSaveTarget(r.filePath, 'pptx')
     },
     saveGate: (input) => uniworkSaveDecision(input),
     userSaved: (path) => notifyUniworkUserSave(path),

@@ -55,11 +55,13 @@ export function forgetConvertedDocument(path: string | null | undefined): void {
 const LEGACY_EXTENSION_RE = /\.(doc|xls|ppt)$/i
 
 /**
- * Where a Save As chooser's answer may be written. The editors write OOXML, so a
- * target with a legacy extension (the recorded original, or any other .doc/.xls/.ppt)
- * gets the editor's extension appended: filters and suggested names are not a
- * write-target guarantee, and OOXML bytes must never land under a legacy name.
+ * Where a Save As chooser's answer may be written. The editors write OOXML, so an answer with
+ * a legacy extension (the recorded original, or any other .doc/.xls/.ppt) is refused: filters
+ * and suggested names are not a write-target guarantee, and OOXML bytes must never land under
+ * a legacy name. Nor is the answer retargeted to `<name>.doc.docx`: the chooser's overwrite
+ * confirmation covered the path it returned, not that one.
  */
-export function modernSaveTarget(chosen: string, ext: 'docx' | 'xlsx' | 'pptx'): string {
-  return LEGACY_EXTENSION_RE.test(chosen) ? `${chosen}.${ext}` : chosen
+export function assertModernSaveTarget(chosen: string, ext: 'docx' | 'xlsx' | 'pptx'): string {
+  if (!LEGACY_EXTENSION_RE.test(chosen)) return chosen
+  throw new Error(`Choose a name ending in .${ext}: a legacy .doc/.xls/.ppt name cannot be used`)
 }

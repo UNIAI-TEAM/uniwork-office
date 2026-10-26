@@ -53,7 +53,7 @@ export {
 } from './drop-open'
 export {
   convertedDocumentFor,
-  modernSaveTarget,
+  assertModernSaveTarget,
   forgetConvertedDocument,
   registerConvertedDocument,
   type ConvertedDocumentInfo,

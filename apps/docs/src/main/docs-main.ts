@@ -72,7 +72,7 @@ import {
   convertedDocumentFor,
   fetchRemoteImage,
   forgetConvertedDocument,
-  modernSaveTarget,
+  assertModernSaveTarget,
   installContextMenu,
   setContextMenuInterceptor,
   installNavigationGuard,
@@ -5324,8 +5324,14 @@ export function registerDocsIpc(): void {
         filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
       })
       if (result.canceled || !result.filePath) return { ok: false }
-      // never write OOXML under a legacy name (a converted .doc's own original included)
-      const target = modernSaveTarget(result.filePath, 'docx')
+      // never write OOXML under a legacy name (a converted .doc's own original included), and never
+      // silently retarget it: the chooser's overwrite confirmation covered the path it returned
+      let target: string
+      try {
+        target = assertModernSaveTarget(result.filePath, 'docx')
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
       // the tab may have been closed while the dialog was open; checked before the
       // write because Save As may overwrite an existing file (no safe rollback)
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }

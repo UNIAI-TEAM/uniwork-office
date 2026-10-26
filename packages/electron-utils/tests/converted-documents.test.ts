@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  assertModernSaveTarget,
   convertedDocumentFor,
   forgetConvertedDocument,
   registerConvertedDocument,
@@ -45,5 +46,18 @@ describe('converted legacy documents registry', () => {
     expect(convertedDocumentFor(null)).toBeUndefined()
     expect(convertedDocumentFor('')).toBeUndefined()
     expect(() => forgetConvertedDocument(undefined)).not.toThrow()
+  })
+})
+
+describe('assertModernSaveTarget (R2-2)', () => {
+  it('passes a modern or extensionless answer through unchanged', () => {
+    expect(assertModernSaveTarget('/home/me/Budget.xlsx', 'xlsx')).toBe('/home/me/Budget.xlsx')
+    expect(assertModernSaveTarget('/home/me/Budget', 'xlsx')).toBe('/home/me/Budget')
+  })
+
+  it('refuses every legacy extension, any case, instead of retargeting it', () => {
+    for (const name of ['/h/A.doc', '/h/A.XLS', '/h/A.Ppt']) {
+      expect(() => assertModernSaveTarget(name, 'docx')).toThrow(/\.docx/)
+    }
   })
 })
