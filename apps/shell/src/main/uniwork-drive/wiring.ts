@@ -177,14 +177,10 @@ export function registerUniworkDrive(ipcMain: IpcMain, deps: UniworkDriveDeps): 
 
   handle(C.getHistory, async (input) => {
     const target = checkTarget(input)
+    // the member lookup starts with the history read; its failure must not fail the call: the rows just stay unnamed
+    const lookup = Promise.resolve(deps.memberNames?.(target.workspaceId)).catch(() => undefined)
     const events = await api().getHistory(target)
-    // a member lookup failure must not fail the history call: the rows just stay unnamed
-    let names: ReadonlyMap<string, string> | undefined
-    try {
-      names = await deps.memberNames?.(target.workspaceId)
-    } catch {
-      names = undefined
-    }
+    const names = await lookup
     if (!names || names.size === 0) return events
     return events.map((event) => {
       // only a person is looked up; an agent/system actor id is never shown as a member

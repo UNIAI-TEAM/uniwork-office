@@ -438,6 +438,26 @@ describe('UNI-1961 Archive (shelved) IPC: list', () => {
     expect(odd.adminScope).toBeUndefined()
   })
 
+  it('memberNamesOf shares the member cache: two reads for one workspace make one /members request', async () => {
+    const { service } = await setup()
+    const seen = stubServer()
+    const first = await service.memberNamesOf('ws_1')
+    const second = await service.memberNamesOf('ws_1')
+    expect(first.get('u_1')).toBe('Alice')
+    expect(second.get('u_1')).toBe('Alice')
+    expect(seen.filter((s) => s.url.pathname === '/api/v1/workspaces/ws_1/members')).toHaveLength(1)
+  })
+
+  it('memberNamesOf answers an empty map when the member read fails', async () => {
+    const { service } = await setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => reply(403, { error: { code: 'forbidden', message: 'x' } })),
+    )
+    const names = await service.memberNamesOf('ws_1')
+    expect(names.size).toBe(0)
+  })
+
   it('answers the result shape for a missing workspace, without a request', async () => {
     const { call } = await setup()
     const seen = stubServer()
