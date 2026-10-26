@@ -56,5 +56,6 @@ export function convertPdfFileToXlsxLocalWithPrompt(
   return convertWithPasswordRetry(
     (password) => convertPdfFileToXlsxLocal(pdfPath, onProgress, password, signal),
     promptPassword,
+    signal,
   )
 }

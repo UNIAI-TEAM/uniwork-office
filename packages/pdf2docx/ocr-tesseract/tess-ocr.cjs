@@ -37,6 +37,18 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
+// Exit if the parent converter crashes or is killed on POSIX (where reparenting
+// changes process.ppid to 1 or a subreaper). Windows does not change ppid on
+// parent exit and relies on `taskkill /T /F` from the host instead.
+const initialPpid = process.ppid
+if (typeof initialPpid === 'number' && initialPpid > 0) {
+  setInterval(() => {
+    if (process.ppid !== initialPpid) {
+      process.exit(1)
+    }
+  }, 200).unref()
+}
+
 const LANG_CODES = /^[a-z_]{2,12}(\+[a-z_]{2,12})*$/
 
 /** Tesseract sparse text: every text fragment is its own line, ruled tables survive */

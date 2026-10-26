@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { ConvertResult, PageResult } from '../../../../packages/pdf2docx/src'
 import { PdfLoadError } from '../../../../packages/pdf2docx/src/extract/pdfium'
-import { runPdfConvertJob } from './pdf-convert/convert-host'
+import { PdfConvertCancelled, runPdfConvertJob } from './pdf-convert/convert-host'
 
 export type { ConvertResult, PageResult }
 export { PdfLoadError }
@@ -56,15 +56,20 @@ export async function convertPdfFileToDocxLocal(
 export async function convertWithPasswordRetry<T>(
   convert: (password: string | undefined) => Promise<T>,
   promptPassword: (retry: boolean) => Promise<string | null>,
+  signal?: AbortSignal,
 ): Promise<T | null> {
   let password: string | undefined
   for (;;) {
+    if (signal?.aborted) return null
     try {
-      return await convert(password)
+      const result = await convert(password)
+      if (signal?.aborted) return null
+      return result
     } catch (err) {
+      if (signal?.aborted || err instanceof PdfConvertCancelled) return null
       if (!(err instanceof PdfLoadError) || err.code !== 'password-required') throw err
       const entered = await promptPassword(password !== undefined)
-      if (entered === null) return null
+      if (entered === null || signal?.aborted) return null
       password = entered
     }
   }
@@ -85,5 +90,6 @@ export function convertPdfFileToDocxLocalWithPrompt(
   return convertWithPasswordRetry(
     (password) => convertPdfFileToDocxLocal(pdfPath, onProgress, password, signal),
     promptPassword,
+    signal,
   )
 }

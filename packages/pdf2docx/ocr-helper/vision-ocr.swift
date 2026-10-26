@@ -21,6 +21,17 @@ import AppKit
 import Foundation
 import Vision
 
+// Exit if the parent converter crashes or is killed (reparented away from initial ppid).
+let initialPpid = getppid()
+if initialPpid > 0 {
+    DispatchQueue.global(qos: .background).async {
+        while true {
+            Thread.sleep(forTimeInterval: 0.5)
+            if getppid() != initialPpid { _exit(1) }
+        }
+    }
+}
+
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
 guard let img = NSImage(data: stdinData),
       let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {

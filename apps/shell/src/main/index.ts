@@ -272,7 +272,11 @@ import {
   setPdfSaveAsInFlight,
 } from '../../../pdf/src/main/pdf-main'
 import { PDF_CHANNELS, type PdfConvertProgressEvent } from '../../../pdf/src/shared/ipc'
-import { killAllPdfConvertJobs, PdfConvertCancelled } from './pdf-convert/convert-host'
+import {
+  beginPdfConvertCommitPhase,
+  killAllPdfConvertJobs,
+  PdfConvertCancelled,
+} from './pdf-convert/convert-host'
 import { convertPdfFileToDocxLocalWithPrompt, PdfLoadError } from './pdf2docx-local'
 import { convertPdfFileToPptxLocalWithPrompt } from './pdf2pptx-local'
 import { convertPdfFileToXlsxLocalWithPrompt } from './pdf2xlsx-local'
@@ -6633,11 +6637,40 @@ async function convertPdfToOffice(
   let lastPage = 0
   let lastTotal = 0
   let progressStarted = false
+  let progressSettled = false
+  let committed = false
   const sendProgress = (payload: PdfConvertProgressEvent) => {
     if (progressSender && !progressSender.isDestroyed()) {
       progressSender.send(PDF_CHANNELS.convertProgress, payload)
     }
   }
+  // Non-cancellable commit boundary (R1-7 + FE-R1-2): once the child's result
+  // arrives (before atomicWriteFile), `convertCancel` becomes a no-op, the
+  // password dialog is closed programmatically, the renderer toast receives
+  // `done: true`, and the taskbar progress bar resets before writing or awaiting
+  // any completion notice dialog.
+  const enterCommitPhase = (): boolean =>
+    beginPdfConvertCommitPhase({
+      isAborted: () => abortController.signal.aborted,
+      disableCancel: () => {
+        committed = true
+        if (activePdfConvertController === abortController) {
+          activePdfConvertController = null
+        }
+      },
+      closePasswordDialog: () => closePdfPasswordDialog(),
+      sendDoneProgress: () => {
+        if (progressStarted && !progressSettled) {
+          progressSettled = true
+          sendProgress({ format: kind, page: lastPage, total: lastTotal, done: true })
+        }
+      },
+      resetProgressBar: () => {
+        if (!host.isDestroyed()) {
+          host.setProgressBar(-1)
+        }
+      },
+    })
   try {
     const picked = await showSaveDialogWithMemory(dialog, host, {
       defaultPath: pdfPath.replace(/\.pdf$/i, `.${kind}`),
@@ -6662,24 +6695,34 @@ async function convertPdfToOffice(
     // encrypted PDFs prompt for the password (P23), looping on wrong entries;
     // null result = user cancelled the prompt → abort silently
     const promptPassword = (retry: boolean) =>
-      promptPdfPassword(host, {
-        fileName: basename(pdfPath),
-        retry,
-        busy: false,
-        lang: currentLang(),
-        strings: {
-          title: tm('pdfPwdTitle'),
-          prompt: tm('pdfPwdPrompt'),
-          retryPrompt: tm('pdfPwdRetryPrompt'),
-          ok: tm('pdfPwdOk'),
-          cancel: tm('btnCancel'),
-          verifying: tm('pdfPwdVerifying'),
-          label: tm('pdfPwdLabel'),
-          placeholder: tm('pdfPwdPlaceholder'),
-          show: tm('pdfPwdShow'),
-          hide: tm('pdfPwdHide'),
+      promptPdfPassword(
+        host,
+        {
+          fileName: basename(pdfPath),
+          retry,
+          busy: false,
+          lang: currentLang(),
+          strings: {
+            title: tm('pdfPwdTitle'),
+            prompt: tm('pdfPwdPrompt'),
+            retryPrompt: tm('pdfPwdRetryPrompt'),
+            ok: tm('pdfPwdOk'),
+            cancel: tm('btnCancel'),
+            verifying: tm('pdfPwdVerifying'),
+            label: tm('pdfPwdLabel'),
+            placeholder: tm('pdfPwdPlaceholder'),
+            show: tm('pdfPwdShow'),
+            hide: tm('pdfPwdHide'),
+          },
         },
-      })
+        {
+          onUserCancel: () => {
+            if (!committed) {
+              abortController.abort()
+            }
+          },
+        },
+      )
     const onProgress = (page: number, total: number) => {
       lastPage = page
       lastTotal = total
@@ -6694,7 +6737,7 @@ async function convertPdfToOffice(
         onProgress,
         abortController.signal,
       )
-      if (result === null || abortController.signal.aborted) return null
+      if (result === null || !enterCommitPhase()) return null
       await atomicWriteFile(target, result.docx)
       // degrade transparency (plan §7.6 dual-track split): whole scan → say so
       // once; individual image-fallback pages → name them;
@@ -6741,7 +6784,7 @@ async function convertPdfToOffice(
         onProgress,
         abortController.signal,
       )
-      if (result === null || abortController.signal.aborted) return null
+      if (result === null || !enterCommitPhase()) return null
       await atomicWriteFile(target, result.pptx)
       // degrade transparency (same split as the Word export): whole scan vs
       // individual image-fallback pages
@@ -6766,7 +6809,7 @@ async function convertPdfToOffice(
         onProgress,
         abortController.signal,
       )
-      if (result === null || abortController.signal.aborted) return null
+      if (result === null || !enterCommitPhase()) return null
       await atomicWriteFile(target, result.xlsx)
       // degrade transparency: pages that could not become cells got a notice
       // row on their worksheet instead of an image (a spreadsheet has none)
@@ -6787,7 +6830,7 @@ async function convertPdfToOffice(
     }
     return target
   } catch (err) {
-    if (err instanceof PdfConvertCancelled || abortController.signal.aborted) {
+    if (!committed && (err instanceof PdfConvertCancelled || abortController.signal.aborted)) {
       return null
     }
     if (!host.isDestroyed()) {
@@ -6810,16 +6853,19 @@ async function convertPdfToOffice(
     }
     return null
   } finally {
-    if (progressStarted) {
+    if (progressStarted && !progressSettled) {
+      progressSettled = true
       sendProgress({ format: kind, page: lastPage, total: lastTotal, done: true })
     }
-    activePdfConvertController = null
+    if (activePdfConvertController === abortController) {
+      activePdfConvertController = null
+    }
     activePdfConvertSenderId = null
     // the prompt window may still be open when the loop exits through cancel
     // or a non-password error thrown mid-retry
     closePdfPasswordDialog()
     exportingPdfDocx = false
-    if (!host.isDestroyed()) host.setProgressBar(-1)
+    if (!committed && !host.isDestroyed()) host.setProgressBar(-1)
   }
 }
 
@@ -6879,7 +6925,8 @@ ipcMain.handle(PDF_CHANNELS.convertCancel, (e) => {
   ) {
     return
   }
-  activePdfConvertController?.abort()
+  if (!activePdfConvertController) return
+  activePdfConvertController.abort()
   closePdfPasswordDialog()
 })
 

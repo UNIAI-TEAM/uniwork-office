@@ -56,5 +56,6 @@ export function convertPdfFileToPptxLocalWithPrompt(
   return convertWithPasswordRetry(
     (password) => convertPdfFileToPptxLocal(pdfPath, onProgress, password, signal),
     promptPassword,
+    signal,
   )
 }
