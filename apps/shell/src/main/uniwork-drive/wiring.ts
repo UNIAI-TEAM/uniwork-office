@@ -26,7 +26,7 @@ export interface UniworkDriveDeps {
   org(): { id: string; slug: string } | null
   authorized<T>(call: (token: string) => Promise<T>): Promise<T>
   openExternal(url: string): Promise<void>
-  capability?(orgId: string): Promise<CapabilityRead>
+  capability(orgId: string): Promise<CapabilityRead>
   fetch?: FetchLike
 }
 
@@ -120,6 +120,18 @@ export function registerUniworkDrive(ipcMain: IpcMain, deps: UniworkDriveDeps): 
   }
 
   const C = UNIWORK_DRIVE_CHANNELS
+
+  ipcMain.handle(C.isAvailable, async (): Promise<boolean> => {
+    try {
+      if (!deps.profile() || !deps.identity()) return false
+      const org = deps.org()
+      if (!org || !org.id) return false
+      const cap = await deps.capability(org.id)
+      return cap.capabilities.drive_connector === true
+    } catch {
+      return false
+    }
+  })
 
   handle(C.listConnections, async (workspaceId) => {
     if (!isValidId(workspaceId)) throw new UniworkDocError('server_error')

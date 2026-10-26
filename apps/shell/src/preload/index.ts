@@ -1868,8 +1868,8 @@ const homeApi: HomeApi = {
       confirmed: confirmed === true,
     })
   },
-  async uniworkDriveIsAvailable(orgId) {
-    return driveApi.isAvailable(orgId)
+  async uniworkDriveIsAvailable() {
+    return driveApi.isAvailable()
   },
   async uniworkDriveListConnections(workspaceId) {
     return driveApi.listConnections(workspaceId)
@@ -2219,10 +2219,8 @@ function asDriveResult<T>(result: unknown): UniworkDriveResult<T> {
 const driveApi: UniworkDriveApi = {
   async isAvailable() {
     try {
-      const snap = asSyncCenterSnapshot(
-        await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.snapshot),
-      )
-      return snap?.header.driveConnector === true
+      const result: unknown = await ipcRenderer.invoke(UNIWORK_DRIVE_CHANNELS.isAvailable)
+      return result === true
     } catch {
       return false
     }

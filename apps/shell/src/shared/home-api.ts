@@ -1827,7 +1827,7 @@ export interface HomeApi {
   /** G5-11 D5: answer a main-initiated sign-out prompt */
   answerSignOutPrompt?(requestId: string, confirmed: boolean): Promise<void>
   /** UNI-2194 (D1): Google Drive connector calls (also on `window.uniworkDrive`) */
-  uniworkDriveIsAvailable?(orgId?: string): Promise<boolean>
+  uniworkDriveIsAvailable?(): Promise<boolean>
   uniworkDriveListConnections?(workspaceId: string): Promise<UniworkDriveResult<DriveConnection[]>>
   uniworkDriveListFiles?(query: DriveFileListQuery): Promise<UniworkDriveResult<DriveFileListPage>>
   uniworkDriveGetFile?(input: DriveFileTarget): Promise<UniworkDriveResult<DriveFileDetail>>

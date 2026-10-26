@@ -133,6 +133,7 @@ import { offlineTabMenuItem, unpinTabDocument } from './uniwork-sync/offline-lib
 import type { OfflineLibraryApi } from './uniwork-sync/offline-library/api'
 import { registerUniworkWork } from './uniwork-work/wiring'
 import { registerUniworkDrive } from './uniwork-drive/wiring'
+import { NEVER_READ_CAPABILITIES } from './uniwork-sync/capability/cache'
 import { refuseLockedOpenPath } from './uniwork-docs/service'
 import {
   COMMENT_AUTHOR_CHANGED_CHANNEL,
@@ -4866,14 +4867,7 @@ function registerHomeIpc(): void {
         ? uniworkDocs.capabilityRead(orgId)
         : Promise.resolve({
             kind: 'ok',
-            capabilities: {
-              sync_feed: false,
-              sync_write: true,
-              offline_library: false,
-              ai_uniwork: false,
-              ai_uniwork_formats: [],
-              drive_connector: false,
-            },
+            capabilities: { ...NEVER_READ_CAPABILITIES },
             source: 'default',
           }),
   })

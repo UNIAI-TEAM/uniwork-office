@@ -213,6 +213,7 @@ export interface DriveFileTarget {
 }
 
 export const UNIWORK_DRIVE_CHANNELS = {
+  isAvailable: 'uniwork-drive:is-available',
   listConnections: 'uniwork-drive:list-connections',
   listFiles: 'uniwork-drive:list-files',
   getFile: 'uniwork-drive:get-file',
@@ -223,7 +224,7 @@ export const UNIWORK_DRIVE_CHANNELS = {
 
 export interface UniworkDriveApi {
   /** Org capability `drive_connector` for the active organization; false when offline or never read. */
-  isAvailable(orgId?: string): Promise<boolean>
+  isAvailable(): Promise<boolean>
   /** `GET /workspaces/{ws}/drive-connections` */
   listConnections(workspaceId: string): Promise<UniworkDriveResult<DriveConnection[]>>
   /** `GET /workspaces/{ws}/drive-files?connection_id=&cursor=&limit=` */

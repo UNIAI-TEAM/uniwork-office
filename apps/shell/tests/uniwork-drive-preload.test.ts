@@ -3,7 +3,6 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { HomeApi } from '../src/shared/home-api'
-import { UNIWORK_SYNC_CENTER_CHANNELS } from '../src/shared/sync-center'
 import { UNIWORK_DRIVE_CHANNELS, type UniworkDriveApi } from '../src/shared/uniwork-drive-api'
 
 async function loadBridge(reply: unknown) {
@@ -41,6 +40,7 @@ afterEach(() => {
 describe('window.uniworkDrive and aiOffice.uniworkDrive* (preload, UNI-2194)', () => {
   it('invokes each UNIWORK_DRIVE_CHANNELS entry with the renderer arguments', async () => {
     const { drive, office, invoked } = await loadBridge({ ok: true, value: null })
+    await drive.isAvailable()
     await drive.listConnections('ws_1')
     await drive.listFiles({ workspaceId: 'ws_1', connectionId: 'c_1', cursor: 'cur', limit: 20 })
     await drive.getFile({ workspaceId: 'ws_1', driveFileId: 'df_1' })
@@ -50,6 +50,7 @@ describe('window.uniworkDrive and aiOffice.uniworkDrive* (preload, UNI-2194)', (
 
     const C = UNIWORK_DRIVE_CHANNELS
     expect(invoked.filter((c) => c.channel.startsWith('uniwork-drive:'))).toEqual([
+      { channel: C.isAvailable, args: [] },
       { channel: C.listConnections, args: ['ws_1'] },
       {
         channel: C.listFiles,
@@ -62,6 +63,8 @@ describe('window.uniworkDrive and aiOffice.uniworkDrive* (preload, UNI-2194)', (
     ])
 
     // aiOffice.uniworkDrive* aliases invoke the same channels
+    await office.uniworkDriveIsAvailable?.()
+    expect(invoked.at(-1)).toEqual({ channel: C.isAvailable, args: [] })
     await office.uniworkDriveListConnections?.('ws_2')
     expect(invoked.at(-1)).toEqual({ channel: C.listConnections, args: ['ws_2'] })
   })
@@ -99,35 +102,21 @@ describe('window.uniworkDrive and aiOffice.uniworkDrive* (preload, UNI-2194)', (
     }
   })
 
-  it('reads driveConnector capability through SyncCenterSnapshot in isAvailable()', async () => {
-    const makeSnapshot = (driveConnector?: boolean) => ({
-      header: {
-        status: 'online',
-        online: true,
-        paused: false,
-        adminPaused: false,
-        otherOrgHasIntents: false,
-        resyncFailed: false,
-        feedOff: false,
-        resynced: false,
-        ...(driveConnector !== undefined ? { driveConnector } : {}),
-      },
-      storeError: false,
-      tabs: { attention: [], pending: [], recent: [] },
-      defaultTab: 'pending',
-    })
+  it('invokes uniwork-drive:is-available in isAvailable() and maps non-boolean replies to false', async () => {
+    const C = UNIWORK_DRIVE_CHANNELS
 
-    const onBridge = await loadBridge((ch: string) =>
-      ch === UNIWORK_SYNC_CENTER_CHANNELS.snapshot ? makeSnapshot(true) : null,
-    )
+    const onBridge = await loadBridge((ch: string) => (ch === C.isAvailable ? true : null))
     expect(await onBridge.drive.isAvailable()).toBe(true)
+    expect(await onBridge.office.uniworkDriveIsAvailable?.()).toBe(true)
 
-    const offBridge = await loadBridge((ch: string) =>
-      ch === UNIWORK_SYNC_CENTER_CHANNELS.snapshot ? makeSnapshot(false) : null,
-    )
+    const offBridge = await loadBridge((ch: string) => (ch === C.isAvailable ? false : null))
     expect(await offBridge.drive.isAvailable()).toBe(false)
+    expect(await offBridge.office.uniworkDriveIsAvailable?.()).toBe(false)
 
-    const missingBridge = await loadBridge(null)
-    expect(await missingBridge.drive.isAvailable()).toBe(false)
+    for (const nonBool of [null, undefined, 'true', 1, { ok: true, value: true }]) {
+      const badBridge = await loadBridge(nonBool)
+      expect(await badBridge.drive.isAvailable()).toBe(false)
+      expect(await badBridge.office.uniworkDriveIsAvailable?.()).toBe(false)
+    }
   })
 })

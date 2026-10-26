@@ -7,6 +7,10 @@ import {
   safeGoogleDriveOpenUrl,
   type UniworkDriveDeps,
 } from '../src/main/uniwork-drive/wiring'
+import {
+  NEVER_READ_CAPABILITIES,
+  type CapabilityRead,
+} from '../src/main/uniwork-sync/capability/cache'
 import { UNIWORK_DRIVE_CHANNELS as C } from '../src/shared/uniwork-drive-api'
 
 const PROFILE: DeploymentProfile = {
@@ -117,6 +121,11 @@ function setup(
     org: () => ({ id: 'org_1', slug: 'acme' }),
     authorized: (call) => call(TOKEN),
     openExternal,
+    capability: async (): Promise<CapabilityRead> => ({
+      kind: 'ok',
+      capabilities: { ...NEVER_READ_CAPABILITIES, drive_connector: true },
+      source: 'cached',
+    }),
     fetch,
     ...over,
   })
@@ -129,6 +138,38 @@ describe('uniwork-drive IPC wiring', () => {
   it('registers one handler per UNIWORK_DRIVE_CHANNELS entry', () => {
     const { handlers } = setup()
     expect([...handlers.keys()].sort()).toEqual(Object.values(C).sort())
+  })
+
+  it('answers is-available from the capability cache with no sync engine involved, and never throws', async () => {
+    const capability = vi.fn(async (_orgId: string): Promise<CapabilityRead> => ({
+      kind: 'ok',
+      capabilities: { ...NEVER_READ_CAPABILITIES, drive_connector: true },
+      source: 'fresh',
+    }))
+    const { call, fetch } = setup({ capability })
+    expect(await call(C.isAvailable)).toBe(true)
+    expect(capability).toHaveBeenCalledWith('org_1')
+    expect(fetch).not.toHaveBeenCalled()
+
+    expect(await setup({ org: () => null }).call(C.isAvailable)).toBe(false)
+    expect(await setup({ profile: () => null }).call(C.isAvailable)).toBe(false)
+    expect(await setup({ identity: () => null }).call(C.isAvailable)).toBe(false)
+    expect(
+      await setup({
+        capability: async () => ({
+          kind: 'ok',
+          capabilities: { ...NEVER_READ_CAPABILITIES, drive_connector: false },
+          source: 'cached',
+        }),
+      }).call(C.isAvailable),
+    ).toBe(false)
+    expect(
+      await setup({
+        capability: async () => {
+          throw new Error('capability cache failure')
+        },
+      }).call(C.isAvailable),
+    ).toBe(false)
   })
 
   it('answers { ok: true, value } and never leaks the session token', async () => {
@@ -273,20 +314,33 @@ describe('uniwork-drive IPC wiring', () => {
 
 describe('uniwork-drive IPC: open-on-google host and URL validation', () => {
   it('opens valid https://docs.google.com and https://drive.google.com URLs from the server response', async () => {
-    const docsUrl =
-      'https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?authuser=uni-work1%40gmail.com'
-    const driveUrl =
-      'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view?authuser=uni-work1%40gmail.com'
+    const acceptedUrls = [
+      {
+        raw: 'https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?authuser=uni-work1%40gmail.com',
+        canonical:
+          'https://docs.google.com/document/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?authuser=uni-work1%40gmail.com',
+      },
+      {
+        raw: 'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view?authuser=uni-work1%40gmail.com',
+        canonical:
+          'https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view?authuser=uni-work1%40gmail.com',
+      },
+      {
+        raw: 'https://DOCS.GOOGLE.COM/document/d/1/edit',
+        canonical: 'https://docs.google.com/document/d/1/edit',
+      },
+    ]
 
-    for (const url of [docsUrl, driveUrl]) {
-      const fetch = vi.fn<FetchLike>(async () => json(200, { file: makeWireFile(url) }))
+    for (const { raw, canonical } of acceptedUrls) {
+      expect(safeGoogleDriveOpenUrl(raw)).toBe(canonical)
+      const fetch = vi.fn<FetchLike>(async () => json(200, { file: makeWireFile(raw) }))
       const { call, openExternal } = setup({}, fetch)
       expect(await call(C.openOnGoogle, { workspaceId: 'ws_1', driveFileId: 'df_1' })).toEqual({
         ok: true,
         value: null,
       })
       expect(openExternal).toHaveBeenCalledTimes(1)
-      expect(openExternal).toHaveBeenCalledWith(url)
+      expect(openExternal).toHaveBeenCalledWith(canonical)
     }
   })
 
@@ -299,6 +353,10 @@ describe('uniwork-drive IPC: open-on-google host and URL validation', () => {
       'https://sub.evil.docs.google.com.x/document/d/1/edit',
       'https://sub.docs.google.com/document/d/1/edit',
       'https://evildocs.google.com/document/d/1/edit',
+      'https://docs.google.com./document/d/1/edit',
+      'https://%64ocs.google.com/document/d/1/edit',
+      'https://xn--docs-1ga.google.com/document/d/1/edit',
+      'https://docs.google.com\\@evil.com/document/d/1/edit',
       'https://user@docs.google.com/document/d/1/edit',
       'https://user:pass@drive.google.com/file/d/1/view',
       'https://docs.google.com@evil.com/document/d/1/edit',
