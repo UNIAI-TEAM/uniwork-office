@@ -74,6 +74,11 @@ export async function convertPdfFileToDocxLocal(
   const bytes = readFileSync(pdfPath)
   const pdf = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const ocr = ensureOcrEngine()
+  // Known limit (follow-up ticket): the whole conversion runs synchronously in
+  // the main process (PDFium scope + one spawnSync per scanned page, 1-4 s each
+  // for Tesseract), so a long scan blocks the event loop for its duration. The
+  // viewer's OCR bridge is already async; this path needs a worker/utility
+  // process or an async pipeline.
   return convertPdfToDocx(pdf, {
     pdfium,
     ...(ocr ? { ocr } : {}),

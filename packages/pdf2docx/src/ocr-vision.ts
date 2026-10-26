@@ -10,10 +10,11 @@
  * (Electron main, tests, eval scripts) import this module directly and pass
  * the engine via ConvertOptions.ocr.
  */
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync, type SpawnSyncOptions } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import type { Rect } from './geometry'
 import type { OcrEngine, OcrRecognition } from './ocr'
+import type { AsyncOcrEngine } from './ocr-chain'
 
 /** helper output caps: a page render is a few MB, JSON a few hundred KB */
 const HELPER_MAX_BUFFER = 64 * 1024 * 1024
@@ -41,40 +42,53 @@ const toRect = (b: [number, number, number, number]): Rect => ({
 export interface HelperRunOptions {
   /** extra environment on top of process.env */
   env?: NodeJS.ProcessEnv
+  /** variables removed from the inherited environment (matched case-insensitively) */
+  dropEnv?: readonly string[]
+  /** working directory of the helper (default: the caller's) */
+  cwd?: string
   /** kill the helper after this long (default 30 s) */
   timeoutMs?: number
+  /** stdout cap in bytes (default 64 MB); the helper is killed above it */
+  maxBufferBytes?: number
   /** keep a console window from flashing up on Windows */
   windowsHide?: boolean
 }
 
-/**
- * Spawn one OCR helper for one page and parse its stdout (protocol shared by
- * every helper: vision-ocr, win-ocr, tess-ocr). `null` = the helper failed or
- * printed something unparseable.
- */
-export function runOcrHelper(
-  command: string,
-  args: string[],
-  png: Uint8Array,
-  options: HelperRunOptions = {},
-): OcrRecognition | null {
-  const res = spawnSync(command, args, {
-    input: png,
-    maxBuffer: HELPER_MAX_BUFFER,
-    timeout: options.timeoutMs ?? HELPER_TIMEOUT_MS,
-    ...(options.env ? { env: { ...process.env, ...options.env } } : {}),
+/** environment of a helper run: the caller's minus `dropEnv`, plus `env` */
+function helperEnv(options: HelperRunOptions): NodeJS.ProcessEnv | undefined {
+  if (!options.env && !options.dropEnv?.length) return undefined
+  const drop = new Set((options.dropEnv ?? []).map((k) => k.toUpperCase()))
+  const env: NodeJS.ProcessEnv = {}
+  for (const [k, v] of Object.entries(process.env)) {
+    if (!drop.has(k.toUpperCase())) env[k] = v
+  }
+  return { ...env, ...options.env }
+}
+
+/** shared by the sync and the async spawn */
+function spawnOptions(
+  options: HelperRunOptions,
+): Pick<SpawnSyncOptions, 'env' | 'cwd' | 'windowsHide'> {
+  const env = helperEnv(options)
+  return {
+    ...(env ? { env } : {}),
+    ...(options.cwd ? { cwd: options.cwd } : {}),
     ...(options.windowsHide ? { windowsHide: true } : {}),
-  })
-  if (res.status !== 0 || res.stdout == null) return null
+  }
+}
+
+/** helper stdout -> recognition; null when it is not the protocol */
+function parseHelperOutput(stdout: Buffer): OcrRecognition | null {
   let parsed: { lines?: HelperLine[]; paper?: number }
   try {
     // defense in depth: .NET Framework consoles can prepend a UTF-8 BOM
-    const text = res.stdout.toString('utf8').replace(/^\uFEFF/, '')
+    const raw = stdout.toString('utf8')
+    const text = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw
     parsed = JSON.parse(text) as { lines?: HelperLine[]; paper?: number }
   } catch {
     return null
   }
-  if (!Array.isArray(parsed.lines)) return null
+  if (!parsed || !Array.isArray(parsed.lines)) return null
   return {
     lines: parsed.lines.map((l) => ({
       text: l.t,
@@ -86,13 +100,97 @@ export function runOcrHelper(
   }
 }
 
+/**
+ * Spawn one OCR helper for one page and parse its stdout (protocol shared by
+ * every helper: vision-ocr, win-ocr, tess-ocr). `null` = the helper failed,
+ * timed out, printed too much or printed something unparseable.
+ */
+export function runOcrHelper(
+  command: string,
+  args: string[],
+  png: Uint8Array,
+  options: HelperRunOptions = {},
+): OcrRecognition | null {
+  const res = spawnSync(command, args, {
+    ...spawnOptions(options),
+    input: png,
+    maxBuffer: options.maxBufferBytes ?? HELPER_MAX_BUFFER,
+    timeout: options.timeoutMs ?? HELPER_TIMEOUT_MS,
+  })
+  if (res.status !== 0 || res.stdout == null) return null
+  return parseHelperOutput(res.stdout)
+}
+
+/**
+ * Async twin of runOcrHelper (same helper protocol, timeout, stdout cap, env,
+ * cwd and windowsHide) that leaves the event loop running while the helper
+ * works. Never rejects: every failure — spawn error, EPIPE on a helper that
+ * exits before reading its stdin, non-zero exit, timeout kill, oversized
+ * stdout — resolves to null.
+ */
+export function runOcrHelperAsync(
+  command: string,
+  args: string[],
+  png: Uint8Array,
+  options: HelperRunOptions = {},
+): Promise<OcrRecognition | null> {
+  const maxBuffer = options.maxBufferBytes ?? HELPER_MAX_BUFFER
+  return new Promise((resolve) => {
+    let child: ReturnType<typeof spawn>
+    try {
+      child = spawn(command, args, { ...spawnOptions(options), stdio: ['pipe', 'pipe', 'ignore'] })
+    } catch {
+      resolve(null)
+      return
+    }
+    let settled = false
+    const chunks: Buffer[] = []
+    let size = 0
+    const timer = setTimeout(() => {
+      child.kill()
+      done(null)
+    }, options.timeoutMs ?? HELPER_TIMEOUT_MS)
+    const done = (result: OcrRecognition | null): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(result)
+    }
+    child.on('error', () => done(null))
+    child.stdout!.on('data', (chunk: Buffer) => {
+      size += chunk.length
+      if (size > maxBuffer) {
+        child.kill()
+        done(null)
+        return
+      }
+      chunks.push(chunk)
+    })
+    child.stdout!.on('error', () => done(null))
+    // a helper that exits before it has read its stdin raises EPIPE here
+    child.stdin!.on('error', () => undefined)
+    child.on('close', (code) => {
+      done(code === 0 ? parseHelperOutput(Buffer.concat(chunks)) : null)
+    })
+    child.stdin!.end(png)
+  })
+}
+
+const helperArgs = (languages?: string[]): string[] =>
+  languages && languages.length > 0 ? [languages.join(',')] : []
+
 /** spawn wrapper shared by the platform engines (protocol is identical) */
 function createHelperOcrEngine(helperPath: string, languages?: string[]): OcrEngine {
-  return (png: Uint8Array): OcrRecognition | null => {
-    const args = languages && languages.length > 0 ? [languages.join(',')] : []
-    return runOcrHelper(helperPath, args, png)
-  }
+  return (png: Uint8Array): OcrRecognition | null =>
+    runOcrHelper(helperPath, helperArgs(languages), png)
 }
+
+function createHelperOcrEngineAsync(helperPath: string, languages?: string[]): AsyncOcrEngine {
+  return (png: Uint8Array) => runOcrHelperAsync(helperPath, helperArgs(languages), png)
+}
+
+const canServe = (platform: NodeJS.Platform, helperPath: string): boolean =>
+  process.platform === platform && existsSync(helperPath)
 
 /**
  * Build an OcrEngine that shells out to the compiled macOS Vision helper.
@@ -104,9 +202,15 @@ function createHelperOcrEngine(helperPath: string, languages?: string[]): OcrEng
  *                   omit to let Vision auto-detect
  */
 export function createVisionOcrEngine(helperPath: string, languages?: string[]): OcrEngine | null {
-  if (process.platform !== 'darwin') return null
-  if (!existsSync(helperPath)) return null
-  return createHelperOcrEngine(helperPath, languages)
+  return canServe('darwin', helperPath) ? createHelperOcrEngine(helperPath, languages) : null
+}
+
+/** async twin of createVisionOcrEngine (the viewer must not block the main process) */
+export function createVisionOcrEngineAsync(
+  helperPath: string,
+  languages?: string[],
+): AsyncOcrEngine | null {
+  return canServe('darwin', helperPath) ? createHelperOcrEngineAsync(helperPath, languages) : null
 }
 
 /**
@@ -120,7 +224,13 @@ export function createVisionOcrEngine(helperPath: string, languages?: string[]):
  *                   omit to use the user-profile languages
  */
 export function createWindowsOcrEngine(helperPath: string, languages?: string[]): OcrEngine | null {
-  if (process.platform !== 'win32') return null
-  if (!existsSync(helperPath)) return null
-  return createHelperOcrEngine(helperPath, languages)
+  return canServe('win32', helperPath) ? createHelperOcrEngine(helperPath, languages) : null
+}
+
+/** async twin of createWindowsOcrEngine */
+export function createWindowsOcrEngineAsync(
+  helperPath: string,
+  languages?: string[],
+): AsyncOcrEngine | null {
+  return canServe('win32', helperPath) ? createHelperOcrEngineAsync(helperPath, languages) : null
 }

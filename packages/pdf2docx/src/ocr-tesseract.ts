@@ -12,9 +12,10 @@
  */
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { OcrEngine, OcrRecognition } from './ocr'
-import { runOcrHelper } from './ocr-vision'
+import type { AsyncOcrEngine } from './ocr-chain'
+import { runOcrHelper, runOcrHelperAsync, type HelperRunOptions } from './ocr-vision'
 
 /** a 300 dpi A4 page takes 2-5 s on a laptop core; leave room for slow VMs */
 const TESSERACT_TIMEOUT_MS = 90_000
@@ -42,23 +43,48 @@ function runtimeAvailable(helperScript: string): boolean {
   }
 }
 
+/** variables that make a process run foreign code or reach a foreign CA: never handed to the helper */
+const HELPER_DROPPED_ENV = ['NODE_OPTIONS', 'NODE_PATH', 'NODE_EXTRA_CA_CERTS'] as const
+
+/** true when the script, its npm runtime and the language model(s) are all in place */
+function helperInstalled(options: TesseractOcrOptions, lang: string): boolean {
+  const { helperScript, tessdataDir } = options
+  if (!existsSync(helperScript)) return false
+  for (const l of lang.split('+')) {
+    if (!existsSync(join(tessdataDir, `${l}.traineddata`))) return false
+  }
+  return runtimeAvailable(helperScript)
+}
+
+/** how the helper runs: the app binary as plain Node, a scrubbed environment, its own directory */
+function helperRun(options: TesseractOcrOptions): HelperRunOptions {
+  return {
+    env: { ELECTRON_RUN_AS_NODE: '1' },
+    dropEnv: HELPER_DROPPED_ENV,
+    cwd: dirname(options.helperScript),
+    timeoutMs: TESSERACT_TIMEOUT_MS,
+    windowsHide: true,
+  }
+}
+
 /**
  * Build an OcrEngine that shells out to tess-ocr.cjs. Returns null when the
  * script, its npm runtime or a language model is missing (caller falls back
  * to the system engine / the bitmap).
  */
 export function createTesseractOcrEngine(options: TesseractOcrOptions): OcrEngine | null {
-  const { nodePath, helperScript, tessdataDir } = options
   const lang = options.lang ?? 'vie'
-  if (!existsSync(helperScript)) return null
-  for (const l of lang.split('+')) {
-    if (!existsSync(join(tessdataDir, `${l}.traineddata`))) return null
-  }
-  if (!runtimeAvailable(helperScript)) return null
+  if (!helperInstalled(options, lang)) return null
+  const run = helperRun(options)
   return (png: Uint8Array): OcrRecognition | null =>
-    runOcrHelper(nodePath, [helperScript, tessdataDir, lang], png, {
-      env: { ELECTRON_RUN_AS_NODE: '1' },
-      timeoutMs: TESSERACT_TIMEOUT_MS,
-      windowsHide: true,
-    })
+    runOcrHelper(options.nodePath, [options.helperScript, options.tessdataDir, lang], png, run)
+}
+
+/** async twin of createTesseractOcrEngine (the viewer must not block the main process) */
+export function createTesseractOcrEngineAsync(options: TesseractOcrOptions): AsyncOcrEngine | null {
+  const lang = options.lang ?? 'vie'
+  if (!helperInstalled(options, lang)) return null
+  const run = helperRun(options)
+  return (png: Uint8Array) =>
+    runOcrHelperAsync(options.nodePath, [options.helperScript, options.tessdataDir, lang], png, run)
 }

@@ -15,9 +15,14 @@
  */
 import { join } from 'node:path'
 import type { OcrEngine } from './ocr'
-import { chainOcrEngines } from './ocr-chain'
-import { createTesseractOcrEngine } from './ocr-tesseract'
-import { createVisionOcrEngine, createWindowsOcrEngine } from './ocr-vision'
+import { chainOcrEngines, chainOcrEnginesAsync, type AsyncOcrEngine } from './ocr-chain'
+import { createTesseractOcrEngine, createTesseractOcrEngineAsync } from './ocr-tesseract'
+import {
+  createVisionOcrEngine,
+  createVisionOcrEngineAsync,
+  createWindowsOcrEngine,
+  createWindowsOcrEngineAsync,
+} from './ocr-vision'
 
 export interface LocalOcrOptions {
   /** `process.resourcesPath` of a packaged app (undefined: dev / tests) */
@@ -28,11 +33,15 @@ export interface LocalOcrOptions {
   nodePath?: string
 }
 
-/**
- * Resolve the local OCR engine chain, or null when this build has no engine
- * at all (callers keep today's behavior: scanned pages stay bitmaps).
- */
-export function resolveLocalOcrEngine(options: LocalOcrOptions): OcrEngine | null {
+/** engine constructors of one flavor (sync or async): the layout walk is shared */
+interface EngineFactories<E> {
+  tesseract: (o: { nodePath: string; helperScript: string; tessdataDir: string }) => E | null
+  vision: (helperPath: string) => E | null
+  windows: (helperPath: string) => E | null
+  chain: (primary: E, fallback: E | null) => E
+}
+
+function resolveWith<E>(options: LocalOcrOptions, make: EngineFactories<E>): E | null {
   const nodePath = options.nodePath ?? process.execPath
   const layouts = [
     ...(options.resourcesPath
@@ -52,18 +61,42 @@ export function resolveLocalOcrEngine(options: LocalOcrOptions): OcrEngine | nul
         ]
       : []),
   ]
-  let tesseract: OcrEngine | null = null
-  let system: OcrEngine | null = null
+  let tesseract: E | null = null
+  let system: E | null = null
   for (const l of layouts) {
-    tesseract ??= createTesseractOcrEngine({
+    tesseract ??= make.tesseract({
       nodePath,
       helperScript: join(l.tesseractDir, 'tess-ocr.cjs'),
       tessdataDir: join(l.tesseractDir, 'tessdata'),
     })
-    if (process.platform === 'darwin')
-      system ??= createVisionOcrEngine(join(l.systemDir, 'vision-ocr'))
-    else if (process.platform === 'win32')
-      system ??= createWindowsOcrEngine(join(l.systemDir, 'win-ocr.exe'))
+    if (process.platform === 'darwin') system ??= make.vision(join(l.systemDir, 'vision-ocr'))
+    else if (process.platform === 'win32') system ??= make.windows(join(l.systemDir, 'win-ocr.exe'))
   }
-  return tesseract ? chainOcrEngines(tesseract, system) : system
+  return tesseract ? make.chain(tesseract, system) : system
+}
+
+/**
+ * Resolve the local OCR engine chain, or null when this build has no engine
+ * at all (callers keep today's behavior: scanned pages stay bitmaps).
+ */
+export function resolveLocalOcrEngine(options: LocalOcrOptions): OcrEngine | null {
+  return resolveWith<OcrEngine>(options, {
+    tesseract: createTesseractOcrEngine,
+    vision: createVisionOcrEngine,
+    windows: createWindowsOcrEngine,
+    chain: chainOcrEngines,
+  })
+}
+
+/**
+ * The same chain on async engines, for callers that must not block the event
+ * loop (the PDF viewer's OCR bridge). Same layouts, same gate.
+ */
+export function resolveLocalOcrEngineAsync(options: LocalOcrOptions): AsyncOcrEngine | null {
+  return resolveWith<AsyncOcrEngine>(options, {
+    tesseract: createTesseractOcrEngineAsync,
+    vision: createVisionOcrEngineAsync,
+    windows: createWindowsOcrEngineAsync,
+    chain: chainOcrEnginesAsync,
+  })
 }

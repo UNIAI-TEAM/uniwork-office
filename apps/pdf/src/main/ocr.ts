@@ -9,16 +9,16 @@
  */
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveLocalOcrEngine } from '../../../../packages/pdf2docx/src/ocr-local'
-import type { OcrEngine } from '../../../../packages/pdf2docx/src/ocr'
+import { resolveLocalOcrEngineAsync } from '../../../../packages/pdf2docx/src/ocr-local'
+import type { AsyncOcrEngine } from '../../../../packages/pdf2docx/src/ocr-chain'
 import type { PdfOcrLine } from '../shared/ipc'
 
-let ocrEngine: OcrEngine | null | undefined
+let ocrEngine: AsyncOcrEngine | null | undefined
 
-function ensureOcrEngine(): OcrEngine | null {
+function ensureOcrEngine(): AsyncOcrEngine | null {
   if (ocrEngine !== undefined) return ocrEngine
   const here = dirname(fileURLToPath(import.meta.url))
-  ocrEngine = resolveLocalOcrEngine({
+  ocrEngine = resolveLocalOcrEngineAsync({
     ...(process.resourcesPath ? { resourcesPath: process.resourcesPath } : {}),
     devPackageDir: join(here, '../../../../packages/pdf2docx'),
   })
@@ -26,8 +26,11 @@ function ensureOcrEngine(): OcrEngine | null {
 }
 
 /** PNG (base64) → OCR lines; null only when the platform has no engine (callers
-    stop trying), [] when recognition failed for this image (callers move on) */
-export function ocrPagePng(pngBase64: string): PdfOcrLine[] | null {
+    stop trying), [] when recognition failed for this image (callers move on).
+    Async on purpose: the engines run in child processes and the main process
+    keeps serving every window meanwhile (the pdf2docx conversion path is the
+    synchronous one). */
+export async function ocrPagePng(pngBase64: string): Promise<PdfOcrLine[] | null> {
   const engine = ensureOcrEngine()
   if (!engine) return null
   let png: Uint8Array
@@ -36,7 +39,7 @@ export function ocrPagePng(pngBase64: string): PdfOcrLine[] | null {
   } catch {
     return []
   }
-  const result = engine(png, { widthPt: 0, heightPt: 0 }) // helpers ignore the page size hint
+  const result = await engine(png, { widthPt: 0, heightPt: 0 }) // helpers ignore the page size hint
   if (!result) return []
   return result.lines.map((l) => ({
     text: l.text,

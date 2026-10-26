@@ -4,15 +4,26 @@
  * chain with a fake system engine. The helper is the real thing: tesseract.js WASM
  * + the committed tessdata_fast model, run as a child process like in the app. */
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseDocx } from '@genoffice/docx-engine'
+import { PNG } from 'pngjs'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { convertPdfToDocx } from '../src'
-import type { OcrEngine, OcrLine, OcrRecognition } from '../src/ocr'
-import { chainOcrEngines, ocrFallbackReason } from '../src/ocr-chain'
+import type { ExtractedPage } from '../src/extract'
+import { tryOcrScannedPage, type OcrEngine, type OcrLine, type OcrRecognition } from '../src/ocr'
+import { chainOcrEngines, chainOcrEnginesAsync, ocrFallbackReason } from '../src/ocr-chain'
 import { resolveLocalOcrEngine } from '../src/ocr-local'
 import { createTesseractOcrEngine } from '../src/ocr-tesseract'
 import { loadPdfium } from './helpers/wasm'
@@ -84,7 +95,7 @@ beforeAll(() => {
   if (!made) throw new Error('bundled Tesseract engine unavailable (npm ci / tessdata missing?)')
   engine = made
   // one real helper run per page, shared by the tests below
-  for (const name of ['vi', 'en', 'fr', 'zh']) {
+  for (const name of ['vi', 'en', 'fr', 'zh', 'form']) {
     const result = engine(png(name), PAGE)
     if (!result) throw new Error(`tess-ocr returned no result for ${name}.png`)
     recognitions[name] = result
@@ -125,6 +136,42 @@ describe('tess-ocr helper on scans', () => {
 
   it('NFC-normalizes the text', () => {
     for (const name of ['vi', 'fr']) expect(text(name)).toBe(text(name).normalize('NFC'))
+  })
+})
+
+describe('a Vietnamese form (underscore fill-in lines, ₫, bullets, @, | rows)', () => {
+  const form = () => recognitions.form!
+
+  it('is not mistaken for another script: no hand-over, Tesseract keeps the page', () => {
+    expect(ocrFallbackReason(form())).toBeNull()
+    const fallback = vi.fn<OcrEngine>(() => null)
+    expect(chainOcrEngines(() => form(), fallback)(png('form'), PAGE)).toBe(form())
+    expect(fallback).not.toHaveBeenCalled()
+  })
+
+  it('reads the words, numbers and ruled rows under 7% CER over what the model can emit', () => {
+    // vie has no underscore, bullet or dong sign (measured: fill-in runs are not emitted at
+    // all, • reads as » or «, ₫ as đ or 4), so those glyphs are scored out of both sides;
+    // the rest is the form's text. Raw CER on this page is ~25% for that reason alone.
+    const symbols = (t: string) => t.replace(/[_•₫|]+/g, ' ')
+    const got = readingOrder(form().lines)
+    expect(cer(symbols(got), symbols(groundTruth('form')))).toBeLessThan(0.07)
+    for (const phrase of [
+      'Họ và tên',
+      'Ngày sinh',
+      'Điện thoại',
+      'Phòng ban',
+      'Mua máy chủ dự phòng',
+      '45.000.000',
+      '12.500.000',
+      '57.500.000',
+      'Tổng cộng',
+      'Người đề nghị ký tên',
+      'Nội dung',
+      'congty.vn',
+    ]) {
+      expect(got, phrase).toContain(phrase)
+    }
   })
 })
 
@@ -171,6 +218,28 @@ describe('tess-ocr protocol', () => {
         expect(c.box.y1).toBeLessThanOrEqual(l.box.y1 + tol)
       }
     }
+  })
+
+  it('keeps every normalized box inside [0, 1] when text touches the page edge', () => {
+    // crop the page to its text extents so lines and glyphs run into all four edges
+    const src = PNG.sync.read(Buffer.from(png('vi')))
+    const margin = 80
+    const w = src.width - 2 * margin + 8
+    const h = src.height - 2 * margin + 8
+    const crop = new PNG({ width: w, height: h })
+    PNG.bitblt(src, crop, margin - 4, margin - 4, w, h, 0, 0)
+    const got = engine(new Uint8Array(PNG.sync.write(crop)), PAGE)
+    expect(got).not.toBeNull()
+    const boxes = got!.lines.flatMap((l) => [l.box, ...(l.chars ?? []).map((c) => c.box)])
+    expect(boxes.length).toBeGreaterThan(100)
+    for (const b of boxes) {
+      for (const v of [b.x0, b.y0, b.x1, b.y1]) {
+        expect(v).toBeGreaterThanOrEqual(0)
+        expect(v).toBeLessThanOrEqual(1)
+      }
+    }
+    // the crop really is edge to edge: some glyph starts within 1% of the left edge
+    expect(Math.min(...got!.lines.map((l) => l.box.x0))).toBeLessThan(0.02)
   })
 
   it('exits non-zero on undecodable input (the wrapper maps it to null)', () => {
@@ -275,6 +344,114 @@ describe('the helper never touches the network', () => {
     expect(src).toContain('langPath,')
     expect(src).not.toMatch(/https?:\/\//)
   })
+
+  describe('under a preload that throws on every network API', () => {
+    const PRELOAD = join(FIXTURES, 'no-network-preload.cjs')
+    let dir: string
+    beforeAll(() => {
+      dir = mkdtempSync(join(tmpdir(), 'tess-net-'))
+    })
+    afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+    const attempts = (file: string) => (existsSync(file) ? readFileSync(file, 'utf8').trim() : '')
+
+    it('the preload trips in the main thread and, inherited through execArgv, in a worker thread', () => {
+      const log = join(dir, 'sanity.txt')
+      const script =
+        "const { Worker } = require('node:worker_threads')\n" +
+        "try { require('node:net').connect(1, '127.0.0.1') } catch {}\n" +
+        'new Worker(\'try { fetch("http://127.0.0.1:1") } catch {}\', { eval: true })\n'
+      const res = spawnSync(process.execPath, ['--require', PRELOAD, '-e', script], {
+        env: { ...process.env, NET_ATTEMPTS_FILE: log },
+        timeout: 30_000,
+      })
+      expect(res.status).toBe(0)
+      expect(attempts(log).split('\n').sort()).toEqual(['fetch', 'net.connect'])
+    })
+
+    it('recognizes a page with exit 0 and zero network attempts', () => {
+      const log = join(dir, 'helper.txt')
+      const res = spawnSync(process.execPath, ['--require', PRELOAD, HELPER, TESSDATA, 'vie'], {
+        input: png('vi'),
+        maxBuffer: 64 << 20,
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', NET_ATTEMPTS_FILE: log },
+        timeout: 60_000,
+      })
+      expect(res.stderr.toString()).not.toContain('network attempt')
+      expect(res.status).toBe(0)
+      expect(res.stdout.toString('utf8')).toContain('Cộng hòa xã hội chủ nghĩa Việt Nam')
+      expect(attempts(log)).toBe('')
+    })
+  })
+})
+
+describe('the helper process environment', () => {
+  /** a parent environment that would run foreign code in, or reconfigure, a plain Node */
+  function withHostileEnv<T>(run: () => T, dir: string): T {
+    const evil = join(dir, 'evil-preload.cjs')
+    writeFileSync(evil, "throw new Error('foreign code ran in the OCR helper')\n")
+    const saved = { ...process.env }
+    process.env.NODE_OPTIONS = `--require ${JSON.stringify(evil)}`
+    process.env.NODE_PATH = join(dir, 'no-such-node-path')
+    process.env.NODE_EXTRA_CA_CERTS = join(dir, 'no-such-ca.pem')
+    try {
+      return run()
+    } finally {
+      for (const k of ['NODE_OPTIONS', 'NODE_PATH', 'NODE_EXTRA_CA_CERTS']) {
+        if (saved[k] === undefined) delete process.env[k]
+        else process.env[k] = saved[k]
+      }
+    }
+  }
+
+  it('still recognizes under a parent NODE_OPTIONS=--require <throwing file>', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tess-env-'))
+    try {
+      // the control: the same environment crashes a Node that inherits it
+      const control = withHostileEnv(
+        () => spawnSync(process.execPath, ['-e', '0'], { env: process.env, encoding: 'utf8' }),
+        dir,
+      )
+      expect(control.status).not.toBe(0)
+      expect(control.stderr).toContain('foreign code ran')
+      const got = withHostileEnv(() => engine(png('en'), PAGE), dir)
+      expect(got).not.toBeNull()
+      expect(cer(readingOrder(got!.lines), groundTruth('en'))).toBeLessThan(0.02)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('hands the helper none of NODE_OPTIONS / NODE_PATH / NODE_EXTRA_CA_CERTS, its own directory as cwd', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tess-env-'))
+    try {
+      mkdirSync(join(dir, 'tessdata'))
+      writeFileSync(join(dir, 'tessdata', 'vie.traineddata'), 'x')
+      for (const pkg of ['tesseract.js', 'pngjs']) {
+        mkdirSync(join(dir, 'node_modules', pkg), { recursive: true })
+        writeFileSync(join(dir, 'node_modules', pkg, 'package.json'), `{"name":"${pkg}"}`)
+      }
+      writeFileSync(
+        join(dir, 'tess-ocr.cjs'),
+        'const e = process.env\n' +
+          "const t = [process.cwd(), String(e.NODE_OPTIONS), String(e.NODE_PATH), String(e.NODE_EXTRA_CA_CERTS), e.ELECTRON_RUN_AS_NODE, e.PATH ? 'path' : 'nopath'].join('|')\n" +
+          'process.stdout.write(JSON.stringify({ lines: [{ t, c: 0.9, b: [0, 0, 1, 1] }] }))\n',
+      )
+      const fake = createTesseractOcrEngine({
+        nodePath: process.execPath,
+        helperScript: join(dir, 'tess-ocr.cjs'),
+        tessdataDir: join(dir, 'tessdata'),
+      })!
+      const got = withHostileEnv(() => fake(png('en'), PAGE), dir)
+      const [cwd, nodeOptions, nodePath, caCerts, runAsNode, path] = got!.lines[0]!.text.split('|')
+      expect(realpathSync(cwd!)).toBe(realpathSync(dir))
+      expect([nodeOptions, nodePath, caCerts]).toEqual(['undefined', 'undefined', 'undefined'])
+      expect(runAsNode).toBe('1')
+      expect(path).toBe('path') // everything else is inherited
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('OCR chain with the real Tesseract engine', () => {
@@ -314,8 +491,106 @@ describe('OCR chain with the real Tesseract engine', () => {
     expect(chainOcrEngines(cached('en'), none)(png('en'), PAGE)).toBe(recognitions.en)
   })
 
-  it('keeps the garbled Chinese result when there is no system engine (Linux)', () => {
-    expect(chainOcrEngines(cached('zh'), null)(png('zh'), PAGE)).toBe(recognitions.zh)
+  it('returns null for the Chinese page when there is no system engine (Linux)', () => {
+    expect(chainOcrEngines(cached('zh'), null)(png('zh'), PAGE)).toBeNull()
+  })
+
+  it('returns null for the Chinese page when the system engine has nothing (no zh recognizer)', () => {
+    for (const nothing of [
+      () => null,
+      () => ({ lines: [] }),
+      () => ({ lines: [{ text: ' ', confidence: 1, box: { x0: 0, y0: 0, x1: 1, y1: 1 } }] }),
+    ]) {
+      expect(chainOcrEngines(cached('zh'), nothing)(png('zh'), PAGE)).toBeNull()
+    }
+    const boom: OcrEngine = () => {
+      throw new Error('helper failed')
+    }
+    expect(chainOcrEngines(cached('zh'), boom)(png('zh'), PAGE)).toBeNull()
+  })
+
+  it('the async chain decides the same on the real recognitions', async () => {
+    const asyncOf = (name: string) => () => Promise.resolve(recognitions[name]!)
+    const none = () => Promise.resolve(null)
+    expect(await chainOcrEnginesAsync(asyncOf('zh'), none)(png('zh'), PAGE)).toBeNull()
+    expect(await chainOcrEnginesAsync(asyncOf('zh'), null)(png('zh'), PAGE)).toBeNull()
+    expect(await chainOcrEnginesAsync(asyncOf('vi'), none)(png('vi'), PAGE)).toBe(recognitions.vi)
+    expect(await chainOcrEnginesAsync(asyncOf('en'), none)(png('en'), PAGE)).toBe(recognitions.en)
+  })
+})
+
+/** a scanned page the way the pipeline hands it to tryOcrScannedPage */
+function scannedPage(): ExtractedPage {
+  return {
+    index: 0,
+    widthPt: 612,
+    heightPt: 792,
+    rotation: 0,
+    chars: [],
+    images: [],
+    paths: [],
+    degraded: false,
+    scanned: true,
+    hasStructTree: false,
+    vectorRegions: [],
+    badUnicodeRatio: 0,
+    render: { data: new Uint8Array([1]), mime: 'image/png', pixelWidth: 612, pixelHeight: 792 },
+  }
+}
+
+describe('a page the vie model cannot read keeps its scan bitmap (tryOcrScannedPage on the real zh recognition)', () => {
+  const cached =
+    (name: string): OcrEngine =>
+    () =>
+      recognitions[name]!
+  const none: OcrEngine = () => null
+
+  it('through the chain with a null system engine result', () => {
+    expect(tryOcrScannedPage(scannedPage(), chainOcrEngines(cached('zh'), none))).toBeNull()
+  })
+
+  it('through the chain with no system engine at all (Linux)', () => {
+    expect(tryOcrScannedPage(scannedPage(), chainOcrEngines(cached('zh'), null))).toBeNull()
+  })
+
+  it('the full conversion keeps the bitmap (status scanned) on both', async () => {
+    const { PDFDocument } = await import('pdf-lib')
+    const doc = await PDFDocument.create()
+    const page = doc.addPage([(808 * 72) / 200, (538 * 72) / 200])
+    const image = await doc.embedPng(png('zh'))
+    page.drawImage(image, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() })
+    const pdf = await doc.save()
+    for (const fallback of [none, null]) {
+      const result = await convertPdfToDocx(pdf, {
+        pdfium: await loadPdfium(),
+        renderScale: 2,
+        ocr: chainOcrEngines(cached('zh'), fallback),
+      })
+      expect(result.pageResults[0]!.status).toBe('scanned')
+      const parsed = await parseDocx(result.docx)
+      expect(parsed.blocks.filter((b) => b.type === 'image')).toHaveLength(1)
+    }
+  }, 60_000)
+
+  it('a mixed page (junk lines at c 0.5-0.6 plus Latin lines) would replace the bitmap unguarded and does not through the chain', () => {
+    const at = (y: number) => ({ x0: 0.1, y0: y, x1: 0.6, y1: y + 0.03 })
+    const mixed: OcrRecognition = {
+      paperShare: 0.95,
+      lines: [
+        { text: '会议纪要项目管理委员会第三次会议', confidence: 0.5, box: at(0.9) },
+        { text: '技术组报告了数据迁移的进度完成', confidence: 0.55, box: at(0.85) },
+        { text: '财务部建议增加测试人员的预算', confidence: 0.6, box: at(0.8) },
+        { text: '河内办公室第三会议室二〇二六年', confidence: 0.52, box: at(0.75) },
+        { text: 'Hà Nội, ngày 15 tháng 9 năm 2026', confidence: 0.95, box: at(0.7) },
+        { text: 'Phòng họp số 3 tầng 5', confidence: 0.9, box: at(0.65) },
+      ],
+    }
+    const raw: OcrEngine = () => mixed
+    // the hazard the review found: the page-level gates in ocr.ts pass this page
+    expect(tryOcrScannedPage(scannedPage(), raw)).not.toBeNull()
+    expect(ocrFallbackReason(mixed)).not.toBeNull()
+    expect(tryOcrScannedPage(scannedPage(), chainOcrEngines(raw, none))).toBeNull()
+    expect(tryOcrScannedPage(scannedPage(), chainOcrEngines(raw, null))).toBeNull()
   })
 })
 

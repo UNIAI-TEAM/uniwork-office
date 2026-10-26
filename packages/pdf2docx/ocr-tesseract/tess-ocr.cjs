@@ -73,10 +73,12 @@ function paperShare(png) {
 }
 
 const num = (v) => Math.round(v * 1e6) / 1e6
+/** normalized coordinates stay inside the page: an edge-touching bbox must not round to 1.000001 / -0.000001 */
+const unit = (v) => num(Math.min(1, Math.max(0, v)))
 
 /** pixel rect (origin top-left) -> normalized PDF-space box (origin bottom-left) */
 function box(b, w, h) {
-  return [num(b.x0 / w), num(1 - b.y1 / h), num(b.x1 / w), num(1 - b.y0 / h)]
+  return [unit(b.x0 / w), unit(1 - b.y1 / h), unit(b.x1 / w), unit(1 - b.y0 / h)]
 }
 
 /**
