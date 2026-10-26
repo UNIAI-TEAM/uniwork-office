@@ -66,20 +66,26 @@ interface LineWord {
   box: [number, number, number, number]
   /** A real separator (space) preceded this word in the OCR stream. CJK scripts
       emit one word per character with no separators — joining them with spaces
-      would corrupt the searchable text (`S P A C E D` never matches unspaced). */
+      would corrupt the searchable text (`使 用 价 值` never matches `使用价值`). */
   gap: boolean
 }
 
+/** Below this rise-to-line-height ratio, vertical scatter across words comes from
+    ascender/descender differences or minor scan jitter rather than a tilted line,
+    so every word keeps the shared line box [ly0, ly1]. Above it, words follow a
+    width-weighted least-squares tilt line with one shared band height per line. */
+const TILT_RISE_RATIO = 0.2
+
 /** Split one OCR line into words: runs of chars between separators (degenerate
     box or whitespace), with x-extent = union of the word's char boxes and
-    y-extent = the line box so all words on a line share one baseline and font
-    size. Both shared-box engines (Vision / Windows) and per-glyph engines
-    (Tesseract alignChars) merge space-delimited words under the union rule.
-    No-space scripts (CJK / Kana) emit one char per box with no separators:
-    when consecutive chars do not share an identical box and either side is a
-    no-space script, each char stays its own word so `data.words` and per-char
-    search item offsets remain unchanged. Whole-line fallback when chars are
-    absent or incomplete. */
+    y-extent = the line box on straight lines (or a tilted band of uniform height
+    when the line is skewed). Both shared-box engines (Vision / Windows) and
+    per-glyph engines (Tesseract alignChars) merge space-delimited words under
+    the union rule. No-space scripts (CJK / Kana / Thai) emit one char per box
+    with no separators: when consecutive chars do not share an identical box and
+    either side is a no-space script, each char stays its own word so `data.words`
+    and per-char search item offsets remain unchanged. Whole-line fallback when
+    chars are absent or incomplete. */
 function lineWords(line: PdfOcrLine): LineWord[] {
   if (!line.chars || line.chars.length === 0) {
     const text = line.text.trim()
@@ -87,8 +93,9 @@ function lineWords(line: PdfOcrLine): LineWord[] {
   }
   const words: LineWord[] = []
   let cur: LineWord | null = null
+  let curLastChar = ''
   let sep = false
-  const [, ly0, , ly1] = line.box
+  const [lx0, , lx1] = line.box
   for (const c of line.chars) {
     if (isSeparatorBox(c.box) || c.text.trim() === '') {
       if (cur) words.push(cur)
@@ -96,25 +103,86 @@ function lineWords(line: PdfOcrLine): LineWord[] {
       sep = true
       continue
     }
+    // Skip stray glyph boxes outside the line's horizontal span so they cannot stretch a word
+    if (c.box[0] < lx0 - 1e-3 || c.box[2] > lx1 + 1e-3) continue
     const sameBox = cur !== null && c.box[0] === cur.box[0] && c.box[2] === cur.box[2]
     const canMerge =
-      cur !== null && (sameBox || (!endsNoSpaceScript(cur.text) && !startsNoSpaceScript(c.text)))
+      cur !== null && (sameBox || (!endsNoSpaceScript(curLastChar) && !startsNoSpaceScript(c.text)))
     if (cur && canMerge) {
       cur.text += c.text
       cur.box[0] = Math.min(cur.box[0], c.box[0])
+      cur.box[1] = Math.min(cur.box[1], c.box[1])
       cur.box[2] = Math.max(cur.box[2], c.box[2])
+      cur.box[3] = Math.max(cur.box[3], c.box[3])
+      curLastChar = c.text
     } else {
       if (cur) words.push(cur)
       cur = {
         text: c.text,
-        box: [c.box[0], ly0, c.box[2], ly1],
+        box: [c.box[0], c.box[1], c.box[2], c.box[3]],
         gap: sep,
       }
+      curLastChar = c.text
       sep = false
     }
   }
   if (cur) words.push(cur)
-  return words.length > 0 ? lineWordsFallback(words, line) : []
+  if (words.length === 0) return []
+  const checked = lineWordsFallback(words, line)
+  if (checked !== words) return checked
+  applyLineVerticalBand(words, line.box)
+  return words
+}
+
+/** Assign vertical bounds to each word on a line: straight lines share [ly0, ly1]
+    across all words; tilted lines fit a width-weighted least-squares centre line
+    and give every word the same band height h centered on the fitted line (clamped
+    to [ly0, ly1]) so spans follow the tilt without overlapping adjacent lines. */
+function applyLineVerticalBand(words: LineWord[], lineBox: [number, number, number, number]): void {
+  const [lx0, ly0, lx1, ly1] = lineBox
+  const lineH = ly1 - ly0
+  const lineW = lx1 - lx0
+  if (words.length >= 2 && lineH > 0 && lineW > 0) {
+    let sw = 0
+    let sx = 0
+    let sy = 0
+    for (const w of words) {
+      const wt = Math.max(w.box[2] - w.box[0], 1e-6)
+      sw += wt
+      sx += wt * 0.5 * (w.box[0] + w.box[2])
+      sy += wt * 0.5 * (w.box[1] + w.box[3])
+    }
+    const mx = sx / sw
+    const my = sy / sw
+    let sxx = 0
+    let sxy = 0
+    for (const w of words) {
+      const wt = Math.max(w.box[2] - w.box[0], 1e-6)
+      const dx = 0.5 * (w.box[0] + w.box[2]) - mx
+      const dy = 0.5 * (w.box[1] + w.box[3]) - my
+      sxx += wt * dx * dx
+      sxy += wt * dx * dy
+    }
+    const slope = sxx > 1e-12 ? sxy / sxx : 0
+    const rise = Math.abs(slope) * lineW
+    if (rise >= TILT_RISE_RATIO * lineH) {
+      const heights = words.map((w) => w.box[3] - w.box[1]).sort((a, b) => a - b)
+      const medianH = heights[Math.floor(heights.length / 2)]!
+      const h = Math.min(lineH, Math.max(lineH - rise, medianH))
+      for (const w of words) {
+        const xc = 0.5 * (w.box[0] + w.box[2])
+        const yc = my + slope * (xc - mx)
+        const y0 = Math.max(ly0, Math.min(ly1 - h, yc - 0.5 * h))
+        w.box[1] = y0
+        w.box[3] = y0 + h
+      }
+      return
+    }
+  }
+  for (const w of words) {
+    w.box[1] = ly0
+    w.box[3] = ly1
+  }
 }
 
 /** Guard against helpers whose char boxes don't cover the text: fall back to the line box */
