@@ -96,6 +96,8 @@ export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
     labelKey: 'uhNavGoogleDrive',
     // UNI-2195 (D2): Google Drive sits under My Folder in the Folders section when capability
     // drive_connector is true and the viewer has >= 1 connection; never in the top sub-nav.
+    // `source: 'drive'` only marks the entry: its rows load through `useDocumentsHomeDrive`
+    // (DriveList.tsx), not through `fetchDocumentsHomePage`.
     available: false,
     source: 'drive',
   },
@@ -477,13 +479,10 @@ export async function fetchDocumentsHomePage(
     filters: UniworkListFilters
     /** UNI-2047: the header sort; unset sends nothing */
     sort?: DocumentsHomeWireSort | null
-    /** UNI-2195 (D2): the picked Google Drive connection id (`null` / omitted = all accounts) */
-    driveConnectionId?: string | null
   },
 ): Promise<{
   result: UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>
   ensuredMyFolder?: UniworkFolderNode
-  drivePage?: UniworkDriveResult<DriveFileListPage>
 }> {
   const { workspaceId, subView, folderId, myFolderId, cursor, filters } = params
   const sortArgs: DocumentsHomeWireSort = params.sort
@@ -644,34 +643,7 @@ export async function fetchDocumentsHomePage(
     }
   }
 
-  if (subView === 'google-drive') {
-    const drivePage = await fetchDocumentsHomeDriveFiles(api, {
-      workspaceId,
-      connectionId: params.driveConnectionId,
-      cursor,
-    })
-    if (!drivePage.ok) {
-      return {
-        result: {
-          ok: false,
-          error:
-            drivePage.error === 'network' ||
-            drivePage.error === 'not_signed_in' ||
-            drivePage.error === 'session_expired' ||
-            drivePage.error === 'not_found' ||
-            drivePage.error === 'forbidden'
-              ? drivePage.error
-              : 'server_error',
-        },
-        drivePage,
-      }
-    }
-    return {
-      result: { ok: true, value: { items: [], nextCursor: drivePage.value.nextCursor } },
-      drivePage,
-    }
-  }
-
+  // Google Drive rows are not documents: DriveList loads them through `useDocumentsHomeDrive`
   return { result: { ok: true, value: { items: [], nextCursor: null } } }
 }
 

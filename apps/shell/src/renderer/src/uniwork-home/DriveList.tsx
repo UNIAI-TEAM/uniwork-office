@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type {
   DriveConnection,
   DriveFile,
+  DriveHistoryEvent,
   DriveIconKind,
   UniworkDriveErrorCode,
   UniworkDriveResult,
 } from '../../../shared/home-api'
+import type { WorkWebTarget } from '../../../shared/uniwork-work-api'
 import { FileBadge } from '../FileBadge'
 import { ListState } from '../doclist/ListState'
 import { useI18n, type TFunc } from '../locale'
+import { driveErrorKey } from './drive-panel-model'
 import {
   buildDriveSidebarState,
   fetchDocumentsHomeDriveFiles,
@@ -203,15 +206,18 @@ export function formatDriveTasksCreated(file: DriveFile, t: TFunc): string | nul
   return t(count === 1 ? 'uhDriveTasksCreatedLineOne' : 'uhDriveTasksCreatedLine', { count })
 }
 
+type DriveTarget = { workspaceId: string; driveFileId: string }
+
 export type DriveRendererBridge = DocumentsHomeApiAdapter & {
-  openOnGoogle?: (input: {
-    workspaceId: string
-    driveFileId: string
-  }) => Promise<UniworkDriveResult<null>>
-  uniworkDriveOpenOnGoogle?: (input: {
-    workspaceId: string
-    driveFileId: string
-  }) => Promise<UniworkDriveResult<null>>
+  openOnGoogle?: (input: DriveTarget) => Promise<UniworkDriveResult<null>>
+  uniworkDriveOpenOnGoogle?: (input: DriveTarget) => Promise<UniworkDriveResult<null>>
+  /** UNI-2196 (D3): the detail panel's reads and the unlink */
+  getFile?: (input: DriveTarget) => Promise<UniworkDriveResult<DriveFile>>
+  uniworkDriveGetFile?: (input: DriveTarget) => Promise<UniworkDriveResult<DriveFile>>
+  unlink?: (input: DriveTarget) => Promise<UniworkDriveResult<null>>
+  uniworkDriveUnlink?: (input: DriveTarget) => Promise<UniworkDriveResult<null>>
+  getHistory?: (input: DriveTarget) => Promise<UniworkDriveResult<DriveHistoryEvent[]>>
+  uniworkDriveGetHistory?: (input: DriveTarget) => Promise<UniworkDriveResult<DriveHistoryEvent[]>>
 }
 
 /**
@@ -222,6 +228,20 @@ export function getDriveBridge(): DriveRendererBridge | null {
   if (window.uniworkDrive) return window.uniworkDrive
   if (window.aiOffice) return window.aiOffice as unknown as DriveRendererBridge
   return null
+}
+
+/**
+ * Hands a Drive step that needs a browser over to the web page through main's `openWeb`
+ * (spec §17.4). Main builds the URL from the ids; the renderer never passes one.
+ */
+export function openDriveWeb(target: WorkWebTarget): Promise<boolean> {
+  const work = typeof window === 'undefined' ? undefined : window.uniworkWork
+  if (!work) return Promise.resolve(false)
+  try {
+    return Promise.resolve(work.openWeb(target)).catch(() => false)
+  } catch {
+    return Promise.resolve(false)
+  }
 }
 
 /**
@@ -306,22 +326,44 @@ export interface DriveListProps {
   onRetry: () => void
   onLoadMore: () => void
   onOpenOnGoogle: (driveFileId: string) => void
-  /** Web hand-off seams (wired in D3; rendered disabled/no-op in D2 when omitted) */
+  /** the row whose detail panel is open (UNI-2196, D3) */
+  selectedFileId?: string | null
+  /** a row was picked: a click or Space (`keyboard`) selects, a double click or Enter opens on Google */
+  onSelect?: (driveFileId: string, via: 'pointer' | 'keyboard') => void
+  /** the detail panel, drawn beside the table */
+  panel?: ReactNode
+  /** Web hand-off seams (UNI-2196, D3); disabled when omitted */
   onAddFromDrive?: (connectionId: string | null) => void
   onManageConnections?: () => void
   onReconnect?: (connectionId: string) => void
 }
 
+/** the five table columns; the loading skeleton reuses them so its cells line up with the header */
+const DRIVE_COLUMNS = [
+  { cls: 'dh-drive-col-name', key: 'uhDriveColName' },
+  { cls: 'dh-drive-col-account', key: 'uhDriveColAccount' },
+  { cls: 'dh-drive-col-access', key: 'uhDriveColAccess' },
+  { cls: 'dh-drive-col-used', key: 'uhDriveColUsedIn' },
+  { cls: 'dh-drive-col-tasks', key: 'uhDriveColTasksCreated' },
+] as const
+
+/** the sentence of a list-level Drive error; a missing file reads as the generic load error here */
+function driveListErrorKey(error: UniworkDriveErrorCode | undefined) {
+  return !error || error === 'not_found' ? 'uhDriveLoadError' : driveErrorKey(error)
+}
+
 /**
  * 4.1 Documents › Google Drive list table and states on the desktop app (spec §17.2, §7.6, §7.10).
  * Columns: Tên, Mở bằng tài khoản, Quyền trên Google Drive, Đang dùng ở, Đã tạo việc.
- * Double-click or Enter on a row calls `open-on-google` with `{ workspaceId, driveFileId }` only.
+ * A click or Space on a row selects it (the detail panel opens, UNI-2196); a double click or Enter
+ * calls `open-on-google` with `{ workspaceId, driveFileId }` only.
  */
 export function DriveList({
   connections,
   selectedAccountId,
   files,
   status,
+  error,
   offline,
   nextCursor,
   loadingMore,
@@ -329,6 +371,9 @@ export function DriveList({
   onRetry,
   onLoadMore,
   onOpenOnGoogle,
+  selectedFileId = null,
+  onSelect,
+  panel,
   onAddFromDrive,
   onManageConnections,
   onReconnect,
@@ -361,15 +406,16 @@ export function DriveList({
   const onRowKeyDown = (event: ReactKeyboardEvent<HTMLTableRowElement>, driveFileId: string) => {
     if (event.nativeEvent.isComposing) return
     if (event.repeat) return
-    if (event.key !== 'Enter') return
+    if (event.key !== 'Enter' && event.key !== ' ') return
     const target = event.target as HTMLElement | null
     if (target && target !== event.currentTarget && target.closest('button, a, input')) return
     event.preventDefault()
-    onOpenOnGoogle(driveFileId)
+    if (event.key === ' ') onSelect?.(driveFileId, 'keyboard')
+    else onOpenOnGoogle(driveFileId)
   }
 
   return (
-    <div className="dh-drive-view" data-drive-view="">
+    <div className={`dh-drive-view${panel ? ' has-panel' : ''}`} data-drive-view="">
       <div className="dh-drive-actions-bar">
         <button
           type="button"
@@ -411,198 +457,214 @@ export function DriveList({
         )}
       </div>
 
-      {isLoadingState && (
-        <div
-          className="dh-drive-table-wrap uw-pick-skeleton dh-drive-skeleton"
-          role="status"
-          aria-busy="true"
-          data-drive-loading=""
-        >
-          <span className="uw-sr-only">{t('uwPickLoading')}</span>
-          <div className="dh-drive-head-row dh-drive-skel-head" aria-hidden="true">
-            <span className="uw-skel dh-drive-skel-th" />
-            <span className="uw-skel dh-drive-skel-th" />
-            <span className="uw-skel dh-drive-skel-th" />
-            <span className="uw-skel dh-drive-skel-th" />
-            <span className="uw-skel dh-drive-skel-th" />
-          </div>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div className="uw-pick-skel-row dh-drive-skel-row" key={i} aria-hidden="true">
-              <span className="dh-drive-skel-name">
-                <span className="uw-skel uw-skel-icon" />
-                <span className="uw-skel uw-skel-line" />
-              </span>
-              <span className="uw-skel uw-skel-line short" />
-              <span className="uw-skel dh-drive-skel-pill" />
-              <span className="uw-skel uw-skel-line short" />
-              <span className="uw-skel dh-drive-skel-num" />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {isOfflineState && (
-        <ListState
-          kind="error"
-          glyph="error"
-          title={t('uhDriveOffline')}
-          action={{ label: t('acctRetry'), onClick: onRetry }}
-        />
-      )}
-
-      {isErrorState && (
-        <ListState
-          kind="error"
-          glyph="error"
-          title={t('uhDriveLoadError')}
-          action={{ label: t('acctRetry'), onClick: onRetry }}
-        />
-      )}
-
-      {!isLoadingState && !isOfflineState && !isErrorState && files.length === 0 && (
-        <div className="dh-empty dh-drive-empty" role="status" data-drive-empty="">
-          <p className="dh-drive-empty-title">{t('uhDriveEmpty')}</p>
-        </div>
-      )}
-
-      {!isLoadingState && !isOfflineState && !isErrorState && files.length > 0 && (
-        <>
-          <div className="dh-drive-table-wrap">
-            <table className="dh-drive-table" aria-label={t('uhNavGoogleDrive')}>
-              <thead>
-                <tr className="dh-drive-head-row">
-                  <th scope="col" className="dh-drive-th dh-drive-col-name">
-                    {t('uhDriveColName')}
-                  </th>
-                  <th scope="col" className="dh-drive-th dh-drive-col-account">
-                    {t('uhDriveColAccount')}
-                  </th>
-                  <th scope="col" className="dh-drive-th dh-drive-col-access">
-                    {t('uhDriveColAccess')}
-                  </th>
-                  <th scope="col" className="dh-drive-th dh-drive-col-used">
-                    {t('uhDriveColUsedIn')}
-                  </th>
-                  <th scope="col" className="dh-drive-th dh-drive-col-tasks">
-                    {t('uhDriveColTasksCreated')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {files.map((file) => {
-                  const badge = formatDriveAccessBadge(file, t)
-                  const viewerConnId = file.viewerConnectionId || file.connectionId
-                  const viewerConn = viewerConnId ? connectionById.get(viewerConnId) : undefined
-                  const rowNeedsReconnect =
-                    file.viewerAccess === 'connection_lost' ||
-                    file.boundConnectionLost === true ||
-                    Boolean(
-                      viewerConn &&
-                      (viewerConn.needsReconnect ||
-                        viewerConn.status === 'needs_reconnect' ||
-                        Boolean(viewerConn.authFailedAt)),
-                    )
-                  const accountEmail = file.viewerAccountEmail?.trim() || '—'
-                  const usedInText = formatDriveUsedIn(file, t)
-                  const tasksCreatedText = formatDriveTasksCreated(file, t)
-
-                  return (
-                    <tr
-                      key={file.id}
-                      className="dh-drive-row"
-                      data-drive-file-id={file.id}
-                      tabIndex={0}
-                      onDoubleClick={() => onOpenOnGoogle(file.id)}
-                      onKeyDown={(e) => onRowKeyDown(e, file.id)}
-                    >
-                      <td className="dh-drive-td dh-drive-cell-name">
-                        <div className="dh-drive-name-wrap">
-                          <DriveFileIcon iconKind={file.iconKind} size={24} />
-                          <span className="dh-drive-file-name" title={file.name}>
-                            {file.name}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="dh-drive-td dh-drive-cell-account">
-                        <div className="dh-drive-account-stack">
-                          <span className="dh-drive-account-email" title={accountEmail}>
-                            {accountEmail}
-                          </span>
-                          {rowNeedsReconnect &&
-                            (onReconnect ? (
-                              <button
-                                type="button"
-                                className="dh-drive-reconnect-link"
-                                data-drive-reconnect={viewerConnId || file.connectionId}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  onReconnect(viewerConnId || file.connectionId)
-                                }}
-                              >
-                                <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
-                                <span>{t('uhDriveReconnect')}</span>
-                              </button>
-                            ) : (
-                              <span
-                                className="dh-drive-reconnect-link dh-drive-reconnect-text"
-                                data-drive-reconnect={viewerConnId || file.connectionId}
-                              >
-                                <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
-                                <span>{t('uhDriveReconnect')}</span>
-                              </span>
-                            ))}
-                        </div>
-                      </td>
-                      <td className="dh-drive-td dh-drive-cell-access">
-                        <span
-                          className={`dh-vis-badge dh-drive-badge dh-drive-badge-${badge.tone}`}
-                          data-drive-access={badge.tone}
-                        >
-                          {badge.label}
+      <div className="dh-drive-body">
+        <div className="dh-drive-main">
+          {isLoadingState && (
+            <div
+              className="dh-drive-table-wrap uw-pick-skeleton dh-drive-skeleton"
+              role="status"
+              aria-busy="true"
+              data-drive-loading=""
+            >
+              <span className="uw-sr-only">{t('uwPickLoading')}</span>
+              <table className="dh-drive-table" aria-hidden="true">
+                <thead>
+                  <tr className="dh-drive-head-row">
+                    {DRIVE_COLUMNS.map((col) => (
+                      <th key={col.cls} className={`dh-drive-th ${col.cls}`}>
+                        <span className="uw-skel dh-drive-skel-th" />
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <tr className="dh-drive-row dh-drive-skel-row" key={i}>
+                      <td className="dh-drive-td">
+                        <span className="dh-drive-skel-name">
+                          <span className="uw-skel uw-skel-icon" />
+                          <span className="uw-skel uw-skel-line" />
                         </span>
                       </td>
-                      <td className="dh-drive-td dh-drive-cell-used">{usedInText}</td>
-                      <td className="dh-drive-td dh-drive-cell-tasks">{tasksCreatedText}</td>
+                      <td className="dh-drive-td">
+                        <span className="uw-skel uw-skel-line short" />
+                      </td>
+                      <td className="dh-drive-td">
+                        <span className="uw-skel dh-drive-skel-pill" />
+                      </td>
+                      <td className="dh-drive-td">
+                        <span className="uw-skel uw-skel-line short" />
+                      </td>
+                      <td className="dh-drive-td">
+                        <span className="uw-skel dh-drive-skel-num" />
+                      </td>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {moreError && (
-            <div className="dh-drive-more-error-row" role="alert">
-              <p className="uw-pick-more-error">
-                {t(moreError === 'network' ? 'uhDriveOffline' : 'uhDriveLoadError')}
-              </p>
-              <button
-                type="button"
-                className="btn btn-secondary dh-drive-retry-btn"
-                data-drive-retry=""
-                onClick={onRetry}
-              >
-                {t('acctRetry')}
-              </button>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
-          {nextCursor && (
-            <div className="dh-load-more-row">
-              <button
-                type="button"
-                className="btn btn-secondary uw-pick-more"
-                data-drive-load-more=""
-                disabled={loadingMore}
-                onClick={onLoadMore}
-              >
-                {loadingMore ? t('uwPickLoadingMore') : t('uhLoadMore')}
-              </button>
+          {isOfflineState && (
+            <ListState
+              kind="error"
+              glyph="error"
+              title={t('uhDriveOffline')}
+              action={{ label: t('acctRetry'), onClick: onRetry }}
+            />
+          )}
+
+          {isErrorState && (
+            <ListState
+              kind="error"
+              glyph="error"
+              title={t(driveListErrorKey(error))}
+              action={{ label: t('acctRetry'), onClick: onRetry }}
+            />
+          )}
+
+          {!isLoadingState && !isOfflineState && !isErrorState && files.length === 0 && (
+            <div className="dh-empty dh-drive-empty" role="status" data-drive-empty="">
+              <p className="dh-drive-empty-title">{t('uhDriveEmpty')}</p>
             </div>
           )}
 
-          <p className="dh-drive-footnote">{t('uhDriveFootnote')}</p>
-        </>
-      )}
+          {!isLoadingState && !isOfflineState && !isErrorState && files.length > 0 && (
+            <>
+              <div className="dh-drive-table-wrap">
+                <table className="dh-drive-table" aria-label={t('uhNavGoogleDrive')}>
+                  <thead>
+                    <tr className="dh-drive-head-row">
+                      {DRIVE_COLUMNS.map((col) => (
+                        <th key={col.cls} scope="col" className={`dh-drive-th ${col.cls}`}>
+                          {t(col.key)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {files.map((file) => {
+                      const badge = formatDriveAccessBadge(file, t)
+                      const viewerConnId = file.viewerConnectionId || file.connectionId
+                      const viewerConn = viewerConnId ? connectionById.get(viewerConnId) : undefined
+                      const rowNeedsReconnect =
+                        file.viewerAccess === 'connection_lost' ||
+                        file.boundConnectionLost === true ||
+                        Boolean(
+                          viewerConn &&
+                          (viewerConn.needsReconnect ||
+                            viewerConn.status === 'needs_reconnect' ||
+                            Boolean(viewerConn.authFailedAt)),
+                        )
+                      const viewerEmail = file.viewerAccountEmail?.trim() ?? ''
+                      // a row without the viewer's account says why, instead of a bare dash
+                      const accountEmail = viewerEmail || t('uhDriveViewerEmailMissing')
+                      const usedInText = formatDriveUsedIn(file, t)
+                      const tasksCreatedText = formatDriveTasksCreated(file, t)
+
+                      return (
+                        <tr
+                          key={file.id}
+                          className={`dh-drive-row${selectedFileId === file.id ? ' is-selected' : ''}`}
+                          data-drive-file-id={file.id}
+                          aria-current={selectedFileId === file.id ? 'true' : undefined}
+                          tabIndex={0}
+                          onClick={() => onSelect?.(file.id, 'pointer')}
+                          onDoubleClick={() => onOpenOnGoogle(file.id)}
+                          onKeyDown={(e) => onRowKeyDown(e, file.id)}
+                        >
+                          <td className="dh-drive-td dh-drive-cell-name">
+                            <div className="dh-drive-name-wrap">
+                              <DriveFileIcon iconKind={file.iconKind} size={24} />
+                              <span className="dh-drive-file-name" title={file.name}>
+                                {file.name}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="dh-drive-td dh-drive-cell-account">
+                            <div className="dh-drive-account-stack">
+                              <span
+                                className={`dh-drive-account-email${viewerEmail ? '' : ' is-missing'}`}
+                                title={accountEmail}
+                              >
+                                {accountEmail}
+                              </span>
+                              {rowNeedsReconnect &&
+                                (onReconnect ? (
+                                  <button
+                                    type="button"
+                                    className="dh-drive-reconnect-link"
+                                    data-drive-reconnect={viewerConnId || file.connectionId}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      onReconnect(viewerConnId || file.connectionId)
+                                    }}
+                                  >
+                                    <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
+                                    <span>{t('uhDriveReconnect')}</span>
+                                  </button>
+                                ) : (
+                                  <span
+                                    className="dh-drive-reconnect-link dh-drive-reconnect-text"
+                                    data-drive-reconnect={viewerConnId || file.connectionId}
+                                  >
+                                    <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
+                                    <span>{t('uhDriveReconnect')}</span>
+                                  </span>
+                                ))}
+                            </div>
+                          </td>
+                          <td className="dh-drive-td dh-drive-cell-access">
+                            <span
+                              className={`dh-vis-badge dh-drive-badge dh-drive-badge-${badge.tone}`}
+                              data-drive-access={badge.tone}
+                            >
+                              {badge.label}
+                            </span>
+                          </td>
+                          <td className="dh-drive-td dh-drive-cell-used">{usedInText}</td>
+                          <td className="dh-drive-td dh-drive-cell-tasks">{tasksCreatedText}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {moreError && (
+                <div className="dh-drive-more-error-row" role="alert">
+                  <p className="uw-pick-more-error">{t(driveListErrorKey(moreError))}</p>
+                  <button
+                    type="button"
+                    className="btn btn-secondary dh-drive-retry-btn"
+                    data-drive-retry=""
+                    onClick={onRetry}
+                  >
+                    {t('acctRetry')}
+                  </button>
+                </div>
+              )}
+
+              {nextCursor && (
+                <div className="dh-load-more-row">
+                  <button
+                    type="button"
+                    className="btn btn-secondary uw-pick-more"
+                    data-drive-load-more=""
+                    disabled={loadingMore}
+                    onClick={onLoadMore}
+                  >
+                    {loadingMore ? t('uwPickLoadingMore') : t('uhLoadMore')}
+                  </button>
+                </div>
+              )}
+
+              <p className="dh-drive-footnote">{t('uhDriveFootnote')}</p>
+            </>
+          )}
+        </div>
+        {panel}
+      </div>
     </div>
   )
 }
@@ -639,11 +701,14 @@ export function useDocumentsHomeDrive({
   subView,
   listTick,
   onErrorToast,
+  onFeatureDisabled,
 }: {
   workspaceId: string
   subView: string
   listTick: number
   onErrorToast?: (error: UniworkDriveErrorCode) => void
+  /** the org turned the connector off mid-session: the host leaves the Drive view */
+  onFeatureDisabled?: () => void
 }): UseDocumentsHomeDriveResult {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [capability, setCapability] = useState(false)
@@ -654,6 +719,8 @@ export function useDocumentsHomeDrive({
   const [networkFailed, setNetworkFailed] = useState(false)
   const [focusTick, setFocusTick] = useState(0)
   const [driveTick, setDriveTick] = useState(0)
+  const onFeatureDisabledRef = useRef(onFeatureDisabled)
+  onFeatureDisabledRef.current = onFeatureDisabled
 
   const [filesState, setFilesState] = useState<{
     status: 'loading' | 'ready' | 'error'
@@ -764,6 +831,7 @@ export function useDocumentsHomeDrive({
         setConnections([])
         seenInSessionRef.current = false
         setSeenInSession(false)
+        onFeatureDisabledRef.current?.()
       }
     })()
   }, [workspaceId, isDriveView, listTick, focusTick, driveTick])
@@ -808,6 +876,7 @@ export function useDocumentsHomeDrive({
       connectionId: resolvedAccountId,
     }).then((res) => {
       if (filesSeqRef.current !== seq) return
+      if (!res.ok && res.error === 'feature_disabled') onFeatureDisabledRef.current?.()
       if (res.ok) {
         setNetworkFailed(false)
         // A successful refresh replaces the list with page 1 (collapsing any cursor-loaded pages).
@@ -852,6 +921,7 @@ export function useDocumentsHomeDrive({
       cursor,
     }).then((res) => {
       if (filesSeqRef.current !== seq) return
+      if (!res.ok && res.error === 'feature_disabled') onFeatureDisabledRef.current?.()
       if (res.ok) {
         setFilesState((prev) => ({
           ...prev,
@@ -893,7 +963,8 @@ export function useDocumentsHomeDrive({
         const res = await fn.call(bridge, { workspaceId, driveFileId })
         if (res && !res.ok && res.error) {
           if (res.error === 'network') setNetworkFailed(true)
-          onErrorToastRef.current?.(res.error)
+          if (res.error === 'feature_disabled') onFeatureDisabledRef.current?.()
+          else onErrorToastRef.current?.(res.error)
         }
       } catch {
         setNetworkFailed(true)
