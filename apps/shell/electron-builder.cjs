@@ -114,6 +114,7 @@ function assertExtraResourceSources() {
     `../../${OCR_TESSERACT}/tessdata/vie.traineddata`,
     `../../${OCR_TESSERACT}/tessdata/LICENSE`,
     `../../${OCR_TESSERACT}/tessdata/README.md`,
+    `../../${OCR_TESSERACT}/LICENSES-tesseract-core.txt`,
     ...LEGAL_FILES.map((name) => `../../${name}`),
   ]) {
     if (!existsSync(join(__dirname, rel))) {
@@ -312,6 +313,13 @@ const REQUIRED_NOTICE_TERMS = [
   'tesseract.js-core',
   'tessdata_fast',
   'Leptonica',
+  'PNG Reference Library License',
+  'Jean-loup Gailly',
+  'Independent JPEG Group',
+  'GIFLIB',
+  'Sam Leffler',
+  'Google Inc.',
+  'OpenLibm',
 ]
 
 function hasValidThirdPartyNotice() {
@@ -451,6 +459,11 @@ const config = {
     {
       from: `../../${OCR_TESSERACT}/tessdata/README.md`,
       to: 'ocr/tesseract/tessdata/README.md',
+    },
+    // licenses of the codec / math libraries compiled into the WebAssembly engine
+    {
+      from: `../../${OCR_TESSERACT}/LICENSES-tesseract-core.txt`,
+      to: 'ocr/tesseract/LICENSES-tesseract-core.txt',
     },
     ...tesseractExtraResources(),
     // genoffice command line: runs on the app binary with ELECTRON_RUN_AS_NODE,

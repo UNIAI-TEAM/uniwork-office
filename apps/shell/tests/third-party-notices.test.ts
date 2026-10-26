@@ -31,6 +31,36 @@ describe('third-party license aggregation', () => {
     expect(text).toContain('Copyright 2014 PDFium Authors')
     expect(text).toContain('Apache License')
 
+    // the bundled OCR engine: tesseract.js-core / the model / Leptonica and the full
+    // license text of every codec library linked into the WebAssembly engine
+    for (const term of [
+      'tesseract.js-core',
+      'tessdata_fast',
+      'Leptonica',
+      'Copyright (C) 2001-2020 Leptonica', // Leptonica BSD-2-Clause
+      'PNG Reference Library License version 2', // libpng
+      'Jean-loup Gailly and Mark Adler', // zlib
+      'Permission is granted to anyone to use this software for any purpose', // zlib
+      'This software is based in part on the work of the Independent JPEG Group', // libjpeg (IJG condition 2)
+      'The GIFLIB distribution is Copyright (c) 1997  Eric S. Raymond', // giflib
+      'Copyright (c) 1988-1997 Sam Leffler', // libtiff
+      'Copyright (c) 2010, Google Inc.', // libwebp
+      'Neither the name of Google nor the names of its contributors', // libwebp BSD-3-Clause
+      'Copyright (c) 2011-14 The Julia Project', // openlibm MIT
+      'Copyright (c) 2008 Stephen L. Moshier', // openlibm ISC
+      'Copyright 1992-2011 The FreeBSD Project', // openlibm BSD-2-Clause
+      'a37d4836519517bdce6cb9d956092321eca3e73b', // libpng: pinned upstream commit
+      'Resources/ocr/tesseract/LICENSES-tesseract-core.txt',
+    ]) {
+      expect(text, term).toContain(term)
+    }
+    // the shipped file next to the engine is the very text embedded in the notice
+    const shipped = readFileSync(
+      join(root, 'packages/pdf2docx/ocr-tesseract/LICENSES-tesseract-core.txt'),
+      'utf8',
+    ).trim()
+    expect(text).toContain(shipped)
+
     const shellPackage = JSON.parse(
       readFileSync(join(root, 'apps/shell/package.json'), 'utf8'),
     ) as { scripts: Record<string, string> }

@@ -34,6 +34,12 @@ interface ResourcesModule {
 }
 const resources = require(join(shellRoot, 'build/ocr-tesseract-resources.cjs')) as ResourcesModule
 
+const envWithout = (names: string[]): NodeJS.ProcessEnv => {
+  const env = { ...process.env }
+  for (const name of names) delete env[name]
+  return env
+}
+
 const scratch: string[] = []
 const tmp = (prefix: string) => {
   const dir = mkdtempSync(join(tmpdir(), prefix))
@@ -69,6 +75,7 @@ describe('bundled Tesseract OCR resources', () => {
       'ocr/tesseract/tess-ocr.cjs',
       'ocr/tesseract/tessdata/vie.traineddata',
       'ocr/tesseract/tessdata/LICENSE',
+      'ocr/tesseract/LICENSES-tesseract-core.txt',
       'ocr/tesseract/node_modules/tesseract.js',
       'ocr/tesseract/node_modules/tesseract.js-core',
       'ocr/tesseract/node_modules/pngjs',
@@ -157,7 +164,8 @@ describe('bundled Tesseract OCR resources', () => {
         copyFiles: (matchers: unknown[]) => Promise<void>
       }
       const config = require(join(shellRoot, 'electron-builder.cjs')) as { extraResources: Entry[] }
-      const out = tmp('tess-staged-')
+      // like a Windows profile path: spaces and Vietnamese letters all the way down
+      const out = join(tmp('tess-staged-'), 'tess Việt dữ liệu')
       const matchers = config.extraResources
         .filter((e) => e.to.startsWith('ocr/tesseract/'))
         .map(
@@ -183,6 +191,7 @@ describe('bundled Tesseract OCR resources', () => {
       expect(core).toEqual(
         [
           'LICENSE',
+          'README.md',
           'package.json',
           'tesseract-core-relaxedsimd.js',
           'tesseract-core-relaxedsimd.wasm',
@@ -194,6 +203,16 @@ describe('bundled Tesseract OCR resources', () => {
       )
       expect(files).toContain('node_modules/node-fetch/node_modules/whatwg-url/package.json')
       expect(files).toContain('tessdata/vie.traineddata')
+      // the license texts the installer owes for what the engine links (UNI-2165 R1-4), and the
+      // README NOTICE refers to for the changes made to Tesseract
+      expect(files).toContain('LICENSES-tesseract-core.txt')
+      const licenses = readFileSync(join(tess, 'LICENSES-tesseract-core.txt'), 'utf8')
+      for (const lib of ['libpng', 'zlib', 'libjpeg', 'giflib', 'libtiff', 'libwebp', 'openlibm']) {
+        expect(licenses, lib).toContain(lib)
+      }
+      expect(
+        readFileSync(join(tess, 'node_modules/tesseract.js-core/README.md'), 'utf8'),
+      ).toContain('All dependencies are unmodified except for Tesseract')
       expect(files.some((f) => f.startsWith('node_modules/tesseract.js/dist/'))).toBe(false)
 
       // a stripped environment: nothing but PATH-less node and the staged files
@@ -215,5 +234,46 @@ describe('bundled Tesseract OCR resources', () => {
       expect(bytes).toBeGreaterThan(8 * 1024 * 1024)
       expect(bytes).toBeLessThan(18 * 1024 * 1024)
     }, 60_000)
+
+    // the binary the installer really runs the helper on (process.execPath of the packaged app is
+    // Electron with ELECTRON_RUN_AS_NODE=1): headless, no window, no display needed
+    const electronBinary = (() => {
+      try {
+        const path = require('electron') as unknown
+        return typeof path === 'string' && existsSync(path) ? path : null
+      } catch {
+        return null
+      }
+    })()
+
+    it.skipIf(electronBinary === null)(
+      'runs the staged helper under the real Electron binary with ELECTRON_RUN_AS_NODE',
+      async () => {
+        const out = await stage()
+        const tess = join(out, 'ocr', 'tesseract')
+        const png = readFileSync(join(repoRoot, 'packages/pdf2docx/tests/fixtures/ocr/vi.png'))
+        const res = spawnSync(
+          electronBinary!,
+          [join(tess, 'tess-ocr.cjs'), join(tess, 'tessdata'), 'vie'],
+          {
+            input: png,
+            maxBuffer: 64 << 20,
+            cwd: tess,
+            // the app's own environment minus Node switches, as the engine wrapper hands it over
+            env: { ...envWithout(['NODE_OPTIONS', 'NODE_PATH']), ELECTRON_RUN_AS_NODE: '1' },
+            timeout: 120_000,
+            windowsHide: true,
+          },
+        )
+        expect(res.error).toBeUndefined()
+        expect(res.stderr.toString()).not.toMatch(/Cannot find module/)
+        expect(res.status).toBe(0)
+        const parsed = JSON.parse(res.stdout.toString('utf8')) as { lines: { t: string }[] }
+        const text = parsed.lines.map((l) => l.t).join('\n')
+        expect(text).toContain('Cộng hòa xã hội chủ nghĩa Việt Nam')
+        expect(text).toContain('Đà Nẵng')
+      },
+      180_000,
+    )
   })
 })

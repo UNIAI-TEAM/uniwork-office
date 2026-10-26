@@ -413,15 +413,20 @@ connection. It runs as a script on the application binary
 
 The tesseract.js-core build also compiles in the image-codec and math libraries
 its repository lists as submodules (https://github.com/naptha/tesseract.js-core):
-libpng (libpng-2.0), zlib (Zlib), libtiff (libtiff license, BSD-style), giflib
-(MIT), libwebp (BSD-3-Clause), openlibm (MIT / BSD-style) and libjpeg, whose
-license requires this statement: this software is based in part on the work of
-the Independent JPEG Group.
+libpng (libpng-2.0), zlib (Zlib), libjpeg (Independent JPEG Group), giflib (MIT),
+libtiff (libtiff license, BSD-style), libwebp (BSD-3-Clause), openlibm (MIT, ISC,
+BSD-2-Clause) and Leptonica (BSD-2-Clause). Which of them are really linked into
+the shipped WebAssembly engine, with the evidence and the upstream commit of each,
+and their FULL license texts follow; the same text ships next to the engine in
+Resources/ocr/tesseract/LICENSES-tesseract-core.txt. The Tesseract changes made by
+the tesseract.js-core packager are listed in
+Resources/ocr/tesseract/node_modules/tesseract.js-core/README.md.
+
+This software is based in part on the work of the Independent JPEG Group.
 `
-out += sub('Leptonica license')
-out +=
-  readFileSync(join(ROOT, 'packages/pdf2docx/ocr-tesseract/LICENSE-LEPTONICA.txt'), 'utf8').trim() +
-  '\n'
+out += sub('Licenses of the libraries compiled into the OCR engine')
+out += `${readFileSync(join(ROOT, 'packages/pdf2docx/ocr-tesseract/LICENSES-tesseract-core.txt'), 'utf8').trim()}
+`
 
 for (const term of [
   '@embedpdf/pdfium',
@@ -430,6 +435,13 @@ for (const term of [
   'tesseract.js-core',
   'tessdata_fast',
   'Leptonica',
+  'PNG Reference Library License',
+  'Jean-loup Gailly',
+  'Independent JPEG Group',
+  'GIFLIB',
+  'Sam Leffler',
+  'Google Inc.',
+  'OpenLibm',
 ]) {
   if (!out.includes(term)) {
     throw new Error(`generated third-party notice is missing required term: ${term}`)

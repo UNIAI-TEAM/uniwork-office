@@ -71,7 +71,7 @@ function loadConfig(env: Record<string, string | undefined>, bakedCliVersion = '
               return `const __cliAppVersion = ${JSON.stringify(bakedCliVersion)};\n`
             }
             if (String(path).endsWith('THIRD-PARTY-NOTICES.txt')) {
-              return '@embedpdf/pdfium\nCopyright 2014 PDFium Authors\nApache License\ntesseract.js-core\ntessdata_fast\nLeptonica\n'
+              return '@embedpdf/pdfium\nCopyright 2014 PDFium Authors\nApache License\ntesseract.js-core\ntessdata_fast\nLeptonica\nPNG Reference Library License\nJean-loup Gailly\nIndependent JPEG Group\nGIFLIB\nSam Leffler\nGoogle Inc.\nOpenLibm\n'
             }
             return require('node:fs').readFileSync(path, encoding as BufferEncoding)
           },

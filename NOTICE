@@ -53,9 +53,17 @@ model download, no network connection). Its components are:
 
 - Tesseract OCR 5 (https://github.com/tesseract-ocr/tesseract), Apache License,
   Version 2.0, compiled to WebAssembly inside the npm package tesseract.js-core
-  (Apache-2.0; its packager's changes to Tesseract are listed in that
-  package's README) together with Leptonica (BSD-2-Clause) and the image-codec
-  libraries named in THIRD-PARTY-NOTICES.txt;
+  (Apache-2.0). The changes its packager made to Tesseract are listed in the
+  README.md shipped in Resources/ocr/tesseract/node_modules/tesseract.js-core/;
+- the libraries linked into that WebAssembly engine besides Tesseract: Leptonica
+  (BSD-2-Clause), libpng (PNG Reference Library License 2), zlib (Zlib), libjpeg
+  (Independent JPEG Group), giflib (MIT), libtiff (libtiff license), libwebp
+  (BSD-3-Clause) and openlibm (MIT, ISC, BSD-2-Clause, FDLIBM notice). Their full
+  license texts, with the evidence which of them the shipped engine links and
+  the upstream commit of each, are in
+  packages/pdf2docx/ocr-tesseract/LICENSES-tesseract-core.txt (shipped as
+  Resources/ocr/tesseract/LICENSES-tesseract-core.txt) and in
+  THIRD-PARTY-NOTICES.txt;
 - tesseract.js (https://github.com/naptha/tesseract.js), Apache-2.0, plus the
   npm packages it runs on (bmp-js, idb-keyval, is-url, node-fetch, pngjs,
   regenerator-runtime, wasm-feature-detect, zlibjs and node-fetch's whatwg-url
@@ -65,11 +73,8 @@ model download, no network connection). Its components are:
   923915d4ced2a7235221788285785a29c4a42d4a); its license text and checksum are
   in packages/pdf2docx/ocr-tesseract/tessdata.
 
-Leptonica Copyright (C) 2001-2020 Leptonica. All rights reserved. It is
-redistributed under the two-clause BSD license reproduced in
-packages/pdf2docx/ocr-tesseract/LICENSE-LEPTONICA.txt and in
-THIRD-PARTY-NOTICES.txt. This software is based in part on the work of the
-Independent JPEG Group.
+Leptonica Copyright (C) 2001-2020 Leptonica. All rights reserved. This software
+is based in part on the work of the Independent JPEG Group.
 
 Unicode Character Database
 

@@ -74,9 +74,11 @@ const FILTERS = {
   // and the base64 .wasm.js twins stay out. The staged-helper test in
   // apps/shell/tests/ocr-tesseract-packaging.test.ts fails if a tesseract.js
   // upgrade changes which build is loaded.
+  // README.md lists the changes made to Tesseract (NOTICE refers to it)
   'tesseract.js-core': [
     'package.json',
     'LICENSE',
+    'README.md',
     'tesseract-core.js',
     'tesseract-core.wasm',
     'tesseract-core-simd.js',
