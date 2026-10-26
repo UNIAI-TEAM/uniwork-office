@@ -3,6 +3,7 @@ import type { FetchLike } from '../src/main/uniwork-docs/client'
 import {
   CapabilityCache,
   NEVER_READ_CAPABILITIES,
+  parseCapabilities,
   type CapabilityFetch,
   type OfficeCapabilities,
 } from '../src/main/uniwork-sync/capability/cache'
@@ -14,6 +15,7 @@ const ALL_ON: OfficeCapabilities = {
   offline_library: true,
   ai_uniwork: true,
   ai_uniwork_formats: ['docx', 'xlsx'],
+  drive_connector: true,
 }
 
 function fakeClock(start = 5_000_000) {
@@ -98,6 +100,7 @@ describe('capability cache', () => {
           offline_library: false,
           ai_uniwork: false,
           ai_uniwork_formats: [],
+          drive_connector: false,
         },
         source: 'stale',
       })
@@ -122,6 +125,7 @@ describe('capability cache', () => {
       offline_library: false,
       ai_uniwork: false,
       ai_uniwork_formats: [],
+      drive_connector: false,
     })
   })
 
@@ -166,6 +170,69 @@ describe('capability cache', () => {
     release()
     expect((await next).source).toBe('fresh')
     expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('drive_connector is optional in parseCapabilities: missing or non-boolean -> false, body stays valid', () => {
+    const withoutDrive = parseCapabilities({
+      sync_feed: true,
+      sync_write: true,
+      offline_library: false,
+      ai_uniwork: true,
+      ai_uniwork_formats: ['docx'],
+      ttl_seconds: 120,
+    })
+    expect(withoutDrive).toEqual({
+      capabilities: {
+        sync_feed: true,
+        sync_write: true,
+        offline_library: false,
+        ai_uniwork: true,
+        ai_uniwork_formats: ['docx'],
+        drive_connector: false,
+      },
+      ttlSeconds: 120,
+    })
+
+    for (const nonBool of [null, 'true', 1, {}, []]) {
+      const parsed = parseCapabilities({
+        sync_feed: true,
+        sync_write: false,
+        offline_library: true,
+        ai_uniwork: false,
+        drive_connector: nonBool,
+      })
+      expect(parsed?.capabilities.drive_connector).toBe(false)
+    }
+
+    const withDriveTrue = parseCapabilities({
+      sync_feed: false,
+      sync_write: true,
+      offline_library: false,
+      ai_uniwork: false,
+      drive_connector: true,
+    })
+    expect(withDriveTrue?.capabilities.drive_connector).toBe(true)
+  })
+
+  it('401 after TTL degrades drive_connector to false along with ai_uniwork', async () => {
+    const clock = fakeClock()
+    const fetch = fakeFetch({ o1: [ok({ drive_connector: true }), { status: 401 }] })
+    const cache = new CapabilityCache({ fetch, clock })
+    expect((await cache.get('o1')).capabilities.drive_connector).toBe(true)
+    clock.advance(300_000)
+    const expired = await cache.get('o1')
+    expect(expired).toEqual({
+      kind: 'session_expired',
+      capabilities: {
+        sync_feed: true,
+        sync_write: true,
+        offline_library: true,
+        ai_uniwork: false,
+        ai_uniwork_formats: [],
+        drive_connector: false,
+      },
+      source: 'stale',
+    })
   })
 })
 
