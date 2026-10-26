@@ -38,6 +38,7 @@ const FILEPASS = 0x002f
 const BIFF8_VERSION = 0x0600
 const SUBSTREAM_WORKBOOK_GLOBALS = 0x0005
 const SUBSTREAM_WORKSHEET = 0x0010
+const SHEET_TYPE_WORKSHEET = 0x00
 const MAX_BIFF8_ROW = 0xffff
 const MAX_BIFF8_COL = 0xff
 const MAX_RECORDS = 500_000
@@ -49,6 +50,7 @@ const MAX_EMPTY_RUN = 8
  * Extract readable text from a legacy Excel 97-2003 (.xls, BIFF8) workbook:
  * one `# SheetName` section per sheet, cells joined with ` | ` matching `xlsxToText`.
  * Numeric date/time cells are emitted as raw Excel serial numbers (XF/FORMAT/DATEMODE formatting is not applied).
+ * Non-worksheet sheets (such as chart sheets, macro sheets, and VB modules) are skipped.
  */
 export async function xlsToText(bytes: Uint8Array): Promise<string> {
   const container = CFB.read(Buffer.from(bytes), { type: 'buffer' })
@@ -117,7 +119,7 @@ function readBiff8Workbook(stream: Uint8Array): BiffSheet[] {
     )
   }
 
-  const bounds: { name: string; position: number }[] = []
+  const bounds: { name: string; position: number; sheetType: number }[] = []
   let sst: string[] = []
   const globalsRecords: BiffRecord[] = []
   const budget: ExtractionBudget = { records: 0, cells: 0, chars: 0 }
@@ -199,7 +201,10 @@ function readBiff8Workbook(stream: Uint8Array): BiffSheet[] {
     }
     const sheetVersion = readU16(stream, sheet.position + 4)
     const sheetKind = readU16(stream, sheet.position + 6)
-    if (sheetVersion !== BIFF8_VERSION || sheetKind !== SUBSTREAM_WORKSHEET) {
+    if (sheetVersion !== BIFF8_VERSION) {
+      throw new Error(`Invalid xls: sheet ${sheet.name} does not start with a BIFF8 BOF`)
+    }
+    if (sheet.sheetType === SHEET_TYPE_WORKSHEET && sheetKind !== SUBSTREAM_WORKSHEET) {
       throw new Error(`Invalid xls: sheet ${sheet.name} does not start with a BIFF8 worksheet BOF`)
     }
   }
@@ -212,13 +217,15 @@ function readBiff8Workbook(stream: Uint8Array): BiffSheet[] {
     maxEndByOffset.set(start, nextStart)
   }
 
-  return bounds.map((sheet) => {
-    const maxEnd = maxEndByOffset.get(sheet.position)!
-    return {
-      name: sheet.name,
-      rows: readSheet(stream, sheet.position, maxEnd, sst, budget, sheet.name),
-    }
-  })
+  return bounds
+    .filter((sheet) => sheet.sheetType === SHEET_TYPE_WORKSHEET)
+    .map((sheet) => {
+      const maxEnd = maxEndByOffset.get(sheet.position)!
+      return {
+        name: sheet.name,
+        rows: readSheet(stream, sheet.position, maxEnd, sst, budget, sheet.name),
+      }
+    })
 }
 
 function validateCellCoords(row: number, col: number): void {
@@ -427,8 +434,9 @@ function readSheet(
 }
 
 
-function readBoundsheet(data: Uint8Array): { name: string; position: number } {
+function readBoundsheet(data: Uint8Array): { name: string; position: number; sheetType: number } {
   if (data.byteLength < 8) throw new Error('Invalid xls: truncated BOUNDSHEET record')
+  const sheetType = data[5] ?? 0
   const cch = data[6] ?? 0
   const grbit = data[7] ?? 0
   const bytes = grbit & 1 ? cch * 2 : cch
@@ -437,7 +445,7 @@ function readBoundsheet(data: Uint8Array): { name: string; position: number } {
     grbit & 1
       ? new TextDecoder('utf-16le').decode(data.subarray(8, 8 + bytes))
       : latin1(data.subarray(8, 8 + bytes))
-  return { name, position: readU32(data, 0) }
+  return { name, position: readU32(data, 0), sheetType }
 }
 
 class BiffStringReader {

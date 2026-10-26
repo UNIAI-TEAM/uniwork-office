@@ -54,9 +54,9 @@ function eof(): Uint8Array {
   return rec(0x000a, [])
 }
 
-function boundsheet(offset: number, name: string): Uint8Array {
+function boundsheet(offset: number, name: string, sheetType = 0x00): Uint8Array {
   const nameBytes = [...Buffer.from(name, 'latin1')]
-  return rec(0x0085, [...u32(offset), 0x00, 0x00, nameBytes.length, 0x00, ...nameBytes])
+  return rec(0x0085, [...u32(offset), 0x00, sheetType & 0xff, nameBytes.length, 0x00, ...nameBytes])
 }
 
 function numberCell(row: number, col: number, value: number): Uint8Array {
@@ -100,12 +100,13 @@ function formulaStringCell(row: number, col: number): Uint8Array {
 
 function buildXlsBuffer(opts: {
   sheetNames: readonly string[]
+  sheetTypes?: readonly number[]
   extraGlobals?: readonly Uint8Array[]
   sheetStreams: readonly Uint8Array[]
   overrideOffsets?: readonly number[]
 }): Buffer {
   const extra = opts.extraGlobals ?? []
-  const dummyBounds = opts.sheetNames.map((name) => boundsheet(0, name))
+  const dummyBounds = opts.sheetNames.map((name, i) => boundsheet(0, name, opts.sheetTypes?.[i] ?? 0x00))
   const globalsHeaderLen =
     bof(0x0005).byteLength +
     dummyBounds.reduce((sum, b) => sum + b.byteLength, 0) +
@@ -118,7 +119,11 @@ function buildXlsBuffer(opts: {
     cursor += s.byteLength
   }
   const realBounds = opts.sheetNames.map((name, i) =>
-    boundsheet(opts.overrideOffsets?.[i] ?? sheetOffsets[i] ?? globalsHeaderLen, name),
+    boundsheet(
+      opts.overrideOffsets?.[i] ?? sheetOffsets[i] ?? globalsHeaderLen,
+      name,
+      opts.sheetTypes?.[i] ?? 0x00,
+    ),
   )
   const stream = concatBytes([bof(0x0005), ...realBounds, ...extra, eof(), ...opts.sheetStreams])
   const cfb = CFB.utils.cfb_new()
@@ -458,5 +463,79 @@ describe('parseFileToText: legacy .xls', () => {
     const validRes = await parseFileToText(writeFixture('r1-15-valid-col255.xls', validCol255Buf))
     expect(validRes.ok).toBe(true)
     expect(validRes.text).toBe('# S0\n(255 empty) | 42')
+  })
+
+  it('R2-1: skips non-worksheet BOUNDSHEET types (chart dt=0x02, macro dt=0x01, VB dt=0x06) while bounding worksheet substreams and rejecting mismatched worksheet BOFs', async () => {
+    // Worksheet + correctly typed chart sheet (dt 0x02, BOF kind 0x0020) -> worksheet text exact, chart sheet omitted
+    const wsAndChartBuf = buildXlsBuffer({
+      sheetNames: ['Data', 'Chart'],
+      sheetTypes: [0x00, 0x02],
+      sheetStreams: [
+        concatBytes([bof(0x0010), numberCell(0, 0, 123), eof()]),
+        concatBytes([bof(0x0020), eof()]),
+      ],
+    })
+    const wsAndChartRes = await parseFileToText(writeFixture('r2-1-ws-and-chart.xls', wsAndChartBuf))
+    expect(wsAndChartRes.ok).toBe(true)
+    expect(wsAndChartRes.text).toBe('# Data\n123')
+
+    // Chart-before-worksheet layout
+    const chartBeforeWsBuf = buildXlsBuffer({
+      sheetNames: ['ChartFirst', 'DataSecond'],
+      sheetTypes: [0x02, 0x00],
+      sheetStreams: [
+        concatBytes([bof(0x0020), eof()]),
+        concatBytes([bof(0x0010), numberCell(0, 0, 456), eof()]),
+      ],
+    })
+    const chartBeforeWsRes = await parseFileToText(
+      writeFixture('r2-1-chart-before-ws.xls', chartBeforeWsBuf),
+    )
+    expect(chartBeforeWsRes.ok).toBe(true)
+    expect(chartBeforeWsRes.text).toBe('# DataSecond\n456')
+
+    // Chart-between-worksheets layout (and macro sheet dt=0x01 / BOF 0x0040, VB module dt=0x06)
+    const chartBetweenWsBuf = buildXlsBuffer({
+      sheetNames: ['First', 'ChartMid', 'MacroMid', 'VbMid', 'Second'],
+      sheetTypes: [0x00, 0x02, 0x01, 0x06, 0x00],
+      sheetStreams: [
+        concatBytes([bof(0x0010), numberCell(0, 0, 10), eof()]),
+        concatBytes([bof(0x0020), eof()]),
+        concatBytes([bof(0x0040), eof()]),
+        concatBytes([bof(0x0006), eof()]),
+        concatBytes([bof(0x0010), numberCell(0, 0, 20), eof()]),
+      ],
+    })
+    const chartBetweenWsRes = await parseFileToText(
+      writeFixture('r2-1-chart-between-ws.xls', chartBetweenWsBuf),
+    )
+    expect(chartBetweenWsRes.ok).toBe(true)
+    expect(chartBetweenWsRes.text).toBe('# First\n10\n\n# Second\n20')
+
+    // Skipped non-worksheet offsets still bound preceding worksheet readers (missing EOF before chart sheet fails)
+    const missingEofBeforeChartBuf = buildXlsBuffer({
+      sheetNames: ['DataNoEof', 'ChartAfter', 'TrailingWs'],
+      sheetTypes: [0x00, 0x02, 0x00],
+      sheetStreams: [
+        concatBytes([bof(0x0010), numberCell(0, 0, 111)]),
+        concatBytes([bof(0x0020), eof()]),
+        concatBytes([bof(0x0010), numberCell(0, 0, 222), eof()]),
+      ],
+    })
+    const missingEofBeforeChartRes = await parseFileToText(
+      writeFixture('r2-1-missing-eof-before-chart.xls', missingEofBeforeChartBuf),
+    )
+    expect(missingEofBeforeChartRes.ok).toBe(false)
+    expect(missingEofBeforeChartRes.error).toMatch(/EOF|substream/i)
+
+    // Mismatched pair (dt 0x00 -> chart BOF 0x0020) is still rejected
+    const mismatchedBuf = buildXlsBuffer({
+      sheetNames: ['Mismatched'],
+      sheetTypes: [0x00],
+      sheetStreams: [concatBytes([bof(0x0020), eof()])],
+    })
+    const mismatchedRes = await parseFileToText(writeFixture('r2-1-mismatched.xls', mismatchedBuf))
+    expect(mismatchedRes.ok).toBe(false)
+    expect(mismatchedRes.error).toMatch(/worksheet BOF/i)
   })
 })
