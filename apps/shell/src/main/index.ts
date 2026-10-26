@@ -241,6 +241,7 @@ import {
   setSheetsExtraFileMenuItems,
   setSheetsHostWindowHook,
   setSheetsShellWindow,
+  setSheetsLegacyOpenHook,
   setSheetsWorkbookOpenedHook,
   startSheetsCaptureServer,
   stopSheetsSidecar,
@@ -4004,6 +4005,8 @@ function createShellWindow(): void {
   })
   // When ⌘O opens a file inside a tab, sync the tab title/path (used for de-dup by path) and record it as recent.
   // The first save / save-as fires this too, so applyPendingDir also runs here.
+  // Sheets' own File > Open picked a legacy .xls: the converter route, not the calamine reader
+  setSheetsLegacyOpenHook((path) => legacyFormatForPath(path) !== null && legacyOpener.open(path))
   setSheetsWorkbookOpenedHook((wc, path) => {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)

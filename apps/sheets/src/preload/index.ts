@@ -529,7 +529,11 @@ const desktopApi: DesktopApi = {
         'path' in payload &&
         typeof payload.path === 'string'
       ) {
-        cb(payload.path)
+        const newPath =
+          'newPath' in payload && typeof payload.newPath === 'string' && payload.newPath
+            ? payload.newPath
+            : undefined
+        cb(payload.path, newPath)
       }
     }
     ipcRenderer.on('uniwork:doc-state-changed', listener)

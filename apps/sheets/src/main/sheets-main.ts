@@ -1849,9 +1849,9 @@ export function sheetsFileRenamed(wc: WebContents, oldPath: string, newPath: str
     matched = true
   }
   if (matched) wc.send(IPC_CHANNELS.workbookRenamed, basename(newPath))
-  // the renderer still names the workbook by its old path: ping that path so it
-  // re-queries the (now bound) state and drops its never-saved flags
-  if (adoptedByUniwork) wc.send('uniwork:doc-state-changed', { path: oldPath })
+  // the renderer still names the workbook by its old path: ping that path so it re-queries the
+  // (now bound) state, drops its never-saved flags and takes the working copy as its file path
+  if (adoptedByUniwork) wc.send('uniwork:doc-state-changed', { path: oldPath, newPath })
 }
 
 /**
@@ -1932,6 +1932,16 @@ export function setSheetsWorkbookOpenedHook(
   fn: ((wc: WebContents, path: string) => void) | null,
 ): void {
   workbookOpenedHook = fn
+}
+
+/**
+ * shell hook: a legacy .xls picked in Sheets' own File > Open. The shell converts it with its
+ * bundled converter and opens the result (every other open route does), so the values-only
+ * calamine preparation here is never the first choice. true = the shell took the file.
+ */
+let legacyOpenHook: ((path: string) => boolean) | null = null
+export function setSheetsLegacyOpenHook(fn: ((path: string) => boolean) | null): void {
+  legacyOpenHook = fn
 }
 
 /** forward an application-menu File command into the sheets renderer */
@@ -2783,6 +2793,9 @@ export function registerSheetsIpc(): void {
       })
       if (selection.canceled || !selection.filePaths[0]) return null
       path = selection.filePaths[0]
+      // a picked legacy .xls goes to the shell's converter route; only a missing converter
+      // falls back (shell side) to the values-only open of this same file
+      if (/\.xls$/i.test(path) && legacyOpenHook?.(path)) return null
       // Retry on a stalled open restarts this pick, not an earlier shell open
       rememberOpenedWorkbook(event.sender, path)
     }

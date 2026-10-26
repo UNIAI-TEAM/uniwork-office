@@ -3020,7 +3020,11 @@ export interface DesktopApi {
   /// EL-1(b) fix6: whether the open workbook is bound to UniWork and read-only
   uniworkState?(): Promise<{ bound: boolean; readOnly: boolean }>
   /// EL-1(b) fix6: pushed (`{ path }`) when `isReadOnly(path)` or `isBound(path)` may have changed
-  onUniworkStateChanged?(cb: (path: string) => void): () => void
+  /**
+   * `newPath` is set when the workbook moved into its UniWork working copy: the renderer's file
+   * is that path from then on (later lock pings name it).
+   */
+  onUniworkStateChanged?(cb: (path: string, newPath?: string) => void): () => void
   /// EL-1(b) fix6: explicit Save on a read-only bound workbook asks main to explain
   uniworkReadOnlySave?(path?: string): Promise<void>
   getAiSettings(): Promise<AiSettings>
