@@ -4526,12 +4526,12 @@ function openGeneratedDocument(filePath: string): boolean {
 /** G5-10: a read-only draft preview (a temp copy under userData) is not a recent file */
 function recordRecentFile(filePath: string): void {
   if (isDraftPreviewPath(app.getPath('userData'), filePath)) return
-  recordRecentFileRaw(filePath)
-}
-
   // a converted legacy copy's staging path is swept when its tab closes: the recents entry is
   // the original the user picked, and the real file once a Save As gives the copy a home
   if (convertedDocumentFor(filePath)) return
+  recordRecentFileRaw(filePath)
+}
+
 /**
  * Progress for a legacy conversion: the taskbar/dock shows busy right away and,
  * when it takes longer than a blink, a box with Cancel (the file converts with
@@ -7546,13 +7546,13 @@ app.on('before-quit', () => {
   // the opener first: it aborts its own pending conversions and refuses new staging, so nothing
   // new starts after the running jobs are killed
   void legacyOpener.dispose()
+  killAllActiveLegacyConversions()
   // release the MCP port synchronously (macOS keeps the process alive after
   // the last window closes, so window-all-closed is not enough)
   stopMcpSync()
 })
 
 // after every window has closed with no veto, so a cancelled close prompt
-  killAllActiveLegacyConversions()
 // never released the lock. Token is still valid: stopUniworkAccount is after
 // the bounded release on the second pass.
 app.on('will-quit', (event) => {
