@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   convertPdfToDocx,
   convertPdfToPptx,
@@ -8,9 +9,9 @@ import {
   type OcrEngine,
   type PdfiumModule,
 } from '@genoffice/pdf2docx'
-import { createVisionOcrEngine, createWindowsOcrEngine } from '../../../pdf2docx/src/ocr-vision'
+import { resolveLocalOcrEngine } from '../../../pdf2docx/src/ocr-local'
 import { clipText } from '../preview'
-import { ocrHelperPath, pdfiumWasmPath } from '../resources'
+import { packagedResourcesDir, pdfiumWasmPath, repoRoot } from '../resources'
 
 let pdfiumPromise: Promise<PdfiumModule> | null = null
 
@@ -33,9 +34,12 @@ export function loadPdfium(): Promise<PdfiumModule> {
 let ocrEngine: OcrEngine | null | undefined
 function ocr(): OcrEngine | null {
   if (ocrEngine !== undefined) return ocrEngine
-  const helper = ocrHelperPath()
-  const create = process.platform === 'darwin' ? createVisionOcrEngine : createWindowsOcrEngine
-  ocrEngine = helper ? create(helper) : null
+  const resources = packagedResourcesDir()
+  const root = repoRoot()
+  ocrEngine = resolveLocalOcrEngine({
+    ...(resources ? { resourcesPath: resources } : {}),
+    ...(root ? { devPackageDir: join(root, 'packages/pdf2docx') } : {}),
+  })
   return ocrEngine
 }
 

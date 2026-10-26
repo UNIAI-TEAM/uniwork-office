@@ -70,16 +70,6 @@ export function xlsxSidecarPath(): string | null {
   return candidates.find((p) => existsSync(p)) ?? null
 }
 
-export function ocrHelperPath(): string | null {
-  const helper = process.platform === 'darwin' ? 'vision-ocr' : 'win-ocr.exe'
-  const packaged = packagedResourcesDir()
-  const candidates = [
-    ...(packaged ? [join(packaged, 'ocr', helper)] : []),
-    ...(repoRoot() ? [join(repoRoot()!, 'packages/pdf2docx/ocr-helper', helper)] : []),
-  ]
-  return candidates.find((p) => existsSync(p)) ?? null
-}
-
 /** skills/genoffice/SKILL.md as shipped beside this bundle (Resources/cli/skills) or in the checkout. */
 export function bundledSkillPath(): string | null {
   const packaged = packagedResourcesDir()
