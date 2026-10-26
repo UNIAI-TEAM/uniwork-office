@@ -8,7 +8,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
-use calamine::{Data, Reader, open_workbook_auto};
+use calamine::{Data, Reader, Sheets, open_workbook_auto};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
@@ -27,13 +27,25 @@ pub fn convert_to_xlsx(source: &Path, target: &Path) -> Result<ConvertResult, Si
         return Err(SidecarError::Workbook("The workbook has no sheets.".into()));
     }
 
+    let is_xls = matches!(workbook, Sheets::Xls(_));
     let mut sheet_xmls: Vec<String> = Vec::new();
     let mut cells = 0usize;
     for name in &names {
         let range = workbook
             .worksheet_range(name)
             .map_err(|error| SidecarError::Workbook(format!("Sheet {name}: {error}")))?;
-        let formulas = workbook.worksheet_formula(name).ok();
+        // calamine 0.36.0's BIFF8 (`Sheets::Xls`) formula parser fails to mask
+        // `ColRelU` flag bits (`0xC000`) on `PtgArea` (`SUM(B2:B4)` ->
+        // `SUM($USN$2:$USN$4)`), corrupts `PtgRef3d` columns with `colu << 2`
+        // and omits quotes around sheet names with spaces/diacritics, and emits
+        // literal `"Unrecognised formula ..."` strings on unsupported tokens.
+        // Keep the cached cell values from `worksheet_range` and omit `<f>` for
+        // `.xls` so converted workbooks never carry corrupted formulas.
+        let formulas = if is_xls {
+            None
+        } else {
+            workbook.worksheet_formula(name).ok()
+        };
         let mut formula_map: HashMap<(u32, u32), String> = HashMap::new();
         if let Some(formula_range) = formulas {
             let (start_row, start_col) = formula_range.start().unwrap_or((0, 0));
@@ -286,6 +298,37 @@ mod tests {
         assert!(sheet.contains(r#"<c r="B2"><f>B1*2</f>"#));
         let workbook = read_entry(&target, "xl/workbook.xml");
         assert!(workbook.contains(r#"<sheet name="Data" sheetId="1" r:id="rId1"/>"#));
+    }
+
+    #[test]
+    fn biff8_xls_conversion_drops_corrupted_calamine_formulas_and_preserves_cached_values() {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/vn-budget.xls");
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("vn-budget.xlsx");
+
+        let result = convert_to_xlsx(&source, &target).unwrap();
+        assert_eq!(result.sheets, 3);
+
+        let sheet1 = read_entry(&target, "xl/worksheets/sheet1.xml");
+        let sheet2 = read_entry(&target, "xl/worksheets/sheet2.xml");
+        let sheet3 = read_entry(&target, "xl/worksheets/sheet3.xml");
+
+        // Never emit corrupted calamine BIFF8 formulas ($USN, $USO, unquoted 3D ref)
+        for xml in [&sheet1, &sheet2, &sheet3] {
+            assert!(!xml.contains("<f>"), "expected no <f> in BIFF8 conversion, got: {xml}");
+            assert!(!xml.contains("USN"));
+            assert!(!xml.contains("USO"));
+            assert!(!xml.contains("USP"));
+            assert!(!xml.contains("Unrecognised formula"));
+        }
+
+        // Cached numeric values in formula cells are preserved intact
+        assert!(sheet1.contains(r#"<c r="B6"><v>4908000000</v></c>"#));
+        assert!(sheet1.contains(r#"<c r="C6"><v>5408000000</v></c>"#));
+        assert!(sheet2.contains(r#"<c r="D2"><v>270</v></c>"#));
+        assert!(sheet2.contains(r#"<c r="B5"><v>415</v></c>"#));
+        assert!(sheet2.contains(r#"<c r="D5"><v>900</v></c>"#));
+        assert!(sheet3.contains(r#"<c r="B1"><v>990</v></c>"#));
     }
 
     fn convert_fixture(path: &Path) {
