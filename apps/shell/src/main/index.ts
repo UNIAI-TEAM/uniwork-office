@@ -3588,8 +3588,9 @@ function applyPendingDir(wcId: number, filePath: string): string {
  * open tab (which re-grants the new path and refreshes its title).
  */
 function afterFileMoved(oldPath: string, newPath: string): void {
-  // a converted legacy copy that moved into the UniWork store has its real home now
-  forgetConvertedDocument(oldPath)
+  // a converted legacy copy renamed inside its staging dir is the same document under a new name
+  // (the opener follows it); one that moved elsewhere (the UniWork store) has its real home now
+  if (!legacyOpener.fileMoved(oldPath, newPath)) forgetConvertedDocument(oldPath)
   replaceRecentFile(oldPath, newPath)
   projectFileRenamed(oldPath, newPath)
   if (/\.pptx$/i.test(newPath)) void replaceSlidesRecentFile(oldPath, newPath)
@@ -4584,7 +4585,7 @@ const legacyOpener = createLegacyOpener({
   },
   activateConverted: (doc) => {
     const tab = tabManager?.findTabByPath(doc.tempPath)
-    if (!tab) return false
+    if (!tab) return focusDetachedByPath(doc.tempPath)
     tabManager?.activateTab(tab.id)
     return true
   },
@@ -7536,7 +7537,8 @@ app.on('before-quit', () => {
   markSheetsShuttingDown()
   stopSheetsSidecar()
   killAllPdfConvertJobs()
-  killAllActiveLegacyConversions()
+  // the opener first: it aborts its own pending conversions and refuses new staging, so nothing
+  // new starts after the running jobs are killed
   void legacyOpener.dispose()
   // release the MCP port synchronously (macOS keeps the process alive after
   // the last window closes, so window-all-closed is not enough)
@@ -7544,6 +7546,7 @@ app.on('before-quit', () => {
 })
 
 // after every window has closed with no veto, so a cancelled close prompt
+  killAllActiveLegacyConversions()
 // never released the lock. Token is still valid: stopUniworkAccount is after
 // the bounded release on the second pass.
 app.on('will-quit', (event) => {

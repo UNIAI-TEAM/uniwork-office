@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { basename, extname, join } from 'node:path'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 import { forgetConvertedDocument, registerConvertedDocument } from '@genoffice/electron-utils'
 import {
   LegacyConvertError,
@@ -11,6 +11,10 @@ import {
   type LegacyTargetFormat,
 } from './legacy-converter'
 import type { LegacyOpenStringKey } from './legacy-open-strings'
+
+const FOLDING_FS = process.platform === 'win32' || process.platform === 'darwin'
+const sameDir = (a: string, b: string): boolean =>
+  FOLDING_FS ? resolve(a).toLowerCase() === resolve(b).toLowerCase() : resolve(a) === resolve(b)
 
 /** the editor a converted document opens in */
 export type ConvertedKind = 'docs' | 'sheets' | 'slides'
@@ -52,6 +56,12 @@ export interface LegacyOpenDeps {
   /** the calamine route for an .xls when the converter is not installed; false = nothing opened */
   openXlsValuesOnly(path: string): boolean
   recordRecent(path: string): void
+  /**
+   * How long a sweep waits before it judges ownership (default 1000 ms). A tab that moves
+   * between the strip and a detached window is owned by neither for a moment, and a sweep
+   * in that gap would delete the live file.
+   */
+  sweepDelayMs?: number
   /** show the progress box; the returned function ends it */
   beginProgress(fileName: string, cancel: () => void): () => void
   /** a typed notice box */
@@ -86,6 +96,10 @@ export function legacyErrorMessage(
 export function createLegacyOpener(deps: LegacyOpenDeps) {
   const inFlight = new Set<string>()
   const documents = new Map<string, ConvertedDocument>()
+  /** the conversions this opener started: dispose aborts them */
+  const controllers = new Set<AbortController>()
+  let sweepTimer: ReturnType<typeof setTimeout> | null = null
+  let disposed = false
 
   const byOriginal = (originalPath: string): ConvertedDocument | undefined =>
     [...documents.values()].find((doc) => doc.originalPath === originalPath)
@@ -102,9 +116,21 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
     await rm(doc.tempDir, { recursive: true, force: true }).catch(() => undefined)
   }
 
+  /** a cancel or a quit that lands during the staging awaits must not open the tab */
+  function throwIfStopped(signal: AbortSignal): void {
+    if (signal.aborted || disposed) throw new LegacyConvertError('cancelled', 'cancelled')
+  }
+
+  function sweepNow(): void {
+    for (const doc of [...documents.values()]) {
+      if (!deps.isPathOpen(doc.tempPath)) void removeTempDir(doc)
+    }
+  }
+
   async function runConversion(filePath: string, source: LegacySourceFormat): Promise<void> {
     const fileName = basename(filePath)
     const controller = new AbortController()
+    controllers.add(controller)
     const endProgress = deps.beginProgress(fileName, () => controller.abort())
     let tempDir: string | null = null
     try {
@@ -113,11 +139,17 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
         sourceFormat: source,
       })
       const kind = KIND_FOR_TARGET[result.targetFormat]
-      tempDir = join(deps.importRoot(), randomUUID())
-      await mkdir(tempDir, { recursive: true })
+      throwIfStopped(controller.signal)
+      // the shared root keeps the default mode; the document's own dir and file are private
+      // (a shared temp dir is traversable by other local users)
+      const importRoot = deps.importRoot()
+      await mkdir(importRoot, { recursive: true })
+      tempDir = join(importRoot, randomUUID())
+      await mkdir(tempDir, { mode: 0o700 })
       const stem = fileName.replace(/\.[^.]+$/, '')
       const tempPath = join(tempDir, `${stem}.${result.targetFormat}`)
-      await writeFile(tempPath, result.bytes)
+      await writeFile(tempPath, result.bytes, { mode: 0o600 })
+      throwIfStopped(controller.signal)
       const doc: ConvertedDocument = {
         kind,
         originalPath: filePath,
@@ -141,9 +173,14 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
         await rm(tempDir, { recursive: true, force: true }).catch(() => undefined)
         throw err
       }
-      // the recents entry is the file the user picked: reopening it converts again
-      deps.recordRecent(filePath)
+      // the tab owns the temp dir from here on: a later failure must not delete it
       tempDir = null
+      // the recents entry is the file the user picked: reopening it converts again
+      try {
+        deps.recordRecent(filePath)
+      } catch {
+        // a lost recents entry does not undo an open tab
+      }
     } catch (err) {
       endProgress()
       if (tempDir) await rm(tempDir, { recursive: true, force: true }).catch(() => undefined)
@@ -162,6 +199,8 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
       deps.notice(
         legacyErrorMessage(new LegacyConvertError('failed', String(err)), fileName, deps.t),
       )
+    } finally {
+      controllers.delete(controller)
     }
   }
 
@@ -170,6 +209,7 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
     open(filePath: string): boolean {
       const source = legacyFormatForPath(filePath)
       if (!source) return false
+      if (disposed) return true
       const existing = byOriginal(filePath)
       if (existing) {
         if (deps.activateConverted(existing)) return true
@@ -177,21 +217,58 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
       }
       if (inFlight.has(filePath)) return true
       inFlight.add(filePath)
-      void runConversion(filePath, source).finally(() => inFlight.delete(filePath))
+      void runConversion(filePath, source).finally(() => {
+        inFlight.delete(filePath)
+      })
       return true
     },
     /** the converted document whose tab shows exactly this path, if any */
     documentForPath(tempPath: string): ConvertedDocument | undefined {
       return documents.get(tempPath)
     },
-    /** drop the temp copy of every converted document no tab or window shows any more */
-    sweep(): void {
-      for (const doc of [...documents.values()]) {
-        if (!deps.isPathOpen(doc.tempPath)) void removeTempDir(doc)
+    /**
+     * A converted file was renamed or moved. Inside its own staging dir (a tab rename) it is the
+     * same document under a new name: the opener entry and the shared registry follow it. Any other
+     * move (Save As, the UniWork first save) ends the conversion's registry entry; the staging
+     * dir is swept once no tab shows the old path. False = not a converted document.
+     */
+    fileMoved(oldPath: string, newPath: string): boolean {
+      const doc = documents.get(oldPath)
+      if (!doc) return false
+      if (!sameDir(dirname(newPath), doc.tempDir)) {
+        forgetConvertedDocument(oldPath)
+        return true
       }
+      const moved: ConvertedDocument = { ...doc, tempPath: newPath }
+      documents.delete(oldPath)
+      documents.set(newPath, moved)
+      forgetConvertedDocument(oldPath)
+      registerConvertedDocument(newPath, {
+        originalPath: moved.originalPath,
+        suggestSaveAs: moved.suggestSaveAs,
+        tempDir: moved.tempDir,
+      })
+      return true
     },
-    /** app quit: every temp copy goes */
+    /**
+     * Drop the temp copy of every converted document no tab or window shows any more. Deferred and
+     * coalesced: a tab that moves between the strip and a detached window briefly has no owner, and
+     * ownership is judged only once that transfer has finished.
+     */
+    sweep(): void {
+      if (sweepTimer || disposed) return
+      sweepTimer = setTimeout(() => {
+        sweepTimer = null
+        sweepNow()
+      }, deps.sweepDelayMs ?? 1000)
+      sweepTimer.unref?.()
+    },
+    /** app quit: pending conversions stop, no new staging starts, every temp copy goes */
     async dispose(): Promise<void> {
+      disposed = true
+      if (sweepTimer) clearTimeout(sweepTimer)
+      sweepTimer = null
+      for (const controller of controllers) controller.abort()
       await Promise.all([...documents.values()].map((doc) => removeTempDir(doc)))
     },
   }

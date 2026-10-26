@@ -1,6 +1,15 @@
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
+import { convertedDocumentFor } from '@genoffice/electron-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LegacyConvertError, type ConvertLegacyResult } from '../src/main/legacy-converter'
 import {
@@ -279,7 +288,7 @@ describe('createLegacyOpener', () => {
   })
 
   it('sweep removes the temp copy of a docs document once no tab shows it', async () => {
-    const h = harness(async (p) => converted('docx', p))
+    const h = harness(async (p) => converted('docx', p), { sweepDelayMs: 10 })
     const opener = createLegacyOpener(h.deps)
     opener.open('/w/a.doc')
     await vi.waitFor(() => expect(h.opened).toHaveLength(1))
@@ -295,7 +304,7 @@ describe('createLegacyOpener', () => {
   })
 
   it('never removes the temp dir of a sheets session (the session owns it)', async () => {
-    const h = harness(async (p) => converted('xlsx', p))
+    const h = harness(async (p) => converted('xlsx', p), { sweepDelayMs: 10 })
     const opener = createLegacyOpener(h.deps)
     opener.open('/w/a.xls')
     await vi.waitFor(() => expect(h.opened).toHaveLength(1))
@@ -316,6 +325,164 @@ describe('createLegacyOpener', () => {
     await vi.waitFor(() => expect(h.opened).toHaveLength(2))
     await opener.dispose()
     expect(readDirCount(importRoot)).toBe(0)
+  })
+})
+
+describe('temp ownership of a converted copy (R1-5, R1-6, R1-9, R1-11, R1-12, F4)', () => {
+  const open = async (
+    h: Harness,
+    opener: ReturnType<typeof createLegacyOpener>,
+    path = '/w/a.doc',
+  ) => {
+    opener.open(path)
+    await vi.waitFor(() => expect(h.opened).toHaveLength(1))
+    return h.opened[0]!
+  }
+
+  it('a tab in transit between the strip and a detached window keeps its file (R1-5)', async () => {
+    const h = harness(async (p) => converted('docx', p), { sweepDelayMs: 40 })
+    const opener = createLegacyOpener(h.deps)
+    const doc = await open(h, opener)
+
+    // detach: the strip let go of the path, the detached window does not own it yet
+    h.openPaths.delete(doc.tempPath)
+    opener.sweep()
+    opener.sweep()
+    h.openPaths.add(doc.tempPath)
+    await new Promise((resolve) => setTimeout(resolve, 120))
+
+    expect(existsSync(doc.tempPath)).toBe(true)
+    expect(opener.documentForPath(doc.tempPath)).toBeDefined()
+    expect(convertedDocumentFor(doc.tempPath)).toBeDefined()
+  })
+
+  it('a path nobody owns once the transfer settled is still swept', async () => {
+    const h = harness(async (p) => converted('docx', p), { sweepDelayMs: 20 })
+    const opener = createLegacyOpener(h.deps)
+    const doc = await open(h, opener)
+
+    h.openPaths.delete(doc.tempPath)
+    opener.sweep()
+    await vi.waitFor(() => expect(existsSync(doc.tempDir)).toBe(false))
+    expect(convertedDocumentFor(doc.tempPath)).toBeUndefined()
+  })
+
+  it('renaming the tab inside the staging dir keeps the file and the first-save routing (R1-6)', async () => {
+    const h = harness(async (p) => converted('docx', p), { sweepDelayMs: 20 })
+    const opener = createLegacyOpener(h.deps)
+    const doc = await open(h, opener)
+    const renamed = join(doc.tempDir, 'Renamed.docx')
+    renameSync(doc.tempPath, renamed)
+
+    expect(opener.fileMoved(doc.tempPath, renamed)).toBe(true)
+    h.openPaths.delete(doc.tempPath)
+    h.openPaths.add(renamed)
+    opener.sweep()
+    await new Promise((resolve) => setTimeout(resolve, 80))
+
+    expect(existsSync(renamed)).toBe(true)
+    expect(opener.documentForPath(renamed)).toMatchObject({ tempPath: renamed, kind: 'docs' })
+    expect(opener.documentForPath(doc.tempPath)).toBeUndefined()
+    expect(convertedDocumentFor(doc.tempPath)).toBeUndefined()
+    expect(convertedDocumentFor(renamed)).toMatchObject({
+      originalPath: '/w/a.doc',
+      suggestSaveAs: doc.suggestSaveAs,
+    })
+    // closing the renamed tab still cleans the dir
+    h.openPaths.delete(renamed)
+    opener.sweep()
+    await vi.waitFor(() => expect(existsSync(doc.tempDir)).toBe(false))
+  })
+
+  it('a move out of the staging dir (the UniWork store, a Save As) ends the conversion entry only', async () => {
+    const h = harness(async (p) => converted('docx', p), { sweepDelayMs: 20 })
+    const opener = createLegacyOpener(h.deps)
+    const doc = await open(h, opener)
+
+    expect(opener.fileMoved(doc.tempPath, join(root, 'store', 'a.docx'))).toBe(true)
+
+    expect(convertedDocumentFor(doc.tempPath)).toBeUndefined()
+    // an unknown path is not a converted document
+    expect(opener.fileMoved('/nowhere/x.docx', '/nowhere/y.docx')).toBe(false)
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'stages the document privately even under a permissive umask (R1-9)',
+    async () => {
+      const before = process.umask(0o022)
+      try {
+        const h = harness(async (p) => converted('docx', p))
+        const doc = await open(h, createLegacyOpener(h.deps))
+        expect(statSync(doc.tempDir).mode & 0o777).toBe(0o700)
+        expect(statSync(doc.tempPath).mode & 0o777).toBe(0o600)
+      } finally {
+        process.umask(before)
+      }
+    },
+  )
+
+  it('a cancel that lands while the result is being staged opens nothing and cleans up (R1-11)', async () => {
+    let cancel: (() => void) | null = null
+    const h = harness(async (p) => converted('docx', p), {
+      beginProgress: (_name, c) => {
+        cancel = c
+        return () => undefined
+      },
+      // the staging root is resolved after conversion finished: cancel arrives right there
+      importRoot: () => {
+        cancel!()
+        return importRoot
+      },
+    })
+    createLegacyOpener(h.deps).open('/w/a.doc')
+    await settle()
+
+    expect(h.opened).toEqual([])
+    expect(h.recents).toEqual([])
+    expect(h.notices).toEqual([])
+    expect(readDirCount(importRoot)).toBe(0)
+  })
+
+  it('dispose aborts a pending conversion and refuses new staging (R1-12)', async () => {
+    let signal: AbortSignal | null = null
+    let finish: (() => void) | null = null
+    const convert = vi.fn(
+      (path: string, options: { signal: AbortSignal }) =>
+        new Promise<ConvertLegacyResult>((resolve) => {
+          signal = options.signal
+          finish = () => resolve(converted('docx', path))
+        }),
+    )
+    const h = harness(convert)
+    const opener = createLegacyOpener(h.deps)
+    opener.open('/w/a.doc')
+    await vi.waitFor(() => expect(signal).not.toBeNull())
+
+    await opener.dispose()
+    expect(signal!.aborted).toBe(true)
+    // the converter finished anyway: the result is dropped, nothing is staged or opened
+    finish!()
+    await settle()
+    expect(h.opened).toEqual([])
+    expect(existsSync(importRoot)).toBe(false)
+
+    // nothing starts after disposal
+    expect(opener.open('/w/b.doc')).toBe(true)
+    await settle()
+    expect(convert).toHaveBeenCalledTimes(1)
+  })
+
+  it('a recents failure after the tab opened does not delete the open tab’s dir (F4)', async () => {
+    const h = harness(async (p) => converted('docx', p), {
+      recordRecent: () => {
+        throw new Error('recent store is gone')
+      },
+    })
+    const doc = await open(h, createLegacyOpener(h.deps))
+    await settle()
+
+    expect(existsSync(doc.tempPath)).toBe(true)
+    expect(h.notices).toEqual([])
   })
 })
 
