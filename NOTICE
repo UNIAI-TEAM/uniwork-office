@@ -46,6 +46,31 @@ Each downloaded file is verified against the sha256 recorded in the catalogue
 before it is installed, and the catalogue states each family's size so an app
 can ask before fetching tens of megabytes.
 
+Bundled OCR engine
+
+The installer ships an OCR engine that reads Vietnamese entirely offline (no
+model download, no network connection). Its components are:
+
+- Tesseract OCR 5 (https://github.com/tesseract-ocr/tesseract), Apache License,
+  Version 2.0, compiled to WebAssembly inside the npm package tesseract.js-core
+  (Apache-2.0; its packager's changes to Tesseract are listed in that
+  package's README) together with Leptonica (BSD-2-Clause) and the image-codec
+  libraries named in THIRD-PARTY-NOTICES.txt;
+- tesseract.js (https://github.com/naptha/tesseract.js), Apache-2.0, plus the
+  npm packages it runs on (bmp-js, idb-keyval, is-url, node-fetch, pngjs,
+  regenerator-runtime, wasm-feature-detect, zlibjs and node-fetch's whatwg-url
+  closure: MIT, BSD-2-Clause and Apache-2.0);
+- the tessdata_fast Vietnamese model vie.traineddata, unmodified, Apache-2.0
+  (https://github.com/tesseract-ocr/tessdata_fast, commit
+  923915d4ced2a7235221788285785a29c4a42d4a); its license text and checksum are
+  in packages/pdf2docx/ocr-tesseract/tessdata.
+
+Leptonica Copyright (C) 2001-2020 Leptonica. All rights reserved. It is
+redistributed under the two-clause BSD license reproduced in
+packages/pdf2docx/ocr-tesseract/LICENSE-LEPTONICA.txt and in
+THIRD-PARTY-NOTICES.txt. This software is based in part on the work of the
+Independent JPEG Group.
+
 Unicode Character Database
 
 apps/pdf/src/shared/radicals.ts contains a generated mapping derived from

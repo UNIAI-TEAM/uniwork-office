@@ -391,9 +391,48 @@ https://www.unicode.org/Public/17.0.0/ucd/EquivalentUnifiedIdeograph.txt
 `
 out += readFileSync(join(ROOT, 'LICENSE-UNICODE.txt'), 'utf8').trim() + '\n'
 
-for (const term of ['@embedpdf/pdfium', 'Copyright 2014 PDFium Authors', 'Apache License']) {
+out += hr('5. Bundled OCR engine (offline Tesseract)')
+out += `
+The installer ships an OCR engine that reads Vietnamese (and other Latin-script
+text) entirely offline: no model is downloaded and the engine opens no network
+connection. It runs as a script on the application binary
+(Resources/ocr/tesseract).
+
+  Tesseract OCR 5 (LSTM engine) — Apache-2.0
+    https://github.com/tesseract-ocr/tesseract
+    compiled to WebAssembly, with the modifications its packager lists, inside
+    the npm package tesseract.js-core (section 1) — Apache-2.0
+  tesseract.js — Apache-2.0 (section 1)
+    https://github.com/naptha/tesseract.js
+  tessdata_fast "vie" (Vietnamese) language model, unmodified — Apache-2.0
+    https://github.com/tesseract-ocr/tessdata_fast
+    commit 923915d4ced2a7235221788285785a29c4a42d4a
+    sha256 79df64caf7bcfb2a27df5042ecb6121e196eada34da774956995747636d5bfa1
+    license text: Resources/ocr/tesseract/tessdata/LICENSE
+  Leptonica — BSD-2-Clause, compiled into tesseract.js-core; its license follows.
+
+The tesseract.js-core build also compiles in the image-codec and math libraries
+its repository lists as submodules (https://github.com/naptha/tesseract.js-core):
+libpng (libpng-2.0), zlib (Zlib), libtiff (libtiff license, BSD-style), giflib
+(MIT), libwebp (BSD-3-Clause), openlibm (MIT / BSD-style) and libjpeg, whose
+license requires this statement: this software is based in part on the work of
+the Independent JPEG Group.
+`
+out += sub('Leptonica license')
+out +=
+  readFileSync(join(ROOT, 'packages/pdf2docx/ocr-tesseract/LICENSE-LEPTONICA.txt'), 'utf8').trim() +
+  '\n'
+
+for (const term of [
+  '@embedpdf/pdfium',
+  'Copyright 2014 PDFium Authors',
+  'Apache License',
+  'tesseract.js-core',
+  'tessdata_fast',
+  'Leptonica',
+]) {
   if (!out.includes(term)) {
-    throw new Error(`generated third-party notice is missing PDFium term: ${term}`)
+    throw new Error(`generated third-party notice is missing required term: ${term}`)
   }
 }
 
