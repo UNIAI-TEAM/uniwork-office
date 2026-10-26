@@ -135,6 +135,19 @@ import type {
 import type { TabsApi, TabSummary } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
 import { UNIWORK_WORK_CHANNELS } from '../shared/uniwork-work-api'
+import {
+  UNIWORK_DRIVE_CHANNELS,
+  UNIWORK_DRIVE_ERROR_CODES,
+  type DriveConnection,
+  type DriveFileDetail,
+  type DriveFileListPage,
+  type DriveFileListQuery,
+  type DriveFileTarget,
+  type DriveHistoryEvent,
+  type UniworkDriveApi,
+  type UniworkDriveErrorCode,
+  type UniworkDriveResult,
+} from '../shared/uniwork-drive-api'
 import type {
   ShareAccess,
   ShareAccessRequest,
@@ -1855,6 +1868,27 @@ const homeApi: HomeApi = {
       confirmed: confirmed === true,
     })
   },
+  async uniworkDriveIsAvailable(orgId) {
+    return driveApi.isAvailable(orgId)
+  },
+  async uniworkDriveListConnections(workspaceId) {
+    return driveApi.listConnections(workspaceId)
+  },
+  async uniworkDriveListFiles(query) {
+    return driveApi.listFiles(query)
+  },
+  async uniworkDriveGetFile(input) {
+    return driveApi.getFile(input)
+  },
+  async uniworkDriveUnlink(input) {
+    return driveApi.unlink(input)
+  },
+  async uniworkDriveOpenOnGoogle(input) {
+    return driveApi.openOnGoogle(input)
+  },
+  async uniworkDriveGetHistory(input) {
+    return driveApi.getHistory(input)
+  },
 }
 
 // Mirror the cloud status into this preload's seam, so getAiMediaProviders()
@@ -2165,6 +2199,63 @@ const workApi: UniworkWorkApi = {
 }
 
 contextBridge.exposeInMainWorld('uniworkWork', workApi)
+
+const DRIVE_ERROR_CODE_MAP: Record<string, true> = Object.fromEntries(
+  UNIWORK_DRIVE_ERROR_CODES.map((code) => [code, true]),
+)
+
+/** main answers every drive call with a UniworkDriveResult; anything else is server_error */
+function asDriveResult<T>(result: unknown): UniworkDriveResult<T> {
+  if (result && typeof result === 'object') {
+    const r = result as { ok?: unknown; value?: unknown; error?: unknown }
+    if (r.ok === true) return { ok: true, value: r.value as T }
+    if (r.ok === false && typeof r.error === 'string' && DRIVE_ERROR_CODE_MAP[r.error]) {
+      return { ok: false, error: r.error as UniworkDriveErrorCode }
+    }
+  }
+  return { ok: false, error: 'server_error' }
+}
+
+const driveApi: UniworkDriveApi = {
+  async isAvailable() {
+    try {
+      const snap = asSyncCenterSnapshot(
+        await ipcRenderer.invoke(UNIWORK_SYNC_CENTER_CHANNELS.snapshot),
+      )
+      return snap?.header.driveConnector === true
+    } catch {
+      return false
+    }
+  },
+  async listConnections(workspaceId) {
+    return asDriveResult<DriveConnection[]>(
+      await ipcRenderer.invoke(UNIWORK_DRIVE_CHANNELS.listConnections, workspaceId),
+    )
+  },
+  async listFiles(query: DriveFileListQuery) {
+    return asDriveResult<DriveFileListPage>(
+      await ipcRenderer.invoke(UNIWORK_DRIVE_CHANNELS.listFiles, query),
+    )
+  },
+  async getFile(input: DriveFileTarget) {
+    return asDriveResult<DriveFileDetail>(
+      await ipcRenderer.invoke(UNIWORK_DRIVE_CHANNELS.getFile, input),
+    )
+  },
+  async unlink(input: DriveFileTarget) {
+    return asDriveResult<null>(await ipcRenderer.invoke(UNIWORK_DRIVE_CHANNELS.unlink, input))
+  },
+  async openOnGoogle(input: DriveFileTarget) {
+    return asDriveResult<null>(await ipcRenderer.invoke(UNIWORK_DRIVE_CHANNELS.openOnGoogle, input))
+  },
+  async getHistory(input: DriveFileTarget) {
+    return asDriveResult<DriveHistoryEvent[]>(
+      await ipcRenderer.invoke(UNIWORK_DRIVE_CHANNELS.getHistory, input),
+    )
+  },
+}
+
+contextBridge.exposeInMainWorld('uniworkDrive', driveApi)
 
 /**
  * UNI-2047 APP-SHARE-DIALOG: main answers every share call with a `ShareResult`;

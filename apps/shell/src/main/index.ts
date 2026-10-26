@@ -132,6 +132,7 @@ import { DEFAULT_DOCUMENT_LIMITS } from './uniwork-docs/limits'
 import { offlineTabMenuItem, unpinTabDocument } from './uniwork-sync/offline-library/menu'
 import type { OfflineLibraryApi } from './uniwork-sync/offline-library/api'
 import { registerUniworkWork } from './uniwork-work/wiring'
+import { registerUniworkDrive } from './uniwork-drive/wiring'
 import { refuseLockedOpenPath } from './uniwork-docs/service'
 import {
   COMMENT_AUTHOR_CHANGED_CHANNEL,
@@ -4852,6 +4853,29 @@ function registerHomeIpc(): void {
     org: () => uniworkAccount().status().org ?? null,
     authorized: (call) => authorizedRequest(call),
     openExternal: (url) => shell.openExternal(url),
+  })
+  // UniWork Google Drive references for the Documents home (UNI-2194); logic in ./uniwork-drive
+  registerUniworkDrive(guardedIpc, {
+    profile: () => uniworkDeploymentProfile(),
+    identity: () => uniworkSessionIdentity(),
+    org: () => uniworkAccount().status().org ?? null,
+    authorized: (call) => authorizedRequest(call),
+    openExternal: (url) => shell.openExternal(url),
+    capability: (orgId) =>
+      uniworkDocs
+        ? uniworkDocs.capabilityRead(orgId)
+        : Promise.resolve({
+            kind: 'ok',
+            capabilities: {
+              sync_feed: false,
+              sync_write: true,
+              offline_library: false,
+              ai_uniwork: false,
+              ai_uniwork_formats: [],
+              drive_connector: false,
+            },
+            source: 'default',
+          }),
   })
   const uniworkService = uniworkDocs.service
   // G8-02: the single comment-author source. A bound document takes the
