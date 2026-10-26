@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { UniworkFolderNode } from '../../../shared/home-api'
 import { useI18n } from '../locale'
@@ -115,6 +115,7 @@ export function UniworkFolderTree({
   checkLabel,
   idPrefix = 'uwf-tree',
   hideRoot = false,
+  afterFirstRootRow,
 }: {
   nodes: UniworkFolderNode[]
   label: string
@@ -143,6 +144,8 @@ export function UniworkFolderTree({
   idPrefix?: string
   /** no root row: the top-level folders at the first level (the picker and dialogs keep it) */
   hideRoot?: boolean
+  /** UNI-2195 (D2): rendered directly after the first top-level row (My Folder) inside the sidebar */
+  afterFirstRootRow?: ReactNode
 }) {
   const { t } = useI18n()
   // `t` is not referentially stable: the memo keys on the translated string
@@ -237,119 +240,126 @@ export function UniworkFolderTree({
         const reasonId = `${idPrefix}-reason-${row.key || 'root'}`
         const items = menuFor?.(row) ?? []
         const tag = tagOf?.(row) ?? null
+        const isFirstRootRow = hideRoot && row.level === 1 && row.posInSet === 1 && isMyFolder(row)
         return (
-          <li
-            key={row.key || 'root'}
-            role="treeitem"
-            data-key={row.key}
-            aria-level={row.level}
-            aria-setsize={row.setSize}
-            aria-posinset={row.posInSet}
-            aria-expanded={row.hasChildren ? row.expanded : undefined}
-            aria-selected={selected}
-            aria-disabled={block ? true : undefined}
-            aria-describedby={block ? reasonId : undefined}
-            tabIndex={row.key === tabKey ? 0 : -1}
-            className={`uwf-tree-row${selected ? ' selected' : ''}${block ? ' blocked' : ''}`}
-            style={{ paddingInlineStart: `${4 + (row.level - 1) * 14}px` }}
-            onKeyDown={(e) => onKeyDown(e, row)}
-            onFocus={(e) => {
-              if (e.target !== e.currentTarget) return
-              setFocusKey(row.key)
-              onMenuIntent?.(row, true)
-            }}
-            onClick={() => {
-              setFocusKey(row.key)
-              if (!block && !editing) onOpen(row.id)
-            }}
-            onContextMenu={(e) => {
-              if (items.length === 0) return
-              e.preventDefault()
-              setFocusKey(row.key)
-              openMenu(row)
-            }}
-          >
-            <span
-              className="uwf-twisty"
-              aria-hidden="true"
-              onClick={(e) => {
-                if (!row.hasChildren) return
-                e.stopPropagation()
-                toggle(row.key, !row.expanded)
+          <Fragment key={row.key || 'root'}>
+            <li
+              role="treeitem"
+              data-key={row.key}
+              aria-level={row.level}
+              aria-setsize={row.setSize}
+              aria-posinset={row.posInSet}
+              aria-expanded={row.hasChildren ? row.expanded : undefined}
+              aria-selected={selected}
+              aria-disabled={block ? true : undefined}
+              aria-describedby={block ? reasonId : undefined}
+              tabIndex={row.key === tabKey ? 0 : -1}
+              className={`uwf-tree-row${selected ? ' selected' : ''}${block ? ' blocked' : ''}`}
+              style={{ paddingInlineStart: `${4 + (row.level - 1) * 14}px` }}
+              onKeyDown={(e) => onKeyDown(e, row)}
+              onFocus={(e) => {
+                if (e.target !== e.currentTarget) return
+                setFocusKey(row.key)
+                onMenuIntent?.(row, true)
+              }}
+              onClick={() => {
+                setFocusKey(row.key)
+                if (!block && !editing) onOpen(row.id)
+              }}
+              onContextMenu={(e) => {
+                if (items.length === 0) return
+                e.preventDefault()
+                setFocusKey(row.key)
+                openMenu(row)
               }}
             >
-              {row.hasChildren && <Chevron expanded={row.expanded} />}
-            </span>
-            {row.id === null ? (
-              <svg
-                className="uwf-glyph"
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
+              <span
+                className="uwf-twisty"
                 aria-hidden="true"
+                onClick={(e) => {
+                  if (!row.hasChildren) return
+                  e.stopPropagation()
+                  toggle(row.key, !row.expanded)
+                }}
               >
-                <path
-                  d="M2.25 7.1 8 2.5l5.75 4.6V13c0 .41-.34.75-.75.75H9.75V10h-3.5v3.75H3c-.41 0-.75-.34-.75-.75z"
-                  fill="currentColor"
-                />
-              </svg>
-            ) : isMyFolder(row) ? (
-              <MyFolderGlyph />
-            ) : (
-              <FolderGlyph open={row.expanded} />
-            )}
-            {editing && onRenameSave ? (
-              <RenameField
-                initial={row.title}
-                label={row.title}
-                nameLabel={t('ufFolderName')}
-                error={editing.error}
-                busy={editing.busy}
-                errorKeys={FOLDER_NAME_ERROR_KEYS}
-                onSave={(value) => onRenameSave(row.id!, value)}
-                onCancel={() => onRenameCancel?.(row.id!)}
-                onEdit={() => onRenameEdit?.()}
-              />
-            ) : (
-              <span className="uwf-tree-text">
-                <span className="uwf-tree-title">{row.title}</span>
-                {block && (
-                  <span className="uwf-reason" id={reasonId}>
-                    {t(MOVE_BLOCK_KEYS[block])}
-                  </span>
-                )}
+                {row.hasChildren && <Chevron expanded={row.expanded} />}
               </span>
-            )}
-            {tag && <span className="uwf-tree-tag">{tag}</span>}
-            {checkLabel && selected && (
-              <svg
-                className="uwf-tree-check"
-                role="img"
-                aria-label={checkLabel}
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-              >
-                <path
-                  d="M13.25 4.5 6.5 11.25 2.75 7.5"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+              {row.id === null ? (
+                <svg
+                  className="uwf-glyph"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2.25 7.1 8 2.5l5.75 4.6V13c0 .41-.34.75-.75.75H9.75V10h-3.5v3.75H3c-.41 0-.75-.34-.75-.75z"
+                    fill="currentColor"
+                  />
+                </svg>
+              ) : isMyFolder(row) ? (
+                <MyFolderGlyph />
+              ) : (
+                <FolderGlyph open={row.expanded} />
+              )}
+              {editing && onRenameSave ? (
+                <RenameField
+                  initial={row.title}
+                  label={row.title}
+                  nameLabel={t('ufFolderName')}
+                  error={editing.error}
+                  busy={editing.busy}
+                  errorKeys={FOLDER_NAME_ERROR_KEYS}
+                  onSave={(value) => onRenameSave(row.id!, value)}
+                  onCancel={() => onRenameCancel?.(row.id!)}
+                  onEdit={() => onRenameEdit?.()}
                 />
-              </svg>
-            )}
-            {items.length > 0 && !editing && (
-              <FolderMenu
-                label={t('ufActionsFor', { name: row.title })}
-                items={items}
-                dataFor={row.key}
-                open={menuKey === row.key}
-                onOpenChange={(open) => (open ? openMenu(row) : setMenuKey(null))}
-              />
-            )}
-          </li>
+              ) : (
+                <span className="uwf-tree-text">
+                  <span className="uwf-tree-title">{row.title}</span>
+                  {block && (
+                    <span className="uwf-reason" id={reasonId}>
+                      {t(MOVE_BLOCK_KEYS[block])}
+                    </span>
+                  )}
+                </span>
+              )}
+              {tag && <span className="uwf-tree-tag">{tag}</span>}
+              {checkLabel && selected && (
+                <svg
+                  className="uwf-tree-check"
+                  role="img"
+                  aria-label={checkLabel}
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                >
+                  <path
+                    d="M13.25 4.5 6.5 11.25 2.75 7.5"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+              {items.length > 0 && !editing && (
+                <FolderMenu
+                  label={t('ufActionsFor', { name: row.title })}
+                  items={items}
+                  dataFor={row.key}
+                  open={menuKey === row.key}
+                  onOpenChange={(open) => (open ? openMenu(row) : setMenuKey(null))}
+                />
+              )}
+            </li>
+            {isFirstRootRow && afterFirstRootRow ? (
+              <li role="presentation" className="uwf-tree-slot">
+                {afterFirstRootRow}
+              </li>
+            ) : null}
+          </Fragment>
         )
       })}
     </ul>

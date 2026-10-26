@@ -1109,18 +1109,15 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.querySelector('.uw-pick-more-error[role="alert"]')).not.toBeNull()
   })
 
-  it('does not include t in any hook dependency array in DocumentsHome.tsx (DH1-R1-8)', async () => {
+  it('does not include t in any hook dependency array in DocumentsHome.tsx or DriveList.tsx (DH1-R1-8, UNI-2195)', async () => {
+    // Lazy-loaded AST parser only for this static-analysis test
     const ts = await import('typescript')
-    const file = resolve(__dirname, '../src/renderer/src/uniwork-home/DocumentsHome.tsx')
-    const src = readFileSync(file, 'utf8')
-    const sourceFile = ts.createSourceFile(
-      file,
-      src,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX,
-    )
-    const hooks = new Set(['useMemo', 'useCallback', 'useEffect', 'useLayoutEffect'])
+    const hooks: Record<string, true> = {
+      useMemo: true,
+      useCallback: true,
+      useEffect: true,
+      useLayoutEffect: true,
+    }
     const hits: string[] = []
 
     const hookNameOf = (node: ts.CallExpression): string | null => {
@@ -1139,20 +1136,34 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       return ts.forEachChild(node, identifierTIn) === true
     }
 
-    const walk = (node: ts.Node): void => {
-      if (ts.isCallExpression(node)) {
-        const name = hookNameOf(node)
-        if (name && hooks.has(name) && node.arguments.length >= 2) {
-          const deps = node.arguments[1]!
-          if (identifierTIn(deps)) {
-            const { line } = sourceFile.getLineAndCharacterOfPosition(deps.getStart(sourceFile))
-            hits.push(`${name}:${line + 1}`)
+    for (const rel of [
+      '../src/renderer/src/uniwork-home/DocumentsHome.tsx',
+      '../src/renderer/src/uniwork-home/DriveList.tsx',
+    ]) {
+      const file = resolve(__dirname, rel)
+      const src = readFileSync(file, 'utf8')
+      const sourceFile = ts.createSourceFile(
+        file,
+        src,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      )
+      const walk = (node: ts.Node): void => {
+        if (ts.isCallExpression(node)) {
+          const name = hookNameOf(node)
+          if (name && hooks[name] && node.arguments.length >= 2) {
+            const deps = node.arguments[1]!
+            if (identifierTIn(deps)) {
+              const { line } = sourceFile.getLineAndCharacterOfPosition(deps.getStart(sourceFile))
+              hits.push(`${rel}:${name}:${line + 1}`)
+            }
           }
         }
+        ts.forEachChild(node, walk)
       }
-      ts.forEachChild(node, walk)
+      walk(sourceFile)
     }
-    walk(sourceFile)
     expect(hits).toEqual([])
   })
 
@@ -1206,6 +1217,10 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       resolve(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
       'utf8',
     )
+    const doclistSideCss = readFileSync(
+      resolve(__dirname, '../src/renderer/src/uniwork-home/doclist-sidebar.css'),
+      'utf8',
+    )
 
     const definedVars = new Set<string>()
     for (const css of [tokensCss, homeCss, uwfCss, saveCss, docsHomeCss]) {
@@ -1216,6 +1231,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
 
     for (const [label, css] of [
       ['documents-home.css', docsHomeCss],
+      ['doclist-sidebar.css', doclistSideCss],
       ['save-dialog.css', saveCss],
     ] as const) {
       const undefinedVars = new Set<string>()
@@ -3130,6 +3146,364 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       )
       await flush()
       expect(document.querySelector('.uw-share')).toBeNull()
+    })
+  })
+
+  describe('UNI-2195 (D2): Google Drive sidebar and list view (4.1 on the app)', () => {
+    const activeConn = {
+      id: 'dc-active',
+      provider: 'google',
+      googleEmail: 'minh@company.vn',
+      status: 'active' as const,
+      needsReconnect: false,
+      linkedFileCount: 2,
+      connectedAt: '2026-10-01T00:00:00Z',
+      updatedAt: '2026-10-10T00:00:00Z',
+    }
+    const brokenConn = {
+      id: 'dc-broken',
+      provider: 'google',
+      googleEmail: 'lan@company.vn',
+      status: 'needs_reconnect' as const,
+      needsReconnect: true,
+      authFailedAt: '2026-10-12T00:00:00Z',
+      authFailedReason: 'invalid_grant',
+      linkedFileCount: 1,
+      connectedAt: '2026-10-02T00:00:00Z',
+      updatedAt: '2026-10-12T00:00:00Z',
+    }
+
+    const fileActive = {
+      id: 'df-1',
+      organizationId: 'org-1',
+      workspaceId: 'ws-1',
+      externalFileId: 'ext-1',
+      name: 'Kế hoạch ra mắt sản phẩm Q4',
+      mimeType: 'application/vnd.google-apps.document',
+      iconKind: 'google_doc' as const,
+      webViewLink: 'https://docs.google.com/document/d/ext-1/edit',
+      openUrl: 'https://docs.google.com/document/d/ext-1/edit',
+      ownerDisplay: 'Minh',
+      sharingState: 'shared' as const,
+      sharedUserCount: 4,
+      connectionId: 'dc-active',
+      boundAccountEmail: 'minh@company.vn',
+      boundConnectionLost: false,
+      boundById: 'u-1',
+      boundByName: 'Minh',
+      createdBy: 'u-1',
+      createdByKind: 'user',
+      createdByName: 'Minh',
+      createdAt: '2026-10-10T00:00:00Z',
+      updatedAt: '2026-10-15T00:00:00Z',
+      viewerAccess: 'granted' as const,
+      viewerConnectionId: 'dc-active',
+      viewerAccountEmail: 'minh@company.vn',
+      canUnlink: true,
+      canRebind: false,
+      canPropose: true,
+      canAsk: true,
+      usedInCount: 3,
+      usedInTasks: [
+        { taskId: 't-1', identifier: 'UNI-1042', title: 'Task 1', status: 'in_progress' },
+        { taskId: 't-2', identifier: 'UNI-1048', title: 'Task 2', status: 'todo' },
+        { taskId: 't-3', identifier: 'UNI-1051', title: 'Task 3', status: 'done' },
+      ],
+      tasksCreated: {
+        count: 3,
+        lastCreatedAt: '2026-10-15T10:00:00Z',
+        lastCreatedByName: 'Minh',
+      },
+    }
+
+    const fileBroken = {
+      id: 'df-2',
+      organizationId: 'org-1',
+      workspaceId: 'ws-1',
+      externalFileId: 'ext-2',
+      name: 'Ngân sách marketing 2026.xlsx',
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+      iconKind: 'google_sheet' as const,
+      webViewLink: 'https://docs.google.com/spreadsheets/d/ext-2/edit',
+      openUrl: 'https://docs.google.com/spreadsheets/d/ext-2/edit',
+      ownerDisplay: 'Lan',
+      sharingState: 'private' as const,
+      connectionId: 'dc-broken',
+      boundAccountEmail: 'lan@company.vn',
+      boundConnectionLost: true,
+      boundById: 'u-1',
+      boundByName: 'Minh',
+      createdBy: 'u-1',
+      createdByKind: 'user',
+      createdByName: 'Minh',
+      createdAt: '2026-10-11T00:00:00Z',
+      updatedAt: '2026-10-12T00:00:00Z',
+      viewerAccess: 'connection_lost' as const,
+      viewerConnectionId: 'dc-broken',
+      viewerAccountEmail: 'lan@company.vn',
+      canUnlink: true,
+      canRebind: true,
+      canPropose: false,
+      canAsk: false,
+      usedInCount: 0,
+      usedInTasks: [],
+      tasksCreated: { count: 0 },
+    }
+
+    const fileSharedDrive = {
+      id: 'df-3',
+      organizationId: 'org-1',
+      workspaceId: 'ws-1',
+      externalFileId: 'ext-3',
+      driveId: 'shared-drive-1',
+      name: 'Hợp đồng khung đối tác.pdf',
+      mimeType: 'application/pdf',
+      iconKind: 'pdf' as const,
+      webViewLink: 'https://drive.google.com/file/d/ext-3/view',
+      openUrl: 'https://drive.google.com/file/d/ext-3/view',
+      ownerDisplay: 'Minh',
+      sharingState: 'shared' as const,
+      connectionId: 'dc-active',
+      boundAccountEmail: 'minh@company.vn',
+      boundConnectionLost: false,
+      boundById: 'u-1',
+      boundByName: 'Minh',
+      createdBy: 'u-1',
+      createdByKind: 'user',
+      createdByName: 'Minh',
+      createdAt: '2026-10-12T00:00:00Z',
+      updatedAt: '2026-10-13T00:00:00Z',
+      viewerAccess: 'granted' as const,
+      viewerConnectionId: 'dc-active',
+      viewerAccountEmail: 'minh@company.vn',
+      canUnlink: true,
+      canRebind: false,
+      canPropose: true,
+      canAsk: true,
+      usedInCount: 1,
+      usedInTasks: [
+        { taskId: 't-9', identifier: 'UNI-1039', title: 'Task 9', status: 'in_progress' },
+      ],
+      tasksCreated: { count: 1 },
+    }
+
+    const installDriveBridge = (overrides?: Partial<Record<string, unknown>>) => {
+      const driveBridge = {
+        isAvailable: vi.fn(async () => true),
+        listConnections: vi.fn(async () => ({
+          ok: true as const,
+          value: [activeConn, brokenConn],
+        })),
+        listFiles: vi.fn(async (q: { workspaceId: string; connectionId?: string }) => {
+          const files =
+            q.connectionId === 'dc-active'
+              ? [fileActive, fileSharedDrive]
+              : q.connectionId === 'dc-broken'
+                ? [fileBroken]
+                : [fileActive, fileBroken, fileSharedDrive]
+          return {
+            ok: true as const,
+            value: {
+              files,
+              totalCount: files.length,
+              nextCursor: null,
+            },
+          }
+        }),
+        openOnGoogle: vi.fn(async () => ({ ok: true as const, value: null })),
+        ...overrides,
+      }
+      Reflect.set(window, 'uniworkDrive', driveBridge)
+      return driveBridge
+    }
+
+    afterEach(() => {
+      Reflect.deleteProperty(window, 'uniworkDrive')
+      Reflect.deleteProperty(window, 'uniworkSyncCenter')
+    })
+
+    it('hides Google Drive in the sidebar when drive_connector is false or when the user has 0 connections (spec §17.2, Q6)', async () => {
+      installDriveBridge({
+        isAvailable: vi.fn(async () => false),
+      })
+      await mountHome()
+      expect(document.querySelector('[data-nav="google-drive"]')).toBeNull()
+
+      installDriveBridge({
+        isAvailable: vi.fn(async () => true),
+        listConnections: vi.fn(async () => ({ ok: true as const, value: [] })),
+      })
+      await mountHome()
+      expect(document.querySelector('[data-nav="google-drive"]')).toBeNull()
+    })
+
+    it('renders Google Drive under My Folder with account sub-rows, Mất kết nối badge, 5-column table, and double-click / Enter open-on-google', async () => {
+      const driveBridge = installDriveBridge()
+      await mountHome()
+      await flush()
+
+      const driveRow = document.querySelector<HTMLButtonElement>('[data-nav="google-drive"]')
+      expect(driveRow).not.toBeNull()
+      expect(driveRow!.textContent).toContain('Google Drive')
+      expect(driveRow!.querySelector('[data-drive-total]')?.textContent).toBe('3')
+
+      const accountRows = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.dh-drive-nav-account'),
+      )
+      expect(accountRows.map((el) => el.getAttribute('data-drive-account'))).toEqual([
+        'dc-active',
+        'dc-broken',
+      ])
+      expect(accountRows[0]!.textContent).toContain('Drive: minh@company.vn')
+      expect(accountRows[0]!.querySelector('[data-drive-lost]')).toBeNull()
+      expect(accountRows[1]!.textContent).toContain('Drive: lan@company.vn')
+      expect(accountRows[1]!.querySelector('[data-drive-lost]')?.textContent).toContain(
+        'Mất kết nối',
+      )
+
+      // Click parent Google Drive row -> all accounts view
+      await act(async () => {
+        driveRow!.click()
+      })
+      await flush()
+      await flush()
+
+      expect(driveRow!.getAttribute('aria-current')).toBe('page')
+      expect(document.querySelector('.dh-title')?.textContent).toBe('Google Drive')
+      expect(document.querySelector('.dh-subtitle')?.textContent).toContain(
+        'Tệp Google Drive bạn đã liên kết hoặc cho UniWork đọc.',
+      )
+      expect(driveBridge.listFiles).toHaveBeenCalledWith({
+        workspaceId: 'ws-1',
+      })
+
+      // 5 columns per prototype Docs-List.dc.html / spec §7.6
+      const headers = Array.from(document.querySelectorAll('.dh-drive-table .dh-drive-th')).map(
+        (el) => el.textContent?.trim(),
+      )
+      expect(headers).toEqual([
+        'Tên',
+        'Mở bằng tài khoản',
+        'Quyền trên Google Drive',
+        'Đang dùng ở',
+        'Đã tạo việc',
+      ])
+
+      // Web-only CTA buttons are disabled in D2
+      const addBtn = document.querySelector<HTMLButtonElement>('[data-drive-add]')!
+      const manageBtn = document.querySelector<HTMLButtonElement>('[data-drive-manage]')!
+      expect(addBtn.disabled).toBe(true)
+      expect(addBtn.textContent).toContain('Thêm từ Google Drive')
+      expect(manageBtn.disabled).toBe(true)
+      expect(manageBtn.textContent).toContain('Quản lý kết nối')
+
+      // Rows render icon kinds, access badges, used-in text, tasks-created text, and reconnect line
+      const row1 = document.querySelector<HTMLElement>('[data-drive-file-id="df-1"]')!
+      expect(row1).not.toBeNull()
+      expect(row1.querySelector('[data-icon-kind="google_doc"]')).not.toBeNull()
+      expect(row1.textContent).toContain('Kế hoạch ra mắt sản phẩm Q4')
+      expect(row1.textContent).toContain('minh@company.vn')
+      expect(row1.textContent).toContain('Chia sẻ với 4 người')
+      expect(row1.textContent).toContain('UNI-1042 và 2 việc khác')
+      expect(row1.textContent).toContain('3 việc')
+
+      const row2 = document.querySelector<HTMLElement>('[data-drive-file-id="df-2"]')!
+      expect(row2.querySelector('[data-icon-kind="google_sheet"]')).not.toBeNull()
+      expect(row2.textContent).toContain('lan@company.vn')
+      expect(row2.textContent).toContain('Mất kết nối · kết nối lại')
+      expect(row2.textContent).toContain('Riêng tư')
+      expect(row2.textContent).toContain('Chưa gắn vào việc nào')
+
+      const row3 = document.querySelector<HTMLElement>('[data-drive-file-id="df-3"]')!
+      expect(row3.querySelector('[data-icon-kind="pdf"]')).not.toBeNull()
+      expect(row3.textContent).toContain('Bộ nhớ dùng chung')
+      expect(row3.textContent).toContain('UNI-1039')
+      expect(row3.textContent).toContain('1 việc')
+
+      // Footnote rendered at bottom of list
+      expect(document.querySelector('.dh-drive-footnote')?.textContent).toContain(
+        'Mỗi tệp gắn với tài khoản Google Drive đã chọn nó.',
+      )
+
+      // Double-clicking a row invokes window.uniworkDrive.openOnGoogle({ workspaceId, driveFileId })
+      await act(async () => {
+        row1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+      })
+      await flush()
+      expect(driveBridge.openOnGoogle).toHaveBeenCalledWith({
+        workspaceId: 'ws-1',
+        driveFileId: 'df-1',
+      })
+
+      // Pressing Enter on a row also invokes openOnGoogle({ workspaceId, driveFileId })
+      const liveRow2 = document.querySelector<HTMLElement>('[data-drive-file-id="df-2"]')!
+      await act(async () => {
+        liveRow2.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      })
+      await flush()
+      expect(driveBridge.openOnGoogle).toHaveBeenCalledWith({
+        workspaceId: 'ws-1',
+        driveFileId: 'df-2',
+      })
+
+      // Clicking active account sub-row -> filters by connectionId, updates title/subtitle/button
+      await act(async () => {
+        accountRows[0]!.click()
+      })
+      await flush()
+      await flush()
+
+      expect(accountRows[0]!.getAttribute('aria-current')).toBe('page')
+      expect(driveRow!.getAttribute('aria-current')).toBeNull()
+      expect(document.querySelector('.dh-title')?.textContent).toBe('Drive: minh@company.vn')
+      expect(document.querySelector('.dh-subtitle')?.textContent).toContain(
+        'Tệp bạn đã thêm từ tài khoản này · luôn mở bằng chính tài khoản này',
+      )
+      expect(document.querySelector('[data-drive-add]')?.textContent).toContain(
+        'Thêm từ minh@company.vn',
+      )
+      expect(driveBridge.listFiles).toHaveBeenCalledWith({
+        workspaceId: 'ws-1',
+        connectionId: 'dc-active',
+      })
+
+      // Clicking broken account sub-row -> shows broken subtitle and hides "+ Thêm từ …" button
+      await act(async () => {
+        accountRows[1]!.click()
+      })
+      await flush()
+      await flush()
+
+      expect(accountRows[1]!.getAttribute('aria-current')).toBe('page')
+      expect(document.querySelector('.dh-title')?.textContent).toBe('Drive: lan@company.vn')
+      expect(document.querySelector('.dh-subtitle')?.textContent).toContain(
+        'Kết nối hết hạn · kết nối lại để mở các tệp này',
+      )
+      expect(document.querySelector('[data-drive-add]')).toBeNull()
+      expect(driveBridge.listFiles).toHaveBeenCalledWith({
+        workspaceId: 'ws-1',
+        connectionId: 'dc-broken',
+      })
+    })
+
+    it('shows the offline state when syncCenter reports offline or listFiles fails with network', async () => {
+      installDriveBridge({
+        listFiles: vi.fn(async () => ({
+          ok: false as const,
+          error: 'network' as const,
+        })),
+      })
+      await mountHome()
+      await flush()
+      const driveRow = document.querySelector<HTMLButtonElement>('[data-nav="google-drive"]')!
+      await act(async () => {
+        driveRow.click()
+      })
+      await flush()
+      await flush()
+      expect(document.querySelector('.dl-state-title')?.textContent).toContain(
+        'Cần kết nối mạng để xem tệp Google Drive.',
+      )
     })
   })
 })

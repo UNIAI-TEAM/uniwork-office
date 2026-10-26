@@ -60,10 +60,11 @@ function makeDoc(overrides: Partial<DocumentsHomeDoc> = {}): DocumentsHomeDoc {
 }
 
 describe('DH1-W2 documents-home-model', () => {
-  it('defines the 9 sub-nav entries in exact order (UNI-1961: archive shown; UNI-2047 B6: starred shown)', () => {
+  it('defines the 10 sub-nav entries in exact order (UNI-1961: archive shown; UNI-2047 B6: starred shown; UNI-2195: google-drive registered)', () => {
     expect(DOCUMENTS_HOME_NAV_ENTRIES.map((e) => e.id)).toEqual([
       'workspace',
       'my-folder',
+      'google-drive',
       'recent',
       'starred',
       'shared-with-me',
@@ -75,10 +76,14 @@ describe('DH1-W2 documents-home-model', () => {
 
     const starred = getDocumentsHomeNavEntry('starred')
     const archive = getDocumentsHomeNavEntry('archive')
+    const drive = getDocumentsHomeNavEntry('google-drive')
     expect(starred.available).toBe(true)
     expect(starred.source).toBe('favorites')
     expect(archive.available).toBe(true)
     expect(archive.source).toBe('shelved')
+    expect(drive.available).toBe(false)
+    expect(drive.source).toBe('drive')
+    expect(drive.labelKey).toBe('uhNavGoogleDrive')
 
     // UNI-1957: My Folder is the tree row (or its stand-in), not a sub-nav entry
     expect(getDocumentsHomeNavEntry('my-folder').available).toBe(false)
@@ -751,6 +756,206 @@ describe('the Type filter strings (UNI-2113)', () => {
     for (const lang of langs.filter((l) => !['en', 'vi'].includes(l))) {
       const table = uniworkHomeStrings[lang] as Record<string, string>
       expect(table.uhFilterTypeRemove, lang).not.toBe(en.uhFilterTypeRemove)
+    }
+  })
+})
+
+describe('UNI-2195 (D2) Google Drive sidebar visibility, loader, and i18n keys', () => {
+  const activeConn = {
+    id: 'dc-active',
+    provider: 'google',
+    googleEmail: 'minh@company.vn',
+    status: 'active' as const,
+    needsReconnect: false,
+    linkedFileCount: 1,
+    connectedAt: '2026-10-01T00:00:00Z',
+    updatedAt: '2026-10-10T00:00:00Z',
+  }
+  const brokenConn = {
+    id: 'dc-broken',
+    provider: 'google',
+    googleEmail: 'lan@company.vn',
+    status: 'needs_reconnect' as const,
+    needsReconnect: true,
+    authFailedAt: '2026-10-12T00:00:00Z',
+    authFailedReason: 'invalid_grant',
+    linkedFileCount: 2,
+    connectedAt: '2026-10-02T00:00:00Z',
+    updatedAt: '2026-10-12T00:00:00Z',
+  }
+
+  it('computes Google Drive sidebar visibility and sub-rows per spec §17.2, §7.6, and Q6', () => {
+    // Hidden when drive_connector capability is off even if connections exist
+    expect(
+      homeModel.buildDriveSidebarState({
+        capability: false,
+        connections: [activeConn],
+      }),
+    ).toEqual({
+      visible: false,
+      totalCount: 0,
+      accounts: [],
+    })
+
+    // Hidden when capability is on, 0 connections (Q6: no "Người khác liên kết" row)
+    expect(
+      homeModel.buildDriveSidebarState({
+        capability: true,
+        connections: [],
+      }),
+    ).toEqual({
+      visible: false,
+      totalCount: 0,
+      accounts: [],
+    })
+
+    // Shown with account sub-rows and aggregate linked count when caller has >= 1 connection (including broken)
+    expect(
+      homeModel.buildDriveSidebarState({
+        capability: true,
+        connections: [activeConn, brokenConn],
+      }),
+    ).toEqual({
+      visible: true,
+      totalCount: 3,
+      accounts: [
+        {
+          id: 'dc-active',
+          email: 'minh@company.vn',
+          linkedFileCount: 1,
+          needsReconnect: false,
+        },
+        {
+          id: 'dc-broken',
+          email: 'lan@company.vn',
+          linkedFileCount: 2,
+          needsReconnect: true,
+        },
+      ],
+    })
+
+    // Keeps row visible when going offline after seen in session; hidden on cold start offline
+    expect(
+      homeModel.isDriveSidebarVisible({
+        capability: false,
+        connections: [activeConn],
+        offline: true,
+        seenInSession: true,
+      }),
+    ).toBe(true)
+    expect(
+      homeModel.isDriveSidebarVisible({
+        capability: false,
+        connections: [activeConn],
+        offline: true,
+        seenInSession: false,
+      }),
+    ).toBe(false)
+  })
+
+  it('resolveDriveAccountFilter returns connection id only when it belongs to the viewer connections', () => {
+    expect(homeModel.resolveDriveAccountFilter(null, [activeConn, brokenConn])).toBeNull()
+    expect(homeModel.resolveDriveAccountFilter('dc-unknown', [activeConn, brokenConn])).toBeNull()
+    expect(homeModel.resolveDriveAccountFilter('dc-broken', [activeConn, brokenConn])).toBe(
+      'dc-broken',
+    )
+  })
+
+  it('fetchDocumentsHomeDriveFiles forwards connectionId, cursor, and limit to the Drive bridge', async () => {
+    const listFiles = vi.fn().mockResolvedValue({
+      ok: true,
+      value: {
+        files: [
+          {
+            id: 'df-1',
+            organizationId: 'org-1',
+            workspaceId: 'ws-1',
+            externalFileId: 'ext-1',
+            name: 'Kế hoạch Q4',
+            mimeType: 'application/vnd.google-apps.document',
+            iconKind: 'google_doc',
+            webViewLink: 'https://docs.google.com/document/d/ext-1/edit',
+            openUrl: 'https://docs.google.com/document/d/ext-1/edit',
+            ownerDisplay: 'Minh',
+            sharingState: 'shared',
+            sharedUserCount: 4,
+            connectionId: 'dc-active',
+            boundAccountEmail: 'minh@company.vn',
+            boundConnectionLost: false,
+            boundById: 'u-1',
+            boundByName: 'Minh',
+            createdBy: 'u-1',
+            createdByKind: 'user',
+            createdByName: 'Minh',
+            createdAt: '2026-10-10T00:00:00Z',
+            updatedAt: '2026-10-10T00:00:00Z',
+            viewerAccess: 'granted',
+            viewerConnectionId: 'dc-active',
+            viewerAccountEmail: 'minh@company.vn',
+            canUnlink: true,
+            canRebind: false,
+            canPropose: true,
+            canAsk: true,
+            usedInCount: 0,
+            usedInTasks: [],
+            tasksCreated: { count: 0 },
+          },
+        ],
+        totalCount: 1,
+        nextCursor: 'next-tok',
+      },
+    })
+
+    const res = await homeModel.fetchDocumentsHomeDriveFiles(
+      { listFiles },
+      {
+        workspaceId: 'ws-1',
+        connectionId: 'dc-active',
+        cursor: 'cur-1',
+        limit: 25,
+      },
+    )
+    expect(listFiles).toHaveBeenCalledWith({
+      workspaceId: 'ws-1',
+      connectionId: 'dc-active',
+      cursor: 'cur-1',
+      limit: 25,
+    })
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      expect(res.value.files).toHaveLength(1)
+      expect(res.value.totalCount).toBe(1)
+      expect(res.value.nextCursor).toBe('next-tok')
+    }
+  })
+
+  it('ships all D2 Google Drive i18n keys across all 21 locales with required placeholders', () => {
+    const langs = Object.keys(uniworkHomeStrings) as (keyof typeof uniworkHomeStrings)[]
+    expect(langs).toHaveLength(21)
+    expect(viLocale.uhNavGoogleDrive).toBe('Google Drive')
+    expect(en.uhNavGoogleDrive).toBe('Google Drive')
+    expect(viLocale.uhNavDriveAccount).toBe('Drive: {email}')
+    expect(en.uhNavDriveAccount).toBe('Drive: {email}')
+    expect(viLocale.uhDriveLost).toBe('Mất kết nối')
+    expect(en.uhDriveLost).toBe('Disconnected')
+    expect(viLocale.uhDriveReconnect).toBe('Mất kết nối · kết nối lại')
+    expect(en.uhDriveReconnect).toBe('Disconnected · Reconnect')
+    expect(viLocale.uhDriveSharedDrive).toBe('Bộ nhớ dùng chung')
+    expect(en.uhDriveSharedDrive).toBe('Shared drive')
+
+    for (const lang of langs) {
+      const table = uniworkHomeStrings[lang] as Record<string, string>
+      expect(table.uhNavDriveAccount, lang).toContain('{email}')
+      expect(table.uhDriveAddFromAccount, lang).toContain('{email}')
+      expect(table.uhDriveSharedCountOne, lang).toContain('{count}')
+      expect(table.uhDriveSharedCount, lang).toContain('{count}')
+      expect(table.uhDriveUsedInSingle, lang).toContain('{identifier}')
+      expect(table.uhDriveUsedInMoreOne, lang).toContain('{identifier}')
+      expect(table.uhDriveUsedInMoreOne, lang).toContain('{count}')
+      expect(table.uhDriveUsedInMore, lang).toContain('{identifier}')
+      expect(table.uhDriveUsedInMore, lang).toContain('{count}')
+      expect(table.uhDriveTasksCreatedLineOne, lang).toContain('{count}')
+      expect(table.uhDriveTasksCreatedLine, lang).toContain('{count}')
     }
   })
 })

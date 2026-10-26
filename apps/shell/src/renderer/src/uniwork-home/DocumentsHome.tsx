@@ -173,6 +173,7 @@ import { ListState } from '../doclist/ListState'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
 import { CREATE_SPECIFIC_ERRORS, NEW_DEFAULT_NAME_KEY, NEW_KIND_EXT } from './new-menu-model'
+import { DriveList, DriveSidebarRows, GoogleDriveGlyph, useDocumentsHomeDrive } from './DriveList'
 import '../uniwork-folders/uniwork-folders.css'
 import './documents-home.css'
 import './doclist-sidebar.css'
@@ -275,6 +276,8 @@ function SubNavIcon({ id }: { id: DocumentsHomeSubViewId }) {
           <path d="M10.7 11.5v-1a1.3 1.3 0 0 1 2.6 0v1" />
         </svg>
       )
+    case 'google-drive':
+      return <GoogleDriveGlyph className="dh-nav-icon" />
     case 'recent':
       return (
         <svg
@@ -541,6 +544,16 @@ export function DocumentsHome({
 
   // G5-05u / NET-OFF-01: pin/unpin entry in each document row's "…" menu (hidden while the capability is off)
   const offlineToggle = useOfflineToggle()
+  const drive = useDocumentsHomeDrive({
+    workspaceId,
+    subView,
+    listTick,
+    onErrorToast: (err) =>
+      setToast({
+        message: t(err === 'network' ? 'uhDriveOffline' : 'uwDocActionFailed'),
+        tone: 'error',
+      }),
+  })
   const myFolderLabel = t(MY_FOLDER_LABEL_KEY)
   const labeledNodes = useMemo(
     () => tree.nodes.map((n) => (isMyFolder(n) ? { ...n, title: myFolderLabel } : n)),
@@ -733,6 +746,7 @@ export function DocumentsHome({
   )
 
   useEffect(() => {
+    if (subView === 'google-drive') return
     const seq = ++listSeqRef.current
     setPage((prev) => ({
       status: 'loading',
@@ -984,6 +998,10 @@ export function DocumentsHome({
   }
 
   const loadMore = () => {
+    if (subView === 'google-drive') {
+      drive.loadMore()
+      return
+    }
     // UNI-1961: "Load more" asks both lists for their next page (the web's rule)
     if (elsewhereView) loadMoreSources()
     if (!page.nextCursor || page.loadingMore || page.status !== 'ready') return
@@ -1104,6 +1122,12 @@ export function DocumentsHome({
   const openElsewhere = (source: ElsewhereSource) => {
     setElsewhereSource(source)
     selectSubView('elsewhere')
+  }
+
+  /** UNI-2195 (D2): selects the Google Drive view (all accounts when `null`, or one connection) */
+  const openDrive = (connectionId: string | null) => {
+    drive.setSelectedAccountId(connectionId)
+    selectSubView('google-drive')
   }
 
   const openFolderInWorkspace = (id: string | null) => {
@@ -2356,8 +2380,13 @@ export function DocumentsHome({
     return { kind: 'key', key: getDocumentsHomeNavEntry(subView).labelKey }
   }, [subView, folderId, index, resolvedMyFolderId, myFolderLabel, shownPath])
   const currentHeading =
-    currentHeadingSpec.kind === 'literal' ? currentHeadingSpec.text : t(currentHeadingSpec.key)
-
+    subView === 'google-drive'
+      ? drive.selectedConnection
+        ? t('uhNavDriveAccount', { email: drive.selectedConnection.googleEmail })
+        : t('uhNavGoogleDrive')
+      : currentHeadingSpec.kind === 'literal'
+        ? currentHeadingSpec.text
+        : t(currentHeadingSpec.key)
   const emptyMessageKey = useMemo<StringKey | null>(() => {
     if (query.length > 0) return null
     if (hasActiveFilters(filters) || (subView === 'recent' && recentSegment !== 'all')) {
@@ -2394,6 +2423,18 @@ export function DocumentsHome({
   }, [sidebarIdle, subView, resolvedMyFolderId, folderId])
 
   const myFolderStandInCurrent = !sidebarIdle && subView === 'my-folder'
+  const hasMyFolderNode = Boolean(myFolderIdOf(tree.nodes))
+  const driveSidebarRows = drive.sidebarState.visible ? (
+    <DriveSidebarRows
+      state={drive.sidebarState}
+      active={!sidebarIdle && subView === 'google-drive'}
+      selectedAccountId={drive.selectedAccountId}
+      onSelect={(accountId) => {
+        onSidebarNavigate?.()
+        openDrive(accountId)
+      }}
+    />
+  ) : null
 
   const sidebarContent = (
     <div className="dh-sidebar-wrap">
@@ -2450,7 +2491,7 @@ export function DocumentsHome({
         </div>
         <div className="dh-sidebar-tree">
           {/* My Folder lives in the tree; until the server has created it, this row stands in its place and creates it. */}
-          {tree.status !== 'loading' && !myFolderIdOf(tree.nodes) && (
+          {tree.status !== 'loading' && !hasMyFolderNode && (
             <button
               type="button"
               data-my-folder-standin=""
@@ -2468,6 +2509,7 @@ export function DocumentsHome({
               </span>
             </button>
           )}
+          {!hasMyFolderNode && driveSidebarRows}
           {tree.status === 'loading' && (
             <p className="uwf-side-state" role="status">
               {t('uwPickLoading')}
@@ -2485,6 +2527,7 @@ export function DocumentsHome({
             <UniworkFolderTree
               idPrefix={`${uid}-tree`}
               hideRoot
+              afterFirstRootRow={hasMyFolderNode ? driveSidebarRows : undefined}
               nodes={tree.nodes}
               label={t('ufTreeLabel')}
               expanded={expanded}
@@ -2557,15 +2600,21 @@ export function DocumentsHome({
   // the recent-canvas layout: subtitle under the title, a search named after the screen, "Mở tiếp"
   // above the list (the app keeps its own Tải lên / Tạo mới / Tạo nhanh, which the board does not draw)
   const recentView = subView === 'recent'
+  const driveView = subView === 'google-drive'
   const searchLabel = recentView
     ? t('dlSearchIn', { name: currentHeading })
     : t('uhSearchPlaceholder')
-  const subtitleKey = recentView
+  const subtitleKey: StringKey | null = recentView
     ? 'dlRecentSubtitle'
     : subView === 'elsewhere'
       ? 'dlElsewhereSubtitle'
-      : null
-  // the strip ranks the loaded page by last touch, which is the server's own order only while
+      : driveView
+        ? drive.selectedConnection
+          ? drive.brokenAccount
+            ? 'uhDriveSubtitleBroken'
+            : 'uhDriveSubtitleAccount'
+          : 'uhDriveSubtitleAll'
+        : null
   // Recent is on its default sort (Lần mở gần nhất, newest first)
   const recentDefaultSort = !docSort || (docSort.column === 'activity' && docSort.dir === 'desc')
   const continueDocs =
@@ -2663,55 +2712,57 @@ export function DocumentsHome({
             </select>
           )}
           {!folderHeader && <div className="dh-toolbar-spacer" />}
-          <div className="dh-search-box" role="search">
-            <svg
-              className="dh-search-icon"
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
-            <input
-              ref={searchInputRef}
-              className="dh-search-input uwf-own-search"
-              type="search"
-              aria-label={searchLabel}
-              placeholder={searchLabel}
-              value={searchDraft}
-              spellCheck={false}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape' && searchDraft) {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setSearchDraft('')
-                }
-              }}
-            />
-            {searchDraft && (
-              <button
-                type="button"
-                className="dh-search-clear"
-                aria-label={t('searchClear')}
-                onClick={() => {
-                  setSearchDraft('')
-                  focusSearch()
-                }}
+          {!driveView && (
+            <div className="dh-search-box" role="search">
+              <svg
+                className="dh-search-icon"
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                ×
-              </button>
-            )}
-          </div>
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                ref={searchInputRef}
+                className="dh-search-input uwf-own-search"
+                type="search"
+                aria-label={searchLabel}
+                placeholder={searchLabel}
+                value={searchDraft}
+                spellCheck={false}
+                onChange={(e) => setSearchDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && searchDraft) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setSearchDraft('')
+                  }
+                }}
+              />
+              {searchDraft && (
+                <button
+                  type="button"
+                  className="dh-search-clear"
+                  aria-label={t('searchClear')}
+                  onClick={() => {
+                    setSearchDraft('')
+                    focusSearch()
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
           {/* the web hides New and Upload where the create rule says no (a viewer in a workspace folder) */}
-          {openFolderCreatable && (
+          {!driveView && openFolderCreatable && (
             <div className="dh-toolbar-actions">
               {folderUpload.available && folderUpload.foldersAvailable ? (
                 <UploadMenu
@@ -2760,315 +2811,349 @@ export function DocumentsHome({
           )}
         </div>
 
-        {subView !== 'trash' &&
-          subView !== 'archive' &&
-          subView !== 'elsewhere' &&
-          openFolderCreatable && (
-            <div className="dh-quick-row">
-              <span className="dh-quick-label">{t('uhQuickCreate')}</span>
-              {QUICK_CREATE_KINDS.map((kind) => (
-                <button
-                  key={kind}
-                  type="button"
-                  className="dh-quick-pill"
-                  data-quick-format={kind}
-                  aria-disabled={creating || unavailableKinds.has(kind) || undefined}
-                  title={unavailableKinds.has(kind) ? t('uhCreateUnavailableHint') : undefined}
-                  onClick={() => void createNow(kind)}
-                >
-                  <FileBadge ext={kind} size={18} />
-                  <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
-                  <span className="dh-quick-ext">{NEW_KIND_EXT[kind]}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-        {subView === 'trash' && <p className="dh-subview-banner">{t('dlTrashBanner30')}</p>}
-        {folderNotice && (
-          <p className="uwf-notice" role="status">
-            {t(folderNotice)}
-          </p>
-        )}
-
-        {/* UNI-1961: the shelf's intro and Lưu trữ bởi; its type / editor / date are the shared bar below */}
-        {shelfView && (
-          <ShelvedToolbar items={page.items} shelvedBy={shelvedBy} onShelvedBy={setShelvedBy} />
-        )}
-
-        {continueDocs.length > 0 && (
-          <ContinueStrip
-            docs={continueDocs}
-            openingId={openingId}
-            onOpen={(doc) => void openDoc(doc)}
+        {driveView ? (
+          <DriveList
+            workspaceId={workspaceId}
+            connections={drive.connections}
+            selectedAccountId={drive.selectedAccountId}
+            files={drive.files}
+            status={drive.status}
+            error={drive.error}
+            offline={drive.offline}
+            nextCursor={drive.nextCursor}
+            loadingMore={drive.loadingMore}
+            moreError={drive.moreError}
+            onRetry={drive.retry}
+            onLoadMore={drive.loadMore}
+            onOpenOnGoogle={(driveFileId) => void drive.openOnGoogle(driveFileId)}
           />
-        )}
-
-        <FilterBar
-          filters={filters}
-          onChange={setFilters}
-          authors={
-            subView === 'shared-with-me'
-              ? collectUpdatedByOptions(page.items)
-              : subView === 'elsewhere'
-                ? sourceAuthorsOf(sources.items)
-                : knownAuthors
-          }
-          hideTypes={subView === 'elsewhere' ? ['page'] : undefined}
-          lead={
-            // the segment needs the server's last_activity: without it (or an empty pick) it is not offered
-            recentView && (recentSegment !== 'all' || specialPresent('recent', page.items)) ? (
-              <RecentSegmentControl
-                value={recentFlat ? 'all' : recentSegment}
-                disabled={recentFlat}
-                onChange={setRecentSegment}
-              />
-            ) : undefined
-          }
-        />
-
-        {((page.status === 'loading' && page.items.length === 0) ||
-          (elsewhereView && sources.status === 'loading')) && (
-          <div className="uw-pick-skeleton" role="status" aria-busy="true">
-            <span className="uw-sr-only">{t('uwPickLoading')}</span>
-            {[0, 1, 2].map((i) => (
-              <div className="uw-pick-skel-row" key={i} aria-hidden="true">
-                <span className="uw-skel uw-skel-icon" />
-                <span className="uw-skel-lines">
-                  <span className="uw-skel uw-skel-line" />
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {listError && (
-          <ListState
-            kind="error"
-            glyph={unavailablePage === 'starred' ? 'star' : 'error'}
-            returnFocus={focusSearch}
-            title={unavailableKeys ? t(unavailableKeys.title) : t(UNIWORK_ERROR_KEYS[listError])}
-            hint={unavailableKeys ? t(unavailableKeys.hint) : undefined}
-            // Thử lại where asking again can help: a missing route (the server may be updated) and
-            // the transient codes; never a sign-in problem
-            action={
-              unavailableKeys || errorActionOf(listError) === 'retry'
-                ? { label: t('acctRetry'), onClick: () => setListTick((n) => n + 1) }
-                : undefined
-            }
-          />
-        )}
-
-        {pageShown && (
+        ) : (
           <>
-            {!shelfView && folders.length > 0 && (
-              <section className="dh-section dh-folders-section" aria-label={t('uhSectionFolders')}>
-                <div className="dh-section-head">
-                  <span className="dh-section-title">{t('uhSectionFolders')}</span>
-                  <span className="dh-section-count">{folders.length}</span>
+            {subView !== 'trash' &&
+              subView !== 'archive' &&
+              subView !== 'elsewhere' &&
+              openFolderCreatable && (
+                <div className="dh-quick-row">
+                  <span className="dh-quick-label">{t('uhQuickCreate')}</span>
+                  {QUICK_CREATE_KINDS.map((kind) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      className="dh-quick-pill"
+                      data-quick-format={kind}
+                      aria-disabled={creating || unavailableKinds.has(kind) || undefined}
+                      title={unavailableKinds.has(kind) ? t('uhCreateUnavailableHint') : undefined}
+                      onClick={() => void createNow(kind)}
+                    >
+                      <FileBadge ext={kind} size={18} />
+                      <span>{t(NEW_KIND_LABEL_KEY[kind])}</span>
+                      <span className="dh-quick-ext">{NEW_KIND_EXT[kind]}</span>
+                    </button>
+                  ))}
                 </div>
-                <div className="dh-folder-grid">
-                  {folders.map((folder) => {
-                    const title = entryTitleOf(folder, myFolderLabel)
-                    const menuItems = folderCardMenuFor(folder)
-                    const mine = isMyFolder(folder)
-                    const folderSearchPath =
-                      query.length > 0 && folder.path
-                        ? shortPath(
-                            labelMyFolderPath(folder.path, resolvedMyFolderId, myFolderLabel),
-                            t('ufRoot'),
-                          )
-                        : null
-                    return (
-                      <div key={folder.id} className="dh-folder-card" data-folder-id={folder.id}>
-                        <button
-                          type="button"
-                          className="dh-folder-open"
-                          onClick={() => openFolderInWorkspace(folder.id)}
-                        >
-                          <span className="dh-folder-icon" aria-hidden="true">
-                            {mine ? <MyFolderGlyph /> : <FolderGlyph />}
-                          </span>
-                          {folderSearchPath ? (
-                            <span style={{ minWidth: 0, flex: 1 }}>
-                              <span
-                                className="dh-folder-name"
-                                title={title}
-                                style={{ display: 'block' }}
-                              >
-                                {title}
-                              </span>
-                              <span
-                                className="dh-doc-subpath uwf-path"
-                                title={folderSearchPath.full}
-                              >
-                                <span aria-hidden="true">{folderSearchPath.short}</span>
-                                <span className="uw-sr-only">
-                                  {t('ufPathLabel', { path: folderSearchPath.full })}
-                                </span>
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="dh-folder-name" title={title}>
-                              {title}
-                            </span>
-                          )}
-                          {/* UNI-2066: `isEmpty` is computed for me by the server; only a real true says it */}
-                          {folder.isEmpty === true && (
-                            <span className="dh-folder-empty">{t('ufCardEmpty')}</span>
-                          )}
-                        </button>
-                        {menuItems.length > 0 && (
-                          <span className="dh-folder-actions" onClick={(e) => e.stopPropagation()}>
-                            <FolderMenu
-                              label={t('ufActionsFor', { name: title })}
-                              items={menuItems}
-                              dataFor={folder.id}
-                              tabbable
-                              open={openMenuId === folder.id}
-                              onOpenChange={(o) => setOpenMenuId(o ? folder.id : null)}
-                            />
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
+              )}
+
+            {subView === 'trash' && <p className="dh-subview-banner">{t('dlTrashBanner30')}</p>}
+            {folderNotice && (
+              <p className="uwf-notice" role="status">
+                {t(folderNotice)}
+              </p>
             )}
 
-            <section
-              className={`dh-section dh-docs-section${shelfView ? ' dh-shelved-section' : ''} uwf-list`}
-              aria-label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
-            >
-              {!shelfView && !recentView && !elsewhereView && (
-                <div className="dh-section-head">
-                  <span className="dh-section-title">{t('uhSectionDocuments')}</span>
-                  <span className="dh-section-count">{tableRows.length}</span>
-                </div>
-              )}
+            {/* UNI-1961: the shelf's intro and Lưu trữ bởi; its type / editor / date are the shared bar below */}
+            {shelfView && (
+              <ShelvedToolbar items={page.items} shelvedBy={shelvedBy} onShelvedBy={setShelvedBy} />
+            )}
 
-              {tableRows.length === 0 ? (
-                shelfView ? (
-                  <div className="dh-empty dh-shelved-empty" role="status">
-                    <p className="dh-shelved-empty-title">
-                      {hasActiveFilters(filters) || shelvedBy !== null
-                        ? t('uhShelvedNoMatchTitle')
-                        : t('uhShelvedEmptyTitle')}
-                    </p>
-                    <p className="dh-shelved-empty-desc">
-                      {hasActiveFilters(filters) || shelvedBy !== null
-                        ? t('uhShelvedNoMatchDesc')
-                        : t('uhShelvedEmptyDesc')}
-                    </p>
+            {continueDocs.length > 0 && (
+              <ContinueStrip
+                docs={continueDocs}
+                openingId={openingId}
+                onOpen={(doc) => void openDoc(doc)}
+              />
+            )}
+
+            <FilterBar
+              filters={filters}
+              onChange={setFilters}
+              authors={
+                subView === 'shared-with-me'
+                  ? collectUpdatedByOptions(page.items)
+                  : subView === 'elsewhere'
+                    ? sourceAuthorsOf(sources.items)
+                    : knownAuthors
+              }
+              hideTypes={subView === 'elsewhere' ? ['page'] : undefined}
+              lead={
+                // the segment needs the server's last_activity: without it (or an empty pick) it is not offered
+                recentView && (recentSegment !== 'all' || specialPresent('recent', page.items)) ? (
+                  <RecentSegmentControl
+                    value={recentFlat ? 'all' : recentSegment}
+                    disabled={recentFlat}
+                    onChange={setRecentSegment}
+                  />
+                ) : undefined
+              }
+            />
+
+            {((page.status === 'loading' && page.items.length === 0) ||
+              (elsewhereView && sources.status === 'loading')) && (
+              <div className="uw-pick-skeleton" role="status" aria-busy="true">
+                <span className="uw-sr-only">{t('uwPickLoading')}</span>
+                {[0, 1, 2].map((i) => (
+                  <div className="uw-pick-skel-row" key={i} aria-hidden="true">
+                    <span className="uw-skel uw-skel-icon" />
+                    <span className="uw-skel-lines">
+                      <span className="uw-skel uw-skel-line" />
+                    </span>
                   </div>
-                ) : // V-STATES F-09: a search with no hit is the shared empty state with Xóa tìm kiếm
-                query.length > 0 ? (
-                  <ListState
-                    kind="empty"
-                    glyph="search"
-                    returnFocus={focusSearch}
-                    title={t('dlSearchNoResults', { query })}
-                    action={{ label: t('searchClear'), onClick: () => setSearchDraft('') }}
-                  />
-                ) : (
-                  <div className="dh-empty" role="status">
-                    {emptyMessage}
-                  </div>
-                )
-              ) : (
-                <>
-                  <BulkBar
-                    screen={screen}
-                    docs={selectedDocs}
-                    busy={bulkBusy || zipBusy || bulkMove.busy}
-                    canShare={shareAvailable}
-                    canDownload={zipAvailable}
-                    canPurge={canPurgeDocuments()}
-                    onAction={onBulkAction}
-                    onClear={() => setSelected(new Set())}
-                  />
-                  <DocList
-                    screen={screen}
-                    rows={tableRows}
-                    sort={flatActivitySort ? defaultSort('workspace') : docSort}
-                    onSortChange={setDocSort}
-                    moreToLoad={page.nextCursor !== null}
-                    selected={selected}
-                    onSelectedChange={setSelected}
-                    label={
-                      shelfView
-                        ? t('uhNavArchive')
-                        : elsewhereView
-                          ? currentHeading
-                          : t('uhSectionDocuments')
-                    }
-                    openingId={trashView ? null : openingId}
-                    openMenuId={openMenuId}
-                    onOpenMenuChange={setOpenMenuId}
-                    menuFor={rowMenuFor}
-                    onShare={shareAvailable ? openRowShare : undefined}
-                    actionsFor={
-                      shelfView ? shelfActionsFor : trashView ? trashActionsFor : undefined
-                    }
-                    // UNI-2047 B7: only Starred rows know their star state (the "Sao · ⋯" Sao button)
-                    onUnstar={
-                      starredView && canFavoriteDocuments()
-                        ? (doc) => void handleFavorite(doc, false)
-                        : undefined
-                    }
-                    onOpen={(doc) => void openDoc(doc)}
-                    sublineFor={trashView ? undefined : sublineFor}
-                    groups={subView !== 'trash' || trashView}
-                    rename={
-                      docRename
-                        ? {
-                            docId: docRename.doc.id,
-                            error: docRename.error,
-                            busy: docRename.busy,
-                            onSave: (value) => void handleSaveDocRename(docRename.doc, value),
-                            onCancel: () => setDocRename(null),
-                            onEdit: () =>
-                              setDocRename((prev) => (prev ? { ...prev, error: null } : null)),
-                          }
-                        : undefined
-                    }
-                    renderSource={(source, columns) => (
-                      <DocumentsSourceRow
-                        key={`source:${source.id}`}
-                        source={source}
-                        columns={columns}
-                        menuOpen={openMenuId === `source:${source.id}`}
-                        onMenuOpenChange={(o) => setOpenMenuId(o ? `source:${source.id}` : null)}
-                        onOpen={(src) => void openSourceFile(src)}
-                        onDownload={(src) => void downloadSourceFile(src)}
-                      />
-                    )}
-                  />
-                </>
-              )}
+                ))}
+              </div>
+            )}
 
-              {page.moreError && (
-                <p className="uw-pick-more-error" role="alert">
-                  {t(UNIWORK_ERROR_KEYS[page.moreError])}
-                </p>
-              )}
+            {listError && (
+              <ListState
+                kind="error"
+                glyph={unavailablePage === 'starred' ? 'star' : 'error'}
+                returnFocus={focusSearch}
+                title={
+                  unavailableKeys ? t(unavailableKeys.title) : t(UNIWORK_ERROR_KEYS[listError])
+                }
+                hint={unavailableKeys ? t(unavailableKeys.hint) : undefined}
+                // Thử lại where asking again can help: a missing route (the server may be updated) and
+                // the transient codes; never a sign-in problem
+                action={
+                  unavailableKeys || errorActionOf(listError) === 'retry'
+                    ? { label: t('acctRetry'), onClick: () => setListTick((n) => n + 1) }
+                    : undefined
+                }
+              />
+            )}
 
-              {(page.nextCursor || (elsewhereView && sources.nextCursor)) && (
-                <div className="dh-load-more-row">
-                  <button
-                    type="button"
-                    className="btn btn-secondary uw-pick-more"
-                    disabled={page.loadingMore || sources.loadingMore}
-                    onClick={loadMore}
+            {pageShown && (
+              <>
+                {!shelfView && folders.length > 0 && (
+                  <section
+                    className="dh-section dh-folders-section"
+                    aria-label={t('uhSectionFolders')}
                   >
-                    {page.loadingMore || sources.loadingMore
-                      ? t('uwPickLoadingMore')
-                      : t('uhLoadMore')}
-                  </button>
-                </div>
-              )}
-            </section>
+                    <div className="dh-section-head">
+                      <span className="dh-section-title">{t('uhSectionFolders')}</span>
+                      <span className="dh-section-count">{folders.length}</span>
+                    </div>
+                    <div className="dh-folder-grid">
+                      {folders.map((folder) => {
+                        const title = entryTitleOf(folder, myFolderLabel)
+                        const menuItems = folderCardMenuFor(folder)
+                        const mine = isMyFolder(folder)
+                        const folderSearchPath =
+                          query.length > 0 && folder.path
+                            ? shortPath(
+                                labelMyFolderPath(folder.path, resolvedMyFolderId, myFolderLabel),
+                                t('ufRoot'),
+                              )
+                            : null
+                        return (
+                          <div
+                            key={folder.id}
+                            className="dh-folder-card"
+                            data-folder-id={folder.id}
+                          >
+                            <button
+                              type="button"
+                              className="dh-folder-open"
+                              onClick={() => openFolderInWorkspace(folder.id)}
+                            >
+                              <span className="dh-folder-icon" aria-hidden="true">
+                                {mine ? <MyFolderGlyph /> : <FolderGlyph />}
+                              </span>
+                              {folderSearchPath ? (
+                                <span style={{ minWidth: 0, flex: 1 }}>
+                                  <span
+                                    className="dh-folder-name"
+                                    title={title}
+                                    style={{ display: 'block' }}
+                                  >
+                                    {title}
+                                  </span>
+                                  <span
+                                    className="dh-doc-subpath uwf-path"
+                                    title={folderSearchPath.full}
+                                  >
+                                    <span aria-hidden="true">{folderSearchPath.short}</span>
+                                    <span className="uw-sr-only">
+                                      {t('ufPathLabel', { path: folderSearchPath.full })}
+                                    </span>
+                                  </span>
+                                </span>
+                              ) : (
+                                <span className="dh-folder-name" title={title}>
+                                  {title}
+                                </span>
+                              )}
+                              {/* UNI-2066: `isEmpty` is computed for me by the server; only a real true says it */}
+                              {folder.isEmpty === true && (
+                                <span className="dh-folder-empty">{t('ufCardEmpty')}</span>
+                              )}
+                            </button>
+                            {menuItems.length > 0 && (
+                              <span
+                                className="dh-folder-actions"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <FolderMenu
+                                  label={t('ufActionsFor', { name: title })}
+                                  items={menuItems}
+                                  dataFor={folder.id}
+                                  tabbable
+                                  open={openMenuId === folder.id}
+                                  onOpenChange={(o) => setOpenMenuId(o ? folder.id : null)}
+                                />
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                <section
+                  className={`dh-section dh-docs-section${shelfView ? ' dh-shelved-section' : ''} uwf-list`}
+                  aria-label={shelfView ? t('uhNavArchive') : t('uhSectionDocuments')}
+                >
+                  {!shelfView && !recentView && !elsewhereView && (
+                    <div className="dh-section-head">
+                      <span className="dh-section-title">{t('uhSectionDocuments')}</span>
+                      <span className="dh-section-count">{tableRows.length}</span>
+                    </div>
+                  )}
+
+                  {tableRows.length === 0 ? (
+                    shelfView ? (
+                      <div className="dh-empty dh-shelved-empty" role="status">
+                        <p className="dh-shelved-empty-title">
+                          {hasActiveFilters(filters) || shelvedBy !== null
+                            ? t('uhShelvedNoMatchTitle')
+                            : t('uhShelvedEmptyTitle')}
+                        </p>
+                        <p className="dh-shelved-empty-desc">
+                          {hasActiveFilters(filters) || shelvedBy !== null
+                            ? t('uhShelvedNoMatchDesc')
+                            : t('uhShelvedEmptyDesc')}
+                        </p>
+                      </div>
+                    ) : // V-STATES F-09: a search with no hit is the shared empty state with Xóa tìm kiếm
+                    query.length > 0 ? (
+                      <ListState
+                        kind="empty"
+                        glyph="search"
+                        returnFocus={focusSearch}
+                        title={t('dlSearchNoResults', { query })}
+                        action={{ label: t('searchClear'), onClick: () => setSearchDraft('') }}
+                      />
+                    ) : (
+                      <div className="dh-empty" role="status">
+                        {emptyMessage}
+                      </div>
+                    )
+                  ) : (
+                    <>
+                      <BulkBar
+                        screen={screen}
+                        docs={selectedDocs}
+                        busy={bulkBusy || zipBusy || bulkMove.busy}
+                        canShare={shareAvailable}
+                        canDownload={zipAvailable}
+                        canPurge={canPurgeDocuments()}
+                        onAction={onBulkAction}
+                        onClear={() => setSelected(new Set())}
+                      />
+                      <DocList
+                        screen={screen}
+                        rows={tableRows}
+                        sort={flatActivitySort ? defaultSort('workspace') : docSort}
+                        onSortChange={setDocSort}
+                        moreToLoad={page.nextCursor !== null}
+                        selected={selected}
+                        onSelectedChange={setSelected}
+                        label={
+                          shelfView
+                            ? t('uhNavArchive')
+                            : elsewhereView
+                              ? currentHeading
+                              : t('uhSectionDocuments')
+                        }
+                        openingId={trashView ? null : openingId}
+                        openMenuId={openMenuId}
+                        onOpenMenuChange={setOpenMenuId}
+                        menuFor={rowMenuFor}
+                        onShare={shareAvailable ? openRowShare : undefined}
+                        actionsFor={
+                          shelfView ? shelfActionsFor : trashView ? trashActionsFor : undefined
+                        }
+                        // UNI-2047 B7: only Starred rows know their star state (the "Sao · ⋯" Sao button)
+                        onUnstar={
+                          starredView && canFavoriteDocuments()
+                            ? (doc) => void handleFavorite(doc, false)
+                            : undefined
+                        }
+                        onOpen={(doc) => void openDoc(doc)}
+                        sublineFor={trashView ? undefined : sublineFor}
+                        groups={subView !== 'trash' || trashView}
+                        rename={
+                          docRename
+                            ? {
+                                docId: docRename.doc.id,
+                                error: docRename.error,
+                                busy: docRename.busy,
+                                onSave: (value) => void handleSaveDocRename(docRename.doc, value),
+                                onCancel: () => setDocRename(null),
+                                onEdit: () =>
+                                  setDocRename((prev) => (prev ? { ...prev, error: null } : null)),
+                              }
+                            : undefined
+                        }
+                        renderSource={(source, columns) => (
+                          <DocumentsSourceRow
+                            key={`source:${source.id}`}
+                            source={source}
+                            columns={columns}
+                            menuOpen={openMenuId === `source:${source.id}`}
+                            onMenuOpenChange={(o) =>
+                              setOpenMenuId(o ? `source:${source.id}` : null)
+                            }
+                            onOpen={(src) => void openSourceFile(src)}
+                            onDownload={(src) => void downloadSourceFile(src)}
+                          />
+                        )}
+                      />
+                    </>
+                  )}
+
+                  {page.moreError && (
+                    <p className="uw-pick-more-error" role="alert">
+                      {t(UNIWORK_ERROR_KEYS[page.moreError])}
+                    </p>
+                  )}
+
+                  {(page.nextCursor || (elsewhereView && sources.nextCursor)) && (
+                    <div className="dh-load-more-row">
+                      <button
+                        type="button"
+                        className="btn btn-secondary uw-pick-more"
+                        disabled={page.loadingMore || sources.loadingMore}
+                        onClick={loadMore}
+                      >
+                        {page.loadingMore || sources.loadingMore
+                          ? t('uwPickLoadingMore')
+                          : t('uhLoadMore')}
+                      </button>
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
           </>
         )}
       </div>

@@ -1850,3 +1850,169 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* UNI-2195 (D2): Google Drive list screen (4.1 on the app) */
+.dh-drive-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dh-drive-actions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dh-drive-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dh-drive-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.dh-drive-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.dh-drive-head-row {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+
+.dh-drive-th {
+  padding: 10px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: start;
+  white-space: nowrap;
+}
+
+.dh-drive-row {
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.dh-drive-row:last-child {
+  border-bottom: 0;
+}
+
+.dh-drive-row:hover {
+  background: var(--hover);
+}
+
+.dh-drive-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.dh-drive-td {
+  padding: 12px 14px;
+  vertical-align: middle;
+}
+
+.dh-drive-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dh-drive-file-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dh-drive-file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.dh-drive-account-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dh-drive-account-email {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.dh-drive-reconnect-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--danger-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dh-drive-reconnect-link:disabled {
+  cursor: default;
+}
+
+.dh-drive-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.dh-drive-badge-shared {
+  background: var(--tint-blue);
+  color: var(--accent-text);
+}
+
+.dh-drive-cell-used,
+.dh-drive-cell-tasks {
+  color: var(--text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.dh-drive-footnote {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}

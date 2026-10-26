@@ -1,9 +1,14 @@
 import type {
+  DriveConnection,
+  DriveFile,
+  DriveFileListPage,
+  DriveFileListQuery,
   UniworkDocShareScope,
   UniworkDocTypePick,
   UniworkDocListPage,
   UniworkDocListQuery,
   UniworkDocSummary,
+  UniworkDriveResult,
   UniworkFolderChildren,
   UniworkFolderNode,
   UniworkFolderQuery,
@@ -38,6 +43,7 @@ export type DocumentsHomeDoc = UniworkDocSummary & {
 export type DocumentsHomeSubViewId =
   | 'workspace'
   | 'my-folder'
+  | 'google-drive'
   | 'recent'
   | 'starred'
   | 'shared-with-me'
@@ -49,6 +55,7 @@ export type DocumentsHomeSubViewId =
 export type DocumentsHomeDataSource =
   | 'children-root'
   | 'my-folder-children'
+  | 'drive'
   | 'documents'
   | 'shared-with-me'
   | 'shared-by-me'
@@ -83,6 +90,14 @@ export const DOCUMENTS_HOME_NAV_ENTRIES: readonly DocumentsHomeNavEntry[] = [
     // until the server has created it); the view itself is still reachable by id.
     available: false,
     source: 'my-folder-children',
+  },
+  {
+    id: 'google-drive',
+    labelKey: 'uhNavGoogleDrive',
+    // UNI-2195 (D2): Google Drive sits under My Folder in the Folders section when capability
+    // drive_connector is true and the viewer has >= 1 connection; never in the top sub-nav.
+    available: false,
+    source: 'drive',
   },
   {
     id: 'recent',
@@ -424,6 +439,15 @@ export interface DocumentsHomeApiAdapter {
     } & DocumentsHomeWireSort,
   ) => Promise<UniworkResult<UniworkDocListPage>>
   uniworkListSources?: (q: UniworkSourceListQuery) => Promise<UniworkResult<UniworkSourceListPage>>
+  /** UNI-2195 (D2): Google Drive connector bridge (on `window.uniworkDrive` or `window.aiOffice`) */
+  uniworkDriveIsAvailable?: () => Promise<boolean>
+  uniworkDriveListConnections?: (
+    workspaceId: string,
+  ) => Promise<UniworkDriveResult<DriveConnection[]>>
+  uniworkDriveListFiles?: (q: DriveFileListQuery) => Promise<UniworkDriveResult<DriveFileListPage>>
+  isAvailable?: () => Promise<boolean>
+  listConnections?: (workspaceId: string) => Promise<UniworkDriveResult<DriveConnection[]>>
+  listFiles?: (q: DriveFileListQuery) => Promise<UniworkDriveResult<DriveFileListPage>>
 }
 
 function mapDocListPageResult(
@@ -453,10 +477,13 @@ export async function fetchDocumentsHomePage(
     filters: UniworkListFilters
     /** UNI-2047: the header sort; unset sends nothing */
     sort?: DocumentsHomeWireSort | null
+    /** UNI-2195 (D2): the picked Google Drive connection id (`null` / omitted = all accounts) */
+    driveConnectionId?: string | null
   },
 ): Promise<{
   result: UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>
   ensuredMyFolder?: UniworkFolderNode
+  drivePage?: UniworkDriveResult<DriveFileListPage>
 }> {
   const { workspaceId, subView, folderId, myFolderId, cursor, filters } = params
   const sortArgs: DocumentsHomeWireSort = params.sort
@@ -617,6 +644,34 @@ export async function fetchDocumentsHomePage(
     }
   }
 
+  if (subView === 'google-drive') {
+    const drivePage = await fetchDocumentsHomeDriveFiles(api, {
+      workspaceId,
+      connectionId: params.driveConnectionId,
+      cursor,
+    })
+    if (!drivePage.ok) {
+      return {
+        result: {
+          ok: false,
+          error:
+            drivePage.error === 'network' ||
+            drivePage.error === 'not_signed_in' ||
+            drivePage.error === 'session_expired' ||
+            drivePage.error === 'not_found' ||
+            drivePage.error === 'forbidden'
+              ? drivePage.error
+              : 'server_error',
+        },
+        drivePage,
+      }
+    }
+    return {
+      result: { ok: true, value: { items: [], nextCursor: drivePage.value.nextCursor } },
+      drivePage,
+    }
+  }
+
   return { result: { ok: true, value: { items: [], nextCursor: null } } }
 }
 
@@ -765,3 +820,149 @@ export function rowSizeBytes(row: DocumentsHomeTableRow): number | null {
     ? (row.doc.sizeBytes ?? null)
     : null
 }
+
+// ── UNI-2195 (D2): Google Drive sidebar + list (4.1 on the app) ────────
+
+export interface DriveAccountNavRow {
+  readonly id: string
+  readonly email: string
+  readonly linkedFileCount: number
+  readonly needsReconnect: boolean
+}
+
+export interface DriveSidebarState {
+  readonly visible: boolean
+  readonly totalCount: number
+  readonly accounts: readonly DriveAccountNavRow[]
+}
+
+/**
+ * Visibility rule (spec §17.2, §7.6, Q6): the Google Drive sidebar entry is shown
+ * only when capability `drive_connector` is true AND the user has >= 1 connection
+ * (including a `needs_reconnect` connection). In a session that has already shown
+ * the Drive row, going offline keeps the row visible so the user can select it and
+ * see the offline state ("Cần kết nối mạng để xem tệp Google Drive." + Retry).
+ * Cold start offline has `capability` false and `seenInSession` false, so the row
+ * stays hidden. Never emits an "Others linked" ("Người khác liên kết") entry.
+ */
+export function isDriveSidebarVisible(params: {
+  capability: boolean
+  connections: readonly DriveConnection[]
+  offline?: boolean
+  seenInSession?: boolean
+}): boolean {
+  const { capability, connections, offline = false, seenInSession = false } = params
+  if (capability && connections.length > 0) return true
+  if (offline && seenInSession && connections.length > 0) return true
+  return false
+}
+
+/**
+ * Builds the sidebar rows for Google Drive: the top-level total and one child row
+ * per connected account (`Drive: <email>`), preserving server order and flagging
+ * broken connections (`needsReconnect` or `status === 'needs_reconnect'` or `authFailedAt`).
+ * Never includes an "Others linked" row (Q6).
+ */
+export function buildDriveSidebarState(params: {
+  capability: boolean
+  connections: readonly DriveConnection[]
+  totalCountOverride?: number | null
+  offline?: boolean
+  seenInSession?: boolean
+}): DriveSidebarState {
+  const visible = isDriveSidebarVisible(params)
+  if (!visible) {
+    return { visible: false, totalCount: 0, accounts: [] }
+  }
+  const accounts: DriveAccountNavRow[] = params.connections.map((conn) => ({
+    id: conn.id,
+    email: conn.googleEmail,
+    linkedFileCount: Math.max(0, conn.linkedFileCount),
+    needsReconnect:
+      conn.needsReconnect === true ||
+      conn.status === 'needs_reconnect' ||
+      Boolean(conn.authFailedAt),
+  }))
+  const sum = accounts.reduce((acc, a) => acc + a.linkedFileCount, 0)
+  const totalCount =
+    typeof params.totalCountOverride === 'number' && params.totalCountOverride >= 0
+      ? params.totalCountOverride
+      : sum
+  return { visible: true, totalCount, accounts }
+}
+
+/**
+ * Resolves the active account filter (`connection_id`) against the viewer's connections:
+ * `null` (all accounts) when unset or when the id does not match any connection.
+ */
+export function resolveDriveAccountFilter(
+  selectedConnectionId: string | null | undefined,
+  connections: readonly DriveConnection[],
+): string | null {
+  const id = selectedConnectionId?.trim() ?? ''
+  if (!id) return null
+  return connections.some((c) => c.id === id) ? id : null
+}
+
+/**
+ * Reads the `drive_connector` capability from `window.uniworkDrive` or `window.aiOffice`.
+ */
+export async function fetchDriveAvailable(
+  api: DocumentsHomeApiAdapter | null | undefined,
+): Promise<boolean> {
+  const fn = api?.isAvailable ?? api?.uniworkDriveIsAvailable
+  if (typeof fn !== 'function') return false
+  try {
+    return (await fn.call(api)) === true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Lists the viewer's Google Drive connections for `workspaceId`.
+ */
+export async function fetchDriveConnections(
+  api: DocumentsHomeApiAdapter | null | undefined,
+  workspaceId: string,
+): Promise<UniworkDriveResult<DriveConnection[]> | null> {
+  const fn = api?.listConnections ?? api?.uniworkDriveListConnections
+  if (typeof fn !== 'function') return null
+  try {
+    return await fn.call(api, workspaceId)
+  } catch {
+    return { ok: false, error: 'network' }
+  }
+}
+
+/**
+ * Fetches one page of the viewer's Google Drive files (`GET /workspaces/{ws}/drive-files`),
+ * optionally narrowed to a single `connectionId` of the viewer.
+ */
+export async function fetchDocumentsHomeDriveFiles(
+  api: DocumentsHomeApiAdapter | null | undefined,
+  params: {
+    workspaceId: string
+    connectionId?: string | null
+    cursor?: string
+    limit?: number
+  },
+): Promise<UniworkDriveResult<DriveFileListPage>> {
+  const fn = api?.listFiles ?? api?.uniworkDriveListFiles
+  if (typeof fn !== 'function') {
+    return { ok: true, value: { files: [], totalCount: 0, nextCursor: null } }
+  }
+  const connectionId = params.connectionId?.trim() || undefined
+  try {
+    return await fn.call(api, {
+      workspaceId: params.workspaceId,
+      ...(connectionId ? { connectionId } : {}),
+      ...(params.cursor ? { cursor: params.cursor } : {}),
+      ...(params.limit ? { limit: params.limit } : {}),
+    })
+  } catch {
+    return { ok: false, error: 'network' }
+  }
+}
+
+export type { DriveConnection, DriveFile, DriveFileListPage }
