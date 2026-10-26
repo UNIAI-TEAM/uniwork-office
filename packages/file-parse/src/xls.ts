@@ -10,6 +10,12 @@ interface BiffSheet {
   readonly rows: Map<number, Map<number, string>>
 }
 
+interface ExtractionBudget {
+  records: number
+  cells: number
+  chars: number
+}
+
 const BOF = 0x0809
 const EOF = 0x000a
 const BOUNDSHEET = 0x0085
@@ -20,16 +26,29 @@ const LABEL = 0x0204
 const RK = 0x027e
 const NUMBER = 0x0203
 const MULRK = 0x00bd
+const BLANK = 0x0201
+const MULBLANK = 0x00be
 const FORMULA = 0x0006
 const STRING = 0x0207
+const SHRFMLA = 0x04bc
+const ARRAY = 0x0221
+const TABLE = 0x0236
 const BOOLERR = 0x0205
 const FILEPASS = 0x002f
+const BIFF8_VERSION = 0x0600
+const SUBSTREAM_WORKBOOK_GLOBALS = 0x0005
+const SUBSTREAM_WORKSHEET = 0x0010
+const MAX_BIFF8_ROW = 0xffff
+const MAX_BIFF8_COL = 0xff
 const MAX_RECORDS = 500_000
+const MAX_CELLS = 100_000
+const MAX_TEXT_CHARS = 4_000_000
 const MAX_EMPTY_RUN = 8
 
 /**
  * Extract readable text from a legacy Excel 97-2003 (.xls, BIFF8) workbook:
  * one `# SheetName` section per sheet, cells joined with ` | ` matching `xlsxToText`.
+ * Numeric date/time cells are emitted as raw Excel serial numbers (XF/FORMAT/DATEMODE formatting is not applied).
  */
 export async function xlsToText(bytes: Uint8Array): Promise<string> {
   const container = CFB.read(Buffer.from(bytes), { type: 'buffer' })
@@ -83,17 +102,34 @@ function readBiff8Workbook(stream: Uint8Array): BiffSheet[] {
   if (stream.byteLength < 8 || readU16(stream, 0) !== BOF) {
     throw new Error('Invalid xls: workbook stream does not start with a BOF record')
   }
+  const bofLength = readU16(stream, 2)
+  if (bofLength < 4 || 4 + bofLength > stream.byteLength) {
+    throw new Error('Invalid xls: truncated workbook BOF record')
+  }
   const version = readU16(stream, 4)
-  if (version !== 0x0600) {
+  if (version !== BIFF8_VERSION) {
     throw new Error(`Unsupported BIFF version 0x${version.toString(16)} (expected BIFF8 0x0600)`)
+  }
+  const globalsKind = readU16(stream, 6)
+  if (globalsKind !== SUBSTREAM_WORKBOOK_GLOBALS) {
+    throw new Error(
+      `Invalid xls: expected workbook globals BOF (0x0005), got 0x${globalsKind.toString(16)}`,
+    )
   }
 
   const bounds: { name: string; position: number }[] = []
   let sst: string[] = []
-  const records: BiffRecord[] = []
+  const globalsRecords: BiffRecord[] = []
+  const budget: ExtractionBudget = { records: 0, cells: 0, chars: 0 }
   let at = 0
-  let count = 0
-  while (at + 4 <= stream.byteLength && count < MAX_RECORDS) {
+  let globalsSawEof = false
+  while (at < stream.byteLength) {
+    if (at + 4 > stream.byteLength) {
+      throw new Error('Invalid xls: truncated record header in workbook globals')
+    }
+    if (budget.records >= MAX_RECORDS) {
+      throw new Error(`Invalid xls: workbook exceeds maximum record limit (${MAX_RECORDS})`)
+    }
     const type = readU16(stream, at)
     const length = readU16(stream, at + 2)
     if (at + 4 + length > stream.byteLength) {
@@ -102,25 +138,36 @@ function readBiff8Workbook(stream: Uint8Array): BiffSheet[] {
     if (type === FILEPASS) {
       throw new Error('Unsupported xls: workbook is password-protected')
     }
-    records.push({ type, data: stream.subarray(at + 4, at + 4 + length) })
+    globalsRecords.push({ type, data: stream.subarray(at + 4, at + 4 + length) })
     at += 4 + length
-    count++
-    if (type === 0 && length === 0) break
+    budget.records += 1
+    if (type === EOF) {
+      globalsSawEof = true
+      break
+    }
   }
+  if (!globalsSawEof) {
+    throw new Error('Invalid xls: workbook globals substream missing EOF')
+  }
+  const globalsEnd = at
 
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i]
+  let seenSst = false
+  for (let i = 0; i < globalsRecords.length; i++) {
+    const record = globalsRecords[i]
     if (!record) continue
     if (record.type === BOUNDSHEET) {
       bounds.push(readBoundsheet(record.data))
     } else if (record.type === SST) {
-      const parts = [record.data]
-      let j = i + 1
-      while (j < records.length && records[j]?.type === CONTINUE) {
-        parts.push(records[j]!.data)
-        j++
+      if (seenSst) {
+        throw new Error('Invalid xls: duplicate SST record in workbook globals')
       }
-      sst = readSst(parts)
+      seenSst = true
+      const parts = [record.data]
+      while (i + 1 < globalsRecords.length && globalsRecords[i + 1]?.type === CONTINUE) {
+        i += 1
+        parts.push(globalsRecords[i]!.data)
+      }
+      sst = readSst(parts, budget)
     }
   }
   if (bounds.length === 0) {
@@ -130,25 +177,73 @@ function readBiff8Workbook(stream: Uint8Array): BiffSheet[] {
     throw new Error(`Invalid xls: ${bounds.length} sheets exceeds limit`)
   }
 
+  const seenOffsets = new Set<number>()
+  for (const sheet of bounds) {
+    if (seenOffsets.has(sheet.position)) {
+      throw new Error(
+        `Invalid xls: duplicate BOUNDSHEET offset ${sheet.position} for sheet ${sheet.name}`,
+      )
+    }
+    seenOffsets.add(sheet.position)
+    if (sheet.position < globalsEnd || sheet.position + 8 > stream.byteLength) {
+      throw new Error(`Invalid xls: sheet ${sheet.name} offset ${sheet.position} is out of bounds`)
+    }
+    const sheetBofType = readU16(stream, sheet.position)
+    const sheetBofLen = readU16(stream, sheet.position + 2)
+    if (
+      sheetBofType !== BOF ||
+      sheetBofLen < 4 ||
+      sheet.position + 4 + sheetBofLen > stream.byteLength
+    ) {
+      throw new Error(`Invalid xls: sheet ${sheet.name} does not start with a valid BOF record`)
+    }
+    const sheetVersion = readU16(stream, sheet.position + 4)
+    const sheetKind = readU16(stream, sheet.position + 6)
+    if (sheetVersion !== BIFF8_VERSION || sheetKind !== SUBSTREAM_WORKSHEET) {
+      throw new Error(`Invalid xls: sheet ${sheet.name} does not start with a BIFF8 worksheet BOF`)
+    }
+  }
+
+  const sortedOffsets = [...seenOffsets].sort((a, b) => a - b)
+  const maxEndByOffset = new Map<number, number>()
+  for (let i = 0; i < sortedOffsets.length; i++) {
+    const start = sortedOffsets[i]!
+    const nextStart = i + 1 < sortedOffsets.length ? sortedOffsets[i + 1]! : stream.byteLength
+    maxEndByOffset.set(start, nextStart)
+  }
+
   return bounds.map((sheet) => {
-    if (sheet.position + 4 > stream.byteLength) {
-      throw new Error(`Invalid xls: sheet ${sheet.name} starts past the stream`)
+    const maxEnd = maxEndByOffset.get(sheet.position)!
+    return {
+      name: sheet.name,
+      rows: readSheet(stream, sheet.position, maxEnd, sst, budget, sheet.name),
     }
-    if (readU16(stream, sheet.position) !== BOF) {
-      throw new Error(`Invalid xls: sheet ${sheet.name} does not start with a BOF record`)
-    }
-    return { name: sheet.name, rows: readSheet(stream, sheet.position, sst) }
   })
+}
+
+function validateCellCoords(row: number, col: number): void {
+  if (row < 0 || row > MAX_BIFF8_ROW || col < 0 || col > MAX_BIFF8_COL) {
+    throw new Error(`Invalid xls: cell coordinates (${row}, ${col}) exceed BIFF8 column/row bounds`)
+  }
 }
 
 function readSheet(
   stream: Uint8Array,
   start: number,
+  maxEnd: number,
   sst: readonly string[],
+  budget: ExtractionBudget,
+  sheetName: string,
 ): Map<number, Map<number, string>> {
   const rows = new Map<number, Map<number, string>>()
   const put = (row: number, col: number, text: string): void => {
-    if (row < 0 || col < 0 || row > 1_048_575 || col > 16_383 || text === '') return
+    validateCellCoords(row, col)
+    if (text === '') return
+    budget.cells += 1
+    budget.chars += text.length
+    if (budget.cells > MAX_CELLS || budget.chars > MAX_TEXT_CHARS) {
+      throw new Error('Invalid xls: workbook exceeds maximum extracted cell/text limit')
+    }
     let rowMap = rows.get(row)
     if (!rowMap) {
       rowMap = new Map()
@@ -157,27 +252,101 @@ function readSheet(
     rowMap.set(col, text)
   }
 
-  let at = start
-  let count = 0
-  while (at + 4 <= stream.byteLength && count < MAX_RECORDS) {
+  const initialBofLen = readU16(stream, start + 2)
+  let at = start + 4 + initialBofLen
+  budget.records += 1
+  if (budget.records > MAX_RECORDS) {
+    throw new Error(`Invalid xls: workbook exceeds maximum record limit (${MAX_RECORDS})`)
+  }
+
+  const collectContinueChain = (firstPayload: Uint8Array): Uint8Array[] => {
+    const parts = [firstPayload]
+    while (at + 4 <= maxEnd && readU16(stream, at) === CONTINUE) {
+      if (budget.records >= MAX_RECORDS) {
+        throw new Error(`Invalid xls: workbook exceeds maximum record limit (${MAX_RECORDS})`)
+      }
+      const contLen = readU16(stream, at + 2)
+      if (at + 4 + contLen > maxEnd) {
+        throw new Error('Invalid xls: CONTINUE record runs past worksheet substream')
+      }
+      parts.push(stream.subarray(at + 4, at + 4 + contLen))
+      at += 4 + contLen
+      budget.records += 1
+    }
+    return parts
+  }
+
+  let nestedDepth = 0
+  let sawEof = false
+  let pendingStringCell: { row: number; col: number } | null = null
+
+  while (at < maxEnd) {
+    if (at + 4 > maxEnd) {
+      throw new Error(`Invalid xls: truncated record header in sheet ${sheetName}`)
+    }
+    if (budget.records >= MAX_RECORDS) {
+      throw new Error(`Invalid xls: workbook exceeds maximum record limit (${MAX_RECORDS})`)
+    }
     const type = readU16(stream, at)
     const length = readU16(stream, at + 2)
-    if (at + 4 + length > stream.byteLength) break
+    if (at + 4 + length > maxEnd) {
+      throw new Error(`Invalid xls: record runs past substream boundary in sheet ${sheetName}`)
+    }
     const data = stream.subarray(at + 4, at + 4 + length)
     at += 4 + length
-    count++
+    budget.records += 1
+
+    if (type === FILEPASS) {
+      throw new Error('Unsupported xls: workbook is password-protected')
+    }
+    if (type === BOF) {
+      if (length < 4) {
+        throw new Error(`Invalid xls: truncated nested BOF record in sheet ${sheetName}`)
+      }
+      const nestedKind = readU16(data, 2)
+      if (nestedKind === SUBSTREAM_WORKSHEET || nestedKind === SUBSTREAM_WORKBOOK_GLOBALS) {
+        throw new Error(`Invalid xls: overlapping substream BOF inside sheet ${sheetName}`)
+      }
+      nestedDepth += 1
+      pendingStringCell = null
+      continue
+    }
+    if (type === EOF) {
+      if (nestedDepth > 0) {
+        nestedDepth -= 1
+        continue
+      }
+      pendingStringCell = null
+      sawEof = true
+      break
+    }
+    if (nestedDepth > 0) {
+      continue
+    }
+
+    if (type !== STRING && type !== SHRFMLA && type !== ARRAY && type !== TABLE) {
+      pendingStringCell = null
+    }
+
     switch (type) {
       case LABELSST: {
         if (length < 10) break
+        const row = readU16(data, 0)
+        const col = readU16(data, 2)
+        validateCellCoords(row, col)
         const index = readU32(data, 6)
         const text = sst[index]
         if (text === undefined) throw new Error(`Invalid xls: SST index ${index} out of range`)
-        put(readU16(data, 0), readU16(data, 2), text)
+        put(row, col, text)
         break
       }
       case LABEL: {
-        if (length < 8) break
-        put(readU16(data, 0), readU16(data, 2), readXLUnicodeString(data, 6))
+        if (length < 9) throw new Error('Invalid xls: truncated LABEL record')
+        const row = readU16(data, 0)
+        const col = readU16(data, 2)
+        validateCellCoords(row, col)
+        const parts = collectContinueChain(data.subarray(6))
+        put(row, col, readSingleString(parts, 'LABEL'))
         break
       }
       case RK: {
@@ -200,43 +369,63 @@ function readSheet(
         }
         break
       }
+      case BLANK: {
+        if (length >= 4) validateCellCoords(readU16(data, 0), readU16(data, 2))
+        break
+      }
+      case MULBLANK: {
+        if (length >= 6) {
+          const row = readU16(data, 0)
+          validateCellCoords(row, readU16(data, 2))
+          validateCellCoords(row, readU16(data, length - 2))
+        }
+        break
+      }
       case BOOLERR: {
-        if (length < 8 || data[7] !== 0) break
-        put(readU16(data, 0), readU16(data, 2), data[6] !== 0 ? 'TRUE' : 'FALSE')
+        if (length < 8) break
+        const row = readU16(data, 0)
+        const col = readU16(data, 2)
+        validateCellCoords(row, col)
+        if (data[7] !== 0) break
+        put(row, col, data[6] !== 0 ? 'TRUE' : 'FALSE')
         break
       }
       case FORMULA: {
         if (length < 14) break
         const row = readU16(data, 0)
         const col = readU16(data, 2)
+        validateCellCoords(row, col)
         if (data[12] === 0xff && data[13] === 0xff) {
           if (data[6] === 1) put(row, col, data[8] !== 0 ? 'TRUE' : 'FALSE')
-          else if (data[6] === 0) {
-            const next = readRecord(stream, at)
-            if (next && next.type === STRING) {
-              put(row, col, readXLUnicodeString(next.data, 0))
-            }
-          }
+          else if (data[6] === 0) pendingStringCell = { row, col }
         } else {
           put(row, col, numberText(readDouble(data, 6)))
+        }
+        break
+      }
+      case SHRFMLA:
+      case ARRAY:
+      case TABLE:
+        break
+      case STRING: {
+        const parts = collectContinueChain(data)
+        const text = readSingleString(parts, 'STRING')
+        if (pendingStringCell !== null) {
+          put(pendingStringCell.row, pendingStringCell.col, text)
+          pendingStringCell = null
         }
         break
       }
       default:
         break
     }
-    if (type === EOF) break
+  }
+  if (!sawEof) {
+    throw new Error(`Invalid xls: worksheet substream for ${sheetName} missing EOF`)
   }
   return rows
 }
 
-function readRecord(stream: Uint8Array, at: number): BiffRecord | null {
-  if (at + 4 > stream.byteLength) return null
-  const type = readU16(stream, at)
-  const length = readU16(stream, at + 2)
-  if (at + 4 + length > stream.byteLength) return null
-  return { type, data: stream.subarray(at + 4, at + 4 + length) }
-}
 
 function readBoundsheet(data: Uint8Array): { name: string; position: number } {
   if (data.byteLength < 8) throw new Error('Invalid xls: truncated BOUNDSHEET record')
@@ -251,7 +440,117 @@ function readBoundsheet(data: Uint8Array): { name: string; position: number } {
   return { name, position: readU32(data, 0) }
 }
 
-function readSst(parts: readonly Uint8Array[]): string[] {
+class BiffStringReader {
+  private part = 0
+  private at: number
+  private readonly parts: readonly Uint8Array[]
+
+  constructor(parts: readonly Uint8Array[], initialOffset = 0) {
+    this.parts = parts
+    this.at = initialOffset
+  }
+
+  private advance(): boolean {
+    if (this.part + 1 >= this.parts.length) return false
+    this.part += 1
+    this.at = 0
+    return true
+  }
+
+  readString(label: string): string {
+    while (this.at >= this.parts[this.part]!.byteLength) {
+      if (!this.advance()) {
+        throw new Error(`Invalid xls: ${label} ended before string header`)
+      }
+    }
+    const headerPart = this.parts[this.part]!
+    if (this.at + 3 > headerPart.byteLength) {
+      throw new Error(`Invalid xls: truncated ${label} string header`)
+    }
+    const cch = readU16(headerPart, this.at)
+    const grbit = headerPart[this.at + 2]!
+    if ((grbit & ~0x0d) !== 0) {
+      throw new Error(`Invalid xls: invalid ${label} string flags 0x${grbit.toString(16)}`)
+    }
+    const rich = (grbit & 0x08) !== 0
+    const phonetic = (grbit & 0x04) !== 0
+    const fixedLen = 3 + (rich ? 2 : 0) + (phonetic ? 4 : 0)
+    if (this.at + fixedLen > headerPart.byteLength) {
+      throw new Error(`Invalid xls: truncated ${label} fixed string header`)
+    }
+    let pos = this.at + 3
+    const runs = rich ? readU16(headerPart, pos) : 0
+    if (rich) pos += 2
+    const extension = phonetic ? readU32(headerPart, pos) : 0
+    if (phonetic) pos += 4
+    this.at = pos
+
+    let high = (grbit & 0x01) !== 0
+    let text = ''
+    let remaining = cch
+    while (remaining > 0) {
+      const cur = this.parts[this.part]!
+      if (this.at >= cur.byteLength) {
+        if (!this.advance()) {
+          throw new Error(`Invalid xls: ${label} string runs past CONTINUE chain`)
+        }
+        const nextPart = this.parts[this.part]!
+        if (nextPart.byteLength < 1) {
+          throw new Error(`Invalid xls: empty CONTINUE record in ${label}`)
+        }
+        const contGrbit = nextPart[0]!
+        if ((contGrbit & ~0x01) !== 0) {
+          throw new Error(
+            `Invalid xls: invalid CONTINUE flags 0x${contGrbit.toString(16)} in ${label}`,
+          )
+        }
+        high = (contGrbit & 0x01) !== 0
+        this.at = 1
+        if (this.at >= nextPart.byteLength) {
+          throw new Error(`Invalid xls: CONTINUE record in ${label} has no character data`)
+        }
+        continue
+      }
+      const availBytes = cur.byteLength - this.at
+      const step = high ? 2 : 1
+      if (high && availBytes < 2) {
+        throw new Error(`Invalid xls: odd byte boundary in UTF-16 ${label} string`)
+      }
+      const take = Math.min(remaining, Math.floor(availBytes / step))
+      for (let i = 0; i < take; i++) {
+        const code = high ? readU16(cur, this.at + i * 2) : cur[this.at + i]!
+        text += String.fromCharCode(code)
+      }
+      this.at += take * step
+      remaining -= take
+    }
+
+    let skip = runs * 4 + extension
+    while (skip > 0) {
+      const cur = this.parts[this.part]!
+      const available = cur.byteLength - this.at
+      if (available <= 0) {
+        if (!this.advance()) {
+          throw new Error(`Invalid xls: ${label} extras run past CONTINUE chain`)
+        }
+        if (this.parts[this.part]!.byteLength === 0) {
+          throw new Error(`Invalid xls: empty CONTINUE record in ${label} extras`)
+        }
+        continue
+      }
+      const step = Math.min(skip, available)
+      this.at += step
+      skip -= step
+    }
+    return text
+  }
+
+  isFullyConsumed(): boolean {
+    return this.part + 1 === this.parts.length && this.at === this.parts[this.part]!.byteLength
+  }
+}
+
+function readSst(parts: readonly Uint8Array[], budget: ExtractionBudget): string[] {
   if (parts.length === 0 || parts[0]!.byteLength < 8) {
     throw new Error('Invalid xls: truncated SST record')
   }
@@ -260,95 +559,29 @@ function readSst(parts: readonly Uint8Array[]): string[] {
   if (unique > 1_000_000 || total < unique) {
     throw new Error(`Invalid xls: implausible SST counts ${total}/${unique}`)
   }
+  const reader = new BiffStringReader(parts, 8)
   const out: string[] = []
-  let part = 0
-  let at = 8
-  const advance = (): boolean => {
-    if (part + 1 >= parts.length) return false
-    part++
-    at = 0
-    return true
-  }
-  const byte = (): number => {
-    const value = parts[part]![at] ?? 0
-    at++
-    return value
-  }
-  const u16 = (): number => {
-    let value = byte()
-    value |= byte() << 8
-    return value
-  }
-  const u32 = (): number => {
-    let value = u16()
-    value += u16() * 0x10000
-    return value
-  }
   for (let index = 0; index < unique; index++) {
-    while (at >= parts[part]!.byteLength && advance()) {
-      /* skip empty CONTINUE payloads */
+    const str = reader.readString(`SST[${index}]`)
+    budget.chars += str.length
+    if (budget.chars > MAX_TEXT_CHARS) {
+      throw new Error('Invalid xls: workbook exceeds maximum extracted cell/text limit')
     }
-    if (at >= parts[part]!.byteLength) {
-      throw new Error(`Invalid xls: SST ended at string ${index} of ${unique}`)
-    }
-    const cch = u16()
-    const grbit = byte()
-    const rich = (grbit & 0x08) !== 0
-    const phonetic = (grbit & 0x04) !== 0
-    const runs = rich ? u16() : 0
-    const extension = phonetic ? u32() : 0
-    let high = (grbit & 0x01) !== 0
-    let text = ''
-    let remaining = cch
-    while (remaining > 0) {
-      if (at >= parts[part]!.byteLength) {
-        if (!advance()) throw new Error(`Invalid xls: SST string ${index} runs past chain`)
-        if (parts[part]!.byteLength === 0) continue
-        const grbitByte = byte()
-        high = (grbitByte & 0x01) !== 0
-        continue
-      }
-      const take = Math.min(
-        remaining,
-        Math.floor((parts[part]!.byteLength - at) / (high ? 2 : 1)),
-      )
-      if (take > 0) {
-        const end = at + take * (high ? 2 : 1)
-        text += high
-          ? new TextDecoder('utf-16le').decode(parts[part]!.subarray(at, end))
-          : latin1(parts[part]!.subarray(at, end))
-        at = end
-        remaining -= take
-      } else if (!advance()) {
-        throw new Error(`Invalid xls: SST string ${index} runs past chain`)
-      }
-    }
-    let skip = runs * 4 + extension
-    while (skip > 0) {
-      const available = parts[part]!.byteLength - at
-      if (available >= skip) {
-        at += skip
-        skip = 0
-      } else {
-        skip -= available
-        if (!advance()) throw new Error(`Invalid xls: SST string ${index} extras run past chain`)
-      }
-    }
-    out.push(text)
+    out.push(str)
   }
   return out
 }
 
-function readXLUnicodeString(data: Uint8Array, at: number): string {
-  if (at + 3 > data.byteLength) return ''
-  const cch = readU16(data, at)
-  const grbit = data[at + 2] ?? 0
-  const start = at + 3
-  const bytes = grbit & 1 ? cch * 2 : cch
-  if (start + bytes > data.byteLength) return ''
-  return grbit & 1
-    ? new TextDecoder('utf-16le').decode(data.subarray(start, start + bytes))
-    : latin1(data.subarray(start, start + bytes))
+function readSingleString(parts: readonly Uint8Array[], label: string): string {
+  if (parts.length === 0 || parts[0]!.byteLength < 3) {
+    throw new Error(`Invalid xls: truncated ${label} record`)
+  }
+  const reader = new BiffStringReader(parts, 0)
+  const text = reader.readString(label)
+  if (!reader.isFullyConsumed()) {
+    throw new Error(`Invalid xls: trailing bytes or unconsumed CONTINUE in ${label} chain`)
+  }
+  return text
 }
 
 /** MS-XLS 2.5.122 RkNumber: bit 0 = fX100 (/100), bit 1 = fInt (signed 30-bit integer). */
