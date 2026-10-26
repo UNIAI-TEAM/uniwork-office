@@ -262,7 +262,7 @@ describe('buildOcrPageData word joining', () => {
         { text: 'n', box: [0.13, 0.808, 0.145, 0.828] },
         { text: 'g', box: [0.145, 0.808, 0.16, 0.828] },
         { text: ' ', box: [0, 0, 0, 0] },
-        // First glyph of second word also overhangs slightly past lx1
+        // First glyph of second word overhangs past lx1; the word rect must equal the in-range union [0.29, 0.35]
         { text: 'h', box: [0.26, 0.805, 0.5, 0.838] },
         { text: 'ò', box: [0.29, 0.808, 0.32, 0.839] },
         { text: 'a', box: [0.32, 0.808, 0.35, 0.828] },
@@ -274,11 +274,54 @@ describe('buildOcrPageData word joining', () => {
     // First word rect stays bounded by its in-range glyphs [0.1 * 600, 0.16 * 600] = [60, 96]
     expect(data.words[0]!.rect[0]).toBeCloseTo(60, 5)
     expect(data.words[0]!.rect[2]).toBeCloseTo(96, 5)
+    // Second word rect equals the union of its in-range glyphs [0.29 * 600, 0.35 * 600] = [174, 210]
+    expect(data.words[1]!.rect[0]).toBeCloseTo(174, 5)
+    expect(data.words[1]!.rect[2]).toBeCloseTo(210, 5)
     // Both word rects stay strictly inside the line box [0.1 * 600, 0.45 * 600] = [60, 270]
     for (const w of data.words) {
       expect(w.rect[0]).toBeGreaterThanOrEqual(lineBox[0] * GEOM.pw - 1e-3)
       expect(w.rect[2]).toBeLessThanOrEqual(lineBox[2] * GEOM.pw + 1e-3)
       expect(w.rect[2]).toBeGreaterThan(w.rect[0])
+    }
+
+    // Words whose glyphs are all wholly left of lx0 or wholly right of lx1 keep their text
+    // and get a clamped rect inside [lx0, lx1] with positive width (never zero).
+    // Also checks a shared-box CJK word whose raw box overhangs the line box: sameBox
+    // compares raw [x0, x2], so the CJK chars still merge into one shared-box word.
+    const strayLine: PdfOcrLine = {
+      text: 'left mid right 使用',
+      confidence: 0.96,
+      box: lineBox,
+      chars: [
+        { text: 'l', box: [0.01, 0.805, 0.04, 0.835] },
+        { text: 'e', box: [0.04, 0.805, 0.06, 0.835] },
+        { text: 'f', box: [0.06, 0.805, 0.07, 0.835] },
+        { text: 't', box: [0.07, 0.805, 0.08, 0.835] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        { text: 'm', box: [0.2, 0.805, 0.22, 0.835] },
+        { text: 'i', box: [0.22, 0.805, 0.23, 0.835] },
+        { text: 'd', box: [0.23, 0.805, 0.25, 0.835] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        { text: 'r', box: [0.85, 0.805, 0.87, 0.835] },
+        { text: 'i', box: [0.87, 0.805, 0.88, 0.835] },
+        { text: 'g', box: [0.88, 0.805, 0.9, 0.835] },
+        { text: 'h', box: [0.9, 0.805, 0.92, 0.835] },
+        { text: 't', box: [0.92, 0.805, 0.95, 0.835] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        { text: '使', box: [0.35, 0.805, 0.5, 0.835] },
+        { text: '用', box: [0.35, 0.805, 0.5, 0.835] },
+      ],
+    }
+    const strayData = buildOcrPageData([strayLine], GEOM)!
+    expect(strayData.entry.text).toBe('left mid right 使用\n')
+    expect(strayData.words.map((w) => w.text)).toEqual(['left', 'mid', 'right', '使用'])
+    for (let i = 0; i < strayData.words.length; i++) {
+      const w = strayData.words[i]!
+      const it = strayData.entry.items[i]!
+      expect(w.rect[0]).toBeGreaterThanOrEqual(lineBox[0] * GEOM.pw - 1e-3)
+      expect(w.rect[2]).toBeLessThanOrEqual(lineBox[2] * GEOM.pw + 1e-3)
+      expect(w.rect[2] - w.rect[0]).toBeGreaterThan(0)
+      expect(it.w).toBeGreaterThan(0)
     }
   })
 
@@ -324,11 +367,90 @@ describe('buildOcrPageData word joining', () => {
     expect(mixedData.words.map((w) => w.spaceAfter)).toEqual([false, false, false, true])
   })
 
+  it('keeps one shared top and height on straight 2-word and 3-word lines with ascender/descender differences', () => {
+    // "Hello" (ascenders -> higher y-range [0.812, 0.84]) followed by "gypsy" (descenders ->
+    // lower y-range [0.8, 0.828]): vertical centre shift is large relative to line height,
+    // but a 2-word line or a 3-word straight line must not misfire tilt mode.
+    const twoWordLine: PdfOcrLine = {
+      text: 'Hello gypsy',
+      confidence: 0.98,
+      box: [0.1, 0.8, 0.35, 0.84],
+      chars: [
+        ...[...'Hello'].map((t, i) => ({
+          text: t,
+          box: [0.1 + i * 0.02, 0.812, 0.1 + (i + 1) * 0.02, 0.84] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        })),
+        { text: ' ', box: SEPARATOR },
+        ...[...'gypsy'].map((t, i) => ({
+          text: t,
+          box: [0.25 + i * 0.02, 0.8, 0.25 + (i + 1) * 0.02, 0.828] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        })),
+      ],
+    }
+    const twoWordData = buildOcrPageData([twoWordLine], GEOM)!
+    expect(twoWordData.words.map((w) => w.text)).toEqual(['Hello', 'gypsy'])
+    for (const w of twoWordData.words) {
+      expect(w.rect[1]).toBeCloseTo(0.8 * GEOM.ph, 5)
+      expect(w.rect[3]).toBeCloseTo(0.84 * GEOM.ph, 5)
+    }
+
+    const threeWordLine: PdfOcrLine = {
+      text: 'Hello brave gypsy',
+      confidence: 0.98,
+      box: [0.1, 0.8, 0.5, 0.84],
+      chars: [
+        ...[...'Hello'].map((t, i) => ({
+          text: t,
+          box: [0.1 + i * 0.02, 0.808, 0.1 + (i + 1) * 0.02, 0.84] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        })),
+        { text: ' ', box: SEPARATOR },
+        ...[...'brave'].map((t, i) => ({
+          text: t,
+          box: [0.25 + i * 0.02, 0.806, 0.25 + (i + 1) * 0.02, 0.834] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        })),
+        { text: ' ', box: SEPARATOR },
+        ...[...'gypsy'].map((t, i) => ({
+          text: t,
+          box: [0.4 + i * 0.02, 0.8, 0.4 + (i + 1) * 0.02, 0.832] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        })),
+      ],
+    }
+    const threeWordData = buildOcrPageData([threeWordLine], GEOM)!
+    expect(threeWordData.words.map((w) => w.text)).toEqual(['Hello', 'brave', 'gypsy'])
+    for (const w of threeWordData.words) {
+      expect(w.rect[1]).toBeCloseTo(0.8 * GEOM.ph, 5)
+      expect(w.rect[3]).toBeCloseTo(0.84 * GEOM.ph, 5)
+    }
+  })
+
   it('fits tilted lines so words follow the slope without adjacent band overlap', () => {
-    // Two Tesseract-style lines at 1448x2048 px scale, ~1100 px wide (x: 150..1250 px),
-    // line pitch 34 px (matching real fixture spacing), word height 22 px, and word tops
-    // rising 1 px per 100 px (+11 px across the 1100 px line -> axis-aligned line union
-    // height is 33 px, which would nearly touch or overlap the next line 34 px below).
+    // Two Tesseract-style lines at 1448x2048 px scale, ~1060 px wide (x: 150..1210 px),
+    // line pitch 30 px, word height 22 px, and word y-ranges rising 1 px per 100 px (~0.57 deg).
     const W = 1448
     const H = 2048
     const makeTiltedLine = (baseY0Px: number, label: string): PdfOcrLine => {
@@ -371,14 +493,11 @@ describe('buildOcrPageData word joining', () => {
       }
     }
 
-    // Upper line at baseY0 = 1560 px, lower line 34 px below at baseY0 = 1526 px.
-    // Un-tilted line boxes would span [1560, 1591.9] and [1526, 1557.9] (only 2.1 px apart,
-    // and at any column x the raw line union bands [1560, 1591.9] and [1526, 1557.9] nearly collide;
-    // with a 30 px pitch at baseY0 = 1530 px the raw line union boxes [1560, 1591.9] and
-    // [1530, 1561.9] actually overlap vertically!).
+    // In normalized y-up coordinates, upperLine at baseY0 = 1560 px sits 30 px above
+    // lowerLine at baseY0 = 1530 px, and their axis-aligned line union boxes overlap.
     const upperLine = makeTiltedLine(1560, 'tren')
     const lowerLine = makeTiltedLine(1530, 'duoi')
-    expect(lowerLine.box[3]).toBeGreaterThan(upperLine.box[1]) // raw line boxes overlap
+    expect(lowerLine.box[3]).toBeGreaterThan(upperLine.box[1])
 
     const a4Geom = { pw: 595.28, ph: 841.89, rot: 0 }
     const data = buildOcrPageData([upperLine, lowerLine], a4Geom)!
