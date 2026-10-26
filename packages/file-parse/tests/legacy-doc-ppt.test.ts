@@ -106,7 +106,9 @@ function buildXlsBuffer(opts: {
   overrideOffsets?: readonly number[]
 }): Buffer {
   const extra = opts.extraGlobals ?? []
-  const dummyBounds = opts.sheetNames.map((name, i) => boundsheet(0, name, opts.sheetTypes?.[i] ?? 0x00))
+  const dummyBounds = opts.sheetNames.map((name, i) =>
+    boundsheet(0, name, opts.sheetTypes?.[i] ?? 0x00),
+  )
   const globalsHeaderLen =
     bof(0x0005).byteLength +
     dummyBounds.reduce((sum, b) => sum + b.byteLength, 0) +
@@ -475,7 +477,9 @@ describe('parseFileToText: legacy .xls', () => {
         concatBytes([bof(0x0020), eof()]),
       ],
     })
-    const wsAndChartRes = await parseFileToText(writeFixture('r2-1-ws-and-chart.xls', wsAndChartBuf))
+    const wsAndChartRes = await parseFileToText(
+      writeFixture('r2-1-ws-and-chart.xls', wsAndChartBuf),
+    )
     expect(wsAndChartRes.ok).toBe(true)
     expect(wsAndChartRes.text).toBe('# Data\n123')
 

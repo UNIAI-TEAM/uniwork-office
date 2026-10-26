@@ -62,8 +62,7 @@ export async function xlsToText(bytes: Uint8Array): Promise<string> {
   if (!entry || !entry.content) {
     throw new Error('Invalid xls: missing Workbook/Book stream in OLE2 container')
   }
-  const stream =
-    entry.content instanceof Uint8Array ? entry.content : new Uint8Array(entry.content)
+  const stream = entry.content instanceof Uint8Array ? entry.content : new Uint8Array(entry.content)
   const sheets = readBiff8Workbook(stream)
   return sheets
     .map((sheet) => {
@@ -323,7 +322,6 @@ function readSheet(
         nestedDepth -= 1
         continue
       }
-      pendingStringCell = null
       sawEof = true
       break
     }
@@ -432,7 +430,6 @@ function readSheet(
   }
   return rows
 }
-
 
 function readBoundsheet(data: Uint8Array): { name: string; position: number; sheetType: number } {
   if (data.byteLength < 8) throw new Error('Invalid xls: truncated BOUNDSHEET record')
