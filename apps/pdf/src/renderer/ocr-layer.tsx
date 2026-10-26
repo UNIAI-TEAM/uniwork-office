@@ -103,23 +103,30 @@ function lineWords(line: PdfOcrLine): LineWord[] {
       sep = true
       continue
     }
-    // Skip stray glyph boxes outside the line's horizontal span so they cannot stretch a word
-    if (c.box[0] < lx0 - 1e-3 || c.box[2] > lx1 + 1e-3) continue
+    // A glyph box outside the line's x-range (italic overhang, stray helper box) keeps its
+    // text in the word without stretching the word union; if it starts a word, clamp into [lx0, lx1].
+    const inLineX = c.box[0] >= lx0 - 1e-3 && c.box[2] <= lx1 + 1e-3
     const sameBox = cur !== null && c.box[0] === cur.box[0] && c.box[2] === cur.box[2]
     const canMerge =
       cur !== null && (sameBox || (!endsNoSpaceScript(curLastChar) && !startsNoSpaceScript(c.text)))
     if (cur && canMerge) {
       cur.text += c.text
-      cur.box[0] = Math.min(cur.box[0], c.box[0])
-      cur.box[1] = Math.min(cur.box[1], c.box[1])
-      cur.box[2] = Math.max(cur.box[2], c.box[2])
-      cur.box[3] = Math.max(cur.box[3], c.box[3])
+      if (inLineX) {
+        cur.box[0] = Math.min(cur.box[0], c.box[0])
+        cur.box[1] = Math.min(cur.box[1], c.box[1])
+        cur.box[2] = Math.max(cur.box[2], c.box[2])
+        cur.box[3] = Math.max(cur.box[3], c.box[3])
+      }
       curLastChar = c.text
     } else {
       if (cur) words.push(cur)
+      const cx0 = inLineX ? c.box[0] : Math.max(lx0, Math.min(lx1, c.box[0]))
+      const cx1 = inLineX
+        ? c.box[2]
+        : Math.max(cx0 + Math.min(1e-3, lx1 - cx0), Math.min(lx1, c.box[2]))
       cur = {
         text: c.text,
-        box: [c.box[0], c.box[1], c.box[2], c.box[3]],
+        box: [cx0, c.box[1], cx1, c.box[3]],
         gap: sep,
       }
       curLastChar = c.text

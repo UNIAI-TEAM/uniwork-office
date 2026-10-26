@@ -206,8 +206,6 @@ describe('buildOcrPageData word joining', () => {
         // Multi-char symbol split evenly by alignChars into abutting sub-boxes [0.13, 0.145] + [0.145, 0.16]
         { text: 'n', box: [0.13, 0.808, 0.145, 0.828] },
         { text: 'g', box: [0.145, 0.808, 0.16, 0.828] },
-        // Stray glyph box outside line x-range must be ignored without stretching the word union
-        { text: '~', box: [0.9, 0.808, 0.95, 0.828] },
         { text: ' ', box: [0, 0, 0, 0] },
         { text: 'h', box: [0.26, 0.805, 0.29, 0.838] },
         { text: 'ò', box: [0.29, 0.808, 0.32, 0.839] },
@@ -248,6 +246,39 @@ describe('buildOcrPageData word joining', () => {
     for (const w of perGlyph.words) {
       expect(w.rect[1]).toBeCloseTo(640, 5)
       expect(w.rect[3]).toBeCloseTo(672, 5)
+    }
+  })
+
+  it('keeps the text of a glyph whose box lies outside the line x-range without stretching the word rect', () => {
+    const lineBox: [number, number, number, number] = [0.1, 0.8, 0.45, 0.84]
+    const line: PdfOcrLine = {
+      text: 'Cộng hòa',
+      confidence: 0.96,
+      box: lineBox,
+      chars: [
+        { text: 'C', box: [0.1, 0.805, 0.12, 0.835] },
+        // Middle glyph 'ộ' has a stray/overhanging box outside lineBox [0.1, 0.45]
+        { text: 'ộ', box: [0.02, 0.8, 0.85, 0.84] },
+        { text: 'n', box: [0.13, 0.808, 0.145, 0.828] },
+        { text: 'g', box: [0.145, 0.808, 0.16, 0.828] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        // First glyph of second word also overhangs slightly past lx1
+        { text: 'h', box: [0.26, 0.805, 0.5, 0.838] },
+        { text: 'ò', box: [0.29, 0.808, 0.32, 0.839] },
+        { text: 'a', box: [0.32, 0.808, 0.35, 0.828] },
+      ],
+    }
+    const data = buildOcrPageData([line], GEOM)!
+    expect(data.entry.text).toBe('Cộng hòa\n')
+    expect(data.words.map((w) => w.text)).toEqual(['Cộng', 'hòa'])
+    // First word rect stays bounded by its in-range glyphs [0.1 * 600, 0.16 * 600] = [60, 96]
+    expect(data.words[0]!.rect[0]).toBeCloseTo(60, 5)
+    expect(data.words[0]!.rect[2]).toBeCloseTo(96, 5)
+    // Both word rects stay strictly inside the line box [0.1 * 600, 0.45 * 600] = [60, 270]
+    for (const w of data.words) {
+      expect(w.rect[0]).toBeGreaterThanOrEqual(lineBox[0] * GEOM.pw - 1e-3)
+      expect(w.rect[2]).toBeLessThanOrEqual(lineBox[2] * GEOM.pw + 1e-3)
+      expect(w.rect[2]).toBeGreaterThan(w.rect[0])
     }
   })
 
