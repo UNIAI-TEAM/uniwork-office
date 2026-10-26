@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type {
+  DriveFile,
   UniworkDocErrorCode,
   UniworkDocSummary,
   UniworkFolderNode,
@@ -9,6 +10,7 @@ import type {
   UniworkSourceFile,
   UniworkWorkspaceRef,
 } from '../../../shared/home-api'
+import type { WorkWebTarget } from '../../../shared/uniwork-work-api'
 import { FileBadge } from '../FileBadge'
 import { useI18n, type StringKey } from '../locale'
 import {
@@ -173,7 +175,15 @@ import { ListState } from '../doclist/ListState'
 import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
 import { CREATE_SPECIFIC_ERRORS, NEW_DEFAULT_NAME_KEY, NEW_KIND_EXT } from './new-menu-model'
-import { DriveList, DriveSidebarRows, GoogleDriveGlyph, useDocumentsHomeDrive } from './DriveList'
+import {
+  DriveList,
+  DriveSidebarRows,
+  GoogleDriveGlyph,
+  openDriveWeb,
+  useDocumentsHomeDrive,
+} from './DriveList'
+import { DrivePanel } from './DrivePanel'
+import { driveErrorKey } from './drive-panel-model'
 import '../uniwork-folders/uniwork-folders.css'
 import './documents-home.css'
 import './doclist-sidebar.css'
@@ -550,10 +560,18 @@ export function DocumentsHome({
     listTick,
     onErrorToast: (err) =>
       setToast({
-        message: t(err === 'network' ? 'uhDriveOffline' : 'uwDocActionFailed'),
+        message: t(err === 'server_error' ? 'uwDocActionFailed' : driveErrorKey(err)),
         tone: 'error',
       }),
+    onFeatureDisabled: () => leaveDrive('uhDriveFeatureOff'),
   })
+  // UNI-2196 (D3): the Drive file whose detail panel is open (the row it was picked from, and whether
+  // the keyboard picked it so the panel takes focus)
+  const [driveSel, setDriveSel] = useState<{ row: DriveFile; focus: boolean } | null>(null)
+  /** id of a file the panel found already unlinked (`not_found`), so closing does not refocus its row */
+  const driveGoneIdRef = useRef<string | null>(null)
+  const driveWs = workspaces.find((ws) => ws.id === workspaceId)
+  const driveWeb = driveWs ? { orgSlug: driveWs.orgSlug, wsSlug: driveWs.slug } : null
   const myFolderLabel = t(MY_FOLDER_LABEL_KEY)
   const labeledNodes = useMemo(
     () => tree.nodes.map((n) => (isMyFolder(n) ? { ...n, title: myFolderLabel } : n)),
@@ -599,6 +617,7 @@ export function DocumentsHome({
     folderIdRef.current = null
     openPathRef.current = []
     setSubView('workspace')
+    setDriveSel(null)
     setFolderId(null)
     setFolderNotice(null)
     setMyFolderId(null)
@@ -1111,6 +1130,7 @@ export function DocumentsHome({
     setFolderNotice(null)
     subViewRef.current = next
     setSubView(next)
+    if (next !== 'google-drive') setDriveSel(null)
     if (next === 'workspace') {
       openPathRef.current = []
       folderIdRef.current = null
@@ -1127,7 +1147,41 @@ export function DocumentsHome({
   /** UNI-2195 (D2): selects the Google Drive view (all accounts when `null`, or one connection) */
   const openDrive = (connectionId: string | null) => {
     drive.setSelectedAccountId(connectionId)
+    setDriveSel(null)
     selectSubView('google-drive')
+  }
+
+  /** UNI-2196 (D3): the connector went off mid-session: say so and leave the Drive view */
+  function leaveDrive(messageKey: StringKey) {
+    setDriveSel(null)
+    if (subViewRef.current !== 'google-drive') return
+    setToast({ message: t(messageKey), tone: 'error' })
+    selectSubView('workspace')
+  }
+
+  /** UNI-2196 (D3): a Drive step that needs a browser opens the web page (ids only, main builds the URL) */
+  const driveHandOff = (build: (base: { orgSlug: string; wsSlug: string }) => WorkWebTarget) => {
+    if (!driveWeb?.orgSlug || !driveWeb.wsSlug) return
+    void openDriveWeb(build(driveWeb))
+  }
+
+  /** closes the Drive panel; focus goes back to the row it was opened from */
+  const closeDrivePanel = () => {
+    const id = driveSel?.row.id
+    setDriveSel(null)
+    if (!id) return
+    window.requestAnimationFrame(() => {
+      // an unlinked row is about to disappear: never focus it
+      const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-drive-file-id]'))
+      const view = document.querySelector<HTMLElement>('[data-drive-view]')
+      const target =
+        (driveGoneIdRef.current === id
+          ? undefined
+          : rows.find((el) => el.dataset.driveFileId === id)) ??
+        rows.find((el) => el.dataset.driveFileId !== id) ??
+        view?.querySelector<HTMLElement>('.dh-drive-add-btn')
+      target?.focus()
+    })
   }
 
   const openFolderInWorkspace = (id: string | null) => {
@@ -2826,6 +2880,64 @@ export function DocumentsHome({
             onRetry={drive.retry}
             onLoadMore={drive.loadMore}
             onOpenOnGoogle={(driveFileId) => void drive.openOnGoogle(driveFileId)}
+            selectedFileId={driveSel?.row.id ?? null}
+            onSelect={(driveFileId, via) => {
+              const row = drive.files.find((f) => f.id === driveFileId)
+              if (row) setDriveSel({ row, focus: via === 'keyboard' })
+            }}
+            onClosePanel={closeDrivePanel}
+            onAddFromDrive={
+              driveWeb?.orgSlug && driveWeb.wsSlug
+                ? (connectionId) =>
+                    driveHandOff((base) => ({
+                      kind: 'drive-pick',
+                      ...base,
+                      ...(connectionId ? { accountId: connectionId } : {}),
+                    }))
+                : undefined
+            }
+            onManageConnections={
+              driveWeb?.orgSlug && driveWeb.wsSlug
+                ? () => driveHandOff((base) => ({ kind: 'drive-connect', ...base }))
+                : undefined
+            }
+            onReconnect={
+              driveWeb?.orgSlug && driveWeb.wsSlug
+                ? () => driveHandOff((base) => ({ kind: 'drive-connect', ...base }))
+                : undefined
+            }
+            panel={
+              driveSel ? (
+                <DrivePanel
+                  workspaceId={workspaceId}
+                  row={drive.files.find((f) => f.id === driveSel.row.id) ?? driveSel.row}
+                  web={driveWeb}
+                  autoFocus={driveSel.focus}
+                  onClose={closeDrivePanel}
+                  onOpenOnGoogle={(driveFileId) => void drive.openOnGoogle(driveFileId)}
+                  onUnlinked={() => {
+                    const unlinkedId = driveSel.row.id
+                    setDriveSel(null)
+                    drive.retry()
+                    // the row and the dialog are gone: focus goes to the first remaining row, else Add
+                    window.requestAnimationFrame(() => {
+                      const view = document.querySelector<HTMLElement>('[data-drive-view]')
+                      const target =
+                        Array.from(
+                          view?.querySelectorAll<HTMLElement>('[data-drive-file-id]') ?? [],
+                        ).find((el) => el.dataset.driveFileId !== unlinkedId) ??
+                        view?.querySelector<HTMLElement>('.dh-drive-add-btn')
+                      target?.focus()
+                    })
+                  }}
+                  onFeatureDisabled={() => leaveDrive('uhDriveFeatureOff')}
+                  onGone={() => {
+                    driveGoneIdRef.current = driveSel.row.id
+                    drive.retry()
+                  }}
+                />
+              ) : null
+            }
           />
         ) : (
           <>

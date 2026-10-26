@@ -175,6 +175,82 @@ describe('uniwork-work IPC', () => {
     const bad = { ...PROFILE, apiOrigin: 'not a url' }
     expect(await setup({ profile: () => bad }).call(C.openWeb, { kind: 'onboarding' })).toBe(false)
   })
+
+  it('openWeb and webUrl build Drive hand-off URLs with query strings intact (UNI-2196)', async () => {
+    const { call, openExternal } = setup()
+    const cases: Array<{ target: unknown; url: string }> = [
+      {
+        target: { kind: 'drive-pick', orgSlug: 'acme', wsSlug: 'eng' },
+        url: 'https://uniwork.example/acme/eng/documents?view=drive&pick=1',
+      },
+      {
+        target: { kind: 'drive-pick', orgSlug: 'acme', wsSlug: 'eng', accountId: 'conn-a' },
+        url: 'https://uniwork.example/acme/eng/documents?view=drive&pick=1&account=conn-a',
+      },
+      {
+        target: { kind: 'drive-connect', orgSlug: 'acme', wsSlug: 'eng' },
+        url: 'https://uniwork.example/acme/eng/settings?tab=integrations&connect=drive',
+      },
+      {
+        target: { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: 'df-1' },
+        url: 'https://uniwork.example/acme/eng/documents/drive/df-1',
+      },
+      {
+        target: {
+          kind: 'drive-file',
+          orgSlug: 'acme',
+          wsSlug: 'eng',
+          id: 'df-1',
+          action: 'propose',
+        },
+        url: 'https://uniwork.example/acme/eng/documents/drive/df-1?propose=1',
+      },
+      {
+        target: { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: 'df-1', action: 'ask' },
+        url: 'https://uniwork.example/acme/eng/documents/drive/df-1?ask=1',
+      },
+    ]
+    for (const { target, url } of cases) {
+      expect(await call(C.webUrl, target)).toBe(url)
+      expect(await call(C.openWeb, target)).toBe(true)
+    }
+    expect(openExternal.mock.calls.map(([url]) => url)).toEqual(cases.map((c) => c.url))
+  })
+
+  it('openWeb and webUrl refuse bad Drive slugs, ids, accountIds, actions and types (UNI-2196)', async () => {
+    const { call, openExternal } = setup()
+    const tooLong = 'a'.repeat(129)
+    const badTargets: unknown[] = [
+      { kind: 'drive-pick', orgSlug: 'a/b', wsSlug: 'eng' },
+      { kind: 'drive-pick', orgSlug: 'acme', wsSlug: '..' },
+      { kind: 'drive-pick', orgSlug: 'acme', wsSlug: 'eng', accountId: 'a/b' },
+      { kind: 'drive-pick', orgSlug: 'acme', wsSlug: 'eng', accountId: 'x?y' },
+      { kind: 'drive-pick', orgSlug: 'acme', wsSlug: 'eng', accountId: '..' },
+      { kind: 'drive-pick', orgSlug: 'acme', wsSlug: 'eng', accountId: '' },
+      { kind: 'drive-pick', orgSlug: 'acme', wsSlug: 'eng', accountId: tooLong },
+      { kind: 'drive-pick', orgSlug: 'acme', wsSlug: 'eng', accountId: 42 },
+      { kind: 'drive-pick', orgSlug: 'acme', wsSlug: 'eng', accountId: null },
+      { kind: 'drive-connect', orgSlug: '', wsSlug: 'eng' },
+      { kind: 'drive-connect', orgSlug: 'acme', wsSlug: tooLong },
+      { kind: 'drive-connect', orgSlug: 123, wsSlug: 'eng' },
+      { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng' },
+      { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: 'a/b' },
+      { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: 'x?y' },
+      { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: '..' },
+      { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: '' },
+      { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: tooLong },
+      { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: 7 },
+      { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: 'df-1', action: 'delete' },
+      { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: 'df-1', action: '' },
+      { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: 'df-1', action: null },
+      { kind: 'drive-file', orgSlug: 'acme', wsSlug: 'eng', id: 'df-1', action: 1 },
+    ]
+    for (const target of badTargets) {
+      expect(await call(C.webUrl, target)).toBeNull()
+      expect(await call(C.openWeb, target)).toBe(false)
+    }
+    expect(openExternal).not.toHaveBeenCalled()
+  })
 })
 
 describe('uniwork-work IPC: notification documents (G3)', () => {

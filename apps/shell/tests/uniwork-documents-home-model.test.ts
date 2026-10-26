@@ -28,6 +28,18 @@ import { zh } from '../src/renderer/src/i18n/uniwork-home/zh'
 import { zhTW } from '../src/renderer/src/i18n/uniwork-home/zh-TW'
 import { vi as viLocale } from '../src/renderer/src/i18n/uniwork-home/vi'
 import { en } from '../src/renderer/src/i18n/uniwork-home/en'
+import {
+  driveActivityRows,
+  driveCreationRows,
+  driveErrorKey,
+  driveUnlinkErrorKey,
+  driveTypeLabel,
+  reboundByName,
+  showRebind,
+  viewerLocksUni,
+  viewerNeedsWeb,
+} from '../src/renderer/src/uniwork-home/drive-panel-model'
+import type { DriveFile, DriveHistoryEvent } from '../src/shared/home-api'
 import { ja } from '../src/renderer/src/i18n/uniwork-home/ja'
 import { ko } from '../src/renderer/src/i18n/uniwork-home/ko'
 import { fr } from '../src/renderer/src/i18n/uniwork-home/fr'
@@ -975,5 +987,113 @@ describe('UNI-2195 (D2) Google Drive sidebar visibility, loader, and i18n keys',
       expect(table.uhDriveTasksCreatedLineOne, lang).toContain('{count}')
       expect(table.uhDriveTasksCreatedLine, lang).toContain('{count}')
     }
+  })
+})
+
+describe('UNI-2196 (D3): Drive panel model', () => {
+  // keys and params as plain text, so the mapping is what is asserted
+  const t = (key: string, params?: Record<string, unknown>) =>
+    params ? `${key}:${JSON.stringify(params)}` : key
+  const file = (over: Partial<DriveFile>): DriveFile => ({ ...({} as DriveFile), ...over })
+
+  it('maps every Drive error to the app message (spec §7.10)', () => {
+    expect(driveErrorKey('network')).toBe('uhDriveOffline')
+    expect(driveErrorKey('not_signed_in')).toBe('uwErrNotSignedIn')
+    expect(driveErrorKey('session_expired')).toBe('uwErrSessionExpired')
+    expect(driveErrorKey('forbidden')).toBe('uwErrForbidden')
+    expect(driveErrorKey('feature_disabled')).toBe('uhDriveFeatureOff')
+    expect(driveErrorKey('auth_failed')).toBe('uhDriveErrAuthFailed')
+    expect(driveErrorKey('not_found')).toBe('uhDriveNotFound')
+    expect(driveErrorKey('server_error')).toBe('uhDriveLoadError')
+  })
+
+  it('a failed unlink reads as an unlink error, the specific codes keep their sentence', () => {
+    expect(driveUnlinkErrorKey('server_error')).toBe('uhDriveUnlinkFailed')
+    expect(driveUnlinkErrorKey('network')).toBe('uhDriveOffline')
+    expect(driveUnlinkErrorKey('forbidden')).toBe('uwErrForbidden')
+  })
+
+  it('names the file type; plain text and unknown kinds read through the dictionary', () => {
+    expect(driveTypeLabel('google_doc', t as never)).toBe('Google Docs')
+    expect(driveTypeLabel('xlsx', t as never)).toBe('Excel')
+    expect(driveTypeLabel('text', t as never)).toBe('uhDriveTypeText')
+    expect(driveTypeLabel('something-new', t as never)).toBe('uhDriveTypeFile')
+  })
+
+  it('a file bound by someone other than the linker was rebound', () => {
+    expect(
+      reboundByName(file({ boundById: 'u-1', createdBy: 'u-1', boundByName: 'Minh' })),
+    ).toBeNull()
+    expect(reboundByName(file({ boundById: 'u-2', createdBy: 'u-1', boundByName: ' Hùng ' }))).toBe(
+      'Hùng',
+    )
+    expect(reboundByName(file({ boundById: 'u-2', createdBy: 'u-1', boundByName: '' }))).toBeNull()
+  })
+
+  it('locks Create / Ask until the viewer reads the file; web steps for unknown, lost, connection_lost', () => {
+    expect(viewerLocksUni('granted')).toBe(false)
+    for (const access of ['unknown', 'lost', 'connection_lost']) {
+      expect(viewerLocksUni(access)).toBe(true)
+      expect(viewerNeedsWeb(access)).toBe(true)
+    }
+    expect(viewerNeedsWeb('granted')).toBe(false)
+  })
+
+  it('offers a rebind only when allowed and the bound connection is lost', () => {
+    expect(showRebind(file({ canRebind: true, boundConnectionLost: true }))).toBe(true)
+    expect(
+      showRebind(file({ canRebind: true, boundConnectionLost: false, accessLostAt: 'x' })),
+    ).toBe(true)
+    expect(showRebind(file({ canRebind: true, boundConnectionLost: false }))).toBe(false)
+    expect(showRebind(file({ canRebind: false, boundConnectionLost: true }))).toBe(false)
+  })
+
+  it('groups the created tasks per creation and drops a creation without visible tasks', () => {
+    const rows = driveCreationRows(
+      [
+        {
+          proposalId: 'p-1',
+          createdAt: '2026-10-15T10:00:00Z',
+          createdById: 'u-1',
+          createdByName: 'Minh',
+          tasks: [{ taskId: 't-1', identifier: 'UNI-1', title: 'A', status: 'todo' }],
+        },
+        {
+          proposalId: 'p-2',
+          createdAt: '2026-10-16T10:00:00Z',
+          createdById: 'u-1',
+          createdByName: 'Minh',
+          tasks: [],
+        },
+      ],
+      t as never,
+      'en',
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.label.startsWith('uhDriveTasksCreatedGroupOne:')).toBe(true)
+    expect(driveCreationRows(undefined, t as never, 'en')).toEqual([])
+  })
+
+  it('lists history newest first and leaves out reads and opens', () => {
+    const event = (id: string, action: string, at: string): DriveHistoryEvent =>
+      ({
+        id,
+        action,
+        occurredAt: at,
+        metadata: id === 'a' ? { actor_name: 'Minh' } : {},
+      }) as unknown as DriveHistoryEvent
+    const rows = driveActivityRows(
+      [
+        event('a', 'drive_file.linked', '2026-10-10T09:00:00Z'),
+        event('b', 'drive_file.opened', '2026-10-11T09:00:00Z'),
+        event('c', 'drive_file.read', '2026-10-11T10:00:00Z'),
+        event('d', 'drive_file.made_up', '2026-10-12T09:00:00Z'),
+      ],
+      t as never,
+      'en',
+    )
+    expect(rows.map((r) => r.id)).toEqual(['d', 'a'])
+    expect(rows[0]!.text).toBe('uhDriveActOther')
+    expect(rows[1]!.text).toBe('Minh · uhDriveActLinked')
   })
 })

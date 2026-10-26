@@ -490,7 +490,7 @@ describe('VersionHistorySheet (UNI-2077 UI-V)', () => {
       await open(target(), undefined, 'vi')
       expect(sheet().textContent).toContain('Lịch sử phiên bản')
       expect(rows()[0]!.textContent).toContain('Phiên bản 3')
-      expect(rows()[0]!.textContent).toContain('mốc thủ công')
+      expect(rows()[0]!.textContent).toContain('phiên bản thủ công')
       expect(rows()[0]!.textContent).toContain(viText.vhsCurrentBadge)
     })
   })

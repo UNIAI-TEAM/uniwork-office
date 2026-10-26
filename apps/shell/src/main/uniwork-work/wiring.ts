@@ -42,6 +42,13 @@ function webPathOf(target: unknown): string | null {
     case 'inbox':
     case 'tasks':
       return `${base}/${t.kind}`
+    case 'drive-pick': {
+      if (t.accountId === undefined) return `${base}/documents?view=drive&pick=1`
+      if (!ok(t.accountId)) return null
+      return `${base}/documents?view=drive&pick=1&account=${t.accountId}`
+    }
+    case 'drive-connect':
+      return `${base}/settings?tab=integrations&connect=drive`
   }
   if (!ok(t.id)) return null
   switch (t.kind) {
@@ -55,6 +62,13 @@ function webPathOf(target: unknown): string | null {
       return `${base}/people/${t.id}`
     case 'document':
       return `${base}/documents/${t.id}`
+    case 'drive-file': {
+      if (t.action === undefined) return `${base}/documents/drive/${t.id}`
+      if (t.action === 'propose' || t.action === 'ask') {
+        return `${base}/documents/drive/${t.id}?${t.action}=1`
+      }
+      return null
+    }
     default:
       return null
   }

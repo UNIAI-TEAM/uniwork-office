@@ -1110,7 +1110,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(host.querySelector('.uw-pick-more-error[role="alert"]')).not.toBeNull()
   })
 
-  it('does not include t in any hook dependency array in DocumentsHome.tsx or DriveList.tsx (DH1-R1-8, UNI-2195)', async () => {
+  it('does not include t in any hook dependency array in DocumentsHome.tsx, DriveList.tsx or DrivePanel.tsx (DH1-R1-8, UNI-2195, UNI-2196)', async () => {
     // Lazy-loaded AST parser only for this static-analysis test
     const ts = await import('typescript')
     const hooks: Record<string, true> = {
@@ -1140,6 +1140,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     for (const rel of [
       '../src/renderer/src/uniwork-home/DocumentsHome.tsx',
       '../src/renderer/src/uniwork-home/DriveList.tsx',
+      '../src/renderer/src/uniwork-home/DrivePanel.tsx',
     ]) {
       const file = resolve(__dirname, rel)
       const src = readFileSync(file, 'utf8')

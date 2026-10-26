@@ -1999,12 +1999,38 @@
   font: inherit;
   font-size: 12px;
   font-weight: 500;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.dh-drive-reconnect-link > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dh-drive-reconnect-link .dh-drive-warn-icon {
+  flex: none;
 }
 
 .dh-drive-reconnect-link:disabled,
 .dh-drive-reconnect-text {
   cursor: default;
+}
+
+/* D3-V2-2: at <= 1100 px let the action wrap to two lines so "kết nối lại" stays visible */
+@media (max-width: 1100px) {
+  .dh-drive-reconnect-link {
+    align-items: flex-start;
+    white-space: normal;
+  }
+
+  .dh-drive-reconnect-link > span {
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 
 .dh-drive-badge {
@@ -2054,22 +2080,12 @@
   overflow: hidden;
 }
 
-.dh-drive-skel-head,
 .dh-drive-skel-row {
-  display: grid;
-  grid-template-columns: 28% 21% 18% 21% 12%;
-  align-items: center;
-  gap: 0;
-  padding: 10px 14px;
+  cursor: default;
 }
 
-.dh-drive-skel-row {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-.dh-drive-skel-row:last-child {
-  border-bottom: 0;
+.dh-drive-skel-row:hover {
+  background: transparent;
 }
 
 .dh-drive-skel-th {
@@ -2114,6 +2130,27 @@
     flex: 1 1 20rem;
   }
 
+  /* D2-V8: give the Name column the room Used-in / Tasks do not need, so short names are not cut */
+  .dh-drive-col-name {
+    width: 36%;
+  }
+
+  .dh-drive-col-account {
+    width: 20%;
+  }
+
+  .dh-drive-col-access {
+    width: 16%;
+  }
+
+  .dh-drive-col-used {
+    width: 16%;
+  }
+
+  .dh-drive-col-tasks {
+    width: 12%;
+  }
+
   .dh-main:has(.dh-drive-view) .dh-subtitle {
     white-space: normal;
     text-overflow: clip;
@@ -2133,9 +2170,362 @@
     white-space: normal;
     line-height: 1.3;
   }
+}
 
-  .dh-drive-reconnect-link {
-    white-space: normal;
-    text-align: start;
+/* UNI-2196 (D3): Google Drive detail panel beside the list */
+.dh-drive-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dh-drive-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dh-drive-row.is-selected {
+  background: var(--tint-blue);
+}
+
+.dh-drive-row.is-selected:hover {
+  background: var(--tint-blue);
+}
+
+.dh-drive-account-email.is-missing {
+  color: var(--text-secondary);
+}
+
+/* the panel carries the details, so the list keeps Name + Access and lets the badge wrap (D3-V1; not when the panel stacks under the table, <= 760 px) */
+@media (min-width: 761px) {
+  .dh-drive-view.has-panel .dh-drive-col-account,
+  .dh-drive-view.has-panel .dh-drive-cell-account,
+  .dh-drive-view.has-panel .dh-drive-col-used,
+  .dh-drive-view.has-panel .dh-drive-cell-used,
+  .dh-drive-view.has-panel .dh-drive-col-tasks,
+  .dh-drive-view.has-panel .dh-drive-cell-tasks {
+    display: none;
+  }
+
+  .dh-drive-view.has-panel .dh-drive-col-name {
+    width: 58%;
+  }
+
+  .dh-drive-view.has-panel .dh-drive-col-access {
+    width: 42%;
+  }
+}
+
+.dh-drive-view.has-panel .dh-drive-th {
+  white-space: normal;
+  line-height: 1.3;
+}
+
+.dh-drive-view.has-panel .dh-drive-badge {
+  white-space: normal;
+  line-height: 1.3;
+}
+
+.dh-drive-panel {
+  display: flex;
+  flex: 0 0 340px;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 160px);
+  min-width: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-subtle);
+  color: var(--text);
+}
+
+.dh-drive-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 12px 8px 16px;
+}
+
+.dh-drive-panel-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dh-drive-panel-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.dh-drive-panel-title:focus {
+  outline: none;
+}
+
+.dh-drive-panel-title:focus-visible,
+.dh-drive-panel-h:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.dh-drive-panel-sub {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-drive-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 16px 16px;
+}
+
+.dh-drive-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dh-drive-panel-actions [aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.dh-drive-panel-warn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--warning-border);
+  border-radius: 8px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dh-drive-panel-warn p {
+  margin: 0;
+}
+
+.dh-drive-panel-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.dh-drive-panel-link:focus-visible,
+.dh-drive-panel-task:focus-visible,
+.dh-drive-panel .btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.dh-drive-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+
+.dh-drive-panel-row dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dh-drive-panel-row dd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.dh-drive-panel-muted {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+p.dh-drive-panel-muted {
+  margin: 0;
+}
+
+.dh-drive-panel-note {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dh-drive-panel-warn-title {
+  color: var(--warning-text);
+  font-size: 13px;
+}
+
+.dh-drive-panel-inline-btn {
+  height: 28px;
+  margin-top: 2px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.dh-drive-panel-badge {
+  margin-top: 2px;
+}
+
+.dh-drive-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dh-drive-panel-h {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dh-drive-panel-tasks,
+.dh-drive-panel-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dh-drive-panel-task {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.dh-drive-panel-task:hover:not(:disabled) .dh-drive-panel-task-title {
+  text-decoration: underline;
+}
+
+.dh-drive-panel-task:disabled {
+  cursor: default;
+}
+
+.dh-drive-panel-task-id {
+  flex: none;
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.dh-drive-panel-task-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dh-drive-panel-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dh-drive-panel-group-label {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dh-drive-panel-activity li {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.dh-drive-panel-inline-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--danger-text);
+  font-size: 12px;
+}
+
+.dh-drive-panel-inline-error p {
+  margin: 0;
+}
+
+.dh-drive-panel-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.dh-drive-panel-unlink {
+  margin-inline-start: auto;
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+
+/* at ~900 px the panel narrows and carries account + access, so the list keeps only Name (D3-V2) */
+@media (max-width: 1100px) {
+  .dh-drive-panel {
+    flex-basis: 300px;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .dh-drive-view.has-panel .dh-drive-col-access,
+  .dh-drive-view.has-panel .dh-drive-cell-access {
+    display: none;
+  }
+
+  .dh-drive-view.has-panel .dh-drive-col-name {
+    width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .dh-drive-body {
+    flex-direction: column;
+  }
+
+  .dh-drive-panel {
+    position: static;
+    flex-basis: auto;
+    width: 100%;
+    max-height: none;
   }
 }
