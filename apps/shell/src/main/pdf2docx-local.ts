@@ -1,90 +1,47 @@
 /**
- * Local PDF → Word conversion for the shell's pdf tabs (pdf2docx P4).
- * Loads the shared PDFium wasm with the same lazy-singleton pattern as
- * apps/pdf/src/main/text-edit.ts and runs the pure @genoffice/pdf2docx
- * pipeline in the main process. Imported by relative path (like the other
- * sibling app modules) so the bundled shell main carries the package inline.
+ * Local PDF → Word conversion for the shell's pdf tabs (pdf2docx P4, UNI-2167).
+ * Runs the @genoffice/pdf2docx pipeline + local OCR chain inside an isolated
+ * Electron utility process via `convert-host.ts` so long scanned documents
+ * never block the main process and can be cancelled immediately.
  */
-import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { convertPdfToDocx, PdfLoadError } from '../../../../packages/pdf2docx/src'
-import type { ConvertResult, OcrEngine, PdfiumModule } from '../../../../packages/pdf2docx/src'
-import { resolveLocalOcrEngine } from '../../../../packages/pdf2docx/src/ocr-local'
-import { pdfiumWasmPath } from '../../../pdf/src/main/wasm-path'
+import type { ConvertResult, PageResult } from '../../../../packages/pdf2docx/src'
+import { PdfLoadError } from '../../../../packages/pdf2docx/src/extract/pdfium'
+import { runPdfConvertJob } from './pdf-convert/convert-host'
 
-export type { ConvertResult, PageResult } from '../../../../packages/pdf2docx/src'
-export { PdfLoadError } from '../../../../packages/pdf2docx/src'
+export type { ConvertResult, PageResult }
+export { PdfLoadError }
 
-/**
- * Local OCR engine for scanned pages: the bundled Tesseract `vie` engine
- * first, the platform system OCR (macOS Vision / Windows.Media.Ocr) behind it
- * (resolution and hand-over gate: packages/pdf2docx/src/ocr-local.ts). Optional
- * by design: with no engine at all scanned pages keep the full-page-image
- * fallback.
- *
- * Packaged: Resources/ocr/ (electron-builder extraResources).
- * Dev: packages/pdf2docx/ocr-tesseract/ and ocr-helper/ in the repo.
- */
-let ocrEngine: OcrEngine | null | undefined
-function ensureOcrEngine(): OcrEngine | null {
-  if (ocrEngine !== undefined) return ocrEngine
-  const here = dirname(fileURLToPath(import.meta.url))
-  ocrEngine = resolveLocalOcrEngine({
-    ...(process.resourcesPath ? { resourcesPath: process.resourcesPath } : {}),
-    devPackageDir: join(here, '../../../../packages/pdf2docx'),
-  })
-  return ocrEngine
-}
+const devPackageDir = join(dirname(fileURLToPath(import.meta.url)), '../../../../packages/pdf2docx')
 
-let pdfiumPromise: Promise<PdfiumModule> | null = null
-
-/** Load the wasm bytes ourselves: the bundled main process must not rely on
- *  the package's own file resolution (see apps/pdf text-edit.ts). Exported so
- *  the pptx exporter (pdf2pptx-local.ts) shares the same wasm singleton. */
-export function ensurePdfium(): Promise<PdfiumModule> {
-  pdfiumPromise ??= (async () => {
-    const { init } = (await import('@embedpdf/pdfium')) as unknown as {
-      init(overrides: object): Promise<object>
-    }
-    const raw = readFileSync(pdfiumWasmPath())
-    // exact slice: Buffer.buffer may be a shared pool larger than the file
-    const wasmBinary = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength)
-    // thisProgram: emscripten's synthetic environ writes process.argv[1] via
-    // ASCII-asserting stringToAscii; a document path with CJK characters handed
-    // to the packaged app by a Windows file association aborts init (same fix
-    // as apps/pdf/src/main/text-edit.ts loadPdfium)
-    const wrapped = (await init({ wasmBinary, thisProgram: 'genoffice-pdf' })) as {
-      pdfium?: unknown
-    }
-    const m = (wrapped.pdfium ?? wrapped) as PdfiumModule & { _PDFiumExt_Init(): void }
-    m._PDFiumExt_Init()
-    return m
-  })()
-  return pdfiumPromise
-}
-
-/** Convert a PDF file on disk to docx bytes, fully locally. */
+/** Convert a PDF file on disk to docx bytes, off the main process. */
 export async function convertPdfFileToDocxLocal(
   pdfPath: string,
   onProgress?: (page: number, total: number) => void,
   password?: string,
+  signal?: AbortSignal,
 ): Promise<ConvertResult> {
-  const pdfium = await ensurePdfium()
-  const bytes = readFileSync(pdfPath)
-  const pdf = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  const ocr = ensureOcrEngine()
-  // Known limit (follow-up ticket): the whole conversion runs synchronously in
-  // the main process (PDFium scope + one spawnSync per scanned page, 1-4 s each
-  // for Tesseract), so a long scan blocks the event loop for its duration. The
-  // viewer's OCR bridge is already async; this path needs a worker/utility
-  // process or an async pipeline.
-  return convertPdfToDocx(pdf, {
-    pdfium,
-    ...(ocr ? { ocr } : {}),
-    ...(onProgress !== undefined ? { onProgress } : {}),
-    ...(password !== undefined ? { password } : {}),
-  })
+  const res = await runPdfConvertJob(
+    {
+      kind: 'docx',
+      pdfPath,
+      ...(password !== undefined ? { password } : {}),
+      ...(process.resourcesPath ? { resourcesPath: process.resourcesPath } : {}),
+      devPackageDir,
+    },
+    {
+      ...(onProgress !== undefined ? { onProgress } : {}),
+      ...(signal !== undefined ? { signal } : {}),
+    },
+  )
+  return {
+    docx: res.bytes,
+    pages: res.pages,
+    warnings: res.warnings,
+    pageResults: res.pageResults,
+    scannedDocument: res.scannedDocument,
+  }
 }
 
 /**
@@ -123,9 +80,10 @@ export function convertPdfFileToDocxLocalWithPrompt(
   pdfPath: string,
   promptPassword: (retry: boolean) => Promise<string | null>,
   onProgress?: (page: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<ConvertResult | null> {
   return convertWithPasswordRetry(
-    (password) => convertPdfFileToDocxLocal(pdfPath, onProgress, password),
+    (password) => convertPdfFileToDocxLocal(pdfPath, onProgress, password, signal),
     promptPassword,
   )
 }

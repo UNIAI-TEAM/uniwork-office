@@ -271,7 +271,8 @@ import {
   setPdfRedactionSavedHook,
   setPdfSaveAsInFlight,
 } from '../../../pdf/src/main/pdf-main'
-import { PDF_CHANNELS } from '../../../pdf/src/shared/ipc'
+import { PDF_CHANNELS, type PdfConvertProgressEvent } from '../../../pdf/src/shared/ipc'
+import { killAllPdfConvertJobs, PdfConvertCancelled } from './pdf-convert/convert-host'
 import { convertPdfFileToDocxLocalWithPrompt, PdfLoadError } from './pdf2docx-local'
 import { convertPdfFileToPptxLocalWithPrompt } from './pdf2pptx-local'
 import { convertPdfFileToXlsxLocalWithPrompt } from './pdf2xlsx-local'
@@ -6582,6 +6583,10 @@ let exportingPdfDocx = false
 /** a Desk tool run is in flight (picker to last write); PDF → Office also takes exportingPdfDocx */
 let deskToolRunning = false
 
+/** AbortController for the in-flight PDF -> Office conversion (cancelled via pdf:convert-cancel) */
+let activePdfConvertController: AbortController | null = null
+/** WebContents ID of the PDF tab that initiated the active conversion (null when started from Desk) */
+let activePdfConvertSenderId: number | null = null
 type PdfOfficeKind = 'docx' | 'pptx' | 'xlsx'
 type MainKey = Parameters<typeof tm>[0]
 
@@ -6614,6 +6619,7 @@ async function convertPdfToOffice(
   pdfPath: string,
   host: BrowserWindow,
   returnTo?: string,
+  progressSender?: WebContents,
 ): Promise<string | null> {
   const copy = PDF_OFFICE_COPY[kind]
   if (exportingPdfDocx) {
@@ -6621,6 +6627,17 @@ async function convertPdfToOffice(
     return null
   }
   exportingPdfDocx = true
+  const abortController = new AbortController()
+  activePdfConvertController = abortController
+  activePdfConvertSenderId = progressSender?.id ?? null
+  let lastPage = 0
+  let lastTotal = 0
+  let progressStarted = false
+  const sendProgress = (payload: PdfConvertProgressEvent) => {
+    if (progressSender && !progressSender.isDestroyed()) {
+      progressSender.send(PDF_CHANNELS.convertProgress, payload)
+    }
+  }
   try {
     const picked = await showSaveDialogWithMemory(dialog, host, {
       defaultPath: pdfPath.replace(/\.pdf$/i, `.${kind}`),
@@ -6640,6 +6657,8 @@ async function convertPdfToOffice(
     // a detached window on the target is just as stale: close it through its own guard, or stop
     if (findDetachedTabByPath(target) && !(await closeDetachedByPath(target))) return null
     host.setProgressBar(2)
+    progressStarted = true
+    sendProgress({ format: kind, page: 0, total: 0 })
     // encrypted PDFs prompt for the password (P23), looping on wrong entries;
     // null result = user cancelled the prompt → abort silently
     const promptPassword = (retry: boolean) =>
@@ -6662,12 +6681,20 @@ async function convertPdfToOffice(
         },
       })
     const onProgress = (page: number, total: number) => {
+      lastPage = page
+      lastTotal = total
       if (!host.isDestroyed() && total > 0) host.setProgressBar(page / total)
+      sendProgress({ format: kind, page, total })
     }
 
     if (kind === 'docx') {
-      const result = await convertPdfFileToDocxLocalWithPrompt(pdfPath, promptPassword, onProgress)
-      if (result === null) return null
+      const result = await convertPdfFileToDocxLocalWithPrompt(
+        pdfPath,
+        promptPassword,
+        onProgress,
+        abortController.signal,
+      )
+      if (result === null || abortController.signal.aborted) return null
       await atomicWriteFile(target, result.docx)
       // degrade transparency (plan §7.6 dual-track split): whole scan → say so
       // once; individual image-fallback pages → name them;
@@ -6708,8 +6735,13 @@ async function convertPdfToOffice(
         })
       }
     } else if (kind === 'pptx') {
-      const result = await convertPdfFileToPptxLocalWithPrompt(pdfPath, promptPassword, onProgress)
-      if (result === null) return null
+      const result = await convertPdfFileToPptxLocalWithPrompt(
+        pdfPath,
+        promptPassword,
+        onProgress,
+        abortController.signal,
+      )
+      if (result === null || abortController.signal.aborted) return null
       await atomicWriteFile(target, result.pptx)
       // degrade transparency (same split as the Word export): whole scan vs
       // individual image-fallback pages
@@ -6728,8 +6760,13 @@ async function convertPdfToOffice(
         })
       }
     } else {
-      const result = await convertPdfFileToXlsxLocalWithPrompt(pdfPath, promptPassword, onProgress)
-      if (result === null) return null
+      const result = await convertPdfFileToXlsxLocalWithPrompt(
+        pdfPath,
+        promptPassword,
+        onProgress,
+        abortController.signal,
+      )
+      if (result === null || abortController.signal.aborted) return null
       await atomicWriteFile(target, result.xlsx)
       // degrade transparency: pages that could not become cells got a notice
       // row on their worksheet instead of an image (a spreadsheet has none)
@@ -6750,6 +6787,9 @@ async function convertPdfToOffice(
     }
     return target
   } catch (err) {
+    if (err instanceof PdfConvertCancelled || abortController.signal.aborted) {
+      return null
+    }
     if (!host.isDestroyed()) {
       // structured load failures (P22): password-protected / damaged PDFs get
       // a human-readable explanation instead of the raw PDFium error string
@@ -6770,6 +6810,11 @@ async function convertPdfToOffice(
     }
     return null
   } finally {
+    if (progressStarted) {
+      sendProgress({ format: kind, page: lastPage, total: lastTotal, done: true })
+    }
+    activePdfConvertController = null
+    activePdfConvertSenderId = null
     // the prompt window may still be open when the loop exits through cancel
     // or a non-password error thrown mid-retry
     closePdfPasswordDialog()
@@ -6800,7 +6845,7 @@ async function exportActivePdfAsOffice(kind: PdfOfficeKind): Promise<void> {
     exportingPdfDocx = false
   }
   if (!flushed) return
-  const out = await convertPdfToOffice(kind, tab.filePath, host, tab.id)
+  const out = await convertPdfToOffice(kind, tab.filePath, host, tab.id, tab.webContents)
   if (out) openDocumentPath(out)
 }
 
@@ -6824,6 +6869,18 @@ ipcMain.handle(PDF_CHANNELS.convertOffice, async (e, format: unknown) => {
   if (format === 'docx') await exportPdfAsDocxLocal()
   else if (format === 'xlsx') await exportPdfAsXlsxLocal()
   else if (format === 'pptx') await exportPdfAsPptxLocal()
+})
+
+ipcMain.handle(PDF_CHANNELS.convertCancel, (e) => {
+  if (
+    activePdfConvertSenderId !== null
+      ? e.sender.id !== activePdfConvertSenderId
+      : activePdfTarget()?.webContents.id !== e.sender.id
+  ) {
+    return
+  }
+  activePdfConvertController?.abort()
+  closePdfPasswordDialog()
 })
 
 function legalDocEnv(): LegalDocEnv {
@@ -7374,6 +7431,7 @@ app.on('before-quit', () => {
   // No close prompt may fall through to "Save" during shutdown
   markSheetsShuttingDown()
   stopSheetsSidecar()
+  killAllPdfConvertJobs()
   // release the MCP port synchronously (macOS keeps the process alive after
   // the last window closes, so window-all-closed is not enough)
   stopMcpSync()

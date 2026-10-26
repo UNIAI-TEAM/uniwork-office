@@ -64,6 +64,21 @@ const api: PdfApi = {
   cropPages: (request) => ipcRenderer.invoke(PDF_CHANNELS.cropPages, request),
   exportImages: (request) => ipcRenderer.invoke(PDF_CHANNELS.exportImages, request),
   convertOffice: (format) => ipcRenderer.invoke(PDF_CHANNELS.convertOffice, format),
+  convertCancel: () => ipcRenderer.invoke(PDF_CHANNELS.convertCancel),
+  onConvertProgress: (handler) => {
+    const listener = (_e: Electron.IpcRendererEvent, payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return
+      const p = payload as Record<string, unknown>
+      const format = p.format
+      if (format !== 'docx' && format !== 'xlsx' && format !== 'pptx') return
+      const done = p.done === true
+      const page = typeof p.page === 'number' && Number.isFinite(p.page) ? p.page : 0
+      const total = typeof p.total === 'number' && Number.isFinite(p.total) ? p.total : 0
+      handler(done ? { format, page, total, done: true } : { format, page, total })
+    }
+    ipcRenderer.on(PDF_CHANNELS.convertProgress, listener)
+    return () => ipcRenderer.removeListener(PDF_CHANNELS.convertProgress, listener)
+  },
   createDocument: (request) => ipcRenderer.invoke(PDF_CHANNELS.createDocument, request),
   imageSearch: (query, maxResults) =>
     ipcRenderer.invoke(AI_CHANNELS.imageSearch, query, maxResults),
