@@ -244,7 +244,7 @@ describe('createLegacyOpener', () => {
     createLegacyOpener(h.deps).open('/w/old.xls')
     await vi.waitFor(() => expect(h.notices).toHaveLength(1))
     expect(h.xlsOpened).toEqual(['/w/old.xls'])
-    expect(h.notices[0]).toMatch(/values only/)
+    expect(h.notices[0]).toMatch(/values only.*Reinstall the app to restore them\./)
     expect(h.opened).toEqual([])
   })
 
@@ -538,10 +538,19 @@ describe('legacyErrorMessage', () => {
   it('names the file and the legacy extension, in the user language', () => {
     const err = new LegacyConvertError('corrupt', 'x')
     expect(legacyErrorMessage(err, 'Old.xls', t)).toBe(
-      '“Old.xls” is damaged or isn’t a valid .xls file, so it can’t be opened.',
+      '“Old.xls” is damaged or isn’t a valid .xls file, so it can’t be opened. Try the original file or a backup copy.',
     )
     expect(legacyErrorMessage(err, 'Old.xls', (k, p) => tLegacyOpen('vi', k, p))).toBe(
-      '“Old.xls” bị hỏng hoặc không phải tệp .xls hợp lệ nên không thể mở.',
+      '“Old.xls” bị hỏng hoặc không phải tệp .xls hợp lệ nên không thể mở. Hãy thử tệp gốc hoặc một bản sao lưu.',
+    )
+  })
+
+  it('the values-only notice says what is lost and how to restore it, in en and vi', () => {
+    expect(t('legacyXlsValuesOnly', { name: 'Old.xls' })).toMatch(
+      /because the converter is missing\. Reinstall the app to restore them\.$/,
+    )
+    expect(tLegacyOpen('vi', 'legacyXlsValuesOnly', { name: 'Old.xls' })).toMatch(
+      /vì thiếu bộ chuyển đổi\. Hãy cài đặt lại ứng dụng để khôi phục chúng\.$/,
     )
   })
 })
