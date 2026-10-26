@@ -1027,6 +1027,8 @@ function setup(
     closeChoice?: 'save' | 'close' | 'cancel'
     /** UNI-1959: shrinks the close-save settlement wait (ms) */
     closeSaveWaitMs?: number
+    /** UNI-2207 C0: converted local tabs (.xls / .doc / .ppt -> .xlsx / .docx / .pptx) */
+    convertedSaveTarget?: (path: string) => { path: string; suggestSaveAs: string } | null
   } = {},
 ) {
   const statuses: UniworkDocStatus[] = []
@@ -1104,6 +1106,7 @@ function setup(
     isShellTab: options.shellTab === undefined ? undefined : () => shellTab!,
     dismissFirstSaveName: options.dismissFirstSaveName,
     closeSaveWaitMs: options.closeSaveWaitMs,
+    convertedSaveTarget: options.convertedSaveTarget,
     requestModuleSave: (path) => {
       moduleSaveCalls.push(path)
       if (options.moduleSaveResult === false) return false
@@ -1111,7 +1114,8 @@ function setup(
         // the module's own Save writes the file, then its user-save hook
         // fires; the queueMicrotask is the renderer round-trip that lands it
         if (options.moduleSaveWrites !== undefined) {
-          writeFileSync(path, options.moduleSaveWrites)
+          const converted = options.convertedSaveTarget?.(path)
+          writeFileSync(converted ? converted.path : path, options.moduleSaveWrites)
         }
         queueMicrotask(() => service.onUserSave(path))
       }
@@ -3853,6 +3857,54 @@ describe('SAVE-01 first save', () => {
     expect(
       server.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/documents/files')),
     ).toHaveLength(1)
+  })
+
+  it('saves a converted legacy tab (.xls / .doc / .ppt with suggestSaveAs) as its target OOXML format instead of failing unsupported_format', async () => {
+    const server = fakeServer()
+    const xlsPath = join(dir, 'budget.xls')
+    const convertedXlsxPath = join(dir, 'converted', 'budget.xlsx')
+    mkdirSync(join(dir, 'converted'), { recursive: true })
+    writeFileSync(xlsPath, 'original biff8 xls bytes')
+    writeFileSync(convertedXlsxPath, 'initial converted xlsx bytes')
+
+    const ctx = setup(server, {
+      pathOpen: true,
+      moduleSaveWrites: 'flushed converted xlsx bytes',
+      convertedSaveTarget: (p) =>
+        p === xlsPath
+          ? { path: convertedXlsxPath, suggestSaveAs: join(dir, 'budget.xlsx') }
+          : null,
+    })
+
+    const saved = await ctx.service.firstSave({
+      tabPath: xlsPath,
+      title: 'budget.xls',
+      workspaceId: WS,
+      target: { kind: 'my_folder' },
+    })
+
+    expect(saved.ok).toBe(true)
+    const posts = server.calls.filter(
+      (c) => c.method === 'POST' && c.path === `/api/v1/workspaces/${WS}/documents/files`,
+    )
+    expect(posts).toHaveLength(1)
+    const body = posts[0]!.body as {
+      destination?: unknown
+      title?: unknown
+      name?: unknown
+      bytes: Uint8Array
+    }
+    expect(body.destination).toBe('my_folder')
+    expect(body.name).toBe('budget.xlsx')
+    expect(body.title).toBe('budget.xlsx')
+    expect(Buffer.from(body.bytes).toString('utf8')).toBe('flushed converted xlsx bytes')
+    // original .xls file is never overwritten
+    expect(readFileSync(xlsPath, 'utf8')).toBe('original biff8 xls bytes')
+    // tab re-keys from the original .xls tabPath to the bound .xlsx working copy
+    expect(ctx.pathRenames).toHaveLength(1)
+    expect(ctx.pathRenames[0]!.oldPath).toBe(xlsPath)
+    expect(ctx.pathRenames[0]!.newPath.endsWith('.xlsx')).toBe(true)
+    expect(ctx.service.isBound(ctx.pathRenames[0]!.newPath)).toBe(true)
   })
 })
 

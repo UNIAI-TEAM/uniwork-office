@@ -333,6 +333,25 @@ describe('SaveDialog State 1 "Đặt tên tài liệu"', () => {
     expect($('.uws-close')?.getAttribute('aria-label')).toBe(vi_.usClose)
   })
 
+  it('maps legacy .doc / .xls / .ppt tab paths to .docx / .xlsx / .pptx in nameParts and the dialog badge', async () => {
+    const xlsTab = 'C:\\Users\\linh\\Documents\\Ngân sách 2026.xls'
+    tabs = [
+      { id: 'home', kind: 'home', title: 'Home', closable: false, active: false },
+      { id: 't1', kind: 'sheets', title: 'x', closable: true, active: true, filePath: xlsTab },
+    ]
+    await render()
+    await push(xlsTab)
+    expect($<HTMLInputElement>('.uws-name-input')?.value).toBe('Ngân sách 2026')
+    expect($('.uws-ext')?.textContent).toBe('.xlsx')
+    await click($('.uws-save'))
+    expect(api.uniworkFirstSave).toHaveBeenCalledWith({
+      tabPath: xlsTab,
+      title: 'Ngân sách 2026.xlsx',
+      workspaceId: 'w1',
+      target: { kind: 'my_folder' },
+    })
+  })
+
   it('ensures My Folder for the workspace when the dialog opens (Q3)', async () => {
     await render()
     await push()

@@ -160,6 +160,8 @@ export interface UniworkDocsWiring {
   /** EL-1(b) fix6 (VEL-2): broadcast `{ path }` to every renderer webContents */
   pushDocStateChanged?(path: string): void
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
+  /** UNI-2207 C0: backing OOXML temp path + suggestSaveAs for a converted legacy tab */
+  convertedSaveTarget?(path: string): { path: string; suggestSaveAs: string } | null
   /** UWNM-BE-R4-1: the shell rewrote `path` itself (docs forgets its disk state) */
   noteShellRewrote?(path: string): void
   reloadPath(path: string): void
@@ -944,6 +946,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
     isPathOpen: (path) => wiring.isPathOpen(path),
     requestModuleSave: (path, onNotWritten, mode) =>
       wiring.requestModuleSave(path, onNotWritten, mode),
+    convertedSaveTarget: (path) => wiring.convertedSaveTarget?.(path) ?? null,
     noteShellRewrote: (path) => wiring.noteShellRewrote?.(path),
     reloadPath: (path) => wiring.reloadPath(path),
     // G5-03a: the fresh editor state of one path (W2's live read; the wiring
