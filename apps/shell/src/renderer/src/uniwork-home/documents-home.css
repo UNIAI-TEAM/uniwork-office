@@ -1889,7 +1889,7 @@
 }
 
 .dh-drive-col-name {
-  width: 28%;
+  width: 27%;
 }
 
 .dh-drive-col-account {
@@ -1901,11 +1901,11 @@
 }
 
 .dh-drive-col-used {
-  width: 18%;
+  width: 17%;
 }
 
 .dh-drive-col-tasks {
-  width: 14%;
+  width: 16%;
 }
 
 .dh-drive-head-row {
@@ -2592,6 +2592,39 @@ p.dh-drive-panel-muted {
 @media (max-width: 760px) {
   .dh-drive-body {
     flex-direction: column;
+  }
+
+  /* D4-A fix2: the window is at least 720 px wide; five columns cannot hold a word each there, so the list keeps
+     Name, Account and Access and the detail panel carries Used in / Tasks created */
+  .dh-drive-col-used,
+  .dh-drive-cell-used,
+  .dh-drive-col-tasks,
+  .dh-drive-cell-tasks {
+    display: none;
+  }
+
+  .dh-drive-col-name {
+    width: 46%;
+  }
+
+  .dh-drive-col-account {
+    width: 28%;
+  }
+
+  .dh-drive-col-access {
+    width: 26%;
+  }
+
+  /* just enough room that "Disconnected · Reconnect" and the access badge wrap between words, not inside one
+     (the longest word is the Russian "Переподключить") */
+  .dh-drive-th,
+  .dh-drive-td {
+    padding-inline: 3px;
+  }
+
+  .dh-drive-reconnect-link {
+    gap: 2px;
+    font-size: 10.5px;
   }
 
   .dh-drive-panel {
