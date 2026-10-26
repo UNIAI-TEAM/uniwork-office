@@ -587,6 +587,8 @@ describe('uniwork save queue machine', () => {
       'too_large',
       'engine_incompatible',
       'idempotency_mismatch',
+      // UNI-2212: a refused legacy conversion is a verdict on the bytes, never retried
+      'legacy_conversion_invalid',
     ] as const) {
       const out = transition(record({ state: 'uploading' }), { type: 'commitFailed', error }, ctx())
       expect(out.record?.state).toBe('failed')

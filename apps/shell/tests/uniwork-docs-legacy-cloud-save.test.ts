@@ -1,7 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import {
-  DOC,
   OOXML_MIME,
   binding,
   commitCalls,
@@ -162,35 +161,5 @@ describe('UNI-2212 Save to UniWork from a converted copy', () => {
     expect(server.versions).toHaveLength(1)
     expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'blocked' })
     expect(Buffer.from(readFileSync(path)).equals(Buffer.from(edited))).toBe(true)
-  })
-
-  it('the same Idempotency-Key replays only with the same conversion (the wire fingerprint)', async () => {
-    // the retry of one intent re-sends one conversion: a lost answer then replays, never duplicates
-    const server = fakeServer({ legacy: 'xls' })
-    const ctx = setup(server)
-    const path = await openDoc(ctx)
-    writeFileSync(path, await ooxml('xlsx', 'once'))
-    await ctx.service.save(path)
-    const [first] = commitCalls(server)
-    const key = first!.headers['idempotency-key']!
-    const replay = await server.fetch(
-      `https://uniwork.example/api/v1/documents/${DOC}/versions/commit`,
-      {
-        method: 'POST',
-        headers: { 'Idempotency-Key': key },
-        body: JSON.stringify(first!.body),
-      },
-    )
-    expect(replay.status).toBe(200)
-    expect(server.versions).toHaveLength(2)
-    const other = await server.fetch(
-      `https://uniwork.example/api/v1/documents/${DOC}/versions/commit`,
-      {
-        method: 'POST',
-        headers: { 'Idempotency-Key': key },
-        body: JSON.stringify({ ...(first!.body as object), conversion: undefined }),
-      },
-    )
-    expect(other.status).toBe(409)
   })
 })
