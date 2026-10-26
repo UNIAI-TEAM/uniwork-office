@@ -2200,8 +2200,7 @@
   color: var(--text-secondary);
 }
 
-/* the panel carries the details, so the list keeps Name + Access and lets the badge wrap (D3-V1) */
-(not when the panel stacks under the table, <= 760 px) */
+/* the panel carries the details, so the list keeps Name + Access and lets the badge wrap (D3-V1; not when the panel stacks under the table, <= 760 px) */
 @media (min-width: 761px) {
   .dh-drive-view.has-panel .dh-drive-col-account,
   .dh-drive-view.has-panel .dh-drive-cell-account,
