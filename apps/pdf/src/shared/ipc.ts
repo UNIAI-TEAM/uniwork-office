@@ -37,6 +37,8 @@ export const PDF_CHANNELS = {
   cropPages: 'pdf:crop-pages',
   exportImages: 'pdf:export-images',
   convertOffice: 'pdf:convert-office',
+  convertProgress: 'pdf:convert-progress',
+  convertCancel: 'pdf:convert-cancel',
   createDocument: 'pdf:create-document',
   generateImage: 'pdf:generate-image',
   listDigitalSignatures: 'pdf:list-digital-signatures',
@@ -224,6 +226,15 @@ export interface SavedSignature {
 }
 
 export type PdfConvertFormat = 'docx' | 'xlsx' | 'pptx'
+
+/** Progress push from the shell's local PDF -> Office conversion (UNI-2167) */
+export interface PdfConvertProgressEvent {
+  format: PdfConvertFormat
+  page: number
+  total: number
+  /** True on the terminal event sent when the conversion finishes, fails, or is cancelled */
+  done?: boolean
+}
 
 /** target file type of the AI create_document tool (mirrors the docs app's contract) */
 export type CreateDocumentType = 'docx' | 'pdf' | 'md' | 'html'
@@ -934,6 +945,10 @@ export interface PdfApi {
   exportImages(request: ExportImagesRequest): Promise<ExportImagesResult>
   /** Convert the current PDF to Word / Excel / PowerPoint via the shell's local conversion flows */
   convertOffice(format: PdfConvertFormat): Promise<void>
+  /** Cancel the in-flight PDF -> Office conversion (no-op when none is running) */
+  convertCancel(): Promise<void>
+  /** Live per-page progress of an in-flight PDF -> Office conversion started from this tab */
+  onConvertProgress(handler: (progress: PdfConvertProgressEvent) => void): () => void
   /** AI create_document: build a new standalone file in the default folder and open it in a new tab */
   createDocument(request: CreateDocumentRequest): Promise<CreateDocumentResult>
   /** Web image search for AI tools (app-wide ai:image-search handler) */

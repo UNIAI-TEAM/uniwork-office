@@ -1,10 +1,24 @@
-import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it, vi } from 'vitest'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { AUTO_OCR_PAGE_CAP, buildOcrPageData, runAutoOcr } from '../src/renderer/ocr-layer'
+import {
+  AUTO_OCR_PAGE_CAP,
+  buildOcrPageData,
+  OcrTextLayer,
+  runAutoOcr,
+} from '../src/renderer/ocr-layer'
 import type { OcrPageData } from '../src/renderer/ocr-layer'
 import type { PdfOcrLine } from '../src/shared/ipc'
 import { createSearchIndexCache, searchInIndex } from '../src/renderer/search'
 import type { SearchIndex, SearchIndexCache } from '../src/renderer/search'
+import { measurePt } from '../src/renderer/text-wrap'
+
+vi.mock('../src/renderer/text-wrap', () => ({
+  measurePt: vi.fn((text: string, fontPx: number) => [...text].length * fontPx * 0.55),
+}))
 
 const GEOM = { pw: 600, ph: 800, rot: 0 }
 
@@ -174,6 +188,442 @@ describe('buildOcrPageData word joining', () => {
     expect(ankara).toHaveLength(1)
     const ankaraItem = data.entry.items[1]!
     expect(ankara[0]!.rects[0]![0]).toBeCloseTo(ankaraItem.x, 5)
+  })
+
+  it('merges per-glyph Vietnamese chars (including decomposed symbol splits) and matches shared-box words', () => {
+    // Per-glyph line (Tesseract alignChars convention): each glyph has its own box
+    // and varying vertical extents (ascenders/diacritics vs x-height), plus a symbol
+    // whose NFC form is several code points split into abutting equal sub-boxes
+    // (alignChars `x0 + sw*i/n`: 'n' [0.13, 0.145] + 'g' [0.145, 0.16] at identical y).
+    const lineBox: [number, number, number, number] = [0.1, 0.8, 0.45, 0.84]
+    const perGlyphLine: PdfOcrLine = {
+      text: 'Cộng hòa',
+      confidence: 0.96,
+      box: lineBox,
+      chars: [
+        { text: 'C', box: [0.1, 0.805, 0.12, 0.835] },
+        { text: 'ộ', box: [0.12, 0.8, 0.13, 0.84] },
+        // Multi-char symbol split evenly by alignChars into abutting sub-boxes [0.13, 0.145] + [0.145, 0.16]
+        { text: 'n', box: [0.13, 0.808, 0.145, 0.828] },
+        { text: 'g', box: [0.145, 0.808, 0.16, 0.828] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        { text: 'h', box: [0.26, 0.805, 0.29, 0.838] },
+        { text: 'ò', box: [0.29, 0.808, 0.32, 0.839] },
+        { text: 'a', box: [0.32, 0.808, 0.35, 0.828] },
+      ],
+    }
+    // Shared-box line (Vision / Windows convention): chars of each word share the word box
+    const sharedBoxLine: PdfOcrLine = {
+      text: 'Cộng hòa',
+      confidence: 0.96,
+      box: lineBox,
+      chars: [
+        ...[...'Cộng'].map((t) => ({
+          text: t,
+          box: [0.1, 0.802, 0.16, 0.838] as [number, number, number, number],
+        })),
+        { text: ' ', box: SEPARATOR },
+        ...[...'hòa'].map((t) => ({
+          text: t,
+          box: [0.26, 0.805, 0.35, 0.839] as [number, number, number, number],
+        })),
+      ],
+    }
+
+    const perGlyph = buildOcrPageData([perGlyphLine], GEOM)!
+    const shared = buildOcrPageData([sharedBoxLine], GEOM)!
+
+    expect(perGlyph.words.map((w) => w.text)).toEqual(['Cộng', 'hòa'])
+    expect(shared.words.map((w) => w.text)).toEqual(['Cộng', 'hòa'])
+    expect(perGlyph.entry.text).toBe('Cộng hòa\n')
+    expect(shared.entry.text).toBe('Cộng hòa\n')
+    // Union rect of 'Cộng' spans [0.1 * 600, 0.16 * 600] = [60, 96] horizontally
+    expect(perGlyph.words[0]!.rect[0]).toBeCloseTo(60, 5)
+    expect(perGlyph.words[0]!.rect[2]).toBeCloseTo(96, 5)
+    expect(perGlyph.words.map((w) => w.rect)).toEqual(shared.words.map((w) => w.rect))
+    expect(perGlyph.entry.items).toEqual(shared.entry.items)
+    // Both words take the line's vertical extent [0.8 * 800, 0.84 * 800] = [640, 672]
+    for (const w of perGlyph.words) {
+      expect(w.rect[1]).toBeCloseTo(640, 5)
+      expect(w.rect[3]).toBeCloseTo(672, 5)
+    }
+  })
+
+  it('keeps the text of a glyph whose box lies outside the line x-range without stretching the word rect', () => {
+    const lineBox: [number, number, number, number] = [0.1, 0.8, 0.45, 0.84]
+    const line: PdfOcrLine = {
+      text: 'Cộng hòa',
+      confidence: 0.96,
+      box: lineBox,
+      chars: [
+        { text: 'C', box: [0.1, 0.805, 0.12, 0.835] },
+        // Middle glyph 'ộ' has a stray/overhanging box outside lineBox [0.1, 0.45]
+        { text: 'ộ', box: [0.02, 0.8, 0.85, 0.84] },
+        { text: 'n', box: [0.13, 0.808, 0.145, 0.828] },
+        { text: 'g', box: [0.145, 0.808, 0.16, 0.828] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        // First glyph of second word overhangs past lx1; the word rect must equal the in-range union [0.29, 0.35]
+        { text: 'h', box: [0.26, 0.805, 0.5, 0.838] },
+        { text: 'ò', box: [0.29, 0.808, 0.32, 0.839] },
+        { text: 'a', box: [0.32, 0.808, 0.35, 0.828] },
+      ],
+    }
+    const data = buildOcrPageData([line], GEOM)!
+    expect(data.entry.text).toBe('Cộng hòa\n')
+    expect(data.words.map((w) => w.text)).toEqual(['Cộng', 'hòa'])
+    // First word rect stays bounded by its in-range glyphs [0.1 * 600, 0.16 * 600] = [60, 96]
+    expect(data.words[0]!.rect[0]).toBeCloseTo(60, 5)
+    expect(data.words[0]!.rect[2]).toBeCloseTo(96, 5)
+    // Second word rect equals the union of its in-range glyphs [0.29 * 600, 0.35 * 600] = [174, 210]
+    expect(data.words[1]!.rect[0]).toBeCloseTo(174, 5)
+    expect(data.words[1]!.rect[2]).toBeCloseTo(210, 5)
+    // Both word rects stay strictly inside the line box [0.1 * 600, 0.45 * 600] = [60, 270]
+    for (const w of data.words) {
+      expect(w.rect[0]).toBeGreaterThanOrEqual(lineBox[0] * GEOM.pw - 1e-3)
+      expect(w.rect[2]).toBeLessThanOrEqual(lineBox[2] * GEOM.pw + 1e-3)
+      expect(w.rect[2]).toBeGreaterThan(w.rect[0])
+    }
+
+    // Words whose glyphs are all wholly left of lx0 or wholly right of lx1 keep their text
+    // and get a clamped rect inside [lx0, lx1] with positive width (never zero).
+    // Also checks a shared-box CJK word whose raw box overhangs the line box: sameBox
+    // compares raw [x0, x2], so the CJK chars still merge into one shared-box word.
+    const strayLine: PdfOcrLine = {
+      text: 'left mid right 使用',
+      confidence: 0.96,
+      box: lineBox,
+      chars: [
+        { text: 'l', box: [0.01, 0.805, 0.04, 0.835] },
+        { text: 'e', box: [0.04, 0.805, 0.06, 0.835] },
+        { text: 'f', box: [0.06, 0.805, 0.07, 0.835] },
+        { text: 't', box: [0.07, 0.805, 0.08, 0.835] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        { text: 'm', box: [0.2, 0.805, 0.22, 0.835] },
+        { text: 'i', box: [0.22, 0.805, 0.23, 0.835] },
+        { text: 'd', box: [0.23, 0.805, 0.25, 0.835] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        { text: 'r', box: [0.85, 0.805, 0.87, 0.835] },
+        { text: 'i', box: [0.87, 0.805, 0.88, 0.835] },
+        { text: 'g', box: [0.88, 0.805, 0.9, 0.835] },
+        { text: 'h', box: [0.9, 0.805, 0.92, 0.835] },
+        { text: 't', box: [0.92, 0.805, 0.95, 0.835] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        { text: '使', box: [0.35, 0.805, 0.5, 0.835] },
+        { text: '用', box: [0.35, 0.805, 0.5, 0.835] },
+      ],
+    }
+    const strayData = buildOcrPageData([strayLine], GEOM)!
+    expect(strayData.entry.text).toBe('left mid right 使用\n')
+    expect(strayData.words.map((w) => w.text)).toEqual(['left', 'mid', 'right', '使用'])
+    for (let i = 0; i < strayData.words.length; i++) {
+      const w = strayData.words[i]!
+      const it = strayData.entry.items[i]!
+      expect(w.rect[0]).toBeGreaterThanOrEqual(lineBox[0] * GEOM.pw - 1e-3)
+      expect(w.rect[2]).toBeLessThanOrEqual(lineBox[2] * GEOM.pw + 1e-3)
+      expect(w.rect[2] - w.rect[0]).toBeGreaterThan(0)
+      expect(it.w).toBeGreaterThan(0)
+    }
+  })
+
+  it('merges per-glyph Hangul into a word and splits mixed Latin+CJK on script boundaries', () => {
+    const hangulLine: PdfOcrLine = {
+      text: '한국어',
+      confidence: 1,
+      box: box(0.1, 0.25),
+      chars: [
+        { text: '한', box: box(0.1, 0.15) },
+        { text: '국', box: box(0.15, 0.2) },
+        { text: '어', box: box(0.2, 0.25) },
+      ],
+    }
+    const hangulData = buildOcrPageData([hangulLine], GEOM)!
+    expect(hangulData.words.map((w) => w.text)).toEqual(['한국어'])
+    expect(hangulData.words[0]!.rect[0]).toBeCloseTo(0.1 * GEOM.pw, 5)
+    expect(hangulData.words[0]!.rect[2]).toBeCloseTo(0.25 * GEOM.pw, 5)
+    expect(hangulData.entry.text).toBe('한국어\n')
+
+    const mixedLine: PdfOcrLine = {
+      text: 'AB使用CD',
+      confidence: 1,
+      box: box(0.1, 0.46),
+      chars: [
+        { text: 'A', box: box(0.1, 0.15) },
+        { text: 'B', box: box(0.15, 0.2) },
+        { text: '使', box: box(0.2, 0.28) },
+        { text: '用', box: box(0.28, 0.36) },
+        { text: 'C', box: box(0.36, 0.41) },
+        { text: 'D', box: box(0.41, 0.46) },
+      ],
+    }
+    const mixedData = buildOcrPageData([mixedLine], GEOM)!
+    expect(mixedData.words.map((w) => w.text)).toEqual(['AB', '使', '用', 'CD'])
+    expect(mixedData.entry.text).toBe('AB使用CD\n')
+    expect(mixedData.entry.items.map((it) => [it.start, it.end])).toEqual([
+      [0, 2],
+      [2, 3],
+      [3, 4],
+      [4, 6],
+    ])
+    expect(mixedData.words.map((w) => w.spaceAfter)).toEqual([false, false, false, true])
+  })
+
+  it('keeps one shared top and height on straight 2-word and 3-word lines with ascender/descender differences', () => {
+    // "Hello" (ascenders -> higher y-range [0.812, 0.84]) followed by "gypsy" (descenders ->
+    // lower y-range [0.8, 0.828]): vertical centre shift is large relative to line height,
+    // but a 2-word line or a 3-word straight line must not misfire tilt mode.
+    const twoWordLine: PdfOcrLine = {
+      text: 'Hello gypsy',
+      confidence: 0.98,
+      box: [0.1, 0.8, 0.35, 0.84],
+      chars: [
+        ...[...'Hello'].map((t, i) => ({
+          text: t,
+          box: [0.1 + i * 0.02, 0.812, 0.1 + (i + 1) * 0.02, 0.84] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        })),
+        { text: ' ', box: SEPARATOR },
+        ...[...'gypsy'].map((t, i) => ({
+          text: t,
+          box: [0.25 + i * 0.02, 0.8, 0.25 + (i + 1) * 0.02, 0.828] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        })),
+      ],
+    }
+    const twoWordData = buildOcrPageData([twoWordLine], GEOM)!
+    expect(twoWordData.words.map((w) => w.text)).toEqual(['Hello', 'gypsy'])
+    for (const w of twoWordData.words) {
+      expect(w.rect[1]).toBeCloseTo(0.8 * GEOM.ph, 5)
+      expect(w.rect[3]).toBeCloseTo(0.84 * GEOM.ph, 5)
+    }
+
+    const threeWordLine: PdfOcrLine = {
+      text: 'Hello brave gypsy',
+      confidence: 0.98,
+      box: [0.1, 0.8, 0.5, 0.84],
+      chars: [
+        ...[...'Hello'].map((t, i) => ({
+          text: t,
+          box: [0.1 + i * 0.02, 0.808, 0.1 + (i + 1) * 0.02, 0.84] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        })),
+        { text: ' ', box: SEPARATOR },
+        ...[...'brave'].map((t, i) => ({
+          text: t,
+          box: [0.25 + i * 0.02, 0.806, 0.25 + (i + 1) * 0.02, 0.834] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        })),
+        { text: ' ', box: SEPARATOR },
+        ...[...'gypsy'].map((t, i) => ({
+          text: t,
+          box: [0.4 + i * 0.02, 0.8, 0.4 + (i + 1) * 0.02, 0.832] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        })),
+      ],
+    }
+    const threeWordData = buildOcrPageData([threeWordLine], GEOM)!
+    expect(threeWordData.words.map((w) => w.text)).toEqual(['Hello', 'brave', 'gypsy'])
+    for (const w of threeWordData.words) {
+      expect(w.rect[1]).toBeCloseTo(0.8 * GEOM.ph, 5)
+      expect(w.rect[3]).toBeCloseTo(0.84 * GEOM.ph, 5)
+    }
+  })
+
+  it('fits tilted lines so words follow the slope without adjacent band overlap', () => {
+    // Two Tesseract-style lines at 1448x2048 px scale, ~1060 px wide (x: 150..1210 px),
+    // line pitch 30 px, word height 22 px, and word y-ranges rising 1 px per 100 px (~0.57 deg).
+    const W = 1448
+    const H = 2048
+    const makeTiltedLine = (baseY0Px: number, label: string): PdfOcrLine => {
+      const wordCount = 10
+      const chars: NonNullable<PdfOcrLine['chars']> = []
+      const wordsText: string[] = []
+      let minX = 1
+      let minY = 1
+      let maxX = 0
+      let maxY = 0
+      for (let wi = 0; wi < wordCount; wi++) {
+        if (wi > 0) chars.push({ text: ' ', box: [0, 0, 0, 0] })
+        const wordStr = `${label}${wi}`
+        wordsText.push(wordStr)
+        const wx0Px = 150 + wi * 110
+        // Rising 1 px per 100 px horizontally
+        const risePx = (wx0Px - 150) * 0.01
+        const wy0Px = baseY0Px + risePx
+        const wy1Px = wy0Px + 22
+        const glyphs = [...wordStr]
+        const gwPx = 70 / glyphs.length
+        for (let gi = 0; gi < glyphs.length; gi++) {
+          const gx0 = (wx0Px + gi * gwPx) / W
+          const gx1 = (wx0Px + (gi + 1) * gwPx) / W
+          // Small per-glyph vertical variation (ascender/x-height)
+          const gy0 = (wy0Px + (gi % 2 === 0 ? 0 : 2)) / H
+          const gy1 = (wy1Px - (gi % 2 === 1 ? 0 : 1)) / H
+          chars.push({ text: glyphs[gi]!, box: [gx0, gy0, gx1, gy1] })
+          minX = Math.min(minX, gx0)
+          minY = Math.min(minY, gy0)
+          maxX = Math.max(maxX, gx1)
+          maxY = Math.max(maxY, gy1)
+        }
+      }
+      return {
+        text: wordsText.join(' '),
+        confidence: 0.95,
+        box: [minX, minY, maxX, maxY],
+        chars,
+      }
+    }
+
+    // In normalized y-up coordinates, upperLine at baseY0 = 1560 px sits 30 px above
+    // lowerLine at baseY0 = 1530 px, and their axis-aligned line union boxes overlap.
+    const upperLine = makeTiltedLine(1560, 'tren')
+    const lowerLine = makeTiltedLine(1530, 'duoi')
+    expect(lowerLine.box[3]).toBeGreaterThan(upperLine.box[1])
+
+    const a4Geom = { pw: 595.28, ph: 841.89, rot: 0 }
+    const data = buildOcrPageData([upperLine, lowerLine], a4Geom)!
+    const upperWords = data.words.slice(0, 10)
+    const lowerWords = data.words.slice(10, 20)
+
+    // One shared band height (fontSize) per line
+    const upperHeights = upperWords.map((w) => w.rect[3] - w.rect[1])
+    const lowerHeights = lowerWords.map((w) => w.rect[3] - w.rect[1])
+    for (const h of upperHeights) expect(h).toBeCloseTo(upperHeights[0]!, 4)
+    for (const h of lowerHeights) expect(h).toBeCloseTo(lowerHeights[0]!, 4)
+
+    // Words climb monotonically along the tilt, and at every column the upper word's
+    // bottom (rect[1]) stays strictly above the lower word's top (rect[3]) — no overlap.
+    for (let i = 0; i < 10; i++) {
+      if (i > 0) {
+        expect(upperWords[i]!.rect[1]).toBeGreaterThan(upperWords[i - 1]!.rect[1])
+        expect(lowerWords[i]!.rect[1]).toBeGreaterThan(lowerWords[i - 1]!.rect[1])
+      }
+      expect(upperWords[i]!.rect[1]).toBeGreaterThan(lowerWords[i]!.rect[3])
+    }
+  })
+
+  it('lays out the real Tesseract Vietnamese biên bản page with word-level boxes and line heights (UNI-2201)', () => {
+    const fixturePath = join(__dirname, 'fixtures/ocr-tesseract-vi-bien-ban.json')
+    const rawLines = JSON.parse(readFileSync(fixturePath, 'utf8')) as PdfOcrLine[]
+    expect(rawLines.length).toBeGreaterThanOrEqual(17)
+
+    const a4Geom = { pw: 595.28, ph: 841.89, rot: 0 }
+    const fullData = buildOcrPageData(rawLines, a4Geom)!
+    expect(fullData).not.toBeNull()
+
+    const text = fullData.entry.text
+    expect(text).toBe(text.normalize('NFC'))
+    expect(text).toContain('Cộng hòa')
+    expect(text).toContain('Độc lập')
+    expect(text).toContain('chủ nghĩa')
+    expect(text).toContain('Nguyễn Văn Thắng')
+
+    // Check every line individually: word count matches printed words (not per-glyph),
+    // all words of a line share top/height, and word rects lie inside the line box in
+    // left-to-right order without overlap.
+    let totalWords = 0
+    for (const line of rawLines) {
+      const lineData = buildOcrPageData([line], a4Geom)!
+      expect(lineData).not.toBeNull()
+      expect(lineData.entry.items.length).toBeGreaterThan(0)
+
+      const printedWords = line.text.trim().split(/\s+/)
+      expect(lineData.words).toHaveLength(printedWords.length)
+      expect(lineData.words.map((w) => w.text)).toEqual(printedWords)
+
+      const lineY0 = line.box[1] * a4Geom.ph
+      const lineY1 = line.box[3] * a4Geom.ph
+      const lineX0 = line.box[0] * a4Geom.pw
+      const lineX1 = line.box[2] * a4Geom.pw
+
+      for (let i = 0; i < lineData.words.length; i++) {
+        const w = lineData.words[i]!
+        const it = lineData.entry.items[i]!
+        // Word rect and search index item rect match and share the line's y-range
+        expect(w.rect[1]).toBeCloseTo(lineY0, 4)
+        expect(w.rect[3]).toBeCloseTo(lineY1, 4)
+        expect(it.y).toBeCloseTo(lineY0, 4)
+        expect(it.h).toBeCloseTo(lineY1 - lineY0, 4)
+        expect(it.x).toBeCloseTo(w.rect[0], 4)
+        expect(it.w).toBeCloseTo(w.rect[2] - w.rect[0], 4)
+        // Inside the line box horizontally
+        expect(w.rect[0]).toBeGreaterThanOrEqual(lineX0 - 1e-3)
+        expect(w.rect[2]).toBeLessThanOrEqual(lineX1 + 1e-3)
+        expect(w.rect[2]).toBeGreaterThan(w.rect[0])
+        // Left-to-right without overlap
+        if (i > 0) {
+          const prev = lineData.words[i - 1]!
+          expect(w.rect[0]).toBeGreaterThanOrEqual(prev.rect[2] - 1e-3)
+        }
+      }
+      totalWords += lineData.words.length
+    }
+    expect(fullData.words).toHaveLength(totalWords)
+    expect(fullData.entry.items).toHaveLength(totalWords)
+  })
+
+  it('renders OcrTextLayer spans of a line with identical top and fontSize', () => {
+    const mockedMeasure = vi.mocked(measurePt)
+    mockedMeasure.mockClear()
+    const line: PdfOcrLine = {
+      text: 'Cộng hòa xã hội',
+      confidence: 0.96,
+      box: [0.1, 0.8, 0.5, 0.82],
+      chars: [
+        { text: 'C', box: [0.1, 0.803, 0.12, 0.818] },
+        { text: 'ộ', box: [0.12, 0.8, 0.14, 0.82] },
+        { text: 'n', box: [0.14, 0.803, 0.16, 0.814] },
+        { text: 'g', box: [0.16, 0.798, 0.18, 0.814] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        { text: 'h', box: [0.2, 0.803, 0.22, 0.819] },
+        { text: 'ò', box: [0.22, 0.803, 0.24, 0.819] },
+        { text: 'a', box: [0.24, 0.803, 0.26, 0.814] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        { text: 'x', box: [0.28, 0.803, 0.3, 0.814] },
+        { text: 'ã', box: [0.3, 0.803, 0.32, 0.819] },
+        { text: ' ', box: [0, 0, 0, 0] },
+        { text: 'h', box: [0.34, 0.803, 0.36, 0.819] },
+        { text: 'ộ', box: [0.36, 0.8, 0.38, 0.82] },
+        { text: 'i', box: [0.38, 0.803, 0.4, 0.819] },
+      ],
+    }
+    const data = buildOcrPageData([line], GEOM)!
+    const html = renderToStaticMarkup(createElement(OcrTextLayer, { data, geom: GEOM, scale: 1.5 }))
+    const container = document.createElement('div')
+    container.innerHTML = html
+    const spans = [...container.querySelectorAll('.pdf-ocr-layer span')] as HTMLSpanElement[]
+    expect(spans).toHaveLength(4)
+    expect(spans.map((s) => s.textContent)).toEqual(['Cộng ', 'hòa ', 'xã ', 'hội '])
+    const tops = new Set(spans.map((s) => s.style.top))
+    const fontSizes = new Set(spans.map((s) => s.style.fontSize))
+    expect(tops.size).toBe(1)
+    expect(fontSizes.size).toBe(1)
+    // Line height is (0.82 - 0.8) * 800 * 1.5 = 24px; top is (1 - 0.82) * 800 * 1.5 = 216px
+    expect(spans[0]!.style.top).toBe('216px')
+    expect(spans[0]!.style.fontSize).toBe('24px')
+    expect(mockedMeasure).toHaveBeenCalledWith('Cộng', 24, 'sans-serif')
+    // 'Cộng' width is (0.18 - 0.1) * 600 * 1.5 = 72px; measured is 4 * 24 * 0.55 = 52.8px
+    const expectedScaleX = 72 / (4 * 24 * 0.55)
+    expect(spans[0]!.style.transform).toBe(`scaleX(${expectedScaleX})`)
   })
 })
 

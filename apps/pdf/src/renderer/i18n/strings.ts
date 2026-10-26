@@ -2,6 +2,7 @@ import { webStrings } from './strings-web'
 import { serverCommentsStrings } from './strings-server-comments'
 import { certSignStrings } from './cert-sign-strings'
 import { aiRunUndoStrings } from './strings-ai-run-undo'
+import { convertProgressStrings } from './strings-convert-progress'
 
 const fillFormStrings = {
   ribbonTabFillForm: 'Fill Form',
@@ -212,6 +213,7 @@ export const strings = {
     ...webStrings.zh,
     ...aiRunUndoStrings.zh,
     ...serverCommentsStrings.zh,
+    ...convertProgressStrings.zh,
     aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
     ...certSignStrings['zh'],
     ribbonTabHome: '开始',
@@ -562,6 +564,7 @@ export const strings = {
     ...webStrings.en,
     ...aiRunUndoStrings.en,
     ...serverCommentsStrings.en,
+    ...convertProgressStrings.en,
     aiViewOnlyNotice:
       'View-only document: AI can read it and answer questions, but editing is turned off.',
     ...certSignStrings['en'],
@@ -922,6 +925,7 @@ export const strings = {
     ...webStrings.vi,
     ...aiRunUndoStrings.vi,
     ...serverCommentsStrings.vi,
+    ...convertProgressStrings.vi,
     aiViewOnlyNotice:
       'Tài liệu chỉ xem: AI có thể đọc và trả lời câu hỏi, nhưng không thể chỉnh sửa.',
     ...certSignStrings['vi'],
@@ -1285,6 +1289,7 @@ export const strings = {
     ...webStrings.ja,
     ...aiRunUndoStrings.ja,
     ...serverCommentsStrings.ja,
+    ...convertProgressStrings.ja,
     aiViewOnlyNotice:
       '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
     ...certSignStrings['ja'],
@@ -1644,6 +1649,7 @@ export const strings = {
     ...webStrings.ko,
     ...aiRunUndoStrings.ko,
     ...serverCommentsStrings.ko,
+    ...convertProgressStrings.ko,
     aiViewOnlyNotice:
       '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
     ...certSignStrings['ko'],
@@ -2002,6 +2008,7 @@ export const strings = {
     ...webStrings.fr,
     ...aiRunUndoStrings.fr,
     ...serverCommentsStrings.fr,
+    ...convertProgressStrings.fr,
     aiViewOnlyNotice:
       'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
     ...certSignStrings['fr'],
@@ -2370,6 +2377,7 @@ export const strings = {
     ...webStrings.de,
     ...aiRunUndoStrings.de,
     ...serverCommentsStrings.de,
+    ...convertProgressStrings.de,
     aiViewOnlyNotice:
       'Schreibgeschütztes Dokument: Die KI kann es lesen und Fragen beantworten, aber nicht bearbeiten.',
     ...certSignStrings['de'],
@@ -2736,6 +2744,7 @@ export const strings = {
     ...webStrings.es,
     ...aiRunUndoStrings.es,
     ...serverCommentsStrings.es,
+    ...convertProgressStrings.es,
     aiViewOnlyNotice:
       'Documento de solo lectura: la IA puede leerlo y responder preguntas, pero no puede editarlo.',
     ...certSignStrings['es'],
@@ -3102,6 +3111,7 @@ export const strings = {
     ...webStrings.th,
     ...aiRunUndoStrings.th,
     ...serverCommentsStrings.th,
+    ...convertProgressStrings.th,
     aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
     ...certSignStrings['th'],
     ribbonTabHome: 'หน้าแรก',
@@ -3459,6 +3469,7 @@ export const strings = {
     ...webStrings.id,
     ...aiRunUndoStrings.id,
     ...serverCommentsStrings.id,
+    ...convertProgressStrings.id,
     aiViewOnlyNotice:
       'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
     ...certSignStrings['id'],
@@ -3822,6 +3833,7 @@ export const strings = {
     ...webStrings.ru,
     ...aiRunUndoStrings.ru,
     ...serverCommentsStrings.ru,
+    ...convertProgressStrings.ru,
     aiViewOnlyNotice:
       'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
     ...certSignStrings['ru'],
@@ -4186,6 +4198,7 @@ export const strings = {
     ...webStrings.ar,
     ...aiRunUndoStrings.ar,
     ...serverCommentsStrings.ar,
+    ...convertProgressStrings.ar,
     aiViewOnlyNotice:
       'مستند للعرض فقط: يمكن للذكاء الاصطناعي قراءته والإجابة عن الأسئلة، لكنه لا يستطيع تعديله.',
     ...certSignStrings['ar'],
@@ -4543,6 +4556,7 @@ export const strings = {
     ...webStrings.pt,
     ...aiRunUndoStrings.pt,
     ...serverCommentsStrings.pt,
+    ...convertProgressStrings.pt,
     aiViewOnlyNotice:
       'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
     ...certSignStrings['pt'],
@@ -4908,6 +4922,7 @@ export const strings = {
     ...webStrings.it,
     ...aiRunUndoStrings.it,
     ...serverCommentsStrings.it,
+    ...convertProgressStrings.it,
     aiViewOnlyNotice:
       'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
     ...certSignStrings['it'],
@@ -5276,6 +5291,7 @@ export const strings = {
     ...webStrings.pl,
     ...aiRunUndoStrings.pl,
     ...serverCommentsStrings.pl,
+    ...convertProgressStrings.pl,
     aiViewOnlyNotice:
       'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
     ...certSignStrings['pl'],
@@ -5639,6 +5655,7 @@ export const strings = {
     ...webStrings.cs,
     ...aiRunUndoStrings.cs,
     ...serverCommentsStrings.cs,
+    ...convertProgressStrings.cs,
     aiViewOnlyNotice:
       'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
     ...certSignStrings['cs'],
@@ -6000,6 +6017,7 @@ export const strings = {
     ...webStrings.nl,
     ...aiRunUndoStrings.nl,
     ...serverCommentsStrings.nl,
+    ...convertProgressStrings.nl,
     aiViewOnlyNotice:
       'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
     ...certSignStrings['nl'],
@@ -6363,6 +6381,7 @@ export const strings = {
     ...webStrings.ms,
     ...aiRunUndoStrings.ms,
     ...serverCommentsStrings.ms,
+    ...convertProgressStrings.ms,
     aiViewOnlyNotice:
       'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
     ...certSignStrings['ms'],
@@ -6725,6 +6744,7 @@ export const strings = {
     ...webStrings.he,
     ...aiRunUndoStrings.he,
     ...serverCommentsStrings.he,
+    ...convertProgressStrings.he,
     aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
     ...certSignStrings['he'],
     ribbonTabHome: 'בית',
@@ -7077,6 +7097,7 @@ export const strings = {
     ...webStrings.hi,
     ...aiRunUndoStrings.hi,
     ...serverCommentsStrings.hi,
+    ...convertProgressStrings.hi,
     aiViewOnlyNotice:
       'केवल-देखने योग्य दस्तावेज़: AI इसे पढ़ सकता है और प्रश्नों के उत्तर दे सकता है, लेकिन संपादित नहीं कर सकता।',
     ...certSignStrings['hi'],
@@ -7436,6 +7457,7 @@ export const strings = {
     ...webStrings['zh-TW'],
     ...aiRunUndoStrings['zh-TW'],
     ...serverCommentsStrings['zh-TW'],
+    ...convertProgressStrings['zh-TW'],
     aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
     ...certSignStrings['zh-TW'],
     ribbonTabHome: '常用',

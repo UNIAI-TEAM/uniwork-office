@@ -16,11 +16,22 @@ import { PDF_PASSWORD_CHANNELS } from '../shared/pdf-password-api'
 let pwWin: BrowserWindow | null = null
 let currentState: PdfPasswordUiState | null = null
 let pendingResolve: ((password: string | null) => void) | null = null
+let userCancelCallback: (() => void) | null = null
+const programmaticCloses = new WeakSet<BrowserWindow>()
 
 function settle(password: string | null): void {
   const resolve = pendingResolve
   pendingResolve = null
   resolve?.(password)
+}
+
+export interface PromptPdfPasswordOptions {
+  /**
+   * Invoked when the user cancels or closes the password window (including
+   * closing it via Alt+F4 / OS close while a submitted password attempt is
+   * already in flight; R1-8). Not invoked on `closePdfPasswordDialog()`.
+   */
+  onUserCancel?: () => void
 }
 
 /**
@@ -36,8 +47,11 @@ export function registerPdfPasswordIpc(ipc: Pick<IpcMain, 'handle'>): void {
     settle(password)
   })
   ipc.handle(PDF_PASSWORD_CHANNELS.cancel, () => {
+    const onCancel = userCancelCallback
+    userCancelCallback = null
     settle(null)
     closePdfPasswordDialog()
+    onCancel?.()
   })
 }
 
@@ -53,17 +67,20 @@ function pushState(patch: Partial<PdfPasswordUiState>): void {
 export function promptPdfPassword(
   parent: BrowserWindow | null,
   state: PdfPasswordUiState,
+  options?: PromptPdfPasswordOptions,
 ): Promise<string | null> {
   // a second prompt while one is pending would orphan the first caller —
   // resolve it as cancelled first (cannot happen in the single-flight export
   // path, but keeps the module safe on its own)
   settle(null)
+  if (options?.onUserCancel !== undefined) {
+    userCancelCallback = options.onUserCancel
+  }
   currentState = { ...state, busy: false }
 
   const promise = new Promise<string | null>((resolve) => {
     pendingResolve = resolve
   })
-
   if (pwWin && !pwWin.isDestroyed()) {
     pwWin.webContents.send(PDF_PASSWORD_CHANNELS.changed, currentState)
     pwWin.focus()
@@ -98,9 +115,17 @@ export function promptPdfPassword(
     // a replaced window's late event must neither drop the new window nor cancel its pending prompt
     if (pwWin !== null && pwWin !== win) return
     pwWin = null
+    currentState = null
+    const wasProgrammatic = programmaticCloses.has(win)
+    const onCancel = userCancelCallback
+    if (!wasProgrammatic) {
+      userCancelCallback = null
+    }
     settle(null)
+    if (!wasProgrammatic) {
+      onCancel?.()
+    }
   })
-
   if (process.env.ELECTRON_RENDERER_URL) {
     void win.loadURL(`${process.env.ELECTRON_RENDERER_URL}/pdf-password.html`)
   } else {
@@ -115,7 +140,12 @@ export function pdfPasswordWindowContents(): WebContents | null {
 }
 
 export function closePdfPasswordDialog(): void {
-  if (pwWin && !pwWin.isDestroyed()) pwWin.close()
-  pwWin = null
+  userCancelCallback = null
   currentState = null
+  const win = pwWin
+  pwWin = null
+  if (win && !win.isDestroyed()) {
+    programmaticCloses.add(win)
+    win.close()
+  }
 }

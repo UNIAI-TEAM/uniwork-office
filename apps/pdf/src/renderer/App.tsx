@@ -260,6 +260,7 @@ import type { Bucket, Op, OpContext, PlanResult } from './edit-ops'
 import { rectsNear } from './edit-state'
 import { EditHistory, sameEditSnapshot, type RunUndoDeps } from './ai/edit-history'
 import { EditsPausedNotice } from './ai/EditsPausedNotice'
+import { ConvertProgressToast, usePdfConvertProgress } from './convert-progress-toast'
 import type {
   StampConfig,
   SavedMarkupAnnot,
@@ -490,6 +491,7 @@ export default function App() {
   const [redactAppOpen, setRedactAppOpen] = useState(false)
   const redactWrapRef = useRef<HTMLDivElement | null>(null)
   const [convertBusy, setConvertBusy] = useState(false)
+  const { progress: convertProgress, cancel: cancelConvert } = usePdfConvertProgress()
   const [drawings, setDrawings] = useState<LocalDrawing[]>([])
   const drawingsRef = useRef(drawings)
   drawingsRef.current = drawings
@@ -6623,7 +6625,7 @@ export default function App() {
     if (convertBusy) return
     setConvertBusy(true)
     try {
-      await window.pdfApi.convertOffice(format)
+      await window.pdfApi?.convertOffice?.(format)
     } catch {
       // No shell conversion flow in standalone mode; shell-side errors show their own dialogs
     } finally {
@@ -9553,7 +9555,8 @@ export default function App() {
                 </button>
               </div>
             )}
-            {ocrRun && (
+            <ConvertProgressToast progress={convertProgress} onCancel={cancelConvert} />
+            {ocrRun && !convertProgress && (
               <div className="pdf-toast pdf-toast-notice" role="status">
                 <span>
                   {ocrRun.stop === null

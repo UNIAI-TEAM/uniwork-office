@@ -177,27 +177,39 @@ describe.each(runners)('%s', (_name, run) => {
     expect(await run([], undefined, undefined, missing)).toBeNull()
   })
 
-  it('passes env, drops dropEnv case-insensitively, and runs in cwd', async () => {
+  it('passes env, drops dropEnv case-insensitively, runs in cwd, and always overwrites GENOFFICE_OCR_PARENT_PID with process.pid (R2-1)', async () => {
     const args = fake(
       'env',
       'const e = process.env\n' +
-        "const t = [process.cwd(), String(e.OCR_RUN_KEEP), String(e.OCR_RUN_DROP), String(e.OCR_RUN_EXTRA)].join('|')\n" +
+        "const t = [process.cwd(), String(e.OCR_RUN_KEEP), String(e.OCR_RUN_DROP), String(e.OCR_RUN_EXTRA), String(e.GENOFFICE_OCR_PARENT_PID)].join('|')\n" +
         'process.stdout.write(JSON.stringify({ lines: [{ t, c: 1, b: [0, 0, 1, 1] }] }))\n',
     )
     process.env.OCR_RUN_KEEP = 'kept'
     process.env.OCR_RUN_DROP = 'dropped'
+    process.env.GENOFFICE_OCR_PARENT_PID = '999999'
     try {
       const got = await run(args, undefined, {
         env: { OCR_RUN_EXTRA: 'extra' },
         dropEnv: ['ocr_run_drop'],
         cwd: dir,
       })
-      const [cwd, keep, drop, extra] = got!.lines[0]!.text.split('|')
+      const [cwd, keep, drop, extra, parentPid] = got!.lines[0]!.text.split('|')
       expect(cwd!.toLowerCase().replace(/\\/g, '/')).toContain('tess việt dữ liệu')
-      expect([keep, drop, extra]).toEqual(['kept', 'undefined', 'extra'])
+      expect([keep, drop, extra, parentPid]).toEqual([
+        'kept',
+        'undefined',
+        'extra',
+        String(process.pid),
+      ])
+
+      // Even with default options (no env or dropEnv), GENOFFICE_OCR_PARENT_PID is overwritten
+      const gotDefault = await run(args)
+      const [, , , , defaultParentPid] = gotDefault!.lines[0]!.text.split('|')
+      expect(defaultParentPid).toBe(String(process.pid))
     } finally {
       delete process.env.OCR_RUN_KEEP
       delete process.env.OCR_RUN_DROP
+      delete process.env.GENOFFICE_OCR_PARENT_PID
     }
   })
 })

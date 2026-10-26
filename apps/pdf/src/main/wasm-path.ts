@@ -7,15 +7,16 @@ import { dirname, join } from 'node:path'
  * ships no node_modules (everything is bundled) — electron-builder copies them
  * into Resources/wasm instead (see apps/shell/electron-builder.cjs extraResources).
  */
-const packagedPath = (fileName: string) => join(process.resourcesPath, 'wasm', fileName)
+const packagedPath = (fileName: string, resourcesPath = process.resourcesPath) =>
+  join(resourcesPath, 'wasm', fileName)
 
 const req = () => createRequire(import.meta.url)
 
-export function pdfiumWasmPath(): string {
+export function pdfiumWasmPath(resourcesPath?: string): string {
   try {
     return req().resolve('@embedpdf/pdfium/pdfium.wasm')
   } catch {
-    return packagedPath('pdfium.wasm')
+    return packagedPath('pdfium.wasm', resourcesPath)
   }
 }
 
