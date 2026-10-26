@@ -21,6 +21,7 @@ import {
   cancelActivePdfConvert,
   collectPosixDescendantsFromPsOutput,
   createNodeChildProcessFork,
+  formatPdfConvertErrorDetail,
   isPidAbsent,
   killAllPdfConvertJobs,
   killPosixProcessTree,
@@ -1351,6 +1352,234 @@ describe('PDF convert progress + cancel IPC wiring', () => {
       ).toBe(false)
     } finally {
       rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('stops after prepareTarget when the owner window is destroyed during held preparation while another window stays alive across docx, pptx, and xlsx (R3-1)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'uniwork-pdf-owner-destroyed-'))
+    try {
+      const kinds = ['docx', 'pptx', 'xlsx'] as const
+      const secondWindow = { destroyed: false }
+
+      for (const kind of kinds) {
+        const target = join(dir, `existing-${kind}.${kind}`)
+        writeFileSync(target, 'old-destination-bytes', 'utf8')
+
+        const ownerWindow = { destroyed: false }
+        const senderId = 810
+        const trace: string[] = []
+        const { promise: prepareEntered, resolve: notifyPrepareEntered } =
+          Promise.withResolvers<void>()
+        const { promise: prepareGate, resolve: releasePrepare } = Promise.withResolvers<string>()
+
+        const exportPromise = runPdfConvertExportFlow({
+          kind,
+          pdfPath: `/tmp/source-${kind}.pdf`,
+          senderId,
+          isHostDestroyed: () => ownerWindow.destroyed,
+          prepareTarget: async () => {
+            trace.push('prepare:start')
+            notifyPrepareEntered()
+            const resolvedTarget = await prepareGate
+            trace.push('prepare:end')
+            return resolvedTarget
+          },
+          setProgressBar: (value) => {
+            trace.push(`progressBar:${value}`)
+          },
+          sendProgress: (payload) => {
+            trace.push(`progress:${payload.page}/${payload.total}:${Boolean(payload.done)}`)
+          },
+          closePasswordDialog: () => {
+            trace.push('password:close')
+          },
+          promptPassword: () => {
+            trace.push('password:prompt')
+            return Promise.resolve(null)
+          },
+          convertDocx: () => {
+            trace.push('convert:docx')
+            return Promise.resolve(null)
+          },
+          convertPptx: () => {
+            trace.push('convert:pptx')
+            return Promise.resolve(null)
+          },
+          convertXlsx: () => {
+            trace.push('convert:xlsx')
+            return Promise.resolve(null)
+          },
+          writeDocx: async () => {
+            trace.push('write:docx')
+          },
+          writePptx: async () => {
+            trace.push('write:pptx')
+          },
+          writeXlsx: async () => {
+            trace.push('write:xlsx')
+          },
+          showDocxNotice: async () => {
+            trace.push('notice:docx')
+          },
+          showPptxNotice: async () => {
+            trace.push('notice:pptx')
+          },
+          showXlsxNotice: async () => {
+            trace.push('notice:xlsx')
+          },
+          showError: () => {
+            trace.push('error:shown')
+          },
+        })
+
+        await prepareEntered
+        // Destroy owner window while target preparation is held; secondWindow remains alive
+        ownerWindow.destroyed = true
+        expect(secondWindow.destroyed).toBe(false)
+        releasePrepare(target)
+
+        expect(await exportPromise).toBeNull()
+        expect(readFileSync(target, 'utf8')).toBe('old-destination-bytes')
+        expect(trace).toEqual(['prepare:start', 'prepare:end', 'password:close'])
+        // Export ownership is cleared so cancelActivePdfConvert is false and another live window can export
+        expect(cancelActivePdfConvert(senderId, senderId)).toBe(false)
+      }
+
+      // Follow-up export on the remaining live window works normally
+      const liveTarget = join(dir, 'live-window.docx')
+      writeFileSync(liveTarget, 'old-live', 'utf8')
+      const liveBytes = new TextEncoder().encode('new-live-docx')
+      const liveResult = await runPdfConvertExportFlow({
+        kind: 'docx',
+        pdfPath: '/tmp/live.pdf',
+        senderId: 811,
+        isHostDestroyed: () => secondWindow.destroyed,
+        prepareTarget: () => Promise.resolve(liveTarget),
+        setProgressBar: () => undefined,
+        sendProgress: () => undefined,
+        closePasswordDialog: () => undefined,
+        promptPassword: () => Promise.resolve(null),
+        convertDocx: () =>
+          Promise.resolve({
+            docx: liveBytes,
+            pages: 1,
+            warnings: [],
+            pageResults: [{ page: 1, status: 'ok' as const }],
+            scannedDocument: false,
+          }),
+        convertPptx: () => Promise.resolve(null),
+        convertXlsx: () => Promise.resolve(null),
+        writeDocx: async (outPath, res) => {
+          await atomicWriteFile(outPath, res.docx)
+        },
+        writePptx: async () => undefined,
+        writeXlsx: async () => undefined,
+        showDocxNotice: async () => undefined,
+        showPptxNotice: async () => undefined,
+        showXlsxNotice: async () => undefined,
+        showError: () => undefined,
+      })
+      expect(liveResult).toBe(liveTarget)
+      expect(readFileSync(liveTarget, 'utf8')).toBe('new-live-docx')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('maps PdfConvertCrashed to localized pdfDocxLocalCrashedDetail in all locales while logging the technical message to the console', async () => {
+    const indexSource = readFileSync(
+      fileURLToPath(new URL('../src/main/index.ts', import.meta.url)),
+      'utf8',
+    )
+    expect(indexSource).toContain('formatPdfConvertErrorDetail(err, {')
+    expect(indexSource).toContain("crashed: tm('pdfDocxLocalCrashedDetail')")
+
+    // Verify every locale block in tMain defines a non-empty localized pdfDocxLocalCrashedDetail
+    const tableSlice = indexSource.slice(
+      indexSource.indexOf('const tMain = createI18n('),
+      indexSource.indexOf('const tm = '),
+    )
+    const localeHeaders = [...tableSlice.matchAll(/\n {2}(?:'([^']+)'|(\w+)): \{/g)].map(
+      (m) => m[1] ?? m[2]!,
+    )
+    expect(localeHeaders.length).toBe(21)
+
+    const crashedByLocale = new Map<string, string>()
+    for (let i = 0; i < localeHeaders.length; i++) {
+      const locale = localeHeaders[i]!
+      const headerPattern = locale.includes('-') ? `'${locale}': {` : `${locale}: {`
+      const start = tableSlice.indexOf(`\n  ${headerPattern}`)
+      const nextLocale = localeHeaders[i + 1]
+      const nextPattern = nextLocale
+        ? nextLocale.includes('-')
+          ? `\n  '${nextLocale}': {`
+          : `\n  ${nextLocale}: {`
+        : '\n})'
+      const end = tableSlice.indexOf(nextPattern, start + 1)
+      const block = tableSlice.slice(start, end)
+      const match = block.match(/pdfDocxLocalCrashedDetail:\s*(?:'([^']*)'|"([^"]*)")/)
+      const value = match?.[1] ?? match?.[2]
+      expect(value, `missing pdfDocxLocalCrashedDetail in ${locale}`).toBeTruthy()
+      crashedByLocale.set(locale, value!)
+    }
+
+    expect(crashedByLocale.get('en')).toBe(
+      'The conversion process stopped unexpectedly. Please try again.',
+    )
+    expect(crashedByLocale.get('vi')).toBe(
+      'Quá trình chuyển đổi đã dừng đột ngột. Vui lòng thử lại.',
+    )
+    expect(crashedByLocale.get('zh')).toBe('转换进程意外停止，请重试。')
+
+    const copyVi = {
+      encrypted: 'Tệp PDF này đã được mã hóa và không thể mở nếu không có mật khẩu chính xác.',
+      unsupported:
+        'Tệp PDF này sử dụng mã hóa dựa trên chứng thư số hoặc mã hóa không được hỗ trợ khác và không thể chuyển đổi.',
+      corrupt: 'Tệp bị hỏng hoặc không phải là tệp PDF hợp lệ và không thể chuyển đổi.',
+      crashed: crashedByLocale.get('vi')!,
+    }
+
+    // 1. Exit crash: localized detail returned, raw technical message logged to console.error
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      const exitCrash = new PdfConvertCrashed(1)
+      expect(formatPdfConvertErrorDetail(exitCrash, copyVi)).toBe(
+        'Quá trình chuyển đổi đã dừng đột ngột. Vui lòng thử lại.',
+      )
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[shell] pdf convert crashed:',
+        'PDF conversion process exited unexpectedly without a result (exit code 1)',
+      )
+
+      // 2. Watchdog crash: localized detail returned, watchdog technical message logged
+      consoleErrorSpy.mockClear()
+      const watchdogCrash = new PdfConvertCrashed(
+        null,
+        'PDF conversion process timed out after 180000ms without progress',
+      )
+      expect(formatPdfConvertErrorDetail(watchdogCrash, copyVi)).toBe(
+        'Quá trình chuyển đổi đã dừng đột ngột. Vui lòng thử lại.',
+      )
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[shell] pdf convert crashed:',
+        'PDF conversion process timed out after 180000ms without progress',
+      )
+
+      // 3. PdfLoadError codes and ordinary Error still map as before without crash logging
+      consoleErrorSpy.mockClear()
+      expect(formatPdfConvertErrorDetail(new PdfLoadError('password-required', 4), copyVi)).toBe(
+        copyVi.encrypted,
+      )
+      expect(formatPdfConvertErrorDetail(new PdfLoadError('unsupported', 5), copyVi)).toBe(
+        copyVi.unsupported,
+      )
+      expect(formatPdfConvertErrorDetail(new PdfLoadError('corrupt', 3), copyVi)).toBe(
+        copyVi.corrupt,
+      )
+      expect(formatPdfConvertErrorDetail(new Error('disk full'), copyVi)).toBe('disk full')
+      expect(consoleErrorSpy).not.toHaveBeenCalled()
+    } finally {
+      consoleErrorSpy.mockRestore()
     }
   })
 })

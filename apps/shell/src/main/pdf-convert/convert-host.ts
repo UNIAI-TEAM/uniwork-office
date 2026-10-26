@@ -260,10 +260,8 @@ export async function runPdfConvertExportFlow<
 
   try {
     const target = await deps.prepareTarget()
-    if (!target) return null
-    if (!deps.isHostDestroyed?.()) {
-      deps.setProgressBar(2)
-    }
+    if (!target || deps.isHostDestroyed?.()) return null
+    deps.setProgressBar(2)
     progressStarted = true
     deps.sendProgress({ format: kind, page: 0, total: 0 })
 
@@ -337,6 +335,38 @@ export async function runPdfConvertExportFlow<
       deps.setProgressBar(-1)
     }
   }
+}
+
+export interface PdfConvertErrorDetailCopy {
+  encrypted: string
+  unsupported: string
+  corrupt: string
+  crashed: string
+}
+
+/**
+ * Map a PDF -> Office conversion failure to the user-facing error dialog
+ * `detail` string. Structured `PdfLoadError` codes and `PdfConvertCrashed`
+ * map to localized strings; `PdfConvertCrashed` retains the technical failure
+ * message in the console log.
+ */
+export function formatPdfConvertErrorDetail(
+  err: unknown,
+  copy: PdfConvertErrorDetailCopy,
+  logCrash: (technicalMessage: string) => void = (msg) => {
+    console.error('[shell] pdf convert crashed:', msg)
+  },
+): string {
+  if (err instanceof PdfLoadError) {
+    if (err.code === 'password-required') return copy.encrypted
+    if (err.code === 'unsupported') return copy.unsupported
+    return copy.corrupt
+  }
+  if (err instanceof PdfConvertCrashed) {
+    logCrash(err.message)
+    return copy.crashed
+  }
+  return err instanceof Error ? err.message : String(err)
 }
 
 export type PosixSpawnSyncFn = (
@@ -543,8 +573,8 @@ export function isPidAbsent(
  * When `rootAlreadyExited` is true (R1-2 / R1-12), the converter process itself
  * has already exited: never signal the saved root PID directly (OS PID reuse
  * hazard). On Windows, run `taskkill /PID <pid> /T /F` only when `process.kill(pid, 0)`
- * throws `ESRCH` (confirming the PID is not in use by another process); otherwise
- * skip `taskkill` and rely on the OCR helper's own expected-parent check (R2-1).
+ * throws `ESRCH` at probe time (skipping PIDs already reused at probe time);
+ * otherwise skip `taskkill` and rely on the OCR helper's expected-parent check (R2-1).
  * On POSIX, reparented OCR helpers self-terminate via their expected-parent watch.
  */
 export function killProcessTree(
@@ -555,6 +585,9 @@ export function killProcessTree(
   if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) return
   const platform = deps.platform ?? process.platform
   if (platform === 'win32') {
+    // Known limit (review r3 R3-2/R3-3): PID reuse between converter exit and
+    // cleanup (or between the ESRCH probe and taskkill) is not covered; a
+    // Windows Job Object would close it (follow-up ticket).
     if (rootAlreadyExited && !isPidAbsent(pid, deps.probePid)) {
       return
     }
