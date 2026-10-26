@@ -208,12 +208,75 @@ describe('UNI-2212 version history: a legacy version opens read-only through the
     expect(commitCalls(server)).toHaveLength(0)
   })
 
+  it('the current legacy version stays a read-only @vN copy even while its editable tab is open', async () => {
+    const server = fakeServer({ legacy: 'doc', title: 'Memo.doc' })
+    const ctx = setup(server)
+    const headPath = await openDoc(ctx)
+    ctx.isPathOpen.mockReturnValue(true)
+    const view = await ctx.service.openVersionView(DOC, 1)
+    expect(view.path).not.toBe(headPath)
+    expect(view.path).toContain(`${DOC}@v1`)
+    expect(ctx.service.isReadOnly(view.path)).toBe(true)
+    expect(binding(view.path).legacyFrom).toBeUndefined()
+    // a Save of the view uploads and commits nothing: version 1 never gains a next version from it
+    writeFileSync(view.path, 'tampered')
+    await ctx.service.save(view.path)
+    expect(uploadCalls(server)).toHaveLength(0)
+    expect(commitCalls(server)).toHaveLength(0)
+    expect(server.versions).toHaveLength(1)
+    // the editable head is untouched and still owes its conversion
+    expect(binding(headPath)).toMatchObject({ access: 'edit', legacyFrom: 'doc' })
+  })
+
   it('an OOXML version never goes through the converter', async () => {
     const { ctx } = await convertedDocument()
     ctx.converter!.calls.length = 0
     const view = await ctx.service.openVersionView(DOC, 2)
     expect(ctx.converter!.calls).toHaveLength(0)
     expect(basename(view.path)).toBe('Budget.xlsx')
+  })
+})
+
+describe('UNI-2212 a head read that a save outran', () => {
+  it('a held legacy metadata reply never brings back the conversion the save settled', async () => {
+    const server = fakeServer({ legacy: 'xls', title: 'Budget.xls' })
+    const ctx = setup(server)
+    const path = await openDoc(ctx)
+    ctx.isPathOpen.mockReturnValue(true)
+    // the reopen's metadata read answers while v1 is still the head, then is held back
+    const real = server.fetch.getMockImplementation()!
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let reached!: () => void
+    const held = new Promise<void>((resolve) => {
+      reached = resolve
+    })
+    server.fetch.mockImplementationOnce(async (url, init) => {
+      const answered = await real(url, init)
+      reached()
+      await gate
+      return answered
+    })
+    const reopen = ctx.service.openDocument(DOC)
+    await held
+    // meanwhile the converted copy saves: v2 is live and the flag is cleared
+    writeFileSync(path, await ooxml('xlsx', 'first edit'))
+    await ctx.service.save(path)
+    expect(server.versions).toHaveLength(2)
+    expect(binding(path).legacyFrom).toBeUndefined()
+    release()
+    expect(await reopen).toMatchObject({ ok: true })
+    // the old reply did not resurrect the flag, so the next ordinary edit saves normally
+    expect(binding(path)).toMatchObject({ baseVersion: 2, baseRevision: '2' })
+    expect(binding(path).legacyFrom).toBeUndefined()
+    writeFileSync(path, await ooxml('xlsx', 'second edit'))
+    await ctx.service.save(path)
+    expect(commitCalls(server)).toHaveLength(2)
+    expect((commitCalls(server)[1]!.body as { conversion?: unknown }).conversion).toBeUndefined()
+    expect(server.versions).toHaveLength(3)
+    expect(await ctx.service.docStatus(path)).toMatchObject({ state: 'saved' })
   })
 })
 

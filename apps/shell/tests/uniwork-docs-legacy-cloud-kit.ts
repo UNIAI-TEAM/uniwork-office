@@ -398,6 +398,7 @@ export function setup(
     scope: () => ({ deploymentId: 'default', accountId: 'acc_1' }),
   })
   const converter = opts.converter === undefined ? fakeConverter() : opts.converter
+  const isPathOpen = vi.fn((_path: string) => false)
   const ui: ConflictUi = { chooseUnsavedClose: vi.fn(async () => 'cancel' as const) }
   const service = new UniworkDocsService({
     userDataDir: work.dir,
@@ -410,7 +411,7 @@ export function setup(
     authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
     fetch: server.fetch,
     openPath: vi.fn(() => true),
-    isPathOpen: vi.fn(() => false),
+    isPathOpen,
     requestModuleSave: vi.fn(() => false),
     reloadPath: vi.fn(),
     activePath: () => undefined,
@@ -432,6 +433,7 @@ export function setup(
     layer,
     converter,
     statuses,
+    isPathOpen,
     setCapabilityOffline: (value: boolean) => {
       capabilityOffline = value
     },

@@ -1099,8 +1099,13 @@ function withServerContext(binding: Binding, detail: DocumentDetail, readOnly = 
   // owes the server that conversion with its next commit; a read-only copy (a version view or a
   // view launch) never saves, and a head that moved on to OOXML owes nothing
   const legacy = readOnly ? null : legacyOfFile(detail.file, detail.title)
-  if (legacy && legacyTargetFormat(legacy) === next.format) next.legacyFrom = legacy
-  else delete next.legacyFrom
+  if (readOnly) delete next.legacyFrom
+  // a read older than the binding's base (a held reply that a save outran) says nothing about
+  // what the head owes now: it must not bring back a conversion the save already settled
+  else if (detail.file.version >= next.baseVersion) {
+    if (legacy && legacyTargetFormat(legacy) === next.format) next.legacyFrom = legacy
+    else delete next.legacyFrom
+  }
   return next
 }
 
@@ -9620,8 +9625,10 @@ export class UniworkDocsService {
     // A ticket without a version takes the live ACL (view only when the
     // descriptor says view). The one exception for a version ticket is a
     // version that is still the current one while a tab of the document is
-    // open: that tab is focused, neither duplicated, downgraded nor upgraded.
-    if (viewTicket && launch.version === detail.file.version) {
+    // open: that tab is focused, neither duplicated, downgraded nor upgraded. A legacy head is the
+    // exception (UNI-2212): its history view must stay the read-only @vN copy, because the editable
+    // tab of a legacy head can still commit its conversion.
+    if (viewTicket && launch.version === detail.file.version && !legacyHead) {
       const open = await this.openTabCopy(identity, documentId)
       if (open) return this.focusOpen(open.path, open.title)
     }
