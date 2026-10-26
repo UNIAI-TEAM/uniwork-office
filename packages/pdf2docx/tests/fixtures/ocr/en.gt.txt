@@ -1,0 +1,8 @@
+Minutes of the project steering committee, third meeting
+Date: 15 September 2026, 9:00 a.m., Hanoi office, room 3.
+The engineering lead reported that the data migration is
+eighty percent complete. Finance asked for more testers and
+a standby server before the hand-over on 30 October 2026.
+Action items: fix legacy form fonts; review access rights;
+the budget overrun must stay below VND 125,000,000.
+Please send comments to the secretary by the end of the week.

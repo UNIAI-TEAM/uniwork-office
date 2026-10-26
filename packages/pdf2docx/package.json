@@ -19,7 +19,9 @@
     "@genoffice/font-metrics": "*",
     "@genoffice/pptx-engine": "*",
     "bidi-js": "^1.0.3",
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "pngjs": "^7.0.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

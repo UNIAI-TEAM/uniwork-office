@@ -37,34 +37,60 @@ const toRect = (b: [number, number, number, number]): Rect => ({
   y1: b[3],
 })
 
+/** how a helper process is run: the system helpers take the defaults */
+export interface HelperRunOptions {
+  /** extra environment on top of process.env */
+  env?: NodeJS.ProcessEnv
+  /** kill the helper after this long (default 30 s) */
+  timeoutMs?: number
+  /** keep a console window from flashing up on Windows */
+  windowsHide?: boolean
+}
+
+/**
+ * Spawn one OCR helper for one page and parse its stdout (protocol shared by
+ * every helper: vision-ocr, win-ocr, tess-ocr). `null` = the helper failed or
+ * printed something unparseable.
+ */
+export function runOcrHelper(
+  command: string,
+  args: string[],
+  png: Uint8Array,
+  options: HelperRunOptions = {},
+): OcrRecognition | null {
+  const res = spawnSync(command, args, {
+    input: png,
+    maxBuffer: HELPER_MAX_BUFFER,
+    timeout: options.timeoutMs ?? HELPER_TIMEOUT_MS,
+    ...(options.env ? { env: { ...process.env, ...options.env } } : {}),
+    ...(options.windowsHide ? { windowsHide: true } : {}),
+  })
+  if (res.status !== 0 || res.stdout == null) return null
+  let parsed: { lines?: HelperLine[]; paper?: number }
+  try {
+    // defense in depth: .NET Framework consoles can prepend a UTF-8 BOM
+    const text = res.stdout.toString('utf8').replace(/^\uFEFF/, '')
+    parsed = JSON.parse(text) as { lines?: HelperLine[]; paper?: number }
+  } catch {
+    return null
+  }
+  if (!Array.isArray(parsed.lines)) return null
+  return {
+    lines: parsed.lines.map((l) => ({
+      text: l.t,
+      confidence: l.c,
+      box: toRect(l.b),
+      ...(l.chars ? { chars: l.chars.map((c) => ({ text: c.t, box: toRect(c.b) })) } : {}),
+    })),
+    ...(typeof parsed.paper === 'number' ? { paperShare: parsed.paper } : {}),
+  }
+}
+
 /** spawn wrapper shared by the platform engines (protocol is identical) */
 function createHelperOcrEngine(helperPath: string, languages?: string[]): OcrEngine {
   return (png: Uint8Array): OcrRecognition | null => {
     const args = languages && languages.length > 0 ? [languages.join(',')] : []
-    const res = spawnSync(helperPath, args, {
-      input: png,
-      maxBuffer: HELPER_MAX_BUFFER,
-      timeout: HELPER_TIMEOUT_MS,
-    })
-    if (res.status !== 0 || res.stdout == null) return null
-    let parsed: { lines?: HelperLine[]; paper?: number }
-    try {
-      // defense in depth: .NET Framework consoles can prepend a UTF-8 BOM
-      const text = res.stdout.toString('utf8').replace(/^\uFEFF/, '')
-      parsed = JSON.parse(text) as { lines?: HelperLine[]; paper?: number }
-    } catch {
-      return null
-    }
-    if (!Array.isArray(parsed.lines)) return null
-    return {
-      lines: parsed.lines.map((l) => ({
-        text: l.t,
-        confidence: l.c,
-        box: toRect(l.b),
-        ...(l.chars ? { chars: l.chars.map((c) => ({ text: c.t, box: toRect(c.b) })) } : {}),
-      })),
-      ...(typeof parsed.paper === 'number' ? { paperShare: parsed.paper } : {}),
-    }
+    return runOcrHelper(helperPath, args, png)
   }
 }
 
