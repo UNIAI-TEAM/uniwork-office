@@ -99,7 +99,10 @@ export interface RunPdfConvertOptions {
   modulePath?: string
   /** Per-message inactivity timeout in ms (default 180_000; <= 0 disables). */
   watchdogMs?: number
+  /** Optional process-tree killer override for lifecycle fault-injection tests (R2-2 / R1-12). */
+  killTree?: (pid: number | undefined, rootAlreadyExited: boolean) => void
 }
+
 export interface CommitPdfConvertPhaseContext {
   isAborted(): boolean
   disableCancel(): void
@@ -123,6 +126,217 @@ export function beginPdfConvertCommitPhase(ctx: CommitPdfConvertPhaseContext): b
   ctx.sendDoneProgress()
   ctx.resetProgressBar()
   return true
+}
+
+export interface PdfConvertExportResultBase {
+  pageResults: PageResult[]
+  scannedDocument: boolean
+}
+
+export interface PdfConvertExportProgressEvent {
+  format: PdfConvertKind
+  page: number
+  total: number
+  done?: boolean
+}
+
+export interface PdfConvertExportFlowDeps<
+  TDocx extends PdfConvertExportResultBase = PdfConvertExportResultBase & { docx: Uint8Array },
+  TPptx extends PdfConvertExportResultBase = PdfConvertExportResultBase & { pptx: Uint8Array },
+  TXlsx extends PdfConvertExportResultBase = PdfConvertExportResultBase & { xlsx: Uint8Array },
+> {
+  kind: PdfConvertKind
+  pdfPath: string
+  senderId?: number | null
+  prepareTarget: () => Promise<string | null>
+  isHostDestroyed?: () => boolean
+  setProgressBar: (value: number) => void
+  sendProgress: (payload: PdfConvertExportProgressEvent) => void
+  closePasswordDialog: () => void
+  promptPassword: (retry: boolean, onUserCancel: () => void) => Promise<string | null>
+  convertDocx: (
+    pdfPath: string,
+    promptPassword: (retry: boolean) => Promise<string | null>,
+    onProgress: (page: number, total: number) => void,
+    signal: AbortSignal,
+  ) => Promise<TDocx | null>
+  convertPptx: (
+    pdfPath: string,
+    promptPassword: (retry: boolean) => Promise<string | null>,
+    onProgress: (page: number, total: number) => void,
+    signal: AbortSignal,
+  ) => Promise<TPptx | null>
+  convertXlsx: (
+    pdfPath: string,
+    promptPassword: (retry: boolean) => Promise<string | null>,
+    onProgress: (page: number, total: number) => void,
+    signal: AbortSignal,
+  ) => Promise<TXlsx | null>
+  writeDocx: (target: string, result: TDocx) => Promise<void>
+  writePptx: (target: string, result: TPptx) => Promise<void>
+  writeXlsx: (target: string, result: TXlsx) => Promise<void>
+  showDocxNotice: (result: TDocx) => Promise<void>
+  showPptxNotice: (result: TPptx) => Promise<void>
+  showXlsxNotice: (result: TXlsx) => Promise<void>
+  showError: (err: unknown) => void
+}
+
+/** AbortController for the in-flight PDF -> Office conversion (cancelled via pdf:convert-cancel) */
+let activePdfConvertController: AbortController | null = null
+/** WebContents ID of the PDF tab that initiated the active conversion (null when started from Desk) */
+let activePdfConvertSenderId: number | null = null
+
+/**
+ * Cancel the active PDF -> Office export if the IPC sender matches the tab that
+ * started it (or the active PDF tab when started without an explicit sender ID)
+ * and the export has not yet entered its non-cancellable commit phase (R1-7 / R2-4).
+ */
+export function cancelActivePdfConvert(
+  senderId: number,
+  activeTabSenderId?: number,
+  closePasswordDialog?: () => void,
+): boolean {
+  if (
+    activePdfConvertSenderId !== null
+      ? senderId !== activePdfConvertSenderId
+      : activeTabSenderId !== senderId
+  ) {
+    return false
+  }
+  if (!activePdfConvertController) return false
+  activePdfConvertController.abort()
+  closePasswordDialog?.()
+  return true
+}
+
+/**
+ * Shared PDF -> Office export orchestration across all three formats (`docx`,
+ * `pptx`, `xlsx`), used by `convertPdfToOffice` in `apps/shell/src/main/index.ts`
+ * (R1-7, FE-R1-2, R2-4):
+ * - Tracks the active `AbortController` and sender ID for `cancelActivePdfConvert`.
+ * - Enters the non-cancellable commit phase immediately after conversion
+ *   completes and BEFORE `atomicWriteFile` or any completion notice dialog runs:
+ *   disables `convertCancel`, closes the password dialog, emits `done: true`
+ *   once, and resets the window progress bar to `-1`.
+ * - Guarantees `done: true` is never sent a second time in `finally`.
+ */
+export async function runPdfConvertExportFlow<
+  TDocx extends PdfConvertExportResultBase,
+  TPptx extends PdfConvertExportResultBase,
+  TXlsx extends PdfConvertExportResultBase,
+>(deps: PdfConvertExportFlowDeps<TDocx, TPptx, TXlsx>): Promise<string | null> {
+  const { kind, pdfPath } = deps
+  const abortController = new AbortController()
+  activePdfConvertController = abortController
+  activePdfConvertSenderId = deps.senderId ?? null
+  let lastPage = 0
+  let lastTotal = 0
+  let progressStarted = false
+  let progressSettled = false
+  let committed = false
+
+  const enterCommitPhase = (): boolean =>
+    beginPdfConvertCommitPhase({
+      isAborted: () => abortController.signal.aborted,
+      disableCancel: () => {
+        committed = true
+        if (activePdfConvertController === abortController) {
+          activePdfConvertController = null
+        }
+      },
+      closePasswordDialog: () => deps.closePasswordDialog(),
+      sendDoneProgress: () => {
+        if (progressStarted && !progressSettled) {
+          progressSettled = true
+          deps.sendProgress({ format: kind, page: lastPage, total: lastTotal, done: true })
+        }
+      },
+      resetProgressBar: () => {
+        if (!deps.isHostDestroyed?.()) {
+          deps.setProgressBar(-1)
+        }
+      },
+    })
+
+  try {
+    const target = await deps.prepareTarget()
+    if (!target) return null
+    if (!deps.isHostDestroyed?.()) {
+      deps.setProgressBar(2)
+    }
+    progressStarted = true
+    deps.sendProgress({ format: kind, page: 0, total: 0 })
+
+    const promptPassword = (retry: boolean) =>
+      deps.promptPassword(retry, () => {
+        if (!committed) {
+          abortController.abort()
+        }
+      })
+
+    const onProgress = (page: number, total: number) => {
+      lastPage = page
+      lastTotal = total
+      if (!deps.isHostDestroyed?.() && total > 0) {
+        deps.setProgressBar(page / total)
+      }
+      deps.sendProgress({ format: kind, page, total })
+    }
+
+    if (kind === 'docx') {
+      const result = await deps.convertDocx(
+        pdfPath,
+        promptPassword,
+        onProgress,
+        abortController.signal,
+      )
+      if (result === null || !enterCommitPhase()) return null
+      await deps.writeDocx(target, result)
+      await deps.showDocxNotice(result)
+    } else if (kind === 'pptx') {
+      const result = await deps.convertPptx(
+        pdfPath,
+        promptPassword,
+        onProgress,
+        abortController.signal,
+      )
+      if (result === null || !enterCommitPhase()) return null
+      await deps.writePptx(target, result)
+      await deps.showPptxNotice(result)
+    } else {
+      const result = await deps.convertXlsx(
+        pdfPath,
+        promptPassword,
+        onProgress,
+        abortController.signal,
+      )
+      if (result === null || !enterCommitPhase()) return null
+      await deps.writeXlsx(target, result)
+      await deps.showXlsxNotice(result)
+    }
+    return target
+  } catch (err) {
+    if (!committed && (err instanceof PdfConvertCancelled || abortController.signal.aborted)) {
+      return null
+    }
+    if (!deps.isHostDestroyed?.()) {
+      deps.showError(err)
+    }
+    return null
+  } finally {
+    if (progressStarted && !progressSettled) {
+      progressSettled = true
+      deps.sendProgress({ format: kind, page: lastPage, total: lastTotal, done: true })
+    }
+    if (activePdfConvertController === abortController) {
+      activePdfConvertController = null
+    }
+    activePdfConvertSenderId = null
+    deps.closePasswordDialog()
+    if (!committed && !deps.isHostDestroyed?.()) {
+      deps.setProgressBar(-1)
+    }
+  }
 }
 
 export type PosixSpawnSyncFn = (
@@ -295,6 +509,32 @@ export function killPosixProcessTree(
   }
 }
 
+export interface KillProcessTreeDeps {
+  platform?: NodeJS.Platform
+  probePid?: (pid: number) => void
+  runTaskkill?: (pid: number) => void
+  killPid?: (pid: number, signal: NodeJS.Signals) => void
+  killPosixTree?: (pid: number) => void
+}
+
+/**
+ * True only when `process.kill(pid, 0)` (or injected `probePid`) throws `ESRCH`,
+ * indicating the numeric PID is not currently assigned to any live process (R1-12).
+ */
+export function isPidAbsent(
+  pid: number,
+  probePid: (targetPid: number) => void = (targetPid) => {
+    process.kill(targetPid, 0)
+  },
+): boolean {
+  try {
+    probePid(pid)
+    return false
+  } catch (err) {
+    return (err as NodeJS.ErrnoException | undefined)?.code === 'ESRCH'
+  }
+}
+
 /**
  * Terminate a process and all descendants it spawned (such as `tess-ocr.cjs`
  * or `win-ocr.exe` started via `spawnSync`). Targets only the owned PID, never
@@ -302,25 +542,44 @@ export function killPosixProcessTree(
  *
  * When `rootAlreadyExited` is true (R1-2 / R1-12), the converter process itself
  * has already exited: never signal the saved root PID directly (OS PID reuse
- * hazard); on Windows `taskkill /T /F` still cleans remaining child processes
- * bearing that parent PID, while on POSIX reparented OCR helpers self-terminate
- * via their `ppid` orphan watch.
+ * hazard). On Windows, run `taskkill /PID <pid> /T /F` only when `process.kill(pid, 0)`
+ * throws `ESRCH` (confirming the PID is not in use by another process); otherwise
+ * skip `taskkill` and rely on the OCR helper's own expected-parent check (R2-1).
+ * On POSIX, reparented OCR helpers self-terminate via their expected-parent watch.
  */
-export function killProcessTree(pid: number | undefined, rootAlreadyExited = false): void {
+export function killProcessTree(
+  pid: number | undefined,
+  rootAlreadyExited = false,
+  deps: KillProcessTreeDeps = {},
+): void {
   if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) return
-  if (process.platform === 'win32') {
-    try {
-      spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
-        stdio: 'ignore',
-        windowsHide: true,
-        timeout: 5_000,
+  const platform = deps.platform ?? process.platform
+  if (platform === 'win32') {
+    if (rootAlreadyExited && !isPidAbsent(pid, deps.probePid)) {
+      return
+    }
+    const runTaskkill =
+      deps.runTaskkill ??
+      ((targetPid: number) => {
+        spawnSync('taskkill', ['/PID', String(targetPid), '/T', '/F'], {
+          stdio: 'ignore',
+          windowsHide: true,
+          timeout: 5_000,
+        })
       })
+    try {
+      runTaskkill(pid)
     } catch {
       // fall through
     }
     if (!rootAlreadyExited) {
+      const killPid =
+        deps.killPid ??
+        ((targetPid: number, signal: NodeJS.Signals) => {
+          process.kill(targetPid, signal)
+        })
       try {
-        process.kill(pid, 'SIGKILL')
+        killPid(pid, 'SIGKILL')
       } catch {
         // already exited
       }
@@ -331,7 +590,9 @@ export function killProcessTree(pid: number | undefined, rootAlreadyExited = fal
   if (rootAlreadyExited) {
     return
   }
-  killPosixProcessTree(pid)
+  const killPosixTree =
+    deps.killPosixTree ?? ((targetPid: number) => killPosixProcessTree(targetPid))
+  killPosixTree(pid)
 }
 
 /**
@@ -620,6 +881,7 @@ export function runPdfConvertJob(
     fork = defaultFork,
     modulePath = defaultConvertChildModulePath(),
     watchdogMs = DEFAULT_WATCHDOG_MS,
+    killTree = (pid, rootAlreadyExited) => killProcessTree(pid, rootAlreadyExited),
   } = options
 
   if (signal?.aborted) {
@@ -667,28 +929,22 @@ export function runPdfConvertJob(
     }
     const pid = child.pid ?? capturedPid
     if (typeof pid === 'number' && pid > 0) {
-      killProcessTree(pid, rootAlreadyExited)
+      killTree(pid, rootAlreadyExited)
     }
     if (rootAlreadyExited) {
       finalizeExitOwnership()
       return
     }
-    let killed = false
     try {
-      killed = child.kill()
+      child.kill()
     } catch {
-      // already exited
+      // already exited or failed synchronously
     }
-    // Once the process has spawned (has a PID so killProcessTree ran, or
-    // `child.kill()` returned true), termination is complete; release exit
-    // listeners and `terminatingJobs` ownership immediately. Before spawn
-    // (`pid === undefined` and `killed === false`, e.g. Electron utilityProcess
-    // cancelled before its async `'spawn'` event), keep ownership in
-    // `terminatingJobs` until `'spawn'` or `'exit'` fires so the process is
-    // killed as soon as it acquires its PID (R1-1).
-    if ((typeof pid === 'number' && pid > 0) || killed) {
-      finalizeExitOwnership()
-    }
+    // Keep `terminatingHandle` in `terminatingJobs` and keep the `'spawn'` and
+    // `'exit'` listeners attached until the process has actually emitted `'exit'`
+    // (`onExit` -> `finalizeExitOwnership()`), never releasing ownership merely
+    // because a PID exists or a kill was requested (R2-2). Failed termination
+    // attempts stay registered so `killAllPdfConvertJobs()` retries them.
   }
 
   const requestTermination = (rootAlreadyExited = false) => {

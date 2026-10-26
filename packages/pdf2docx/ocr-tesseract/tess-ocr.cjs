@@ -37,17 +37,58 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
-// Exit if the parent converter crashes or is killed on POSIX (where reparenting
-// changes process.ppid to 1 or a subreaper). Windows does not change ppid on
-// parent exit and relies on `taskkill /T /F` from the host instead.
-const initialPpid = process.ppid
-if (typeof initialPpid === 'number' && initialPpid > 0) {
-  setInterval(() => {
-    if (process.ppid !== initialPpid) {
+const PARENT_PID_ENV = 'GENOFFICE_OCR_PARENT_PID'
+
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (err) {
+    return Boolean(err && err.code === 'EPERM')
+  }
+}
+
+// Exit if the parent converter crashes or is killed (R1-2 / R2-1).
+// When GENOFFICE_OCR_PARENT_PID is set by the spawner, verify immediately at
+// startup (before reading stdin or doing any OCR work) and on every 200 ms tick
+// that process.ppid matches the expected parent PID and that the expected
+// parent is still alive (process.kill(pid, 0) does not throw ESRCH). When unset
+// (standalone/CLI use), keep the baseline process.ppid !== initialPpid poll.
+function startParentWatch(env = process.env) {
+  const rawExpected = env[PARENT_PID_ENV]
+  if (typeof rawExpected === 'string' && rawExpected.trim() !== '') {
+    const expectedPpid = Number(rawExpected)
+    const isOrphaned = () =>
+      !Number.isInteger(expectedPpid) ||
+      expectedPpid <= 0 ||
+      (typeof process.ppid === 'number' && process.ppid > 0 && process.ppid !== expectedPpid) ||
+      !isProcessAlive(expectedPpid)
+    if (isOrphaned()) {
       process.exit(1)
     }
-  }, 200).unref()
+    const timer = setInterval(() => {
+      if (isOrphaned()) {
+        process.exit(1)
+      }
+    }, 200)
+    timer.unref()
+    return timer
+  }
+
+  const initialPpid = process.ppid
+  if (typeof initialPpid === 'number' && initialPpid > 0) {
+    const timer = setInterval(() => {
+      if (process.ppid !== initialPpid) {
+        process.exit(1)
+      }
+    }, 200)
+    timer.unref()
+    return timer
+  }
+  return null
 }
+
+startParentWatch()
 
 const LANG_CODES = /^[a-z_]{2,12}(\+[a-z_]{2,12})*$/
 
@@ -211,4 +252,8 @@ async function main() {
   process.stdout.write(payload, () => process.exit(0))
 }
 
-main().catch((e) => fail(3, `unexpected failure: ${e && e.stack ? e.stack : e}`))
+if (require.main === module) {
+  main().catch((e) => fail(3, `unexpected failure: ${e && e.stack ? e.stack : e}`))
+} else {
+  module.exports = { startParentWatch, PARENT_PID_ENV }
+}
