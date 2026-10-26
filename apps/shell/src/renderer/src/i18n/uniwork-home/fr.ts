@@ -268,7 +268,7 @@ export const fr = {
   uhDriveColUsedIn: 'Utilisé dans',
   uhDriveColTasksCreated: 'Tâches créées',
   uhDriveSubtitleAll:
-    'Fichiers Google Drive que vous avez liés ou autorisés à être lus par UniWork. Vous seul voyez cette liste ; UniWork ne conserve que les liens.',
+    'Fichiers Google Drive que vous avez associés ou autorisés à être lus par UniWork. Vous seul voyez cette liste ; UniWork ne conserve que les liens.',
   uhDriveSubtitleAccount: 'Fichiers ajoutés depuis ce compte · toujours ouverts avec ce compte',
   uhDriveSubtitleBroken: 'Connexion expirée · reconnectez-vous pour ouvrir ces fichiers',
   uhDriveFootnote:
@@ -290,7 +290,7 @@ export const fr = {
   uhDriveUsedInMore: '{identifier} et {count} autres tâches',
   uhDriveTasksCreatedLineOne: '{count} tâche',
   uhDriveTasksCreatedLine: '{count} tâches',
-  uhDriveEmpty: 'Aucun fichier Google Drive n’a encore été lié.',
+  uhDriveEmpty: 'Aucun fichier Google Drive n’a encore été associé.',
   uhDriveLoadError: 'Impossible de charger les fichiers Google Drive.',
   uhDriveOffline: 'Une connexion Internet est requise pour afficher les fichiers Google Drive.',
   uhDriveOpenOnGoogle: 'Ouvrir dans Google Drive',
@@ -301,8 +301,8 @@ export const fr = {
   uhDriveModifiedBy: 'Modifié par {name} le {when}',
   uhDriveModifiedAt: 'Modifié le {when}',
   uhDriveFieldSource: 'Source',
-  uhDriveBoundAccount: 'Compte associé',
-  uhDriveReboundBy: '(réassocié par {name})',
+  uhDriveBoundAccount: 'Compte rattaché',
+  uhDriveReboundBy: '(rattaché à nouveau par {name})',
   uhDriveYouOpenWith: 'Vous ouvrez avec',
   uhDriveOpensWithNote:
     "Afficher et modifier le contenu sur Google, avec le compte {email}. UniWork ne conserve que le lien, les tâches qui utilisent le fichier et l'historique des actions ; le contenu reste dans Google Drive.",

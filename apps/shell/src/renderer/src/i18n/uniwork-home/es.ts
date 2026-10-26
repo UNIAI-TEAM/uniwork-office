@@ -266,7 +266,7 @@ export const es = {
   uhDriveColUsedIn: 'Usado en',
   uhDriveColTasksCreated: 'Tareas creadas',
   uhDriveSubtitleAll:
-    'Archivos de Google Drive que vinculaste o permitiste leer a UniWork. Solo tú ves esta lista; UniWork solo guarda enlaces.',
+    'Archivos de Google Drive que vinculaste o permitiste leer a UniWork. Solo tú ves esta lista; UniWork solo guarda vínculos.',
   uhDriveSubtitleAccount:
     'Archivos que añadiste desde esta cuenta · siempre se abren con esta cuenta',
   uhDriveSubtitleBroken: 'Conexión caducada · vuelve a conectar para abrir estos archivos',
@@ -300,8 +300,8 @@ export const es = {
   uhDriveModifiedBy: '{name} editó {when}',
   uhDriveModifiedAt: 'Editado {when}',
   uhDriveFieldSource: 'Origen',
-  uhDriveBoundAccount: 'Cuenta vinculada',
-  uhDriveReboundBy: '(revinculado por {name})',
+  uhDriveBoundAccount: 'Cuenta asociada',
+  uhDriveReboundBy: '(reasociado por {name})',
   uhDriveYouOpenWith: 'Lo abres con',
   uhDriveOpensWithNote:
     'Ver y editar el contenido en Google con la cuenta {email}. UniWork solo guarda el vínculo, las tareas que usan el archivo y el historial de acciones; el contenido permanece en Google Drive.',
@@ -314,7 +314,7 @@ export const es = {
   uhDriveViewerLost: 'La cuenta {email} ya no tiene acceso a este archivo.',
   uhDriveViewerConnLost: 'La conexión de Google Drive {email} ha caducado.',
   uhDriveGrantAccess: 'Permitir que UniWork lea el archivo',
-  uhDriveReconnectAction: 'Volver a conectar',
+  uhDriveReconnectAction: 'Reconectar',
   uhDriveFieldOwner: 'Propietario',
   uhDriveFieldLinkedBy: 'Vinculado por',
   uhDriveFieldPermissions: 'Permisos de vista y edición',

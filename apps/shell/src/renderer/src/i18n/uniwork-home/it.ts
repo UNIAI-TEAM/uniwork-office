@@ -262,7 +262,7 @@ export const it = {
   uhDriveColAccount: 'Aperto con',
   uhDriveColAccess: 'Accesso su Google Drive',
   uhDriveColUsedIn: 'Usato in',
-  uhDriveColTasksCreated: 'attività create',
+  uhDriveColTasksCreated: 'Attività create',
   uhDriveSubtitleAll:
     'File di Google Drive che hai collegato o consentito a UniWork di leggere. Solo tu vedi questo elenco; UniWork salva solo i link.',
   uhDriveSubtitleAccount: 'File aggiunti da questo account · sempre aperti con questo account',

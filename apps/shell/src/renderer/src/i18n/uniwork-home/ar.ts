@@ -261,7 +261,7 @@ export const ar = {
   uhDriveSubtitleAccount: 'الملفات التي أضفتها من هذا الحساب · تُفتح دائمًا بهذا الحساب',
   uhDriveSubtitleBroken: 'انتهت صلاحية الاتصال · أعد الاتصال لفتح هذه الملفات',
   uhDriveFootnote:
-    'كل ملف مرتبط بحساب Google Drive الذي اختاره. فتح الملف والسماح لـ UNI بقراءته يستخدمان ذلك الحساب نفسه. عند إلغاء الربط يبقى الملف في Google Drive كما هو.',
+    'كل ملف مخصّص لحساب Google Drive الذي اختاره. فتح الملف والسماح لـ UNI بقراءته يستخدمان ذلك الحساب نفسه. عند إلغاء الربط يبقى الملف في Google Drive كما هو.',
   uhDriveAddFromDrive: 'إضافة من Google Drive',
   uhDriveAddFromAccount: 'إضافة من {email}',
   uhDriveManageConnections: 'إدارة الاتصالات',
@@ -290,8 +290,8 @@ export const ar = {
   uhDriveModifiedBy: 'عدّله {name} في {when}',
   uhDriveModifiedAt: 'عُدّل في {when}',
   uhDriveFieldSource: 'المصدر',
-  uhDriveBoundAccount: 'الحساب المرتبط',
-  uhDriveReboundBy: '(أعاد {name} الربط)',
+  uhDriveBoundAccount: 'الحساب المخصّص',
+  uhDriveReboundBy: '(أعاد {name} تخصيص الحساب)',
   uhDriveYouOpenWith: 'تفتحه بالحساب',
   uhDriveOpensWithNote:
     'اعرض المحتوى وعدّله على Google باستخدام الحساب {email}. يحتفظ UniWork بالرابط والمهام التي تستخدم الملف وسجل الإجراءات فقط؛ ويبقى المحتوى في Google Drive.',
@@ -300,7 +300,7 @@ export const ar = {
   uhDriveViewerUnknownBody:
     'لم تسمح لـ UniWork بقراءة هذا الملف. ربطه {name} من Google Drive الخاص به. تقرأ UNI الملفات بحساب Google Drive الخاص بك، لذا تحتاج إلى إذنك مرة واحدة.',
   uhDriveViewerUnknownHint:
-    'إذا أبلغك Google بأنه ليس لديك صلاحية، فاطلب من المالك مشاركة الملف على Google Drive. لا تقوم UniWork بالمشاركة نيابةً عنك.',
+    'إذا أبلغك Google بأنه ليس لديك صلاحية، فاطلب من المالك مشاركة الملف على Google Drive. لا يقوم UniWork بالمشاركة نيابةً عنك.',
   uhDriveViewerLost: 'لم يعد للحساب {email} صلاحية الوصول إلى هذا الملف.',
   uhDriveViewerConnLost: 'انتهت صلاحية اتصال Google Drive الخاص بـ {email}.',
   uhDriveGrantAccess: 'السماح لـ UniWork بقراءة هذا الملف',

@@ -270,7 +270,7 @@ export const nl = {
     'Bestanden die je vanuit dit account hebt toegevoegd · worden altijd met dit account geopend',
   uhDriveSubtitleBroken: 'Verbinding verlopen · verbind opnieuw om deze bestanden te openen',
   uhDriveFootnote:
-    'Elk bestand is gekoppeld aan het Google Drive-account waarmee het is gekozen. Zowel het openen van het bestand als het laten lezen door UNI gebruikt dat account. Bij ontkoppelen blijft het bestand op Google Drive ongewijzigd.',
+    'Elk bestand is gebonden aan het Google Drive-account waarmee het is gekozen. Zowel het openen van het bestand als het laten lezen door UNI gebruikt dat account. Bij loskoppelen blijft het bestand op Google Drive ongewijzigd.',
   uhDriveAddFromDrive: 'Toevoegen vanuit Google Drive',
   uhDriveAddFromAccount: 'Toevoegen vanuit {email}',
   uhDriveManageConnections: 'Verbindingen beheren',
@@ -299,17 +299,17 @@ export const nl = {
   uhDriveModifiedBy: '{name} bewerkte op {when}',
   uhDriveModifiedAt: 'Bewerkt op {when}',
   uhDriveFieldSource: 'Bron',
-  uhDriveBoundAccount: 'Gekoppeld account',
-  uhDriveReboundBy: '(opnieuw gekoppeld door {name})',
-  uhDriveYouOpenWith: 'U opent met',
+  uhDriveBoundAccount: 'Gebonden account',
+  uhDriveReboundBy: '(opnieuw gebonden door {name})',
+  uhDriveYouOpenWith: 'Je opent met',
   uhDriveOpensWithNote:
     'Bekijk en bewerk de inhoud op Google met het account {email}. UniWork bewaart alleen de koppeling, de taken die het bestand gebruiken en de actiegeschiedenis; de inhoud blijft in Google Drive.',
   uhDriveViewerEmailMissing: 'Account nog niet bekend',
   uhDriveViewerUnknownTitle: 'UniWork mag dit bestand nog niet lezen',
   uhDriveViewerUnknownBody:
-    'U hebt UniWork nog geen toestemming gegeven dit bestand te lezen. {name} heeft het gekoppeld vanuit de eigen Google Drive. UNI leest bestanden met uw eigen Google Drive-account, dus uw toestemming is eenmalig nodig.',
+    'Je hebt UniWork nog geen toestemming gegeven dit bestand te lezen. {name} heeft het gekoppeld vanuit de eigen Google Drive. UNI leest bestanden met je eigen Google Drive-account, dus je toestemming is eenmalig nodig.',
   uhDriveViewerUnknownHint:
-    'Als Google meldt dat u geen toegang hebt, vraag de eigenaar het bestand te delen in Google Drive. UniWork deelt niet namens u.',
+    'Als Google meldt dat je geen toegang hebt, vraag de eigenaar het bestand te delen in Google Drive. UniWork deelt niet namens jou.',
   uhDriveViewerLost: 'Het account {email} heeft geen toegang meer tot dit bestand.',
   uhDriveViewerConnLost: 'De Google Drive-verbinding {email} is verlopen.',
   uhDriveGrantAccess: 'UniWork het bestand laten lezen',
@@ -325,7 +325,7 @@ export const nl = {
   uhDriveActivityTitle: 'Activiteit in UniWork',
   uhDriveActivityEmpty: 'Nog geen activiteit.',
   uhDriveActLinked: 'Bestand gekoppeld',
-  uhDriveActUnlinked: 'Bestandskoppeling verwijderd',
+  uhDriveActUnlinked: 'Bestand losgekoppeld',
   uhDriveActRebound: 'Opnieuw gekoppeld met ander account',
   uhDriveActAccessGranted: 'UniWork het bestand laten lezen',
   uhDriveActAccessChanged: 'Leesaccount van het bestand gewijzigd',
@@ -334,7 +334,7 @@ export const nl = {
   uhDriveActOther: 'Bestand bijgewerkt',
   uhDriveCreateTasks: 'Taken maken uit document',
   uhDriveAskUni: 'Vraag het UNI',
-  uhDriveUnlink: 'Koppeling verwijderen',
+  uhDriveUnlink: 'Loskoppelen',
   uhDriveRebind: 'Opnieuw koppelen met ander account',
   uhDriveRecreateWarning:
     'Uit dit document zijn al taken gemaakt ({count} tot nu toe, het laatst op {date} door {name}). Meer maken kan dubbele taken opleveren.',
@@ -351,7 +351,7 @@ export const nl = {
   uhDriveUnlinkConfirmSubmit: 'Loskoppelen',
   uhDriveUnlinkConfirmWorking: 'Loskoppelen…',
   uhDriveUnlinkFailed: 'Loskoppelen mislukt. Probeer het opnieuw.',
-  uhDriveNotFound: 'Dit bestand is niet gevonden of u mag het niet bekijken.',
+  uhDriveNotFound: 'Dit bestand is niet gevonden of je mag het niet bekijken.',
   uhDriveErrAuthFailed: 'De Google Drive-verbinding is verlopen. Verbind opnieuw om door te gaan.',
   uhDriveFeatureOff: 'Google Drive is niet meer beschikbaar voor deze organisatie.',
 } satisfies Record<keyof typeof zh, string>

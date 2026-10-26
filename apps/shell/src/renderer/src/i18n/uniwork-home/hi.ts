@@ -268,7 +268,7 @@ export const hi = {
   uhDriveSubtitleAccount: 'इस खाते से जोड़ी गई फ़ाइलें · हमेशा इसी खाते से खुलती हैं',
   uhDriveSubtitleBroken: 'कनेक्शन समाप्त हो गया · इन फ़ाइलों को खोलने के लिए फिर से कनेक्ट करें',
   uhDriveFootnote:
-    'प्रत्येक फ़ाइल उस Google Drive खाते से जुड़ी होती है जिससे उसे चुना गया था। फ़ाइल खोलना और UNI को पढ़ने देना दोनों उसी खाते का उपयोग करते हैं। अनलिंक करने पर Google Drive पर मौजूद फ़ाइल वैसी ही रहती है।',
+    'प्रत्येक फ़ाइल उस Google Drive खाते से बंधी होती है जिससे उसे चुना गया था। फ़ाइल खोलना और UNI को पढ़ने देना दोनों उसी खाते का उपयोग करते हैं। लिंक हटाने पर Google Drive पर मौजूद फ़ाइल वैसी ही रहती है।',
   uhDriveAddFromDrive: 'Google Drive से जोड़ें',
   uhDriveAddFromAccount: '{email} से जोड़ें',
   uhDriveManageConnections: 'कनेक्शन प्रबंधित करें',
@@ -305,7 +305,7 @@ export const hi = {
   uhDriveViewerEmailMissing: 'खाता अभी ज्ञात नहीं',
   uhDriveViewerUnknownTitle: 'UniWork अभी यह फ़ाइल नहीं पढ़ सकता',
   uhDriveViewerUnknownBody:
-    'आपने अभी UniWork को यह फ़ाइल पढ़ने की अनुमति नहीं दी है। इसे {name} ने अपने Google Drive से जोड़ा है। UNI फ़ाइलें आपके अपने Google Drive खाते से पढ़ता है, इसलिए आपकी अनुमति एक बार चाहिए।',
+    'आपने अभी UniWork को यह फ़ाइल पढ़ने की अनुमति नहीं दी है। इसे {name} ने अपने Google Drive से लिंक किया है। UNI फ़ाइलें आपके अपने Google Drive खाते से पढ़ता है, इसलिए आपकी अनुमति एक बार चाहिए।',
   uhDriveViewerUnknownHint:
     'यदि Google कहे कि आपके पास पहुँच नहीं है, तो मालिक से Google Drive पर फ़ाइल साझा करने को कहें। UniWork आपकी ओर से साझा नहीं करता।',
   uhDriveViewerLost: 'खाते {email} की अब इस फ़ाइल तक पहुँच नहीं है।',
@@ -313,7 +313,7 @@ export const hi = {
   uhDriveGrantAccess: 'UniWork को फ़ाइल पढ़ने दें',
   uhDriveReconnectAction: 'फिर से कनेक्ट करें',
   uhDriveFieldOwner: 'स्वामी',
-  uhDriveFieldLinkedBy: 'जोड़ने वाले',
+  uhDriveFieldLinkedBy: 'लिंक करने वाले',
   uhDriveFieldPermissions: 'देखने और संपादित करने की अनुमति',
   uhDrivePermissionsValue: 'Drive पर साझाकरण के अनुसार',
   uhDriveUsedInTitle: 'उपयोग में · {count}',
@@ -322,9 +322,9 @@ export const hi = {
   uhDriveTasksCreatedGroupOne: '{date} · {name} · {count} कार्य',
   uhDriveActivityTitle: 'UniWork में गतिविधि',
   uhDriveActivityEmpty: 'अभी कोई गतिविधि नहीं।',
-  uhDriveActLinked: 'फ़ाइल जोड़ी',
+  uhDriveActLinked: 'फ़ाइल लिंक की',
   uhDriveActUnlinked: 'फ़ाइल का लिंक हटाया',
-  uhDriveActRebound: 'दूसरे खाते से दोबारा जोड़ा',
+  uhDriveActRebound: 'दूसरे खाते से दोबारा लिंक किया',
   uhDriveActAccessGranted: 'UniWork को फ़ाइल पढ़ने दी',
   uhDriveActAccessChanged: 'फ़ाइल पढ़ने वाला खाता बदला',
   uhDriveActAccessLost: 'फ़ाइल तक पहुँच खो गई',
@@ -333,7 +333,7 @@ export const hi = {
   uhDriveCreateTasks: 'दस्तावेज़ से कार्य बनाएँ',
   uhDriveAskUni: 'UNI से पूछें',
   uhDriveUnlink: 'लिंक हटाएँ',
-  uhDriveRebind: 'दूसरे खाते से दोबारा जोड़ें',
+  uhDriveRebind: 'दूसरे खाते से दोबारा लिंक करें',
   uhDriveRecreateWarning:
     'इस दस्तावेज़ से पहले ही कार्य बनाए जा चुके हैं (अब तक {count}, सबसे हाल में {date} को {name} द्वारा)। और बनाने पर दोहराव हो सकता है।',
   uhDriveRecreateWarningShort:

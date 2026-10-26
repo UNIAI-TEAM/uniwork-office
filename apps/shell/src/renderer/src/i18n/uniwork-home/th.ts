@@ -340,7 +340,7 @@ export const th = {
   uhDriveUnlinkConfirmTitleOne: 'ยกเลิกลิงก์จาก {count} งานหรือไม่',
   uhDriveUnlinkConfirmTitleNone: 'ยกเลิกลิงก์ไฟล์นี้หรือไม่',
   uhDriveUnlinkConfirmBody:
-    'การดำเนินการนี้ลบเฉพาะลิงก์ใน UniWork ไฟล์บน Google Drive ยังอยู่เหมือนเดิม งานที่สร้างไปแล้วยังอยู่ แค่ไม่ผูกกับเอกสารอีก',
+    'การดำเนินการนี้ลบเฉพาะลิงก์ใน UniWork ไฟล์บน Google Drive ยังอยู่เหมือนเดิม งานที่สร้างไปแล้วยังอยู่ แค่ไม่ได้ลิงก์กับเอกสารอีก',
   uhDriveUnlinkConfirmKeep: 'เก็บไว้',
   uhDriveUnlinkConfirmSubmit: 'ยกเลิกลิงก์',
   uhDriveUnlinkConfirmWorking: 'กำลังยกเลิกลิงก์…',

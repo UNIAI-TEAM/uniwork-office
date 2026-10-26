@@ -262,12 +262,12 @@ export const cs = {
   uhDriveColUsedIn: 'Použito v',
   uhDriveColTasksCreated: 'Vytvořené úkoly',
   uhDriveSubtitleAll:
-    'Soubory Google Drive, které jste propojili nebo povolili UniWorku číst. Tento seznam vidíte pouze vy; UniWork ukládá jen odkazy.',
+    'Soubory Google Drive, které jste propojili nebo povolili aplikaci UniWork číst. Tento seznam vidíte pouze vy; UniWork ukládá jen odkazy.',
   uhDriveSubtitleAccount: 'Soubory přidané z tohoto účtu · vždy otevírané tímto účtem',
   uhDriveSubtitleBroken:
     'Platnost připojení vypršela · pro otevření těchto souborů se znovu připojte',
   uhDriveFootnote:
-    'Každý soubor je svázán s účtem Google Drive, ze kterého byl vybrán. Otevření souboru i čtení pomocí UNI používají tento účet. Odpojením zůstane soubor na Google Drive nedotčený.',
+    'Každý soubor je svázán s účtem Google Drive, ze kterého byl vybrán. Otevření souboru i čtení pomocí UNI používají tento účet. Zrušením propojení zůstane soubor na Google Drive nedotčený.',
   uhDriveAddFromDrive: 'Přidat z Google Drive',
   uhDriveAddFromAccount: 'Přidat z {email}',
   uhDriveManageConnections: 'Spravovat připojení',
@@ -304,7 +304,7 @@ export const cs = {
   uhDriveViewerEmailMissing: 'Účet zatím není znám',
   uhDriveViewerUnknownTitle: 'UniWork zatím nemůže soubor číst',
   uhDriveViewerUnknownBody:
-    'Nepovolili jste UniWork číst tento soubor. Propojil(a) ho {name} ze svého Google Drive. UNI čte soubory vaším vlastním účtem Google Drive, proto potřebuje jednorázové povolení.',
+    'Ještě jste UniWork nepovolili číst tento soubor. Propojil(a) ho {name} ze svého Google Drive. UNI čte soubory vaším vlastním účtem Google Drive, proto potřebuje jednorázové povolení.',
   uhDriveViewerUnknownHint:
     'Pokud Google hlásí, že nemáte oprávnění, požádejte vlastníka, aby soubor sdílel na Google Drive. UniWork za vás nesdílí.',
   uhDriveViewerLost: 'Účet {email} už k tomuto souboru nemá přístup.',
@@ -315,7 +315,7 @@ export const cs = {
   uhDriveFieldLinkedBy: 'Propojil(a)',
   uhDriveFieldPermissions: 'Oprávnění k zobrazení a úpravám',
   uhDrivePermissionsValue: 'Podle sdílení na Drive',
-  uhDriveUsedInTitle: 'Používá se v · {count}',
+  uhDriveUsedInTitle: 'Použito v · {count}',
   uhDriveTasksCreatedTitle: 'Úkoly vytvořené z tohoto dokumentu',
   uhDriveTasksCreatedGroup: '{date} · {name} · úkoly: {count}',
   uhDriveTasksCreatedGroupOne: '{date} · {name} · {count} úkol',
@@ -334,7 +334,7 @@ export const cs = {
   uhDriveUnlink: 'Zrušit propojení',
   uhDriveRebind: 'Znovu propojit jiným účtem',
   uhDriveRecreateWarning:
-    'Tento dokument už byl použit k vytvoření úkolů ({count} dosud, naposledy {date}, {name}). Další vytváření může způsobit duplicity.',
+    'Tento dokument už byl použit k vytvoření úkolů ({count} dosud, naposledy {date}, autor: {name}). Další vytváření může způsobit duplicity.',
   uhDriveRecreateWarningShort:
     'Tento dokument už byl použit k vytvoření úkolů ({count} dosud). Další vytváření může způsobit duplicity.',
   uhDriveRecreateView: 'Zobrazit vytvořené úkoly',
