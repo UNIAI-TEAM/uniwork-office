@@ -127,6 +127,18 @@ import {
   sha256Hex,
   workingCopyName,
 } from './formats'
+import {
+  legacyOfFile,
+  legacyTargetFormat,
+  type LegacyFrom,
+} from './legacy-cloud'
+import {
+  isCfbBytes,
+  legacyOfCfbBytes,
+  type CloudConvertOutcome,
+  type CloudLegacyConvertInput,
+} from './legacy-cloud-open'
+import { detectOoxmlKindFromZipBytes } from '../legacy-converter'
 import { pathKey } from '../../shared/path-key'
 import { isBlankDefaultTitle } from '../../shared/blank-default-names'
 import { LaunchController } from './launch'
@@ -473,6 +485,12 @@ export interface UniworkDocsServiceDeps {
    * null = nothing is pinned (the open fails as it did before).
    */
   openOfflineCopy?(documentId: string): Promise<OfflineCopyOpen>
+  /**
+   * UNI-2212: the app's legacy converter (progress box, Cancel, typed notices), for a cloud
+   * .doc / .xls / .ppt whose bytes were just downloaded. Absent = such a document cannot be
+   * opened (`unsupported_format`), exactly as before the converter existed.
+   */
+  convertLegacy?(input: CloudLegacyConvertInput): Promise<CloudConvertOutcome>
   /**
    * The org capability cache (the same one the sync runtime reads), for the
    * save queue's lane verdicts. Absent = writes allowed (tests that never read
@@ -1074,6 +1092,12 @@ function withServerContext(binding: Binding, detail: DocumentDetail, readOnly = 
   if (detail.file.versionId && next.baseVersion === detail.file.version) {
     next.baseVersionId = detail.file.versionId
   }
+  // UNI-2212: a copy of a head that is still a legacy .doc/.xls/.ppt is its OOXML conversion and
+  // owes the server that conversion with its next commit; a read-only copy (a version view or a
+  // view launch) never saves, and a head that moved on to OOXML owes nothing
+  const legacy = readOnly ? null : legacyOfFile(detail.file, detail.title)
+  if (legacy && legacyTargetFormat(legacy) === next.format) next.legacyFrom = legacy
+  else delete next.legacyFrom
   return next
 }
 
@@ -9469,15 +9493,56 @@ export class UniworkDocsService {
   private async fetchLatest(
     documentId: string,
     first?: DocumentDetail,
-  ): Promise<{ detail: DocumentDetail; bytes: Uint8Array }> {
+  ): Promise<{ detail: DocumentDetail; bytes: Uint8Array; format: UniworkDocFormat | null }> {
     let detail = first ?? (await this.api().getDocument(documentId))
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const { bytes } = await this.api().download(documentId)
-      if (sha256Hex(bytes) === detail.file.checksumSha256) return { detail, bytes }
+      if (sha256Hex(bytes) === detail.file.checksumSha256) {
+        // UNI-2212: the bytes the caller writes as the working copy are the converted OOXML of a
+        // legacy head (the checksum above is the server's, of the raw bytes)
+        const opened = await this.openableBytes(bytes, {
+          hint: legacyOfFile(detail.file, detail.title),
+          name: detail.title,
+        })
+        return { detail, bytes: opened.bytes, format: opened.format }
+      }
       // a save landed between the two reads: read the detail again
       detail = await this.api().getDocument(documentId)
     }
     throw new UniworkDocError('malformed_response')
+  }
+
+  /**
+   * UNI-2212: what a downloaded file opens as. A compound file (.doc/.xls/.ppt) goes through the
+   * app's converter (the progress box, Cancel and typed notices are the converter's); an OOXML
+   * package under a legacy name opens as it is. Anything else is not ours to touch.
+   */
+  private async openableBytes(
+    bytes: Uint8Array,
+    options: { hint: LegacyFrom | null; name: string },
+  ): Promise<{ bytes: Uint8Array; format: UniworkDocFormat | null }> {
+    if (!isCfbBytes(bytes)) {
+      if (!options.hint) return { bytes, format: null }
+      // a legacy MIME type or name on a file that is really OOXML: it opens as the format it is,
+      // provided it is the family the commit's conversion pair names
+      const kind = detectOoxmlKindFromZipBytes(bytes)
+      if (kind !== legacyTargetFormat(options.hint)) throw new UniworkDocError('unsupported_format')
+      return { bytes, format: kind }
+    }
+    const from = legacyOfCfbBytes(bytes) ?? options.hint
+    if (!from) return { bytes, format: null }
+    const convert = this.deps.convertLegacy
+    if (!convert) throw new UniworkDocError('unsupported_format')
+    const name = options.name.toLowerCase().endsWith(`.${from}`)
+      ? options.name
+      : `${options.name}.${from}`
+    const out = await convert({ bytes, from, name })
+    if (!out.ok) {
+      throw new UniworkDocError(
+        out.reason === 'cancelled' ? 'legacy_cancelled' : 'legacy_open_failed',
+      )
+    }
+    return { bytes: out.bytes, format: out.to }
   }
 
   /** picker, recents reopen and launch: the one open flow */
@@ -9527,7 +9592,10 @@ export class UniworkDocsService {
       }
       throw error
     }
-    const format =
+    // UNI-2212: a live version that is still a legacy .doc/.xls/.ppt opens as its OOXML conversion
+    const legacyHead = legacyOfFile(detail.file, detail.title)
+    let format =
+      (legacyHead ? legacyTargetFormat(legacyHead) : null) ??
       formatForMime(detail.file.mimeType) ??
       formatForName(detail.file.filename) ??
       formatForName(detail.title)
@@ -9630,11 +9698,17 @@ export class UniworkDocsService {
     let bytes: Uint8Array
     let base = detail
     if (viewTicket) {
-      bytes = (await this.api().download(documentId, launch.version)).bytes
+      // UNI-2212: a version from history can be a legacy file under a document whose head is
+      // already OOXML, so the bytes (not the head's metadata) decide whether the converter runs
+      const raw = (await this.api().download(documentId, launch.version)).bytes
+      const opened = await this.openableBytes(raw, { hint: null, name: detail.title })
+      bytes = opened.bytes
+      if (opened.format) format = opened.format
     } else {
       const latest = await this.fetchLatest(documentId, detail)
       bytes = latest.bytes
       base = latest.detail
+      if (latest.format) format = latest.format
     }
     // while the sweep still owns this folder the fresh download writes
     // nothing: its binding write below would be refused (the store's hold), so

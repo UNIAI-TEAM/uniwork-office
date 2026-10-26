@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { extname } from 'node:path'
 import type { UniworkDocFormat } from '../../shared/home-api'
+import { legacyOfName, legacyTargetFormat } from './legacy-cloud'
 
 /**
  * The six document formats UniWork Office opens from UniWork, their upload
@@ -48,6 +49,16 @@ export function formatForName(name: string): UniworkDocFormat | null {
   return Object.hasOwn(BY_EXTENSION, ext) ? BY_EXTENSION[ext] : null
 }
 
+/**
+ * UNI-2212: the name ends in the legacy extension (`.xls`) of the OOXML `format` (`xlsx`): the
+ * conversion keeps the document's title (the server rewrites only that suffix), so a converted
+ * copy's name drops the legacy suffix instead of stacking `.xls.xlsx`.
+ */
+function legacyExtensionOf(name: string, format: UniworkDocFormat): boolean {
+  const legacy = legacyOfName(name)
+  return legacy !== null && legacyTargetFormat(legacy) === format
+}
+
 export function formatForMime(mime: string): UniworkDocFormat | null {
   const key = mime.split(';', 1)[0]?.trim().toLowerCase() ?? ''
   return Object.hasOwn(BY_MIME, key) ? (BY_MIME[key] ?? null) : null
@@ -83,7 +94,9 @@ const MAX_BASENAME = 120
  */
 export function sanitizeFilename(name: string, format: UniworkDocFormat): string {
   let base = name.replace(LONE_SURROGATE, '_').trim()
-  if (formatForName(base) === format) base = base.slice(0, base.length - extname(base).length)
+  if (formatForName(base) === format || legacyExtensionOf(base, format)) {
+    base = base.slice(0, base.length - extname(base).length)
+  }
   // cut by code points so an astral character is never split in half
   base = Array.from(
     base
@@ -108,8 +121,12 @@ export function sanitizeFilename(name: string, format: UniworkDocFormat): string
  */
 export function copyTitleFor(title: string, suffix: string, format: UniworkDocFormat): string {
   const trimmed = title.replace(LONE_SURROGATE, '_').trim()
-  const ext = formatForName(trimmed) === format ? extname(trimmed) : ''
-  const stem = trimmed.slice(0, trimmed.length - ext.length).trim()
+  // a converted copy of `Plan.ppt` is saved as `Plan (my version).pptx`: the copy is OOXML
+  const legacyName = legacyExtensionOf(trimmed, format)
+  const ext = formatForName(trimmed) === format ? extname(trimmed) : legacyName ? `.${format}` : ''
+  const stem = trimmed
+    .slice(0, trimmed.length - (legacyName ? extname(trimmed).length : ext.length))
+    .trim()
   const safe = (text: string) => text.replace(UNSAFE_FILENAME_CHAR, '_')
   const tail = ` ${suffix}${ext}`
   const room = Math.max(1, MAX_TITLE_RUNES - Array.from(safe(tail)).length)

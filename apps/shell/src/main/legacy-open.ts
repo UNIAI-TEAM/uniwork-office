@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
 import { forgetConvertedDocument, registerConvertedDocument } from '@genoffice/electron-utils'
 import {
   LegacyConvertError,
@@ -9,8 +10,10 @@ import {
   type LegacyConvertErrorCode,
   type LegacySourceFormat,
   type LegacyTargetFormat,
+  LEGACY_TARGET_FOR_SOURCE as LEGACY_TARGET,
 } from './legacy-converter'
 import type { LegacyOpenStringKey } from './legacy-open-strings'
+import type { CloudConvertOutcome, CloudLegacyConvertInput } from './uniwork-docs/legacy-cloud-open'
 
 const FOLDING_FS = process.platform === 'win32' || process.platform === 'darwin'
 const sameDir = (a: string, b: string): boolean =>
@@ -278,3 +281,71 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
 }
 
 export type LegacyOpener = ReturnType<typeof createLegacyOpener>
+
+export interface CloudLegacyConverterDeps {
+  convert: LegacyOpenDeps['convert']
+  /** where the downloaded legacy bytes are staged for the converter (default: the OS temp dir) */
+  stagingRoot?(): string
+  beginProgress: LegacyOpenDeps['beginProgress']
+  notice: LegacyOpenDeps['notice']
+  t: LegacyOpenDeps['t']
+}
+
+/**
+ * UNI-2212: the converter the UniWork open flow uses for a cloud .doc / .xls / .ppt whose bytes it
+ * just downloaded. The same progress box with Cancel and the same typed notices as a local open
+ * (`createLegacyOpener`); there is no values-only fallback here (a cloud copy must not be bound as
+ * a lossy one). The downloaded bytes are staged in a private temp dir that is always removed, and
+ * nothing is opened or written beyond that: the caller owns the converted bytes.
+ */
+export function createCloudLegacyConverter(deps: CloudLegacyConverterDeps) {
+  const controllers = new Set<AbortController>()
+  let disposed = false
+  return {
+    async convert(input: CloudLegacyConvertInput): Promise<CloudConvertOutcome> {
+      if (disposed) return { ok: false, reason: 'cancelled' }
+      const controller = new AbortController()
+      controllers.add(controller)
+      const endProgress = deps.beginProgress(input.name, () => controller.abort())
+      let dir: string | null = null
+      try {
+        const root = deps.stagingRoot?.() ?? tmpdir()
+        await mkdir(root, { recursive: true })
+        dir = await mkdtemp(join(root, 'genoffice-cloud-legacy-'))
+        const staged = join(dir, `document.${input.from}`)
+        await writeFile(staged, input.bytes, { mode: 0o600 })
+        if (controller.signal.aborted || disposed) return { ok: false, reason: 'cancelled' }
+        const result = await deps.convert(staged, {
+          signal: controller.signal,
+          sourceFormat: input.from,
+        })
+        // an OOXML package that only carries a legacy name must still be the family the
+        // document's own format maps to, or the server would refuse it as the next version
+        if (result.targetFormat !== LEGACY_TARGET[input.from]) {
+          throw new LegacyConvertError('corrupt', 'converted family does not match the document')
+        }
+        return { ok: true, bytes: result.bytes, to: result.targetFormat }
+      } catch (err) {
+        if (controller.signal.aborted || disposed) return { ok: false, reason: 'cancelled' }
+        if (err instanceof LegacyConvertError && err.code === 'cancelled') {
+          return { ok: false, reason: 'cancelled' }
+        }
+        const failure =
+          err instanceof LegacyConvertError ? err : new LegacyConvertError('failed', String(err))
+        deps.notice(legacyErrorMessage(failure, input.name, deps.t))
+        return { ok: false, reason: 'failed' }
+      } finally {
+        endProgress()
+        controllers.delete(controller)
+        if (dir) await rm(dir, { recursive: true, force: true }).catch(() => undefined)
+      }
+    },
+    /** app quit: a pending conversion stops and no new one starts */
+    dispose(): void {
+      disposed = true
+      for (const controller of controllers) controller.abort()
+    },
+  }
+}
+
+export type CloudLegacyConverter = ReturnType<typeof createCloudLegacyConverter>

@@ -346,6 +346,18 @@ describe('parseBinding + write (what this build stamps)', () => {
     expect(bindingCanEdit(copy('view', 'manage'))).toBe(false)
   })
 
+  it('UNI-2212: legacyFrom survives only as the conversion of this copy\u2019s own format', async () => {
+    const raw = (format: string, legacyFrom: unknown) => ({ ...schema2, format, legacyFrom })
+    expect(parseBinding(raw('docx', 'doc'))?.legacyFrom).toBe('doc')
+    expect(parseBinding(raw('xlsx', 'xls'))?.legacyFrom).toBe('xls')
+    expect(parseBinding(raw('pptx', 'ppt'))?.legacyFrom).toBe('ppt')
+    // a cross-family pair, an unknown word or a non-string never rides on a binding
+    expect(parseBinding(raw('docx', 'xls'))).not.toHaveProperty('legacyFrom')
+    expect(parseBinding(raw('docx', 'docx'))).not.toHaveProperty('legacyFrom')
+    expect(parseBinding(raw('docx', 7))).not.toHaveProperty('legacyFrom')
+    expect(parseBinding({ ...schema2 })).not.toHaveProperty('legacyFrom')
+  })
+
   it('a malformed raw value never parses, whatever the schema claims', () => {
     expect(parseBinding({ schema: 2, min_store_level: 2 })).toBeNull()
     expect(parseBinding({ ...schema2, baseVersion: 1.5 })).toBeNull()

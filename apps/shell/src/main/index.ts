@@ -384,7 +384,8 @@ import {
   killAllActiveLegacyConversions,
   legacyFormatForPath,
 } from './legacy-converter'
-import { createLegacyOpener } from './legacy-open'
+import { createCloudLegacyConverter, createLegacyOpener } from './legacy-open'
+import type { CloudLegacyConvertInput } from './uniwork-docs/legacy-cloud-open'
 import { tLegacyOpen } from './legacy-open-strings'
 import {
   FolderWatcher,
@@ -4402,6 +4403,7 @@ function uniworkDocsWiring() {
     // G5-04g: a newer-store working copy is locked, never routed to a module
     refuseLockedPath: (path: string) => refuseLockedOpenPath(uniworkDocs?.service, path),
     isPathOpen: (path: string) => webContentsForPath(path) !== undefined,
+    convertLegacy: (input: CloudLegacyConvertInput) => cloudLegacyConverter.convert(input),
     // the module's own Save (same path as the menu), which ends in the user-save hook
     requestModuleSave: requestUniworkModuleSave,
     // UWNM-BE-R4-1: docs' outside-change check; slides / sheets keep no such state
@@ -4610,6 +4612,14 @@ const legacyOpener = createLegacyOpener({
     return true
   },
   recordRecent: recordRecentFile,
+  beginProgress: beginLegacyProgress,
+  notice: showAppWarning,
+  t: (key, params) => tLegacyOpen(currentLang(), key, params),
+})
+
+/** UNI-2212: the same converter, progress box and typed notices for a cloud .doc/.xls/.ppt */
+const cloudLegacyConverter = createCloudLegacyConverter({
+  convert: (path, options) => convertLegacyFile(path, options),
   beginProgress: beginLegacyProgress,
   notice: showAppWarning,
   t: (key, params) => tLegacyOpen(currentLang(), key, params),
@@ -7568,6 +7578,7 @@ app.on('will-quit', (event) => {
   // tabs read their backing files. The opener first: it aborts its own pending conversions and
   // refuses new staging, so nothing new starts after the running jobs are killed
   void legacyOpener.dispose()
+  cloudLegacyConverter.dispose()
   // Reject queued conversions and refuse new ones before the running soffice trees are killed
   disposeLegacyConverter()
   killAllActiveLegacyConversions()
