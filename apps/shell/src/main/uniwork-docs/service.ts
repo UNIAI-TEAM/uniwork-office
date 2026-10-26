@@ -128,8 +128,11 @@ import {
   workingCopyName,
 } from './formats'
 import {
+  conversionFor,
+  convertedTitle,
   legacyOfFile,
   legacyTargetFormat,
+  type LegacyConversion,
   type LegacyFrom,
 } from './legacy-cloud'
 import {
@@ -2491,6 +2494,8 @@ export class UniworkDocsService {
       pause,
       drafts,
       clock: () => Date.now(),
+      // UNI-2212: a converted copy of a legacy document declares its conversion with its commit
+      conversionFor: (path) => this.conversionOf(path),
       // an account switch (or a sign-out) between the upload and the commit
       // must not commit this copy under the other account: the dispatcher
       // re-asks this right before the upload and right before the commit
@@ -2684,6 +2689,12 @@ export class UniworkDocsService {
     delete next.maxBytes
     delete next.serverRevision
     delete next.serverVersion
+    // UNI-2212: the converted copy is now the live version: an ordinary OOXML document, whose
+    // title the server rewrote from the legacy suffix (the title notice would say the same)
+    if (next.legacyFrom) {
+      next.title = convertedTitle(next.title, next.legacyFrom)
+      delete next.legacyFrom
+    }
     // the intent landed: nothing newer waits behind it (RBE6u-02)
     this.coordinator.clearPendingNext(doc.path)
     const done = await this.coordinator.commitState(doc, next)
@@ -3096,6 +3107,12 @@ export class UniworkDocsService {
       record: stored.intent,
       payload: stored.payload,
     }
+  }
+
+  /** UNI-2212: the conversion the next commit of this working copy declares, if it owes one */
+  private conversionOf(path: string): LegacyConversion | null {
+    const from = this.store.lookup(path)?.binding.legacyFrom
+    return from ? conversionFor(from) : null
   }
 
   /** the queue sessions whose dispatcher must not commit any more (torn down) */
