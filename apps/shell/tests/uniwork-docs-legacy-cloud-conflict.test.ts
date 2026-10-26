@@ -49,6 +49,33 @@ async function conflictedTab(
   return { ctx, path, mine }
 }
 
+/**
+ * the conversion settled (flag cleared, v2), then another device restored the legacy v1 as head
+ * v3; my next edit conflicts against it with no local flag to say the head is legacy again
+ */
+async function restoredLegacyTab(
+  server: ReturnType<typeof fakeServer>,
+): Promise<{ ctx: Ctx; path: string; mine: Uint8Array }> {
+  const ctx = setup(server)
+  const path = await openDoc(ctx)
+  await ctx.service.save(path)
+  expect(binding(path).legacyFrom).toBeUndefined()
+  server.versions.push({
+    bytes: server.versions[0]!.bytes,
+    mime: server.versions[0]!.mime,
+    filename: 'budget.xls',
+    reason: 'restore',
+  })
+  server.state.revision = 3
+  server.state.title = 'Budget.xls'
+  const mine = await ooxml('xlsx', 'my edits')
+  writeFileSync(path, mine)
+  await ctx.service.save(path)
+  expect(binding(path)).toMatchObject({ state: 'conflict' })
+  expect(binding(path).legacyFrom).toBeUndefined()
+  return { ctx, path, mine }
+}
+
 async function act(ctx: Ctx, path: string, action: unknown) {
   const resolving = ctx.service.resolveConflict(path)
   await vi.waitFor(() => expect(ctx.views).toHaveLength(1))
@@ -95,6 +122,24 @@ describe('UNI-2212 Overwrite on a converted copy', () => {
     expect(Buffer.from(server.versions[1]!.bytes).equals(Buffer.from(mine))).toBe(true)
     expect(binding(path).legacyFrom).toBeUndefined()
   })
+
+  it('a legacy head restored after the conversion settled still gets the conversion', async () => {
+    const server = fakeServer({ legacy: 'xls', title: 'Budget.xls' })
+    const { ctx, path, mine } = await restoredLegacyTab(server)
+    const before = commitCalls(server).length
+    const reply = await act(ctx, path, { kind: 'overwrite', stopAi: false })
+    expect(reply).toEqual({ kind: 'closed' })
+    expect(commitCalls(server)).toHaveLength(before + 1)
+    expect(commitCalls(server).at(-1)!.body).toMatchObject({
+      base_revision: '3',
+      conversion: { from_format: 'xls', to_format: 'xlsx' },
+    })
+    expect(server.versions).toHaveLength(4)
+    expect(server.versions[3]).toMatchObject({ reason: 'converted_version' })
+    expect(Buffer.from(server.versions[3]!.bytes).equals(Buffer.from(mine))).toBe(true)
+    expect(Buffer.from(readFileSync(path)).equals(Buffer.from(mine))).toBe(true)
+    expect(binding(path).legacyFrom).toBeUndefined()
+  })
 })
 
 describe('UNI-2212 Save as a copy from a converted copy', () => {
@@ -134,5 +179,22 @@ describe('UNI-2212 Save as a copy from a converted copy', () => {
     expect(copy.versions).toHaveLength(2)
     expect(copy.versions[1]).toMatchObject({ reason: 'save', mime: OOXML_MIME.xlsx })
     expect(Buffer.from(copy.versions[1]!.bytes).equals(Buffer.from(mine))).toBe(true)
+  })
+
+  it('a copied head restored to legacy after the conversion settled still gets the conversion', async () => {
+    const server = fakeServer({ legacy: 'xls', title: 'Budget.xls' })
+    const copies = attachCopy(server)
+    const { ctx, path, mine } = await restoredLegacyTab(server)
+    const reply = await act(ctx, path, { kind: 'save-copy', stopAi: false })
+    expect(reply).toMatchObject({ kind: 'view', view: { notice: 'save_copy_done' } })
+    const copy = copies.copy!
+    expect(copies.archived).toBe(0)
+    const commits = commitCalls(copy)
+    expect(commits).toHaveLength(1)
+    expect(commits[0]!.body).toMatchObject({
+      conversion: { from_format: 'xls', to_format: 'xlsx' },
+    })
+    expect(Buffer.from(copy.versions.at(-1)!.bytes).equals(Buffer.from(mine))).toBe(true)
+    expect(Buffer.from(readFileSync(path)).equals(Buffer.from(mine))).toBe(true)
   })
 })

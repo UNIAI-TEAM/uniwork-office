@@ -2252,8 +2252,8 @@ describe('G5-12 Save as a copy (main)', () => {
     // upload happened under acc_1, then nothing at all reached the copy
     expect(callsTo(server, `${COPY}/archive`)).toHaveLength(0)
     expect(callsTo(server, `${COPY}/versions/commit`)).toHaveLength(0)
-    // the copy saw exactly its upload (under the first account), nothing after the switch
-    expect(server.calls.filter((c) => c.path.includes(COPY))).toHaveLength(1)
+    // the copy saw exactly its head read and its upload (under the first account), nothing after the switch
+    expect(server.calls.filter((c) => c.path.includes(COPY))).toHaveLength(2)
     expect(server.state.copy!.archived).toBe(false)
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`${COPY}.*account`)))
     warn.mockRestore()

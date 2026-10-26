@@ -9051,11 +9051,10 @@ export class UniworkDocsService {
     }
     const copyId = created.summary.id
 
-    // UNI-2212: the copy starts as the source's head. A converted tab declares its conversion only
-    // when that head is still legacy (the source may have been converted by another device since)
-    const copyHead = chosen.binding.legacyFrom
-      ? await this.readLegacyHead(copyId, chosen.binding.format)
-      : null
+    // UNI-2212: the copy starts as the source's head. A tab declares a conversion only when that
+    // head is legacy: the source may have been converted by another device since, or restored to
+    // its legacy version after this copy's own conversion cleared the flag
+    const copyHead = await this.readLegacyHead(copyId, chosen.binding.format)
     const copyConversion = copyHead?.legacyFrom ? conversionFor(copyHead.legacyFrom) : undefined
 
     // step 2: the local bytes become version 2 of the copy; one retry, same keys
@@ -9347,11 +9346,13 @@ export class UniworkDocsService {
     if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
     // UNI-2212: the head may have been converted by another device since this copy was opened,
     // so what the commit owes follows the head as it is now, read with its revision: a head that
-    // is OOXML already takes an ordinary commit (a stale conversion would be refused not_legacy)
+    // is OOXML already takes an ordinary commit (a stale conversion would be refused not_legacy),
+    // and a head restored to legacy needs the conversion even though this copy's flag was cleared
     let legacyFrom = chosen.binding.legacyFrom
-    if (legacyFrom && currentView.online) {
+    if (currentView.online) {
       const head = await this.readLegacyHead(chosen.binding.documentId, chosen.binding.format)
-      if (head) {
+      // an ordinary head keeps the revision the dialog showed: a head that moved since is a 409
+      if (head && (legacyFrom || head.legacyFrom)) {
         serverRevision = head.revision
         legacyFrom = head.legacyFrom
       }
