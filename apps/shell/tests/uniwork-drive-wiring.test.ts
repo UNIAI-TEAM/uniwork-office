@@ -254,6 +254,20 @@ describe('uniwork-drive IPC wiring', () => {
       expect(res.value).toHaveLength(3)
       expect(res.value.some((e) => 'actorName' in e)).toBe(false)
     })
+
+    it('still answers ok when the member lookup throws synchronously', async () => {
+      const memberNames = vi.fn((): Promise<Map<string, string>> => {
+        throw new Error('members unreadable')
+      })
+      const { call } = setup({ memberNames }, historyFetch())
+      const res = (await call(C.getHistory, target)) as {
+        ok: boolean
+        value: Array<{ actorName?: string }>
+      }
+      expect(res.ok).toBe(true)
+      expect(res.value).toHaveLength(3)
+      expect(res.value.some((e) => 'actorName' in e)).toBe(false)
+    })
   })
 
   it('refuses invalid renderer arguments before making any network request', async () => {
