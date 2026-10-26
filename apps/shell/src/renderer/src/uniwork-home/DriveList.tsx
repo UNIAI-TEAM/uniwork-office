@@ -220,7 +220,7 @@ export type DriveRendererBridge = DocumentsHomeApiAdapter & {
 export function getDriveBridge(): DriveRendererBridge | null {
   if (typeof window === 'undefined') return null
   if (window.uniworkDrive) return window.uniworkDrive
-  if (window.aiOffice) return window.aiOffice
+  if (window.aiOffice) return window.aiOffice as unknown as DriveRendererBridge
   return null
 }
 
