@@ -70,8 +70,25 @@ interface LineWord {
   gap: boolean
 }
 
-/** Split one OCR line into words: char boxes when present (chars of a word share
-    its box; separators carry degenerate boxes), whole-line fallback otherwise */
+/** Below these thresholds, vertical scatter across words comes from ascender/descender
+    differences or minor scan jitter rather than a tilted line, so every word keeps the
+    shared line box [ly0, ly1]. Above them (at least 3 words, width-weighted x-spread
+    >= 25 % of line width, and fitted rise >= 30 % of line height), words follow a
+    width-weighted least-squares tilt line with one shared band height per line. */
+const TILT_MIN_WORDS = 3
+const TILT_MIN_X_SPREAD_RATIO = 0.25
+const TILT_RISE_RATIO = 0.3
+
+/** Split one OCR line into words: runs of chars between separators (degenerate
+    box or whitespace), with x-extent = union of the word's char boxes and
+    y-extent = the line box on straight lines (or a tilted band of uniform height
+    when the line is skewed). Both shared-box engines (Vision / Windows) and
+    per-glyph engines (Tesseract alignChars) merge space-delimited words under
+    the union rule. No-space scripts (CJK / Kana / Thai) emit one char per box
+    with no separators: when consecutive chars do not share an identical box and
+    either side is a no-space script, each char stays its own word so `data.words`
+    and per-char search item offsets remain unchanged. Whole-line fallback when
+    chars are absent or incomplete. */
 function lineWords(line: PdfOcrLine): LineWord[] {
   if (!line.chars || line.chars.length === 0) {
     const text = line.text.trim()
@@ -79,23 +96,130 @@ function lineWords(line: PdfOcrLine): LineWord[] {
   }
   const words: LineWord[] = []
   let cur: LineWord | null = null
+  let curHasInRange = false
+  let curFallbackBox: [number, number, number, number] = line.box
+  let prevRawX0 = NaN
+  let prevRawX2 = NaN
+  let curLastChar = ''
   let sep = false
+  const [lx0, , lx1] = line.box
+  const clampWordBox = (b: [number, number, number, number]): [number, number, number, number] => {
+    const lineW = Math.max(0, lx1 - lx0)
+    const minW = Math.max(1e-3, lineW * 0.005)
+    const rawW = Math.max(minW, b[2] - b[0])
+    if (lineW <= 0) return [lx0, b[1], lx0 + minW, b[3]]
+    const w = Math.min(lineW, Math.max(minW, Math.min(lx1, b[2]) - Math.max(lx0, b[0]), rawW))
+    const x0 = Math.max(lx0, Math.min(lx1 - w, b[0]))
+    return [x0, b[1], x0 + w, b[3]]
+  }
+  const flushCur = (): void => {
+    if (!cur) return
+    if (!curHasInRange) cur.box = clampWordBox(curFallbackBox)
+    words.push(cur)
+    cur = null
+  }
   for (const c of line.chars) {
     if (isSeparatorBox(c.box) || c.text.trim() === '') {
-      if (cur) words.push(cur)
-      cur = null
+      flushCur()
       sep = true
       continue
     }
-    if (cur && c.box[0] === cur.box[0] && c.box[2] === cur.box[2]) cur.text += c.text
-    else {
-      if (cur) words.push(cur)
-      cur = { text: c.text, box: [...c.box] as [number, number, number, number], gap: sep }
+    // A glyph box outside the line's x-range (italic overhang, stray helper box) keeps its
+    // text in the word without seeding or stretching the word union; if no in-range glyph
+    // ever arrives in the word, flushCur clamps curFallbackBox inside [lx0, lx1].
+    const inLineX = c.box[0] >= lx0 - 1e-3 && c.box[2] <= lx1 + 1e-3
+    const sameBox = cur !== null && c.box[0] === prevRawX0 && c.box[2] === prevRawX2
+    const canMerge =
+      cur !== null && (sameBox || (!endsNoSpaceScript(curLastChar) && !startsNoSpaceScript(c.text)))
+    if (cur && canMerge) {
+      cur.text += c.text
+      if (inLineX) {
+        if (!curHasInRange) {
+          cur.box = [c.box[0], c.box[1], c.box[2], c.box[3]]
+          curHasInRange = true
+        } else {
+          cur.box[0] = Math.min(cur.box[0], c.box[0])
+          cur.box[1] = Math.min(cur.box[1], c.box[1])
+          cur.box[2] = Math.max(cur.box[2], c.box[2])
+          cur.box[3] = Math.max(cur.box[3], c.box[3])
+        }
+      }
+      curLastChar = c.text
+      prevRawX0 = c.box[0]
+      prevRawX2 = c.box[2]
+    } else {
+      flushCur()
+      cur = {
+        text: c.text,
+        box: [c.box[0], c.box[1], c.box[2], c.box[3]],
+        gap: sep,
+      }
+      curHasInRange = inLineX
+      curFallbackBox = [c.box[0], c.box[1], c.box[2], c.box[3]]
+      curLastChar = c.text
+      prevRawX0 = c.box[0]
+      prevRawX2 = c.box[2]
       sep = false
     }
   }
-  if (cur) words.push(cur)
-  return words.length > 0 ? lineWordsFallback(words, line) : []
+  flushCur()
+  if (words.length === 0) return []
+  const checked = lineWordsFallback(words, line)
+  if (checked !== words) return checked
+  applyLineVerticalBand(words, line.box)
+  return words
+}
+
+/** Assign vertical bounds to each word on a line: straight lines share [ly0, ly1]
+    across all words; tilted lines fit a width-weighted least-squares centre line
+    and give every word the same band height h centered on the fitted line (clamped
+    to [ly0, ly1]) so spans follow the tilt without overlapping adjacent lines. */
+function applyLineVerticalBand(words: LineWord[], lineBox: [number, number, number, number]): void {
+  const [lx0, ly0, lx1, ly1] = lineBox
+  const lineH = ly1 - ly0
+  const lineW = lx1 - lx0
+  if (words.length >= TILT_MIN_WORDS && lineH > 0 && lineW > 0) {
+    let sw = 0
+    let sx = 0
+    let sy = 0
+    for (const w of words) {
+      const wt = Math.max(w.box[2] - w.box[0], 1e-6)
+      sw += wt
+      sx += wt * 0.5 * (w.box[0] + w.box[2])
+      sy += wt * 0.5 * (w.box[1] + w.box[3])
+    }
+    const mx = sx / sw
+    const my = sy / sw
+    let sxx = 0
+    let sxy = 0
+    for (const w of words) {
+      const wt = Math.max(w.box[2] - w.box[0], 1e-6)
+      const dx = 0.5 * (w.box[0] + w.box[2]) - mx
+      const dy = 0.5 * (w.box[1] + w.box[3]) - my
+      sxx += wt * dx * dx
+      sxy += wt * dx * dy
+    }
+    const xSpread = Math.sqrt(sxx / sw)
+    const slope = sxx > 1e-12 ? sxy / sxx : 0
+    const rise = Math.abs(slope) * lineW
+    if (xSpread >= TILT_MIN_X_SPREAD_RATIO * lineW && rise >= TILT_RISE_RATIO * lineH) {
+      const heights = words.map((w) => w.box[3] - w.box[1]).sort((a, b) => a - b)
+      const medianH = heights[Math.floor(heights.length / 2)]!
+      const h = Math.min(lineH, Math.max(lineH - rise, medianH))
+      for (const w of words) {
+        const xc = 0.5 * (w.box[0] + w.box[2])
+        const yc = my + slope * (xc - mx)
+        const y0 = Math.max(ly0, Math.min(ly1 - h, yc - 0.5 * h))
+        w.box[1] = y0
+        w.box[3] = y0 + h
+      }
+      return
+    }
+  }
+  for (const w of words) {
+    w.box[1] = ly0
+    w.box[3] = ly1
+  }
 }
 
 /** Guard against helpers whose char boxes don't cover the text: fall back to the line box */

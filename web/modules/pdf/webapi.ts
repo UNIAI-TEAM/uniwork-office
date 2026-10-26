@@ -1164,6 +1164,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     // null = "no OCR engine on this platform": the viewer stops trying
     ocrPage: async () => null,
     convertOffice: async () => {},
+    convertCancel: async () => {},
+    onConvertProgress: () => () => {},
     createDocument: async () => ({ ok: false, error: NOT_AVAILABLE }),
     generateImage: async () => ({ error: NOT_AVAILABLE }),
     getAiPanelPrefs: async () => ({ ...DEFAULT_AI_PANEL_PREFS }),

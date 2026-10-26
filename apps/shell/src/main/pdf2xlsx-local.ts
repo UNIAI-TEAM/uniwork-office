@@ -1,31 +1,45 @@
 /**
- * Local PDF → Excel conversion for the shell's pdf tabs (pdf2xlsx P26).
- * Mirrors pdf2pptx-local.ts: same lazy PDFium wasm singleton (shared via
- * ensurePdfium), same password retry loop, pure @genoffice/pdf2docx pipeline
- * in the main process. Imported by relative path so the bundled shell main
- * carries the package inline.
+ * Local PDF → Excel conversion for the shell's pdf tabs (pdf2xlsx P26, UNI-2167).
+ * Mirrors pdf2pptx-local.ts: runs the @genoffice/pdf2docx pipeline inside the
+ * shared utility-process host (`convert-host.ts`) with the same password retry loop.
  */
-import { readFileSync } from 'node:fs'
-import { convertPdfToXlsx } from '../../../../packages/pdf2docx/src'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { ConvertXlsxResult } from '../../../../packages/pdf2docx/src'
-import { convertWithPasswordRetry, ensurePdfium } from './pdf2docx-local'
+import { runPdfConvertJob } from './pdf-convert/convert-host'
+import { convertWithPasswordRetry } from './pdf2docx-local'
 
 export type { ConvertXlsxResult } from '../../../../packages/pdf2docx/src'
 
-/** Convert a PDF file on disk to xlsx bytes, fully locally. */
+const devPackageDir = join(dirname(fileURLToPath(import.meta.url)), '../../../../packages/pdf2docx')
+
+/** Convert a PDF file on disk to xlsx bytes, off the main process. */
 export async function convertPdfFileToXlsxLocal(
   pdfPath: string,
   onProgress?: (page: number, total: number) => void,
   password?: string,
+  signal?: AbortSignal,
 ): Promise<ConvertXlsxResult> {
-  const pdfium = await ensurePdfium()
-  const bytes = readFileSync(pdfPath)
-  const pdf = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  return convertPdfToXlsx(pdf, {
-    pdfium,
-    ...(onProgress !== undefined ? { onProgress } : {}),
-    ...(password !== undefined ? { password } : {}),
-  })
+  const res = await runPdfConvertJob(
+    {
+      kind: 'xlsx',
+      pdfPath,
+      ...(password !== undefined ? { password } : {}),
+      ...(process.resourcesPath ? { resourcesPath: process.resourcesPath } : {}),
+      devPackageDir,
+    },
+    {
+      ...(onProgress !== undefined ? { onProgress } : {}),
+      ...(signal !== undefined ? { signal } : {}),
+    },
+  )
+  return {
+    xlsx: res.bytes,
+    pages: res.pages,
+    warnings: res.warnings,
+    pageResults: res.pageResults,
+    scannedDocument: res.scannedDocument,
+  }
 }
 
 /**
@@ -37,9 +51,11 @@ export function convertPdfFileToXlsxLocalWithPrompt(
   pdfPath: string,
   promptPassword: (retry: boolean) => Promise<string | null>,
   onProgress?: (page: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<ConvertXlsxResult | null> {
   return convertWithPasswordRetry(
-    (password) => convertPdfFileToXlsxLocal(pdfPath, onProgress, password),
+    (password) => convertPdfFileToXlsxLocal(pdfPath, onProgress, password, signal),
     promptPassword,
+    signal,
   )
 }

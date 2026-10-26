@@ -21,6 +21,28 @@ import AppKit
 import Foundation
 import Vision
 
+// Exit if the parent converter crashes or is killed (R1-2 / R2-1).
+// When GENOFFICE_OCR_PARENT_PID is set by the spawner, compare the actual
+// parent against it immediately at start (before reading stdin / OCR work)
+// and on every poll; when unset (standalone/CLI use), keep initial getppid().
+let expectedPpid: pid_t = {
+    if let raw = ProcessInfo.processInfo.environment["GENOFFICE_OCR_PARENT_PID"],
+       !raw.isEmpty {
+        guard let parsed = Int32(raw), parsed > 0 else { _exit(1) }
+        if getppid() != parsed { _exit(1) }
+        return parsed
+    }
+    return getppid()
+}()
+if expectedPpid > 0 {
+    DispatchQueue.global(qos: .background).async {
+        while true {
+            Thread.sleep(forTimeInterval: 0.5)
+            if getppid() != expectedPpid { _exit(1) }
+        }
+    }
+}
+
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
 guard let img = NSImage(data: stdinData),
       let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else {

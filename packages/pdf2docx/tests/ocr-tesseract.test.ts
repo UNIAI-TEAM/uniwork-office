@@ -25,7 +25,7 @@ import type { ExtractedPage } from '../src/extract'
 import { tryOcrScannedPage, type OcrEngine, type OcrLine, type OcrRecognition } from '../src/ocr'
 import { chainOcrEngines, chainOcrEnginesAsync, ocrFallbackReason } from '../src/ocr-chain'
 import { resolveLocalOcrEngine } from '../src/ocr-local'
-import { createTesseractOcrEngine } from '../src/ocr-tesseract'
+import { createTesseractOcrEngine, createTesseractOcrEngineAsync } from '../src/ocr-tesseract'
 import { loadPdfium } from './helpers/wasm'
 
 // each helper run is a child process starting WASM: 1-5 s, more on a loaded CI box
@@ -422,7 +422,7 @@ describe('the helper process environment', () => {
     }
   })
 
-  it('hands the helper none of NODE_OPTIONS / NODE_PATH / NODE_EXTRA_CA_CERTS, its own directory as cwd', () => {
+  it('hands the helper none of NODE_OPTIONS / NODE_PATH / NODE_EXTRA_CA_CERTS, its own directory as cwd, and overwrites GENOFFICE_OCR_PARENT_PID (R2-1)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'tess-env-'))
     try {
       mkdirSync(join(dir, 'tessdata'))
@@ -434,7 +434,7 @@ describe('the helper process environment', () => {
       writeFileSync(
         join(dir, 'tess-ocr.cjs'),
         'const e = process.env\n' +
-          "const t = [process.cwd(), String(e.NODE_OPTIONS), String(e.NODE_PATH), String(e.NODE_EXTRA_CA_CERTS), e.ELECTRON_RUN_AS_NODE, e.PATH ? 'path' : 'nopath'].join('|')\n" +
+          "const t = [process.cwd(), String(e.NODE_OPTIONS), String(e.NODE_PATH), String(e.NODE_EXTRA_CA_CERTS), e.ELECTRON_RUN_AS_NODE, e.PATH ? 'path' : 'nopath', String(e.GENOFFICE_OCR_PARENT_PID)].join('|')\n" +
           'process.stdout.write(JSON.stringify({ lines: [{ t, c: 0.9, b: [0, 0, 1, 1] }] }))\n',
       )
       const fake = createTesseractOcrEngine({
@@ -442,15 +442,46 @@ describe('the helper process environment', () => {
         helperScript: join(dir, 'tess-ocr.cjs'),
         tessdataDir: join(dir, 'tessdata'),
       })!
-      const got = withHostileEnv(() => fake(png('en'), PAGE), dir)
-      const [cwd, nodeOptions, nodePath, caCerts, runAsNode, path] = got!.lines[0]!.text.split('|')
-      expect(realpathSync(cwd!)).toBe(realpathSync(dir))
-      expect([nodeOptions, nodePath, caCerts]).toEqual(['undefined', 'undefined', 'undefined'])
-      expect(runAsNode).toBe('1')
-      expect(path).toBe('path') // everything else is inherited
+      const fakeAsync = createTesseractOcrEngineAsync({
+        nodePath: process.execPath,
+        helperScript: join(dir, 'tess-ocr.cjs'),
+        tessdataDir: join(dir, 'tessdata'),
+      })!
+      process.env.GENOFFICE_OCR_PARENT_PID = '777777'
+      try {
+        const got = withHostileEnv(() => fake(png('en'), PAGE), dir)
+        const [cwd, nodeOptions, nodePath, caCerts, runAsNode, path, parentPid] =
+          got!.lines[0]!.text.split('|')
+        expect(realpathSync(cwd!)).toBe(realpathSync(dir))
+        expect([nodeOptions, nodePath, caCerts]).toEqual(['undefined', 'undefined', 'undefined'])
+        expect(runAsNode).toBe('1')
+        expect(path).toBe('path') // everything else is inherited
+        expect(parentPid).toBe(String(process.pid))
+
+        const gotAsync = await fakeAsync(png('en'), PAGE)
+        const asyncParts = gotAsync!.lines[0]!.text.split('|')
+        expect(asyncParts[6]).toBe(String(process.pid))
+      } finally {
+        delete process.env.GENOFFICE_OCR_PARENT_PID
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+
+  it('exits non-zero immediately at startup before stdin/OCR work when GENOFFICE_OCR_PARENT_PID mismatches process.ppid (R2-1)', () => {
+    const mismatchedPpid = process.pid === 1 ? 2 : 1
+    const res = spawnSync(process.execPath, [HELPER, TESSDATA, 'vie'], {
+      input: png('vi'),
+      maxBuffer: 64 << 20,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        GENOFFICE_OCR_PARENT_PID: String(mismatchedPpid),
+      },
+    })
+    expect(res.status).toBe(1)
+    expect(res.stdout.length).toBe(0)
   })
 })
 

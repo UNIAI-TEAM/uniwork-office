@@ -15,7 +15,12 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import type { OcrEngine, OcrRecognition } from './ocr'
 import type { AsyncOcrEngine } from './ocr-chain'
-import { runOcrHelper, runOcrHelperAsync, type HelperRunOptions } from './ocr-vision'
+import {
+  OCR_PARENT_PID_ENV,
+  runOcrHelper,
+  runOcrHelperAsync,
+  type HelperRunOptions,
+} from './ocr-vision'
 
 /** a 300 dpi A4 page takes 2-5 s on a laptop core; leave room for slow VMs */
 const TESSERACT_TIMEOUT_MS = 90_000
@@ -59,7 +64,10 @@ function helperInstalled(options: TesseractOcrOptions, lang: string): boolean {
 /** how the helper runs: the app binary as plain Node, a scrubbed environment, its own directory */
 function helperRun(options: TesseractOcrOptions): HelperRunOptions {
   return {
-    env: { ELECTRON_RUN_AS_NODE: '1' },
+    env: {
+      ELECTRON_RUN_AS_NODE: '1',
+      [OCR_PARENT_PID_ENV]: String(process.pid),
+    },
     dropEnv: HELPER_DROPPED_ENV,
     cwd: dirname(options.helperScript),
     timeoutMs: TESSERACT_TIMEOUT_MS,

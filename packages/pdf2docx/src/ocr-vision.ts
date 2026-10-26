@@ -54,24 +54,37 @@ export interface HelperRunOptions {
   windowsHide?: boolean
 }
 
-/** environment of a helper run: the caller's minus `dropEnv`, plus `env` */
-function helperEnv(options: HelperRunOptions): NodeJS.ProcessEnv | undefined {
-  if (!options.env && !options.dropEnv?.length) return undefined
-  const drop = new Set((options.dropEnv ?? []).map((k) => k.toUpperCase()))
+/**
+ * Environment variable set to the immediate spawner's `process.pid` on every
+ * OCR helper launch (sync and async) so the helper can verify its parent both
+ * immediately at startup (catching parent death before initial `ppid` capture)
+ * and on every watchdog tick (R2-1).
+ */
+export const OCR_PARENT_PID_ENV = 'GENOFFICE_OCR_PARENT_PID'
+
+/**
+ * Environment of a helper run: the caller's minus `dropEnv`, plus `env`, with
+ * `GENOFFICE_OCR_PARENT_PID` always overwritten to the immediate spawner's PID.
+ */
+function helperEnv(options: HelperRunOptions): NodeJS.ProcessEnv {
+  const drop = new Set([OCR_PARENT_PID_ENV, ...(options.dropEnv ?? []).map((k) => k.toUpperCase())])
   const env: NodeJS.ProcessEnv = {}
   for (const [k, v] of Object.entries(process.env)) {
     if (!drop.has(k.toUpperCase())) env[k] = v
   }
-  return { ...env, ...options.env }
+  return {
+    ...env,
+    ...options.env,
+    [OCR_PARENT_PID_ENV]: String(process.pid),
+  }
 }
 
 /** shared by the sync and the async spawn */
 function spawnOptions(
   options: HelperRunOptions,
 ): Pick<SpawnSyncOptions, 'env' | 'cwd' | 'windowsHide'> {
-  const env = helperEnv(options)
   return {
-    ...(env ? { env } : {}),
+    env: helperEnv(options),
     ...(options.cwd ? { cwd: options.cwd } : {}),
     ...(options.windowsHide ? { windowsHide: true } : {}),
   }
