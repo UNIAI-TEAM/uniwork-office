@@ -380,6 +380,7 @@ import {
 import { isSameFile, pdfSaveAsTarget, isValidRawRenameName } from './rename-validation'
 import {
   convertLegacyFile,
+  disposeLegacyConverter,
   killAllActiveLegacyConversions,
   legacyFormatForPath,
 } from './legacy-converter'
@@ -7546,6 +7547,8 @@ app.on('before-quit', () => {
   // the opener first: it aborts its own pending conversions and refuses new staging, so nothing
   // new starts after the running jobs are killed
   void legacyOpener.dispose()
+  // Reject queued conversions and refuse new ones before the running soffice trees are killed
+  disposeLegacyConverter()
   killAllActiveLegacyConversions()
   // release the MCP port synchronously (macOS keeps the process alive after
   // the last window closes, so window-all-closed is not enough)

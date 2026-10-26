@@ -1,18 +1,9 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs'
+import { constants as fsConstants, existsSync, readFileSync, type Stats } from 'node:fs'
+import { cp, mkdir, mkdtemp, open, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { randomUUID } from 'node:crypto'
-import { inflateRawSync } from 'node:zlib'
 import { killProcessTree, type KillProcessTreeDeps } from './pdf-convert/convert-host'
 
 export type LegacySourceFormat = 'doc' | 'xls' | 'ppt'
@@ -59,6 +50,8 @@ export const OOXML_REQUIRED_MAIN_PART: Readonly<Record<LegacyTargetFormat, strin
 
 const DEFAULT_TIMEOUT_MS = 60_000
 const DEFAULT_MAX_CONCURRENCY = 2
+/** Largest legacy input read into memory; anything bigger is refused before reading. */
+const MAX_LEGACY_INPUT_BYTES = 200 * 1024 * 1024
 
 const CFB_SIGNATURE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1] as const
 const ZIP_SIGNATURE = [0x50, 0x4b, 0x03, 0x04] as const
@@ -95,11 +88,17 @@ export function suggestedOoxmlPathForLegacy(filePath: string): string {
 // ---- CFB (OLE2) container reader + pre-check ----
 
 interface CfbDirectoryEntry {
+  readonly id: number
   readonly name: string
   readonly type: number
+  readonly left: number
+  readonly right: number
+  readonly child: number
   readonly start: number
   readonly size: number
 }
+
+const CFB_NOSTREAM = 0xffffffff
 
 function dirView(bytes: Uint8Array, at: number): DataView {
   return new DataView(bytes.buffer, bytes.byteOffset + at)
@@ -190,6 +189,13 @@ function readCfbFat(view: DataView, sectorSize: number, sectorCount: number): Ui
   return fat
 }
 
+/**
+ * Read every stream of a compound file. Keys are the stream's path from the root
+ * storage: a root-level stream is its bare name (`WordDocument`), a nested one
+ * carries its storage path (`ObjectPool/_1/EncryptionInfo`), so format and
+ * encryption checks can tell the document's own streams from embedded objects'.
+ * Every chain is still walked and bounds-checked, nested or not.
+ */
 export function readCfbStreams(bytes: Uint8Array): Map<string, Uint8Array> {
   if (bytes.byteLength < 512) {
     throw new LegacyConvertError('corrupt', 'shorter than a compound file header')
@@ -228,18 +234,40 @@ export function readCfbStreams(bytes: Uint8Array): Map<string, Uint8Array> {
 
   const directory = concatBytes(chain(firstDirSector).map(sectorBytes))
   const entries: CfbDirectoryEntry[] = []
+  const entryById = new Map<number, CfbDirectoryEntry>()
   for (let at = 0; at + 128 <= directory.byteLength; at += 128) {
     const nameLen = dirView(directory, at).getUint16(64, true)
     if (nameLen < 2 || nameLen > 64) continue
-    entries.push({
+    const entry: CfbDirectoryEntry = {
+      id: at / 128,
       name: new TextDecoder('utf-16le').decode(directory.subarray(at, at + nameLen - 2)),
       type: directory[at + 66] ?? 0,
+      left: dirView(directory, at).getUint32(68, true),
+      right: dirView(directory, at).getUint32(72, true),
+      child: dirView(directory, at).getUint32(76, true),
       start: dirView(directory, at).getUint32(116, true),
       size: Number(dirView(directory, at).getBigUint64(120, true)),
-    })
+    }
+    entries.push(entry)
+    entryById.set(entry.id, entry)
   }
   const root = entries.find((e) => e.type === 5)
   if (!root) throw new LegacyConvertError('corrupt', 'no root directory entry')
+
+  // Path of each entry below the root storage, walking the red-black sibling trees
+  // and descending into storages; entries the walk never reaches are not the
+  // document's own and get a key no root-level check can match.
+  const pathById = new Map<number, string>()
+  const walk: Array<[number, string]> = [[root.child, '']]
+  for (let step = walk.pop(); step; step = walk.pop()) {
+    const [id, prefix] = step
+    const entry = id === CFB_NOSTREAM || pathById.has(id) ? undefined : entryById.get(id)
+    if (!entry || entry.type === 5) continue
+    const path = `${prefix}${entry.name}`
+    pathById.set(id, path)
+    walk.push([entry.left, prefix], [entry.right, prefix])
+    if (entry.type === 1) walk.push([entry.child, `${path}/`])
+  }
 
   const miniFat =
     firstMiniFat === ENDOFCHAIN || firstMiniFat === FREESECT
@@ -273,6 +301,7 @@ export function readCfbStreams(bytes: Uint8Array): Map<string, Uint8Array> {
   const out = new Map<string, Uint8Array>()
   for (const entry of entries) {
     if (entry.type !== 2 || entry.name === '' || entry.size === 0) continue
+    const key = pathById.get(entry.id) ?? `<unreachable>/${entry.id}/${entry.name}`
     if (entry.size < MINI_STREAM_CUTOFF && miniStream.byteLength > 0) {
       if (entry.size > miniStream.byteLength) {
         throw new LegacyConvertError(
@@ -295,7 +324,7 @@ export function readCfbStreams(bytes: Uint8Array): Map<string, Uint8Array> {
           `stream ${entry.name} is shorter than its declared size`,
         )
       }
-      out.set(entry.name, buf)
+      out.set(key, buf)
     } else {
       if (entry.size > bytes.byteLength) {
         throw new LegacyConvertError('corrupt', `stream ${entry.name} is larger than the file`)
@@ -307,7 +336,7 @@ export function readCfbStreams(bytes: Uint8Array): Map<string, Uint8Array> {
           `stream ${entry.name} is shorter than its declared size`,
         )
       }
-      out.set(entry.name, body.subarray(0, entry.size))
+      out.set(key, body.subarray(0, entry.size))
     }
   }
   return out
@@ -317,7 +346,6 @@ const ZIP_LOCAL_SIG = 0x04034b50
 const ZIP_CENTRAL_SIG = 0x02014b50
 const ZIP_EOCD_SIG = 0x06054b50
 const ZIP_FLAG_ENCRYPTED = 1
-const MAX_SELECTIVE_ZIP_PART_BYTES = 128 * 1024 * 1024
 
 function isZipSignature(bytes: Uint8Array): boolean {
   if (bytes.byteLength < 4) return false
@@ -327,14 +355,20 @@ function isZipSignature(bytes: Uint8Array): boolean {
   return true
 }
 
+interface ZipEntry {
+  readonly name: string
+  readonly method: number
+  readonly compressedSize: number
+  readonly size: number
+  readonly localOffset: number
+}
+
 /**
- * Read named parts from an in-memory ZIP archive (central directory scan +
- * bounded `inflateRawSync` for method 8 or direct slice for method 0).
+ * List the entries of an in-memory ZIP archive from its central directory only.
+ * No part is ever inflated, so the cost is bounded by the directory size
+ * whatever the archive claims to contain.
  */
-export function readSelectiveZipParts(
-  bytes: Uint8Array,
-  wantedNames: readonly string[],
-): Map<string, Uint8Array> {
+function listZipEntries(bytes: Uint8Array): ZipEntry[] {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const end = bytes.byteLength - 22
   if (end < 0) throw new Error('zip: end of central directory not found')
@@ -352,80 +386,73 @@ export function readSelectiveZipParts(
   if (cdOffset > bytes.byteLength || cdSize > bytes.byteLength - cdOffset) {
     throw new Error('zip: corrupt central directory')
   }
-  const wanted = new Set(wantedNames)
-  const out = new Map<string, Uint8Array>()
+  const entries: ZipEntry[] = []
   let pos = cdOffset
   const decoder = new TextDecoder('utf-8')
   for (let i = 0; i < count; i++) {
     if (pos + 46 > cdOffset + cdSize || view.getUint32(pos, true) !== ZIP_CENTRAL_SIG) {
       throw new Error('zip: corrupt central directory')
     }
-    const flags = view.getUint16(pos + 8, true)
-    if ((flags & ZIP_FLAG_ENCRYPTED) !== 0) {
+    if ((view.getUint16(pos + 8, true) & ZIP_FLAG_ENCRYPTED) !== 0) {
       throw new Error('zip: encrypted entries are not supported')
     }
-    const method = view.getUint16(pos + 10, true)
-    const csize = view.getUint32(pos + 20, true)
-    const usize = view.getUint32(pos + 24, true)
     const nameLen = view.getUint16(pos + 28, true)
     const extraLen = view.getUint16(pos + 30, true)
     const commentLen = view.getUint16(pos + 32, true)
-    const localOffset = view.getUint32(pos + 42, true)
     const nameStart = pos + 46
     if (nameStart + nameLen > cdOffset + cdSize) {
       throw new Error('zip: corrupt central directory')
     }
-    const name = decoder.decode(bytes.subarray(nameStart, nameStart + nameLen)).replace(/\\/g, '/')
+    entries.push({
+      name: decoder.decode(bytes.subarray(nameStart, nameStart + nameLen)).replace(/\\/g, '/'),
+      method: view.getUint16(pos + 10, true),
+      compressedSize: view.getUint32(pos + 20, true),
+      size: view.getUint32(pos + 24, true),
+      localOffset: view.getUint32(pos + 42, true),
+    })
     pos = nameStart + nameLen + extraLen + commentLen
-    if (!wanted.has(name)) continue
-    if (usize > MAX_SELECTIVE_ZIP_PART_BYTES) {
-      throw new Error(`zip: part ${name} exceeds size limit`)
+  }
+  return entries
+}
+
+/**
+ * True when `name` is present, non-empty and its local header (the only bytes of
+ * the part that are read) points at in-bounds stored or deflated data.
+ */
+function hasUsableZipPart(bytes: Uint8Array, entries: readonly ZipEntry[], name: string): boolean {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  return entries.some((entry) => {
+    if (entry.name !== name || entry.size === 0 || (entry.method !== 0 && entry.method !== 8)) {
+      return false
     }
     if (
-      localOffset + 30 > bytes.byteLength ||
-      view.getUint32(localOffset, true) !== ZIP_LOCAL_SIG
+      entry.localOffset + 30 > bytes.byteLength ||
+      view.getUint32(entry.localOffset, true) !== ZIP_LOCAL_SIG
     ) {
-      throw new Error(`zip: corrupt local header for ${name}`)
+      return false
     }
-    const localNameLen = view.getUint16(localOffset + 26, true)
-    const localExtraLen = view.getUint16(localOffset + 28, true)
-    const dataStart = localOffset + 30 + localNameLen + localExtraLen
-    if (dataStart > bytes.byteLength || csize > bytes.byteLength - dataStart) {
-      throw new Error(`zip: entry ${name} data out of bounds`)
-    }
-    const raw = bytes.subarray(dataStart, dataStart + csize)
-    if (method === 0) {
-      out.set(name, raw)
-    } else if (method === 8) {
-      const inflated = inflateRawSync(raw, { maxOutputLength: MAX_SELECTIVE_ZIP_PART_BYTES })
-      out.set(name, new Uint8Array(inflated.buffer, inflated.byteOffset, inflated.byteLength))
-    } else {
-      throw new Error(`zip: unsupported compression method ${method} for ${name}`)
-    }
-  }
-  return out
+    const dataStart =
+      entry.localOffset +
+      30 +
+      view.getUint16(entry.localOffset + 26, true) +
+      view.getUint16(entry.localOffset + 28, true)
+    return dataStart <= bytes.byteLength && entry.compressedSize <= bytes.byteLength - dataStart
+  })
 }
 
 /**
  * Inspect a ZIP buffer to determine whether it is a valid OOXML package and which
- * format (`docx` | `xlsx` | `pptx`) it contains.
+ * format (`docx` | `xlsx` | `pptx`) it contains. Reads the central directory only.
  */
 export function detectOoxmlKindFromZipBytes(bytes: Uint8Array): LegacyTargetFormat | null {
   if (!isZipSignature(bytes)) return null
   try {
-    const parts = readSelectiveZipParts(bytes, [
-      '[Content_Types].xml',
-      OOXML_REQUIRED_MAIN_PART.docx,
-      OOXML_REQUIRED_MAIN_PART.xlsx,
-      OOXML_REQUIRED_MAIN_PART.pptx,
-    ])
-    const ct = parts.get('[Content_Types].xml')
-    if (!ct || ct.byteLength === 0) return null
+    const entries = listZipEntries(bytes)
+    if (!hasUsableZipPart(bytes, entries, '[Content_Types].xml')) return null
     for (const [kind, mainPart] of Object.entries(OOXML_REQUIRED_MAIN_PART) as Array<
       [LegacyTargetFormat, string]
     >) {
-      const partBytes = parts.get(mainPart)
-      if (partBytes && partBytes.byteLength > 0) return kind
+      if (hasUsableZipPart(bytes, entries, mainPart)) return kind
     }
     return null
   } catch {
@@ -434,8 +461,9 @@ export function detectOoxmlKindFromZipBytes(bytes: Uint8Array): LegacyTargetForm
 }
 
 /**
- * Validate that a converted OOXML file exists on disk and is a valid ZIP
- * containing `[Content_Types].xml` and the expected main part for `expectedKind`.
+ * Validate that a converted OOXML file is a ZIP whose central directory lists
+ * `[Content_Types].xml` and the expected main part for `expectedKind`, each with
+ * a sound local header. The parts themselves are not inflated.
  */
 export function validateOoxmlOutputBytes(
   bytes: Uint8Array,
@@ -449,10 +477,11 @@ export function validateOoxmlOutputBytes(
   }
   const mainPart = OOXML_REQUIRED_MAIN_PART[expectedKind]
   try {
-    const parts = readSelectiveZipParts(bytes, ['[Content_Types].xml', mainPart])
-    const ct = parts.get('[Content_Types].xml')
-    const main = parts.get(mainPart)
-    if (!ct || ct.byteLength === 0 || !main || main.byteLength === 0) {
+    const entries = listZipEntries(bytes)
+    if (
+      !hasUsableZipPart(bytes, entries, '[Content_Types].xml') ||
+      !hasUsableZipPart(bytes, entries, mainPart)
+    ) {
       throw new LegacyConvertError(
         'failed',
         `Converted ${expectedKind} is missing required OOXML parts (${mainPart})`,
@@ -782,16 +811,16 @@ export function resolveLibreOfficePaths(
  * (Very High) and external link updates disabled when `template-profile/` is
  * absent in a custom `GENOFFICE_LO_DIR` tree.
  */
-export function ensureJobProfileDir(
+export async function ensureJobProfileDir(
   jobProfileDir: string,
   templateProfileDir: string | null,
   loRootDir?: string,
-): void {
+): Promise<void> {
   if (templateProfileDir && existsSync(templateProfileDir)) {
-    cpSync(templateProfileDir, jobProfileDir, { recursive: true })
+    await cp(templateProfileDir, jobProfileDir, { recursive: true })
     return
   }
-  mkdirSync(join(jobProfileDir, 'user'), { recursive: true })
+  await mkdir(join(jobProfileDir, 'user'), { recursive: true })
   let buildId = '26.8.2.2'
   if (loRootDir) {
     for (const rel of [
@@ -802,7 +831,7 @@ export function ensureJobProfileDir(
       const p = join(loRootDir, rel)
       if (existsSync(p)) {
         try {
-          const text = readFileSync(p, 'utf8')
+          const text = await readFile(p, 'utf8')
           const m = /^buildid=(.+)$/m.exec(text)
           if (m?.[1]) buildId = m[1].trim()
         } catch {
@@ -813,7 +842,7 @@ export function ensureJobProfileDir(
     }
   }
   const extRoot = join(jobProfileDir, 'user', 'extensions')
-  mkdirSync(extRoot, { recursive: true })
+  await mkdir(extRoot, { recursive: true })
   const xcu = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<oor:items xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">',
@@ -829,11 +858,8 @@ export function ensureJobProfileDir(
     '</oor:items>',
     '',
   ].join('\n')
-  mkdirSync(join(jobProfileDir, 'user'), { recursive: true })
-  rmSync(join(jobProfileDir, 'user', 'registrymodifications.xcu'), { force: true })
-  // writeFileSync imported at top
-  writeFileSync(join(jobProfileDir, 'user', 'registrymodifications.xcu'), xcu, 'utf8')
-  writeFileSync(join(extRoot, 'buildid'), buildId, 'utf8')
+  await writeFile(join(jobProfileDir, 'user', 'registrymodifications.xcu'), xcu, 'utf8')
+  await writeFile(join(extRoot, 'buildid'), buildId, 'utf8')
 }
 
 /**
@@ -904,13 +930,38 @@ export type SpawnSofficeFn = (
   options: { env: NodeJS.ProcessEnv; cwd: string },
 ) => ChildProcess
 
+// On POSIX soffice leads its own process group so the whole group can be killed
+// once it exits, timeouts or is cancelled (LibreOffice helpers outlive the parent).
 const defaultSpawnSoffice: SpawnSofficeFn = (command, args, options) =>
   spawn(command, args, {
     env: options.env,
     cwd: options.cwd,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
+    detached: process.platform !== 'win32',
   })
+
+export interface LegacyKillDeps extends KillProcessTreeDeps {
+  /** POSIX: kill the whole process group led by `pid` (default `process.kill(-pid, 'SIGKILL')`). */
+  killGroup?: (pid: number) => void
+}
+
+function killLegacyProcessTree(
+  pid: number,
+  rootAlreadyExited: boolean,
+  deps: LegacyKillDeps = {},
+): void {
+  if ((deps.platform ?? process.platform) === 'win32') {
+    killProcessTree(pid, rootAlreadyExited, deps)
+    return
+  }
+  const killGroup = deps.killGroup ?? ((target) => process.kill(-target, 'SIGKILL'))
+  try {
+    killGroup(pid)
+  } catch {
+    // group already gone
+  }
+}
 
 export interface ConvertLegacyOptions {
   /** Override input format (defaults to extension of `inputPath`). */
@@ -926,7 +977,7 @@ export interface ConvertLegacyOptions {
   /** Optional process spawn override for unit tests. */
   spawnFn?: SpawnSofficeFn
   /** Optional process-tree killer deps for unit tests. */
-  killTreeDeps?: KillProcessTreeDeps
+  killTreeDeps?: LegacyKillDeps
 }
 
 export type ConvertLegacyResult =
@@ -962,16 +1013,30 @@ function deferred<T>(): {
 
 const activeSofficePids = new Set<number>()
 
-/** Kill every in-flight `soffice.bin` process tree (called on `before-quit` and test teardown). */
-export function killAllActiveLegacyConversions(deps?: KillProcessTreeDeps): void {
+/** Kill every in-flight `soffice.bin` process tree (test teardown; quit uses `disposeLegacyConverter`). */
+export function killAllActiveLegacyConversions(deps?: LegacyKillDeps): void {
   for (const pid of [...activeSofficePids]) {
     activeSofficePids.delete(pid)
-    killProcessTree(pid, false, deps)
+    killLegacyProcessTree(pid, false, deps)
   }
+}
+
+/**
+ * Shut the converter down: queued jobs are rejected as cancelled, no new job is
+ * accepted or spawned, then every in-flight `soffice` tree is killed. Call on quit.
+ */
+export function disposeLegacyConverter(deps?: LegacyKillDeps): void {
+  defaultQueue.close()
+  killAllActiveLegacyConversions(deps)
+}
+
+function cancelledError(format?: LegacySourceFormat): LegacyConvertError {
+  return new LegacyConvertError('cancelled', 'Legacy conversion was cancelled', { format })
 }
 
 class ConcurrencyQueue {
   private active = 0
+  private closed = false
   private readonly waiters: Array<{
     run: () => void
     reject: (err: unknown) => void
@@ -981,8 +1046,22 @@ class ConcurrencyQueue {
 
   constructor(private readonly maxConcurrency: number) {}
 
+  get isClosed(): boolean {
+    return this.closed
+  }
+
+  /** Reject every waiter and refuse further jobs; running jobs are left to the caller to kill. */
+  close(): void {
+    this.closed = true
+    for (const waiter of this.waiters.splice(0)) {
+      if (waiter.onAbort && waiter.signal)
+        waiter.signal.removeEventListener('abort', waiter.onAbort)
+      waiter.reject(new LegacyConvertError('cancelled', 'Legacy conversion was cancelled'))
+    }
+  }
+
   async acquire(signal?: AbortSignal): Promise<() => void> {
-    if (signal?.aborted) {
+    if (signal?.aborted || this.closed) {
       throw new LegacyConvertError('cancelled', 'Legacy conversion was cancelled')
     }
     if (this.active < this.maxConcurrency) {
@@ -1040,19 +1119,23 @@ const defaultQueue = new ConcurrencyQueue(DEFAULT_MAX_CONCURRENCY)
 
 async function runSingleSofficeJob(opts: {
   loPaths: LibreOfficePaths
-  inputPath: string
+  /** The validated bytes of the source, converted from a private copy. */
+  inputBytes: Uint8Array
+  /** Base name of the source (kept so the output name and LibreOffice title match it). */
+  inputName: string
   sourceFormat: LegacySourceFormat
   targetFormat: LegacyTargetFormat
   timeoutMs: number
   signal?: AbortSignal
   tempRoot: string
   spawnFn: SpawnSofficeFn
-  killTreeDeps?: KillProcessTreeDeps
+  killTreeDeps?: LegacyKillDeps
   allowExit81Retry: boolean
 }): Promise<Uint8Array> {
   const {
     loPaths,
-    inputPath,
+    inputBytes,
+    inputName,
     sourceFormat,
     targetFormat,
     timeoutMs,
@@ -1063,19 +1146,26 @@ async function runSingleSofficeJob(opts: {
     allowExit81Retry,
   } = opts
 
-  if (signal?.aborted) {
-    throw new LegacyConvertError('cancelled', 'Legacy conversion was cancelled', {
-      format: sourceFormat,
-    })
-  }
+  if (signal?.aborted || defaultQueue.isClosed) throw cancelledError(sourceFormat)
 
-  const jobDir = join(tempRoot, 'genoffice-lo-jobs', randomUUID())
-  const profileDir = join(jobDir, 'profile')
-  const outDir = join(jobDir, 'out')
-  mkdirSync(outDir, { recursive: true })
+  // Owner-only: mkdtemp creates the job dir 0700 under a 0700 parent, so the staged
+  // input and the converted output are unreadable by other local users.
+  const jobsRoot = join(tempRoot, 'genoffice-lo-jobs')
+  await mkdir(jobsRoot, { recursive: true, mode: 0o700 })
+  const jobDir = await mkdtemp(join(jobsRoot, 'job-'))
 
   try {
-    ensureJobProfileDir(profileDir, loPaths.templateProfileDir, loPaths.rootDir)
+    const profileDir = join(jobDir, 'profile')
+    const inDir = join(jobDir, 'in')
+    const outDir = join(jobDir, 'out')
+    await mkdir(inDir, { mode: 0o700 })
+    await mkdir(outDir, { mode: 0o700 })
+    const inputPath = join(inDir, inputName)
+    await writeFile(inputPath, inputBytes, { mode: 0o600 })
+    await ensureJobProfileDir(profileDir, loPaths.templateProfileDir, loPaths.rootDir)
+
+    // One deadline for the whole job: the exit-81 retry only gets what is left.
+    const deadline = Date.now() + timeoutMs
 
     const runOnce = (): Promise<{ code: number | null; stderr: string }> => {
       const {
@@ -1083,12 +1173,13 @@ async function runSingleSofficeJob(opts: {
         resolve: resolveRun,
         reject: rejectRun,
       } = deferred<{ code: number | null; stderr: string }>()
-      if (signal?.aborted) {
-        rejectRun(
-          new LegacyConvertError('cancelled', 'Legacy conversion was cancelled', {
-            format: sourceFormat,
-          }),
-        )
+      if (signal?.aborted || defaultQueue.isClosed) {
+        rejectRun(cancelledError(sourceFormat))
+        return promise
+      }
+      const remainingMs = deadline - Date.now()
+      if (remainingMs <= 0) {
+        rejectRun(timeoutError())
         return promise
       }
 
@@ -1142,7 +1233,7 @@ async function runSingleSofficeJob(opts: {
 
       const terminateChild = (rootAlreadyExited: boolean) => {
         if (typeof pid === 'number' && pid > 0) {
-          killProcessTree(pid, rootAlreadyExited, killTreeDeps)
+          killLegacyProcessTree(pid, rootAlreadyExited, killTreeDeps)
         } else {
           try {
             child.kill('SIGKILL')
@@ -1158,14 +1249,8 @@ async function runSingleSofficeJob(opts: {
         settled = true
         cleanupListeners()
         terminateChild(false)
-        rejectRun(
-          new LegacyConvertError(
-            'timeout',
-            `Legacy ${sourceFormat} conversion timed out after ${timeoutMs} ms`,
-            { format: sourceFormat },
-          ),
-        )
-      }, timeoutMs)
+        rejectRun(timeoutError())
+      }, remainingMs)
 
       const onAbort = () => {
         if (settled) return
@@ -1173,11 +1258,7 @@ async function runSingleSofficeJob(opts: {
         settled = true
         cleanupListeners()
         terminateChild(false)
-        rejectRun(
-          new LegacyConvertError('cancelled', 'Legacy conversion was cancelled', {
-            format: sourceFormat,
-          }),
-        )
+        rejectRun(cancelledError(sourceFormat))
       }
 
       if (signal) {
@@ -1207,6 +1288,13 @@ async function runSingleSofficeJob(opts: {
       return promise
     }
 
+    const timeoutError = (): LegacyConvertError =>
+      new LegacyConvertError(
+        'timeout',
+        `Legacy ${sourceFormat} conversion timed out after ${timeoutMs} ms`,
+        { format: sourceFormat },
+      )
+
     let outcome = await runOnce()
     // Exit 81 is LibreOffice's first-start profile registration restart signal when
     // a cold profile is used; re-running once against the now-initialised job profile succeeds.
@@ -1214,9 +1302,15 @@ async function runSingleSofficeJob(opts: {
       outcome = await runOnce()
     }
 
-    const stem = basename(inputPath, extname(inputPath))
+    const stem = basename(inputName, extname(inputName))
     const expectedOutPath = join(outDir, `${stem}.${targetFormat}`)
-    if (!existsSync(expectedOutPath)) {
+    let outStat: Stats | null
+    try {
+      outStat = await stat(expectedOutPath)
+    } catch {
+      outStat = null
+    }
+    if (!outStat) {
       const detail = outcome.stderr || `exit code ${outcome.code ?? 'unknown'}`
       // If soffice reported a load failure on the source file, surface as corrupt
       if (/source file could not be loaded|general input\/output error|corrupt/i.test(detail)) {
@@ -1233,19 +1327,18 @@ async function runSingleSofficeJob(opts: {
       )
     }
 
-    const stat = statSync(expectedOutPath)
-    if (stat.size <= 0) {
+    if (outStat.size <= 0) {
       throw new LegacyConvertError('failed', `LibreOffice produced an empty ${targetFormat} file`, {
         format: sourceFormat,
       })
     }
 
-    const outBytes = new Uint8Array(readFileSync(expectedOutPath))
+    const outBytes = new Uint8Array(await readFile(expectedOutPath))
     validateOoxmlOutputBytes(outBytes, targetFormat, sourceFormat)
     return outBytes
   } finally {
     try {
-      rmSync(jobDir, { recursive: true, force: true })
+      await rm(jobDir, { recursive: true, force: true })
     } catch {
       // best-effort temp cleanup
     }
@@ -1253,16 +1346,59 @@ async function runSingleSofficeJob(opts: {
 }
 
 /**
+ * Read a legacy input into memory without blocking the main thread or a pipe:
+ * open non-blocking, fstat the handle, refuse anything that is not a regular
+ * file or exceeds the size cap, then read exactly that many bytes.
+ */
+async function readLegacyInput(path: string, format: LegacySourceFormat): Promise<Uint8Array> {
+  let handle: Awaited<ReturnType<typeof open>> | undefined
+  try {
+    handle = await open(path, fsConstants.O_RDONLY | (fsConstants.O_NONBLOCK ?? 0))
+    const info = await handle.stat()
+    if (!info.isFile()) {
+      throw new LegacyConvertError('unsupported', 'Input is not a regular file', { format })
+    }
+    if (info.size > MAX_LEGACY_INPUT_BYTES) {
+      throw new LegacyConvertError(
+        'unsupported',
+        `Input is larger than the ${MAX_LEGACY_INPUT_BYTES / (1024 * 1024)} MiB conversion limit`,
+        { format },
+      )
+    }
+    const buf = Buffer.allocUnsafeSlow(info.size)
+    let total = 0
+    while (total < buf.length) {
+      const { bytesRead } = await handle.read(buf, total, buf.length - total, total)
+      if (bytesRead === 0) break
+      total += bytesRead
+    }
+    return new Uint8Array(buf.buffer, buf.byteOffset, total)
+  } catch (err) {
+    if (err instanceof LegacyConvertError) throw err
+    throw new LegacyConvertError(
+      'corrupt',
+      `Could not read input file: ${err instanceof Error ? err.message : String(err)}`,
+      { format, cause: err },
+    )
+  } finally {
+    await handle?.close().catch(() => {})
+  }
+}
+
+/**
  * Convert a local legacy `.doc`, `.xls`, or `.ppt` file to `.docx`, `.xlsx`, or `.pptx`.
  *
- * 1. Runs `preflightLegacyBytes` in TypeScript (< 1 ms) to reject corrupt CFB containers
- *    and password-protected files without spawning LibreOffice, and detects OOXML files
- *    misnamed with a legacy extension.
+ * 1. Resolves the path once and reads the file off the main thread (regular files
+ *    only, 200 MiB cap), then runs `preflightLegacyBytes` in TypeScript to reject
+ *    corrupt CFB containers and password-protected files without spawning
+ *    LibreOffice, and detects OOXML files misnamed with a legacy extension.
  * 2. Resolves the bundled LibreOffice 26.8.2.2 converter (`GENOFFICE_LO_DIR` or
  *    `<resourcesPath>/libreoffice`). Throws `converter_missing` if absent.
- * 3. Queues the job (max 2 concurrent `soffice.bin` processes), copies the pre-initialised
- *    `template-profile` into a per-job temp dir, runs `soffice` with explicit `--infilter`,
- *    network blocked, and a 60 s timeout (killing the process tree on timeout/cancel/exit).
+ * 3. Queues the job (max 2 concurrent `soffice.bin` processes), writes the inspected
+ *    bytes into a private (0700) per-job dir and converts that copy, never the
+ *    original, with the pre-initialised `template-profile`, explicit `--infilter`,
+ *    network blocked, and one 60 s deadline (killing the process group on exit,
+ *    timeout or cancel).
  * 4. Validates the output ZIP and required OOXML main part before returning bytes.
  */
 export async function convertLegacyFile(
@@ -1274,26 +1410,14 @@ export async function convertLegacyFile(
     throw new LegacyConvertError('unsupported', `Unsupported legacy file extension: ${inputPath}`)
   }
 
-  if (options.signal?.aborted) {
-    throw new LegacyConvertError('cancelled', 'Legacy conversion was cancelled', {
-      format: sourceFormat,
-    })
-  }
+  if (options.signal?.aborted || defaultQueue.isClosed) throw cancelledError(sourceFormat)
 
-  let inputBytes: Uint8Array
-  try {
-    inputBytes = new Uint8Array(readFileSync(inputPath))
-  } catch (err) {
-    throw new LegacyConvertError(
-      'corrupt',
-      `Could not read input file: ${err instanceof Error ? err.message : String(err)}`,
-      { format: sourceFormat, cause: err },
-    )
-  }
+  const resolvedPath = resolve(inputPath)
+  const inputBytes = await readLegacyInput(resolvedPath, sourceFormat)
 
   const preflight = preflightLegacyBytes(inputBytes, sourceFormat)
   if (preflight.kind === 'ooxml_misnamed') {
-    const suggestedSaveAsPath = inputPath.replace(/\.[^.]+$/, `.${preflight.detectedFormat}`)
+    const suggestedSaveAsPath = resolvedPath.replace(/\.[^.]+$/, `.${preflight.detectedFormat}`)
     return {
       kind: 'ooxml_misnamed',
       sourceFormat,
@@ -1321,7 +1445,8 @@ export async function convertLegacyFile(
   try {
     const bytes = await runSingleSofficeJob({
       loPaths,
-      inputPath,
+      inputBytes,
+      inputName: basename(resolvedPath),
       sourceFormat,
       targetFormat,
       timeoutMs,
@@ -1336,7 +1461,7 @@ export async function convertLegacyFile(
       sourceFormat,
       targetFormat,
       bytes,
-      suggestedSaveAsPath: suggestedOoxmlPathForLegacy(inputPath),
+      suggestedSaveAsPath: suggestedOoxmlPathForLegacy(resolvedPath),
     }
   } finally {
     release()
