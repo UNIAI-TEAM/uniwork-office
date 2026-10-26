@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LegacyConvertError, type ConvertLegacyResult } from '../src/main/legacy-converter'
 import {
@@ -9,6 +9,7 @@ import {
   type ConvertedDocument,
   type LegacyOpenDeps,
 } from '../src/main/legacy-open'
+import { nameParts } from '../src/renderer/src/uniwork-folders/SaveDialog'
 import { tLegacyOpen, type LegacyOpenStringKey } from '../src/main/legacy-open-strings'
 
 const t: LegacyOpenDeps['t'] = (key: LegacyOpenStringKey, params) => tLegacyOpen('en', key, params)
@@ -316,6 +317,29 @@ describe('createLegacyOpener', () => {
     await opener.dispose()
     expect(readDirCount(importRoot)).toBe(0)
   })
+})
+
+describe('names a converted tab consistently (R1-13)', () => {
+  it.each([
+    ['/w/Budget.xls', 'xlsx', 'Budget', '.xlsx'],
+    ['/w/Q3 report.v2.doc', 'docx', 'Q3 report.v2', '.docx'],
+    ['/w/Deck.ppt', 'pptx', 'Deck', '.pptx'],
+  ] as const)(
+    '%s: the tab, the Save dialog name and the upload title all say the OOXML name',
+    async (path, target, base, ext) => {
+      const h = harness(async (p) => converted(target, p))
+      createLegacyOpener(h.deps).open(path)
+      await vi.waitFor(() => expect(h.opened).toHaveLength(1))
+      const tempPath = h.opened[0]!.tempPath
+
+      // the tab edits this file, so its name is what every title is derived from
+      expect(basename(tempPath)).toBe(`${base}${ext}`)
+      // the Save to UniWork dialog splits the same path: editable base + fixed OOXML extension
+      expect(nameParts(tempPath)).toEqual({ base, ext })
+      // and the Save As suggestion carries the same name next to the original
+      expect(basename(h.opened[0]!.suggestSaveAs)).toBe(`${base}${ext}`)
+    },
+  )
 })
 
 describe('legacyErrorMessage', () => {
