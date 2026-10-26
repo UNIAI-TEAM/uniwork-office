@@ -119,6 +119,10 @@ describe('uniwork documents string shards', () => {
         // UNI-2078: the purge route's refusals
         'document_not_in_trash',
         'folder_too_large',
+        // UNI-2212: legacy-format open refusals
+        'legacy_cancelled',
+        'legacy_conversion_invalid',
+        'legacy_open_failed',
       ].sort(),
     )
     // the G5-04 / G5-06 refusals reuse the sync shard's sentences, FD-11's the folders shard's
