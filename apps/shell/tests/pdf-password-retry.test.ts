@@ -95,6 +95,51 @@ describe('convertWithPasswordRetry (pure state machine)', () => {
     ).rejects.toThrow('disk on fire')
     expect(prompt).not.toHaveBeenCalled()
   })
+
+  it('aborts an in-flight submitted password attempt when the password window is closed mid-attempt (R1-8)', async () => {
+    const prompt =
+      vi.fn<(retry: boolean, onCloseDuringAttempt: () => void) => Promise<string | null>>()
+
+    // Case 1: wrong password submitted, user closes the window while the attempt is in flight ->
+    // resolves null without re-prompting.
+    const wrongController = new AbortController()
+    const wrongPrompts: boolean[] = []
+    const wrongResult = await convertWithPasswordRetry(
+      (password) => {
+        if (password === undefined) return Promise.reject(passwordRequired())
+        // User closes the password dialog while the converter is checking 'wrong'
+        wrongController.abort()
+        return Promise.reject(passwordRequired())
+      },
+      (retry) => {
+        wrongPrompts.push(retry)
+        return Promise.resolve('wrong')
+      },
+      wrongController.signal,
+    )
+    expect(wrongResult).toBeNull()
+    expect(wrongPrompts).toEqual([false])
+
+    // Case 2: right password submitted, user closes the window while the attempt is in flight ->
+    // resolves null (no write/open).
+    const rightController = new AbortController()
+    const rightPrompts: boolean[] = []
+    const rightResult = await convertWithPasswordRetry(
+      (password) => {
+        if (password === undefined) return Promise.reject(passwordRequired())
+        rightController.abort()
+        return Promise.resolve('converted-bytes')
+      },
+      (retry) => {
+        rightPrompts.push(retry)
+        return Promise.resolve('sesame')
+      },
+      rightController.signal,
+    )
+    expect(rightResult).toBeNull()
+    expect(rightPrompts).toEqual([false])
+    expect(prompt).not.toHaveBeenCalled()
+  })
 })
 
 describe('integration: testPassword4Spaces.pdf through the real converter', () => {

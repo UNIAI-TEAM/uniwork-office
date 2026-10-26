@@ -16,12 +16,20 @@ import {
 } from '../src/main/pdf-convert/convert-child'
 import {
   activePdfConvertJobCount,
+  beginPdfConvertCommitPhase,
+  collectPosixDescendantsFromPsOutput,
   createNodeChildProcessFork,
   killAllPdfConvertJobs,
+  killPosixProcessTree,
+  listPosixDescendants,
   PdfConvertCancelled,
   PdfConvertCrashed,
   runPdfConvertJob,
+  terminatingPdfConvertJobCount,
+  type ConvertChildExitListener,
+  type ConvertChildMessageListener,
   type ConvertChildProcess,
+  type ConvertChildSpawnListener,
 } from '../src/main/pdf-convert/convert-host'
 import {
   convertPdfFileToDocxLocal,
@@ -188,12 +196,35 @@ process.on('message', (job) => {
     const gpidFile = files[1];
     writeFileSync(cpidFile, String(process.pid), 'utf8');
     process.send({ type: 'progress', page: 1, total: 5 });
-    // Block inside spawnSync exactly like ocr-vision.ts / ocr-tesseract.ts
+    // Block inside spawnSync exactly like ocr-vision.ts / ocr-tesseract.ts,
+    // including the POSIX ppid orphan watch from tess-ocr.cjs.
     const grandchildCode =
+      'const initialPpid = process.ppid; ' +
+      'if (typeof initialPpid === "number" && initialPpid > 0) { ' +
+      '  setInterval(() => { if (process.ppid !== initialPpid) process.exit(1); }, 100).unref(); ' +
+      '} ' +
       'require("node:fs").writeFileSync(' +
       JSON.stringify(gpidFile) +
       ', String(process.pid), "utf8"); setInterval(() => {}, 1000);';
     spawnSync(process.execPath, ['-e', grandchildCode], { stdio: 'ignore', windowsHide: true });
+    return;
+  }
+
+  if (mode === 'mode:slow-extraction') {
+    // Simulate a slow initial whole-document extraction pass before the first progress event (R1-11)
+    setTimeout(() => {
+      process.send({ type: 'progress', page: 1, total: 1 });
+      process.send({
+        type: 'result',
+        kind: job.kind,
+        bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04, 77]),
+        pages: 1,
+        warnings: [],
+        pageResults: [{ page: 1, status: 'ok' }],
+        scannedDocument: false,
+      });
+      setTimeout(() => process.exit(0), 5000).unref();
+    }, 400);
     return;
   }
 });
@@ -403,20 +434,195 @@ describe('PDF -> Office utilityProcess host protocol (fake child via child_proce
     expect((caught as PdfConvertCrashed).exitCode).toBe(0)
   })
 
-  it('rejects with PdfConvertCrashed and kills the child when the inactivity watchdog fires', async () => {
-    const pidFile = join(scratchDir, 'watchdog-cpid.txt')
-    const fork = createNodeChildProcessFork(fakeChildPath)
+  it('rejects with PdfConvertCrashed and kills the child when the inactivity watchdog fires after first progress (R1-9/R1-10/R1-11)', async () => {
+    let spawnedPid: number | undefined
+    const baseFork = createNodeChildProcessFork(fakeChildPath)
+    const fork = (modulePath: string): ConvertChildProcess => {
+      const child = baseFork(modulePath)
+      spawnedPid = child.pid
+      return child
+    }
 
     await expect(
-      runPdfConvertJob(
-        { kind: 'docx', pdfPath: 'mode:silent-hang', password: pidFile },
-        { fork, watchdogMs: 250 },
-      ),
+      runPdfConvertJob({ kind: 'docx', pdfPath: 'mode:hang' }, { fork, watchdogMs: 250 }),
     ).rejects.toThrow(/timed out after 250ms/)
 
-    const childPid = Number(await waitForFileContent(pidFile))
-    expect(await waitForPidGone(childPid)).toBe(true)
+    expect(spawnedPid).toBeGreaterThan(0)
+    expect(await waitForPidGone(spawnedPid)).toBe(true)
     expect(activePdfConvertJobCount()).toBe(0)
+  })
+
+  it('arms the inactivity watchdog only after the first progress message so slow initial extraction is not killed prematurely (R1-11)', async () => {
+    let spawnedPid: number | undefined
+    const baseFork = createNodeChildProcessFork(fakeChildPath)
+    const fork = (modulePath: string): ConvertChildProcess => {
+      const child = baseFork(modulePath)
+      spawnedPid = child.pid
+      return child
+    }
+
+    // Initial extraction takes ~400 ms before the first progress message, while
+    // watchdogMs is 150 ms; it must succeed because the watchdog only arms on progress.
+    const res = await runPdfConvertJob(
+      { kind: 'docx', pdfPath: 'mode:slow-extraction' },
+      { fork, watchdogMs: 150 },
+    )
+    expect(res.pages).toBe(1)
+    expect(Array.from(res.bytes)).toEqual([0x50, 0x4b, 0x03, 0x04, 77])
+    expect(await waitForPidGone(spawnedPid)).toBe(true)
+    expect(activePdfConvertJobCount()).toBe(0)
+  })
+
+  it('retains cleanup ownership across asynchronous spawn: cancel or quit before spawn kills the process once its PID arrives and never dispatches the job (R1-1)', async () => {
+    const baseFork = createNodeChildProcessFork(fakeChildPath)
+    let underlyingChild: ConvertChildProcess | null = null
+    let latePid: number | undefined
+    let dispatchedMessages = 0
+
+    const asyncSpawnFork = (modulePath: string): ConvertChildProcess => {
+      const emitter = new EventEmitter()
+      let spawned = false
+      const real = baseFork(modulePath)
+      underlyingChild = real
+      latePid = real.pid
+
+      real.on('message', (m) => emitter.emit('message', m))
+      real.on('exit', (code) => emitter.emit('exit', code))
+
+      // Simulate Electron utilityProcess: pid is undefined and kill() returns false
+      // until the asynchronous 'spawn' event fires 120 ms later.
+      setTimeout(() => {
+        spawned = true
+        emitter.emit('spawn')
+      }, 120)
+
+      return {
+        awaitsSpawn: true,
+        get pid() {
+          return spawned ? real.pid : undefined
+        },
+        postMessage(msg: PdfConvertJob) {
+          dispatchedMessages++
+          real.postMessage(msg)
+        },
+        on(
+          event: 'message' | 'exit' | 'spawn',
+          listener:
+            ConvertChildMessageListener | ConvertChildExitListener | ConvertChildSpawnListener,
+        ) {
+          emitter.on(event, listener)
+          return this
+        },
+        off(
+          event: 'message' | 'exit' | 'spawn',
+          listener:
+            ConvertChildMessageListener | ConvertChildExitListener | ConvertChildSpawnListener,
+        ) {
+          emitter.off(event, listener)
+          return this
+        },
+        kill() {
+          if (!spawned) return false
+          return real.kill()
+        },
+      }
+    }
+
+    const controller = new AbortController()
+    const cpidFile = join(scratchDir, 'async-spawn-cpid.txt')
+    const jobPromise = runPdfConvertJob(
+      { kind: 'docx', pdfPath: 'mode:hang', password: cpidFile },
+      { fork: asyncSpawnFork, signal: controller.signal },
+    )
+
+    // Cancel immediately while pid === undefined and kill() returns false
+    controller.abort()
+    await expect(jobPromise).rejects.toBeInstanceOf(PdfConvertCancelled)
+    expect(activePdfConvertJobCount()).toBe(0)
+    // Still tracked in terminatingJobs until the async spawn arrives and is killed
+    expect(terminatingPdfConvertJobCount()).toBe(1)
+
+    expect(latePid).toBeGreaterThan(0)
+    expect(await waitForPidGone(latePid, 4_000)).toBe(true)
+    expect(dispatchedMessages).toBe(0)
+    expect(existsSync(cpidFile)).toBe(false)
+    expect(terminatingPdfConvertJobCount()).toBe(0)
+    // Safety cleanup in case test assertions fail
+    underlyingChild?.kill()
+  })
+
+  it('cleans up the spawnSync grandchild when only the root converter crashes/is killed (R1-2/R1-4)', async () => {
+    const cpidFile = join(scratchDir, 'crash-tree-cpid.txt')
+    const gpidFile = join(scratchDir, 'crash-tree-gpid.txt')
+    const fork = createNodeChildProcessFork(fakeChildPath)
+
+    const jobPromise = runPdfConvertJob(
+      {
+        kind: 'docx',
+        pdfPath: `mode:spawnsync-grandchild:${cpidFile}|${gpidFile}`,
+      },
+      { fork },
+    )
+
+    const childPid = Number(await waitForFileContent(cpidFile))
+    const grandchildPid = Number(await waitForFileContent(gpidFile))
+    expect(childPid).toBeGreaterThan(0)
+    expect(grandchildPid).toBeGreaterThan(0)
+    expect(isPidAlive(childPid)).toBe(true)
+    expect(isPidAlive(grandchildPid)).toBe(true)
+
+    // Kill ONLY the root converter process directly (simulating a sudden crash / SIGKILL)
+    process.kill(childPid, 'SIGKILL')
+
+    await expect(jobPromise).rejects.toBeInstanceOf(PdfConvertCrashed)
+    expect(await waitForPidGone(childPid)).toBe(true)
+    expect(await waitForPidGone(grandchildPid)).toBe(true)
+    expect(activePdfConvertJobCount()).toBe(0)
+  })
+
+  it('POSIX tree killer sends SIGSTOP to root before killing descendants and falls back to ps when pgrep fails (R1-5, R1-6)', () => {
+    const signals: Array<[number, string]> = []
+    const psOutput = [
+      '  100     1',
+      '  200   100',
+      '  201   100',
+      '  300   200',
+      '  999     1',
+    ].join('\n')
+
+    // 1. Verify ps parser orders descendants leaf-first (300 before 200)
+    expect(collectPosixDescendantsFromPsOutput(psOutput, 100)).toEqual([300, 200, 201])
+
+    // 2. When pgrep fails (e.g. ENOENT or status 2), listPosixDescendants falls back to ps
+    const descendantsOnPgrepFailure = listPosixDescendants(100, (cmd) => {
+      if (cmd === 'pgrep') {
+        return { status: null, error: new Error('spawnSync pgrep ENOENT'), stdout: '' }
+      }
+      return { status: 0, stdout: psOutput }
+    })
+    expect(descendantsOnPgrepFailure).toEqual([300, 200, 201])
+
+    // 3. killPosixProcessTree sends SIGSTOP to root first, then SIGKILLs leaves, then SIGKILLs root
+    killPosixProcessTree(
+      100,
+      (cmd) => {
+        if (cmd === 'pgrep') {
+          return { status: 2, stdout: '' }
+        }
+        return { status: 0, stdout: psOutput }
+      },
+      (pid, sig) => {
+        signals.push([pid, sig])
+      },
+    )
+
+    expect(signals).toEqual([
+      [100, 'SIGSTOP'],
+      [300, 'SIGKILL'],
+      [200, 'SIGKILL'],
+      [201, 'SIGKILL'],
+      [100, 'SIGKILL'],
+    ])
   })
 
   it('leaves no listener or timer leaks on the child emitter or AbortSignal after completion, error, or cancel', async () => {
@@ -640,5 +846,68 @@ describe('PDF convert progress + cancel IPC wiring', () => {
     expect(invoked).toContain(PDF_CHANNELS.convertCancel)
 
     vi.doUnmock('electron')
+  })
+  it('enforces a non-cancellable commit boundary before atomicWriteFile and sends done:true once without double-sending (R1-7 + FE-R1-2)', () => {
+    // 1. Pre-commit abort returns false and performs no commit-phase side effects
+    const abortedController = new AbortController()
+    abortedController.abort()
+    const abortedEvents: string[] = []
+    expect(
+      beginPdfConvertCommitPhase({
+        isAborted: () => abortedController.signal.aborted,
+        disableCancel: () => abortedEvents.push('disableCancel'),
+        closePasswordDialog: () => abortedEvents.push('closePasswordDialog'),
+        sendDoneProgress: () => abortedEvents.push('sendDoneProgress'),
+        resetProgressBar: () => abortedEvents.push('resetProgressBar'),
+      }),
+    ).toBe(false)
+    expect(abortedEvents).toEqual([])
+
+    // 2. Entering the commit phase disables convertCancel, closes the password dialog,
+    // emits done: true, and resets the progress bar before atomicWriteFile / completion dialogs;
+    // the finally guard does not emit a duplicate done event.
+    const controller = new AbortController()
+    let activeController: AbortController | null = controller
+    let progressSettled = false
+    const progressEvents: PdfConvertProgressEvent[] = []
+    const progressBarValues: number[] = [0.5]
+    let passwordDialogClosed = 0
+
+    const sendDoneIfUnsettled = () => {
+      if (!progressSettled) {
+        progressSettled = true
+        progressEvents.push({ format: 'docx', page: 3, total: 3, done: true })
+      }
+    }
+
+    const committed = beginPdfConvertCommitPhase({
+      isAborted: () => controller.signal.aborted,
+      disableCancel: () => {
+        if (activeController === controller) activeController = null
+      },
+      closePasswordDialog: () => {
+        passwordDialogClosed++
+      },
+      sendDoneProgress: sendDoneIfUnsettled,
+      resetProgressBar: () => {
+        progressBarValues.push(-1)
+      },
+    })
+
+    expect(committed).toBe(true)
+    expect(activeController).toBeNull()
+    expect(passwordDialogClosed).toBe(1)
+    expect(progressEvents).toEqual([{ format: 'docx', page: 3, total: 3, done: true }])
+    expect(progressBarValues).toEqual([0.5, -1])
+
+    // Subsequent convertCancel IPC (which checks activeController) is now a no-op
+    if (activeController) {
+      ;(activeController as AbortController).abort()
+    }
+    expect(controller.signal.aborted).toBe(false)
+
+    // And the finally block's sendDoneIfUnsettled does not double-send done: true
+    sendDoneIfUnsettled()
+    expect(progressEvents).toHaveLength(1)
   })
 })

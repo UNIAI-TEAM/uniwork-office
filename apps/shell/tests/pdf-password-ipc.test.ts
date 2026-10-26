@@ -130,4 +130,39 @@ describe('pdf password dialog — ipc registrar', () => {
     handlers.get('pdf-password:submit')!({}, 'right')
     await expect(secondPending).resolves.toBe('right')
   })
+
+  it('invokes onUserCancel when the user closes the password window after submitting a password, but not on closePdfPasswordDialog (R1-8)', async () => {
+    const mod = await loadModule()
+    let userCancelled = 0
+
+    // 1. User submits a password (resolving promptPdfPassword), then closes the window while busy ->
+    // onUserCancel fires so the in-flight conversion attempt aborts.
+    const attempt1 = mod.promptPdfPassword(null, state, {
+      onUserCancel: () => {
+        userCancelled++
+      },
+    })
+    const win1 = created.at(-1)!
+    handlers.get('pdf-password:submit')!({}, 'wrong-pw')
+    await expect(attempt1).resolves.toBe('wrong-pw')
+    expect(userCancelled).toBe(0)
+
+    for (const fire of win1.closedListeners) fire()
+    expect(userCancelled).toBe(1)
+
+    // 2. User submits a password and the conversion succeeds -> closePdfPasswordDialog() closes
+    // the window programmatically and must NOT fire onUserCancel.
+    const attempt2 = mod.promptPdfPassword(null, state, {
+      onUserCancel: () => {
+        userCancelled++
+      },
+    })
+    const win2 = created.at(-1)!
+    handlers.get('pdf-password:submit')!({}, 'right-pw')
+    await expect(attempt2).resolves.toBe('right-pw')
+
+    mod.closePdfPasswordDialog()
+    for (const fire of win2.closedListeners) fire()
+    expect(userCancelled).toBe(1)
+  })
 })
