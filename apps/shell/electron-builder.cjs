@@ -38,6 +38,9 @@ const { join } = require('node:path')
 // third-party notice header. Absolute path so vm-based tests can load it too.
 const legal = require(join(__dirname, 'src/shared/legal.json'))
 const { bakedDeploymentDefaults } = require(join(__dirname, 'build/deployment-defaults.cjs'))
+const { tesseractExtraResources, assertTesseractResources } = require(
+  join(__dirname, 'build/ocr-tesseract-resources.cjs'),
+)
 
 function normalizeHttpsBaseUrl(name, value) {
   if (!value || !value.trim()) return null
@@ -97,11 +100,20 @@ const WIN_SIDECAR = `../sheets/native/xlsx-engine/target/${winSidecarTarget}/rel
 // Shipped next to THIRD-PARTY-NOTICES.txt (see extraResources)
 const LEGAL_FILES = ['LICENSE', 'NOTICE', 'MODIFICATIONS', 'LICENSE-UNICODE.txt']
 
+// Bundled Tesseract OCR (all platforms): a Node script run on the app binary
+// with ELECTRON_RUN_AS_NODE + its model + its npm runtime, see
+// build/ocr-tesseract-resources.cjs
+const OCR_TESSERACT = 'packages/pdf2docx/ocr-tesseract'
+
 function assertExtraResourceSources() {
   for (const rel of [
     '../../node_modules/electron/dist/LICENSES.chromium.html',
     '../../node_modules/@embedpdf/pdfium/dist/pdfium.wasm',
     '../pdf/node_modules/harfbuzzjs/hb-subset.wasm',
+    `../../${OCR_TESSERACT}/tess-ocr.cjs`,
+    `../../${OCR_TESSERACT}/tessdata/vie.traineddata`,
+    `../../${OCR_TESSERACT}/tessdata/LICENSE`,
+    `../../${OCR_TESSERACT}/tessdata/README.md`,
     ...LEGAL_FILES.map((name) => `../../${name}`),
   ]) {
     if (!existsSync(join(__dirname, rel))) {
@@ -110,6 +122,8 @@ function assertExtraResourceSources() {
       )
     }
   }
+  // the helper's npm runtime must be exactly the reviewed closure
+  assertTesseractResources()
 }
 
 // macOS local-OCR helper (scanned-page text recovery): a swiftc output, not
@@ -289,13 +303,22 @@ function ensureCliBundleCarriesAppVersion() {
 }
 
 const NOTICE_PATH = join(__dirname, 'build/THIRD-PARTY-NOTICES.txt')
-const PDFIUM_NOTICE_TERMS = ['@embedpdf/pdfium', 'Copyright 2014 PDFium Authors', 'Apache License']
+// terms a valid generated notice must carry: PDFium's redistribution terms and the
+// bundled OCR engine's (a notice generated before the OCR engine shipped is stale)
+const REQUIRED_NOTICE_TERMS = [
+  '@embedpdf/pdfium',
+  'Copyright 2014 PDFium Authors',
+  'Apache License',
+  'tesseract.js-core',
+  'tessdata_fast',
+  'Leptonica',
+]
 
 function hasValidThirdPartyNotice() {
   if (!existsSync(NOTICE_PATH)) return false
   try {
     const text = readFileSync(NOTICE_PATH, 'utf8')
-    return PDFIUM_NOTICE_TERMS.every((term) => text.includes(term))
+    return REQUIRED_NOTICE_TERMS.every((term) => text.includes(term))
   } catch {
     return false
   }
@@ -308,7 +331,7 @@ function ensureThirdPartyNotices() {
     })
   }
   if (!hasValidThirdPartyNotice()) {
-    throw new Error('third-party notice missing PDFium redistribution terms')
+    throw new Error('third-party notice missing PDFium or bundled OCR redistribution terms')
   }
 }
 
@@ -409,6 +432,27 @@ const config = {
       from: '../../packages/pdf2docx/ocr-helper/win-ocr.exe',
       to: 'ocr/win-ocr.exe',
     },
+    // bundled Tesseract OCR (Vietnamese `vie` model + tesseract.js WASM): runs
+    // as a script on the app binary with ELECTRON_RUN_AS_NODE (the RunAsNode
+    // fuse stays enabled, see below). The node_modules entries are derived from
+    // the installed tree and guarded in beforePack (assertTesseractResources).
+    {
+      from: `../../${OCR_TESSERACT}/tess-ocr.cjs`,
+      to: 'ocr/tesseract/tess-ocr.cjs',
+    },
+    {
+      from: `../../${OCR_TESSERACT}/tessdata/vie.traineddata`,
+      to: 'ocr/tesseract/tessdata/vie.traineddata',
+    },
+    {
+      from: `../../${OCR_TESSERACT}/tessdata/LICENSE`,
+      to: 'ocr/tesseract/tessdata/LICENSE',
+    },
+    {
+      from: `../../${OCR_TESSERACT}/tessdata/README.md`,
+      to: 'ocr/tesseract/tessdata/README.md',
+    },
+    ...tesseractExtraResources(),
     // genoffice command line: runs on the app binary with ELECTRON_RUN_AS_NODE,
     // so the RunAsNode fuse must stay enabled.
     // Layout (Resources/cli next to wasm/, native/, ocr/) is what
