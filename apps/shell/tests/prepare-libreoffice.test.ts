@@ -7,7 +7,6 @@ import {
   readFileSync,
   readlinkSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -21,13 +20,13 @@ const {
   loadManifest,
   manifestHash,
   verifyArchiveChecksum,
-  parseElfNeeded,
-  parseMachoNeeded,
-  parsePeNeeded,
   verifyBinaryClosure,
   trimUnpackedTree,
   isPackValid,
   writeReadyMarker,
+  ensureLibreOfficePack,
+  getCacheRoot,
+  getTargetPackDir,
 } = require(resolve(shellRoot, 'build/prepare-libreoffice.cjs'))
 
 const tempDirs: string[] = []
@@ -133,6 +132,44 @@ function buildSyntheticMacho64(dylibs: string[]): Buffer {
   header.writeUInt32LE(cmds.length, 16) // ncmds
   header.writeUInt32LE(cmdsBuf.length, 20) // sizeofcmds
   return Buffer.concat([header, cmdsBuf])
+}
+
+/**
+ * Construct a minimal PE32+ buffer with one `.idata` section whose import
+ * directory lists the given DLL names.
+ */
+function buildSyntheticPe64(dlls: string[]): Buffer {
+  const peOff = 0x40
+  const optSz = 240
+  const secOff = peOff + 24 + optSz
+  const fileOff = 0x200
+  const rva = 0x1000
+  const descBytes = (dlls.length + 1) * 20
+  const names = dlls.map((d) => Buffer.from(`${d}\0`, 'utf8'))
+  const total = fileOff + descBytes + names.reduce((n, b) => n + b.length, 0)
+  const buf = Buffer.alloc(total)
+  buf.write('MZ', 0, 'latin1')
+  buf.writeUInt32LE(peOff, 0x3c)
+  buf.writeUInt32LE(0x00004550, peOff)
+  buf.writeUInt16LE(1, peOff + 6) // one section
+  buf.writeUInt16LE(optSz, peOff + 20)
+  const optOff = peOff + 24
+  buf.writeUInt16LE(0x20b, optOff) // PE32+
+  buf.writeUInt32LE(rva, optOff + 112 + 8) // import directory RVA
+  buf.writeUInt32LE(descBytes, optOff + 112 + 12)
+  buf.writeUInt32LE(total - fileOff, secOff + 8) // virtual size
+  buf.writeUInt32LE(rva, secOff + 12)
+  buf.writeUInt32LE(total - fileOff, secOff + 16) // raw size
+  buf.writeUInt32LE(fileOff, secOff + 20)
+  let nameAt = descBytes
+  names.forEach((name, i) => {
+    const d = fileOff + i * 20
+    buf.writeUInt32LE(rva + nameAt, d + 12) // name RVA
+    buf.writeUInt32LE(rva + nameAt, d + 16) // IAT (non-zero keeps the descriptor live)
+    name.copy(buf, fileOff + nameAt)
+    nameAt += name.length
+  })
+  return buf
 }
 
 describe('libreoffice-manifest.json', () => {
@@ -402,5 +439,82 @@ describe('prepare-libreoffice manifest & trim logic', () => {
     expect(existsSync(join(dstRoot, 'LICENSE'))).toBe(true)
     expect(existsSync(join(dstRoot, 'NOTICE'))).toBe(true)
     expect(manifestHash(fakeManifest)).toMatch(/^[0-9a-f]{16}$/)
+  })
+})
+
+describe('prepare-libreoffice provenance and closure', () => {
+  it('fails binary closure when a Windows binary imports a DLL that is absent, for both win targets', () => {
+    for (const target of ['win32-x64', 'win32-arm64']) {
+      const dir = join(makeTempDir('lo-closure-pe-'), 'pack')
+      mkdirSync(join(dir, 'program'), { recursive: true })
+      writeFileSync(
+        join(dir, 'program/soffice.exe'),
+        buildSyntheticPe64(['KERNEL32.dll', 'mergedlo.dll']),
+      )
+
+      expect(() => verifyBinaryClosure(dir, target)).toThrow(
+        new RegExp(
+          `Missing required shared libraries in ${target} trimmed pack: soffice\\.exe -> mergedlo\\.dll`,
+        ),
+      )
+
+      writeFileSync(join(dir, 'program/mergedlo.dll'), buildSyntheticPe64(['kernel32.dll']))
+      expect(() => verifyBinaryClosure(dir, target)).not.toThrow()
+    }
+  })
+
+  it('refuses to stamp a scratch tree ready when no checksum-verified archive is available', async () => {
+    const root = makeTempDir('lo-scratch-')
+    const home = join(root, 'home')
+    const cacheRoot = join(root, 'cache')
+    const scratch = join(home, 'scratch/legacy-formats/trim/tdf-linux-arm64/bisect-lo')
+    mkdirSync(join(scratch, 'program'), { recursive: true })
+    writeFileSync(join(scratch, 'program/soffice.bin'), buildSyntheticElf64(['libc.so.6']))
+    const keep = ['LICENSE', 'LICENSE.html', 'NOTICE', 'presets/config/autotbl.fmt']
+    for (const rel of keep) {
+      mkdirSync(dirname(join(scratch, rel)), { recursive: true })
+      writeFileSync(join(scratch, rel), 'not archive-verified')
+    }
+    const manifest = {
+      version: '26.8.2.2',
+      buildId: '9dea406ab7695df6325b11b0e19fdca8db4b7276',
+      archives: {
+        'linux-arm64': {
+          // Nothing listens on port 1: the verified-archive route cannot succeed.
+          url: 'https://127.0.0.1:1/LibreOffice_26.8.2.2_Linux_aarch64_deb.tar.gz',
+          sha256: '0'.repeat(64),
+          format: 'deb-tar.gz',
+          keepKey: 'linux',
+          sofficeRelPath: 'program/soffice.bin',
+          binaryDir: 'program',
+        },
+      },
+      fonts24: [],
+      keep: { linux: [...keep, 'program/soffice.bin'] },
+    }
+
+    const prevHome = process.env.HOME
+    process.env.HOME = home
+    try {
+      await expect(ensureLibreOfficePack('linux-arm64', { manifest, cacheRoot })).rejects.toThrow()
+    } finally {
+      if (prevHome === undefined) delete process.env.HOME
+      else process.env.HOME = prevHome
+    }
+    const packDir = getTargetPackDir('linux-arm64', { manifest, cacheRoot })
+    expect(existsSync(join(packDir, '.ready.json'))).toBe(false)
+  })
+
+  it('ignores GENOFFICE_LO_CACHE_DIR so a pack never comes from a root the installer does not copy', () => {
+    const prev = process.env.GENOFFICE_LO_CACHE_DIR
+    process.env.GENOFFICE_LO_CACHE_DIR = makeTempDir('lo-cache-override-')
+    try {
+      const withEnv = getCacheRoot()
+      delete process.env.GENOFFICE_LO_CACHE_DIR
+      expect(withEnv).toBe(getCacheRoot())
+    } finally {
+      if (prev === undefined) delete process.env.GENOFFICE_LO_CACHE_DIR
+      else process.env.GENOFFICE_LO_CACHE_DIR = prev
+    }
   })
 })

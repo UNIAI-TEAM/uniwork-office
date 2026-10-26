@@ -6,7 +6,8 @@
  *
  * Output is cached per version + platform + arch under:
  *   apps/shell/build/.cache/libreoffice-<version>/<platform>-<arch>/libreoffice/
- * (override via GENOFFICE_LO_CACHE_DIR).
+ * (the `--cache-dir` option only redirects this preparer CLI; packaging always reads the
+ * default cache, so a custom root can never feed an installer).
  *
  * Usage:
  *   node apps/shell/build/prepare-libreoffice.cjs [--target <platform>-<arch>] [--all] [--cache-dir <dir>]
@@ -171,7 +172,7 @@ function manifestHash(manifest = loadManifest()) {
 }
 
 function getCacheRoot(customCacheRoot) {
-  return resolve(customCacheRoot || process.env.GENOFFICE_LO_CACHE_DIR || DEFAULT_CACHE_ROOT)
+  return resolve(customCacheRoot || DEFAULT_CACHE_ROOT)
 }
 
 function getTargetPackDir(target, { manifest = loadManifest(), cacheRoot } = {}) {
@@ -897,39 +898,6 @@ function unpackMsi(archivePath, workDir) {
 }
 
 /**
- * Check if the local scratch environment on bro already holds the pre-unpacked / trimmed tree
- * for this target so we can seed from it without re-downloading when offline/cached on bro.
- */
-function findLocalScratchTree(target) {
-  const home = process.env.HOME || ''
-  const trimBase = join(home, 'scratch', 'legacy-formats', 'trim')
-  if (!existsSync(trimBase)) return null
-  const map = {
-    'linux-arm64': join(trimBase, 'tdf-linux-arm64', 'bisect-lo'),
-    'linux-x64': join(trimBase, 'tdf-linux-x64', 'trimmed-lo'),
-    'darwin-arm64': join(trimBase, 'tdf-mac-arm64'),
-    'darwin-x64': join(trimBase, 'tdf-mac-x64'),
-    'win32-x64': join(trimBase, 'tdf-win-x64', 'trimmed-lo'),
-    'win32-arm64': join(trimBase, 'tdf-win-arm64', 'trimmed-lo'),
-  }
-  const dir = map[target]
-  if (!dir || !existsSync(dir)) return null
-  if (target.startsWith('darwin-')) {
-    const trimmedApp = join(dir, 'trimmed-LibreOffice.app')
-    const stdApp = join(dir, 'LibreOffice.app')
-    if (existsSync(trimmedApp) && !existsSync(stdApp)) {
-      try {
-        symlinkSync('trimmed-LibreOffice.app', stdApp)
-      } catch {
-        // ignore if already exists
-      }
-    }
-    return existsSync(join(dir, 'LibreOffice.app', 'Contents', 'MacOS', 'soffice')) ? dir : null
-  }
-  return existsSync(join(dir, 'program')) ? dir : null
-}
-
-/**
  * Ensure the trimmed LibreOffice converter pack for `target` (`<platform>-<arch>`)
  * is built and verified in the cache directory. Reuses the cached directory when valid.
  */
@@ -945,23 +913,6 @@ async function ensureLibreOfficePack(target, { manifest = loadManifest(), cacheR
 
   const stageDir = `${packDir}.tmp-${process.pid}`
   rmSync(stageDir, { recursive: true, force: true })
-
-  // If bro's local scratch directory already has the unpacked tree for this target,
-  // trim directly from it through the exact same manifest + closure + font + profile pipeline.
-  const scratchSource = findLocalScratchTree(target)
-  if (scratchSource) {
-    trimUnpackedTree({
-      sourceRoot: scratchSource,
-      destDir: stageDir,
-      target,
-      manifest,
-    })
-    writeReadyMarker(stageDir, target, manifest)
-    rmSync(packDir, { recursive: true, force: true })
-    mkdirSync(dirname(packDir), { recursive: true })
-    renameSync(stageDir, packDir)
-    return packDir
-  }
 
   const downloadsDir = join(getCacheRoot(cacheRoot), 'downloads')
   const archiveFileName = basename(new URL(archiveMeta.url).pathname)
