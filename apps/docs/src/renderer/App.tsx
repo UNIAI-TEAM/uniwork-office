@@ -7795,6 +7795,7 @@ export function App() {
                     hasUnsavedChanges,
                     uniwork.readOnly,
                     uniwork.bound,
+                    !!doc.suggestSaveAs,
                   )
                   if (!saveState) return null
                   return (

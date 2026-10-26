@@ -203,17 +203,22 @@ export function setEditorEditable(
  * Footer save-state label: a view-only document is never "unsaved", it has no
  * save state. A clean UniWork copy shows none: whether its last Save reached
  * UniWork (saved, conflict, offline, signed out) is the title-bar chip's to
- * say, and a local "All changes saved" would contradict it.
+ * say, and a local "All changes saved" would contradict it. A converted legacy copy that has not
+ * had its first Save As (`neverSaved`) is an unsaved document, not a saved one.
  */
 export function saveStateLabel(
   hasUnsavedChanges: boolean,
   readOnly: boolean,
   bound = false,
+  neverSaved = false,
 ): {
   key: 'appSaveStateViewOnly' | 'appSaveStateUnsaved' | 'appSaveStateSaved'
   unsaved: boolean
 } | null {
   if (readOnly) return { key: 'appSaveStateViewOnly', unsaved: false }
   if (hasUnsavedChanges) return { key: 'appSaveStateUnsaved', unsaved: true }
-  return bound ? null : { key: 'appSaveStateSaved', unsaved: false }
+  if (bound) return null
+  return neverSaved
+    ? { key: 'appSaveStateUnsaved', unsaved: true }
+    : { key: 'appSaveStateSaved', unsaved: false }
 }
