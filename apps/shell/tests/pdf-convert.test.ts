@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { convertPdfToDocx, PdfLoadError } from '../../../packages/pdf2docx/src'
 import { buildLatinPdf } from '../../../packages/pdf2docx/tests/helpers/fixtures'
 import { PDF_CHANNELS, type PdfConvertProgressEvent } from '../../pdf/src/shared/ipc'
+import { atomicWriteFile } from '../src/main/atomic-write'
 import {
   ensurePdfium,
   handleConvertJob,
@@ -17,13 +18,17 @@ import {
 import {
   activePdfConvertJobCount,
   beginPdfConvertCommitPhase,
+  cancelActivePdfConvert,
   collectPosixDescendantsFromPsOutput,
   createNodeChildProcessFork,
+  isPidAbsent,
   killAllPdfConvertJobs,
   killPosixProcessTree,
+  killProcessTree,
   listPosixDescendants,
   PdfConvertCancelled,
   PdfConvertCrashed,
+  runPdfConvertExportFlow,
   runPdfConvertJob,
   terminatingPdfConvertJobCount,
   type ConvertChildExitListener,
@@ -41,6 +46,9 @@ import { convertPdfFileToXlsxLocal } from '../src/main/pdf2xlsx-local'
 
 const PASSWORD_FIXTURE = fileURLToPath(
   new URL('./fixtures/testPassword4Spaces.pdf', import.meta.url),
+)
+const SHIPPED_TESS_OCR_PATH = fileURLToPath(
+  new URL('../../../packages/pdf2docx/ocr-tesseract/tess-ocr.cjs', import.meta.url),
 )
 
 function isPidAlive(pid: number | undefined): boolean {
@@ -70,12 +78,12 @@ async function waitForFileContent(filePath: string, timeoutMs = 5_000): Promise<
 async function waitForPidGone(pid: number | undefined, timeoutMs = 3_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (!isPidAlive(pid)) return true
+    if (!isPidAlive(pid) && terminatingPdfConvertJobCount() === 0) return true
     await new Promise<void>((r) => {
       setTimeout(r, 25)
     })
   }
-  return !isPidAlive(pid)
+  return !isPidAlive(pid) && terminatingPdfConvertJobCount() === 0
 }
 
 /**
@@ -196,20 +204,62 @@ process.on('message', (job) => {
     const gpidFile = files[1];
     writeFileSync(cpidFile, String(process.pid), 'utf8');
     process.send({ type: 'progress', page: 1, total: 5 });
-    // Block inside spawnSync exactly like ocr-vision.ts / ocr-tesseract.ts,
-    // including the POSIX ppid orphan watch from tess-ocr.cjs.
+    // Block inside spawnSync and run the shipped tess-ocr.cjs watch with
+    // GENOFFICE_OCR_PARENT_PID set to the immediate converter's PID (R2-1 / R2-3).
     const grandchildCode =
-      'const initialPpid = process.ppid; ' +
-      'if (typeof initialPpid === "number" && initialPpid > 0) { ' +
-      '  setInterval(() => { if (process.ppid !== initialPpid) process.exit(1); }, 100).unref(); ' +
-      '} ' +
+      'require(' +
+      ${JSON.stringify(JSON.stringify(SHIPPED_TESS_OCR_PATH))} +
+      '); ' +
       'require("node:fs").writeFileSync(' +
       JSON.stringify(gpidFile) +
       ', String(process.pid), "utf8"); setInterval(() => {}, 1000);';
-    spawnSync(process.execPath, ['-e', grandchildCode], { stdio: 'ignore', windowsHide: true });
+    spawnSync(process.execPath, ['-e', grandchildCode], {
+      stdio: 'ignore',
+      windowsHide: true,
+      env: { ...process.env, GENOFFICE_OCR_PARENT_PID: String(process.pid) },
+    });
     return;
   }
 
+  if (mode.startsWith('mode:spawnsync-grandchild-preinit:')) {
+    const files = mode.slice('mode:spawnsync-grandchild-preinit:'.length).split('|');
+    const cpidFile = files[0];
+    const gpidFile = files[1];
+    const survivedFile = files[2];
+    writeFileSync(cpidFile, String(process.pid), 'utf8');
+    process.send({ type: 'progress', page: 1, total: 5 });
+    // Spawn the helper with GENOFFICE_OCR_PARENT_PID, wait until the parent
+    // converter has died BEFORE requiring tess-ocr.cjs, then load the shipped
+    // tess-ocr.cjs watch (R2-1 / R2-3a).
+    const grandchildCode =
+      'const fs = require("node:fs"); ' +
+      'const expectedParent = Number(process.env.GENOFFICE_OCR_PARENT_PID); ' +
+      'fs.writeFileSync(' +
+      JSON.stringify(gpidFile) +
+      ', String(process.pid), "utf8"); ' +
+      'const waitTimer = setInterval(() => { ' +
+      '  let parentStillOwned = process.ppid === expectedParent; ' +
+      '  if (parentStillOwned) { ' +
+      '    try { process.kill(expectedParent, 0); } catch (e) { parentStillOwned = Boolean(e && e.code === "EPERM"); } ' +
+      '  } ' +
+      '  if (!parentStillOwned) { ' +
+      '    clearInterval(waitTimer); ' +
+      '    require(' +
+      ${JSON.stringify(JSON.stringify(SHIPPED_TESS_OCR_PATH))} +
+      '); ' +
+      '    fs.writeFileSync(' +
+      JSON.stringify(survivedFile) +
+      ', "survived", "utf8"); ' +
+      '    setInterval(() => {}, 1000); ' +
+      '  } ' +
+      '}, 15);';
+    spawnSync(process.execPath, ['-e', grandchildCode], {
+      stdio: 'ignore',
+      windowsHide: true,
+      env: { ...process.env, GENOFFICE_OCR_PARENT_PID: String(process.pid) },
+    });
+    return;
+  }
   if (mode === 'mode:slow-extraction') {
     // Simulate a slow initial whole-document extraction pass before the first progress event (R1-11)
     setTimeout(() => {
@@ -551,35 +601,233 @@ describe('PDF -> Office utilityProcess host protocol (fake child via child_proce
     underlyingChild?.kill()
   })
 
-  it('cleans up the spawnSync grandchild when only the root converter crashes/is killed (R1-2/R1-4)', async () => {
-    const cpidFile = join(scratchDir, 'crash-tree-cpid.txt')
-    const gpidFile = join(scratchDir, 'crash-tree-gpid.txt')
+  it('runs the shipped tess-ocr.cjs parent watch: helper exits when parent dies (a) before helper watch initializes and (b) while helper is working (R1-2/R1-4/R2-1/R2-3)', async () => {
     const fork = createNodeChildProcessFork(fakeChildPath)
 
-    const jobPromise = runPdfConvertJob(
+    // (a) Kill the converter parent BEFORE the helper initializes tess-ocr.cjs.
+    // Pass `killTree: () => {}` so host-side tree kill cannot mask a broken watcher on Windows.
+    const preInitCpidFile = join(scratchDir, 'crash-preinit-cpid.txt')
+    const preInitGpidFile = join(scratchDir, 'crash-preinit-gpid.txt')
+    const preInitSurvivedFile = join(scratchDir, 'crash-preinit-survived.txt')
+
+    const preInitPromise = runPdfConvertJob(
       {
         kind: 'docx',
-        pdfPath: `mode:spawnsync-grandchild:${cpidFile}|${gpidFile}`,
+        pdfPath: `mode:spawnsync-grandchild-preinit:${preInitCpidFile}|${preInitGpidFile}|${preInitSurvivedFile}`,
       },
-      { fork },
+      { fork, killTree: () => undefined },
     )
 
-    const childPid = Number(await waitForFileContent(cpidFile))
-    const grandchildPid = Number(await waitForFileContent(gpidFile))
-    expect(childPid).toBeGreaterThan(0)
-    expect(grandchildPid).toBeGreaterThan(0)
-    expect(isPidAlive(childPid)).toBe(true)
-    expect(isPidAlive(grandchildPid)).toBe(true)
+    const preInitChildPid = Number(await waitForFileContent(preInitCpidFile))
+    const preInitGrandchildPid = Number(await waitForFileContent(preInitGpidFile))
+    expect(isPidAlive(preInitChildPid)).toBe(true)
+    expect(isPidAlive(preInitGrandchildPid)).toBe(true)
 
-    // Kill ONLY the root converter process directly (simulating a sudden crash / SIGKILL)
-    process.kill(childPid, 'SIGKILL')
+    process.kill(preInitChildPid, 'SIGKILL')
 
-    await expect(jobPromise).rejects.toBeInstanceOf(PdfConvertCrashed)
-    expect(await waitForPidGone(childPid)).toBe(true)
-    expect(await waitForPidGone(grandchildPid)).toBe(true)
+    await expect(preInitPromise).rejects.toBeInstanceOf(PdfConvertCrashed)
+    expect(await waitForPidGone(preInitChildPid)).toBe(true)
+    expect(await waitForPidGone(preInitGrandchildPid)).toBe(true)
+    expect(existsSync(preInitSurvivedFile)).toBe(false)
+
+    // (b) Kill the converter parent WHILE the helper is working after tess-ocr.cjs watch initialized.
+    // Again pass `killTree: () => {}` first so only the shipped tess-ocr.cjs watch can terminate it.
+    const workingCpidFile = join(scratchDir, 'crash-working-cpid.txt')
+    const workingGpidFile = join(scratchDir, 'crash-working-gpid.txt')
+
+    const workingPromise = runPdfConvertJob(
+      {
+        kind: 'docx',
+        pdfPath: `mode:spawnsync-grandchild:${workingCpidFile}|${workingGpidFile}`,
+      },
+      { fork, killTree: () => undefined },
+    )
+
+    const workingChildPid = Number(await waitForFileContent(workingCpidFile))
+    const workingGrandchildPid = Number(await waitForFileContent(workingGpidFile))
+    expect(isPidAlive(workingChildPid)).toBe(true)
+    expect(isPidAlive(workingGrandchildPid)).toBe(true)
+
+    process.kill(workingChildPid, 'SIGKILL')
+
+    await expect(workingPromise).rejects.toBeInstanceOf(PdfConvertCrashed)
+    expect(await waitForPidGone(workingChildPid)).toBe(true)
+    expect(await waitForPidGone(workingGrandchildPid)).toBe(true)
     expect(activePdfConvertJobCount()).toBe(0)
+    expect(terminatingPdfConvertJobCount()).toBe(0)
   })
 
+  it('keeps the terminating handle and exit listener until the process actually emits exit: retries failed kills and handles late exit after successful kill (R2-2)', async () => {
+    // 1. Failed tree kill + kill() returning false on a child with a valid PID keeps the
+    // handle in terminatingJobs so killAllPdfConvertJobs() retries it; later exit clears it.
+    const emitter1 = new EventEmitter()
+    let killAttempts1 = 0
+    let allowKill1 = false
+    const treeKillCalls1: Array<[number | undefined, boolean]> = []
+
+    const fork1 = (): ConvertChildProcess => ({
+      pid: 42424,
+      postMessage() {
+        // stay in flight until aborted
+      },
+      on(event, listener) {
+        emitter1.on(event, listener)
+        return this
+      },
+      off(event, listener) {
+        emitter1.off(event, listener)
+        return this
+      },
+      kill() {
+        killAttempts1++
+        return allowKill1
+      },
+    })
+
+    const controller1 = new AbortController()
+    const job1 = runPdfConvertJob(
+      { kind: 'docx', pdfPath: 'x.pdf' },
+      {
+        fork: fork1,
+        signal: controller1.signal,
+        killTree: (pid, rootAlreadyExited) => {
+          treeKillCalls1.push([pid, rootAlreadyExited])
+        },
+      },
+    )
+
+    controller1.abort()
+    await expect(job1).rejects.toBeInstanceOf(PdfConvertCancelled)
+
+    // Even though child.pid === 42424, kill() returned false and 'exit' has not fired:
+    // terminating handle and exit listener MUST remain registered.
+    expect(killAttempts1).toBe(1)
+    expect(treeKillCalls1).toEqual([[42424, false]])
+    expect(activePdfConvertJobCount()).toBe(0)
+    expect(terminatingPdfConvertJobCount()).toBe(1)
+    expect(emitter1.listenerCount('exit')).toBe(1)
+
+    // Calling killAllPdfConvertJobs() retries both killTree and child.kill()
+    allowKill1 = true
+    killAllPdfConvertJobs()
+    expect(killAttempts1).toBe(2)
+    expect(treeKillCalls1).toEqual([
+      [42424, false],
+      [42424, false],
+    ])
+    // Still waiting for the actual 'exit' event
+    expect(terminatingPdfConvertJobCount()).toBe(1)
+    expect(emitter1.listenerCount('exit')).toBe(1)
+
+    // Once 'exit' arrives, ownership and listeners are released
+    emitter1.emit('exit', null)
+    expect(terminatingPdfConvertJobCount()).toBe(0)
+    expect(emitter1.listenerCount('exit')).toBe(0)
+    expect(emitter1.listenerCount('spawn')).toBe(0)
+
+    // 2. Successful kill (kill() returns true) with late asynchronous exit event:
+    // handle stays registered until the late 'exit' event fires.
+    const emitter2 = new EventEmitter()
+    let killAttempts2 = 0
+    const fork2 = (): ConvertChildProcess => ({
+      pid: 52525,
+      postMessage(job: PdfConvertJob) {
+        setImmediate(() => {
+          emitter2.emit('message', {
+            type: 'result',
+            kind: job.kind,
+            bytes: new Uint8Array([1, 2, 3]),
+            pages: 1,
+            warnings: [],
+            pageResults: [{ page: 1, status: 'ok' }],
+            scannedDocument: false,
+          })
+        })
+      },
+      on(event, listener) {
+        emitter2.on(event, listener)
+        return this
+      },
+      off(event, listener) {
+        emitter2.off(event, listener)
+        return this
+      },
+      kill() {
+        killAttempts2++
+        return true
+      },
+    })
+
+    const res2 = await runPdfConvertJob(
+      { kind: 'docx', pdfPath: 'x.pdf' },
+      { fork: fork2, killTree: () => undefined },
+    )
+    expect(res2.pages).toBe(1)
+    expect(killAttempts2).toBe(1)
+    // Before the delayed 'exit' fires, terminating handle is still held
+    expect(terminatingPdfConvertJobCount()).toBe(1)
+    expect(emitter2.listenerCount('exit')).toBe(1)
+
+    emitter2.emit('exit', 0)
+    expect(terminatingPdfConvertJobCount()).toBe(0)
+    expect(emitter2.listenerCount('exit')).toBe(0)
+  })
+
+  it('runs Windows post-exit taskkill only when process.kill(pid, 0) throws ESRCH, skipping reused PIDs (R1-12)', () => {
+    const esrchError = () => {
+      throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' })
+    }
+    const epermError = () => {
+      throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' })
+    }
+    const aliveProbe = () => undefined
+
+    expect(isPidAbsent(9001, esrchError)).toBe(true)
+    expect(isPidAbsent(9001, aliveProbe)).toBe(false)
+    expect(isPidAbsent(9001, epermError)).toBe(false)
+
+    // Branch 1: Converter exited and probePid throws ESRCH (PID not reused) -> run taskkill /T /F, no process.kill
+    const taskkillOnEsrch: number[] = []
+    const killPidOnEsrch: Array<[number, string]> = []
+    killProcessTree(9001, true, {
+      platform: 'win32',
+      probePid: esrchError,
+      runTaskkill: (pid) => taskkillOnEsrch.push(pid),
+      killPid: (pid, sig) => killPidOnEsrch.push([pid, sig]),
+    })
+    expect(taskkillOnEsrch).toEqual([9001])
+    expect(killPidOnEsrch).toEqual([])
+
+    // Branch 2a: Converter exited and probePid succeeds (PID reused by another process) -> skip taskkill
+    const taskkillOnReused: number[] = []
+    killProcessTree(9002, true, {
+      platform: 'win32',
+      probePid: aliveProbe,
+      runTaskkill: (pid) => taskkillOnReused.push(pid),
+    })
+    expect(taskkillOnReused).toEqual([])
+
+    // Branch 2b: Converter exited and probePid throws EPERM (PID reused by another user/elevated process) -> skip taskkill
+    const taskkillOnEperm: number[] = []
+    killProcessTree(9003, true, {
+      platform: 'win32',
+      probePid: epermError,
+      runTaskkill: (pid) => taskkillOnEperm.push(pid),
+    })
+    expect(taskkillOnEperm).toEqual([])
+
+    // Live root (rootAlreadyExited = false): always runs taskkill and SIGKILLs root
+    const taskkillOnLive: number[] = []
+    const killPidOnLive: Array<[number, string]> = []
+    killProcessTree(9004, false, {
+      platform: 'win32',
+      probePid: aliveProbe,
+      runTaskkill: (pid) => taskkillOnLive.push(pid),
+      killPid: (pid, sig) => killPidOnLive.push([pid, sig]),
+    })
+    expect(taskkillOnLive).toEqual([9004])
+    expect(killPidOnLive).toEqual([[9004, 'SIGKILL']])
+  })
   it('POSIX tree killer sends SIGSTOP to root before killing descendants and falls back to ps when pgrep fails (R1-5, R1-6)', () => {
     const signals: Array<[number, string]> = []
     const psOutput = [
@@ -665,6 +913,7 @@ describe('PDF -> Office utilityProcess host protocol (fake child via child_proce
         return this
       },
       kill() {
+        emitter.emit('exit', 0)
         return true
       },
     })
@@ -847,67 +1096,261 @@ describe('PDF convert progress + cancel IPC wiring', () => {
 
     vi.doUnmock('electron')
   })
-  it('enforces a non-cancellable commit boundary before atomicWriteFile and sends done:true once without double-sending (R1-7 + FE-R1-2)', () => {
-    // 1. Pre-commit abort returns false and performs no commit-phase side effects
-    const abortedController = new AbortController()
-    abortedController.abort()
-    const abortedEvents: string[] = []
-    expect(
-      beginPdfConvertCommitPhase({
-        isAborted: () => abortedController.signal.aborted,
-        disableCancel: () => abortedEvents.push('disableCancel'),
-        closePasswordDialog: () => abortedEvents.push('closePasswordDialog'),
-        sendDoneProgress: () => abortedEvents.push('sendDoneProgress'),
-        resetProgressBar: () => abortedEvents.push('resetProgressBar'),
-      }),
-    ).toBe(false)
-    expect(abortedEvents).toEqual([])
+  it('exercises the shared runPdfConvertExportFlow + cancelActivePdfConvert across docx, pptx, and xlsx: emits done once before write and notice, makes post-commit cancel a no-op, and never double-sends done (R1-7 + FE-R1-2 + R2-4)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'uniwork-pdf-export-flow-'))
+    try {
+      const kinds = ['docx', 'pptx', 'xlsx'] as const
+      const senderId = 701
 
-    // 2. Entering the commit phase disables convertCancel, closes the password dialog,
-    // emits done: true, and resets the progress bar before atomicWriteFile / completion dialogs;
-    // the finally guard does not emit a duplicate done event.
-    const controller = new AbortController()
-    let activeController: AbortController | null = controller
-    let progressSettled = false
-    const progressEvents: PdfConvertProgressEvent[] = []
-    const progressBarValues: number[] = [0.5]
-    let passwordDialogClosed = 0
+      for (const kind of kinds) {
+        const target = join(dir, `converted.${kind}`)
+        writeFileSync(target, 'old-destination-bytes', 'utf8')
 
-    const sendDoneIfUnsettled = () => {
-      if (!progressSettled) {
-        progressSettled = true
-        progressEvents.push({ format: 'docx', page: 3, total: 3, done: true })
+        const trace: string[] = []
+        const progressEvents: PdfConvertProgressEvent[] = []
+        const newBytes = new TextEncoder().encode(`new-${kind}-bytes`)
+
+        const { promise: writeEntered, resolve: notifyWriteEntered } = Promise.withResolvers<void>()
+        const { promise: writeGate, resolve: releaseWrite } = Promise.withResolvers<void>()
+        const { promise: noticeEntered, resolve: notifyNoticeEntered } =
+          Promise.withResolvers<void>()
+        const { promise: noticeGate, resolve: releaseNotice } = Promise.withResolvers<void>()
+        const closePwd = () => {
+          trace.push('password:close')
+        }
+
+        const exportPromise = runPdfConvertExportFlow({
+          kind,
+          pdfPath: `/tmp/source-${kind}.pdf`,
+          senderId,
+          prepareTarget: () => Promise.resolve(target),
+          setProgressBar: (value) => {
+            trace.push(`progressBar:${value}`)
+          },
+          sendProgress: (payload) => {
+            progressEvents.push(payload)
+            trace.push(
+              payload.done
+                ? `done:${payload.page}/${payload.total}`
+                : `progress:${payload.page}/${payload.total}`,
+            )
+          },
+          closePasswordDialog: closePwd,
+          promptPassword: () => Promise.resolve(null),
+          convertDocx: (_pdfPath, _prompt, onProgress) => {
+            onProgress(1, 2)
+            onProgress(2, 2)
+            return Promise.resolve({
+              docx: newBytes,
+              pages: 2,
+              warnings: [],
+              pageResults: [
+                { page: 1, status: 'ok' as const },
+                { page: 2, status: 'ocr' as const, confidence: 0.95 },
+              ],
+              scannedDocument: false,
+            })
+          },
+          convertPptx: (_pdfPath, _prompt, onProgress) => {
+            onProgress(1, 2)
+            onProgress(2, 2)
+            return Promise.resolve({
+              pptx: newBytes,
+              pages: 2,
+              warnings: [],
+              pageResults: [
+                { page: 1, status: 'ok' as const },
+                { page: 2, status: 'degraded' as const },
+              ],
+              scannedDocument: false,
+            })
+          },
+          convertXlsx: (_pdfPath, _prompt, onProgress) => {
+            onProgress(1, 2)
+            onProgress(2, 2)
+            return Promise.resolve({
+              xlsx: newBytes,
+              pages: 2,
+              warnings: [],
+              pageResults: [
+                { page: 1, status: 'ok' as const },
+                { page: 2, status: 'degraded' as const },
+              ],
+              scannedDocument: false,
+            })
+          },
+          writeDocx: async (outPath, res) => {
+            trace.push('write:start')
+            notifyWriteEntered()
+            await writeGate
+            await atomicWriteFile(outPath, res.docx)
+            trace.push('write:end')
+          },
+          writePptx: async (outPath, res) => {
+            trace.push('write:start')
+            notifyWriteEntered()
+            await writeGate
+            await atomicWriteFile(outPath, res.pptx)
+            trace.push('write:end')
+          },
+          writeXlsx: async (outPath, res) => {
+            trace.push('write:start')
+            notifyWriteEntered()
+            await writeGate
+            await atomicWriteFile(outPath, res.xlsx)
+            trace.push('write:end')
+          },
+          showDocxNotice: async () => {
+            trace.push('notice:start')
+            notifyNoticeEntered()
+            await noticeGate
+            trace.push('notice:end')
+          },
+          showPptxNotice: async () => {
+            trace.push('notice:start')
+            notifyNoticeEntered()
+            await noticeGate
+            trace.push('notice:end')
+          },
+          showXlsxNotice: async () => {
+            trace.push('notice:start')
+            notifyNoticeEntered()
+            await noticeGate
+            trace.push('notice:end')
+          },
+          showError: () => {
+            trace.push('error:shown')
+          },
+        })
+
+        // Wait until the flow has entered the write callback (before atomicWriteFile runs)
+        await writeEntered
+
+        // At the write boundary (before disk persistence and before notice dialog):
+        // 1. done:true has already been emitted once
+        // 2. password dialog was closed and progress bar reset to -1
+        // 3. existing destination still has old bytes until writeGate releases
+        expect(progressEvents.filter((e) => e.done)).toEqual([
+          { format: kind, page: 2, total: 2, done: true },
+        ])
+        expect(readFileSync(target, 'utf8')).toBe('old-destination-bytes')
+        expect(trace).toEqual([
+          'progressBar:2',
+          'progress:0/0',
+          'progressBar:0.5',
+          'progress:1/2',
+          'progressBar:1',
+          'progress:2/2',
+          'password:close',
+          'done:2/2',
+          'progressBar:-1',
+          'write:start',
+        ])
+
+        // Cancel after the commit point is a no-op
+        expect(cancelActivePdfConvert(senderId, senderId, closePwd)).toBe(false)
+
+        // Release the write and wait until the completion notice dialog is held open
+        releaseWrite()
+        await noticeEntered
+
+        expect(readFileSync(target, 'utf8')).toBe(`new-${kind}-bytes`)
+        expect(cancelActivePdfConvert(senderId, senderId, closePwd)).toBe(false)
+        expect(progressEvents.filter((e) => e.done)).toHaveLength(1)
+
+        // Release the notice dialog and verify the flow finishes without a duplicate done event
+        releaseNotice()
+        expect(await exportPromise).toBe(target)
+        expect(progressEvents.filter((e) => e.done)).toHaveLength(1)
+        expect(trace).toEqual([
+          'progressBar:2',
+          'progress:0/0',
+          'progressBar:0.5',
+          'progress:1/2',
+          'progressBar:1',
+          'progress:2/2',
+          'password:close',
+          'done:2/2',
+          'progressBar:-1',
+          'write:start',
+          'write:end',
+          'notice:start',
+          'notice:end',
+          'password:close',
+        ])
       }
+
+      // Also verify pre-commit cancel aborts the in-flight conversion, leaves destination intact,
+      // and sends done:true once from finally
+      const cancelTarget = join(dir, 'cancelled.docx')
+      writeFileSync(cancelTarget, 'untouched', 'utf8')
+      const cancelEvents: PdfConvertProgressEvent[] = []
+      const { promise: inFlight, resolve: notifyInFlight } = Promise.withResolvers<void>()
+
+      const cancelledFlow = runPdfConvertExportFlow({
+        kind: 'docx',
+        pdfPath: '/tmp/cancel.pdf',
+        senderId,
+        prepareTarget: () => Promise.resolve(cancelTarget),
+        setProgressBar: () => undefined,
+        sendProgress: (p) => cancelEvents.push(p),
+        closePasswordDialog: () => undefined,
+        promptPassword: () => Promise.resolve(null),
+        convertDocx: (_pdfPath, _prompt, onProgress, signal) => {
+          const { promise, reject } = Promise.withResolvers<{
+            docx: Uint8Array
+            pages: number
+            warnings: string[]
+            pageResults: Array<{ page: number; status: 'ok' }>
+            scannedDocument: boolean
+          } | null>()
+          onProgress(1, 4)
+          notifyInFlight()
+          signal.addEventListener(
+            'abort',
+            () => {
+              reject(new PdfConvertCancelled())
+            },
+            { once: true },
+          )
+          return promise
+        },
+        convertPptx: () => Promise.resolve(null),
+        convertXlsx: () => Promise.resolve(null),
+        writeDocx: async () => {
+          throw new Error('should not write on cancel')
+        },
+        writePptx: async () => undefined,
+        writeXlsx: async () => undefined,
+        showDocxNotice: async () => {
+          throw new Error('should not show notice on cancel')
+        },
+        showPptxNotice: async () => undefined,
+        showXlsxNotice: async () => undefined,
+        showError: () => {
+          throw new Error('should not show error dialog on cancel')
+        },
+      })
+
+      await inFlight
+      expect(cancelActivePdfConvert(999, 999)).toBe(false)
+      expect(cancelActivePdfConvert(senderId, senderId)).toBe(true)
+      expect(await cancelledFlow).toBeNull()
+      expect(readFileSync(cancelTarget, 'utf8')).toBe('untouched')
+      expect(cancelEvents.filter((e) => e.done)).toEqual([
+        { format: 'docx', page: 1, total: 4, done: true },
+      ])
+      expect(
+        beginPdfConvertCommitPhase({
+          isAborted: () => true,
+          disableCancel: () => undefined,
+          closePasswordDialog: () => undefined,
+          sendDoneProgress: () => undefined,
+          resetProgressBar: () => undefined,
+        }),
+      ).toBe(false)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
-
-    const committed = beginPdfConvertCommitPhase({
-      isAborted: () => controller.signal.aborted,
-      disableCancel: () => {
-        if (activeController === controller) activeController = null
-      },
-      closePasswordDialog: () => {
-        passwordDialogClosed++
-      },
-      sendDoneProgress: sendDoneIfUnsettled,
-      resetProgressBar: () => {
-        progressBarValues.push(-1)
-      },
-    })
-
-    expect(committed).toBe(true)
-    expect(activeController).toBeNull()
-    expect(passwordDialogClosed).toBe(1)
-    expect(progressEvents).toEqual([{ format: 'docx', page: 3, total: 3, done: true }])
-    expect(progressBarValues).toEqual([0.5, -1])
-
-    // Subsequent convertCancel IPC (which checks activeController) is now a no-op
-    if (activeController) {
-      ;(activeController as AbortController).abort()
-    }
-    expect(controller.signal.aborted).toBe(false)
-
-    // And the finally block's sendDoneIfUnsettled does not double-send done: true
-    sendDoneIfUnsettled()
-    expect(progressEvents).toHaveLength(1)
   })
 })
