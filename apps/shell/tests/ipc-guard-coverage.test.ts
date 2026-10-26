@@ -12,6 +12,7 @@ import { registerAiRunIpc } from '../src/main/ai-run-registry'
 import { registerUniworkAiFlagIpc } from '../src/main/uniwork-ai-flag'
 import { registerUniworkCloudStatusIpc } from '../src/main/uniwork-cloud-status'
 import { registerUniworkWork } from '../src/main/uniwork-work/wiring'
+import { registerUniworkDrive } from '../src/main/uniwork-drive/wiring'
 import { HOME_CHANNELS, UNIWORK_DOC_CHANNELS, UNIWORK_SHARE_CHANNELS } from '../src/shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../src/shared/integrations-api'
 import { PDF_PASSWORD_CHANNELS } from '../src/shared/pdf-password-api'
@@ -22,6 +23,7 @@ import { ASKUNI_CHANNELS, ASKUNI_DOC_CHANNELS, ASKUNI_V2_CHANNELS } from '../src
 import { SOURCE_VIEW_CHANNELS } from '../src/shared/source-view'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../src/shared/sync-center'
 import { UNIWORK_WORK_CHANNELS } from '../src/shared/uniwork-work-api'
+import { UNIWORK_DRIVE_CHANNELS } from '../src/shared/uniwork-drive-api'
 import { ZIP_DOWNLOAD_CHANNELS } from '../src/shared/zip-download-api'
 import { AI_RUN_CHANNEL } from '../../../packages/electron-utils/src/ai-run'
 import {
@@ -379,6 +381,7 @@ function registrarFileDiff(
 const REGISTRARS = [
   'createUniworkDocs',
   'registerUniworkWork',
+  'registerUniworkDrive',
   'registerAccountIpc',
   'registerAiRunIpc',
   'registerUniworkAiFlagIpc',
@@ -422,6 +425,7 @@ const REGISTRAR_FILES: Record<string, string> = {
   'apps/shell/src/main/uniwork-sync/offline-library/api.ts':
     'registerOfflineLibraryIpc (in createUniworkDocs)',
   'apps/shell/src/main/uniwork-work/wiring.ts': 'registerUniworkWork',
+  'apps/shell/src/main/uniwork-drive/wiring.ts': 'registerUniworkDrive',
   'apps/shell/src/main/uniwork-auth/index.ts': 'registerAccountIpc',
   'apps/shell/src/main/uniwork-cloud-status.ts':
     'registerUniworkCloudStatusIpc (in registerAccountIpc)',
@@ -1355,6 +1359,7 @@ describe('policy of every uniwork* and home account channel constant', () => {
     UNIWORK_SHARE_CHANNELS,
     UNIWORK_SYNC_CENTER_CHANNELS,
     UNIWORK_WORK_CHANNELS,
+    UNIWORK_DRIVE_CHANNELS,
     ZIP_DOWNLOAD_CHANNELS,
     SOURCE_VIEW_CHANNELS,
     ASKUNI_CHANNELS,
@@ -1622,6 +1627,18 @@ describe('registrars under the real guard', () => {
       },
       openExternal: async () => undefined,
     })
+    registerUniworkDrive(guarded as never, {
+      profile: () => null,
+      identity: () => null,
+      org: () => null,
+      authorized: async () => {
+        throw new Error('unused')
+      },
+      openExternal: async () => undefined,
+      capability: async () => {
+        throw new Error('unused')
+      },
+    })
     expect(registered.sort()).toEqual(
       [
         AI_RUN_CHANNEL,
@@ -1630,6 +1647,7 @@ describe('registrars under the real guard', () => {
         UNIWORK_CLOUD_STATUS_OPEN_ACCOUNT,
         UNIWORK_CLOUD_STATUS_SIGN_IN,
         ...Object.values(UNIWORK_WORK_CHANNELS),
+        ...Object.values(UNIWORK_DRIVE_CHANNELS),
       ].sort(),
     )
   })
