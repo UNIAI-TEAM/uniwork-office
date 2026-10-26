@@ -1978,7 +1978,8 @@
   cursor: pointer;
 }
 
-.dh-drive-reconnect-link:disabled {
+.dh-drive-reconnect-link:disabled,
+.dh-drive-reconnect-text {
   cursor: default;
 }
 

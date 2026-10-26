@@ -360,6 +360,7 @@ export function DriveList({
 
   const onRowKeyDown = (event: ReactKeyboardEvent<HTMLTableRowElement>, driveFileId: string) => {
     if (event.nativeEvent.isComposing) return
+    if (event.repeat) return
     if (event.key !== 'Enter') return
     const target = event.target as HTMLElement | null
     if (target && target !== event.currentTarget && target.closest('button, a, input')) return
@@ -514,22 +515,29 @@ export function DriveList({
                       <td className="dh-drive-td dh-drive-cell-account">
                         <div className="dh-drive-account-stack">
                           <span className="dh-drive-account-email">{accountEmail}</span>
-                          {rowNeedsReconnect && (
-                            <button
-                              type="button"
-                              className="dh-drive-reconnect-link"
-                              data-drive-reconnect={viewerConnId || file.connectionId}
-                              disabled={!onReconnect}
-                              aria-disabled={!onReconnect || undefined}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onReconnect?.(viewerConnId || file.connectionId)
-                              }}
-                            >
-                              <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
-                              <span>{t('uhDriveReconnect')}</span>
-                            </button>
-                          )}
+                          {rowNeedsReconnect &&
+                            (onReconnect ? (
+                              <button
+                                type="button"
+                                className="dh-drive-reconnect-link"
+                                data-drive-reconnect={viewerConnId || file.connectionId}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onReconnect(viewerConnId || file.connectionId)
+                                }}
+                              >
+                                <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
+                                <span>{t('uhDriveReconnect')}</span>
+                              </button>
+                            ) : (
+                              <span
+                                className="dh-drive-reconnect-link dh-drive-reconnect-text"
+                                data-drive-reconnect={viewerConnId || file.connectionId}
+                              >
+                                <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
+                                <span>{t('uhDriveReconnect')}</span>
+                              </span>
+                            ))}
                         </div>
                       </td>
                       <td className="dh-drive-td dh-drive-cell-access">
@@ -618,6 +626,7 @@ export function useDocumentsHomeDrive({
   const [capability, setCapability] = useState(false)
   const [connections, setConnections] = useState<readonly DriveConnection[]>([])
   const [seenInSession, setSeenInSession] = useState(false)
+  const seenInSessionRef = useRef(false)
   const [syncOnline, setSyncOnline] = useState<boolean>(true)
   const [networkFailed, setNetworkFailed] = useState(false)
   const [focusTick, setFocusTick] = useState(0)
@@ -646,6 +655,7 @@ export function useDocumentsHomeDrive({
     setSelectedAccountId(null)
     setConnections([])
     setSeenInSession(false)
+    seenInSessionRef.current = false
     setNetworkFailed(false)
     setFilesState({
       status: 'loading',
@@ -691,6 +701,8 @@ export function useDocumentsHomeDrive({
     return () => window.removeEventListener('focus', onFocus)
   }, [])
 
+  const isDriveView = subView === 'google-drive'
+
   // Load capability + connections
   const connSeqRef = useRef(0)
   useEffect(() => {
@@ -707,7 +719,7 @@ export function useDocumentsHomeDrive({
       setCapability(avail)
       if (!avail) {
         // If we haven't seen the row in this session, don't fetch connections
-        if (!seenInSession) {
+        if (!seenInSessionRef.current) {
           setConnections([])
           return
         }
@@ -718,7 +730,8 @@ export function useDocumentsHomeDrive({
       if (res.ok) {
         setNetworkFailed(false)
         setConnections(res.value)
-        if (avail && res.value.length > 0) {
+        if ((avail || seenInSessionRef.current) && res.value.length > 0) {
+          seenInSessionRef.current = true
           setSeenInSession(true)
         }
       } else if (res.error === 'network') {
@@ -726,41 +739,46 @@ export function useDocumentsHomeDrive({
       } else if (res.error === 'feature_disabled') {
         setCapability(false)
         setConnections([])
+        seenInSessionRef.current = false
         setSeenInSession(false)
       }
     })()
-  }, [workspaceId, subView, listTick, focusTick, driveTick, seenInSession])
+  }, [workspaceId, isDriveView, listTick, focusTick, driveTick])
 
   const resolvedAccountId = resolveDriveAccountFilter(selectedAccountId, connections)
 
   // Load files when Google Drive sub-view is open
   const filesSeqRef = useRef(0)
-  const isDriveView = subView === 'google-drive'
   const prevAccountRef = useRef<string | null>(resolvedAccountId)
   useEffect(() => {
     if (!isDriveView) return
     const seq = ++filesSeqRef.current
     const bridge = getDriveBridge()
-    if (!syncOnline) {
-      setNetworkFailed(true)
-      setFilesState({
-        status: 'error',
-        files: [],
-        totalCount: null,
-        nextCursor: null,
-        loadingMore: false,
-        error: 'network',
-      })
-      return
-    }
     const accountChanged = prevAccountRef.current !== resolvedAccountId
     prevAccountRef.current = resolvedAccountId
+    if (!syncOnline) {
+      setNetworkFailed(true)
+      setFilesState((prev) =>
+        !accountChanged && prev.files.length > 0
+          ? { ...prev, loadingMore: false, moreError: 'network' }
+          : {
+              status: 'error',
+              files: [],
+              totalCount: null,
+              nextCursor: null,
+              loadingMore: false,
+              error: 'network',
+            },
+      )
+      return
+    }
     setFilesState((prev) => ({
       status: !accountChanged && prev.files.length > 0 ? prev.status : 'loading',
       files: accountChanged ? [] : prev.files,
       totalCount: prev.totalCount,
       nextCursor: accountChanged ? null : prev.nextCursor,
       loadingMore: false,
+      moreError: undefined,
     }))
     void fetchDocumentsHomeDriveFiles(bridge, {
       workspaceId,
@@ -769,6 +787,7 @@ export function useDocumentsHomeDrive({
       if (filesSeqRef.current !== seq) return
       if (res.ok) {
         setNetworkFailed(false)
+        // A successful refresh replaces the list with page 1 (collapsing any cursor-loaded pages).
         setFilesState({
           status: 'ready',
           files: res.value.files,
@@ -778,14 +797,22 @@ export function useDocumentsHomeDrive({
         })
       } else {
         if (res.error === 'network') setNetworkFailed(true)
-        setFilesState({
-          status: 'error',
-          files: [],
-          totalCount: null,
-          nextCursor: null,
-          loadingMore: false,
-          error: res.error,
-        })
+        setFilesState((prev) =>
+          !accountChanged && prev.files.length > 0
+            ? {
+                ...prev,
+                loadingMore: false,
+                moreError: res.error,
+              }
+            : {
+                status: 'error',
+                files: [],
+                totalCount: null,
+                nextCursor: null,
+                loadingMore: false,
+                error: res.error,
+              },
+        )
       }
     })
   }, [workspaceId, isDriveView, resolvedAccountId, syncOnline, listTick, focusTick, driveTick])
@@ -848,9 +875,8 @@ export function useDocumentsHomeDrive({
       } catch {
         setNetworkFailed(true)
         onErrorToastRef.current?.('network')
-      } finally {
-        setDriveTick((n) => n + 1)
       }
+      // Window focus handles refreshing when returning from the external browser; do not refetch here.
     },
     [workspaceId],
   )

@@ -15,6 +15,7 @@ import type {
 } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
+import { DriveList } from '../src/renderer/src/uniwork-home/DriveList'
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import {
   openDocumentShare,
@@ -3338,6 +3339,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     })
 
     it('renders Google Drive under My Folder with account sub-rows, Mất kết nối badge, 5-column table, and double-click / Enter open-on-google', async () => {
+      folderTree[0] = { ...folderTree[0]!, systemKind: 'my_folder' }
       const driveBridge = installDriveBridge()
       await mountHome()
       await flush()
@@ -3425,6 +3427,17 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         'Mỗi tệp gắn với tài khoản Google Drive đã chọn nó.',
       )
 
+      // R1-8 / R1-3 #7: When tree is ready with My Folder, Drive rows sit inside the tree's afterFirstRootRow slot
+      expect(document.querySelector('.uwf-tree-slot [data-drive-sidebar]')).not.toBeNull()
+
+      // R1-4: While onReconnect is absent in D2, the broken-row marker renders as a non-interactive span (no button)
+      expect(row2.querySelector('button[data-drive-reconnect]')).toBeNull()
+      expect(row2.querySelector('span[data-drive-reconnect]')?.textContent).toContain(
+        'Mất kết nối · kết nối lại',
+      )
+
+      // R1-2: Double-clicking a row invokes openOnGoogle without triggering an extra listFiles refetch
+      const listFilesBeforeOpen = driveBridge.listFiles.mock.calls.length
       // Double-clicking a row invokes window.uniworkDrive.openOnGoogle({ workspaceId, driveFileId })
       await act(async () => {
         row1.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
@@ -3434,9 +3447,17 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         workspaceId: 'ws-1',
         driveFileId: 'df-1',
       })
+      expect(driveBridge.listFiles.mock.calls.length).toBe(listFilesBeforeOpen)
 
-      // Pressing Enter on a row also invokes openOnGoogle({ workspaceId, driveFileId })
+      // Pressing Enter on a row also invokes openOnGoogle({ workspaceId, driveFileId }), while repeat is ignored (R1-9)
       const liveRow2 = document.querySelector<HTMLElement>('[data-drive-file-id="df-2"]')!
+      await act(async () => {
+        liveRow2.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true }),
+        )
+      })
+      await flush()
+      expect(driveBridge.openOnGoogle).toHaveBeenCalledTimes(1)
       await act(async () => {
         liveRow2.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
       })
@@ -3486,12 +3507,28 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       })
     })
 
-    it('shows the offline state when syncCenter reports offline or listFiles fails with network', async () => {
-      installDriveBridge({
-        listFiles: vi.fn(async () => ({
-          ok: false as const,
-          error: 'network' as const,
-        })),
+    it('shows the offline state when syncCenter reports offline or listFiles fails with network, and retries on Retry click', async () => {
+      let syncSubscriber: ((snap: { header: { online: boolean } }) => void) | null = null
+      Reflect.set(window, 'uniworkSyncCenter', {
+        getSnapshot: vi.fn(async () => ({ header: { online: false } })),
+        subscribe: vi.fn((cb: (snap: { header: { online: boolean } }) => void) => {
+          syncSubscriber = cb
+          return () => {
+            syncSubscriber = null
+          }
+        }),
+      })
+      let shouldFailNetwork = false
+      const driveBridge = installDriveBridge({
+        listFiles: vi.fn(async () => {
+          if (shouldFailNetwork) {
+            return { ok: false as const, error: 'network' as const }
+          }
+          return {
+            ok: true as const,
+            value: { files: [fileActive], totalCount: 1, nextCursor: null },
+          }
+        }),
       })
       await mountHome()
       await flush()
@@ -3501,9 +3538,394 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       })
       await flush()
       await flush()
+      // SyncCenter offline path shows offline state without calling listFiles
       expect(document.querySelector('.dl-state-title')?.textContent).toContain(
         'Cần kết nối mạng để xem tệp Google Drive.',
       )
+      expect(driveBridge.listFiles).not.toHaveBeenCalled()
+
+      // When syncCenter comes back online, but listFiles fails with network -> still offline state, and Retry reloads
+      shouldFailNetwork = true
+      await act(async () => {
+        syncSubscriber?.({ header: { online: true } })
+      })
+      await flush()
+      await flush()
+      expect(document.querySelector('.dl-state-title')?.textContent).toContain(
+        'Cần kết nối mạng để xem tệp Google Drive.',
+      )
+
+      shouldFailNetwork = false
+      const retryBtn = document.querySelector<HTMLButtonElement>('.dl-state .btn')!
+      await act(async () => {
+        retryBtn.click()
+      })
+      await flush()
+      await flush()
+      expect(document.querySelector('[data-drive-file-id="df-1"]')).not.toBeNull()
+    })
+
+    it('keeps Drive rows visible when the folder tree has loaded My Folder and then fails on refresh, or when seen-then-offline (R1-1, R1-3 #2, #7)', async () => {
+      let treeChangeCb: ((ev: { workspaceId: string }) => void) | null = null
+      api.onUniworkTreeChanged = vi.fn((cb: (ev: { workspaceId: string }) => void) => {
+        treeChangeCb = cb
+        return () => {
+          treeChangeCb = null
+        }
+      })
+      api.uniworkFolderTree.mockResolvedValue(
+        ok([
+          {
+            id: 'f-mine',
+            parentId: null,
+            title: 'My Folder',
+            position: 0,
+            systemKind: 'my_folder' as const,
+            children: [],
+          },
+          {
+            id: 'f-board',
+            parentId: null,
+            title: 'Báo cáo HĐQT Q4',
+            position: 1,
+            children: [],
+          },
+        ]),
+      )
+      let avail = true
+      let netOffline = false
+      installDriveBridge({
+        isAvailable: vi.fn(async () => avail),
+        listConnections: vi.fn(async () =>
+          netOffline
+            ? ({ ok: false as const, error: 'network' as const } as const)
+            : ({ ok: true as const, value: [activeConn, brokenConn] } as const),
+        ),
+        listFiles: vi.fn(async () =>
+          netOffline
+            ? ({ ok: false as const, error: 'network' as const } as const)
+            : ({
+                ok: true as const,
+                value: { files: [fileActive], totalCount: 1, nextCursor: null },
+              } as const),
+        ),
+      })
+      await mountHome()
+      await flush()
+
+      // Initially rendered inside the tree slot
+      expect(document.querySelector('.uwf-tree-slot [data-nav="google-drive"]')).not.toBeNull()
+
+      // Now both tree and Drive go offline; tree refresh keeps prev.nodes (with My Folder) and sets tree.status = 'error'
+      avail = false
+      netOffline = true
+      api.uniworkFolderTree.mockResolvedValue({ ok: false, error: 'network' })
+      await act(async () => {
+        treeChangeCb?.({ workspaceId: 'ws-1' })
+      })
+      await flush()
+      await flush()
+
+      // Tree error banner is shown, and Drive row is still rendered outside the unmounted tree
+      expect(document.querySelector('.uwf-side-state[role="alert"]')).not.toBeNull()
+      const driveRow = document.querySelector<HTMLButtonElement>('[data-nav="google-drive"]')
+      expect(driveRow).not.toBeNull()
+
+      // Clicking the Drive row shows the offline state with Retry
+      await act(async () => {
+        driveRow!.click()
+      })
+      await flush()
+      await flush()
+      expect(document.querySelector('.dl-state-title')?.textContent).toContain(
+        'Cần kết nối mạng để xem tệp Google Drive.',
+      )
+    })
+
+    it('hides Drive row on cold-start offline and renders Drive row under stand-in when My Folder node is absent (R1-3 #2, #7)', async () => {
+      // Cold-start offline: capability unread (false) + listConnections network -> hidden
+      installDriveBridge({
+        isAvailable: vi.fn(async () => false),
+        listConnections: vi.fn(async () => ({ ok: false as const, error: 'network' as const })),
+      })
+      await mountHome()
+      await flush()
+      expect(document.querySelector('[data-nav="google-drive"]')).toBeNull()
+
+      // Remount cleanly for stand-in path: folderTree has no my_folder node
+      await act(async () => {
+        root.unmount()
+      })
+      root = createRoot(host)
+      folderTree = [
+        {
+          id: 'f-board',
+          parentId: null,
+          title: 'Báo cáo HĐQT Q4',
+          position: 1,
+          children: [],
+        },
+      ]
+      api.uniworkFolderTree.mockResolvedValue(ok(folderTree))
+      installDriveBridge()
+      await mountHome()
+      await flush()
+      expect(document.querySelector('[data-my-folder-standin]')).not.toBeNull()
+      expect(document.querySelector('.uwf-tree-slot')).toBeNull()
+      expect(document.querySelector('[data-nav="google-drive"]')).not.toBeNull()
+    })
+
+    it('renders empty state and load-error state with Retry button (R1-3 #3)', async () => {
+      let mode: 'empty' | 'error' | 'ready' = 'empty'
+      installDriveBridge({
+        listFiles: vi.fn(async () => {
+          if (mode === 'error') {
+            return { ok: false as const, error: 'server_error' as const }
+          }
+          if (mode === 'empty') {
+            return { ok: true as const, value: { files: [], totalCount: 0, nextCursor: null } }
+          }
+          return {
+            ok: true as const,
+            value: { files: [fileActive], totalCount: 1, nextCursor: null },
+          }
+        }),
+      })
+      await mountHome()
+      await flush()
+
+      const driveRow = document.querySelector<HTMLButtonElement>('[data-nav="google-drive"]')!
+      await act(async () => {
+        driveRow.click()
+      })
+      await flush()
+      await flush()
+      expect(document.querySelector('[data-drive-empty]')?.textContent).toContain(
+        'Chưa có tệp Google Drive nào được liên kết.',
+      )
+
+      // Switch to account row with error mode -> shows load-error state and Retry recovers
+      mode = 'error'
+      const acctRow = document.querySelector<HTMLButtonElement>('[data-drive-account="dc-active"]')!
+      await act(async () => {
+        acctRow.click()
+      })
+      await flush()
+      await flush()
+      expect(document.querySelector('.dl-state-title')?.textContent).toContain(
+        'Không tải được danh sách tệp Google Drive.',
+      )
+
+      mode = 'ready'
+      const retryBtn = document.querySelector<HTMLButtonElement>('.dl-state .btn')!
+      await act(async () => {
+        retryBtn.click()
+      })
+      await flush()
+      await flush()
+      expect(document.querySelector('[data-drive-file-id="df-1"]')).not.toBeNull()
+    })
+
+    it('supports paging via next_cursor, surfaces moreError, and keeps loaded rows when a focus refresh fails (R1-2, R1-3 #4, #6)', async () => {
+      let failRefresh = false
+      let failCursor = false
+      const listFilesSpy = vi.fn(async (q: { workspaceId: string; cursor?: string }) => {
+        if (q.cursor === 'cur-2') {
+          if (failCursor) {
+            return { ok: false as const, error: 'server_error' as const }
+          }
+          return {
+            ok: true as const,
+            value: { files: [fileSharedDrive], totalCount: 2, nextCursor: null },
+          }
+        }
+        if (failRefresh) {
+          return { ok: false as const, error: 'server_error' as const }
+        }
+        return {
+          ok: true as const,
+          value: { files: [fileActive], totalCount: 2, nextCursor: 'cur-2' },
+        }
+      })
+      installDriveBridge({
+        listFiles: listFilesSpy,
+      })
+      await mountHome()
+      await flush()
+
+      const driveRow = document.querySelector<HTMLButtonElement>('[data-nav="google-drive"]')!
+      await act(async () => {
+        driveRow.click()
+      })
+      await flush()
+      await flush()
+
+      expect(document.querySelectorAll('.dh-drive-row')).toHaveLength(1)
+      const loadMoreBtn = document.querySelector<HTMLButtonElement>('[data-drive-load-more]')!
+      expect(loadMoreBtn).not.toBeNull()
+
+      // Failing loadMore surfaces moreError inline while keeping page 1
+      failCursor = true
+      await act(async () => {
+        loadMoreBtn.click()
+      })
+      await flush()
+      await flush()
+      expect(document.querySelector('.uw-pick-more-error')?.textContent).toContain(
+        'Không tải được danh sách tệp Google Drive.',
+      )
+      expect(document.querySelectorAll('.dh-drive-row')).toHaveLength(1)
+
+      // Succeeding loadMore appends page 2
+      failCursor = false
+      await act(async () => {
+        loadMoreBtn.click()
+      })
+      await flush()
+      await flush()
+      expect(document.querySelectorAll('.dh-drive-row')).toHaveLength(2)
+      expect(document.querySelector('[data-drive-load-more]')).toBeNull()
+
+      // R1-2: Opening a file on page 2 does not trigger a listFiles refetch from finally, and keeps page 2 rows
+      const callsBeforeOpen = listFilesSpy.mock.calls.length
+      await act(async () => {
+        document
+          .querySelector<HTMLElement>('[data-drive-file-id="df-3"]')!
+          .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+      })
+      await flush()
+      expect(listFilesSpy.mock.calls.length).toBe(callsBeforeOpen)
+      expect(document.querySelectorAll('.dh-drive-row')).toHaveLength(2)
+      // Window focus triggers refresh; if refresh fails, loaded rows stay visible + non-blocking error
+      failRefresh = true
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+      })
+      await flush()
+      await flush()
+      expect(document.querySelectorAll('.dh-drive-row')).toHaveLength(2)
+      expect(document.querySelector('.uw-pick-more-error')?.textContent).toContain(
+        'Không tải được danh sách tệp Google Drive.',
+      )
+    })
+
+    it('ignores stale listFiles responses after switching account and avoids refetching connections on non-Drive navigations (R1-3 #5, R1-5, R1-6)', async () => {
+      const slowActive = Promise.withResolvers<{
+        ok: true
+        value: { files: (typeof fileActive)[]; totalCount: number; nextCursor: null }
+      }>()
+      let avail = true
+      let connResult:
+        { ok: true; value: (typeof activeConn)[] } | { ok: false; error: 'server_error' } = {
+        ok: true,
+        value: [activeConn, brokenConn],
+      }
+      const driveBridge = installDriveBridge({
+        isAvailable: vi.fn(async () => avail),
+        listConnections: vi.fn(async () => connResult),
+        listFiles: vi.fn((q: { workspaceId: string; connectionId?: string }) => {
+          if (q.connectionId === 'dc-active') {
+            return slowActive.promise
+          }
+          return Promise.resolve({
+            ok: true as const,
+            value: {
+              files: q.connectionId === 'dc-broken' ? [fileBroken] : [fileActive, fileBroken],
+              totalCount: q.connectionId === 'dc-broken' ? 1 : 2,
+              nextCursor: null,
+            },
+          })
+        }),
+      })
+      await mountHome()
+      await flush()
+      await flush()
+
+      // R1-6: Initial load calls listConnections once (seenInSession flip does not trigger a duplicate round),
+      // and navigating between non-Drive views (Recent, Starred) does not re-call listConnections.
+      expect(driveBridge.listConnections).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>('[data-nav="recent"]')!.click()
+      })
+      await flush()
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>('[data-nav="starred"]')!.click()
+      })
+      await flush()
+      expect(driveBridge.listConnections).toHaveBeenCalledTimes(1)
+
+      // R1-3 #5: Select dc-active (slow request), then immediately switch to dc-broken (fast request);
+      // when dc-active resolves late, its rows must be ignored.
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>('[data-drive-account="dc-active"]')!.click()
+      })
+      await flush()
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>('[data-drive-account="dc-broken"]')!.click()
+      })
+      await flush()
+      await flush()
+      expect(document.querySelector('[data-drive-file-id="df-2"]')).not.toBeNull()
+
+      await act(async () => {
+        slowActive.resolve({
+          ok: true,
+          value: { files: [fileActive], totalCount: 1, nextCursor: null },
+        })
+      })
+      await flush()
+      expect(document.querySelector('[data-drive-file-id="df-2"]')).not.toBeNull()
+      expect(document.querySelector('[data-drive-file-id="df-1"]')).toBeNull()
+
+      // R1-5: When capability cache expires (isAvailable -> false) and listConnections returns server_error,
+      // the Drive row stays visible because it was already seen in this session.
+      avail = false
+      connResult = { ok: false, error: 'server_error' }
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+      })
+      await flush()
+      await flush()
+      expect(document.querySelector('[data-nav="google-drive"]')).not.toBeNull()
+    })
+
+    it('rendered DriveList with onReconnect callback turns the reconnect marker into a live button and Enter on it does not open the file (R1-3 #8, R1-4)', async () => {
+      const onOpenOnGoogle = vi.fn()
+      const onReconnect = vi.fn()
+      // DriveList statically imported at top of file
+      await act(async () => {
+        root.render(
+          createElement(
+            LocaleProvider,
+            { initial: 'vi' },
+            createElement(DriveList, {
+              workspaceId: 'ws-1',
+              connections: [activeConn, brokenConn],
+              selectedAccountId: null,
+              files: [fileBroken],
+              status: 'ready',
+              offline: false,
+              nextCursor: null,
+              loadingMore: false,
+              onRetry: vi.fn(),
+              onLoadMore: vi.fn(),
+              onOpenOnGoogle,
+              onReconnect,
+            }),
+          ),
+        )
+      })
+      await flush()
+      const reconnectBtn = document.querySelector<HTMLButtonElement>(
+        'button[data-drive-reconnect="dc-broken"]',
+      )
+      expect(reconnectBtn).not.toBeNull()
+      await act(async () => {
+        reconnectBtn!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+        reconnectBtn!.click()
+      })
+      expect(onOpenOnGoogle).not.toHaveBeenCalled()
+      expect(onReconnect).toHaveBeenCalledWith('dc-broken')
     })
   })
 })

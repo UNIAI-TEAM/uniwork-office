@@ -355,6 +355,9 @@ export function UniworkFolderTree({
               )}
             </li>
             {isFirstRootRow && afterFirstRootRow ? (
+              // The prototype places Google Drive rows directly between "Thư mục của tôi" and the other
+              // folders, so in D2 they sit as plain buttons in a presentational slot inside the tree;
+              // full treeitem semantics is deferred to a later card.
               <li role="presentation" className="uwf-tree-slot">
                 {afterFirstRootRow}
               </li>

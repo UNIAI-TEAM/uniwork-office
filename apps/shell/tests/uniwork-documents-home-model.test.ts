@@ -851,6 +851,24 @@ describe('UNI-2195 (D2) Google Drive sidebar visibility, loader, and i18n keys',
         seenInSession: false,
       }),
     ).toBe(false)
+
+    // R1-5: Once seen in session, keeps row visible even when capability cache expires and offline is false (e.g. non-network refresh error), as long as connections > 0
+    expect(
+      homeModel.isDriveSidebarVisible({
+        capability: false,
+        connections: [activeConn],
+        offline: false,
+        seenInSession: true,
+      }),
+    ).toBe(true)
+    expect(
+      homeModel.isDriveSidebarVisible({
+        capability: false,
+        connections: [],
+        offline: false,
+        seenInSession: true,
+      }),
+    ).toBe(false)
   })
 
   it('resolveDriveAccountFilter returns connection id only when it belongs to the viewer connections', () => {

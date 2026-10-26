@@ -2509,7 +2509,7 @@ export function DocumentsHome({
               </span>
             </button>
           )}
-          {!hasMyFolderNode && driveSidebarRows}
+          {!(tree.status === 'ready' && hasMyFolderNode) && driveSidebarRows}
           {tree.status === 'loading' && (
             <p className="uwf-side-state" role="status">
               {t('uwPickLoading')}

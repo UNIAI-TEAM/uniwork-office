@@ -851,10 +851,8 @@ export function isDriveSidebarVisible(params: {
   offline?: boolean
   seenInSession?: boolean
 }): boolean {
-  const { capability, connections, offline = false, seenInSession = false } = params
-  if (capability && connections.length > 0) return true
-  if (offline && seenInSession && connections.length > 0) return true
-  return false
+  const { capability, connections, seenInSession = false } = params
+  return (capability || seenInSession) && connections.length > 0
 }
 
 /**
