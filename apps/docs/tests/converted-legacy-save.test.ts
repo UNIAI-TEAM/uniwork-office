@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   autoSavesDocument,
   canReuseSavePass,
+  save,
   savesAsConvertedCopy,
 } from '../src/renderer/file-actions'
 
@@ -45,6 +46,46 @@ describe('AutoSave of a converted legacy .doc (F1)', () => {
     expect(autoSavesDocument(true, false, ordinary)).toBe(true)
     expect(autoSavesDocument(true, true, ordinary)).toBe(false)
     expect(autoSavesDocument(false, false, ordinary)).toBe(false)
+  })
+})
+
+describe('the common save boundary refuses an auto save of a converted copy (F1)', () => {
+  // the section-break insertion effect calls save(false, true) outside the AutoSave timer
+  function contextFor(doc: Doc) {
+    const touched = { editor: false }
+    const ctx = {
+      doc,
+      get editor() {
+        touched.editor = true
+        return undefined
+      },
+    } as unknown as Parameters<typeof save>[0]
+    return { ctx, touched }
+  }
+  const convertedWithPath = {
+    filePath: '/tmp/uniwork-legacy/Memo.docx',
+    suggestSaveAs: '/home/me/Memo.docx',
+  } as unknown as Doc
+
+  it('refuses an auto save whatever triggered it and never starts a write pass', async () => {
+    const { ctx, touched } = contextFor(convertedWithPath)
+    await expect(save(ctx, false, true)).resolves.toBe(false)
+    expect(touched.editor).toBe(false)
+  })
+
+  it('lets the shell in-place flush and an explicit Save through', async () => {
+    const inPlace = contextFor(convertedWithPath)
+    await save(inPlace.ctx, false, false, undefined, undefined, true)
+    expect(inPlace.touched.editor).toBe(true)
+    const explicit = contextFor(convertedWithPath)
+    await save(explicit.ctx, false, false)
+    expect(explicit.touched.editor).toBe(true)
+  })
+
+  it('keeps the section-save behaviour of a normal document', async () => {
+    const { ctx, touched } = contextFor({ filePath: '/home/me/Memo.docx' } as unknown as Doc)
+    await save(ctx, false, true)
+    expect(touched.editor).toBe(true)
   })
 })
 

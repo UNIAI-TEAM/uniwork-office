@@ -1040,9 +1040,10 @@ export function currentDocGeneration(): number {
 
 /**
  * A converted legacy .doc is held as a temp .docx: an explicit Save of it is a
- * Save As next to the original, never a write into the temp copy. AutoSave and
- * the shell's own flush for the UniWork first save (`inPlace`) do write the
- * temp copy; an MCP explicit target keeps its own path.
+ * Save As next to the original, never a write into the temp copy. The shell's own
+ * flush for the UniWork first save (`inPlace`) does write the temp copy; an MCP
+ * explicit target keeps its own path. An auto save never reaches either (see
+ * `refusesConvertedAutoSave`).
  */
 export function savesAsConvertedCopy(
   doc: FileActionContext['doc'],
@@ -1051,6 +1052,21 @@ export function savesAsConvertedCopy(
   explicitTarget: ExplicitSaveTarget | undefined,
 ): boolean {
   return !!doc?.suggestSaveAs && !auto && !inPlace && !explicitTarget
+}
+
+/**
+ * An auto save of a converted copy is refused at the common save boundary, whatever
+ * trigger asked for it (AutoSave timer, blur, close, section-break insertion): the
+ * temp file is swept when the tab closes, so a silent write would clear the dirty
+ * state while the edits live nowhere. The caller stays dirty.
+ */
+export function refusesConvertedAutoSave(
+  doc: FileActionContext['doc'],
+  auto: boolean,
+  inPlace: boolean,
+  explicitTarget: ExplicitSaveTarget | undefined,
+): boolean {
+  return !!doc?.suggestSaveAs && auto && !inPlace && !explicitTarget
 }
 
 /**
@@ -1093,6 +1109,8 @@ export function save(
   explicitTarget?: ExplicitSaveTarget,
   inPlace = false,
 ): Promise<boolean> {
+  if (refusesConvertedAutoSave(ctx.doc, auto, inPlace, explicitTarget))
+    return Promise.resolve(false)
   // A save arriving mid-flight waits for the current one instead of failing.
   // Reuse the finished pass only when it left nothing behind — judged by the
   // composite dirty check (header/section/theme edits do not set dirtyRef), plus
