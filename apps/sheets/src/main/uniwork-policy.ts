@@ -38,12 +38,6 @@ export interface UniworkDocumentPolicy {
    * the shell to explain the lock / view-only state instead of writing.
    */
   readOnlySave?(path: string): void
-  /**
-   * UNI-2207 C0: true while `flushEditorToDisk` is waiting for a first-save
-   * flush on `path` (or its converted temp copy), so a converted legacy tab
-   * (.xls -> temp .xlsx) writes to the temp file without opening Save As.
-   */
-  isFirstSaveFlush?(path: string): boolean
 }
 
 let policy: UniworkDocumentPolicy | null = null
@@ -55,15 +49,6 @@ export function setUniworkDocumentPolicy(next: UniworkDocumentPolicy | null): vo
 
 export function setUniworkUserSaveHook(hook: ((path: string) => void) | null): void {
   userSaveHook = hook
-}
-
-export function uniworkIsFirstSaveFlush(path: string | null | undefined): boolean {
-  if (!path || !policy?.isFirstSaveFlush) return false
-  try {
-    return policy.isFirstSaveFlush(path) === true
-  } catch {
-    return false
-  }
 }
 
 /** EL-1(b) fix6 (VEL-1): forward a read-only Save attempt to the installed policy. */

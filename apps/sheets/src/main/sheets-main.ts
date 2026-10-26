@@ -4,7 +4,6 @@ import {
   uniworkIsBound,
   uniworkIsLocked,
   uniworkIsReadOnly,
-  uniworkIsFirstSaveFlush,
   uniworkRefusesOpen,
   uniworkRequestOrigin,
   uniworkReadOnlySave,
@@ -1839,33 +1838,6 @@ export function sheetsFileRenamed(wc: WebContents, oldPath: string, newPath: str
 }
 
 /**
- * UNI-2207 C0: When a local legacy tab (.xls, or later .doc/.ppt) was converted
- * into a temp .xlsx with `suggestSaveAs`, the shell's "Save to UniWork" first-save
- * flow needs the backing temp path and suggested .xlsx path so it can flush into
- * the temp file without popping a native Save As dialog and upload the converted
- * .xlsx.
- */
-export function sheetsConvertedSaveTarget(
-  tabPath: string,
-): { path: string; suggestSaveAs: string } | null {
-  const candidateSuggest = tabPath.replace(/\.[^.]+$/, '.xlsx')
-  for (const entry of sheetsTabs.values()) {
-    for (const session of entry.sessions.values()) {
-      if (
-        session.suggestSaveAs !== undefined &&
-        !session.unsavedNew &&
-        (uniworkSamePath(session.suggestSaveAs, candidateSuggest) ||
-          uniworkSamePath(session.suggestSaveAs, tabPath) ||
-          uniworkSamePath(session.path, tabPath))
-      ) {
-        return { path: session.path, suggestSaveAs: session.suggestSaveAs }
-      }
-    }
-  }
-  return null
-}
-
-/**
  * Workbooks the shell pre-created on disk with the localized untitled name
  * ("New Spreadsheet"). Only these ever qualify for the content-derived
  * auto-rename after an AI run; any manual rename removes the mark.
@@ -3392,17 +3364,10 @@ export function registerSheetsIpc(): void {
       if (existsSync(targetPath) && request.overwrite !== true) {
         throw new Error(`file already exists: ${targetPath}`)
       }
-    } else if (
-      request.mode === 'save' &&
-      ((request.quiet && session.unsavedNew) ||
-        (session.suggestSaveAs !== undefined &&
-          (uniworkIsFirstSaveFlush(session.path) ||
-            uniworkIsFirstSaveFlush(session.suggestSaveAs) ||
-            uniworkIsFirstSaveFlush(session.suggestSaveAs.replace(/\.xlsx$/i, '.xls')))))
-    ) {
-      // AutoSave / AI-run autosave of a workbook the user has not named yet, or
-      // a UniWork first-save flush on a converted legacy tab (.xls -> temp .xlsx):
-      // no dialog mid-flow, the edits land in the backing temp file.
+    } else if (request.mode === 'save' && request.quiet && session.unsavedNew) {
+      // AutoSave / AI-run autosave of a workbook the user has not named yet:
+      // no dialog mid-flow, the edits land in the backing temp file and the
+      // session stays an unsaved new one (Ctrl+S still asks where to save)
       targetPath = session.path
     } else if (request.mode === 'save-as' || session.suggestSaveAs !== undefined) {
       // .xlsm keeps its extension: untouched archive entries (vbaProject.bin,
@@ -3503,8 +3468,6 @@ export function registerSheetsIpc(): void {
     // The sidecar session still streams the pre-save bytes; swap it for a
     // fresh session over the saved file so future reads match the disk state.
     const quietUnsavedNew = targetPath === session.path && session.unsavedNew === true
-    const convertedFlushInPlace =
-      targetPath === session.path && session.suggestSaveAs !== undefined && !session.unsavedNew
     entry.sessions.delete(request.sessionId)
     await cleanupSessionResources({
       tempRoot: app.getPath('temp'),
@@ -3512,8 +3475,7 @@ export function registerSheetsIpc(): void {
       // A CSV in-place save keeps saving into the temp copy, and a quiet save of
       // an unsaved new workbook just wrote its backing file — the directory
       // must survive the session swap.
-      importTempDir:
-        csvInPlace || quietUnsavedNew || convertedFlushInPlace ? undefined : session.importTempDir,
+      importTempDir: csvInPlace || quietUnsavedNew ? undefined : session.importTempDir,
       closeSidecar: () => client.close(request.sessionId),
     })
     const file = await openWorkbookSession(
@@ -3532,12 +3494,7 @@ export function registerSheetsIpc(): void {
               importTempDir: session.importTempDir,
               unsavedNew: true,
             }
-          : convertedFlushInPlace
-            ? {
-                suggestSaveAs: session.suggestSaveAs,
-                importTempDir: session.importTempDir,
-              }
-            : undefined,
+          : undefined,
     )
     // G5-04g: the save gate above already refused a locked target, so this is
     // unreachable in practice; a null here means the session could not be
@@ -3554,10 +3511,6 @@ export function registerSheetsIpc(): void {
       } catch (error) {
         console.warn('[sheets] recovery copy of an unsaved new workbook failed:', error)
       }
-      return { canceled: false, file, touchedEntries: mutation.touchedEntries }
-    }
-    if (convertedFlushInPlace) {
-      notifyUniworkUserSave(targetPath)
       return { canceled: false, file, touchedEntries: mutation.touchedEntries }
     }
     // Notify shell (if running) so it can update the tab title and record the

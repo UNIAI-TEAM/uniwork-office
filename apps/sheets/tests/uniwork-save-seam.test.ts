@@ -253,12 +253,7 @@ describe('workbookSaveRequestSchema forceWrite / origin', () => {
 const saveWorkbookEdits = vi.fn()
 const writeWorkbookRecovery = vi.fn()
 
-function ctxWith(opts: {
-  dirty: boolean
-  uniworkBound?: boolean
-  readOnly?: boolean
-  needsSaveAs?: boolean
-}): {
+function ctxWith(opts: { dirty: boolean; uniworkBound?: boolean; readOnly?: boolean }): {
   ctx: SaveContext
   messages: string[]
 } {
@@ -284,7 +279,6 @@ function ctxWith(opts: {
             sessionId: '11111111-1111-4111-8111-111111111111',
             readOnly: opts.readOnly === true,
             ...(opts.uniworkBound ? { uniworkBound: true } : {}),
-            ...(opts.needsSaveAs ? { needsSaveAs: true } : {}),
           },
         },
       } as never,
@@ -345,11 +339,5 @@ describe('handleSave carries the UniWork origin', () => {
   it('a clean bound workbook is not force-written by AutoSave', async () => {
     await handleSave(ctxWith({ dirty: false, uniworkBound: true }).ctx, 'save', true)
     expect(saveWorkbookEdits).not.toHaveBeenCalled()
-  })
-
-  it('a clean converted workbook (needsSaveAs: true, e.g. .xls) writes on explicit Save so firstSave flush succeeds', async () => {
-    await handleSave(ctxWith({ dirty: false, needsSaveAs: true }).ctx, 'save')
-    expect(saveWorkbookEdits).toHaveBeenCalledTimes(1)
-    expect(payload().origin).toBe('user')
   })
 })

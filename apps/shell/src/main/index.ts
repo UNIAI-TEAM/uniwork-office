@@ -235,7 +235,6 @@ import {
   authorizeMcpSheetWrite,
   sendSheetsMenuAction,
   sheetsFileRenamed,
-  sheetsConvertedSaveTarget,
   setSheetsCloseTabHook,
   setSheetsExtraFileMenuItems,
   setSheetsHostWindowHook,
@@ -4385,7 +4384,6 @@ function uniworkDocsWiring() {
     isPathOpen: (path: string) => webContentsForPath(path) !== undefined,
     // the module's own Save (same path as the menu), which ends in the user-save hook
     requestModuleSave: requestUniworkModuleSave,
-    convertedSaveTarget: (path: string) => sheetsConvertedSaveTarget(path),
     // UWNM-BE-R4-1: docs' outside-change check; slides / sheets keep no such state
     noteShellRewrote: (path: string) => forgetDocsDiskState(path),
     reloadPath: (path: string) => {

@@ -358,15 +358,6 @@ export interface UniworkDocsServiceDeps {
    */
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
   /**
-   * UNI-2207 C0: when `path` is a legacy tab (.xls / .doc / .ppt) whose module
-   * converted it into a backing OOXML file in a temp directory (`suggestSaveAs`
-   * set), returns the backing file (`path`) and suggested target (`suggestSaveAs`)
-   * so `runFirstSave` flushes into the temp copy without opening a native Save As
-   * dialog, uploads the converted OOXML bytes, and re-keys the tab to the bound
-   * working copy.
-   */
-  convertedSaveTarget?(path: string): { path: string; suggestSaveAs: string } | null
-  /**
    * The shell itself rewrote the file at `path` behind its module: a module
    * that refuses to write over another program's change (docs) forgets what
    * it recorded, so the next Save writes. Absent / a no-op for the others.
@@ -5476,19 +5467,10 @@ export class UniworkDocsService {
     if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
     // S01-R2-4: the same refusal across a restart, from the account's durable record
     await this.refuseBoundFirstSave(session, owner, tabPath)
-    const converted = this.deps.convertedSaveTarget?.(tabPath) ?? null
-    const readPath = converted ? resolve(converted.path) : tabPath
-    const filename = basename(converted ? converted.suggestSaveAs : tabPath)
-    const format = filename ? formatForName(filename) : null
-    if (!filename || !format) {
+    const title = requireName(input.title)
+    const filename = basename(tabPath)
+    if (!filename || !formatForName(filename)) {
       throw new UniworkDocError('unsupported_format')
-    }
-    let title = requireName(input.title)
-    if (converted) {
-      const expectedExt = `.${format}`
-      if (!title.toLowerCase().endsWith(expectedExt)) {
-        title = `${title.replace(/\.(?:xls|doc|ppt)$/i, '')}${expectedExt}`
-      }
     }
     // the editor's own Save writes the bytes; unbound paths resolve the
     // flush waiter through the branch onUserSave keeps for them. A refused or
@@ -5507,7 +5489,7 @@ export class UniworkDocsService {
     let size: number
     let mtimeMs: number
     try {
-      const info = await stat(readPath)
+      const info = await stat(tabPath)
       if (!info.isFile()) throw new UniworkDocError('not_found')
       size = info.size
       mtimeMs = info.mtimeMs
@@ -5529,7 +5511,6 @@ export class UniworkDocsService {
         session,
         owner,
         tabPath,
-        readPath,
         key,
         title,
         filename,
@@ -5545,7 +5526,6 @@ export class UniworkDocsService {
             session,
             owner,
             tabPath,
-            readPath,
             key,
             title,
             filename,
@@ -5559,7 +5539,6 @@ export class UniworkDocsService {
       session,
       owner,
       tabPath,
-      readPath,
       key,
       title,
       filename,
@@ -5579,7 +5558,6 @@ export class UniworkDocsService {
     session: { identity: SessionIdentity; epoch: number }
     owner: string
     tabPath: string
-    readPath?: string
     key: string
     title: string
     filename: string
@@ -5589,10 +5567,9 @@ export class UniworkDocsService {
   }): Promise<UniworkDocSummary> {
     const { session, owner, tabPath, key, title, filename, workspaceId, createTarget, limits } =
       input
-    const sourcePath = input.readPath ?? tabPath
     let bytes: Uint8Array
     try {
-      bytes = new Uint8Array(await readFile(sourcePath))
+      bytes = new Uint8Array(await readFile(tabPath))
     } catch {
       throw new UniworkDocError('not_found')
     }
@@ -5675,7 +5652,6 @@ export class UniworkDocsService {
     session: { identity: SessionIdentity; epoch: number }
     owner: string
     tabPath: string
-    readPath?: string
     key: string
     title: string
     filename: string
@@ -5699,12 +5675,11 @@ export class UniworkDocsService {
       workspaceId,
       createTarget,
     } = input
-    const sourcePath = input.readPath ?? tabPath
     const destination =
       'parentId' in createTarget && createTarget.parentId
         ? `parent:${createTarget.parentId}`
         : 'my_folder'
-    const bytesChecksum = await sha256File(sourcePath)
+    const bytesChecksum = await sha256File(tabPath)
     // the path may have been bound while the checksum streamed
     if (this.claimedFirstSave(owner, tabPath)) throw new UniworkDocError('conflict')
     const keyFp = [owner, workspaceId, key, title, destination, bytesChecksum].join('')
@@ -5712,12 +5687,12 @@ export class UniworkDocsService {
     const attempt = await this.beginFirstSaveAttempt(session, owner, key, keyFp)
     let idempotencyKey = attempt.idempotencyKey
     const api = this.api()
-    const probe = await readLocalFileProbe({ path: sourcePath }, size, filename)
+    const probe = await readLocalFileProbe({ path: tabPath }, size, filename)
     const parentId = await this.uploadSessionParentId(api, {
       workspaceId,
       create: createTarget,
     })
-    const resumeKey = uploadSessionKey(sourcePath, size, mtimeMs)
+    const resumeKey = uploadSessionKey(tabPath, size, mtimeMs)
     const store = await this.uploadSessionStore()
     // R1-BE-03: the same full-fingerprint rule as the new-document path - a
     // first save retried under another title or destination must not finish the
@@ -5735,7 +5710,7 @@ export class UniworkDocsService {
         target: { kind: 'workspace', workspaceId, parentId, title },
         filename,
         size,
-        readRange: (offset, length) => readFileRange(sourcePath, offset, length),
+        readRange: (offset, length) => readFileRange(tabPath, offset, length),
         probe,
         idempotencyKey,
         ...(resume ? { resume } : {}),
@@ -5761,7 +5736,7 @@ export class UniworkDocsService {
             folderId: parentId,
             title,
             filename,
-            path: sourcePath,
+            path: tabPath,
             size,
             mtimeMs,
             partSize: state.partSize,
@@ -5814,7 +5789,7 @@ export class UniworkDocsService {
       bytesChecksum,
       attempt,
       onBindFailure: () => this.firstSaveKeys.delete(keyFp),
-      writeWorkingCopy: (dir, name) => this.store.copyIntoWorkingCopy(dir, name, sourcePath),
+      writeWorkingCopy: (dir, name) => this.store.copyIntoWorkingCopy(dir, name, tabPath),
       verifyWorkingCopy: async (copiedPath, serverChecksum) => {
         const copied = await sha256File(copiedPath)
         if (copied !== bytesChecksum || serverChecksum !== copied) {
@@ -6295,18 +6270,8 @@ export class UniworkDocsService {
    * FAILS (S01-R1-1): the disk copy is never uploaded in place of the edits
    * the editor could not write.
    */
-  /** UNI-2207 C0: true while `flushEditorToDisk` awaits a first-save flush on `path` */
-  isFirstSaveFlush(path: string): boolean {
-    return this.draftFlushWaiters.has(pathKey(path))
-  }
-
   private flushEditorToDisk(path: string): Promise<boolean> {
     const key = pathKey(path)
-    const converted = this.deps.convertedSaveTarget?.(path) ?? null
-    const convertedKey = converted ? pathKey(converted.path) : null
-    if (convertedKey && convertedKey !== key) {
-      this.draftFlushWaiters.get(convertedKey)?.(false)
-    }
     this.draftFlushWaiters.get(key)?.(false)
     // S01-R1-1: the wait is finite by contract; a test shrinks it through the dep
     const waitMs = this.deps.firstSaveFlushTimeoutMs ?? CLOSE_SAVE_WAIT_MS
@@ -6319,17 +6284,11 @@ export class UniworkDocsService {
         if (this.draftFlushWaiters.get(key) === finish) {
           this.draftFlushWaiters.delete(key)
         }
-        if (convertedKey && this.draftFlushWaiters.get(convertedKey) === finish) {
-          this.draftFlushWaiters.delete(convertedKey)
-        }
         resolveFlush(wrote)
       }
       const timer = setTimeout(() => finish(false), waitMs)
       ;(timer as { unref?: () => void }).unref?.()
       this.draftFlushWaiters.set(key, finish)
-      if (convertedKey && convertedKey !== key) {
-        this.draftFlushWaiters.set(convertedKey, finish)
-      }
       let requested: boolean
       try {
         requested = this.deps.requestModuleSave(path, () => finish(false))

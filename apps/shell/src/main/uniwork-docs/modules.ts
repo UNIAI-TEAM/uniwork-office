@@ -50,8 +50,6 @@ export interface UniworkModuleSeam {
    * save writes the working copy to disk without firing the user-save hook.
    */
   consumeCapture?(path: string): boolean
-  /** UNI-2207 C0: true while `flushEditorToDisk` awaits a first-save flush on `path` */
-  isFirstSaveFlush?(path: string): boolean
   /**
    * G5-11: registers the docs/sheets/slides crash-recovery cleaner so sign-out can
    * bump recovery epochs and delete recovery files without service.ts importing
@@ -182,7 +180,6 @@ export function installUniworkModuleSeams(
         isLocked: (path: string) => seam.isLocked?.(path) === true,
         peekLocked: (path: string) => (seam.peekLocked ?? seam.isLocked)?.call(seam, path) === true,
         consumeCapture: (path: string) => seam.consumeCapture?.(path) === true,
-        isFirstSaveFlush: (path: string) => seam.isFirstSaveFlush?.(path) === true,
         refuseOpen: (path: string) => seam.refuseLockedPath(path),
         commentAuthor: (path: string) => author(path),
         readOnlySave: (path: string) => seam.onReadOnlySave?.(path),

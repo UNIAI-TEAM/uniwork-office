@@ -322,13 +322,9 @@ export async function handleSave(
   // bytes themselves, not the journal: a plain Save with nothing pending must
   // still write back to the original file (and clear the recovery copy).
   const restoreWriteBack = mode === 'save' && state.file.restoredFromRecovery === true
-  // An unsaved new workbook's or converted legacy (.xls/.tsv) session's Save is
-  // its first Save As (or UniWork first-save flush), journal or not: a quiet
-  // AutoSave or open conversion may already have moved the work into the backing file.
-  const firstSaveAs =
-    mode === 'save' &&
-    (state.file.unsavedNew === true || state.file.needsSaveAs === true) &&
-    !quiet
+  // An unsaved new workbook's Save is its first Save As, journal or not: a
+  // quiet AutoSave may already have moved the work into the backing file.
+  const firstSaveAs = mode === 'save' && state.file.unsavedNew === true && !quiet
   // An explicit Save of a UniWork-bound workbook always writes, pending edits
   // or not: the shell uploads what the Save wrote (Retry after a failed upload).
   const forceWrite = mode === 'save' && !quiet && uniworkForcesWrite(state.file)

@@ -210,19 +210,11 @@ function Spinner() {
   )
 }
 
-const LEGACY_SAVE_EXT: Readonly<Record<string, string>> = {
-  '.doc': '.docx',
-  '.xls': '.xlsx',
-  '.ppt': '.pptx',
-}
-
 /** the file name split into the editable name and its fixed extension (".docx") */
 export function nameParts(path: string): { base: string; ext: string } {
   const file = path.split(/[\\/]/).pop() ?? ''
   const dot = file.lastIndexOf('.')
-  if (dot <= 0) return { base: file, ext: '' }
-  const rawExt = file.slice(dot)
-  return { base: file.slice(0, dot), ext: LEGACY_SAVE_EXT[rawExt.toLowerCase()] ?? rawExt }
+  return dot > 0 ? { base: file.slice(0, dot), ext: file.slice(dot) } : { base: file, ext: '' }
 }
 
 /** the title sent on create: the name plus the fixed extension, once */
