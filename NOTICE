@@ -76,6 +76,32 @@ model download, no network connection). Its components are:
 Leptonica Copyright (C) 2001-2020 Leptonica. All rights reserved. This software
 is based in part on the work of the Independent JPEG Group.
 
+Bundled legacy format converter (LibreOffice)
+
+The desktop installer ships an unmodified trimmed subset of official TDF
+LibreOffice 26.8.2.2 (build 9dea406ab7695df6325b11b0e19fdca8db4b7276) under
+Resources/libreoffice/ and invokes its soffice executable as a separate
+headless child process solely to convert legacy binary Microsoft Office 97-2003
+documents (.doc -> .docx, .xls -> .xlsx, .ppt -> .pptx).
+
+- LibreOffice 26.8.2.2 is licensed under the Mozilla Public License, Version
+  2.0 (MPL-2.0). Copyright © 2000-2026 LibreOffice contributors and The
+  Document Foundation. Upstream source code archive (MPL-2.0 Section 3.2):
+  https://downloadarchive.documentfoundation.org/libreoffice/old/26.8.2.2/src/
+  Full third-party notices and licenses ship in Resources/libreoffice/LICENSE,
+  Resources/libreoffice/LICENSE.html and Resources/libreoffice/NOTICE, and the
+  MPL-2.0 full text is included in THIRD-PARTY-NOTICES.txt;
+- the 24 metric-compatible font files kept inside Resources/libreoffice/ for
+  headless layout metrics are: Liberation Sans, Liberation Serif and Liberation
+  Mono (9 files, SIL Open Font License 1.1, © 2010 Google Corporation / © 2012
+  Red Hat, Inc.), Carlito (4 files, SIL Open Font License 1.1, © 2010-2013
+  tyPoland Lukasz Dziedzic), Caladea (4 files, Apache License 2.0, © 2012
+  Huerta Tipográfica), Noto Sans and Noto Serif (4 files, SIL Open Font License
+  1.1, © The Noto Project Authors / Google LLC), DejaVu Sans (2 files,
+  Bitstream Vera / Arev / DejaVu License, © 2003 Bitstream, Inc., © 2006
+  Tavmjong Bah) and OpenSymbol (1 file, MPL-2.0, © 2009 Sun Microsystems,
+  Inc. / The Document Foundation).
+
 Unicode Character Database
 
 apps/pdf/src/shared/radicals.ts contains a generated mapping derived from
