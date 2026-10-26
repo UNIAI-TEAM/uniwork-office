@@ -48,6 +48,7 @@ import {
   installContextMenu,
   installNavigationGuard,
   isHeadlessMode,
+  modernSaveTarget,
   safeExternalUrl,
   saveAsSuggestion,
   showOpenDialogWithMemory,
@@ -676,7 +677,7 @@ function hostFor(wc: WebContents): HostIO {
         filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
       }
       const r = await showSaveDialogWithMemory(dialog, dialogParent(), options, getDraftsDir())
-      return r.canceled || !r.filePath ? null : r.filePath
+      return r.canceled || !r.filePath ? null : modernSaveTarget(r.filePath, 'pptx')
     },
     saveGate: (input) => uniworkSaveDecision(input),
     userSaved: (path) => notifyUniworkUserSave(path),
@@ -1083,7 +1084,11 @@ export function registerSlidesIpc(): void {
   // copy (AutoSave forced off) and whether it is view-only (Save disabled)
   ipcMain.handle('slides:uniwork-state', (e) => {
     const path = sessions.get(e.sender.id)?.path || null
-    return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+    return {
+      bound: uniworkIsBound(path),
+      readOnly: uniworkIsReadOnly(path),
+      converted: path ? convertedDocumentFor(path) !== undefined : false,
+    }
   })
   ipcMain.handle('slides:uniwork-read-only-save', (e, filePath?: unknown) => {
     const path = sessions.get(e.sender.id)?.path || null

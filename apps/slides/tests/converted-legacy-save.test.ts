@@ -177,13 +177,12 @@ describe('slides:save of a converted legacy deck', () => {
     expect(convertedDocumentFor(deckPath)).toBeDefined()
   })
 
-  it('AutoSave writes the temp copy without a dialog or a user save', async () => {
-    const r = (await call('slides:save', 'auto')) as { ok: boolean; path?: string }
+  it('tells the renderer a converted deck never autosaves, until Save As gives it a real home (F1)', async () => {
+    expect(await call('slides:uniwork-state')).toMatchObject({ bound: false, converted: true })
 
-    expect(r).toMatchObject({ ok: true, path: deckPath })
-    expect(env.saveDialogOptions).toHaveLength(0)
-    expect(written(deckPath)).toBe(true)
-    expect(hook).not.toHaveBeenCalled()
+    await call('slides:save')
+
+    expect(await call('slides:uniwork-state')).toMatchObject({ bound: false, converted: false })
   })
 
   it('a same-stem sibling deck is an ordinary deck: Save writes in place', async () => {
@@ -207,5 +206,36 @@ describe('slides:save of a converted legacy deck', () => {
     expect(readFileSync(deckPath, 'utf8')).toBe(ORIGINAL)
     expect(session.path).toBe(deckPath)
     expect(convertedDocumentFor(deckPath)).toBeDefined()
+  })
+
+  it('a Save As answered with the recorded original never writes it: the pptx lands beside it (R1-3)', async () => {
+    const original = suggested.replace(/\.pptx$/, '.ppt')
+    writeFileSync(original, ORIGINAL)
+    env.saveDialogPath = original
+
+    const r = (await call('slides:save')) as { ok: boolean; path?: string }
+
+    expect(readFileSync(original, 'utf8')).toBe(ORIGINAL)
+    expect(r).toMatchObject({ ok: true, path: `${original}.pptx` })
+    expect(written(`${original}.pptx`)).toBe(true)
+    expect(session.path).toBe(`${original}.pptx`)
+    rmSync(`${original}.pptx`, { force: true })
+  })
+
+  it('any other legacy-extension answer is normalised too, for a converted and an ordinary deck', async () => {
+    const other = join(env.dir, 'elsewhere.ppt')
+    writeFileSync(other, ORIGINAL)
+    env.saveDialogPath = other
+
+    const converted = (await call('slides:save-as', 'x.pptx')) as { ok: boolean; path?: string }
+    expect(converted).toMatchObject({ ok: true, path: `${other}.pptx` })
+    expect(readFileSync(other, 'utf8')).toBe(ORIGINAL)
+
+    forgetConvertedDocument(deckPath)
+    sessions.set(WC, { ...session, path: deckPath })
+    const ordinary = (await call('slides:save-as', 'x.pptx')) as { ok: boolean; path?: string }
+    expect(ordinary).toMatchObject({ ok: true, path: `${other}.pptx` })
+    expect(readFileSync(other, 'utf8')).toBe(ORIGINAL)
+    rmSync(`${other}.pptx`, { force: true })
   })
 })

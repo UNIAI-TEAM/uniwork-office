@@ -51,3 +51,15 @@ export function convertedDocumentFor(
 export function forgetConvertedDocument(path: string | null | undefined): void {
   if (path) table().delete(keyOf(path))
 }
+
+const LEGACY_EXTENSION_RE = /\.(doc|xls|ppt)$/i
+
+/**
+ * Where a Save As chooser's answer may be written. The editors write OOXML, so a
+ * target with a legacy extension (the recorded original, or any other .doc/.xls/.ppt)
+ * gets the editor's extension appended: filters and suggested names are not a
+ * write-target guarantee, and OOXML bytes must never land under a legacy name.
+ */
+export function modernSaveTarget(chosen: string, ext: 'docx' | 'xlsx' | 'pptx'): string {
+  return LEGACY_EXTENSION_RE.test(chosen) ? `${chosen}.${ext}` : chosen
+}

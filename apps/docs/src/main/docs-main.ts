@@ -72,6 +72,7 @@ import {
   convertedDocumentFor,
   fetchRemoteImage,
   forgetConvertedDocument,
+  modernSaveTarget,
   installContextMenu,
   setContextMenuInterceptor,
   installNavigationGuard,
@@ -5320,6 +5321,8 @@ export function registerDocsIpc(): void {
         filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
       })
       if (result.canceled || !result.filePath) return { ok: false }
+      // never write OOXML under a legacy name (a converted .doc's own original included)
+      const target = modernSaveTarget(result.filePath, 'docx')
       // the tab may have been closed while the dialog was open; checked before the
       // write because Save As may overwrite an existing file (no safe rollback)
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
@@ -5327,8 +5330,8 @@ export function registerDocsIpc(): void {
       // Picking the document's own file is an explicit Save of it, so it reports a
       // user save; any other target is a plain local copy.
       const uniwork = uniworkSaveDecision(
-        uniworkSamePath(sourcePath, result.filePath) ? 'user' : 'save-as',
-        result.filePath,
+        uniworkSamePath(sourcePath, target) ? 'user' : 'save-as',
+        target,
       )
       if (!uniwork.write) return { ok: false }
       try {
@@ -5338,32 +5341,28 @@ export function registerDocsIpc(): void {
         )
         const { bytes: plain, hashes } = await materializeLazyDocx(Buffer.from(data))
         const bytes = passwordState.password ? encryptDocx(plain, passwordState.password) : plain
-        await atomicWriteFile(result.filePath, bytes)
+        await atomicWriteFile(target, bytes)
         if (tornDownWcIds.has(event.sender.id)) return { ok: false }
-        allowDocWrite(event.sender.id, result.filePath)
-        rememberOpenDoc(event.sender.id, result.filePath)
-        await rememberDiskState(event.sender.id, result.filePath, sha256Hex(bytes))
+        allowDocWrite(event.sender.id, target)
+        rememberOpenDoc(event.sender.id, target)
+        await rememberDiskState(event.sender.id, target, sha256Hex(bytes))
         pointLazyMediaAt(
           hashes,
-          result.filePath,
+          target,
           event.sender.id,
           passwordState.password ? plain : undefined,
         )
         if (tornDownWcIds.has(event.sender.id)) return { ok: false }
-        const passwordIntentPending = commitDocPasswordSave(
-          event.sender.id,
-          passwordState,
-          result.filePath,
-        )
-        pushRecent(result.filePath)
+        const passwordIntentPending = commitDocPasswordSave(event.sender.id, passwordState, target)
+        pushRecent(target)
         // the converted copy has its real home now
-        if (typeof sourcePath === 'string' && sourcePath !== result.filePath) {
+        if (typeof sourcePath === 'string' && sourcePath !== target) {
           forgetConvertedDocument(sourcePath)
         }
-        if (uniwork.fireHook) notifyUniworkUserSave(result.filePath)
+        if (uniwork.fireHook) notifyUniworkUserSave(target)
         // the renderer has no path yet to match a rename notification against,
         // so the reply must carry the path it may save to next
-        const savedPath = notifyFileSaved(event.sender, result.filePath)
+        const savedPath = notifyFileSaved(event.sender, target)
         return {
           ok: true,
           path: savedPath,

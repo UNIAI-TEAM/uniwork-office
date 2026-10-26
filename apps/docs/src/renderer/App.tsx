@@ -421,6 +421,7 @@ import {
 import {
   applyAiDocContent as applyAiDocContentImpl,
   buildDocBytes as buildDocBytesImpl,
+  autoSavesDocument,
   currentDocGeneration,
   exportPdf as exportPdfImpl,
   exportHtml as exportHtmlImpl,
@@ -1187,8 +1188,8 @@ export function App() {
   const uniwork = uniworkStateFor(uniworkState, doc?.filePath)
   const uniworkRef = useRef(uniworkState)
   uniworkRef.current = uniworkState
-  /** autosave as it actually runs: the pref, forced off for a UniWork document */
-  const autoSaveActive = autoSave && !uniwork.bound
+  /** autosave as it actually runs: the pref, forced off for a UniWork document and a converted legacy copy */
+  const autoSaveActive = autoSavesDocument(autoSave, uniwork.bound, doc)
   // G8-12: server comments (S12) when the host answers a comments context for this document; a
   // Save replaces `doc` but not the document generation, so server mode survives it
   const serverMode = useServerMode(doc ? currentDocGeneration() + 1 : 0, doc?.filePath)

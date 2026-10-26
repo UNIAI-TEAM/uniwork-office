@@ -78,6 +78,23 @@ describe('renameStaysInApp', () => {
     expect(renameStaysInApp('/x/a.png', 'a.png')).toBe(true)
   })
 
+  it('never renames a modern document to a legacy extension, or a legacy one to a modern format (R1-4)', () => {
+    for (const [from, to] of [
+      ['/x/a.docx', 'b.doc'],
+      ['/x/a.pptx', 'b.ppt'],
+      ['/x/a.xlsx', 'b.xls'],
+      ['/x/a.docx', 'b.DOC'],
+      ['/x/a.doc', 'a.docx'],
+      ['/x/a.xls', 'a.xlsx'],
+      ['/x/a.ppt', 'a.pptx'],
+    ] as const) {
+      expect(renameStaysInApp(from, to), `${from} -> ${to}`).toBe(false)
+    }
+    // an ordinary same-format rename, and a legacy file keeping its own extension, still pass
+    expect(renameStaysInApp('/x/a.docx', 'b.docx')).toBe(true)
+    expect(renameStaysInApp('/x/a.doc', 'b.doc')).toBe(true)
+  })
+
   it('stays put when the file was never openable to begin with', () => {
     // no app to stay in, so this gate is not what blocks it
     expect(renameStaysInApp('/x/a.xyz', 'a.anything')).toBe(true)

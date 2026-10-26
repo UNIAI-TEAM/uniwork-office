@@ -540,7 +540,8 @@ export function App() {
   }, [path, uniwork.bound, uniwork.readOnly, commentsBridgeApi])
   const serverComments = !!(commentsContext && commentsBridgeApi && path)
   // web frame: explicit saves only (CONTRACT C10), whatever a stored preference says
-  const autoSave = cap('autoSave') && autoSavePref && !uniwork.bound
+  // a converted legacy copy never autosaves: its temp file is swept on close, so a silent write loses the edits
+  const autoSave = cap('autoSave') && autoSavePref && !uniwork.bound && !uniwork.converted
   useEffect(() => {
     window.slidesApi.setAutoSavePref?.(autoSave)
   }, [autoSave])

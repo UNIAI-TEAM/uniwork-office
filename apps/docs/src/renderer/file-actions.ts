@@ -1053,6 +1053,38 @@ export function savesAsConvertedCopy(
   return !!doc?.suggestSaveAs && !auto && !inPlace && !explicitTarget
 }
 
+/**
+ * AutoSave as it actually runs: the pref, off for a UniWork working copy and for a
+ * converted legacy copy (its temp file is swept when the tab closes, so a silent
+ * write would leave the edits nowhere).
+ */
+export function autoSavesDocument(
+  pref: boolean,
+  uniworkBound: boolean,
+  doc: FileActionContext['doc'],
+): boolean {
+  return pref && !uniworkBound && !doc?.suggestSaveAs
+}
+
+/**
+ * May a save that waited behind another pass reuse that pass's success? Only for a
+ * plain Save with nothing left to persist. Never for Save As, an MCP explicit target
+ * or a converted copy's Save As, and never for the shell's in-place flush: it needs
+ * its own successful user-save notification even when an AutoSave just left the file clean.
+ */
+export function canReuseSavePass(p: {
+  saveAs: boolean
+  inPlace: boolean
+  explicitTarget: ExplicitSaveTarget | undefined
+  convertedSaveAs: boolean
+  incomplete: boolean
+  dirty: boolean
+}): boolean {
+  return (
+    !p.saveAs && !p.inPlace && !p.explicitTarget && !p.convertedSaveAs && !p.incomplete && !p.dirty
+  )
+}
+
 export function save(
   ctx: FileActionContext,
   saveAs: boolean,
@@ -1074,13 +1106,15 @@ export function save(
       if (docGeneration !== generation) return false
       return saveOnce(settled, saveAs, auto, newDocName, explicitTarget, inPlace)
     },
-    // an explicit MCP target must always write, never reuse an earlier pass
     () =>
-      !saveAs &&
-      !explicitTarget &&
-      !savesAsConvertedCopy(ctx.doc, auto, inPlace, explicitTarget) &&
-      !ctx.saveIncompleteRef.current &&
-      !isDocDirty(ctx),
+      canReuseSavePass({
+        saveAs,
+        inPlace,
+        explicitTarget,
+        convertedSaveAs: savesAsConvertedCopy(ctx.doc, auto, inPlace, explicitTarget),
+        incomplete: ctx.saveIncompleteRef.current,
+        dirty: isDocDirty(ctx),
+      }),
   )
 }
 

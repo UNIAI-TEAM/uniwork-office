@@ -29,8 +29,17 @@ export function editorMayOpenPath(path: string): boolean {
   return appForPath(path) === 'markdown'
 }
 
-/** A legal name in an extension no app routes to would turn an openable file into an unopenable one. */
+const LEGACY_EXT_RE = /\.(doc|xls|ppt)$/i
+const legacyExtOf = (name: string): string | null =>
+  LEGACY_EXT_RE.exec(name)?.[1]?.toLowerCase() ?? null
+
+/**
+ * A legal name in an extension no app routes to would turn an openable file into an unopenable one.
+ * The legacy binaries are accepted as input (appForPath) but are never a write format: a rename may
+ * not cross the legacy/modern boundary, or the editors would save OOXML under a .doc/.xls/.ppt name.
+ */
 export function renameStaysInApp(from: string, newName: string): boolean {
+  if (legacyExtOf(from) !== legacyExtOf(newName)) return false
   const current = appForPath(from)
   if (!current) return true
   return appForPath(newName) === current

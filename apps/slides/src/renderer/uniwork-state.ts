@@ -9,12 +9,14 @@ import { useEffect, useState } from 'react'
 export interface SlidesUniworkState {
   bound: boolean
   readOnly: boolean
+  /** a converted legacy .ppt held as a temp copy: it never autosaves */
+  converted?: boolean
 }
 
 export const PLAIN_SLIDES_STATE: SlidesUniworkState = { bound: false, readOnly: false }
 
 export interface SlidesUniworkSeam {
-  uniworkState?(): Promise<{ bound: boolean; readOnly: boolean }>
+  uniworkState?(): Promise<{ bound: boolean; readOnly: boolean; converted?: boolean }>
   onUniworkStateChanged?(cb: (path: string) => void): () => void
   uniworkReadOnlySave?(path?: string): Promise<void>
 }
@@ -35,7 +37,8 @@ export function useSlidesUniworkState(
       void api
         ?.uniworkState?.()
         ?.then((s) => {
-          if (live && s) setState({ bound: !!s.bound, readOnly: !!s.readOnly })
+          if (live && s)
+            setState({ bound: !!s.bound, readOnly: !!s.readOnly, converted: !!s.converted })
         })
         ?.catch(() => {})
     }
