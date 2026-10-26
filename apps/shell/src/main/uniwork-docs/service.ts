@@ -9593,7 +9593,13 @@ export class UniworkDocsService {
       if (kind !== legacyTargetFormat(options.hint)) throw new UniworkDocError('unsupported_format')
       return { bytes, format: kind }
     }
-    const from = legacyOfCfbBytes(bytes) ?? options.hint
+    const detected = legacyOfCfbBytes(bytes)
+    // the head says it is one legacy family and the compound file is another: the commit's
+    // conversion pair would be refused, so nothing opens (the same refusal as an OOXML mismatch)
+    if (options.hint && detected && detected !== options.hint) {
+      throw new UniworkDocError('unsupported_format')
+    }
+    const from = detected ?? options.hint
     if (!from) return { bytes, format: null }
     const convert = this.deps.convertLegacy
     if (!convert) throw new UniworkDocError('unsupported_format')

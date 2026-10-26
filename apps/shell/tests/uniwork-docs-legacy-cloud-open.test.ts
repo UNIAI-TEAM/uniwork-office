@@ -309,6 +309,18 @@ describe('UNI-2212 malformed server answers', () => {
     expect(ctx.converter!.calls).toHaveLength(0)
   })
 
+  it('a compound file of another legacy family than the head says is refused, never converted', async () => {
+    // the head is declared .xls but the bytes are a Word 97 file
+    const server = fakeServer({ legacy: 'xls', bytes: legacyBytes.doc })
+    const ctx = setup(server)
+    expect(await ctx.service.openDocument(DOC)).toMatchObject({
+      ok: false,
+      error: 'unsupported_format',
+    })
+    expect(ctx.converter!.calls).toHaveLength(0)
+    expect(existsSync(join(work.dir, 'uniwork-documents', 'default', 'acc_1', DOC))).toBe(false)
+  })
+
   it('an OOXML package under a legacy name opens as it is and still owes the conversion', async () => {
     const server = fakeServer({ legacy: 'xls', bytes: await ooxml('xlsx', 'misnamed') })
     const ctx = setup(server)
