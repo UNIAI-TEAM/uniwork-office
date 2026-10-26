@@ -151,13 +151,9 @@ export interface DriveActivityRow {
   when: string
 }
 
+/** the member name main resolved for the actor; empty when it did not (unknown, former or non-person actor) */
 function actorName(event: DriveHistoryEvent): string {
-  const meta = event.metadata ?? {}
-  for (const key of ['actor_name', 'actorName', 'actor_display']) {
-    const value = meta[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
-  }
-  return ''
+  return event.actorName?.trim() ?? ''
 }
 
 /** the history rows of the panel, newest first; reads and opens are dropped */

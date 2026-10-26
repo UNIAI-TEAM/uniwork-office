@@ -1080,7 +1080,9 @@ describe('UNI-2196 (D3): Drive panel model', () => {
         id,
         action,
         occurredAt: at,
-        metadata: id === 'a' ? { actor_name: 'Minh' } : {},
+        ...(id === 'a' ? { actorName: 'Minh' } : {}),
+        // a name guessed from metadata is never shown
+        metadata: id === 'd' ? { actor_name: 'Guess' } : {},
       }) as unknown as DriveHistoryEvent
     const rows = driveActivityRows(
       [

@@ -4895,6 +4895,9 @@ function registerHomeIpc(): void {
     org: () => uniworkAccount().status().org ?? null,
     authorized: (call) => authorizedRequest(call),
     openExternal: (url) => shell.openExternal(url),
+    // the same workspace member lookup the shelved / trash rows use
+    memberNames: (workspaceId) =>
+      uniworkDocs ? uniworkDocs.service.memberNamesOf(workspaceId) : Promise.resolve(new Map()),
     capability: (orgId) =>
       uniworkDocs
         ? uniworkDocs.capabilityRead(orgId)

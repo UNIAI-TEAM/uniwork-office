@@ -197,6 +197,8 @@ export interface DriveHistoryEvent {
   workspaceId?: string
   actorKind: string
   actorId: string
+  /** display name of a workspace member actor; absent for an unknown, former or non-person actor */
+  actorName?: string
   action: string
   resourceType: string
   resourceID: string

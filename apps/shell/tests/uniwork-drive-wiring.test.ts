@@ -200,6 +200,62 @@ describe('uniwork-drive IPC wiring', () => {
     expect(history).toEqual({ ok: true, value: [] })
   })
 
+  describe('get-history actor names', () => {
+    const wireEvent = (id: string, kind: string, actor: string) => ({
+      id,
+      organization_id: 'org_1',
+      workspace_id: 'ws_1',
+      actor_kind: kind,
+      actor_id: actor,
+      action: 'drive_file.linked',
+      resource_type: 'drive_file',
+      resource_id: 'df_1',
+      changes: {},
+      metadata: {},
+      correlation_id: 'c_1',
+      occurred_at: '2026-10-26T08:15:00Z',
+    })
+    const historyFetch = () =>
+      vi.fn<FetchLike>(async () =>
+        json(200, {
+          events: [
+            wireEvent('e_1', 'human', 'u_1'),
+            wireEvent('e_2', 'human', 'u_gone'),
+            wireEvent('e_3', 'agent', 'u_1'),
+          ],
+        }),
+      )
+    const target = { workspaceId: 'ws_1', driveFileId: 'df_1' }
+
+    it('attaches the member name for a known person and omits it otherwise', async () => {
+      const memberNames = vi.fn(async () => new Map([['u_1', ' Minh ']]))
+      const { call } = setup({ memberNames }, historyFetch())
+      const res = (await call(C.getHistory, target)) as {
+        ok: boolean
+        value: Array<{ id: string; actorName?: string }>
+      }
+      expect(res.ok).toBe(true)
+      expect(memberNames).toHaveBeenCalledWith('ws_1')
+      expect(res.value.map((e) => e.actorName)).toEqual(['Minh', undefined, undefined])
+      expect('actorName' in res.value[1]!).toBe(false)
+      expect('actorName' in res.value[2]!).toBe(false)
+    })
+
+    it('still answers ok when the member lookup fails', async () => {
+      const memberNames = vi.fn(async () => {
+        throw new Error('members unreadable')
+      })
+      const { call } = setup({ memberNames }, historyFetch())
+      const res = (await call(C.getHistory, target)) as {
+        ok: boolean
+        value: Array<{ actorName?: string }>
+      }
+      expect(res.ok).toBe(true)
+      expect(res.value).toHaveLength(3)
+      expect(res.value.some((e) => 'actorName' in e)).toBe(false)
+    })
+  })
+
   it('refuses invalid renderer arguments before making any network request', async () => {
     const fetch = vi.fn<FetchLike>(async () => json(200, {}))
     const { call, openExternal } = setup({}, fetch)

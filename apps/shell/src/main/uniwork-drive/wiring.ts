@@ -27,6 +27,8 @@ export interface UniworkDriveDeps {
   authorized<T>(call: (token: string) => Promise<T>): Promise<T>
   openExternal(url: string): Promise<void>
   capability(orgId: string): Promise<CapabilityRead>
+  /** workspace member names (userId → display name); the activity rows take the actor name from it */
+  memberNames?(workspaceId: string): Promise<ReadonlyMap<string, string>>
   fetch?: FetchLike
 }
 
@@ -173,5 +175,23 @@ export function registerUniworkDrive(ipcMain: IpcMain, deps: UniworkDriveDeps): 
     return null
   })
 
-  handle(C.getHistory, async (input) => api().getHistory(checkTarget(input)))
+  handle(C.getHistory, async (input) => {
+    const target = checkTarget(input)
+    const events = await api().getHistory(target)
+    // a member lookup failure must not fail the history call: the rows just stay unnamed
+    let names: ReadonlyMap<string, string> | undefined
+    try {
+      names = await deps.memberNames?.(target.workspaceId)
+    } catch {
+      names = undefined
+    }
+    if (!names || names.size === 0) return events
+    return events.map((event) => {
+      // only a person is looked up; an agent/system actor id is never shown as a member
+      const isPerson =
+        event.actorKind === '' || event.actorKind === 'human' || event.actorKind === 'user'
+      const actorName = isPerson ? names.get(event.actorId)?.trim() : undefined
+      return actorName ? { ...event, actorName } : event
+    })
+  })
 }

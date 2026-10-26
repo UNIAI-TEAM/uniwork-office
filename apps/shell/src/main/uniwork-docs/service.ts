@@ -6624,6 +6624,15 @@ export class UniworkDocsService {
   }
 
   /**
+   * The workspace member names (userId → display name) the shelved / trash
+   * rows use, for other main-process readers (the Drive activity). Never
+   * rejects: an unreadable member list is an empty map.
+   */
+  memberNamesOf(workspaceId: string): Promise<Map<string, string>> {
+    return this.memberNamesForWorkspace(workspaceId).catch(() => new Map<string, string>())
+  }
+
+  /**
    * DESKTOP-HOME: the workspace's member names (`user_id` -> `display_name`),
    * read once per `workspaceId` via `GET /workspaces/{ws}/members` (capped at
    * `MEMBERS_PAGE_SIZE * MEMBERS_MAX_PAGES` = 2000 entries). Concurrent list
