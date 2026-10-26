@@ -168,6 +168,10 @@ export const hi = {
   uwTipEditLocked: '{name} {time} से संपादन कर रहे हैं।',
   uwTipEditLockedSelf: 'आप इस दस्तावेज़ को किसी अन्य विंडो में संपादित कर रहे हैं।',
   uwErrEditLocked: 'कोई और इस दस्तावेज़ को संपादित कर रहा है।',
+  uwErrLegacyConversion:
+    'यह पुराने फ़ॉर्मैट का Office दस्तावेज़ नया संस्करण बनाकर सहेजा नहीं जा सका। आपके बदलाव इस प्रति में बने रहते हैं।',
+  uwErrLegacyOpen: 'यह पुराने फ़ॉर्मैट का Office दस्तावेज़ यहाँ खोला नहीं जा सका।',
+  uwErrLegacyCancelled: 'खोलना रद्द किया गया।',
   uwReasonEditLocked: 'कोई और संपादित कर रहा है',
   uwLockBannerOther: '{name} {time} से संपादित कर रहे हैं। आप केवल-पठन देख रहे हैं।',
   uwLockBannerSelfElsewhere: 'आप यह दस्तावेज़ किसी अन्य विंडो में संपादित कर रहे हैं।',

@@ -164,6 +164,8 @@ const FAILED_CODES = new Set<UniworkDocErrorCode>([
   'unsupported_format',
   'engine_incompatible',
   'idempotency_mismatch',
+  // UNI-2212: a refused conversion is a verdict on the bytes and the document, never a retry
+  'legacy_conversion_invalid',
   // EL-1(a) (UNI-1645c): 423 document_locked parks until an explicit user Save or document close
   'edit_locked',
 ])

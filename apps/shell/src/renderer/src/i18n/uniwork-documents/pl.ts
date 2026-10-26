@@ -171,6 +171,10 @@ export const pl = {
   uwTipEditLocked: '{name} edytuje od {time}.',
   uwTipEditLockedSelf: 'Edytujesz ten dokument w innym oknie.',
   uwErrEditLocked: 'Ktoś inny edytuje ten dokument.',
+  uwErrLegacyConversion:
+    'Nie udało się zapisać tego dokumentu Office w starym formacie jako nowej wersji. Twoje zmiany pozostają w tej kopii.',
+  uwErrLegacyOpen: 'Nie udało się otworzyć tutaj tego dokumentu Office w starym formacie.',
+  uwErrLegacyCancelled: 'Otwieranie zostało anulowane.',
   uwReasonEditLocked: 'ktoś inny edytuje',
   uwLockBannerOther: '{name} edytuje od {time}. Przeglądasz w trybie tylko do odczytu.',
   uwLockBannerSelfElsewhere: 'Edytujesz ten dokument w innym oknie.',

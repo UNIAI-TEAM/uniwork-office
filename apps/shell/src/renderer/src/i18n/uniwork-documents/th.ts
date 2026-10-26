@@ -170,6 +170,10 @@ export const th = {
   uwTipEditLocked: '{name} กำลังแก้ไขตั้งแต่ {time}',
   uwTipEditLockedSelf: 'คุณกำลังแก้ไขเอกสารนี้ในหน้าต่างอื่น',
   uwErrEditLocked: 'มีคนอื่นกำลังแก้ไขเอกสารนี้',
+  uwErrLegacyConversion:
+    'ไม่สามารถบันทึกเอกสาร Office รูปแบบเก่านี้เป็นเวอร์ชันใหม่ได้ การเปลี่ยนแปลงของคุณยังอยู่ในสำเนานี้',
+  uwErrLegacyOpen: 'ไม่สามารถเปิดเอกสาร Office รูปแบบเก่านี้ที่นี่ได้',
+  uwErrLegacyCancelled: 'ยกเลิกการเปิดแล้ว',
   uwReasonEditLocked: 'มีคนอื่นกำลังแก้ไข',
   uwLockBannerOther: '{name} กำลังแก้ไขตั้งแต่ {time} คุณกำลังดูแบบอ่านอย่างเดียว',
   uwLockBannerSelfElsewhere: 'คุณกำลังแก้ไขเอกสารนี้ในหน้าต่างอื่น',

@@ -15,6 +15,7 @@ import type {
 import { TransportError } from '../uniwork-auth/transport'
 import { UniworkDocError, errorFromResponse, parseRetryAfter } from './errors'
 import { formatForName, isDecimalString, mimeForFormat } from './formats'
+import { isLegacyConversion, type LegacyConversion } from './legacy-cloud'
 import { DEFAULT_DOCUMENT_LIMITS, parseDocumentLimits, type DocumentLimits } from './limits'
 import {
   documentRevisionOf,
@@ -371,6 +372,11 @@ export interface UniworkDocsClient {
     idempotencyKey: string
     /** EL-1(b): the held lock of this path; omitted on the copy flow */
     editLockId?: string
+    /**
+     * UNI-2212: the staged OOXML is the conversion of the document's legacy live version, so
+     * the server may change its format along this pair (and only this pair); omitted otherwise
+     */
+    conversion?: LegacyConversion
   }): Promise<CommitReceipt>
   /**
    * What became of a commit intent (G5-07). A 410 `commit_intent_unknown` is
@@ -1509,6 +1515,10 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
 
     async commit(input) {
       if (!isDecimalString(input.baseRevision)) throw new UniworkDocError('malformed_response')
+      // a pair the server would refuse as a 400 never leaves the app
+      if (input.conversion !== undefined && !isLegacyConversion(input.conversion)) {
+        throw new UniworkDocError('malformed_response')
+      }
       const raw = await send({
         method: 'POST',
         route: `/documents/${id(input.documentId)}/versions/commit`,
@@ -1516,6 +1526,9 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
           upload_id: input.uploadId,
           base_revision: input.baseRevision,
           ...(input.editLockId ? { edit_lock_id: input.editLockId } : {}),
+          ...(input.conversion
+            ? { conversion: { from_format: input.conversion.from, to_format: input.conversion.to } }
+            : {}),
         },
         idempotencyKey: input.idempotencyKey,
         timeoutMs: metadataTimeout,

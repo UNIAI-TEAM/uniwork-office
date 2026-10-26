@@ -169,6 +169,10 @@ export const cs = {
   uwTipEditLocked: '{name} upravuje od {time}.',
   uwTipEditLockedSelf: 'Tento dokument upravujete v jiném okně.',
   uwErrEditLocked: 'Tento dokument právě upravuje někdo jiný.',
+  uwErrLegacyConversion:
+    'Tento dokument Office ve starším formátu se nepodařilo uložit jako novou verzi. Vaše změny zůstávají v této kopii.',
+  uwErrLegacyOpen: 'Tento dokument Office ve starším formátu se zde nepodařilo otevřít.',
+  uwErrLegacyCancelled: 'Otevření bylo zrušeno.',
   uwReasonEditLocked: 'upravuje někdo jiný',
   uwLockBannerOther: '{name} upravuje od {time}. Prohlížíte si jen pro čtení.',
   uwLockBannerSelfElsewhere: 'Tento dokument upravujete v jiném okně.',

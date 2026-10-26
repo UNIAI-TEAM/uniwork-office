@@ -170,6 +170,10 @@ export const id = {
   uwTipEditLocked: '{name} mengedit sejak {time}.',
   uwTipEditLockedSelf: 'Anda mengedit dokumen ini di jendela lain.',
   uwErrEditLocked: 'Orang lain sedang mengedit dokumen ini.',
+  uwErrLegacyConversion:
+    'Dokumen Office format lama ini tidak dapat disimpan sebagai versi baru. Perubahan Anda tetap ada di salinan ini.',
+  uwErrLegacyOpen: 'Dokumen Office format lama ini tidak dapat dibuka di sini.',
+  uwErrLegacyCancelled: 'Pembukaan dibatalkan.',
   uwReasonEditLocked: 'orang lain sedang mengedit',
   uwLockBannerOther: '{name} sedang mengedit sejak {time}. Anda melihat dalam mode baca-saja.',
   uwLockBannerSelfElsewhere: 'Anda sedang mengedit dokumen ini di jendela lain.',

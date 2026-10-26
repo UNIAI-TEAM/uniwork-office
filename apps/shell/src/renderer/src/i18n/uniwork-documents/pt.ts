@@ -172,6 +172,10 @@ export const pt = {
   uwTipEditLocked: '{name} está editando desde {time}.',
   uwTipEditLockedSelf: 'Você está editando este documento em outra janela.',
   uwErrEditLocked: 'Outra pessoa está editando este documento.',
+  uwErrLegacyConversion:
+    'Não foi possível salvar este documento Office em formato antigo como uma nova versão. Suas alterações continuam nesta cópia.',
+  uwErrLegacyOpen: 'Não foi possível abrir aqui este documento Office em formato antigo.',
+  uwErrLegacyCancelled: 'A abertura foi cancelada.',
   uwReasonEditLocked: 'outra pessoa está editando',
   uwLockBannerOther: '{name} está a editar desde {time}. Está a ver em modo só de leitura.',
   uwLockBannerSelfElsewhere: 'Está a editar este documento noutra janela.',
