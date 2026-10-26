@@ -339,7 +339,7 @@ export const he = {
   uhDriveUnlinkConfirmKeep: 'השאר',
   uhDriveUnlinkConfirmSubmit: 'בטל קישור',
   uhDriveUnlinkConfirmWorking: 'מבטל קישור…',
-  uhDriveUnlinkFailed: 'לא ניתן היה לבטל את הקישור. נסה שוב.',
+  uhDriveUnlinkFailed: 'לא ניתן היה לבטל את הקישור. נסו שוב.',
   uhDriveNotFound: 'הקובץ לא נמצא או שאין לך הרשאה לצפות בו.',
   uhDriveErrAuthFailed: 'חיבור Google Drive פג תוקף. התחבר מחדש כדי להמשיך.',
   uhDriveFeatureOff: 'Google Drive אינו זמין עוד עבור הארגון הזה.',
