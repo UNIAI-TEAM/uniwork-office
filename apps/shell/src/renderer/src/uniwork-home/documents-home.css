@@ -1918,8 +1918,11 @@
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.3;
   text-align: start;
-  white-space: nowrap;
+  /* a long header wraps to a second line (a very long word breaks) instead of cutting or scrolling the table (D4-A) */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .dh-drive-row {
@@ -1944,6 +1947,7 @@
   min-width: 0;
   padding: 12px 14px;
   vertical-align: middle;
+  overflow-wrap: anywhere;
 }
 
 .dh-drive-name-wrap {
@@ -2042,7 +2046,8 @@
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
-  white-space: nowrap;
+  line-height: 1.3;
+  white-space: normal;
 }
 
 .dh-drive-badge-shared {
@@ -2169,6 +2174,67 @@
   .dh-drive-badge {
     white-space: normal;
     line-height: 1.3;
+  }
+}
+
+/* D4-A (UNI-2197): from ~860 px down the sidebar leaves about 350 px for the table; tighten the page gutter, the
+   cell padding and the type so all five columns fit without horizontal scroll in every locale */
+@media (max-width: 860px) {
+  .dh-main:has(.dh-drive-view) {
+    padding-inline: 12px;
+  }
+
+  .dh-drive-col-name {
+    width: 28%;
+  }
+
+  .dh-drive-col-account {
+    width: 25%;
+  }
+
+  .dh-drive-col-access {
+    width: 16%;
+  }
+
+  .dh-drive-col-used {
+    width: 16%;
+  }
+
+  .dh-drive-col-tasks {
+    width: 15%;
+  }
+
+  .dh-drive-th {
+    padding: 6px 4px;
+    font-size: 11px;
+  }
+
+  .dh-drive-td {
+    padding: 8px 4px;
+  }
+
+  .dh-drive-cell-used,
+  .dh-drive-cell-tasks,
+  .dh-drive-account-email {
+    font-size: 12px;
+  }
+
+  .dh-drive-name-wrap {
+    gap: 4px;
+  }
+
+  .dh-drive-file-icon {
+    padding-inline-end: 0;
+  }
+
+  .dh-drive-reconnect-link {
+    font-size: 11px;
+  }
+
+  .dh-drive-badge {
+    padding: 2px 6px;
+    font-size: 11px;
+    overflow-wrap: anywhere;
   }
 }
 
