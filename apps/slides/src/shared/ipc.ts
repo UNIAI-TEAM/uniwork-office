@@ -1703,9 +1703,14 @@ export interface SlidesApi {
   /** Print (system dialog; cancel counts as ok=false without an error) */
   printSlides: (op: PrintSlidesOp) => Promise<{ ok: boolean; error?: string }>
   /** `origin` 'auto' = AutoSave pass (never writes a UniWork document); omitted = explicit Save */
-  save: (
-    origin?: 'user' | 'auto' | 'in-place',
-  ) => Promise<{ ok: boolean; path?: string; error?: string; slides?: RenderSlide[] }>
+  save: (origin?: 'user' | 'auto' | 'in-place') => Promise<{
+    ok: boolean
+    path?: string
+    error?: string
+    slides?: RenderSlide[]
+    /** a converted deck's Save As was cancelled: nothing was written and nothing failed */
+    canceled?: boolean
+  }>
   /** UniWork seam: this deck is a UniWork working copy (AutoSave off) / view-only (Save off) */
   uniworkState: () => Promise<{ bound: boolean; readOnly: boolean; converted?: boolean }>
   /** EL-1(b) fix6: pushed (`{ path }`) when `isReadOnly(path)` or `isBound(path)` may have changed */

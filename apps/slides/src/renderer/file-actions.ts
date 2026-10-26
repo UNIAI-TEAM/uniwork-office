@@ -113,7 +113,7 @@ export async function save(
       const saved = t('appStatusSaved')
       ctx.setStatus(saved)
       if (!quiet) showToast(saved)
-    } else if (!isWeb() || r.error) {
+    } else if (!r.canceled && (!isWeb() || r.error)) {
       const failed = t('appStatusSaveFailed', { error: r.error ?? t('appErrorCanceled') })
       ctx.setStatus(failed)
       // quiet suppresses the success toast only — a failed save (incl. the 30s

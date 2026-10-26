@@ -185,6 +185,29 @@ describe('slides:save of a converted legacy deck', () => {
     expect(await call('slides:uniwork-state')).toMatchObject({ bound: false, converted: false })
   })
 
+  it('opening a converted deck never records its staging path in recents (F2)', async () => {
+    const recent = () => {
+      try {
+        return readFileSync(join(env.dir, 'slides-recent.json'), 'utf8')
+      } catch {
+        return ''
+      }
+    }
+    writeFileSync(deckPath, await createBlankPptx())
+    expect(await call('slides:open-path', deckPath, FIT)).not.toBeNull()
+    expect(recent()).not.toContain(deckPath)
+
+    // an ordinary deck still lands in recents, and so does the real file a Save As writes
+    const plain = join(env.dir, `plain-${Math.random().toString(36).slice(2)}.pptx`)
+    writeFileSync(plain, await createBlankPptx())
+    expect(await call('slides:open-path', plain, FIT)).not.toBeNull()
+    expect(recent()).toContain(plain)
+    sessions.set(WC, session)
+    session.path = deckPath
+    await call('slides:save')
+    expect(recent()).toContain(suggested)
+  })
+
   it('a same-stem sibling deck is an ordinary deck: Save writes in place', async () => {
     const sibling = suggested
     sessions.set(WC, { ...session, path: sibling })
@@ -202,7 +225,8 @@ describe('slides:save of a converted legacy deck', () => {
     env.saveDialogPath = ''
     const r = (await call('slides:save')) as { ok: boolean }
 
-    expect(r.ok).toBe(false)
+    // silent in the renderer: no "Save failed: canceled" toast (F3)
+    expect(r).toEqual({ ok: false, canceled: true })
     expect(readFileSync(deckPath, 'utf8')).toBe(ORIGINAL)
     expect(session.path).toBe(deckPath)
     expect(convertedDocumentFor(deckPath)).toBeDefined()

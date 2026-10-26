@@ -384,6 +384,8 @@ async function pushRecent(path: string): Promise<void> {
   if (isHeadlessMode()) return
   // A kept-draft preview is a temporary decrypted copy, not a file the user opened.
   if (isDraftPreviewPath(app.getPath('userData'), path)) return
+  // A converted legacy copy is a staging file swept when its tab closes: never a recent entry.
+  if (convertedDocumentFor(path)) return
   const cur = await readRecent()
   const next = [path, ...cur.filter((p) => p !== path)].slice(0, 10)
   try {

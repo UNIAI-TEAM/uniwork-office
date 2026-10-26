@@ -7,6 +7,7 @@ vi.mock('../src/renderer/export-render', () => ({ renderSlidesToPngBase64: vi.fn
 vi.mock('../src/renderer/components/toast-bus', () => ({ showToast: vi.fn() }))
 vi.mock('../src/renderer/i18n/locale', () => ({ t: (k: string) => k }))
 
+import { showToast } from '../src/renderer/components/toast-bus'
 import { adoptSavedSlides, save, saveAs } from '../src/renderer/file-actions'
 import type { ActionCtx } from '../src/renderer/action-context'
 
@@ -134,6 +135,20 @@ describe('slides save serialization', () => {
     expect(r2).toBe(true)
     expect(mockSave).toHaveBeenCalledTimes(2)
 
+    vi.unstubAllGlobals()
+  })
+
+  it('a cancelled Save As of a converted deck is silent: no failure toast, no failure status (F3)', async () => {
+    const setStatus = vi.fn()
+    vi.mocked(showToast).mockClear()
+    vi.stubGlobal('window', {
+      slidesApi: { save: vi.fn(async () => ({ ok: false, canceled: true })) },
+    })
+
+    expect(await save(() => ({ ...ctx(), setStatus }) as ActionCtx)).toBe(false)
+
+    expect(showToast).not.toHaveBeenCalled()
+    expect(setStatus).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
 

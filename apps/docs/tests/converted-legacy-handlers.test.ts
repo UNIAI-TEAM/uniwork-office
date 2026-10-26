@@ -168,6 +168,22 @@ describe('docs real handlers on a converted legacy .doc', () => {
     expect((await call('docs:open-path', fakeWc(), ordinary)).suggestSaveAs).toBeUndefined()
   })
 
+  it('opening it never records the staging path in recents; the real file a Save As writes is recorded (F2)', async () => {
+    const recent = () => {
+      try {
+        return readFileSync(join(dir, 'recent.json'), 'utf8')
+      } catch {
+        return ''
+      }
+    }
+    await call('docs:open-path', fakeWc(), tempPath)
+    expect(recent()).not.toContain(tempPath)
+
+    showSaveDialog.mockResolvedValue({ canceled: false, filePath: suggested })
+    await call('docs:save-as', wc, 'Memo.docx', bytes('edited'), tempPath)
+    expect(recent()).toContain(suggested)
+  })
+
   it('Save As starts at the suggestion next to the original, writes there, and forgets the conversion', async () => {
     showSaveDialog.mockResolvedValue({ canceled: false, filePath: suggested })
 

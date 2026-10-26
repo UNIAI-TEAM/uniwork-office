@@ -124,7 +124,9 @@ export const historySaveHandlers = {
       pathBefore &&
       ctx.host.saveTarget.convertedSaveAs?.(pathBefore)
     ) {
-      return saveAs(ctx, baseName(pathBefore))
+      const result = await saveAs(ctx, baseName(pathBefore))
+      // a cancelled chooser (or a refused target) wrote nothing and is not a failure to report
+      return result.ok || 'error' in result ? result : { ...result, canceled: true }
     }
     const gate =
       pathBefore && ctx.host.saveGate

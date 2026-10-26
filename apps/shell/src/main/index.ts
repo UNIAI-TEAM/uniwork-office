@@ -4526,6 +4526,9 @@ function recordRecentFile(filePath: string): void {
   recordRecentFileRaw(filePath)
 }
 
+  // a converted legacy copy's staging path is swept when its tab closes: the recents entry is
+  // the original the user picked, and the real file once a Save As gives the copy a home
+  if (convertedDocumentFor(filePath)) return
 /**
  * Progress for a legacy conversion: the taskbar/dock shows busy right away and,
  * when it takes longer than a blink, a box with Cancel (the file converts with
