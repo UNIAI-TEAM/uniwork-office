@@ -199,6 +199,7 @@ export const zhTW = {
   appEndnotePlaceholder: '章節附註內容…',
   appAutoSave: '自動儲存',
   appAutoSaveTip: '自動儲存(每 30 秒及視窗失去焦點時)',
+  appAutoSaveNeedsSaveTip: '請先儲存文件，再開啟自動儲存',
   appSaveShortcutTip: '儲存 ({keys})',
   appUndo: '復原',
   appRedo: '重做',

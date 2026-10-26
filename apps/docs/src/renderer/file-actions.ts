@@ -1079,7 +1079,15 @@ export function autoSavesDocument(
   uniworkBound: boolean,
   doc: FileActionContext['doc'],
 ): boolean {
-  return pref && !uniworkBound && !doc?.suggestSaveAs
+  return pref && !uniworkBound && !autoSaveNeedsFirstSave(doc)
+}
+
+/**
+ * A converted legacy copy has no file of its own until its first Save As, so the AutoSave switch
+ * is shown disabled (with a tip saying why) instead of looking enabled and doing nothing.
+ */
+export function autoSaveNeedsFirstSave(doc: FileActionContext['doc']): boolean {
+  return !!doc?.suggestSaveAs
 }
 
 /**

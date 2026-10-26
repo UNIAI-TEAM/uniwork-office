@@ -422,6 +422,7 @@ import {
   applyAiDocContent as applyAiDocContentImpl,
   buildDocBytes as buildDocBytesImpl,
   autoSavesDocument,
+  autoSaveNeedsFirstSave,
   currentDocGeneration,
   exportPdf as exportPdfImpl,
   exportHtml as exportHtmlImpl,
@@ -1190,6 +1191,7 @@ export function App() {
   uniworkRef.current = uniworkState
   /** autosave as it actually runs: the pref, forced off for a UniWork document and a converted legacy copy */
   const autoSaveActive = autoSavesDocument(autoSave, uniwork.bound, doc)
+  const autoSaveBlocked = autoSaveNeedsFirstSave(doc)
   // G8-12: server comments (S12) when the host answers a comments context for this document; a
   // Save replaces `doc` but not the document generation, so server mode survives it
   const serverMode = useServerMode(doc ? currentDocGeneration() + 1 : 0, doc?.filePath)
@@ -7115,14 +7117,16 @@ export function App() {
         {/* product rule: a UniWork document is only written by an explicit Save, so it has no AutoSave switch */}
         {autoSaveToggleVisible(autoSaveToDisk, uniwork.bound) && (
           <label
-            className={`autosave-toggle ${autoSaveActive ? 'on' : ''}`}
-            data-tip={t('appAutoSaveTip')}
+            className={`autosave-toggle ${autoSaveActive ? 'on' : ''}${autoSaveBlocked ? ' disabled' : ''}`}
+            data-tip={t(autoSaveBlocked ? 'appAutoSaveNeedsSaveTip' : 'appAutoSaveTip')}
+            aria-disabled={autoSaveBlocked || undefined}
           >
             <span className="autosave-knob" />
             <span className="autosave-text">{t('appAutoSave')}</span>
             <input
               type="checkbox"
               checked={autoSaveActive}
+              disabled={autoSaveBlocked}
               onChange={(e) => setAutoSave(e.target.checked)}
             />
           </label>
@@ -7135,6 +7139,7 @@ export function App() {
       hasDoc,
       hasUnsavedChanges,
       autoSaveActive,
+      autoSaveBlocked,
       uniwork.bound,
       uniwork.readOnly,
       editor,

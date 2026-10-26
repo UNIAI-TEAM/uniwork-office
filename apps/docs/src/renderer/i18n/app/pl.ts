@@ -219,6 +219,7 @@ export const pl = {
   appEndnotePlaceholder: 'Treść przypisu końcowego…',
   appAutoSave: 'Autozapis',
   appAutoSaveTip: 'Autozapis (co 30 sekund oraz gdy okno traci fokus)',
+  appAutoSaveNeedsSaveTip: 'Najpierw zapisz dokument, aby włączyć automatyczny zapis',
   appSaveShortcutTip: 'Zapisz ({keys})',
   appUndo: 'Cofnij',
   appRedo: 'Ponów',

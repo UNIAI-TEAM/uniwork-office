@@ -223,6 +223,8 @@ export const fr = {
   appAutoSave: 'Enregistrement automatique',
   appAutoSaveTip:
     'Enregistrement automatique (toutes les 30 secondes et lorsque la fenêtre perd le focus)',
+  appAutoSaveNeedsSaveTip:
+    "Enregistrez d'abord le document pour activer l'enregistrement automatique",
   appSaveShortcutTip: 'Enregistrer ({keys})',
   appUndo: 'Annuler',
   appRedo: 'Rétablir',

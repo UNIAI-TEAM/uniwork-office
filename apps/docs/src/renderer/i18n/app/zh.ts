@@ -212,6 +212,7 @@ export const zh = {
   // Quick actions bar
   appAutoSave: '自动保存',
   appAutoSaveTip: '自动保存(每 30 秒及窗口失焦时)',
+  appAutoSaveNeedsSaveTip: '请先保存文档，再开启自动保存',
   appSaveShortcutTip: '保存 ({keys})',
   appUndo: '撤销',
   appRedo: '恢复',

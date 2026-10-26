@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { en } from '../src/renderer/i18n/app/en'
+import { vi as viStrings } from '../src/renderer/i18n/app/vi'
 import {
+  autoSaveNeedsFirstSave,
   autoSavesDocument,
   canReuseSavePass,
   save,
@@ -46,6 +51,30 @@ describe('AutoSave of a converted legacy .doc (F1)', () => {
     expect(autoSavesDocument(true, false, ordinary)).toBe(true)
     expect(autoSavesDocument(true, true, ordinary)).toBe(false)
     expect(autoSavesDocument(false, false, ordinary)).toBe(false)
+  })
+})
+
+describe('the AutoSave switch of a converted copy is disabled until the first Save As (F4)', () => {
+  it('flags a converted copy, not an ordinary or absent document', () => {
+    expect(autoSaveNeedsFirstSave(converted)).toBe(true)
+    expect(autoSaveNeedsFirstSave(ordinary)).toBe(false)
+    expect(autoSaveNeedsFirstSave(null)).toBe(false)
+  })
+
+  it('the switch renders disabled with the explaining tip, keeping its label and aria state', () => {
+    const app = readFileSync(join(__dirname, '../src/renderer/App.tsx'), 'utf8')
+    const toggle = app.slice(app.indexOf('<label\n            className={`autosave-toggle'))
+    const block = toggle.slice(0, toggle.indexOf('</label>'))
+    expect(block).toContain("autoSaveBlocked ? ' disabled' : ''")
+    expect(block).toContain("t(autoSaveBlocked ? 'appAutoSaveNeedsSaveTip' : 'appAutoSaveTip')")
+    expect(block).toContain('aria-disabled={autoSaveBlocked || undefined}')
+    expect(block).toContain('disabled={autoSaveBlocked}')
+    expect(block).toContain("t('appAutoSave')")
+  })
+
+  it('has en and vi copy', () => {
+    expect(en.appAutoSaveNeedsSaveTip).toBe('Save the document first to turn on AutoSave')
+    expect(viStrings.appAutoSaveNeedsSaveTip).toBe('Hãy lưu tài liệu trước để bật Tự động lưu')
   })
 })
 

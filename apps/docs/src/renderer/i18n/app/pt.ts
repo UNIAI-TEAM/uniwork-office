@@ -215,6 +215,7 @@ export const pt = {
   appEndnotePlaceholder: 'Texto da nota de fim…',
   appAutoSave: 'Salvamento automático',
   appAutoSaveTip: 'Salvamento automático (a cada 30 segundos e quando a janela perde o foco)',
+  appAutoSaveNeedsSaveTip: 'Salve o documento primeiro para ativar o salvamento automático',
   appSaveShortcutTip: 'Salvar ({keys})',
   appUndo: 'Desfazer',
   appRedo: 'Refazer',

@@ -217,6 +217,7 @@ export const ru = {
   appEndnotePlaceholder: 'Текст концевой сноски…',
   appAutoSave: 'Автосохранение',
   appAutoSaveTip: 'Автосохранение (каждые 30 секунд и при потере фокуса окном)',
+  appAutoSaveNeedsSaveTip: 'Сначала сохраните документ, чтобы включить автосохранение',
   appSaveShortcutTip: 'Сохранить ({keys})',
   appUndo: 'Отменить',
   appRedo: 'Вернуть',

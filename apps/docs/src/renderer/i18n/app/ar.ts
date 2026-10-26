@@ -206,6 +206,7 @@ export const ar = {
   appEndnotePlaceholder: 'نص التعليق الختامي…',
   appAutoSave: 'حفظ تلقائي',
   appAutoSaveTip: 'حفظ تلقائي (كل 30 ثانية وعند فقدان النافذة للتركيز)',
+  appAutoSaveNeedsSaveTip: 'احفظ المستند أولاً لتشغيل الحفظ التلقائي',
   appSaveShortcutTip: 'حفظ ({keys})',
   appUndo: 'تراجع',
   appRedo: 'إعادة',

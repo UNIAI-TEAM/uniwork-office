@@ -223,6 +223,7 @@ export const nl = {
   appEndnotePlaceholder: 'Eindnoottekst…',
   appAutoSave: 'Automatisch opslaan',
   appAutoSaveTip: 'Automatisch opslaan (elke 30 seconden en wanneer het venster de focus verliest)',
+  appAutoSaveNeedsSaveTip: 'Sla het document eerst op om Automatisch opslaan in te schakelen',
   appSaveShortcutTip: 'Opslaan ({keys})',
   appUndo: 'Ongedaan maken',
   appRedo: 'Opnieuw',
