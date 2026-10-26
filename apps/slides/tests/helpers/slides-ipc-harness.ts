@@ -8,6 +8,11 @@
  * filter list or event payload shows up in the trace.
  */
 import { createHash } from 'node:crypto'
+import {
+  assertModernSaveTarget,
+  convertedDocumentFor,
+  forgetConvertedDocument,
+} from '@genoffice/electron-utils/converted-documents'
 import { RecoveryClearEpochs, recoveryEpochKey } from '@genoffice/electron-utils/recovery-epochs'
 import { safeExternalUrl } from '@genoffice/electron-utils/safe-external-url'
 
@@ -205,6 +210,11 @@ export const electronUtilsModule = {
   appMenuLabels: () => ({}),
   configuredDefaultSaveDir: () => harness.draftsDir,
   contextMenuLabels: () => ({}),
+  // the real converted-document table and Save As target gate (pure, own subpath): the save
+  // handlers consult them on every Save / Save As, and nothing is registered unless a suite does
+  convertedDocumentFor,
+  forgetConvertedDocument,
+  assertModernSaveTarget,
   fetchRemoteImage: async () => null,
   installContextMenu: () => {},
   installNavigationGuard: () => {},

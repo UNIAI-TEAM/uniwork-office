@@ -189,7 +189,7 @@ describe('useSlidesUniworkState hook', () => {
     root = createRoot(container)
     await act(async () => root!.render(createElement(Probe, { p: PATH })))
     await settle()
-    expect(latest).toEqual({ bound: true, readOnly: true })
+    expect(latest).toEqual({ bound: true, readOnly: true, converted: false })
     expect(stateCalls).toBe(1)
 
     answer = { bound: true, readOnly: false }
@@ -201,13 +201,13 @@ describe('useSlidesUniworkState hook', () => {
     ping?.(PATH)
     await settle()
     expect(stateCalls).toBe(2)
-    expect(latest).toEqual({ bound: true, readOnly: false })
+    expect(latest).toEqual({ bound: true, readOnly: false, converted: false })
 
     answer = { bound: true, readOnly: true }
     ping?.(PATH)
     await settle()
     expect(stateCalls).toBe(3)
-    expect(latest).toEqual({ bound: true, readOnly: true })
+    expect(latest).toEqual({ bound: true, readOnly: true, converted: false })
 
     act(() => root?.unmount())
     root = null

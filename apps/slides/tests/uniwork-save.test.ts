@@ -262,13 +262,29 @@ describe('slides:save UniWork seam', () => {
   })
 
   it('reports bound / read-only for the sender deck only', async () => {
-    expect(await call('slides:uniwork-state')).toEqual({ bound: false, readOnly: false })
+    expect(await call('slides:uniwork-state')).toEqual({
+      bound: false,
+      readOnly: false,
+      converted: false,
+    })
     bindPolicy({ bound: [deckPath] })
-    expect(await call('slides:uniwork-state')).toEqual({ bound: true, readOnly: false })
+    expect(await call('slides:uniwork-state')).toEqual({
+      bound: true,
+      readOnly: false,
+      converted: false,
+    })
     bindPolicy({ readOnly: [deckPath] })
-    expect(await call('slides:uniwork-state')).toEqual({ bound: true, readOnly: true })
+    expect(await call('slides:uniwork-state')).toEqual({
+      bound: true,
+      readOnly: true,
+      converted: false,
+    })
     session.path = ''
-    expect(await call('slides:uniwork-state')).toEqual({ bound: false, readOnly: false })
+    expect(await call('slides:uniwork-state')).toEqual({
+      bound: false,
+      readOnly: false,
+      converted: false,
+    })
   })
 })
 
