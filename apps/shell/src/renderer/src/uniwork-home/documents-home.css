@@ -2020,6 +2020,19 @@
   cursor: default;
 }
 
+/* D3-V2-2: at <= 1100 px let the action wrap to two lines so "kết nối lại" stays visible */
+@media (max-width: 1100px) {
+  .dh-drive-reconnect-link {
+    align-items: flex-start;
+    white-space: normal;
+  }
+
+  .dh-drive-reconnect-link > span {
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
 .dh-drive-badge {
   display: inline-flex;
   align-items: center;
@@ -2188,21 +2201,24 @@
 }
 
 /* the panel carries the details, so the list keeps Name + Access and lets the badge wrap (D3-V1) */
-.dh-drive-view.has-panel .dh-drive-col-account,
-.dh-drive-view.has-panel .dh-drive-cell-account,
-.dh-drive-view.has-panel .dh-drive-col-used,
-.dh-drive-view.has-panel .dh-drive-cell-used,
-.dh-drive-view.has-panel .dh-drive-col-tasks,
-.dh-drive-view.has-panel .dh-drive-cell-tasks {
-  display: none;
-}
+(not when the panel stacks under the table, <= 760 px) */
+@media (min-width: 761px) {
+  .dh-drive-view.has-panel .dh-drive-col-account,
+  .dh-drive-view.has-panel .dh-drive-cell-account,
+  .dh-drive-view.has-panel .dh-drive-col-used,
+  .dh-drive-view.has-panel .dh-drive-cell-used,
+  .dh-drive-view.has-panel .dh-drive-col-tasks,
+  .dh-drive-view.has-panel .dh-drive-cell-tasks {
+    display: none;
+  }
 
-.dh-drive-view.has-panel .dh-drive-col-name {
-  width: 58%;
-}
+  .dh-drive-view.has-panel .dh-drive-col-name {
+    width: 58%;
+  }
 
-.dh-drive-view.has-panel .dh-drive-col-access {
-  width: 42%;
+  .dh-drive-view.has-panel .dh-drive-col-access {
+    width: 42%;
+  }
 }
 
 .dh-drive-view.has-panel .dh-drive-th {
@@ -2489,7 +2505,9 @@ p.dh-drive-panel-muted {
   .dh-drive-panel {
     flex-basis: 300px;
   }
+}
 
+@media (min-width: 761px) and (max-width: 1100px) {
   .dh-drive-view.has-panel .dh-drive-col-access,
   .dh-drive-view.has-panel .dh-drive-cell-access {
     display: none;

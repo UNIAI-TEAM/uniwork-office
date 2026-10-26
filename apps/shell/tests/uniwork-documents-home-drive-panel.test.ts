@@ -271,7 +271,15 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
 
   const panel = () => document.querySelector<HTMLElement>('[data-drive-panel]')
 
+  // D3-V2-1: web hand-offs of the same target within 1 s collapse into one; a fake clock keeps tests apart
+  let clock = 1_700_000_000_000
+  const advance = (ms: number) => {
+    clock += ms
+  }
+
   beforeEach(() => {
+    advance(10_000)
+    vi.spyOn(Date, 'now').mockImplementation(() => clock)
     localStorage.clear()
     localStorage.setItem('genoffice.lang', 'vi')
     document.documentElement.lang = 'vi'
@@ -318,6 +326,7 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
   })
 
   afterEach(async () => {
+    vi.mocked(Date.now).mockRestore()
     await act(async () => {
       root.unmount()
     })
@@ -622,6 +631,48 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
     expect(document.querySelector('[data-drive-view]')!.contains(document.activeElement)).toBe(true)
   })
 
+  it('a double click on a hand-off button opens the web once; a later click opens it again (D3-V2-1)', async () => {
+    await openDriveView()
+    const reconnect = document.querySelector<HTMLButtonElement>(
+      'button[data-drive-reconnect="dc-broken"]',
+    )!
+    await act(async () => {
+      reconnect.click()
+      reconnect.click()
+    })
+    await flush()
+    expect(openWeb).toHaveBeenCalledTimes(1)
+    advance(1_500)
+    await click(reconnect)
+    expect(openWeb).toHaveBeenCalledTimes(2)
+  })
+
+  it('unlinking the first row focuses another live row while the list is still refreshing (D3F-R2-1)', async () => {
+    await openDriveView()
+    await selectRow('df-1')
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    listFiles.mockImplementation(async () => {
+      await gate
+      return { ok: true as const, value: { files: [fileTwo], totalCount: 1, nextCursor: null } }
+    })
+    await click(panel()!.querySelector('[data-drive-unlink]'))
+    await click(document.querySelector('[data-drive-unlink-confirm]'))
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    const view = document.querySelector('[data-drive-view]')!
+    const active = document.activeElement as HTMLElement
+    expect(view.contains(active)).toBe(true)
+    expect(active.dataset.driveFileId).toBe('df-2')
+    await act(async () => {
+      release()
+    })
+    await flush()
+    expect(document.querySelector('[data-drive-file-id="df-1"]')).toBeNull()
+    expect(view.contains(document.activeElement)).toBe(true)
+  })
+
   it('an unlink error stays in the dialog with the mapped sentence', async () => {
     unlink.mockResolvedValueOnce({ ok: false, error: 'forbidden' })
     await openDriveView()
@@ -792,6 +843,7 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
       reconnect.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
     })
     expect(openOnGoogle).not.toHaveBeenCalled()
+    advance(1_500)
     await click(reconnect)
     expect(openWeb).toHaveBeenLastCalledWith({
       kind: 'drive-connect',

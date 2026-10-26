@@ -230,6 +230,9 @@ export function getDriveBridge(): DriveRendererBridge | null {
   return null
 }
 
+const WEB_HAND_OFF_DEDUPE_MS = 1000
+let lastWebHandOff = { key: '', at: 0 }
+
 /**
  * Hands a Drive step that needs a browser over to the web page through main's `openWeb`
  * (spec §17.4). Main builds the URL from the ids; the renderer never passes one.
@@ -237,6 +240,13 @@ export function getDriveBridge(): DriveRendererBridge | null {
 export function openDriveWeb(target: WorkWebTarget): Promise<boolean> {
   const work = typeof window === 'undefined' ? undefined : window.uniworkWork
   if (!work) return Promise.resolve(false)
+  // D3-V2-1: the second click of a double-click must not open the same page twice
+  const key = JSON.stringify(target)
+  const now = Date.now()
+  if (key === lastWebHandOff.key && now - lastWebHandOff.at < WEB_HAND_OFF_DEDUPE_MS) {
+    return Promise.resolve(true)
+  }
+  lastWebHandOff = { key, at: now }
   try {
     return Promise.resolve(work.openWeb(target)).catch(() => false)
   } catch {

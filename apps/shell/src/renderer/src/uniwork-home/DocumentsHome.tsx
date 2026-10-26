@@ -568,6 +568,8 @@ export function DocumentsHome({
   // UNI-2196 (D3): the Drive file whose detail panel is open (the row it was picked from, and whether
   // the keyboard picked it so the panel takes focus)
   const [driveSel, setDriveSel] = useState<{ row: DriveFile; focus: boolean } | null>(null)
+  /** id of a file the panel found already unlinked (`not_found`), so closing does not refocus its row */
+  const driveGoneIdRef = useRef<string | null>(null)
   const driveWs = workspaces.find((ws) => ws.id === workspaceId)
   const driveWeb = driveWs ? { orgSlug: driveWs.orgSlug, wsSlug: driveWs.slug } : null
   const myFolderLabel = t(MY_FOLDER_LABEL_KEY)
@@ -1168,11 +1170,18 @@ export function DocumentsHome({
     const id = driveSel?.row.id
     setDriveSel(null)
     if (!id) return
-    window.requestAnimationFrame(() =>
-      Array.from(document.querySelectorAll<HTMLElement>('[data-drive-file-id]'))
-        .find((el) => el.dataset.driveFileId === id)
-        ?.focus(),
-    )
+    window.requestAnimationFrame(() => {
+      // an unlinked row is about to disappear: never focus it
+      const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-drive-file-id]'))
+      const view = document.querySelector<HTMLElement>('[data-drive-view]')
+      const target =
+        (driveGoneIdRef.current === id
+          ? undefined
+          : rows.find((el) => el.dataset.driveFileId === id)) ??
+        rows.find((el) => el.dataset.driveFileId !== id) ??
+        view?.querySelector<HTMLElement>('.dh-drive-add-btn')
+      target?.focus()
+    })
   }
 
   const openFolderInWorkspace = (id: string | null) => {
@@ -2907,19 +2916,25 @@ export function DocumentsHome({
                   onClose={closeDrivePanel}
                   onOpenOnGoogle={(driveFileId) => void drive.openOnGoogle(driveFileId)}
                   onUnlinked={() => {
+                    const unlinkedId = driveSel.row.id
                     setDriveSel(null)
                     drive.retry()
                     // the row and the dialog are gone: focus goes to the first remaining row, else Add
                     window.requestAnimationFrame(() => {
                       const view = document.querySelector<HTMLElement>('[data-drive-view]')
                       const target =
-                        view?.querySelector<HTMLElement>('[data-drive-file-id]') ??
+                        Array.from(
+                          view?.querySelectorAll<HTMLElement>('[data-drive-file-id]') ?? [],
+                        ).find((el) => el.dataset.driveFileId !== unlinkedId) ??
                         view?.querySelector<HTMLElement>('.dh-drive-add-btn')
                       target?.focus()
                     })
                   }}
                   onFeatureDisabled={() => leaveDrive('uhDriveFeatureOff')}
-                  onGone={drive.retry}
+                  onGone={() => {
+                    driveGoneIdRef.current = driveSel.row.id
+                    drive.retry()
+                  }}
                 />
               ) : null
             }
