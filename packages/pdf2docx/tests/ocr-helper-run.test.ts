@@ -144,6 +144,33 @@ describe.each(runners)('%s', (_name, run) => {
     expect(await run(fake('null-json', "process.stdout.write('null')"))).toBeNull()
   })
 
+  it.each([
+    ['a null line', '{"lines":[null]}'],
+    ['a non-object line', '{"lines":["x"]}'],
+    ['a line without b', '{"lines":[{"t":"a","c":1}]}'],
+    ['a line without t', '{"lines":[{"c":1,"b":[0,0,1,1]}]}'],
+    ['a box of 3 numbers', '{"lines":[{"t":"a","c":1,"b":[0,0,1]}]}'],
+    ['a box of strings', '{"lines":[{"t":"a","c":1,"b":["0","0","1","1"]}]}'],
+    ['a non-array box', '{"lines":[{"t":"a","c":1,"b":"0,0,1,1"}]}'],
+    ['a char without b', '{"lines":[{"t":"a","c":1,"b":[0,0,1,1],"chars":[{"t":"a"}]}]}'],
+    ['a null char', '{"lines":[{"t":"a","c":1,"b":[0,0,1,1],"chars":[null]}]}'],
+    [
+      'a char box of strings',
+      '{"lines":[{"t":"a","c":1,"b":[0,0,1,1],"chars":[{"t":"a","b":["0","0","1","1"]}]}]}',
+    ],
+    ['non-array chars', '{"lines":[{"t":"a","c":1,"b":[0,0,1,1],"chars":"a"}]}'],
+    ['one good line and one null line', `{"lines":[{"t":"a","c":1,"b":[0,0,1,1]},null]}`],
+  ])('answers null (no throw) for malformed lines: %s', async (name, json) => {
+    expect(
+      await run(
+        fake(
+          `malformed-${name.replace(/\W+/g, '-')}`,
+          `process.stdout.write(${JSON.stringify(json)})`,
+        ),
+      ),
+    ).toBeNull()
+  })
+
   it('answers null when the binary does not exist', async () => {
     const missing = join(dir, 'no-such-binary.exe')
     expect(existsSync(missing)).toBe(false)
@@ -172,6 +199,32 @@ describe.each(runners)('%s', (_name, run) => {
       delete process.env.OCR_RUN_KEEP
       delete process.env.OCR_RUN_DROP
     }
+  })
+})
+
+describe('runOcrHelperAsync with malformed lines', () => {
+  it('settles to null without an exception escaping a listener', async () => {
+    const seen: unknown[] = []
+    const spy = (e: unknown): void => void seen.push(e)
+    // vitest installs its own handlers; ours runs alongside and records anything uncaught
+    process.on('uncaughtException', spy)
+    try {
+      for (const json of [
+        '{"lines":[null]}',
+        '{"lines":[{"t":"a","c":1}]}',
+        '{"lines":[{"t":"a","c":1,"b":[0,0,1,1],"chars":[{"t":"a"}]}]}',
+        '{"lines":[{"t":"a","c":1,"b":[0,0,1]}]}',
+        '{"lines":[{"t":"a","c":1,"b":["0","0","1","1"]}]}',
+      ]) {
+        const args = fake('malformed-async', `process.stdout.write(${JSON.stringify(json)})`)
+        expect(await runOcrHelperAsync(process.execPath, args, new Uint8Array([1]))).toBeNull()
+      }
+      // let a throw that escaped a listener surface on the next turns
+      await new Promise((r) => setTimeout(r, 100))
+    } finally {
+      process.off('uncaughtException', spy)
+    }
+    expect(seen).toEqual([])
   })
 })
 

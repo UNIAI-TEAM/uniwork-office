@@ -77,18 +77,39 @@ function spawnOptions(
   }
 }
 
-/** helper stdout -> recognition; null when it is not the protocol */
+const isBox = (b: unknown): b is [number, number, number, number] =>
+  Array.isArray(b) && b.length === 4 && b.every((n) => typeof n === 'number' && Number.isFinite(n))
+
+const isHelperChar = (c: unknown): c is HelperChar =>
+  typeof c === 'object' &&
+  c !== null &&
+  typeof (c as HelperChar).t === 'string' &&
+  isBox((c as HelperChar).b)
+
+const isHelperLine = (l: unknown): l is HelperLine => {
+  if (typeof l !== 'object' || l === null) return false
+  const line = l as HelperLine
+  if (typeof line.t !== 'string' || typeof line.c !== 'number' || !isBox(line.b)) return false
+  return line.chars === undefined || (Array.isArray(line.chars) && line.chars.every(isHelperChar))
+}
+
+/**
+ * helper stdout -> recognition; null when it is not the protocol — unparseable
+ * JSON and any malformed line or glyph (a null entry, a missing or non-numeric
+ * box, a non-array `chars`) alike. Never throws: the async runner calls it from
+ * an event listener, where a throw would reach the main process.
+ */
 function parseHelperOutput(stdout: Buffer): OcrRecognition | null {
-  let parsed: { lines?: HelperLine[]; paper?: number }
+  let parsed: { lines?: unknown; paper?: unknown }
   try {
     // defense in depth: .NET Framework consoles can prepend a UTF-8 BOM
     const raw = stdout.toString('utf8')
     const text = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw
-    parsed = JSON.parse(text) as { lines?: HelperLine[]; paper?: number }
+    parsed = JSON.parse(text) as { lines?: unknown; paper?: unknown }
   } catch {
     return null
   }
-  if (!parsed || !Array.isArray(parsed.lines)) return null
+  if (!parsed || !Array.isArray(parsed.lines) || !parsed.lines.every(isHelperLine)) return null
   return {
     lines: parsed.lines.map((l) => ({
       text: l.t,
@@ -170,7 +191,14 @@ export function runOcrHelperAsync(
     // a helper that exits before it has read its stdin raises EPIPE here
     child.stdin!.on('error', () => undefined)
     child.on('close', (code) => {
-      done(code === 0 ? parseHelperOutput(Buffer.concat(chunks)) : null)
+      // a throw out of a listener would reach the main process and leave the promise pending
+      let result: OcrRecognition | null = null
+      try {
+        if (code === 0) result = parseHelperOutput(Buffer.concat(chunks))
+      } catch {
+        result = null
+      }
+      done(result)
     })
     child.stdin!.end(png)
   })
