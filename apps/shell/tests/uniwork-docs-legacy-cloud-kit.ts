@@ -97,6 +97,8 @@ export function fakeServer(initial: {
   myLevel?: string
   /** the live version is already this OOXML (a converted document) */
   ooxml?: Ooxml
+  /** the live version's MIME type, when it is none of the OOXML or legacy ones (a PDF, text ...) */
+  mime?: string
   bytes?: Uint8Array
   /** a second version on top of the first: the document was converted and saved (title already rewritten) */
   converted?: { bytes: Uint8Array; kind: Ooxml }
@@ -112,7 +114,7 @@ export function fakeServer(initial: {
         }
       : {
           bytes: initial.bytes ?? enc('ordinary'),
-          mime: OOXML_MIME[initial.ooxml ?? 'docx'],
+          mime: initial.mime ?? OOXML_MIME[initial.ooxml ?? 'docx'],
           filename: initial.filename ?? `plan.${initial.ooxml ?? 'docx'}`,
           reason: 'upload',
         },

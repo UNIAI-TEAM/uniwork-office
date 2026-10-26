@@ -73,6 +73,25 @@ describe('UNI-2212 opening a cloud legacy document', () => {
     expect(binding(first).legacyFrom).toBe('xls')
   })
 
+  it.each([
+    ['application/pdf', 'Original.pdf', 'pdf'],
+    ['text/markdown', 'Original.md', 'md'],
+    ['text/plain', 'Original.txt', 'txt'],
+    ['text/html', 'Original.html', 'html'],
+  ])(
+    'a %s head with a legacy-looking title opens as itself, never through the converter',
+    async (mime, filename, format) => {
+      for (const title of ['Renamed.doc', 'Renamed.xls', 'Renamed.ppt']) {
+        const server = fakeServer({ mime, filename, title, bytes: enc('plain content') })
+        const ctx = setup(server)
+        const path = await openDoc(ctx)
+        expect(ctx.converter!.calls).toHaveLength(0)
+        expect(binding(path)).toMatchObject({ format, state: 'ready' })
+        expect(binding(path).legacyFrom).toBeUndefined()
+      }
+    },
+  )
+
   it('an ordinary OOXML document never touches the converter', async () => {
     const server = fakeServer({ ooxml: 'docx', title: 'Plan.docx' })
     const ctx = setup(server)

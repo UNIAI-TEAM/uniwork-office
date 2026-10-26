@@ -10,8 +10,8 @@ import type {
   UniworkSystemKind,
 } from '../../shared/home-api'
 import { UniworkDocError } from './errors'
-import { formatForMime, formatForName, isDecimalString } from './formats'
-import { legacyOfFile, legacyTargetFormat } from './legacy-cloud'
+import { formatForMime, formatForName, isDecimalString, legacyOfFile } from './formats'
+import { legacyTargetFormat } from './legacy-cloud'
 
 /**
  * Strict readers for the server's snake_case DTOs (documents, uploads,

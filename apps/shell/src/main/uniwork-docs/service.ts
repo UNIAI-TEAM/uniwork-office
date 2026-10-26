@@ -123,6 +123,7 @@ import {
   formatForMime,
   formatForName,
   hasReplacementChar,
+  legacyOfFile,
   sanitizeFilename,
   sha256Hex,
   workingCopyName,
@@ -130,7 +131,6 @@ import {
 import {
   conversionFor,
   convertedTitle,
-  legacyOfFile,
   legacyTargetFormat,
   type LegacyConversion,
   type LegacyFrom,

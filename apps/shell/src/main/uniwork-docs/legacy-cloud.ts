@@ -51,7 +51,7 @@ export function isLegacyConversion(value: unknown): value is LegacyConversion {
   return isLegacyFrom(from) && TARGET[from] === to
 }
 
-function legacyOfMime(mime: string): LegacyFrom | null {
+export function legacyOfMime(mime: string): LegacyFrom | null {
   const key = mime.split(';', 1)[0]?.trim().toLowerCase() ?? ''
   return Object.hasOwn(MIME_TO_SOURCE, key) ? (MIME_TO_SOURCE[key] ?? null) : null
 }
@@ -59,26 +59,6 @@ function legacyOfMime(mime: string): LegacyFrom | null {
 export function legacyOfName(name: string): LegacyFrom | null {
   const ext = extname(name.trim()).slice(1).toLowerCase()
   return isLegacyFrom(ext) ? ext : null
-}
-
-/**
- * Is the live version of this document a legacy Office file? The file's MIME
- * type decides (the server stores the real one), then its upload name, then the
- * title: a document whose title still ends in `.xls` but whose live version is
- * already OOXML is not legacy (the server rewrites the title suffix on convert,
- * but an older or renamed title can keep it).
- */
-export function legacyOfFile(
-  file: { mimeType: string; filename: string },
-  title: string,
-): LegacyFrom | null {
-  if (file.mimeType.trim() !== '') {
-    const byMime = legacyOfMime(file.mimeType)
-    if (byMime) return byMime
-    // a known OOXML (or other) MIME type is authoritative over any name
-    if (/^application\/vnd\.openxmlformats-officedocument\./i.test(file.mimeType)) return null
-  }
-  return legacyOfName(file.filename) ?? legacyOfName(title)
 }
 
 /**

@@ -3,9 +3,9 @@ import {
   convertedTitle,
   conversionFor,
   isLegacyConversion,
-  legacyOfFile,
   legacyTarget,
 } from '../src/main/uniwork-docs/legacy-cloud'
+import { legacyOfFile } from '../src/main/uniwork-docs/formats'
 
 const OOXML = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -35,6 +35,23 @@ describe('legacy cloud documents (UNI-2212)', () => {
     expect(legacyOfFile({ mimeType: OOXML, filename: 'budget.xls' }, 'Budget')).toBeNull()
     expect(legacyOfFile({ mimeType: 'application/pdf', filename: 'x.pdf' }, 'x.pdf')).toBeNull()
   })
+
+  it.each([
+    ['application/pdf', 'Original.pdf'],
+    ['text/markdown', 'notes.md'],
+    ['text/plain', 'notes.txt'],
+    ['text/html; charset=utf-8', 'page.html'],
+  ])(
+    'a %s live version is never legacy, whatever its upload name or title says',
+    (mimeType, name) => {
+      for (const title of ['Renamed.doc', 'Renamed.XLS', 'Renamed.ppt']) {
+        expect(legacyOfFile({ mimeType, filename: name }, title)).toBeNull()
+        expect(legacyOfFile({ mimeType, filename: 'Renamed.doc' }, title)).toBeNull()
+      }
+      // no MIME type: an upload name of a known format is still the file's own
+      expect(legacyOfFile({ mimeType: '', filename: name }, 'Renamed.doc')).toBeNull()
+    },
+  )
 
   it('rewrites only a title that ends in the legacy extension, as the server does', () => {
     expect(convertedTitle('Báo cáo ngân sách.xls', 'xls')).toBe('Báo cáo ngân sách.xlsx')

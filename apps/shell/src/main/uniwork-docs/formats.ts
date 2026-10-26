@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { extname } from 'node:path'
 import type { UniworkDocFormat } from '../../shared/home-api'
-import { legacyOfName, legacyTargetFormat } from './legacy-cloud'
+import { legacyOfMime, legacyOfName, legacyTargetFormat, type LegacyFrom } from './legacy-cloud'
 
 /**
  * The six document formats UniWork Office opens from UniWork, their upload
@@ -62,6 +62,28 @@ function legacyExtensionOf(name: string, format: UniworkDocFormat): boolean {
 export function formatForMime(mime: string): UniworkDocFormat | null {
   const key = mime.split(';', 1)[0]?.trim().toLowerCase() ?? ''
   return Object.hasOwn(BY_MIME, key) ? (BY_MIME[key] ?? null) : null
+}
+
+/**
+ * UNI-2212: is the live version of this document a legacy Office file? The file's MIME type
+ * decides (the server stores the real one): a legacy MIME is legacy, any other format this table
+ * knows (OOXML, PDF, Markdown, text, HTML) is not, whatever the names say. Only an unknown or
+ * empty MIME falls back to the upload name, then the title: a title that still ends in `.xls`
+ * over an OOXML or PDF head is a renamed document, not a legacy one (the server rewrites the
+ * suffix on convert).
+ */
+export function legacyOfFile(
+  file: { mimeType: string; filename: string },
+  title: string,
+): LegacyFrom | null {
+  if (file.mimeType.trim() !== '') {
+    const byMime = legacyOfMime(file.mimeType)
+    if (byMime) return byMime
+    if (formatForMime(file.mimeType)) return null
+  }
+  // an upload name of a format this table knows is the file's own; the title is the last resort
+  if (formatForName(file.filename)) return null
+  return legacyOfName(file.filename) ?? legacyOfName(title)
 }
 
 export function mimeForFormat(format: UniworkDocFormat): string {
