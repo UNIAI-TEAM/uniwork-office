@@ -14,6 +14,8 @@ import type { AsyncOcrEngine } from '../../../../packages/pdf2docx/src/ocr-chain
 import type { PdfOcrLine } from '../shared/ipc'
 
 let ocrEngine: AsyncOcrEngine | null | undefined
+/** tail of the recognition queue (settles when the last queued call has finished) */
+let ocrQueue: Promise<void> = Promise.resolve()
 
 function ensureOcrEngine(): AsyncOcrEngine | null {
   if (ocrEngine !== undefined) return ocrEngine
@@ -30,7 +32,19 @@ function ensureOcrEngine(): AsyncOcrEngine | null {
     Async on purpose: the engines run in child processes and the main process
     keeps serving every window meanwhile (the pdf2docx conversion path is the
     synchronous one). */
-export async function ocrPagePng(pngBase64: string): Promise<PdfOcrLine[] | null> {
+export function ocrPagePng(pngBase64: string): Promise<PdfOcrLine[] | null> {
+  // one recognition at a time across every window: each helper is a Node + WASM
+  // process of several hundred MB. A call that fails or rejects must not stall
+  // the calls queued behind it, so the tail only ever tracks settlement.
+  const run = ocrQueue.then(() => recognizePagePng(pngBase64))
+  ocrQueue = run.then(
+    () => undefined,
+    () => undefined,
+  )
+  return run
+}
+
+async function recognizePagePng(pngBase64: string): Promise<PdfOcrLine[] | null> {
   const engine = ensureOcrEngine()
   if (!engine) return null
   let png: Uint8Array
