@@ -131,47 +131,62 @@ describe('UNI-2212 the cloud legacy converter', () => {
     },
   )
 
-  it('Cancel in the progress box ends silently: no notice, nothing staged', async () => {
-    const h = harness(
-      (_path, options) =>
-        new Promise((_resolve, reject) => {
-          options.signal.addEventListener('abort', () =>
-            reject(new LegacyConvertError('cancelled', 'cancelled')),
-          )
-        }),
-      () => join(work.dir, 'staging'),
-    )
-    const pending = createCloudLegacyConverter(h.deps).convert({
-      bytes: legacyBytes.doc,
-      from: 'doc',
-      name: 'Memo.doc',
-    })
-    await vi.waitFor(() => expect(h.progress.cancel).not.toBeNull())
-    h.progress.cancel!()
-    expect(await pending).toEqual({ ok: false, reason: 'cancelled' })
-    expect(h.notices).toEqual([])
-    expect(h.progress.ended).toBe(1)
-    expect(readdirSync(join(work.dir, 'staging'))).toEqual([])
-  })
+  /** a converter held at its boundary: `entered` resolves once the real converter is running */
+  function heldConverter() {
+    let enter!: () => void
+    const entered = new Promise<void>((resolve) => (enter = resolve))
+    let settle!: (outcome: () => ConvertLegacyResult) => void
+    const gate = new Promise<() => ConvertLegacyResult>((resolve) => (settle = resolve))
+    const convert: CloudLegacyConverterDeps['convert'] = async () => {
+      enter()
+      return (await gate)()
+    }
+    return { convert, entered, succeed: () => settle(() => converted('xlsx')), fail }
+    function fail(code: LegacyConvertError['code']) {
+      settle(() => {
+        throw new LegacyConvertError(code, code)
+      })
+    }
+  }
 
-  it('a converter that raises converter_missing after a cancel is still silent', async () => {
-    let release!: () => void
-    const gate = new Promise<void>((r) => (release = r))
-    const h = harness(async () => {
-      await gate
-      throw new LegacyConvertError('converter_missing', 'late')
-    })
-    const pending = createCloudLegacyConverter(h.deps).convert({
-      bytes: legacyBytes.xls,
-      from: 'xls',
-      name: 'Budget.xls',
-    })
-    await vi.waitFor(() => expect(h.progress.cancel).not.toBeNull())
-    h.progress.cancel!()
-    release()
-    expect(await pending).toEqual({ ok: false, reason: 'cancelled' })
-    expect(h.notices).toEqual([])
-  })
+  it.each([
+    ['Cancel', (h: ReturnType<typeof harness>) => h.progress.cancel!()],
+    ['quit', (_h: ReturnType<typeof harness>, c?: { dispose(): void }) => c!.dispose()],
+  ])(
+    '%s while the converter runs ends silently, whether it then succeeds, fails or is aborted',
+    async (_name, stop) => {
+      for (const ending of ['succeed', 'abort', 'converter_missing'] as const) {
+        const held = heldConverter()
+        const h = harness(
+          (path, options) =>
+            ending === 'abort'
+              ? new Promise((_resolve, reject) => {
+                  void held.convert(path, options)
+                  options.signal.addEventListener('abort', () =>
+                    reject(new LegacyConvertError('cancelled', 'cancelled')),
+                  )
+                })
+              : held.convert(path, options),
+          () => join(work.dir, `staging-${ending}`),
+        )
+        const converter = createCloudLegacyConverter(h.deps)
+        const pending = converter.convert({
+          bytes: legacyBytes.xls,
+          from: 'xls',
+          name: 'Budget.xls',
+        })
+        // the cancel lands once the real converter is running, not while the bytes are staged
+        await held.entered
+        stop(h, converter)
+        if (ending === 'succeed') held.succeed()
+        else if (ending === 'converter_missing') held.fail('converter_missing')
+        expect(await pending).toEqual({ ok: false, reason: 'cancelled' })
+        expect(h.notices).toEqual([])
+        expect(h.progress.ended).toBe(1)
+        expect(readdirSync(join(work.dir, `staging-${ending}`))).toEqual([])
+      }
+    },
+  )
 
   it('an OOXML package of another family under a legacy name is refused as corrupt', async () => {
     const h = harness(async () => ({

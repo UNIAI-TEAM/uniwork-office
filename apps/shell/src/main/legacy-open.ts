@@ -319,6 +319,10 @@ export function createCloudLegacyConverter(deps: CloudLegacyConverterDeps) {
           signal: controller.signal,
           sourceFormat: input.from,
         })
+        // Cancel or quit during the converter's own tail (its output stat, read and cleanup run
+        // after the subprocess has exited and its abort listener is gone) must still win over a
+        // success the caller would otherwise open
+        if (controller.signal.aborted || disposed) return { ok: false, reason: 'cancelled' }
         // an OOXML package that only carries a legacy name must still be the family the
         // document's own format maps to, or the server would refuse it as the next version
         if (result.targetFormat !== LEGACY_TARGET[input.from]) {
