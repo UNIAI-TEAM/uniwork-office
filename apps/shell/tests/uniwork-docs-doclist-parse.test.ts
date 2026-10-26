@@ -332,3 +332,25 @@ describe('the fields never cost the row', () => {
     expect(doc).not.toHaveProperty('purgeAfter')
   })
 })
+
+describe('UNI-2212 a live legacy file is a row that opens', () => {
+  it.each([
+    ['Budget.xls', 'application/vnd.ms-excel', 'xlsx'],
+    ['Memo.doc', 'application/msword', 'docx'],
+    ['Deck.ppt', 'application/vnd.ms-powerpoint', 'pptx'],
+  ])('%s reads as the OOXML format it opens as', (title, mime, format) => {
+    expect(
+      parseOne({ title, file: { mime_type: mime, filename: title.toLowerCase() } }).format,
+    ).toBe(format)
+    // the title alone (a row that omits `file`) decides too
+    expect(parseOne({ title }).format).toBe(format)
+  })
+
+  it('an OOXML file keeps its own format whatever the title says, and other types stay unsupported', () => {
+    const xlsxMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    expect(
+      parseOne({ title: 'Old.xls', file: { mime_type: xlsxMime, filename: 'old.xlsx' } }).format,
+    ).toBe('xlsx')
+    expect(parseOne({ title: 'Archive.zip' }).format).toBeNull()
+  })
+})

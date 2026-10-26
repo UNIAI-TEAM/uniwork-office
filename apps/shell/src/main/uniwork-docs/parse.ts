@@ -11,6 +11,7 @@ import type {
 } from '../../shared/home-api'
 import { UniworkDocError } from './errors'
 import { formatForMime, formatForName, isDecimalString } from './formats'
+import { legacyOfFile, legacyTargetFormat } from './legacy-cloud'
 
 /**
  * Strict readers for the server's snake_case DTOs (documents, uploads,
@@ -161,7 +162,18 @@ function formatOf(doc: Record<string, unknown>, title: string): UniworkDocFormat
       if (byName) return byName
     }
   }
-  return formatForName(title)
+  const byTitle = formatForName(title)
+  if (byTitle) return byTitle
+  // UNI-2212: a live .doc / .xls / .ppt opens (converted) as the editor of its OOXML counterpart,
+  // so its row is an openable one of that format instead of an unsupported file type
+  const legacy = legacyOfFile(
+    {
+      mimeType: file && typeof file.mime_type === 'string' ? file.mime_type : '',
+      filename: file && typeof file.filename === 'string' ? file.filename : '',
+    },
+    title,
+  )
+  return legacy ? legacyTargetFormat(legacy) : null
 }
 
 /** FD-11: the three entry kinds; a row of any other kind is skipped, never guessed */
