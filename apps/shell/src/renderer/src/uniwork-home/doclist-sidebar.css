@@ -140,3 +140,8 @@
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* D2-V3: muted gray misses 4.5:1 on the selected row fill; match active nav counts */
+.dh-nav-item.active .dh-drive-nav-count {
+  color: var(--accent-text);
+}

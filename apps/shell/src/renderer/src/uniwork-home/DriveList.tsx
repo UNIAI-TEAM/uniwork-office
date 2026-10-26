@@ -413,18 +413,29 @@ export function DriveList({
 
       {isLoadingState && (
         <div
-          className="uw-pick-skeleton dh-drive-skeleton"
+          className="dh-drive-table-wrap uw-pick-skeleton dh-drive-skeleton"
           role="status"
           aria-busy="true"
           data-drive-loading=""
         >
           <span className="uw-sr-only">{t('uwPickLoading')}</span>
-          {[0, 1, 2].map((i) => (
-            <div className="uw-pick-skel-row" key={i} aria-hidden="true">
-              <span className="uw-skel uw-skel-icon" />
-              <span className="uw-skel-lines">
+          <div className="dh-drive-head-row dh-drive-skel-head" aria-hidden="true">
+            <span className="uw-skel dh-drive-skel-th" />
+            <span className="uw-skel dh-drive-skel-th" />
+            <span className="uw-skel dh-drive-skel-th" />
+            <span className="uw-skel dh-drive-skel-th" />
+            <span className="uw-skel dh-drive-skel-th" />
+          </div>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div className="uw-pick-skel-row dh-drive-skel-row" key={i} aria-hidden="true">
+              <span className="dh-drive-skel-name">
+                <span className="uw-skel uw-skel-icon" />
                 <span className="uw-skel uw-skel-line" />
               </span>
+              <span className="uw-skel uw-skel-line short" />
+              <span className="uw-skel dh-drive-skel-pill" />
+              <span className="uw-skel uw-skel-line short" />
+              <span className="uw-skel dh-drive-skel-num" />
             </div>
           ))}
         </div>
@@ -514,7 +525,9 @@ export function DriveList({
                       </td>
                       <td className="dh-drive-td dh-drive-cell-account">
                         <div className="dh-drive-account-stack">
-                          <span className="dh-drive-account-email">{accountEmail}</span>
+                          <span className="dh-drive-account-email" title={accountEmail}>
+                            {accountEmail}
+                          </span>
                           {rowNeedsReconnect &&
                             (onReconnect ? (
                               <button
@@ -558,9 +571,19 @@ export function DriveList({
           </div>
 
           {moreError && (
-            <p className="uw-pick-more-error" role="alert">
-              {t(moreError === 'network' ? 'uhDriveOffline' : 'uhDriveLoadError')}
-            </p>
+            <div className="dh-drive-more-error-row" role="alert">
+              <p className="uw-pick-more-error">
+                {t(moreError === 'network' ? 'uhDriveOffline' : 'uhDriveLoadError')}
+              </p>
+              <button
+                type="button"
+                className="btn btn-secondary dh-drive-retry-btn"
+                data-drive-retry=""
+                onClick={onRetry}
+              >
+                {t('acctRetry')}
+              </button>
+            </div>
           )}
 
           {nextCursor && (

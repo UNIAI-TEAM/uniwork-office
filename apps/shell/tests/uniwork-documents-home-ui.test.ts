@@ -3408,7 +3408,14 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       expect(row1.textContent).toContain('Chia sẻ với 4 người')
       expect(row1.textContent).toContain('UNI-1042 và 2 việc khác')
       expect(row1.textContent).toContain('3 việc')
-
+      // D2-V1: Name cell carries the truncation class and full name in title; account email also carries title
+      const row1Name = row1.querySelector<HTMLElement>('.dh-drive-cell-name .dh-drive-file-name')
+      expect(row1Name).not.toBeNull()
+      expect(row1Name?.getAttribute('title')).toBe('Kế hoạch ra mắt sản phẩm Q4')
+      const row1Email = row1.querySelector<HTMLElement>(
+        '.dh-drive-cell-account .dh-drive-account-email',
+      )
+      expect(row1Email?.getAttribute('title')).toBe('minh@company.vn')
       const row2 = document.querySelector<HTMLElement>('[data-drive-file-id="df-2"]')!
       expect(row2.querySelector('[data-icon-kind="google_sheet"]')).not.toBeNull()
       expect(row2.textContent).toContain('lan@company.vn')
@@ -3796,7 +3803,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       await flush()
       expect(listFilesSpy.mock.calls.length).toBe(callsBeforeOpen)
       expect(document.querySelectorAll('.dh-drive-row')).toHaveLength(2)
-      // Window focus triggers refresh; if refresh fails, loaded rows stay visible + non-blocking error
+      // Window focus triggers refresh; if refresh fails, loaded rows stay visible + non-blocking error + Retry (D2-V4)
       failRefresh = true
       await act(async () => {
         window.dispatchEvent(new Event('focus'))
@@ -3807,6 +3814,21 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       expect(document.querySelector('.uw-pick-more-error')?.textContent).toContain(
         'Không tải được danh sách tệp Google Drive.',
       )
+      const retryAfterRefreshBtn = document.querySelector<HTMLButtonElement>('[data-drive-retry]')!
+      expect(retryAfterRefreshBtn).not.toBeNull()
+      expect(retryAfterRefreshBtn.textContent).toContain('Thử lại')
+
+      // Clicking Retry next to the kept-rows message re-requests listFiles and clears moreError
+      failRefresh = false
+      const callsBeforeRetry = listFilesSpy.mock.calls.length
+      await act(async () => {
+        retryAfterRefreshBtn.click()
+      })
+      await flush()
+      await flush()
+      expect(listFilesSpy.mock.calls.length).toBeGreaterThan(callsBeforeRetry)
+      expect(document.querySelector('.uw-pick-more-error')).toBeNull()
+      expect(document.querySelector('[data-drive-retry]')).toBeNull()
     })
 
     it('ignores stale listFiles responses after switching account and avoids refetching connections on non-Drive navigations (R1-3 #5, R1-5, R1-6)', async () => {

@@ -1882,9 +1882,30 @@
 
 .dh-drive-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 13px;
   color: var(--text);
+}
+
+.dh-drive-col-name {
+  width: 28%;
+}
+
+.dh-drive-col-account {
+  width: 21%;
+}
+
+.dh-drive-col-access {
+  width: 18%;
+}
+
+.dh-drive-col-used {
+  width: 21%;
+}
+
+.dh-drive-col-tasks {
+  width: 12%;
 }
 
 .dh-drive-head-row {
@@ -1920,6 +1941,7 @@
 }
 
 .dh-drive-td {
+  min-width: 0;
   padding: 12px 14px;
   vertical-align: middle;
 }
@@ -1939,6 +1961,7 @@
 }
 
 .dh-drive-file-name {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1956,6 +1979,7 @@
 }
 
 .dh-drive-account-email {
+  max-width: 100%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2004,7 +2028,72 @@
 .dh-drive-cell-tasks {
   color: var(--text-secondary);
   font-size: 13px;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+}
+
+.dh-drive-more-error-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 8px 0;
+}
+
+.dh-drive-more-error-row .uw-pick-more-error {
+  margin: 0;
+}
+
+.dh-drive-retry-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.dh-drive-skeleton.uw-pick-skeleton {
+  padding-top: 0;
+  overflow: hidden;
+}
+
+.dh-drive-skel-head,
+.dh-drive-skel-row {
+  display: grid;
+  grid-template-columns: 28% 21% 18% 21% 12%;
+  align-items: center;
+  gap: 0;
+  padding: 10px 14px;
+}
+
+.dh-drive-skel-row {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dh-drive-skel-row:last-child {
+  border-bottom: 0;
+}
+
+.dh-drive-skel-th {
+  width: 55%;
+  height: 10px;
+}
+
+.dh-drive-skel-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-inline-end: 12px;
+}
+
+.dh-drive-skel-pill {
+  width: 72px;
+  height: 20px;
+  border-radius: 999px;
+}
+
+.dh-drive-skel-num {
+  width: 44px;
+  height: 10px;
 }
 
 .dh-drive-footnote {
@@ -2016,4 +2105,37 @@
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* D2-V2: at narrow viewports (~900 px) let headers/cells wrap and tighten cell padding so the 5-column
+   table fits without horizontal scroll, and let the Drive subtitle wrap instead of ellipsis */
+@media (max-width: 1100px) {
+  .dh-main:has(.dh-drive-view) .dh-title-group.dh-title-stack {
+    flex: 1 1 20rem;
+  }
+
+  .dh-main:has(.dh-drive-view) .dh-subtitle {
+    white-space: normal;
+    text-overflow: clip;
+  }
+
+  .dh-drive-th {
+    padding: 8px 8px;
+    white-space: normal;
+    line-height: 1.3;
+  }
+
+  .dh-drive-td {
+    padding: 10px 8px;
+  }
+
+  .dh-drive-badge {
+    white-space: normal;
+    line-height: 1.3;
+  }
+
+  .dh-drive-reconnect-link {
+    white-space: normal;
+    text-align: start;
+  }
 }
