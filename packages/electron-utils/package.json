@@ -15,14 +15,23 @@
     "./comments-reply": "./src/comments-reply.ts",
     "./discussion-bridge": "./src/discussion-bridge.ts",
     "./atomic-write": "./src/atomic-write.ts",
+<<<<<<< ours
     "./draft-preview": "./src/draft-preview.ts",
+=======
+    "./disk-watch": "./src/disk-watch.ts",
+>>>>>>> theirs
     "./drop-open": "./src/drop-open.ts",
-    "./generated-images": "./src/generated-images.ts",
     "./font-catalog": "./src/font-catalog.ts",
     "./font-store": "./src/font-store.ts",
+    "./generated-images": "./src/generated-images.ts",
     "./headless-export": "./src/headless-export.ts",
+<<<<<<< ours
     "./recovery-copy": "./src/recovery-copy.ts",
     "./recovery-epochs": "./src/recovery-epochs.ts",
+=======
+    "./main-proxy": "./src/main-proxy.ts",
+    "./print-job": "./src/print-job.ts",
+>>>>>>> theirs
     "./print-window": "./src/print-window.ts",
     "./remote-image": "./src/remote-image.ts",
     "./renderer-protocol": "./src/renderer-protocol.ts",
@@ -41,9 +50,13 @@
   },
   "devDependencies": {
     "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "dependencies": {
+<<<<<<< ours
+=======
+    "officecrypto-tool": "^0.0.19",
+>>>>>>> theirs
     "parse5": "^8.0.1",
     "undici": "^6.29.0"
   }

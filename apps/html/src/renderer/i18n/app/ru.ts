@@ -9,6 +9,14 @@ export const ru = {
   redactDialogPlaceholder: 'Имя метки, напр. телефон клиента',
   redactCancel: 'Отмена',
   redactInsert: 'Скрыть',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'Этот файл изменён другой программой.',
+  diskConflictMsg: 'Этот файл изменён на диске; сохранение перезапишет эти изменения.',
+  diskReload: 'Перезагрузить',
+  diskKeepMine: 'Оставить моё',
+  diskOverwrite: 'Всё равно перезаписать',
+>>>>>>> theirs
 
   loading: 'Загрузка…',
   loadFailed: 'Не удалось открыть файл',
@@ -107,6 +115,7 @@ export const ru = {
   alignLeft: 'По левому краю',
   alignCenter: 'По центру',
   alignRight: 'По правому краю',
+  alignJustify: 'По ширине',
   fontSizeDec: 'Уменьшить размер шрифта',
   fontSizeInc: 'Увеличить размер шрифта',
   typography: 'Типографика',

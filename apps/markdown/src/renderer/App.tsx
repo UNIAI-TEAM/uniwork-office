@@ -10,8 +10,11 @@ import {
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
   useAutoSavePref,
+<<<<<<< ours
   useImageGenerationOffered,
   UniAiMark,
+=======
+>>>>>>> theirs
   useAiSidebarEnabled,
 } from '@genoffice/ui'
 import {
@@ -29,6 +32,10 @@ import type { Editor } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 import { exportImages } from './export/imageExport'
 import type { StringKey } from './i18n/locale'
+<<<<<<< ours
+=======
+import { countWords } from '../../../docs/src/renderer/word-count'
+>>>>>>> theirs
 import { t as translate, useI18n } from './i18n/locale'
 import {
   buildFrontmatterRaw,
@@ -52,8 +59,14 @@ import { collectOutline, type OutlineItem } from './editor/outline'
 import { rewriteRawHtmlImages } from './editor/rawHtml'
 import { buildSlashItems } from './editor/slashCommand'
 import type { SlashController, SlashMenuState } from './editor/slashCommand'
+<<<<<<< ours
 import { revealWikiFragment, wikiFragmentPosition } from './editor/wikilink'
 import { dirOf, refreshWebPictures, setImageBaseDir, VIEW_IMAGE_EVENT } from './editor/localImage'
+=======
+import { wikiFragmentPosition, wikiTargetOf } from './editor/wikilink'
+import type { WikiSuggestController, WikiSuggestState } from './editor/wikiSuggest'
+import { dirOf, setImageBaseDir, VIEW_IMAGE_EVENT } from './editor/localImage'
+>>>>>>> theirs
 import { Ribbon } from './components/Ribbon'
 import type { MarkdownTheme } from '../shared/markdown-theme'
 import { ImageHostDialog } from './components/ImageHostDialog'
@@ -61,6 +74,9 @@ import { RedactMenu } from './components/RedactMenu'
 import { OutlinePane } from './components/OutlinePane'
 import { SourcePane } from './components/SourcePane'
 import { SlashMenu, type SlashMenuHandle } from './components/SlashMenu'
+import { WikiSuggestMenu, type WikiSuggestMenuHandle } from './components/WikiSuggestMenu'
+import { BacklinksPane } from './components/BacklinksPane'
+import { GraphView } from './components/GraphView'
 import { ToastHost } from './components/toast'
 import { showToast } from './components/toast-bus'
 import { TableMenu } from './components/TableMenu'
@@ -182,6 +198,7 @@ export default function App() {
     params?: Record<string, string | number>
   } | null>(null)
   const [slashState, setSlashState] = useState<SlashMenuState | null>(null)
+  const [wikiSuggestState, setWikiSuggestState] = useState<WikiSuggestState | null>(null)
   const [fmOpen, setFmOpen] = useState(false)
   const [fmText, setFmText] = useState('')
   // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
@@ -204,6 +221,8 @@ export default function App() {
   const [outlineWidth, setOutlineWidth] = useState(
     () => Number(localStorage.getItem('mdapp.outlineWidth')) || undefined,
   )
+  const [backlinksOpen, setBacklinksOpen] = useState(false)
+  const [graphOpen, setGraphOpen] = useState(false)
   const [sourceViewOpen, setSourceViewOpen] = useState(false)
   const [sourceText, setSourceText] = useState('')
   const sourceViewOpenRef = useRef(false)
@@ -262,7 +281,17 @@ export default function App() {
     return map ? spliceMarkdown(current, current.state.doc, map) : current.getMarkdown()
   }
   const filePathRef = useRef<string | null>(null)
+  /** text last read from or written to disk; a watcher tick that reads the same text is a touch, not an edit */
+  const diskTextRef = useRef<string | null>(null)
+  const overwriteRef = useRef(false)
+  const [diskNotice, setDiskNoticeState] = useState<'changed' | 'conflict' | null>(null)
+  const diskNoticeRef = useRef<'changed' | 'conflict' | null>(null)
+  const setDiskNotice = (next: 'changed' | 'conflict' | null) => {
+    diskNoticeRef.current = next
+    setDiskNoticeState(next)
+  }
   const slashMenuRef = useRef<SlashMenuHandle>(null)
+  const wikiSuggestMenuRef = useRef<WikiSuggestMenuHandle>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const zoomOut = useCallback(
@@ -329,6 +358,7 @@ export default function App() {
       if (!fragment || filePathRef.current !== path) return
       const pos = wikiFragmentPosition(current.state.doc, fragment)
       if (pos === null) return
+<<<<<<< ours
       revealWikiFragment(current.view, pos)
     })
   }, [])
@@ -341,6 +371,37 @@ export default function App() {
       window.markdownApi.onWikiFragmentReady?.((path) => {
         if (filePathRef.current === path) jumpToWikiFragment(path)
       }),
+=======
+      const selection = TextSelection.near(current.state.doc.resolve(pos))
+      current.view.dispatch(current.state.tr.setSelection(selection).scrollIntoView())
+      current.view.focus()
+    })
+  }, [])
+
+  /**
+   * Close an unresolved `[[link]]` the Obsidian way: create the note it names
+   * and open it. Main decides where the file lands (beside this document, or
+   * under the vault root when the target carries a directory) and never
+   * overwrites; the answer carries the `#fragment`, so opening rides the same
+   * path every resolved link takes and no document text has to change.
+   */
+  const createWikiNoteAndOpen = useCallback(
+    (target: string): void => {
+      // The browser test harness stubs markdownApi without the Electron-only
+      // wiki channels; a missing API leaves the link as written.
+      if (typeof window.markdownApi.createWikiNote !== 'function') return
+      void window.markdownApi.createWikiNote({ target }).then((result) => {
+        if (!result.ok) {
+          showToast(translate('wikiLinkUnresolved', { target }), 'error')
+          return
+        }
+        void window.markdownApi.rememberWikiFragment(result.path, result.fragment)
+        void window.markdownApi.openSourcePath(result.path)
+        // a link into the note already on screen opens no tab; jump here
+        if (filePathRef.current === result.path) jumpToWikiFragment(result.path)
+      })
+    },
+>>>>>>> theirs
     [jumpToWikiFragment],
   )
 
@@ -351,10 +412,20 @@ export default function App() {
       onKeyDown: (event) => slashMenuRef.current?.handleKey(event) ?? false,
       onClose: () => setSlashState(null),
     }
+    const wikiSuggestController: WikiSuggestController = {
+      onOpen: setWikiSuggestState,
+      onUpdate: setWikiSuggestState,
+      onKeyDown: (event) => wikiSuggestMenuRef.current?.handleKey(event) ?? false,
+      onClose: () => setWikiSuggestState(null),
+    }
     return buildExtensions({
       slashController: controller,
       slashItems: () =>
         buildSlashItems({ insertImage: filePathRef.current ? insertImage : undefined }),
+<<<<<<< ours
+=======
+      wikiSuggestController,
+>>>>>>> theirs
       wikiLink: {
         getDocumentPath: () => filePathRef.current ?? '',
         onOpen: (path, fragment) => {
@@ -365,10 +436,33 @@ export default function App() {
         },
         // the module-level `t`, not the hook's: this memo holds the closure for
         // the life of the editor, and the hook's `t` is a new function each render
+<<<<<<< ours
         onUnresolved: (target) => showToast(translate('wikiLinkUnresolved', { target }), 'error'),
       },
     })
   }, [insertImage, jumpToWikiFragment])
+=======
+        onUnresolved: (target, embed) => {
+          // an embed of a missing file usually names a picture, which an empty
+          // note cannot stand in for; only a link creates its note
+          if (embed) {
+            showToast(translate('wikiLinkUnresolved', { target }), 'error')
+            return
+          }
+          createWikiNoteAndOpen(wikiTargetOf(target))
+        },
+      },
+    })
+  }, [createWikiNoteAndOpen, insertImage, jumpToWikiFragment])
+
+  // status-bar text statistics: Word's CJK counting rule (asian chars count
+  // one by one, non-asian words by whitespace) shared with the docs status bar
+  const [docStats, setDocStats] = useState<{ words: number; chars: number } | null>(null)
+  const statsOf = (text: string) => ({
+    words: countWords(text),
+    chars: Array.from(text).length,
+  })
+>>>>>>> theirs
 
   const editor = useEditor({
     extensions,
@@ -379,6 +473,7 @@ export default function App() {
     onUpdate: ({ editor: updated, transaction }) => {
       if (!transaction.getMeta('uiOnly')) markDirty()
       setOutlineItems(collectOutline(updated))
+      setDocStats(statsOf(updated.getText()))
       syncSourceFromEditorRef.current()
     },
   })
@@ -450,6 +545,9 @@ export default function App() {
    */
   const loadFromPath = useCallback(
     (path: string, raw: string) => {
+      diskTextRef.current = raw
+      overwriteRef.current = false
+      setDiskNotice(null)
       const mode = textModeForPath(path)
       setTextMode(mode)
       if (sourceApplyTimerRef.current) clearTimeout(sourceApplyTimerRef.current)
@@ -461,6 +559,7 @@ export default function App() {
         const { text, format } = readSourceText(raw)
         sourceTextRef.current = text
         sourceFormatRef.current = format
+        setDocStats(statsOf(text))
         setFilePath(path)
         setFmText('')
         setFmOpen(false)
@@ -505,8 +604,11 @@ export default function App() {
           if (cancelled) return
           loadFromPath(path, raw)
           jumpToWikiFragment(path)
+<<<<<<< ours
           // LAG-F1 (web frame): the document is mounted; the lag detector's settle stamp starts now
           window.markdownApi.noteDocumentMounted?.()
+=======
+>>>>>>> theirs
         } else {
           envelopeRef.current = { ...EMPTY_ENVELOPE }
         }
@@ -525,7 +627,11 @@ export default function App() {
     return () => {
       cancelled = true
     }
+<<<<<<< ours
   }, [editor, roundTripEnabled, loadFromPath, markDirty, jumpToWikiFragment])
+=======
+  }, [editor, roundTripEnabled, loadFromPath, jumpToWikiFragment])
+>>>>>>> theirs
 
   const onFrontmatterChange = useCallback(
     (inner: string) => {
@@ -543,24 +649,40 @@ export default function App() {
    * holds it, with the file's own BOM and line endings restored — no markdown
    * serialization, no image extraction, no trailing-newline fixups.
    */
+<<<<<<< ours
   const doSaveSource = useCallback(async (mode: SaveMode, origin?: 'auto'): Promise<boolean> => {
     const allowed = mode === 'saveAs' ? cap('saveAs') : cap('save')
     if (statusRef.current !== 'ready' || savingRef.current || !allowed) return false
     if (mode === 'save' && !origin && uniworkRef.current.bound && uniworkRef.current.readOnly) {
       void (window.markdownApi as MarkdownUniworkLockSeam).uniworkReadOnlySave?.()?.catch(() => {})
+=======
+  const doSaveSource = useCallback(async (mode: SaveMode): Promise<boolean> => {
+    if (statusRef.current !== 'ready' || savingRef.current) return false
+    if (diskNoticeRef.current && !overwriteRef.current) {
+      // the user has not chosen between the two versions yet; autosave must not pick for them
+      setDiskNotice('conflict')
+>>>>>>> theirs
       return false
     }
     savingRef.current = true
     setSaveState('saving')
     const textAtSave = sourceTextRef.current
     try {
+      const written = writeSourceText(textAtSave, sourceFormatRef.current)
       const result = await window.markdownApi.save({
-        text: writeSourceText(textAtSave, sourceFormatRef.current),
+        text: written,
         imageSources: [],
         mode,
+<<<<<<< ours
         ...(origin ? { origin } : {}),
+=======
+        overwrite: overwriteRef.current,
+>>>>>>> theirs
       })
       if (result.ok && 'path' in result) {
+        diskTextRef.current = written
+        overwriteRef.current = false
+        setDiskNotice(null)
         // an edit that landed mid-write is still unsaved
         const unchanged = sourceTextRef.current === textAtSave
         setFilePath(result.path)
@@ -577,6 +699,7 @@ export default function App() {
         }
         return true
       }
+      if (!result.ok && result.conflict) setDiskNotice('conflict')
       setSaveState(result.ok ? 'idle' : 'failed')
       return false
     } catch (err) {
@@ -662,6 +785,7 @@ export default function App() {
       if (uniworkRef.current.readOnly || !cap('save')) return
       setSourceText(text)
       pendingSourceRef.current = text
+      setDocStats(statsOf(text))
       markDirty()
       if (sourceApplyTimerRef.current) clearTimeout(sourceApplyTimerRef.current)
       sourceApplyTimerRef.current = setTimeout(flushSource, SOURCE_APPLY_DEBOUNCE_MS)
@@ -696,6 +820,7 @@ export default function App() {
       if (sourceMode) return doSaveSource(mode, origin)
       flushSource()
       const current = editorRef.current
+<<<<<<< ours
       const allowed = mode === 'saveAs' ? cap('saveAs') : cap('save')
       if (!current || statusRef.current !== 'ready' || savingRef.current || !allowed) return false
       // EL-1(b) VEL-1: an explicit Save on a read-only bound copy asks main to
@@ -705,6 +830,11 @@ export default function App() {
         void (window.markdownApi as MarkdownUniworkLockSeam)
           .uniworkReadOnlySave?.()
           ?.catch(() => {})
+=======
+      if (!current || statusRef.current !== 'ready' || savingRef.current) return false
+      if (diskNoticeRef.current && !overwriteRef.current) {
+        setDiskNotice('conflict')
+>>>>>>> theirs
         return false
       }
       savingRef.current = true
@@ -728,9 +858,16 @@ export default function App() {
           imageSources,
           mode,
           suggestedName,
+<<<<<<< ours
           ...(origin ? { origin } : {}),
+=======
+          overwrite: overwriteRef.current,
+>>>>>>> theirs
         })
         if (result.ok && 'path' in result) {
+          diskTextRef.current = result.writtenText ?? text
+          overwriteRef.current = false
+          setDiskNotice(null)
           const unchanged =
             editorRef.current?.state.doc === docAtSave &&
             envelopeRef.current.frontmatter === fmAtSave
@@ -788,6 +925,7 @@ export default function App() {
           }
           return true
         }
+        if (!result.ok && result.conflict) setDiskNotice('conflict')
         setSaveState(result.ok ? 'idle' : 'failed')
         return false
       } catch (err) {
@@ -800,6 +938,62 @@ export default function App() {
     },
     [flushSource, sourceMode, doSaveSource],
   )
+
+  /** another program wrote the file: swap the text in, keep caret and scroll, leave undo history alone */
+  const reloadFromDisk = useCallback(
+    (path: string, raw: string) => {
+      const current = editorRef.current
+      const caret = current?.state.selection.from ?? 1
+      const scrollTop = scrollRef.current?.scrollTop ?? 0
+      // loadFromPath replaces the content; with the status parked the resulting update is not an edit
+      statusRef.current = 'loading'
+      try {
+        loadFromPath(path, raw)
+        if (isSourceMode(textModeForPath(path))) sourceRef.current?.setDoc(readSourceText(raw).text)
+      } finally {
+        statusRef.current = 'ready'
+      }
+      if (current && !isSourceMode(textModeForPath(path))) {
+        current
+          .chain()
+          .setMeta('addToHistory', false)
+          .setMeta('uiOnly', true)
+          .setTextSelection(Math.min(caret, current.state.doc.content.size))
+          .run()
+      }
+      requestAnimationFrame(() => {
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollTop
+      })
+      dirtyRef.current = false
+      setDirty(false)
+      window.markdownApi.setDirty(false)
+      setSaveState('idle')
+    },
+    [loadFromPath],
+  )
+
+  const reloadNow = useCallback(async () => {
+    const path = filePathRef.current
+    if (!path) return
+    try {
+      window.markdownApi.ackFileChangedOnDisk()
+      reloadFromDisk(path, await window.markdownApi.readFile(path))
+    } catch (err) {
+      console.error('[markdown] reload from disk failed:', err)
+    }
+  }, [reloadFromDisk])
+
+  const keepMine = useCallback(() => {
+    overwriteRef.current = true
+    setDiskNotice(null)
+    window.markdownApi.ackFileChangedOnDisk()
+  }, [])
+
+  const overwriteNow = useCallback(() => {
+    overwriteRef.current = true
+    setDiskNotice(null)
+    void doSave('save')
+  }, [doSave])
 
   /** `outPath` (headless export only) skips the save dialog; resolves true when a file was written. */
   const runExport = useCallback(
@@ -1060,6 +1254,30 @@ export default function App() {
         window.markdownApi.sendCloseSaveResult(ok)
       })()
     })
+    const offDisk = window.markdownApi.onFileChangedOnDisk((changedPath) => {
+      // the watcher keeps refusing saves until the change is acknowledged; a
+      // change parked behind the bar stays unacknowledged until the user decides
+      let awaitingUser = false
+      void (async () => {
+        try {
+          if (changedPath !== filePathRef.current || statusRef.current !== 'ready') return
+          const raw = await window.markdownApi.readFile(changedPath)
+          if (changedPath !== filePathRef.current || raw === diskTextRef.current) return
+          const dirtyNow = dirtyRef.current || savingRef.current
+          if (dirtyNow) {
+            diskTextRef.current = raw
+            setDiskNotice('changed')
+            awaitingUser = true
+            return
+          }
+          reloadFromDisk(changedPath, raw)
+        } catch (err) {
+          console.error('[markdown] reload after external change failed:', err)
+        } finally {
+          if (!awaitingUser) window.markdownApi.ackFileChangedOnDisk()
+        }
+      })()
+    })
     const offRenamed = window.markdownApi.onFileRenamed((newPath) => {
       // A rename that changes the extension changes what the file is, so the
       // open document has to follow it onto the matching surface. Reloading
@@ -1087,6 +1305,7 @@ export default function App() {
       })()
     })
     const onKeyDown = (event: KeyboardEvent) => {
+<<<<<<< ours
       // Only window-level commands are claimed here (and only they are preventDefault'ed):
       // text and block keys, Ctrl+Shift+S strikethrough among them, go on to the editor
       const command = markdownWindowCommand(event)
@@ -1120,6 +1339,37 @@ export default function App() {
         case 'zoomReset':
           setZoom(100)
           return
+=======
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return
+      const key = event.key.toLowerCase()
+      if (key === 's') {
+        event.preventDefault()
+        void doSave(event.shiftKey ? 'saveAs' : 'save')
+      } else if (key === 'p' && !event.shiftKey) {
+        event.preventDefault()
+        void printDoc()
+      } else if (key === 'f' && !event.shiftKey) {
+        event.preventDefault()
+        openFind(false)
+      } else if (key === 'h' && !event.shiftKey) {
+        // Word's replace shortcut: Ctrl+H on Windows/Linux, Control+H on macOS —
+        // its ⌘H belongs to the system Hide role, so the menu keeps that key
+        event.preventDefault()
+        openFind(true)
+      } else if (key === 'e' && !event.shiftKey) {
+        // Obsidian's edit/preview toggle: the source view
+        event.preventDefault()
+        toggleSource()
+      } else if (key === '=' || key === '+') {
+        event.preventDefault()
+        zoomIn()
+      } else if (key === '-' || key === '_') {
+        event.preventDefault()
+        zoomOut()
+      } else if (key === '0') {
+        event.preventDefault()
+        setZoom(100)
+>>>>>>> theirs
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
@@ -1127,10 +1377,11 @@ export default function App() {
       offSave()
       offReadText()
       offClose()
+      offDisk()
       offRenamed()
       window.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [doSave, printDoc, zoomIn, zoomOut, openFind, toggleSource, loadFromPath, t])
+  }, [doSave, printDoc, zoomIn, zoomOut, openFind, toggleSource, loadFromPath, reloadFromDisk, t])
 
   // Chromium reports trackpad pinch as ctrl+wheel. Also support Cmd/Ctrl+scroll
   // while the pointer is over the document canvas.
@@ -1346,6 +1597,9 @@ export default function App() {
         outlineOpen={outlineOpen}
         onToggleOutline={() => setOutlineOpen((v) => !v)}
         hasOutline={outlineItems.length > 0}
+        backlinksOpen={backlinksOpen}
+        onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
+        onOpenGraph={() => setGraphOpen(true)}
         spellcheck={spellcheck}
         onToggleSpellcheck={() => setSpellcheck((v) => !v)}
         sourceMode={sourceMode}
@@ -1366,6 +1620,7 @@ export default function App() {
       />
       {status === 'loading' && <div className="center-note">{t('loading')}</div>}
       <div className="app-main" style={status === 'ready' ? undefined : { display: 'none' }}>
+<<<<<<< ours
         {aiEnabled && (
           <div
             className={`ai-dock${aiOpen ? '' : ' collapsed'}${
@@ -1402,6 +1657,39 @@ export default function App() {
             )}
           </div>
         )}
+=======
+        <div
+          className={`ai-dock${aiOpen ? '' : ' collapsed'}${
+            !aiSidebarEnabled && !aiOpen ? ' ai-dock-off' : ''
+          }`}
+        >
+          {!aiOpen && aiSidebarEnabled && (
+            <button
+              className="ai-rail"
+              data-tip={t('aiOpenAssistant')}
+              aria-label={t('aiOpenAssistant')}
+              onClick={() => setAiOpen(true)}
+            >
+              <GensparkMark size={22} />
+            </button>
+          )}
+          {/* mounted only after the file is loaded so chat history resolves against the real path */}
+          {status === 'ready' && (
+            <AiPanel
+              deps={aiDeps}
+              filePath={filePath}
+              preset={aiPreset}
+              onCollapse={() => setAiOpen(false)}
+              editQueue={editQueue}
+              onQueueEditInstruction={queueUpdate}
+              onQueueRemove={queueRemove}
+              onQueueClear={queueClear}
+              onQueueFocus={queueFocus}
+              onQueueConsume={queueConsume}
+            />
+          )}
+        </div>
+>>>>>>> theirs
         {outlineOpen && !sourceMode && (
           <OutlinePane
             items={outlineItems}
@@ -1410,7 +1698,24 @@ export default function App() {
             onResize={setOutlineWidth}
           />
         )}
+        {backlinksOpen && !sourceMode && (
+          <BacklinksPane
+            path={filePath}
+            onOpen={(path) => void window.markdownApi.openSourcePath(path)}
+          />
+        )}
         <div className="app-content">
+          {diskNotice && (
+            <div className="disk-notice" role="status">
+              <span>{t(diskNotice === 'changed' ? 'diskChangedMsg' : 'diskConflictMsg')}</span>
+              <button type="button" onClick={() => void reloadNow()}>
+                {t('diskReload')}
+              </button>
+              <button type="button" onClick={diskNotice === 'changed' ? keepMine : overwriteNow}>
+                {t(diskNotice === 'changed' ? 'diskKeepMine' : 'diskOverwrite')}
+              </button>
+            </div>
+          )}
           {showFind && findTarget && (
             <FindPanel
               target={findTarget}
@@ -1476,9 +1781,19 @@ export default function App() {
                 </span>
               )}
               {fileName && <span className="status-item status-file">{fileName}</span>}
+<<<<<<< ours
               {/* on the web the host announces view-only (banner + live region): cap viewOnlyChip is off there */}
               {!canEdit && cap('viewOnlyChip') && status === 'ready' && (
                 <span className="status-item status-view-only">{t('viewOnly')}</span>
+=======
+              {fileName && docStats && (
+                <span className="status-item status-stats">
+                  {t('statusWords', { n: docStats.words })} ·{' '}
+                  {t('statusChars', {
+                    n: docStats.chars,
+                  })}
+                </span>
+>>>>>>> theirs
               )}
             </div>
             <div className="status-right">
@@ -1523,12 +1838,33 @@ export default function App() {
       {!sourceMode && (
         <SlashMenu ref={slashMenuRef} state={slashState} onDismiss={() => setSlashState(null)} />
       )}
+<<<<<<< ours
       {/* the model lives behind `ai`: with the key off (web frame) a stored toggle has nothing to hide from */}
       <RedactMenu
         editor={editor}
         enabled={aiEnabled && redactEnabled && canEdit && !uniwork.readOnly}
       />
+=======
+      {!sourceMode && (
+        <WikiSuggestMenu
+          ref={wikiSuggestMenuRef}
+          state={wikiSuggestState}
+          onDismiss={() => setWikiSuggestState(null)}
+        />
+      )}
+      <RedactMenu editor={editor} enabled={redactEnabled} />
+>>>>>>> theirs
       <ToastHost />
+      {graphOpen && (
+        <GraphView
+          current={filePath}
+          onClose={() => setGraphOpen(false)}
+          onOpen={(path) => {
+            setGraphOpen(false)
+            void window.markdownApi.openSourcePath(path)
+          }}
+        />
+      )}
       {imageHostOpen && (
         <ImageHostDialog onClose={() => setImageHostOpen(false)} onSaved={() => {}} />
       )}

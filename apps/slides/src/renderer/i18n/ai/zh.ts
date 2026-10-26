@@ -108,6 +108,7 @@ export const zh = {
   aiErrEmptyOutput: '空输出',
   aiErrUnknown: '未知错误',
   aiErrStreamTimeout: 'AI 请求超时：网络长时间无响应，已停止。请检查网络后重试',
+  aiErrRegion: '该模型的厂商不向当前地区提供服务，请换一个模型或切换网络',
   aiErrOverloaded: 'AI 服务当前繁忙，请稍后重试',
   aiErrNetwork: '网络有问题，无法连接 AI 服务。请检查网络后重试',
   aiCreditsExhausted: 'UniWork 积分已用完，请前往 uniworkos.com/pricing 充值后重试',
@@ -219,6 +220,9 @@ export const zh = {
   aiSumSaveTemplate: '保存风格模板"{name}"',
   aiSumTemplatesEmpty: '风格模板列表（空）',
   aiSumListTemplates: '列出 {count} 个风格模板',
+<<<<<<< ours
   aiPageCloudToLocal: '云端不可用,已本地生成',
   aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
+=======
+>>>>>>> theirs
 }

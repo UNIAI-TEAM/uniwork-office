@@ -115,6 +115,8 @@ export const pt = {
   aiErrUnknown: 'Erro desconhecido',
   aiErrStreamTimeout:
     'A solicitação de IA expirou: sem resposta da rede, a execução foi interrompida. Verifique sua conexão e tente novamente',
+  aiErrRegion:
+    'O fornecedor deste modelo não atende à sua região atual — escolha outro modelo ou mude de rede',
   aiErrOverloaded: 'O serviço de IA está sobrecarregado no momento — tente novamente em instantes',
   aiErrNetwork:
     'Problema de rede: não foi possível conectar ao serviço de IA. Verifique sua conexão e tente novamente',
@@ -228,7 +230,10 @@ export const pt = {
   aiSumSaveTemplate: 'Modelo de estilo "{name}" salvo',
   aiSumTemplatesEmpty: 'Modelos de estilo (vazio)',
   aiSumListTemplates: '{count} modelos de estilo listados',
+<<<<<<< ours
   aiPageCloudToLocal: 'Nuvem indisponível — gerado localmente',
   aiViewOnlyNotice:
     'Documento somente leitura: a IA pode lê-lo e responder a perguntas, mas não pode editá-lo.',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

@@ -3,6 +3,9 @@ import {
   parseLazyMediaUrl,
   setPPrChange,
   stripPPrChange,
+  stripParaMarkRevision,
+  paraMarkColor,
+  stripParaMarkColor,
   ommlToLatex,
   patchFieldParagraphXml,
   applyImageWrap,
@@ -21,6 +24,9 @@ import {
   type TextboxSizePatch,
   patchTextboxParas,
   generateTableModelXml,
+  inlinePictureDrawingXml,
+  resizeInlinePictureXml,
+  NEW_PICTURE_TOKEN_PREFIX,
   symbolGlyph,
   symbolPuaChar,
   type Block,
@@ -45,18 +51,23 @@ import {
   type TextboxDisplay,
   type TextboxParaPatch,
   type TextboxParasPatchSet,
+  type AutoSpace,
+  type EffectivePPr,
+  type EffectiveRPr,
 } from '@genoffice/docx-engine'
 import { t } from '../i18n/locale'
 import { symbolFontCovers } from '../font-check'
 import {
   canvasMetrics,
   charScaleEm,
+  maxLineWidthPx,
   maxWordWidthPx,
   textHasComplexScript,
   type FontMetricsProvider,
   wordKerns,
 } from '../line-metrics'
 import { firstStrongDir } from './direction'
+import { splitCellBoxGroup } from './protected-render'
 import { inlineMathML } from './equation'
 import { isStraightLineKind } from './shape-svg'
 import { borderDrawnPx, borderTotalPt, collapsedEdgePx } from './border-metrics'
@@ -109,6 +120,20 @@ export function pmDocOptions(parsed: {
   }
 }
 
+/** the element this editor writes into a run's rPr to carry the label */
+const REDACT_RPR_RE = /<go:redact\b/
+const REDACT_LABEL_RE = /<go:redact\b[^>]*\bw:label="([^"]*)"/
+
+function redactLabelIn(rawRPr: string): string {
+  const found = REDACT_LABEL_RE.exec(rawRPr)
+  const label = found?.[1] ?? 'private'
+  return label
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+}
+
 export function blocksToPmDoc(
   blocks: Block[],
   sections?: SectionInfo[],
@@ -146,8 +171,37 @@ export function inferredBidi(format: ParaFormat | undefined, runs: Run[] | undef
   return runs.some((r) => r.rtl)
 }
 
+/** Display-only: the cell-paragraph properties the table style (whole table or a
+ * tblStylePr condition) resolves and no other layer sets. blockAttrs paints them
+ * inline; the save path never reads them (the `td p` style CSS stays as the
+ * fallback for paragraphs typed or pasted into a cell). */
+function tableStyleParaAttr(eff: EffectivePPr | undefined): string | null {
+  if (!eff) return null
+  const by = (k: string) => eff.source[k] === 'tableStyle'
+  const t: Record<string, unknown> = {}
+  if (by('align') && eff.align) t.align = eff.align
+  if (by('spaceBefore')) t.spaceBefore = eff.spacing.before
+  if (by('spaceAfter')) t.spaceAfter = eff.spacing.after
+  if (by('line') && eff.spacing.line) t.line = eff.spacing.line
+  return Object.keys(t).length > 0 ? JSON.stringify(t) : null
+}
+
+/** Display-only twin for runs: non-toggle rPr the table style resolves (size, face,
+ * caps, spacing); bold/colour stay on the cell (styleBold/styleColor) and the style CSS */
+function tableStyleRunAttr(eff: EffectiveRPr | undefined): string | null {
+  if (!eff) return null
+  const by = (k: string) => eff.source[k] === 'tableStyle'
+  const t: Record<string, unknown> = {}
+  if (by('sizeHalfPoints')) t.sizeHalfPoints = eff.sizeHalfPoints
+  if (by('ascii') && eff.fonts.ascii) t.fontAscii = eff.fonts.ascii
+  if (by('caps')) t.caps = eff.caps
+  if (by('charSpacingTwips')) t.charSpacingTwips = eff.charSpacingTwips
+  return Object.keys(t).length > 0 ? JSON.stringify(t) : null
+}
+
 function formatAttrs(format: ParaFormat | undefined, runs?: Run[]): Record<string, unknown> {
   return {
+    tblPara: tableStyleParaAttr(format?.effective),
     align: format?.align ?? null,
     lineSpacing: format?.lineSpacing ?? null,
     lineRule: format?.lineRule ?? null,
@@ -506,18 +560,37 @@ function paraIndentPx(para: TableParagraph): number {
   return Math.max(leftTw + firstTw, 0) / 15
 }
 
-function cellMaxWordPx(
+type CellRuns = Parameters<typeof maxWordWidthPx>[0]
+
+/** widest paragraph of a cell (px), paragraph indent included. `word`: the
+ * widest unbreakable unit (min-content); `line`: the unwrapped line (max-content).
+ * An inline picture is an unbreakable unit of its own width; floating ones
+ * take no cell width. */
+function cellMeasurePx(
   cell: TableCell,
+  mode: 'word' | 'line',
   metrics: FontMetricsProvider | null,
   defaults?: RunDefaults,
 ): number {
-  const measure = (runs: Parameters<typeof maxWordWidthPx>[0]) =>
-    metrics ? maxWordWidthPx(runs, metrics) : maxWordWidthPx(runs)
+  const measureText = (runs: CellRuns) =>
+    mode === 'word'
+      ? metrics
+        ? maxWordWidthPx(runs, metrics)
+        : maxWordWidthPx(runs)
+      : metrics
+        ? maxLineWidthPx(runs, metrics)
+        : maxLineWidthPx(runs)
   let max = 0
   if (cell.richParas?.length) {
     for (const para of cell.richParas) {
-      const runs: Parameters<typeof maxWordWidthPx>[0] = []
+      const runs: CellRuns = []
+      let imgMax = 0
+      let imgSum = 0
       for (const r of para.runs) {
+        if (r.image && !r.image.wrap && (r.image.widthPx ?? 0) > 0) {
+          imgMax = Math.max(imgMax, r.image.widthPx!)
+          imgSum += r.image.widthPx!
+        }
         if (!r.text) continue
         // Latin words render in the ascii slot; `font` may be the East Asian face
         const family = r.fontAscii ?? r.font ?? defaults?.font
@@ -530,15 +603,17 @@ function cellMaxWordPx(
           ...(r.italic ? { italic: true } : {}),
         })
       }
-      if (!runs.length) continue
-      max = Math.max(max, measure(runs) + paraIndentPx(para))
+      const textPx = runs.length ? measureText(runs) : 0
+      const px = mode === 'word' ? Math.max(textPx, imgMax) : textPx + imgSum
+      if (px <= 0) continue
+      max = Math.max(max, px + paraIndentPx(para))
     }
   } else {
     for (const text of cell.paras) {
       if (!text) continue
       max = Math.max(
         max,
-        measure([
+        measureText([
           {
             text,
             ...(cell.bold ? { bold: true } : {}),
@@ -550,6 +625,100 @@ function cellMaxWordPx(
     }
   }
   return max
+}
+
+function cellMaxWordPx(
+  cell: TableCell,
+  metrics: FontMetricsProvider | null,
+  defaults?: RunDefaults,
+): number {
+  return cellMeasurePx(cell, 'word', metrics, defaults)
+}
+
+/** widest a nested table wants to be in its cell (twips): its grid plus indent
+ * and the straddled outer borders; pct tables follow the cell (0) */
+function nestedTablePreferredTwips(nt: TableModel): number {
+  const widths = nt.colWidthsTwips
+  if (!widths?.length || nt.widthPct) return 0
+  const border = ((borderTotalPt(nt.borders?.left) + borderTotalPt(nt.borders?.right)) / 2) * 20
+  return widths.reduce((a, b) => a + b, 0) + tableIndentTwips(nt) + border
+}
+
+/** per grid column (twips): widest unwrapped paragraph in single-span cells plus
+ * side padding (max-content) */
+function maxContentColTwips(
+  model: TableModel,
+  colCount: number,
+  metrics: FontMetricsProvider | null,
+  defaults?: RunDefaults,
+): number[] {
+  const slack = metrics ? MEASURED_SLACK : MIN_CONTENT_SLACK
+  const maxes = new Array<number>(colCount).fill(0)
+  for (const row of model.rows) {
+    let column = 0
+    for (const cell of row) {
+      const start = column
+      column += cell.colSpan ?? 1
+      if ((cell.colSpan ?? 1) !== 1 || start >= colCount) continue
+      if (cell.vMerge === 'continue' || cell.textDirection) continue
+      const mar = cell.cellMarTwips ?? model.cellMarTwips
+      const pad = (mar?.left ?? DEFAULT_CELL_MAR) + (mar?.right ?? DEFAULT_CELL_MAR)
+      for (const nt of cell.nestedTables ?? []) {
+        const ntMax = Math.max(
+          nestedTablePreferredTwips(nt),
+          nestedTableMinTwips(nt, metrics, defaults),
+        )
+        if (ntMax > 0) maxes[start] = Math.max(maxes[start], ntMax + pad)
+      }
+      let linePx = cellMeasurePx(cell, 'line', metrics, defaults)
+      if (linePx <= 0) continue
+      if (metrics) linePx += MEASURED_EDGE_PX
+      maxes[start] = Math.max(maxes[start], Math.ceil(linePx * slack * 15) + pad)
+    }
+  }
+  return maxes
+}
+
+/**
+ * Word autofit for a table whose cells carry no w:tcW (probe 2026-10-20, pct
+ * 100/50 tables, uniform and skewed grids): the grid is ignored and the table
+ * width is shared like CSS auto layout - over the max-content sum the extra is
+ * split in proportion to each column's max-content; under it every column
+ * starts at its min-content and the rest is split by (max - min).
+ */
+export function distributeContentAutofit(
+  tableTwips: number,
+  mins: number[],
+  maxes: number[],
+): number[] {
+  const n = mins.length
+  const lo = mins.map((m) => Math.max(1, m))
+  const hi = maxes.map((m, i) => Math.max(m, lo[i]))
+  const sumLo = lo.reduce((a, b) => a + b, 0)
+  const sumHi = hi.reduce((a, b) => a + b, 0)
+  let widths: number[]
+  if (tableTwips >= sumHi) {
+    const extra = tableTwips - sumHi
+    widths = hi.map((h) => h + (sumHi > 0 ? (extra * h) / sumHi : extra / n))
+  } else if (tableTwips > sumLo) {
+    const room = tableTwips - sumLo
+    const slack = hi.map((h, i) => h - lo[i])
+    const sumSlack = slack.reduce((a, b) => a + b, 0)
+    widths = lo.map((l, i) => l + (sumSlack > 0 ? (room * slack[i]) / sumSlack : room / n))
+  } else {
+    const scale = sumLo > 0 ? tableTwips / sumLo : 1
+    widths = lo.map((l) => l * scale)
+  }
+  const rounded = widths.map((w) => Math.max(1, Math.round(w)))
+  const drift = tableTwips - rounded.reduce((a, b) => a + b, 0)
+  if (drift !== 0 && rounded.length) {
+    let widest = 0
+    rounded.forEach((w, i) => {
+      if (w > rounded[widest]) widest = i
+    })
+    rounded[widest] = Math.max(1, rounded[widest] + drift)
+  }
+  return rounded
 }
 
 /**
@@ -590,6 +759,21 @@ export function expandAutofitColWidths(
     if (tableW > 0) {
       widths = model.colWidthsPct.map((p) => Math.round((p / 100) * tableW))
       resolvedPct = true
+      if (model.contentAutofit) {
+        const n = widths.length
+        const mins = minContentColTwips(model, n, metrics, false, defaults)
+        const maxes = maxContentColTwips(model, n, metrics, defaults)
+        if (maxes.some((m) => m > 0)) {
+          const sideMar = sideMarginTwips(model)
+          // an empty column still keeps its side margins
+          widths = distributeContentAutofit(
+            Math.round(tableW),
+            mins.map((m) => Math.max(m, Math.min(sideMar, Math.round(tableW) / n))),
+            maxes.map((m, i) => Math.max(m, mins[i])),
+          )
+          widthsChanged = true
+        }
+      }
     }
   }
   if (autofit && (resolvedPct || !model.widthPct) && widths?.length && budget > 0) {
@@ -742,6 +926,7 @@ function blockToPmNode(
           commentEnds: block.commentEnds ?? null,
           pPrChange: block.pPrChangeInfo ? JSON.stringify(block.pPrChangeInfo) : null,
           paraMarkDel: block.paraMarkDel ? JSON.stringify(block.paraMarkDel) : null,
+          paraMarkIns: block.paraMarkIns ? JSON.stringify(block.paraMarkIns) : null,
           blockRevision: block.blockRevision ?? null,
           ...formatAttrs(block.format, block.runs),
         },
@@ -763,6 +948,7 @@ function blockToPmNode(
           commentEnds: block.commentEnds ?? null,
           pPrChange: block.pPrChangeInfo ? JSON.stringify(block.pPrChangeInfo) : null,
           paraMarkDel: block.paraMarkDel ? JSON.stringify(block.paraMarkDel) : null,
+          paraMarkIns: block.paraMarkIns ? JSON.stringify(block.paraMarkIns) : null,
           blockRevision: block.blockRevision ?? null,
           ...formatAttrs(block.format, block.runs),
         },
@@ -783,6 +969,7 @@ function blockToPmNode(
           moveRevision: block.moveRevision ?? null,
           pPrChange: block.pPrChangeInfo ? JSON.stringify(block.pPrChangeInfo) : null,
           paraMarkDel: block.paraMarkDel ? JSON.stringify(block.paraMarkDel) : null,
+          paraMarkIns: block.paraMarkIns ? JSON.stringify(block.paraMarkIns) : null,
           blockRevision: block.blockRevision ?? null,
           ...formatAttrs(block.format, block.runs),
         },
@@ -833,6 +1020,9 @@ function blockToPmNode(
           imageParagraphIndentFirstLine: block.imageParagraphIndentFirstLine ?? null,
           imageParagraphSpaceBefore: block.imageParagraphSpaceBefore ?? null,
           imageParagraphSpaceAfter: block.imageParagraphSpaceAfter ?? null,
+          imageParagraphSpaceBeforeAuto: block.imageParagraphSpaceBeforeAuto ?? null,
+          imageParagraphSpaceAfterAuto: block.imageParagraphSpaceAfterAuto ?? null,
+          imageParagraphAdditiveSpacing: block.imageParagraphAdditiveSpacing ?? null,
           imageParagraphLineTwips: block.imageParagraphLineTwips ?? null,
           imageParagraphLineRule: block.imageParagraphLineRule ?? null,
           imageMarkFont: block.imageMarkFont ?? null,
@@ -841,6 +1031,7 @@ function blockToPmNode(
           imageEffectExtentTopPx: block.imageEffectExtentTopPx ?? null,
           imageEffectExtentBottomPx: block.imageEffectExtentBottomPx ?? null,
           imageAlign: block.imageAlign ?? null,
+          imageIndentLeftTwips: block.imageIndentLeftTwips ?? null,
           imageWrap: block.imageWrap ?? null,
           imageBand: block.imageBand ?? false,
           imageWrapDistTopEmu: block.imageWrapDistTopEmu ?? null,
@@ -929,15 +1120,15 @@ export function cellClipTwips(
   if (rowSpan > 1 || model.rowHeightRules?.[rowIndex] !== 'exact') return null
   const h = model.rowHeightsTwips?.[rowIndex]
   if (!h) return null
+  // the bottom margin sits below the declared height (rowHeightCss), the top one inside
   const padTop = cell.cellMarTwips?.top ?? model.cellMarTwips?.top ?? 0
-  const padBottom = cell.cellMarTwips?.bottom ?? model.cellMarTwips?.bottom ?? 0
   // collapsed borders straddle the row edges: half of each eats into the row height
   const bTop = cell.borders?.top ?? (rowIndex === 0 ? model.borders?.top : model.borders?.insideH)
   const bBottom =
     cell.borders?.bottom ??
     (rowIndex === model.rows.length - 1 ? model.borders?.bottom : model.borders?.insideH)
   const borderTwips = Math.round(((cellBorderPx(bTop) + cellBorderPx(bBottom)) / 2) * 15)
-  return Math.max(0, h - padTop - padBottom - borderTwips)
+  return Math.max(0, h - padTop - borderTwips)
 }
 
 /** free side beside a text-anchored float below which Word's side text is only word fragments */
@@ -1102,6 +1293,7 @@ export function tableModelToPmNode(
               cellMar: cell.cellMarTwips ?? null,
               textDirection: cell.textDirection ?? null,
               noWrap: cell.noWrap ?? null,
+              hideMark: cell.hideMark ?? false,
               tcPrEdited: false,
               fill: cell.fill ?? null,
               color: cell.styleColor ?? null,
@@ -1175,7 +1367,9 @@ function cellContentNodes(cell: TableCell): PmNode[] {
     else boxGroups.set(at, [boxes[i]])
   }
   for (const [at, group] of boxGroups) {
-    inserts.push({ at, node: { type: 'docCellBoxes', attrs: { boxes: group } } })
+    for (const boxes of splitCellBoxGroup(group)) {
+      inserts.push({ at, node: { type: 'docCellBoxes', attrs: { boxes } } })
+    }
   }
   const content = [...paraNodes]
   inserts.sort((a, b) => a.at - b.at)
@@ -1244,6 +1438,9 @@ function inlineFormattingSignature(content: PmNode[] | undefined): string[] {
   const styles: string[] = []
   for (const node of content ?? []) {
     // the schema re-sorts marks by rank on load, so the parse-side order must not count
+    // a picture adds no text, so one placed next to another must count on its
+    // own, and a resized one must regenerate the cell (its drawing carries the size)
+    const atom = node.type === 'docInlineImage'
     const style =
       node.type === 'text'
         ? JSON.stringify(
@@ -1251,8 +1448,10 @@ function inlineFormattingSignature(content: PmNode[] | undefined): string[] {
               .sort((a, b) => a.type.localeCompare(b.type))
               .map((mark) => [mark.type, mark.attrs ?? null]),
           )
-        : node.type
-    if (styles[styles.length - 1] !== style) styles.push(style)
+        : atom
+          ? JSON.stringify([node.type, node.attrs?.widthPx ?? null, node.attrs?.heightPx ?? null])
+          : node.type
+    if (atom || styles[styles.length - 1] !== style) styles.push(style)
   }
   return styles
 }
@@ -1523,9 +1722,12 @@ export function pmTableToModel(table: PmNode): TableModel {
 export function runsToInline(runs: Run[]): PmNode[] {
   const nodes: PmNode[] = []
   for (const run of runs) {
+    const marks = runMarks(run)
+    const atomMarks = marks.length > 0 ? { marks } : {}
     if (run.math) {
       nodes.push({
         type: 'docInlineMath',
+        ...atomMarks,
         attrs: {
           omml: run.math.omml,
           mathml: inlineMathML(run.math.omml),
@@ -1540,6 +1742,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
     if (run.ruby) {
       nodes.push({
         type: 'docRuby',
+        ...atomMarks,
         attrs: { base: run.text, rt: run.ruby.rt, xml: run.ruby.xml },
       })
       continue
@@ -1547,6 +1750,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
     if (run.noteRef) {
       nodes.push({
         type: 'docNoteRef',
+        ...atomMarks,
         attrs: {
           kind: run.noteRef.kind,
           id: run.noteRef.id,
@@ -1556,7 +1760,6 @@ export function runsToInline(runs: Run[]): PmNode[] {
       })
       continue
     }
-    const marks = runMarks(run)
     // \n = soft line break, \f = in-paragraph page break, \v = column break, \u001e = text wrapping break
     const breakMarks = marks.length > 0 ? { marks } : {}
     // eslint-disable-next-line no-control-regex
@@ -1577,6 +1780,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
     if (run.image) {
       nodes.push({
         type: 'docInlineImage',
+        ...atomMarks,
         attrs: {
           dataUrl: run.image.dataUrl,
           widthPx: run.image.widthPx ?? null,
@@ -1607,7 +1811,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
       })
     }
     if (run.xeTerm !== undefined) {
-      nodes.push({ type: 'docXeMark', attrs: { term: run.xeTerm } })
+      nodes.push({ type: 'docXeMark', ...atomMarks, attrs: { term: run.xeTerm } })
     }
   }
   markLeadRule(nodes)
@@ -1628,6 +1832,7 @@ let nextZoteroFieldId = 1
 
 function runMarks(run: Run): PmMark[] {
   const marks: PmMark[] = []
+  const cs = run.effective?.cs ? run.effective : undefined
   if (run.bold) marks.push({ type: 'bold' })
   if (run.italic) marks.push({ type: 'italic' })
   if (run.underline) marks.push({ type: 'underline' })
@@ -1677,13 +1882,23 @@ function runMarks(run: Run): PmMark[] {
   if (run.ins) {
     marks.push({
       type: 'ins',
-      attrs: { author: run.ins.author, date: run.ins.date ?? null, id: run.ins.id ?? null },
+      attrs: {
+        author: run.ins.author,
+        date: run.ins.date ?? null,
+        dateUtc: run.ins.dateUtc ?? null,
+        id: run.ins.id ?? null,
+      },
     })
   }
   if (run.del) {
     marks.push({
       type: 'del',
-      attrs: { author: run.del.author, date: run.del.date ?? null, id: run.del.id ?? null },
+      attrs: {
+        author: run.del.author,
+        date: run.del.date ?? null,
+        dateUtc: run.del.dateUtc ?? null,
+        id: run.del.id ?? null,
+      },
     })
   }
   if (run.rPrChange) {
@@ -1692,6 +1907,7 @@ function runMarks(run: Run): PmMark[] {
       attrs: {
         author: run.rPrChange.author,
         date: run.rPrChange.date ?? null,
+        dateUtc: run.rPrChange.dateUtc ?? null,
         id: run.rPrChange.id ?? null,
         old: run.rPrChange.old ?? null,
       },
@@ -1732,6 +1948,19 @@ function runMarks(run: Run): PmMark[] {
       run.charScalePct && !/\s/.test(run.text) && !run.underline && !run.strike && !run.link
         ? charScaleXAttr(run.text, run.charScalePct, charScaleEm(run.text, run.charScalePct))
         : null
+    // A run whose rPr carries our element came back from a file this editor
+    // wrote. The parser has no schema for a custom element, so the label is
+    // lifted out of the raw rPr and the run is re-tagged: without it the
+    // border survives a reopen but the document quietly stops withholding
+    // anything, and a model can read the whole thing again.
+    if (typeof run.rawRPr === 'string' && REDACT_RPR_RE.test(run.rawRPr)) {
+      marks.push({
+        type: 'redaction',
+        // bdr and rawRPr are what the save path needs to write the mark back;
+        // docTextStyle already carries the border, this re-asserts it on ours
+        attrs: { label: redactLabelIn(run.rawRPr), rawRPr: run.rawRPr },
+      })
+    }
     marks.push({
       type: 'docTextStyle',
       attrs: {
@@ -1772,6 +2001,12 @@ function runMarks(run: Run): PmMark[] {
         rawRPr: run.rawRPr ?? null,
         themeRFonts: run.themeRFonts ? JSON.stringify(run.themeRFonts) : null,
         themeColor: run.themeColor ?? null,
+        // the Cs size an rtl run inherits (strut input only; the .doc-cs style CSS paints it)
+        csSize: cs && run.sizeHalfPoints === undefined ? cs.sizeHalfPoints : null,
+        // the resolved weight / style of an rtl run (table style, Cs twins, XOR), display only
+        csBold: cs && run.bold === undefined ? cs.bold : null,
+        csItalic: cs && run.italic === undefined ? cs.italic : null,
+        tblRun: tableStyleRunAttr(run.effective),
       },
     })
   }
@@ -1798,6 +2033,8 @@ export interface SavePlan {
   /** count of original blocks removed */
   deletedCount: number
   totalOriginal: number
+  /** cell pictures inserted by the editor, for SaveOptions.newPictures */
+  newPictures: Record<string, { base64: string; mime: NewImage['mime'] }>
 }
 
 const ZOTERO_FIELD_INSTR_RE = /^\s*(?:ADDIN\s+)?(?:ZOTERO_|CSL_)/i
@@ -1944,6 +2181,9 @@ export function normalizeZoteroFieldParts(doc: PmNode): PmNode {
 }
 
 export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): SavePlan {
+  newPictures.clear()
+  newPictureSeq = 0
+  newPictureTokenOf = new WeakMap()
   const doc = normalizeZoteroFieldParts(inputDoc)
   const originalByIndex = new Map<number, Block>()
   for (const block of originalBlocks) {
@@ -2387,8 +2627,10 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
         if (node.attrs.imageHeightPx) image.heightPx = Number(node.attrs.imageHeightPx)
         const align = node.attrs.imageAlign as NewImage['align'] | null
         if (align) image.align = align
-        const wrap = node.attrs.imageWrap as ImageWrap | null
-        if (wrap) image.wrap = wrap
+        // the attrs carry the live state (wrap/drag/position-preset edits
+        // mutate them, not the insert-time genImage payload): re-derive the
+        // floating position or the drag is silently lost on save
+        applyImageFloatAttrs(image, node.attrs)
         if (node.attrs.imageZOrder != null) image.zOrder = Number(node.attrs.imageZOrder)
         if (node.attrs.imageRotDeg) image.rotDeg = Number(node.attrs.imageRotDeg)
         if (node.attrs.imageFlipH) image.flipH = true
@@ -2556,9 +2798,53 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
     saveBlocks,
     chartPatches,
     saveBlockIndexByDocx,
+    newPictures: Object.fromEntries(newPictures),
     changedCount,
     deletedCount,
     totalOriginal: originalByIndex.size,
+  }
+}
+
+/**
+ * Floating-position payload (wrap + placement) from the live node attrs — the
+ * editor's source of truth after wrap/drag/position-preset edits, which mutate
+ * the attrs but never the insert-time genImage payload. Writes posOffsetEmu
+ * from the drag offsets, or the margin-relative align pair for Word position
+ * presets, and clears stale fields so e.g. back-to-inline drops the anchor.
+ */
+function applyImageFloatAttrs(image: NewImage, attrs: Record<string, unknown>): void {
+  const wrap = (attrs.imageWrap as ImageWrap | null) ?? null
+  if (wrap) image.wrap = wrap
+  else delete image.wrap
+  const offX = attrs.imageOffsetXEmu != null ? Number(attrs.imageOffsetXEmu) : undefined
+  const offY = attrs.imageOffsetYEmu != null ? Number(attrs.imageOffsetYEmu) : undefined
+  if (wrap && offX !== undefined && offY !== undefined) {
+    // NewImage.posOffsetEmu carries one basis for both axes: page wins over
+    // margin (relH/relV are only set for page/margin-pinned floats; plain
+    // drags keep the column/paragraph defaults applyImageWrap uses)
+    const relH = attrs.imageRelH as string | null | undefined
+    const relV = attrs.imageRelV as string | null | undefined
+    const relativeTo =
+      relH === 'page' || relV === 'page'
+        ? 'page'
+        : relH === 'margin' || relV === 'margin'
+          ? 'margin'
+          : undefined
+    image.posOffsetEmu = { x: offX, y: offY, ...(relativeTo ? { relativeTo } : {}) }
+  } else {
+    delete image.posOffsetEmu
+  }
+  const posH = attrs.imagePosH as NewImage['posH'] | null
+  const posV = attrs.imagePosV as NewImage['posV'] | null
+  if (wrap && image.posOffsetEmu === undefined && posH && posV) {
+    // margin-relative wp:align pair — the same bytes imagePatchOf produces for
+    // original images via applyImageWrap's marginAlign (numeric offsets win
+    // when both are present, matching applyImageWrap's own priority)
+    image.posH = posH
+    image.posV = posV
+  } else {
+    delete image.posH
+    delete image.posV
   }
 }
 
@@ -2576,8 +2862,7 @@ function imageFromProtectedAttrs(node: PmNode): NewImage | null {
     : { base64: m![2], mime: m![1] as NewImage['mime'], widthPx, heightPx }
   const align = node.attrs?.imageAlign as NewImage['align'] | null
   if (align) image.align = align
-  const wrap = node.attrs?.imageWrap as ImageWrap | null
-  if (wrap) image.wrap = wrap
+  applyImageFloatAttrs(image, node.attrs)
   if (node.attrs?.imageZOrder != null) image.zOrder = Number(node.attrs.imageZOrder)
   if (node.attrs?.imageRotDeg) image.rotDeg = Number(node.attrs.imageRotDeg)
   if (node.attrs?.imageFlipH) image.flipH = true
@@ -2825,9 +3110,14 @@ function nestedTextsDiff(
   return changed ? grid : null
 }
 
-/** rich-run signature of one textbox paragraph, for per-paragraph change detection */
+/** rich-run signature of one textbox paragraph, for per-paragraph change detection.
+ * List identity (numId/ilvl/kind) participates: toggling a list on or off must
+ * reach the byte patch even when the runs are untouched; the marker TEXT stays
+ * out — its per-box counters are recomputed on both sides and may drift. */
 export function textboxParaSignature(para: TextboxDisplay['paras'][number]): string {
-  return JSON.stringify([para.align ?? null, normalizedRuns(para.runs)])
+  const m = para.listMarker
+  const list = m ? [m.numId ?? null, m.ilvl ?? null, m.kind ?? null] : null
+  return JSON.stringify([para.align ?? null, normalizedRuns(para.runs), list])
 }
 
 /** all-empty sub-editor content counts as "still no text" for a paras:[] box */
@@ -2862,13 +3152,26 @@ function textboxParasPatch(node: PmNode, original: Block): TextboxParasPatchSet 
         ) {
           return null
         }
-        // align is always explicit so a removed alignment also clears w:jc
-        return { runs: mergeRuns(p.runs), align: p.align ?? null }
+        // align/numPr are always explicit so a removed alignment or list
+        // membership also clears w:jc / w:numPr
+        const m = p.listMarker
+        return {
+          runs: mergeRuns(p.runs),
+          align: p.align ?? null,
+          numPr: m?.numId != null ? { numId: m.numId, ilvl: m.ilvl ?? 0 } : null,
+        }
       })
     } else if (origBox.shapeId) {
       inject.push({
         shapeId: origBox.shapeId,
-        paras: box.paras.map((p) => ({ runs: mergeRuns(p.runs), align: p.align ?? null })),
+        paras: box.paras.map((p) => ({
+          runs: mergeRuns(p.runs),
+          align: p.align ?? null,
+          numPr:
+            p.listMarker?.numId != null
+              ? { numId: p.listMarker.numId, ilvl: p.listMarker.ilvl ?? 0 }
+              : null,
+        })),
       })
     }
   })
@@ -3016,6 +3319,16 @@ function applyRawPPr(generated: GeneratedBlock, original: Block): void {
   } else if (generated.pPrChange) {
     rawPPr = setPPrChange(rawPPr, generated.pPrChange)
   }
+  if (generated.paraMarkDel === null && original.paraMarkDel)
+    rawPPr = stripParaMarkRevision(rawPPr, 'del')
+  if (generated.paraMarkIns === null && original.paraMarkIns)
+    rawPPr = stripParaMarkRevision(rawPPr, 'ins')
+  const markColor = paraMarkColor(rawPPr)
+  if (markColor && generated.runs.some((r) => r.text)) {
+    const hasColor = (runs: Run[] | undefined) =>
+      (runs ?? []).some((r) => (r.color ?? '').toUpperCase() === markColor)
+    if (hasColor(original.runs) && !hasColor(generated.runs)) rawPPr = stripParaMarkColor(rawPPr)
+  }
   generated.rawPPr = rawPPr
 }
 
@@ -3066,7 +3379,7 @@ function nodeFormat(node: PmNode): ParaFormat | undefined {
     if (node.attrs?.[key] != null) format[key] = node.attrs[key] as boolean
   if (node.attrs?.pageBreakBefore) format.pageBreakBefore = true
   if (node.attrs?.bidi) format.bidi = true
-  if (node.attrs?.autoSpace != null) format.autoSpace = node.attrs.autoSpace as boolean
+  if (node.attrs?.autoSpace != null) format.autoSpace = node.attrs.autoSpace as AutoSpace
   if (node.attrs?.wordWrap != null) format.wordWrap = node.attrs.wordWrap as boolean
   if (node.attrs?.overflowPunct != null) {
     format.overflowPunct = node.attrs.overflowPunct as boolean
@@ -3087,7 +3400,8 @@ function nodeFormat(node: PmNode): ParaFormat | undefined {
   if (node.attrs?.tabStops) {
     try {
       const parsed = JSON.parse(String(node.attrs.tabStops))
-      if (Array.isArray(parsed) && parsed.length > 0) format.tabStops = parsed
+      // [] is an explicit clear (setParagraphFormat tabs: []): save then drops w:tabs
+      if (Array.isArray(parsed)) format.tabStops = parsed
     } catch {
       /* ignore malformed */
     }
@@ -3141,6 +3455,7 @@ export function pmNodeToGeneratedBlock(node: PmNode): GeneratedBlock {
       runs,
       ...(pPrChange !== undefined ? { pPrChange: pPrChange ?? null } : {}),
       ...(blockRevision !== undefined ? { blockRevision: blockRevision ?? null } : {}),
+      ...paraMarkRevisions(node),
     }
   }
   if (node.type === 'docListItem') {
@@ -3164,6 +3479,7 @@ export function pmNodeToGeneratedBlock(node: PmNode): GeneratedBlock {
         runs,
         ...(pPrChange !== undefined ? { pPrChange: pPrChange ?? null } : {}),
         ...(blockRevision !== undefined ? { blockRevision: blockRevision ?? null } : {}),
+        ...paraMarkRevisions(node),
       }
     }
     // list item without a docx numbering id degrades to a plain paragraph with marker
@@ -3204,6 +3520,15 @@ export function pmNodeToGeneratedBlock(node: PmNode): GeneratedBlock {
     // carry pPrChange through: null means "user accepted/rejected, strip from rawPPr"
     ...(pPrChange !== undefined ? { pPrChange: pPrChange ?? null } : {}),
     ...(blockRevision !== undefined ? { blockRevision: blockRevision ?? null } : {}),
+    ...paraMarkRevisions(node),
+  }
+}
+
+/** null = no pending paragraph-mark revision; applyRawPPr strips the record the original carried */
+function paraMarkRevisions(node: PmNode): Pick<GeneratedBlock, 'paraMarkDel' | 'paraMarkIns'> {
+  return {
+    paraMarkDel: (node.attrs?.paraMarkDel as string | null | undefined) ?? null,
+    paraMarkIns: (node.attrs?.paraMarkIns as string | null | undefined) ?? null,
   }
 }
 
@@ -3213,6 +3538,41 @@ function nodeBookmarks(
 ): string[] | undefined {
   const value = node.attrs?.[attr] as string[] | null | undefined
   return Array.isArray(value) && value.length > 0 ? value : undefined
+}
+
+/** pictures the editor placed in cells this save: placeholder token -> bytes (see SaveOptions.newPictures) */
+const newPictures = new Map<string, { base64: string; mime: NewImage['mime'] }>()
+let newPictureSeq = 0
+// the same node is converted more than once per save (signatures, text, save)
+let newPictureTokenOf = new WeakMap<PmNode, string>()
+
+function newPictureBytes(dataUrl: string): { base64: string; mime: NewImage['mime'] } | null {
+  const m = /^data:(image\/(?:png|jpeg|gif));base64,(.+)$/s.exec(dataUrl)
+  return m ? { base64: m[2], mime: m[1] as NewImage['mime'] } : null
+}
+
+/** a cell picture inserted by the editor has bytes but no drawing yet: emit one
+ *  around a placeholder the save resolves once the media part exists */
+function newPictureXml(node: PmNode): string {
+  const widthPx = Number(node.attrs?.widthPx)
+  const heightPx = Number(node.attrs?.heightPx)
+  const bytes = newPictureBytes(String(node.attrs?.dataUrl ?? ''))
+  if (!bytes || !(widthPx > 0) || !(heightPx > 0)) return ''
+  let token = newPictureTokenOf.get(node)
+  if (!token) {
+    token = `${NEW_PICTURE_TOKEN_PREFIX}${++newPictureSeq}`
+    newPictureTokenOf.set(node, token)
+  }
+  newPictures.set(token, bytes)
+  return inlinePictureDrawingXml({
+    rId: token,
+    docPrId: token,
+    widthPx,
+    heightPx,
+    rotDeg: node.attrs?.rotDeg ? Number(node.attrs.rotDeg) : undefined,
+    flipH: !!node.attrs?.flipH,
+    flipV: !!node.attrs?.flipV,
+  })
 }
 
 export function inlineToRuns(content: PmNode[]): Run[] {
@@ -3243,6 +3603,7 @@ export function inlineToRuns(content: PmNode[]): Run[] {
     if (node.type === 'docNoteRef') {
       const markerRawRPr = node.attrs?.rawRPr
       runs.push({
+        ...atomBase(node),
         text: String(node.attrs?.num ?? 1),
         noteRef: {
           kind: (node.attrs?.kind as 'footnote' | 'endnote') ?? 'footnote',
@@ -3253,30 +3614,37 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       continue
     }
     if (node.type === 'docXeMark') {
-      runs.push({ text: '', xeTerm: String(node.attrs?.term ?? '') })
+      runs.push({ ...atomBase(node), text: '', xeTerm: String(node.attrs?.term ?? '') })
       continue
     }
     if (node.type === 'docInlineMath') {
       const omml = String(node.attrs?.omml ?? '')
-      if (omml) runs.push({ text: String(node.attrs?.text ?? ''), math: { omml } })
+      if (omml)
+        runs.push({ ...atomBase(node), text: String(node.attrs?.text ?? ''), math: { omml } })
       continue
     }
     if (node.type === 'docRuby') {
       const base = String(node.attrs?.base ?? '')
       const xml = String(node.attrs?.xml ?? '')
       if (base) {
-        runs.push(
-          xml ? { text: base, ruby: { rt: String(node.attrs?.rt ?? ''), xml } } : { text: base },
-        )
+        runs.push({
+          ...atomBase(node),
+          text: base,
+          ...(xml ? { ruby: { rt: String(node.attrs?.rt ?? ''), xml } } : {}),
+        })
       }
       continue
     }
     if (node.type === 'docInlineImage') {
       const dataUrl = String(node.attrs?.dataUrl ?? '')
-      const xml = String(node.attrs?.xml ?? '')
       const rule = node.attrs?.rule as NonNullable<Run['image']>['rule'] | null | undefined
+      const w = Number(node.attrs?.widthPx)
+      const h = Number(node.attrs?.heightPx)
+      let xml = String(node.attrs?.xml ?? '') || (rule ? '' : newPictureXml(node))
+      if (xml && !rule && w > 0 && h > 0) xml = resizeInlinePictureXml(xml, w, h)
       if ((dataUrl || rule) && xml) {
         runs.push({
+          ...atomBase(node),
           text: '',
           ...(node.attrs?.rawRPr ? { rawRPr: String(node.attrs.rawRPr) } : {}),
           image: {
@@ -3317,10 +3685,25 @@ function symRuns(run: Run): Run[] {
   return [...run.text].map((ch) => ({ ...plain, text: ch, ...(ch === glyph ? { sym } : {}) }))
 }
 
+/** an atom's marks carry its revision / comment / character style; dropping them lost the w:ins wrapper */
+function atomBase(node: PmNode): Partial<Run> {
+  if (!node.marks?.length) return {}
+  const { text: _text, ...rest } = runFromMarks('', node.marks)
+  return rest
+}
+
 function runFromMarks(text: string, marks: PmMark[]): Run {
   const run: Run = { text }
   for (const mark of marks) {
-    if (mark.type === 'bold') run.bold = true
+    if (mark.type === 'redaction') {
+      // rawRPr is the whole story: it carries both the w:bdr Word draws and the
+      // custom element holding the label, and the save path writes it back
+      // byte for byte because the run model never manages a custom element.
+      // Setting run.bdr as well would only duplicate what rPr already has.
+      if (typeof mark.attrs?.rawRPr === 'string' && mark.attrs.rawRPr) {
+        run.rawRPr = mark.attrs.rawRPr
+      }
+    } else if (mark.type === 'bold') run.bold = true
     else if (mark.type === 'italic') run.italic = true
     else if (mark.type === 'underline') run.underline = true
     else if (mark.type === 'strike') run.strike = true
@@ -3366,6 +3749,7 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
     } else if (mark.type === 'ins' || mark.type === 'del') {
       const info: NonNullable<Run['ins']> = { author: String(mark.attrs?.author ?? '') }
       if (mark.attrs?.date) info.date = String(mark.attrs.date)
+      if (mark.attrs?.dateUtc) info.dateUtc = String(mark.attrs.dateUtc)
       if (mark.attrs?.id) info.id = String(mark.attrs.id)
       if (mark.type === 'ins') run.ins = info
       else run.del = info
@@ -3419,6 +3803,7 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       run.rPrChange = {
         author: String(mark.attrs?.author ?? ''),
         ...(mark.attrs?.date ? { date: String(mark.attrs.date) } : {}),
+        ...(mark.attrs?.dateUtc ? { dateUtc: String(mark.attrs.dateUtc) } : {}),
         ...(mark.attrs?.id ? { id: String(mark.attrs.id) } : {}),
         ...(mark.attrs?.old ? { old: mark.attrs.old as NonNullable<Run['rPrChange']>['old'] } : {}),
       }
@@ -3509,9 +3894,11 @@ function revisionKey(run: Run): string | null {
   return JSON.stringify([
     run.ins?.author ?? null,
     run.ins?.date ?? null,
+    run.ins?.dateUtc ?? null,
     run.ins?.id ?? null,
     run.del?.author ?? null,
     run.del?.date ?? null,
+    run.del?.dateUtc ?? null,
     run.del?.id ?? null,
   ])
 }
@@ -3569,8 +3956,14 @@ function indentSame(a: ParaFormat | undefined, b: ParaFormat | undefined): boole
   )
 }
 
+/** a format that declares nothing (display-only keys such as `effective`) signs like no format */
 function normalizedFormat(format: ParaFormat | undefined): unknown {
   if (!format) return null
+  const fields = normalizedFormatFields(format)
+  return JSON.stringify(fields) === EMPTY_FORMAT_SIGNATURE ? null : fields
+}
+
+function normalizedFormatFields(format: ParaFormat): unknown[] {
   return [
     format.align ?? null,
     format.lineSpacing ?? null,
@@ -3607,6 +4000,8 @@ function normalizedFormat(format: ParaFormat | undefined): unknown {
   ]
 }
 
+const EMPTY_FORMAT_SIGNATURE = JSON.stringify(normalizedFormatFields({}))
+
 export function signatureOfBlock(block: Block): string {
   return JSON.stringify({
     type: block.type,
@@ -3621,6 +4016,8 @@ export function signatureOfBlock(block: Block): string {
     runs: normalizedRuns(block.runs ?? []),
     // include pPrChangeInfo in signature: present = has pPrChange, absent = clean
     pPrChange: block.pPrChangeInfo ? JSON.stringify(block.pPrChangeInfo) : null,
+    paraMarkDel: block.paraMarkDel ? JSON.stringify(block.paraMarkDel) : null,
+    paraMarkIns: block.paraMarkIns ? JSON.stringify(block.paraMarkIns) : null,
     blockRevision: block.blockRevision ?? null,
   })
 }
@@ -3639,6 +4036,8 @@ export function signatureOfGenerated(block: GeneratedBlock): string {
     runs: normalizedRuns(block.runs),
     // include pPrChange in signature: null (accepted/rejected) != non-null (has pPrChange)
     pPrChange: block.pPrChange ?? null,
+    paraMarkDel: block.paraMarkDel ?? null,
+    paraMarkIns: block.paraMarkIns ?? null,
     blockRevision: block.blockRevision ?? null,
   })
 }

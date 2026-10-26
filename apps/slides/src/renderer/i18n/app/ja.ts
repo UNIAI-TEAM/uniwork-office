@@ -65,7 +65,8 @@ export const ja = {
   appStatusVideoInserted: 'ビデオを挿入しました（pptx に埋め込み済み。PowerPoint で再生可能）',
   appStatusAudioInserted: 'オーディオを挿入しました（pptx に埋め込み済み）',
   appStatusModel3dInserted:
-    '3D モデルを埋め込みました（キャンバスにはプレースホルダーを表示。モデル ファイルは pptx に保存済み）',
+    '3D モデルを挿入しました：選択すると回転できます（PowerPoint でも 3D で表示されます）',
+  appStatusModel3dNoPreview: 'ここでは 3D モデルを描画できませんでした。画像は変更されていません',
   appStatusRecordingEmpty: '録画内容が空のため、挿入しませんでした',
   appStatusRecordingInserted: '画面録画を現在のスライドに挿入しました（webm 埋め込み）',
   appStatusRecording: '画面録画中…もう一度「画面録画」をクリックすると停止して挿入',
@@ -220,6 +221,8 @@ export const ja = {
   appMasterFillNone: '塗りつぶしなし',
   appMasterStroke: '枠線の色…',
   appMasterStrokeNone: '枠線なし',
+  appMasterInsertTextBox: 'テキストボックス',
+  appMasterInsertShape: '図形',
   appStartOpening: '開いています…',
   appReadingSlideTitle: 'クリックで次のページへ（Esc で閲覧表示を終了）',
   appReadingPrev: '‹ 前のページ',
@@ -247,6 +250,26 @@ export const ja = {
     'スライドショーの所要時間は {duration} でした。各スライドの表示時間を自動切り替えのタイミングとして保存しますか？',
   appRehearseDiscard: '保存しない',
   appRehearseSave: '保存',
+<<<<<<< ours
+=======
+  appRecordTitle: 'ナレーションの録音',
+  appRecordSummary: '録音時間 {duration}。各スライドのナレーションと表示時間を保存しますか？',
+  appRecordDiscard: '保存しない',
+  appRecordSave: '保存',
+  appStatusRecordSaved:
+    '{count} 枚のスライドにナレーションを保存しました（PowerPoint でも再生できます）',
+  appStatusRecordFailed: '録音を保存できませんでした',
+  appStatusNarrationCleared: 'ナレーションをクリアしました',
+  appSettingsTitle: 'AI 設定',
+  appSettingsAccount: 'Genspark アカウント',
+  appSettingsChecking: '確認中…',
+  appSettingsLoggedIn: 'サインイン済み',
+  appSettingsLoggedInEmail: 'サインイン済み：{email}',
+  appSettingsLoggedOut: '未サインイン（AI 機能には Genspark アカウントへのサインインが必要）',
+  appSettingsLoginPending: 'ブラウザーでのサインインを待機中…',
+  appSettingsLogin: 'Genspark にサインイン',
+  appSettingsModel: 'モデル',
+>>>>>>> theirs
   appSettingsCancel: 'キャンセル',
   appCropHint: 'Enter で確定 · Esc でキャンセル · 外側をクリックで確定',
   appStatusZoomsInserted:

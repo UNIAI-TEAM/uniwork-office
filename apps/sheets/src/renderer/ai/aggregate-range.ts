@@ -14,8 +14,13 @@ import type { CellScalar } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { isSheetRemoved, journalEntriesInRange } from '../edit-journal'
 import type { LazyWorkbookState } from '../univer-state'
 import { createRangeAggregator, type RangeAggregate } from './aggregate'
+<<<<<<< ours
 import { sessionHasInputEdits } from './cell-read'
 import { rowVisibilityProbe, type WorkbookReadContext } from './workbook-readers'
+=======
+import { redactionsOf, type WorkbookReadContext } from './workbook-readers'
+import { countWithheldIn } from './redact'
+>>>>>>> theirs
 
 interface ConstantFill {
   readonly startRow: number
@@ -262,9 +267,69 @@ export function prepareLazyRange(
   state: LazyWorkbookState,
   sheetId: string | undefined,
   bounds: RangeBounds,
+<<<<<<< ours
   toolName: string,
 ): PreparedLazyRange | { ok: false; error: string } {
+=======
+  options: AggregateRangeOptions = {},
+): Promise<{ ok: true; aggregate: RangeAggregate } | { ok: false; error: string }> {
+  const aggregator = createRangeAggregator()
+  const state = ctx.lazyWorkbookRef.current
+  const workbook = ctx.univerRef.current?.univerAPI.getActiveWorkbook()
+  const activeSheetId = workbook?.getActiveSheet()?.getSheetId()
+  if (!state) {
+    // Demo workbook: the snapshot holds every cell in memory.
+    const snapshot = ctx.adapterRef.current.getSnapshot()
+    const sheet = sheetIdArg
+      ? snapshot.sheets.find((candidate) => candidate.id === sheetIdArg)
+      : (snapshot.sheets.find((candidate) => candidate.id === activeSheetId) ?? snapshot.sheets[0])
+    if (!sheet) {
+      return {
+        ok: false,
+        error: sheetIdArg
+          ? `Unknown sheet: ${sheetIdArg} (use an id from get_workbook_context)`
+          : 'No workbook is open.',
+      }
+    }
+    const worksheet = workbook?.getSheetBySheetId(sheet.id)
+    const redactions = redactionsOf(ctx)
+    let counted = 0
+    for (const [address, cell] of Object.entries(sheet.cells)) {
+      const position = parseAddress(address)
+      if (
+        position.row < bounds.startRow ||
+        position.row > bounds.endRow ||
+        position.column < bounds.startColumn ||
+        position.column > bounds.endColumn
+      ) {
+        continue
+      }
+      if (redactions.labelAt(sheet.id, position.row, position.column) !== null) {
+        // Counted, never summed: see addWithheld in ./aggregate.
+        aggregator.addWithheld(1)
+        counted += 1
+        continue
+      }
+      let value = cell.value
+      // The in-memory model stores value:null for formula cells; the computed
+      // value lives in Univer's formula engine — backfill like find_cells.
+      if (cell.formula && value === null && worksheet) {
+        try {
+          value = (worksheet.getRange(address).getValue() as CellScalar) ?? null
+        } catch {
+          /* fail-open: count the cell as empty */
+        }
+      }
+      aggregator.add(value)
+      counted += 1
+    }
+    aggregator.addEmpty(rangeCellCount(bounds) - counted)
+    return { ok: true, aggregate: aggregator.finish(50) }
+  }
+  const sheetId = sheetIdArg ?? activeSheetId
+>>>>>>> theirs
   if (!sheetId) return { ok: false, error: 'No workbook is open.' }
+  const redactions = redactionsOf(ctx)
   if (isSheetRemoved(state.editJournal, sheetId)) {
     return { ok: false, error: `Unknown sheet: ${sheetId}` }
   }
@@ -519,6 +584,11 @@ export async function aggregateWorkbookRange(
         ) {
           continue
         }
+        if (redactions.labelAt(sheetId, cell.row, cell.column) !== null) {
+          aggregator.addWithheld(1)
+          counted += 1
+          continue
+        }
         aggregator.add(cell.value)
         counted += 1
         // The sidecar serves the file's cached <v> for formula cells — shared
@@ -555,12 +625,36 @@ export async function aggregateWorkbookRange(
       const repetitions =
         rowCount * (segment.endColumn - segment.startColumn + 1) -
         (fillOverrideCounts.get(segment) ?? 0)
-      aggregator.addRepeated(segment.value, repetitions)
+      // A fill band is one value repeated over a rectangle, so the withheld
+      // share is the area intersection rather than a per-cell lookup. The
+      // repetition count is what would otherwise add the reader's own value
+      // into the sum once per row — exactly the leak addWithheld exists to stop.
+      const withheldHere = Math.min(
+        repetitions,
+        countWithheldIn(redactions.marksFor(sheetId), {
+          startRow: Math.max(band.startRow, clamped.startRow),
+          endRow: Math.min(band.endRow, clamped.endRow),
+          startColumn: Math.max(segment.startColumn, clamped.startColumn),
+          endColumn: Math.min(segment.endColumn, clamped.endColumn),
+        }) - (fillOverrideCounts.get(segment) ?? 0),
+      )
+      aggregator.addWithheld(Math.max(0, withheldHere))
+      aggregator.addRepeated(segment.value, repetitions - Math.max(0, withheldHere))
       counted += repetitions
     }
   }
+<<<<<<< ours
   for (const { row, value } of journalValues.values()) {
     if (dropped.has(row)) continue
+=======
+  for (const { row, column, value } of journalValues.values()) {
+    if (hiddenRows.has(row)) continue
+    if (redactions.labelAt(sheetId, row, column) !== null) {
+      aggregator.addWithheld(1)
+      counted += 1
+      continue
+    }
+>>>>>>> theirs
     aggregator.add(value)
     counted += 1
   }

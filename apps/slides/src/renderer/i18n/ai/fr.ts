@@ -116,6 +116,8 @@ export const fr = {
   aiErrUnknown: 'Erreur inconnue',
   aiErrStreamTimeout:
     "Délai de la requête IA dépassé : aucune réponse du réseau, l'exécution a été interrompue. Vérifiez votre connexion et réessayez",
+  aiErrRegion:
+    'Le fournisseur de ce modèle ne dessert pas votre région actuelle — choisissez un autre modèle ou changez de réseau',
   aiErrOverloaded: "Le service d'IA est actuellement surchargé — réessayez dans un instant",
   aiErrNetwork:
     'Problème réseau : impossible de joindre le service IA. Vérifiez votre connexion et réessayez',
@@ -229,7 +231,10 @@ export const fr = {
   aiSumSaveTemplate: 'Modèle de style « {name} » enregistré',
   aiSumTemplatesEmpty: 'Modèles de style (vide)',
   aiSumListTemplates: '{count} modèles de style listés',
+<<<<<<< ours
   aiPageCloudToLocal: 'Cloud indisponible — généré localement',
   aiViewOnlyNotice:
     'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

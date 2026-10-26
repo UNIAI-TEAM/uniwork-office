@@ -1,7 +1,7 @@
-export type TabKind = 'home' | 'docs' | 'sheets' | 'slides' | 'pdf' | 'markdown' | 'html'
+export type TabKind = 'home' | 'docs' | 'sheets' | 'slides' | 'pdf' | 'markdown' | 'html' | 'help'
 
-/** a tab that holds a document — every kind except the Home screen */
-export type DocumentTabKind = Exclude<TabKind, 'home'>
+/** a tab that holds a document — every kind except the Home screen and the in-app manual */
+export type DocumentTabKind = Exclude<TabKind, 'home' | 'help'>
 
 /** one open tab in the top tab strip; Home is always id 'home' and not closable */
 export interface TabSummary {
@@ -12,6 +12,10 @@ export interface TabSummary {
   active: boolean
   /** absolute path behind the tab; absent while the document is untitled */
   filePath?: string
+  /** renderer released to free memory; reopens its file when shown */
+  dormant?: boolean
+  /** excluded from sleeping (tab context menu) */
+  pinned?: boolean
 }
 
 /**
@@ -97,12 +101,17 @@ export interface TabsApi {
    * triggers; the shell's own popovers subscribe so a title-bar drag — which
    * produces no DOM event — still dismisses them */
   onChromePressed(handler: () => void): () => void
+<<<<<<< ours
   /**
    * fire-and-forget: hand keyboard focus back to the active tab's view (or the
    * shell page on Home). A shell popover opened for the editor (the queue
    * popover after Ctrl/Cmd+S) returns focus to the document with this.
    */
   focusActive(): void
+=======
+  /** subscribe to main process requesting inline rename of a tab */
+  onStartRename?(handler: (id: string) => void): () => void
+>>>>>>> theirs
 }
 
 export const TABS_CHANNELS = {
@@ -123,5 +132,9 @@ export const TABS_CHANNELS = {
   reorder: 'tabs:reorder',
   changed: 'tabs:changed',
   chromePressed: 'tabs:chrome-pressed',
+<<<<<<< ours
   focusActive: 'tabs:focus-active',
+=======
+  startRename: 'tabs:start-rename',
+>>>>>>> theirs
 } as const

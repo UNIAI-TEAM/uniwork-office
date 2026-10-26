@@ -117,6 +117,7 @@ export const zh = {
   aiTooManyImages: '图片最多随消息发送 {max} 张,多余的已忽略',
   aiUnknownError: '未知错误',
   aiTimeoutError: 'AI 请求超时：网络长时间无响应，已停止。请检查网络后重试',
+  aiRegionError: '该模型的厂商不向当前地区提供服务，请换一个模型或切换网络',
   aiOverloadedError: 'AI 服务当前繁忙，请稍后重试',
   aiNetworkError: '网络有问题，无法连接 AI 服务。请检查网络后重试',
   aiCreditsExhausted: 'UniWork 积分已用完，请前往 uniworkos.com/pricing 充值后重试',
@@ -124,6 +125,9 @@ export const zh = {
   aiSumImageAttachment: '图片附件 {name}',
   aiSumRead: '读取 {name}',
   aiSumReadAttachmentName: '读取附件 {name}',
+  aiSumSkillsList: '列出已装技能',
+  aiSumSkillRead: '读取技能 {name}',
+  aiSumRunCli: '已执行 {args}',
   aiSumWebSearch: '联网搜索',
   aiSumWebSearchDone: '搜索“{query}”({count} 条)',
   aiSumImageSearch: '图片搜索',
@@ -185,6 +189,7 @@ export const zh = {
   aiCmdImages: '已更新 {count} 张图片',
   aiCmdToc: '已插入目录({count} 个条目)',
   aiCmdSkipped: '(跳过 {count} 个受保护块)',
+<<<<<<< ours
   aiViewOnlyNotice: '仅查看文档:AI 可以阅读并回答问题,但无法编辑。',
   aiClarifyTitle: '继续之前先确认几个问题',
   aiClarifyDecide: '帮我决定',
@@ -198,6 +203,8 @@ export const zh = {
   aiClarifySubmit: '继续',
   aiSumClarify: '已回答澄清问题',
   aiSumClarifySkipped: '跳过了澄清问题',
+=======
+>>>>>>> theirs
   aiStarterMindMap: '为这篇文档生成思维导图',
   aiMindMapBtn: 'AI 思维导图',
   aiMindMapPrompt: '为这篇文档生成思维导图,按文档的章节结构组织主要主题和关键概念',

@@ -67,7 +67,9 @@ export const de = {
     'Video eingefügt (in die .pptx-Datei eingebettet; abspielbar in PowerPoint)',
   appStatusAudioInserted: 'Audio eingefügt (in die .pptx-Datei eingebettet)',
   appStatusModel3dInserted:
-    '3D-Modell eingebettet (die Zeichenfläche zeigt einen Platzhalter; die Modelldatei ist in der .pptx-Datei gespeichert)',
+    '3D-Modell eingefügt: zum Drehen auswählen (PowerPoint zeigt es ebenfalls in 3D)',
+  appStatusModel3dNoPreview:
+    'Das 3D-Modell konnte hier nicht gezeichnet werden; sein Bild bleibt unverändert',
   appStatusRecordingEmpty: 'Die Aufzeichnung ist leer; nichts wurde eingefügt',
   appStatusRecordingInserted:
     'Bildschirmaufzeichnung auf der aktuellen Folie eingefügt (eingebettetes WebM)',
@@ -233,6 +235,8 @@ export const de = {
   appMasterFillNone: 'Keine Füllung',
   appMasterStroke: 'Konturfarbe…',
   appMasterStrokeNone: 'Keine Kontur',
+  appMasterInsertTextBox: 'Textfeld',
+  appMasterInsertShape: 'Formen',
   appStartOpening: 'Wird geöffnet…',
   appReadingSlideTitle: 'Klicken für die nächste Folie (Esc zum Beenden der Leseansicht)',
   appReadingPrev: '‹ Zurück',
@@ -262,6 +266,26 @@ export const de = {
     'Die Gesamtdauer der Bildschirmpräsentation betrug {duration}. Möchten Sie die Anzeigedauer der einzelnen Folien für den automatischen Folienwechsel speichern?',
   appRehearseDiscard: 'Nicht speichern',
   appRehearseSave: 'Speichern',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Kommentar aufzeichnen',
+  appRecordSummary: 'Aufnahmedauer {duration}. Kommentar und Anzeigedauer jeder Folie speichern?',
+  appRecordDiscard: 'Nicht speichern',
+  appRecordSave: 'Speichern',
+  appStatusRecordSaved:
+    'Kommentar auf {count} Folien gespeichert (PowerPoint spielt ihn ebenfalls ab)',
+  appStatusRecordFailed: 'Die Aufnahme konnte nicht gespeichert werden',
+  appStatusNarrationCleared: 'Kommentar gelöscht',
+  appSettingsTitle: 'KI-Einstellungen',
+  appSettingsAccount: 'Genspark-Konto',
+  appSettingsChecking: 'Wird überprüft…',
+  appSettingsLoggedIn: 'Angemeldet',
+  appSettingsLoggedInEmail: 'Angemeldet: {email}',
+  appSettingsLoggedOut: 'Nicht angemeldet (KI-Funktionen erfordern ein Genspark-Konto)',
+  appSettingsLoginPending: 'Warten auf Anmeldung im Browser…',
+  appSettingsLogin: 'Bei Genspark anmelden',
+  appSettingsModel: 'Modell',
+>>>>>>> theirs
   appSettingsCancel: 'Abbrechen',
   appCropHint: 'Eingabetaste zum Bestätigen · Esc zum Abbrechen · Klick außerhalb zum Bestätigen',
   appStatusZoomsInserted:

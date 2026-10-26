@@ -15,9 +15,13 @@ import { AiHighlight } from './aiHighlight'
 import { AiRunHistory } from './aiRunHistory'
 import { AiQueueAnchors } from './aiQueueAnchors'
 import { InactiveSelection } from './inactiveSelection'
+import { Highlight } from './highlight'
 import { SearchHighlight } from './searchHighlight'
 import { buildMathExtensions } from './math'
+<<<<<<< ours
 import { RawHtmlBlock, RawHtmlInline } from './rawHtml'
+=======
+>>>>>>> theirs
 import { Redaction } from './Redaction'
 import {
   BlockStartEscapedParagraph,
@@ -40,15 +44,30 @@ import {
 } from './markdownStyleRenderers'
 import { boundOrderedList, boundTable, boundTaskList } from './boundedTokenizers'
 import { WikiLink, WikiLinkResolve } from './wikilink'
+<<<<<<< ours
 import { WikiMarkOnInput } from './wikilinkInput'
+=======
+>>>>>>> theirs
 import type { WikiLinkOptions } from './wikilink'
 import type { SlashController, SlashItem } from './slashCommand'
+import { WikiSuggest } from './wikiSuggest'
+import type { WikiSuggestController } from './wikiSuggest'
+import { WikiEmbed } from './wikiEmbed'
+import { FootnoteDefinition, FootnoteNav, FootnoteReference } from './footnote'
 import { t } from '../i18n/locale'
 
 export interface BuildExtensionsOptions {
   slashController: SlashController
   slashItems: () => SlashItem[]
   /**
+<<<<<<< ours
+=======
+   * The `[[` suggester. Omitted in tests and headless paths: the plugin then
+   * runs with no menu sink, so nothing intercepts the keys around a `[[`.
+   */
+  wikiSuggestController?: WikiSuggestController
+  /**
+>>>>>>> theirs
    * Wiki-link navigation. Omitted in tests and headless paths: the resolver is
    * then left on its default, which reports every link unresolved rather than
    * reaching for the filesystem.
@@ -134,9 +153,14 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     StyledTaskItem.configure({ nested: true }),
     // KaTeX-rendered $...$ / $$...$$ formulas (issue #100)
     ...buildMathExtensions(),
+<<<<<<< ours
     // raw HTML / comments survive open → save byte-identically
     RawHtmlBlock,
     RawHtmlInline,
+=======
+    // ==highlight== (Obsidian's text highlight)
+    Highlight,
+>>>>>>> theirs
     // text the reader withholds from the model: the words stay in the document
     // and in the file, and only the model-facing view replaces them
     Redaction,
@@ -144,8 +168,18 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     // links open externally via main-process guard
     ImageAwareLink.configure({ openOnClick: false }),
     WikiLink,
+<<<<<<< ours
     WikiMarkOnInput,
     WikiLinkResolve.configure(options.wikiLink ?? {}),
+=======
+    WikiEmbed,
+    // GFM footnotes: `[^1]` references and `[^1]: text` definitions (see footnote.ts)
+    FootnoteDefinition,
+    FootnoteReference,
+    FootnoteNav,
+    WikiLinkResolve.configure(options.wikiLink ?? {}),
+    WikiSuggest.configure({ controller: options.wikiSuggestController }),
+>>>>>>> theirs
     BlockDragHandle,
     BlockKeymap,
     TableKeymap,

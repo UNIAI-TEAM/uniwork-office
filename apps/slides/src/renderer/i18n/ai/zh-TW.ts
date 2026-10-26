@@ -109,6 +109,7 @@ export const zhTW = {
   aiErrEmptyOutput: '空輸出',
   aiErrUnknown: '未知錯誤',
   aiErrStreamTimeout: 'AI 請求逾時：網路長時間無回應，已停止。請檢查網路後重試',
+  aiErrRegion: '該模型的廠商不向目前地區提供服務，請換一個模型或切換網路',
   aiErrOverloaded: 'AI 服務目前繁忙，請稍後重試',
   aiErrNetwork: '網路有問題，無法連接 AI 服務。請檢查網路後重試',
   aiCreditsExhausted: 'UniWork 點數已用完，請前往 uniworkos.com/pricing 儲值後重試',
@@ -220,6 +221,9 @@ export const zhTW = {
   aiSumSaveTemplate: '儲存風格範本"{name}"',
   aiSumTemplatesEmpty: '風格範本清單（空）',
   aiSumListTemplates: '列出 {count} 個風格範本',
+<<<<<<< ours
   aiPageCloudToLocal: '雲端不可用,已本地生成',
   aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

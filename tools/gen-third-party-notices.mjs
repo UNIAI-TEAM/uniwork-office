@@ -360,9 +360,15 @@ const FONTS = [
     '© The Noto Project Authors, original Reserved Font Name "Noto". Modified advance widths;\nrenamed per OFL 1.1.',
   ],
   [
+<<<<<<< ours
     'Inter 4.x (UniWork Sans, Workbench UI)',
     'SIL OFL 1.1',
     '© 2016 The Inter Project Authors (https://github.com/rsms/inter).\nLatin, Latin Extended and Vietnamese woff2 subsets; unmodified otherwise.',
+=======
+    'GenOffice Bengali (Noto Sans Bengali derivative)',
+    'SIL OFL 1.1',
+    '© The Noto Project Authors, original Reserved Font Name "Noto". Modified advance widths;\nrenamed per OFL 1.1.',
+>>>>>>> theirs
   ],
   [
     'KaTeX webfonts',

@@ -16,7 +16,43 @@ import { aiUniworkText } from './strings-ai-uniwork'
 // Keep in sync with the CSS `max-height` on `.ai-input-box textarea` (7 lines à 24px)
 const MAX_TEXTAREA_HEIGHT = 168
 
+<<<<<<< ours
 export interface AiComposerProps {
+=======
+/**
+ * The AI panel input box shared by docs and sheets: auto-growing textarea
+ * (Enter sends, Shift+Enter newline, Esc stops) plus a footer with optional
+ * app-specific controls, a shortcut hint, and the send/stop button.
+ * Renders the `.ai-input-box` class family; each app themes it in its own CSS.
+ * While busy, Enter queues the draft instead (see useChatRunQueue).
+ */
+export function AiComposer({
+  value,
+  busy,
+  placeholder,
+  hintIdle,
+  hintBusy,
+  hintIdleTitle,
+  sendLabel,
+  stopLabel,
+  ariaLabel,
+  header,
+  queueStrip,
+  footerStart,
+  iconOnly = false,
+  sendIconEnabled,
+  sendIconDisabled,
+  stopIcon,
+  textareaRef,
+  onChange,
+  onSend,
+  onQueue,
+  queuePlaceholder,
+  onStop,
+  onPasteFiles,
+  onPasteText,
+}: {
+>>>>>>> theirs
   readonly value: string
   readonly busy: boolean
   readonly placeholder: string
@@ -182,6 +218,7 @@ export function AiComposer({
     ta.style.height = `${Math.min(ta.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`
   }, [value, ref])
 
+<<<<<<< ours
   // the disclosure region owns its own ack hook; an ack that cannot be stored (empty account)
   // lives in this composer's hook, so it has to be recorded here too
   const disclosureOnAck = disclosureCfg?.onAck
@@ -217,6 +254,10 @@ export function AiComposer({
 
   const inputBox = (
     <div ref={boxRef} className="ai-input-box" data-esc-local={busy ? '' : undefined}>
+=======
+  return (
+    <div className="ai-input-box">
+>>>>>>> theirs
       {queueStrip}
       {header}
       <textarea

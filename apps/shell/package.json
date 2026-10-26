@@ -1,7 +1,12 @@
 {
   "name": "@genoffice/shell",
+<<<<<<< ours
   "productName": "UniWork Office",
   "version": "1.0.0",
+=======
+  "productName": "GenOffice",
+  "version": "0.12.0",
+>>>>>>> theirs
   "license": "Apache-2.0",
   "homepage": "https://uniworkos.com",
   "private": true,
@@ -34,6 +39,7 @@
     "@genoffice/sheets": "*",
     "@genoffice/shortcuts": "*",
     "@genoffice/slides": "*",
+    "@genoffice/project-store": "*",
     "@genoffice/ui": "*",
     "@genoffice/xlsx-gateway": "*",
     "@types/qrcode": "^1.5.6",
@@ -54,8 +60,8 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1",
-    "vitest": "^4.1.11"
+    "vite": "^7.3.7",
+    "vitest": "^4.1.12"
   },
   "author": {
     "name": "UniWork",

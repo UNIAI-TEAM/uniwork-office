@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const ja = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: '選択範囲をAIから隠す',
+  redactDialogDesc:
+    '選択した内容はドキュメントとファイルに残り、AI には下のマーカーしか見えません。名前をつけると、何を表すかAIが理解できます。',
+  redactDialogScope:
+    'これはこのアプリの AI に限られます。CLI、MCP ツール、GUI なしのエクスポートはファイルを直接読み込むため、これらの文字はまだ見えています。',
+  redactDialogPlaceholder: 'プレースホルダー名（例：顧客電話）',
+  redactCancel: 'キャンセル',
+  redactInsert: '隠す',
+  redactEnable: '選択範囲を右クリックしてAIから隠します。',
+  redactNeedsSavedRow:
+    'この行はまだファイルに保存されていません。保存してからセルを非表示にしてください。',
+  redactRecoveredFromNames:
+    '別のアプリがこのファイルを書き換え、非表示にする情報を記録した部品が失われました。非表示のセルはワークブックの名前から復元されました。保存すれば完全な記録が書き戻されます。',
+
   appMergeWorkbooks: 'ブックの結合',
   appMergeWorkbooksTip: '他の Excel ファイルのシートをこのブックに追加します',
   appMergeWorkbooksPicking: '結合するファイルを選択…',
@@ -323,7 +338,9 @@ export const ja = {
   appFullLoadStart: 'すべて読み込む',
   appFullLoadRunning: 'ブック全体を読み込んでいます。完了すると並べ替えとフィルターが使用できます…',
   appFullLoadTooLarge:
-    'このブックは大きすぎるため完全に読み込めません。このファイルでは並べ替えとフィルターを使用できません。',
+    'このブックは大きすぎるため完全に読み込めません。このファイルでは並べ替えと範囲の移動を使用できません。フィルターはファイル上で直接実行されます。',
+  appLargeFilterLoading: 'ファイルからフィルター列を読み込んでいます…',
+  appLargeFilterApplying: 'ファイルにフィルターを適用しています…',
   appSortValueModeFormulas:
     '選択範囲に数式が含まれていますが、この大きなブックでは数式はライブ計算されません。並べ替えや移動を行うと数式が値として保存されます。数式を含まない範囲を選択してください。',
   appSortRangeTooLarge:
@@ -720,6 +737,7 @@ export const ja = {
   appTabReview: '校閲',
   appRibbonCollapse: 'リボンを折りたたむ',
   appRibbonExpand: 'リボンを展開する',
+  appRibbonCompact: 'コンパクトリボン（アイコンのみ）',
   appTabView: '表示',
   appTabAi: 'AI',
   appTabChartDesign: 'グラフのデザイン',
@@ -766,7 +784,6 @@ export const ja = {
   appRemoveLink: 'リンクの削除',
   // Ribbon common
   appNotAvailableYet: '現在利用できません',
-  appComingSoon: '近日提供予定',
   // Chart Design tab
   appGroupChartLayouts: 'グラフのレイアウト',
   appAddChartElement: 'グラフ要素を追加',
@@ -1277,6 +1294,10 @@ export const ja = {
   appFontSizeTip: 'フォントサイズ',
   appZoomIn: '拡大',
   appZoomOut: '縮小',
+  appImgActualSize: '実際のサイズ',
+  appImgFitWindow: 'ウィンドウに合わせる',
+  appImgSaveAs: '画像を名前を付けて保存…',
+  appImgClose: '閉じる (Esc)',
   appZoomSheetTitle: 'シートをズーム',
   appResetZoom: 'ズームのリセット',
   appZoomToSelection: '選択範囲に合わせて拡大/縮小',
@@ -1320,6 +1341,21 @@ export const ja = {
   appOpenFileFirst: '先にファイルを開いてください',
   appNoPassword: 'パスワードなし',
   appProtectWorkbook: 'ブックの保護',
+  appChangePassword: 'パスワードの変更',
+  appWorkbookPasswordChanged: 'ブックのパスワードを更新しました。',
+  appEncryptedOpenTitle: 'パスワード保護されたブックを開く',
+  appEncryptedOpenCopy: 'このブックのロックを解除するパスワードを入力してください。',
+  appEncryptedPasswordLabel: 'パスワード',
+  appEncryptedOpen: '開く',
+  appChangePasswordTitle: 'ブックのパスワードを変更',
+  appChangePasswordCopy: '新しいパスワードを入力し、下で確認してください。',
+  appNewPasswordLabel: '新しいパスワード',
+  appConfirmPasswordLabel: '新しいパスワードの確認',
+  appPasswordsMismatch: 'パスワードが一致しません。',
+  appPasswordUpdateFailed: 'ブックのパスワードを更新できませんでした。',
+  appPasswordUpdating: '更新中…',
+  appUpdatePassword: 'パスワードを更新',
+  appWorkbookNotPasswordProtected: 'このブックには読み取りパスワードが設定されていません。',
   appAllowEditRanges: '範囲の編集を許可',
   // Home tab
   appGroupClipboard: 'クリップボード',
@@ -1502,6 +1538,16 @@ export const ja = {
   appTableFileUnnamed: 'このテーブルはファイル内に名前がないため、ここでは変更できません。',
   appTableRowsNotLoaded: 'テーブルの行をまだ読み込み中です。しばらくしてからやり直してください。',
   appTableTotalLabel: '集計',
+  appNotePicturesPaneTitle: 'メモの画像',
+  appNotePicturesClose: '閉じる',
+  appNotePicturesNone: 'このブックに画像を表示しているメモはありません。',
+  appNotePictureUnavailable: 'この画像は表示できません。',
+  appNotePicturesToggle: 'メモの画像',
+  appNoteInsertPicture: '画像を挿入',
+  appNotePictureInserted:
+    '{cell} のコメントに画像を追加しました。保存するとファイルに書き込まれます。',
+  appNotePictureRemoved: '{cell} のコメントから画像を取り除きました。',
+  appNotePictureRemove: '画像を削除',
   appCommentsPaneTitle: 'コメント',
   appThreadReply: '返信',
   appThreadReplyPlaceholder: '返信…',
@@ -1546,6 +1592,8 @@ export const ja = {
   appVisualSendBackward: '背面へ移動',
   appVisualSizeProperties: 'サイズとプロパティ…',
   appVisualHyperlink: 'ハイパーリンク…',
+  appVisualEmbedInCell: 'セルに画像を埋め込む',
+  appVisualEmbedFailed: 'この画像をセルに埋め込めませんでした。',
   appVisualDelete: '削除',
   appVisualArranged: 'オブジェクトを更新しました — {saveKeys} で保存。',
   appVisualCopied: 'オブジェクトをコピーしました。',

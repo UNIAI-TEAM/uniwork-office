@@ -1,9 +1,18 @@
 import { Mark, Extension } from '@tiptap/core'
+<<<<<<< ours
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
+=======
+import { Plugin, PluginKey } from '@tiptap/pm/state'
+>>>>>>> theirs
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import type { EditorView } from '@tiptap/pm/view'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import type { WikiLinkResolved } from '../../shared/ipc'
+<<<<<<< ours
+=======
+import { collectWikiEmbedTargets, embedWidth, isImagePath, wikiEmbedSpans } from './wikiEmbed'
+import { resolveImageSrc } from './localImage'
+>>>>>>> theirs
 
 /**
  * `[[target]]`, `[[target|alias]]`, `[[target#heading]]`, `[[target#^blockid]]`.
@@ -13,6 +22,7 @@ import type { WikiLinkResolved } from '../../shared/ipc'
 const WIKI_LINK_RE = /^\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+))?\]\]/
 
 /**
+<<<<<<< ours
  * `[[Note#Head|Alias]]` -> `Note#Head`: the bare target the resolver documents.
  * The `#fragment` stays (the resolver splits it); '' when nothing is left.
  */
@@ -24,6 +34,8 @@ export function wikiTarget(raw: string): string {
 }
 
 /**
+=======
+>>>>>>> theirs
  * Index of the first unescaped `[[`. The stock link tokenizer opens on a
  * single `[`, so both candidates start at the same offset and marked breaks
  * that tie by extension order — pointing `start` at the first bracket is what
@@ -112,15 +124,33 @@ function wikiSpans(doc: PmNode): WikiSpan[] {
   return spans
 }
 
+<<<<<<< ours
 /** every distinct bare wiki target in the document, in document order */
+=======
+/** the file part of a link as written: `[[Note|Alias]]` -> `Note`, `[[Note#H]]` -> `Note#H` */
+export function wikiTargetOf(raw: string): string {
+  // an embed's inner `Note#Heading|200` arrives without brackets; its hint is
+  // not part of the file name either
+  const inner = WIKI_LINK_RE.exec(raw)?.[1] ?? raw.split('|')[0]!
+  return inner.trim()
+}
+
+/** every distinct wiki link in the document as written, in document order */
+>>>>>>> theirs
 export function collectWikiTargets(doc: PmNode): string[] {
   const seen = new Set<string>()
   const out: string[] = []
   for (const span of wikiSpans(doc)) {
+<<<<<<< ours
     const target = wikiTarget(span.raw)
     if (!target || seen.has(target)) continue
     seen.add(target)
     out.push(target)
+=======
+    if (seen.has(span.raw)) continue
+    seen.add(span.raw)
+    out.push(span.raw)
+>>>>>>> theirs
   }
   return out
 }
@@ -141,6 +171,7 @@ export function wikiFragmentPosition(doc: PmNode, fragment: string): number | nu
   return found
 }
 
+<<<<<<< ours
 /** Put the caret at `pos` (from {@link wikiFragmentPosition}) and bring it into view. */
 export function revealWikiFragment(view: EditorView, pos: number): void {
   const selection = TextSelection.near(view.state.doc.resolve(pos))
@@ -150,13 +181,24 @@ export function revealWikiFragment(view: EditorView, pos: number): void {
   view.dispatch(view.state.tr.setSelection(selection).scrollIntoView())
 }
 
+=======
+>>>>>>> theirs
 export interface WikiLinkOptions {
   /** absolute path of the open document; '' while it is untitled */
   getDocumentPath(): string
   /** a link whose target was found was activated */
   onOpen(path: string, fragment: string): void
+<<<<<<< ours
   /** a link whose target was not found was activated, with the target as written */
   onUnresolved(target: string): void
+=======
+  /**
+   * a link whose target was not found was activated, with the target as
+   * written — the literal (brackets included) for a link, the inner text for
+   * an embed, which is flagged so a caller can decline to create from it
+   */
+  onUnresolved(target: string, embed: boolean): void
+>>>>>>> theirs
   /** seam for tests; defaults to the real IPC */
   resolve(fromPath: string, targets: string[]): Promise<Record<string, WikiLinkResolved>>
 }
@@ -202,6 +244,7 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
     let generation = 0
     /** what the last resolution asked for; a pause that asks the same thing again is not a new question */
     let asked = ''
+<<<<<<< ours
 
     /** paint every link in the document from the answers at hand */
     const decorate = (view: EditorView, answers: Record<string, WikiLinkResolved>) => {
@@ -224,12 +267,32 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
     const resolveNow = async (view: EditorView) => {
       const targets = collectWikiTargets(view.state.doc)
       if (targets.length === 0) {
+=======
+    // embed targets the browser refused to load. The resolver walks the whole
+    // vault, but the md-asset handler only serves files under an open
+    // document's own directory, so a picture in another folder resolves and
+    // then 403s. Remembering the refusal keeps the empty box from coming back
+    // on every repaint; the card is the honest rendering of that embed.
+    const blockedPictures = new Set<string>()
+
+    /** `repaint` re-answers an unchanged document: a refused picture has to be
+     *  re-decided, and the "same question" guard would otherwise skip it */
+    const resolveNow = async (view: EditorView, repaint = false) => {
+      // one batch answers links and embeds: an embed is the same lookup with
+      // the `!` folded away, and both halves pay for a single traversal
+      const raws = [
+        ...collectWikiTargets(view.state.doc),
+        ...collectWikiEmbedTargets(view.state.doc),
+      ]
+      if (raws.length === 0) {
+>>>>>>> theirs
         asked = ''
         if (view.isDestroyed) return
         view.dispatch(view.state.tr.setMeta(key, { decorations: DecorationSet.empty, answers: {} }))
         return
       }
       const fromPath = options.getDocumentPath()
+<<<<<<< ours
       const question = `${fromPath}\u0000${targets.join('\u0000')}`
       // the walk it triggers can read twenty thousand entries; typing prose
       // around an unresolved link changes no target, so it asks nothing; a link
@@ -245,14 +308,99 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
       let answers: Record<string, WikiLinkResolved>
       try {
         answers = await options.resolve(fromPath, targets)
+=======
+      const question = `${fromPath}\u0000${raws.join('\u0000')}`
+      // the walk it triggers can read twenty thousand entries; typing prose
+      // around an unresolved link changes no target, so it asks nothing
+      if (!repaint && question === asked) return
+      const mine = ++generation
+      // the resolver takes file names; the answers are keyed back by the literal
+      const targets = [...new Set(raws.map(wikiTargetOf))]
+      let resolved: Record<string, WikiLinkResolved>
+      try {
+        resolved = await options.resolve(fromPath, targets)
+>>>>>>> theirs
       } catch {
         return // an unavailable resolver must not break editing
       }
       // a later keystroke started a newer resolution; its answer is the current one
       if (mine !== generation || view.isDestroyed) return
       asked = question
+<<<<<<< ours
 
       decorate(view, answers)
+=======
+      const answers: Record<string, WikiLinkResolved> = {}
+      for (const raw of raws) {
+        const answer = resolved[wikiTargetOf(raw)]
+        if (answer) answers[raw] = answer
+      }
+
+      const linkDecorations = wikiSpans(view.state.doc).map((span) =>
+        Decoration.inline(span.from, span.to, {
+          class: answers[span.raw]?.found ? 'wiki-link-resolved' : 'wiki-link-unresolved',
+          'data-wiki-target': span.raw,
+        }),
+      )
+      // embed targets whose <img> the md-asset protocol refused (see below)
+      const blocked = blockedPictures
+      const embedDecorations: Decoration[] = []
+      for (const span of wikiEmbedSpans(view.state.doc)) {
+        const answer = answers[span.inner]
+        const found = answer?.found === true
+        // a resolved picture swaps the literal for the image itself, so the
+        // node also carries the class that hides its own text
+        // the resolver walks the whole vault, but the md-asset handler only
+        // serves files under an open document's own directory — a picture in
+        // another folder resolves here and then 403s, which would show an
+        // empty box. `blocked` holds the ones the browser refused, so the
+        // embed falls back to its card instead.
+        const picture = found && isImagePath(answer!.path) && !blocked.has(span.inner)
+        embedDecorations.push(
+          Decoration.node(span.from, span.to, {
+            class: `${found ? 'wiki-embed-resolved' : 'wiki-embed-unresolved'}${
+              picture ? ' wiki-embed-image' : ''
+            }`,
+            'data-wiki-target': span.inner,
+            'data-wiki-embed': '1',
+          }),
+        )
+        if (picture) {
+          const width = embedWidth(`![[${span.inner}]]`)
+          const target = span.inner
+          embedDecorations.push(
+            Decoration.widget(
+              span.to,
+              () => {
+                const img = document.createElement('img')
+                img.className = 'wiki-embed-img'
+                img.src = resolveImageSrc(answer!.path)
+                img.alt = span.inner
+                if (width !== null) img.style.width = `${width}px`
+                // the handler refused this file: drop the picture and let the
+                // node render its card, rather than leave an empty box
+                img.addEventListener('error', () => {
+                  if (blockedPictures.has(target)) return
+                  blockedPictures.add(target)
+                  void resolveNow(view, true)
+                })
+                return img
+              },
+              { side: 10 },
+            ),
+          )
+        }
+      }
+      view.dispatch(
+        view.state.tr.setMeta(key, {
+          decorations: DecorationSet.create(view.state.doc, [
+            ...linkDecorations,
+            ...embedDecorations,
+          ]),
+          answers,
+        }),
+      )
+>>>>>>> theirs
     }
 
     const schedule = (view: EditorView) => {
@@ -272,17 +420,32 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
         props: {
           decorations: (state) => (key.getState(state) ?? EMPTY).decorations,
           handleClick: (view, _pos, event) => {
+<<<<<<< ours
             // a plain click only places the caret, so link text stays editable;
             // the modifier is what leaves the document, as with `openOnClick: false` elsewhere
             if (!event.metaKey && !event.ctrlKey) return false
+=======
+>>>>>>> theirs
             const el = (event.target as HTMLElement | null)?.closest<HTMLElement>(
               '[data-wiki-target]',
             )
             if (!el) return false
+<<<<<<< ours
             const raw = el.getAttribute('data-wiki-target') ?? ''
             const answer = (key.getState(view.state) ?? EMPTY).answers[wikiTarget(raw)]
             if (answer?.found) options.onOpen(answer.path, answer.fragment)
             else options.onUnresolved(raw)
+=======
+            // a link's text stays editable, so the modifier is what leaves the
+            // document (as with `openOnClick: false` elsewhere); an embed has no
+            // text to edit, so a plain click is what opens it
+            const embed = el.getAttribute('data-wiki-embed') === '1'
+            if (!embed && !event.metaKey && !event.ctrlKey) return false
+            const raw = el.getAttribute('data-wiki-target') ?? ''
+            const answer = (key.getState(view.state) ?? EMPTY).answers[raw]
+            if (answer?.found) options.onOpen(answer.path, answer.fragment)
+            else options.onUnresolved(raw, embed)
+>>>>>>> theirs
             return true
           },
         },
@@ -307,9 +470,12 @@ export const WikiLink = Mark.create({
   // above Link (1000): a wiki link must open before a markdown link claims the
   // same bracket, and ProseMirror derives mark ranks from this order
   priority: 1100,
+<<<<<<< ours
   // a link ends where its literal ends: text typed after it, or the next line
   // after Enter, must not grow it
   inclusive: false,
+=======
+>>>>>>> theirs
 
   markdownTokenizer: {
     name: 'wikiLink',

@@ -9,6 +9,14 @@ export const en = {
   redactDialogPlaceholder: 'Placeholder name, e.g. client phone',
   redactCancel: 'Cancel',
   redactInsert: 'Hide',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'This file was changed by another program.',
+  diskConflictMsg: 'This file changed on disk; saving will overwrite those changes.',
+  diskReload: 'Reload',
+  diskKeepMine: 'Keep mine',
+  diskOverwrite: 'Overwrite anyway',
+>>>>>>> theirs
 
   loading: 'Loading…',
   loadFailed: 'Could not open the file',
@@ -107,6 +115,7 @@ export const en = {
   alignLeft: 'Align left',
   alignCenter: 'Center',
   alignRight: 'Align right',
+  alignJustify: 'Justify',
   fontSizeDec: 'Decrease font size',
   fontSizeInc: 'Increase font size',
   typography: 'Typography',

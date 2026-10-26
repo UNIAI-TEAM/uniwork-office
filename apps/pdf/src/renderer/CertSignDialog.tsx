@@ -10,9 +10,15 @@ import type {
 import type { TFunc } from './i18n/locale'
 import { useModalDialog } from './modal-dialog'
 import { renderSignatureAppearance } from './cert-appearance'
+<<<<<<< ours
 import { isConfirmKey } from './shortcuts'
 
 const BOX_WIDTH = 210
+=======
+
+const BOX_WIDTH = 210
+const IS_MAC = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
+>>>>>>> theirs
 const BOX_HEIGHT = 70
 const POSITIONS: { value: SignaturePosition; key: Parameters<TFunc>[0] }[] = [
   { value: 'bottom-right', key: 'certPosBottomRight' },
@@ -38,6 +44,11 @@ export function certErrorKey(error: FailedResult['error']): Parameters<TFunc>[0]
       return 'certErrNotExportable'
     case 'cert-store-locked':
       return 'certErrStoreLocked'
+<<<<<<< ours
+=======
+    case 'cert-store-unsupported':
+      return 'certStoreUnsupported'
+>>>>>>> theirs
     case 'cert-store-tool-missing':
       return 'certErrNoTools'
     case 'pdf-encrypted':
@@ -68,10 +79,15 @@ export function CertSignDialog({
   onCancel: () => void
   onSigned: (path: string) => void
 }): ReactElement {
+<<<<<<< ours
   const [busy, setBusy] = useState(false)
   // Esc, like the backdrop and the buttons, must not abandon a signing run in flight
   const dialogRef = useModalDialog(onCancel, { escape: !busy })
   const [source, setSource] = useState<'system' | 'file'>('system')
+=======
+  const dialogRef = useModalDialog(onCancel)
+  const [source, setSource] = useState<'system' | 'file'>(IS_MAC ? 'file' : 'system')
+>>>>>>> theirs
   const [cert, setCert] = useState<{ certId: string; fileName: string } | null>(null)
   const [systemCerts, setSystemCerts] = useState<SystemCertificateInfo[]>([])
   const [systemId, setSystemId] = useState('')
@@ -89,11 +105,19 @@ export function CertSignDialog({
   const [location, setLocation] = useState('')
   const [contact, setContact] = useState('')
   const [visible, setVisible] = useState(true)
+<<<<<<< ours
   // text, not a number: a cleared field must stay empty while the user types a new page
   const [pageText, setPageText] = useState(String(currentPage))
   const [position, setPosition] = useState<SignaturePosition>('bottom-right')
   const [certify, setCertify] = useState(false)
   const [level, setLevel] = useState<1 | 2 | 3>(2)
+=======
+  const [page, setPage] = useState(currentPage)
+  const [position, setPosition] = useState<SignaturePosition>('bottom-right')
+  const [certify, setCertify] = useState(false)
+  const [level, setLevel] = useState<1 | 2 | 3>(2)
+  const [busy, setBusy] = useState(false)
+>>>>>>> theirs
   const [error, setError] = useState<string | null>(null)
 
   // A different password or certificate invalidates what was checked
@@ -182,13 +206,21 @@ export function CertSignDialog({
         path: filePath,
         certId: activeId,
         password: source === 'file' ? password : '',
+<<<<<<< ours
+=======
+        storePassword: source === 'system' && storePassword ? storePassword : undefined,
+>>>>>>> theirs
         reason: reason.trim() || undefined,
         location: location.trim() || undefined,
         contactInfo: contact.trim() || undefined,
         certifyLevel: certify && !hasSignatures ? level : undefined,
         visible: png
           ? {
+<<<<<<< ours
               pageIndex: Math.min(Math.max(Number(pageText) || 1, 1), pageCount) - 1,
+=======
+              pageIndex: Math.min(Math.max(page, 1), pageCount) - 1,
+>>>>>>> theirs
               position,
               width: BOX_WIDTH,
               height: BOX_HEIGHT,
@@ -224,12 +256,19 @@ export function CertSignDialog({
           <span>{t('certSource')}</span>
           <select
             className="pdf-modal-input"
+<<<<<<< ours
             aria-label={t('certSource')}
+=======
+>>>>>>> theirs
             value={source}
             disabled={busy}
             onChange={(e) => setSource(e.target.value as 'system' | 'file')}
           >
+<<<<<<< ours
             <option value="system">{t('certSourceSystem')}</option>
+=======
+            {!IS_MAC && <option value="system">{t('certSourceSystem')}</option>}
+>>>>>>> theirs
             <option value="file">{t('certSourceFile')}</option>
           </select>
         </div>
@@ -240,7 +279,10 @@ export function CertSignDialog({
               <span>{t('certSigner')}</span>
               <select
                 className="pdf-modal-input"
+<<<<<<< ours
                 aria-label={t('certSigner')}
+=======
+>>>>>>> theirs
                 value={systemId}
                 disabled={busy || systemCerts.length === 0}
                 onChange={(e) => setSystemId(e.target.value)}
@@ -266,6 +308,12 @@ export function CertSignDialog({
             {!listing && systemCerts.length === 0 && issues.length === 0 && (
               <div className="pdf-modal-hint">{t('certSystemEmpty')}</div>
             )}
+<<<<<<< ours
+=======
+            {issues.includes('platform-unsupported') && (
+              <div className="pdf-modal-hint">{t('certStoreUnsupported')}</div>
+            )}
+>>>>>>> theirs
             {issues.includes('nss-tools-missing') && (
               <div className="pdf-modal-hint">{t('certStoreNoTools')}</div>
             )}
@@ -275,12 +323,19 @@ export function CertSignDialog({
                 <input
                   className="pdf-modal-input"
                   type="password"
+<<<<<<< ours
                   aria-label={t('certStorePassword')}
+=======
+>>>>>>> theirs
                   autoComplete="off"
                   value={storePassword}
                   onChange={(e) => setStorePassword(e.target.value)}
                   onKeyDown={(e) => {
+<<<<<<< ours
                     if (isConfirmKey(e)) void loadSystem(storePassword || undefined)
+=======
+                    if (e.key === 'Enter') void loadSystem(storePassword || undefined)
+>>>>>>> theirs
                   }}
                 />
                 <button
@@ -325,7 +380,11 @@ export function CertSignDialog({
                 disabled={!cert || busy}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => {
+<<<<<<< ours
                   if (isConfirmKey(e)) void (signer ? sign() : check())
+=======
+                  if (e.key === 'Enter') void (signer ? sign() : check())
+>>>>>>> theirs
                 }}
               />
               <button
@@ -418,6 +477,7 @@ export function CertSignDialog({
               type="number"
               min={1}
               max={pageCount}
+<<<<<<< ours
               value={pageText}
               aria-label={t('certPage')}
               disabled={busy}
@@ -425,11 +485,19 @@ export function CertSignDialog({
               onBlur={() =>
                 setPageText(String(Math.min(Math.max(Number(pageText) || 1, 1), pageCount)))
               }
+=======
+              value={page}
+              disabled={busy}
+              onChange={(e) => setPage(Number(e.target.value) || 1)}
+>>>>>>> theirs
             />
             <span>{t('certPosition')}</span>
             <select
               className="pdf-modal-input"
+<<<<<<< ours
               aria-label={t('certPosition')}
+=======
+>>>>>>> theirs
               value={position}
               disabled={busy}
               onChange={(e) => setPosition(e.target.value as SignaturePosition)}
@@ -460,7 +528,10 @@ export function CertSignDialog({
             <span />
             <select
               className="pdf-modal-input"
+<<<<<<< ours
               aria-label={t('certCertify')}
+=======
+>>>>>>> theirs
               value={level}
               disabled={busy}
               onChange={(e) => setLevel(Number(e.target.value) as 1 | 2 | 3)}

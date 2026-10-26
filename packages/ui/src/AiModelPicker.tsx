@@ -287,6 +287,7 @@ export function AiModelPicker({
       ),
     [groups],
   )
+<<<<<<< ours
   const isOrgGroup = (id: string) => settings?.modelSources?.[id as AiProviderId]?.origin === 'org'
   const hasOrgGroup = groups.some((g) => isOrgGroup(g.id))
   const noteDue = (id: string) => isOrgGroup(id) && !seenOrgNotes.has(id) && !readOrgNoteSeen(id)
@@ -379,6 +380,12 @@ export function AiModelPicker({
     for (const id of shown) writeOrgNoteSeen(id)
     setSeenOrgNotes((prev) => new Set([...prev, ...shown]))
   }, [open, shownIds])
+=======
+  const current = settings ? aiModelPickerSelection(settings) : null
+  const sameGroup = (g: { id: string; endpoint?: string | undefined }) =>
+    g.id === current?.provider && (g.id !== 'custom' || g.endpoint === current?.endpoint)
+  const currentUsable = groups.some(sameGroup)
+>>>>>>> theirs
 
   const toggle = () => {
     // every open re-reads the settings (host data: Settings pick, live lists, served model); a host
@@ -597,7 +604,7 @@ export function AiModelPicker({
   if (!settings) return null
   const chipText =
     currentUsable && current
-      ? current.model || groupLabel(groups, current.provider)
+      ? current.model || (groups.find(sameGroup)?.label ?? '')
       : strings.choose
   const chipLabel = `${strings.title}: ${chipText}`
 
@@ -622,10 +629,15 @@ export function AiModelPicker({
         onKeyDown={onChipKeyDown}
         aria-haspopup="listbox"
         aria-expanded={open}
+<<<<<<< ours
         aria-controls={open ? listId : undefined}
         title={chipLabel}
         data-tip={chipLabel}
         aria-label={chipLabel}
+=======
+        data-tip={`${strings.title}: ${chipText}`}
+        aria-label={`${strings.title}: ${chipText}`}
+>>>>>>> theirs
       >
         {currentUsable && current && <ProviderLogo id={current.provider} />}
         <span className="ai-model-chip-text">{chipText}</span>
@@ -648,6 +660,7 @@ export function AiModelPicker({
           aria-label={strings.choose}
           style={popStyle}
         >
+<<<<<<< ours
           <div
             ref={listRef}
             id={listId}
@@ -687,6 +700,25 @@ export function AiModelPicker({
                       role="presentation"
                       aria-hidden
                       data-org-key-note=""
+=======
+          <div className="ai-model-pop-list">
+            {groups.map((g) => (
+              <div key={g.endpoint ? `${g.id}:${g.endpoint}` : g.id} className="ai-model-group">
+                <div className="ai-model-group-head">
+                  <ProviderLogo id={g.id} />
+                  <span>{g.label}</span>
+                </div>
+                {(g.models.length > 0 ? g.models : ['']).map((m) => {
+                  const selected = sameGroup(g) && current?.model === m
+                  return (
+                    <button
+                      key={`${g.id}:${g.endpoint ?? ''}:${m}`}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className={`ai-model-item${selected ? ' selected' : ''}`}
+                      onClick={() => pick({ provider: g.id, endpoint: g.endpoint, model: m })}
+>>>>>>> theirs
                     >
                       {strings.orgKeyNote}
                     </div>
@@ -788,6 +820,7 @@ export function AiModelPicker({
     </div>
   )
 }
+<<<<<<< ours
 
 function effectiveZoom(el: HTMLElement | null): number {
   if (!el) return 1
@@ -810,3 +843,5 @@ function effectiveZoom(el: HTMLElement | null): number {
 function groupLabel(groups: ReadonlyArray<{ id: string; label: string }>, id: string): string {
   return groups.find((g) => g.id === id)?.label ?? id
 }
+=======
+>>>>>>> theirs

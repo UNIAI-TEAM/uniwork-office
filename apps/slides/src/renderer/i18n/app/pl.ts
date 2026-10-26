@@ -67,7 +67,8 @@ export const pl = {
     'Wstawiono wideo (osadzone w pliku .pptx; można je odtwarzać w programie PowerPoint)',
   appStatusAudioInserted: 'Wstawiono dźwięk (osadzony w pliku .pptx)',
   appStatusModel3dInserted:
-    'Osadzono model 3D (na kanwie widoczny jest symbol zastępczy; plik modelu jest zapisany w pliku .pptx)',
+    'Wstawiono model 3D: zaznacz go, aby go obrócić (PowerPoint także pokazuje go w 3D)',
+  appStatusModel3dNoPreview: 'Nie można tutaj narysować modelu 3D; jego obraz pozostaje bez zmian',
   appStatusRecordingEmpty: 'Nagranie jest puste; niczego nie wstawiono',
   appStatusRecordingInserted: 'Wstawiono nagranie ekranu na bieżący slajd (osadzony plik webm)',
   appStatusRecording:
@@ -228,6 +229,8 @@ export const pl = {
   appMasterFillNone: 'Brak wypełnienia',
   appMasterStroke: 'Kolor konturu…',
   appMasterStrokeNone: 'Brak konturu',
+  appMasterInsertTextBox: 'Pole tekstowe',
+  appMasterInsertShape: 'Kształty',
   appStartOpening: 'Otwieranie…',
   appReadingSlideTitle:
     'Kliknij, aby przejść do następnego slajdu (Esc, aby wyjść z widoku do czytania)',
@@ -257,6 +260,25 @@ export const pl = {
     'Łączny czas pokazu wyniósł {duration}. Czy zapisać czasy wyświetlania slajdów do automatycznego przełączania?',
   appRehearseDiscard: 'Nie zapisuj',
   appRehearseSave: 'Zapisz',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Nagraj narrację',
+  appRecordSummary: 'Czas nagrania: {duration}. Zapisać narrację i czas każdego slajdu?',
+  appRecordDiscard: 'Nie zapisuj',
+  appRecordSave: 'Zapisz',
+  appStatusRecordSaved: 'Zapisano narrację na slajdach: {count} (odtwarza ją także PowerPoint)',
+  appStatusRecordFailed: 'Nie udało się zapisać nagrania',
+  appStatusNarrationCleared: 'Wyczyszczono narrację',
+  appSettingsTitle: 'Ustawienia AI',
+  appSettingsAccount: 'Konto Genspark',
+  appSettingsChecking: 'Sprawdzanie…',
+  appSettingsLoggedIn: 'Zalogowano',
+  appSettingsLoggedInEmail: 'Zalogowano: {email}',
+  appSettingsLoggedOut: 'Nie zalogowano (funkcje AI wymagają konta Genspark)',
+  appSettingsLoginPending: 'Oczekiwanie na logowanie w przeglądarce…',
+  appSettingsLogin: 'Zaloguj się do Genspark',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Anuluj',
   appCropHint: 'Enter — potwierdź · Esc — anuluj · Kliknij poza obszarem, aby potwierdzić',
   appStatusZoomsInserted:

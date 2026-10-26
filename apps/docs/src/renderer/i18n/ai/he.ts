@@ -123,6 +123,7 @@ export const he = {
   aiTooManyImages: 'עד {max} תמונות בהודעה; הנוספות לא נכללו',
   aiUnknownError: 'שגיאה לא ידועה',
   aiTimeoutError: 'תם הזמן לבקשת ה-AI: אין תגובה מהרשת וההרצה הופסקה. בדוק את החיבור ונסה שוב',
+  aiRegionError: 'ספק המודל הזה אינו פועל באזור הנוכחי שלך — בחרו מודל אחר או החליפו רשת',
   aiOverloadedError: 'שירות ה-AI עמוס כרגע — נסו שוב בעוד רגע',
   aiNetworkError: 'בעיית רשת: לא ניתן להתחבר לשירות ה-AI. בדוק את החיבור ונסה שוב',
   aiCreditsExhausted: 'קרדיטי UniWork שלך אזלו. טען מחדש ב-uniworkos.com/pricing ונסה שוב',
@@ -130,6 +131,9 @@ export const he = {
   aiSumImageAttachment: 'תמונה מצורפת {name}',
   aiSumRead: 'קריאת {name}',
   aiSumReadAttachmentName: 'קריאת הקובץ המצורף {name}',
+  aiSumSkillsList: 'רשימת מיומנויות מותקנות',
+  aiSumSkillRead: 'נקראה מיומנות {name}',
+  aiSumRunCli: 'בוצע {args}',
   aiSumWebSearch: 'חיפוש באינטרנט',
   aiSumWebSearchDone: 'חיפוש "{query}" ({count} תוצאות)',
   aiSumImageSearch: 'חיפוש תמונות',
@@ -191,6 +195,7 @@ export const he = {
   aiCmdImages: 'עודכנו {count} תמונות',
   aiCmdToc: 'הוסף תוכן עניינים ({count} ערכים)',
   aiCmdSkipped: ' (דולגו {count} בלוקים מוגנים)',
+<<<<<<< ours
   aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
   aiClarifyTitle: 'כמה שאלות לפני שאמשיך',
   aiClarifyDecide: 'החלט בשבילי',
@@ -204,6 +209,8 @@ export const he = {
   aiClarifySubmit: 'המשך',
   aiSumClarify: 'שאלות ההבהרה נענו',
   aiSumClarifySkipped: 'שאלות ההבהרה דולגו',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'צור מפת חשיבה של המסמך הזה',
   aiMindMapBtn: 'מפת חשיבה AI',
   aiMindMapPrompt:

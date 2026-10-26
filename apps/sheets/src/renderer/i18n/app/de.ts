@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const de = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Auswahl vor der KI verbergen',
+  redactDialogDesc:
+    'Das Ausgewählte bleibt im Dokument und in der Datei; das Modell sieht nur den Platzhalter. Geben Sie ihm einen Namen.',
+  redactDialogScope:
+    'Das Verbergen gilt nur für die KI dieser App. CLI, MCP-Tools und der Headless-Export lesen die Datei direkt und sehen diese Wörter weiterhin.',
+  redactDialogPlaceholder: 'Name des Platzhalters, z. B. Telefonnummer des Kunden',
+  redactCancel: 'Abbrechen',
+  redactInsert: 'Verbergen',
+  redactEnable: 'Rechtsklick auf eine Auswahl, um sie vor dem Modell zu verbergen.',
+  redactNeedsSavedRow:
+    'Diese Zeile ist noch nicht in der Datei. Bitte zuerst speichern und dann die Zelle ausblenden.',
+  redactRecoveredFromNames:
+    'Eine andere App hat diese Datei neu geschrieben und den Eintrag darüber, was ausgeblendet ist, verworfen. Die ausgeblendeten Zellen wurden aus den Namen in der Arbeitsmappe wiederhergestellt; beim Speichern wird der vollständige Eintrag zurückgeschrieben.',
+
   appMergeWorkbooks: 'Arbeitsmappen zusammenführen',
   appMergeWorkbooksTip: 'Blätter aus anderen Excel-Dateien in diese Arbeitsmappe übernehmen',
   appMergeWorkbooksPicking: 'Dateien zum Zusammenführen wählen…',
@@ -331,7 +346,9 @@ export const de = {
   appFullLoadRunning:
     'Die gesamte Arbeitsmappe wird geladen — Sortieren und Filtern sind danach verfügbar…',
   appFullLoadTooLarge:
-    'Diese Arbeitsmappe ist zu groß, um vollständig geladen zu werden; Sortieren und Filtern sind für diese Datei nicht verfügbar.',
+    'Diese Arbeitsmappe ist zu groß, um vollständig geladen zu werden; Sortieren und Verschieben von Bereichen sind für diese Datei nicht verfügbar. Das Filtern läuft direkt auf der Datei.',
+  appLargeFilterLoading: 'Filterspalte wird aus der Datei gelesen …',
+  appLargeFilterApplying: 'Filter wird auf die Datei angewendet …',
   appSortValueModeFormulas:
     'Dieser Bereich enthält Formeln, die in dieser großen Arbeitsmappe nicht live berechnet werden — Sortieren oder Verschieben würde sie als reine Werte speichern. Wählen Sie einen Bereich ohne Formeln.',
   appSortRangeTooLarge:
@@ -735,6 +752,7 @@ export const de = {
   appTabReview: 'Überprüfen',
   appRibbonCollapse: 'Menüband reduzieren',
   appRibbonExpand: 'Menüband erweitern',
+  appRibbonCompact: 'Kompaktes Menüband (nur Symbole)',
   appTabView: 'Ansicht',
   appTabAi: 'KI',
   appTabChartDesign: 'Diagrammentwurf',
@@ -776,7 +794,6 @@ export const de = {
   appLinkPlaceholder: 'https://example.com oder Sheet1!A1',
   appRemoveLink: 'Link entfernen',
   appNotAvailableYet: 'Noch nicht verfügbar',
-  appComingSoon: 'Demnächst verfügbar',
   appGroupChartLayouts: 'Diagrammlayouts',
   appAddChartElement: 'Diagrammelement hinzufügen',
   appAddChartElementTitle: 'Titel, Datenbeschriftungen, Legende',
@@ -1281,6 +1298,10 @@ export const de = {
   appFontSizeTip: 'Schriftgrad',
   appZoomIn: 'Vergrößern',
   appZoomOut: 'Verkleinern',
+  appImgActualSize: 'Originalgröße',
+  appImgFitWindow: 'An Fenster anpassen',
+  appImgSaveAs: 'Bild speichern unter…',
+  appImgClose: 'Schließen (Esc)',
   appZoomSheetTitle: 'Blatt zoomen',
   appResetZoom: 'Zoom zurücksetzen',
   appZoomToSelection: 'An Markierung anpassen',
@@ -1323,6 +1344,22 @@ export const de = {
   appOpenFileFirst: 'Öffnen Sie zuerst eine Datei',
   appNoPassword: 'Kein Kennwort',
   appProtectWorkbook: 'Arbeitsmappe schützen',
+  appChangePassword: 'Kennwort ändern',
+  appWorkbookPasswordChanged: 'Das Arbeitsmappenkennwort wurde aktualisiert.',
+  appEncryptedOpenTitle: 'Kennwortgeschützte Arbeitsmappe öffnen',
+  appEncryptedOpenCopy: 'Geben Sie das Kennwort ein, um diese Arbeitsmappe zu entsperren.',
+  appEncryptedPasswordLabel: 'Kennwort',
+  appEncryptedOpen: 'Öffnen',
+  appChangePasswordTitle: 'Kennwort der Arbeitsmappe ändern',
+  appChangePasswordCopy: 'Wählen Sie ein neues Kennwort und bestätigen Sie es unten.',
+  appNewPasswordLabel: 'Neues Kennwort',
+  appConfirmPasswordLabel: 'Neues Kennwort bestätigen',
+  appPasswordsMismatch: 'Die Kennwörter stimmen nicht überein.',
+  appPasswordUpdateFailed: 'Das Kennwort der Arbeitsmappe konnte nicht aktualisiert werden.',
+  appPasswordUpdating: 'Wird aktualisiert…',
+  appUpdatePassword: 'Kennwort aktualisieren',
+  appWorkbookNotPasswordProtected:
+    'Diese Arbeitsmappe ist nicht durch ein Öffnungskennwort geschützt.',
   appAllowEditRanges: 'Bereiche zur Bearbeitung freigeben',
   appGroupClipboard: 'Zwischenablage',
   appPaste: 'Einfügen',
@@ -1508,6 +1545,16 @@ export const de = {
   appTableRowsNotLoaded:
     'Die Tabellenzeilen werden noch geladen – versuchen Sie es gleich noch einmal.',
   appTableTotalLabel: 'Ergebnis',
+  appNotePicturesPaneTitle: 'Bilder in Notizen',
+  appNotePicturesClose: 'Schließen',
+  appNotePicturesNone: 'Keine Notiz in dieser Arbeitsmappe zeigt ein Bild.',
+  appNotePictureUnavailable: 'Dieses Bild kann nicht angezeigt werden.',
+  appNotePicturesToggle: 'Bilder in Notizen',
+  appNoteInsertPicture: 'Bild einfügen',
+  appNotePictureInserted:
+    'Bild dem Kommentar in {cell} hinzugefügt. Speichern, um es in die Datei zu schreiben.',
+  appNotePictureRemoved: 'Bild aus dem Kommentar in {cell} entfernt.',
+  appNotePictureRemove: 'Bild entfernen',
   appCommentsPaneTitle: 'Kommentare',
   appThreadReply: 'Antworten',
   appThreadReplyPlaceholder: 'Antworten…',
@@ -1554,6 +1601,8 @@ export const de = {
   appVisualSendBackward: 'Eine Ebene nach hinten',
   appVisualSizeProperties: 'Größe und Eigenschaften…',
   appVisualHyperlink: 'Link…',
+  appVisualEmbedInCell: 'Bild in Zelle einbetten',
+  appVisualEmbedFailed: 'Das Bild konnte nicht in die Zelle eingebettet werden.',
   appVisualDelete: 'Löschen',
   appVisualArranged: 'Objekt aktualisiert — mit {saveKeys} speichern.',
   appVisualCopied: 'Objekt kopiert.',

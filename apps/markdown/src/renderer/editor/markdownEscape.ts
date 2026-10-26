@@ -98,6 +98,7 @@ type Serializer = {
 
 const hasMark = (node: JsonNode, name: string): boolean =>
   (node.marks ?? []).some((m) => (typeof m === 'string' ? m : m.type) === name)
+<<<<<<< ours
 
 const hasCodeMark = (node: JsonNode): boolean => hasMark(node, 'code')
 const hasWikiMark = (node: JsonNode): boolean => hasMark(node, 'wikiLink')
@@ -129,6 +130,8 @@ function wikiText(text: string, encode: (text: string) => string): string {
   }
   return at < text.length ? out + encode(text.slice(at)) : out
 }
+=======
+>>>>>>> theirs
 
 export const SelectiveEscapeMarkdown = Markdown.extend({
   onBeforeCreate(props) {
@@ -137,12 +140,21 @@ export const SelectiveEscapeMarkdown = Markdown.extend({
     if (!manager) return
     manager.escapeMarkdownSyntax = escapeMarkdownText
     const encode = manager.encodeTextForMarkdown.bind(manager)
+<<<<<<< ours
     manager.encodeTextForMarkdown = (text, node, parent) =>
       hasCodeMark(node)
         ? fenceCodeSpan(text)
         : hasWikiMark(node)
           ? wikiText(text, (part) => encode(part, node, parent))
           : encode(text, node, parent)
+=======
+    manager.encodeTextForMarkdown = (text, node, parent) => {
+      if (hasMark(node, 'code')) return fenceCodeSpan(text)
+      // the text under a wiki mark is the `[[...]]` literal; escaping it would change the target
+      if (hasMark(node, 'wikiLink')) return text
+      return encode(text, node, parent)
+    }
+>>>>>>> theirs
     patchInlineParsing(manager)
   },
 })

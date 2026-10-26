@@ -96,9 +96,11 @@ export const ja = {
   // Export PDF
   appExportingPdf: 'PDF をエクスポートしています…',
   appExportingHtml: 'HTML をエクスポートしています…',
+  appExportingMarkdown: 'Markdown をエクスポートしています…',
   appExportPdf: 'PDF のエクスポート',
   appExportPdfFailed: 'PDF のエクスポートに失敗しました: {error}',
   appExportHtmlFailed: 'HTML のエクスポートに失敗しました: {error}',
+  appExportMarkdownFailed: 'Markdown のエクスポートに失敗しました: {error}',
   appPrintGroupFailed: 'ページ グループの印刷に失敗しました',
   appPrintTitle: '印刷',
   appPrintProgress: '印刷を準備しています…',
@@ -113,12 +115,24 @@ export const ja = {
   appPrintFailed: '印刷に失敗しました: {error}',
   appPrintPrevPage: '前のページ',
   appPrintNextPage: '次のページ',
+  appPrintPrinter: 'プリンター',
+  appPrintDefaultPrinter: '既定のプリンター',
+  appPrintSystemDialog: 'システムの印刷ダイアログ…',
+  appPrintCopies: '部数',
+  appPrintCollate: '部単位で印刷',
+  appPrintDuplex: '両面印刷',
+  appPrintDuplexOff: '片面',
+  appPrintDuplexLong: '両面（長辺とじ）',
+  appPrintDuplexShort: '両面（短辺とじ）',
   appExportedPdf: 'PDF をエクスポートしました: {path}',
   appExportedHtml: 'HTML をエクスポートしました: {path}',
+  appExportedMarkdown: 'Markdown をエクスポートしました: {path}',
+  appExportMarkdownImagesDropped: '（{count} 枚の画像を読み取れなかったためスキップしました）',
   appExportedPdfMixed:
     'PDF をエクスポートしました: {path}(用紙サイズ混在、{n} グループをページ順に結合)',
   appExportPdfCanceled: 'PDF のエクスポートをキャンセルしました',
   appExportHtmlCanceled: 'HTML のエクスポートをキャンセルしました',
+  appExportMarkdownCanceled: 'Markdown のエクスポートをキャンセルしました',
   appExportingImages: '画像をエクスポート中…',
   appExportImagesProgress: '{count} 枚の画像をエクスポート中…',
   appExportImagesDone: '{count} 枚の画像を {dir} にエクスポートしました',
@@ -367,6 +381,15 @@ export const ja = {
   appAiBadgeTip: 'AI を使用します',
   appTranslate: '翻訳',
   appTranslateTo: '{lang}に翻訳',
+  redactMenuLabel: '選択範囲をAIから隠す',
+  redactDialogDesc:
+    '文章はドキュメントとファイルに残り、AI には下のマーカーしか見えません。名前をつけると、何を表すかAIが理解できます。',
+  redactDialogScope:
+    'これはこのアプリの AI に限られます。CLI、MCP ツール、GUI なしのエクスポートはファイルを直接読み込むため、これらの文字はまだ見えています。',
+  redactDialogPlaceholder: 'プレースホルダー名（例：顧客電話）',
+  redactCancel: 'キャンセル',
+  redactInsert: '隠す',
+  redactShowLabel: '選択範囲をAIにもう一度見せる',
   appLangEnglish: '英語',
   appLangSimplifiedChinese: '簡体字中国語',
   appLangJapanese: '日本語',
@@ -547,6 +570,7 @@ export const ja = {
   appUpdateStyleTip: '現在の選択範囲の書式でこのスタイルを更新します(styles.xml に書き戻し)',
   appNewStyleFromSelection: '選択範囲から新しいスタイルを作成',
   appStyleNamePlaceholder: 'スタイル名',
+<<<<<<< ours
   appWebConflictTitle: 'このドキュメントは別の場所で変更されました',
   appWebConflictBody: '変更はまだ UniWork になく、ログアウトするまでこのブラウザーに保持されます。',
   appWebConflictOverwrite: '上書き…',
@@ -586,4 +610,9 @@ export const ja = {
   appCopySaved: 'あなたのバージョンを新しいドキュメントとして保存しました：{title}。',
   appCopySaveFailed:
     'コピーを作成できませんでした。変更は引き続き安全です。もう一度お試しください。',
+=======
+  appMergeSourceLoaded: '{name}（{n} 件）を読み込みました',
+  appMergeWritten: '{n} 個のドキュメントを書き出しました',
+  appMergeNothingToWrite: '書き出すものがありません',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

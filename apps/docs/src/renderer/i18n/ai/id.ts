@@ -127,6 +127,8 @@ export const id = {
   aiUnknownError: 'Kesalahan tidak dikenal',
   aiTimeoutError:
     'Permintaan AI habis waktu: jaringan tidak merespons sehingga proses dihentikan. Periksa koneksi Anda lalu coba lagi',
+  aiRegionError:
+    'Penyedia model ini tidak melayani wilayah Anda saat ini — pilih model lain atau ganti jaringan',
   aiOverloadedError: 'Layanan AI sedang sibuk — silakan coba lagi sebentar lagi',
   aiNetworkError:
     'Masalah jaringan: tidak dapat terhubung ke layanan AI. Periksa koneksi Anda lalu coba lagi',
@@ -136,6 +138,9 @@ export const id = {
   aiSumImageAttachment: 'Lampiran gambar {name}',
   aiSumRead: 'Baca {name}',
   aiSumReadAttachmentName: 'Baca lampiran {name}',
+  aiSumSkillsList: 'Menampilkan skill terpasang',
+  aiSumSkillRead: 'Membaca skill {name}',
+  aiSumRunCli: 'Menjalankan {args}',
   aiSumWebSearch: 'Pencarian web',
   aiSumWebSearchDone: 'Mencari "{query}" ({count} hasil)',
   aiSumImageSearch: 'Pencarian gambar',
@@ -197,6 +202,7 @@ export const id = {
   aiCmdImages: '{count} gambar diperbarui',
   aiCmdToc: 'Daftar isi disisipkan ({count} entri)',
   aiCmdSkipped: ' ({count} blok terlindungi dilewati)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Dokumen hanya-lihat: AI dapat membaca dan menjawab pertanyaan, tetapi tidak dapat mengedit.',
   aiClarifyTitle: 'Beberapa pertanyaan sebelum melanjutkan',
@@ -211,6 +217,8 @@ export const id = {
   aiClarifySubmit: 'Lanjutkan',
   aiSumClarify: 'Klarifikasi dijawab',
   aiSumClarifySkipped: 'Klarifikasi dilewati',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Buat peta pikiran dari dokumen ini',
   aiMindMapBtn: 'Peta Pikiran AI',
   aiMindMapPrompt:

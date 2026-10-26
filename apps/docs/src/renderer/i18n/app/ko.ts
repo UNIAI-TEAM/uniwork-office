@@ -95,9 +95,11 @@ export const ko = {
   // Export PDF
   appExportingPdf: 'PDF 내보내는 중…',
   appExportingHtml: 'HTML 내보내는 중…',
+  appExportingMarkdown: 'Markdown 내보내는 중…',
   appExportPdf: 'PDF 내보내기',
   appExportPdfFailed: 'PDF 내보내기 실패: {error}',
   appExportHtmlFailed: 'HTML 내보내기 실패: {error}',
+  appExportMarkdownFailed: 'Markdown 내보내기 실패: {error}',
   appPrintGroupFailed: '페이지 그룹 인쇄 실패',
   appPrintTitle: '인쇄',
   appPrintProgress: '인쇄 준비 중…',
@@ -112,12 +114,24 @@ export const ko = {
   appPrintFailed: '인쇄 실패: {error}',
   appPrintPrevPage: '이전 페이지',
   appPrintNextPage: '다음 페이지',
+  appPrintPrinter: '프린터',
+  appPrintDefaultPrinter: '기본 프린터',
+  appPrintSystemDialog: '시스템 인쇄 대화 상자…',
+  appPrintCopies: '매수',
+  appPrintCollate: '한 부씩 인쇄',
+  appPrintDuplex: '양면 인쇄',
+  appPrintDuplexOff: '끄기',
+  appPrintDuplexLong: '긴 쪽으로 넘김',
+  appPrintDuplexShort: '짧은 쪽으로 넘김',
   appExportedPdf: 'PDF를 내보냈습니다: {path}',
   appExportedHtml: 'HTML를 내보냈습니다: {path}',
+  appExportedMarkdown: 'Markdown를 내보냈습니다: {path}',
+  appExportMarkdownImagesDropped: '({count}개 이미지를 읽을 수 없어 건너뛰었습니다)',
   appExportedPdfMixed:
     'PDF를 내보냈습니다: {path}(용지 크기 혼합, {n}개 그룹을 페이지 순서로 병합)',
   appExportPdfCanceled: 'PDF 내보내기를 취소했습니다',
   appExportHtmlCanceled: 'HTML 내보내기를 취소했습니다',
+  appExportMarkdownCanceled: 'Markdown 내보내기를 취소했습니다',
   appExportingImages: '이미지 내보내는 중…',
   appExportImagesProgress: '이미지 {count}장 내보내는 중…',
   appExportImagesDone: '이미지 {count}장을 {dir}에 내보냈습니다',
@@ -365,6 +379,15 @@ export const ko = {
   appAiBadgeTip: 'AI를 사용합니다',
   appTranslate: '번역',
   appTranslateTo: '{lang}(으)로 번역',
+  redactMenuLabel: '선택한 부분을 AI에서 숨기기',
+  redactDialogDesc:
+    '문서는 그대로 두고 AI에게는 아래 자리표시자만 보냅니다. 이름을 붙이면 AI가 무엇을 뜻하는지 알 수 있습니다.',
+  redactDialogScope:
+    '이 앱의 AI에만 적용됩니다. CLI, MCP 도구, 창 없는 내보내기는 파일을 직접 읽으므로 이 단어들은 여전히 보입니다.',
+  redactDialogPlaceholder: '자리표시자 이름, 예: 고객 전화',
+  redactCancel: '취소',
+  redactInsert: '숨기기',
+  redactShowLabel: '선택 영역을 AI에 다시 표시',
   appLangEnglish: '영어',
   appLangSimplifiedChinese: '중국어 간체',
   appLangJapanese: '일본어',
@@ -545,6 +568,7 @@ export const ko = {
   appUpdateStyleTip: '현재 선택 영역의 서식으로 이 스타일을 업데이트합니다(styles.xml에 기록)',
   appNewStyleFromSelection: '선택 영역에서 새 스타일 만들기',
   appStyleNamePlaceholder: '스타일 이름',
+<<<<<<< ours
   appWebConflictTitle: '이 문서는 다른 곳에서 변경되었습니다',
   appWebConflictBody:
     '변경 사항은 아직 UniWork에 없으며 로그아웃할 때까지 이 브라우저에 보관됩니다.',
@@ -580,4 +604,9 @@ export const ko = {
   appFileSaveCopy: '사본으로 저장…',
   appCopySaved: '내 버전을 새 문서로 저장했습니다: {title}.',
   appCopySaveFailed: '사본을 만들지 못했습니다. 변경 사항은 여전히 안전합니다. 다시 시도하세요.',
+=======
+  appMergeSourceLoaded: '{name}({n}개 레코드)을 불러왔습니다',
+  appMergeWritten: '문서 {n}개를 저장했습니다',
+  appMergeNothingToWrite: '저장할 문서가 없습니다',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

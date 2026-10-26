@@ -8,6 +8,14 @@ export const zh = {
   redactDialogPlaceholder: '占位名称，例如：客户电话',
   redactCancel: '取消',
   redactInsert: '隐藏',
+<<<<<<< ours
+=======
+  diskChangedMsg: '这个文件已被其他程序修改。',
+  diskConflictMsg: '这个文件在磁盘上已被修改，保存会覆盖那些改动。',
+  diskReload: '重新载入',
+  diskKeepMine: '保留我的',
+  diskOverwrite: '仍然覆盖',
+>>>>>>> theirs
 
   loading: '加载中…',
   loadFailed: '无法打开文件',
@@ -102,6 +110,7 @@ export const zh = {
   alignLeft: '左对齐',
   alignCenter: '居中',
   alignRight: '右对齐',
+  alignJustify: '两端对齐',
   fontSizeDec: '减小字号',
   fontSizeInc: '增大字号',
   typography: '文字排版',

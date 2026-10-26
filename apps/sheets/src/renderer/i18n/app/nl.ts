@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const nl = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Selectie verbergen voor de AI',
+  redactDialogDesc:
+    'De selectie blijft in het document en het bestand; het model ziet alleen de placeholder. Geef hem een naam.',
+  redactDialogScope:
+    'Verbergen geldt alleen voor de AI in deze app. De CLI, MCP-tools en de export zonder venster lezen het bestand rechtstreeks en zien deze woorden nog steeds.',
+  redactDialogPlaceholder: 'Naam van placeholder, bv. telefoonnummer klant',
+  redactCancel: 'Annuleren',
+  redactInsert: 'Verbergen',
+  redactEnable: 'Rechtsklik op een selectie om die voor het model te verbergen.',
+  redactNeedsSavedRow:
+    'Deze rij staat nog niet in het bestand. Sla eerst op en verberg daarna de cel.',
+  redactRecoveredFromNames:
+    'Een andere app heeft dit bestand herschreven en het overzicht van wat verborgen is weggegooid. De verborgen cellen zijn teruggevonden in de namen van de werkmap; bij opslaan wordt het volledige overzicht teruggeschreven.',
+
   appMergeWorkbooks: 'Werkmappen samenvoegen',
   appMergeWorkbooksTip: 'Bladen uit andere Excel-bestanden aan deze werkmap toevoegen',
   appMergeWorkbooksPicking: 'Kies bestanden om samen te voegen…',
@@ -323,7 +338,9 @@ export const nl = {
   appFullLoadRunning:
     'De hele werkmap wordt geladen — sorteren en filteren zijn beschikbaar zodra dit klaar is…',
   appFullLoadTooLarge:
-    'Deze werkmap is te groot om volledig in het geheugen te laden; sorteren en filteren zijn niet beschikbaar voor dit bestand.',
+    'Deze werkmap is te groot om volledig in het geheugen te laden; sorteren en bereiken verplaatsen zijn voor dit bestand niet beschikbaar. Filteren gebeurt rechtstreeks op het bestand.',
+  appLargeFilterLoading: 'Filterkolom wordt uit het bestand gelezen…',
+  appLargeFilterApplying: 'Filter wordt op het bestand toegepast…',
   appSortValueModeFormulas:
     'Dit bereik bevat formules die in deze grote werkmap niet live worden berekend — sorteren of verplaatsen zou ze als gewone waarden opslaan. Kies een bereik zonder formules.',
   appSortRangeTooLarge:
@@ -718,6 +735,7 @@ export const nl = {
   appTabReview: 'Controleren',
   appRibbonCollapse: 'Het lint samenvouwen',
   appRibbonExpand: 'Het lint uitvouwen',
+  appRibbonCompact: 'Compact lint (alleen pictogrammen)',
   appTabView: 'Beeld',
   appTabAi: 'AI',
   appTabChartDesign: 'Grafiekontwerp',
@@ -758,7 +776,6 @@ export const nl = {
   appLinkPlaceholder: 'https://example.com of Sheet1!A1',
   appRemoveLink: 'Koppeling verwijderen',
   appNotAvailableYet: 'Nog niet beschikbaar',
-  appComingSoon: 'Binnenkort beschikbaar',
   appGroupChartLayouts: 'Grafiekindelingen',
   appAddChartElement: 'Grafiekelement toevoegen',
   appAddChartElementTitle: 'Titels, gegevenslabels, legenda',
@@ -1262,6 +1279,10 @@ export const nl = {
   appFontSizeTip: 'Tekengrootte',
   appZoomIn: 'Inzoomen',
   appZoomOut: 'Uitzoomen',
+  appImgActualSize: 'Ware grootte',
+  appImgFitWindow: 'Aanpassen aan venster',
+  appImgSaveAs: 'Afbeelding opslaan als…',
+  appImgClose: 'Sluiten (Esc)',
   appZoomSheetTitle: 'In-/uitzoomen op het werkblad',
   appResetZoom: 'Zoomniveau herstellen',
   appZoomToSelection: 'Inzoomen op selectie',
@@ -1304,6 +1325,21 @@ export const nl = {
   appOpenFileFirst: 'Open eerst een bestand',
   appNoPassword: 'Geen wachtwoord',
   appProtectWorkbook: 'Werkmap beveiligen',
+  appChangePassword: 'Wachtwoord wijzigen',
+  appWorkbookPasswordChanged: 'Het wachtwoord van de werkmap is bijgewerkt.',
+  appEncryptedOpenTitle: 'Met wachtwoord beveiligde werkmap openen',
+  appEncryptedOpenCopy: 'Voer het wachtwoord in om deze werkmap te ontgrendelen.',
+  appEncryptedPasswordLabel: 'Wachtwoord',
+  appEncryptedOpen: 'Openen',
+  appChangePasswordTitle: 'Wachtwoord van werkmap wijzigen',
+  appChangePasswordCopy: 'Kies een nieuw wachtwoord en bevestig het hieronder.',
+  appNewPasswordLabel: 'Nieuw wachtwoord',
+  appConfirmPasswordLabel: 'Nieuw wachtwoord bevestigen',
+  appPasswordsMismatch: 'De wachtwoorden komen niet overeen.',
+  appPasswordUpdateFailed: 'Het wachtwoord van de werkmap kon niet worden bijgewerkt.',
+  appPasswordUpdating: 'Bijwerken…',
+  appUpdatePassword: 'Wachtwoord bijwerken',
+  appWorkbookNotPasswordProtected: 'Deze werkmap is niet beveiligd met een openingswachtwoord.',
   appAllowEditRanges: 'Bewerken van bereiken toestaan',
   appGroupClipboard: 'Klembord',
   appPaste: 'Plakken',
@@ -1488,6 +1524,16 @@ export const nl = {
     'Deze tabel heeft geen naam in het bestand en kan hier niet worden gewijzigd.',
   appTableRowsNotLoaded: 'De tabelrijen worden nog geladen; probeer het zo opnieuw.',
   appTableTotalLabel: 'Totaal',
+  appNotePicturesPaneTitle: 'Afbeeldingen bij notities',
+  appNotePicturesClose: 'Sluiten',
+  appNotePicturesNone: 'Geen enkele notitie in deze werkmap toont een afbeelding.',
+  appNotePictureUnavailable: 'Deze afbeelding kan niet worden getoond.',
+  appNotePicturesToggle: 'Afbeeldingen bij notities',
+  appNoteInsertPicture: 'Afbeelding invoegen',
+  appNotePictureInserted:
+    'Afbeelding toegevoegd aan de notitie in {cell}. Opslaan om die naar het bestand te schrijven.',
+  appNotePictureRemoved: 'Afbeelding verwijderd uit de notitie in {cell}.',
+  appNotePictureRemove: 'Afbeelding verwijderen',
   appCommentsPaneTitle: 'Opmerkingen',
   appThreadReply: 'Beantwoorden',
   appThreadReplyPlaceholder: 'Beantwoorden…',
@@ -1534,6 +1580,8 @@ export const nl = {
   appVisualSendBackward: 'Naar achteren',
   appVisualSizeProperties: 'Grootte en eigenschappen…',
   appVisualHyperlink: 'Hyperlink…',
+  appVisualEmbedInCell: 'Afbeelding in cel insluiten',
+  appVisualEmbedFailed: 'Deze afbeelding kon niet in de cel worden ingesloten.',
   appVisualDelete: 'Verwijderen',
   appVisualArranged: 'Object bijgewerkt — opslaan met {saveKeys}.',
   appVisualCopied: 'Object gekopieerd.',

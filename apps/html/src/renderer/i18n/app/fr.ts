@@ -9,6 +9,14 @@ export const fr = {
   redactDialogPlaceholder: 'Nom du placeholder, ex. : téléphone du client',
   redactCancel: 'Annuler',
   redactInsert: 'Masquer',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'Ce fichier a été modifié par un autre programme.',
+  diskConflictMsg: "Ce fichier a changé sur le disque ; l'enregistrer écrasera ces modifications.",
+  diskReload: 'Recharger',
+  diskKeepMine: 'Garder le mien',
+  diskOverwrite: 'Écraser quand même',
+>>>>>>> theirs
 
   loading: 'Chargement…',
   loadFailed: "Impossible d'ouvrir le fichier",
@@ -109,6 +117,7 @@ export const fr = {
   alignLeft: 'Aligner à gauche',
   alignCenter: 'Centrer',
   alignRight: 'Aligner à droite',
+  alignJustify: 'Justifier',
   fontSizeDec: 'Réduire la taille de police',
   fontSizeInc: 'Augmenter la taille de police',
   typography: 'Typographie',

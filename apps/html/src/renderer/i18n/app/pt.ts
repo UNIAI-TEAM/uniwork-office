@@ -9,6 +9,14 @@ export const pt = {
   redactDialogPlaceholder: 'Nome do marcador, ex.: telefone do cliente',
   redactCancel: 'Cancelar',
   redactInsert: 'Ocultar',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'Este arquivo foi alterado por outro programa.',
+  diskConflictMsg: 'Este arquivo mudou no disco; salvar substituirá essas alterações.',
+  diskReload: 'Recarregar',
+  diskKeepMine: 'Manter o meu',
+  diskOverwrite: 'Substituir mesmo assim',
+>>>>>>> theirs
 
   loading: 'Carregando…',
   loadFailed: 'Não foi possível abrir o arquivo',
@@ -109,6 +117,7 @@ export const pt = {
   alignLeft: 'Alinhar à esquerda',
   alignCenter: 'Centralizar',
   alignRight: 'Alinhar à direita',
+  alignJustify: 'Justificar',
   fontSizeDec: 'Diminuir tamanho da fonte',
   fontSizeInc: 'Aumentar tamanho da fonte',
   typography: 'Tipografia',

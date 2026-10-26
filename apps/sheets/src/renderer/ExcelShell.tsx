@@ -8,9 +8,13 @@ import {
   useRibbonCollapse,
   aiPanelInitiallyOpen,
   rememberAiPanelOpen,
+<<<<<<< ours
   UniAiMark,
   useAiSidebarEnabled,
   useUniworkSendGate,
+=======
+  useAiSidebarEnabled,
+>>>>>>> theirs
   type AiTokenUsageView,
 } from '@genoffice/ui'
 
@@ -269,6 +273,8 @@ interface ExcelShellProps {
   /// Chat attachments (chips + 📎 button + drag-and-drop), same structure as the
   /// docs/slides AI panels.
   readonly attachments: readonly AttachmentMeta[]
+  readonly attachedSkills: readonly string[]
+  readonly onToggleSkill: (name: string) => void
   readonly attachNotice: string | null
   readonly onPickAttachments: () => void
   readonly onAddAttachmentPaths: (paths: readonly string[]) => void
@@ -368,6 +374,8 @@ interface ExcelShellProps {
   readonly sheetTabActions: SheetTabActions | null
   /// Effective workbook structure lock (null = no file open).
   readonly onGetWorkbookProtection: () => boolean | null
+  /// True when the current OOXML file is encrypted with a workbook-open password.
+  readonly passwordProtected: boolean
   readonly formulaBarVisible: boolean
   /// Cross-highlight ("reading mode") of the active row/column, echoed by the View checkbox.
   readonly crossHighlightVisible: boolean
@@ -493,6 +501,8 @@ export function ExcelShell({
   chat,
   historicChat,
   attachments,
+  attachedSkills,
+  onToggleSkill,
   attachNotice,
   onPickAttachments,
   onAddAttachmentPaths,
@@ -504,6 +514,7 @@ export function ExcelShell({
   onUnprotectSheet,
   sheetTabActions,
   onGetWorkbookProtection,
+  passwordProtected,
   formulaBarVisible,
   crossHighlightVisible,
   onGetProtectedRanges,
@@ -585,6 +596,7 @@ export function ExcelShell({
   onGetFillSeriesContext,
 }: ExcelShellProps): React.JSX.Element {
   const { t } = useI18n()
+<<<<<<< ours
   const viewOnly = isViewOnly() || aiViewOnly
   const [activeTab, setActiveTab] = useState<RibbonTab>(() => (viewOnly ? 'View' : 'Home'))
   const effectiveTab: RibbonTab = viewOnly ? 'View' : activeTab
@@ -619,6 +631,20 @@ export function ExcelShell({
     if (cap('ai'))
       setIsCopilotOpenState((prev) => resolveCopilotOpen(prev, next, askingRef.current))
   }, [])
+=======
+  const [activeTab, setActiveTab] = useState<RibbonTab>('Home')
+  const collapse = useRibbonCollapse('ai-sheets-ribbon-collapsed', {
+    collapse: t('appRibbonCollapse'),
+    expand: t('appRibbonExpand'),
+    // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (docs parity, see #362)
+    compact: t('appRibbonCompact'),
+    expandFull: t('appRibbonExpand'),
+  })
+  // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
+  const [isCopilotOpen, setIsCopilotOpen] = useState(() =>
+    aiPanelInitiallyOpen('ai-sheets-show-ai'),
+  )
+>>>>>>> theirs
   // the sidebar switch is a soft hide; it closes the panel when it turns off
   const aiSidebarEnabled = useAiSidebarEnabled(setIsCopilotOpen)
   useEffect(() => {
@@ -631,6 +657,7 @@ export function ExcelShell({
     }
     rememberAiPanelOpen('ai-sheets-show-ai', isCopilotOpen)
   }, [isCopilotOpen])
+<<<<<<< ours
   // every time the dock opens, so a plan changed while it was collapsed shows
   const onAiPanelOpenRef = useRef(onAiPanelOpen)
   onAiPanelOpenRef.current = onAiPanelOpen
@@ -660,6 +687,12 @@ export function ExcelShell({
   // closing it returns to hidden — no dead affordances, no invisible runs
   /// the tab Format Cells opens on, or null while it is closed
   const [showFormatCells, setShowFormatCells] = useState<FormatCellsTab | null>(null)
+=======
+  // the "show the AI sidebar" setting off hides the copilot rail (soft hide):
+  // an explicit AI action (ribbon run, toggle) still opens the panel, and
+  // closing it returns to hidden — no dead affordances, no invisible runs
+  const [showFormatCells, setShowFormatCells] = useState(false)
+>>>>>>> theirs
   const [axisSizeTarget, setAxisSizeTarget] = useState<'row' | 'col' | null>(null)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [showSortDialog, setShowSortDialog] = useState(false)
@@ -982,7 +1015,13 @@ export function ExcelShell({
 
   return (
     <main
+<<<<<<< ours
       className={`app-shell ${copilotShellClass(cap('ai'), aiSidebarEnabled, isCopilotOpen)}`}
+=======
+      className={`app-shell ${isCopilotOpen ? '' : 'copilot-collapsed'}${
+        !isCopilotOpen && !aiSidebarEnabled ? ' copilot-off' : ''
+      }`}
+>>>>>>> theirs
       inert={openingWorkbook}
       aria-busy={openingWorkbook}
     >
@@ -1093,6 +1132,7 @@ export function ExcelShell({
           sheetHasContent={sheetHasContent}
           sheetProtected={onGetSheetProtection()?.protected ?? null}
           workbookProtected={onGetWorkbookProtection()}
+          passwordProtected={passwordProtected}
           formulaBarVisible={formulaBarVisible}
           crossHighlightVisible={crossHighlightVisible}
           pageLayout={pageLayout}
@@ -1126,6 +1166,7 @@ export function ExcelShell({
 
       {/* AI panel docks on the left, full height under the ribbon (unified with docs) */}
       <div className="sheet-body">
+<<<<<<< ours
         {cap('ai') && (
           <AiChatPanel
             isOpen={isCopilotOpen}
@@ -1167,6 +1208,44 @@ export function ExcelShell({
             clarify={aiClarify}
           />
         )}
+=======
+        <AiChatPanel
+          isOpen={isCopilotOpen}
+          hideRail={!aiSidebarEnabled}
+          hasContent={sheetHasContent}
+          chat={chat}
+          {...(historicChat !== undefined ? { historicChat } : {})}
+          attachments={attachments}
+          attachedSkills={attachedSkills}
+          onToggleSkill={onToggleSkill}
+          attachNotice={attachNotice}
+          onPickAttachments={onPickAttachments}
+          onAddAttachmentPaths={onAddAttachmentPaths}
+          onAddPastedImage={onAddPastedImage}
+          onRemoveAttachment={onRemoveAttachment}
+          prompt={prompt}
+          preview={preview}
+          aiBusy={aiBusy}
+          sessionUsage={sessionUsage}
+          onPromptChange={onPromptChange}
+          onSend={onSend}
+          onSendQueued={(text, atts) => {
+            if (aiBusy) return false
+            onSend(text, atts)
+            return true
+          }}
+          onStop={onStop}
+          onNewChat={onNewChat}
+          onUndo={onUndo}
+          scopeRange={aiScopeRange}
+          scopeColumns={aiScopeColumns}
+          scopeLocked={aiScopeLocked}
+          onScopeDismiss={onAiScopeDismiss}
+          onCitation={onAiCitation}
+          onExpand={() => setIsCopilotOpen(true)}
+          onCollapse={() => setIsCopilotOpen(false)}
+        />
+>>>>>>> theirs
         <div className="sheet-main">
           <section className="workbook-area">
             <div id="univer-container" className="spreadsheet" />
@@ -2064,6 +2143,7 @@ function Ribbon({
   sheetHasContent,
   sheetProtected,
   workbookProtected,
+  passwordProtected,
   formulaBarVisible,
   crossHighlightVisible,
   pageLayout,
@@ -2090,6 +2170,7 @@ function Ribbon({
   readonly sheetHasContent: boolean
   readonly sheetProtected: boolean | null
   readonly workbookProtected: boolean | null
+  readonly passwordProtected: boolean
   /// View > Show echo for the formula bar toggle (app-level, not per sheet).
   readonly formulaBarVisible: boolean
   readonly crossHighlightVisible: boolean
@@ -3223,8 +3304,12 @@ function Ribbon({
           <RibbonButton
             large
             label={t('appFilter')}
+<<<<<<< ours
             detail={t('appFilterToggleDetail', { keys: sheetsHint('sheets-81', SHORTCUT_TARGET) })}
             keys={sheetsAria('sheets-81', SHORTCUT_TARGET)}
+=======
+            detail={platformShortcuts(t('appFilterToggleDetail'))}
+>>>>>>> theirs
             symbol="▽"
             onClick={() => onCommand('filter-toggle')}
           />
@@ -3358,7 +3443,7 @@ function Ribbon({
           />
         </RibbonGroup>
         <RibbonGroup label={t('appGroupShow')}>
-          <div className="check-column">
+          <div className="check-column check-column-view">
             <button
               className="check-item"
               data-tip={t('appGridlines')}
@@ -3554,9 +3639,11 @@ function Ribbon({
         <RibbonGroup label={t('appGroupNotes')}>
           {largeMenu(t('appGroupNotes'), '🗒', t('appNotesDetail'), [
             { value: 'note-open', label: t('appNewNote') },
+            { value: 'note-insert-picture', label: t('appNoteInsertPicture') },
             { value: 'note-show-toggle', label: t('appShowHideNote') },
             { value: 'note-show-all', label: t('appShowAllNotes') },
             { value: 'notes-convert', label: t('appConvertToNotes') },
+            { value: 'note-pictures-pane-toggle', label: t('appNotePicturesToggle') },
           ])}
         </RibbonGroup>
         <RibbonGroup label={t('appGroupProtection')}>
@@ -3574,6 +3661,15 @@ function Ribbon({
             symbol={workbookProtected ? '🔓' : '🔐'}
             onClick={() => onCommand('workbook-protect')}
           />
+          {passwordProtected && (
+            <RibbonButton
+              large
+              label={t('appChangePassword')}
+              detail={t('appChangePassword')}
+              symbol="🔑"
+              onClick={() => onCommand('workbook-change-password')}
+            />
+          )}
           <RibbonButton
             large
             label={t('appAllowEditRanges')}

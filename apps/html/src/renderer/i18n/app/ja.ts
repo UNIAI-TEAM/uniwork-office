@@ -9,6 +9,14 @@ export const ja = {
   redactDialogPlaceholder: 'プレースホルダー名（例：顧客電話）',
   redactCancel: 'キャンセル',
   redactInsert: '隠す',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'このファイルは他のプログラムによって変更されました。',
+  diskConflictMsg: 'このファイルはディスク上で変更されています。保存するとその変更を上書きします。',
+  diskReload: '再読み込み',
+  diskKeepMine: '自分の内容を保持',
+  diskOverwrite: '上書きする',
+>>>>>>> theirs
 
   loading: '読み込み中…',
   loadFailed: 'ファイルを開けませんでした',
@@ -108,6 +116,7 @@ export const ja = {
   alignLeft: '左揃え',
   alignCenter: '中央揃え',
   alignRight: '右揃え',
+  alignJustify: '両端揃え',
   fontSizeDec: 'フォントサイズを縮小',
   fontSizeInc: 'フォントサイズを拡大',
   typography: 'タイポグラフィ',

@@ -129,6 +129,8 @@ export const fr = {
   aiUnknownError: 'Erreur inconnue',
   aiTimeoutError:
     "Délai de la requête IA dépassé : aucune réponse du réseau, l'exécution a été interrompue. Vérifiez votre connexion et réessayez",
+  aiRegionError:
+    'Le fournisseur de ce modèle ne dessert pas votre région actuelle — choisissez un autre modèle ou changez de réseau',
   aiOverloadedError: "Le service d'IA est actuellement surchargé — réessayez dans un instant",
   aiNetworkError:
     'Problème réseau : impossible de joindre le service IA. Vérifiez votre connexion et réessayez',
@@ -138,6 +140,9 @@ export const fr = {
   aiSumImageAttachment: 'Pièce jointe image {name}',
   aiSumRead: 'Lire {name}',
   aiSumReadAttachmentName: 'Lire la pièce jointe {name}',
+  aiSumSkillsList: 'Compétences installées listées',
+  aiSumSkillRead: 'Lecture de la compétence {name}',
+  aiSumRunCli: 'A exécuté {args}',
   aiSumWebSearch: 'Recherche web',
   aiSumWebSearchDone: 'Recherche « {query} » ({count} résultats)',
   aiSumImageSearch: "Recherche d'images",
@@ -201,6 +206,7 @@ export const fr = {
   aiCmdImages: '{count} image(s) mise(s) à jour',
   aiCmdToc: 'Table des matières insérée ({count} entrées)',
   aiCmdSkipped: ' ({count} bloc(s) protégé(s) ignoré(s))',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Document en lecture seule : l’IA peut le lire et répondre à des questions, mais ne peut pas le modifier.',
   aiClarifyTitle: 'Quelques questions avant de continuer',
@@ -215,6 +221,8 @@ export const fr = {
   aiClarifySubmit: 'Continuer',
   aiSumClarify: 'Précisions apportées',
   aiSumClarifySkipped: 'Précisions ignorées',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Générer une carte mentale de ce document',
   aiMindMapBtn: 'Carte mentale IA',
   aiMindMapPrompt:

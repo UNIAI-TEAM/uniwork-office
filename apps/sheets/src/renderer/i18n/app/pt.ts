@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const pt = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Ocultar a seleção da IA',
+  redactDialogDesc:
+    'O conteúdo selecionado continua no documento e no arquivo; o modelo vê apenas o marcador. Dê-lhe um nome para que saiba o que representa.',
+  redactDialogScope:
+    'Isso se aplica apenas à IA deste aplicativo. A CLI, as ferramentas MCP e a exportação sem interface leem o arquivo diretamente e ainda veem essas palavras.',
+  redactDialogPlaceholder: 'Nome do marcador, ex.: telefone do cliente',
+  redactCancel: 'Cancelar',
+  redactInsert: 'Ocultar',
+  redactEnable: 'Clique com o botão direito numa seleção para ocultá-la do modelo.',
+  redactNeedsSavedRow:
+    'Esta linha ainda não está no ficheiro. Guarde primeiro e depois oculte a célula.',
+  redactRecoveredFromNames:
+    'Outra aplicação reescreveu este ficheiro e descartou o registo do que está oculto. As células ocultas foram recuperadas a partir dos nomes na pasta de trabalho; guardar restaura o registo completo.',
+
   appMergeWorkbooks: 'Mesclar pastas de trabalho',
   appMergeWorkbooksTip: 'Adicionar planilhas de outros arquivos do Excel a esta pasta de trabalho',
   appMergeWorkbooksPicking: 'Escolha os arquivos para mesclar…',
@@ -331,7 +346,9 @@ export const pt = {
   appFullLoadRunning:
     'Carregando toda a pasta de trabalho — classificar e filtrar ficarão disponíveis ao concluir…',
   appFullLoadTooLarge:
-    'Esta pasta de trabalho é grande demais para ser totalmente carregada na memória; classificar e filtrar não estão disponíveis para este arquivo.',
+    'Esta pasta de trabalho é grande demais para ser carregada por completo na memória; ordenar e mover intervalos não estão disponíveis para este arquivo. A filtragem é executada diretamente no arquivo.',
+  appLargeFilterLoading: 'Lendo a coluna do filtro a partir do arquivo…',
+  appLargeFilterApplying: 'Aplicando o filtro no arquivo…',
   appSortValueModeFormulas:
     'Este intervalo contém fórmulas que não são calculadas ao vivo nesta pasta grande — classificá-lo ou movê-lo as salvaria como valores simples. Escolha um intervalo sem fórmulas.',
   appSortRangeTooLarge:
@@ -719,6 +736,7 @@ export const pt = {
   appTabReview: 'Revisão',
   appRibbonCollapse: 'Recolher a Faixa de Opções',
   appRibbonExpand: 'Expandir a Faixa de Opções',
+  appRibbonCompact: 'Faixa compacta (somente ícones)',
   appTabView: 'Exibir',
   appTabAi: 'IA',
   appTabChartDesign: 'Design do Gráfico',
@@ -760,7 +778,6 @@ export const pt = {
   appLinkPlaceholder: 'https://example.com ou Sheet1!A1',
   appRemoveLink: 'Remover Link',
   appNotAvailableYet: 'Ainda não disponível',
-  appComingSoon: 'Em breve',
   appGroupChartLayouts: 'Layouts de gráfico',
   appAddChartElement: 'Adicionar Elemento de Gráfico',
   appAddChartElementTitle: 'Títulos, rótulos de dados, legenda',
@@ -1265,6 +1282,10 @@ export const pt = {
   appFontSizeTip: 'Tamanho da fonte',
   appZoomIn: 'Ampliar',
   appZoomOut: 'Reduzir',
+  appImgActualSize: 'Tamanho real',
+  appImgFitWindow: 'Ajustar à janela',
+  appImgSaveAs: 'Salvar imagem como…',
+  appImgClose: 'Fechar (Esc)',
   appZoomSheetTitle: 'Aplicar zoom na planilha',
   appResetZoom: 'Redefinir zoom',
   appZoomToSelection: 'Zoom na Seleção',
@@ -1307,6 +1328,22 @@ export const pt = {
   appOpenFileFirst: 'Abra um arquivo primeiro',
   appNoPassword: 'Sem senha',
   appProtectWorkbook: 'Proteger Pasta de Trabalho',
+  appChangePassword: 'Alterar Senha',
+  appWorkbookPasswordChanged: 'A senha da pasta de trabalho foi atualizada.',
+  appEncryptedOpenTitle: 'Abrir pasta de trabalho protegida por senha',
+  appEncryptedOpenCopy: 'Digite a senha para desbloquear esta pasta de trabalho.',
+  appEncryptedPasswordLabel: 'Senha',
+  appEncryptedOpen: 'Abrir',
+  appChangePasswordTitle: 'Alterar a senha da pasta de trabalho',
+  appChangePasswordCopy: 'Escolha uma nova senha e confirme-a abaixo.',
+  appNewPasswordLabel: 'Nova senha',
+  appConfirmPasswordLabel: 'Confirmar nova senha',
+  appPasswordsMismatch: 'As senhas não coincidem.',
+  appPasswordUpdateFailed: 'Não foi possível atualizar a senha da pasta de trabalho.',
+  appPasswordUpdating: 'Atualizando…',
+  appUpdatePassword: 'Atualizar senha',
+  appWorkbookNotPasswordProtected:
+    'Esta pasta de trabalho não está protegida por uma senha de abertura.',
   appAllowEditRanges: 'Permitir Edição de Intervalos',
   appGroupClipboard: 'Área de Transferência',
   appPaste: 'Colar',
@@ -1491,6 +1528,15 @@ export const pt = {
   appTableRowsNotLoaded:
     'As linhas da tabela ainda estão carregando — tente novamente em instantes.',
   appTableTotalLabel: 'Total',
+  appNotePicturesPaneTitle: 'Imagens das anotações',
+  appNotePicturesClose: 'Fechar',
+  appNotePicturesNone: 'Nenhuma anotação desta pasta de trabalho exibe uma imagem.',
+  appNotePictureUnavailable: 'Não é possível exibir esta imagem.',
+  appNotePicturesToggle: 'Imagens das anotações',
+  appNoteInsertPicture: 'Inserir imagem',
+  appNotePictureInserted: 'Imagem adicionada à nota em {cell}. Salve para gravá-la no ficheiro.',
+  appNotePictureRemoved: 'Imagem removida da nota em {cell}.',
+  appNotePictureRemove: 'Remover imagem',
   appCommentsPaneTitle: 'Comentários',
   appThreadReply: 'Responder',
   appThreadReplyPlaceholder: 'Responder…',
@@ -1537,6 +1583,8 @@ export const pt = {
   appVisualSendBackward: 'Recuar',
   appVisualSizeProperties: 'Tamanho e propriedades…',
   appVisualHyperlink: 'Hiperligação…',
+  appVisualEmbedInCell: 'Inserir imagem na célula',
+  appVisualEmbedFailed: 'Não foi possível inserir esta imagem na célula.',
   appVisualDelete: 'Eliminar',
   appVisualArranged: 'Objeto atualizado — guarde com {saveKeys}.',
   appVisualCopied: 'Objeto copiado.',

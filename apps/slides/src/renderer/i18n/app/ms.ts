@@ -66,7 +66,8 @@ export const ms = {
     'Video diselitkan (dibenamkan dalam .pptx; boleh dimainkan dalam PowerPoint)',
   appStatusAudioInserted: 'Audio diselitkan (dibenamkan dalam .pptx)',
   appStatusModel3dInserted:
-    'Model 3D dibenamkan (kanvas memaparkan ruang letak; fail model disimpan dalam .pptx)',
+    'Model 3D disisipkan: pilih untuk memutarnya (PowerPoint juga memaparkannya dalam 3D)',
+  appStatusModel3dNoPreview: 'Model 3D tidak dapat dilukis di sini; gambarnya tidak berubah',
   appStatusRecordingEmpty: 'Rakaman kosong; tiada apa-apa diselitkan',
   appStatusRecordingInserted: 'Rakaman skrin diselitkan pada slaid semasa (webm dibenamkan)',
   appStatusRecording:
@@ -228,6 +229,8 @@ export const ms = {
   appMasterFillNone: 'Tiada Isian',
   appMasterStroke: 'Warna Garis Luar…',
   appMasterStrokeNone: 'Tiada Garis Luar',
+  appMasterInsertTextBox: 'Kotak Teks',
+  appMasterInsertShape: 'Bentuk',
   appStartOpening: 'Membuka…',
   appReadingSlideTitle: 'Klik untuk ke slaid seterusnya (Esc untuk keluar dari Pandangan Baca)',
   appReadingPrev: '‹ Sebelumnya',
@@ -255,6 +258,25 @@ export const ms = {
     'Jumlah masa persembahan ialah {duration}. Adakah anda mahu menyimpan pemasaan slaid untuk peralihan slaid automatik?',
   appRehearseDiscard: 'Jangan Simpan',
   appRehearseSave: 'Simpan',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Rakam Naratif',
+  appRecordSummary: 'Tempoh rakaman {duration}. Simpan naratif dan masa setiap slaid?',
+  appRecordDiscard: 'Jangan Simpan',
+  appRecordSave: 'Simpan',
+  appStatusRecordSaved: 'Naratif disimpan pada {count} slaid (PowerPoint turut memainkannya)',
+  appStatusRecordFailed: 'Rakaman tidak dapat disimpan',
+  appStatusNarrationCleared: 'Naratif dikosongkan',
+  appSettingsTitle: 'Tetapan AI',
+  appSettingsAccount: 'Akaun Genspark',
+  appSettingsChecking: 'Menyemak…',
+  appSettingsLoggedIn: 'Telah log masuk',
+  appSettingsLoggedInEmail: 'Telah log masuk: {email}',
+  appSettingsLoggedOut: 'Belum log masuk (ciri AI memerlukan akaun Genspark)',
+  appSettingsLoginPending: 'Menunggu log masuk pelayar…',
+  appSettingsLogin: 'Log masuk ke Genspark',
+  appSettingsModel: 'Model',
+>>>>>>> theirs
   appSettingsCancel: 'Batal',
   appCropHint: 'Enter untuk mengesahkan · Esc untuk membatalkan · Klik di luar untuk mengesahkan',
   appStatusZoomsInserted:

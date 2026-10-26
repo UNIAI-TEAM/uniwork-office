@@ -18,16 +18,36 @@ export {
 export {
   aboutMenuItem,
   appMenuLabels,
+  appMenuTemplate,
   checkUpdatesMenuItem,
   editMenuTemplate,
   helpMenuTemplate,
+  setSettingsInvoker,
   setUpdateCheckInvoker,
+  settingsMenuItem,
   toggleDevToolsItem,
   viewMenuTemplate,
   windowMenuTemplate,
   type AppMenuLabels,
   type ViewMenuOptions,
 } from './app-menu'
+export {
+  decryptOoxml,
+  encryptOoxml,
+  isCfbFile,
+  isEncryptedOoxml,
+  OoxmlDecryptError,
+  type OoxmlDecryptFailReason,
+} from './ooxml-encryption'
+export {
+  AUTHOR_NAME_KEY,
+  AUTHOR_NAME_MAX,
+  configuredAuthorName,
+  readAuthorNameSetting,
+  resolveAuthorName,
+  sanitizeAuthorName,
+  systemAuthorName,
+} from './author-name'
 export {
   saveAsSuggestion,
   showOpenDialogWithMemory,
@@ -37,7 +57,11 @@ export {
   DEFAULT_SAVE_DIR_KEY,
   configuredDefaultSaveDir,
   isUsableSaveDir,
+<<<<<<< ours
   peekDefaultSaveDir,
+=======
+  mkdirDirs,
+>>>>>>> theirs
   readDefaultSaveDirSetting,
   resolveDefaultSaveDir,
   type PathProvider,
@@ -102,7 +126,7 @@ export {
   type RendererHost,
 } from './renderer-scheme'
 export { installRendererProtocol, registerRendererScheme } from './renderer-protocol'
-export { atomicWriteFile, writeJsonAtomic } from './atomic-write'
+export { atomicCopyFile, atomicWriteFile, atomicWriteVia, writeJsonAtomic } from './atomic-write'
 export {
   PRINT_READY_SCRIPT,
   printHtmlDocument,
@@ -111,6 +135,7 @@ export {
   type PrintDocumentOptions,
 } from './print-window'
 export { abortOnDestroyed, type DestroyableSender } from './abort-on-destroyed'
+<<<<<<< ours
 export { createUniworkCommentsApi, installUniworkCommentsBridge } from './comments-bridge'
 export { unwrapCommentsReply } from './comments-reply'
 export {
@@ -148,3 +173,6 @@ export {
 } from './comments-poll'
 export { newerCopyMtime } from './recovery-copy'
 export { RecoveryClearEpochs, recoveryEpochKey, type RecoveryWriteTicket } from './recovery-epochs'
+=======
+export { recoveryCopyDiskNewer } from './recovery-copy'
+>>>>>>> theirs

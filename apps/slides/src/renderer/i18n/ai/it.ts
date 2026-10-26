@@ -116,6 +116,8 @@ export const it = {
   aiErrUnknown: 'Errore sconosciuto',
   aiErrStreamTimeout:
     'Richiesta IA scaduta: nessuna risposta dalla rete, esecuzione interrotta. Controlla la connessione e riprova',
+  aiErrRegion:
+    'Il fornitore di questo modello non serve la tua regione attuale — scegli un altro modello o cambia rete',
   aiErrOverloaded: 'Il servizio IA è momentaneamente sovraccarico — riprova tra poco',
   aiErrNetwork:
     'Problema di rete: impossibile raggiungere il servizio IA. Controlla la connessione e riprova',
@@ -229,7 +231,10 @@ export const it = {
   aiSumSaveTemplate: 'Modello di stile "{name}" salvato',
   aiSumTemplatesEmpty: 'Modelli di stile (vuoto)',
   aiSumListTemplates: '{count} modelli di stile elencati',
+<<<<<<< ours
   aiPageCloudToLocal: 'Cloud non disponibile — generato localmente',
   aiViewOnlyNotice:
     'Documento di sola lettura: l’IA può leggerlo e rispondere a domande, ma non può modificarlo.',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

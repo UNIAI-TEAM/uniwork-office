@@ -1,5 +1,6 @@
 import { scriptFontHtml } from './editor/script-fonts'
-import { DOC_CSS_COMMITTED_EVENT } from './editor/cjk-punct-shrink'
+import { carryDocSeen } from './ai/tools'
+import { DOC_CSS_COMMITTED_EVENT, WRAP_WIDTHS_COMMITTED_EVENT } from './editor/cjk-punct-shrink'
 import { justifyShrinkPluginKey } from './editor/justify-shrink'
 import {
   useCallback,
@@ -24,7 +25,10 @@ import {
   rememberAiPanelOpen,
   createZoomWheelClassifier,
   useAutoSavePref,
+<<<<<<< ours
   useImageGenerationOffered,
+=======
+>>>>>>> theirs
   useAiSidebarEnabled,
 } from '@genoffice/ui'
 import { wordRangeAtCaret } from './editor/comments'
@@ -77,8 +81,10 @@ import {
   type NumberingDef,
   type DocProtection,
   type WriteProtection,
+  mergeFieldName,
   nextNoteId,
   PAGE_MARK,
+  placeholderText,
   type HeaderFooter,
   type HfImage,
   type NoteInfo,
@@ -97,8 +103,19 @@ import {
   type PictureWatermarkSpec,
   type WatermarkSpec,
 } from '@genoffice/docx-engine'
-import type { AiDocContent, AiSettings, MenuCommand, OpenDocxResult } from '../shared/ipc'
+import type {
+  AiDocContent,
+  AiSettings,
+  MenuCommand,
+  MergeDataSource,
+  OpenDocxResult,
+} from '../shared/ipc'
 import { AI_PROVIDERS } from '../shared/ipc'
+import {
+  buildMailMergeFiles,
+  type MailMergeRequest,
+  type MailMergeResponse,
+} from './mail-merge/output'
 import { ZoteroDocumentController } from './zotero/controller'
 import { AiPanel, AI_REVISION_AUTHOR } from './ai/AiPanel'
 import { aiProtectionOf } from './ai/docs-skill'
@@ -118,6 +135,7 @@ import { applyHfText, hfEditText } from './editor/hf-text'
 import {
   insertHfField,
   insertHfInstrField,
+  insertHfPicture,
   mountHfEditor,
   type HfEditorHandle,
 } from './editor/hf-editor'
@@ -148,7 +166,7 @@ import { HeaderFooterArea } from './components/HeaderFooterArea'
 import { PageFootnotes, PageEndnotes } from './components/PageNoteAreas'
 import { noteMarkText, type NoteKind } from './note-format'
 import { PaginationPreview } from './components/PaginationPreview'
-import { paraPaginationMeta, tableWidowOff } from './editor/para-flags'
+import { imageParaPaginationMeta, paraPaginationMeta, tableWidowOff } from './editor/para-flags'
 import { PrintDialog } from './components/PrintDialog'
 import {
   appendEndnotesBlock,
@@ -192,6 +210,7 @@ import {
   sectionGridPitchSpecs,
   docCharSpacePt,
   sectionCharSpaceSpecs,
+  singleByteCharSpacePt,
   type ColumnBlockPlacement,
   sectionBidi,
   sectionColGeom,
@@ -214,12 +233,14 @@ import {
   GAP_BAND,
   alignGapHfStrips,
   alignTableGapFills,
+  leadDropsSpaceBefore,
   clearFloatShifts,
   floatFlowChangedMeta,
   insideFloatTable,
   setFloatVShifts,
   setOversizeClips,
   setPageGaps,
+  canvasZoomOf,
   rowFillsSig,
   setRowFills,
   syncAnchorBands,
@@ -229,10 +250,18 @@ import {
   syncPageSheets,
   clampCellBoxTops,
   clampCellImageTops,
+  pinCellBoxesToPage,
+  pinPageRelXPictures,
+  pinParagraphRelVPictures,
   pageBorderStyleOf,
   type PageGapSpec,
   LayoutBatch,
+  pageFramesFromGaps,
+  type PageFrame,
 } from './editor/pagination-gaps'
+import { syncWrapObstacles } from './editor/wrap-obstacles'
+import { MultipageGrid, snapshotCanvas, type CanvasSnapshot } from './components/MultipageGrid'
+import { layoutMultipage, multipageColumns, multipageZoomForColumns } from './multipage'
 import { setColumnLayout } from './editor/column-layout'
 import { pageMargins } from './page-margins'
 import { syncLineNumbers } from './editor/line-numbers'
@@ -263,6 +292,7 @@ import {
   footnoteLineHeightPx,
   noteLineHeightPx,
   FOOTNOTE_SEPARATOR_H,
+  takeSettledMetricFaces,
   textHasCjk,
 } from './line-metrics'
 import { saveUntilPersisted } from './save-until-persisted'
@@ -284,7 +314,7 @@ import { useShallowStable, useStableCallbacks } from './use-stable'
 import { FindPanel } from './components/FindPanel'
 import { ZoomDialog } from './components/ZoomDialog'
 import type { PageLayout } from './editor/goto'
-import { Ribbon } from './components/Ribbon'
+import { Ribbon, type ConvertFormat } from './components/Ribbon'
 import {
   AdjustListIndentsDialog,
   DefineBulletDialog,
@@ -311,6 +341,7 @@ import {
 } from './components/icons'
 import { ToastHost } from './components/toast'
 import {
+  imageSizeOf,
   AI_REWRITE_ACK_KEY,
   LinkInsertModal,
   TableInsertModal,
@@ -331,6 +362,7 @@ import {
   ParagraphDialog,
   type ContextMenuState,
 } from './components/ContextMenu'
+import { RedactDialog } from './editor/RedactDialog'
 import {
   CellMarginsDialog,
   DeleteCellsDialog,
@@ -380,7 +412,7 @@ import {
 import { installSelectionBar } from './editor/selection-bar'
 import type { CompareEntry } from './editor/compare'
 import { collectHeadings } from './editor/headings'
-import { applyTocPageDisplays } from './editor/toc-refresh'
+import { applyTocPageDisplays, backfillTocPageDom } from './editor/toc-refresh'
 import { setSelectionAlign } from './editor/direction'
 
 import {
@@ -424,6 +456,7 @@ import {
   currentDocGeneration,
   exportPdf as exportPdfImpl,
   exportHtml as exportHtmlImpl,
+  exportMarkdown as exportMarkdownImpl,
   exportImages as exportImagesImpl,
   firstSaveName,
   loadFile as loadFileImpl,
@@ -443,6 +476,7 @@ import {
   singleInlineEditIndex,
   type FastPassBlock,
 } from './editor/pagination-fast-path'
+import { FollowUpChain } from './pagination-loop'
 
 /** min gap between whole-document pagination passes while a phased open streams its tail */
 const STREAMING_PASS_GAP_MS = 1500
@@ -457,7 +491,6 @@ const EDIT_PASS_DEBOUNCE_MAX_MS = 2000
 const FOLLOW_UP_PASS_DELAY_MS = 100
 const WORD_COUNT_THROTTLE_MS = 400
 /** consecutive follow-up passes a pass may schedule for itself */
-const MAX_FOLLOW_UP_PASSES = 6
 import { runHeadlessDocumentExport } from './headless-export'
 import { installMcpBridge } from './mcp-bridge'
 import {
@@ -506,6 +539,7 @@ import {
   type NotePrompt,
   type ReviewContext,
 } from './review-actions'
+import { authorName, onAuthorNameChanged } from './author-name'
 
 /** The commands App's window handler runs; their keys come from the docs shortcut table. */
 const APP_SHORTCUTS = [
@@ -888,6 +922,7 @@ export function App() {
   } | null>(null)
   const [_recent, setRecent] = useState<string[]>([])
   const [settings, setSettings] = useState<AiSettings>(DEFAULT_SETTINGS)
+<<<<<<< ours
   // capability-gated: when the platform has no AI the dock never shows, whatever
   // the stored preference or a stray setShowAi(true) says
   const aiEnabled = cap('ai')
@@ -900,6 +935,9 @@ export function App() {
     () => aiPanelInitiallyOpen('aidocs.showAi') && !isNarrowViewport(),
   )
   const showAi = aiEnabled && showAiPref
+=======
+  const [showAi, setShowAi] = useState(() => aiPanelInitiallyOpen('aidocs.showAi'))
+>>>>>>> theirs
   // Settings › "show the AI sidebar" off hides the panel and its rail the way Word
   // treats the Copilot pane: an explicit Ask-AI action (ribbon, context menu,
   // shortcut, preset) still opens the panel for this document, and closing it
@@ -932,6 +970,11 @@ export function App() {
   useClearStatusOnLangChange(lang, clearStaleStatus)
   const [zoom, setZoom] = useState(100)
   const scrollContainerRef = useRef<HTMLElement>(null)
+  /** bumps after every pagination pass: the canvas' page gaps are in place */
+  const [layoutRev, setLayoutRev] = useState(0)
+  /** Multiple Pages grid: page index under the live editor, null while single-column */
+  const multipageActiveRef = useRef<number | null>(null)
+  const mpFramesRef = useRef<PageFrame[]>([])
   // Word-style dark page (editor/dark-page.ts): the shell's document-page-theme
   // setting (genoffice#1811) decides which theme the page follows; a light
   // page theme never shows a dark page, in the dark one it is on by default
@@ -1274,6 +1317,12 @@ export function App() {
   const saveImageAs = useCallback((src: string) => void window.desktop.saveImageAs(src), [])
   const [showFontDialog, setShowFontDialog] = useState(false)
   const [showParaDialog, setShowParaDialog] = useState(false)
+  /** label the reader gives a span they are withholding from the model */
+  const [redactTarget, setRedactTarget] = useState<{
+    from: number
+    to: number
+    seed: string
+  } | null>(null)
   /** Word's table dialogs, shared by the ribbon, the right-click menu and the Table menu */
   const [tableDialog, setTableDialog] = useState<TableDialogKind | null>(null)
   const [tableGridlines, setTableGridlines] = useState(
@@ -1970,34 +2019,6 @@ export function App() {
   // shrink the overflow and clamp them before this effect gets to read them.
   const scrollPosRef = useRef({ left: 0, top: 0 })
   const prevZoomRef = useRef(zoom)
-  useLayoutEffect(() => {
-    const prevZoom = prevZoomRef.current
-    prevZoomRef.current = zoom
-    const anchor = zoomAnchorRef.current
-    zoomAnchorRef.current = null
-    const container = scrollContainerRef.current
-    const page = container?.querySelector<HTMLElement>('.doc-zoom')
-    if (!container || !page || prevZoom === zoom) return
-
-    const ratio = zoom / prevZoom
-    const vx = anchor ? anchor.vx : container.clientWidth / 2
-    const vy = anchor ? anchor.vy : container.clientHeight / 2
-    const cs = getComputedStyle(container)
-    const padLeft = parseFloat(cs.paddingLeft) || 0
-    const innerWidth = container.clientWidth - padLeft - (parseFloat(cs.paddingRight) || 0)
-    const containerRect = container.getBoundingClientRect()
-    const pageRect = page.getBoundingClientRect()
-    const pageLeft = pageRect.left - containerRect.left + container.scrollLeft
-    const pageTop = pageRect.top - containerRect.top + container.scrollTop
-    const prevPageLeft = padLeft + Math.max(0, (innerWidth - pageRect.width / ratio) / 2)
-    const prev = scrollPosRef.current
-
-    const docX = Math.max(0, prev.left + vx - prevPageLeft)
-    const docY = Math.max(0, prev.top + vy - pageTop)
-    container.scrollLeft = pageLeft + docX * ratio - vx
-    container.scrollTop = pageTop + docY * ratio - vy
-    scrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop }
-  }, [zoom])
 
   // ---- protection enforcement (Review > Protect Document) ----
   const editRestriction = protection?.enforced ? protection.edit : null
@@ -2039,6 +2060,10 @@ export function App() {
     if (!editor) return
     const storage = editor.storage.trackChanges as TrackChangesStorage
     storage.enabled = trackChanges
+    storage.author = authorName()
+    return onAuthorNameChanged(() => {
+      storage.author = authorName()
+    })
   }, [editor, trackChanges])
 
   // forms protection locks the body but the form's own checkboxes stay
@@ -2048,6 +2073,14 @@ export function App() {
     editor.storage.checkboxToggle.formsFill =
       !writeLocked && editRestriction === 'forms' && !readMode && !docLoading
   }, [editor, writeLocked, editRestriction, readMode, docLoading])
+
+  // outline view (View ▸ Outline View) folds: the plugin draws the ⊕/⊖ handles
+  // and hides folded heading rows only while the view mode is outline; leaving
+  // the view clears the collapsed set (view state, not document state)
+  useEffect(() => {
+    if (!editor) return
+    editor.commands.setOutlineViewActive(viewMode === 'outline')
+  }, [editor, viewMode])
 
   // window title follows the document, so the OS window list and Switch Window show file names
   useEffect(() => {
@@ -2143,11 +2176,19 @@ export function App() {
   const [pendingExportTick, setPendingExportTick] = useState(0)
   // Print dialog (Word-style preview + range); the pagination preview is its print source
   const [showPrintDialog, setShowPrintDialog] = useState(false)
+  const showPrintDialogRef = useRef(false)
+  showPrintDialogRef.current = showPrintDialog
+  // Chromium is capturing the live .pv-page sheets: Escape / Close must not unmount them
+  const [exportLocksPreview, setExportLocksPreview] = useState(false)
   // the dialog auto-opened the pagination preview: close it again with the dialog
   const printAutoOpenedPreviewRef = useRef(false)
 
   /** App state bundle for the extracted file actions (file-actions.ts); refreshed every render. */
   const fileCtxRef = useRef<FileActionContext>(null as unknown as FileActionContext)
+  // style-pane previews patch the parsed styles; a font-settle rebuild must keep them
+  const liveStylesRef = useRef<{ parsed: ParsedDocFull; styles: Map<string, StyleInfo> } | null>(
+    null,
+  )
   fileCtxRef.current = {
     editor,
     doc,
@@ -2198,6 +2239,7 @@ export function App() {
     setHfVariantsDirty,
     sectionHfEdits,
     setSectionHfEdits,
+    pageCount: pageInfo.total,
     hfLinks,
     setHfLinks,
     titlePg,
@@ -2517,6 +2559,55 @@ export function App() {
     return saveImpl(fileCtxRef.current, saveAs, auto, newDocName)
   }, [])
 
+  // ---- Mailings: the data source and the merge ----
+
+  /** the recipient list the user picked; null until they pick one */
+  const [mergeSource, setMergeSource] = useState<MergeDataSource | null>(null)
+
+  /** open the file dialog and read the recipient list the user chose */
+  const pickMergeDataSource = useCallback(async () => {
+    const result = await window.desktop.pickMergeDataSource()
+    if (!result) return
+    if (!result.ok) {
+      setStatus(result.error)
+      return
+    }
+    setMergeSource(result.source)
+    setStatus(
+      t('appMergeSourceLoaded', {
+        name: result.source.name,
+        n: result.source.records.length,
+      }),
+    )
+  }, [])
+
+  /** build the merged documents and write them where the user says */
+  const mergeMailings = useCallback(
+    async (request: MailMergeRequest): Promise<MailMergeResponse> => {
+      try {
+        const files = await buildMailMergeFiles(fileCtxRef.current, request)
+        if (files.length === 0) return { ok: false, error: t('appMergeNothingToWrite') }
+        const written = await window.desktop.writeMergeOutput({
+          mode: request.mode,
+          files: files.map((file) => ({
+            name: file.name,
+            data: file.bytes.buffer.slice(
+              file.bytes.byteOffset,
+              file.bytes.byteOffset + file.bytes.byteLength,
+            ) as ArrayBuffer,
+          })),
+        })
+        if (written.ok) {
+          setStatus(t('appMergeWritten', { n: written.count ?? files.length }))
+        }
+        return written
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+    [],
+  )
+
   // inserting a section break needs one save for the new section to take effect; the
   // flag is consumed in the render after state commit, guaranteeing the save closure
   // sees the latest sectionsDirty/trailingStartType
@@ -2783,6 +2874,11 @@ export function App() {
           return String(pageInfo.current)
         case 'FILENAME':
           return doc?.fileName ?? ''
+        case 'MERGEFIELD': {
+          // a merge field shows its name in guillemets until the merge fills it
+          const name = mergeFieldName(instr)
+          return name ? placeholderText(name) : ''
+        }
         default:
           return ''
       }
@@ -2895,7 +2991,11 @@ export function App() {
         const numId = idOf[kind]
         if (numId) tr = tr.setNodeMarkup(item.pos, undefined, { ...item.attrs, numId })
       }
-      if (tr.docChanged) editor.view.dispatch(tr)
+      if (tr.docChanged) {
+        const before = editor.state.doc
+        editor.view.dispatch(tr)
+        carryDocSeen(editor, before)
+      }
     }
     editor.on('update', fill)
     return () => {
@@ -2936,6 +3036,7 @@ export function App() {
     setStatus(t('appPgNumFormatSet'))
   }, [pgNumModal, sections, activeSection])
 
+<<<<<<< ours
   const exportPdf = useCallback((outPath?: string) => {
     if (!cap('exportPdf')) return Promise.resolve(false)
     return exportPdfImpl(fileCtxRef.current, outPath)
@@ -2944,6 +3045,20 @@ export function App() {
     if (!cap('exportHtml')) return Promise.resolve(false)
     return exportHtmlImpl(fileCtxRef.current, outPath)
   }, [])
+=======
+  const exportPdf = useCallback(
+    (outPath?: string) => exportPdfImpl(fileCtxRef.current, outPath),
+    [],
+  )
+  const exportHtml = useCallback(
+    (outPath?: string) => exportHtmlImpl(fileCtxRef.current, outPath),
+    [],
+  )
+  const exportMarkdown = useCallback(
+    (outPath?: string) => exportMarkdownImpl(fileCtxRef.current, outPath),
+    [],
+  )
+>>>>>>> theirs
   const exportImages = useCallback(() => exportImagesImpl(fileCtxRef.current), [])
   const printDoc = useCallback(() => {
     if (!cap('print')) return Promise.resolve()
@@ -2991,11 +3106,11 @@ export function App() {
           const doc = fileCtxRef.current.doc
           return { opened: typeof doc?.filePath === 'string', failed: doc?.filePath === null }
         },
-        target.format === 'html' ? exportHtml : exportPdf,
+        target.format === 'html' ? exportHtml : target.format === 'md' ? exportMarkdown : exportPdf,
       )
       window.desktop.headlessExportDone(report)
     })()
-  }, [exportPdf, exportHtml])
+  }, [exportPdf, exportHtml, exportMarkdown])
 
   useEffect(() => {
     const pending = pendingMixedExportRef.current
@@ -3036,7 +3151,12 @@ export function App() {
         setStatus(t('appExportPdfFailed', { error: 'pagination preview produced no pages' }))
         return
       }
-      void exportPdf(pending.outPath).then(pending.resolve, () => pending.resolve(false))
+      setExportLocksPreview(true)
+      const ok = await exportPdf(pending.outPath).catch(() => false)
+      setExportLocksPreview(false)
+      // a Print the user started meanwhile owns the preview now
+      if (pending.closePreview && !showPrintDialogRef.current) setShowPagePreview(false)
+      pending.resolve(ok)
     }, 1200)
     return () => window.clearTimeout(timer)
   }, [showPagePreview, pendingExportTick, exportPdf])
@@ -3122,6 +3242,36 @@ export function App() {
 
   const cancelNewComment = useCallback(() => cancelNewCommentImpl(reviewCtxRef.current), [])
   const startNewComment = useCallback(() => startNewCommentImpl(reviewCtxRef.current), [])
+  /**
+   * Capture the range now, while the menu still knows what was selected: the
+   * dialog takes seconds to answer and a click elsewhere would otherwise move
+   * the span the reader asked to withhold.
+   */
+  const startRedaction = useCallback(() => {
+    if (!editor) return
+    const { from, to } = editor.state.selection
+    if (from === to) return
+    setRedactTarget({
+      from,
+      to,
+      seed: editor.state.doc.textBetween(from, to, ' ').trim().slice(0, 24),
+    })
+  }, [editor])
+
+  /**
+   * Stop withholding whatever the selection carries.
+   *
+   * The command reads the selection itself and clears the mark across it, so
+   * the same selection the menu decided on is the one that gets cleaned: the
+   * menu closes before this runs, but closing a menu does not move a caret.
+   * No dialog, because there is nothing to ask — the words were never replaced,
+   * so there is no label to revise and nothing to confirm.
+   */
+  const clearRedaction = useCallback(() => {
+    if (!editor) return
+    editor.commands.unsetRedaction()
+  }, [editor])
+
   const submitNewComment = useCallback(
     (text: string) => submitNewCommentImpl(reviewCtxRef.current, text),
     [],
@@ -3193,6 +3343,13 @@ export function App() {
       const hFit = ((scroller.clientHeight - pad) / twipsToPx(section.pageHeight)) * 100
       const textW = twipsToPx(section.pageWidth - section.marginLeft - section.marginRight)
       const tFit = ((scroller.clientWidth - pad) / (textW + markupExtra)) * 100
+      if (mode === 'multi') {
+        // Word: a whole page tall and as many across as fit, never fewer than two
+        const slotW = twipsToPx(section.pageWidth) + markupExtra
+        const byHeight = clampDocsZoom(Math.floor(hFit))
+        if (multipageColumns(scroller.clientWidth, slotW, byHeight) >= 2) return byHeight
+        return clampDocsZoom(Math.floor(multipageZoomForColumns(scroller.clientWidth, slotW, 2)))
+      }
       // whole page = the entire page visible, so it must fit both dimensions;
       // floor, not round: rounding up would push the page past the pane edge
       const next =
@@ -3205,7 +3362,12 @@ export function App() {
     },
     [section, markupExtra],
   )
-  const zoomFit = useCallback(
+  // Word: Multiple Pages turns the side-by-side arrangement on and it stays
+  // through later zooming (a manual zoom-out alone keeps the single column);
+  // One Page / Page Width / Text Width turn it off
+  const [multipageMode, setMultipageMode] = useState(false)
+  /** fit without touching the arrangement: the resize follow-up / overflow clamp below */
+  const refitZoom = useCallback(
     (mode: ZoomFitMode) => {
       const applied = fitZoomFor(mode)
       if (applied == null) return
@@ -3213,6 +3375,13 @@ export function App() {
       setZoom(applied)
     },
     [fitZoomFor],
+  )
+  const zoomFit = useCallback(
+    (mode: ZoomFitMode) => {
+      setMultipageMode(mode === 'multi')
+      refitZoom(mode)
+    },
+    [refitZoom],
   )
 
   // On scroller size changes (window/AI-dock/nav-pane toggles): follow with a
@@ -3231,7 +3400,7 @@ export function App() {
       lastWidth = el.clientWidth
       const lf = lastFitRef.current
       if (lf != null && Math.abs(zoomLiveRef.current - lf.value) <= 0.5) {
-        zoomFit(lf.mode) // fit mode: follow the container in the user's chosen fit
+        refitZoom(lf.mode) // fit mode: follow the container in the user's chosen fit
         return
       }
       // The overflow test uses the uncapped ratio: a manual zoom that still
@@ -3239,11 +3408,11 @@ export function App() {
       // A height-only change (a classic horizontal scrollbar appearing for the
       // zoomed-in page) must not clamp a zoom the user just chose.
       if (!widthChanged || zoomLiveRef.current <= raw + 0.5) return
-      zoomFit('width')
+      refitZoom('width')
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [doc, zoomFit, rawFitWidth])
+  }, [doc, refitZoom, rawFitWidth])
 
   // markup column appearing/disappearing changes the canvas width without a
   // pane resize: apply the same follow/clamp rules as the ResizeObserver above
@@ -3252,9 +3421,9 @@ export function App() {
     const raw = rawFitWidth()
     if (raw == null) return
     const lf = lastFitRef.current
-    if (lf != null && Math.abs(zoomLiveRef.current - lf.value) <= 0.5) zoomFit(lf.mode)
-    else if (zoomLiveRef.current > raw + 0.5) zoomFit('width')
-  }, [doc, markupExtra, rawFitWidth, zoomFit])
+    if (lf != null && Math.abs(zoomLiveRef.current - lf.value) <= 0.5) refitZoom(lf.mode)
+    else if (zoomLiveRef.current > raw + 0.5) refitZoom('width')
+  }, [doc, markupExtra, rawFitWidth, refitZoom])
 
   // Read Mode opens at 1:1 — the same page size as the Page Preview — and the
   // user's zoom / fit mode is restored on exit (wheel zoom still works inside).
@@ -3418,6 +3587,8 @@ export function App() {
   // w:docGrid charSpace character grid: uniform per-character letter-spacing
   // delta (pt); mixed docs deliver it per block via sectionCharSpaceSpecs
   const charSpacePt = useMemo(() => docCharSpacePt(sections), [sections])
+  // balanceSingleByteDoubleByteWidth: single-byte characters get half the delta
+  const balancedGrid = doc?.parsed.balanceDbcsSpacing === true
 
   // page color: Word lays out one extra blank Normal paragraph under section 1's header
   const hfPhantom = useMemo(
@@ -3458,7 +3629,11 @@ export function App() {
   const effBottomSingle = section ? effectiveBottomPx(section, singleHfPx.footerPx) : 0
   const canvasSection = sections[0]?.settings ?? section
   const canvasBox = canvasSection ? sectionPageBox(canvasSection) : null
-  const canvasTop = section ? canvasContentTopPx(sections, section, singleHfPx.headerPx) : 0
+  // the canvas's first page draws the titlePg first-page header: its body
+  // starts under that strip, as the preview slicer already assumes
+  const canvasTop = section
+    ? canvasContentTopPx(sections, section, singleHfPx.firstHeaderPx ?? singleHfPx.headerPx)
+    : 0
   const canvasBottom = canvasSection ? effectiveBottomPx(canvasSection, singleHfPx.footerPx) : 0
 
   // titlePg: the document's first page renders the first-page header/footer
@@ -3570,9 +3745,11 @@ export function App() {
           ...(fnExtra > 0 ? { footnoteExtraPx: fnExtra, footnoteBands: fnBands } : {}),
         }
       }
-      const styleDisplay = (b.styleId ? doc?.parsed.styles.get(b.styleId) : defaultParaStyle)
-        ?.display
-      const flags = paraPaginationMeta(b.format, styleDisplay, doc?.parsed.docDefaults)
+      const styleOf = (id: string | undefined) =>
+        (id ? doc?.parsed.styles.get(id) : defaultParaStyle)?.display
+      const flags = b.format
+        ? paraPaginationMeta(b.format)
+        : imageParaPaginationMeta(b.originalXml, styleOf, doc?.parsed.docDefaults)
       const fnBands = footnoteBandsOf(b)
       const fnExtra = fnBands.reduce((s, band) => s + band.heightPx, 0)
       if (!flags && fnExtra === 0) return undefined
@@ -3748,7 +3925,7 @@ export function App() {
         assignSections(blocks, live)
         s = sliceWithLineSplit(
           blocks,
-          colGeomsFor(sectionGeoms(live, hfHeightsOf(live))),
+          colGeomsFor(sectionGeoms(live, hfHeightsOf(live), evenOddHf)),
           totalHeight,
           factor,
           blockMetaOf,
@@ -3800,6 +3977,7 @@ export function App() {
     hfHeightsOf,
     measureSingleFlow,
     colGeomsFor,
+    evenOddHf,
   ])
 
   // status-bar page number: real page slicing (same algorithm as the pagination preview). Edits remeasure with debounce; scrolling only relocates
@@ -3812,7 +3990,13 @@ export function App() {
     }
     const scroller = document.querySelector('.editor-scroll')
     if (!scroller) return
-    const factor = zoom / 100
+    // Blink lays text out at the zoomed font size and snaps line boxes to device
+    // pixels, so block heights read under a 10% (or 88%) canvas zoom differ from
+    // the 100% layout by up to a pixel per line — enough to move page breaks and
+    // to park a paragraph in the wrong column of an unequal-width section
+    // (genoffice#1970). Passes measure the canvas at zoom 1 and restore the
+    // view zoom before the viewport-dependent reads (locate).
+    let factor = zoom / 100
     const mTopPx = canvasTop
     // shared paper = the widest section's page; narrower pages are centered on it
     const paperWPx = paperWidthPx(sections, sections[0]?.settings ?? section)
@@ -3821,24 +4005,30 @@ export function App() {
     const contentH = twipsToPx(section.pageHeight) - effTopSingle - effBottomSingle
     let slices: PageSlice[] = []
     let timer: number | null = null
+<<<<<<< ours
     // set by the cleanup: callbacks that outlive this run (a font-ready promise
     // settling late, a follow-up from a stale listener) must not re-arm a timer
     // nobody will clear, or a pass would run against a destroyed editor
     let disposed = false
     let suppressSig = ''
+=======
+>>>>>>> theirs
     let rowFillSig = ''
     // passes a pass schedules for itself (widths / suppression applied late);
     // a document whose column widths never settle must not paginate forever
-    let followUps = 0
+    const chain = new FollowUpChain()
     let selfScheduled = false
+    // set by the cleanup: document.fonts.ready and other promise callbacks of
+    // this run can still fire after the effect was re-created (zoom change)
+    // and would schedule a pass of this stale closure next to the live one
+    let disposed = false
     let retrigger: string[] = []
-    // several reasons in one pass debounce into one follow-up: count passes, not reasons
-    // decoration-only re-decisions (justify shrink, float flow) arrive after a
-    // pass and re-run it from the changed block: they count against the same
-    // cap, or a flip-flopping decision paginates forever
+    // several reasons in one pass debounce into one follow-up; decoration-only
+    // re-decisions (justify shrink, float flow) arrive after a pass and re-run
+    // it from the changed block, through the same chain
     const followUpAt = (why: string, dirtyIndex: number | null) => {
       retrigger.push(why)
-      if (followUps >= MAX_FOLLOW_UP_PASSES) return
+      if (chain.request(why, dirtyIndex) !== 'run') return
       selfScheduled = true
       onUpdate(null, dirtyIndex, true)
     }
@@ -3853,7 +4043,14 @@ export function App() {
       const pmRect = pm.getBoundingClientRect()
       const scrollRect = scroller.getBoundingClientRect()
       const origin = pmRect.top + mTopPx * factor
-      const midScreen = Math.min(scrollRect.top + scrollRect.height / 2, pmRect.bottom)
+      // Multiple Pages: the active page is the one under the live window, probe its
+      // first content line instead of the viewport middle
+      const mpIdx = multipageActiveRef.current
+      const mpFrame = mpIdx == null ? null : mpFramesRef.current[mpIdx]
+      const wrapTop = pm.closest('.page-wrap')?.getBoundingClientRect().top ?? pmRect.top
+      const midScreen = mpFrame
+        ? wrapTop + (mpFrame.top + mTopPx + 1) * factor
+        : Math.min(scrollRect.top + scrollRect.height / 2, pmRect.bottom)
       // slices use gapless virtual coordinates; subtract the page-gap height above the midpoint
       // (including mid-paragraph inline gaps and repeated-header clone rows, which carry
       // page-repeat-header but not page-gap)
@@ -3864,14 +4061,20 @@ export function App() {
       // repeated-header clones are float content (the carry covers only the
       // gap bands; the continuation's page starts at the gap's bottom)
       let gapAbove = 0
-      for (const gap of pm.querySelectorAll(
+      // mixed-column pages pull their gap (and everything below) up over the
+      // vacated stacked space: add that back to land in the gapless coordinates
+      let pullUpAbove = 0
+      for (const gap of pm.querySelectorAll<HTMLElement>(
         '.page-gap:not(.page-gap-carry), .page-repeat-header',
       )) {
         if (gap.classList.contains('page-repeat-header') && insideFloatTable(gap)) continue
         const r = gap.getBoundingClientRect()
-        if (r.top < midScreen) gapAbove += Math.min(r.height, midScreen - r.top)
+        if (r.top < midScreen) {
+          gapAbove += Math.min(r.height, midScreen - r.top)
+          pullUpAbove += Math.max(0, -parseFloat(gap.style.marginTop) || 0)
+        }
       }
-      const midY = (midScreen - origin - gapAbove) / factor
+      const midY = (midScreen - origin - gapAbove) / factor + pullUpAbove
       // visible-page numbering so the status bar and F9 NUMPAGES agree with the gap widgets
       const current = visiblePageCount(slices, pageAt(slices, midY))
       const total = visiblePageCount(slices)
@@ -3902,6 +4105,7 @@ export function App() {
     let fastEdits: Set<number> | null = new Set()
     let fastPasses = 0
     let fastReject = ''
+    let gapBoundaryMismatch = 0
     const sameBox = (a: BlockBox, b: BlockBox) =>
       a.el === b.el &&
       Math.abs(a.top - b.top) < 0.01 &&
@@ -4025,6 +4229,7 @@ export function App() {
       return blocksKeepSlicing(items, slices, factor) || reject('geometry')
     }
     const remeasure = () => {
+      if (disposed) return
       timer = null
       if (disposed || editor?.isDestroyed) return
       lastPassAt = performance.now()
@@ -4033,16 +4238,40 @@ export function App() {
       const dirty = dirtyFrom
       dirtyFrom = Infinity
       try {
-        if (edited && edited.size > 0 && tryFastPass(edited)) {
+        const zoomEl = scroller.querySelector<HTMLElement>('.doc-zoom')
+        // the canvas zoom as applied, not this closure's: a pass reaching the
+        // DOM through a late async callback must never read a zoomed canvas at
+        // factor 1 (split-row fills then land in zoomed px and rows overlap)
+        const liveZoom = canvasZoomOf(zoomEl, zoom / 100)
+        const swapZoom = zoomEl !== null && Math.abs(liveZoom - 1) > 0.0001
+        const scrollTop = scroller.scrollTop
+        const scrollLeft = scroller.scrollLeft
+        if (swapZoom) {
+          zoomEl.style.zoom = '1'
+          factor = 1
+        }
+        let fast = false
+        try {
+          fast = Boolean(edited && edited.size > 0 && tryFastPass(edited))
+          if (!fast) {
+            if (!edited) fastReject = 'trigger'
+            else if (edited.size === 0) fastReject = 'none'
+            remeasurePass(dirty)
+          }
+        } finally {
+          if (swapZoom) {
+            zoomEl.style.zoom = String(liveZoom)
+            factor = liveZoom
+            scroller.scrollTop = scrollTop
+            scroller.scrollLeft = scrollLeft
+          }
+        }
+        if (fast) {
           fastPasses++
           const dbg = (window as unknown as Record<string, Record<string, unknown>>).__pageDebug
           if (dbg) dbg.fastPasses = fastPasses
-          locate()
-          return
         }
-        if (!edited) fastReject = 'trigger'
-        else if (edited.size === 0) fastReject = 'none'
-        remeasurePass(dirty)
+        locate()
       } finally {
         lastPassMs = performance.now() - lastPassAt
         // a pass that threw between the add and the pre-setPageGaps remove
@@ -4053,7 +4282,8 @@ export function App() {
     const remeasurePass = (dirty: number | null) => {
       const pm = pmEl()
       if (!pm) return
-      followUps = selfScheduled ? followUps + 1 : 0
+      if (selfScheduled) chain.beginPass()
+      else chain.reset()
       selfScheduled = false
       retrigger = []
       const tStart = performance.now()
@@ -4064,6 +4294,9 @@ export function App() {
       // consecutive anchor-paragraph runs collapse onto their band union before
       // measurement (layout-affecting, idempotent)
       syncAnchorBands(pm, factor, (doc?.parsed.compatibilityMode ?? 0) >= 15)
+      // later blocks were read before this pass's writes landed: one more
+      // pass settles the chain (FollowUpChain refuses a repeating cause)
+      const obstaclesChanged = syncWrapObstacles(pm, factor, editor.view)
       // natural-flow measuring state: in-paragraph gap widgets force a line break
       // at the PREVIOUS pass's cut, so measuring with them in layout re-confirms
       // that cut even after decoration-only reflows (justify space-shrink) moved
@@ -4133,7 +4366,7 @@ export function App() {
         const s = secList
           ? sliceWithLineSplit(
               blocks,
-              colGeomsFor(sectionGeoms(secList, hfHs!)),
+              colGeomsFor(sectionGeoms(secList, hfHs!, evenOddHf)),
               flowH,
               factor,
               blockMetaOf,
@@ -4228,7 +4461,10 @@ export function App() {
         const tr = editor.state.tr
         if (applyTocPageDisplays(editor.state.doc, tr, headings, displays)) {
           tr.setMeta('addToHistory', false)
+          const before = editor.state.doc
           editor.view.dispatch(tr)
+          // a field refresh is not a user edit: keep the AI freshness baseline
+          carryDocSeen(editor, before)
         }
       }
       // M4 always-on pagination in the canvas: render page gaps before page-leading blocks
@@ -4595,7 +4831,9 @@ export function App() {
                     ? { ...notesMetrics, marginBottom: notesMetrics.marginBottom + pad }
                     : notesMetrics,
                 ...(pullUp > 0.5 ? { pullUp } : {}),
-                ...(blocks[i].breakBefore || (i > 0 && blocks[i - 1].breakAfter)
+                ...(blocks[i].breakBefore ||
+                (i > 0 && blocks[i - 1].breakAfter) ||
+                leadDropsSpaceBefore(blocks, i)
                   ? { suppressLeadMt: true }
                   : {}),
                 ...(notes ? { notes, notesKey } : {}),
@@ -4640,15 +4878,19 @@ export function App() {
               const elTop = b.el.getBoundingClientRect().top
               let matched = false
               let cutRow: Element | null = null
+              // the previous pass's gap rows sit exactly at their cut: matching one
+              // resolves to the table, not a row, and the boundary is silently lost
               for (const tr of Array.from(b.el.querySelectorAll('tr')).filter(
                 (r) =>
-                  !r.closest('.doc-nested-table') && !r.classList.contains('page-repeat-header'),
+                  !r.closest('.doc-nested-table') &&
+                  !r.classList.contains('page-repeat-header') &&
+                  !r.classList.contains('page-gap'),
               )) {
                 const trTop = tr.getBoundingClientRect().top
                 const gapsAbove = gapRects.reduce((s, g) => (g.top <= trTop ? s + g.height : s), 0)
                 const off = (trTop - elTop - gapsAbove) / factor
                 // last real row starting at/above the cut = the row the cut falls inside
-                if (!tr.classList.contains('page-gap') && off <= cutOff + 0.5) cutRow = tr
+                if (off <= cutOff + 0.5) cutRow = tr
                 if (Math.abs(off - cutOff) < 1.5) {
                   matched = true
                   try {
@@ -4815,16 +5057,16 @@ export function App() {
           }
           // silently dropped boundaries merge two pages into one giant page — surface them
           const boundaries = slices.slice(1).filter((s, k) => s.start !== slices[k].start).length
-          if (gaps.length + overlayCutAnchors.length !== boundaries)
+          if (gaps.length + overlayCutAnchors.length !== boundaries) {
+            gapBoundaryMismatch++
             console.warn(
               `[pagination] ${gaps.length + overlayCutAnchors.length} page gaps built for ${boundaries} boundaries`,
             )
-          // TOC page numbers: the file's cached PAGEREF results are stale (generators
-          // write them against a layout that never matches; Word silently refreshes on
-          // open, we never write back). Backfill the display from the live layout —
-          // DOM-only, inside contenteditable=false subtrees the save path never reads.
+          }
+          // DOM-only (contenteditable=false subtrees the save path never reads);
+          // a pristine open keeps the file's cached results like the refresh above
           const tocLines = pm.querySelectorAll<HTMLElement>('.doc-toc-line[data-toc-anchor]')
-          if (tocLines.length > 0) {
+          if (tocLines.length > 0 && slices.length > 0) {
             const anchorIdx = new Map<string, number>()
             for (const b of parsed.blocks) {
               if (b.docxIndex == null) continue
@@ -4834,15 +5076,19 @@ export function App() {
             for (const b of blocks) {
               if (b.docxIndex != null) topByIdx.set(b.docxIndex, b.top)
             }
-            for (const el of tocLines) {
-              const idx = anchorIdx.get(el.getAttribute('data-toc-anchor') ?? '')
-              const top = idx === undefined ? undefined : topByIdx.get(idx)
-              if (top === undefined) continue
-              const pageEl = el.querySelector('.doc-toc-page')
-              // pageAt is 1-based; pageNoTextOf indexes nums/slices 0-based
-              const pageIdx = Math.max(0, Math.min(pageAt(slices, top + 1) - 1, slices.length - 1))
-              if (pageEl && slices.length > 0) pageEl.textContent = pageNoTextOf(pageIdx)
-            }
+            backfillTocPageDom(
+              tocLines,
+              (anchor) => {
+                const idx = anchorIdx.get(anchor)
+                const top = idx === undefined ? undefined : topByIdx.get(idx)
+                if (top === undefined) return undefined
+                // pageAt is 1-based; pageNoTextOf indexes nums/slices 0-based
+                return pageNoTextOf(
+                  Math.max(0, Math.min(pageAt(slices, top + 1) - 1, slices.length - 1)),
+                )
+              },
+              dirtyRef.current,
+            )
           }
         }
         tGapsBuild = performance.now() - tGaps0
@@ -4969,7 +5215,9 @@ export function App() {
           viewMode === 'print' && !readMode && secList ? sectionGridPitchSpecs(blocks, secList) : []
         // sections disagreeing on the docGrid charSpace delta: per-block letter-spacing vars
         const charSpecs =
-          viewMode === 'print' && !readMode && secList ? sectionCharSpaceSpecs(blocks, secList) : []
+          viewMode === 'print' && !readMode && secList
+            ? sectionCharSpaceSpecs(blocks, secList, doc.parsed.balanceDbcsSpacing === true)
+            : []
         // sections disagreeing on the top margin: per-block --doc-margin-top for page-relative anchors
         const topSpecs =
           viewMode === 'print' && !readMode && secList ? sectionTopMarginSpecs(blocks, secList) : []
@@ -5040,6 +5288,9 @@ export function App() {
         // paper top by a negative anchor offset are pushed back down
         clampCellBoxTops(pm, pm.getBoundingClientRect().top, factor)
         clampCellImageTops(pm, factor)
+        pinCellBoxesToPage(pm, factor)
+        pinPageRelXPictures(pm, factor)
+        pinParagraphRelVPictures(pm)
         stage('clampCells')
         syncCutOverlays((pm.closest('.page-wrap') as HTMLElement) ?? pm, overlayCutAnchors, factor)
         stage('cutOverlays')
@@ -5074,12 +5325,7 @@ export function App() {
         )
         stage('sheets+annotations')
         tSetGaps = performance.now() - tSet0
-        // suppression collapses the DOM after this pass sliced; one follow-up remeasure re-syncs (sig goes stable, no loop)
-        const sig = gaps.reduce((s, g, n) => (g.suppressLeadMt ? `${s},${n}` : s), '')
-        if (sig !== suppressSig) {
-          suppressSig = sig
-          followUp('suppress')
-        }
+        if (obstaclesChanged) followUp('obstacles')
         // a fill just applied to a split row changed the table height under the slices
         const fSig = rowFillsSig(rowFills)
         if (fSig !== rowFillSig) {
@@ -5091,11 +5337,16 @@ export function App() {
         const wSig = [...secWSpecs, ...colSpecs, ...vertSpecs]
           .map((s) => `${Math.round(s.widthPx ?? -1)}:${Math.round(s.contentWPx ?? -1)}`)
           .join(',')
+        let wrapWidthsChanged = false
         if (wSig !== secWidthSig) {
           secWidthSig = wSig
+          wrapWidthsChanged = true
           followUp('width')
         }
-        if (colGranted) followUp('columns')
+        if (colGranted) {
+          wrapWidthsChanged = true
+          followUp('columns')
+        }
         // freshly applied per-block letter-spacing changes line breaks the same way
         const cSig =
           charSpecs.length === 0
@@ -5103,8 +5354,12 @@ export function App() {
             : `${charSpecs.length}:${[...new Set(charSpecs.map((s) => s.charSpacePt))].join(',')}`
         if (cSig !== charSpaceSig) {
           charSpaceSig = cSig
+          wrapWidthsChanged = true
           followUp('charSpace')
         }
+        // the shrink loops measured line breaks the new widths just moved;
+        // their re-decision rides the follow-up pass already scheduled
+        if (wrapWidthsChanged) document.dispatchEvent(new Event(WRAP_WIDTHS_COMMITTED_EVENT))
         // the last page paints as a full sheet like the ones above it:
         // extend the canvas to that page's paper bottom, measured from the last gap
         const gapEls = pm.querySelectorAll('.page-gap:not(.page-gap-carry)')
@@ -5116,9 +5371,17 @@ export function App() {
           const paperTop =
             (lastGapEl.getBoundingClientRect().bottom - pm.getBoundingClientRect().top) / factor -
             effectiveTopPx(lastSec, lastHf.headerPx)
-          pm.style.minHeight = `${Math.round(paperTop + twipsToPx(lastSec.pageHeight))}px`
+          const paperH = Math.round(paperTop + twipsToPx(lastSec.pageHeight))
+          pm.style.minHeight = `${paperH}px`
+          // a mixed-column last page keeps its columns stacked in the flow with no
+          // following gap to pull up over the vacated space: pin the box to the
+          // paper bottom (the stacked tail below holds nothing visible)
+          const stackedTail = last.regions && colMode === 'mixed' && (last.physHeight ?? 0) > 0
+          if (stackedTail) pm.style.height = `${paperH}px`
+          else pm.style.removeProperty('height')
         } else {
           pm.style.removeProperty('min-height')
+          pm.style.removeProperty('height')
         }
         // endnote area: Word puts it right after the last body line, not at the page
         // bottom — anchor it to the flow end measured in the final display state
@@ -5136,6 +5399,7 @@ export function App() {
           slices,
           fastPasses,
           fastReject,
+          gapBoundaryMismatch,
           carriedSamples,
           resumePasses,
           resumeReject,
@@ -5143,7 +5407,12 @@ export function App() {
           resumeDiag,
           colMode,
           retrigger,
-          followUps,
+          retriggerLog: chain.log,
+          followUps: chain.passes,
+          // live: a refusal after the last pass must be visible too
+          get loopStops() {
+            return chain.stops
+          },
           colSpecs: colSpecs.map((s) => ({
             w: s.widthPx === undefined ? null : Math.round(s.widthPx),
             dx: Math.round(s.dx),
@@ -5200,7 +5469,7 @@ export function App() {
           return gapIds
         })
       }
-      locate()
+      setLayoutRev((v) => v + 1)
     }
     const onUpdate = (
       fastIndex: number | null = null,
@@ -5252,6 +5521,16 @@ export function App() {
     const onFontsChanged = (reprobeHf: boolean) => {
       if (disposed) return
       bumpLineSampleFontEpoch()
+      // strut metrics measured under a fallback face before a bundled font loaded
+      if (takeSettledMetricFaces()) {
+        const parsed = fileCtxRef.current.doc?.parsed
+        const live = liveStylesRef.current
+        if (parsed) {
+          setDocCss(
+            docStyleCss(live?.parsed === parsed ? { ...parsed, styles: live.styles } : parsed),
+          )
+        }
+      }
       if (reprobeHf) {
         bumpHfProbeFontEpoch()
         if (hfTimer) window.clearTimeout(hfTimer)
@@ -5796,6 +6075,9 @@ export function App() {
         case 'zoom-whole-page':
           zoomFit('page')
           break
+        case 'zoom-multi-page':
+          zoomFit('multi')
+          break
         case 'toggle-ai':
           setShowAi((v) => !v)
           break
@@ -5932,6 +6214,9 @@ export function App() {
         case 'export-html':
           void exportHtml()
           break
+        case 'export-markdown':
+          void exportMarkdown()
+          break
         case 'export-images':
           void exportImages()
           break
@@ -5949,6 +6234,7 @@ export function App() {
     save,
     exportPdf,
     exportHtml,
+    exportMarkdown,
     exportImages,
     printDoc,
     zoomFit,
@@ -6237,6 +6523,17 @@ export function App() {
       case 'field':
         if (sub) insertHfInstrField(sub, action.instr, fieldValue(action.instr))
         break
+      case 'picture':
+        if (sub) {
+          void (async () => {
+            const picked = await window.desktop.pickImage()
+            if (!picked || !hfEditorRef.current) return
+            const dataUrl = `data:${picked.mime};base64,${picked.base64}`
+            const natural = await imageSizeOf(dataUrl)
+            insertHfPicture(sub, { dataUrl, widthPx: natural.width, heightPx: natural.height })
+          })()
+        }
+        break
       case 'linkToPrevious':
         if (cur) setHfLink(cur.section, cur.kind, cur.variant, action.on)
         if (!action.on) refocus()
@@ -6299,8 +6596,10 @@ export function App() {
       getStatus: () => statusText(status, t),
       exportPdfTo: (path: string) => exportPdf(path),
       exportHtmlTo: (path: string) => exportHtml(path),
+      exportMarkdownTo: (path: string) => exportMarkdown(path),
+      subEditor: () => getActiveSubEditor(),
     }
-  }, [editor, openRecent, save, status, exportPdf, exportHtml])
+  }, [editor, openRecent, save, status, exportPdf, exportHtml, exportMarkdown])
 
   // Pending style definitions (Styles pane / AI define_style) show before the
   // save writes them: styles.xml is re-resolved with the patches applied and
@@ -6313,6 +6612,7 @@ export function App() {
     const parsed = doc?.parsed
     const upserts = Object.values(styleUpserts)
     if (!parsed || upserts.length === 0) {
+      liveStylesRef.current = null
       setLiveStyles(null)
       return
     }
@@ -6321,6 +6621,7 @@ export function App() {
       .then((r) => {
         // a document switch or a save re-parse while resolving: their open path already set fresh styles
         if (cancelled || fileCtxRef.current.doc?.parsed !== parsed) return
+        liveStylesRef.current = { parsed, styles: r.styles }
         setLiveStyles({ parsed, styles: r.styles })
         editor.storage.listNumbering.styles = r.styles
         setDocCss(docStyleCss({ ...parsed, styles: r.styles }))
@@ -6889,9 +7190,18 @@ export function App() {
     onOpen: () => void openFile(),
     onSave: () => void save(false),
     onSaveAs: () => void save(true),
+<<<<<<< ours
     onExportPdf: () => void exportPdf(),
     onSaveCopy: () => void saveCopyDoc(),
     onPrint: () => void printDoc(),
+=======
+    onConvert: (format: ConvertFormat) => {
+      if (format === 'pdf') void exportPdf()
+      else if (format === 'html') void exportHtml()
+      else if (format === 'md') void exportMarkdown()
+      else exportImages()
+    },
+>>>>>>> theirs
     onToggleAi: () => setShowAi((v) => !v),
     onSection: (next: SectionSettings) => {
       // layout applies to the cursor's section; the final section's sectPr goes through SaveOptions.section (also drives canvas geometry)
@@ -6974,6 +7284,8 @@ export function App() {
     onHeader: (next: HeaderFooter) => commitHfAt(0, 'header', headerAreaView, next),
     onPageNumFormat: openPgNumModal,
     onInsertField: insertField,
+    onPickMergeDataSource: () => void pickMergeDataSource(),
+    onMergeMailings: mergeMailings,
     onFooter: (next: HeaderFooter) => commitHfAt(lastSectionIdx, 'footer', footerAreaView, next),
     onHfAction: (action: HfAction) => onHfAction(action),
     onHfEdit: (kind: 'header' | 'footer') => openHfEditor(kind),
@@ -7131,6 +7443,237 @@ export function App() {
     ],
   )
 
+  // ---- Multiple Pages: the grid is a function of zoom × pane width ----
+  const [paneW, setPaneW] = useState(0)
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!doc || !el) return
+    const ro = new ResizeObserver(() => setPaneW(el.clientWidth))
+    ro.observe(el)
+    setPaneW(el.clientWidth)
+    return () => ro.disconnect()
+  }, [doc])
+  const mpPaperW = canvasBox ? paperWidthPx(sections, canvasSection) : 0
+  const mpSlotW = mpPaperW + markupExtra
+  // differing paper widths keep the single column (their sheets are drawn per page)
+  const mpUniform = !sections.some((s) => pageLeftPx(s.settings, mpPaperW) > 0.5)
+  const mpCols =
+    doc && viewMode === 'print' && !readMode && mpUniform && multipageMode
+      ? multipageColumns(paneW, mpSlotW, zoom)
+      : 1
+  const mpWanted = mpCols >= 2
+  const [mpFrames, setMpFrames] = useState<PageFrame[]>([])
+  const canvasPageH = canvasBox?.height ?? 0
+  useEffect(() => {
+    if (!mpWanted) {
+      setMpFrames((prev) => (prev.length ? [] : prev))
+      return
+    }
+    const wrap = editor?.view.dom.closest<HTMLElement>('.page-wrap')
+    if (!wrap) return
+    const frames = pageFramesFromGaps(wrap, zoom / 100)
+    // the canvas ends where the content ends; the grid shows the last sheet whole
+    const last = frames[frames.length - 1]
+    if (last && last.bottom - last.top < canvasPageH) last.bottom = last.top + canvasPageH
+    setMpFrames(frames)
+  }, [doc, editor, mpWanted, zoom, layoutRev, canvasPageH])
+  const multipage = mpWanted && mpFrames.length >= 2
+  const mpLayout = useMemo(
+    () =>
+      multipage
+        ? // every slot is a full sheet: a mid-paragraph cut leaves its canvas frame a
+          // few px short of the paper, and Word's grid is equal-height
+          layoutMultipage(
+            mpFrames.map((f) => Math.max(canvasPageH, f.bottom - f.top)),
+            mpCols,
+            mpSlotW,
+          )
+        : null,
+    [multipage, mpFrames, mpCols, mpSlotW, canvasPageH],
+  )
+  const [mpActive, setMpActive] = useState(0)
+  const mpActiveIdx = Math.max(0, Math.min(mpActive, mpFrames.length - 1))
+  multipageActiveRef.current = multipage ? mpActiveIdx : null
+  mpFramesRef.current = mpFrames
+
+  const [mpSnap, setMpSnap] = useState<CanvasSnapshot | null>(null)
+  useEffect(() => {
+    if (!multipage) {
+      setMpSnap(null)
+      return
+    }
+    const wrap = editor?.view.dom.closest<HTMLElement>('.page-wrap')
+    if (!wrap) return
+    const raf = requestAnimationFrame(() => setMpSnap(snapshotCanvas(wrap, zoom / 100)))
+    return () => cancelAnimationFrame(raf)
+  }, [multipage, editor, zoom, layoutRev, mpFrames, mpActiveIdx])
+
+  /** the page under the caret, so the live window follows selection moves and page turns */
+  const mpFollowCaret = useCallback(() => {
+    if (!editor || multipageActiveRef.current == null) return
+    const frames = mpFramesRef.current
+    const wrap = editor.view.dom.closest<HTMLElement>('.page-wrap')
+    if (!wrap || frames.length === 0) return
+    let y: number
+    try {
+      y = editor.view.coordsAtPos(editor.state.selection.head).top
+    } catch {
+      return
+    }
+    const canvasY = (y - wrap.getBoundingClientRect().top) / (zoomLiveRef.current / 100)
+    let idx = 0
+    for (let i = 1; i < frames.length; i++) if (frames[i].top <= canvasY + 0.5) idx = i
+    setMpActive(idx)
+  }, [editor])
+  useEffect(() => {
+    if (!editor || !multipage) return
+    const onTr = ({ transaction }: { transaction: Transaction }) => {
+      // a typed change settles on its page after the next pagination pass
+      if (!transaction.docChanged && transaction.selectionSet) mpFollowCaret()
+    }
+    editor.on('transaction', onTr)
+    return () => {
+      editor.off('transaction', onTr)
+    }
+  }, [editor, multipage, mpFollowCaret])
+  useEffect(() => {
+    if (multipage) mpFollowCaret()
+  }, [multipage, mpFrames, mpFollowCaret])
+
+  /** a click on a painted page moves the live editor there and lands the caret under the pointer */
+  const mpPickRef = useRef<{ x: number; y: number } | null>(null)
+  const onMpPick = useCallback((index: number, x: number, y: number) => {
+    mpPickRef.current = { x, y }
+    setMpActive(index)
+  }, [])
+  useLayoutEffect(() => {
+    const pick = mpPickRef.current
+    if (!pick || !editor) return
+    mpPickRef.current = null
+    const view = editor.view
+    const wrap = view.dom.closest<HTMLElement>('.page-wrap')
+    const frames = mpFramesRef.current
+    const frame = frames[mpActiveIdx]
+    if (!wrap || !frame) return
+    const z = zoomLiveRef.current / 100
+    const wrapTop = wrap.getBoundingClientRect().top
+    const pageOf = (pos: number): number => {
+      const y = (view.coordsAtPos(pos).top - wrapTop) / z
+      let idx = 0
+      for (let i = 1; i < frames.length; i++) if (frames[i].top <= y + 0.5) idx = i
+      return idx
+    }
+    let pos = view.posAtCoords({ left: pick.x, top: pick.y })?.pos ?? null
+    if (pos != null && pageOf(pos) !== mpActiveIdx) pos = null
+    if (pos == null) {
+      // the pointer is on blank paper whose nearest caret slot is another
+      // page's: take the picked page's block nearest to the pointer instead
+      const canvasY = (pick.y - wrapTop) / z
+      let best: { el: HTMLElement; d: number; r: DOMRect } | null = null
+      for (const el of Array.from(view.dom.children) as HTMLElement[]) {
+        if (el.classList.contains('ProseMirror-widget')) continue
+        const r = el.getBoundingClientRect()
+        const top = (r.top - wrapTop) / z
+        const bottom = (r.bottom - wrapTop) / z
+        if (bottom <= frame.top || top >= frame.bottom) continue
+        const d = canvasY < top ? top - canvasY : canvasY > bottom ? canvasY - bottom : 0
+        if (!best || d < best.d) best = { el, d, r }
+      }
+      if (best) {
+        const x = Math.min(Math.max(pick.x, best.r.left + 1), best.r.right - 1)
+        const y = Math.min(Math.max(pick.y, best.r.top + 1), best.r.bottom - 1)
+        pos = view.posAtCoords({ left: x, top: y })?.pos ?? null
+      }
+    }
+    if (pos != null) {
+      const sel = TextSelection.near(view.state.doc.resolve(pos), 1)
+      view.dispatch(view.state.tr.setSelection(sel))
+    }
+    view.focus()
+  }, [mpActiveIdx, editor])
+
+  /** scroller offset of the active slot's top edge (CSS px) */
+  const mpActiveSlotTop = useCallback((): number | null => {
+    const scroller = scrollContainerRef.current
+    const grid = scroller?.querySelector<HTMLElement>('.doc-zoom')
+    const slot = mpLayout?.slots[mpActiveIdx]
+    if (!scroller || !grid || !slot) return null
+    const gridTop =
+      grid.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
+    return gridTop + slot.top * (zoom / 100)
+  }, [mpLayout, mpActiveIdx, zoom])
+  // a caret-driven page turn may land on a slot outside the viewport (zoom
+  // changes keep their own anchoring below)
+  const mpSeenActiveRef = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const scroller = scrollContainerRef.current
+    const seen = mpSeenActiveRef.current
+    mpSeenActiveRef.current = multipage ? mpActiveIdx : null
+    if (!multipage || !scroller || !mpLayout || seen === mpActiveIdx) return
+    const top = mpActiveSlotTop()
+    if (top == null) return
+    const slot = mpLayout.slots[mpActiveIdx]
+    const bottom = top + slot.height * (zoom / 100)
+    const viewTop = scroller.scrollTop
+    const viewBottom = viewTop + scroller.clientHeight
+    if (bottom > viewTop && top < viewBottom) return
+    scroller.scrollTop = Math.max(0, top - 26)
+    scrollPosRef.current = { left: scroller.scrollLeft, top: scroller.scrollTop }
+  }, [multipage, mpActiveIdx, mpLayout, mpActiveSlotTop, zoom])
+
+  const multipagePrevRef = useRef({ on: false, cols: 1 })
+  useLayoutEffect(() => {
+    const prevZoom = prevZoomRef.current
+    prevZoomRef.current = zoom
+    const anchor = zoomAnchorRef.current
+    zoomAnchorRef.current = null
+    const container = scrollContainerRef.current
+    const page = container?.querySelector<HTMLElement>('.doc-zoom')
+    if (!container || !page) return
+    // the Multiple Pages grid re-flows when its column count changes: keep
+    // the active page in view instead of a point that no longer exists
+    const prevMp = multipagePrevRef.current
+    const colsNow = multipage ? mpCols : 1
+    multipagePrevRef.current = { on: multipage, cols: colsNow }
+    if (multipage !== prevMp.on || colsNow !== prevMp.cols) {
+      let top = mpActiveSlotTop()
+      if (top == null && editor) {
+        // grid collapsed: the caret's page in the single column
+        try {
+          const c = editor.view.coordsAtPos(editor.state.selection.head)
+          top = c.top - container.getBoundingClientRect().top + container.scrollTop - 120
+        } catch {
+          top = null
+        }
+      }
+      if (top != null) {
+        container.scrollTop = Math.max(0, top - 26)
+        scrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop }
+      }
+      return
+    }
+    if (prevZoom === zoom) return
+
+    const ratio = zoom / prevZoom
+    const vx = anchor ? anchor.vx : container.clientWidth / 2
+    const vy = anchor ? anchor.vy : container.clientHeight / 2
+    const cs = getComputedStyle(container)
+    const padLeft = parseFloat(cs.paddingLeft) || 0
+    const innerWidth = container.clientWidth - padLeft - (parseFloat(cs.paddingRight) || 0)
+    const containerRect = container.getBoundingClientRect()
+    const pageRect = page.getBoundingClientRect()
+    const pageLeft = pageRect.left - containerRect.left + container.scrollLeft
+    const pageTop = pageRect.top - containerRect.top + container.scrollTop
+    const prevPageLeft = padLeft + Math.max(0, (innerWidth - pageRect.width / ratio) / 2)
+    const prev = scrollPosRef.current
+
+    const docX = Math.max(0, prev.left + vx - prevPageLeft)
+    const docY = Math.max(0, prev.top + vy - pageTop)
+    container.scrollLeft = pageLeft + docX * ratio - vx
+    container.scrollTop = pageTop + docY * ratio - vy
+    scrollPosRef.current = { left: container.scrollLeft, top: container.scrollTop }
+  }, [zoom, multipage, mpCols, mpActiveSlotTop, editor])
+
   if (!editor) return null
 
   // canvas geometry is anchored to the first section (stable across cursor moves);
@@ -7199,6 +7742,10 @@ export function App() {
     '--page-pad': canvasSection
       ? `${canvasTop}px ${twipsToPx(canvasSection.marginRight)}px ${canvasBottom}px ${twipsToPx(canvasSection.marginLeft)}px`
       : undefined,
+    '--page-mt': canvasSection ? `${canvasTop}px` : undefined,
+    '--page-mb': canvasSection ? `${canvasBottom}px` : undefined,
+    '--page-ml': canvasSection ? `${twipsToPx(canvasSection.marginLeft)}px` : undefined,
+    '--page-mr': canvasSection ? `${twipsToPx(canvasSection.marginRight)}px` : undefined,
     '--header-dist': canvasBox ? `${canvasBox.headerDist}px` : undefined,
     '--footer-dist': canvasBox ? `${canvasBox.footerDist}px` : undefined,
     '--page-bg': pageColor ? `#${pageColor}` : undefined,
@@ -7221,6 +7768,7 @@ export function App() {
 
   const docZoomClass = [
     'doc-zoom',
+    multipage ? 'multipage' : '',
     showMarks ? 'show-marks' : '',
     `view-${viewMode}`,
     showGrid ? 'show-grid' : '',
@@ -7242,7 +7790,16 @@ export function App() {
       )}
       {doc && charSpacePt != null && (
         // w:docGrid charSpace: every character advances natural width + this delta
-        <style>{`.doc-page { --doc-char-space:${Math.round(charSpacePt * 10000) / 10000}pt }`}</style>
+        <style>{`.doc-page { --doc-char-space:${Math.round(charSpacePt * 10000) / 10000}pt${
+          balancedGrid
+            ? `; --doc-char-space-sb:${Math.round(singleByteCharSpacePt(charSpacePt, true) * 10000) / 10000}pt`
+            : ''
+        } }`}</style>
+      )}
+      {doc && balancedGrid && (
+        // full-width spans take the whole delta back (halfwidth kana stay single-byte);
+        // an inline run letter-spacing still wins
+        <style>{`.doc-page .doc-east-asian-font:not(.doc-east-asian-halfwidth, [style*='letter-spacing'] .doc-east-asian-font, .page-gap-hf *) { letter-spacing: var(--doc-char-space, normal) }`}</style>
       )}
       {doc && section && (
         // over-wide tables may spill into the margins (Word/LO), capped at the paper edge
@@ -7267,6 +7824,7 @@ export function App() {
         aiEditLocked={uniwork.readOnly}
         actionsRef={ribbonActionsRef}
         quickActions={quickActions}
+        mergeSource={mergeSource}
         editor={editor}
         formatState={formatState}
         hasDoc={!!doc}
@@ -7338,7 +7896,11 @@ export function App() {
       />
 
       <div className="app-main">
+<<<<<<< ours
         {doc && aiEnabled && (
+=======
+        {doc && (
+>>>>>>> theirs
           <div
             className={`ai-dock${showAi ? '' : ' collapsed'}${
               !aiSidebarEnabled && !showAi ? ' ai-dock-off' : ''
@@ -7356,7 +7918,10 @@ export function App() {
               }
               preset={aiPreset}
               open={showAi}
+<<<<<<< ours
               dockHidden={readMode}
+=======
+>>>>>>> theirs
               hideRail={!aiSidebarEnabled}
               onExpand={() => setShowAi(true)}
               onCollapse={() => setShowAi(false)}
@@ -7460,166 +8025,210 @@ export function App() {
                     onClick={onDocClick}
                     onContextMenu={onDocContextMenu}
                     onDoubleClick={onDocDoubleClick}
-                    style={docZoomStyle}
+                    style={
+                      multipage && mpLayout
+                        ? { ...docZoomStyle, width: mpLayout.width, height: mpLayout.height }
+                        : docZoomStyle
+                    }
                   >
-                    {showRuler && rulerSection && (
-                      <Ruler
-                        section={rulerSection}
-                        editor={editor}
-                        onTabStopsChange={(stops) => {
-                          if (!editor) return
-                          setParaAttrs(editor, { tabStops: stops ? JSON.stringify(stops) : null })
-                        }}
-                        onIndentsChange={(attrs) => {
-                          if (editor) setParaAttrs(editor, { ...attrs })
-                        }}
-                        onMarginsChange={({ left, right }) => {
-                          const sec = sections[activeSection]?.settings ?? section
-                          ribbonActions.onSection({
-                            ...sec,
-                            marginLeft: rulerSwap ? right : left,
-                            marginRight: rulerSwap ? left : right,
-                          })
-                        }}
+                    <div
+                      className="doc-live"
+                      style={
+                        multipage && mpLayout
+                          ? {
+                              left: mpLayout.slots[mpActiveIdx].left,
+                              top: mpLayout.slots[mpActiveIdx].top,
+                              width: mpLayout.slots[mpActiveIdx].width,
+                              height: mpLayout.slots[mpActiveIdx].height,
+                            }
+                          : undefined
+                      }
+                    >
+                      {showRuler && rulerSection && !multipage && (
+                        <Ruler
+                          section={rulerSection}
+                          editor={editor}
+                          onTabStopsChange={(stops) => {
+                            if (!editor) return
+                            setParaAttrs(editor, { tabStops: stops ? JSON.stringify(stops) : null })
+                          }}
+                          onIndentsChange={(attrs) => {
+                            if (editor) setParaAttrs(editor, { ...attrs })
+                          }}
+                          onMarginsChange={({ left, right }) => {
+                            const sec = sections[activeSection]?.settings ?? section
+                            ribbonActions.onSection({
+                              ...sec,
+                              marginLeft: rulerSwap ? right : left,
+                              marginRight: rulerSwap ? left : right,
+                            })
+                          }}
+                        />
+                      )}
+                      <div
+                        className={`${mixedPaper ? 'page-wrap paper-mixed' : 'page-wrap'}${hfEditing ? ' hf-editing' : ''}`}
+                        style={
+                          multipage
+                            ? {
+                                marginTop: -mpFrames[mpActiveIdx].top,
+                                clipPath: `inset(${mpFrames[mpActiveIdx].top}px 0 calc(100% - ${mpFrames[mpActiveIdx].bottom}px) 0)`,
+                              }
+                            : undefined
+                        }
+                      >
+                        {watermark && watermarkDirty && (
+                          <div className="page-watermark" aria-hidden="true">
+                            {watermark}
+                          </div>
+                        )}
+                        {/* Boolean(): a trailing 0 (empty non-floating image list) must not render as a literal "0" text node */}
+                        {Boolean(
+                          multiHf ||
+                          headerAreaView !== 'default' ||
+                          hfAreaEditRequest?.kind === 'header' ||
+                          hfHasVisibleContent(shownHeader, hfImagesOf('header')),
+                        ) && (
+                          <HeaderFooterArea
+                            kind="header"
+                            value={shownHeader ?? { text: '' }}
+                            images={hfImagesOf('header')}
+                            readOnly={isProtected || readMode}
+                            onCommit={(next) => {
+                              const target = edgeHfTarget('header', headerAreaView)
+                              commitHfAt(0, 'header', target.variant, next, target.owner)
+                            }}
+                            pageNo={firstPageNoText}
+                            pageTotal={pageInfo.total}
+                            sectionLabel={hfSectionLabel('header', 0)}
+                            editRequest={
+                              hfAreaEditRequest?.kind === 'header' ? hfAreaEditRequest.nonce : null
+                            }
+                            onEditingChange={(editing, handle) => {
+                              hfEditorRef.current = editing ? handle : null
+                              if (!editing) setHfAreaEditRequest(null)
+                              setHfEditing(
+                                editing
+                                  ? {
+                                      kind: 'header',
+                                      section: 0,
+                                      variant: headerAreaView,
+                                      pageIdx: 0,
+                                      owner: hfResolveAt(0, 'header', headerAreaView).owner,
+                                    }
+                                  : null,
+                              )
+                            }}
+                            style={edgeHeaderStyle}
+                            boxGeom={
+                              canvasSection && canvasBox
+                                ? {
+                                    ...hfStripGeom(canvasSection),
+                                    stripLeft: edgeHeaderStyle
+                                      ? twipsToPx(firstPageMargins!.left)
+                                      : (paperW - canvasBox.contentWidth) / 2,
+                                  }
+                                : undefined
+                            }
+                          />
+                        )}
+                        <EditorContent editor={editor} />
+                        {/* footnotes already shown per page in page gaps aren't repeated at the end (last page's footnotes still live here) */}
+                        <PageFootnotes
+                          notes={footnotes}
+                          skipIds={gapNoteIds}
+                          numberOf={(n, i) => noteNo('footnote', n.id, i)}
+                          onEdit={(id) => editNote('footnote', id)}
+                          onDelete={(id) => deleteNote('footnote', id)}
+                        />
+                        <PageEndnotes
+                          notes={endnotes}
+                          top={endnotesAreaTop}
+                          numberOf={(n, i) => noteNo('endnote', n.id, i)}
+                          onEdit={(id) => editNote('endnote', id)}
+                          onDelete={(id) => deleteNote('endnote', id)}
+                        />
+                        {Boolean(
+                          multiHf ||
+                          footerAreaView !== 'default' ||
+                          hfAreaEditRequest?.kind === 'footer' ||
+                          hfHasVisibleContent(shownFooter, hfImagesOf('footer')),
+                        ) && (
+                          <HeaderFooterArea
+                            kind="footer"
+                            value={shownFooter ?? { text: '' }}
+                            images={hfImagesOf('footer')}
+                            readOnly={isProtected || readMode}
+                            onCommit={(next) => {
+                              const target = edgeHfTarget('footer', footerAreaView)
+                              commitHfAt(
+                                lastSectionIdx,
+                                'footer',
+                                target.variant,
+                                next,
+                                target.owner,
+                              )
+                            }}
+                            pageNo={lastPageNoText}
+                            pageTotal={pageInfo.total}
+                            linked={hfLinkedAt(lastSectionIdx, 'footer', footerAreaView)}
+                            sectionLabel={hfSectionLabel('footer', lastSectionIdx)}
+                            editRequest={
+                              hfAreaEditRequest?.kind === 'footer' ? hfAreaEditRequest.nonce : null
+                            }
+                            onEditingChange={(editing, handle) => {
+                              hfEditorRef.current = editing ? handle : null
+                              if (!editing) setHfAreaEditRequest(null)
+                              setHfEditing(
+                                editing
+                                  ? {
+                                      kind: 'footer',
+                                      section: lastSectionIdx,
+                                      variant: footerAreaView,
+                                      pageIdx: lastPageIdx,
+                                      owner: hfResolveAt(lastSectionIdx, 'footer', footerAreaView)
+                                        .owner,
+                                    }
+                                  : null,
+                              )
+                            }}
+                            style={edgeFooterStyle}
+                            boxGeom={
+                              lastSection && lastBox
+                                ? {
+                                    ...hfStripGeom(lastSection),
+                                    stripLeft: edgeFooterStyle
+                                      ? twipsToPx(lastPageMargins!.left)
+                                      : (paperW - lastBox.contentWidth) / 2,
+                                  }
+                                : undefined
+                            }
+                          />
+                        )}
+                        {(inkAnnotations.length > 0 || inkTool !== 'select') && !readMode && (
+                          <InkOverlay
+                            tool={isProtected ? 'select' : inkTool}
+                            color={inkTool === 'highlighter' ? inkHighlighter.color : inkPen.color}
+                            width={inkTool === 'highlighter' ? inkHighlighter.width : inkPen.width}
+                            zoom={zoom}
+                            annotations={inkAnnotations}
+                            onAdd={addInk}
+                            onRemove={removeInks}
+                          />
+                        )}
+                      </div>
+                    </div>
+                    {/* after the live editor in DOM order: first-match lookups of
+                        .ProseMirror / .doc-page / .page-wrap must find the editor */}
+                    {multipage && mpLayout && (
+                      <MultipageGrid
+                        frames={mpFrames}
+                        layout={mpLayout}
+                        active={mpActiveIdx}
+                        snap={mpSnap}
+                        scroller={scrollContainerRef.current}
+                        onPick={onMpPick}
                       />
                     )}
-                    <div
-                      className={`${mixedPaper ? 'page-wrap paper-mixed' : 'page-wrap'}${hfEditing ? ' hf-editing' : ''}`}
-                    >
-                      {watermark && watermarkDirty && (
-                        <div className="page-watermark" aria-hidden="true">
-                          {watermark}
-                        </div>
-                      )}
-                      {/* Boolean(): a trailing 0 (empty non-floating image list) must not render as a literal "0" text node */}
-                      {Boolean(
-                        multiHf ||
-                        headerAreaView !== 'default' ||
-                        hfAreaEditRequest?.kind === 'header' ||
-                        hfHasVisibleContent(shownHeader, hfImagesOf('header')),
-                      ) && (
-                        <HeaderFooterArea
-                          kind="header"
-                          value={shownHeader ?? { text: '' }}
-                          images={hfImagesOf('header')}
-                          readOnly={isProtected || readMode}
-                          onCommit={(next) => {
-                            const target = edgeHfTarget('header', headerAreaView)
-                            commitHfAt(0, 'header', target.variant, next, target.owner)
-                          }}
-                          pageNo={firstPageNoText}
-                          pageTotal={pageInfo.total}
-                          sectionLabel={hfSectionLabel('header', 0)}
-                          editRequest={
-                            hfAreaEditRequest?.kind === 'header' ? hfAreaEditRequest.nonce : null
-                          }
-                          onEditingChange={(editing, handle) => {
-                            hfEditorRef.current = editing ? handle : null
-                            if (!editing) setHfAreaEditRequest(null)
-                            setHfEditing(
-                              editing
-                                ? {
-                                    kind: 'header',
-                                    section: 0,
-                                    variant: headerAreaView,
-                                    pageIdx: 0,
-                                    owner: hfResolveAt(0, 'header', headerAreaView).owner,
-                                  }
-                                : null,
-                            )
-                          }}
-                          style={edgeHeaderStyle}
-                          boxGeom={
-                            canvasSection && canvasBox
-                              ? {
-                                  ...hfStripGeom(canvasSection),
-                                  stripLeft: edgeHeaderStyle
-                                    ? twipsToPx(firstPageMargins!.left)
-                                    : (paperW - canvasBox.contentWidth) / 2,
-                                }
-                              : undefined
-                          }
-                        />
-                      )}
-                      <EditorContent editor={editor} />
-                      {/* footnotes already shown per page in page gaps aren't repeated at the end (last page's footnotes still live here) */}
-                      <PageFootnotes
-                        notes={footnotes}
-                        skipIds={gapNoteIds}
-                        numberOf={(n, i) => noteNo('footnote', n.id, i)}
-                        onEdit={(id) => editNote('footnote', id)}
-                        onDelete={(id) => deleteNote('footnote', id)}
-                      />
-                      <PageEndnotes
-                        notes={endnotes}
-                        top={endnotesAreaTop}
-                        numberOf={(n, i) => noteNo('endnote', n.id, i)}
-                        onEdit={(id) => editNote('endnote', id)}
-                        onDelete={(id) => deleteNote('endnote', id)}
-                      />
-                      {Boolean(
-                        multiHf ||
-                        footerAreaView !== 'default' ||
-                        hfAreaEditRequest?.kind === 'footer' ||
-                        hfHasVisibleContent(shownFooter, hfImagesOf('footer')),
-                      ) && (
-                        <HeaderFooterArea
-                          kind="footer"
-                          value={shownFooter ?? { text: '' }}
-                          images={hfImagesOf('footer')}
-                          readOnly={isProtected || readMode}
-                          onCommit={(next) => {
-                            const target = edgeHfTarget('footer', footerAreaView)
-                            commitHfAt(lastSectionIdx, 'footer', target.variant, next, target.owner)
-                          }}
-                          pageNo={lastPageNoText}
-                          pageTotal={pageInfo.total}
-                          linked={hfLinkedAt(lastSectionIdx, 'footer', footerAreaView)}
-                          sectionLabel={hfSectionLabel('footer', lastSectionIdx)}
-                          editRequest={
-                            hfAreaEditRequest?.kind === 'footer' ? hfAreaEditRequest.nonce : null
-                          }
-                          onEditingChange={(editing, handle) => {
-                            hfEditorRef.current = editing ? handle : null
-                            if (!editing) setHfAreaEditRequest(null)
-                            setHfEditing(
-                              editing
-                                ? {
-                                    kind: 'footer',
-                                    section: lastSectionIdx,
-                                    variant: footerAreaView,
-                                    pageIdx: lastPageIdx,
-                                    owner: hfResolveAt(lastSectionIdx, 'footer', footerAreaView)
-                                      .owner,
-                                  }
-                                : null,
-                            )
-                          }}
-                          style={edgeFooterStyle}
-                          boxGeom={
-                            lastSection && lastBox
-                              ? {
-                                  ...hfStripGeom(lastSection),
-                                  stripLeft: edgeFooterStyle
-                                    ? twipsToPx(lastPageMargins!.left)
-                                    : (paperW - lastBox.contentWidth) / 2,
-                                }
-                              : undefined
-                          }
-                        />
-                      )}
-                      {(inkAnnotations.length > 0 || inkTool !== 'select') && !readMode && (
-                        <InkOverlay
-                          tool={isProtected ? 'select' : inkTool}
-                          color={inkTool === 'highlighter' ? inkHighlighter.color : inkPen.color}
-                          width={inkTool === 'highlighter' ? inkHighlighter.width : inkPen.width}
-                          zoom={zoom}
-                          annotations={inkAnnotations}
-                          onAdd={addInk}
-                          onRemove={removeInks}
-                        />
-                      )}
-                    </div>
                   </div>
                 ) : refusedMessage ? (
                   <div
@@ -7648,7 +8257,7 @@ export function App() {
                     </button>
                   </div>
                   <div className="split-pane-scroll">
-                    <div className={docZoomClass} style={docZoomStyle}>
+                    <div className={docZoomClass.replace(' multipage', '')} style={docZoomStyle}>
                       <div className="page-wrap">
                         <div
                           className="doc-page ProseMirror split-doc"
@@ -7913,6 +8522,8 @@ export function App() {
           onParagraphDialog={() => setShowParaDialog(true)}
           onLink={() => setShowLinkModal(true)}
           onNewComment={startNewComment}
+          onRedact={startRedaction}
+          onUnredact={clearRedaction}
           onViewImage={setViewImage}
           onSaveImageAs={saveImageAs}
           onAiPreset={(text) => {
@@ -7958,6 +8569,23 @@ export function App() {
           styles={ribbonStyles}
           pageWidth={section?.pageWidth}
           onClose={() => setShowParaDialog(false)}
+        />
+      )}
+      {doc && redactTarget && (
+        <RedactDialog
+          seed={redactTarget.seed}
+          onCancel={() => setRedactTarget(null)}
+          onSubmit={(label) => {
+            // re-assert the captured range: the command marks the selection,
+            // and the reader may have clicked somewhere while deciding
+            if (editor)
+              editor
+                .chain()
+                .setTextSelection({ from: redactTarget.from, to: redactTarget.to })
+                .setRedaction(label)
+                .run()
+            setRedactTarget(null)
+          }}
         />
       )}
       {doc && tableDialog === 'properties' && (
@@ -8149,8 +8777,10 @@ export function App() {
             }
           }}
           onExportPdf={() => void exportPdf()}
-          onClose={() => setShowPagePreview(false)}
-          suppressEscape={showPrintDialog}
+          onClose={() => {
+            if (!exportLocksPreview) setShowPagePreview(false)
+          }}
+          suppressEscape={showPrintDialog || exportLocksPreview}
         />
       )}
 

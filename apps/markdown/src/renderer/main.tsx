@@ -8,6 +8,10 @@ import '@genoffice/ui/screentip.css'
 import '@genoffice/ui/ai-model-picker.css'
 import '@genoffice/ui/ai-queue-strip.css'
 import '@genoffice/ui/ai-usage.css'
+<<<<<<< ours
+=======
+import '@genoffice/ui/ai-skills.css'
+>>>>>>> theirs
 import '@genoffice/ui/dropdown.css'
 import '@genoffice/ui/find-panel.css'
 import '@genoffice/ui/ribbon-collapse.css'
@@ -17,12 +21,17 @@ import '@genoffice/ui/ai-scope-quote.css'
 import '@genoffice/ui/image-viewer.css'
 import 'katex/dist/katex.min.css'
 import './styles.css'
+<<<<<<< ours
 // after styles.css: the shared AI panel skin overrides the per-app panel look
 import '@genoffice/ui/ai-panel.css'
 import '@genoffice/ui/ai-dock-narrow.css'
 import './markdown-themes.css'
 import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
 import { mirrorUniworkAiFlag } from '@genoffice/ai-provider/browser'
+=======
+import './markdown-themes.css'
+import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
+>>>>>>> theirs
 import type { MarkdownTheme } from '../shared/markdown-theme'
 
 installScreenTips()
@@ -57,7 +66,11 @@ void (async () => {
   document.documentElement.dir = htmlDir(lang)
   applyTheme(theme)
   applyDocumentTheme(docTheme ?? 'follow')
+<<<<<<< ours
   applyMarkdownTheme(mdTheme ?? 'default')
+=======
+  applyMarkdownTheme(mdTheme)
+>>>>>>> theirs
   window.markdownApi.onThemeChanged(applyTheme)
   window.markdownApi.onDocumentThemeChanged?.(applyDocumentTheme)
   await window.markdownApi

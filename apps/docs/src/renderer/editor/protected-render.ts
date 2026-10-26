@@ -4,13 +4,21 @@ import type { EditorView } from '@tiptap/pm/view'
 import {} from '@tiptap/pm/tables'
 import { WORDART_PRESETS, wordArtStrokePx } from '@genoffice/ui'
 import {
-  autospaceBoundaries,
+  autospaceLatinFirst,
+  autospaceMode,
   autospacePadBetween,
+  autospacePadClass,
+  autospacePadScale,
+  autospaceSeams,
+  latinAutospaceGapEm,
   codePointLengthAt,
+  type AutospaceMode,
   cssAutoLineMult,
   cssCsFontFamily,
   hangulSpaceOffsets,
   hangulSpaceWideningOn,
+  krNoBreakOffsets,
+  cjkDeclaredLineFactor,
   cssFontFamily,
   cssRunFontFamily,
   cssGridLineBase,
@@ -64,6 +72,7 @@ import {
   type TableParagraph,
   type TextboxDisplay,
   type TextboxParaDisplay,
+  type AutoSpace,
 } from '@genoffice/docx-engine'
 
 /**
@@ -81,6 +90,9 @@ import {
   cellClipStyle,
   borderWidthPx,
   cellPadCss,
+  asciiFamilyResolver,
+  type AsciiFamilyOf,
+  type ListNumberingStorage,
   modelEdgeBorders,
   outerBorderPx,
   cellVAlignGridCss,
@@ -88,6 +100,7 @@ import {
   preventProtectedLineBreak,
   protectedText,
   rowHeightCss,
+  rowPadVarsCss,
   rtlStartMarginCss,
   tableBordersCss,
   tableRowEatCss,
@@ -101,6 +114,7 @@ import {
   inferredBidi,
 } from './convert'
 import { cellDiagonalCss, cellPadPx } from './border-metrics'
+import { effectiveRPrCss } from './effective-css'
 
 // Word: links and TOC entries jump on modifier+click only
 const jumpHint = () =>
@@ -116,6 +130,11 @@ const TOC_LEADER_GLYPH: Record<NonNullable<FieldDisplay['leader']>, string> = {
   middleDot: '\u00b7',
 }
 
+/** a direct exact/atLeast rule pins the field line's auto multiple to 1 (autoLineMultOf) */
+function fixedLineRule(field: FieldDisplay): boolean {
+  return (field.lineRule === 'exact' && !!field.lineRawTwips) || field.lineRule === 'atLeast'
+}
+
 /** Rendering of a field result; safe visible text becomes editable on double-click. */
 export function renderFieldSpec(field: FieldDisplay): DomSpec | null {
   if (field.kind === 'tocLine') {
@@ -129,14 +148,18 @@ export function renderFieldSpec(field: FieldDisplay): DomSpec | null {
     if (field.runStyleId) titleAttrs['data-style'] = field.runStyleId
     // direct pPr/run metrics of the entry paragraph beat the inherited body size
     const tocStyles: string[] = []
-    if (field.szHalfPoints) tocStyles.push(`font-size:${field.szHalfPoints / 2}pt`)
     if (field.fontFamily) {
-      tocStyles.push(
-        `--doc-line-factor:${lineHeightFactor(field.fontFamily)}`,
-        `font-family:${cssFontFamily(field.fontFamily)}`,
+      // a CJK run behind a Latin leading run ("1.1 " + KaiTi title) still sets
+      // the line: Word meters it by the tallest face on it (36pt, not 18pt, on
+      // an 18pt grid)
+      const ea = field.eaFontFamily
+      const factor = Math.max(
+        lineHeightFactor(field.fontFamily),
+        ea ? (cjkDeclaredLineFactor(ea) ?? lineHeightFactor(ea)) : 0,
       )
+      tocStyles.push(`--doc-line-factor:${factor}`)
     }
-    if (field.bold) tocStyles.push('font-weight:bold')
+    tocStyles.push(...effectiveRPrCss({ sizeHalfPoints: field.szHalfPoints, ...field }))
     const tocLh = cssLineHeight(field.lineRule, field.lineRawTwips, field.lineSpacing)
     // an own face needs its own strut: the inherited computed line-height
     // would carry the body face's factor; the inherited multiple still applies
@@ -149,6 +172,7 @@ export function renderFieldSpec(field: FieldDisplay): DomSpec | null {
     // --doc-line-max reads the multiple from this var on the same element
     const tocMult = cssAutoLineMult(field.lineRule, field.lineRawTwips, field.lineSpacing)
     if (tocMult && tocMult !== 1) tocStyles.push(`--doc-line-mult:${tocMult}`)
+    else if (fixedLineRule(field)) tocStyles.push('--doc-line-fixed:1')
     if (tocStyles.length > 0) attrs.style = tocStyles.join(';')
     const numAttrs: Record<string, string> = { class: 'doc-toc-num', contenteditable: 'false' }
     if (field.indentLeftTwips != null)
@@ -175,20 +199,17 @@ export function renderFieldSpec(field: FieldDisplay): DomSpec | null {
   if (field.kind === 'pageBreak') {
     return ['div', { class: 'doc-field-pagebreak' }, ['span', {}, t('editorPageBreak')]]
   }
-  if (field.kind === 'text' && field.left) {
+  if (field.kind === 'text' && (field.left || field.emptyLine)) {
     // carry the result runs' face/size: the passthrough div otherwise inherits
     // the document default and mis-snaps on a typed line grid. Spaces must
     // survive inline: prosemirror-view injects a higher-specificity
     // `.ProseMirror [contenteditable=false] { white-space: normal }`
     const styles: string[] = ['white-space:pre-wrap']
-    if (field.szHalfPoints) styles.push(`font-size:${field.szHalfPoints / 2}pt`)
     if (field.align) styles.push(`text-align:${field.align}`)
-    if (field.fontFamily) {
-      styles.push(
-        `--doc-line-factor:${lineHeightFactor(field.fontFamily)}`,
-        `font-family:${cssFontFamily(field.fontFamily)}`,
-      )
-    }
+    if (field.fontFamily) styles.push(`--doc-line-factor:${lineHeightFactor(field.fontFamily)}`)
+    styles.push(
+      ...effectiveRPrCss({ sizeHalfPoints: field.szHalfPoints, fontFamily: field.fontFamily }),
+    )
     if (field.szHalfPoints || field.fontFamily || field.lineRule) {
       // explicit w:spacing beats the single-spacing snap; either way the line
       // strut must recompute from the field's own size/face, not the
@@ -198,6 +219,7 @@ export function renderFieldSpec(field: FieldDisplay): DomSpec | null {
       )
       const mult = cssAutoLineMult(field.lineRule, field.lineRawTwips, field.lineSpacing)
       if (mult && mult !== 1) styles.push(`--doc-line-mult:${mult}`)
+      else if (fixedLineRule(field)) styles.push('--doc-line-fixed:1')
     }
     const attrs: Record<string, string> = {
       class: 'doc-field-text',
@@ -207,6 +229,7 @@ export function renderFieldSpec(field: FieldDisplay): DomSpec | null {
     // formatted result runs (italic citations, a drop-cap letter before body
     // text); the wrapper keeps the dominant size for the line strut
     // EQ layouts: the MathML host is empty in the spec; buildProtectedDom fills it
+    if (field.emptyLine) return ['div', attrs, '\u00a0']
     if (field.runs)
       return [
         'div',
@@ -228,9 +251,8 @@ export function renderFieldSpec(field: FieldDisplay): DomSpec | null {
 }
 
 export function renderFormulaSpec(formula: FormulaDisplay): DomSpec {
-  const size: Record<string, string> = formula.sizeHalfPoints
-    ? { style: `font-size:${formula.sizeHalfPoints / 2}pt` }
-    : {}
+  const sizeCss = effectiveRPrCss(formula)
+  const size: Record<string, string> = sizeCss.length ? { style: sizeCss.join(';') } : {}
   const tokenStrip: DomSpec = [
     'span',
     { class: 'doc-formula' + (formula.mathml ? ' doc-formula-has-math' : ''), ...size },
@@ -1707,12 +1729,20 @@ export function textboxBoxStyle(box: TextboxDisplay, opts?: { inCell?: boolean }
   const insetRight = pad(box.insetRightPx ?? 9.6, geomInset?.r ?? 0)
   const insetBottom = pad(box.insetBottomPx ?? 4.8, geomInset?.b ?? 0)
   const insetLeft = pad(box.insetLeftPx ?? 9.6, geomInset?.l ?? 0)
+  // a translucent solid fill rides along as an 8-digit hex (svg and css alike)
+  const fill =
+    box.fill && box.fillAlpha !== undefined
+      ? box.fill +
+        Math.round(box.fillAlpha * 255)
+          .toString(16)
+          .padStart(2, '0')
+      : box.fill
   // preset/custom geometry renders as an SVG background so the border follows
   // the outline (a clip-path would clip a CSS outline away with the box corners)
   const geomCss = box.pathData
-    ? custGeomBackgroundCss(box.pathData, boxW, boxH, box.fill, box.borderColor)
+    ? custGeomBackgroundCss(box.pathData, boxW, boxH, fill, box.borderColor)
     : box.prst
-      ? shapeBackgroundCss(box.prst, boxW, boxH, box.fill, box.borderColor, {
+      ? shapeBackgroundCss(box.prst, boxW, boxH, fill, box.borderColor, {
           diag: box.lineDiag,
           flipH: box.flipH,
           flipV: box.flipV,
@@ -1750,7 +1780,7 @@ export function textboxBoxStyle(box: TextboxDisplay, opts?: { inCell?: boolean }
     : ''
   return [
     geomCss ?? '',
-    !geomCss && box.fill ? `background-color:#${box.fill}` : '',
+    !geomCss && fill ? `background-color:#${fill}` : '',
     !geomCss && box.borderColor ? `border-color:#${box.borderColor}` : '',
     !geomCss && box.borderColor ? `border-width:${box.borderWidthPx ?? 1}px` : '',
     !geomCss && box.borderColor && box.borderDash ? `border-style:${box.borderDash}` : '',
@@ -1797,9 +1827,25 @@ export function textboxBoxStyle(box: TextboxDisplay, opts?: { inCell?: boolean }
 
 const AUTOSPACE_PAD_ATTRS = { class: 'doc-autospace-pad' }
 const HANGUL_SPACE_ATTRS = { class: 'doc-hangul-space' }
+const KR_WJ_SPEC = ['span', { class: 'doc-kr-wj' }]
 
-/** texts directly before/after a run inside its paragraph (empty = none) */
-export type RunNeighbours = { prev?: string; next?: string }
+/** paragraph styleId -> inherited ascii face of the open document (the editor's
+ *  asciiOf; static runs without a face of their own scale their pads by it) */
+let staticAsciiOf: AsciiFamilyOf = () => null
+export function setStaticAsciiResolver(getStorage: () => ListNumberingStorage | undefined): void {
+  staticAsciiOf = asciiFamilyResolver(getStorage)
+}
+
+/** texts directly before/after a run inside its paragraph (empty = none); prevFace = the
+ *  ascii face of the text before (its Latin -> CJK seam gap); face = this run's ascii face
+ *  after inheritance; krNoBreak = Korean word-wrap paragraph (word-joiner at punctuation seams) */
+export type RunNeighbours = {
+  prev?: string
+  next?: string
+  prevFace?: string
+  face?: string
+  krNoBreak?: boolean
+}
 
 /**
  * static-DOM counterpart of the editor's autospace pad and hangul-space
@@ -1809,16 +1855,35 @@ export type RunNeighbours = { prev?: string; next?: string }
  */
 function padSegments(
   text: string,
-  pads: boolean,
+  pads: AutospaceMode | null,
   leadPad: boolean,
   neighbours: RunNeighbours,
+  face?: string,
 ): unknown[] {
   const wraps: Array<[number, number, object]> = []
   if (pads) {
-    const cuts = autospaceBoundaries(text)
-    if (leadPad && text) cuts.unshift(0)
-    for (const cut of cuts) {
-      wraps.push([cut, cut + codePointLengthAt(text, cut), AUTOSPACE_PAD_ATTRS])
+    const cls = autospacePadClass(pads)
+    const attrs = pads === true ? AUTOSPACE_PAD_ATTRS : { class: cls }
+    const attrsFor = (latinFirst: boolean, latinFace: string | undefined) => {
+      const scale = latinFirst ? autospacePadScale(latinAutospaceGapEm(latinFace), pads) : 1
+      return scale === 1
+        ? attrs
+        : { class: `${cls} doc-autospace-pad-le`, style: `--doc-autospace-pad-le:${scale}` }
+    }
+    const seams = autospaceSeams(text, pads).map((s) => ({ ...s, face }))
+    if (leadPad && text) {
+      seams.unshift({
+        at: 0,
+        latinFirst: autospaceLatinFirst(neighbours.prev ?? ''),
+        face: neighbours.prevFace,
+      })
+    }
+    for (const seam of seams) {
+      wraps.push([
+        seam.at,
+        seam.at + codePointLengthAt(text, seam.at),
+        attrsFor(seam.latinFirst, seam.face),
+      ])
     }
   }
   if (hangulSpaceWideningOn()) {
@@ -1826,15 +1891,26 @@ function padSegments(
       wraps.push([i, i + 1, HANGUL_SPACE_ATTRS])
     }
   }
-  if (wraps.length === 0) return [text]
+  const joiners = neighbours.krNoBreak ? krNoBreakOffsets(text, neighbours.prev) : []
+  if (wraps.length === 0 && joiners.length === 0) return [text]
   wraps.sort((a, b) => a[0] - b[0])
   const out: unknown[] = []
   let start = 0
+  let j = 0
+  const emitJoinersBefore = (at: number) => {
+    for (; j < joiners.length && joiners[j] <= at; j++) {
+      if (joiners[j] > start) out.push(text.slice(start, joiners[j]))
+      start = joiners[j]
+      out.push(KR_WJ_SPEC)
+    }
+  }
   for (const [from, end, attrs] of wraps) {
+    emitJoinersBefore(from)
     if (from > start) out.push(text.slice(start, from))
     out.push(['span', attrs, text.slice(from, end)])
     start = end
   }
+  emitJoinersBefore(text.length)
   if (start < text.length) out.push(text.slice(start))
   return out
 }
@@ -1842,7 +1918,7 @@ function padSegments(
 /** run → styled <span> (+ inline <img>) specs, shared by textbox and table-cell rendering */
 export function runSpanSpecs(
   run: Run,
-  autoSpace?: boolean,
+  autoSpace?: AutoSpace,
   leadPad = false,
   neighbours: RunNeighbours = {},
 ): DomSpec[] {
@@ -1874,7 +1950,7 @@ export function runSpanSpecs(
 
 function textSpanSpec(
   run: Run,
-  autoSpace?: boolean,
+  autoSpace?: AutoSpace,
   leadPad = false,
   neighbours: RunNeighbours = {},
 ): DomSpec {
@@ -1906,11 +1982,17 @@ function textSpanSpec(
     run.caps === 'small' ? 'font-variant-caps:small-caps' : '',
     run.caps === 'none' ? 'text-transform:none;font-variant-caps:normal' : '',
     // explicit autoSpaceDE/DN off also disables the browser's native gap (same as the editor path)
-    autoSpace === false ? 'text-autospace:no-autospace' : '',
+    autoSpace != null && autoSpace !== true ? 'text-autospace:no-autospace' : '',
   ]
     .filter(Boolean)
     .join(';')
-  const content = padSegments(run.text, autoSpace !== false, leadPad, neighbours)
+  const content = padSegments(
+    run.text,
+    autospaceMode(autoSpace),
+    leadPad,
+    neighbours,
+    neighbours.face ?? run.fontAscii ?? run.font,
+  )
   // hyperlink runs keep the editable path's look (.doc-link) and real href;
   // App-level click handling prevents in-place navigation (jump on mod+click)
   const attrs: Record<string, string> = {}
@@ -1938,19 +2020,37 @@ function adjacentRunText(runs: Run[], k: number, step: 1 | -1): string {
   return ''
 }
 
-/** run spans with pads at run-boundary CJK-Latin seams (empty runs keep their span, no pad) */
-function runSpansWithPads(runs: Run[], autoSpace?: boolean): DomSpec[] {
+/** run spans with pads at run-boundary CJK-Latin seams (empty runs keep their span, no pad);
+ *  para = the paragraph's style id (inherited ascii face) and wordWrap (Korean no-break seams) */
+function runSpansWithPads(
+  runs: Run[],
+  autoSpace?: AutoSpace,
+  para?: { styleId?: string; wordWrap?: boolean },
+): DomSpec[] {
   const out: DomSpec[] = []
   let prevText = ''
+  let prevFace: string | undefined
+  let inherited: string | undefined
+  const faceOf = (run: Run): string | undefined => {
+    const own = run.fontAscii ?? run.font
+    if (own) return own
+    if (inherited === undefined) inherited = staticAsciiOf(para?.styleId) ?? ''
+    return inherited || undefined
+  }
+  const krNoBreak = para?.wordWrap !== false && textHasHangul(runs.map((r) => r.text).join(''))
   runs.forEach((run, k) => {
     let leadPad = false
     const neighbours: RunNeighbours = {
       prev: adjacentRunText(runs, k, -1),
       next: adjacentRunText(runs, k, 1),
+      prevFace,
+      krNoBreak,
     }
     if (run.text !== '') {
-      leadPad = autoSpace !== false && autospacePadBetween(prevText, run.text)
+      const mode = autospaceMode(autoSpace)
+      leadPad = mode !== null && autospacePadBetween(prevText, run.text, mode)
       prevText = run.text
+      prevFace = neighbours.face = faceOf(run)
     }
     out.push(...runSpanSpecs(run, autoSpace, leadPad, neighbours))
   })
@@ -1978,9 +2078,11 @@ function textboxRowSpec(para: TextboxParaDisplay): DomSpec {
     if (geom.diagonals) decls.push(dkBackgroundImage(geom.diagonals))
     const lines = (cell.paras.length > 0 ? cell.paras : [[]]).map((runs, k): DomSpec => {
       const attrs: Record<string, string> = { class: 'page-hf-cell-para' }
-      const style = styleText(hfCellParaStyle(cell.paraProps?.[k]))
+      const style = styleText(hfCellParaStyle(cell.paraProps?.[k], undefined, undefined, para.row))
       if (style) attrs.style = style
-      return runs.length === 0 ? ['div', attrs, ' '] : ['div', attrs, ...runSpansWithPads(runs)]
+      return runs.length === 0
+        ? ['div', attrs, ' ']
+        : ['div', attrs, ...runSpansWithPads(runs, undefined, cell.paraProps?.[k])]
     })
     return ['div', { class: 'page-hf-cell', style: decls.filter(Boolean).join(';') }, ...lines]
   })
@@ -2002,16 +2104,32 @@ export function renderTextboxSpec(box: TextboxDisplay, opts?: { inCell?: boolean
     if (box.pageRelVFrom === 'page') boxAttrs['data-page-rel-from'] = 'page'
   }
   // page-absolute X: the column-layout counter-translate keys on this
-  if (box.floating && box.pageRelX) boxAttrs['data-page-rel-x'] = '1'
+  if (box.floating && box.pageRelX) {
+    boxAttrs['data-page-rel-x'] = '1'
+    if (box.pageRelXFrom === 'page') boxAttrs['data-page-rel-x-from'] = 'page'
+  }
+  // layoutInCell="0" page-positioned cell box: pinCellBoxesToPage lands it on
+  // the page from these raw offsets instead of the cell origin
+  if (opts?.inCell && cellBoxOnPage(box)) {
+    boxAttrs['data-cell-page'] = '1'
+    boxAttrs['data-cell-page-x'] = ((box.offsetXEmu ?? 0) / 9525).toFixed(1)
+    boxAttrs['data-cell-page-y'] = ((box.offsetYEmu ?? 0) / 9525).toFixed(1)
+  }
   // wrapNone/front/behind boxes never open pages: Word clips them at their
   // anchor's page edge (a letterhead's page-tall art box must not add a page)
   if (box.floating && !box.bandTopPx && !box.bandBottomPx && !box.wrapSide) {
     boxAttrs['data-no-spill'] = '1'
   }
+  // side-wrapped floating box: a page obstacle for every later line (syncWrapObstacles)
+  if (box.floating && box.wrapSides) {
+    boxAttrs['data-wrap-side'] = '1'
+    const d = box.wrapDistPx
+    if (d) boxAttrs['data-wrap-dist'] = `${d.l} ${d.r} ${d.t} ${d.b}`
+  }
 
   const paras: DomSpec[] = box.paras.map((para) => {
     if (para.cells) return textboxRowSpec(para)
-    const spans: DomSpec[] = runSpansWithPads(para.runs, para.autoSpace)
+    const spans: DomSpec[] = runSpansWithPads(para.runs, para.autoSpace, para)
     const text = para.runs.map((r) => r.text).join('')
     // same line strut as body/cell paragraphs (factor by run fonts + run-size
     // strut + grid snapping); inheriting the page's computed line-height
@@ -2081,17 +2199,15 @@ export function renderTextboxSpec(box: TextboxDisplay, opts?: { inCell?: boolean
   return ['div', boxAttrs, ...paras]
 }
 
-/** Max explicit run size (half-points, plus uniformity) when every run declares one (blockAttrs' strut rule). */
-function runStrutHalfPoints(runs: Run[]): { halfPoints: number; uniform: boolean } | null {
-  let max: number | null = null
+/** Smallest explicit run size (half-points) when every run declares one (blockAttrs' strut rule). */
+function runStrutHalfPoints(runs: Run[]): number | null {
   let min: number | null = null
   for (const run of runs) {
     if (SPACE_ONLY_RE.test(run.text)) continue
     if (run.sizeHalfPoints == null) return null
-    max = Math.max(max ?? 0, run.sizeHalfPoints)
     min = Math.min(min ?? Infinity, run.sizeHalfPoints)
   }
-  return max === null ? null : { halfPoints: max, uniform: max === min }
+  return min
 }
 
 /** Run[] port of extensions' paraDeclaredFontFamily (strut face follows the runs). */
@@ -2188,15 +2304,19 @@ function cellParaSpec(
  * wrapNone boxes overlay the cell without growing it */
 export function cellBoxesSpec(boxes: TextboxDisplay[]): DomSpec {
   if (boxes.length === 0) return ['div', { class: 'doc-cell-boxes' }]
+  // a page-positioned group (splitCellBoxGroup) gets its own strut: the
+  // preview un-positions it so the boxes resolve against the page box like
+  // top-level page-relative floats; Word does not grow the row for them
+  const onPage = boxes.every(cellBoxOnPage)
   let bottom = 0
   for (const b of boxes) {
-    if (b.noWrap) continue
+    if (b.noWrap || onPage) continue
     bottom = Math.max(bottom, (b.offsetYEmu ?? 0) / 9525 + (b.heightPx ?? b.minHeightPx ?? 0))
   }
   return [
     'div',
     {
-      class: 'doc-cell-boxes',
+      class: onPage ? 'doc-cell-boxes doc-cell-boxes-page' : 'doc-cell-boxes',
       contenteditable: 'false',
       style: bottom > 0 ? `height:${bottom.toFixed(1)}px` : '',
     },
@@ -2212,6 +2332,20 @@ export function cellBoxesSpec(boxes: TextboxDisplay[]): DomSpec {
       ]
     }),
   ]
+}
+
+/** one anchor paragraph's boxes split into page-positioned and in-cell struts */
+export function splitCellBoxGroup(group: TextboxDisplay[]): TextboxDisplay[][] {
+  const onPage = group.filter(cellBoxOnPage)
+  const inCell = group.filter((b) => !cellBoxOnPage(b))
+  return [onPage, inCell].filter((g) => g.length > 0)
+}
+
+/** a layoutInCell="0" box with a page/margin-relative offset: Word positions it
+ *  on the page, not in the cell (resume templates: avatar and header bar
+ *  anchored in the first cell of a page-anchored floating table) */
+export function cellBoxOnPage(box: TextboxDisplay): boolean {
+  return !!box.outsideCell && !!box.floating && !!box.pageRelV
 }
 
 /** read-only <table> DOM spec from the display model (vMerge -> rowSpan);
@@ -2277,7 +2411,7 @@ export function renderTableSpec(model: TableModel, nested = false): DomSpec {
             .join(',')
           return layers ? `background-image:${layers};${dkBackgroundImage(layers)}` : ''
         })(),
-        ...(['top', 'left', 'bottom', 'right'] as const).map((side) =>
+        ...(['left', 'right'] as const).map((side) =>
           cell.cellMarTwips?.[side] !== undefined
             ? `--doc-cell-pad-${DK_SIDE[side]}:${cellPadPx(cell.cellMarTwips[side]!)}`
             : '',
@@ -2293,20 +2427,35 @@ export function renderTableSpec(model: TableModel, nested = false): DomSpec {
       }
       // not in-flow evidence for the .cell-vert switch (same as tableCellHtml)
       if (cell.gridGap) tdAttrs['data-grid-gap'] = '1'
+      if (cell.hideMark) tdAttrs['data-hide-mark'] = '1'
       if (cell.colSpan && cell.colSpan > 1) tdAttrs.colspan = String(cell.colSpan)
       if (rowSpan > 1) tdAttrs.rowspan = String(rowSpan)
       const paraBlocks: DomSpec[] = cell.richParas?.length
         ? cell.richParas.map((p) => {
             const runs = p.runs.filter((run) => run.text !== '' || run.image)
             return cellParaSpec(
-              runSpansWithPads(runs, p.autoSpace),
+              runSpansWithPads(runs, p.autoSpace, p),
               runs.map((r) => r.text).join(''),
               runs,
               p,
             )
           })
         : cell.paras.map((p) =>
-            cellParaSpec(p === '' ? [] : [...padSegments(p, true, false, {})], p, null),
+            cellParaSpec(
+              p === ''
+                ? []
+                : [
+                    ...padSegments(
+                      p,
+                      true,
+                      false,
+                      { krNoBreak: textHasHangul(p) },
+                      staticAsciiOf(undefined) ?? undefined,
+                    ),
+                  ],
+              p,
+              null,
+            ),
           )
       // nested tables spliced in at their paragraph anchors (cells with them are never editable)
       const nested = cell.nestedTables ?? []
@@ -2323,7 +2472,7 @@ export function renderTableSpec(model: TableModel, nested = false): DomSpec {
       let ni = 0
       const boxesAt = (pi: number) => {
         const group = boxGroups.get(pi)
-        if (group) content.push(cellBoxesSpec(group))
+        if (group) for (const g of splitCellBoxGroup(group)) content.push(cellBoxesSpec(g))
       }
       paraBlocks.forEach((blk, pi) => {
         while (ni < nested.length && anchorOf(ni) <= pi)
@@ -2360,16 +2509,20 @@ export function renderTableSpec(model: TableModel, nested = false): DomSpec {
       }
     })
     const trAttrs: Record<string, string> = {}
+    const inFlow = row.filter((cell) => !cell.gridGap)
+    const trStyles = rowPadVarsCss(inFlow.map((cell) => cell.cellMarTwips))
     const rh = model.rowHeightsTwips?.[ri]
     if (rh) {
-      const inFlow = row.filter((cell) => !cell.gridGap)
-      trAttrs.style = rowHeightCss(
-        rh,
-        inFlow.map((cell) => cell.borders),
-        inFlow.map((cell) => cell.cellMarTwips),
-        model.rowHeightRules?.[ri] ?? null,
+      trStyles.push(
+        rowHeightCss(
+          rh,
+          inFlow.map((cell) => cell.borders),
+          inFlow.map((cell) => cell.cellMarTwips),
+          model.rowHeightRules?.[ri] ?? null,
+        ),
       )
     }
+    if (trStyles.length > 0) trAttrs.style = trStyles.join(';')
     return ['tr', trAttrs, ...tds]
   })
 

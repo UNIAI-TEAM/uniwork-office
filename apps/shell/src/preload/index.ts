@@ -42,9 +42,13 @@ import type {
   FolderListing,
   FolderRoot,
   MoveResult,
+<<<<<<< ours
   ProjectHomeApi,
   ProjectSummaryEntry,
   TimelineEntryItem,
+=======
+  AuthorNameSetting,
+>>>>>>> theirs
   HomeApi,
   RecentEntry,
   RecentPage,
@@ -118,6 +122,7 @@ import {
   UNIWORK_SHARE_CHANNELS,
   UNIWORK_LOCK_REASONS,
 } from '../shared/home-api'
+<<<<<<< ours
 import type { UniworkDocFavoriteResult, UniworkDocShelveResult } from '../shared/home-api'
 import {
   asDocHistoryResult,
@@ -126,12 +131,17 @@ import {
   type DocHistoryResult,
   type UniworkDocHistoryApi,
 } from '../shared/doc-history-api'
+=======
+import type { ProjectApi } from '@genoffice/project-store'
+import { HOME_CHANNELS } from '../shared/home-api'
+>>>>>>> theirs
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
 import type {
   IntegrationsApi,
   IntegrationsStatus,
   SkillInstallState,
 } from '../shared/integrations-api'
+import type { FoundSkill, RecommendedSkill } from '../shared/found-skill'
 import type { TabsApi, TabSummary } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
 import { UNIWORK_WORK_CHANNELS } from '../shared/uniwork-work-api'
@@ -339,6 +349,7 @@ function normalizeDefaultAppStatus(result: unknown): DefaultAppStatus {
   }
 }
 
+<<<<<<< ours
 function normalizeCliLinkState(result: unknown): CliLinkState {
   const r = (result ?? {}) as Partial<CliLinkState>
   const state = r.state
@@ -646,6 +657,21 @@ function testResultOf(raw: unknown): AiConnectionTestResult {
     ? { ok: true }
     : { ok: false, errorKind: normalizeAiTestFailureKind(r.errorKind) }
 }
+=======
+function normalizeAuthorNameSetting(result: unknown): AuthorNameSetting {
+  const r = (result ?? {}) as Partial<AuthorNameSetting>
+  return {
+    value: typeof r.value === 'string' ? r.value : '',
+    fallback: typeof r.fallback === 'string' ? r.fallback : '',
+  }
+}
+
+// a Settings request (menu click, Cmd+,) can land before Home has subscribed
+const pendingOpenSettings: Array<{ section: string }> = []
+ipcRenderer.on(HOME_CHANNELS.openSettings, (_event, target: { section: string }) => {
+  if (ipcRenderer.listenerCount(HOME_CHANNELS.openSettings) === 1) pendingOpenSettings.push(target)
+})
+>>>>>>> theirs
 
 const homeApi: HomeApi = {
   async recents(query) {
@@ -689,6 +715,70 @@ const homeApi: HomeApi = {
   async toggleStar(path) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')
     await ipcRenderer.invoke(HOME_CHANNELS.toggleStar, path)
+  },
+  async openHelp() {
+    await ipcRenderer.invoke(HOME_CHANNELS.openHelp)
+  },
+  // knowledge-base ask panel (handlers live in the shell main, same process
+  // that owns the index and the shared ai:stream registration)
+  async kbList() {
+    return ipcRenderer.invoke('kb:list')
+  },
+  async skillsList() {
+    return ipcRenderer.invoke('ai:skills-list')
+  },
+  async skillText(name) {
+    return ipcRenderer.invoke('ai:skill-text', name)
+  },
+  async openSkillsSettings() {
+    await ipcRenderer.invoke('ai:open-skills-settings')
+  },
+  async kbSearch(query) {
+    return ipcRenderer.invoke('kb:search', query)
+  },
+  async kbRead(path, offset) {
+    return ipcRenderer.invoke('kb:read', { path, offset })
+  },
+  async kbCreateDocument(request) {
+    return ipcRenderer.invoke('kb:create-document', request)
+  },
+  async kbCliContext(sessionId) {
+    return ipcRenderer.invoke('kb:cli-context', sessionId)
+  },
+  async kbRunCli(sessionId, request) {
+    return ipcRenderer.invoke('kb:run-cli', { sessionId, ...request })
+  },
+  async pickAttachments() {
+    return ipcRenderer.invoke('files:pick')
+  },
+  async addAttachmentPaths(paths) {
+    return ipcRenderer.invoke('files:add', paths)
+  },
+  async addPastedImage(data, ext) {
+    return ipcRenderer.invoke('files:add-pasted-image', data, ext)
+  },
+  async readAttachment(path, offset, maxChars) {
+    return ipcRenderer.invoke('files:read', path, offset, maxChars)
+  },
+  async readAttachmentImage(path) {
+    return ipcRenderer.invoke('files:read-image', path)
+  },
+  async aiGetSettings() {
+    return ipcRenderer.invoke('ai:get-settings')
+  },
+  async aiStream(request) {
+    await ipcRenderer.invoke('ai:stream', request)
+  },
+  async aiStreamCancel(requestId) {
+    await ipcRenderer.invoke('ai:stream-cancel', requestId)
+  },
+  onAiStream(handler) {
+    const listener = (_event: Electron.IpcRendererEvent, chunk: unknown) => handler(chunk as never)
+    ipcRenderer.on('ai:stream-chunk', listener)
+    return () => ipcRenderer.removeListener('ai:stream-chunk', listener)
+  },
+  async aiGskStatus() {
+    return ipcRenderer.invoke('ai:gsk-status')
   },
   async openPath(path) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')
@@ -867,6 +957,14 @@ const homeApi: HomeApi = {
     if (channel !== 'stable' && channel !== 'beta') throw new Error('Invalid update channel.')
     await ipcRenderer.invoke(HOME_CHANNELS.setUpdateChannel, channel)
   },
+  async getAutoUpdateCheck() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getAutoUpdateCheck)
+    return result !== false
+  },
+  async setAutoUpdateCheck(on) {
+    if (typeof on !== 'boolean') throw new Error('Invalid update check setting.')
+    await ipcRenderer.invoke(HOME_CHANNELS.setAutoUpdateCheck, on)
+  },
   async accountStatus() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.accountStatus)
     return (result ?? { loggedIn: false, state: 'signed-out' }) as AccountStatus
@@ -878,6 +976,7 @@ const homeApi: HomeApi = {
   onOpenSettings(handler) {
     const listener = (_event: IpcRendererEvent, target: { section: string }) => handler(target)
     ipcRenderer.on(HOME_CHANNELS.openSettings, listener)
+    for (const target of pendingOpenSettings.splice(0)) handler(target)
     return () => ipcRenderer.removeListener(HOME_CHANNELS.openSettings, listener)
   },
   onAccountLogin(handler) {
@@ -1002,6 +1101,22 @@ const homeApi: HomeApi = {
       updatedAt: typeof r?.updatedAt === 'number' ? r.updatedAt : 0,
     }
   },
+  async getTabSleepEnabled() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getTabSleepEnabled)
+    return result !== false
+  },
+  async setTabSleepEnabled(on) {
+    if (typeof on !== 'boolean') throw new Error('Invalid tab sleep setting.')
+    await ipcRenderer.invoke(HOME_CHANNELS.setTabSleepEnabled, on)
+  },
+  async getRestoreLastSession() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getRestoreLastSession)
+    return result === true
+  },
+  async setRestoreLastSession(on) {
+    if (typeof on !== 'boolean') throw new Error('Invalid restore session setting.')
+    await ipcRenderer.invoke(HOME_CHANNELS.setRestoreLastSession, on)
+  },
   async setAutoSaveDefault(on) {
     if (typeof on !== 'boolean') throw new Error('Invalid AutoSave default.')
     await ipcRenderer.invoke(HOME_CHANNELS.setAutoSaveDefault, on)
@@ -1071,6 +1186,24 @@ const homeApi: HomeApi = {
   async openMcpLogFile() {
     await ipcRenderer.invoke(HOME_CHANNELS.openMcpLogFile)
   },
+<<<<<<< ours
+=======
+  async getAnalyticsEnabled() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getAnalyticsEnabled)
+    return result !== false
+  },
+  async setAnalyticsEnabled(enabled) {
+    if (typeof enabled !== 'boolean') throw new Error('Invalid analytics consent.')
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.setAnalyticsEnabled, enabled)
+    return result === true
+  },
+  async getAuthorName() {
+    return normalizeAuthorNameSetting(await ipcRenderer.invoke(HOME_CHANNELS.getAuthorName))
+  },
+  async setAuthorName(value) {
+    return normalizeAuthorNameSetting(await ipcRenderer.invoke(HOME_CHANNELS.setAuthorName, value))
+  },
+>>>>>>> theirs
   async getAiPanelPrefs() {
     return normalizeAiPanelPrefs(await ipcRenderer.invoke(HOME_CHANNELS.getAiPanelPrefs))
   },
@@ -1159,8 +1292,12 @@ const homeApi: HomeApi = {
   async getCodexModels(cliPath) {
     return (await ipcRenderer.invoke('ai:codex-models', cliPath)) as CodexModelCatalog
   },
-  async getCustomModels(baseUrl, apiKey) {
-    return (await ipcRenderer.invoke('ai:custom-models', { baseUrl, apiKey })) as CodexModelCatalog
+  async getCustomModels(baseUrl, apiKey, api) {
+    return (await ipcRenderer.invoke('ai:custom-models', {
+      baseUrl,
+      apiKey,
+      ...(api ? { api } : {}),
+    })) as CodexModelCatalog
   },
   async testAiSettings(settings) {
     return testResultOf(
@@ -1935,6 +2072,20 @@ const projectApi: ProjectHomeApi = {
 
 contextBridge.exposeInMainWorld('aiOfficeProject', projectApi)
 
+// The same project:* channels the editor preloads use; the home screen's
+// knowledge-base ask panel keeps its thread through them. The handlers are
+// registered once by the docs main process in shell mode (registerProjectIpc).
+const projectApi: ProjectApi = {
+  resolveChat: (args) => ipcRenderer.invoke('project:resolveChat', args),
+  appendChat: (args) => ipcRenderer.invoke('project:appendChat', args),
+  loadChat: (args) => ipcRenderer.invoke('project:loadChat', args),
+  rebindChat: (args) => ipcRenderer.invoke('project:rebindChat', args),
+  listChats: (args) => ipcRenderer.invoke('project:listChats', args),
+  deleteChat: (args) => ipcRenderer.invoke('project:deleteChat', args),
+}
+
+contextBridge.exposeInMainWorld('projectApi', projectApi)
+
 const integrationsApi: IntegrationsApi = {
   async status() {
     return (await ipcRenderer.invoke(INTEGRATIONS_CHANNELS.status)) as IntegrationsStatus
@@ -1961,6 +2112,34 @@ const integrationsApi: IntegrationsApi = {
   },
   async copyText(text) {
     await ipcRenderer.invoke(INTEGRATIONS_CHANNELS.copyText, text)
+  },
+  async listSkills() {
+    return (await ipcRenderer.invoke(INTEGRATIONS_CHANNELS.listSkills)) as FoundSkill[]
+  },
+  async skillBody(path) {
+    return (await ipcRenderer.invoke(INTEGRATIONS_CHANNELS.skillBody, path)) as string
+  },
+  async importSkillFolder(title) {
+    const r: unknown = await ipcRenderer.invoke(INTEGRATIONS_CHANNELS.importSkillFolder, title)
+    return (r as FoundSkill | null) ?? null
+  },
+  async importSkillZip(title) {
+    const r: unknown = await ipcRenderer.invoke(INTEGRATIONS_CHANNELS.importSkillZip, title)
+    return (r as FoundSkill | null) ?? null
+  },
+  async listRecommendedSkills() {
+    return (await ipcRenderer.invoke(
+      INTEGRATIONS_CHANNELS.listRecommendedSkills,
+    )) as RecommendedSkill[]
+  },
+  async removeSkill(name) {
+    await ipcRenderer.invoke(INTEGRATIONS_CHANNELS.removeSkill, name)
+  },
+  async installRecommendedSkill(name) {
+    return (await ipcRenderer.invoke(
+      INTEGRATIONS_CHANNELS.installRecommendedSkill,
+      name,
+    )) as FoundSkill
   },
 }
 contextBridge.exposeInMainWorld('aiOfficeIntegrations', integrationsApi)
@@ -2031,6 +2210,13 @@ const tabsApi: TabsApi = {
     const listener = () => handler()
     ipcRenderer.on('app:chrome-pressed', listener)
     return () => ipcRenderer.removeListener('app:chrome-pressed', listener)
+  },
+  onStartRename(handler) {
+    const listener = (_event: IpcRendererEvent, id: unknown) => {
+      if (typeof id === 'string') handler(id)
+    }
+    ipcRenderer.on(TABS_CHANNELS.startRename, listener)
+    return () => ipcRenderer.removeListener(TABS_CHANNELS.startRename, listener)
   },
 }
 

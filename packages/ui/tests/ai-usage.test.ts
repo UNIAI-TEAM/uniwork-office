@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
+<<<<<<< ours
 import { addTokenUsage, formatTokenCount, usageAriaLabel } from '../src/AiUsageChip'
+=======
+import { addTokenUsage, formatTokenCount } from '../src/AiUsageChip'
+>>>>>>> theirs
 import { AI_USAGE_LABELS } from '../src/strings-ai-usage'
 
 describe('formatTokenCount', () => {
@@ -47,6 +51,7 @@ describe('AI_USAGE_LABELS', () => {
     for (const [lang, labels] of Object.entries(AI_USAGE_LABELS)) {
       expect(labels.runTitle.length, lang).toBeGreaterThan(0)
       expect(labels.sessionTitle.length, lang).toBeGreaterThan(0)
+<<<<<<< ours
       expect(labels.inputTokens.length, lang).toBeGreaterThan(0)
       expect(labels.outputTokens.length, lang).toBeGreaterThan(0)
     }
@@ -66,3 +71,8 @@ describe('usageAriaLabel', () => {
     )
   })
 })
+=======
+    }
+  })
+})
+>>>>>>> theirs

@@ -3,6 +3,7 @@
  * tab that shows the note are not always the same one, so the fragment waits
  * in main, keyed by path, until a renderer loads that path.
  */
+<<<<<<< ours
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,6 +14,10 @@ import {
   takeWikiFragment,
   viewsShowingNote,
 } from '../src/main/wiki-fragment'
+=======
+import { describe, expect, it } from 'vitest'
+import { rememberWikiFragment, takeWikiFragment } from '../src/main/wiki-fragment'
+>>>>>>> theirs
 
 const PATH = '/notes/Index.md'
 
@@ -54,6 +59,7 @@ describe('wiki fragments', () => {
     expect(takeWikiFragment('')).toBe('')
   })
 })
+<<<<<<< ours
 
 describe('views already showing the note', () => {
   // the shell only activates a note's open tab and tells its view nothing, so
@@ -170,3 +176,5 @@ describe('telling the views that already show the note', () => {
     expect(takeWikiFragment('/notes/C.md')).toBe('Late')
   })
 })
+=======
+>>>>>>> theirs

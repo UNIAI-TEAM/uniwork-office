@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufReader, BufWriter, Read, Seek, Write};
+#[cfg(unix)]
+use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -18,9 +20,12 @@ use zip::ZipArchive;
 pub mod archive;
 pub mod convert;
 pub mod find;
+pub mod odf;
+pub mod protocol;
 pub mod recalc;
 mod richdata;
 mod shared_formulas;
+pub mod spreadsheetml;
 mod visuals;
 
 mod cell_images;
@@ -32,6 +37,7 @@ mod tests;
 mod types;
 mod workbook;
 mod worksheet;
+mod xlsx_package;
 mod xml_util;
 
 use cell_images::*;
@@ -128,7 +134,10 @@ struct CacheDirectory {
 
 impl CacheDirectory {
     fn create(path: PathBuf) -> Result<Self, SidecarError> {
-        fs::create_dir(&path)?;
+        let mut builder = fs::DirBuilder::new();
+        #[cfg(unix)]
+        builder.mode(0o700);
+        builder.create(&path)?;
         Ok(Self {
             path,
             committed: false,
@@ -153,6 +162,38 @@ impl Drop for CacheDirectory {
     }
 }
 
+/// Whether this build can run work on background threads. WebAssembly
+/// without threads (wasm32-wasip1, a browser without cross-origin isolation)
+/// and the `single-thread` feature run the same work inline: a sheet is
+/// indexed completely the first time it is read, and a recalc answers before
+/// the next request is read.
+pub const THREADS: bool = !cfg!(any(
+    feature = "single-thread",
+    all(target_family = "wasm", not(target_feature = "atomics"))
+));
+
+/// `std::env::temp_dir` panics on WASI, which has no notion of one: there the
+/// host maps a directory and names it in `TMPDIR` (`/tmp` when unset).
+fn temp_dir() -> PathBuf {
+    if cfg!(target_os = "wasi") {
+        std::env::var_os("TMPDIR").map_or_else(|| PathBuf::from("/tmp"), PathBuf::from)
+    } else {
+        std::env::temp_dir()
+    }
+}
+
+/// `Path::canonicalize`, which WASI does not support: there the host hands over absolute
+/// paths in a sandbox without symlinks or a working directory, so the path is already
+/// canonical and only has to exist.
+pub(crate) fn canonicalize(path: &Path) -> std::io::Result<PathBuf> {
+    if cfg!(target_os = "wasi") {
+        fs::metadata(path)?;
+        Ok(path.to_path_buf())
+    } else {
+        path.canonicalize()
+    }
+}
+
 /// Creates the cache directory an open needs. This is the one boundary where
 /// the open touches the filesystem, so it is the one abort that happens after
 /// the directory exists: returning here drops the guard, which reclaims it,
@@ -161,7 +202,11 @@ fn create_cache_directory(
     session_id: &str,
     cancelled: &AtomicBool,
 ) -> Result<CacheDirectory, SidecarError> {
+<<<<<<< ours
     let path = temp_root().join(format!("ai-excel-session-{session_id}"));
+=======
+    let path = temp_dir().join(format!("genspark-ai-excel-{session_id}"));
+>>>>>>> theirs
     let directory = CacheDirectory::create(path)?;
     if cancelled.load(Ordering::Acquire) {
         return Err(SidecarError::cancelled());
@@ -171,6 +216,19 @@ fn create_cache_directory(
 
 pub struct WorkbookSessions {
     sessions: HashMap<String, WorkbookSession>,
+}
+
+/// Excel wraps password-encrypted workbooks in an OLE2 compound container
+/// rather than a ZIP package. Detect that signature before the zip reader
+/// runs so the open fails with an explanation instead of "invalid Zip
+/// archive: Could not find EOCD" (genoffice#2076). The file cursor is rewound so the
+/// caller can keep reading from the start.
+fn is_ole2_container(file: &mut File) -> std::io::Result<bool> {
+    const OLE2_MAGIC: [u8; 8] = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+    let mut magic = [0u8; 8];
+    let read = file.read(&mut magic)?;
+    file.rewind()?;
+    Ok(read == OLE2_MAGIC.len() && magic == OLE2_MAGIC)
 }
 
 impl WorkbookSessions {
@@ -207,13 +265,24 @@ impl WorkbookSessions {
         if cancelled.load(Ordering::Acquire) {
             return Err(SidecarError::cancelled());
         }
+<<<<<<< ours
         // wasm32-wasip1 has no realpath: the in-memory FS paths are already canonical
         #[cfg(not(target_os = "wasi"))]
         let canonical_path = path.canonicalize()?;
         #[cfg(target_os = "wasi")]
         let canonical_path = path.to_path_buf();
         let file = File::open(&canonical_path)?;
+=======
+        let canonical_path = canonicalize(path)?;
+        let mut file = File::open(&canonical_path)?;
+        if is_ole2_container(&mut file)? {
+            return Err(SidecarError::Workbook(
+                "This workbook is password-protected and must be decrypted by the host application.".into(),
+            ));
+        }
+>>>>>>> theirs
         let mut archive = ZipArchive::new(file)?;
+        let workbook_path = canonical_path.clone();
         archive::validate_entries(&mut archive)?;
         // The archive is open and validated and nothing has been written to
         // disk yet, so abandoning here costs only the parse already done.
@@ -240,6 +309,7 @@ impl WorkbookSessions {
         let rich_value_images = richdata::read_rich_value_images(&mut archive);
         let wps_cell_images = read_wps_cell_images(&mut archive);
         let mut cell_image_count = 0usize;
+        let mut note_image_count = 0usize;
         let mut sheets = Vec::with_capacity(declarations.len());
         let mut runtimes = Vec::with_capacity(declarations.len());
         let mut visual_sources = Vec::with_capacity(declarations.len());
@@ -277,15 +347,27 @@ impl WorkbookSessions {
             )?;
             let comments = visuals::read_comments(&mut archive, &worksheet_path)?
                 .into_iter()
-                .filter_map(|(reference, author, text, thread)| {
-                    let anchor = reference.split(':').next().unwrap_or(&reference);
+                .filter_map(|comment| {
+                    let anchor = comment
+                        .reference
+                        .split(':')
+                        .next()
+                        .unwrap_or(&comment.reference);
                     let (row, column) = parse_address(&anchor.replace('$', "")).ok()?;
+                    let image = comment.image_media_path.map(|media_path| {
+                        note_image_count += 1;
+                        CommentImageInfo {
+                            id: format!("note-picture-{note_image_count}"),
+                            media_path,
+                        }
+                    });
                     Some(CommentInfo {
                         row,
                         column,
-                        author,
-                        text,
-                        thread,
+                        author: comment.author,
+                        text: comment.text,
+                        thread: comment.thread,
+                        image,
                     })
                 })
                 .collect();
@@ -348,6 +430,9 @@ impl WorkbookSessions {
                 column_count,
                 source_xml_bytes,
                 stored_cell_count: dimensions.stored_cell_count,
+                value_cell_count: dimensions.value_cell_count,
+                value_row_count: dimensions.value_extent.map(|(rows, _)| rows),
+                value_column_count: dimensions.value_extent.map(|(_, columns)| columns),
                 column_widths: dimensions.column_widths,
                 default_row_height: dimensions.default_row_height,
                 default_row_height_fixed: dimensions.default_row_height_fixed,
@@ -428,7 +513,7 @@ impl WorkbookSessions {
         self.sessions.insert(
             session_id.clone(),
             WorkbookSession {
-                path: canonical_path,
+                path: workbook_path,
                 sheets: sheets.clone(),
                 runtimes,
                 shared_strings,
@@ -565,6 +650,21 @@ impl WorkbookSessions {
                     .find(|image| image.id == visual_id)
                     .map(|image| image.media_path.as_str())
             })
+            .or_else(|| {
+                // A picture inside a note is reachable the same way, under the
+                // id its comment carries.
+                session
+                    .sheets
+                    .iter()
+                    .flat_map(|sheet| sheet.comments.iter())
+                    .find_map(|comment| {
+                        comment
+                            .image
+                            .as_ref()
+                            .filter(|image| image.id == visual_id)
+                            .map(|image| image.media_path.as_str())
+                    })
+            })
             .map(str::to_owned)
             .or_else(|| session.header_footer_picture_path(visual_id))
             .ok_or_else(|| SidecarError::InvalidRequest("Unknown workbook image.".into()))?;
@@ -648,7 +748,7 @@ impl WorkbookSession {
     #[cfg(not(target_os = "wasi"))]
     fn ensure_parser(&mut self, sheet_index: usize) -> Result<(), SidecarError> {
         let runtime = &mut self.runtimes[sheet_index];
-        if runtime.handle.is_some() {
+        if runtime.started {
             return Ok(());
         }
         let path = self.path.clone();
@@ -668,31 +768,38 @@ impl WorkbookSession {
                 .collect(),
         );
         let cancelled = Arc::clone(&self.cancelled);
-        let handle = thread::Builder::new()
-            .name(format!("xlsx-index-{sheet_index}"))
-            .spawn(move || {
-                let result = index_worksheet(
-                    &path,
-                    &worksheet_path,
-                    sheet_index,
-                    &cache_directory,
-                    &shared_strings,
-                    &styled_xfs,
-                    &color_context,
-                    &rich_image_cells,
-                    &state,
-                    &cancelled,
-                );
-                let (lock, condition) = &*state;
-                if let Ok(mut index) = lock.lock() {
-                    match result {
-                        Ok(()) => index.complete = true,
-                        Err(error) => index.error = Some(error.to_string()),
-                    }
-                    condition.notify_all();
+        let index = move || {
+            let result = index_worksheet(
+                &path,
+                &worksheet_path,
+                sheet_index,
+                &cache_directory,
+                &shared_strings,
+                &styled_xfs,
+                &color_context,
+                &rich_image_cells,
+                &state,
+                &cancelled,
+            );
+            let (lock, condition) = &*state;
+            if let Ok(mut index) = lock.lock() {
+                match result {
+                    Ok(()) => index.complete = true,
+                    Err(error) => index.error = Some(error.to_string()),
                 }
-            })?;
-        runtime.handle = Some(handle);
+                condition.notify_all();
+            }
+        };
+        if THREADS {
+            runtime.handle = Some(
+                thread::Builder::new()
+                    .name(format!("xlsx-index-{sheet_index}"))
+                    .spawn(index)?,
+            );
+        } else {
+            index();
+        }
+        runtime.started = true;
         Ok(())
     }
 
@@ -978,9 +1085,12 @@ impl WorkbookSession {
                 let _ = handle.join();
             }
         }
-        if self.cache_directory.exists() {
-            fs::remove_dir_all(&self.cache_directory)?;
-        }
+        let cache_result = if self.cache_directory.exists() {
+            fs::remove_dir_all(&self.cache_directory)
+        } else {
+            Ok(())
+        };
+        cache_result?;
         Ok(())
     }
 }
@@ -988,6 +1098,8 @@ impl WorkbookSession {
 struct SheetRuntime {
     worksheet_path: String,
     state: Arc<(Mutex<SheetIndex>, Condvar)>,
+    /// Indexing has begun, on a thread or inline.
+    started: bool,
     handle: Option<JoinHandle<()>>,
     /// wasm: a first index pass ran (the background step only continues sheets
     /// that were read, like the desktop's lazily started index threads)
@@ -1000,6 +1112,7 @@ impl SheetRuntime {
         Self {
             worksheet_path,
             state: Arc::new((Mutex::new(SheetIndex::default()), Condvar::new())),
+            started: false,
             handle: None,
             #[cfg(target_os = "wasi")]
             started: false,

@@ -59,6 +59,10 @@ import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { parseFileToText } from '@genoffice/file-parse'
 import { convertHtmlToDocx } from '../../../../packages/html2docx/src'
 import { atomicWriteFile } from './atomic-write'
+import {
+  createDocumentDiskWatcher,
+  type DocumentDiskWatcher,
+} from '@genoffice/electron-utils/disk-watch'
 import { ElectronBrowserDriver } from '../../../../packages/html2docx/src/drivers/electron'
 import {
   copyImageIntoOwnedAssets,
@@ -82,6 +86,7 @@ import {
 } from './asset-mime'
 import { buildPreviewDocument } from './preview-document'
 import { inlineImagesForSingleFile, singleFileExportBaseName } from './single-file-html'
+import { registerHtmlAiSearchIpc } from './ai-search-ipc'
 import {
   assetBaseHref,
   previewRefusal,
@@ -845,6 +850,7 @@ const openPathByWc = new Map<number, string>()
 const allowedByWc = new Map<number, Set<string>>()
 /** Current save target per view; absent = untitled document */
 const savePathByWc = new Map<number, string>()
+const diskWatcherByWc = new Map<number, DocumentDiskWatcher>()
 /** Unsaved-changes flags mirrored from the renderer; drives the save prompt before closing a tab/window */
 const dirtyByWc = new Set<number>()
 /** Latest buffer text pushed by each renderer; served by html-preview:// to the preview iframe */
@@ -1018,6 +1024,7 @@ export function htmlFileRenamed(contents: WebContents, oldPath: string, newPath:
   if (openPathByWc.get(wcId) === oldPath) openPathByWc.set(wcId, newPath)
   const allowed = allowedByWc.get(wcId)
   if (allowed?.has(oldPath)) allowed.add(newPath)
+  if (savePathByWc.get(wcId) === newPath) void diskWatcherByWc.get(wcId)?.watch(newPath)
   void renameOwnedAssetDocument(oldPath, newPath).catch((error) => {
     console.warn('[html] asset manifest rename sync failed:', error)
   })
@@ -1387,6 +1394,10 @@ function registerHtmlIpc(): void {
     return true
   })
 
+  ipcMain.on(HTML_CHANNELS.ackFileChangedOnDisk, (e) => {
+    void diskWatcherByWc.get(e.sender.id)?.acknowledge()
+  })
+
   ipcMain.handle(HTML_CHANNELS.readFile, async (e, path: unknown) => {
     if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {
       throw new Error('html: path not granted to this view')
@@ -1485,11 +1496,19 @@ function registerHtmlIpc(): void {
             : null
         const textToWrite = prepared?.text ?? request.text
         const savedImageSources = prepared?.imageSources ?? imageSources
+        const watcher = diskWatcherByWc.get(e.sender.id)
+        if (watcher && !isNewPath && request.overwrite !== true && !(await watcher.isCurrent())) {
+          if (prepared) await rollbackPreparedSaveAsAssets(prepared).catch(() => {})
+          return done({ ok: false, error: 'html: file changed on disk', conflict: true })
+        }
+        watcher?.beginOwnWrite()
         try {
           await writeTextAtomic(target, textToWrite)
         } catch (error) {
           if (prepared) await rollbackPreparedSaveAsAssets(prepared).catch(() => {})
           throw error
+        } finally {
+          await watcher?.endOwnWrite(target)
         }
         savePathByWc.set(e.sender.id, target)
         // keep the reload path in sync — a stale openPathByWc would make a
@@ -1909,15 +1928,22 @@ function registerHtmlIpc(): void {
 
 function grantAndTrack(wc: WebContents, openPath?: string | null): void {
   const wcId = wc.id
+  const watcher = createDocumentDiskWatcher((path) => {
+    if (!wc.isDestroyed()) wc.send(HTML_CHANNELS.fileChangedOnDisk, path)
+  })
+  diskWatcherByWc.set(wcId, watcher)
   if (openPath && existsSync(openPath)) {
     openPathByWc.set(wcId, openPath)
     savePathByWc.set(wcId, openPath)
     allowedByWc.set(wcId, new Set([openPath]))
+    void watcher.watch(openPath)
   }
   installExternalLinkOpener(wc)
   installReadOnlySaveKey(wc)
   wc.once('destroyed', () => {
     closePresentViewsOf(wcId)
+    diskWatcherByWc.get(wcId)?.dispose()
+    diskWatcherByWc.delete(wcId)
     openPathByWc.delete(wcId)
     allowedByWc.delete(wcId)
     savePathByWc.delete(wcId)
@@ -2070,6 +2096,8 @@ export function startHtmlStandalone(): void {
   void app.whenReady().then(() => {
     installRendererProtocol({ html: join(__dirname, '../renderer') })
     registerHtmlIpc()
+    // shell mode leaves the shared ai:* search channels to docs-main registerAiIpc
+    registerHtmlAiSearchIpc()
     const win = new BrowserWindow({
       width: 1200,
       height: 850,

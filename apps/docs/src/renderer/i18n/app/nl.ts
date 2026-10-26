@@ -93,9 +93,11 @@ export const nl = {
   appPgNumAppliesTo: '; geldt voor sectie {n}',
   appExportingPdf: 'PDF exporteren…',
   appExportingHtml: 'HTML exporteren…',
+  appExportingMarkdown: 'Markdown exporteren…',
   appExportPdf: 'PDF exporteren',
   appExportPdfFailed: 'PDF-export mislukt: {error}',
   appExportHtmlFailed: 'HTML-export mislukt: {error}',
+  appExportMarkdownFailed: 'Markdown-export mislukt: {error}',
   appPrintGroupFailed: 'afdrukken van paginagroep mislukt',
   appPrintTitle: 'Afdrukken',
   appPrintProgress: 'Afdrukken voorbereiden…',
@@ -110,12 +112,24 @@ export const nl = {
   appPrintFailed: 'Afdrukken mislukt: {error}',
   appPrintPrevPage: 'Vorige pagina',
   appPrintNextPage: 'Volgende pagina',
+  appPrintPrinter: 'Printer',
+  appPrintDefaultPrinter: 'Standaardprinter',
+  appPrintSystemDialog: 'Systeemafdrukvenster…',
+  appPrintCopies: 'Exemplaren',
+  appPrintCollate: 'Sorteren',
+  appPrintDuplex: 'Dubbelzijdig',
+  appPrintDuplexOff: 'Uit',
+  appPrintDuplexLong: 'Omslaan langs lange zijde',
+  appPrintDuplexShort: 'Omslaan langs korte zijde',
   appExportedPdf: 'PDF geëxporteerd: {path}',
   appExportedHtml: 'HTML geëxporteerd: {path}',
+  appExportedMarkdown: 'Markdown geëxporteerd: {path}',
+  appExportMarkdownImagesDropped: '({count} afbeelding(en) onleesbaar, overgeslagen)',
   appExportedPdfMixed:
     'PDF geëxporteerd: {path} (gemengde papierformaten, {n} groepen per pagina samengevoegd)',
   appExportPdfCanceled: 'PDF-export geannuleerd',
   appExportHtmlCanceled: 'HTML-export geannuleerd',
+  appExportMarkdownCanceled: 'Markdown-export geannuleerd',
   appExportingImages: 'Afbeeldingen exporteren…',
   appExportImagesProgress: '{count} afbeeldingen exporteren…',
   appExportImagesDone: '{count} afbeeldingen geëxporteerd naar {dir}',
@@ -358,6 +372,15 @@ export const nl = {
   appAiBadgeTip: 'Gebruikt AI',
   appTranslate: 'Vertalen',
   appTranslateTo: 'Vertalen naar {lang}',
+  redactMenuLabel: 'Selectie verbergen voor de AI',
+  redactDialogDesc:
+    'De woorden blijven in het document en het bestand; het model ziet alleen de placeholder. Geef hem een naam.',
+  redactDialogScope:
+    'Verbergen geldt alleen voor de AI in deze app. De CLI, MCP-tools en de export zonder venster lezen het bestand rechtstreeks en zien deze woorden nog steeds.',
+  redactDialogPlaceholder: 'Naam van placeholder, bv. telefoonnummer klant',
+  redactCancel: 'Annuleren',
+  redactInsert: 'Verbergen',
+  redactShowLabel: 'Selectie opnieuw aan de AI tonen',
   appLangEnglish: 'Engels',
   appLangSimplifiedChinese: 'Vereenvoudigd Chinees',
   appLangJapanese: 'Japans',
@@ -533,6 +556,7 @@ export const nl = {
     'Deze stijl bijwerken met de huidige selectie (teruggeschreven naar styles.xml)',
   appNewStyleFromSelection: 'Nieuwe stijl op basis van de huidige selectie',
   appStyleNamePlaceholder: 'Stijlnaam',
+<<<<<<< ours
   appWebConflictTitle: 'Dit document is elders gewijzigd',
   appWebConflictBody:
     'Je wijzigingen staan nog niet op UniWork en blijven in deze browser tot je je afmeldt.',
@@ -572,4 +596,9 @@ export const nl = {
   appCopySaved: 'Je versie is opgeslagen als nieuw document: {title}.',
   appCopySaveFailed:
     'Kan de kopie niet maken. Je wijzigingen zijn nog veilig; probeer het opnieuw.',
+=======
+  appMergeSourceLoaded: '{name} geladen ({n} records)',
+  appMergeWritten: '{n} documenten geschreven',
+  appMergeNothingToWrite: 'Er is niets te schrijven',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

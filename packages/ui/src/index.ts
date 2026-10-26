@@ -5,6 +5,11 @@ export { AiComposer } from './AiComposer'
 export { AiQueueStrip } from './AiQueueStrip'
 export { useChatRunQueue, type ChatRunQueue, type QueuedChatMessage } from './chat-run-queue'
 export { AI_QUEUE_LABELS, type AiQueueStripLabels } from './strings-ai-queue'
+<<<<<<< ours
+=======
+export { AI_SKILLS_LABELS, type AiSkillsLabels } from './strings-ai-skills'
+export { AiSkillsMenu, AiSkillChips, type AiSkillsMenuEntry } from './AiSkillsMenu'
+>>>>>>> theirs
 export { AiUsageChip, addTokenUsage, formatTokenCount, type AiTokenUsageView } from './AiUsageChip'
 export { AI_USAGE_LABELS, type AiUsageLabels } from './strings-ai-usage'
 export { AiScopeQuote, type AiScopeQuoteData } from './AiScopeQuote'
@@ -75,8 +80,13 @@ export {
 } from './ribbon-collapse'
 export { AiTypingIndicator } from './AiTypingIndicator'
 export { IconSend, IconStop, type IconProps } from './icons'
+<<<<<<< ours
 export { UniAiMark } from './UniAiMark'
 export { Markdown, type MarkdownInlineToken, type MarkdownNav } from './Markdown'
+=======
+export { Markdown, type MarkdownNav } from './Markdown'
+export { FILE_NAV_SCHEME, createFileNav, fileNavHref, parseFileNavHref } from './file-nav'
+>>>>>>> theirs
 export { isSymbolFontFamily } from './symbol-fonts'
 export {
   BUILTIN_FONT_FAMILIES,
@@ -176,6 +186,7 @@ export {
 export { ProviderLogo } from './provider-logos'
 export { useRedactLabelField } from './use-redact-label'
 export type { RedactLabelField } from './use-redact-label'
+<<<<<<< ours
 export { type AiComposerProps } from './AiComposer'
 export {
   UNIWORK_ACK_STORAGE_KEY,
@@ -220,3 +231,5 @@ export {
   askUniText,
   type AskUniStringKey,
 } from './strings-ask-uni'
+=======
+>>>>>>> theirs

@@ -9,6 +9,14 @@ export const he = {
   redactDialogPlaceholder: 'שם הסימון, לדוגמה: טלפון הלקוח',
   redactCancel: 'ביטול',
   redactInsert: 'הסתר',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'קובץ זה שונה על ידי תוכנית אחרת.',
+  diskConflictMsg: 'קובץ זה השתנה בדיסק; שמירה תדרוס את השינויים האלה.',
+  diskReload: 'טען מחדש',
+  diskKeepMine: 'השאר את שלי',
+  diskOverwrite: 'דרוס בכל זאת',
+>>>>>>> theirs
 
   loading: 'טוען…',
   loadFailed: 'לא ניתן לפתוח את הקובץ',
@@ -104,6 +112,7 @@ export const he = {
   alignLeft: 'יישור לשמאל',
   alignCenter: 'מרכז',
   alignRight: 'יישור לימין',
+  alignJustify: 'יישור לשני הצדדים',
   fontSizeDec: 'הקטן גודל גופן',
   fontSizeInc: 'הגדל גודל גופן',
   typography: 'טיפוגרפיה',

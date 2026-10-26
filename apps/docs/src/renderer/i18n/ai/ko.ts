@@ -125,6 +125,8 @@ export const ko = {
   aiUnknownError: '알 수 없는 오류',
   aiTimeoutError:
     'AI 요청 시간 초과: 네트워크 응답이 없어 중단되었습니다. 연결을 확인한 후 다시 시도해 주세요',
+  aiRegionError:
+    '이 모델의 제공업체는 현재 지역에서 서비스를 제공하지 않습니다. 다른 모델을 선택하거나 네트워크를 변경하세요',
   aiOverloadedError: 'AI 서비스가 혼잡합니다. 잠시 후 다시 시도해 주세요',
   aiNetworkError:
     '네트워크에 문제가 있어 AI 서비스에 연결할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요',
@@ -134,6 +136,9 @@ export const ko = {
   aiSumImageAttachment: '이미지 첨부 {name}',
   aiSumRead: '{name} 읽기',
   aiSumReadAttachmentName: '첨부 파일 {name} 읽기',
+  aiSumSkillsList: '설치된 스킬 목록 조회',
+  aiSumSkillRead: '스킬 {name} 읽기',
+  aiSumRunCli: '{args} 실행',
   aiSumWebSearch: '웹 검색',
   aiSumWebSearchDone: '"{query}" 검색({count}건)',
   aiSumImageSearch: '이미지 검색',
@@ -195,6 +200,7 @@ export const ko = {
   aiCmdImages: '이미지 {count}장을 업데이트했습니다',
   aiCmdToc: '목차를 삽입했습니다({count}개 항목)',
   aiCmdSkipped: ' (보호된 블록 {count}개 건너뜀)',
+<<<<<<< ours
   aiViewOnlyNotice: '보기 전용 문서: AI는 내용을 읽고 질문에 답할 수 있지만 편집할 수는 없습니다.',
   aiClarifyTitle: '계속하기 전에 몇 가지 확인할게요',
   aiClarifyDecide: '알아서 결정',
@@ -208,6 +214,8 @@ export const ko = {
   aiClarifySubmit: '계속',
   aiSumClarify: '확인 질문에 답변함',
   aiSumClarifySkipped: '확인 질문을 건너뜀',
+=======
+>>>>>>> theirs
   aiStarterMindMap: '이 문서의 마인드맵 생성',
   aiMindMapBtn: 'AI 마인드맵',
   aiMindMapPrompt:

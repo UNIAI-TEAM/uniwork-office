@@ -111,6 +111,7 @@ export const he = {
   aiErrEmptyOutput: 'פלט ריק',
   aiErrUnknown: 'שגיאה לא ידועה',
   aiErrStreamTimeout: 'תם הזמן לבקשת ה-AI: אין תגובה מהרשת וההרצה הופסקה. בדוק את החיבור ונסה שוב',
+  aiErrRegion: 'ספק המודל הזה אינו פועל באזור הנוכחי שלך — בחרו מודל אחר או החליפו רשת',
   aiErrOverloaded: 'שירות ה-AI עמוס כרגע — נסו שוב בעוד רגע',
   aiErrNetwork: 'בעיית רשת: לא ניתן להתחבר לשירות ה-AI. בדוק את החיבור ונסה שוב',
   aiCreditsExhausted: 'קרדיטי UniWork שלך אזלו. טען מחדש ב-uniworkos.com/pricing ונסה שוב',
@@ -222,6 +223,9 @@ export const he = {
   aiSumSaveTemplate: 'תבנית הסגנון "{name}" נשמרה',
   aiSumTemplatesEmpty: 'תבניות סגנון (ריק)',
   aiSumListTemplates: 'הוצגו {count} תבניות סגנון',
+<<<<<<< ours
   aiPageCloudToLocal: 'הענן לא זמין — נוצר מקומית',
   aiViewOnlyNotice: 'מסמך לצפייה בלבד: ה-AI יכול לקרוא אותו ולענות על שאלות, אך לא לערוך אותו.',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

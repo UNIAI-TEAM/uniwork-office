@@ -1,3 +1,4 @@
+<<<<<<< ours
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -77,6 +78,176 @@ function fakeTransport(): FakeTransport {
 afterEach(() => {
   setUniworkCloudStatus(UNIWORK_CLOUD_SIGNED_OUT)
   setUniworkCloudTransport(null)
+=======
+import { describe, it, expect, afterEach } from 'vitest'
+import {
+  gskChildEnv,
+  setGskProxyUrl,
+  parseGskOutput,
+  parseGskWebSearch,
+  parseGskImageSearch,
+  parseGskGeneratedImage,
+  parseGskPastProjects,
+  extractGskText,
+  summarizeGskFailure,
+} from '../src/gsk'
+
+describe('parseGskOutput', () => {
+  it('parses clean JSON', () => {
+    expect(parseGskOutput('{"status":"ok"}')).toEqual({ status: 'ok' })
+  })
+
+  it('skips [INFO] noise lines before JSON', () => {
+    const out = '[INFO] Calling /tools...\n[INFO] cache hit\n{"status":"ok","data":[1,2]}'
+    expect(parseGskOutput(out)).toEqual({ status: 'ok', data: [1, 2] })
+  })
+
+  it('parses multi-line JSON after noise', () => {
+    const out = '[INFO] x\n{\n "a": 1\n}'
+    expect(parseGskOutput(out)).toEqual({ a: 1 })
+  })
+
+  it('skips trailing log lines after JSON', () => {
+    const out = '{"status":"ok","data":[1,2]}\n[INFO] done in 120ms'
+    expect(parseGskOutput(out)).toEqual({ status: 'ok', data: [1, 2] })
+  })
+
+  it('parses multi-line JSON surrounded by leading and trailing noise', () => {
+    const out =
+      '[INFO] Calling /tools...\n{\n "a": 1,\n "b": [1, 2]\n}\n[INFO] cache hit\n[INFO] done'
+    expect(parseGskOutput(out)).toEqual({ a: 1, b: [1, 2] })
+  })
+
+  it('returns the root of a pretty-printed array followed by logs', () => {
+    const out = '{\n  "items": [\n    { "id": 1 },\n    { "id": 2 }\n  ]\n}\n[INFO] done'
+    expect(parseGskOutput(out)).toEqual({ items: [{ id: 1 }, { id: 2 }] })
+  })
+
+  it('throws when no JSON present', () => {
+    expect(() => parseGskOutput('[INFO] nothing here')).toThrow()
+  })
+
+  it('recovers past a log line that only looks like an array opener', () => {
+    expect(parseGskOutput('[INFO] progress {50%}\n{"status":"ok"}')).toEqual({ status: 'ok' })
+  })
+
+  it('takes the outer block, not the first inner one, of a large pretty payload', () => {
+    const rows = Array.from({ length: 2000 }, (_, i) => `    { "id": ${i}, "t": "row ${i}" },`)
+    const out = [
+      '[INFO] Calling /tools...',
+      '[INFO] cache hit',
+      '{',
+      '  "status": "ok",',
+      '  "data": [',
+      ...rows.slice(0, -1),
+      rows.at(-1)!.replace(/,$/, ''),
+      '  ]',
+      '}',
+      '[INFO] done in 900ms',
+    ].join('\n')
+    const parsed = parseGskOutput(out) as { status: string; data: unknown[] }
+    expect(parsed.status).toBe('ok')
+    expect(parsed.data).toHaveLength(2000)
+    expect(parsed.data[0]).toEqual({ id: 0, t: 'row 0' })
+  })
+
+  it('locates a large payload in linear time', () => {
+    const rows = Array.from({ length: 20_000 }, (_, i) => `  { "id": ${i} },`)
+    const out = [
+      '[INFO] starting',
+      '{',
+      '  "data": [',
+      ...rows.slice(0, -1),
+      rows.at(-1)!.replace(/,$/, ''),
+      '  ]',
+      '}',
+      '[INFO] done',
+    ].join('\n')
+    const started = performance.now()
+    const parsed = parseGskOutput(out) as { data: unknown[] }
+    const elapsed = performance.now() - started
+    expect(parsed.data).toHaveLength(20_000)
+    // the previous nested slice-and-reparse scan needed minutes at this size
+    expect(elapsed).toBeLessThan(5_000)
+  })
+
+  it('gives up on a hostile response in bounded time', () => {
+    // Every line opens a block that never closes, so each candidate re-scans the
+    // rest of the output: N lines of length L cost N x L. gsk output is
+    // model-controlled and capped only by MAX_BUFFER, so the recovery scan has
+    // to be bounded rather than quadratic.
+    const out = Array.from(
+      { length: 16_000 },
+      (_, i) => `{"step":${i},"msg":"still rendering`,
+    ).join('\n')
+    const started = performance.now()
+    expect(() => parseGskOutput(out)).toThrow(/No JSON found/)
+    const elapsed = performance.now() - started
+    // the unbounded scan needed ~25s at this size
+    expect(elapsed).toBeLessThan(1_000)
+  })
+
+  it('still finds a payload buried behind unclosed log lines', () => {
+    const out = [
+      '{"msg":"still rendering',
+      '{"msg":"still rendering',
+      '{"status":"ok","data":{"n":7}}',
+      '[INFO] done',
+    ].join('\n')
+    expect(parseGskOutput(out)).toEqual({ status: 'ok', data: { n: 7 } })
+  })
+})
+
+describe('gskChildEnv', () => {
+  afterEach(() => setGskProxyUrl(''))
+
+  it('sets ELECTRON_RUN_AS_NODE and no proxy vars when no proxy is known', () => {
+    const env = gskChildEnv({ PATH: '/bin' })
+    expect(env.ELECTRON_RUN_AS_NODE).toBe('1')
+    expect(env.NODE_USE_ENV_PROXY).toBeUndefined()
+    expect(env.HTTPS_PROXY).toBeUndefined()
+  })
+
+  it('forwards the proxy registered by the main-process bootstrap', () => {
+    setGskProxyUrl('http://127.0.0.1:7890')
+    const env = gskChildEnv({ PATH: '/bin' })
+    expect(env.NODE_USE_ENV_PROXY).toBe('1')
+    expect(env.HTTPS_PROXY).toBe('http://127.0.0.1:7890')
+    expect(env.HTTP_PROXY).toBe('http://127.0.0.1:7890')
+  })
+
+  it('falls back to inherited proxy env vars (terminal launch)', () => {
+    const env = gskChildEnv({ https_proxy: 'http://10.0.0.1:8080' })
+    expect(env.NODE_USE_ENV_PROXY).toBe('1')
+    expect(env.HTTPS_PROXY).toBe('http://10.0.0.1:8080')
+  })
+
+  it('prefers the registered proxy over env vars', () => {
+    setGskProxyUrl('http://127.0.0.1:7890')
+    const env = gskChildEnv({ HTTPS_PROXY: 'http://10.0.0.1:8080' })
+    expect(env.HTTPS_PROXY).toBe('http://127.0.0.1:7890')
+  })
+
+  it('scrubs lowercase/ALL_PROXY variants so they cannot override the selection', () => {
+    setGskProxyUrl('http://127.0.0.1:7890')
+    const env = gskChildEnv({
+      https_proxy: 'socks5://127.0.0.1:1080',
+      http_proxy: 'http://10.0.0.1:8080',
+      all_proxy: 'socks5://127.0.0.1:1080',
+    })
+    expect(env.HTTPS_PROXY).toBe('http://127.0.0.1:7890')
+    expect(env.https_proxy).toBeUndefined()
+    expect(env.http_proxy).toBeUndefined()
+    expect(env.all_proxy).toBeUndefined()
+  })
+
+  it('ignores SOCKS proxies (undici env proxy is http(s)-only)', () => {
+    setGskProxyUrl('socks5://127.0.0.1:1080')
+    const env = gskChildEnv({ ALL_PROXY: 'socks5://127.0.0.1:1080' })
+    expect(env.NODE_USE_ENV_PROXY).toBeUndefined()
+    expect(env.HTTPS_PROXY).toBeUndefined()
+  })
+>>>>>>> theirs
 })
 
 describe('UniWork cloud tools, signed out', () => {
@@ -274,6 +445,7 @@ describe('media tools and search options route to the cloud only while it is on'
   })
 })
 
+<<<<<<< ours
 describe('cloud media reads fail closed without media roots', () => {
   const SETTINGS = '/nonexistent/ai-settings.json'
   const SECRET = join(tmpdir(), 'passport.jpg')
@@ -362,6 +534,61 @@ describe('cloud media reads fail closed without media roots', () => {
     expect(transport.analyzeMedia.mock.calls[0]![0].media).toEqual([
       { mime: 'video/mp4', dataBase64: Buffer.from([0, 0, 0, 0]).toString('base64') },
     ])
+=======
+describe('summarizeGskFailure', () => {
+  // trimmed version of the gateway page Genspark serves for refused calls
+  const HTML_403 = `<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Genspark</title>
+  </head>
+  <body>
+    <div class="tt">Service unavailable. Please check your internet connection.</div>
+    <form id="codeForm">
+      <input type="text" id="codeInput" maxlength="8" />
+      <button type="submit" class="submit-button">Submit</button>
+    </form>
+  </body>
+  <script>function setCookie(event) { location.reload() }</script>
+</html>`
+
+  it('distills an HTML error page to its status and visible text', () => {
+    const s = summarizeGskFailure(`HTTP 403: ${HTML_403}`)
+    expect(s).toBe(
+      'HTTP 403 (HTML error page): Service unavailable. Please check your internet connection.',
+    )
+    expect(s).not.toContain('<')
+  })
+
+  it('labels an HTML page that carries no status', () => {
+    expect(summarizeGskFailure(HTML_403)).toBe(
+      'an HTML error page: Service unavailable. Please check your internet connection.',
+    )
+  })
+
+  it('keeps a short plain message as it is', () => {
+    expect(summarizeGskFailure('HTTP 500: internal error')).toBe('HTTP 500: internal error')
+    expect(summarizeGskFailure('deck_context must be an object')).toBe(
+      'deck_context must be an object',
+    )
+  })
+
+  it('keeps the [ERROR] lines, drops [INFO] chatter and crash noise', () => {
+    const s = summarizeGskFailure(
+      '[INFO] Uploading a.png...\n[INFO] Calling /file/upload_url...\n[ERROR] Failed to get upload URL: HTTP 403: Forbidden\nAssertion failed: !(handle->flags)',
+    )
+    expect(s).toBe('[ERROR] Failed to get upload URL: HTTP 403: Forbidden')
+  })
+
+  it('collapses multi-line plain text to one line', () => {
+    expect(summarizeGskFailure('first line\nsecond line')).toBe('first line second line')
+  })
+
+  it('clips a long plain message', () => {
+    const s = summarizeGskFailure('x'.repeat(400))
+    expect(s.length).toBe(301)
+    expect(s.endsWith('…')).toBe(true)
+>>>>>>> theirs
   })
 
   it('already-loaded media is capped like loaded-by-URL media', async () => {
@@ -374,6 +601,7 @@ describe('cloud media reads fail closed without media roots', () => {
     await expect(gskAnalyzeLoadedMedia({ requirements: 'r', media: [blob] })).resolves.toBe('a cat')
   })
 })
+<<<<<<< ours
 
 describe('cloud request shaping', () => {
   it('sends the image size only as WxH, so an aspect ratio is not cancelled by auto', async () => {
@@ -413,3 +641,5 @@ describe('cloud request shaping', () => {
     await expect(gskWebSearch('q')).rejects.toThrow(/subscription is not active/)
   })
 })
+=======
+>>>>>>> theirs

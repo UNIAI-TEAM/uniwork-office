@@ -9,6 +9,14 @@ export const id = {
   redactDialogPlaceholder: 'Nama placeholder, mis. telepon pelanggan',
   redactCancel: 'Batal',
   redactInsert: 'Sembunyikan',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'File ini diubah oleh program lain.',
+  diskConflictMsg: 'File ini berubah di disk; menyimpan akan menimpa perubahan tersebut.',
+  diskReload: 'Muat ulang',
+  diskKeepMine: 'Pertahankan milik saya',
+  diskOverwrite: 'Tetap timpa',
+>>>>>>> theirs
 
   loading: 'Memuat…',
   loadFailed: 'Tidak dapat membuka file',
@@ -107,6 +115,7 @@ export const id = {
   alignLeft: 'Rata kiri',
   alignCenter: 'Rata tengah',
   alignRight: 'Rata kanan',
+  alignJustify: 'Rata kanan-kiri',
   fontSizeDec: 'Perkecil ukuran font',
   fontSizeInc: 'Perbesar ukuran font',
   typography: 'Tipografi',

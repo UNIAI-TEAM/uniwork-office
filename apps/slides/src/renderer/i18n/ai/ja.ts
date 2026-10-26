@@ -113,6 +113,8 @@ export const ja = {
   aiErrUnknown: '不明なエラー',
   aiErrStreamTimeout:
     'AIリクエストがタイムアウトしました：ネットワークからの応答がないため中断しました。接続を確認して再試行してください',
+  aiErrRegion:
+    'このモデルの提供元は現在の地域ではサービスを提供していません。別のモデルを選ぶか、ネットワークを切り替えてください',
   aiErrOverloaded: 'AI サービスが混み合っています。しばらくしてからもう一度お試しください',
   aiErrNetwork:
     'ネットワークに問題があり、AI サービスに接続できません。接続を確認して再試行してください',
@@ -226,7 +228,10 @@ export const ja = {
   aiSumSaveTemplate: 'スタイル テンプレート「{name}」を保存',
   aiSumTemplatesEmpty: 'スタイル テンプレート一覧（空）',
   aiSumListTemplates: '{count} 個のスタイル テンプレートを一覧表示',
+<<<<<<< ours
   aiPageCloudToLocal: 'クラウド生成不可効 — ローカルで生成',
   aiViewOnlyNotice:
     '閲覧専用のドキュメント: AI は内容の読み取りと質問への回答はできますが、編集はできません。',
+=======
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

@@ -12,6 +12,7 @@ import {
 } from '@genoffice/ui'
 import { findShortcut } from '@genoffice/shortcuts'
 import { useI18n } from '../i18n/locale'
+<<<<<<< ours
 import { cap } from '../capabilities'
 import {
   markdownAria,
@@ -21,6 +22,8 @@ import {
   type MarkdownCommand,
 } from '../shortcuts'
 import { OPEN_LINK_EVENT } from '../editor/tableKeymap'
+=======
+>>>>>>> theirs
 import { MARKDOWN_THEME_IDS, type MarkdownTheme } from '../../shared/markdown-theme'
 import type { StringKey } from '../i18n/locale'
 import { uiOp, type BlockType, type ListKind, type StylableMark } from '../editor/ops'
@@ -39,6 +42,8 @@ import {
   IconSearch,
   IconEyeOff,
   IconSourceCode,
+  IconBacklinks,
+  IconGraph,
   IconSpellcheck,
   IconTable,
   IconTaskList,
@@ -76,12 +81,18 @@ interface Props {
   outlineOpen: boolean
   onToggleOutline: () => void
   hasOutline: boolean
+  backlinksOpen: boolean
+  onToggleBacklinks: () => void
+  onOpenGraph: () => void
   spellcheck: boolean
   onToggleSpellcheck: () => void
+<<<<<<< ours
   /** false on the web (cap 'autoSave'): no AutoSave toggle */
   showAutoSave?: boolean
   /** false on the web (cap 'ai'): no AI group */
   showAi?: boolean
+=======
+>>>>>>> theirs
   mdTheme: MarkdownTheme
   onMarkdownTheme: (theme: MarkdownTheme) => void
   aiOpen: boolean
@@ -216,6 +227,7 @@ function ThemePicker({
   useDismissablePopover(open, () => setOpen(false), {
     inside: () => [wrapRef.current],
   })
+<<<<<<< ours
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -227,6 +239,8 @@ function ThemePicker({
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [open])
+=======
+>>>>>>> theirs
   return (
     <div className="md-theme-wrap" ref={wrapRef}>
       <IconBtn
@@ -263,8 +277,11 @@ function ThemePicker({
   )
 }
 
+<<<<<<< ours
 /** `title` is the plain command name (the accessible name); the tooltip adds the `command` row's chord and
  * the chord also goes to aria-keyshortcuts */
+=======
+>>>>>>> theirs
 function IconBtn({
   title,
   command,
@@ -319,10 +336,16 @@ export function Ribbon({
   outlineOpen,
   onToggleOutline,
   hasOutline,
+  backlinksOpen,
+  onToggleBacklinks,
+  onOpenGraph,
   spellcheck,
   onToggleSpellcheck,
+<<<<<<< ours
   showAutoSave = true,
   showAi = true,
+=======
+>>>>>>> theirs
   mdTheme,
   onMarkdownTheme,
   aiOpen,
@@ -368,6 +391,7 @@ export function Ribbon({
         bold: e.isActive('bold'),
         italic: e.isActive('italic'),
         strike: e.isActive('strike'),
+        highlight: e.isActive('highlight'),
         code: e.isActive('code'),
         link: e.isActive('link'),
         bullet: e.isActive('bulletList'),
@@ -650,6 +674,14 @@ export function Ribbon({
                 <s>ab</s>
               </IconBtn>
               <IconBtn
+                title={t('highlight')}
+                active={state?.highlight}
+                disabled={off}
+                onClick={() => toggleStyle(editor, 'highlight')}
+              >
+                <mark>ab</mark>
+              </IconBtn>
+              <IconBtn
                 title={t('inlineCode')}
                 active={state?.code}
                 disabled={off}
@@ -805,9 +837,31 @@ export function Ribbon({
                 <IconOutlineView size={ICON} />
               </IconBtn>
             )}
+<<<<<<< ours
             {/* the paper theme persists through the desktop's config file (cap 'mdTheme': no web store) */}
             {cap('mdTheme') && (
               <ThemePicker mdTheme={mdTheme} disabled={disabled} onPick={onMarkdownTheme} />
+=======
+            <ThemePicker
+              mdTheme={mdTheme}
+              disabled={disabled || sourceMode || sourceViewOpen}
+              onPick={onMarkdownTheme}
+            />
+            {!sourceMode && (
+              <IconBtn
+                title={t('backlinks')}
+                active={backlinksOpen}
+                disabled={disabled}
+                onClick={onToggleBacklinks}
+              >
+                <IconBacklinks size={ICON} />
+              </IconBtn>
+            )}
+            {!sourceMode && (
+              <IconBtn title={t('graph')} disabled={disabled} onClick={onOpenGraph}>
+                <IconGraph size={ICON} />
+              </IconBtn>
+>>>>>>> theirs
             )}
             <IconBtn
               title={t('spellcheck')}
@@ -817,7 +871,11 @@ export function Ribbon({
             >
               <IconSpellcheck size={ICON} />
             </IconBtn>
+<<<<<<< ours
             {showAi && !sourceMode && (
+=======
+            {!sourceMode && (
+>>>>>>> theirs
               <IconBtn
                 title={t('redactEnable')}
                 active={redactEnabled}

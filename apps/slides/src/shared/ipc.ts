@@ -170,7 +170,7 @@ export interface ApplyTxnResult {
   plan?: string[]
   failures?: Array<{ index: number; error: string }>
   /** compact journal echo: op name, target, ids minted by additive ops */
-  records?: Array<{ op: string; target?: string; created?: string[] }>
+  records?: Array<{ op: string; target?: string; created?: string[]; note?: string }>
   /** full deck after a mutation (a transaction may touch any slide) */
   slides?: RenderSlide[]
 }
@@ -330,6 +330,24 @@ export interface MasterEditStrokeOp {
 
 export interface MasterDeleteElementOp {
   sourceId: string
+}
+
+/** Insert onto the current master/layout part; pixel coordinates like AddElementOp, the part is the session's edit target */
+export interface MasterAddElementOp {
+  kind: InsertKind
+  xPx: number
+  yPx: number
+  wPx: number
+  hPx: number
+  fitWidthPx: number
+  /** Rich-text paragraphs (a text box starts empty; shape defaults apply otherwise) */
+  paragraphs?: EditParagraph[]
+  /** Shape solid fill #RRGGBB */
+  fillColor?: string
+  /** Shape stroke (solid color + point width) */
+  stroke?: { color: string; widthPt: number }
+  /** Text body wrap / autofit (click-to-type text boxes); absent = wrap="square", no autofit */
+  bodyPr?: { wrap?: 'square' | 'none'; autoFit?: 'shrink' | 'resize' }
 }
 
 /** Find/replace: matches within runs across pages; firstOnly+elementId used by "Replace" for the current hit. */
@@ -626,6 +644,18 @@ export interface SetTransitionOp {
 /** Batch-write each page's auto-advance time (<p:transition advTm>, ms; ms=null clears). Used by rehearsal timing save. */
 export interface SetAdvanceTimesOp {
   times: Array<{ slideIndex: number; ms: number | null }>
+}
+
+/** What the show needs to play a slide by itself: its saved advance time and its narration. */
+export interface ShowTiming {
+  advanceMs: number | null
+  /** Element ids of the slide's recorded narration pictures, hidden during the show */
+  narrationIds: string[]
+}
+
+/** Slide Show > Record: each recorded slide's narration (16-bit WAV) and time on screen. */
+export interface SaveRecordingOp {
+  slides: Array<{ slideIndex: number; wavBase64: string; durationMs: number; advanceMs: number }>
 }
 
 // ── Section management ────────────────────────────────────────────────
@@ -1025,6 +1055,28 @@ export type AddImageBytesOp = {
 )
 
 /** Swap a picture's backing image in place: frame, z-order, border and effects survive. */
+/** A 3D model the renderer read and rendered: inserted centred, half the slide high. */
+export interface AddModel3dOp {
+  slideIndex: number
+  /** glTF binary */
+  bytes: Uint8Array
+  name: string
+  /** The model's first rendering, base64 PNG without the data: prefix */
+  posterBase64?: string
+  /** Frame width / height */
+  aspect: number
+  fitWidthPx: number
+}
+
+/** Turn a 3D model (am3d:rot, 60,000ths of a degree) and store the rendering the renderer drew. */
+export interface SetModel3dViewOp {
+  slideIndex: number
+  sourceId: string
+  rot: { ax: number; ay: number; az: number }
+  /** base64 PNG without the data: prefix */
+  posterBase64?: string
+}
+
 export interface ReplacePictureBytesOp {
   slideIndex: number
   sourceId: string
@@ -1339,8 +1391,9 @@ export interface SlidesApi {
   /** Headless export mode: report the export outcome so the main process can quit */
   headlessExportDone: (result: { ok: boolean; error?: string }) => void
   /** New blank presentation (single blank 16:9 page, untitled) */
-  newBlank: (fitWidthPx: number) => Promise<OpenResult>
-  /** Land generated pages: each pageMarkers entry is a marker (cloudpptx:<path>) redeemable for a one-slide pptx.
+  /** `size` (EMU): the "Use for New Presentations" slide size; omitted keeps the 16:9 template */
+  newBlank: (fitWidthPx: number, size?: { cx: number; cy: number }) => Promise<OpenResult>
+  /** Land generated pages: each pageMarkers entry is a marker (genpptx:<path>) redeemable for a one-slide pptx.
    *  mode="append" merges the new pages onto the existing deck (appendedFrom = existing page count);
    *  mode="replace_at" redoes page atIndex in place from a single marker (other pages untouched, undoable, replacedIndex = that page's index);
    *  mode="insert_at" inserts a new page at atIndex from a single marker (later pages shift back, undoable, insertedIndex = that page's index);
@@ -1362,6 +1415,7 @@ export interface SlidesApi {
       })
     | { error: string }
   >
+<<<<<<< ours
   /** Whether cloud single-page generation is available (always false: slide generation is not a UniWork cloud tool) */
   cloudGenStatus: () => Promise<{ enabled: boolean }>
   /** Abort every in-flight cloud page generation of this window (AI panel stop) */
@@ -1377,6 +1431,9 @@ export interface SlidesApi {
     height?: number
   }) => Promise<{ ok: boolean; marker?: string; error?: string }>
   /** Local single-page generation: a JSON slide spec (LLM output) built directly into a one-slide pptx; same marker kind as the cloud path */
+=======
+  /** Single-page generation: a JSON slide spec (LLM output) built directly into a one-slide pptx; the marker goes into a landGeneratedPages pageMarkers slot */
+>>>>>>> theirs
   localGeneratePage: (op: {
     specJson: string
   }) => Promise<{ ok: boolean; marker?: string; error?: string; imageFailures?: string[] }>
@@ -1398,6 +1455,8 @@ export interface SlidesApi {
   editTransform: (op: EditTransformOp) => Promise<RenderSlide | null>
   /** Multi-selection nudge/rotate: every item commits like editTransform, all in one undo step */
   editTransformMulti: (op: EditTransformMultiOp) => Promise<RenderSlide | null>
+  /** Escape during a previewed resize: drop the gesture's preview frames and its undo snapshot */
+  cancelTransformPreview: (op: { slideIndex: number }) => Promise<RenderSlide | null>
   /** Connector endpoint drag: reposition ends and attach/detach shape anchors (stCxn/endCxn) */
   editConnectorEndpoints: (op: EditConnectorEndpointsOp) => Promise<RenderSlide | null>
   /** Batch position update (align/distribute); all items share one undo step */
@@ -1568,11 +1627,12 @@ export interface SlidesApi {
     slideIndex: number,
     sourceId: string,
   ) => Promise<{ kind: 'video' | 'audio'; dataUrl: string } | null>
-  /** Show a dialog to pick a 3D model (glb/gltf), embed + poster placeholder */
-  insertModel3d: (
-    slideIndex: number,
-    fitWidthPx: number,
-  ) => Promise<{ slide: RenderSlide; sourceId: string } | null>
+  /** Show a dialog to pick a 3D model (.glb) and read it */
+  pickModel3d: () => Promise<{ name: string; bytes: Uint8Array } | null>
+  addModel3d: (op: AddModel3dOp) => Promise<{ slide: RenderSlide; sourceId: string } | null>
+  /** A 3D model element's glTF binary */
+  getModel3dData: (slideIndex: number, sourceId: string) => Promise<Uint8Array | null>
+  setModel3dView: (op: SetModel3dViewOp) => Promise<RenderSlide | null>
   /** Set/clear an element hyperlink; the whole page's element ids update, requiring a whole-page replace and clearing the selection */
   setLink: (op: SetLinkOp) => Promise<RenderSlide | null>
   /** Read the element's current hyperlink (dialog echo) */
@@ -1597,8 +1657,14 @@ export interface SlidesApi {
   setTransition: (op: SetTransitionOp) => Promise<boolean>
   /** The current page's transition effect (echoed on page switch) */
   getTransition: (slideIndex: number) => Promise<TransitionKind>
+  getShowTiming: (slideIndex: number) => Promise<ShowTiming>
   /** Batch-write each page's auto-advance time (rehearsal timing save; the saved pptx auto-advances in PowerPoint shows); returns success */
   setAdvanceTimes: (op: SetAdvanceTimesOp) => Promise<boolean>
+  /** Replaces the recorded slides' narration and advance time in one undo step; the whole deck back. */
+  saveRecording: (op: SaveRecordingOp) => Promise<RenderSlide[] | null>
+  clearNarration: (slideIndexes: number[]) => Promise<RenderSlide[] | null>
+  /** Asks the OS for the microphone where it gates it (macOS); false when refused. */
+  microphoneAccess: () => Promise<boolean>
   /** The current page's animation list (read by the Animations tab / during shows) */
   getAnimations: (slideIndex: number) => Promise<AnimationItem[]>
   /** Morph pairing keys of the current page's elements (matched against same-name/same-id elements on the previous page during morph tweening) */
@@ -1651,7 +1717,7 @@ export interface SlidesApi {
   /** Apply an edit script's collected primitives as ONE atomic op transaction (the executor rolls back on any failure); returns the rebuilt slide or a guided error */
   applyEditScript: (
     op: ApplyEditScriptOp,
-  ) => Promise<{ slide: RenderSlide } | { error: string } | null>
+  ) => Promise<{ slide: RenderSlide; notes?: string[] } | { error: string } | null>
   /** AI batch surface: apply raw ops as one transaction (atomic/per_op, dry-run supported) */
   applyTxn: (op: ApplyTxnOp) => Promise<ApplyTxnResult | null>
   /** Roll the deck back to an AI rollback point; returns the restored full RenderSlide array, null when the id is unknown */
@@ -1736,6 +1802,12 @@ export interface SlidesApi {
   onAiSettingsChanged: (handler: () => void) => () => void
   /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */
   openAiModelSettings: () => Promise<void>
+  /** shell only: switch to Home and open Settings › Integrations (the skills list) */
+  openSkillsSettings: () => Promise<void>
+  /** the skills installed into GenOffice's own folder */
+  skillsList: () => Promise<UserSkillEntry[]>
+  /** one installed skill's body, by name; the main process resolves the path */
+  skillText: (name: string) => Promise<string>
   aiStream: (request: AiStreamRequest) => Promise<void>
   aiStreamCancel: (requestId: string) => Promise<void>
   /** UniWork cloud account status (internal gsk name; signed in to UniWork + plan includes cloud AI) */
@@ -1850,6 +1922,10 @@ export interface SlidesApi {
   masterEditFill: (op: MasterEditFillOp) => Promise<RenderSlide | null>
   masterEditStroke: (op: MasterEditStrokeOp) => Promise<RenderSlide | null>
   masterDeleteElement: (op: MasterDeleteElementOp) => Promise<RenderSlide | null>
+  /** Insert a text box / preset shape / line onto the current master/layout part */
+  masterAddElement: (
+    op: MasterAddElementOp,
+  ) => Promise<{ slide: RenderSlide; sourceId: string } | null>
   // ── Presenter-view multi-screen show ────────────────────────────────
   /** Enter presenter view: detects multiple displays and opens a fullscreen audience show window on the external screen (sharing this session's document) */
   presenterStart: () => Promise<{ audience: boolean }>
@@ -1886,4 +1962,10 @@ declare global {
     slidesApi: SlidesApi
     desktop: DesktopFilesApi
   }
+}
+
+export interface UserSkillEntry {
+  name: string
+  description: string
+  relevant: boolean
 }

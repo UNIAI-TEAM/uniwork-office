@@ -13,6 +13,11 @@ import {
   mergeCells,
   splitCell,
 } from '@tiptap/pm/tables'
+<<<<<<< ours
+=======
+import { platformShortcuts } from '@genoffice/i18n'
+import { redactTextBetween, type RedactableNode } from '../ai/redact-view'
+>>>>>>> theirs
 import type { TextboxDisplay } from '@genoffice/docx-engine'
 
 import { useI18n, type StringKey } from '../i18n/locale'
@@ -49,6 +54,7 @@ import { applySpellingSuggestion } from '../editor/spell-replace'
 import { requestRespellKick } from '../editor/respell-kick-gate'
 import { linkRangeAt, linkTarget, removeLink } from '../editor/link-actions'
 import { fieldRangeAt, toggleFieldCodes, type FieldRange } from '../editor/field-codes'
+import { hasRedactionIn } from '../editor/redaction'
 import type { SpellLanguages } from '../../shared/ipc'
 import { TRANSLATE_LANGS, appLangKey } from './translate-langs'
 
@@ -97,6 +103,10 @@ interface EditorContextMenuProps {
   onEditField?: (field: FieldRange) => void
   /** Open Hyperlink: browser for http(s), in-document jump for #bookmark */
   onOpenLink?: (href: string) => void
+  /** Ask for a label, then withhold the selection from the model */
+  onRedact?: () => void
+  /** Stop withholding a selection that already carries the mark, keeping the text */
+  onUnredact?: () => void
   /** Word's table dialogs (Split Cells… / Insert Cells… / Delete Cells… / Table Properties…) */
   onTableDialog?: (kind: TableDialogKind) => void
   /** section content width the AutoFit / Distribute commands fit the grid into */
@@ -146,6 +156,8 @@ export function EditorContextMenu({
   onUpdateFields,
   onEditField,
   onOpenLink,
+  onRedact,
+  onUnredact,
   onTableDialog,
   sectionContentWidthPx = 624,
   onRespell,
@@ -237,7 +249,15 @@ export function EditorContextMenu({
   const field = fieldRangeAt(editor.state, clickPos)
   const canComment = hasSelection || wordRangeAtCaret(editor) !== null
   const canEdit = editor.isEditable
-  const selectedText = hasSelection ? editor.state.doc.textBetween(from, to, ' ').trim() : ''
+  // Whether stopping the withholding is an option here. Decided from the live
+  // selection rather than from a list kept alongside the document, so it cannot
+  // drift from the marks the editor is actually carrying. A bare caret answers
+  // false on its own, so no selection test is needed here either.
+  const isRedactedSelection = hasRedactionIn(editor, from, to)
+  // the presets quote the selection back to the model, so it reads the projection
+  const selectedText = hasSelection
+    ? redactTextBetween(editor.getJSON() as RedactableNode, from, to, ' ').trim()
+    : ''
   // Synonyms targets a word / short phrase, not long selections
   const synonymText = selectedText.length > 0 && selectedText.length <= 20 ? selectedText : ''
 
@@ -714,8 +734,37 @@ export function EditorContextMenu({
               </div>
             )}
           </div>
+<<<<<<< ours
         </>
       )}
+=======
+        )}
+      </div>
+      {/* Withholding a span. No AI badge: the item spends the words rather
+          than using the model, and the badge would read "Uses AI".
+          Text only, deliberately. A picture alone in a paragraph is a *block*
+          node (docProtected), which takes no marks at all, and a picture
+          beside text is an inline atom whose mark is dropped by the docx save
+          (convert.ts reads the run's node attrs, never the node's marks) — so
+          offering it for a picture would hide it for one session and then lose
+          the decision on the next save, with nothing to tell the reader. */}
+      {onRedact &&
+        item(t('redactMenuLabel'), {
+          disabled: !canEdit || !hasSelection,
+          onClick: run(onRedact),
+        })}
+      {/* The other half of the item above, and its mirror: offered only when the
+          selection really carries the mark. Without this the sole way to stop
+          withholding a span was to delete the words, which loses the reader's
+          own text to undo a decision they made in the editor. Same reason as
+          the item beside it for no AI badge — this one only moves a mark. */}
+      {onUnredact &&
+        isRedactedSelection &&
+        item(t('redactShowLabel'), {
+          disabled: !canEdit,
+          onClick: run(onUnredact),
+        })}
+>>>>>>> theirs
       {isFloating && (
         <>
           <div className="ctx-sep" />

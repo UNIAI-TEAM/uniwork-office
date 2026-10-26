@@ -66,7 +66,8 @@ export const pt = {
     'Vídeo inserido (incorporado ao .pptx; pode ser reproduzido no PowerPoint)',
   appStatusAudioInserted: 'Áudio inserido (incorporado ao .pptx)',
   appStatusModel3dInserted:
-    'Modelo 3D incorporado (a tela mostra um espaço reservado; o arquivo do modelo é salvo no .pptx)',
+    'Modelo 3D inserido: selecione-o para girá-lo (o PowerPoint também o mostra em 3D)',
+  appStatusModel3dNoPreview: 'Não foi possível desenhar o modelo 3D aqui; a imagem dele não muda',
   appStatusRecordingEmpty: 'A gravação está vazia; nada foi inserido',
   appStatusRecordingInserted: 'Gravação de tela inserida no slide atual (webm incorporado)',
   appStatusRecording:
@@ -229,6 +230,8 @@ export const pt = {
   appMasterFillNone: 'Sem Preenchimento',
   appMasterStroke: 'Cor do Contorno…',
   appMasterStrokeNone: 'Sem Contorno',
+  appMasterInsertTextBox: 'Caixa de Texto',
+  appMasterInsertShape: 'Formas',
   appStartOpening: 'Abrindo…',
   appReadingSlideTitle:
     'Clique para ir ao próximo slide (Esc para sair do Modo de Exibição de Leitura)',
@@ -258,6 +261,25 @@ export const pt = {
     'O tempo total da apresentação foi de {duration}. Deseja salvar os intervalos dos slides para o avanço automático?',
   appRehearseDiscard: 'Não Salvar',
   appRehearseSave: 'Salvar',
+<<<<<<< ours
+=======
+  appRecordTitle: 'Gravar Narração',
+  appRecordSummary: 'Duração da gravação: {duration}. Salvar a narração e o tempo de cada slide?',
+  appRecordDiscard: 'Não Salvar',
+  appRecordSave: 'Salvar',
+  appStatusRecordSaved: 'Narração salva em {count} slides (o PowerPoint também a reproduz)',
+  appStatusRecordFailed: 'Não foi possível salvar a gravação',
+  appStatusNarrationCleared: 'Narração limpa',
+  appSettingsTitle: 'Configurações de IA',
+  appSettingsAccount: 'Conta Genspark',
+  appSettingsChecking: 'Verificando…',
+  appSettingsLoggedIn: 'Conectado',
+  appSettingsLoggedInEmail: 'Conectado: {email}',
+  appSettingsLoggedOut: 'Não conectado (os recursos de IA exigem uma conta Genspark)',
+  appSettingsLoginPending: 'Aguardando o login no navegador…',
+  appSettingsLogin: 'Entrar no Genspark',
+  appSettingsModel: 'Modelo',
+>>>>>>> theirs
   appSettingsCancel: 'Cancelar',
   appCropHint: 'Enter para confirmar · Esc para cancelar · Clique fora para confirmar',
   appStatusZoomsInserted:

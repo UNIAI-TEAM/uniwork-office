@@ -93,9 +93,11 @@ export const fr = {
   appPgNumAppliesTo: " ; s'applique à la section {n}",
   appExportingPdf: 'Exportation du PDF…',
   appExportingHtml: 'Exportation du HTML…',
+  appExportingMarkdown: 'Exportation du Markdown…',
   appExportPdf: 'Exporter en PDF',
   appExportPdfFailed: "Échec de l'exportation PDF : {error}",
   appExportHtmlFailed: "Échec de l'exportation HTML : {error}",
+  appExportMarkdownFailed: "Échec de l'exportation Markdown : {error}",
   appPrintGroupFailed: "échec de l'impression du groupe de pages",
   appPrintTitle: 'Imprimer',
   appPrintProgress: 'Préparation de l’impression…',
@@ -110,12 +112,24 @@ export const fr = {
   appPrintFailed: 'Échec de l’impression : {error}',
   appPrintPrevPage: 'Page précédente',
   appPrintNextPage: 'Page suivante',
+  appPrintPrinter: 'Imprimante',
+  appPrintDefaultPrinter: 'Imprimante par défaut',
+  appPrintSystemDialog: 'Boîte de dialogue d’impression système…',
+  appPrintCopies: 'Copies',
+  appPrintCollate: 'Assembler',
+  appPrintDuplex: 'Recto verso',
+  appPrintDuplexOff: 'Désactivé',
+  appPrintDuplexLong: 'Retourner sur le bord long',
+  appPrintDuplexShort: 'Retourner sur le bord court',
   appExportedPdf: 'PDF exporté : {path}',
   appExportedHtml: 'HTML exporté : {path}',
+  appExportedMarkdown: 'Markdown exporté : {path}',
+  appExportMarkdownImagesDropped: '({count} image(s) illisible(s) ignorée(s))',
   appExportedPdfMixed:
     'PDF exporté : {path} (formats de papier mixtes, {n} groupes fusionnés par page)',
   appExportPdfCanceled: 'Exportation PDF annulée',
   appExportHtmlCanceled: 'Exportation HTML annulée',
+  appExportMarkdownCanceled: 'Exportation Markdown annulée',
   appExportingImages: 'Exportation des images…',
   appExportImagesProgress: 'Exportation de {count} images…',
   appExportImagesDone: '{count} images exportées vers {dir}',
@@ -358,6 +372,15 @@ export const fr = {
   appAiBadgeTip: "Utilise l'IA",
   appTranslate: 'Traduire',
   appTranslateTo: 'Traduire en {lang}',
+  redactMenuLabel: 'Masquer la sélection à l’IA',
+  redactDialogDesc:
+    'Les mots restent dans le document et dans le fichier ; le modèle ne voit que le marqueur ci-dessous. Donnez-lui un nom pour qu’il sache ce qu’il désigne.',
+  redactDialogScope:
+    'Le masquage ne concerne que l’IA de cette application. La CLI, les outils MCP et l’exportation sans interface lisent le fichier directement et voient toujours ces mots.',
+  redactDialogPlaceholder: 'Nom du placeholder, ex. : téléphone du client',
+  redactCancel: 'Annuler',
+  redactInsert: 'Masquer',
+  redactShowLabel: 'Réafficher la sélection à l’IA',
   appLangEnglish: 'anglais',
   appLangSimplifiedChinese: 'chinois simplifié',
   appLangJapanese: 'japonais',
@@ -533,6 +556,7 @@ export const fr = {
     'Mettre à jour ce style à partir de la sélection actuelle (réécrit dans styles.xml)',
   appNewStyleFromSelection: 'Nouveau style à partir de la sélection actuelle',
   appStyleNamePlaceholder: 'Nom du style',
+<<<<<<< ours
   appWebConflictTitle: 'Ce document a été modifié ailleurs',
   appWebConflictBody:
     'Vos modifications ne sont pas encore sur UniWork et sont conservées dans ce navigateur jusqu’à votre déconnexion.',
@@ -572,4 +596,9 @@ export const fr = {
   appCopySaved: 'Votre version a été enregistrée comme nouveau document : {title}.',
   appCopySaveFailed:
     'Impossible de créer la copie. Vos modifications sont toujours en sécurité ; réessayez.',
+=======
+  appMergeSourceLoaded: '{name} chargé ({n} enregistrements)',
+  appMergeWritten: '{n} documents écrits',
+  appMergeNothingToWrite: "Il n'y a rien à écrire",
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

@@ -72,6 +72,15 @@ pub struct SheetMetadata {
     /// once the workbook's STORED_CELL_COUNT_BUDGET is spent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stored_cell_count: Option<usize>,
+    /// Stored cells with a value or formula — what sorting and filtering
+    /// need resident; style-only blanks are the remainder.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_cell_count: Option<usize>,
+    /// Rows and columns spanned by the value cells (1-based extents).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_row_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_column_count: Option<usize>,
     pub column_widths: Vec<ColumnWidth>,
     pub default_row_height: Option<f64>,
     /// sheetFormatPr/@customHeight: the default row height is user-fixed, so
@@ -349,6 +358,21 @@ pub struct CommentInfo {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thread: Option<ThreadInfo>,
+    /// The picture the note's shape is showing, when it has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image: Option<CommentImageInfo>,
+}
+
+/// A note's picture, fetched through the `read_media` command rather than
+/// carried inline: the bytes of a photograph do not belong in the metadata a
+/// workbook hands back for every sheet it has.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommentImageInfo {
+    /// Media lookup key for the read_media command.
+    pub id: String,
+    #[serde(skip_serializing)]
+    pub media_path: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -579,7 +603,7 @@ pub struct SheetProtectionAllow {
 }
 
 #[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase", untagged)]
+#[serde(rename_all_fields = "camelCase", untagged)]
 pub enum SheetPasswordHash {
     Legacy {
         legacy: String,

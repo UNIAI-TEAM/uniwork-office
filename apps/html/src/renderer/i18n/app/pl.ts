@@ -9,6 +9,14 @@ export const pl = {
   redactDialogPlaceholder: 'Nazwa symbolu, np. telefon klienta',
   redactCancel: 'Anuluj',
   redactInsert: 'Ukryj',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'Ten plik został zmieniony przez inny program.',
+  diskConflictMsg: 'Ten plik zmienił się na dysku; zapisanie nadpisze te zmiany.',
+  diskReload: 'Wczytaj ponownie',
+  diskKeepMine: 'Zachowaj moje',
+  diskOverwrite: 'Nadpisz mimo to',
+>>>>>>> theirs
 
   loading: 'Wczytywanie…',
   loadFailed: 'Nie można otworzyć pliku',
@@ -105,6 +113,7 @@ export const pl = {
   alignLeft: 'Wyrównaj do lewej',
   alignCenter: 'Wyśrodkuj',
   alignRight: 'Wyrównaj do prawej',
+  alignJustify: 'Wyjustuj',
   fontSizeDec: 'Zmniejsz rozmiar czcionki',
   fontSizeInc: 'Zwiększ rozmiar czcionki',
   typography: 'Typografia',

@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const fr = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Masquer la sélection à l’IA',
+  redactDialogDesc:
+    'La sélection reste dans le document et dans le fichier ; le modèle ne voit que le marqueur ci-dessous. Donnez-lui un nom pour qu’il sache ce qu’il désigne.',
+  redactDialogScope:
+    'Le masquage ne concerne que l’IA de cette application. La CLI, les outils MCP et l’exportation sans interface lisent le fichier directement et voient toujours ces mots.',
+  redactDialogPlaceholder: 'Nom du placeholder, ex. : téléphone du client',
+  redactCancel: 'Annuler',
+  redactInsert: 'Masquer',
+  redactEnable: 'Clic droit sur une sélection pour la masquer au modèle.',
+  redactNeedsSavedRow:
+    "Cette ligne n'est pas encore dans le fichier. Enregistrez d'abord, puis masquez la cellule.",
+  redactRecoveredFromNames:
+    'Une autre application a réécrit ce fichier et effacé la trace de ce qui est masqué. Les cellules masquées ont été retrouvées dans les noms du classeur ; la sauvegarde restaure la trace complète.',
+
   appMergeWorkbooks: 'Fusionner des classeurs',
   appMergeWorkbooksTip: "Ajouter les feuilles d'autres fichiers Excel à ce classeur",
   appMergeWorkbooksPicking: 'Choisissez les fichiers à fusionner…',
@@ -341,7 +356,9 @@ export const fr = {
   appFullLoadRunning:
     'Chargement complet du classeur en cours — le tri et le filtrage seront disponibles une fois terminé…',
   appFullLoadTooLarge:
-    'Ce classeur est trop volumineux pour être chargé entièrement en mémoire ; le tri et le filtrage sont indisponibles pour ce fichier.',
+    "Ce classeur est trop volumineux pour être chargé entièrement en mémoire ; le tri et le déplacement de plages sont indisponibles pour ce fichier. Le filtrage s'exécute directement sur le fichier.",
+  appLargeFilterLoading: 'Lecture de la colonne de filtre depuis le fichier…',
+  appLargeFilterApplying: 'Application du filtre sur le fichier…',
   appSortValueModeFormulas:
     'Cette plage contient des formules qui ne sont pas calculées en direct dans ce grand classeur — la trier ou la déplacer les enregistrerait comme simples valeurs. Choisissez une plage sans formules.',
   appSortRangeTooLarge:
@@ -745,6 +762,7 @@ export const fr = {
   appTabReview: 'Révision',
   appRibbonCollapse: 'Réduire le ruban',
   appRibbonExpand: 'Développer le ruban',
+  appRibbonCompact: 'Ruban compact (icônes uniquement)',
   appTabView: 'Affichage',
   appTabAi: 'IA',
   appTabChartDesign: 'Création de graphique',
@@ -787,7 +805,6 @@ export const fr = {
   appLinkPlaceholder: 'https://example.com ou Sheet1!A1',
   appRemoveLink: 'Supprimer le lien',
   appNotAvailableYet: 'Pas encore disponible',
-  appComingSoon: 'Bientôt disponible',
   appGroupChartLayouts: 'Dispositions du graphique',
   appAddChartElement: 'Ajouter un élément de graphique',
   appAddChartElementTitle: 'Titres, étiquettes de données, légende',
@@ -1292,6 +1309,10 @@ export const fr = {
   appFontSizeTip: 'Taille de police',
   appZoomIn: 'Zoom avant',
   appZoomOut: 'Zoom arrière',
+  appImgActualSize: 'Taille réelle',
+  appImgFitWindow: 'Ajuster à la fenêtre',
+  appImgSaveAs: "Enregistrer l'image sous…",
+  appImgClose: 'Fermer (Échap)',
   appZoomSheetTitle: 'Zoomer la feuille',
   appResetZoom: 'Réinitialiser le zoom',
   appZoomToSelection: 'Zoom sur la sélection',
@@ -1334,6 +1355,21 @@ export const fr = {
   appOpenFileFirst: "Ouvrez d'abord un fichier",
   appNoPassword: 'Sans mot de passe',
   appProtectWorkbook: 'Protéger le classeur',
+  appChangePassword: 'Modifier le mot de passe',
+  appWorkbookPasswordChanged: 'Le mot de passe du classeur a été mis à jour.',
+  appEncryptedOpenTitle: 'Ouvrir un classeur protégé par mot de passe',
+  appEncryptedOpenCopy: 'Saisissez le mot de passe pour déverrouiller ce classeur.',
+  appEncryptedPasswordLabel: 'Mot de passe',
+  appEncryptedOpen: 'Ouvrir',
+  appChangePasswordTitle: 'Modifier le mot de passe du classeur',
+  appChangePasswordCopy: 'Choisissez un nouveau mot de passe et confirmez-le ci-dessous.',
+  appNewPasswordLabel: 'Nouveau mot de passe',
+  appConfirmPasswordLabel: 'Confirmer le nouveau mot de passe',
+  appPasswordsMismatch: 'Les mots de passe ne correspondent pas.',
+  appPasswordUpdateFailed: 'Impossible de mettre à jour le mot de passe du classeur.',
+  appPasswordUpdating: 'Mise à jour…',
+  appUpdatePassword: 'Mettre à jour le mot de passe',
+  appWorkbookNotPasswordProtected: "Ce classeur n'est pas protégé par un mot de passe d'ouverture.",
   appAllowEditRanges: 'Permettre la modification des plages',
   appGroupClipboard: 'Presse-papiers',
   appPaste: 'Coller',
@@ -1519,6 +1555,16 @@ export const fr = {
   appTableRowsNotLoaded:
     'Les lignes du tableau sont encore en cours de chargement : réessayez dans un instant.',
   appTableTotalLabel: 'Total',
+  appNotePicturesPaneTitle: 'Images des notes',
+  appNotePicturesClose: 'Fermer',
+  appNotePicturesNone: "Aucune note de ce classeur ne contient d'image.",
+  appNotePictureUnavailable: 'Cette image ne peut pas être affichée.',
+  appNotePicturesToggle: 'Images des notes',
+  appNoteInsertPicture: 'Insérer une image',
+  appNotePictureInserted:
+    'Image ajoutée au commentaire de {cell}. Enregistrez pour l’écrire dans le fichier.',
+  appNotePictureRemoved: 'Image retirée du commentaire de {cell}.',
+  appNotePictureRemove: 'Retirer l’image',
   appCommentsPaneTitle: 'Commentaires',
   appThreadReply: 'Répondre',
   appThreadReplyPlaceholder: 'Répondre…',
@@ -1565,6 +1611,8 @@ export const fr = {
   appVisualSendBackward: 'Reculer',
   appVisualSizeProperties: 'Taille et propriétés…',
   appVisualHyperlink: 'Lien hypertexte…',
+  appVisualEmbedInCell: "Incorporer l'image dans la cellule",
+  appVisualEmbedFailed: "Impossible d'incorporer cette image dans la cellule.",
   appVisualDelete: 'Supprimer',
   appVisualArranged: 'Objet mis à jour — enregistrez avec {saveKeys}.',
   appVisualCopied: 'Objet copié.',

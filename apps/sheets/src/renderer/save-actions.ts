@@ -25,10 +25,21 @@ import {
   toSaveTableEdits,
   toSaveVisualAdds,
   toSaveVisualEdits,
+  toSaveCellImageAdds,
 } from './edit-journal'
+<<<<<<< ours
 import { cap, isViewOnly, platform } from './capabilities'
 import { activeCsvSheet, handleExportCsv, serializeActiveSheetCsv } from './csv-export'
+=======
+import {
+  activeCsvSheet,
+  cellPatternLookup,
+  handleExportCsv,
+  serializeActiveSheetCsv,
+} from './csv-export'
+>>>>>>> theirs
 import type { CellState } from '@genoffice/xlsx-gateway/domain/workbook.types'
+import type { SheetRedactionState } from '@genoffice/xlsx-gateway/gateway/xlsx-redaction'
 import { verifiedFormulaValues } from './formula-values'
 import { t } from './i18n/locale'
 import { abortStagedEditsTransfer, stageEditsForSave, type StagedEdits } from './save-edits-staging'
@@ -59,6 +70,14 @@ export interface SaveContext {
   setPendingEdits?: (count: number) => void
   /** live cell readout, for the cached values of formulas an MCP batch wrote (optional in tests) */
   readCells?: (addresses: string[], sheetId: string) => Record<string, CellState>
+  /**
+   * The cells the reader withheld from the model, keyed by sheet name as the
+   * package part is. A save carries them even when nothing else is pending: a
+   * workbook whose only change is a newly withheld cell is still one that has
+   * to be written, and a save that dropped the marks would leave the file
+   * claiming nothing is hidden.
+   */
+  redactionStates?: () => readonly SheetRedactionState[]
   /** Saving swaps the session and reinstalls the workbook, which resets the
       view to the first sheet's A1 — stash where the user was so the
       reinstall lands there instead. `viewRow`/`viewColumn` is the viewport's
@@ -172,6 +191,7 @@ export async function handleSave(
   const chartEdits = toSaveChartEdits(state.editJournal)
   const visualEdits = toSaveVisualEdits(state.editJournal)
   const visualAdditions = toSaveVisualAdds(state.editJournal)
+  const cellImageAdditions = toSaveCellImageAdds(state.editJournal)
   const tableAdditions = toSaveTableAdds(state.editJournal)
   const tableEdits = toSaveTableEdits(state.editJournal)
   const pivotAdditions = toSavePivotAdds(state.editJournal)
@@ -241,8 +261,13 @@ export async function handleSave(
   // separately so the save refreshes each formula cell's cached <v>, keeping its <f>.
   // A journaled formula is excluded: the overlay may still hold the previous
   // formula's result when the user saves immediately after entering a replacement.
+  // A sheet whose run kept any cached value is excluded wholesale: the engine
+  // evaluated an incomplete model there, so a dependent of the gap may carry a
+  // clean wrong value (IFERROR over an unsupported precedent collapses to its
+  // literal); the file's own cached results stay, and fullCalcOnLoad already
+  // asks Excel to recalculate the session's edits on open.
   const overlayValues = [...(state.recalc?.overlay ?? [])].flatMap(([sheetId, cells]) =>
-    isSheetRemoved(state.editJournal, sheetId)
+    isSheetRemoved(state.editJournal, sheetId) || state.recalc?.incompleteRuns?.has(sheetId)
       ? []
       : [...cells].flatMap(([key, cell]) => {
           // #ERROR! is IronCalc's own failure, never a value Excel would cache.
@@ -258,6 +283,13 @@ export async function handleSave(
   // out above because the overlay could be stale; their values are read live here.
   const journaledValues = ctx.readCells ? verifiedFormulaValues(ctx.readCells) : []
   const formulaValues = [...overlayValues, ...journaledValues]
+  // Withheld cells travel in a package part of their own, so they ride with
+  // this save rather than in the journal. Copied into the request's own shape
+  // so the renderer never hands main a readonly view of its state.
+  const redactionStates = (ctx.redactionStates?.() ?? []).map((state) => ({
+    sheetName: state.sheetName,
+    marks: state.marks.map((mark) => ({ ...mark })),
+  }))
   // The gateway fails closed when these additions ride with structural or
   // sheet changes (their coordinates entangle). Instead of bouncing the
   // user, hold them back and save in two sequential phases: structure
@@ -313,11 +345,15 @@ export async function handleSave(
     (themeState === null ? 0 : 1) +
     protectedRangeStates.length +
     visualAdditions.length +
+    cellImageAdditions.length +
     visualEdits.length +
     tableAdditions.length +
     tableEdits.length +
     pivotAdditions.length +
-    sparklineAdditions.length
+    sparklineAdditions.length +
+    // A save with nothing else pending but newly withheld cells is still a
+    // save: skipping it would leave the file claiming nothing is hidden.
+    redactionStates.length
   // A restored crash-recovery session carries its changes in the workbook
   // bytes themselves, not the journal: a plain Save with nothing pending must
   // still write back to the original file (and clear the recovery copy).
@@ -359,7 +395,15 @@ export async function handleSave(
       return { ok: false }
     }
     const active = activeCsvSheet(ctx.univerRef.current)
-    const serialized = active === null ? null : serializeActiveSheetCsv(active.sheet, state)
+    const runtime = ctx.univerRef.current
+    const serialized =
+      active === null || runtime === null
+        ? null
+        : serializeActiveSheetCsv(
+            active.sheet,
+            state,
+            cellPatternLookup(runtime, active.sheet.getSheetId(), state.file.date1904 === true),
+          )
     if (serialized === 'too-large') {
       ctx.setMessage(t('appCsvExportTooLarge'))
       return { ok: false }
@@ -414,6 +458,7 @@ export async function handleSave(
     chartEdits,
     visualEdits,
     visualAdditions,
+    cellImageAdditions,
     tableAdditions,
     tableEdits,
     pivotAdditions,
@@ -434,6 +479,7 @@ export async function handleSave(
     themeState,
     workbookProtectionState,
     protectedRangeStates,
+    redactionStates,
   }
   if (mode === 'recovery') {
     // Best-effort; a failure only means this tick's copy is skipped — but an
@@ -470,6 +516,7 @@ export async function handleSave(
       chartEdits,
       visualEdits,
       visualAdditions,
+      cellImageAdditions,
       tableAdditions: splitSave && heldTables.length > 0 ? [] : tableAdditions,
       tableEdits: phaseOneTableEdits,
       pivotAdditions: splitSave && heldPivots.length > 0 ? [] : pivotAdditions,
@@ -490,6 +537,7 @@ export async function handleSave(
       themeState,
       workbookProtectionState,
       protectedRangeStates,
+      redactionStates,
     })
     if (ctx.lazyWorkbookRef.current !== state) return { ok: false }
     if (result.canceled) {
@@ -548,6 +596,7 @@ export async function handleSave(
         chartEdits: [],
         visualEdits: [],
         visualAdditions: [],
+        cellImageAdditions: [],
         tableAdditions: heldTables,
         tableEdits: heldTableEdits,
         pivotAdditions: heldPivots,
@@ -569,6 +618,10 @@ export async function handleSave(
         themeState: null,
         workbookProtectionState: null,
         protectedRangeStates: [],
+        // Phase one already wrote the marks, re-keyed for the renames it
+        // performed. Sending them again would rewrite the part under the names
+        // this session loaded — the pre-rename ones — and orphan it.
+        redactionStates: [],
       })
       if (ctx.lazyWorkbookRef.current !== state) return { ok: false }
       if (second.canceled) {

@@ -9,6 +9,7 @@ case "$1" in
   0|remove|purge) ;;
   *) exit 0 ;;
 esac
+<<<<<<< ours
 
 if ! { type update-alternatives >/dev/null 2>&1 && update-alternatives --remove '${executable}' '/opt/${sanitizedProductName}/${executable}'; }; then
   rm -f '/usr/bin/${executable}'
@@ -52,5 +53,16 @@ if [ "$1" = purge ]; then
   if [ ! -e "$apt_list" ] || [ "$(head -n 1 "$apt_list" 2>/dev/null)" = '# managed by uniwork-office' ]; then
     rm -f "$apt_list" /usr/share/keyrings/uniwork-office-archive-keyring.gpg
   fi
+=======
+# fpm already removed our MIME file; rebuild the database so the icons we
+# overrode come back without a relogin.
+command -v update-mime-database >/dev/null 2>&1 && update-mime-database /usr/share/mime >/dev/null 2>&1 || true
+link="/usr/bin/genoffice"
+# same ownership rule as the post-install: only a link into our install dir is ours
+if [ -L "$link" ]; then
+  case "$(readlink "$link")" in
+    /opt/GenOffice/*) rm -f "$link" ;;
+  esac
+>>>>>>> theirs
 fi
 exit 0

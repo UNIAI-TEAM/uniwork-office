@@ -533,6 +533,10 @@ export function fillLineBoxes(
       !(i > 0 && blocks[i - 1].keepNext && !block.keepNext)
     )
       continue
+    if (block.lineLeadPx === undefined) {
+      block.lineLeadPx = lineLeadPx(block.el)
+      if (block.lineLeadPx > 0.5) changed = true
+    }
     // a protected image block is atomic like a shape: the tiny lead line its
     // anchor marker / leading spaces form is not a page-break point (cutting
     // there left a sliver strip of a page-crossing photo behind). Over-page
@@ -579,10 +583,6 @@ export function fillLineBoxes(
         changed = true
       }
       continue
-    }
-    if (block.lineLeadPx === undefined) {
-      block.lineLeadPx = lineLeadPx(block.el)
-      if (block.lineLeadPx > 0.5) changed = true
     }
     // synthesized over-page cuts below mutate the list, so cached entries are copied out
     let boundaries: number[]
@@ -759,6 +759,23 @@ export function overlayLiveRowFlags(el: HTMLElement, rows: TableRowBox[]): void 
   })
 }
 
+/** Row boxes paired to trs by index from each tr's measured top offset (trs[0] is
+ *  pinned to 0: its own offset is only the collapsed-border half-width). Offsets are
+ *  clamped monotonic, so a collapsed 0px row keeps its slot instead of being
+ *  dropped and shifting every later row onto the wrong tr. */
+export function indexedRowBoxes(rowTops: number[], blockHeight: number): LineBox[] {
+  const tops: number[] = []
+  for (let i = 0; i < rowTops.length; i++) {
+    const prev = i === 0 ? 0 : tops[i - 1]
+    tops.push(i === 0 ? 0 : Math.min(Math.max(rowTops[i], prev), blockHeight))
+  }
+  if (tops.length === 0) tops.push(0)
+  return tops.map((top, i) => ({
+    offsetInBlock: top,
+    height: (i + 1 < tops.length ? tops[i + 1] : blockHeight) - top,
+  }))
+}
+
 function domTableRows(el: HTMLElement, blockHeight: number, zoomFactor: number): TableRowBox[] {
   const gaps = Array.from(el.querySelectorAll('.page-gap-inline')).map((g) =>
     g.getBoundingClientRect(),
@@ -766,16 +783,11 @@ function domTableRows(el: HTMLElement, blockHeight: number, zoomFactor: number):
   const gapAbove = (top: number) => gaps.reduce((s, g) => (g.top <= top ? s + g.height : s), 0)
   const elTop = el.getBoundingClientRect().top
   const trs = outerTableRows(el)
-  const tops: number[] = []
-  // skip trs[0]: the first row starts at box 0 by definition — its measured
-  // offset is just the collapsed-border half-width (1px at w:sz=12), and
-  // letting it through creates a phantom row that shifts the trs[i] pairing
-  for (const tr of trs.slice(1)) {
+  const tops = trs.map((tr) => {
     const trTop = tr.getBoundingClientRect().top
-    const off = (trTop - elTop - gapAbove(trTop)) / zoomFactor
-    if (off > 0.5) tops.push(off)
-  }
-  return tileBoxes(tops, blockHeight).map((b, i) => {
+    return (trTop - elTop - gapAbove(trTop)) / zoomFactor
+  })
+  return indexedRowBoxes(tops, blockHeight).map((b, i) => {
     if (!trs[i]) return { height: b.height }
     const { cuts, contentBottom, cells, forcedCuts } = rowCutYs(
       trs[i],
@@ -961,12 +973,21 @@ function rowCutYs(
   )
   // forced cuts travel separately from the content-line candidates: a forced
   // cut must turn the page even when the whole row fits, which the placement
+<<<<<<< ours
   // gate would skip, and per-cell line splitting must not double-cut at it
   return {
     cuts: cellCutYs(cellBands, rowHeight, paraBands),
+=======
+  // gate would skip, and per-cell line splitting must not double-cut at it.
+  // A row without cell boxes (single cell, exact-height cells) splits on the
+  // cut list alone, so there the breaks have to ride along with it.
+  const hasCells = cellsOk && cellBoxes.some((c) => c.lines.length > 0)
+  return {
+    cuts: cellCutYs(cellBands, rowHeight, paraBands, hasCells ? [] : forcedCuts),
+>>>>>>> theirs
     ...(forcedCuts.length > 0 ? { forcedCuts } : {}),
     contentBottom,
-    ...(cellsOk && cellBoxes.some((c) => c.lines.length > 0) ? { cells: cellBoxes } : {}),
+    ...(hasCells ? { cells: cellBoxes } : {}),
   }
 }
 
@@ -1004,7 +1025,20 @@ function cellBoxOf(
     const [t, b] = toBand(ch.getBoundingClientRect())
     return [t - alignDy, b - alignDy]
   })
-  return { ...cellLinesOf(shifted), childBox, alignDy, alignFrac }
+  // Word probe 2026-10-20: a cell paragraph's space-after must fit below its
+  // last line or the paragraph does not end on the page; a continuation that
+  // opens at a new paragraph keeps that paragraph's space-before, except when
+  // the previous paragraph's HTML auto space-after already collapsed it
+  const childAfter = Array.from(
+    cell.children,
+    (ch) => parseFloat(getComputedStyle(ch).marginBottom) || 0,
+  )
+  const childBefore = Array.from(cell.children, (ch, i) =>
+    i > 0 && cell.children[i - 1].classList.contains('sp-auto-a')
+      ? 0
+      : parseFloat(getComputedStyle(ch).marginTop) || 0,
+  )
+  return { ...cellLinesOf(shifted), childBox, childAfter, childBefore, alignDy, alignFrac }
 }
 
 /** Pure core of cellBoxOf: rect entries → clustered lines (same overlap rule as
@@ -1056,7 +1090,11 @@ function clusterLineBands(bands: Array<[number, number]>): Array<[number, number
  *  tolerance for sub-pixel jitter). paraBands (per-paragraph line bands across
  *  all cells) add Word's widow/orphan rule to in-row breaks: a cut through a
  *  paragraph must leave at least two of its lines on each side, else the whole
+<<<<<<< ours
  *  row pushes (Word pushes a row whose 2-line cell would split, prod100r4/32+47).
+=======
+ *  row pushes (Word pushes a row whose 2-line cell would split; corpus probe 2026-09).
+>>>>>>> theirs
  *
  *  forcedCuts are explicit page breaks the author typed (br.doc-page-br), as
  *  offsets from the row top. They are honoured whatever the heuristics say:
@@ -1363,18 +1401,51 @@ function cellContentBottom(cell: Element): number {
   return bottom
 }
 
+/**
+ * A cell of an earlier row spans down through this row, or this row's own cell
+ * spans below it: the row sits inside a vertical merge. Height added inside one
+ * of its cells then shifts every row the merge covers, the next measure sees
+ * the shifted rows as new content, another boundary lands inside, another band
+ * is anchored — the row inflates page by page (genoffice#2114). Such rows take
+ * the zero-height cut marker, never an in-cell gap band.
+ */
+function insideVerticalMerge(row: Element): boolean {
+  const table = (row as HTMLTableRowElement).closest('table')
+  const rows = table ? Array.from(table.rows) : []
+  const i = rows.indexOf(row as HTMLTableRowElement)
+  if (i < 0) return false
+  for (let k = 0; k <= i; k++) {
+    for (const cell of Array.from(rows[k].cells)) {
+      // the live rowSpan includes bridging's phantom rows; the authored span
+      // is what the geometry runs on
+      const span =
+        Number(cell.getAttribute('data-base-rowspan')) ||
+        (cell as HTMLTableCellElement).rowSpan ||
+        1
+      if (k < i ? span > i - k : span > 1) return true
+    }
+  }
+  return false
+}
+
 /** In-row cut decoration policy: a single-cell row can host a real inline gap band
  *  (one cell spans the whole cut) — returns that cell. A multi-cell row can too when
  *  every other cell's content ends above the cut (nothing at the band's y to
  *  misalign — HTML→docx layout tables put whole articles in one cell next to
  *  spacer-gif sliver cells); otherwise the zero-height cut marker stays (same-y
- *  bands across cells are not modeled) — returns null. */
+ *  bands across cells are not modeled) — returns null. A row inside a vertical
+ *  merge never hosts a band (see insideVerticalMerge). */
 export function singleCutCell(row: Element | null, anchor?: LineAnchor | null): Element | null {
   const cells = row
     ? Array.from(row.children).filter((c) => c.tagName === 'TD' || c.tagName === 'TH')
     : []
+  if (cells.length === 0) return null
+  // a row inside a vertical merge never hosts an in-cell band: the band's
+  // height shifts every row the merge covers and feeds back into the next
+  // measure (genoffice#2114) — the zero-height cut marker carries the break
+  if (insideVerticalMerge(row as HTMLTableRowElement)) return null
   if (cells.length === 1) return cells[0]
-  if (cells.length === 0 || !anchor) return null
+  if (!anchor) return null
   const anchorCell = anchorElement(anchor)?.closest('td, th')
   const host = anchorCell && cells.find((c) => c === anchorCell || c.contains(anchorCell))
   if (!host) return null

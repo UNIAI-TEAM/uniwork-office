@@ -128,6 +128,8 @@ export const cs = {
   aiUnknownError: 'Neznámá chyba',
   aiTimeoutError:
     'Časový limit požadavku AI vypršel: síť neodpověděla, běh byl zastaven. Zkontrolujte připojení a zkuste to znovu',
+  aiRegionError:
+    'Poskytovatel tohoto modelu neposkytuje služby ve vaší aktuální oblasti — vyberte jiný model nebo změňte síť',
   aiOverloadedError: 'Služba AI je právě zaneprázdněna – zkuste to prosím za chvíli znovu',
   aiNetworkError:
     'Problém se sítí: nepodařilo se připojit ke službě AI. Zkontrolujte připojení a zkuste to znovu',
@@ -137,6 +139,9 @@ export const cs = {
   aiSumImageAttachment: 'Obrázková příloha {name}',
   aiSumRead: 'Přečteno {name}',
   aiSumReadAttachmentName: 'Přečtena příloha {name}',
+  aiSumSkillsList: 'Výpis nainstalovaných skillů',
+  aiSumSkillRead: 'Přečten skill {name}',
+  aiSumRunCli: 'Spuštěno {args}',
   aiSumWebSearch: 'Hledání na webu',
   aiSumWebSearchDone: 'Hledáno „{query}“ ({count} výsledků)',
   aiSumImageSearch: 'Hledání obrázků',
@@ -199,6 +204,7 @@ export const cs = {
   aiCmdImages: 'Aktualizováno obrázků: {count}',
   aiCmdToc: 'Vložen obsah ({count} položek)',
   aiCmdSkipped: ' (přeskočeno {count} chráněných bloků)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Dokument jen pro čtení: AI jej může číst a odpovídat na otázky, ale nemůže jej upravovat.',
   aiClarifyTitle: 'Pár otázek, než budu pokračovat',
@@ -213,6 +219,8 @@ export const cs = {
   aiClarifySubmit: 'Pokračovat',
   aiSumClarify: 'Upřesnění zodpovězeno',
   aiSumClarifySkipped: 'Upřesnění přeskočeno',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Vytvořit myšlenkovou mapu tohoto dokumentu',
   aiMindMapBtn: 'Myšlenková mapa AI',
   aiMindMapPrompt:

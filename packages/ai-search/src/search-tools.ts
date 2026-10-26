@@ -1,10 +1,17 @@
 /**
  * ai:web-search / ai:image-search for the editors' main processes: reads
  * ai-settings.json live and turns the search provider choice into
+<<<<<<< ours
  * SearchOptions — `auto` tries the UniWork cloud first while it is on (signed
  * in, entitled, cloud tools not switched off), then the keyless chain (env
  * keys, then free Parallel MCP, then DuckDuckGo); a selected custom provider
  * runs first and never spends UniWork credits.
+=======
+ * SearchOptions — Genspark keeps the historic chain (gsk when signed in and
+ * cloud tools are on, then env keys, then free Parallel MCP, then DuckDuckGo); a
+ * selected custom provider runs first and skips gsk. Keenable's free endpoint
+ * only runs when Keenable is the selected provider.
+>>>>>>> theirs
  */
 
 import {
@@ -28,6 +35,7 @@ export function searchOptionsFromSettings(settings: AiSettings): SearchOptions {
   if (provider === 'serply') return { useGsk: false, serplyKey: key, prefer: 'serply' }
   if (provider === 'exa') return { useGsk: false, exaKey: key, prefer: 'exa' }
   if (provider === 'firecrawl') return { useGsk: false, firecrawlKey: key, prefer: 'firecrawl' }
+  if (provider === 'keenable') return { useGsk: false, keenableKey: key, prefer: 'keenable' }
   return provider === 'tavily'
     ? { useGsk: false, tavilyKey: key, prefer: 'tavily' }
     : { useGsk: false, serperKey: key }
@@ -54,7 +62,12 @@ export async function testSearchProvider(
 ): Promise<AiTestResult> {
   if (provider === 'auto') return { ok: true }
   apiKey = apiKey.trim()
+<<<<<<< ours
   if (!apiKey && provider !== 'parallel') return aiTestFailure('invalid_key', 'API key is empty')
+=======
+  if (!apiKey && provider !== 'parallel' && provider !== 'keenable')
+    return { ok: false, error: 'API key is empty' }
+>>>>>>> theirs
   const options: SearchOptions = {
     useGsk: false,
     serperKey: provider === 'serper' ? apiKey : '',
@@ -63,6 +76,7 @@ export async function testSearchProvider(
     parallelKey: provider === 'parallel' ? apiKey : '',
     exaKey: provider === 'exa' ? apiKey : '',
     firecrawlKey: provider === 'firecrawl' ? apiKey : '',
+    keenableKey: provider === 'keenable' ? apiKey : '',
     prefer: provider,
   }
   const r = await webSearch('UniWork Office', 1, options)

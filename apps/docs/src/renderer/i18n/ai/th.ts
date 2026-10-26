@@ -125,6 +125,8 @@ export const th = {
   aiUnknownError: 'ข้อผิดพลาดที่ไม่รู้จัก',
   aiTimeoutError:
     'คำขอ AI หมดเวลา: เครือข่ายไม่ตอบสนอง จึงหยุดการทำงาน โปรดตรวจสอบการเชื่อมต่อแล้วลองใหม่',
+  aiRegionError:
+    'ผู้ให้บริการของโมเดลนี้ไม่ให้บริการในภูมิภาคปัจจุบันของคุณ — โปรดเลือกโมเดลอื่นหรือเปลี่ยนเครือข่าย',
   aiOverloadedError: 'บริการ AI มีผู้ใช้งานจำนวนมากในขณะนี้ โปรดลองอีกครั้งในอีกสักครู่',
   aiNetworkError:
     'เครือข่ายมีปัญหา ไม่สามารถเชื่อมต่อบริการ AI ได้ โปรดตรวจสอบการเชื่อมต่อแล้วลองใหม่',
@@ -134,6 +136,9 @@ export const th = {
   aiSumImageAttachment: 'รูปภาพแนบ {name}',
   aiSumRead: 'อ่าน {name}',
   aiSumReadAttachmentName: 'อ่านสิ่งที่แนบ {name}',
+  aiSumSkillsList: 'รายการสกิลที่ติดตั้ง',
+  aiSumSkillRead: 'อ่านสกิล {name}',
+  aiSumRunCli: 'รัน {args} แล้ว',
   aiSumWebSearch: 'ค้นหาเว็บ',
   aiSumWebSearchDone: 'ค้นหา "{query}" ({count} รายการ)',
   aiSumImageSearch: 'ค้นหารูปภาพ',
@@ -195,6 +200,7 @@ export const th = {
   aiCmdImages: 'อัปเดตรูปภาพ {count} รูปแล้ว',
   aiCmdToc: 'แทรกสารบัญแล้ว ({count} รายการ)',
   aiCmdSkipped: ' (ข้ามบล็อกที่ได้รับการป้องกัน {count} บล็อก)',
+<<<<<<< ours
   aiViewOnlyNotice: 'เอกสารแบบดูอย่างเดียว: AI อ่านและตอบคำถามได้ แต่แก้ไขไม่ได้',
   aiClarifyTitle: 'ขอถามสักครู่ก่อนดำเนินการต่อ',
   aiClarifyDecide: 'ตัดสินใจให้ฉัน',
@@ -208,6 +214,8 @@ export const th = {
   aiClarifySubmit: 'ดำเนินการต่อ',
   aiSumClarify: 'ตอบคำถามเพื่อความชัดเจนแล้ว',
   aiSumClarifySkipped: 'ข้ามคำถามเพื่อความชัดเจน',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'สร้างแผนที่ความคิดของเอกสารนี้',
   aiMindMapBtn: 'แผนที่ความคิด AI',
   aiMindMapPrompt:

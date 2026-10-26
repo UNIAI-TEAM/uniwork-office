@@ -1,11 +1,17 @@
 import type { AiPanelPrefs } from '@genoffice/ui'
 import type { Lang } from '@genoffice/i18n'
+<<<<<<< ours
 import type {
   AiSettings,
   AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
 } from '@genoffice/ai-provider'
+=======
+import type { AiSettings, AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
+import type { PrintDuplex, PrintJobOptions, PrinterInfo } from '@genoffice/electron-utils/print-job'
+export type { PrintDuplex, PrintJobOptions, PrinterInfo }
+>>>>>>> theirs
 
 export const PDF_CHANNELS = {
   consumePending: 'pdf:consume-pending',
@@ -58,6 +64,8 @@ export const PDF_CHANNELS = {
   saveAsResult: 'pdf:save-as-result',
   saveAsFlow: 'pdf:save-as-flow',
   printRequest: 'pdf:print-request',
+  print: 'pdf:print',
+  printers: 'pdf:printers',
   fileRenamed: 'pdf:file-renamed',
   getLanguage: 'app:get-language',
   languageChanged: 'app:language-changed',
@@ -127,8 +135,13 @@ export interface PdfSignatureInfo {
   /** Zero-based page of the signature widget; -1 when it has none */
   pageIndex: number
   kind: 'signature' | 'timestamp'
+<<<<<<< ours
   /** Derived from `problems`: invalid (altered or unreadable) > warning (weakened) > valid (intact; trust problems stay listed as notes) */
   status: 'valid' | 'warning' | 'invalid'
+=======
+  /** Derived from `problems`: invalid (altered or unreadable) > warning (weakened) > untrusted (intact, chain reaches no trusted root) > valid */
+  status: 'valid' | 'untrusted' | 'warning' | 'invalid'
+>>>>>>> theirs
   problems: PdfSignatureProblem[]
   subFilter: string
   signerName?: string
@@ -160,6 +173,11 @@ export type CertificateErrorCode =
   | 'cert-not-exportable'
   | 'cert-store-locked'
   | 'cert-store-tool-missing'
+<<<<<<< ours
+=======
+  /** The system store is not supported on this platform (macOS for now) */
+  | 'cert-store-unsupported'
+>>>>>>> theirs
 
 /** A signing identity found in the operating system's certificate store */
 export interface SystemCertificateInfo {
@@ -173,7 +191,11 @@ export interface SystemCertificateInfo {
   expired: boolean
 }
 
+<<<<<<< ours
 export type SystemStoreIssue = 'nss-tools-missing' | 'store-locked'
+=======
+export type SystemStoreIssue = 'nss-tools-missing' | 'store-locked' | 'platform-unsupported'
+>>>>>>> theirs
 
 export interface ListSystemCertificatesResult {
   certs: SystemCertificateInfo[]
@@ -191,6 +213,11 @@ export interface SignWithCertificateRequest {
   /** Opaque id returned by pickCertificate for this view */
   certId: string
   password: string
+<<<<<<< ours
+=======
+  /** Unlocks a locked system store (NSS) when the identity has to be exported again */
+  storePassword?: string
+>>>>>>> theirs
   reason?: string
   location?: string
   contactInfo?: string
@@ -225,7 +252,7 @@ export interface SavedSignature {
   data: SignatureData
 }
 
-export type PdfConvertFormat = 'docx' | 'xlsx' | 'pptx'
+export type PdfConvertFormat = 'docx' | 'xlsx' | 'pptx' | 'md' | 'html'
 
 /** Progress push from the shell's local PDF -> Office conversion (UNI-2167) */
 export interface PdfConvertProgressEvent {
@@ -322,6 +349,17 @@ export type DrawingInput =
     })
   | (DrawBase & { kind: 'rect'; rect: [number, number, number, number] })
   | (DrawBase & { kind: 'ellipse'; rect: [number, number, number, number] })
+  | {
+      /** Hyperlink placed by the user; written as a Link annotation */
+      kind: 'link'
+      pageIndex: number
+      /** PDF user space [x1,y1,x2,y2] */
+      rect: [number, number, number, number]
+      /** External target (http/https/mailto/…); exactly one of url / destPage is set */
+      url?: string
+      /** In-document jump: 1-based page number */
+      destPage?: number
+    }
   | (DrawBase & { kind: 'line'; from: [number, number]; to: [number, number] })
   | (DrawBase & { kind: 'arrow'; from: [number, number]; to: [number, number] })
   | {
@@ -632,6 +670,51 @@ export interface FormValueInput {
   checked?: boolean
 }
 
+export type FormFieldKind = 'text' | 'checkbox' | 'radio' | 'choice' | 'signature'
+
+/** A new AcroForm field authored in Form Design; becomes a real widget on save. PDF user space, y up. */
+export interface FormFieldInput {
+  name: string
+  kind: FormFieldKind
+  pageIndex: number
+  rect: [number, number, number, number]
+  required?: boolean
+  /** text only */
+  multiLine?: boolean
+  /** text only; 0 or absent = no limit */
+  maxLen?: number
+  /** text only; absent = auto size */
+  fontSize?: number
+  textAlignment?: 'left' | 'center' | 'right'
+  /** text: initial value; choice: selected option; checkbox/radio: initial state */
+  value?: string
+  checked?: boolean
+  /** radio only: this button's export value; buttons sharing a name form one group */
+  exportValue?: string
+  /** choice only */
+  options?: string[]
+  /** text only: Acrobat AFDate format (e.g. yyyy-mm-dd) installs date format/keystroke actions */
+  dateFormat?: string
+}
+
+/** Design-time change to an AcroForm widget already in the file, addressed by its pdf.js annotation id (object ref). */
+export interface FormWidgetEditInput {
+  widgetId: string
+  fieldName: string
+  rect?: [number, number, number, number]
+  required?: boolean
+  remove?: boolean
+}
+
+/** A blank page authored in the session. `pageIndex` is its virtual original index: the
+    document's page count plus its rank among the session's blank pages, so every other
+    pending edit can address it like a real page; the save appends it there first. */
+export interface BlankPageInput {
+  pageIndex: number
+  width: number
+  height: number
+}
+
 export interface SavePdfRequest {
   path: string
   /**
@@ -659,6 +742,12 @@ export interface SavePdfRequest {
   redactions?: RedactionInput[]
   /** Complete resulting set; omitted means preserve existing embedded metadata. */
   staticFormFills?: StaticFormFillRecord[]
+  /** Moves/flag changes/removals of existing widgets, applied before formFields */
+  formWidgetEdits?: FormWidgetEditInput[]
+  /** New AcroForm fields, created after formValues (names must not collide with existing fields) */
+  formFields?: FormFieldInput[]
+  /** Blank pages appended (in pageIndex order) before every page-addressed stage runs */
+  blankPages?: BlankPageInput[]
   /** Page rotation deltas (original page index → multiple of 90 clockwise) */
   rotations?: { pageIndex: number; delta: number }[]
   /** Pages to delete (original page indices) */
@@ -846,11 +935,20 @@ export type ExportImagesResult =
   | { ok: false; error: string }
 
 /** AI channels are app-wide shared ipcMain handlers (shell registers via docs-main registerAiIpc); pass-through only */
+export interface UserSkillEntry {
+  name: string
+  description: string
+  relevant: boolean
+}
+
 export const AI_CHANNELS = {
   getSettings: 'ai:get-settings',
   setSettings: 'ai:set-settings',
   settingsChanged: 'ai:settings-changed',
   openModelSettings: 'ai:open-model-settings',
+  openSkillsSettings: 'ai:open-skills-settings',
+  skillsList: 'ai:skills-list',
+  skillText: 'ai:skill-text',
   gskStatus: 'ai:gsk-status',
   stream: 'ai:stream',
   streamChunk: 'ai:stream-chunk',
@@ -877,6 +975,7 @@ export interface ImageSearchResponse {
 export interface PdfApi {
   /** Take the pdf path pending for this view (queued at tab creation); null if none */
   consumePending(): Promise<string | null>
+<<<<<<< ours
   /** Web frame only (UNI-1865): the renderer reports that the opened document finished
    *  mounting, so the passive lag detector's settle stamp starts at first paint. Absent
    *  on desktop. */
@@ -887,6 +986,10 @@ export interface PdfApi {
   onAiPreset(
     handler: (preset: { text: string; autoRun?: boolean; displayText?: string }) => void,
   ): () => void
+=======
+  /** open any shell-routed document path (an AI answer's filenav citation) */
+  openSourcePath(path: string): Promise<void>
+>>>>>>> theirs
   /** Read pdf bytes. Only paths granted to this view are allowed */
   readFile(path: string): Promise<ArrayBuffer>
   /** Write markups/form values/page ops back to the original file (pdf-lib, content streams untouched); path grants same as readFile. With targetPath set (Save As), the original is only read and the result goes to targetPath */
@@ -996,8 +1099,14 @@ export interface PdfApi {
   onCommentAuthorChanged?(handler: () => void): () => void
   /** Mirror unsaved-changes state to the main process; drives the save prompt before closing a tab/window */
   setDirty(dirty: boolean): void
+<<<<<<< ours
   /** Main process picked "Save" in the close prompt, or flushes before an export → renderer saves with that origin and replies via sendCloseSaveResult */
   onCloseSaveRequest(handler: (request: PdfCloseSaveRequest) => void): () => void
+=======
+  /** Main process asks for a save (close prompt, menu Save, export flows) and waits for sendCloseSaveResult.
+   *  flushAll: success must mean everything on screen is in the file, including the form field whose card is open */
+  onCloseSaveRequest(handler: (opts: { flushAll: boolean }) => void): () => void
+>>>>>>> theirs
   sendCloseSaveResult(ok: boolean): void
   /** Shell menu Save As → renderer writes pending edits to targetPath only (original untouched) and replies via sendSaveAsResult */
   onSaveAsRequest(handler: (targetPath: string) => void): () => void
@@ -1006,6 +1115,11 @@ export interface PdfApi {
   onSaveAsFlow(handler: (inFlight: boolean) => void): () => void
   /** Shell menu Print → renderer runs its print flow (save, rasterize, system dialog) */
   onPrintRequest(handler: () => void): () => void
+  /** print this window's print stylesheet output on a named printer ('' = OS default)
+   *  without the system dialog; ok=false without error = canceled */
+  print(job: PrintJobOptions): Promise<{ ok: boolean; error?: string }>
+  /** installed printers for the in-app print dialog */
+  listPrinters(): Promise<PrinterInfo[]>
   /** The file was renamed or moved from the shell (home Folders / Files pane); the viewer follows the new path */
   onFileRenamed(handler: (newPath: string) => void): () => void
   getLanguage(): Promise<Lang>
@@ -1025,7 +1139,17 @@ export interface PdfApi {
   onAiSettingsChanged(handler: () => void): () => void
   /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */
   openAiModelSettings(): Promise<void>
+<<<<<<< ours
   /** UniWork cloud sign-in state (internal gsk name; loggedIn = signed in + entitled) */
+=======
+  /** shell only: switch to Home and open Settings › Integrations (the skills list) */
+  openSkillsSettings(): Promise<void>
+  /** the skills the user installed into GenOffice */
+  skillsList(): Promise<UserSkillEntry[]>
+  /** one installed skill's body, by name */
+  skillText(name: string): Promise<string>
+  /** Genspark login state (gsk); gates the cloud-only generate_image tool */
+>>>>>>> theirs
   gskStatus(): Promise<{ loggedIn: boolean }>
   aiStream(request: AiStreamRequest): Promise<void>
   aiStreamCancel(requestId: string): Promise<void>

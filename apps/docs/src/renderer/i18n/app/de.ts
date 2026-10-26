@@ -93,9 +93,11 @@ export const de = {
   appPgNumAppliesTo: '; gilt für Abschnitt {n}',
   appExportingPdf: 'PDF wird exportiert…',
   appExportingHtml: 'HTML wird exportiert…',
+  appExportingMarkdown: 'Markdown wird exportiert…',
   appExportPdf: 'PDF exportieren',
   appExportPdfFailed: 'PDF-Export fehlgeschlagen: {error}',
   appExportHtmlFailed: 'HTML-Export fehlgeschlagen: {error}',
+  appExportMarkdownFailed: 'Markdown-Export fehlgeschlagen: {error}',
   appPrintGroupFailed: 'Drucken der Seitengruppe fehlgeschlagen',
   appPrintTitle: 'Drucken',
   appPrintProgress: 'Druck wird vorbereitet…',
@@ -110,12 +112,24 @@ export const de = {
   appPrintFailed: 'Drucken fehlgeschlagen: {error}',
   appPrintPrevPage: 'Vorherige Seite',
   appPrintNextPage: 'Nächste Seite',
+  appPrintPrinter: 'Drucker',
+  appPrintDefaultPrinter: 'Standarddrucker',
+  appPrintSystemDialog: 'Systemdruckdialog…',
+  appPrintCopies: 'Exemplare',
+  appPrintCollate: 'Sortieren',
+  appPrintDuplex: 'Beidseitig',
+  appPrintDuplexOff: 'Aus',
+  appPrintDuplexLong: 'An langer Kante spiegeln',
+  appPrintDuplexShort: 'An kurzer Kante spiegeln',
   appExportedPdf: 'PDF exportiert: {path}',
   appExportedHtml: 'HTML exportiert: {path}',
+  appExportedMarkdown: 'Markdown exportiert: {path}',
+  appExportMarkdownImagesDropped: '({count} Bild(er) nicht lesbar, übersprungen)',
   appExportedPdfMixed:
     'PDF exportiert: {path} (gemischte Papierformate, {n} Gruppen seitenweise zusammengeführt)',
   appExportPdfCanceled: 'PDF-Export abgebrochen',
   appExportHtmlCanceled: 'HTML-Export abgebrochen',
+  appExportMarkdownCanceled: 'Markdown-Export abgebrochen',
   appExportingImages: 'Bilder werden exportiert…',
   appExportImagesProgress: '{count} Bilder werden exportiert…',
   appExportImagesDone: '{count} Bilder nach {dir} exportiert',
@@ -360,6 +374,15 @@ export const de = {
   appAiBadgeTip: 'Verwendet KI',
   appTranslate: 'Übersetzen',
   appTranslateTo: 'In {lang} übersetzen',
+  redactMenuLabel: 'Auswahl vor der KI verbergen',
+  redactDialogDesc:
+    'Die Wörter bleiben im Dokument und in der Datei; das Modell sieht nur den Platzhalter. Geben Sie ihm einen Namen.',
+  redactDialogScope:
+    'Das Verbergen gilt nur für die KI dieser App. CLI, MCP-Tools und der Headless-Export lesen die Datei direkt und sehen diese Wörter weiterhin.',
+  redactDialogPlaceholder: 'Name des Platzhalters, z. B. Telefonnummer des Kunden',
+  redactCancel: 'Abbrechen',
+  redactInsert: 'Verbergen',
+  redactShowLabel: 'Auswahl der KI wieder anzeigen',
   appLangEnglish: 'Englisch',
   appLangSimplifiedChinese: 'Chinesisch (vereinfacht)',
   appLangJapanese: 'Japanisch',
@@ -536,6 +559,7 @@ export const de = {
     'Diese Formatvorlage mit der Formatierung der aktuellen Auswahl aktualisieren (wird in styles.xml zurückgeschrieben)',
   appNewStyleFromSelection: 'Neue Formatvorlage aus der aktuellen Auswahl',
   appStyleNamePlaceholder: 'Name der Formatvorlage',
+<<<<<<< ours
   appWebConflictTitle: 'Dieses Dokument wurde an anderer Stelle geändert',
   appWebConflictBody:
     'Ihre Änderungen sind noch nicht in UniWork und bleiben in diesem Browser, bis Sie sich abmelden.',
@@ -576,4 +600,9 @@ export const de = {
   appCopySaved: 'Ihre Version wurde als neues Dokument gespeichert: {title}.',
   appCopySaveFailed:
     'Die Kopie konnte nicht erstellt werden. Ihre Änderungen sind weiterhin sicher; versuchen Sie es erneut.',
+=======
+  appMergeSourceLoaded: '{name} geladen ({n} Datensätze)',
+  appMergeWritten: '{n} Dokumente geschrieben',
+  appMergeNothingToWrite: 'Es gibt nichts zu schreiben',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>

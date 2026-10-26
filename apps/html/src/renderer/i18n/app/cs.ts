@@ -9,6 +9,14 @@ export const cs = {
   redactDialogPlaceholder: 'Název zástupného symbolu, např. telefon zákazníka',
   redactCancel: 'Zrušit',
   redactInsert: 'Skrýt',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'Tento soubor změnil jiný program.',
+  diskConflictMsg: 'Tento soubor se na disku změnil; uložení tyto změny přepíše.',
+  diskReload: 'Znovu načíst',
+  diskKeepMine: 'Ponechat moje',
+  diskOverwrite: 'Přesto přepsat',
+>>>>>>> theirs
 
   loading: 'Načítání…',
   loadFailed: 'Soubor nelze otevřít',
@@ -92,6 +100,7 @@ export const cs = {
   alignLeft: 'Zarovnat vlevo',
   alignCenter: 'Na střed',
   alignRight: 'Zarovnat vpravo',
+  alignJustify: 'Zarovnat do bloku',
   fontSizeDec: 'Zmenšit písmo',
   fontSizeInc: 'Zvětšit písmo',
   typography: 'Typografie',

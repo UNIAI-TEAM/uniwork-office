@@ -129,6 +129,8 @@ export const nl = {
   aiUnknownError: 'Onbekende fout',
   aiTimeoutError:
     'AI-verzoek verlopen: geen reactie van het netwerk, uitvoering gestopt. Controleer je verbinding en probeer het opnieuw',
+  aiRegionError:
+    'De aanbieder van dit model bedient uw huidige regio niet — kies een ander model of wissel van netwerk',
   aiOverloadedError: 'De AI-service is momenteel overbelast — probeer het zo opnieuw',
   aiNetworkError:
     'Netwerkprobleem: kan de AI-service niet bereiken. Controleer je verbinding en probeer het opnieuw',
@@ -138,6 +140,9 @@ export const nl = {
   aiSumImageAttachment: 'Afbeeldingsbijlage {name}',
   aiSumRead: '{name} lezen',
   aiSumReadAttachmentName: 'Bijlage {name} lezen',
+  aiSumSkillsList: 'Geïnstalleerde skills opgelijst',
+  aiSumSkillRead: 'Skill {name} gelezen',
+  aiSumRunCli: '{args} uitgevoerd',
   aiSumWebSearch: 'Zoeken op internet',
   aiSumWebSearchDone: 'Gezocht naar "{query}" ({count} resultaten)',
   aiSumImageSearch: 'Afbeeldingen zoeken',
@@ -201,6 +206,7 @@ export const nl = {
   aiCmdImages: '{count} afbeelding(en) bijgewerkt',
   aiCmdToc: 'Inhoudsopgave ingevoegd ({count} vermeldingen)',
   aiCmdSkipped: ' ({count} beveiligde blok(ken) overgeslagen)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Alleen-lezen document: AI kan het lezen en vragen beantwoorden, maar niet bewerken.',
   aiClarifyTitle: 'Een paar vragen voordat ik verder ga',
@@ -215,6 +221,8 @@ export const nl = {
   aiClarifySubmit: 'Doorgaan',
   aiSumClarify: 'Verduidelijking beantwoord',
   aiSumClarifySkipped: 'Verduidelijking overgeslagen',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Maak een mindmap van dit document',
   aiMindMapBtn: 'AI-mindmap',
   aiMindMapPrompt:

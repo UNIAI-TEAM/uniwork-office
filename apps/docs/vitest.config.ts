@@ -12,6 +12,10 @@ export default defineConfig({
       '@genoffice/docx-engine/zip-splice': local('../../packages/docx-engine/src/zip-splice.ts'),
       '@genoffice/docx-engine/lazy-media': local('../../packages/docx-engine/src/lazy-media.ts'),
       '@genoffice/docx-engine': local('../../packages/docx-engine/src/index.ts'),
+      '@genoffice/font-metrics/resolve': local('../../packages/font-metrics/src/resolve.ts'),
+      '@genoffice/font-metrics/word-faces.json': local(
+        '../../packages/font-metrics/word-faces.json',
+      ),
       '@genoffice/font-metrics': local('../../packages/font-metrics/src/index.ts'),
       // subpath before the bare name: string aliases are prefix replacements
       '@genoffice/electron-utils/headless-export': local(
@@ -23,6 +27,7 @@ export default defineConfig({
       '@genoffice/electron-utils/safe-external-url': local(
         '../../packages/electron-utils/src/safe-external-url.ts',
       ),
+<<<<<<< ours
       '@genoffice/electron-utils/ai-run-bridge': local(
         '../../packages/electron-utils/src/ai-run-bridge.ts',
       ),
@@ -54,6 +59,10 @@ export default defineConfig({
       '@genoffice/electron-utils/ai-run': local('../../packages/electron-utils/src/ai-run.ts'),
       '@genoffice/electron-utils/drop-open': local(
         '../../packages/electron-utils/src/drop-open.ts',
+=======
+      '@genoffice/electron-utils/print-job': local(
+        '../../packages/electron-utils/src/print-job.ts',
+>>>>>>> theirs
       ),
       '@genoffice/electron-utils': local('../../packages/electron-utils/src/index.ts'),
       '@genoffice/ai-provider/askuni': local('../../packages/ai-provider/src/askuni.ts'),
@@ -79,10 +88,13 @@ export default defineConfig({
       // subpath before the bare name (string aliases are prefix replacements)
       '@genoffice/ui/capabilities': local('../../packages/ui/src/capabilities.ts'),
       '@genoffice/ui': local('../../packages/ui/src/index.ts'),
+      '@genoffice/xlsx-gateway/*': local('../../packages/xlsx-gateway/src/*'),
     },
   },
   test: {
     include: ['tests/**/*.test.ts'],
+    // the engine's display-only `effective` keys stay out of saved-model toEqual
+    setupFiles: [local('../../packages/docx-engine/tests/setup-equality.ts')],
     environment: 'jsdom',
     testTimeout: 20000,
   },

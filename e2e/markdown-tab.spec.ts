@@ -122,6 +122,7 @@ test.describe('markdown editor', () => {
       await expect(editor.locator('h1')).toHaveText('Hello')
       await expect(editor.locator('strong')).toHaveText('bold')
 
+<<<<<<< ours
       // type at the end of the document, save with ⌘/Ctrl+S. The caret goes
       // through the editor state, not a scripted DOM range: ProseMirror's focus
       // handling (and Tiptap's autofocus frame) write the state selection back
@@ -161,6 +162,34 @@ test.describe('markdown editor', () => {
             )
           }),
         )
+=======
+      // the shell hands focus to the view late and ProseMirror restores its
+      // start-of-doc selection on that focus; place the caret until it stays
+      await editor.focus()
+      await expect
+        .poll(async () => {
+          await editor.evaluate((element) => {
+            const last = element.lastElementChild
+            const selection = window.getSelection()
+            if (!last || !selection) throw new Error('Markdown editor has no final block')
+            const range = document.createRange()
+            range.selectNodeContents(last)
+            range.collapse(false)
+            selection.removeAllRanges()
+            selection.addRange(range)
+          })
+          await editorPage.waitForTimeout(150)
+          return editor.evaluate((element) => {
+            const selection = window.getSelection()
+            const last = element.lastElementChild
+            return Boolean(
+              selection?.isCollapsed &&
+              selection.anchorNode &&
+              last?.contains(selection.anchorNode),
+            )
+          })
+        })
+>>>>>>> theirs
         .toBe(true)
       await editorPage.keyboard.press('Enter')
       await editorPage.keyboard.type('Appended line.')

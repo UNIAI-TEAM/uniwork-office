@@ -128,6 +128,8 @@ export const pl = {
   aiUnknownError: 'Nieznany błąd',
   aiTimeoutError:
     'Przekroczono limit czasu żądania AI: brak odpowiedzi sieci, przerwano. Sprawdź połączenie i spróbuj ponownie',
+  aiRegionError:
+    'Dostawca tego modelu nie obsługuje Twojego obecnego regionu — wybierz inny model lub zmień sieć',
   aiOverloadedError: 'Usługa AI jest obecnie przeciążona — spróbuj ponownie za chwilę',
   aiNetworkError:
     'Problem z siecią: nie można połączyć się z usługą AI. Sprawdź połączenie i spróbuj ponownie',
@@ -137,6 +139,9 @@ export const pl = {
   aiSumImageAttachment: 'Załącznik graficzny {name}',
   aiSumRead: 'Odczyt {name}',
   aiSumReadAttachmentName: 'Odczyt załącznika {name}',
+  aiSumSkillsList: 'Wypisano zainstalowane skille',
+  aiSumSkillRead: 'Przeczytano skill {name}',
+  aiSumRunCli: 'Wykonano {args}',
   aiSumWebSearch: 'Wyszukiwanie w internecie',
   aiSumWebSearchDone: 'Wyszukano „{query}” ({count} wyników)',
   aiSumImageSearch: 'Wyszukiwanie obrazów',
@@ -200,6 +205,7 @@ export const pl = {
   aiCmdImages: 'Zaktualizowano obrazów: {count}',
   aiCmdToc: 'Wstawiono spis treści (pozycji: {count})',
   aiCmdSkipped: ' (pominięto chronione bloki: {count})',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Dokument tylko do odczytu: AI może go czytać i odpowiadać na pytania, ale nie może go edytować.',
   aiClarifyTitle: 'Kilka pytań, zanim przejdę dalej',
@@ -214,6 +220,8 @@ export const pl = {
   aiClarifySubmit: 'Dalej',
   aiSumClarify: 'Udzielono wyjaśnień',
   aiSumClarifySkipped: 'Pominięto wyjaśnienia',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Wygeneruj mapę myśli tego dokumentu',
   aiMindMapBtn: 'Mapa myśli AI',
   aiMindMapPrompt:

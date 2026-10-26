@@ -39,6 +39,7 @@ import type {
   WorkbookRangeResult,
   WorkbookRecalcRequest,
   WorkbookRecalcResult,
+  WorkbookRedactionsResult,
   WorkbookRichRun,
   WorkbookSaveRequest,
   WorkbookSaveResult,
@@ -46,6 +47,7 @@ import type {
   WebSearchResult,
   ImageSearchResponse,
   GenerateImageResult,
+  UserSkillEntry,
 } from '../shared/desktop-api'
 import {
   HEADER_FOOTER_PICTURE_POSITION,
@@ -68,6 +70,7 @@ import { parseWorksheetComment } from './worksheet-comments'
 
 const desktopApi: DesktopApi = {
   getLanguage: () => ipcRenderer.invoke('app:get-language'),
+  openSourcePath: (path: string) => ipcRenderer.invoke('home:open-path', path),
   onLanguageChanged(handler) {
     const listener = (
       _event: Electron.IpcRendererEvent,
@@ -111,7 +114,56 @@ const desktopApi: DesktopApi = {
   },
   async selectWorkbook() {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.selectWorkbook)
+    if (result === null) return null
+    if (
+      typeof result === 'object' &&
+      result !== null &&
+      (result as { passwordRequired?: unknown }).passwordRequired === true &&
+      typeof (result as { path?: unknown }).path === 'string'
+    ) {
+      return { passwordRequired: true, path: (result as { path: string }).path }
+    }
+    return parseWorkbookFile(result)
+  },
+  async openEncryptedWorkbook(path, password) {
+    if (
+      typeof path !== 'string' ||
+      path.length === 0 ||
+      typeof password !== 'string' ||
+      password.length === 0
+    ) {
+      throw new Error('Invalid encrypted workbook request.')
+    }
+    const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.openEncryptedWorkbook, {
+      path,
+      password,
+    })
     return result === null ? null : parseWorkbookFile(result)
+  },
+  async updateWorkbookPassword(sessionId, newPassword) {
+    if (!isUuid(sessionId) || typeof newPassword !== 'string' || newPassword.length === 0) {
+      throw new Error('Invalid workbook password update request.')
+    }
+    const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.updateWorkbookPassword, {
+      sessionId,
+      newPassword,
+    })
+    if (
+      !isRecord(result) ||
+      typeof result.sha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/i.test(result.sha256) ||
+      typeof result.fileBytes !== 'number' ||
+      !Number.isSafeInteger(result.fileBytes) ||
+      result.fileBytes < 0 ||
+      result.passwordProtected !== true
+    ) {
+      throw new Error('Invalid workbook password update response.')
+    }
+    return {
+      sha256: result.sha256,
+      fileBytes: result.fileBytes,
+      passwordProtected: true as const,
+    }
   },
   async selectWorkbooksForMerge() {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.selectWorkbooksForMerge)
@@ -246,6 +298,15 @@ const desktopApi: DesktopApi = {
       validatedRequest,
     )
     return parsePivotDefinitionResult(result)
+  },
+  async readWorkbookRedactions(request) {
+    if (!isRecord(request) || !isUuid(request.sessionId)) {
+      throw new Error('Invalid redaction request.')
+    }
+    const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.readWorkbookRedactions, {
+      sessionId: request.sessionId,
+    })
+    return parseWorkbookRedactionsResult(result)
   },
   async saveWorkbookEdits(request) {
     const validatedRequest = parseSaveRequest(request)
@@ -501,6 +562,7 @@ const desktopApi: DesktopApi = {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.userDisplayName, sessionId)
     return typeof result === 'string' ? result : ''
   },
+<<<<<<< ours
   onCommentAuthorChanged(handler) {
     const listener = () => handler()
     ipcRenderer.on('uniwork:comment-author-changed', listener)
@@ -536,6 +598,14 @@ const desktopApi: DesktopApi = {
   },
   async uniworkReadOnlySave(path?: string) {
     await ipcRenderer.invoke(IPC_CHANNELS.uniworkReadOnlySave, path)
+=======
+  onUserDisplayNameChanged(handler) {
+    const listener = (_event: Electron.IpcRendererEvent, name: unknown) => {
+      if (typeof name === 'string') handler(name)
+    }
+    ipcRenderer.on('app:author-name-changed', listener)
+    return () => ipcRenderer.removeListener('app:author-name-changed', listener)
+>>>>>>> theirs
   },
   async getAiSettings() {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.aiGetSettings)
@@ -552,6 +622,15 @@ const desktopApi: DesktopApi = {
   },
   async openAiModelSettings() {
     await ipcRenderer.invoke(IPC_CHANNELS.aiOpenModelSettings)
+  },
+  async openSkillsSettings() {
+    await ipcRenderer.invoke('ai:open-skills-settings')
+  },
+  skillsList() {
+    return ipcRenderer.invoke('ai:skills-list') as Promise<UserSkillEntry[]>
+  },
+  skillText(name: string) {
+    return ipcRenderer.invoke('ai:skill-text', name) as Promise<string>
   },
   async aiChat(request) {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.aiChat, request)
@@ -803,6 +882,8 @@ const projectApi: ProjectApi = {
   appendChat: (args) => ipcRenderer.invoke('project:appendChat', args),
   loadChat: (args) => ipcRenderer.invoke('project:loadChat', args),
   rebindChat: (args) => ipcRenderer.invoke('project:rebindChat', args),
+  listChats: (args) => ipcRenderer.invoke('project:listChats', args),
+  deleteChat: (args) => ipcRenderer.invoke('project:deleteChat', args),
 }
 contextBridge.exposeInMainWorld('projectApi', projectApi)
 
@@ -1052,6 +1133,12 @@ function parseWorkbookFile(input: unknown): WorkbookFile {
       ...(isPositiveInteger(sheet.sourceXmlBytes) ? { sourceXmlBytes: sheet.sourceXmlBytes } : {}),
       ...(isNonnegativeInteger(sheet.storedCellCount)
         ? { storedCellCount: sheet.storedCellCount }
+        : {}),
+      ...(isNonnegativeInteger(sheet.valueCellCount)
+        ? { valueCellCount: sheet.valueCellCount }
+        : {}),
+      ...(isNonnegativeInteger(sheet.valueRowCount) && isNonnegativeInteger(sheet.valueColumnCount)
+        ? { valueRowCount: sheet.valueRowCount, valueColumnCount: sheet.valueColumnCount }
         : {}),
       columnWidths,
       // Degrade instead of rejecting the workbook: 0 / malformed defaults
@@ -2145,6 +2232,28 @@ function parseSaveRequest(input: WorkbookSaveRequest): WorkbookSaveRequest {
     )
   )
     invalid('protected-range states: malformed entry')
+  cappedArray('redaction states', input.redactionStates, 1_000)
+  if (
+    input.redactionStates.some(
+      (state) =>
+        !isRecord(state) ||
+        typeof state.sheetName !== 'string' ||
+        state.sheetName.length === 0 ||
+        !Array.isArray(state.marks) ||
+        state.marks.length > 100_000 ||
+        state.marks.some(
+          (mark: unknown) =>
+            !isRecord(mark) ||
+            typeof mark.startRow !== 'number' ||
+            typeof mark.endRow !== 'number' ||
+            typeof mark.startColumn !== 'number' ||
+            typeof mark.endColumn !== 'number' ||
+            typeof mark.label !== 'string' ||
+            mark.label.length === 0,
+        ),
+    )
+  )
+    invalid('redaction states: malformed entry')
   if (
     input.mode !== 'save-as' &&
     input.restoreWriteBack !== true &&
@@ -2173,7 +2282,8 @@ function parseSaveRequest(input: WorkbookSaveRequest): WorkbookSaveRequest {
     input.definedNamesState === null &&
     input.themeState === null &&
     input.workbookProtectionState === null &&
-    input.protectedRangeStates.length === 0
+    input.protectedRangeStates.length === 0 &&
+    input.redactionStates.length === 0
   )
     invalid('no changes to save')
   if (input.sheetOps.length > 0 && input.sheetOrder.length === 0)
@@ -3202,6 +3312,52 @@ function parsePivotDefinitionResult(input: unknown): WorkbookPivotDefinition {
     throw new Error('Invalid pivot definition response.')
   }
   return input as unknown as WorkbookPivotDefinition
+}
+
+/**
+ * Structural check only — the main process zod-validates the full shape, and
+ * the gateway's own parser is what refuses a part it cannot understand. The
+ * three states stay distinct here: an `unreadable` result must not be folded
+ * into an empty state list on the way to the renderer, or a damaged part would
+ * read as "nothing is withheld".
+ */
+function parseWorkbookRedactionsResult(input: unknown): WorkbookRedactionsResult {
+  if (!isRecord(input)) throw new Error('Invalid redaction response.')
+  if (input.status === 'absent') return { status: 'absent' }
+  if (input.status === 'unreadable') {
+    if (typeof input.error !== 'string' || input.error.length === 0) {
+      throw new Error('Invalid redaction response.')
+    }
+    return { status: 'unreadable', error: input.error }
+  }
+  if (input.status !== 'ok' || !Array.isArray(input.states) || input.states.length > 1_000) {
+    throw new Error('Invalid redaction response.')
+  }
+  for (const state of input.states) {
+    if (
+      !isRecord(state) ||
+      typeof state.sheetName !== 'string' ||
+      state.sheetName.length === 0 ||
+      !Array.isArray(state.marks) ||
+      state.marks.length > 100_000
+    ) {
+      throw new Error('Invalid redaction response.')
+    }
+    for (const mark of state.marks) {
+      if (
+        !isRecord(mark) ||
+        typeof mark.startRow !== 'number' ||
+        typeof mark.endRow !== 'number' ||
+        typeof mark.startColumn !== 'number' ||
+        typeof mark.endColumn !== 'number' ||
+        typeof mark.label !== 'string' ||
+        mark.label.length === 0
+      ) {
+        throw new Error('Invalid redaction response.')
+      }
+    }
+  }
+  return input as unknown as WorkbookRedactionsResult
 }
 
 function parseCellStyle(input: unknown): WorkbookCellStyle {

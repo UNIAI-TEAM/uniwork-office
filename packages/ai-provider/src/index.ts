@@ -1,4 +1,9 @@
 export type {
+  AiCustomCompat,
+  AiCustomEndpoint,
+  AiCustomModelProfile,
+  AiCustomProfile,
+  AiCustomProtocol,
   AiChatRequest,
   AiChatResponse,
   AiMediaProviderConfig,
@@ -56,6 +61,24 @@ export {
   toProxyRequest,
 } from './proxy-url'
 export type { ProxyRequest } from './proxy-url'
+export {
+  activeCustomEndpoint,
+  customEndpointLabel,
+  newCustomEndpointId,
+  removeCustomEndpoint,
+  resolveCustomEndpoints,
+  selectCustomEndpoint,
+  upsertCustomEndpoint,
+} from './custom-endpoints'
+export {
+  AI_CUSTOM_PROTOCOLS,
+  declaredModelProfile,
+  normalizeCustomProfile,
+  resolveCustomProfile,
+} from './custom-profile'
+export type { ResolvedCustomProfile } from './custom-profile'
+export { resolveProfileCredential } from './credential-env'
+export type { EnvLookup } from './credential-env'
 export {
   AI_MEDIA_PROVIDERS,
   GEMINI_MEDIA_BASE_URL,
@@ -126,6 +149,7 @@ export { AI_CHAT_TEST_TIMEOUT_MS, testChatConnection } from './ai-chat-test'
 export { setAiUserAgent, setPrimaryFetch, setRescueFetch } from './fetch'
 export { isAiNetworkError } from './network-error'
 export { isAiOverloadedError } from './overload-error'
+export { isAiRegionBlockedError } from './region-error'
 export { parseOutputCapRejection } from './output-cap'
 export { AiCreditsError, sseLines, streamForProvider } from './stream'
 export {

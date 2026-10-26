@@ -9,10 +9,16 @@ import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
 import {
   collectWikiTargets,
+<<<<<<< ours
   revealWikiFragment,
   wikilinkStart,
   wikiFragmentPosition,
   wikiTarget,
+=======
+  wikiTargetOf,
+  wikilinkStart,
+  wikiFragmentPosition,
+>>>>>>> theirs
 } from '../src/renderer/editor/wikilink'
 import { parseDocText } from '../src/renderer/markdown/docText'
 import { buildSourceMap, spliceMarkdown } from '../src/renderer/markdown/sourceSplice'
@@ -37,7 +43,11 @@ function open(
   source: string,
   wiki: {
     onOpen?: (path: string, fragment: string) => void
+<<<<<<< ours
     onUnresolved?: (target: string) => void
+=======
+    onUnresolved?: (target: string, embed: boolean) => void
+>>>>>>> theirs
     answers?: Record<string, WikiLinkResolved>
     documentPath?: string
     resolve?: (from: string, targets: string[]) => Promise<Record<string, WikiLinkResolved>>
@@ -102,6 +112,14 @@ function clickWikiLink(editor: Editor, raw: string, modifier = true): boolean {
 }
 
 describe('syntax', () => {
+<<<<<<< ours
+=======
+  it('wikiTargetOf drops the alias or width hint from a link and from an embed inner', () => {
+    expect(wikiTargetOf('[[Note|shown]]')).toBe('Note')
+    expect(wikiTargetOf('img.png|200')).toBe('img.png')
+    expect(wikiTargetOf('Note#Heading')).toBe('Note#Heading')
+  })
+>>>>>>> theirs
   it('wikilinkStart points at the first unescaped [[', () => {
     expect(wikilinkStart('a [[Note]] b')).toBe(2)
     expect(wikilinkStart('no brackets here')).toBe(-1)
@@ -110,6 +128,7 @@ describe('syntax', () => {
 
   it('collects each distinct target once, in document order', () => {
     const { editor } = open('[[A]] then [[A]] then [[B]]')
+<<<<<<< ours
     expect(collectWikiTargets(editor.state.doc)).toEqual(['A', 'B'])
   })
 
@@ -127,6 +146,9 @@ describe('syntax', () => {
   it('does not collect a literal with nothing between the brackets', () => {
     const { editor } = open('a [[ ]] b')
     expect(collectWikiTargets(editor.state.doc)).toEqual([])
+=======
+    expect(collectWikiTargets(editor.state.doc)).toEqual(['[[A]]', '[[B]]'])
+>>>>>>> theirs
   })
 
   it.each([
@@ -137,7 +159,10 @@ describe('syntax', () => {
     ['a same-file ref', 'Same file [[#Section]].'],
     ['an embed', 'Embed ![[Note]] inline.'],
     ['two in one line', 'before [[A]] middle [[B]] after'],
+<<<<<<< ours
     ['all six forms', 'a [[b]] [[b#Heading]] [[b|Bee]] [[sub/c]] [[#Heading]] [[b#^a1]]'],
+=======
+>>>>>>> theirs
   ])('parses %s and writes it back byte for byte', (_label, src) => {
     const { editor, envelope } = open(src)
     const map = buildSourceMap(editor, editor.state.doc, envelope.body)
@@ -145,6 +170,16 @@ describe('syntax', () => {
     expect(out).toBe(src)
   })
 
+<<<<<<< ours
+=======
+  it('writes a literal * or _ inside a link back unescaped on a full re-serialize', () => {
+    const src = 'See [[Note *em*|a_b]] now.'
+    const { editor } = open(src)
+    expect(editor.getMarkdown()).toBe(src)
+    expect(editor.view.dom.querySelector('.wiki-link em')).toBeNull()
+  })
+
+>>>>>>> theirs
   it('leaves a standard markdown link to the link mark', () => {
     const { editor } = open('A [label](https://example.com) link.')
     const names: string[] = []
@@ -167,6 +202,7 @@ describe('syntax', () => {
   })
 })
 
+<<<<<<< ours
 describe('wikiTarget', () => {
   it.each([
     ['a bare link', '[[Note]]', 'Note'],
@@ -189,6 +225,8 @@ describe('wikiTarget', () => {
   })
 })
 
+=======
+>>>>>>> theirs
 describe('editing', () => {
   /**
    * The bytes a save writes. The source map is built when the file is opened,
@@ -250,19 +288,48 @@ describe('editing', () => {
     expect(resolve).toHaveBeenLastCalledWith('/notes/Index.md', ['Alphab'])
   })
 
+<<<<<<< ours
   it('resolves two adjacent links as two links, not one run', () => {
     const { editor } = open('[[Alpha]][[Beta]]')
     expect(collectWikiTargets(editor.state.doc)).toEqual(['Alpha', 'Beta'])
+=======
+  it('asks the resolver for file names, not literals, and keys the answers back', async () => {
+    const resolve = vi.fn(async (_from: string, targets: string[]) => {
+      const out: Record<string, WikiLinkResolved> = {}
+      for (const t of targets) out[t] = ANSWERS[t] ?? { path: '', fragment: '', found: false }
+      return out
+    })
+    const { editor } = open('[[Alpha]] [[Beta|Bee]] [[Gamma#Section]] [[Alpha|Again]]', { resolve })
+    await settled()
+    expect(resolve).toHaveBeenLastCalledWith('/notes/Index.md', ['Alpha', 'Beta', 'Gamma#Section'])
+    const resolved = [...editor.view.dom.querySelectorAll('.wiki-link-resolved')].map((el) =>
+      el.getAttribute('data-wiki-target'),
+    )
+    expect(resolved).toEqual(['[[Alpha]]', '[[Beta|Bee]]', '[[Gamma#Section]]', '[[Alpha|Again]]'])
+  })
+
+  it('resolves two adjacent links as two links, not one run', () => {
+    const { editor } = open('[[Alpha]][[Beta]]')
+    expect(collectWikiTargets(editor.state.doc)).toEqual(['[[Alpha]]', '[[Beta]]'])
+>>>>>>> theirs
   })
 
   it('resolves a link split by an inline mark inside its brackets', () => {
     const { editor } = open('[[Note *emphasis*]]')
+<<<<<<< ours
     expect(collectWikiTargets(editor.state.doc)).toEqual(['Note *emphasis*'])
+=======
+    expect(collectWikiTargets(editor.state.doc)).toEqual(['[[Note *emphasis*]]'])
+>>>>>>> theirs
   })
 
   it('stops resolving a link once the edit takes its brackets away', async () => {
     const { editor } = open('See [[Note]] here.', { answers: ANSWERS })
+<<<<<<< ours
     expect(collectWikiTargets(editor.state.doc)).toEqual(['Note'])
+=======
+    expect(collectWikiTargets(editor.state.doc)).toEqual(['[[Note]]'])
+>>>>>>> theirs
     editor.view.dispatch(editor.state.tr.delete(after(editor, 'Not'), after(editor, ']]')))
     expect(collectWikiTargets(editor.state.doc)).toEqual([])
     await settled()
@@ -313,6 +380,7 @@ describe('fragments', () => {
   })
 })
 
+<<<<<<< ours
 describe('revealing a fragment', () => {
   // jsdom has no layout, so the scroll itself is the visual stage's to prove.
   // What a unit can hold is the order: ProseMirror anchors the scroll request
@@ -433,6 +501,9 @@ describe('resolution', () => {
     expect(out).toBe(source)
   })
 
+=======
+describe('resolution', () => {
+>>>>>>> theirs
   it('marks a resolved link and leaves an unresolved one dimmed', async () => {
     const { editor } = open('See [[Alpha]] and [[Nowhere]].', { answers: ANSWERS })
     await settled()
@@ -466,7 +537,22 @@ describe('resolution', () => {
     await settled()
     expect(clickWikiLink(editor, '[[Nowhere]]')).toBe(true)
     expect(onOpen).not.toHaveBeenCalled()
+<<<<<<< ours
     expect(onUnresolved).toHaveBeenCalledWith('[[Nowhere]]')
+=======
+    expect(onUnresolved).toHaveBeenCalledWith('[[Nowhere]]', false)
+  })
+
+  it('clicking an unresolved embed reports it flagged as an embed', async () => {
+    const onOpen = vi.fn()
+    const onUnresolved = vi.fn()
+    const { editor } = open('![[Nowhere]]', { onOpen, onUnresolved, answers: ANSWERS })
+    await settled()
+    // an embed opens on a plain click, no modifier needed
+    expect(clickWikiLink(editor, 'Nowhere')).toBe(true)
+    expect(onOpen).not.toHaveBeenCalled()
+    expect(onUnresolved).toHaveBeenCalledWith('Nowhere', true)
+>>>>>>> theirs
   })
 
   it('the resolution never becomes document state', async () => {
@@ -494,6 +580,7 @@ describe('resolution', () => {
     expect(resolve).toHaveBeenCalledTimes(2)
   })
 
+<<<<<<< ours
   it('a stale in-flight answer does not repaint links the edit has since restored', async () => {
     let release: (answers: Record<string, WikiLinkResolved>) => void = () => {}
     const resolve = vi.fn(async (_from: string, targets: string[]) => {
@@ -522,6 +609,8 @@ describe('resolution', () => {
     expect(resolve).toHaveBeenCalledTimes(2)
   })
 
+=======
+>>>>>>> theirs
   it('a resolver that throws leaves the editor working', async () => {
     const { editor } = open('[[Alpha]]')
     // replace the seam with a failing one

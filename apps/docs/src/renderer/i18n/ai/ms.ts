@@ -127,6 +127,8 @@ export const ms = {
   aiUnknownError: 'Ralat tidak diketahui',
   aiTimeoutError:
     'Permintaan AI tamat masa: rangkaian tidak memberi respons, proses dihentikan. Semak sambungan anda dan cuba lagi',
+  aiRegionError:
+    'Penyedia model ini tidak memberi perkhidmatan di rantau semasa anda — pilih model lain atau tukar rangkaian',
   aiOverloadedError: 'Perkhidmatan AI sedang sibuk — sila cuba lagi sebentar lagi',
   aiNetworkError:
     'Masalah rangkaian: tidak dapat menghubungi perkhidmatan AI. Semak sambungan anda dan cuba lagi',
@@ -136,6 +138,9 @@ export const ms = {
   aiSumImageAttachment: 'Lampiran imej {name}',
   aiSumRead: 'Baca {name}',
   aiSumReadAttachmentName: 'Baca lampiran {name}',
+  aiSumSkillsList: 'Senarai skill dipasang',
+  aiSumSkillRead: 'Baca skill {name}',
+  aiSumRunCli: 'Jalankan {args}',
   aiSumWebSearch: 'Carian web',
   aiSumWebSearchDone: 'Mencari "{query}" ({count} hasil)',
   aiSumImageSearch: 'Carian imej',
@@ -198,6 +203,7 @@ export const ms = {
   aiCmdImages: '{count} imej dikemas kini',
   aiCmdToc: 'Jadual kandungan disisipkan ({count} entri)',
   aiCmdSkipped: ' ({count} blok dilindungi dilangkau)',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Dokumen lihat sahaja: AI boleh membaca dan menjawab soalan, tetapi tidak boleh mengedit.',
   aiClarifyTitle: 'Beberapa soalan sebelum meneruskan',
@@ -212,6 +218,8 @@ export const ms = {
   aiClarifySubmit: 'Teruskan',
   aiSumClarify: 'Penjelasan dijawab',
   aiSumClarifySkipped: 'Penjelasan dilangkau',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Jana peta minda dokumen ini',
   aiMindMapBtn: 'Peta Minda AI',
   aiMindMapPrompt:

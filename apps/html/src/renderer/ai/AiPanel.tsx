@@ -7,13 +7,19 @@ import {
   AiModelPicker,
   useAiModelNeedHint,
   type AiModelPickerBridge,
+<<<<<<< ours
   UniAiMark,
   composerNoteFor,
   useOverlayDock,
+=======
+  AiSkillChips,
+  AiSkillsMenu,
+>>>>>>> theirs
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
+<<<<<<< ours
 import {
   AgentLoop,
   droppedCallsOfNotes,
@@ -36,6 +42,12 @@ import type {
   UniworkCloudStatusSnapshot,
 } from '@genoffice/electron-utils/uniwork-cloud-status'
 import { platform } from '../capabilities'
+=======
+import { AgentLoop, composeSkills, withAttachedSkills } from '@genoffice/agent-core'
+import type { AgentImage } from '@genoffice/agent-core'
+import type { AiSettings } from '@genoffice/ai-provider'
+import { imageGenerationAvailable } from '@genoffice/ai-provider/browser'
+>>>>>>> theirs
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 
@@ -44,18 +56,27 @@ function readUniworkCloudStatus(): UniworkCloudStatusBridge | undefined {
 }
 import {
   AiComposer,
+<<<<<<< ours
   AiErrorAction,
+=======
+>>>>>>> theirs
   AiQueueStrip,
   AI_QUEUE_LABELS,
   AiScopeQuote,
   AiTypingIndicator,
   AiUsageChip,
   addTokenUsage,
+<<<<<<< ours
   Markdown,
   uniworkErrorForEntry,
   useChatRunQueue,
   useUniworkDisclosureAck,
   useUniworkSendGate,
+=======
+  createFileNav,
+  Markdown,
+  useChatRunQueue,
+>>>>>>> theirs
   type AiScopeQuoteData,
   type AiTokenUsageView,
 } from '@genoffice/ui'
@@ -72,7 +93,6 @@ import { workedStepsLabel } from './worked-steps'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
-import attachIcon from '../assets/attach-icon.png'
 import fileDocumentIcon from '../assets/file-document.png'
 import fileExcelIcon from '../assets/file-excel.png'
 import fileGeneralIcon from '../assets/file-general.png'
@@ -273,15 +293,20 @@ interface ChatEntry {
   queueRun?: boolean
   /** attachments consumed from the composer by this message (echoed read-only; retries resend them) */
   attachments?: AttachmentMeta[]
+  /** skills the user attached to this message from the composer menu */
+  skills?: string[]
   tools?: ToolActivity[]
   /** the element this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+<<<<<<< ours
   /** the sids this element-scoped turn may edit; a retry resends them */
   fenceSids?: number[]
   stopped?: boolean | undefined
   /** the turn streamed real text before it ended (a stop filler is not text) */
   streamedText?: boolean | undefined
   mutated?: boolean | undefined
+=======
+>>>>>>> theirs
   /** tokens the provider billed for this reply, summed across its turns (absent when unreported) */
   usage?: AiTokenUsageView
 }
@@ -409,10 +434,16 @@ export function AiPanel({
     busy,
     submit: (text, atts) => {
       const loop = loopRef.current
+<<<<<<< ours
       if (needModelHint !== null || !loop || loop.busy) return false
       // held until the user acknowledges the UniWork disclosure, as Send is
       if (uniworkGate.isBlocked()) return false
       return send(text, text, false, atts, undefined)
+=======
+      if (!loop || loop.busy) return false
+      send(text, text, false, atts, undefined)
+      return true
+>>>>>>> theirs
     },
   })
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
@@ -440,6 +471,9 @@ export function AiPanel({
   const [attachments, setAttachments] = useState<AttachmentMeta[]>([])
   const attachmentsRef = useRef(attachments)
   attachmentsRef.current = attachments
+  const [attachedSkills, setAttachedSkills] = useState<string[]>([])
+  const attachedSkillsRef = useRef(attachedSkills)
+  attachedSkillsRef.current = attachedSkills
   const sendSeqRef = useRef(0)
   const [attachNotice, setAttachNotice] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -502,6 +536,31 @@ export function AiPanel({
     showAttachNotice(result.rejected)
   }
   const pickAttachments = async () => mergeAttachments(await window.htmlApi.pickAttachments())
+
+  /** the attached skills' full text in front of the request; a skill that vanished is skipped */
+  const withSkillBodies = async (instruction: string, names: readonly string[]) => {
+    if (names.length === 0) return instruction
+    const bodies = await Promise.all(
+      names.map(async (name) => {
+        try {
+          return { name, body: await window.htmlApi.skillText(name) }
+        } catch {
+          return null
+        }
+      }),
+    )
+    return withAttachedSkills(
+      instruction,
+      bodies.filter((b): b is { name: string; body: string } => b !== null),
+    )
+  }
+
+  const listSkillsForMenu = async () =>
+    (await window.htmlApi.skillsList()).map(({ name, description }) => ({ name, description }))
+  const toggleSkill = (name: string) =>
+    setAttachedSkills((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
+    )
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -605,6 +664,25 @@ export function AiPanel({
   }, [panelWidth])
 
   const settingsRef = useRef<AiSettings | null>(null)
+  /** gsk login state for the generate_image gate (refreshed on mount and window focus) */
+  const gskLoggedInRef = useRef(false)
+  useEffect(() => {
+    let alive = true
+    const refresh = () => {
+      void window.htmlApi
+        .aiGskStatus()
+        .then((s) => {
+          if (alive) gskLoggedInRef.current = !!s?.loggedIn
+        })
+        .catch(() => {})
+    }
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => {
+      alive = false
+      window.removeEventListener('focus', refresh)
+    }
+  }, [])
   const langRef = useRef(lang)
   langRef.current = lang
   const depsRef = useRef(deps)
@@ -811,10 +889,15 @@ export function AiPanel({
             getInstruction: () => runInstructionRef.current,
             resolveAttachmentSrc: (ref) => resolveAttachmentSrc(ref),
             listAttachmentNames: () => availableAttachments().map((a) => a.name),
+<<<<<<< ours
             getEditFence: () => fenceRef.current,
             uniworkBound: () => depsRef.current.access.uniworkBound?.() ?? false,
           },
           () => readOnlyRef.current,
+=======
+          },
+          () => imageGenerationAvailable(settingsRef.current, gskLoggedInRef.current),
+>>>>>>> theirs
         ),
         createSearchSkill(),
         createFilesSkill(availableAttachments),
@@ -1078,7 +1161,12 @@ export function AiPanel({
     queueRun = false,
     attachmentsOverride?: AttachmentMeta[],
     scope?: AiScopeQuoteData,
+<<<<<<< ours
     fenceSids: readonly number[] | null = null,
+=======
+    /** only the composer's own send takes the attached skills along */
+    attachSkills = false,
+>>>>>>> theirs
   ): boolean => {
     const instruction = text.trim()
     const loop = loopRef.current
@@ -1095,6 +1183,9 @@ export function AiPanel({
       ]
       if (!attachmentsOverride) setAttachments([])
     }
+    // skills ride with this one message only: the chips clear like attachments do
+    const sentSkills = attachSkills ? attachedSkillsRef.current : []
+    if (sentSkills.length > 0) setAttachedSkills([])
     stickToBottomRef.current = true
     queueRunRef.current = queueRun
     lastQueueRunRef.current = queueRun
@@ -1115,6 +1206,7 @@ export function AiPanel({
         instruction: displayText ? instruction : undefined,
         queueRun: queueRun || undefined,
         attachments: sentAtts.length > 0 ? sentAtts : undefined,
+        skills: sentSkills.length > 0 ? sentSkills : undefined,
         scope,
         fenceSids: fence ? [...fence] : undefined,
       },
@@ -1134,7 +1226,9 @@ export function AiPanel({
         if (mountedRef.current) setProvider(s?.provider)
         const images = sentAtts.length > 0 ? await collectImages(sentAtts) : []
         if (!mountedRef.current || seq !== sendSeqRef.current) return
-        await loop.run(instruction, images.length > 0 ? images : undefined)
+        const withSkills = await withSkillBodies(instruction, sentSkills)
+        if (!mountedRef.current || seq !== sendSeqRef.current) return
+        await loop.run(withSkills, images.length > 0 ? images : undefined)
       } catch (err) {
         // a send cancelled during its pre-run reads must not paint its error onto a later turn's bubble
         if (!mountedRef.current || seq !== sendSeqRef.current) return
@@ -1216,6 +1310,7 @@ export function AiPanel({
   }
 
   const stop = (): void => {
+    msgQueue.hold()
     dismissCards()
     const loop = loopRef.current
     if (loop?.busy) loop.cancel()
@@ -1242,6 +1337,10 @@ export function AiPanel({
       if (sid !== null) depsRef.current.navigateTo(sid)
     },
   }
+  // [name](filenav:///abs/path) citations open the cited file in its own app
+  const fileNav = createFileNav((path) => {
+    void window.htmlApi.openSourcePath(path)
+  })
 
   const draftNonceRef = useRef(0)
   useEffect(() => {
@@ -1474,6 +1573,7 @@ export function AiPanel({
                 setChat([])
                 setReceipts([])
                 setAttachments([])
+                setAttachedSkills([])
                 setAttachNotice(null)
                 sentAttachmentsRef.current = []
               }}
@@ -1668,6 +1768,7 @@ export function AiPanel({
                     {entry.waitLine && <div className="ai-msg-notice">{entry.waitLine}</div>}
                   </div>
                 )}
+<<<<<<< ours
                 {!entry.text && entry.streaming ? (
                   <span className="ai-typing-row">
                     <AiTypingIndicator label={hasTools ? t('aiWorking') : t('aiThinking')} />
@@ -1682,6 +1783,24 @@ export function AiPanel({
                           lead={chipLead}
                         />
                       )}
+=======
+                {entry.skills && <AiSkillChips lang={lang} names={entry.skills} />}
+                <span dir="auto">{entry.text}</span>
+                {own.map((r, k) =>
+                  r.qa ? (
+                    <div key={`ca${k}`} className="ai-clarify-answered">
+                      {r.qa.map((pair, m) => (
+                        <div key={m} className="ai-clarify-answered-row">
+                          <div className="ai-clarify-answered-q">{pair.q}</div>
+                          <div className="ai-clarify-answered-a">{pair.a}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : r.brief ? (
+                    <div key={`br${k}`} className="brief-receipt">
+                      <b>{t('briefTitle')}</b> ·{' '}
+                      {t('briefReceipt', { hook: r.brief.core_hook, n: r.brief.sections.length })}
+>>>>>>> theirs
                     </div>
                   )
                 )}
@@ -1779,6 +1898,7 @@ export function AiPanel({
                 )}
               </div>
             )
+<<<<<<< ours
           })}
           {saveOffer && !busy && (
             <AiSaveDraftCard
@@ -1792,6 +1912,116 @@ export function AiPanel({
               onLater={() => setSaveOffer(null)}
             />
           )}
+=======
+          }
+          const hasTools = (entry.tools?.length ?? 0) > 0
+          if (!entry.text && !entry.streaming && !hasTools) return null
+          const isLast = i === chat.length - 1
+          // Action row appears once per completed reply: on the turn's final segment only
+          // (mid-turn segments have a following assistant entry; the live turn ends when !busy)
+          const nextEntry = chat[i + 1]
+          const turnEnded = nextEntry ? nextEntry.role === 'user' : !busy
+          const showToolbar = !entry.streaming && turnEnded && !!entry.text && !entry.isError
+          return (
+            <div
+              key={i}
+              className={`ai-msg ai-msg-assistant${entry.isError ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
+            >
+              {!entry.text && entry.streaming ? (
+                <span className="ai-typing-row">
+                  <AiTypingIndicator label={hasTools ? t('aiWorking') : t('aiThinking')} />
+                </span>
+              ) : (
+                entry.text && (
+                  <div dir="auto">
+                    <Markdown text={entry.text} navs={[docNav, fileNav]} />
+                  </div>
+                )
+              )}
+              {hasTools && <ToolChipList tools={entry.tools!} />}
+              {entry.usage && (
+                <div className="ai-message-usage">
+                  <AiUsageChip usage={entry.usage} lang={lang} />
+                </div>
+              )}
+              {showToolbar && (
+                <div className="ai-msg-toolbar">
+                  <button
+                    className="ai-msg-tool-btn"
+                    onClick={() => copyMessage(entry.text, i)}
+                    aria-label={t('aiCopyReplyTitle')}
+                    data-tip={t('aiCopyReplyTitle')}
+                  >
+                    {copiedIdx === i ? (
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path
+                          d="M14.6113 5.34253C16.0608 5.3428 17.2363 6.518 17.2363 7.96753V15.5066C17.2361 16.956 16.0607 18.1313 14.6113 18.1316H7.07227C5.62267 18.1316 4.44751 16.9561 4.44727 15.5066V7.96753C4.44732 6.51783 5.62255 5.34253 7.07227 5.34253H14.6113ZM7.07227 6.59253C6.31291 6.59253 5.69732 7.20819 5.69727 7.96753V15.5066C5.69751 16.2658 6.31302 16.8816 7.07227 16.8816H14.6113C15.3703 16.8813 15.9861 16.2656 15.9863 15.5066V7.96753C15.9863 7.20835 15.3705 6.5928 14.6113 6.59253H7.07227ZM10.0176 2.8689C10.3626 2.86905 10.6426 3.14882 10.6426 3.4939C10.6425 3.83888 10.3626 4.11874 10.0176 4.1189H4.59961C3.84022 4.1189 3.22461 4.73451 3.22461 5.4939V11.324C3.22433 11.6689 2.94461 11.949 2.59961 11.949C2.25461 11.949 1.97489 11.6689 1.97461 11.324V5.4939C1.97461 4.04415 3.14987 2.8689 4.59961 2.8689H10.0176Z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                  {isLast && !busy && runInstructionRef.current && (
+                    <button
+                      className="ai-msg-tool-btn"
+                      onClick={retry}
+                      aria-label={t('aiRegenerateTitle')}
+                      data-tip={t('aiRegenerateTitle')}
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <path d="M 12.68 6.65 a 4.86 4.86 0 0 0 -9 -1.08 M 3.32 9.35 a 4.86 4.86 0 0 0 9 1.08" />
+                        <path d="M 12.95 3.05 v 2.7 h -2.7 M 3.05 12.95 v -2.7 h 2.7" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {snapshots.length > 0 && (
+        <div className="ai-versions">
+          <div className="ai-versions-title">
+            <IconClock />
+            {t('aiSnapshotsTitle')}
+          </div>
+          {snapshots.map((s, i) => (
+            <div key={i} className="ai-version-row">
+              <span className="ai-version-label" data-tip={s.label}>
+                <span className="ai-version-time">{s.time}</span>
+                {s.label}
+              </span>
+              <button className="ai-version-rollback" disabled={busy} onClick={() => rollback(s)}>
+                {t('aiRollback')}
+              </button>
+            </div>
+          ))}
+>>>>>>> theirs
         </div>
 
         {snapshots.length > 0 && (
@@ -2034,7 +2264,70 @@ export function AiPanel({
               </>
             }
           />
+<<<<<<< ours
         </div>
+=======
+        )}
+        <AiSkillChips lang={lang} names={attachedSkills} onRemove={toggleSkill} />
+        {attachments.length > 0 && (
+          <div className="ai-attachments">
+            <AttachmentList
+              atts={attachments}
+              previews={attachmentPreviews}
+              onRemove={removeAttachment}
+              removeLabel={t('aiRemoveAttachmentTitle')}
+            />
+          </div>
+        )}
+        {attachNotice && <div className="ai-attach-notice">{attachNotice}</div>}
+        <AiComposer
+          queueStrip={
+            <AiQueueStrip
+              items={msgQueue.queued}
+              labels={AI_QUEUE_LABELS[lang]}
+              onUpdate={msgQueue.update}
+              onRemove={msgQueue.remove}
+              onClear={msgQueue.clear}
+              paused={msgQueue.paused}
+              onTogglePause={msgQueue.togglePaused}
+              onMove={msgQueue.move}
+            />
+          }
+          onQueue={enqueueDraft}
+          queuePlaceholder={AI_QUEUE_LABELS[lang].queuePlaceholder}
+          value={prompt}
+          busy={busy}
+          placeholder={t('aiComposerPlaceholder')}
+          hintIdle={t('aiHintIdle')}
+          hintBusy={t('aiHintBusy')}
+          sendLabel={t('aiSend')}
+          stopLabel={t('aiStop')}
+          iconOnly
+          sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
+          sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
+          stopIcon={<img src={sendStop} alt="" aria-hidden />}
+          textareaRef={inputRef}
+          onChange={setPrompt}
+          onSend={() => send(prompt, undefined, false, undefined, undefined, true)}
+          onStop={stop}
+          onPasteFiles={(files) => void onPasteFiles(files)}
+          onPasteText={onPasteText}
+          footerStart={
+            <>
+              <AiModelPicker bridge={MODEL_BRIDGE} lang={lang} />
+              {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
+              <AiSkillsMenu
+                lang={lang}
+                listSkills={listSkillsForMenu}
+                selected={attachedSkills}
+                onToggle={toggleSkill}
+                onAddFile={() => void pickAttachments()}
+                onManage={() => void window.htmlApi.openSkillsSettings?.()}
+              />
+            </>
+          }
+        />
+>>>>>>> theirs
       </div>
     </aside>
   )

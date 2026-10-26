@@ -1,5 +1,6 @@
-import { basename } from 'node:path'
+import { basename, join } from 'node:path'
 import { realpathSync } from 'node:fs'
+<<<<<<< ours
 import { BrowserWindow } from 'electron'
 import type { Rectangle, WebContents, WebContentsView } from 'electron'
 import {
@@ -8,6 +9,10 @@ import {
   notePathsDropped,
   uniworkNeedsClosePrompt,
 } from './uniwork-docs/close-guard'
+=======
+import { app, BrowserWindow, shell, WebContentsView } from 'electron'
+import type { Rectangle, WebContents } from 'electron'
+>>>>>>> theirs
 
 import {
   createDocsView,
@@ -58,13 +63,26 @@ import {
   setActiveSlidesWebContents,
   slidesIsDirty,
 } from '../../../slides/src/main/slides-main'
+import { rendererUrl, safeExternalUrl } from '@genoffice/electron-utils'
 import type { DocumentTabKind, OpenDocumentTab, TabKind, TabSummary } from '../shared/tabs-api'
+<<<<<<< ours
 import { tabStripHeight } from '../shared/tab-drag-geometry'
 import { clampDiscussionPanelWidth } from '@genoffice/electron-utils/comments-ipc'
 import { aiEpochOf, clearAiRun, isAiRunning, type EditorState } from './ai-run-registry'
 import { matchShellKey, shortcutPlatform } from './shell-shortcuts'
 import { blankRetiredPage } from './retire-page'
 import { reloadViewFromDisk } from './reload-view'
+=======
+import { isSettledRect, tabStripHeight } from '../shared/tab-drag-geometry'
+import {
+  DEFAULT_IDLE_MS,
+  defaultMaxLiveTabs,
+  MEMORY_BUDGET_SHARE,
+  pickTabsToSleep,
+  SLEEP_SWEEP_INTERVAL_MS,
+  type SleepPolicy,
+} from './tab-hibernation'
+>>>>>>> theirs
 
 /** a tab lifted out of the strip with its live view: what "Open in New Window",
  *  tear-off and dock hand back and forth between the shell and a detached window */
@@ -84,12 +102,21 @@ interface TabRecord {
   filePath?: string
   /** chrome-free Present tab: no file, no editor menu or save/export targets */
   present?: boolean
+<<<<<<< ours
   /**
    * Present tab only: the editing view whose live preview it shows. Its AI
    * turns and unsaved edits belong to that owner's document, so the poll
    * attributes them there (a present tab carries no file of its own).
    */
   ownerWcId?: number
+=======
+  /** when the tab last became or stopped being the active one */
+  lastActiveAt: number
+  /** never put to sleep (tab context menu) */
+  pinned?: boolean
+  /** renderer destroyed to free memory; `view` is null until the tab is shown again */
+  dormant?: boolean
+>>>>>>> theirs
 }
 
 const HOME_ID = 'home'
@@ -104,7 +131,11 @@ const TOP_INSET_MAX = 400
  */
 export class TabManager {
   private readonly tabs: TabRecord[] = [
+<<<<<<< ours
     { id: HOME_ID, kind: 'home', view: null, title: 'UniWork Office' },
+=======
+    { id: HOME_ID, kind: 'home', view: null, title: 'GenOffice', lastActiveAt: Date.now() },
+>>>>>>> theirs
   ]
   private activeId: string = HOME_ID
   /** Last activated Office editor tab (Home/My AI stays active while user chats). */
@@ -122,6 +153,7 @@ export class TabManager {
   private readonly bleedWcIds = new Set<number>()
   /** tabs mid unsaved-changes prompt, so a second close click doesn't stack dialogs */
   private readonly closingIds = new Set<string>()
+  private closedListener: ((tab: { kind: TabKind; filePath: string }) => void) | null = null
   /** views whose HTML-fullscreen listeners are installed: a view that leaves
    *  for a detached window and docks back must not get a second pair */
   private readonly fullScreenTracked = new WeakSet<WebContentsView>()
@@ -143,6 +175,7 @@ export class TabManager {
      * made from the View menu reaches the next layout without rebuilding this.
      */
     private readonly uiScale: () => number = () => 1,
+<<<<<<< ours
     /** developer tools are offered (a development build): F12 opens them where the module does not bind it */
     private readonly devToolsEnabled: () => boolean = () => false,
     /**
@@ -153,6 +186,8 @@ export class TabManager {
       _filePath,
       title,
     ) => title,
+=======
+>>>>>>> theirs
   ) {
     // Layout once synchronously for macOS/Windows (bounds are already correct),
     // then once more on the next tick. On Linux/X11, `resize` fires before the
@@ -163,8 +198,20 @@ export class TabManager {
       this.layout()
       setImmediate(() => this.layout())
     })
+<<<<<<< ours
     // the chrome (tab strip, Home, a dialog) can hold keyboard focus while a tab is active
     this.trackCloseChord(shellWindow.webContents)
+=======
+    // Windows fires `restore` when a minimized window comes back from the taskbar,
+    // sometimes before the client bounds have settled — the same stale-geometry
+    // race as Linux/X11 maximize (issue #15). Reconcile synchronously (the bounds
+    // are usually already right) and once more on the next tick. Bounded: exactly
+    // two layout passes per restore, no polling, no recurring timers.
+    shellWindow.on('restore', () => {
+      this.reconcileAfterWindowRestore()
+      setImmediate(() => this.reconcileAfterWindowRestore())
+    })
+>>>>>>> theirs
   }
 
   private scheduleSpareSheetsView(delayMs: number): void {
@@ -182,6 +229,7 @@ export class TabManager {
       this.trackCloseChord(view.webContents)
       this.shellWindow.contentView.addChildView(view)
       view.setVisible(false)
+<<<<<<< ours
       view.setBounds(this.contentBounds())
       // Chromium focuses a new webContents inside createSheetsView (its loadURL),
       // before any `focus` listener exists, and OS keys sent to a hidden view
@@ -190,6 +238,12 @@ export class TabManager {
       // Hand focus back now and again once the first load is done.
       this.refocusIfHidden(view.webContents)
       view.webContents.once('did-finish-load', () => this.refocusIfHidden(view.webContents))
+=======
+      // the window may be minimized or mid-restore when the spare spawns; a
+      // degenerate rect would leave the spare zero-sized until its next layout
+      const bounds = this.contentBounds()
+      if (isSettledRect(bounds)) view.setBounds(bounds)
+>>>>>>> theirs
       view.webContents.once('render-process-gone', () => {
         if (this.spareSheetsView !== view) return
         this.spareSheetsView = null
@@ -230,6 +284,7 @@ export class TabManager {
     if (active?.view && this.bleedWcIds.has(active.view.webContents.id)) {
       return { x: 0, y: 0, width, height }
     }
+<<<<<<< ours
     // the Discussion panel is drawn by the shell renderer at the right edge,
     // under no view: the active editor view gives up the clamped panel width.
     // The strip is `zoom`ed by the interface scale, so its rendered height
@@ -279,6 +334,13 @@ export class TabManager {
     this.discussionPanelWidth =
       panel.open && Number.isFinite(panel.width) ? Math.max(0, panel.width) : 0
     this.layout()
+=======
+    // The strip is `zoom`ed by the interface scale, so its rendered height
+    // grows with it — positioning the view at the unscaled constant would paint
+    // the document underneath a taller tab strip.
+    const strip = tabStripHeight(this.uiScale())
+    return { x: 0, y: strip, width, height: Math.max(0, height - strip) }
+>>>>>>> theirs
   }
 
   /** Grow/restore a tab view over the tab strip on request (slides show fullscreen) */
@@ -401,8 +463,24 @@ export class TabManager {
   layout(): void {
     // Deferred resize layouts can land after the shell window was closed.
     if (this.shellWindow.isDestroyed()) return
+    const bounds = this.contentBounds()
+    // A minimized or mid-restore window can report a degenerate client rect;
+    // applying it would shrink the active view to nothing — the white screen
+    // after a Windows taskbar restore. Keep the last good layout instead.
+    if (!isSettledRect(bounds)) return
     const active = this.tabs.find((t) => t.id === this.activeId)
-    if (active?.view) active.view.setBounds(this.contentBounds())
+    if (active?.view) active.view.setBounds(bounds)
+  }
+
+  /**
+   * Re-fit the active view after the native window returns from the taskbar.
+   * Deliberately narrower than activateTab: no visibility toggles, no focus,
+   * no menu, no onChanged — the active tab, its WebContentsView and every
+   * other document stay exactly as they were.
+   */
+  reconcileAfterWindowRestore(): void {
+    if (this.shellWindow.isDestroyed() || this.shellWindow.isMinimized()) return
+    this.layout()
   }
 
   /** files open in any tab, for the open-documents registry */
@@ -418,6 +496,8 @@ export class TabManager {
       closable: t.id !== HOME_ID,
       active: t.id === this.activeId,
       ...(t.filePath ? { filePath: t.filePath } : {}),
+      ...(t.dormant ? { dormant: true } : {}),
+      ...(t.pinned ? { pinned: true } : {}),
     }))
   }
 
@@ -531,7 +611,9 @@ export class TabManager {
    * renderer. Hence the async signature.
    */
   async openDocuments(): Promise<OpenDocumentTab[]> {
-    const tabs = this.tabs.filter((tab) => tab.kind !== 'home' && !tab.present && tab.view)
+    const tabs = this.tabs.filter(
+      (tab) => tab.kind !== 'home' && !tab.present && (tab.view || tab.dormant),
+    )
     return Promise.all(
       tabs.map(async (tab) => ({
         id: tab.id,
@@ -619,6 +701,33 @@ export class TabManager {
     this.activateTab(HOME_ID)
   }
 
+  /** The in-app user manual (issue #1520): a closable tab showing the shell
+      renderer's help mode — the same bundle, branched on ?mode=help, so no
+      second renderer build is needed. */
+  openHelpTab(): string {
+    // F1 again, or the Help menu while the manual is already open, focuses it
+    // instead of stacking a second copy: the tab is closable (only Home is
+    // not), so "press F1 again" is an ordinary thing to do
+    const existing = this.tabs.find((t) => t.kind === 'help')
+    if (existing) {
+      this.activateTab(existing.id)
+      return existing.id
+    }
+    const view = createHelpView()
+    const id = `t${this.nextId++}`
+    this.shellWindow.contentView.addChildView(view)
+    view.setVisible(false)
+    this.tabs.push({
+      id,
+      kind: 'help',
+      view,
+      title: this.untitled('help', 'GenOffice Help'),
+      lastActiveAt: Date.now(),
+    })
+    this.activateTab(id)
+    return id
+  }
+
   openDocsTab(
     openPath?: string,
     options?: { newBlank?: boolean; aiContent?: AiDocContent; aiPreset?: AiPresetPayload },
@@ -634,6 +743,7 @@ export class TabManager {
     this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
+      lastActiveAt: Date.now(),
       kind: 'docs',
       view,
       title: openPath ? basename(openPath) : this.untitled('docs', 'UniWork Docs'),
@@ -668,6 +778,7 @@ export class TabManager {
     this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
+      lastActiveAt: Date.now(),
       kind: 'sheets',
       view,
       title: openPath ? basename(openPath) : this.untitled('sheets', 'AI Sheets'),
@@ -687,6 +798,7 @@ export class TabManager {
     this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
+      lastActiveAt: Date.now(),
       kind: 'slides',
       view,
       title: openPath ? basename(openPath) : this.untitled('slides', 'AI Slides'),
@@ -703,8 +815,19 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+<<<<<<< ours
     this.trackCloseChord(view.webContents)
     this.tabs.push({ id, kind: 'pdf', view, title: basename(openPath), filePath: openPath })
+=======
+    this.tabs.push({
+      id,
+      kind: 'pdf',
+      view,
+      title: basename(openPath),
+      filePath: openPath,
+      lastActiveAt: Date.now(),
+    })
+>>>>>>> theirs
     this.activateTab(id)
     return id
   }
@@ -726,6 +849,7 @@ export class TabManager {
     this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
+      lastActiveAt: Date.now(),
       kind: 'markdown',
       view,
       title: openPath ? basename(openPath) : this.untitled('markdown', 'AI Markdown'),
@@ -744,6 +868,7 @@ export class TabManager {
     this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
+      lastActiveAt: Date.now(),
       kind: 'html',
       view,
       title: openPath ? basename(openPath) : this.untitled('html', 'AI HTML'),
@@ -763,6 +888,7 @@ export class TabManager {
     this.trackCloseChord(view.webContents)
     this.tabs.push({
       id,
+      lastActiveAt: Date.now(),
       kind: 'html',
       view,
       title: title || this.untitled('html', 'AI HTML'),
@@ -776,8 +902,20 @@ export class TabManager {
   activateTab(id: string): void {
     const target = this.tabs.find((t) => t.id === id)
     if (!target) return
+    if (target.dormant) this.reviveTab(target)
+    const now = Date.now()
+    const previous = this.tabs.find((t) => t.id === this.activeId)
+    if (previous) previous.lastActiveAt = now
+    target.lastActiveAt = now
     for (const t of this.tabs) t.view?.setVisible(t.id === id)
+<<<<<<< ours
     if (target.view) target.view.setBounds(this.contentBounds(id))
+=======
+    const bounds = this.contentBounds()
+    // a bring-forward while the window is minimized or mid-restore must not
+    // zero-size the view being activated (same guard as layout())
+    if (target.view && isSettledRect(bounds)) target.view.setBounds(bounds)
+>>>>>>> theirs
     this.activeId = id
     if (this.isOfficeTab(target)) this.lastOfficeId = id
     if (target.kind === 'sheets') this.scheduleSpareSheetsView(3000)
@@ -875,13 +1013,15 @@ export class TabManager {
     newPath: string,
   ): Array<{ kind: TabKind; webContents: WebContents }> {
     const affected: Array<{ kind: TabKind; webContents: WebContents }> = []
+    let renamed = 0
     for (const tab of this.tabs) {
       if (tab.filePath !== oldPath) continue
       tab.filePath = newPath
       tab.title = basename(newPath)
+      renamed++
       if (tab.view) affected.push({ kind: tab.kind, webContents: tab.view.webContents })
     }
-    if (affected.length > 0) this.onChanged()
+    if (renamed > 0) this.onChanged()
     return affected
   }
 
@@ -1092,7 +1232,12 @@ export class TabManager {
     if (idx < 0) return
     if (this.htmlFullScreenId === id) this.htmlFullScreenId = null
     const [removed] = this.tabs.splice(idx, 1)
+<<<<<<< ours
     if (removed.filePath) notePathsDropped([removed.filePath])
+=======
+    if (removed.filePath && !removed.present)
+      this.closedListener?.({ kind: removed.kind, filePath: removed.filePath })
+>>>>>>> theirs
     if (this.activeId === id) {
       const fallback = this.tabs[idx - 1] ?? this.tabs[0]
       this.activateTab(fallback.id)
@@ -1102,6 +1247,7 @@ export class TabManager {
     if (removed.view) {
       removed.view.setVisible(false)
       this.shellWindow.contentView.removeChildView(removed.view)
+<<<<<<< ours
       // G5-03a: a tab closed mid AI turn must not keep the document "busy";
       // a docs view is blanked (not destroyed), so its flag is cleared here
       clearAiRun(removed.view.webContents.id)
@@ -1117,7 +1263,137 @@ export class TabManager {
       } else {
         removed.view.webContents.close()
       }
+=======
+      destroyView(removed.kind, removed.view)
+>>>>>>> theirs
     }
+  }
+
+  /** a tab with a renderer; dormant and Home tabs have none */
+  private isLive(tab: TabRecord): boolean {
+    return !!tab.view
+  }
+
+  setPinned(id: string, pinned: boolean): void {
+    const tab = this.tabs.find((t) => t.id === id)
+    if (!tab || tab.kind === 'home') return
+    tab.pinned = pinned
+    this.onChanged()
+  }
+
+  /**
+   * Destroy the renderer of a background tab and keep only what is needed to
+   * reopen it: kind, path, title, position. Refuses the active tab, pinned
+   * tabs, untitled documents, Present tabs, the manual, a tab mid-prompt or in
+   * HTML fullscreen, and anything with unsaved changes. Resolves true when the
+   * tab went to sleep.
+   */
+  async sleepTab(id: string): Promise<boolean> {
+    const tab = this.tabs.find((t) => t.id === id)
+    if (!tab?.view || !this.canSleep(tab)) return false
+    if (await this.tabIsDirty(tab)) return false
+    // re-check: the dirty query yielded, and the user may have switched here meanwhile
+    if (!tab.view || !this.canSleep(tab)) return false
+    const view = tab.view
+    tab.view = null
+    tab.dormant = true
+    view.setVisible(false)
+    this.shellWindow.contentView.removeChildView(view)
+    destroyView(tab.kind, view)
+    this.onChanged()
+    return true
+  }
+
+  private canSleep(tab: TabRecord): boolean {
+    return (
+      tab.id !== this.activeId &&
+      !tab.pinned &&
+      !tab.present &&
+      !!tab.filePath &&
+      tab.kind !== 'home' &&
+      tab.kind !== 'help' &&
+      !this.closingIds.has(tab.id) &&
+      this.htmlFullScreenId !== tab.id
+    )
+  }
+
+  /** rebuild a sleeping tab's view from its file, in place; the caller shows it */
+  private reviveTab(tab: TabRecord): void {
+    const view = createViewFor(tab.kind, tab.filePath)
+    if (!view) return
+    this.shellWindow.contentView.addChildView(view)
+    view.setVisible(false)
+    this.trackHtmlFullScreen(view)
+    tab.view = view
+    tab.dormant = false
+    tab.lastActiveAt = Date.now()
+  }
+
+  /** a sleeping tab asked for by its webContents (agents, CLI, menus) wakes in the background */
+  private ensureLive(tab: TabRecord | undefined): TabRecord | undefined {
+    if (tab?.dormant) {
+      this.reviveTab(tab)
+      this.onChanged()
+    }
+    return tab
+  }
+
+  /**
+   * One pass of the sleep policy: background tabs idle past `policy.idleMs`
+   * sleep while more than `policy.maxLiveTabs` renderers are alive; over the
+   * memory budget the oldest sleeps regardless. Returns the ids put to sleep.
+   */
+  async sleepIdleTabs(
+    policy: SleepPolicy,
+    now = Date.now(),
+    overBudget = false,
+  ): Promise<string[]> {
+    const live = this.tabs.filter((t) => this.isLive(t))
+    const candidates: { id: string; lastActiveAt: number }[] = []
+    // dirtiness is resolved here, not in canSleep: it is async for docs, and a
+    // dirty tab left among the candidates would be picked (and refused) on
+    // every sweep, starving the clean tabs behind it
+    for (const t of live) {
+      if (this.canSleep(t) && !(await this.tabIsDirty(t)))
+        candidates.push({ id: t.id, lastActiveAt: t.lastActiveAt })
+    }
+    const slept: string[] = []
+    for (const id of pickTabsToSleep(candidates, live.length, policy, now, overBudget)) {
+      if (await this.sleepTab(id)) slept.push(id)
+    }
+    return slept
+  }
+
+  /**
+   * Run the sleep policy every minute while `enabled()` holds. The live-tab
+   * cap follows the machine's memory; the budget check sums every process of
+   * the app against a share of physical memory.
+   */
+  startSleepSweeper(enabled: () => boolean): () => void {
+    const policy: SleepPolicy = {
+      maxLiveTabs:
+        envNumber('GENOFFICE_TAB_SLEEP_MAX_LIVE') ??
+        defaultMaxLiveTabs(process.getSystemMemoryInfo().total * 1024),
+      idleMs: envNumber('GENOFFICE_TAB_SLEEP_IDLE_MS') ?? DEFAULT_IDLE_MS,
+    }
+    let running = false
+    const timer = setInterval(
+      () => {
+        if (!enabled() || running || this.shellWindow.isDestroyed()) return
+        running = true
+        void this.sleepIdleTabs(policy, Date.now(), appOverMemoryBudget()).finally(() => {
+          running = false
+        })
+      },
+      envNumber('GENOFFICE_TAB_SLEEP_SWEEP_MS') ?? SLEEP_SWEEP_INTERVAL_MS,
+    )
+    timer.unref?.()
+    return () => clearInterval(timer)
+  }
+
+  /** told when a tab with a file is closed (not detached), so it can be reopened */
+  setClosedListener(listener: ((tab: { kind: TabKind; filePath: string }) => void) | null): void {
+    this.closedListener = listener
   }
 
   /** Remove a tab from the strip WITHOUT destroying its WebContentsView and
@@ -1174,6 +1450,7 @@ export class TabManager {
       view,
       title: record.title,
       filePath: record.filePath,
+      lastActiveAt: Date.now(),
     })
     this.activateTab(id)
     return id
@@ -1184,14 +1461,17 @@ export class TabManager {
     path?: string,
   ): { id: string; kind: TabKind; webContents: WebContents } | undefined {
     const wanted = canonicalPath(path)
-    const tab = this.tabs.find(
-      (t) => t.view && t.filePath && !t.present && canonicalPath(t.filePath) === wanted,
+    const tab = this.ensureLive(
+      this.tabs.find(
+        (t) =>
+          (t.view || t.dormant) && t.filePath && !t.present && canonicalPath(t.filePath) === wanted,
+      ),
     )
     return tab?.view ? { id: tab.id, kind: tab.kind, webContents: tab.view.webContents } : undefined
   }
 
   webContentsForTab(id: string): WebContents | undefined {
-    return this.tabs.find((t) => t.id === id)?.view?.webContents
+    return this.ensureLive(this.tabs.find((t) => t.id === id))?.view?.webContents
   }
 
   private findTabOfKindByPath(kind: TabKind, path?: string): string | undefined {
@@ -1199,7 +1479,7 @@ export class TabManager {
     return this.tabs.find(
       (t) =>
         t.kind === kind &&
-        t.view &&
+        (t.view || t.dormant) &&
         t.filePath &&
         !t.present &&
         canonicalPath(t.filePath) === wanted,
@@ -1259,6 +1539,52 @@ export class TabManager {
   }
 }
 
+/** the editor view for a tab rebuilt from its file (sleep/wake); null for kinds that cannot be */
+function createViewFor(kind: TabKind, filePath: string | undefined): WebContentsView | null {
+  if (!filePath) return null
+  switch (kind) {
+    case 'docs':
+      return createDocsView(filePath)
+    case 'sheets': {
+      const view = createSheetsView({ includeAiHandlers: false, openingWorkbook: true })
+      queueWorkbookForView(view.webContents, filePath)
+      return view
+    }
+    case 'slides':
+      return createSlidesView(filePath)
+    case 'pdf':
+      return createPdfView(filePath)
+    case 'markdown':
+      return createMarkdownView(filePath)
+    case 'html':
+      return createHtmlView(filePath)
+    default:
+      return null
+  }
+}
+
+/** release a view's renderer; docs needs its main-process bookkeeping dropped first */
+function destroyView(kind: TabKind, view: WebContentsView): void {
+  if (view.webContents.isDestroyed()) return
+  if (kind === 'docs') teardownDocsRenderer(view.webContents)
+  view.webContents.close()
+}
+
+/** test hooks: the sweep is minutes-scale by design, too slow for an e2e run */
+function envNumber(name: string): number | undefined {
+  const value = Number(process.env[name])
+  return Number.isFinite(value) && value > 0 ? value : undefined
+}
+
+function appOverMemoryBudget(): boolean {
+  try {
+    const usedKB = app.getAppMetrics().reduce((sum, m) => sum + m.memory.workingSetSize, 0)
+    return usedKB > process.getSystemMemoryInfo().total * MEMORY_BUDGET_SHARE
+  } catch {
+    return false
+  }
+}
+
 export function canonicalPath(path: string | undefined): string | undefined {
   if (path === undefined) return undefined
   try {
@@ -1266,4 +1592,28 @@ export function canonicalPath(path: string | undefined): string | undefined {
   } catch {
     return path
   }
+}
+
+/** The manual shares the shell's renderer bundle and preload: the view is just
+    the shell renderer at ?mode=help. Dev serves it from the dev server, the
+    packaged app from the `help` scheme root registered in shell main. */
+function createHelpView(): WebContentsView {
+  const view = new WebContentsView({
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
+  })
+  view.webContents.setWindowOpenHandler(({ url }) => {
+    const target = safeExternalUrl(url)
+    if (target) void shell.openExternal(target)
+    return { action: 'deny' }
+  })
+  void view.webContents.loadURL(
+    rendererUrl(process.env.ELECTRON_RENDERER_URL, 'help', { mode: 'help' }),
+  )
+  return view
 }

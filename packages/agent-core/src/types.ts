@@ -149,6 +149,7 @@ export interface AgentStreamCallbacks {
   onPhase?(phase: AgentPhase): void
   /** normalized stop reason of the turn ('max_tokens' = cut off by the token limit); transports may omit this */
   onStopReason?(reason: string): void
+<<<<<<< ours
   /** a non-fatal turn notice (UniWork AI: dropped tool calls, a Retry-After wait, a new conversation); transports may omit this */
   onNotice?(notice: AgentStreamNotice): void
   /**
@@ -156,6 +157,8 @@ export interface AgentStreamCallbacks {
    * turn's streamed text, reasoning and tool calls; history is untouched. Transports may omit this.
    */
   onTurnReset?(): void
+=======
+>>>>>>> theirs
   /** tokens the provider billed for this turn; transports whose provider does not report usage omit this */
   onUsage?(usage: AgentTokenUsage): void
   onDone(): void

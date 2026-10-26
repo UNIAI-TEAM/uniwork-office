@@ -1,5 +1,6 @@
 import type {
   AiChatResponse,
+  AiCustomProtocol,
   AiMediaProviderConfig,
   AiMediaProviderId,
   AiMediaProviderMeta,
@@ -7,10 +8,15 @@ import type {
   AiSearchProviderId,
   AiSearchProviderMeta,
   AiSettings,
+<<<<<<< ours
   AiSettingsSaveOptions,
   AiStreamChunk,
   AiStreamRequest,
   AiTestFailureKind,
+=======
+  AiStreamChunk,
+  AiStreamRequest,
+>>>>>>> theirs
   CodexModelCatalog,
   OpenRouterKeyStatus,
   UniworkCloudStatus,
@@ -25,6 +31,7 @@ import type {
 } from './askuni-api'
 import type { UpdateChannel, UpdateUiState } from './update-api'
 import type {
+<<<<<<< ours
   UniworkConflictAction,
   UniworkConflictReply,
   UniworkConflictView,
@@ -95,6 +102,16 @@ export interface AttachmentImageResult {
   mime?: string
   error?: string
 }
+=======
+  AttachmentInfo,
+  CliContext,
+  CliRunRequest,
+  CliRunResult,
+  KbFileInfo,
+  KbReadPage,
+  KbSearchHit,
+} from '@genoffice/agent-core'
+>>>>>>> theirs
 import type { AiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type { FileExcerpt } from './file-excerpt'
 import type { DocumentTabKind } from './tabs-api'
@@ -107,6 +124,28 @@ import type {
   PreflightSDO,
 } from './folder-upload-api'
 import type { ZipDownloadBridge } from './zip-download-api'
+
+export interface AttachmentAddResult {
+  accepted: AttachmentInfo[]
+  /** per-file rejection messages, already localized by the main process */
+  rejected: string[]
+}
+
+export interface AttachmentReadResult {
+  ok: boolean
+  error?: string
+  totalChars?: number
+  text?: string
+  offset?: number
+}
+
+export interface AttachmentImageResult {
+  ok: boolean
+  /** raw base64 (no data: URL prefix) */
+  base64?: string
+  mime?: string
+  error?: string
+}
 
 /** UI language; kept self-contained here (mirrors Lang in @genoffice/i18n) */
 
@@ -144,6 +183,16 @@ export type UiTheme = 'light' | 'dark' | 'system'
 export type DocTheme = 'follow' | 'light' | 'dark'
 
 /** shell-wide AutoSave default for every editor; updatedAt is 0 until first set */
+/** mirrors AUTHOR_NAME_MAX in @genoffice/electron-utils (the renderer cannot import it) */
+export const AUTHOR_NAME_MAX = 120
+
+export interface AuthorNameSetting {
+  /** stored override; '' means "use fallback" */
+  value: string
+  /** the OS account name */
+  fallback: string
+}
+
 export interface AutoSaveDefault {
   on: boolean
   updatedAt: number
@@ -1171,13 +1220,30 @@ export interface FileSearchHit extends RecentEntry {
 }
 
 /**
- * Endpoints the search reranker can judge against. The hosted Jev routes are
- * OpenRouter and TypeSafe's own API; Perplexity and Cloudflare host their own
- * decision models; Kev and Rizzo Flow are local /v1/systemone servers;
- * `custom` points at any other /v1/systemone-compatible server.
+ * The decision-model routes the app can call. Several vendors publish more
+ * than one size or generation behind the same URL, and the difference is only
+ * the `model` in the body — but they are listed separately rather than folded
+ * into one option with a model picker, because picking the wrong one costs
+ * real money per call and a dropdown that names them is the safer surface.
  */
 export type DecisionEndpoint =
-  'openrouter' | 'direct' | 'perplexity' | 'cloudflare' | 'kev' | 'rizzo' | 'custom'
+  | 'openrouter'
+  | 'direct'
+  | 'perplexity'
+  | 'perplexity-v12'
+  | 'perplexity-flash'
+  | 'liquid'
+  | 'liquid-ultra'
+  | 'openai'
+  | 'cloudflare'
+  | 'cloudflare-flash'
+  | 'kev'
+  | 'rizzo'
+  | 'custom'
+
+export function isCloudflareEndpoint(endpoint: DecisionEndpoint): boolean {
+  return endpoint === 'cloudflare' || endpoint === 'cloudflare-flash'
+}
 
 /** home search options persisted in app-settings.json under `fileSearch` */
 export interface FileSearchSettings {
@@ -1190,9 +1256,9 @@ export interface FileSearchSettings {
   customBaseUrl: string
   /** `custom` endpoint only: model id the server expects */
   customModel: string
-  /** `cloudflare` endpoint only: Workers AI account id */
+  /** `cloudflare`/`cloudflare-flash` only: Workers AI account id */
   cloudflareAccountId: string
-  /** `cloudflare` endpoint only: Workers AI model path, e.g. @cf/cloudflare/clef */
+  /** `cloudflare`/`cloudflare-flash` only: Workers AI model path, e.g. @cf/cloudflare/clef */
   cloudflareModel: string
 }
 
@@ -1224,6 +1290,7 @@ export interface DefaultAppStatus {
   manualOnly: boolean
 }
 
+<<<<<<< ours
 /**
  * The command line tool on the PATH (`command`: the name to type, `uniwork-office-cli`
  * on every OS). Created only when the user
@@ -1283,6 +1350,14 @@ export type DeskToolResult =
         'busy' | 'bad-input' | 'not-found' | 'same-path' | 'target-open' | 'encrypted' | 'failed'
     }
 
+=======
+export interface UserSkillEntry {
+  name: string
+  description: string
+  relevant: boolean
+}
+
+>>>>>>> theirs
 export interface HomeApi {
   /** unified recents across document types, newest first (paged) */
   recents(query?: RecentQuery): Promise<RecentPage>
@@ -1304,7 +1379,50 @@ export interface HomeApi {
   statPaths(paths: string[]): Promise<RecentEntry[]>
   /** star / unstar a file */
   toggleStar(path: string): Promise<void>
+  // ---- knowledge-base ask panel: the reader's starred corpus, askable ----
+  /** the starred corpus as the AI's knowledge base */
+  kbList(): Promise<KbFileInfo[]>
+  /** the skills the user installed into GenOffice */
+  skillsList(): Promise<UserSkillEntry[]>
+  /** one installed skill's body, by name */
+  skillText(name: string): Promise<string>
+  /** open Settings › Integrations (the skills list) */
+  openSkillsSettings(): Promise<void>
+  /** full-text search over the corpus */
+  kbSearch(query: { q: string; limit?: number }): Promise<KbSearchHit[]>
+  /** one page of a corpus file's parsed text (path must be in kbList) */
+  kbRead(path: string, offset: number): Promise<KbReadPage>
+  /** write the AI's markdown as a new .md / .docx in the save folder; resolves to its path */
+  kbCreateDocument(request: {
+    title: string
+    format: 'md' | 'docx'
+    content: string
+  }): Promise<{ path: string }>
+  /** the work and output directories the Ask AI CLI tools use for one conversation */
+  kbCliContext(sessionId: string): Promise<CliContext>
+  /** run the bundled genoffice CLI for one conversation (confined; see main/home-cli.ts);
+   *  `sources` are the attached files whose folders the CLI may read */
+  kbRunCli(
+    sessionId: string,
+    request: CliRunRequest & { sources?: string[] },
+  ): Promise<CliRunResult>
+  /** chat attachments: the files:* handlers Docs registers in the shell main process */
+  pickAttachments(): Promise<AttachmentAddResult | null>
+  addAttachmentPaths(paths: string[]): Promise<AttachmentAddResult>
+  addPastedImage(data: ArrayBuffer, ext: string): Promise<AttachmentAddResult>
+  readAttachment(path: string, offset: number, maxChars: number): Promise<AttachmentReadResult>
+  readAttachmentImage(path: string): Promise<AttachmentImageResult>
+  /** the user's AI provider settings (shared with every app's panel) */
+  aiGetSettings(): Promise<AiSettings>
+  /** one streamed model turn over the shared ai:stream handler */
+  aiStream(request: AiStreamRequest): Promise<void>
+  aiStreamCancel(requestId: string): Promise<void>
+  /** subscribe to stream chunks; returns unsubscribe */
+  onAiStream(handler: (chunk: AiStreamChunk) => void): () => void
+  /** Genspark login state (the default provider's auth source) */
+  aiGskStatus(): Promise<{ loggedIn: boolean; email?: string }>
   /** open an existing file, routing to the right module by extension */
+  openHelp(): Promise<void>
   openPath(path: string): Promise<void>
   /**
    * Budget-capped text excerpts for Recent/Starred files (My AI summarize).
@@ -1394,7 +1512,14 @@ export interface HomeApi {
   getPinnedUpdateChannel(): Promise<string | null>
   /** switch + persist the update channel; triggers an immediate update check */
   setUpdateChannel(channel: UpdateChannel): Promise<void>
+<<<<<<< ours
   /** UniWork account status (desktop session sync TBD; Sign-in opens the UniWork web link) */
+=======
+  /** whether the launch and periodic background update checks run (default on) */
+  getAutoUpdateCheck(): Promise<boolean>
+  setAutoUpdateCheck(on: boolean): Promise<void>
+  /** Genspark account status (gsk login state; to be upgraded to a signup/account system later) */
+>>>>>>> theirs
   accountStatus(): Promise<AccountStatus>
   /** open UniWork Sign-in in the system browser; returns whether the launch succeeded */
   accountLogin(): Promise<boolean>
@@ -1456,6 +1581,12 @@ export interface HomeApi {
   getAutoSaveDefault(): Promise<AutoSaveDefault>
   /** persist the AutoSave default; broadcasts 'app:auto-save-default-changed' to all web contents */
   setAutoSaveDefault(on: boolean): Promise<void>
+  /** whether long-idle background tabs release their renderer once many are open (default on) */
+  getTabSleepEnabled(): Promise<boolean>
+  setTabSleepEnabled(on: boolean): Promise<void>
+  /** whether the documents open at the last close reopen at launch (default off) */
+  getRestoreLastSession(): Promise<boolean>
+  setRestoreLastSession(on: boolean): Promise<void>
   /** current local MCP server state (running/enabled/port/url) */
   getMcpStatus(): Promise<McpStatus>
   /** enable/disable the MCP server and/or change its port/background/logging; applies and persists, returns the new state */
@@ -1471,6 +1602,17 @@ export interface HomeApi {
   clearMcpLogs(): Promise<void>
   /** reveal the MCP log file in the file manager (created empty when missing) */
   openMcpLogFile(): Promise<void>
+<<<<<<< ours
+=======
+  /** whether anonymous usage statistics are enabled (default true in official builds) */
+  getAnalyticsEnabled(): Promise<boolean>
+  /** persist an explicit analytics opt-in or opt-out */
+  setAnalyticsEnabled(enabled: boolean): Promise<boolean>
+  /** name on comments and tracked changes; `value` is the stored override ('' = use `fallback`, the OS account) */
+  getAuthorName(): Promise<AuthorNameSetting>
+  /** persist; broadcasts 'app:author-name-changed' (the effective name) to all web contents */
+  setAuthorName(value: string): Promise<AuthorNameSetting>
+>>>>>>> theirs
   /** AI panel text size + chat-input spellcheck (persisted in userData/app-settings.json) */
   getAiPanelPrefs(): Promise<AiPanelPrefs>
   /** merge + persist; broadcasts 'app:ai-panel-prefs-changed' to all web contents */
@@ -1506,8 +1648,12 @@ export interface HomeApi {
   getAiProviders(): AiCatalogEntry[]
   /** live Codex model catalog discovered through the current or overridden app-server */
   getCodexModels(cliPath?: string): Promise<CodexModelCatalog>
-  /** live model list advertised by a user-hosted OpenAI-compatible endpoint; empty when it cannot answer */
-  getCustomModels(baseUrl: string, apiKey?: string): Promise<CodexModelCatalog>
+  /** live model list advertised by a user-hosted endpoint, probed on the route its declared protocol speaks; empty when it cannot answer */
+  getCustomModels(
+    baseUrl: string,
+    apiKey?: string,
+    api?: AiCustomProtocol,
+  ): Promise<CodexModelCatalog>
   /** one-shot round trip against the given (possibly unsaved) settings — the settings-UI connection test */
   testAiSettings(settings: AiSettings): Promise<AiConnectionTestResult>
   /** OpenRouter Token Hub: GET /api/v1/key for the given (possibly unsaved) API key */
@@ -2202,6 +2348,7 @@ export interface MoveResult {
 }
 
 export const HOME_CHANNELS = {
+  openHelp: 'home:open-help',
   recents: 'home:recents',
   searchFiles: 'home:search-files',
   rerankSearch: 'home:rerank-search',
@@ -2246,6 +2393,8 @@ export const HOME_CHANNELS = {
   getUpdateChannel: 'home:get-update-channel',
   getPinnedUpdateChannel: 'home:get-pinned-update-channel',
   setUpdateChannel: 'home:set-update-channel',
+  getAutoUpdateCheck: 'home:get-auto-update-check',
+  setAutoUpdateCheck: 'home:set-auto-update-check',
   accountStatus: 'home:account-status',
   accountLogin: 'home:account-login',
   accountLoginEvent: 'home:account-login-event',
@@ -2274,11 +2423,22 @@ export const HOME_CHANNELS = {
   setDocumentTheme: 'home:set-document-theme',
   getAutoSaveDefault: 'home:get-auto-save-default',
   setAutoSaveDefault: 'home:set-auto-save-default',
+  getTabSleepEnabled: 'home:get-tab-sleep-enabled',
+  setTabSleepEnabled: 'home:set-tab-sleep-enabled',
+  getRestoreLastSession: 'home:get-restore-last-session',
+  setRestoreLastSession: 'home:set-restore-last-session',
   getMcpStatus: 'home:get-mcp-status',
   setMcpSettings: 'home:set-mcp-settings',
   getMcpLogs: 'home:get-mcp-logs',
   clearMcpLogs: 'home:clear-mcp-logs',
   openMcpLogFile: 'home:open-mcp-log-file',
+<<<<<<< ours
+=======
+  getAnalyticsEnabled: 'home:get-analytics-enabled',
+  setAnalyticsEnabled: 'home:set-analytics-enabled',
+  getAuthorName: 'home:get-author-name',
+  setAuthorName: 'home:set-author-name',
+>>>>>>> theirs
   getAiPanelPrefs: 'home:get-ai-panel-prefs',
   setAiPanelPrefs: 'home:set-ai-panel-prefs',
   getDefaultSaveDir: 'home:get-default-save-dir',

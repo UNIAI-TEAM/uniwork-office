@@ -9,6 +9,14 @@ export const vi = {
   redactDialogPlaceholder: 'Tên placeholder, ví dụ: số điện thoại khách hàng',
   redactCancel: 'Hủy',
   redactInsert: 'Ẩn',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'Tệp này đã bị một chương trình khác thay đổi.',
+  diskConflictMsg: 'Tệp này đã thay đổi trên đĩa; lưu sẽ ghi đè các thay đổi đó.',
+  diskReload: 'Tải lại',
+  diskKeepMine: 'Giữ của tôi',
+  diskOverwrite: 'Vẫn ghi đè',
+>>>>>>> theirs
 
   loading: 'Đang tải…',
   loadFailed: 'Không thể mở tệp',
@@ -108,6 +116,7 @@ export const vi = {
   alignLeft: 'Căn trái',
   alignCenter: 'Căn giữa',
   alignRight: 'Căn phải',
+  alignJustify: 'Căn đều',
   fontSizeDec: 'Giảm cỡ chữ',
   fontSizeInc: 'Tăng cỡ chữ',
   typography: 'Kiểu chữ',

@@ -158,6 +158,7 @@ describe('Windows / Linux desktop', () => {
     ])
   })
 
+<<<<<<< ours
   it('requires the exact modifier set and keeps Mac chords off Windows', () => {
     expectUnbound(GRID, [
       ['Ctrl+Shift+G', keyEvent('KeyG', ctrlShift)],
@@ -169,6 +170,19 @@ describe('Windows / Linux desktop', () => {
       ['Alt+Cmd+0', keyEvent('Digit0', metaAlt)],
       ['Shift+Cmd+F', keyEvent('KeyF', metaShift)],
     ])
+=======
+  it('binds the Excel-for-Mac Cmd variant of the filter on mac only', () => {
+    expect(resolveGlobalShortcut(keyEvent('KeyF', metaShift), MAC)).toEqual(cmd('filter-toggle'))
+    expect(resolveGlobalShortcut(keyEvent('KeyF', ctrlShift), GRID)).toBeNull()
+    expect(resolveGlobalShortcut(keyEvent('KeyF', ctrlShift), MAC)).toBeNull()
+>>>>>>> theirs
+  })
+
+  it('binds AutoSum cross-platform; the filter Ctrl/⌘+Shift+L chord belongs to Univer', () => {
+    expect(resolveGlobalShortcut(keyEvent('KeyL', ctrlShift), GRID)).toBeNull()
+    expect(resolveGlobalShortcut(keyEvent('KeyL', metaShift), MAC)).toBeNull()
+    expect(resolveGlobalShortcut(keyEvent('KeyT', ctrlShift), GRID)).toEqual(cmd('autofn:SUM'))
+    expect(resolveGlobalShortcut(keyEvent('KeyT', metaShift), MAC)).toEqual(cmd('autofn:SUM'))
   })
 
   it('leaves unrelated keys to the rest of the app', () => {
@@ -430,5 +444,14 @@ describe('guards', () => {
     expect(resolveGlobalShortcut(keyEvent('Period', { ...ctrlShift, repeat: true }), GRID)).toEqual(
       cmd('font-size-step:1'),
     )
+  })
+
+  it('keep the mac-only border chords off Windows and Linux', () => {
+    const macBorder = keyEvent('Digit0', { metaKey: true, altKey: true })
+    expect(resolveGlobalShortcut(macBorder, MAC)).toEqual({
+      kind: 'command',
+      command: 'border:outer',
+    })
+    expect(resolveGlobalShortcut(macBorder, GRID)).toBeNull()
   })
 })

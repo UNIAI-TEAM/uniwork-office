@@ -11,6 +11,7 @@ import type { WorkbookChartEdit, WorkbookVisualEdit } from '../shared/edit-schem
 import type { SheetFilterState } from './xlsx-filter'
 import type { DefinedNamesState } from './xlsx-defined-names'
 import type { SheetPageSetupState } from './xlsx-page-setup'
+import type { SheetRedactionState } from './xlsx-redaction'
 import type {
   CellEdit,
   BulkConstantFill,
@@ -31,6 +32,7 @@ import type {
   SheetTableEdit,
   SheetVisualAddition,
   SheetFormulaValues,
+  SheetCellImageAddition,
 } from './xlsx-gateway'
 import { planCellEditsToXlsx, syncFileBestEffort } from './xlsx-gateway'
 import { normalizeOoxmlPartPrefix } from './xlsx-namespace'
@@ -99,6 +101,8 @@ export interface StreamingSaveRequest {
   readonly noteStates?: readonly SheetNoteState[] | undefined
   readonly tableAdditions?: readonly SheetTableAddition[] | undefined
   readonly tableEdits?: readonly SheetTableEdit[] | undefined
+  /// Session-created pictures in cells ("Place in Cell").
+  readonly cellImageAdditions?: readonly SheetCellImageAddition[] | undefined
   readonly pivotAdditions?: readonly SheetPivotAddition[] | undefined
   readonly pivotCacheRefreshPaths?: readonly string[] | undefined
   readonly pivotRefreshUpdates?: readonly PivotRefreshUpdate[] | undefined
@@ -110,6 +114,7 @@ export interface StreamingSaveRequest {
   readonly workbookProtectionState?: { readonly lockStructure: boolean } | null | undefined
   readonly protectedRangeStates?: readonly SheetProtectedRangesState[] | undefined
   readonly tabColorStates?: readonly SheetTabColorState[] | undefined
+  readonly redactionStates?: readonly SheetRedactionState[] | undefined
 }
 
 export interface StreamingSaveResult {
@@ -179,6 +184,8 @@ export async function saveWorkbookViaSidecar(
       request.bulkConstantFills ?? [],
       request.tabColorStates ?? [],
       request.tableEdits ?? [],
+      request.cellImageAdditions ?? [],
+      request.redactionStates ?? [],
     )
 
     const replacements = await writePlanContents(workDir, 'replace', plan.replaced)

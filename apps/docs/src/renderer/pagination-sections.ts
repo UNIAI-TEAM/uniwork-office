@@ -101,18 +101,25 @@ export function docGridPitchPt(sections: SectionInfo[]): number | null {
 
 /**
  * Character-grid letter-spacing delta (pt) of one section. Word probes
- * (2026-09-02, MS Mincho/Arial, sizes 10.5/12pt): with w:docGrid
- * type="linesAndChars" and w:charSpace=N, EVERY character in the section
- * (east-asian, latin, halfwidth) advances by its natural width + N/4096 pt —
- * a uniform letter-spacing, positive or negative. Types lines/default ignore
- * charSpace; snapToChars snaps to a Normal-style-based pitch instead (not
- * modeled). Table cells and snapToGrid=0 paragraphs are spaced too; headers
- * and footers are not.
+ * (2026-09-02 and 2026-10-22, MS Mincho/Times New Roman/Arial, 10.5/12pt):
+ * with w:docGrid type="linesAndChars" and w:charSpace=N, every character in
+ * the section advances by its natural width + N/4096 pt, positive or negative.
+ * Under settings.xml <w:balanceSingleByteDoubleByteWidth/> single-byte
+ * characters (Latin, digits, spaces, halfwidth kana, any font or size) get
+ * half of it (N/8192) while full-width ones keep N/4096
+ * (singleByteCharSpacePt). Types lines/default ignore charSpace; snapToChars
+ * snaps to a Normal-style-based pitch instead (not modeled). Table cells and
+ * snapToGrid=0 paragraphs are spaced too; headers and footers are not.
  */
 export function sectionCharSpacePt(s: SectionInfo): number {
   const g = s.settings.docGrid
   if (!g || g.type !== 'linesAndChars' || !g.charSpace) return 0
   return g.charSpace / 4096
+}
+
+/** letter-spacing of single-byte characters for a full-width delta of `pt` */
+export function singleByteCharSpacePt(pt: number, balanced: boolean): number {
+  return balanced ? pt / 2 : pt
 }
 
 /**
@@ -128,14 +135,31 @@ export function docCharSpacePt(sections: SectionInfo[]): number | null {
 }
 
 /** Nothing Word produces is narrower than this; smaller "columns" are the
+<<<<<<< ours
  *  degenerate state of corrupt cols metadata, not a layout (#1952). */
 const MIN_USABLE_COL_PX = 36
 
+=======
+ *  degenerate state of corrupt cols metadata, not a layout (genoffice#1952). */
+const MIN_USABLE_COL_PX = 36
+
+/** Narrowest wrap width a block takes from its landing column. PDF-converter
+ *  output keeps formula numbers in a gutter-sized column; a paragraph the
+ *  engine lands there (its measured top fell into that slot) would wrap one
+ *  glyph per line and grow tall enough to stay there, so it wraps at the
+ *  region's widest column instead (genoffice#1970). */
+const MIN_BLOCK_WRAP_PX = 72
+
+>>>>>>> theirs
 /** Column count of a section (w:cols w:num; covers equal and explicit-width columns).
  *  A count that would divide the content width below `MIN_USABLE_COL_PX` per
  *  column (or past Word's 45-column ceiling) is corrupt metadata: rendering it
  *  collapses every column to one-or-two characters beside a blank page (the
+<<<<<<< ours
  *  catastrophic shape reported in #1952) — one-column flow is the fallback. */
+=======
+ *  catastrophic shape reported in genoffice#1952) — one-column flow is the fallback. */
+>>>>>>> theirs
 export function sectionColumns(s: SectionInfo): number {
   const num = Math.max(1, s.settings.columns ?? 1)
   if (num === 1) return 1
@@ -172,8 +196,8 @@ export function sectionColGeom(s: SectionInfo): {
   if (cols > 1 && /<w:cols[^>]*w:equalWidth="0"/.test(s.sectPrXml ?? '')) {
     const colsXml = /<w:cols\b[^>]*>([\s\S]*?)<\/w:cols>/.exec(s.sectPrXml ?? '')?.[1] ?? ''
     const list = Array.from(colsXml.matchAll(/<w:col\b([^>]*)\/?>/g), (m) => ({
-      w: twipsToPx(parseInt(/w:w="(\d+)"/.exec(m[1])?.[1] ?? '0', 10)),
-      space: twipsToPx(parseInt(/w:space="(\d+)"/.exec(m[1])?.[1] ?? '0', 10)),
+      w: twipsToPx(parseFloat(/w:w="([\d.]+)"/.exec(m[1])?.[1] ?? '0')),
+      space: twipsToPx(parseFloat(/w:space="([\d.]+)"/.exec(m[1])?.[1] ?? '0')),
     }))
     // a list entry below the usable floor (CNKI/PDF-converter output sometimes
     // carries one) must not drag the real columns down with it
@@ -244,6 +268,7 @@ export function columnLayoutSpecs(
     end: number
     section: number
     widthPx: number | undefined
+    widestPx: number
     dx: number
     dy: number
     natural: boolean
@@ -256,6 +281,7 @@ export function columnLayoutSpecs(
         end: slice.end,
         section: -1,
         widthPx: undefined,
+        widestPx: 0,
         dx: 0,
         dy: 0,
         natural: true,
@@ -275,6 +301,7 @@ export function columnLayoutSpecs(
         x += geom.widths[c] + (geom.gaps[c] ?? 0)
       }
       const totalW = x
+      const widestPx = Math.max(...geom.widths)
       for (let c = 0; c < region.columns.length; c++) {
         const col = region.columns[c]
         const w = geom.widths[Math.min(c, geom.widths.length - 1)]
@@ -286,6 +313,7 @@ export function columnLayoutSpecs(
           end: col.end,
           section: region.section,
           widthPx,
+          widestPx,
           dx,
           dy,
           // untouched single-column region at its natural place: no decorations
@@ -314,7 +342,8 @@ export function columnLayoutSpecs(
         })
         continue
       }
-      if (widthPx !== undefined) {
+      if (widthPx !== undefined && isGutter(b.el, widthPx, col.widestPx)) widthPx = col.widestPx
+      else if (widthPx !== undefined) {
         const bottom = b.top + b.height - (b.footnoteExtraPx ?? 0) - (b.spaceAfterPx ?? 0)
         for (let j = k + 1; j < cols.length && cols[j].start < bottom - 0.5; j++) {
           const next = cols[j]
@@ -426,6 +455,11 @@ const isTableBlock = (el: HTMLElement) =>
  *  preview clips the last glyphs of every line */
 function blockColumnWidth(el: HTMLElement, colW: number): number {
   return Math.max(0, colW - blockInlineExtraPx(el))
+}
+
+/** landing column too narrow to hold the block's text while the region has a real column */
+function isGutter(el: HTMLElement, colW: number, widestPx: number): boolean {
+  return blockColumnWidth(el, colW) < MIN_BLOCK_WRAP_PX && widestPx > colW
 }
 
 /** horizontal margins/padding/borders the block loses from its column width (0 for tables and fixed-width blocks) */
@@ -572,6 +606,7 @@ export function sectionGridPitchSpecs(
 export function sectionCharSpaceSpecs(
   blocks: BlockBox[],
   sections: SectionInfo[],
+  balanced = false,
 ): ColumnBlockPlacement[] {
   const deltas = sections.map(sectionCharSpacePt)
   if (!deltas.some((d) => d !== 0) || deltas.every((d) => d === deltas[0])) return []
@@ -580,7 +615,14 @@ export function sectionCharSpaceSpecs(
     if (!b.el) continue
     const si = Math.max(0, Math.min(b.section ?? 0, deltas.length - 1))
     const d = deltas[si] ?? 0
-    if (d !== 0) specs.push({ el: b.el, dx: 0, dy: 0, charSpacePt: d })
+    if (d !== 0)
+      specs.push({
+        el: b.el,
+        dx: 0,
+        dy: 0,
+        charSpacePt: d,
+        ...(balanced ? { charSpaceSbPt: singleByteCharSpacePt(d, true) } : {}),
+      })
   }
   return specs
 }
@@ -739,11 +781,18 @@ export function verticalTextSpecs(
 export function sectionGeoms(
   sections: SectionInfo[],
   hfHeights?: SectionHfHeights[],
+  evenOddHf = false,
 ): SectionGeom[] {
   return sections.map((s, i) => {
     const cols = sectionColumns(s)
     let forceBreak = false
     let colBreakStart = false
+    const numberingParity =
+      evenOddHf && i > 0 && s.startType === 'nextPage' && s.pageNumberStart !== undefined
+        ? s.pageNumberStart % 2 === 0
+          ? 'evenPage'
+          : 'oddPage'
+        : undefined
     if (i > 0) {
       // nextColumn with the same multi-column count advances one column (Word,
       // tdf#135343 c14/c15); a changed count or a single-column layout acts like a
@@ -786,6 +835,7 @@ export function sectionGeoms(
       pageHeightPx: twipsToPx(set.pageHeight),
       forceBreak,
       startType: s.startType,
+      ...(numberingParity ? { numberingParity } : {}),
       // colWidths only for explicit-width columns: the narrower-column gate is
       // meaningless when every column is the same width
       ...(cols > 1

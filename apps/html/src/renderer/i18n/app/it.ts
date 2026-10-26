@@ -9,6 +9,15 @@ export const it = {
   redactDialogPlaceholder: 'Nome del segnaposto, es. telefono del cliente',
   redactCancel: 'Annulla',
   redactInsert: 'Nascondi',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'Questo file è stato modificato da un altro programma.',
+  diskConflictMsg:
+    'Questo file è cambiato su disco; il salvataggio sovrascriverà quelle modifiche.',
+  diskReload: 'Ricarica',
+  diskKeepMine: 'Mantieni il mio',
+  diskOverwrite: 'Sovrascrivi comunque',
+>>>>>>> theirs
 
   loading: 'Caricamento…',
   loadFailed: 'Impossibile aprire il file',
@@ -110,6 +119,7 @@ export const it = {
   alignLeft: 'Allinea a sinistra',
   alignCenter: 'Centra',
   alignRight: 'Allinea a destra',
+  alignJustify: 'Giustifica',
   fontSizeDec: 'Riduci dimensione carattere',
   fontSizeInc: 'Aumenta dimensione carattere',
   typography: 'Tipografia',

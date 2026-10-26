@@ -47,10 +47,21 @@ export function resolveImageSrc(src: string, baseDir: string | null = imageBaseD
   const toAssetUrl = (path: string) =>
     `md-asset://${path.startsWith('/') ? '' : '/'}${path.replace(/\\/g, '/').split('/').map(encodeSegment).join('/')}`
   // a Windows drive path would also match the URL-scheme regex — check it first
-  if (src.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(src)) return toAssetUrl(src)
+  if (src.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(src)) return toAssetUrl(decodePath(src))
   if (/^[a-z][a-z0-9+.-]*:/i.test(src)) return src
   if (!baseDir) return src
-  return toAssetUrl(`${baseDir.replace(/\\/g, '/').replace(/\/$/, '')}/${src}`)
+  return toAssetUrl(`${baseDir.replace(/\\/g, '/').replace(/\/$/, '')}/${decodePath(src)}`)
+}
+
+// Authored paths are often percent-encoded (`%E5%9B%BE.png`, as every
+// docx→md exporter writes CJK names); without decoding first the segment
+// encoder doubles the escapes and the handler looks up a literal `%E5…` file.
+function decodePath(path: string): string {
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
 }
 
 /**
@@ -88,7 +99,10 @@ export function unresolveImageSrc(src: string, baseDir: string | null = imageBas
   const authored = window.markdownApi?.unresolveAssetUrl?.(src)
   if (authored) return authored
   if (!src.startsWith('md-asset://')) return src
-  let path = decodeURIComponent(src.slice('md-asset://'.length))
+  // Reuse the guarded decoder: a lone `%` (e.g. in a file named `100%.png`)
+  // throws a URIError from decodeURIComponent, and parseHTML calls this for
+  // every md-asset img, so the throw would break paste/document load.
+  let path = decodePath(src.slice('md-asset://'.length))
   // Windows drive paths were prefixed with '/' to form a valid URL path
   if (/^\/[a-zA-Z]:\//.test(path)) path = path.slice(1)
   if (baseDir) {

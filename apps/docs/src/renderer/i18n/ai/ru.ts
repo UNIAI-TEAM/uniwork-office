@@ -128,6 +128,8 @@ export const ru = {
   aiUnknownError: 'Неизвестная ошибка',
   aiTimeoutError:
     'Тайм-аут запроса ИИ: сеть не отвечает, выполнение остановлено. Проверьте подключение и повторите попытку',
+  aiRegionError:
+    'Поставщик этой модели не обслуживает ваш текущий регион — выберите другую модель или смените сеть',
   aiOverloadedError: 'Сервис ИИ сейчас перегружен — повторите попытку чуть позже',
   aiNetworkError:
     'Проблема с сетью: не удалось подключиться к сервису ИИ. Проверьте подключение и повторите попытку',
@@ -137,6 +139,9 @@ export const ru = {
   aiSumImageAttachment: 'Вложенное изображение {name}',
   aiSumRead: 'Чтение {name}',
   aiSumReadAttachmentName: 'Чтение вложения {name}',
+  aiSumSkillsList: 'Список установленных навыков',
+  aiSumSkillRead: 'Прочитан навык {name}',
+  aiSumRunCli: 'Выполнено: {args}',
   aiSumWebSearch: 'Поиск в Интернете',
   aiSumWebSearchDone: 'Поиск «{query}» ({count} результатов)',
   aiSumImageSearch: 'Поиск изображений',
@@ -199,6 +204,7 @@ export const ru = {
   aiCmdImages: 'Обновлено изображений: {count}',
   aiCmdToc: 'Вставлено оглавление (элементов: {count})',
   aiCmdSkipped: ' (пропущено защищенных блоков: {count})',
+<<<<<<< ours
   aiViewOnlyNotice:
     'Документ только для просмотра: ИИ может читать его и отвечать на вопросы, но не может редактировать.',
   aiClarifyTitle: 'Несколько вопросов, прежде чем продолжить',
@@ -213,6 +219,8 @@ export const ru = {
   aiClarifySubmit: 'Продолжить',
   aiSumClarify: 'Уточнения получены',
   aiSumClarifySkipped: 'Уточнения пропущены',
+=======
+>>>>>>> theirs
   aiStarterMindMap: 'Создать ментальную карту документа',
   aiMindMapBtn: 'ИИ-ментальная карта',
   aiMindMapPrompt:

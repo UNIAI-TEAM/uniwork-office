@@ -119,6 +119,7 @@ export const zhTW = {
   aiTooManyImages: '圖片最多隨訊息傳送 {max} 張,多餘的已忽略',
   aiUnknownError: '未知錯誤',
   aiTimeoutError: 'AI 請求逾時：網路長時間無回應，已停止。請檢查網路後重試',
+  aiRegionError: '該模型的廠商不向目前地區提供服務，請換一個模型或切換網路',
   aiOverloadedError: 'AI 服務目前繁忙，請稍後重試',
   aiNetworkError: '網路有問題，無法連接 AI 服務。請檢查網路後重試',
   aiCreditsExhausted: 'UniWork 點數已用完，請前往 uniworkos.com/pricing 儲值後重試',
@@ -126,6 +127,9 @@ export const zhTW = {
   aiSumImageAttachment: '圖片附件 {name}',
   aiSumRead: '讀取 {name}',
   aiSumReadAttachmentName: '讀取附件 {name}',
+  aiSumSkillsList: '列出已裝技能',
+  aiSumSkillRead: '讀取技能 {name}',
+  aiSumRunCli: '已執行 {args}',
   aiSumWebSearch: '網路搜尋',
   aiSumWebSearchDone: '搜尋「{query}」({count} 筆)',
   aiSumImageSearch: '圖片搜尋',
@@ -187,6 +191,7 @@ export const zhTW = {
   aiCmdImages: '已更新 {count} 張圖片',
   aiCmdToc: '已插入目錄({count} 個項目)',
   aiCmdSkipped: '(略過 {count} 個受保護區塊)',
+<<<<<<< ours
   aiViewOnlyNotice: '唯讀文件:AI 可以閱讀並回答問題,但無法編輯。',
   aiClarifyTitle: '繼續之前先確認幾個問題',
   aiClarifyDecide: '幫我決定',
@@ -200,6 +205,8 @@ export const zhTW = {
   aiClarifySubmit: '繼續',
   aiSumClarify: '已回答釐清問題',
   aiSumClarifySkipped: '已略過釐清問題',
+=======
+>>>>>>> theirs
   aiStarterMindMap: '為這份文件產生心智圖',
   aiMindMapBtn: 'AI 心智圖',
   aiMindMapPrompt: '為這份文件產生心智圖,依文件的章節結構組織主要主題與關鍵概念',

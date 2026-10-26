@@ -9,6 +9,14 @@ export const ar = {
   redactDialogPlaceholder: 'اسم العنصر، مثال: هاتف العميل',
   redactCancel: 'إلغاء',
   redactInsert: 'إخفاء',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'تم تغيير هذا الملف بواسطة برنامج آخر.',
+  diskConflictMsg: 'تغيّر هذا الملف على القرص؛ سيؤدي الحفظ إلى استبدال تلك التغييرات.',
+  diskReload: 'إعادة التحميل',
+  diskKeepMine: 'الاحتفاظ بنسختي',
+  diskOverwrite: 'الاستبدال على أي حال',
+>>>>>>> theirs
 
   loading: 'جارٍ التحميل…',
   loadFailed: 'تعذر فتح الملف',
@@ -106,6 +114,7 @@ export const ar = {
   alignLeft: 'محاذاة لليسار',
   alignCenter: 'توسيط',
   alignRight: 'محاذاة لليمين',
+  alignJustify: 'ضبط',
   fontSizeDec: 'تصغير حجم الخط',
   fontSizeInc: 'تكبير حجم الخط',
   typography: 'الطباعة',

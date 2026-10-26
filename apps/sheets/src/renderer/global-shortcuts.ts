@@ -132,6 +132,37 @@ const BINDINGS: readonly Binding[] = [
     gate: 'sheet',
     action: bySubAction(BORDER_SHORTCUT_ROW, 'border:outer', 'border:none'),
   },
+<<<<<<< ours
+=======
+  {
+    code: 'Comma',
+    chord: { mod: true, shift: true },
+    gate: 'sheet',
+    action: command('font-size-step:-1'),
+  },
+  {
+    code: 'KeyF',
+    chord: { cmdMac: true, shift: true },
+    gate: 'sheet',
+    action: command('filter-toggle'),
+  },
+  // AutoSum beyond the mac-only ⇧⌘T: Ctrl+Shift+T on Windows/Linux, where
+  // Univer's own QuickSum already owns Alt+=. The filter's Ctrl/⌘+Shift+L is
+  // Univer's own SmartToggleFilterShortcut, so no row here for it.
+  {
+    code: 'KeyT',
+    chord: { mod: true, shift: true },
+    gate: 'sheet',
+    action: command('autofn:SUM'),
+  },
+  { code: 'KeyT', chord: { mod: true }, gate: 'sheet', action: command('table-create-open') },
+  { code: 'F9', chord: {}, gate: 'idle', action: command('calculate-now') },
+  { code: 'F9', chord: { shift: true }, gate: 'idle', action: command('calculate-sheet') },
+  { code: 'PageDown', chord: {}, gate: 'grid', action: command('page-row:1') },
+  { code: 'PageUp', chord: {}, gate: 'grid', action: command('page-row:-1') },
+  { code: 'PageDown', chord: { alt: true }, gate: 'grid', action: command('page-col:1') },
+  { code: 'PageUp', chord: { alt: true }, gate: 'grid', action: command('page-col:-1') },
+>>>>>>> theirs
 ]
 
 /**
@@ -183,7 +214,14 @@ export function resolveGlobalShortcut(
     if (!gateOpen(binding.gate, guards)) return null
     return typeof binding.action === 'function' ? binding.action(chord) : binding.action
   }
+<<<<<<< ours
   const pageRow = pageRowCommand(event)
   if (pageRow && !isComposingEvent(event) && gateOpen('grid', guards)) return command(pageRow)
+=======
+  // number-format / border chords (Ctrl+Shift+digit, Ctrl+Shift+&/_, mac ⌘⌥
+  // borders) write to the range: same gate as the table's `sheet` rows
+  const formatCommand = formatShortcutCommand(event, guards.isMac)
+  if (formatCommand && gateOpen('sheet', guards)) return { kind: 'command', command: formatCommand }
+>>>>>>> theirs
   return null
 }

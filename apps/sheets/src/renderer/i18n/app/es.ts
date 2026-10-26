@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const es = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Ocultar la selección a la IA',
+  redactDialogDesc:
+    'Lo seleccionado sigue en el documento y en el archivo; el modelo solo ve el marcador. Ponle un nombre para que sepa qué representa.',
+  redactDialogScope:
+    'Ocultar solo se aplica a la IA de esta aplicación. La CLI, las herramientas MCP y la exportación headless leen el archivo directamente y siguen viendo estas palabras.',
+  redactDialogPlaceholder: 'Nombre del marcador, p. ej.: teléfono del cliente',
+  redactCancel: 'Cancelar',
+  redactInsert: 'Ocultar',
+  redactEnable: 'Clic derecho en una selección para ocultarla al modelo.',
+  redactNeedsSavedRow:
+    'Esta fila todavía no está en el archivo. Guarda primero y luego oculta la celda.',
+  redactRecoveredFromNames:
+    'Otra aplicación reescribió este archivo y descartó el registro de lo que está oculto. Las celdas ocultas se recuperaron de los nombres del libro; al guardar se restaura el registro completo.',
+
   appMergeWorkbooks: 'Combinar libros',
   appMergeWorkbooksTip: 'Añadir las hojas de otros archivos de Excel a este libro',
   appMergeWorkbooksPicking: 'Elige los archivos para combinar…',
@@ -329,7 +344,9 @@ export const es = {
   appFullLoadRunning:
     'Cargando el libro completo: ordenar y filtrar estarán disponibles al terminar…',
   appFullLoadTooLarge:
-    'Este libro es demasiado grande para cargarlo por completo en memoria; ordenar y filtrar no están disponibles para este archivo.',
+    'Este libro es demasiado grande para cargarlo por completo en memoria; ordenar y mover rangos no están disponibles para este archivo. El filtrado se ejecuta directamente sobre el archivo.',
+  appLargeFilterLoading: 'Leyendo la columna de filtro desde el archivo…',
+  appLargeFilterApplying: 'Aplicando el filtro sobre el archivo…',
   appSortValueModeFormulas:
     'Este rango contiene fórmulas que no se calculan en vivo en este libro grande: ordenarlo o moverlo las guardaría como valores simples. Elija un rango sin fórmulas.',
   appSortRangeTooLarge:
@@ -723,6 +740,7 @@ export const es = {
   appTabReview: 'Revisar',
   appRibbonCollapse: 'Contraer la cinta de opciones',
   appRibbonExpand: 'Expandir la cinta de opciones',
+  appRibbonCompact: 'Cinta compacta (solo iconos)',
   appTabView: 'Vista',
   appTabAi: 'IA',
   appTabChartDesign: 'Diseño de gráfico',
@@ -764,7 +782,6 @@ export const es = {
   appLinkPlaceholder: 'https://example.com o Sheet1!A1',
   appRemoveLink: 'Quitar vínculo',
   appNotAvailableYet: 'Aún no disponible',
-  appComingSoon: 'Próximamente',
   appGroupChartLayouts: 'Diseños de gráfico',
   appAddChartElement: 'Agregar elemento de gráfico',
   appAddChartElementTitle: 'Títulos, etiquetas de datos, leyenda',
@@ -1269,6 +1286,10 @@ export const es = {
   appFontSizeTip: 'Tamaño de fuente',
   appZoomIn: 'Acercar',
   appZoomOut: 'Alejar',
+  appImgActualSize: 'Tamaño real',
+  appImgFitWindow: 'Ajustar a la ventana',
+  appImgSaveAs: 'Guardar imagen como…',
+  appImgClose: 'Cerrar (Esc)',
   appZoomSheetTitle: 'Hacer zoom en la hoja',
   appResetZoom: 'Restablecer zoom',
   appZoomToSelection: 'Ampliar selección',
@@ -1311,6 +1332,21 @@ export const es = {
   appOpenFileFirst: 'Abra primero un archivo',
   appNoPassword: 'Sin contraseña',
   appProtectWorkbook: 'Proteger libro',
+  appChangePassword: 'Cambiar contraseña',
+  appWorkbookPasswordChanged: 'Se actualizó la contraseña del libro.',
+  appEncryptedOpenTitle: 'Abrir libro protegido con contraseña',
+  appEncryptedOpenCopy: 'Introduce la contraseña para desbloquear este libro.',
+  appEncryptedPasswordLabel: 'Contraseña',
+  appEncryptedOpen: 'Abrir',
+  appChangePasswordTitle: 'Cambiar la contraseña del libro',
+  appChangePasswordCopy: 'Elige una nueva contraseña y confírmala abajo.',
+  appNewPasswordLabel: 'Nueva contraseña',
+  appConfirmPasswordLabel: 'Confirmar nueva contraseña',
+  appPasswordsMismatch: 'Las contraseñas no coinciden.',
+  appPasswordUpdateFailed: 'No se pudo actualizar la contraseña del libro.',
+  appPasswordUpdating: 'Actualizando…',
+  appUpdatePassword: 'Actualizar contraseña',
+  appWorkbookNotPasswordProtected: 'Este libro no está protegido con una contraseña de apertura.',
   appAllowEditRanges: 'Permitir editar rangos',
   appGroupClipboard: 'Portapapeles',
   appPaste: 'Pegar',
@@ -1495,6 +1531,16 @@ export const es = {
   appTableRowsNotLoaded:
     'Las filas de la tabla aún se están cargando; inténtelo de nuevo en un momento.',
   appTableTotalLabel: 'Total',
+  appNotePicturesPaneTitle: 'Imágenes de notas',
+  appNotePicturesClose: 'Cerrar',
+  appNotePicturesNone: 'Ninguna nota de este libro muestra una imagen.',
+  appNotePictureUnavailable: 'No se puede mostrar esta imagen.',
+  appNotePicturesToggle: 'Imágenes de notas',
+  appNoteInsertPicture: 'Insertar imagen',
+  appNotePictureInserted:
+    'Imagen añadida a la nota de {cell}. Guarda para escribirla en el archivo.',
+  appNotePictureRemoved: 'Imagen quitada de la nota de {cell}.',
+  appNotePictureRemove: 'Quitar imagen',
   appCommentsPaneTitle: 'Comentarios',
   appThreadReply: 'Responder',
   appThreadReplyPlaceholder: 'Responder…',
@@ -1541,6 +1587,8 @@ export const es = {
   appVisualSendBackward: 'Enviar atrás',
   appVisualSizeProperties: 'Tamaño y propiedades…',
   appVisualHyperlink: 'Hipervínculo…',
+  appVisualEmbedInCell: 'Insertar imagen en la celda',
+  appVisualEmbedFailed: 'No se pudo insertar esta imagen en la celda.',
   appVisualDelete: 'Eliminar',
   appVisualArranged: 'Objeto actualizado — guarda con {saveKeys}.',
   appVisualCopied: 'Objeto copiado.',

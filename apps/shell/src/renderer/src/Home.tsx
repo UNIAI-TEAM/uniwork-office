@@ -1,3 +1,4 @@
+<<<<<<< ours
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   DragEvent as ReactDragEvent,
@@ -5,6 +6,18 @@ import type {
   ReactElement,
 } from 'react'
 import appIcon from './assets/app-icon.png'
+=======
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type {
+  DragEvent as ReactDragEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactElement,
+} from 'react'
+import logoLockup from './assets/genoffice-logo.svg'
+import { KbAskPanel } from './KbAskPanel'
+import { FileBadge } from './file-badge'
+import { placeFolderMenu } from './folder-menu-position'
+>>>>>>> theirs
 import type {
   AccountStatus,
   FolderEntry,
@@ -89,13 +102,20 @@ function isHomeArea(raw: string | null | undefined): raw is HomeArea {
   return raw === 'uniwork' || raw === 'device'
 }
 
+import type { ProjectApi } from '@genoffice/project-store'
+
 declare global {
   interface Window {
     aiOffice: HomeApi
     aiOfficeIntegrations?: IntegrationsApi
+<<<<<<< ours
     aiOfficeProject?: ProjectHomeApi
     /** UniWork work data (preload, same lifetime as aiOffice); declared here only */
     uniworkWork: UniworkWorkApi
+=======
+    /** Optional: a build without the project bridge keeps the panel in memory. */
+    projectApi?: ProjectApi
+>>>>>>> theirs
   }
 }
 
@@ -113,9 +133,16 @@ const GREET_ASK_KEYS = [
 ] as const satisfies readonly StringKey[]
 
 /* Formats the open-local card advertises. Too long for the card at any window
+<<<<<<< ours
    width, so it ellipsizes and a hover ScreenTip carries the full list. Derived
    from the main-process open-dialog filter so the two cannot drift apart. */
 const OPEN_LOCAL_EXTENSIONS = openLocalHint()
+=======
+   width, so it ellipsizes and a hover ScreenTip carries the full list. Keep in
+   sync with the main-process open-dialog filter (OPEN_DIALOG_EXTENSIONS). */
+const OPEN_LOCAL_EXTENSIONS =
+  '.docx / .odt / .ott / .xlsx / .xlsm / .xls / .csv / .tsv / .ods / .ots / .pptx / .odp / .otp / .pdf / .md / .html'
+>>>>>>> theirs
 
 /** drag payload of home file/folder rows (JSON array of absolute paths) */
 const DRAG_PATHS_MIME = 'application/x-genoffice-paths'
@@ -123,12 +150,32 @@ const DRAG_PATHS_MIME = 'application/x-genoffice-paths'
 const DRAG_EXPAND_DELAY_MS = 600
 /** expanded folders survive a home reload; the selection is per session */
 const TREE_STATE_KEY = 'home.folderTree'
+/** user-dragged sidebar width; unset keeps the stylesheet's default (genoffice#2169) */
+const SIDEBAR_WIDTH_KEY = 'home.sidebarWidth'
+const SIDEBAR_MIN_WIDTH = 180
+const SIDEBAR_MAX_WIDTH = 480
 
+<<<<<<< ours
+=======
+function readSidebarWidth(): number | null {
+  try {
+    const n = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY))
+    return n >= SIDEBAR_MIN_WIDTH && n <= SIDEBAR_MAX_WIDTH ? n : null
+  } catch {
+    return null
+  }
+}
+
+>>>>>>> theirs
 /**
  * Width of the viewport that `position: fixed` elements anchor to. The layout
  * engine owns this coordinate system, so documentElement's client rect is the
  * value to compute menu offsets from; window.innerWidth can disagree on scaled
+<<<<<<< ours
  * Linux desktops, which pushed row menus past the window's left edge (#1946).
+=======
+ * Linux desktops, which pushed row menus past the window's left edge (genoffice#1946).
+>>>>>>> theirs
  */
 function fixedViewportWidth(): number {
   return document.documentElement.clientWidth
@@ -257,10 +304,17 @@ const FILTERS: { key: string; label: StringKey }[] = [
 
 /** sidebar filter keys that stand for a family of extensions (mirrors recent-files.ts) */
 const FILTER_FAMILY: Record<string, readonly string[]> = {
+<<<<<<< ours
   docx: ['docx', 'doc'],
   xlsx: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'],
   pptx: ['pptx', 'ppt'],
   md: ['md', 'markdown'],
+=======
+  docx: ['docx', 'doc', 'odt', 'ott'],
+  xlsx: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv', 'ods', 'ots'],
+  pptx: ['pptx', 'ppt', 'odp', 'otp'],
+  md: ['md', 'markdown', 'txt', 'json'],
+>>>>>>> theirs
   html: ['html', 'htm'],
 }
 
@@ -689,10 +743,117 @@ function ConflictPrompt({ names, onChoose }: ConflictPromptProps) {
   )
 }
 
+<<<<<<< ours
 /** whether we are inside the shell (aiOfficeProject API available) */
 function hasProjectApi(): boolean {
   return typeof window.aiOfficeProject !== 'undefined'
 }
+=======
+// ── Starred-group picker ─────────────────────────────────
+
+interface GroupPickerProps {
+  /** existing group names (a group exists while it has at least one file) */
+  groups: readonly string[]
+  count: number
+  onCancel: () => void
+  /** put the files into an existing group */
+  onPick: (group: string) => void
+  /** create a group named `name` and put the files into it */
+  onCreate: (name: string) => void
+  /** take the files out of their group (back to the unfiltered list) */
+  onRemove: () => void
+}
+
+/** Modal moving starred files into a named group. Deliberately minimal: no
+ *  group rename/delete — a group is just a label its entries carry, and it
+ *  vanishes when its last member leaves (via this dialog's remove action,
+ *  an unstar, or a deleted file). */
+function GroupPicker({ groups, count, onCancel, onPick, onCreate, onRemove }: GroupPickerProps) {
+  const { t } = useI18n()
+  const [name, setName] = useState('')
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onCancel])
+
+  const create = () => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    setName('')
+    onCreate(trimmed)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('moveToGroupTitle')}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3>{t('moveToGroupTitle')}</h3>
+        <p>{t('selectedCount', { n: count })}</p>
+        {groups.length > 0 && (
+          <ul className="group-picker-list">
+            {groups.map((group) => (
+              <li key={group}>
+                <button
+                  className="group-picker-row"
+                  onClick={() => {
+                    setName('')
+                    onPick(group)
+                  }}
+                >
+                  <FolderIcon size={16} />
+                  <span className="group-picker-name">{group}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="group-picker-new">
+          <input
+            className="folder-rename-input"
+            placeholder={t('groupNamePlaceholder')}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.nativeEvent.isComposing) return
+              if (e.key === 'Enter') create()
+            }}
+          />
+          <button className="btn btn-secondary" disabled={!name.trim()} onClick={create}>
+            {t('newGroup')}
+          </button>
+        </div>
+        <div className="modal-buttons">
+          <button className="btn btn-secondary" onClick={onRemove}>
+            {t('removeFromGroup')}
+          </button>
+          <button className="btn btn-secondary" autoFocus onClick={onCancel}>
+            {t('cancel')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Account entry (bottom-left) ──────────────────────────
+// Currently the Genspark (gsk) login entry; to be upgraded to a signup/account system later.
+// Clicking it opens the settings modal directly (SettingsModal.tsx), which hosts
+// login/logout plus preferences (language, theme, save location, update channel).
+
+const LOGIN_POLL_MS = 2500
+/** fallback deadline when the CLI does not report expires_in (device codes live ~300s) */
+const LOGIN_MAX_WAIT_MS = 300_000
+>>>>>>> theirs
 
 // ── Starred-group picker ─────────────────────────────────
 
@@ -1290,7 +1451,10 @@ export function Home() {
   const [otherLoaded, setOtherLoaded] = useState(false)
   const [lastPageLen, setLastPageLen] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth)
+  const sidebarRef = useRef<HTMLElement>(null)
   const [view, setView] = useState<'recent' | 'starred'>('recent')
+<<<<<<< ours
   // FD-13 persisted area preference ('uniwork' | 'device')
   const [savedArea, setSavedArea] = useState<HomeArea | null>(() => {
     const raw = wbStoreGetRaw(HOME_AREA_KEY)
@@ -1344,6 +1508,12 @@ export function Home() {
   const [projectFileEntries, setProjectFileEntries] = useState<RecentEntry[]>([])
   // refresh signal for project-view data (re-pull file stats after file changes)
   const [projectTick, setProjectTick] = useState(0)
+=======
+  // Genspark web projects take over the content area (like a selected folder)
+  const [cloudMode, setCloudMode] = useState(false)
+  // the knowledge-base ask panel takes over the content area the same way
+  const [askMode, setAskMode] = useState(false)
+>>>>>>> theirs
   const [filter, setFilter] = useState('all')
   // ── Starred groups (named buckets the Starred view can filter on) ──
   // groups that currently have at least one starred file (drives the pills)
@@ -1606,12 +1776,15 @@ export function Home() {
   const [folderMenu, setFolderMenu] = useState<{
     path: string
     where: 'tree' | 'table'
-    top: number
-    right: number
+    x: number
+    y: number
+    above: number
+    align: 'start' | 'end'
   } | null>(null)
   const menuOpenAt = (where: 'tree' | 'table', path: string) =>
     folderMenu?.where === where && folderMenu.path === path
   const folderMenuWrapRef = useRef<HTMLDivElement>(null)
+  const folderMenuPopRef = useRef<HTMLDivElement>(null)
   const [folderRenaming, setFolderRenaming] = useState<{
     path: string
     where: 'tree' | 'table'
@@ -1728,6 +1901,7 @@ export function Home() {
     const limit = keepCount ? Math.max(entriesLen.current, PAGE_SIZE) : PAGE_SIZE
     const primary = view === 'recent' ? window.aiOffice.recents : window.aiOffice.starred
     const secondary = view === 'recent' ? window.aiOffice.starred : window.aiOffice.recents
+<<<<<<< ours
     void primary({ offset: 0, limit, ext, group })
       .then((page) => {
         if (seq !== requestSeq.current) return
@@ -1764,6 +1938,28 @@ export function Home() {
     if (projectMode) {
       void window.aiOfficeProject!.listProjects().then(setProjects)
     }
+    // the group pills live on the renderer, so their list rides along with
+    // every reload; a vanished group (last file unstarred/ungrouped) clears
+    // the filter instead of showing a silently empty list
+    void window.aiOffice.starredGroups().then((groups) => {
+=======
+    void primary({ offset: 0, limit, ext, group }).then((page) => {
+      if (seq !== requestSeq.current) return
+      setEntries(page.entries)
+      setListTotal(page.total)
+      setNavCounts((prev) =>
+        view === 'recent'
+          ? { ...prev, recent: visiblePageCount(page) }
+          : { ...prev, starred: visiblePageCount(page) },
+      )
+    })
+    // The other view fetches only its count under the same active filter.
+    void secondary({ offset: 0, limit: 0, ext }).then((page) => {
+>>>>>>> theirs
+      if (seq !== requestSeq.current) return
+      setStarredGroups(groups)
+      setGroupFilter((cur) => (cur && !groups.includes(cur) ? null : cur))
+    })
     // the group pills live on the renderer, so their list rides along with
     // every reload; a vanished group (last file unstarred/ungrouped) clears
     // the filter instead of showing a silently empty list
@@ -1957,6 +2153,18 @@ export function Home() {
     window.addEventListener('scroll', onScroll, true)
     return () => window.removeEventListener('scroll', onScroll, true)
   }, [folderMenu])
+  // open to the right of the anchor, flipped above when short of room below, clamped to the viewport
+  useLayoutEffect(() => {
+    const el = folderMenuPopRef.current
+    if (!folderMenu || !el) return
+    const { left, top } = placeFolderMenu(
+      folderMenu,
+      { width: el.offsetWidth, height: el.offsetHeight },
+      { width: fixedViewportWidth(), height: document.documentElement.clientHeight },
+    )
+    el.style.left = `${left}px`
+    el.style.top = `${top}px`
+  }, [folderMenu])
 
   // Escape closes the row menu and the confirm dialogs
   useEffect(() => {
@@ -2016,6 +2224,7 @@ export function Home() {
   const folderSubfolders = folderListing?.folders ?? []
   const folderSelectedPaths = folderFiles.filter((e) => selected.has(e.path)).map((e) => e.path)
 
+<<<<<<< ours
   // project files of the selected project
   useEffect(() => {
     if (!projectMode || !selectedProjectId) {
@@ -2080,6 +2289,16 @@ export function Home() {
       // unmoved rows while the moved ones stay out of this project
       refresh()
     }
+=======
+  const changeView = (next: 'recent' | 'starred') => {
+    setView(next)
+    setSelectedFolder(null)
+    setCloudMode(false)
+    setAskMode(false)
+    setSelected(new Set())
+    setRowMenu(null)
+    setGroupFilter(null)
+>>>>>>> theirs
   }
 
   const projSelectedPaths = projectFileEntries
@@ -2100,9 +2319,14 @@ export function Home() {
 
   const selectFolder = (dir: string) => {
     setSelectedFolder(dir)
+<<<<<<< ours
     setSelectedProjectId(null)
     setEduMode(false)
     setChatMode(false)
+=======
+    setCloudMode(false)
+    setAskMode(false)
+>>>>>>> theirs
     setSelected(new Set())
     setRowMenu(null)
     setFolderMenu(null)
@@ -2509,19 +2733,22 @@ export function Home() {
           setFolderMenu({
             path: entry.path,
             where: 'tree',
+<<<<<<< ours
             top: rect.bottom + 4,
             right: fixedViewportWidth() - rect.right,
+=======
+            x: rect.right,
+            y: rect.bottom + 4,
+            above: rect.top - 4,
+            align: 'end',
+>>>>>>> theirs
           })
         }}
       >
         <MoreDots />
       </button>
       {folderMenu && menuOpenAt('tree', entry.path) && (
-        <div
-          className="folder-menu"
-          role="menu"
-          style={{ top: folderMenu.top, right: folderMenu.right }}
-        >
+        <div className="folder-menu" role="menu" ref={folderMenuPopRef}>
           {editableAt(entry.path) && (
             <button role="menuitem" onClick={() => startCreateFolder(entry.path)}>
               {t('newSubfolder')}
@@ -2639,8 +2866,15 @@ export function Home() {
             setFolderMenu({
               path: entry.path,
               where: 'tree',
+<<<<<<< ours
               top: e.clientY + 2,
               right: fixedViewportWidth() - e.clientX,
+=======
+              x: e.clientX + 2,
+              y: e.clientY + 2,
+              above: e.clientY + 2,
+              align: 'start',
+>>>>>>> theirs
             })
           }}
           draggable={!isRoot && !isRenaming}
@@ -2762,9 +2996,72 @@ export function Home() {
                 >
                   {t('pickSaveDir')}
                 </button>
+<<<<<<< ours
               </li>
             ) : (
               root && renderTreeNode({ path: root.path, name: root.name, hasSubfolders: true }, 0)
+=======
+                {canMove && editable && !entry.missing && (
+                  <>
+                    <div className="row-menu-divider" />
+                    <button role="menuitem" onClick={() => startMove([entry.path])}>
+                      {t('moveToFolder')}
+                    </button>
+                  </>
+                )}
+                {editable && (
+                  <>
+                    <div className="row-menu-divider" />
+                    <button role="menuitem" onClick={() => startRename(entry)}>
+                      {t('rename')}
+                    </button>
+                    <button role="menuitem" onClick={() => duplicateFile(entry.path)}>
+                      {t('duplicate')}
+                    </button>
+                  </>
+                )}
+                {entry.starred && (
+                  <>
+                    <div className="row-menu-divider" />
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setRowMenu(null)
+                        setGroupPicker([entry.path])
+                      }}
+                    >
+                      {t('moveToGroup')}
+                    </button>
+                  </>
+                )}
+                {canDelete && (context === 'global' || editable) && (
+                  <>
+                    <div className="row-menu-divider" />
+                    {context === 'global' &&
+                      // same root cause as the selection bar: in the Starred
+                      // view "remove from list" must unstar, not drop recents
+                      (view === 'starred' ? (
+                        <button role="menuitem" onClick={() => unstarSelected([entry.path])}>
+                          {t('unstar')}
+                        </button>
+                      ) : (
+                        <button role="menuitem" onClick={() => removeRecent([entry.path])}>
+                          {t('removeFromList')}
+                        </button>
+                      ))}
+                    {editable && (
+                      <button
+                        role="menuitem"
+                        className="danger"
+                        onClick={() => deleteFiles([entry.path])}
+                      >
+                        {t('deleteFiles')}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+>>>>>>> theirs
             )}
             {roots
               .slice(1)
@@ -2777,6 +3074,7 @@ export function Home() {
     )
   }
 
+<<<<<<< ours
   // ── The device lists: Gần đây, Đã gắn sao, a folder's contents, project files and search hits
   //    are all the shared DocList on the `device` screen ──
 
@@ -2869,6 +3167,148 @@ export function Home() {
         node: (
           <span className="uw-recent-badge" title={t('uwRecentBadgeTip')}>
             {t('uwRecentBadge')}
+=======
+  /** sub-folder row in the folder view's table: enter on click, same … menu as the tree */
+  function renderSubfolderRow(entry: FolderEntry) {
+    const isRenaming = folderRenaming?.where === 'table' && folderRenaming.path === entry.path
+    const editable = editableAt(entry.path)
+    return (
+      <li className="recent-row" key={entry.path}>
+        <div
+          className={`recent-item folder-item${dropTarget === entry.path ? ' drop-target' : ''}`}
+          role="button"
+          tabIndex={0}
+          draggable={!isRenaming}
+          onDragStart={(e) => onRowDragStart(e, [entry.path])}
+          {...folderDropProps(entry.path, { autoExpand: false })}
+          onClick={() => {
+            if (isRenaming) return
+            expandTo(entry.path)
+            selectFolder(entry.path)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && event.target === event.currentTarget) {
+              expandTo(entry.path)
+              selectFolder(entry.path)
+            }
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            setFolderMenu({
+              path: entry.path,
+              where: 'table',
+              x: e.clientX + 2,
+              y: e.clientY + 2,
+              above: e.clientY + 2,
+              align: 'start',
+            })
+          }}
+        >
+          <span className="col-check" aria-hidden="true" />
+          <span className="recent-icon folder-badge">
+            <FolderIcon size={22} />
+          </span>
+          {isRenaming ? (
+            <input
+              className="rename-input"
+              value={folderRenaming.value}
+              autoFocus
+              onFocus={(event) => event.target.select()}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) =>
+                setFolderRenaming({ path: entry.path, where: 'table', value: event.target.value })
+              }
+              onBlur={() => void commitRenameFolder()}
+              onKeyDown={(event) => {
+                event.stopPropagation()
+                if (event.nativeEvent.isComposing) return
+                if (event.key === 'Enter') void commitRenameFolder()
+                if (event.key === 'Escape') setFolderRenaming(null)
+              }}
+            />
+          ) : (
+            <span className="recent-name">{entry.name}</span>
+          )}
+          <span className="recent-path">{t('folderType')}</span>
+          <span className="recent-time">{formatModified(entry.mtimeMs, i18n)}</span>
+          <span className="recent-size">—</span>
+          <span />
+          <span
+            className="recent-actions"
+            ref={menuOpenAt('table', entry.path) ? folderMenuWrapRef : undefined}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              className="more-btn"
+              aria-label={t('folderMoreActions', { name: entry.name })}
+              aria-expanded={menuOpenAt('table', entry.path)}
+              onClick={(e) => {
+                if (menuOpenAt('table', entry.path)) {
+                  setFolderMenu(null)
+                  return
+                }
+                const rect = e.currentTarget.getBoundingClientRect()
+                setFolderMenu({
+                  path: entry.path,
+                  where: 'table',
+                  x: rect.right,
+                  y: rect.bottom + 4,
+                  above: rect.top - 4,
+                  align: 'end',
+                })
+              }}
+            >
+              <MoreDots />
+            </button>
+            {folderMenu && menuOpenAt('table', entry.path) && (
+              <div className="folder-menu" role="menu" ref={folderMenuPopRef}>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setFolderMenu(null)
+                    expandTo(entry.path)
+                    selectFolder(entry.path)
+                  }}
+                >
+                  {t('open')}
+                </button>
+                {editable && (
+                  <>
+                    <button role="menuitem" onClick={() => startRenameFolder(entry, 'table')}>
+                      {t('rename')}
+                    </button>
+                    <button role="menuitem" onClick={() => startMove([entry.path])}>
+                      {t('moveToFolder')}
+                    </button>
+                  </>
+                )}
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setFolderMenu(null)
+                    void window.aiOffice.revealPath(entry.path)
+                  }}
+                >
+                  {t('revealInFolder')}
+                </button>
+                {editable && (
+                  <>
+                    <div className="row-menu-divider" />
+                    <button
+                      role="menuitem"
+                      className="danger"
+                      onClick={() => {
+                        setFolderMenu(null)
+                        setConfirmDeleteFolder(entry.path)
+                      }}
+                    >
+                      {t('deleteFolder')}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+>>>>>>> theirs
           </span>
         ),
       }
@@ -3594,6 +4034,7 @@ export function Home() {
       return parent?.folders.some((f) => f.path === p) ?? false
     })
 
+<<<<<<< ours
   const activeRecentInArea =
     !selectedProjectId &&
     !eduMode &&
@@ -3667,11 +4108,40 @@ export function Home() {
   const leaveAiMode = () => {
     setChatMode(false)
     setEduMode(false)
+=======
+  const activeNav = !selectedFolder && !cloudMode ? (askMode ? 'ask' : view) : null
+
+  const onSidebarResizeStart = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const startX = e.clientX
+    const startW = sidebarRef.current?.getBoundingClientRect().width ?? SIDEBAR_MIN_WIDTH
+    const el = e.currentTarget
+    el.setPointerCapture(e.pointerId)
+    let next = startW
+    const move = (ev: PointerEvent) => {
+      next = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startW + ev.clientX - startX))
+      setSidebarWidth(next)
+    }
+    const up = () => {
+      el.removeEventListener('pointermove', move)
+      el.removeEventListener('pointerup', up)
+      try {
+        localStorage.setItem(SIDEBAR_WIDTH_KEY, String(Math.round(next)))
+      } catch {
+        // quota / private mode: the width lasts for this session only
+      }
+    }
+    el.addEventListener('pointermove', move)
+    el.addEventListener('pointerup', up)
+>>>>>>> theirs
   }
 
   return (
     <div className="home">
-      <aside className="sidebar">
+      <aside
+        className="sidebar"
+        ref={sidebarRef}
+        style={sidebarWidth === null ? undefined : { width: sidebarWidth }}
+      >
         <div className="sidebar-logo">
           <img className="logo-mark" src={appIcon} alt="" />
           <span className="logo-text">
@@ -3684,10 +4154,16 @@ export function Home() {
         </div>
         <nav className="sidebar-nav">
           <button
+<<<<<<< ours
             className={`nav-item${chatMode && !selectedProjectId && !eduMode ? ' active' : ''}`}
             aria-current={chatMode && !selectedProjectId && !eduMode ? 'page' : undefined}
             data-nav="chat"
             onClick={goNewChat}
+=======
+            className={`nav-item${activeNav === 'recent' ? ' active' : ''}`}
+            aria-current={activeNav === 'recent' ? 'page' : undefined}
+            onClick={() => changeView('recent')}
+>>>>>>> theirs
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path
@@ -3696,6 +4172,19 @@ export function Home() {
                 strokeWidth="1.3"
                 strokeLinejoin="round"
               />
+<<<<<<< ours
+=======
+            </svg>
+            <span className="nav-label">{t('navRecent')}</span>
+            <span className="nav-count">{navCounts.recent}</span>
+          </button>
+          <button
+            className={`nav-item${activeNav === 'starred' ? ' active' : ''}`}
+            aria-current={activeNav === 'starred' ? 'page' : undefined}
+            onClick={() => changeView('starred')}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+>>>>>>> theirs
               <path
                 d="M5.5 7h5M5.5 9h3.2"
                 stroke="currentColor"
@@ -3711,14 +4200,50 @@ export function Home() {
                   : 'My AI'}
             </span>
           </button>
+<<<<<<< ours
           {projectMode && (
+=======
+          <button
+            className={`nav-item${activeNav === 'ask' ? ' active' : ''}`}
+            aria-current={activeNav === 'ask' ? 'page' : undefined}
+            onClick={() => {
+              setAskMode(true)
+              setSelectedFolder(null)
+              setCloudMode(false)
+              setSelected(new Set())
+              setRowMenu(null)
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M14 10.5c0 .9-.7 1.6-1.6 1.6H5.4L2 14.5V3.6C2 2.7 2.7 2 3.6 2h8.8c.9 0 1.6.7 1.6 1.6z"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M5 6.2h6M5 8.6h4"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className="nav-label">{t('navAsk')}</span>
+          </button>
+          {loggedIn && (
+>>>>>>> theirs
             <button
               className={`nav-item${eduMode && !selectedProjectId ? ' active' : ''}`}
               aria-current={eduMode && !selectedProjectId ? 'page' : undefined}
               onClick={() => {
+<<<<<<< ours
                 setEduMode(true)
                 setChatMode(false)
                 setSelectedProjectId(null)
+=======
+                setCloudMode(true)
+                setAskMode(false)
+>>>>>>> theirs
                 setSelectedFolder(null)
                 setSelected(new Set())
                 setRowMenu(null)
@@ -3815,6 +4340,7 @@ export function Home() {
           openRequest={settingsRequest}
         />
       </aside>
+<<<<<<< ours
 
       {selectedProjectId ? (
         renderProjectContent()
@@ -3880,6 +4406,19 @@ export function Home() {
         ) : null
       ) : selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
         renderFolderContent()
+=======
+      <div className="sidebar-resizer" onPointerDown={onSidebarResizeStart} />
+      {selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
+        renderFolderContent()
+      ) : askMode ? (
+        <KbAskPanel
+          onOpenPath={(path) => void window.aiOffice.openPath(path)}
+          onGoToRecents={() => changeView('recent')}
+          onOpenModelSettings={() => setSettingsRequest({ section: 'aiModel' })}
+        />
+      ) : cloudMode ? (
+        <CloudProjectsView />
+>>>>>>> theirs
       ) : (
         renderGlobalContent()
       )}

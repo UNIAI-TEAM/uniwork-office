@@ -70,6 +70,9 @@ import {
   bulletRunText,
 } from '../bullet-presets'
 
+/** The New Slide screentip shows the platform's real chord: ⇧⌘N on mac, Ctrl+M elsewhere. */
+const IS_MAC = navigator.platform.toLowerCase().includes('mac')
+
 // Symbol fonts (Wingdings & co.) render their own name as pictographs, so the
 // picker shows those names in the UI font (like Word) instead of the font itself.
 const fontPreviewFamily = (f: string): string | undefined =>
@@ -444,8 +447,12 @@ export function RibbonHomeTab({ rb }: { rb: RibbonTabCtx }) {
             disabled={!hasDoc}
             onClick={onAddSlide}
             data-tip={platformShortcuts(t('ribbonNewSlideTip'))}
+<<<<<<< ours
             data-tip-kbd={slidesTipKbd('slides-14')}
             aria-keyshortcuts={slidesAriaProp('slides-14')}
+=======
+            data-tip-kbd={IS_MAC ? '⇧⌘N' : 'Ctrl+M'}
+>>>>>>> theirs
           >
             <span className="rb-big-icon">
               <span className="rb-split-main">

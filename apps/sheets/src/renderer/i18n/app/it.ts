@@ -1,6 +1,20 @@
 import type { zh } from './zh'
 
 export const it = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Nascondi la selezione all’IA',
+  redactDialogDesc:
+    'Il contenuto selezionato resta nel documento e nel file; il modello vede solo il segnaposto. Dai un nome perché sappia cosa rappresenta.',
+  redactDialogScope:
+    'Nascondere vale solo per l’IA di questa app. La CLI, gli strumenti MCP e l’esportazione senza interfaccia leggono direttamente il file e vedono comunque queste parole.',
+  redactDialogPlaceholder: 'Nome del segnaposto, es. telefono del cliente',
+  redactCancel: 'Annulla',
+  redactInsert: 'Nascondi',
+  redactEnable: 'Clic destro su una selezione per nasconderla al modello.',
+  redactNeedsSavedRow: 'Questa riga non è ancora nel file. Salva prima, poi nascondi la cella.',
+  redactRecoveredFromNames:
+    "Un'altra app ha riscritto questo file e ha perso il registro di ciò che è nascosto. Le celle nascoste sono state recuperate dai nomi del foglio di lavoro; salvando il file viene ripristinato il registro completo.",
+
   appMergeWorkbooks: 'Unisci cartelle di lavoro',
   appMergeWorkbooksTip: 'Aggiungi i fogli di altri file Excel a questa cartella di lavoro',
   appMergeWorkbooksPicking: 'Scegli i file da unire…',
@@ -334,7 +348,9 @@ export const it = {
   appFullLoadRunning:
     'Caricamento della cartella completa in corso: ordinamento e filtri saranno disponibili al termine…',
   appFullLoadTooLarge:
-    'Questa cartella di lavoro è troppo grande per essere caricata completamente in memoria; ordinamento e filtri non sono disponibili per questo file.',
+    'Questa cartella di lavoro è troppo grande per essere caricata completamente in memoria; ordinamento e spostamento di intervalli non sono disponibili per questo file. Il filtro viene eseguito direttamente sul file.',
+  appLargeFilterLoading: 'Lettura della colonna del filtro dal file…',
+  appLargeFilterApplying: 'Applicazione del filtro sul file…',
   appSortValueModeFormulas:
     'Questo intervallo contiene formule che in questa cartella di grandi dimensioni non vengono calcolate in tempo reale: ordinarlo o spostarlo le salverebbe come semplici valori. Scegliere un intervallo senza formule.',
   appSortRangeTooLarge:
@@ -720,6 +736,7 @@ export const it = {
   appTabReview: 'Revisione',
   appRibbonCollapse: 'Riduci a icona la barra multifunzione',
   appRibbonExpand: 'Espandi la barra multifunzione',
+  appRibbonCompact: 'Barra multifunzione compatta (solo icone)',
   appTabView: 'Visualizza',
   appTabAi: 'IA',
   appTabChartDesign: 'Struttura grafico',
@@ -761,7 +778,6 @@ export const it = {
   appLinkPlaceholder: 'https://example.com o Sheet1!A1',
   appRemoveLink: 'Rimuovi collegamento',
   appNotAvailableYet: 'Non ancora disponibile',
-  appComingSoon: 'Prossimamente',
   appGroupChartLayouts: 'Layout grafici',
   appAddChartElement: 'Aggiungi elemento grafico',
   appAddChartElementTitle: 'Titoli, etichette dati, legenda',
@@ -1267,6 +1283,10 @@ export const it = {
   appFontSizeTip: 'Dimensione carattere',
   appZoomIn: 'Ingrandisci',
   appZoomOut: 'Riduci',
+  appImgActualSize: 'Dimensioni originali',
+  appImgFitWindow: 'Adatta alla finestra',
+  appImgSaveAs: 'Salva immagine con nome…',
+  appImgClose: 'Chiudi (Esc)',
   appZoomSheetTitle: 'Zoom sul foglio',
   appResetZoom: 'Reimposta zoom',
   appZoomToSelection: 'Zoom sulla selezione',
@@ -1309,6 +1329,22 @@ export const it = {
   appOpenFileFirst: 'Apri prima un file',
   appNoPassword: 'Nessuna password',
   appProtectWorkbook: 'Proteggi cartella di lavoro',
+  appChangePassword: 'Cambia password',
+  appWorkbookPasswordChanged: 'La password della cartella di lavoro è stata aggiornata.',
+  appEncryptedOpenTitle: 'Apri cartella di lavoro protetta da password',
+  appEncryptedOpenCopy: 'Inserisci la password per sbloccare questa cartella di lavoro.',
+  appEncryptedPasswordLabel: 'Password',
+  appEncryptedOpen: 'Apri',
+  appChangePasswordTitle: 'Cambia la password della cartella di lavoro',
+  appChangePasswordCopy: 'Scegli una nuova password e confermala qui sotto.',
+  appNewPasswordLabel: 'Nuova password',
+  appConfirmPasswordLabel: 'Conferma nuova password',
+  appPasswordsMismatch: 'Le password non corrispondono.',
+  appPasswordUpdateFailed: 'Impossibile aggiornare la password della cartella di lavoro.',
+  appPasswordUpdating: 'Aggiornamento…',
+  appUpdatePassword: 'Aggiorna password',
+  appWorkbookNotPasswordProtected:
+    'Questa cartella di lavoro non è protetta da una password di apertura.',
   appAllowEditRanges: 'Consenti modifica intervalli',
   appGroupClipboard: 'Appunti',
   appPaste: 'Incolla',
@@ -1493,6 +1529,15 @@ export const it = {
   appTableRowsNotLoaded:
     'Le righe della tabella sono ancora in caricamento: riprovare tra un istante.',
   appTableTotalLabel: 'Totale',
+  appNotePicturesPaneTitle: 'Immagini delle note',
+  appNotePicturesClose: 'Chiudi',
+  appNotePicturesNone: "Nessuna nota di questa cartella di lavoro contiene un'immagine.",
+  appNotePictureUnavailable: 'Non è possibile mostrare questa immagine.',
+  appNotePicturesToggle: 'Immagini delle note',
+  appNoteInsertPicture: 'Inserisci immagine',
+  appNotePictureInserted: 'Immagine aggiunta alla nota in {cell}. Salva per scriverla nel file.',
+  appNotePictureRemoved: 'Immagine rimossa dalla nota in {cell}.',
+  appNotePictureRemove: 'Rimuovi immagine',
   appCommentsPaneTitle: 'Commenti',
   appThreadReply: 'Rispondi',
   appThreadReplyPlaceholder: 'Rispondi…',
@@ -1538,6 +1583,8 @@ export const it = {
   appVisualSendBackward: 'Porta indietro',
   appVisualSizeProperties: 'Dimensioni e proprietà…',
   appVisualHyperlink: 'Collegamento ipertestuale…',
+  appVisualEmbedInCell: "Incorpora l'immagine nella cella",
+  appVisualEmbedFailed: 'Impossibile incorporare questa immagine nella cella.',
   appVisualDelete: 'Elimina',
   appVisualArranged: 'Oggetto aggiornato — salva con {saveKeys}.',
   appVisualCopied: 'Oggetto copiato.',

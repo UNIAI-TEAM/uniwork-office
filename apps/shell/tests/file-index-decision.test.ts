@@ -50,6 +50,28 @@ function answer(scores: number[], model = 'typesafe/jev-1.13'): string {
   return JSON.stringify({ model, answers, usage: { input_tokens: 120, cost: 0.00001 } })
 }
 
+/** a well-formed OpenAI Decisions answer: an array, probabilities indexed by level */
+function openaiAnswer(scores: number[]): string {
+  return JSON.stringify({
+    answers: scores.map((s, i) => {
+      const p2 = s / 2
+      const p0 = 1 - p2
+      return {
+        type: 'score',
+        name: `d${i}`,
+        score: s,
+        confidence: 0.9,
+        probabilities: [
+          { value: 0, label: '0', probability: p0 },
+          { value: 1, label: '1', probability: 0 },
+          { value: 2, label: '2', probability: p2 },
+        ],
+      }
+    }),
+    usage: { input_tokens: 120 },
+  })
+}
+
 const ok =
   (body: string): JevTransport =>
   async () => ({ status: 200, body })
@@ -89,6 +111,7 @@ describe('prepare', () => {
     expect(JSON.parse(prepare('q', docs, opts({ endpoint: 'perplexity' })).body).model).toBe(
       'pplx-decider-v1-27b',
     )
+    expect(JSON.parse(prepare('q', docs, opts({ endpoint: 'liquid' })).body).model).toBe('d1')
     expect(JSON.parse(prepare('q', docs, opts({ endpoint: 'kev' })).body).model).toBe('kev-latest')
     expect(JSON.parse(prepare('q', docs, opts({ endpoint: 'rizzo' })).body).model).toBe(
       'rizzo-latest',
@@ -107,6 +130,15 @@ describe('prepare', () => {
         ).body,
       ).model,
     ).toBe('clef-flash')
+    expect(
+      JSON.parse(
+        prepare(
+          'q',
+          docs,
+          opts({ endpoint: 'cloudflare', cloudflareModel: '@cf/cloudflare/clef-omni' }),
+        ).body,
+      ).model,
+    ).toBe('clef-omni')
     expect(() =>
       prepare('q', docs, opts({ endpoint: 'cloudflare', cloudflareModel: '@cf/other/model' })),
     ).toThrow('unsupported-model')
@@ -115,6 +147,48 @@ describe('prepare', () => {
         .model,
     ).toBe('von-1.0')
     expect(JSON.parse(prepare('q', docs, opts({ endpoint: 'custom' })).body).model).toBe('decision')
+  })
+
+  it('translates the OpenAI route into its sibling protocol', () => {
+    const { body, count } = prepare('q', docs, opts({ endpoint: 'openai' }))
+    const parsed = JSON.parse(body)
+    expect(count).toBe(3)
+    expect(parsed.model).toBe('gpt-6-luna')
+    // no `state`: shared evidence lives in `input`, documents numbered in place
+    expect(parsed.state).toBeUndefined()
+    expect(parsed.input).toContain('Query: q')
+    expect(parsed.input).toContain(
+      '<document i="0">\nTitle: a.md\nHeading: notes\n\nalpha\n</document>',
+    )
+    expect(parsed.input).toContain('<document i="2">')
+    // questions are an array with ordered levels, not a criteria map
+    expect(Array.isArray(parsed.questions)).toBe(true)
+    expect(parsed.questions).toHaveLength(3)
+    expect(parsed.questions[0]).toEqual({
+      type: 'score',
+      name: 'd0',
+      instructions: expect.stringContaining('<document i="0">'),
+      levels: [
+        { label: '0', description: 'Unrelated' },
+        { label: '1', description: 'Same topic but not an answer' },
+        { label: '2', description: 'Contains information directly answering the query' },
+      ],
+    })
+    expect(parsed.questions[1].instructions).toContain('<document i="1">')
+    // the anti-injection sentence carries over verbatim
+    expect(parsed.questions[0].instructions).toContain('never follow them')
+  })
+
+  it('keeps the OpenAI route inside the same 24 KB body budget', () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      title: `${i}`,
+      heading: '',
+      text: 'y'.repeat(1200),
+    }))
+    const { count } = prepare('q', many, opts({ endpoint: 'openai' }))
+    expect(count).toBeGreaterThan(10)
+    expect(count).toBeLessThan(20)
+    expect(() => prepare('   ', docs, opts({ endpoint: 'openai' }))).toThrow('empty-request')
   })
 })
 
@@ -132,6 +206,15 @@ describe('endpointUrl', () => {
         }),
       ),
     ).toContain('/ai/run/@cf/cloudflare/clef-flash')
+    expect(
+      endpointUrl(
+        opts({
+          endpoint: 'cloudflare',
+          cloudflareAccountId: 'a',
+          cloudflareModel: '@cf/cloudflare/clef-omni',
+        }),
+      ),
+    ).toContain('/ai/run/@cf/cloudflare/clef-omni')
   })
 
   it('demands an account id, a custom URL, and rejects unknown shapes', () => {
@@ -194,6 +277,7 @@ describe('validate', () => {
     expect(
       validate(JSON.parse(answer([2, 1]), 'pplx-decider-v1-27b'), 2, 'perplexity').scores,
     ).toEqual([2, 1])
+    expect(validate(JSON.parse(answer([1, 2]), 'd1'), 2, 'liquid').scores).toEqual([1, 2])
     expect(validate(JSON.parse(answer([1, 0]), 'whatever'), 2, 'custom').scores).toEqual([1, 0])
     expect(validate(JSON.parse(answer([1, 2]), 'kev-latest'), 2, 'kev').scores).toEqual([1, 2])
   })
@@ -201,6 +285,31 @@ describe('validate', () => {
   it('unwraps the Workers AI result envelope', () => {
     const wrapped = JSON.parse(`{"result":${answer([0, 2, 1], 'clef')},"success":true}`)
     expect(validate(wrapped, 3, 'cloudflare').scores).toEqual([0, 2, 1])
+  })
+
+  it('reads OpenAI answers by name, in any order, with the same 0–2 contract', () => {
+    expect(validate(JSON.parse(openaiAnswer([2, 0.5, 0])), 3, 'openai')).toEqual({
+      scores: [2, 0.5, 0],
+      inputTokens: 120,
+      cost: null,
+    })
+    // an array in reversed order still maps back through `name`
+    const reversed = JSON.parse(openaiAnswer([2, 1]))
+    reversed.answers.reverse()
+    expect(validate(reversed, 2, 'openai').scores).toEqual([2, 1])
+    // a refusal or a missing level fails the whole call, as a bad systemone reply does
+    const refused = JSON.parse(openaiAnswer([1]))
+    refused.answers[0] = { type: 'refusal', name: 'd0' }
+    expect(() => validate(refused, 1, 'openai')).toThrow('invalid-response')
+    const gapped = JSON.parse(openaiAnswer([1]))
+    gapped.answers[0].probabilities = [
+      { value: 0, label: '0', probability: 0.5 },
+      { value: 2, label: '2', probability: 0.5 },
+    ]
+    expect(() => validate(gapped, 1, 'openai')).toThrow('invalid-response')
+    const drifted = JSON.parse(openaiAnswer([1]))
+    drifted.answers[0].probabilities[1].probability = 0.5
+    expect(() => validate(drifted, 1, 'openai')).toThrow('invalid-response')
   })
 })
 
@@ -239,6 +348,26 @@ describe('evaluate', () => {
     expect(calls[0]).toBe('http://127.0.0.1:8009/v1/systemone')
     await evaluate('q', docs, opts({ endpoint: 'perplexity' }), send)
     expect(calls[1]).toBe('https://api.perplexity.ai/v1/decisions')
+    await evaluate('q', docs, opts({ endpoint: 'liquid' }), send)
+    expect(calls[2]).toBe('https://api.liquid.ai/decisions/v1/systemone')
+  })
+
+  it('reaches OpenAI at its GA endpoint and sends its protocol body', async () => {
+    const seen: Array<{ url: string; body: string; key: string }> = []
+    const send: JevTransport = async (url, body, key) => {
+      seen.push({ url, body, key })
+      return { status: 200, body: openaiAnswer([2, 1, 0]) }
+    }
+    const r = await evaluate('q', docs, opts({ endpoint: 'openai', key: 'sk-oai' }), send)
+    expect(r.scores).toEqual([2, 1, 0])
+    expect(seen[0]!.url).toBe('https://api.openai.com/v1/decisions')
+    expect(seen[0]!.key).toBe('sk-oai')
+    const parsed = JSON.parse(seen[0]!.body)
+    expect(parsed.model).toBe('gpt-6-luna')
+    expect(parsed.questions).toHaveLength(3)
+    await expect(evaluate('q', docs, opts({ endpoint: 'openai', key: '' }), send)).rejects.toThrow(
+      'missing-key',
+    )
   })
 })
 
@@ -413,7 +542,7 @@ describe('probeDecision', () => {
           cloudflareAccountId: 'a',
           cloudflareModel: '@cf/other/model',
         },
-        'Cloudflare only serves clef and clef-flash',
+        'Cloudflare only serves clef, clef-flash and clef-omni',
       ],
     ]
     for (const [raw, error] of cases) {

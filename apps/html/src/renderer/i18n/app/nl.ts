@@ -9,6 +9,14 @@ export const nl = {
   redactDialogPlaceholder: 'Naam van placeholder, bv. telefoonnummer klant',
   redactCancel: 'Annuleren',
   redactInsert: 'Verbergen',
+<<<<<<< ours
+=======
+  diskChangedMsg: 'Dit bestand is door een ander programma gewijzigd.',
+  diskConflictMsg: 'Dit bestand is op schijf gewijzigd; opslaan overschrijft die wijzigingen.',
+  diskReload: 'Opnieuw laden',
+  diskKeepMine: 'Mijn versie behouden',
+  diskOverwrite: 'Toch overschrijven',
+>>>>>>> theirs
 
   loading: 'Laden…',
   loadFailed: 'Kan het bestand niet openen',
@@ -110,6 +118,7 @@ export const nl = {
   alignLeft: 'Links uitlijnen',
   alignCenter: 'Centreren',
   alignRight: 'Rechts uitlijnen',
+  alignJustify: 'Uitvullen',
   fontSizeDec: 'Tekengrootte verkleinen',
   fontSizeInc: 'Tekengrootte vergroten',
   typography: 'Typografie',

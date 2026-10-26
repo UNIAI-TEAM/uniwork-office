@@ -1,6 +1,10 @@
 import type { Editor, ChainedCommands, SingleCommands } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
+<<<<<<< ours
 import { NodeSelection, Selection, TextSelection, type Transaction } from '@tiptap/pm/state'
+=======
+import { NodeSelection, TextSelection, type Transaction } from '@tiptap/pm/state'
+>>>>>>> theirs
 import { checkPlaceholders, collectPlaceholders, modelTextOf } from './redact'
 import type { Mapping } from '@tiptap/pm/transform'
 import { createTable } from '@tiptap/extension-table'
@@ -20,7 +24,7 @@ export type BlockTarget = 'selection' | { start: number; end?: number }
 /** block index to insert after (-1 = document start) or 'selection' = after the caret's block */
 export type InsertAnchor = 'selection' | number
 
-export const STYLABLE_MARKS = ['bold', 'italic', 'strike', 'code'] as const
+export const STYLABLE_MARKS = ['bold', 'italic', 'strike', 'code', 'highlight'] as const
 export const BLOCK_TYPES = ['paragraph', 'heading', 'blockquote', 'codeBlock'] as const
 export const LIST_KINDS = ['bullet', 'ordered', 'task'] as const
 export const TABLE_ACTIONS = [

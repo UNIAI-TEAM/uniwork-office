@@ -209,7 +209,7 @@ html.genoffice-popover-open .ribbon-tabs {
 }
 
 .qa-btn:disabled {
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   cursor: default;
 }
 
@@ -411,6 +411,33 @@ html.genoffice-popover-open .ribbon-tabs {
   min-height: 0;
 }
 
+.disk-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+}
+.disk-notice span {
+  flex: 1;
+  min-width: 0;
+}
+.disk-notice button {
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.disk-notice button:hover {
+  background: var(--hover);
+}
+
 /* ---- AI change highlight in the source pane ---- */
 
 .cm-ai-changed {
@@ -581,6 +608,7 @@ html.genoffice-popover-open .ribbon-tabs {
   color: var(--text-dim);
 }
 
+<<<<<<< ours
 /* the disclaimer that the file still holds the words: same rhythm as the description */
 .redact-dialog-scope {
   margin: 0 0 12px;
@@ -589,6 +617,8 @@ html.genoffice-popover-open .ribbon-tabs {
   color: var(--text-dim);
 }
 
+=======
+>>>>>>> theirs
 /* the marker as the model will see it, live as the label is typed */
 .redact-dialog-preview {
   margin-bottom: 8px;
@@ -597,7 +627,11 @@ html.genoffice-popover-open .ribbon-tabs {
   border-radius: var(--radius-8);
   background: var(--surface-subtle);
   color: var(--text);
+<<<<<<< ours
   font-family: 'SF Mono', Menlo, Consolas, 'Noto Sans Mono', 'Liberation Mono', monospace;
+=======
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+>>>>>>> theirs
   font-size: 12.5px;
   word-break: break-all;
 }
@@ -1022,7 +1056,7 @@ html.genoffice-popover-open .ribbon-tabs {
 .ai-msg {
   position: relative;
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -1966,11 +2000,16 @@ html.genoffice-popover-open .ribbon-tabs {
   border: none;
   background: none;
   border-radius: var(--radius-16) var(--radius-16) 0 0;
+<<<<<<< ours
   /* vertical gaps live on margin, not padding (as docs/pdf): padding eats into the min-height, so a
    * placeholder wrapped to two lines (narrow panel) ran under the hint below the box */
   padding: 0 14px;
   margin: 12px 0 4px;
   font-size: 16px;
+=======
+  padding: 12px 14px 4px;
+  font-size: 14px;
+>>>>>>> theirs
   font-family: inherit;
   line-height: 24px;
   outline: none;

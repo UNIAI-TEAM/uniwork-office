@@ -89,9 +89,11 @@ export const cs = {
   appPgNumAppliesTo: '; platí pro oddíl {n}',
   appExportingPdf: 'Exportování PDF…',
   appExportingHtml: 'Exportování HTML…',
+  appExportingMarkdown: 'Exportování Markdown…',
   appExportPdf: 'Exportovat PDF',
   appExportPdfFailed: 'Export PDF se nezdařil: {error}',
   appExportHtmlFailed: 'Export HTML se nezdařil: {error}',
+  appExportMarkdownFailed: 'Export Markdown se nezdařil: {error}',
   appPrintGroupFailed: 'tisk skupiny stránek se nezdařil',
   appPrintTitle: 'Tisk',
   appPrintProgress: 'Příprava tisku…',
@@ -106,12 +108,24 @@ export const cs = {
   appPrintFailed: 'Tisk se nezdařil: {error}',
   appPrintPrevPage: 'Předchozí stránka',
   appPrintNextPage: 'Další stránka',
+  appPrintPrinter: 'Tiskárna',
+  appPrintDefaultPrinter: 'Výchozí tiskárna',
+  appPrintSystemDialog: 'Systémový dialog tisku…',
+  appPrintCopies: 'Kopie',
+  appPrintCollate: 'Kompletovat',
+  appPrintDuplex: 'Oboustranný tisk',
+  appPrintDuplexOff: 'Vypnuto',
+  appPrintDuplexLong: 'Překlopit po delší straně',
+  appPrintDuplexShort: 'Překlopit po kratší straně',
   appExportedPdf: 'PDF exportováno: {path}',
   appExportedHtml: 'HTML exportováno: {path}',
+  appExportedMarkdown: 'Markdown exportováno: {path}',
+  appExportMarkdownImagesDropped: '({count} obrázků nelze přečíst, přeskočeno)',
   appExportedPdfMixed:
     'PDF exportováno: {path} (různé velikosti papíru, {n} skupin sloučeno podle stránek)',
   appExportPdfCanceled: 'Export PDF zrušen',
   appExportHtmlCanceled: 'Export HTML zrušen',
+  appExportMarkdownCanceled: 'Export Markdown zrušen',
   appExportingImages: 'Exportují se obrázky…',
   appExportImagesProgress: 'Exportuje se {count} obrázků…',
   appExportImagesDone: 'Exportováno {count} obrázků do {dir}',
@@ -347,6 +361,15 @@ export const cs = {
   appAiBadgeTip: 'Používá AI',
   appTranslate: 'Přeložit',
   appTranslateTo: 'Přeložit do jazyka {lang}',
+  redactMenuLabel: 'Skrýt výběr před AI',
+  redactDialogDesc:
+    'Slova zůstanou v dokumentu i v souboru; model uvidí jen zástupný symbol. Pojmenujte ho, aby věděl, co zastupuje.',
+  redactDialogScope:
+    'Skrýtí se týká jen AI v této aplikaci. CLI, nástroje MCP a headless export čtou soubor přímo a tato slova stále vidí.',
+  redactDialogPlaceholder: 'Název zástupného symbolu, např. telefon zákazníka',
+  redactCancel: 'Zrušit',
+  redactInsert: 'Skrýt',
+  redactShowLabel: 'Znovu zobrazit výběr AI',
   appLangEnglish: 'angličtina',
   appLangSimplifiedChinese: 'zjednodušená čínština',
   appLangJapanese: 'japonština',
@@ -521,6 +544,7 @@ export const cs = {
   appUpdateStyleTip: 'Aktualizovat tento styl podle aktuálního výběru (zapíše se do styles.xml)',
   appNewStyleFromSelection: 'Nový styl z aktuálního výběru',
   appStyleNamePlaceholder: 'Název stylu',
+<<<<<<< ours
   appWebConflictTitle: 'Tento dokument byl změněn jinde',
   appWebConflictBody:
     'Vaše změny zatím nejsou v UniWork a zůstanou v tomto prohlížeči, dokud se neodhlásíte.',
@@ -558,4 +582,9 @@ export const cs = {
   appCopySaved: 'Vaše verze byla uložena jako nový dokument: {title}.',
   appCopySaveFailed:
     'Kopii se nepodařilo vytvořit. Vaše změny jsou stále v bezpečí; zkuste to znovu.',
+=======
+  appMergeSourceLoaded: 'Načteno {name} ({n} záznamů)',
+  appMergeWritten: 'Zapsáno dokumentů: {n}',
+  appMergeNothingToWrite: 'Není co zapsat',
+>>>>>>> theirs
 } satisfies Record<keyof typeof zh, string>
