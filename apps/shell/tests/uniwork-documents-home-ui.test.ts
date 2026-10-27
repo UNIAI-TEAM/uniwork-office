@@ -4424,5 +4424,224 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         expect(document.querySelector('[data-drive-panel]')).not.toBeNull()
       })
     })
+
+    describe('UNI-2223 v3: the server folder list and Name from Drive', () => {
+      const inFolder = (
+        file: typeof fileActive,
+        id: string,
+        name: string | null,
+        fileName: string,
+      ) => ({ ...file, name: fileName, driveFolder: { id, name } })
+      const a1 = inFolder(fileActive, 'f_contracts', 'Hợp đồng', 'Hợp đồng A')
+      const a2 = inFolder({ ...fileActive, id: 'df-5' }, 'f_contracts', 'Hợp đồng', 'Hợp đồng B')
+      const hidden = inFolder({ ...fileActive, id: 'df-4' }, 'abcdef123456', null, 'Ẩn tên')
+      const loose = { ...fileActive, id: 'df-6', name: 'Không thư mục', driveFolder: null }
+      // the server counts are on purpose not the walked counts: the list is the source of the numbers
+      const serverFolders = [
+        { id: 'f_contracts', name: 'Hợp đồng', fileCount: 7 },
+        { id: 'abcdef123456', name: null, fileCount: 3 },
+        { id: null, name: null, fileCount: 1 },
+      ]
+      const serverBridge = (listFolders: unknown) =>
+        installDriveBridge({
+          listFolders,
+          listFiles: vi.fn(async (q: { connectionId?: string; cursor?: string }) => {
+            if (q.connectionId === 'dc-broken') {
+              return {
+                ok: true as const,
+                value: { files: [fileBroken], totalCount: 1, nextCursor: null },
+              }
+            }
+            const page1 = [a1, hidden]
+            const page2 = [a2, loose]
+            const files = q.cursor ? page2 : page1
+            return {
+              ok: true as const,
+              value: {
+                files: q.connectionId ? files : [...page1, ...page2],
+                totalCount: 4,
+                nextCursor: q.connectionId && !q.cursor ? 'p2' : null,
+              },
+            }
+          }),
+        })
+      const listServer = () =>
+        vi.fn(async (q: { connectionId: string }) => ({
+          ok: true as const,
+          value: q.connectionId === 'dc-active' ? serverFolders : [],
+        }))
+
+      const toggleOf = (id: string) =>
+        document.querySelector<HTMLButtonElement>(`[data-drive-account-toggle="${id}"]`)
+      const folderNodes = () =>
+        Array.from(document.querySelectorAll<HTMLElement>('.dh-drive-nav-folder'))
+      const folderRows = () =>
+        Array.from(document.querySelectorAll<HTMLElement>('[data-drive-folder-row]'))
+      const fileNames = () =>
+        Array.from(
+          document.querySelectorAll('.dh-drive-row:not(.dh-drive-folder-row) .dh-drive-file-name'),
+        ).map((n) => n.textContent)
+      const nameButtons = () =>
+        Array.from(document.querySelectorAll<HTMLButtonElement>('[data-drive-name-folder]'))
+      const open = async (el: Element | null) => {
+        await act(async () => {
+          ;(el as HTMLElement).click()
+        })
+        await flush()
+        await flush()
+      }
+      const openWeb = vi.fn(async (_target: unknown) => true)
+      const mountWithOrg = async () => {
+        workspaces = workspaces.map((w) => ({ ...w, orgSlug: 'acme' }))
+        Reflect.set(window, 'uniworkWork', { openWeb })
+        await mountHome('en')
+        await flush()
+      }
+      afterEach(() => {
+        Reflect.deleteProperty(window, 'uniworkWork')
+        openWeb.mockClear()
+      })
+
+      it('draws the tree from one request per account: server counts, no no-folder node, no page walk for a closed-in account', async () => {
+        const bridge = serverBridge(listServer())
+        await mountWithOrg()
+        await open(toggleOf('dc-broken'))
+        await open(toggleOf('dc-active'))
+        expect(
+          folderNodes().map((n) => [
+            n.querySelector('.dh-nav-label')?.textContent,
+            n.querySelector('[data-drive-folder-count] [aria-hidden]')?.textContent,
+          ]),
+        ).toEqual([
+          ['Hợp đồng', '7'],
+          ['Drive folder · abcdef', '3'],
+        ])
+        expect(
+          folderNodes()[0]!.querySelector('[data-drive-folder-count] .uw-sr-only')?.textContent,
+        ).toBe('7 files')
+        // the account with only the no-folder group has no folder: its chevron goes
+        expect(toggleOf('dc-broken')).toBeNull()
+        const asked = (bridge.listFolders as ReturnType<typeof vi.fn>).mock.calls.map(
+          ([q]) => (q as { connectionId: string }).connectionId,
+        )
+        expect(asked.sort()).toEqual(['dc-active', 'dc-broken'])
+        expect(bridge.listFolders).toHaveBeenCalledWith({
+          workspaceId: 'ws-1',
+          connectionId: 'dc-active',
+        })
+        // an expanded account that is not open never has its files walked
+        const walked = (bridge.listFiles as ReturnType<typeof vi.fn>).mock.calls
+          .map(([q]) => (q as { connectionId?: string }).connectionId)
+          .filter(Boolean)
+        expect(walked).not.toContain('dc-broken')
+      })
+
+      it('the account view lists the server folders and the files without a folder; a folder keeps its own files only', async () => {
+        serverBridge(listServer())
+        await mountWithOrg()
+        await open(document.querySelector('[data-drive-account="dc-active"]'))
+        expect(
+          folderRows().map((r) => r.querySelector('.dh-drive-file-name')?.textContent),
+        ).toEqual(['Hợp đồng', 'Drive folder · abcdef'])
+        expect(folderRows()[0]!.textContent).toContain('7 files')
+        expect(fileNames()).toEqual(['Không thư mục'])
+
+        await open(folderRows()[0]!)
+        expect(fileNames()).toEqual(['Hợp đồng A', 'Hợp đồng B'])
+        const crumbs = Array.from(document.querySelectorAll('[data-drive-crumbs] li')).map((li) =>
+          li.textContent?.replace('›', '').trim(),
+        )
+        expect(crumbs[2]).toBe('Hợp đồng')
+      })
+
+      it('a file whose folder the list does not know stays visible as a file without a folder', async () => {
+        serverBridge(
+          vi.fn(async () => ({
+            ok: true as const,
+            value: [{ id: 'f_contracts', name: 'Hợp đồng', fileCount: 2 }],
+          })),
+        )
+        await mountWithOrg()
+        await open(document.querySelector('[data-drive-account="dc-active"]'))
+        expect(folderRows()).toHaveLength(1)
+        expect(fileNames()).toEqual(['Ẩn tên', 'Không thư mục'])
+      })
+
+      it('falls back to the folders derived from the files on an old server (404), a list-less answer or a bridge without the call', async () => {
+        const cases: Array<[string, unknown]> = [
+          ['404', vi.fn(async () => ({ ok: false as const, error: 'not_found' as const }))],
+          ['no list', vi.fn(async () => ({ ok: true as const, value: null }))],
+          ['network', vi.fn(async () => ({ ok: false as const, error: 'network' as const }))],
+          ['no bridge call', undefined],
+        ]
+        for (const [label, listFolders] of cases) {
+          serverBridge(listFolders)
+          await mountWithOrg()
+          await open(toggleOf('dc-active'))
+          // derived: counts are the walked files', and there is nothing to name from Drive
+          expect(
+            folderNodes().map((n) => [
+              n.querySelector('.dh-nav-label')?.textContent,
+              n.querySelector('[data-drive-folder-count] [aria-hidden]')?.textContent,
+            ]),
+            label,
+          ).toEqual([
+            ['Hợp đồng', '2'],
+            ['Drive folder · abcdef', '1'],
+          ])
+          expect(nameButtons(), label).toHaveLength(0)
+          await act(async () => root.unmount())
+          root = createRoot(host)
+          Reflect.deleteProperty(window, 'uniworkDrive')
+        }
+      })
+
+      it('refetches the folder list when the window regains focus (back from the web)', async () => {
+        const listFolders = listServer()
+        serverBridge(listFolders)
+        await mountWithOrg()
+        await open(toggleOf('dc-active'))
+        const before = listFolders.mock.calls.length
+        // the folder was named on the web: the next read answers its name
+        listFolders.mockImplementation(async () => ({
+          ok: true as const,
+          value: [
+            { id: 'f_contracts', name: 'Hợp đồng', fileCount: 7 },
+            { id: 'abcdef123456', name: 'Báo giá', fileCount: 3 },
+          ],
+        }))
+        await act(async () => {
+          window.dispatchEvent(new Event('focus'))
+        })
+        await flush()
+        await flush()
+        expect(listFolders.mock.calls.length).toBeGreaterThan(before)
+        expect(folderNodes().map((n) => n.querySelector('.dh-nav-label')?.textContent)).toEqual([
+          'Báo giá',
+          'Hợp đồng',
+        ])
+        expect(nameButtons()).toHaveLength(0)
+      })
+
+      it('keeps the tree when a refresh of the folder list fails', async () => {
+        const listFolders = listServer()
+        serverBridge(listFolders)
+        await mountWithOrg()
+        await open(toggleOf('dc-active'))
+        listFolders.mockImplementation(async () => ({
+          ok: false as const,
+          error: 'network' as const,
+        }))
+        await act(async () => {
+          window.dispatchEvent(new Event('focus'))
+        })
+        await flush()
+        await flush()
+        expect(folderNodes()).toHaveLength(2)
+        expect(
+          folderNodes()[0]!.querySelector('[data-drive-folder-count] [aria-hidden]')?.textContent,
+        ).toBe('7')
+      })
+    })
   })
 })

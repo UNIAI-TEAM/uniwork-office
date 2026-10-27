@@ -4,7 +4,9 @@ import {
   deriveDriveFolders,
   driveFolderFileCount,
   driveFolderLabel,
+  attachFolderFiles,
   filterDriveFilesByName,
+  serverDriveFolders,
   shortFolderId,
 } from '../src/renderer/src/uniwork-home/drive-folders'
 import {
@@ -91,6 +93,78 @@ describe('deriveDriveFolders (UNI-2223 v2)', () => {
     const index = deriveDriveFolders([file('a'), file('b', null)], 'en')
     expect(index.folders).toEqual([])
     expect(index.looseFiles).toHaveLength(2)
+  })
+})
+
+describe('serverDriveFolders and attachFolderFiles (UNI-2223 v3)', () => {
+  it('turns the server list into nodes in the shared order; the no-folder group is not a node', () => {
+    const nodes = serverDriveFolders(
+      [
+        { id: 'zzzzzz-folder', name: null, fileCount: 2 },
+        { id: null, name: null, fileCount: 9 },
+        { id: 'f10', name: 'Quý 10', fileCount: 1 },
+        { id: 'aaaaaa-folder', name: '  ', fileCount: 4 },
+        { id: 'f2', name: 'Quý 2', fileCount: 3 },
+      ],
+      'vi',
+    )
+    expect(nodes.map((n) => [n.key, n.name, n.count, n.shortId])).toEqual([
+      ['f2', 'Quý 2', 3, 'f2'],
+      ['f10', 'Quý 10', 1, 'f10'],
+      ['aaaaaa-folder', null, 4, 'aaaaaa'],
+      ['zzzzzz-folder', null, 2, 'zzzzzz'],
+    ])
+    // the count is the server's; the files come later from the walk
+    expect(nodes.every((n) => n.files.length === 0)).toBe(true)
+  })
+
+  it('keeps one node per id and lets a readable name win', () => {
+    const nodes = serverDriveFolders(
+      [
+        { id: 'f1', name: null, fileCount: 2 },
+        { id: 'f1', name: 'Hợp đồng', fileCount: 5 },
+      ],
+      'en',
+    )
+    expect(nodes.map((n) => [n.key, n.name, n.count])).toEqual([['f1', 'Hợp đồng', 2]])
+  })
+
+  it('an empty or all-null list has no node', () => {
+    expect(serverDriveFolders([], 'en')).toEqual([])
+    expect(serverDriveFolders([{ id: null, name: null, fileCount: 3 }], 'en')).toEqual([])
+  })
+
+  it('puts each file in its listed folder and leaves the rest as files without a folder', () => {
+    const nodes = serverDriveFolders(
+      [
+        { id: 'f1', name: 'One', fileCount: 2 },
+        { id: 'f2', name: 'Two', fileCount: 0 },
+      ],
+      'en',
+    )
+    const out = attachFolderFiles(nodes, [
+      file('a', { id: 'f1', name: 'One' }),
+      file('b'),
+      file('c', { id: 'f_unlisted', name: null }),
+      file('d', { id: 'f1', name: 'One' }),
+      file('e', null),
+    ])
+    expect(out.folders.map((f) => [f.key, f.count, f.files.map((x) => x.id)])).toEqual([
+      ['f1', 2, ['a', 'd']],
+      ['f2', 0, []],
+    ])
+    // an unlisted parent must not hide the file
+    expect(out.looseFiles.map((f) => f.id)).toEqual(['b', 'c', 'e'])
+    // the input nodes are not mutated
+    expect(nodes.every((n) => n.files.length === 0)).toBe(true)
+  })
+
+  it('derived folders carry their file count', () => {
+    const index = deriveDriveFolders(
+      [file('a', { id: 'f1', name: 'One' }), file('b', { id: 'f1', name: 'One' })],
+      'en',
+    )
+    expect(index.folders[0]?.count).toBe(2)
   })
 })
 

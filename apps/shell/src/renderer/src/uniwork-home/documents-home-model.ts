@@ -3,6 +3,8 @@ import type {
   DriveFile,
   DriveFileListPage,
   DriveFileListQuery,
+  DriveFolderListQuery,
+  DriveFolderSummary,
   UniworkDocShareScope,
   UniworkDocTypePick,
   UniworkDocListPage,
@@ -447,9 +449,16 @@ export interface DocumentsHomeApiAdapter {
     workspaceId: string,
   ) => Promise<UniworkDriveResult<DriveConnection[]>>
   uniworkDriveListFiles?: (q: DriveFileListQuery) => Promise<UniworkDriveResult<DriveFileListPage>>
+  /** UNI-2223 (v3): the server folder list of one account; a bridge without it reads as an old server */
+  uniworkDriveListFolders?: (
+    q: DriveFolderListQuery,
+  ) => Promise<UniworkDriveResult<DriveFolderSummary[] | null>>
   isAvailable?: () => Promise<boolean>
   listConnections?: (workspaceId: string) => Promise<UniworkDriveResult<DriveConnection[]>>
   listFiles?: (q: DriveFileListQuery) => Promise<UniworkDriveResult<DriveFileListPage>>
+  listFolders?: (
+    q: DriveFolderListQuery,
+  ) => Promise<UniworkDriveResult<DriveFolderSummary[] | null>>
 }
 
 function mapDocListPageResult(
@@ -934,6 +943,24 @@ export async function fetchDocumentsHomeDriveFiles(
       ...(params.cursor ? { cursor: params.cursor } : {}),
       ...(params.limit ? { limit: params.limit } : {}),
     })
+  } catch {
+    return { ok: false, error: 'network' }
+  }
+}
+
+/**
+ * Reads the server folder list of one Google Drive account (`GET /workspaces/{ws}/drive-folders`).
+ * A bridge that cannot list folders answers `not_found` like an old server: the caller derives the
+ * folders from the files instead.
+ */
+export async function fetchDocumentsHomeDriveFolders(
+  api: DocumentsHomeApiAdapter | null | undefined,
+  params: { workspaceId: string; connectionId: string },
+): Promise<UniworkDriveResult<DriveFolderSummary[] | null>> {
+  const fn = api?.listFolders ?? api?.uniworkDriveListFolders
+  if (typeof fn !== 'function') return { ok: false, error: 'not_found' }
+  try {
+    return await fn.call(api, params)
   } catch {
     return { ok: false, error: 'network' }
   }
