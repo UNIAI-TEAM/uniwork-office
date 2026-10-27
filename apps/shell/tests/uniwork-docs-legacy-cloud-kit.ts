@@ -65,10 +65,11 @@ export const TARGET: Record<Legacy, Ooxml> = { doc: 'docx', xls: 'xlsx', ppt: 'p
 /** a minimal valid OOXML package of one family (the shape the converter hands back) */
 export async function ooxml(kind: Ooxml, marker = 'converted'): Promise<Uint8Array> {
   const zip = new JSZip()
-  // a fixed date keeps two builds of the same package byte-identical
+  // a fixed date keeps two builds of the same package byte-identical; the implicit folder entry
+  // ("xl/") of a nested part would be stamped with the current time instead, so none is created
   const date = new Date('2000-01-01T00:00:00Z')
   zip.file('[Content_Types].xml', '<Types/>', { date })
-  zip.file(MAIN_PART[kind], `<root>${marker}</root>`, { date })
+  zip.file(MAIN_PART[kind], `<root>${marker}</root>`, { date, createFolders: false })
   return zip.generateAsync({ type: 'uint8array' })
 }
 
