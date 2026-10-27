@@ -857,20 +857,24 @@ export function useDocumentsHomeDrive({
       if (!res) return
       if (res.ok) {
         setNetworkFailed(false)
-        setConnections(res.value)
+        const known = avail || seenInSessionRef.current
         // no connection: one file is enough to keep the Drive row (its connection may be disconnected)
         let linked = 0
-        if ((avail || seenInSessionRef.current) && res.value.length === 0) {
+        if (known && res.value.length === 0) {
           const probe = await fetchDocumentsHomeDriveFiles(bridge, {
             workspaceId,
             connectionId: null,
             limit: 1,
           })
           if (connSeqRef.current !== seq) return
-          if (probe.ok) linked = probe.value.totalCount ?? probe.value.files.length
+          // a failed probe keeps the last good connections and count: the row neither blinks nor vanishes
+          if (!probe.ok) return
+          linked = probe.value.totalCount
         }
+        // committed together, so the row does not blink while the probe is in flight
+        setConnections(res.value)
         setOrphanFileCount(linked)
-        if ((avail || seenInSessionRef.current) && (res.value.length > 0 || linked > 0)) {
+        if (known && (res.value.length > 0 || linked > 0)) {
           seenInSessionRef.current = true
           setSeenInSession(true)
         }

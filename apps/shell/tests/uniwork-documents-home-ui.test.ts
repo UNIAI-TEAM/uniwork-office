@@ -3372,6 +3372,110 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       expect(document.querySelector('[data-drive-reconnect]')).not.toBeNull()
     })
 
+    describe('the no-connection probe (D4B-fix2)', () => {
+      const lostFile = {
+        ...fileBroken,
+        boundConnectionLost: true,
+        viewerAccess: 'connection_lost' as const,
+      }
+      const driveRow = () => document.querySelector('[data-nav="google-drive"]')
+      const renderWs = async (workspaceId: string) => {
+        await act(async () => {
+          root.render(
+            createElement(
+              LocaleProvider,
+              { initial: 'vi' },
+              createElement(DocumentsHome, {
+                workspaceId,
+                workspaces,
+                onWorkspaceChange: vi.fn(),
+                onOpenDocument: vi.fn(),
+                sidebarHost: sidebarSlot,
+              }),
+            ),
+          )
+        })
+        await flush()
+      }
+      const refocus = async () => {
+        await act(async () => {
+          window.dispatchEvent(new Event('focus'))
+        })
+        await flush()
+      }
+
+      it('keeps the row when a later probe fails, and does not show one when the first probe fails', async () => {
+        let probeFails = false
+        const bridge = installDriveBridge({
+          listConnections: vi.fn(async () => ({ ok: true as const, value: [] })),
+          listFiles: vi.fn(async () =>
+            probeFails
+              ? { ok: false as const, error: 'server_error' }
+              : {
+                  ok: true as const,
+                  value: { files: [lostFile], totalCount: 1, nextCursor: null },
+                },
+          ),
+        })
+        await mountHome()
+        expect(driveRow()).not.toBeNull()
+        probeFails = true
+        await refocus()
+        expect(bridge.listFiles).toHaveBeenCalledTimes(2)
+        expect(driveRow()).not.toBeNull()
+        expect(driveRow()!.querySelector('[data-drive-total]')?.textContent).toBe('1')
+
+        // never shown: a failing probe leaves the row hidden
+        installDriveBridge({
+          listConnections: vi.fn(async () => ({ ok: true as const, value: [] })),
+          listFiles: vi.fn(async () => ({ ok: false as const, error: 'server_error' })),
+        })
+        await act(async () => {
+          root.unmount()
+        })
+        root = createRoot(host)
+        await mountHome()
+        expect(driveRow()).toBeNull()
+      })
+
+      it('sends no probe when the viewer has a connection', async () => {
+        const bridge = installDriveBridge()
+        await mountHome()
+        await refocus()
+        expect(bridge.listConnections).toHaveBeenCalled()
+        expect(
+          bridge.listFiles.mock.calls.filter(([q]) => (q as { limit?: number }).limit === 1),
+        ).toHaveLength(0)
+      })
+
+      it('ignores a probe that answers after the workspace changed', async () => {
+        let answerProbe: (v: unknown) => void = () => undefined
+        const bridge = installDriveBridge({
+          listConnections: vi.fn(async () => ({ ok: true as const, value: [] })),
+          listFiles: vi.fn(
+            (q: { workspaceId: string }) =>
+              new Promise((resolve) => {
+                if (q.workspaceId === 'ws-1') answerProbe = resolve
+                else resolve({ ok: true, value: { files: [], totalCount: 0, nextCursor: null } })
+              }),
+          ),
+        })
+        await mountHome()
+        expect(bridge.listFiles).toHaveBeenCalledTimes(1)
+        expect(driveRow()).toBeNull()
+        await renderWs('ws-2')
+        await act(async () => {
+          answerProbe({
+            ok: true,
+            value: { files: [lostFile], totalCount: 1, nextCursor: null },
+          })
+        })
+        await flush()
+        // ws-2 has no connection and no file: the ws-1 count must not show its row
+        expect(driveRow()).toBeNull()
+      })
+    })
+
     it('renders Google Drive under My Folder with account sub-rows, Mất kết nối badge, 5-column table, and double-click / Enter open-on-google', async () => {
       folderTree[0] = { ...folderTree[0]!, systemKind: 'my_folder' }
       const driveBridge = installDriveBridge()
