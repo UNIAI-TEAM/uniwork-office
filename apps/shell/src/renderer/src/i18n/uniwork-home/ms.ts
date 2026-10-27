@@ -273,6 +273,8 @@ export const ms = {
   uhDriveAddFromAccount: 'Tambah daripada {email}',
   uhDriveManageConnections: 'Urus sambungan',
   uhDriveFolderUnnamed: 'Folder Drive · {id}',
+  uhDriveNameFolder: 'Namakan daripada Drive',
+  uhDriveNameFolderFor: 'Namakan daripada Drive: {folder}',
   uhDriveFolderFilesOne: '{n} fail',
   uhDriveFolderFilesOther: '{n} fail',
   uhDriveBreadcrumb: 'Lokasi dalam Google Drive',

@@ -273,6 +273,8 @@ export const hi = {
   uhDriveAddFromAccount: '{email} से जोड़ें',
   uhDriveManageConnections: 'कनेक्शन प्रबंधित करें',
   uhDriveFolderUnnamed: 'Drive फ़ोल्डर · {id}',
+  uhDriveNameFolder: 'Drive से नाम दें',
+  uhDriveNameFolderFor: 'Drive से नाम दें: {folder}',
   uhDriveFolderFilesOne: '{n} फ़ाइल',
   uhDriveFolderFilesOther: '{n} फ़ाइलें',
   uhDriveBreadcrumb: 'Google Drive में स्थान',

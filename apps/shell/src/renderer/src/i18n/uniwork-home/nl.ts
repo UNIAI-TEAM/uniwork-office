@@ -275,6 +275,8 @@ export const nl = {
   uhDriveAddFromAccount: 'Toevoegen vanuit {email}',
   uhDriveManageConnections: 'Verbindingen beheren',
   uhDriveFolderUnnamed: 'Drive-map · {id}',
+  uhDriveNameFolder: 'Naam overnemen uit Drive',
+  uhDriveNameFolderFor: 'Naam overnemen uit Drive: {folder}',
   uhDriveFolderFilesOne: '{n} bestand',
   uhDriveFolderFilesOther: '{n} bestanden',
   uhDriveBreadcrumb: 'Locatie in Google Drive',

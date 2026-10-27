@@ -764,4 +764,19 @@ describe('tree grid numbers: TS and CSS cannot drift (D4BF-R3-3)', () => {
     // a folder of an account has no raw colour of its own: the row reuses the nav-item states
     expect(css).not.toMatch(/\.dh-drive-nav-folder[^{]*\{[^}]*#[0-9a-f]{3,8}/i)
   })
+
+  it('the Name from Drive action sits before the count column and shows on hover or focus only (UNI-2223 v3)', () => {
+    const css = sidebarCss.replace(/\/\*[\s\S]*?\*\//g, '')
+    const rule = /\.dh-drive-name-folder\s*\{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(rule).toMatch(/position:\s*absolute/)
+    expect(rule).toMatch(
+      /inset-inline-end:\s*calc\(var\(--dh-tree-end\) \+ var\(--dh-tree-count-w, 28px\)\)/,
+    )
+    expect(rule).toMatch(/opacity:\s*0/)
+    expect(css).toMatch(
+      /\.dh-drive-folder-node:hover > \.dh-drive-name-folder,\s*\.dh-drive-folder-node:focus-within > \.dh-drive-name-folder\s*\{\s*opacity:\s*1;/,
+    )
+    // chrome colours come from tokens, never a raw value
+    expect(rule).not.toMatch(/#[0-9a-f]{3,8}|rgb\(/i)
+  })
 })

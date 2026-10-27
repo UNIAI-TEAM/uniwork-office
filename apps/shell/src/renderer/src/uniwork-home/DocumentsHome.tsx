@@ -1218,6 +1218,16 @@ export function DocumentsHome({
     void openDriveWeb(build(driveWeb))
   }
 
+  /**
+   * UNI-2223 v3: "Name from Drive" on an unnamed folder. The app has no Google Picker, so the web
+   * library opens with the folder and `nameFolder=1`; returning to the app refetches the folders on focus.
+   */
+  const nameDriveFolder =
+    driveWeb?.orgSlug && driveWeb.wsSlug
+      ? (accountId: string, folderId: string) =>
+          driveHandOff((base) => ({ kind: 'drive-name-folder', ...base, accountId, folderId }))
+      : undefined
+
   /** closes the Drive panel; focus goes back to the row it was opened from */
   const closeDrivePanel = () => {
     const id = driveSel?.row.id
@@ -2543,6 +2553,7 @@ export function DocumentsHome({
       expanded={expanded.has(DRIVE_NODE_KEY)}
       expandedAccountIds={new Set(expandedDriveAccountIds)}
       folderTree={drive.folderTree}
+      onNameFolder={nameDriveFolder}
       onToggle={() =>
         setExpanded((prev) => {
           const next = new Set(prev)
@@ -2779,6 +2790,14 @@ export function DocumentsHome({
               folderLabel={currentHeading}
               onOpenDrive={() => openDrive(null)}
               onOpenAccount={() => openDrive(drive.selectedConnection?.id ?? null)}
+              onNameFolder={
+                nameDriveFolder &&
+                drive.canNameFolders &&
+                drive.status === 'ready' &&
+                !driveFolder.name
+                  ? () => nameDriveFolder(drive.selectedConnection?.id ?? '', driveFolder.key)
+                  : undefined
+              }
             />
           ) : folderHeader && folderId !== null ? (
             <BrowserCrumbs

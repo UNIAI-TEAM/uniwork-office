@@ -268,6 +268,26 @@ export function openDriveWeb(target: WorkWebTarget): Promise<boolean> {
   }
 }
 
+/** the pencil of "Name from Drive" (the same glyph the workspace folder header uses to rename) */
+function NameFolderGlyph() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  )
+}
+
 /**
  * Sidebar rows for Google Drive (spec §17.2, §7.6, prototype `Docs-List.dc.html`):
  * sits directly under "Thư mục của tôi" in the Folders section, with one child row
@@ -286,6 +306,7 @@ export function DriveSidebarRows({
   onToggleAccount,
   onSelect,
   onSelectFolder,
+  onNameFolder,
 }: {
   state: DriveSidebarState
   active: boolean
@@ -301,6 +322,8 @@ export function DriveSidebarRows({
   onToggleAccount: (connectionId: string) => void
   onSelect: (connectionId: string | null) => void
   onSelectFolder: (connectionId: string, folderKey: string) => void
+  /** "Name from Drive" on an unnamed folder node: hands off to the web; omitted = no action drawn */
+  onNameFolder?: (connectionId: string, folderKey: string) => void
 }) {
   const { t } = useI18n()
   const accountsId = useId()
@@ -413,6 +436,9 @@ export function DriveSidebarRows({
                     {tree?.folders.map((folder) => {
                       const current = folderCurrent && selectedFolderKey === folder.key
                       const folderLabel = driveFolderLabel(folder, t)
+                      // only a folder the server could not name, and only against a server that can name it
+                      const nameable =
+                        Boolean(onNameFolder) && tree.source === 'server' && !folder.name
                       return (
                         <div key={folder.key} className="dh-drive-node dh-drive-folder-node">
                           <button
@@ -432,6 +458,19 @@ export function DriveSidebarRows({
                               </span>
                             </span>
                           </button>
+                          {/* a sibling of the row button (a button cannot hold a button), shown on hover and focus */}
+                          {nameable && (
+                            <button
+                              type="button"
+                              className="dh-drive-name-folder"
+                              data-drive-name-folder={folder.key}
+                              aria-label={t('uhDriveNameFolderFor', { folder: folderLabel })}
+                              title={t('uhDriveNameFolder')}
+                              onClick={() => onNameFolder?.(acct.id, folder.key)}
+                            >
+                              <NameFolderGlyph />
+                            </button>
+                          )}
                         </div>
                       )
                     })}
@@ -456,11 +495,14 @@ export function DriveFolderCrumbs({
   folderLabel,
   onOpenDrive,
   onOpenAccount,
+  onNameFolder,
 }: {
   accountEmail: string
   folderLabel: string
   onOpenDrive: () => void
   onOpenAccount: () => void
+  /** "Name from Drive", drawn after the title of an unnamed folder; omitted = no action */
+  onNameFolder?: () => void
 }) {
   const { t } = useI18n()
   const sep = (
@@ -499,6 +541,20 @@ export function DriveFolderCrumbs({
           >
             {folderLabel}
           </h1>
+          {onNameFolder && (
+            <span className="uwf-crumb-actions">
+              <button
+                type="button"
+                className="uwf-crumb-rename"
+                data-drive-name-folder-header=""
+                aria-label={t('uhDriveNameFolder')}
+                title={t('uhDriveNameFolder')}
+                onClick={onNameFolder}
+              >
+                <NameFolderGlyph />
+              </button>
+            </span>
+          )}
         </li>
       </ol>
     </nav>
@@ -982,6 +1038,8 @@ export interface UseDocumentsHomeDriveResult {
   folders: readonly DriveFolder[]
   /** the folders of every account loaded for the sidebar tree */
   folderTree: Readonly<Record<string, DriveAccountFolders>>
+  /** the open folder (or the account's folders) can be named from Drive: the server answers the folder list */
+  canNameFolders: boolean
   /** selects an account (and one of its folders); `null` account = every account */
   select: (accountId: string | null, folderKey?: string | null) => void
   /** the raw selection (not resolved against the connections), for the host to keep */
@@ -1506,6 +1564,7 @@ export function useDocumentsHomeDrive({
     scope,
     folders: shownFolders,
     folderTree,
+    canNameFolders: tree?.source === 'server',
     select,
     viewState: { accountId: selectedAccountId, folderKey: selectedFolderKeyRaw },
     findFile,

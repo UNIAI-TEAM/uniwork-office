@@ -228,6 +228,45 @@
   );
 }
 
+/* a folder node holds the row button and, for an unnamed folder, the "Name from Drive" action as a
+   sibling; the row's own :hover stops matching while the pointer is on the action */
+.dh-drive-folder-node:hover > .dh-drive-nav-folder:not(.active) {
+  background: var(--hover);
+}
+
+/* the action sits just before the count column and shows on hover and keyboard focus only */
+.dh-drive-name-folder {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: calc(var(--dh-tree-end) + var(--dh-tree-count-w, 28px));
+  margin-block: auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--hover);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.dh-drive-folder-node:hover > .dh-drive-name-folder,
+.dh-drive-folder-node:focus-within > .dh-drive-name-folder {
+  opacity: 1;
+}
+
+.dh-drive-name-folder:hover {
+  color: var(--text);
+}
+
+.dh-drive-name-folder:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .dh-drive-folders {
   display: flex;
   flex-direction: column;

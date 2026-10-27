@@ -268,6 +268,8 @@ export const en = {
   uhDriveAddFromAccount: 'Add from {email}',
   uhDriveManageConnections: 'Manage connections',
   uhDriveFolderUnnamed: 'Drive folder · {id}',
+  uhDriveNameFolder: 'Name from Drive',
+  uhDriveNameFolderFor: 'Name from Drive: {folder}',
   uhDriveFolderFilesOne: '{n} file',
   uhDriveFolderFilesOther: '{n} files',
   uhDriveBreadcrumb: 'Google Drive location',

@@ -272,6 +272,8 @@ export const cs = {
   uhDriveAddFromAccount: 'Přidat z {email}',
   uhDriveManageConnections: 'Spravovat připojení',
   uhDriveFolderUnnamed: 'Složka na Drive · {id}',
+  uhDriveNameFolder: 'Pojmenovat podle Drive',
+  uhDriveNameFolderFor: 'Pojmenovat podle Drive: {folder}',
   uhDriveFolderFilesOne: 'Soubory: {n}',
   uhDriveFolderFilesOther: 'Soubory: {n}',
   uhDriveBreadcrumb: 'Umístění na Google Drive',

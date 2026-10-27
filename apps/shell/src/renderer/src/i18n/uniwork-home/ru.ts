@@ -273,6 +273,8 @@ export const ru = {
   uhDriveAddFromAccount: 'Добавить из {email}',
   uhDriveManageConnections: 'Управление подключениями',
   uhDriveFolderUnnamed: 'Папка на Drive · {id}',
+  uhDriveNameFolder: 'Назвать как в Drive',
+  uhDriveNameFolderFor: 'Назвать как в Drive: {folder}',
   uhDriveFolderFilesOne: 'Файлов: {n}',
   uhDriveFolderFilesOther: 'Файлов: {n}',
   uhDriveBreadcrumb: 'Расположение в Google Drive',

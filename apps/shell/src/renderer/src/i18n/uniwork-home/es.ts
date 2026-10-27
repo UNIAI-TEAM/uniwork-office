@@ -276,6 +276,8 @@ export const es = {
   uhDriveAddFromAccount: 'Añadir desde {email}',
   uhDriveManageConnections: 'Gestionar conexiones',
   uhDriveFolderUnnamed: 'Carpeta de Drive · {id}',
+  uhDriveNameFolder: 'Nombrar desde Drive',
+  uhDriveNameFolderFor: 'Nombrar desde Drive: {folder}',
   uhDriveFolderFilesOne: '{n} archivo',
   uhDriveFolderFilesOther: '{n} archivos',
   uhDriveBreadcrumb: 'Ubicación en Google Drive',

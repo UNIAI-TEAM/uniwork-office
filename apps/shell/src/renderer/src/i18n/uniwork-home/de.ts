@@ -279,6 +279,8 @@ export const de = {
   uhDriveAddFromAccount: 'Aus {email} hinzufügen',
   uhDriveManageConnections: 'Verbindungen verwalten',
   uhDriveFolderUnnamed: 'Drive-Ordner · {id}',
+  uhDriveNameFolder: 'Namen aus Drive übernehmen',
+  uhDriveNameFolderFor: 'Namen aus Drive übernehmen: {folder}',
   uhDriveFolderFilesOne: '{n} Datei',
   uhDriveFolderFilesOther: '{n} Dateien',
   uhDriveBreadcrumb: 'Ort in Google Drive',

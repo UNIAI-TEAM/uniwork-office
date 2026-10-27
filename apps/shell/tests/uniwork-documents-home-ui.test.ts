@@ -4596,6 +4596,66 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         }
       })
 
+      it('offers Name from Drive on an unnamed node only, and hands off to the web with the folder', async () => {
+        serverBridge(listServer())
+        await mountWithOrg()
+        await open(toggleOf('dc-active'))
+        // the named folder has no action; the unnamed one has it, named after the folder
+        expect(nameButtons().map((b) => b.dataset.driveNameFolder)).toEqual(['abcdef123456'])
+        expect(nameButtons()[0]!.getAttribute('aria-label')).toBe(
+          'Name from Drive: Drive folder · abcdef',
+        )
+        await open(nameButtons()[0]!)
+        expect(openWeb).toHaveBeenCalledTimes(1)
+        expect(openWeb).toHaveBeenCalledWith({
+          kind: 'drive-name-folder',
+          orgSlug: 'acme',
+          wsSlug: 'uniwork',
+          accountId: 'dc-active',
+          folderId: 'abcdef123456',
+        })
+        // the action is not the row: the folder did not open
+        expect(document.querySelector('[data-drive-crumbs]')).toBeNull()
+      })
+
+      it('the header of an unnamed folder carries the same action; a named folder has none', async () => {
+        serverBridge(listServer())
+        await mountWithOrg()
+        await open(document.querySelector('[data-drive-account="dc-active"]'))
+        await open(folderRows()[0]!)
+        expect(document.querySelector('[data-drive-name-folder-header]')).toBeNull()
+
+        await open(document.querySelector('[data-crumb="account"]'))
+        await open(folderRows()[1]!)
+        const header = document.querySelector<HTMLButtonElement>('[data-drive-name-folder-header]')
+        expect(header?.getAttribute('aria-label')).toBe('Name from Drive')
+        // the hand-off ignores a repeat of the same target within a second (a double click): step past it
+        const realNow = Date.now()
+        const clock = vi.spyOn(Date, 'now').mockReturnValue(realNow + 5000)
+        try {
+          await open(header)
+        } finally {
+          clock.mockRestore()
+        }
+        expect(openWeb).toHaveBeenCalledWith({
+          kind: 'drive-name-folder',
+          orgSlug: 'acme',
+          wsSlug: 'uniwork',
+          accountId: 'dc-active',
+          folderId: 'abcdef123456',
+        })
+      })
+
+      it('draws no action when the workspace has no web address to hand off to', async () => {
+        serverBridge(listServer())
+        Reflect.set(window, 'uniworkWork', { openWeb })
+        await mountHome('en')
+        await flush()
+        await open(toggleOf('dc-active'))
+        expect(folderNodes()).toHaveLength(2)
+        expect(nameButtons()).toHaveLength(0)
+      })
+
       it('refetches the folder list when the window regains focus (back from the web)', async () => {
         const listFolders = listServer()
         serverBridge(listFolders)

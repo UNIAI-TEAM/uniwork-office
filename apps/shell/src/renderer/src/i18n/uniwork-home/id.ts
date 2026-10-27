@@ -271,6 +271,8 @@ export const id = {
   uhDriveAddFromAccount: 'Tambahkan dari {email}',
   uhDriveManageConnections: 'Kelola koneksi',
   uhDriveFolderUnnamed: 'Folder Drive · {id}',
+  uhDriveNameFolder: 'Beri nama dari Drive',
+  uhDriveNameFolderFor: 'Beri nama dari Drive: {folder}',
   uhDriveFolderFilesOne: '{n} file',
   uhDriveFolderFilesOther: '{n} file',
   uhDriveBreadcrumb: 'Lokasi di Google Drive',

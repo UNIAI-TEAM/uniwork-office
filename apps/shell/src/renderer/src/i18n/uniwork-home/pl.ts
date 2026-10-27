@@ -274,6 +274,8 @@ export const pl = {
   uhDriveAddFromAccount: 'Dodaj z {email}',
   uhDriveManageConnections: 'Zarządzaj połączeniami',
   uhDriveFolderUnnamed: 'Folder na Drive · {id}',
+  uhDriveNameFolder: 'Nazwij według Drive',
+  uhDriveNameFolderFor: 'Nazwij według Drive: {folder}',
   uhDriveFolderFilesOne: 'Pliki: {n}',
   uhDriveFolderFilesOther: 'Pliki: {n}',
   uhDriveBreadcrumb: 'Lokalizacja w Google Drive',
