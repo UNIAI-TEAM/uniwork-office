@@ -2252,8 +2252,8 @@
   color: var(--text-secondary);
 }
 
-/* the panel carries the details, so the list keeps Name + Access and lets the badge wrap (D3-V1; not when the panel stacks under the table, <= 900 px) */
-@media (min-width: 901px) {
+/* the panel carries the details, so the list keeps Name + Access and lets the badge wrap (D3-V1; not when the panel stacks under the table, <= 1100 px) */
+@media (min-width: 1101px) {
   .dh-drive-view.has-panel .dh-drive-col-account,
   .dh-drive-view.has-panel .dh-drive-cell-account,
   .dh-drive-view.has-panel .dh-drive-col-used,
@@ -2551,26 +2551,8 @@ p.dh-drive-panel-muted {
   color: var(--danger-text);
 }
 
-/* at ~900 px the panel narrows and carries account + access, so the list keeps only Name (D3-V2) */
+/* D4B-fix2: up to 1100 px the list would shrink to Name only beside the panel, so the panel sits below it */
 @media (max-width: 1100px) {
-  .dh-drive-panel {
-    flex-basis: 300px;
-  }
-}
-
-@media (min-width: 901px) and (max-width: 1100px) {
-  .dh-drive-view.has-panel .dh-drive-col-access,
-  .dh-drive-view.has-panel .dh-drive-cell-access {
-    display: none;
-  }
-
-  .dh-drive-view.has-panel .dh-drive-col-name {
-    width: 100%;
-  }
-}
-
-/* D4B-fix1: up to 900 px the list is three columns wide, so the panel sits below it instead of squeezing it */
-@media (max-width: 900px) {
   .dh-drive-body {
     flex-direction: column;
   }
