@@ -4209,14 +4209,14 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         expect(
           folderNodes().map((n) => [
             n.querySelector('.dh-nav-label')?.textContent,
-            n.querySelector('[data-drive-folder-count]')?.textContent,
+            n.querySelector('[data-drive-folder-count] [aria-hidden]')?.textContent,
           ]),
         ).toEqual([
           ['Hợp đồng', '2'],
           ['Drive folder · abcdef', '1'],
         ])
         expect(
-          folderNodes()[0]!.querySelector('[data-drive-folder-count]')?.getAttribute('aria-label'),
+          folderNodes()[0]!.querySelector('[data-drive-folder-count] .uw-sr-only')?.textContent,
         ).toBe('2 files')
         // the node is a row of the tree grid: icon, name, count
         expect(folderNodes()[0]!.querySelector('.uwf-glyph')).not.toBeNull()

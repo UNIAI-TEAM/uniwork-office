@@ -421,12 +421,11 @@ export function DriveSidebarRows({
                         >
                           <FolderGlyph />
                           <span className="dh-nav-label">{folderLabel}</span>
-                          <span
-                            className="dh-drive-nav-count"
-                            data-drive-folder-count=""
-                            aria-label={driveFolderFileCount(folder.files.length, t)}
-                          >
-                            {folder.files.length}
+                          <span className="dh-drive-nav-count" data-drive-folder-count="">
+                            <span aria-hidden="true">{folder.files.length}</span>
+                            <span className="uw-sr-only">
+                              {driveFolderFileCount(folder.files.length, t)}
+                            </span>
                           </span>
                         </button>
                       )
@@ -478,6 +477,7 @@ export function DriveFolderCrumbs({
             type="button"
             className="uwf-crumb-btn"
             data-crumb="account"
+            dir="auto"
             title={accountEmail}
             onClick={onOpenAccount}
           >
@@ -489,6 +489,7 @@ export function DriveFolderCrumbs({
           <h1
             className="uwf-crumb-current uwf-crumb-heading"
             aria-current="page"
+            dir="auto"
             title={folderLabel}
           >
             {folderLabel}
