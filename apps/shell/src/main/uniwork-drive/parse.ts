@@ -250,7 +250,12 @@ export function parseDriveFile(value: unknown): DriveFile {
   }
 }
 
-/** `{ files: DriveFileDTO[], total_count: number, next_cursor: string | null }` */
+/**
+ * `{ files: DriveFileDTO[], total_count: number, next_cursor: string | null, drive_folder_id?: string | null }`.
+ * `drive_folder_id` echoes the applied folder filter. Lenient: a non-empty string or null is kept;
+ * an absent key, an empty string or any other type reads as absent, which tells the caller the
+ * server did not confirm a filter (an old server), so a malformed echo can never pass for one.
+ */
 export function parseDriveFileList(raw: unknown): DriveFileListPage {
   const r = record(raw)
   if (!Array.isArray(r.files)) bad()
@@ -262,10 +267,14 @@ export function parseDriveFileList(raw: unknown): DriveFileListPage {
     const c = text(r.next_cursor)
     nextCursor = c.length > 0 ? c : null
   }
+  const echo = r.drive_folder_id
+  const driveFolderId =
+    echo === null || (typeof echo === 'string' && echo.length > 0) ? echo : undefined
   return {
     files,
     totalCount,
     nextCursor,
+    ...(driveFolderId !== undefined ? { driveFolderId } : {}),
   }
 }
 

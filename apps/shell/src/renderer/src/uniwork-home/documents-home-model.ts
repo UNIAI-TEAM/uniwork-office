@@ -941,6 +941,8 @@ export async function fetchDocumentsHomeDriveFiles(
   params: {
     workspaceId: string
     connectionId?: string | null
+    /** a Drive folder id, or `none` for the files with no known parent; absent = every file */
+    driveFolderId?: string
     cursor?: string
     limit?: number
   },
@@ -954,6 +956,7 @@ export async function fetchDocumentsHomeDriveFiles(
     return await fn.call(api, {
       workspaceId: params.workspaceId,
       ...(connectionId ? { connectionId } : {}),
+      ...(params.driveFolderId ? { driveFolderId: params.driveFolderId } : {}),
       ...(params.cursor ? { cursor: params.cursor } : {}),
       ...(params.limit ? { limit: params.limit } : {}),
     })

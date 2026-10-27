@@ -304,6 +304,8 @@ describe('uniwork-drive IPC wiring', () => {
       { workspaceId: 'ws_1', connectionId: 'bad/id' },
       { workspaceId: 'ws_1', cursor: 123 },
       { workspaceId: 'ws_1', limit: '50' },
+      { workspaceId: 'ws_1', driveFolderId: 7 },
+      { workspaceId: 'ws_1', driveFolderId: 'bad id' },
     ]) {
       expect(await call(C.listFiles, badQuery)).toEqual({ ok: false, error: 'server_error' })
     }

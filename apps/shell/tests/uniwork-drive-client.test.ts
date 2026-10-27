@@ -297,6 +297,48 @@ describe('uniwork drive client: routes and query formatting', () => {
     ])
   })
 
+  it('sends the folder filter as drive_folder_id: a Google folder id or none, with the other filters and the cursor', async () => {
+    const fetch = server()
+    const api = client(fetch)
+    await api.listFiles({
+      workspaceId: 'ws_1',
+      connectionId: 'conn_1',
+      driveFolderId: '1AbCdEfGhIjK_lmn-OP',
+      cursor: 'cur_abc',
+      limit: 25,
+    })
+    await api.listFiles({ workspaceId: 'ws_1', driveFolderId: 'none' })
+    // absent, null and empty mean no filter
+    await api.listFiles({ workspaceId: 'ws_1', driveFolderId: undefined })
+    await api.listFiles({ workspaceId: 'ws_1', driveFolderId: '' })
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      `${ORIGIN}/api/v1/workspaces/ws_1/drive-files?connection_id=conn_1&drive_folder_id=1AbCdEfGhIjK_lmn-OP&cursor=cur_abc&limit=25`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/drive-files?drive_folder_id=none&limit=50`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/drive-files?limit=50`,
+      `${ORIGIN}/api/v1/workspaces/ws_1/drive-files?limit=50`,
+    ])
+  })
+
+  it('refuses a folder filter that is neither none nor shaped like a Google id, before any request', async () => {
+    const fetch = server()
+    const api = client(fetch)
+    for (const driveFolderId of [
+      'short',
+      'has space in id',
+      'a/b/c/d/e/f/g/h',
+      'x'.repeat(257),
+      'NONE',
+      'none ',
+      42,
+      {},
+    ]) {
+      await expect(
+        api.listFiles({ workspaceId: 'ws_1', driveFolderId } as never),
+      ).rejects.toMatchObject({ code: 'server_error' })
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('refuses invalid IDs or bad query arguments before making any network request', async () => {
     const fetch = server()
     const api = client(fetch)
@@ -463,6 +505,27 @@ describe('uniwork drive client: parsing', () => {
     })
     const page = await client(fetch).listFiles({ workspaceId: 'ws_1' })
     expect(page.files.map((f) => f.driveFolder)).toEqual(cases.map(([, parsed]) => parsed))
+  })
+
+  it('reads the drive_folder_id echo: a string or null as sent, anything else as absent (an old server)', async () => {
+    const echoOf = async (body: Record<string, unknown>) => {
+      const fetch = server({
+        'GET /workspaces/ws_1/drive-files': () =>
+          json(200, { files: [], total_count: 0, next_cursor: null, ...body }),
+      })
+      return client(fetch).listFiles({ workspaceId: 'ws_1' })
+    }
+    expect((await echoOf({ drive_folder_id: 'f_abcdefghij' })).driveFolderId).toBe('f_abcdefghij')
+    expect((await echoOf({ drive_folder_id: 'none' })).driveFolderId).toBe('none')
+    // null = the server applied no filter: kept apart from "key absent"
+    const none = await echoOf({ drive_folder_id: null })
+    expect(none.driveFolderId).toBeNull()
+    expect('driveFolderId' in none).toBe(true)
+    // absent, and values that cannot be an echo, never throw and read as absent
+    for (const drive_folder_id of [undefined, '', 7, true, {}, ['none']]) {
+      const page = await echoOf(drive_folder_id === undefined ? {} : { drive_folder_id })
+      expect('driveFolderId' in page).toBe(false)
+    }
   })
 
   it('turns malformed / partial JSON bodies into malformed_response (mapped to server_error)', async () => {

@@ -44,6 +44,8 @@ export interface UniworkDriveClient {
 export const DRIVE_FILES_PAGE_DEFAULT = 50
 export const DRIVE_FILES_PAGE_MAX = 100
 export const DRIVE_CURSOR_MAX = 512
+/** what the server accepts as `drive_folder_id`: the `none` sentinel, or a Google-id-shaped value */
+const DRIVE_FOLDER_FILTER = /^(?:none|[A-Za-z0-9_-]{10,256})$/
 
 function refuse(): never {
   throw new UniworkDocError('server_error')
@@ -76,6 +78,13 @@ export function createUniworkDriveClient(options: UniworkDocsClientOptions): Uni
         if (typeof r.connectionId !== 'string') refuse()
         uniworkId(r.connectionId)
         params.set('connection_id', r.connectionId)
+      }
+
+      if (r.driveFolderId !== undefined && r.driveFolderId !== null && r.driveFolderId !== '') {
+        if (typeof r.driveFolderId !== 'string' || !DRIVE_FOLDER_FILTER.test(r.driveFolderId)) {
+          refuse()
+        }
+        params.set('drive_folder_id', r.driveFolderId)
       }
 
       if (r.cursor !== undefined && r.cursor !== null && r.cursor !== '') {

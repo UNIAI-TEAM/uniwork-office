@@ -204,6 +204,12 @@ export interface DriveFolderListQuery {
 export interface DriveFileListQuery {
   workspaceId: string
   connectionId?: string
+  /**
+   * Narrows the list to one Drive folder: a Google folder id, or `none` for the files with no known
+   * parent (the `{ id: null }` group of the folder list). Absent = no filter. `total_count` and the
+   * cursor pages then count the filtered files only.
+   */
+  driveFolderId?: string
   cursor?: string
   limit?: number
 }
@@ -212,6 +218,12 @@ export interface DriveFileListPage {
   files: DriveFile[]
   totalCount: number
   nextCursor: string | null
+  /**
+   * The filter the server says it applied: the folder id, `none`, or null (no filter applied).
+   * The key is absent when the server did not send it, which means an old server that ignored
+   * `driveFolderId`: the page is then unfiltered.
+   */
+  driveFolderId?: string | null
 }
 
 /**
@@ -256,7 +268,7 @@ export interface UniworkDriveApi {
   isAvailable(): Promise<boolean>
   /** `GET /workspaces/{ws}/drive-connections` */
   listConnections(workspaceId: string): Promise<UniworkDriveResult<DriveConnection[]>>
-  /** `GET /workspaces/{ws}/drive-files?connection_id=&cursor=&limit=` */
+  /** `GET /workspaces/{ws}/drive-files?connection_id=&drive_folder_id=&cursor=&limit=` */
   listFiles(query: DriveFileListQuery): Promise<UniworkDriveResult<DriveFileListPage>>
   /**
    * `GET /workspaces/{ws}/drive-folders?drive_connection_id=` (one request per account). The value

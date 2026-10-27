@@ -150,6 +150,13 @@ export function registerUniworkDrive(ipcMain: IpcMain, deps: UniworkDriveDeps): 
     if (q.connectionId !== undefined && q.connectionId !== null && q.connectionId !== '') {
       if (!isValidId(q.connectionId)) throw new UniworkDocError('server_error')
     }
+    if (
+      q.driveFolderId !== undefined &&
+      q.driveFolderId !== null &&
+      typeof q.driveFolderId !== 'string'
+    ) {
+      throw new UniworkDocError('server_error')
+    }
     if (q.cursor !== undefined && q.cursor !== null && typeof q.cursor !== 'string') {
       throw new UniworkDocError('server_error')
     }
