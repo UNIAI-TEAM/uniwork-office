@@ -416,6 +416,19 @@ export function DriveList({
   const isErrorState = !isOfflineState && status === 'error' && files.length === 0
   const isLoadingState = !isOfflineState && status === 'loading' && files.length === 0
 
+  // a pick brings a stacked panel (below the list) into view; beside the list nothing scrolls
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [pickTick, setPickTick] = useState(0)
+  const pick = (driveFileId: string, via: 'pointer' | 'keyboard') => {
+    setPickTick((n) => n + 1)
+    onSelect?.(driveFileId, via)
+  }
+  useEffect(() => {
+    const body = bodyRef.current
+    if (pickTick === 0 || !body || getComputedStyle(body).flexDirection !== 'column') return
+    body.querySelector('[data-drive-panel]')?.scrollIntoView?.({ block: 'nearest' })
+  }, [pickTick])
+
   const onRowKeyDown = (event: ReactKeyboardEvent<HTMLTableRowElement>, driveFileId: string) => {
     if (event.nativeEvent.isComposing) return
     if (event.repeat) return
@@ -428,7 +441,7 @@ export function DriveList({
     const target = event.target as HTMLElement | null
     if (target && target !== event.currentTarget && target.closest('button, a, input')) return
     event.preventDefault()
-    if (event.key === ' ') onSelect?.(driveFileId, 'keyboard')
+    if (event.key === ' ') pick(driveFileId, 'keyboard')
     else onOpenOnGoogle(driveFileId)
   }
 
@@ -475,7 +488,7 @@ export function DriveList({
         )}
       </div>
 
-      <div className="dh-drive-body">
+      <div className="dh-drive-body" ref={bodyRef}>
         <div className="dh-drive-main">
           {isLoadingState && (
             <div
@@ -587,7 +600,7 @@ export function DriveList({
                           data-drive-file-id={file.id}
                           aria-current={selectedFileId === file.id ? 'true' : undefined}
                           tabIndex={0}
-                          onClick={() => onSelect?.(file.id, 'pointer')}
+                          onClick={() => pick(file.id, 'pointer')}
                           onDoubleClick={(e) => {
                             const target = e.target as HTMLElement | null
                             if (target && target.closest('button, a, input')) return
