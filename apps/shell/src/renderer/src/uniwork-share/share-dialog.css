@@ -899,6 +899,8 @@
 
 .uw-fca-warnings {
   display: flex;
+  width: 100%;
+  min-width: 0;
   flex-direction: column;
   gap: 6px;
   margin: 0;
@@ -934,6 +936,22 @@
 
 .uw-fca [data-fca-home] .uw-act-select {
   width: 100%;
+}
+
+/* the picker row's level select grows with its longest label (de / ru "Kommentieren", "Редактирование")
+   instead of clipping inside the fixed 160px column; it never outgrows the dialog body */
+.uw-fca .uw-share-form-row > .uw-share-field {
+  width: auto;
+  min-width: 160px;
+  max-width: 100%;
+}
+
+/* a warning fills the dialog body at every width: the list stretches and the notice keeps no
+   bottom margin of its own (the list's gap spaces the lines) */
+.uw-fca-warnings > .uw-share-notice {
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 /* the legend sits above the first radio card with a gap, not on its border */
