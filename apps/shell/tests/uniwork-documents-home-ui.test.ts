@@ -4325,6 +4325,17 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         expect(folderNodes()).toHaveLength(0)
       })
 
+      it('an old server (no drive_folder): the chevron goes once the account is loaded with no folder, as on the web', async () => {
+        installDriveBridge()
+        await mountHome('en')
+        await flush()
+        // nothing is fetched before the account opens: the chevron is there until that is known
+        expect(toggleOf('dc-broken')).not.toBeNull()
+        await open(toggleOf('dc-broken'))
+        expect(toggleOf('dc-broken')).toBeNull()
+        expect(folderNodes()).toHaveLength(0)
+      })
+
       it('treats an unknown folder id as the account view', async () => {
         pagedBridge()
         const onDriveViewChange = vi.fn()
