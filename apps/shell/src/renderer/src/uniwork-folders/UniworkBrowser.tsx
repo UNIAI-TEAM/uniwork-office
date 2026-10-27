@@ -4,7 +4,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { UniworkDocSummary } from '../../../shared/home-api'
 import { useI18n } from '../locale'
 import { ActionToast } from '../UniworkDocActions'
-import { FolderContentsAccessBar } from '../uniwork-share/FolderContentsAccessBar'
+import { useFolderBatchEnd } from '../uniwork-share/use-folder-batch-end'
 import {
   FolderContentsAccessDialog,
   type FolderContentsTarget,
@@ -116,6 +116,11 @@ export function UniworkBrowser({
   const [ownDraft, setOwnDraft] = useState('')
   const [toast, setToast] = useState<{ message: string; tone: 'ok' | 'error' } | null>(null)
   const clearToast = useCallback(() => setToast(null), [])
+  // UNI-2244: a background "share the documents inside…" run ended: the list refetches, one host toasts
+  useFolderBatchEnd({
+    onToast: (message, tone) => setToast({ message, tone }),
+    onRefetch: browser.refresh,
+  })
   // UNI-2244: the folder whose documents "Share documents inside…" writes to (no entry without the bridge)
   const [folderContents, setFolderContents] = useState<FolderContentsTarget | null>(null)
   const folderContentsItems = (id: string, title: string): FolderMenuItem[] =>
@@ -484,12 +489,6 @@ export function UniworkBrowser({
           onNotice={(message, tone) => setToast({ message, tone })}
         />
       )}
-      <FolderContentsAccessBar
-        onSettled={(message, tone) => {
-          setToast({ message, tone })
-          browser.refresh()
-        }}
-      />
       {toast && <ActionToast message={toast.message} tone={toast.tone} onDone={clearToast} />}
     </div>
   )

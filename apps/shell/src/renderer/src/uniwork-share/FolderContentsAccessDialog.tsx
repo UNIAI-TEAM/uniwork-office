@@ -20,11 +20,13 @@ import {
   doneMessage,
   folderErrorKey,
   HOME_WORKSPACE_LEVELS,
+  maxPickedItems,
   previewLines,
-  warningKeys,
+  warningLines,
   type HomeWorkspaceChoice,
+  type HomeWorkspaceState,
 } from './folder-contents-access-model'
-import { trackFolderBatch } from './folder-contents-access-store'
+import { trackFolderBatch, useFolderBatches } from './folder-contents-access-store'
 import { levelLabel as levelText, rejectedReasonKey } from './share-model'
 import { useShareCandidates } from './use-share'
 import './share-dialog.css'
@@ -39,14 +41,14 @@ export interface FolderContentsTarget {
 export interface FolderContentsAccessDialogProps {
   open: boolean
   folder: FolderContentsTarget
-  /** the home workspace's name for its row in the replace mode (absent = the row says "the workspace") */
+  /** the home workspace's name for its row in the replace mode (absent = the row says "workspace of this folder") */
   workspaceName?: string
   /** the bridge; defaults to `window.uniworkShare` (tests pass the in-memory fake) */
   api?: UniworkShareApi
   onClose: () => void
   /** the run wrote something (a sync run settled): the list refetches once */
   onChanged?: () => void
-  /** the answer in words, for the screen's toast (the bar reports a background run itself) */
+  /** the answer in words, for the screen's toast (a background run's end comes from `useFolderBatchEnd`) */
   onNotice?: (message: string, tone: 'ok' | 'error') => void
 }
 
@@ -58,7 +60,8 @@ export interface FolderContentsAccessDialogProps {
  * shows the home-workspace row because leaving it out turns the documents private. Confirm asks
  * the server for a dry run first; the summary and its warnings come back before anything is
  * written, and Thay thế quyền is a destructive button. A small folder answers at once (a toast);
- * a large one runs in the background and its progress lives in the bar, not in this dialog.
+ * a large one runs in the background and its progress is drawn in this dialog (the web's flow):
+ * closing it keeps the run going, and the screen's `useFolderBatchEnd` toasts the end.
  */
 export function FolderContentsAccessDialog(props: FolderContentsAccessDialogProps) {
   if (!props.open) return null
@@ -82,9 +85,13 @@ function FolderContentsAccessBody({
   const [opened, setOpened] = useState(false)
   const [selected, setSelected] = useState<SelectedShareCandidate[]>([])
   const [level, setLevel] = useState<ShareLevel>('view')
-  // replace: no row sent = the documents go private, so the default is the honest "not shared"
-  const [homeChoice, setHomeChoice] = useState<HomeWorkspaceChoice>('none')
-  const [step, setStep] = useState<'form' | 'review'>('form')
+  // replace: no level is preselected, the person answers for the home workspace (or picks Private)
+  const [homeChoice, setHomeChoice] = useState<HomeWorkspaceState>('')
+  const [step, setStep] = useState<'form' | 'review' | 'progress'>('form')
+  // the background run this dialog shows; `alreadyRunning` = it is another request's (a 409)
+  const [progress, setProgress] = useState<{ batchId: string; alreadyRunning: boolean } | null>(
+    null,
+  )
   const [preview, setPreview] = useState<FolderContentsAccessPreview | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -92,6 +99,20 @@ function FolderContentsAccessBody({
   // the state flips after the click; the ref closes the gap for a fast second one
   const inFlight = useRef(false)
   const reviewRef = useRef<HTMLDivElement>(null)
+  const closing = useRef(false)
+  const batches = useFolderBatches()
+  const batch = progress ? batches.find((b) => b.batchId === progress.batchId) : undefined
+
+  /** closes once: the end of the run and a click can meet */
+  const finish = () => {
+    if (closing.current) return
+    closing.current = true
+    onClose()
+  }
+  // the run ended (an ended batch leaves the store): the screen toasts it, nothing is left to show
+  useEffect(() => {
+    if (step === 'progress' && !batch) finish()
+  })
 
   useEffect(() => {
     const trimmed = query.trim()
@@ -144,12 +165,32 @@ function FolderContentsAccessBody({
     homeWorkspaceId: folder.workspaceId,
     homeChoice,
   })
-  const canSubmit = canSubmitFolderItems(mode, items)
+  const canSubmit = canSubmitFolderItems(mode, items, homeChoice)
+  // the server takes 100 items, the replace mode's home row among them
+  const maxPicked = maxPickedItems(mode)
+  const listFull = selected.length >= maxPicked
+  const homeName = workspaceName?.trim()
 
   const resetOutcome = () => {
     setPreview(null)
     setError(null)
     setRejectedByKey({})
+  }
+
+  /** follow a background run inside this dialog; closing the dialog does not stop it */
+  const showProgress = (batchId: string, total: number, alreadyRunning: boolean) => {
+    trackFolderBatch({
+      api: shareApi,
+      batchId,
+      folderId: folder.id,
+      folderTitle: folder.title,
+      total,
+    })
+    announce(t('shrFcProgressTitle'))
+    setProgress({ batchId, alreadyRunning })
+    setPreview(null)
+    setError(null)
+    setStep('progress')
   }
 
   /** the refusals every call of the dialog meets; true when it has been handled */
@@ -160,36 +201,33 @@ function FolderContentsAccessBody({
       setRejectedByKey(next)
       setStep('form')
       setPreview(null)
-      setError(
-        failure.rejected
-          .map((r) => {
-            const match = selected.find(
-              (s) =>
-                s.candidate.principalType === r.principalType &&
-                s.candidate.principalId === r.principalId,
-            )
-            return `${match?.candidate.name ?? r.principalId}: ${t(rejectedReasonKey(r.code))}`
-          })
-          .join(' · '),
-      )
+      // the web's sentence, then the app's per-person reason (the home row has no chip to mark)
+      const reasons = failure.rejected.map((r) => {
+        const match = selected.find(
+          (s) =>
+            s.candidate.principalType === r.principalType &&
+            s.candidate.principalId === r.principalId,
+        )
+        const name =
+          match?.candidate.name ??
+          (r.principalType === 'workspace' && r.principalId === folder.workspaceId
+            ? (homeName ?? t('shrFcHomeRowUnnamed'))
+            : r.principalId)
+        return `${name}: ${t(rejectedReasonKey(r.code))}`
+      })
+      setError(`${t('shrFcErrorRejected')} ${reasons.join(' · ')}`)
       return
     }
     if (failure.error === 'folder_access_batch_running') {
-      // another run owns this folder: say so and follow it, closing the dialog does not stop it
-      const { batchId } = failure
-      const message = t('shrFcRunning')
-      if (batchId) {
-        trackFolderBatch({
-          api: shareApi,
-          batchId,
-          folderId: folder.id,
-          folderTitle: folder.title,
-          total: 0,
-        })
+      // another run owns this folder: show its progress here (closing the dialog does not stop
+      // it); without a batch id there is nothing to follow, so no promise of progress is made
+      if (failure.batchId) {
+        showProgress(failure.batchId, 0, true)
+        return
       }
-      announce(message)
-      onNotice?.(message, 'ok')
-      onClose()
+      setStep('form')
+      setPreview(null)
+      setError(t('shrFcRunningNoBatch'))
       return
     }
     setStep('form')
@@ -214,10 +252,19 @@ function FolderContentsAccessBody({
     setPending(false)
     if (!answer.ok) return handleFailure(answer)
     if (answer.value.kind !== 'dryRun') {
-      setError(t('shrSubmitFailed'))
+      setError(t('shrFcErrorGeneric'))
       return
     }
-    setPreview(answer.value.preview)
+    const found = answer.value.preview
+    // the summary appears already filled, which a screen reader does not read out by itself
+    announce(
+      [
+        ...previewLines(t, found),
+        ...(found.changed === 0 ? [t('shrFcNothing')] : []),
+        ...warningLines(t, found),
+      ].join('. '),
+    )
+    setPreview(found)
     setStep('review')
   }
 
@@ -237,72 +284,103 @@ function FolderContentsAccessBody({
       announce(message)
       onNotice?.(message, 'ok')
       onChanged?.()
-      onClose()
+      finish()
       return
     }
     if (value.kind === 'background') {
-      trackFolderBatch({
-        api: shareApi,
-        batchId: value.batchId,
-        folderId: folder.id,
-        folderTitle: folder.title,
-        total: value.total,
-      })
-      announce(t('shrFcStarted', { title: folder.title, total: value.total }))
+      showProgress(value.batchId, value.total, false)
       onChanged?.()
-      onClose()
       return
     }
     setStep('form')
     setPreview(null)
-    setError(t('shrSubmitFailed'))
+    setError(t('shrFcErrorGeneric'))
   }
 
   const titleId = `${baseId}-title`
   const descriptionId = `${baseId}-desc`
+  const summaryId = `${baseId}-summary`
+  const warningsId = `${baseId}-warnings`
   const ids = {
     input: `${baseId}-input`,
     listbox: `${baseId}-listbox`,
     level: `${baseId}-level`,
     home: `${baseId}-home`,
+    homeRow: `${baseId}-home-row`,
     modes: `${baseId}-modes`,
   }
-  const lines = preview ? previewLines(t, preview, mode) : []
-  const warnings = preview ? warningKeys(preview) : []
+  const lines = preview ? previewLines(t, preview) : []
+  const warnings = preview ? warningLines(t, preview) : []
   const nothingToChange = preview !== null && preview.changed === 0
-  const homeName = workspaceName?.trim() || t('shrFcHomeFallback')
+  // the review's buttons are announced with what they are about to do
+  const reviewDescribedBy = warnings.length > 0 ? `${summaryId} ${warningsId}` : summaryId
+  const title = folder.title.trim()
+    ? t('shrFcTitle', { title: folder.title })
+    : t('shrFcTitleUntitled')
+  const total = batch?.total ?? 0
+  const percent =
+    total > 0 ? Math.min(100, Math.round(((batch?.processed ?? 0) / total) * 100)) : undefined
 
   return (
     <ActionModal
       labelledBy={titleId}
-      describedBy={descriptionId}
+      describedBy={step === 'review' ? `${descriptionId} ${reviewDescribedBy}` : descriptionId}
       className="uw-share uw-fca"
-      onCancel={pending ? () => {} : onClose}
+      onCancel={pending ? () => {} : finish}
     >
       <header className="uw-share-header">
         <div className="uw-share-header-text">
           <h2 id={titleId} className="uw-act-heading uw-share-title">
-            {t('shrFcTitle', { title: folder.title })}
+            {step === 'progress' ? t('shrFcProgressTitle') : title}
           </h2>
           <p id={descriptionId} className="uw-share-muted">
-            {t('shrFcFixed')}
+            {step === 'progress' ? t('shrFcProgressHint') : t('shrFcFixed')}
           </p>
         </div>
       </header>
 
-      {step === 'review' && preview ? (
+      {step === 'progress' ? (
+        <div className="uw-share-body" data-fca-progress>
+          {progress?.alreadyRunning && (
+            <p className="uw-share-notice warn" data-fca-running>
+              {t('shrFcProgressAlreadyRunning')}
+            </p>
+          )}
+          <div className="uw-fca-progress">
+            <progress
+              className="uw-fca-meter"
+              max={100}
+              value={percent}
+              aria-label={t('shrFcProgressLabel')}
+            />
+            <p className="uw-fca-count" data-fca-count>
+              {total > 0
+                ? t(total === 1 ? 'shrFcProgressCountOne' : 'shrFcProgressCountOther', {
+                    processed: batch?.processed ?? 0,
+                    count: total,
+                  })
+                : t('shrFcProgressStarting')}
+            </p>
+          </div>
+          <div className="modal-buttons">
+            <button type="button" className="btn btn-primary" data-fca-done onClick={finish}>
+              {t('shrFcProgressClose')}
+            </button>
+          </div>
+        </div>
+      ) : step === 'review' && preview ? (
         <div className="uw-share-body" data-fca-review ref={reviewRef}>
-          <ul className="uw-fca-summary" role="status" aria-label={t('shrFcSummaryLabel')}>
+          <ul id={summaryId} className="uw-fca-summary" aria-label={t('shrFcSummaryLabel')}>
             {lines.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
           {nothingToChange && <p className="uw-share-muted">{t('shrFcNothing')}</p>}
           {warnings.length > 0 && (
-            <ul className="uw-fca-warnings" aria-label={t('shrFcWarningsLabel')}>
-              {warnings.map((key) => (
-                <li key={key} className="uw-share-notice warn" data-fca-warning>
-                  {t(key)}
+            <ul id={warningsId} className="uw-fca-warnings" aria-label={t('shrFcWarningsLabel')}>
+              {warnings.map((line) => (
+                <li key={line} className="uw-share-notice warn" data-fca-warning>
+                  {line}
                 </li>
               ))}
             </ul>
@@ -317,6 +395,7 @@ function FolderContentsAccessBody({
               type="button"
               className="btn"
               data-fca-back
+              aria-describedby={reviewDescribedBy}
               disabled={pending}
               onClick={() => {
                 setStep('form')
@@ -330,6 +409,7 @@ function FolderContentsAccessBody({
                 type="button"
                 className={mode === 'replace' ? 'btn btn-danger' : 'btn btn-primary'}
                 data-fca-apply
+                aria-describedby={reviewDescribedBy}
                 aria-busy={pending || undefined}
                 disabled={pending}
                 onClick={() => void apply()}
@@ -358,6 +438,17 @@ function FolderContentsAccessBody({
                   data-fca-mode={value}
                   checked={mode === value}
                   onChange={() => {
+                    if (value === 'replace') {
+                      // the home row is the replace mode's own: a picked home workspace moves into
+                      // it (its level kept) instead of staying as a chip that is never sent
+                      const home = selected.find((s) => s.key === homeKey)
+                      if (home) {
+                        setSelected((prev) => prev.filter((s) => s.key !== homeKey))
+                        if (homeChoice === '') {
+                          setHomeChoice(level === 'manage' ? 'edit' : level)
+                        }
+                      }
+                    }
                     setMode(value)
                     resetOutcome()
                   }}
@@ -375,7 +466,7 @@ function FolderContentsAccessBody({
           <section aria-labelledby={`${baseId}-add`} className="uw-share-section">
             <div className="uw-share-section-head">
               <h3 id={`${baseId}-add`} className="uw-share-heading">
-                {t('shrAddTitle')}
+                {t('shrFcPrincipalsTitle')}
               </h3>
             </div>
             <ShareCandidatePicker
@@ -396,10 +487,11 @@ function FolderContentsAccessBody({
               onRetry={candidatesQuery.retry}
               alreadySharedUserIds={[]}
               disabled={pending}
+              full={listFull}
               rejectedByKey={rejectedByKey}
               onSelectCandidate={(candidate: ShareCandidate) => {
                 const key = `${candidate.principalType}:${candidate.principalId}`
-                if (selectedKeys.has(key)) return
+                if (selectedKeys.has(key) || listFull) return
                 setSelected((prev) => [...prev, { key, candidate, onExisting: 'keep' }])
                 setQuery('')
                 resetOutcome()
@@ -412,6 +504,19 @@ function FolderContentsAccessBody({
               effectiveItemLevel={effectiveItemLevel}
               rejectedReason={(code) => t(rejectedReasonKey(code))}
             />
+            {listFull ? (
+              <p className="uw-share-muted" data-fca-cap>
+                {t('shrFcTooMany', { max: maxPicked })}
+              </p>
+            ) : (
+              selected.length === 0 && (
+                <p className="uw-share-muted" data-fca-empty>
+                  {t(
+                    mode === 'merge' ? 'shrFcPrincipalsEmptyMerge' : 'shrFcPrincipalsEmptyReplace',
+                  )}
+                </p>
+              )
+            )}
             <div className="uw-share-form-row">
               <div className="uw-share-field">
                 <label className="uw-act-label" htmlFor={ids.level}>
@@ -439,10 +544,13 @@ function FolderContentsAccessBody({
           </section>
 
           {mode === 'replace' && (
-            <section className="uw-share-section" data-fca-home>
+            <section className="uw-share-section" data-fca-home aria-labelledby={ids.homeRow}>
+              <h3 id={ids.homeRow} className="uw-share-heading">
+                {homeName ? t('shrFcHomeRow', { name: homeName }) : t('shrFcHomeRowUnnamed')}
+              </h3>
               <div className="uw-share-field">
                 <label className="uw-act-label" htmlFor={ids.home}>
-                  {t('shrFcHomeRow', { name: homeName })}
+                  {t('shrFcHomeLevelLabel')}
                 </label>
                 <select
                   id={ids.home}
@@ -455,15 +563,17 @@ function FolderContentsAccessBody({
                     resetOutcome()
                   }}
                 >
+                  <option value="" disabled>
+                    {t('shrFcHomeLevelChoose')}
+                  </option>
                   {HOME_WORKSPACE_LEVELS.map((value) => (
                     <option key={value} value={value}>
                       {label(value)}
                     </option>
                   ))}
-                  <option value="none">{t('shrBulkWorkspaceNone')}</option>
+                  <option value="private">{t('shrFcLevelPrivate')}</option>
                 </select>
               </div>
-              {items.length === 0 && <p className="uw-share-muted">{t('shrFcReplaceEmpty')}</p>}
             </section>
           )}
 
@@ -479,7 +589,7 @@ function FolderContentsAccessBody({
               className="btn"
               data-fca-cancel
               disabled={pending}
-              onClick={onClose}
+              onClick={finish}
             >
               {t('shrConfirmCancel')}
             </button>

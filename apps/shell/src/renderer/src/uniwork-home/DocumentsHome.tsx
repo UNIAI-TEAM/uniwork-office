@@ -106,7 +106,7 @@ import {
   FolderContentsAccessDialog,
   type FolderContentsTarget,
 } from '../uniwork-share/FolderContentsAccessDialog'
-import { FolderContentsAccessBar } from '../uniwork-share/FolderContentsAccessBar'
+import { useFolderBatchEnd } from '../uniwork-share/use-folder-batch-end'
 import {
   rowShareTarget,
   shareBridgeAvailable,
@@ -560,6 +560,11 @@ export function DocumentsHome({
     action?: { label: string; onClick: () => void }
   } | null>(null)
   const clearToast = useCallback(() => setToast(null), [])
+  // UNI-2244: a background "share the documents inside…" run ended (its dialog may be long closed)
+  useFolderBatchEnd({
+    onToast: (message, tone) => setToast({ message, tone }),
+    onRefetch: () => setListTick((n) => n + 1),
+  })
 
   // G5-05u / NET-OFF-01: pin/unpin entry in each document row's "…" menu (hidden while the capability is off)
   const offlineToggle = useOfflineToggle()
@@ -3496,12 +3501,6 @@ export function DocumentsHome({
 
       <FolderUploadLayer controller={folderUpload} />
       <ZipDownloadBar />
-      <FolderContentsAccessBar
-        onSettled={(message, tone) => {
-          setToast({ message, tone })
-          setListTick((n) => n + 1)
-        }}
-      />
 
       {toast && (
         <ActionToast

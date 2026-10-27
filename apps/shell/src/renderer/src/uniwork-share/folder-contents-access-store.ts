@@ -8,10 +8,12 @@ import type {
 /**
  * UNI-2244: the background runs of "share the documents inside a folder", kept outside any
  * screen. The server works through the folder in the background (202); the renderer only polls
- * the batch and draws it. Closing the dialog, or leaving the screen, does not cancel the run, so
- * the runs and their timers live here, like the bulk Download's. A tracked batch is polled until
- * the server says `completed` / `failed`; a batch nobody can read any more (404) or that the
- * network keeps refusing ends as `failed` here (the run itself is the server's, not ours).
+ * the batch and draws it, inside the dialog that started it. Closing the dialog, or leaving the
+ * screen, does not cancel the run, so the runs and their timers live here, like the bulk
+ * Download's. A tracked batch is polled until the server says `completed` / `failed`; a batch
+ * nobody can read any more (404) or that the network keeps refusing ends as `failed` here (the
+ * run itself is the server's, not ours). When a batch ends it leaves the store and every mounted
+ * host hears of it: all of them refetch their list, one of them (the newest) tells it in a toast.
  */
 
 export type FolderBatchPhase = 'running' | 'completed' | 'failed'
@@ -40,8 +42,19 @@ let batches: readonly StoredFolderBatch[] = NO_BATCHES
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
 const failures = new Map<string, number>()
 const listeners = new Set<() => void>()
-/** told once for every batch that ends: the bar turns it into a toast */
-const settledListeners = new Set<(batch: StoredFolderBatch) => void>()
+/** told once for every batch that ends */
+const settledListeners = new Set<FolderBatchSettledListener>()
+/** the batches whose end was already told in a toast, for the life of the window */
+const announced = new Set<string>()
+
+export interface FolderBatchEnd {
+  /** this listener raises the toast and the screen-reader line (once per batch, newest host) */
+  toast: boolean
+}
+export type FolderBatchSettledListener = (
+  batch: StoredFolderBatch & { phase: 'completed' | 'failed' },
+  end: FolderBatchEnd,
+) => void
 
 function emit(): void {
   for (const listener of [...listeners]) listener()
@@ -63,7 +76,17 @@ function settle(
 ) {
   stopTimer(batchId)
   const done = patch(batchId, { ...change, phase })
-  if (done) for (const listener of [...settledListeners]) listener(done)
+  if (!done) return
+  // the ended batch leaves the store: the dialog that shows it sees it go and closes
+  batches = batches.filter((b) => b.batchId !== batchId)
+  emit()
+  const first = !announced.has(batchId)
+  announced.add(batchId)
+  const listeners = [...settledListeners]
+  const ended = { ...done, phase }
+  listeners.forEach((listener, i) =>
+    listener(ended, { toast: first && i === listeners.length - 1 }),
+  )
 }
 
 function stopTimer(batchId: string): void {
@@ -153,15 +176,8 @@ export function trackFolderBatch(input: TrackFolderBatchInput): void {
   )
 }
 
-/** drop a finished batch's bar */
-export function closeFolderBatch(batchId: string): void {
-  stopTimer(batchId)
-  batches = batches.filter((b) => b.batchId !== batchId)
-  emit()
-}
-
 /** told when a batch ends; returns the unsubscribe */
-export function onFolderBatchSettled(listener: (batch: StoredFolderBatch) => void): () => void {
+export function onFolderBatchSettled(listener: FolderBatchSettledListener): () => void {
   settledListeners.add(listener)
   return () => settledListeners.delete(listener)
 }
@@ -187,5 +203,6 @@ export function resetFolderBatchesForTest(): void {
   failures.clear()
   batches = NO_BATCHES
   settledListeners.clear()
+  announced.clear()
   emit()
 }

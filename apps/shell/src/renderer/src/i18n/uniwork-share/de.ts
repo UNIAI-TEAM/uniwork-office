@@ -230,49 +230,74 @@ export const de = {
     'Gilt für die vorhandenen Dokumente. Später hinzugefügte Dokumente erhalten diesen Zugriff nicht.',
   shrFcModeLabel: 'Art der Anwendung',
   shrFcModeMerge: 'Zu vorhandenem Zugriff hinzufügen',
-  shrFcModeMergeHint: 'Wer bereits eine höhere Stufe hat, behält sie; niemand wird herabgestuft.',
   shrFcModeReplace: 'Vorhandenen Zugriff ersetzen',
-  shrFcModeReplaceHint:
-    'Nur die aufgeführten Personen behalten den Zugriff; alle anderen werden entfernt.',
-  shrFcHomeRow: 'Arbeitsbereich {name}',
-  shrFcHomeFallback: 'Arbeitsbereich',
-  shrFcReplaceEmpty: 'Die Liste ist leer: Alle Freigaben für diese Dokumente werden entfernt.',
   shrFcChecking: 'Wird geprüft…',
   shrFcBack: 'Zurück',
   shrFcApplying: 'Wird angewendet…',
-  shrFcApplyMerge: 'Zugriff hinzufügen',
   shrFcApplyReplace: 'Zugriff ersetzen',
   shrFcSummaryLabel: 'Zusammenfassung der Änderungen',
   shrFcWarningsLabel: 'Warnungen',
-  shrFcNothing: 'Es müssen keine Dokumente geändert werden.',
   shrFcWillChangeOne: '{count} Dokument wird geändert',
   shrFcWillChangeOther: '{count} Dokumente werden geändert',
   shrFcSkippedNotManageable: '{count} übersprungen, die Sie nicht verwalten',
-  shrFcSkippedLocked: '{count} übersprungen, weil gesperrt',
-  shrFcUnchanged: '{count} Dokumente stimmen bereits überein',
   shrFcLosingOne: '{count} Person verliert den Zugriff auf mindestens ein Dokument',
   shrFcLosingOther: '{count} Personen verlieren den Zugriff auf mindestens ein Dokument',
-  shrFcDowngradedOne: '{count} Person erhält bei mindestens einem Dokument eine niedrigere Stufe',
-  shrFcDowngradedOther:
-    '{count} Personen erhalten bei mindestens einem Dokument eine niedrigere Stufe',
-  shrFcWarnWide: 'Ein breites Publikum erhält Zugriff auf viele Dokumente.',
-  shrFcWarnPrivate:
-    'Einige Dokumente werden privat, weil sie nicht mehr mit dem Arbeitsbereich geteilt werden.',
-  shrFcWarnDowngrade: 'Bei einigen Personen wird die Stufe herabgesetzt.',
   shrFcDoneOne: 'Zugriff bei {count} Dokument geändert',
   shrFcDoneOther: 'Zugriff bei {count} Dokumenten geändert',
-  shrFcSkippedTotal: '{count} übersprungen',
-  shrFcNotAFolder: 'Dies ist kein Ordner mehr.',
   shrFcForbidden: 'Sie dürfen diesen Ordner nicht lesen.',
   shrFcNotFound: 'Dieser Ordner wurde nicht gefunden.',
-  shrFcRunning:
-    'Für diesen Ordner läuft bereits eine andere Freigabe. Der Fortschritt wird verfolgt.',
-  shrFcStarted: 'Zugriff wird im Hintergrund auf {total} Dokumente in „{title}“ angewendet.',
-  shrFcProgress: 'Dokumente in „{title}“ werden freigegeben: {processed}/{total}',
-  shrFcQueued: 'Die Freigabe der Dokumente in „{title}“ ist eingereiht…',
-  shrFcBatchDone: '„{title}“: {summary}',
-  shrFcBatchFailed:
-    'Die Freigabe in „{title}“ wurde zwischendurch gestoppt ({processed}/{total} Dokumente). Führen Sie sie erneut aus.',
   shrFcUnavailable:
     'Dieser Server unterstützt das Freigeben der Dokumente eines Ordners noch nicht.',
+  shrFcTitleUntitled: 'Dokumente in diesem Ordner teilen',
+  shrFcModeMergeHint:
+    'Gewährt Zugriff für die ausgewählten Personen und Gruppen. Bestehender Zugriff wird nie herabgestuft oder entfernt.',
+  shrFcModeReplaceHint:
+    'Jedes Dokument behält genau die Liste unten. Wer nicht auf der Liste steht, verliert den Zugriff.',
+  shrFcPrincipalsTitle: 'Personen und Zugriffsstufen',
+  shrFcPrincipalsEmptyMerge:
+    'Noch niemand ausgewählt. Suche und wähle mindestens eine Person oder Gruppe, um Zugriff hinzuzufügen.',
+  shrFcPrincipalsEmptyReplace:
+    'Sonst niemand ausgewählt. Nur die Zeile „Arbeitsbereich“ unten bleibt erhalten.',
+  shrFcHomeRow: 'Arbeitsbereich „{name}“',
+  shrFcHomeRowUnnamed: 'Arbeitsbereich dieses Ordners',
+  shrFcHomeLevelLabel: 'Zugriffsstufe des Arbeitsbereichs',
+  shrFcHomeLevelChoose: 'Zugriff wählen',
+  shrFcLevelPrivate: 'Privat',
+  shrFcApplyMerge: 'Anwenden',
+  shrFcSkippedLocked: '{count} gesperrt',
+  shrFcWarnWide:
+    'Ein ganzer Arbeitsbereich oder eine ganze Organisation ist in der Liste: Viele Personen können diese Dokumente öffnen.',
+  shrFcWarnPrivate:
+    'Der Arbeitsbereich ist nicht mehr in der Liste: Diese Dokumente werden privat.',
+  shrFcWarnDowngradeOne:
+    '{count} Person erhält bei mindestens einem Dokument eine niedrigere Stufe.',
+  shrFcWarnDowngradeOther:
+    '{count} Personen erhalten bei mindestens einem Dokument eine niedrigere Stufe.',
+  shrFcNothing: 'Nichts ändert sich: Der aktuelle Zugriff entspricht bereits dieser Liste.',
+  shrFcToastSkippedOne: '{count} Dokument übersprungen, das du nicht verwaltest.',
+  shrFcToastSkippedOther: '{count} Dokumente übersprungen, die du nicht verwaltest.',
+  shrFcToastLockedOne: '{count} Dokument ist gesperrt und wurde nicht geändert.',
+  shrFcToastLockedOther: '{count} Dokumente sind gesperrt und wurden nicht geändert.',
+  shrFcProgressTitle: 'Zugriff wird angewendet',
+  shrFcProgressLabel: 'Fortschritt der Zugriffsänderung',
+  shrFcProgressCountOne: '{processed}/{count} Dokument',
+  shrFcProgressCountOther: '{processed}/{count} Dokumente',
+  shrFcProgressStarting: 'Wartet auf Start…',
+  shrFcProgressHint:
+    'Du kannst dieses Fenster schließen. Die Änderung läuft im Hintergrund weiter, und du wirst benachrichtigt, wenn sie endet.',
+  shrFcProgressAlreadyRunning:
+    'Für diesen Ordner läuft bereits eine Zugriffsänderung im Hintergrund. Dies ist ihr Fortschritt.',
+  shrFcProgressClose: 'Fertig',
+  shrFcBatchDoneOne: 'Zugriff bei {count} Dokument angewendet',
+  shrFcBatchDoneOther: 'Zugriff bei {count} Dokumenten angewendet',
+  shrFcBatchFailed:
+    'Die Zugriffsänderung wurde mittendrin gestoppt. Führe „Zugriff ersetzen“ erneut aus, um sie abzuschließen.',
+  shrFcNotAFolder:
+    'Dieses Element ist kein Ordner, daher können seine Dokumente nicht auf einmal geändert werden.',
+  shrFcErrorGeneric: 'Zugriff konnte nicht angewendet werden. Versuche es erneut.',
+  shrFcErrorRejected:
+    'Der Zugriff konnte für einige Personen oder Gruppen nicht angewendet werden. Korrigiere die markierten Zeilen und versuche es erneut.',
+  shrFcRunningNoBatch:
+    'Für diesen Ordner läuft bereits eine Zugriffsänderung im Hintergrund. Versuche es erneut, wenn sie beendet ist.',
+  shrFcTooMany: 'Du kannst auf einmal bis zu {max} Personen oder Gruppen hinzufügen.',
 } satisfies Record<keyof typeof zh, string>

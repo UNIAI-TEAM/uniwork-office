@@ -223,49 +223,73 @@ export const fr = {
     'S’applique aux documents existants. Les documents ajoutés plus tard n’ont pas cet accès.',
   shrFcModeLabel: 'Mode d’application',
   shrFcModeMerge: 'Ajouter aux accès existants',
-  shrFcModeMergeHint:
-    'Les personnes qui ont déjà un niveau supérieur le gardent ; personne n’est rétrogradé.',
   shrFcModeReplace: 'Remplacer les accès existants',
-  shrFcModeReplaceHint:
-    'Seules les personnes de la liste gardent l’accès ; les autres sont retirées.',
-  shrFcHomeRow: 'Espace de travail {name}',
-  shrFcHomeFallback: 'Espace de travail',
-  shrFcReplaceEmpty:
-    'La liste est vide : tous les accès partagés sur ces documents seront retirés.',
   shrFcChecking: 'Vérification…',
   shrFcBack: 'Retour',
   shrFcApplying: 'Application…',
-  shrFcApplyMerge: 'Ajouter l’accès',
   shrFcApplyReplace: 'Remplacer l’accès',
   shrFcSummaryLabel: 'Résumé des modifications',
   shrFcWarningsLabel: 'Avertissements',
-  shrFcNothing: 'Aucun document à modifier.',
   shrFcWillChangeOne: '{count} document sera modifié',
   shrFcWillChangeOther: '{count} documents seront modifiés',
   shrFcSkippedNotManageable: '{count} ignorés que vous ne gérez pas',
-  shrFcSkippedLocked: '{count} ignorés car verrouillés',
-  shrFcUnchanged: '{count} documents déjà conformes',
   shrFcLosingOne: '{count} personne perd l’accès à au moins un document',
   shrFcLosingOther: '{count} personnes perdent l’accès à au moins un document',
-  shrFcDowngradedOne: '{count} personne passe à un niveau inférieur sur au moins un document',
-  shrFcDowngradedOther: '{count} personnes passent à un niveau inférieur sur au moins un document',
-  shrFcWarnWide: 'Un large public aura accès à de nombreux documents.',
-  shrFcWarnPrivate:
-    'Certains documents deviendront privés car ils ne sont plus partagés avec l’espace de travail.',
-  shrFcWarnDowngrade: 'Le niveau de certaines personnes sera abaissé.',
   shrFcDoneOne: 'Accès modifié sur {count} document',
   shrFcDoneOther: 'Accès modifié sur {count} documents',
-  shrFcSkippedTotal: '{count} ignorés',
-  shrFcNotAFolder: 'Cet élément n’est plus un dossier.',
   shrFcForbidden: 'Vous n’avez pas l’autorisation de lire ce dossier.',
   shrFcNotFound: 'Ce dossier est introuvable.',
-  shrFcRunning: 'Un autre partage est déjà en cours pour ce dossier. Suivi de sa progression.',
-  shrFcStarted: 'Application de l’accès à {total} documents dans « {title} » en arrière-plan.',
-  shrFcProgress: 'Partage des documents dans « {title} » : {processed}/{total}',
-  shrFcQueued: 'Le partage des documents dans « {title} » est en attente…',
-  shrFcBatchDone: '« {title} » : {summary}',
-  shrFcBatchFailed:
-    'Le partage dans « {title} » s’est arrêté en cours de route ({processed}/{total} documents). Relancez-le.',
   shrFcUnavailable:
     'Ce serveur ne prend pas encore en charge le partage des documents d’un dossier.',
+  shrFcTitleUntitled: 'Partager les documents de ce dossier',
+  shrFcModeMergeHint:
+    'Accorde l’accès aux personnes et groupes choisis. L’accès existant n’est jamais abaissé ni retiré.',
+  shrFcModeReplaceHint:
+    'Chaque document garde exactement la liste ci-dessous. Toute personne absente de la liste perd son accès.',
+  shrFcPrincipalsTitle: 'Personnes et niveaux d’accès',
+  shrFcPrincipalsEmptyMerge:
+    'Aucune personne choisie pour l’instant. Recherchez et sélectionnez au moins une personne ou un groupe pour ajouter un accès.',
+  shrFcPrincipalsEmptyReplace:
+    'Aucune autre personne choisie. Seule la ligne de l’espace de travail ci-dessous est conservée.',
+  shrFcHomeRow: 'Espace de travail « {name} »',
+  shrFcHomeRowUnnamed: 'Espace de travail de ce dossier',
+  shrFcHomeLevelLabel: 'Niveau d’accès de l’espace de travail',
+  shrFcHomeLevelChoose: 'Choisir l’accès',
+  shrFcLevelPrivate: 'Privé',
+  shrFcApplyMerge: 'Appliquer',
+  shrFcSkippedLocked: '{count} verrouillés',
+  shrFcWarnWide:
+    'La liste contient un espace de travail ou une organisation entière : de nombreuses personnes pourront ouvrir ces documents.',
+  shrFcWarnPrivate:
+    'L’espace de travail n’est plus dans la liste : ces documents deviennent privés.',
+  shrFcWarnDowngradeOne: '{count} personne passe à un niveau inférieur sur au moins un document.',
+  shrFcWarnDowngradeOther:
+    '{count} personnes passent à un niveau inférieur sur au moins un document.',
+  shrFcNothing: 'Rien ne changera : l’accès actuel correspond déjà à cette liste.',
+  shrFcToastSkippedOne: '{count} document ignoré que vous ne gérez pas.',
+  shrFcToastSkippedOther: '{count} documents ignorés que vous ne gérez pas.',
+  shrFcToastLockedOne: '{count} document est verrouillé et n’a pas été modifié.',
+  shrFcToastLockedOther: '{count} documents sont verrouillés et n’ont pas été modifiés.',
+  shrFcProgressTitle: 'Application de l’accès',
+  shrFcProgressLabel: 'Progression de la modification de l’accès',
+  shrFcProgressCountOne: '{processed}/{count} document',
+  shrFcProgressCountOther: '{processed}/{count} documents',
+  shrFcProgressStarting: 'En attente de démarrage…',
+  shrFcProgressHint:
+    'Vous pouvez fermer cette fenêtre ; la modification continue en arrière-plan et vous serez averti à la fin.',
+  shrFcProgressAlreadyRunning:
+    'Une modification d’accès est déjà en cours en arrière-plan pour ce dossier. Voici sa progression.',
+  shrFcProgressClose: 'Terminé',
+  shrFcBatchDoneOne: 'Accès appliqué à {count} document',
+  shrFcBatchDoneOther: 'Accès appliqué à {count} documents',
+  shrFcBatchFailed:
+    'La modification de l’accès s’est arrêtée en cours de route. Relancez « Remplacer l’accès » pour la terminer.',
+  shrFcNotAFolder:
+    'Cet élément n’est pas un dossier : ses documents ne peuvent pas être modifiés en masse.',
+  shrFcErrorGeneric: 'Impossible d’appliquer l’accès. Réessayez.',
+  shrFcErrorRejected:
+    'L’accès n’a pas pu être appliqué à certaines personnes ou certains groupes. Corrigez les lignes signalées et réessayez.',
+  shrFcRunningNoBatch:
+    'Une modification d’accès est déjà en cours en arrière-plan pour ce dossier. Réessayez quand elle sera terminée.',
+  shrFcTooMany: 'Vous pouvez ajouter jusqu’à {max} personnes ou groupes à la fois.',
 } satisfies Record<keyof typeof zh, string>
