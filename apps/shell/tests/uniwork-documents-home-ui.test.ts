@@ -1078,8 +1078,27 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(moreBtn.disabled).toBe(false)
     expect(host.querySelector('.uw-pick-more-error[role="alert"]')).not.toBeNull()
 
-    // 5. Search initial-load rejection & search loadMore rejection (DH1-R1-3)
+    // 5. Search on Recent is client-side (KLV-6) and never calls uniworkSearchDocuments;
+    // server search initial-load rejection & search loadMore rejection run on workspace root (DH1-R1-3)
     const searchInput = host.querySelector<HTMLInputElement>('input.uwf-own-search')!
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(searchInput, 'Kế hoạch')
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }))
+      searchInput.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await flush()
+    expect(api.uniworkSearchDocuments).not.toHaveBeenCalled()
+
+    const workspaceBtn = sidebarSlot.querySelector<HTMLButtonElement>(
+      '.nav-item[data-nav="workspace"]',
+    )!
+    api.uniworkListChildren.mockResolvedValueOnce(ok({ items: rootItems, nextCursor: null }))
+    await act(async () => {
+      workspaceBtn.click()
+    })
+    await flush()
+
     api.uniworkSearchDocuments.mockRejectedValueOnce(new Error('search boom'))
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set

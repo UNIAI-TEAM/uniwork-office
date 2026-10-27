@@ -1033,12 +1033,12 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
       expect(rowIds()).toEqual(['rec-p2-edited', 'rec-p2-opened'])
       expect(rowIds()).not.toContain('ws-only-hit')
       // The "where" subline stays as on Recent today
-      expect(
-        host.querySelector('[data-doc-id="rec-p2-edited"] .dh-doc-subpath')?.textContent,
-      ).toBe('Thư mục Hợp đồng')
-      expect(
-        host.querySelector('[data-doc-id="rec-p2-opened"] .dh-doc-subpath')?.textContent,
-      ).toBe('Tài liệu (gốc)')
+      expect(host.querySelector('[data-doc-id="rec-p2-edited"] .dh-doc-subpath')?.textContent).toBe(
+        'Thư mục Hợp đồng',
+      )
+      expect(host.querySelector('[data-doc-id="rec-p2-opened"] .dh-doc-subpath')?.textContent).toBe(
+        'Tài liệu (gốc)',
+      )
 
       // Đã sửa segment + query narrows to edited Recent matches
       await click(host.querySelector('[data-seg="edited"]'))
@@ -1047,6 +1047,74 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
         expect.objectContaining({ workspaceId: 'ws-1', activity: 'edited' }),
       )
       expect(rowIds()).toEqual(['rec-edited'])
+    })
+
+    it('scopes a query on Được chia sẻ với tôi to the Shared-with-me list client-side without calling searchDocuments, omits own and workspace-only hits, auto-fetches page 2, and keeps the workspace subline (KLV-9)', async () => {
+      api.uniworkSearchDocuments.mockResolvedValue(
+        ok({
+          items: [
+            row({
+              id: 'own-hit',
+              title: 'Đánh giá cá nhân.docx',
+            }),
+            row({
+              id: 'ws-only-hit',
+              title: 'Đánh giá nội bộ workspace.docx',
+            }),
+          ],
+          nextCursor: null,
+        }),
+      )
+      api.uniworkListSharedWithMe.mockImplementation(async (q: { cursor?: string }) => {
+        if (q.cursor === 'swm-c2') {
+          return ok({
+            documents: [
+              row({
+                id: 'swm-p2-hit',
+                workspaceId: 'ws-2',
+                workspaceName: 'Phòng Tài chính',
+                title: 'Báo cáo Đánh giá Đối tác.docx',
+                shared: { byName: 'Hải Lê', at: iso(2026, 10, 21, 9, 0) },
+              }),
+            ],
+            nextCursor: null,
+          })
+        }
+        return ok({
+          documents: [
+            row({
+              id: 'swm-p1-other',
+              workspaceId: 'ws-2',
+              workspaceName: 'Phòng Tài chính',
+              title: 'Biên bản họp.docx',
+              shared: { byName: 'Lan Nguyễn', at: iso(2026, 10, 21, 10, 0) },
+            }),
+          ],
+          nextCursor: 'swm-c2',
+        })
+      })
+
+      await mount('shared-with-me')
+      expect(api.uniworkSearchDocuments).not.toHaveBeenCalled()
+
+      await typeIntoSearch('ĐÁNH GIÁ')
+      expect(api.uniworkSearchDocuments).not.toHaveBeenCalled()
+      expect(
+        api.uniworkListSharedWithMe.mock.calls.filter(
+          ([arg]: [{ cursor?: string }]) => !arg.cursor,
+        ),
+      ).toHaveLength(1)
+      expect(api.uniworkListSharedWithMe).toHaveBeenCalledWith(
+        expect.objectContaining({ cursor: 'swm-c2', includePages: true }),
+      )
+      // Own and workspace-only search hits do not appear; page-2 shared row shows
+      expect(rowIds()).toEqual(['swm-p2-hit'])
+      expect(rowIds()).not.toContain('own-hit')
+      expect(rowIds()).not.toContain('ws-only-hit')
+      // Its "where" line (workspace name) stays
+      expect(host.querySelector('[data-doc-id="swm-p2-hit"] .dh-doc-subpath')?.textContent).toBe(
+        'Phòng Tài chính',
+      )
     })
 
     it('does not duplicate-append page 2 when typing a query on Recent or changing a filter during a search, and hides empty state while refetching (KLF-5, KLF-6, KLF-7, KLF-9)', async () => {
