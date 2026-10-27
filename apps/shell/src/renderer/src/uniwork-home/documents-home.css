@@ -187,6 +187,10 @@
 }
 
 .dh-title {
+  min-width: 0; /* a long account email shrinks (ellipsis) before the workspace select */
+  /* in the stacked group (column, align-items: flex-start) the h1 sizes to its max-content, so the
+     ellipsis needs the cap to engage */
+  max-width: 100%;
   margin: 0;
   overflow: hidden;
   color: var(--text);
@@ -2003,6 +2007,22 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+/* UNI-2223: a folder row of the account view: the folder glyph in the 24px icon box of a file row */
+.dh-drive-folder-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--text-secondary);
+}
+
+.dh-drive-cell-folder-count {
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 .dh-drive-file-name {

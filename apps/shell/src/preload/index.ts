@@ -143,6 +143,8 @@ import {
   type DriveFileListPage,
   type DriveFileListQuery,
   type DriveFileTarget,
+  type DriveFolderListQuery,
+  type DriveFolderSummary,
   type DriveHistoryEvent,
   type UniworkDriveApi,
   type UniworkDriveErrorCode,
@@ -1877,6 +1879,9 @@ const homeApi: HomeApi = {
   async uniworkDriveListFiles(query) {
     return driveApi.listFiles(query)
   },
+  async uniworkDriveListFolders(query) {
+    return driveApi.listFolders(query)
+  },
   async uniworkDriveGetFile(input) {
     return driveApi.getFile(input)
   },
@@ -2233,6 +2238,11 @@ const driveApi: UniworkDriveApi = {
   async listFiles(query: DriveFileListQuery) {
     return asDriveResult<DriveFileListPage>(
       await ipcRenderer.invoke(UNIWORK_DRIVE_CHANNELS.listFiles, query),
+    )
+  },
+  async listFolders(query: DriveFolderListQuery) {
+    return asDriveResult<DriveFolderSummary[] | null>(
+      await ipcRenderer.invoke(UNIWORK_DRIVE_CHANNELS.listFolders, query),
     )
   },
   async getFile(input: DriveFileTarget) {

@@ -43,6 +43,7 @@ describe('window.uniworkDrive and aiOffice.uniworkDrive* (preload, UNI-2194)', (
     await drive.isAvailable()
     await drive.listConnections('ws_1')
     await drive.listFiles({ workspaceId: 'ws_1', connectionId: 'c_1', cursor: 'cur', limit: 20 })
+    await drive.listFolders({ workspaceId: 'ws_1', connectionId: 'c_1' })
     await drive.getFile({ workspaceId: 'ws_1', driveFileId: 'df_1' })
     await drive.unlink({ workspaceId: 'ws_1', driveFileId: 'df_1' })
     await drive.openOnGoogle({ workspaceId: 'ws_1', driveFileId: 'df_1' })
@@ -56,6 +57,7 @@ describe('window.uniworkDrive and aiOffice.uniworkDrive* (preload, UNI-2194)', (
         channel: C.listFiles,
         args: [{ workspaceId: 'ws_1', connectionId: 'c_1', cursor: 'cur', limit: 20 }],
       },
+      { channel: C.listFolders, args: [{ workspaceId: 'ws_1', connectionId: 'c_1' }] },
       { channel: C.getFile, args: [{ workspaceId: 'ws_1', driveFileId: 'df_1' }] },
       { channel: C.unlink, args: [{ workspaceId: 'ws_1', driveFileId: 'df_1' }] },
       { channel: C.openOnGoogle, args: [{ workspaceId: 'ws_1', driveFileId: 'df_1' }] },
@@ -67,6 +69,11 @@ describe('window.uniworkDrive and aiOffice.uniworkDrive* (preload, UNI-2194)', (
     expect(invoked.at(-1)).toEqual({ channel: C.isAvailable, args: [] })
     await office.uniworkDriveListConnections?.('ws_2')
     expect(invoked.at(-1)).toEqual({ channel: C.listConnections, args: ['ws_2'] })
+    await office.uniworkDriveListFolders?.({ workspaceId: 'ws_2', connectionId: 'c_2' })
+    expect(invoked.at(-1)).toEqual({
+      channel: C.listFolders,
+      args: [{ workspaceId: 'ws_2', connectionId: 'c_2' }],
+    })
   })
 
   it('passes valid ok/error envelopes through and turns broken replies into server_error', async () => {

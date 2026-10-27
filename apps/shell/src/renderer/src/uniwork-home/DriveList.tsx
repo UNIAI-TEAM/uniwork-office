@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type {
   DriveConnection,
@@ -12,11 +12,12 @@ import type { WorkWebTarget } from '../../../shared/uniwork-work-api'
 import { FileBadge } from '../FileBadge'
 import { ListState } from '../doclist/ListState'
 import { useI18n, type TFunc } from '../locale'
-import { Chevron } from '../uniwork-folders/UniworkFolderTree'
+import { Chevron, FolderGlyph } from '../uniwork-folders/UniworkFolderTree'
 import { driveErrorKey } from './drive-panel-model'
 import {
   buildDriveSidebarState,
   fetchDocumentsHomeDriveFiles,
+  fetchDocumentsHomeDriveFolders,
   fetchDriveAvailable,
   fetchDriveConnections,
   resolveDriveAccountFilter,
@@ -24,6 +25,19 @@ import {
   type DriveAccountNavRow,
   type DriveSidebarState,
 } from './documents-home-model'
+import {
+  attachFolderFiles,
+  deriveDriveFolders,
+  driveFolderFileCount,
+  driveFolderLabel,
+  driveFolderShortLabel,
+  filterDriveFilesByName,
+  serverDriveFolders,
+  shortFolderId,
+  type DriveFolder,
+} from './drive-folders'
+import { useDriveAccountFiles } from './use-drive-account-files'
+import { useDriveFolderLists } from './use-drive-folder-lists'
 
 /**
  * Google Drive brand mark (3-color triangle). Brand logo colors are fixed artwork,
@@ -255,6 +269,26 @@ export function openDriveWeb(target: WorkWebTarget): Promise<boolean> {
   }
 }
 
+/** the pencil of "Name from Drive" (the same glyph the workspace folder header uses to rename) */
+function NameFolderGlyph() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  )
+}
+
 /**
  * Sidebar rows for Google Drive (spec §17.2, §7.6, prototype `Docs-List.dc.html`):
  * sits directly under "Thư mục của tôi" in the Folders section, with one child row
@@ -265,17 +299,32 @@ export function DriveSidebarRows({
   state,
   active,
   selectedAccountId,
+  selectedFolderKey,
   expanded,
+  expandedAccountIds,
+  folderTree,
   onToggle,
+  onToggleAccount,
   onSelect,
+  onSelectFolder,
+  onNameFolder,
 }: {
   state: DriveSidebarState
   active: boolean
   selectedAccountId: string | null
+  /** the folder current under the selected account (null = the account row itself) */
+  selectedFolderKey: string | null
   /** the account rows are shown (the node's chevron is open) */
   expanded: boolean
+  /** the accounts whose folder nodes are shown */
+  expandedAccountIds: ReadonlySet<string>
+  folderTree: Readonly<Record<string, DriveAccountFolders>>
   onToggle: () => void
+  onToggleAccount: (connectionId: string) => void
   onSelect: (connectionId: string | null) => void
+  onSelectFolder: (connectionId: string, folderKey: string) => void
+  /** "Name from Drive" on an unnamed folder node: hands off to the web; omitted = no action drawn */
+  onNameFolder?: (connectionId: string, folderKey: string) => void
 }) {
   const { t } = useI18n()
   const accountsId = useId()
@@ -319,34 +368,121 @@ export function DriveSidebarRows({
       {hasAccounts && expanded && (
         <div id={accountsId} className="dh-drive-accounts" role="group">
           {state.accounts.map((acct: DriveAccountNavRow) => {
-            const isCurrent = active && selectedAccountId === acct.id
+            const accountActive = active && selectedAccountId === acct.id
+            const folderCurrent = accountActive && selectedFolderKey !== null
+            const isCurrent = accountActive && !folderCurrent
             const label = t('uhNavDriveAccount', { email: acct.email })
             const rowTitle = acct.needsReconnect ? `${label} · ${t('uhDriveLost')}` : label
+            const tree = folderTree[acct.id]
+            // the chevron stays until the account is known to have no folder (nothing is fetched before it opens)
+            const expandable = !tree || tree.status !== 'ready' || tree.folders.length > 0
+            const open = expandable && expandedAccountIds.has(acct.id)
+            const foldersId = `${accountsId}-${acct.id}`
             return (
-              <button
-                key={acct.id}
-                type="button"
-                className={`dh-nav-item nav-item dh-drive-nav-account${isCurrent ? ' active' : ''}`}
-                data-drive-account={acct.id}
-                aria-current={isCurrent ? 'page' : undefined}
-                title={rowTitle}
-                onClick={() => onSelect(acct.id)}
-              >
-                {/* web parity: only the email is drawn; "Drive: <email>" is read by assistive tech and sits in the title */}
-                <span className="uw-sr-only">{label}</span>
-                <span className="dh-nav-label" aria-hidden="true">
-                  {acct.email}
-                </span>
-                {acct.needsReconnect && (
-                  <span className="dh-drive-nav-lost" data-drive-lost="">
-                    <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
-                    <span className="uw-sr-only">{t('uhDriveLost')}</span>
-                  </span>
+              <div key={acct.id} className="dh-drive-account-node">
+                <div className="dh-drive-node">
+                  <button
+                    type="button"
+                    className={`dh-nav-item nav-item dh-drive-nav-account${isCurrent ? ' active' : ''}`}
+                    data-drive-account={acct.id}
+                    aria-current={isCurrent ? 'page' : undefined}
+                    title={rowTitle}
+                    onClick={() => onSelect(acct.id)}
+                  >
+                    {/* web parity: only the email is drawn; "Drive: <email>" is read by assistive tech and sits in the title */}
+                    <span className="uw-sr-only">{label}</span>
+                    <span className="dh-nav-label" aria-hidden="true">
+                      {acct.email}
+                    </span>
+                    {acct.needsReconnect && (
+                      <span className="dh-drive-nav-lost" data-drive-lost="">
+                        <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
+                        <span className="uw-sr-only">{t('uhDriveLost')}</span>
+                      </span>
+                    )}
+                    <span className="dh-drive-nav-count" data-drive-account-count="">
+                      {acct.linkedFileCount}
+                    </span>
+                  </button>
+                  {expandable && (
+                    <button
+                      type="button"
+                      className="uwf-twisty dh-drive-twisty dh-drive-twisty-account"
+                      data-drive-account-toggle={acct.id}
+                      aria-expanded={open}
+                      aria-controls={open ? foldersId : undefined}
+                      aria-label={t('dlGroupToggle', { group: acct.email })}
+                      onClick={() => onToggleAccount(acct.id)}
+                    >
+                      <Chevron expanded={open} />
+                    </button>
+                  )}
+                </div>
+                {open && (
+                  <div id={foldersId} className="dh-drive-folders" role="group">
+                    {(!tree || tree.status === 'loading') && (
+                      <p
+                        className="dh-drive-folders-note"
+                        role="status"
+                        data-drive-folders-loading=""
+                      >
+                        {t('uwPickLoadingMore')}
+                      </p>
+                    )}
+                    {tree?.status === 'error' && tree.folders.length === 0 && (
+                      <p className="dh-drive-folders-note" data-drive-folders-error="">
+                        {t('uhDriveLoadError')}
+                      </p>
+                    )}
+                    {tree?.folders.map((folder) => {
+                      const current = folderCurrent && selectedFolderKey === folder.key
+                      const folderLabel = driveFolderLabel(folder, t)
+                      const folderShortLabel = driveFolderShortLabel(folder, t)
+                      // only a folder the server could not name, against a server that can name it, on an
+                      // account that still works (the web drops the hand-off of a broken one)
+                      const nameable =
+                        Boolean(onNameFolder) &&
+                        tree.source === 'server' &&
+                        !acct.needsReconnect &&
+                        !folder.name
+                      return (
+                        <div key={folder.key} className="dh-drive-node dh-drive-folder-node">
+                          <button
+                            type="button"
+                            className={`dh-nav-item nav-item dh-drive-nav-folder${current ? ' active' : ''}`}
+                            data-drive-folder={folder.key}
+                            aria-current={current ? 'page' : undefined}
+                            title={folderLabel}
+                            onClick={() => onSelectFolder(acct.id, folder.key)}
+                          >
+                            <FolderGlyph />
+                            <span className="dh-nav-label">{folderShortLabel}</span>
+                            <span className="dh-drive-nav-count" data-drive-folder-count="">
+                              <span aria-hidden="true">{folder.count}</span>
+                              <span className="uw-sr-only">
+                                {driveFolderFileCount(folder.count, t)}
+                              </span>
+                            </span>
+                          </button>
+                          {/* a sibling of the row button (a button cannot hold a button), shown on hover and focus */}
+                          {nameable && (
+                            <button
+                              type="button"
+                              className="dh-drive-name-folder"
+                              data-drive-name-folder={folder.key}
+                              aria-label={t('uhDriveNameFolderFor', { folder: folderLabel })}
+                              title={t('uhDriveNameFolder')}
+                              onClick={() => onNameFolder?.(acct.id, folder.key)}
+                            >
+                              <NameFolderGlyph />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
-                <span className="dh-drive-nav-count" data-drive-account-count="">
-                  {acct.linkedFileCount}
-                </span>
-              </button>
+              </div>
             )
           })}
         </div>
@@ -355,11 +491,94 @@ export function DriveSidebarRows({
   )
 }
 
+/**
+ * The header of an open Drive folder: Google Drive > <account email> > <folder>. It draws the same
+ * crumb row as a workspace folder (`BrowserCrumbs` is tied to the workspace root label), the leaf
+ * is the page's h1, and each ancestor navigates.
+ */
+export function DriveFolderCrumbs({
+  accountEmail,
+  folderLabel,
+  onOpenDrive,
+  onOpenAccount,
+  onNameFolder,
+}: {
+  accountEmail: string
+  folderLabel: string
+  onOpenDrive: () => void
+  onOpenAccount: () => void
+  /** "Name from Drive", drawn after the title of an unnamed folder; omitted = no action */
+  onNameFolder?: () => void
+}) {
+  const { t } = useI18n()
+  const sep = (
+    <span className="uwf-crumb-sep" aria-hidden="true">
+      ›
+    </span>
+  )
+  return (
+    <nav className="uwf-crumbs" aria-label={t('uhDriveBreadcrumb')} data-drive-crumbs="">
+      <ol>
+        <li className="uwf-crumb uwf-crumb-root">
+          <button type="button" className="uwf-crumb-btn" data-crumb="drive" onClick={onOpenDrive}>
+            {t('uhNavGoogleDrive')}
+          </button>
+          {sep}
+        </li>
+        <li className="uwf-crumb uwf-crumb-ancestor">
+          <button
+            type="button"
+            className="uwf-crumb-btn"
+            data-crumb="account"
+            dir="auto"
+            title={accountEmail}
+            onClick={onOpenAccount}
+          >
+            {accountEmail}
+          </button>
+          {sep}
+        </li>
+        <li className="uwf-crumb uwf-crumb-leaf">
+          <h1
+            className="uwf-crumb-current uwf-crumb-heading"
+            aria-current="page"
+            dir="auto"
+            title={folderLabel}
+          >
+            {folderLabel}
+          </h1>
+          {onNameFolder && (
+            <span className="uwf-crumb-actions">
+              <button
+                type="button"
+                className="uwf-crumb-rename"
+                data-drive-name-folder-header=""
+                aria-label={t('uhDriveNameFolder')}
+                title={t('uhDriveNameFolder')}
+                onClick={onNameFolder}
+              >
+                <NameFolderGlyph />
+              </button>
+            </span>
+          )}
+        </li>
+      </ol>
+    </nav>
+  )
+}
+
 export interface DriveListProps {
   workspaceId: string
   connections: readonly DriveConnection[]
   selectedAccountId: string | null
   files: readonly DriveFile[]
+  /** folder rows drawn before the files (the account view); empty elsewhere */
+  folders?: readonly DriveFolder[]
+  /** the search text scoping the list: an empty result then says nothing matched */
+  query?: string
+  onClearSearch?: () => void
+  /** a folder row was opened (click, Enter) */
+  onOpenFolder?: (folderKey: string) => void
   status: 'loading' | 'ready' | 'error'
   error?: UniworkDriveErrorCode
   offline: boolean
@@ -407,6 +626,10 @@ export function DriveList({
   connections,
   selectedAccountId,
   files,
+  folders = [],
+  query = '',
+  onClearSearch,
+  onOpenFolder,
   status,
   error,
   offline,
@@ -445,9 +668,10 @@ export function DriveList({
 
   const connectionById = new Map(connections.map((c) => [c.id, c]))
 
-  const isOfflineState = offline && files.length === 0
-  const isErrorState = !isOfflineState && status === 'error' && files.length === 0
-  const isLoadingState = !isOfflineState && status === 'loading' && files.length === 0
+  const rowCount = files.length + folders.length
+  const isOfflineState = offline && rowCount === 0
+  const isErrorState = !isOfflineState && status === 'error' && rowCount === 0
+  const isLoadingState = !isOfflineState && status === 'loading' && rowCount === 0
 
   // a pick brings a stacked panel (below the list) into view; beside the list nothing scrolls
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -587,13 +811,32 @@ export function DriveList({
             />
           )}
 
-          {!isLoadingState && !isOfflineState && !isErrorState && files.length === 0 && (
-            <div className="dh-empty dh-drive-empty" role="status" data-drive-empty="">
-              <p className="dh-drive-empty-title">{t('uhDriveEmpty')}</p>
-            </div>
-          )}
+          {!isLoadingState &&
+            !isOfflineState &&
+            !isErrorState &&
+            rowCount === 0 &&
+            query.trim() && (
+              <ListState
+                kind="empty"
+                glyph="search"
+                title={t('dlSearchNoResults', { query: query.trim() })}
+                action={
+                  onClearSearch ? { label: t('searchClear'), onClick: onClearSearch } : undefined
+                }
+              />
+            )}
 
-          {!isLoadingState && !isOfflineState && !isErrorState && files.length > 0 && (
+          {!isLoadingState &&
+            !isOfflineState &&
+            !isErrorState &&
+            rowCount === 0 &&
+            !query.trim() && (
+              <div className="dh-empty dh-drive-empty" role="status" data-drive-empty="">
+                <p className="dh-drive-empty-title">{t('uhDriveEmpty')}</p>
+              </div>
+            )}
+
+          {!isLoadingState && !isOfflineState && !isErrorState && rowCount > 0 && (
             <>
               <div className="dh-drive-table-wrap">
                 <table className="dh-drive-table" aria-label={t('uhNavGoogleDrive')}>
@@ -607,6 +850,42 @@ export function DriveList({
                     </tr>
                   </thead>
                   <tbody>
+                    {folders.map((folder) => {
+                      const folderLabel = driveFolderLabel(folder, t)
+                      const open = () => onOpenFolder?.(folder.key)
+                      return (
+                        <tr
+                          key={`folder:${folder.key}`}
+                          className="dh-drive-row dh-drive-folder-row"
+                          data-drive-folder-row={folder.key}
+                          tabIndex={0}
+                          onClick={open}
+                          onKeyDown={(e) => {
+                            if (e.nativeEvent.isComposing || e.repeat) return
+                            if (e.key !== 'Enter' && e.key !== ' ') return
+                            e.preventDefault()
+                            open()
+                          }}
+                        >
+                          <td className="dh-drive-td dh-drive-cell-name">
+                            <div className="dh-drive-name-wrap">
+                              <span className="dh-drive-folder-icon">
+                                <FolderGlyph />
+                              </span>
+                              <span className="dh-drive-file-name" title={folderLabel}>
+                                {folderLabel}
+                              </span>
+                            </div>
+                          </td>
+                          <td
+                            className="dh-drive-td dh-drive-cell-folder-count"
+                            colSpan={DRIVE_COLUMNS.length - 1}
+                          >
+                            {driveFolderFileCount(folder.count, t)}
+                          </td>
+                        </tr>
+                      )
+                    })}
                     {files.map((file) => {
                       const badge = formatDriveAccessBadge(file, t)
                       const viewerConnId = file.viewerConnectionId || file.connectionId
@@ -737,9 +1016,42 @@ export function DriveList({
   )
 }
 
+/** what the Drive library shows: every account, one account, or one folder of an account */
+export type DriveScope =
+  { kind: 'all' } | { kind: 'account' } | { kind: 'folder'; folder: DriveFolder }
+
+/** the folders of one account for the sidebar (every page of its files is behind them) */
+export interface DriveAccountFolders {
+  status: 'loading' | 'ready' | 'error'
+  folders: readonly DriveFolder[]
+  /** where the folders came from: the server list, or derived from the account's files (an old server) */
+  source: 'server' | 'derived'
+}
+
+/** the Drive selection a host keeps so back/relaunch restores it (the account and folder ids) */
+export interface DriveViewState {
+  accountId: string | null
+  folderKey: string | null
+}
+
 export interface UseDocumentsHomeDriveResult {
   sidebarState: DriveSidebarState
   selectedAccountId: string | null
+  /** the selected folder of the selected account; null = the account (or all accounts) view */
+  selectedFolderKey: string | null
+  scope: DriveScope
+  /** folder rows of the account view (empty in every other view, and while searching) */
+  folders: readonly DriveFolder[]
+  /** the folders of every account loaded for the sidebar tree */
+  folderTree: Readonly<Record<string, DriveAccountFolders>>
+  /** the open folder (or the account's folders) can be named from Drive: the server answers the folder list */
+  canNameFolders: boolean
+  /** selects an account (and one of its folders); `null` account = every account */
+  select: (accountId: string | null, folderKey?: string | null) => void
+  /** the raw selection (not resolved against the connections), for the host to keep */
+  viewState: DriveViewState
+  /** a Drive file by id, from the page list or any loaded account */
+  findFile: (driveFileId: string) => DriveFile | undefined
   setSelectedAccountId: (accountId: string | null) => void
   selectedConnection: DriveConnection | null
   brokenAccount: boolean
@@ -768,17 +1080,40 @@ export function useDocumentsHomeDrive({
   workspaceId,
   subView,
   listTick,
+  query = '',
+  folderAccountIds = [],
+  initialView,
   onErrorToast,
   onFeatureDisabled,
 }: {
   workspaceId: string
   subView: string
   listTick: number
+  /** the search box: scopes to the current node (the account, the folder, every account) */
+  query?: string
+  /** the accounts whose folders the sidebar shows (expanded rows); the selected one is always added */
+  folderAccountIds?: readonly string[]
+  /** the selection to restore when the view remounts */
+  initialView?: DriveViewState
   onErrorToast?: (error: UniworkDriveErrorCode) => void
   /** the org turned the connector off mid-session: the host leaves the Drive view */
   onFeatureDisabled?: () => void
 }): UseDocumentsHomeDriveResult {
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
+  const { dateLocale } = useI18n()
+  const [selectedAccountId, setSelectedAccountIdRaw] = useState<string | null>(
+    initialView?.accountId ?? null,
+  )
+  const [selectedFolderKeyRaw, setSelectedFolderKey] = useState<string | null>(
+    initialView?.folderKey ?? null,
+  )
+  const select = useCallback((accountId: string | null, folderKey: string | null = null) => {
+    setSelectedAccountIdRaw(accountId)
+    setSelectedFolderKey(accountId ? folderKey : null)
+  }, [])
+  const setSelectedAccountId = useCallback(
+    (accountId: string | null) => select(accountId),
+    [select],
+  )
   const [capability, setCapability] = useState(false)
   const [connections, setConnections] = useState<readonly DriveConnection[]>([])
   // the viewer has linked files although no connection is left (a disconnected one): the row stays
@@ -812,7 +1147,7 @@ export function useDocumentsHomeDrive({
   const prevWsRef = useRef(workspaceId)
   if (prevWsRef.current !== workspaceId) {
     prevWsRef.current = workspaceId
-    setSelectedAccountId(null)
+    select(null)
     setConnections([])
     setOrphanFileCount(0)
     setSeenInSession(false)
@@ -925,6 +1260,51 @@ export function useDocumentsHomeDrive({
   }, [workspaceId, isDriveView, listTick, focusTick, driveTick])
 
   const resolvedAccountId = resolveDriveAccountFilter(selectedAccountId, connections)
+
+  // the accounts whose folders the sidebar tree shows (the expanded rows) and the open one
+  const wantedAccountIds = useMemo(() => {
+    const known = new Set(connections.map((c) => c.id))
+    const ids = new Set<string>()
+    for (const id of folderAccountIds) if (known.has(id)) ids.add(id)
+    if (isDriveView && resolvedAccountId) ids.add(resolvedAccountId)
+    return [...ids]
+  }, [connections, folderAccountIds, isDriveView, resolvedAccountId])
+  const refreshKey = `${listTick}:${focusTick}:${driveTick}`
+  const loadEnabled = (capability || seenInSession) && syncOnline
+  const fetchAccountFolders = useCallback(
+    (connectionId: string) =>
+      fetchDocumentsHomeDriveFolders(getDriveBridge(), { workspaceId, connectionId }),
+    [workspaceId],
+  )
+  // one request per account: the tree and the folder rows come from the server list, no page walk
+  const folderLists = useDriveFolderLists({
+    workspaceId,
+    enabled: loadEnabled,
+    accountIds: wantedAccountIds,
+    refreshKey,
+    fetchFolders: fetchAccountFolders,
+  })
+  // the pages are walked only where the files are needed: the open account (its folder views and
+  // the files without a folder), and any account whose server sent no folder list (v2 derivation)
+  const walkedAccountIds = useMemo(
+    () =>
+      wantedAccountIds.filter(
+        (id) => (isDriveView && id === resolvedAccountId) || folderLists[id]?.status === 'fallback',
+      ),
+    [wantedAccountIds, isDriveView, resolvedAccountId, folderLists],
+  )
+  const fetchAccountPage = useCallback(
+    (connectionId: string, cursor?: string) =>
+      fetchDocumentsHomeDriveFiles(getDriveBridge(), { workspaceId, connectionId, cursor }),
+    [workspaceId],
+  )
+  const accountFiles = useDriveAccountFiles({
+    workspaceId,
+    enabled: loadEnabled,
+    accountIds: walkedAccountIds,
+    refreshKey,
+    fetchPage: fetchAccountPage,
+  })
 
   // Load files when Google Drive sub-view is open
   const filesSeqRef = useRef(0)
@@ -1087,18 +1467,122 @@ export function useDocumentsHomeDrive({
       Boolean(selectedConnection.authFailedAt)),
   )
 
+  // the folders of each listed account, for the sidebar tree and the folder views: the server list,
+  // or (an old server) derived from the account's files
+  const folderTree = useMemo(() => {
+    const out: Record<string, DriveAccountFolders> = {}
+    for (const id of wantedAccountIds) {
+      const list = folderLists[id]
+      const walk = accountFiles[id]
+      if (list?.status === 'ready') {
+        const nodes = serverDriveFolders(list.folders, dateLocale)
+        out[id] = {
+          status: 'ready',
+          source: 'server',
+          folders: walk?.status === 'ready' ? attachFolderFiles(nodes, walk.files).folders : nodes,
+        }
+      } else if (list?.status === 'fallback' && walk) {
+        out[id] = {
+          status: walk.status,
+          source: 'derived',
+          folders: deriveDriveFolders(walk.files, dateLocale).folders,
+        }
+      } else {
+        out[id] = { status: 'loading', source: 'derived', folders: [] }
+      }
+    }
+    return out
+  }, [wantedAccountIds, folderLists, accountFiles, dateLocale])
+
+  // what the list shows: the selected node's files (an old server, with no drive_folder, keeps today's flat list)
+  const tree = resolvedAccountId ? folderTree[resolvedAccountId] : undefined
+  const accountEntry = resolvedAccountId ? accountFiles[resolvedAccountId] : undefined
+  // the folders and every file of the open account are in: the folder rows and the files without a folder
+  const indexedView = useMemo(() => {
+    if (!tree || tree.status !== 'ready' || accountEntry?.status !== 'ready') return null
+    const listed = new Set(tree.folders.map((f) => f.key))
+    return {
+      folders: tree.folders,
+      looseFiles: accountEntry.files.filter(
+        (f) => !f.driveFolder?.id || !listed.has(f.driveFolder.id),
+      ),
+    }
+  }, [tree, accountEntry])
+  const folder =
+    indexedView && selectedFolderKeyRaw
+      ? (indexedView.folders.find((f) => f.key === selectedFolderKeyRaw) ?? null)
+      : null
+  // a folder of an account still loading waits; an unknown folder id (or a failed load) is the account view
+  const folderPending =
+    Boolean(resolvedAccountId && selectedFolderKeyRaw) &&
+    (!tree || tree.status === 'loading' || !accountEntry || accountEntry.status === 'loading')
+  const searching = query.trim().length > 0
+
+  let scope: DriveScope = resolvedAccountId ? { kind: 'account' } : { kind: 'all' }
+  let shownFiles: readonly DriveFile[] = filesState.files
+  let shownFolders: readonly DriveFolder[] = []
+  let shownStatus = filesState.status
+  let shownNextCursor: string | null = filesState.nextCursor
+  if (folder) {
+    scope = { kind: 'folder', folder }
+    shownFiles = folder.files
+    shownStatus = 'ready'
+    shownNextCursor = null
+  } else if (folderPending) {
+    const key = selectedFolderKeyRaw ?? ''
+    scope = {
+      kind: 'folder',
+      folder: { key, name: null, shortId: shortFolderId(key), count: 0, files: [] },
+    }
+    shownFiles = []
+    shownStatus = 'loading'
+    shownNextCursor = null
+  } else if (indexedView) {
+    // every page is in: the folder rows first, then the files that have no folder
+    shownStatus = 'ready'
+    shownNextCursor = null
+    if (searching || indexedView.folders.length === 0) {
+      shownFiles = [...indexedView.folders.flatMap((f) => f.files), ...indexedView.looseFiles]
+    } else {
+      shownFolders = indexedView.folders
+      shownFiles = indexedView.looseFiles
+    }
+  }
+  const visibleFiles = searching ? filterDriveFilesByName(shownFiles, query) : shownFiles
+
+  const findFile = useCallback(
+    (driveFileId: string) => {
+      const fromPage = filesState.files.find((f) => f.id === driveFileId)
+      if (fromPage) return fromPage
+      for (const entry of Object.values(accountFiles)) {
+        const hit = entry.files.find((f) => f.id === driveFileId)
+        if (hit) return hit
+      }
+      return undefined
+    },
+    [filesState.files, accountFiles],
+  )
+
   return {
     sidebarState,
     selectedAccountId: resolvedAccountId,
+    selectedFolderKey: folder ? folder.key : null,
+    scope,
+    folders: shownFolders,
+    folderTree,
+    canNameFolders: tree?.source === 'server',
+    select,
+    viewState: { accountId: selectedAccountId, folderKey: selectedFolderKeyRaw },
+    findFile,
     setSelectedAccountId,
     selectedConnection,
     brokenAccount,
     connections,
-    files: filesState.files,
-    status: filesState.status,
+    files: visibleFiles,
+    status: shownStatus,
     error: filesState.error,
     offline,
-    nextCursor: filesState.nextCursor,
+    nextCursor: shownNextCursor,
     loadingMore: filesState.loadingMore,
     moreError: filesState.moreError,
     retry,
