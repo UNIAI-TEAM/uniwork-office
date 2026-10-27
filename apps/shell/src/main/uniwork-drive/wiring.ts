@@ -4,6 +4,7 @@ import {
   driveErrorOfDocError,
   type DriveFileListQuery,
   type DriveFileTarget,
+  type DriveFolderListQuery,
   type UniworkDriveResult,
 } from '../../shared/uniwork-drive-api'
 import type { DeploymentProfile } from '../uniwork-auth/deployment'
@@ -156,6 +157,20 @@ export function registerUniworkDrive(ipcMain: IpcMain, deps: UniworkDriveDeps): 
       throw new UniworkDocError('server_error')
     }
     return api().listFiles(query as DriveFileListQuery)
+  })
+
+  handle(C.listFolders, async (query) => {
+    if (!query || typeof query !== 'object' || Array.isArray(query)) {
+      throw new UniworkDocError('server_error')
+    }
+    const q = query as Record<string, unknown>
+    if (!isValidId(q.workspaceId) || !isValidId(q.connectionId)) {
+      throw new UniworkDocError('server_error')
+    }
+    return api().listFolders({
+      workspaceId: q.workspaceId,
+      connectionId: q.connectionId,
+    } satisfies DriveFolderListQuery)
   })
 
   handle(C.getFile, async (input) => api().getFile(checkTarget(input)))

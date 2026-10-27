@@ -505,6 +505,90 @@ describe('uniwork drive client: parsing', () => {
   })
 })
 
+describe('uniwork drive client: folder list (UNI-2223 v3)', () => {
+  it('asks GET drive-folders for one connection and reads the counts', async () => {
+    const fetch = server({
+      'GET /workspaces/ws_1/drive-folders': () =>
+        json(200, {
+          folders: [
+            { id: 'f_a', name: 'Hợp đồng', file_count: 4 },
+            { id: 'f_b', name: null, file_count: 2 },
+            { id: null, name: null, file_count: 1 },
+          ],
+        }),
+    })
+    const folders = await client(fetch).listFolders({ workspaceId: 'ws_1', connectionId: 'conn_1' })
+    expect(fetch.mock.calls.map(([url, init]) => `${init.method} ${url}`)).toEqual([
+      `GET ${ORIGIN}/api/v1/workspaces/ws_1/drive-folders?drive_connection_id=conn_1`,
+    ])
+    expect(folders).toEqual([
+      { id: 'f_a', name: 'Hợp đồng', fileCount: 4 },
+      { id: 'f_b', name: null, fileCount: 2 },
+      { id: null, name: null, fileCount: 1 },
+    ])
+  })
+
+  it('reads the list leniently: bad entries are dropped, no list at all is null', async () => {
+    const answer = (body: unknown) =>
+      client(server({ 'GET /workspaces/ws_1/drive-folders': () => json(200, body) })).listFolders({
+        workspaceId: 'ws_1',
+        connectionId: 'conn_1',
+      })
+    expect(
+      await answer({
+        folders: [
+          { id: 'f_ok', name: '  Báo giá ', file_count: 3 },
+          { id: 'f_blank', name: '   ', file_count: 0 },
+          { id: 'f_num', name: 7, file_count: 1 },
+          { id: 'f_nocount', name: 'x' },
+          { id: 'f_neg', name: 'x', file_count: -1 },
+          { id: 'f_frac', name: 'x', file_count: 1.5 },
+          { id: 'f_str', name: 'x', file_count: '3' },
+          { id: '', name: 'x', file_count: 1 },
+          { id: 9, name: 'x', file_count: 1 },
+          { name: 'no id key', file_count: 5 },
+          'f_a',
+          null,
+          ['f_a'],
+        ],
+      }),
+    ).toEqual([
+      { id: 'f_ok', name: 'Báo giá', fileCount: 3 },
+      { id: 'f_blank', name: null, fileCount: 0 },
+      { id: 'f_num', name: null, fileCount: 1 },
+      // an entry without an id key is the no-folder group, like an explicit null
+      { id: null, name: 'no id key', fileCount: 5 },
+    ])
+    expect(await answer({ folders: [] })).toEqual([])
+    for (const body of [{}, { folders: null }, { folders: 'x' }, { folders: { a: 1 } }, [], null]) {
+      expect(await answer(body)).toBeNull()
+    }
+  })
+
+  it('an old server (404) comes back as not_found; a missing or bad connection is refused locally', async () => {
+    const err = await errorOf(
+      client(server()).listFolders({ workspaceId: 'ws_1', connectionId: 'conn_1' }),
+    )
+    expect(driveErrorOfDocError(err.code as never, err.serverCode)).toBe('not_found')
+
+    const fetch = server()
+    const api = client(fetch)
+    await expect(api.listFolders({ workspaceId: 'ws_1', connectionId: '' })).rejects.toMatchObject({
+      code: 'not_found',
+    })
+    await expect(
+      api.listFolders({ workspaceId: 'ws_1', connectionId: 'bad/id' }),
+    ).rejects.toMatchObject({ code: 'not_found' })
+    await expect(
+      api.listFolders({ workspaceId: '../ws', connectionId: 'conn_1' }),
+    ).rejects.toMatchObject({ code: 'not_found' })
+    await expect(api.listFolders({ workspaceId: 'ws_1' } as never)).rejects.toMatchObject({
+      code: 'server_error',
+    })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
 describe('uniwork drive client: errors and driveErrorOfDocError', () => {
   it('maps network, not_signed_in, session_expired, not_found, forbidden, feature_disabled, auth_failed, and server_error', async () => {
     // network failure

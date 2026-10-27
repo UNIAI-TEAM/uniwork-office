@@ -242,6 +242,13 @@ export type WorkWebTarget =
   | { kind: 'onboarding' }
   | { kind: 'drive-pick'; orgSlug: string; wsSlug: string; accountId?: string }
   | { kind: 'drive-connect'; orgSlug: string; wsSlug: string }
+  | {
+      kind: 'drive-name-folder'
+      orgSlug: string
+      wsSlug: string
+      accountId: string
+      folderId: string
+    }
   | { kind: 'drive-file'; orgSlug: string; wsSlug: string; id: string; action?: 'propose' | 'ask' }
 
 export const UNIWORK_WORK_CHANNELS = {

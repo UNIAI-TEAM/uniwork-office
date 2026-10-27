@@ -186,6 +186,21 @@ export interface DriveFile {
 
 export type DriveFileDetail = DriveFile
 
+/**
+ * One entry of the server folder list (`GET /workspaces/{ws}/drive-folders`). `id` null is the
+ * group of files with no parent folder; `name` null is a folder whose name is not readable.
+ */
+export interface DriveFolderSummary {
+  id: string | null
+  name: string | null
+  fileCount: number
+}
+
+export interface DriveFolderListQuery {
+  workspaceId: string
+  connectionId: string
+}
+
 export interface DriveFileListQuery {
   workspaceId: string
   connectionId?: string
@@ -229,6 +244,7 @@ export const UNIWORK_DRIVE_CHANNELS = {
   isAvailable: 'uniwork-drive:is-available',
   listConnections: 'uniwork-drive:list-connections',
   listFiles: 'uniwork-drive:list-files',
+  listFolders: 'uniwork-drive:list-folders',
   getFile: 'uniwork-drive:get-file',
   unlink: 'uniwork-drive:unlink',
   openOnGoogle: 'uniwork-drive:open-on-google',
@@ -242,6 +258,12 @@ export interface UniworkDriveApi {
   listConnections(workspaceId: string): Promise<UniworkDriveResult<DriveConnection[]>>
   /** `GET /workspaces/{ws}/drive-files?connection_id=&cursor=&limit=` */
   listFiles(query: DriveFileListQuery): Promise<UniworkDriveResult<DriveFileListPage>>
+  /**
+   * `GET /workspaces/{ws}/drive-folders?drive_connection_id=` (one request per account). The value
+   * is null when the server sent no folder list (an old server): the caller derives the folders
+   * from the files instead. A 404 from an old server comes back as `not_found`.
+   */
+  listFolders(query: DriveFolderListQuery): Promise<UniworkDriveResult<DriveFolderSummary[] | null>>
   /** `GET /workspaces/{ws}/drive-files/{id}` */
   getFile(input: DriveFileTarget): Promise<UniworkDriveResult<DriveFileDetail>>
   /** `DELETE /workspaces/{ws}/drive-files/{id}` */

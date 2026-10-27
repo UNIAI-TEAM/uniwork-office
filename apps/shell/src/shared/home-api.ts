@@ -113,6 +113,8 @@ import type {
   DriveFileListPage,
   DriveFileListQuery,
   DriveFileTarget,
+  DriveFolderListQuery,
+  DriveFolderSummary,
   DriveHistoryEvent,
   UniworkDriveResult,
 } from './uniwork-drive-api'
@@ -125,7 +127,9 @@ export type {
   DriveFileListPage,
   DriveFileListQuery,
   DriveFileTarget,
+  DriveFolderListQuery,
   DriveFolderRef,
+  DriveFolderSummary,
   DriveHistoryEvent,
   DriveIconKind,
   DriveLinkedTaskRef,
@@ -1838,6 +1842,9 @@ export interface HomeApi {
   uniworkDriveIsAvailable?(): Promise<boolean>
   uniworkDriveListConnections?(workspaceId: string): Promise<UniworkDriveResult<DriveConnection[]>>
   uniworkDriveListFiles?(query: DriveFileListQuery): Promise<UniworkDriveResult<DriveFileListPage>>
+  uniworkDriveListFolders?(
+    query: DriveFolderListQuery,
+  ): Promise<UniworkDriveResult<DriveFolderSummary[] | null>>
   uniworkDriveGetFile?(input: DriveFileTarget): Promise<UniworkDriveResult<DriveFileDetail>>
   uniworkDriveUnlink?(input: DriveFileTarget): Promise<UniworkDriveResult<null>>
   uniworkDriveOpenOnGoogle?(input: DriveFileTarget): Promise<UniworkDriveResult<null>>
