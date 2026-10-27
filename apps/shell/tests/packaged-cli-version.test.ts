@@ -16,6 +16,22 @@ interface Rebuild {
   appVersion: string | undefined
 }
 
+interface LibreOfficeCall {
+  target: string
+}
+
+/**
+ * The real beforePack also makes sure the LibreOffice pack exists and downloads
+ * it when the cache is cold, which has nothing to do with the CLI version and
+ * made these tests depend on the network. The loader serves a stand-in for that
+ * one step and records each call, so every beforePack run can prove it stayed on
+ * the stand-in (a future change that reaches the real download fails the assert
+ * instead of timing out).
+ */
+function expectLibreOfficeStubbed(calls: LibreOfficeCall[]): void {
+  expect(calls).toEqual([{ target: 'linux-x64' }])
+}
+
 /**
  * Loads the real packaging config and drives its beforePack hook with a stand-in
  * CLI bundle: `rebuiltWith` is the version the fake rebuild bakes in, so the hook
@@ -28,8 +44,10 @@ function loadConfig(opts: {
 }): {
   config: { beforePack: (context: { electronPlatformName: string }) => Promise<void> }
   rebuilds: Rebuild[]
+  libreOfficeCalls: LibreOfficeCall[]
 } {
   const rebuilds: Rebuild[] = []
+  const libreOfficeCalls: LibreOfficeCall[] = []
   let baked = opts.baked
   const configModule = { exports: {} as Record<string, unknown> }
   runInNewContext(readFileSync(resolve(shellRoot, 'electron-builder.cjs'), 'utf8'), {
@@ -64,6 +82,17 @@ function loadConfig(opts: {
           },
         }
       }
+      if (id.replace(/\\/g, '/').endsWith('build/prepare-libreoffice.cjs')) {
+        return {
+          ...require(id),
+          // Report the pack as missing so the hook always takes the download path,
+          // then record the request instead of fetching anything.
+          isPackValid: () => false,
+          ensureLibreOfficePack: async (target: string) => {
+            libreOfficeCalls.push({ target })
+          },
+        }
+      }
       return require(id)
     },
   })
@@ -74,39 +103,46 @@ function loadConfig(opts: {
   if (opts.extraMetadataVersion) {
     config.extraMetadata = { ...(config.extraMetadata ?? {}), version: opts.extraMetadataVersion }
   }
-  return { config, rebuilds }
+  return { config, rebuilds, libreOfficeCalls }
 }
 
 describe('packaged CLI version agreement', () => {
   it('rebuilds the CLI bundle with the app version when the two disagree', async () => {
-    const { config, rebuilds } = loadConfig({ baked: '9.9.9' })
+    const { config, rebuilds, libreOfficeCalls } = loadConfig({ baked: '9.9.9' })
     await config.beforePack({ electronPlatformName: 'linux' })
+    expectLibreOfficeStubbed(libreOfficeCalls)
     expect(rebuilds).toHaveLength(1)
     expect(rebuilds[0].script.replace(/\\/g, '/').endsWith('packages/cli/build.mjs')).toBe(true)
     expect(rebuilds[0].appVersion).toBe(shellPackage.version)
   })
 
   it('uses the release version electron-builder injects into extraMetadata', async () => {
-    const { config, rebuilds } = loadConfig({
+    const { config, rebuilds, libreOfficeCalls } = loadConfig({
       baked: shellPackage.version,
       extraMetadataVersion: '0.5.149',
     })
     await config.beforePack({ electronPlatformName: 'linux' })
+    expectLibreOfficeStubbed(libreOfficeCalls)
     expect(rebuilds).toHaveLength(1)
     expect(rebuilds[0].appVersion).toBe('0.5.149')
   })
 
   it('leaves an already matching bundle alone', async () => {
-    const { config, rebuilds } = loadConfig({ baked: shellPackage.version })
+    const { config, rebuilds, libreOfficeCalls } = loadConfig({ baked: shellPackage.version })
     await config.beforePack({ electronPlatformName: 'linux' })
+    expectLibreOfficeStubbed(libreOfficeCalls)
     expect(rebuilds).toEqual([])
   })
 
   it('fails the package when the bundle still disagrees after the rebuild', async () => {
-    const { config, rebuilds } = loadConfig({ baked: '9.9.9', rebuildApplies: false })
+    const { config, rebuilds, libreOfficeCalls } = loadConfig({
+      baked: '9.9.9',
+      rebuildApplies: false,
+    })
     await expect(config.beforePack({ electronPlatformName: 'linux' })).rejects.toThrow(
       /but the app ships/,
     )
+    expectLibreOfficeStubbed(libreOfficeCalls)
     expect(rebuilds).toHaveLength(1)
   })
 
