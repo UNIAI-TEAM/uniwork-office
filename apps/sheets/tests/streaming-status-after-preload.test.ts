@@ -14,12 +14,12 @@ import type { LazyWorkbookState } from '../src/renderer/univer-state'
 const ROWS = 9
 const COLUMNS = 4
 
-function sheetMeta(rowCount = ROWS) {
+function sheetMeta(rowCount = ROWS, columnCount = COLUMNS) {
   return {
     id: 'sheet-1',
     name: 'Sheet1',
     rowCount,
-    columnCount: COLUMNS,
+    columnCount,
     tables: [],
     pivotTables: [],
     freeze: null,
@@ -27,14 +27,14 @@ function sheetMeta(rowCount = ROWS) {
   }
 }
 
-function lazyState(rowCount = ROWS): LazyWorkbookState {
+function lazyState(rowCount = ROWS, columnCount = COLUMNS): LazyWorkbookState {
   return {
     file: {
       sessionId: 'session-1',
       sha256: 'sha',
       name: 'Small.xlsx',
       styles: [],
-      sheets: [sheetMeta(rowCount)],
+      sheets: [sheetMeta(rowCount, columnCount)],
     },
     generation: 1,
     loadedRanges: new Map(),
@@ -228,6 +228,25 @@ describe('streaming status after the full preload', () => {
 
       await loadVisibleRange(runtime as never, ref, worksheet as never, setMessage)
 
+      expect(messages).not.toContain(
+        t('appStreamingRows', { name: 'Small.xlsx', rows: String(ROWS) }),
+      )
+      expect(messages.at(-1)).toBe('')
+    })
+
+    it('a sheet declared far wider than its viewport clears the status once every row is in', async () => {
+      // A LibreOffice-converted .xls reports A:IW although only a few columns
+      // hold data; the viewport load never spans them, rows are all loaded.
+      const state = lazyState(ROWS, 257)
+      const ref = { current: state }
+      const worksheet = makeWorksheet()
+      const runtime = makeRuntime(worksheet)
+      const setMessage = (message: string) => messages.push(message)
+      reads = [rangeResult(true)]
+
+      await loadVisibleRange(runtime as never, ref, worksheet as never, setMessage)
+
+      expect(state.loadedRanges.get('sheet-1')?.endColumn).toBeLessThan(256)
       expect(messages).not.toContain(
         t('appStreamingRows', { name: 'Small.xlsx', rows: String(ROWS) }),
       )

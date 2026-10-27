@@ -3368,19 +3368,17 @@ async function loadRange(
       // tail (retry timer, decoration re-read) must not replace it.
       const loadedNow = state.loadedRanges.get(sheetId)
       const extent = lazySheetScreenExtent(state, sheetId)
+      // Rows are what streams: columns load with the viewport and a sheet's
+      // declared width (a converted .xls reports A:IW) rarely holds data, so
+      // requiring them too would keep the line on a fully read sheet.
       if (
         loadedNow &&
         extent &&
         extent.rows > 0 &&
-        extent.columns > 0 &&
-        containsRange(loadedNow, {
-          startRow: 0,
-          endRow: extent.rows - 1,
-          startColumn: 0,
-          endColumn: extent.columns - 1,
-        })
+        loadedNow.startRow <= 0 &&
+        loadedNow.endRow >= extent.rows - 1
       ) {
-        // Indexing is done and the whole sheet sits in the grid: nothing is
+        // Indexing is done and every row sits in the grid: nothing is
         // streaming any more, so the "Indexing"/"Streaming" line must not
         // linger on a loaded sheet (small workbooks never run the full preload).
         setMessage('')
