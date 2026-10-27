@@ -380,6 +380,106 @@ export function vmlWordArtBox(shape: XNode): TextboxDisplay | null {
   return box
 }
 
+/**
+ * Id of the v:shapetype a shape points at. Word writes type="#_x0000_t109";
+ * LibreOffice's DOC/DOCX export writes the bare id (type="_x0000_t109"), which
+ * must resolve to the same template or the shape loses its geometry.
+ */
+export function vmlTypeId(type: string | undefined): string | undefined {
+  const id = type?.trim().replace(/^#/, '')
+  return id ? id : undefined
+}
+
+/** one v:line end ("899,1439", "0pt,10pt"): unitless counts in group units (scale) or px */
+function vmlLinePoint(
+  value: string | undefined,
+  scale: VmlGroupScale | null,
+): [number, number] | undefined {
+  const parts = (value ?? '').split(',')
+  if (parts.length !== 2) return undefined
+  const one = (tok: string, unit: number): number | undefined => {
+    const m = /^\s*(-?[\d.]+)(pt|px|in|mm|cm)?\s*$/.exec(tok)
+    if (!m) return undefined
+    return m[2] ? vmlLengthPx(tok) : parseFloat(m[1]!) * unit
+  }
+  const x = one(parts[0]!, scale?.sx ?? 1)
+  const y = one(parts[1]!, scale?.sy ?? 1)
+  return x === undefined || y === undefined || !Number.isFinite(x + y) ? undefined : [x, y]
+}
+
+/** v:stroke dashstyle → SVG dash pattern in stroke-width units */
+const VML_DASH: Record<string, string> = {
+  dot: '1 1',
+  shortdot: '1 1',
+  dash: '4 3',
+  shortdash: '3 1',
+  dashdot: '4 3 1 3',
+  shortdashdot: '3 1 1 1',
+  longdash: '8 3',
+  longdashdot: '8 3 1 3',
+}
+
+/**
+ * Straight v:line (from/to) → SVG data URL covering the line's bounding box,
+ * plus that box's top-left corner in px from the group origin (or the paragraph
+ * when the line is not in a group). Stroke color, weight and dash style come
+ * from the line or its v:stroke child; flip:x / flip:y mirror the line inside
+ * its box. A bare v:stroke weight (LibreOffice writes EMU) counts as EMU.
+ */
+export function vmlLineSvg(
+  shape: XNode,
+  scale: VmlGroupScale | null,
+): { dataUrl: string; widthPx: number; heightPx: number; leftPx: number; topPx: number } | null {
+  const a = attrsOf(shape)
+  const style = a['style'] ?? ''
+  if (/visibility:\s*hidden/.test(style)) return null
+  const strokeNode = attrsOf(findChild(shape, 'v:stroke') ?? {})
+  const off = (v: string | undefined) => v === 'f' || v === 'false' || v === '0'
+  if (off(a['stroked']) || off(strokeNode['on'])) return null
+  const from = vmlLinePoint(a['from'], scale)
+  const to = vmlLinePoint(a['to'], scale)
+  if (!from || !to) return null
+  const weightRaw = strokeNode['weight'] ?? a['strokeweight']
+  const weight = /^\s*[\d.]+\s*$/.test(strokeNode['weight'] ?? '')
+    ? parseFloat(weightRaw!) / EMU_PER_PX
+    : vmlLengthPx(weightRaw)
+  const sw = Math.max(0.75, Math.round((weight ?? 1) * 100) / 100)
+  // the box is padded by half the stroke so a horizontal/vertical line keeps all of it
+  const pad = sw / 2
+  const left = Math.min(from[0], to[0]) - pad
+  const top = Math.min(from[1], to[1]) - pad
+  const w = Math.abs(to[0] - from[0]) + sw
+  const h = Math.abs(to[1] - from[1]) + sw
+  const flip = vmlStyleProp(style, 'flip') ?? ''
+  const fx = flip.includes('x')
+  const fy = flip.includes('y')
+  const x1 = from[0] - left
+  const x2 = to[0] - left
+  const y1 = from[1] - top
+  const y2 = to[1] - top
+  const mx = (v: number) => (fx ? w - v : v)
+  const my = (v: number) => (fy ? h - v : v)
+  const dash = VML_DASH[(strokeNode['dashstyle'] ?? '').trim().toLowerCase()]
+  const dashAttr = dash
+    ? ` stroke-dasharray="${dash
+        .split(' ')
+        .map((n) => Math.round(parseFloat(n) * sw * 100) / 100)
+        .join(' ')}"`
+    : ''
+  const color = vmlColorHex(strokeNode['color'] ?? a['strokecolor']) ?? '000000'
+  const cap = strokeNode['endcap'] === 'round' ? ' stroke-linecap="round"' : ''
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">` +
+    `<line x1="${mx(x1)}" y1="${my(y1)}" x2="${mx(x2)}" y2="${my(y2)}" stroke="#${color}" stroke-width="${sw}"${dashAttr}${cap}/></svg>`
+  return {
+    dataUrl: `data:image/svg+xml,${encodeURIComponent(svg)}`,
+    widthPx: Math.round(w * 100) / 100,
+    heightPx: Math.round(h * 100) / 100,
+    leftPx: left,
+    topPx: top,
+  }
+}
+
 /** the shape element of a VML pict, its shapetype templates stripped */
 function vmlPictShape(pict: string): RegExpExecArray | null {
   const body = pict.replace(/<v:shapetype\b[\s\S]*?<\/v:shapetype>/g, '')
@@ -428,7 +528,7 @@ export function vmlShapeSvg(
   if (!m) return null
   const [, rawKind, attrText] = m
   const own = parseTagAttrs(attrText!)
-  const typeId = /^#(.+)$/.exec(own['type'] ?? '')?.[1]
+  const typeId = vmlTypeId(own['type'])
   const typeAttrs =
     (typeId && (vmlShapeTypeTable(pict).get(typeId) ?? shapeTypes?.get(typeId))) || {}
   const a: Record<string, string> = { ...typeAttrs, ...own }

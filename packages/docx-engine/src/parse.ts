@@ -226,8 +226,10 @@ import {
   vmlPathToNormD,
   vmlRotationDeg,
   vmlShapeDimPx,
+  vmlLineSvg,
   vmlShapeSvg,
   vmlShapeTypeTable,
+  vmlTypeId,
   vmlStyleDimPx,
   vmlWordArtBox,
   type VmlGroupScale,
@@ -240,6 +242,9 @@ export { styleRunFormat } from './parse-styles'
 export { assertZipWithinLimits }
 
 // picture extents keep the authored size to 1/100 px: whole-px rounding lost up to 0.5 px per picture
+/** frame color of the neutral box standing in for a VML shape the engine cannot draw (document data) */
+const VML_PLACEHOLDER_BORDER = '9CA3AF'
+
 const emuToPx = (emu: number): number => Math.round((emu / EMU_PER_PX) * 100) / 100
 
 /** w:br w:type → run-text control char (\f page, \v column; else soft \n) */
@@ -1196,6 +1201,18 @@ async function buildBlock(
           type: 'image',
           label: 'Image',
           imageDataUrl: image,
+          ...vmlImageMeta(detect),
+        }
+      }
+      // picture whose media cannot be shown (missing rel, unconvertible
+      // metafile): the empty frame at the declared extent the DrawingML path
+      // uses, not an unsized chip. Bytes still pass through untouched.
+      if (rId) {
+        return {
+          ...base,
+          type: 'passthrough',
+          label: 'Image',
+          brokenImage: true,
           ...vmlImageMeta(detect),
         }
       }
@@ -2353,7 +2370,7 @@ function txbxParaVisible(p: TextboxParaDisplay): boolean {
 /** a textless top-level v:shape/rect/roundrect/oval placed with position:absolute */
 function hasFloatingVmlGeometry(xml: string): boolean {
   if (VML_PICT_RID_RE.test(xml) || xml.includes('<w:txbxContent')) return false
-  return /<v:(?:shape|rect|roundrect|oval)\b[^>]*\bstyle="[^"]*position:\s*absolute/.test(xml)
+  return /<v:(?:shape|rect|roundrect|oval|line)\b[^>]*\bstyle="[^"]*position:\s*absolute/.test(xml)
 }
 
 /**
@@ -3051,7 +3068,7 @@ function extractTextboxes(
 
   // legacy VML shapes (w:pict, outside w:drawing fragments)
   let parsed: XNode[] | null = null
-  if (/<v:(?:shape|rect|roundrect|oval)\b/.test(xml)) {
+  if (/<v:(?:shape|rect|roundrect|oval|line)\b/.test(xml)) {
     try {
       parsed = xmlParser.parse(xml) as XNode[]
     } catch {
@@ -3062,7 +3079,7 @@ function extractTextboxes(
     const shapeTypes: XNode[] = []
     collectNodes(parsed, 'v:shapetype', shapeTypes)
     const vmlShapeTypeAttrs = (type: string | undefined): Record<string, string> => {
-      const id = type?.startsWith('#') ? type.slice(1) : undefined
+      const id = vmlTypeId(type)
       const node = id ? shapeTypes.find((t) => attrsOf(t)['id'] === id) : undefined
       return node ? attrsOf(node) : (id && ctx.vmlShapeTypes?.get(id)) || {}
     }
@@ -3192,11 +3209,46 @@ function extractTextboxes(
       if (path) {
         const cs = /^\s*(\d+)[,\s]+(\d+)/.exec(a['coordsize'] ?? '')
         const d = cs ? vmlPathToNormD(path, parseInt(cs[1]!, 10), parseInt(cs[2]!, 10)) : undefined
-        // an unconvertible path must not degrade to a solid bounding box
-        if (!d) return
+        // an unconvertible path (curves, arcs) must not degrade to a solid
+        // bounding box: a neutral frame of the declared size marks the spot
+        if (!d) {
+          delete box.fill
+          box.borderColor = VML_PLACEHOLDER_BORDER
+          box.borderWidthPx = 1
+          placeVmlBox(box, style, scale, origin)
+          out.push(box)
+          return
+        }
         box.pathData = { path: d }
       }
       placeVmlBox(box, style, scale, origin)
+      out.push(box)
+    }
+    // straight v:line: an SVG line box at its from/to span (stroke color,
+    // weight and dash style kept), group coordinates scaled like other children
+    const vmlLineBox = (
+      shape: XNode,
+      scale: VmlGroupScale | null,
+      origin: VmlOrigin | null,
+    ): void => {
+      const line = vmlLineSvg(shape, scale)
+      if (!line) return
+      const box: TextboxDisplay = {
+        paras: [],
+        readOnly: true,
+        fillImageDataUrl: line.dataUrl,
+        widthPx: line.widthPx,
+        heightPx: line.heightPx,
+        insetTopPx: 0,
+        insetRightPx: 0,
+        insetBottomPx: 0,
+        insetLeftPx: 0,
+        floating: true,
+        offsetXEmu: Math.round(((origin?.x ?? 0) + line.leftPx) * EMU_PER_PX),
+        offsetYEmu: Math.round(((origin?.y ?? 0) + line.topPx) * EMU_PER_PX),
+      }
+      const style = attrsOf(shape)['style'] ?? ''
+      if (/z-index:\s*-/.test(style)) box.behind = true
       out.push(box)
     }
     // Children of a v:group (drawing canvas) position/size in the group's own
@@ -3338,6 +3390,8 @@ function extractTextboxes(
           name === 'v:oval'
         ) {
           vmlBox(node, scale, origin, nested)
+        } else if (name === 'v:line' && !nested) {
+          vmlLineBox(node, scale, origin)
         }
         // below a w:txbxContent = inside some box: consumes no save ordinal
         walkVml(childrenOf(node), scale, origin, nested || name === 'w:txbxContent')
