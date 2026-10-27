@@ -221,7 +221,7 @@ export const pl = {
   shrOwnerUnavailable: 'Przenoszenie własności nie jest jeszcze dostępne na tym serwerze.',
   shrFcMenu: 'Udostępnij',
   shrFcTitle: 'Udostępnij',
-  shrFcScope: 'Dotyczy dokumentów w folderze "{title}" i jego podfolderach.',
+  shrFcScope: 'Dokumenty w folderze "{title}" i jego podfolderach.',
   shrFcFixed: 'Dotyczy istniejących dokumentów. Dokumenty dodane później nie dostają tego dostępu.',
   shrFcModeLabel: 'Sposób zastosowania',
   shrFcModeMerge: 'Dodaj do istniejącego dostępu',
@@ -243,7 +243,7 @@ export const pl = {
   shrFcForbidden: 'Nie masz uprawnień do odczytu tego folderu.',
   shrFcNotFound: 'Nie znaleziono tego folderu.',
   shrFcUnavailable: 'Ten serwer nie obsługuje jeszcze udostępniania dokumentów w folderze.',
-  shrFcScopeUntitled: 'Dotyczy dokumentów w tym folderze i jego podfolderach.',
+  shrFcScopeUntitled: 'Dokumenty w tym folderze i jego podfolderach.',
   shrFcModeMergeHint:
     'Nadaje dostęp wybranym osobom i grupom. Istniejący dostęp nigdy nie jest obniżany ani usuwany.',
   shrFcModeReplaceHint:
@@ -267,6 +267,7 @@ export const pl = {
     'Osoby z obniżonym poziomem dostępu w co najmniej jednym dokumencie: {count}',
   shrFcWarnDowngradeOther:
     'Osoby z obniżonym poziomem dostępu w co najmniej jednym dokumencie: {count}',
+  shrFcWarnDowngradeGeneric: 'Część dostępu do tych dokumentów zostanie obniżona.',
   shrFcNothing: 'Nic się nie zmieni: obecny dostęp już odpowiada tej liście.',
   shrFcToastSkippedOne: 'Pominięte dokumenty, którymi nie zarządzasz: {count}',
   shrFcToastSkippedOther: 'Pominięte dokumenty, którymi nie zarządzasz: {count}',

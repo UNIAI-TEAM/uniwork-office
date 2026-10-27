@@ -235,7 +235,7 @@ export const en = {
   shrFcForbidden: 'You do not have permission to read this folder.',
   shrFcNotFound: 'This folder was not found.',
   shrFcUnavailable: 'This server does not support sharing the documents inside a folder yet.',
-  shrFcScopeUntitled: 'Applies to the documents in this folder and its subfolders.',
+  shrFcScopeUntitled: 'Documents in this folder and its subfolders.',
   shrFcModeMergeHint:
     'Grants the people and groups you pick. Existing access is never lowered or removed.',
   shrFcModeReplaceHint:
@@ -256,6 +256,7 @@ export const en = {
   shrFcWarnPrivate: 'The workspace is no longer in the list: these documents become Private.',
   shrFcWarnDowngradeOne: '{count} person gets a lower access level on at least one document.',
   shrFcWarnDowngradeOther: '{count} people get a lower access level on at least one document.',
+  shrFcWarnDowngradeGeneric: 'Some access on these documents will be lowered.',
   shrFcNothing: 'Nothing will change: current access already matches this list.',
   shrFcToastSkippedOne: "Skipped {count} document you don't manage.",
   shrFcToastSkippedOther: "Skipped {count} documents you don't manage.",
@@ -281,7 +282,7 @@ export const en = {
   shrFcRunningNoBatch: 'Access in this folder is being updated. Try again in a moment.',
   shrFcTooMany: 'You can add up to {max} people or groups at a time.',
   shrFcTitle: 'Share',
-  shrFcScope: 'Applies to the documents in folder "{title}" and its subfolders.',
+  shrFcScope: 'Documents in folder "{title}" and its subfolders.',
   shrFcSkippedNotManageable: "skip {count} you don't manage",
   shrFcToastUnknown: 'The access change was sent. Open the documents to check the result.',
 } satisfies Record<keyof typeof zh, string>

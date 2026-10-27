@@ -226,7 +226,7 @@ export const de = {
     'Die Übertragung der Eigentümerschaft ist auf diesem Server noch nicht verfügbar.',
   shrFcMenu: 'Teilen',
   shrFcTitle: 'Teilen',
-  shrFcScope: 'Gilt für die Dokumente im Ordner "{title}" und seinen Unterordnern.',
+  shrFcScope: 'Dokumente im Ordner "{title}" und seinen Unterordnern.',
   shrFcFixed:
     'Gilt für die vorhandenen Dokumente. Später hinzugefügte Dokumente erhalten diesen Zugriff nicht.',
   shrFcModeLabel: 'Art der Anwendung',
@@ -251,7 +251,7 @@ export const de = {
   shrFcNotFound: 'Dieser Ordner wurde nicht gefunden.',
   shrFcUnavailable:
     'Dieser Server unterstützt das Freigeben der Dokumente eines Ordners noch nicht.',
-  shrFcScopeUntitled: 'Gilt für die Dokumente in diesem Ordner und seinen Unterordnern.',
+  shrFcScopeUntitled: 'Dokumente in diesem Ordner und seinen Unterordnern.',
   shrFcModeMergeHint:
     'Gewährt Zugriff für die ausgewählten Personen und Gruppen. Bestehender Zugriff wird nie herabgestuft oder entfernt.',
   shrFcModeReplaceHint:
@@ -276,6 +276,7 @@ export const de = {
     '{count} Person erhält bei mindestens einem Dokument eine niedrigere Stufe.',
   shrFcWarnDowngradeOther:
     '{count} Personen erhalten bei mindestens einem Dokument eine niedrigere Stufe.',
+  shrFcWarnDowngradeGeneric: 'Einige Zugriffsrechte für diese Dokumente werden herabgestuft.',
   shrFcNothing: 'Nichts ändert sich: Der aktuelle Zugriff entspricht bereits dieser Liste.',
   shrFcToastSkippedOne: '{count} Dokument übersprungen, das du nicht verwaltest.',
   shrFcToastSkippedOther: '{count} Dokumente übersprungen, die du nicht verwaltest.',

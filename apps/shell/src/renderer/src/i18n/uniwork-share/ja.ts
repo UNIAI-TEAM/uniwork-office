@@ -220,7 +220,7 @@ export const ja = {
   shrOwnerUnavailable: 'このサーバーではまだオーナー権限の移譲を利用できません。',
   shrFcMenu: '共有',
   shrFcTitle: '共有',
-  shrFcScope: '"{title}"フォルダーとそのサブフォルダー内のドキュメントに適用されます。',
+  shrFcScope: '"{title}"フォルダーとそのサブフォルダー内のドキュメント。',
   shrFcFixed:
     '現在あるドキュメントに適用されます。後から追加したドキュメントにはこのアクセス権は付きません。',
   shrFcModeLabel: '適用方法',
@@ -243,7 +243,7 @@ export const ja = {
   shrFcForbidden: 'このフォルダーを読み取る権限がありません。',
   shrFcNotFound: 'このフォルダーが見つかりません。',
   shrFcUnavailable: 'このサーバーはまだフォルダー内のドキュメントの共有に対応していません。',
-  shrFcScopeUntitled: 'このフォルダーとそのサブフォルダー内のドキュメントに適用されます。',
+  shrFcScopeUntitled: 'このフォルダーとそのサブフォルダー内のドキュメント。',
   shrFcModeMergeHint:
     '選択した人やグループにアクセス権を付与します。既存のアクセス権が下がったり削除されたりすることはありません。',
   shrFcModeReplaceHint:
@@ -267,6 +267,7 @@ export const ja = {
     '{count} 人が少なくとも 1 件のドキュメントでアクセス権のレベルが下がります。',
   shrFcWarnDowngradeOther:
     '{count} 人が少なくとも 1 件のドキュメントでアクセス権のレベルが下がります。',
+  shrFcWarnDowngradeGeneric: 'これらのドキュメントの一部のアクセス権が引き下げられます。',
   shrFcNothing: '変更はありません。現在のアクセス権はこのリストと一致しています。',
   shrFcToastSkippedOne: '管理権限のないドキュメント {count} 件をスキップしました。',
   shrFcToastSkippedOther: '管理権限のないドキュメント {count} 件をスキップしました。',

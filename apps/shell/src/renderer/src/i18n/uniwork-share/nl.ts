@@ -217,7 +217,7 @@ export const nl = {
   shrOwnerUnavailable: 'Eigendom overdragen is nog niet beschikbaar op deze server.',
   shrFcMenu: 'Delen',
   shrFcTitle: 'Delen',
-  shrFcScope: 'Geldt voor de documenten in de map "{title}" en de submappen ervan.',
+  shrFcScope: 'Documenten in de map "{title}" en de submappen ervan.',
   shrFcFixed:
     'Geldt voor de documenten die er nu zijn. Later toegevoegde documenten krijgen deze toegang niet.',
   shrFcModeLabel: 'Zo toepassen',
@@ -241,7 +241,7 @@ export const nl = {
   shrFcForbidden: 'U mag deze map niet lezen.',
   shrFcNotFound: 'Deze map is niet gevonden.',
   shrFcUnavailable: 'Deze server ondersteunt het delen van de documenten in een map nog niet.',
-  shrFcScopeUntitled: 'Geldt voor de documenten in deze map en de submappen ervan.',
+  shrFcScopeUntitled: 'Documenten in deze map en de submappen ervan.',
   shrFcModeMergeHint:
     'Geeft toegang aan de personen en groepen die u kiest. Bestaande toegang wordt nooit verlaagd of verwijderd.',
   shrFcModeReplaceHint:
@@ -265,6 +265,7 @@ export const nl = {
     '{count} persoon krijgt een lager toegangsniveau voor minstens één document.',
   shrFcWarnDowngradeOther:
     '{count} personen krijgen een lager toegangsniveau voor minstens één document.',
+  shrFcWarnDowngradeGeneric: 'Een deel van de toegang tot deze documenten wordt verlaagd.',
   shrFcNothing: 'Er verandert niets: de huidige toegang komt al overeen met deze lijst.',
   shrFcToastSkippedOne: '{count} document overgeslagen dat u niet beheert.',
   shrFcToastSkippedOther: '{count} documenten overgeslagen die u niet beheert.',

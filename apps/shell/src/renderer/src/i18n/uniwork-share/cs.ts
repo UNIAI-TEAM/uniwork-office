@@ -219,7 +219,7 @@ export const cs = {
   shrOwnerUnavailable: 'Převod vlastnictví zatím není na tomto serveru k dispozici.',
   shrFcMenu: 'Sdílet',
   shrFcTitle: 'Sdílet',
-  shrFcScope: 'Platí pro dokumenty ve složce "{title}" a jejích podsložkách.',
+  shrFcScope: 'Dokumenty ve složce "{title}" a jejích podsložkách.',
   shrFcFixed:
     'Platí pro dokumenty, které existují nyní. Později přidané dokumenty tento přístup nezískají.',
   shrFcModeLabel: 'Jak použít',
@@ -242,7 +242,7 @@ export const cs = {
   shrFcForbidden: 'Nemáte oprávnění číst tuto složku.',
   shrFcNotFound: 'Tato složka nebyla nalezena.',
   shrFcUnavailable: 'Tento server zatím nepodporuje sdílení dokumentů ve složce.',
-  shrFcScopeUntitled: 'Platí pro dokumenty v této složce a jejích podsložkách.',
+  shrFcScopeUntitled: 'Dokumenty v této složce a jejích podsložkách.',
   shrFcModeMergeHint:
     'Uděluje přístup vybraným osobám a skupinám. Stávající přístup se nikdy nesnižuje ani neodebírá.',
   shrFcModeReplaceHint:
@@ -264,6 +264,7 @@ export const cs = {
   shrFcWarnPrivate: 'Pracovní prostor už v seznamu není: tyto dokumenty se stanou soukromými.',
   shrFcWarnDowngradeOne: 'Lidí se sníženou úrovní přístupu alespoň u jednoho dokumentu: {count}',
   shrFcWarnDowngradeOther: 'Lidí se sníženou úrovní přístupu alespoň u jednoho dokumentu: {count}',
+  shrFcWarnDowngradeGeneric: 'Část přístupu k těmto dokumentům bude snížena.',
   shrFcNothing: 'Nic se nezmění: stávající přístup už odpovídá tomuto seznamu.',
   shrFcToastSkippedOne: 'Přeskočeno dokumentů, které nespravujete: {count}',
   shrFcToastSkippedOther: 'Přeskočeno dokumentů, které nespravujete: {count}',

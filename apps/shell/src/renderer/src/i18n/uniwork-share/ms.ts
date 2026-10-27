@@ -218,7 +218,7 @@ export const ms = {
   shrOwnerUnavailable: 'Pindah milik belum tersedia pada pelayan ini.',
   shrFcMenu: 'Kongsi',
   shrFcTitle: 'Kongsi',
-  shrFcScope: 'Terpakai untuk dokumen dalam folder "{title}" dan subfoldernya.',
+  shrFcScope: 'Dokumen dalam folder "{title}" dan subfoldernya.',
   shrFcFixed:
     'Terpakai untuk dokumen yang wujud sekarang. Dokumen yang ditambah kemudian tidak mendapat akses ini.',
   shrFcModeLabel: 'Cara menggunakan',
@@ -241,7 +241,7 @@ export const ms = {
   shrFcForbidden: 'Anda tiada kebenaran untuk membaca folder ini.',
   shrFcNotFound: 'Folder ini tidak ditemui.',
   shrFcUnavailable: 'Pelayan ini belum menyokong perkongsian dokumen dalam folder.',
-  shrFcScopeUntitled: 'Terpakai untuk dokumen dalam folder ini dan subfoldernya.',
+  shrFcScopeUntitled: 'Dokumen dalam folder ini dan subfoldernya.',
   shrFcModeMergeHint:
     'Memberi akses kepada orang dan kumpulan yang dipilih. Akses sedia ada tidak pernah diturunkan atau dialih keluar.',
   shrFcModeReplaceHint:
@@ -265,6 +265,7 @@ export const ms = {
     '{count} orang diturunkan tahap akses pada sekurang-kurangnya satu dokumen.',
   shrFcWarnDowngradeOther:
     '{count} orang diturunkan tahap akses pada sekurang-kurangnya satu dokumen.',
+  shrFcWarnDowngradeGeneric: 'Sebahagian akses pada dokumen ini akan diturunkan.',
   shrFcNothing: 'Tiada yang akan berubah: akses semasa sudah sepadan dengan senarai ini.',
   shrFcToastSkippedOne: 'Melangkau {count} dokumen yang anda tidak urus.',
   shrFcToastSkippedOther: 'Melangkau {count} dokumen yang anda tidak urus.',

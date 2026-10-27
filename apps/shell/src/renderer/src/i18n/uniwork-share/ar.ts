@@ -215,7 +215,7 @@ export const ar = {
   shrOwnerUnavailable: 'نقل الملكية غير متاح بعد على هذا الخادم.',
   shrFcMenu: 'مشاركة',
   shrFcTitle: 'مشاركة',
-  shrFcScope: 'ينطبق على المستندات في المجلد "{title}" ومجلداته الفرعية.',
+  shrFcScope: 'المستندات في المجلد "{title}" ومجلداته الفرعية.',
   shrFcFixed: 'ينطبق على المستندات الموجودة الآن. المستندات المضافة لاحقًا لا تحصل على هذا الوصول.',
   shrFcModeLabel: 'طريقة التطبيق',
   shrFcModeMerge: 'الإضافة إلى الوصول الحالي',
@@ -237,7 +237,7 @@ export const ar = {
   shrFcForbidden: 'ليس لديك إذن بقراءة هذا المجلد.',
   shrFcNotFound: 'لم يتم العثور على هذا المجلد.',
   shrFcUnavailable: 'هذا الخادم لا يدعم بعد مشاركة المستندات داخل المجلد.',
-  shrFcScopeUntitled: 'ينطبق على المستندات في هذا المجلد ومجلداته الفرعية.',
+  shrFcScopeUntitled: 'المستندات في هذا المجلد ومجلداته الفرعية.',
   shrFcModeMergeHint:
     'يمنح الوصول للأشخاص والمجموعات التي تختارها. لا يتم خفض الوصول الحالي أو إزالته أبداً.',
   shrFcModeReplaceHint: 'يحتفظ كل مستند بالقائمة أدناه بالضبط. من ليس في القائمة يفقد الوصول.',
@@ -258,6 +258,7 @@ export const ar = {
   shrFcWarnDowngradeOne: 'عدد الأشخاص الذين يُخفَّض مستوى وصولهم في مستند واحد على الأقل: {count}',
   shrFcWarnDowngradeOther:
     'عدد الأشخاص الذين يُخفَّض مستوى وصولهم في مستند واحد على الأقل: {count}',
+  shrFcWarnDowngradeGeneric: 'سيتم خفض بعض الأذونات على هذه المستندات.',
   shrFcNothing: 'لن يتغير شيء: الوصول الحالي مطابق لهذه القائمة بالفعل.',
   shrFcToastSkippedOne: 'عدد المستندات التي لا تديرها وتم تخطيها: {count}',
   shrFcToastSkippedOther: 'عدد المستندات التي لا تديرها وتم تخطيها: {count}',

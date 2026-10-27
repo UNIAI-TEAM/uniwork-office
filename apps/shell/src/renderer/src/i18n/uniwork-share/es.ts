@@ -220,7 +220,7 @@ export const es = {
   shrOwnerUnavailable: 'La transferencia de propiedad aún no está disponible en este servidor.',
   shrFcMenu: 'Compartir',
   shrFcTitle: 'Compartir',
-  shrFcScope: 'Se aplica a los documentos de la carpeta "{title}" y sus subcarpetas.',
+  shrFcScope: 'Documentos de la carpeta "{title}" y sus subcarpetas.',
   shrFcFixed:
     'Se aplica a los documentos que existen ahora. Los documentos añadidos después no reciben este acceso.',
   shrFcModeLabel: 'Cómo aplicar',
@@ -244,7 +244,7 @@ export const es = {
   shrFcForbidden: 'No tienes permiso para leer esta carpeta.',
   shrFcNotFound: 'No se encontró esta carpeta.',
   shrFcUnavailable: 'Este servidor aún no admite compartir los documentos de una carpeta.',
-  shrFcScopeUntitled: 'Se aplica a los documentos de esta carpeta y sus subcarpetas.',
+  shrFcScopeUntitled: 'Documentos de esta carpeta y sus subcarpetas.',
   shrFcModeMergeHint:
     'Concede acceso a las personas y los grupos que elijas. El acceso existente nunca se reduce ni se quita.',
   shrFcModeReplaceHint:
@@ -267,6 +267,7 @@ export const es = {
     'El espacio de trabajo ya no está en la lista: estos documentos pasarán a ser privados.',
   shrFcWarnDowngradeOne: '{count} persona baja de nivel en al menos un documento.',
   shrFcWarnDowngradeOther: '{count} personas bajan de nivel en al menos un documento.',
+  shrFcWarnDowngradeGeneric: 'Se reducirá parte del acceso a estos documentos.',
   shrFcNothing: 'No cambiará nada: el acceso actual ya coincide con esta lista.',
   shrFcToastSkippedOne: 'Se omitió {count} documento que no administras.',
   shrFcToastSkippedOther: 'Se omitieron {count} documentos que no administras.',

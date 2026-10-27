@@ -220,7 +220,7 @@ export const pt = {
   shrOwnerUnavailable: 'A transferência de propriedade ainda não está disponível neste servidor.',
   shrFcMenu: 'Compartilhar',
   shrFcTitle: 'Compartilhar',
-  shrFcScope: 'Aplica-se aos documentos da pasta "{title}" e das suas subpastas.',
+  shrFcScope: 'Documentos da pasta "{title}" e das suas subpastas.',
   shrFcFixed:
     'Aplica-se aos documentos que existem agora. Documentos adicionados depois não recebem este acesso.',
   shrFcModeLabel: 'Como aplicar',
@@ -245,7 +245,7 @@ export const pt = {
   shrFcNotFound: 'Esta pasta não foi encontrada.',
   shrFcUnavailable:
     'Este servidor ainda não oferece suporte ao compartilhamento dos documentos de uma pasta.',
-  shrFcScopeUntitled: 'Aplica-se aos documentos desta pasta e das suas subpastas.',
+  shrFcScopeUntitled: 'Documentos desta pasta e das suas subpastas.',
   shrFcModeMergeHint:
     'Concede acesso às pessoas e aos grupos escolhidos. O acesso existente nunca é reduzido nem removido.',
   shrFcModeReplaceHint:
@@ -267,6 +267,7 @@ export const pt = {
   shrFcWarnDowngradeOne: '{count} pessoa tem um nível de acesso menor em pelo menos um documento.',
   shrFcWarnDowngradeOther:
     '{count} pessoas têm um nível de acesso menor em pelo menos um documento.',
+  shrFcWarnDowngradeGeneric: 'Parte do acesso a estes documentos será reduzida.',
   shrFcNothing: 'Nada vai mudar: o acesso atual já corresponde a esta lista.',
   shrFcToastSkippedOne: '{count} documento ignorado que você não gerencia.',
   shrFcToastSkippedOther: '{count} documentos ignorados que você não gerencia.',

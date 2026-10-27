@@ -219,7 +219,7 @@ export const fr = {
   shrOwnerUnavailable: "Le transfert de propriété n'est pas encore disponible sur ce serveur.",
   shrFcMenu: 'Partager',
   shrFcTitle: 'Partager',
-  shrFcScope: 'S’applique aux documents du dossier "{title}" et de ses sous-dossiers.',
+  shrFcScope: 'Documents du dossier "{title}" et de ses sous-dossiers.',
   shrFcFixed:
     'S’applique aux documents existants. Les documents ajoutés plus tard n’ont pas cet accès.',
   shrFcModeLabel: 'Mode d’application',
@@ -244,7 +244,7 @@ export const fr = {
   shrFcNotFound: 'Ce dossier est introuvable.',
   shrFcUnavailable:
     'Ce serveur ne prend pas encore en charge le partage des documents d’un dossier.',
-  shrFcScopeUntitled: 'S’applique aux documents de ce dossier et de ses sous-dossiers.',
+  shrFcScopeUntitled: 'Documents de ce dossier et de ses sous-dossiers.',
   shrFcModeMergeHint:
     'Accorde l’accès aux personnes et groupes choisis. L’accès existant n’est jamais abaissé ni retiré.',
   shrFcModeReplaceHint:
@@ -268,6 +268,7 @@ export const fr = {
   shrFcWarnDowngradeOne: '{count} personne passe à un niveau inférieur sur au moins un document.',
   shrFcWarnDowngradeOther:
     '{count} personnes passent à un niveau inférieur sur au moins un document.',
+  shrFcWarnDowngradeGeneric: 'Une partie des accès à ces documents sera réduite.',
   shrFcNothing: 'Rien ne changera : l’accès actuel correspond déjà à cette liste.',
   shrFcToastSkippedOne: '{count} document ignoré que vous ne gérez pas.',
   shrFcToastSkippedOther: '{count} documents ignorés que vous ne gérez pas.',

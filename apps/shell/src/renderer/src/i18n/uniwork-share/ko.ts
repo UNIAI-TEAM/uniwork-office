@@ -216,7 +216,7 @@ export const ko = {
   shrOwnerUnavailable: '이 서버에서는 아직 소유권 이전을 사용할 수 없습니다.',
   shrFcMenu: '공유',
   shrFcTitle: '공유',
-  shrFcScope: '"{title}" 폴더와 하위 폴더의 문서에 적용됩니다.',
+  shrFcScope: '"{title}" 폴더와 하위 폴더의 문서.',
   shrFcFixed: '현재 있는 문서에 적용됩니다. 나중에 추가된 문서에는 이 권한이 부여되지 않습니다.',
   shrFcModeLabel: '적용 방식',
   shrFcModeMerge: '기존 권한에 추가',
@@ -238,7 +238,7 @@ export const ko = {
   shrFcForbidden: '이 폴더를 읽을 권한이 없습니다.',
   shrFcNotFound: '이 폴더를 찾을 수 없습니다.',
   shrFcUnavailable: '이 서버는 아직 폴더 안의 문서 공유를 지원하지 않습니다.',
-  shrFcScopeUntitled: '이 폴더와 하위 폴더의 문서에 적용됩니다.',
+  shrFcScopeUntitled: '이 폴더와 하위 폴더의 문서.',
   shrFcModeMergeHint:
     '선택한 사람과 그룹에 권한을 부여합니다. 기존 권한은 낮아지거나 제거되지 않습니다.',
   shrFcModeReplaceHint:
@@ -260,6 +260,7 @@ export const ko = {
   shrFcWarnPrivate: '워크스페이스가 더 이상 목록에 없습니다. 이 문서들은 비공개가 됩니다.',
   shrFcWarnDowngradeOne: '{count}명이 문서 하나 이상에서 권한 수준이 낮아집니다.',
   shrFcWarnDowngradeOther: '{count}명이 문서 하나 이상에서 권한 수준이 낮아집니다.',
+  shrFcWarnDowngradeGeneric: '이 문서들의 일부 권한이 낮아집니다.',
   shrFcNothing: '변경되는 것이 없습니다. 현재 권한이 이미 이 목록과 일치합니다.',
   shrFcToastSkippedOne: '관리 권한이 없는 문서 {count}개를 건너뛰었습니다.',
   shrFcToastSkippedOther: '관리 권한이 없는 문서 {count}개를 건너뛰었습니다.',

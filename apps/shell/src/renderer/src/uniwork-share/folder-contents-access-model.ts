@@ -75,7 +75,10 @@ function warningText(t: ShareT, code: string, preview: FolderContentsAccessPrevi
     case 'to_private':
       return t('shrFcWarnPrivate')
     case 'downgrade':
-      return plural(t, 'shrFcWarnDowngrade', preview.downgradedUsers)
+      // the server named the warning but gave no usable count: "0 people" would be wrong
+      return preview.downgradedUsers > 0
+        ? plural(t, 'shrFcWarnDowngrade', preview.downgradedUsers)
+        : t('shrFcWarnDowngradeGeneric')
     default:
       return null
   }

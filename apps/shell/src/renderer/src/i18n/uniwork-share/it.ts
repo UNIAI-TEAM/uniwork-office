@@ -224,7 +224,7 @@ export const it = {
     'Il trasferimento della proprietà non è ancora disponibile su questo server.',
   shrFcMenu: 'Condividi',
   shrFcTitle: 'Condividi',
-  shrFcScope: 'Si applica ai documenti nella cartella "{title}" e nelle sue sottocartelle.',
+  shrFcScope: 'Documenti nella cartella "{title}" e nelle sue sottocartelle.',
   shrFcFixed:
     'Si applica ai documenti esistenti. I documenti aggiunti in seguito non ricevono questo accesso.',
   shrFcModeLabel: 'Modalità di applicazione',
@@ -249,7 +249,7 @@ export const it = {
   shrFcNotFound: 'Cartella non trovata.',
   shrFcUnavailable:
     'Questo server non supporta ancora la condivisione dei documenti di una cartella.',
-  shrFcScopeUntitled: 'Si applica ai documenti in questa cartella e nelle sue sottocartelle.',
+  shrFcScopeUntitled: 'Documenti in questa cartella e nelle sue sottocartelle.',
   shrFcModeMergeHint:
     'Concede accesso alle persone e ai gruppi scelti. L’accesso esistente non viene mai abbassato né rimosso.',
   shrFcModeReplaceHint:
@@ -272,6 +272,7 @@ export const it = {
     'Lo spazio di lavoro non è più nell’elenco: questi documenti diventano Privati.',
   shrFcWarnDowngradeOne: '{count} persona riceve un livello inferiore su almeno un documento.',
   shrFcWarnDowngradeOther: '{count} persone ricevono un livello inferiore su almeno un documento.',
+  shrFcWarnDowngradeGeneric: 'Una parte dell’accesso a questi documenti verrà ridotta.',
   shrFcNothing: 'Nulla cambierà: l’accesso attuale corrisponde già a questo elenco.',
   shrFcToastSkippedOne: 'Ignorato {count} documento che non gestisci.',
   shrFcToastSkippedOther: 'Ignorati {count} documenti che non gestisci.',

@@ -218,7 +218,7 @@ export const id = {
   shrOwnerUnavailable: 'Transfer kepemilikan belum tersedia di server ini.',
   shrFcMenu: 'Bagikan',
   shrFcTitle: 'Bagikan',
-  shrFcScope: 'Berlaku untuk dokumen di folder "{title}" dan subfoldernya.',
+  shrFcScope: 'Dokumen di folder "{title}" dan subfoldernya.',
   shrFcFixed:
     'Berlaku untuk dokumen yang ada sekarang. Dokumen yang ditambahkan kemudian tidak mendapat akses ini.',
   shrFcModeLabel: 'Cara menerapkan',
@@ -241,7 +241,7 @@ export const id = {
   shrFcForbidden: 'Anda tidak memiliki izin untuk membaca folder ini.',
   shrFcNotFound: 'Folder ini tidak ditemukan.',
   shrFcUnavailable: 'Server ini belum mendukung pembagian dokumen di dalam folder.',
-  shrFcScopeUntitled: 'Berlaku untuk dokumen di folder ini dan subfoldernya.',
+  shrFcScopeUntitled: 'Dokumen di folder ini dan subfoldernya.',
   shrFcModeMergeHint:
     'Memberikan akses kepada orang dan grup yang Anda pilih. Akses yang sudah ada tidak pernah diturunkan atau dihapus.',
   shrFcModeReplaceHint:
@@ -265,6 +265,7 @@ export const id = {
     '{count} orang mendapat tingkat akses lebih rendah pada setidaknya satu dokumen.',
   shrFcWarnDowngradeOther:
     '{count} orang mendapat tingkat akses lebih rendah pada setidaknya satu dokumen.',
+  shrFcWarnDowngradeGeneric: 'Sebagian akses pada dokumen ini akan diturunkan.',
   shrFcNothing: 'Tidak ada yang berubah: akses saat ini sudah sesuai dengan daftar ini.',
   shrFcToastSkippedOne: 'Melewati {count} dokumen yang tidak Anda kelola.',
   shrFcToastSkippedOther: 'Melewati {count} dokumen yang tidak Anda kelola.',
