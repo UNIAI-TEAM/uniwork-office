@@ -321,6 +321,7 @@ export function DriveSidebarRows({
           {state.accounts.map((acct: DriveAccountNavRow) => {
             const isCurrent = active && selectedAccountId === acct.id
             const label = t('uhNavDriveAccount', { email: acct.email })
+            const rowTitle = acct.needsReconnect ? `${label} · ${t('uhDriveLost')}` : label
             return (
               <button
                 key={acct.id}
@@ -328,14 +329,18 @@ export function DriveSidebarRows({
                 className={`dh-nav-item nav-item dh-drive-nav-account${isCurrent ? ' active' : ''}`}
                 data-drive-account={acct.id}
                 aria-current={isCurrent ? 'page' : undefined}
-                title={label}
+                title={rowTitle}
                 onClick={() => onSelect(acct.id)}
               >
-                <span className="dh-nav-label">{label}</span>
+                {/* web parity: only the email is drawn; "Drive: <email>" is read by assistive tech and sits in the title */}
+                <span className="uw-sr-only">{label}</span>
+                <span className="dh-nav-label" aria-hidden="true">
+                  {acct.email}
+                </span>
                 {acct.needsReconnect && (
                   <span className="dh-drive-nav-lost" data-drive-lost="">
                     <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
-                    <span>{t('uhDriveLost')}</span>
+                    <span className="uw-sr-only">{t('uhDriveLost')}</span>
                   </span>
                 )}
                 <span className="dh-drive-nav-count" data-drive-account-count="">

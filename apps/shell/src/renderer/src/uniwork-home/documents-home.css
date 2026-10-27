@@ -120,7 +120,6 @@
   --dh-tree-slot: 16px;
   --dh-tree-gap: 6px;
   --dh-tree-icon: 20px;
-  --dh-tree-step: calc(var(--dh-tree-slot) + var(--dh-tree-gap));
   --dh-tree-end: 8px;
   --dh-tree-count-w: 28px;
   flex: 1;

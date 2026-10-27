@@ -130,6 +130,12 @@
   position: relative;
 }
 
+/* the chevron is a sibling above the row button, so the row's own :hover stops matching while the
+   pointer is on it: keep the hover fill while the pointer is anywhere on the node */
+.dh-drive-node:hover > .dh-drive-nav-root:not(.active) {
+  background: var(--hover);
+}
+
 .dh-sidebar-tree .dh-drive-nav-root {
   padding-inline-start: calc(var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap));
 }
@@ -158,6 +164,7 @@
 /* "Drive: <email>": the text starts exactly under the "Google Drive" label (the icon column of its
    parent, one step in, is where the label begins) */
 .dh-sidebar-tree .dh-drive-nav-account {
+  position: relative; /* anchors the sr-only label */
   padding-inline-start: calc(
     var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap) + var(--dh-tree-icon) +
       var(--dh-tree-gap)
@@ -168,18 +175,18 @@
   flex: none;
 }
 
+/* a lost account shows the warning icon only (the web sidebar does the same); the words stay for
+   assistive tech in an sr-only span and in the row title, so the email keeps the freed width */
 .dh-drive-nav-lost {
+  position: relative;
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: var(--danger-bg);
-  color: var(--danger-text);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.2;
+  color: var(--warning-text);
+}
+
+.dh-drive-nav-lost .dh-drive-warn-icon {
+  color: inherit;
 }
 
 .dh-drive-warn-icon {

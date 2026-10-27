@@ -28,7 +28,7 @@ export interface TreeRename {
 
 /** first-level inline padding, and the indent of each level below: one chevron slot (16px) + the row gap (6px),
  *  so a child's chevron slot starts under its parent's icon. The Drive rows in documents-home.css read the
- *  same numbers as --dh-tree-pad / --dh-tree-step. */
+ *  same numbers as --dh-tree-pad and --dh-tree-slot + --dh-tree-gap (pinned by doclist-sidebar.test.ts). */
 export const TREE_PAD = 4
 export const TREE_STEP = 22
 
