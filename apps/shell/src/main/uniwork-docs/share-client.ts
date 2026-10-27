@@ -180,6 +180,13 @@ function wireFolderItem(item: FolderContentsAccessItem): Record<string, unknown>
   }
 }
 
+/**
+ * The contents-access PUT waits on the server's folder lock for up to 30 s before it answers 409
+ * `folder_access_batch_running`. Its deadline must exceed that, or the app gives up just before the
+ * busy answer arrives and shows the generic error instead of the busy message.
+ */
+export const FOLDER_CONTENTS_ACCESS_TIMEOUT_MS = 45_000
+
 export function createUniworkShareClient(options: UniworkDocsClientOptions): UniworkShareClient {
   const timeoutMs = options.metadataTimeoutMs ?? METADATA_TIMEOUT_MS
   const send = createUniworkSend(options)
@@ -230,7 +237,7 @@ export function createUniworkShareClient(options: UniworkDocsClientOptions): Uni
         method: 'PUT',
         route,
         json: { mode: request.mode, items, dry_run: request.dryRun },
-        timeoutMs,
+        timeoutMs: Math.max(timeoutMs, FOLDER_CONTENTS_ACCESS_TIMEOUT_MS),
         read: async (response) => ({ status: response.status, body: await response.json() }),
       })
       return parseFolderContentsAccess(body, status, request.dryRun)

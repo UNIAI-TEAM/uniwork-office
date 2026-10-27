@@ -947,6 +947,81 @@ describe('folder contents access (UNI-2244)', () => {
     })
   })
 
+  describe('request deadline', () => {
+    /** a server that answers after `delayMs` (the folder lock wait), honouring the client's abort */
+    function slowClient(delayMs: number, answer: () => Response) {
+      const fetch: FetchLike = (_url, init) =>
+        new Promise<Response>((resolve, reject) => {
+          const timer = setTimeout(() => resolve(answer()), delayMs)
+          init?.signal?.addEventListener('abort', () => {
+            clearTimeout(timer)
+            reject(new DOMException('aborted', 'AbortError'))
+          })
+        })
+      return createUniworkShareClient({
+        apiOrigin: ORIGIN,
+        authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
+        isSignedIn: () => true,
+        fetch,
+      })
+    }
+
+    it('lets the contents-access PUT wait past the server 30 s lock timeout for its busy 409', async () => {
+      vi.useFakeTimers()
+      try {
+        const client = slowClient(30_300, () => envelope(409, 'folder_access_batch_running'))
+        for (const dryRun of [true, false]) {
+          const outcome = failure(
+            client.updateFolderContentsAccess({
+              folderId: 'fld_1',
+              mode: 'merge',
+              items: [...ITEMS],
+              dryRun,
+            }),
+          )
+          await vi.advanceTimersByTimeAsync(31_000)
+          expect(await outcome).toMatchObject({
+            status: 409,
+            serverCode: 'folder_access_batch_running',
+          })
+        }
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('still gives up on the contents-access PUT after 45 s', async () => {
+      vi.useFakeTimers()
+      try {
+        const client = slowClient(60_000, () => json(200, PREVIEW))
+        const outcome = failure(
+          client.updateFolderContentsAccess({
+            folderId: 'fld_1',
+            mode: 'merge',
+            items: [...ITEMS],
+            dryRun: true,
+          }),
+        )
+        await vi.advanceTimersByTimeAsync(45_100)
+        expect((await outcome).code).toBe('timeout')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('keeps the 30 s deadline on the batch GET', async () => {
+      vi.useFakeTimers()
+      try {
+        const client = slowClient(40_000, () => json(200, BATCH))
+        const outcome = failure(client.getFolderContentsAccessBatch('fld_1', 'b_1'))
+        await vi.advanceTimersByTimeAsync(30_100)
+        expect((await outcome).code).toBe('timeout')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
   it('GETs /documents/{folderId}/contents-access/{batchId} and reads the progress', async () => {
     const { client, seen } = setup(() => json(200, BATCH))
     const batch = await client.getFolderContentsAccessBatch('fld_1', 'b_1')
