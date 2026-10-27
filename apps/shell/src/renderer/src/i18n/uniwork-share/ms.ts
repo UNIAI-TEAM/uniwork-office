@@ -264,4 +264,5 @@ export const ms = {
   shrFcBatchDone: '“{title}”: {summary}',
   shrFcBatchFailed:
     'Perkongsian dalam “{title}” terhenti separuh jalan ({processed}/{total} dokumen). Jalankan semula.',
+  shrFcUnavailable: 'Pelayan ini belum menyokong perkongsian dokumen dalam folder.',
 } satisfies Record<keyof typeof zh, string>

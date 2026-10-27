@@ -260,4 +260,5 @@ export const en = {
   shrFcBatchDone: '“{title}”: {summary}',
   shrFcBatchFailed:
     'Sharing inside “{title}” stopped partway ({processed}/{total} documents). Run it again.',
+  shrFcUnavailable: 'This server does not support sharing the documents inside a folder yet.',
 } satisfies Record<keyof typeof zh, string>

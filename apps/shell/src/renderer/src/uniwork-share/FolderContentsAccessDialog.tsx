@@ -25,11 +25,7 @@ import {
   type HomeWorkspaceChoice,
 } from './folder-contents-access-model'
 import { trackFolderBatch } from './folder-contents-access-store'
-import {
-  allowedLevelsForPrincipal,
-  levelLabel as levelText,
-  rejectedReasonKey,
-} from './share-model'
+import { levelLabel as levelText, rejectedReasonKey } from './share-model'
 import { useShareCandidates } from './use-share'
 import './share-dialog.css'
 
@@ -131,13 +127,10 @@ function FolderContentsAccessBody({
   }, [selected, mode, homeKey])
 
   const label = (value: string | null | undefined) => levelText(t, value)
+  // BE-1: a workspace or the organization never takes manage (level_not_allowed), whichever
+  // workspace it is, so a picked group is held at edit when the common level is manage
   const effectiveItemLevel = (item: SelectedShareCandidate): ShareLevel =>
-    allowedLevelsForPrincipal(
-      item.candidate.principalType,
-      item.candidate.isHomeWorkspace,
-    ).includes(level)
-      ? level
-      : 'edit'
+    item.candidate.principalType !== 'user' && level === 'manage' ? 'edit' : level
 
   const picked = (): FolderContentsAccessItem[] =>
     selected.map((item) => ({
@@ -201,7 +194,8 @@ function FolderContentsAccessBody({
     }
     setStep('form')
     setPreview(null)
-    setError(t(folderErrorKey(failure.error)))
+    // a server without the route (BE-1: a coded 501 until the feature ships) is not a fault of this call
+    setError(failure.endpointMissing ? t('shrFcUnavailable') : t(folderErrorKey(failure.error)))
   }
 
   const call = async (dryRun: boolean): Promise<ShareResult<FolderContentsAccessResult>> =>

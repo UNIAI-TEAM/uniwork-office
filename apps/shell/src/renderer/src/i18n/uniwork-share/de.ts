@@ -273,4 +273,6 @@ export const de = {
   shrFcBatchDone: '„{title}“: {summary}',
   shrFcBatchFailed:
     'Die Freigabe in „{title}“ wurde zwischendurch gestoppt ({processed}/{total} Dokumente). Führen Sie sie erneut aus.',
+  shrFcUnavailable:
+    'Dieser Server unterstützt das Freigeben der Dokumente eines Ordners noch nicht.',
 } satisfies Record<keyof typeof zh, string>

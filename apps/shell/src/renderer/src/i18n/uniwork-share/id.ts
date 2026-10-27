@@ -263,4 +263,5 @@ export const id = {
   shrFcBatchDone: '“{title}”: {summary}',
   shrFcBatchFailed:
     'Pembagian di dalam “{title}” berhenti di tengah jalan ({processed}/{total} dokumen). Jalankan lagi.',
+  shrFcUnavailable: 'Server ini belum mendukung pembagian dokumen di dalam folder.',
 } satisfies Record<keyof typeof zh, string>

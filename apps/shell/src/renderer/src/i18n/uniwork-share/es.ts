@@ -265,4 +265,5 @@ export const es = {
   shrFcBatchDone: '«{title}»: {summary}',
   shrFcBatchFailed:
     'El uso compartido en «{title}» se detuvo a medias ({processed}/{total} documentos). Vuelve a ejecutarlo.',
+  shrFcUnavailable: 'Este servidor aún no admite compartir los documentos de una carpeta.',
 } satisfies Record<keyof typeof zh, string>

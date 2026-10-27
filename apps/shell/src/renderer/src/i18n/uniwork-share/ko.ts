@@ -258,4 +258,5 @@ export const ko = {
   shrFcBatchDone: '“{title}”: {summary}',
   shrFcBatchFailed:
     '“{title}” 안의 공유가 중간에 멈췄습니다(문서 {processed}/{total}개). 다시 실행하세요.',
+  shrFcUnavailable: '이 서버는 아직 폴더 안의 문서 공유를 지원하지 않습니다.',
 } satisfies Record<keyof typeof zh, string>

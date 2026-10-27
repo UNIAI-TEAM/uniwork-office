@@ -265,4 +265,6 @@ export const ru = {
   shrFcBatchDone: '«{title}»: {summary}',
   shrFcBatchFailed:
     'Предоставление доступа в «{title}» остановилось на полпути ({processed}/{total} документов). Запустите его снова.',
+  shrFcUnavailable:
+    'Этот сервер пока не поддерживает предоставление доступа к документам внутри папки.',
 } satisfies Record<keyof typeof zh, string>

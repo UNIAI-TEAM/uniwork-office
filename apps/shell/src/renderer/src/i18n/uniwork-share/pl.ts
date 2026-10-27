@@ -265,4 +265,5 @@ export const pl = {
   shrFcBatchDone: '„{title}”: {summary}',
   shrFcBatchFailed:
     'Udostępnianie w „{title}” zatrzymało się w połowie ({processed}/{total} dokumentów). Uruchom je ponownie.',
+  shrFcUnavailable: 'Ten serwer nie obsługuje jeszcze udostępniania dokumentów w folderze.',
 } satisfies Record<keyof typeof zh, string>

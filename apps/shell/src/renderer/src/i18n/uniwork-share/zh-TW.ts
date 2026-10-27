@@ -244,4 +244,5 @@ export const zhTW = {
   shrFcQueued: '「{title}」中的文件分享已排入佇列…',
   shrFcBatchDone: '「{title}」：{summary}',
   shrFcBatchFailed: '「{title}」中的分享中途停止（{processed}/{total} 份文件）。請重新執行。',
+  shrFcUnavailable: '此伺服器暫不支援分享資料夾中的文件。',
 } satisfies Record<keyof typeof zh, string>

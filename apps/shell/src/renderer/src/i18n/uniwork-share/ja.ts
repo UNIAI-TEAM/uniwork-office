@@ -264,4 +264,5 @@ export const ja = {
   shrFcBatchDone: '「{title}」：{summary}',
   shrFcBatchFailed:
     '「{title}」内の共有が途中で停止しました（{processed}/{total} 件）。もう一度実行してください。',
+  shrFcUnavailable: 'このサーバーはまだフォルダー内のドキュメントの共有に対応していません。',
 } satisfies Record<keyof typeof zh, string>

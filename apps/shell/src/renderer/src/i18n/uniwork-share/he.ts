@@ -250,4 +250,5 @@ export const he = {
   shrFcQueued: 'שיתוף המסמכים ב„{title}” ממתין בתור…',
   shrFcBatchDone: '„{title}”: {summary}',
   shrFcBatchFailed: 'השיתוף ב„{title}” נעצר באמצע ({processed}/{total} מסמכים). הריצו אותו שוב.',
+  shrFcUnavailable: 'שרת זה עדיין לא תומך בשיתוף המסמכים שבתיקייה.',
 } satisfies Record<keyof typeof zh, string>

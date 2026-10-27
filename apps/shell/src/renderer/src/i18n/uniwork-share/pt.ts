@@ -266,4 +266,6 @@ export const pt = {
   shrFcBatchDone: '“{title}”: {summary}',
   shrFcBatchFailed:
     'O compartilhamento em “{title}” parou no meio ({processed}/{total} documentos). Execute-o novamente.',
+  shrFcUnavailable:
+    'Este servidor ainda não oferece suporte ao compartilhamento dos documentos de uma pasta.',
 } satisfies Record<keyof typeof zh, string>

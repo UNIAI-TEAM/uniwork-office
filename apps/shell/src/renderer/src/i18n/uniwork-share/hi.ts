@@ -262,4 +262,5 @@ export const hi = {
   shrFcBatchDone: '“{title}”: {summary}',
   shrFcBatchFailed:
     '“{title}” में साझाकरण बीच में रुक गया ({processed}/{total} दस्तावेज़)। इसे फिर चलाएँ।',
+  shrFcUnavailable: 'यह सर्वर अभी फ़ोल्डर के दस्तावेज़ साझा करने का समर्थन नहीं करता।',
 } satisfies Record<keyof typeof zh, string>

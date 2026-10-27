@@ -261,4 +261,5 @@ export const vi = {
   shrFcBatchDone: '“{title}”: {summary}',
   shrFcBatchFailed:
     'Việc chia sẻ trong “{title}” dừng giữa chừng ({processed}/{total} tài liệu). Hãy chạy lại.',
+  shrFcUnavailable: 'Máy chủ này chưa hỗ trợ chia sẻ các tài liệu trong thư mục.',
 } satisfies Record<keyof typeof zh, string>

@@ -243,4 +243,5 @@ export const zh = {
   shrFcQueued: '“{title}”中的文档分享已排队…',
   shrFcBatchDone: '“{title}”：{summary}',
   shrFcBatchFailed: '“{title}”中的分享中途停止（{processed}/{total} 个文档）。请重新运行。',
+  shrFcUnavailable: '此服务器暂不支持分享文件夹中的文档。',
 }

@@ -266,4 +266,6 @@ export const fr = {
   shrFcBatchDone: '« {title} » : {summary}',
   shrFcBatchFailed:
     'Le partage dans « {title} » s’est arrêté en cours de route ({processed}/{total} documents). Relancez-le.',
+  shrFcUnavailable:
+    'Ce serveur ne prend pas encore en charge le partage des documents d’un dossier.',
 } satisfies Record<keyof typeof zh, string>

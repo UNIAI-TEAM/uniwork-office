@@ -255,4 +255,5 @@ export const th = {
   shrFcBatchDone: '“{title}”: {summary}',
   shrFcBatchFailed:
     'การแชร์ใน “{title}” หยุดกลางทาง ({processed}/{total} เอกสาร) โปรดเรียกใช้อีกครั้ง',
+  shrFcUnavailable: 'เซิร์ฟเวอร์นี้ยังไม่รองรับการแชร์เอกสารภายในโฟลเดอร์',
 } satisfies Record<keyof typeof zh, string>

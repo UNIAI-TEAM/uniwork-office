@@ -916,3 +916,13 @@
   gap: 8px;
   width: min(380px, calc(var(--ui-vw) * 90));
 }
+
+/* the home-workspace row of the replace mode: its choices read "Not shared (private)", so the field
+   takes the whole row instead of the level select's narrow column */
+.uw-fca [data-fca-home] .uw-share-field {
+  width: 100%;
+}
+
+.uw-fca [data-fca-home] .uw-act-select {
+  width: 100%;
+}

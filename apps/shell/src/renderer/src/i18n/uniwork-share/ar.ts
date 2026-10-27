@@ -257,4 +257,5 @@ export const ar = {
   shrFcBatchDone: '«{title}»: {summary}',
   shrFcBatchFailed:
     'توقفت المشاركة داخل «{title}» في منتصفها ({processed}/{total} مستندات). شغّلها مرة أخرى.',
+  shrFcUnavailable: 'هذا الخادم لا يدعم بعد مشاركة المستندات داخل المجلد.',
 } satisfies Record<keyof typeof zh, string>

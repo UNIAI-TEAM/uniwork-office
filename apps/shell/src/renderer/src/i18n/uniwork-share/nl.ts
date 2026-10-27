@@ -262,4 +262,5 @@ export const nl = {
   shrFcBatchDone: '“{title}”: {summary}',
   shrFcBatchFailed:
     'Het delen in “{title}” is halverwege gestopt ({processed}/{total} documenten). Voer het opnieuw uit.',
+  shrFcUnavailable: 'Deze server ondersteunt het delen van de documenten in een map nog niet.',
 } satisfies Record<keyof typeof zh, string>

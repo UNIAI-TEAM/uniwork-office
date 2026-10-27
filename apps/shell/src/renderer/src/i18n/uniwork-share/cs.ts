@@ -263,4 +263,5 @@ export const cs = {
   shrFcBatchDone: '„{title}“: {summary}',
   shrFcBatchFailed:
     'Sdílení ve složce „{title}“ se zastavilo v půli ({processed}/{total} dokumentů). Spusťte ho znovu.',
+  shrFcUnavailable: 'Tento server zatím nepodporuje sdílení dokumentů ve složce.',
 } satisfies Record<keyof typeof zh, string>

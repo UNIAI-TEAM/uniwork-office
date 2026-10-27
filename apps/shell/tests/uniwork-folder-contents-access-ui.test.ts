@@ -470,6 +470,52 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     expect(onNotice).not.toHaveBeenCalled()
   })
 
+  it('a workspace or the organization is held at edit when the level is manage; a person keeps it', async () => {
+    const api = await open({ folderContents: { total: 5 } })
+    await choose(q<HTMLSelectElement>('[data-fca-level]')!, 'manage')
+    await pick('Minh')
+    await pick('Design')
+    await pick('Acme')
+    await click(confirm())
+    expect(requests(api)[0]!.items).toEqual([
+      { principalType: 'user', principalId: 'u_minh', level: 'manage' },
+      { principalType: 'workspace', principalId: 'ws_2', level: 'edit' },
+      { principalType: 'organization', principalId: 'org_1', level: 'edit' },
+    ])
+  })
+
+  it.each([
+    ['principal_not_in_organization', 'shrRejectedNotInOrg'],
+    ['level_not_allowed', 'shrRejectedLevelNotAllowed'],
+    ['duplicate_principal', 'shrRejectedDuplicate'],
+    ['break_glass_required', 'shrRejectedBreakGlass'],
+  ])('422 code %s reads as its own inline sentence', async (code, key) => {
+    const api = await open({ folderContents: { total: 5 } })
+    await pick('Minh')
+    api.failNext('folderContentsAccess', {
+      ok: false,
+      error: 'document_access_rejected',
+      status: 422,
+      rejected: [{ index: 0, principalType: 'user', principalId: 'u_minh', code }],
+    })
+    await click(confirm())
+    expect(q('[data-fca-error]')!.textContent).toBe(`Minh Trần: ${t(key)}`)
+  })
+
+  it('a server without the route (coded 501 -> endpointMissing) says the feature is not available', async () => {
+    const api = await open({ folderContents: { total: 5 } })
+    await pick('Minh')
+    api.failNext('folderContentsAccess', {
+      ok: false,
+      error: 'server_error',
+      status: 501,
+      endpointMissing: true,
+    })
+    await click(confirm())
+    expect(q('[data-fca-error]')!.textContent).toBe(t('shrFcUnavailable'))
+    expect(q('[data-fca-form]')).toBeTruthy()
+  })
+
   it('Escape closes the dialog and the buttons carry their labels (keyboard)', async () => {
     await open()
     expect(q('[data-fca-cancel]')!.textContent).toBe(t('shrConfirmCancel'))

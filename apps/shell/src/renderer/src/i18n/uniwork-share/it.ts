@@ -269,4 +269,6 @@ export const it = {
   shrFcBatchDone: '“{title}”: {summary}',
   shrFcBatchFailed:
     'La condivisione in “{title}” si è interrotta a metà ({processed}/{total} documenti). Eseguila di nuovo.',
+  shrFcUnavailable:
+    'Questo server non supporta ancora la condivisione dei documenti di una cartella.',
 } satisfies Record<keyof typeof zh, string>
