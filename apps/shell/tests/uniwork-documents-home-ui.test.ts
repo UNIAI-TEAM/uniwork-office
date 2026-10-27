@@ -4875,8 +4875,8 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
           undefined,
           '2',
         ])
-        // the unfiltered account list is only its first page (the flat view), never walked
-        expect(calls.filter((q) => !q.driveFolderId).map((q) => q.cursor)).toEqual([undefined])
+        // the plain account list is only for a typed search: nothing typed, no unfiltered request
+        expect(calls.filter((q) => !q.driveFolderId)).toEqual([])
       })
 
       it('a folder view is the filtered list with the same load-more paging, scoped to that folder', async () => {
@@ -4954,6 +4954,54 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         await open(loadMoreButton())
         await type('hợp đồng c')
         expect(fileNames()).toEqual(['Hợp đồng C'])
+      })
+
+      const typeSearch = async (value: string) => {
+        const input = document.querySelector<HTMLInputElement>('.dh-search-input')!
+        await act(async () => {
+          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+          setter.call(input, value)
+          input.dispatchEvent(new Event('input', { bubbles: true }))
+        })
+        await flush()
+      }
+
+      it('requests the plain account list only while a search is typed', async () => {
+        const { listFiles } = filterBridge()
+        await openAccount()
+        expect(callsOf(listFiles).filter((q) => !q.driveFolderId)).toEqual([])
+        await typeSearch('hợp')
+        expect(callsOf(listFiles).filter((q) => !q.driveFolderId)).toHaveLength(1)
+        await typeSearch('')
+        await open(folderRows()[0]!)
+        await typeSearch('hợp')
+        // a folder search reads the folder's own pages, never the plain list
+        expect(callsOf(listFiles).filter((q) => !q.driveFolderId)).toHaveLength(1)
+      })
+
+      it('an empty account search keeps Load more while the list has a next page, and loading it finds the page-2 name', async () => {
+        filterBridge()
+        await openAccount()
+        await typeSearch('ẩn tên')
+        // page 1 of the plain list (Hợp đồng A, B) has no match; Hợp đồng C / Ẩn tên sit on page 2
+        expect(fileNames()).toEqual([])
+        expect(document.body.textContent).toContain('Clear search')
+        expect(loadMoreButton()).not.toBeNull()
+        await open(loadMoreButton())
+        expect(fileNames()).toEqual(['Ẩn tên'])
+      })
+
+      it('an empty in-folder search keeps Load more, and loading it finds the page-2 name', async () => {
+        filterBridge()
+        await openAccount()
+        await open(folderRows()[0]!)
+        await typeSearch('hợp đồng c')
+        expect(fileNames()).toEqual([])
+        expect(document.body.textContent).toContain('Clear search')
+        expect(loadMoreButton()).not.toBeNull()
+        await open(loadMoreButton())
+        expect(fileNames()).toEqual(['Hợp đồng C'])
+        expect(loadMoreButton()).toBeNull()
       })
 
       it('a file opened from a folder page is found for the detail panel', async () => {

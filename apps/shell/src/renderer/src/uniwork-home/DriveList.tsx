@@ -707,6 +707,39 @@ export function DriveList({
     else onOpenOnGoogle(driveFileId)
   }
 
+  // under the rows, and under an empty search too: the name may sit on a page that is not loaded yet
+  const moreBlock = (
+    <>
+      {moreError && (
+        <div className="dh-drive-more-error-row" role="alert">
+          <p className="uw-pick-more-error">{t(driveListErrorKey(moreError))}</p>
+          <button
+            type="button"
+            className="btn btn-secondary dh-drive-retry-btn"
+            data-drive-retry=""
+            onClick={onRetry}
+          >
+            {t('acctRetry')}
+          </button>
+        </div>
+      )}
+
+      {nextCursor && (
+        <div className="dh-load-more-row">
+          <button
+            type="button"
+            className="btn btn-secondary uw-pick-more"
+            data-drive-load-more=""
+            disabled={loadingMore}
+            onClick={onLoadMore}
+          >
+            {loadingMore ? t('uwPickLoadingMore') : t('uhLoadMore')}
+          </button>
+        </div>
+      )}
+    </>
+  )
+
   return (
     <div className={`dh-drive-view${panel ? ' has-panel' : ''}`} data-drive-view="">
       <div className="dh-drive-actions-bar">
@@ -821,14 +854,17 @@ export function DriveList({
             !isErrorState &&
             rowCount === 0 &&
             query.trim() && (
-              <ListState
-                kind="empty"
-                glyph="search"
-                title={t('dlSearchNoResults', { query: query.trim() })}
-                action={
-                  onClearSearch ? { label: t('searchClear'), onClick: onClearSearch } : undefined
-                }
-              />
+              <>
+                <ListState
+                  kind="empty"
+                  glyph="search"
+                  title={t('dlSearchNoResults', { query: query.trim() })}
+                  action={
+                    onClearSearch ? { label: t('searchClear'), onClick: onClearSearch } : undefined
+                  }
+                />
+                {moreBlock}
+              </>
             )}
 
           {!isLoadingState &&
@@ -983,33 +1019,7 @@ export function DriveList({
                 </table>
               </div>
 
-              {moreError && (
-                <div className="dh-drive-more-error-row" role="alert">
-                  <p className="uw-pick-more-error">{t(driveListErrorKey(moreError))}</p>
-                  <button
-                    type="button"
-                    className="btn btn-secondary dh-drive-retry-btn"
-                    data-drive-retry=""
-                    onClick={onRetry}
-                  >
-                    {t('acctRetry')}
-                  </button>
-                </div>
-              )}
-
-              {nextCursor && (
-                <div className="dh-load-more-row">
-                  <button
-                    type="button"
-                    className="btn btn-secondary uw-pick-more"
-                    data-drive-load-more=""
-                    disabled={loadingMore}
-                    onClick={onLoadMore}
-                  >
-                    {loadingMore ? t('uwPickLoadingMore') : t('uhLoadMore')}
-                  </button>
-                </div>
-              )}
+              {moreBlock}
 
               <p className="dh-drive-footnote">{t('uhDriveFootnote')}</p>
             </>
@@ -1352,6 +1362,15 @@ export function useDocumentsHomeDrive({
     fetchPage: fetchAccountPage,
   })
 
+  // the account's folder list has not answered yet: whether the node is filtered is not known, and
+  // the plain list must not be fired in the meantime (unless a search over the account is typed)
+  const folderListPending =
+    resolvedAccountId !== null &&
+    (!folderLists[resolvedAccountId] || folderLists[resolvedAccountId]?.status === 'loading')
+  const skipPlainList =
+    resolvedAccountId !== null &&
+    (filterTarget !== null || (folderListPending && (!searching || selectedFolderKeyRaw !== null)))
+
   // Load files when Google Drive sub-view is open
   const filesSeqRef = useRef(0)
   const prevAccountRef = useRef<string | null>(resolvedAccountId)
@@ -1361,6 +1380,22 @@ export function useDocumentsHomeDrive({
     const bridge = getDriveBridge()
     const accountChanged = prevAccountRef.current !== resolvedAccountId
     prevAccountRef.current = resolvedAccountId
+    // the node reads its files from the folder filter: the plain list is only needed once a search
+    // over the account is typed, so nothing is requested (and nothing stale is kept) until then
+    if (skipPlainList) {
+      setFilesState((prev) =>
+        prev.status === 'loading' && prev.files.length === 0 && prev.nextCursor === null
+          ? prev
+          : {
+              status: 'loading',
+              files: [],
+              totalCount: null,
+              nextCursor: null,
+              loadingMore: false,
+            },
+      )
+      return
+    }
     if (!syncOnline) {
       setNetworkFailed(true)
       setFilesState((prev) =>
@@ -1421,7 +1456,16 @@ export function useDocumentsHomeDrive({
         )
       }
     })
-  }, [workspaceId, isDriveView, resolvedAccountId, syncOnline, listTick, focusTick, driveTick])
+  }, [
+    workspaceId,
+    isDriveView,
+    resolvedAccountId,
+    skipPlainList,
+    syncOnline,
+    listTick,
+    focusTick,
+    driveTick,
+  ])
 
   const loadMore = useCallback(() => {
     const cursor = filesState.nextCursor
