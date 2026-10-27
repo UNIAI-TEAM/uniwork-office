@@ -208,3 +208,35 @@
 .dh-nav-item.active .dh-drive-nav-count {
   color: var(--accent-text);
 }
+
+/* UNI-2223: an account row is a node too. Its chevron sits in the slot under the Drive icon (one
+   level in), and the account's folders are level-3 rows: chevron slot (empty, folders have no
+   children), 20px icon column, name, count; the same columns as every other tree row. */
+.dh-drive-twisty-account {
+  inset-inline-start: calc(var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap));
+}
+
+.dh-drive-account-node .dh-drive-node:hover > .dh-drive-nav-account:not(.active) {
+  background: var(--hover);
+}
+
+.dh-sidebar-tree .dh-drive-nav-folder {
+  padding-inline-start: calc(var(--dh-tree-pad) + 3 * (var(--dh-tree-slot) + var(--dh-tree-gap)));
+}
+
+.dh-drive-folders {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dh-drive-folders-note {
+  margin: 0;
+  padding-block: 6px;
+  padding-inline-start: calc(
+    var(--dh-tree-pad) + 3 * (var(--dh-tree-slot) + var(--dh-tree-gap)) + var(--dh-tree-icon) +
+      var(--dh-tree-gap)
+  );
+  font-size: 12px;
+  color: var(--text-muted);
+}

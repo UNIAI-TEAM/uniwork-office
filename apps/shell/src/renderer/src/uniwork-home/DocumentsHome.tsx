@@ -176,12 +176,15 @@ import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
 import { CREATE_SPECIFIC_ERRORS, NEW_DEFAULT_NAME_KEY, NEW_KIND_EXT } from './new-menu-model'
 import {
+  DriveFolderCrumbs,
   DriveList,
   DriveSidebarRows,
   GoogleDriveGlyph,
   openDriveWeb,
   useDocumentsHomeDrive,
+  type DriveViewState,
 } from './DriveList'
+import { driveFolderLabel } from './drive-folders'
 import { DrivePanel } from './DrivePanel'
 import { driveErrorKey } from './drive-panel-model'
 import '../uniwork-folders/uniwork-folders.css'
@@ -198,6 +201,8 @@ export type ElsewhereSource = 'chat' | 'meeting' | 'email' | 'task'
  */
 /** the Google Drive node's key in the sidebar's expanded set (folder ids are uuids, so it cannot clash) */
 const DRIVE_NODE_KEY = 'drive:google'
+/** a Drive account row's key in that set (its folder nodes are shown); connection ids are uuids */
+const driveAccountKey = (connectionId: string) => `drive:account:${connectionId}`
 
 const ELSEWHERE_SOURCES: readonly {
   source: ElsewhereSource
@@ -430,6 +435,9 @@ export interface DocumentsHomeProps {
   /** sub-view to mount with (kept by the host so an area switch can restore it — VDH-7) */
   initialSubView?: DocumentsHomeSubViewId
   onSubViewChange?: (subView: DocumentsHomeSubViewId) => void
+  /** the Google Drive account + folder to mount with, kept by the host with the sub-view (UNI-2223) */
+  initialDriveView?: DriveViewState
+  onDriveViewChange?: (view: DriveViewState) => void
   /** the Từ nơi khác source row kept by the host with the sub-view (RV-16); used only when the sub-view is Từ nơi khác */
   initialElsewhereSource?: ElsewhereSource | null
   onElsewhereSourceChange?: (source: ElsewhereSource | null) => void
@@ -463,6 +471,8 @@ export function DocumentsHome({
   initialFolderId = null,
   initialSubView = 'workspace',
   onSubViewChange,
+  initialDriveView,
+  onDriveViewChange,
   initialElsewhereSource = null,
   onElsewhereSourceChange,
   onFolderChange,
@@ -480,7 +490,14 @@ export function DocumentsHome({
   // the workspaces whose sources route answered: the section shows once it has (the web's probe)
   const [sourcesAnswered, setSourcesAnswered] = useState<Readonly<Record<string, boolean>>>({})
   // the Drive node remembers its chevron here beside the folders' (open by default, reset with them)
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY, DRIVE_NODE_KEY]))
+  // a restored Drive view opens its account's folder nodes, so the current node is visible
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    const keys = [ROOT_KEY, DRIVE_NODE_KEY]
+    if (initialSubView === 'google-drive' && initialDriveView?.accountId) {
+      keys.push(driveAccountKey(initialDriveView.accountId))
+    }
+    return new Set(keys)
+  })
   const [tree, setTree] = useState<TreeState>({ status: 'loading', nodes: [] })
   const [treeTick, setTreeTick] = useState(0)
   const [folderNotice, setFolderNotice] = useState<'ufFolderGone' | 'ufFolderNoAccess' | null>(null)
@@ -558,10 +575,23 @@ export function DocumentsHome({
 
   // G5-05u / NET-OFF-01: pin/unpin entry in each document row's "…" menu (hidden while the capability is off)
   const offlineToggle = useOfflineToggle()
+  // the Drive accounts whose folder nodes the sidebar shows (only while the Drive node itself is open)
+  const expandedDriveAccountIds = useMemo(
+    () =>
+      expanded.has(DRIVE_NODE_KEY)
+        ? Array.from(expanded, (key) =>
+            key.startsWith('drive:account:') ? key.slice('drive:account:'.length) : '',
+          ).filter(Boolean)
+        : [],
+    [expanded],
+  )
   const drive = useDocumentsHomeDrive({
     workspaceId,
     subView,
     listTick,
+    query: searchDraft,
+    folderAccountIds: expandedDriveAccountIds,
+    initialView: initialSubView === 'google-drive' ? initialDriveView : undefined,
     onErrorToast: (err) =>
       setToast({
         message: t(err === 'server_error' ? 'uwDocActionFailed' : driveErrorKey(err)),
@@ -722,6 +752,14 @@ export function DocumentsHome({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folderId, pathKey])
 
+  // the Drive account + folder travel with the sub-view, so Back and an area switch restore the node (UNI-2223)
+  const onDriveViewChangeRef = useRef(onDriveViewChange)
+  onDriveViewChangeRef.current = onDriveViewChange
+  const driveViewAccountId = drive.viewState.accountId
+  const driveViewFolderKey = drive.viewState.folderKey
+  useEffect(() => {
+    onDriveViewChangeRef.current?.({ accountId: driveViewAccountId, folderKey: driveViewFolderKey })
+  }, [driveViewAccountId, driveViewFolderKey])
   // Notify host of sub-view changes so an area switch can restore it on remount (VDH-7)
   const onSubViewChangeRef = useRef(onSubViewChange)
   onSubViewChangeRef.current = onSubViewChange
@@ -1148,10 +1186,21 @@ export function DocumentsHome({
     selectSubView('elsewhere')
   }
 
-  /** UNI-2195 (D2): selects the Google Drive view (all accounts when `null`, or one connection) */
-  const openDrive = (connectionId: string | null) => {
-    drive.setSelectedAccountId(connectionId)
+  /**
+   * UNI-2195 (D2): selects the Google Drive view (all accounts when `null`, or one connection),
+   * and with `folderKey` one folder of that account (UNI-2223). The account's folder nodes open
+   * with it, and the search starts clean (it is scoped to the node it was typed in).
+   */
+  const openDrive = (connectionId: string | null, folderKey: string | null = null) => {
+    drive.select(connectionId, folderKey)
     setDriveSel(null)
+    if (connectionId) {
+      setExpanded((prev) => {
+        const key = driveAccountKey(connectionId)
+        if (prev.has(key)) return prev
+        return new Set(prev).add(key)
+      })
+    }
     selectSubView('google-drive')
   }
 
@@ -2437,11 +2486,14 @@ export function DocumentsHome({
     }
     return { kind: 'key', key: getDocumentsHomeNavEntry(subView).labelKey }
   }, [subView, folderId, index, resolvedMyFolderId, myFolderLabel, shownPath])
+  const driveFolder = drive.scope.kind === 'folder' ? drive.scope.folder : null
   const currentHeading =
     subView === 'google-drive'
-      ? drive.selectedConnection
-        ? t('uhNavDriveAccount', { email: drive.selectedConnection.googleEmail })
-        : t('uhNavGoogleDrive')
+      ? driveFolder
+        ? driveFolderLabel(driveFolder, t)
+        : drive.selectedConnection
+          ? t('uhNavDriveAccount', { email: drive.selectedConnection.googleEmail })
+          : t('uhNavGoogleDrive')
       : currentHeadingSpec.kind === 'literal'
         ? currentHeadingSpec.text
         : t(currentHeadingSpec.key)
@@ -2487,7 +2539,10 @@ export function DocumentsHome({
       state={drive.sidebarState}
       active={!sidebarIdle && subView === 'google-drive'}
       selectedAccountId={drive.selectedAccountId}
+      selectedFolderKey={drive.selectedFolderKey}
       expanded={expanded.has(DRIVE_NODE_KEY)}
+      expandedAccountIds={new Set(expandedDriveAccountIds)}
+      folderTree={drive.folderTree}
       onToggle={() =>
         setExpanded((prev) => {
           const next = new Set(prev)
@@ -2495,9 +2550,21 @@ export function DocumentsHome({
           return next
         })
       }
+      onToggleAccount={(connectionId) =>
+        setExpanded((prev) => {
+          const next = new Set(prev)
+          const key = driveAccountKey(connectionId)
+          if (!next.delete(key)) next.add(key)
+          return next
+        })
+      }
       onSelect={(accountId) => {
         onSidebarNavigate?.()
         openDrive(accountId)
+      }}
+      onSelectFolder={(connectionId, folderKey) => {
+        onSidebarNavigate?.()
+        openDrive(connectionId, folderKey)
       }}
     />
   ) : null
@@ -2667,9 +2734,8 @@ export function DocumentsHome({
   // above the list (the app keeps its own Tải lên / Tạo mới / Tạo nhanh, which the board does not draw)
   const recentView = subView === 'recent'
   const driveView = subView === 'google-drive'
-  const searchLabel = recentView
-    ? t('dlSearchIn', { name: currentHeading })
-    : t('uhSearchPlaceholder')
+  const searchLabel =
+    recentView || driveView ? t('dlSearchIn', { name: currentHeading }) : t('uhSearchPlaceholder')
   const subtitleKey: StringKey | null = recentView
     ? 'dlRecentSubtitle'
     : subView === 'elsewhere'
@@ -2704,8 +2770,17 @@ export function DocumentsHome({
 
       <div className="dh-main uwf-main" {...zoneHandlers}>
         {libraryDrop.over && <DropOverlay targetLabel={dropTargetLabel} box={libraryDrop.over} />}
-        <div className={`dh-toolbar${folderHeader ? ' dh-toolbar-folder' : ''}`}>
-          {folderHeader && folderId !== null ? (
+        <div
+          className={`dh-toolbar${folderHeader || (driveFolder && drive.selectedConnection) ? ' dh-toolbar-folder' : ''}`}
+        >
+          {driveFolder && drive.selectedConnection ? (
+            <DriveFolderCrumbs
+              accountEmail={drive.selectedConnection.googleEmail}
+              folderLabel={currentHeading}
+              onOpenDrive={() => openDrive(null)}
+              onOpenAccount={() => openDrive(drive.selectedConnection?.id ?? null)}
+            />
+          ) : folderHeader && folderId !== null ? (
             <BrowserCrumbs
               path={shownPath}
               onOpen={openFolderInWorkspace}
@@ -2777,8 +2852,10 @@ export function DocumentsHome({
               ))}
             </select>
           )}
-          {!folderHeader && <div className="dh-toolbar-spacer" />}
-          {!driveView && (
+          {!folderHeader && !(driveFolder && drive.selectedConnection) && (
+            <div className="dh-toolbar-spacer" />
+          )}
+          {(!driveView || drive.sidebarState.visible) && (
             <div className="dh-search-box" role="search">
               <svg
                 className="dh-search-icon"
@@ -2883,6 +2960,13 @@ export function DocumentsHome({
             connections={drive.connections}
             selectedAccountId={drive.selectedAccountId}
             files={drive.files}
+            folders={drive.folders}
+            query={query}
+            onClearSearch={() => {
+              setSearchDraft('')
+              focusSearch()
+            }}
+            onOpenFolder={(folderKey) => openDrive(drive.selectedAccountId, folderKey)}
             status={drive.status}
             error={drive.error}
             offline={drive.offline}
@@ -2894,7 +2978,7 @@ export function DocumentsHome({
             onOpenOnGoogle={(driveFileId) => void drive.openOnGoogle(driveFileId)}
             selectedFileId={driveSel?.row.id ?? null}
             onSelect={(driveFileId, via) => {
-              const row = drive.files.find((f) => f.id === driveFileId)
+              const row = drive.findFile(driveFileId)
               if (row) setDriveSel({ row, focus: via === 'keyboard' })
             }}
             onClosePanel={closeDrivePanel}
@@ -2922,7 +3006,7 @@ export function DocumentsHome({
               driveSel ? (
                 <DrivePanel
                   workspaceId={workspaceId}
-                  row={drive.files.find((f) => f.id === driveSel.row.id) ?? driveSel.row}
+                  row={drive.findFile(driveSel.row.id) ?? driveSel.row}
                   web={driveWeb}
                   autoFocus={driveSel.focus}
                   onClose={closeDrivePanel}
