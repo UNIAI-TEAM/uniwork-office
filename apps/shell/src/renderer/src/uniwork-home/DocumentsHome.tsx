@@ -803,6 +803,7 @@ export function DocumentsHome({
         workspaceId,
         query: serverQuery,
         kind: 'all',
+        ...(subView === 'archive' ? { shelved: true } : {}),
         ...(wireFilters.types ? { types: wireFilters.types } : {}),
       })
         .then((res) => {
@@ -1083,6 +1084,7 @@ export function DocumentsHome({
         query: serverQuery,
         cursor,
         kind: 'all',
+        ...(subView === 'archive' ? { shelved: true } : {}),
         ...(wireFilters.types ? { types: wireFilters.types } : {}),
       })
         .then((res) => {
@@ -1732,7 +1734,9 @@ export function DocumentsHome({
 
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf's member filter and row commands.
   // The filter narrows the loaded pages only (the server has no shelved_by).
-  const shelfView = subView === 'archive' && query.length === 0
+  // UNI-2205: a query on the shelf keeps its layout (chips, note, columns); the search asks for
+  // `shelved=true` and the member filter narrows its hits like it narrows the shelf.
+  const shelfView = subView === 'archive'
   const starredView = subView === 'starred' && query.length === 0
   // the trash list proper (a search inside it lists live hits on the plain table)
   const trashView = subView === 'trash' && query.length === 0
@@ -2468,7 +2472,12 @@ export function DocumentsHome({
   // show without a false empty state.
   const clientFilteredSearch =
     query.length > 0 &&
-    (screenScopedQuery || filters.updatedBy.trim() !== '' || filters.updatedPreset !== 'any')
+    (screenScopedQuery ||
+      filters.updatedBy.trim() !== '' ||
+      filters.updatedPreset !== 'any' ||
+      (shelfView && shelvedBy !== null))
+  // the shelf draws no folder cards (its folders are table rows), so only its rows count there
+  const shownCount = shelfView ? tableRows.length : folders.length + tableRows.length
   const autoLoadingSearchPages =
     query.length > 0 &&
     (page.status === 'loading' ||
@@ -2478,17 +2487,17 @@ export function DocumentsHome({
         !page.moreError &&
         (screenScopedQuery
           ? page.loadedPages < MAX_AUTO_SEARCH_PAGES || page.loadingMore
-          : (folders.length + tableRows.length === 0 && page.loadedPages < MAX_AUTO_SEARCH_PAGES) ||
-            (folders.length + tableRows.length === 0 && page.loadingMore))))
+          : (shownCount === 0 && page.loadedPages < MAX_AUTO_SEARCH_PAGES) ||
+            (shownCount === 0 && page.loadingMore))))
   useEffect(() => {
     if (!clientFilteredSearch) return
     if (page.seq !== listSeqRef.current) return
     if (page.status !== 'ready' || !page.nextCursor || page.moreError) return
     if (page.loadedPages >= MAX_AUTO_SEARCH_PAGES) return
-    if (!screenScopedQuery && folders.length + tableRows.length > 0) return
+    if (!screenScopedQuery && shownCount > 0) return
     if (!page.loadingMore) loadMore()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientFilteredSearch, screenScopedQuery, folders.length, tableRows.length, page])
+  }, [clientFilteredSearch, screenScopedQuery, shownCount, page])
   // UNI-2047: the selection and the bulk bar act on the rows the person sees, not on everything
   // loaded: the shelf's Lưu trữ bởi and the source rows narrow the table
   const visibleDocs = useMemo(
@@ -2781,7 +2790,9 @@ export function DocumentsHome({
 
       <div className="dh-main uwf-main" {...zoneHandlers}>
         {libraryDrop.over && <DropOverlay targetLabel={dropTargetLabel} box={libraryDrop.over} />}
-        <div className={`dh-toolbar${folderHeader ? ' dh-toolbar-folder' : ''}`}>
+        <div
+          className={`dh-toolbar${folderHeader ? ' dh-toolbar-folder' : ''}${subView === 'archive' ? ' dh-toolbar-shelf' : ''}`}
+        >
           {folderHeader && folderId !== null ? (
             <BrowserCrumbs
               path={shownPath}
@@ -3106,7 +3117,7 @@ export function DocumentsHome({
             {shelfView && shelvedBy !== null && <ShelvedLoadedOnlyNote />}
 
             {((page.status === 'loading' && page.items.length === 0) ||
-              (autoLoadingSearchPages && folders.length + tableRows.length === 0) ||
+              (autoLoadingSearchPages && shownCount === 0) ||
               (elsewhereView && sources.status === 'loading')) && (
               <div className="uw-pick-skeleton" role="status" aria-busy="true">
                 <span className="uw-sr-only">{t('uwPickLoading')}</span>
@@ -3240,7 +3251,7 @@ export function DocumentsHome({
                   )}
 
                   {tableRows.length === 0 ? (
-                    shelfView ? (
+                    shelfView && query.length === 0 ? (
                       <div className="dh-empty dh-shelved-empty" role="status">
                         <p className="dh-shelved-empty-title">
                           {hasActiveFilters(filters) || shelvedBy !== null
@@ -3263,6 +3274,7 @@ export function DocumentsHome({
                           title={t('dlSearchNoResults', { query })}
                           hint={
                             hasActiveFilters(filters) ||
+                            (shelfView && shelvedBy !== null) ||
                             (subView === 'recent' && recentSegment !== 'all')
                               ? t('uhEmptyFiltered')
                               : undefined

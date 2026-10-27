@@ -544,6 +544,14 @@
   outline-offset: 1px;
 }
 
+/* UNI-2205 (VS-AR1-2): the open list of a filter chip is a native popup that does not inherit the
+   chip's transparent field: give every option the theme's surface and text so the list reads in
+   both themes */
+.dh-filter-select option {
+  background-color: var(--surface);
+  color: var(--text);
+}
+
 /* N-04: Người sửa and Cập nhật are one pair: they wrap together, never one up and one down, and
    share one width (two equal tracks sized by the wider of the two). A long member name
    ellipsises inside its select; the pair never grows past the row */
@@ -1395,6 +1403,24 @@
 
   .dh-toolbar.dh-toolbar-folder {
     flex-wrap: wrap;
+  }
+}
+
+/* UNI-2205 (VS-AR1-1): the Archive's short title leaves room for the search box on the title row
+   at <= 1100px, where Recent / Shared with me / All documents wrap it under their longer
+   titles. The Archive wraps it at the same breakpoint, to the same slot: the spacer takes a line
+   of its own (no height) and the box starts the next one, 12px under the title row. */
+@media (max-width: 1100px) {
+  .dh-toolbar.dh-toolbar-shelf {
+    row-gap: 0;
+  }
+
+  .dh-toolbar-shelf > .dh-toolbar-spacer {
+    flex: 1 0 100%;
+  }
+
+  .dh-toolbar-shelf > .dh-search-box {
+    margin-top: 12px;
   }
 }
 
