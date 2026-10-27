@@ -3334,9 +3334,42 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       installDriveBridge({
         isAvailable: vi.fn(async () => true),
         listConnections: vi.fn(async () => ({ ok: true as const, value: [] })),
+        listFiles: vi.fn(async () => ({
+          ok: true as const,
+          value: { files: [], totalCount: 0, nextCursor: null },
+        })),
       })
       await mountHome()
       expect(document.querySelector('[data-nav="google-drive"]')).toBeNull()
+    })
+
+    it('keeps Google Drive in the sidebar for a linked file whose connection is gone, with the reconnect hand-off (Q-D4R-2)', async () => {
+      const lostFile = {
+        ...fileBroken,
+        boundConnectionLost: true,
+        viewerAccess: 'connection_lost' as const,
+      }
+      installDriveBridge({
+        listConnections: vi.fn(async () => ({ ok: true as const, value: [] })),
+        listFiles: vi.fn(async () => ({
+          ok: true as const,
+          value: { files: [lostFile], totalCount: 1, nextCursor: null },
+        })),
+      })
+      await mountHome()
+      await flush()
+      const driveRow = document.querySelector<HTMLButtonElement>('[data-nav="google-drive"]')
+      expect(driveRow).not.toBeNull()
+      expect(driveRow!.querySelector('[data-drive-total]')?.textContent).toBe('1')
+      expect(document.querySelectorAll('.dh-drive-nav-account')).toHaveLength(0)
+
+      await act(async () => {
+        driveRow!.click()
+      })
+      await flush()
+      await flush()
+      expect(document.querySelectorAll('[data-drive-file-id]')).toHaveLength(1)
+      expect(document.querySelector('[data-drive-reconnect]')).not.toBeNull()
     })
 
     it('renders Google Drive under My Folder with account sub-rows, Mất kết nối badge, 5-column table, and double-click / Enter open-on-google', async () => {

@@ -883,6 +883,36 @@ describe('UNI-2195 (D2) Google Drive sidebar visibility, loader, and i18n keys',
     ).toBe(false)
   })
 
+  it('keeps the Google Drive row for linked files whose connection is gone (Q-D4R-2)', () => {
+    // no connection but one linked file (bound_connection_lost): shown, no account sub-rows
+    expect(
+      homeModel.buildDriveSidebarState({
+        capability: true,
+        connections: [],
+        hasLinkedFiles: true,
+        totalCountOverride: 1,
+      }),
+    ).toEqual({ visible: true, totalCount: 1, accounts: [] })
+
+    // none + none: hidden
+    expect(
+      homeModel.buildDriveSidebarState({
+        capability: true,
+        connections: [],
+        hasLinkedFiles: false,
+      }),
+    ).toEqual({ visible: false, totalCount: 0, accounts: [] })
+
+    // the capability rule still wins
+    expect(
+      homeModel.isDriveSidebarVisible({
+        capability: false,
+        connections: [],
+        hasLinkedFiles: true,
+      }),
+    ).toBe(false)
+  })
+
   it('resolveDriveAccountFilter returns connection id only when it belongs to the viewer connections', () => {
     expect(homeModel.resolveDriveAccountFilter(null, [activeConn, brokenConn])).toBeNull()
     expect(homeModel.resolveDriveAccountFilter('dc-unknown', [activeConn, brokenConn])).toBeNull()

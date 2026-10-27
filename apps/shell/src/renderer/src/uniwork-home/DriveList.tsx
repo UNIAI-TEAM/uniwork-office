@@ -735,6 +735,8 @@ export function useDocumentsHomeDrive({
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [capability, setCapability] = useState(false)
   const [connections, setConnections] = useState<readonly DriveConnection[]>([])
+  // the viewer has linked files although no connection is left (a disconnected one): the row stays
+  const [orphanFileCount, setOrphanFileCount] = useState(0)
   const [seenInSession, setSeenInSession] = useState(false)
   const seenInSessionRef = useRef(false)
   const [syncOnline, setSyncOnline] = useState<boolean>(true)
@@ -766,6 +768,7 @@ export function useDocumentsHomeDrive({
     prevWsRef.current = workspaceId
     setSelectedAccountId(null)
     setConnections([])
+    setOrphanFileCount(0)
     setSeenInSession(false)
     seenInSessionRef.current = false
     setNetworkFailed(false)
@@ -842,7 +845,19 @@ export function useDocumentsHomeDrive({
       if (res.ok) {
         setNetworkFailed(false)
         setConnections(res.value)
-        if ((avail || seenInSessionRef.current) && res.value.length > 0) {
+        // no connection: one file is enough to keep the Drive row (its connection may be disconnected)
+        let linked = 0
+        if ((avail || seenInSessionRef.current) && res.value.length === 0) {
+          const probe = await fetchDocumentsHomeDriveFiles(bridge, {
+            workspaceId,
+            connectionId: null,
+            limit: 1,
+          })
+          if (connSeqRef.current !== seq) return
+          if (probe.ok) linked = probe.value.totalCount ?? probe.value.files.length
+        }
+        setOrphanFileCount(linked)
+        if ((avail || seenInSessionRef.current) && (res.value.length > 0 || linked > 0)) {
           seenInSessionRef.current = true
           setSeenInSession(true)
         }
@@ -851,6 +866,7 @@ export function useDocumentsHomeDrive({
       } else if (res.error === 'feature_disabled') {
         setCapability(false)
         setConnections([])
+        setOrphanFileCount(0)
         seenInSessionRef.current = false
         setSeenInSession(false)
         onFeatureDisabledRef.current?.()
@@ -1002,7 +1018,11 @@ export function useDocumentsHomeDrive({
   const sidebarState = buildDriveSidebarState({
     capability,
     connections,
-    totalCountOverride: resolvedAccountId === null ? filesState.totalCount : null,
+    totalCountOverride:
+      resolvedAccountId === null
+        ? (filesState.totalCount ?? (connections.length === 0 ? orphanFileCount : null))
+        : null,
+    hasLinkedFiles: orphanFileCount > 0,
     offline,
     seenInSession,
   })

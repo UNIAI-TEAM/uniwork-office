@@ -811,7 +811,9 @@ export interface DriveSidebarState {
 /**
  * Visibility rule (spec §17.2, §7.6, Q6): the Google Drive sidebar entry is shown
  * only when capability `drive_connector` is true AND the user has >= 1 connection
- * (including a `needs_reconnect` connection). In a session that has already shown
+ * (including a `needs_reconnect` connection) OR >= 1 linked file (`hasLinkedFiles`: a file
+ * whose connection was disconnected still lists, with the lost-connection state and the
+ * reconnect hand-off; Q-D4R-2). In a session that has already shown
  * the Drive row, going offline keeps the row visible so the user can select it and
  * see the offline state ("Cần kết nối mạng để xem tệp Google Drive." + Retry).
  * Cold start offline has `capability` false and `seenInSession` false, so the row
@@ -820,11 +822,12 @@ export interface DriveSidebarState {
 export function isDriveSidebarVisible(params: {
   capability: boolean
   connections: readonly DriveConnection[]
+  hasLinkedFiles?: boolean
   offline?: boolean
   seenInSession?: boolean
 }): boolean {
-  const { capability, connections, seenInSession = false } = params
-  return (capability || seenInSession) && connections.length > 0
+  const { capability, connections, hasLinkedFiles = false, seenInSession = false } = params
+  return (capability || seenInSession) && (connections.length > 0 || hasLinkedFiles)
 }
 
 /**
@@ -837,6 +840,7 @@ export function buildDriveSidebarState(params: {
   capability: boolean
   connections: readonly DriveConnection[]
   totalCountOverride?: number | null
+  hasLinkedFiles?: boolean
   offline?: boolean
   seenInSession?: boolean
 }): DriveSidebarState {
