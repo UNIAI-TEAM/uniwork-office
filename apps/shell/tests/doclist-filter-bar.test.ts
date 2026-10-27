@@ -575,6 +575,50 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
         await goTo('starred')
         expect(host.querySelector(boxSelector), 'starred: matched by the wrap rule').not.toBeNull()
       })
+
+      it('the wrap rule skips an open folder header and still reaches a folder with a query (KLF-24)', async () => {
+        const css = readFileSync(
+          join(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
+          'utf8',
+        )
+        const boxSelector = searchWrapBlock(css)
+          .match(/([^{}]+>\s*\.dh-search-box)\s*\{[^}]*margin-inline-end:/)![1]!
+          .trim()
+        api.uniworkFolderTree = vi.fn(async () =>
+          ok([
+            { id: 'f-alpha', parentId: null, title: 'Alpha', position: 0, children: [] },
+          ] as never),
+        )
+        await act(async () => {
+          root.unmount()
+        })
+        root = createRoot(host)
+        await act(async () => {
+          root.render(
+            createElement(
+              LocaleProvider,
+              { initial: 'vi' },
+              createElement(DocumentsHome, {
+                workspaceId: 'ws-1',
+                workspaces,
+                onWorkspaceChange: vi.fn(),
+                onOpenDocument: vi.fn(),
+                sidebarHost: sidebarSlot,
+                initialFolderId: 'f-alpha',
+              }),
+            ),
+          )
+        })
+        await flush()
+        // an open folder, no query: the container-query header, not the box the rule wraps
+        expect(host.querySelector('.dh-toolbar.dh-toolbar-folder')).not.toBeNull()
+        expect(host.querySelector('.dh-search-box')).not.toBeNull()
+        expect(host.querySelector(boxSelector), 'open folder: not matched').toBeNull()
+        // the same folder with a query is the plain toolbar: matched like every other screen
+        await typeIntoSearch('plan')
+        expect(host.querySelector('.dh-toolbar-folder')).toBeNull()
+        expect(host.querySelector(boxSelector), 'folder + query: matched').not.toBeNull()
+      })
     })
 
     it('says Type: All types / Type: 3 types in English', async () => {
@@ -1779,7 +1823,7 @@ describe('documents-home.css: the toolbar search wrap and the filter lists (UNI-
     'utf8',
   )
 
-  it('ends the single-row toolbar at 1101px and wraps the search box onto its own row at 1100px', () => {
+  it('ends the single-row toolbar at 1101px and, at 1100px, keeps the actions on row one above the search box', () => {
     expect(css).toMatch(
       /@media \(min-width: 1101px\)\s*\{\s*\.dh-toolbar\s*\{\s*flex-wrap:\s*nowrap;/,
     )
@@ -1788,6 +1832,15 @@ describe('documents-home.css: the toolbar search wrap and the filter lists (UNI-
     expect(block).toMatch(
       /> \.dh-search-box\s*\{[^}]*margin-inline-end:\s*max\(0px, calc\(100% - var\(--dh-search-box-width\)\)\);/,
     )
+    // the box is ordered after every other toolbar item (all at the default order 0), so the
+    // title, the select and the right-aligned actions come first in the visual order and the box
+    // is last, on its own row
+    expect(block).toMatch(/> \.dh-search-box\s*\{[^}]*\border:\s*1;/)
+    expect(block.match(/\border:/g)).toHaveLength(1)
+    const actions = css.match(/(?:^|\})\s*\.dh-toolbar-actions\s*\{([^}]*)\}/m)
+    expect(actions, '.dh-toolbar-actions rule').not.toBeNull()
+    expect(actions![1]).not.toMatch(/\border:/)
+    expect(actions![1]).toMatch(/margin-inline-start:\s*auto;/)
     // no row-gap override: a select that wraps keeps the normal toolbar gap
     expect(block).not.toMatch(/row-gap/)
   })
