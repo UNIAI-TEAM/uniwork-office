@@ -784,6 +784,17 @@ describe('tree grid numbers: TS and CSS cannot drift (D4BF-R3-3)', () => {
     expect(driveFolderIcon).toBe(44)
   })
 
+  it('the Drive folder note text starts on the folder name column (UNI-2192)', () => {
+    const css = sidebarCss.replace(/\/\*[\s\S]*?\*\//g, '')
+    const rule = /\.dh-drive-folders-note\s*\{[^}]*?padding-inline-start:\s*calc\(\s*([^;]*?)\s*\);/.exec(css)
+    // folder icon column (the folder rule's padding) + icon + gap
+    expect(rule?.[1].replace(/\s+/g, ' ')).toBe(
+      'var(--dh-tree-pad) + 2 * (var(--dh-tree-slot) + var(--dh-tree-gap) - var(--dh-tree-pull)) + var(--dh-tree-icon) + var(--dh-tree-gap)',
+    )
+    const step = px('--dh-tree-slot') + px('--dh-tree-gap') - px('--dh-tree-pull')
+    expect(px('--dh-tree-pad') + 2 * step + px('--dh-tree-icon') + px('--dh-tree-gap')).toBe(70)
+  })
+
   it('the Name from Drive action overlays the count column and shows on hover or focus only (UNI-2223 v3)', () => {
     const css = sidebarCss.replace(/\/\*[\s\S]*?\*\//g, '')
     const rule = /\.dh-drive-name-folder\s*\{([^}]*)\}/.exec(css)?.[1] ?? ''

@@ -286,9 +286,11 @@
 .dh-drive-folders-note {
   margin: 0;
   padding-block: 6px;
+  /* the note text starts on the folder NAME column: the folder row's padding (icon column) plus the
+     icon and the gap after it, the same formula .dh-drive-nav-folder uses */
   padding-inline-start: calc(
-    var(--dh-tree-pad) + 3 * (var(--dh-tree-slot) + var(--dh-tree-gap)) + var(--dh-tree-icon) +
-      var(--dh-tree-gap)
+    var(--dh-tree-pad) + 2 * (var(--dh-tree-slot) + var(--dh-tree-gap) - var(--dh-tree-pull)) +
+      var(--dh-tree-icon) + var(--dh-tree-gap)
   );
   font-size: 12px;
   color: var(--text-muted);
