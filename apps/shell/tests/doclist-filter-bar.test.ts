@@ -805,6 +805,9 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
       expect(host.querySelector('.dl-state-title')?.textContent).toBe(
         'Không có kết quả cho “Hợp đồng”',
       )
+      expect(host.querySelector('.dl-state-hint')?.textContent).toBe(
+        'Không có tài liệu nào khớp bộ lọc.',
+      )
 
       // relaxing Người sửa leaves only Cập nhật (24h) active on the search hits
       await pick(select('updatedBy'), 'u-minh')
@@ -826,6 +829,201 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
           updatedFrom: expect.any(String),
         }),
       )
+    })
+
+    it('auto-loads the next search page when active filters hide page 1 hits, and merges authors from page 2 (KLF-1, KLF-4)', async () => {
+      const { promise: page2Promise, resolve: resolvePage2 } =
+        Promise.withResolvers<
+          UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>
+        >()
+      api.uniworkSearchDocuments.mockImplementation((q: { cursor?: string }) => {
+        if (q.cursor === 'c2') {
+          return page2Promise
+        }
+        return Promise.resolve(
+          ok({
+            items: [
+              row({
+                id: 'hit-minh-p1',
+                title: 'Hợp đồng P1.docx',
+                updatedById: 'u-minh',
+                updatedByName: 'Minh Trần',
+                updatedAt: iso(2026, 10, 21, 9, 5),
+              }),
+            ],
+            nextCursor: 'c2',
+          }),
+        )
+      })
+      await mount('workspace')
+      await pick(select('updatedBy'), 'u-lan')
+
+      await typeIntoSearch('Hợp đồng')
+      // Page 1 was filtered out while nextCursor is 'c2': auto-loads page 2 without showing the empty state
+      expect(api.uniworkSearchDocuments).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: 'ws-1', query: 'Hợp đồng', cursor: 'c2' }),
+      )
+      expect(host.querySelector('.dl-state-title')).toBeNull()
+      expect(host.querySelector('.uw-pick-skeleton')).not.toBeNull()
+
+      await act(async () => {
+        resolvePage2(
+          ok({
+            items: [
+              row({
+                id: 'hit-lan-p2',
+                title: 'Hợp đồng P2.docx',
+                updatedById: 'u-lan',
+                updatedByName: 'Lan Nguyễn',
+                updatedAt: iso(2026, 10, 21, 10, 0),
+              }),
+              row({
+                id: 'hit-hoa-p2',
+                title: 'Hợp đồng Hoa P2.docx',
+                updatedById: 'u-hoa',
+                updatedByName: 'Hoa Phạm',
+                updatedAt: iso(2026, 10, 21, 10, 15),
+              }),
+            ],
+            nextCursor: null,
+          }),
+        )
+      })
+      await flush()
+
+      expect(host.querySelector('.dl-state-title')).toBeNull()
+      expect(rowIds()).toEqual(['hit-lan-p2'])
+      // Author seen only on search page 2 appears as a Người sửa option (KLF-4)
+      const authorValues = Array.from(select('updatedBy')!.querySelectorAll('option')).map(
+        (o) => o.value,
+      )
+      expect(authorValues).toContain('u-hoa')
+
+      // Past the 10-page cap with more pages left: stops auto-loading and shows Tải thêm without the empty state
+      let searchCalls = 0
+      api.uniworkSearchDocuments.mockImplementation(async () => {
+        searchCalls += 1
+        return ok({
+          items: [
+            row({
+              id: `hit-minh-cap-${searchCalls}`,
+              title: `Hợp đồng Cap ${searchCalls}.docx`,
+              updatedById: 'u-minh',
+              updatedByName: 'Minh Trần',
+              updatedAt: iso(2026, 10, 21, 9, 5),
+            }),
+          ],
+          nextCursor: `cap-${searchCalls + 1}`,
+        })
+      })
+      await typeIntoSearch('Hợp đồng Cap')
+      for (let i = 0; i < 12; i++) {
+        await flush()
+      }
+      expect(searchCalls).toBe(10)
+      expect(host.querySelector('.dl-state-title')).toBeNull()
+      expect(host.querySelector('.dh-load-more-row button')).not.toBeNull()
+    })
+
+    it('scopes a query on Gần đây to the Recent list client-side without calling searchDocuments, auto-fetches page 2, and combines with Đã sửa (KLV-6)', async () => {
+      api.uniworkFolderTree.mockResolvedValue(
+        ok([
+          {
+            id: 'f-contracts',
+            parentId: null,
+            title: 'Thư mục Hợp đồng',
+            position: 0,
+            kind: 'folder' as const,
+            isSystem: false,
+            children: [],
+          },
+        ]),
+      )
+      api.uniworkSearchDocuments.mockResolvedValue(
+        ok({
+          items: [
+            row({
+              id: 'ws-only-hit',
+              title: 'Đánh giá ngoài Gần đây.docx',
+            }),
+          ],
+          nextCursor: null,
+        }),
+      )
+      api.uniworkListDocuments.mockImplementation(
+        async (q: { cursor?: string; activity?: string }) => {
+          if (q.activity === 'edited') {
+            return ok({
+              documents: [
+                row({
+                  id: 'rec-edited',
+                  title: 'Báo cáo Đánh giá Quý 4.docx',
+                  parentId: 'f-contracts',
+                  lastActivity: { kind: 'edited', at: iso(2026, 10, 21, 9, 0) },
+                }),
+              ],
+              nextCursor: null,
+            })
+          }
+          if (q.cursor === 'rec-c2') {
+            return ok({
+              documents: [
+                row({
+                  id: 'rec-p2-opened',
+                  title: 'Đề xuất Đánh giá Nhân sự.docx',
+                  parentId: null,
+                  lastActivity: { kind: 'opened', at: iso(2026, 10, 20, 14, 0) },
+                }),
+                row({
+                  id: 'rec-p2-edited',
+                  title: 'Báo cáo Đánh giá Quý 4.docx',
+                  parentId: 'f-contracts',
+                  lastActivity: { kind: 'edited', at: iso(2026, 10, 21, 9, 0) },
+                }),
+              ],
+              nextCursor: null,
+            })
+          }
+          return ok({
+            documents: [
+              row({
+                id: 'rec-p1-other',
+                title: 'Ngân sách năm.xlsx',
+                lastActivity: { kind: 'opened', at: iso(2026, 10, 21, 10, 0) },
+              }),
+            ],
+            nextCursor: 'rec-c2',
+          })
+        },
+      )
+
+      await mount('recent')
+      expect(api.uniworkSearchDocuments).not.toHaveBeenCalled()
+
+      // Diacritic- and đ/Đ-insensitive query on Gần đây
+      await typeIntoSearch('danh gia')
+      expect(api.uniworkSearchDocuments).not.toHaveBeenCalled()
+      expect(api.uniworkListDocuments).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: 'ws-1', cursor: 'rec-c2' }),
+      )
+      // Workspace-only search hit does not appear; page 2 Recent matches appear
+      expect(rowIds()).toEqual(['rec-p2-edited', 'rec-p2-opened'])
+      expect(rowIds()).not.toContain('ws-only-hit')
+      // The "where" subline stays as on Recent today
+      expect(
+        host.querySelector('[data-doc-id="rec-p2-edited"] .dh-doc-subpath')?.textContent,
+      ).toBe('Thư mục Hợp đồng')
+      expect(
+        host.querySelector('[data-doc-id="rec-p2-opened"] .dh-doc-subpath')?.textContent,
+      ).toBe('Tài liệu (gốc)')
+
+      // Đã sửa segment + query narrows to edited Recent matches
+      await click(host.querySelector('[data-seg="edited"]'))
+      expect(api.uniworkSearchDocuments).not.toHaveBeenCalled()
+      expect(lastCall('uniworkListDocuments')).toEqual(
+        expect.objectContaining({ workspaceId: 'ws-1', activity: 'edited' }),
+      )
+      expect(rowIds()).toEqual(['rec-edited'])
     })
   })
 
