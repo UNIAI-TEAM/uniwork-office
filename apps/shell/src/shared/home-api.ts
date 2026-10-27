@@ -615,6 +615,11 @@ export interface UniworkSearchQuery {
   workspaceId: string
   query: string
   kind: 'all' | 'folder' | 'document'
+  /**
+   * UNI-2205: the Archive keeps its layout while searching: `shelved=true` narrows the title search
+   * to the Lưu trữ shelf (the web's search on the shelved view). Only a real `true` is sent.
+   */
+  shelved?: boolean
   /** UNI-2113: the Type picks narrow the search like the lists (one `type=` each, OR across picks) */
   types?: UniworkDocTypePick[]
   cursor?: string

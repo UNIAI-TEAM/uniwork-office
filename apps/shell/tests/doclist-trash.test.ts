@@ -876,12 +876,15 @@ describe('Lưu trữ on the shared table (UNI-2047 A2b)', () => {
     await mount()
     expect(host.querySelectorAll('.dh-doc-table')).toHaveLength(1)
     expect(host.querySelector('table')).toBeNull()
-    expect(host.querySelector('.dh-shelved-head select[data-filter="format"]')).toBeNull()
-    expect(host.querySelectorAll('.dh-shelved-head select')).toHaveLength(1)
+    expect(host.querySelector('.dh-filter-bar select[data-filter="format"]')).toBeNull()
+    // Lưu trữ bởi is the only select the shelf adds to the shared bar's pair
+    expect(host.querySelectorAll('.dh-filter-bar select[data-filter="shelvedBy"]')).toHaveLength(1)
     expect(host.querySelector('.dh-shelved-intro')).not.toBeNull()
     expect(host.querySelector('[data-group]')).toBeNull()
     expect(Object.keys(shelvedView).sort()).toEqual([
-      'ShelvedToolbar',
+      'ShelvedByChip',
+      'ShelvedIntro',
+      'ShelvedLoadedOnlyNote',
       'filterByShelver',
       'shelvedDescendantIds',
     ])

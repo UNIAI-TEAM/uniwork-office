@@ -219,6 +219,8 @@ export interface UniworkDocsClient {
     workspaceId: string
     query: string
     kind: 'all' | 'folder' | 'document'
+    /** UNI-2205: narrow the search to the shelf (`shelved=true`) */
+    shelved?: boolean
     types?: UniworkDocTypePick[]
     cursor?: string
     limit?: number
@@ -1088,6 +1090,8 @@ export function createUniworkDocsClient(options: UniworkDocsClientOptions): Uniw
       // `document` is the server's value for "everything that is not a folder"
       // (pages included); 'all' sends no kind at all
       if (input.kind !== 'all') params.set('kind', input.kind)
+      // the Archive's own search (UNI-2205): the same `shelved=true` the shelf list sends
+      if (input.shelved === true) params.set('shelved', 'true')
       const limit = Math.min(100, Math.max(1, Math.floor(Number(input.limit) || 50)))
       params.set('limit', String(limit))
       if (input.cursor) params.set('cursor', input.cursor.slice(0, 512))

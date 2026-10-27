@@ -99,7 +99,7 @@ export const zh = {
   uhShelvedIntro:
     '已完成的文档存放在这里：永久保留、只读、不可评论。取消归档会将项目恢复原样。能查看的人仍可打开和找到它（标记为“已归档”）。归档文件夹会归档整个目录树；需要管理权限。',
   uhShelvedSort: '最近归档',
-  uhShelvedFilterBy: '归档者',
+  uhShelvedFilterBy: '归档者：',
   uhShelvedFilterAny: '任何人',
   uhShelvedLoadedOnly: '仅筛选已加载的部分——加载更多以扩大范围。',
   uhShelvedByFormer: '前成员',

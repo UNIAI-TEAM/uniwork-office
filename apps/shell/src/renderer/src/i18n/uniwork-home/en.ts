@@ -100,7 +100,7 @@ export const en = {
   uhShelvedIntro:
     'Finished documents are put away here: kept forever, read-only, no comments. Unarchiving an item restores it as before. Anyone who can see an item still opens and finds it (labelled “Archived”). Archiving a folder archives the whole tree; it needs Manage access.',
   uhShelvedSort: 'Archived most recently',
-  uhShelvedFilterBy: 'Archived by',
+  uhShelvedFilterBy: 'Archived by:',
   uhShelvedFilterAny: 'Anyone',
   uhShelvedLoadedOnly: 'Filters what is loaded — load more to widen it.',
   uhShelvedByFormer: 'Former member',

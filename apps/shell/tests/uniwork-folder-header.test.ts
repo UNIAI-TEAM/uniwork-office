@@ -281,7 +281,7 @@ describe('UNI-1979 open-folder header: one row, the folder name once', () => {
     expect(row).toMatch(/flex-wrap:\s*wrap/)
     // the wide-window rule that stops .dh-toolbar wrapping must not reach the folder row
     const wide =
-      homeCss.match(/@media\s*\(\s*min-width:\s*1101px\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+      homeCss.match(/@media\s*\(\s*min-width:\s*1281px\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
     expect(ruleBody(wide, '.dh-toolbar.dh-toolbar-folder')).toMatch(/flex-wrap:\s*wrap/)
     const crumbs = ruleBody(homeCss, '.dh-toolbar-folder > .uwf-crumbs')
     // the app row also holds the workspace select, so the crumbs' basis is below the web's 18rem

@@ -19,6 +19,7 @@ import type {
   UniworkSourceListQuery,
 } from '../../../shared/home-api'
 import type { StringKey, TFunc } from '../locale'
+import { foldSearchText } from '../uniwork-share/share-model'
 
 export type UniworkDocVisibility = 'private' | 'workspace' | 'restricted'
 export type UniworkDocAccessLevel = 'view' | 'comment' | 'edit' | 'manage'
@@ -741,6 +742,19 @@ export function docMatchesUpdated(doc: DocumentsHomeDoc, filters: UniworkListFil
   }
   return true
 }
+
+/**
+ * UNI-2205 (KLV-6 / KLV-9 / KLF-8): case- and Vietnamese-diacritic-insensitive title match (đ/Đ included),
+ * reusing `foldSearchText` for screens whose route has no `q` parameter (Gần đây, Được chia sẻ với tôi).
+ */
+export function docMatchesQuery(doc: DocumentsHomeDoc, query: string): boolean {
+  const foldedQuery = foldSearchText(query)
+  if (!foldedQuery) return true
+  return foldSearchText(doc.title).includes(foldedQuery)
+}
+
+/** Cap on automatic page fetches while a search query or client filter is narrowing paged results. */
+export const MAX_AUTO_SEARCH_PAGES = 10
 
 /**
  * UNI-1961: one page of the root's source files, with the home's Type picks

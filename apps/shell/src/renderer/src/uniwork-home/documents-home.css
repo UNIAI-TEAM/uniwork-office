@@ -285,11 +285,12 @@
 }
 
 .dh-search-box {
+  --dh-search-box-width: 320px;
   display: flex;
   flex: 0 1 auto;
   align-items: center;
   gap: 8px;
-  width: 320px;
+  width: var(--dh-search-box-width);
   /* V-LAYOUT F-11: room for "Search folders and documents"; the title row wraps before the field shrinks */
   min-width: min(15rem, 100%);
   max-width: 100%;
@@ -552,6 +553,14 @@
   outline-offset: 1px;
 }
 
+/* UNI-2205 (VS-AR1-2): the open list of a filter chip is a native popup that does not inherit the
+   chip's transparent field: give every option the theme's surface and text so the list reads in
+   both themes */
+.dh-filter-select option {
+  background-color: var(--surface);
+  color: var(--text);
+}
+
 /* N-04: Người sửa and Cập nhật are one pair: they wrap together, never one up and one down, and
    share one width (two equal tracks sized by the wider of the two). A long member name
    ellipsises inside its select; the pair never grows past the row */
@@ -568,6 +577,19 @@
 }
 
 .dh-filter-selects .dh-filter-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+/* a screen's own chip (the shelf's Lưu trữ bởi) sits in the bar's row at the pair's size; a long
+   member name ellipsises inside its select and never widens the chip past the row */
+.dh-filter-bar > .dh-filter-chip {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dh-filter-bar > .dh-filter-chip .dh-filter-select {
   flex: 1 1 auto;
   min-width: 0;
   text-overflow: ellipsis;
@@ -1379,11 +1401,13 @@
   outline-offset: 1px;
 }
 
-/* VDH-12: at wide desktop viewports (>= 1101 px, e.g. 1280 px) keep the toolbar
-   (title, workspace select, search, Tải lên, Tạo mới) on a single row like the board;
-   below 1100 px (e.g. 900 px) the base flex-wrap: wrap lets the search and buttons
-   wrap cleanly to the second line */
-@media (min-width: 1101px) {
+/* VDH-12: at wide desktop viewports (>= 1281 px) keep the toolbar (title, workspace select, search,
+   Tải lên, Tạo mới) on a single row like the board; at <= 1280 px (e.g. 900 px) the rule below
+   wraps the search box onto its own line. UNI-2205 (KLA2-2): the boundary was 1100/1101, but at
+   1101 px Recent, All documents and Shared with me overflowed the toolbar (title + select +
+   search + actions need about 1225 px even with the box squeezed to its 240px floor); the single
+   row now starts where it fits, with room to spare for longer labels (vi) */
+@media (min-width: 1281px) {
   .dh-toolbar {
     flex-wrap: nowrap;
   }
@@ -1393,15 +1417,31 @@
   }
 }
 
-/* UNI-1961 (ARCHIVE-01): the Lưu trữ / Archive shelf, as the web's
-   DocumentsShelvedView: intro, toolbar (type, Lưu trữ bởi) and the shared
-   Documents table with the Lưu trữ column (person + date). */
-.dh-shelved-head {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* UNI-2205 (KLF-18, KLF-23): one wrap rule for every non-folder toolbar (Archive, Recent, Shared
+   with me, All documents, Starred, Shared by me, Trash), as on the web: at <= 1280px row one is the
+   title, the workspace select and the Upload / Create actions (right-aligned), row two is the search
+   box alone, in the same slot and width on every screen whatever the title or the select measure
+   (the >= 1281px rule above keeps the single row). The box is ordered after everything else, so
+   when row one does not fit, the select and/or the actions wrap above it, never below. Its end
+   margin takes the rest of the row, so its outer width is the whole row and it can never share a
+   line with anything; the normal row gap is the only space above it, so a select that wraps keeps
+   its gap too. The spacer only pushed the box to the end of a shared row: it would be a stray empty
+   line here. The open folder toolbar keeps its own container-query layout (crumbs + actions share
+   row one, the search box has its row below them). */
+@media (max-width: 1280px) {
+  .dh-toolbar:not(.dh-toolbar-folder) > .dh-toolbar-spacer {
+    display: none;
+  }
+
+  .dh-toolbar:not(.dh-toolbar-folder) > .dh-search-box {
+    order: 1;
+    margin-inline-end: max(0px, calc(100% - var(--dh-search-box-width)));
+  }
 }
 
+/* UNI-1961 (ARCHIVE-01): the Lưu trữ / Archive shelf, as the web's
+   DocumentsShelvedView: intro, the shared filter bar (type, editor, date and the Lưu trữ bởi chip)
+   and the shared Documents table with the Lưu trữ column (person + date). */
 .dh-shelved-intro {
   margin: 0;
   color: var(--text-secondary);
@@ -1409,21 +1449,8 @@
   line-height: 1.5;
 }
 
-.dh-shelved-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.dh-shelved-by {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-
 .dh-shelved-loaded-only {
+  margin: 0;
   color: var(--text-secondary);
   font-size: 11.5px;
 }
@@ -1671,7 +1698,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  /* V-FIX2 N-01: the one-row header (>= 1101px) must never outgrow its box: this group yields
+  /* V-FIX2 N-01: the one-row header (>= 1281px) must never outgrow its box: this group yields
      first (the select, the search and the buttons keep their size) and its subtitle ellipsises;
      the floor keeps the title itself whole. N-08: 10rem cut "From elsewhere" (175px at 24px) under
      the select, so the floor is 11.5rem (184px); min-content cannot do it, the nowrap subtitle

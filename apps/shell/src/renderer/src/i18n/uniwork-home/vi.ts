@@ -100,7 +100,7 @@ export const vi = {
   uhShelvedIntro:
     'Tài liệu đã xong việc được cất ở đây: giữ mãi, chỉ đọc, không bình luận. Bỏ lưu trữ đưa mục về như cũ. Ai xem được vẫn mở và tìm thấy (nhãn “Đã lưu trữ”). Lưu trữ một thư mục là lưu cả cây; cần quyền Quản lý.',
   uhShelvedSort: 'Lưu trữ gần nhất',
-  uhShelvedFilterBy: 'Lưu trữ bởi',
+  uhShelvedFilterBy: 'Lưu trữ bởi:',
   uhShelvedFilterAny: 'Bất kỳ ai',
   uhShelvedLoadedOnly: 'Chỉ lọc trong phần đã tải — tải thêm để lọc rộng hơn.',
   uhShelvedByFormer: 'Cựu thành viên',

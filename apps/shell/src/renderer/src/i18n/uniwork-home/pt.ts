@@ -100,7 +100,7 @@ export const pt = {
   uhShelvedIntro:
     'Documentos concluídos ficam guardados aqui: para sempre, somente leitura, sem comentários. Desarquivar um item o restaura como antes. Quem pode vê-lo ainda o abre e encontra (com o rótulo “Arquivado”). Arquivar uma pasta arquiva a árvore inteira; requer acesso de Gerenciar.',
   uhShelvedSort: 'Arquivados mais recentemente',
-  uhShelvedFilterBy: 'Arquivado por',
+  uhShelvedFilterBy: 'Arquivado por:',
   uhShelvedFilterAny: 'Qualquer pessoa',
   uhShelvedLoadedOnly: 'Filtra o que foi carregado — carregue mais para ampliar.',
   uhShelvedByFormer: 'Ex-membro',
