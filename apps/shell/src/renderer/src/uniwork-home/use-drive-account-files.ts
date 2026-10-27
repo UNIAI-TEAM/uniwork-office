@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { DriveFile, DriveFileListPage, UniworkDriveResult } from '../../../shared/home-api'
 
 /**
- * Every file of the Drive accounts whose folders the sidebar shows (UNI-2223 v2). The files list is
- * cursor-paginated, so the folders of an account (and what is in each) are only known once all its
- * pages are in: this hook walks them. It is the one place the folder tree gets its data from, so a
- * server folder list can replace it without touching the views.
+ * Every file of a Drive account, by walking its cursor pages. This is the old-server fallback only
+ * (UNI-2223): an account whose server sends no folder list (the folders are derived from the files)
+ * or ignores the folder filter of the files list (`use-drive-folder-files`) has no other way to know
+ * what each folder holds. Servers that filter never reach it. The pages are only known once all of
+ * them are in, so the hook walks them and the host reads the account from the result.
  */
 
 export interface DriveAccountFiles {
