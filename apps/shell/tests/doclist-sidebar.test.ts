@@ -767,7 +767,9 @@ describe('tree grid numbers: TS and CSS cannot drift (D4BF-R3-3)', () => {
     )
     // the folder row's padding is the tree's own formula: first-level padding plus two steps
     const folderRule =
-      /\.dh-sidebar-tree \.dh-drive-nav-folder\s*\{\s*padding-inline-start:\s*calc\(\s*([^;]*?)\s*\);/.exec(css)
+      /\.dh-sidebar-tree \.dh-drive-nav-folder\s*\{\s*padding-inline-start:\s*calc\(\s*([^;]*?)\s*\);/.exec(
+        css,
+      )
     expect(folderRule?.[1]).toBe(
       'var(--dh-tree-pad) + 2 * (var(--dh-tree-slot) + var(--dh-tree-gap) - var(--dh-tree-pull))',
     )
@@ -786,7 +788,8 @@ describe('tree grid numbers: TS and CSS cannot drift (D4BF-R3-3)', () => {
 
   it('the Drive folder note text starts on the folder name column (UNI-2192)', () => {
     const css = sidebarCss.replace(/\/\*[\s\S]*?\*\//g, '')
-    const rule = /\.dh-drive-folders-note\s*\{[^}]*?padding-inline-start:\s*calc\(\s*([^;]*?)\s*\);/.exec(css)
+    const rule =
+      /\.dh-drive-folders-note\s*\{[^}]*?padding-inline-start:\s*calc\(\s*([^;]*?)\s*\);/.exec(css)
     // folder icon column (the folder rule's padding) + icon + gap
     expect(rule?.[1].replace(/\s+/g, ' ')).toBe(
       'var(--dh-tree-pad) + 2 * (var(--dh-tree-slot) + var(--dh-tree-gap) - var(--dh-tree-pull)) + var(--dh-tree-icon) + var(--dh-tree-gap)',
