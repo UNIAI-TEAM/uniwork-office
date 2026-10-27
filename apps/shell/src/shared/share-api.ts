@@ -417,13 +417,23 @@ export interface FolderContentsAccessCounts {
   skippedLocked: number
 }
 
-/** `warnings` of a dry run: `wide_scope` | `downgrade` | `to_private`, kept as sent (open set) */
+/** the warnings a dry run can carry; any other code the server sends is dropped at parse (the web's rule) */
+export type FolderContentsAccessWarning = 'wide_scope' | 'downgrade' | 'to_private'
+export const FOLDER_CONTENTS_ACCESS_WARNINGS: readonly FolderContentsAccessWarning[] = [
+  'wide_scope',
+  'downgrade',
+  'to_private',
+]
+
+/** a plain id (a ULID fits): the one shape of every principal / folder / batch id the folder command sends or reads */
+export const FOLDER_CONTENTS_ACCESS_ID = /^[A-Za-z0-9_-]{1,128}$/
+
 export interface FolderContentsAccessPreview extends FolderContentsAccessCounts {
   /** people who lose access to at least one document */
   losingUsers: number
   /** people whose level drops on at least one document */
   downgradedUsers: number
-  warnings: string[]
+  warnings: FolderContentsAccessWarning[]
 }
 
 /**
@@ -443,7 +453,10 @@ export const FOLDER_CONTENTS_ACCESS_BATCH_STATUSES: readonly FolderContentsAcces
   'failed',
 ]
 
-/** `GET .../contents-access/{batchId}`: the progress of a background run (only its creator may read it) */
+/**
+ * `GET .../contents-access/{batchId}`: the progress of a background run (only its creator may read it).
+ * A status this client does not list reads as `running`, so the UI asks again.
+ */
 export interface FolderContentsAccessBatch extends FolderContentsAccessCounts {
   batchId: string
   status: FolderContentsAccessBatchStatus
