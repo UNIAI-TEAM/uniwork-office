@@ -1889,10 +1889,14 @@ describe('G5-06 W4b save queue wiring', () => {
     // and a lock still held keeps the overlay (the same read, the other verdict)
     expect((await opener.acquire(key)).kind).toBe('held')
     await second.service.pollSaveQueue()
-    expect(await second.service.docStatus(path)).toMatchObject({
-      state: 'blocked',
-      error: 'other_window',
-    })
+    // the poll only publishes the read-only status: the overlay lands when the
+    // record push has read the binding, which can trail the poll's own resolve
+    await vi.waitFor(async () =>
+      expect(await second.service.docStatus(path)).toMatchObject({
+        state: 'blocked',
+        error: 'other_window',
+      }),
+    )
     await opener.release(key, 1)
   })
 
