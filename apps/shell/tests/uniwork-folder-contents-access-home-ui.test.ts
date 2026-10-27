@@ -223,7 +223,7 @@ describe('Share documents inside… in the Documents page (UNI-2244)', () => {
     expect(labels()).toEqual([ENTRY, 'New subfolder'])
   })
 
-  it('the page wires a background run end to a list refetch and one toast (R2-5)', async () => {
+  it('the page refetches its list when a background run ends and leaves the toast to the shell frame (R2-5)', async () => {
     await mount('f-beta')
     const list = (window as unknown as { home: { uniworkListChildren: ReturnType<typeof vi.fn> } })
       .home.uniworkListChildren
@@ -242,6 +242,7 @@ describe('Share documents inside… in the Documents page (UNI-2244)', () => {
     })
     await flush()
     expect(list.mock.calls.length).toBeGreaterThan(before)
-    expect(document.body.textContent).toContain(en.shrFcBatchFailed)
+    // the toast is the shell frame's FolderBatchEndHost (not mounted here): no second one from the page
+    expect(document.body.textContent).not.toContain(en.shrFcBatchFailed)
   })
 })

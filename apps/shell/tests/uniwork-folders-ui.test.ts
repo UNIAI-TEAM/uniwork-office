@@ -1736,7 +1736,7 @@ describe('UniworkBrowser: Share documents inside… (UNI-2244)', () => {
     expect(menuLabels()).not.toContain(entryLabel)
   })
 
-  it('the browser wires a background run end to a list refetch and one toast (R2-5)', async () => {
+  it('the browser refetches its list when a background run ends and leaves the toast to the shell frame (R2-5)', async () => {
     resetFolderBatchesForTest()
     const shareApi = createFakeShareApi()
     ;(window as unknown as { uniworkShare: unknown }).uniworkShare = shareApi
@@ -1755,7 +1755,8 @@ describe('UniworkBrowser: Share documents inside… (UNI-2244)', () => {
     })
     await flush()
     expect(api.uniworkListChildren.mock.calls.length).toBeGreaterThan(before)
-    expect(document.body.textContent).toContain(
+    // the toast is the shell frame's FolderBatchEndHost (not mounted here): no second one from the browser
+    expect(document.body.textContent).not.toContain(
       (uniworkShareStrings.en as Record<string, string>).shrFcBatchFailed,
     )
     resetFolderBatchesForTest()

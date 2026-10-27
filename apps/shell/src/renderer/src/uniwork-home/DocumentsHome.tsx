@@ -597,11 +597,9 @@ export function DocumentsHome({
     action?: { label: string; onClick: () => void }
   } | null>(null)
   const clearToast = useCallback(() => setToast(null), [])
-  // UNI-2244: a background "share the documents inside…" run ended (its dialog may be long closed)
-  useFolderBatchEnd({
-    onToast: (message, tone) => setToast({ message, tone }),
-    onRefetch: () => setListTick((n) => n + 1),
-  })
+  // UNI-2244: a background "share the documents inside…" run ended (its dialog may be long closed):
+  // the list refetches; the shell frame's FolderBatchEndHost tells the end
+  useFolderBatchEnd({ onRefetch: () => setListTick((n) => n + 1) })
 
   // G5-05u / NET-OFF-01: pin/unpin entry in each document row's "…" menu (hidden while the capability is off)
   const offlineToggle = useOfflineToggle()
