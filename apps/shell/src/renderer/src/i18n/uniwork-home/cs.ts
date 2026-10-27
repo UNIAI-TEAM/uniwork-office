@@ -304,7 +304,7 @@ export const cs = {
   uhDriveViewerEmailMissing: 'Účet zatím není znám',
   uhDriveViewerUnknownTitle: 'UniWork zatím nemůže soubor číst',
   uhDriveViewerUnknownBody:
-    'Ještě jste UniWork nepovolili číst tento soubor. Propojil(a) ho {name} ze svého Google Drive. UNI čte soubory vaším vlastním účtem Google Drive, proto potřebuje jednorázové povolení.',
+    'Propojil(a) ho {name} ze svého Google Drive. UNI čte soubory vaším vlastním účtem Google Drive, proto potřebuje jednorázové povolení.',
   uhDriveViewerUnknownHint:
     'Pokud Google hlásí, že nemáte oprávnění, požádejte vlastníka, aby soubor sdílel na Google Drive. UniWork za vás nesdílí.',
   uhDriveViewerLost: 'Účet {email} už k tomuto souboru nemá přístup.',

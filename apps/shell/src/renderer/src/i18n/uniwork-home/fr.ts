@@ -309,7 +309,7 @@ export const fr = {
   uhDriveViewerEmailMissing: 'Compte pas encore connu',
   uhDriveViewerUnknownTitle: 'UniWork ne peut pas encore lire ce fichier',
   uhDriveViewerUnknownBody:
-    "Vous n'avez pas encore autorisé UniWork à lire ce fichier. {name} l'a associé depuis son propre Google Drive. UNI lit les fichiers avec votre propre compte Google Drive : il faut donc votre autorisation une fois.",
+    "{name} l'a associé depuis son propre Google Drive. UNI lit les fichiers avec votre propre compte Google Drive : il faut donc votre autorisation une fois.",
   uhDriveViewerUnknownHint:
     "Si Google indique que vous n'avez pas accès, demandez au propriétaire de partager le fichier sur Google Drive. UniWork ne partage pas à votre place.",
   uhDriveViewerLost: "Le compte {email} n'a plus accès à ce fichier.",

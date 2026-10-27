@@ -307,7 +307,7 @@ export const nl = {
   uhDriveViewerEmailMissing: 'Account nog niet bekend',
   uhDriveViewerUnknownTitle: 'UniWork mag dit bestand nog niet lezen',
   uhDriveViewerUnknownBody:
-    'Je hebt UniWork nog geen toestemming gegeven dit bestand te lezen. {name} heeft het gekoppeld vanuit de eigen Google Drive. UNI leest bestanden met je eigen Google Drive-account, dus je toestemming is eenmalig nodig.',
+    '{name} heeft het gekoppeld vanuit de eigen Google Drive. UNI leest bestanden met je eigen Google Drive-account, dus je toestemming is eenmalig nodig.',
   uhDriveViewerUnknownHint:
     'Als Google meldt dat je geen toegang hebt, vraag de eigenaar het bestand te delen in Google Drive. UniWork deelt niet namens jou.',
   uhDriveViewerLost: 'Het account {email} heeft geen toegang meer tot dit bestand.',

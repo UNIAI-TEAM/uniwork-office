@@ -305,7 +305,7 @@ export const ru = {
   uhDriveViewerEmailMissing: 'Аккаунт пока не известен',
   uhDriveViewerUnknownTitle: 'UniWork пока не может читать этот файл',
   uhDriveViewerUnknownBody:
-    'Вы ещё не разрешили UniWork читать этот файл. Его привязал(а) {name} из своего Google Drive. UNI читает файлы через ваш собственный аккаунт Google Drive, поэтому нужно ваше разрешение один раз.',
+    'Его привязал(а) {name} из своего Google Drive. UNI читает файлы через ваш собственный аккаунт Google Drive, поэтому нужно ваше разрешение один раз.',
   uhDriveViewerUnknownHint:
     'Если Google сообщает, что у вас нет доступа, попросите владельца поделиться файлом в Google Drive. UniWork не делится файлами за вас.',
   uhDriveViewerLost: 'У аккаунта {email} больше нет доступа к этому файлу.',

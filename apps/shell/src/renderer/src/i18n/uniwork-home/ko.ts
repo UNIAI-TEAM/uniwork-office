@@ -302,7 +302,7 @@ export const ko = {
   uhDriveViewerEmailMissing: '아직 계정을 알 수 없음',
   uhDriveViewerUnknownTitle: 'UniWork가 아직 이 파일을 읽을 수 없음',
   uhDriveViewerUnknownBody:
-    '아직 UniWork가 이 파일을 읽도록 허용하지 않았습니다. 이 파일은 {name}님이 본인의 Google Drive에서 링크했습니다. UNI는 본인의 Google Drive 계정으로 파일을 읽으므로 한 번 허용해야 합니다.',
+    '이 파일은 {name}님이 본인의 Google Drive에서 링크했습니다. UNI는 본인의 Google Drive 계정으로 파일을 읽으므로 한 번 허용해야 합니다.',
   uhDriveViewerUnknownHint:
     'Google에서 권한이 없다고 표시되면 소유자에게 Google Drive에서 파일을 공유해 달라고 요청하세요. UniWork는 대신 공유하지 않습니다.',
   uhDriveViewerLost: '{email} 계정은 더 이상 이 파일에 접근할 수 없습니다.',

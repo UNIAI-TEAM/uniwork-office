@@ -296,7 +296,7 @@ export const he = {
   uhDriveViewerEmailMissing: 'החשבון עדיין לא ידוע',
   uhDriveViewerUnknownTitle: 'UniWork עדיין לא יכול לקרוא את הקובץ',
   uhDriveViewerUnknownBody:
-    'עדיין לא אפשרת ל-UniWork לקרוא את הקובץ הזה. {name} קישר אותו מה-Google Drive שלו. UNI קורא קבצים בחשבון Google Drive שלך, ולכן נדרש אישורך פעם אחת.',
+    '{name} קישר אותו מה-Google Drive שלו. UNI קורא קבצים בחשבון Google Drive שלך, ולכן נדרש אישורך פעם אחת.',
   uhDriveViewerUnknownHint:
     'אם Google מודיע שאין לך הרשאה, בקש מהבעלים לשתף את הקובץ ב-Google Drive. UniWork לא משתף בשמך.',
   uhDriveViewerLost: 'לחשבון {email} כבר אין גישה לקובץ הזה.',

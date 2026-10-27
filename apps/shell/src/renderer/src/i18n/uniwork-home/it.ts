@@ -306,7 +306,7 @@ export const it = {
   uhDriveViewerEmailMissing: 'Account non ancora noto',
   uhDriveViewerUnknownTitle: 'UniWork non può ancora leggere questo file',
   uhDriveViewerUnknownBody:
-    'Non hai ancora consentito a UniWork di leggere questo file. {name} lo ha collegato dal proprio Google Drive. UNI legge i file con il tuo account Google Drive, quindi serve il tuo consenso una volta.',
+    '{name} lo ha collegato dal proprio Google Drive. UNI legge i file con il tuo account Google Drive, quindi serve il tuo consenso una volta.',
   uhDriveViewerUnknownHint:
     'Se Google segnala che non hai accesso, chiedi al proprietario di condividere il file su Google Drive. UniWork non condivide al posto tuo.',
   uhDriveViewerLost: "L'account {email} non ha più accesso a questo file.",

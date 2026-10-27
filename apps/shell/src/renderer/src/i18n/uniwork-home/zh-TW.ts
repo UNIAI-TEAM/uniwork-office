@@ -296,7 +296,7 @@ export const zhTW = {
   uhDriveViewerEmailMissing: '尚未確定帳號',
   uhDriveViewerUnknownTitle: '尚未允許 UniWork 讀取此檔案',
   uhDriveViewerUnknownBody:
-    '你尚未允許 UniWork 讀取此檔案。該檔案由 {name} 從其 Google Drive 關聯。UNI 使用你自己的 Google Drive 帳號讀取檔案，因此需要你授權一次。',
+    '該檔案由 {name} 從其 Google Drive 關聯。UNI 使用你自己的 Google Drive 帳號讀取檔案，因此需要你授權一次。',
   uhDriveViewerUnknownHint:
     '如果 Google 提示你沒有權限，請讓擁有者在 Google Drive 上共用該檔案。UniWork 不會代為共用。',
   uhDriveViewerLost: '帳號 {email} 已無權存取此檔案。',

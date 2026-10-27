@@ -301,7 +301,7 @@ export const th = {
   uhDriveViewerEmailMissing: 'ยังไม่ทราบบัญชี',
   uhDriveViewerUnknownTitle: 'UniWork ยังอ่านไฟล์นี้ไม่ได้',
   uhDriveViewerUnknownBody:
-    'คุณยังไม่ได้อนุญาตให้ UniWork อ่านไฟล์นี้ ไฟล์นี้ลิงก์โดย {name} จาก Google Drive ของ {name} UNI อ่านไฟล์ด้วยบัญชี Google Drive ของคุณเอง จึงต้องขออนุญาตจากคุณหนึ่งครั้ง',
+    'ไฟล์นี้ลิงก์โดย {name} จาก Google Drive ของ {name} UNI อ่านไฟล์ด้วยบัญชี Google Drive ของคุณเอง จึงต้องขออนุญาตจากคุณหนึ่งครั้ง',
   uhDriveViewerUnknownHint:
     'หาก Google แจ้งว่าคุณไม่มีสิทธิ์ ให้ขอให้เจ้าของแชร์ไฟล์บน Google Drive UniWork ไม่แชร์แทนคุณ',
   uhDriveViewerLost: 'บัญชี {email} ไม่มีสิทธิ์เข้าถึงไฟล์นี้อีกต่อไป',
