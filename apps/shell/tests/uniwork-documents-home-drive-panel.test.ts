@@ -393,7 +393,7 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
       (r) => r.textContent ?? '',
     )
     expect(rows).toHaveLength(2)
-    expect(rows[0]).toContain('Đã liên kết lại bằng tài khoản khác')
+    expect(rows[0]).toContain('Đã liên kết lại tệp bằng tài khoản khác')
     expect(rows[1]).toContain('Minh · Đã liên kết tệp')
 
     // a click selects only; the file is not opened
@@ -442,7 +442,7 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
     await openDriveView()
     await selectRow('df-1')
     const viewer = panel()!.querySelector('[data-drive-viewer="unknown"]')!
-    expect(viewer.textContent).toContain('Chưa cho UniWork đọc tệp')
+    expect(viewer.textContent).toContain('Bạn chưa cho UniWork đọc tệp này.')
     expect(viewer.textContent).toContain('Tệp do Minh liên kết từ Google Drive của Minh.')
     expect(viewer.textContent).toContain('UniWork không chia sẻ thay.')
     // create / ask stay locked until the viewer reads the file
@@ -698,7 +698,7 @@ describe('UNI-2196 (D3): Google Drive detail panel, unlink and web hand-offs', (
     await click(panel()!.querySelector('[data-drive-unlink]'))
     await click(document.querySelector('[data-drive-unlink-confirm]'))
     expect(document.querySelector('[data-drive-unlink-error]')?.textContent).toBe(
-      'Không bỏ liên kết được. Thử lại.',
+      'Không bỏ liên kết được tệp. Thử lại.',
     )
     expect(panel()).not.toBeNull()
   })

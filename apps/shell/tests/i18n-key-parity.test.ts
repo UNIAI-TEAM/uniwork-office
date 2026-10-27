@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { strings } from '../src/renderer/src/strings'
+import { uniworkHomeStrings } from '../src/renderer/src/i18n/strings-uniwork-home'
 
 /**
  * zh defines the key set, every sibling locale must cover it. The LangDicts
@@ -36,6 +37,21 @@ describe('shell strings — key parity', () => {
     for (const lang of LOCALES) {
       for (const [key, value] of Object.entries(strings[lang])) {
         expect(value.length, `${lang}.${key} is an empty string`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('names the product "Google Drive" in every locale, never a localized name', () => {
+    // the brand stays untranslated (UNI-2197): no "Google ドライブ", "Dysk Google", "Google Диск", ...
+    const localized =
+      /Google[\s-]?(ドライブ|드라이브|Диск|Unidad|Laufwerk|Disque|Unità|Schijf|ไดรฟ์|डिस्क|דרייב|云端硬盘|雲端硬碟)|Dysk(iem|u|iu)?\s+Google|Диск(е|а|у|ом)?\s+Google|גוגל\s+דרייב|谷歌/
+    for (const [lang, table] of Object.entries(uniworkHomeStrings) as Array<
+      [string, Record<string, string>]
+    >) {
+      expect(table.uhNavGoogleDrive, lang).toBe('Google Drive')
+      for (const [key, value] of Object.entries(table)) {
+        if (!/^(uhDrive|uhNavDrive|uhNavGoogleDrive)/.test(key)) continue
+        expect(value, `${lang}.${key} localizes the Google Drive name`).not.toMatch(localized)
       }
     }
   })

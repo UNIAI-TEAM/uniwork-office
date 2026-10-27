@@ -351,6 +351,6 @@ export const pl = {
   uhDriveUnlinkConfirmWorking: 'Usuwanie powiązania…',
   uhDriveUnlinkFailed: 'Nie udało się usunąć powiązania. Spróbuj ponownie.',
   uhDriveNotFound: 'Nie znaleziono tego pliku lub nie masz uprawnień do jego wyświetlenia.',
-  uhDriveErrAuthFailed: 'Połączenie z Dyskiem Google wygasło. Połącz ponownie, aby kontynuować.',
+  uhDriveErrAuthFailed: 'Połączenie z Google Drive wygasło. Połącz ponownie, aby kontynuować.',
   uhDriveFeatureOff: 'Google Drive nie jest już dostępny dla tej organizacji.',
 } satisfies Record<keyof typeof zh, string>
