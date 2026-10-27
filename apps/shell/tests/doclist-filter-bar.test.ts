@@ -741,6 +741,92 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
         expect.objectContaining({ cursor: 'cur-2', types: ['docx'] }),
       )
     })
+
+    it('narrows search hits on documents and folders with Người sửa and Cập nhật, and keeps filters when clearing the query (UNI-2205)', async () => {
+      const searchHits: DocumentsHomeDoc[] = [
+        row({
+          id: 'fold-minh',
+          title: 'Hợp đồng Minh',
+          kind: 'folder',
+          format: null,
+          updatedById: 'u-minh',
+          updatedByName: 'Minh Trần',
+          updatedAt: iso(2026, 10, 21, 9, 5),
+        }),
+        row({
+          id: 'fold-lan-old',
+          title: 'Hợp đồng Lan',
+          kind: 'folder',
+          format: null,
+          updatedById: 'u-lan',
+          updatedByName: 'Lan Nguyễn',
+          updatedAt: iso(2026, 10, 1, 8, 0),
+        }),
+        row({
+          id: 'hit-minh-today',
+          title: 'Hợp đồng A.docx',
+          updatedById: 'u-minh',
+          updatedByName: 'Minh Trần',
+          updatedAt: iso(2026, 10, 21, 9, 5),
+        }),
+        row({
+          id: 'hit-lan-old',
+          title: 'Hợp đồng B.xlsx',
+          format: 'xlsx',
+          updatedById: 'u-lan',
+          updatedByName: 'Lan Nguyễn',
+          updatedAt: iso(2026, 10, 1, 8, 0),
+        }),
+      ]
+      api.uniworkSearchDocuments.mockResolvedValue(ok({ items: searchHits, nextCursor: null }))
+      await mount('workspace')
+
+      await typeIntoSearch('Hợp đồng')
+      expect(
+        Array.from(host.querySelectorAll('.dh-folder-card[data-folder-id]')).map((el) =>
+          el.getAttribute('data-folder-id'),
+        ),
+      ).toEqual(['fold-lan-old', 'fold-minh'])
+      expect(rowIds()).toEqual(expect.arrayContaining(['hit-minh-today', 'hit-lan-old']))
+
+      // query + Người sửa narrows folders and documents
+      await pick(select('updatedBy'), 'u-lan')
+      expect(
+        Array.from(host.querySelectorAll('.dh-folder-card[data-folder-id]')).map((el) =>
+          el.getAttribute('data-folder-id'),
+        ),
+      ).toEqual(['fold-lan-old'])
+      expect(rowIds()).toEqual(['hit-lan-old'])
+
+      // query + Cập nhật narrows folders and documents (and shows search empty state when none match both)
+      await pick(select('updatedFrom'), '24h')
+      expect(host.querySelectorAll('.dh-folder-card[data-folder-id]')).toHaveLength(0)
+      expect(rowIds()).toEqual([])
+      expect(host.querySelector('.dl-state-title')?.textContent).toBe(
+        'Không có kết quả cho “Hợp đồng”',
+      )
+
+      // relaxing Người sửa leaves only Cập nhật (24h) active on the search hits
+      await pick(select('updatedBy'), 'u-minh')
+      expect(
+        Array.from(host.querySelectorAll('.dh-folder-card[data-folder-id]')).map((el) =>
+          el.getAttribute('data-folder-id'),
+        ),
+      ).toEqual(['fold-minh'])
+      expect(rowIds()).toEqual(['hit-minh-today'])
+      // clearing the query keeps the filters on the normal list
+      await click(host.querySelector('.dh-search-clear'))
+      expect(host.querySelector<HTMLInputElement>('.dh-search-input')!.value).toBe('')
+      expect(select('updatedBy')!.value).toBe('u-minh')
+      expect(select('updatedFrom')!.value).toBe('24h')
+      expect(lastCall('uniworkListChildren')).toEqual(
+        expect.objectContaining({
+          workspaceId: 'ws-1',
+          updatedBy: 'u-minh',
+          updatedFrom: expect.any(String),
+        }),
+      )
+    })
   })
 
   describe('the Q0 switch moves the folder cards too (UNI-2113 fix1, T-R1-2)', () => {
