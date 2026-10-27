@@ -125,6 +125,7 @@ export type {
   DriveFileListPage,
   DriveFileListQuery,
   DriveFileTarget,
+  DriveFolderRef,
   DriveHistoryEvent,
   DriveIconKind,
   DriveLinkedTaskRef,

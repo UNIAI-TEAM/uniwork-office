@@ -89,6 +89,7 @@ const WIRE_FILE = {
     last_created_at: '2026-10-26T09:58:00Z',
     last_created_by_name: 'Minh Nguyễn',
   },
+  drive_folder: { id: '1FoLdErIdAbCdEfGhIjK', name: 'Ra mắt Q4' },
   task_creations: [
     {
       proposal_id: '01J8X4PROP0N1P2Q3R4S5T6U7V',
@@ -158,6 +159,7 @@ const PARSED_FILE: DriveFile = {
     lastCreatedAt: '2026-10-26T09:58:00Z',
     lastCreatedByName: 'Minh Nguyễn',
   },
+  driveFolder: { id: '1FoLdErIdAbCdEfGhIjK', name: 'Ra mắt Q4' },
   taskCreations: [
     {
       proposalId: '01J8X4PROP0N1P2Q3R4S5T6U7V',
@@ -412,6 +414,51 @@ describe('uniwork drive client: parsing', () => {
     expect(page.files[0]?.tasksCreated).toEqual({ count: 0 })
     expect('driveId' in page.files[0]!).toBe(false)
     expect('taskCreations' in page.files[0]!).toBe(false)
+    // an older server that does not send drive_folder reads as "parent unknown"
+    expect(page.files[0]?.driveFolder).toBeNull()
+  })
+
+  it('reads drive_folder leniently: named, unnamed, absent and malformed values never throw', async () => {
+    const row = (driveFolder: unknown) => ({
+      ...WIRE_FILE,
+      ...(driveFolder === undefined ? { drive_folder: undefined } : { drive_folder: driveFolder }),
+    })
+    const cases: Array<[unknown, unknown]> = [
+      [
+        { id: 'f_a', name: 'Hợp đồng' },
+        { id: 'f_a', name: 'Hợp đồng' },
+      ],
+      [
+        { id: 'f_b', name: null },
+        { id: 'f_b', name: null },
+      ],
+      [{ id: 'f_c' }, { id: 'f_c', name: null }],
+      [
+        { id: 'f_d', name: '   ' },
+        { id: 'f_d', name: null },
+      ],
+      [
+        { id: 'f_e', name: 42 },
+        { id: 'f_e', name: null },
+      ],
+      [undefined, null],
+      [null, null],
+      ['f_a', null],
+      [['f_a'], null],
+      [{ id: '', name: 'x' }, null],
+      [{ id: 7, name: 'x' }, null],
+      [{ name: 'only a name' }, null],
+    ]
+    const fetch = server({
+      'GET /workspaces/ws_1/drive-files': () =>
+        json(200, {
+          files: cases.map(([wire]) => row(wire)),
+          total_count: cases.length,
+          next_cursor: null,
+        }),
+    })
+    const page = await client(fetch).listFiles({ workspaceId: 'ws_1' })
+    expect(page.files.map((f) => f.driveFolder)).toEqual(cases.map(([, parsed]) => parsed))
   })
 
   it('turns malformed / partial JSON bodies into malformed_response (mapped to server_error)', async () => {
