@@ -209,7 +209,7 @@ export const he = {
   shrOwnerUnavailable: 'העברת בעלות עדיין אינה זמינה בשרת הזה.',
   shrFcMenu: 'שיתוף',
   shrFcTitle: 'שיתוף',
-  shrFcScope: 'חל על המסמכים בתיקייה „{title}” ובתיקיות המשנה שלה.',
+  shrFcScope: 'חל על המסמכים בתיקייה "{title}" ובתיקיות המשנה שלה.',
   shrFcFixed: 'חל על המסמכים הקיימים כעת. מסמכים שיתווספו בהמשך לא יקבלו גישה זו.',
   shrFcModeLabel: 'אופן ההחלה',
   shrFcModeMerge: 'הוספה לגישה הקיימת',

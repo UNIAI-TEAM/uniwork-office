@@ -202,7 +202,7 @@ export const zh = {
   shrOwnerUnavailable: '此服务器暂不支持转移所有权。',
   shrFcMenu: '分享',
   shrFcTitle: '分享',
-  shrFcScope: '适用于文件夹“{title}”及其子文件夹中的文档。',
+  shrFcScope: '适用于文件夹"{title}"及其子文件夹中的文档。',
   shrFcFixed: '适用于现有文档。之后新增的文档不会自动获得此权限。',
   shrFcModeLabel: '应用方式',
   shrFcModeMerge: '添加到现有权限',

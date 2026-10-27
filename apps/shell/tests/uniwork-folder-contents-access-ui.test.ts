@@ -87,8 +87,8 @@ describe('web copy (UNI-2244): the app strings are the web draft, word for word'
     [
       'scope',
       'shrFcScope',
-      'Áp dụng cho các tài liệu trong thư mục “{title}” và thư mục con.',
-      'Applies to the documents in the folder “{title}” and its subfolders.',
+      'Áp dụng cho các tài liệu trong thư mục "{title}" và thư mục con.',
+      'Applies to the documents in folder "{title}" and its subfolders.',
     ],
     [
       'scope_untitled',
@@ -475,7 +475,7 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
   it('vi copy: the dialog reads the web vi strings', async () => {
     await open({}, 'vi')
     const text = q('[role="dialog"]')!.textContent!
-    expect(text).toContain('Áp dụng cho các tài liệu trong thư mục “Plans” và thư mục con.')
+    expect(text).toContain('Áp dụng cho các tài liệu trong thư mục "Plans" và thư mục con.')
     expect(text).toContain(
       'Áp dụng cho các tài liệu hiện có. Tài liệu thêm sau không tự nhận quyền.',
     )

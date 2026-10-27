@@ -224,7 +224,7 @@ export const it = {
     'Il trasferimento della proprietà non è ancora disponibile su questo server.',
   shrFcMenu: 'Condividi',
   shrFcTitle: 'Condividi',
-  shrFcScope: 'Si applica ai documenti nella cartella “{title}” e nelle sue sottocartelle.',
+  shrFcScope: 'Si applica ai documenti nella cartella "{title}" e nelle sue sottocartelle.',
   shrFcFixed:
     'Si applica ai documenti esistenti. I documenti aggiunti in seguito non ricevono questo accesso.',
   shrFcModeLabel: 'Modalità di applicazione',

@@ -220,7 +220,7 @@ export const pt = {
   shrOwnerUnavailable: 'A transferência de propriedade ainda não está disponível neste servidor.',
   shrFcMenu: 'Compartilhar',
   shrFcTitle: 'Compartilhar',
-  shrFcScope: 'Aplica-se aos documentos da pasta “{title}” e das suas subpastas.',
+  shrFcScope: 'Aplica-se aos documentos da pasta "{title}" e das suas subpastas.',
   shrFcFixed:
     'Aplica-se aos documentos que existem agora. Documentos adicionados depois não recebem este acesso.',
   shrFcModeLabel: 'Como aplicar',

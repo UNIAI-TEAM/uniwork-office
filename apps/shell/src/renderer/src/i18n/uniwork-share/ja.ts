@@ -220,7 +220,7 @@ export const ja = {
   shrOwnerUnavailable: 'このサーバーではまだオーナー権限の移譲を利用できません。',
   shrFcMenu: '共有',
   shrFcTitle: '共有',
-  shrFcScope: '「{title}」フォルダーとそのサブフォルダー内のドキュメントに適用されます。',
+  shrFcScope: '"{title}"フォルダーとそのサブフォルダー内のドキュメントに適用されます。',
   shrFcFixed:
     '現在あるドキュメントに適用されます。後から追加したドキュメントにはこのアクセス権は付きません。',
   shrFcModeLabel: '適用方法',

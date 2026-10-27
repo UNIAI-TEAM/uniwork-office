@@ -218,7 +218,7 @@ export const vi = {
   shrOwnerUnavailable: 'Máy chủ này chưa hỗ trợ chuyển quyền sở hữu.',
   shrFcMenu: 'Chia sẻ',
   shrFcTitle: 'Chia sẻ',
-  shrFcScope: 'Áp dụng cho các tài liệu trong thư mục “{title}” và thư mục con.',
+  shrFcScope: 'Áp dụng cho các tài liệu trong thư mục "{title}" và thư mục con.',
   shrFcFixed: 'Áp dụng cho các tài liệu hiện có. Tài liệu thêm sau không tự nhận quyền.',
   shrFcModeLabel: 'Cách áp dụng',
   shrFcModeMerge: 'Thêm vào quyền đã có',

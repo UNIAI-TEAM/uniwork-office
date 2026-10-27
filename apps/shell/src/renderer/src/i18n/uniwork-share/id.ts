@@ -218,7 +218,7 @@ export const id = {
   shrOwnerUnavailable: 'Transfer kepemilikan belum tersedia di server ini.',
   shrFcMenu: 'Bagikan',
   shrFcTitle: 'Bagikan',
-  shrFcScope: 'Berlaku untuk dokumen di folder “{title}” dan subfoldernya.',
+  shrFcScope: 'Berlaku untuk dokumen di folder "{title}" dan subfoldernya.',
   shrFcFixed:
     'Berlaku untuk dokumen yang ada sekarang. Dokumen yang ditambahkan kemudian tidak mendapat akses ini.',
   shrFcModeLabel: 'Cara menerapkan',

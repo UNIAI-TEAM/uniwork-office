@@ -219,7 +219,7 @@ export const cs = {
   shrOwnerUnavailable: 'Převod vlastnictví zatím není na tomto serveru k dispozici.',
   shrFcMenu: 'Sdílet',
   shrFcTitle: 'Sdílet',
-  shrFcScope: 'Platí pro dokumenty ve složce „{title}“ a jejích podsložkách.',
+  shrFcScope: 'Platí pro dokumenty ve složce "{title}" a jejích podsložkách.',
   shrFcFixed:
     'Platí pro dokumenty, které existují nyní. Později přidané dokumenty tento přístup nezískají.',
   shrFcModeLabel: 'Jak použít',

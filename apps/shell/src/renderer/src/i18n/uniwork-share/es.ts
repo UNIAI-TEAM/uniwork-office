@@ -220,7 +220,7 @@ export const es = {
   shrOwnerUnavailable: 'La transferencia de propiedad aún no está disponible en este servidor.',
   shrFcMenu: 'Compartir',
   shrFcTitle: 'Compartir',
-  shrFcScope: 'Se aplica a los documentos de la carpeta «{title}» y sus subcarpetas.',
+  shrFcScope: 'Se aplica a los documentos de la carpeta "{title}" y sus subcarpetas.',
   shrFcFixed:
     'Se aplica a los documentos que existen ahora. Los documentos añadidos después no reciben este acceso.',
   shrFcModeLabel: 'Cómo aplicar',

@@ -216,7 +216,7 @@ export const ko = {
   shrOwnerUnavailable: '이 서버에서는 아직 소유권 이전을 사용할 수 없습니다.',
   shrFcMenu: '공유',
   shrFcTitle: '공유',
-  shrFcScope: '“{title}” 폴더와 하위 폴더의 문서에 적용됩니다.',
+  shrFcScope: '"{title}" 폴더와 하위 폴더의 문서에 적용됩니다.',
   shrFcFixed: '현재 있는 문서에 적용됩니다. 나중에 추가된 문서에는 이 권한이 부여되지 않습니다.',
   shrFcModeLabel: '적용 방식',
   shrFcModeMerge: '기존 권한에 추가',

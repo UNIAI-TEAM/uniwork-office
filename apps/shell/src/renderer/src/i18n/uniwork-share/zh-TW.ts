@@ -203,7 +203,7 @@ export const zhTW = {
   shrOwnerUnavailable: '此伺服器尚不支援轉移擁有權。',
   shrFcMenu: '分享',
   shrFcTitle: '分享',
-  shrFcScope: '適用於資料夾「{title}」及其子資料夾中的文件。',
+  shrFcScope: '適用於資料夾"{title}"及其子資料夾中的文件。',
   shrFcFixed: '適用於現有文件。之後新增的文件不會自動取得此權限。',
   shrFcModeLabel: '套用方式',
   shrFcModeMerge: '加入現有權限',

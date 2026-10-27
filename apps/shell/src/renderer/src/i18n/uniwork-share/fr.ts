@@ -219,7 +219,7 @@ export const fr = {
   shrOwnerUnavailable: "Le transfert de propriété n'est pas encore disponible sur ce serveur.",
   shrFcMenu: 'Partager',
   shrFcTitle: 'Partager',
-  shrFcScope: 'S’applique aux documents du dossier « {title} » et de ses sous-dossiers.',
+  shrFcScope: 'S’applique aux documents du dossier "{title}" et de ses sous-dossiers.',
   shrFcFixed:
     'S’applique aux documents existants. Les documents ajoutés plus tard n’ont pas cet accès.',
   shrFcModeLabel: 'Mode d’application',

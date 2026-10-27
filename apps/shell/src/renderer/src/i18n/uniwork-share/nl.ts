@@ -217,7 +217,7 @@ export const nl = {
   shrOwnerUnavailable: 'Eigendom overdragen is nog niet beschikbaar op deze server.',
   shrFcMenu: 'Delen',
   shrFcTitle: 'Delen',
-  shrFcScope: 'Geldt voor de documenten in de map “{title}” en de submappen ervan.',
+  shrFcScope: 'Geldt voor de documenten in de map "{title}" en de submappen ervan.',
   shrFcFixed:
     'Geldt voor de documenten die er nu zijn. Later toegevoegde documenten krijgen deze toegang niet.',
   shrFcModeLabel: 'Zo toepassen',

@@ -221,7 +221,7 @@ export const pl = {
   shrOwnerUnavailable: 'Przenoszenie własności nie jest jeszcze dostępne na tym serwerze.',
   shrFcMenu: 'Udostępnij',
   shrFcTitle: 'Udostępnij',
-  shrFcScope: 'Dotyczy dokumentów w folderze „{title}” i jego podfolderach.',
+  shrFcScope: 'Dotyczy dokumentów w folderze "{title}" i jego podfolderach.',
   shrFcFixed: 'Dotyczy istniejących dokumentów. Dokumenty dodane później nie dostają tego dostępu.',
   shrFcModeLabel: 'Sposób zastosowania',
   shrFcModeMerge: 'Dodaj do istniejącego dostępu',

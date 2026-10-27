@@ -226,7 +226,7 @@ export const de = {
     'Die Übertragung der Eigentümerschaft ist auf diesem Server noch nicht verfügbar.',
   shrFcMenu: 'Teilen',
   shrFcTitle: 'Teilen',
-  shrFcScope: 'Gilt für die Dokumente im Ordner „{title}“ und seinen Unterordnern.',
+  shrFcScope: 'Gilt für die Dokumente im Ordner "{title}" und seinen Unterordnern.',
   shrFcFixed:
     'Gilt für die vorhandenen Dokumente. Später hinzugefügte Dokumente erhalten diesen Zugriff nicht.',
   shrFcModeLabel: 'Art der Anwendung',

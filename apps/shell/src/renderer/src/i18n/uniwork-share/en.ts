@@ -281,7 +281,7 @@ export const en = {
   shrFcRunningNoBatch: 'Access in this folder is being updated. Try again in a moment.',
   shrFcTooMany: 'You can add up to {max} people or groups at a time.',
   shrFcTitle: 'Share',
-  shrFcScope: 'Applies to the documents in the folder “{title}” and its subfolders.',
+  shrFcScope: 'Applies to the documents in folder "{title}" and its subfolders.',
   shrFcSkippedNotManageable: "skip {count} you don't manage",
   shrFcToastUnknown: 'The access change was sent. Open the documents to check the result.',
 } satisfies Record<keyof typeof zh, string>

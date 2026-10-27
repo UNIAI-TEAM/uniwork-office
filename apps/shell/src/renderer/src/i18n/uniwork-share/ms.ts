@@ -218,7 +218,7 @@ export const ms = {
   shrOwnerUnavailable: 'Pindah milik belum tersedia pada pelayan ini.',
   shrFcMenu: 'Kongsi',
   shrFcTitle: 'Kongsi',
-  shrFcScope: 'Terpakai untuk dokumen dalam folder “{title}” dan subfoldernya.',
+  shrFcScope: 'Terpakai untuk dokumen dalam folder "{title}" dan subfoldernya.',
   shrFcFixed:
     'Terpakai untuk dokumen yang wujud sekarang. Dokumen yang ditambah kemudian tidak mendapat akses ini.',
   shrFcModeLabel: 'Cara menggunakan',
