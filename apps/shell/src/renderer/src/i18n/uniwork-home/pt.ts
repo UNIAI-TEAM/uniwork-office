@@ -272,6 +272,7 @@ export const pt = {
   uhDriveAddFromAccount: 'Adicionar de {email}',
   uhDriveManageConnections: 'Gerenciar conexões',
   uhDriveFolderUnnamed: 'Pasta do Drive · {id}',
+  uhDriveFolderUnnamedShort: 'Pasta · {id}',
   uhDriveNameFolder: 'Nomear esta pasta',
   uhDriveNameFolderFor: 'Nomear esta pasta: {folder}',
   uhDriveFolderFilesOne: '{n} arquivo',

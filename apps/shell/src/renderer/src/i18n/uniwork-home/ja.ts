@@ -277,6 +277,7 @@ export const ja = {
   uhDriveAddFromAccount: '{email} から追加',
   uhDriveManageConnections: '接続を管理',
   uhDriveFolderUnnamed: 'Drive のフォルダ · {id}',
+  uhDriveFolderUnnamedShort: 'フォルダ · {id}',
   uhDriveNameFolder: 'このフォルダーに名前を付ける',
   uhDriveNameFolderFor: 'このフォルダーに名前を付ける：{folder}',
   uhDriveFolderFilesOne: '{n} 件のファイル',

@@ -263,6 +263,7 @@ export const zh = {
   uhDriveAddFromAccount: '从 {email} 添加',
   uhDriveManageConnections: '管理连接',
   uhDriveFolderUnnamed: 'Drive 文件夹 · {id}',
+  uhDriveFolderUnnamedShort: '文件夹 · {id}',
   uhDriveNameFolder: '为此文件夹命名',
   uhDriveNameFolderFor: '为此文件夹命名：{folder}',
   uhDriveFolderFilesOne: '{n} 个文件',

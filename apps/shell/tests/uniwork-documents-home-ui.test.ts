@@ -4213,11 +4213,13 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
           ]),
         ).toEqual([
           ['Hợp đồng', '2'],
-          ['Drive folder · abcdef', '1'],
+          ['Folder · abcdef', '1'],
         ])
         expect(
           folderNodes()[0]!.querySelector('[data-drive-folder-count] .uw-sr-only')?.textContent,
         ).toBe('2 files')
+        // the sidebar drops the long prefix so the short id fits; the full label stays in the title
+        expect(folderNodes()[1]!.getAttribute('title')).toBe('Drive folder · abcdef')
         // the node is a row of the tree grid: icon, name, count
         expect(folderNodes()[0]!.querySelector('.uwf-glyph')).not.toBeNull()
         // the account that has no folder: its chevron goes once that is known
@@ -4514,7 +4516,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
           ]),
         ).toEqual([
           ['Hợp đồng', '7'],
-          ['Drive folder · abcdef', '3'],
+          ['Folder · abcdef', '3'],
         ])
         expect(
           folderNodes()[0]!.querySelector('[data-drive-folder-count] .uw-sr-only')?.textContent,
@@ -4587,7 +4589,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
             label,
           ).toEqual([
             ['Hợp đồng', '2'],
-            ['Drive folder · abcdef', '1'],
+            ['Folder · abcdef', '1'],
           ])
           expect(nameButtons(), label).toHaveLength(0)
           await act(async () => root.unmount())

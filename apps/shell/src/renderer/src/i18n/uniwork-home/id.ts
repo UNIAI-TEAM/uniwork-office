@@ -271,6 +271,7 @@ export const id = {
   uhDriveAddFromAccount: 'Tambahkan dari {email}',
   uhDriveManageConnections: 'Kelola koneksi',
   uhDriveFolderUnnamed: 'Folder Drive · {id}',
+  uhDriveFolderUnnamedShort: 'Folder · {id}',
   uhDriveNameFolder: 'Beri nama folder ini',
   uhDriveNameFolderFor: 'Beri nama folder ini: {folder}',
   uhDriveFolderFilesOne: '{n} file',

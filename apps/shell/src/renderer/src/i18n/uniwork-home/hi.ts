@@ -273,6 +273,7 @@ export const hi = {
   uhDriveAddFromAccount: '{email} से जोड़ें',
   uhDriveManageConnections: 'कनेक्शन प्रबंधित करें',
   uhDriveFolderUnnamed: 'Drive फ़ोल्डर · {id}',
+  uhDriveFolderUnnamedShort: 'फ़ोल्डर · {id}',
   uhDriveNameFolder: 'इस फ़ोल्डर को नाम दें',
   uhDriveNameFolderFor: 'इस फ़ोल्डर को नाम दें: {folder}',
   uhDriveFolderFilesOne: '{n} फ़ाइल',

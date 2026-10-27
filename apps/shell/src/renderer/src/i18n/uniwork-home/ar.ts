@@ -266,6 +266,7 @@ export const ar = {
   uhDriveAddFromAccount: 'إضافة من {email}',
   uhDriveManageConnections: 'إدارة الاتصالات',
   uhDriveFolderUnnamed: 'مجلد Drive · {id}',
+  uhDriveFolderUnnamedShort: 'مجلد · {id}',
   uhDriveNameFolder: 'تسمية هذا المجلد',
   uhDriveNameFolderFor: 'تسمية هذا المجلد: {folder}',
   uhDriveFolderFilesOne: 'الملفات: {n}',

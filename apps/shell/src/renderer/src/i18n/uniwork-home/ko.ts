@@ -270,6 +270,7 @@ export const ko = {
   uhDriveAddFromAccount: '{email}에서 추가',
   uhDriveManageConnections: '연결 관리',
   uhDriveFolderUnnamed: 'Drive 폴더 · {id}',
+  uhDriveFolderUnnamedShort: '폴더 · {id}',
   uhDriveNameFolder: '이 폴더 이름 지정',
   uhDriveNameFolderFor: '이 폴더 이름 지정: {folder}',
   uhDriveFolderFilesOne: '파일 {n}개',

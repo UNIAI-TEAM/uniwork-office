@@ -275,6 +275,7 @@ export const nl = {
   uhDriveAddFromAccount: 'Toevoegen vanuit {email}',
   uhDriveManageConnections: 'Verbindingen beheren',
   uhDriveFolderUnnamed: 'Drive-map · {id}',
+  uhDriveFolderUnnamedShort: 'Map · {id}',
   uhDriveNameFolder: 'Deze map een naam geven',
   uhDriveNameFolderFor: 'Deze map een naam geven: {folder}',
   uhDriveFolderFilesOne: '{n} bestand',

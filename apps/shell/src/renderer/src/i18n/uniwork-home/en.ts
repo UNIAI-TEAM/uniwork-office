@@ -268,6 +268,7 @@ export const en = {
   uhDriveAddFromAccount: 'Add from {email}',
   uhDriveManageConnections: 'Manage connections',
   uhDriveFolderUnnamed: 'Drive folder · {id}',
+  uhDriveFolderUnnamedShort: 'Folder · {id}',
   uhDriveNameFolder: 'Name this folder',
   uhDriveNameFolderFor: 'Name this folder: {folder}',
   uhDriveFolderFilesOne: '{n} file',

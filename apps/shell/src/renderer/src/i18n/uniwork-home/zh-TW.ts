@@ -264,6 +264,7 @@ export const zhTW = {
   uhDriveAddFromAccount: '從 {email} 新增',
   uhDriveManageConnections: '管理連線',
   uhDriveFolderUnnamed: 'Drive 資料夾 · {id}',
+  uhDriveFolderUnnamedShort: '資料夾 · {id}',
   uhDriveNameFolder: '為此資料夾命名',
   uhDriveNameFolderFor: '為此資料夾命名：{folder}',
   uhDriveFolderFilesOne: '{n} 個檔案',

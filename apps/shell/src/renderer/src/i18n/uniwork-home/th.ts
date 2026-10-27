@@ -269,6 +269,7 @@ export const th = {
   uhDriveAddFromAccount: 'เพิ่มจาก {email}',
   uhDriveManageConnections: 'จัดการการเชื่อมต่อ',
   uhDriveFolderUnnamed: 'โฟลเดอร์ใน Drive · {id}',
+  uhDriveFolderUnnamedShort: 'โฟลเดอร์ · {id}',
   uhDriveNameFolder: 'ตั้งชื่อโฟลเดอร์นี้',
   uhDriveNameFolderFor: 'ตั้งชื่อโฟลเดอร์นี้: {folder}',
   uhDriveFolderFilesOne: '{n} ไฟล์',

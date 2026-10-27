@@ -273,6 +273,7 @@ export const ru = {
   uhDriveAddFromAccount: 'Добавить из {email}',
   uhDriveManageConnections: 'Управление подключениями',
   uhDriveFolderUnnamed: 'Папка на Drive · {id}',
+  uhDriveFolderUnnamedShort: 'Папка · {id}',
   uhDriveNameFolder: 'Назвать эту папку',
   uhDriveNameFolderFor: 'Назвать эту папку: {folder}',
   uhDriveFolderFilesOne: 'Файлов: {n}',

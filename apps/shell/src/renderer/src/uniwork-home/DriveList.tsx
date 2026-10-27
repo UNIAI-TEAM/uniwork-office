@@ -30,6 +30,7 @@ import {
   deriveDriveFolders,
   driveFolderFileCount,
   driveFolderLabel,
+  driveFolderShortLabel,
   filterDriveFilesByName,
   serverDriveFolders,
   shortFolderId,
@@ -436,6 +437,7 @@ export function DriveSidebarRows({
                     {tree?.folders.map((folder) => {
                       const current = folderCurrent && selectedFolderKey === folder.key
                       const folderLabel = driveFolderLabel(folder, t)
+                      const folderShortLabel = driveFolderShortLabel(folder, t)
                       // only a folder the server could not name, against a server that can name it, on an
                       // account that still works (the web drops the hand-off of a broken one)
                       const nameable =
@@ -454,7 +456,7 @@ export function DriveSidebarRows({
                             onClick={() => onSelectFolder(acct.id, folder.key)}
                           >
                             <FolderGlyph />
-                            <span className="dh-nav-label">{folderLabel}</span>
+                            <span className="dh-nav-label">{folderShortLabel}</span>
                             <span className="dh-drive-nav-count" data-drive-folder-count="">
                               <span aria-hidden="true">{folder.count}</span>
                               <span className="uw-sr-only">

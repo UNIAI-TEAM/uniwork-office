@@ -277,6 +277,7 @@ export const fr = {
   uhDriveAddFromAccount: 'Ajouter depuis {email}',
   uhDriveManageConnections: 'Gérer les connexions',
   uhDriveFolderUnnamed: 'Dossier Drive · {id}',
+  uhDriveFolderUnnamedShort: 'Dossier · {id}',
   uhDriveNameFolder: 'Nommer ce dossier',
   uhDriveNameFolderFor: 'Nommer ce dossier : {folder}',
   uhDriveFolderFilesOne: '{n} fichier',

@@ -273,6 +273,7 @@ export const it = {
   uhDriveAddFromAccount: 'Aggiungi da {email}',
   uhDriveManageConnections: 'Gestisci connessioni',
   uhDriveFolderUnnamed: 'Cartella di Drive · {id}',
+  uhDriveFolderUnnamedShort: 'Cartella · {id}',
   uhDriveNameFolder: 'Assegna un nome a questa cartella',
   uhDriveNameFolderFor: 'Assegna un nome a questa cartella: {folder}',
   uhDriveFolderFilesOne: '{n} file',

@@ -264,6 +264,7 @@ export const he = {
   uhDriveAddFromAccount: 'הוספה מ-{email}',
   uhDriveManageConnections: 'ניהול חיבורים',
   uhDriveFolderUnnamed: 'תיקיית Drive · {id}',
+  uhDriveFolderUnnamedShort: 'תיקייה · {id}',
   uhDriveNameFolder: 'מתן שם לתיקייה הזו',
   uhDriveNameFolderFor: 'מתן שם לתיקייה הזו: {folder}',
   uhDriveFolderFilesOne: 'קבצים: {n}',

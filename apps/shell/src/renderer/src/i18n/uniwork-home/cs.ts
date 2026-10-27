@@ -272,6 +272,7 @@ export const cs = {
   uhDriveAddFromAccount: 'Přidat z {email}',
   uhDriveManageConnections: 'Spravovat připojení',
   uhDriveFolderUnnamed: 'Složka na Drive · {id}',
+  uhDriveFolderUnnamedShort: 'Složka · {id}',
   uhDriveNameFolder: 'Pojmenovat tuto složku',
   uhDriveNameFolderFor: 'Pojmenovat tuto složku: {folder}',
   uhDriveFolderFilesOne: 'Soubory: {n}',

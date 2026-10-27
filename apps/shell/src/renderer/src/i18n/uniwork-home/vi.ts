@@ -268,6 +268,7 @@ export const vi = {
   uhDriveAddFromAccount: 'Thêm từ {email}',
   uhDriveManageConnections: 'Quản lý kết nối',
   uhDriveFolderUnnamed: 'Thư mục trên Drive · {id}',
+  uhDriveFolderUnnamedShort: 'Thư mục · {id}',
   uhDriveNameFolder: 'Đặt tên theo Drive',
   uhDriveNameFolderFor: 'Đặt tên theo Drive: {folder}',
   uhDriveFolderFilesOne: '{n} tệp',

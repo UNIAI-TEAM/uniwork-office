@@ -273,6 +273,7 @@ export const ms = {
   uhDriveAddFromAccount: 'Tambah daripada {email}',
   uhDriveManageConnections: 'Urus sambungan',
   uhDriveFolderUnnamed: 'Folder Drive · {id}',
+  uhDriveFolderUnnamedShort: 'Folder · {id}',
   uhDriveNameFolder: 'Namakan folder ini',
   uhDriveNameFolderFor: 'Namakan folder ini: {folder}',
   uhDriveFolderFilesOne: '{n} fail',

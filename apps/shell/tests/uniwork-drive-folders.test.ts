@@ -4,6 +4,7 @@ import {
   deriveDriveFolders,
   driveFolderFileCount,
   driveFolderLabel,
+  driveFolderShortLabel,
   attachFolderFiles,
   filterDriveFilesByName,
   serverDriveFolders,
@@ -176,6 +177,13 @@ describe('labels and counts', () => {
     expect(driveFolderLabel({ name: 'Báo giá', shortId: 'abcdef' }, t)).toBe('Báo giá')
     expect(driveFolderLabel({ name: null, shortId: 'abcdef' }, t)).toBe(
       'uhDriveFolderUnnamed:{"id":"abcdef"}',
+    )
+  })
+
+  it('uses the short sidebar label only for unnamed folders', () => {
+    expect(driveFolderShortLabel({ name: 'Báo giá', shortId: 'abcdef' }, t)).toBe('Báo giá')
+    expect(driveFolderShortLabel({ name: null, shortId: 'abcdef' }, t)).toBe(
+      'uhDriveFolderUnnamedShort:{"id":"abcdef"}',
     )
     expect(shortFolderId('abcdefghij')).toBe('abcdef')
   })

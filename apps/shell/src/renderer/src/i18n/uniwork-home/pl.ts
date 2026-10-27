@@ -274,6 +274,7 @@ export const pl = {
   uhDriveAddFromAccount: 'Dodaj z {email}',
   uhDriveManageConnections: 'Zarządzaj połączeniami',
   uhDriveFolderUnnamed: 'Folder na Drive · {id}',
+  uhDriveFolderUnnamedShort: 'Folder · {id}',
   uhDriveNameFolder: 'Nazwij ten folder',
   uhDriveNameFolderFor: 'Nazwij ten folder: {folder}',
   uhDriveFolderFilesOne: 'Pliki: {n}',

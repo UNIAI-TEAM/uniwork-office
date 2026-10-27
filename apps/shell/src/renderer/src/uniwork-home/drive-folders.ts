@@ -42,6 +42,14 @@ export function driveFolderLabel(folder: Pick<DriveFolder, 'name' | 'shortId'>, 
   return folder.name ?? t('uhDriveFolderUnnamed', { id: folder.shortId })
 }
 
+/** the sidebar label: an unnamed folder drops the long prefix so the short id (what tells two apart) fits */
+export function driveFolderShortLabel(
+  folder: Pick<DriveFolder, 'name' | 'shortId'>,
+  t: TFunc,
+): string {
+  return folder.name ?? t('uhDriveFolderUnnamedShort', { id: folder.shortId })
+}
+
 /** the count beside a label: "3 files" */
 export function driveFolderFileCount(count: number, t: TFunc): string {
   return t(count === 1 ? 'uhDriveFolderFilesOne' : 'uhDriveFolderFilesOther', { n: count })
