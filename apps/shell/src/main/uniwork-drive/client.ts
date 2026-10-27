@@ -4,6 +4,8 @@ import type {
   DriveFileListPage,
   DriveFileListQuery,
   DriveFileTarget,
+  DriveFolderListQuery,
+  DriveFolderSummary,
   DriveHistoryEvent,
 } from '../../shared/uniwork-drive-api'
 import {
@@ -16,6 +18,7 @@ import { UniworkDocError } from '../uniwork-docs/errors'
 import {
   parseDriveConnectionList,
   parseDriveFileList,
+  parseDriveFolderList,
   parseDriveHistoryList,
   parseDriveStatus,
   parseOneDriveFile,
@@ -31,6 +34,8 @@ import {
 export interface UniworkDriveClient {
   listConnections(workspaceId: string): Promise<DriveConnection[]>
   listFiles(query: DriveFileListQuery): Promise<DriveFileListPage>
+  /** null = the server sent no folder list (an old server); a 404 throws `not_found` */
+  listFolders(query: DriveFolderListQuery): Promise<DriveFolderSummary[] | null>
   getFile(input: DriveFileTarget): Promise<DriveFileDetail>
   unlink(input: DriveFileTarget): Promise<null>
   getHistory(input: DriveFileTarget): Promise<DriveHistoryEvent[]>
@@ -87,6 +92,16 @@ export function createUniworkDriveClient(options: UniworkDocsClientOptions): Uni
       }
 
       return parseDriveFileList(await get(`/workspaces/${ws}/drive-files`, params))
+    },
+
+    async listFolders(q) {
+      const r = recordArg(q)
+      const ws = uniworkId(r.workspaceId as string)
+      // always one account: the empty value would list every connection of the viewer at once
+      if (typeof r.connectionId !== 'string') refuse()
+      uniworkId(r.connectionId)
+      const params = new URLSearchParams({ drive_connection_id: r.connectionId })
+      return parseDriveFolderList(await get(`/workspaces/${ws}/drive-folders`, params))
     },
 
     async getFile(input) {

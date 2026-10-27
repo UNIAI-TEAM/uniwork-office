@@ -96,6 +96,14 @@ function setup(
         next_cursor: null,
       })
     }
+    if (method === 'GET' && path === '/workspaces/ws_1/drive-folders') {
+      return json(200, {
+        folders: [
+          { id: 'f_a', name: 'Hợp đồng', file_count: 2 },
+          { id: null, name: null, file_count: 1 },
+        ],
+      })
+    }
     if (method === 'GET' && path === '/workspaces/ws_1/drive-files/df_1') {
       return json(200, {
         file: makeWireFile(
@@ -185,6 +193,15 @@ describe('uniwork-drive IPC wiring', () => {
     expect(files).toMatchObject({
       ok: true,
       value: { totalCount: 1, nextCursor: null },
+    })
+
+    const folders = await call(C.listFolders, { workspaceId: 'ws_1', connectionId: 'conn_1' })
+    expect(folders).toEqual({
+      ok: true,
+      value: [
+        { id: 'f_a', name: 'Hợp đồng', fileCount: 2 },
+        { id: null, name: null, fileCount: 1 },
+      ],
     })
 
     const detail = await call(C.getFile, { workspaceId: 'ws_1', driveFileId: 'df_1' })
@@ -291,6 +308,21 @@ describe('uniwork-drive IPC wiring', () => {
       expect(await call(C.listFiles, badQuery)).toEqual({ ok: false, error: 'server_error' })
     }
 
+    // the folder list is per account: a missing or bad connection never reaches the server
+    for (const badQuery of [
+      null,
+      'ws_1',
+      [],
+      {},
+      { workspaceId: 'ws_1' },
+      { workspaceId: 'ws_1', connectionId: '' },
+      { workspaceId: 'ws_1', connectionId: 'bad/id' },
+      { workspaceId: '../ws', connectionId: 'conn_1' },
+      { connectionId: 'conn_1' },
+    ]) {
+      expect(await call(C.listFolders, badQuery)).toEqual({ ok: false, error: 'server_error' })
+    }
+
     for (const badTarget of [
       null,
       'https://docs.google.com/document/d/1',
@@ -338,6 +370,19 @@ describe('uniwork-drive IPC wiring', () => {
       ok: false,
       error: 'not_found',
     })
+    // an old server has no folder route: the renderer reads not_found and derives the folders itself
+    expect(
+      await setup({}, async () => json(404, { error: { code: 'not_found' } })).call(C.listFolders, {
+        workspaceId: 'ws_1',
+        connectionId: 'conn_1',
+      }),
+    ).toEqual({ ok: false, error: 'not_found' })
+    expect(
+      await setup({}, async () => json(200, { ok: true })).call(C.listFolders, {
+        workspaceId: 'ws_1',
+        connectionId: 'conn_1',
+      }),
+    ).toEqual({ ok: true, value: null })
     expect(
       await setup({}, async () => json(404, { error: { code: 'feature_disabled' } })).call(
         C.listConnections,

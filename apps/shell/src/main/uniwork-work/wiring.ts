@@ -47,6 +47,11 @@ function webPathOf(target: unknown): string | null {
       if (!ok(t.accountId)) return null
       return `${base}/documents?view=drive&pick=1&account=${t.accountId}`
     }
+    case 'drive-name-folder': {
+      // the web opens its Picker flow for this unnamed folder, then drops the param
+      if (!ok(t.accountId) || !ok(t.folderId)) return null
+      return `${base}/documents?view=drive&account=${t.accountId}&driveFolder=${t.folderId}&nameFolder=1`
+    }
     case 'drive-connect':
       return `${base}/settings?tab=integrations&connect=drive`
   }
