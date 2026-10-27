@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -87,14 +89,14 @@ describe('web copy (UNI-2244): the app strings are the web draft, word for word'
     [
       'scope',
       'shrFcScope',
-      'Áp dụng cho các tài liệu trong thư mục "{title}" và thư mục con.',
-      'Applies to the documents in folder "{title}" and its subfolders.',
+      'Các tài liệu trong thư mục "{title}" và các thư mục con.',
+      'Documents in folder "{title}" and its subfolders.',
     ],
     [
       'scope_untitled',
       'shrFcScopeUntitled',
-      'Áp dụng cho các tài liệu trong thư mục này và thư mục con.',
-      'Applies to the documents in this folder and its subfolders.',
+      'Các tài liệu trong thư mục này và các thư mục con.',
+      'Documents in this folder and its subfolders.',
     ],
     [
       'fixed_sentence',
@@ -216,6 +218,12 @@ describe('web copy (UNI-2244): the app strings are the web draft, word for word'
       'shrFcWarnDowngradeOther',
       '{count} người bị hạ mức quyền ở ít nhất một tài liệu.',
       '{count} people get a lower access level on at least one document.',
+    ],
+    [
+      'warning_downgrade_generic',
+      'shrFcWarnDowngradeGeneric',
+      'Một số quyền trên các tài liệu này sẽ bị hạ mức.',
+      'Some access on these documents will be lowered.',
     ],
     [
       'nothing_to_change',
@@ -475,7 +483,7 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
   it('vi copy: the dialog reads the web vi strings', async () => {
     await open({}, 'vi')
     const text = q('[role="dialog"]')!.textContent!
-    expect(text).toContain('Áp dụng cho các tài liệu trong thư mục "Plans" và thư mục con.')
+    expect(text).toContain('Các tài liệu trong thư mục "Plans" và các thư mục con.')
     expect(text).toContain(
       'Áp dụng cho các tài liệu hiện có. Tài liệu thêm sau không tự nhận quyền.',
     )
@@ -694,6 +702,29 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     expect(q('.uw-fca-summary')!.textContent).not.toContain('lower')
   })
 
+  it('a downgrade warning without a usable count reads the generic sentence, never "0 people"', async () => {
+    const fake = createFakeShareApi({ folderContents: { total: 6 } })
+    const api = withFolderCandidates(fake)
+    const real = fake.folderContentsAccess
+    api.folderContentsAccess = async (req) => {
+      const answer = await real(req)
+      if (answer.ok && answer.value.kind === 'dryRun') {
+        answer.value.preview.warnings = ['downgrade']
+        answer.value.preview.downgradedUsers = 0
+      }
+      return answer
+    }
+    await act(async () => {
+      root.render(view(api, 'en'))
+    })
+    await flush()
+    await pick('Minh')
+    await click(confirm())
+    const warnings = qa('[data-fca-warning]').map((w) => w.textContent)
+    expect(warnings).toEqual([t('shrFcWarnDowngradeGeneric')])
+    expect(warnings[0]).not.toMatch(/\b0\b/)
+  })
+
   it('only the three known warnings are shown; any other value is ignored', async () => {
     const fake = createFakeShareApi({ folderContents: { total: 6 } })
     const api = withFolderCandidates(fake)
@@ -826,6 +857,63 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     await advance(FOLDER_BATCH_POLL_MS * 3)
     expect(endToast).toHaveBeenCalledTimes(1)
     expect(endToast).toHaveBeenCalledWith(t('shrFcBatchFailed'), 'error')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('a failed background run while the dialog shows its progress: exactly one message reaches the person', async () => {
+    vi.useFakeTimers()
+    const api = await open({ folderContents: { total: 900, batchSteps: 2, batchFails: true } })
+    await toReview(api)
+    await click(apply())
+    expect(q('[data-fca-progress]')).toBeTruthy()
+    await advance(FOLDER_BATCH_POLL_MS * 3)
+    // one toast through the screen's host; the dialog adds no notice, no in-dialog error, no live line
+    expect(endToast).toHaveBeenCalledTimes(1)
+    expect(endToast).toHaveBeenCalledWith(t('shrFcBatchFailed'), 'error')
+    expect(onNotice).not.toHaveBeenCalled()
+    expect(q('[data-fca-error]')).toBeNull()
+    expect(q('[role="alert"]')).toBeNull()
+    expect(live()).not.toContain(t('shrFcBatchFailed'))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('a failed run followed from a 409, with two hosts mounted: still one message in total', async () => {
+    vi.useFakeTimers()
+    const second = vi.fn()
+    const secondRefetch = vi.fn()
+    const api = await open({ folderContents: { total: 6 } })
+    // a second screen that lists documents (the home under the folder browser) is mounted too
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(
+            'div',
+            null,
+            createElement(EndProbe, { onToast: second, onRefetch: secondRefetch }),
+            view(withFolderCandidates(api), 'en').props.children,
+          ),
+        ),
+      )
+    })
+    await flush()
+    await toReview(api)
+    api.failNext('folderContentsAccess', {
+      ok: false,
+      error: 'folder_access_batch_running',
+      status: 409,
+      batchId: 'fb_ghost',
+    })
+    await click(apply())
+    await advance(0)
+    // the screens refetch, the newest alone toasts; nothing else spoke
+    expect(second).not.toHaveBeenCalled()
+    expect(endToast).toHaveBeenCalledTimes(1)
+    expect(endToast).toHaveBeenCalledWith(t('shrFcBatchFailed'), 'error')
+    expect(onNotice).not.toHaveBeenCalled()
+    expect(q('[role="alert"]')).toBeNull()
+    expect(live()).not.toContain(t('shrFcBatchFailed'))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
@@ -1389,5 +1477,32 @@ describe('folder contents access store (UNI-2244)', () => {
       expect(errors).not.toHaveBeenCalled()
       errors.mockRestore()
     })
+  })
+})
+
+describe('folder contents access layout (UNI-2244, CSS only)', () => {
+  const css = readFileSync(
+    join(__dirname, '../src/renderer/src/uniwork-share/share-dialog.css'),
+    'utf8',
+  )
+  const rule = (selector: string) => {
+    const at = css.indexOf(`${selector} {`)
+    expect(at, selector).toBeGreaterThanOrEqual(0)
+    return css.slice(at, css.indexOf('}', at))
+  }
+
+  it('the home row select takes the whole row; the picker row select grows with its longest label', () => {
+    expect(rule('.uw-fca [data-fca-home] .uw-act-select')).toContain('width: 100%')
+    const picker = rule('.uw-fca .uw-share-form-row > .uw-share-field')
+    expect(picker).toContain('width: auto')
+    expect(picker).toContain('min-width: 160px')
+    expect(picker).toContain('max-width: 100%')
+  })
+
+  it('a warning notice fills the dialog body and keeps no margin of its own', () => {
+    expect(rule('.uw-fca-warnings')).toContain('width: 100%')
+    const notice = rule('.uw-fca-warnings > .uw-share-notice')
+    expect(notice).toContain('width: 100%')
+    expect(notice).toContain('margin: 0')
   })
 })
