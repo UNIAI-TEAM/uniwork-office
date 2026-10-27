@@ -277,11 +277,12 @@
 }
 
 .dh-search-box {
+  --dh-search-box-width: 320px;
   display: flex;
   flex: 0 1 auto;
   align-items: center;
   gap: 8px;
-  width: 320px;
+  width: var(--dh-search-box-width);
   /* V-LAYOUT F-11: room for "Search folders and documents"; the title row wraps before the field shrinks */
   min-width: min(15rem, 100%);
   max-width: 100%;
@@ -1406,21 +1407,22 @@
   }
 }
 
-/* UNI-2205 (VS-AR1-1): the Archive's short title leaves room for the search box on the title row
-   at <= 1100px, where Recent / Shared with me / All documents wrap it under their longer
-   titles. The Archive wraps it at the same breakpoint, to the same slot: the spacer takes a line
-   of its own (no height) and the box starts the next one, 12px under the title row. */
+/* UNI-2205 (KLF-18): one wrap rule for every non-folder toolbar (Archive, Recent, Shared with me,
+   All documents, Starred, Shared by me, Trash): at <= 1100px the search box sits on its own row
+   under the title, in the same slot and width on every screen, whatever the title or the
+   workspace select measure (the >= 1101px rule above keeps the single row). The box's end margin
+   takes the rest of the row, so its outer width is the whole row and it can never share a line
+   with the title or the select; the normal row gap is the only space above it, so a select that
+   wraps keeps its gap too. The spacer only pushed the box to the end of a shared row: it would
+   be a stray empty line here. The open folder toolbar keeps its own container-query layout
+   (crumbs + actions share row one, the search box has its row below them). */
 @media (max-width: 1100px) {
-  .dh-toolbar.dh-toolbar-shelf {
-    row-gap: 0;
+  .dh-toolbar:not(.dh-toolbar-folder) > .dh-toolbar-spacer {
+    display: none;
   }
 
-  .dh-toolbar-shelf > .dh-toolbar-spacer {
-    flex: 1 0 100%;
-  }
-
-  .dh-toolbar-shelf > .dh-search-box {
-    margin-top: 12px;
+  .dh-toolbar:not(.dh-toolbar-folder) > .dh-search-box {
+    margin-inline-end: max(0px, calc(100% - var(--dh-search-box-width)));
   }
 }
 

@@ -2790,9 +2790,7 @@ export function DocumentsHome({
 
       <div className="dh-main uwf-main" {...zoneHandlers}>
         {libraryDrop.over && <DropOverlay targetLabel={dropTargetLabel} box={libraryDrop.over} />}
-        <div
-          className={`dh-toolbar${folderHeader ? ' dh-toolbar-folder' : ''}${subView === 'archive' ? ' dh-toolbar-shelf' : ''}`}
-        >
+        <div className={`dh-toolbar${folderHeader ? ' dh-toolbar-folder' : ''}`}>
           {folderHeader && folderId !== null ? (
             <BrowserCrumbs
               path={shownPath}
