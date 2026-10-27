@@ -3476,6 +3476,55 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
       })
     })
 
+    it('Google Drive is a tree node: its chevron button folds the account rows, says so with aria-expanded and is remembered', async () => {
+      folderTree[0] = { ...folderTree[0]!, systemKind: 'my_folder' }
+      installDriveBridge()
+      await mountHome()
+      await flush()
+
+      const accounts = () => document.querySelectorAll('.dh-drive-nav-account')
+      const toggle = () => document.querySelector<HTMLButtonElement>('[data-drive-toggle]')
+      const rowButton = () => document.querySelector<HTMLButtonElement>('[data-nav="google-drive"]')
+
+      // open by default, the chevron is a real button beside (not inside) the row button
+      expect(toggle()).not.toBeNull()
+      expect(toggle()!.tagName).toBe('BUTTON')
+      expect(toggle()!.getAttribute('aria-expanded')).toBe('true')
+      expect(toggle()!.getAttribute('aria-label')).toContain('Google Drive')
+      expect(rowButton()!.contains(toggle())).toBe(false)
+      expect(accounts()).toHaveLength(2)
+      const groupId = toggle()!.getAttribute('aria-controls')
+      expect(groupId).toBeTruthy()
+      expect(
+        document.getElementById(groupId!)?.querySelectorAll('.dh-drive-nav-account'),
+      ).toHaveLength(2)
+
+      // fold: the account rows go, the Google Drive row (and its count) stay, the chevron does not open the view
+      await act(async () => {
+        toggle()!.click()
+      })
+      expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
+      expect(toggle()!.hasAttribute('aria-controls')).toBe(false)
+      expect(accounts()).toHaveLength(0)
+      expect(rowButton()!.querySelector('[data-drive-total]')?.textContent).toBe('3')
+      expect(rowButton()!.getAttribute('aria-current')).toBeNull()
+
+      // the folded state survives a re-render of the sidebar (a pick elsewhere)
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>('[data-nav="recent"]')?.click()
+      })
+      await flush()
+      expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
+      expect(accounts()).toHaveLength(0)
+
+      // unfold again
+      await act(async () => {
+        toggle()!.click()
+      })
+      expect(toggle()!.getAttribute('aria-expanded')).toBe('true')
+      expect(accounts()).toHaveLength(2)
+    })
+
     it('renders Google Drive under My Folder with account sub-rows, Mất kết nối badge, 5-column table, and double-click / Enter open-on-google', async () => {
       folderTree[0] = { ...folderTree[0]!, systemKind: 'my_folder' }
       const driveBridge = installDriveBridge()

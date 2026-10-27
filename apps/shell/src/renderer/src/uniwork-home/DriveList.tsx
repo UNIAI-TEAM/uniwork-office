@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type {
   DriveConnection,
@@ -12,6 +12,7 @@ import type { WorkWebTarget } from '../../../shared/uniwork-work-api'
 import { FileBadge } from '../FileBadge'
 import { ListState } from '../doclist/ListState'
 import { useI18n, type TFunc } from '../locale'
+import { Chevron } from '../uniwork-folders/UniworkFolderTree'
 import { driveErrorKey } from './drive-panel-model'
 import {
   buildDriveSidebarState,
@@ -264,60 +265,87 @@ export function DriveSidebarRows({
   state,
   active,
   selectedAccountId,
+  expanded,
+  onToggle,
   onSelect,
 }: {
   state: DriveSidebarState
   active: boolean
   selectedAccountId: string | null
+  /** the account rows are shown (the node's chevron is open) */
+  expanded: boolean
+  onToggle: () => void
   onSelect: (connectionId: string | null) => void
 }) {
   const { t } = useI18n()
+  const accountsId = useId()
   if (!state.visible) return null
 
   const isAllCurrent = active && selectedAccountId === null
+  const hasAccounts = state.accounts.length > 0
 
   return (
     <div className="dh-drive-sidebar" data-drive-sidebar="">
-      <button
-        type="button"
-        className={`dh-nav-item nav-item dh-drive-nav-root${isAllCurrent ? ' active' : ''}`}
-        data-nav="google-drive"
-        data-drive-account="all"
-        aria-current={isAllCurrent ? 'page' : undefined}
-        onClick={() => onSelect(null)}
-      >
-        <GoogleDriveGlyph className="dh-nav-icon dh-drive-brand-icon" />
-        <span className="dh-nav-label">{t('uhNavGoogleDrive')}</span>
-        <span className="dh-drive-nav-count" data-drive-total="">
-          {state.totalCount}
-        </span>
-      </button>
-      {state.accounts.map((acct: DriveAccountNavRow) => {
-        const isCurrent = active && selectedAccountId === acct.id
-        const label = t('uhNavDriveAccount', { email: acct.email })
-        return (
+      <div className="dh-drive-node">
+        <button
+          type="button"
+          className={`dh-nav-item nav-item dh-drive-nav-root${isAllCurrent ? ' active' : ''}`}
+          data-nav="google-drive"
+          data-drive-account="all"
+          aria-current={isAllCurrent ? 'page' : undefined}
+          onClick={() => onSelect(null)}
+        >
+          <GoogleDriveGlyph className="dh-nav-icon dh-drive-brand-icon" />
+          <span className="dh-nav-label">{t('uhNavGoogleDrive')}</span>
+          <span className="dh-drive-nav-count" data-drive-total="">
+            {state.totalCount}
+          </span>
+        </button>
+        {/* a sibling of the row button (a button cannot hold a button); a node without accounts keeps the empty slot */}
+        {hasAccounts && (
           <button
-            key={acct.id}
             type="button"
-            className={`dh-nav-item nav-item dh-drive-nav-account${isCurrent ? ' active' : ''}`}
-            data-drive-account={acct.id}
-            aria-current={isCurrent ? 'page' : undefined}
-            title={label}
-            onClick={() => onSelect(acct.id)}
+            className="uwf-twisty dh-drive-twisty"
+            data-drive-toggle=""
+            aria-expanded={expanded}
+            aria-controls={expanded ? accountsId : undefined}
+            aria-label={t('dlGroupToggle', { group: t('uhNavGoogleDrive') })}
+            onClick={onToggle}
           >
-            <span className="dh-nav-label">{label}</span>
-            {acct.needsReconnect && (
-              <span className="dh-drive-nav-lost" data-drive-lost="">
-                <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
-                <span>{t('uhDriveLost')}</span>
-              </span>
-            )}
-            <span className="dh-drive-nav-count" data-drive-account-count="">
-              {acct.linkedFileCount}
-            </span>
+            <Chevron expanded={expanded} />
           </button>
-        )
-      })}
+        )}
+      </div>
+      {hasAccounts && expanded && (
+        <div id={accountsId} className="dh-drive-accounts" role="group">
+          {state.accounts.map((acct: DriveAccountNavRow) => {
+            const isCurrent = active && selectedAccountId === acct.id
+            const label = t('uhNavDriveAccount', { email: acct.email })
+            return (
+              <button
+                key={acct.id}
+                type="button"
+                className={`dh-nav-item nav-item dh-drive-nav-account${isCurrent ? ' active' : ''}`}
+                data-drive-account={acct.id}
+                aria-current={isCurrent ? 'page' : undefined}
+                title={label}
+                onClick={() => onSelect(acct.id)}
+              >
+                <span className="dh-nav-label">{label}</span>
+                {acct.needsReconnect && (
+                  <span className="dh-drive-nav-lost" data-drive-lost="">
+                    <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
+                    <span>{t('uhDriveLost')}</span>
+                  </span>
+                )}
+                <span className="dh-drive-nav-count" data-drive-account-count="">
+                  {acct.linkedFileCount}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

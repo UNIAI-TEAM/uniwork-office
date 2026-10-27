@@ -196,6 +196,9 @@ export type ElsewhereSource = 'chat' | 'meeting' | 'email' | 'task'
  * app sidebar (module-icons.ts glyph, module-tones.ts tint): Chat blue, Meetings violet, Email
  * orange, Tasks green.
  */
+/** the Google Drive node's key in the sidebar's expanded set (folder ids are uuids, so it cannot clash) */
+const DRIVE_NODE_KEY = 'drive:google'
+
 const ELSEWHERE_SOURCES: readonly {
   source: ElsewhereSource
   labelKey: StringKey
@@ -476,7 +479,8 @@ export function DocumentsHome({
   )
   // the workspaces whose sources route answered: the section shows once it has (the web's probe)
   const [sourcesAnswered, setSourcesAnswered] = useState<Readonly<Record<string, boolean>>>({})
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY]))
+  // the Drive node remembers its chevron here beside the folders' (open by default, reset with them)
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY, DRIVE_NODE_KEY]))
   const [tree, setTree] = useState<TreeState>({ status: 'loading', nodes: [] })
   const [treeTick, setTreeTick] = useState(0)
   const [folderNotice, setFolderNotice] = useState<'ufFolderGone' | 'ufFolderNoAccess' | null>(null)
@@ -622,7 +626,7 @@ export function DocumentsHome({
     setFolderNotice(null)
     setMyFolderId(null)
     setElsewhereSource(null)
-    setExpanded(new Set([ROOT_KEY]))
+    setExpanded(new Set([ROOT_KEY, DRIVE_NODE_KEY]))
     resetFilters()
     setSearchDraft('')
     setKnownAuthors([])
@@ -2483,6 +2487,14 @@ export function DocumentsHome({
       state={drive.sidebarState}
       active={!sidebarIdle && subView === 'google-drive'}
       selectedAccountId={drive.selectedAccountId}
+      expanded={expanded.has(DRIVE_NODE_KEY)}
+      onToggle={() =>
+        setExpanded((prev) => {
+          const next = new Set(prev)
+          if (!next.delete(DRIVE_NODE_KEY)) next.add(DRIVE_NODE_KEY)
+          return next
+        })
+      }
       onSelect={(accountId) => {
         onSidebarNavigate?.()
         openDrive(accountId)

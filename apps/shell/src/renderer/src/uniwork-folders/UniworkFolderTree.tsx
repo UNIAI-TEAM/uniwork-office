@@ -26,6 +26,12 @@ export interface TreeRename {
   busy: boolean
 }
 
+/** first-level inline padding, and the indent of each level below: one chevron slot (16px) + the row gap (6px),
+ *  so a child's chevron slot starts under its parent's icon. The Drive rows in documents-home.css read the
+ *  same numbers as --dh-tree-pad / --dh-tree-step. */
+export const TREE_PAD = 4
+export const TREE_STEP = 22
+
 export function FolderGlyph({ open = false }: { open?: boolean }) {
   return (
     <svg className="uwf-glyph" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
@@ -64,7 +70,7 @@ export function MyFolderGlyph() {
   )
 }
 
-function Chevron({ expanded }: { expanded: boolean }) {
+export function Chevron({ expanded }: { expanded: boolean }) {
   return (
     <svg
       className={`uwf-chevron${expanded ? ' open' : ''}`}
@@ -255,7 +261,7 @@ export function UniworkFolderTree({
               aria-describedby={block ? reasonId : undefined}
               tabIndex={row.key === tabKey ? 0 : -1}
               className={`uwf-tree-row${selected ? ' selected' : ''}${block ? ' blocked' : ''}`}
-              style={{ paddingInlineStart: `${4 + (row.level - 1) * 14}px` }}
+              style={{ paddingInlineStart: `${TREE_PAD + (row.level - 1) * TREE_STEP}px` }}
               onKeyDown={(e) => onKeyDown(e, row)}
               onFocus={(e) => {
                 if (e.target !== e.currentTarget) return
