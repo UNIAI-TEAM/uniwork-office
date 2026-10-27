@@ -19,6 +19,7 @@ import type {
   UniworkSourceListQuery,
 } from '../../../shared/home-api'
 import type { StringKey, TFunc } from '../locale'
+import { foldSearchText } from '../uniwork-share/share-model'
 
 export type UniworkDocVisibility = 'private' | 'workspace' | 'restricted'
 export type UniworkDocAccessLevel = 'view' | 'comment' | 'edit' | 'manage'
@@ -743,23 +744,13 @@ export function docMatchesUpdated(doc: DocumentsHomeDoc, filters: UniworkListFil
 }
 
 /**
- * UNI-2205 (KLV-6): lower-case without Vietnamese diacritics (đ/Đ included) and collapsed spaces,
- * for client-side title matching on screens whose route has no `q` parameter (Gần đây).
+ * UNI-2205 (KLV-6 / KLF-8): case- and Vietnamese-diacritic-insensitive title match (đ/Đ included),
+ * reusing `foldSearchText` for screens whose route has no `q` parameter (Gần đây).
  */
-export function foldForSearch(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .replace(/đ/gi, 'd')
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ')
-}
-
 export function docMatchesQuery(doc: DocumentsHomeDoc, query: string): boolean {
-  const foldedQuery = foldForSearch(query)
+  const foldedQuery = foldSearchText(query)
   if (!foldedQuery) return true
-  return foldForSearch(doc.title).includes(foldedQuery)
+  return foldSearchText(doc.title).includes(foldedQuery)
 }
 
 /** Cap on automatic page fetches while a search query or client filter is narrowing paged results. */

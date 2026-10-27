@@ -446,6 +446,7 @@ type PageState = {
   nextCursor: string | null
   loadingMore: boolean
   loadedPages: number
+  seq: number
   error?: UniworkDocErrorCode
   moreError?: UniworkDocErrorCode
 }
@@ -504,6 +505,7 @@ export function DocumentsHome({
     nextCursor: null,
     loadingMore: false,
     loadedPages: 0,
+    seq: 0,
   })
   const [listTick, setListTick] = useState(0)
   // UNI-1961 / V-STATES F-14: the files of the other modules (the web's "other sources"), read and
@@ -744,6 +746,7 @@ export function DocumentsHome({
   }, [elsewhereSource])
   // Load sub-view / folder / search items with sequence guard
   const query = searchDraft.trim()
+  const serverQuery = subView === 'recent' ? '' : query
   const listSeqRef = useRef(0)
   // Người sửa / Cập nhật put Recent on the flat list, which has no activity filter and no
   // last-activity sort: the segment is off while they are on, and Cập nhật is the sort
@@ -785,12 +788,13 @@ export function DocumentsHome({
       nextCursor: null,
       loadingMore: false,
       loadedPages: 0,
+      seq,
     }))
 
-    if (query.length > 0 && subView !== 'recent') {
+    if (serverQuery.length > 0) {
       void searchDocuments({
         workspaceId,
-        query,
+        query: serverQuery,
         kind: 'all',
         ...(wireFilters.types ? { types: wireFilters.types } : {}),
       })
@@ -804,6 +808,7 @@ export function DocumentsHome({
               nextCursor: res.value.nextCursor,
               loadingMore: false,
               loadedPages: 1,
+              seq,
             })
             if (subView !== 'shared-with-me') {
               mergeKnownAuthors(items)
@@ -815,6 +820,7 @@ export function DocumentsHome({
               nextCursor: null,
               loadingMore: false,
               loadedPages: 0,
+              seq,
               error: res.error,
             })
           }
@@ -827,6 +833,7 @@ export function DocumentsHome({
             nextCursor: null,
             loadingMore: false,
             loadedPages: 0,
+            seq,
             error: 'network',
           })
         })
@@ -868,6 +875,7 @@ export function DocumentsHome({
             nextCursor: result.value.nextCursor,
             loadingMore: false,
             loadedPages: 1,
+            seq,
           })
           if (subView !== 'shared-with-me') {
             mergeKnownAuthors(items)
@@ -903,6 +911,7 @@ export function DocumentsHome({
             nextCursor: null,
             loadingMore: false,
             loadedPages: 0,
+            seq,
             error: result.error,
           })
         }
@@ -915,10 +924,20 @@ export function DocumentsHome({
           nextCursor: null,
           loadingMore: false,
           loadedPages: 0,
+          seq,
           error: 'network',
         })
       })
-  }, [workspaceId, subView, folderId, resolvedMyFolderId, wireFilters, wireSort, query, listTick])
+  }, [
+    workspaceId,
+    subView,
+    folderId,
+    resolvedMyFolderId,
+    wireFilters,
+    wireSort,
+    serverQuery,
+    listTick,
+  ])
 
   // UNI-2047 B4 / V-STATES F-14: the files other modules sent (chat, tasks, meetings, email) are
   // listed on the Từ nơi khác page only, never merged into the workspace root (a search lists the
@@ -1040,15 +1059,21 @@ export function DocumentsHome({
     }
     // UNI-1961: "Load more" asks both lists for their next page (the web's rule)
     if (elsewhereView) loadMoreSources()
-    if (!page.nextCursor || page.loadingMore || page.status !== 'ready') return
+    if (
+      !page.nextCursor ||
+      page.loadingMore ||
+      page.status !== 'ready' ||
+      page.seq !== listSeqRef.current
+    )
+      return
     const cursor = page.nextCursor
     const seq = listSeqRef.current
     setPage((prev) => ({ ...prev, loadingMore: true, moreError: undefined }))
 
-    if (query.length > 0 && subView !== 'recent') {
+    if (serverQuery.length > 0) {
       void searchDocuments({
         workspaceId,
-        query,
+        query: serverQuery,
         cursor,
         kind: 'all',
         ...(wireFilters.types ? { types: wireFilters.types } : {}),
@@ -1063,6 +1088,7 @@ export function DocumentsHome({
               nextCursor: res.value.nextCursor,
               loadingMore: false,
               loadedPages: prev.loadedPages + 1,
+              seq,
             }))
             if (subView !== 'shared-with-me') {
               mergeKnownAuthors(nextItems)
@@ -1106,6 +1132,7 @@ export function DocumentsHome({
             nextCursor: result.value.nextCursor,
             loadingMore: false,
             loadedPages: prev.loadedPages + 1,
+            seq,
           }))
           if (subView !== 'shared-with-me') {
             mergeKnownAuthors(nextItems)
@@ -2434,16 +2461,19 @@ export function DocumentsHome({
     query.length > 0 &&
     (subView === 'recent' || filters.updatedBy.trim() !== '' || filters.updatedPreset !== 'any')
   const autoLoadingSearchPages =
-    clientFilteredSearch &&
-    page.status === 'ready' &&
-    page.nextCursor !== null &&
-    !page.moreError &&
-    (subView === 'recent'
-      ? page.loadedPages < MAX_AUTO_SEARCH_PAGES || page.loadingMore
-      : (folders.length + tableRows.length === 0 && page.loadedPages < MAX_AUTO_SEARCH_PAGES) ||
-        (folders.length + tableRows.length === 0 && page.loadingMore))
+    query.length > 0 &&
+    (page.status === 'loading' ||
+      (clientFilteredSearch &&
+        page.status === 'ready' &&
+        page.nextCursor !== null &&
+        !page.moreError &&
+        (subView === 'recent'
+          ? page.loadedPages < MAX_AUTO_SEARCH_PAGES || page.loadingMore
+          : (folders.length + tableRows.length === 0 && page.loadedPages < MAX_AUTO_SEARCH_PAGES) ||
+            (folders.length + tableRows.length === 0 && page.loadingMore))))
   useEffect(() => {
     if (!clientFilteredSearch) return
+    if (page.seq !== listSeqRef.current) return
     if (page.status !== 'ready' || !page.nextCursor || page.moreError) return
     if (page.loadedPages >= MAX_AUTO_SEARCH_PAGES) return
     if (subView !== 'recent' && folders.length + tableRows.length > 0) return
