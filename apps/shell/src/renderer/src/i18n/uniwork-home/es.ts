@@ -101,7 +101,7 @@ export const es = {
   uhShelvedIntro:
     'Los documentos terminados se guardan aquí: para siempre, de solo lectura y sin comentarios. Desarchivar un elemento lo restaura como estaba. Quien pueda verlo podrá seguir abriéndolo y encontrándolo (etiqueta «Archivado»). Archivar una carpeta archiva todo el árbol; requiere acceso de Administrar.',
   uhShelvedSort: 'Archivados más recientemente',
-  uhShelvedFilterBy: 'Archivado por',
+  uhShelvedFilterBy: 'Archivado por:',
   uhShelvedFilterAny: 'Cualquiera',
   uhShelvedLoadedOnly: 'Filtra lo cargado: carga más para ampliarlo.',
   uhShelvedByFormer: 'Antiguo miembro',

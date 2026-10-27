@@ -100,7 +100,7 @@ export const it = {
   uhShelvedIntro:
     'I documenti conclusi vengono conservati qui: per sempre, in sola lettura, senza commenti. Ripristinare dall’archivio riporta l’elemento com’era. Chi può vederlo continua ad aprirlo e trovarlo (etichetta «Archiviato»). Archiviare una cartella archivia l’intero albero; serve l’accesso Gestisci.',
   uhShelvedSort: 'Archiviati più di recente',
-  uhShelvedFilterBy: 'Archiviato da',
+  uhShelvedFilterBy: 'Archiviato da:',
   uhShelvedFilterAny: 'Chiunque',
   uhShelvedLoadedOnly: 'Filtra ciò che è caricato: caricane altri per ampliare.',
   uhShelvedByFormer: 'Ex membro',

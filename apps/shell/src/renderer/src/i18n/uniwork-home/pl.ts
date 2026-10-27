@@ -101,7 +101,7 @@ export const pl = {
   uhShelvedIntro:
     'Ukończone dokumenty są tu odkładane: przechowywane na zawsze, tylko do odczytu, bez komentarzy. Przywrócenie z archiwum przywraca element do poprzedniego stanu. Każdy, kto może go zobaczyć, nadal go otworzy i znajdzie (z etykietą „Zarchiwizowane”). Archiwizacja folderu archiwizuje całe drzewo; wymaga dostępu Zarządzanie.',
   uhShelvedSort: 'Ostatnio zarchiwizowane',
-  uhShelvedFilterBy: 'Zarchiwizował(a)',
+  uhShelvedFilterBy: 'Zarchiwizował(a):',
   uhShelvedFilterAny: 'Ktokolwiek',
   uhShelvedLoadedOnly: 'Filtruje tylko wczytane — wczytaj więcej, aby rozszerzyć.',
   uhShelvedByFormer: 'Były członek',

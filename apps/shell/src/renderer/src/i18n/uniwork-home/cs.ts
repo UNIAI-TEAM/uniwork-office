@@ -101,7 +101,7 @@ export const cs = {
   uhShelvedIntro:
     'Hotové dokumenty se ukládají sem: navždy, jen pro čtení, bez komentářů. Zrušením archivace se položka vrátí do původního stavu. Kdo ji může vidět, ji stále otevře a najde (se štítkem „Archivováno“). Archivace složky archivuje celý strom; vyžaduje přístup Správa.',
   uhShelvedSort: 'Naposledy archivované',
-  uhShelvedFilterBy: 'Archivoval(a)',
+  uhShelvedFilterBy: 'Archivoval(a):',
   uhShelvedFilterAny: 'Kdokoli',
   uhShelvedLoadedOnly: 'Filtruje jen načtené — načtěte víc pro širší rozsah.',
   uhShelvedByFormer: 'Bývalý člen',

@@ -101,7 +101,7 @@ export const ja = {
   uhShelvedIntro:
     '完了した文書はここに保管されます：無期限に保存、読み取り専用、コメント不可。アーカイブを解除すると元に戻ります。閲覧できる人は引き続き開いたり検索したりできます（「アーカイブ済み」ラベル付き）。フォルダーをアーカイブするとツリー全体がアーカイブされます。管理権限が必要です。',
   uhShelvedSort: 'アーカイブが新しい順',
-  uhShelvedFilterBy: 'アーカイブした人',
+  uhShelvedFilterBy: 'アーカイブした人:',
   uhShelvedFilterAny: 'すべてのユーザー',
   uhShelvedLoadedOnly: '読み込み済みの範囲のみ絞り込みます — さらに読み込むと範囲が広がります。',
   uhShelvedByFormer: '元メンバー',

@@ -100,7 +100,7 @@ export const id = {
   uhShelvedIntro:
     'Dokumen yang sudah selesai disimpan di sini: disimpan selamanya, hanya-baca, tanpa komentar. Membatalkan arsip mengembalikan item seperti semula. Siapa pun yang dapat melihatnya tetap dapat membuka dan menemukannya (berlabel “Diarsipkan”). Mengarsipkan folder mengarsipkan seluruh pohonnya; perlu akses Kelola.',
   uhShelvedSort: 'Terakhir diarsipkan',
-  uhShelvedFilterBy: 'Diarsipkan oleh',
+  uhShelvedFilterBy: 'Diarsipkan oleh:',
   uhShelvedFilterAny: 'Siapa saja',
   uhShelvedLoadedOnly: 'Hanya memfilter yang sudah dimuat — muat lebih banyak untuk memperluas.',
   uhShelvedByFormer: 'Mantan anggota',

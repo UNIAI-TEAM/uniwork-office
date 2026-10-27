@@ -147,7 +147,13 @@ import {
   zipDownloadBridge,
 } from '../uniwork-library-api'
 import { UniworkDocInfoPanel, type DocInfoLoad } from '../UniworkDocInfoPanel'
-import { ShelvedToolbar, filterByShelver, shelvedDescendantIds } from './ShelvedDocumentsView'
+import {
+  ShelvedByChip,
+  ShelvedIntro,
+  ShelvedLoadedOnlyNote,
+  filterByShelver,
+  shelvedDescendantIds,
+} from './ShelvedDocumentsView'
 import { BulkBar, BulkTrashConfirm } from '../doclist/BulkBar'
 import { BulkPurgeConfirm } from '../doclist/BulkPurgeConfirm'
 import {
@@ -3055,10 +3061,8 @@ export function DocumentsHome({
               </p>
             )}
 
-            {/* UNI-1961: the shelf's intro and Lưu trữ bởi; its type / editor / date are the shared bar below */}
-            {shelfView && (
-              <ShelvedToolbar items={page.items} shelvedBy={shelvedBy} onShelvedBy={setShelvedBy} />
-            )}
+            {/* UNI-1961: the shelf's intro; its Lưu trữ bởi is a chip in the shared bar below */}
+            {shelfView && <ShelvedIntro />}
 
             {continueDocs.length > 0 && (
               <ContinueStrip
@@ -3089,7 +3093,17 @@ export function DocumentsHome({
                   />
                 ) : undefined
               }
+              trail={
+                shelfView ? (
+                  <ShelvedByChip
+                    items={page.items}
+                    shelvedBy={shelvedBy}
+                    onShelvedBy={setShelvedBy}
+                  />
+                ) : undefined
+              }
             />
+            {shelfView && shelvedBy !== null && <ShelvedLoadedOnlyNote />}
 
             {((page.status === 'loading' && page.items.length === 0) ||
               (autoLoadingSearchPages && folders.length + tableRows.length === 0) ||

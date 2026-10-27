@@ -102,7 +102,7 @@ export const de = {
   uhShelvedIntro:
     'Abgeschlossene Dokumente werden hier abgelegt: dauerhaft aufbewahrt, schreibgeschützt, ohne Kommentare. Beim Dearchivieren wird ein Element wiederhergestellt wie zuvor. Wer es sehen kann, kann es weiterhin öffnen und finden (Kennzeichnung „Archiviert“). Beim Archivieren eines Ordners wird der gesamte Baum archiviert; dafür ist Verwalten-Zugriff nötig.',
   uhShelvedSort: 'Zuletzt archiviert',
-  uhShelvedFilterBy: 'Archiviert von',
+  uhShelvedFilterBy: 'Archiviert von:',
   uhShelvedFilterAny: 'Beliebige Person',
   uhShelvedLoadedOnly: 'Filtert nur Geladenes — mehr laden, um zu erweitern.',
   uhShelvedByFormer: 'Ehemaliges Mitglied',

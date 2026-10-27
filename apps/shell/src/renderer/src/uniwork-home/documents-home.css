@@ -565,6 +565,19 @@
   text-overflow: ellipsis;
 }
 
+/* a screen's own chip (the shelf's Lưu trữ bởi) sits in the bar's row at the pair's size; a long
+   member name ellipsises inside its select and never widens the chip past the row */
+.dh-filter-bar > .dh-filter-chip {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dh-filter-bar > .dh-filter-chip .dh-filter-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
 .dh-filter-clear {
   height: 34px;
   padding: 0 12px;
@@ -1386,14 +1399,8 @@
 }
 
 /* UNI-1961 (ARCHIVE-01): the Lưu trữ / Archive shelf, as the web's
-   DocumentsShelvedView: intro, toolbar (type, Lưu trữ bởi) and the shared
-   Documents table with the Lưu trữ column (person + date). */
-.dh-shelved-head {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
+   DocumentsShelvedView: intro, the shared filter bar (type, editor, date and the Lưu trữ bởi chip)
+   and the shared Documents table with the Lưu trữ column (person + date). */
 .dh-shelved-intro {
   margin: 0;
   color: var(--text-secondary);
@@ -1401,21 +1408,8 @@
   line-height: 1.5;
 }
 
-.dh-shelved-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.dh-shelved-by {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-
 .dh-shelved-loaded-only {
+  margin: 0;
   color: var(--text-secondary);
   font-size: 11.5px;
 }
