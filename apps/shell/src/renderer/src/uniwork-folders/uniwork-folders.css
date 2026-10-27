@@ -144,12 +144,15 @@
   color: var(--text-muted);
 }
 
+/* the pull (-2px) trims the 6px row gap after the chevron slot to the web's 4px, so the step is 16 + 6 - 2 = 20
+   (TREE_STEP) and a child's chevron slot starts under its parent's icon */
 .uwf-twisty {
   display: grid;
   flex: 0 0 16px;
   place-items: center;
   width: 16px;
   height: 16px;
+  margin-inline-end: -2px;
   color: var(--text-secondary);
 }
 
@@ -198,7 +201,8 @@
   padding: 2px 0;
 }
 
-/* the row "…" sits at the end of a tree or contents row; shown on hover / keyboard focus / open (V2-2, FE13-R1-2, V13-6) */
+/* the row "…" is an overlay at the end of a tree or contents row (it takes no width in the row); shown on hover /
+   keyboard focus / open (V2-2, FE13-R1-2, V13-6) */
 .uw-row-menu.uwf-menu {
   position: absolute;
   top: 0;
@@ -222,6 +226,48 @@
 .uwf-tree .uwf-tree-row .uw-row-menu.uwf-menu .uw-row-menu-btn.on,
 .uwf-contents .uw-pick-item .uw-row-menu.uwf-menu .uw-row-menu-btn.on {
   opacity: 1;
+}
+
+/* A row with a menu reserves no width for the overlay "…": the name takes the row to the 8px end padding (the
+   web's deep rows do the same), so a deep name keeps its room. Only while the button shows (hover / focus /
+   open) does the end of the name fade out under it: the button reaches 24px into the name's box (its 28px
+   at 4px from the edge, minus the 8px padding) and the fade is 8px more, so a short name is never touched.
+   Touch has no hover and keeps the button visible at rest: it keeps the 32px lane (below). */
+.uwf-tree {
+  --uwf-menu-reach: 24px;
+  --uwf-menu-fade: 8px;
+}
+
+.uwf-tree-row.uwf-tree-row-menu {
+  padding-inline-end: 8px;
+}
+
+.uwf-tree-row.uwf-tree-row-menu .uwf-tree-text {
+  flex: 1 1 auto;
+}
+
+@media not (pointer: coarse) {
+  .uwf-tree-row.uwf-tree-row-menu:hover .uwf-tree-text,
+  .uwf-tree-row.uwf-tree-row-menu:focus-visible .uwf-tree-text,
+  .uwf-tree-row.uwf-tree-row-menu:has(:focus-visible) .uwf-tree-text,
+  .uwf-tree-row.uwf-tree-row-menu:has(.uw-row-menu-btn.on) .uwf-tree-text {
+    mask-image: linear-gradient(
+      to left,
+      transparent var(--uwf-menu-reach),
+      black calc(var(--uwf-menu-reach) + var(--uwf-menu-fade))
+    );
+  }
+
+  [dir='rtl'] .uwf-tree-row.uwf-tree-row-menu:hover .uwf-tree-text,
+  [dir='rtl'] .uwf-tree-row.uwf-tree-row-menu:focus-visible .uwf-tree-text,
+  [dir='rtl'] .uwf-tree-row.uwf-tree-row-menu:has(:focus-visible) .uwf-tree-text,
+  [dir='rtl'] .uwf-tree-row.uwf-tree-row-menu:has(.uw-row-menu-btn.on) .uwf-tree-text {
+    mask-image: linear-gradient(
+      to right,
+      transparent var(--uwf-menu-reach),
+      black calc(var(--uwf-menu-reach) + var(--uwf-menu-fade))
+    );
+  }
 }
 
 /* ── main column ── */
@@ -618,6 +664,11 @@
   .uwf-new-folder,
   .uwf-location-btn {
     min-height: 44px;
+  }
+
+  /* no hover on touch: the "…" stays visible at rest, so its 32px lane stays reserved */
+  .uwf-tree-row.uwf-tree-row-menu {
+    padding-inline-end: 32px;
   }
 
   /* the header's pencil and "…" are 44 x 44 targets side by side (web

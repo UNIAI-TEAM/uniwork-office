@@ -2669,7 +2669,9 @@ export function DocumentsHome({
               <span className="uwf-twisty" aria-hidden="true" />
               <MyFolderGlyph />
               <span className="uwf-tree-text">
-                <span className="uwf-tree-title">{myFolderLabel}</span>
+                <span className="uwf-tree-title" title={myFolderLabel}>
+                  {myFolderLabel}
+                </span>
               </span>
             </button>
           )}
