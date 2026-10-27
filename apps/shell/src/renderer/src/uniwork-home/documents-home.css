@@ -2179,7 +2179,7 @@
 }
 
 /* D4-A (UNI-2197): from ~860 px down the sidebar leaves about 350 px for the table; tighten the page gutter, the
-   cell padding and the type so the three columns (see the 900 px block below) fit without horizontal scroll in every
+   cell padding and the type so the three columns (see the 1050 px block below) fit without horizontal scroll in every
    locale */
 @media (max-width: 860px) {
   .dh-main:has(.dh-drive-view) {
@@ -2561,10 +2561,10 @@ p.dh-drive-panel-muted {
   }
 }
 
-/* D4-B: the window is at least 720 px wide; up to 900 px five columns leave Name about 100 px (names ellipsised,
-   badges on three lines), so the list keeps Name, Account and Access and the detail panel carries Used in /
-   Tasks created. The five-column table starts at 901 px. */
-@media (max-width: 900px) {
+/* D4-B / D4-V31: up to 1050 px five columns leave Name about 150 px or less (names ellipsised, headers on four lines,
+   Russian words broken), so the list keeps Name, Account and Access and the detail panel carries Used in / Tasks
+   created. The five-column table starts at 1051 px; the panel stacks under the list up to 1100 px (above). */
+@media (max-width: 1050px) {
   .dh-drive-col-used,
   .dh-drive-cell-used,
   .dh-drive-col-tasks,
@@ -2583,9 +2583,12 @@ p.dh-drive-panel-muted {
   .dh-drive-col-access {
     width: 26%;
   }
+}
 
-  /* just enough room that "Disconnected · Reconnect" and the access badge wrap between words, not inside one
-     (the longest word is the Russian "Переподключить") */
+/* the window is at least 720 px wide; the three columns of the narrowest band get just enough room that
+   "Disconnected · Reconnect" and the access badge wrap between words, not inside one (the longest word is the
+   Russian "Переподключить") */
+@media (max-width: 900px) {
   .dh-drive-th,
   .dh-drive-td {
     padding-inline: 3px;
