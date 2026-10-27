@@ -4902,15 +4902,20 @@ export class UniworkDocsService {
         throw new UniworkDocError('not_found')
       }
       const types = normalizeTypePicks(q.types)
+      const shelved = q.shelved === true
       const page = await this.api().searchDocuments({
         workspaceId: q.workspaceId,
         query: typeof q.query === 'string' ? q.query : '',
         kind: q.kind === 'folder' || q.kind === 'document' ? q.kind : 'all',
         ...(types.length > 0 ? { types } : {}),
+        ...(shelved ? { shelved: true } : {}),
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
       })
-      const items = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      // a shelf hit carries its shelver by name like a shelf row, for the Lưu trữ bởi chip and column
+      const items = shelved
+        ? await this.enrichShelvedRows(q.workspaceId, page.documents)
+        : await this.enrichWorkspaceRows(q.workspaceId, page.documents)
       return { items, nextCursor: page.nextCursor }
     })
   }

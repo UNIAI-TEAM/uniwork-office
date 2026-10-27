@@ -562,3 +562,42 @@ describe('UNI-2113 fix1: the Type picks on the title search at the IPC boundary'
     expect(req!.searchParams.get('kind')).not.toBe('page')
   })
 })
+
+describe('UNI-2205 fix6: the Archive search at the IPC boundary', () => {
+  it('sends shelved=true beside match=title and q only for a real true', async () => {
+    const call = await setup()
+    const server = stubServer()
+    const base = { workspaceId: 'ws_1', query: 'plan', kind: 'all' }
+    await call(UNIWORK_DOC_CHANNELS.searchDocuments, { ...base, shelved: true })
+    await call(UNIWORK_DOC_CHANNELS.searchDocuments, { ...base, shelved: 'true' })
+    await call(UNIWORK_DOC_CHANNELS.searchDocuments, { ...base, shelved: false })
+    await call(UNIWORK_DOC_CHANNELS.searchDocuments, base)
+    const [shelf, ...plain] = server.lists()
+    expect(shelf!.searchParams.get('match')).toBe('title')
+    expect(shelf!.searchParams.get('q')).toBe('plan')
+    expect(shelf!.searchParams.get('shelved')).toBe('true')
+    expect(shelf!.searchParams.has('archived')).toBe(false)
+    expect(plain).toHaveLength(3)
+    for (const req of plain) expect(req.searchParams.has('shelved')).toBe(false)
+  })
+
+  it('names the shelver of a shelved hit from the workspace members, like a shelf row', async () => {
+    const call = await setup()
+    stubServer({
+      list: [
+        row('d1', 'ws_1', { shelved_at: '2026-10-01T00:00:00Z', shelved_by: 'u_a' }),
+        row('d2', 'ws_1', { shelved_at: '2026-10-01T00:00:00Z', shelved_by: 'u_gone' }),
+      ],
+      members: [{ user_id: 'u_a', display_name: ' Ada Lovelace ' }],
+    })
+    const res = (await call(UNIWORK_DOC_CHANNELS.searchDocuments, {
+      workspaceId: 'ws_1',
+      query: 'plan',
+      kind: 'all',
+      shelved: true,
+    })) as { value: { items: Array<Record<string, unknown>> } }
+    const byId = new Map(res.value.items.map((d) => [d.id, d]))
+    expect(byId.get('d1')!.shelvedByName).toBe('Ada Lovelace')
+    expect(byId.get('d2')!.shelvedByFormer).toBe(true)
+  })
+})

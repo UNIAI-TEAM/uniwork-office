@@ -1078,8 +1078,27 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     expect(moreBtn.disabled).toBe(false)
     expect(host.querySelector('.uw-pick-more-error[role="alert"]')).not.toBeNull()
 
-    // 5. Search initial-load rejection & search loadMore rejection (DH1-R1-3)
+    // 5. Search on Recent is client-side (KLV-6) and never calls uniworkSearchDocuments;
+    // server search initial-load rejection & search loadMore rejection run on workspace root (DH1-R1-3)
     const searchInput = host.querySelector<HTMLInputElement>('input.uwf-own-search')!
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(searchInput, 'Kế hoạch')
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }))
+      searchInput.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await flush()
+    expect(api.uniworkSearchDocuments).not.toHaveBeenCalled()
+
+    const workspaceBtn = sidebarSlot.querySelector<HTMLButtonElement>(
+      '.nav-item[data-nav="workspace"]',
+    )!
+    api.uniworkListChildren.mockResolvedValueOnce(ok({ items: rootItems, nextCursor: null }))
+    await act(async () => {
+      workspaceBtn.click()
+    })
+    await flush()
+
     api.uniworkSearchDocuments.mockRejectedValueOnce(new Error('search boom'))
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -2645,17 +2664,17 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     }
   })
 
-  it('keeps "Tạo mới" on the first toolbar line at 1280px while preserving the 900px wrap (VDH-12)', () => {
+  it('keeps "Tạo mới" on the first toolbar line at 1440px while preserving the 900px wrap (VDH-12)', () => {
     const css = docsHomeCss()
     // .dh-toolbar-spacer must not take minimum flex width or force wrapping;
-    // .dh-search-box and .dh-toolbar-btn fit on one line at 1280px alongside the title and workspace select,
+    // .dh-search-box and .dh-toolbar-btn fit on one line at 1440px alongside the title and workspace select,
     // while .dh-toolbar keeps flex-wrap: wrap so narrow viewports (900px) still wrap cleanly
     expect(cssBlock(css, '.dh-toolbar')).toMatch(/flex-wrap:\s*wrap/)
     // both one-line guards must hold on their own — an OR regex would let either slip (DH1-R4-5)
     expect(cssBlock(css, '.dh-toolbar-btn')).toMatch(/flex-shrink:\s*0/)
     expect(cssBlock(css, '.dh-toolbar-btn')).toMatch(/white-space:\s*nowrap/)
     const wideMedia =
-      css.match(/@media\s*\(\s*min-width:\s*1101px\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+      css.match(/@media\s*\(\s*min-width:\s*1281px\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
     expect(
       /flex-wrap:\s*nowrap/.test(cssBlock(wideMedia, '.dh-toolbar')) ||
         /width:\s*2[0-6]\dpx/.test(cssBlock(css, '.dh-search-box')),

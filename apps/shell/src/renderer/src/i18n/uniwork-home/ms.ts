@@ -100,7 +100,7 @@ export const ms = {
   uhShelvedIntro:
     'Dokumen yang telah selesai disimpan di sini: disimpan selama-lamanya, baca sahaja, tanpa ulasan. Nyaharkib mengembalikan item seperti asal. Sesiapa yang boleh melihatnya masih boleh membuka dan menemuinya (berlabel “Diarkib”). Mengarkib folder mengarkib seluruh pepohon; perlukan akses Urus.',
   uhShelvedSort: 'Terkini diarkib',
-  uhShelvedFilterBy: 'Diarkib oleh',
+  uhShelvedFilterBy: 'Diarkib oleh:',
   uhShelvedFilterAny: 'Sesiapa sahaja',
   uhShelvedLoadedOnly: 'Hanya menapis yang telah dimuatkan — muatkan lagi untuk meluaskan.',
   uhShelvedByFormer: 'Bekas ahli',

@@ -119,8 +119,10 @@ import {
   fetchDocumentsHomeSources,
   folderCardsUnderTypePick,
   getDocumentsHomeNavEntry,
+  docMatchesQuery,
   docMatchesUpdated,
   hasActiveFilters,
+  MAX_AUTO_SEARCH_PAGES,
   rowsUnderTypePick,
   sourceAuthorsOf,
   sourceMatchesFilters,
@@ -145,7 +147,13 @@ import {
   zipDownloadBridge,
 } from '../uniwork-library-api'
 import { UniworkDocInfoPanel, type DocInfoLoad } from '../UniworkDocInfoPanel'
-import { ShelvedToolbar, filterByShelver, shelvedDescendantIds } from './ShelvedDocumentsView'
+import {
+  ShelvedByChip,
+  ShelvedIntro,
+  ShelvedLoadedOnlyNote,
+  filterByShelver,
+  shelvedDescendantIds,
+} from './ShelvedDocumentsView'
 import { BulkBar, BulkTrashConfirm } from '../doclist/BulkBar'
 import { BulkPurgeConfirm } from '../doclist/BulkPurgeConfirm'
 import {
@@ -446,6 +454,8 @@ type PageState = {
   items: DocumentsHomeDoc[]
   nextCursor: string | null
   loadingMore: boolean
+  loadedPages: number
+  seq: number
   error?: UniworkDocErrorCode
   moreError?: UniworkDocErrorCode
 }
@@ -504,6 +514,8 @@ export function DocumentsHome({
     items: [],
     nextCursor: null,
     loadingMore: false,
+    loadedPages: 0,
+    seq: 0,
   })
   const [listTick, setListTick] = useState(0)
   // UNI-1961 / V-STATES F-14: the files of the other modules (the web's "other sources"), read and
@@ -517,6 +529,14 @@ export function DocumentsHome({
     loadingMore: boolean
   }>({ status: 'idle', items: [], nextCursor: null, loadingMore: false })
   const [knownAuthors, setKnownAuthors] = useState<readonly UpdatedByOption[]>([])
+  const mergeKnownAuthors = (items: readonly DocumentsHomeDoc[]) => {
+    setKnownAuthors((prev) => {
+      const merged = new Map<string, string>()
+      for (const opt of prev) merged.set(opt.id, opt.name)
+      for (const opt of collectUpdatedByOptions(items)) merged.set(opt.id, opt.name)
+      return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
+    })
+  }
 
   // Dialogs & inline actions
   // UNI-1959: kinds the server answered 404 / 501 for: disabled for the session
@@ -736,6 +756,8 @@ export function DocumentsHome({
   }, [elsewhereSource])
   // Load sub-view / folder / search items with sequence guard
   const query = searchDraft.trim()
+  const screenScopedQuery = subView === 'recent' || subView === 'shared-with-me'
+  const serverQuery = screenScopedQuery ? '' : query
   const listSeqRef = useRef(0)
   // Người sửa / Cập nhật put Recent on the flat list, which has no activity filter and no
   // last-activity sort: the segment is off while they are on, and Cập nhật is the sort
@@ -776,13 +798,16 @@ export function DocumentsHome({
       items: prev.status === 'ready' ? prev.items : [],
       nextCursor: null,
       loadingMore: false,
+      loadedPages: 0,
+      seq,
     }))
 
-    if (query.length > 0) {
+    if (serverQuery.length > 0) {
       void searchDocuments({
         workspaceId,
-        query,
+        query: serverQuery,
         kind: 'all',
+        ...(subView === 'archive' ? { shelved: true } : {}),
         ...(wireFilters.types ? { types: wireFilters.types } : {}),
       })
         .then((res) => {
@@ -794,13 +819,20 @@ export function DocumentsHome({
               items,
               nextCursor: res.value.nextCursor,
               loadingMore: false,
+              loadedPages: 1,
+              seq,
             })
+            if (subView !== 'shared-with-me') {
+              mergeKnownAuthors(items)
+            }
           } else {
             setPage({
               status: 'error',
               items: [],
               nextCursor: null,
               loadingMore: false,
+              loadedPages: 0,
+              seq,
               error: res.error,
             })
           }
@@ -812,6 +844,8 @@ export function DocumentsHome({
             items: [],
             nextCursor: null,
             loadingMore: false,
+            loadedPages: 0,
+            seq,
             error: 'network',
           })
         })
@@ -852,14 +886,11 @@ export function DocumentsHome({
             items,
             nextCursor: result.value.nextCursor,
             loadingMore: false,
+            loadedPages: 1,
+            seq,
           })
           if (subView !== 'shared-with-me') {
-            setKnownAuthors((prev) => {
-              const merged = new Map<string, string>()
-              for (const opt of prev) merged.set(opt.id, opt.name)
-              for (const opt of collectUpdatedByOptions(items)) merged.set(opt.id, opt.name)
-              return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
-            })
+            mergeKnownAuthors(items)
           }
         } else {
           if (
@@ -891,6 +922,8 @@ export function DocumentsHome({
             items: [],
             nextCursor: null,
             loadingMore: false,
+            loadedPages: 0,
+            seq,
             error: result.error,
           })
         }
@@ -902,10 +935,21 @@ export function DocumentsHome({
           items: [],
           nextCursor: null,
           loadingMore: false,
+          loadedPages: 0,
+          seq,
           error: 'network',
         })
       })
-  }, [workspaceId, subView, folderId, resolvedMyFolderId, wireFilters, wireSort, query, listTick])
+  }, [
+    workspaceId,
+    subView,
+    folderId,
+    resolvedMyFolderId,
+    wireFilters,
+    wireSort,
+    serverQuery,
+    listTick,
+  ])
 
   // UNI-2047 B4 / V-STATES F-14: the files other modules sent (chat, tasks, meetings, email) are
   // listed on the Từ nơi khác page only, never merged into the workspace root (a search lists the
@@ -1027,28 +1071,41 @@ export function DocumentsHome({
     }
     // UNI-1961: "Load more" asks both lists for their next page (the web's rule)
     if (elsewhereView) loadMoreSources()
-    if (!page.nextCursor || page.loadingMore || page.status !== 'ready') return
+    if (
+      !page.nextCursor ||
+      page.loadingMore ||
+      page.status !== 'ready' ||
+      page.seq !== listSeqRef.current
+    )
+      return
     const cursor = page.nextCursor
     const seq = listSeqRef.current
     setPage((prev) => ({ ...prev, loadingMore: true, moreError: undefined }))
 
-    if (query.length > 0) {
+    if (serverQuery.length > 0) {
       void searchDocuments({
         workspaceId,
-        query,
+        query: serverQuery,
         cursor,
         kind: 'all',
+        ...(subView === 'archive' ? { shelved: true } : {}),
         ...(wireFilters.types ? { types: wireFilters.types } : {}),
       })
         .then((res) => {
           if (listSeqRef.current !== seq) return
           if (res.ok) {
+            const nextItems = res.value.items as DocumentsHomeDoc[]
             setPage((prev) => ({
               ...prev,
-              items: [...prev.items, ...(res.value.items as DocumentsHomeDoc[])],
+              items: [...prev.items, ...nextItems],
               nextCursor: res.value.nextCursor,
               loadingMore: false,
+              loadedPages: prev.loadedPages + 1,
+              seq,
             }))
+            if (subView !== 'shared-with-me') {
+              mergeKnownAuthors(nextItems)
+            }
           } else {
             setPage((prev) => ({
               ...prev,
@@ -1087,14 +1144,11 @@ export function DocumentsHome({
             items: [...prev.items, ...nextItems],
             nextCursor: result.value.nextCursor,
             loadingMore: false,
+            loadedPages: prev.loadedPages + 1,
+            seq,
           }))
           if (subView !== 'shared-with-me') {
-            setKnownAuthors((prev) => {
-              const merged = new Map<string, string>()
-              for (const opt of prev) merged.set(opt.id, opt.name)
-              for (const opt of collectUpdatedByOptions(nextItems)) merged.set(opt.id, opt.name)
-              return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
-            })
+            mergeKnownAuthors(nextItems)
           }
         } else {
           setPage((prev) => ({
@@ -1684,7 +1738,9 @@ export function DocumentsHome({
 
   // UNI-1961 (ARCHIVE-01): the Lưu trữ shelf's member filter and row commands.
   // The filter narrows the loaded pages only (the server has no shelved_by).
-  const shelfView = subView === 'archive' && query.length === 0
+  // UNI-2205: a query on the shelf keeps its layout (chips, note, columns); the search asks for
+  // `shelved=true` and the member filter narrows its hits like it narrows the shelf.
+  const shelfView = subView === 'archive'
   const starredView = subView === 'starred' && query.length === 0
   // the trash list proper (a search inside it lists live hits on the plain table)
   const trashView = subView === 'trash' && query.length === 0
@@ -2346,11 +2402,21 @@ export function DocumentsHome({
   // the folder cards keep their own order: the server's position, or the name when the table sorts by it
   const folderOrder = docSort?.column === 'name' ? 'name' : 'recent'
   const folderDesc = folderOrder === 'name' && docSort?.dir === 'desc'
+  // UNI-2205: the search IPC takes the Type picks only, so Người sửa / Cập nhật narrow the search
+  // hits here on folders and documents alike (matching the web, which combines all filters with q);
+  // on Gần đây (KLV-6) and Được chia sẻ với tôi (KLV-9) the query filters the loaded screen rows
+  // client-side by folded title.
   const { folders: allFolders, files } = useMemo(() => {
-    const split = splitAndSortItems(page.items, folderOrder, dateLocale)
+    const matched =
+      query.length > 0
+        ? screenScopedQuery
+          ? page.items.filter((doc) => docMatchesQuery(doc, query))
+          : page.items.filter((doc) => docMatchesUpdated(doc, wireFilters))
+        : page.items
+    const split = splitAndSortItems(matched, folderOrder, dateLocale)
     const ordered = folderDesc ? [...split.folders].reverse() : split.folders
     return { folders: myFolderFirst(ordered), files: split.files }
-  }, [page.items, folderOrder, folderDesc, dateLocale])
+  }, [page.items, query, screenScopedQuery, wireFilters, folderOrder, folderDesc, dateLocale])
   // Q0: the tree level (workspace root, My Folder, an open folder) keeps its cards, they navigate;
   // on a flat list the same switch as the rows hides them under a Type pick
   const folders = folderCardsUnderTypePick(
@@ -2404,6 +2470,38 @@ export function DocumentsHome({
     filters.types,
   ])
 
+  // UNI-2205 (KLF-1 / KLV-6 / KLV-9): while a query is active and client-side filtering hides every
+  // hit of the loaded pages (or on Gần đây / Được chia sẻ với tôi, where the query narrows the
+  // screen's list client-side), auto-load the next page up to 10 pages so matches on later pages
+  // show without a false empty state.
+  const clientFilteredSearch =
+    query.length > 0 &&
+    (screenScopedQuery ||
+      filters.updatedBy.trim() !== '' ||
+      filters.updatedPreset !== 'any' ||
+      (shelfView && shelvedBy !== null))
+  // the shelf draws no folder cards (its folders are table rows), so only its rows count there
+  const shownCount = shelfView ? tableRows.length : folders.length + tableRows.length
+  const autoLoadingSearchPages =
+    query.length > 0 &&
+    (page.status === 'loading' ||
+      (clientFilteredSearch &&
+        page.status === 'ready' &&
+        page.nextCursor !== null &&
+        !page.moreError &&
+        (screenScopedQuery
+          ? page.loadedPages < MAX_AUTO_SEARCH_PAGES || page.loadingMore
+          : (shownCount === 0 && page.loadedPages < MAX_AUTO_SEARCH_PAGES) ||
+            (shownCount === 0 && page.loadingMore))))
+  useEffect(() => {
+    if (!clientFilteredSearch) return
+    if (page.seq !== listSeqRef.current) return
+    if (page.status !== 'ready' || !page.nextCursor || page.moreError) return
+    if (page.loadedPages >= MAX_AUTO_SEARCH_PAGES) return
+    if (!screenScopedQuery && shownCount > 0) return
+    if (!page.loadingMore) loadMore()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientFilteredSearch, screenScopedQuery, shownCount, page])
   // UNI-2047: the selection and the bulk bar act on the rows the person sees, not on everything
   // loaded: the shelf's Lưu trữ bởi and the source rows narrow the table
   const visibleDocs = useMemo(
@@ -2984,10 +3082,8 @@ export function DocumentsHome({
               </p>
             )}
 
-            {/* UNI-1961: the shelf's intro and Lưu trữ bởi; its type / editor / date are the shared bar below */}
-            {shelfView && (
-              <ShelvedToolbar items={page.items} shelvedBy={shelvedBy} onShelvedBy={setShelvedBy} />
-            )}
+            {/* UNI-1961: the shelf's intro; its Lưu trữ bởi is a chip in the shared bar below */}
+            {shelfView && <ShelvedIntro />}
 
             {continueDocs.length > 0 && (
               <ContinueStrip
@@ -3018,9 +3114,20 @@ export function DocumentsHome({
                   />
                 ) : undefined
               }
+              trail={
+                shelfView ? (
+                  <ShelvedByChip
+                    items={page.items}
+                    shelvedBy={shelvedBy}
+                    onShelvedBy={setShelvedBy}
+                  />
+                ) : undefined
+              }
             />
+            {shelfView && shelvedBy !== null && <ShelvedLoadedOnlyNote />}
 
             {((page.status === 'loading' && page.items.length === 0) ||
+              (autoLoadingSearchPages && shownCount === 0) ||
               (elsewhereView && sources.status === 'loading')) && (
               <div className="uw-pick-skeleton" role="status" aria-busy="true">
                 <span className="uw-sr-only">{t('uwPickLoading')}</span>
@@ -3154,7 +3261,7 @@ export function DocumentsHome({
                   )}
 
                   {tableRows.length === 0 ? (
-                    shelfView ? (
+                    shelfView && query.length === 0 ? (
                       <div className="dh-empty dh-shelved-empty" role="status">
                         <p className="dh-shelved-empty-title">
                           {hasActiveFilters(filters) || shelvedBy !== null
@@ -3169,13 +3276,22 @@ export function DocumentsHome({
                       </div>
                     ) : // V-STATES F-09: a search with no hit is the shared empty state with Xóa tìm kiếm
                     query.length > 0 ? (
-                      <ListState
-                        kind="empty"
-                        glyph="search"
-                        returnFocus={focusSearch}
-                        title={t('dlSearchNoResults', { query })}
-                        action={{ label: t('searchClear'), onClick: () => setSearchDraft('') }}
-                      />
+                      autoLoadingSearchPages || page.nextCursor !== null ? null : (
+                        <ListState
+                          kind="empty"
+                          glyph="search"
+                          returnFocus={focusSearch}
+                          title={t('dlSearchNoResults', { query })}
+                          hint={
+                            hasActiveFilters(filters) ||
+                            (shelfView && shelvedBy !== null) ||
+                            (subView === 'recent' && recentSegment !== 'all')
+                              ? t('uhEmptyFiltered')
+                              : undefined
+                          }
+                          action={{ label: t('searchClear'), onClick: () => setSearchDraft('') }}
+                        />
+                      )
                     ) : (
                       <div className="dh-empty" role="status">
                         {emptyMessage}
