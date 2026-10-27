@@ -292,7 +292,12 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
         expect(menu(), 'closed until opened').toBeNull()
         expect(
           Array.from(bar!.querySelectorAll('select')).map((el) => el.getAttribute('data-filter')),
-        ).toEqual(['updatedBy', 'updatedFrom'])
+        ).toEqual(
+          // the shelf's Lưu trữ bởi is one more chip of the same bar, after the pair
+          subView === 'archive'
+            ? ['updatedBy', 'updatedFrom', 'shelvedBy']
+            : ['updatedBy', 'updatedFrom'],
+        )
         // the old inline type select, Truy cập and Nhóm theo are not part of the bar
         expect(bar!.querySelector('select[data-filter="format"]')).toBeNull()
         expect(bar!.querySelector('select[data-filter="groupBy"]')).toBeNull()
@@ -332,12 +337,85 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
       expect(labels).toEqual(['Loại:', 'Người sửa:', 'Cập nhật:'])
     })
 
-    it('keeps Lưu trữ bởi on the shelf next to the shared bar', async () => {
+    it('draws Lưu trữ bởi on the shelf as a chip of the shared bar, like Người sửa and Cập nhật', async () => {
       await mount('archive')
-      expect(host.querySelector('.dh-shelved-head select[data-filter="shelvedBy"]')).not.toBeNull()
+      const bar = host.querySelector('.dh-filter-bar')!
+      const by = bar.querySelector<HTMLSelectElement>('select[data-filter="shelvedBy"]')
+      expect(by).not.toBeNull()
+      // no second row above the bar holds a select
+      expect(host.querySelector('.dh-shelved-head, .dh-shelved-toolbar, .dh-shelved-by')).toBeNull()
+      // the same markup as Người sửa: a .dh-filter-chip label (key + select), a direct child of the bar
+      const chipOf = (name: string) =>
+        bar.querySelector(`select[data-filter="${name}"]`)!.closest('label.dh-filter-chip')!
+      const mine = chipOf('shelvedBy')
+      const editor = chipOf('updatedBy')
+      expect(mine.parentElement).toBe(bar)
+      expect(mine.className).toBe(editor.className)
+      expect(mine.firstElementChild!.className).toBe(editor.firstElementChild!.className)
+      expect(by!.className).toBe(bar.querySelector('select[data-filter="updatedBy"]')!.className)
+      expect(squash(mine)).toContain('Lưu trữ bởi:')
+      expect(squash(mine)).toContain('Bất kỳ ai')
+      // the chips after the Type control, in the bar's order: Loại, Người sửa + Cập nhật, Lưu trữ bởi
+      expect(Array.from(bar.children).map((el) => el.className.split(' ')[0])).toEqual([
+        'dh-type-filter',
+        'dh-filter-selects',
+        'dh-filter-chip',
+      ])
       // one type control only
       expect(host.querySelectorAll('.dh-filter-bar button[data-filter="type"]')).toHaveLength(1)
     })
+
+    it('keeps filtering the shelf by Lưu trữ bởi from the bar chip, on the loaded rows only', async () => {
+      const by = (id: string, name: string) => ({ shelvedById: id, shelvedByName: name })
+      const mixed = [
+        row({
+          id: 'doc-a',
+          canManage: true,
+          shelvedAt: iso(2026, 10, 19, 8, 0),
+          ...by('u-lan', 'Lan Nguyễn'),
+        }),
+        row({
+          id: 'doc-b',
+          canManage: true,
+          shelvedAt: iso(2026, 10, 18, 8, 0),
+          ...by('u-hai', 'Hải Lê'),
+        }),
+      ]
+      api.uniworkListShelved!.mockImplementation(async () =>
+        ok({ documents: mixed, nextCursor: null }),
+      )
+      await mount('archive')
+      expect(rowIds()).toEqual(['doc-a', 'doc-b'])
+      expect(host.querySelector('.dh-shelved-loaded-only')).toBeNull()
+      const calls = api.uniworkListShelved!.mock.calls.length
+      await pick(select('shelvedBy'), 'u-hai')
+      expect(rowIds()).toEqual(['doc-b'])
+      expect(host.querySelector('.dh-shelved-loaded-only')).not.toBeNull()
+      await pick(select('shelvedBy'), '')
+      expect(rowIds()).toEqual(['doc-a', 'doc-b'])
+      expect(host.querySelector('.dh-shelved-loaded-only')).toBeNull()
+      // client-side only: no new request
+      expect(api.uniworkListShelved!.mock.calls.length).toBe(calls)
+    })
+
+    it.each(['recent', 'shared-with-me', 'archive'] as const)(
+      'puts the search box in the same slot of the same toolbar row on %s',
+      async (subView) => {
+        await remount(subView)
+        const toolbar = host.querySelector('.dh-toolbar')!
+        const box = toolbar.querySelector(':scope > .dh-search-box')
+        expect(box, 'search box is a direct child of the toolbar row').not.toBeNull()
+        expect(box!.getAttribute('role')).toBe('search')
+        // title, then the spacer, then the search box: the order Recent and Shared with me draw
+        expect(Array.from(toolbar.children).map((el) => el.className.split(' ')[0])).toEqual(
+          expect.arrayContaining(['dh-title-group', 'dh-toolbar-spacer', 'dh-search-box']),
+        )
+        expect(box!.previousElementSibling!.className).toBe('dh-toolbar-spacer')
+        // not inside the filter bar and not above the toolbar
+        expect(host.querySelector('.dh-filter-bar .dh-search-box')).toBeNull()
+        expect(host.querySelectorAll('.dh-search-box')).toHaveLength(1)
+      },
+    )
 
     it('says Type: All types / Type: 3 types in English', async () => {
       await remount('workspace')
