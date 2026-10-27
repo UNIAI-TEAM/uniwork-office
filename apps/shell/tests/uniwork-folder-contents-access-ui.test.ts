@@ -572,6 +572,8 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     expect(home.value).toBe('')
     // an empty list is valid in replace, with its own hint, but not before the home answer
     expect(q('[data-fca-empty]')!.textContent).toBe(t('shrFcPrincipalsEmptyReplace'))
+    // nobody picked: no level to choose (the merge form keeps its select)
+    expect(q('[data-fca-level]')).toBeNull()
     expect(confirm()!.getAttribute('aria-disabled')).toBe('true')
     await click(confirm())
     expect(requests(api)).toEqual([])

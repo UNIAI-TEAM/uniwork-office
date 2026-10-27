@@ -535,30 +535,33 @@ function FolderContentsAccessBody({
                 </p>
               )
             )}
-            <div className="uw-share-form-row">
-              <div className="uw-share-field">
-                <label className="uw-act-label" htmlFor={ids.level}>
-                  {t('shrLevelLabel')}
-                </label>
-                <select
-                  id={ids.level}
-                  data-fca-level
-                  className="uw-act-select"
-                  value={level}
-                  disabled={pending}
-                  onChange={(e) => {
-                    setLevel(e.target.value as ShareLevel)
-                    resetOutcome()
-                  }}
-                >
-                  {SHARE_LEVELS.map((value) => (
-                    <option key={value} value={value}>
-                      {label(value)}
-                    </option>
-                  ))}
-                </select>
+            {/* replace with nobody picked has no level to choose: the home row below is the answer */}
+            {(mode === 'merge' || selected.length > 0) && (
+              <div className="uw-share-form-row">
+                <div className="uw-share-field">
+                  <label className="uw-act-label" htmlFor={ids.level}>
+                    {t('shrLevelLabel')}
+                  </label>
+                  <select
+                    id={ids.level}
+                    data-fca-level
+                    className="uw-act-select"
+                    value={level}
+                    disabled={pending}
+                    onChange={(e) => {
+                      setLevel(e.target.value as ShareLevel)
+                      resetOutcome()
+                    }}
+                  >
+                    {SHARE_LEVELS.map((value) => (
+                      <option key={value} value={value}>
+                        {label(value)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
+            )}
           </section>
 
           {mode === 'replace' && (

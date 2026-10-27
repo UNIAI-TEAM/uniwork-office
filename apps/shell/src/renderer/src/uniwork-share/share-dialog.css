@@ -935,3 +935,20 @@
 .uw-fca [data-fca-home] .uw-act-select {
   width: 100%;
 }
+
+/* the legend sits above the first radio card with a gap, not on its border */
+.uw-fca-modes .uw-share-heading {
+  padding: 0 0 8px;
+}
+
+/* the footer stays in view while the body scrolls in a short window: pinned to the modal's outer
+   edge like the header, covering the 20px padding so scrolled content never shows under it */
+.uw-fca .modal-buttons {
+  position: sticky;
+  bottom: -20px;
+  z-index: 1;
+  margin: 0 -20px -20px;
+  padding: 12px 20px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
