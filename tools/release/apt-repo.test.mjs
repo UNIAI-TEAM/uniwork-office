@@ -89,17 +89,19 @@ function makeRelease(version, channel, { aptSource = true } = {}) {
       '',
     ].join('\n'),
   )
+  // Windows and mac builds carry the unsigned label; the Linux packages do not (signed apt repository)
   const prefix = `UniWork-Office_${version}_unsigned`
+  const linuxPrefix = `UniWork-Office_${version}`
   execFileSync(
     'dpkg-deb',
-    ['--root-owner-group', '--build', pkg, join(dir, `${prefix}_linux_x64.deb`)],
+    ['--root-owner-group', '--build', pkg, join(dir, `${linuxPrefix}_linux_x64.deb`)],
     {
       stdio: 'pipe',
     },
   )
   rmSync(pkg, { recursive: true })
   const exe = `${prefix}_win32_x64-setup.exe`
-  const appImage = `${prefix}_linux_x64.AppImage`
+  const appImage = `${linuxPrefix}_linux_x64.AppImage`
   writeFileSync(join(dir, exe), `exe ${version}`)
   writeFileSync(join(dir, appImage), `appimage ${version}`)
   writeFileSync(join(dir, `${prefix}_darwin_arm64.dmg`), `dmg ${version}`)
@@ -220,13 +222,13 @@ describe('apt-repo.sh', { skip }, () => {
       'apt/dists/dev/Release.gpg',
       'apt/dists/dev/InRelease',
       'apt/latest/dev/uniwork-office_amd64.deb',
-      'dev/0.11.0-dev.1/UniWork-Office_0.11.0-dev.1_unsigned_linux_x64.deb',
+      'dev/0.11.0-dev.1/UniWork-Office_0.11.0-dev.1_linux_x64.deb',
       'dev/0.11.0-dev.1/UniWork-Office_0.11.0-dev.1_unsigned_darwin_arm64.dmg',
       'dev/0.11.0-dev.1/SHA256SUMS-linux-x64.txt',
       'dev/0.11.0-dev.1/dev.yml',
       'dev/0.11.0-dev.1/SHA256SUMS',
       'update/dev/UniWork-Office_0.11.0-dev.1_unsigned_win32_x64-setup.exe',
-      'update/dev/UniWork-Office_0.11.0-dev.1_unsigned_linux_x64.AppImage',
+      'update/dev/UniWork-Office_0.11.0-dev.1_linux_x64.AppImage',
       'update/dev/dev.yml',
       'update/dev/dev-linux.yml',
     ]) {
@@ -250,7 +252,7 @@ describe('apt-repo.sh', { skip }, () => {
     assert.doesNotMatch(readFileSync(join(target, 'apt/key.asc'), 'utf8'), /PRIVATE/)
 
     const sums = readFileSync(join(target, 'dev/0.11.0-dev.1/SHA256SUMS'), 'utf8')
-    const deb = 'UniWork-Office_0.11.0-dev.1_unsigned_linux_x64.deb'
+    const deb = 'UniWork-Office_0.11.0-dev.1_linux_x64.deb'
     assert.match(
       sums,
       new RegExp(`^${sha256(join(target, 'dev/0.11.0-dev.1', deb))}  ${deb}$`, 'm'),
@@ -443,8 +445,9 @@ describe('apt-repo.sh', { skip }, () => {
     assert.equal(first.git_sha, GIT_SHA)
     assert.equal(first.notes_url, null)
     assert.match(first.published_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
-    assert.deepEqual(first.signed, { windows: false, macos: true, linux: false })
-    assert.deepEqual(second.signed, { windows: false, macos: false, linux: false })
+    // Linux names carry no unsigned label, so the manifest lists Linux as signed (apt repository)
+    assert.deepEqual(first.signed, { windows: false, macos: true, linux: true })
+    assert.deepEqual(second.signed, { windows: false, macos: false, linux: true })
     assert.deepEqual(first.apt, {
       suite: 'dev',
       package: 'uniwork-office',
@@ -458,9 +461,9 @@ describe('apt-repo.sh', { skip }, () => {
       'all/all/checksums/false',
       'darwin/all/checksums/false',
       'darwin/arm64/dmg/true',
-      'linux/x64/appimage/false',
+      'linux/x64/appimage/true',
       'linux/x64/checksums/false',
-      'linux/x64/deb/false',
+      'linux/x64/deb/true',
       'win32/x64/nsis/false',
     ])
     for (const asset of first.assets) {

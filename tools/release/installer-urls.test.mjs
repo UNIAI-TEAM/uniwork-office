@@ -27,8 +27,12 @@ describe('installerPlatformOf', () => {
     assert.equal(installerPlatformOf(MAC_ARM, 'dev'), 'darwin-arm64')
     assert.equal(installerPlatformOf(MAC_X64, 'dev'), 'darwin-x64')
     assert.equal(
-      installerPlatformOf('UniWork-Office_0.11.0-beta.2_unsigned_linux_x64.AppImage', 'beta'),
+      installerPlatformOf('UniWork-Office_0.11.0-beta.2_linux_x64.AppImage', 'beta'),
       'linux-x64-appimage',
+    )
+    assert.equal(
+      installerPlatformOf('UniWork-Office_0.11.0-beta.2_linux_x64.deb', 'beta'),
+      'linux-x64-deb',
     )
   })
 
@@ -43,13 +47,21 @@ describe('installerPlatformOf', () => {
     }
   })
 
-  it('refuses a Windows or Linux installer without the unsigned label', () => {
-    for (const name of [
-      'UniWork-Office_0.11.0-dev.3_win32_x64-setup.exe',
-      'UniWork-Office_0.11.0-dev.3_linux_x64.deb',
-      'UniWork-Office_0.11.0-dev.3_linux_x64.AppImage',
+  it('refuses a Windows installer without the unsigned label', () => {
+    assert.throws(
+      () => installerPlatformOf('UniWork-Office_0.11.0-dev.3_win32_x64-setup.exe', 'dev'),
+      /no "unsigned" label/,
+    )
+  })
+
+  it('accepts Linux packages with no label and the old unsigned-labelled ones (beta.10)', () => {
+    for (const [name, platform] of [
+      ['UniWork-Office_0.11.0-dev.3_linux_x64.deb', 'linux-x64-deb'],
+      ['UniWork-Office_0.11.0-dev.3_linux_x64.AppImage', 'linux-x64-appimage'],
+      ['UniWork-Office_0.11.0-dev.3_unsigned_linux_x64.deb', 'linux-x64-deb'],
+      ['UniWork-Office_0.11.0-dev.3_unsigned_linux_x64.AppImage', 'linux-x64-appimage'],
     ]) {
-      assert.throws(() => installerPlatformOf(name, 'dev'), /no "unsigned" label/, name)
+      assert.equal(installerPlatformOf(name, 'dev'), platform, name)
     }
   })
 
@@ -105,14 +117,27 @@ describe('buildInstallerUrls', () => {
     ])
   })
 
-  it('lists signed mac dmgs beside unsigned Windows and Linux installers', () => {
+  it('lists signed mac dmgs beside unsigned Windows and unlabelled Linux installers', () => {
+    const deb = 'UniWork-Office_0.11.0-dev.3_linux_x64.deb'
+    const appImage = 'UniWork-Office_0.11.0-dev.3_linux_x64.AppImage'
     const urls = buildInstallerUrls({
       channel: 'dev',
       baseUrl: BASE,
-      files: [WIN, SIGNED_MAC_ARM, SIGNED_MAC_X64],
+      files: [WIN, SIGNED_MAC_ARM, SIGNED_MAC_X64, deb, appImage],
     })
     assert.equal(urls['darwin-arm64'], `${BASE}/${SIGNED_MAC_ARM}`)
     assert.equal(urls['darwin-x64'], `${BASE}/${SIGNED_MAC_X64}`)
+    assert.equal(urls['linux-x64-deb'], `${BASE}/${deb}`)
+    assert.equal(urls['linux-x64-appimage'], `${BASE}/${appImage}`)
+  })
+
+  it('does not count a Linux package towards the mac signing state', () => {
+    const urls = buildInstallerUrls({
+      channel: 'dev',
+      baseUrl: BASE,
+      files: [MAC_ARM, 'UniWork-Office_0.11.0-dev.3_linux_x64.deb'],
+    })
+    assert.deepEqual(Object.keys(urls), ['darwin-arm64', 'linux-x64-deb'])
   })
 
   it('refuses a signed and an unsigned mac dmg in one release', () => {

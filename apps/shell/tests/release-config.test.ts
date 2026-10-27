@@ -145,7 +145,7 @@ describe('installer identity', () => {
 })
 
 describe('dev / beta release builds', () => {
-  it('use the download-server names with the unsigned label', () => {
+  it('use the download-server names with the unsigned label on Windows and mac', () => {
     const config = loadConfig({ UNIWORK_RELEASE_CHANNEL: 'dev' })
     expect(config.nsis.artifactName).toBe(
       'UniWork-Office_${version}_unsigned_win32_${arch}-setup.${ext}',
@@ -155,11 +155,9 @@ describe('dev / beta release builds', () => {
 
   it('name the Linux packages for the download server and drop the rpm', () => {
     const config = loadConfig({ UNIWORK_RELEASE_CHANNEL: 'beta', CSC_LINK: 'file:///cert.p12' })
-    // never signed, and x64 spelled out (${arch} would be amd64 / x86_64)
-    expect(config.deb.artifactName).toBe('UniWork-Office_${version}_unsigned_linux_x64.${ext}')
-    expect(config.appImage?.artifactName).toBe(
-      'UniWork-Office_${version}_unsigned_linux_x64.${ext}',
-    )
+    // no unsigned label (the apt repository is signed), x64 spelled out (${arch} would be amd64 / x86_64)
+    expect(config.deb.artifactName).toBe('UniWork-Office_${version}_linux_x64.${ext}')
+    expect(config.appImage?.artifactName).toBe('UniWork-Office_${version}_linux_x64.${ext}')
     expect(config.linux.target.map((entry) => entry.target)).toEqual(['AppImage', 'deb'])
     expect(config.deb.packageName).toBe('uniwork-office')
     expect(`${config.linux.maintainer} ${config.linux.vendor}`).not.toMatch(BRAND)

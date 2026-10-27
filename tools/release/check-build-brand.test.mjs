@@ -572,7 +572,7 @@ describe('checkBuildDir', () => {
 /** electron-builder's linux layout: linux-unpacked/ next to the deb and AppImage (no .deb here). */
 async function fakeLinuxOutput({ executable = 'uniwork-office', unpacked = true } = {}) {
   const root = newRoot()
-  writeFileSync(join(root, 'UniWork-Office_0.11.0-dev.0_unsigned_linux_x64.AppImage'), '')
+  writeFileSync(join(root, 'UniWork-Office_0.11.0-dev.0_linux_x64.AppImage'), '')
   if (!unpacked) return root
   const resources = join(root, 'linux-unpacked', 'resources')
   mkdirSync(resources, { recursive: true })
@@ -602,7 +602,7 @@ describe('Linux packages', () => {
   }
 
   it('maps deb / AppImage names to linux-unpacked', () => {
-    assert.deepEqual(impliedUnpackedDir('UniWork-Office_1.0.0-dev.1_unsigned_linux_x64.deb'), {
+    assert.deepEqual(impliedUnpackedDir('UniWork-Office_1.0.0-dev.1_linux_x64.deb'), {
       platform: 'linux',
       dir: 'linux-unpacked',
     })
@@ -615,7 +615,7 @@ describe('Linux packages', () => {
   it('passes a clean linux-unpacked and requires it for an AppImage', async () => {
     assert.deepEqual(checkBuildDir(await fakeLinuxOutput()).problems, [])
     assert.deepEqual(checkBuildDir(await fakeLinuxOutput({ unpacked: false })).problems, [
-      'linux-unpacked: unpacked app directory missing (required by UniWork-Office_0.11.0-dev.0_unsigned_linux_x64.AppImage)',
+      'linux-unpacked: unpacked app directory missing (required by UniWork-Office_0.11.0-dev.0_linux_x64.AppImage)',
     ])
     const upstream = checkBuildDir(await fakeLinuxOutput({ executable: 'genoffice' })).problems
     assert.ok(upstream.some((p) => p.startsWith('linux-unpacked file name:')))
