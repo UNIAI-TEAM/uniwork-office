@@ -221,7 +221,11 @@
 }
 
 .dh-sidebar-tree .dh-drive-nav-folder {
-  padding-inline-start: calc(var(--dh-tree-pad) + 3 * (var(--dh-tree-slot) + var(--dh-tree-gap)));
+  /* the folder icon sits under the account email's first letter, like the web */
+  padding-inline-start: calc(
+    var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap) + var(--dh-tree-icon) +
+      var(--dh-tree-gap)
+  );
 }
 
 .dh-drive-folders {

@@ -753,13 +753,13 @@ describe('tree grid numbers: TS and CSS cannot drift (D4BF-R3-3)', () => {
     expect(css).not.toMatch(/\.dh-drive-nav-lost\s*\{[^}]*background/)
   })
 
-  it('an account chevron sits under the Drive icon and a folder node starts three steps in (UNI-2223)', () => {
+  it('an account chevron sits under the Drive icon and a folder icon starts under the account email (UNI-2223)', () => {
     const css = sidebarCss.replace(/\/\*[\s\S]*?\*\//g, '')
     expect(css).toMatch(
       /\.dh-drive-twisty-account\s*\{\s*inset-inline-start:\s*calc\(var\(--dh-tree-pad\) \+ var\(--dh-tree-slot\) \+ var\(--dh-tree-gap\)\);/,
     )
     expect(css).toMatch(
-      /\.dh-sidebar-tree \.dh-drive-nav-folder\s*\{\s*padding-inline-start:\s*calc\(var\(--dh-tree-pad\) \+ 3 \* \(var\(--dh-tree-slot\) \+ var\(--dh-tree-gap\)\)\);/,
+      /\.dh-sidebar-tree \.dh-drive-nav-folder\s*\{\s*padding-inline-start:\s*calc\(\s*var\(--dh-tree-pad\) \+ var\(--dh-tree-slot\) \+ var\(--dh-tree-gap\) \+ var\(--dh-tree-icon\) \+\s*var\(--dh-tree-gap\)\s*\);/,
     )
     // a folder of an account has no raw colour of its own: the row reuses the nav-item states
     expect(css).not.toMatch(/\.dh-drive-nav-folder[^{]*\{[^}]*#[0-9a-f]{3,8}/i)
