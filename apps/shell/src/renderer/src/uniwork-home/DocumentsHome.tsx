@@ -2830,7 +2830,9 @@ export function DocumentsHome({
             />
           ) : (
             <div className={`dh-title-group${subtitleKey ? ' dh-title-stack' : ''}`}>
-              <h1 className="dh-title">{currentHeading}</h1>
+              <h1 className="dh-title" dir="auto" title={currentHeading}>
+                {currentHeading}
+              </h1>
               {subtitleKey && (
                 <p className="dh-subtitle" title={t(subtitleKey)}>
                   {t(subtitleKey)}
