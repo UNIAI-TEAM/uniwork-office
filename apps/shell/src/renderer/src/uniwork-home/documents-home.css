@@ -1681,6 +1681,12 @@
   white-space: nowrap;
 }
 
+/* the Drive subtitle is long in some locales (ru, de): it wraps instead of ellipsing at every width (D4B-fix1) */
+.dh-main:has(.dh-drive-view) .dh-subtitle {
+  white-space: normal;
+  text-overflow: clip;
+}
+
 /* order: 1 keeps the DOM order but lets the Type chips and Clear filters (order 0) follow the Type
    control, while the select pair stays pinned to the far end of the row */
 .dh-filter-bar.has-lead .dh-filter-selects {
@@ -2136,11 +2142,6 @@
 @media (max-width: 1100px) {
   .dh-main:has(.dh-drive-view) .dh-title-group.dh-title-stack {
     flex: 1 1 20rem;
-  }
-
-  .dh-main:has(.dh-drive-view) .dh-subtitle {
-    white-space: normal;
-    text-overflow: clip;
   }
 
   /* D2-V8: give the Name column the room Used-in / Tasks do not need, so short names are not cut */
