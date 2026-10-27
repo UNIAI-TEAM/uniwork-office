@@ -171,7 +171,7 @@ GNUPGHOME="$root/gnupg-other" gpgconf --kill all
 
 make_release() {
   local version="$1" out="$root/release-$1" pkg="$root/pkg-$1"
-  local prefix="UniWork-Office_${version}_unsigned"
+  local prefix="UniWork-Office_${version}"
   mkdir -p "$out" "$pkg/DEBIAN" "$pkg/opt/uniwork-office/resources/apt"
   cp "$root/pubkey.gpg" "$pkg/opt/uniwork-office/resources/apt/uniwork-office-archive-keyring.gpg"
   cp "$root/uniwork-office.sources" "$pkg/opt/uniwork-office/resources/apt/uniwork-office.sources"

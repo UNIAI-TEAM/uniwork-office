@@ -2,8 +2,9 @@ name: Release installers
 
 # Builds the UniWork Office desktop installers for the dev and beta channels:
 # Windows x64 (NSIS), macOS arm64 + x64 (dmg) and Linux x64 (AppImage, deb).
-# The mac dmgs can be signed and notarized (mac signing below); Windows and
-# Linux stay unsigned. See tools/release/README.md.
+# The mac dmgs can be signed and notarized (mac signing below); Windows
+# stays unsigned; Linux updates come through the GPG-signed apt repository.
+# See tools/release/README.md.
 #
 #   tag push v<version>-dev.<n> / v<version>-beta.<n>
 #       build every platform, then publish a pre-release for the tag (never
@@ -832,7 +833,7 @@ jobs:
           npm run build:all
           test -x apps/sheets/native/xlsx-engine/target/release/xlsx-sidecar
 
-      # Linux packages are unsigned in every mode; the release config builds
+      # Linux names carry no unsigned label (signed apt repository); the release config builds
       # the AppImage and the deb only (the download server has no rpm key).
       - name: Package the AppImage and the deb
         working-directory: apps/shell
@@ -846,7 +847,7 @@ jobs:
       # real install proves the launcher link, the URL handler registration,
       # the deployment profile carry-over and a clean uninstall.
       - name: Install check (deb)
-        run: bash tools/release/linux-install-check.sh "$BUILD_DIR/UniWork-Office_${RELEASE_VERSION}_unsigned_linux_x64.deb"
+        run: bash tools/release/linux-install-check.sh "$BUILD_DIR/UniWork-Office_${RELEASE_VERSION}_linux_x64.deb"
 
       - name: Collect the packages, the AppImage update feed file and their SHA-256 sums
         run: |
@@ -885,7 +886,7 @@ jobs:
           retention-days: 14
 
   # Read-only: runs the repository's URL helper on the built files. A file it
-  # refuses (no unsigned label outside the mac dmgs, another channel) stops the
+  # refuses (no unsigned label on Windows, another channel) stops the
   # release before anything is published.
   urls:
     # exactly one of the two mac jobs runs (meta's mac_signed); a skipped one
@@ -1027,11 +1028,11 @@ jobs:
           NOTES_END
             )"
             if [ "$MAC_SIGNED" = "true" ]; then
-              build="A $CHANNEL build (macOS signed and notarized by Apple; Windows and Linux unsigned)"
+              build="A $CHANNEL build (macOS signed and notarized by Apple; Windows unsigned)"
               mac_install="macOS: open the .dmg and drag UniWork Office to Applications."
-              title_signing="mac signed, Windows/Linux unsigned"
+              title_signing="mac signed, Windows unsigned"
             else
-              build="Unsigned $CHANNEL build"
+              build="A $CHANNEL build (Windows and macOS unsigned)"
               mac_install="$(cat <<'MAC_END'
           macOS: a .dmg downloaded in a browser can show "is damaged and can't be opened. You should move it to the Trash." The file is fine; macOS blocks it because the build is not signed yet. Open Terminal and run:
 
@@ -1040,7 +1041,7 @@ jobs:
           (for example xattr -d com.apple.quarantine ~/Downloads/<file>.dmg), then open the .dmg again and drag UniWork Office to Applications. If macOS then says it could not verify the app, right-click the app > Open, or on macOS 15 and later open it once, then System Settings > Privacy & Security > scroll to the UniWork Office message > Open Anyway, and enter your password.
           MAC_END
               )"
-              title_signing="unsigned"
+              title_signing="Windows/macOS unsigned"
             fi
             # quoted replacements: bash 5.2 otherwise expands & to the match
             NOTES="${NOTES//BUILD_PLACEHOLDER/"$build"}"

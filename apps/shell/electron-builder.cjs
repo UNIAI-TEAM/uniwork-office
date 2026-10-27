@@ -925,11 +925,12 @@ if (winSignMode) {
 // workflow sets UNIWORK_RELEASE_CHANNEL; plain local `dist:*` runs leave it
 // unset and keep the artifactName above. Release names follow the download
 // server's contract: `_<version>_` carries the version, the `unsigned` token
-// marks a build without a signing identity for that platform (it disappears
-// once one is configured), then the platform and arch:
+// marks a Windows or mac build without a signing identity (it disappears
+// once one is configured), then the platform and arch. Linux never carries
+// the token: its updates come through the GPG-signed apt repository:
 //   UniWork-Office_0.11.0-dev.1_unsigned_win32_x64-setup.exe
 //   UniWork-Office_0.11.0-dev.1_unsigned_darwin_arm64.dmg
-//   UniWork-Office_0.11.0-dev.1_unsigned_linux_x64.deb / .AppImage
+//   UniWork-Office_0.11.0-dev.1_linux_x64.deb / .AppImage
 // Only dev and beta exist; stable waits for signed builds.
 const RELEASE_CHANNELS = ['dev', 'beta']
 const RELEASE_SIGNING_ENV = [
@@ -989,13 +990,13 @@ if (releaseChannel) {
     config.mac.notarize = false
     config.dmg.sign = false
   }
-  // Linux packages are never signed, so they always carry the label. x64 is
-  // spelled out: ${arch} expands to amd64 (deb) / x86_64 (AppImage), and the
+  // Linux names carry no unsigned label: the apt repository is GPG-signed, so
+  // Linux is not presented as unsigned. x64 is spelled out: ${arch} expands to amd64 (deb) / x86_64 (AppImage), and the
   // linux targets are x64-only. The rpm is not released: the download server
   // has no rpm platform key.
   config.linux.target = config.linux.target.filter((entry) => entry.target !== 'rpm')
-  config.appImage = { artifactName: 'UniWork-Office_${version}_unsigned_linux_x64.${ext}' }
-  config.deb.artifactName = 'UniWork-Office_${version}_unsigned_linux_x64.${ext}'
+  config.appImage = { artifactName: 'UniWork-Office_${version}_linux_x64.${ext}' }
+  config.deb.artifactName = 'UniWork-Office_${version}_linux_x64.${ext}'
   // With UNIWORK_APT_SOURCE=true release debs also ship the apt source for
   // their channel; the postinst installs it, so `apt upgrade` delivers the next
   // build. Without it (repository not live yet) and in local builds the deb

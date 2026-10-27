@@ -8,8 +8,10 @@
 //
 // The platform keys, their order and the file extension per key mirror the
 // server's installer contract. Only dev and beta exist (stable waits for signed
-// builds on every platform). Only the mac dmgs may come signed, i.e. without the
-// `unsigned` label; any other installer-shaped file without it, one that carries
+// builds on every platform). The mac dmgs may come signed, i.e. without the
+// `unsigned` label, and the Linux packages never carry it (their updates come
+// through the GPG-signed apt repository; an old `_unsigned_` Linux name still
+// parses). A Windows installer without the label, one that carries
 // another channel's version, or a release mixing signed and unsigned dmgs is
 // refused rather than skipped, so a beta asset can never end up in the dev variable. Anything else in the directory
 // (checksums, mac zips, url files) is ignored. See tools/release/README.md.
@@ -28,8 +30,10 @@ export const INSTALLER_PLATFORMS = [
   'linux-x64-appimage',
 ]
 export const INSTALLER_CHANNELS = ['dev', 'beta']
-/** Platforms the release workflow can sign (Developer ID + notarization); the rest always carry the label. */
+/** Platforms the release workflow can sign (Developer ID + notarization). */
 const SIGNABLE_PLATFORMS = ['darwin-arm64', 'darwin-x64']
+/** Platforms whose names may lack the unsigned label: the signable ones and Linux (signed apt repository). */
+const LABEL_OPTIONAL_PLATFORMS = [...SIGNABLE_PLATFORMS, 'linux-x64-deb', 'linux-x64-appimage']
 
 /** The file-name ending per platform key (the release artifact names end this way). */
 export const PLATFORM_SUFFIX = {
@@ -54,17 +58,19 @@ function assertChannel(channel) {
 
 /**
  * The platform key of an installer file for `channel`, or undefined when the
- * file is not an installer. Throws for an installer that lacks the unsigned
- * label on a platform that is never signed, is of another channel, or has a
- * name the server would not accept.
+ * file is not an installer. Throws for a Windows installer that lacks the
+ * unsigned label, is of another channel, or has a name the server would not
+ * accept.
  */
 export function installerPlatformOf(fileName, channel) {
   assertChannel(channel)
   const platform = INSTALLER_PLATFORMS.find((key) => fileName.endsWith(PLATFORM_SUFFIX[key]))
   if (!platform) return undefined
   if (!SAFE_FILE_NAME.test(fileName)) throw new Error(`unsafe installer file name: ${fileName}`)
-  if (!fileName.includes('_unsigned_') && !SIGNABLE_PLATFORMS.includes(platform)) {
-    throw new Error(`${fileName} has no "unsigned" label (only the mac dmgs are signed)`)
+  if (!fileName.includes('_unsigned_') && !LABEL_OPTIONAL_PLATFORMS.includes(platform)) {
+    throw new Error(
+      `${fileName} has no "unsigned" label (only the mac dmgs and Linux packages go without)`,
+    )
   }
   const version = VERSION.exec(fileName)?.[1]
   if (!version) throw new Error(`${fileName} carries no _<version>_`)

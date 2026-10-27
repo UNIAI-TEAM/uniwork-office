@@ -2,8 +2,8 @@
 
 UniWork Office ships desktop installers on two channels, `dev` and `beta`, built by
 `.github/workflows/release-installers.yml`. The mac dmgs are signed and notarized when mac
-signing is on (see "Mac signing"); Windows and Linux builds are **unsigned**, and `stable` is
-refused until every platform signs. Auto-update is off in these builds.
+signing is on (see "Mac signing"); Windows builds are **unsigned**, Linux updates come through the
+GPG-signed apt repository, and `stable` is refused until every platform signs. Auto-update is off in these builds.
 
 | File                     | Role                                                                                    |
 | ------------------------ | --------------------------------------------------------------------------------------- |
@@ -60,8 +60,8 @@ plain local `npm run dist:win` / `dist:mac` keeps `UniWork-Office-<version>-<arc
 | Windows x64 (NSIS)  | `UniWork-Office_<version>_unsigned_win32_x64-setup.exe`                         |
 | macOS Apple Silicon | `UniWork-Office_<version>_unsigned_darwin_arm64.dmg`                            |
 | macOS Intel         | `UniWork-Office_<version>_unsigned_darwin_x64.dmg`                              |
-| Linux x64 (deb)     | `UniWork-Office_<version>_unsigned_linux_x64.deb`                               |
-| Linux x64 AppImage  | `UniWork-Office_<version>_unsigned_linux_x64.AppImage`                          |
+| Linux x64 (deb)     | `UniWork-Office_<version>_linux_x64.deb`                                        |
+| Linux x64 AppImage  | `UniWork-Office_<version>_linux_x64.AppImage`                                   |
 | Checksums           | `SHA256SUMS-win32-x64.txt`, `SHA256SUMS-darwin.txt`, `SHA256SUMS-linux-x64.txt` |
 
 The server reads the version from `_<version>_` and the `unsigned` flag from the name. The
@@ -70,7 +70,8 @@ platform: a mac signing run ships `UniWork-Office_<version>_darwin_arm64.dmg` /
 `_darwin_x64.dmg` (see "Mac signing"). Release builds produce no mac zips (they only feed an
 updater, which is off); plain local `dist:mac` still builds them.
 
-Linux packages are never signed, so their names always carry `_unsigned`, and the arch is
+Linux names never carry `_unsigned` (the apt repository is GPG-signed; the beta.10 packages
+still carry it and still parse), and the arch is
 spelled `x64` (electron-builder's own `${arch}` would say `amd64` / `x86_64`). The deb's
 `Package` is `uniwork-office`, its `Maintainer` / `Vendor` / `Homepage` come from
 `apps/shell/src/shared/legal.json`. Release builds **do not build the rpm**: the download
@@ -99,8 +100,8 @@ redirects, mirror the files to a host that serves them directly and regenerate t
 node tools/release/installer-urls.mjs --channel dev --base-url https://downloads.example/office/dev --dir <folder with the installers>
 ```
 
-The helper refuses an installer without the `unsigned` label (only the mac dmgs may come
-signed), a release mixing signed and unsigned dmgs, another channel's version, two installers
+The helper refuses a Windows installer without the `unsigned` label (the mac dmgs may come
+signed and the Linux packages never carry it), a release mixing signed and unsigned dmgs, another channel's version, two installers
 for one platform, mixed versions and a non-HTTPS base URL.
 
 ## Unsigned builds: first launch
@@ -118,9 +119,9 @@ for one platform, mixed versions and a non-HTTPS base URL.
   Open does not help). Run `xattr -d com.apple.quarantine <path to the .dmg>` and open the
   image again. The release body (the `--notes` text in `release-installers.yml`) carries this
   note and the Open Anyway path; keep the two in step with this section.
-- **Linux:** `sudo apt install ./UniWork-Office_<version>_unsigned_linux_x64.deb` (Debian,
+- **Linux:** `sudo apt install ./UniWork-Office_<version>_linux_x64.deb` (Debian,
   Ubuntu), or `chmod +x` the AppImage and run it (needs FUSE 2, `libfuse2` /
-  `libfuse2t64` on Ubuntu). Nothing is signed on Linux, so no prompt appears. The deb
+  `libfuse2t64` on Ubuntu). The packages are not code-signed and no prompt appears; the apt repository the deb adds is GPG-signed. The deb
   installs an AppArmor profile on Ubuntu 24.04 and later, where the sandbox needs it.
 
 With mac signing on, the dmg opens without a prompt: the release body then says so instead of
@@ -497,7 +498,7 @@ Linux (x64 Debian / Ubuntu host; `npm run build:all` builds the sidecar natively
 npm run notices && npm run build:all
 cd apps/shell && UNIWORK_RELEASE_CHANNEL=dev BUILD_DIR=release-local \n  npx electron-builder --linux --x64 --publish never -c.extraMetadata.version=0.11.0-dev.0
 cd ../.. && node tools/release/check-build-brand.mjs --dir apps/shell/release-local --expect linux-unpacked
-bash tools/release/linux-install-check.sh apps/shell/release-local/UniWork-Office_0.11.0-dev.0_unsigned_linux_x64.deb --smoke
+bash tools/release/linux-install-check.sh apps/shell/release-local/UniWork-Office_0.11.0-dev.0_linux_x64.deb --smoke
 ```
 
 ## Not covered
