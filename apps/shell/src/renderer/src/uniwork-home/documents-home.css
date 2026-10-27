@@ -2138,6 +2138,11 @@
     flex: 1 1 20rem;
   }
 
+  .dh-main:has(.dh-drive-view) .dh-subtitle {
+    white-space: normal;
+    text-overflow: clip;
+  }
+
   /* D2-V8: give the Name column the room Used-in / Tasks do not need, so short names are not cut */
   .dh-drive-col-name {
     width: 36%;
@@ -2157,11 +2162,6 @@
 
   .dh-drive-col-tasks {
     width: 12%;
-  }
-
-  .dh-main:has(.dh-drive-view) .dh-subtitle {
-    white-space: normal;
-    text-overflow: clip;
   }
 
   .dh-drive-th {
@@ -2251,8 +2251,8 @@
   color: var(--text-secondary);
 }
 
-/* the panel carries the details, so the list keeps Name + Access and lets the badge wrap (D3-V1; not when the panel stacks under the table, <= 760 px) */
-@media (min-width: 761px) {
+/* the panel carries the details, so the list keeps Name + Access and lets the badge wrap (D3-V1; not when the panel stacks under the table, <= 900 px) */
+@media (min-width: 901px) {
   .dh-drive-view.has-panel .dh-drive-col-account,
   .dh-drive-view.has-panel .dh-drive-cell-account,
   .dh-drive-view.has-panel .dh-drive-col-used,
@@ -2557,7 +2557,7 @@ p.dh-drive-panel-muted {
   }
 }
 
-@media (min-width: 761px) and (max-width: 1100px) {
+@media (min-width: 901px) and (max-width: 1100px) {
   .dh-drive-view.has-panel .dh-drive-col-access,
   .dh-drive-view.has-panel .dh-drive-cell-access {
     display: none;
@@ -2568,7 +2568,8 @@ p.dh-drive-panel-muted {
   }
 }
 
-@media (max-width: 760px) {
+/* D4B-fix1: up to 900 px the list is three columns wide, so the panel sits below it instead of squeezing it */
+@media (max-width: 900px) {
   .dh-drive-body {
     flex-direction: column;
   }
