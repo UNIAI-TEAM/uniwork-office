@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type {
   DriveConnection,
@@ -13,6 +13,12 @@ import { FileBadge } from '../FileBadge'
 import { ListState } from '../doclist/ListState'
 import { useI18n, type TFunc } from '../locale'
 import { driveErrorKey } from './drive-panel-model'
+import {
+  driveFolderGroupCount,
+  driveFolderGroupLabel,
+  groupDriveFilesByFolder,
+} from './drive-folder-groups'
+import { readDriveGroupByFolder, writeDriveGroupByFolder } from './drive-folder-prefs'
 import {
   buildDriveSidebarState,
   fetchDocumentsHomeDriveFiles,
@@ -391,7 +397,27 @@ export function DriveList({
   onManageConnections,
   onReconnect,
 }: DriveListProps) {
-  const { t } = useI18n()
+  const { t, dateLocale } = useI18n()
+
+  const [groupByFolder, setGroupByFolder] = useState<boolean>(() => readDriveGroupByFolder())
+  // collapsed groups are remembered for this session only
+  const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(() => new Set())
+  const toggleGroupByFolder = () => {
+    const next = !groupByFolder
+    setGroupByFolder(next)
+    writeDriveGroupByFolder(next)
+  }
+  const toggleFolder = (key: string) =>
+    setCollapsedFolders((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(key)) next.add(key)
+      return next
+    })
+  // null = nothing to group (off, or every file's folder unknown): the flat list shows
+  const folderGroups = useMemo(
+    () => (groupByFolder ? groupDriveFilesByFolder(files, dateLocale) : null),
+    [groupByFolder, files, dateLocale],
+  )
 
   const resolvedAccountId = resolveDriveAccountFilter(selectedAccountId, connections)
   const selectedConnection = resolvedAccountId
@@ -432,9 +458,107 @@ export function DriveList({
     else onOpenOnGoogle(driveFileId)
   }
 
+  const renderRow = (file: DriveFile) => {
+    const badge = formatDriveAccessBadge(file, t)
+    const viewerConnId = file.viewerConnectionId || file.connectionId
+    const viewerConn = viewerConnId ? connectionById.get(viewerConnId) : undefined
+    const rowNeedsReconnect =
+      file.viewerAccess === 'connection_lost' ||
+      file.boundConnectionLost === true ||
+      Boolean(
+        viewerConn &&
+        (viewerConn.needsReconnect ||
+          viewerConn.status === 'needs_reconnect' ||
+          Boolean(viewerConn.authFailedAt)),
+      )
+    const viewerEmail = file.viewerAccountEmail?.trim() ?? ''
+    // a row without the viewer's account says why, instead of a bare dash
+    const accountEmail = viewerEmail || t('uhDriveViewerEmailMissing')
+    const usedInText = formatDriveUsedIn(file, t)
+    const tasksCreatedText = formatDriveTasksCreated(file, t)
+
+    return (
+      <tr
+        key={file.id}
+        className={`dh-drive-row${selectedFileId === file.id ? ' is-selected' : ''}`}
+        data-drive-file-id={file.id}
+        aria-current={selectedFileId === file.id ? 'true' : undefined}
+        tabIndex={0}
+        onClick={() => onSelect?.(file.id, 'pointer')}
+        onDoubleClick={(e) => {
+          const target = e.target as HTMLElement | null
+          if (target && target.closest('button, a, input')) return
+          onOpenOnGoogle(file.id)
+        }}
+        onKeyDown={(e) => onRowKeyDown(e, file.id)}
+      >
+        <td className="dh-drive-td dh-drive-cell-name">
+          <div className="dh-drive-name-wrap">
+            <DriveFileIcon iconKind={file.iconKind} size={24} />
+            <span className="dh-drive-file-name" title={file.name}>
+              {file.name}
+            </span>
+          </div>
+        </td>
+        <td className="dh-drive-td dh-drive-cell-account">
+          <div className="dh-drive-account-stack">
+            <span
+              className={`dh-drive-account-email${viewerEmail ? '' : ' is-missing'}`}
+              title={accountEmail}
+            >
+              {accountEmail}
+            </span>
+            {rowNeedsReconnect &&
+              (onReconnect ? (
+                <button
+                  type="button"
+                  className="dh-drive-reconnect-link"
+                  data-drive-reconnect={viewerConnId || file.connectionId}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onReconnect(viewerConnId || file.connectionId)
+                  }}
+                >
+                  <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
+                  <span>{t('uhDriveReconnect')}</span>
+                </button>
+              ) : (
+                <span
+                  className="dh-drive-reconnect-link dh-drive-reconnect-text"
+                  data-drive-reconnect={viewerConnId || file.connectionId}
+                >
+                  <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
+                  <span>{t('uhDriveReconnect')}</span>
+                </span>
+              ))}
+          </div>
+        </td>
+        <td className="dh-drive-td dh-drive-cell-access">
+          <span
+            className={`dh-vis-badge dh-drive-badge dh-drive-badge-${badge.tone}`}
+            data-drive-access={badge.tone}
+          >
+            {badge.label}
+          </span>
+        </td>
+        <td className="dh-drive-td dh-drive-cell-used">{usedInText}</td>
+        <td className="dh-drive-td dh-drive-cell-tasks">{tasksCreatedText}</td>
+      </tr>
+    )
+  }
+
   return (
     <div className={`dh-drive-view${panel ? ' has-panel' : ''}`} data-drive-view="">
       <div className="dh-drive-actions-bar">
+        <label className="dh-drive-group-switch">
+          <input
+            type="checkbox"
+            checked={groupByFolder}
+            data-drive-group-by-folder=""
+            onChange={toggleGroupByFolder}
+          />
+          <span>{t('uhDriveGroupBy')}</span>
+        </label>
         <button
           type="button"
           className="btn btn-secondary dh-toolbar-btn dh-drive-manage-btn"
@@ -560,96 +684,58 @@ export function DriveList({
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
-                    {files.map((file) => {
-                      const badge = formatDriveAccessBadge(file, t)
-                      const viewerConnId = file.viewerConnectionId || file.connectionId
-                      const viewerConn = viewerConnId ? connectionById.get(viewerConnId) : undefined
-                      const rowNeedsReconnect =
-                        file.viewerAccess === 'connection_lost' ||
-                        file.boundConnectionLost === true ||
-                        Boolean(
-                          viewerConn &&
-                          (viewerConn.needsReconnect ||
-                            viewerConn.status === 'needs_reconnect' ||
-                            Boolean(viewerConn.authFailedAt)),
-                        )
-                      const viewerEmail = file.viewerAccountEmail?.trim() ?? ''
-                      // a row without the viewer's account says why, instead of a bare dash
-                      const accountEmail = viewerEmail || t('uhDriveViewerEmailMissing')
-                      const usedInText = formatDriveUsedIn(file, t)
-                      const tasksCreatedText = formatDriveTasksCreated(file, t)
-
+                  {folderGroups ? (
+                    folderGroups.map((group) => {
+                      const open = !collapsedFolders.has(group.key)
+                      const label = driveFolderGroupLabel(group, t)
                       return (
-                        <tr
-                          key={file.id}
-                          className={`dh-drive-row${selectedFileId === file.id ? ' is-selected' : ''}`}
-                          data-drive-file-id={file.id}
-                          aria-current={selectedFileId === file.id ? 'true' : undefined}
-                          tabIndex={0}
-                          onClick={() => onSelect?.(file.id, 'pointer')}
-                          onDoubleClick={(e) => {
-                            const target = e.target as HTMLElement | null
-                            if (target && target.closest('button, a, input')) return
-                            onOpenOnGoogle(file.id)
-                          }}
-                          onKeyDown={(e) => onRowKeyDown(e, file.id)}
+                        <tbody
+                          key={group.key}
+                          className="dh-drive-group"
+                          data-drive-group={group.key}
+                          data-drive-group-kind={group.kind}
                         >
-                          <td className="dh-drive-td dh-drive-cell-name">
-                            <div className="dh-drive-name-wrap">
-                              <DriveFileIcon iconKind={file.iconKind} size={24} />
-                              <span className="dh-drive-file-name" title={file.name}>
-                                {file.name}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="dh-drive-td dh-drive-cell-account">
-                            <div className="dh-drive-account-stack">
-                              <span
-                                className={`dh-drive-account-email${viewerEmail ? '' : ' is-missing'}`}
-                                title={accountEmail}
-                              >
-                                {accountEmail}
-                              </span>
-                              {rowNeedsReconnect &&
-                                (onReconnect ? (
-                                  <button
-                                    type="button"
-                                    className="dh-drive-reconnect-link"
-                                    data-drive-reconnect={viewerConnId || file.connectionId}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      onReconnect(viewerConnId || file.connectionId)
-                                    }}
-                                  >
-                                    <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
-                                    <span>{t('uhDriveReconnect')}</span>
-                                  </button>
-                                ) : (
-                                  <span
-                                    className="dh-drive-reconnect-link dh-drive-reconnect-text"
-                                    data-drive-reconnect={viewerConnId || file.connectionId}
-                                  >
-                                    <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
-                                    <span>{t('uhDriveReconnect')}</span>
-                                  </span>
-                                ))}
-                            </div>
-                          </td>
-                          <td className="dh-drive-td dh-drive-cell-access">
-                            <span
-                              className={`dh-vis-badge dh-drive-badge dh-drive-badge-${badge.tone}`}
-                              data-drive-access={badge.tone}
+                          <tr className="dh-group-row dh-drive-group-row">
+                            <th
+                              scope="rowgroup"
+                              colSpan={DRIVE_COLUMNS.length}
+                              className="dh-group-cell"
                             >
-                              {badge.label}
-                            </span>
-                          </td>
-                          <td className="dh-drive-td dh-drive-cell-used">{usedInText}</td>
-                          <td className="dh-drive-td dh-drive-cell-tasks">{tasksCreatedText}</td>
-                        </tr>
+                              <button
+                                type="button"
+                                className="dh-group-toggle"
+                                aria-expanded={open}
+                                title={label}
+                                onClick={() => toggleFolder(group.key)}
+                              >
+                                <svg
+                                  className="dh-group-chevron"
+                                  width="10"
+                                  height="10"
+                                  viewBox="0 0 10 10"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M2.5 3.5L5 6.5l2.5-3" />
+                                </svg>
+                                <span className="dh-drive-group-label">{label}</span>
+                                <span className="dh-group-count">
+                                  {` · ${driveFolderGroupCount(group.files.length, t)}`}
+                                </span>
+                              </button>
+                            </th>
+                          </tr>
+                          {open && group.files.map(renderRow)}
+                        </tbody>
                       )
-                    })}
-                  </tbody>
+                    })
+                  ) : (
+                    <tbody>{files.map(renderRow)}</tbody>
+                  )}
                 </table>
               </div>
 

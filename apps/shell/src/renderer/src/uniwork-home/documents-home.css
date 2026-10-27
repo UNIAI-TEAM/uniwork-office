@@ -1867,6 +1867,53 @@
   gap: 8px;
 }
 
+/* UNI-2172: "Group by folder" sits at the start of the bar, the buttons stay at the end */
+.dh-drive-group-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-end: auto;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dh-drive-group-switch input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.dh-drive-group-switch:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* the folder groups of the Drive list: the header is the shared group row, the files sit 28px in */
+.dh-drive-group + .dh-drive-group .dh-drive-group-row {
+  border-top: 1px solid var(--border);
+}
+
+.dh-drive-group .dh-group-cell {
+  padding: 0;
+  text-align: start;
+}
+
+.dh-drive-group .dh-drive-cell-name {
+  padding-inline-start: 42px;
+}
+
+.dh-drive-group-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-drive-group-row .dh-group-count {
+  flex: none;
+}
+
 .dh-drive-add-btn {
   display: inline-flex;
   align-items: center;
