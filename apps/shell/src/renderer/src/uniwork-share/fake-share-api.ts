@@ -6,9 +6,17 @@
 import {
   BREAK_GLASS_REASON_MAX,
   BREAK_GLASS_REASON_MIN,
+  FOLDER_CONTENTS_ACCESS_MAX_ITEMS,
+  FOLDER_CONTENTS_ACCESS_MODES,
+  SHARE_LEVELS,
   SHARE_OWNER_KEEP_LEVELS,
 } from '../../../shared/share-api'
 import type {
+  FolderContentsAccessBatch,
+  FolderContentsAccessBatchRequest,
+  FolderContentsAccessCounts,
+  FolderContentsAccessRequest,
+  FolderContentsAccessResult,
   ShareAccess,
   ShareAccessRequest,
   ShareBreakGlassGrant,
@@ -30,6 +38,31 @@ import type {
   ShareWarning,
   UniworkShareApi,
 } from '../../../shared/share-api'
+
+/**
+ * UNI-2244: the one seeded folder of `folderContentsAccess`. The counts are deterministic: of
+ * `total` documents, `notManageable` and `locked` are skipped, `unchanged` already hold the asked
+ * access, and the rest change. A run of `total <= syncMax` answers at once (sync); a bigger one is a
+ * background batch that moves one step on each `folderContentsAccessBatch` call.
+ */
+export interface FakeFolderContentsOptions {
+  /** the seeded folder; the seeded document id is `not_a_folder`, any other id `not_found` (default `fld_1`) */
+  folderId?: string
+  /** documents under the folder (default 12) */
+  total?: number
+  notManageable?: number
+  locked?: number
+  unchanged?: number
+  /** dry run of a `replace`: people who lose a document / whose level drops (default 0) */
+  losingUsers?: number
+  downgradedUsers?: number
+  /** the largest total that runs inside the request (default 500, the server's) */
+  syncMax?: number
+  /** GETs a background batch needs to end (default 3: queued -> running -> ... -> ended) */
+  batchSteps?: number
+  /** the background batch ends `failed` instead of `completed` */
+  batchFails?: boolean
+}
 
 export interface FakeShareOptions {
   /** the seeded document; any other id is not_found (default `doc_1`) */
@@ -54,6 +87,8 @@ export interface FakeShareOptions {
   restricted?: boolean
   /** UNI-2078: the signed-in user (default `u_admin`, the break-glass actor) */
   selfUserId?: string
+  /** UNI-2244: the folder contents access command's data (defaults apply when omitted) */
+  folderContents?: FakeFolderContentsOptions
   /** UNI-2078: the owner transfer answers this refusal; `endpoint_missing` = a server without the route */
   ownerTransferRefuses?:
     | 'owner_target_not_member'
@@ -115,6 +150,18 @@ const OWNER_REFUSAL_STATUS = {
 } as const
 
 const keyOf = (type: string, id: string) => `${type}:${id}`
+
+const pick = (item: { principalType: SharePrincipalType; principalId: string }) => ({
+  principalType: item.principalType,
+  principalId: item.principalId,
+})
+
+const NO_COUNTS: FolderContentsAccessCounts = {
+  changed: 0,
+  unchanged: 0,
+  skippedNotManageable: 0,
+  skippedLocked: 0,
+}
 
 export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi {
   const documentId = options.documentId ?? 'doc_1'
@@ -447,6 +494,136 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
     }
   }
 
+  // UNI-2244: the folder contents access command
+  const folderOptions = options.folderContents ?? {}
+  const folderId = folderOptions.folderId ?? 'fld_1'
+  const folderTotal = folderOptions.total ?? 12
+  const syncMax = folderOptions.syncMax ?? 500
+  const batchSteps = Math.max(1, folderOptions.batchSteps ?? 3)
+  const folderCounts = (): FolderContentsAccessCounts => {
+    const skippedNotManageable = folderOptions.notManageable ?? 0
+    const skippedLocked = folderOptions.locked ?? 0
+    const unchanged = folderOptions.unchanged ?? 0
+    return {
+      changed: Math.max(0, folderTotal - skippedNotManageable - skippedLocked - unchanged),
+      unchanged,
+      skippedNotManageable,
+      skippedLocked,
+    }
+  }
+  const batches = new Map<string, { gets: number; folderId: string }>()
+  /** the batch that still holds the folder (not ended), if any */
+  const runningBatch = (): string | undefined => {
+    for (const [id, batch] of batches) {
+      if (batch.folderId === folderId && batch.gets < batchSteps) return id
+    }
+    return undefined
+  }
+  const principalKnown = (type: SharePrincipalType, id: string): boolean =>
+    type === 'user'
+      ? ACTIVE_PEOPLE.some((p) => p.userId === id)
+      : type === 'workspace'
+        ? WORKSPACES.some((w) => w.id === id)
+        : id === ORG.id
+
+  const folderContentsAccess = (
+    req: FolderContentsAccessRequest,
+  ): ShareResult<FolderContentsAccessResult> => {
+    if (req.folderId === documentId) return fail('not_a_folder', 422)
+    if (req.folderId !== folderId) return fail('not_found', 404)
+    if (
+      !(FOLDER_CONTENTS_ACCESS_MODES as readonly string[]).includes(req.mode) ||
+      typeof req.dryRun !== 'boolean' ||
+      !Array.isArray(req.items) ||
+      req.items.length > FOLDER_CONTENTS_ACCESS_MAX_ITEMS ||
+      (req.items.length === 0 && req.mode !== 'replace') ||
+      req.items.some((item) => !(SHARE_LEVELS as readonly string[]).includes(item.level))
+    ) {
+      return fail('invalid_request', 400)
+    }
+    // the whole list is checked before anything is written: any bad item refuses the run
+    const rejected: ShareRejectedItem[] = []
+    const seen = new Set<string>()
+    req.items.forEach((item, index) => {
+      const key = keyOf(item.principalType, item.principalId)
+      if (seen.has(key)) {
+        rejected.push({ index, ...pick(item), code: 'duplicate_principal' })
+      } else if (!principalKnown(item.principalType, item.principalId)) {
+        rejected.push({ index, ...pick(item), code: 'principal_not_in_organization' })
+      }
+      seen.add(key)
+    })
+    if (rejected.length > 0) return { ...fail('document_access_rejected', 422), rejected }
+    const running = runningBatch()
+    if (running) return { ...fail('folder_access_batch_running', 409), batchId: running }
+    const counts = folderCounts()
+    if (req.dryRun) {
+      const warnings: string[] = []
+      if (req.items.some((i) => i.principalType !== 'user')) warnings.push('wide_scope')
+      if (req.mode === 'replace') {
+        if (
+          !req.items.some(
+            (i) => keyOf(i.principalType, i.principalId) === keyOf('workspace', HOME_WORKSPACE),
+          )
+        ) {
+          warnings.push('to_private')
+        }
+        if ((folderOptions.downgradedUsers ?? 0) > 0) warnings.push('downgrade')
+      }
+      const replace = req.mode === 'replace'
+      return {
+        ok: true,
+        value: {
+          kind: 'dryRun',
+          total: folderTotal,
+          preview: {
+            ...counts,
+            losingUsers: replace ? (folderOptions.losingUsers ?? 0) : 0,
+            downgradedUsers: replace ? (folderOptions.downgradedUsers ?? 0) : 0,
+            warnings,
+          },
+        },
+      }
+    }
+    const batchId = nextId('fb')
+    if (folderTotal <= syncMax) {
+      return { ok: true, value: { kind: 'sync', batchId, total: folderTotal, ...counts } }
+    }
+    batches.set(batchId, { gets: 0, folderId })
+    return { ok: true, value: { kind: 'background', batchId, total: folderTotal } }
+  }
+
+  /** each call moves a background batch one step: queued, running ..., then completed (or failed) */
+  const folderContentsAccessBatch = (
+    req: FolderContentsAccessBatchRequest,
+  ): ShareResult<FolderContentsAccessBatch> => {
+    const batch = batches.get(req.batchId)
+    if (req.folderId !== folderId || !batch) return fail('not_found', 404)
+    batch.gets = Math.min(batch.gets + 1, batchSteps)
+    const ended = batch.gets >= batchSteps
+    const processed = ended
+      ? folderTotal
+      : Math.min(folderTotal, Math.ceil((folderTotal * (batch.gets - 1)) / batchSteps))
+    const status: FolderContentsAccessBatch['status'] = ended
+      ? folderOptions.batchFails
+        ? 'failed'
+        : 'completed'
+      : batch.gets === 1
+        ? 'queued'
+        : 'running'
+    return {
+      ok: true,
+      value: {
+        batchId: req.batchId,
+        status,
+        total: folderTotal,
+        processed,
+        ...(ended && !folderOptions.batchFails ? folderCounts() : NO_COUNTS),
+        ...(ended ? { finishedAt: NOW } : {}),
+      },
+    }
+  }
+
   const api: FakeShareApi = {
     calls,
     failNext: (method, failure) => void failures.set(method, failure),
@@ -564,6 +741,12 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
     ownerCandidates: (id) => call('ownerCandidates', [id], () => ownerCandidates(id)),
 
     transferOwner: (input) => call('transferOwner', [input], () => transferOwner(input)),
+
+    folderContentsAccess: (req) =>
+      call('folderContentsAccess', [req], () => folderContentsAccess(req)),
+
+    folderContentsAccessBatch: (req) =>
+      call('folderContentsAccessBatch', [req], () => folderContentsAccessBatch(req)),
 
     bulk: (plan: ShareBulkPlan) =>
       call('bulk', [plan], () => {

@@ -1,6 +1,12 @@
 import {
   SHARE_LEVELS,
   SHARE_PRINCIPAL_TYPES,
+  FOLDER_CONTENTS_ACCESS_BATCH_STATUSES,
+  type FolderContentsAccessBatch,
+  type FolderContentsAccessBatchStatus,
+  type FolderContentsAccessCounts,
+  type FolderContentsAccessPreview,
+  type FolderContentsAccessResult,
   type ShareAccess,
   type ShareAccessRequest,
   type ShareBreakGlassGrant,
@@ -495,6 +501,88 @@ export function parseActiveOrgMembers(raw: unknown): {
     if (name) members.push({ userId, name, email })
   }
   return { members, nextCursor: typeof next === 'string' ? next : '' }
+}
+
+/** UNI-2244: a count the server must send: a safe non-negative integer, else the whole answer is malformed */
+function count(value: unknown): number {
+  const n = nonNegInt(value)
+  if (n === null) bad()
+  return n
+}
+
+function folderCountsOf(body: Record<string, unknown>): FolderContentsAccessCounts {
+  return {
+    changed: count(body.changed),
+    unchanged: count(body.unchanged),
+    skippedNotManageable: count(body.skipped_not_manageable),
+    skippedLocked: count(body.skipped_locked),
+  }
+}
+
+function folderPreviewOf(raw: unknown): FolderContentsAccessPreview {
+  const body = record(raw)
+  // the codes stay open (`wide_scope` | `downgrade` | `to_private` today); only non-text entries are bad
+  if (!Array.isArray(body.warnings)) bad()
+  const warnings = body.warnings.map((entry) => {
+    if (typeof entry !== 'string' || entry.length === 0 || entry.length > MAX_ID) bad()
+    return entry
+  })
+  return {
+    ...folderCountsOf(body),
+    losingUsers: count(body.losing_users),
+    downgradedUsers: count(body.downgraded_users),
+    warnings,
+  }
+}
+
+/**
+ * UNI-2244: `PUT /documents/{folderId}/contents-access`. A write must be provable, so every
+ * count is required and the shape has to agree with the request and the HTTP status: a dry run
+ * answers 200 with a preview, a write answers 200 `sync` or 202 `background`, never the other way.
+ */
+export function parseFolderContentsAccess(
+  raw: unknown,
+  status: number,
+  dryRun: boolean,
+): FolderContentsAccessResult {
+  const body = record(raw)
+  const total = count(body.total)
+  if (dryRun) {
+    if (status !== 200 || body.mode !== undefined) bad()
+    return { kind: 'dryRun', total, preview: folderPreviewOf(body.preview) }
+  }
+  const batchId = required(body.batch_id)
+  if (body.mode === 'sync' && status === 200) {
+    return { kind: 'sync', batchId, total, ...folderCountsOf(body) }
+  }
+  if (body.mode === 'background' && status === 202) return { kind: 'background', batchId, total }
+  return bad()
+}
+
+/** UNI-2244: `GET .../contents-access/{batchId}`; an unknown status is not a state the UI can act on */
+export function parseFolderContentsAccessBatch(raw: unknown): FolderContentsAccessBatch {
+  const body = record(raw)
+  const status = body.status
+  if (
+    typeof status !== 'string' ||
+    !(FOLDER_CONTENTS_ACCESS_BATCH_STATUSES as readonly string[]).includes(status)
+  ) {
+    bad()
+  }
+  const total = count(body.total)
+  const processed = count(body.processed)
+  // progress past the end is not a count a bar can show
+  if (processed > total) bad()
+  const finishedAt = body.finished_at
+  if (finishedAt !== undefined && finishedAt !== null && typeof finishedAt !== 'string') bad()
+  return {
+    batchId: required(body.batch_id),
+    status: status as FolderContentsAccessBatchStatus,
+    total,
+    processed,
+    ...folderCountsOf(body),
+    ...(typeof finishedAt === 'string' && finishedAt ? { finishedAt } : {}),
+  }
 }
 
 export { parseRejectedItems } from './share-rejected'

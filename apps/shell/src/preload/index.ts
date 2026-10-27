@@ -149,6 +149,8 @@ import {
   type UniworkDriveResult,
 } from '../shared/uniwork-drive-api'
 import type {
+  FolderContentsAccessBatch,
+  FolderContentsAccessResult,
   ShareAccess,
   ShareAccessRequest,
   ShareBreakGlassGrant,
@@ -2268,6 +2270,7 @@ function asShareResult<T>(result: unknown): ShareResult<T> {
       error?: unknown
       status?: unknown
       rejected?: unknown
+      batchId?: unknown
       retryable?: unknown
       endpointMissing?: unknown
     }
@@ -2278,6 +2281,7 @@ function asShareResult<T>(result: unknown): ShareResult<T> {
         error: r.error as Extract<ShareResult<T>, { ok: false }>['error'],
         ...(typeof r.status === 'number' ? { status: r.status } : {}),
         ...(Array.isArray(r.rejected) ? { rejected: r.rejected as ShareRejectedItem[] } : {}),
+        ...(typeof r.batchId === 'string' && r.batchId ? { batchId: r.batchId } : {}),
         ...(r.retryable === true ? { retryable: true } : {}),
         ...(r.endpointMissing === true ? { endpointMissing: true } : {}),
       }
@@ -2358,6 +2362,16 @@ const shareApi: UniworkShareApi = {
   async transferOwner(input) {
     return asShareResult<ShareOwnerTransfer>(
       await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.transferOwner, input),
+    )
+  },
+  async folderContentsAccess(request) {
+    return asShareResult<FolderContentsAccessResult>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.folderContentsAccess, request),
+    )
+  },
+  async folderContentsAccessBatch(request) {
+    return asShareResult<FolderContentsAccessBatch>(
+      await ipcRenderer.invoke(UNIWORK_SHARE_CHANNELS.folderContentsAccessBatch, request),
     )
   },
 }

@@ -2,9 +2,15 @@ import { randomUUID } from 'node:crypto'
 import {
   BREAK_GLASS_REASON_MAX,
   BREAK_GLASS_REASON_MIN,
+  FOLDER_CONTENTS_ACCESS_MAX_ITEMS,
+  FOLDER_CONTENTS_ACCESS_MODES,
   SHARE_LEVELS,
   SHARE_OWNER_KEEP_LEVELS,
   SHARE_PRINCIPAL_TYPES,
+  type FolderContentsAccessBatch,
+  type FolderContentsAccessItem,
+  type FolderContentsAccessRequest,
+  type FolderContentsAccessResult,
   type ShareAccess,
   type ShareAccessRequest,
   type ShareBreakGlassGrant,
@@ -36,6 +42,8 @@ import {
   type ShareOwnerGate,
   parseBreakGlassGrant,
   parseBreakGlassRevoke,
+  parseFolderContentsAccess,
+  parseFolderContentsAccessBatch,
   parseShareMembers,
   parseRequestDecision,
   parseShareAccess,
@@ -112,6 +120,18 @@ export interface UniworkShareClient {
     documentId: string,
     body: { userId: string; previousOwnerLevel?: ShareOwnerKeepLevel },
   ): Promise<ShareOwnerTransfer>
+  /**
+   * UNI-2244: `PUT /documents/{folderId}/contents-access` (dry run, sync write or background batch).
+   * The answer must agree with the request and the status (see `parseFolderContentsAccess`).
+   */
+  updateFolderContentsAccess(
+    request: FolderContentsAccessRequest,
+  ): Promise<FolderContentsAccessResult>
+  /** UNI-2244: `GET /documents/{folderId}/contents-access/{batchId}` */
+  getFolderContentsAccessBatch(
+    folderId: string,
+    batchId: string,
+  ): Promise<FolderContentsAccessBatch>
   /** UNI-2078: `GET /documents/{id}`, what the owner gate reads */
   getOwnerGate(documentId: string): Promise<ShareOwnerGate>
   /** UNI-2078: `GET /workspaces/{ws}/members` as user ids */
@@ -146,6 +166,19 @@ function wireItem(item: ShareUpdateItem): Record<string, unknown> {
   }
 }
 
+function wireFolderItem(item: FolderContentsAccessItem): Record<string, unknown> {
+  if (!item || typeof item !== 'object') invalid()
+  if (!(SHARE_PRINCIPAL_TYPES as readonly string[]).includes(item.principalType)) invalid()
+  if (typeof item.principalId !== 'string' || !PRINCIPAL_ID.test(item.principalId)) invalid()
+  // there is no removal item: `replace` removes whoever is not listed
+  if (!(SHARE_LEVELS as readonly string[]).includes(item.level as string)) invalid()
+  return {
+    principal_type: item.principalType,
+    principal_id: item.principalId,
+    level: item.level,
+  }
+}
+
 export function createUniworkShareClient(options: UniworkDocsClientOptions): UniworkShareClient {
   const timeoutMs = options.metadataTimeoutMs ?? METADATA_TIMEOUT_MS
   const send = createUniworkSend(options)
@@ -176,6 +209,43 @@ export function createUniworkShareClient(options: UniworkDocsClientOptions): Uni
         read: json,
       })
       return parseShareUpdate(raw)
+    },
+
+    async updateFolderContentsAccess(request) {
+      if (!request || typeof request !== 'object') invalid()
+      if (!(FOLDER_CONTENTS_ACCESS_MODES as readonly string[]).includes(request.mode)) invalid()
+      if (typeof request.dryRun !== 'boolean') invalid()
+      if (
+        !Array.isArray(request.items) ||
+        request.items.length > FOLDER_CONTENTS_ACCESS_MAX_ITEMS
+      ) {
+        invalid()
+      }
+      // an empty list is valid only with replace (it removes every share)
+      if (request.items.length === 0 && request.mode !== 'replace') invalid()
+      const route = `${docRoute(request.folderId)}/contents-access`
+      const items = request.items.map(wireFolderItem)
+      const { status, body } = await send({
+        method: 'PUT',
+        route,
+        json: { mode: request.mode, items, dry_run: request.dryRun },
+        timeoutMs,
+        read: async (response) => ({ status: response.status, body: await response.json() }),
+      })
+      return parseFolderContentsAccess(body, status, request.dryRun)
+    },
+
+    async getFolderContentsAccessBatch(folderId, batchId) {
+      const raw = await send({
+        method: 'GET',
+        route: `${docRoute(folderId)}/contents-access/${uniworkId(batchId)}`,
+        timeoutMs,
+        read: json,
+      })
+      const batch = parseFolderContentsAccessBatch(raw)
+      // another run's progress must not stand in for the one asked about
+      if (batch.batchId !== batchId) throw new UniworkDocError('malformed_response')
+      return batch
     },
 
     async listShareCandidates(documentId, opts) {

@@ -379,6 +379,86 @@ export interface ShareOwnerTransfer {
 }
 
 /**
+ * UNI-2244: the folder-wide access command (`PUT /documents/{folderId}/contents-access`,
+ * `GET .../contents-access/{batchId}`). It writes the same people onto every document of the
+ * folder's subtree the caller may manage, once, at the moment of the click (a folder has no ACL).
+ * `merge` adds people and never lowers a level; `replace` sets exactly the listed people and
+ * removes everyone else.
+ */
+export type FolderContentsAccessMode = 'merge' | 'replace'
+export const FOLDER_CONTENTS_ACCESS_MODES: readonly FolderContentsAccessMode[] = [
+  'merge',
+  'replace',
+]
+
+/** one principal of the list; `level` is required (there is no removal item, `replace` removes) */
+export interface FolderContentsAccessItem {
+  principalType: SharePrincipalType
+  principalId: string
+  level: ShareLevel
+}
+
+/** the server takes 0-100 items; an empty list is valid only with `replace` (it removes every share) */
+export const FOLDER_CONTENTS_ACCESS_MAX_ITEMS = 100
+
+export interface FolderContentsAccessRequest {
+  folderId: string
+  mode: FolderContentsAccessMode
+  items: FolderContentsAccessItem[]
+  /** true = count and preview only (nothing is written) */
+  dryRun: boolean
+}
+
+/** what one run did, in documents (never names: the server sends counts only) */
+export interface FolderContentsAccessCounts {
+  changed: number
+  unchanged: number
+  skippedNotManageable: number
+  skippedLocked: number
+}
+
+/** `warnings` of a dry run: `wide_scope` | `downgrade` | `to_private`, kept as sent (open set) */
+export interface FolderContentsAccessPreview extends FolderContentsAccessCounts {
+  /** people who lose access to at least one document */
+  losingUsers: number
+  /** people whose level drops on at least one document */
+  downgradedUsers: number
+  warnings: string[]
+}
+
+/**
+ * 200 dry run, 200 sync (the folder was small enough to finish inside the request) or
+ * 202 background (poll `folderContentsAccessBatch` with `batchId`).
+ */
+export type FolderContentsAccessResult =
+  | { kind: 'dryRun'; total: number; preview: FolderContentsAccessPreview }
+  | ({ kind: 'sync'; batchId: string; total: number } & FolderContentsAccessCounts)
+  | { kind: 'background'; batchId: string; total: number }
+
+export type FolderContentsAccessBatchStatus = 'queued' | 'running' | 'completed' | 'failed'
+export const FOLDER_CONTENTS_ACCESS_BATCH_STATUSES: readonly FolderContentsAccessBatchStatus[] = [
+  'queued',
+  'running',
+  'completed',
+  'failed',
+]
+
+/** `GET .../contents-access/{batchId}`: the progress of a background run (only its creator may read it) */
+export interface FolderContentsAccessBatch extends FolderContentsAccessCounts {
+  batchId: string
+  status: FolderContentsAccessBatchStatus
+  total: number
+  processed: number
+  /** set once the run ended (completed or failed) */
+  finishedAt?: string
+}
+
+export interface FolderContentsAccessBatchRequest {
+  folderId: string
+  batchId: string
+}
+
+/**
  * What a share call may fail with. The server's own verdicts keep their names
  * (`document_access_rejected` carries `rejected`); the transport / permission
  * failures are the app's usual ones.
@@ -406,6 +486,8 @@ export type ShareErrorCode =
   | 'access_request_closed'
   | 'owner_target_not_member'
   | 'document_owned_by_work_product'
+  | 'not_a_folder'
+  | 'folder_access_batch_running'
 
 export type ShareResult<T> =
   | { ok: true; value: T }
@@ -416,6 +498,8 @@ export type ShareResult<T> =
       status?: number
       /** `document_access_rejected`: the refused items, by index of the request */
       rejected?: ShareRejectedItem[]
+      /** UNI-2244 `folder_access_batch_running`: the run that already holds the folder (attach to its progress) */
+      batchId?: string
       /** a throttle (429 / 503): the same call may be repeated once */
       retryable?: boolean
       /** the server has no such route (404 / 405 / 501): the action is hidden for the session */
@@ -448,4 +532,15 @@ export interface UniworkShareApi {
   ownerCandidates(documentId: string): Promise<ShareResult<ShareOwnerCandidate[]>>
   /** UNI-2078: hand the ACL owner to another member (`PUT /documents/{id}/owner`) */
   transferOwner(input: ShareOwnerTransferInput): Promise<ShareResult<ShareOwnerTransfer>>
+  /**
+   * UNI-2244: change the access of every document under a folder (dry run first, then the write).
+   * Errors: `not_a_folder`, `document_access_rejected` (+ `rejected`), `folder_access_batch_running` (+ `batchId`).
+   */
+  folderContentsAccess(
+    request: FolderContentsAccessRequest,
+  ): Promise<ShareResult<FolderContentsAccessResult>>
+  /** UNI-2244: the progress of a background run (`not_found` for a run that is not the caller's) */
+  folderContentsAccessBatch(
+    request: FolderContentsAccessBatchRequest,
+  ): Promise<ShareResult<FolderContentsAccessBatch>>
 }
