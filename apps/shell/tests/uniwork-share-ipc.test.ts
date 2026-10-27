@@ -494,9 +494,18 @@ describe('main: the handlers', () => {
         folderId: 'fld_1',
         mode: 'merge',
         items: [{ principalType: 'user', principalId: 'u_2', level: 'view' }],
-        dryRun: true,
+        dryRun: false,
       }),
     ).toEqual({ ok: false, error: 'malformed_response' })
+    // a dry run it cannot read is "nothing to change", not an error (the web's behaviour)
+    expect(
+      await call(CHANNEL_NAMES.folderContentsAccess, {
+        folderId: 'fld_1',
+        mode: 'merge',
+        items: [{ principalType: 'user', principalId: 'u_2', level: 'view' }],
+        dryRun: true,
+      }),
+    ).toMatchObject({ ok: true, value: { kind: 'dryRun', total: 0 } })
     expect(
       await call(CHANNEL_NAMES.folderContentsAccessBatch, { folderId: 'fld_1', batchId: 'b_1' }),
     ).toEqual({ ok: false, error: 'malformed_response' })

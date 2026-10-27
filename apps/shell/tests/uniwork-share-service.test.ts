@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
 import {
+  documentAccessRejectedError,
+  invalidJsonError,
+  invalidRequestError,
+  notImplementedError,
+} from '../src/shared/folder-contents-access.fixtures'
+import {
   createUniworkShareClient,
   type UniworkShareClient,
 } from '../src/main/uniwork-docs/share-client'
@@ -1365,6 +1371,56 @@ describe('folder contents access (UNI-2244)', () => {
     expect(await service(coded).folderContentsAccess(REQUEST)).not.toHaveProperty('endpointMissing')
   })
 
+  it('the coded 501 not_implemented of BE-1 is endpointMissing too (the feature is not on this server yet)', async () => {
+    const thrown = new UniworkDocError('server_error', {
+      status: 501,
+      serverCode: 'not_implemented',
+    })
+    const client = fakeClient({
+      updateFolderContentsAccess: vi.fn(async () => {
+        throw thrown
+      }),
+      getFolderContentsAccessBatch: vi.fn(async () => {
+        throw thrown
+      }),
+    })
+    const svc = service(client)
+    expect(await svc.folderContentsAccess(REQUEST)).toEqual({
+      ok: false,
+      error: 'server_error',
+      status: 501,
+      endpointMissing: true,
+    })
+    expect(
+      await svc.folderContentsAccessBatch({ folderId: 'fld_1', batchId: 'b_1' }),
+    ).toMatchObject({ ok: false, endpointMissing: true, status: 501 })
+    // not retried: one call each
+    expect(client.updateFolderContentsAccess).toHaveBeenCalledTimes(1)
+  })
+
+  it('a coded 400 invalid_request / invalid_json is invalid_request, a coded 400 of another code is not', async () => {
+    for (const serverCode of ['invalid_request', 'invalid_json']) {
+      const client = fakeClient({
+        updateFolderContentsAccess: vi.fn(async () => {
+          throw new UniworkDocError('server_error', { status: 400, serverCode })
+        }),
+      })
+      expect(await service(client).folderContentsAccess(REQUEST)).toEqual({
+        ok: false,
+        error: 'invalid_request',
+      })
+    }
+    const other = fakeClient({
+      updateFolderContentsAccess: vi.fn(async () => {
+        throw new UniworkDocError('server_error', { status: 400, serverCode: 'something_else' })
+      }),
+    })
+    expect(await service(other).folderContentsAccess(REQUEST)).toMatchObject({
+      ok: false,
+      error: 'server_error',
+    })
+  })
+
   it('the batch read validates its ids and answers the progress', async () => {
     const client = fakeClient()
     const svc = service(client)
@@ -1471,6 +1527,38 @@ describe('folder contents access through the real client (UNI-2244)', () => {
         { index: 0, principalType: 'workspace', principalId: 'ws_1', code: 'level_not_allowed' },
       ],
     })
+  })
+
+  it('BE-1 envelopes through the real client: 501 not_implemented, 400 invalid_request / invalid_json', async () => {
+    expect(
+      await through(
+        json(notImplementedError.status, notImplementedError.body),
+      ).folderContentsAccess(req),
+    ).toEqual({ ok: false, error: 'server_error', status: 501, endpointMissing: true })
+    expect(
+      await through(
+        json(notImplementedError.status, notImplementedError.body),
+      ).folderContentsAccessBatch({ folderId: 'fld_1', batchId: 'b_1' }),
+    ).toMatchObject({ ok: false, status: 501, endpointMissing: true })
+    for (const answer of [invalidRequestError, invalidJsonError]) {
+      expect(await through(json(answer.status, answer.body)).folderContentsAccess(req)).toEqual({
+        ok: false,
+        error: 'invalid_request',
+      })
+    }
+  })
+
+  it('422 document_access_rejected keeps the four BE-1 codes row by row', async () => {
+    const res = await through(
+      json(documentAccessRejectedError.status, documentAccessRejectedError.body),
+    ).folderContentsAccess(req)
+    expect(res).toMatchObject({ ok: false, error: 'document_access_rejected', status: 422 })
+    expect((res as { rejected: Array<{ code: string }> }).rejected.map((r) => r.code)).toEqual([
+      'level_not_allowed',
+      'principal_not_in_organization',
+      'duplicate_principal',
+      'break_glass_required',
+    ])
   })
 
   it('202 is a background run, 200 a dry run, a foreign batch is 404', async () => {

@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { createFakeShareApi } from '../src/renderer/src/uniwork-share/fake-share-api'
+import {
+  parseFolderContentsAccess,
+  parseFolderContentsAccessBatch,
+} from '../src/main/uniwork-docs/share-parse'
+import {
+  backgroundAccepted,
+  batchCompleted,
+  batchFailed,
+  batchRunning,
+  dryRunMerge,
+  dryRunReplace,
+  syncResult,
+} from '../src/shared/folder-contents-access.fixtures'
 import type {
   FolderContentsAccessBatch,
   FolderContentsAccessRequest,
@@ -606,20 +619,83 @@ describe('folder contents access (UNI-2244)', () => {
     expect((await poll()).status).toBe('completed')
   })
 
-  it('the batch can end failed, with the progress it reached and no counts', async () => {
+  it('the batch can end failed, short of the total, with the counts of what it wrote', async () => {
     const api = createFakeShareApi({
-      folderContents: { total: 900, batchSteps: 2, batchFails: true },
+      folderContents: {
+        total: 900,
+        notManageable: 90,
+        locked: 10,
+        unchanged: 100,
+        batchSteps: 2,
+        batchFails: true,
+      },
     })
     const started = ok<Extract<FolderContentsAccessResult, { kind: 'background' }>>(
       await api.folderContentsAccess(request()),
     )
     const get = () => api.folderContentsAccessBatch({ folderId: FOLDER, batchId: started.batchId })
     expect(ok<FolderContentsAccessBatch>(await get()).status).toBe('queued')
-    expect(ok<FolderContentsAccessBatch>(await get())).toMatchObject({
+    const failed = ok<FolderContentsAccessBatch>(await get())
+    expect(failed).toMatchObject({
       status: 'failed',
-      changed: 0,
+      total: 900,
+      processed: 450,
+      changed: 350,
+      unchanged: 50,
+      skippedNotManageable: 45,
+      skippedLocked: 5,
       finishedAt: expect.any(String),
     })
+    expect(failed.processed).toBeLessThan(failed.total)
+  })
+
+  it('answers what the wire fixtures say (the same numbers as the web fixtures, read through the parser)', async () => {
+    const wide = [{ principalType: 'workspace', principalId: 'ws_2', level: 'view' }] as const
+    const base = { total: 42, notManageable: 5 }
+    const run = async (options: object, over: Partial<FolderContentsAccessRequest>) =>
+      ok<FolderContentsAccessResult>(
+        await createFakeShareApi({ folderContents: options }).folderContentsAccess(
+          request({ items: [...wide], ...over }),
+        ),
+      )
+    expect(await run(base, { dryRun: true })).toEqual(
+      parseFolderContentsAccess(dryRunMerge, 200, true),
+    )
+    expect(
+      await run(
+        { ...base, losingUsers: 12, downgradedUsers: 3 },
+        { dryRun: true, mode: 'replace' },
+      ),
+    ).toEqual(parseFolderContentsAccess(dryRunReplace, 200, true))
+    expect(await run(base, {})).toEqual({
+      ...parseFolderContentsAccess(syncResult, 200, false),
+      batchId: expect.stringMatching(/^fb_/),
+    })
+    expect(await run({ total: 1800, notManageable: 10 }, {})).toEqual({
+      ...parseFolderContentsAccess(backgroundAccepted, 202, false),
+      batchId: expect.stringMatching(/^fb_/),
+    })
+
+    const poll = async (options: object, gets: number) => {
+      const api = createFakeShareApi({
+        folderContents: { total: 1800, notManageable: 10, ...options },
+      })
+      const started = ok<Extract<FolderContentsAccessResult, { kind: 'background' }>>(
+        await api.folderContentsAccess(request({ items: [...wide] })),
+      )
+      let last: FolderContentsAccessBatch | undefined
+      for (let i = 0; i < gets; i++) {
+        last = ok<FolderContentsAccessBatch>(
+          await api.folderContentsAccessBatch({ folderId: FOLDER, batchId: started.batchId }),
+        )
+      }
+      return { ...last!, batchId: batchRunning.batch_id }
+    }
+    expect(await poll({ batchSteps: 3 }, 2)).toEqual(parseFolderContentsAccessBatch(batchRunning))
+    expect(await poll({ batchSteps: 3 }, 3)).toEqual(parseFolderContentsAccessBatch(batchCompleted))
+    expect(await poll({ batchSteps: 2, batchFails: true }, 2)).toEqual(
+      parseFolderContentsAccessBatch(batchFailed),
+    )
   })
 
   it('a second write while a batch runs is 409 with the batch id; after it ended it is accepted', async () => {
