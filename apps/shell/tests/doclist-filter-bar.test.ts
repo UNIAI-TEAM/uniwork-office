@@ -417,6 +417,132 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
       },
     )
 
+    describe('a query on the Archive keeps the shelf layout (UNI-2205 fix6)', () => {
+      const typeIntoSearch = async (text: string) => {
+        const input = host.querySelector<HTMLInputElement>('.dh-search-input')!
+        await act(async () => {
+          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+          setter.call(input, text)
+          input.dispatchEvent(new Event('input', { bubbles: true }))
+        })
+        await flush()
+      }
+      const hit = (id: string, shelvedById: string, shelvedByName: string) =>
+        row({
+          id,
+          canManage: true,
+          // hit-a is the newest shelved: the shelf sorts newest first
+          shelvedAt: iso(2026, 10, id === 'hit-a' ? 19 : 18, 8, 0),
+          shelvedById,
+          shelvedByName,
+        })
+      const barLabels = () =>
+        Array.from(host.querySelectorAll('.dh-filter-bar .dh-filter-k')).map((el) =>
+          el.textContent?.trim(),
+        )
+
+      it('keeps the chips, the intro and the Archive columns, and asks the search for shelved=true', async () => {
+        api.uniworkSearchDocuments!.mockResolvedValue(
+          ok({ items: [hit('hit-a', 'u-lan', 'Lan Nguyễn')], nextCursor: null }),
+        )
+        await mount('archive')
+        const labelsAtRest = barLabels()
+        expect(labelsAtRest).toContain('Lưu trữ bởi:')
+        await typeIntoSearch('plan')
+        expect(lastCall('uniworkSearchDocuments')).toEqual(
+          expect.objectContaining({ workspaceId: 'ws-1', query: 'plan', shelved: true }),
+        )
+        expect(barLabels()).toEqual(labelsAtRest)
+        expect(select('shelvedBy')).not.toBeNull()
+        expect(host.querySelector('.dh-shelved-intro')).not.toBeNull()
+        expect(rowIds()).toEqual(['hit-a'])
+        expect(
+          Array.from(host.querySelectorAll('.dh-doc-table [role="columnheader"]')).map((h) =>
+            h.getAttribute('data-col'),
+          ),
+        ).toContain('shelved')
+      })
+
+      it('narrows the hits by Lưu trữ bởi on the client, with the loaded-only note and no new request', async () => {
+        api.uniworkSearchDocuments!.mockResolvedValue(
+          ok({
+            items: [hit('hit-a', 'u-lan', 'Lan Nguyễn'), hit('hit-b', 'u-hai', 'Hải Lê')],
+            nextCursor: null,
+          }),
+        )
+        await mount('archive')
+        await typeIntoSearch('plan')
+        expect(rowIds()).toEqual(['hit-a', 'hit-b'])
+        expect(host.querySelector('.dh-shelved-loaded-only')).toBeNull()
+        const calls = api.uniworkSearchDocuments!.mock.calls.length
+        await pick(select('shelvedBy'), 'u-hai')
+        expect(rowIds()).toEqual(['hit-b'])
+        expect(host.querySelector('.dh-shelved-loaded-only')).not.toBeNull()
+        expect(api.uniworkSearchDocuments!.mock.calls.length).toBe(calls)
+      })
+
+      it('a query with no archived hit shows the search empty state, not the empty shelf', async () => {
+        await mount('archive')
+        await typeIntoSearch('zzz')
+        expect(rowIds()).toEqual([])
+        expect(host.querySelector('.dh-shelved-empty')).toBeNull()
+        expect(host.textContent).toContain('zzz')
+        expect(host.querySelector('.dh-shelved-intro')).not.toBeNull()
+      })
+
+      it('keeps shelved=true on Load more and on a Type pick, and returns to the shelf list when cleared', async () => {
+        api.uniworkSearchDocuments!.mockResolvedValueOnce(
+          ok({ items: [hit('hit-a', 'u-lan', 'Lan Nguyễn')], nextCursor: 'c-2' }),
+        )
+        await mount('archive')
+        await typeIntoSearch('plan')
+        api.uniworkSearchDocuments!.mockResolvedValueOnce(
+          ok({ items: [hit('hit-b', 'u-lan', 'Lan Nguyễn')], nextCursor: null }),
+        )
+        await click(host.querySelector('.dh-load-more-row button'))
+        expect(lastCall('uniworkSearchDocuments')).toEqual(
+          expect.objectContaining({ query: 'plan', cursor: 'c-2', shelved: true }),
+        )
+        expect(rowIds()).toEqual(['hit-a', 'hit-b'])
+        await chip('docx')
+        expect(lastCall('uniworkSearchDocuments')).toEqual(
+          expect.objectContaining({ query: 'plan', shelved: true, types: ['docx'] }),
+        )
+        await click(host.querySelector('.dh-search-clear'))
+        expect(lastCall('uniworkListShelved')).toEqual(
+          expect.objectContaining({ workspaceId: 'ws-1' }),
+        )
+      })
+
+      it('leaves the other screens as they were: no shelved flag, no Lưu trữ bởi chip', async () => {
+        await mount('workspace')
+        await typeIntoSearch('plan')
+        const sent = lastCall('uniworkSearchDocuments')
+        expect(sent).toEqual(expect.objectContaining({ query: 'plan' }))
+        expect(sent).not.toHaveProperty('shelved')
+        expect(select('shelvedBy')).toBeNull()
+        for (const subView of ['recent', 'shared-with-me'] as const) {
+          await remount(subView)
+          const before = api.uniworkSearchDocuments!.mock.calls.length
+          await typeIntoSearch('plan')
+          // Recent and Shared with me filter their own loaded rows: no search request at all
+          expect(api.uniworkSearchDocuments!.mock.calls.length).toBe(before)
+          expect(select('shelvedBy')).toBeNull()
+        }
+      })
+
+      it('marks only the Archive toolbar with the class the wrap rule keys on', async () => {
+        await mount('archive')
+        expect(host.querySelector('.dh-toolbar')!.classList.contains('dh-toolbar-shelf')).toBe(true)
+        for (const subView of ['workspace', 'recent', 'shared-with-me'] as const) {
+          await remount(subView)
+          expect(host.querySelector('.dh-toolbar')!.classList.contains('dh-toolbar-shelf')).toBe(
+            false,
+          )
+        }
+      })
+    })
+
     it('says Type: All types / Type: 3 types in English', async () => {
       await remount('workspace')
       await act(async () => {
@@ -1610,5 +1736,32 @@ describe('the local Home filter splits .md from .txt (UNI-2047 A3)', () => {
     expect(matchesExtFamily('md', 'md')).toBe(true)
     expect(matchesExtFamily('markdown', 'md')).toBe(true)
     expect(matchesExtFamily('md', 'txt')).toBe(false)
+  })
+})
+
+describe('documents-home.css: the Archive toolbar and the filter lists (UNI-2205 fix6)', () => {
+  const css = readFileSync(
+    join(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
+    'utf8',
+  )
+
+  it('wraps the Archive search box at the 1100px breakpoint the other screens wrap at, to its own row under the title', () => {
+    // the toolbar keys on `dh-toolbar-shelf`; the media query is the one that ends the single-row toolbar
+    expect(css).toMatch(
+      /@media \(min-width: 1101px\)\s*\{\s*\.dh-toolbar\s*\{\s*flex-wrap:\s*nowrap;/,
+    )
+    const block = css.match(
+      /@media \(max-width: 1100px\)\s*\{\s*\.dh-toolbar\.dh-toolbar-shelf\s*\{[^@]*?\n\}/,
+    )
+    expect(block, 'Archive wrap rule at max-width 1100px').not.toBeNull()
+    expect(block![0]).toMatch(/\.dh-toolbar-shelf > \.dh-toolbar-spacer\s*\{[^}]*flex:\s*1 0 100%;/)
+    expect(block![0]).toMatch(/\.dh-toolbar-shelf > \.dh-search-box\s*\{[^}]*margin-top:\s*12px;/)
+  })
+
+  it('themes the options of a filter chip list with the surface and text tokens', () => {
+    const rule = css.match(/\.dh-filter-select option\s*\{([^}]*)\}/)
+    expect(rule, '.dh-filter-select option rule').not.toBeNull()
+    expect(rule![1]).toMatch(/background-color:\s*var\(--surface\);/)
+    expect(rule![1]).toMatch(/color:\s*var\(--text\);/)
   })
 })
