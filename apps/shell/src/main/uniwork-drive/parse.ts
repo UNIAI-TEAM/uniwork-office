@@ -190,7 +190,7 @@ function parseDriveFolder(value: unknown): DriveFolderRef | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const r = value as Record<string, unknown>
   if (typeof r.id !== 'string' || r.id.trim() === '') return null
-  const name = typeof r.name === 'string' && r.name.trim() !== '' ? r.name : null
+  const name = typeof r.name === 'string' && r.name.trim() !== '' ? r.name.trim() : null
   return { id: r.id, name }
 }
 

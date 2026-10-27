@@ -434,6 +434,10 @@ describe('uniwork drive client: parsing', () => {
       ],
       [{ id: 'f_c' }, { id: 'f_c', name: null }],
       [
+        { id: 'f_t', name: '  Báo giá  ' },
+        { id: 'f_t', name: 'Báo giá' },
+      ],
+      [
         { id: 'f_d', name: '   ' },
         { id: 'f_d', name: null },
       ],

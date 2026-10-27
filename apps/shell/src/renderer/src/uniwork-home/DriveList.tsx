@@ -18,7 +18,12 @@ import {
   driveFolderGroupLabel,
   groupDriveFilesByFolder,
 } from './drive-folder-groups'
-import { readDriveGroupByFolder, writeDriveGroupByFolder } from './drive-folder-prefs'
+import {
+  readCollapsedDriveFolders,
+  readDriveGroupByFolder,
+  writeCollapsedDriveFolders,
+  writeDriveGroupByFolder,
+} from './drive-folder-prefs'
 import {
   buildDriveSidebarState,
   fetchDocumentsHomeDriveFiles,
@@ -400,8 +405,10 @@ export function DriveList({
   const { t, dateLocale } = useI18n()
 
   const [groupByFolder, setGroupByFolder] = useState<boolean>(() => readDriveGroupByFolder())
-  // collapsed groups are remembered for this session only
-  const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(() => new Set())
+  // collapsed groups are remembered for this session only (kept across view switches)
+  const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(() =>
+    readCollapsedDriveFolders(),
+  )
   const toggleGroupByFolder = () => {
     const next = !groupByFolder
     setGroupByFolder(next)
@@ -411,6 +418,7 @@ export function DriveList({
     setCollapsedFolders((prev) => {
       const next = new Set(prev)
       if (!next.delete(key)) next.add(key)
+      writeCollapsedDriveFolders(next)
       return next
     })
   // null = nothing to group (off, or every file's folder unknown): the flat list shows

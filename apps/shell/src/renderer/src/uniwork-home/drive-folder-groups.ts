@@ -48,14 +48,14 @@ export function driveFolderGroupCount(count: number, t: TFunc): string {
 
 function makeCollator(locale: string): Intl.Collator {
   try {
-    return new Intl.Collator(locale)
+    return new Intl.Collator(locale, { numeric: true, sensitivity: 'base' })
   } catch {
     return new Intl.Collator()
   }
 }
 
-function compareText(a: string, b: string, collator: Intl.Collator): number {
-  return collator.compare(a, b) || (a < b ? -1 : a > b ? 1 : 0)
+function compareCodeUnits(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0
 }
 
 /**
@@ -100,8 +100,8 @@ export function groupDriveFilesByFolder(
     if (a.kind !== b.kind) return rank[a.kind] - rank[b.kind]
     const first =
       a.kind === 'named'
-        ? compareText(a.name ?? '', b.name ?? '', collator)
-        : compareText(a.shortId, b.shortId, collator)
-    return first || compareText(a.key, b.key, collator)
+        ? collator.compare(a.name ?? '', b.name ?? '') || compareCodeUnits(a.key, b.key)
+        : compareCodeUnits(a.key, b.key)
+    return first
   })
 }

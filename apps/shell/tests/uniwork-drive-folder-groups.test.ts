@@ -52,6 +52,19 @@ describe('groupDriveFilesByFolder (UNI-2172 contract)', () => {
     expect(groups?.[1]?.files.map((f) => f.id)).toEqual(['1', '3'])
   })
 
+  it('orders names with numbers naturally and unnamed ids by code unit, like the web', () => {
+    const named = groupDriveFilesByFolder(
+      [file('1', { id: 'f_10', name: 'Dự án 10' }), file('2', { id: 'f_2', name: 'Dự án 2' })],
+      'vi',
+    )
+    expect(named?.map((g) => g.name)).toEqual(['Dự án 2', 'Dự án 10'])
+    const unnamed = groupDriveFilesByFolder(
+      [file('1', { id: 'abd000', name: null }), file('2', { id: 'Abc123', name: null })],
+      'en',
+    )
+    expect(keys(unnamed)).toEqual(['Abc123', 'abd000'])
+  })
+
   it('returns null (flat list) when every file is unknown, and for an empty list', () => {
     expect(groupDriveFilesByFolder([file('a'), file('b', null)], 'en')).toBeNull()
     expect(groupDriveFilesByFolder([], 'en')).toBeNull()

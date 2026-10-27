@@ -176,6 +176,21 @@ describe('DriveList group by folder (UNI-2172)', () => {
     expect(rowNames()).toHaveLength(6)
   })
 
+  it('collapsed groups survive a remount (switching views) for the session', async () => {
+    await render(MIX)
+    const open = () =>
+      document.querySelector<HTMLButtonElement>(
+        '[data-drive-group="f_contracts"] .dh-group-toggle',
+      )!
+    await click(open())
+    expect(open().getAttribute('aria-expanded')).toBe('false')
+    await act(async () => root.unmount())
+    root = createRoot(host)
+    await render(MIX)
+    expect(open().getAttribute('aria-expanded')).toBe('false')
+    await click(open())
+  })
+
   it('turning it off shows the flat list in the incoming order and remembers the choice', async () => {
     await render(MIX)
     await click(document.querySelector('[data-drive-group-by-folder]')!)

@@ -129,10 +129,6 @@ export interface DriveTaskCreationGroup {
 }
 
 /**
- * A Google Drive file reference in the workspace (`DriveFileDTO` on list 4.1
- * and detail 4.2). `taskCreations` is populated on the detail response.
- */
-/**
  * The Drive folder a file sits in (`drive_folder` on the server DTO). `name` is null when the
  * folder exists but its name is not readable (or not fetched yet).
  */
@@ -141,6 +137,10 @@ export interface DriveFolderRef {
   name: string | null
 }
 
+/**
+ * A Google Drive file reference in the workspace (`DriveFileDTO` on list 4.1
+ * and detail 4.2). `taskCreations` is populated on the detail response.
+ */
 export interface DriveFile {
   id: string
   organizationId: string

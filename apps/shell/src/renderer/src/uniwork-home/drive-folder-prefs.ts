@@ -2,6 +2,7 @@
 // in the Workbench store (one bucket per account) under the allowed `uniwork.wb.` prefix. A store
 // that cannot be read or written leaves the default (on), so the list always renders.
 import { wbStoreRead, wbStoreWrite } from '../workbench-store-client'
+import { currentWorkbenchBucket } from '../workbench-bucket'
 
 export const DRIVE_GROUP_BY_FOLDER_KEY = 'uniwork.wb.drive.groupByFolder'
 
@@ -21,4 +22,16 @@ export function writeDriveGroupByFolder(on: boolean): void {
   } catch {
     /* an unwritable store keeps nothing; the choice still holds for the session */
   }
+}
+
+// Collapsed folder groups survive switching views for the session (module memory, one set per
+// account bucket); they are not persisted across restarts.
+const collapsedByBucket = new Map<string, ReadonlySet<string>>()
+
+export function readCollapsedDriveFolders(): ReadonlySet<string> {
+  return collapsedByBucket.get(currentWorkbenchBucket()) ?? new Set()
+}
+
+export function writeCollapsedDriveFolders(keys: ReadonlySet<string>): void {
+  collapsedByBucket.set(currentWorkbenchBucket(), keys)
 }
