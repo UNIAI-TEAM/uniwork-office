@@ -232,6 +232,7 @@ export const hi = {
   shrFcWillChangeOne: '{count} दस्तावेज़ बदले जाएँगे',
   shrFcWillChangeOther: '{count} दस्तावेज़ बदले जाएँगे',
   shrFcSkippedNotManageable: 'आपके प्रबंधन से बाहर के {count} छोड़े जा रहे हैं',
+  shrFcToastUnknown: 'एक्सेस बदलाव भेज दिया गया है। नतीजा जांचने के लिए दस्तावेज़ खोलें।',
   shrFcLosingOne: '{count} लोग कम से कम एक दस्तावेज़ की पहुँच खो देंगे',
   shrFcLosingOther: '{count} लोग कम से कम एक दस्तावेज़ की पहुँच खो देंगे',
   shrFcDoneOne: '{count} दस्तावेज़ों की पहुँच बदली गई',

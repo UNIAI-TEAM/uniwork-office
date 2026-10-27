@@ -228,6 +228,7 @@ export const ar = {
   shrFcWillChangeOne: 'المستندات التي سيتم تغييرها: {count}',
   shrFcWillChangeOther: 'المستندات التي سيتم تغييرها: {count}',
   shrFcSkippedNotManageable: 'تم تخطي {count} لا تديرها',
+  shrFcToastUnknown: 'تم إرسال تغيير الوصول. افتح المستندات للتحقق من النتيجة.',
   shrFcLosingOne: 'أشخاص سيفقدون الوصول إلى مستند واحد على الأقل: {count}',
   shrFcLosingOther: 'أشخاص سيفقدون الوصول إلى مستند واحد على الأقل: {count}',
   shrFcDoneOne: 'تم تغيير الوصول في المستندات: {count}',

@@ -215,6 +215,7 @@ export const zh = {
   shrFcWillChangeOne: '将更改 {count} 个文档',
   shrFcWillChangeOther: '将更改 {count} 个文档',
   shrFcSkippedNotManageable: '跳过 {count} 个你无权管理的文档',
+  shrFcToastUnknown: '已发送权限更改。请打开文档查看结果。',
   shrFcLosingOne: '{count} 人将失去至少一个文档的访问权限',
   shrFcLosingOther: '{count} 人将失去至少一个文档的访问权限',
   shrFcDoneOne: '已更改 {count} 个文档的权限',

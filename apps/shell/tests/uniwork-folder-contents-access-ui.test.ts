@@ -165,8 +165,14 @@ describe('web copy (UNI-2244): the app strings are the web draft, word for word'
     [
       'summary_skipped',
       'shrFcSkippedNotManageable',
-      'bỏ qua {count} bạn không quản lý',
+      'bỏ qua {count} tài liệu bạn không quản lý',
       "skip {count} you don't manage",
+    ],
+    [
+      'toast_unknown',
+      'shrFcToastUnknown',
+      'Đã gửi thay đổi quyền. Mở các tài liệu để kiểm tra kết quả.',
+      'The access change was sent. Open the documents to check the result.',
     ],
     ['summary_locked', 'shrFcSkippedLocked', '{count} đang bị khóa', '{count} locked'],
     [
@@ -985,6 +991,29 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     api.failNext('folderContentsAccess', { ok: false, error: 'network' })
     await click(confirm())
     expect(q('[data-fca-error]')!.textContent).toBe(t('shrFcErrorGeneric'))
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('apply answered 2xx but unreadable (malformed_response): neutral toast, closes, refetches, no error text', async () => {
+    const api = await open({ folderContents: { total: 5 } })
+    await toReview(api)
+    api.failNext('folderContentsAccess', { ok: false, error: 'malformed_response' })
+    await click(apply())
+    expect(requests(api).map((c) => c.dryRun)).toEqual([true, false])
+    expect(onNotice).toHaveBeenCalledTimes(1)
+    expect(onNotice).toHaveBeenCalledWith(t('shrFcToastUnknown'), 'ok')
+    expect(onChanged).toHaveBeenCalledTimes(1)
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(q('[data-fca-error]')).toBeNull()
+  })
+
+  it('a malformed answer to the dry run keeps today behaviour: back on the form with the error, no toast', async () => {
+    const api = await open({ folderContents: { total: 5 } })
+    await pick('Minh')
+    api.failNext('folderContentsAccess', { ok: false, error: 'malformed_response' })
+    await click(confirm())
+    expect(onNotice).not.toHaveBeenCalled()
+    expect(onChanged).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
   })
 

@@ -216,6 +216,7 @@ export const zhTW = {
   shrFcWillChangeOne: '將變更 {count} 份文件',
   shrFcWillChangeOther: '將變更 {count} 份文件',
   shrFcSkippedNotManageable: '略過 {count} 份你無權管理的文件',
+  shrFcToastUnknown: '已送出權限變更。請開啟文件確認結果。',
   shrFcLosingOne: '{count} 人將失去至少一份文件的存取權',
   shrFcLosingOther: '{count} 人將失去至少一份文件的存取權',
   shrFcDoneOne: '已變更 {count} 份文件的權限',

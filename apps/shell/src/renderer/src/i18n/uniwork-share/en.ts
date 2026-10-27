@@ -282,4 +282,5 @@ export const en = {
   shrFcTooMany: 'You can add up to {max} people or groups at a time.',
   shrFcTitle: 'Share documents in “{title}”',
   shrFcSkippedNotManageable: "skip {count} you don't manage",
+  shrFcToastUnknown: 'The access change was sent. Open the documents to check the result.',
 } satisfies Record<keyof typeof zh, string>

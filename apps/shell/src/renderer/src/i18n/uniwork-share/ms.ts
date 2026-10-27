@@ -232,6 +232,7 @@ export const ms = {
   shrFcWillChangeOne: '{count} dokumen akan diubah',
   shrFcWillChangeOther: '{count} dokumen akan diubah',
   shrFcSkippedNotManageable: 'melangkau {count} yang tidak anda urus',
+  shrFcToastUnknown: 'Perubahan akses telah dihantar. Buka dokumen untuk menyemak hasilnya.',
   shrFcLosingOne: '{count} orang kehilangan akses kepada sekurang-kurangnya satu dokumen',
   shrFcLosingOther: '{count} orang kehilangan akses kepada sekurang-kurangnya satu dokumen',
   shrFcDoneOne: 'Akses diubah pada {count} dokumen',

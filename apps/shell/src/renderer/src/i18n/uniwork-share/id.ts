@@ -232,6 +232,7 @@ export const id = {
   shrFcWillChangeOne: '{count} dokumen akan diubah',
   shrFcWillChangeOther: '{count} dokumen akan diubah',
   shrFcSkippedNotManageable: 'melewati {count} yang tidak Anda kelola',
+  shrFcToastUnknown: 'Perubahan akses telah dikirim. Buka dokumen untuk memeriksa hasilnya.',
   shrFcLosingOne: '{count} orang kehilangan akses ke setidaknya satu dokumen',
   shrFcLosingOther: '{count} orang kehilangan akses ke setidaknya satu dokumen',
   shrFcDoneOne: 'Akses diubah pada {count} dokumen',

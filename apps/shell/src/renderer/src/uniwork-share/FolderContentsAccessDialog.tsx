@@ -286,6 +286,16 @@ function FolderContentsAccessBody({
     const answer = await call(false)
     inFlight.current = false
     setPending(false)
+    if (!answer.ok && answer.error === 'malformed_response') {
+      // the write answered 2xx but the body cannot be read: it may have been applied, so no error
+      // and no form to resubmit; say so neutrally (the toast has no neutral tone: 'ok') and refetch
+      const message = t('shrFcToastUnknown')
+      announce(message)
+      onNotice?.(message, 'ok')
+      onChanged?.()
+      finish()
+      return
+    }
     if (!answer.ok) return handleFailure(answer)
     const value = answer.value
     if (value.kind === 'sync') {

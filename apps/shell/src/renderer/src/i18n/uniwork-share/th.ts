@@ -226,6 +226,7 @@ export const th = {
   shrFcWillChangeOne: 'จะเปลี่ยน {count} เอกสาร',
   shrFcWillChangeOther: 'จะเปลี่ยน {count} เอกสาร',
   shrFcSkippedNotManageable: 'ข้าม {count} รายการที่คุณไม่ได้จัดการ',
+  shrFcToastUnknown: 'ส่งการเปลี่ยนแปลงสิทธิ์การเข้าถึงแล้ว เปิดเอกสารเพื่อตรวจสอบผลลัพธ์',
   shrFcLosingOne: '{count} คนจะสูญเสียสิทธิ์เข้าถึงอย่างน้อยหนึ่งเอกสาร',
   shrFcLosingOther: '{count} คนจะสูญเสียสิทธิ์เข้าถึงอย่างน้อยหนึ่งเอกสาร',
   shrFcDoneOne: 'เปลี่ยนสิทธิ์ของ {count} เอกสารแล้ว',

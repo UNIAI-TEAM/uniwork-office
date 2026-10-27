@@ -234,6 +234,7 @@ export const ru = {
   shrFcWillChangeOne: 'Будет изменено документов: {count}',
   shrFcWillChangeOther: 'Будет изменено документов: {count}',
   shrFcSkippedNotManageable: 'пропущено документов, которыми вы не управляете: {count}',
+  shrFcToastUnknown: 'Изменение доступа отправлено. Откройте документы, чтобы проверить результат.',
   shrFcLosingOne: 'Потеряют доступ хотя бы к одному документу: {count}',
   shrFcLosingOther: 'Потеряют доступ хотя бы к одному документу: {count}',
   shrFcDoneOne: 'Доступ изменён в документах: {count}',

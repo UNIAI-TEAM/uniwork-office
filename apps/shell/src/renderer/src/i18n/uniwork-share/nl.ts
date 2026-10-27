@@ -231,6 +231,8 @@ export const nl = {
   shrFcWillChangeOne: '{count} document wordt gewijzigd',
   shrFcWillChangeOther: '{count} documenten worden gewijzigd',
   shrFcSkippedNotManageable: '{count} overgeslagen die u niet beheert',
+  shrFcToastUnknown:
+    'De toegangswijziging is verzonden. Open de documenten om het resultaat te controleren.',
   shrFcLosingOne: '{count} persoon verliest toegang tot minstens één document',
   shrFcLosingOther: '{count} personen verliezen toegang tot minstens één document',
   shrFcDoneOne: 'Toegang gewijzigd op {count} document',

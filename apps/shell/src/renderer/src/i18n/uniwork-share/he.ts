@@ -222,6 +222,7 @@ export const he = {
   shrFcWillChangeOne: 'מסמכים שישתנו: {count}',
   shrFcWillChangeOther: 'מסמכים שישתנו: {count}',
   shrFcSkippedNotManageable: 'דולגו {count} שאינך מנהל',
+  shrFcToastUnknown: 'שינוי ההרשאות נשלח. פתחו את המסמכים כדי לבדוק את התוצאה.',
   shrFcLosingOne: 'אנשים שיאבדו גישה למסמך אחד לפחות: {count}',
   shrFcLosingOther: 'אנשים שיאבדו גישה למסמך אחד לפחות: {count}',
   shrFcDoneOne: 'הגישה שונתה במסמכים: {count}',

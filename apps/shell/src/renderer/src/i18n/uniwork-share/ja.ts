@@ -234,6 +234,7 @@ export const ja = {
   shrFcWillChangeOne: '{count} 件のドキュメントを変更します',
   shrFcWillChangeOther: '{count} 件のドキュメントを変更します',
   shrFcSkippedNotManageable: '管理権限のない {count} 件をスキップ',
+  shrFcToastUnknown: 'アクセス権の変更を送信しました。ドキュメントを開いて結果を確認してください。',
   shrFcLosingOne: '{count} 人が少なくとも 1 件のドキュメントへのアクセス権を失います',
   shrFcLosingOther: '{count} 人が少なくとも 1 件のドキュメントへのアクセス権を失います',
   shrFcDoneOne: '{count} 件のドキュメントのアクセス権を変更しました',

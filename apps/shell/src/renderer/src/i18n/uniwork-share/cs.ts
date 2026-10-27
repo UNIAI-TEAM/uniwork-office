@@ -233,6 +233,7 @@ export const cs = {
   shrFcWillChangeOne: 'Dokumentů ke změně: {count}',
   shrFcWillChangeOther: 'Dokumentů ke změně: {count}',
   shrFcSkippedNotManageable: 'přeskočeno dokumentů, které nespravujete: {count}',
+  shrFcToastUnknown: 'Změna přístupu byla odeslána. Otevřete dokumenty a zkontrolujte výsledek.',
   shrFcLosingOne: 'Lidí, kteří ztratí přístup alespoň k jednomu dokumentu: {count}',
   shrFcLosingOther: 'Lidí, kteří ztratí přístup alespoň k jednomu dokumentu: {count}',
   shrFcDoneOne: 'Přístup změněn u dokumentů: {count}',

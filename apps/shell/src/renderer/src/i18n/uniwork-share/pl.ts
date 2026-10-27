@@ -234,6 +234,7 @@ export const pl = {
   shrFcWillChangeOne: 'Dokumentów do zmiany: {count}',
   shrFcWillChangeOther: 'Dokumentów do zmiany: {count}',
   shrFcSkippedNotManageable: 'pominięto dokumenty, którymi nie zarządzasz: {count}',
+  shrFcToastUnknown: 'Zmiana dostępu została wysłana. Otwórz dokumenty, aby sprawdzić wynik.',
   shrFcLosingOne: 'Osób tracących dostęp do co najmniej jednego dokumentu: {count}',
   shrFcLosingOther: 'Osób tracących dostęp do co najmniej jednego dokumentu: {count}',
   shrFcDoneOne: 'Zmieniono dostęp w dokumentach: {count}',

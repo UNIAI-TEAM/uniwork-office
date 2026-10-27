@@ -229,6 +229,7 @@ export const ko = {
   shrFcWillChangeOne: '문서 {count}개를 변경합니다',
   shrFcWillChangeOther: '문서 {count}개를 변경합니다',
   shrFcSkippedNotManageable: '관리 권한이 없는 {count}개 건너뜀',
+  shrFcToastUnknown: '접근 권한 변경을 전송했습니다. 문서를 열어 결과를 확인하세요.',
   shrFcLosingOne: '{count}명이 문서 하나 이상에 대한 접근 권한을 잃습니다',
   shrFcLosingOther: '{count}명이 문서 하나 이상에 대한 접근 권한을 잃습니다',
   shrFcDoneOne: '문서 {count}개의 권한을 변경했습니다',
