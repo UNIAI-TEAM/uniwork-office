@@ -923,6 +923,26 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
       expect(searchCalls).toBe(10)
       expect(host.querySelector('.dl-state-title')).toBeNull()
       expect(host.querySelector('.dh-load-more-row button')).not.toBeNull()
+
+      // Clicking Tải thêm past the 10-page cap loads page 11 manually without restarting auto-load (KLF-9)
+      api.uniworkSearchDocuments.mockImplementationOnce(async () => {
+        searchCalls += 1
+        return ok({
+          items: [
+            row({
+              id: 'hit-lan-p11',
+              title: 'Hợp đồng Cap 11.docx',
+              updatedById: 'u-lan',
+              updatedByName: 'Lan Nguyễn',
+              updatedAt: iso(2026, 10, 21, 10, 30),
+            }),
+          ],
+          nextCursor: 'cap-12',
+        })
+      })
+      await click(host.querySelector('.dh-load-more-row button'))
+      expect(searchCalls).toBe(11)
+      expect(rowIds()).toEqual(['hit-lan-p11'])
     })
 
     it('scopes a query on Gần đây to the Recent list client-side without calling searchDocuments, auto-fetches page 2, and combines with Đã sửa (KLV-6)', async () => {
@@ -1000,9 +1020,12 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
       await mount('recent')
       expect(api.uniworkSearchDocuments).not.toHaveBeenCalled()
 
-      // Diacritic- and đ/Đ-insensitive query on Gần đây
-      await typeIntoSearch('danh gia')
+      // Diacritic-, đ/Đ-, and case-insensitive query on Gần đây does not refetch page 1 (KLF-7, KLF-9)
+      await typeIntoSearch('ĐÁNH GIÁ')
       expect(api.uniworkSearchDocuments).not.toHaveBeenCalled()
+      expect(
+        api.uniworkListDocuments.mock.calls.filter(([arg]: [{ cursor?: string }]) => !arg.cursor),
+      ).toHaveLength(1)
       expect(api.uniworkListDocuments).toHaveBeenCalledWith(
         expect.objectContaining({ workspaceId: 'ws-1', cursor: 'rec-c2' }),
       )
@@ -1024,6 +1047,224 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
         expect.objectContaining({ workspaceId: 'ws-1', activity: 'edited' }),
       )
       expect(rowIds()).toEqual(['rec-edited'])
+    })
+
+    it('does not duplicate-append page 2 when typing a query on Recent or changing a filter during a search, and hides empty state while refetching (KLF-5, KLF-6, KLF-7, KLF-9)', async () => {
+      type RecentRes = UniworkResult<{ documents: DocumentsHomeDoc[]; nextCursor: string | null }>
+      const pendingPage1: Array<(res: RecentRes) => void> = []
+      const pendingPage2: Array<(res: RecentRes) => void> = []
+      let initialMount = true
+      api.uniworkListDocuments.mockImplementation((q: { cursor?: string }) => {
+        if (q.cursor === 'rec-c2') {
+          const { promise, resolve } = Promise.withResolvers<RecentRes>()
+          pendingPage2.push(resolve)
+          return promise
+        }
+        if (initialMount) {
+          initialMount = false
+          return Promise.resolve(
+            ok({
+              documents: [
+                row({
+                  id: 'rec-p1-other',
+                  title: 'Ngân sách năm.xlsx',
+                  lastActivity: { kind: 'opened', at: iso(2026, 10, 21, 10, 0) },
+                }),
+              ],
+              nextCursor: 'rec-c2',
+            }),
+          )
+        }
+        const { promise, resolve } = Promise.withResolvers<RecentRes>()
+        pendingPage1.push(resolve)
+        return promise
+      })
+
+      await mount('recent')
+
+      const input = host.querySelector<HTMLInputElement>('.dh-search-input')!
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+        setter.call(input, 'Đánh giá')
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+
+      // No page-1 refetch on Recent keystroke (KLF-7)
+      expect(pendingPage1).toHaveLength(0)
+
+      for (const resolveP2 of pendingPage2.splice(0)) {
+        await act(async () => {
+          resolveP2(
+            ok({
+              documents: [
+                row({
+                  id: 'rec-p2-hit',
+                  title: 'Báo cáo Đánh giá Quý 4.docx',
+                  lastActivity: { kind: 'edited', at: iso(2026, 10, 21, 9, 0) },
+                }),
+              ],
+              nextCursor: null,
+            }),
+          )
+        })
+      }
+      await flush()
+
+      const page2Calls = api.uniworkListDocuments.mock.calls.filter(
+        ([arg]: [{ cursor?: string }]) => arg.cursor === 'rec-c2',
+      )
+      expect(rowIds()).toEqual(['rec-p2-hit'])
+      expect(page2Calls).toHaveLength(1)
+
+      // Switching segment to Đã sửa while searching triggers a page-1 refetch (with kept non-matching rows):
+      // must show skeleton instead of empty state while loading (KLF-6), and when page 1 lands with nextCursor,
+      // a failed page-2 auto-load stops on moreError until Tải thêm retries (KLF-9)
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+        setter.call(input, 'Không khớp')
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+        host.querySelector<HTMLElement>('[data-seg="edited"]')!.click()
+      })
+      expect(pendingPage1).toHaveLength(1)
+      expect(host.querySelector('.dl-state-title')).toBeNull()
+      expect(host.querySelector('.uw-pick-skeleton')).not.toBeNull()
+
+      let failEdPage2 = true
+      api.uniworkListDocuments.mockImplementation(async (q: { cursor?: string }) => {
+        if (q.cursor === 'rec-ed-c2') {
+          if (failEdPage2) {
+            failEdPage2 = false
+            return { ok: false, error: 'server_error' as const }
+          }
+          return ok({
+            documents: [
+              row({
+                id: 'rec-ed-p2',
+                title: 'Không khớp nhưng có ở trang 2.docx',
+                lastActivity: { kind: 'edited', at: iso(2026, 10, 21, 11, 0) },
+              }),
+            ],
+            nextCursor: null,
+          })
+        }
+        return ok({ documents: [], nextCursor: null })
+      })
+      await act(async () => {
+        pendingPage1.shift()!(
+          ok({
+            documents: [
+              row({
+                id: 'rec-ed-p1-miss',
+                title: 'Tài liệu khác.docx',
+                lastActivity: { kind: 'edited', at: iso(2026, 10, 21, 8, 0) },
+              }),
+            ],
+            nextCursor: 'rec-ed-c2',
+          }),
+        )
+      })
+      await flush()
+
+      // Auto-load stopped on moreError; error alert and Tải thêm button are rendered
+      expect(host.querySelector('.uw-pick-more-error')).not.toBeNull()
+      const edPage2CallsAfterFail = api.uniworkListDocuments.mock.calls.filter(
+        ([arg]: [{ cursor?: string }]) => arg.cursor === 'rec-ed-c2',
+      )
+      expect(edPage2CallsAfterFail).toHaveLength(1)
+
+      // Clicking Tải thêm retries and renders the match
+      await click(host.querySelector('.dh-load-more-row button'))
+      expect(host.querySelector('.uw-pick-more-error')).toBeNull()
+      expect(rowIds()).toEqual(['rec-ed-p2'])
+
+      // On workspace search with nextCursor, changing query + filter in the same commit must not call loadMore with the old cursor (KLF-5)
+      await remount('workspace')
+      type SearchRes = UniworkResult<{ items: DocumentsHomeDoc[]; nextCursor: string | null }>
+      const pendingSearchP1: Array<(res: SearchRes) => void> = []
+      const pendingSearchP2: Array<(res: SearchRes) => void> = []
+      let firstSearch = true
+      api.uniworkSearchDocuments.mockImplementation((q: { cursor?: string }) => {
+        if (q.cursor === 'ws-c2') {
+          const { promise, resolve } = Promise.withResolvers<SearchRes>()
+          pendingSearchP2.push(resolve)
+          return promise
+        }
+        if (firstSearch) {
+          firstSearch = false
+          return Promise.resolve(
+            ok({
+              items: [
+                row({
+                  id: 'ws-p1-lan',
+                  title: 'Hợp đồng 1.docx',
+                  updatedById: 'u-lan',
+                  updatedByName: 'Lan Nguyễn',
+                }),
+              ],
+              nextCursor: 'ws-c2',
+            }),
+          )
+        }
+        const { promise, resolve } = Promise.withResolvers<SearchRes>()
+        pendingSearchP1.push(resolve)
+        return promise
+      })
+      await pick(select('updatedBy'), 'u-lan')
+      await typeIntoSearch('Hợp đồng')
+      expect(rowIds()).toEqual(['ws-p1-lan'])
+      expect(pendingSearchP2).toHaveLength(0)
+
+      // Pick u-minh while search is active: wireFilters changes (triggers search refetch) and visible rows drop to 0 in the same commit
+      await act(async () => {
+        const bySelect = select('updatedBy')!
+        bySelect.value = 'u-minh'
+        bySelect.dispatchEvent(new Event('change', { bubbles: true }))
+      })
+      // Must not have requested ws-c2 from the stale pre-reset page while refetch is pending, and must show skeleton instead of empty state (KLF-5, KLF-6)
+      expect(pendingSearchP1).toHaveLength(1)
+      expect(pendingSearchP2).toHaveLength(0)
+      expect(host.querySelector('.dl-state-title')).toBeNull()
+      expect(host.querySelector('.uw-pick-skeleton')).not.toBeNull()
+
+      await act(async () => {
+        pendingSearchP1.shift()!(
+          ok({
+            items: [
+              row({
+                id: 'ws-p1-lan-new',
+                title: 'Hợp đồng mới 1.docx',
+                updatedById: 'u-lan',
+                updatedByName: 'Lan Nguyễn',
+              }),
+            ],
+            nextCursor: 'ws-c2',
+          }),
+        )
+      })
+      await flush()
+      expect(pendingSearchP2).toHaveLength(1)
+      await act(async () => {
+        pendingSearchP2.shift()!(
+          ok({
+            items: [
+              row({
+                id: 'ws-p2-minh-new',
+                title: 'Hợp đồng mới 2.docx',
+                updatedById: 'u-minh',
+                updatedByName: 'Minh Trần',
+              }),
+            ],
+            nextCursor: null,
+          }),
+        )
+      })
+      await flush()
+      expect(
+        api.uniworkSearchDocuments.mock.calls.filter(
+          ([arg]: [{ cursor?: string }]) => arg.cursor === 'ws-c2',
+        ),
+      ).toHaveLength(1)
+      expect(rowIds()).toEqual(['ws-p2-minh-new'])
     })
   })
 
