@@ -119,8 +119,10 @@ import {
   fetchDocumentsHomeSources,
   folderCardsUnderTypePick,
   getDocumentsHomeNavEntry,
+  docMatchesQuery,
   docMatchesUpdated,
   hasActiveFilters,
+  MAX_AUTO_SEARCH_PAGES,
   rowsUnderTypePick,
   sourceAuthorsOf,
   sourceMatchesFilters,
@@ -443,6 +445,7 @@ type PageState = {
   items: DocumentsHomeDoc[]
   nextCursor: string | null
   loadingMore: boolean
+  loadedPages: number
   error?: UniworkDocErrorCode
   moreError?: UniworkDocErrorCode
 }
@@ -500,6 +503,7 @@ export function DocumentsHome({
     items: [],
     nextCursor: null,
     loadingMore: false,
+    loadedPages: 0,
   })
   const [listTick, setListTick] = useState(0)
   // UNI-1961 / V-STATES F-14: the files of the other modules (the web's "other sources"), read and
@@ -513,6 +517,14 @@ export function DocumentsHome({
     loadingMore: boolean
   }>({ status: 'idle', items: [], nextCursor: null, loadingMore: false })
   const [knownAuthors, setKnownAuthors] = useState<readonly UpdatedByOption[]>([])
+  const mergeKnownAuthors = (items: readonly DocumentsHomeDoc[]) => {
+    setKnownAuthors((prev) => {
+      const merged = new Map<string, string>()
+      for (const opt of prev) merged.set(opt.id, opt.name)
+      for (const opt of collectUpdatedByOptions(items)) merged.set(opt.id, opt.name)
+      return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
+    })
+  }
 
   // Dialogs & inline actions
   // UNI-1959: kinds the server answered 404 / 501 for: disabled for the session
@@ -772,9 +784,10 @@ export function DocumentsHome({
       items: prev.status === 'ready' ? prev.items : [],
       nextCursor: null,
       loadingMore: false,
+      loadedPages: 0,
     }))
 
-    if (query.length > 0) {
+    if (query.length > 0 && subView !== 'recent') {
       void searchDocuments({
         workspaceId,
         query,
@@ -790,14 +803,10 @@ export function DocumentsHome({
               items,
               nextCursor: res.value.nextCursor,
               loadingMore: false,
+              loadedPages: 1,
             })
             if (subView !== 'shared-with-me') {
-              setKnownAuthors((prev) => {
-                const merged = new Map<string, string>()
-                for (const opt of prev) merged.set(opt.id, opt.name)
-                for (const opt of collectUpdatedByOptions(items)) merged.set(opt.id, opt.name)
-                return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
-              })
+              mergeKnownAuthors(items)
             }
           } else {
             setPage({
@@ -805,6 +814,7 @@ export function DocumentsHome({
               items: [],
               nextCursor: null,
               loadingMore: false,
+              loadedPages: 0,
               error: res.error,
             })
           }
@@ -816,6 +826,7 @@ export function DocumentsHome({
             items: [],
             nextCursor: null,
             loadingMore: false,
+            loadedPages: 0,
             error: 'network',
           })
         })
@@ -856,14 +867,10 @@ export function DocumentsHome({
             items,
             nextCursor: result.value.nextCursor,
             loadingMore: false,
+            loadedPages: 1,
           })
           if (subView !== 'shared-with-me') {
-            setKnownAuthors((prev) => {
-              const merged = new Map<string, string>()
-              for (const opt of prev) merged.set(opt.id, opt.name)
-              for (const opt of collectUpdatedByOptions(items)) merged.set(opt.id, opt.name)
-              return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
-            })
+            mergeKnownAuthors(items)
           }
         } else {
           if (
@@ -895,6 +902,7 @@ export function DocumentsHome({
             items: [],
             nextCursor: null,
             loadingMore: false,
+            loadedPages: 0,
             error: result.error,
           })
         }
@@ -906,6 +914,7 @@ export function DocumentsHome({
           items: [],
           nextCursor: null,
           loadingMore: false,
+          loadedPages: 0,
           error: 'network',
         })
       })
@@ -1036,7 +1045,7 @@ export function DocumentsHome({
     const seq = listSeqRef.current
     setPage((prev) => ({ ...prev, loadingMore: true, moreError: undefined }))
 
-    if (query.length > 0) {
+    if (query.length > 0 && subView !== 'recent') {
       void searchDocuments({
         workspaceId,
         query,
@@ -1053,14 +1062,10 @@ export function DocumentsHome({
               items: [...prev.items, ...nextItems],
               nextCursor: res.value.nextCursor,
               loadingMore: false,
+              loadedPages: prev.loadedPages + 1,
             }))
             if (subView !== 'shared-with-me') {
-              setKnownAuthors((prev) => {
-                const merged = new Map<string, string>()
-                for (const opt of prev) merged.set(opt.id, opt.name)
-                for (const opt of collectUpdatedByOptions(nextItems)) merged.set(opt.id, opt.name)
-                return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
-              })
+              mergeKnownAuthors(nextItems)
             }
           } else {
             setPage((prev) => ({
@@ -1100,14 +1105,10 @@ export function DocumentsHome({
             items: [...prev.items, ...nextItems],
             nextCursor: result.value.nextCursor,
             loadingMore: false,
+            loadedPages: prev.loadedPages + 1,
           }))
           if (subView !== 'shared-with-me') {
-            setKnownAuthors((prev) => {
-              const merged = new Map<string, string>()
-              for (const opt of prev) merged.set(opt.id, opt.name)
-              for (const opt of collectUpdatedByOptions(nextItems)) merged.set(opt.id, opt.name)
-              return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
-            })
+            mergeKnownAuthors(nextItems)
           }
         } else {
           setPage((prev) => ({
@@ -2360,14 +2361,19 @@ export function DocumentsHome({
   const folderOrder = docSort?.column === 'name' ? 'name' : 'recent'
   const folderDesc = folderOrder === 'name' && docSort?.dir === 'desc'
   // UNI-2205: the search IPC takes the Type picks only, so Người sửa / Cập nhật narrow the search
-  // hits here on folders and documents alike (matching the web, which combines all filters with q)
+  // hits here on folders and documents alike (matching the web, which combines all filters with q);
+  // on Gần đây (KLV-6) the query filters the loaded Recent rows client-side by folded title.
   const { folders: allFolders, files } = useMemo(() => {
     const matched =
-      query.length > 0 ? page.items.filter((doc) => docMatchesUpdated(doc, wireFilters)) : page.items
+      query.length > 0
+        ? subView === 'recent'
+          ? page.items.filter((doc) => docMatchesQuery(doc, query))
+          : page.items.filter((doc) => docMatchesUpdated(doc, wireFilters))
+        : page.items
     const split = splitAndSortItems(matched, folderOrder, dateLocale)
     const ordered = folderDesc ? [...split.folders].reverse() : split.folders
     return { folders: myFolderFirst(ordered), files: split.files }
-  }, [page.items, query, wireFilters, folderOrder, folderDesc, dateLocale])
+  }, [page.items, query, subView, wireFilters, folderOrder, folderDesc, dateLocale])
   // Q0: the tree level (workspace root, My Folder, an open folder) keeps its cards, they navigate;
   // on a flat list the same switch as the rows hides them under a Type pick
   const folders = folderCardsUnderTypePick(
@@ -2421,6 +2427,35 @@ export function DocumentsHome({
     filters.types,
   ])
 
+  // UNI-2205 (KLF-1 / KLV-6): while a query is active and client-side filtering hides every hit of
+  // the loaded pages (or on Gần đây, where the query narrows the Recent list client-side), auto-load
+  // the next page up to 10 pages so matches on later pages show without a false empty state.
+  const clientFilteredSearch =
+    query.length > 0 &&
+    (subView === 'recent' || filters.updatedBy.trim() !== '' || filters.updatedPreset !== 'any')
+  const autoLoadingSearchPages =
+    clientFilteredSearch &&
+    page.status === 'ready' &&
+    page.nextCursor !== null &&
+    !page.moreError &&
+    (subView === 'recent'
+      ? page.loadedPages < MAX_AUTO_SEARCH_PAGES || page.loadingMore
+      : (folders.length + tableRows.length === 0 && page.loadedPages < MAX_AUTO_SEARCH_PAGES) ||
+        (folders.length + tableRows.length === 0 && page.loadingMore))
+  useEffect(() => {
+    if (!clientFilteredSearch) return
+    if (page.status !== 'ready' || !page.nextCursor || page.moreError) return
+    if (page.loadedPages >= MAX_AUTO_SEARCH_PAGES) return
+    if (subView !== 'recent' && folders.length + tableRows.length > 0) return
+    if (!page.loadingMore) loadMore()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    clientFilteredSearch,
+    subView,
+    folders.length,
+    tableRows.length,
+    page,
+  ])
   // UNI-2047: the selection and the bulk bar act on the rows the person sees, not on everything
   // loaded: the shelf's Lưu trữ bởi and the source rows narrow the table
   const visibleDocs = useMemo(
@@ -3030,6 +3065,7 @@ export function DocumentsHome({
             />
 
             {((page.status === 'loading' && page.items.length === 0) ||
+              (autoLoadingSearchPages && folders.length + tableRows.length === 0) ||
               (elsewhereView && sources.status === 'loading')) && (
               <div className="uw-pick-skeleton" role="status" aria-busy="true">
                 <span className="uw-sr-only">{t('uwPickLoading')}</span>
@@ -3178,13 +3214,21 @@ export function DocumentsHome({
                       </div>
                     ) : // V-STATES F-09: a search with no hit is the shared empty state with Xóa tìm kiếm
                     query.length > 0 ? (
-                      <ListState
-                        kind="empty"
-                        glyph="search"
-                        returnFocus={focusSearch}
-                        title={t('dlSearchNoResults', { query })}
-                        action={{ label: t('searchClear'), onClick: () => setSearchDraft('') }}
-                      />
+                      autoLoadingSearchPages || page.nextCursor !== null ? null : (
+                        <ListState
+                          kind="empty"
+                          glyph="search"
+                          returnFocus={focusSearch}
+                          title={t('dlSearchNoResults', { query })}
+                          hint={
+                            hasActiveFilters(filters) ||
+                            (subView === 'recent' && recentSegment !== 'all')
+                              ? t('uhEmptyFiltered')
+                              : undefined
+                          }
+                          action={{ label: t('searchClear'), onClick: () => setSearchDraft('') }}
+                        />
+                      )
                     ) : (
                       <div className="dh-empty" role="status">
                         {emptyMessage}

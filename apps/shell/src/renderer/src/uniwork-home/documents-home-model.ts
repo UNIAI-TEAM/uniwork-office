@@ -743,6 +743,29 @@ export function docMatchesUpdated(doc: DocumentsHomeDoc, filters: UniworkListFil
 }
 
 /**
+ * UNI-2205 (KLV-6): lower-case without Vietnamese diacritics (đ/Đ included) and collapsed spaces,
+ * for client-side title matching on screens whose route has no `q` parameter (Gần đây).
+ */
+export function foldForSearch(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+export function docMatchesQuery(doc: DocumentsHomeDoc, query: string): boolean {
+  const foldedQuery = foldForSearch(query)
+  if (!foldedQuery) return true
+  return foldForSearch(doc.title).includes(foldedQuery)
+}
+
+/** Cap on automatic page fetches while a search query or client filter is narrowing paged results. */
+export const MAX_AUTO_SEARCH_PAGES = 10
+
+/**
  * UNI-1961: one page of the root's source files, with the home's Type picks
  * as the sources `types`. Null when the bridge has no sources call. `source` narrows to one
  * module (a sidebar row of Từ nơi khác); `limit` is the sidebar's availability probe.
