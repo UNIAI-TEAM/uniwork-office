@@ -318,6 +318,7 @@ function FolderContentsAccessBody({
 
   const titleId = `${baseId}-title`
   const descriptionId = `${baseId}-desc`
+  const scopeId = `${baseId}-scope`
   const summaryId = `${baseId}-summary`
   const warningsId = `${baseId}-warnings`
   const nothingId = `${baseId}-nothing`
@@ -338,9 +339,10 @@ function FolderContentsAccessBody({
     ...(nothingToChange ? [nothingId] : []),
     ...(warnings.length > 0 ? [warningsId] : []),
   ].join(' ')
-  const title = folder.title.trim()
-    ? t('shrFcTitle', { title: folder.title })
-    : t('shrFcTitleUntitled')
+  // the title is the plain verb; the subtitle says which folder the share covers
+  const scope = folder.title.trim()
+    ? t('shrFcScope', { title: folder.title })
+    : t('shrFcScopeUntitled')
   const total = batch?.total ?? 0
   const percent =
     total > 0 ? Math.min(100, Math.round(((batch?.processed ?? 0) / total) * 100)) : undefined
@@ -348,15 +350,24 @@ function FolderContentsAccessBody({
   return (
     <ActionModal
       labelledBy={titleId}
-      describedBy={step === 'review' ? `${descriptionId} ${reviewDescribedBy}` : descriptionId}
+      describedBy={[
+        ...(step === 'progress' ? [] : [scopeId]),
+        descriptionId,
+        ...(step === 'review' ? [reviewDescribedBy] : []),
+      ].join(' ')}
       className="uw-share uw-fca"
       onCancel={pending ? () => {} : finish}
     >
       <header className="uw-share-header">
         <div className="uw-share-header-text">
           <h2 id={titleId} className="uw-act-heading uw-share-title">
-            {step === 'progress' ? t('shrFcProgressTitle') : title}
+            {step === 'progress' ? t('shrFcProgressTitle') : t('shrFcTitle')}
           </h2>
+          {step !== 'progress' && (
+            <p id={scopeId} className="uw-share-muted" data-fca-scope>
+              {scope}
+            </p>
+          )}
           <p id={descriptionId} className="uw-share-muted">
             {step === 'progress' ? t('shrFcProgressHint') : t('shrFcFixed')}
           </p>

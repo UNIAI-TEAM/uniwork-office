@@ -82,13 +82,19 @@ function EndProbe(props: FolderBatchEndHandlers) {
 describe('web copy (UNI-2244): the app strings are the web draft, word for word', () => {
   // web key -> [app key, vi, en] (drive-web contract-fe.md, draft r1 + the pending rows)
   const WEB: Array<[string, string, string, string]> = [
-    ['menu', 'shrFcMenu', 'Chia sẻ các tài liệu bên trong…', 'Share documents inside…'],
-    ['title', 'shrFcTitle', 'Chia sẻ tài liệu trong “{title}”', 'Share documents in “{title}”'],
+    ['menu', 'shrFcMenu', 'Chia sẻ', 'Share'],
+    ['title', 'shrFcTitle', 'Chia sẻ', 'Share'],
     [
-      'title_untitled',
-      'shrFcTitleUntitled',
-      'Chia sẻ tài liệu trong thư mục',
-      'Share documents in this folder',
+      'scope',
+      'shrFcScope',
+      'Áp dụng cho các tài liệu trong thư mục “{title}” và thư mục con.',
+      'Applies to the documents in the folder “{title}” and its subfolders.',
+    ],
+    [
+      'scope_untitled',
+      'shrFcScopeUntitled',
+      'Áp dụng cho các tài liệu trong thư mục này và thư mục con.',
+      'Applies to the documents in this folder and its subfolders.',
     ],
     [
       'fixed_sentence',
@@ -442,10 +448,12 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
   it('title, the fixed sentence, merge by default and the two modes in the web copy', async () => {
     await open()
     const dialog = q('[role="dialog"]')!
-    expect(q('#' + dialog.getAttribute('aria-labelledby'))!.textContent).toBe(
-      t('shrFcTitle', { title: 'Plans' }),
-    )
-    expect(q('#' + dialog.getAttribute('aria-describedby'))!.textContent).toBe(t('shrFcFixed'))
+    expect(q('#' + dialog.getAttribute('aria-labelledby'))!.textContent).toBe(t('shrFcTitle'))
+    // the subtitle names the folder; the fixed sentence stays the description
+    expect(q('[data-fca-scope]')!.textContent).toBe(t('shrFcScope', { title: 'Plans' }))
+    const describedBy = dialog.getAttribute('aria-describedby')!.split(' ')
+    expect(describedBy).toContain(q('[data-fca-scope]')!.id)
+    expect(q('#' + describedBy[describedBy.length - 1])!.textContent).toBe(t('shrFcFixed'))
     expect(q<HTMLInputElement>('[data-fca-mode="merge"]')!.checked).toBe(true)
     expect(q<HTMLInputElement>('[data-fca-mode="replace"]')!.checked).toBe(false)
     expect(dialog.textContent).toContain(t('shrFcModeMerge'))
@@ -458,15 +466,16 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     expect(q('[data-fca-home]')).toBeNull()
   })
 
-  it('a folder without a title reads "Share documents in this folder"', async () => {
+  it('a folder without a title says "this folder" in the subtitle', async () => {
     await open({}, 'en', { ...FOLDER, title: ' ' })
-    expect(q('[role="dialog"] h2')!.textContent).toBe(t('shrFcTitleUntitled'))
+    expect(q('[role="dialog"] h2')!.textContent).toBe(t('shrFcTitle'))
+    expect(q('[data-fca-scope]')!.textContent).toBe(t('shrFcScopeUntitled'))
   })
 
   it('vi copy: the dialog reads the web vi strings', async () => {
     await open({}, 'vi')
     const text = q('[role="dialog"]')!.textContent!
-    expect(text).toContain('Chia sẻ tài liệu trong “Plans”')
+    expect(text).toContain('Áp dụng cho các tài liệu trong thư mục “Plans” và thư mục con.')
     expect(text).toContain(
       'Áp dụng cho các tài liệu hiện có. Tài liệu thêm sau không tự nhận quyền.',
     )

@@ -222,8 +222,9 @@ export const it = {
     'Questo documento appartiene a un prodotto di lavoro, quindi il proprietario non può essere cambiato.',
   shrOwnerUnavailable:
     'Il trasferimento della proprietà non è ancora disponibile su questo server.',
-  shrFcMenu: 'Condividi i documenti all’interno…',
-  shrFcTitle: 'Condividi i documenti in “{title}”',
+  shrFcMenu: 'Condividi',
+  shrFcTitle: 'Condividi',
+  shrFcScope: 'Si applica ai documenti nella cartella “{title}” e nelle sue sottocartelle.',
   shrFcFixed:
     'Si applica ai documenti esistenti. I documenti aggiunti in seguito non ricevono questo accesso.',
   shrFcModeLabel: 'Modalità di applicazione',
@@ -248,7 +249,7 @@ export const it = {
   shrFcNotFound: 'Cartella non trovata.',
   shrFcUnavailable:
     'Questo server non supporta ancora la condivisione dei documenti di una cartella.',
-  shrFcTitleUntitled: 'Condividi i documenti in questa cartella',
+  shrFcScopeUntitled: 'Si applica ai documenti in questa cartella e nelle sue sottocartelle.',
   shrFcModeMergeHint:
     'Concede accesso alle persone e ai gruppi scelti. L’accesso esistente non viene mai abbassato né rimosso.',
   shrFcModeReplaceHint:

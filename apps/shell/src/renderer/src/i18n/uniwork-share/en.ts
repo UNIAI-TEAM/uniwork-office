@@ -214,7 +214,7 @@ export const en = {
   shrOwnerOwnedByWorkProduct:
     "This document belongs to a work product, so its owner can't be changed.",
   shrOwnerUnavailable: "Ownership transfer isn't available on this server yet.",
-  shrFcMenu: 'Share documents inside…',
+  shrFcMenu: 'Share',
   shrFcFixed:
     'Applies to the documents that exist now. Documents added later do not get this access.',
   shrFcModeLabel: 'How to apply',
@@ -235,7 +235,7 @@ export const en = {
   shrFcForbidden: 'You do not have permission to read this folder.',
   shrFcNotFound: 'This folder was not found.',
   shrFcUnavailable: 'This server does not support sharing the documents inside a folder yet.',
-  shrFcTitleUntitled: 'Share documents in this folder',
+  shrFcScopeUntitled: 'Applies to the documents in this folder and its subfolders.',
   shrFcModeMergeHint:
     'Grants the people and groups you pick. Existing access is never lowered or removed.',
   shrFcModeReplaceHint:
@@ -280,7 +280,8 @@ export const en = {
     'Access could not be applied for some people or groups. Fix the marked rows and try again.',
   shrFcRunningNoBatch: 'Access in this folder is being updated. Try again in a moment.',
   shrFcTooMany: 'You can add up to {max} people or groups at a time.',
-  shrFcTitle: 'Share documents in “{title}”',
+  shrFcTitle: 'Share',
+  shrFcScope: 'Applies to the documents in the folder “{title}” and its subfolders.',
   shrFcSkippedNotManageable: "skip {count} you don't manage",
   shrFcToastUnknown: 'The access change was sent. Open the documents to check the result.',
 } satisfies Record<keyof typeof zh, string>

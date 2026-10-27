@@ -1699,7 +1699,7 @@ describe('UniworkBrowser: folder actions (S3)', () => {
 describe('UniworkBrowser: Share documents inside… (UNI-2244)', () => {
   const entryLabel = (uniworkShareStrings.en as Record<string, string>).shrFcMenu!
   const titleOf = (title: string) =>
-    (uniworkShareStrings.en as Record<string, string>).shrFcTitle!.replace('{title}', title)
+    (uniworkShareStrings.en as Record<string, string>).shrFcScope!.replace('{title}', title)
   const menuLabels = () => $$('[role="menuitem"]').map((el) => el.textContent)
 
   afterEach(() => {

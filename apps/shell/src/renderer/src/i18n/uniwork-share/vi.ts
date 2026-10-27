@@ -216,8 +216,9 @@ export const vi = {
   shrOwnerOwnedByWorkProduct:
     'Tài liệu này thuộc về một sản phẩm công việc nên không đổi được chủ sở hữu.',
   shrOwnerUnavailable: 'Máy chủ này chưa hỗ trợ chuyển quyền sở hữu.',
-  shrFcMenu: 'Chia sẻ các tài liệu bên trong…',
-  shrFcTitle: 'Chia sẻ tài liệu trong “{title}”',
+  shrFcMenu: 'Chia sẻ',
+  shrFcTitle: 'Chia sẻ',
+  shrFcScope: 'Áp dụng cho các tài liệu trong thư mục “{title}” và thư mục con.',
   shrFcFixed: 'Áp dụng cho các tài liệu hiện có. Tài liệu thêm sau không tự nhận quyền.',
   shrFcModeLabel: 'Cách áp dụng',
   shrFcModeMerge: 'Thêm vào quyền đã có',
@@ -237,7 +238,7 @@ export const vi = {
   shrFcForbidden: 'Bạn không có quyền xem thư mục này.',
   shrFcNotFound: 'Không tìm thấy thư mục này.',
   shrFcUnavailable: 'Máy chủ này chưa hỗ trợ chia sẻ các tài liệu trong thư mục.',
-  shrFcTitleUntitled: 'Chia sẻ tài liệu trong thư mục',
+  shrFcScopeUntitled: 'Áp dụng cho các tài liệu trong thư mục này và thư mục con.',
   shrFcModeMergeHint: 'Cấp thêm cho các đối tượng đã chọn. Quyền đang có không bị hạ hay gỡ.',
   shrFcModeReplaceHint:
     'Mỗi tài liệu chỉ còn đúng danh sách bên dưới. Ai không có trong danh sách sẽ mất quyền.',

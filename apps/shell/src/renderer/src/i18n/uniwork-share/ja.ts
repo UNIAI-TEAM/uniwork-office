@@ -218,8 +218,9 @@ export const ja = {
   shrOwnerOwnedByWorkProduct:
     'このドキュメントは作業成果物に属しているため、オーナーを変更できません。',
   shrOwnerUnavailable: 'このサーバーではまだオーナー権限の移譲を利用できません。',
-  shrFcMenu: 'フォルダー内のドキュメントを共有…',
-  shrFcTitle: '「{title}」内のドキュメントを共有',
+  shrFcMenu: '共有',
+  shrFcTitle: '共有',
+  shrFcScope: '「{title}」フォルダーとそのサブフォルダー内のドキュメントに適用されます。',
   shrFcFixed:
     '現在あるドキュメントに適用されます。後から追加したドキュメントにはこのアクセス権は付きません。',
   shrFcModeLabel: '適用方法',
@@ -242,7 +243,7 @@ export const ja = {
   shrFcForbidden: 'このフォルダーを読み取る権限がありません。',
   shrFcNotFound: 'このフォルダーが見つかりません。',
   shrFcUnavailable: 'このサーバーはまだフォルダー内のドキュメントの共有に対応していません。',
-  shrFcTitleUntitled: 'このフォルダー内のドキュメントを共有',
+  shrFcScopeUntitled: 'このフォルダーとそのサブフォルダー内のドキュメントに適用されます。',
   shrFcModeMergeHint:
     '選択した人やグループにアクセス権を付与します。既存のアクセス権が下がったり削除されたりすることはありません。',
   shrFcModeReplaceHint:

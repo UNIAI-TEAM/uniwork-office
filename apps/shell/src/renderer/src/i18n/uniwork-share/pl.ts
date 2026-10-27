@@ -219,8 +219,9 @@ export const pl = {
   shrOwnerOwnedByWorkProduct:
     'Ten dokument należy do produktu pracy, więc nie można zmienić jego właściciela.',
   shrOwnerUnavailable: 'Przenoszenie własności nie jest jeszcze dostępne na tym serwerze.',
-  shrFcMenu: 'Udostępnij dokumenty w środku…',
-  shrFcTitle: 'Udostępnij dokumenty w „{title}”',
+  shrFcMenu: 'Udostępnij',
+  shrFcTitle: 'Udostępnij',
+  shrFcScope: 'Dotyczy dokumentów w folderze „{title}” i jego podfolderach.',
   shrFcFixed: 'Dotyczy istniejących dokumentów. Dokumenty dodane później nie dostają tego dostępu.',
   shrFcModeLabel: 'Sposób zastosowania',
   shrFcModeMerge: 'Dodaj do istniejącego dostępu',
@@ -242,7 +243,7 @@ export const pl = {
   shrFcForbidden: 'Nie masz uprawnień do odczytu tego folderu.',
   shrFcNotFound: 'Nie znaleziono tego folderu.',
   shrFcUnavailable: 'Ten serwer nie obsługuje jeszcze udostępniania dokumentów w folderze.',
-  shrFcTitleUntitled: 'Udostępnij dokumenty w tym folderze',
+  shrFcScopeUntitled: 'Dotyczy dokumentów w tym folderze i jego podfolderach.',
   shrFcModeMergeHint:
     'Nadaje dostęp wybranym osobom i grupom. Istniejący dostęp nigdy nie jest obniżany ani usuwany.',
   shrFcModeReplaceHint:

@@ -215,8 +215,9 @@ export const nl = {
   shrOwnerOwnedByWorkProduct:
     'Dit document hoort bij een werkproduct, dus de eigenaar kan niet worden gewijzigd.',
   shrOwnerUnavailable: 'Eigendom overdragen is nog niet beschikbaar op deze server.',
-  shrFcMenu: 'Documenten erin delen…',
-  shrFcTitle: 'Documenten in “{title}” delen',
+  shrFcMenu: 'Delen',
+  shrFcTitle: 'Delen',
+  shrFcScope: 'Geldt voor de documenten in de map “{title}” en de submappen ervan.',
   shrFcFixed:
     'Geldt voor de documenten die er nu zijn. Later toegevoegde documenten krijgen deze toegang niet.',
   shrFcModeLabel: 'Zo toepassen',
@@ -240,7 +241,7 @@ export const nl = {
   shrFcForbidden: 'U mag deze map niet lezen.',
   shrFcNotFound: 'Deze map is niet gevonden.',
   shrFcUnavailable: 'Deze server ondersteunt het delen van de documenten in een map nog niet.',
-  shrFcTitleUntitled: 'Documenten in deze map delen',
+  shrFcScopeUntitled: 'Geldt voor de documenten in deze map en de submappen ervan.',
   shrFcModeMergeHint:
     'Geeft toegang aan de personen en groepen die u kiest. Bestaande toegang wordt nooit verlaagd of verwijderd.',
   shrFcModeReplaceHint:

@@ -217,8 +217,9 @@ export const cs = {
   shrOwnerOwnedByWorkProduct:
     'Tento dokument patří k pracovnímu výstupu, proto nelze změnit jeho vlastníka.',
   shrOwnerUnavailable: 'Převod vlastnictví zatím není na tomto serveru k dispozici.',
-  shrFcMenu: 'Sdílet dokumenty uvnitř…',
-  shrFcTitle: 'Sdílet dokumenty ve složce „{title}“',
+  shrFcMenu: 'Sdílet',
+  shrFcTitle: 'Sdílet',
+  shrFcScope: 'Platí pro dokumenty ve složce „{title}“ a jejích podsložkách.',
   shrFcFixed:
     'Platí pro dokumenty, které existují nyní. Později přidané dokumenty tento přístup nezískají.',
   shrFcModeLabel: 'Jak použít',
@@ -241,7 +242,7 @@ export const cs = {
   shrFcForbidden: 'Nemáte oprávnění číst tuto složku.',
   shrFcNotFound: 'Tato složka nebyla nalezena.',
   shrFcUnavailable: 'Tento server zatím nepodporuje sdílení dokumentů ve složce.',
-  shrFcTitleUntitled: 'Sdílet dokumenty v této složce',
+  shrFcScopeUntitled: 'Platí pro dokumenty v této složce a jejích podsložkách.',
   shrFcModeMergeHint:
     'Uděluje přístup vybraným osobám a skupinám. Stávající přístup se nikdy nesnižuje ani neodebírá.',
   shrFcModeReplaceHint:

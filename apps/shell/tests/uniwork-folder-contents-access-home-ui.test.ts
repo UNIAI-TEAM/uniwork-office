@@ -174,7 +174,7 @@ describe('Share documents inside… in the Documents page (UNI-2244)', () => {
       ),
     )
     expect(dialog()).not.toBeNull()
-    expect(dialog()!.textContent).toContain(en.shrFcTitle!.replace('{title}', 'Beta Leaf'))
+    expect(dialog()!.textContent).toContain(en.shrFcScope!.replace('{title}', 'Beta Leaf'))
   })
 
   it('a folder card menu offers it right after Open', async () => {
@@ -205,7 +205,7 @@ describe('Share documents inside… in the Documents page (UNI-2244)', () => {
         (i) => i.textContent === ENTRY,
       ),
     )
-    expect(dialog()!.textContent).toContain(en.shrFcTitle!.replace('{title}', 'Alpha Folder'))
+    expect(dialog()!.textContent).toContain(en.shrFcScope!.replace('{title}', 'Alpha Folder'))
   })
 
   it('no entry anywhere without the share bridge (a stale preload)', async () => {

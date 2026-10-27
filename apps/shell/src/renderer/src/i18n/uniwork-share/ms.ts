@@ -216,8 +216,9 @@ export const ms = {
   shrOwnerOwnedByWorkProduct:
     'Dokumen ini milik produk kerja, jadi pemiliknya tidak boleh ditukar.',
   shrOwnerUnavailable: 'Pindah milik belum tersedia pada pelayan ini.',
-  shrFcMenu: 'Kongsi dokumen di dalamnya…',
-  shrFcTitle: 'Kongsi dokumen dalam “{title}”',
+  shrFcMenu: 'Kongsi',
+  shrFcTitle: 'Kongsi',
+  shrFcScope: 'Terpakai untuk dokumen dalam folder “{title}” dan subfoldernya.',
   shrFcFixed:
     'Terpakai untuk dokumen yang wujud sekarang. Dokumen yang ditambah kemudian tidak mendapat akses ini.',
   shrFcModeLabel: 'Cara menggunakan',
@@ -240,7 +241,7 @@ export const ms = {
   shrFcForbidden: 'Anda tiada kebenaran untuk membaca folder ini.',
   shrFcNotFound: 'Folder ini tidak ditemui.',
   shrFcUnavailable: 'Pelayan ini belum menyokong perkongsian dokumen dalam folder.',
-  shrFcTitleUntitled: 'Kongsi dokumen dalam folder ini',
+  shrFcScopeUntitled: 'Terpakai untuk dokumen dalam folder ini dan subfoldernya.',
   shrFcModeMergeHint:
     'Memberi akses kepada orang dan kumpulan yang dipilih. Akses sedia ada tidak pernah diturunkan atau dialih keluar.',
   shrFcModeReplaceHint:

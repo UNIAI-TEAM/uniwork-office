@@ -224,8 +224,9 @@ export const de = {
     'Dieses Dokument gehört zu einem Arbeitsergebnis, daher kann der Eigentümer nicht geändert werden.',
   shrOwnerUnavailable:
     'Die Übertragung der Eigentümerschaft ist auf diesem Server noch nicht verfügbar.',
-  shrFcMenu: 'Dokumente darin freigeben…',
-  shrFcTitle: 'Dokumente in „{title}“ freigeben',
+  shrFcMenu: 'Teilen',
+  shrFcTitle: 'Teilen',
+  shrFcScope: 'Gilt für die Dokumente im Ordner „{title}“ und seinen Unterordnern.',
   shrFcFixed:
     'Gilt für die vorhandenen Dokumente. Später hinzugefügte Dokumente erhalten diesen Zugriff nicht.',
   shrFcModeLabel: 'Art der Anwendung',
@@ -250,7 +251,7 @@ export const de = {
   shrFcNotFound: 'Dieser Ordner wurde nicht gefunden.',
   shrFcUnavailable:
     'Dieser Server unterstützt das Freigeben der Dokumente eines Ordners noch nicht.',
-  shrFcTitleUntitled: 'Dokumente in diesem Ordner teilen',
+  shrFcScopeUntitled: 'Gilt für die Dokumente in diesem Ordner und seinen Unterordnern.',
   shrFcModeMergeHint:
     'Gewährt Zugriff für die ausgewählten Personen und Gruppen. Bestehender Zugriff wird nie herabgestuft oder entfernt.',
   shrFcModeReplaceHint:

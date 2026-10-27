@@ -214,8 +214,9 @@ export const ko = {
   shrOwnerCandidatesFailed: '구성원을 불러오지 못했습니다. 닫고 다시 시도하세요.',
   shrOwnerOwnedByWorkProduct: '이 문서는 작업 결과물에 속해 있어 소유자를 변경할 수 없습니다.',
   shrOwnerUnavailable: '이 서버에서는 아직 소유권 이전을 사용할 수 없습니다.',
-  shrFcMenu: '폴더 안의 문서 공유…',
-  shrFcTitle: '“{title}” 안의 문서 공유',
+  shrFcMenu: '공유',
+  shrFcTitle: '공유',
+  shrFcScope: '“{title}” 폴더와 하위 폴더의 문서에 적용됩니다.',
   shrFcFixed: '현재 있는 문서에 적용됩니다. 나중에 추가된 문서에는 이 권한이 부여되지 않습니다.',
   shrFcModeLabel: '적용 방식',
   shrFcModeMerge: '기존 권한에 추가',
@@ -237,7 +238,7 @@ export const ko = {
   shrFcForbidden: '이 폴더를 읽을 권한이 없습니다.',
   shrFcNotFound: '이 폴더를 찾을 수 없습니다.',
   shrFcUnavailable: '이 서버는 아직 폴더 안의 문서 공유를 지원하지 않습니다.',
-  shrFcTitleUntitled: '이 폴더의 문서 공유',
+  shrFcScopeUntitled: '이 폴더와 하위 폴더의 문서에 적용됩니다.',
   shrFcModeMergeHint:
     '선택한 사람과 그룹에 권한을 부여합니다. 기존 권한은 낮아지거나 제거되지 않습니다.',
   shrFcModeReplaceHint:

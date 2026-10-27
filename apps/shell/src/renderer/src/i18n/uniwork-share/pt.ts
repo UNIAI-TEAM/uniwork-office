@@ -218,8 +218,9 @@ export const pt = {
   shrOwnerOwnedByWorkProduct:
     'Este documento pertence a um produto de trabalho, por isso o proprietário não pode ser alterado.',
   shrOwnerUnavailable: 'A transferência de propriedade ainda não está disponível neste servidor.',
-  shrFcMenu: 'Compartilhar os documentos dentro…',
-  shrFcTitle: 'Compartilhar os documentos em “{title}”',
+  shrFcMenu: 'Compartilhar',
+  shrFcTitle: 'Compartilhar',
+  shrFcScope: 'Aplica-se aos documentos da pasta “{title}” e das suas subpastas.',
   shrFcFixed:
     'Aplica-se aos documentos que existem agora. Documentos adicionados depois não recebem este acesso.',
   shrFcModeLabel: 'Como aplicar',
@@ -244,7 +245,7 @@ export const pt = {
   shrFcNotFound: 'Esta pasta não foi encontrada.',
   shrFcUnavailable:
     'Este servidor ainda não oferece suporte ao compartilhamento dos documentos de uma pasta.',
-  shrFcTitleUntitled: 'Compartilhar documentos nesta pasta',
+  shrFcScopeUntitled: 'Aplica-se aos documentos desta pasta e das suas subpastas.',
   shrFcModeMergeHint:
     'Concede acesso às pessoas e aos grupos escolhidos. O acesso existente nunca é reduzido nem removido.',
   shrFcModeReplaceHint:

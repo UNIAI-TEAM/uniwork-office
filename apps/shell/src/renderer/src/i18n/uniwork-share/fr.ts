@@ -217,8 +217,9 @@ export const fr = {
   shrOwnerOwnedByWorkProduct:
     'Ce document appartient à un livrable, son propriétaire ne peut donc pas être changé.',
   shrOwnerUnavailable: "Le transfert de propriété n'est pas encore disponible sur ce serveur.",
-  shrFcMenu: 'Partager les documents à l’intérieur…',
-  shrFcTitle: 'Partager les documents dans « {title} »',
+  shrFcMenu: 'Partager',
+  shrFcTitle: 'Partager',
+  shrFcScope: 'S’applique aux documents du dossier « {title} » et de ses sous-dossiers.',
   shrFcFixed:
     'S’applique aux documents existants. Les documents ajoutés plus tard n’ont pas cet accès.',
   shrFcModeLabel: 'Mode d’application',
@@ -243,7 +244,7 @@ export const fr = {
   shrFcNotFound: 'Ce dossier est introuvable.',
   shrFcUnavailable:
     'Ce serveur ne prend pas encore en charge le partage des documents d’un dossier.',
-  shrFcTitleUntitled: 'Partager les documents de ce dossier',
+  shrFcScopeUntitled: 'S’applique aux documents de ce dossier et de ses sous-dossiers.',
   shrFcModeMergeHint:
     'Accorde l’accès aux personnes et groupes choisis. L’accès existant n’est jamais abaissé ni retiré.',
   shrFcModeReplaceHint:

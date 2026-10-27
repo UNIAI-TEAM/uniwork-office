@@ -216,8 +216,9 @@ export const id = {
   shrOwnerOwnedByWorkProduct:
     'Dokumen ini milik sebuah produk kerja, jadi pemiliknya tidak dapat diubah.',
   shrOwnerUnavailable: 'Transfer kepemilikan belum tersedia di server ini.',
-  shrFcMenu: 'Bagikan dokumen di dalamnya…',
-  shrFcTitle: 'Bagikan dokumen di dalam “{title}”',
+  shrFcMenu: 'Bagikan',
+  shrFcTitle: 'Bagikan',
+  shrFcScope: 'Berlaku untuk dokumen di folder “{title}” dan subfoldernya.',
   shrFcFixed:
     'Berlaku untuk dokumen yang ada sekarang. Dokumen yang ditambahkan kemudian tidak mendapat akses ini.',
   shrFcModeLabel: 'Cara menerapkan',
@@ -240,7 +241,7 @@ export const id = {
   shrFcForbidden: 'Anda tidak memiliki izin untuk membaca folder ini.',
   shrFcNotFound: 'Folder ini tidak ditemukan.',
   shrFcUnavailable: 'Server ini belum mendukung pembagian dokumen di dalam folder.',
-  shrFcTitleUntitled: 'Bagikan dokumen di folder ini',
+  shrFcScopeUntitled: 'Berlaku untuk dokumen di folder ini dan subfoldernya.',
   shrFcModeMergeHint:
     'Memberikan akses kepada orang dan grup yang Anda pilih. Akses yang sudah ada tidak pernah diturunkan atau dihapus.',
   shrFcModeReplaceHint:

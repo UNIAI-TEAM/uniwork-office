@@ -218,8 +218,9 @@ export const es = {
   shrOwnerOwnedByWorkProduct:
     'Este documento pertenece a un producto de trabajo, así que no se puede cambiar su propietario.',
   shrOwnerUnavailable: 'La transferencia de propiedad aún no está disponible en este servidor.',
-  shrFcMenu: 'Compartir los documentos de dentro…',
-  shrFcTitle: 'Compartir los documentos de «{title}»',
+  shrFcMenu: 'Compartir',
+  shrFcTitle: 'Compartir',
+  shrFcScope: 'Se aplica a los documentos de la carpeta «{title}» y sus subcarpetas.',
   shrFcFixed:
     'Se aplica a los documentos que existen ahora. Los documentos añadidos después no reciben este acceso.',
   shrFcModeLabel: 'Cómo aplicar',
@@ -243,7 +244,7 @@ export const es = {
   shrFcForbidden: 'No tienes permiso para leer esta carpeta.',
   shrFcNotFound: 'No se encontró esta carpeta.',
   shrFcUnavailable: 'Este servidor aún no admite compartir los documentos de una carpeta.',
-  shrFcTitleUntitled: 'Compartir los documentos de esta carpeta',
+  shrFcScopeUntitled: 'Se aplica a los documentos de esta carpeta y sus subcarpetas.',
   shrFcModeMergeHint:
     'Concede acceso a las personas y los grupos que elijas. El acceso existente nunca se reduce ni se quita.',
   shrFcModeReplaceHint:
