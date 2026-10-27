@@ -316,7 +316,7 @@ export const de = {
   uhDriveViewerEmailMissing: 'Konto noch nicht bekannt',
   uhDriveViewerUnknownTitle: 'UniWork darf diese Datei noch nicht lesen',
   uhDriveViewerUnknownBody:
-    'Sie haben UniWork noch nicht erlaubt, diese Datei zu lesen. {name} hat sie aus dem eigenen Google Drive verknüpft. UNI liest Dateien mit Ihrem eigenen Google-Drive-Konto, daher ist einmalig Ihre Erlaubnis nötig.',
+    '{name} hat sie aus dem eigenen Google Drive verknüpft. UNI liest Dateien mit Ihrem eigenen Google-Drive-Konto, daher ist einmalig Ihre Erlaubnis nötig.',
   uhDriveViewerUnknownHint:
     'Wenn Google meldet, dass Sie keinen Zugriff haben, bitten Sie die Eigentümerin oder den Eigentümer, die Datei in Google Drive zu teilen. UniWork teilt nicht in Ihrem Namen.',
   uhDriveViewerLost: 'Das Konto {email} hat keinen Zugriff mehr auf diese Datei.',

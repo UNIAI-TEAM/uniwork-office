@@ -25,7 +25,11 @@ import type {
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 import type { DocumentsHomeSubViewId } from '../src/renderer/src/uniwork-home/documents-home-model'
-import { UniworkFolderTree } from '../src/renderer/src/uniwork-folders/UniworkFolderTree'
+import {
+  TREE_PAD,
+  TREE_STEP,
+  UniworkFolderTree,
+} from '../src/renderer/src/uniwork-folders/UniworkFolderTree'
 import { UniworkFolderPicker } from '../src/renderer/src/uniwork-folders/UniworkFolderPicker'
 import { ROOT_KEY } from '../src/renderer/src/uniwork-folders/uniwork-folders-model'
 import { pickType } from './doclist-type-filter-fixture'
@@ -725,5 +729,27 @@ describe('VS-8: the My Folder stand-in lines up with the top-level rows when the
     )
     expect(base?.body).toMatch(/padding-inline-start:\s*18px/)
     expect(specificity(rule!.selectors[0]!)).toBeGreaterThan(specificity('.dh-my-folder-standin'))
+  })
+})
+
+describe('tree grid numbers: TS and CSS cannot drift (D4BF-R3-3)', () => {
+  const homeVars = readSrc('uniwork-home/documents-home.css').replace(/\/\*[\s\S]*?\*\//g, '')
+  const px = (name: string) => {
+    const m = homeVars.match(new RegExp(`${name}:\\s*(\\d+)px;`))
+    expect(m, `${name} is a px custom property`).not.toBeNull()
+    return Number(m![1])
+  }
+
+  it('TREE_PAD is --dh-tree-pad and TREE_STEP is --dh-tree-slot + --dh-tree-gap', () => {
+    expect(TREE_PAD).toBe(px('--dh-tree-pad'))
+    expect(TREE_STEP).toBe(px('--dh-tree-slot') + px('--dh-tree-gap'))
+  })
+
+  it('a lost account row shows the icon with sr-only words, and the node keeps the row hover', () => {
+    const css = sidebarCss.replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(css).toMatch(
+      /\.dh-drive-node:hover > \.dh-drive-nav-root:not\(\.active\)\s*\{\s*background:\s*var\(--hover\)/,
+    )
+    expect(css).not.toMatch(/\.dh-drive-nav-lost\s*\{[^}]*background/)
   })
 })

@@ -310,7 +310,7 @@ export const ms = {
   uhDriveViewerEmailMissing: 'Akaun belum diketahui',
   uhDriveViewerUnknownTitle: 'UniWork belum boleh membaca fail ini',
   uhDriveViewerUnknownBody:
-    'Anda belum membenarkan UniWork membaca fail ini. Fail ini dipautkan oleh {name} daripada Google Drive miliknya. UNI membaca fail dengan akaun Google Drive anda sendiri, jadi kebenaran anda diperlukan sekali.',
+    'Fail ini dipautkan oleh {name} daripada Google Drive miliknya. UNI membaca fail dengan akaun Google Drive anda sendiri, jadi kebenaran anda diperlukan sekali.',
   uhDriveViewerUnknownHint:
     'Jika Google menyatakan anda tiada akses, minta pemilik berkongsi fail di Google Drive. UniWork tidak berkongsi bagi pihak anda.',
   uhDriveViewerLost: 'Akaun {email} tidak lagi mempunyai akses kepada fail ini.',

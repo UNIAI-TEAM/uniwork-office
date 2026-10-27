@@ -103,30 +103,90 @@
   gap: 2px;
 }
 
-.dh-sidebar-tree .dh-drive-nav-root {
-  padding-inline-start: 4px;
+/* One grid for every row of the folder tree section (folders at any depth, the My Folder stand-in,
+   Google Drive and its account rows), the same spec as the web's tree:
+   [pad][chevron slot][gap][icon column][gap][name] ... [count / menu]. UniworkFolderTree draws a row
+   with TREE_PAD inline on level 1 and TREE_STEP more per level (one chevron slot + gap), so a child's
+   chevron slot starts under its parent's icon; the Drive rows are plain buttons and take the same
+   columns from the --dh-tree-* properties documents-home.css defines on .dh-sidebar-tree. Logical
+   properties only: RTL mirrors the whole grid. */
+.dh-sidebar-tree .uwf-glyph,
+.dh-sidebar-tree .dh-drive-brand-icon {
+  /* the 16px artwork centred in the icon column */
+  box-sizing: content-box;
+  padding: calc((var(--dh-tree-icon) - 16px) / 2);
 }
 
+.dh-sidebar-tree .dh-drive-sidebar .dh-nav-item {
+  gap: var(--dh-tree-gap);
+  height: 32px;
+  padding-block: 0;
+  padding-inline-end: var(--dh-tree-end);
+}
+
+/* Google Drive: a tree node. Its chevron button sits in the slot of a folder row's twisty, so
+   chevron, icon and name share the folder rows' columns */
+.dh-drive-node {
+  position: relative;
+}
+
+/* the chevron is a sibling above the row button, so the row's own :hover stops matching while the
+   pointer is on it: keep the hover fill while the pointer is anywhere on the node */
+.dh-drive-node:hover > .dh-drive-nav-root:not(.active) {
+  background: var(--hover);
+}
+
+.dh-sidebar-tree .dh-drive-nav-root {
+  padding-inline-start: calc(var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap));
+}
+
+.dh-drive-twisty {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: var(--dh-tree-pad);
+  margin-block: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dh-drive-twisty:hover {
+  color: var(--text);
+}
+
+.dh-drive-twisty:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* "Drive: <email>": the text starts exactly under the "Google Drive" label (the icon column of its
+   parent, one step in, is where the label begins) */
 .dh-sidebar-tree .dh-drive-nav-account {
-  padding-inline-start: 28px;
+  position: relative; /* anchors the sr-only label */
+  padding-inline-start: calc(
+    var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap) + var(--dh-tree-icon) +
+      var(--dh-tree-gap)
+  );
 }
 
 .dh-drive-brand-icon {
   flex: none;
 }
 
+/* a lost account shows the warning icon only (the web sidebar does the same); the words stay for
+   assistive tech in an sr-only span and in the row title, so the email keeps the freed width */
 .dh-drive-nav-lost {
+  position: relative;
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: var(--danger-bg);
-  color: var(--danger-text);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.2;
+  color: var(--warning-text);
+}
+
+.dh-drive-nav-lost .dh-drive-warn-icon {
+  color: inherit;
 }
 
 .dh-drive-warn-icon {
@@ -134,8 +194,11 @@
   color: var(--danger-text);
 }
 
+/* one count column: every Drive row ends on the same inline-end edge, numbers right-aligned */
 .dh-drive-nav-count {
   flex: none;
+  min-width: var(--dh-tree-count-w, 28px);
+  text-align: end;
   font-size: 11px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;

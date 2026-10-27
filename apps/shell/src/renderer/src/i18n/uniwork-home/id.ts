@@ -308,7 +308,7 @@ export const id = {
   uhDriveViewerEmailMissing: 'Akun belum diketahui',
   uhDriveViewerUnknownTitle: 'UniWork belum bisa membaca file ini',
   uhDriveViewerUnknownBody:
-    'Anda belum mengizinkan UniWork membaca file ini. File ini ditautkan oleh {name} dari Google Drive miliknya. UNI membaca file dengan akun Google Drive Anda sendiri, jadi perlu izin Anda satu kali.',
+    'File ini ditautkan oleh {name} dari Google Drive miliknya. UNI membaca file dengan akun Google Drive Anda sendiri, jadi perlu izin Anda satu kali.',
   uhDriveViewerUnknownHint:
     'Jika Google menyatakan Anda tidak punya akses, minta pemilik membagikan file di Google Drive. UniWork tidak membagikan atas nama Anda.',
   uhDriveViewerLost: 'Akun {email} tidak lagi punya akses ke file ini.',

@@ -311,7 +311,7 @@ export const pl = {
   uhDriveViewerEmailMissing: 'Konto nie jest jeszcze znane',
   uhDriveViewerUnknownTitle: 'UniWork nie może jeszcze odczytać pliku',
   uhDriveViewerUnknownBody:
-    'Nie zezwolono jeszcze UniWork na odczyt tego pliku. Powiązał(a) go {name} ze swojego Google Drive. UNI czyta pliki Twoim własnym kontem Google Drive, więc wymaga to jednorazowej zgody.',
+    'Powiązał(a) go {name} ze swojego Google Drive. UNI czyta pliki Twoim własnym kontem Google Drive, więc wymaga to jednorazowej zgody.',
   uhDriveViewerUnknownHint:
     'Jeśli Google zgłasza brak dostępu, poproś właściciela o udostępnienie pliku w Google Drive. UniWork nie udostępnia w Twoim imieniu.',
   uhDriveViewerLost: 'Konto {email} nie ma już dostępu do tego pliku.',
@@ -356,6 +356,6 @@ export const pl = {
   uhDriveUnlinkConfirmWorking: 'Usuwanie powiązania…',
   uhDriveUnlinkFailed: 'Nie udało się usunąć powiązania. Spróbuj ponownie.',
   uhDriveNotFound: 'Nie znaleziono tego pliku lub nie masz uprawnień do jego wyświetlenia.',
-  uhDriveErrAuthFailed: 'Połączenie z Dyskiem Google wygasło. Połącz ponownie, aby kontynuować.',
+  uhDriveErrAuthFailed: 'Połączenie z Google Drive wygasło. Połącz ponownie, aby kontynuować.',
   uhDriveFeatureOff: 'Google Drive nie jest już dostępny dla tej organizacji.',
 } satisfies Record<keyof typeof zh, string>

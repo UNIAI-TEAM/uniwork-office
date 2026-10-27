@@ -303,7 +303,7 @@ export const ar = {
   uhDriveViewerEmailMissing: 'الحساب غير معروف بعد',
   uhDriveViewerUnknownTitle: 'لم تسمح لـ UniWork بقراءة الملف بعد',
   uhDriveViewerUnknownBody:
-    'لم تسمح لـ UniWork بقراءة هذا الملف. ربطه {name} من Google Drive الخاص به. تقرأ UNI الملفات بحساب Google Drive الخاص بك، لذا تحتاج إلى إذنك مرة واحدة.',
+    'ربطه {name} من Google Drive الخاص به. تقرأ UNI الملفات بحساب Google Drive الخاص بك، لذا تحتاج إلى إذنك مرة واحدة.',
   uhDriveViewerUnknownHint:
     'إذا أبلغك Google بأنه ليس لديك صلاحية، فاطلب من المالك مشاركة الملف على Google Drive. لا يقوم UniWork بالمشاركة نيابةً عنك.',
   uhDriveViewerLost: 'لم يعد للحساب {email} صلاحية الوصول إلى هذا الملف.',

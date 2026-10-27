@@ -300,7 +300,7 @@ export const zh = {
   uhDriveViewerEmailMissing: '尚未确定账号',
   uhDriveViewerUnknownTitle: '尚未允许 UniWork 读取此文件',
   uhDriveViewerUnknownBody:
-    '你尚未允许 UniWork 读取此文件。该文件由 {name} 从其 Google Drive 关联。UNI 使用你自己的 Google Drive 账号读取文件，因此需要你授权一次。',
+    '该文件由 {name} 从其 Google Drive 关联。UNI 使用你自己的 Google Drive 账号读取文件，因此需要你授权一次。',
   uhDriveViewerUnknownHint:
     '如果 Google 提示你没有权限，请让所有者在 Google Drive 上共享该文件。UniWork 不会代为共享。',
   uhDriveViewerLost: '账号 {email} 已无权访问此文件。',

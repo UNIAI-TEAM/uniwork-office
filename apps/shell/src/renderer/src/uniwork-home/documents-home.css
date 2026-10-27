@@ -114,6 +114,14 @@
 }
 
 .dh-sidebar-tree {
+  /* the one grid of every folder-tree row and Drive row (see doclist-sidebar.css):
+     [chevron slot][gap][icon column][gap][name] ... [count / menu]; a child indents by one step */
+  --dh-tree-pad: 4px;
+  --dh-tree-slot: 16px;
+  --dh-tree-gap: 6px;
+  --dh-tree-icon: 20px;
+  --dh-tree-end: 8px;
+  --dh-tree-count-w: 28px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -1681,6 +1689,12 @@
   white-space: nowrap;
 }
 
+/* the Drive subtitle is long in some locales (ru, de): it wraps instead of ellipsing at every width (D4B-fix1) */
+.dh-main:has(.dh-drive-view) .dh-subtitle {
+  white-space: normal;
+  text-overflow: clip;
+}
+
 /* order: 1 keeps the DOM order but lets the Type chips and Clear filters (order 0) follow the Type
    control, while the select pair stays pinned to the far end of the row */
 .dh-filter-bar.has-lead .dh-filter-selects {
@@ -2052,14 +2066,14 @@
   font-weight: 500;
   max-width: 100%;
   min-width: 0;
-  white-space: nowrap;
+  white-space: normal;
+  align-items: flex-start;
+  text-align: start;
   cursor: pointer;
 }
 
 .dh-drive-reconnect-link > span {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .dh-drive-reconnect-link .dh-drive-warn-icon {
@@ -2069,19 +2083,6 @@
 .dh-drive-reconnect-link:disabled,
 .dh-drive-reconnect-text {
   cursor: default;
-}
-
-/* D3-V2-2: at <= 1100 px let the action wrap to two lines so "kết nối lại" stays visible */
-@media (max-width: 1100px) {
-  .dh-drive-reconnect-link {
-    align-items: flex-start;
-    white-space: normal;
-  }
-
-  .dh-drive-reconnect-link > span {
-    overflow: visible;
-    text-overflow: clip;
-  }
 }
 
 /* block sizing: a badge that wraps keeps its text inside, the background grows with the lines (D4-A) */
@@ -2206,11 +2207,6 @@
     width: 12%;
   }
 
-  .dh-main:has(.dh-drive-view) .dh-subtitle {
-    white-space: normal;
-    text-overflow: clip;
-  }
-
   .dh-drive-th {
     padding: 8px 8px;
     white-space: normal;
@@ -2229,30 +2225,11 @@
 }
 
 /* D4-A (UNI-2197): from ~860 px down the sidebar leaves about 350 px for the table; tighten the page gutter, the
-   cell padding and the type so all five columns fit without horizontal scroll in every locale */
+   cell padding and the type so the three columns (see the 1050 px block below) fit without horizontal scroll in every
+   locale */
 @media (max-width: 860px) {
   .dh-main:has(.dh-drive-view) {
     padding-inline: 12px;
-  }
-
-  .dh-drive-col-name {
-    width: 30%;
-  }
-
-  .dh-drive-col-account {
-    width: 18%;
-  }
-
-  .dh-drive-col-access {
-    width: 16%;
-  }
-
-  .dh-drive-col-used {
-    width: 21%;
-  }
-
-  .dh-drive-col-tasks {
-    width: 15%;
   }
 
   .dh-drive-th {
@@ -2264,8 +2241,6 @@
     padding: 8px 4px;
   }
 
-  .dh-drive-cell-used,
-  .dh-drive-cell-tasks,
   .dh-drive-account-email {
     font-size: 12px;
   }
@@ -2319,8 +2294,8 @@
   color: var(--text-secondary);
 }
 
-/* the panel carries the details, so the list keeps Name + Access and lets the badge wrap (D3-V1; not when the panel stacks under the table, <= 760 px) */
-@media (min-width: 761px) {
+/* the panel carries the details, so the list keeps Name + Access and lets the badge wrap (D3-V1; not when the panel stacks under the table, <= 1100 px) */
+@media (min-width: 1101px) {
   .dh-drive-view.has-panel .dh-drive-col-account,
   .dh-drive-view.has-panel .dh-drive-cell-account,
   .dh-drive-view.has-panel .dh-drive-col-used,
@@ -2618,31 +2593,24 @@ p.dh-drive-panel-muted {
   color: var(--danger-text);
 }
 
-/* at ~900 px the panel narrows and carries account + access, so the list keeps only Name (D3-V2) */
+/* D4B-fix2: up to 1100 px the list would shrink to Name only beside the panel, so the panel sits below it */
 @media (max-width: 1100px) {
-  .dh-drive-panel {
-    flex-basis: 300px;
-  }
-}
-
-@media (min-width: 761px) and (max-width: 1100px) {
-  .dh-drive-view.has-panel .dh-drive-col-access,
-  .dh-drive-view.has-panel .dh-drive-cell-access {
-    display: none;
-  }
-
-  .dh-drive-view.has-panel .dh-drive-col-name {
-    width: 100%;
-  }
-}
-
-@media (max-width: 760px) {
   .dh-drive-body {
     flex-direction: column;
   }
 
-  /* D4-A fix2: the window is at least 720 px wide; five columns cannot hold a word each there, so the list keeps
-     Name, Account and Access and the detail panel carries Used in / Tasks created */
+  .dh-drive-panel {
+    position: static;
+    flex-basis: auto;
+    width: 100%;
+    max-height: none;
+  }
+}
+
+/* D4-B / D4-V31: up to 1050 px five columns leave Name about 150 px or less (names ellipsised, headers on four lines,
+   Russian words broken), so the list keeps Name, Account and Access and the detail panel carries Used in / Tasks
+   created. The five-column table starts at 1051 px; the panel stacks under the list up to 1100 px (above). */
+@media (max-width: 1050px) {
   .dh-drive-col-used,
   .dh-drive-cell-used,
   .dh-drive-col-tasks,
@@ -2661,9 +2629,12 @@ p.dh-drive-panel-muted {
   .dh-drive-col-access {
     width: 26%;
   }
+}
 
-  /* just enough room that "Disconnected · Reconnect" and the access badge wrap between words, not inside one
-     (the longest word is the Russian "Переподключить") */
+/* the window is at least 720 px wide; the three columns of the narrowest band get just enough room that
+   "Disconnected · Reconnect" and the access badge wrap between words, not inside one (the longest word is the
+   Russian "Переподключить") */
+@media (max-width: 900px) {
   .dh-drive-th,
   .dh-drive-td {
     padding-inline: 3px;
@@ -2672,12 +2643,5 @@ p.dh-drive-panel-muted {
   .dh-drive-reconnect-link {
     gap: 2px;
     font-size: 10.5px;
-  }
-
-  .dh-drive-panel {
-    position: static;
-    flex-basis: auto;
-    width: 100%;
-    max-height: none;
   }
 }

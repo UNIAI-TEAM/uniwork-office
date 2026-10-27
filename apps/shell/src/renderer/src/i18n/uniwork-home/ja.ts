@@ -314,7 +314,7 @@ export const ja = {
   uhDriveViewerEmailMissing: 'アカウントはまだ不明です',
   uhDriveViewerUnknownTitle: 'UniWork はまだこのファイルを読めません',
   uhDriveViewerUnknownBody:
-    'UniWork にこのファイルの読み取りをまだ許可していません。ファイルは {name} さんの Google Drive からリンクされました。UNI はあなた自身の Google Drive のアカウントでファイルを読むため、一度だけ許可が必要です。',
+    'ファイルは {name} さんの Google Drive からリンクされました。UNI はあなた自身の Google Drive のアカウントでファイルを読むため、一度だけ許可が必要です。',
   uhDriveViewerUnknownHint:
     'Google にアクセス権がないと表示された場合は、所有者に Google Drive でファイルを共有してもらってください。UniWork が代わりに共有することはありません。',
   uhDriveViewerLost: 'アカウント {email} はこのファイルにアクセスできなくなりました。',

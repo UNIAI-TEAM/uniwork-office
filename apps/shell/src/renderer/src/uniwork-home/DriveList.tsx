@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type {
   DriveConnection,
@@ -12,18 +12,8 @@ import type { WorkWebTarget } from '../../../shared/uniwork-work-api'
 import { FileBadge } from '../FileBadge'
 import { ListState } from '../doclist/ListState'
 import { useI18n, type TFunc } from '../locale'
+import { Chevron } from '../uniwork-folders/UniworkFolderTree'
 import { driveErrorKey } from './drive-panel-model'
-import {
-  driveFolderGroupCount,
-  driveFolderGroupLabel,
-  groupDriveFilesByFolder,
-} from './drive-folder-groups'
-import {
-  readCollapsedDriveFolders,
-  readDriveGroupByFolder,
-  writeCollapsedDriveFolders,
-  writeDriveGroupByFolder,
-} from './drive-folder-prefs'
 import {
   buildDriveSidebarState,
   fetchDocumentsHomeDriveFiles,
@@ -275,60 +265,92 @@ export function DriveSidebarRows({
   state,
   active,
   selectedAccountId,
+  expanded,
+  onToggle,
   onSelect,
 }: {
   state: DriveSidebarState
   active: boolean
   selectedAccountId: string | null
+  /** the account rows are shown (the node's chevron is open) */
+  expanded: boolean
+  onToggle: () => void
   onSelect: (connectionId: string | null) => void
 }) {
   const { t } = useI18n()
+  const accountsId = useId()
   if (!state.visible) return null
 
   const isAllCurrent = active && selectedAccountId === null
+  const hasAccounts = state.accounts.length > 0
 
   return (
     <div className="dh-drive-sidebar" data-drive-sidebar="">
-      <button
-        type="button"
-        className={`dh-nav-item nav-item dh-drive-nav-root${isAllCurrent ? ' active' : ''}`}
-        data-nav="google-drive"
-        data-drive-account="all"
-        aria-current={isAllCurrent ? 'page' : undefined}
-        onClick={() => onSelect(null)}
-      >
-        <GoogleDriveGlyph className="dh-nav-icon dh-drive-brand-icon" />
-        <span className="dh-nav-label">{t('uhNavGoogleDrive')}</span>
-        <span className="dh-drive-nav-count" data-drive-total="">
-          {state.totalCount}
-        </span>
-      </button>
-      {state.accounts.map((acct: DriveAccountNavRow) => {
-        const isCurrent = active && selectedAccountId === acct.id
-        const label = t('uhNavDriveAccount', { email: acct.email })
-        return (
+      <div className="dh-drive-node">
+        <button
+          type="button"
+          className={`dh-nav-item nav-item dh-drive-nav-root${isAllCurrent ? ' active' : ''}`}
+          data-nav="google-drive"
+          data-drive-account="all"
+          aria-current={isAllCurrent ? 'page' : undefined}
+          onClick={() => onSelect(null)}
+        >
+          <GoogleDriveGlyph className="dh-nav-icon dh-drive-brand-icon" />
+          <span className="dh-nav-label">{t('uhNavGoogleDrive')}</span>
+          <span className="dh-drive-nav-count" data-drive-total="">
+            {state.totalCount}
+          </span>
+        </button>
+        {/* a sibling of the row button (a button cannot hold a button); a node without accounts keeps the empty slot */}
+        {hasAccounts && (
           <button
-            key={acct.id}
             type="button"
-            className={`dh-nav-item nav-item dh-drive-nav-account${isCurrent ? ' active' : ''}`}
-            data-drive-account={acct.id}
-            aria-current={isCurrent ? 'page' : undefined}
-            title={label}
-            onClick={() => onSelect(acct.id)}
+            className="uwf-twisty dh-drive-twisty"
+            data-drive-toggle=""
+            aria-expanded={expanded}
+            aria-controls={expanded ? accountsId : undefined}
+            aria-label={t('dlGroupToggle', { group: t('uhNavGoogleDrive') })}
+            onClick={onToggle}
           >
-            <span className="dh-nav-label">{label}</span>
-            {acct.needsReconnect && (
-              <span className="dh-drive-nav-lost" data-drive-lost="">
-                <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
-                <span>{t('uhDriveLost')}</span>
-              </span>
-            )}
-            <span className="dh-drive-nav-count" data-drive-account-count="">
-              {acct.linkedFileCount}
-            </span>
+            <Chevron expanded={expanded} />
           </button>
-        )
-      })}
+        )}
+      </div>
+      {hasAccounts && expanded && (
+        <div id={accountsId} className="dh-drive-accounts" role="group">
+          {state.accounts.map((acct: DriveAccountNavRow) => {
+            const isCurrent = active && selectedAccountId === acct.id
+            const label = t('uhNavDriveAccount', { email: acct.email })
+            const rowTitle = acct.needsReconnect ? `${label} · ${t('uhDriveLost')}` : label
+            return (
+              <button
+                key={acct.id}
+                type="button"
+                className={`dh-nav-item nav-item dh-drive-nav-account${isCurrent ? ' active' : ''}`}
+                data-drive-account={acct.id}
+                aria-current={isCurrent ? 'page' : undefined}
+                title={rowTitle}
+                onClick={() => onSelect(acct.id)}
+              >
+                {/* web parity: only the email is drawn; "Drive: <email>" is read by assistive tech and sits in the title */}
+                <span className="uw-sr-only">{label}</span>
+                <span className="dh-nav-label" aria-hidden="true">
+                  {acct.email}
+                </span>
+                {acct.needsReconnect && (
+                  <span className="dh-drive-nav-lost" data-drive-lost="">
+                    <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
+                    <span className="uw-sr-only">{t('uhDriveLost')}</span>
+                  </span>
+                )}
+                <span className="dh-drive-nav-count" data-drive-account-count="">
+                  {acct.linkedFileCount}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -402,30 +424,7 @@ export function DriveList({
   onManageConnections,
   onReconnect,
 }: DriveListProps) {
-  const { t, dateLocale } = useI18n()
-
-  const [groupByFolder, setGroupByFolder] = useState<boolean>(() => readDriveGroupByFolder())
-  // collapsed groups are remembered for this session only (kept across view switches)
-  const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(() =>
-    readCollapsedDriveFolders(),
-  )
-  const toggleGroupByFolder = () => {
-    const next = !groupByFolder
-    setGroupByFolder(next)
-    writeDriveGroupByFolder(next)
-  }
-  const toggleFolder = (key: string) =>
-    setCollapsedFolders((prev) => {
-      const next = new Set(prev)
-      if (!next.delete(key)) next.add(key)
-      writeCollapsedDriveFolders(next)
-      return next
-    })
-  // null = nothing to group (off, or every file's folder unknown): the flat list shows
-  const folderGroups = useMemo(
-    () => (groupByFolder ? groupDriveFilesByFolder(files, dateLocale) : null),
-    [groupByFolder, files, dateLocale],
-  )
+  const { t } = useI18n()
 
   const resolvedAccountId = resolveDriveAccountFilter(selectedAccountId, connections)
   const selectedConnection = resolvedAccountId
@@ -450,6 +449,19 @@ export function DriveList({
   const isErrorState = !isOfflineState && status === 'error' && files.length === 0
   const isLoadingState = !isOfflineState && status === 'loading' && files.length === 0
 
+  // a pick brings a stacked panel (below the list) into view; beside the list nothing scrolls
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [pickTick, setPickTick] = useState(0)
+  const pick = (driveFileId: string, via: 'pointer' | 'keyboard') => {
+    setPickTick((n) => n + 1)
+    onSelect?.(driveFileId, via)
+  }
+  useEffect(() => {
+    const body = bodyRef.current
+    if (pickTick === 0 || !body || getComputedStyle(body).flexDirection !== 'column') return
+    body.querySelector('[data-drive-panel]')?.scrollIntoView?.({ block: 'nearest' })
+  }, [pickTick])
+
   const onRowKeyDown = (event: ReactKeyboardEvent<HTMLTableRowElement>, driveFileId: string) => {
     if (event.nativeEvent.isComposing) return
     if (event.repeat) return
@@ -462,111 +474,13 @@ export function DriveList({
     const target = event.target as HTMLElement | null
     if (target && target !== event.currentTarget && target.closest('button, a, input')) return
     event.preventDefault()
-    if (event.key === ' ') onSelect?.(driveFileId, 'keyboard')
+    if (event.key === ' ') pick(driveFileId, 'keyboard')
     else onOpenOnGoogle(driveFileId)
-  }
-
-  const renderRow = (file: DriveFile) => {
-    const badge = formatDriveAccessBadge(file, t)
-    const viewerConnId = file.viewerConnectionId || file.connectionId
-    const viewerConn = viewerConnId ? connectionById.get(viewerConnId) : undefined
-    const rowNeedsReconnect =
-      file.viewerAccess === 'connection_lost' ||
-      file.boundConnectionLost === true ||
-      Boolean(
-        viewerConn &&
-        (viewerConn.needsReconnect ||
-          viewerConn.status === 'needs_reconnect' ||
-          Boolean(viewerConn.authFailedAt)),
-      )
-    const viewerEmail = file.viewerAccountEmail?.trim() ?? ''
-    // a row without the viewer's account says why, instead of a bare dash
-    const accountEmail = viewerEmail || t('uhDriveViewerEmailMissing')
-    const usedInText = formatDriveUsedIn(file, t)
-    const tasksCreatedText = formatDriveTasksCreated(file, t)
-
-    return (
-      <tr
-        key={file.id}
-        className={`dh-drive-row${selectedFileId === file.id ? ' is-selected' : ''}`}
-        data-drive-file-id={file.id}
-        aria-current={selectedFileId === file.id ? 'true' : undefined}
-        tabIndex={0}
-        onClick={() => onSelect?.(file.id, 'pointer')}
-        onDoubleClick={(e) => {
-          const target = e.target as HTMLElement | null
-          if (target && target.closest('button, a, input')) return
-          onOpenOnGoogle(file.id)
-        }}
-        onKeyDown={(e) => onRowKeyDown(e, file.id)}
-      >
-        <td className="dh-drive-td dh-drive-cell-name">
-          <div className="dh-drive-name-wrap">
-            <DriveFileIcon iconKind={file.iconKind} size={24} />
-            <span className="dh-drive-file-name" title={file.name}>
-              {file.name}
-            </span>
-          </div>
-        </td>
-        <td className="dh-drive-td dh-drive-cell-account">
-          <div className="dh-drive-account-stack">
-            <span
-              className={`dh-drive-account-email${viewerEmail ? '' : ' is-missing'}`}
-              title={accountEmail}
-            >
-              {accountEmail}
-            </span>
-            {rowNeedsReconnect &&
-              (onReconnect ? (
-                <button
-                  type="button"
-                  className="dh-drive-reconnect-link"
-                  data-drive-reconnect={viewerConnId || file.connectionId}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onReconnect(viewerConnId || file.connectionId)
-                  }}
-                >
-                  <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
-                  <span>{t('uhDriveReconnect')}</span>
-                </button>
-              ) : (
-                <span
-                  className="dh-drive-reconnect-link dh-drive-reconnect-text"
-                  data-drive-reconnect={viewerConnId || file.connectionId}
-                >
-                  <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
-                  <span>{t('uhDriveReconnect')}</span>
-                </span>
-              ))}
-          </div>
-        </td>
-        <td className="dh-drive-td dh-drive-cell-access">
-          <span
-            className={`dh-vis-badge dh-drive-badge dh-drive-badge-${badge.tone}`}
-            data-drive-access={badge.tone}
-          >
-            {badge.label}
-          </span>
-        </td>
-        <td className="dh-drive-td dh-drive-cell-used">{usedInText}</td>
-        <td className="dh-drive-td dh-drive-cell-tasks">{tasksCreatedText}</td>
-      </tr>
-    )
   }
 
   return (
     <div className={`dh-drive-view${panel ? ' has-panel' : ''}`} data-drive-view="">
       <div className="dh-drive-actions-bar">
-        <label className="dh-drive-group-switch">
-          <input
-            type="checkbox"
-            checked={groupByFolder}
-            data-drive-group-by-folder=""
-            onChange={toggleGroupByFolder}
-          />
-          <span>{t('uhDriveGroupBy')}</span>
-        </label>
         <button
           type="button"
           className="btn btn-secondary dh-toolbar-btn dh-drive-manage-btn"
@@ -607,7 +521,7 @@ export function DriveList({
         )}
       </div>
 
-      <div className="dh-drive-body">
+      <div className="dh-drive-body" ref={bodyRef}>
         <div className="dh-drive-main">
           {isLoadingState && (
             <div
@@ -692,58 +606,96 @@ export function DriveList({
                       ))}
                     </tr>
                   </thead>
-                  {folderGroups ? (
-                    folderGroups.map((group) => {
-                      const open = !collapsedFolders.has(group.key)
-                      const label = driveFolderGroupLabel(group, t)
+                  <tbody>
+                    {files.map((file) => {
+                      const badge = formatDriveAccessBadge(file, t)
+                      const viewerConnId = file.viewerConnectionId || file.connectionId
+                      const viewerConn = viewerConnId ? connectionById.get(viewerConnId) : undefined
+                      const rowNeedsReconnect =
+                        file.viewerAccess === 'connection_lost' ||
+                        file.boundConnectionLost === true ||
+                        Boolean(
+                          viewerConn &&
+                          (viewerConn.needsReconnect ||
+                            viewerConn.status === 'needs_reconnect' ||
+                            Boolean(viewerConn.authFailedAt)),
+                        )
+                      const viewerEmail = file.viewerAccountEmail?.trim() ?? ''
+                      // a row without the viewer's account says why, instead of a bare dash
+                      const accountEmail = viewerEmail || t('uhDriveViewerEmailMissing')
+                      const usedInText = formatDriveUsedIn(file, t)
+                      const tasksCreatedText = formatDriveTasksCreated(file, t)
+
                       return (
-                        <tbody
-                          key={group.key}
-                          className="dh-drive-group"
-                          data-drive-group={group.key}
-                          data-drive-group-kind={group.kind}
+                        <tr
+                          key={file.id}
+                          className={`dh-drive-row${selectedFileId === file.id ? ' is-selected' : ''}`}
+                          data-drive-file-id={file.id}
+                          aria-current={selectedFileId === file.id ? 'true' : undefined}
+                          tabIndex={0}
+                          onClick={() => pick(file.id, 'pointer')}
+                          onDoubleClick={(e) => {
+                            const target = e.target as HTMLElement | null
+                            if (target && target.closest('button, a, input')) return
+                            onOpenOnGoogle(file.id)
+                          }}
+                          onKeyDown={(e) => onRowKeyDown(e, file.id)}
                         >
-                          <tr className="dh-group-row dh-drive-group-row">
-                            <th
-                              scope="rowgroup"
-                              colSpan={DRIVE_COLUMNS.length}
-                              className="dh-group-cell"
-                            >
-                              <button
-                                type="button"
-                                className="dh-group-toggle"
-                                aria-expanded={open}
-                                title={label}
-                                onClick={() => toggleFolder(group.key)}
+                          <td className="dh-drive-td dh-drive-cell-name">
+                            <div className="dh-drive-name-wrap">
+                              <DriveFileIcon iconKind={file.iconKind} size={24} />
+                              <span className="dh-drive-file-name" title={file.name}>
+                                {file.name}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="dh-drive-td dh-drive-cell-account">
+                            <div className="dh-drive-account-stack">
+                              <span
+                                className={`dh-drive-account-email${viewerEmail ? '' : ' is-missing'}`}
+                                title={accountEmail}
                               >
-                                <svg
-                                  className="dh-group-chevron"
-                                  width="10"
-                                  height="10"
-                                  viewBox="0 0 10 10"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  aria-hidden="true"
-                                >
-                                  <path d="M2.5 3.5L5 6.5l2.5-3" />
-                                </svg>
-                                <span className="dh-drive-group-label">{label}</span>
-                                <span className="dh-group-count">
-                                  {` · ${driveFolderGroupCount(group.files.length, t)}`}
-                                </span>
-                              </button>
-                            </th>
-                          </tr>
-                          {open && group.files.map(renderRow)}
-                        </tbody>
+                                {accountEmail}
+                              </span>
+                              {rowNeedsReconnect &&
+                                (onReconnect ? (
+                                  <button
+                                    type="button"
+                                    className="dh-drive-reconnect-link"
+                                    data-drive-reconnect={viewerConnId || file.connectionId}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      onReconnect(viewerConnId || file.connectionId)
+                                    }}
+                                  >
+                                    <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
+                                    <span>{t('uhDriveReconnect')}</span>
+                                  </button>
+                                ) : (
+                                  <span
+                                    className="dh-drive-reconnect-link dh-drive-reconnect-text"
+                                    data-drive-reconnect={viewerConnId || file.connectionId}
+                                  >
+                                    <DriveTriangleAlertIcon className="dh-drive-warn-icon" />
+                                    <span>{t('uhDriveReconnect')}</span>
+                                  </span>
+                                ))}
+                            </div>
+                          </td>
+                          <td className="dh-drive-td dh-drive-cell-access">
+                            <span
+                              className={`dh-vis-badge dh-drive-badge dh-drive-badge-${badge.tone}`}
+                              data-drive-access={badge.tone}
+                            >
+                              {badge.label}
+                            </span>
+                          </td>
+                          <td className="dh-drive-td dh-drive-cell-used">{usedInText}</td>
+                          <td className="dh-drive-td dh-drive-cell-tasks">{tasksCreatedText}</td>
+                        </tr>
                       )
-                    })
-                  ) : (
-                    <tbody>{files.map(renderRow)}</tbody>
-                  )}
+                    })}
+                  </tbody>
                 </table>
               </div>
 
@@ -829,6 +781,8 @@ export function useDocumentsHomeDrive({
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [capability, setCapability] = useState(false)
   const [connections, setConnections] = useState<readonly DriveConnection[]>([])
+  // the viewer has linked files although no connection is left (a disconnected one): the row stays
+  const [orphanFileCount, setOrphanFileCount] = useState(0)
   const [seenInSession, setSeenInSession] = useState(false)
   const seenInSessionRef = useRef(false)
   const [syncOnline, setSyncOnline] = useState<boolean>(true)
@@ -860,6 +814,7 @@ export function useDocumentsHomeDrive({
     prevWsRef.current = workspaceId
     setSelectedAccountId(null)
     setConnections([])
+    setOrphanFileCount(0)
     setSeenInSession(false)
     seenInSessionRef.current = false
     setNetworkFailed(false)
@@ -935,8 +890,24 @@ export function useDocumentsHomeDrive({
       if (!res) return
       if (res.ok) {
         setNetworkFailed(false)
+        const known = avail || seenInSessionRef.current
+        // no connection: one file is enough to keep the Drive row (its connection may be disconnected)
+        let linked = 0
+        if (known && res.value.length === 0) {
+          const probe = await fetchDocumentsHomeDriveFiles(bridge, {
+            workspaceId,
+            connectionId: null,
+            limit: 1,
+          })
+          if (connSeqRef.current !== seq) return
+          // a failed probe keeps the last good connections and count: the row neither blinks nor vanishes
+          if (!probe.ok) return
+          linked = probe.value.totalCount
+        }
+        // committed together, so the row does not blink while the probe is in flight
         setConnections(res.value)
-        if ((avail || seenInSessionRef.current) && res.value.length > 0) {
+        setOrphanFileCount(linked)
+        if (known && (res.value.length > 0 || linked > 0)) {
           seenInSessionRef.current = true
           setSeenInSession(true)
         }
@@ -945,6 +916,7 @@ export function useDocumentsHomeDrive({
       } else if (res.error === 'feature_disabled') {
         setCapability(false)
         setConnections([])
+        setOrphanFileCount(0)
         seenInSessionRef.current = false
         setSeenInSession(false)
         onFeatureDisabledRef.current?.()
@@ -1096,7 +1068,11 @@ export function useDocumentsHomeDrive({
   const sidebarState = buildDriveSidebarState({
     capability,
     connections,
-    totalCountOverride: resolvedAccountId === null ? filesState.totalCount : null,
+    totalCountOverride:
+      resolvedAccountId === null
+        ? (filesState.totalCount ?? (connections.length === 0 ? orphanFileCount : null))
+        : null,
+    hasLinkedFiles: orphanFileCount > 0,
     offline,
     seenInSession,
   })

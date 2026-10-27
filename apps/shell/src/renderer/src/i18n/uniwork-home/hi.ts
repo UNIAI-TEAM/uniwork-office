@@ -310,7 +310,7 @@ export const hi = {
   uhDriveViewerEmailMissing: 'खाता अभी ज्ञात नहीं',
   uhDriveViewerUnknownTitle: 'UniWork अभी यह फ़ाइल नहीं पढ़ सकता',
   uhDriveViewerUnknownBody:
-    'आपने अभी UniWork को यह फ़ाइल पढ़ने की अनुमति नहीं दी है। इसे {name} ने अपने Google Drive से लिंक किया है। UNI फ़ाइलें आपके अपने Google Drive खाते से पढ़ता है, इसलिए आपकी अनुमति एक बार चाहिए।',
+    'इसे {name} ने अपने Google Drive से लिंक किया है। UNI फ़ाइलें आपके अपने Google Drive खाते से पढ़ता है, इसलिए आपकी अनुमति एक बार चाहिए।',
   uhDriveViewerUnknownHint:
     'यदि Google कहे कि आपके पास पहुँच नहीं है, तो मालिक से Google Drive पर फ़ाइल साझा करने को कहें। UniWork आपकी ओर से साझा नहीं करता।',
   uhDriveViewerLost: 'खाते {email} की अब इस फ़ाइल तक पहुँच नहीं है।',
