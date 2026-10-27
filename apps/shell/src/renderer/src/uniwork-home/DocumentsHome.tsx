@@ -2793,6 +2793,7 @@ export function DocumentsHome({
               onNameFolder={
                 nameDriveFolder &&
                 drive.canNameFolders &&
+                !drive.brokenAccount &&
                 drive.status === 'ready' &&
                 !driveFolder.name
                   ? () => nameDriveFolder(drive.selectedConnection?.id ?? '', driveFolder.key)

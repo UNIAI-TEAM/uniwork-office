@@ -436,9 +436,13 @@ export function DriveSidebarRows({
                     {tree?.folders.map((folder) => {
                       const current = folderCurrent && selectedFolderKey === folder.key
                       const folderLabel = driveFolderLabel(folder, t)
-                      // only a folder the server could not name, and only against a server that can name it
+                      // only a folder the server could not name, against a server that can name it, on an
+                      // account that still works (the web drops the hand-off of a broken one)
                       const nameable =
-                        Boolean(onNameFolder) && tree.source === 'server' && !folder.name
+                        Boolean(onNameFolder) &&
+                        tree.source === 'server' &&
+                        !acct.needsReconnect &&
+                        !folder.name
                       return (
                         <div key={folder.key} className="dh-drive-node dh-drive-folder-node">
                           <button
