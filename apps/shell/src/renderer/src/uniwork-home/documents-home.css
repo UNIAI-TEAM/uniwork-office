@@ -2182,30 +2182,11 @@
 }
 
 /* D4-A (UNI-2197): from ~860 px down the sidebar leaves about 350 px for the table; tighten the page gutter, the
-   cell padding and the type so all five columns fit without horizontal scroll in every locale */
+   cell padding and the type so the three columns (see the 900 px block below) fit without horizontal scroll in every
+   locale */
 @media (max-width: 860px) {
   .dh-main:has(.dh-drive-view) {
     padding-inline: 12px;
-  }
-
-  .dh-drive-col-name {
-    width: 30%;
-  }
-
-  .dh-drive-col-account {
-    width: 18%;
-  }
-
-  .dh-drive-col-access {
-    width: 16%;
-  }
-
-  .dh-drive-col-used {
-    width: 21%;
-  }
-
-  .dh-drive-col-tasks {
-    width: 15%;
   }
 
   .dh-drive-th {
@@ -2217,8 +2198,6 @@
     padding: 8px 4px;
   }
 
-  .dh-drive-cell-used,
-  .dh-drive-cell-tasks,
   .dh-drive-account-email {
     font-size: 12px;
   }
@@ -2594,8 +2573,18 @@ p.dh-drive-panel-muted {
     flex-direction: column;
   }
 
-  /* D4-A fix2: the window is at least 720 px wide; five columns cannot hold a word each there, so the list keeps
-     Name, Account and Access and the detail panel carries Used in / Tasks created */
+  .dh-drive-panel {
+    position: static;
+    flex-basis: auto;
+    width: 100%;
+    max-height: none;
+  }
+}
+
+/* D4-B: the window is at least 720 px wide; up to 900 px five columns leave Name about 100 px (names ellipsised,
+   badges on three lines), so the list keeps Name, Account and Access and the detail panel carries Used in /
+   Tasks created. The five-column table starts at 901 px. */
+@media (max-width: 900px) {
   .dh-drive-col-used,
   .dh-drive-cell-used,
   .dh-drive-col-tasks,
@@ -2625,12 +2614,5 @@ p.dh-drive-panel-muted {
   .dh-drive-reconnect-link {
     gap: 2px;
     font-size: 10.5px;
-  }
-
-  .dh-drive-panel {
-    position: static;
-    flex-basis: auto;
-    width: 100%;
-    max-height: none;
   }
 }
