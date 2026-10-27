@@ -14,11 +14,11 @@ import type { LazyWorkbookState } from '../src/renderer/univer-state'
 const ROWS = 9
 const COLUMNS = 4
 
-function sheetMeta() {
+function sheetMeta(rowCount = ROWS) {
   return {
     id: 'sheet-1',
     name: 'Sheet1',
-    rowCount: ROWS,
+    rowCount,
     columnCount: COLUMNS,
     tables: [],
     pivotTables: [],
@@ -27,14 +27,14 @@ function sheetMeta() {
   }
 }
 
-function lazyState(): LazyWorkbookState {
+function lazyState(rowCount = ROWS): LazyWorkbookState {
   return {
     file: {
       sessionId: 'session-1',
       sha256: 'sha',
       name: 'Small.xlsx',
       styles: [],
-      sheets: [sheetMeta()],
+      sheets: [sheetMeta(rowCount)],
     },
     generation: 1,
     loadedRanges: new Map(),
@@ -190,5 +190,63 @@ describe('streaming status after the full preload', () => {
     await vi.advanceTimersByTimeAsync(300)
 
     expect(messages.at(-1)).toBe(t('appFullyLoaded'))
+  })
+
+  // UNI-2216: a workbook that never runs the full preload (small, non-formula
+  // mode) kept "Streaming <name>: N rows available." on the bar for good.
+  describe('without the full preload', () => {
+    it('shows the indexing status while the stream runs and clears it once the sheet is complete', async () => {
+      const state = lazyState()
+      const ref = { current: state }
+      const worksheet = makeWorksheet()
+      const runtime = makeRuntime(worksheet)
+      const setMessage = (message: string) => messages.push(message)
+      reads = [{ ...rangeResult(false), indexedThroughRow: 3 }, rangeResult(true)]
+
+      // The hidden-row probe polls on a timer while decorations are pending.
+      const viewport = loadVisibleRange(runtime as never, ref, worksheet as never, setMessage)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(messages.at(-1)).toBe(t('appIndexing', { name: 'Sheet1', rows: '4' }))
+
+      await vi.advanceTimersByTimeAsync(10_000)
+      await viewport
+
+      expect(state.flags.preloadComplete).toBe(false)
+      expect(messages.at(-1)).toBe('')
+      expect(messages).not.toContain(
+        t('appStreamingRows', { name: 'Small.xlsx', rows: String(ROWS) }),
+      )
+    })
+
+    it('a small workbook that finishes indexing at once never shows the streaming status', async () => {
+      const state = lazyState()
+      const ref = { current: state }
+      const worksheet = makeWorksheet()
+      const runtime = makeRuntime(worksheet)
+      const setMessage = (message: string) => messages.push(message)
+      reads = [rangeResult(true)]
+
+      await loadVisibleRange(runtime as never, ref, worksheet as never, setMessage)
+
+      expect(messages).not.toContain(
+        t('appStreamingRows', { name: 'Small.xlsx', rows: String(ROWS) }),
+      )
+      expect(messages.at(-1)).toBe('')
+    })
+
+    it('keeps the streaming status while only part of the sheet is in the grid', async () => {
+      const state = lazyState(100_000)
+      const ref = { current: state }
+      const worksheet = makeWorksheet()
+      const runtime = makeRuntime(worksheet)
+      const setMessage = (message: string) => messages.push(message)
+      reads = [rangeResult(true)]
+
+      await loadVisibleRange(runtime as never, ref, worksheet as never, setMessage)
+
+      expect(messages.at(-1)).toBe(
+        t('appStreamingRows', { name: 'Small.xlsx', rows: (100_000).toLocaleString() }),
+      )
+    })
   })
 })

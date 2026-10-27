@@ -3366,12 +3366,32 @@ async function loadRange(
     } else if (isActiveSheet(runtime, sheetId) && !state.flags.preloadComplete) {
       // After the full preload the status already says "fully loaded"; a late
       // tail (retry timer, decoration re-read) must not replace it.
-      setMessage(
-        t('appStreamingRows', {
-          name: state.file.name,
-          rows: sheet?.rowCount.toLocaleString() ?? '?',
-        }),
-      )
+      const loadedNow = state.loadedRanges.get(sheetId)
+      const extent = lazySheetScreenExtent(state, sheetId)
+      if (
+        loadedNow &&
+        extent &&
+        extent.rows > 0 &&
+        extent.columns > 0 &&
+        containsRange(loadedNow, {
+          startRow: 0,
+          endRow: extent.rows - 1,
+          startColumn: 0,
+          endColumn: extent.columns - 1,
+        })
+      ) {
+        // Indexing is done and the whole sheet sits in the grid: nothing is
+        // streaming any more, so the "Indexing"/"Streaming" line must not
+        // linger on a loaded sheet (small workbooks never run the full preload).
+        setMessage('')
+      } else {
+        setMessage(
+          t('appStreamingRows', {
+            name: state.file.name,
+            rows: sheet?.rowCount.toLocaleString() ?? '?',
+          }),
+        )
+      }
     }
   } catch (error: unknown) {
     if (lazyWorkbookRef.current === state && isActiveSheet(runtime, sheetId)) {
