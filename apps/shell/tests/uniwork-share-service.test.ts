@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import type { FetchLike } from '../src/main/uniwork-docs/client'
 import {
+  documentAccessRejectedError,
+  invalidJsonError,
+  invalidRequestError,
+  notImplementedError,
+} from '../src/shared/folder-contents-access.fixtures'
+import {
   createUniworkShareClient,
   type UniworkShareClient,
 } from '../src/main/uniwork-docs/share-client'
@@ -11,6 +17,8 @@ import {
   type UniworkShareServiceDeps,
 } from '../src/main/uniwork-docs/share-service'
 import type {
+  FolderContentsAccessBatch,
+  FolderContentsAccessResult,
   ShareAccess,
   ShareBreakGlassGrant,
   ShareBulkPlan,
@@ -88,6 +96,23 @@ function fakeClient(over: Partial<UniworkShareClient> = {}): UniworkShareClient 
       shelved: false,
       visibility: 'workspace',
     })),
+    updateFolderContentsAccess: vi.fn(async (): Promise<FolderContentsAccessResult> => ({
+      kind: 'background',
+      batchId: 'b_1',
+      total: 900,
+    })),
+    getFolderContentsAccessBatch: vi.fn(
+      async (_folderId: string, batchId: string): Promise<FolderContentsAccessBatch> => ({
+        batchId,
+        status: 'running',
+        total: 900,
+        processed: 200,
+        changed: 100,
+        unchanged: 50,
+        skippedNotManageable: 40,
+        skippedLocked: 10,
+      }),
+    ),
     listWorkspaceMemberIds: vi.fn(async () => ['u_owner', 'u_an', 'u_off', 'u_me']),
     listActiveOrgMembers: vi.fn(async () => ({
       members: [
@@ -1122,5 +1147,449 @@ describe('owner transfer against the merged UNI-2084 answers (UNI-2105)', () => 
     ['plain 501', () => new Response('', { status: 501 }), 501],
   ] as const)('%s is a server without the route', async (_n, make, status) => {
     expect(await transfer(make())).toMatchObject({ ok: false, endpointMissing: true, status })
+  })
+})
+
+describe('folder contents access (UNI-2244)', () => {
+  const REQUEST = {
+    folderId: 'fld_1',
+    mode: 'merge',
+    items: [{ principalType: 'user', principalId: 'u_an', level: 'edit' }],
+    dryRun: false,
+  } as const
+  const refusal = (serverCode: string, status: number, fields?: Record<string, unknown>) =>
+    new UniworkDocError('server_error', { serverCode, status, ...(fields ? { fields } : {}) })
+
+  it('forwards the plain request and answers the result', async () => {
+    const client = fakeClient()
+    const res = await service(client).folderContentsAccess({
+      ...REQUEST,
+      // whatever else the renderer sends does not reach the client
+      extra: 'x',
+      items: [{ ...REQUEST.items[0], note: 'x' }],
+    } as never)
+    expect(res).toEqual({ ok: true, value: { kind: 'background', batchId: 'b_1', total: 900 } })
+    expect(client.updateFolderContentsAccess).toHaveBeenCalledWith({
+      folderId: 'fld_1',
+      mode: 'merge',
+      dryRun: false,
+      items: [{ principalType: 'user', principalId: 'u_an', level: 'edit' }],
+    })
+  })
+
+  it('refuses a structurally bad request without calling the client', async () => {
+    const client = fakeClient()
+    const svc = service(client)
+    const bad: unknown[] = [
+      null,
+      'fld_1',
+      { ...REQUEST, folderId: '' },
+      { ...REQUEST, folderId: 3 },
+      { ...REQUEST, mode: 'union' },
+      { ...REQUEST, dryRun: undefined },
+      { ...REQUEST, dryRun: 'false' },
+      { ...REQUEST, items: 'x' },
+      { ...REQUEST, items: [] },
+      { ...REQUEST, items: new Array(101).fill(REQUEST.items[0]) },
+      { ...REQUEST, items: [{ ...REQUEST.items[0], level: null }] },
+      { ...REQUEST, items: [{ ...REQUEST.items[0], level: 'owner' }] },
+      { ...REQUEST, items: [{ ...REQUEST.items[0], principalType: 'group' }] },
+      { ...REQUEST, items: [{ ...REQUEST.items[0], principalId: '' }] },
+      { ...REQUEST, items: [null] },
+    ]
+    for (const input of bad) {
+      expect(await svc.folderContentsAccess(input as never)).toEqual({
+        ok: false,
+        error: 'invalid_request',
+      })
+    }
+    expect(client.updateFolderContentsAccess).not.toHaveBeenCalled()
+  })
+
+  it('an empty list is valid for replace only, and 100 items are allowed', async () => {
+    const client = fakeClient()
+    const svc = service(client)
+    expect(
+      await svc.folderContentsAccess({ ...REQUEST, mode: 'replace', items: [] }),
+    ).toMatchObject({
+      ok: true,
+    })
+    const hundred = new Array(100).fill(REQUEST.items[0])
+    expect(await svc.folderContentsAccess({ ...REQUEST, items: hundred })).toMatchObject({
+      ok: true,
+    })
+  })
+
+  it('not signed in is not_signed_in', async () => {
+    const client = fakeClient()
+    expect(
+      await service(client, { isSignedIn: () => false }).folderContentsAccess(REQUEST),
+    ).toEqual({ ok: false, error: 'not_signed_in' })
+    expect(
+      await service(client, { isSignedIn: () => false }).folderContentsAccessBatch({
+        folderId: 'fld_1',
+        batchId: 'b_1',
+      }),
+    ).toEqual({ ok: false, error: 'not_signed_in' })
+  })
+
+  it('not_a_folder keeps its name and status', async () => {
+    const client = fakeClient({
+      updateFolderContentsAccess: vi.fn(async () => {
+        throw refusal('not_a_folder', 422)
+      }),
+    })
+    expect(await service(client).folderContentsAccess(REQUEST)).toEqual({
+      ok: false,
+      error: 'not_a_folder',
+      status: 422,
+    })
+  })
+
+  it('document_access_rejected carries the refused items', async () => {
+    const rejected = [
+      {
+        index: 0,
+        principalType: 'user',
+        principalId: 'u_an',
+        code: 'principal_not_in_organization',
+      },
+    ] as const
+    const client = fakeClient({
+      updateFolderContentsAccess: vi.fn(async () => {
+        throw new UniworkDocError('server_error', {
+          serverCode: 'document_access_rejected',
+          status: 422,
+          rejected: [...rejected],
+        })
+      }),
+    })
+    expect(await service(client).folderContentsAccess(REQUEST)).toEqual({
+      ok: false,
+      error: 'document_access_rejected',
+      status: 422,
+      rejected: [...rejected],
+    })
+  })
+
+  it('folder_access_batch_running carries the batch id of the run that holds the folder', async () => {
+    const running = (fields?: Record<string, unknown>) =>
+      fakeClient({
+        updateFolderContentsAccess: vi.fn(async () => {
+          throw refusal('folder_access_batch_running', 409, fields)
+        }),
+      })
+    expect(await service(running({ batch_id: 'b_9' })).folderContentsAccess(REQUEST)).toEqual({
+      ok: false,
+      error: 'folder_access_batch_running',
+      status: 409,
+      batchId: 'b_9',
+    })
+    // an id that is not an id (or none) is not passed on; the refusal still stands
+    for (const fields of [undefined, { batch_id: '' }, { batch_id: '../x' }, { batch_id: 7 }]) {
+      const res = await service(running(fields)).folderContentsAccess(REQUEST)
+      expect(res).toEqual({ ok: false, error: 'folder_access_batch_running', status: 409 })
+    }
+  })
+
+  it('a batchId never rides another refusal', async () => {
+    const client = fakeClient({
+      updateFolderContentsAccess: vi.fn(async () => {
+        throw refusal('not_a_folder', 422, { batch_id: 'b_9' })
+      }),
+    })
+    expect(await service(client).folderContentsAccess(REQUEST)).not.toHaveProperty('batchId')
+  })
+
+  it('403 is forbidden, a coded 404 is not_found', async () => {
+    expect(
+      await service(
+        fakeClient({
+          updateFolderContentsAccess: vi.fn(async () => {
+            throw new UniworkDocError('forbidden', { status: 403, serverCode: 'forbidden' })
+          }),
+        }),
+      ).folderContentsAccess(REQUEST),
+    ).toMatchObject({ ok: false, error: 'forbidden', status: 403 })
+    expect(
+      await service(
+        fakeClient({
+          getFolderContentsAccessBatch: vi.fn(async () => {
+            throw new UniworkDocError('not_found', { status: 404, serverCode: 'not_found' })
+          }),
+        }),
+      ).folderContentsAccessBatch({ folderId: 'fld_1', batchId: 'b_1' }),
+    ).toEqual({ ok: false, error: 'not_found', status: 404 })
+  })
+
+  it('a dry run is repeated once after any throttle, a write after a 429 only (a 503 may follow the commit)', async () => {
+    const throttled = (status: number) => new UniworkDocError('server_error', { status })
+    const retried = (status: number, dryRun: boolean) => {
+      const call = vi
+        .fn<UniworkShareClient['updateFolderContentsAccess']>()
+        .mockRejectedValueOnce(throttled(status))
+        .mockResolvedValueOnce({ kind: 'background', batchId: 'b', total: 1 })
+      return service(fakeClient({ updateFolderContentsAccess: call }))
+        .folderContentsAccess({ ...REQUEST, dryRun })
+        .then((res) => ({ res, calls: call.mock.calls.length }))
+    }
+    expect(await retried(429, true)).toMatchObject({ res: { ok: true }, calls: 2 })
+    expect(await retried(503, true)).toMatchObject({ res: { ok: true }, calls: 2 })
+    expect(await retried(429, false)).toMatchObject({ res: { ok: true }, calls: 2 })
+    expect(await retried(503, false)).toMatchObject({
+      res: { ok: false, error: 'server_error', retryable: true },
+      calls: 1,
+    })
+  })
+
+  it('a server without the routes (envelope-less 404 / 405 / 501) is endpointMissing, a coded 404 is not', async () => {
+    for (const status of [404, 405, 501]) {
+      const thrown = new UniworkDocError('server_error', { status })
+      const client = fakeClient({
+        updateFolderContentsAccess: vi.fn(async () => {
+          throw thrown
+        }),
+        getFolderContentsAccessBatch: vi.fn(async () => {
+          throw thrown
+        }),
+      })
+      const svc = service(client)
+      expect(await svc.folderContentsAccess(REQUEST)).toMatchObject({
+        ok: false,
+        endpointMissing: true,
+        status,
+      })
+      expect(
+        await svc.folderContentsAccessBatch({ folderId: 'fld_1', batchId: 'b_1' }),
+      ).toMatchObject({ ok: false, endpointMissing: true, status })
+    }
+    const coded = fakeClient({
+      updateFolderContentsAccess: vi.fn(async () => {
+        throw new UniworkDocError('not_found', { status: 404, serverCode: 'not_found' })
+      }),
+    })
+    expect(await service(coded).folderContentsAccess(REQUEST)).not.toHaveProperty('endpointMissing')
+  })
+
+  it('the coded 501 not_implemented of BE-1 is endpointMissing too (the feature is not on this server yet)', async () => {
+    const thrown = new UniworkDocError('server_error', {
+      status: 501,
+      serverCode: 'not_implemented',
+    })
+    const client = fakeClient({
+      updateFolderContentsAccess: vi.fn(async () => {
+        throw thrown
+      }),
+      getFolderContentsAccessBatch: vi.fn(async () => {
+        throw thrown
+      }),
+    })
+    const svc = service(client)
+    expect(await svc.folderContentsAccess(REQUEST)).toEqual({
+      ok: false,
+      error: 'server_error',
+      status: 501,
+      endpointMissing: true,
+    })
+    expect(
+      await svc.folderContentsAccessBatch({ folderId: 'fld_1', batchId: 'b_1' }),
+    ).toMatchObject({ ok: false, endpointMissing: true, status: 501 })
+    // not retried: one call each
+    expect(client.updateFolderContentsAccess).toHaveBeenCalledTimes(1)
+  })
+
+  it('a coded 400 invalid_request / invalid_json is invalid_request, a coded 400 of another code is not', async () => {
+    for (const serverCode of ['invalid_request', 'invalid_json']) {
+      const client = fakeClient({
+        updateFolderContentsAccess: vi.fn(async () => {
+          throw new UniworkDocError('server_error', { status: 400, serverCode })
+        }),
+      })
+      expect(await service(client).folderContentsAccess(REQUEST)).toEqual({
+        ok: false,
+        error: 'invalid_request',
+      })
+    }
+    const other = fakeClient({
+      updateFolderContentsAccess: vi.fn(async () => {
+        throw new UniworkDocError('server_error', { status: 400, serverCode: 'something_else' })
+      }),
+    })
+    expect(await service(other).folderContentsAccess(REQUEST)).toMatchObject({
+      ok: false,
+      error: 'server_error',
+    })
+  })
+
+  it('the batch read validates its ids and answers the progress', async () => {
+    const client = fakeClient()
+    const svc = service(client)
+    for (const input of [
+      null,
+      {},
+      { folderId: 'fld_1' },
+      { folderId: '', batchId: 'b' },
+      { batchId: 'b' },
+    ]) {
+      expect(await svc.folderContentsAccessBatch(input as never)).toEqual({
+        ok: false,
+        error: 'invalid_request',
+      })
+    }
+    expect(client.getFolderContentsAccessBatch).not.toHaveBeenCalled()
+    expect(
+      await svc.folderContentsAccessBatch({ folderId: 'fld_1', batchId: 'b_1' }),
+    ).toMatchObject({
+      ok: true,
+      value: { batchId: 'b_1', status: 'running', processed: 200, total: 900 },
+    })
+    expect(client.getFolderContentsAccessBatch).toHaveBeenCalledWith('fld_1', 'b_1')
+  })
+
+  it('a malformed answer reaches the caller as malformed_response', async () => {
+    const client = fakeClient({
+      getFolderContentsAccessBatch: vi.fn(async () => {
+        throw new UniworkDocError('malformed_response')
+      }),
+    })
+    expect(
+      await service(client).folderContentsAccessBatch({ folderId: 'fld_1', batchId: 'b_1' }),
+    ).toEqual({ ok: false, error: 'malformed_response' })
+  })
+})
+
+describe('folder contents access through the real client (UNI-2244)', () => {
+  const ORIGIN = 'https://uniwork.example'
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+  function through(answer: Response) {
+    const fetch = vi.fn<FetchLike>(async () => answer.clone())
+    return service(
+      createUniworkShareClient({
+        apiOrigin: ORIGIN,
+        authorized: <T>(call: (t: string) => Promise<T>) => call('tok'),
+        isSignedIn: () => true,
+        fetch,
+      }),
+    )
+  }
+  const req = {
+    folderId: 'fld_1',
+    mode: 'replace',
+    items: [{ principalType: 'workspace', principalId: 'ws_1', level: 'view' }],
+    dryRun: false,
+  } as const
+
+  it('409 folder_access_batch_running with fields.batch_id gives the id to attach to', async () => {
+    const svc = through(
+      json(409, {
+        error: { code: 'folder_access_batch_running', message: 'x', fields: { batch_id: 'b_7' } },
+      }),
+    )
+    expect(await svc.folderContentsAccess(req)).toEqual({
+      ok: false,
+      error: 'folder_access_batch_running',
+      status: 409,
+      batchId: 'b_7',
+    })
+  })
+
+  it('422 not_a_folder and 422 document_access_rejected keep their codes', async () => {
+    expect(
+      await through(
+        json(422, { error: { code: 'not_a_folder', message: 'x' } }),
+      ).folderContentsAccess(req),
+    ).toEqual({ ok: false, error: 'not_a_folder', status: 422 })
+    const rejected = await through(
+      json(422, {
+        error: {
+          code: 'document_access_rejected',
+          message: 'x',
+          fields: {
+            rejected: [
+              {
+                index: 0,
+                principal_type: 'workspace',
+                principal_id: 'ws_1',
+                code: 'level_not_allowed',
+              },
+            ],
+          },
+        },
+      }),
+    ).folderContentsAccess(req)
+    expect(rejected).toEqual({
+      ok: false,
+      error: 'document_access_rejected',
+      status: 422,
+      rejected: [
+        { index: 0, principalType: 'workspace', principalId: 'ws_1', code: 'level_not_allowed' },
+      ],
+    })
+  })
+
+  it('BE-1 envelopes through the real client: 501 not_implemented, 400 invalid_request / invalid_json', async () => {
+    expect(
+      await through(
+        json(notImplementedError.status, notImplementedError.body),
+      ).folderContentsAccess(req),
+    ).toEqual({ ok: false, error: 'server_error', status: 501, endpointMissing: true })
+    expect(
+      await through(
+        json(notImplementedError.status, notImplementedError.body),
+      ).folderContentsAccessBatch({ folderId: 'fld_1', batchId: 'b_1' }),
+    ).toMatchObject({ ok: false, status: 501, endpointMissing: true })
+    for (const answer of [invalidRequestError, invalidJsonError]) {
+      expect(await through(json(answer.status, answer.body)).folderContentsAccess(req)).toEqual({
+        ok: false,
+        error: 'invalid_request',
+      })
+    }
+  })
+
+  it('422 document_access_rejected keeps the four BE-1 codes row by row', async () => {
+    const res = await through(
+      json(documentAccessRejectedError.status, documentAccessRejectedError.body),
+    ).folderContentsAccess(req)
+    expect(res).toMatchObject({ ok: false, error: 'document_access_rejected', status: 422 })
+    expect((res as { rejected: Array<{ code: string }> }).rejected.map((r) => r.code)).toEqual([
+      'level_not_allowed',
+      'principal_not_in_organization',
+      'duplicate_principal',
+      'break_glass_required',
+    ])
+  })
+
+  it('202 is a background run, 200 a dry run, a foreign batch is 404', async () => {
+    expect(
+      await through(
+        json(202, { batch_id: 'b_2', mode: 'background', total: 900 }),
+      ).folderContentsAccess(req),
+    ).toEqual({ ok: true, value: { kind: 'background', batchId: 'b_2', total: 900 } })
+    expect(
+      await through(
+        json(200, {
+          total: 3,
+          preview: {
+            changed: 3,
+            unchanged: 0,
+            skipped_not_manageable: 0,
+            skipped_locked: 0,
+            losing_users: 0,
+            downgraded_users: 0,
+            warnings: [],
+          },
+        }),
+      ).folderContentsAccess({ ...req, dryRun: true }),
+    ).toMatchObject({ ok: true, value: { kind: 'dryRun', total: 3 } })
+    expect(
+      await through(
+        json(404, { error: { code: 'not_found', message: 'x' } }),
+      ).folderContentsAccessBatch({
+        folderId: 'fld_1',
+        batchId: 'b_1',
+      }),
+    ).toEqual({ ok: false, error: 'not_found', status: 404 })
   })
 })

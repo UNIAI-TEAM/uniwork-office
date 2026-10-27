@@ -224,4 +224,84 @@ export const de = {
     'Dieses Dokument gehört zu einem Arbeitsergebnis, daher kann der Eigentümer nicht geändert werden.',
   shrOwnerUnavailable:
     'Die Übertragung der Eigentümerschaft ist auf diesem Server noch nicht verfügbar.',
+  shrFcMenu: 'Teilen',
+  shrFcTitle: 'Teilen',
+  shrFcScope: 'Dokumente im Ordner "{title}" und seinen Unterordnern.',
+  shrFcFixed:
+    'Gilt für die vorhandenen Dokumente. Später hinzugefügte Dokumente erhalten diesen Zugriff nicht.',
+  shrFcModeLabel: 'Art der Anwendung',
+  shrFcModeMerge: 'Zu vorhandenem Zugriff hinzufügen',
+  shrFcModeReplace: 'Vorhandenen Zugriff ersetzen',
+  shrFcChecking: 'Wird geprüft…',
+  shrFcBack: 'Zurück',
+  shrFcApplying: 'Wird angewendet…',
+  shrFcApplyReplace: 'Zugriff ersetzen',
+  shrFcSummaryLabel: 'Zusammenfassung der Änderungen',
+  shrFcWarningsLabel: 'Warnungen',
+  shrFcWillChangeOne: '{count} Dokument wird geändert',
+  shrFcWillChangeOther: '{count} Dokumente werden geändert',
+  shrFcSkippedNotManageable: '{count} übersprungen, die du nicht verwalten kannst',
+  shrFcToastUnknown:
+    'Die Zugriffsänderung wurde gesendet. Öffne die Dokumente, um das Ergebnis zu prüfen.',
+  shrFcLosingOne: '{count} Person verliert den Zugriff auf mindestens ein Dokument',
+  shrFcLosingOther: '{count} Personen verlieren den Zugriff auf mindestens ein Dokument',
+  shrFcDoneOne: 'Zugriff bei {count} Dokument geändert',
+  shrFcDoneOther: 'Zugriff bei {count} Dokumenten geändert',
+  shrFcForbidden: 'Du darfst diesen Ordner nicht lesen.',
+  shrFcNotFound: 'Dieser Ordner wurde nicht gefunden.',
+  shrFcUnavailable:
+    'Dieser Server unterstützt das Freigeben der Dokumente eines Ordners noch nicht.',
+  shrFcScopeUntitled: 'Dokumente in diesem Ordner und seinen Unterordnern.',
+  shrFcModeMergeHint:
+    'Gewährt Zugriff für die ausgewählten Personen und Gruppen. Bestehender Zugriff wird nie herabgestuft oder entfernt.',
+  shrFcModeReplaceHint:
+    'Jedes Dokument behält genau die Liste unten. Wer nicht auf der Liste steht, verliert den Zugriff.',
+  shrFcPrincipalsTitle: 'Personen und Zugriffsstufen',
+  shrFcPrincipalsEmptyMerge:
+    'Noch niemand ausgewählt. Suche und wähle mindestens eine Person oder Gruppe, um Zugriff hinzuzufügen.',
+  shrFcPrincipalsEmptyReplace:
+    'Sonst niemand ausgewählt. Nur die Zeile „Arbeitsbereich“ unten bleibt erhalten.',
+  shrFcHomeRow: 'Arbeitsbereich „{name}“',
+  shrFcHomeRowUnnamed: 'Arbeitsbereich dieses Ordners',
+  shrFcHomeLevelLabel: 'Zugriffsstufe des Arbeitsbereichs',
+  shrFcHomeLevelChoose: 'Zugriff wählen',
+  shrFcLevelPrivate: 'Privat',
+  shrFcApplyMerge: 'Anwenden',
+  shrFcSkippedLocked: '{count} gesperrt',
+  shrFcWarnWide:
+    'Ein ganzer Arbeitsbereich oder eine ganze Organisation ist in der Liste: Viele Personen können diese Dokumente öffnen.',
+  shrFcWarnPrivate:
+    'Der Arbeitsbereich ist nicht mehr in der Liste: Diese Dokumente werden privat.',
+  shrFcWarnDowngradeOne:
+    '{count} Person erhält bei mindestens einem Dokument eine niedrigere Stufe.',
+  shrFcWarnDowngradeOther:
+    '{count} Personen erhalten bei mindestens einem Dokument eine niedrigere Stufe.',
+  shrFcWarnDowngradeGeneric: 'Einige Zugriffsrechte für diese Dokumente werden herabgestuft.',
+  shrFcNothing: 'Nichts ändert sich: Der aktuelle Zugriff entspricht bereits dieser Liste.',
+  shrFcToastSkippedOne: '{count} Dokument übersprungen, das du nicht verwaltest.',
+  shrFcToastSkippedOther: '{count} Dokumente übersprungen, die du nicht verwaltest.',
+  shrFcToastLockedOne: '{count} Dokument ist gesperrt und wurde nicht geändert.',
+  shrFcToastLockedOther: '{count} Dokumente sind gesperrt und wurden nicht geändert.',
+  shrFcProgressTitle: 'Zugriff wird angewendet',
+  shrFcProgressLabel: 'Fortschritt der Zugriffsänderung',
+  shrFcProgressCountOne: '{processed}/{count} Dokument',
+  shrFcProgressCountOther: '{processed}/{count} Dokumente',
+  shrFcProgressStarting: 'Wartet auf Start…',
+  shrFcProgressHint:
+    'Du kannst dieses Fenster schließen. Die Änderung läuft im Hintergrund weiter, und du wirst benachrichtigt, wenn sie endet.',
+  shrFcProgressAlreadyRunning:
+    'Für diesen Ordner läuft bereits eine Zugriffsänderung im Hintergrund. Dies ist ihr Fortschritt.',
+  shrFcProgressClose: 'Fertig',
+  shrFcBatchDoneOne: 'Zugriff bei {count} Dokument angewendet',
+  shrFcBatchDoneOther: 'Zugriff bei {count} Dokumenten angewendet',
+  shrFcBatchFailed:
+    'Die Zugriffsänderung wurde mittendrin gestoppt. Führe „Zugriff ersetzen“ erneut aus, um sie abzuschließen.',
+  shrFcNotAFolder:
+    'Dieses Element ist kein Ordner, daher können seine Dokumente nicht auf einmal geändert werden.',
+  shrFcErrorGeneric: 'Zugriff konnte nicht angewendet werden. Versuche es erneut.',
+  shrFcErrorRejected:
+    'Der Zugriff konnte für einige Personen oder Gruppen nicht angewendet werden. Korrigiere die markierten Zeilen und versuche es erneut.',
+  shrFcRunningNoBatch:
+    'Der Zugriff in diesem Ordner wird gerade aktualisiert. Versuche es gleich noch einmal.',
+  shrFcTooMany: 'Du kannst auf einmal bis zu {max} Personen oder Gruppen hinzufügen.',
 } satisfies Record<keyof typeof zh, string>

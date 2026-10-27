@@ -218,4 +218,80 @@ export const ja = {
   shrOwnerOwnedByWorkProduct:
     'このドキュメントは作業成果物に属しているため、オーナーを変更できません。',
   shrOwnerUnavailable: 'このサーバーではまだオーナー権限の移譲を利用できません。',
+  shrFcMenu: '共有',
+  shrFcTitle: '共有',
+  shrFcScope: '"{title}"フォルダーとそのサブフォルダー内のドキュメント。',
+  shrFcFixed:
+    '現在あるドキュメントに適用されます。後から追加したドキュメントにはこのアクセス権は付きません。',
+  shrFcModeLabel: '適用方法',
+  shrFcModeMerge: '既存のアクセス権に追加',
+  shrFcModeReplace: '既存のアクセス権を置き換え',
+  shrFcChecking: '確認中…',
+  shrFcBack: '戻る',
+  shrFcApplying: '適用中…',
+  shrFcApplyReplace: 'アクセス権を置き換え',
+  shrFcSummaryLabel: '変更の概要',
+  shrFcWarningsLabel: '警告',
+  shrFcWillChangeOne: '{count} 件のドキュメントを変更します',
+  shrFcWillChangeOther: '{count} 件のドキュメントを変更します',
+  shrFcSkippedNotManageable: '管理権限のない {count} 件をスキップ',
+  shrFcToastUnknown: 'アクセス権の変更を送信しました。ドキュメントを開いて結果を確認してください。',
+  shrFcLosingOne: '{count} 人が少なくとも 1 件のドキュメントへのアクセス権を失います',
+  shrFcLosingOther: '{count} 人が少なくとも 1 件のドキュメントへのアクセス権を失います',
+  shrFcDoneOne: '{count} 件のドキュメントのアクセス権を変更しました',
+  shrFcDoneOther: '{count} 件のドキュメントのアクセス権を変更しました',
+  shrFcForbidden: 'このフォルダーを読み取る権限がありません。',
+  shrFcNotFound: 'このフォルダーが見つかりません。',
+  shrFcUnavailable: 'このサーバーはまだフォルダー内のドキュメントの共有に対応していません。',
+  shrFcScopeUntitled: 'このフォルダーとそのサブフォルダー内のドキュメント。',
+  shrFcModeMergeHint:
+    '選択した人やグループにアクセス権を付与します。既存のアクセス権が下がったり削除されたりすることはありません。',
+  shrFcModeReplaceHint:
+    '各ドキュメントは下のリストと完全に一致します。リストにない人はアクセス権を失います。',
+  shrFcPrincipalsTitle: 'ユーザーと権限',
+  shrFcPrincipalsEmptyMerge:
+    'まだ選択されていません。人またはグループを検索して、少なくとも 1 つ選択するとアクセス権が追加されます。',
+  shrFcPrincipalsEmptyReplace: 'ほかに選択されていません。下のワークスペースの行だけが残ります。',
+  shrFcHomeRow: 'ワークスペース 「{name}」',
+  shrFcHomeRowUnnamed: 'このフォルダーのワークスペース',
+  shrFcHomeLevelLabel: 'ワークスペースのアクセス権',
+  shrFcHomeLevelChoose: 'アクセス権を選択',
+  shrFcLevelPrivate: '非公開',
+  shrFcApplyMerge: '適用',
+  shrFcSkippedLocked: 'ロック中 {count} 件',
+  shrFcWarnWide:
+    'ワークスペースまたは組織全体がリストに含まれています。多くの人がこれらのドキュメントを開けるようになります。',
+  shrFcWarnPrivate:
+    'ワークスペースがリストから外れているため、これらのドキュメントは非公開になります。',
+  shrFcWarnDowngradeOne:
+    '{count} 人が少なくとも 1 件のドキュメントでアクセス権のレベルが下がります。',
+  shrFcWarnDowngradeOther:
+    '{count} 人が少なくとも 1 件のドキュメントでアクセス権のレベルが下がります。',
+  shrFcWarnDowngradeGeneric: 'これらのドキュメントの一部のアクセス権が引き下げられます。',
+  shrFcNothing: '変更はありません。現在のアクセス権はこのリストと一致しています。',
+  shrFcToastSkippedOne: '管理権限のないドキュメント {count} 件をスキップしました。',
+  shrFcToastSkippedOther: '管理権限のないドキュメント {count} 件をスキップしました。',
+  shrFcToastLockedOne: 'ロック中のドキュメント {count} 件は変更されませんでした。',
+  shrFcToastLockedOther: 'ロック中のドキュメント {count} 件は変更されませんでした。',
+  shrFcProgressTitle: 'アクセス権を適用中',
+  shrFcProgressLabel: 'アクセス権変更の進行状況',
+  shrFcProgressCountOne: '{processed}/{count} 件のドキュメント',
+  shrFcProgressCountOther: '{processed}/{count} 件のドキュメント',
+  shrFcProgressStarting: '開始を待機中…',
+  shrFcProgressHint:
+    'このダイアログは閉じても構いません。変更はバックグラウンドで続行され、完了時にお知らせします。',
+  shrFcProgressAlreadyRunning:
+    'このフォルダーではバックグラウンドでアクセス権の変更が実行中です。その進行状況です。',
+  shrFcProgressClose: '完了',
+  shrFcBatchDoneOne: '{count} 件のドキュメントにアクセス権を適用しました',
+  shrFcBatchDoneOther: '{count} 件のドキュメントにアクセス権を適用しました',
+  shrFcBatchFailed:
+    'アクセス権の変更が途中で停止しました。「アクセス権を置き換え」をもう一度実行して完了させてください。',
+  shrFcNotAFolder: 'この項目はフォルダーではないため、ドキュメントを一括で変更できません。',
+  shrFcErrorGeneric: 'アクセス権を適用できませんでした。もう一度お試しください。',
+  shrFcErrorRejected:
+    '一部の人またはグループにはアクセス権を適用できませんでした。マークされた行を修正してもう一度お試しください。',
+  shrFcRunningNoBatch:
+    'このフォルダーのアクセス権を更新しています。少し待ってからもう一度お試しください。',
+  shrFcTooMany: '一度に追加できるのは最大 {max} 人またはグループまでです。',
 } satisfies Record<keyof typeof zh, string>

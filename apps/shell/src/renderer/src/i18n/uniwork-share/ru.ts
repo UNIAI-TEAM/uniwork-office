@@ -218,4 +218,80 @@ export const ru = {
   shrOwnerOwnedByWorkProduct:
     'Этот документ принадлежит рабочему результату, поэтому владельца нельзя изменить.',
   shrOwnerUnavailable: 'Передача владения пока недоступна на этом сервере.',
+  shrFcMenu: 'Поделиться',
+  shrFcTitle: 'Поделиться',
+  shrFcScope: 'Документы в папке "{title}" и её вложенных папках.',
+  shrFcFixed:
+    'Применяется к существующим документам. Добавленные позже документы этот доступ не получают.',
+  shrFcModeLabel: 'Как применить',
+  shrFcModeMerge: 'Добавить к имеющемуся доступу',
+  shrFcModeReplace: 'Заменить имеющийся доступ',
+  shrFcChecking: 'Проверка…',
+  shrFcBack: 'Назад',
+  shrFcApplying: 'Применение…',
+  shrFcApplyReplace: 'Заменить доступ',
+  shrFcSummaryLabel: 'Сводка изменений',
+  shrFcWarningsLabel: 'Предупреждения',
+  shrFcWillChangeOne: 'Будет изменено документов: {count}',
+  shrFcWillChangeOther: 'Будет изменено документов: {count}',
+  shrFcSkippedNotManageable: 'пропущено документов, которыми вы не управляете: {count}',
+  shrFcToastUnknown: 'Изменение доступа отправлено. Откройте документы, чтобы проверить результат.',
+  shrFcLosingOne: 'Потеряют доступ хотя бы к одному документу: {count}',
+  shrFcLosingOther: 'Потеряют доступ хотя бы к одному документу: {count}',
+  shrFcDoneOne: 'Доступ изменён в документах: {count}',
+  shrFcDoneOther: 'Доступ изменён в документах: {count}',
+  shrFcForbidden: 'У вас нет прав на чтение этой папки.',
+  shrFcNotFound: 'Эта папка не найдена.',
+  shrFcUnavailable:
+    'Этот сервер пока не поддерживает предоставление доступа к документам внутри папки.',
+  shrFcScopeUntitled: 'Документы в этой папке и её вложенных папках.',
+  shrFcModeMergeHint:
+    'Даёт доступ выбранным пользователям и группам. Текущий доступ никогда не понижается и не удаляется.',
+  shrFcModeReplaceHint:
+    'Каждый документ будет иметь только список ниже. Все, кого нет в списке, потеряют доступ.',
+  shrFcPrincipalsTitle: 'Пользователи и уровни доступа',
+  shrFcPrincipalsEmptyMerge:
+    'Никто не выбран. Найдите и выберите хотя бы одного пользователя или группу, чтобы добавить доступ.',
+  shrFcPrincipalsEmptyReplace:
+    'Больше никто не выбран. Сохраняется только строка «Рабочее пространство» ниже.',
+  shrFcHomeRow: 'Рабочее пространство «{name}»',
+  shrFcHomeRowUnnamed: 'Рабочее пространство этой папки',
+  shrFcHomeLevelLabel: 'Уровень доступа рабочего пространства',
+  shrFcHomeLevelChoose: 'Выберите доступ',
+  shrFcLevelPrivate: 'Личный',
+  shrFcApplyMerge: 'Применить',
+  shrFcSkippedLocked: 'Заблокировано: {count}',
+  shrFcWarnWide:
+    'В список добавлено всё рабочее пространство или вся организация: эти документы смогут открыть многие пользователи.',
+  shrFcWarnPrivate: 'Рабочего пространства больше нет в списке: эти документы станут личными.',
+  shrFcWarnDowngradeOne:
+    'Пользователи с пониженным уровнем доступа хотя бы в одном документе: {count}',
+  shrFcWarnDowngradeOther:
+    'Пользователи с пониженным уровнем доступа хотя бы в одном документе: {count}',
+  shrFcWarnDowngradeGeneric: 'Часть доступа к этим документам будет понижена.',
+  shrFcNothing: 'Ничего не изменится: текущий доступ уже соответствует этому списку.',
+  shrFcToastSkippedOne: 'Пропущены документы, которыми вы не управляете: {count}',
+  shrFcToastSkippedOther: 'Пропущены документы, которыми вы не управляете: {count}',
+  shrFcToastLockedOne: 'Заблокированные документы, которые не изменены: {count}',
+  shrFcToastLockedOther: 'Заблокированные документы, которые не изменены: {count}',
+  shrFcProgressTitle: 'Применение доступа',
+  shrFcProgressLabel: 'Ход изменения доступа',
+  shrFcProgressCountOne: 'Документы: {processed}/{count}',
+  shrFcProgressCountOther: 'Документы: {processed}/{count}',
+  shrFcProgressStarting: 'Ожидание начала…',
+  shrFcProgressHint:
+    'Вы можете закрыть окно: изменение продолжится в фоновом режиме, и вы получите уведомление по завершении.',
+  shrFcProgressAlreadyRunning:
+    'В этой папке уже выполняется изменение доступа в фоновом режиме. Здесь показан его ход.',
+  shrFcProgressClose: 'Готово',
+  shrFcBatchDoneOne: 'Доступ применён к документам: {count}',
+  shrFcBatchDoneOther: 'Доступ применён к документам: {count}',
+  shrFcBatchFailed:
+    'Изменение доступа остановилось на полпути. Запустите «Заменить доступ» снова, чтобы завершить его.',
+  shrFcNotAFolder: 'Это не папка, поэтому её документы нельзя изменить пакетно.',
+  shrFcErrorGeneric: 'Не удалось применить доступ. Попробуйте ещё раз.',
+  shrFcErrorRejected:
+    'Не удалось применить доступ для некоторых пользователей или групп. Исправьте отмеченные строки и попробуйте снова.',
+  shrFcRunningNoBatch: 'Доступ в этой папке сейчас обновляется. Попробуйте снова через мгновение.',
+  shrFcTooMany: 'За один раз можно добавить не более {max} пользователей или групп.',
 } satisfies Record<keyof typeof zh, string>

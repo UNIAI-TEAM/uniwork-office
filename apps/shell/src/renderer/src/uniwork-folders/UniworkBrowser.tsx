@@ -4,6 +4,12 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { UniworkDocSummary } from '../../../shared/home-api'
 import { useI18n } from '../locale'
 import { ActionToast } from '../UniworkDocActions'
+import { useFolderBatchEnd } from '../uniwork-share/use-folder-batch-end'
+import {
+  FolderContentsAccessDialog,
+  type FolderContentsTarget,
+} from '../uniwork-share/FolderContentsAccessDialog'
+import { shareBridgeAvailable } from '../uniwork-share/share-dialog-target'
 import { UNIWORK_ERROR_KEYS } from '../uniwork-docs-model'
 import { loadFolderTree } from '../uniwork-library-api'
 import { BROWSER_HIDDEN_HINT_ID, BrowserContents } from './BrowserContents'
@@ -110,6 +116,23 @@ export function UniworkBrowser({
   const [ownDraft, setOwnDraft] = useState('')
   const [toast, setToast] = useState<{ message: string; tone: 'ok' | 'error' } | null>(null)
   const clearToast = useCallback(() => setToast(null), [])
+  // UNI-2244: a background "share the documents inside…" run ended: the list refetches, one host toasts
+  useFolderBatchEnd({
+    onToast: (message, tone) => setToast({ message, tone }),
+    onRefetch: browser.refresh,
+  })
+  // UNI-2244: the folder whose documents "Share documents inside…" writes to (no entry without the bridge)
+  const [folderContents, setFolderContents] = useState<FolderContentsTarget | null>(null)
+  const folderContentsItems = (id: string, title: string): FolderMenuItem[] =>
+    shareBridgeAvailable()
+      ? [
+          {
+            id: 'share-contents',
+            label: t('shrFcMenu'),
+            onSelect: () => setFolderContents({ id, workspaceId, title }),
+          },
+        ]
+      : []
   const actions = useFolderActions({
     workspaceId,
     onChanged: browser.refresh,
@@ -163,6 +186,7 @@ export function UniworkBrowser({
     const items: FolderMenuItem[] = [
       { id: 'open', label: t('dlActOpen'), onSelect: () => openFolder(id) },
     ]
+    items.push(...folderContentsItems(id, row.title))
     if (access.create) {
       items.push({
         id: 'new',
@@ -212,11 +236,15 @@ export function UniworkBrowser({
       label: t('ufNewSubfolder'),
       onSelect: () => actions.openCreate(doc.id, true, { parentRow: doc }),
     }
+    const shareContents = folderContentsItems(doc.id, doc.title)
     if (!canEdit) {
-      return canCreateInsideFolder({ ...doc, canEdit }, browser.index, myRole) ? [newItem] : []
+      return canCreateInsideFolder({ ...doc, canEdit }, browser.index, myRole)
+        ? [...shareContents, newItem]
+        : shareContents
     }
-    if (!folderEditActionsOffered(doc)) return [newItem]
+    if (!folderEditActionsOffered(doc)) return [...shareContents, newItem]
     return [
+      ...shareContents,
       newItem,
       { id: 'rename', label: t('ufRename'), onSelect: () => actions.openRename(doc) },
       move,
@@ -450,6 +478,15 @@ export function UniworkBrowser({
           initialFolderId={actions.moving.parentId}
           onPick={(picked) => void actions.move(actions.moving!, picked)}
           onCancel={actions.cancelMove}
+        />
+      )}
+      {folderContents && (
+        <FolderContentsAccessDialog
+          open
+          folder={folderContents}
+          onClose={() => setFolderContents(null)}
+          onChanged={browser.refresh}
+          onNotice={(message, tone) => setToast({ message, tone })}
         />
       )}
       {toast && <ActionToast message={toast.message} tone={toast.tone} onDone={clearToast} />}

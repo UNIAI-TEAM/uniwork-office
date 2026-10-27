@@ -37,6 +37,14 @@ export const pl = {
   wbNotif_document_shared_untitled: '{actor} udostępnił(a) Ci dokument ({level}).',
   wbNotif_document_shared_nolevel: '{actor} udostępnił(a) Ci „{document}”.',
   wbNotif_document_shared_untitled_nolevel: '{actor} udostępnił(a) Ci dokument.',
+  wbNotif_document_shared_folder:
+    '{actor} udostępnił(a) Ci dokumenty ({count}) w folderze „{document}” ({level}).',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} udostępnił(a) Ci dokumenty ({count}) w folderze ({level}).',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} udostępnił(a) Ci dokumenty ({count}) w folderze „{document}”.',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} udostępnił(a) Ci dokumenty ({count}) w folderze.',
   wbNotif_document_owner_transferred: '{actor} przekazał(a) Ci własność dokumentu „{document}”.',
   wbNotif_document_owner_transferred_untitled: '{actor} przekazał(a) Ci własność dokumentu.',
   wbNotif_document_trashed_by_other:

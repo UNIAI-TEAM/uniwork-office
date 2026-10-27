@@ -1,7 +1,11 @@
 import {
+  FOLDER_CONTENTS_ACCESS_ID,
+  FOLDER_CONTENTS_ACCESS_MAX_ITEMS,
+  FOLDER_CONTENTS_ACCESS_MODES,
   SHARE_LEVELS,
   SHARE_OWNER_KEEP_LEVELS,
   SHARE_PRINCIPAL_TYPES,
+  type FolderContentsAccessRequest,
   type ShareAccess,
   type ShareBulkFailure,
   type ShareBulkPlan,
@@ -55,6 +59,8 @@ const KEPT_SERVER_CODES: ReadonlySet<string> = new Set<ShareErrorCode>([
   'access_request_closed',
   'owner_target_not_member',
   'document_owned_by_work_product',
+  'not_a_folder',
+  'folder_access_batch_running',
 ])
 
 /** the app's transport / session codes, kept as they are */
@@ -101,6 +107,11 @@ const MAX_BULK_PEOPLE = 100
 const MIN_LINK_DAYS = 1
 const MAX_LINK_DAYS = 90
 
+function batchIdOf(error: UniworkDocError): { batchId?: string } {
+  const id = error.fields?.batch_id
+  return typeof id === 'string' && FOLDER_CONTENTS_ACCESS_ID.test(id) ? { batchId: id } : {}
+}
+
 /**
  * A thrown error as the failure result of the contract: the server's own verdicts
  * keep their names (`document_access_rejected` carries the refused items), a 403 is
@@ -121,6 +132,8 @@ export function shareErrorOf(error: unknown): Failure {
       ...(serverCode === 'document_access_rejected' && error.rejected
         ? { rejected: error.rejected }
         : {}),
+      // UNI-2244: the run that holds the folder, so the caller can attach to its progress
+      ...(serverCode === 'folder_access_batch_running' ? batchIdOf(error) : {}),
     }
   }
   if (FORBIDDEN_DOC_CODES.has(error.code)) return { ok: false, error: 'forbidden', ...at }
@@ -143,6 +156,29 @@ class MissingRoute extends Error {
   constructor(readonly refusal: UniworkDocError) {
     super('endpoint_missing')
   }
+}
+
+/**
+ * UNI-2244: what the two folder routes answer that is not a normal failure.
+ * - a plain 404 / 405 / 501 (no envelope), or the coded `501 not_implemented` BE-1 stub answers
+ *   until BE-2, is a server without the feature (`endpointMissing`); a coded 404 (a foreign batch,
+ *   a folder that is gone) came from a handler that ran and stays a normal failure
+ * - a 400 `invalid_request` / `invalid_json` is a request the server refused as malformed:
+ *   `invalid_request`, the same verdict the app's own checks give before any request
+ */
+function folderRouteErrorOf(error: unknown): unknown {
+  if (!(error instanceof UniworkDocError)) return error
+  const code = error.serverCode
+  if (
+    (!code && MISSING_ROUTE_STATUSES.has(error.status ?? 0)) ||
+    (code === 'not_implemented' && error.status === 501)
+  ) {
+    return new MissingRoute(error)
+  }
+  if (error.status === 400 && (code === 'invalid_request' || code === 'invalid_json')) {
+    return new UniworkDocError('server_error', { status: 400, serverCode: 'invalid_input' })
+  }
+  return error
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -176,6 +212,25 @@ function isBulkPlan(plan: unknown): plan is ShareBulkPlan {
     (Number.isInteger(plan.expiresInDays) &&
       (plan.expiresInDays as number) >= MIN_LINK_DAYS &&
       (plan.expiresInDays as number) <= MAX_LINK_DAYS)
+  )
+}
+
+/** the structural check of a folder contents access request; the client checks each value again */
+function isFolderContentsRequest(input: unknown): input is FolderContentsAccessRequest {
+  if (!isObject(input) || !isText(input.folderId)) return false
+  if (!(FOLDER_CONTENTS_ACCESS_MODES as readonly string[]).includes(input.mode as string)) {
+    return false
+  }
+  if (typeof input.dryRun !== 'boolean' || !Array.isArray(input.items)) return false
+  if (input.items.length > FOLDER_CONTENTS_ACCESS_MAX_ITEMS) return false
+  // an empty list only removes shares, which only `replace` does
+  if (input.items.length === 0 && input.mode !== 'replace') return false
+  return input.items.every(
+    (item) =>
+      isObject(item) &&
+      (SHARE_PRINCIPAL_TYPES as readonly string[]).includes(item.principalType as string) &&
+      isText(item.principalId) &&
+      (SHARE_LEVELS as readonly string[]).includes(item.level as string),
   )
 }
 
@@ -460,6 +515,44 @@ export function createUniworkShareService(deps: UniworkShareServiceDeps): Uniwor
             throw new MissingRoute(error)
           }
           throw error
+        }
+      })
+    },
+
+    folderContentsAccess(request) {
+      if (!isFolderContentsRequest(request)) return Promise.resolve(invalidRequest())
+      // only the plain request is forwarded: whatever else the renderer put on the object stays here
+      const { folderId, mode, items, dryRun } = request
+      const plain = {
+        folderId,
+        mode,
+        dryRun,
+        items: items.map(({ principalType, principalId, level }) => ({
+          principalType,
+          principalId,
+          level,
+        })),
+      }
+      return run(async (client) => {
+        try {
+          // a write is repeated on a 429 only (a 503 may come after the commit)
+          return await withRetry(() => client.updateFolderContentsAccess(plain), dryRun)
+        } catch (error) {
+          throw folderRouteErrorOf(error)
+        }
+      })
+    },
+
+    folderContentsAccessBatch(request) {
+      if (!isObject(request) || !isText(request.folderId) || !isText(request.batchId)) {
+        return Promise.resolve(invalidRequest())
+      }
+      const { folderId, batchId } = request
+      return run(async (client) => {
+        try {
+          return await withRetry(() => client.getFolderContentsAccessBatch(folderId, batchId))
+        } catch (error) {
+          throw folderRouteErrorOf(error)
         }
       })
     },

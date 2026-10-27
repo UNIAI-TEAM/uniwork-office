@@ -2,6 +2,8 @@ import type {
   DriveConnection,
   DriveFile,
   DriveFileListPage,
+  DriveFolderRef,
+  DriveFolderSummary,
   DriveHistoryEvent,
   DriveLinkedTaskRef,
   DriveTaskCreationGroup,
@@ -180,6 +182,19 @@ function parseTaskCreationGroups(value: unknown): DriveTaskCreationGroup[] | und
   return out
 }
 
+/**
+ * `drive_folder: { id, name | null } | null`. Lenient on purpose (API compatibility): an absent,
+ * malformed or id-less value reads as null (parent unknown) and never throws; a name that is not
+ * a non-blank string reads as null.
+ */
+function parseDriveFolder(value: unknown): DriveFolderRef | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const r = value as Record<string, unknown>
+  if (typeof r.id !== 'string' || r.id.trim() === '') return null
+  const name = typeof r.name === 'string' && r.name.trim() !== '' ? r.name.trim() : null
+  return { id: r.id, name }
+}
+
 export function parseDriveFile(value: unknown): DriveFile {
   const r = record(value)
   const driveId = optionalText(r.drive_id)
@@ -231,6 +246,7 @@ export function parseDriveFile(value: unknown): DriveFile {
     usedInTasks: parseLinkedTaskRefList(r.used_in_tasks),
     tasksCreated: parseTasksCreatedSummary(r.tasks_created),
     ...(taskCreations !== undefined ? { taskCreations } : {}),
+    driveFolder: parseDriveFolder(r.drive_folder),
   }
 }
 
@@ -251,6 +267,32 @@ export function parseDriveFileList(raw: unknown): DriveFileListPage {
     totalCount,
     nextCursor,
   }
+}
+
+/**
+ * `{ folders: [{ id: string | null, name: string | null, file_count: number }] }`. Lenient: an entry
+ * that is not an object, has a non-string non-null id, or no usable count is dropped; a name that is
+ * not a non-blank string reads as null. No `folders` array at all (an old server) is null: the
+ * caller derives the folders from the files instead.
+ */
+export function parseDriveFolderList(raw: unknown): DriveFolderSummary[] | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const list = (raw as Record<string, unknown>).folders
+  if (!Array.isArray(list)) return null
+  const out: DriveFolderSummary[] = []
+  for (const entry of list) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue
+    const r = entry as Record<string, unknown>
+    let folderId: string | null
+    if (r.id === null || r.id === undefined) folderId = null
+    else if (typeof r.id === 'string' && r.id.trim() !== '') folderId = r.id
+    else continue
+    const count = r.file_count
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) continue
+    const name = typeof r.name === 'string' && r.name.trim() !== '' ? r.name.trim() : null
+    out.push({ id: folderId, name, fileCount: count })
+  }
+  return out
 }
 
 /** `{ file: DriveFileDTO }` */

@@ -12,7 +12,7 @@ import {
 } from './desk-doc-change'
 import type { TFunc } from './locale'
 import { localizeNoticeParams, noticeSentence, noticeTarget } from './notices-model'
-import { openDocumentShare, revealInTrash } from './documents-intent-bus'
+import { openDocumentShare, openFolderInDocuments, revealInTrash } from './documents-intent-bus'
 import { publishUniworkNotice } from './uniwork-notice-bus'
 import { openUniworkDocument } from './uniwork-open'
 
@@ -123,6 +123,10 @@ export async function openNotice(
         workspaceId: target.workspaceId,
         section: target.section,
       })
+      await env.markRead(n.id)
+      return
+    case 'folder':
+      openFolderInDocuments({ folderId: target.folderId, workspaceId: target.workspaceId })
       await env.markRead(n.id)
       return
     case 'trash':

@@ -103,6 +103,11 @@ import { getDocHistoryBridge } from '../uniwork-doc-history/bridge'
 import { VersionHistorySheet } from '../uniwork-doc-history/VersionHistorySheet'
 import { ShareDialog } from '../uniwork-share/ShareDialog'
 import {
+  FolderContentsAccessDialog,
+  type FolderContentsTarget,
+} from '../uniwork-share/FolderContentsAccessDialog'
+import { useFolderBatchEnd } from '../uniwork-share/use-folder-batch-end'
+import {
   rowShareTarget,
   shareBridgeAvailable,
   type ShareDialogTarget,
@@ -184,12 +189,15 @@ import { sourceOpenExtension, sourceOpenFailureOf } from './source-open-model'
 import { NewMenu } from './NewMenu'
 import { CREATE_SPECIFIC_ERRORS, NEW_DEFAULT_NAME_KEY, NEW_KIND_EXT } from './new-menu-model'
 import {
+  DriveFolderCrumbs,
   DriveList,
   DriveSidebarRows,
   GoogleDriveGlyph,
   openDriveWeb,
   useDocumentsHomeDrive,
+  type DriveViewState,
 } from './DriveList'
+import { driveFolderLabel } from './drive-folders'
 import { DrivePanel } from './DrivePanel'
 import { driveErrorKey } from './drive-panel-model'
 import '../uniwork-folders/uniwork-folders.css'
@@ -206,6 +214,8 @@ export type ElsewhereSource = 'chat' | 'meeting' | 'email' | 'task'
  */
 /** the Google Drive node's key in the sidebar's expanded set (folder ids are uuids, so it cannot clash) */
 const DRIVE_NODE_KEY = 'drive:google'
+/** a Drive account row's key in that set (its folder nodes are shown); connection ids are uuids */
+const driveAccountKey = (connectionId: string) => `drive:account:${connectionId}`
 
 const ELSEWHERE_SOURCES: readonly {
   source: ElsewhereSource
@@ -438,6 +448,9 @@ export interface DocumentsHomeProps {
   /** sub-view to mount with (kept by the host so an area switch can restore it — VDH-7) */
   initialSubView?: DocumentsHomeSubViewId
   onSubViewChange?: (subView: DocumentsHomeSubViewId) => void
+  /** the Google Drive account + folder to mount with, kept by the host with the sub-view (UNI-2223) */
+  initialDriveView?: DriveViewState
+  onDriveViewChange?: (view: DriveViewState) => void
   /** the Từ nơi khác source row kept by the host with the sub-view (RV-16); used only when the sub-view is Từ nơi khác */
   initialElsewhereSource?: ElsewhereSource | null
   onElsewhereSourceChange?: (source: ElsewhereSource | null) => void
@@ -473,6 +486,8 @@ export function DocumentsHome({
   initialFolderId = null,
   initialSubView = 'workspace',
   onSubViewChange,
+  initialDriveView,
+  onDriveViewChange,
   initialElsewhereSource = null,
   onElsewhereSourceChange,
   onFolderChange,
@@ -490,7 +505,14 @@ export function DocumentsHome({
   // the workspaces whose sources route answered: the section shows once it has (the web's probe)
   const [sourcesAnswered, setSourcesAnswered] = useState<Readonly<Record<string, boolean>>>({})
   // the Drive node remembers its chevron here beside the folders' (open by default, reset with them)
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_KEY, DRIVE_NODE_KEY]))
+  // a restored Drive view opens its account's folder nodes, so the current node is visible
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    const keys = [ROOT_KEY, DRIVE_NODE_KEY]
+    if (initialSubView === 'google-drive' && initialDriveView?.accountId) {
+      keys.push(driveAccountKey(initialDriveView.accountId))
+    }
+    return new Set(keys)
+  })
   const [tree, setTree] = useState<TreeState>({ status: 'loading', nodes: [] })
   const [treeTick, setTreeTick] = useState(0)
   const [folderNotice, setFolderNotice] = useState<'ufFolderGone' | 'ufFolderNoAccess' | null>(null)
@@ -575,13 +597,31 @@ export function DocumentsHome({
     action?: { label: string; onClick: () => void }
   } | null>(null)
   const clearToast = useCallback(() => setToast(null), [])
+  // UNI-2244: a background "share the documents inside…" run ended (its dialog may be long closed)
+  useFolderBatchEnd({
+    onToast: (message, tone) => setToast({ message, tone }),
+    onRefetch: () => setListTick((n) => n + 1),
+  })
 
   // G5-05u / NET-OFF-01: pin/unpin entry in each document row's "…" menu (hidden while the capability is off)
   const offlineToggle = useOfflineToggle()
+  // the Drive accounts whose folder nodes the sidebar shows (only while the Drive node itself is open)
+  const expandedDriveAccountIds = useMemo(
+    () =>
+      expanded.has(DRIVE_NODE_KEY)
+        ? Array.from(expanded, (key) =>
+            key.startsWith('drive:account:') ? key.slice('drive:account:'.length) : '',
+          ).filter(Boolean)
+        : [],
+    [expanded],
+  )
   const drive = useDocumentsHomeDrive({
     workspaceId,
     subView,
     listTick,
+    query: searchDraft,
+    folderAccountIds: expandedDriveAccountIds,
+    initialView: initialSubView === 'google-drive' ? initialDriveView : undefined,
     onErrorToast: (err) =>
       setToast({
         message: t(err === 'server_error' ? 'uwDocActionFailed' : driveErrorKey(err)),
@@ -742,6 +782,14 @@ export function DocumentsHome({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folderId, pathKey])
 
+  // the Drive account + folder travel with the sub-view, so Back and an area switch restore the node (UNI-2223)
+  const onDriveViewChangeRef = useRef(onDriveViewChange)
+  onDriveViewChangeRef.current = onDriveViewChange
+  const driveViewAccountId = drive.viewState.accountId
+  const driveViewFolderKey = drive.viewState.folderKey
+  useEffect(() => {
+    onDriveViewChangeRef.current?.({ accountId: driveViewAccountId, folderKey: driveViewFolderKey })
+  }, [driveViewAccountId, driveViewFolderKey])
   // Notify host of sub-view changes so an area switch can restore it on remount (VDH-7)
   const onSubViewChangeRef = useRef(onSubViewChange)
   onSubViewChangeRef.current = onSubViewChange
@@ -1202,10 +1250,21 @@ export function DocumentsHome({
     selectSubView('elsewhere')
   }
 
-  /** UNI-2195 (D2): selects the Google Drive view (all accounts when `null`, or one connection) */
-  const openDrive = (connectionId: string | null) => {
-    drive.setSelectedAccountId(connectionId)
+  /**
+   * UNI-2195 (D2): selects the Google Drive view (all accounts when `null`, or one connection),
+   * and with `folderKey` one folder of that account (UNI-2223). The account's folder nodes open
+   * with it, and the search starts clean (it is scoped to the node it was typed in).
+   */
+  const openDrive = (connectionId: string | null, folderKey: string | null = null) => {
+    drive.select(connectionId, folderKey)
     setDriveSel(null)
+    if (connectionId) {
+      setExpanded((prev) => {
+        const key = driveAccountKey(connectionId)
+        if (prev.has(key)) return prev
+        return new Set(prev).add(key)
+      })
+    }
     selectSubView('google-drive')
   }
 
@@ -1222,6 +1281,16 @@ export function DocumentsHome({
     if (!driveWeb?.orgSlug || !driveWeb.wsSlug) return
     void openDriveWeb(build(driveWeb))
   }
+
+  /**
+   * UNI-2223 v3: "Name from Drive" on an unnamed folder. The app has no Google Picker, so the web
+   * library opens with the folder and `nameFolder=1`; returning to the app refetches the folders on focus.
+   */
+  const nameDriveFolder =
+    driveWeb?.orgSlug && driveWeb.wsSlug
+      ? (accountId: string, folderId: string) =>
+          driveHandOff((base) => ({ kind: 'drive-name-folder', ...base, accountId, folderId }))
+      : undefined
 
   /** closes the Drive panel; focus goes back to the row it was opened from */
   const closeDrivePanel = () => {
@@ -1815,6 +1884,29 @@ export function DocumentsHome({
     setShare({ row: rowShareTarget(doc, organizationName) })
   const [bulkShareDocs, setBulkShareDocs] = useState<BulkShareDoc[] | null>(null)
   const shareAvailable = shareBridgeAvailable()
+  // UNI-2244: the folder whose documents the "Share documents inside…" dialog writes to
+  const [folderContents, setFolderContents] = useState<FolderContentsTarget | null>(null)
+  const openFolderContents = (folder: { id: string; workspaceId?: string; title: string }) =>
+    setFolderContents({
+      id: folder.id,
+      workspaceId: folder.workspaceId || workspaceId,
+      title: folder.title,
+    })
+  /** the menu entry every reader of a folder gets; none when this shell has no Share bridge */
+  const folderContentsItem = (folder: {
+    id: string
+    workspaceId?: string
+    title: string
+  }): FolderMenuItem[] =>
+    shareAvailable
+      ? [
+          {
+            id: 'share-contents',
+            label: t('shrFcMenu'),
+            onSelect: () => openFolderContents(folder),
+          },
+        ]
+      : []
   // UNI-2077: the Access log sheet of a row; no entry when this main has no doc history bridge
   const [logsRow, setLogsRow] = useState<DocumentsHomeDoc | null>(null)
   const docHistoryAvailable = getDocHistoryBridge() !== null
@@ -1868,6 +1960,11 @@ export function DocumentsHome({
   } | null>(null)
   const takeIntent = (intent: DocumentsIntent): boolean => {
     if (intent.workspaceId !== workspaceId) return false
+    if (intent.kind === 'folder') {
+      resetFilters()
+      openFolderInWorkspace(intent.folderId)
+      return true
+    }
     if (intent.kind === 'trash') {
       const stalePage = subViewRef.current === 'trash' ? null : pageRef.current
       resetFilters()
@@ -2097,6 +2194,7 @@ export function DocumentsHome({
         },
       },
     ]
+    items.push(...folderContentsItem({ id, title: row.title }))
     if (access.create) items.push(newFolder)
     if (!access.edit) return items
     const parentId = index.get(id)?.parentId ?? null
@@ -2128,9 +2226,19 @@ export function DocumentsHome({
     }
     const canCreate = canCreateIn(folder)
     // Mở leads every row menu (Rules board section 3); a viewer-only folder has no menu, the card opens it
-    if (folder.canEdit === false && !canCreate) return []
+    // UNI-2244: every reader gets Share documents inside…, so a viewer-only card has this one entry
+    if (folder.canEdit === false && !canCreate) {
+      const shareOnly = folderContentsItem(folder)
+      return shareOnly.length === 0
+        ? []
+        : [
+            { id: 'open', label: t('dlActOpen'), onSelect: () => openFolderInWorkspace(folder.id) },
+            ...shareOnly,
+          ]
+    }
     const items: FolderMenuItem[] = [
       { id: 'open', label: t('dlActOpen'), onSelect: () => openFolderInWorkspace(folder.id) },
+      ...folderContentsItem(folder),
       {
         id: 'new',
         label: t('ufNewSubfolder'),
@@ -2187,7 +2295,8 @@ export function DocumentsHome({
   /** the open folder's own menu in its header (UNI-1979): the card menu minus the card, no Share */
   const openFolderMenu = (id: string): FolderMenuItem[] => {
     const node = index.get(id)
-    const items: FolderMenuItem[] = []
+    // UNI-2244: the open folder's own Share documents inside…, for every reader
+    const items: FolderMenuItem[] = folderContentsItem({ id, title: node?.title ?? '' })
     if (openFolderCreatable) {
       items.push({
         id: 'new',
@@ -2274,6 +2383,9 @@ export function DocumentsHome({
           }),
         // no entry when this shell has no Share bridge (a stale preload)
         ...(shareAvailable ? { share: () => openRowShare(doc) } : {}),
+        ...(shareAvailable && doc.kind === 'folder'
+          ? { 'share-contents': () => openFolderContents(doc) }
+          : {}),
         ...(docHistoryAvailable ? { logs: () => setLogsRow(doc) } : {}),
         ...(docHistoryAvailable ? { versions: () => setVersionsRow(doc) } : {}),
         'copy-link': () => void handleCopyLink(doc),
@@ -2535,11 +2647,14 @@ export function DocumentsHome({
     }
     return { kind: 'key', key: getDocumentsHomeNavEntry(subView).labelKey }
   }, [subView, folderId, index, resolvedMyFolderId, myFolderLabel, shownPath])
+  const driveFolder = drive.scope.kind === 'folder' ? drive.scope.folder : null
   const currentHeading =
     subView === 'google-drive'
-      ? drive.selectedConnection
-        ? t('uhNavDriveAccount', { email: drive.selectedConnection.googleEmail })
-        : t('uhNavGoogleDrive')
+      ? driveFolder
+        ? driveFolderLabel(driveFolder, t)
+        : drive.selectedConnection
+          ? t('uhNavDriveAccount', { email: drive.selectedConnection.googleEmail })
+          : t('uhNavGoogleDrive')
       : currentHeadingSpec.kind === 'literal'
         ? currentHeadingSpec.text
         : t(currentHeadingSpec.key)
@@ -2585,7 +2700,11 @@ export function DocumentsHome({
       state={drive.sidebarState}
       active={!sidebarIdle && subView === 'google-drive'}
       selectedAccountId={drive.selectedAccountId}
+      selectedFolderKey={drive.selectedFolderKey}
       expanded={expanded.has(DRIVE_NODE_KEY)}
+      expandedAccountIds={new Set(expandedDriveAccountIds)}
+      folderTree={drive.folderTree}
+      onNameFolder={nameDriveFolder}
       onToggle={() =>
         setExpanded((prev) => {
           const next = new Set(prev)
@@ -2593,9 +2712,21 @@ export function DocumentsHome({
           return next
         })
       }
+      onToggleAccount={(connectionId) =>
+        setExpanded((prev) => {
+          const next = new Set(prev)
+          const key = driveAccountKey(connectionId)
+          if (!next.delete(key)) next.add(key)
+          return next
+        })
+      }
       onSelect={(accountId) => {
         onSidebarNavigate?.()
         openDrive(accountId)
+      }}
+      onSelectFolder={(connectionId, folderKey) => {
+        onSidebarNavigate?.()
+        openDrive(connectionId, folderKey)
       }}
     />
   ) : null
@@ -2767,9 +2898,8 @@ export function DocumentsHome({
   // above the list (the app keeps its own Tải lên / Tạo mới / Tạo nhanh, which the board does not draw)
   const recentView = subView === 'recent'
   const driveView = subView === 'google-drive'
-  const searchLabel = recentView
-    ? t('dlSearchIn', { name: currentHeading })
-    : t('uhSearchPlaceholder')
+  const searchLabel =
+    recentView || driveView ? t('dlSearchIn', { name: currentHeading }) : t('uhSearchPlaceholder')
   const subtitleKey: StringKey | null = recentView
     ? 'dlRecentSubtitle'
     : subView === 'elsewhere'
@@ -2804,8 +2934,26 @@ export function DocumentsHome({
 
       <div className="dh-main uwf-main" {...zoneHandlers}>
         {libraryDrop.over && <DropOverlay targetLabel={dropTargetLabel} box={libraryDrop.over} />}
-        <div className={`dh-toolbar${folderHeader ? ' dh-toolbar-folder' : ''}`}>
-          {folderHeader && folderId !== null ? (
+        <div
+          className={`dh-toolbar${folderHeader || (driveFolder && drive.selectedConnection) ? ' dh-toolbar-folder' : ''}`}
+        >
+          {driveFolder && drive.selectedConnection ? (
+            <DriveFolderCrumbs
+              accountEmail={drive.selectedConnection.googleEmail}
+              folderLabel={currentHeading}
+              onOpenDrive={() => openDrive(null)}
+              onOpenAccount={() => openDrive(drive.selectedConnection?.id ?? null)}
+              onNameFolder={
+                nameDriveFolder &&
+                drive.canNameFolders &&
+                !drive.brokenAccount &&
+                drive.status === 'ready' &&
+                !driveFolder.name
+                  ? () => nameDriveFolder(drive.selectedConnection?.id ?? '', driveFolder.key)
+                  : undefined
+              }
+            />
+          ) : folderHeader && folderId !== null ? (
             <BrowserCrumbs
               path={shownPath}
               onOpen={openFolderInWorkspace}
@@ -2855,7 +3003,9 @@ export function DocumentsHome({
             />
           ) : (
             <div className={`dh-title-group${subtitleKey ? ' dh-title-stack' : ''}`}>
-              <h1 className="dh-title">{currentHeading}</h1>
+              <h1 className="dh-title" dir="auto" title={currentHeading}>
+                {currentHeading}
+              </h1>
               {subtitleKey && (
                 <p className="dh-subtitle" title={t(subtitleKey)}>
                   {t(subtitleKey)}
@@ -2877,8 +3027,10 @@ export function DocumentsHome({
               ))}
             </select>
           )}
-          {!folderHeader && <div className="dh-toolbar-spacer" />}
-          {!driveView && (
+          {!folderHeader && !(driveFolder && drive.selectedConnection) && (
+            <div className="dh-toolbar-spacer" />
+          )}
+          {(!driveView || drive.sidebarState.visible) && (
             <div className="dh-search-box" role="search">
               <svg
                 className="dh-search-icon"
@@ -2983,6 +3135,13 @@ export function DocumentsHome({
             connections={drive.connections}
             selectedAccountId={drive.selectedAccountId}
             files={drive.files}
+            folders={drive.folders}
+            query={query}
+            onClearSearch={() => {
+              setSearchDraft('')
+              focusSearch()
+            }}
+            onOpenFolder={(folderKey) => openDrive(drive.selectedAccountId, folderKey)}
             status={drive.status}
             error={drive.error}
             offline={drive.offline}
@@ -2994,7 +3153,7 @@ export function DocumentsHome({
             onOpenOnGoogle={(driveFileId) => void drive.openOnGoogle(driveFileId)}
             selectedFileId={driveSel?.row.id ?? null}
             onSelect={(driveFileId, via) => {
-              const row = drive.files.find((f) => f.id === driveFileId)
+              const row = drive.findFile(driveFileId)
               if (row) setDriveSel({ row, focus: via === 'keyboard' })
             }}
             onClosePanel={closeDrivePanel}
@@ -3022,7 +3181,7 @@ export function DocumentsHome({
               driveSel ? (
                 <DrivePanel
                   workspaceId={workspaceId}
-                  row={drive.files.find((f) => f.id === driveSel.row.id) ?? driveSel.row}
+                  row={drive.findFile(driveSel.row.id) ?? driveSel.row}
                   web={driveWeb}
                   autoFocus={driveSel.focus}
                   onClose={closeDrivePanel}
@@ -3491,6 +3650,19 @@ export function DocumentsHome({
           workspaces={workspaces}
           onClose={() => setShare(null)}
           onChanged={() => setListTick((n) => n + 1)}
+        />
+      )}
+
+      {folderContents && (
+        <FolderContentsAccessDialog
+          open
+          folder={folderContents}
+          workspaceName={
+            workspaces.find((ws) => ws.id === folderContents.workspaceId)?.name ?? undefined
+          }
+          onClose={() => setFolderContents(null)}
+          onChanged={() => setListTick((n) => n + 1)}
+          onNotice={(message, tone) => setToast({ message, tone })}
         />
       )}
 

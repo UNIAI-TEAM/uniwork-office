@@ -434,6 +434,14 @@ export const vi = {
   wbNotif_document_shared_untitled: '{actor} đã chia sẻ một tài liệu với bạn. Quyền: {level}.',
   wbNotif_document_shared_nolevel: '{actor} đã chia sẻ tài liệu “{document}” với bạn.',
   wbNotif_document_shared_untitled_nolevel: '{actor} đã chia sẻ một tài liệu với bạn.',
+  wbNotif_document_shared_folder:
+    '{actor} đã chia sẻ {count} tài liệu trong thư mục "{document}" với bạn. Quyền: {level}.',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} đã chia sẻ {count} tài liệu trong một thư mục với bạn. Quyền: {level}.',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} đã chia sẻ {count} tài liệu trong thư mục "{document}" với bạn.',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} đã chia sẻ {count} tài liệu trong một thư mục với bạn.',
   wbNotif_document_owner_transferred:
     '{actor} đã chuyển cho bạn quyền sở hữu tài liệu “{document}”.',
   wbNotif_document_owner_transferred_untitled:

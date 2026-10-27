@@ -78,6 +78,7 @@ import {
   type ElsewhereSource as DocumentsHomeElsewhereSource,
 } from './uniwork-home/DocumentsHome'
 import type { DocumentsHomeDoc, DocumentsHomeSubViewId } from './uniwork-home/documents-home-model'
+import type { DriveViewState as DocumentsHomeDriveView } from './uniwork-home/DriveList'
 import type { FolderMenuItem } from './uniwork-folders/FolderMenu'
 import { useOfflineToggle } from './OfflineToggle'
 import { useAskUniOpenRequest } from './askuni-entry'
@@ -1304,6 +1305,10 @@ export function Home() {
   // FD-13/VDH-7: the UniWork sub-view kept per workspace so an area switch restores it
   const [uniworkSubViewByWs, setUniworkSubViewByWs] = useState<
     Record<string, DocumentsHomeSubViewId>
+  >({})
+  // UNI-2223: the Google Drive account + folder picked, kept with the sub-view per workspace
+  const [uniworkDriveViewByWs, setUniworkDriveViewByWs] = useState<
+    Record<string, DocumentsHomeDriveView>
   >({})
   // RV-16: the Từ nơi khác source row picked, kept with the sub-view per workspace
   const [uniworkSourceByWs, setUniworkSourceByWs] = useState<
@@ -3895,6 +3900,15 @@ export function Home() {
             onWorkspaceChange={selectUniworkWorkspace}
             initialFolderId={activeUwFolderId}
             initialSubView={activeUwSubView}
+            initialDriveView={uniworkDriveViewByWs[activeUwWorkspaceId]}
+            onDriveViewChange={(view) => {
+              setUniworkDriveViewByWs((prev) =>
+                prev[activeUwWorkspaceId]?.accountId === view.accountId &&
+                prev[activeUwWorkspaceId]?.folderKey === view.folderKey
+                  ? prev
+                  : { ...prev, [activeUwWorkspaceId]: view },
+              )
+            }}
             initialElsewhereSource={uniworkSourceByWs[activeUwWorkspaceId] ?? null}
             onElsewhereSourceChange={(source) => {
               setUniworkSourceByWs((prev) => ({ ...prev, [activeUwWorkspaceId]: source }))

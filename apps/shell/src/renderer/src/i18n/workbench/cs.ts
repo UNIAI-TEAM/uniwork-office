@@ -37,6 +37,14 @@ export const cs = {
   wbNotif_document_shared_untitled: '{actor} s vámi sdílel(a) dokument ({level}).',
   wbNotif_document_shared_nolevel: '{actor} s vámi sdílel(a) dokument „{document}“.',
   wbNotif_document_shared_untitled_nolevel: '{actor} s vámi sdílel(a) dokument.',
+  wbNotif_document_shared_folder:
+    '{actor} s vámi sdílel(a) dokumenty ({count}) ve složce „{document}“ ({level}).',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} s vámi sdílel(a) dokumenty ({count}) ve složce ({level}).',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} s vámi sdílel(a) dokumenty ({count}) ve složce „{document}“.',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} s vámi sdílel(a) dokumenty ({count}) ve složce.',
   wbNotif_document_owner_transferred:
     '{actor} na vás převedl(a) vlastnictví dokumentu „{document}“.',
   wbNotif_document_owner_transferred_untitled: '{actor} na vás převedl(a) vlastnictví dokumentu.',

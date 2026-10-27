@@ -218,4 +218,81 @@ export const es = {
   shrOwnerOwnedByWorkProduct:
     'Este documento pertenece a un producto de trabajo, así que no se puede cambiar su propietario.',
   shrOwnerUnavailable: 'La transferencia de propiedad aún no está disponible en este servidor.',
+  shrFcMenu: 'Compartir',
+  shrFcTitle: 'Compartir',
+  shrFcScope: 'Documentos de la carpeta "{title}" y sus subcarpetas.',
+  shrFcFixed:
+    'Se aplica a los documentos que existen ahora. Los documentos añadidos después no reciben este acceso.',
+  shrFcModeLabel: 'Cómo aplicar',
+  shrFcModeMerge: 'Añadir al acceso existente',
+  shrFcModeReplace: 'Reemplazar el acceso existente',
+  shrFcChecking: 'Comprobando…',
+  shrFcBack: 'Atrás',
+  shrFcApplying: 'Aplicando…',
+  shrFcApplyReplace: 'Reemplazar acceso',
+  shrFcSummaryLabel: 'Resumen de cambios',
+  shrFcWarningsLabel: 'Advertencias',
+  shrFcWillChangeOne: 'Se cambiará {count} documento',
+  shrFcWillChangeOther: 'Se cambiarán {count} documentos',
+  shrFcSkippedNotManageable: 'se omiten {count} que no administras',
+  shrFcToastUnknown:
+    'Se envió el cambio de acceso. Abre los documentos para comprobar el resultado.',
+  shrFcLosingOne: '{count} persona pierde el acceso a al menos un documento',
+  shrFcLosingOther: '{count} personas pierden el acceso a al menos un documento',
+  shrFcDoneOne: 'Acceso cambiado en {count} documento',
+  shrFcDoneOther: 'Acceso cambiado en {count} documentos',
+  shrFcForbidden: 'No tienes permiso para leer esta carpeta.',
+  shrFcNotFound: 'No se encontró esta carpeta.',
+  shrFcUnavailable: 'Este servidor aún no admite compartir los documentos de una carpeta.',
+  shrFcScopeUntitled: 'Documentos de esta carpeta y sus subcarpetas.',
+  shrFcModeMergeHint:
+    'Concede acceso a las personas y los grupos que elijas. El acceso existente nunca se reduce ni se quita.',
+  shrFcModeReplaceHint:
+    'Cada documento conservará exactamente la lista de abajo. Quien no esté en la lista perderá el acceso.',
+  shrFcPrincipalsTitle: 'Personas y niveles de acceso',
+  shrFcPrincipalsEmptyMerge:
+    'Aún no has elegido a nadie. Busca y elige al menos una persona o grupo para añadir acceso.',
+  shrFcPrincipalsEmptyReplace:
+    'No se ha elegido a nadie más. Solo se conserva la fila del espacio de trabajo de abajo.',
+  shrFcHomeRow: 'Espacio de trabajo «{name}»',
+  shrFcHomeRowUnnamed: 'Espacio de trabajo de esta carpeta',
+  shrFcHomeLevelLabel: 'Nivel de acceso del espacio de trabajo',
+  shrFcHomeLevelChoose: 'Elige el acceso',
+  shrFcLevelPrivate: 'Privado',
+  shrFcApplyMerge: 'Aplicar',
+  shrFcSkippedLocked: '{count} bloqueados',
+  shrFcWarnWide:
+    'Un espacio de trabajo o una organización completa está en la lista: muchas personas podrán abrir estos documentos.',
+  shrFcWarnPrivate:
+    'El espacio de trabajo ya no está en la lista: estos documentos pasarán a ser privados.',
+  shrFcWarnDowngradeOne: '{count} persona baja de nivel en al menos un documento.',
+  shrFcWarnDowngradeOther: '{count} personas bajan de nivel en al menos un documento.',
+  shrFcWarnDowngradeGeneric: 'Se reducirá parte del acceso a estos documentos.',
+  shrFcNothing: 'No cambiará nada: el acceso actual ya coincide con esta lista.',
+  shrFcToastSkippedOne: 'Se omitió {count} documento que no administras.',
+  shrFcToastSkippedOther: 'Se omitieron {count} documentos que no administras.',
+  shrFcToastLockedOne: '{count} documento está bloqueado y no se cambió.',
+  shrFcToastLockedOther: '{count} documentos están bloqueados y no se cambiaron.',
+  shrFcProgressTitle: 'Aplicando el acceso',
+  shrFcProgressLabel: 'Progreso del cambio de acceso',
+  shrFcProgressCountOne: '{processed}/{count} documento',
+  shrFcProgressCountOther: '{processed}/{count} documentos',
+  shrFcProgressStarting: 'Esperando para empezar…',
+  shrFcProgressHint:
+    'Puedes cerrar este cuadro; el cambio sigue en segundo plano y se te avisará cuando termine.',
+  shrFcProgressAlreadyRunning:
+    'Esta carpeta ya tiene un cambio de acceso en curso en segundo plano. Este es su progreso.',
+  shrFcProgressClose: 'Listo',
+  shrFcBatchDoneOne: 'Acceso aplicado a {count} documento',
+  shrFcBatchDoneOther: 'Acceso aplicado a {count} documentos',
+  shrFcBatchFailed:
+    'El cambio de acceso se detuvo a medias. Vuelve a ejecutar «Reemplazar acceso» para terminarlo.',
+  shrFcNotAFolder:
+    'Este elemento no es una carpeta, así que sus documentos no se pueden cambiar en lote.',
+  shrFcErrorGeneric: 'No se pudo aplicar el acceso. Inténtalo de nuevo.',
+  shrFcErrorRejected:
+    'No se pudo aplicar el acceso a algunas personas o grupos. Corrige las filas marcadas e inténtalo de nuevo.',
+  shrFcRunningNoBatch:
+    'Se está actualizando el acceso en esta carpeta. Inténtalo de nuevo en un momento.',
+  shrFcTooMany: 'Puedes añadir hasta {max} personas o grupos a la vez.',
 } satisfies Record<keyof typeof zh, string>

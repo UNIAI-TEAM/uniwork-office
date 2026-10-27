@@ -15,6 +15,7 @@ export type RowMenuActionId =
   | 'open'
   | 'offline'
   | 'share'
+  | 'share-contents'
   | 'copy-link'
   | 'star'
   | 'unstar'
@@ -145,6 +146,11 @@ export function buildRowMenu({
   // Chia sẻ (UNI-2047 SD-C): any reader opens the dialog, the gate keeps folders, other modules'
   // documents, trashed rows and My Folder out; it sits just before Sao chép link like the web's
   if (canShareRow(doc)) add('share', label('dlActShare'), LINK)
+  // Chia sẻ các tài liệu bên trong… (UNI-2244): every reader of a live folder; the server skips
+  // what the person cannot manage, so no level gate here (the web's folder row menu)
+  if (doc.kind === 'folder' && !shelved) {
+    add('share-contents', label('shrFcMenu'), LINK)
+  }
   if (doc.kind !== 'folder') add('copy-link', label('dlActCopyLink'), LINK)
   // Tải xuống (UNI-2068): the bulk bar reads this entry for its gate; a host that gives the row
   // menu no handler leaves the visible menu as it was

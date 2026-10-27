@@ -215,4 +215,81 @@ export const nl = {
   shrOwnerOwnedByWorkProduct:
     'Dit document hoort bij een werkproduct, dus de eigenaar kan niet worden gewijzigd.',
   shrOwnerUnavailable: 'Eigendom overdragen is nog niet beschikbaar op deze server.',
+  shrFcMenu: 'Delen',
+  shrFcTitle: 'Delen',
+  shrFcScope: 'Documenten in de map "{title}" en de submappen ervan.',
+  shrFcFixed:
+    'Geldt voor de documenten die er nu zijn. Later toegevoegde documenten krijgen deze toegang niet.',
+  shrFcModeLabel: 'Zo toepassen',
+  shrFcModeMerge: 'Toevoegen aan bestaande toegang',
+  shrFcModeReplace: 'Bestaande toegang vervangen',
+  shrFcChecking: 'Controleren…',
+  shrFcBack: 'Terug',
+  shrFcApplying: 'Toepassen…',
+  shrFcApplyReplace: 'Toegang vervangen',
+  shrFcSummaryLabel: 'Samenvatting van wijzigingen',
+  shrFcWarningsLabel: 'Waarschuwingen',
+  shrFcWillChangeOne: '{count} document wordt gewijzigd',
+  shrFcWillChangeOther: '{count} documenten worden gewijzigd',
+  shrFcSkippedNotManageable: '{count} overgeslagen die u niet beheert',
+  shrFcToastUnknown:
+    'De toegangswijziging is verzonden. Open de documenten om het resultaat te controleren.',
+  shrFcLosingOne: '{count} persoon verliest toegang tot minstens één document',
+  shrFcLosingOther: '{count} personen verliezen toegang tot minstens één document',
+  shrFcDoneOne: 'Toegang gewijzigd op {count} document',
+  shrFcDoneOther: 'Toegang gewijzigd op {count} documenten',
+  shrFcForbidden: 'U mag deze map niet lezen.',
+  shrFcNotFound: 'Deze map is niet gevonden.',
+  shrFcUnavailable: 'Deze server ondersteunt het delen van de documenten in een map nog niet.',
+  shrFcScopeUntitled: 'Documenten in deze map en de submappen ervan.',
+  shrFcModeMergeHint:
+    'Geeft toegang aan de personen en groepen die u kiest. Bestaande toegang wordt nooit verlaagd of verwijderd.',
+  shrFcModeReplaceHint:
+    'Elk document behoudt precies de onderstaande lijst. Wie niet in de lijst staat, verliest de toegang.',
+  shrFcPrincipalsTitle: 'Personen en toegangsniveaus',
+  shrFcPrincipalsEmptyMerge:
+    'Nog niemand gekozen. Zoek en kies minstens één persoon of groep om toegang toe te voegen.',
+  shrFcPrincipalsEmptyReplace:
+    'Verder niemand gekozen. Alleen de rij Werkruimte hieronder blijft behouden.',
+  shrFcHomeRow: 'Werkruimte “{name}”',
+  shrFcHomeRowUnnamed: 'Werkruimte van deze map',
+  shrFcHomeLevelLabel: 'Toegangsniveau van de werkruimte',
+  shrFcHomeLevelChoose: 'Kies toegang',
+  shrFcLevelPrivate: 'Privé',
+  shrFcApplyMerge: 'Toepassen',
+  shrFcSkippedLocked: '{count} vergrendeld',
+  shrFcWarnWide:
+    'Een hele werkruimte of organisatie staat in de lijst: veel mensen kunnen deze documenten openen.',
+  shrFcWarnPrivate: 'De werkruimte staat niet meer in de lijst: deze documenten worden Privé.',
+  shrFcWarnDowngradeOne:
+    '{count} persoon krijgt een lager toegangsniveau voor minstens één document.',
+  shrFcWarnDowngradeOther:
+    '{count} personen krijgen een lager toegangsniveau voor minstens één document.',
+  shrFcWarnDowngradeGeneric: 'Een deel van de toegang tot deze documenten wordt verlaagd.',
+  shrFcNothing: 'Er verandert niets: de huidige toegang komt al overeen met deze lijst.',
+  shrFcToastSkippedOne: '{count} document overgeslagen dat u niet beheert.',
+  shrFcToastSkippedOther: '{count} documenten overgeslagen die u niet beheert.',
+  shrFcToastLockedOne: '{count} document is vergrendeld en is niet gewijzigd.',
+  shrFcToastLockedOther: '{count} documenten zijn vergrendeld en zijn niet gewijzigd.',
+  shrFcProgressTitle: 'Toegang toepassen',
+  shrFcProgressLabel: 'Voortgang van de toegangswijziging',
+  shrFcProgressCountOne: '{processed}/{count} document',
+  shrFcProgressCountOther: '{processed}/{count} documenten',
+  shrFcProgressStarting: 'Wachten op start…',
+  shrFcProgressHint:
+    'U kunt dit venster sluiten; de wijziging blijft op de achtergrond draaien en u krijgt bericht wanneer ze klaar is.',
+  shrFcProgressAlreadyRunning:
+    'Voor deze map loopt al een toegangswijziging op de achtergrond. Dit is de voortgang daarvan.',
+  shrFcProgressClose: 'Klaar',
+  shrFcBatchDoneOne: 'Toegang toegepast op {count} document',
+  shrFcBatchDoneOther: 'Toegang toegepast op {count} documenten',
+  shrFcBatchFailed:
+    'De toegangswijziging is halverwege gestopt. Voer Bestaande toegang vervangen opnieuw uit om haar af te ronden.',
+  shrFcNotAFolder:
+    'Dit item is geen map, dus de documenten erin kunnen niet in één keer worden gewijzigd.',
+  shrFcErrorGeneric: 'Toegang kon niet worden toegepast. Probeer het opnieuw.',
+  shrFcErrorRejected:
+    'Toegang kon niet worden toegepast voor sommige personen of groepen. Corrigeer de gemarkeerde rijen en probeer het opnieuw.',
+  shrFcRunningNoBatch: 'De toegang in deze map wordt bijgewerkt. Probeer het zo meteen opnieuw.',
+  shrFcTooMany: 'U kunt per keer maximaal {max} personen of groepen toevoegen.',
 } satisfies Record<keyof typeof zh, string>

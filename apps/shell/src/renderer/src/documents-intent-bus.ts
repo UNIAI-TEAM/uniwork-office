@@ -1,6 +1,6 @@
 /**
- * A notice can send the person to two places inside the Documents home: a document's Share
- * dialog (on its access-requests or break-glass section) and a row of the Trash. The inbox
+ * A notice can send the person to three places inside the Documents home: a document's Share
+ * dialog (on its access-requests or break-glass section), a row of the Trash and a folder. The inbox
  * publishes the intent here; two kinds of subscriber answer it:
  * - a route subscriber (the app Home) switches the surface to the Documents home of the
  *   intent's workspace; it never takes the intent;
@@ -19,6 +19,7 @@ export type DocumentsIntent =
       section: DocumentsShareSection
     }
   | { kind: 'trash'; documentId: string; workspaceId: string }
+  | { kind: 'folder'; folderId: string; workspaceId: string }
 
 export type DocumentsIntentConsumer = (intent: DocumentsIntent) => boolean
 export type DocumentsIntentRouter = (intent: DocumentsIntent) => void
@@ -56,6 +57,11 @@ export function openDocumentShare(input: {
 /** Open the Trash of a workspace with the document's row selected. */
 export function revealInTrash(input: { documentId: string; workspaceId: string }): void {
   publish({ kind: 'trash', ...input })
+}
+
+/** Open a folder in the Documents home of a workspace (a grouped share notice names the folder). */
+export function openFolderInDocuments(input: { folderId: string; workspaceId: string }): void {
+  publish({ kind: 'folder', ...input })
 }
 
 /** Subscribe as the one that does the work; returns the unsubscribe function. */

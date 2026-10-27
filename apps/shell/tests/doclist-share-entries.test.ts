@@ -43,6 +43,51 @@ const doc = (partial: Partial<DocumentsHomeDoc> & { id: string }): DocumentsHome
 const rowOf = (d: DocumentsHomeDoc): DocumentsHomeTableRow => ({ type: 'doc', id: d.id, doc: d })
 const ids = (items: RowMenuItem[]) => items.map((i) => i.id)
 
+describe('row menu: Chia sẻ các tài liệu bên trong… (UNI-2244)', () => {
+  const menu = (d: DocumentsHomeDoc, run: Partial<Record<RowMenuActionId, () => void>>) =>
+    buildRowMenu({
+      screen: 'workspace',
+      doc: d,
+      run: { open: () => {}, 'copy-link': () => {}, ...run },
+      offlineLabel: null,
+      label: (key) => key,
+    })
+
+  it('a live folder offers it after Open, in the link group, for the host that can run it', () => {
+    const run = vi.fn()
+    const items = menu(doc({ id: 'f', kind: 'folder' }), { 'share-contents': run })
+    expect(ids(items)).toEqual(['open', 'share-contents'])
+    const entry = items.find((i) => i.id === 'share-contents')!
+    expect(entry.label).toBe('shrFcMenu')
+    entry.onSelect()
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
+  it('every reader gets it: a viewer-only folder keeps the entry', () => {
+    const items = menu(
+      doc({ id: 'v', kind: 'folder', myLevel: 'view', canManage: false, canEdit: false }),
+      { 'share-contents': () => {} },
+    )
+    expect(ids(items)).toContain('share-contents')
+  })
+
+  it('no entry for a file, a trashed or a shelved folder, or a host that cannot run it', () => {
+    const run = () => {}
+    expect(ids(menu(doc({ id: 'a' }), { 'share-contents': run }))).not.toContain('share-contents')
+    expect(
+      ids(menu(doc({ id: 't', kind: 'folder', archived: true }), { 'share-contents': run })),
+    ).not.toContain('share-contents')
+    expect(
+      ids(
+        menu(doc({ id: 's', kind: 'folder', shelvedAt: '2026-10-20T00:00:00Z' }), {
+          'share-contents': run,
+        }),
+      ),
+    ).not.toContain('share-contents')
+    expect(ids(menu(doc({ id: 'n', kind: 'folder' }), {}))).not.toContain('share-contents')
+  })
+})
+
 describe('row menu: Chia sẻ', () => {
   const menu = (d: DocumentsHomeDoc, run: Partial<Record<RowMenuActionId, () => void>>) =>
     buildRowMenu({

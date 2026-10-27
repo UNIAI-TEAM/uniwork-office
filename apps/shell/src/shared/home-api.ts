@@ -113,6 +113,8 @@ import type {
   DriveFileListPage,
   DriveFileListQuery,
   DriveFileTarget,
+  DriveFolderListQuery,
+  DriveFolderSummary,
   DriveHistoryEvent,
   UniworkDriveResult,
 } from './uniwork-drive-api'
@@ -125,6 +127,9 @@ export type {
   DriveFileListPage,
   DriveFileListQuery,
   DriveFileTarget,
+  DriveFolderListQuery,
+  DriveFolderRef,
+  DriveFolderSummary,
   DriveHistoryEvent,
   DriveIconKind,
   DriveLinkedTaskRef,
@@ -1842,6 +1847,9 @@ export interface HomeApi {
   uniworkDriveIsAvailable?(): Promise<boolean>
   uniworkDriveListConnections?(workspaceId: string): Promise<UniworkDriveResult<DriveConnection[]>>
   uniworkDriveListFiles?(query: DriveFileListQuery): Promise<UniworkDriveResult<DriveFileListPage>>
+  uniworkDriveListFolders?(
+    query: DriveFolderListQuery,
+  ): Promise<UniworkDriveResult<DriveFolderSummary[] | null>>
   uniworkDriveGetFile?(input: DriveFileTarget): Promise<UniworkDriveResult<DriveFileDetail>>
   uniworkDriveUnlink?(input: DriveFileTarget): Promise<UniworkDriveResult<null>>
   uniworkDriveOpenOnGoogle?(input: DriveFileTarget): Promise<UniworkDriveResult<null>>
@@ -2546,6 +2554,10 @@ export const UNIWORK_SHARE_CHANNELS = {
   ownerCandidates: 'uniwork-share:owner-candidates',
   /** UNI-2078: invoke({documentId, userId, previousOwnerLevel?}) -> transfer the ownership */
   transferOwner: 'uniwork-share:owner-transfer',
+  /** UNI-2244: invoke({folderId, mode, items, dryRun}) -> change the access of every document under a folder */
+  folderContentsAccess: 'uniwork-share:folder-contents-access',
+  /** UNI-2244: invoke({folderId, batchId}) -> the progress of a background run */
+  folderContentsAccessBatch: 'uniwork-share:folder-contents-access-batch',
 } as const
 
 export const PROJECT_CHANNELS = {

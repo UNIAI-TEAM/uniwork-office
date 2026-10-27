@@ -38,6 +38,14 @@ export const hi = {
   wbNotif_document_shared_untitled: '{actor} ने एक दस्तावेज़ आपके साथ साझा किया ({level})।',
   wbNotif_document_shared_nolevel: '{actor} ने “{document}” आपके साथ साझा किया।',
   wbNotif_document_shared_untitled_nolevel: '{actor} ने एक दस्तावेज़ आपके साथ साझा किया।',
+  wbNotif_document_shared_folder:
+    '{actor} ने फ़ोल्डर “{document}” के {count} दस्तावेज़ आपके साथ साझा किए ({level})।',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} ने एक फ़ोल्डर के {count} दस्तावेज़ आपके साथ साझा किए ({level})।',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} ने फ़ोल्डर “{document}” के {count} दस्तावेज़ आपके साथ साझा किए।',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} ने एक फ़ोल्डर के {count} दस्तावेज़ आपके साथ साझा किए।',
   wbNotif_document_owner_transferred: '{actor} ने “{document}” का स्वामित्व आपको सौंप दिया।',
   wbNotif_document_owner_transferred_untitled:
     '{actor} ने एक दस्तावेज़ का स्वामित्व आपको सौंप दिया।',

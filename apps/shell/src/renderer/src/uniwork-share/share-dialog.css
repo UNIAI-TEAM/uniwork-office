@@ -832,3 +832,141 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+
+/* Folder contents access (UNI-2244): the mode choice, the home-workspace row, the dry-run summary
+   and the in-dialog progress of a background run. Tokens only. */
+
+.uw-fca-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.uw-fca-mode {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.uw-fca-mode:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.uw-fca-mode:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-fca-mode input {
+  margin-top: 2px;
+}
+
+.uw-fca-mode-name {
+  font-weight: 600;
+}
+
+.uw-fca-mode-hint {
+  grid-column: 2;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.uw-fca-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.uw-fca-summary li:first-child {
+  font-weight: 600;
+}
+
+.uw-fca-warnings {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uw-fca-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.uw-fca-meter {
+  display: block;
+  width: 100%;
+  height: 8px;
+  accent-color: var(--accent);
+}
+
+.uw-fca-count {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* the home-workspace row of the replace mode: its choices read "Private" and the level names, so the field
+   takes the whole row instead of the level select's narrow column */
+.uw-fca [data-fca-home] .uw-share-field {
+  width: 100%;
+}
+
+.uw-fca [data-fca-home] .uw-act-select {
+  width: 100%;
+}
+
+/* the picker row's level select grows with its longest label (de / ru "Kommentieren", "Редактирование")
+   instead of clipping inside the fixed 160px column; it never outgrows the dialog body */
+.uw-fca .uw-share-form-row > .uw-share-field {
+  width: auto;
+  min-width: 160px;
+  max-width: 100%;
+}
+
+/* a warning fills the dialog body at every width: the list stretches and the notice keeps no
+   bottom margin of its own (the list's gap spaces the lines) */
+.uw-fca-warnings > .uw-share-notice {
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* the legend sits above the first radio card with a gap, not on its border */
+.uw-fca-modes .uw-share-heading {
+  padding: 0 0 8px;
+}
+
+/* the footer stays in view while the body scrolls in a short window: pinned to the modal's outer
+   edge like the header, covering the 20px padding so scrolled content never shows under it */
+.uw-fca .modal-buttons {
+  position: sticky;
+  bottom: -20px;
+  z-index: 1;
+  margin: 0 -20px -20px;
+  padding: 12px 20px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}

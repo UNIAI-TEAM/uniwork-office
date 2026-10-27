@@ -218,4 +218,80 @@ export const pt = {
   shrOwnerOwnedByWorkProduct:
     'Este documento pertence a um produto de trabalho, por isso o proprietário não pode ser alterado.',
   shrOwnerUnavailable: 'A transferência de propriedade ainda não está disponível neste servidor.',
+  shrFcMenu: 'Compartilhar',
+  shrFcTitle: 'Compartilhar',
+  shrFcScope: 'Documentos da pasta "{title}" e das suas subpastas.',
+  shrFcFixed:
+    'Aplica-se aos documentos que existem agora. Documentos adicionados depois não recebem este acesso.',
+  shrFcModeLabel: 'Como aplicar',
+  shrFcModeMerge: 'Adicionar ao acesso existente',
+  shrFcModeReplace: 'Substituir o acesso existente',
+  shrFcChecking: 'Verificando…',
+  shrFcBack: 'Voltar',
+  shrFcApplying: 'Aplicando…',
+  shrFcApplyReplace: 'Substituir acesso',
+  shrFcSummaryLabel: 'Resumo das alterações',
+  shrFcWarningsLabel: 'Avisos',
+  shrFcWillChangeOne: '{count} documento será alterado',
+  shrFcWillChangeOther: '{count} documentos serão alterados',
+  shrFcSkippedNotManageable: '{count} ignorados que você não gerencia',
+  shrFcToastUnknown:
+    'A alteração de acesso foi enviada. Abra os documentos para conferir o resultado.',
+  shrFcLosingOne: '{count} pessoa perde o acesso a pelo menos um documento',
+  shrFcLosingOther: '{count} pessoas perdem o acesso a pelo menos um documento',
+  shrFcDoneOne: 'Acesso alterado em {count} documento',
+  shrFcDoneOther: 'Acesso alterado em {count} documentos',
+  shrFcForbidden: 'Você não tem permissão para ler esta pasta.',
+  shrFcNotFound: 'Esta pasta não foi encontrada.',
+  shrFcUnavailable:
+    'Este servidor ainda não oferece suporte ao compartilhamento dos documentos de uma pasta.',
+  shrFcScopeUntitled: 'Documentos desta pasta e das suas subpastas.',
+  shrFcModeMergeHint:
+    'Concede acesso às pessoas e aos grupos escolhidos. O acesso existente nunca é reduzido nem removido.',
+  shrFcModeReplaceHint:
+    'Cada documento fica exatamente com a lista abaixo. Quem não estiver na lista perde o acesso.',
+  shrFcPrincipalsTitle: 'Pessoas e níveis de acesso',
+  shrFcPrincipalsEmptyMerge:
+    'Ninguém escolhido ainda. Pesquise e escolha pelo menos uma pessoa ou grupo para adicionar acesso.',
+  shrFcPrincipalsEmptyReplace: 'Ninguém mais escolhido. Só a linha do Workspace abaixo é mantida.',
+  shrFcHomeRow: 'Workspace “{name}”',
+  shrFcHomeRowUnnamed: 'Workspace desta pasta',
+  shrFcHomeLevelLabel: 'Nível de acesso do Workspace',
+  shrFcHomeLevelChoose: 'Escolher acesso',
+  shrFcLevelPrivate: 'Privado',
+  shrFcApplyMerge: 'Aplicar',
+  shrFcSkippedLocked: 'Bloqueados: {count}',
+  shrFcWarnWide:
+    'Um Workspace ou uma organização inteira está na lista: muitas pessoas poderão abrir estes documentos.',
+  shrFcWarnPrivate: 'O Workspace não está mais na lista: estes documentos passam a ser Privados.',
+  shrFcWarnDowngradeOne: '{count} pessoa tem um nível de acesso menor em pelo menos um documento.',
+  shrFcWarnDowngradeOther:
+    '{count} pessoas têm um nível de acesso menor em pelo menos um documento.',
+  shrFcWarnDowngradeGeneric: 'Parte do acesso a estes documentos será reduzida.',
+  shrFcNothing: 'Nada vai mudar: o acesso atual já corresponde a esta lista.',
+  shrFcToastSkippedOne: '{count} documento ignorado que você não gerencia.',
+  shrFcToastSkippedOther: '{count} documentos ignorados que você não gerencia.',
+  shrFcToastLockedOne: '{count} documento está bloqueado e não foi alterado.',
+  shrFcToastLockedOther: '{count} documentos estão bloqueados e não foram alterados.',
+  shrFcProgressTitle: 'Aplicando acesso',
+  shrFcProgressLabel: 'Progresso da alteração de acesso',
+  shrFcProgressCountOne: '{processed}/{count} documento',
+  shrFcProgressCountOther: '{processed}/{count} documentos',
+  shrFcProgressStarting: 'Aguardando início…',
+  shrFcProgressHint:
+    'Você pode fechar esta janela; a alteração continua em segundo plano e você será avisado quando terminar.',
+  shrFcProgressAlreadyRunning:
+    'Esta pasta já tem uma alteração de acesso em segundo plano. Este é o progresso dela.',
+  shrFcProgressClose: 'Concluído',
+  shrFcBatchDoneOne: 'Acesso aplicado a {count} documento',
+  shrFcBatchDoneOther: 'Acesso aplicado a {count} documentos',
+  shrFcBatchFailed:
+    'A alteração de acesso parou no meio do caminho. Execute Substituir acesso novamente para concluí-la.',
+  shrFcNotAFolder:
+    'Este item não é uma pasta, então os documentos dele não podem ser alterados em lote.',
+  shrFcErrorGeneric: 'Não foi possível aplicar o acesso. Tente novamente.',
+  shrFcErrorRejected:
+    'Não foi possível aplicar o acesso para algumas pessoas ou grupos. Corrija as linhas marcadas e tente novamente.',
+  shrFcRunningNoBatch: 'O acesso nesta pasta está sendo atualizado. Tente novamente em instantes.',
+  shrFcTooMany: 'Você pode adicionar até {max} pessoas ou grupos por vez.',
 } satisfies Record<keyof typeof zh, string>

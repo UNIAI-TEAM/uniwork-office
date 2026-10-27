@@ -87,6 +87,8 @@ function setup(overrides: Partial<IpcSenderGuardDeps> = {}) {
 const FAMILIES: ReadonlyArray<[family: string, channel: string, policy: IpcSenderPolicy]> = [
   ['doc', 'uniwork-doc:list', 'shell'],
   ['share', 'uniwork-share:create-link', 'shell'],
+  ['share (UNI-2244 folder contents)', 'uniwork-share:folder-contents-access', 'shell'],
+  ['share (UNI-2244 batch progress)', 'uniwork-share:folder-contents-access-batch', 'shell'],
   ['sync-center', 'uniwork-sync-center:sync-now', 'shell'],
   ['work', 'uniwork-work:list', 'shell'],
   ['askuni', 'uniwork:askuni:ask', 'shell'],

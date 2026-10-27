@@ -46,6 +46,14 @@ describe('N-01: the title row of a page with a subtitle shrinks its text, not it
     expect(sub).toMatch(/white-space:\s*nowrap;/)
     expect(sub).toMatch(/max-width:\s*100%;/)
   })
+
+  it('caps the h1 at the group width so a long account email ellipsises before the workspace select', () => {
+    const title = ruleOf('.dh-title')
+    expect(title).toMatch(/min-width:\s*0;/)
+    expect(title).toMatch(/max-width:\s*100%;/)
+    expect(title).toMatch(/overflow:\s*hidden;/)
+    expect(title).toMatch(/text-overflow:\s*ellipsis;/)
+  })
 })
 
 describe('N-02: Trash below the Deleted column', () => {

@@ -31,6 +31,14 @@ export const zhTW = {
   wbNotif_document_shared_untitled: '{actor} 與你共用了一份文件（{level}）。',
   wbNotif_document_shared_nolevel: '{actor} 與你共用了「{document}」。',
   wbNotif_document_shared_untitled_nolevel: '{actor} 與你共用了一份文件。',
+  wbNotif_document_shared_folder:
+    '{actor} 與你共用了資料夾「{document}」中的 {count} 份文件（{level}）。',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} 與你共用了一個資料夾中的 {count} 份文件（{level}）。',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} 與你共用了資料夾「{document}」中的 {count} 份文件。',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} 與你共用了一個資料夾中的 {count} 份文件。',
   wbNotif_document_owner_transferred: '{actor} 已將「{document}」的擁有權轉移給你。',
   wbNotif_document_owner_transferred_untitled: '{actor} 已將一份文件的擁有權轉移給你。',
   wbNotif_document_trashed_by_other: '{actor} 將你的文件移到垃圾桶。請於 {date} 前還原',

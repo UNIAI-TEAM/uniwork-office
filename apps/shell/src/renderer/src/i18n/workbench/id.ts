@@ -32,6 +32,14 @@ export const id = {
   wbNotif_document_shared_untitled: '{actor} membagikan dokumen kepada Anda ({level}).',
   wbNotif_document_shared_nolevel: '{actor} membagikan “{document}” kepada Anda.',
   wbNotif_document_shared_untitled_nolevel: '{actor} membagikan dokumen kepada Anda.',
+  wbNotif_document_shared_folder:
+    '{actor} membagikan {count} dokumen di folder “{document}” kepada Anda ({level}).',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} membagikan {count} dokumen di sebuah folder kepada Anda ({level}).',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} membagikan {count} dokumen di folder “{document}” kepada Anda.',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} membagikan {count} dokumen di sebuah folder kepada Anda.',
   wbNotif_document_owner_transferred: '{actor} mengalihkan kepemilikan “{document}” kepada Anda.',
   wbNotif_document_owner_transferred_untitled:
     '{actor} mengalihkan kepemilikan dokumen kepada Anda.',

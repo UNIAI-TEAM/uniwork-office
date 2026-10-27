@@ -72,6 +72,8 @@ export interface ShareCandidatePickerProps {
   onRetry: () => void
   alreadySharedUserIds: readonly (string | null | undefined)[]
   disabled: boolean
+  /** nobody more can be added (the folder dialog's 100-item cap): the search is off, the chips stay removable */
+  full?: boolean
   rejectedByKey: Record<string, string>
   onSelectCandidate: (candidate: ShareCandidate) => void
   onRemoveCandidate: (key: string, name: string) => void
@@ -100,6 +102,7 @@ export function ShareCandidatePicker(props: ShareCandidatePickerProps) {
     onRetry,
     alreadySharedUserIds,
     disabled,
+    full,
     rejectedByKey,
     onSelectCandidate,
     onRemoveCandidate,
@@ -215,7 +218,7 @@ export function ShareCandidatePicker(props: ShareCandidatePickerProps) {
         aria-controls={firstPageFailed ? undefined : listboxId}
         placeholder={t('shrCandidateSearch')}
         value={query}
-        disabled={disabled}
+        disabled={disabled || full}
         // not on focus: the dialog focuses this input when it opens, and a list that opened then
         // collapses on the first press elsewhere, moving the control under the pointer
         onClick={show}

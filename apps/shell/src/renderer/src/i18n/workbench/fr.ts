@@ -39,6 +39,14 @@ export const fr = {
   wbNotif_document_shared_untitled: '{actor} a partagé un document avec vous ({level}).',
   wbNotif_document_shared_nolevel: '{actor} a partagé « {document} » avec vous.',
   wbNotif_document_shared_untitled_nolevel: '{actor} a partagé un document avec vous.',
+  wbNotif_document_shared_folder:
+    '{actor} a partagé {count} document(s) du dossier « {document} » avec vous ({level}).',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} a partagé {count} document(s) d’un dossier avec vous ({level}).',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} a partagé {count} document(s) du dossier « {document} » avec vous.',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} a partagé {count} document(s) d’un dossier avec vous.',
   wbNotif_document_owner_transferred: '{actor} vous a transféré la propriété de « {document} ».',
   wbNotif_document_owner_transferred_untitled:
     '{actor} vous a transféré la propriété d’un document.',

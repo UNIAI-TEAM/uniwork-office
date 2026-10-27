@@ -1142,6 +1142,16 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.transferOwner, (_event, input: unknown) =>
     shareService.transferOwner(input as Parameters<typeof shareService.transferOwner>[0]),
   )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.folderContentsAccess, (_event, request: unknown) =>
+    shareService.folderContentsAccess(
+      request as Parameters<typeof shareService.folderContentsAccess>[0],
+    ),
+  )
+  ipcMain.handle(UNIWORK_SHARE_CHANNELS.folderContentsAccessBatch, (_event, request: unknown) =>
+    shareService.folderContentsAccessBatch(
+      request as Parameters<typeof shareService.folderContentsAccessBatch>[0],
+    ),
+  )
   ipcMain.handle(UNIWORK_SHARE_CHANNELS.bulk, (_event, plan: unknown) =>
     shareService.bulk(plan as Parameters<typeof shareService.bulk>[0]),
   )
