@@ -2011,14 +2011,14 @@
   font-weight: 500;
   max-width: 100%;
   min-width: 0;
-  white-space: nowrap;
+  white-space: normal;
+  align-items: flex-start;
+  text-align: start;
   cursor: pointer;
 }
 
 .dh-drive-reconnect-link > span {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .dh-drive-reconnect-link .dh-drive-warn-icon {
@@ -2028,19 +2028,6 @@
 .dh-drive-reconnect-link:disabled,
 .dh-drive-reconnect-text {
   cursor: default;
-}
-
-/* D3-V2-2: at <= 1100 px let the action wrap to two lines so "kết nối lại" stays visible */
-@media (max-width: 1100px) {
-  .dh-drive-reconnect-link {
-    align-items: flex-start;
-    white-space: normal;
-  }
-
-  .dh-drive-reconnect-link > span {
-    overflow: visible;
-    text-overflow: clip;
-  }
 }
 
 /* block sizing: a badge that wraps keeps its text inside, the background grows with the lines (D4-A) */
