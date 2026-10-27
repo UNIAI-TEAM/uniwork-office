@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   excelWidthScale,
   formatForMeasure,
+  formatGeneral,
+  generalOverflowHashes,
   hasGdiDigitCalibration,
   hashFill,
   overflowHashes,
@@ -167,5 +169,31 @@ describe('formatForMeasure', () => {
     expect(formatForMeasure('#,##0,\\ ', 105303159)).toBe('105,303\u00a0')
     expect(formatForMeasure('General', 105303159)).toBe('105303159')
     expect(formatForMeasure(undefined, 12.5)).toBe('12.5')
+  })
+})
+
+describe('generalOverflowHashes', () => {
+  it('keeps text that fits the character budget', () => {
+    expect(generalOverflowHashes('1.3E+09', 7, 64, measure)).toBeNull()
+    expect(generalOverflowHashes('1234567', 7, 64, measure)).toBeNull()
+  })
+
+  it('fills the column with hashes when even the scientific fallback is too wide', () => {
+    // A 4-character column: 1234567 shrinks to 1E+06 (5 chars), which no longer fits.
+    const text = formatGeneral(1234567, 4)
+    expect(text).toBe('1E+06')
+    // fill = floor((33 - 5) / 8) = 3
+    expect(generalOverflowHashes(text, 4, 33, measure)).toBe('###')
+  })
+
+  it('widening the column brings the value back', () => {
+    const wide = formatGeneral(1234567, 9)
+    expect(wide).toBe('1234567')
+    expect(generalOverflowHashes(wide, 9, 80, measure)).toBeNull()
+  })
+
+  it('keeps a hash in a one-character column', () => {
+    expect(generalOverflowHashes(formatGeneral(5.5, 1), 1, 12, measure)).toBeNull()
+    expect(generalOverflowHashes(formatGeneral(1234, 1), 1, 12, measure)).toBe('#')
   })
 })

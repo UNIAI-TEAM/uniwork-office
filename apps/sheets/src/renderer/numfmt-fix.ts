@@ -454,6 +454,20 @@ export function mergedSpanWidth(sheet: MergedSpanSheet, row: number, col: number
   return total
 }
 
+/// Excel's General never clips either: once even the scientific fallback of
+/// formatGeneral is wider than the column's character budget, the cell shows
+/// the hash fill (a 1E+06 needs five characters, so a 4-character column
+/// shows ####). Null when the text fits.
+export function generalOverflowHashes(
+  text: string,
+  budget: number,
+  columnWidthPx: number,
+  measure: (text: string) => number,
+): string | null {
+  if (text.length <= budget) return null
+  return hashFill(columnWidthPx, measure)
+}
+
 export function hashFill(columnWidthPx: number, measure: (text: string) => number): string | null {
   const hashWidth = measure('#')
   if (!(hashWidth > 0)) return null
@@ -861,16 +875,34 @@ export function installNumberFormatFix(
       }
       if (isDefaultFormat(pattern)) {
         if (cell.t !== CellValueType.NUMBER || typeof raw !== 'number') return next(cell)
-        const budget = generalCharBudget(
+        const width =
           mergedSpanWidth(location.worksheet, location.row, location.col) ??
-            location.worksheet.getColumnWidth(location.col),
-        )
+          location.worksheet.getColumnWidth(location.col)
+        const budget = generalCharBudget(width)
         const key = `G ${raw} ${budget}`
         let text = cache.get(key)
         if (text === undefined) {
           text = formatGeneral(raw, budget)
           if (cache.size > 50_000) cache.clear()
           cache.set(key, text)
+        }
+        // Same exclusions as maybeHash: wrapped, rotated and shrink-to-fit
+        // cells keep Univer's behavior.
+        if (
+          text !== null &&
+          style?.tb !== WrapStrategy.WRAP &&
+          !style?.tr?.a &&
+          !style?.tr?.v &&
+          location.rawData?.custom?.[SHRINK_TO_FIT_KEY] !== true
+        ) {
+          const fontString = getFontStyleString(style ?? undefined).fontString
+          const hashes = generalOverflowHashes(
+            text,
+            budget,
+            width,
+            (t) => FontCache.getMeasureText(t, fontString).width,
+          )
+          if (hashes !== null) return next({ ...cell, v: hashes, t: CellValueType.NUMBER })
         }
         if (text === null || text === String(cell.v)) return next(cell)
         return next({ ...cell, v: text, t: CellValueType.NUMBER })
