@@ -234,11 +234,12 @@
   background: var(--hover);
 }
 
-/* the action sits just before the count column and shows on hover and keyboard focus only */
+/* the action overlays the count column (no space of its own, so the label keeps its full width) and
+   shows on hover and keyboard focus only; the count hides while it shows */
 .dh-drive-name-folder {
   position: absolute;
   inset-block: 0;
-  inset-inline-end: calc(var(--dh-tree-end) + var(--dh-tree-count-w, 28px));
+  inset-inline-end: var(--dh-tree-end);
   margin-block: auto;
   display: grid;
   place-items: center;
@@ -256,6 +257,11 @@
 .dh-drive-folder-node:hover > .dh-drive-name-folder,
 .dh-drive-folder-node:focus-within > .dh-drive-name-folder {
   opacity: 1;
+}
+
+.dh-drive-folder-node:hover:has(> .dh-drive-name-folder) .dh-drive-nav-count,
+.dh-drive-folder-node:focus-within:has(> .dh-drive-name-folder) .dh-drive-nav-count {
+  visibility: hidden;
 }
 
 .dh-drive-name-folder:hover {

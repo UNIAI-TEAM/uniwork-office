@@ -4603,7 +4603,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         // the named folder has no action; the unnamed one has it, named after the folder
         expect(nameButtons().map((b) => b.dataset.driveNameFolder)).toEqual(['abcdef123456'])
         expect(nameButtons()[0]!.getAttribute('aria-label')).toBe(
-          'Name from Drive: Drive folder · abcdef',
+          'Name this folder: Drive folder · abcdef',
         )
         await open(nameButtons()[0]!)
         expect(openWeb).toHaveBeenCalledTimes(1)
@@ -4628,7 +4628,7 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         await open(document.querySelector('[data-crumb="account"]'))
         await open(folderRows()[1]!)
         const header = document.querySelector<HTMLButtonElement>('[data-drive-name-folder-header]')
-        expect(header?.getAttribute('aria-label')).toBe('Name from Drive')
+        expect(header?.getAttribute('aria-label')).toBe('Name this folder')
         // the hand-off ignores a repeat of the same target within a second (a double click): step past it
         const realNow = Date.now()
         const clock = vi.spyOn(Date, 'now').mockReturnValue(realNow + 5000)
@@ -4644,6 +4644,23 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
           accountId: 'dc-active',
           folderId: 'abcdef123456',
         })
+      })
+
+      it('draws no action on a broken account, in the tree or in a folder header', async () => {
+        serverBridge(vi.fn(async () => ({ ok: true as const, value: serverFolders })))
+        await mountWithOrg()
+        await open(toggleOf('dc-active'))
+        expect(nameButtons()).toHaveLength(1)
+        await open(toggleOf('dc-broken'))
+        // the broken account lists the same unnamed folder, and still gets no action
+        expect(folderNodes()).toHaveLength(4)
+        expect(nameButtons()).toHaveLength(1)
+        // its folder header has none either
+        await open(document.querySelector('[data-drive-account="dc-broken"]'))
+        const unnamed = folderRows().find((r) => r.textContent?.includes('abcdef'))
+        await open(unnamed ?? null)
+        expect(document.querySelector('[data-drive-crumbs]')).not.toBeNull()
+        expect(document.querySelector('[data-drive-name-folder-header]')).toBeNull()
       })
 
       it('draws no action when the workspace has no web address to hand off to', async () => {
