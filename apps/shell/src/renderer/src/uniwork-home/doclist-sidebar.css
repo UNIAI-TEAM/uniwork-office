@@ -213,8 +213,8 @@
 }
 
 /* UNI-2223: an account row is a node too. Its chevron sits in the slot under the Drive icon (one
-   level in), and the account's folders are level-3 rows: chevron slot (empty, folders have no
-   children), 20px icon column, name, count; the same columns as every other tree row. */
+   level in), and the account's folders are rows of the tree's level 2: chevron slot (empty, folders
+   have no children), 20px icon column, name, count; the same columns as every other tree row. */
 .dh-drive-twisty-account {
   inset-inline-start: calc(var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap));
 }
@@ -224,10 +224,11 @@
 }
 
 .dh-sidebar-tree .dh-drive-nav-folder {
-  /* the folder icon sits under the account email's first letter, like the web */
+  /* the folder icon sits on the icon column of a level-2 folder-tree row, the web's depth-1 row: the
+     tree's first-level padding plus two steps (a step is slot + gap - pull, UniworkFolderTree's
+     TREE_STEP), the same formula treeRowPadding(2) + TREE_STEP draws */
   padding-inline-start: calc(
-    var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap) + var(--dh-tree-icon) +
-      var(--dh-tree-gap)
+    var(--dh-tree-pad) + 2 * (var(--dh-tree-slot) + var(--dh-tree-gap) - var(--dh-tree-pull))
   );
 }
 
@@ -285,9 +286,11 @@
 .dh-drive-folders-note {
   margin: 0;
   padding-block: 6px;
+  /* the note text starts on the folder NAME column: the folder row's padding (icon column) plus the
+     icon and the gap after it, the same formula .dh-drive-nav-folder uses */
   padding-inline-start: calc(
-    var(--dh-tree-pad) + 3 * (var(--dh-tree-slot) + var(--dh-tree-gap)) + var(--dh-tree-icon) +
-      var(--dh-tree-gap)
+    var(--dh-tree-pad) + 2 * (var(--dh-tree-slot) + var(--dh-tree-gap) - var(--dh-tree-pull)) +
+      var(--dh-tree-icon) + var(--dh-tree-gap)
   );
   font-size: 12px;
   color: var(--text-muted);

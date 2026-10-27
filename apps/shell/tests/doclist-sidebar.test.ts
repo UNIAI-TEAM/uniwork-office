@@ -28,6 +28,7 @@ import type { DocumentsHomeSubViewId } from '../src/renderer/src/uniwork-home/do
 import {
   TREE_PAD,
   TREE_STEP,
+  treeRowPadding,
   UniworkFolderTree,
 } from '../src/renderer/src/uniwork-folders/UniworkFolderTree'
 import { UniworkFolderPicker } from '../src/renderer/src/uniwork-folders/UniworkFolderPicker'
@@ -759,16 +760,42 @@ describe('tree grid numbers: TS and CSS cannot drift (D4BF-R3-3)', () => {
     expect(css).not.toMatch(/\.dh-drive-nav-lost\s*\{[^}]*background/)
   })
 
-  it('an account chevron sits under the Drive icon and a folder icon starts under the account email (UNI-2223)', () => {
+  it('an account chevron sits under the Drive icon and a folder icon is on the icon column of a level-2 tree row (UNI-2223, UNI-2192)', () => {
     const css = sidebarCss.replace(/\/\*[\s\S]*?\*\//g, '')
     expect(css).toMatch(
       /\.dh-drive-twisty-account\s*\{\s*inset-inline-start:\s*calc\(var\(--dh-tree-pad\) \+ var\(--dh-tree-slot\) \+ var\(--dh-tree-gap\)\);/,
     )
-    expect(css).toMatch(
-      /\.dh-sidebar-tree \.dh-drive-nav-folder\s*\{\s*padding-inline-start:\s*calc\(\s*var\(--dh-tree-pad\) \+ var\(--dh-tree-slot\) \+ var\(--dh-tree-gap\) \+ var\(--dh-tree-icon\) \+\s*var\(--dh-tree-gap\)\s*\);/,
+    // the folder row's padding is the tree's own formula: first-level padding plus two steps
+    const folderRule =
+      /\.dh-sidebar-tree \.dh-drive-nav-folder\s*\{\s*padding-inline-start:\s*calc\(\s*([^;]*?)\s*\);/.exec(
+        css,
+      )
+    expect(folderRule?.[1]).toBe(
+      'var(--dh-tree-pad) + 2 * (var(--dh-tree-slot) + var(--dh-tree-gap) - var(--dh-tree-pull))',
     )
     // a folder of an account has no raw colour of its own: the row reuses the nav-item states
     expect(css).not.toMatch(/\.dh-drive-nav-folder[^{]*\{[^}]*#[0-9a-f]{3,8}/i)
+  })
+
+  it('a Drive folder icon starts where a level-2 tree row draws its icon: padding + one step (UNI-2192)', () => {
+    const step = px('--dh-tree-slot') + px('--dh-tree-gap') - px('--dh-tree-pull')
+    // the Drive folder rule's value: --dh-tree-pad + 2 * step
+    const driveFolderIcon = px('--dh-tree-pad') + 2 * step
+    // a tree row's icon column is its inline padding plus one step (slot + gap - pull)
+    expect(driveFolderIcon).toBe(treeRowPadding(2) + TREE_STEP)
+    expect(driveFolderIcon).toBe(44)
+  })
+
+  it('the Drive folder note text starts on the folder name column (UNI-2192)', () => {
+    const css = sidebarCss.replace(/\/\*[\s\S]*?\*\//g, '')
+    const rule =
+      /\.dh-drive-folders-note\s*\{[^}]*?padding-inline-start:\s*calc\(\s*([^;]*?)\s*\);/.exec(css)
+    // folder icon column (the folder rule's padding) + icon + gap
+    expect(rule?.[1].replace(/\s+/g, ' ')).toBe(
+      'var(--dh-tree-pad) + 2 * (var(--dh-tree-slot) + var(--dh-tree-gap) - var(--dh-tree-pull)) + var(--dh-tree-icon) + var(--dh-tree-gap)',
+    )
+    const step = px('--dh-tree-slot') + px('--dh-tree-gap') - px('--dh-tree-pull')
+    expect(px('--dh-tree-pad') + 2 * step + px('--dh-tree-icon') + px('--dh-tree-gap')).toBe(70)
   })
 
   it('the Name from Drive action overlays the count column and shows on hover or focus only (UNI-2223 v3)', () => {
