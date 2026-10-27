@@ -123,6 +123,17 @@ describe('filterDriveFilesByName', () => {
     expect(filterDriveFilesByName(files, ' BÁO ').map((f) => f.id)).toEqual(['a', 'c'])
   })
 
+  it('ignores accents and the d-stroke', () => {
+    const vi = [
+      file('x', null, 'Dự án Beta'),
+      file('y', null, 'Đơn hàng'),
+      file('z', null, 'Other'),
+    ]
+    expect(filterDriveFilesByName(vi, 'du an').map((f) => f.id)).toEqual(['x'])
+    expect(filterDriveFilesByName(vi, 'don').map((f) => f.id)).toEqual(['y'])
+    expect(filterDriveFilesByName(vi, 'ĐƠN').map((f) => f.id)).toEqual(['y'])
+  })
+
   it('keeps every file for an empty query', () => {
     expect(filterDriveFilesByName(files, '  ')).toHaveLength(3)
   })
@@ -153,11 +164,11 @@ describe('fetchAllAccountFiles', () => {
     expect(await fetchAllAccountFiles(fetchPage, 'dc-1')).toBeNull()
   })
 
-  it('stops following a cursor chain that never ends', async () => {
+  it('gives up on a cursor chain longer than the cap instead of returning a partial list', async () => {
     const fetchPage = vi.fn<DriveFetchPage>(async () => page(['a'], 'again'))
     const files = await fetchAllAccountFiles(fetchPage, 'dc-1')
     expect(fetchPage).toHaveBeenCalledTimes(MAX_ACCOUNT_PAGES)
-    expect(files).toHaveLength(MAX_ACCOUNT_PAGES)
+    expect(files).toBeNull()
   })
 
   it('drops the answer when the request went stale meanwhile', async () => {

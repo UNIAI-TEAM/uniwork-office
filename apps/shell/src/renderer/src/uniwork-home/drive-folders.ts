@@ -87,9 +87,18 @@ export function deriveDriveFolders(files: readonly DriveFile[], locale: string):
   return { folders, looseFiles }
 }
 
-/** the files whose name contains `query` (case-insensitive); an empty query keeps every file */
+/** case and accents ignored, so "du an" finds "Dự án" (same fold as the web search) */
+const foldText = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLocaleLowerCase()
+
+/** the files whose name contains `query` (case and accents ignored); an empty query keeps every file */
 export function filterDriveFilesByName(files: readonly DriveFile[], query: string): DriveFile[] {
-  const needle = query.trim().toLocaleLowerCase()
+  const needle = foldText(query.trim())
   if (!needle) return [...files]
-  return files.filter((file) => file.name.toLocaleLowerCase().includes(needle))
+  return files.filter((file) => foldText(file.name).includes(needle))
 }
