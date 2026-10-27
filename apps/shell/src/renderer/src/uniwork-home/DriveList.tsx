@@ -37,6 +37,11 @@ import {
   type DriveFolder,
 } from './drive-folders'
 import { useDriveAccountFiles } from './use-drive-account-files'
+import {
+  NO_FOLDER_FILTER,
+  useDriveFolderFiles,
+  type DriveFolderFilesTarget,
+} from './use-drive-folder-files'
 import { useDriveFolderLists } from './use-drive-folder-lists'
 
 /**
@@ -1284,14 +1289,55 @@ export function useDocumentsHomeDrive({
     refreshKey,
     fetchFolders: fetchAccountFolders,
   })
-  // the pages are walked only where the files are needed: the open account (its folder views and
-  // the files without a folder), and any account whose server sent no folder list (v2 derivation)
+  const searching = query.trim().length > 0
+  // the open account's folders from the server list (null while it loads or when the server has none)
+  const openFolderNodes = useMemo(() => {
+    const list = resolvedAccountId ? folderLists[resolvedAccountId] : undefined
+    return list?.status === 'ready' ? serverDriveFolders(list.folders, dateLocale) : null
+  }, [resolvedAccountId, folderLists, dateLocale])
+  // the open node reads its files from the server folder filter: a folder of the list, or the files
+  // without a folder when the account has folders and nothing is searched. Everything else (the flat
+  // list, search over the account, an account without folders) is the plain paged list.
+  const folderFilterTarget = useMemo((): DriveFolderFilesTarget | null => {
+    if (!isDriveView || !resolvedAccountId || !openFolderNodes) return null
+    if (selectedFolderKeyRaw && openFolderNodes.some((f) => f.key === selectedFolderKeyRaw)) {
+      return { accountId: resolvedAccountId, filter: selectedFolderKeyRaw }
+    }
+    if (!searching && openFolderNodes.length > 0) {
+      return { accountId: resolvedAccountId, filter: NO_FOLDER_FILTER }
+    }
+    return null
+  }, [isDriveView, resolvedAccountId, openFolderNodes, selectedFolderKeyRaw, searching])
+  const fetchFolderPage = useCallback(
+    (connectionId: string, driveFolderId: string, cursor?: string) =>
+      fetchDocumentsHomeDriveFiles(getDriveBridge(), {
+        workspaceId,
+        connectionId,
+        driveFolderId,
+        cursor,
+      }),
+    [workspaceId],
+  )
+  const folderFiles = useDriveFolderFiles({
+    workspaceId,
+    enabled: loadEnabled,
+    target: folderFilterTarget,
+    refreshKey,
+    fetchPage: fetchFolderPage,
+  })
+  // null once the account is known to be unsupported: its node is then read by the walk below
+  const filterTarget =
+    folderFilterTarget && !folderFiles.unsupportedAccountIds.has(folderFilterTarget.accountId)
+      ? folderFilterTarget
+      : null
+  // the pages are walked only for the old servers: an account whose server sent no folder list (v2
+  // derivation), or whose files list ignored the folder filter (it sent no echo)
   const walkedAccountIds = useMemo(
     () =>
       wantedAccountIds.filter(
-        (id) => (isDriveView && id === resolvedAccountId) || folderLists[id]?.status === 'fallback',
+        (id) => folderLists[id]?.status === 'fallback' || folderFiles.unsupportedAccountIds.has(id),
       ),
-    [wantedAccountIds, isDriveView, resolvedAccountId, folderLists],
+    [wantedAccountIds, folderLists, folderFiles.unsupportedAccountIds],
   )
   const fetchAccountPage = useCallback(
     (connectionId: string, cursor?: string) =>
@@ -1443,7 +1489,8 @@ export function useDocumentsHomeDrive({
     [workspaceId],
   )
 
-  const offline = !syncOnline || networkFailed || filesState.error === 'network'
+  const shownError = filterTarget ? folderFiles.files?.error : filesState.error
+  const offline = !syncOnline || networkFailed || shownError === 'network'
 
   const sidebarState = buildDriveSidebarState({
     capability,
@@ -1494,7 +1541,8 @@ export function useDocumentsHomeDrive({
     return out
   }, [wantedAccountIds, folderLists, accountFiles, dateLocale])
 
-  // what the list shows: the selected node's files (an old server, with no drive_folder, keeps today's flat list)
+  // what the list shows: the selected node's files, from the folder filter, or (an old server) from the walked pages;
+  // a server with no drive_folder at all keeps today's flat list
   const tree = resolvedAccountId ? folderTree[resolvedAccountId] : undefined
   const accountEntry = resolvedAccountId ? accountFiles[resolvedAccountId] : undefined
   // the folders and every file of the open account are in: the folder rows and the files without a folder
@@ -1512,18 +1560,33 @@ export function useDocumentsHomeDrive({
     indexedView && selectedFolderKeyRaw
       ? (indexedView.folders.find((f) => f.key === selectedFolderKeyRaw) ?? null)
       : null
-  // a folder of an account still loading waits; an unknown folder id (or a failed load) is the account view
+  // an account read by the walk is `walked`; its folder waits for the pages. A folder of an account
+  // whose list is still loading waits too. An unknown folder id (or a failed load) is the account view
+  const walked = Boolean(resolvedAccountId && walkedAccountIds.includes(resolvedAccountId))
   const folderPending =
     Boolean(resolvedAccountId && selectedFolderKeyRaw) &&
-    (!tree || tree.status === 'loading' || !accountEntry || accountEntry.status === 'loading')
-  const searching = query.trim().length > 0
+    (!tree ||
+      tree.status === 'loading' ||
+      (walked && (!accountEntry || accountEntry.status === 'loading')))
+  // the node is read from the server filter: its files, status and paging are the filtered list's
+  const filteredFolder =
+    filterTarget && filterTarget.filter !== NO_FOLDER_FILTER
+      ? (openFolderNodes?.find((f) => f.key === filterTarget.filter) ?? null)
+      : null
 
   let scope: DriveScope = resolvedAccountId ? { kind: 'account' } : { kind: 'all' }
   let shownFiles: readonly DriveFile[] = filesState.files
   let shownFolders: readonly DriveFolder[] = []
   let shownStatus = filesState.status
   let shownNextCursor: string | null = filesState.nextCursor
-  if (folder) {
+  if (filterTarget) {
+    shownFiles = folderFiles.files?.files ?? []
+    shownStatus = folderFiles.files?.status ?? 'loading'
+    shownNextCursor = folderFiles.files?.nextCursor ?? null
+    if (filteredFolder) scope = { kind: 'folder', folder: filteredFolder }
+    // the account view: the folder rows come with the files that have none, not before them
+    else if (shownStatus === 'ready' && openFolderNodes) shownFolders = openFolderNodes
+  } else if (folder) {
     scope = { kind: 'folder', folder }
     shownFiles = folder.files
     shownStatus = 'ready'
@@ -1552,7 +1615,9 @@ export function useDocumentsHomeDrive({
 
   const findFile = useCallback(
     (driveFileId: string) => {
-      const fromPage = filesState.files.find((f) => f.id === driveFileId)
+      const fromPage =
+        filesState.files.find((f) => f.id === driveFileId) ??
+        folderFiles.files?.files.find((f) => f.id === driveFileId)
       if (fromPage) return fromPage
       for (const entry of Object.values(accountFiles)) {
         const hit = entry.files.find((f) => f.id === driveFileId)
@@ -1560,7 +1625,7 @@ export function useDocumentsHomeDrive({
       }
       return undefined
     },
-    [filesState.files, accountFiles],
+    [filesState.files, folderFiles.files, accountFiles],
   )
 
   return {
@@ -1580,13 +1645,13 @@ export function useDocumentsHomeDrive({
     connections,
     files: visibleFiles,
     status: shownStatus,
-    error: filesState.error,
+    error: shownError,
     offline,
     nextCursor: shownNextCursor,
-    loadingMore: filesState.loadingMore,
-    moreError: filesState.moreError,
+    loadingMore: (filterTarget ? folderFiles.files?.loadingMore : filesState.loadingMore) ?? false,
+    moreError: filterTarget ? folderFiles.files?.moreError : filesState.moreError,
     retry,
-    loadMore,
+    loadMore: filterTarget ? folderFiles.loadMore : loadMore,
     openOnGoogle,
   }
 }

@@ -4741,5 +4741,258 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
         ).toBe('7')
       })
     })
+
+    describe('UNI-2223 v4: the folder views on the server folder filter', () => {
+      type Row = typeof fileActive & { driveFolder: { id: string; name: string | null } | null }
+      const inFolder = (id: string, name: string | null, fileName: string, n: number): Row => ({
+        ...fileActive,
+        id: `df-${n}`,
+        name: fileName,
+        driveFolder: { id, name },
+      })
+      const contracts = [
+        inFolder('f_contracts', 'Hợp đồng', 'Hợp đồng A', 1),
+        inFolder('f_contracts', 'Hợp đồng', 'Hợp đồng B', 2),
+        inFolder('f_contracts', 'Hợp đồng', 'Hợp đồng C', 3),
+      ]
+      const hidden = inFolder('abcdef123456', null, 'Ẩn tên', 4)
+      const loose = [5, 6, 7].map((n) => ({
+        ...fileActive,
+        id: `df-${n}`,
+        name: `Không thư mục ${n}`,
+        driveFolder: null,
+      })) as Row[]
+      const everyFile = [...contracts, hidden, ...loose]
+      const serverFolders = [
+        { id: 'f_contracts', name: 'Hợp đồng', fileCount: 3 },
+        { id: 'abcdef123456', name: null, fileCount: 1 },
+        { id: null, name: null, fileCount: 3 },
+      ]
+      type ListQuery = { connectionId?: string; driveFolderId?: string; cursor?: string }
+      const PAGE = 2
+      /**
+       * A server that filters: `echo: 'applied'` answers the filtered page and echoes it, `'absent'`
+       * ignores the param like an old server (the whole account, no echo key), `'null'` answers
+       * the whole account and echoes null (no filter applied).
+       */
+      const filterBridge = (
+        opts: {
+          echo?: 'applied' | 'absent' | 'null'
+          failFirst?: string
+          emptyFolder?: string
+        } = {},
+      ) => {
+        const echo = opts.echo ?? 'applied'
+        let failedOnce = false
+        const listFiles = vi.fn(async (q: ListQuery) => {
+          if (q.connectionId === 'dc-broken') {
+            return {
+              ok: true as const,
+              value: { files: [fileBroken], totalCount: 1, nextCursor: null },
+            }
+          }
+          const wanted = echo === 'applied' ? q.driveFolderId : undefined
+          if (wanted && wanted === opts.failFirst && !failedOnce) {
+            failedOnce = true
+            return { ok: false as const, error: 'server_error' as const }
+          }
+          const pool =
+            wanted === 'none'
+              ? everyFile.filter((f) => !f.driveFolder)
+              : wanted
+                ? wanted === opts.emptyFolder
+                  ? []
+                  : everyFile.filter((f) => f.driveFolder?.id === wanted)
+                : everyFile
+          const start = q.cursor ? Number(q.cursor) : 0
+          const files = q.connectionId ? pool.slice(start, start + PAGE) : pool.slice(0, PAGE)
+          const more = q.connectionId && start + PAGE < pool.length
+          return {
+            ok: true as const,
+            value: {
+              files,
+              totalCount: pool.length,
+              nextCursor: more ? String(start + PAGE) : null,
+              ...(echo === 'applied' && q.driveFolderId ? { driveFolderId: q.driveFolderId } : {}),
+              ...(echo === 'null' ? { driveFolderId: null } : {}),
+            },
+          }
+        })
+        const listFolders = vi.fn(async (q: { connectionId: string }) => ({
+          ok: true as const,
+          value: q.connectionId === 'dc-active' ? serverFolders : [],
+        }))
+        const bridge = installDriveBridge({ listFiles, listFolders })
+        return { bridge, listFiles }
+      }
+      const callsOf = (listFiles: ReturnType<typeof vi.fn>): ListQuery[] =>
+        listFiles.mock.calls
+          .map(([q]) => q as ListQuery)
+          .filter((q) => q.connectionId === 'dc-active')
+
+      const folderRows = () =>
+        Array.from(document.querySelectorAll<HTMLElement>('[data-drive-folder-row]'))
+      const fileNames = () =>
+        Array.from(
+          document.querySelectorAll('.dh-drive-row:not(.dh-drive-folder-row) .dh-drive-file-name'),
+        ).map((n) => n.textContent)
+      const loadMoreButton = () =>
+        document.querySelector<HTMLButtonElement>('[data-drive-load-more]')
+      const open = async (el: Element | null) => {
+        await act(async () => {
+          ;(el as HTMLElement).click()
+        })
+        await flush()
+        await flush()
+      }
+      const openAccount = async () => {
+        await mountHome('en')
+        await flush()
+        await open(document.querySelector('[data-drive-account="dc-active"]'))
+      }
+
+      it('the account view lists the folder rows and pages the files without a folder through drive_folder_id=none; no page walk', async () => {
+        const { listFiles } = filterBridge()
+        await openAccount()
+        expect(
+          folderRows().map((r) => [
+            r.querySelector('.dh-drive-file-name')?.textContent,
+            r.querySelector('.dh-drive-cell-folder-count')?.textContent,
+          ]),
+        ).toEqual([
+          ['Hợp đồng', '3 files'],
+          ['Drive folder · abcdef', '1 file'],
+        ])
+        expect(fileNames()).toEqual(['Không thư mục 5', 'Không thư mục 6'])
+        expect(loadMoreButton()).not.toBeNull()
+
+        await open(loadMoreButton())
+        expect(fileNames()).toEqual(['Không thư mục 5', 'Không thư mục 6', 'Không thư mục 7'])
+        expect(loadMoreButton()).toBeNull()
+
+        const calls = callsOf(listFiles)
+        expect(calls.filter((q) => q.driveFolderId === 'none').map((q) => q.cursor)).toEqual([
+          undefined,
+          '2',
+        ])
+        // the unfiltered account list is only its first page (the flat view), never walked
+        expect(calls.filter((q) => !q.driveFolderId).map((q) => q.cursor)).toEqual([undefined])
+      })
+
+      it('a folder view is the filtered list with the same load-more paging, scoped to that folder', async () => {
+        const { listFiles } = filterBridge()
+        await openAccount()
+        await open(folderRows()[0]!)
+        expect(fileNames()).toEqual(['Hợp đồng A', 'Hợp đồng B'])
+        expect(loadMoreButton()).not.toBeNull()
+
+        await open(loadMoreButton())
+        expect(fileNames()).toEqual(['Hợp đồng A', 'Hợp đồng B', 'Hợp đồng C'])
+        expect(loadMoreButton()).toBeNull()
+
+        expect(
+          callsOf(listFiles)
+            .filter((q) => q.driveFolderId === 'f_contracts')
+            .map((q) => q.cursor),
+        ).toEqual([undefined, '2'])
+        expect(callsOf(listFiles).filter((q) => q.cursor && !q.driveFolderId)).toEqual([])
+        // the breadcrumb and the search scope are the folder's
+        expect(document.querySelector('[data-drive-crumbs]')).not.toBeNull()
+      })
+
+      it('an empty filtered page is an empty folder, not a reason to walk the account', async () => {
+        const { listFiles } = filterBridge({ emptyFolder: 'abcdef123456' })
+        await openAccount()
+        await open(folderRows()[1]!)
+        expect(document.querySelector('[data-drive-empty]')).not.toBeNull()
+        expect(fileNames()).toEqual([])
+        expect(loadMoreButton()).toBeNull()
+        expect(callsOf(listFiles).filter((q) => q.cursor && !q.driveFolderId)).toEqual([])
+      })
+
+      it('a failed first page shows the Drive error with Retry, and Retry loads the folder', async () => {
+        filterBridge({ failFirst: 'f_contracts' })
+        await openAccount()
+        await open(folderRows()[0]!)
+        expect(fileNames()).toEqual([])
+        const retry = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
+          (b) => b.textContent === 'Retry',
+        )
+        expect(retry).toBeDefined()
+        await open(retry!)
+        expect(fileNames()).toEqual(['Hợp đồng A', 'Hợp đồng B'])
+      })
+
+      it('searches the loaded files of the node: the account list is the plain paged list, a folder its own filtered pages', async () => {
+        filterBridge()
+        await openAccount()
+        const search = () => document.querySelector<HTMLInputElement>('.dh-search-input')!
+        const type = async (value: string) => {
+          await act(async () => {
+            const setter = Object.getOwnPropertyDescriptor(
+              HTMLInputElement.prototype,
+              'value',
+            )!.set!
+            setter.call(search(), value)
+            search().dispatchEvent(new Event('input', { bubbles: true }))
+          })
+          await flush()
+        }
+        // the account: folder rows step aside and the paged account list is searched
+        await type('hợp đồng b')
+        expect(folderRows()).toHaveLength(0)
+        expect(fileNames()).toEqual(['Hợp đồng B'])
+        await type('')
+        expect(folderRows()).toHaveLength(2)
+        expect(fileNames()).toEqual(['Không thư mục 5', 'Không thư mục 6'])
+
+        // a folder: its own files only, and a loaded next page is searchable too
+        await open(folderRows()[0]!)
+        await type('hợp đồng c')
+        expect(fileNames()).toEqual([])
+        await type('')
+        await open(loadMoreButton())
+        await type('hợp đồng c')
+        expect(fileNames()).toEqual(['Hợp đồng C'])
+      })
+
+      it('a file opened from a folder page is found for the detail panel', async () => {
+        filterBridge()
+        await openAccount()
+        await open(folderRows()[0]!)
+        await open(document.querySelector('[data-drive-file-id="df-2"]'))
+        expect(document.querySelector('[data-drive-panel]')).not.toBeNull()
+      })
+
+      it('keeps the old page walk and client-side folder filter for a server that does not echo the filter', async () => {
+        for (const echo of ['absent', 'null'] as const) {
+          const { listFiles } = filterBridge({ echo })
+          await openAccount()
+          // the account view and a folder both come out of the walked pages
+          expect(folderRows()).toHaveLength(2)
+          expect(fileNames(), echo).toEqual([
+            'Không thư mục 5',
+            'Không thư mục 6',
+            'Không thư mục 7',
+          ])
+          await open(folderRows()[0]!)
+          expect(fileNames(), echo).toEqual(['Hợp đồng A', 'Hợp đồng B', 'Hợp đồng C'])
+          expect(loadMoreButton(), echo).toBeNull()
+          const calls = callsOf(listFiles)
+          // one probe of the filter, then the walk (cursor pages without a filter); the probe is not repeated per folder
+          expect(
+            calls.filter((q) => q.driveFolderId),
+            echo,
+          ).toHaveLength(1)
+          expect(
+            calls.some((q) => q.cursor && !q.driveFolderId),
+            echo,
+          ).toBe(true)
+          await act(async () => root.unmount())
+          root = createRoot(host)
+          Reflect.deleteProperty(window, 'uniworkDrive')
+        }
+      })
+    })
   })
 })
