@@ -99,14 +99,14 @@ const SCREENS = [
   ['archive', 'uniworkListShelved'],
 ] as const satisfies readonly (readonly [DocumentsHomeSubViewId, string])[]
 
-// the rules of the @media (max-width: 1100px) block that wraps the toolbar search box (the file
+// the rules of the @media (max-width: 1280px) block that wraps the toolbar search box (the file
 // has other blocks at that width: pick the one that names the box)
 function searchWrapBlock(css: string): string {
-  const blocks = [...css.matchAll(/@media \(max-width: 1100px\)\s*\{([^@]*?)\n\}/g)].map(
+  const blocks = [...css.matchAll(/@media \(max-width: 1280px\)\s*\{([^@]*?)\n\}/g)].map(
     (m) => m[1]!,
   )
   const block = blocks.find((b) => b.includes('.dh-search-box'))
-  if (block === undefined) throw new Error('no max-width 1100px block names .dh-search-box')
+  if (block === undefined) throw new Error('no max-width 1280px block names .dh-search-box')
   return block
 }
 
@@ -542,7 +542,7 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
         }
       })
 
-      it('every screen renders its search box under the toolbar selector the 1100px wrap rule keys on', async () => {
+      it('every screen renders its search box under the toolbar selector the 1280px wrap rule keys on', async () => {
         const css = readFileSync(
           join(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
           'utf8',
@@ -1823,10 +1823,20 @@ describe('documents-home.css: the toolbar search wrap and the filter lists (UNI-
     'utf8',
   )
 
-  it('ends the single-row toolbar at 1101px and, at 1100px, keeps the actions on row one above the search box', () => {
+  it('ends the single-row toolbar at 1281px and, at 1280px, keeps the actions on row one above the search box', () => {
     expect(css).toMatch(
-      /@media \(min-width: 1101px\)\s*\{\s*\.dh-toolbar\s*\{\s*flex-wrap:\s*nowrap;/,
+      /@media \(min-width: 1281px\)\s*\{\s*\.dh-toolbar\s*\{\s*flex-wrap:\s*nowrap;/,
     )
+    // the two rules meet without a gap or an overlap: max-width N and min-width N + 1
+    const single =
+      /@media \(min-width: (\d+)px\)\s*\{\s*\.dh-toolbar\s*\{\s*flex-wrap:\s*nowrap;/.exec(css)
+    const wrap =
+      /@media \(max-width: (\d+)px\)\s*\{\s*\.dh-toolbar:not\(\.dh-toolbar-folder\) > \.dh-toolbar-spacer/.exec(
+        css,
+      )
+    expect(single, 'single-row rule').not.toBeNull()
+    expect(wrap, 'wrap rule').not.toBeNull()
+    expect(Number(single![1])).toBe(Number(wrap![1]) + 1)
     const block = searchWrapBlock(css)
     expect(block).toMatch(/> \.dh-toolbar-spacer\s*\{[^}]*display:\s*none;/)
     expect(block).toMatch(

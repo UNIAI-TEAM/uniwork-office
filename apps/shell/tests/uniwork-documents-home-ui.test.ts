@@ -2664,17 +2664,17 @@ describe('DH1-W2 DocumentsHome UI + VS01 SaveDialog polish', () => {
     }
   })
 
-  it('keeps "Tạo mới" on the first toolbar line at 1280px while preserving the 900px wrap (VDH-12)', () => {
+  it('keeps "Tạo mới" on the first toolbar line at 1440px while preserving the 900px wrap (VDH-12)', () => {
     const css = docsHomeCss()
     // .dh-toolbar-spacer must not take minimum flex width or force wrapping;
-    // .dh-search-box and .dh-toolbar-btn fit on one line at 1280px alongside the title and workspace select,
+    // .dh-search-box and .dh-toolbar-btn fit on one line at 1440px alongside the title and workspace select,
     // while .dh-toolbar keeps flex-wrap: wrap so narrow viewports (900px) still wrap cleanly
     expect(cssBlock(css, '.dh-toolbar')).toMatch(/flex-wrap:\s*wrap/)
     // both one-line guards must hold on their own — an OR regex would let either slip (DH1-R4-5)
     expect(cssBlock(css, '.dh-toolbar-btn')).toMatch(/flex-shrink:\s*0/)
     expect(cssBlock(css, '.dh-toolbar-btn')).toMatch(/white-space:\s*nowrap/)
     const wideMedia =
-      css.match(/@media\s*\(\s*min-width:\s*1101px\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+      css.match(/@media\s*\(\s*min-width:\s*1281px\s*\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
     expect(
       /flex-wrap:\s*nowrap/.test(cssBlock(wideMedia, '.dh-toolbar')) ||
         /width:\s*2[0-6]\dpx/.test(cssBlock(css, '.dh-search-box')),
