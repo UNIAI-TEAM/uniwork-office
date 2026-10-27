@@ -526,7 +526,7 @@ export function createUniworkShareService(deps: UniworkShareServiceDeps): Uniwor
       }
       return run(async (client) => {
         try {
-          // a dry run repeats safely; a write is never repeated (a 503 may come after the commit)
+          // a write is repeated on a 429 only (a 503 may come after the commit)
           return await withRetry(() => client.updateFolderContentsAccess(plain), dryRun)
         } catch (error) {
           throw missingRouteOf(error)

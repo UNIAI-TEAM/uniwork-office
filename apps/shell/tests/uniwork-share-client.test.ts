@@ -646,3 +646,320 @@ describe('owner transfer reads', () => {
     })
   })
 })
+
+describe('folder contents access (UNI-2244)', () => {
+  const ITEMS = [
+    { principalType: 'user', principalId: 'u_2', level: 'edit' },
+    { principalType: 'workspace', principalId: 'ws_1', level: 'view' },
+  ] as const
+  const PREVIEW = {
+    total: 37,
+    preview: {
+      changed: 30,
+      unchanged: 2,
+      skipped_not_manageable: 5,
+      skipped_locked: 0,
+      losing_users: 12,
+      downgraded_users: 1,
+      warnings: ['wide_scope', 'to_private'],
+    },
+  }
+  const SYNC = {
+    batch_id: 'b_1',
+    mode: 'sync',
+    total: 40,
+    changed: 30,
+    unchanged: 5,
+    skipped_not_manageable: 3,
+    skipped_locked: 2,
+  }
+  const BATCH = {
+    batch_id: 'b_1',
+    status: 'running',
+    total: 900,
+    processed: 200,
+    changed: 150,
+    unchanged: 20,
+    skipped_not_manageable: 20,
+    skipped_locked: 10,
+  }
+
+  it('PUTs /documents/{folderId}/contents-access with snake_case items, mode and dry_run', async () => {
+    const { client, seen } = setup(() => json(200, PREVIEW))
+    const result = await client.updateFolderContentsAccess({
+      folderId: 'fld_1',
+      mode: 'merge',
+      items: [...ITEMS],
+      dryRun: true,
+    })
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toMatchObject({ url: `${API}/documents/fld_1/contents-access`, method: 'PUT' })
+    expect(seen[0]!.body).toEqual({
+      mode: 'merge',
+      items: [
+        { principal_type: 'user', principal_id: 'u_2', level: 'edit' },
+        { principal_type: 'workspace', principal_id: 'ws_1', level: 'view' },
+      ],
+      dry_run: true,
+    })
+    expect(seen[0]!.headers.Authorization).toBe('Bearer tok')
+    expect(result).toEqual({
+      kind: 'dryRun',
+      total: 37,
+      preview: {
+        changed: 30,
+        unchanged: 2,
+        skippedNotManageable: 5,
+        skippedLocked: 0,
+        losingUsers: 12,
+        downgradedUsers: 1,
+        warnings: ['wide_scope', 'to_private'],
+      },
+    })
+  })
+
+  it('a 200 sync write answers the counts and the batch id', async () => {
+    const { client, seen } = setup(() => json(200, SYNC))
+    const result = await client.updateFolderContentsAccess({
+      folderId: 'fld_1',
+      mode: 'replace',
+      items: [...ITEMS],
+      dryRun: false,
+    })
+    expect(seen[0]!.body).toMatchObject({ mode: 'replace', dry_run: false })
+    expect(result).toEqual({
+      kind: 'sync',
+      batchId: 'b_1',
+      total: 40,
+      changed: 30,
+      unchanged: 5,
+      skippedNotManageable: 3,
+      skippedLocked: 2,
+    })
+  })
+
+  it('a 202 answers a background run to poll', async () => {
+    const { client } = setup(() => json(202, { batch_id: 'b_2', mode: 'background', total: 900 }))
+    expect(
+      await client.updateFolderContentsAccess({
+        folderId: 'fld_1',
+        mode: 'merge',
+        items: [...ITEMS],
+        dryRun: false,
+      }),
+    ).toEqual({ kind: 'background', batchId: 'b_2', total: 900 })
+  })
+
+  it('an empty list goes out for replace (it removes every share) and nothing else', async () => {
+    const { client, seen } = setup(() => json(200, SYNC))
+    await client.updateFolderContentsAccess({
+      folderId: 'fld_1',
+      mode: 'replace',
+      items: [],
+      dryRun: false,
+    })
+    expect(seen[0]!.body).toEqual({ mode: 'replace', items: [], dry_run: false })
+    const refused = setup(() => json(200, SYNC))
+    const err = await failure(
+      refused.client.updateFolderContentsAccess({
+        folderId: 'fld_1',
+        mode: 'merge',
+        items: [],
+        dryRun: false,
+      }),
+    )
+    expect(err.serverCode).toBe('invalid_input')
+    expect(refused.seen).toHaveLength(0)
+  })
+
+  it('refuses a call it will not send before any request', async () => {
+    const { client, seen } = setup(() => json(200, SYNC))
+    const base = { folderId: 'fld_1', mode: 'merge', items: [...ITEMS], dryRun: false } as const
+    const calls = [
+      { ...base, mode: 'union' },
+      { ...base, dryRun: 'yes' },
+      { ...base, items: new Array(101).fill(ITEMS[0]) },
+      { ...base, items: [{ ...ITEMS[0], level: null }] },
+      { ...base, items: [{ ...ITEMS[0], level: 'owner' }] },
+      { ...base, items: [{ ...ITEMS[0], principalType: 'group' }] },
+      { ...base, items: [{ ...ITEMS[0], principalId: '../x' }] },
+      { ...base, items: [null] },
+    ]
+    for (const call of calls) {
+      const err = await failure(
+        client.updateFolderContentsAccess(
+          call as unknown as Parameters<typeof client.updateFolderContentsAccess>[0],
+        ),
+      )
+      expect(err.serverCode).toBe('invalid_input')
+    }
+    expect(
+      (await failure(client.updateFolderContentsAccess({ ...base, folderId: '../x' }))).code,
+    ).toBe('not_found')
+    expect(seen).toHaveLength(0)
+  })
+
+  it('accepts 100 items', async () => {
+    const { client, seen } = setup(() => json(200, SYNC))
+    const items = Array.from({ length: 100 }, (_, i) => ({
+      principalType: 'user' as const,
+      principalId: `u_${i}`,
+      level: 'view' as const,
+    }))
+    await client.updateFolderContentsAccess({
+      folderId: 'fld_1',
+      mode: 'merge',
+      items,
+      dryRun: false,
+    })
+    expect((seen[0]!.body as { items: unknown[] }).items).toHaveLength(100)
+  })
+
+  it('keeps the server verdicts: not_a_folder, rejected items, a running batch with its id', async () => {
+    const req = { folderId: 'fld_1', mode: 'merge', items: [...ITEMS], dryRun: false } as const
+    const notFolder = await failure(
+      setup(() => envelope(422, 'not_a_folder')).client.updateFolderContentsAccess(req),
+    )
+    expect(notFolder).toMatchObject({ status: 422, serverCode: 'not_a_folder' })
+
+    const rejected = await failure(
+      setup(() =>
+        envelope(422, 'document_access_rejected', {
+          rejected: [
+            {
+              index: 1,
+              principal_type: 'workspace',
+              principal_id: 'ws_1',
+              code: 'level_not_allowed',
+            },
+          ],
+        }),
+      ).client.updateFolderContentsAccess(req),
+    )
+    expect(rejected.serverCode).toBe('document_access_rejected')
+    expect(rejected.rejected).toEqual([
+      { index: 1, principalType: 'workspace', principalId: 'ws_1', code: 'level_not_allowed' },
+    ])
+
+    const running = await failure(
+      setup(() =>
+        envelope(409, 'folder_access_batch_running', { batch_id: 'b_9' }),
+      ).client.updateFolderContentsAccess(req),
+    )
+    expect(running).toMatchObject({ status: 409, serverCode: 'folder_access_batch_running' })
+    expect(running.fields).toEqual({ batch_id: 'b_9' })
+  })
+
+  it('malformed answers are malformed_response', async () => {
+    const req = { folderId: 'fld_1', mode: 'merge', items: [...ITEMS], dryRun: false } as const
+    const dry = { ...req, dryRun: true }
+    const answers: Array<[typeof req | typeof dry, number, unknown]> = [
+      // a dry run that answers a write shape
+      [dry, 200, SYNC],
+      // a write that answers a preview
+      [req, 200, PREVIEW],
+      // 202 with the sync body, and 200 with the background body
+      [req, 202, SYNC],
+      [req, 200, { batch_id: 'b_2', mode: 'background', total: 900 }],
+      // an unknown mode
+      [req, 200, { ...SYNC, mode: 'turbo' }],
+      // a count that is missing, negative, fractional or the wrong type
+      [req, 200, { ...SYNC, changed: undefined }],
+      [req, 200, { ...SYNC, skipped_locked: -1 }],
+      [req, 200, { ...SYNC, unchanged: 1.5 }],
+      [req, 200, { ...SYNC, total: '40' }],
+      [req, 200, { ...SYNC, batch_id: '' }],
+      [dry, 200, { total: 1 }],
+      [dry, 200, { ...PREVIEW, preview: { ...PREVIEW.preview, losing_users: undefined } }],
+      [dry, 200, { ...PREVIEW, preview: { ...PREVIEW.preview, warnings: 'wide_scope' } }],
+      [dry, 200, { ...PREVIEW, preview: { ...PREVIEW.preview, warnings: [3] } }],
+      [dry, 200, []],
+    ]
+    for (const [request, status, body] of answers) {
+      const { client } = setup(() => json(status, body))
+      expect((await failure(client.updateFolderContentsAccess(request))).code).toBe(
+        'malformed_response',
+      )
+    }
+  })
+
+  it('GETs /documents/{folderId}/contents-access/{batchId} and reads the progress', async () => {
+    const { client, seen } = setup(() => json(200, BATCH))
+    const batch = await client.getFolderContentsAccessBatch('fld_1', 'b_1')
+    expect(seen[0]).toMatchObject({
+      url: `${API}/documents/fld_1/contents-access/b_1`,
+      method: 'GET',
+    })
+    expect(seen[0]!.body).toBeUndefined()
+    expect(batch).toEqual({
+      batchId: 'b_1',
+      status: 'running',
+      total: 900,
+      processed: 200,
+      changed: 150,
+      unchanged: 20,
+      skippedNotManageable: 20,
+      skippedLocked: 10,
+    })
+  })
+
+  it('reads finished_at of an ended run', async () => {
+    const { client } = setup(() =>
+      json(200, {
+        ...BATCH,
+        status: 'completed',
+        processed: 900,
+        finished_at: '2026-10-27T10:00:00Z',
+      }),
+    )
+    expect(await client.getFolderContentsAccessBatch('fld_1', 'b_1')).toMatchObject({
+      status: 'completed',
+      processed: 900,
+      finishedAt: '2026-10-27T10:00:00Z',
+    })
+  })
+
+  it('refuses ids that are not ids before any request', async () => {
+    const { client, seen } = setup(() => json(200, BATCH))
+    expect((await failure(client.getFolderContentsAccessBatch('../x', 'b_1'))).code).toBe(
+      'not_found',
+    )
+    expect((await failure(client.getFolderContentsAccessBatch('fld_1', 'b/../1'))).code).toBe(
+      'not_found',
+    )
+    expect(seen).toHaveLength(0)
+  })
+
+  it('a batch the caller does not own is the server 404, kept as not_found', async () => {
+    const { client } = setup(() => envelope(404, 'not_found'))
+    expect(await failure(client.getFolderContentsAccessBatch('fld_1', 'b_1'))).toMatchObject({
+      code: 'not_found',
+      status: 404,
+    })
+  })
+
+  it('malformed batch answers are malformed_response', async () => {
+    const bodies: unknown[] = [
+      [],
+      { ...BATCH, status: 'paused' },
+      { ...BATCH, status: undefined },
+      { ...BATCH, status: 3 },
+      { ...BATCH, total: undefined },
+      { ...BATCH, processed: '200' },
+      { ...BATCH, processed: -1 },
+      { ...BATCH, processed: 901 },
+      { ...BATCH, changed: null },
+      { ...BATCH, skipped_not_manageable: undefined },
+      { ...BATCH, batch_id: '' },
+      { ...BATCH, finished_at: 5 },
+      // another run's progress is not the answer to this one
+      { ...BATCH, batch_id: 'b_other' },
+    ]
+    for (const body of bodies) {
+      const { client } = setup(() => json(200, body))
+      expect((await failure(client.getFolderContentsAccessBatch('fld_1', 'b_1'))).code).toBe(
+        'malformed_response',
+      )
+    }
+  })
+})

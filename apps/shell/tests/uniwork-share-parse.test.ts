@@ -3,6 +3,8 @@ import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import {
   parseAccessRequests,
   parseActiveOrgMembers,
+  parseFolderContentsAccess,
+  parseFolderContentsAccessBatch,
   parseOwnerGate,
   parseOwnerTransfer,
   parseWorkspaceMemberIds,
@@ -583,5 +585,164 @@ describe('owner transfer (UNI-2078 slice 4)', () => {
       nextCursor: '',
     })
     malformed(() => parseActiveOrgMembers({ members: [], next_cursor: 3 }))
+  })
+})
+
+describe('folder contents access parse (UNI-2244)', () => {
+  const COUNTS = {
+    changed: 30,
+    unchanged: 2,
+    skipped_not_manageable: 5,
+    skipped_locked: 1,
+  }
+  const PREVIEW = {
+    total: 38,
+    preview: { ...COUNTS, losing_users: 12, downgraded_users: 3, warnings: ['downgrade'] },
+  }
+
+  it('a dry run reads the preview (snake -> camel); unknown warning codes stay as sent', () => {
+    expect(
+      parseFolderContentsAccess(
+        { ...PREVIEW, preview: { ...PREVIEW.preview, warnings: ['wide_scope', 'future_code'] } },
+        200,
+        true,
+      ),
+    ).toEqual({
+      kind: 'dryRun',
+      total: 38,
+      preview: {
+        changed: 30,
+        unchanged: 2,
+        skippedNotManageable: 5,
+        skippedLocked: 1,
+        losingUsers: 12,
+        downgradedUsers: 3,
+        warnings: ['wide_scope', 'future_code'],
+      },
+    })
+  })
+
+  it('a sync write reads the counts and a background run the id and total', () => {
+    expect(
+      parseFolderContentsAccess({ batch_id: 'b', mode: 'sync', total: 38, ...COUNTS }, 200, false),
+    ).toEqual({
+      kind: 'sync',
+      batchId: 'b',
+      total: 38,
+      changed: 30,
+      unchanged: 2,
+      skippedNotManageable: 5,
+      skippedLocked: 1,
+    })
+    expect(
+      parseFolderContentsAccess({ batch_id: 'b', mode: 'background', total: 900 }, 202, false),
+    ).toEqual({ kind: 'background', batchId: 'b', total: 900 })
+  })
+
+  it('ignores unknown fields', () => {
+    expect(
+      parseFolderContentsAccess(
+        { batch_id: 'b', mode: 'background', total: 9, extra: { a: 1 } },
+        202,
+        false,
+      ),
+    ).toEqual({ kind: 'background', batchId: 'b', total: 9 })
+  })
+
+  it('rejects a shape that disagrees with the request or the status', () => {
+    const sync = { batch_id: 'b', mode: 'sync', total: 38, ...COUNTS }
+    const background = { batch_id: 'b', mode: 'background', total: 38 }
+    malformed(() => parseFolderContentsAccess(sync, 200, true))
+    malformed(() => parseFolderContentsAccess(PREVIEW, 200, false))
+    malformed(() => parseFolderContentsAccess(PREVIEW, 202, true))
+    malformed(() => parseFolderContentsAccess(sync, 202, false))
+    malformed(() => parseFolderContentsAccess(background, 200, false))
+    malformed(() => parseFolderContentsAccess({ ...sync, mode: 'turbo' }, 200, false))
+    malformed(() => parseFolderContentsAccess({ ...sync, mode: undefined }, 200, false))
+  })
+
+  it('rejects missing, negative, fractional, unsafe and wrong-typed counts', () => {
+    const sync = { batch_id: 'b', mode: 'sync', total: 38, ...COUNTS }
+    for (const key of ['total', ...Object.keys(COUNTS)]) {
+      for (const value of [undefined, null, -1, 1.5, '3', Number.MAX_SAFE_INTEGER + 2, NaN]) {
+        malformed(() => parseFolderContentsAccess({ ...sync, [key]: value }, 200, false))
+      }
+    }
+    for (const key of ['losing_users', 'downgraded_users', ...Object.keys(COUNTS)]) {
+      malformed(() =>
+        parseFolderContentsAccess(
+          { ...PREVIEW, preview: { ...PREVIEW.preview, [key]: undefined } },
+          200,
+          true,
+        ),
+      )
+    }
+  })
+
+  it('rejects a write without a batch id, a preview without its object or warnings list', () => {
+    const sync = { batch_id: 'b', mode: 'sync', total: 38, ...COUNTS }
+    malformed(() => parseFolderContentsAccess({ ...sync, batch_id: undefined }, 200, false))
+    malformed(() => parseFolderContentsAccess({ ...sync, batch_id: '' }, 200, false))
+    malformed(() => parseFolderContentsAccess({ ...sync, batch_id: 7 }, 200, false))
+    malformed(() => parseFolderContentsAccess({ total: 1 }, 200, true))
+    malformed(() => parseFolderContentsAccess({ ...PREVIEW, preview: [] }, 200, true))
+    for (const warnings of [undefined, null, 'wide_scope', [1], ['']]) {
+      malformed(() =>
+        parseFolderContentsAccess(
+          { ...PREVIEW, preview: { ...PREVIEW.preview, warnings } },
+          200,
+          true,
+        ),
+      )
+    }
+    for (const top of [null, 'x', 3, []]) malformed(() => parseFolderContentsAccess(top, 200, true))
+  })
+
+  describe('batch progress', () => {
+    const BATCH = { batch_id: 'b', status: 'running', total: 900, processed: 200, ...COUNTS }
+
+    it('reads every status the server lists, finished_at only when sent', () => {
+      for (const status of ['queued', 'running', 'completed', 'failed'] as const) {
+        expect(parseFolderContentsAccessBatch({ ...BATCH, status })).toMatchObject({ status })
+      }
+      expect(parseFolderContentsAccessBatch(BATCH)).not.toHaveProperty('finishedAt')
+      expect(parseFolderContentsAccessBatch({ ...BATCH, finished_at: null })).not.toHaveProperty(
+        'finishedAt',
+      )
+      expect(
+        parseFolderContentsAccessBatch({
+          ...BATCH,
+          status: 'completed',
+          processed: 900,
+          finished_at: '2026-10-27T10:00:00Z',
+        }),
+      ).toEqual({
+        batchId: 'b',
+        status: 'completed',
+        total: 900,
+        processed: 900,
+        changed: 30,
+        unchanged: 2,
+        skippedNotManageable: 5,
+        skippedLocked: 1,
+        finishedAt: '2026-10-27T10:00:00Z',
+      })
+    })
+
+    it('rejects an unknown status, a bad count, progress past the total and a bad finished_at', () => {
+      for (const status of ['paused', '', 'RUNNING', 3, null, undefined]) {
+        malformed(() => parseFolderContentsAccessBatch({ ...BATCH, status }))
+      }
+      for (const key of ['total', 'processed', ...Object.keys(COUNTS)]) {
+        for (const value of [undefined, null, -1, 1.5, '3']) {
+          malformed(() => parseFolderContentsAccessBatch({ ...BATCH, [key]: value }))
+        }
+      }
+      malformed(() => parseFolderContentsAccessBatch({ ...BATCH, processed: 901 }))
+      malformed(() => parseFolderContentsAccessBatch({ ...BATCH, batch_id: '' }))
+      malformed(() => parseFolderContentsAccessBatch({ ...BATCH, batch_id: undefined }))
+      malformed(() => parseFolderContentsAccessBatch({ ...BATCH, finished_at: 5 }))
+      for (const top of [null, 'x', 3, []]) malformed(() => parseFolderContentsAccessBatch(top))
+    })
   })
 })
