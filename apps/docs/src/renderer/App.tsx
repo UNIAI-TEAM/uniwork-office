@@ -421,6 +421,8 @@ import {
 import {
   applyAiDocContent as applyAiDocContentImpl,
   buildDocBytes as buildDocBytesImpl,
+  autoSavesDocument,
+  autoSaveNeedsFirstSave,
   currentDocGeneration,
   exportPdf as exportPdfImpl,
   exportHtml as exportHtmlImpl,
@@ -1187,8 +1189,9 @@ export function App() {
   const uniwork = uniworkStateFor(uniworkState, doc?.filePath)
   const uniworkRef = useRef(uniworkState)
   uniworkRef.current = uniworkState
-  /** autosave as it actually runs: the pref, forced off for a UniWork document */
-  const autoSaveActive = autoSave && !uniwork.bound
+  /** autosave as it actually runs: the pref, forced off for a UniWork document and a converted legacy copy */
+  const autoSaveActive = autoSavesDocument(autoSave, uniwork.bound, doc)
+  const autoSaveBlocked = autoSaveNeedsFirstSave(doc)
   // G8-12: server comments (S12) when the host answers a comments context for this document; a
   // Save replaces `doc` but not the document generation, so server mode survives it
   const serverMode = useServerMode(doc ? currentDocGeneration() + 1 : 0, doc?.filePath)
@@ -2322,6 +2325,8 @@ export function App() {
                 ...prev,
                 filePath: newPath,
                 fileName: newPath.split(/[\\/]/).pop() ?? prev.fileName,
+                // moved into the UniWork store: no longer a converted temp copy
+                suggestSaveAs: undefined,
               }
             : prev,
         )
@@ -2504,18 +2509,25 @@ export function App() {
     }
   }
 
-  /** newDocName: the first-save name the AI ask card showed (a never-saved document only) */
-  const save = useCallback((saveAs: boolean, auto = false, newDocName?: string) => {
-    if (!(saveAs ? cap('saveAs') : cap('save'))) return Promise.resolve(false)
-    // UniWork seam: no autosave onto a UniWork document, no in-place Save of a view-only one
-    const filePath = fileCtxRef.current.doc?.filePath
-    const state = uniworkStateFor(uniworkRef.current, filePath)
-    if (!uniworkAllowsSave(state, saveAs, auto)) {
-      uniworkExplainReadOnlySave(window.desktop as UniworkLockSeam, state, saveAs, auto, filePath)
-      return Promise.resolve(false)
-    }
-    return saveImpl(fileCtxRef.current, saveAs, auto, newDocName)
-  }, [])
+  /**
+   * newDocName: the first-save name the AI ask card showed (a never-saved document only).
+   * inPlace: the shell's flush of a converted legacy document for the UniWork first save -
+   * write the temp copy, no Save As.
+   */
+  const save = useCallback(
+    (saveAs: boolean, auto = false, newDocName?: string, inPlace = false) => {
+      if (!(saveAs ? cap('saveAs') : cap('save'))) return Promise.resolve(false)
+      // UniWork seam: no autosave onto a UniWork document, no in-place Save of a view-only one
+      const filePath = fileCtxRef.current.doc?.filePath
+      const state = uniworkStateFor(uniworkRef.current, filePath)
+      if (!uniworkAllowsSave(state, saveAs, auto)) {
+        uniworkExplainReadOnlySave(window.desktop as UniworkLockSeam, state, saveAs, auto, filePath)
+        return Promise.resolve(false)
+      }
+      return saveImpl(fileCtxRef.current, saveAs, auto, newDocName, undefined, inPlace)
+    },
+    [],
+  )
 
   // inserting a section break needs one save for the new section to take effect; the
   // flag is consumed in the render after state commit, guaranteeing the save closure
@@ -5769,6 +5781,9 @@ export function App() {
         case 'save':
           void save(false)
           break
+        case 'save-in-place':
+          void save(false, false, undefined, true)
+          break
         case 'save-as':
           void save(true)
           break
@@ -7102,14 +7117,16 @@ export function App() {
         {/* product rule: a UniWork document is only written by an explicit Save, so it has no AutoSave switch */}
         {autoSaveToggleVisible(autoSaveToDisk, uniwork.bound) && (
           <label
-            className={`autosave-toggle ${autoSaveActive ? 'on' : ''}`}
-            data-tip={t('appAutoSaveTip')}
+            className={`autosave-toggle ${autoSaveActive ? 'on' : ''}${autoSaveBlocked ? ' disabled' : ''}`}
+            data-tip={t(autoSaveBlocked ? 'appAutoSaveNeedsSaveTip' : 'appAutoSaveTip')}
+            aria-disabled={autoSaveBlocked || undefined}
           >
             <span className="autosave-knob" />
             <span className="autosave-text">{t('appAutoSave')}</span>
             <input
               type="checkbox"
               checked={autoSaveActive}
+              disabled={autoSaveBlocked}
               onChange={(e) => setAutoSave(e.target.checked)}
             />
           </label>
@@ -7122,6 +7139,7 @@ export function App() {
       hasDoc,
       hasUnsavedChanges,
       autoSaveActive,
+      autoSaveBlocked,
       uniwork.bound,
       uniwork.readOnly,
       editor,
@@ -7782,6 +7800,7 @@ export function App() {
                     hasUnsavedChanges,
                     uniwork.readOnly,
                     uniwork.bound,
+                    !!doc.suggestSaveAs,
                   )
                   if (!saveState) return null
                   return (

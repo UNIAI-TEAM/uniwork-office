@@ -173,6 +173,10 @@ export const ru = {
   uwTipEditLocked: '{name} редактирует с {time}.',
   uwTipEditLockedSelf: 'Вы редактируете этот документ в другом окне.',
   uwErrEditLocked: 'Кто-то другой редактирует этот документ.',
+  uwErrLegacyConversion:
+    'Не удалось сохранить этот документ Office старого формата как новую версию. Ваши изменения остаются в этой копии.',
+  uwErrLegacyOpen: 'Не удалось открыть здесь этот документ Office старого формата.',
+  uwErrLegacyCancelled: 'Открытие отменено.',
   uwReasonEditLocked: 'кто-то другой редактирует',
   uwLockBannerOther: '{name} редактирует с {time}. Вы просматриваете в режиме чтения.',
   uwLockBannerSelfElsewhere: 'Вы редактируете этот документ в другом окне.',

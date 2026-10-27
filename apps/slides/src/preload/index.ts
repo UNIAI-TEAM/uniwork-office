@@ -359,7 +359,7 @@ const api: SlidesApi = {
   savePicture: (op: SavePictureOp) => ipcRenderer.invoke('slides:save-picture', op),
   exportPdf: (op: ExportPdfOp) => ipcRenderer.invoke('slides:export-pdf', op),
   printSlides: (op: PrintSlidesOp) => ipcRenderer.invoke('slides:print', op),
-  save: (origin?: 'user' | 'auto') => ipcRenderer.invoke('slides:save', origin),
+  save: (origin?: 'user' | 'auto' | 'in-place') => ipcRenderer.invoke('slides:save', origin),
   uniworkState: () => ipcRenderer.invoke('slides:uniwork-state'),
   onUniworkStateChanged: (cb: (path: string) => void) => {
     const listener = (_event: IpcRendererEvent, payload: unknown) => {

@@ -178,6 +178,10 @@ export const fr = {
   uwTipEditLocked: '{name} modifie depuis {time}.',
   uwTipEditLockedSelf: 'Vous modifiez ce document dans une autre fenêtre.',
   uwErrEditLocked: 'Une autre personne modifie ce document.',
+  uwErrLegacyConversion:
+    'Ce document Office ancien format n’a pas pu être enregistré comme nouvelle version. Vos modifications restent dans cette copie.',
+  uwErrLegacyOpen: 'Ce document Office ancien format n’a pas pu être ouvert ici.',
+  uwErrLegacyCancelled: 'L’ouverture a été annulée.',
   uwReasonEditLocked: 'une autre personne modifie',
   uwLockBannerOther: '{name} modifie depuis {time}. Vous consultez en lecture seule.',
   uwLockBannerSelfElsewhere: 'Vous modifiez ce document dans une autre fenêtre.',

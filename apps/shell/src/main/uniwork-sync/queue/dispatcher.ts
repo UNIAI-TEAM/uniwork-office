@@ -8,6 +8,7 @@ import {
   type DocumentLimitsCache,
 } from '../../uniwork-docs/limits'
 import type { SavedUploadSession } from '../../uniwork-docs/upload-session'
+import type { LegacyConversion } from '../../uniwork-docs/legacy-cloud'
 import {
   abortVersionUploadSession,
   uploadVersionBytes,
@@ -65,6 +66,8 @@ export interface QueueClient {
     idempotencyKey: string
     /** EL-1(b): the held lock of this path; omitted when none */
     editLockId?: string
+    /** UNI-2212: the staged OOXML converts the document's legacy live version; omitted otherwise */
+    conversion?: LegacyConversion
   }): Promise<{
     documentId: string
     versionId: string
@@ -189,6 +192,14 @@ export interface QueueDispatcherDeps {
   prepareEditLock?(path: string): Promise<'held' | 'park' | 'proceed'>
   /** EL-1(b): current lock id of a held path (outgoing commit body) */
   editLockId?(path: string): string | null
+  /**
+   * UNI-2212: the conversion the commit of this path's copy declares (its legacy live version is
+   * replaced by the converted OOXML), or null for an ordinary commit. Only the fallback for an
+   * intent minted before the conversion was snapshotted on its record (`record.conversion`
+   * absent): every newer intent sends the pair it was minted with, never the binding's current
+   * state.
+   */
+  conversionFor?(path: string): LegacyConversion | null
   /** EL-1(b) B8: holder summary for a synthesised park 423 */
   editLockHolder?(path: string): UniworkDocEditLock | null
   /** EL-1(b): a 423 on commit while we held — session becomes 'lost' */
@@ -219,6 +230,8 @@ export interface MintedIntent {
   baseVersion: number
   checksum: string
   length: number
+  /** UNI-2212: the commit's conversion snapshot (null = ordinary; absent = read the binding) */
+  conversion?: LegacyConversion | null
 }
 
 export class QueueDispatcher {
@@ -903,12 +916,17 @@ export class QueueDispatcher {
         checksumSha256: string | null
       }
       try {
+        const conversion =
+          doc.record.conversion !== undefined
+            ? doc.record.conversion
+            : (this.deps.conversionFor?.(doc.path) ?? null)
         receipt = await this.deps.client.commit({
           documentId: doc.record.documentId,
           uploadId: upload.uploadId,
           baseRevision: doc.record.baseRevision,
           idempotencyKey: doc.record.idempotencyKey,
           ...(editLockId ? { editLockId } : {}),
+          ...(conversion ? { conversion } : {}),
         })
       } catch (error) {
         if (error instanceof UniworkDocError && error.code === 'edit_locked' && editLockId) {
@@ -1315,5 +1333,6 @@ function toNewIntent(intent: MintedIntent): NewIntentInput {
     baseVersion: intent.baseVersion,
     checksum: intent.checksum,
     length: intent.length,
+    ...(intent.conversion === undefined ? {} : { conversion: intent.conversion }),
   }
 }

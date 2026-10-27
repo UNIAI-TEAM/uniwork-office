@@ -118,6 +118,7 @@ import { scopeWorkingCopyDirs } from './binding-store'
 import { tUniworkDocs } from './strings'
 import { createTreeChangedCoalescer } from './tree-changed'
 import { registerFirstSaveOpenAck } from './first-save-open'
+import type { CloudConvertOutcome, CloudLegacyConvertInput } from './legacy-cloud-open'
 import { createFirstSaveNameBroker, registerFirstSaveNameAnswer } from './first-save-name'
 import { UNIWORK_SYNC_CENTER_CHANNELS } from '../../shared/sync-center'
 import { createWiredSyncCenter, startPreviewStartupSweep } from '../uniwork-sync/sync-center'
@@ -157,6 +158,8 @@ export interface UniworkDocsWiring {
    */
   refuseLockedPath(path: string): boolean
   isPathOpen(path: string): boolean
+  /** UNI-2212: the app's legacy converter for a downloaded cloud .doc/.xls/.ppt (absent = not openable) */
+  convertLegacy?(input: CloudLegacyConvertInput): Promise<CloudConvertOutcome>
   /** EL-1(b) fix6 (VEL-2): broadcast `{ path }` to every renderer webContents */
   pushDocStateChanged?(path: string): void
   requestModuleSave(path: string, onNotWritten?: () => void, mode?: 'save' | 'capture'): boolean
@@ -942,6 +945,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       return wiring.openPath(path)
     },
     isPathOpen: (path) => wiring.isPathOpen(path),
+    ...(wiring.convertLegacy ? { convertLegacy: (input) => wiring.convertLegacy!(input) } : {}),
     requestModuleSave: (path, onNotWritten, mode) =>
       wiring.requestModuleSave(path, onNotWritten, mode),
     noteShellRewrote: (path) => wiring.noteShellRewrote?.(path),

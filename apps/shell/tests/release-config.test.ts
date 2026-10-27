@@ -25,7 +25,10 @@ interface BuilderConfig {
   }
   fileAssociations: { ext: string; name: string; description?: string; rank?: string }[]
   nsis: Record<string, unknown>
-  mac: Record<string, unknown> & { target: { target: string; arch: string[] }[] }
+  mac: Record<string, unknown> & {
+    target: { target: string; arch: string[] }[]
+    extraResources: { from: string; to: string }[]
+  }
   dmg: Record<string, unknown>
   win: { extraResources: { from: string; to: string }[] }
   linux: {
@@ -62,6 +65,14 @@ function loadConfig(env: Record<string, string | undefined>, bakedCliVersion = '
           },
         }
       }
+      if (String(id).endsWith('prepare-libreoffice.cjs')) {
+        const actual = require(id)
+        return {
+          ...actual,
+          isPackValid: () => true,
+          ensureLibreOfficePack: async () => '/stub/libreoffice',
+        }
+      }
       if (id === 'node:fs') {
         return {
           ...require(id),
@@ -71,7 +82,7 @@ function loadConfig(env: Record<string, string | undefined>, bakedCliVersion = '
               return `const __cliAppVersion = ${JSON.stringify(bakedCliVersion)};\n`
             }
             if (String(path).endsWith('THIRD-PARTY-NOTICES.txt')) {
-              return '@embedpdf/pdfium\nCopyright 2014 PDFium Authors\nApache License\ntesseract.js-core\ntessdata_fast\nLeptonica\nPNG Reference Library License\nJean-loup Gailly\nIndependent JPEG Group\nGIFLIB\nSam Leffler\nGoogle Inc.\nOpenLibm\n'
+              return '@embedpdf/pdfium\nCopyright 2014 PDFium Authors\nApache License\ntesseract.js-core\ntessdata_fast\nLeptonica\nPNG Reference Library License\nJean-loup Gailly\nIndependent JPEG Group\nGIFLIB\nSam Leffler\nGoogle Inc.\nOpenLibm\nLibreOffice 26.8.2.2\nMozilla Public License Version 2.0\nhttps://downloadarchive.documentfoundation.org/libreoffice/old/26.8.2.2/src/\nBitstream Vera\n'
             }
             return require('node:fs').readFileSync(path, encoding as BufferEncoding)
           },
@@ -380,5 +391,31 @@ describe('Windows sidecar target', () => {
     expect(() => loadConfig({ GENOFFICE_WIN_SIDECAR_TARGET: 'i686-pc-windows-msvc' })).toThrow(
       /GENOFFICE_WIN_SIDECAR_TARGET/,
     )
+  })
+})
+
+describe('bundled LibreOffice converter pack', () => {
+  it('adds extraResources libreoffice per platform and respects winArm64 BCJ filter', () => {
+    const x64Config = loadConfig({})
+    expect(x64Config.mac.extraResources).toContainEqual({
+      from: 'build/.cache/libreoffice-26.8.2.2/darwin-${arch}/libreoffice',
+      to: 'libreoffice',
+    })
+    expect(x64Config.win.extraResources).toContainEqual({
+      from: 'build/.cache/libreoffice-26.8.2.2/win32-x64/libreoffice',
+      to: 'libreoffice',
+    })
+    expect(x64Config.linux.extraResources).toContainEqual({
+      from: 'build/.cache/libreoffice-26.8.2.2/linux-${arch}/libreoffice',
+      to: 'libreoffice',
+    })
+
+    const arm64Env: Record<string, string | undefined> = { GENOFFICE_WIN_ARM64: '1' }
+    const arm64Config = loadConfig(arm64Env)
+    expect(arm64Env.ELECTRON_BUILDER_7Z_FILTER).toBe('BCJ')
+    expect(arm64Config.win.extraResources).toContainEqual({
+      from: 'build/.cache/libreoffice-26.8.2.2/win32-arm64/libreoffice',
+      to: 'libreoffice',
+    })
   })
 })

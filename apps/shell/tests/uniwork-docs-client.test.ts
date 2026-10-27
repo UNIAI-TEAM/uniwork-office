@@ -240,6 +240,120 @@ describe('error envelope mapping', () => {
   })
 })
 
+describe('UNI-2212 legacy conversion commit (c5 wire contract)', () => {
+  const UPLOAD = '01J8X4FILE0000000000000002'
+  const converted = {
+    document: {
+      id: DOC,
+      organization_id: '01J8X4ORGN1P2Q3R4S5T6U7V8',
+      workspace_id: '01J8X4WS0N1P2Q3R4S5T6U7V8',
+      kind: 'file',
+      title: 'Báo cáo ngân sách.xlsx',
+      revision: '2',
+      current_version: 2,
+      my_level: 'edit',
+    },
+    version: {
+      id: '01J8X4VER00000000000000002',
+      document_id: DOC,
+      version: 2,
+      kind: 'file',
+      reason: 'converted_version',
+      mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      checksum_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    },
+  }
+  const refusal = (status: number, code: string, reason?: string) =>
+    json(status, { error: { code, message: 'x', ...(reason ? { fields: { reason } } : {}) } })
+  const input = {
+    documentId: DOC,
+    uploadId: UPLOAD,
+    baseRevision: '1',
+    idempotencyKey: 'office-key-1',
+  }
+
+  it('declares the conversion pair in the commit body (wire fixture 7.1)', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(200, converted))
+    const receipt = await client(fetch).commit({
+      ...input,
+      conversion: { from: 'xls', to: 'xlsx' },
+    })
+    expect(JSON.parse(String(fetch.mock.calls[0]![1].body))).toEqual({
+      upload_id: UPLOAD,
+      base_revision: '1',
+      conversion: { from_format: 'xls', to_format: 'xlsx' },
+    })
+    expect(receipt).toMatchObject({ documentId: DOC, revision: '2', version: 2 })
+  })
+
+  it('sends no conversion member when the commit is an ordinary one', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(200, converted))
+    await client(fetch).commit(input)
+    expect(JSON.parse(String(fetch.mock.calls[0]![1].body))).toEqual({
+      upload_id: UPLOAD,
+      base_revision: '1',
+    })
+  })
+
+  it('refuses a cross-family or unknown pair before anything is sent', async () => {
+    const fetch = vi.fn<FetchLike>(async () => json(200, converted))
+    const api = client(fetch)
+    for (const conversion of [
+      { from: 'doc', to: 'xlsx' },
+      { from: 'xls', to: 'pptx' },
+      { from: 'docx', to: 'docx' },
+      { from: 'xls', to: 'XLSX' },
+    ]) {
+      expect(await codeOf(api.commit({ ...input, conversion: conversion as never }))).toBe(
+        'malformed_response',
+      )
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it.each(['not_legacy', 'target_mismatch', 'not_ooxml'])(
+    'a 422 legacy_conversion_invalid (%s) is its own code and keeps the reason',
+    async (reason) => {
+      const api = client(async () => refusal(422, 'legacy_conversion_invalid', reason))
+      const error = await api
+        .commit({ ...input, conversion: { from: 'xls', to: 'xlsx' } })
+        .catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(UniworkDocError)
+      expect((error as UniworkDocError).code).toBe('legacy_conversion_invalid')
+      expect((error as UniworkDocError).serverCode).toBe('legacy_conversion_invalid')
+      expect((error as UniworkDocError).fields).toEqual({ reason })
+      // the verdict is not a retry, but the converted copy is never dropped with it: its intent is
+      // kept (parked failed), like a too_large one
+      expect(isTerminalRefusal(error as UniworkDocError)).toBe(false)
+    },
+  )
+
+  it.each([
+    [refusal(415, 'unsupported_media_type', 'format_changed'), 'unsupported_format'],
+    [refusal(403, 'forbidden'), 'permission_revoked'],
+    [refusal(409, 'document_version_conflict'), 'conflict'],
+    [refusal(409, 'idempotency_payload_mismatch'), 'idempotency_mismatch'],
+  ])('maps the other commit refusals the contract lists (%#)', async (response, code) => {
+    expect(
+      await codeOf(
+        client(async () => response.clone()).commit({
+          ...input,
+          conversion: { from: 'xls', to: 'xlsx' },
+        }),
+      ),
+    ).toBe(code)
+  })
+
+  it('a success body without a document or version is malformed, never a receipt', async () => {
+    for (const body of [{}, { document: converted.document }, { version: converted.version }]) {
+      const api = client(async () => json(200, body))
+      expect(await codeOf(api.commit({ ...input, conversion: { from: 'xls', to: 'xlsx' } }))).toBe(
+        'malformed_response',
+      )
+    }
+  })
+})
+
 describe('Retry-After (G5-06 be-9)', () => {
   beforeEach(() => vi.useFakeTimers({ now: new Date('2026-10-13T12:00:00Z'), toFake: ['Date'] }))
   afterEach(() => vi.useRealTimers())

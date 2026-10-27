@@ -226,6 +226,7 @@ export const de = {
   appAutoSave: 'Automatisches Speichern',
   appAutoSaveTip:
     'Automatisches Speichern (alle 30 Sekunden und wenn das Fenster den Fokus verliert)',
+  appAutoSaveNeedsSaveTip: 'Speichern Sie das Dokument zuerst, um AutoSpeichern zu aktivieren',
   appSaveShortcutTip: 'Speichern ({keys})',
   appUndo: 'Rückgängig',
   appRedo: 'Wiederholen',

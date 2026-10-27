@@ -158,7 +158,13 @@ export const SYNC_CENTER_DISCARDABLE_BLOCKED_REASONS: readonly SyncCenterBlocked
   'member_deactivated',
 ]
 
-export type SyncCenterFailedReason = 'quota' | 'too_large' | 'edit_locked' | 'other'
+export type SyncCenterFailedReason =
+  | 'quota'
+  | 'too_large'
+  | 'edit_locked'
+  // UNI-2212: the server refused the converted copy of a legacy document as its next version
+  | 'legacy_conversion'
+  | 'other'
 
 export interface SyncCenterRowProgress {
   done: number

@@ -311,6 +311,12 @@ export function errorFromResponse(
   if (serverCode === 'unsupported_media_type') {
     return new UniworkDocError('unsupported_format', at)
   }
+  // UNI-2212: the converted OOXML was refused as the next version of a legacy document (the live
+  // version is not legacy, the pair does not match it, or the bytes are not the target OOXML).
+  // `fields.reason` (not_legacy | target_mismatch | not_ooxml) rides on the error; never retried.
+  if (serverCode === 'legacy_conversion_invalid') {
+    return new UniworkDocError('legacy_conversion_invalid', at)
+  }
   // throttled (429) or temporarily down (503): retryable, never a terminal
   // refusal - the save queue backs off and can honour the Retry-After
   if (status === 429 || status === 503) return new UniworkDocError('server_error', retried)

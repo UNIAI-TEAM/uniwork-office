@@ -215,6 +215,7 @@ export const id = {
   appEndnotePlaceholder: 'Teks catatan akhir…',
   appAutoSave: 'Simpan Otomatis',
   appAutoSaveTip: 'Simpan otomatis (setiap 30 detik dan saat jendela kehilangan fokus)',
+  appAutoSaveNeedsSaveTip: 'Simpan dokumen terlebih dahulu untuk mengaktifkan Simpan Otomatis',
   appSaveShortcutTip: 'Simpan ({keys})',
   appUndo: 'Urungkan',
   appRedo: 'Ulangi',

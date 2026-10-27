@@ -224,6 +224,7 @@ export const ko = {
   // Quick actions bar
   appAutoSave: '자동 저장',
   appAutoSaveTip: '자동 저장(30초마다, 창 포커스가 해제될 때)',
+  appAutoSaveNeedsSaveTip: '자동 저장을 켜려면 먼저 문서를 저장하세요',
   appSaveShortcutTip: '저장 ({keys})',
   appUndo: '실행 취소',
   appRedo: '다시 실행',

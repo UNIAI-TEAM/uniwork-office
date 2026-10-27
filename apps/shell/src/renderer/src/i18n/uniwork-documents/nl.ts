@@ -174,6 +174,10 @@ export const nl = {
   uwTipEditLocked: '{name} bewerkt sinds {time}.',
   uwTipEditLockedSelf: 'U bewerkt dit document in een ander venster.',
   uwErrEditLocked: 'Iemand anders bewerkt dit document.',
+  uwErrLegacyConversion:
+    'Dit Office-document in een ouder formaat kon niet als nieuwe versie worden opgeslagen. Je wijzigingen blijven in deze kopie bewaard.',
+  uwErrLegacyOpen: 'Dit Office-document in een ouder formaat kon hier niet worden geopend.',
+  uwErrLegacyCancelled: 'Openen is geannuleerd.',
   uwReasonEditLocked: 'iemand anders bewerkt het',
   uwLockBannerOther: '{name} bewerkt sinds {time}. Je bekijkt alleen-lezen.',
   uwLockBannerSelfElsewhere: 'Je bewerkt dit document in een ander venster.',

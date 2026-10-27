@@ -218,6 +218,7 @@ export const ms = {
   appEndnotePlaceholder: 'Teks nota hujung…',
   appAutoSave: 'Autosimpan',
   appAutoSaveTip: 'Autosimpan (setiap 30 saat dan apabila tetingkap hilang fokus)',
+  appAutoSaveNeedsSaveTip: 'Simpan dokumen dahulu untuk menghidupkan Simpan Automatik',
   appSaveShortcutTip: 'Simpan ({keys})',
   appUndo: 'Buat asal',
   appRedo: 'Buat semula',

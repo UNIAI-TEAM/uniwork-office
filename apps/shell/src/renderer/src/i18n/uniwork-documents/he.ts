@@ -166,6 +166,10 @@ export const he = {
   uwTipEditLocked: '{name} עורך מאז {time}.',
   uwTipEditLockedSelf: 'אתה עורך את המסמך הזה בחלון אחר.',
   uwErrEditLocked: 'מישהו אחר עורך את המסמך הזה.',
+  uwErrLegacyConversion:
+    'לא ניתן היה לשמור את מסמך ה-Office הישן הזה כגרסה חדשה. השינויים שלך נשארים בעותק הזה.',
+  uwErrLegacyOpen: 'לא ניתן היה לפתוח כאן את מסמך ה-Office הישן הזה.',
+  uwErrLegacyCancelled: 'הפתיחה בוטלה.',
   uwReasonEditLocked: 'מישהו אחר עורך',
   uwLockBannerOther: '{name} עורך מאז {time}. אתה מציג לקריאה בלבד.',
   uwLockBannerSelfElsewhere: 'אתה עורך את המסמך הזה בחלון אחר.',

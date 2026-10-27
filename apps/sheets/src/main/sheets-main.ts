@@ -64,6 +64,7 @@ import {
   printHtmlToPdf,
   safeExternalUrl,
   showOpenDialogWithMemory,
+  assertModernSaveTarget,
   showSaveDialogWithMemory,
   helpMenuTemplate,
   viewMenuTemplate,
@@ -190,7 +191,7 @@ import {
   cleanupSessionResources,
 } from './temp-files'
 import { XlsxSidecarClient } from './xlsx-sidecar-client'
-import { sessionAfterRename } from './session-rename'
+import { sessionAfterRename, withoutUnsavedNew } from './session-rename'
 
 /**
  * Sheets main-process logic as an embeddable module: no top-level lifecycle.
@@ -1812,6 +1813,7 @@ export function sheetsFileRenamed(wc: WebContents, oldPath: string, newPath: str
   const entry = sheetsTabs.get(wc.id)
   if (!entry) return
   let matched = false
+  let adoptedByUniwork = false
   for (const [id, session] of entry.sessions) {
     // Converted copies (.csv / .xls / .tsv) and restored recovery copies keep
     // the user's file in a side field, not in `path`; move those too, or the
@@ -1821,7 +1823,12 @@ export function sheetsFileRenamed(wc: WebContents, oldPath: string, newPath: str
     // An unsaved new workbook's tab renames its hidden backing file; the name
     // the user typed is what the first Save As should offer, and the crash copy
     // is keyed on that name.
-    if (session.unsavedNew && session.path === oldPath && session.suggestSaveAs !== undefined) {
+    if (
+      session.unsavedNew &&
+      session.path === oldPath &&
+      session.suggestSaveAs !== undefined &&
+      !uniworkIsBound(newPath)
+    ) {
       const suggested = join(dirname(session.suggestSaveAs), basename(newPath))
       if (
         suggested !== session.suggestSaveAs &&
@@ -1831,10 +1838,21 @@ export function sheetsFileRenamed(wc: WebContents, oldPath: string, newPath: str
       )
         renamed = { ...renamed, suggestSaveAs: suggested }
     }
+    // The UniWork first save moved an unsaved new workbook (a converted copy, a
+    // "New spreadsheet") into its working copy: the live session adopts the bound
+    // path and drops the never-saved state, so the next Save is a plain Save of it
+    if (session.unsavedNew && session.path === oldPath && uniworkIsBound(newPath)) {
+      if (session.suggestSaveAs !== undefined) forgetUnsavedNewRecovery(session.suggestSaveAs)
+      renamed = withoutUnsavedNew(renamed)
+      adoptedByUniwork = true
+    }
     entry.sessions.set(id, renamed)
     matched = true
   }
   if (matched) wc.send(IPC_CHANNELS.workbookRenamed, basename(newPath))
+  // the renderer still names the workbook by its old path: ping that path so it re-queries the
+  // (now bound) state, drops its never-saved flags and takes the working copy as its file path
+  if (adoptedByUniwork) wc.send('uniwork:doc-state-changed', { path: oldPath, newPath })
 }
 
 /**
@@ -1915,6 +1933,16 @@ export function setSheetsWorkbookOpenedHook(
   fn: ((wc: WebContents, path: string) => void) | null,
 ): void {
   workbookOpenedHook = fn
+}
+
+/**
+ * shell hook: a legacy .xls picked in Sheets' own File > Open. The shell converts it with its
+ * bundled converter and opens the result (every other open route does), so the values-only
+ * calamine preparation here is never the first choice. true = the shell took the file.
+ */
+let legacyOpenHook: ((path: string) => boolean) | null = null
+export function setSheetsLegacyOpenHook(fn: ((path: string) => boolean) | null): void {
+  legacyOpenHook = fn
 }
 
 /** forward an application-menu File command into the sheets renderer */
@@ -2766,6 +2794,9 @@ export function registerSheetsIpc(): void {
       })
       if (selection.canceled || !selection.filePaths[0]) return null
       path = selection.filePaths[0]
+      // a picked legacy .xls goes to the shell's converter route; only a missing converter
+      // falls back (shell side) to the values-only open of this same file
+      if (/\.xls$/i.test(path) && legacyOpenHook?.(path)) return null
       // Retry on a stalled open restarts this pick, not an earlier shell open
       rememberOpenedWorkbook(event.sender, path)
     }
@@ -3364,10 +3395,16 @@ export function registerSheetsIpc(): void {
       if (existsSync(targetPath) && request.overwrite !== true) {
         throw new Error(`file already exists: ${targetPath}`)
       }
-    } else if (request.mode === 'save' && request.quiet && session.unsavedNew) {
+    } else if (
+      request.mode === 'save' &&
+      (request.quiet || request.inPlace === true) &&
+      session.unsavedNew
+    ) {
       // AutoSave / AI-run autosave of a workbook the user has not named yet:
       // no dialog mid-flow, the edits land in the backing temp file and the
-      // session stays an unsaved new one (Ctrl+S still asks where to save)
+      // session stays an unsaved new one (Ctrl+S still asks where to save).
+      // The shell's flush for the UniWork first save (inPlace) takes the same
+      // branch: it needs the bytes in that file, not a place to put them.
       targetPath = session.path
     } else if (request.mode === 'save-as' || session.suggestSaveAs !== undefined) {
       // .xlsm keeps its extension: untouched archive entries (vbaProject.bin,
@@ -3399,6 +3436,9 @@ export function registerSheetsIpc(): void {
       if (!macroEnabled && selection.filePath.toLowerCase().endsWith('.csv')) {
         return { canceled: true, csvSaveAsPath: selection.filePath }
       }
+      // a typed .xls/.doc/.ppt answer is refused, never retargeted to `<name>.xls.xlsx`: the
+      // chooser's overwrite confirmation covered the path it returned, not that one
+      assertModernSaveTarget(selection.filePath, ext)
       targetPath = selection.filePath.toLowerCase().endsWith(`.${ext}`)
         ? selection.filePath
         : `${selection.filePath}.${ext}`
@@ -3511,6 +3551,9 @@ export function registerSheetsIpc(): void {
       } catch (error) {
         console.warn('[sheets] recovery copy of an unsaved new workbook failed:', error)
       }
+      // the flush the UniWork first save is waiting on: the session has no document
+      // path yet, so the gate above never reports it - report the explicit Save here
+      if (request.inPlace === true) notifyUniworkUserSave(session.path)
       return { canceled: false, file, touchedEntries: mutation.touchedEntries }
     }
     // Notify shell (if running) so it can update the tab title and record the

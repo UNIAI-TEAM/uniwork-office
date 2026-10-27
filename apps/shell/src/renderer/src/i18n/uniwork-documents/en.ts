@@ -169,6 +169,10 @@ export const en = {
   uwTipEditLocked: '{name} has been editing since {time}.',
   uwTipEditLockedSelf: 'You’re editing this document in another window.',
   uwErrEditLocked: 'Someone else is editing this document.',
+  uwErrLegacyConversion:
+    'This older Office document couldn’t be saved as a new version. Your changes stay in this copy.',
+  uwErrLegacyOpen: 'This older Office document couldn’t be opened here.',
+  uwErrLegacyCancelled: 'Opening was cancelled.',
   uwReasonEditLocked: 'someone else is editing',
   uwLockBannerOther: '{name} has been editing since {time}. You’re viewing read‑only.',
   uwLockBannerSelfElsewhere: 'You’re editing this document in another window.',

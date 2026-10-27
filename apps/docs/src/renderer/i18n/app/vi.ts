@@ -210,6 +210,7 @@ export const vi = {
   appEndnotePlaceholder: 'Văn bản chú thích cuối tài liệu…',
   appAutoSave: 'Tự động lưu',
   appAutoSaveTip: 'Tự động lưu (mỗi 30 giây và khi cửa sổ mất tiêu điểm)',
+  appAutoSaveNeedsSaveTip: 'Hãy lưu tài liệu trước để bật Tự động lưu',
   appSaveShortcutTip: 'Lưu ({keys})',
   appUndo: 'Hoàn tác',
   appRedo: 'Làm lại',

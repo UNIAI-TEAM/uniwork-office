@@ -287,6 +287,14 @@ jobs:
           key: release-electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: release-electron-${{ runner.os }}-
 
+      - name: Cache trimmed LibreOffice pack
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            apps/shell/build/.cache/libreoffice-26.8.2.2/win32-x64
+            apps/shell/build/.cache/libreoffice-26.8.2.2/win32-arm64
+          key: release-libreoffice-${{ runner.os }}-${{ hashFiles('apps/shell/build/libreoffice-manifest.json', 'apps/shell/build/prepare-libreoffice.cjs') }}
+
       - name: Install dependencies
         run: npm ci
 
@@ -439,6 +447,14 @@ jobs:
             ~/Library/Caches/electron-builder
           key: release-electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: release-electron-${{ runner.os }}-
+
+      - name: Cache trimmed LibreOffice pack
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            apps/shell/build/.cache/libreoffice-26.8.2.2/darwin-arm64
+            apps/shell/build/.cache/libreoffice-26.8.2.2/darwin-x64
+          key: release-libreoffice-${{ runner.os }}-${{ hashFiles('apps/shell/build/libreoffice-manifest.json', 'apps/shell/build/prepare-libreoffice.cjs') }}
 
       - name: Install dependencies
         run: npm ci
@@ -641,6 +657,14 @@ jobs:
           key: release-electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: release-electron-${{ runner.os }}-
 
+      - name: Cache trimmed LibreOffice pack
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            apps/shell/build/.cache/libreoffice-26.8.2.2/darwin-arm64
+            apps/shell/build/.cache/libreoffice-26.8.2.2/darwin-x64
+          key: release-libreoffice-${{ runner.os }}-${{ hashFiles('apps/shell/build/libreoffice-manifest.json', 'apps/shell/build/prepare-libreoffice.cjs') }}
+
       - name: Install dependencies
         run: npm ci
 
@@ -788,6 +812,14 @@ jobs:
             ~/.cache/electron-builder
           key: release-electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: release-electron-${{ runner.os }}-
+
+      - name: Cache trimmed LibreOffice pack
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            apps/shell/build/.cache/libreoffice-26.8.2.2/linux-x64
+            apps/shell/build/.cache/libreoffice-26.8.2.2/linux-arm64
+          key: release-libreoffice-${{ runner.os }}-${{ hashFiles('apps/shell/build/libreoffice-manifest.json', 'apps/shell/build/prepare-libreoffice.cjs') }}
 
       - name: Install dependencies
         run: npm ci

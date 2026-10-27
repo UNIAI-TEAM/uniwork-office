@@ -178,6 +178,10 @@ export const de = {
   uwTipEditLocked: '{name} bearbeitet seit {time}.',
   uwTipEditLockedSelf: 'Sie bearbeiten dieses Dokument in einem anderen Fenster.',
   uwErrEditLocked: 'Jemand anderes bearbeitet dieses Dokument.',
+  uwErrLegacyConversion:
+    'Dieses ältere Office-Dokument konnte nicht als neue Version gespeichert werden. Ihre Änderungen bleiben in dieser Kopie erhalten.',
+  uwErrLegacyOpen: 'Dieses ältere Office-Dokument konnte hier nicht geöffnet werden.',
+  uwErrLegacyCancelled: 'Das Öffnen wurde abgebrochen.',
   uwReasonEditLocked: 'jemand anderes bearbeitet es',
   uwLockBannerOther: '{name} bearbeitet seit {time}. Sie sehen schreibgeschützt.',
   uwLockBannerSelfElsewhere: 'Sie bearbeiten dieses Dokument in einem anderen Fenster.',

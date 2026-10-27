@@ -69,7 +69,10 @@ import {
   buildPrintableHtml,
   configuredDefaultSaveDir,
   contextMenuLabels,
+  convertedDocumentFor,
   fetchRemoteImage,
+  forgetConvertedDocument,
+  assertModernSaveTarget,
   installContextMenu,
   setContextMenuInterceptor,
   installNavigationGuard,
@@ -3189,6 +3192,9 @@ function pushRecent(filePath: string): void {
   // A kept-draft preview is a temporary decrypted copy opened through loadDocx, which lands
   // here too: it is not a file the user opened, so it never becomes a recent entry.
   if (isDraftPreviewPath(app.getPath('userData'), filePath)) return
+  // A converted legacy copy is a staging file swept when its tab closes: never a recent entry
+  // (the original the user picked is recorded by the shell; a Save As records the real file).
+  if (convertedDocumentFor(filePath)) return
   const recent = readJson<string[]>(RECENT_PATH(), [])
   // Every save lands here (autosave = every 30s): skip the write and the menu
   // rebuild when the file is already at the head of the list
@@ -3705,6 +3711,8 @@ async function loadDocx(
     hash,
     encrypted,
     recovered: recovered || undefined,
+    // converted from a legacy .doc: Save is a Save As next to the original
+    suggestSaveAs: convertedDocumentFor(filePath)?.suggestSaveAs,
   }
 }
 
@@ -5311,10 +5319,19 @@ export function registerDocsIpc(): void {
         defaultPath:
           typeof sourcePath === 'string' && uniworkIsBound(sourcePath)
             ? defaultName
-            : saveAsSuggestion(typeof sourcePath === 'string' ? sourcePath : null, defaultName),
+            : (convertedDocumentFor(sourcePath)?.suggestSaveAs ??
+              saveAsSuggestion(typeof sourcePath === 'string' ? sourcePath : null, defaultName)),
         filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
       })
       if (result.canceled || !result.filePath) return { ok: false }
+      // never write OOXML under a legacy name (a converted .doc's own original included), and never
+      // silently retarget it: the chooser's overwrite confirmation covered the path it returned
+      let target: string
+      try {
+        target = assertModernSaveTarget(result.filePath, 'docx')
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
       // the tab may have been closed while the dialog was open; checked before the
       // write because Save As may overwrite an existing file (no safe rollback)
       if (tornDownWcIds.has(event.sender.id)) return { ok: false }
@@ -5322,8 +5339,8 @@ export function registerDocsIpc(): void {
       // Picking the document's own file is an explicit Save of it, so it reports a
       // user save; any other target is a plain local copy.
       const uniwork = uniworkSaveDecision(
-        uniworkSamePath(sourcePath, result.filePath) ? 'user' : 'save-as',
-        result.filePath,
+        uniworkSamePath(sourcePath, target) ? 'user' : 'save-as',
+        target,
       )
       if (!uniwork.write) return { ok: false }
       try {
@@ -5333,28 +5350,28 @@ export function registerDocsIpc(): void {
         )
         const { bytes: plain, hashes } = await materializeLazyDocx(Buffer.from(data))
         const bytes = passwordState.password ? encryptDocx(plain, passwordState.password) : plain
-        await atomicWriteFile(result.filePath, bytes)
+        await atomicWriteFile(target, bytes)
         if (tornDownWcIds.has(event.sender.id)) return { ok: false }
-        allowDocWrite(event.sender.id, result.filePath)
-        rememberOpenDoc(event.sender.id, result.filePath)
-        await rememberDiskState(event.sender.id, result.filePath, sha256Hex(bytes))
+        allowDocWrite(event.sender.id, target)
+        rememberOpenDoc(event.sender.id, target)
+        await rememberDiskState(event.sender.id, target, sha256Hex(bytes))
         pointLazyMediaAt(
           hashes,
-          result.filePath,
+          target,
           event.sender.id,
           passwordState.password ? plain : undefined,
         )
         if (tornDownWcIds.has(event.sender.id)) return { ok: false }
-        const passwordIntentPending = commitDocPasswordSave(
-          event.sender.id,
-          passwordState,
-          result.filePath,
-        )
-        pushRecent(result.filePath)
-        if (uniwork.fireHook) notifyUniworkUserSave(result.filePath)
+        const passwordIntentPending = commitDocPasswordSave(event.sender.id, passwordState, target)
+        pushRecent(target)
+        // the converted copy has its real home now
+        if (typeof sourcePath === 'string' && sourcePath !== target) {
+          forgetConvertedDocument(sourcePath)
+        }
+        if (uniwork.fireHook) notifyUniworkUserSave(target)
         // the renderer has no path yet to match a rename notification against,
         // so the reply must carry the path it may save to next
-        const savedPath = notifyFileSaved(event.sender, result.filePath)
+        const savedPath = notifyFileSaved(event.sender, target)
         return {
           ok: true,
           path: savedPath,

@@ -123,10 +123,25 @@ import {
   formatForMime,
   formatForName,
   hasReplacementChar,
+  legacyOfFile,
   sanitizeFilename,
   sha256Hex,
   workingCopyName,
 } from './formats'
+import {
+  conversionFor,
+  convertedTitle,
+  legacyTargetFormat,
+  type LegacyConversion,
+  type LegacyFrom,
+} from './legacy-cloud'
+import {
+  isCfbBytes,
+  legacyOfCfbBytes,
+  type CloudConvertOutcome,
+  type CloudLegacyConvertInput,
+} from './legacy-cloud-open'
+import { detectOoxmlKindFromZipBytes } from '../legacy-converter'
 import { pathKey } from '../../shared/path-key'
 import { isBlankDefaultTitle } from '../../shared/blank-default-names'
 import { LaunchController } from './launch'
@@ -473,6 +488,12 @@ export interface UniworkDocsServiceDeps {
    * null = nothing is pinned (the open fails as it did before).
    */
   openOfflineCopy?(documentId: string): Promise<OfflineCopyOpen>
+  /**
+   * UNI-2212: the app's legacy converter (progress box, Cancel, typed notices), for a cloud
+   * .doc / .xls / .ppt whose bytes were just downloaded. Absent = such a document cannot be
+   * opened (`unsupported_format`), exactly as before the converter existed.
+   */
+  convertLegacy?(input: CloudLegacyConvertInput): Promise<CloudConvertOutcome>
   /**
    * The org capability cache (the same one the sync runtime reads), for the
    * save queue's lane verdicts. Absent = writes allowed (tests that never read
@@ -1073,6 +1094,17 @@ function withServerContext(binding: Binding, detail: DocumentDetail, readOnly = 
   }
   if (detail.file.versionId && next.baseVersion === detail.file.version) {
     next.baseVersionId = detail.file.versionId
+  }
+  // UNI-2212: a copy of a head that is still a legacy .doc/.xls/.ppt is its OOXML conversion and
+  // owes the server that conversion with its next commit; a read-only copy (a version view or a
+  // view launch) never saves, and a head that moved on to OOXML owes nothing
+  const legacy = readOnly ? null : legacyOfFile(detail.file, detail.title)
+  if (readOnly) delete next.legacyFrom
+  // a read older than the binding's base (a held reply that a save outran) says nothing about
+  // what the head owes now: it must not bring back a conversion the save already settled
+  else if (detail.file.version >= next.baseVersion) {
+    if (legacy && legacyTargetFormat(legacy) === next.format) next.legacyFrom = legacy
+    else delete next.legacyFrom
   }
   return next
 }
@@ -2467,6 +2499,8 @@ export class UniworkDocsService {
       pause,
       drafts,
       clock: () => Date.now(),
+      // UNI-2212: a converted copy of a legacy document declares its conversion with its commit
+      conversionFor: (path) => this.conversionOf(path),
       // an account switch (or a sign-out) between the upload and the commit
       // must not commit this copy under the other account: the dispatcher
       // re-asks this right before the upload and right before the commit
@@ -2660,6 +2694,12 @@ export class UniworkDocsService {
     delete next.maxBytes
     delete next.serverRevision
     delete next.serverVersion
+    // UNI-2212: the converted copy is now the live version: an ordinary OOXML document, whose
+    // title the server rewrote from the legacy suffix (the title notice would say the same)
+    if (next.legacyFrom) {
+      next.title = convertedTitle(next.title, next.legacyFrom)
+      delete next.legacyFrom
+    }
     // the intent landed: nothing newer waits behind it (RBE6u-02)
     this.coordinator.clearPendingNext(doc.path)
     const done = await this.coordinator.commitState(doc, next)
@@ -3072,6 +3112,12 @@ export class UniworkDocsService {
       record: stored.intent,
       payload: stored.payload,
     }
+  }
+
+  /** UNI-2212: the conversion the next commit of this working copy declares, if it owes one */
+  private conversionOf(path: string): LegacyConversion | null {
+    const from = this.store.lookup(path)?.binding.legacyFrom
+    return from ? conversionFor(from) : null
   }
 
   /** the queue sessions whose dispatcher must not commit any more (torn down) */
@@ -9014,6 +9060,12 @@ export class UniworkDocsService {
     }
     const copyId = created.summary.id
 
+    // UNI-2212: the copy starts as the source's head. A tab declares a conversion only when that
+    // head is legacy: the source may have been converted by another device since, or restored to
+    // its legacy version after this copy's own conversion cleared the flag
+    const copyHead = await this.readLegacyHead(copyId, chosen.binding.format)
+    const copyConversion = copyHead?.legacyFrom ? conversionFor(copyHead.legacyFrom) : undefined
+
     // step 2: the local bytes become version 2 of the copy; one retry, same keys
     const commitKey = this.newIdempotencyKey()
     // BE-12F-02 / FD11-C-R2-01 / R3-01: the account and session epoch that
@@ -9046,6 +9098,7 @@ export class UniworkDocsService {
           uploadId: upload.uploadId,
           baseRevision: created.revision,
           idempotencyKey: commitKey,
+          ...(copyConversion ? { conversion: copyConversion } : {}),
         })
         committed = true
       } catch (error) {
@@ -9224,6 +9277,27 @@ export class UniworkDocsService {
     }
   }
 
+  /**
+   * UNI-2212: the head of a document as it is now - its revision and the legacy format a copy
+   * bound as `format` still owes it (undefined when the head is OOXML, or another family). Null
+   * when the read cannot answer: the caller then keeps what it knew.
+   */
+  private async readLegacyHead(
+    documentId: string,
+    format: UniworkDocFormat,
+  ): Promise<{ revision: string; legacyFrom: LegacyFrom | undefined } | null> {
+    try {
+      const detail = await this.api().getDocument(documentId)
+      const legacy = legacyOfFile(detail.file, detail.title)
+      return {
+        revision: detail.revision,
+        legacyFrom: legacy && legacyTargetFormat(legacy) === format ? legacy : undefined,
+      }
+    } catch {
+      return null
+    }
+  }
+
   private async overwriteInConflict(
     open: ConflictSession,
     chosen: BoundDocument,
@@ -9279,6 +9353,19 @@ export class UniworkDocsService {
       }
     }
     if (action.stopAi) this.deps.stopAiRun?.(chosen.path)
+    // UNI-2212: the head may have been converted by another device since this copy was opened,
+    // so what the commit owes follows the head as it is now, read with its revision: a head that
+    // is OOXML already takes an ordinary commit (a stale conversion would be refused not_legacy),
+    // and a head restored to legacy needs the conversion even though this copy's flag was cleared
+    let legacyFrom = chosen.binding.legacyFrom
+    if (currentView.online) {
+      const head = await this.readLegacyHead(chosen.binding.documentId, chosen.binding.format)
+      // an ordinary head keeps the revision the dialog showed: a head that moved since is a 409
+      if (head && (legacyFrom || head.legacyFrom)) {
+        serverRevision = head.revision
+        legacyFrom = head.legacyFrom
+      }
+    }
     const next: Binding = {
       ...chosen.binding,
       baseRevision: serverRevision,
@@ -9288,6 +9375,8 @@ export class UniworkDocsService {
       baseChecksum: '',
       state: 'dirty',
     }
+    if (legacyFrom) next.legacyFrom = legacyFrom
+    else delete next.legacyFrom
     delete next.error
     delete next.serverRevision
     delete next.serverVersion
@@ -9478,15 +9567,62 @@ export class UniworkDocsService {
   private async fetchLatest(
     documentId: string,
     first?: DocumentDetail,
-  ): Promise<{ detail: DocumentDetail; bytes: Uint8Array }> {
+  ): Promise<{ detail: DocumentDetail; bytes: Uint8Array; format: UniworkDocFormat | null }> {
     let detail = first ?? (await this.api().getDocument(documentId))
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const { bytes } = await this.api().download(documentId)
-      if (sha256Hex(bytes) === detail.file.checksumSha256) return { detail, bytes }
+      if (sha256Hex(bytes) === detail.file.checksumSha256) {
+        // UNI-2212: the bytes the caller writes as the working copy are the converted OOXML of a
+        // legacy head (the checksum above is the server's, of the raw bytes)
+        const opened = await this.openableBytes(bytes, {
+          hint: legacyOfFile(detail.file, detail.title),
+          name: detail.title,
+        })
+        return { detail, bytes: opened.bytes, format: opened.format }
+      }
       // a save landed between the two reads: read the detail again
       detail = await this.api().getDocument(documentId)
     }
     throw new UniworkDocError('malformed_response')
+  }
+
+  /**
+   * UNI-2212: what a downloaded file opens as. A compound file (.doc/.xls/.ppt) goes through the
+   * app's converter (the progress box, Cancel and typed notices are the converter's); an OOXML
+   * package under a legacy name opens as it is. Anything else is not ours to touch.
+   */
+  private async openableBytes(
+    bytes: Uint8Array,
+    options: { hint: LegacyFrom | null; name: string },
+  ): Promise<{ bytes: Uint8Array; format: UniworkDocFormat | null }> {
+    if (!isCfbBytes(bytes)) {
+      if (!options.hint) return { bytes, format: null }
+      // a legacy MIME type or name on a file that is really OOXML: it opens as the format it is,
+      // provided it is the family the commit's conversion pair names
+      const kind = detectOoxmlKindFromZipBytes(bytes)
+      if (kind !== legacyTargetFormat(options.hint)) throw new UniworkDocError('unsupported_format')
+      return { bytes, format: kind }
+    }
+    const detected = legacyOfCfbBytes(bytes)
+    // the head says it is one legacy family and the compound file is another: the commit's
+    // conversion pair would be refused, so nothing opens (the same refusal as an OOXML mismatch)
+    if (options.hint && detected && detected !== options.hint) {
+      throw new UniworkDocError('unsupported_format')
+    }
+    const from = detected ?? options.hint
+    if (!from) return { bytes, format: null }
+    const convert = this.deps.convertLegacy
+    if (!convert) throw new UniworkDocError('unsupported_format')
+    const name = options.name.toLowerCase().endsWith(`.${from}`)
+      ? options.name
+      : `${options.name}.${from}`
+    const out = await convert({ bytes, from, name })
+    if (!out.ok) {
+      throw new UniworkDocError(
+        out.reason === 'cancelled' ? 'legacy_cancelled' : 'legacy_open_failed',
+      )
+    }
+    return { bytes: out.bytes, format: out.to }
   }
 
   /** picker, recents reopen and launch: the one open flow */
@@ -9536,7 +9672,10 @@ export class UniworkDocsService {
       }
       throw error
     }
-    const format =
+    // UNI-2212: a live version that is still a legacy .doc/.xls/.ppt opens as its OOXML conversion
+    const legacyHead = legacyOfFile(detail.file, detail.title)
+    let format =
+      (legacyHead ? legacyTargetFormat(legacyHead) : null) ??
       formatForMime(detail.file.mimeType) ??
       formatForName(detail.file.filename) ??
       formatForName(detail.title)
@@ -9544,8 +9683,10 @@ export class UniworkDocsService {
     // A ticket without a version takes the live ACL (view only when the
     // descriptor says view). The one exception for a version ticket is a
     // version that is still the current one while a tab of the document is
-    // open: that tab is focused, neither duplicated, downgraded nor upgraded.
-    if (viewTicket && launch.version === detail.file.version) {
+    // open: that tab is focused, neither duplicated, downgraded nor upgraded. A legacy head is the
+    // exception (UNI-2212): its history view must stay the read-only @vN copy, because the editable
+    // tab of a legacy head can still commit its conversion.
+    if (viewTicket && launch.version === detail.file.version && !legacyHead) {
       const open = await this.openTabCopy(identity, documentId)
       if (open) return this.focusOpen(open.path, open.title)
     }
@@ -9639,11 +9780,17 @@ export class UniworkDocsService {
     let bytes: Uint8Array
     let base = detail
     if (viewTicket) {
-      bytes = (await this.api().download(documentId, launch.version)).bytes
+      // UNI-2212: a version from history can be a legacy file under a document whose head is
+      // already OOXML, so the bytes (not the head's metadata) decide whether the converter runs
+      const raw = (await this.api().download(documentId, launch.version)).bytes
+      const opened = await this.openableBytes(raw, { hint: null, name: detail.title })
+      bytes = opened.bytes
+      if (opened.format) format = opened.format
     } else {
       const latest = await this.fetchLatest(documentId, detail)
       bytes = latest.bytes
       base = latest.detail
+      if (latest.format) format = latest.format
     }
     // while the sweep still owns this folder the fresh download writes
     // nothing: its binding write below would be refused (the store's hold), so

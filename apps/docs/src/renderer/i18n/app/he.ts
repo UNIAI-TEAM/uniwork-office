@@ -202,6 +202,7 @@ export const he = {
   appEndnotePlaceholder: 'טקסט הערת סיום…',
   appAutoSave: 'שמירה אוטומטית',
   appAutoSaveTip: 'שמירה אוטומטית (כל 30 שניות וכאשר החלון מאבד מיקוד)',
+  appAutoSaveNeedsSaveTip: 'שמרו את המסמך תחילה כדי להפעיל שמירה אוטומטית',
   appSaveShortcutTip: 'שמירה ({keys})',
   appUndo: 'ביטול פעולה',
   appRedo: 'ביצוע מחדש',

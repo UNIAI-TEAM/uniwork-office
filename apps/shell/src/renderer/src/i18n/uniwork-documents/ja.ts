@@ -172,6 +172,10 @@ export const ja = {
   uwTipEditLocked: '{name} が {time} から編集中です。',
   uwTipEditLockedSelf: 'あなたは別のウィンドウでこの文書を編集しています。',
   uwErrEditLocked: '他のユーザーがこの文書を編集中です。',
+  uwErrLegacyConversion:
+    'この古い形式の Office 文書を新しいバージョンとして保存できませんでした。変更はこのコピーに残っています。',
+  uwErrLegacyOpen: 'この古い形式の Office 文書はここで開けませんでした。',
+  uwErrLegacyCancelled: '開く操作をキャンセルしました。',
   uwReasonEditLocked: '他のユーザーが編集中',
   uwLockBannerOther: '{name} が {time} から編集中です。あなたは読み取り専用で表示しています。',
   uwLockBannerSelfElsewhere: 'この文書は別のウィンドウで編集中です。',

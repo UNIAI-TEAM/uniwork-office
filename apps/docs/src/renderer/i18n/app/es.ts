@@ -220,6 +220,7 @@ export const es = {
   appEndnotePlaceholder: 'Texto de la nota al final…',
   appAutoSave: 'Autoguardado',
   appAutoSaveTip: 'Autoguardado (cada 30 segundos y cuando la ventana pierde el foco)',
+  appAutoSaveNeedsSaveTip: 'Guarda primero el documento para activar el autoguardado',
   appSaveShortcutTip: 'Guardar ({keys})',
   appUndo: 'Deshacer',
   appRedo: 'Rehacer',

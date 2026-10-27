@@ -170,6 +170,10 @@ export const ms = {
   uwTipEditLocked: '{name} menyunting sejak {time}.',
   uwTipEditLockedSelf: 'Anda menyunting dokumen ini dalam tetingkap lain.',
   uwErrEditLocked: 'Orang lain sedang menyunting dokumen ini.',
+  uwErrLegacyConversion:
+    'Dokumen Office format lama ini tidak dapat disimpan sebagai versi baharu. Perubahan anda kekal dalam salinan ini.',
+  uwErrLegacyOpen: 'Dokumen Office format lama ini tidak dapat dibuka di sini.',
+  uwErrLegacyCancelled: 'Pembukaan dibatalkan.',
   uwReasonEditLocked: 'orang lain sedang menyunting',
   uwLockBannerOther: '{name} sedang menyunting sejak {time}. Anda sedang melihat baca-sahaja.',
   uwLockBannerSelfElsewhere: 'Anda sedang menyunting dokumen ini di tetingkap lain.',

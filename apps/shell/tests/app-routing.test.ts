@@ -18,6 +18,12 @@ describe('appForPath', () => {
     expect(appForPath('/x/a.html')).toBe('html')
   })
 
+  it('routes the legacy binaries to the app of the OOXML they convert to', () => {
+    expect(appForPath('/x/old.doc')).toBe('docs')
+    expect(appForPath('/x/old.xls')).toBe('sheets')
+    expect(appForPath('/x/old.ppt')).toBe('slides')
+  })
+
   it('has no app for an extension nothing opens', () => {
     expect(appForPath('/x/a.xyz')).toBeUndefined()
     expect(appForPath('/x/noextension')).toBeUndefined()
@@ -70,6 +76,23 @@ describe('renameStaysInApp', () => {
     expect(renameStaysInApp('/x/a.docx', 'a.pdf')).toBe(false)
     expect(renameStaysInApp('/x/a.xlsx', 'a.csv')).toBe(true)
     expect(renameStaysInApp('/x/a.png', 'a.png')).toBe(true)
+  })
+
+  it('never renames a modern document to a legacy extension, or a legacy one to a modern format (R1-4)', () => {
+    for (const [from, to] of [
+      ['/x/a.docx', 'b.doc'],
+      ['/x/a.pptx', 'b.ppt'],
+      ['/x/a.xlsx', 'b.xls'],
+      ['/x/a.docx', 'b.DOC'],
+      ['/x/a.doc', 'a.docx'],
+      ['/x/a.xls', 'a.xlsx'],
+      ['/x/a.ppt', 'a.pptx'],
+    ] as const) {
+      expect(renameStaysInApp(from, to), `${from} -> ${to}`).toBe(false)
+    }
+    // an ordinary same-format rename, and a legacy file keeping its own extension, still pass
+    expect(renameStaysInApp('/x/a.docx', 'b.docx')).toBe(true)
+    expect(renameStaysInApp('/x/a.doc', 'b.doc')).toBe(true)
   })
 
   it('stays put when the file was never openable to begin with', () => {

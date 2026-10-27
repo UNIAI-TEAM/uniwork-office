@@ -167,6 +167,10 @@ export const vi = {
   uwTipEditLocked: '{name} đang sửa từ {time}.',
   uwTipEditLockedSelf: 'Bạn đang sửa tài liệu này ở cửa sổ khác.',
   uwErrEditLocked: 'Người khác đang sửa tài liệu này.',
+  uwErrLegacyConversion:
+    'Không thể lưu tài liệu Office đời cũ này thành phiên bản mới. Thay đổi của bạn vẫn còn trong bản này.',
+  uwErrLegacyOpen: 'Không thể mở tài liệu Office đời cũ này tại đây.',
+  uwErrLegacyCancelled: 'Đã hủy việc mở tài liệu.',
   uwReasonEditLocked: 'người khác đang sửa',
   uwLockBannerOther: '{name} đang sửa từ {time}. Bạn đang xem ở chế độ chỉ đọc.',
   uwLockBannerSelfElsewhere: 'Bạn đang sửa tài liệu này ở cửa sổ khác.',

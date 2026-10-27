@@ -62,6 +62,24 @@ describe('saveStateLabel', () => {
     })
   })
 
+  it('a converted legacy copy never saved anywhere is unsaved, not "All changes saved"', () => {
+    expect(saveStateLabel(false, false, false, true)).toEqual({
+      key: 'appSaveStateUnsaved',
+      unsaved: true,
+    })
+    // view only and a UniWork-bound copy keep their own states
+    expect(saveStateLabel(false, true, false, true)).toEqual({
+      key: 'appSaveStateViewOnly',
+      unsaved: false,
+    })
+    expect(saveStateLabel(false, false, true, true)).toBeNull()
+    // an ordinary clean document is still saved
+    expect(saveStateLabel(false, false, false, false)).toEqual({
+      key: 'appSaveStateSaved',
+      unsaved: false,
+    })
+  })
+
   it('has en and vi copy', () => {
     expect(en.appSaveStateViewOnly).toBe('View only')
     expect(viStrings.appSaveStateViewOnly).toBe('Chỉ xem')

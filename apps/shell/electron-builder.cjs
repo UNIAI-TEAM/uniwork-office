@@ -41,6 +41,14 @@ const { bakedDeploymentDefaults } = require(join(__dirname, 'build/deployment-de
 const { tesseractExtraResources, assertTesseractResources } = require(
   join(__dirname, 'build/ocr-tesseract-resources.cjs'),
 )
+const {
+  ensureLibreOfficePack,
+  getTargetPackDir,
+  isPackValid,
+  loadManifest: loadLibreOfficeManifest,
+} = require(join(__dirname, 'build/prepare-libreoffice.cjs'))
+const loManifest = loadLibreOfficeManifest()
+const LO_CACHE_PREFIX = `build/.cache/libreoffice-${loManifest.version}`
 
 function normalizeHttpsBaseUrl(name, value) {
   if (!value || !value.trim()) return null
@@ -178,6 +186,27 @@ function ensurePlatformHelpers() {
   }
 }
 
+// Ensure the trimmed LibreOffice 26.8.2.2 converter pack exists and passes
+// manifest / binary-closure / template-profile validation before electron-builder
+// copies extraResources into the app bundle.
+const ARCH_BY_ID = { 0: 'ia32', 1: 'x64', 2: 'armv7l', 3: 'arm64', 4: 'universal' }
+async function ensureBundledLibreOffice(context) {
+  const platform = context.electronPlatformName
+  const rawArch = context.arch
+  const arch =
+    typeof rawArch === 'number'
+      ? ARCH_BY_ID[rawArch] || process.arch
+      : typeof rawArch === 'string' && rawArch
+        ? rawArch
+        : platform === 'win32'
+          ? winArch
+          : process.arch
+  const target = `${platform}-${arch}`
+  const packDir = getTargetPackDir(target, { manifest: loManifest })
+  if (!existsSync(join(packDir, '.ready.json')) || !isPackValid(packDir, target, loManifest)) {
+    await ensureLibreOfficePack(target, { manifest: loManifest })
+  }
+}
 // Dual-arch packs share one extraResources path, so the shipped helper must be
 // a lipo fat binary. A stale host-arch build (dev path above) is rebuilt in
 // place; if a universal build cannot be produced, packaging aborts — otherwise
@@ -320,6 +349,10 @@ const REQUIRED_NOTICE_TERMS = [
   'Sam Leffler',
   'Google Inc.',
   'OpenLibm',
+  'LibreOffice 26.8.2.2',
+  'Mozilla Public License Version 2.0',
+  'https://downloadarchive.documentfoundation.org/libreoffice/old/26.8.2.2/src/',
+  'Bitstream Vera',
 ]
 
 function hasValidThirdPartyNotice() {
@@ -561,6 +594,23 @@ const config = {
       mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     },
     {
+      // opens as a converted .docx copy (legacy-open.ts)
+      ext: 'doc',
+      name: 'Word 97-2003 Document',
+      role: 'Editor',
+      rank: 'Alternate',
+      icon: 'docx',
+      mimeType: 'application/msword',
+    },
+    {
+      ext: 'ppt',
+      name: 'PowerPoint 97-2003 Presentation',
+      role: 'Editor',
+      rank: 'Alternate',
+      icon: 'pptx',
+      mimeType: 'application/vnd.ms-powerpoint',
+    },
+    {
       ext: 'xls',
       name: 'Excel 97-2003 Workbook',
       role: 'Editor',
@@ -678,6 +728,10 @@ const config = {
         from: '../sheets/native/xlsx-engine/target/release/xlsx-sidecar',
         to: 'native/xlsx-sidecar',
       },
+      {
+        from: `${LO_CACHE_PREFIX}/darwin-\${arch}/libreoffice`,
+        to: 'libreoffice',
+      },
     ],
   },
   win: {
@@ -696,6 +750,10 @@ const config = {
         from: 'build/shell-new',
         to: 'shell-new',
         filter: ['*.docx', '*.xlsx', '*.pptx'],
+      },
+      {
+        from: `${LO_CACHE_PREFIX}/win32-${winArch}/libreoffice`,
+        to: 'libreoffice',
       },
     ],
   },
@@ -754,6 +812,10 @@ const config = {
         from: 'build/apt/uniwork-office-archive-keyring.gpg',
         to: 'apt/uniwork-office-archive-keyring.gpg',
       },
+      {
+        from: `${LO_CACHE_PREFIX}/linux-\${arch}/libreoffice`,
+        to: 'libreoffice',
+      },
     ],
   },
   // Same scoped-name problem as executableName above: the default deb
@@ -804,6 +866,7 @@ const config = {
     writeDeploymentDefaults()
     writeAptSources()
     ensurePlatformHelpers()
+    await ensureBundledLibreOffice(context)
     assertExtraResourceSources()
     ensureThirdPartyNotices()
     assertModuleTreesPresent()

@@ -23,6 +23,7 @@ import type {
 import { atomicCopyFile, atomicWriteFile } from '../atomic-write'
 import { APP_STORE_LEVEL, readStoreGate } from '../uniwork-sync/store-level'
 import { formatForName, isDecimalString } from './formats'
+import { isLegacyFrom, legacyTargetFormat, type LegacyFrom } from './legacy-cloud'
 
 /**
  * Working copies of UniWork documents and their binding metadata:
@@ -104,6 +105,13 @@ export interface Binding {
   level?: UniworkDocLevel
   /** UNI-1961: true while the document is shelved in Archive (Lưu trữ); forces read-only without altering `level` */
   shelved?: true
+  /**
+   * UNI-2212: this working copy is the local OOXML conversion of a legacy .doc/.xls/.ppt whose live
+   * version on UniWork is still the legacy file. Its next commit carries `conversion` so the server
+   * stores the OOXML as the next version; the settle of that commit clears this. `format` is the
+   * target OOXML format.
+   */
+  legacyFrom?: LegacyFrom
 }
 
 export type UniworkDocLevel = 'view' | 'comment' | 'edit' | 'manage'
@@ -352,6 +360,10 @@ export function parseBinding(raw: unknown): Binding | null {
       : {}),
     ...(docLevelOf(r.level) ? { level: docLevelOf(r.level) } : {}),
     ...(r.shelved === true ? { shelved: true } : {}),
+    // only a flag that names the conversion of this copy's own format is kept
+    ...(isLegacyFrom(r.legacyFrom) && legacyTargetFormat(r.legacyFrom) === r.format
+      ? { legacyFrom: r.legacyFrom }
+      : {}),
   }
 }
 

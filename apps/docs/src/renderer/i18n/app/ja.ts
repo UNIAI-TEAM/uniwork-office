@@ -226,6 +226,7 @@ export const ja = {
   // Quick actions bar
   appAutoSave: '自動保存',
   appAutoSaveTip: '自動保存(30 秒ごと、およびウィンドウのフォーカスが外れたとき)',
+  appAutoSaveNeedsSaveTip: '自動保存を有効にするには、先にドキュメントを保存してください',
   appSaveShortcutTip: '上書き保存 ({keys})',
   appUndo: '元に戻す',
   appRedo: 'やり直し',

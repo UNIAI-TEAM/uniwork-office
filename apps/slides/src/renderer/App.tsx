@@ -540,7 +540,8 @@ export function App() {
   }, [path, uniwork.bound, uniwork.readOnly, commentsBridgeApi])
   const serverComments = !!(commentsContext && commentsBridgeApi && path)
   // web frame: explicit saves only (CONTRACT C10), whatever a stored preference says
-  const autoSave = cap('autoSave') && autoSavePref && !uniwork.bound
+  // a converted legacy copy never autosaves: its temp file is swept on close, so a silent write loses the edits
+  const autoSave = cap('autoSave') && autoSavePref && !uniwork.bound && !uniwork.converted
   useEffect(() => {
     window.slidesApi.setAutoSavePref?.(autoSave)
   }, [autoSave])
@@ -1038,15 +1039,22 @@ export function App() {
   /** Set while the AI annotation popover is open (assigned below, next to askState) */
   const askOpenRef = useRef(false)
 
-  const save = useCallback((quiet = false, origin: 'user' | 'auto' = 'user'): Promise<boolean> => {
-    // a view-only UniWork document has no Save (the main process refuses it too);
-    // an explicit Save on a bound read-only deck asks main to explain the lock
-    if (uniworkRef.current.readOnly) {
-      slidesExplainReadOnlySave(window.slidesApi as SlidesUniworkSeam, uniworkRef.current, origin)
-      return Promise.resolve(false)
-    }
-    return fileActions.save(() => ctxRef.current, quiet, origin)
-  }, [])
+  const save = useCallback(
+    (quiet = false, origin: 'user' | 'auto' | 'in-place' = 'user'): Promise<boolean> => {
+      // a view-only UniWork document has no Save (the main process refuses it too);
+      // an explicit Save on a bound read-only deck asks main to explain the lock
+      if (uniworkRef.current.readOnly) {
+        slidesExplainReadOnlySave(
+          window.slidesApi as SlidesUniworkSeam,
+          uniworkRef.current,
+          origin === 'auto' ? 'auto' : 'user',
+        )
+        return Promise.resolve(false)
+      }
+      return fileActions.save(() => ctxRef.current, quiet, origin)
+    },
+    [],
+  )
 
   // Close guard (closing tab/window) chose "Save": run the full save flow and report the result
   useEffect(() => {
@@ -2493,10 +2501,12 @@ export function App() {
       // Master view: only allow save (undo/clipboard etc. target normal pages, not applicable inside the master)
       if (masterItems) {
         if (cmd === 'save') void save()
+        else if (cmd === 'save-in-place') void save(false, 'in-place')
         return
       }
       if (cmd === 'open') void openDialog()
       else if (cmd === 'save') void save()
+      else if (cmd === 'save-in-place') void save(false, 'in-place')
       else if (cmd === 'save-as') void saveAs()
       // macOS has no File ribbon tab, so these only exist in the menu
       else if (cmd === 'export-pdf' && cap('exportPdf')) void exportPdf()

@@ -49,3 +49,15 @@ export function sessionAfterRename<S extends RenamableSession>(
   }
   return next
 }
+
+/**
+ * The session without its never-saved state (suggested Save As path, unsaved-new mark). A
+ * never-saved workbook (new, or converted from a legacy .xls) that UniWork adopted as a bound
+ * working copy is a plain bound file from then on: its next Save must not ask Save As again.
+ */
+export function withoutUnsavedNew<
+  S extends { unsavedNew?: boolean | undefined; suggestSaveAs?: string | undefined },
+>(session: S): S {
+  const { unsavedNew: _unsavedNew, suggestSaveAs: _suggestSaveAs, ...rest } = session
+  return rest as S
+}

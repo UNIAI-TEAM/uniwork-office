@@ -15,7 +15,14 @@ import { readFile, readdir, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { deflateRawSync } from 'node:zlib'
+import type { WebContents } from 'electron'
+import {
+  convertedDocumentFor,
+  forgetConvertedDocument,
+  registerConvertedDocument,
+} from '@genoffice/electron-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createModuleSaveRequester } from '../src/main/uniwork-docs/module-save'
 import type { UniworkDocSummary, UniworkDocStatus } from '../src/shared/home-api'
 import type { DeploymentProfile } from '../src/main/uniwork-auth/deployment'
 import { UniworkDocsService, type ConflictUi } from '../src/main/uniwork-docs/service'
@@ -996,6 +1003,12 @@ function setup(
     moduleSaveResult?: boolean
     /** SAVE-01 r2: the module accepts the Save but its hook never fires (flush timeout) */
     moduleSaveSilent?: boolean
+    /**
+     * UNI-2211: replaces the fake module Save with a caller-built requester (the real
+     * createModuleSaveRequester over a fake editor view); `service` lets the fake editor
+     * fire the user-save hook the way a real module's Save does
+     */
+    moduleSaveRequester?: (service: UniworkDocsService) => (path: string) => boolean
     /** SAVE-01 r2: shrink the first-save flush wait (ms), for the timeout case */
     firstSaveFlushTimeoutMs?: number
     /** SAVE-01 r2: notifyPathRenamed / pushStatus / pushTreeChanged throw */
@@ -1106,6 +1119,7 @@ function setup(
     closeSaveWaitMs: options.closeSaveWaitMs,
     requestModuleSave: (path) => {
       moduleSaveCalls.push(path)
+      if (options.moduleSaveRequester) return options.moduleSaveRequester(service)(path)
       if (options.moduleSaveResult === false) return false
       if (!options.moduleSaveSilent) {
         // the module's own Save writes the file, then its user-save hook
@@ -3697,6 +3711,124 @@ describe('SAVE-01 my_folder_locked and invalid_destination', () => {
 // SAVE-01: the first Save to UniWork of an unbound tab - the editor flushes,
 // the document is created (My Folder by default, or the picked folder), and
 // the tab binds to it so the next Ctrl+S is a plain bound save.
+// UNI-2211: a converted legacy .doc/.xls/.ppt is open as an unsaved temp .docx/.xlsx/.pptx. Its own
+// Save is a Save As (a dialog, no user-save hook), so the shell's flush for the first Save to
+// UniWork must use the in-place command. Runs the real requester and the real service.
+describe('first save of a converted legacy document', () => {
+  /** an editor view that obeys the menu commands like the real module: 'save' on an unsaved converted tab opens a dialog and never reports a user save */
+  function fakeEditor(
+    service: () => UniworkDocsService | undefined,
+    sent: Array<{ channel: string; command: string; path: string }>,
+    pathOf: { current: string },
+  ) {
+    return {
+      isDestroyed: () => false,
+      send: (channel: string, command: string) => {
+        sent.push({ channel, command, path: pathOf.current })
+        if (command !== 'save-in-place') return
+        writeFileSync(pathOf.current, 'converted bytes')
+        queueMicrotask(() => service()?.onUserSave(pathOf.current))
+      },
+    }
+  }
+
+  it('flushes a converted temp tab with save-in-place and uploads it under its OOXML name (R1-1, R1-2, R1-4, R1-13)', async () => {
+    const converted = join(dir, 'genoffice-imports', 'abc')
+    mkdirSync(converted, { recursive: true })
+    const tempPath = join(converted, 'Budget.xlsx')
+    writeFileSync(tempPath, 'untouched converted bytes')
+    registerConvertedDocument(tempPath, {
+      originalPath: join(dir, 'Budget.xls'),
+      suggestSaveAs: join(dir, 'Budget.xlsx'),
+      tempDir: converted,
+    })
+    try {
+      const sent: Array<{ channel: string; command: string; path: string }> = []
+      const pathOf = { current: tempPath }
+      const server = fakeServer()
+      const ctx = setup(server, {
+        pathOpen: true,
+        moduleSaveRequester: (service) =>
+          createModuleSaveRequester({
+            targetForPath: () => ({
+              kind: 'sheets',
+              webContents: fakeEditor(() => service, sent, pathOf) as unknown as WebContents,
+            }),
+            isConvertedPath: (path) => convertedDocumentFor(path) !== undefined,
+            sheetsMenuChannel: 'menu:action',
+            requestMarkdownSave: async () => true,
+            requestHtmlSave: async () => true,
+            flushPdfSave: async () => true,
+          }),
+      })
+
+      const saved = await ctx.service.firstSave({
+        tabPath: tempPath,
+        title: 'Budget.xlsx',
+        workspaceId: WS,
+        target: { kind: 'my_folder' },
+      })
+
+      expect(saved.ok).toBe(true)
+      expect(sent).toEqual([{ channel: 'menu:action', command: 'save-in-place', path: tempPath }])
+      const posts = server.calls.filter(
+        (c) => c.method === 'POST' && c.path === `/api/v1/workspaces/${WS}/documents/files`,
+      )
+      expect(posts).toHaveLength(1)
+      const body = posts[0]!.body as { title?: unknown; bytes: Uint8Array }
+      expect(body.title).toBe('Budget.xlsx')
+      expect(Buffer.from(body.bytes).toString('utf8')).toBe('converted bytes')
+      // the tab followed its file into the store folder, bound under the OOXML name
+      expect(ctx.pathRenames).toHaveLength(1)
+      expect(basename(ctx.pathRenames[0]!.newPath)).toMatch(/\.xlsx$/)
+      expect(ctx.service.isBound(ctx.pathRenames[0]!.newPath)).toBe(true)
+    } finally {
+      forgetConvertedDocument(tempPath)
+    }
+  })
+
+  it('a same-stem sibling of a converted tab is flushed with the ordinary save command (R1-4)', async () => {
+    const converted = join(dir, 'genoffice-imports', 'def')
+    mkdirSync(converted, { recursive: true })
+    const tempPath = join(converted, 'Plan.docx')
+    const sibling = join(dir, 'Plan.docx')
+    writeFileSync(tempPath, 'converted')
+    writeFileSync(sibling, 'a real document')
+    registerConvertedDocument(tempPath, {
+      originalPath: join(dir, 'Plan.doc'),
+      suggestSaveAs: sibling,
+      tempDir: converted,
+    })
+    try {
+      const sent: Array<{ channel: string; command: string; path: string }> = []
+      const requester = createModuleSaveRequester({
+        targetForPath: () => ({
+          kind: 'docs',
+          webContents: {
+            isDestroyed: () => false,
+            send: (channel: string, command: string) => sent.push({ channel, command, path: '' }),
+          } as unknown as WebContents,
+        }),
+        isConvertedPath: (path) => convertedDocumentFor(path) !== undefined,
+        sheetsMenuChannel: 'menu:action',
+        requestMarkdownSave: async () => true,
+        requestHtmlSave: async () => true,
+        flushPdfSave: async () => true,
+      })
+
+      requester(sibling)
+      requester(tempPath)
+
+      expect(sent.map((s) => [s.channel, s.command])).toEqual([
+        ['menu:command', 'save'],
+        ['menu:command', 'save-in-place'],
+      ])
+    } finally {
+      forgetConvertedDocument(tempPath)
+    }
+  })
+})
+
 describe('SAVE-01 first save', () => {
   it('flushes the editor, creates with destination my_folder and binds the tab', async () => {
     const server = fakeServer()

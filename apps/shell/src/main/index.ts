@@ -63,6 +63,8 @@ import {
   DROP_OPEN_CHANNEL,
   appMenuLabels,
   contextMenuLabels,
+  convertedDocumentFor,
+  forgetConvertedDocument,
   editMenuTemplate,
   installContextMenu,
   installNavigationGuard,
@@ -239,6 +241,7 @@ import {
   setSheetsExtraFileMenuItems,
   setSheetsHostWindowHook,
   setSheetsShellWindow,
+  setSheetsLegacyOpenHook,
   setSheetsWorkbookOpenedHook,
   startSheetsCaptureServer,
   stopSheetsSidecar,
@@ -375,6 +378,15 @@ import {
   renameStaysInApp,
 } from './app-routing'
 import { isSameFile, pdfSaveAsTarget, isValidRawRenameName } from './rename-validation'
+import {
+  convertLegacyFile,
+  disposeLegacyConverter,
+  killAllActiveLegacyConversions,
+  legacyFormatForPath,
+} from './legacy-converter'
+import { createCloudLegacyConverter, createLegacyOpener } from './legacy-open'
+import type { CloudLegacyConvertInput } from './uniwork-docs/legacy-cloud-open'
+import { tLegacyOpen } from './legacy-open-strings'
 import {
   FolderWatcher,
   createFolder,
@@ -3579,6 +3591,9 @@ function applyPendingDir(wcId: number, filePath: string): string {
  * open tab (which re-grants the new path and refreshes its title).
  */
 function afterFileMoved(oldPath: string, newPath: string): void {
+  // a converted legacy copy renamed inside its staging dir is the same document under a new name
+  // (the opener follows it); one that moved elsewhere (the UniWork store) has its real home now
+  if (!legacyOpener.fileMoved(oldPath, newPath)) forgetConvertedDocument(oldPath)
   replaceRecentFile(oldPath, newPath)
   projectFileRenamed(oldPath, newPath)
   if (/\.pptx$/i.test(newPath)) void replaceSlidesRecentFile(oldPath, newPath)
@@ -3874,6 +3889,8 @@ function createShellWindow(): void {
     () => {
       win.webContents.send(TABS_CHANNELS.changed, manager.list())
       publishOpenDocumentsIfOwner([...manager.openFilePaths(), ...detachedFilePaths()])
+      // a converted legacy document's temp copy goes once no tab shows it (closed, or saved elsewhere)
+      legacyOpener.sweep()
       // a UniWork copy written outside the save hook shows as dirty once its tab is active
       activeDocRefresh.tabsChanged(manager.activeFilePath())
     },
@@ -3990,6 +4007,8 @@ function createShellWindow(): void {
   })
   // When ⌘O opens a file inside a tab, sync the tab title/path (used for de-dup by path) and record it as recent.
   // The first save / save-as fires this too, so applyPendingDir also runs here.
+  // Sheets' own File > Open picked a legacy .xls: the converter route, not the calamine reader
+  setSheetsLegacyOpenHook((path) => legacyFormatForPath(path) !== null && legacyOpener.open(path))
   setSheetsWorkbookOpenedHook((wc, path) => {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)
@@ -4339,6 +4358,8 @@ async function editorStateOfPath(
 /** each module's explicit Save, exactly what its File > Save runs */
 const requestUniworkModuleSave = createModuleSaveRequester({
   targetForPath: webContentsForPath,
+  // a converted legacy copy is flushed in place (its plain Save is a Save As); exact tab path only
+  isConvertedPath: (path) => convertedDocumentFor(path) !== undefined,
   sheetsMenuChannel: SHEETS_IPC_CHANNELS.menuAction,
   requestMarkdownSave,
   requestHtmlSave,
@@ -4382,6 +4403,7 @@ function uniworkDocsWiring() {
     // G5-04g: a newer-store working copy is locked, never routed to a module
     refuseLockedPath: (path: string) => refuseLockedOpenPath(uniworkDocs?.service, path),
     isPathOpen: (path: string) => webContentsForPath(path) !== undefined,
+    convertLegacy: (input: CloudLegacyConvertInput) => cloudLegacyConverter.convert(input),
     // the module's own Save (same path as the menu), which ends in the user-save hook
     requestModuleSave: requestUniworkModuleSave,
     // UWNM-BE-R4-1: docs' outside-change check; slides / sheets keep no such state
@@ -4507,8 +4529,101 @@ function openGeneratedDocument(filePath: string): boolean {
 /** G5-10: a read-only draft preview (a temp copy under userData) is not a recent file */
 function recordRecentFile(filePath: string): void {
   if (isDraftPreviewPath(app.getPath('userData'), filePath)) return
+  // a converted legacy copy's staging path is swept when its tab closes: the recents entry is
+  // the original the user picked, and the real file once a Save As gives the copy a home
+  if (convertedDocumentFor(filePath)) return
   recordRecentFileRaw(filePath)
 }
+
+/**
+ * Progress for a legacy conversion: the taskbar/dock shows busy right away and,
+ * when it takes longer than a blink, a box with Cancel (the file converts with
+ * a bundled LibreOffice, a few seconds for a typical document).
+ */
+const LEGACY_PROGRESS_DELAY_MS = 600
+function beginLegacyProgress(fileName: string, cancel: () => void): () => void {
+  const host = shellWindow && !shellWindow.isDestroyed() ? shellWindow : null
+  host?.setProgressBar(2, { mode: 'indeterminate' })
+  const box = new AbortController()
+  let finished = false
+  const timer = setTimeout(() => {
+    const options = {
+      type: 'info' as const,
+      message: tLegacyOpen(currentLang(), 'legacyConvertingMsg', { name: fileName }),
+      detail: tLegacyOpen(currentLang(), 'legacyConvertingDetail'),
+      buttons: [tm('btnCancel')],
+      cancelId: 0,
+      noLink: true,
+      signal: box.signal,
+    }
+    const shown = host ? dialog.showMessageBox(host, options) : dialog.showMessageBox(options)
+    // our own abort closes the box the same way a click on Cancel does
+    void shown.then(() => {
+      if (!finished) cancel()
+    })
+  }, LEGACY_PROGRESS_DELAY_MS)
+  return () => {
+    if (finished) return
+    finished = true
+    clearTimeout(timer)
+    box.abort()
+    if (host && !host.isDestroyed()) host.setProgressBar(-1)
+  }
+}
+
+const legacyOpener = createLegacyOpener({
+  convert: (path, options) => convertLegacyFile(path, options),
+  importRoot: () => join(app.getPath('temp'), 'genoffice-imports'),
+  openConverted: (doc) => {
+    if (!tabManager) throw new Error('the shell window is gone')
+    if (doc.kind === 'sheets') {
+      // the same unsaved-new workbook a "New spreadsheet" is: Save asks where to write it
+      markSheetsUnsavedNew(doc.tempPath, doc.suggestSaveAs, doc.tempDir)
+      try {
+        tabManager.openSheetsTab(doc.tempPath)
+      } catch (err) {
+        unmarkSheetsUnsavedNew(doc.tempPath)
+        throw err
+      }
+      startQueuedWorkbookNudge()
+    } else if (doc.kind === 'docs') {
+      tabManager.openDocsTab(doc.tempPath)
+    } else {
+      tabManager.openSlidesTab(doc.tempPath)
+    }
+  },
+  activateConverted: (doc) => {
+    const tab = tabManager?.findTabByPath(doc.tempPath)
+    if (!tab) return focusDetachedByPath(doc.tempPath)
+    tabManager?.activateTab(tab.id)
+    return true
+  },
+  isPathOpen: (path) => webContentsForPath(path) !== undefined,
+  openXlsValuesOnly: (path) => {
+    if (!tabManager) return false
+    recordRecentFile(path)
+    const existing = tabManager.findSheetsTabByPath(path)
+    if (existing) {
+      tabManager.activateTab(existing)
+    } else {
+      tabManager.openSheetsTab(path)
+      startQueuedWorkbookNudge()
+    }
+    return true
+  },
+  recordRecent: recordRecentFile,
+  beginProgress: beginLegacyProgress,
+  notice: showAppWarning,
+  t: (key, params) => tLegacyOpen(currentLang(), key, params),
+})
+
+/** UNI-2212: the same converter, progress box and typed notices for a cloud .doc/.xls/.ppt */
+const cloudLegacyConverter = createCloudLegacyConverter({
+  convert: (path, options) => convertLegacyFile(path, options),
+  beginProgress: beginLegacyProgress,
+  notice: showAppWarning,
+  t: (key, params) => tLegacyOpen(currentLang(), key, params),
+})
 
 function routeDocumentPath(filePath: string): boolean {
   // G5-04g: every open route (File > Open, recents, argv, drag, MCP, a module
@@ -4521,6 +4636,8 @@ function routeDocumentPath(filePath: string): boolean {
   // a detached editor window already shows this file — focus it, never a second copy
   if (focusDetachedByPath(filePath)) return true
   if (!tabManager) return false
+  // .doc / .xls / .ppt: converted in the background, then opened as an unsaved .docx / .xlsx / .pptx
+  if (legacyFormatForPath(filePath)) return legacyOpener.open(filePath)
   if (DOCX_RE.test(filePath)) {
     recordRecentFile(filePath)
     const existing = tabManager.findDocsTabByPath(filePath)
@@ -7460,6 +7577,14 @@ app.on('will-quit', (event) => {
   // not in before-quit: a close prompt can still veto the quit, and the tabs would then
   // lose their files and read as plain local documents
   uniworkDocs?.service.disposeSourceViews()
+  // The same for the legacy converter: its opener and queue cannot be reopened, and the converted
+  // tabs read their backing files. The opener first: it aborts its own pending conversions and
+  // refuses new staging, so nothing new starts after the running jobs are killed
+  void legacyOpener.dispose()
+  cloudLegacyConverter.dispose()
+  // Reject queued conversions and refuse new ones before the running soffice trees are killed
+  disposeLegacyConverter()
+  killAllActiveLegacyConversions()
   // UNI-2068: a zip download in flight is abandoned; its temp file must not outlive the app
   uniworkDocs?.disposeZipDownloads()
   stopUniworkAccount()

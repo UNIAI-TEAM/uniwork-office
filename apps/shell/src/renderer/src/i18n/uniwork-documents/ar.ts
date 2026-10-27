@@ -166,6 +166,10 @@ export const ar = {
   uwTipEditLocked: '{name} يحرّر منذ {time}.',
   uwTipEditLockedSelf: 'أنت تحرّر هذا المستند في نافذة أخرى.',
   uwErrEditLocked: 'شخص آخر يحرّر هذا المستند.',
+  uwErrLegacyConversion:
+    'تعذّر حفظ مستند Office القديم هذا كإصدار جديد. تبقى تغييراتك في هذه النسخة.',
+  uwErrLegacyOpen: 'تعذّر فتح مستند Office القديم هذا هنا.',
+  uwErrLegacyCancelled: 'تم إلغاء الفتح.',
   uwReasonEditLocked: 'شخص آخر يحرّر',
   uwLockBannerOther: '{name} يعدّل منذ {time}. أنت تعرض للقراءة فقط.',
   uwLockBannerSelfElsewhere: 'أنت تعدّل هذا المستند في نافذة أخرى.',

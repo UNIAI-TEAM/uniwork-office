@@ -8,7 +8,7 @@ import type { EditableWorkbook, ViewOnlyLock } from './view-only-lock'
  */
 export interface SheetsUniworkSeam {
   uniworkState?(): Promise<{ bound: boolean; readOnly: boolean }>
-  onUniworkStateChanged?(cb: (path: string) => void): () => void
+  onUniworkStateChanged?(cb: (path: string, newPath?: string) => void): () => void
   uniworkReadOnlySave?(path?: string): Promise<void>
 }
 
@@ -41,10 +41,17 @@ export function applySheetsUniworkAnswer<T extends SheetsUniworkFile>(
   const converted = file.needsSaveAs === true && file.unsavedNew !== true
   const bound = !converted && answer.bound === true
   const readOnly = !converted && answer.readOnly === true
-  if (file.readOnly === readOnly && (file.uniworkBound === true) === bound) return file
+  // An unsaved new workbook (or converted copy) the shell just moved into a UniWork working
+  // copy is no longer a never-saved one: its next Save is a plain Save of the bound file.
+  const adopted = bound && file.unsavedNew === true
+  if (file.readOnly === readOnly && (file.uniworkBound === true) === bound && !adopted) return file
   const next: T = { ...file, readOnly }
   if (bound) next.uniworkBound = true
   else delete next.uniworkBound
+  if (adopted) {
+    delete next.unsavedNew
+    delete next.needsSaveAs
+  }
   return next
 }
 
@@ -63,15 +70,22 @@ export function watchSheetsUniworkState<T extends SheetsUniworkFile>(deps: {
   webViewOnly: boolean
 }): () => void {
   let live = true
-  const unsubscribe = deps.api?.onUniworkStateChanged?.((pingPath) => {
+  const unsubscribe = deps.api?.onUniworkStateChanged?.((pingPath, newPath) => {
     const before = deps.getFile()
-    if (!sheetsMatchesUniworkPath(before, pingPath)) return
+    if (!before || !sheetsMatchesUniworkPath(before, pingPath)) return
+    // the workbook moved into its working copy: that path is its identity from now on, so a
+    // later lock ping (which names the working copy) still finds this file
+    let target = pingPath
+    if (newPath && before.path !== newPath) {
+      deps.setFile({ ...before, path: newPath })
+      target = newPath
+    }
     void deps.api
       ?.uniworkState?.()
       ?.then((answer) => {
         if (!live || !answer) return
         const current = deps.getFile()
-        if (!sheetsMatchesUniworkPath(current, pingPath) || !current) return
+        if (!sheetsMatchesUniworkPath(current, target) || !current) return
         const next = applySheetsUniworkAnswer(current, answer)
         if (next === current) return
         deps.setFile(next)

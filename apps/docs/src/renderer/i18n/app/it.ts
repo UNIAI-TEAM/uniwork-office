@@ -220,6 +220,7 @@ export const it = {
   appEndnotePlaceholder: 'Testo della nota di chiusura…',
   appAutoSave: 'Salvataggio automatico',
   appAutoSaveTip: 'Salvataggio automatico (ogni 30 secondi e quando la finestra perde il focus)',
+  appAutoSaveNeedsSaveTip: 'Salva prima il documento per attivare il salvataggio automatico',
   appSaveShortcutTip: 'Salva ({keys})',
   appUndo: 'Annulla',
   appRedo: 'Ripristina',

@@ -1,6 +1,7 @@
 /** Session handlers: History batches, AI rollback points, undo/redo, dirty state, save and save-as. */
 import { commitSaved } from '@genoffice/pptx-engine'
 import type { HandlerContext } from '../host-io'
+import { baseName } from '../../shared/base-name'
 import { buildAllRenderSlides } from '../render'
 import {
   beginHistoryBatch,
@@ -15,6 +16,53 @@ import {
   settleStaleHistoryBatch,
   takeSnapshot,
 } from '../state'
+
+async function saveAs(ctx: HandlerContext, defaultName: string) {
+  const session = sessions.get(ctx.clientId)
+  if (!session) return { ok: false, error: 'no file open' }
+  // G5-03a: a locked working copy leaves as nothing, not even a Save As copy
+  if (session.path && ctx.host.isLocked?.(session.path)) return { ok: false }
+  let target: string | null
+  try {
+    target = await ctx.host.saveTarget.saveAs(session.path, defaultName)
+  } catch (err) {
+    // the host refused the chooser's answer (a legacy extension): nothing is written
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+  if (!target) return { ok: false }
+  // A view-only UniWork path is refused (cancel shape); picking the deck's own
+  // file is an explicit Save of it and reports a user save, any other target is
+  // a plain local copy
+  const gate = ctx.host.saveGate?.({
+    kind: 'save-as',
+    origin: 'user',
+    currentPath: session.path || null,
+    targetPath: target,
+  }) ?? { write: true, fireHook: false }
+  if (!gate.write) return { ok: false }
+  try {
+    const metaRevAtSave = session.metaRev ?? 0
+    await ctx.host.writeDeck(session.opened, target)
+    const previousPath = session.path
+    session.path = target
+    await ctx.host.saved({
+      kind: 'saveAs',
+      session,
+      path: target,
+      ...(previousPath ? { previousPath } : {}),
+    })
+    commitSaved(session.opened)
+    if ((session.metaRev ?? 0) === metaRevAtSave) session.metaDirty = false
+    if (gate.fireHook) ctx.host.userSaved?.(target)
+    return {
+      ok: true,
+      path: target,
+      slides: buildAllRenderSlides(session.opened, session.fitWidthPx),
+    }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+}
 
 export const historySaveHandlers = {
   'slides:history-batch-begin': (ctx: HandlerContext) => {
@@ -74,6 +122,18 @@ export const historySaveHandlers = {
     const session = sessions.get(ctx.clientId)
     if (!session) return { ok: false, error: 'no file open' }
     const pathBefore = session.path || null
+    // a converted legacy deck is a temp copy: an explicit Save asks where to write it. AutoSave
+    // and the shell's own flush for the UniWork first save ('in-place') write the copy itself.
+    if (
+      rawOrigin !== 'auto' &&
+      rawOrigin !== 'in-place' &&
+      pathBefore &&
+      ctx.host.saveTarget.convertedSaveAs?.(pathBefore)
+    ) {
+      const result = await saveAs(ctx, baseName(pathBefore))
+      // a cancelled chooser (or a refused target) wrote nothing and is not a failure to report
+      return result.ok || 'error' in result ? result : { ...result, canceled: true }
+    }
     const gate =
       pathBefore && ctx.host.saveGate
         ? ctx.host.saveGate({
@@ -112,40 +172,7 @@ export const historySaveHandlers = {
     }
   },
 
-  'slides:save-as': async (ctx: HandlerContext, defaultName: string) => {
-    const session = sessions.get(ctx.clientId)
-    if (!session) return { ok: false, error: 'no file open' }
-    // G5-03a: a locked working copy leaves as nothing, not even a Save As copy
-    if (session.path && ctx.host.isLocked?.(session.path)) return { ok: false }
-    const target = await ctx.host.saveTarget.saveAs(session.path, defaultName)
-    if (!target) return { ok: false }
-    // A view-only UniWork path is refused (cancel shape); picking the deck's own
-    // file is an explicit Save of it and reports a user save, any other target is
-    // a plain local copy
-    const gate = ctx.host.saveGate?.({
-      kind: 'save-as',
-      origin: 'user',
-      currentPath: session.path || null,
-      targetPath: target,
-    }) ?? { write: true, fireHook: false }
-    if (!gate.write) return { ok: false }
-    try {
-      const metaRevAtSave = session.metaRev ?? 0
-      await ctx.host.writeDeck(session.opened, target)
-      session.path = target
-      await ctx.host.saved({ kind: 'saveAs', session, path: target })
-      commitSaved(session.opened)
-      if ((session.metaRev ?? 0) === metaRevAtSave) session.metaDirty = false
-      if (gate.fireHook) ctx.host.userSaved?.(target)
-      return {
-        ok: true,
-        path: target,
-        slides: buildAllRenderSlides(session.opened, session.fitWidthPx),
-      }
-    } catch (err) {
-      return { ok: false, error: String(err) }
-    }
-  },
+  'slides:save-as': saveAs,
 
   'slides:recent': (ctx: HandlerContext) => ctx.host.recent(),
 }

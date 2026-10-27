@@ -15,6 +15,7 @@ import {
 } from '../../shared/sync-center'
 import { formatBytes as formatListBytes } from './doclist/format'
 import type { StringKey } from './locale'
+import { LEGACY_CONVERSION_KEY, failedTipKeyOf } from './uniwork-docs-model'
 
 export type SyncTone = 'info' | 'warn' | 'error' | 'ok' | 'neutral'
 
@@ -243,6 +244,8 @@ const FAILED_REASON: Record<string, StringKey> = {
   too_large: 'uwReasonTooLarge',
   // EL-1(a) (UNI-1645c): a commit refused by someone else's edit lock
   edit_locked: 'uwReasonEditLocked',
+  // UNI-2212: a refused legacy conversion
+  legacy_conversion: LEGACY_CONVERSION_KEY,
   other: 'uwReasonOther',
 }
 
@@ -369,13 +372,17 @@ export function rowView(row: SyncCenterRow, ctx: { online: boolean }): SyncRowVi
       return {
         ...base,
         badge: { tone: 'error', key: 'uwBadgeFailed' },
-        sub: {
-          key: 'uwRowFailed',
-          keyParams: { reason: failedReasonKey(row) },
-          ...(row.failedReason === 'too_large' && row.maxBytes !== undefined
-            ? { reasonMaxBytes: row.maxBytes }
-            : {}),
-        },
+        // UNI-2212: a refused conversion is its own sentence, not a fragment of "Couldn't send"
+        sub:
+          failedTipKeyOf(failedReasonKey(row)) === LEGACY_CONVERSION_KEY
+            ? { key: LEGACY_CONVERSION_KEY }
+            : {
+                key: 'uwRowFailed',
+                keyParams: { reason: failedReasonKey(row) },
+                ...(row.failedReason === 'too_large' && row.maxBytes !== undefined
+                  ? { reasonMaxBytes: row.maxBytes }
+                  : {}),
+              },
         actions: [action('details'), action('saveAgain'), cancel],
       }
     case 'committed':

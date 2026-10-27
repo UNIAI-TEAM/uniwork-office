@@ -5,10 +5,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { createModuleSaveRequester } from '../src/main/uniwork-docs/module-save'
 import type { TabKind } from '../src/shared/tabs-api'
 
-function setup(kind: TabKind | null, destroyed = false) {
+function setup(kind: TabKind | null, destroyed = false, converted: string[] = []) {
   const wc = { isDestroyed: () => destroyed, send: vi.fn() } as unknown as WebContents
   const deps = {
     targetForPath: vi.fn(() => (kind ? { kind, webContents: wc } : undefined)),
+    isConvertedPath: (path: string) => converted.includes(path),
     sheetsMenuChannel: 'menu:action',
     requestMarkdownSave: vi.fn().mockResolvedValue(true),
     requestHtmlSave: vi.fn().mockResolvedValue(true),
@@ -60,6 +61,20 @@ describe('UniWork chip Retry / conflict overwrite run the owning module Save', (
     expect(deps.flushPdfSave).toHaveBeenCalledTimes(1)
     expect(deps.flushPdfSave.mock.calls[0]).toEqual([wc])
     expect(wc.send).not.toHaveBeenCalled()
+  })
+
+  it('a converted legacy tab is flushed in place (docs / sheets / slides), a same-stem sibling is not (UNI-2211 R1-4)', () => {
+    for (const [kind, channel] of [
+      ['docs', 'menu:command'],
+      ['sheets', 'menu:action'],
+      ['slides', 'slides:menu'],
+    ] as const) {
+      const { wc, save } = setup(kind, false, ['/tmp/imports/u1/Budget.xlsx'])
+      expect(save('/tmp/imports/u1/Budget.xlsx')).toBe(true)
+      expect(save('/w/Budget.xlsx')).toBe(true)
+      expect(wc.send).toHaveBeenNthCalledWith(1, channel, 'save-in-place')
+      expect(wc.send).toHaveBeenNthCalledWith(2, channel, 'save')
+    }
   })
 
   it('returns false when nothing shows the path, so the service falls back', () => {

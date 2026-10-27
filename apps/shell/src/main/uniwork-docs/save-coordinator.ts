@@ -5,6 +5,7 @@ import type { Binding, BindingStore, BoundDocument } from './binding-store'
 import type { UniworkDocsClient } from './client'
 import { UniworkDocError, isTerminalRefusal } from './errors'
 import { sha256Hex } from './formats'
+import { conversionFor, convertedTitle } from './legacy-cloud'
 import { DEFAULT_DOCUMENT_LIMITS, type DocumentLimits, type DocumentLimitsCache } from './limits'
 import type { CommitLookup, CommitReceipt, DocumentDetail } from './parse'
 import type { SavedUploadSession } from './upload-session'
@@ -606,7 +607,10 @@ export class SaveCoordinator {
     // bytes identical to the base never touch the network, and an unchanged
     // copy over the cap is already on the server: the no-op verdict comes first
     // so a lowered limit never marks an unchanged document failed
-    const unchangedFromBase = checksum === doc.binding.baseChecksum
+    // UNI-2212: a copy that still owes the server its conversion is never "unchanged": the OOXML
+    // bytes equal the base the open recorded (they are what the converter produced), yet the
+    // server's live version is still the legacy file, so the explicit Save must commit them
+    const unchangedFromBase = checksum === doc.binding.baseChecksum && !doc.binding.legacyFrom
     // EL-1(a) (UNI-1645c): when the previous commit was refused with 423
     // `document_locked` (`edit_locked`), the intent is parked in `failed` with
     // `lastError: 'edit_locked'` so background polls never auto-retry it, while
@@ -942,6 +946,9 @@ export class SaveCoordinator {
       attempt: 0,
       createdAt: at,
       updatedAt: at,
+      // UNI-2212: the conversion this commit declares is fixed with the intent, so a retry after
+      // the binding changed (a view launch, a reopen) still sends the same one
+      conversion: doc.binding.legacyFrom ? conversionFor(doc.binding.legacyFrom) : null,
     }
   }
 
@@ -968,6 +975,12 @@ export class SaveCoordinator {
       lastSavedAt: this.now().toISOString(),
     })
     delete settled.serverRevision
+    // UNI-2212: the converted copy is now the live version: an ordinary OOXML document, whose
+    // title the server rewrote from the legacy suffix
+    if (settled.legacyFrom) {
+      settled.title = convertedTitle(settled.title, settled.legacyFrom)
+      delete settled.legacyFrom
+    }
     // the comments anchor base moves with the base version; an unknown id is
     // dropped rather than left naming the previous version
     if (landed.versionId) settled.baseVersionId = landed.versionId
@@ -1373,6 +1386,12 @@ export class SaveCoordinator {
           })
         }
         const editLockId = this.deps.editLockId?.(doc.path) ?? null
+        const conversion =
+          intent.conversion !== undefined
+            ? intent.conversion
+            : doc.binding.legacyFrom
+              ? conversionFor(doc.binding.legacyFrom)
+              : null
         // B70 + R2: the commit is about to be POSTed, so the durable record
         // must say `committing` BEFORE the request leaves - a crash or a lost
         // answer then reads `committing`, never `queued` (which the next poll
@@ -1400,6 +1419,9 @@ export class SaveCoordinator {
             baseRevision: intent.baseRevision,
             idempotencyKey: intent.idempotencyKey,
             ...(editLockId ? { editLockId } : {}),
+            // UNI-2212: a converted copy of a legacy document declares its conversion, the one its
+            // intent was minted with (an intent from before the snapshot reads the binding)
+            ...(conversion ? { conversion } : {}),
           })
         } catch (error) {
           // only the COMMIT leg is tagged, and only for an answer the server
@@ -1596,6 +1618,21 @@ export class SaveCoordinator {
           error: 'too_large',
           sizeBytes: error.sizeBytes ?? intent.length,
           ...(error.maxBytes !== undefined ? { maxBytes: error.maxBytes } : {}),
+        })
+      case 'legacy_conversion_invalid':
+        // UNI-2212: the converted copy was refused as the next version of its legacy document.
+        // The edits are never dropped: the intent stays as a durable `failed` record (the same
+        // place a too_large one parks) so no poll replays it, and the converted local copy is
+        // still the working copy - the user can keep it, save it locally or save a copy.
+        this.pendingNext.delete(doc.path)
+        await this.settleRecord(intents, doc, intent, {
+          type: 'commitFailed',
+          error: 'legacy_conversion_invalid',
+        })
+        return this.commitState(doc, {
+          ...base,
+          state: 'failed',
+          error: 'legacy_conversion_invalid',
         })
       case 'quota_exceeded':
       case 'not_found':

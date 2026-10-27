@@ -48,16 +48,13 @@ describe('the shared open-dialog extensions', () => {
 })
 
 describe('the Home "Open local file" hint', () => {
-  it('names the legacy binaries it deliberately leaves out', () => {
-    expect(OPEN_DIALOG_UNSUPPORTED_EXTENSIONS).toEqual(['doc', 'ppt'])
-    for (const ext of OPEN_DIALOG_UNSUPPORTED_EXTENSIONS) {
-      expect(OPEN_DIALOG_EXTENSIONS).toContain(ext)
-    }
+  it('leaves nothing out: the legacy .doc/.ppt binaries open through the converter', () => {
+    expect(OPEN_DIALOG_UNSUPPORTED_EXTENSIONS).toEqual([])
   })
 
   it('is the dialog list in the same order, minus the unsupported ones', () => {
     expect(openLocalHint()).toBe(
-      '.docx / .xlsx / .xlsm / .xls / .csv / .tsv / .pptx / .pdf / .md / .markdown / .txt / .json / .html / .htm',
+      '.docx / .doc / .xlsx / .xlsm / .xls / .csv / .tsv / .pptx / .ppt / .pdf / .md / .markdown / .txt / .json / .html / .htm',
     )
     const shown = openLocalHint()
       .split(' / ')
@@ -65,8 +62,8 @@ describe('the Home "Open local file" hint', () => {
     expect(shown).toEqual(
       OPEN_DIALOG_EXTENSIONS.filter((e) => !OPEN_DIALOG_UNSUPPORTED_EXTENSIONS.includes(e)),
     )
-    expect(shown).not.toContain('doc')
-    expect(shown).not.toContain('ppt')
+    expect(shown).toContain('doc')
+    expect(shown).toContain('ppt')
   })
 
   it('Home reads the shared list instead of a hand-typed copy', () => {

@@ -672,7 +672,8 @@ export function SyncCenterPane({
           {disclosure === 'details' && (
             <span id={`${base}-more-${r.id}`} className="sc-more-text">
               {fmt({
-                key: 'uwTipFailed',
+                // a refused conversion's row already is its own sentence: the details repeat it
+                key: view.sub.key === 'uwErrLegacyConversion' ? view.sub.key : 'uwTipFailed',
                 keyParams: view.sub.keyParams,
                 reasonMaxBytes: view.sub.reasonMaxBytes,
               })}

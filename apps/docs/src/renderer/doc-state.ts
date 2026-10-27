@@ -26,6 +26,8 @@ export interface DocState {
   isBlank?: boolean
   /** desired open password is set for the next save; toggled via Review > Protect */
   encrypted?: boolean
+  /** converted legacy .doc held as a temp copy: Save asks where to write, suggested at this path */
+  suggestSaveAs?: string
 }
 
 /** A restored recovery snapshot has not reached the original path yet. */

@@ -243,6 +243,7 @@ function mapFailedReason(
   // EL-1(a) (UNI-1645c): the queue parked the intent with lastError edit_locked; the row must
   // say "someone else is editing", not the generic "unavailable"
   if (error === 'edit_locked') return 'edit_locked'
+  if (error === 'legacy_conversion_invalid') return 'legacy_conversion'
   return 'other'
 }
 
@@ -920,6 +921,8 @@ export function createSyncCenterController(deps: SyncCenterControllerDeps): Sync
           baseVersion: old.baseVersion,
           checksum: old.checksum,
           length: old.length,
+          // the same snapshot, so "Save again" re-sends the conversion the bytes were made for
+          ...(old.conversion === undefined ? {} : { conversion: old.conversion }),
         },
         deps.now?.() ?? Date.now(),
       )

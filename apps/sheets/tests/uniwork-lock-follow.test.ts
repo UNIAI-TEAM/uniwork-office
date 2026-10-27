@@ -93,6 +93,53 @@ describe('watchSheetsUniworkState follows the lock ping', () => {
     expect(unsubscribes).toBe(1)
   })
 
+  it('takes the working-copy path from the adoption ping, then follows a later lock ping for it (R1-7)', async () => {
+    const TEMP = 'C:/tmp/genoffice-imports/u1/budget.xlsx'
+    let file: SheetsUniworkFile | null = makeFile({
+      path: TEMP,
+      readOnly: false,
+      uniworkBound: undefined,
+      unsavedNew: true,
+      needsSaveAs: true,
+    })
+    let answer = { bound: true, readOnly: false }
+    let ping = (_path: string, _newPath?: string): void => {}
+    const editableHistory: boolean[] = []
+    const workbook: EditableWorkbook = { setEditable: (v: boolean) => void editableHistory.push(v) }
+    const lock = createViewOnlyLock(() => () => {})
+    watchSheetsUniworkState({
+      api: {
+        uniworkState: async () => answer,
+        onUniworkStateChanged: (cb) => {
+          ping = cb
+          return () => {}
+        },
+      },
+      getFile: () => file,
+      setFile: (next) => {
+        file = next
+      },
+      getWorkbook: () => workbook,
+      lock,
+      webViewOnly: false,
+    })
+
+    // adoption: the ping names the old temp path and carries the working copy
+    ping(TEMP, PATH)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(file).toMatchObject({ path: PATH, uniworkBound: true, readOnly: false })
+    expect(file?.unsavedNew).toBeUndefined()
+
+    // the lock changes for the working copy: the editor follows without a save / reopen
+    answer = { bound: true, readOnly: true }
+    ping(PATH)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(file?.readOnly).toBe(true)
+    expect(editableHistory).toEqual([false])
+  })
+
   it('matches the ping regardless of Windows slash / case spelling or csvPath', () => {
     const xlsx = makeFile({ path: 'C:\\U\\Doc1\\budget.xlsx' })
     expect(sheetsMatchesUniworkPath(xlsx, 'c:/u/doc1/budget.xlsx')).toBe(true)

@@ -1,4 +1,5 @@
 import type { UniworkDocErrorCode } from '../../../shared/home-api'
+import type { LegacyConversion } from '../../uniwork-docs/legacy-cloud'
 import { QUEUE_LIMITS, type QueueLimits } from './limits'
 import {
   isTerminalQueueState,
@@ -42,6 +43,8 @@ export interface NewIntentInput {
   length: number
   /** defaults to `ctx.now` */
   createdAt?: string
+  /** UNI-2212: the commit's conversion snapshot (null = ordinary; absent = read the binding) */
+  conversion?: LegacyConversion | null
 }
 
 export type QueueEffect =
@@ -164,6 +167,8 @@ const FAILED_CODES = new Set<UniworkDocErrorCode>([
   'unsupported_format',
   'engine_incompatible',
   'idempotency_mismatch',
+  // UNI-2212: a refused conversion is a verdict on the bytes and the document, never a retry
+  'legacy_conversion_invalid',
   // EL-1(a) (UNI-1645c): 423 document_locked parks until an explicit user Save or document close
   'edit_locked',
 ])
@@ -293,6 +298,7 @@ function createFromSave(
     attempt: 0,
     createdAt: input.createdAt ?? iso(ctx.now),
     updatedAt: iso(ctx.now),
+    ...(input.conversion === undefined ? {} : { conversion: input.conversion }),
   }
 }
 

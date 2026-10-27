@@ -96,7 +96,7 @@ async function runSerialized<T>(pass: () => Promise<T>): Promise<T> {
 export async function save(
   getCtx: () => ActionCtx,
   quiet = false,
-  origin: 'user' | 'auto' = 'user',
+  origin: 'user' | 'auto' | 'in-place' = 'user',
 ): Promise<boolean> {
   // web frame without the host's save grant: the deck is view-only
   if (isViewOnly()) return false
@@ -113,7 +113,7 @@ export async function save(
       const saved = t('appStatusSaved')
       ctx.setStatus(saved)
       if (!quiet) showToast(saved)
-    } else if (!isWeb() || r.error) {
+    } else if (!r.canceled && (!isWeb() || r.error)) {
       const failed = t('appStatusSaveFailed', { error: r.error ?? t('appErrorCanceled') })
       ctx.setStatus(failed)
       // quiet suppresses the success toast only — a failed save (incl. the 30s

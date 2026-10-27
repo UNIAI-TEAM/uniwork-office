@@ -213,6 +213,7 @@ export const cs = {
   appEndnotePlaceholder: 'Text vysvětlivky…',
   appAutoSave: 'Automatické ukládání',
   appAutoSaveTip: 'Automatické ukládání (každých 30 sekund a při ztrátě fokusu okna)',
+  appAutoSaveNeedsSaveTip: 'Nejprve dokument uložte, poté můžete zapnout automatické ukládání',
   appSaveShortcutTip: 'Uložit ({keys})',
   appUndo: 'Zpět',
   appRedo: 'Znovu',

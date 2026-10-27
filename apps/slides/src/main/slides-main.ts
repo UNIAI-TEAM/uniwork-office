@@ -42,10 +42,13 @@ import {
   appMenuLabels,
   configuredDefaultSaveDir,
   contextMenuLabels,
+  convertedDocumentFor,
   fetchRemoteImage,
+  forgetConvertedDocument,
   installContextMenu,
   installNavigationGuard,
   isHeadlessMode,
+  assertModernSaveTarget,
   safeExternalUrl,
   saveAsSuggestion,
   showOpenDialogWithMemory,
@@ -381,6 +384,8 @@ async function pushRecent(path: string): Promise<void> {
   if (isHeadlessMode()) return
   // A kept-draft preview is a temporary decrypted copy, not a file the user opened.
   if (isDraftPreviewPath(app.getPath('userData'), path)) return
+  // A converted legacy copy is a staging file swept when its tab closes: never a recent entry.
+  if (convertedDocumentFor(path)) return
   const cur = await readRecent()
   const next = [path, ...cur.filter((p) => p !== path)].slice(0, 10)
   try {
@@ -669,15 +674,16 @@ function hostFor(wc: WebContents): HostIO {
         // a UniWork working copy's Save As starts outside its hidden folder
         defaultPath: uniworkIsBound(currentPath)
           ? defaultName
-          : saveAsSuggestion(currentPath, defaultName),
+          : (convertedDocumentFor(currentPath)?.suggestSaveAs ??
+            saveAsSuggestion(currentPath, defaultName)),
         filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
       }
       const r = await showSaveDialogWithMemory(dialog, dialogParent(), options, getDraftsDir())
-      return r.canceled || !r.filePath ? null : r.filePath
+      return r.canceled || !r.filePath ? null : assertModernSaveTarget(r.filePath, 'pptx')
     },
     saveGate: (input) => uniworkSaveDecision(input),
     userSaved: (path) => notifyUniworkUserSave(path),
-    saved: async ({ kind, session, path }) => {
+    saved: async ({ kind, session, path, previousPath }) => {
       if (kind === 'untitled') {
         await pushRecent(path)
         slidesOpenedHook?.(wc, path)
@@ -687,6 +693,8 @@ function hostFor(wc: WebContents): HostIO {
       if (kind === 'save') void rm(autosavePathFor(path), { force: true }).catch(() => {})
       dropUntitledRecovery(wc.id)
       if (kind === 'saveAs') {
+        // a converted legacy deck has its real home now
+        forgetConvertedDocument(previousPath)
         await pushRecent(path)
         syncAttachedPaths(session, path)
       }
@@ -1078,7 +1086,11 @@ export function registerSlidesIpc(): void {
   // copy (AutoSave forced off) and whether it is view-only (Save disabled)
   ipcMain.handle('slides:uniwork-state', (e) => {
     const path = sessions.get(e.sender.id)?.path || null
-    return { bound: uniworkIsBound(path), readOnly: uniworkIsReadOnly(path) }
+    return {
+      bound: uniworkIsBound(path),
+      readOnly: uniworkIsReadOnly(path),
+      converted: path ? convertedDocumentFor(path) !== undefined : false,
+    }
   })
   ipcMain.handle('slides:uniwork-read-only-save', (e, filePath?: unknown) => {
     const path = sessions.get(e.sender.id)?.path || null

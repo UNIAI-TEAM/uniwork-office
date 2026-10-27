@@ -898,6 +898,7 @@ export function App({
       mode: 'save' | 'save-as' | 'recovery',
       quiet?: boolean,
       explicitTarget?: { path: string; overwrite: boolean },
+      inPlace?: boolean,
     ) => Promise<SaveOutcome>
   >(() => Promise.resolve({ ok: false }))
   /// Latest MCP bridge handlers (assigned each render; see the install below).
@@ -4838,6 +4839,7 @@ export function App({
     mode: 'save' | 'save-as' | 'recovery',
     quiet = false,
     explicitTarget?: { path: string; overwrite: boolean },
+    inPlace = false,
   ): Promise<SaveOutcome> {
     // Manual and AI saves take the same gate as the timers: a recovery copy
     // written beside a real save would outlive it as a phantom Restore prompt.
@@ -4858,7 +4860,7 @@ export function App({
     }
     return gate.run(async () => {
       if (!(await commitActiveEditor())) return { ok: false }
-      return handleSaveImpl(saveContext(), mode, quiet, explicitTarget)
+      return handleSaveImpl(saveContext(), mode, quiet, explicitTarget, inPlace)
     })
   }
   closeSaveRef.current = async () => {
@@ -4911,6 +4913,8 @@ export function App({
       } else {
         void univerRef.current?.univerAPI.redo()
       }
+    } else if (action === 'save-in-place') {
+      void handleSave('save', false, undefined, true)
     } else {
       void handleSave(action)
     }

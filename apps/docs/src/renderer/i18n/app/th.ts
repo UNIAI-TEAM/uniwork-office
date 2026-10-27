@@ -211,6 +211,7 @@ export const th = {
   appEndnotePlaceholder: 'ข้อความอ้างอิงท้ายเรื่อง…',
   appAutoSave: 'บันทึกอัตโนมัติ',
   appAutoSaveTip: 'บันทึกอัตโนมัติ (ทุก 30 วินาทีและเมื่อหน้าต่างไม่ได้โฟกัส)',
+  appAutoSaveNeedsSaveTip: 'บันทึกเอกสารก่อนเพื่อเปิดการบันทึกอัตโนมัติ',
   appSaveShortcutTip: 'บันทึก ({keys})',
   appUndo: 'เลิกทำ',
   appRedo: 'ทำซ้ำ',

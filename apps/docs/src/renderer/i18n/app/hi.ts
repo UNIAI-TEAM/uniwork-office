@@ -213,6 +213,7 @@ export const hi = {
   appEndnotePlaceholder: 'अंत टिप्पणी का टेक्स्ट…',
   appAutoSave: 'स्वतः सहेजना',
   appAutoSaveTip: 'स्वतः सहेजना (हर 30 सेकंड में और विंडो का फ़ोकस हटने पर)',
+  appAutoSaveNeedsSaveTip: 'ऑटोसेव चालू करने के लिए पहले दस्तावेज़ सहेजें',
   appSaveShortcutTip: 'सहेजें ({keys})',
   appUndo: 'पूर्ववत करें',
   appRedo: 'फिर से करें',

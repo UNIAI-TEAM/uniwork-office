@@ -149,3 +149,18 @@ describe('copyTitleFor (G5-12, BE-12F-04)', () => {
     expect(copyTitleFor('Plan.xlsx', '(my version)', 'docx')).toBe('Plan.xlsx (my version)')
   })
 })
+
+describe('UNI-2212 names of a converted legacy copy', () => {
+  it('sanitizeFilename drops the legacy suffix of the pair instead of stacking it', () => {
+    expect(sanitizeFilename('Budget.xls', 'xlsx')).toBe('Budget.xlsx')
+    expect(sanitizeFilename('Memo.DOC', 'docx')).toBe('Memo.docx')
+    expect(sanitizeFilename('Deck.ppt', 'pptx')).toBe('Deck.pptx')
+    // a legacy suffix of another family is part of the name
+    expect(sanitizeFilename('Budget.xls', 'docx')).toBe('Budget.xls.docx')
+  })
+
+  it('copyTitleFor names the copy of a legacy title as OOXML', () => {
+    expect(copyTitleFor('Plan.ppt', '(mine)', 'pptx')).toBe('Plan (mine).pptx')
+    expect(copyTitleFor('Plan.ppt', '(mine)', 'docx')).toBe('Plan.ppt (mine)')
+  })
+})

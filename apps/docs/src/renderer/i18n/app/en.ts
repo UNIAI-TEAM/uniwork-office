@@ -209,6 +209,7 @@ export const en = {
   appEndnotePlaceholder: 'Endnote text…',
   appAutoSave: 'AutoSave',
   appAutoSaveTip: 'AutoSave (every 30 seconds and when the window loses focus)',
+  appAutoSaveNeedsSaveTip: 'Save the document first to turn on AutoSave',
   appSaveShortcutTip: 'Save ({keys})',
   appUndo: 'Undo',
   appRedo: 'Redo',

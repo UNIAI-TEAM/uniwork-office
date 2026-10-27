@@ -270,6 +270,37 @@ in this repository yet**: add it, then pass the secrets it reads (for KeyLocker 
 `SM_CODE_SIGNING_CERT_SHA1_HASH`; for a PFX the file and its password) to the "Sign the
 helper binaries" and "Package the installer" steps.
 
+## Bundled legacy format converter (LibreOffice 26.8.2.2)
+
+Every desktop installer bundles a trimmed LibreOffice 26.8.2.2 converter pack under
+`Resources/libreoffice/` (`apps/shell/build/prepare-libreoffice.cjs` and
+`apps/shell/build/libreoffice-manifest.json`), including a pre-initialised
+`Resources/libreoffice/template-profile/` (`MacroSecurityLevel=3`, link updates disabled) and the
+24 metric-compatible font files needed for headless `.doc -> .docx`, `.xls -> .xlsx` and
+`.ppt -> .pptx` conversion. `beforePack` prepares and verifies the target's cached pack under
+`apps/shell/build/.cache/libreoffice-26.8.2.2/<platform>-<arch>/libreoffice` before
+`electron-builder` copies `extraResources`, and `.github/workflows/release-installers.yml` caches
+that directory per runner OS keyed by the manifest and script hashes.
+
+Code-signing backlog notes for a later signing card:
+
+- **Windows (`win32-x64`, `win32-arm64`):** `electron-builder` does not sign `extraResources`
+  files automatically. When `scripts/win-sign.cjs` and `UNIWORK_SIGNING_ENABLED` are enabled, the
+  signing step must also sign `program/soffice.exe`, `program/soffice.bin`, and all 75 `.dll`
+  files under `apps/shell/build/.cache/libreoffice-26.8.2.2/win32-<arch>/libreoffice/program/`
+  before packaging (and re-save or exclude the signed binaries from raw-checksum invalidation) so
+  Smart App Control / WDAC / AppLocker do not block `soffice.bin` child processes.
+- **macOS (`darwin-arm64`, `darwin-x64`):** `@electron/osx-sign` walks `Contents/Resources/libreoffice/LibreOffice.app`
+  and re-signs its 85 Mach-O binaries (`Contents/MacOS/soffice` and 84 `.dylib` files in
+  `Contents/Frameworks/`) plus the nested `.app` bundle with the app's Developer ID Application
+  identity and `entitlementsInherit` (`com.apple.security.cs.allow-jit`,
+  `com.apple.security.cs.allow-unsigned-executable-memory`,
+  `com.apple.security.cs.disable-library-validation`). A later macOS signing verification card
+  should verify that notarization and `spctl --assess` succeed with the nested `LibreOffice.app`
+  inside `Contents/Resources/libreoffice/`.
+- **Linux (`linux-x64`, `linux-arm64`):** ELF binaries inside `.deb` and `.AppImage` are not
+  individually code-signed; repository metadata stays GPG-signed by `apt-repo.sh`.
+
 ## Download server and apt repository
 
 Every published release is also copied to `https://uniworkos.com/downloads/office/`: the edge

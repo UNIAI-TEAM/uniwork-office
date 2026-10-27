@@ -168,6 +168,10 @@ export const ko = {
   uwTipEditLocked: '{name} 님이 {time}부터 편집 중입니다.',
   uwTipEditLockedSelf: '다른 창에서 이 문서를 편집 중입니다.',
   uwErrEditLocked: '다른 사용자가 이 문서를 편집 중입니다.',
+  uwErrLegacyConversion:
+    '이 이전 형식의 Office 문서를 새 버전으로 저장할 수 없습니다. 변경 내용은 이 사본에 그대로 남아 있습니다.',
+  uwErrLegacyOpen: '이 이전 형식의 Office 문서를 여기서 열 수 없습니다.',
+  uwErrLegacyCancelled: '열기를 취소했습니다.',
   uwReasonEditLocked: '다른 사용자가 편집 중',
   uwLockBannerOther: '{name} 님이 {time}부터 편집 중입니다. 읽기 전용으로 보고 있습니다.',
   uwLockBannerSelfElsewhere: '다른 창에서 이 문서를 편집 중입니다.',

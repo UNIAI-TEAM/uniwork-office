@@ -553,6 +553,7 @@ export async function loadFile(
       fileName: result.name,
       hash: result.hash,
       encrypted: result.encrypted,
+      suggestSaveAs: result.suggestSaveAs,
     })
     ctx.onRevisionsLoaded(blocksHaveRevisions(parsed.blocks))
     // this tab's document was replaced: a password parked for the previous
@@ -1037,13 +1038,87 @@ export function currentDocGeneration(): number {
   return docGeneration
 }
 
+/**
+ * A converted legacy .doc is held as a temp .docx: an explicit Save of it is a
+ * Save As next to the original, never a write into the temp copy. The shell's own
+ * flush for the UniWork first save (`inPlace`) does write the temp copy; an MCP
+ * explicit target keeps its own path. An auto save never reaches either (see
+ * `refusesConvertedAutoSave`).
+ */
+export function savesAsConvertedCopy(
+  doc: FileActionContext['doc'],
+  auto: boolean,
+  inPlace: boolean,
+  explicitTarget: ExplicitSaveTarget | undefined,
+): boolean {
+  return !!doc?.suggestSaveAs && !auto && !inPlace && !explicitTarget
+}
+
+/**
+ * An auto save of a converted copy is refused at the common save boundary, whatever
+ * trigger asked for it (AutoSave timer, blur, close, section-break insertion): the
+ * temp file is swept when the tab closes, so a silent write would clear the dirty
+ * state while the edits live nowhere. The caller stays dirty.
+ */
+export function refusesConvertedAutoSave(
+  doc: FileActionContext['doc'],
+  auto: boolean,
+  inPlace: boolean,
+  explicitTarget: ExplicitSaveTarget | undefined,
+): boolean {
+  return !!doc?.suggestSaveAs && auto && !inPlace && !explicitTarget
+}
+
+/**
+ * AutoSave as it actually runs: the pref, off for a UniWork working copy and for a
+ * converted legacy copy (its temp file is swept when the tab closes, so a silent
+ * write would leave the edits nowhere).
+ */
+export function autoSavesDocument(
+  pref: boolean,
+  uniworkBound: boolean,
+  doc: FileActionContext['doc'],
+): boolean {
+  return pref && !uniworkBound && !autoSaveNeedsFirstSave(doc)
+}
+
+/**
+ * A converted legacy copy has no file of its own until its first Save As, so the AutoSave switch
+ * is shown disabled (with a tip saying why) instead of looking enabled and doing nothing.
+ */
+export function autoSaveNeedsFirstSave(doc: FileActionContext['doc']): boolean {
+  return !!doc?.suggestSaveAs
+}
+
+/**
+ * May a save that waited behind another pass reuse that pass's success? Only for a
+ * plain Save with nothing left to persist. Never for Save As, an MCP explicit target
+ * or a converted copy's Save As, and never for the shell's in-place flush: it needs
+ * its own successful user-save notification even when an AutoSave just left the file clean.
+ */
+export function canReuseSavePass(p: {
+  saveAs: boolean
+  inPlace: boolean
+  explicitTarget: ExplicitSaveTarget | undefined
+  convertedSaveAs: boolean
+  incomplete: boolean
+  dirty: boolean
+}): boolean {
+  return (
+    !p.saveAs && !p.inPlace && !p.explicitTarget && !p.convertedSaveAs && !p.incomplete && !p.dirty
+  )
+}
+
 export function save(
   ctx: FileActionContext,
   saveAs: boolean,
   auto = false,
   newDocName?: string,
   explicitTarget?: ExplicitSaveTarget,
+  inPlace = false,
 ): Promise<boolean> {
+  if (refusesConvertedAutoSave(ctx.doc, auto, inPlace, explicitTarget))
+    return Promise.resolve(false)
   // A save arriving mid-flight waits for the current one instead of failing.
   // Reuse the finished pass only when it left nothing behind — judged by the
   // composite dirty check (header/section/theme edits do not set dirtyRef), plus
@@ -1055,10 +1130,17 @@ export function save(
     async () => {
       const settled = ctx.settleFontSettings ? await ctx.settleFontSettings() : ctx
       if (docGeneration !== generation) return false
-      return saveOnce(settled, saveAs, auto, newDocName, explicitTarget)
+      return saveOnce(settled, saveAs, auto, newDocName, explicitTarget, inPlace)
     },
-    // an explicit MCP target must always write, never reuse an earlier pass
-    () => !saveAs && !explicitTarget && !ctx.saveIncompleteRef.current && !isDocDirty(ctx),
+    () =>
+      canReuseSavePass({
+        saveAs,
+        inPlace,
+        explicitTarget,
+        convertedSaveAs: savesAsConvertedCopy(ctx.doc, auto, inPlace, explicitTarget),
+        incomplete: ctx.saveIncompleteRef.current,
+        dirty: isDocDirty(ctx),
+      }),
   )
 }
 
@@ -1130,13 +1212,15 @@ export async function applyAiDocContent(
 
 async function saveOnce(
   ctx: FileActionContext,
-  saveAs: boolean,
+  saveAsRequested: boolean,
   auto: boolean,
   newDocName?: string,
   explicitTarget?: ExplicitSaveTarget,
+  inPlace = false,
 ): Promise<boolean> {
   const { doc, editor } = ctx
   if (!doc || !editor) return false
+  const saveAs = saveAsRequested || savesAsConvertedCopy(doc, auto, inPlace, explicitTarget)
   ctx.saveInFlightRef.current = true
   ctx.saveIncompleteRef.current = false
   // visible progress for a manual save (Save As can wait on a dialog and an upload); every
@@ -1255,6 +1339,8 @@ async function saveOnce(
                 ? {
                     filePath: savedPath,
                     fileName: savedPath?.split(/[\\/]/).pop() ?? prev.fileName,
+                    // the copy has its real home now
+                    ...(saveAs ? { suggestSaveAs: undefined } : {}),
                   }
                 : {}),
             }
@@ -1306,6 +1392,7 @@ async function saveOnce(
               ? {
                   filePath: savedPath,
                   fileName: savedPath?.split(/[\\/]/).pop() ?? prev.fileName,
+                  ...(saveAs ? { suggestSaveAs: undefined } : {}),
                 }
               : {}),
           }

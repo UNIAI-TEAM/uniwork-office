@@ -283,6 +283,13 @@ export type UniworkDocErrorCode =
   | 'other_window'
   // EL-1(a) (UNI-1645c): HTTP 423 document_locked — another user holds the server edit lock
   | 'edit_locked'
+  // UNI-2212: the server's 422 `legacy_conversion_invalid` - the converted copy of an old-format
+  // document was refused as its next version (user-facing, never retried)
+  | 'legacy_conversion_invalid'
+  // UNI-2212: opening a cloud .doc/.xls/.ppt - the converter refused it (the typed notice naming
+  // why was already shown by the app) / the person cancelled the conversion
+  | 'legacy_open_failed'
+  | 'legacy_cancelled'
 
 export interface UniworkWorkspaceRef {
   id: string

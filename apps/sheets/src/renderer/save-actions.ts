@@ -119,6 +119,7 @@ export async function handleSave(
   mode: 'save' | 'save-as' | 'recovery',
   quiet = false,
   explicitTarget?: { path: string; overwrite: boolean },
+  inPlace = false,
 ): Promise<SaveOutcome> {
   // web frame without the host's save grant: the workbook is view-only
   if (isViewOnly() || (mode === 'save-as' && !cap('saveAs'))) {
@@ -327,7 +328,10 @@ export async function handleSave(
   const firstSaveAs = mode === 'save' && state.file.unsavedNew === true && !quiet
   // An explicit Save of a UniWork-bound workbook always writes, pending edits
   // or not: the shell uploads what the Save wrote (Retry after a failed upload).
-  const forceWrite = mode === 'save' && !quiet && uniworkForcesWrite(state.file)
+  // The shell's flush of an unsaved converted copy for the UniWork first save: an untouched
+  // copy has nothing pending, so the explicit-write permission lets it reach the file
+  const inPlaceFlush = mode === 'save' && !quiet && inPlace && state.file.unsavedNew === true
+  const forceWrite = mode === 'save' && !quiet && (uniworkForcesWrite(state.file) || inPlaceFlush)
   if (total === 0 && mode !== 'save-as' && !restoreWriteBack && !firstSaveAs && !forceWrite) {
     if (mode !== 'recovery') ctx.setMessage(t('appNoEditsToSave'))
     return { ok: false }
@@ -458,6 +462,7 @@ export async function handleSave(
       // MCP saves (explicitTarget) carry no origin: they never count as a user Save
       ...(explicitTarget ? {} : { origin: saveOrigin(quiet) }),
       ...(forceWrite ? { forceWrite: true } : {}),
+      ...(inPlaceFlush ? { inPlace: true } : {}),
       ...(csvContent === undefined ? {} : { csvContent }),
       // MCP explicit-path save: main skips the Save-As dialog for these
       ...(explicitTarget
