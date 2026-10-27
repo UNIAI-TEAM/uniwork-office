@@ -1,11 +1,18 @@
+import { WrapStrategy } from '@univerjs/core'
 import { describe, expect, it } from 'vitest'
 
 import {
   excelWidthScale,
   formatForMeasure,
+  formatGeneral,
+  generalCharBudget,
+  generalOverflowHashes,
   hasGdiDigitCalibration,
   hashFill,
+  keepsUniverOverflow,
+  mergedSpanWidth,
   overflowHashes,
+  SHRINK_TO_FIT_KEY,
 } from '../src/renderer/numfmt-fix'
 
 const measure = (text: string): number => text.length * 8
@@ -167,5 +174,71 @@ describe('formatForMeasure', () => {
     expect(formatForMeasure('#,##0,\\ ', 105303159)).toBe('105,303\u00a0')
     expect(formatForMeasure('General', 105303159)).toBe('105303159')
     expect(formatForMeasure(undefined, 12.5)).toBe('12.5')
+  })
+})
+
+describe('generalOverflowHashes', () => {
+  it('keeps text that fits the character budget', () => {
+    expect(generalOverflowHashes('1.3E+09', 7, 64, measure)).toBeNull()
+    expect(generalOverflowHashes('1234567', 7, 64, measure)).toBeNull()
+  })
+
+  it('fills the column with hashes when even the scientific fallback is too wide', () => {
+    // A 4-character column: 1234567 shrinks to 1E+06 (5 chars), which no longer fits.
+    const text = formatGeneral(1234567, 4)
+    expect(text).toBe('1E+06')
+    // fill = floor((33 - 5) / 8) = 3
+    expect(generalOverflowHashes(text, 4, 33, measure)).toBe('###')
+  })
+
+  it('widening the column brings the value back', () => {
+    const wide = formatGeneral(1234567, 9)
+    expect(wide).toBe('1234567')
+    expect(generalOverflowHashes(wide, 9, 80, measure)).toBeNull()
+  })
+
+  it('keeps a hash in a one-character column', () => {
+    expect(generalOverflowHashes(formatGeneral(5.5, 1), 1, 12, measure)).toBeNull()
+    expect(generalOverflowHashes(formatGeneral(1234, 1), 1, 12, measure)).toBe('#')
+  })
+
+  it('does not hash a text longer than the budget that fits the pixels (small font)', () => {
+    // 1E+06 (5 chars) is over the 4-char budget, but at 8pt it is 25px of the 28 available.
+    expect(generalOverflowHashes('1E+06', 4, 33, (t) => t.length * 5)).toBeNull()
+    // The 11pt measure does not fit: hashed.
+    expect(generalOverflowHashes('1E+06', 4, 33, (t) => t.length * 8)).toBe('###')
+  })
+})
+
+describe('keepsUniverOverflow', () => {
+  it('keeps wrapped, rotated and shrink-to-fit cells out of the #### rule', () => {
+    expect(keepsUniverOverflow({ tb: WrapStrategy.WRAP }, undefined)).toBe(true)
+    expect(keepsUniverOverflow({ tr: { a: 45 } }, undefined)).toBe(true)
+    expect(keepsUniverOverflow({ tr: { a: 0, v: 1 } }, undefined)).toBe(true)
+    expect(keepsUniverOverflow(undefined, { [SHRINK_TO_FIT_KEY]: true })).toBe(true)
+  })
+
+  it('lets a plain cell through', () => {
+    expect(keepsUniverOverflow(undefined, undefined)).toBe(false)
+    expect(keepsUniverOverflow({ tb: WrapStrategy.CLIP, tr: { a: 0, v: 0 } }, {})).toBe(false)
+  })
+})
+
+describe('General #### in a merged span', () => {
+  const sheet = {
+    getMergedCell: () => ({ startColumn: 0, endColumn: 1 }),
+    getColumnWidth: () => 33,
+    getColVisible: () => true,
+  }
+
+  it('uses the whole span for the budget and the fill', () => {
+    // Two 33px columns: 66px -> floor(61 / 7) = 8 chars, so 1234567 fits as is.
+    const width = mergedSpanWidth(sheet, 0, 0) as number
+    expect(width).toBe(66)
+    const budget = generalCharBudget(width)
+    expect(generalOverflowHashes(formatGeneral(1234567, budget), budget, width, measure)).toBeNull()
+    // The anchor column alone (33px) would have hashed it.
+    const narrow = generalCharBudget(33)
+    expect(generalOverflowHashes(formatGeneral(1234567, narrow), narrow, 33, measure)).toBe('###')
   })
 })

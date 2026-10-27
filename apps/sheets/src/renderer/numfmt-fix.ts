@@ -18,6 +18,7 @@
 import {
   CellValueType,
   type ICellData,
+  type IStyleData,
   InterceptorEffectEnum,
   isDefaultFormat,
   numfmt,
@@ -454,6 +455,38 @@ export function mergedSpanWidth(sheet: MergedSpanSheet, row: number, col: number
   return total
 }
 
+/// Excel's General never clips either: once even the scientific fallback of
+/// formatGeneral is wider than the column's character budget (a 1E+06 needs
+/// five characters) AND the text really overflows the column pixels (same
+/// rule as overflowHashes, so a small font that fits keeps its value), the
+/// cell shows the hash fill. Null when the text fits.
+export function generalOverflowHashes(
+  text: string,
+  budget: number,
+  columnWidthPx: number,
+  measure: (text: string) => number,
+  scale = 1,
+  calibrated = scale !== 1,
+): string | null {
+  if (text.length <= budget) return null
+  return overflowHashes(text, columnWidthPx, measure, scale, calibrated)
+}
+
+/// Wrapped, rotated and shrink-to-fit cells keep Univer's own rendering
+/// instead of the #### rule (shared by the formatted and General paths).
+export function keepsUniverOverflow(
+  // void: Univer's Nullable<T> includes it.
+  style: IStyleData | null | undefined | void,
+  custom: Record<string, unknown> | null | undefined | void,
+): boolean {
+  return (
+    style?.tb === WrapStrategy.WRAP ||
+    Boolean(style?.tr?.a) ||
+    Boolean(style?.tr?.v) ||
+    custom?.[SHRINK_TO_FIT_KEY] === true
+  )
+}
+
 export function hashFill(columnWidthPx: number, measure: (text: string) => number): string | null {
   const hashWidth = measure('#')
   if (!(hashWidth > 0)) return null
@@ -814,8 +847,7 @@ export function installNumberFormatFix(
         if (isDefaultFormat(patternUsed)) return outCell
         const type = patternType(patternUsed)
         if (type === 'text' || type === 'unknown') return outCell
-        if (style?.tb === WrapStrategy.WRAP || style?.tr?.a || style?.tr?.v) return outCell
-        if (location.rawData?.custom?.[SHRINK_TO_FIT_KEY] === true) return outCell
+        if (keepsUniverOverflow(style, location.rawData?.custom)) return outCell
         const fontString = getFontStyleString(style ?? undefined).fontString
         const measure = (text: string) => FontCache.getMeasureText(text, fontString).width
         const width =
@@ -861,16 +893,34 @@ export function installNumberFormatFix(
       }
       if (isDefaultFormat(pattern)) {
         if (cell.t !== CellValueType.NUMBER || typeof raw !== 'number') return next(cell)
-        const budget = generalCharBudget(
+        const width =
           mergedSpanWidth(location.worksheet, location.row, location.col) ??
-            location.worksheet.getColumnWidth(location.col),
-        )
+          location.worksheet.getColumnWidth(location.col)
+        const budget = generalCharBudget(width)
         const key = `G ${raw} ${budget}`
         let text = cache.get(key)
         if (text === undefined) {
           text = formatGeneral(raw, budget)
           if (cache.size > 50_000) cache.clear()
           cache.set(key, text)
+        }
+        // Cheap char test first; the exclusions and the pixel rule are maybeHash's.
+        if (
+          text !== null &&
+          text.length > budget &&
+          !keepsUniverOverflow(style, location.rawData?.custom)
+        ) {
+          const fontString = getFontStyleString(style ?? undefined).fontString
+          const measure = (t: string) => FontCache.getMeasureText(t, fontString).width
+          const hashes = generalOverflowHashes(
+            text,
+            budget,
+            width,
+            measure,
+            excelWidthScale(style?.ff ?? undefined, style?.fs ?? 11, () => measure('0')),
+            hasGdiDigitCalibration(style?.ff ?? undefined),
+          )
+          if (hashes !== null) return next({ ...cell, v: hashes, t: CellValueType.NUMBER })
         }
         if (text === null || text === String(cell.v)) return next(cell)
         return next({ ...cell, v: text, t: CellValueType.NUMBER })
