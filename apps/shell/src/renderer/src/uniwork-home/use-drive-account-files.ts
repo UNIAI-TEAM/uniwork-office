@@ -21,7 +21,7 @@ export type DriveFetchPage = (
 /** a runaway cursor chain must not spin forever; 40 pages is far past any real account */
 export const MAX_ACCOUNT_PAGES = 40
 
-/** all pages of one account, or null when a page fails (a partial folder tree would lie about counts) */
+/** all pages of one account, or null when a page fails or the page cap is hit (a partial folder tree would lie about counts) */
 export async function fetchAllAccountFiles(
   fetchPage: DriveFetchPage,
   connectionId: string,
@@ -37,7 +37,8 @@ export async function fetchAllAccountFiles(
     if (!res.value.nextCursor) return files
     cursor = res.value.nextCursor
   }
-  return files
+  // the cap hit with a cursor still pending: a partial tree would lie, so the account falls back to the flat paged list
+  return null
 }
 
 export function useDriveAccountFiles({
