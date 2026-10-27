@@ -20,9 +20,34 @@ const FILE_ICONS: Record<string, string> = {
   htm: iconHtml,
 }
 
+// Legacy Office formats draw a lighter copy of their modern format's icon (same rule as the web DocumentTypeIcon).
+const LEGACY_ICONS: Record<string, string> = {
+  doc: iconDocx,
+  dot: iconDocx,
+  rtf: iconDocx,
+  xls: iconXlsx,
+  xlt: iconXlsx,
+  ppt: iconPptx,
+  pps: iconPptx,
+  pot: iconPptx,
+}
+
 /** file-type icon by extension ('page' = UniNote, the shared option J tile); an unknown extension gets a neutral letter tile */
 export function FileBadge({ ext, size }: { ext: string; size: number }) {
   if (ext === 'page') return <UniNoteIcon width={size} height={size} />
+  const legacy = LEGACY_ICONS[ext]
+  if (legacy) {
+    return (
+      <img
+        src={legacy}
+        width={size}
+        height={size}
+        alt=""
+        aria-hidden="true"
+        style={{ opacity: 0.55 }}
+      />
+    )
+  }
   const icon = FILE_ICONS[ext]
   if (icon) {
     return <img src={icon} width={size} height={size} alt="" aria-hidden="true" />
