@@ -1960,6 +1960,11 @@ export function DocumentsHome({
   } | null>(null)
   const takeIntent = (intent: DocumentsIntent): boolean => {
     if (intent.workspaceId !== workspaceId) return false
+    if (intent.kind === 'folder') {
+      resetFilters()
+      openFolderInWorkspace(intent.folderId)
+      return true
+    }
     if (intent.kind === 'trash') {
       const stalePage = subViewRef.current === 'trash' ? null : pageRef.current
       resetFilters()

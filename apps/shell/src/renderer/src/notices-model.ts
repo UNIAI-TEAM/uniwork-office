@@ -209,6 +209,11 @@ function isGroupedCount(count: string | undefined): boolean {
   return count !== undefined && /^[1-9]\d*$/.test(count.trim())
 }
 
+/** a share notice of one folder batch: the sentence names the folder and the click opens that folder */
+export function isGroupedShare(n: WorkNotification): boolean {
+  return n.kind === 'document_shared' && isGroupedCount(n.params.count)
+}
+
 /**
  * The sentence of a notice and the params it places. A document notice whose title is gone (the
  * server drops it once the reader lost access) uses the untitled variant, never an empty quoted
@@ -230,7 +235,7 @@ export function noticeSentence(n: WorkNotification): {
 
   let name = `wbNotif_${n.kind}`
   // the grouped share of one batch: the folder's title and how many documents it holds
-  if (n.kind === 'document_shared' && isGroupedCount(n.params.count)) name += '_folder'
+  if (isGroupedShare(n)) name += '_folder'
   if (!NEVER_UNTITLED.has(n.kind) && !n.params.document?.trim()) name += '_untitled'
   if (n.kind === 'document_shared' && shareLevelKey(n.params.level ?? '') === null)
     name += '_nolevel'
@@ -281,6 +286,8 @@ export type NoticeTarget =
   | { to: 'document'; documentId: string; commentId?: string; discussion?: true }
   | { to: 'share'; documentId: string; workspaceId: string; section: 'requests' | 'break_glass' }
   | { to: 'trash'; documentId: string; workspaceId: string }
+  /** a grouped folder share: the notice's resource is the folder, which opens in Documents */
+  | { to: 'folder'; folderId: string; workspaceId: string }
   /** document_changed: the UNI-2067 dialog / open code decides */
   | { to: 'changed' }
   | { to: 'web'; target: NoticeWebTarget }
@@ -316,6 +323,10 @@ export function noticeTarget(n: WorkNotification): NoticeTarget {
         return { to: 'share', documentId, workspaceId: n.workspace_id, section: 'break_glass' }
       case 'document_trashed_by_other':
         return { to: 'trash', documentId, workspaceId: n.workspace_id }
+      case 'document_shared':
+        if (isGroupedShare(n))
+          return { to: 'folder', folderId: documentId, workspaceId: n.workspace_id }
+        break
     }
     const commentId = n.params.comment_id
     if (!COMMENT_KINDS.has(n.kind) || !commentId || n.comment_deleted)

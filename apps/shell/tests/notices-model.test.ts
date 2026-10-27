@@ -506,6 +506,30 @@ describe('noticeTarget', () => {
     })
   })
 
+  it('opens the folder of a grouped share notice, the document of a single one (UNI-2244)', () => {
+    expect(noticeTarget(kindRow('document_shared', { count: '6', level: 'edit' }))).toEqual({
+      to: 'folder',
+      folderId: 'd1',
+      workspaceId: 'w1',
+    })
+    for (const count of ['', '0', '-3', '1.5', 'many']) {
+      expect(noticeTarget(kindRow('document_shared', { count, level: 'edit' }))).toEqual({
+        to: 'document',
+        documentId: 'd1',
+      })
+    }
+    expect(noticeTarget(kindRow('document_shared', { level: 'edit' }))).toEqual({
+      to: 'document',
+      documentId: 'd1',
+    })
+    // a count on any other kind does not make it a folder share
+    expect(noticeTarget(kindRow('document_commented', { count: '6' })).to).toBe('document')
+    // a gone folder opens nothing
+    expect(
+      noticeTarget({ ...kindRow('document_shared', { count: '6' }), resource_deleted: true }),
+    ).toEqual({ to: 'none' })
+  })
+
   it('opens the Trash for a trashed-by-other notice', () => {
     expect(noticeTarget(kindRow('document_trashed_by_other'))).toEqual({
       to: 'trash',

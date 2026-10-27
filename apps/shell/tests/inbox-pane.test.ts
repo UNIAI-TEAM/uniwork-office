@@ -706,6 +706,44 @@ describe('InboxPane opens a notice', () => {
     expect(work.markNotificationsRead).toHaveBeenCalledWith(['n1'])
   })
 
+  it('opens the folder of a grouped share notice in Documents and marks it read (UNI-2244)', async () => {
+    const { taken, off } = intents()
+    try {
+      await show([
+        row('g1', {
+          kind: 'document_shared',
+          params: { actor: 'Lan', document: 'Q4', count: '6', level: 'edit' },
+        }),
+      ])
+      await click(mainOf('g1'))
+      expect(taken).toEqual([{ kind: 'folder', folderId: 'd-g1', workspaceId: 'w' }])
+      expect(work.markNotificationsRead).toHaveBeenCalledWith(['g1'])
+      // the folder id is never opened as a document
+      expect(api.uniworkOpenDocument).not.toHaveBeenCalled()
+      expect(api.uniworkOpenDocumentAt).not.toHaveBeenCalled()
+    } finally {
+      off()
+    }
+  })
+
+  it('keeps a share notice with an unusable count opening its document (UNI-2244)', async () => {
+    const { taken, off } = intents()
+    try {
+      await show([
+        row('g2', {
+          kind: 'document_shared',
+          params: { actor: 'Lan', document: 'Plan', count: '0', level: 'edit' },
+        }),
+      ])
+      await click(mainOf('g2'))
+      expect(api.uniworkOpenDocument).toHaveBeenCalledWith('d-g2')
+      expect(taken).toEqual([])
+      expect(work.markNotificationsRead).toHaveBeenCalledWith(['g2'])
+    } finally {
+      off()
+    }
+  })
+
   it('keeps the row unread when the document fails to open', async () => {
     api.uniworkOpenDocument.mockResolvedValueOnce({ ok: false, error: 'not_found' })
     await show([row('n1')])
