@@ -289,6 +289,6 @@ export const pl = {
   shrFcErrorRejected:
     'Nie udało się zastosować dostępu dla niektórych osób lub grup. Popraw oznaczone wiersze i spróbuj ponownie.',
   shrFcRunningNoBatch:
-    'Ten folder ma już zmianę dostępu działającą w tle. Spróbuj ponownie, gdy się zakończy.',
+    'Dostęp w tym folderze jest właśnie aktualizowany. Spróbuj ponownie za chwilę.',
   shrFcTooMany: 'Naraz można dodać najwyżej {max} osób lub grup.',
 } satisfies Record<keyof typeof zh, string>

@@ -280,7 +280,6 @@ export const ko = {
   shrFcErrorGeneric: '권한을 적용할 수 없습니다. 다시 시도하세요.',
   shrFcErrorRejected:
     '일부 사람이나 그룹에는 권한을 적용할 수 없습니다. 표시된 행을 수정한 뒤 다시 시도하세요.',
-  shrFcRunningNoBatch:
-    '이 폴더에서 백그라운드로 권한 변경이 이미 진행 중입니다. 끝난 뒤 다시 시도하세요.',
+  shrFcRunningNoBatch: '이 폴더의 권한을 업데이트하는 중입니다. 잠시 후 다시 시도하세요.',
   shrFcTooMany: '한 번에 최대 {max}명의 사람이나 그룹을 추가할 수 있습니다.',
 } satisfies Record<keyof typeof zh, string>

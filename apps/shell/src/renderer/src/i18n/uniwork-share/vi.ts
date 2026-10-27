@@ -277,8 +277,7 @@ export const vi = {
   shrFcErrorGeneric: 'Không áp dụng được quyền. Hãy thử lại.',
   shrFcErrorRejected:
     'Không áp dụng được cho một số đối tượng. Sửa các đối tượng được đánh dấu rồi thử lại.',
-  shrFcRunningNoBatch:
-    'Thư mục này đang có một lượt áp dụng quyền chạy nền. Hãy thử lại khi nó kết thúc.',
+  shrFcRunningNoBatch: 'Thư mục này đang được cập nhật quyền. Thử lại sau giây lát.',
   shrFcTooMany: 'Chỉ thêm được tối đa {max} đối tượng mỗi lần.',
   shrFcDoneOne: 'Đã đổi quyền {count} tài liệu',
   shrFcDoneOther: 'Đã đổi quyền {count} tài liệu',

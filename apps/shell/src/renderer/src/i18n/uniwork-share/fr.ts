@@ -290,6 +290,6 @@ export const fr = {
   shrFcErrorRejected:
     'L’accès n’a pas pu être appliqué à certaines personnes ou certains groupes. Corrigez les lignes signalées et réessayez.',
   shrFcRunningNoBatch:
-    'Une modification d’accès est déjà en cours en arrière-plan pour ce dossier. Réessayez quand elle sera terminée.',
+    'L’accès dans ce dossier est en cours de mise à jour. Réessayez dans un instant.',
   shrFcTooMany: 'Vous pouvez ajouter jusqu’à {max} personnes ou groupes à la fois.',
 } satisfies Record<keyof typeof zh, string>

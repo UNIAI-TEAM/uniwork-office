@@ -289,6 +289,6 @@ export const ja = {
   shrFcErrorRejected:
     '一部の人またはグループにはアクセス権を適用できませんでした。マークされた行を修正してもう一度お試しください。',
   shrFcRunningNoBatch:
-    'このフォルダーではバックグラウンドでアクセス権の変更が実行中です。終了後にもう一度お試しください。',
+    'このフォルダーのアクセス権を更新しています。少し待ってからもう一度お試しください。',
   shrFcTooMany: '一度に追加できるのは最大 {max} 人またはグループまでです。',
 } satisfies Record<keyof typeof zh, string>

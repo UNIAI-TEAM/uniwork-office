@@ -289,6 +289,6 @@ export const es = {
   shrFcErrorRejected:
     'No se pudo aplicar el acceso a algunas personas o grupos. Corrige las filas marcadas e inténtalo de nuevo.',
   shrFcRunningNoBatch:
-    'Esta carpeta ya tiene un cambio de acceso en curso en segundo plano. Inténtalo de nuevo cuando termine.',
+    'Se está actualizando el acceso en esta carpeta. Inténtalo de nuevo en un momento.',
   shrFcTooMany: 'Puedes añadir hasta {max} personas o grupos a la vez.',
 } satisfies Record<keyof typeof zh, string>

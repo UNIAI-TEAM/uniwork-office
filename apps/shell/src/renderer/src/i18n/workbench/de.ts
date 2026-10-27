@@ -40,6 +40,14 @@ export const de = {
   wbNotif_document_shared_untitled: '{actor} hat ein Dokument mit dir geteilt ({level}).',
   wbNotif_document_shared_nolevel: '{actor} hat „{document}“ mit dir geteilt.',
   wbNotif_document_shared_untitled_nolevel: '{actor} hat ein Dokument mit dir geteilt.',
+  wbNotif_document_shared_folder:
+    '{actor} hat {count} Dokument(e) im Ordner „{document}“ mit dir geteilt ({level}).',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} hat {count} Dokument(e) in einem Ordner mit dir geteilt ({level}).',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} hat {count} Dokument(e) im Ordner „{document}“ mit dir geteilt.',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} hat {count} Dokument(e) in einem Ordner mit dir geteilt.',
   wbNotif_document_owner_transferred:
     '{actor} hat dir die Inhaberschaft an „{document}“ übertragen.',
   wbNotif_document_owner_transferred_untitled:

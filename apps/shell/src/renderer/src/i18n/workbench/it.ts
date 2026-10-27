@@ -37,6 +37,14 @@ export const it = {
   wbNotif_document_shared_untitled: '{actor} ha condiviso un documento con te ({level}).',
   wbNotif_document_shared_nolevel: '{actor} ha condiviso «{document}» con te.',
   wbNotif_document_shared_untitled_nolevel: '{actor} ha condiviso un documento con te.',
+  wbNotif_document_shared_folder:
+    '{actor} ha condiviso {count} documento/i nella cartella «{document}» con te ({level}).',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} ha condiviso {count} documento/i in una cartella con te ({level}).',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} ha condiviso {count} documento/i nella cartella «{document}» con te.',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} ha condiviso {count} documento/i in una cartella con te.',
   wbNotif_document_owner_transferred: '{actor} ti ha trasferito la proprietà di «{document}».',
   wbNotif_document_owner_transferred_untitled:
     '{actor} ti ha trasferito la proprietà di un documento.',

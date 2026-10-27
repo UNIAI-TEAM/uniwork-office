@@ -259,6 +259,6 @@ export const zhTW = {
   shrFcNotAFolder: '此項目不是資料夾，因此無法批次變更其中的文件。',
   shrFcErrorGeneric: '無法套用權限，請再試一次。',
   shrFcErrorRejected: '無法為部分人員或群組套用權限。請修正標記的列後再試一次。',
-  shrFcRunningNoBatch: '此資料夾已有一項權限變更正在背景執行。請待其結束後再試。',
+  shrFcRunningNoBatch: '此資料夾的權限正在更新。請稍後再試。',
   shrFcTooMany: '每次最多可新增 {max} 位人員或群組。',
 } satisfies Record<keyof typeof zh, string>

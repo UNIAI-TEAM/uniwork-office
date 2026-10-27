@@ -288,7 +288,6 @@ export const pt = {
   shrFcErrorGeneric: 'Não foi possível aplicar o acesso. Tente novamente.',
   shrFcErrorRejected:
     'Não foi possível aplicar o acesso para algumas pessoas ou grupos. Corrija as linhas marcadas e tente novamente.',
-  shrFcRunningNoBatch:
-    'Esta pasta já tem uma alteração de acesso em segundo plano. Tente novamente quando ela terminar.',
+  shrFcRunningNoBatch: 'O acesso nesta pasta está sendo atualizado. Tente novamente em instantes.',
   shrFcTooMany: 'Você pode adicionar até {max} pessoas ou grupos por vez.',
 } satisfies Record<keyof typeof zh, string>

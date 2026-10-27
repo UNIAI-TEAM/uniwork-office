@@ -40,6 +40,14 @@ export const nl = {
   wbNotif_document_shared_untitled: '{actor} heeft een document met je gedeeld ({level}).',
   wbNotif_document_shared_nolevel: '{actor} heeft “{document}” met je gedeeld.',
   wbNotif_document_shared_untitled_nolevel: '{actor} heeft een document met je gedeeld.',
+  wbNotif_document_shared_folder:
+    '{actor} heeft {count} document(en) in de map “{document}” met je gedeeld ({level}).',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} heeft {count} document(en) in een map met je gedeeld ({level}).',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} heeft {count} document(en) in de map “{document}” met je gedeeld.',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} heeft {count} document(en) in een map met je gedeeld.',
   wbNotif_document_owner_transferred:
     '{actor} heeft het eigendom van “{document}” aan je overgedragen.',
   wbNotif_document_owner_transferred_untitled:

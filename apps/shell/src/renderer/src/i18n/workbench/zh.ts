@@ -421,6 +421,14 @@ export const zh = {
   wbNotif_document_shared_untitled: '{actor} 与你共享了一个文档（{level}）。',
   wbNotif_document_shared_nolevel: '{actor} 与你共享了“{document}”。',
   wbNotif_document_shared_untitled_nolevel: '{actor} 与你共享了一个文档。',
+  wbNotif_document_shared_folder:
+    '{actor} 与你共享了文件夹“{document}”中的 {count} 个文档（{level}）。',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} 与你共享了一个文件夹中的 {count} 个文档（{level}）。',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} 与你共享了文件夹“{document}”中的 {count} 个文档。',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} 与你共享了一个文件夹中的 {count} 个文档。',
   wbNotif_document_owner_transferred: '{actor} 已将“{document}”的所有权转让给你。',
   wbNotif_document_owner_transferred_untitled: '{actor} 已将一个文档的所有权转让给你。',
   wbNotif_document_trashed_by_other: '{actor} 将你的文档移入了回收站。请在 {date} 前还原',

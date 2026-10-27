@@ -276,6 +276,6 @@ export const ar = {
   shrFcErrorGeneric: 'تعذّر تطبيق الوصول. حاول مرة أخرى.',
   shrFcErrorRejected:
     'تعذّر تطبيق الوصول على بعض الأشخاص أو المجموعات. صحّح الصفوف المعلَّمة ثم حاول مرة أخرى.',
-  shrFcRunningNoBatch: 'يجري بالفعل تغيير وصول في الخلفية لهذا المجلد. حاول مرة أخرى عند انتهائه.',
+  shrFcRunningNoBatch: 'يجري تحديث الوصول في هذا المجلد. حاول مرة أخرى بعد قليل.',
   shrFcTooMany: 'يمكنك إضافة {max} شخصاً أو مجموعة كحد أقصى في كل مرة.',
 } satisfies Record<keyof typeof zh, string>

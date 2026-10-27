@@ -278,8 +278,7 @@ export const en = {
   shrFcErrorGeneric: 'Could not apply access. Try again.',
   shrFcErrorRejected:
     'Access could not be applied for some people or groups. Fix the marked rows and try again.',
-  shrFcRunningNoBatch:
-    'This folder already has an access change running in the background. Try again when it ends.',
+  shrFcRunningNoBatch: 'Access in this folder is being updated. Try again in a moment.',
   shrFcTooMany: 'You can add up to {max} people or groups at a time.',
   shrFcTitle: 'Share documents in “{title}”',
   shrFcSkippedNotManageable: "skip {count} you don't manage",

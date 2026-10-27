@@ -298,6 +298,6 @@ export const de = {
   shrFcErrorRejected:
     'Der Zugriff konnte für einige Personen oder Gruppen nicht angewendet werden. Korrigiere die markierten Zeilen und versuche es erneut.',
   shrFcRunningNoBatch:
-    'Für diesen Ordner läuft bereits eine Zugriffsänderung im Hintergrund. Versuche es erneut, wenn sie beendet ist.',
+    'Der Zugriff in diesem Ordner wird gerade aktualisiert. Versuche es gleich noch einmal.',
   shrFcTooMany: 'Du kannst auf einmal bis zu {max} Personen oder Gruppen hinzufügen.',
 } satisfies Record<keyof typeof zh, string>

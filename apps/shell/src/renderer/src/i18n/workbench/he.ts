@@ -31,6 +31,14 @@ export const he = {
   wbNotif_document_shared_untitled: '{actor} שיתף/שיתפה איתך מסמך ({level}).',
   wbNotif_document_shared_nolevel: '{actor} שיתף/שיתפה איתך את “{document}”.',
   wbNotif_document_shared_untitled_nolevel: '{actor} שיתף/שיתפה איתך מסמך.',
+  wbNotif_document_shared_folder:
+    '{actor} שיתף/שיתפה איתך {count} מסמכים בתיקייה “{document}” ({level}).',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} שיתף/שיתפה איתך {count} מסמכים בתיקייה ({level}).',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} שיתף/שיתפה איתך {count} מסמכים בתיקייה “{document}”.',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} שיתף/שיתפה איתך {count} מסמכים בתיקייה.',
   wbNotif_document_owner_transferred: '{actor} העביר/ה אליך את הבעלות על “{document}”.',
   wbNotif_document_owner_transferred_untitled: '{actor} העביר/ה אליך את הבעלות על מסמך.',
   wbNotif_document_trashed_by_other: '{actor} העביר/ה את המסמך שלך לאשפה. שחזר/י אותו לפני {date}',

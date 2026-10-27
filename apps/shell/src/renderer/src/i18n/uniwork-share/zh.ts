@@ -258,6 +258,6 @@ export const zh = {
   shrFcNotAFolder: '此项不是文件夹，因此无法批量更改其中的文档。',
   shrFcErrorGeneric: '无法应用权限，请重试。',
   shrFcErrorRejected: '无法为部分人员或群组应用权限。请修正标记的行后重试。',
-  shrFcRunningNoBatch: '此文件夹已有一项权限变更正在后台运行。请待其结束后再试。',
+  shrFcRunningNoBatch: '此文件夹的权限正在更新。请稍后再试。',
   shrFcTooMany: '每次最多可添加 {max} 个人员或群组。',
 }

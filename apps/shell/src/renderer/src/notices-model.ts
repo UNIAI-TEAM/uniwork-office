@@ -204,11 +204,17 @@ const NEVER_UNTITLED: ReadonlySet<string> = new Set([
   'document_access_declined',
 ])
 
+/** a share notice names its documents by count only when the server sent a positive whole number */
+function isGroupedCount(count: string | undefined): boolean {
+  return count !== undefined && /^[1-9]\d*$/.test(count.trim())
+}
+
 /**
  * The sentence of a notice and the params it places. A document notice whose title is gone (the
  * server drops it once the reader lost access) uses the untitled variant, never an empty quoted
  * name; a decline of an edit request reads "still editing"; a share without a known level and a
- * trash notice without a readable date drop that clause. A change row words itself by verb and shape.
+ * trash notice without a readable date drop that clause. A share with a document count is the
+ * grouped folder share and names the folder instead. A change row words itself by verb and shape.
  */
 export function noticeSentence(n: WorkNotification): {
   key: StringKey
@@ -223,6 +229,8 @@ export function noticeSentence(n: WorkNotification): {
     return { key: 'wbNotif_document_edit_request_answered_declined', params: n.params }
 
   let name = `wbNotif_${n.kind}`
+  // the grouped share of one batch: the folder's title and how many documents it holds
+  if (n.kind === 'document_shared' && isGroupedCount(n.params.count)) name += '_folder'
   if (!NEVER_UNTITLED.has(n.kind) && !n.params.document?.trim()) name += '_untitled'
   if (n.kind === 'document_shared' && shareLevelKey(n.params.level ?? '') === null)
     name += '_nolevel'

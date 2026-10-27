@@ -267,6 +267,6 @@ export const he = {
   shrFcErrorGeneric: 'לא ניתן להחיל את ההרשאה. נסה שוב.',
   shrFcErrorRejected:
     'לא ניתן היה להחיל הרשאה על חלק מהאנשים או הקבוצות. תקן את השורות המסומנות ונסה שוב.',
-  shrFcRunningNoBatch: 'כבר פועל שינוי הרשאה ברקע לתיקייה הזו. נסה שוב כשיסתיים.',
+  shrFcRunningNoBatch: 'ההרשאות בתיקייה הזו מתעדכנות כעת. נסה שוב בעוד רגע.',
   shrFcTooMany: 'אפשר להוסיף עד {max} אנשים או קבוצות בכל פעם.',
 } satisfies Record<keyof typeof zh, string>

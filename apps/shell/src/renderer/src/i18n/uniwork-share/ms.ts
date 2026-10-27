@@ -286,7 +286,6 @@ export const ms = {
   shrFcErrorGeneric: 'Akses tidak dapat digunakan. Cuba lagi.',
   shrFcErrorRejected:
     'Akses tidak dapat digunakan untuk sesetengah orang atau kumpulan. Betulkan baris yang ditanda dan cuba lagi.',
-  shrFcRunningNoBatch:
-    'Folder ini sudah mempunyai perubahan akses yang sedang berjalan di latar belakang. Cuba lagi apabila ia selesai.',
+  shrFcRunningNoBatch: 'Akses dalam folder ini sedang dikemas kini. Cuba lagi sebentar lagi.',
   shrFcTooMany: 'Anda boleh menambah sehingga {max} orang atau kumpulan sekali gus.',
 } satisfies Record<keyof typeof zh, string>

@@ -286,7 +286,6 @@ export const nl = {
   shrFcErrorGeneric: 'Toegang kon niet worden toegepast. Probeer het opnieuw.',
   shrFcErrorRejected:
     'Toegang kon niet worden toegepast voor sommige personen of groepen. Corrigeer de gemarkeerde rijen en probeer het opnieuw.',
-  shrFcRunningNoBatch:
-    'Voor deze map loopt al een toegangswijziging op de achtergrond. Probeer het opnieuw wanneer die klaar is.',
+  shrFcRunningNoBatch: 'De toegang in deze map wordt bijgewerkt. Probeer het zo meteen opnieuw.',
   shrFcTooMany: 'U kunt per keer maximaal {max} personen of groepen toevoegen.',
 } satisfies Record<keyof typeof zh, string>

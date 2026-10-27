@@ -286,7 +286,6 @@ export const id = {
   shrFcErrorGeneric: 'Akses tidak dapat diterapkan. Coba lagi.',
   shrFcErrorRejected:
     'Akses tidak dapat diterapkan untuk beberapa orang atau grup. Perbaiki baris yang ditandai lalu coba lagi.',
-  shrFcRunningNoBatch:
-    'Folder ini sudah memiliki perubahan akses yang berjalan di latar belakang. Coba lagi saat selesai.',
+  shrFcRunningNoBatch: 'Akses di folder ini sedang diperbarui. Coba lagi sebentar lagi.',
   shrFcTooMany: 'Anda dapat menambahkan hingga {max} orang atau grup sekaligus.',
 } satisfies Record<keyof typeof zh, string>

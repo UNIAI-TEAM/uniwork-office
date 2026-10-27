@@ -46,6 +46,14 @@ export const ja = {
   wbNotif_document_shared_untitled: '{actor} さんがドキュメントをあなたと共有しました（{level}）。',
   wbNotif_document_shared_nolevel: '{actor} さんが “{document}” をあなたと共有しました。',
   wbNotif_document_shared_untitled_nolevel: '{actor} さんがドキュメントをあなたと共有しました。',
+  wbNotif_document_shared_folder:
+    '{actor} さんがフォルダー “{document}” 内の {count} 件のドキュメントをあなたと共有しました（{level}）。',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} さんがフォルダー内の {count} 件のドキュメントをあなたと共有しました（{level}）。',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} さんがフォルダー “{document}” 内の {count} 件のドキュメントをあなたと共有しました。',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} さんがフォルダー内の {count} 件のドキュメントをあなたと共有しました。',
   wbNotif_document_owner_transferred:
     '{actor} さんが “{document}” の所有権をあなたに譲渡しました。',
   wbNotif_document_owner_transferred_untitled:

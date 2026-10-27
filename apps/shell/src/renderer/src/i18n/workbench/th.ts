@@ -31,6 +31,14 @@ export const th = {
   wbNotif_document_shared_untitled: '{actor} แชร์เอกสารกับคุณ ({level})',
   wbNotif_document_shared_nolevel: '{actor} แชร์ “{document}” กับคุณ',
   wbNotif_document_shared_untitled_nolevel: '{actor} แชร์เอกสารกับคุณ',
+  wbNotif_document_shared_folder:
+    '{actor} แชร์เอกสาร {count} รายการในโฟลเดอร์ “{document}” กับคุณ ({level})',
+  wbNotif_document_shared_folder_untitled:
+    '{actor} แชร์เอกสาร {count} รายการในโฟลเดอร์หนึ่งกับคุณ ({level})',
+  wbNotif_document_shared_folder_nolevel:
+    '{actor} แชร์เอกสาร {count} รายการในโฟลเดอร์ “{document}” กับคุณ',
+  wbNotif_document_shared_folder_untitled_nolevel:
+    '{actor} แชร์เอกสาร {count} รายการในโฟลเดอร์หนึ่งกับคุณ',
   wbNotif_document_owner_transferred: '{actor} โอนความเป็นเจ้าของ “{document}” ให้คุณ',
   wbNotif_document_owner_transferred_untitled: '{actor} โอนความเป็นเจ้าของเอกสารให้คุณ',
   wbNotif_document_trashed_by_other: '{actor} ย้ายเอกสารของคุณไปถังขยะ กู้คืนก่อนวันที่ {date}',

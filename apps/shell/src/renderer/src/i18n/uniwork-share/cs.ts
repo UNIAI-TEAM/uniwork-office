@@ -285,7 +285,6 @@ export const cs = {
   shrFcErrorGeneric: 'Přístup se nepodařilo použít. Zkuste to znovu.',
   shrFcErrorRejected:
     'Přístup se nepodařilo použít u některých osob nebo skupin. Opravte označené řádky a zkuste to znovu.',
-  shrFcRunningNoBatch:
-    'U této složky už běží změna přístupu na pozadí. Zkuste to znovu, až skončí.',
+  shrFcRunningNoBatch: 'Přístup v této složce se právě aktualizuje. Zkuste to znovu za chvíli.',
   shrFcTooMany: 'Najednou můžete přidat nejvýše {max} osob nebo skupin.',
 } satisfies Record<keyof typeof zh, string>
