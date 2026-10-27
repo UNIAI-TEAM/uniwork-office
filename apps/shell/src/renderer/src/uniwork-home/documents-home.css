@@ -188,6 +188,9 @@
 
 .dh-title {
   min-width: 0; /* a long account email shrinks (ellipsis) before the workspace select */
+  /* in the stacked group (column, align-items: flex-start) the h1 sizes to its max-content, so the
+     ellipsis needs the cap to engage */
+  max-width: 100%;
   margin: 0;
   overflow: hidden;
   color: var(--text);
