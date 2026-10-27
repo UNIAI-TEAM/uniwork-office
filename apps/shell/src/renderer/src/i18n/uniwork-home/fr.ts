@@ -101,7 +101,7 @@ export const fr = {
   uhShelvedIntro:
     'Les documents terminés sont rangés ici : conservés pour toujours, en lecture seule, sans commentaires. Désarchiver un élément le rétablit tel quel. Toute personne qui peut le voir peut toujours l’ouvrir et le trouver (libellé « Archivé »). Archiver un dossier archive toute l’arborescence ; il faut l’accès Gérer.',
   uhShelvedSort: 'Archivés le plus récemment',
-  uhShelvedFilterBy: 'Archivé par',
+  uhShelvedFilterBy: 'Archivé par :',
   uhShelvedFilterAny: 'N’importe qui',
   uhShelvedLoadedOnly: 'Filtre ce qui est chargé — chargez-en plus pour élargir.',
   uhShelvedByFormer: 'Ancien membre',

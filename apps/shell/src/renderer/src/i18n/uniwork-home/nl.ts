@@ -100,7 +100,7 @@ export const nl = {
   uhShelvedIntro:
     'Afgeronde documenten worden hier opgeborgen: voor altijd bewaard, alleen-lezen, zonder opmerkingen. Dearchiveren zet een item terug zoals het was. Wie het kan zien, kan het nog steeds openen en vinden (label „Gearchiveerd”). Een map archiveren archiveert de hele boom; daarvoor is Beheren-toegang nodig.',
   uhShelvedSort: 'Meest recent gearchiveerd',
-  uhShelvedFilterBy: 'Gearchiveerd door',
+  uhShelvedFilterBy: 'Gearchiveerd door:',
   uhShelvedFilterAny: 'Iedereen',
   uhShelvedLoadedOnly: 'Filtert wat geladen is — laad meer om te verbreden.',
   uhShelvedByFormer: 'Voormalig lid',

@@ -5,9 +5,9 @@ import { shelvedByOptionsOf, shelverKeyOf, type DocumentsHomeDoc } from './docum
  * UNI-1961 (ARCHIVE-01): the Lưu trữ / Archive shelf of the Documents home,
  * drawn as the web's DocumentsShelvedView (D packages/views/documents
  * documents-shelved-view/-toolbar/-row.tsx): the intro and the
- * "Lưu trữ bởi" filter over the loaded rows (the type, editor and date filters are the shared
- * filter bar, doclist/FilterBar) (the server has no `shelved_by`
- * parameter, so the toolbar says so). The rows are drawn by the shared
+ * "Lưu trữ bởi" filter over the loaded rows, a chip in the shared filter bar's row (the type,
+ * editor and date filters are that bar, doclist/FilterBar) (the server has no `shelved_by`
+ * parameter, so a note says so). The rows are drawn by the shared
  * Documents table (doclist/DocList, screen `shelved`), newest shelved first;
  * shelved folders are rows too and never browse.
  */
@@ -46,7 +46,14 @@ export function shelvedDescendantIds(
   return out
 }
 
-export function ShelvedToolbar({
+/** the shelf's intro line above the shared filter bar */
+export function ShelvedIntro() {
+  const { t } = useI18n()
+  return <p className="dh-shelved-intro">{t('uhShelvedIntro')}</p>
+}
+
+/** "Lưu trữ bởi": the same chip as the shared bar's Người sửa / Cập nhật, drawn in that bar's row */
+export function ShelvedByChip({
   items,
   shelvedBy,
   onShelvedBy,
@@ -60,35 +67,29 @@ export function ShelvedToolbar({
   // keep a picked shelver selectable after a reload dropped its rows
   const known = shelvedBy === null || options.some((opt) => opt.id === shelvedBy)
   return (
-    <div className="dh-shelved-head">
-      <p className="dh-shelved-intro">{t('uhShelvedIntro')}</p>
-      <div className="dh-shelved-toolbar">
-        <div className="dh-shelved-by">
-          <label className="dh-filter-chip">
-            <span className="dh-filter-k">{t('uhShelvedFilterBy')}</span>
-            <select
-              className="dh-filter-select"
-              data-filter="shelvedBy"
-              aria-label={t('uhShelvedFilterBy')}
-              value={shelvedBy ?? SHELVED_BY_ANY}
-              onChange={(e) =>
-                onShelvedBy(e.target.value === SHELVED_BY_ANY ? null : e.target.value)
-              }
-            >
-              <option value={SHELVED_BY_ANY}>{t('uhShelvedFilterAny')}</option>
-              {options.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.name}
-                </option>
-              ))}
-              {!known && <option value={shelvedBy!}>{t('uwEditLockSomeone')}</option>}
-            </select>
-          </label>
-          {shelvedBy !== null && (
-            <span className="dh-shelved-loaded-only">{t('uhShelvedLoadedOnly')}</span>
-          )}
-        </div>
-      </div>
-    </div>
+    <label className="dh-filter-chip">
+      <span className="dh-filter-k">{t('uhShelvedFilterBy')}</span>
+      <select
+        className="dh-filter-select"
+        data-filter="shelvedBy"
+        aria-label={t('uhShelvedFilterBy')}
+        value={shelvedBy ?? SHELVED_BY_ANY}
+        onChange={(e) => onShelvedBy(e.target.value === SHELVED_BY_ANY ? null : e.target.value)}
+      >
+        <option value={SHELVED_BY_ANY}>{t('uhShelvedFilterAny')}</option>
+        {options.map((opt) => (
+          <option key={opt.id} value={opt.id}>
+            {opt.name}
+          </option>
+        ))}
+        {!known && <option value={shelvedBy!}>{t('uwEditLockSomeone')}</option>}
+      </select>
+    </label>
   )
+}
+
+/** says the Lưu trữ bởi pick narrows only the rows already loaded */
+export function ShelvedLoadedOnlyNote() {
+  const { t } = useI18n()
+  return <p className="dh-shelved-loaded-only">{t('uhShelvedLoadedOnly')}</p>
 }

@@ -100,7 +100,7 @@ export const ko = {
   uhShelvedIntro:
     '완료된 문서를 이곳에 보관합니다. 영구 보관되며 읽기 전용이고 댓글을 달 수 없습니다. 보관을 해제하면 원래대로 돌아갑니다. 볼 수 있는 사람은 계속 열고 찾을 수 있습니다(“보관됨” 라벨 표시). 폴더를 보관하면 하위 항목 전체가 보관되며, 관리 권한이 필요합니다.',
   uhShelvedSort: '최근 보관순',
-  uhShelvedFilterBy: '보관한 사람',
+  uhShelvedFilterBy: '보관한 사람:',
   uhShelvedFilterAny: '모든 사람',
   uhShelvedLoadedOnly: '불러온 항목만 필터링합니다 — 더 불러오면 범위가 넓어집니다.',
   uhShelvedByFormer: '이전 멤버',

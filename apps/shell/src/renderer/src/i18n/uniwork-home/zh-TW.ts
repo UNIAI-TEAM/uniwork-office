@@ -100,7 +100,7 @@ export const zhTW = {
   uhShelvedIntro:
     '已完成的文件存放在這裡：永久保留、唯讀、不可留言。取消封存會將項目恢復原狀。能檢視的人仍可開啟並找到它（標示為「已封存」）。封存資料夾會封存整個樹狀結構；需要管理權限。',
   uhShelvedSort: '最近封存',
-  uhShelvedFilterBy: '封存者',
+  uhShelvedFilterBy: '封存者：',
   uhShelvedFilterAny: '任何人',
   uhShelvedLoadedOnly: '僅篩選已載入的部分——載入更多以擴大範圍。',
   uhShelvedByFormer: '前成員',

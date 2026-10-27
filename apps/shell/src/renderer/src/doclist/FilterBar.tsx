@@ -43,6 +43,8 @@ export interface FilterBarProps {
   lead?: ReactNode
   /** types this screen's rows can never match (Từ nơi khác lists files only: no UniNote) */
   hideTypes?: readonly DocumentsHomeTypePick[]
+  /** a screen's own filter chip (the shelf's Lưu trữ bởi), drawn in the row after Người sửa / Cập nhật */
+  trail?: ReactNode
 }
 
 /**
@@ -50,7 +52,7 @@ export interface FilterBarProps {
  * then Người sửa and Cập nhật, then one removable chip per picked type. The list reloads from its
  * first page on every change. A screen with a `lead` (Recent's segment) keeps it first in this row.
  */
-export function FilterBar({ filters, onChange, authors, lead, hideTypes }: FilterBarProps) {
+export function FilterBar({ filters, onChange, authors, lead, hideTypes, trail }: FilterBarProps) {
   const { t } = useI18n()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const patch = (part: Partial<DocumentsHomeFilterState>) => onChange({ ...filters, ...part })
@@ -108,6 +110,8 @@ export function FilterBar({ filters, onChange, authors, lead, hideTypes }: Filte
           </select>
         </label>
       </div>
+
+      {trail}
 
       {filters.types.length > 0 && (
         <div className="dh-filter-chips" role="group" aria-label={typeGroupName(t('uhFilterType'))}>
