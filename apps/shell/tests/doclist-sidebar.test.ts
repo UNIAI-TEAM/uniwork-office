@@ -740,9 +740,15 @@ describe('tree grid numbers: TS and CSS cannot drift (D4BF-R3-3)', () => {
     return Number(m![1])
   }
 
-  it('TREE_PAD is --dh-tree-pad and TREE_STEP is --dh-tree-slot + --dh-tree-gap', () => {
+  it('TREE_PAD is --dh-tree-pad and TREE_STEP is --dh-tree-slot + --dh-tree-gap - --dh-tree-pull', () => {
     expect(TREE_PAD).toBe(px('--dh-tree-pad'))
-    expect(TREE_STEP).toBe(px('--dh-tree-slot') + px('--dh-tree-gap'))
+    expect(TREE_STEP).toBe(px('--dh-tree-slot') + px('--dh-tree-gap') - px('--dh-tree-pull'))
+    // the web's 20px step; the pull is the twisty's negative end margin (the web's -mr-1)
+    expect(TREE_STEP).toBe(20)
+    const twisty = cssRules(readSrc('uniwork-folders/uniwork-folders.css')).find((r) =>
+      r.selectors.includes('.uwf-twisty'),
+    )
+    expect(twisty?.body).toContain(`margin-inline-end: -${px('--dh-tree-pull')}px;`)
   })
 
   it('a lost account row shows the icon with sr-only words, and the node keeps the row hover', () => {

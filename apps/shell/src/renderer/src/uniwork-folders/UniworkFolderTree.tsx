@@ -26,11 +26,20 @@ export interface TreeRename {
   busy: boolean
 }
 
-/** first-level inline padding, and the indent of each level below: one chevron slot (16px) + the row gap (6px),
- *  so a child's chevron slot starts under its parent's icon. The Drive rows in documents-home.css read the
- *  same numbers as --dh-tree-pad and --dh-tree-slot + --dh-tree-gap (pinned by doclist-sidebar.test.ts). */
+/** first-level inline padding, and the indent of each level below: one chevron slot (16px) + the row gap (6px)
+ *  - the twisty's 2px pull (`margin-inline-end: -2px`, the web's `-mr-1`), so a child's chevron slot starts under
+ *  its parent's icon. The Drive rows in documents-home.css read the same numbers as --dh-tree-pad and
+ *  --dh-tree-slot + --dh-tree-gap - --dh-tree-pull (pinned by doclist-sidebar.test.ts). */
 export const TREE_PAD = 4
-export const TREE_STEP = 22
+export const TREE_STEP = 20
+/** the deepest inline padding: from level 6 down every row stays here, so a deep name keeps its width
+ *  inside the sidebar (the web's `min(8 + depth * 20, 120)`) */
+export const TREE_MAX_PAD = 120
+
+/** inline padding of a row at `level` (aria-level, 1 = first level) */
+export function treeRowPadding(level: number): number {
+  return Math.min(TREE_PAD + (level - 1) * TREE_STEP, TREE_MAX_PAD)
+}
 
 export function FolderGlyph({ open = false }: { open?: boolean }) {
   return (
@@ -260,8 +269,8 @@ export function UniworkFolderTree({
               aria-disabled={block ? true : undefined}
               aria-describedby={block ? reasonId : undefined}
               tabIndex={row.key === tabKey ? 0 : -1}
-              className={`uwf-tree-row${selected ? ' selected' : ''}${block ? ' blocked' : ''}`}
-              style={{ paddingInlineStart: `${TREE_PAD + (row.level - 1) * TREE_STEP}px` }}
+              className={`uwf-tree-row${items.length > 0 ? ' uwf-tree-row-menu' : ''}${selected ? ' selected' : ''}${block ? ' blocked' : ''}`}
+              style={{ paddingInlineStart: `${treeRowPadding(row.level)}px` }}
               onKeyDown={(e) => onKeyDown(e, row)}
               onFocus={(e) => {
                 if (e.target !== e.currentTarget) return
@@ -322,7 +331,9 @@ export function UniworkFolderTree({
                 />
               ) : (
                 <span className="uwf-tree-text">
-                  <span className="uwf-tree-title">{row.title}</span>
+                  <span className="uwf-tree-title" title={row.title}>
+                    {row.title}
+                  </span>
                   {block && (
                     <span className="uwf-reason" id={reasonId}>
                       {t(MOVE_BLOCK_KEYS[block])}

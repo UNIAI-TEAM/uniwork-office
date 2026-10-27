@@ -105,8 +105,9 @@
 
 /* One grid for every row of the folder tree section (folders at any depth, the My Folder stand-in,
    Google Drive and its account rows), the same spec as the web's tree:
-   [pad][chevron slot][gap][icon column][gap][name] ... [count / menu]. UniworkFolderTree draws a row
-   with TREE_PAD inline on level 1 and TREE_STEP more per level (one chevron slot + gap), so a child's
+   [pad][chevron slot][gap - pull][icon column][gap][name] ... [count / menu]. UniworkFolderTree draws a row
+   with TREE_PAD inline on level 1 and TREE_STEP more per level (one chevron slot + gap - the twisty pull, 20px
+   as on the web, capped at TREE_MAX_PAD), so a child's
    chevron slot starts under its parent's icon; the Drive rows are plain buttons and take the same
    columns from the --dh-tree-* properties documents-home.css defines on .dh-sidebar-tree. Logical
    properties only: RTL mirrors the whole grid. */
@@ -137,7 +138,9 @@
 }
 
 .dh-sidebar-tree .dh-drive-nav-root {
-  padding-inline-start: calc(var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap));
+  padding-inline-start: calc(
+    var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap) - var(--dh-tree-pull)
+  );
 }
 
 .dh-drive-twisty {
@@ -166,8 +169,8 @@
 .dh-sidebar-tree .dh-drive-nav-account {
   position: relative; /* anchors the sr-only label */
   padding-inline-start: calc(
-    var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap) + var(--dh-tree-icon) +
-      var(--dh-tree-gap)
+    var(--dh-tree-pad) + var(--dh-tree-slot) + var(--dh-tree-gap) - var(--dh-tree-pull) +
+      var(--dh-tree-icon) + var(--dh-tree-gap)
   );
 }
 

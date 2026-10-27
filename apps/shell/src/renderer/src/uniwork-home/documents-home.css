@@ -115,10 +115,12 @@
 
 .dh-sidebar-tree {
   /* the one grid of every folder-tree row and Drive row (see doclist-sidebar.css):
-     [chevron slot][gap][icon column][gap][name] ... [count / menu]; a child indents by one step */
+     [chevron slot][gap - pull][icon column][gap][name] ... [count / menu]; a child indents by one step
+     (slot + gap - pull) */
   --dh-tree-pad: 4px;
   --dh-tree-slot: 16px;
   --dh-tree-gap: 6px;
+  --dh-tree-pull: 2px;
   --dh-tree-icon: 20px;
   --dh-tree-end: 8px;
   --dh-tree-count-w: 28px;
