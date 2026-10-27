@@ -17,6 +17,7 @@ import type {
   FolderContentsAccessCounts,
   FolderContentsAccessRequest,
   FolderContentsAccessResult,
+  FolderContentsAccessWarning,
   ShareAccess,
   ShareAccessRequest,
   ShareBreakGlassGrant,
@@ -60,7 +61,7 @@ export interface FakeFolderContentsOptions {
   syncMax?: number
   /** GETs a background batch needs to end (default 3: queued -> running -> ... -> ended) */
   batchSteps?: number
-  /** the background batch ends `failed` instead of `completed` */
+  /** the background batch ends `failed` instead of `completed`, short of the total, keeping its partial counts */
   batchFails?: boolean
 }
 
@@ -155,13 +156,6 @@ const pick = (item: { principalType: SharePrincipalType; principalId: string }) 
   principalType: item.principalType,
   principalId: item.principalId,
 })
-
-const NO_COUNTS: FolderContentsAccessCounts = {
-  changed: 0,
-  unchanged: 0,
-  skippedNotManageable: 0,
-  skippedLocked: 0,
-}
 
 export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi {
   const documentId = options.documentId ?? 'doc_1'
@@ -558,7 +552,7 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
     if (running) return { ...fail('folder_access_batch_running', 409), batchId: running }
     const counts = folderCounts()
     if (req.dryRun) {
-      const warnings: string[] = []
+      const warnings: FolderContentsAccessWarning[] = []
       if (req.items.some((i) => i.principalType !== 'user')) warnings.push('wide_scope')
       if (req.mode === 'replace') {
         if (
@@ -601,11 +595,23 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
     if (req.folderId !== folderId || !batch) return fail('not_found', 404)
     batch.gets = Math.min(batch.gets + 1, batchSteps)
     const ended = batch.gets >= batchSteps
-    const processed = ended
-      ? folderTotal
-      : Math.min(folderTotal, Math.ceil((folderTotal * (batch.gets - 1)) / batchSteps))
+    const failed = ended && folderOptions.batchFails === true
+    // a failed run stops where it was (what it wrote stays), so it reads like a running one
+    const processed =
+      ended && !failed
+        ? folderTotal
+        : Math.min(folderTotal, Math.ceil((folderTotal * (batch.gets - 1)) / batchSteps))
+    const partial = (all: FolderContentsAccessCounts): FolderContentsAccessCounts => {
+      const part = (n: number): number => Math.floor((n * processed) / Math.max(1, folderTotal))
+      return {
+        changed: part(all.changed),
+        unchanged: part(all.unchanged),
+        skippedNotManageable: part(all.skippedNotManageable),
+        skippedLocked: part(all.skippedLocked),
+      }
+    }
     const status: FolderContentsAccessBatch['status'] = ended
-      ? folderOptions.batchFails
+      ? failed
         ? 'failed'
         : 'completed'
       : batch.gets === 1
@@ -618,7 +624,7 @@ export function createFakeShareApi(options: FakeShareOptions = {}): FakeShareApi
         status,
         total: folderTotal,
         processed,
-        ...(ended && !folderOptions.batchFails ? folderCounts() : NO_COUNTS),
+        ...(ended && !failed ? folderCounts() : partial(folderCounts())),
         ...(ended ? { finishedAt: NOW } : {}),
       },
     }

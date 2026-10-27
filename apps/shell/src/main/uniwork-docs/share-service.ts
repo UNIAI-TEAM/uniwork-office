@@ -1,4 +1,5 @@
 import {
+  FOLDER_CONTENTS_ACCESS_ID,
   FOLDER_CONTENTS_ACCESS_MAX_ITEMS,
   FOLDER_CONTENTS_ACCESS_MODES,
   SHARE_LEVELS,
@@ -91,9 +92,6 @@ const MISSING_ROUTE_STATUSES: ReadonlySet<number> = new Set([404, 405, 501])
 /** UNI-2078: the active-member walk stops here (the web's bound: 40 pages) */
 const MAX_MEMBER_PAGES = 40
 
-/** a run id the 409 `folder_access_batch_running` names (a ULID); anything else is not passed on */
-const BATCH_ID = /^[A-Za-z0-9_-]{1,128}$/
-
 const DEFAULT_THROTTLE_WAIT_MS = 1000
 const MAX_THROTTLE_WAIT_MS = 5000
 
@@ -111,7 +109,7 @@ const MAX_LINK_DAYS = 90
 
 function batchIdOf(error: UniworkDocError): { batchId?: string } {
   const id = error.fields?.batch_id
-  return typeof id === 'string' && BATCH_ID.test(id) ? { batchId: id } : {}
+  return typeof id === 'string' && FOLDER_CONTENTS_ACCESS_ID.test(id) ? { batchId: id } : {}
 }
 
 /**
@@ -161,15 +159,26 @@ class MissingRoute extends Error {
 }
 
 /**
- * UNI-2244: a plain 404 / 405 / 501 (no envelope) is a server without the route; a coded one
- * (a foreign batch, a folder that is gone) came from a handler that ran and stays a normal failure.
+ * UNI-2244: what the two folder routes answer that is not a normal failure.
+ * - a plain 404 / 405 / 501 (no envelope), or the coded `501 not_implemented` BE-1 stub answers
+ *   until BE-2, is a server without the feature (`endpointMissing`); a coded 404 (a foreign batch,
+ *   a folder that is gone) came from a handler that ran and stays a normal failure
+ * - a 400 `invalid_request` / `invalid_json` is a request the server refused as malformed:
+ *   `invalid_request`, the same verdict the app's own checks give before any request
  */
-function missingRouteOf(error: unknown): unknown {
-  return error instanceof UniworkDocError &&
-    !error.serverCode &&
-    MISSING_ROUTE_STATUSES.has(error.status ?? 0)
-    ? new MissingRoute(error)
-    : error
+function folderRouteErrorOf(error: unknown): unknown {
+  if (!(error instanceof UniworkDocError)) return error
+  const code = error.serverCode
+  if (
+    (!code && MISSING_ROUTE_STATUSES.has(error.status ?? 0)) ||
+    (code === 'not_implemented' && error.status === 501)
+  ) {
+    return new MissingRoute(error)
+  }
+  if (error.status === 400 && (code === 'invalid_request' || code === 'invalid_json')) {
+    return new UniworkDocError('server_error', { status: 400, serverCode: 'invalid_input' })
+  }
+  return error
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -526,10 +535,10 @@ export function createUniworkShareService(deps: UniworkShareServiceDeps): Uniwor
       }
       return run(async (client) => {
         try {
-          // a dry run repeats safely; a write is never repeated (a 503 may come after the commit)
+          // a write is repeated on a 429 only (a 503 may come after the commit)
           return await withRetry(() => client.updateFolderContentsAccess(plain), dryRun)
         } catch (error) {
-          throw missingRouteOf(error)
+          throw folderRouteErrorOf(error)
         }
       })
     },
@@ -543,7 +552,7 @@ export function createUniworkShareService(deps: UniworkShareServiceDeps): Uniwor
         try {
           return await withRetry(() => client.getFolderContentsAccessBatch(folderId, batchId))
         } catch (error) {
-          throw missingRouteOf(error)
+          throw folderRouteErrorOf(error)
         }
       })
     },

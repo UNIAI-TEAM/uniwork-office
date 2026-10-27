@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { createFakeShareApi } from '../src/renderer/src/uniwork-share/fake-share-api'
-import type { ShareAccess, ShareUpdate } from '../src/shared/share-api'
+import {
+  parseFolderContentsAccess,
+  parseFolderContentsAccessBatch,
+} from '../src/main/uniwork-docs/share-parse'
+import {
+  backgroundAccepted,
+  batchCompleted,
+  batchFailed,
+  batchRunning,
+  dryRunMerge,
+  dryRunReplace,
+  syncResult,
+} from '../src/shared/folder-contents-access.fixtures'
+import type {
+  FolderContentsAccessBatch,
+  FolderContentsAccessRequest,
+  FolderContentsAccessResult,
+  ShareAccess,
+  ShareUpdate,
+} from '../src/shared/share-api'
 
 /**
  * UNI-2047 SD-A: the in-memory fake the SD-B / SD-C / SD-D renderer tests run
@@ -477,6 +496,315 @@ describe('owner transfer', () => {
       error: 'not_found',
       status: 404,
       endpointMissing: true,
+    })
+  })
+})
+
+describe('folder contents access (UNI-2244)', () => {
+  const FOLDER = 'fld_1'
+  const request = (
+    over: Partial<FolderContentsAccessRequest> = {},
+  ): FolderContentsAccessRequest => ({
+    folderId: FOLDER,
+    mode: 'merge',
+    items: [{ principalType: 'user', principalId: 'u_an', level: 'edit' }],
+    dryRun: false,
+    ...over,
+  })
+
+  it('a dry run counts, writes nothing and warns on wide scope', async () => {
+    const api = createFakeShareApi({
+      folderContents: { total: 42, notManageable: 5, locked: 1, unchanged: 4 },
+    })
+    const wide = ok<FolderContentsAccessResult>(
+      await api.folderContentsAccess(
+        request({
+          dryRun: true,
+          items: [{ principalType: 'workspace', principalId: 'ws_2', level: 'view' }],
+        }),
+      ),
+    )
+    expect(wide).toEqual({
+      kind: 'dryRun',
+      total: 42,
+      preview: {
+        changed: 32,
+        unchanged: 4,
+        skippedNotManageable: 5,
+        skippedLocked: 1,
+        losingUsers: 0,
+        downgradedUsers: 0,
+        warnings: ['wide_scope'],
+      },
+    })
+    // nothing was written: the same dry run again answers the same, and a write is still possible
+    expect(
+      ok<FolderContentsAccessResult>(await api.folderContentsAccess(request({ dryRun: true }))),
+    ).toMatchObject({ kind: 'dryRun', preview: { warnings: [] } })
+    expect(ok<FolderContentsAccessResult>(await api.folderContentsAccess(request()))).toMatchObject(
+      {
+        kind: 'sync',
+      },
+    )
+  })
+
+  it('replace reports who loses access and to_private without the home workspace row', async () => {
+    const api = createFakeShareApi({ folderContents: { losingUsers: 12, downgradedUsers: 2 } })
+    const dry = (items: FolderContentsAccessRequest['items']) =>
+      api.folderContentsAccess(request({ mode: 'replace', dryRun: true, items }))
+    const withoutHome = ok<Extract<FolderContentsAccessResult, { kind: 'dryRun' }>>(
+      await dry([{ principalType: 'user', principalId: 'u_an', level: 'view' }]),
+    )
+    expect(withoutHome.preview).toMatchObject({ losingUsers: 12, downgradedUsers: 2 })
+    expect(withoutHome.preview.warnings).toEqual(['to_private', 'downgrade'])
+    const withHome = ok<Extract<FolderContentsAccessResult, { kind: 'dryRun' }>>(
+      await dry([{ principalType: 'workspace', principalId: 'ws_1', level: 'view' }]),
+    )
+    expect(withHome.preview.warnings).toEqual(['wide_scope', 'downgrade'])
+    // an empty replace removes every share
+    expect(
+      ok<Extract<FolderContentsAccessResult, { kind: 'dryRun' }>>(await dry([])).preview.warnings,
+    ).toContain('to_private')
+    // merge never loses or lowers anything
+    const merge = ok<Extract<FolderContentsAccessResult, { kind: 'dryRun' }>>(
+      await api.folderContentsAccess(request({ dryRun: true })),
+    )
+    expect(merge.preview).toMatchObject({ losingUsers: 0, downgradedUsers: 0 })
+  })
+
+  it('a total up to the sync cap is written inside the request (sync)', async () => {
+    const api = createFakeShareApi({
+      folderContents: { total: 500, notManageable: 100, locked: 50 },
+    })
+    expect(ok<FolderContentsAccessResult>(await api.folderContentsAccess(request()))).toEqual({
+      kind: 'sync',
+      batchId: expect.stringMatching(/^fb_/),
+      total: 500,
+      changed: 350,
+      unchanged: 0,
+      skippedNotManageable: 100,
+      skippedLocked: 50,
+    })
+  })
+
+  it('a bigger total is a background batch that advances on each GET and then ends', async () => {
+    const api = createFakeShareApi({
+      folderContents: { total: 900, notManageable: 90, locked: 10, unchanged: 100 },
+    })
+    const started = ok<Extract<FolderContentsAccessResult, { kind: 'background' }>>(
+      await api.folderContentsAccess(request()),
+    )
+    expect(started).toMatchObject({ kind: 'background', total: 900 })
+    const poll = async () =>
+      ok<FolderContentsAccessBatch>(
+        await api.folderContentsAccessBatch({ folderId: FOLDER, batchId: started.batchId }),
+      )
+    const first = await poll()
+    const second = await poll()
+    const last = await poll()
+    expect([first.status, second.status, last.status]).toEqual(['queued', 'running', 'completed'])
+    expect([first.processed, second.processed, last.processed]).toEqual([0, 300, 900])
+    expect(first).not.toHaveProperty('finishedAt')
+    expect(first.changed).toBe(0)
+    expect(last).toMatchObject({
+      batchId: started.batchId,
+      total: 900,
+      changed: 700,
+      unchanged: 100,
+      skippedNotManageable: 90,
+      skippedLocked: 10,
+      finishedAt: expect.any(String),
+    })
+    // an ended batch stays ended
+    expect((await poll()).status).toBe('completed')
+  })
+
+  it('the batch can end failed, short of the total, with the counts of what it wrote', async () => {
+    const api = createFakeShareApi({
+      folderContents: {
+        total: 900,
+        notManageable: 90,
+        locked: 10,
+        unchanged: 100,
+        batchSteps: 2,
+        batchFails: true,
+      },
+    })
+    const started = ok<Extract<FolderContentsAccessResult, { kind: 'background' }>>(
+      await api.folderContentsAccess(request()),
+    )
+    const get = () => api.folderContentsAccessBatch({ folderId: FOLDER, batchId: started.batchId })
+    expect(ok<FolderContentsAccessBatch>(await get()).status).toBe('queued')
+    const failed = ok<FolderContentsAccessBatch>(await get())
+    expect(failed).toMatchObject({
+      status: 'failed',
+      total: 900,
+      processed: 450,
+      changed: 350,
+      unchanged: 50,
+      skippedNotManageable: 45,
+      skippedLocked: 5,
+      finishedAt: expect.any(String),
+    })
+    expect(failed.processed).toBeLessThan(failed.total)
+  })
+
+  it('answers what the wire fixtures say (the same numbers as the web fixtures, read through the parser)', async () => {
+    const wide = [{ principalType: 'workspace', principalId: 'ws_2', level: 'view' }] as const
+    const base = { total: 42, notManageable: 5 }
+    const run = async (options: object, over: Partial<FolderContentsAccessRequest>) =>
+      ok<FolderContentsAccessResult>(
+        await createFakeShareApi({ folderContents: options }).folderContentsAccess(
+          request({ items: [...wide], ...over }),
+        ),
+      )
+    expect(await run(base, { dryRun: true })).toEqual(
+      parseFolderContentsAccess(dryRunMerge, 200, true),
+    )
+    expect(
+      await run(
+        { ...base, losingUsers: 12, downgradedUsers: 3 },
+        { dryRun: true, mode: 'replace' },
+      ),
+    ).toEqual(parseFolderContentsAccess(dryRunReplace, 200, true))
+    expect(await run(base, {})).toEqual({
+      ...parseFolderContentsAccess(syncResult, 200, false),
+      batchId: expect.stringMatching(/^fb_/),
+    })
+    expect(await run({ total: 1800, notManageable: 10 }, {})).toEqual({
+      ...parseFolderContentsAccess(backgroundAccepted, 202, false),
+      batchId: expect.stringMatching(/^fb_/),
+    })
+
+    const poll = async (options: object, gets: number) => {
+      const api = createFakeShareApi({
+        folderContents: { total: 1800, notManageable: 10, ...options },
+      })
+      const started = ok<Extract<FolderContentsAccessResult, { kind: 'background' }>>(
+        await api.folderContentsAccess(request({ items: [...wide] })),
+      )
+      let last: FolderContentsAccessBatch | undefined
+      for (let i = 0; i < gets; i++) {
+        last = ok<FolderContentsAccessBatch>(
+          await api.folderContentsAccessBatch({ folderId: FOLDER, batchId: started.batchId }),
+        )
+      }
+      return { ...last!, batchId: batchRunning.batch_id }
+    }
+    expect(await poll({ batchSteps: 3 }, 2)).toEqual(parseFolderContentsAccessBatch(batchRunning))
+    expect(await poll({ batchSteps: 3 }, 3)).toEqual(parseFolderContentsAccessBatch(batchCompleted))
+    expect(await poll({ batchSteps: 2, batchFails: true }, 2)).toEqual(
+      parseFolderContentsAccessBatch(batchFailed),
+    )
+  })
+
+  it('a second write while a batch runs is 409 with the batch id; after it ended it is accepted', async () => {
+    const api = createFakeShareApi({ folderContents: { total: 900, batchSteps: 2 } })
+    const started = ok<Extract<FolderContentsAccessResult, { kind: 'background' }>>(
+      await api.folderContentsAccess(request()),
+    )
+    const get = () => api.folderContentsAccessBatch({ folderId: FOLDER, batchId: started.batchId })
+    expect(await api.folderContentsAccess(request())).toEqual({
+      ok: false,
+      error: 'folder_access_batch_running',
+      status: 409,
+      batchId: started.batchId,
+    })
+    // the dry run is refused too: the lock comes before the preview
+    expect(await api.folderContentsAccess(request({ dryRun: true }))).toMatchObject({
+      ok: false,
+      error: 'folder_access_batch_running',
+    })
+    await get()
+    await get()
+    expect(ok<FolderContentsAccessResult>(await api.folderContentsAccess(request()))).toMatchObject(
+      { kind: 'background' },
+    )
+  })
+
+  it('refuses a document (not_a_folder), an unknown folder and a foreign batch', async () => {
+    const api = createFakeShareApi()
+    expect(await api.folderContentsAccess(request({ folderId: DOC }))).toEqual({
+      ok: false,
+      error: 'not_a_folder',
+      status: 422,
+    })
+    expect(await api.folderContentsAccess(request({ folderId: 'nope' }))).toEqual({
+      ok: false,
+      error: 'not_found',
+      status: 404,
+    })
+    expect(await api.folderContentsAccessBatch({ folderId: FOLDER, batchId: 'fb_x' })).toEqual({
+      ok: false,
+      error: 'not_found',
+      status: 404,
+    })
+  })
+
+  it('rejects the whole request item by item, like the server (nothing is written)', async () => {
+    const api = createFakeShareApi({ folderContents: { total: 900 } })
+    const res = await api.folderContentsAccess(
+      request({
+        items: [
+          { principalType: 'user', principalId: 'u_an', level: 'edit' },
+          { principalType: 'user', principalId: 'u_ghost', level: 'edit' },
+          { principalType: 'user', principalId: 'u_an', level: 'view' },
+        ],
+      }),
+    )
+    expect(res).toEqual({
+      ok: false,
+      error: 'document_access_rejected',
+      status: 422,
+      rejected: [
+        {
+          index: 1,
+          principalType: 'user',
+          principalId: 'u_ghost',
+          code: 'principal_not_in_organization',
+        },
+        { index: 2, principalType: 'user', principalId: 'u_an', code: 'duplicate_principal' },
+      ],
+    })
+    // no batch was started by the refused call: the folder is free
+    expect(ok<FolderContentsAccessResult>(await api.folderContentsAccess(request()))).toMatchObject(
+      {
+        kind: 'background',
+      },
+    )
+  })
+
+  it('refuses a malformed request as invalid_request', async () => {
+    const api = createFakeShareApi()
+    const bad: Array<Partial<FolderContentsAccessRequest>> = [
+      { mode: 'union' as never },
+      { items: [] },
+      { items: new Array(101).fill({ principalType: 'user', principalId: 'u_an', level: 'view' }) },
+      { items: [{ principalType: 'user', principalId: 'u_an', level: 'owner' as never }] },
+    ]
+    for (const over of bad) {
+      expect(await api.folderContentsAccess(request(over))).toMatchObject({
+        ok: false,
+        error: 'invalid_request',
+      })
+    }
+    expect(
+      ok<FolderContentsAccessResult>(
+        await api.folderContentsAccess(request({ mode: 'replace', items: [] })),
+      ),
+    ).toMatchObject({ kind: 'sync' })
+  })
+
+  it('records the calls and answers a queued failure once, like the other methods', async () => {
+    const api = createFakeShareApi()
+    api.failNext('folderContentsAccess', { ok: false, error: 'network' })
+    expect(await api.folderContentsAccess(request())).toEqual({ ok: false, error: 'network' })
+    expect(await api.folderContentsAccess(request())).toMatchObject({ ok: true })
+    expect(api.calls.map((c) => c.method)).toEqual(['folderContentsAccess', 'folderContentsAccess'])
+    await api.folderContentsAccessBatch({ folderId: FOLDER, batchId: 'fb_x' })
+    expect(api.calls.at(-1)).toMatchObject({
+      method: 'folderContentsAccessBatch',
+      args: [{ folderId: FOLDER, batchId: 'fb_x' }],
     })
   })
 })

@@ -2,11 +2,14 @@ import {
   SHARE_LEVELS,
   SHARE_PRINCIPAL_TYPES,
   FOLDER_CONTENTS_ACCESS_BATCH_STATUSES,
+  FOLDER_CONTENTS_ACCESS_ID,
+  FOLDER_CONTENTS_ACCESS_WARNINGS,
   type FolderContentsAccessBatch,
   type FolderContentsAccessBatchStatus,
   type FolderContentsAccessCounts,
   type FolderContentsAccessPreview,
   type FolderContentsAccessResult,
+  type FolderContentsAccessWarning,
   type ShareAccess,
   type ShareAccessRequest,
   type ShareBreakGlassGrant,
@@ -521,12 +524,11 @@ function folderCountsOf(body: Record<string, unknown>): FolderContentsAccessCoun
 
 function folderPreviewOf(raw: unknown): FolderContentsAccessPreview {
   const body = record(raw)
-  // the codes stay open (`wide_scope` | `downgrade` | `to_private` today); only non-text entries are bad
   if (!Array.isArray(body.warnings)) bad()
-  const warnings = body.warnings.map((entry) => {
-    if (typeof entry !== 'string' || entry.length === 0 || entry.length > MAX_ID) bad()
-    return entry
-  })
+  // the web keeps the three known codes and ignores the rest
+  const warnings = body.warnings.filter((entry): entry is FolderContentsAccessWarning =>
+    (FOLDER_CONTENTS_ACCESS_WARNINGS as readonly unknown[]).includes(entry),
+  )
   return {
     ...folderCountsOf(body),
     losingUsers: count(body.losing_users),
@@ -535,23 +537,57 @@ function folderPreviewOf(raw: unknown): FolderContentsAccessPreview {
   }
 }
 
+/** what the UI reads as "nothing to change": the web's answer to a dry run it cannot read */
+const EMPTY_DRY_RUN: FolderContentsAccessResult = {
+  kind: 'dryRun',
+  total: 0,
+  preview: {
+    changed: 0,
+    unchanged: 0,
+    skippedNotManageable: 0,
+    skippedLocked: 0,
+    losingUsers: 0,
+    downgradedUsers: 0,
+    warnings: [],
+  },
+}
+
+function parseDryRun(raw: unknown, status: number): FolderContentsAccessResult {
+  const body = record(raw)
+  const total = count(body.total)
+  if (status !== 200) bad()
+  // a discriminator on a dry run is tolerated; only the write shapes are refused (they have no preview)
+  if (body.mode === 'sync' || body.mode === 'background') bad()
+  return { kind: 'dryRun', total, preview: folderPreviewOf(body.preview) }
+}
+
 /**
  * UNI-2244: `PUT /documents/{folderId}/contents-access`. A write must be provable, so every
- * count is required and the shape has to agree with the request and the HTTP status: a dry run
- * answers 200 with a preview, a write answers 200 `sync` or 202 `background`, never the other way.
+ * count is required and the shape has to agree with the request and the HTTP status: a write
+ * answers 200 `sync` or 202 `background` with a plain batch id, else `malformed_response`. A dry
+ * run writes nothing, so one the app cannot read is "nothing to change" (the web's behaviour),
+ * never an error.
  */
 export function parseFolderContentsAccess(
   raw: unknown,
   status: number,
   dryRun: boolean,
 ): FolderContentsAccessResult {
+  if (dryRun) {
+    try {
+      return parseDryRun(raw, status)
+    } catch (error) {
+      if (error instanceof UniworkDocError && error.code === 'malformed_response') {
+        return EMPTY_DRY_RUN
+      }
+      throw error
+    }
+  }
   const body = record(raw)
   const total = count(body.total)
-  if (dryRun) {
-    if (status !== 200 || body.mode !== undefined) bad()
-    return { kind: 'dryRun', total, preview: folderPreviewOf(body.preview) }
-  }
   const batchId = required(body.batch_id)
+  // the follow-up routes only take a plain id, so a batch id they would refuse is not a success
+  if (!FOLDER_CONTENTS_ACCESS_ID.test(batchId)) bad()
   if (body.mode === 'sync' && status === 200) {
     return { kind: 'sync', batchId, total, ...folderCountsOf(body) }
   }
@@ -559,16 +595,11 @@ export function parseFolderContentsAccess(
   return bad()
 }
 
-/** UNI-2244: `GET .../contents-access/{batchId}`; an unknown status is not a state the UI can act on */
+/** UNI-2244: `GET .../contents-access/{batchId}`; a status the app does not list reads as `running` (ask again, like the web) */
 export function parseFolderContentsAccessBatch(raw: unknown): FolderContentsAccessBatch {
   const body = record(raw)
   const status = body.status
-  if (
-    typeof status !== 'string' ||
-    !(FOLDER_CONTENTS_ACCESS_BATCH_STATUSES as readonly string[]).includes(status)
-  ) {
-    bad()
-  }
+  if (typeof status !== 'string') bad()
   const total = count(body.total)
   const processed = count(body.processed)
   // progress past the end is not a count a bar can show
@@ -577,7 +608,9 @@ export function parseFolderContentsAccessBatch(raw: unknown): FolderContentsAcce
   if (finishedAt !== undefined && finishedAt !== null && typeof finishedAt !== 'string') bad()
   return {
     batchId: required(body.batch_id),
-    status: status as FolderContentsAccessBatchStatus,
+    status: (FOLDER_CONTENTS_ACCESS_BATCH_STATUSES as readonly string[]).includes(status)
+      ? (status as FolderContentsAccessBatchStatus)
+      : 'running',
     total,
     processed,
     ...folderCountsOf(body),

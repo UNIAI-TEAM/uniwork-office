@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import {
   BREAK_GLASS_REASON_MAX,
   BREAK_GLASS_REASON_MIN,
+  FOLDER_CONTENTS_ACCESS_ID,
   FOLDER_CONTENTS_ACCESS_MAX_ITEMS,
   FOLDER_CONTENTS_ACCESS_MODES,
   SHARE_LEVELS,
@@ -67,7 +68,7 @@ import {
  * request; the service maps it to `invalid_request`.
  */
 
-const PRINCIPAL_ID = /^[A-Za-z0-9_-]{1,128}$/
+const PRINCIPAL_ID = FOLDER_CONTENTS_ACCESS_ID
 const MAX_CANDIDATES_LIMIT = 100
 const MAX_LINK_DAYS = 90
 const MAX_MEMBERS_LIMIT = 100

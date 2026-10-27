@@ -82,10 +82,12 @@ const CHANNEL_NAMES = {
   members: 'uniwork-share:members',
   ownerCandidates: 'uniwork-share:owner-candidates',
   transferOwner: 'uniwork-share:owner-transfer',
+  folderContentsAccess: 'uniwork-share:folder-contents-access',
+  folderContentsAccessBatch: 'uniwork-share:folder-contents-access-batch',
 } as const
 
 describe('the channel table', () => {
-  it('has exactly the fifteen uniwork-share channels', () => {
+  it('has exactly the seventeen uniwork-share channels', () => {
     expect(UNIWORK_SHARE_CHANNELS).toEqual(CHANNEL_NAMES)
   })
 })
@@ -394,6 +396,121 @@ describe('main: the handlers', () => {
     ).toMatchObject({ ok: false, endpointMissing: true, status: 404 })
   })
 
+  it('UNI-2244 folder contents access: dry run, 202 background, the batch read and the 409 attach', async () => {
+    const { call } = await setup()
+    const request = {
+      folderId: 'fld_1',
+      mode: 'replace',
+      items: [{ principalType: 'workspace', principalId: 'ws_1', level: 'view' }],
+      dryRun: true,
+    }
+    const seen = stubServer((s) => {
+      if (s.method === 'GET') {
+        return reply(200, {
+          batch_id: 'b_2',
+          status: 'running',
+          total: 900,
+          processed: 200,
+          changed: 150,
+          unchanged: 20,
+          skipped_not_manageable: 20,
+          skipped_locked: 10,
+        })
+      }
+      const body = s.body as { dry_run: boolean }
+      if (body.dry_run) {
+        return reply(200, {
+          total: 900,
+          preview: {
+            changed: 800,
+            unchanged: 50,
+            skipped_not_manageable: 40,
+            skipped_locked: 10,
+            losing_users: 12,
+            downgraded_users: 0,
+            warnings: ['to_private'],
+          },
+        })
+      }
+      return reply(202, { batch_id: 'b_2', mode: 'background', total: 900 })
+    })
+    expect(await call(CHANNEL_NAMES.folderContentsAccess, request)).toMatchObject({
+      ok: true,
+      value: { kind: 'dryRun', total: 900, preview: { losingUsers: 12, warnings: ['to_private'] } },
+    })
+    expect(await call(CHANNEL_NAMES.folderContentsAccess, { ...request, dryRun: false })).toEqual({
+      ok: true,
+      value: { kind: 'background', batchId: 'b_2', total: 900 },
+    })
+    expect(
+      await call(CHANNEL_NAMES.folderContentsAccessBatch, { folderId: 'fld_1', batchId: 'b_2' }),
+    ).toMatchObject({ ok: true, value: { batchId: 'b_2', status: 'running', processed: 200 } })
+    expect(seen.map((s) => `${s.method} ${s.path.slice('/api/v1'.length)}`)).toEqual([
+      'PUT /documents/fld_1/contents-access',
+      'PUT /documents/fld_1/contents-access',
+      'GET /documents/fld_1/contents-access/b_2',
+    ])
+    expect(seen[0]!.body).toEqual({
+      mode: 'replace',
+      items: [{ principal_type: 'workspace', principal_id: 'ws_1', level: 'view' }],
+      dry_run: true,
+    })
+
+    stubServer(() =>
+      reply(409, {
+        error: { code: 'folder_access_batch_running', message: 'x', fields: { batch_id: 'b_2' } },
+      }),
+    )
+    expect(await call(CHANNEL_NAMES.folderContentsAccess, { ...request, dryRun: false })).toEqual({
+      ok: false,
+      error: 'folder_access_batch_running',
+      status: 409,
+      batchId: 'b_2',
+    })
+    stubServer(() => reply(422, { error: { code: 'not_a_folder', message: 'x' } }))
+    expect(await call(CHANNEL_NAMES.folderContentsAccess, request)).toEqual({
+      ok: false,
+      error: 'not_a_folder',
+      status: 422,
+    })
+  })
+
+  it('UNI-2244: a bad request or a bad answer never reaches the renderer as a result', async () => {
+    const { call } = await setup()
+    const seen = stubServer(() => reply(200, { total: 'many' }))
+    for (const input of [undefined, null, 'fld_1', { folderId: 'fld_1' }]) {
+      expect(await call(CHANNEL_NAMES.folderContentsAccess, input)).toEqual({
+        ok: false,
+        error: 'invalid_request',
+      })
+      expect(await call(CHANNEL_NAMES.folderContentsAccessBatch, input)).toEqual({
+        ok: false,
+        error: 'invalid_request',
+      })
+    }
+    expect(seen).toEqual([])
+    expect(
+      await call(CHANNEL_NAMES.folderContentsAccess, {
+        folderId: 'fld_1',
+        mode: 'merge',
+        items: [{ principalType: 'user', principalId: 'u_2', level: 'view' }],
+        dryRun: false,
+      }),
+    ).toEqual({ ok: false, error: 'malformed_response' })
+    // a dry run it cannot read is "nothing to change", not an error (the web's behaviour)
+    expect(
+      await call(CHANNEL_NAMES.folderContentsAccess, {
+        folderId: 'fld_1',
+        mode: 'merge',
+        items: [{ principalType: 'user', principalId: 'u_2', level: 'view' }],
+        dryRun: true,
+      }),
+    ).toMatchObject({ ok: true, value: { kind: 'dryRun', total: 0 } })
+    expect(
+      await call(CHANNEL_NAMES.folderContentsAccessBatch, { folderId: 'fld_1', batchId: 'b_1' }),
+    ).toEqual({ ok: false, error: 'malformed_response' })
+  })
+
   it('a refused reason comes back as break_glass_reason_invalid (the 422 verdict)', async () => {
     const { call } = await setup()
     stubServer(() => reply(422, { error: { code: 'break_glass_reason_invalid', message: 'x' } }))
@@ -460,6 +577,8 @@ interface ShareBridge {
   members(input: unknown): Promise<unknown>
   ownerCandidates(documentId: string): Promise<unknown>
   transferOwner(input: unknown): Promise<unknown>
+  folderContentsAccess(request: unknown): Promise<unknown>
+  folderContentsAccessBatch(request: unknown): Promise<unknown>
 }
 
 async function loadPreload(replyValue: unknown) {
@@ -510,6 +629,8 @@ describe('preload: window.uniworkShare', () => {
     await share!.members(input)
     await share!.ownerCandidates('doc_1')
     await share!.transferOwner(input)
+    await share!.folderContentsAccess(input)
+    await share!.folderContentsAccessBatch(input)
     expect(invoked.filter((i) => i.channel.startsWith('uniwork-share:'))).toEqual([
       { channel: CHANNEL_NAMES.get, args: ['doc_1'] },
       { channel: CHANNEL_NAMES.update, args: [input] },
@@ -526,6 +647,8 @@ describe('preload: window.uniworkShare', () => {
       { channel: CHANNEL_NAMES.members, args: [input] },
       { channel: CHANNEL_NAMES.ownerCandidates, args: ['doc_1'] },
       { channel: CHANNEL_NAMES.transferOwner, args: [input] },
+      { channel: CHANNEL_NAMES.folderContentsAccess, args: [input] },
+      { channel: CHANNEL_NAMES.folderContentsAccessBatch, args: [input] },
     ])
   })
 
@@ -569,6 +692,32 @@ describe('preload: window.uniworkShare', () => {
       ok: false,
       error: 'not_found',
     })
+  })
+
+  it('UNI-2244: keeps the batchId of a running-batch refusal, only as text', async () => {
+    const { share } = await loadPreload({
+      ok: false,
+      error: 'folder_access_batch_running',
+      status: 409,
+      batchId: 'b_9',
+    })
+    expect(await share!.folderContentsAccess({})).toEqual({
+      ok: false,
+      error: 'folder_access_batch_running',
+      status: 409,
+      batchId: 'b_9',
+    })
+    for (const batchId of [7, '', null, {}]) {
+      const odd = await loadPreload({
+        ok: false,
+        error: 'folder_access_batch_running',
+        batchId,
+      })
+      expect(await odd.share!.folderContentsAccess({})).toEqual({
+        ok: false,
+        error: 'folder_access_batch_running',
+      })
+    }
   })
 
   it('keeps only the known failure fields', async () => {

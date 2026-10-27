@@ -1367,6 +1367,13 @@ describe('policy of every uniwork* and home account channel constant', () => {
     DISCUSSION_CHANNELS,
   }
 
+  it('UNI-2244: the folder contents access channels are shell-only share channels', () => {
+    for (const key of ['folderContentsAccess', 'folderContentsAccessBatch'] as const) {
+      expect(UNIWORK_SHARE_CHANNELS[key]).toMatch(/^uniwork-share:folder-contents-access/)
+      expect(policyForChannel(UNIWORK_SHARE_CHANNELS[key]), key).toBe('shell')
+    }
+  })
+
   for (const [name, table] of Object.entries(shellOnly)) {
     it(`${name}: shell`, () => {
       const values = Object.values(table)
