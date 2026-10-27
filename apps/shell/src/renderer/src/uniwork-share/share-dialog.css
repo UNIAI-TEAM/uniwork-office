@@ -832,3 +832,87 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+
+/* Folder contents access (UNI-2244): the mode choice, the home-workspace row, the dry-run summary
+   and the background progress bars (the bars reuse the bulk Download's .zd-bar look). Tokens only. */
+
+.uw-fca-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.uw-fca-mode {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.uw-fca-mode:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.uw-fca-mode:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.uw-fca-mode input {
+  margin-top: 2px;
+}
+
+.uw-fca-mode-name {
+  font-weight: 600;
+}
+
+.uw-fca-mode-hint {
+  grid-column: 2;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.uw-fca-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.uw-fca-summary li:first-child {
+  font-weight: 600;
+}
+
+.uw-fca-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fca-bars {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 115;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(var(--ui-vw) * 90));
+}

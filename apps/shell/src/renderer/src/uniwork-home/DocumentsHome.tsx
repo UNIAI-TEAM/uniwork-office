@@ -103,6 +103,11 @@ import { getDocHistoryBridge } from '../uniwork-doc-history/bridge'
 import { VersionHistorySheet } from '../uniwork-doc-history/VersionHistorySheet'
 import { ShareDialog } from '../uniwork-share/ShareDialog'
 import {
+  FolderContentsAccessDialog,
+  type FolderContentsTarget,
+} from '../uniwork-share/FolderContentsAccessDialog'
+import { FolderContentsAccessBar } from '../uniwork-share/FolderContentsAccessBar'
+import {
   rowShareTarget,
   shareBridgeAvailable,
   type ShareDialogTarget,
@@ -1759,6 +1764,29 @@ export function DocumentsHome({
     setShare({ row: rowShareTarget(doc, organizationName) })
   const [bulkShareDocs, setBulkShareDocs] = useState<BulkShareDoc[] | null>(null)
   const shareAvailable = shareBridgeAvailable()
+  // UNI-2244: the folder whose documents the "Share documents inside…" dialog writes to
+  const [folderContents, setFolderContents] = useState<FolderContentsTarget | null>(null)
+  const openFolderContents = (folder: { id: string; workspaceId?: string; title: string }) =>
+    setFolderContents({
+      id: folder.id,
+      workspaceId: folder.workspaceId || workspaceId,
+      title: folder.title,
+    })
+  /** the menu entry every reader of a folder gets; none when this shell has no Share bridge */
+  const folderContentsItem = (folder: {
+    id: string
+    workspaceId?: string
+    title: string
+  }): FolderMenuItem[] =>
+    shareAvailable
+      ? [
+          {
+            id: 'share-contents',
+            label: t('shrFcMenu'),
+            onSelect: () => openFolderContents(folder),
+          },
+        ]
+      : []
   // UNI-2077: the Access log sheet of a row; no entry when this main has no doc history bridge
   const [logsRow, setLogsRow] = useState<DocumentsHomeDoc | null>(null)
   const docHistoryAvailable = getDocHistoryBridge() !== null
@@ -2041,6 +2069,7 @@ export function DocumentsHome({
         },
       },
     ]
+    items.push(...folderContentsItem({ id, title: row.title }))
     if (access.create) items.push(newFolder)
     if (!access.edit) return items
     const parentId = index.get(id)?.parentId ?? null
@@ -2072,9 +2101,19 @@ export function DocumentsHome({
     }
     const canCreate = canCreateIn(folder)
     // Mở leads every row menu (Rules board section 3); a viewer-only folder has no menu, the card opens it
-    if (folder.canEdit === false && !canCreate) return []
+    // UNI-2244: every reader gets Share documents inside…, so a viewer-only card has this one entry
+    if (folder.canEdit === false && !canCreate) {
+      const shareOnly = folderContentsItem(folder)
+      return shareOnly.length === 0
+        ? []
+        : [
+            { id: 'open', label: t('dlActOpen'), onSelect: () => openFolderInWorkspace(folder.id) },
+            ...shareOnly,
+          ]
+    }
     const items: FolderMenuItem[] = [
       { id: 'open', label: t('dlActOpen'), onSelect: () => openFolderInWorkspace(folder.id) },
+      ...folderContentsItem(folder),
       {
         id: 'new',
         label: t('ufNewSubfolder'),
@@ -2131,7 +2170,8 @@ export function DocumentsHome({
   /** the open folder's own menu in its header (UNI-1979): the card menu minus the card, no Share */
   const openFolderMenu = (id: string): FolderMenuItem[] => {
     const node = index.get(id)
-    const items: FolderMenuItem[] = []
+    // UNI-2244: the open folder's own Share documents inside…, for every reader
+    const items: FolderMenuItem[] = folderContentsItem({ id, title: node?.title ?? '' })
     if (openFolderCreatable) {
       items.push({
         id: 'new',
@@ -2218,6 +2258,9 @@ export function DocumentsHome({
           }),
         // no entry when this shell has no Share bridge (a stale preload)
         ...(shareAvailable ? { share: () => openRowShare(doc) } : {}),
+        ...(shareAvailable && doc.kind === 'folder'
+          ? { 'share-contents': () => openFolderContents(doc) }
+          : {}),
         ...(docHistoryAvailable ? { logs: () => setLogsRow(doc) } : {}),
         ...(docHistoryAvailable ? { versions: () => setVersionsRow(doc) } : {}),
         'copy-link': () => void handleCopyLink(doc),
@@ -3376,6 +3419,19 @@ export function DocumentsHome({
         />
       )}
 
+      {folderContents && (
+        <FolderContentsAccessDialog
+          open
+          folder={folderContents}
+          workspaceName={
+            workspaces.find((ws) => ws.id === folderContents.workspaceId)?.name ?? undefined
+          }
+          onClose={() => setFolderContents(null)}
+          onChanged={() => setListTick((n) => n + 1)}
+          onNotice={(message, tone) => setToast({ message, tone })}
+        />
+      )}
+
       {logsRow && <AccessLogSheet open row={logsRow} onClose={() => setLogsRow(null)} />}
 
       {versionsRow && (
@@ -3440,6 +3496,12 @@ export function DocumentsHome({
 
       <FolderUploadLayer controller={folderUpload} />
       <ZipDownloadBar />
+      <FolderContentsAccessBar
+        onSettled={(message, tone) => {
+          setToast({ message, tone })
+          setListTick((n) => n + 1)
+        }}
+      />
 
       {toast && (
         <ActionToast

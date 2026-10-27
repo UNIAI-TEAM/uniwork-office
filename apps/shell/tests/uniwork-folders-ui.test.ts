@@ -23,6 +23,8 @@ import { UniworkBrowser } from '../src/renderer/src/uniwork-folders/UniworkBrows
 import { UniworkLiveHost, resetLiveForTests } from '../src/renderer/src/uniwork-live'
 import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-folders'
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
+import { uniworkShareStrings } from '../src/renderer/src/i18n/strings-uniwork-share'
+import { createFakeShareApi } from '../src/renderer/src/uniwork-share/fake-share-api'
 
 /**
  * FD-11 S1-S3: the UniWork browser against a typed fake of the folder IPC
@@ -1687,5 +1689,46 @@ describe('UniworkBrowser: folder actions (S3)', () => {
     await flush()
     expect(optionTitles()).toEqual(['KeptOnServer.docx'])
     expect(host.textContent).not.toContain('LateSearchMore.docx')
+  })
+})
+
+describe('UniworkBrowser: Share documents inside… (UNI-2244)', () => {
+  const entryLabel = (uniworkShareStrings.en as Record<string, string>).shrFcMenu!
+  const titleOf = (title: string) =>
+    (uniworkShareStrings.en as Record<string, string>).shrFcTitle!.replace('{title}', title)
+  const menuLabels = () => $$('[role="menuitem"]').map((el) => el.textContent)
+
+  afterEach(() => {
+    delete (window as unknown as { uniworkShare?: unknown }).uniworkShare
+  })
+
+  it('a folder row and a tree row offer it, and it opens the dialog for that folder', async () => {
+    ;(window as unknown as { uniworkShare: unknown }).uniworkShare = createFakeShareApi()
+    await render()
+    const row = $$('.uw-pick-item').find((el) => el.textContent?.includes('Beta'))!
+    await click(row.querySelector('[data-folder-menu-for]'))
+    expect(menuLabels()).toContain(entryLabel)
+    await click($$('[role="menuitem"]').find((el) => el.textContent === entryLabel))
+    expect($('[role="dialog"]')?.textContent).toContain(titleOf('Beta'))
+    // closing leaves the browser as it was
+    await key($('[role="dialog"]')!, 'Escape')
+    expect($('[role="dialog"]')).toBeNull()
+
+    await click(treeItem('Alpha').querySelector('[data-folder-menu-for]'))
+    expect(menuLabels()).toContain(entryLabel)
+  })
+
+  it('a file row has no such entry, and without the share bridge no folder has it', async () => {
+    ;(window as unknown as { uniworkShare: unknown }).uniworkShare = createFakeShareApi()
+    await render()
+    const file = $$('.uw-pick-item').find((el) => el.textContent?.includes('Report.docx'))!
+    await click(file.querySelector('[data-folder-menu-for]'))
+    expect(menuLabels()).not.toContain(entryLabel)
+    await key($('[role="menu"]')!, 'Escape')
+
+    delete (window as unknown as { uniworkShare?: unknown }).uniworkShare
+    const row = $$('.uw-pick-item').find((el) => el.textContent?.includes('Beta'))!
+    await click(row.querySelector('[data-folder-menu-for]'))
+    expect(menuLabels()).not.toContain(entryLabel)
   })
 })
