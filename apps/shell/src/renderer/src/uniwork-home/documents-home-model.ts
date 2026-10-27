@@ -744,8 +744,8 @@ export function docMatchesUpdated(doc: DocumentsHomeDoc, filters: UniworkListFil
 }
 
 /**
- * UNI-2205 (KLV-6 / KLF-8): case- and Vietnamese-diacritic-insensitive title match (đ/Đ included),
- * reusing `foldSearchText` for screens whose route has no `q` parameter (Gần đây).
+ * UNI-2205 (KLV-6 / KLV-9 / KLF-8): case- and Vietnamese-diacritic-insensitive title match (đ/Đ included),
+ * reusing `foldSearchText` for screens whose route has no `q` parameter (Gần đây, Được chia sẻ với tôi).
  */
 export function docMatchesQuery(doc: DocumentsHomeDoc, query: string): boolean {
   const foldedQuery = foldSearchText(query)

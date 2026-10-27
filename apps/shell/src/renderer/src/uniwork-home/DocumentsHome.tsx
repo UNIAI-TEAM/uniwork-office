@@ -746,7 +746,8 @@ export function DocumentsHome({
   }, [elsewhereSource])
   // Load sub-view / folder / search items with sequence guard
   const query = searchDraft.trim()
-  const serverQuery = subView === 'recent' ? '' : query
+  const screenScopedQuery = subView === 'recent' || subView === 'shared-with-me'
+  const serverQuery = screenScopedQuery ? '' : query
   const listSeqRef = useRef(0)
   // Người sửa / Cập nhật put Recent on the flat list, which has no activity filter and no
   // last-activity sort: the segment is off while they are on, and Cập nhật is the sort
@@ -2389,18 +2390,19 @@ export function DocumentsHome({
   const folderDesc = folderOrder === 'name' && docSort?.dir === 'desc'
   // UNI-2205: the search IPC takes the Type picks only, so Người sửa / Cập nhật narrow the search
   // hits here on folders and documents alike (matching the web, which combines all filters with q);
-  // on Gần đây (KLV-6) the query filters the loaded Recent rows client-side by folded title.
+  // on Gần đây (KLV-6) and Được chia sẻ với tôi (KLV-9) the query filters the loaded screen rows
+  // client-side by folded title.
   const { folders: allFolders, files } = useMemo(() => {
     const matched =
       query.length > 0
-        ? subView === 'recent'
+        ? screenScopedQuery
           ? page.items.filter((doc) => docMatchesQuery(doc, query))
           : page.items.filter((doc) => docMatchesUpdated(doc, wireFilters))
         : page.items
     const split = splitAndSortItems(matched, folderOrder, dateLocale)
     const ordered = folderDesc ? [...split.folders].reverse() : split.folders
     return { folders: myFolderFirst(ordered), files: split.files }
-  }, [page.items, query, subView, wireFilters, folderOrder, folderDesc, dateLocale])
+  }, [page.items, query, screenScopedQuery, wireFilters, folderOrder, folderDesc, dateLocale])
   // Q0: the tree level (workspace root, My Folder, an open folder) keeps its cards, they navigate;
   // on a flat list the same switch as the rows hides them under a Type pick
   const folders = folderCardsUnderTypePick(
@@ -2454,12 +2456,13 @@ export function DocumentsHome({
     filters.types,
   ])
 
-  // UNI-2205 (KLF-1 / KLV-6): while a query is active and client-side filtering hides every hit of
-  // the loaded pages (or on Gần đây, where the query narrows the Recent list client-side), auto-load
-  // the next page up to 10 pages so matches on later pages show without a false empty state.
+  // UNI-2205 (KLF-1 / KLV-6 / KLV-9): while a query is active and client-side filtering hides every
+  // hit of the loaded pages (or on Gần đây / Được chia sẻ với tôi, where the query narrows the
+  // screen's list client-side), auto-load the next page up to 10 pages so matches on later pages
+  // show without a false empty state.
   const clientFilteredSearch =
     query.length > 0 &&
-    (subView === 'recent' || filters.updatedBy.trim() !== '' || filters.updatedPreset !== 'any')
+    (screenScopedQuery || filters.updatedBy.trim() !== '' || filters.updatedPreset !== 'any')
   const autoLoadingSearchPages =
     query.length > 0 &&
     (page.status === 'loading' ||
@@ -2467,7 +2470,7 @@ export function DocumentsHome({
         page.status === 'ready' &&
         page.nextCursor !== null &&
         !page.moreError &&
-        (subView === 'recent'
+        (screenScopedQuery
           ? page.loadedPages < MAX_AUTO_SEARCH_PAGES || page.loadingMore
           : (folders.length + tableRows.length === 0 && page.loadedPages < MAX_AUTO_SEARCH_PAGES) ||
             (folders.length + tableRows.length === 0 && page.loadingMore))))
@@ -2476,16 +2479,10 @@ export function DocumentsHome({
     if (page.seq !== listSeqRef.current) return
     if (page.status !== 'ready' || !page.nextCursor || page.moreError) return
     if (page.loadedPages >= MAX_AUTO_SEARCH_PAGES) return
-    if (subView !== 'recent' && folders.length + tableRows.length > 0) return
+    if (!screenScopedQuery && folders.length + tableRows.length > 0) return
     if (!page.loadingMore) loadMore()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    clientFilteredSearch,
-    subView,
-    folders.length,
-    tableRows.length,
-    page,
-  ])
+  }, [clientFilteredSearch, screenScopedQuery, folders.length, tableRows.length, page])
   // UNI-2047: the selection and the bulk bar act on the rows the person sees, not on everything
   // loaded: the shelf's Lưu trữ bởi and the source rows narrow the table
   const visibleDocs = useMemo(
