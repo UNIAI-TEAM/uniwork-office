@@ -99,6 +99,17 @@ const SCREENS = [
   ['archive', 'uniworkListShelved'],
 ] as const satisfies readonly (readonly [DocumentsHomeSubViewId, string])[]
 
+// the rules of the @media (max-width: 1100px) block that wraps the toolbar search box (the file
+// has other blocks at that width: pick the one that names the box)
+function searchWrapBlock(css: string): string {
+  const blocks = [...css.matchAll(/@media \(max-width: 1100px\)\s*\{([^@]*?)\n\}/g)].map(
+    (m) => m[1]!,
+  )
+  const block = blocks.find((b) => b.includes('.dh-search-box'))
+  if (block === undefined) throw new Error('no max-width 1100px block names .dh-search-box')
+  return block
+}
+
 describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
   let host: HTMLDivElement
   let sidebarSlot: HTMLDivElement
@@ -531,15 +542,38 @@ describe('the filter bar on the shared list rules (UNI-2047 A3)', () => {
         }
       })
 
-      it('marks only the Archive toolbar with the class the wrap rule keys on', async () => {
-        await mount('archive')
-        expect(host.querySelector('.dh-toolbar')!.classList.contains('dh-toolbar-shelf')).toBe(true)
-        for (const subView of ['workspace', 'recent', 'shared-with-me'] as const) {
+      it('every screen renders its search box under the toolbar selector the 1100px wrap rule keys on', async () => {
+        const css = readFileSync(
+          join(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
+          'utf8',
+        )
+        const boxRule = searchWrapBlock(css).match(
+          /([^{}]+>\s*\.dh-search-box)\s*\{[^}]*margin-inline-end:/,
+        )
+        expect(boxRule, 'search box wrap rule').not.toBeNull()
+        const boxSelector = boxRule![1]!.trim()
+        expect(boxSelector).toBe('.dh-toolbar:not(.dh-toolbar-folder) > .dh-search-box')
+        for (const subView of [
+          'archive',
+          'recent',
+          'shared-with-me',
+          'shared-by-me',
+          'trash',
+          'workspace',
+        ] as const) {
           await remount(subView)
-          expect(host.querySelector('.dh-toolbar')!.classList.contains('dh-toolbar-shelf')).toBe(
-            false,
-          )
+          expect(
+            host.querySelector(boxSelector),
+            `${subView}: matched by the wrap rule`,
+          ).not.toBeNull()
+          expect(
+            host.querySelector('.dh-toolbar-shelf'),
+            `${subView}: no per-screen class`,
+          ).toBeNull()
         }
+        api.uniworkListFavorites = vi.fn(async () => ok({ documents: items, nextCursor: null }))
+        await goTo('starred')
+        expect(host.querySelector(boxSelector), 'starred: matched by the wrap rule').not.toBeNull()
       })
     })
 
@@ -1739,23 +1773,23 @@ describe('the local Home filter splits .md from .txt (UNI-2047 A3)', () => {
   })
 })
 
-describe('documents-home.css: the Archive toolbar and the filter lists (UNI-2205 fix6)', () => {
+describe('documents-home.css: the toolbar search wrap and the filter lists (UNI-2205 fix7)', () => {
   const css = readFileSync(
     join(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
     'utf8',
   )
 
-  it('wraps the Archive search box at the 1100px breakpoint the other screens wrap at, to its own row under the title', () => {
-    // the toolbar keys on `dh-toolbar-shelf`; the media query is the one that ends the single-row toolbar
+  it('ends the single-row toolbar at 1101px and wraps the search box onto its own row at 1100px', () => {
     expect(css).toMatch(
       /@media \(min-width: 1101px\)\s*\{\s*\.dh-toolbar\s*\{\s*flex-wrap:\s*nowrap;/,
     )
-    const block = css.match(
-      /@media \(max-width: 1100px\)\s*\{\s*\.dh-toolbar\.dh-toolbar-shelf\s*\{[^@]*?\n\}/,
+    const block = searchWrapBlock(css)
+    expect(block).toMatch(/> \.dh-toolbar-spacer\s*\{[^}]*display:\s*none;/)
+    expect(block).toMatch(
+      /> \.dh-search-box\s*\{[^}]*margin-inline-end:\s*max\(0px, calc\(100% - var\(--dh-search-box-width\)\)\);/,
     )
-    expect(block, 'Archive wrap rule at max-width 1100px').not.toBeNull()
-    expect(block![0]).toMatch(/\.dh-toolbar-shelf > \.dh-toolbar-spacer\s*\{[^}]*flex:\s*1 0 100%;/)
-    expect(block![0]).toMatch(/\.dh-toolbar-shelf > \.dh-search-box\s*\{[^}]*margin-top:\s*12px;/)
+    // no row-gap override: a select that wraps keeps the normal toolbar gap
+    expect(block).not.toMatch(/row-gap/)
   })
 
   it('themes the options of a filter chip list with the surface and text tokens', () => {
