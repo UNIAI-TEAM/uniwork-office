@@ -791,6 +791,14 @@ export function DocumentsHome({
               nextCursor: res.value.nextCursor,
               loadingMore: false,
             })
+            if (subView !== 'shared-with-me') {
+              setKnownAuthors((prev) => {
+                const merged = new Map<string, string>()
+                for (const opt of prev) merged.set(opt.id, opt.name)
+                for (const opt of collectUpdatedByOptions(items)) merged.set(opt.id, opt.name)
+                return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
+              })
+            }
           } else {
             setPage({
               status: 'error',
@@ -1039,12 +1047,21 @@ export function DocumentsHome({
         .then((res) => {
           if (listSeqRef.current !== seq) return
           if (res.ok) {
+            const nextItems = res.value.items as DocumentsHomeDoc[]
             setPage((prev) => ({
               ...prev,
-              items: [...prev.items, ...(res.value.items as DocumentsHomeDoc[])],
+              items: [...prev.items, ...nextItems],
               nextCursor: res.value.nextCursor,
               loadingMore: false,
             }))
+            if (subView !== 'shared-with-me') {
+              setKnownAuthors((prev) => {
+                const merged = new Map<string, string>()
+                for (const opt of prev) merged.set(opt.id, opt.name)
+                for (const opt of collectUpdatedByOptions(nextItems)) merged.set(opt.id, opt.name)
+                return Array.from(merged.entries()).map(([id, name]) => ({ id, name }))
+              })
+            }
           } else {
             setPage((prev) => ({
               ...prev,
@@ -2342,11 +2359,15 @@ export function DocumentsHome({
   // the folder cards keep their own order: the server's position, or the name when the table sorts by it
   const folderOrder = docSort?.column === 'name' ? 'name' : 'recent'
   const folderDesc = folderOrder === 'name' && docSort?.dir === 'desc'
+  // UNI-2205: the search IPC takes the Type picks only, so Người sửa / Cập nhật narrow the search
+  // hits here on folders and documents alike (matching the web, which combines all filters with q)
   const { folders: allFolders, files } = useMemo(() => {
-    const split = splitAndSortItems(page.items, folderOrder, dateLocale)
+    const matched =
+      query.length > 0 ? page.items.filter((doc) => docMatchesUpdated(doc, wireFilters)) : page.items
+    const split = splitAndSortItems(matched, folderOrder, dateLocale)
     const ordered = folderDesc ? [...split.folders].reverse() : split.folders
     return { folders: myFolderFirst(ordered), files: split.files }
-  }, [page.items, folderOrder, folderDesc, dateLocale])
+  }, [page.items, query, wireFilters, folderOrder, folderDesc, dateLocale])
   // Q0: the tree level (workspace root, My Folder, an open folder) keeps its cards, they navigate;
   // on a flat list the same switch as the rows hides them under a Type pick
   const folders = folderCardsUnderTypePick(
