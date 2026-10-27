@@ -1,4 +1,4 @@
-import type { ShapeRenderNode } from '@genoffice/pptx-render'
+import type { RenderNode, ShapeRenderNode } from '@genoffice/pptx-render'
 
 /** Text frames need a full-box hit target because their glyph runs do not cover spacing/insets. */
 export function needsTextFrameHitArea(shape: ShapeRenderNode): boolean {
@@ -11,6 +11,40 @@ const PROMPT_PLACEHOLDERS = new Set(['title', 'ctrTitle', 'subTitle', 'body'])
 export function isPromptPlaceholder(shape: ShapeRenderNode): boolean {
   if (!shape.placeholder || !PROMPT_PLACEHOLDERS.has(shape.placeholder)) return false
   return !shape.text?.lines.some((l) => l.runs.some((r) => !r.isBullet && r.text.trim()))
+}
+
+/** Shape/text node whose own text has a visible character (bullets alone do not count). */
+function hasVisibleText(node: RenderNode): boolean {
+  if (node.type !== 'shape' && node.type !== 'text') return false
+  return !!node.text?.lines.some((l) => l.runs.some((r) => !r.isBullet && r.text.trim()))
+}
+
+/** Overlap needed on each axis (px) for text to count as sitting in a frame, not just touching its edge. */
+const PROMPT_OVERLAP_PX = 4
+
+/**
+ * Empty prompt placeholders whose frame is covered by other visible text on the slide: the
+ * slide's own text box, or a master/layout shape that draws text there (a converted .ppt
+ * leaves an empty title placeholder beside a free text box). The prompt would be painted
+ * over that text, so these placeholders draw no prompt; the others keep it.
+ */
+export function coveredPromptIds(nodes: readonly RenderNode[]): Set<string> {
+  const covered = new Set<string>()
+  const texts = nodes.filter(hasVisibleText)
+  for (const n of nodes) {
+    if (n.type !== 'shape' && n.type !== 'text') continue
+    if (!isPromptPlaceholder(n)) continue
+    const a = n.box
+    const hit = texts.some((t) => {
+      const b = t.box
+      return (
+        Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > PROMPT_OVERLAP_PX &&
+        Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > PROMPT_OVERLAP_PX
+      )
+    })
+    if (hit) covered.add(n.id)
+  }
+  return covered
 }
 
 /** Frame-edge grip band (screen px, each side of the edge): PowerPoint's border grabs about this wide */

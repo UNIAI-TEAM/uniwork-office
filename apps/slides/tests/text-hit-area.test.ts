@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import type { ShapeRenderNode } from '@genoffice/pptx-render'
-import { isPromptPlaceholder, textHitAtPoint } from '../src/renderer/text-hit-area'
+import {
+  coveredPromptIds,
+  isPromptPlaceholder,
+  textHitAtPoint,
+} from '../src/renderer/text-hit-area'
 
 const run = (text: string, x: number, widthPx: number) => ({
   text,
@@ -168,5 +172,62 @@ describe('frame-edge grip band', () => {
     const ph = shape({ placeholder: 'body' }, 0)
     expect(textHitAtPoint(ph, box, { x: 150, y: 3 })).toBe(false)
     expect(textHitAtPoint(ph, box, { x: 150, y: 100 })).toBe(true)
+  })
+})
+
+describe('coveredPromptIds (no click-to-add prompt over visible text)', () => {
+  const frame = (id: string, x: number, y: number, w: number, h: number) => ({
+    id,
+    sourceId: id,
+    box: { x, y, w, h, rotationDeg: 0 } as ShapeRenderNode['box'],
+  })
+  const title = (id = 'ph') => ({
+    ...shape({ placeholder: 'title' }, 0),
+    ...frame(id, 50, 30, 800, 120),
+  })
+  const textBox = (id: string, x: number, y: number, extra: Partial<ShapeRenderNode> = {}) => ({
+    ...shape({ type: 'text', ...extra }, 1),
+    ...frame(id, x, y, 300, 60),
+    text: {
+      ...shape({}, 1).text!,
+      lines: [{ runs: [run('Key Results', 0, 200)], top: 0, height: 30, paraStart: true }],
+    },
+  })
+
+  it('covers an empty placeholder when the slide has its own text box over it (converted vn-deck slide 3)', () => {
+    const nodes = [title(), textBox('t', 400, 50)]
+    expect([...coveredPromptIds(nodes)]).toEqual(['ph'])
+  })
+
+  it('covers it when a master/layout decoration shape draws text there', () => {
+    const nodes = [textBox('m', 100, 60, { decoration: true }), title()]
+    expect([...coveredPromptIds(nodes)]).toEqual(['ph'])
+  })
+
+  it('keeps the prompt when the other text sits clear of the frame', () => {
+    expect(coveredPromptIds([title(), textBox('t', 400, 400)]).size).toBe(0)
+    // only touching the frame edge is not overlap
+    expect(coveredPromptIds([title(), textBox('t', 850, 50)]).size).toBe(0)
+  })
+
+  it('keeps the prompt for a lone empty placeholder and ignores empty / bullet-only neighbours', () => {
+    expect(coveredPromptIds([title()]).size).toBe(0)
+    const emptyBox = { ...shape({ type: 'text' }, 0), ...frame('e', 400, 50, 300, 60) }
+    const bulletOnly = {
+      ...shape({ type: 'text' }, 0),
+      ...frame('b', 400, 50, 300, 60),
+      text: {
+        ...shape({}, 1).text!,
+        lines: [
+          { runs: [{ ...run('•', 0, 10), isBullet: true }], top: 0, height: 20, paraStart: true },
+        ],
+      },
+    }
+    expect(coveredPromptIds([title(), emptyBox, bulletOnly as ShapeRenderNode]).size).toBe(0)
+  })
+
+  it('a placeholder that has its own text is not a prompt placeholder and stays out of the set', () => {
+    const filled = { ...shape({ placeholder: 'title' }, 1), ...frame('f', 50, 30, 800, 120) }
+    expect(coveredPromptIds([filled, textBox('t', 400, 50)]).size).toBe(0)
   })
 })

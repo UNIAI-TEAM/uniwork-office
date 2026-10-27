@@ -35,7 +35,12 @@ import type {
 } from '@genoffice/pptx-render'
 import { boxPivotProps, fillToKonva, isConnectorNode, isEditableText } from './konva-adapter'
 import { tableCellAtPoint, tableCellOverlayBox, tableLocalPointFromStage } from './table-hit'
-import { EDGE_GRIP_PX, isPromptPlaceholder, textHitAtPoint } from './text-hit-area'
+import {
+  coveredPromptIds,
+  EDGE_GRIP_PX,
+  isPromptPlaceholder,
+  textHitAtPoint,
+} from './text-hit-area'
 import type { EditCaret, EditPointsState } from './action-context'
 import {
   computeSnap,
@@ -938,6 +943,8 @@ export function SlideCanvas({
     () => new Set(slide.nodes.filter((n) => n.background).map((n) => n.sourceId)),
     [slide],
   )
+  // Empty placeholders sitting under other visible text draw no click-to-add prompt over it
+  const promptCovered = useMemo(() => coveredPromptIds(slide.nodes), [slide])
   // Rubber-band selection rectangle (slide coordinates); null = not rubber-band selecting
   const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(
     null,
@@ -1272,6 +1279,7 @@ export function SlideCanvas({
             livePreview={selectedIds.length === 1}
             zoom={zoom}
             multiDrag={selectedIds.length > 1 && selectedIds.includes(n.sourceId)}
+            promptCovered={promptCovered.has(n.id)}
             onDuplicateTo={onDuplicateTo}
             entered={n.sourceId === enteredGroupId}
             onEnterGroup={onEnterGroup}
@@ -1839,6 +1847,8 @@ interface NodeProps {
   zoom: number
   /** This node is part of a multi-select drag: disable per-node snapping (each node snapping separately would break relative positions within the selection) */
   multiDrag?: boolean
+  /** An empty placeholder whose frame is covered by other visible text: no prompt drawn over it */
+  promptCovered?: boolean
   onDuplicateTo?: Props['onDuplicateTo']
   /** This group is in in-group editing mode: children are interactive, whole-group hit area is off */
   entered?: boolean
@@ -1877,6 +1887,7 @@ function NodeView({
   livePreview,
   zoom,
   multiDrag,
+  promptCovered,
   onDuplicateTo,
   entered,
   onEnterGroup,
@@ -2295,7 +2306,7 @@ function NodeView({
   }
   // Empty placeholder: canvas draws a gray click hint (edit canvas only, not in thumbnails/export)
   const phPrompt = (() => {
-    if (hidePhPrompts) return null
+    if (hidePhPrompts || promptCovered) return null
     if (node.type !== 'shape' && node.type !== 'text') return null
     const sh = node as ShapeRenderNode
     if (!isPromptPlaceholder(sh)) return null
