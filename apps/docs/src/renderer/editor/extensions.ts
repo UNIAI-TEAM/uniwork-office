@@ -94,6 +94,7 @@ import {
   type TextboxListMarker,
   type ParaFrame,
   type TextFlowDirection,
+  UNDRAWABLE_FRAME_COLOR,
 } from '@genoffice/docx-engine'
 import {
   substituteBullet,
@@ -5251,21 +5252,23 @@ function protectedDomSpec(node: PmNode): DomSpec {
     return ['div', attrs, moveHandleSpec(t('editorMoveImage')), diagramSpecOf(diagram)]
   }
   // Broken picture (missing rel/media): empty frame at the declared extent
-  // with centered alt text. Frame/text colors stand in for document content
-  // (must look identical in both themes), hence hardcoded inline.
+  // with centered alt text (the localized "Picture" when the file has none).
+  // Frame/text colors stand in for document content (must look identical in
+  // both themes), hence hardcoded inline; the frame gray is the engine's
+  // shared "cannot draw" color, the text keeps a darker gray to stay legible.
   if (node.attrs.brokenImage) {
     attrs.class += ' doc-protected-broken-img'
     const { imageWidthPx, imageHeightPx, imageAlign } = node.attrs
     if (imageAlign === 'center' || imageAlign === 'right') {
       attrs.style = `text-align:${imageAlign}`
     }
-    let style = 'border:1px solid #999;color:#888;'
+    let style = `border:1px solid #${UNDRAWABLE_FRAME_COLOR};color:#888;`
     if (imageWidthPx) style += `width:${Number(imageWidthPx)}px;`
     if (imageHeightPx) style += `height:${Number(imageHeightPx)}px;`
     return [
       'div',
       attrs,
-      ['span', { class: 'doc-broken-img-frame', style }, String(previewText || label || '')],
+      ['span', { class: 'doc-broken-img-frame', style }, String(previewText || t('ribbonPicture'))],
     ]
   }
   // OLE embed with a packaged preview picture: Word draws just the preview at

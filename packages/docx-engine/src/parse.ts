@@ -234,6 +234,7 @@ import {
   vmlWordArtBox,
   type VmlGroupScale,
   type VmlOrigin,
+  UNDRAWABLE_FRAME_COLOR,
 } from './parse-vml'
 
 export { resolveMainDocumentPath } from './parse-package'
@@ -242,9 +243,6 @@ export { styleRunFormat } from './parse-styles'
 export { assertZipWithinLimits }
 
 // picture extents keep the authored size to 1/100 px: whole-px rounding lost up to 0.5 px per picture
-/** frame color of the neutral box standing in for a VML shape the engine cannot draw (document data) */
-const VML_PLACEHOLDER_BORDER = '9CA3AF'
-
 const emuToPx = (emu: number): number => Math.round((emu / EMU_PER_PX) * 100) / 100
 
 /** w:br w:type → run-text control char (\f page, \v column; else soft \n) */
@@ -3213,7 +3211,7 @@ function extractTextboxes(
         // bounding box: a neutral frame of the declared size marks the spot
         if (!d) {
           delete box.fill
-          box.borderColor = VML_PLACEHOLDER_BORDER
+          box.borderColor = UNDRAWABLE_FRAME_COLOR
           box.borderWidthPx = 1
           placeVmlBox(box, style, scale, origin)
           out.push(box)
@@ -3233,6 +3231,7 @@ function extractTextboxes(
     ): void => {
       const line = vmlLineSvg(shape, scale)
       if (!line) return
+      const style = attrsOf(shape)['style'] ?? ''
       const box: TextboxDisplay = {
         paras: [],
         readOnly: true,
@@ -3243,11 +3242,16 @@ function extractTextboxes(
         insetRightPx: 0,
         insetBottomPx: 0,
         insetLeftPx: 0,
-        floating: true,
-        offsetXEmu: Math.round(((origin?.x ?? 0) + line.leftPx) * EMU_PER_PX),
-        offsetYEmu: Math.round(((origin?.y ?? 0) + line.topPx) * EMU_PER_PX),
       }
-      const style = attrsOf(shape)['style'] ?? ''
+      // the from/to span rides on top of the shape's placement: the group origin inside a
+      // group (the line's own left/top is not used there), else the pt margins and
+      // mso-position-* like any other top-level VML shape
+      if (!scale) placeVmlBox(box, style, scale, origin)
+      box.floating = true
+      const dx = scale && origin ? origin.x : 0
+      const dy = scale && origin ? origin.y : 0
+      box.offsetXEmu = (box.offsetXEmu ?? 0) + Math.round((dx + line.leftPx) * EMU_PER_PX)
+      box.offsetYEmu = (box.offsetYEmu ?? 0) + Math.round((dy + line.topPx) * EMU_PER_PX)
       if (/z-index:\s*-/.test(style)) box.behind = true
       out.push(box)
     }

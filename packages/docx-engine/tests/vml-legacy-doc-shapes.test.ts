@@ -1,5 +1,6 @@
+import JSZip from 'jszip'
 import { describe, expect, it, vi } from 'vitest'
-import { parseDocx, saveDocx } from '../src/index'
+import { parseDocx, saveDocx, UNDRAWABLE_FRAME_COLOR } from '../src/index'
 import { convertWmfToDataUrl } from '../src/vendor/emf-converter/index.mjs'
 import { buildDocx } from './helpers/build-docx'
 
@@ -118,6 +119,49 @@ describe('legacy .doc VML shapes', () => {
     expect(svg).toContain('stroke="#ff0000"')
     expect(svg).toContain('stroke-width="1.33"')
     expect(svg).toContain('stroke-dasharray="1.33 1.33"')
+    // top-level lines sit at their pt margins like the other VML shapes; the SVG box is
+    // padded by half the stroke, so it starts that much before the margin
+    const pad = Math.round(0.665 * 9525)
+    expect(box?.offsetXEmu).toBe(10 * 12700 - pad)
+    expect(box?.offsetYEmu).toBe(4 * 12700 - pad)
+  })
+
+  it('a top-level v:line honours mso-position-horizontal like other top-level shapes', async () => {
+    const xml = DOTTED_LINE.replace(
+      'margin-left:10pt;margin-top:4pt',
+      'margin-top:4pt;mso-position-horizontal:right;mso-position-horizontal-relative:margin',
+    )
+    const doc = await parseDocx(await buildDocx({ bodyXml: xml }))
+    const box = doc.blocks[0].textboxes?.[0]
+    // right-aligned: the box's right edge lands on the text area's right edge
+    expect(box?.offsetXEmu).toBeGreaterThan(0)
+  })
+
+  it('dash styles cover the dot-dot variants and cap the stroke weight', async () => {
+    const dashed = (attrs: string) => DOTTED_LINE.replace('weight="1pt" dashstyle="dot"', attrs)
+    const svgOf = async (attrs: string) => {
+      const doc = await parseDocx(await buildDocx({ bodyXml: dashed(attrs) }))
+      return decode(doc.blocks[0].textboxes?.[0]?.fillImageDataUrl)
+    }
+    expect(await svgOf('weight="1pt" dashstyle="shortdashdotdot"')).toContain(
+      'stroke-dasharray="3.99 1.33 1.33 1.33 1.33 1.33"',
+    )
+    expect(await svgOf('weight="1pt" dashstyle="longdashdotdot"')).toContain(
+      'stroke-dasharray="10.64 3.99 1.33 3.99 1.33 3.99"',
+    )
+    // a numeric pattern stays solid
+    expect(await svgOf('weight="1pt" dashstyle="2 2"')).not.toContain('stroke-dasharray')
+    // bare v:stroke weight is EMU: 9360 EMU is under a pixel, floored at 0.75
+    expect(await svgOf('weight="9360"')).toContain('stroke-width="0.98"')
+    // a huge weight cannot size the SVG without bound
+    expect(await svgOf('weight="99999999pt"')).toContain('stroke-width="96"')
+    // the shape's own strokeweight is a pt length, capped the same way
+    const own = DOTTED_LINE.replace(
+      '<v:stroke color="#ff0000" weight="1pt" dashstyle="dot"/>',
+      '',
+    ).replace('stroked="t"', 'stroked="t" strokeweight="2pt"')
+    const doc = await parseDocx(await buildDocx({ bodyXml: own }))
+    expect(decode(doc.blocks[0].textboxes?.[0]?.fillImageDataUrl)).toContain('stroke-width="2.67"')
   })
 
   it('a visible shape with a curved path leaves a neutral frame of its size, not nothing', async () => {
@@ -126,7 +170,7 @@ describe('legacy .doc VML shapes', () => {
     expect(box).toBeDefined()
     expect(box?.widthPx).toBe(40)
     expect(box?.heightPx).toBe(40)
-    expect(box?.borderColor).toBe('9CA3AF')
+    expect(box?.borderColor).toBe(UNDRAWABLE_FRAME_COLOR)
     expect(box?.fill).toBeUndefined()
     expect(box?.pathData).toBeUndefined()
   })
@@ -180,6 +224,52 @@ describe('round trip', () => {
     ]) {
       const bytes = await buildDocx(opts)
       expect(await unchangedSave(bytes)).toBe(bytes)
+    }
+  })
+})
+
+describe('round trip with an edit', () => {
+  const picts = (xml: string) => xml.match(/<w:pict>[\s\S]*?<\/w:pict>/g) ?? []
+
+  it('an edited package keeps every w:pict fragment and every media part byte-identical', async () => {
+    const bytes = await buildDocx({
+      bodyXml:
+        CHECKBOX_PARA +
+        LINE_GROUP +
+        DOTTED_LINE +
+        CURVED_SHAPE +
+        WMF_PICT('rId10') +
+        '<w:p><w:r><w:t>edit me</w:t></w:r></w:p>',
+      extraRels: WMF_REL,
+      binaryParts: [WMF_PART],
+    })
+    const doc = await parseDocx(bytes)
+    const keep = doc.blocks
+      .filter((b) => !b.hidden)
+      .map((b) => ({ kind: 'original' as const, docxIndex: b.docxIndex! }))
+    const saved = await saveDocx(doc, [
+      ...keep,
+      {
+        kind: 'xml' as const,
+        xml: '<w:p><w:r><w:t>one added paragraph</w:t></w:r></w:p>',
+      },
+    ])
+    expect(saved).not.toBe(bytes)
+    const before = await JSZip.loadAsync(bytes)
+    const after = await JSZip.loadAsync(saved)
+    const docBefore = await before.file('word/document.xml')!.async('string')
+    const docAfter = await after.file('word/document.xml')!.async('string')
+    expect(docAfter).toContain('one added paragraph')
+    expect(picts(docBefore).length).toBe(5)
+    expect(picts(docAfter)).toEqual(picts(docBefore))
+    const media = Object.keys(before.files).filter(
+      (n) => n.startsWith('word/media/') && !before.files[n]!.dir,
+    )
+    expect(media).toContain('word/media/image5.wmf')
+    for (const name of media) {
+      expect(Buffer.from(await after.file(name)!.async('uint8array'))).toEqual(
+        Buffer.from(await before.file(name)!.async('uint8array')),
+      )
     }
   })
 })

@@ -407,7 +407,18 @@ function vmlLinePoint(
   return x === undefined || y === undefined || !Number.isFinite(x + y) ? undefined : [x, y]
 }
 
-/** v:stroke dashstyle → SVG dash pattern in stroke-width units */
+/**
+ * Frame color (hex, no #) of the neutral box standing in for a shape or picture
+ * the engine cannot draw. Document data, not chrome: it must look the same in
+ * both themes, so it is a constant shared by the VML placeholder and the
+ * renderer's broken-picture frame rather than a token.
+ */
+export const UNDRAWABLE_FRAME_COLOR = '9CA3AF'
+
+/** longest stroke a v:line may ask for (px); a hostile weight must not size the SVG box */
+const VML_LINE_MAX_STROKE_PX = 96
+
+/** v:stroke dashstyle → SVG dash pattern in stroke-width units (numeric patterns stay solid) */
 const VML_DASH: Record<string, string> = {
   dot: '1 1',
   shortdot: '1 1',
@@ -415,8 +426,10 @@ const VML_DASH: Record<string, string> = {
   shortdash: '3 1',
   dashdot: '4 3 1 3',
   shortdashdot: '3 1 1 1',
+  shortdashdotdot: '3 1 1 1 1 1',
   longdash: '8 3',
   longdashdot: '8 3 1 3',
+  longdashdotdot: '8 3 1 3 1 3',
 }
 
 /**
@@ -424,7 +437,8 @@ const VML_DASH: Record<string, string> = {
  * plus that box's top-left corner in px from the group origin (or the paragraph
  * when the line is not in a group). Stroke color, weight and dash style come
  * from the line or its v:stroke child; flip:x / flip:y mirror the line inside
- * its box. A bare v:stroke weight (LibreOffice writes EMU) counts as EMU.
+ * its box. A bare v:stroke weight (LibreOffice writes EMU) counts as EMU; the
+ * stroke is capped at 96 px.
  */
 export function vmlLineSvg(
   shape: XNode,
@@ -439,11 +453,14 @@ export function vmlLineSvg(
   const from = vmlLinePoint(a['from'], scale)
   const to = vmlLinePoint(a['to'], scale)
   if (!from || !to) return null
+  // Only LibreOffice's v:stroke weight is a bare EMU count (9360 = 0.26 mm, seen in its
+  // output). The shape's strokeweight is a CSS length where a bare number is pt (Word's
+  // reading; no LibreOffice sample writes it bare), so it stays on vmlLengthPx.
   const weightRaw = strokeNode['weight'] ?? a['strokeweight']
   const weight = /^\s*[\d.]+\s*$/.test(strokeNode['weight'] ?? '')
     ? parseFloat(weightRaw!) / EMU_PER_PX
     : vmlLengthPx(weightRaw)
-  const sw = Math.max(0.75, Math.round((weight ?? 1) * 100) / 100)
+  const sw = Math.min(VML_LINE_MAX_STROKE_PX, Math.max(0.75, Math.round((weight ?? 1) * 100) / 100))
   // the box is padded by half the stroke so a horizontal/vertical line keeps all of it
   const pad = sw / 2
   const left = Math.min(from[0], to[0]) - pad

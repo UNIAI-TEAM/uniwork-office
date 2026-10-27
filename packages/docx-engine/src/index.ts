@@ -7,6 +7,7 @@ export {
   sfntLineMetrics,
 } from './font-table'
 export { decodeEntities } from './parse-xml-text'
+export { UNDRAWABLE_FRAME_COLOR } from './parse-vml'
 export { sdtCheckboxGlyphs, sdtCheckboxIsChecked } from './checkbox-control'
 export {
   parseDocx,
