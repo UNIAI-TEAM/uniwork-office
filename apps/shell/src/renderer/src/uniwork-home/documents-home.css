@@ -1407,21 +1407,24 @@
   }
 }
 
-/* UNI-2205 (KLF-18): one wrap rule for every non-folder toolbar (Archive, Recent, Shared with me,
-   All documents, Starred, Shared by me, Trash): at <= 1100px the search box sits on its own row
-   under the title, in the same slot and width on every screen, whatever the title or the
-   workspace select measure (the >= 1101px rule above keeps the single row). The box's end margin
-   takes the rest of the row, so its outer width is the whole row and it can never share a line
-   with the title or the select; the normal row gap is the only space above it, so a select that
-   wraps keeps its gap too. The spacer only pushed the box to the end of a shared row: it would
-   be a stray empty line here. The open folder toolbar keeps its own container-query layout
-   (crumbs + actions share row one, the search box has its row below them). */
+/* UNI-2205 (KLF-18, KLF-23): one wrap rule for every non-folder toolbar (Archive, Recent, Shared
+   with me, All documents, Starred, Shared by me, Trash), as on the web: at <= 1100px row one is the
+   title, the workspace select and the Upload / Create actions (right-aligned), row two is the search
+   box alone, in the same slot and width on every screen whatever the title or the select measure
+   (the >= 1101px rule above keeps the single row). The box is ordered after everything else, so
+   when row one does not fit, the select and/or the actions wrap above it, never below. Its end
+   margin takes the rest of the row, so its outer width is the whole row and it can never share a
+   line with anything; the normal row gap is the only space above it, so a select that wraps keeps
+   its gap too. The spacer only pushed the box to the end of a shared row: it would be a stray empty
+   line here. The open folder toolbar keeps its own container-query layout (crumbs + actions share
+   row one, the search box has its row below them). */
 @media (max-width: 1100px) {
   .dh-toolbar:not(.dh-toolbar-folder) > .dh-toolbar-spacer {
     display: none;
   }
 
   .dh-toolbar:not(.dh-toolbar-folder) > .dh-search-box {
+    order: 1;
     margin-inline-end: max(0px, calc(100% - var(--dh-search-box-width)));
   }
 }
