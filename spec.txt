@@ -1,0 +1,4 @@
+rustup toolchain install 1.90.0 --profile minimal --target wasm32-wasip1; rc=$?; echo RUSTUP_EXIT=$rc; [ $rc -eq 0 ]
+NODE_OPTIONS=--max-old-space-size=6144 npm run build:web -- --all; rc=$?; echo BUILDWEB_EXIT=$rc; [ $rc -eq 0 ]
+npx playwright install --with-deps chromium; rc=$?; echo PWINSTALL_EXIT=$rc; [ $rc -eq 0 ]
+WEB_E2E_REQUIRE_BUILD=1 npx playwright test -c web/e2e html-preview-security draft-recovery slides-presenter ai-web modules-smoke docs-web docs-rename-save conflict-dialog-layout docs-conflict-diff ui-forced-colors-picker size-gate open-refused sheets-too-large markdown-web docs-mobile-390 docs-readonly-narrow html-web ai-save-confirm ai-panel-phone ai-composer-390; rc=$?; echo WEBE2E_EXIT=$rc; [ $rc -eq 0 ]
