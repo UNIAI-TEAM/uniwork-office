@@ -31,7 +31,8 @@ export function useFolderBatchEnd(handlers: FolderBatchEndHandlers): void {
         if (!end.toast) return
         const message = batchEndMessage(liveT, batch)
         const tone = batch.phase === 'completed' ? 'ok' : 'error'
-        announce(message, { assertive: tone === 'error' })
+        // the error toast is role=alert and reads itself; only the ok toast needs the live line
+        if (tone === 'ok') announce(message)
         live.onToast(message, tone)
       }),
     [],

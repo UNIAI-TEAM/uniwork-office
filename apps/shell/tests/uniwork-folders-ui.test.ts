@@ -25,6 +25,10 @@ import { uniworkFolderStrings } from '../src/renderer/src/i18n/strings-uniwork-f
 import { uniworkDocumentStrings } from '../src/renderer/src/i18n/strings-uniwork-documents'
 import { uniworkShareStrings } from '../src/renderer/src/i18n/strings-uniwork-share'
 import { createFakeShareApi } from '../src/renderer/src/uniwork-share/fake-share-api'
+import {
+  resetFolderBatchesForTest,
+  trackFolderBatch,
+} from '../src/renderer/src/uniwork-share/folder-contents-access-store'
 
 /**
  * FD-11 S1-S3: the UniWork browser against a typed fake of the folder IPC
@@ -1730,5 +1734,31 @@ describe('UniworkBrowser: Share documents inside… (UNI-2244)', () => {
     const row = $$('.uw-pick-item').find((el) => el.textContent?.includes('Beta'))!
     await click(row.querySelector('[data-folder-menu-for]'))
     expect(menuLabels()).not.toContain(entryLabel)
+  })
+
+  it('the browser wires a background run end to a list refetch and one toast (R2-5)', async () => {
+    resetFolderBatchesForTest()
+    const shareApi = createFakeShareApi()
+    ;(window as unknown as { uniworkShare: unknown }).uniworkShare = shareApi
+    await render()
+    const before = api.uniworkListChildren.mock.calls.length
+    // a batch the server does not know ends as failed at its first read
+    trackFolderBatch({
+      api: shareApi,
+      batchId: 'fb_unknown',
+      folderId: 'a',
+      folderTitle: 'Alpha',
+      total: 0,
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    await flush()
+    expect(api.uniworkListChildren.mock.calls.length).toBeGreaterThan(before)
+    expect(document.body.textContent).toContain(
+      (uniworkShareStrings.en as Record<string, string>).shrFcBatchFailed,
+    )
+    resetFolderBatchesForTest()
+    delete (window as unknown as { uniworkShare?: unknown }).uniworkShare
   })
 })

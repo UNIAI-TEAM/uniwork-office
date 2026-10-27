@@ -18,7 +18,10 @@ import { LocaleProvider } from '../src/renderer/src/locale'
 import { DocumentsHome } from '../src/renderer/src/uniwork-home/DocumentsHome'
 import type { DocumentsHomeDoc } from '../src/renderer/src/uniwork-home/documents-home-model'
 import { createFakeShareApi } from '../src/renderer/src/uniwork-share/fake-share-api'
-import { resetFolderBatchesForTest } from '../src/renderer/src/uniwork-share/folder-contents-access-store'
+import {
+  resetFolderBatchesForTest,
+  trackFolderBatch,
+} from '../src/renderer/src/uniwork-share/folder-contents-access-store'
 import { uniworkShareStrings } from '../src/renderer/src/i18n/strings-uniwork-share'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -218,5 +221,27 @@ describe('Share documents inside… in the Documents page (UNI-2244)', () => {
     const crumb = host.querySelector<HTMLElement>('.dh-main h1')!.closest('li.uwf-crumb')!
     await click(crumb.querySelector('button[data-folder-menu-for]'))
     expect(labels()).toEqual([ENTRY, 'New subfolder'])
+  })
+
+  it('the page wires a background run end to a list refetch and one toast (R2-5)', async () => {
+    await mount('f-beta')
+    const list = (window as unknown as { home: { uniworkListChildren: ReturnType<typeof vi.fn> } })
+      .home.uniworkListChildren
+    const before = list.mock.calls.length
+    // a batch the server does not know ends as failed at its first read
+    trackFolderBatch({
+      api: (window as unknown as { uniworkShare: Parameters<typeof trackFolderBatch>[0]['api'] })
+        .uniworkShare,
+      batchId: 'fb_unknown',
+      folderId: 'f-beta',
+      folderTitle: 'Beta Leaf',
+      total: 0,
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    await flush()
+    expect(list.mock.calls.length).toBeGreaterThan(before)
+    expect(document.body.textContent).toContain(en.shrFcBatchFailed)
   })
 })

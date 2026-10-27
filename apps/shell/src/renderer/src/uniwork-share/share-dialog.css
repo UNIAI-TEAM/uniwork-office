@@ -926,7 +926,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* the home-workspace row of the replace mode: its choices read "Not shared (private)", so the field
+/* the home-workspace row of the replace mode: its choices read "Private" and the level names, so the field
    takes the whole row instead of the level select's narrow column */
 .uw-fca [data-fca-home] .uw-share-field {
   width: 100%;

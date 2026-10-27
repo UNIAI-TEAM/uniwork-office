@@ -516,21 +516,14 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     )
   })
 
-  it('the dry-run summary is read out and the review buttons are described by it (R1-2)', async () => {
+  it('the dry-run summary is spoken once: described-by on the focused review button, no live line (R1-2, R2-2)', async () => {
     const api = await open({ folderContents: { total: 8, losingUsers: 4 } })
     await setMode('replace')
     await choose(homeSelect(), 'view')
     await click(confirm())
     expect(requests(api)).toHaveLength(1)
-    // one sentence for the screen reader: the summary, then the warnings
-    expect(live()).toBe(
-      [
-        t('shrFcWillChangeOther', { count: 8 }),
-        t('shrFcLosingOther', { count: 4 }),
-        // the home row is a workspace: the fake warns of a wide scope
-        t('shrFcWarnWide'),
-      ].join('. '),
-    )
+    // the live region stays empty: the description is the only voice of the summary
+    expect(live()).toBe('')
     // the focused button is described by the summary (and the warnings when there are some)
     const focused = document.activeElement as HTMLElement
     expect(focused).toBe(q('[data-fca-back]'))
@@ -712,18 +705,28 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     await pick('Minh')
     await click(confirm())
     expect(q('[data-fca-review]')!.textContent).toContain(t('shrFcNothing'))
-    expect(live()).toContain(t('shrFcNothing'))
     expect(apply()).toBeNull()
-    expect(q('[data-fca-back]')).toBeTruthy()
+    // Back is the only button: it holds the focus and its description carries the sentence
+    const back = q('[data-fca-back]')!
+    expect(document.activeElement).toBe(back)
+    const described = back
+      .getAttribute('aria-describedby')!
+      .split(' ')
+      .map((id) => document.getElementById(id)?.textContent ?? '')
+      .join(' ')
+    expect(described).toContain(t('shrFcNothing'))
+    expect(live()).toBe('')
   })
 
-  it('Back from the review returns to the form with the picked people kept', async () => {
+  it('Back from the review returns to the form with the picked people kept and focus inside it (R2-1)', async () => {
     await open({ folderContents: { total: 6 } })
     await pick('Minh')
     await click(confirm())
     await click(q('[data-fca-back]'))
     expect(q('[data-fca-form]')).toBeTruthy()
     expect(q('[data-fca-form]')!.textContent).toContain('Minh')
+    expect(q('[data-fca-form]')!.contains(document.activeElement)).toBe(true)
+    expect(document.activeElement).not.toBe(document.body)
   })
 
   it('background run (202): progress inside the dialog, which stays open; the end toasts and closes it', async () => {
@@ -862,6 +865,8 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     })
     await click(apply())
     expect(q('[data-fca-running]')!.textContent).toBe(t('shrFcProgressAlreadyRunning'))
+    // the follower from the review step keeps the keyboard inside the dialog (R2-1)
+    expect(document.activeElement).toBe(q('[data-fca-done]'))
     // nothing is known of it yet: the starting line
     expect(q('[data-fca-count]')!.textContent).toBe(t('shrFcProgressStarting'))
     expect(requests(api).map((r) => r.dryRun)).toEqual([true, false])
@@ -972,6 +977,37 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     expect(q('[data-fca-form]')).toBeTruthy()
     expect(q('[data-fca-error]')!.textContent).toBe(t('shrFcErrorGeneric'))
     expect(onNotice).not.toHaveBeenCalled()
+    // the focused Apply button unmounted: focus is back inside the form, not on <body> (R2-1)
+    expect(q('[data-fca-form]')!.contains(document.activeElement)).toBe(true)
+  })
+
+  it('202: focus lands on Done, and Esc there closes the dialog without cancelling the run (R2-1)', async () => {
+    vi.useFakeTimers()
+    const api = await open({ folderContents: { total: 900, batchSteps: 3 } })
+    await toReview(api)
+    await click(apply())
+    expect(q('[data-fca-progress]')).toBeTruthy()
+    expect(document.activeElement).toBe(q('[data-fca-done]'))
+    await act(async () => {
+      document.activeElement!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      )
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    // the run goes on: its end is still toasted and the hosts refetch
+    await act(async () => root.unmount())
+    root = createRoot(host)
+    await act(async () => {
+      root.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en' },
+          createElement(EndProbe, { onToast: endToast, onRefetch: endRefetch }),
+        ),
+      )
+    })
+    await advance(FOLDER_BATCH_POLL_MS * 4)
+    expect(endToast).toHaveBeenCalledWith(t('shrFcBatchDoneOther', { count: 900 }), 'ok')
   })
 
   it('a workspace or the organization is held at edit when the level is manage; a person keeps it', async () => {

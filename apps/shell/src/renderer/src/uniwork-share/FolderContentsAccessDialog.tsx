@@ -98,7 +98,7 @@ function FolderContentsAccessBody({
   const [rejectedByKey, setRejectedByKey] = useState<Record<string, string>>({})
   // the state flips after the click; the ref closes the gap for a fast second one
   const inFlight = useRef(false)
-  const reviewRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const closing = useRef(false)
   const batches = useFolderBatches()
   const batch = progress ? batches.find((b) => b.batchId === progress.batchId) : undefined
@@ -124,12 +124,28 @@ function FolderContentsAccessBody({
     return () => clearTimeout(timer)
   }, [query])
 
-  // the form's buttons unmount when the review replaces it: focus goes to the review's safe
-  // button (Back for a destructive replace, the action for an add) so the Tab trap keeps working
+  // the focused button unmounts whenever the step changes, which would drop focus on <body> and
+  // with it the dialog's Esc / Tab handling: focus follows the step. Review: the safe button
+  // (Back for a destructive replace, the action for an add); progress: Done; back to the form
+  // (Back, or a failed apply): its first control. The first render is the modal's own focus.
+  const previousStep = useRef(step)
   useEffect(() => {
-    if (step !== 'review') return
-    const selector = mode === 'replace' ? '[data-fca-back]' : '[data-fca-apply]'
-    reviewRef.current?.querySelector<HTMLElement>(selector)?.focus()
+    const from = previousStep.current
+    previousStep.current = step
+    if (step === 'review') {
+      const selector = mode === 'replace' ? '[data-fca-back]' : '[data-fca-apply]'
+      // nothing to change has no apply button: Back is what is left
+      const target =
+        bodyRef.current?.querySelector<HTMLElement>(selector) ??
+        bodyRef.current?.querySelector<HTMLElement>('[data-fca-back]')
+      target?.focus()
+    } else if (step === 'progress') {
+      bodyRef.current?.querySelector<HTMLElement>('[data-fca-done]')?.focus()
+    } else if (from !== 'form') {
+      bodyRef.current
+        ?.querySelector<HTMLElement>('[data-fca-mode]:checked, [data-fca-confirm]')
+        ?.focus()
+    }
   }, [step, mode])
 
   const candidatesQuery = useShareCandidates(
@@ -256,14 +272,7 @@ function FolderContentsAccessBody({
       return
     }
     const found = answer.value.preview
-    // the summary appears already filled, which a screen reader does not read out by itself
-    announce(
-      [
-        ...previewLines(t, found),
-        ...(found.changed === 0 ? [t('shrFcNothing')] : []),
-        ...warningLines(t, found),
-      ].join('. '),
-    )
+    // the summary is read out through aria-describedby on the focused review button
     setPreview(found)
     setStep('review')
   }
@@ -301,6 +310,7 @@ function FolderContentsAccessBody({
   const descriptionId = `${baseId}-desc`
   const summaryId = `${baseId}-summary`
   const warningsId = `${baseId}-warnings`
+  const nothingId = `${baseId}-nothing`
   const ids = {
     input: `${baseId}-input`,
     listbox: `${baseId}-listbox`,
@@ -312,8 +322,12 @@ function FolderContentsAccessBody({
   const lines = preview ? previewLines(t, preview) : []
   const warnings = preview ? warningLines(t, preview) : []
   const nothingToChange = preview !== null && preview.changed === 0
-  // the review's buttons are announced with what they are about to do
-  const reviewDescribedBy = warnings.length > 0 ? `${summaryId} ${warningsId}` : summaryId
+  // the summary is spoken once, as the description of the focused review button
+  const reviewDescribedBy = [
+    summaryId,
+    ...(nothingToChange ? [nothingId] : []),
+    ...(warnings.length > 0 ? [warningsId] : []),
+  ].join(' ')
   const title = folder.title.trim()
     ? t('shrFcTitle', { title: folder.title })
     : t('shrFcTitleUntitled')
@@ -340,7 +354,7 @@ function FolderContentsAccessBody({
       </header>
 
       {step === 'progress' ? (
-        <div className="uw-share-body" data-fca-progress>
+        <div className="uw-share-body" data-fca-progress ref={bodyRef}>
           {progress?.alreadyRunning && (
             <p className="uw-share-notice warn" data-fca-running>
               {t('shrFcProgressAlreadyRunning')}
@@ -369,13 +383,17 @@ function FolderContentsAccessBody({
           </div>
         </div>
       ) : step === 'review' && preview ? (
-        <div className="uw-share-body" data-fca-review ref={reviewRef}>
+        <div className="uw-share-body" data-fca-review ref={bodyRef}>
           <ul id={summaryId} className="uw-fca-summary" aria-label={t('shrFcSummaryLabel')}>
             {lines.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
-          {nothingToChange && <p className="uw-share-muted">{t('shrFcNothing')}</p>}
+          {nothingToChange && (
+            <p id={nothingId} className="uw-share-muted">
+              {t('shrFcNothing')}
+            </p>
+          )}
           {warnings.length > 0 && (
             <ul id={warningsId} className="uw-fca-warnings" aria-label={t('shrFcWarningsLabel')}>
               {warnings.map((line) => (
@@ -424,7 +442,7 @@ function FolderContentsAccessBody({
           </div>
         </div>
       ) : (
-        <div className="uw-share-body" data-fca-form>
+        <div className="uw-share-body" data-fca-form ref={bodyRef}>
           <fieldset className="uw-fca-modes" aria-labelledby={ids.modes} disabled={pending}>
             <legend id={ids.modes} className="uw-share-heading">
               {t('shrFcModeLabel')}
