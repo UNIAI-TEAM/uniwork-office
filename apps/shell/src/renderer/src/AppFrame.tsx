@@ -5,6 +5,7 @@ import { useAskUniShortcut } from './askuni-entry'
 import { Onboarding } from './Onboarding'
 import { TabBar } from './TabBar'
 import { UniworkLockHost } from './UniworkLockPanel'
+import { FolderBatchEndHost } from './uniwork-share/FolderBatchEndHost'
 import { WorkbenchAccountGate } from './WorkbenchAccountGate'
 
 interface AppFrameProps {
@@ -57,6 +58,9 @@ export function AppFrame({ initialOnboardingSeen }: AppFrameProps) {
       {/* editor WebContentsViews paint above ALL shell DOM, so the overlay only
        * renders while the home tab is active — it comes back when home does */}
       {showOnboarding && homeActive && <Onboarding onDone={finishOnboarding} />}
+      {/* UNI-2244: a folder access run's end is told here, outside the Home subtree: switching
+       * area or workspace unmounts the Documents screens, and the end must outlive them */}
+      <FolderBatchEndHost />
     </div>
   )
 }

@@ -116,11 +116,9 @@ export function UniworkBrowser({
   const [ownDraft, setOwnDraft] = useState('')
   const [toast, setToast] = useState<{ message: string; tone: 'ok' | 'error' } | null>(null)
   const clearToast = useCallback(() => setToast(null), [])
-  // UNI-2244: a background "share the documents inside…" run ended: the list refetches, one host toasts
-  useFolderBatchEnd({
-    onToast: (message, tone) => setToast({ message, tone }),
-    onRefetch: browser.refresh,
-  })
+  // UNI-2244: a background "share the documents inside…" run ended: the list refetches (the
+  // shell frame's FolderBatchEndHost tells the end, once, whatever screen is up)
+  useFolderBatchEnd({ onRefetch: browser.refresh })
   // UNI-2244: the folder whose documents "Share documents inside…" writes to (no entry without the bridge)
   const [folderContents, setFolderContents] = useState<FolderContentsTarget | null>(null)
   const folderContentsItems = (id: string, title: string): FolderMenuItem[] =>

@@ -12,6 +12,7 @@ import {
   FolderContentsAccessDialog,
   type FolderContentsTarget,
 } from '../src/renderer/src/uniwork-share/FolderContentsAccessDialog'
+import { FolderBatchEndHost } from '../src/renderer/src/uniwork-share/FolderBatchEndHost'
 import {
   buildFolderItems,
   canSubmitFolderItems,
@@ -41,7 +42,7 @@ import type { FolderContentsAccessRequest, UniworkShareApi } from '../src/shared
  * Thay thế, the picker + one level, the home-workspace row of the replace mode (no preselected
  * level), a dry run before any write, the summary with its warnings, the destructive replace button,
  * the sync toast, the background run followed INSIDE the dialog (closing it does not stop it; the
- * screen's `useFolderBatchEnd` toasts the end), 409 and 422.
+ * screen's `useFolderBatchEnd` refetches, the shell's `FolderBatchEndHost` toasts the end), 409 and 422.
  */
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -75,7 +76,7 @@ function withFolderCandidates(api: FakeShareApi): FakeShareApi {
   })
 }
 
-/** a screen that lists documents: it hears of the end of a background run */
+/** a screen that lists documents: it hears of the end of a background run to refetch */
 function EndProbe(props: FolderBatchEndHandlers) {
   useFolderBatchEnd(props)
   return null
@@ -345,7 +346,6 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
   let onClose: ReturnType<typeof vi.fn>
   let onChanged: ReturnType<typeof vi.fn>
   let onNotice: ReturnType<typeof vi.fn>
-  let endToast: ReturnType<typeof vi.fn>
   let endRefetch: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
@@ -355,7 +355,6 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     onClose = vi.fn()
     onChanged = vi.fn()
     onNotice = vi.fn()
-    endToast = vi.fn()
     endRefetch = vi.fn()
     resetFolderBatchesForTest()
     resetLiveForTests()
@@ -389,7 +388,9 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
           onChanged,
           onNotice,
         }),
-        createElement(EndProbe, { onToast: endToast, onRefetch: endRefetch }),
+        createElement(EndProbe, { onRefetch: endRefetch }),
+        // the shell frame's host: the one surface that tells the end of a run
+        createElement(FolderBatchEndHost),
         createElement(UniworkLiveHost),
       ),
     )
@@ -412,6 +413,7 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
   const q = <E extends Element = HTMLElement>(sel: string) => host.querySelector<E>(sel)
   const qa = (sel: string) => Array.from(host.querySelectorAll<HTMLElement>(sel))
   const live = () => document.querySelector('#uw-live-host [role="status"]')?.textContent ?? ''
+  const toastTexts = () => qa('.uw-act-toast').map((el) => el.textContent)
   async function click(el: Element | null | undefined) {
     expect(el).toBeTruthy()
     await act(async () => {
@@ -799,8 +801,7 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     ).toBeGreaterThanOrEqual(1)
     await advance(FOLDER_BATCH_POLL_MS * 3)
     // the end: one toast with the batch copy, every host refetched, the dialog closed itself
-    expect(endToast).toHaveBeenCalledTimes(1)
-    expect(endToast).toHaveBeenCalledWith(t('shrFcBatchDoneOther', { count: 900 }), 'ok')
+    expect(toastTexts()).toEqual([t('shrFcBatchDoneOther', { count: 900 })])
     expect(endRefetch).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
@@ -839,13 +840,17 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
         createElement(
           LocaleProvider,
           { initial: 'en' },
-          createElement(EndProbe, { onToast: endToast, onRefetch: endRefetch }),
+          createElement(
+            'div',
+            null,
+            createElement(EndProbe, { onRefetch: endRefetch }),
+            createElement(FolderBatchEndHost),
+          ),
         ),
       )
     })
     await advance(FOLDER_BATCH_POLL_MS * 4)
-    expect(endToast).toHaveBeenCalledTimes(1)
-    expect(endToast).toHaveBeenCalledWith(t('shrFcBatchDoneOther', { count: 900 }), 'ok')
+    expect(toastTexts()).toEqual([t('shrFcBatchDoneOther', { count: 900 })])
     expect(endRefetch).toHaveBeenCalledTimes(1)
   })
 
@@ -855,8 +860,7 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     await toReview(api)
     await click(apply())
     await advance(FOLDER_BATCH_POLL_MS * 3)
-    expect(endToast).toHaveBeenCalledTimes(1)
-    expect(endToast).toHaveBeenCalledWith(t('shrFcBatchFailed'), 'error')
+    expect(toastTexts()).toEqual([t('shrFcBatchFailed')])
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
@@ -867,19 +871,18 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     await click(apply())
     expect(q('[data-fca-progress]')).toBeTruthy()
     await advance(FOLDER_BATCH_POLL_MS * 3)
-    // one toast through the screen's host; the dialog adds no notice, no in-dialog error, no live line
-    expect(endToast).toHaveBeenCalledTimes(1)
-    expect(endToast).toHaveBeenCalledWith(t('shrFcBatchFailed'), 'error')
+    // one toast through the shell's host; the dialog adds no notice, no in-dialog error, no live line
+    expect(toastTexts()).toEqual([t('shrFcBatchFailed')])
     expect(onNotice).not.toHaveBeenCalled()
     expect(q('[data-fca-error]')).toBeNull()
-    expect(q('[role="alert"]')).toBeNull()
+    // the only alert is the shell's toast itself
+    expect(qa('[role="alert"]')).toHaveLength(1)
     expect(live()).not.toContain(t('shrFcBatchFailed'))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('a failed run followed from a 409, with two hosts mounted: still one message in total', async () => {
     vi.useFakeTimers()
-    const second = vi.fn()
     const secondRefetch = vi.fn()
     const api = await open({ folderContents: { total: 6 } })
     // a second screen that lists documents (the home under the folder browser) is mounted too
@@ -891,7 +894,7 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
           createElement(
             'div',
             null,
-            createElement(EndProbe, { onToast: second, onRefetch: secondRefetch }),
+            createElement(EndProbe, { onRefetch: secondRefetch }),
             view(withFolderCandidates(api), 'en').props.children,
           ),
         ),
@@ -907,12 +910,12 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     })
     await click(apply())
     await advance(0)
-    // the screens refetch, the newest alone toasts; nothing else spoke
-    expect(second).not.toHaveBeenCalled()
-    expect(endToast).toHaveBeenCalledTimes(1)
-    expect(endToast).toHaveBeenCalledWith(t('shrFcBatchFailed'), 'error')
+    // the screens refetch, the shell's host alone toasts; nothing else spoke
+    expect(endRefetch).toHaveBeenCalledTimes(1)
+    expect(secondRefetch).toHaveBeenCalledTimes(1)
+    expect(toastTexts()).toEqual([t('shrFcBatchFailed')])
     expect(onNotice).not.toHaveBeenCalled()
-    expect(q('[role="alert"]')).toBeNull()
+    expect(qa('[role="alert"]')).toHaveLength(1)
     expect(live()).not.toContain(t('shrFcBatchFailed'))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
@@ -925,10 +928,9 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     await toReview(api)
     await click(apply())
     await advance(FOLDER_BATCH_POLL_MS * 3)
-    expect(endToast).toHaveBeenCalledWith(
+    expect(toastTexts()).toEqual([
       `${t('shrFcBatchDoneOther', { count: 886 })}. ${t('shrFcToastSkippedOther', { count: 10 })}. ${t('shrFcToastLockedOther', { count: 4 })}`,
-      'ok',
-    )
+    ])
   })
 
   it('409 on the dry run: progress_already_running with that batch inside the dialog', async () => {
@@ -954,7 +956,7 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     await advance(FOLDER_BATCH_POLL_MS)
     expect(q('[data-fca-count]')!.textContent).toMatch(/^\d+\/900 documents$/)
     await advance(FOLDER_BATCH_POLL_MS * 6)
-    expect(endToast).toHaveBeenCalledTimes(1)
+    expect(toastTexts()).toHaveLength(1)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
@@ -977,7 +979,7 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     expect(requests(api).map((r) => r.dryRun)).toEqual([true, false])
     // the follower reads it at once; a batch that is not ours is a failed end
     await advance(0)
-    expect(endToast).toHaveBeenCalledWith(t('shrFcBatchFailed'), 'error')
+    expect(toastTexts()).toEqual([t('shrFcBatchFailed')])
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
@@ -1147,12 +1149,17 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
         createElement(
           LocaleProvider,
           { initial: 'en' },
-          createElement(EndProbe, { onToast: endToast, onRefetch: endRefetch }),
+          createElement(
+            'div',
+            null,
+            createElement(EndProbe, { onRefetch: endRefetch }),
+            createElement(FolderBatchEndHost),
+          ),
         ),
       )
     })
     await advance(FOLDER_BATCH_POLL_MS * 4)
-    expect(endToast).toHaveBeenCalledWith(t('shrFcBatchDoneOther', { count: 900 }), 'ok')
+    expect(toastTexts()).toEqual([t('shrFcBatchDoneOther', { count: 900 })])
   })
 
   it('a workspace or the organization is held at edit when the level is manage; a person keeps it', async () => {
@@ -1429,41 +1436,22 @@ describe('folder contents access store (UNI-2244)', () => {
         await vi.advanceTimersByTimeAsync(ms)
       })
 
-    it('two folders at once: each ends on its own, each toasted once', async () => {
-      const toast = vi.fn()
+    it('two folders at once: each ends on its own, each told once and refetched', async () => {
       const refetch = vi.fn()
-      await mount({ onToast: toast, onRefetch: refetch })
+      const told: string[] = []
+      await mount({ onRefetch: refetch })
+      onFolderBatchSettled((batch, end) => told.push(`${batch.phase}:${end.toast}`))
       await startRun({ folderId: 'fld_1', total: 900 })
       await startRun({ folderId: 'fld_2', total: 700, batchFails: true, trackAs: 'fb_second' })
       await advance(FOLDER_BATCH_POLL_MS * 4)
       expect(refetch).toHaveBeenCalledTimes(2)
-      expect(toast.mock.calls.map((c) => c[1]).sort()).toEqual(['error', 'ok'])
-      expect(toast).toHaveBeenCalledWith(t('shrFcBatchDoneOther', { count: 900 }), 'ok')
-      expect(toast).toHaveBeenCalledWith(t('shrFcBatchFailed'), 'error')
-    })
-
-    it('two hosts mounted at once (Open dialog over the home): both refetch, the newest toasts once (R1-1)', async () => {
-      const homeToast = vi.fn()
-      const homeRefetch = vi.fn()
-      const dialogToast = vi.fn()
-      const dialogRefetch = vi.fn()
-      await mount(
-        { onToast: homeToast, onRefetch: homeRefetch },
-        { onToast: dialogToast, onRefetch: dialogRefetch },
-      )
-      await startRun({ total: 900 })
-      await advance(FOLDER_BATCH_POLL_MS * 3)
-      expect(homeRefetch).toHaveBeenCalledTimes(1)
-      expect(dialogRefetch).toHaveBeenCalledTimes(1)
-      expect(homeToast).not.toHaveBeenCalled()
-      expect(dialogToast).toHaveBeenCalledTimes(1)
-      expect(dialogToast).toHaveBeenCalledWith(t('shrFcBatchDoneOther', { count: 900 }), 'ok')
+      expect(told.sort()).toEqual(['completed:true', 'failed:true'])
     })
 
     it('the host unmounts during a poll: nothing throws, the run is still polled to its end', async () => {
-      const toast = vi.fn()
+      const refetch = vi.fn()
       const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
-      await mount({ onToast: toast, onRefetch: vi.fn() })
+      await mount({ onRefetch: refetch })
       const ended: string[] = []
       onFolderBatchSettled((batch) => ended.push(batch.phase))
       await startRun({ total: 900 })
@@ -1473,7 +1461,7 @@ describe('folder contents access store (UNI-2244)', () => {
       await advance(FOLDER_BATCH_POLL_MS * 3)
       expect(ended).toEqual(['completed'])
       // the gone host heard nothing and no React warning came out of the poll
-      expect(toast).not.toHaveBeenCalled()
+      expect(refetch).not.toHaveBeenCalled()
       expect(errors).not.toHaveBeenCalled()
       errors.mockRestore()
     })

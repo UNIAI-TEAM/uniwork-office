@@ -12,8 +12,9 @@ import type {
  * screen, does not cancel the run, so the runs and their timers live here, like the bulk
  * Download's. A tracked batch is polled until the server says `completed` / `failed`; a batch
  * nobody can read any more (404) or that the network keeps refusing ends as `failed` here (the
- * run itself is the server's, not ours). When a batch ends it leaves the store and every mounted
- * host hears of it: all of them refetch their list, one of them (the newest) tells it in a toast.
+ * run itself is the server's, not ours). When a batch ends it leaves the store and the listeners
+ * hear of it: every mounted Documents screen refetches its list, and the shell frame's
+ * `FolderBatchEndHost` (always mounted, so it outlives the screens) tells it in one toast.
  */
 
 export type FolderBatchPhase = 'running' | 'completed' | 'failed'
@@ -48,7 +49,7 @@ const settledListeners = new Set<FolderBatchSettledListener>()
 const announced = new Set<string>()
 
 export interface FolderBatchEnd {
-  /** this listener raises the toast and the screen-reader line (once per batch, newest host) */
+  /** the first end told for this batch in the life of the window: the one that toasts and announces */
   toast: boolean
 }
 export type FolderBatchSettledListener = (
@@ -82,11 +83,8 @@ function settle(
   emit()
   const first = !announced.has(batchId)
   announced.add(batchId)
-  const listeners = [...settledListeners]
   const ended = { ...done, phase }
-  listeners.forEach((listener, i) =>
-    listener(ended, { toast: first && i === listeners.length - 1 }),
-  )
+  for (const listener of [...settledListeners]) listener(ended, { toast: first })
 }
 
 function stopTimer(batchId: string): void {
