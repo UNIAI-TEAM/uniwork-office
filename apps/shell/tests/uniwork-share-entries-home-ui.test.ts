@@ -204,13 +204,18 @@ describe('DocumentsHome mounts the Share dialogs (UNI-2047 SD-C)', () => {
     expect(onOpenDocument).not.toHaveBeenCalled()
   })
 
-  it('a folder row menu has no Chia sẻ', async () => {
+  it("a folder row's Chia sẻ item opens the contents access dialog, never the document share dialog", async () => {
     await mount()
     await click(host.querySelector('button[data-folder-menu-for="fld"]'))
-    const labels = Array.from(document.body.querySelectorAll('[role="menuitem"]')).map(
-      (e) => e.textContent,
-    )
-    expect(labels).not.toContain('Chia sẻ')
+    const entries = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+    const shares = entries.filter((e) => e.textContent === 'Chia sẻ')
+    expect(shares).toHaveLength(1)
+    await click(shares[0])
+    const d = dialog()!
+    expect(d).not.toBeNull()
+    expect(d.querySelector('[data-fca-scope]')!.textContent).toContain('Thư mục')
+    expect(d.querySelector('[data-share-section]')).toBeNull()
+    expect(onOpenDocument).not.toHaveBeenCalled()
   })
 
   it('without the share bridge there is no button, no menu item and no bulk action', async () => {
