@@ -275,6 +275,57 @@ describe('noticeSentence', () => {
     )
   })
 
+  it('words a grouped folder share by its document count, with the level and title variants', () => {
+    const key = (params: Record<string, string>) =>
+      noticeSentence(kindRow('document_shared', { count: '37', ...params })).key
+    expect(key({ level: 'view' })).toBe('wbNotif_document_shared_folder')
+    expect(key({ level: '' })).toBe('wbNotif_document_shared_folder_nolevel')
+    expect(key({ level: 'edit', document: '' })).toBe('wbNotif_document_shared_folder_untitled')
+    expect(key({ document: '' })).toBe('wbNotif_document_shared_folder_untitled_nolevel')
+    // the count and the folder title reach the sentence as the server sent them
+    expect(
+      noticeSentence(kindRow('document_shared', { count: '37', level: 'view' })).params,
+    ).toMatchObject({
+      count: '37',
+      document: 'Contract',
+    })
+  })
+
+  it('keeps the single-document share wording when the count is missing or not a positive whole number', () => {
+    for (const count of ['', '0', '-3', '1.5', 'many', '3 docs']) {
+      expect(noticeSentence(kindRow('document_shared', { level: 'view', count })).key).toBe(
+        'wbNotif_document_shared',
+      )
+    }
+    expect(noticeSentence(kindRow('document_shared', { document: '', count: '0' })).key).toBe(
+      'wbNotif_document_shared_untitled_nolevel',
+    )
+  })
+
+  it('renders the grouped share in vi and en with the count and the folder name', () => {
+    const fmt = (sentence: string, p: Record<string, string>) =>
+      sentence.replace(/\{(\w+)\}/g, (_m, k: string) => p[k] ?? `{${k}}`)
+    const params = { actor: 'Lan', document: 'Hợp đồng', count: '37', level: 'Xem' }
+    expect(fmt(vi.wbNotif_document_shared_folder, params)).toBe(
+      'Lan đã chia sẻ 37 tài liệu trong thư mục "Hợp đồng" với bạn. Quyền: Xem.',
+    )
+    expect(fmt(en.wbNotif_document_shared_folder, { ...params, level: 'View' })).toBe(
+      'Lan shared 37 document(s) in folder "Hợp đồng" with you (View).',
+    )
+    expect(fmt(vi.wbNotif_document_shared_folder_untitled_nolevel, params)).toBe(
+      'Lan đã chia sẻ 37 tài liệu trong một thư mục với bạn.',
+    )
+    expect(fmt(en.wbNotif_document_shared_folder_untitled_nolevel, params)).toBe(
+      'Lan shared 37 document(s) in a folder with you.',
+    )
+    expect(fmt(vi.wbNotif_document_shared_folder_nolevel, params)).toBe(
+      'Lan đã chia sẻ 37 tài liệu trong thư mục "Hợp đồng" với bạn.',
+    )
+    expect(fmt(en.wbNotif_document_shared_folder_untitled, { ...params, level: 'View' })).toBe(
+      'Lan shared 37 document(s) in a folder with you (View).',
+    )
+  })
+
   it('words an ownership transfer titled and untitled, with no level clause', () => {
     expect(noticeSentence(kindRow('document_owner_transferred')).key).toBe(
       'wbNotif_document_owner_transferred',
@@ -557,6 +608,10 @@ describe('wbNotif_ strings', () => {
     const keys = [
       'wbNotif_document_shared_nolevel',
       'wbNotif_document_shared_untitled_nolevel',
+      'wbNotif_document_shared_folder',
+      'wbNotif_document_shared_folder_untitled',
+      'wbNotif_document_shared_folder_nolevel',
+      'wbNotif_document_shared_folder_untitled_nolevel',
       'wbNotif_document_trashed_by_other_nodate',
       'wbNotif_document_trashed_by_other_untitled_nodate',
       'wbNotif_document_edit_request_answered_declined',
@@ -564,4 +619,24 @@ describe('wbNotif_ strings', () => {
     ]
     expect(keys.filter((k) => !table[k]?.trim())).toEqual([])
   })
+})
+
+describe('grouped folder share strings', () => {
+  it.each([...LANGS])(
+    'locale %s places the actor and the count, the title only when titled',
+    (lang) => {
+      const table = workbenchStrings[lang] as Record<string, string>
+      const has = (key: string, token: string) => table[key]!.includes(token)
+      for (const key of [
+        'wbNotif_document_shared_folder',
+        'wbNotif_document_shared_folder_untitled',
+        'wbNotif_document_shared_folder_nolevel',
+        'wbNotif_document_shared_folder_untitled_nolevel',
+      ]) {
+        expect(has(key, '{actor}') && has(key, '{count}')).toBe(true)
+        expect(has(key, '{document}')).toBe(!key.includes('untitled'))
+        expect(has(key, '{level}')).toBe(!key.endsWith('nolevel'))
+      }
+    },
+  )
 })

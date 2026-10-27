@@ -895,6 +895,23 @@ describe('FolderContentsAccessDialog (UNI-2244)', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
+  it('409 without a batch id on the apply step: back on the form with the message, no progress follow', async () => {
+    const api = await open({ folderContents: { total: 6 } })
+    await toReview(api)
+    api.failNext('folderContentsAccess', {
+      ok: false,
+      error: 'folder_access_batch_running',
+      status: 409,
+    })
+    await click(apply())
+    expect(q('[data-fca-error]')!.textContent).toBe(t('shrFcRunningNoBatch'))
+    expect(q('[data-fca-form]')).toBeTruthy()
+    expect(q('[data-fca-progress]')).toBeNull()
+    expect(requests(api).map((r) => r.dryRun)).toEqual([true, false])
+    expect(api.calls.filter((c) => c.method === 'folderContentsAccessBatch')).toEqual([])
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('422 rejected[] on the dry run: back on the form, the refused person marked inline with the reason', async () => {
     const api = await open({ folderContents: { total: 5 } })
     await pick('Minh')
