@@ -166,6 +166,14 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
     | 'rememberWikiFragment'
     | 'takeWikiFragment'
     | 'openSourcePath'
+    // the note vault (cap 'wikiVault' off): backlinks, graph, tags, the `[[` suggester and
+    // create-note all read or write a notes folder. The frame's safe no-op api would answer
+    // them with undefined, so the renderer installs none of their UI or plugins on the web.
+    | 'wikiBacklinks'
+    | 'wikiGraph'
+    | 'wikiTags'
+    | 'listWikiNotes'
+    | 'createWikiNote'
   >
   return Object.assign(api, {
     // web-only (renderer: editor/localImage.ts): relative pictures through OpenPayload.assets
