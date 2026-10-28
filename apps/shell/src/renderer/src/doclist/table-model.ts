@@ -132,6 +132,12 @@ export function editorNameOf(doc: DocumentsHomeDoc): string | null {
   return name || null
 }
 
+/** the editor's avatar URL (https only, validated by main) if the server sent one */
+export function editorAvatarUrlOf(doc: DocumentsHomeDoc): string | null {
+  const url = doc.updatedByUser?.avatarUrl?.trim()
+  return url || null
+}
+
 /** up to two letters for the avatar: the app's one avatar helper */
 export function editorInitials(name: string): string {
   return initials(name)

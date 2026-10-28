@@ -90,6 +90,8 @@ describe('BulkBar: visible from one selected row, actions = what every row allow
         screen: 'workspace',
         docs: [row({ id: 'a' })],
         busy: false,
+        canShare: true,
+        canDownload: true,
         onAction,
         onClear,
       }),
@@ -98,10 +100,24 @@ describe('BulkBar: visible from one selected row, actions = what every row allow
     expect(bar).not.toBeNull()
     expect(bar!.getAttribute('role')).toBe('toolbar')
     expect(bar!.querySelector('[data-bulk-count]')?.textContent).toBe('1 đã chọn')
-    expect(actionIds()).toEqual(['move', 'shelve', 'trash'])
+    expect(actionIds()).toEqual(['share', 'move', 'download', 'shelve', 'trash'])
+    expect(
+      Array.from(host.querySelectorAll('[data-bulk-action] svg[data-icon]')).map((el) =>
+        el.getAttribute('data-icon'),
+      ),
+    ).toEqual(['share-2', 'folder-input', 'download', 'archive', 'trash'])
     expect(host.querySelector('[data-bulk-action="trash"]')?.textContent).toBe(
       'Chuyển vào thùng rác',
     )
+    expect(host.querySelector('[data-bulk-action="trash"]')?.classList.contains('danger')).toBe(
+      true,
+    )
+    expect(host.querySelector('[data-bulk-action="share"]')?.classList.contains('danger')).toBe(
+      false,
+    )
+    expect(
+      host.querySelector('[data-bulk-clear] svg[data-icon="x"]'),
+    ).not.toBeNull()
     await act(async () => host.querySelector<HTMLElement>('[data-bulk-action="shelve"]')!.click())
     expect(onAction).toHaveBeenCalledWith('shelve')
     await act(async () => host.querySelector<HTMLElement>('[data-bulk-clear]')!.click())

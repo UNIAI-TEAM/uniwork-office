@@ -633,4 +633,20 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
   it('the picker variant heads its columns at the same 12px', () => {
     expect(ruleOf(picker, '.dh-picker-head')).toMatch(/font-size:\s*12px;/)
   })
+
+  it('access badge is rounded-4px with inline-start icon, updated date uses tabular-nums, and checkbox uses drawn border/accent', () => {
+    const badge = ruleOf(css, '.dh-vis-badge')
+    expect(badge).toMatch(/border-radius:\s*4px;/)
+    expect(badge).toMatch(/gap:\s*4px;/)
+    expect(ruleOf(css, '.dh-cell-time')).toMatch(/font-variant-numeric:\s*tabular-nums;/)
+    const check = ruleOf(css, '.dh-check')
+    expect(check).toMatch(/appearance:\s*none;/)
+    expect(check).toMatch(/border:\s*1\.5px solid var\(--wb-check-border\);/)
+    expect(check).toMatch(/border-radius:\s*4px;/)
+    expect(ruleOf(css, '.dh-check:checked')).toMatch(/background:\s*var\(--accent\);/)
+    const bulkAction = ruleOf(css, '.dl-bulk-action')
+    expect(bulkAction).toMatch(/background:\s*transparent;/)
+    expect(ruleOf(css, '.dl-bulk-action.danger')).toMatch(/background:\s*var\(--danger-bg\);/)
+    expect(ruleOf(css, '.dl-bulk-action.danger')).toMatch(/color:\s*var\(--danger-text\);/)
+  })
 })

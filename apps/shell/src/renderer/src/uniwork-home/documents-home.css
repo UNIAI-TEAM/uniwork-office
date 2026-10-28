@@ -1035,16 +1035,62 @@
 }
 
 .dh-check {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--accent);
+  appearance: none;
+  border: 1.5px solid var(--wb-check-border);
+  border-radius: 4px;
+  background: var(--surface);
   cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.dh-check::after {
+  content: '';
+  opacity: 0;
+}
+
+.dh-check:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.dh-check:checked::after {
+  width: 9px;
+  height: 5px;
+  border-bottom: 1.75px solid var(--on-accent);
+  border-left: 1.75px solid var(--on-accent);
+  transform: translateY(-1px) rotate(-45deg);
+  opacity: 1;
+}
+
+.dh-check:indeterminate {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.dh-check:indeterminate::after {
+  width: 8px;
+  height: 0;
+  border-top: 1.75px solid var(--on-accent);
+  opacity: 1;
 }
 
 .dh-check:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.dh-check:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .dh-cell-name {
@@ -1115,13 +1161,29 @@
 .dh-vis-badge {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   width: fit-content;
   max-width: 100%;
-  padding: 2px 8px;
+  height: 20px;
+  padding: 2px 8px 2px 6px;
   overflow: hidden;
-  border-radius: 999px;
+  border: 1px solid transparent;
+  border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dh-vis-icon {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
+.dh-vis-label {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1151,21 +1213,44 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  color: var(--text-secondary);
+  color: var(--text);
   font-size: 12.5px;
 }
 
 .dh-avatar {
+  position: relative;
   display: grid;
   flex: none;
   place-items: center;
   width: 24px;
   height: 24px;
+  overflow: hidden;
   border-radius: 999px;
   background: var(--tint-blue);
   color: var(--tint-blue-fg);
   font-size: 11px;
   font-weight: 600;
+}
+
+.dh-avatar-initials {
+  line-height: 1;
+}
+
+.dh-avatar-initials.is-hidden {
+  visibility: hidden;
+}
+
+.dh-avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+}
+
+.dh-avatar-img.is-loaded {
+  opacity: 1;
 }
 
 .dh-person-name {
@@ -1178,6 +1263,7 @@
 .dh-cell-time {
   color: var(--text-secondary);
   font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -1501,19 +1587,21 @@
 /* UNI-2047 A5: the bar over the table while rows are selected */
 .dl-bulk-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-subtle);
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-8);
   background: var(--surface-subtle);
   color: var(--text);
 }
 
 .dl-bulk-count {
+  margin-inline-end: 4px;
   color: var(--text);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -1527,37 +1615,83 @@
 }
 
 .dl-bulk-action {
-  min-height: 32px;
-  padding-block: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 10px 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-6);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
   font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.dl-bulk-action:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.dl-bulk-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dl-bulk-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .dl-bulk-action.danger {
-  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  border-color: transparent;
   color: var(--danger-text);
 }
 
 .dl-bulk-action.danger:hover:not(:disabled) {
-  background: var(--danger-bg);
-  border-color: var(--danger-border);
+  background: var(--danger-border);
+  color: var(--danger-text);
+}
+
+.dl-bulk-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
 }
 
 .dl-bulk-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   margin-inline-start: auto;
   flex: none;
+  min-height: 28px;
   white-space: nowrap;
-  padding: 4px 8px;
-  border: none;
+  padding: 4px 10px 4px 8px;
+  border: 1px solid transparent;
   border-radius: var(--radius-6);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text);
   font: inherit;
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .dl-bulk-clear:hover {
-  background: var(--bg-hover);
+  background: var(--hover);
   color: var(--text);
 }
 

@@ -400,15 +400,33 @@ describe('DocList: the shared Documents table (UNI-2047 A2a)', () => {
       expect(ROWS.map((r) => cell(r.id, 'size')?.textContent)).toEqual(['2.9 KB', '—', '4.8 MB'])
     })
 
-    it('draws the Truy cập pill and the level line from the shared rules', async () => {
+    it('draws the Truy cập pill with its scope icon and the level line from the shared rules', async () => {
       await mount('workspace')
       const pill = (id: string) => cell(id, 'access')?.querySelector('.dh-vis-badge')?.textContent
+      const icon = (id: string) =>
+        cell(id, 'access')?.querySelector('.dh-vis-badge svg[data-icon="inline-start"]')
+      const kind = (id: string) =>
+        cell(id, 'access')?.querySelector('.dh-vis-badge')?.getAttribute('data-access-kind')
       const line = (id: string) => cell(id, 'access')?.querySelector('.dh-level-sub')?.textContent
-      expect([pill('budget'), line('budget')]).toEqual(['Workspace', 'Bạn: Sửa'])
-      // restricted with people shared = "Được chia sẻ"; the owner reads "Chủ sở hữu", not a level
-      expect([pill('note'), line('note')]).toEqual(['Được chia sẻ', 'Chủ sở hữu'])
+      expect([pill('budget'), kind('budget'), line('budget')]).toEqual([
+        'Workspace',
+        'workspace',
+        'Bạn: Sửa',
+      ])
+      expect(icon('budget')).not.toBeNull()
+      expect([pill('note'), kind('note'), line('note')]).toEqual([
+        'Được chia sẻ',
+        'shared',
+        'Chủ sở hữu',
+      ])
+      expect(icon('note')).not.toBeNull()
       // no share scope is never guessed: a private row, and no level line without a level
-      expect([pill('report'), line('report')]).toEqual(['Riêng tư', undefined])
+      expect([pill('report'), kind('report'), line('report')]).toEqual([
+        'Riêng tư',
+        'restricted',
+        undefined,
+      ])
+      expect(icon('report')).not.toBeNull()
     })
 
     it('says Private for a restricted row with nobody else, in English', async () => {
@@ -420,17 +438,25 @@ describe('DocList: the shared Documents table (UNI-2047 A2a)', () => {
       expect(cell('solo', 'access')?.querySelector('.dh-vis-badge')?.textContent).toBe('Private')
     })
 
-    it('shows the editor as initials and a name, never a remote avatar', async () => {
+    it('shows the editor with avatar photo when avatarUrl is present and falls back to initials on error or when absent', async () => {
       await mount('workspace')
       const person = cell('budget', 'editor')!
       expect(person.querySelector('.dh-avatar')?.textContent).toBe('MT')
       expect(person.querySelector('.dh-person-name')?.textContent).toBe('Minh Trần')
-      // the renderer CSP blocks remote images: avatar_url is parsed but not drawn
-      expect(person.querySelector('img')).toBeNull()
+      const img = person.querySelector<HTMLImageElement>('img.dh-avatar-img')
+      expect(img).not.toBeNull()
+      expect(img?.getAttribute('src')).toBe('https://cdn.example.com/minh.png')
+      // on image error, falls back cleanly to initials
+      await act(async () => {
+        img!.dispatchEvent(new Event('error'))
+      })
+      expect(person.querySelector('img.dh-avatar-img')).toBeNull()
+      expect(person.querySelector('.dh-avatar')?.textContent).toBe('MT')
       // the name the row already carries is the fallback; no name at all reads "—"
-      expect(cell('note', 'editor')?.querySelector('.dh-person-name')?.textContent).toBe(
-        'Lan Nguyễn',
-      )
+      const notePerson = cell('note', 'editor')!
+      expect(notePerson.querySelector('.dh-person-name')?.textContent).toBe('Lan Nguyễn')
+      expect(notePerson.querySelector('img.dh-avatar-img')).toBeNull()
+      expect(notePerson.querySelector('.dh-avatar')?.textContent).toBe('LN')
       expect(cell('report', 'editor')?.textContent).toBe('—')
     })
 

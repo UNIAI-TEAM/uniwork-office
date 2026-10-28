@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const css = readFileSync('src/renderer/src/uniwork-home/documents-home.css', 'utf8')
+const css = readFileSync(
+  resolve(__dirname, '../src/renderer/src/uniwork-home/documents-home.css'),
+  'utf8',
+)
 const rule = (selector: string) =>
   new RegExp(`(?:^|\\n)${selector.replace('.', '\\.')} \\{([^}]*)\\}`).exec(css)?.[1] ?? ''
 
