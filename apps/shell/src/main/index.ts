@@ -6193,6 +6193,10 @@ function activeEditorTarget(
 function activePdfTarget() {
   return activeEditorTarget('pdf', () => tabManager?.activePdfTab())
 }
+function saveActivePdf(): void {
+  const tab = activePdfTarget()
+  if (tab) void flushPdfSave(tab.webContents)
+}
 
 /** ⌘W / File > Close targets the focused window: a detached editor closes
  *  itself (its own unsaved-changes guard runs), otherwise the shell's active tab
@@ -6261,9 +6265,7 @@ function tabMenuActions(): TabMenuActions {
     runTabDocumentAction(
       {
         tabs: tabManager,
-        savePdf: (contents) => {
-          void flushPdfSave(contents)
-        },
+        savePdf: () => saveActivePdf(),
         savePdfAs: (target) => {
           void savePdfAs(target)
         },
@@ -6627,10 +6629,7 @@ function buildPdfMenu(): void {
         {
           label: tm('menuSave'),
           ...acc(a.save),
-          click: () => {
-            const tab = activePdfTarget()
-            if (tab) void flushPdfSave(tab.webContents)
-          },
+          click: () => saveActivePdf(),
         },
         {
           label: tm('menuSaveAs'),
