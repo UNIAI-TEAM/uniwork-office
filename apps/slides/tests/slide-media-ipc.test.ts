@@ -83,7 +83,7 @@ import {
   type SlideBundle,
   type TextElement,
 } from '@genoffice/pptx-engine'
-import { appClipboard } from '../src/session/app-clipboard'
+import { appClipboard, lastSlidePaste } from '../src/session/app-clipboard'
 import { registerSlidesIpc } from '../src/main/slides-main'
 import {
   buildAllRenderSlides,
@@ -91,8 +91,10 @@ import {
   rebuildSlide,
   readSlideMedia,
   pruneMediaSources,
+  restoreSnapshot,
   takeSnapshot,
   sessions,
+  type HistorySnapshot,
   type Session,
 } from '../src/main/session-state'
 import { buildPdfExportHtml } from '../src/main/pdf-export'
@@ -924,6 +926,8 @@ describe('slide media IPC payload', () => {
   // ── Fork-only test (3): 200 slides (>= 20 MB distinct media) 15+2 handler matrix + no memory leak ──
   describe('200-slide >= 20 MB distinct-media handler matrix (R1b-02)', () => {
     let largeDeckSession: Session
+    let baselineSnapshot: HistorySnapshot
+    let baselineRender: RenderSlide[]
     let current: RenderSlide[]
     let layoutPath: string
     let externalBundle: SlideBundle
@@ -1011,12 +1015,19 @@ describe('slide media IPC payload', () => {
       sessions.set(WC, largeDeckSession)
       const layouts = call<{ layouts: Array<{ path: string }> }>('slides:get-layouts')
       layoutPath = layouts.layouts[0]!.path
-      current = buildAllRenderSlides(largeDeckSession.opened, FIT)
+      baselineSnapshot = takeSnapshot(largeDeckSession)
+      baselineRender = buildAllRenderSlides(largeDeckSession.opened, FIT)
+      current = [...baselineRender]
       expect(serialize(current).byteLength).toBeGreaterThan(64 * 1024)
       expect(serialize(current).byteLength).toBeLessThan(1024 * 1024)
     })
 
     beforeEach(() => {
+      restoreSnapshot(largeDeckSession, baselineSnapshot)
+      largeDeckSession.undoStack = []
+      largeDeckSession.redoStack = []
+      lastSlidePaste.clear()
+      current = [...baselineRender]
       sessions.set(WC, largeDeckSession)
     })
 
@@ -1086,7 +1097,11 @@ describe('slide media IPC payload', () => {
       [
         'slides:remove-section-slides',
         () => {
-          const secs = call<SectionInfo[]>('slides:get-sections')
+          call('slides:add-section', { atSlideIndex: 0, name: 'SecA' })
+          const secs = call<SectionInfo[]>('slides:add-section', {
+            atSlideIndex: 198,
+            name: 'SecB',
+          })
           const secB = secs.find((s) => s.name === 'SecB')!
           return call<SlideUpdate>('slides:remove-section-slides', { id: secB.id })
         },
@@ -1126,11 +1141,19 @@ describe('slide media IPC payload', () => {
       ],
       [
         'slides:repaste-slide (picture mode)',
-        () =>
-          call<SlideUpdate>('slides:repaste-slide', {
+        () => {
+          appClipboard.slide = { bundles: [externalBundle], pngs: [pngBase64] }
+          const pasted = call<SlideUpdate>('slides:paste-slide', {
+            afterIndex: 40,
+            fitWidthPx: FIT,
+            mode: 'source',
+          })
+          current = mergeSlideUpdate(current, pasted)
+          return call<SlideUpdate>('slides:repaste-slide', {
             fitWidthPx: FIT,
             mode: 'picture',
-          }),
+          })
+        },
       ],
       [
         'slides:save-recording',
@@ -1139,7 +1162,16 @@ describe('slide media IPC payload', () => {
             slides: [{ slideIndex: 0, wavBase64, durationMs: 800, advanceMs: 1000 }],
           }),
       ],
-      ['slides:clear-narration', () => call<SlideUpdate>('slides:clear-narration', [0])],
+      [
+        'slides:clear-narration',
+        () => {
+          const recorded = call<SlideUpdate>('slides:save-recording', {
+            slides: [{ slideIndex: 0, wavBase64, durationMs: 800, advanceMs: 1000 }],
+          })
+          current = mergeSlideUpdate(current, recorded)
+          return call<SlideUpdate>('slides:clear-narration', [0])
+        },
+      ],
     ])(
       '%s keeps serialized result < 64 KiB and merges identically to buildAllRenderSlides',
       async (_label, invoke) => {
