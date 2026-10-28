@@ -72,14 +72,18 @@ import {
   addElement,
   addMedia,
   addModel3d,
+  copySlide,
   createBlankPptx,
   duplicateSlide,
   openPptx,
   savePptx,
   replacePictureBytes,
+  setSlideBackgroundImage,
   type PictureElement,
+  type SlideBundle,
   type TextElement,
 } from '@genoffice/pptx-engine'
+import { appClipboard } from '../src/session/app-clipboard'
 import { registerSlidesIpc } from '../src/main/slides-main'
 import {
   buildAllRenderSlides,
@@ -715,24 +719,65 @@ describe('slide media IPC payload', () => {
     expect(emfServed.mime).toBe('image/x-emf')
     expect(emfServed.body).toEqual(emfBytes)
 
-    // Exercise insert / duplicate / move / hide / paste / find-replace / edit-background
-    const added = call('slides:add-blank-slide', { sourceIndex: 1, fitWidthPx: FIT })
+    // Exercise all 15 SlideUpdate channels + save-recording / clear-narration
+    const added = call('slides:add-slide', { sourceIndex: 1, fitWidthPx: FIT })
     current = mergeSlideUpdate(current, added)
-    const deleted = call('slides:delete-slide', 2)
-    current = mergeSlideUpdate(current, deleted)
+    const deletedSingle = call('slides:delete-slide', 2)
+    current = mergeSlideUpdate(current, deletedSingle)
+    const addedBlank = call('slides:add-blank-slide', { sourceIndex: 1, fitWidthPx: FIT })
+    current = mergeSlideUpdate(current, addedBlank)
+    const deletedBlank = call('slides:delete-slide', 2)
+    current = mergeSlideUpdate(current, deletedBlank)
+    const layouts = call<{ layouts: Array<{ path: string; name: string }> }>('slides:get-layouts')
+    const addedLayout = call('slides:add-slide-with-layout', {
+      sourceIndex: 1,
+      layoutPath: layouts.layouts[0]!.path,
+      fitWidthPx: FIT,
+    })
+    current = mergeSlideUpdate(current, addedLayout)
+    const deletedLayout = call('slides:delete-slide', 2)
+    current = mergeSlideUpdate(current, deletedLayout)
     const duped = call('slides:duplicate-slides', { slideIndexes: [0], fitWidthPx: FIT })
     current = mergeSlideUpdate(current, duped)
     const moved = call('slides:move-slide', { fromIndex: 1, toIndex: 2 })
     current = mergeSlideUpdate(current, moved)
+    const movedMulti = call('slides:move-slides', { slideIndexes: [1, 2], insertAt: 0 })
+    current = mergeSlideUpdate(current, movedMulti)
+    const restoredMulti = call('slides:move-slides', { slideIndexes: [0, 1], insertAt: 3 })
+    current = mergeSlideUpdate(current, restoredMulti)
     const hidden = call('slides:set-slides-hidden', { slideIndexes: [1], hidden: true })
     current = mergeSlideUpdate(current, hidden)
     const unhidden = call('slides:set-slides-hidden', { slideIndexes: [1], hidden: false })
     current = mergeSlideUpdate(current, unhidden)
-    call('slides:copy-slides', { slideIndexes: [1] })
-    const pasted = call('slides:paste-slide', { afterIndex: 2, fitWidthPx: FIT })
+    call('slides:add-section', { atSlideIndex: 0, name: 'MainSec' })
+    const secs = call<SectionInfo[]>('slides:add-section', { atSlideIndex: 2, name: 'TempSec' })
+    const tempSecId = secs.find((s) => s.name === 'TempSec')!.id
+    const movedSecUp = call('slides:move-section', { id: tempSecId, dir: 'up' })
+    current = mergeSlideUpdate(current, movedSecUp)
+    const movedSecDown = call('slides:move-section', { id: tempSecId, dir: 'down' })
+    current = mergeSlideUpdate(current, movedSecDown)
+    const removedSec = call('slides:remove-section-slides', { id: tempSecId })
+    current = mergeSlideUpdate(current, removedSec)
+    const mainSec = call<SectionInfo[]>('slides:get-sections')[0]
+    if (mainSec) call('slides:remove-section', { id: mainSec.id })
+    call('slides:copy-slides', {
+      slideIndexes: [1],
+      pngs: [Buffer.from(pngBytes).toString('base64')],
+    })
+    const pasted = call('slides:paste-slide', { afterIndex: 1, fitWidthPx: FIT, mode: 'source' })
     current = mergeSlideUpdate(current, pasted)
-    const removedPaste = call('slides:delete-slides', { slideIndexes: [3] })
+    const repastedPic = call('slides:repaste-slide', { fitWidthPx: FIT, mode: 'picture' })
+    current = mergeSlideUpdate(current, repastedPic)
+    const repastedSlide = call('slides:repaste-slide', { fitWidthPx: FIT, mode: 'theme' })
+    current = mergeSlideUpdate(current, repastedSlide)
+    const removedPaste = call('slides:delete-slides', { slideIndexes: [2] })
     current = mergeSlideUpdate(current, removedPaste)
+    const clearedNarration = call<SlideUpdate>('slides:clear-narration', [0])
+    current = mergeSlideUpdate(current, clearedNarration)
+    const reRecorded = call<SlideUpdate>('slides:save-recording', {
+      slides: [{ slideIndex: 0, wavBase64, durationMs: 1000, advanceMs: 1200 }],
+    })
+    current = mergeSlideUpdate(current, reRecorded)
     const replaced = call<{ count: number; update: SlideUpdate }>('slides:find-replace', {
       find: 'find-target',
       replace: 'replaced-target',
@@ -747,20 +792,21 @@ describe('slide media IPC payload', () => {
     })
     current = mergeSlideUpdate(current, bgUpdated)
     expect(current).toEqual(buildAllRenderSlides(session.opened, FIT))
-
     // Save and reopen: verify untouched parts (slide1.xml, media, 3D model, theme, master) are byte-equal
     const savedBytes = await savePptx(session.opened)
     const reopened = await openPptx(savedBytes)
     const savedZip = await JSZip.loadAsync(savedBytes)
-    const touchedParts = new Set([
-      '[Content_Types].xml',
-      'ppt/presentation.xml',
-      'ppt/_rels/presentation.xml.rels',
-      'ppt/slides/slide2.xml',
-    ])
+    const touchedParts: Record<string, true> = {
+      '[Content_Types].xml': true,
+      'ppt/presentation.xml': true,
+      'ppt/_rels/presentation.xml.rels': true,
+      'ppt/slides/slide1.xml': true,
+      'ppt/slides/_rels/slide1.xml.rels': true,
+      'ppt/slides/slide2.xml': true,
+      'ppt/media/media3.wav': true,
+    }
     for (const [path, entry] of Object.entries(baselineZip.files)) {
-      if (entry.dir || touchedParts.has(path)) continue
-      expect(savedZip.file(path), path).not.toBeNull()
+      if (entry.dir || touchedParts[path]) continue
       expect(await savedZip.file(path)!.async('uint8array'), path).toEqual(
         await entry.async('uint8array'),
       )
@@ -788,7 +834,7 @@ describe('slide media IPC payload', () => {
     let current = buildAllRenderSlides(session.opened, FIT)
     assertAllUrlsResolve(current)
 
-    // Begin an AI history batch, replace picture bytes + duplicate slide, then end batch -> registers AI snapshot
+    // Begin an AI history batch: replace picture bytes, set background image, and paste a slide -> registers AI snapshot
     expect(call('slides:history-batch-begin')).toBe(true)
     const replace1 = new Uint8Array([
       ...Buffer.from(
@@ -798,6 +844,7 @@ describe('slide media IPC payload', () => {
       11,
       22,
     ])
+    const bgImgBytes = new Uint8Array([...replace1, 55, 66])
     const s0Pic = session.opened.deck.slides[0]!.elements.find(
       (e) => e.type === 'picture',
     ) as PictureElement
@@ -807,14 +854,30 @@ describe('slide media IPC payload', () => {
       base64: Buffer.from(replace1).toString('base64'),
       ext: 'png',
     })
-    call('slides:duplicate-slides', { slideIndexes: [0], fitWidthPx: FIT })
+    expect(
+      setSlideBackgroundImage(
+        session.opened,
+        session.opened.deck.slides[1]!,
+        { bytes: bgImgBytes, ext: 'png' },
+        false,
+      ),
+    ).toBeTruthy()
+    await call<Promise<SlideUpdate>>('slides:edit-background', {
+      slideIndex: 0,
+      sourceSlideIndex: 1,
+      kind: 'image',
+      pick: false,
+      fitWidthPx: FIT,
+    })
+    call('slides:copy-slides', { slideIndexes: [0] })
+    call('slides:paste-slide', { afterIndex: 1, fitWidthPx: FIT })
     const snapId = call<number>('slides:history-batch-end')
     expect(snapId).toBeGreaterThan(0)
     await new Promise<void>((resolve) => setImmediate(resolve))
     current = buildAllRenderSlides(session.opened, FIT)
     assertAllUrlsResolve(current)
 
-    // Another edit outside the batch: replace picture again + delete slide
+    // Another edit outside the batch: replace picture again + reset background + delete pasted slide
     const replace2 = new Uint8Array([...replace1, 33, 44])
     const s0PicAfter = session.opened.deck.slides[0]!.elements.find(
       (e) => e.type === 'picture',
@@ -825,11 +888,15 @@ describe('slide media IPC payload', () => {
       base64: Buffer.from(replace2).toString('base64'),
       ext: 'png',
     })
+    await call<Promise<SlideUpdate>>('slides:edit-background', {
+      slideIndex: 0,
+      kind: 'reset',
+      fitWidthPx: FIT,
+    })
     const delUpdate = call<SlideUpdate>('slides:delete-slide', 2)
     current = mergeSlideUpdate(buildAllRenderSlides(session.opened, FIT), delUpdate)
     await new Promise<void>((resolve) => setImmediate(resolve))
     assertAllUrlsResolve(current)
-
     // Undo and redo each step while scheduleHistoryNotify runs pruneMediaSources
     const undone1 = call<RenderSlide[]>('slides:undo')
     await new Promise<void>((resolve) => setImmediate(resolve))
@@ -854,71 +921,255 @@ describe('slide media IPC payload', () => {
     assertAllUrlsResolve(undoneAi)
   })
 
-  // ── Fork-only test (3): 200 slides x 5 images payload bound + no memory leak ──
-  it('keeps every handler result under 64 KB on a 200-slide x 5-image deck with no growth of pruned media sources', async () => {
-    const imgBytes = addImage(32 * 1024)
-    for (let k = 1; k < 5; k++) {
-      addPicture(session.opened, session.opened.deck.slides[0]!, {
-        bytes: new Uint8Array([...imgBytes, k]),
-        ext: 'png',
-        offset: { x: k * 457200, y: 0, cx: 457200, cy: 457200 },
+  // ── Fork-only test (3): 200 slides (>= 20 MB distinct media) 15+2 handler matrix + no memory leak ──
+  describe('200-slide >= 20 MB distinct-media handler matrix (R1b-02)', () => {
+    let largeDeckSession: Session
+    let current: RenderSlide[]
+    let layoutPath: string
+    let externalBundle: SlideBundle
+    let pngBase64: string
+    const wavBase64 = 'UklGRiwAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQgAAAAAAAAAAAAAAA=='
+
+    beforeAll(async () => {
+      const opened = await openPptx(await createBlankPptx())
+      // Allocate 20 distinct 1 MB PNG media parts (totalling >= 20 MB in opened.archive)
+      const pngHeader = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS9sAAAAASUVORK5CYII=',
+        'base64',
+      )
+      pngBase64 = pngHeader.toString('base64')
+      for (let i = 1; i < 200; i++) expect(duplicateSlide(opened, 0)).toBeTruthy()
+      expect(opened.deck.slides).toHaveLength(200)
+      for (let m = 0; m < 20; m++) {
+        const distinctBytes = new Uint8Array(1024 * 1024 + 64)
+        distinctBytes.set(pngHeader)
+        distinctBytes[distinctBytes.length - 1] = m + 1
+        addPicture(opened, opened.deck.slides[m]!, {
+          bytes: distinctBytes,
+          ext: 'png',
+          offset: { x: 0, y: 0, cx: 457200, cy: 457200 },
+        })
+      }
+      addElement(opened.deck.slides[0]!, {
+        kind: 'textbox',
+        offset: { x: 0, y: 0, cx: 914400, cy: 457200 },
+        paragraphs: [{ runs: [{ text: 'matrix-needle' }] }],
       })
-    }
-    for (let i = 2; i < 200; i++) expect(duplicateSlide(session.opened, 0)).toBeTruthy()
-    expect(session.opened.deck.slides).toHaveLength(200)
+      let mediaTotalBytes = 0
+      for (const [p, b] of opened.archive.entries) {
+        if (p.startsWith('ppt/media/')) mediaTotalBytes += b.byteLength
+      }
+      expect(mediaTotalBytes).toBeGreaterThanOrEqual(20 * 1024 * 1024)
 
-    let current = buildAllRenderSlides(session.opened, FIT)
-    expect(serialize(current).byteLength).toBeLessThan(512 * 1024)
+      // Prepare a second deck with a distinct layout/master/theme chain for source-mode paste
+      const extDeck = await openPptx(await createBlankPptx())
+      extDeck.archive.entries.set(
+        'ppt/slideLayouts/slideLayout1.xml',
+        Buffer.from(
+          extDeck.archive
+            .readText('ppt/slideLayouts/slideLayout1.xml')!
+            .replace('<p:cSld', '<p:cSld name="CustomExtLayout"'),
+          'utf8',
+        ),
+      )
+      extDeck.archive.entries.set(
+        'ppt/theme/theme1.xml',
+        Buffer.from(
+          extDeck.archive
+            .readText('ppt/theme/theme1.xml')!
+            .replace('name="Office Theme"', 'name="External Matrix Theme"'),
+          'utf8',
+        ),
+      )
+      addPicture(extDeck, extDeck.deck.slides[0]!, {
+        bytes: new Uint8Array([...pngHeader, 99]),
+        ext: 'png',
+        offset: { x: 0, y: 0, cx: 457200, cy: 457200 },
+      })
+      externalBundle = copySlide(extDeck, 0)!
 
-    const addRes = call('slides:add-slide', { sourceIndex: 100, fitWidthPx: FIT })
-    expect(serialize(addRes).byteLength).toBeLessThan(64 * 1024)
-    current = mergeSlideUpdate(current, addRes)
-
-    const moveRes = call('slides:move-slide', { fromIndex: 101, toIndex: 50 })
-    expect(serialize(moveRes).byteLength).toBeLessThan(64 * 1024)
-    current = mergeSlideUpdate(current, moveRes)
-
-    const hideRes = call('slides:set-slides-hidden', { slideIndexes: [50], hidden: true })
-    expect(serialize(hideRes).byteLength).toBeLessThan(64 * 1024)
-    current = mergeSlideUpdate(current, hideRes)
-
-    const bgRes = await call<Promise<SlideUpdate>>('slides:edit-background', {
-      slideIndex: 50,
-      kind: 'solid',
-      color: 'DDEBF7',
-      fitWidthPx: FIT,
+      largeDeckSession = {
+        path: '',
+        fitWidthPx: FIT,
+        undoStack: [],
+        redoStack: [],
+        opened,
+      }
+      sessions.set(WC, largeDeckSession)
+      const layouts = call<{ layouts: Array<{ path: string }> }>('slides:get-layouts')
+      layoutPath = layouts.layouts[0]!.path
+      current = buildAllRenderSlides(largeDeckSession.opened, FIT)
+      expect(serialize(current).byteLength).toBeLessThan(1024 * 1024)
     })
-    expect(serialize(bgRes).byteLength).toBeLessThan(64 * 1024)
-    current = mergeSlideUpdate(current, bgRes)
 
-    const delRes = call('slides:delete-slide', 50)
-    expect(serialize(delRes).byteLength).toBeLessThan(64 * 1024)
-    current = mergeSlideUpdate(current, delRes)
-    expect(current).toHaveLength(200)
+    beforeEach(() => {
+      sessions.set(WC, largeDeckSession)
+    })
 
-    // Repeated replacements that are overwritten and pruned from history must be collected
-    const pic = session.opened.deck.slides[0]!.elements.find(
-      (e) => e.type === 'picture',
-    ) as PictureElement
-    const transientUrls: string[] = []
-    for (let step = 0; step < 5; step++) {
-      const tempBytes = new Uint8Array([...imgBytes.subarray(0, 128), 100 + step])
-      replacePictureBytes(session.opened, session.opened.deck.slides[0]!, pic.id, tempBytes, 'png')
-      const u = makeMediaResolver(
-        session.opened,
-        session.opened.deck.slides[0]!.path,
-      )(pic.mediaRef!)!
-      transientUrls.push(u)
-      expect(readSlideMedia(u)).not.toBeNull()
-    }
-    session.undoStack = []
-    session.redoStack = []
-    pruneMediaSources(session)
-    // All 4 superseded URLs were pruned; only the live 5th URL remains
-    for (const oldUrl of transientUrls.slice(0, 4)) {
-      expect(readSlideMedia(oldUrl)).toBeNull()
-    }
-    expect(readSlideMedia(transientUrls[4]!)).not.toBeNull()
+    it.each([
+      [
+        'slides:add-slide',
+        () => call<SlideUpdate>('slides:add-slide', { sourceIndex: 100, fitWidthPx: FIT }),
+      ],
+      [
+        'slides:add-blank-slide',
+        () => call<SlideUpdate>('slides:add-blank-slide', { sourceIndex: 100, fitWidthPx: FIT }),
+      ],
+      [
+        'slides:add-slide-with-layout',
+        () =>
+          call<SlideUpdate>('slides:add-slide-with-layout', {
+            sourceIndex: 100,
+            layoutPath,
+            fitWidthPx: FIT,
+          }),
+      ],
+      ['slides:delete-slide', () => call<SlideUpdate>('slides:delete-slide', 101)],
+      [
+        'slides:delete-slides',
+        () => call<SlideUpdate>('slides:delete-slides', { slideIndexes: [101, 102] }),
+      ],
+      [
+        'slides:duplicate-slides',
+        () =>
+          call<SlideUpdate>('slides:duplicate-slides', {
+            slideIndexes: [10, 20],
+            fitWidthPx: FIT,
+          }),
+      ],
+      [
+        'slides:set-slides-hidden',
+        () =>
+          call<SlideUpdate>('slides:set-slides-hidden', {
+            slideIndexes: [21, 22],
+            hidden: true,
+          }),
+      ],
+      [
+        'slides:move-slide',
+        () => call<SlideUpdate>('slides:move-slide', { fromIndex: 21, toIndex: 50 }),
+      ],
+      [
+        'slides:move-slides',
+        () =>
+          call<SlideUpdate>('slides:move-slides', {
+            slideIndexes: [50, 22],
+            insertAt: 10,
+          }),
+      ],
+      [
+        'slides:move-section',
+        () => {
+          call('slides:add-section', { atSlideIndex: 0, name: 'SecA' })
+          const secs = call<SectionInfo[]>('slides:add-section', {
+            atSlideIndex: 198,
+            name: 'SecB',
+          })
+          const secB = secs.find((s) => s.name === 'SecB')!
+          return call<SlideUpdate>('slides:move-section', { id: secB.id, dir: 'up' })
+        },
+      ],
+      [
+        'slides:remove-section-slides',
+        () => {
+          const secs = call<SectionInfo[]>('slides:get-sections')
+          const secB = secs.find((s) => s.name === 'SecB')!
+          return call<SlideUpdate>('slides:remove-section-slides', { id: secB.id })
+        },
+      ],
+      [
+        'slides:edit-background',
+        () =>
+          call<Promise<SlideUpdate>>('slides:edit-background', {
+            slideIndex: 50,
+            kind: 'solid',
+            color: 'DDEBF7',
+            fitWidthPx: FIT,
+          }),
+      ],
+      [
+        'slides:find-replace',
+        () => {
+          const r = call<{ count: number; update: SlideUpdate }>('slides:find-replace', {
+            find: 'matrix-needle',
+            replace: 'matrix-updated',
+            slideIndex: 0,
+          })
+          expect(r.count).toBe(1)
+          return r
+        },
+      ],
+      [
+        'slides:paste-slide (source mode with new layout/master chain)',
+        () => {
+          appClipboard.slide = { bundles: [externalBundle], pngs: [pngBase64] }
+          return call<SlideUpdate>('slides:paste-slide', {
+            afterIndex: 40,
+            fitWidthPx: FIT,
+            mode: 'source',
+          })
+        },
+      ],
+      [
+        'slides:repaste-slide (picture mode)',
+        () =>
+          call<SlideUpdate>('slides:repaste-slide', {
+            fitWidthPx: FIT,
+            mode: 'picture',
+          }),
+      ],
+      [
+        'slides:save-recording',
+        () =>
+          call<SlideUpdate>('slides:save-recording', {
+            slides: [{ slideIndex: 0, wavBase64, durationMs: 800, advanceMs: 1000 }],
+          }),
+      ],
+      ['slides:clear-narration', () => call<SlideUpdate>('slides:clear-narration', [0])],
+    ])(
+      '%s keeps serialized result < 64 KiB and merges identically to buildAllRenderSlides',
+      async (_label, invoke) => {
+        const raw = await invoke()
+        expect(serialize(raw).byteLength).toBeLessThan(64 * 1024)
+        const update = 'update' in raw ? raw.update : raw
+        current = mergeSlideUpdate(current, update)
+        expect(current).toEqual(buildAllRenderSlides(largeDeckSession.opened, FIT))
+      },
+    )
+
+    it('prunes superseded picture replacement URLs once history is cleared', () => {
+      const pic = largeDeckSession.opened.deck.slides[0]!.elements.find(
+        (e) => e.type === 'picture',
+      ) as PictureElement
+      const pngHeader = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS9sAAAAASUVORK5CYII=',
+        'base64',
+      )
+      const transientUrls: string[] = []
+      for (let step = 0; step < 5; step++) {
+        const tempBytes = new Uint8Array([...pngHeader, 100 + step])
+        replacePictureBytes(
+          largeDeckSession.opened,
+          largeDeckSession.opened.deck.slides[0]!,
+          pic.id,
+          tempBytes,
+          'png',
+        )
+        const u = makeMediaResolver(
+          largeDeckSession.opened,
+          largeDeckSession.opened.deck.slides[0]!.path,
+        )(pic.mediaRef!)!
+        transientUrls.push(u)
+        expect(readSlideMedia(u)).not.toBeNull()
+      }
+      largeDeckSession.undoStack = []
+      largeDeckSession.redoStack = []
+      pruneMediaSources(largeDeckSession)
+      for (const oldUrl of transientUrls.slice(0, 4)) {
+        expect(readSlideMedia(oldUrl)).toBeNull()
+      }
+      expect(readSlideMedia(transientUrls[4]!)).not.toBeNull()
+    })
   })
 
   // ── Fork-only test (4): two attached clients partial -> full broadcast ordering + missing base refetch ──
