@@ -18,4 +18,9 @@ export const fr = {
   statusWords: '{n} mots',
   statusChars: '{n} caractères',
   highlight: 'Surligner',
+  diskChangedMsg: 'Ce fichier a été modifié par un autre programme.',
+  diskConflictMsg: "Ce fichier a changé sur le disque ; l'enregistrer écrasera ces modifications.",
+  diskReload: 'Recharger',
+  diskKeepMine: 'Garder le mien',
+  diskOverwrite: 'Écraser quand même',
 } satisfies Record<keyof typeof zh, string>

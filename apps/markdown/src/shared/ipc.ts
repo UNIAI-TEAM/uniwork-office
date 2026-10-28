@@ -41,6 +41,8 @@ export const MARKDOWN_CHANNELS = {
   closeSaveRequest: 'markdown:close-save-request',
   closeSaveResult: 'markdown:close-save-result',
   fileRenamed: 'markdown:file-renamed',
+  fileChangedOnDisk: 'markdown:file-changed-on-disk',
+  ackFileChangedOnDisk: 'markdown:ack-file-changed-on-disk',
   pickImage: 'markdown:pick-image',
   saveImage: 'markdown:save-image',
   discardPendingAssets: 'markdown:discard-pending-assets',
@@ -240,6 +242,8 @@ export interface SaveMarkdownRequest {
    * before the user confirms. Ignored when the document already has a path.
    */
   suggestedName?: string
+  /** write even though the file changed on disk since it was loaded or last saved */
+  overwrite?: boolean
 }
 
 export type SaveMarkdownResult =
@@ -252,7 +256,7 @@ export type SaveMarkdownResult =
       writtenText?: string
     }
   | { ok: true; canceled: true }
-  | { ok: false; error: string }
+  | { ok: false; error: string; conflict?: true }
 
 /** AI channels are app-wide shared ipcMain handlers (shell registers via docs-main registerAiIpc); pass-through only */
 export const AI_CHANNELS = {
@@ -408,6 +412,10 @@ export interface MarkdownApi {
   sendCloseSaveResult(ok: boolean): void
   /** The file was renamed on disk (Home list rename) — renderer syncs its display path */
   onFileRenamed(handler: (newPath: string) => void): () => void
+  /** Another program wrote the open file; the renderer re-reads and decides whether to reload */
+  onFileChangedOnDisk(handler: (path: string) => void): () => void
+  /** the renderer has read the changed file and decided; a later save is checked against this version */
+  ackFileChangedOnDisk(): void
   /**
    * Pick an image file and copy it into `assets/` next to the open document;
    * returns the relative path to author into the markdown, or null when the
