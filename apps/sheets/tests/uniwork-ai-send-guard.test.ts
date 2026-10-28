@@ -418,8 +418,9 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     const here = dirname(fileURLToPath(import.meta.url))
     const shell = readFileSync(join(here, '../src/renderer/ExcelShell.tsx'), 'utf8')
     expect(shell).toContain('const uniworkSendGate = useUniworkSendGate()')
+    // it answers whether the send went out (a preset that did not waits in the composer, UNI-2264)
     expect(shell).toMatch(
-      /const onSend: typeof onSendRaw = [^{]*\{\s*if \(uniworkSendGate\.refuse\(\)\) return\s*onSendRaw\(/,
+      /const onSend: typeof onSendRaw = [^{]*\{\s*if \(uniworkSendGate\.refuse\(\)\) return false\s*return onSendRaw\(/,
     )
     expect(shell).toContain('sendGate={uniworkSendGate}')
     // no entry calls the raw prop around the gate
@@ -435,5 +436,19 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     expect(start).toBeGreaterThan(-1)
     const body = app.slice(start, app.indexOf('runToolsRef.current = []', start))
     expect(body).toMatch(/if \(needModelHint !== null \|\| !instruction \|\| aiBusy\) return false/)
+  })
+
+  it('App.tsx handleSend sends nothing (no bubble, no regex planner) while the settings are unread or a run is busy or starting (UNI-2264)', () => {
+    const app = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/App.tsx'),
+      'utf8',
+    )
+    const start = app.indexOf('  function handleSend(')
+    // everything before the first side effect: the caller keeps the text (a preset waits in the composer)
+    const body = app.slice(start, app.indexOf('runToolsRef.current = []', start))
+    expect(body).toContain('if (!aiSettingsRef.current) return false')
+    expect(body).toMatch(
+      /if \(agentConfigured && \(!loop \|\| loop\.busy \|\| runStartingRef\.current\)\) return false/,
+    )
   })
 })

@@ -57,4 +57,7 @@ export const vi = {
   // U-02 catalogue S10: workbook over the web AI size limit
   aiErrWorkbookTooLarge:
     'Bảng tính này quá lớn để AI xử lý trên web. Mở bằng ứng dụng UniWork Office.',
+
+  // UNI-2264: the next turn of a job handed over from UniWork (ai.start)
+  aiHandoffContinue: 'Tiếp tục phần tiếp theo.',
 } satisfies Record<keyof typeof zh, string>

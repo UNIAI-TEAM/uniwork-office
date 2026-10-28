@@ -10,6 +10,7 @@ import {
   UniAiMark,
   composerNoteFor,
   useOverlayDock,
+  aiPanelOnUniwork,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
@@ -297,10 +298,16 @@ interface Snapshot {
   doc: DocSnapshot
 }
 
-/** Preset instruction (ribbon / Ask AI "send now"); a new nonce triggers one auto-send */
+/**
+ * Preset instruction (ribbon / Ask AI "send now" / the job a web host handed over); a new nonce
+ * triggers one auto-send (unless autoRun is false)
+ */
 export interface AiPreset {
   text: string
   nonce: number
+  autoRun?: boolean
+  /** a web host's job: it runs only while the panel is on UniWork AI (read when it would run) */
+  uniworkOnly?: boolean
   /** what the chat bubble shows when the instruction itself carries protocol text */
   displayText?: string
   scope?: AiScopeQuoteData
@@ -1258,9 +1265,29 @@ export function AiPanel({
     presetNonceRef.current = preset.nonce
     // the run lands in the chat: leave Ask UNI so it is the one on screen
     askUni.leave()
-    // while a run is active the request lands in the composer as the user phrased it, never as protocol text
-    if (loopRef.current?.busy) setPrompt(preset.displayText ?? preset.text)
-    else send(preset.text, preset.displayText, false, undefined, preset.scope, preset.fenceSids)
+    // a preset that does not run waits in the composer, word for word, and takes focus there unless a
+    // refusal moved it to the UniWork AI disclosure (acknowledge first)
+    const toComposer = (text: string, refused: boolean) => {
+      setPrompt(text)
+      if (!(refused && uniworkGate.isBlocked())) inputRef.current?.focus()
+    }
+    // the text goes out word for word (a host job is recognised by it, UNI-2264). One that cannot
+    // run now (busy, no model yet, the UniWork AI disclosure not acknowledged) waits in the
+    // composer: an element ask as the user phrased it (never its protocol text), anything else as is
+    const kept = preset.fenceSids ? (preset.displayText ?? preset.text) : preset.text
+    const take = () => {
+      if (preset.autoRun === false) toComposer(kept, false)
+      else if (
+        !send(preset.text, preset.displayText, false, undefined, preset.scope, preset.fenceSids)
+      )
+        toComposer(kept, true)
+    }
+    // a host job runs only on UniWork AI: the provider is the one of now, not of when it arrived
+    if (!preset.uniworkOnly) take()
+    else
+      void aiPanelOnUniwork(() => window.htmlApi.getAiSettings()).then((on) =>
+        on ? take() : toComposer(kept, false),
+      )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset])
 

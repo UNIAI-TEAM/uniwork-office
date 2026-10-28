@@ -110,14 +110,13 @@ export function installBridge(): void {
   ]
   if (headless) modules.push(headless.desktopFor(webapi))
   // the headless entry has no frame token: AI stays off there
-  const desktop = withWebAi(
-    mergeModules(modules),
-    createWebAi({
-      port: client,
-      capabilities: capabilities as Record<string, unknown>,
-      aiRun: frameAiRun,
-    }),
-  )
+  const webAi = createWebAi({
+    port: client,
+    capabilities: capabilities as Record<string, unknown>,
+    aiRun: frameAiRun,
+  })
+  client.handleAiStart?.((job) => webAi.startHandoff(job))
+  const desktop = withWebAi(mergeModules(modules), webAi)
   desktop.capabilities = capabilities
 
   const win = window as unknown as {

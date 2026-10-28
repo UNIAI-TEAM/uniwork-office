@@ -310,6 +310,12 @@ export type Capability =
    * absent, the frame renders its own fallback warning chip and save-blocked dialog.
    */
   | 'sizeUi'
+  /**
+   * additive (UNI-2264): the host can hand an approved job to the AI panel via `ai.start`.
+   * Accepts ai.start. The frame claims it once its AI panel runs UniWork AI; effective = host
+   * grant AND frame claim.
+   */
+  | 'aiStart'
 
 export type Capabilities = Partial<Record<Capability, boolean>>
 
@@ -335,6 +341,7 @@ export const CAPABILITY_KEYS: readonly Capability[] = [
   'commentsShareView',
   'commentsViewVersion',
   'sizeUi',
+  'aiStart',
 ]
 
 /**
@@ -727,6 +734,21 @@ export interface ApiExportResult {
  */
 export interface ApiDownloadPayload {
   data: ArrayBuffer
+}
+
+/** additive (UNI-2264): the host hands an approved job to the AI panel; needs capability `aiStart`. */
+export interface AiStartPayload {
+  /** opaque id of the handoff, echoed back by the frame in its own events */
+  handoffId: string
+  /** the prompt the panel runs */
+  text: string
+  /** what the panel shows as the user turn when it differs from `text` */
+  displayText?: string
+}
+
+export interface AiStartResult {
+  /** the panel accepted the job; it runs in the panel, not in this answer */
+  queued: true
 }
 
 export interface ApiDownloadResult {
@@ -1393,6 +1415,8 @@ export interface HostRequests {
    * bytes via `api.download`.
    */
   'doc.download': Rpc<Record<string, never>, ApiDownloadResult>
+  /** additive (UNI-2264): host hands an approved job to the AI panel. Send only after an InitAck with `aiStart`. */
+  'ai.start': Rpc<AiStartPayload, AiStartResult>
 }
 
 /** Events the host sends to the frame. */
@@ -1535,6 +1559,7 @@ const HOST_REQUESTS: Record<HostRequestType, true> = {
   'doc.closeCheck': true,
   'comments.reveal': true,
   'doc.download': true,
+  'ai.start': true,
 }
 const HOST_EVENTS: Record<HostEventType, true> = {
   'token.update': true,
@@ -1608,6 +1633,19 @@ function isObj(x: unknown): x is Obj {
 function isStr(x: unknown): x is string {
   return typeof x === 'string'
 }
+const AI_START_MAX_TEXT = 8000
+
+function isAiStartPayload(x: unknown): boolean {
+  return (
+    isObj(x) &&
+    typeof x.handoffId === 'string' &&
+    /^[A-Za-z0-9]{1,64}$/.test(x.handoffId) &&
+    isNonEmptyStr(x.text) &&
+    x.text.length <= AI_START_MAX_TEXT &&
+    isOpt(x.displayText, (y): y is string => isStr(y) && y.length <= AI_START_MAX_TEXT)
+  )
+}
+
 function isNonEmptyStr(x: unknown): x is string {
   return typeof x === 'string' && x.length > 0
 }
@@ -1891,6 +1929,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'request:doc.closeCheck': (x) => isObj(x),
   'request:comments.reveal': isCommentIdPayload,
   'request:doc.download': (x) => isObj(x),
+  'request:ai.start': isAiStartPayload,
   // host -> frame events
   'event:file.renamed': (x) => isObj(x) && isFileMeta(x.file),
   'event:token.update': isTokenPayload,
@@ -2073,6 +2112,7 @@ const PAYLOAD_VALIDATORS: Record<string, (x: unknown) => boolean> = {
   'response:mentions.search': (x) => isObj(x) && isArrayOf(x.candidates, isMentionCandidate),
   'response:comments.reveal': (x) => isObj(x) && isBool(x.revealed),
   'response:doc.download': (x) => isObj(x) && x.delivered === true,
+  'response:ai.start': (x) => isObj(x) && x.queued === true,
 }
 
 /** Outcome of `parseEnvelope`. */

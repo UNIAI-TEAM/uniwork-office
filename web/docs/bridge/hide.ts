@@ -29,6 +29,9 @@
  * | Shell drag-drop     | getPathForFile                                                                               | '' (no OS path in a browser)        |
  * | Overridable default | consumePendingOpenDocx, onOpenDocx, onRenamedDocx (the open flow is webapi.ts, which wins)   | null / disposer                     |
  *
+ * consumeAiPreset / onAiPreset are the answers while AI is off: the web AI bridge (withWebAi)
+ * hands over the host's `ai.start` jobs through them while it is on (UNI-2264).
+ *
  * Merge order in install.ts is hide, ai, webapi, browser: a later module that
  * defines the same key silently replaces these (install.ts also replaces
  * `capabilities` with a copy that gets the host grants, see `hostGrants`).

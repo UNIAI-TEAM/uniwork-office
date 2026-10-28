@@ -372,9 +372,23 @@ const EMPTY_STREAM_RETRY_DELAYS_MS = [1_000, 3_000]
 const TOOL_ARGS_DROP_MARK = 'while sending tool arguments'
 const TOOL_ARGS_DROP_RETRIES = 1
 
-const TURN_LIMIT_NOTE =
+/** the loop's own user message once the turn limit is hit (a host may recognise it as not the user's) */
+export const TURN_LIMIT_NOTE =
   '[System] The tool-call turn limit for this request has been reached; no more tools may be called this turn. ' +
   'Answer directly from the information already gathered; if the task is unfinished, briefly state what is done and what remains.'
+
+/** the Sheets skill's claimed-selection correction (its verifyResponse), pushed by the loop as a user message */
+export const SELECTION_CLAIM_CORRECTION =
+  '[System check] Your reply claims that something was located / selected / highlighted on screen for the user, ' +
+  'but no successful select_range call happened during this run — the visible selection has NOT moved. ' +
+  'Either call select_range now to actually perform the action, or rewrite your reply so it no longer claims an action that did not happen.'
+
+/**
+ * Every user message the loop pushes itself (never the person's words): a host that follows the
+ * person's turns (the web handoff) tells them apart by these texts. Closed list: a skill's new
+ * verifyResponse correction must be defined here and added, or it reads as a person's question.
+ */
+export const LOOP_NUDGE_TEXTS: readonly string[] = [TURN_LIMIT_NOTE, SELECTION_CLAIM_CORRECTION]
 
 export const TOOL_ABORTED_OUTPUT =
   '(the user stopped the run while this tool was still executing; its result was discarded)'

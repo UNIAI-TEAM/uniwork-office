@@ -287,6 +287,25 @@ export default function App() {
   const imageGenerationOffered = useImageGenerationOffered(cap('imageGeneration'), aiSettings, () =>
     window.markdownApi?.aiGskStatus?.(),
   )
+  // the job a web host hands over (`ai.start`, UNI-2264): the boot read and the live subscription
+  // start in the same tick, so a preset in between is never lost; the panel mounts (and takes it)
+  // once the file has loaded
+  useEffect(() => {
+    if (!aiEnabled) return
+    const take = (preset: { text: string; autoRun?: boolean; displayText?: string } | null) => {
+      if (!preset?.text) return
+      setAiOpen(true)
+      setAiPreset((prev) => ({
+        text: preset.text,
+        nonce: (prev?.nonce ?? 0) + 1,
+        autoRun: preset.autoRun !== false,
+        ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        ...(platform() === 'web' ? { uniworkOnly: true } : {}),
+      }))
+    }
+    void window.markdownApi.consumeAiPreset?.().then(take)
+    return window.markdownApi.onAiPreset?.(take)
+  }, [aiEnabled])
   const canEdit = cap('save')
 
   const markDirty = useCallback(() => {

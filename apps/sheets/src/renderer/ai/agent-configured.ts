@@ -6,6 +6,8 @@ import { isOrgServedReady, type AiSettings } from '@genoffice/ai-provider/browse
  */
 export function agentConfigured(settings: AiSettings | null | undefined, webCredentials: boolean) {
   if (!settings) return false
+  // UniWork AI has no key and no model choice here: the server's policy picks the model
+  if (settings.provider === 'uniwork') return true
   // a key saved on UniWork serves the provider: main routes the call and the slot holds no key
   if (isOrgServedReady(settings, settings.provider)) return true
   const config = settings.providers[settings.provider]

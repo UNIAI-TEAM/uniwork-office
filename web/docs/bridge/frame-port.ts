@@ -101,6 +101,8 @@ export interface FramePort {
   refreshToken?(reason: 'expiring' | 'unauthorized'): Promise<string>
   /** answer the host's `doc.download` request (SIZE-F1; optional for older clients and mocks) */
   handleDownload?(handler: HostHandler<'doc.download'>): () => void
+  /** answer the host's `ai.start` request (UNI-2264; optional for older clients and mocks) */
+  handleAiStart?(handler: HostHandler<'ai.start'>): () => void
   /** protocol `size_warning` event (SIZE-F1; optional for older clients and mocks) */
   reportSizeWarning?(payload: SizeWarningPayload): void
   /** protocol `save_blocked` event (SIZE-F1; optional for older clients and mocks) */

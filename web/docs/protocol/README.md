@@ -56,6 +56,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 | `cancel`            | event   | {id} — abort a host→frame request                                                                                                                                                                                                                                                             |
 | `comments.changed`  | event   | {document_id} — reload the comment list (additive, G8-08; see "Server comments")                                                                                                                                                                                                              |
 | `comments.reveal`   | request | {comment_id} → {revealed} (additive, G8-08; only after an InitAck with `comments`)                                                                                                                                                                                                            |
+| `ai.start`          | request | {handoffId, text, displayText?} → {queued: true} (additive, UNI-2264; only after an InitAck with `aiStart`; `handoffId` `[A-Za-z0-9]{1,64}`, `text` 1..8000 chars)                                                                                                                            |
 | `doc.download`      | request | {} → {delivered: true} (additive, SIZE-F1; asks the frame to send `api.download` with its last-blocked or live serialized bytes)                                                                                                                                                              |
 
 ### Frame → host
@@ -97,7 +98,7 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
 
 Capabilities: `save`, `saveAs`, `saveCopy` (additive, UNI-1872), `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
-`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`, and (additive, G8-18) `commentsShareView`, and (additive, UNI-2033) `commentsViewVersion`, and (additive, SIZE-F1) `sizeUi`. The effective set is the frame's ∩
+`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`, and (additive, G8-18) `commentsShareView`, and (additive, UNI-2033) `commentsViewVersion`, and (additive, SIZE-F1) `sizeUi`, and (additive, UNI-2264) `aiStart`. The effective set is the frame's ∩
 the host's grant. `desktopOpen` (additive, default false) is the "Open in desktop app" grant, see "Open in desktop app (`app.open`)" below. The three cloud-tool keys only count together with `ai`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
 is granted (grant it only with an `api` handler for `file.pick`) and stops asking for recents without `recents`.
 `InitPayload.limits?: DocumentSizeLimits` and `OpenPayload.limits?: DocumentSizeLimits` (`{ max_bytes, warn_ratio }`,
@@ -164,6 +165,9 @@ URL must widen `connect-src` in the CSP it serves (`csp.json`) for that origin.
   does. A host before SIZE-F1 drops the event.
 - `uniworkAi`: UniWork AI in the AI panel. The frame claims it (`AI_FRAME_CAPABILITIES`) once the adapter exists
   (G6-05); until then it is `false` whatever the host grants.
+- `aiStart`: the host can hand an approved job to the AI panel with `ai.start`. The frame claims it once its AI
+  panel runs UniWork AI; effective = host grant AND frame claim. `host.startAi(payload)` rejects `unsupported`
+  without sending when the InitAck has no `aiStart`; a frame without a handler answers `unknown_type`.
 - `save` answers keep the existing codes and `SaveResult`; `PROTOCOL_VERSION` stays 1.
 
 ### Server comments (`comments`, additive, G8-08)
