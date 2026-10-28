@@ -4595,6 +4595,9 @@ async function isCfbWorkbookFile(path: string): Promise<boolean> {
  * save base (see SessionInfo.snapshotPath). */
 async function snapshotWorkbook(path: string, bytes?: Buffer): Promise<string> {
   const dir = await getSessionSnapshotDirectory()
+  // The directory is created once per process; recreate it if a temp sweep (or a
+  // test's cleanup) removed it since.
+  await mkdir(dir, { recursive: true, mode: 0o700 })
   const snapshotPath = join(dir, `${randomUUID()}.xlsx`)
   if (bytes) await writeFile(snapshotPath, bytes, { mode: 0o600 })
   else await copyFile(path, snapshotPath)
