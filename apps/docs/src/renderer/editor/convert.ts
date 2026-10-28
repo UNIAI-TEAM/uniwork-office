@@ -3361,15 +3361,18 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       continue
     }
     if (node.type === 'docNoteRef') {
-      const markerRawRPr = node.attrs?.rawRPr
+      const base = atomBase(node)
+      const markerRawRPr =
+        typeof node.attrs?.rawRPr === 'string' && node.attrs.rawRPr ? node.attrs.rawRPr : undefined
+      const rawRPr = mergeRawRPr(markerRawRPr, base.rawRPr)
       runs.push({
-        ...atomBase(node),
+        ...base,
         text: String(node.attrs?.num ?? 1),
         noteRef: {
           kind: (node.attrs?.kind as 'footnote' | 'endnote') ?? 'footnote',
           id: String(node.attrs?.id ?? ''),
         },
-        ...(typeof markerRawRPr === 'string' && markerRawRPr ? { rawRPr: markerRawRPr } : {}),
+        ...(rawRPr ? { rawRPr } : {}),
       })
       continue
     }
@@ -3400,10 +3403,16 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       const xml = String(node.attrs?.xml ?? '')
       const rule = node.attrs?.rule as NonNullable<Run['image']>['rule'] | null | undefined
       if ((dataUrl || rule) && xml) {
+        const base = atomBase(node)
+        const imageRawRPr =
+          typeof node.attrs?.rawRPr === 'string' && node.attrs.rawRPr
+            ? String(node.attrs.rawRPr)
+            : undefined
+        const rawRPr = mergeRawRPr(imageRawRPr, base.rawRPr)
         runs.push({
-          ...atomBase(node),
+          ...base,
           text: '',
-          ...(node.attrs?.rawRPr ? { rawRPr: String(node.attrs.rawRPr) } : {}),
+          ...(rawRPr ? { rawRPr } : {}),
           image: {
             dataUrl,
             xml,
@@ -3442,6 +3451,52 @@ function symRuns(run: Run): Run[] {
   return [...run.text].map((ch) => ({ ...plain, text: ch, ...(ch === glyph ? { sym } : {}) }))
 }
 
+/** top-level child elements of an rPr fragment (depth-aware, attrs kept) */
+function splitRPrChildren(xml: string): Array<{ name: string; xml: string }> {
+  const out: Array<{ name: string; xml: string }> = []
+  const tagRe = /<(\/?)([A-Za-z0-9:._-]+)((?:"[^"]*"|'[^']*'|[^"'>])*)>/g
+  let depth = 0
+  let start = -1
+  let name = ''
+  let match: RegExpExecArray | null
+  while ((match = tagRe.exec(xml)) !== null) {
+    const closing = match[1] === '/'
+    const selfClosing = match[3].endsWith('/')
+    if (closing) {
+      depth--
+      if (depth === 0) out.push({ name, xml: xml.slice(start, match.index + match[0].length) })
+    } else if (selfClosing) {
+      if (depth === 0) out.push({ name: match[2], xml: match[0] })
+    } else {
+      if (depth === 0) {
+        start = match.index
+        name = match[2]
+      }
+      depth++
+    }
+  }
+  return out
+}
+
+/** merge mark-derived rPr with fallback rPr so mark properties win while keeping unrelated original children */
+function mergeRawRPr(
+  fallback: string | undefined,
+  authoritative: string | undefined,
+): string | undefined {
+  if (!authoritative) return fallback || undefined
+  if (!fallback || fallback === authoritative) return authoritative
+  const fbOpen = /^<w:rPr(?:\s[^>]*)?>/.exec(fallback)?.[0]
+  const authOpen = /^<w:rPr(?:\s[^>]*)?>/.exec(authoritative)?.[0]
+  if (!fbOpen || !fallback.endsWith('</w:rPr>') || !authOpen || !authoritative.endsWith('</w:rPr>'))
+    return authoritative
+  const fbChildren = splitRPrChildren(fallback.slice(fbOpen.length, -'</w:rPr>'.length))
+  const authChildren = splitRPrChildren(authoritative.slice(authOpen.length, -'</w:rPr>'.length))
+  const authNames = new Set(authChildren.map((c) => c.name))
+  const kept = fbChildren.filter((c) => !authNames.has(c.name))
+  if (kept.length === 0) return authoritative
+  return `${authOpen}${kept.map((c) => c.xml).join('')}${authChildren.map((c) => c.xml).join('')}</w:rPr>`
+}
+
 /** an atom's marks carry its revision / comment / character style; dropping them lost the w:ins wrapper */
 function atomBase(node: PmNode): Partial<Run> {
   if (!node.marks?.length) return {}
@@ -3451,6 +3506,8 @@ function atomBase(node: PmNode): Partial<Run> {
 
 function runFromMarks(text: string, marks: PmMark[]): Run {
   const run: Run = { text }
+  let redactRawRPr: string | undefined
+  let styleRawRPr: string | undefined
   for (const mark of marks) {
     if (mark.type === 'redaction') {
       // rawRPr is the whole story: it carries both the w:bdr Word draws and the
@@ -3458,7 +3515,7 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       // byte for byte because the run model never manages a custom element.
       // Setting run.bdr as well would only duplicate what rPr already has.
       if (typeof mark.attrs?.rawRPr === 'string' && mark.attrs.rawRPr) {
-        run.rawRPr = mark.attrs.rawRPr
+        redactRawRPr = mark.attrs.rawRPr
       }
     } else if (mark.type === 'bold') run.bold = true
     else if (mark.type === 'italic') run.italic = true
@@ -3550,7 +3607,7 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       if (mark.attrs?.eaLang) run.eastAsiaLang = String(mark.attrs.eaLang)
       if (mark.attrs?.rtl != null) run.rtl = Boolean(mark.attrs.rtl)
       if (mark.attrs?.styleId) run.styleId = String(mark.attrs.styleId)
-      if (mark.attrs?.rawRPr) run.rawRPr = String(mark.attrs.rawRPr)
+      if (mark.attrs?.rawRPr) styleRawRPr = String(mark.attrs.rawRPr)
       if (mark.attrs?.themeRFonts) {
         run.themeRFonts = JSON.parse(String(mark.attrs.themeRFonts)) as Run['themeRFonts']
       }
@@ -3564,6 +3621,8 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       }
     }
   }
+  const mergedRawRPr = mergeRawRPr(styleRawRPr, redactRawRPr)
+  if (mergedRawRPr) run.rawRPr = mergedRawRPr
   return run
 }
 

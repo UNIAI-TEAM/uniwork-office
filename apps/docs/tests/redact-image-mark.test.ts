@@ -127,6 +127,43 @@ describe('a picture and the withhold mark — what sticks, what round-trips', ()
     expect(redactionCount(reloaded.getJSON() as never)).toBe(1)
   })
 
+  it('a formatted inline picture (<w:b/>) hidden via NodeSelection survives save and reopen', async () => {
+    const formattedXml = INLINE_XML.replace(
+      '<w:r><w:drawing>',
+      '<w:r><w:rPr><w:b/></w:rPr><w:drawing>',
+    )
+    const { editor, parsed } = await open(formattedXml)
+    const { pos } = findNode(editor, 'docInlineImage')
+    editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)))
+    expect(editor.commands.setRedaction('id-photo')).toBe(true)
+    expect(redactionCount(editor.getJSON() as never)).toBe(1)
+
+    const reloaded = await roundTrip(editor, parsed)
+    const { node } = findNode(reloaded, 'docInlineImage')
+    expect(markNames(node)).toContain('redaction')
+    expect(markNames(node)).toContain('bold')
+    expect(String(node.attrs.rawRPr ?? '')).toContain('<w:b/>')
+    expect(String(node.attrs.rawRPr ?? '')).toContain('go:redact')
+    expect(redactionCount(reloaded.getJSON() as never)).toBe(1)
+  })
+
+  it('a formatted note reference (<w:b/>) hidden via NodeSelection survives save and reopen', async () => {
+    const noteXml =
+      '<w:p><w:r><w:t>before </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:footnoteReference w:id="1"/></w:r></w:p>'
+    const { editor, parsed } = await open(noteXml)
+    const { pos } = findNode(editor, 'docNoteRef')
+    editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos)))
+    expect(editor.commands.setRedaction('note-ref')).toBe(true)
+    expect(redactionCount(editor.getJSON() as never)).toBe(1)
+
+    const reloaded = await roundTrip(editor, parsed)
+    const { node } = findNode(reloaded, 'docNoteRef')
+    expect(markNames(node)).toContain('redaction')
+    expect(String(node.attrs.rawRPr ?? '')).toContain('<w:b/>')
+    expect(String(node.attrs.rawRPr ?? '')).toContain('go:redact')
+    expect(redactionCount(reloaded.getJSON() as never)).toBe(1)
+  })
+
   it("and the load path rebuilds the mark from the file's element", async () => {
     // a file that really does carry the element on a picture run comes back
     // withholding the picture, not showing it to the model
