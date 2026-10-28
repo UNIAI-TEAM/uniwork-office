@@ -2,7 +2,7 @@ import type { zh } from './zh'
 
 export const he = {
   // ── Withholding cells from the model ──
-  redactMenuLabel: 'הסתרת הבחירה מהמודל',
+  redactMenuLabel: 'הסתרת הבחירה מה-AI',
   redactDialogDesc:
     'הבחירה נשארת במסמך ובקובץ; המודל רואה רק את הסימון. תן לו שם כדי שיהיה ברור מה הוא מייצג.',
   redactDialogScope:
@@ -10,7 +10,7 @@ export const he = {
   redactDialogPlaceholder: 'שם הסימון, לדוגמה: טלפון הלקוח',
   redactCancel: 'ביטול',
   redactInsert: 'הסתר',
-  redactEnable: 'לחיצה ימנית על טקסט נבחר מסתירה אותו מה-AI.',
+  redactEnable: 'לחיצה ימנית על הבחירה מסתירה אותה מה-AI.',
   redactNeedsSavedRow: 'השורה הזו עדיין אינה בקובץ. שמור תחילה, ואז הסתר את התא.',
   redactRecoveredFromNames:
     'יישום אחר כתב מחדש את הקובץ הזה והשמיט את הרשומה של מה מוסתר. התאים המוסתרים שוחזרו מהשמות שבחוברת העבודה; שמירה משחזרת את הרשומה המלאה.',

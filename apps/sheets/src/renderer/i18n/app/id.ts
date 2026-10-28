@@ -10,7 +10,7 @@ export const id = {
   redactDialogPlaceholder: 'Nama placeholder, mis. telepon pelanggan',
   redactCancel: 'Batal',
   redactInsert: 'Sembunyikan',
-  redactEnable: 'Klik kanan pada teks yang dipilih untuk menyembunyikannya dari AI.',
+  redactEnable: 'Klik kanan pada pilihan untuk menyembunyikannya dari AI.',
   redactNeedsSavedRow: 'Baris ini belum ada di berkas. Simpan dulu, lalu sembunyikan selnya.',
   redactRecoveredFromNames:
     'Aplikasi lain menulis ulang berkas ini dan membuang catatan apa yang disembunyikan. Sel yang disembunyikan dipulihkan dari nama-nama di dalam buku kerja; menyimpan akan memulihkan catatan lengkapnya.',

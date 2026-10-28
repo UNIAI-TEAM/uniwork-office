@@ -9,7 +9,7 @@ export const zh = {
   redactDialogPlaceholder: '占位名称，例如：客户电话',
   redactCancel: '取消',
   redactInsert: '隐藏',
-  redactEnable: '选中文字后右键，即可对 AI 隐藏。',
+  redactEnable: '选中单元格后右键，即可对 AI 隐藏。',
   redactNeedsSavedRow: '这一行还没存进文件。请先存盘，再隐藏其中的单元格。',
   redactRecoveredFromNames:
     '这个文件被别的软件改写过，隐藏记录的部件被丢掉了。已从工作簿里的名称把隐藏单元格找回来；存一次盘就能恢复完整记录。',

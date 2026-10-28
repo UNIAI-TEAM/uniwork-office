@@ -337,7 +337,7 @@ export const he = {
   appAiBadgeTip: 'משתמש ב-AI',
   appTranslate: 'תרגום',
   appTranslateTo: 'תרגום ל{lang}',
-  redactMenuLabel: 'הסתרת הבחירה מהמודל',
+  redactMenuLabel: 'הסתרת הבחירה מה-AI',
   redactDialogDesc:
     'המילים נשארות במסמך ובקובץ; המודל רואה רק את הסימון. תן לו שם כדי שיהיה ברור מה הוא מייצג.',
   redactDialogScope:
@@ -345,7 +345,7 @@ export const he = {
   redactDialogPlaceholder: 'שם הסימון, לדוגמה: טלפון הלקוח',
   redactCancel: 'ביטול',
   redactInsert: 'הסתר',
-  redactShowLabel: 'הצגת הבחירה למודל שוב',
+  redactShowLabel: 'הצגת הבחירה ל-AI שוב',
   appLangEnglish: 'אנגלית',
   appLangSimplifiedChinese: 'סינית פשוטה',
   appLangJapanese: 'יפנית',

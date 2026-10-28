@@ -276,11 +276,11 @@ export function insertRowsBelowLocale(pack: LocalePack): LocalePack {
  * It is a Univer menu item, so its label is a Univer locale key resolved at
  * render — the app's own `t()` cannot be used for a menu `title`. The pack,
  * however, is built here, so the wording is read straight out of the app's
- * `redactMenuLabel`: one definition, all 22 languages, and the same gesture
+ * `redactMenuLabel`: one definition, all 21 languages, and the same gesture
  * reads identically in markdown, slides, docs and html. A second hand-written
  * table could only ever drift from it.
  *
- * Languages Univer has no pack for (th/nl/ms/he/hi/cs/tr/zh-TW) keep the English
+ * Languages Univer has no pack for (th/nl/ms/he/hi/cs/zh-TW) keep the English
  * pack the runtime booted with, where every other right-click item is English;
  * the redaction item follows that rather than being the one entry in the menu
  * with a language of its own. `applyUniverLocale` returns before reaching here
