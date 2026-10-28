@@ -81,7 +81,7 @@ function writerRig(
       },
       (c) => chunks.push(c),
     )
-  return { calls, chunks, run }
+  return { calls, chunks, run, conversations }
 }
 
 const header = (call: Call, name: string) => new Headers(call.init.headers).get(name)
@@ -147,6 +147,24 @@ describe('runUniworkWriter', () => {
       expect(r.chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: code })
     },
   )
+
+  it('a terminal frame without a readable code still fails the write (ai_provider_error)', async () => {
+    const r = writerRig(() => sse([delta('x'), { x_uniwork: { terminal: { code: 7 } } }]))
+    await r.run()
+    expect(r.chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: 'ai_provider_error' })
+    const bare = writerRig(() => sse([delta('x'), { x_uniwork: { terminal: {} } }]))
+    await bare.run()
+    expect(bare.chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: 'ai_provider_error' })
+  })
+
+  it('a lost session (401 after the token refresh) forgets every conversation, as the chat does', async () => {
+    const r = writerRig(() => new Response(null, { status: 401 }))
+    await r.run()
+    // the frame client retried once with a fresh token
+    expect(r.calls).toHaveLength(2)
+    expect(r.chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: 'session_expired' })
+    expect(r.conversations.ids('sess-1')).toEqual({})
+  })
 
   it('an HTTP failure carries the server code (409 run_limit_reached)', async () => {
     const r = writerRig(

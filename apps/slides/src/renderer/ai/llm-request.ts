@@ -1,6 +1,6 @@
 import { writerInput, type WriterCall } from '@genoffice/agent-core'
 import type { AiSettings, AiStreamRequest } from '../../shared/ipc'
-import type { DeckAccess } from './slides-skill'
+import { DEFAULT_DECK_STYLE, type DeckAccess } from './slides-skill'
 
 /**
  * The request behind the panel's own generators (per-page, style skill, planning). They are not
@@ -64,13 +64,17 @@ export function deckOutlineWriter(a: OutlineArgs): WriterCall {
   }
 }
 
-/** previousError: the validation error of the attempt before (the repair round) */
+/**
+ * previousError: the validation error of the attempt before (the repair round). The server
+ * requires a style and a title: a page redone outside generate_deck may have neither, so it gets
+ * the deck's default style and "Slide N" (the BYOK prompt is built from the args unchanged).
+ */
 export function slidePageWriter(a: PageArgs, previousError?: string): WriterCall {
   return {
     kind: 'slides.page',
     input: writerInput({
-      style: a.style.slice(0, 8000),
-      title: a.title.slice(0, 300),
+      style: (a.style.trim() || DEFAULT_DECK_STYLE).slice(0, 8000),
+      title: (a.title.trim() || `Slide ${a.pageIndex}`).slice(0, 300),
       brief: a.brief.slice(0, 4000),
       page_index: a.pageIndex,
       total_pages: a.totalPages,
@@ -84,4 +88,16 @@ export function slidePageWriter(a: PageArgs, previousError?: string): WriterCall
       previous_error: previousError?.slice(0, 1000),
     }),
   }
+}
+
+/** UniWork AI refusals the same request cannot get past: a generator does not send it again */
+const FINAL_WRITER_REFUSALS: ReadonlySet<string> = new Set([
+  'run_limit_reached',
+  'invalid_request',
+  'payload_too_large',
+  'unsupported',
+])
+
+export function writerRefusalIsFinal(uniworkCode: string | undefined): boolean {
+  return uniworkCode !== undefined && FINAL_WRITER_REFUSALS.has(uniworkCode)
 }

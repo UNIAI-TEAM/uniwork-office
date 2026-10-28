@@ -4,13 +4,20 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { RenderSlide } from '@genoffice/pptx-render'
 import {
   deckOutlineWriter,
   deckStyleWriter,
   oneShotStreamRequest,
   slidePageWriter,
+  writerRefusalIsFinal,
 } from '../src/renderer/ai/llm-request'
+import {
+  DEFAULT_DECK_STYLE,
+  createSlidesSkill,
+  type DeckAccess,
+} from '../src/renderer/ai/slides-skill'
 import type { AiSettings } from '../src/shared/ipc'
 
 const settings = { provider: 'uniwork', providers: {} } as unknown as AiSettings
@@ -170,5 +177,76 @@ describe('Slides writer inputs', () => {
     expect((page.layout as string).length).toBe(100)
     expect((page.context as string).length).toBe(4000)
     expect(page.image_urls).toEqual(Array.from({ length: 8 }, (_, i) => `https://img/${i}.png`))
+  })
+
+  it('a page with no style or title still sends both (the server requires them)', () => {
+    const page = slidePageWriter({
+      pageIndex: 3,
+      totalPages: 4,
+      coreHook: '',
+      style: '  ',
+      title: '',
+      brief: 'KPIs',
+      layout: '',
+      images: [],
+      canvasW: 1280,
+      canvasH: 720,
+    })
+    expect(page.input).toEqual({
+      style: DEFAULT_DECK_STYLE,
+      title: 'Slide 3',
+      brief: 'KPIs',
+      page_index: 3,
+      total_pages: 4,
+    })
+  })
+
+  it('regenerate_slide with no generate_deck before it and no title writes a full slides.page input', async () => {
+    const pageSlide = { widthPx: 1280, heightPx: 720, nodes: [] } as unknown as RenderSlide
+    const generatePageLocal = vi.fn(async () => ({ ok: true, marker: 'localpptx:P1' }))
+    const access = {
+      getSlides: () => [pageSlide, pageSlide],
+      getCurrent: () => 0,
+      getSelectedIds: () => [],
+      applySlide: () => {},
+      applyDeck: () => {},
+      fitWidthPx: 1280,
+      isCloudPageGenEnabled: async () => false,
+      regenerateSlide: vi.fn(async () => ({ ok: true })),
+      generatePageLocal,
+      retryBackoffMs: 0,
+    } as unknown as DeckAccess
+    const r = await createSlidesSkill(access).executeTool!({
+      id: 't',
+      name: 'regenerate_slide',
+      input: { slideIndex: 1, brief: 'Three cards' },
+    })
+    expect(r.isError).toBeUndefined()
+    // the panel builds the UniWork AI writer from exactly these arguments
+    const args = (
+      generatePageLocal.mock.calls[0] as unknown as [Parameters<typeof slidePageWriter>[0]]
+    )[0]
+    const input = slidePageWriter(args).input
+    expect(input.style).toBe(DEFAULT_DECK_STYLE)
+    expect(input.title).toBe('Slide 2')
+    expect(input).toMatchObject({ brief: 'Three cards', page_index: 2, total_pages: 2 })
+  })
+})
+
+describe('writerRefusalIsFinal', () => {
+  it('a refusal the same request cannot get past ends the retries', () => {
+    for (const code of ['run_limit_reached', 'invalid_request', 'payload_too_large', 'unsupported'])
+      expect(writerRefusalIsFinal(code)).toBe(true)
+    for (const code of [undefined, 'ai_provider_error', 'ai_provider_timeout', 'disconnected'])
+      expect(writerRefusalIsFinal(code)).toBe(false)
+  })
+
+  it('the panel generators stop on it and never feed it back as the repair note', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/ai/AiPanel.tsx'),
+      'utf8',
+    )
+    // the page repair loop and the outline loop
+    expect(source.match(/writerRefusalIsFinal\(r\.uniworkCode\)/g)).toHaveLength(2)
   })
 })

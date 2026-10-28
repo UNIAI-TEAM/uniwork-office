@@ -85,6 +85,7 @@ import {
   deckStyleWriter,
   oneShotStreamRequest,
   slidePageWriter,
+  writerRefusalIsFinal,
 } from './llm-request'
 import { renderSlidesToPngBase64 } from '../export-render'
 import {
@@ -932,6 +933,8 @@ export function AiPanel({
       text?: string
       error?: string
       errKind?: 'timeout' | 'empty' | 'stopped'
+      /** a UniWork AI failure: the server's code (writerRefusalIsFinal ends the retries) */
+      uniworkCode?: string
     }
     // the chat loop's transport: under UniWork AI a generator runs in the run of its session
     const chatTransport = createElectronTransport(() => settingsRef.current)
@@ -1002,6 +1005,7 @@ export function AiPanel({
               // tags them with this suffix); keep classifying them as empty output
               // so retry ladders fail fast instead of burning billed attempts
               ...(chunk.error?.includes('(empty stream)') ? { errKind: 'empty' as const } : {}),
+              ...(chunk.uniworkCode ? { uniworkCode: chunk.uniworkCode } : {}),
             })
         })
         signal?.addEventListener('abort', onAbort, { once: true })
@@ -1242,6 +1246,8 @@ export function AiPanel({
           const r = await runLlmOnce(sys, msg, 120000, true, args.signal, 16384, writer)
           if (!r.ok || !r.text) {
             lastErr = r.error ?? tGlobal('aiErrEmptyOutput')
+            // a refusal the same request cannot get past is not a repair note: stop here
+            if (writerRefusalIsFinal(r.uniworkCode)) break
             continue
           }
           try {
@@ -1376,8 +1382,10 @@ export function AiPanel({
           const r = await runLlmOnce(sys, userMsg, undefined, true, a.signal, undefined, writer)
           if (!r.ok || !r.text) {
             lastErr = r.error ?? tGlobal('aiErrEmptyOutput')
-            // Empty output/timeout doesn't burn another attempt; request-level errors may retry
+            // Empty output/timeout doesn't burn another attempt; request-level errors may retry,
+            // except a UniWork AI refusal the same request cannot get past
             if (r.errKind === 'timeout' || r.errKind === 'empty' || r.errKind === 'stopped') break
+            if (writerRefusalIsFinal(r.uniworkCode)) break
             continue
           }
           const parsed = parseOutline(r.text)

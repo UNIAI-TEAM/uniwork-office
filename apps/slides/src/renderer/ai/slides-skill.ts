@@ -34,6 +34,9 @@ import { redactGuardFor } from './redact-guard'
 
 /** Upper bound on generate_deck approx_pages; bounds planner round trips and the progress note. */
 export const MAX_APPROX_PAGES = 200
+/** the style a deck is generated in when neither a style template nor a Style Skill gives one */
+export const DEFAULT_DECK_STYLE =
+  'Unified clean modern style: main background #FFFFFF, main text #1A1A2E, primary accent #2563EB, secondary accent #F59E0B, cards #F8FAFC, borders #E2E8F0; sans-serif fonts; titles 40-56px, body 16-20px'
 const MAX_PROGRESS_NOTE_PAGES = 40
 
 /** Per-page progress status */
@@ -2227,9 +2230,7 @@ async function executeTool(
       }
 
       if (!coreHook) coreHook = topic || 'Presentation'
-      if (!styleSkill)
-        styleSkill =
-          'Unified clean modern style: main background #FFFFFF, main text #1A1A2E, primary accent #2563EB, secondary accent #F59E0B, cards #F8FAFC, borders #E2E8F0; sans-serif fonts; titles 40-56px, body 16-20px'
+      if (!styleSkill) styleSkill = DEFAULT_DECK_STYLE
       const total = pages.length
       if (total === 0) return fail(t('aiFailGenDeck'), 'No pages to generate (the plan is empty).')
 

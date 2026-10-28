@@ -72,7 +72,8 @@ export async function runUniworkWriter(
       uniworkCode: failure.code,
       ...(failure.retryAfterSec !== undefined ? { retryAfterSec: failure.retryAfterSec } : {}),
     })
-  const ids = (deps.conversations ?? uniworkConversations).ids(request.sessionId)
+  const conversations = deps.conversations ?? uniworkConversations
+  const ids = conversations.ids(request.sessionId)
   // a writer belongs to the run of the turn that called it; without one nothing is sent
   if (!ids.runId) {
     fail({ code: 'unsupported' })
@@ -115,9 +116,14 @@ export async function runUniworkWriter(
       {
         // a terminal frame ends the read: the write stops where it is, as a failure
         onExtension: (ext) => {
-          const code = (ext as { terminal?: { code?: unknown } } | null)?.terminal?.code
-          // the server's code is passed on as it came (ai_cancelled is not in the chat union)
-          if (typeof code === 'string') throw new UniworkError(code as UniworkError['code'])
+          const terminal = (ext as { terminal?: unknown } | null)?.terminal
+          if (!terminal || typeof terminal !== 'object') return
+          // the server's code is passed on as it came (ai_cancelled is not in the chat union);
+          // a terminal without a readable one still ends the write as a failure
+          const code = (terminal as { code?: unknown }).code
+          throw new UniworkError(
+            (typeof code === 'string' && code ? code : 'ai_provider_error') as UniworkError['code'],
+          )
         },
         creditsNotice: false,
       },
@@ -133,6 +139,9 @@ export async function runUniworkWriter(
       return
     }
     // a malformed answer is a provider error, never an empty success
-    fail(uniworkFailureOf(err) ?? { code: 'ai_provider_error' })
+    const failure = uniworkFailureOf(err) ?? { code: 'ai_provider_error' }
+    // a lost session may come back as another account: nothing of this one is sent again
+    if (failure.code === 'session_expired') conversations.clear()
+    fail(failure)
   }
 }
