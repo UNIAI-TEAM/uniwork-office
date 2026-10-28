@@ -1242,6 +1242,12 @@ function formatSummary(
         : context.hiddenMode === 'skip'
           ? ' (skipped — visible rows only)'
           : ' (included — pass skipHiddenRows=true for visible rows only)'),
+    ...(result.withheld > 0
+      ? [
+          `- withheld: ${result.withheld.toLocaleString('en-US')} cell(s) hidden from the model; ` +
+            'every statistic below covers the remaining cells only',
+        ]
+      : []),
   ]
   if (result.totalRows.length > 0) {
     const listed = result.totalRows.slice(0, MAX_TOTAL_ROWS_LISTED)

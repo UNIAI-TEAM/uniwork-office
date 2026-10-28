@@ -57,6 +57,8 @@ export interface SummarizeRow {
   readonly cached?: readonly boolean[] | undefined
   /** formula text per column, when known (total-row detection) */
   readonly formulas?: readonly (string | undefined)[] | undefined
+  /** per column: the cell is withheld from the model */
+  readonly withheld?: readonly boolean[] | undefined
 }
 
 export interface SkipBucket {
@@ -82,6 +84,8 @@ export interface SummarizeResult {
   /** hidden/filtered data rows, included or skipped per spec */
   hiddenRows: number
   valuesUsed: number
+  /** value-column cells in matched rows that the reader withheld from the model */
+  withheld: number
   readonly skipped: {
     readonly blank: SkipBucket
     readonly text: SkipBucket
@@ -209,6 +213,7 @@ export function summarizeRows(rows: readonly SummarizeRow[], spec: SummarizeSpec
     rowsMatched: 0,
     hiddenRows: 0,
     valuesUsed: 0,
+    withheld: 0,
     skipped: { blank: bucket(), text: bucket(), error: bucket(), boolean: bucket() },
     criteriaNotComparable: 0,
     cachedFormulaCells: 0,
@@ -262,6 +267,11 @@ export function summarizeRows(rows: readonly SummarizeRow[], spec: SummarizeSpec
       group.rows += 1
     }
     if (spec.fn === 'count' || spec.valueColumn === undefined) continue
+    const valColIdx = spec.valueColumn - spec.startColumn
+    if (row.withheld?.[valColIdx]) {
+      result.withheld += 1
+      continue
+    }
     const value = at(row, spec.valueColumn)
     const skip = (target: SkipBucket): void => {
       target.count += 1
