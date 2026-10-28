@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { useI18n } from '../i18n/locale'
 import { layoutGraph, type LayoutPoint } from './graph-layout'
+import { readGraphColors, type GraphColors } from './graph-colors'
 import type { WikiGraph } from '../../shared/ipc'
 
 /** node radius, in world px */
@@ -72,17 +73,9 @@ export function GraphView({
   }, [])
 
   /** theme colors, read off the canvas's own computed style at draw time */
-  const colors = useCallback((): { text: string; dim: string; accent: string; line: string } => {
+  const colors = useCallback((): GraphColors => {
     const el = canvasRef.current
-    const style = el ? getComputedStyle(el) : null
-    const pick = (name: string, fallback: string): string =>
-      style?.getPropertyValue(name).trim() || fallback
-    return {
-      text: pick('--text', '#333333'),
-      dim: pick('--text-tertiary', '#999999'),
-      accent: pick('--accent', '#4a7d00'),
-      line: pick('--border-strong', '#cccccc'),
-    }
+    return readGraphColors(el ? getComputedStyle(el) : null)
   }, [])
 
   useEffect(() => {
