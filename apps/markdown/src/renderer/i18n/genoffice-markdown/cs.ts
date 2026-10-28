@@ -18,4 +18,9 @@ export const cs = {
   statusWords: '{n} slov',
   statusChars: '{n} znaků',
   highlight: 'Zvýraznit',
+  diskChangedMsg: 'Tento soubor změnil jiný program.',
+  diskConflictMsg: 'Tento soubor se na disku změnil; uložení tyto změny přepíše.',
+  diskReload: 'Znovu načíst',
+  diskKeepMine: 'Ponechat moje',
+  diskOverwrite: 'Přesto přepsat',
 } satisfies Record<keyof typeof zh, string>

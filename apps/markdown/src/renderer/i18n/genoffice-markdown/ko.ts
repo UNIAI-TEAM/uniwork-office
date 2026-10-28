@@ -18,4 +18,9 @@ export const ko = {
   statusWords: '{n}단어',
   statusChars: '{n}자',
   highlight: '형광펜',
+  diskChangedMsg: '이 파일이 다른 프로그램에서 변경되었습니다.',
+  diskConflictMsg: '이 파일이 디스크에서 변경되었습니다. 저장하면 해당 변경 사항을 덮어씁니다.',
+  diskReload: '다시 불러오기',
+  diskKeepMine: '내 내용 유지',
+  diskOverwrite: '그래도 덮어쓰기',
 } satisfies Record<keyof typeof zh, string>

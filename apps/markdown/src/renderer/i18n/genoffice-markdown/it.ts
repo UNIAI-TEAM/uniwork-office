@@ -18,4 +18,10 @@ export const it = {
   statusWords: '{n} parole',
   statusChars: '{n} caratteri',
   highlight: 'Evidenzia',
+  diskChangedMsg: 'Questo file è stato modificato da un altro programma.',
+  diskConflictMsg:
+    'Questo file è cambiato su disco; il salvataggio sovrascriverà quelle modifiche.',
+  diskReload: 'Ricarica',
+  diskKeepMine: 'Mantieni il mio',
+  diskOverwrite: 'Sovrascrivi comunque',
 } satisfies Record<keyof typeof zh, string>

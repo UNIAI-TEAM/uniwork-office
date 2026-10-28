@@ -18,4 +18,9 @@ export const ar = {
   statusWords: '{n} كلمة',
   statusChars: '{n} حرفًا',
   highlight: 'تظليل',
+  diskChangedMsg: 'تم تغيير هذا الملف بواسطة برنامج آخر.',
+  diskConflictMsg: 'تغيّر هذا الملف على القرص؛ سيؤدي الحفظ إلى استبدال تلك التغييرات.',
+  diskReload: 'إعادة التحميل',
+  diskKeepMine: 'الاحتفاظ بنسختي',
+  diskOverwrite: 'الاستبدال على أي حال',
 } satisfies Record<keyof typeof zh, string>

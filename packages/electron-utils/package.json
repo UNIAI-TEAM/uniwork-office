@@ -16,6 +16,7 @@
     "./comments-reply": "./src/comments-reply.ts",
     "./discussion-bridge": "./src/discussion-bridge.ts",
     "./atomic-write": "./src/atomic-write.ts",
+    "./disk-watch": "./src/disk-watch.ts",
     "./draft-preview": "./src/draft-preview.ts",
     "./drop-open": "./src/drop-open.ts",
     "./generated-images": "./src/generated-images.ts",

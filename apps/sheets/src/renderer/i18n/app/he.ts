@@ -98,8 +98,10 @@ export const he = {
   appChartNoRepoint: 'תרשים זה אינו תומך בהגדרה מחדש של טווחי הנתונים שלו.',
   appKeepOneSeries: 'השאר לפחות סדרה אחת.',
   appNoCategoriesToSwitch: 'אין קטגוריות להחלפה.',
-  appComboNoSelectData: 'שינוי מקור הנתונים של תרשים משולב אינו נתמך עדיין.',
+  appSelectDataUnsupported: 'שינוי מקור הנתונים של סוג תרשים זה אינו נתמך.',
   appSeriesName: 'שם סדרה',
+  appSeriesType: 'סוג הסדרה',
+  appSecondaryAxis: 'ציר משני',
   appValuesRange: 'טווח ערכים',
   appCategoriesRange: 'טווח קטגוריות',
   appKeepUnchanged: 'השאר ללא שינוי',
@@ -294,7 +296,6 @@ export const he = {
   appDialogCancel: 'ביטול',
   appPivotSheetNoMove: 'גיליון זה מכיל טבלת ציר — הזזת טווחים אינה נתמכת עדיין.',
   appMergeOverTable: 'הבחירה חופפת לטבלת Excel — מיזוג תאים בתוך טבלה עדיין אינו נתמך.',
-  appTableFilterNoEdit: 'המסנן של גיליון זה שייך לטבלת Excel — לא ניתן עדיין לשמור את העריכה.',
   appAutofillStreaming: 'מילוי אוטומטי לאזור שעדיין נטען בהזרמה אינו מותר עדיין.',
   appDvNeedsIndexed:
     'עריכת אימות נתונים דורשת שגיליון זה יסיים תחילה את יצירת האינדקס — נסה שוב בעוד רגע.',
@@ -517,8 +518,6 @@ export const he = {
   appSaved: 'נשמר.',
   appSaveFailed: 'לא ניתן לשמור את חוברת העבודה.',
   appCfRuleUnsaveable: 'לא ניתן לשמור כלל עיצוב מותנה זה בקובץ xlsx — השתמשו בסוג כלל אחר.',
-  appSaveErrX14Dv:
-    'בגיליון זה יש אימות נתונים מורחב (x14); עריכת כללי האימות שלו עדיין אינה נתמכת.',
   appSaveErrMultiSelectList:
     'לא ניתן לשמור אימות רשימה מרובת בחירה בקובץ xlsx — מחקו את הכלל לפני השמירה.',
   appSaveErrX14Cf: 'בטווח זה יש עיצוב מותנה מורחב (x14) ולא ניתן לשנותו בשלב זה.',

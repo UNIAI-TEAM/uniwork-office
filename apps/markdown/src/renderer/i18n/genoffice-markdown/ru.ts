@@ -18,4 +18,9 @@ export const ru = {
   statusWords: '{n} слов',
   statusChars: '{n} символов',
   highlight: 'Выделить',
+  diskChangedMsg: 'Этот файл изменён другой программой.',
+  diskConflictMsg: 'Этот файл изменён на диске; сохранение перезапишет эти изменения.',
+  diskReload: 'Перезагрузить',
+  diskKeepMine: 'Оставить моё',
+  diskOverwrite: 'Всё равно перезаписать',
 } satisfies Record<keyof typeof zh, string>
