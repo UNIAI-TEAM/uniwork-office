@@ -1586,4 +1586,5 @@ export const it = {
     "Il motore della cartella di lavoro si è arrestato in modo imprevisto ed è stato riavviato. La cartella è stata riaperta dall'ultima versione salvata; le modifiche non salvate sono conservate, salva presto.",
   appWebSavedReopenFailed:
     "Le modifiche sono state salvate in UniWork, ma non è stato possibile riaprire qui la cartella di lavoro. Ricarica l'editor per continuare.",
+  appDataTable: 'Tabella dati',
 } satisfies Record<keyof typeof zh, string>

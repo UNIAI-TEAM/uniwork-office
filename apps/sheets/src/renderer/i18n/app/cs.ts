@@ -1543,4 +1543,5 @@ export const cs = {
     'Modul sešitu se neočekávaně zastavil a byl restartován. Sešit byl znovu otevřen z poslední uložené verze; neuložené změny zůstaly zachovány, brzy je uložte.',
   appWebSavedReopenFailed:
     'Vaše změny byly uloženy do UniWork, ale sešit se zde nepodařilo znovu otevřít. Chcete-li pokračovat, načtěte editor znovu.',
+  appDataTable: 'Datová tabulka',
 } satisfies Record<keyof typeof zh, string>
