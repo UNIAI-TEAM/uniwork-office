@@ -1858,7 +1858,7 @@ describe('real repo', () => {
   })
 
   it('resolves the recursive mind-map schema at the pin (G6-09d, REPIN-1, RBD9-6)', () => {
-    const EXPECTED_HASH = 'ad838ec1782297153a2f798b110c62ef30e050ee6656615f7d4ff6a7f9c925e0'
+    const EXPECTED_HASH = '429247ed06edd88672907f9990f1a01dbfa0ca17691d13c8019be461fdf06cb5'
     const expectedNode = (depth) => ({
       type: 'object',
       properties: {
@@ -1882,6 +1882,16 @@ describe('real repo', () => {
             : {
                 type: 'array',
                 description: 'sub-topics; 2-5 per node reads best',
+                items: {
+                  type: 'object',
+                  properties: {
+                    label: {
+                      type: 'string',
+                      description: "short node label (2-8 words) in the document's language",
+                    },
+                  },
+                  required: ['label'],
+                },
               },
       },
       required: ['label'],
@@ -1941,21 +1951,22 @@ describe('real repo', () => {
       // explicit structural pins for focus, descriptions, block, and leaf shape across all 6 levels
       assert.deepEqual(tool.function.parameters.properties.focus, EXPECTED_SCHEMA.properties.focus)
       let node = tool.function.parameters.properties.root
-      let levels = 0
-      let leaf = null
-      while (node) {
+      for (let level = 0; level < 6; level += 1) {
         assert.deepEqual(Object.keys(node.properties).sort(), ['block', 'children', 'label'])
         assert.deepEqual(node.properties.label, EXPECTED_SCHEMA.properties.root.properties.label)
         assert.deepEqual(node.properties.block, EXPECTED_SCHEMA.properties.root.properties.block)
         assert.deepEqual(node.required, ['label'])
-        leaf = node
-        levels += 1
         node = node.properties.children.items
       }
-      assert.equal(levels, 6)
-      assert.deepEqual(leaf.properties.children, {
-        type: 'array',
-        description: 'sub-topics; 2-5 per node reads best',
+      assert.deepEqual(node, {
+        type: 'object',
+        properties: {
+          label: {
+            type: 'string',
+            description: "short node label (2-8 words) in the document's language",
+          },
+        },
+        required: ['label'],
       })
       assert.deepEqual(tool.function.parameters.required, ['root'])
     }
@@ -2350,6 +2361,11 @@ const recursiveMindMap = (maxDepth) =>
     '        : {',
     "            type: 'array',",
     "            description: 'sub-topics',",
+    '            items: {',
+    "              type: 'object',",
+    "              properties: { label: { type: 'string' } },",
+    "              required: ['label'],",
+    '            },',
     '          },',
     '  },',
     "  required: ['label'],",
@@ -2400,7 +2416,15 @@ const RECURSIVE_DOCS_PARAMS = {
                   type: 'object',
                   properties: {
                     label: { type: 'string' },
-                    children: { type: 'array', description: 'sub-topics' },
+                    children: {
+                      type: 'array',
+                      description: 'sub-topics',
+                      items: {
+                        type: 'object',
+                        properties: { label: { type: 'string' } },
+                        required: ['label'],
+                      },
+                    },
                   },
                   required: ['label'],
                 },
@@ -2416,7 +2440,7 @@ const RECURSIVE_DOCS_PARAMS = {
   required: ['root'],
 }
 
-/** hand-expanded `nodeSchema(1)`: the root plus one nested level, no `items` at the bottom */
+/** hand-expanded `nodeSchema(1)`: the root plus one nested level, leaf `items` at the bottom */
 const RECURSIVE_MARKDOWN_PARAMS = {
   type: 'object',
   properties: {
@@ -2433,7 +2457,15 @@ const RECURSIVE_MARKDOWN_PARAMS = {
             type: 'object',
             properties: {
               label: { type: 'string' },
-              children: { type: 'array', description: 'sub-topics' },
+              children: {
+                type: 'array',
+                description: 'sub-topics',
+                items: {
+                  type: 'object',
+                  properties: { label: { type: 'string' } },
+                  required: ['label'],
+                },
+              },
             },
             required: ['label'],
           },
