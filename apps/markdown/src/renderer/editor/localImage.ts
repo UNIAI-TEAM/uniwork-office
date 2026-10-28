@@ -79,6 +79,17 @@ export function refreshWebPictures(root: ParentNode): void {
   }
 }
 
+// The md-asset URL path is percent-encoded by resolveImageSrc; a file name that holds a literal `%`
+// (`100%.png`, hand-written into a src) is not valid percent-encoding and makes decodeURIComponent
+// throw, so fall back to the raw text.
+function decodePath(path: string): string {
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
+}
+
 /**
  * Reverse of {@link resolveImageSrc}: map a display URL (md-asset://) back to
  * the authored path so DOM-parsed content (copy/paste inside the editor) never
@@ -88,7 +99,10 @@ export function unresolveImageSrc(src: string, baseDir: string | null = imageBas
   const authored = window.markdownApi?.unresolveAssetUrl?.(src)
   if (authored) return authored
   if (!src.startsWith('md-asset://')) return src
-  let path = decodeURIComponent(src.slice('md-asset://'.length))
+  // Reuse the guarded decoder: a lone `%` (e.g. in a file named `100%.png`)
+  // throws a URIError from decodeURIComponent, and parseHTML calls this for
+  // every md-asset img, so the throw would break paste/document load.
+  let path = decodePath(src.slice('md-asset://'.length))
   // Windows drive paths were prefixed with '/' to form a valid URL path
   if (/^\/[a-zA-Z]:\//.test(path)) path = path.slice(1)
   if (baseDir) {
