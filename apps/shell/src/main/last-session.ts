@@ -170,6 +170,7 @@ export function createSessionSnapshotRecorder(
     },
     onShellCreated() {
       closedShellPaths = []
+      quitInProgress = false
     },
     onQuitVetoed() {
       quitInProgress = false

@@ -492,6 +492,7 @@ import {
   isDetachedWebContents,
   isTearingOff,
   setDetachedChangedListener,
+  setDetachedQuitVetoedListener,
   setDockHost,
   takeTornTab,
 } from './detached-windows'
@@ -4180,10 +4181,7 @@ function createShellWindow(): void {
   // all-clean close is left untouched, so ⌘Q keeps quitting the app.
   installShellCloseGuard(win, manager, {
     inFlight: () => appQuitInFlight,
-    clear: () => {
-      appQuitInFlight = false
-      sessionSnapshot.onQuitVetoed()
-    },
+    clear: clearQuitInFlight,
     resume: () => app.quit(),
   })
 
@@ -7777,7 +7775,11 @@ app.on('window-all-closed', () => {
 
 /** set by before-quit, cleared when a close prompt vetoes the quit: lets the shell close guard resume a quit its async prompt path cancelled */
 let appQuitInFlight = false
-
+function clearQuitInFlight(): void {
+  appQuitInFlight = false
+  sessionSnapshot.onQuitVetoed()
+}
+setDetachedQuitVetoedListener(clearQuitInFlight)
 app.on('before-quit', () => {
   appQuitInFlight = true
   sessionSnapshot.onBeforeQuit(tabManager ? tabManager.openFilePaths() : null, detachedFilePaths())
