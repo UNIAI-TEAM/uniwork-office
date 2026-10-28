@@ -76,7 +76,6 @@ import { consumePendingUndoCarry, undoStackDepth } from './undo-carry'
 import { createSaveGate, recoveryCopyBacksSession, shouldRunSaveTick } from './save-scheduler'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  aiPresetAutoRuns,
   aiUniworkText,
   isUniworkRefusalErrorKey,
   useAutoSavePref,
@@ -631,6 +630,8 @@ export function App({
     autoRun?: boolean
     /** the bubble's words when they differ from what is sent (`text`) */
     displayText?: string
+    /** a web host's job (`ai.start`): it runs only while the panel is on UniWork AI */
+    uniworkOnly?: boolean
   } | null>(null)
   const [preview, setPreview] = useState<ChangePlan | null>(null)
   const [_revision, setRevision] = useState(0)
@@ -2092,16 +2093,13 @@ export function App({
       preset: { text: string; autoRun?: boolean; displayText?: string } | null,
     ): void => {
       if (!preset?.text) return
-      void aiPresetAutoRuns(preset, platform() === 'web', () =>
-        window.desktopApi.getAiSettings(),
-      ).then((autoRun) =>
-        setAiPreset({
-          text: preset.text,
-          nonce: Date.now(),
-          autoRun,
-          ...(preset.displayText ? { displayText: preset.displayText } : {}),
-        }),
-      )
+      setAiPreset({
+        text: preset.text,
+        nonce: Date.now(),
+        autoRun: preset.autoRun !== false,
+        ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        ...(platform() === 'web' ? { uniworkOnly: true } : {}),
+      })
     }
     void window.desktopApi?.consumeAiPreset?.().then(takeAiPreset)
     const offAiPreset = window.desktopApi?.onAiPreset?.(takeAiPreset)
@@ -3601,13 +3599,19 @@ export function App({
   ): boolean {
     const instruction = (overrideInstruction ?? prompt).trim()
     if (needModelHint !== null || !instruction || aiBusy) return false
+    // nothing can run before the AI settings are read (the regex planner would answer a question
+    // meant for the model), nor while the loop is busy or a run is still starting: the caller keeps
+    // the text (a preset waits in the composer)
+    if (!aiSettingsRef.current) return false
+    const agentConfigured = isAgentConfigured()
+    const loop = agentLoopRef.current
+    if (agentConfigured && (!loop || loop.busy || runStartingRef.current)) return false
     runToolsRef.current = []
     runUsageRef.current = undefined
     // The message consumes the composer attachments: they ride along (echoed on the
     // bubble, images multimodal, files via the files skill) and the composer clears.
     // Retry passes the failed message's original set instead.
     const sentAtts = overrideAttachments ?? attachmentsRef.current
-    const agentConfigured = isAgentConfigured()
     // Retry re-sends in place: drop the failed bubble and its error reply instead
     // of stacking a "Not sent" duplicate above the resent copy.
     const alreadyPersisted = retryIndex !== undefined && chat[retryIndex]?.persisted === true

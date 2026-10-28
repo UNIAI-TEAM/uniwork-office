@@ -8,7 +8,7 @@ import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { setUniworkAiAvailable } from '@genoffice/ai-provider'
-import { clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
+import { aiUniworkText, clearUniworkAcks, setAiModelNeedHint } from '@genoffice/ui'
 import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AI_PROVIDERS, type AiPresetPayload, type AiSettings } from '../src/shared/ipc'
@@ -63,6 +63,18 @@ function stubDesktop(members: Record<string, unknown>): void {
       return target[prop]
     },
   })
+}
+
+/** the UniWork AI disclosure's acknowledge button, by role and name (no LocaleProvider: zh) */
+function ackButton(within: HTMLElement): HTMLButtonElement {
+  const region = [...within.querySelectorAll<HTMLElement>('[role="region"]')].find(
+    (r) => r.getAttribute('aria-label') === aiUniworkText('zh', 'aiUniworkDisclosureLabel'),
+  )
+  const button = [...(region?.querySelectorAll('button') ?? [])].find(
+    (b) => b.textContent === aiUniworkText('zh', 'aiUniworkAck'),
+  )
+  if (!button) throw new Error('no UniWork AI disclosure to acknowledge')
+  return button
 }
 
 let root: Root | null = null
@@ -141,15 +153,67 @@ describe('docs AI panel: a preset that cannot run waits in the composer', () => 
     expect(box.value).toBe(JOB.replace(/\r\n/g, '\n'))
 
     // the person acknowledges the disclosure and sends the kept text
-    act(() => {
-      container!.querySelector<HTMLButtonElement>('[role="region"] button')!.click()
-    })
+    act(() => ackButton(container!).click())
     await settle(2)
     act(() => {
       box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     })
     await settle(2)
     expect(harness.runs).toEqual([JOB.trim()])
+  })
+
+  it('a host job runs only while the panel is on UniWork AI when it would run; held, it waits in the focused composer', async () => {
+    setUniworkAiAvailable(true)
+    const settings = settingsFor('uniwork')
+    // the provider the panel reads right before the job would run
+    let live = settingsFor('anthropic')
+    stubDesktop({
+      capabilities: { platform: 'desktop' },
+      getAiSettings: vi.fn(async () => live),
+      aiGskStatus: vi.fn(async () => ({ loggedIn: false })),
+    })
+    editor = new Editor({ element: document.createElement('div'), extensions: editorExtensions })
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    const render = (preset: Record<string, unknown> | null) =>
+      act(() =>
+        root!.render(
+          createElement(AiPanel, {
+            editor: editor!,
+            blocks: [],
+            settings,
+            open: true,
+            ...(preset ? { preset } : {}),
+          } as never),
+        ),
+      )
+    const box = () => container!.querySelector<HTMLTextAreaElement>('textarea.ai-input')!
+    render(null)
+    await settle(2)
+    act(() => ackButton(container!).click())
+    await settle(2)
+
+    // the person switched to another provider after the job arrived: nothing goes to it
+    render({ text: JOB, nonce: 1, autoRun: true, uniworkOnly: true })
+    await settle(2)
+    expect(harness.runs).toEqual([])
+    expect(box().value).toBe(JOB.replace(/\r\n/g, '\n'))
+    expect(document.activeElement).toBe(box())
+
+    // back on UniWork AI, the job runs
+    live = settingsFor('uniwork')
+    render({ text: JOB, nonce: 2, autoRun: true, uniworkOnly: true })
+    await settle(2)
+    expect(harness.runs).toEqual([JOB])
+
+    // an auto-run preset refused while that run is going waits in the composer, which takes focus
+    act(() => box().blur())
+    render({ text: 'Summarise it', nonce: 3, autoRun: true })
+    await settle(2)
+    expect(harness.runs).toEqual([JOB])
+    expect(box().value).toBe('Summarise it')
+    expect(document.activeElement).toBe(box())
   })
 })
 
@@ -190,7 +254,7 @@ describe('docs AI panel: one question per preset', () => {
 })
 
 describe('docs app: a preset that arrives before the document has loaded', () => {
-  async function mountApp(consumed: AiPresetPayload | null) {
+  async function mountApp(consumed: AiPresetPayload | null, web = false) {
     setModuleLang('en')
     window.requestAnimationFrame ??= (cb: FrameRequestCallback) =>
       window.setTimeout(() => cb(performance.now()), 0)
@@ -228,6 +292,7 @@ describe('docs app: a preset that arrives before the document has loaded', () =>
     let listener: ((preset: AiPresetPayload) => void) | null = null
     const settings = settingsFor('anthropic')
     ;(window as unknown as { desktop?: unknown }).desktop = {
+      ...(web ? { capabilities: { platform: 'web' } } : {}),
       consumePendingOpenDocx: () => opened,
       consumeNewBlankDoc: () => Promise.resolve(false),
       consumeAiDocContent: () => Promise.resolve(null),
@@ -298,6 +363,7 @@ describe('docs app: a preset that arrives before the document has loaded', () =>
       zoteroCommand: () => Promise.resolve(null),
       uniworkState: () => Promise.resolve(null),
     }
+    resetCapabilitiesForTest()
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -321,6 +387,19 @@ describe('docs app: a preset that arrives before the document has loaded', () =>
     expect(harness.runs).toEqual([JOB])
     // the bubble shows the display words, the loop got the text
     expect(document.querySelector('.ai-msg-user')?.textContent).toContain('Draft the plan')
+  })
+
+  it('in a web frame a job on another provider than UniWork AI waits in the composer, not sent', async () => {
+    const app = await mountApp(null, true)
+    app.fire({ text: JOB, autoRun: true })
+    app.open()
+    for (let i = 0; i < 200 && !document.querySelector('textarea.ai-input'); i++) await tick()
+    await settle()
+    expect(harness.runs).toEqual([])
+    expect(document.querySelector('.ai-msg-user')).toBeNull()
+    expect(document.querySelector<HTMLTextAreaElement>('textarea.ai-input')!.value).toBe(
+      JOB.replace(/\r\n/g, '\n'),
+    )
   })
 
   it('a preset buffered before the panel subscribed runs once the document has loaded', async () => {

@@ -87,10 +87,11 @@ describe('slides AI panel: a preset from outside', () => {
     delete (window as { desktop?: unknown }).desktop
   })
 
-  function mount(provider: AiSettings['provider']) {
+  /** `live`: what the bridge answers when the panel reads its provider (default: the panel's) */
+  function mount(provider: AiSettings['provider'], live?: () => AiSettings) {
     const settings = settingsFor(provider)
     ;(window as { slidesApi?: unknown }).slidesApi = {
-      getAiSettings: vi.fn(async () => settings),
+      getAiSettings: vi.fn(async () => (live ? live() : settings)),
       aiGskStatus: vi.fn(async () => ({ loggedIn: false })),
       beginHistoryBatch: vi.fn(async () => false),
       endHistoryBatch: vi.fn(async () => null),
@@ -105,7 +106,13 @@ describe('slides AI panel: a preset from outside', () => {
     root = createRoot(container)
     const seen = { current: null as number | null }
     return (
-      preset: { text: string; nonce: number; autoRun: boolean; displayText?: string } | null,
+      preset: {
+        text: string
+        nonce: number
+        autoRun: boolean
+        displayText?: string
+        uniworkOnly?: boolean
+      } | null,
       key = 1,
     ) =>
       act(() =>
@@ -168,5 +175,37 @@ describe('slides AI panel: a preset from outside', () => {
     await flush()
     await flush()
     expect(harness.runs).toEqual([JOB])
+  })
+
+  it('a host job runs only while the panel is on UniWork AI when it would run; held, it waits in the focused composer', async () => {
+    let live = settingsFor('anthropic')
+    const render = mount('anthropic', () => live)
+    const box = () =>
+      container!.querySelector<HTMLTextAreaElement>('textarea[data-slides-ai-input]')!
+    render(null)
+    await flush()
+    await flush()
+    // the person is on another provider when the job would run: nothing goes to it
+    render({ text: JOB, nonce: 1, autoRun: true, uniworkOnly: true })
+    await flush()
+    await flush()
+    expect(harness.runs).toEqual([])
+    expect(box().value).toBe(JOB)
+    expect(document.activeElement).toBe(box())
+
+    live = settingsFor('uniwork')
+    render({ text: JOB, nonce: 2, autoRun: true, uniworkOnly: true })
+    await flush()
+    await flush()
+    expect(harness.runs).toEqual([JOB])
+
+    // an auto-run preset refused while that run is going waits in the composer, which takes focus
+    act(() => box().blur())
+    render({ text: 'Tidy the deck', nonce: 3, autoRun: true })
+    await flush()
+    await flush()
+    expect(harness.runs).toEqual([JOB])
+    expect(box().value).toBe('Tidy the deck')
+    expect(document.activeElement).toBe(box())
   })
 })

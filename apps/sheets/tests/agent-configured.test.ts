@@ -29,4 +29,12 @@ describe('agentConfigured', () => {
   it('is ready in the web frame, whose keys stay in UniWork, once a model is set', () => {
     expect(agentConfigured(anthropicSlot(), true)).toBe(true)
   })
+
+  it('is ready on UniWork AI, which has no key and no model choice here (UNI-2264)', () => {
+    const s = defaultAiSettings()
+    s.provider = 'uniwork'
+    s.providers.uniwork = { apiKey: '…', model: '' }
+    expect(agentConfigured(s, false)).toBe(true)
+    expect(agentConfigured(s, true)).toBe(true)
+  })
 })

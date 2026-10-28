@@ -149,7 +149,6 @@ import type { CharStyle } from './color-runs'
 import {
   Dropdown,
   aiPanelInitiallyOpen,
-  aiPresetAutoRuns,
   rememberAiPanelOpen,
   useDismissablePopover,
   useRibbonCollapse,
@@ -453,6 +452,8 @@ export default function App() {
     nonce: number
     autoRun?: boolean
     displayText?: string
+    /** a web host's job (`ai.start`): it runs only while the panel is on UniWork AI */
+    uniworkOnly?: boolean
   } | null>(null)
   const [ribbonTab, setRibbonTab] = useState<RibbonTab>('home')
   const [spread, setSpread] = useState<1 | 2>(1)
@@ -1479,14 +1480,12 @@ export default function App() {
       const preset = await window.pdfApi.consumeAiPreset()
       if (preset?.text) {
         setAiCollapsed(false)
-        const autoRun = await aiPresetAutoRuns(preset, platform() === 'web', () =>
-          window.pdfApi.getAiSettings(),
-        )
         setAiPreset({
           text: preset.text,
           nonce: Date.now(),
-          autoRun,
+          autoRun: preset.autoRun !== false,
           ...(preset.displayText ? { displayText: preset.displayText } : {}),
+          ...(platform() === 'web' ? { uniworkOnly: true } : {}),
         })
       }
     })()
@@ -1500,15 +1499,13 @@ export default function App() {
     return window.pdfApi.onAiPreset?.((preset) => {
       if (!preset?.text) return
       aiDockRef.current.open()
-      void aiPresetAutoRuns(preset, platform() === 'web', () => window.pdfApi.getAiSettings()).then(
-        (autoRun) =>
-          setAiPreset({
-            text: preset.text,
-            nonce: Date.now(),
-            autoRun,
-            ...(preset.displayText ? { displayText: preset.displayText } : {}),
-          }),
-      )
+      setAiPreset({
+        text: preset.text,
+        nonce: Date.now(),
+        autoRun: preset.autoRun !== false,
+        ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        ...(platform() === 'web' ? { uniworkOnly: true } : {}),
+      })
     })
   }, [])
 

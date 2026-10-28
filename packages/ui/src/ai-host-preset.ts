@@ -1,16 +1,14 @@
 /**
- * Whether a preset the AI panel received from outside (`consumeAiPreset` / `onAiPreset`) sends at
- * once. On the desktop it is the shell's preset and runs as asked. In a web frame it is the job the
- * host handed over (`ai.start`, UNI-2264): that job runs only on UniWork AI, so on any other
- * provider it waits in the composer for the person to send (or to switch to UniWork AI first).
+ * Whether the AI panel is on UniWork AI right now. Read right before the job a web host handed over
+ * (`ai.start`, UNI-2264) would run, not when it arrived: only UniWork AI runs that job, so on any
+ * other provider (or with no answer) it waits in the composer for the person to send.
  */
-export async function aiPresetAutoRuns(
-  preset: { readonly autoRun?: boolean | undefined },
-  web: boolean,
+export async function aiPanelOnUniwork(
   settings: () => Promise<{ readonly provider?: string } | null | undefined>,
 ): Promise<boolean> {
-  if (preset.autoRun === false) return false
-  if (!web) return true
-  const current = await settings().catch(() => null)
-  return current?.provider === 'uniwork'
+  try {
+    return (await settings())?.provider === 'uniwork'
+  } catch {
+    return false
+  }
 }

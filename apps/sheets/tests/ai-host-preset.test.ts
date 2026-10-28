@@ -146,9 +146,14 @@ describe('ExcelShell: a preset from outside', () => {
     resetForTest()
   })
 
-  function mount() {
+  /** `provider`: what the bridge answers when the shell reads the panel's provider */
+  function mount(provider: () => string = () => 'uniwork') {
     Object.assign(window, {
-      desktopApi: { onLanguageChanged: () => () => undefined, capabilities: { ai: false } },
+      desktopApi: {
+        onLanguageChanged: () => () => undefined,
+        capabilities: { ai: false },
+        getAiSettings: async () => ({ provider: provider(), providers: {} }),
+      },
     })
     resetForTest()
     container = document.createElement('div')
@@ -206,6 +211,19 @@ describe('ExcelShell: a preset from outside', () => {
     await shell.wait(200)
     expect(shell.sends).toHaveLength(1)
     expect(shell.prompts).toEqual([])
+  })
+
+  it('a host job runs only while the panel is on UniWork AI when it would run, else it waits in the composer', async () => {
+    let provider = 'openai'
+    const shell = mount(() => provider)
+    await shell.render({ aiPreset: { text: JOB, nonce: 5, autoRun: true, uniworkOnly: true } })
+    await shell.wait(200)
+    expect(shell.sends).toEqual([])
+    expect(shell.prompts).toEqual([JOB])
+    provider = 'uniwork'
+    await shell.render({ aiPreset: { text: JOB, nonce: 6, autoRun: true, uniworkOnly: true } })
+    await shell.wait(200)
+    expect(shell.sends).toEqual([[JOB, undefined, undefined, undefined]])
   })
 
   it('a preset the send refuses waits in the composer, word for word', async () => {

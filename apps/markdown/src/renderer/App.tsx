@@ -8,7 +8,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ImageViewer,
   aiPanelInitiallyOpen,
-  aiPresetAutoRuns,
   rememberAiPanelOpen,
   useAutoSavePref,
   useImageGenerationOffered,
@@ -296,16 +295,13 @@ export default function App() {
     const take = (preset: { text: string; autoRun?: boolean; displayText?: string } | null) => {
       if (!preset?.text) return
       setAiOpen(true)
-      void aiPresetAutoRuns(preset, platform() === 'web', () =>
-        window.markdownApi.getAiSettings(),
-      ).then((autoRun) =>
-        setAiPreset((prev) => ({
-          text: preset.text,
-          nonce: (prev?.nonce ?? 0) + 1,
-          autoRun,
-          ...(preset.displayText ? { displayText: preset.displayText } : {}),
-        })),
-      )
+      setAiPreset((prev) => ({
+        text: preset.text,
+        nonce: (prev?.nonce ?? 0) + 1,
+        autoRun: preset.autoRun !== false,
+        ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        ...(platform() === 'web' ? { uniworkOnly: true } : {}),
+      }))
     }
     void window.markdownApi.consumeAiPreset?.().then(take)
     return window.markdownApi.onAiPreset?.(take)

@@ -133,7 +133,6 @@ import {
   type AiScopeQuoteData,
   type WordArtPreset,
   aiPanelInitiallyOpen,
-  aiPresetAutoRuns,
   rememberAiPanelOpen,
   UniAiMark,
   useAiSidebarEnabled,
@@ -569,6 +568,8 @@ export function App() {
     displayText?: string
     attachments?: AttachmentMeta[]
     slideShot?: boolean
+    /** a web host's job (`ai.start`): it runs only while the panel is on UniWork AI */
+    uniworkOnly?: boolean
   } | null>(null)
   const aiPresetSeen = useRef<number | null>(null)
   const [_recent, setRecent] = useState<string[]>([])
@@ -1377,15 +1378,13 @@ export function App() {
             localStorage.setItem('ai-slides-show-ai', '1')
             return true
           })
-          const autoRun = await aiPresetAutoRuns(preset, isWeb(), () =>
-            window.slidesApi.getAiSettings(),
-          )
           await new Promise((resolve) => setTimeout(resolve, 120))
           setAiPreset({
             text: preset.text,
             nonce: Date.now(),
-            autoRun,
+            autoRun: preset.autoRun !== false,
             ...(preset.displayText ? { displayText: preset.displayText } : {}),
+            ...(isWeb() ? { uniworkOnly: true } : {}),
           })
         }
       })
@@ -1403,15 +1402,13 @@ export function App() {
         localStorage.setItem('ai-slides-show-ai', '1')
         return true
       })
-      void aiPresetAutoRuns(preset, isWeb(), () => window.slidesApi.getAiSettings()).then(
-        (autoRun) =>
-          setAiPreset({
-            text: preset.text,
-            nonce: Date.now(),
-            autoRun,
-            ...(preset.displayText ? { displayText: preset.displayText } : {}),
-          }),
-      )
+      setAiPreset({
+        text: preset.text,
+        nonce: Date.now(),
+        autoRun: preset.autoRun !== false,
+        ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        ...(isWeb() ? { uniworkOnly: true } : {}),
+      })
     })
     return () => {
       off()

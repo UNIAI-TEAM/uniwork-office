@@ -14,6 +14,7 @@ import {
   isComposerPopupOpen,
   useUniworkDisclosureAck,
   useOverlayDock,
+  aiPanelOnUniwork,
 } from '@genoffice/ui'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
@@ -344,6 +345,8 @@ interface AiPanelProps {
     attachments?: AttachmentMeta[]
     slideShot?: boolean
     scope?: AiScopeQuoteData
+    /** a web host's job: it runs only while the panel is on UniWork AI (read when it would run) */
+    uniworkOnly?: boolean
   } | null
   /** the last preset nonce taken, kept by App so a remounted panel (a new deck key) never runs it again */
   presetSeen?: { current: number | null }
@@ -1677,9 +1680,8 @@ export function AiPanel({
   useEffect(() => {
     if (!preset || presetNonceRef.current === preset.nonce) return
     presetNonceRef.current = preset.nonce
-    // the run lands in the chat: leave Ask UNI so it is the one on screen (a prefilled composer takes
-    // focus once the chat pane is shown again)
-    askUni.leave(preset.autoRun ? undefined : () => inputRef.current?.focus())
+    // the run lands in the chat: leave Ask UNI so it is the one on screen
+    askUni.leave()
     // Attachments from the start screen: merge into attachments first (ref updated synchronously so this runWith can read them),
     // then trigger the run. Deduplicated by path, safe under StrictMode double runs.
     if (preset.attachments && preset.attachments.length > 0) {
@@ -1691,15 +1693,30 @@ export function AiPanel({
       attachmentsRef.current = merged
       setAttachments(merged)
     }
+    // a preset that does not run waits in the composer, word for word; the composer takes focus once
+    // the chat pane shows, unless a refusal moved it to the UniWork AI disclosure (acknowledge first)
+    const toComposer = (refused: boolean) => {
+      setInput(preset.text)
+      if (!(refused && uniworkSendBlockedRef.current)) askUni.leave(() => inputRef.current?.focus())
+    }
     // the text goes out word for word (a host job is recognised by it, UNI-2264). One that cannot
     // run now (busy, no model yet, the UniWork AI disclosure not acknowledged) waits in the composer
-    const ran =
-      preset.autoRun === true &&
-      runWith(preset.text, preset.displayText, {
-        slideShot: preset.slideShot ?? false,
-        ...(preset.scope ? { scope: preset.scope } : {}),
-      })
-    if (!ran) setInput(preset.text)
+    const take = () => {
+      if (preset.autoRun !== true) toComposer(false)
+      else if (
+        !runWith(preset.text, preset.displayText, {
+          slideShot: preset.slideShot ?? false,
+          ...(preset.scope ? { scope: preset.scope } : {}),
+        })
+      )
+        toComposer(true)
+    }
+    // a host job runs only on UniWork AI: the provider is the one of now, not of when it arrived
+    if (!preset.uniworkOnly) take()
+    else
+      void aiPanelOnUniwork(() => window.slidesApi.getAiSettings()).then((on) =>
+        on ? take() : toComposer(false),
+      )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset?.nonce])
 

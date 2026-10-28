@@ -166,7 +166,7 @@ export {
 } from './wheel-zoom'
 export { AiModelPicker, type AiModelPickerBridge } from './AiModelPicker'
 export { setAiModelNeedHint, useAiModelNeedAction, useAiModelNeedHint } from './ai-model-need'
-export { aiPresetAutoRuns } from './ai-host-preset'
+export { aiPanelOnUniwork } from './ai-host-preset'
 export {
   aiModelPickerGroups,
   aiModelPickerSelection,

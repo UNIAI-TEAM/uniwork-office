@@ -106,6 +106,7 @@ import { useI18n, t as tModule, aiLangDirective, getLang, type StringKey } from 
 import { AiErrorAction, Markdown, uniworkErrorForEntry, useAiModelNeedHint } from '@genoffice/ui'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import { AiSaveDraftCard } from '@genoffice/ui'
+import { aiPanelOnUniwork } from '@genoffice/ui'
 import {
   AskUniModeBody,
   AskUniModeToggle,
@@ -430,7 +431,14 @@ interface AiPanelProps {
    * preset instruction pushed from the ribbon, the start screen or the web host's job (`ai.start`);
    * autoRun sends it immediately. displayText is the bubble when it differs from the sent text
    */
-  preset?: { text: string; nonce: number; autoRun?: boolean; displayText?: string } | null
+  preset?: {
+    text: string
+    nonce: number
+    autoRun?: boolean
+    displayText?: string
+    /** a web host's job: it runs only while the panel is on UniWork AI (read when it would run) */
+    uniworkOnly?: boolean
+  } | null
   /** the last preset nonce taken, kept by App so a remounted panel (a new document key) never runs it again */
   presetSeen?: { current: number | null }
   /** false shows only the collapsed rail; the component stays mounted so panel state survives */
@@ -1220,14 +1228,26 @@ export function AiPanel({
   useEffect(() => {
     if (!preset || presetNonceRef.current === preset.nonce) return
     presetNonceRef.current = preset.nonce
-    // the run lands in the chat: leave Ask UNI so it is the one on screen (a prefilled composer takes
-    // focus once the chat pane is shown again)
-    askUni.leave(preset.autoRun ? undefined : () => inputRef.current?.focus())
+    // the run lands in the chat: leave Ask UNI so it is the one on screen
+    askUni.leave()
+    // a preset that does not run waits in the composer, word for word; the composer takes focus once
+    // the chat pane shows, unless a refusal moved it to the UniWork AI disclosure (acknowledge first)
+    const toComposer = (refused: boolean) => {
+      setInput(preset.text)
+      if (!(refused && uniworkGate.isBlocked())) askUni.leave(() => inputRef.current?.focus())
+    }
     // the text goes out word for word (a host job is recognised by it, UNI-2264). One that cannot
     // run now (busy, no model yet, the UniWork AI disclosure not acknowledged) waits in the composer
-    if (!preset.autoRun || !runWith(preset.text, preset.displayText ?? preset.text)) {
-      setInput(preset.text)
+    const take = () => {
+      if (!preset.autoRun) toComposer(false)
+      else if (!runWith(preset.text, preset.displayText ?? preset.text)) toComposer(true)
     }
+    // a host job runs only on UniWork AI: the provider is the one of now, not of when it arrived
+    if (!preset.uniworkOnly) take()
+    else
+      void aiPanelOnUniwork(() => window.desktop.getAiSettings()).then((on) =>
+        on ? take() : toComposer(false),
+      )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset?.nonce])
 

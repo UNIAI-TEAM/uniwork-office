@@ -21,7 +21,6 @@ import {
   Dropdown,
   ImageViewer,
   aiPanelInitiallyOpen,
-  aiPresetAutoRuns,
   rememberAiPanelOpen,
   createZoomWheelClassifier,
   useAutoSavePref,
@@ -1219,6 +1218,8 @@ export function App() {
     autoRun?: boolean
     /** the bubble's words when they differ from what is sent (`text`) */
     displayText?: string
+    /** a web host's job (`ai.start`): it runs only while the panel is on UniWork AI */
+    uniworkOnly?: boolean
   } | null>(null)
   const aiPresetSeen = useRef<number | null>(null)
   // selection-scoped AI edit queue (anchors live as editor decorations)
@@ -2381,16 +2382,14 @@ export function App() {
         if (aiPresetQueued?.text) {
           setShowAi(true)
           localStorage.setItem('aidocs.showAi', '1')
-          const autoRun = await aiPresetAutoRuns(aiPresetQueued, isWebFrame(), () =>
-            window.desktop.getAiSettings(),
-          )
           // Let the seeded outline settle before the panel auto-sends
           await new Promise((resolve) => setTimeout(resolve, 120))
           setAiPreset({
             text: aiPresetQueued.text,
             nonce: Date.now(),
-            autoRun,
+            autoRun: aiPresetQueued.autoRun !== false,
             ...(aiPresetQueued.displayText ? { displayText: aiPresetQueued.displayText } : {}),
+            ...(isWebFrame() ? { uniworkOnly: true } : {}),
           })
         }
       })
@@ -2406,15 +2405,13 @@ export function App() {
       if (!preset?.text) return
       setShowAi(true)
       localStorage.setItem('aidocs.showAi', '1')
-      void aiPresetAutoRuns(preset, isWebFrame(), () => window.desktop.getAiSettings()).then(
-        (autoRun) =>
-          setAiPreset({
-            text: preset.text,
-            nonce: Date.now(),
-            autoRun,
-            ...(preset.displayText ? { displayText: preset.displayText } : {}),
-          }),
-      )
+      setAiPreset({
+        text: preset.text,
+        nonce: Date.now(),
+        autoRun: preset.autoRun !== false,
+        ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        ...(isWebFrame() ? { uniworkOnly: true } : {}),
+      })
     })
     return () => {
       unsubscribe()

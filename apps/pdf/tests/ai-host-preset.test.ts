@@ -2,6 +2,9 @@
 // `ai.start`) goes to the loop word for word, since the frame recognises the job's question by its
 // text; the bubble shows its display words and Retry sends the text again. One that cannot run now
 // waits in the composer; a preset seen again (its nonce) never runs twice.
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -88,7 +91,9 @@ describe('pdf AI panel: a preset from outside', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    return (preset: { text: string; nonce: number; displayText?: string } | null) =>
+    return (
+      preset: { text: string; nonce: number; displayText?: string; uniworkOnly?: boolean } | null,
+    ) =>
       act(() =>
         root!.render(
           createElement(
@@ -171,5 +176,33 @@ describe('pdf AI panel: a preset from outside', () => {
     expect(harness.runs).toEqual([])
     expect(container!.querySelector('.ai-msg-user')).toBeNull()
     expect(container!.querySelector<HTMLTextAreaElement>('textarea.ai-input')!.value).toBe(JOB)
+  })
+
+  it('a host job on another provider than UniWork AI when it would run waits in the focused composer', async () => {
+    const render = mount('openai')
+    render(null)
+    await flush()
+    await flush()
+    render({ text: JOB, nonce: 1, uniworkOnly: true })
+    await flush()
+    await flush()
+    expect(harness.runs).toEqual([])
+    const box = container!.querySelector<HTMLTextAreaElement>('textarea.ai-input')!
+    expect(box.value).toBe(JOB)
+    expect(document.activeElement).toBe(box)
+  })
+})
+
+// The PDF App cannot be mounted in jsdom (the pdf.js worker URL import), so its gate is pinned from
+// source: the panel gets a preset only once the document is ready, and its nonce guard (above) runs
+// it once however often the gate closes and opens again (a reload after a save)
+describe('pdf App: the preset waits for the document', () => {
+  it('hands the panel its preset only while the document is ready', () => {
+    const app = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/App.tsx'),
+      'utf8',
+    )
+    expect(app).toContain("preset={status === 'ready' ? aiPreset : null}")
+    expect(app.match(/preset=\{/g)).toHaveLength(1)
   })
 })

@@ -172,4 +172,18 @@ describe('markdown AI panel: a preset from outside', () => {
     expect(harness.runs).toEqual([])
     expect(container!.querySelector<HTMLTextAreaElement>('textarea.ai-input')!.value).toBe(JOB)
   })
+
+  it('a host job on another provider than UniWork AI when it would run waits in the focused composer', async () => {
+    const render = mount('openai')
+    render(null)
+    await flush()
+    await flush()
+    render({ text: JOB, nonce: 1, autoRun: true, uniworkOnly: true })
+    await flush()
+    await flush()
+    expect(harness.runs).toEqual([])
+    const box = container!.querySelector<HTMLTextAreaElement>('textarea.ai-input')!
+    expect(box.value).toBe(JOB)
+    expect(document.activeElement).toBe(box)
+  })
 })

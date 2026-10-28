@@ -11,6 +11,7 @@ import {
   UniAiMark,
   useAiSidebarEnabled,
   useUniworkSendGate,
+  aiPanelOnUniwork,
   type AiTokenUsageView,
 } from '@genoffice/ui'
 
@@ -283,6 +284,8 @@ interface ExcelShellProps {
     nonce: number
     autoRun?: boolean
     displayText?: string
+    /** a web host's job: it runs only while the panel is on UniWork AI (read when it would run) */
+    uniworkOnly?: boolean
   } | null
   /** the AI dock was opened (or starts open): the app re-reads the UniWork cloud plan */
   readonly onAiPanelOpen?: () => void
@@ -663,12 +666,19 @@ export function ExcelShell({
     }
     const timer = window.setTimeout(() => {
       presetNonceRef.current = aiPreset.nonce
+      const toComposer = () => onPromptChange(aiPreset.text)
       // the text goes out word for word (a host job is recognised by it, UNI-2264). One that
-      // cannot run now (busy, no model yet, the UniWork AI disclosure not acknowledged) waits in the
-      // composer
-      if (onSend(aiPreset.text, undefined, undefined, aiPreset.displayText) !== true) {
-        onPromptChange(aiPreset.text)
+      // cannot run now (settings unread, busy, no model yet, the UniWork AI disclosure not
+      // acknowledged) waits in the composer
+      const take = () => {
+        if (onSend(aiPreset.text, undefined, undefined, aiPreset.displayText) !== true) toComposer()
       }
+      // a host job runs only on UniWork AI: the provider is the one of now, not of when it arrived
+      if (!aiPreset.uniworkOnly) take()
+      else
+        void aiPanelOnUniwork(() => window.desktopApi.getAiSettings()).then((on) =>
+          on ? take() : toComposer(),
+        )
     }, 120)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps

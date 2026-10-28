@@ -9,7 +9,6 @@ import {
   type FindPanelStrings,
   type FindTarget,
   aiPanelInitiallyOpen,
-  aiPresetAutoRuns,
   rememberAiPanelOpen,
   UniAiMark,
   useAiSidebarEnabled,
@@ -303,22 +302,19 @@ export default function App() {
   const canEdit = cap('save')
   // the job a web host hands over (`ai.start`, UNI-2264): the boot read and the live subscription
   // start in the same tick, so a preset in between is never lost; the panel takes it once the page
-  // has loaded (the `preset` prop below)
+  // has loaded (nothing below renders it before)
   useEffect(() => {
     if (!aiEnabled) return
     const take = (preset: { text: string; autoRun?: boolean; displayText?: string } | null) => {
       if (!preset?.text) return
       setAiOpen(true)
-      void aiPresetAutoRuns(preset, platform() === 'web', () =>
-        window.htmlApi.getAiSettings(),
-      ).then((autoRun) =>
-        setAiPreset({
-          text: preset.text,
-          nonce: Date.now(),
-          autoRun,
-          ...(preset.displayText ? { displayText: preset.displayText } : {}),
-        }),
-      )
+      setAiPreset({
+        text: preset.text,
+        nonce: Date.now(),
+        autoRun: preset.autoRun !== false,
+        ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        ...(platform() === 'web' ? { uniworkOnly: true } : {}),
+      })
     }
     void window.htmlApi.consumeAiPreset?.().then(take)
     return window.htmlApi.onAiPreset?.(take)
@@ -1898,7 +1894,7 @@ export default function App() {
             <AiPanel
               deps={aiDeps}
               filePath={path}
-              preset={status === 'ready' ? aiPreset : null}
+              preset={aiPreset}
               editQueue={editQueue}
               onQueueEditInstruction={queueUpdate}
               onQueueRemove={queueRemove}

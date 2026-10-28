@@ -11,6 +11,7 @@ import {
   type AiModelPickerBridge,
   UniAiMark,
   useOverlayDock,
+  aiPanelOnUniwork,
 } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import '@genoffice/ui/ai-uniwork-composer.css'
@@ -238,6 +239,8 @@ export interface AiPreset {
   nonce: number
   autoRun?: boolean
   displayText?: string
+  /** a web host's job: it runs only while the panel is on UniWork AI (read when it would run) */
+  uniworkOnly?: boolean
 }
 
 export interface MarkdownAiDeps {
@@ -1146,9 +1149,24 @@ export function AiPanel({
     presetNonceRef.current = preset.nonce
     // the run lands in the chat: leave Ask UNI so it is the one on screen
     askUni.leave()
+    // a preset that does not run waits in the composer, word for word, and takes focus there unless a
+    // refusal moved it to the UniWork AI disclosure (acknowledge first)
+    const toComposer = (text: string, refused: boolean) => {
+      setPrompt(text)
+      if (!(refused && uniworkGate.isBlocked())) inputRef.current?.focus()
+    }
     // the text goes out word for word (a host job is recognised by it, UNI-2264). One that cannot
     // run now (busy, no model yet, the UniWork AI disclosure not acknowledged) waits in the composer
-    if (preset.autoRun === false || !send(preset.text, preset.displayText)) setPrompt(preset.text)
+    const take = () => {
+      if (preset.autoRun === false) toComposer(preset.text, false)
+      else if (!send(preset.text, preset.displayText)) toComposer(preset.text, true)
+    }
+    // a host job runs only on UniWork AI: the provider is the one of now, not of when it arrived
+    if (!preset.uniworkOnly) take()
+    else
+      void aiPanelOnUniwork(() => window.markdownApi.getAiSettings()).then((on) =>
+        on ? take() : toComposer(preset.text, false),
+      )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset])
 

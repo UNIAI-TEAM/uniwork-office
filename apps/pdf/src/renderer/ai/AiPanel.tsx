@@ -65,6 +65,7 @@ import {
   useAskUniMode,
 } from '@genoffice/ui'
 import { Markdown } from '@genoffice/ui'
+import { aiPanelOnUniwork } from '@genoffice/ui'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -192,7 +193,14 @@ export function AiPanel({
    * Ribbon AI buttons and the web host's job push a one-shot prompt; a new nonce triggers an
    * auto-run (unless autoRun is false). displayText is the bubble when it differs from the sent text
    */
-  preset?: { text: string; nonce: number; autoRun?: boolean; displayText?: string } | null
+  preset?: {
+    text: string
+    nonce: number
+    autoRun?: boolean
+    displayText?: string
+    /** a web host's job: it runs only while the panel is on UniWork AI (read when it would run) */
+    uniworkOnly?: boolean
+  } | null
   /**
    * Fired when a run that mutated the document finishes. Resolves to the file name to offer saving
    * under when the document is a blank the user has not named (the panel then asks, nothing is
@@ -794,11 +802,24 @@ export function AiPanel({
     presetNonceRef.current = preset.nonce
     // the run lands in the chat: leave Ask UNI so it is the one on screen
     askUni.leave()
+    // a preset that does not run waits in the composer, word for word, and takes focus there unless a
+    // refusal moved it to the UniWork AI disclosure (acknowledge first)
+    const toComposer = (text: string, refused: boolean) => {
+      setPrompt(text)
+      if (!(refused && uniworkGate.isBlocked())) inputRef.current?.focus()
+    }
     // the text goes out word for word (a host job is recognised by it, UNI-2264). One that cannot
     // run now (busy, no model yet, the UniWork AI disclosure not acknowledged) waits in the composer
-    if (preset.autoRun === false || !send(preset.text, undefined, preset.displayText)) {
-      setPrompt(preset.text)
+    const take = () => {
+      if (preset.autoRun === false) toComposer(preset.text, false)
+      else if (!send(preset.text, undefined, preset.displayText)) toComposer(preset.text, true)
     }
+    // a host job runs only on UniWork AI: the provider is the one of now, not of when it arrived
+    if (!preset.uniworkOnly) take()
+    else
+      void aiPanelOnUniwork(() => window.pdfApi.getAiSettings()).then((on) =>
+        on ? take() : toComposer(preset.text, false),
+      )
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per nonce
   }, [preset?.nonce])
 

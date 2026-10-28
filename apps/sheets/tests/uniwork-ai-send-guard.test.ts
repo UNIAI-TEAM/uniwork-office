@@ -437,4 +437,18 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     const body = app.slice(start, app.indexOf('runToolsRef.current = []', start))
     expect(body).toMatch(/if \(needModelHint !== null \|\| !instruction \|\| aiBusy\) return false/)
   })
+
+  it('App.tsx handleSend sends nothing (no bubble, no regex planner) while the settings are unread or a run is busy or starting (UNI-2264)', () => {
+    const app = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/renderer/App.tsx'),
+      'utf8',
+    )
+    const start = app.indexOf('  function handleSend(')
+    // everything before the first side effect: the caller keeps the text (a preset waits in the composer)
+    const body = app.slice(start, app.indexOf('runToolsRef.current = []', start))
+    expect(body).toContain('if (!aiSettingsRef.current) return false')
+    expect(body).toMatch(
+      /if \(agentConfigured && \(!loop \|\| loop\.busy \|\| runStartingRef\.current\)\) return false/,
+    )
+  })
 })
