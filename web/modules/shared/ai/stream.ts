@@ -59,7 +59,12 @@ import {
 } from '../../../../packages/ai-provider/src/watchdog'
 import type { AiRunTracker } from '../ai-run'
 import type { AiWebClient } from './client'
-import { UNIWORK_HANDOFF_HEADER, UNIWORK_HANDOFF_REMAINING_HEADER, type AiHandoff } from './handoff'
+import {
+  UNIWORK_HANDOFF_HEADER,
+  UNIWORK_HANDOFF_REMAINING_HEADER,
+  type AiHandoff,
+  type AiHandoffStream,
+} from './handoff'
 import {
   AiWebError,
   asUniworkFailure,
@@ -107,7 +112,17 @@ export interface StreamDeps {
   aiRun?: UniworkRunTracker
   uniwork?: UniworkStreamDeps
   /** the job the host handed over (`ai.start`): its header on a UniWork AI question, the turn outcome */
-  handoff?: Pick<AiHandoff, 'question' | 'remaining' | 'ended'>
+  handoff?: Pick<AiHandoff, 'stream' | 'answered' | 'ended'>
+}
+
+/** what the handoff needs of a stream's history: its question's own words, or tool results */
+function handoffTurn(messages: AiStreamRequest['messages'], uniwork: boolean): AiHandoffStream {
+  const last = messages.at(-1)
+  return {
+    words: last?.role === 'user' ? (last.instruction ?? last.text) : null,
+    afterTools: messages.at(-2)?.role === 'tool',
+    uniwork,
+  }
 }
 
 /** the request config ai-provider sees: proxy base URL, no key */
@@ -230,16 +245,20 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     deps.aiRun?.begin(requestId, () => controller.abort())
     // a question (never tool results) may run the handed-over job: every post of this turn is that
     // question, its run_expired / 429 resends included, so each carries the id
-    const last = messages.at(-1)
-    const handoffId =
-      last?.role === 'user' ? (deps.handoff?.question(last.instruction ?? last.text) ?? null) : null
+    const handoffId = deps.handoff?.stream(handoffTurn(messages, true)) ?? null
     const transport: UniworkChatTransport = {
       post: async (req) => {
         const headers = handoffId
           ? { ...req.headers, [UNIWORK_HANDOFF_HEADER]: handoffId }
           : req.headers
         const res = await chat({ headers, body: req.body, signal: req.signal })
-        if (handoffId) deps.handoff?.remaining(res.headers.get(UNIWORK_HANDOFF_REMAINING_HEADER))
+        if (handoffId) {
+          deps.handoff?.answered(
+            handoffId,
+            res.ok,
+            res.headers.get(UNIWORK_HANDOFF_REMAINING_HEADER),
+          )
+        }
         // the run id of the turn is the one the server issued, as soon as a response carries it
         const runId = res.headers.get(UNIWORK_RUN_HEADER)
         if (runId) deps.aiRun?.setRunId?.(runId)
@@ -353,6 +372,8 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     const { requestId, settings, system, messages } = request
     const provider = settings.provider
     if (provider === UNIWORK_PROVIDER_ID) return uniworkTurn(request)
+    // a question the person asks another provider ends a handed-over job
+    if (!request.purpose) deps.handoff?.stream(handoffTurn(messages, false))
     // a turn of another provider on this session ends the UniWork AI conversation (the next UniWork
     // turn opens a new one with a boundary notice)
     uniworkConversations.observe(request.sessionId, provider)

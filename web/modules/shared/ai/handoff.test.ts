@@ -1,6 +1,8 @@
 // UNI-2264: a job the host hands to the AI panel (`ai.start`), followed part by part. Driven end to
 // end through the web AI bridge (createWebAi + withWebAi, the real UniWork AI adapter) over a fake
-// frame route: the panel is played by hand (its run = the tracker's run, its streams = aiStream).
+// frame route, with a real run tracker (a short grace): as in production only the streams begin and
+// end runs, the panel's next stream starts right after the previous one, and a slow tool step is a
+// pause longer than the grace.
 import type { AgentMessage } from '@genoffice/agent-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setUniworkAiAvailable } from '../../../../packages/ai-provider/src/providers'
@@ -16,11 +18,14 @@ const ORIGIN = 'https://app.test'
 const ROUTE = `${ORIGIN}/api/v1/office-frame/documents/doc-1/ai/uniwork/chat/completions`
 const JOB = 'Draft the approved plan'
 const CALL = { id: 'call-1', name: 'edit_doc', args: { at: 0 } }
+const GRACE_MS = 20
 
 afterEach(() => {
   setUniworkAiAvailable(false)
   uniworkConversations.clear()
 })
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
@@ -66,6 +71,12 @@ function ok(opts: { calls?: Array<typeof CALL>; remaining?: number } = {}): Resp
   })
 }
 
+/** a request that hangs until the panel's Stop aborts it */
+const hangs = (init: RequestInit) =>
+  new Promise<Response>((_, reject) =>
+    init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))),
+  )
+
 type Answer = (init: RequestInit) => Response | Promise<Response>
 
 function rig(opts: { caps?: Record<string, boolean>; credentials?: unknown } = {}) {
@@ -90,7 +101,12 @@ function rig(opts: { caps?: Record<string, boolean>; credentials?: unknown } = {
       credits: { unit: 'ai.tokens', used: 0, limit: null, remaining: null, period_end: null },
     })
   }) as unknown as typeof globalThis.fetch
-  const aiRun = createAiRunTracker({ graceMs: 0 })
+  // the idles the tracker reported (a repeated `running` carries the server run id)
+  let idles = 0
+  const aiRun = createAiRunTracker({
+    graceMs: GRACE_MS,
+    report: (p) => void (p.state === 'idle' && idles++),
+  })
   const ai = createWebAi({
     port: {
       whenInitialized: async () => ({
@@ -114,24 +130,28 @@ function rig(opts: { caps?: Record<string, boolean>; credentials?: unknown } = {
   }
   const presets: AiPreset[] = []
   let streams = 0
-  const stream = (messages: AgentMessage[]) =>
-    api.aiStream({
+  // another provider goes to the streams directly: withWebAi would pick this frame's choice (UniWork AI)
+  const stream = (messages: AgentMessage[], provider = 'uniwork') =>
+    (provider === 'uniwork' ? api.aiStream : ai.streams.aiStream)({
       requestId: `s${++streams}`,
       sessionId: 'sess-1',
-      settings: { provider: 'uniwork', providers: {} },
+      settings: { provider, providers: {} },
       system: '',
       messages,
       tools: [{ name: 'edit_doc', description: 'edit', inputSchema: { type: 'object' } }],
-    })
-  /** the panel's run: its streams, then idle (and the continuation microtask) */
-  const run = async (body: () => Promise<void>) => {
-    aiRun.begin('panel')
-    await body()
-    aiRun.end('panel')
+    } as never)
+  /** the tracker's grace runs out: the run is idle (and the continuation microtask ran) */
+  const idle = async () => {
+    await sleep(GRACE_MS * 3)
     await Promise.resolve()
   }
+  /** the panel's run: its streams back to back, then idle */
+  const run = async (body: () => Promise<void>) => {
+    await body()
+    await idle()
+  }
   const question = (words: string): AgentMessage[] => [{ role: 'user', text: words }]
-  /** the question, then the tool results of CALL */
+  /** the question, its CALL, and the tool results */
   const withResults = (words: string): AgentMessage[] => [
     ...question(words),
     {
@@ -146,9 +166,11 @@ function rig(opts: { caps?: Record<string, boolean>; credentials?: unknown } = {
     api,
     posts,
     presets,
+    idles: () => idles,
     answer: (...a: Answer[]) => queue.push(...a),
     stream,
     run,
+    idle,
     question,
     withResults,
     listen: () => api.onAiPreset((p) => presets.push(p)),
@@ -261,6 +283,29 @@ describe('ai.start handoff (UNI-2264)', () => {
     expect(r.presets).toHaveLength(2)
   })
 
+  it('a tool step slower than the grace idles the tracker mid-part; the part still continues', async () => {
+    const r = rig()
+    r.listen()
+    await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
+    r.answer(
+      () => ok({ calls: [CALL], remaining: 1 }),
+      () => ok(),
+    )
+    await r.stream(r.question(JOB))
+    // the tool (a search, an image, a confirm card) outlasts the grace: the tracker goes idle
+    await r.idle()
+    expect(r.idles()).toBe(1)
+    expect(r.presets).toHaveLength(1)
+    // its results resume the part in a new run; the part ends with the answer that calls no tool
+    await r.run(() => r.stream(r.withResults(JOB)))
+    expect(r.idles()).toBe(2)
+    const next = continueText()
+    expect(r.presets.at(-1)).toEqual({ text: next, displayText: next, autoRun: true })
+    r.answer(() => ok({ remaining: 0 }))
+    await r.run(() => r.stream(r.question(next)))
+    expect(r.posts.map((p) => p.handoff)).toEqual(['h1', null, 'h1'])
+  })
+
   it.each([
     ['a cancelled run', 'cancelled'],
     ['a failed run', 'failed'],
@@ -277,17 +322,8 @@ describe('ai.start handoff (UNI-2264)', () => {
     if (outcome === 'failed') {
       r.answer(() => json(502, { code: 'ai_provider_error', message: 'upstream' }))
     }
-    if (outcome === 'cancelled') {
-      // the tool-result request hangs until the panel's Stop aborts it
-      r.answer(
-        (init) =>
-          new Promise<Response>((_, reject) =>
-            init.signal?.addEventListener('abort', () =>
-              reject(new DOMException('aborted', 'AbortError')),
-            ),
-          ),
-      )
-    }
+    // the tool-result request hangs until the panel's Stop aborts it
+    if (outcome === 'cancelled') r.answer(hangs)
     await r.run(async () => {
       await r.stream(r.question(JOB))
       if (outcome === 'failed') await r.stream(r.withResults(JOB))
@@ -300,12 +336,53 @@ describe('ai.start handoff (UNI-2264)', () => {
       // 'stopped': the panel never sends the tool results
     })
     expect(r.presets).toHaveLength(1)
-    // dropped: the same words asked again carry no id
-    r.answer(() => ok())
+    // the same words asked again are the person's own question: they carry no id
+    r.answer(() => ok({ remaining: 1 }))
     await r.run(() => r.stream(r.question(JOB)))
     expect(r.posts.at(-1)!.handoff).toBeNull()
     expect(r.presets).toHaveLength(1)
   })
+
+  it.each([
+    ['offline', 'offline'],
+    ['stopped before any answer', 'aborted'],
+    ['a 429 given up', 'gave-up'],
+    ['a restarted conversation', 'restarted'],
+  ] as const)(
+    'a first post with no OK answer (%s) keeps the job: the retry carries the header',
+    async (_name, outcome) => {
+      const r = rig()
+      r.listen()
+      await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
+      if (outcome === 'offline') {
+        r.answer(() => {
+          throw new TypeError('Failed to fetch')
+        })
+      } else if (outcome === 'aborted') {
+        r.answer(hangs)
+      } else if (outcome === 'gave-up') {
+        r.answer(() =>
+          json(429, { code: 'ai_rate_limited', message: 'busy' }, { 'Retry-After': '3600' }),
+        )
+      } else {
+        r.answer(() => json(409, { code: 'conversation_expired', message: 'expired' }))
+      }
+      await r.run(async () => {
+        const first = r.stream(r.question(JOB))
+        if (outcome === 'aborted') {
+          await vi.waitFor(() => expect(r.posts).toHaveLength(1))
+          await r.api.aiStreamCancel('s1')
+        }
+        await first
+      })
+      // the panel's Retry (or the person sending the kept question again)
+      r.answer(() => ok({ remaining: 1 }))
+      await r.run(() => r.stream(r.question(JOB)))
+      expect(r.posts.map((p) => p.handoff)).toEqual(['h1', 'h1'])
+      // the answer took the header: the next part follows
+      expect(r.presets.at(-1)!.text).toBe(continueText())
+    },
+  )
 
   it('a run the person starts drops the handoff', async () => {
     const r = rig()
@@ -320,6 +397,68 @@ describe('ai.start handoff (UNI-2264)', () => {
     await r.run(() => r.stream(r.question(JOB)))
     expect(r.posts.map((p) => p.handoff)).toEqual([null, null])
     expect(r.presets).toHaveLength(1)
+  })
+
+  it('a preset whose text the composer rewrote (CRLF, spaces, NFC) still carries the header', async () => {
+    const r = rig()
+    r.listen()
+    // "Soạn" with a decomposed ạ, CRLF and doubled spaces
+    await r.ai.startHandoff({ handoffId: 'h1', text: 'Soạn\r\nthe  plan' })
+    r.answer(() => ok({ remaining: 0 }))
+    await r.run(() => r.stream(r.question('Please: Soạn\nthe plan')))
+    expect(r.posts.map((p) => p.handoff)).toEqual(['h1'])
+  })
+
+  it("a loop nudge after tool results keeps the job; the person's question inside the grace drops it", async () => {
+    const r = rig()
+    r.listen()
+    await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
+    r.answer(
+      () => ok({ calls: [CALL], remaining: 1 }),
+      () => ok(),
+    )
+    await r.run(async () => {
+      await r.stream(r.question(JOB))
+      // the loop's own follow-up question after the tool results (e.g. its turn-limit note)
+      await r.stream([...r.withResults(JOB), { role: 'user', text: 'Answer now without tools.' }])
+    })
+    const next = continueText()
+    expect(r.presets.at(-1)!.text).toBe(next)
+    r.answer(
+      () => ok({ remaining: 1 }),
+      () => ok(),
+    )
+    await r.run(async () => {
+      await r.stream(r.question(next))
+      // a queued question of the person starts inside the grace: same tracker run
+      await r.stream([
+        ...r.question(next),
+        { role: 'assistant', text: 'Done.' },
+        { role: 'user', text: 'Also fix the title' },
+      ])
+    })
+    expect(r.posts.map((p) => p.handoff)).toEqual(['h1', null, 'h1', null])
+    expect(r.presets).toHaveLength(2)
+  })
+
+  it('a dropped job takes its buffered preset with it', async () => {
+    const r = rig()
+    // no listener: the preset waits for consumeAiPreset
+    await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
+    r.answer(() => ok())
+    await r.run(() => r.stream(r.question('Something else first')))
+    expect(await r.api.consumeAiPreset()).toBeNull()
+  })
+
+  it('a question to another provider drops the job', async () => {
+    const r = rig()
+    r.listen()
+    await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
+    // no BYOK key: the turn fails at once, but the person asked something else
+    await r.run(() => r.stream(r.question('Translate this'), 'openai'))
+    r.answer(() => ok())
+    await r.run(() => r.stream(r.question(JOB)))
+    expect(r.posts.map((p) => p.handoff)).toEqual([null])
   })
 
   it('a module frame answers the host ai.start and its global hands the preset over', async () => {
