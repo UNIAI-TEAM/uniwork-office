@@ -18,4 +18,9 @@ export const id = {
   statusWords: '{n} kata',
   statusChars: '{n} karakter',
   highlight: 'Sorot',
+  diskChangedMsg: 'File ini diubah oleh program lain.',
+  diskConflictMsg: 'File ini berubah di disk; menyimpan akan menimpa perubahan tersebut.',
+  diskReload: 'Muat ulang',
+  diskKeepMine: 'Pertahankan milik saya',
+  diskOverwrite: 'Tetap timpa',
 } satisfies Record<keyof typeof zh, string>

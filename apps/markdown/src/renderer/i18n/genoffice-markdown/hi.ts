@@ -18,4 +18,9 @@ export const hi = {
   statusWords: '{n} शब्द',
   statusChars: '{n} अक्षर',
   highlight: 'हाइलाइट',
+  diskChangedMsg: 'यह फ़ाइल किसी अन्य प्रोग्राम द्वारा बदली गई।',
+  diskConflictMsg: 'यह फ़ाइल डिस्क पर बदल गई है; सहेजने से वे बदलाव मिट जाएँगे।',
+  diskReload: 'फिर से लोड करें',
+  diskKeepMine: 'मेरा रखें',
+  diskOverwrite: 'फिर भी अधिलेखित करें',
 } satisfies Record<keyof typeof zh, string>

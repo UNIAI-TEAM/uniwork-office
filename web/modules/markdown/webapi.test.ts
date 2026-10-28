@@ -655,6 +655,21 @@ describe('markdownApi: view only and capabilities', () => {
       await (api as unknown as { getAutoSaveDefault: () => Promise<unknown> }).getAutoSaveDefault(),
     ).toEqual({ on: false, updatedAt: 0 })
   })
+
+  it('disk-watch is desktop-only: webapi omits onFileChangedOnDisk/ackFileChangedOnDisk and save never reports a disk conflict', async () => {
+    const rawApi = createMarkdownWebApi({
+      module: 'markdown',
+      client: createMockPort().port,
+      capabilities: FULL,
+    })
+    expect('onFileChangedOnDisk' in rawApi).toBe(false)
+    expect('ackFileChangedOnDisk' in rawApi).toBe(false)
+    const { api } = setup()
+    const { text } = await open(api)
+    const saved = await api.save({ text, imageSources: [], mode: 'save' })
+    expect(saved).toMatchObject({ ok: true })
+    expect('conflict' in saved).toBe(false)
+  })
 })
 
 describe('markdownApi: pictures and exports', () => {

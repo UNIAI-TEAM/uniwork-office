@@ -18,4 +18,9 @@ export const ms = {
   statusWords: '{n} perkataan',
   statusChars: '{n} aksara',
   highlight: 'Serlahkan',
+  diskChangedMsg: 'Fail ini telah diubah oleh program lain.',
+  diskConflictMsg: 'Fail ini berubah pada cakera; menyimpan akan menulis ganti perubahan itu.',
+  diskReload: 'Muat semula',
+  diskKeepMine: 'Kekalkan milik saya',
+  diskOverwrite: 'Tulis ganti juga',
 } satisfies Record<keyof typeof zh, string>

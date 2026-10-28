@@ -174,6 +174,10 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
     | 'wikiTags'
     | 'listWikiNotes'
     | 'createWikiNote'
+    // desktop file-system polling watcher: a web frame has no local file on disk (save conflicts
+    // go through the shared text-module server conflict dialog instead)
+    | 'onFileChangedOnDisk'
+    | 'ackFileChangedOnDisk'
   >
   return Object.assign(api, {
     // web-only (renderer: editor/localImage.ts): relative pictures through OpenPayload.assets
