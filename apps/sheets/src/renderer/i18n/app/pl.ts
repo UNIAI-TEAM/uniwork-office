@@ -10,7 +10,7 @@ export const pl = {
   redactDialogPlaceholder: 'Nazwa symbolu, np. telefon klienta',
   redactCancel: 'Anuluj',
   redactInsert: 'Ukryj',
-  redactEnable: 'Kliknij prawym na zaznaczeniu, aby ukryć je przed modelem.',
+  redactEnable: 'Kliknij prawym na zaznaczeniu, aby ukryć je przed AI.',
   redactNeedsSavedRow:
     'Ten wiersz nie jest jeszcze w pliku. Zapisz najpierw, a potem ukryj komórkę.',
   redactRecoveredFromNames:

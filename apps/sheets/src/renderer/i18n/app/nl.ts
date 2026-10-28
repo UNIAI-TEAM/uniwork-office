@@ -10,7 +10,7 @@ export const nl = {
   redactDialogPlaceholder: 'Naam van placeholder, bv. telefoonnummer klant',
   redactCancel: 'Annuleren',
   redactInsert: 'Verbergen',
-  redactEnable: 'Rechtsklik op een selectie om die voor het model te verbergen.',
+  redactEnable: 'Rechtsklik op een selectie om die voor de AI te verbergen.',
   redactNeedsSavedRow:
     'Deze rij staat nog niet in het bestand. Sla eerst op en verberg daarna de cel.',
   redactRecoveredFromNames:

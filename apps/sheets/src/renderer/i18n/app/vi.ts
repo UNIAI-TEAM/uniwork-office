@@ -10,7 +10,7 @@ export const vi = {
   redactDialogPlaceholder: 'Tên placeholder, ví dụ: số điện thoại khách hàng',
   redactCancel: 'Hủy',
   redactInsert: 'Ẩn',
-  redactEnable: 'Nhấp chuột phải vào phần đã chọn để ẩn khỏi mô hình.',
+  redactEnable: 'Nhấp chuột phải vào phần đã chọn để ẩn khỏi AI.',
   redactNeedsSavedRow: 'Hàng này chưa có trong tệp. Hãy lưu trước, rồi ẩn ô.',
   redactRecoveredFromNames:
     'Ứng dụng khác đã ghi lại tệp này và làm mất bản ghi về những ô đang ẩn. Các ô bị ẩn đã được khôi phục từ các tên trong sổ làm việc; lưu sẽ khôi phục lại toàn bộ bản ghi.',

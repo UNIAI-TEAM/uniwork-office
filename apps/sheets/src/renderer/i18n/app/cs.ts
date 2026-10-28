@@ -10,7 +10,7 @@ export const cs = {
   redactDialogPlaceholder: 'Název zástupného symbolu, např. telefon zákazníka',
   redactCancel: 'Zrušit',
   redactInsert: 'Skrýt',
-  redactEnable: 'Pravým klikem na výběr jej skryjete před modelem.',
+  redactEnable: 'Pravým klikem na výběr jej skryjete před AI.',
   redactNeedsSavedRow: 'Tento řádek zatím není v souboru. Nejprve uložte, pak buňku skryjte.',
   redactRecoveredFromNames:
     'Jiná aplikace tento soubor přepsala a zahodila záznam o tom, co je skrytoé. Skryté buňky byly obnoveny z názvů v sešitě; uložením se obnoví celý záznam.',

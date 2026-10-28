@@ -10,7 +10,7 @@ export const it = {
   redactDialogPlaceholder: 'Nome del segnaposto, es. telefono del cliente',
   redactCancel: 'Annulla',
   redactInsert: 'Nascondi',
-  redactEnable: 'Clic destro su una selezione per nasconderla al modello.',
+  redactEnable: 'Clic destro su una selezione per nasconderla all’IA.',
   redactNeedsSavedRow: 'Questa riga non è ancora nel file. Salva prima, poi nascondi la cella.',
   redactRecoveredFromNames:
     "Un'altra app ha riscritto questo file e ha perso il registro di ciò che è nascosto. Le celle nascoste sono state recuperate dai nomi del foglio di lavoro; salvando il file viene ripristinato il registro completo.",

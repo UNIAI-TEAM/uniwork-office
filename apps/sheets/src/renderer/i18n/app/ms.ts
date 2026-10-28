@@ -10,7 +10,7 @@ export const ms = {
   redactDialogPlaceholder: 'Nama placeholder, cth. telefon pelanggan',
   redactCancel: 'Batal',
   redactInsert: 'Sembunyikan',
-  redactEnable: 'Klik kanan pada teks yang dipilih untuk menyembunyikannya daripada model.',
+  redactEnable: 'Klik kanan pada teks yang dipilih untuk menyembunyikannya daripada AI.',
   redactNeedsSavedRow:
     'Baris ini belum lagi dalam fail. Simpan dahulu, kemudian sembunyikan selnya.',
   redactRecoveredFromNames:

@@ -10,7 +10,7 @@ export const es = {
   redactDialogPlaceholder: 'Nombre del marcador, p. ej.: teléfono del cliente',
   redactCancel: 'Cancelar',
   redactInsert: 'Ocultar',
-  redactEnable: 'Clic derecho en una selección para ocultarla al modelo.',
+  redactEnable: 'Clic derecho en una selección para ocultarla a la IA.',
   redactNeedsSavedRow:
     'Esta fila todavía no está en el archivo. Guarda primero y luego oculta la celda.',
   redactRecoveredFromNames:

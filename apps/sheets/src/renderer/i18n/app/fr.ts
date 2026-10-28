@@ -10,7 +10,7 @@ export const fr = {
   redactDialogPlaceholder: 'Nom du placeholder, ex. : téléphone du client',
   redactCancel: 'Annuler',
   redactInsert: 'Masquer',
-  redactEnable: 'Clic droit sur une sélection pour la masquer au modèle.',
+  redactEnable: 'Clic droit sur une sélection pour la masquer à l’IA.',
   redactNeedsSavedRow:
     "Cette ligne n'est pas encore dans le fichier. Enregistrez d'abord, puis masquez la cellule.",
   redactRecoveredFromNames:

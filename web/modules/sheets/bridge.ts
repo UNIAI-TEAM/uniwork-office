@@ -45,6 +45,7 @@
  * `engine-unavailable`: the bridge reports it to the host once (`error` {code:'unsupported'},
  * non-fatal: the frame shows its own styled screen) and the renderer shows that screen.
  */
+import JSZip from 'jszip'
 import {
   isReadOnlyProfile,
   toProtocolError,
@@ -81,19 +82,29 @@ import {
   type ConflictIo,
   type ConflictOutcome,
 } from '../shared/conflict-dialog'
-import type {
-  DesktopApi,
-  MenuAction,
-  WorkbookCellEdit,
-  WorkbookExportCsvResult,
-  WorkbookExportPdfResult,
-  WorkbookFile,
-  WorkbookSaveEditsAbort,
-  WorkbookSaveEditsBegin,
-  WorkbookSaveEditsChunk,
-  WorkbookSaveRequest,
-  WorkbookSaveResult,
+import {
+  workbookRedactionsResultSchema,
+  type DesktopApi,
+  type MenuAction,
+  type WorkbookCellEdit,
+  type WorkbookExportCsvResult,
+  type WorkbookExportPdfResult,
+  type WorkbookFile,
+  type WorkbookRedactionsRequest,
+  type WorkbookRedactionsResult,
+  type WorkbookSaveEditsAbort,
+  type WorkbookSaveEditsBegin,
+  type WorkbookSaveEditsChunk,
+  type WorkbookSaveRequest,
+  type WorkbookSaveResult,
 } from '../../../apps/sheets/src/shared/desktop-api'
+import {
+  REDACTION_PART_PATH,
+  parseRedactionNameMirror,
+  parseRedactionPart,
+  type SheetRedactionState,
+} from '../../../packages/xlsx-gateway/src/gateway/xlsx-redaction'
+import { parseSheetElements } from '../../../packages/xlsx-gateway/src/gateway/xlsx-sheets'
 import { ask as domAsk, notifySavedReopenFailed, text, type AskFn } from './notice'
 import { frameDocVersion } from '../shared/comments/doc-version'
 import { isEngineUnavailable, type SheetsEngineTransport } from './engine/transport'
@@ -270,6 +281,56 @@ export interface SheetsWebApiOptions {
 interface Session {
   fileId: string | null
   name: string
+  /** workbook bytes the session was opened from (for reading package parts such as redactions) */
+  data: ArrayBuffer
+}
+
+const WORKBOOK_PART_PATH = 'xl/workbook.xml'
+
+type RedactionPartRead =
+  | { readonly status: 'absent' }
+  | {
+      readonly status: 'ok'
+      readonly states: readonly SheetRedactionState[]
+      readonly source: 'part' | 'mirror'
+    }
+  | { readonly status: 'unreadable'; readonly error: string }
+
+async function readRedactionNameMirrorFromZip(zip: JSZip): Promise<RedactionPartRead> {
+  const workbookFile = zip.file(WORKBOOK_PART_PATH)
+  if (!workbookFile) return { status: 'absent' }
+  try {
+    const workbookXml = await workbookFile.async('text')
+    const states = parseRedactionNameMirror(
+      workbookXml,
+      parseSheetElements(workbookXml).map((sheet) => sheet.name),
+    )
+    return states.length === 0 ? { status: 'absent' } : { status: 'ok', states, source: 'mirror' }
+  } catch (err) {
+    return { status: 'unreadable', error: describe(err) }
+  }
+}
+
+async function readWorkbookRedactionBytes(data: ArrayBuffer): Promise<RedactionPartRead> {
+  if (data.byteLength === 0 || hasOleMagic(data)) return { status: 'absent' }
+  let zip: JSZip
+  try {
+    zip = await JSZip.loadAsync(data, { checkCRC32: false })
+  } catch {
+    return { status: 'absent' }
+  }
+  const partFile = zip.file(REDACTION_PART_PATH)
+  if (partFile) {
+    try {
+      const text = await partFile.async('text')
+      return { status: 'ok', states: parseRedactionPart(text), source: 'part' }
+    } catch (err) {
+      const fromMirror = await readRedactionNameMirrorFromZip(zip)
+      if (fromMirror.status === 'ok') return fromMirror
+      return { status: 'unreadable', error: describe(err) }
+    }
+  }
+  return readRedactionNameMirrorFromZip(zip)
 }
 
 const NOT_AVAILABLE = 'Not available in the web build'
@@ -458,10 +519,11 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   async function openPayload(payload: OpenPayload, offer = true): Promise<WorkbookFile> {
     const server = await readSource(payload.source)
     const draft = offer ? await offerDraft(payload.file) : null
-    // the engine may take ownership of the buffer: open a copy of the draft
+    // the engine may take ownership of the buffer: keep our own copy for package reads
     const data = draft ? copyBuffer(draft) : server
+    const sessionData = copyBuffer(data)
     let opened: WorkbookFile
-    const oleContainer = hasOleMagic(data)
+    const oleContainer = hasOleMagic(sessionData)
     try {
       opened = await transport.open({ name: payload.file.name, data, locale: locale() })
     } catch (err) {
@@ -510,7 +572,11 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     if (current !== null && current !== payload.file.fileId) remote?.reset()
     sizeGate.noteDocumentOpened(payload.file.fileId, payload.limits)
     remember(payload.file)
-    sessions.set(opened.sessionId, { fileId: payload.file.fileId, name: payload.file.name })
+    sessions.set(opened.sessionId, {
+      fileId: payload.file.fileId,
+      name: payload.file.name,
+      data: sessionData,
+    })
     restored = draft !== null
     latest = draft ? { sessionId: opened.sessionId, data: draft } : null
     dirty = restored
@@ -959,6 +1025,13 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       capabilities.pivotRefresh === false
         ? Promise.reject(new Error(`pivot refresh: ${NOT_AVAILABLE}`))
         : transport.readPivotDefinition(request),
+    async readWorkbookRedactions(
+      request: WorkbookRedactionsRequest,
+    ): Promise<WorkbookRedactionsResult> {
+      const session = sessions.get(request.sessionId)
+      if (!session) throw new Error('Unknown workbook session.')
+      return workbookRedactionsResultSchema.parse(await readWorkbookRedactionBytes(session.data))
+    },
     recalcWorkbook: (request) =>
       capabilities.recalcFallback === false
         ? Promise.reject(new Error(`recalculation fallback: ${NOT_AVAILABLE}`))
@@ -988,8 +1061,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       const session = sessions.get(request.sessionId)
       if (!session) throw new Error('Unknown workbook session.')
       const { data, touchedEntries } = await transport.serialize(request)
-      // the bytes are transferred to the host: keep our own copy for the session swap
+      // the bytes are transferred to the host and the engine: keep copies for the session swap and package reads
       const kept = copyBuffer(data)
+      const sessionData = copyBuffer(data)
       const landed: Landed =
         request.mode === 'save' && session.fileId !== null && !hostSaveAs
           ? await saveInPlace(session.fileId, data)
@@ -1036,7 +1110,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
           : new Error(text('appWebSavedReopenFailed'))
       }
       sessions.delete(request.sessionId)
-      sessions.set(swapped.sessionId, { fileId: meta.fileId, name: meta.name })
+      sessions.set(swapped.sessionId, { fileId: meta.fileId, name: meta.name, data: sessionData })
       return { canceled: false, file: decorate(swapped, meta), touchedEntries }
     },
 

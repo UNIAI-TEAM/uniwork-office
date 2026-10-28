@@ -10,7 +10,7 @@ export const en = {
   redactDialogPlaceholder: 'Placeholder name, e.g. client phone',
   redactCancel: 'Cancel',
   redactInsert: 'Hide',
-  redactEnable: 'Right-click a selection to hide it from the model.',
+  redactEnable: 'Right-click a selection to hide it from AI.',
   redactNeedsSavedRow: 'This row is not in the file yet. Save first, then hide a cell in it.',
   redactRecoveredFromNames:
     'Another app rewrote this file and dropped the record of what is hidden. The hidden cells were recovered from the names in the workbook; saving restores the full record.',

@@ -10,7 +10,7 @@ export const de = {
   redactDialogPlaceholder: 'Name des Platzhalters, z. B. Telefonnummer des Kunden',
   redactCancel: 'Abbrechen',
   redactInsert: 'Verbergen',
-  redactEnable: 'Rechtsklick auf eine Auswahl, um sie vor dem Modell zu verbergen.',
+  redactEnable: 'Rechtsklick auf eine Auswahl, um sie vor der KI zu verbergen.',
   redactNeedsSavedRow:
     'Diese Zeile ist noch nicht in der Datei. Bitte zuerst speichern und dann die Zelle ausblenden.',
   redactRecoveredFromNames:
