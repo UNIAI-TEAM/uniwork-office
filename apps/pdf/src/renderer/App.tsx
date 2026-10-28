@@ -928,6 +928,8 @@ export default function App() {
   const [recovered, setRecovered] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchMatchCase, setSearchMatchCase] = useState(false)
+  const [searchWholeWord, setSearchWholeWord] = useState(false)
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([])
   const [searchCur, setSearchCur] = useState(0)
   const [printing, setPrinting] = useState(false)
@@ -2457,7 +2459,12 @@ export default function App() {
     const timer = setTimeout(() => {
       void getSearchIndex()?.then((idx) => {
         if (cancelled) return
-        setSearchMatches(searchInIndex(idx, searchQuery.trim()))
+        setSearchMatches(
+          searchInIndex(idx, searchQuery.trim(), {
+            matchCase: searchMatchCase,
+            wholeWord: searchWholeWord,
+          }),
+        )
         setSearchCur(0)
       })
     }, 200)
@@ -2465,7 +2472,7 @@ export default function App() {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [searchOpen, searchQuery, getSearchIndex])
+  }, [searchOpen, searchQuery, searchMatchCase, searchWholeWord, getSearchIndex])
 
   /** Pages with unsaved deletion are excluded from match navigation */
   const activeMatches = useMemo(
@@ -9267,6 +9274,24 @@ export default function App() {
                     }
                   }}
                 />
+                <button
+                  className={`rb-icon pdf-search-opt${searchMatchCase ? ' is-active' : ''}`}
+                  data-tip={t('searchMatchCase')}
+                  aria-label={t('searchMatchCase')}
+                  aria-pressed={searchMatchCase}
+                  onClick={() => setSearchMatchCase((v) => !v)}
+                >
+                  Aa
+                </button>
+                <button
+                  className={`rb-icon pdf-search-opt${searchWholeWord ? ' is-active' : ''}`}
+                  data-tip={t('searchWholeWord')}
+                  aria-label={t('searchWholeWord')}
+                  aria-pressed={searchWholeWord}
+                  onClick={() => setSearchWholeWord((v) => !v)}
+                >
+                  W
+                </button>
                 <span className="pdf-search-count">
                   {searchQuery.trim()
                     ? activeMatches.length > 0
