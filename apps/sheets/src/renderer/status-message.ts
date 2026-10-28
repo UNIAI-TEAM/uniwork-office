@@ -7,7 +7,11 @@ import { tFor } from './i18n/locale'
  * Status-bar texts without parameters. The bar keeps the string it was given, so a language
  * switch used to leave "Workbook fully loaded ..." in the old language until the next message.
  */
-const STATIC_STATUS_KEYS: readonly StringKey[] = ['appReadyInitial', 'appFullyLoaded']
+const STATIC_STATUS_KEYS: readonly StringKey[] = [
+  'appReadyInitial',
+  'appFullyLoaded',
+  'redactRecoveredFromNames',
+]
 
 /**
  * Status-bar texts built from `{name}` style parameters ("Streaming report.xlsx: 6 rows

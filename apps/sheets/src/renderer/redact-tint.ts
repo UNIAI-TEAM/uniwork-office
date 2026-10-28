@@ -27,6 +27,7 @@
  * the mark — and the protection — is still there. Re-toggling the mark restores
  * the two.
  */
+import { CellValueType, type ICellData } from '@univerjs/core'
 import { NO_FILL_STYLE } from './edit-journal'
 import type { UniverRuntime, UniverWorksheet } from './univer-state'
 import type { MarkKey } from './redact-actions'
@@ -68,8 +69,48 @@ export function readCellFill(range: FacadeRange): string | null {
  */
 export function tintRange(range: FacadeRange, fill: string = MARK_FILL): string | null {
   const previousFill = readCellFill(range)
-  range.setBackground(fill)
+  setBackgroundPreservingStrings(range, () => range.setBackground(fill))
   return previousFill
+}
+
+interface FacadeRangeWithWorksheet {
+  _worksheet?: {
+    getCellMatrix?: () => {
+      getValue(row: number, col: number): ICellData | null | undefined
+    }
+  }
+}
+
+/**
+ * Univer's `mergeCellData` (in `SetRangeValuesMutation`) re-evaluates `getCellType`
+ * even on style-only updates (`{ s: { bg } }`): when `oldVal.t` is `STRING`
+ * without `@` text number-format, `checkCellValueType(oldVal.v, oldVal.t)`
+ * coerces any numeric-looking string (`"13800138000"`, `"0600136000"`) to
+ * `NUMBER`. Snapshot string cells before the fill and restore their `STRING`
+ * type and text immediately after.
+ */
+function setBackgroundPreservingStrings(range: FacadeRange, applyFill: () => void): void {
+  const rawGrid = typeof range.getCellDataGrid === 'function' ? range.getCellDataGrid() : null
+  const bounds = typeof range.getRange === 'function' ? range.getRange() : null
+  // FRange holds the core Worksheet on `_worksheet` (protected in its d.ts).
+  const rangeWithSheet = range as unknown as FacadeRangeWithWorksheet
+  applyFill()
+  if (!rawGrid || !bounds) return
+  const matrix = rangeWithSheet._worksheet?.getCellMatrix?.()
+  if (!matrix) return
+  for (let r = 0; r < rawGrid.length; r += 1) {
+    const row = rawGrid[r]
+    if (!row) continue
+    for (let c = 0; c < row.length; c += 1) {
+      const before = row[c]
+      if (before?.t !== CellValueType.STRING || typeof before.v !== 'string') continue
+      const live = matrix.getValue(bounds.startRow + r, bounds.startColumn + c)
+      if (live && (live.t !== CellValueType.STRING || live.v !== before.v)) {
+        live.t = CellValueType.STRING
+        live.v = before.v
+      }
+    }
+  }
 }
 
 /**
@@ -106,14 +147,16 @@ export function restoreCellFill(
   previousFill: string | null | undefined,
   workbookId: string,
 ): void {
-  if (previousFill) {
-    range.setBackground(previousFill)
-    return
-  }
-  runtime.univerAPI.syncExecuteCommand('sheet.command.set-style', {
-    unitId: workbookId,
-    subUnitId: sheetId,
-    range: range.getRange(),
-    style: { type: 'bg', value: { ...NO_FILL_STYLE } },
+  setBackgroundPreservingStrings(range, () => {
+    if (previousFill) {
+      range.setBackground(previousFill)
+      return
+    }
+    runtime.univerAPI.syncExecuteCommand('sheet.command.set-style', {
+      unitId: workbookId,
+      subUnitId: sheetId,
+      range: range.getRange(),
+      style: { type: 'bg', value: { ...NO_FILL_STYLE } },
+    })
   })
 }

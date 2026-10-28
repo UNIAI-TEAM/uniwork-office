@@ -192,6 +192,21 @@ describe('streaming status after the full preload', () => {
     expect(messages.at(-1)).toBe(t('appFullyLoaded'))
   })
 
+  it('keeps redactionMessage visible when full preload finishes instead of overwriting with appFullyLoaded', async () => {
+    const state = lazyState()
+    state.redactionMessage = t('redactRecoveredFromNames')
+    const ref = { current: state }
+    const worksheet = makeWorksheet()
+    const runtime = makeRuntime(worksheet)
+    const setMessage = (message: string) => messages.push(message)
+    reads = [rangeResult(true)]
+
+    await preloadEntireWorkbook(runtime as never, ref, setMessage)
+
+    expect(state.flags.preloadComplete).toBe(true)
+    expect(messages.at(-1)).toBe(t('redactRecoveredFromNames'))
+  })
+
   // UNI-2216: a workbook that never runs the full preload (small, non-formula
   // mode) kept "Streaming <name>: N rows available." on the bar for good.
   describe('without the full preload', () => {
@@ -266,6 +281,20 @@ describe('streaming status after the full preload', () => {
       expect(messages.at(-1)).toBe(
         t('appStreamingRows', { name: 'Small.xlsx', rows: (100_000).toLocaleString() }),
       )
+    })
+
+    it('keeps redactionMessage visible when viewport load finishes on a small workbook instead of clearing to empty', async () => {
+      const state = lazyState()
+      state.redactionMessage = t('redactRecoveredFromNames')
+      const ref = { current: state }
+      const worksheet = makeWorksheet()
+      const runtime = makeRuntime(worksheet)
+      const setMessage = (message: string) => messages.push(message)
+      reads = [rangeResult(true)]
+
+      await loadVisibleRange(runtime as never, ref, worksheet as never, setMessage)
+
+      expect(messages.at(-1)).toBe(t('redactRecoveredFromNames'))
     })
   })
 })
