@@ -1642,4 +1642,5 @@ export const de = {
     'Die Arbeitsmappen-Engine wurde unerwartet beendet und neu gestartet. Die Arbeitsmappe wurde aus der zuletzt gespeicherten Version erneut geöffnet; Ihre nicht gespeicherten Änderungen bleiben erhalten – speichern Sie bald.',
   appWebSavedReopenFailed:
     'Ihre Änderungen wurden in UniWork gespeichert, aber die Arbeitsmappe konnte hier nicht erneut geöffnet werden. Laden Sie den Editor neu, um weiterzuarbeiten.',
+  appDataTable: 'Datentabelle',
 } satisfies Record<keyof typeof zh, string>

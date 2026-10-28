@@ -1583,4 +1583,5 @@ export const id = {
     'Mesin buku kerja berhenti secara tak terduga dan telah dimulai ulang. Buku kerja dibuka kembali dari versi terakhir yang disimpan; perubahan yang belum disimpan tetap ada, segera simpan.',
   appWebSavedReopenFailed:
     'Perubahan Anda sudah disimpan ke UniWork, tetapi buku kerja tidak dapat dibuka ulang di sini. Muat ulang editor untuk melanjutkan.',
+  appDataTable: 'Tabel Data',
 } satisfies Record<keyof typeof zh, string>

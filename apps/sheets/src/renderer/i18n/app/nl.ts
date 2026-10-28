@@ -1621,4 +1621,5 @@ export const nl = {
     'De werkmap-engine is onverwacht gestopt en opnieuw gestart. De werkmap is opnieuw geopend vanaf de laatst opgeslagen versie; uw niet-opgeslagen wijzigingen blijven behouden, sla snel op.',
   appWebSavedReopenFailed:
     'Je wijzigingen zijn opgeslagen in UniWork, maar de werkmap kon hier niet opnieuw worden geopend. Laad de editor opnieuw om verder te werken.',
+  appDataTable: 'Gegevenstabel',
 } satisfies Record<keyof typeof zh, string>

@@ -558,7 +558,7 @@ Proposed Sheets capability keys (renderer-local; host protocol grants stay `save
 | `xlsxEngine`       | **the whole workbook surface** (S1–S6, S10): off means the frame shows "engine unavailable"; the host never routes xlsx to the frame while it is off | **sidecar-only (GO-D3)** |
 | `recalcFallback`   | IronCalc recalc fallback (S8)                                                                                                                        | **sidecar-only (GO-D3)** |
 | `xlsImport`        | `.xls` open (S9)                                                                                                                                     | **sidecar-only (GO-D3)** |
-| `pivotRefresh`     | PivotTable refresh (S10)                                                                                                                             | **sidecar-only (GO-D3)** |
+| `pivotRefresh`     | PivotTable refresh (S10) and Insert > PivotChart (binds to a pivot definition)                                                                       | **sidecar-only (GO-D3)** |
 | `mergeWorkbooks`   | Data > Merge workbooks, AI attachment merge (S11)                                                                                                    | **sidecar-only (GO-D3)** |
 | `workbookPassword` | Review > Change Password (open password; Electron main only)                                                                                         | general (desktop-only)   |
 

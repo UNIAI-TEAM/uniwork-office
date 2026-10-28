@@ -1483,4 +1483,5 @@ export const zhTW = {
     '活頁簿引擎意外停止並已重新啟動。活頁簿已從上次儲存的版本重新開啟；您尚未儲存的變更仍然保留，請盡快儲存。',
   appWebSavedReopenFailed:
     '您的變更已儲存到 UniWork，但此處無法重新開啟活頁簿。請重新載入編輯器後繼續。',
+  appDataTable: '資料表',
 } satisfies Record<keyof typeof zh, string>

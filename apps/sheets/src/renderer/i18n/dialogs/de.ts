@@ -669,4 +669,25 @@ export const de = {
   dlgSizeMoveOnly: 'Von Zellposition abhängig',
   dlgSizeFixed: 'Von Zellposition und -größe unabhängig',
   dlgSizeInvalid: 'Geben Sie eine gültige Größe und Drehung ein.',
+  dlgDataTableTitle: 'Datentabelle',
+  dlgDataTableRange: 'Tabellenbereich',
+  dlgDataTableRowInput: 'Eingabezelle (Zeile)',
+  dlgDataTableColumnInput: 'Eingabezelle (Spalte)',
+  dlgDataTableNote:
+    'Die Ergebnisse werden als einfache Werte eingetragen und aktualisieren sich bei Neuberechnung nicht (anders als in Excel als Matrixformel); die ganze Tabelle lässt sich in einem Schritt rückgängig machen.',
+  dlgDataTableNeedInput:
+    'Füllen Sie mindestens eine Eingabezelle aus: nur eine = eine Variable, beide = zwei Variablen.',
+  dlgDataTableBadRange: 'Der Tabellenbereich muss ein Bezug wie A1 oder A1:B4 sein.',
+  dlgDataTableBadShape:
+    'Falsche Bereichsform: eine Variable in einer Spalte braucht 2 Spalten und 2+ Zeilen, in einer Zeile 2 Zeilen und 2+ Spalten, zwei Variablen mindestens 2×2.',
+  dlgDataTableTooManyCells: 'Die Tabelle überschreitet das Limit von {limit} Ergebniszellen.',
+  dlgDataTableInputInside: 'Eingabezellen dürfen nicht im Tabellenbereich liegen.',
+  dlgDataTableSameInput: 'Zeilen- und Spalteneingabezelle müssen unterschiedlich sein.',
+  dlgDataTableNeedsFormula: 'Die Formelzelle muss eine Formel enthalten.',
+  dlgDataTableInputNotNumber: 'Eingabezellen müssen eine schlichte Zahl enthalten oder leer sein.',
+  dlgDataTableValuesNotNumber: 'Die Ersetzungswerte müssen Zahlen sein.',
+  dlgDataTableRunning: 'Berechnung… {done}/{total}',
+  dlgDataTableRunningShort: 'Berechnung…',
+  dlgDataTableDone:
+    '{count} Ergebnisse eingetragen (einfache Werte; keine Aktualisierung bei Neuberechnung).',
 } satisfies Record<keyof typeof zh, string>

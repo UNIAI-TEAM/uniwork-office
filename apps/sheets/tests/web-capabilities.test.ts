@@ -185,6 +185,8 @@ describe('ExcelShell view-only ribbon (UNI-1876 SVF-1)', () => {
       solution: 0,
       iterations: 0,
     }),
+    onDataTable: async () => ({ kind: 'column' as const, cells: 0 }),
+    onGetDataTableRange: () => '',
     onFillSeries: () => null,
     onGetFillSeriesContext: () => ({
       singleCell: true,

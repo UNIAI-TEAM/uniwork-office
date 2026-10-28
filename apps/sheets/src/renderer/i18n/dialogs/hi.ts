@@ -660,4 +660,23 @@ export const hi = {
   dlgSizeMoveOnly: 'कक्षों के साथ स्थानांतरित करें पर आकार न बदलें',
   dlgSizeFixed: 'कक्षों के साथ न स्थानांतरित करें न आकार बदलें',
   dlgSizeInvalid: 'मान्य आकार और घुमाव दर्ज करें।',
+  dlgDataTableTitle: 'डेटा टेबल',
+  dlgDataTableRange: 'तालिका श्रेणी',
+  dlgDataTableRowInput: 'पंक्ति इनपुट सेल',
+  dlgDataTableColumnInput: 'स्तंभ इनपुट सेल',
+  dlgDataTableNote:
+    'परिणाम सामान्य मानों के रूप में लिखे जाते हैं और पुनर्गणना पर अपडेट नहीं होते (Excel के ऐरे-फ़ॉर्मूला टेबलों से भिन्न); पूरी तालिका एक ही चरण में पूर्ववत हो सकती है।',
+  dlgDataTableNeedInput: 'कम से कम एक इनपुट सेल भरें: केवल एक = एक चर, दोनों = दो चर।',
+  dlgDataTableBadRange: 'तालिका श्रेणी A1 या A1:B4 जैसा संदर्भ होना चाहिए।',
+  dlgDataTableBadShape:
+    'श्रेणी का आकार गलत है: स्तंभ-दिशा एक चर के लिए 2 स्तंभ और 2+ पंक्तियाँ, पंक्ति-दिशा के लिए 2 पंक्तियाँ और 2+ स्तंभ, दो चरों के लिए कम से कम 2×2 चाहिए।',
+  dlgDataTableTooManyCells: 'तालिका {limit} परिणाम सेल की सीमा से अधिक है।',
+  dlgDataTableInputInside: 'इनपुट सेल तालिका श्रेणी के भीतर नहीं हो सकते।',
+  dlgDataTableSameInput: 'दो-चर तालिका के पंक्ति और स्तंभ इनपुट सेल अलग होने चाहिए।',
+  dlgDataTableNeedsFormula: 'फ़ॉर्मूला सेल में फ़ॉर्मूला होना चाहिए।',
+  dlgDataTableInputNotNumber: 'इनपुट सेल में साधारण संख्या होनी चाहिए या वे खाली होने चाहिए।',
+  dlgDataTableValuesNotNumber: 'प्रतिस्थापन मान संख्याएँ होनी चाहिए।',
+  dlgDataTableRunning: 'गणना हो रही है… {done}/{total}',
+  dlgDataTableRunningShort: 'गणना हो रही है…',
+  dlgDataTableDone: '{count} परिणाम लिखे गए (सामान्य मान; पुनर्गणना पर अपडेट नहीं होते)।',
 } satisfies Record<keyof typeof zh, string>

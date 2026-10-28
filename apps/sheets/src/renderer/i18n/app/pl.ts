@@ -1607,4 +1607,5 @@ export const pl = {
     'Silnik skoroszytu nieoczekiwanie się zatrzymał i został uruchomiony ponownie. Skoroszyt otwarto ponownie z ostatnio zapisanej wersji; niezapisane zmiany zostały zachowane — zapisz je wkrótce.',
   appWebSavedReopenFailed:
     'Twoje zmiany zapisano w UniWork, ale nie udało się ponownie otworzyć skoroszytu tutaj. Załaduj edytor ponownie, aby kontynuować.',
+  appDataTable: 'Tabela danych',
 } satisfies Record<keyof typeof zh, string>
