@@ -12,10 +12,25 @@ import type { ActionCtx } from '../src/renderer/action-context'
 
 vi.mock('react-konva', () => {
   const stub = () => null
-  return { Stage: stub, Layer: stub, Rect: stub, Group: stub, Line: stub, Text: stub, Image: stub }
+  return {
+    Stage: stub,
+    Layer: stub,
+    Rect: stub,
+    Group: stub,
+    Transformer: stub,
+    Line: stub,
+    Arrow: stub,
+    Text: stub,
+    Ellipse: stub,
+    Image: stub,
+    Path: stub,
+    Circle: stub,
+    Arc: stub,
+  }
 })
 
 import { Ribbon } from '../src/renderer/components/Ribbon'
+import { App } from '../src/renderer/App'
 import { LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -254,6 +269,109 @@ describe('Ribbon gating', () => {
     })
     expect(event.defaultPrevented).toBe(true)
     expect(el.querySelector('.pen-flyout')).toBeNull()
+  })
+})
+
+describe('existing 3D model selection when model3d capability is false (R1a-01)', () => {
+  it('treats an existing model3d picture as an ordinary picture: no 3D contextual tab, no turn handle, and no getModel3dData/setModel3dView calls', async () => {
+    Object.assign(globalThis, {
+      IS_REACT_ACT_ENVIRONMENT: true,
+      ResizeObserver: class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    })
+    window.matchMedia ??= (query: string) =>
+      ({
+        matches: false,
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        onchange: null,
+        dispatchEvent: () => false,
+      }) as MediaQueryList
+    Element.prototype.scrollTo ??= () => {}
+    Element.prototype.scrollIntoView ??= () => {}
+    const getModel3dData = vi.fn(() => Promise.resolve(new Uint8Array([1, 2, 3, 4])))
+    const setModel3dView = vi.fn(() => Promise.resolve(null))
+    const slideWithModel = {
+      partPath: 'ppt/slides/slide1.xml',
+      widthPx: 1280,
+      heightPx: 720,
+      scale: 1,
+      background: { kind: 'color' as const, color: '#ffffff' },
+      nodes: [
+        {
+          type: 'picture' as const,
+          id: 'pic-m3d',
+          sourceId: 'pic-m3d',
+          box: { x: 100, y: 100, w: 300, h: 200, rot: 0, flipH: false, flipV: false },
+          dataUrl:
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS9sAAAAASUVORK5CYII=',
+          model3d: { ax: 0, ay: 0, az: 0 },
+        },
+      ],
+    }
+    Object.assign(window, {
+      slidesApi: fakeApi({
+        capabilities: WEB_DEFAULTS,
+        consumePendingOpen: () =>
+          Promise.resolve({
+            ok: true,
+            path: '/deck.pptx',
+            slides: [slideWithModel],
+            defaultFont: 'Arial',
+          }),
+        isDirty: () => Promise.resolve(false),
+        getRecentFiles: () => Promise.resolve([]),
+        getSections: () => Promise.resolve([]),
+        getComments: () => Promise.resolve([]),
+        getNotes: () => Promise.resolve(''),
+        getAnimations: () => Promise.resolve([]),
+        getTransition: () => Promise.resolve(null),
+        listFonts: () => Promise.resolve([]),
+        getModel3dData,
+        setModel3dView,
+      }),
+    })
+    resetForTest()
+
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    setModuleLang('en')
+    await act(async () => {
+      root!.render(
+        createElement(LocaleProvider, {
+          initial: 'en',
+          children: createElement(App),
+        }),
+      )
+    })
+    for (let i = 0; i < 6; i++) {
+      await act(async () => {
+        await Promise.resolve()
+      })
+    }
+
+    const win: Record<string, unknown> = window as never
+    const ctrl = win.__genofficeControl as (req: unknown) => unknown
+    act(() => {
+      ctrl({ cmd: 'goto', target: { kind: 'element', slide: 0, el: 'pic-m3d' } })
+    })
+
+    const tabs = [...container.querySelectorAll('button.ribbon-tab:not(.ribbon-tab-file)')].map(
+      (b) => b.textContent,
+    )
+    expect(tabs).not.toContain('3D Model')
+    expect(tabs).toContain('Picture Tools')
+    expect(container.querySelector('.m3d-turn')).toBeNull()
+    expect(container.querySelector('.m3d-turn-handle')).toBeNull()
+    expect(getModel3dData).not.toHaveBeenCalled()
+    expect(setModel3dView).not.toHaveBeenCalled()
   })
 })
 

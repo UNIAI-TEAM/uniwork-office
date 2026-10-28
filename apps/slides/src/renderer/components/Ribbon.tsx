@@ -3523,7 +3523,7 @@ export function Ribbon({
               </div>
             </Group>
           </>
-        ) : tab === 'model3dFormat' ? (
+        ) : tab === 'model3dFormat' && cap('model3d') ? (
           <Group label={t('ribbonModel3dViews')}>
             <button
               className="rb-big"

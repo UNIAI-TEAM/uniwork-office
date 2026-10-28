@@ -3084,7 +3084,7 @@ export function App() {
 
   const model3dNode = useMemo(
     () =>
-      selectedNode?.type === 'picture' && selectedNode.model3d
+      cap('model3d') && selectedNode?.type === 'picture' && selectedNode.model3d
         ? (selectedNode as PictureRenderNode & { model3d: Model3dRotation })
         : null,
     [selectedNode],

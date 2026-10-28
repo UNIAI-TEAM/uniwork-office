@@ -6,6 +6,7 @@ import {
   contextTabForElement,
   contextualTabFor,
 } from '../src/renderer/components/context-tabs'
+import { resetForTest } from '../src/renderer/capabilities'
 
 describe('slides contextual ribbon tabs', () => {
   it('maps every selection type to its dedicated contextual tab', () => {
@@ -62,5 +63,20 @@ describe('slides contextual ribbon tabs', () => {
     expect(contextualTabFor(node({ type: 'shape', line: {} }))).toBe('shapeFormat')
     expect(contextualTabFor(node({ type: 'group', children: [] }))).toBe('shapeFormat')
     expect(contextualTabFor(node({ type: 'placeholder-chip' }))).toBeNull()
+  })
+
+  it('classifies a model3d picture as an ordinary picture when cap("model3d") is false', () => {
+    Object.assign(window, {
+      slidesApi: { capabilities: { platform: 'web', model3d: false } },
+    })
+    resetForTest()
+    try {
+      const m3dNode = { type: 'picture', model3d: { ax: 0, ay: 0, az: 0 } } as unknown as RenderNode
+      expect(contextElementTypeForNode(m3dNode)).toBe('picture')
+      expect(contextualTabFor(m3dNode)).toBe('pictureFormat')
+    } finally {
+      Object.assign(window, { slidesApi: undefined })
+      resetForTest()
+    }
   })
 })
