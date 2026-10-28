@@ -1,3 +1,5 @@
 import type { zh } from './zh'
 
-export const fr = {} satisfies Record<keyof typeof zh, string>
+export const fr = {
+  insertFootnote: 'Note de bas de page',
+} satisfies Record<keyof typeof zh, string>

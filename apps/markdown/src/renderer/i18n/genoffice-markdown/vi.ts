@@ -1,3 +1,5 @@
 import type { zh } from './zh'
 
-export const vi = {} satisfies Record<keyof typeof zh, string>
+export const vi = {
+  insertFootnote: 'Chú thích cuối trang',
+} satisfies Record<keyof typeof zh, string>
