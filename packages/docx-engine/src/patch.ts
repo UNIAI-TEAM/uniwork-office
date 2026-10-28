@@ -94,6 +94,11 @@ import {
 } from './watermark'
 import { escapeXmlAttr, escapeXmlText } from './xml-utils'
 import {
+  buildContentControlXml,
+  nextContentControlId,
+  type ContentControlSpec,
+} from './content-control'
+import {
   CUSTOM_PROPERTIES_CONTENT_TYPE,
   CUSTOM_PROPERTIES_PATH,
   CUSTOM_PROPERTIES_REL_TYPE,
@@ -336,6 +341,13 @@ export const nextFreeRelId = (relsXml: string): string => {
 
 export type ParsedDocFull = ParsedDoc & { extras: ParseExtras }
 
+/** the original body block a save block came from, when it has one */
+function saveBlockDocxIndex(fb: SaveBlock): number | undefined {
+  if (fb.kind === 'original') return fb.docxIndex
+  if (fb.kind === 'generated' || fb.kind === 'xml') return fb.docxIndex
+  return undefined
+}
+
 /** Body content in final editor order (hidden trailing elements are appended automatically). */
 export type SaveBlock = (
   | { kind: 'original'; docxIndex: number }
@@ -366,6 +378,16 @@ export type SaveBlock = (
 export interface SaveOptions {
   /** save timestamp (ISO), written to docProps/core.xml dcterms:modified; default = now */
   savedAt?: string
+  /**
+   * Block-level content controls (w:sdt) for the saved body. `wrap` puts the
+   * listed body blocks into one new control (the blocks stay individually
+   * editable), `unwrap` removes the wrapper of the control with that tag and
+   * leaves its blocks as plain body children.
+   */
+  contentControls?: {
+    wrap?: Array<{ docxIndexes: number[]; spec: ContentControlSpec }>
+    unwrap?: Array<{ tag: string }>
+  }
   /** Zotero document preferences; written as Word-compatible 255-character custom-property chunks */
   zoteroDocumentData?: string
   /** replace the trailing w:sectPr with this XML before the field-level options below apply (headless editors that keep the sectPr itself) */
@@ -705,6 +727,7 @@ export async function saveDocx(
     options.themeFonts === undefined &&
     options.themeColors === undefined &&
     options.properties === undefined &&
+    options.contentControls === undefined &&
     (options.partXml === undefined || Object.keys(options.partXml).length === 0) &&
     (options.partBinary === undefined || Object.keys(options.partBinary).length === 0)
   if (isUnchanged && !scrubPersonalInfo) return originalBytes
@@ -1470,6 +1493,42 @@ export async function saveDocx(
     }
   }
 
+  // Block-level content controls: a new control wraps the blocks of one range,
+  // an unwrap drops the wrapper of the control with that tag. Both work on the
+  // emitted bytes, so the blocks inside stay individually editable.
+  const unwrapTags = new Set((options.contentControls?.unwrap ?? []).map((u) => u.tag))
+  // an edited block saves as its original xml (shell bytes included), so the
+  // shell is stripped by content, whichever block kind carries it
+  const unwrapShells = parsed.blocks
+    .map((b) => b.sdtShell)
+    .filter((shell): shell is NonNullable<typeof shell> => !!shell && unwrapTags.has(shell.tag))
+  const stripUnwrappedShell = (xml: string): string => {
+    for (const shell of unwrapShells) {
+      if (shell.openXml && xml.startsWith(shell.openXml)) xml = xml.slice(shell.openXml.length)
+      if (shell.closeXml && xml.endsWith(shell.closeXml))
+        xml = xml.slice(0, xml.length - shell.closeXml.length)
+    }
+    return xml
+  }
+  let nextControlId = nextContentControlId(documentXml)
+  const controlWraps = (options.contentControls?.wrap ?? []).map((w) => {
+    const shell = buildContentControlXml({
+      ...w.spec,
+      id: w.spec.id ?? String(nextControlId++),
+    })
+    const indexes = new Set(w.docxIndexes)
+    // the first and the last emitted block of the range carry the wrapper
+    let first = -1
+    let last = -1
+    for (let i = 0; i < finalBlocks.length; i++) {
+      const docxIndex = saveBlockDocxIndex(finalBlocks[i]!)
+      if (docxIndex === undefined || !indexes.has(docxIndex)) continue
+      if (first === -1) first = i
+      last = i
+    }
+    return { indexes, shell, first, last }
+  })
+
   const parts: string[] = [...detachedOpaque]
   for (let i = 0; i < finalBlocks.length; i++) {
     const fb = finalBlocks[i]
@@ -1480,15 +1539,17 @@ export async function saveDocx(
       if (!el) throw new Error(`invalid docxIndex ${fb.docxIndex}`)
       xml = documentXml.slice(el.start, el.end)
       fbDocxIndex = fb.docxIndex
+      if (unwrapShells.length > 0) xml = stripUnwrappedShell(xml)
     } else if (fb.kind === 'generated') {
       if (fb.docxIndex !== undefined) fbDocxIndex = fb.docxIndex
       xml = generateParagraphXml(fb.block, genCtx)
       // If the original paragraph was inside a w:sdt shell, re-wrap it
-      if (fb.block.sdtShell) {
-        xml = fb.block.sdtShell.openXml + xml + fb.block.sdtShell.closeXml
+      const shell = fb.block.sdtShell
+      if (shell && !unwrapTags.has(shell.tag)) {
+        xml = shell.openXml + xml + shell.closeXml
       }
     } else if (fb.kind === 'xml') {
-      xml = fb.xml
+      xml = unwrapShells.length > 0 ? stripUnwrappedShell(fb.xml) : fb.xml
       fbDocxIndex = fb.docxIndex
       if (fb.replaceImage) xml = retargetImageBlip(xml, embedImageMedia(fb.replaceImage))
     } else if (fb.kind === 'chart') {
@@ -1531,6 +1592,12 @@ export async function saveDocx(
       const leadingOpaque = (opaqueBefore.get(fbDocxIndex) ?? []).join('')
       const trailingOpaque = (opaqueAfter.get(fbDocxIndex) ?? []).join('')
       if (leadingOpaque || trailingOpaque) xml = leadingOpaque + xml + trailingOpaque
+    }
+    // a new block-level content control opens before the first block of its
+    // range and closes after the last one
+    for (const wrap of controlWraps) {
+      if (wrap.first === i) xml = wrap.shell.openXml + xml
+      if (wrap.last === i) xml = xml + wrap.shell.closeXml
     }
     parts.push(xml)
   }
