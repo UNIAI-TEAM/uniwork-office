@@ -1289,6 +1289,9 @@ export const ms = {
   appPasswordChangeUniwork: 'Kata laluan dokumen UniWork tidak boleh ditukar di sini.',
   appPasswordChangeReadOnly:
     'Buku kerja ini hanya untuk dibaca, jadi kata laluannya tidak boleh ditukar.',
+  appEncryptedWrongPassword: 'Kata laluan salah. Cuba lagi.',
+  appPasswordChangeRestored:
+    'Simpan dahulu buku kerja yang dipulihkan, kemudian tukar kata laluannya.',
   appAllowEditRanges: 'Benarkan Edit Julat',
   appGroupClipboard: 'Papan Klip',
   appPaste: 'Tampal',

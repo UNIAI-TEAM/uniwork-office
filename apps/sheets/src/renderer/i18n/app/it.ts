@@ -1330,6 +1330,9 @@ export const it = {
   appPasswordChangeUniwork: 'La password di un documento UniWork non può essere modificata qui.',
   appPasswordChangeReadOnly:
     'Questa cartella di lavoro è di sola lettura, quindi la password non può essere modificata.',
+  appEncryptedWrongPassword: 'La password non è corretta. Riprova.',
+  appPasswordChangeRestored:
+    'Salva prima la cartella di lavoro ripristinata, poi cambia la sua password.',
   appAllowEditRanges: 'Consenti modifica intervalli',
   appGroupClipboard: 'Appunti',
   appPaste: 'Incolla',

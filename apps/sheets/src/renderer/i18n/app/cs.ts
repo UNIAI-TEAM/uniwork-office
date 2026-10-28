@@ -1288,6 +1288,8 @@ export const cs = {
     'Sešit chráněný heslem nelze uložit do dokumentu UniWork. Pomocí Uložit jako ponechte šifrovanou kopii v tomto počítači.',
   appPasswordChangeUniwork: 'Heslo dokumentu UniWork zde nelze změnit.',
   appPasswordChangeReadOnly: 'Tento sešit je jen pro čtení, takže jeho heslo nelze změnit.',
+  appEncryptedWrongPassword: 'Heslo není správné. Zkuste to znovu.',
+  appPasswordChangeRestored: 'Nejprve uložte obnovený sešit a teprve poté změňte jeho heslo.',
   appAllowEditRanges: 'Povolit úpravy oblastí',
   appGroupClipboard: 'Schránka',
   appPaste: 'Vložit',

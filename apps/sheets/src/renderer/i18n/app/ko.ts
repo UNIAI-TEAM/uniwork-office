@@ -1313,6 +1313,8 @@ export const ko = {
     '암호가 설정된 통합 문서는 UniWork 문서에 저장할 수 없습니다. 다른 이름으로 저장을 사용해 이 컴퓨터에 암호화된 사본을 보관하세요.',
   appPasswordChangeUniwork: 'UniWork 문서의 암호는 여기에서 변경할 수 없습니다.',
   appPasswordChangeReadOnly: '이 통합 문서는 읽기 전용이므로 암호를 변경할 수 없습니다.',
+  appEncryptedWrongPassword: '암호가 올바르지 않습니다. 다시 시도하세요.',
+  appPasswordChangeRestored: '복구한 통합 문서를 먼저 저장한 다음 암호를 변경하세요.',
   appAllowEditRanges: '범위 편집 허용',
   // Home tab
   appGroupClipboard: '클립보드',

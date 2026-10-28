@@ -671,6 +671,7 @@ const SAVE_ERROR_PATTERNS = [
   ['A password-protected workbook cannot be saved to a UniWork', 'appSaveErrEncryptedUniwork'],
   ['The password of a UniWork document cannot be changed', 'appPasswordChangeUniwork'],
   ['its password cannot be changed', 'appPasswordChangeReadOnly'],
+  ['Save the restored workbook first', 'appPasswordChangeRestored'],
 ] as const
 
 export function localizeSaveError(message: string): string | null {

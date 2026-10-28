@@ -2825,6 +2825,8 @@ export function registerSheetsIpc(): void {
     // Password first, recovery prompt second: the prompt's Restore/Discard
     // choice is consumed by prepareWorkbookForOpen, so asking for the
     // password (or rejecting a wrong one) must happen before it runs.
+    // G5-04g: a locked working copy is refused before any byte of it is read.
+    if (uniworkRefusesOpen(path)) return null
     if (await isCfbWorkbookFile(path)) {
       const bytes = await readFile(path)
       if (isEncryptedOoxml(bytes)) {
@@ -2918,6 +2920,8 @@ export function registerSheetsIpc(): void {
       .object({ path: z.string().min(1), password: z.string().min(1) })
       .parse(input)
     if (!existsSync(path)) throw new Error('Workbook file not found.')
+    const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+    if (!WORKBOOK_EXTS.has(ext)) throw new Error(`Unsupported workbook: ${ext}`)
     return openSelectedWorkbook(event, path, password)
   })
 
@@ -2938,6 +2942,8 @@ export function registerSheetsIpc(): void {
     const documentPath = sessionDocumentPath(session)
     if (uniworkIsReadOnly(documentPath)) throw new Error(PASSWORD_CHANGE_READ_ONLY_REFUSED)
     if (uniworkIsBound(documentPath)) throw new Error(PASSWORD_CHANGE_UNIWORK_REFUSED)
+    // session.path is the recovery copy here; the original would keep the old password
+    if (session.restoreTarget !== undefined) throw new Error(PASSWORD_CHANGE_RESTORED_REFUSED)
 
     const currentSha = await sha256File(session.path).catch(() => undefined)
     if (currentSha !== undefined && currentSha !== session.sha256) {
@@ -4461,7 +4467,7 @@ async function writeWorkbookTo(
     cells,
   }))
   const encryptedSaveTempDir = session.password
-    ? await mkdtemp(join(app.getPath('temp'), 'genoffice-encrypted-save-'))
+    ? await mkdtemp(join(await getSessionSnapshotDirectory(), 'save-'))
     : undefined
   const plainTargetPath = encryptedSaveTempDir
     ? join(encryptedSaveTempDir, 'workbook.xlsx')
@@ -4536,6 +4542,8 @@ async function writeWorkbookTo(
 const ENCRYPTED_UNIWORK_SAVE_REFUSED =
   'A password-protected workbook cannot be saved to a UniWork document. Use Save As to keep an encrypted copy on this computer.'
 const PASSWORD_CHANGE_UNIWORK_REFUSED = 'The password of a UniWork document cannot be changed here.'
+const PASSWORD_CHANGE_RESTORED_REFUSED =
+  'Save the restored workbook first, then change its password.'
 const PASSWORD_CHANGE_READ_ONLY_REFUSED =
   'This workbook is view-only, so its password cannot be changed.'
 

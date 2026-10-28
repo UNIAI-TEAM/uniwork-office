@@ -1354,6 +1354,9 @@ export const fr = {
   appPasswordChangeUniwork: 'Le mot de passe d’un document UniWork ne peut pas être modifié ici.',
   appPasswordChangeReadOnly:
     'Ce classeur est en lecture seule : son mot de passe ne peut pas être modifié.',
+  appEncryptedWrongPassword: 'Le mot de passe est incorrect. Réessayez.',
+  appPasswordChangeRestored:
+    "Enregistrez d'abord le classeur restauré, puis modifiez son mot de passe.",
   appAllowEditRanges: 'Permettre la modification des plages',
   appGroupClipboard: 'Presse-papiers',
   appPaste: 'Coller',

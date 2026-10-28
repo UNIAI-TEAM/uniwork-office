@@ -1277,6 +1277,8 @@ export const vi = {
     'Sổ làm việc có mật khẩu không thể lưu vào tài liệu UniWork. Hãy dùng Lưu dưới dạng để giữ bản mã hóa trên máy này.',
   appPasswordChangeUniwork: 'Không thể đổi mật khẩu của tài liệu UniWork tại đây.',
   appPasswordChangeReadOnly: 'Sổ làm việc này chỉ để xem nên không thể đổi mật khẩu.',
+  appEncryptedWrongPassword: 'Mật khẩu không đúng. Hãy thử lại.',
+  appPasswordChangeRestored: 'Hãy lưu sổ làm việc đã khôi phục trước, rồi mới đổi mật khẩu.',
   appAllowEditRanges: 'Cho phép chỉnh sửa các vùng',
   appGroupClipboard: 'Bảng nhớ tạm',
   appPaste: 'Dán',

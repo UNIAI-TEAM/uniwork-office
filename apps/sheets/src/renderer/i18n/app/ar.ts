@@ -1252,6 +1252,8 @@ export const ar = {
     'لا يمكن حفظ مصنف محمي بكلمة مرور في مستند UniWork. استخدم «حفظ باسم» للاحتفاظ بنسخة مشفرة على هذا الكمبيوتر.',
   appPasswordChangeUniwork: 'لا يمكن تغيير كلمة مرور مستند UniWork هنا.',
   appPasswordChangeReadOnly: 'هذا المصنف للعرض فقط، لذلك لا يمكن تغيير كلمة المرور الخاصة به.',
+  appEncryptedWrongPassword: 'كلمة المرور غير صحيحة. حاول مرة أخرى.',
+  appPasswordChangeRestored: 'احفظ المصنف المستعاد أولاً، ثم غيّر كلمة المرور الخاصة به.',
   appAllowEditRanges: 'السماح بتحرير النطاقات',
   appGroupClipboard: 'الحافظة',
   appPaste: 'لصق',

@@ -1325,6 +1325,8 @@ export const nl = {
     'Het wachtwoord van een UniWork-document kan hier niet worden gewijzigd.',
   appPasswordChangeReadOnly:
     'Deze werkmap is alleen-lezen, dus het wachtwoord kan niet worden gewijzigd.',
+  appEncryptedWrongPassword: 'Het wachtwoord is onjuist. Probeer het opnieuw.',
+  appPasswordChangeRestored: 'Sla eerst de herstelde werkmap op en wijzig daarna het wachtwoord.',
   appAllowEditRanges: 'Bewerken van bereiken toestaan',
   appGroupClipboard: 'Klembord',
   appPaste: 'Plakken',

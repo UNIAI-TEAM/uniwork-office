@@ -1306,6 +1306,8 @@ export const ru = {
   appPasswordChangeUniwork: 'Пароль документа UniWork нельзя изменить здесь.',
   appPasswordChangeReadOnly:
     'Эта книга доступна только для просмотра, поэтому её пароль изменить нельзя.',
+  appEncryptedWrongPassword: 'Неверный пароль. Повторите попытку.',
+  appPasswordChangeRestored: 'Сначала сохраните восстановленную книгу, затем измените её пароль.',
   appAllowEditRanges: 'Разрешить изменение диапазонов',
   appGroupClipboard: 'Буфер обмена',
   appPaste: 'Вставить',

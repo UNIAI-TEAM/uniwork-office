@@ -1267,6 +1267,8 @@ export const en = {
     'A password-protected workbook cannot be saved to a UniWork document. Use Save As to keep an encrypted copy on this computer.',
   appPasswordChangeUniwork: 'The password of a UniWork document cannot be changed here.',
   appPasswordChangeReadOnly: 'This workbook is view-only, so its password cannot be changed.',
+  appEncryptedWrongPassword: 'The password is incorrect. Try again.',
+  appPasswordChangeRestored: 'Save the restored workbook first, then change its password.',
   appAllowEditRanges: 'Allow Edit Ranges',
   appGroupClipboard: 'Clipboard',
   appPaste: 'Paste',

@@ -1288,6 +1288,8 @@ export const id = {
   appPasswordChangeUniwork: 'Kata sandi dokumen UniWork tidak dapat diubah di sini.',
   appPasswordChangeReadOnly:
     'Buku kerja ini hanya dapat dilihat, sehingga kata sandinya tidak dapat diubah.',
+  appEncryptedWrongPassword: 'Kata sandi salah. Coba lagi.',
+  appPasswordChangeRestored: 'Simpan dulu buku kerja yang dipulihkan, lalu ubah kata sandinya.',
   appAllowEditRanges: 'Izinkan Edit Rentang',
   appGroupClipboard: 'Papan Klip',
   appPaste: 'Tempel',
