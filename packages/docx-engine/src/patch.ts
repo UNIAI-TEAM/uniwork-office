@@ -927,8 +927,15 @@ export async function saveDocx(
       `<pic:spPr><a:xfrm${rot ? ` rot="${rot * 60000}"` : ''}${image.flipH ? ' flipH="1"' : ''}${image.flipV ? ' flipV="1"' : ''}><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>` +
       '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' +
       '</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>'
+    // posH/posV are the margin-relative align pair (Word position presets);
+    // applyImageWrap itself prefers posOffset when both are set, mirroring the
+    // original-image patch path (imagePatchOf)
+    const marginAlign =
+      image.posOffsetEmu === undefined && image.posH && image.posV
+        ? { h: image.posH, v: image.posV }
+        : undefined
     return image.wrap
-      ? applyImageWrap(xml, image.wrap, image.posOffsetEmu, undefined, image.zOrder)
+      ? applyImageWrap(xml, image.wrap, image.posOffsetEmu, marginAlign, image.zOrder)
       : xml
   }
   /** the pictures' runs collected into the first picture's holder paragraph */
