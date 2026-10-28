@@ -113,6 +113,7 @@ import {
   markMetaDirty,
   resetFontMetrics,
   pushHistory,
+  readSlideMedia,
   runtime,
   scheduleDeckBroadcast,
   scheduleHistoryNotify,
@@ -1028,6 +1029,18 @@ export function registerSlidesIpc(): void {
   // Screen recording: source dispatch for the renderer's navigator.mediaDevices.getDisplayMedia.
   // macOS prefers the system picker (with its permission flow), falling back to the first screen.
   void app.whenReady().then(() => {
+    electronSession.defaultSession.protocol.handle('genoffice-slide-media', (request) => {
+      const media = readSlideMedia(request.url)
+      if (!media) return new Response(null, { status: 404 })
+      return new Response(media.body as BodyInit, {
+        headers: {
+          'Content-Type': media.mime,
+          'Content-Length': String(media.body.byteLength),
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store',
+        },
+      })
+    })
     try {
       electronSession.defaultSession.setDisplayMediaRequestHandler(
         (_request, callback) => {

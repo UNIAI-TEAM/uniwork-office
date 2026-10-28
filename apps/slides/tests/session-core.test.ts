@@ -219,11 +219,15 @@ describe('session handlers with the in-memory host', () => {
       slides: [{ slideIndex: 0, wavBase64, durationMs: 1200, advanceMs: 1500 }],
     })
     expect(afterSave).not.toBeNull()
+    expect(afterSave!.order).toHaveLength(5)
+    expect(afterSave!.slides).toHaveLength(1)
     const timing = callSessionHandler('slides:get-show-timing', ctx, 0)
     expect(timing.advanceMs).toBe(1500)
     expect(timing.narrationIds).toHaveLength(1)
     const afterClear = callSessionHandler('slides:clear-narration', ctx, [0])
     expect(afterClear).not.toBeNull()
+    expect(afterClear!.order).toHaveLength(5)
+    expect(afterClear!.slides).toHaveLength(1)
     expect(callSessionHandler('slides:get-show-timing', ctx, 0).narrationIds).toEqual([])
   })
 

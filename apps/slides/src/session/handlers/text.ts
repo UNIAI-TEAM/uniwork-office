@@ -12,7 +12,7 @@ import type {
 } from '../../shared/ipc'
 import { applySessionTxn } from '../apply-txn'
 import type { HandlerContext } from '../host-io'
-import { applyAutofitResize, buildAllRenderSlides, rebuildSlide, syncAutofitScale } from '../render'
+import { applyAutofitResize, buildSlideUpdate, rebuildSlide, syncAutofitScale } from '../render'
 import { pushHistory, sessions } from '../state'
 import { journaledTxn, sessionTxn } from '../txn'
 
@@ -144,6 +144,7 @@ export const textHandlers = {
   'slides:find-replace': (ctx: HandlerContext, op: FindReplaceOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     const r = sessionTxn(session, {
       ops: [
         {
@@ -157,9 +158,12 @@ export const textHandlers = {
         },
       ],
     })
-    if (!r) return { count: 0, slides: null }
-    const count = (r.records![0]!.after as { count: number }).count
-    return { count, slides: buildAllRenderSlides(session.opened, session.fitWidthPx) }
+    if (!r) return { count: 0, update: null }
+    const { count, changedSlides } = r.records![0]!.after as {
+      count: number
+      changedSlides: number[]
+    }
+    return { count, update: buildSlideUpdate(session, before, changedSlides) }
   },
 
   'slides:set-text-anchor': (

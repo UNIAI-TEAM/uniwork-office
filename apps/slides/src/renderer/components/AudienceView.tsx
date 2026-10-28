@@ -21,6 +21,8 @@ import { ShowMediaLayer } from './ShowMediaLayer'
 import { useI18n } from '../i18n/locale'
 import { MorphStage } from './MorphStage'
 import { InkLayer, type InkStroke } from './ShowInk'
+import { mergeBroadcastUpdate } from '../../shared/slide-update'
+import { setImageSource } from '../image-loader'
 import { isWeb } from '../capabilities'
 import { showNavKey } from '../show-keys'
 import { shortcutPlatform, shortcutSurface } from '../shortcuts'
@@ -70,7 +72,7 @@ function useSlideImages(slides: RenderSlide[] | null): Map<string, HTMLImageElem
         done()
       }
       img.onerror = done
-      img.src = u
+      setImageSource(img, u)
     })
     return () => {
       cancelled = true
@@ -131,10 +133,21 @@ export function AudienceView() {
   // the fresh deck instead of keeping stale animation state.
   useEffect(
     () =>
-      window.slidesApi.onDeckChanged?.(({ slides: all }) => {
-        if (all.length === 0) return
+      window.slidesApi.onDeckChanged?.(({ slides: all, order }) => {
+        if ((order?.length ?? all.length) === 0) return
         cursorRef.current = ''
-        setSlides(all)
+        setSlides((current) =>
+          order
+            ? mergeBroadcastUpdate(current, { slides: all, order }, () => {
+                void window.slidesApi
+                  .getRenderSlides()
+                  .then((slides) => {
+                    if (slides) setSlides(slides)
+                  })
+                  .catch((error) => console.error('Failed to refresh audience deck:', error))
+              })
+            : all,
+        )
       }),
     [],
   )

@@ -5,6 +5,8 @@ import { defineConfig } from 'vitest/config'
 const here = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+  // Workspace packages' `?raw` markdown assets live outside apps/slides
+  server: { fs: { allow: [resolve(here, '../..')] } },
   // Pin resolution to this repo's workspace sources (matches tsconfig paths)
   resolve: {
     alias: {

@@ -41,7 +41,7 @@ import type {
   ShowTiming,
 } from '../../shared/ipc'
 import type { HandlerContext } from '../host-io'
-import { buildAllRenderSlides, deckDefaultFont, rebuildSlide } from '../render'
+import { buildAllRenderSlides, buildSlideUpdate, deckDefaultFont, rebuildSlide } from '../render'
 import { planSlideDuplicates, planSlideMoves } from '../../shared/slide-selection'
 import { createSession, markMetaDirty, pushHistory, sessions, type Session } from '../state'
 import { journaledTxn, sessionTxn } from '../txn'
@@ -82,6 +82,7 @@ export const slideHandlers = {
   'slides:add-slide': (ctx: HandlerContext, op: AddSlideOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     const r = sessionTxn(session, {
       ops: [
         {
@@ -95,7 +96,7 @@ export const slideHandlers = {
     session.fitWidthPx = op.fitWidthPx
     markMetaDirty(session)
     return {
-      slides: buildAllRenderSlides(session.opened, op.fitWidthPx),
+      ...buildSlideUpdate(session, before),
       index: op.sourceIndex + 1,
     }
   },
@@ -103,6 +104,7 @@ export const slideHandlers = {
   'slides:add-blank-slide': (ctx: HandlerContext, op: AddBlankSlideOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     const r = sessionTxn(session, {
       ops: [
         { op: 'addBlankSlide', target: { slide: op.sourceIndex } },
@@ -119,7 +121,7 @@ export const slideHandlers = {
     // element dirty flag is set and the insert would otherwise be unsaveable.
     markMetaDirty(session)
     return {
-      slides: buildAllRenderSlides(session.opened, op.fitWidthPx),
+      ...buildSlideUpdate(session, before),
       index: op.before ? op.sourceIndex : op.sourceIndex + 1,
     }
   },
@@ -141,6 +143,7 @@ export const slideHandlers = {
   'slides:add-slide-with-layout': (ctx: HandlerContext, op: AddSlideWithLayoutOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     // 'builtin:' resolution may inject a layout part — do it before the undo snapshot
     // is taken so a failed insert still rolls back to a consistent package
     pushHistory(session)
@@ -157,7 +160,7 @@ export const slideHandlers = {
     session.fitWidthPx = op.fitWidthPx
     markMetaDirty(session)
     return {
-      slides: buildAllRenderSlides(session.opened, op.fitWidthPx),
+      ...buildSlideUpdate(session, before),
       index: op.sourceIndex + 1,
     }
   },
@@ -204,23 +207,25 @@ export const slideHandlers = {
   'slides:delete-slide': (ctx: HandlerContext, slideIndex: number) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     const r = sessionTxn(session, { ops: [{ op: 'deleteSlide', target: { slide: slideIndex } }] })
     if (!r) return null
     markMetaDirty(session)
-    return buildAllRenderSlides(session.opened, session.fitWidthPx)
+    return buildSlideUpdate(session, before)
   },
 
-  // Drag to reorder slides (sldIdLst + deck.slides + section membership); must send back the full RenderSlide set
+  // Drag to reorder slides (sldIdLst + deck.slides + section membership)
   'slides:move-slide': (ctx: HandlerContext, op: MoveSlideOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     const r = sessionTxn(session, {
       ops: [{ op: 'moveSlide', target: { slide: op.fromIndex }, to: op.toIndex }],
     })
     if (!r) return null
     markMetaDirty(session)
     return {
-      slides: buildAllRenderSlides(session.opened, session.fitWidthPx),
+      ...buildSlideUpdate(session, before),
       sections: getSections(session.opened),
     }
   },
@@ -287,6 +292,7 @@ export const slideHandlers = {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
     const slides = session.opened.deck.slides
+    const before = slides.map((s) => s.path)
     const recorded = op.slides.filter((s) => slides[s.slideIndex])
     if (recorded.length === 0) return null
     const r = sessionTxn(session, {
@@ -301,19 +307,26 @@ export const slideHandlers = {
         { op: 'setAdvanceTime' as const, target: { slide: s.slideIndex }, ms: s.advanceMs },
       ]),
     })
-    return r ? slides.map((_, i) => rebuildSlide(session, i)) : null
+    return r
+      ? buildSlideUpdate(
+          session,
+          before,
+          recorded.map((s) => s.slideIndex),
+        )
+      : null
   },
 
   'slides:clear-narration': (ctx: HandlerContext, slideIndexes: number[]) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
     const slides = session.opened.deck.slides
+    const before = slides.map((s) => s.path)
     const targets = slideIndexes.filter((i) => slides[i] && narrationSpids(slides[i]).length > 0)
     if (targets.length === 0) return null
     const r = sessionTxn(session, {
       ops: targets.map((i) => ({ op: 'clearNarration' as const, target: { slide: i } })),
     })
-    return r ? slides.map((_, i) => rebuildSlide(session, i)) : null
+    return r ? buildSlideUpdate(session, before, targets) : null
   },
 
   'slides:microphone-access': async (ctx: HandlerContext) => {
@@ -385,6 +398,7 @@ export const slideHandlers = {
   'slides:delete-slides': (ctx: HandlerContext, op: DeleteSlidesOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     const indexes = [...new Set(op.slideIndexes)].sort((a, b) => b - a)
     if (!indexes.length || indexes.length >= session.opened.deck.slides.length) return null
     const r = sessionTxn(session, {
@@ -392,7 +406,7 @@ export const slideHandlers = {
     })
     if (!r) return null
     markMetaDirty(session)
-    return buildAllRenderSlides(session.opened, session.fitWidthPx)
+    return buildSlideUpdate(session, before)
   },
 
   'slides:duplicate-slides': (ctx: HandlerContext, op: DuplicateSlidesOp) => {
@@ -400,6 +414,7 @@ export const slideHandlers = {
     if (!session) return null
     const steps = planSlideDuplicates(op.slideIndexes)
     if (!steps.length) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     const r = sessionTxn(session, {
       ops: steps.map((st) =>
         'duplicate' in st
@@ -413,7 +428,7 @@ export const slideHandlers = {
     // would otherwise leave the deck changed but reported clean.
     markMetaDirty(session)
     return {
-      slides: buildAllRenderSlides(session.opened, op.fitWidthPx),
+      ...buildSlideUpdate(session, before),
       index: Math.max(...op.slideIndexes) + 1,
     }
   },
@@ -421,6 +436,7 @@ export const slideHandlers = {
   'slides:set-slides-hidden': (ctx: HandlerContext, op: SetSlidesHiddenOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session || !op.slideIndexes.length) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     const r = sessionTxn(session, {
       ops: op.slideIndexes.map((i) => ({
         op: 'setHidden' as const,
@@ -428,12 +444,13 @@ export const slideHandlers = {
         hidden: op.hidden,
       })),
     })
-    return r ? buildAllRenderSlides(session.opened, session.fitWidthPx) : null
+    return r ? buildSlideUpdate(session, before, op.slideIndexes) : null
   },
 
   'slides:move-slides': (ctx: HandlerContext, op: MoveSlidesOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     const steps = planSlideMoves(session.opened.deck.slides.length, op.slideIndexes, op.insertAt)
     if (!steps.length) return null
     const r = sessionTxn(session, {
@@ -442,7 +459,7 @@ export const slideHandlers = {
     if (!r) return null
     markMetaDirty(session)
     return {
-      slides: buildAllRenderSlides(session.opened, session.fitWidthPx),
+      ...buildSlideUpdate(session, before),
       sections: getSections(session.opened),
     }
   },
@@ -452,6 +469,7 @@ export const slideHandlers = {
   'slides:remove-section-slides': (ctx: HandlerContext, op: RemoveSectionSlidesOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     const total = session.opened.deck.slides.length
     const { lead, sections } = normalizeSections(getSections(session.opened), total)
     const indices = op.id == null ? lead : sections.find((s) => s.id === op.id)?.slideIndices
@@ -465,7 +483,7 @@ export const slideHandlers = {
     if (!r) return null
     markMetaDirty(session)
     return {
-      slides: buildAllRenderSlides(session.opened, session.fitWidthPx),
+      ...buildSlideUpdate(session, before),
       sections: getSections(session.opened),
     }
   },

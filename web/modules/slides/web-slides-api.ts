@@ -28,6 +28,7 @@ import { readPendingTextEdit } from '../../../apps/slides/src/renderer/pending-t
 import { base64ToBytes, bytesToBase64 } from '../../../apps/slides/src/session/bytes'
 import {
   appClipboard,
+  buildAllRenderSlides,
   callSessionHandler,
   configureSessionPlatform,
   ELEMENTS_MARKER,
@@ -42,6 +43,7 @@ import {
   type SessionChannel,
 } from '../../../apps/slides/src/session'
 import type {
+  DeckChange,
   ExportImagesOp,
   ExportImagesResult,
   ExportPdfOp,
@@ -213,7 +215,7 @@ export function createWebSlidesApi(
   const editorStartMs = opts.editorStartMs ?? TIMEOUTS.editorStart
 
   const historyEvents = listeners<{ canUndo: boolean; canRedo: boolean }>()
-  const deckEvents = listeners<{ slides: OpenResult['slides']; size: { cx: number; cy: number } }>()
+  const deckEvents = listeners<DeckChange>()
   const openedEvents = listeners<OpenResult>()
   const renamedEvents = listeners<string>()
   const menuEvents = listeners<MenuCommand>()
@@ -230,6 +232,8 @@ export function createWebSlidesApi(
     decodeTiff: tiffToPng,
     defer: (fn) => void setTimeout(fn, 0),
     defaultPictureDpi: pictureDpiFor(/Mac/i.test(navigator.platform)),
+    mediaUrl: undefined,
+    pruneMedia: undefined,
     events: {
       historyChanged: (ids, s) => {
         if (!ids.includes(WEB_CLIENT_ID)) return
@@ -239,7 +243,12 @@ export function createWebSlidesApi(
       deckChanged: (ids, payload) => {
         if (!ids.includes(WEB_CLIENT_ID)) return
         deckEvents.emit(payload)
-        presenter?.deckChanged(payload.slides)
+        if (presenter) {
+          const s = sessions.get(WEB_CLIENT_ID)
+          const fullSlides =
+            payload.order && s ? buildAllRenderSlides(s.opened, s.fitWidthPx) : payload.slides
+          presenter.deckChanged(fullSlides)
+        }
       },
     },
     deckOpened: (opened) => {

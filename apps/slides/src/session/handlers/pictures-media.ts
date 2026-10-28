@@ -21,7 +21,7 @@ import type {
 import { base64ToBytes, bytesToBase64 } from '../bytes'
 import type { HandlerContext, PickedFile } from '../host-io'
 import { sessionPlatform } from '../platform'
-import { buildAllRenderSlides, rebuildSlide } from '../render'
+import { buildSlideUpdate, rebuildSlide } from '../render'
 import { pushHistory, sessions, type Session } from '../state'
 import { journaledTxn, sessionTxn } from '../txn'
 
@@ -312,6 +312,7 @@ export const pictureMediaHandlers = {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
     const slides = session.opened.deck.slides
+    const before = slides.map((s) => s.path)
     const targets = op.slideIndex === -1 ? slides : [slides[op.slideIndex]].filter(Boolean)
     if (targets.length === 0) return null
 
@@ -381,7 +382,11 @@ export const pictureMediaHandlers = {
       }
     }
     session.fitWidthPx = op.fitWidthPx
-    return buildAllRenderSlides(session.opened, op.fitWidthPx)
+    return buildSlideUpdate(
+      session,
+      before,
+      targets.map((s) => slides.indexOf(s)),
+    )
   },
 
   // Freehand ink stroke commit: one transparent PNG picture element per stroke (cNvPr name has

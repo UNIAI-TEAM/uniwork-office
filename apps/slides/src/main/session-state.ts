@@ -8,16 +8,26 @@
  */
 import { BrowserWindow, webContents } from 'electron'
 import type { WebContents } from 'electron'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { configureSessionPlatform, resetFontMetricsCache } from '../session'
+import type { OpenedPptx } from '@genoffice/pptx-engine'
+import {
+  configureSessionPlatform,
+  resetFontMetricsCache,
+  retintThemedSvg,
+  type Session,
+} from '../session'
 import { createSystemFontMetrics, resetFontRegistry } from './fonts'
-import { tiffToPng } from './tiff-decode'
+import { neutralizeJpegOrientation } from './jpeg-orientation'
+import { displayMime } from './media-mime'
 import { pictureDpiFor } from './picture-frame'
+import { tiffToPng } from './tiff-decode'
 
 export {
   attachedIds,
   beginHistoryBatch,
   buildAllRenderSlides,
+  buildSlideUpdate,
   carryHistoryForReplacement,
   editorAttachedIds,
   endHistoryBatch,
@@ -43,11 +53,120 @@ export {
   type Session,
 } from '../session'
 
+type MediaSource = {
+  opened: WeakRef<OpenedPptx>
+  bytes: WeakRef<Uint8Array>
+  mediaRef: string
+  slidePath?: string
+}
+const mediaSources = new Map<string, MediaSource>()
+const mediaUrls = new WeakMap<OpenedPptx, Map<string, string>>()
+const mediaCleanup = new FinalizationRegistry<Map<string, string>>((urls) => {
+  for (const url of urls.values()) mediaSources.delete(url)
+})
+const byteVersions = new WeakMap<Uint8Array, number>()
+let nextByteVersion = 0
+function byteVersion(bytes: Uint8Array | null): number {
+  if (!bytes) return 0
+  let version = byteVersions.get(bytes)
+  if (version === undefined) byteVersions.set(bytes, (version = ++nextByteVersion))
+  return version
+}
+
+/** Keep archive and rollback bytes, including media used by masters, layouts and notes. */
+export function pruneMediaSources(session: Session): void {
+  const urls = mediaUrls.get(session.opened)
+  if (!urls) return
+  const snapshots = [
+    ...session.undoStack,
+    ...session.redoStack,
+    ...(session.previewRedo ?? []),
+    ...(session.historyBatch ? [session.historyBatch.before] : []),
+    ...(session.aiSnapshots?.values() ?? []),
+  ]
+  const retained = new Set(session.opened.archive.entries.values())
+  for (const snapshot of snapshots)
+    for (const bytes of snapshot.entries.values()) retained.add(bytes)
+  for (const [key, url] of urls) {
+    const bytes = mediaSources.get(url)?.bytes.deref()
+    if (!bytes || !retained.has(bytes)) {
+      urls.delete(key)
+      mediaSources.delete(url)
+    }
+  }
+}
+
+/** Resolve opaque media URLs without cloning image bytes across the IPC boundary.
+ * Weak references leave archive/history responsible for the lifetime of the bytes.
+ * A replacement gets a new URL; undo reuses the original URL and decoded image. */
+export function resolveSlideMediaUrl(
+  opened: OpenedPptx,
+  mediaRef: string,
+  slidePath?: string,
+): string | undefined {
+  const bytes = opened.archive.readBytes(mediaRef)
+  if (!bytes) return undefined
+  const mime = displayMime(mediaRef, bytes)
+  let context = ''
+  // SVG theme classes depend on the live theme and clrMap, including per-slide overrides.
+  if (mime === 'image/svg+xml') {
+    const path = slidePath ?? opened.deck.slides[0]?.path
+    if (path) {
+      const chain = opened.archive.resolveSlideChain(path)
+      context = [path, chain.layoutPath, chain.masterPath, chain.themePath]
+        .map((p) => `${p}:${byteVersion(p ? opened.archive.readBytes(p) : null)}`)
+        .join('|')
+    }
+  }
+  let urls = mediaUrls.get(opened)
+  if (!urls) {
+    urls = new Map()
+    mediaUrls.set(opened, urls)
+    mediaCleanup.register(opened, urls)
+  }
+  const key = `${byteVersion(bytes)}:${mime}:${context}`
+  let url = urls.get(key)
+  if (!url) {
+    url = `genoffice-slide-media://archive/${randomUUID()}?mime=${encodeURIComponent(mime)}`
+    urls.set(key, url)
+    mediaSources.set(url, {
+      opened: new WeakRef(opened),
+      bytes: new WeakRef(bytes),
+      mediaRef,
+      ...(slidePath ? { slidePath } : {}),
+    })
+  }
+  return url
+}
+
+/** Display-only conversion; the original archive bytes are untouched for PPTX save. */
+export function readSlideMedia(url: string): { body: Uint8Array; mime: string } | null {
+  const source = mediaSources.get(url)
+  const opened = source?.opened.deref()
+  const bytes = source?.bytes.deref()
+  if (!source || !opened || !bytes) return null
+  let mime = displayMime(source.mediaRef, bytes)
+  let body = bytes
+  if (mime === 'image/tiff') {
+    const decoded = tiffToPng(bytes)
+    if (!decoded) return null
+    body = decoded.png
+    mime = 'image/png'
+  } else if (mime === 'image/svg+xml') {
+    const text = Buffer.from(bytes).toString('utf8')
+    body = Buffer.from(retintThemedSvg(text, opened, source.slidePath), 'utf8')
+  } else if (mime === 'image/jpeg') {
+    body = neutralizeJpegOrientation(bytes)
+  }
+  return { body, mime }
+}
 configureSessionPlatform({
   createFontMetrics: createSystemFontMetrics,
   decodeTiff: tiffToPng,
   defer: (fn) => void setImmediate(fn),
   defaultPictureDpi: pictureDpiFor(process.platform === 'darwin'),
+  mediaUrl: resolveSlideMediaUrl,
+  pruneMedia: pruneMediaSources,
   events: {
     historyChanged: (ids, state) => {
       for (const id of ids) webContents.fromId(id)?.send('slides:history-changed', { ...state })

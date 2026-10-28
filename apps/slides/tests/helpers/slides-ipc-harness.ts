@@ -185,7 +185,9 @@ export const electronModule = {
       return new FakeImage({ width: 16, height: 9 }, TINY_PNG)
     },
   },
-  session: { defaultSession: { setDisplayMediaRequestHandler: () => {} } },
+  session: {
+    defaultSession: { protocol: { handle: () => {} }, setDisplayMediaRequestHandler: () => {} },
+  },
   shell: {
     openExternal: async () => {},
     showItemInFolder: (path: string) =>

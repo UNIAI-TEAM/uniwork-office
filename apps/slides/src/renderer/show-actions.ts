@@ -4,6 +4,7 @@
  * Functions take the ActionCtx built fresh per call.
  */
 import type { ActionCtx } from './action-context'
+import { mergeSlideUpdate } from '../shared/slide-update'
 import { recordedSlides } from './narration/encode'
 import type { NarrationTake } from './narration/use-recording'
 import type { CustomShow } from './slideshow-utils'
@@ -113,9 +114,9 @@ export async function saveRecording(ctx: ActionCtx): Promise<void> {
   ctx.setPendingRecording(null)
   try {
     const slides = await recordedSlides(take.audio, take.marks, take.endMs)
-    const all = slides.length > 0 ? await window.slidesApi.saveRecording({ slides }) : null
-    if (!all) throw new Error('the recording was not saved')
-    ctx.setSlides(all)
+    const update = slides.length > 0 ? await window.slidesApi.saveRecording({ slides }) : null
+    if (!update) throw new Error('the recording was not saved')
+    ctx.setSlides((current) => mergeSlideUpdate(current, update))
     ctx.setDirty(true)
     ctx.setStatus(t('appStatusRecordSaved', { count: slides.length }))
   } catch {
@@ -125,9 +126,9 @@ export async function saveRecording(ctx: ActionCtx): Promise<void> {
 
 export async function clearNarration(ctx: ActionCtx, all: boolean): Promise<void> {
   const indexes = all ? ctx.slides.map((_, i) => i) : [ctx.current]
-  const updated = await window.slidesApi.clearNarration(indexes)
-  if (!updated) return
-  ctx.setSlides(updated)
+  const update = await window.slidesApi.clearNarration(indexes)
+  if (!update) return
+  ctx.setSlides((current) => mergeSlideUpdate(current, update))
   ctx.setDirty(true)
   ctx.setStatus(t('appStatusNarrationCleared'))
 }
@@ -164,7 +165,7 @@ export async function setSlidesHidden(
   if (!sel.length) return
   const r = await window.slidesApi.setSlidesHidden({ slideIndexes: sel, hidden })
   if (!r) return
-  ctx.setSlides(r)
+  ctx.setSlides((current) => mergeSlideUpdate(current, r))
   ctx.setDirty(true)
   if (sel.length === 1) {
     const page = sel[0]! + 1
