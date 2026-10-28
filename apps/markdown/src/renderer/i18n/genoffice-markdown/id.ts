@@ -8,4 +8,5 @@ export const id = {
   graphClose: 'Tutup graf',
   graphEmpty: 'Vault belum memiliki catatan.',
   graphTruncated: 'Terlalu banyak catatan: graf menampilkan {shown} pertama dari {total}.',
+  suggestCreateNote: 'Buat catatan baru',
 } satisfies Record<keyof typeof zh, string>

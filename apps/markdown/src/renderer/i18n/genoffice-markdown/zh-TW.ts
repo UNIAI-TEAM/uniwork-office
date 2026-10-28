@@ -8,4 +8,5 @@ export const zhTW = {
   graphClose: '關閉圖譜',
   graphEmpty: '庫中還沒有筆記。',
   graphTruncated: '筆記太多，圖譜只畫出了前 {shown} / {total} 篇。',
+  suggestCreateNote: '新增筆記',
 } satisfies Record<keyof typeof zh, string>

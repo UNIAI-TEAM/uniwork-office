@@ -8,4 +8,5 @@ export const ar = {
   graphClose: 'إغلاق المخطط',
   graphEmpty: 'لا توجد ملاحظات في المكتبة بعد.',
   graphTruncated: 'ملاحظات كثيرة جدًا: يعرض الرسم أول {shown} من {total}.',
+  suggestCreateNote: 'إنشاء ملاحظة جديدة',
 } satisfies Record<keyof typeof zh, string>

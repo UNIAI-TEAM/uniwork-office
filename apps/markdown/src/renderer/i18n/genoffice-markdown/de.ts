@@ -8,4 +8,5 @@ export const de = {
   graphClose: 'Graph schließen',
   graphEmpty: 'Der Tresor hat noch keine Notizen.',
   graphTruncated: 'Zu viele Notizen: Das Diagramm zeigt die ersten {shown} von {total}.',
+  suggestCreateNote: 'Neue Notiz erstellen',
 } satisfies Record<keyof typeof zh, string>

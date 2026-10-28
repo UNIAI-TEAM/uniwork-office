@@ -8,4 +8,5 @@ export const ms = {
   graphClose: 'Tutup graf',
   graphEmpty: 'Vault belum mempunyai nota.',
   graphTruncated: 'Terlalu banyak nota: graf menunjukkan {shown} yang pertama daripada {total}.',
+  suggestCreateNote: 'Cipta nota baharu',
 } satisfies Record<keyof typeof zh, string>

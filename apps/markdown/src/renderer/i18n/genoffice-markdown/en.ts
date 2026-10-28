@@ -8,4 +8,5 @@ export const en = {
   graphClose: 'Close the graph',
   graphEmpty: 'The vault has no notes yet.',
   graphTruncated: 'Too many notes: the graph shows the first {shown} of {total}.',
+  suggestCreateNote: 'Create new note',
 } satisfies Record<keyof typeof zh, string>

@@ -8,4 +8,5 @@ export const cs = {
   graphClose: 'Zavřít graf',
   graphEmpty: 'V trezoru ještě nejsou poznámky.',
   graphTruncated: 'Příliš poznámek: graf zobrazuje prvních {shown} z {total}.',
+  suggestCreateNote: 'Vytvořit novou poznámku',
 } satisfies Record<keyof typeof zh, string>

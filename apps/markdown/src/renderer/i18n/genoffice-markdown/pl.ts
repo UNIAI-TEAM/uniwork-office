@@ -8,4 +8,5 @@ export const pl = {
   graphClose: 'Zamknij graf',
   graphEmpty: 'W sejfie nie ma jeszcze notatek.',
   graphTruncated: 'Za dużo notatek: wykres pokazuje pierwsze {shown} z {total}.',
+  suggestCreateNote: 'Utwórz nową notatkę',
 } satisfies Record<keyof typeof zh, string>

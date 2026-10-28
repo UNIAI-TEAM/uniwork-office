@@ -7,4 +7,5 @@ export const zh = {
   graphClose: '关闭图谱',
   graphEmpty: '库中还没有笔记。',
   graphTruncated: '笔记太多，图谱只画出了前 {shown} / {total} 篇。',
+  suggestCreateNote: '新建笔记',
 }

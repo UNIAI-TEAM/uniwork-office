@@ -8,4 +8,5 @@ export const ru = {
   graphClose: 'Закрыть граф',
   graphEmpty: 'В хранилище ещё нет заметок.',
   graphTruncated: 'Слишком много заметок: на графике показаны первые {shown} из {total}.',
+  suggestCreateNote: 'Создать новую заметку',
 } satisfies Record<keyof typeof zh, string>

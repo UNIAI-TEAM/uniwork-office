@@ -8,4 +8,5 @@ export const he = {
   graphClose: 'סגירת הגרף',
   graphEmpty: 'עדיין אין פתקים בכספת.',
   graphTruncated: 'יותר מדי הערות: הגרף מציג את {shown} הראשונות מתוך {total}.',
+  suggestCreateNote: 'צור פתק חדש',
 } satisfies Record<keyof typeof zh, string>

@@ -8,4 +8,5 @@ export const nl = {
   graphClose: 'Grafiek sluiten',
   graphEmpty: 'De kluis heeft nog geen notities.',
   graphTruncated: 'Te veel notities: de grafiek toont de eerste {shown} van {total}.',
+  suggestCreateNote: 'Nieuwe notitie maken',
 } satisfies Record<keyof typeof zh, string>

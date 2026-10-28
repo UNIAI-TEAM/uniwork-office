@@ -8,4 +8,5 @@ export const pt = {
   graphClose: 'Fechar o grafo',
   graphEmpty: 'O cofre ainda não tem notas.',
   graphTruncated: 'Notas demais: o gráfico mostra as primeiras {shown} de {total}.',
+  suggestCreateNote: 'Criar nova nota',
 } satisfies Record<keyof typeof zh, string>

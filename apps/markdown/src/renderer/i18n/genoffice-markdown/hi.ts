@@ -8,4 +8,5 @@ export const hi = {
   graphClose: 'ग्राफ़ बंद करें',
   graphEmpty: 'वॉल्ट में अभी कोई नोट नहीं है।',
   graphTruncated: 'बहुत अधिक नोट्स: ग्राफ़ पहली {shown} / {total} दिखाता है।',
+  suggestCreateNote: 'नया नोट बनाएँ',
 } satisfies Record<keyof typeof zh, string>

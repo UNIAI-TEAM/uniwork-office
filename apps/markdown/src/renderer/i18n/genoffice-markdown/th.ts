@@ -8,4 +8,5 @@ export const th = {
   graphClose: 'ปิดกราฟ',
   graphEmpty: 'ยังไม่มีโน้ตในไลบรารี',
   graphTruncated: 'มีโน้ตมากเกินไป: กราฟแสดง {shown} จาก {total} รายการแรก',
+  suggestCreateNote: 'สร้างโน้ตใหม่',
 } satisfies Record<keyof typeof zh, string>

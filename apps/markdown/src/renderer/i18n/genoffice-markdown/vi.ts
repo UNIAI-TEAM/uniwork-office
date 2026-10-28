@@ -9,4 +9,5 @@ export const vi = {
   graphEmpty: 'Kho chưa có ghi chú nào.',
   graphTruncated:
     'Quá nhiều ghi chú: biểu đồ chỉ hiển thị {shown} ghi chú đầu tiên trong tổng số {total}.',
+  suggestCreateNote: 'Tạo ghi chú mới',
 } satisfies Record<keyof typeof zh, string>
