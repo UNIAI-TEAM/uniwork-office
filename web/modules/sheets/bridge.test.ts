@@ -122,10 +122,12 @@ function setup(
     revision?: string
     /** SIZE-F1: `init.limits` the host advertises for the session */
     limits?: { max_bytes: number; warn_ratio: number }
+    /** the bytes the host serves for Budget.xlsx (default: a tiny text stand-in) */
+    fileBytes?: Uint8Array
   } = {},
 ) {
   const mock = createMockPort({ documentId: 'pending' })
-  const file = mock.seed('Budget.xlsx', enc('v1'))
+  const file = mock.seed('Budget.xlsx', opts.fileBytes ?? enc('v1'))
   const fake = fakeTransport(opts.features)
   const transport = opts.transport ?? fake.transport
   const print = vi.fn(async () => ({ ok: true }))
@@ -777,6 +779,36 @@ describe('encrypted workbook open', () => {
     expect(message).not.toMatch(/host application|decrypted/i)
     // a refusal for this reason is not a size refusal: the host hears no open_refused
     expect(t.mock.openRefused).toEqual([])
+  })
+})
+
+describe("encrypted workbook open: the web engine's zip error", () => {
+  const oleBytes = Uint8Array.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0])
+
+  async function openWith(bytes: Uint8Array, engineMessage: string) {
+    const fake = fakeTransport()
+    const failing = {
+      ...fake.transport,
+      open: async () => {
+        throw new Error(engineMessage)
+      },
+    }
+    const t = setup({ transport: failing, fileBytes: bytes })
+    t.mock.init({ documentId: t.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    return t.desktop.selectWorkbook().catch((e: unknown) => e)
+  }
+
+  it('an OLE2 container the engine rejects as a zip is told as a password-protected workbook', async () => {
+    const err = await openWith(oleBytes, 'invalid Zip archive: Could not find EOCD')
+    expect((err as Error).message).toMatch(/password/i)
+    expect((err as Error).message).toMatch(/desktop app/i)
+    expect((err as Error).message).not.toMatch(/EOCD|Zip archive/i)
+  })
+
+  it('a zip error on bytes that are not an OLE2 container keeps the engine message', async () => {
+    const err = await openWith(enc('not a package'), 'invalid Zip archive: Could not find EOCD')
+    expect((err as Error).message).toMatch(/EOCD/)
   })
 })
 

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { applyDataTable } from '../src/renderer/data-table'
 import { setManualCalculation } from '../src/renderer/calc-options'
 import { setModuleLang } from '../src/renderer/i18n/locale'
-import type { UniverRuntime } from '../src/renderer/univer-state'
+import { undoSuppression, type UniverRuntime } from '../src/renderer/univer-state'
 
 beforeEach(() => {
   // Stable error-message assertions; zh is the authored source, en the mirror.
@@ -33,6 +33,15 @@ function makeRuntime(
   const key = (row: number, column: number) => `${row}:${column}`
   const writes: string[] = []
   const events: string[] = []
+  // Undo entries the patched Univer undo service would keep, in push order.
+  // A batched undo item replays them in that order (LocalUndoRedoService
+  // appends each pushed item's undoMutations), so the last entry per cell wins.
+  const undoEntries: (() => void)[] = []
+  const rememberForUndo = (at: string): void => {
+    if (undoSuppression.active) return
+    const previous = cells.get(at)
+    undoEntries.push(() => (previous === undefined ? cells.delete(at) : cells.set(at, previous)))
+  }
   let calcEnds = 0
   let forcedCalcs = 0
   const listeners = new Set<() => void>()
@@ -55,6 +64,7 @@ function makeRuntime(
         : (cells.get(key(row, column)) ?? null),
     setValue: (value: number | string | boolean | ICellDataLike) => {
       writes.push(`set ${key(row, column)} ${JSON.stringify(value)}`)
+      rememberForUndo(key(row, column))
       if (typeof value === 'object' && value !== null) {
         if (value.v === null || value.v === undefined) cells.delete(key(row, column))
         else cells.set(key(row, column), value.v)
@@ -66,6 +76,7 @@ function makeRuntime(
       matrix.forEach((rowValues, rowIndex) => {
         rowValues.forEach((data, columnIndex) => {
           const at = key(row + rowIndex, column + columnIndex)
+          rememberForUndo(at)
           if (data.v === null || data.v === undefined) cells.delete(at)
           else cells.set(at, data.v)
         })
@@ -110,6 +121,7 @@ function makeRuntime(
     read,
     writes,
     events,
+    undoBatch: () => undoEntries.forEach((undo) => undo()),
     calcEnds: () => calcEnds,
     forcedCalcs: () => forcedCalcs,
   }
@@ -158,6 +170,32 @@ describe('applyDataTable: one-variable column table', () => {
     expect(fake.events[0]).toBe('batch-begin')
     expect(fake.events[fake.events.length - 1]).toBe('batch-dispose')
     expect(fake.events.filter((event) => event === 'batch-begin')).toHaveLength(1)
+  })
+
+  it('one undo clears the results and leaves the input at its original value', async () => {
+    const fake = makeRuntime({ row: 3, column: 2 }, () => {
+      const input = fake.read(0, 3)
+      return typeof input === 'number' ? input * 2 : '#ERR'
+    })
+    fake.seed(0, 3, 10)
+    fake.seed(4, 1, 1)
+    fake.seed(5, 1, 2)
+    fake.seed(6, 1, 3)
+    await applyDataTable(fake.runtime, {
+      tableRange: 'B4:C7',
+      rowInputCell: null,
+      columnInputCell: 'D1',
+    })
+    expect(fake.read(4, 2)).toBe(2)
+
+    fake.undoBatch()
+
+    // Without the input writes kept out of the undo stack, the replay in
+    // push order left D1 at the last substituted value (3).
+    expect(fake.read(0, 3)).toBe(10)
+    expect(fake.read(4, 2)).toBeNull()
+    expect(fake.read(5, 2)).toBeNull()
+    expect(fake.read(6, 2)).toBeNull()
   })
 
   it('restores an originally empty input cell to empty', async () => {
@@ -258,6 +296,36 @@ describe('applyDataTable: two-variable grid', () => {
         [{ v: 30 }, { v: 40 }],
       ])}`,
     ])
+  })
+})
+
+describe('applyDataTable: undo of a two-variable grid', () => {
+  it('one undo restores both inputs and clears the grid', async () => {
+    const fake = makeRuntime({ row: 3, column: 1 }, () => {
+      const rowInput = fake.read(0, 5)
+      const columnInput = fake.read(1, 5)
+      return typeof rowInput === 'number' && typeof columnInput === 'number'
+        ? rowInput * 10 + columnInput
+        : '#ERR'
+    })
+    fake.seed(0, 5, 5)
+    fake.seed(1, 5, 7)
+    fake.seed(3, 2, 1)
+    fake.seed(3, 3, 2)
+    fake.seed(4, 1, 10)
+    fake.seed(5, 1, 20)
+    await applyDataTable(fake.runtime, {
+      tableRange: 'B4:D6',
+      rowInputCell: 'F1',
+      columnInputCell: 'F2',
+    })
+
+    fake.undoBatch()
+
+    expect(fake.read(0, 5)).toBe(5)
+    expect(fake.read(1, 5)).toBe(7)
+    expect(fake.read(4, 2)).toBeNull()
+    expect(fake.read(5, 3)).toBeNull()
   })
 })
 
