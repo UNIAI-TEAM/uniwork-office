@@ -8,6 +8,7 @@ import { blocksToPmDoc, pmDocToSavePlan, type PmNode } from '../src/renderer/edi
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { DocRedaction } from '../src/renderer/editor/redaction'
 import { REDACT_MARK } from '../src/renderer/ai/redact'
+import { modelTextOf, redactionCount } from '../src/renderer/ai/redact-view'
 
 /**
  * The whole feature rests on the mark surviving a .docx round trip: a
@@ -278,6 +279,30 @@ describe('a withheld span survives the .docx', () => {
     editor.commands.unsetRedaction()
     expect(redactionMarks(editor)).toEqual([])
     expect(editor.state.doc.textContent).toContain(SECRET)
+  })
+
+  it('showing a saved hidden span to AI again survives save and reopen while keeping unrelated rPr', async () => {
+    const docx = await makeDocx('<w:r><w:rPr><w:em w:val="dot"/></w:rPr><w:t>secret</w:t></w:r>')
+    const editor = await open(docx)
+    selectText(editor, 'secret')
+    editor.commands.setRedaction('client')
+
+    const savedHidden = await save(editor, docx)
+    const reopenedHidden = await open(savedHidden)
+    expect(redactionCount(reopenedHidden.getJSON() as never)).toBe(1)
+    expect(modelTextOf(reopenedHidden.getJSON() as never)).toBe('{{client}}')
+
+    selectText(reopenedHidden, 'secret')
+    reopenedHidden.commands.unsetRedaction()
+    expect(redactionCount(reopenedHidden.getJSON() as never)).toBe(0)
+
+    const savedShown = await save(reopenedHidden, savedHidden)
+    const reopenedShown = await open(savedShown)
+    expect(redactionCount(reopenedShown.getJSON() as never)).toBe(0)
+    expect(redactionMarks(reopenedShown)).toEqual([])
+    expect(modelTextOf(reopenedShown.getJSON() as never)).toBe('secret')
+    const reparsed = await parseDocx(savedShown)
+    expect(reparsed.blocks[0]?.runs?.[0]?.em).toBe('dot')
   })
 })
 

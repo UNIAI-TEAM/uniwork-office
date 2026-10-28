@@ -123,6 +123,19 @@ function redactLabelIn(rawRPr: string): string {
     .replace(/&amp;/g, '&')
 }
 
+/** strip the custom redaction element from generic retained rPr while keeping unrelated children */
+function stripRedactRPr(rawRPr: string): string | undefined {
+  if (!REDACT_RPR_RE.test(rawRPr)) return rawRPr
+  const stripped = rawRPr.replace(
+    /<go:redact\b[^>]*>[\s\S]*?<\/go:redact>|<go:redact\b[^>]*\/>/g,
+    '',
+  )
+  if (/^<w:rPr(?:\s[^>]*)?>\s*<\/w:rPr>$/.test(stripped) || stripped.trim() === '') {
+    return undefined
+  }
+  return stripped
+}
+
 export function blocksToPmDoc(
   blocks: Block[],
   sections?: SectionInfo[],
@@ -1801,7 +1814,7 @@ function runMarks(run: Run): PmMark[] {
         cs: run.cs ?? null,
         rtl: run.rtl ?? null,
         styleId: run.styleId ?? null,
-        rawRPr: run.rawRPr ?? null,
+        rawRPr: (typeof run.rawRPr === 'string' ? stripRedactRPr(run.rawRPr) : null) ?? null,
         themeRFonts: run.themeRFonts ? JSON.stringify(run.themeRFonts) : null,
         themeColor: run.themeColor ?? null,
       },
@@ -3362,8 +3375,13 @@ export function inlineToRuns(content: PmNode[]): Run[] {
     }
     if (node.type === 'docNoteRef') {
       const base = atomBase(node)
+      const hasRedact = node.marks?.some((m) => m.type === 'redaction') ?? false
       const markerRawRPr =
-        typeof node.attrs?.rawRPr === 'string' && node.attrs.rawRPr ? node.attrs.rawRPr : undefined
+        typeof node.attrs?.rawRPr === 'string' && node.attrs.rawRPr
+          ? hasRedact
+            ? node.attrs.rawRPr
+            : stripRedactRPr(node.attrs.rawRPr)
+          : undefined
       const rawRPr = mergeRawRPr(markerRawRPr, base.rawRPr)
       runs.push({
         ...base,
@@ -3404,9 +3422,12 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       const rule = node.attrs?.rule as NonNullable<Run['image']>['rule'] | null | undefined
       if ((dataUrl || rule) && xml) {
         const base = atomBase(node)
+        const hasRedact = node.marks?.some((m) => m.type === 'redaction') ?? false
         const imageRawRPr =
           typeof node.attrs?.rawRPr === 'string' && node.attrs.rawRPr
-            ? String(node.attrs.rawRPr)
+            ? hasRedact
+              ? String(node.attrs.rawRPr)
+              : stripRedactRPr(String(node.attrs.rawRPr))
             : undefined
         const rawRPr = mergeRawRPr(imageRawRPr, base.rawRPr)
         runs.push({
@@ -3607,7 +3628,7 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       if (mark.attrs?.eaLang) run.eastAsiaLang = String(mark.attrs.eaLang)
       if (mark.attrs?.rtl != null) run.rtl = Boolean(mark.attrs.rtl)
       if (mark.attrs?.styleId) run.styleId = String(mark.attrs.styleId)
-      if (mark.attrs?.rawRPr) styleRawRPr = String(mark.attrs.rawRPr)
+      if (mark.attrs?.rawRPr) styleRawRPr = stripRedactRPr(String(mark.attrs.rawRPr))
       if (mark.attrs?.themeRFonts) {
         run.themeRFonts = JSON.parse(String(mark.attrs.themeRFonts)) as Run['themeRFonts']
       }
