@@ -235,6 +235,22 @@ describe('editing', () => {
     expect(save()).toBe('See [[Note|Display!]] here.')
   })
 
+  it('leaves the links undecorated, without an error, when the resolver answers undefined', async () => {
+    const rejected: unknown[] = []
+    const onRejected = (reason: unknown) => rejected.push(reason)
+    process.on('unhandledRejection', onRejected)
+    try {
+      const resolve = vi.fn(async () => undefined as unknown as Record<string, WikiLinkResolved>)
+      const { editor } = open('see [[Alpha]] and ![[pic.png]]', { resolve })
+      await settled()
+      expect(resolve).toHaveBeenCalled()
+      expect(editor.view.dom.querySelector('.wiki-link-resolved, .wiki-link-unresolved')).toBeNull()
+      expect(rejected).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onRejected)
+    }
+  })
+
   it('resolves the link as the text spells it now, not as it was parsed', async () => {
     const resolve = vi.fn(async (_from: string, targets: string[]) => {
       const out: Record<string, WikiLinkResolved> = {}

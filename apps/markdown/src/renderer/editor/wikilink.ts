@@ -364,7 +364,7 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
         return
       }
       const mine = ++generation
-      let answers: Record<string, WikiLinkResolved>
+      let answers: Record<string, WikiLinkResolved> | undefined
       try {
         answers = await options.resolve(fromPath, targets)
       } catch {
@@ -372,6 +372,9 @@ export const WikiLinkResolve = Extension.create<WikiLinkOptions>({
       }
       // a later keystroke started a newer resolution; its answer is the current one
       if (mine !== generation || view.isDestroyed) return
+      // the web frame's bridge answers a missing resolver with undefined, not a throw:
+      // the links stay undecorated, as when the call throws
+      if (!answers) return
       asked = question
 
       decorate(view, answers)

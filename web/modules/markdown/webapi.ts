@@ -160,8 +160,8 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
     | 'setMarkdownTheme'
     // wiki links resolve against the file tree and open a note through the shell; a frame
     // holds one document and has neither. The renderer already tolerates the absence: the
-    // resolver call is caught (links simply stay undecorated) and the fragment take is
-    // typeof-guarded, so nothing throws.
+    // bridge answers the resolver call with undefined, which leaves the links undecorated,
+    // and the fragment take is typeof-guarded, so nothing throws.
     | 'resolveWikiLinks'
     | 'rememberWikiFragment'
     | 'takeWikiFragment'
