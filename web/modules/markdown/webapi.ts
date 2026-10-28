@@ -28,6 +28,9 @@ export const MARKDOWN_WEB_CAPABILITIES = Object.freeze({
   // the paper theme persists in the desktop's image-host config file (markdown:get/set-theme);
   // a picker that cannot remember the choice after a reload is a dead control
   mdTheme: false,
+  // the note vault (backlinks, graph, tags, `[[` suggester, create-note, block ids, embed paste)
+  // reads a notes folder; a frame holds one document and no file tree
+  wikiVault: false,
 })
 
 /**
