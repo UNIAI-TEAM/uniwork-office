@@ -40,22 +40,38 @@ import {
   renderTable,
 } from './markdownStyleRenderers'
 import { boundOrderedList, boundTable, boundTaskList } from './boundedTokenizers'
-import { WikiLink, WikiLinkResolve } from './wikilink'
+import { WikiLink, WikiLinkResolve, WikiAliasDisplay } from './wikilink'
 import { WikiMarkOnInput } from './wikilinkInput'
 import type { WikiLinkOptions } from './wikilink'
 import type { SlashController, SlashItem } from './slashCommand'
+import { WikiSuggest } from './wikiSuggest'
+import type { WikiSuggestController } from './wikiSuggest'
+import { WikiEmbed } from './wikiEmbed'
+import { BlockLink } from './blockId'
+import type { BlockLinkOptions } from './blockId'
 import { FootnoteDefinition, FootnoteNav, FootnoteReference } from './footnote'
 import { t } from '../i18n/locale'
+import { cap } from '../capabilities'
 
 export interface BuildExtensionsOptions {
   slashController: SlashController
   slashItems: () => SlashItem[]
+  /**
+   * The `[[` suggester. Omitted in tests and headless paths: the plugin then
+   * runs with no menu sink, so nothing intercepts the keys around a `[[`.
+   */
+  wikiSuggestController?: WikiSuggestController
   /**
    * Wiki-link navigation. Omitted in tests and headless paths: the resolver is
    * then left on its default, which reports every link unresolved rather than
    * reaching for the filesystem.
    */
   wikiLink?: Partial<WikiLinkOptions>
+  /**
+   * Copy-link-to-block. Omitted in tests and headless paths: the command then
+   * reports to no one and writes to whatever clipboard the environment has.
+   */
+  blockLink?: Partial<BlockLinkOptions>
 }
 
 export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[] {
@@ -149,11 +165,24 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     ImageAwareLink.configure({ openOnClick: false }),
     WikiLink,
     WikiMarkOnInput,
+    // the vault's embeds and the `[[` suggester read the notes folder (cap 'wikiVault': off on the web,
+    // where `![[x]]` stays literal text)
+    ...(cap('wikiVault') ? [WikiEmbed] : []),
     // GFM footnotes: `[^1]` references and `[^1]: text` definitions (see footnote.ts)
     FootnoteDefinition,
     FootnoteReference,
     FootnoteNav,
     WikiLinkResolve.configure(options.wikiLink ?? {}),
+    // an aliased link reads as its alias: the syntax is hidden in the view only
+    WikiAliasDisplay,
+    // block ids and the `[[` suggester work on the notes folder (cap 'wikiVault'): `^id` markers
+    // are written on demand, dimmed in the view, plain text in the file
+    ...(cap('wikiVault')
+      ? [
+          BlockLink.configure(options.blockLink ?? {}),
+          WikiSuggest.configure({ controller: options.wikiSuggestController }),
+        ]
+      : []),
     BlockDragHandle,
     BlockKeymap,
     TableKeymap,

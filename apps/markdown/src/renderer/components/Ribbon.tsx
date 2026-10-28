@@ -39,6 +39,10 @@ import {
   IconSearch,
   IconEyeOff,
   IconSourceCode,
+  IconBacklinks,
+  IconBlockLink,
+  IconTag,
+  IconGraph,
   IconSpellcheck,
   IconTable,
   IconTaskList,
@@ -76,6 +80,13 @@ interface Props {
   outlineOpen: boolean
   onToggleOutline: () => void
   hasOutline: boolean
+  backlinksOpen: boolean
+  tagsOpen: boolean
+  onToggleTags: () => void
+  onToggleBacklinks: () => void
+  onOpenGraph: () => void
+  /** put a `[[Note#^id]]` for the block at the caret on the clipboard */
+  onCopyBlockLink: () => void
   spellcheck: boolean
   onToggleSpellcheck: () => void
   /** false on the web (cap 'autoSave'): no AutoSave toggle */
@@ -319,6 +330,12 @@ export function Ribbon({
   outlineOpen,
   onToggleOutline,
   hasOutline,
+  backlinksOpen,
+  tagsOpen,
+  onToggleTags,
+  onToggleBacklinks,
+  onOpenGraph,
+  onCopyBlockLink,
   spellcheck,
   onToggleSpellcheck,
   showAutoSave = true,
@@ -703,6 +720,13 @@ export function Ribbon({
                   </span>
                 )}
               </span>
+              {/* writes a `^id` into the document and links by file name: the vault only (cap 'wikiVault'),
+                  and `off` already covers a view-only or locked copy */}
+              {cap('wikiVault') && (
+                <IconBtn title={t('blockLink')} disabled={off} onClick={onCopyBlockLink}>
+                  <IconBlockLink size={ICON} />
+                </IconBtn>
+              )}
             </div>
           </div>
         )}
@@ -817,6 +841,32 @@ export function Ribbon({
             {/* the paper theme persists through the desktop's config file (cap 'mdTheme': no web store) */}
             {cap('mdTheme') && (
               <ThemePicker mdTheme={mdTheme} disabled={disabled} onPick={onMarkdownTheme} />
+            )}
+            {/* the vault views read the desktop's notes folder (cap 'wikiVault': off on the web) */}
+            {cap('wikiVault') && !sourceMode && (
+              <IconBtn
+                title={t('backlinks')}
+                active={backlinksOpen}
+                disabled={disabled}
+                onClick={onToggleBacklinks}
+              >
+                <IconBacklinks size={ICON} />
+              </IconBtn>
+            )}
+            {cap('wikiVault') && !sourceMode && (
+              <IconBtn
+                title={t('tags')}
+                active={tagsOpen}
+                disabled={disabled}
+                onClick={onToggleTags}
+              >
+                <IconTag size={ICON} />
+              </IconBtn>
+            )}
+            {cap('wikiVault') && !sourceMode && (
+              <IconBtn title={t('graph')} disabled={disabled} onClick={onOpenGraph}>
+                <IconGraph size={ICON} />
+              </IconBtn>
             )}
             <IconBtn
               title={t('spellcheck')}

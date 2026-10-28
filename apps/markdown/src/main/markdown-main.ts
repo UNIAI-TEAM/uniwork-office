@@ -59,6 +59,8 @@ import {
   reconcileOwnedAssets,
   renameOwnedAssetDocument,
   resolveSafeRelativeImagePath,
+  resolveSafeVaultImagePath,
+  vaultRootServesPictures,
   resolveSourcePendingAfterSaveAs,
   restoreOwnedAssetFiles,
   rollbackPreparedSaveAsAssets,
@@ -67,9 +69,21 @@ import {
 import { createMarkdownConversionSession, writeMarkdownConversion } from './conversion-lifecycle'
 import { normalizeMarkdownTheme, type MarkdownTheme } from '../shared/markdown-theme'
 import { MARKDOWN_CHANNELS, MAX_PASTED_IMAGE_BYTES } from '../shared/ipc'
-import type { ImageHostConfig, WikiLinkResolveRequest, WikiLinkResolved } from '../shared/ipc'
-import { resolveWikiLinks } from './wiki-resolve'
+import type {
+  ImageHostConfig,
+  WikiBacklink,
+  WikiCreateNoteRequest,
+  WikiCreateNoteResult,
+  WikiGraph,
+  WikiLinkResolveRequest,
+  WikiLinkResolved,
+  WikiNoteEntry,
+} from '../shared/ipc'
+import { nodeFs, resolveWikiLinks } from './wiki-resolve'
 import { cleanDraftName } from '../shared/draft-name'
+import { listWikiNotes } from './wiki-notes'
+import { createWikiNote, mayCreateWikiNote } from './wiki-create'
+import { nodeVaultFs, warmWikiIndex, wikiBacklinks, wikiGraph, wikiTags } from './wiki-index'
 import { notifyViewsShowingNote, takeWikiFragment } from './wiki-fragment'
 import { isImageHostUsable, normalizeImageHostConfig, uploadImageToHost } from './image-host'
 import {
@@ -425,6 +439,7 @@ const mcpSaveByWc = new Set<number>()
 const readTextWaiters = new Map<number, (result: { text: string } | { error: string }) => void>()
 /** one read per tab at a time: concurrent callers share this promise */
 const readTextInFlight = new Map<number, Promise<string>>()
+const vaultFs = nodeFs()
 
 /** Fired after a save lands on a NEW path (untitled first save / Save As) — the shell syncs tab title, recents, projects */
 let fileSavedHook: ((wc: WebContents, path: string) => void) | null = null
@@ -731,19 +746,29 @@ function registerImageProtocol(): void {
     if (!DISPLAY_IMAGE_EXTS.has(extname(target).toLowerCase()) || !existsSync(target)) {
       return new Response(null, { status: 404 })
     }
-    let inDocDir = false
-    for (const doc of new Set([...openPathByWc.values(), ...savePathByWc.values()])) {
+    let served: string | null = null
+    const openDocs = new Set([...openPathByWc.values(), ...savePathByWc.values()])
+    for (const doc of openDocs) {
       const dir = resolve(dirname(doc))
       // isInDocDir handles filesystem-root docs ("/", "C:\") whose dir
       // already ends in a separator — dir + sep would 403 every sibling.
       if (!isInDocDir(target, dir)) continue
-      if (await resolveSafeRelativeImagePath(doc, relative(dir, target), { decoded: true })) {
-        inDocDir = true
+      const safe = await resolveSafeRelativeImagePath(doc, relative(dir, target), { decoded: true })
+      if (safe) {
+        served = safe
         break
       }
     }
-    if (!inDocDir) return new Response(null, { status: 403 })
-    return net.fetch(pathToFileURL(target).toString())
+    // a cross-folder embed resolves through the vault root the wiki resolver
+    // walks, so the picture next to the note (vault attachments/ from a
+    // nested note, the Obsidian layout) renders too: the same root decides,
+    // realpath-resolved so a symlink escape is refused. Local documents only:
+    // a bound UniWork working copy keeps the own-directory rule above.
+    if (!served && vaultRootServesPictures(openDocs, uniworkIsBound)) {
+      served = await resolveSafeVaultImagePath(configuredDefaultSaveDir(app), target)
+    }
+    if (!served) return new Response(null, { status: 403 })
+    return net.fetch(pathToFileURL(served).toString())
   })
 }
 
@@ -757,7 +782,13 @@ function registerMarkdownIpc(): void {
 
   registerImageProtocol()
 
-  ipcMain.handle(MARKDOWN_CHANNELS.consumePending, (e) => openPathByWc.get(e.sender.id) ?? null)
+  ipcMain.handle(MARKDOWN_CHANNELS.consumePending, (e) => {
+    const pending = openPathByWc.get(e.sender.id) ?? null
+    // the vault root is known from here on: start the index so the backlinks
+    // panel and the graph usually find it already built
+    if (pending) warmWikiIndex(configuredDefaultSaveDir(app))
+    return pending
+  })
 
   // ---- headless export mode (--headless-export) ----
 
@@ -805,15 +836,16 @@ function registerMarkdownIpc(): void {
 
   ipcMain.handle(
     MARKDOWN_CHANNELS.resolveWikiLinks,
-    (_e, request: WikiLinkResolveRequest): Record<string, WikiLinkResolved> => {
+    async (_e, request: WikiLinkResolveRequest): Promise<Record<string, WikiLinkResolved>> => {
       const fromPath = typeof request?.fromPath === 'string' ? request.fromPath : ''
       const targets = Array.isArray(request?.targets)
         ? request.targets.filter((t): t is string => typeof t === 'string')
         : []
-      const resolved = resolveWikiLinks(targets, {
-        fromPath,
-        root: configuredDefaultSaveDir(app),
-      })
+      const resolved = await resolveWikiLinks(
+        targets,
+        { fromPath, root: configuredDefaultSaveDir(app) },
+        vaultFs,
+      )
       // a Map is structured-cloneable but arrives as an empty object; ship the
       // shape the renderer asked for
       return Object.fromEntries(resolved)
@@ -832,6 +864,41 @@ function registerMarkdownIpc(): void {
 
   ipcMain.handle(MARKDOWN_CHANNELS.takeWikiFragment, (_e, path: unknown): string =>
     typeof path === 'string' ? takeWikiFragment(path) : '',
+  )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.listWikiNotes, async (): Promise<WikiNoteEntry[]> =>
+    listWikiNotes(configuredDefaultSaveDir(app), nodeFs()),
+  )
+
+  ipcMain.handle(
+    MARKDOWN_CHANNELS.createWikiNote,
+    async (e, request: WikiCreateNoteRequest): Promise<WikiCreateNoteResult> => {
+      const target = typeof request?.target === 'string' ? request.target : ''
+      if (!target) return { ok: false }
+      // where a bare name lands follows the document this view holds: the
+      // saved path wins (Save As moved it), the opened path is the fallback
+      const fromPath = savePathByWc.get(e.sender.id) ?? openPathByWc.get(e.sender.id) ?? ''
+      if (!mayCreateWikiNote(fromPath, uniworkIsBound)) return { ok: false }
+      const made = await createWikiNote(target, {
+        root: configuredDefaultSaveDir(app),
+        fromDir: fromPath ? dirname(fromPath) : '',
+      }).catch(() => null)
+      return made ? { ok: true, ...made } : { ok: false }
+    },
+  )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.wikiBacklinks, (_e, path: unknown): Promise<WikiBacklink[]> =>
+    typeof path === 'string'
+      ? wikiBacklinks(configuredDefaultSaveDir(app), path, nodeVaultFs())
+      : Promise.resolve([]),
+  )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.wikiGraph, (): Promise<WikiGraph> =>
+    wikiGraph(configuredDefaultSaveDir(app), nodeVaultFs()),
+  )
+
+  ipcMain.handle(MARKDOWN_CHANNELS.wikiTags, (): Promise<{ tag: string; files: string[] }[]> =>
+    wikiTags(configuredDefaultSaveDir(app), nodeVaultFs()),
   )
 
   ipcMain.handle(

@@ -21,6 +21,15 @@ export const MARKDOWN_CHANNELS = {
   takeWikiFragment: 'markdown:take-wiki-fragment',
   /** main -> view: a fragment is waiting for the note this view already shows */
   wikiFragmentReady: 'markdown:wiki-fragment-ready',
+  /** list the vault's notes for the `[[` suggester, breadth-first from the root */
+  listWikiNotes: 'markdown:list-wiki-notes',
+  /** create the note an unresolved `[[wiki link]]` names (never overwrites) */
+  createWikiNote: 'markdown:create-wiki-note',
+  /** notes whose links land on the given path (the backlinks panel) */
+  wikiBacklinks: 'markdown:wiki-backlinks',
+  wikiTags: 'markdown:wiki-tags',
+  /** the vault's link graph (nodes + resolved edges, the graph view) */
+  wikiGraph: 'markdown:wiki-graph',
   save: 'markdown:save',
   uniworkState: 'markdown:uniwork-state',
   uniworkReadOnlySave: 'markdown:uniwork-read-only-save',
@@ -78,6 +87,78 @@ export interface WikiLinkResolved {
   /** the `#Heading` / `#^block` part, '' when there was none */
   fragment: string
   found: boolean
+}
+
+/** one vault note offered by the `[[` suggester, in the resolver's own order */
+export interface WikiNoteEntry {
+  /** absolute path, the shape `resolveWikiLinks` answers with */
+  path: string
+  /** file name with extension, as `[[Figure 1.png]]` addresses it */
+  file: string
+  /** stem without extension, as a bare `[[Figure 1]]` addresses it */
+  name: string
+  /** path relative to the walk root, shown under the name in the menu */
+  relPath: string
+}
+
+export interface WikiCreateNoteRequest {
+  /**
+   * The link's target as written, alias dropped: `Note`, `folder/Note`,
+   * `Note#Heading`. The fragment rides back on the answer for the caller to
+   * open on; the file part is what gets created.
+   */
+  target: string
+}
+
+export type WikiCreateNoteResult =
+  | {
+      ok: true
+      /** absolute path of the note, created or already there */
+      path: string
+      /** the spelling a link resolves by: sanitized stem, directories kept (`folder/Note`) */
+      target: string
+      /** the `#Heading` part of the target, '' when there was none */
+      fragment: string
+      /** false when a file already occupied the path and nothing was written */
+      created: boolean
+    }
+  | { ok: false }
+
+/** a note whose link lands on the asked-for path */
+export interface WikiBacklink {
+  /** absolute path of the note carrying the link */
+  source: string
+  /** the target as written there (`Note`, `Note#Heading`) */
+  target: string
+}
+
+export interface WikiGraphNode {
+  /** absolute path */
+  path: string
+  /** stem, the label a node carries */
+  name: string
+  /** path relative to the vault root, the label's smaller half */
+  relPath: string
+}
+
+export interface WikiGraphEdge {
+  /** absolute path of the linking note */
+  from: string
+  /** absolute path of the linked note */
+  to: string
+}
+
+export interface WikiGraph {
+  nodes: WikiGraphNode[]
+  edges: WikiGraphEdge[]
+  /**
+   * the vault held more notes than the node cap, so this is a slice: the nodes
+   * are the first `MAX_GRAPH_NODES` in walk order and the edges only those among
+   * them. Callers say so rather than presenting a cut graph as the whole vault.
+   */
+  truncated: boolean
+  /** how many notes the walk found in total (never below nodes.length) */
+  totalNotes: number
 }
 
 export type UiTheme = 'light' | 'dark' | 'system'
@@ -268,6 +349,20 @@ export interface MarkdownApi {
    * activates the tab, so main says the fragment for `path` is waiting.
    */
   onWikiFragmentReady?(handler: (path: string) => void): () => void
+  listWikiNotes(): Promise<WikiNoteEntry[]>
+  /**
+   * Create the note an unresolved `[[target]]` names — Obsidian's "create new
+   * note". A target with a directory lands under the vault root, a bare name
+   * beside the open document (both decided in main, where the open paths
+   * live). An existing file is opened, never overwritten. `ok: false` when
+   * the target cannot name a note at all.
+   */
+  createWikiNote(request: WikiCreateNoteRequest): Promise<WikiCreateNoteResult>
+  /** Notes whose links resolve to `path` (the backlinks panel); '' answers []. */
+  wikiBacklinks(path: string): Promise<WikiBacklink[]>
+  wikiTags(): Promise<{ tag: string; files: string[] }[]>
+  /** The vault's link graph, notes as nodes and resolved links as edges. */
+  wikiGraph(): Promise<WikiGraph>
   /** Headless export mode: the PDF path this hidden renderer must export to, null in normal use */
   consumeHeadlessExport(): Promise<string | null>
   /** Headless export mode: report the export outcome so the main process can quit */

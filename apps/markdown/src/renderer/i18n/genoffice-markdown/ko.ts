@@ -1,6 +1,19 @@
 import type { zh } from './zh'
 
 export const ko = {
+  backlinks: '백링크',
+  backlinksEmpty: '아직 링크한 노트가 없습니다.',
+  backlinksRefresh: '백링크 새로고침',
+  graph: '그래프 보기',
+  graphClose: '그래프 닫기',
+  graphEmpty: '볼트에 아직 노트가 없습니다.',
+  graphTruncated: '노트가 너무 많아 그래프에 앞의 {shown} / {total}개만 표시됩니다.',
+  suggestCreateNote: '새 노트 만들기',
+  tags: '태그',
+  tagsEmpty: '볼트에 아직 #태그가 없습니다',
+  blockLink: '블록 링크 복사',
+  blockLinkCopied: '{link} 복사됨',
+  blockLinkNone: '여기에는 링크할 블록이 없습니다',
   insertFootnote: '각주',
   statusWords: '{n}단어',
   statusChars: '{n}자',

@@ -37,7 +37,7 @@ function open(
   source: string,
   wiki: {
     onOpen?: (path: string, fragment: string) => void
-    onUnresolved?: (target: string) => void
+    onUnresolved?: (target: string, embed: boolean) => void
     answers?: Record<string, WikiLinkResolved>
     documentPath?: string
     resolve?: (from: string, targets: string[]) => Promise<Record<string, WikiLinkResolved>>
@@ -233,6 +233,22 @@ describe('editing', () => {
     const { editor, save } = saver('See [[Note|Display]] here.')
     editor.view.dispatch(editor.state.tr.insertText('!', after(editor, 'Display')))
     expect(save()).toBe('See [[Note|Display!]] here.')
+  })
+
+  it('leaves the links undecorated, without an error, when the resolver answers undefined', async () => {
+    const rejected: unknown[] = []
+    const onRejected = (reason: unknown) => rejected.push(reason)
+    process.on('unhandledRejection', onRejected)
+    try {
+      const resolve = vi.fn(async () => undefined as unknown as Record<string, WikiLinkResolved>)
+      const { editor } = open('see [[Alpha]] and ![[pic.png]]', { resolve })
+      await settled()
+      expect(resolve).toHaveBeenCalled()
+      expect(editor.view.dom.querySelector('.wiki-link-resolved, .wiki-link-unresolved')).toBeNull()
+      expect(rejected).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onRejected)
+    }
   })
 
   it('resolves the link as the text spells it now, not as it was parsed', async () => {
@@ -466,7 +482,18 @@ describe('resolution', () => {
     await settled()
     expect(clickWikiLink(editor, '[[Nowhere]]')).toBe(true)
     expect(onOpen).not.toHaveBeenCalled()
-    expect(onUnresolved).toHaveBeenCalledWith('[[Nowhere]]')
+    expect(onUnresolved).toHaveBeenCalledWith('[[Nowhere]]', false)
+  })
+
+  it('clicking an unresolved embed reports it flagged as an embed', async () => {
+    const onOpen = vi.fn()
+    const onUnresolved = vi.fn()
+    const { editor } = open('![[Nowhere]]', { onOpen, onUnresolved, answers: ANSWERS })
+    await settled()
+    // an embed opens on a plain click, no modifier needed
+    expect(clickWikiLink(editor, 'Nowhere')).toBe(true)
+    expect(onOpen).not.toHaveBeenCalled()
+    expect(onUnresolved).toHaveBeenCalledWith('Nowhere', true)
   })
 
   it('the resolution never becomes document state', async () => {

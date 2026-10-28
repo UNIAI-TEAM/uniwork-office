@@ -608,6 +608,23 @@ describe('markdownApi: view only and capabilities', () => {
     })
   })
 
+  it('the note vault is off on the web: capability false, its api members are the bridge no-op', async () => {
+    const { api } = setup()
+    await open(api)
+    expect(api.capabilities).toMatchObject({ wikiVault: false })
+    const vault = api as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
+    // nothing is implemented behind them: a caller gets undefined, never a note list or a file write
+    for (const member of [
+      'wikiBacklinks',
+      'wikiGraph',
+      'wikiTags',
+      'listWikiNotes',
+      'createWikiNote',
+    ]) {
+      expect(await vault[member]!({ target: 'x' }), member).toBeUndefined()
+    }
+  })
+
   it('without the save grant: view only, every write refused, never dirty', async () => {
     const { api, mock } = setup({ caps: { print: true } })
     const { text } = await open(api)

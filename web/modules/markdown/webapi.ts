@@ -28,6 +28,9 @@ export const MARKDOWN_WEB_CAPABILITIES = Object.freeze({
   // the paper theme persists in the desktop's image-host config file (markdown:get/set-theme);
   // a picker that cannot remember the choice after a reload is a dead control
   mdTheme: false,
+  // the note vault (backlinks, graph, tags, `[[` suggester, create-note, block ids, embed paste)
+  // reads a notes folder; a frame holds one document and no file tree
+  wikiVault: false,
 })
 
 /**
@@ -157,12 +160,20 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
     | 'setMarkdownTheme'
     // wiki links resolve against the file tree and open a note through the shell; a frame
     // holds one document and has neither. The renderer already tolerates the absence: the
-    // resolver call is caught (links simply stay undecorated) and the fragment take is
-    // typeof-guarded, so nothing throws.
+    // bridge answers the resolver call with undefined, which leaves the links undecorated,
+    // and the fragment take is typeof-guarded, so nothing throws.
     | 'resolveWikiLinks'
     | 'rememberWikiFragment'
     | 'takeWikiFragment'
     | 'openSourcePath'
+    // the note vault (cap 'wikiVault' off): backlinks, graph, tags, the `[[` suggester and
+    // create-note all read or write a notes folder. The frame's safe no-op api would answer
+    // them with undefined, so the renderer installs none of their UI or plugins on the web.
+    | 'wikiBacklinks'
+    | 'wikiGraph'
+    | 'wikiTags'
+    | 'listWikiNotes'
+    | 'createWikiNote'
   >
   return Object.assign(api, {
     // web-only (renderer: editor/localImage.ts): relative pictures through OpenPayload.assets

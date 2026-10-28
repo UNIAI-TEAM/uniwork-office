@@ -6,14 +6,22 @@ import { Plugin } from '@tiptap/pm/state'
  * The wiki mark is made by the markdown parser, so a link typed or pasted in
  * the editor stayed plain text until the file was reopened. These rules add the
  * mark (only the mark: the text never changes) when the closing `]]` is typed
- * and to the links of a paste or drop.
+ * and to the links of a paste or drop. A pasted `![[embed]]` becomes the embed
+ * node the tokenizer builds on load, so it renders at once too.
  *
  * Same literal as `WIKI_LINK_RE` in wikilink.ts, backslash included: the
  * serializer writes a wiki-marked literal verbatim (F8), so a backslash in it
  * no longer doubles on save.
+ *
+ * Where the schema has the embed node (cap 'wikiVault'), the `[[x]]` inside a
+ * `![[x]]` is not a link: the embed owns that span, as it does when the file
+ * is loaded. A `!` the author escaped (`\![[x]]`) does not make an embed.
  */
 const TYPED = /\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+))?\]\]$/
-const PASTED = /\[\[[^[\]|\n]+?(?:\|[^[\]\n]+)?\]\]/g
+const TYPED_NOT_EMBED = /(?<!(?<!\\)!)\[\[([^[\]|\n]+?)(?:\|([^[\]\n]+))?\]\]$/
+/** one pasted wiki literal: group 1 is the embed's unescaped `!`, unset for a link */
+const PASTED_ANY = /(?:(?<!\\)(!))?\[\[[^[\]|\n]+?(?:\|[^[\]\n]+)?\]\]/g
+const PASTED_LINK_ONLY = /\[\[[^[\]|\n]+?(?:\|[^[\]\n]+)?\]\]/g
 
 export const WikiMarkOnInput = Extension.create({
   name: 'wikiMarkOnInput',
@@ -25,7 +33,7 @@ export const WikiMarkOnInput = Extension.create({
     if (!wikiLink) return []
     return [
       new InputRule({
-        find: TYPED,
+        find: this.editor.schema.nodes.wikiEmbed ? TYPED_NOT_EMBED : TYPED,
         handler: ({ state, range, match }) => {
           if (!state.selection.empty) return null
           // not over a hyperlink or inline code (a literal split by a code run
@@ -50,6 +58,7 @@ export const WikiMarkOnInput = Extension.create({
   addProseMirrorPlugins() {
     const wikiLink = this.editor.schema.marks.wikiLink
     if (!wikiLink) return []
+    const wikiEmbed = this.editor.schema.nodes.wikiEmbed
     return [
       new Plugin({
         appendTransaction(trs, _old, state) {
@@ -67,6 +76,8 @@ export const WikiMarkOnInput = Extension.create({
             map.forEach((_a, _b, from, to) => ranges.push([rest.map(from, -1), rest.map(to, 1)]))
           })
           const out = state.tr
+          // wiki literals of the changed ranges, once each: ranges may overlap
+          const found = new Map<number, { from: number; to: number; embed: boolean }>()
           for (const [from, to] of ranges) {
             state.doc.nodesBetween(from, to, (node, pos, parent) => {
               if (parent?.type.spec.code) return
@@ -78,12 +89,21 @@ export const WikiMarkOnInput = Extension.create({
               ) {
                 return
               }
-              for (const m of node.text!.matchAll(PASTED)) {
+              for (const m of node.text!.matchAll(wikiEmbed ? PASTED_ANY : PASTED_LINK_ONLY)) {
                 const a = pos + m.index
                 const b = a + m[0].length
-                if (b > from && a < to) out.addMark(a, b, wikiLink.create())
+                if (b > from && a < to) found.set(a, { from: a, to: b, embed: !!m[1] })
               }
             })
+          }
+          // from the end: an embed swaps its text for a node, which moves what follows
+          for (const hit of [...found.values()].sort((x, y) => y.from - x.from)) {
+            if (hit.embed) {
+              const raw = state.doc.textBetween(hit.from, hit.to)
+              out.replaceWith(hit.from, hit.to, wikiEmbed!.create({ raw }))
+            } else {
+              out.addMark(hit.from, hit.to, wikiLink.create())
+            }
           }
           return out.docChanged ? out : null
         },

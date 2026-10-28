@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
 import { Ribbon } from '../src/renderer/components/Ribbon'
+import { resetForTest } from '../src/renderer/capabilities'
 
 // The assistant is unrelated to the formatting buttons under test.
 
@@ -12,6 +13,8 @@ const cleanups: Array<() => void> = []
 afterEach(() => {
   cleanups.splice(0).forEach((cleanup) => cleanup())
   vi.unstubAllGlobals()
+  delete (window as unknown as { markdownApi?: unknown }).markdownApi
+  resetForTest()
 })
 
 /**
@@ -94,8 +97,10 @@ describe('Ribbon source mode', () => {
     // use for it), plus the image-host button, which is not a formatting
     // control and so renders in either mode, plus the paper-theme picker,
     // which the source view benefits from just as much, plus the highlight
-    // button next to bold/italic/strike.
-    expect(markdown.iconButtons).toBe(19)
+    // button next to bold/italic/strike, plus the backlinks, tags and graph
+    // buttons, which are markdown-only views like the source-view toggle, plus
+    // the copy-block-link button beside the link one.
+    expect(markdown.iconButtons).toBe(23)
     // source mode keeps exactly two: the spellcheck toggle (the withhold
     // toggle gates the block editor's marks, which source mode does not carry)
     // and the paper-theme picker (the paper exists in source view too)
@@ -147,9 +152,44 @@ describe('Ribbon source mode', () => {
   it('shows the formatting controls again for a markdown file', () => {
     const { styleDropdown, iconButtons } = counts(renderRibbon(false))
     expect(styleDropdown).toBe(1)
-    // 19 here too: the source-view toggle is present here and absent above,
-    // the withhold toggle, the image-host button, the paper-theme picker and
-    // the highlight button are present in both
-    expect(iconButtons).toBe(19)
+    // 23 here too: the source-view toggle is present here and absent above,
+    // the withhold toggle, the image-host button, the paper-theme picker, the
+    // highlight button and the vault buttons are present in both
+    expect(iconButtons).toBe(23)
+  })
+})
+
+describe('Ribbon without the note vault (web: cap wikiVault off)', () => {
+  it('drops the backlinks, tags, graph and block-link buttons and the vault editor plugins', () => {
+    const withVault = counts(renderRibbon(false))
+    ;(window as unknown as { markdownApi: unknown }).markdownApi = {
+      capabilities: { wikiVault: false },
+    }
+    resetForTest()
+    const web = counts(renderRibbon(false))
+    expect(withVault.iconButtons - web.iconButtons).toBe(4)
+
+    const names = (caps: boolean): string[] => {
+      ;(window as unknown as { markdownApi: unknown }).markdownApi = {
+        capabilities: { wikiVault: caps },
+      }
+      resetForTest()
+      return buildExtensions({
+        slashController: { onOpen() {}, onUpdate() {}, onKeyDown: () => false, onClose() {} },
+        slashItems: () => [],
+      })
+        .map((e) => e.name)
+        .filter((name) =>
+          ['wikiEmbed', 'wikiSuggest', 'blockLink', 'wikiAliasDisplay'].includes(name),
+        )
+    }
+    expect(names(true).sort()).toEqual([
+      'blockLink',
+      'wikiAliasDisplay',
+      'wikiEmbed',
+      'wikiSuggest',
+    ])
+    // the alias display only hides syntax in the view: it needs no notes folder
+    expect(names(false)).toEqual(['wikiAliasDisplay'])
   })
 })
