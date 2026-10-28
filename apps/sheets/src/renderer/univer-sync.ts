@@ -132,6 +132,7 @@ import {
   setWorkbookMdw,
   TABLE_FILTER_COMMAND,
 } from './app-constants'
+import { planFileTableRegistrations } from './file-tables'
 import { tableFilterState } from './table-filter-state'
 import { excelRowPitchPx } from './autofit-line-pitch'
 import { batchWrapRowHeights, createUniverWrapMeasurer } from './wrap-row-height-batch'
@@ -6578,11 +6579,18 @@ function releaseFileHiddenTableRows(
   const worksheet = runtime.univerAPI.getActiveWorkbook()?.getSheetBySheetId(sheetId)
   if (released.length === 0 || !worksheet) return false
   for (const row of released) hidden.delete(row)
-  runtime.univerAPI.syncExecuteCommand('sheet.mutation.set-row-visible', {
-    unitId: worksheet.getSheet().getUnitId(),
-    subUnitId: sheetId,
-    ranges: rowIndexRanges(worksheet, released),
-  })
+  // Derived from the table model, not a user unhide: it must stay out of the
+  // edit journal (a journaled unhide would replay at save as a manual show).
+  journalSuppression.active = true
+  try {
+    runtime.univerAPI.syncExecuteCommand('sheet.mutation.set-row-visible', {
+      unitId: worksheet.getSheet().getUnitId(),
+      subUnitId: sheetId,
+      ranges: rowIndexRanges(worksheet, released),
+    })
+  } finally {
+    journalSuppression.active = false
+  }
   return true
 }
 
@@ -6602,6 +6610,66 @@ export function noteTableFilterEdit(
   if (range) releaseFileHiddenTableRows(runtime, state, sheetId, range)
   recordTableFilterChange(state.editJournal, sheetId, tableId)
   return sheetId
+}
+
+/// The journal's view of `sheet.mutation.set-table-filter`. The mutation
+/// names its table, not a sheet (no `subUnitId`), and belongs to the open
+/// workbook only. Returns whether the edit was journaled.
+export function journalTableFilterMutation(
+  runtime: UniverRuntime,
+  state: LazyWorkbookState,
+  params: unknown,
+): boolean {
+  const { unitId, tableId } = (params ?? {}) as { unitId?: unknown; tableId?: unknown }
+  if (unitId !== `file-${state.file.sha256}` || typeof tableId !== 'string') return false
+  return noteTableFilterEdit(runtime, state, unitId, tableId) !== null
+}
+
+/// Registers the file's header-bearing tables with Univer under their
+/// displayName so it renders filter dropdowns and resolves structured
+/// references. The journal stays empty for file tables, so failures are
+/// swallowed: the data is still usable. Returns the pending installs.
+export function registerFileTables(
+  workbook: ActiveWorkbook,
+  file: WorkbookFile,
+  sessionNames: readonly string[],
+): Promise<unknown>[] {
+  const installs: Promise<unknown>[] = []
+  for (const entry of planFileTableRegistrations(file.sheets, sessionNames)) {
+    const ws = workbook.getSheetBySheetId(entry.sheetId)
+    if (!ws) continue
+    const { tableId, tableName } = entry
+    try {
+      // File column names must reach Univer, or empty header cells fall back
+      // to its locale template ("Column 1" with a space) where Excel shows
+      // the table part's names ("Column1").
+      const columnOptions = entry.columns
+        ? {
+            columns: entry.columns.map((name, columnIndex) => ({
+              id: `${tableId}-col-${columnIndex}`,
+              displayName: name,
+            })),
+          }
+        : undefined
+      const added = ws.addTable(tableName, entry.range, tableId, columnOptions as never) as unknown
+      // Univer paints its own lavender default table theme over the cells;
+      // file tables carry Excel's real banding in the cell fills
+      // (applyTableBanding), so mute the theme to plain.
+      installs.push(
+        Promise.resolve(added)
+          .then(() =>
+            (
+              ws as unknown as { addTableTheme(id: string, theme: { name: string }): unknown }
+            ).addTableTheme(tableId, { name: `plain-${tableId}` }),
+          )
+          // Theme muting is cosmetic; the table itself is registered.
+          .catch(() => undefined),
+      )
+    } catch {
+      // Best-effort: skip if Univer rejects (e.g. overlapping ranges)
+    }
+  }
+  return installs
 }
 
 /// Ribbon / context-menu Clear on a sheet with tables: clears every table
