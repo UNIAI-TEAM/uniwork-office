@@ -106,7 +106,7 @@ test.describe('withholding a span from the model', () => {
       const dialog = page.locator('.modal', { hasText: 'Hide the selection from AI' })
       await expect(dialog).toBeVisible()
       const input = dialog.locator('input').first()
-      await expect(input).toHaveValue(SECRET.slice(0, 24))
+      await expect(input).toHaveValue('')
       await page.screenshot({ path: screenshotPath('docs-3-dialog') })
 
       await input.fill(LABEL)
