@@ -564,13 +564,15 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
     }
   })
 
-  it('the four fixed tracks keep 8px at the sides, in the head and in the rows', () => {
+  it('the five fixed tracks keep 8px at the sides, in the head and in the rows', () => {
     const fixed =
-      ":is([data-col='select'], [data-col='updated'], [data-col='size'], [data-col='actions'])"
+      ":is(\n    [data-col='select'],\n    [data-col='access'],\n    [data-col='updated'],\n    [data-col='size'],\n    [data-col='actions']\n  )"
     const rule = ruleOf(css, `.dh-doc-head\n  > ${fixed},\n.dh-doc-row\n  > ${fixed}`)
     expect(rule).toMatch(/padding-inline:\s*8px;/)
     // the two buttons of "Sao · ⋯" (28 + 4 + 28) fill the 76px track's 60px of room exactly
     expect(76 - 2 * 8).toBe(28 + 4 + 28)
+    // the 120px Access track leaves 104px of content width for "Được chia sẻ" / "Workspace" (TV-2275-01)
+    expect(120 - 2 * 8).toBe(104)
   })
 
   it('on a coarse pointer the Starred actions track holds Sao 44 + gap 4 + "…" 44 (RV7-3) and .dh-check::before is inset -14px (FE R2-5)', () => {
@@ -651,6 +653,7 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
     expect(badge).toMatch(/min-height:\s*20px;/)
     expect(badge).not.toMatch(/(?:^|\n)\s*height:\s*20px;/)
     expect(badge).toMatch(/gap:\s*4px;/)
+    expect(badge).toMatch(/flex-shrink:\s*0;/)
     const driveBadge = ruleOf(css, '.dh-drive-badge')
     expect(driveBadge).toMatch(/height:\s*auto;/)
     expect(driveBadge).toMatch(/border:\s*0;/)
@@ -687,13 +690,39 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
     )
     expect(folderGrid).toMatch(/gap:\s*12px;/)
     expect(ruleOf(css, '.dh-folder-card')).toMatch(/border-radius:\s*var\(--radius-12\);/)
+    expect(ruleOf(css, '.dh-folder-card')).toMatch(/min-height:\s*69px;/)
     expect(ruleOf(css, '.dh-folder-open')).toMatch(/border-radius:\s*var\(--radius-12\);/)
     expect(ruleOf(css, '.dh-folder-card .dh-folder-icon')).toMatch(
       /border-radius:\s*var\(--radius-12\);/,
     )
+    const folderSvgPath = ruleOf(
+      css,
+      '.dh-folder-card .dh-folder-icon svg:not(.uwf-glyph-my-folder) path',
+    )
+    expect(folderSvgPath).toMatch(/fill:\s*none;/)
+    expect(folderSvgPath).toMatch(/stroke:\s*currentColor;/)
+    const folderName = ruleOf(css, '.dh-folder-name')
+    expect(folderName).toMatch(/font-size:\s*14px;/)
+    expect(folderName).toMatch(/font-weight:\s*500;/)
+
+    expect(ruleOf(css, '.dh-doc-row')).toMatch(/font-size:\s*14px;/)
+    const docOpen = ruleOf(css, '.dh-doc-open')
+    expect(docOpen).toMatch(/font-size:\s*14px;/)
+    expect(docOpen).toMatch(/font-weight:\s*400;/)
+    const docTitle = ruleOf(css, '.dh-doc-title')
+    expect(docTitle).toMatch(/font-size:\s*14px;/)
+    expect(docTitle).toMatch(/font-weight:\s*400;/)
+    expect(ruleOf(css, '.dh-cell-person')).toMatch(/font-size:\s*14px;/)
+
     expect(ruleOf(css, '.dh-avatar')).toMatch(/background:\s*var\(--tint-gray\);/)
+    const bulkBar = ruleOf(css, '.dl-bulk-bar')
+    expect(bulkBar).toMatch(/border-radius:\s*var\(--radius-12\);/)
+    expect(bulkBar).toMatch(/gap:\s*6px;/)
+    expect(ruleOf(css, '.dl-bulk-actions')).toMatch(/gap:\s*6px;/)
     const bulkAction = ruleOf(css, '.dl-bulk-action')
     expect(bulkAction).toMatch(/background:\s*transparent;/)
+    expect(bulkAction).toMatch(/border-radius:\s*var\(--radius-8\);/)
+    expect(ruleOf(css, '.dl-bulk-clear')).toMatch(/border-radius:\s*var\(--radius-8\);/)
     expect(ruleOf(css, '.dl-bulk-action:hover:not(:disabled)')).toMatch(
       /background:\s*var\(--border\);/,
     )

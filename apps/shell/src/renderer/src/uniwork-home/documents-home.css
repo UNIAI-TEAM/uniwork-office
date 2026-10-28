@@ -803,7 +803,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 64px;
+  min-height: 69px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-12);
@@ -870,13 +870,21 @@
   height: 20px;
 }
 
+.dh-folder-card .dh-folder-icon svg:not(.uwf-glyph-my-folder) path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .dh-folder-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -917,13 +925,26 @@
   padding-block: 9px;
 }
 
-/* the fixed tracks (Chọn, Cập nhật, Dung lượng, Thao tác) keep 8px at the sides: their widths are
-   the web's ladder numbers (doclist/columns.ts), and 12px would clip "Hôm qua, 16:30" or the two
-   28px buttons of "Sao · ⋯" */
+/* the fixed tracks (Chọn, Truy cập, Cập nhật, Dung lượng, Thao tác) keep 8px at the sides: their
+   widths are the web's ladder numbers (doclist/columns.ts; px-2 on optional columns in
+   library-columns.ts), and 12px would clip "Được chia sẻ", "Hôm qua, 16:30" or the two 28px
+   buttons of "Sao · ⋯" */
 .dh-doc-head
-  > :is([data-col='select'], [data-col='updated'], [data-col='size'], [data-col='actions']),
+  > :is(
+    [data-col='select'],
+    [data-col='access'],
+    [data-col='updated'],
+    [data-col='size'],
+    [data-col='actions']
+  ),
 .dh-doc-row
-  > :is([data-col='select'], [data-col='updated'], [data-col='size'], [data-col='actions']) {
+  > :is(
+    [data-col='select'],
+    [data-col='access'],
+    [data-col='updated'],
+    [data-col='size'],
+    [data-col='actions']
+  ) {
   padding-inline: 8px;
 }
 
@@ -1017,7 +1038,7 @@
 
 .dh-doc-row {
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
 }
 
@@ -1128,8 +1149,8 @@
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
   text-align: start;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1149,8 +1170,8 @@
   display: block;
   overflow: hidden;
   color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1178,6 +1199,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
   width: fit-content;
   max-width: 100%;
   min-height: 20px;
@@ -1230,7 +1252,7 @@
   gap: 8px;
   min-width: 0;
   color: var(--text);
-  font-size: 12.5px;
+  font-size: 14px;
 }
 
 .dh-avatar {
@@ -1605,10 +1627,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-8);
+  border-radius: var(--radius-12);
   background: var(--surface-subtle);
   color: var(--text);
 }
@@ -1625,7 +1647,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -1638,7 +1660,7 @@
   min-height: 28px;
   padding: 4px 10px 4px 8px;
   border: 1px solid transparent;
-  border-radius: var(--radius-6);
+  border-radius: var(--radius-8);
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -1694,7 +1716,7 @@
   white-space: nowrap;
   padding: 4px 10px 4px 8px;
   border: 1px solid transparent;
-  border-radius: var(--radius-6);
+  border-radius: var(--radius-8);
   background: transparent;
   color: var(--text);
   font: inherit;

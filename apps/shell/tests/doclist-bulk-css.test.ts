@@ -21,4 +21,13 @@ describe('bulk bar narrow-pane layout (UNI-2068 TVZ-2)', () => {
     expect(actions).toContain('flex-wrap: wrap')
     expect(actions).toContain('min-width: 0')
   })
+
+  it('matches the web bulk bar radius (12px), gap (6px), and button radius (8px) (TV-2275-04)', () => {
+    const bar = rule('.dl-bulk-bar')
+    expect(bar).toContain('border-radius: var(--radius-12)')
+    expect(bar).toContain('gap: 6px')
+    expect(rule('.dl-bulk-actions')).toContain('gap: 6px')
+    expect(rule('.dl-bulk-action')).toContain('border-radius: var(--radius-8)')
+    expect(rule('.dl-bulk-clear')).toContain('border-radius: var(--radius-8)')
+  })
 })
