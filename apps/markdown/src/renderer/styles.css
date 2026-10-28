@@ -2622,7 +2622,8 @@ html.markdown-graph-open .ribbon-tabs {
 .disk-notice {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   padding: 6px 14px;
   font-size: 13px;
   color: var(--text);
@@ -2631,7 +2632,7 @@ html.markdown-graph-open .ribbon-tabs {
 }
 
 .disk-notice span {
-  flex: 1;
+  flex: 1 1 240px;
   min-width: 0;
 }
 

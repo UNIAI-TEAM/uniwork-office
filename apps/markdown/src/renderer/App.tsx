@@ -1583,6 +1583,17 @@ export default function App() {
         }}
       />
       {status === 'loading' && <div className="center-note">{t('loading')}</div>}
+      {status === 'ready' && diskNotice && (
+        <div className="disk-notice" role="status">
+          <span>{t(diskNotice === 'changed' ? 'diskChangedMsg' : 'diskConflictMsg')}</span>
+          <button type="button" onClick={() => void reloadNow()}>
+            {t('diskReload')}
+          </button>
+          <button type="button" onClick={diskNotice === 'changed' ? keepMine : overwriteNow}>
+            {t(diskNotice === 'changed' ? 'diskKeepMine' : 'diskOverwrite')}
+          </button>
+        </div>
+      )}
       <div className="app-main" style={status === 'ready' ? undefined : { display: 'none' }}>
         {aiEnabled && (
           <div
@@ -1638,17 +1649,6 @@ export default function App() {
           <TagsPane onOpen={(path) => void window.markdownApi.openSourcePath(path)} />
         )}
         <div className="app-content">
-          {diskNotice && (
-            <div className="disk-notice" role="status">
-              <span>{t(diskNotice === 'changed' ? 'diskChangedMsg' : 'diskConflictMsg')}</span>
-              <button type="button" onClick={() => void reloadNow()}>
-                {t('diskReload')}
-              </button>
-              <button type="button" onClick={diskNotice === 'changed' ? keepMine : overwriteNow}>
-                {t(diskNotice === 'changed' ? 'diskKeepMine' : 'diskOverwrite')}
-              </button>
-            </div>
-          )}
           {showFind && findTarget && (
             <FindPanel
               target={findTarget}
