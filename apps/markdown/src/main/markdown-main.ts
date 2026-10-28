@@ -82,7 +82,7 @@ import type {
 import { nodeFs, resolveWikiLinks } from './wiki-resolve'
 import { cleanDraftName } from '../shared/draft-name'
 import { listWikiNotes } from './wiki-notes'
-import { createWikiNote } from './wiki-create'
+import { createWikiNote, mayCreateWikiNote } from './wiki-create'
 import { nodeVaultFs, warmWikiIndex, wikiBacklinks, wikiGraph, wikiTags } from './wiki-index'
 import { notifyViewsShowingNote, takeWikiFragment } from './wiki-fragment'
 import { isImageHostUsable, normalizeImageHostConfig, uploadImageToHost } from './image-host'
@@ -878,6 +878,7 @@ function registerMarkdownIpc(): void {
       // where a bare name lands follows the document this view holds: the
       // saved path wins (Save As moved it), the opened path is the fallback
       const fromPath = savePathByWc.get(e.sender.id) ?? openPathByWc.get(e.sender.id) ?? ''
+      if (!mayCreateWikiNote(fromPath, uniworkIsBound)) return { ok: false }
       const made = await createWikiNote(target, {
         root: configuredDefaultSaveDir(app),
         fromDir: fromPath ? dirname(fromPath) : '',

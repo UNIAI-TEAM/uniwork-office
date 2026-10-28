@@ -8,7 +8,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { createWikiNote } from '../src/main/wiki-create'
+import { createWikiNote, mayCreateWikiNote } from '../src/main/wiki-create'
 
 const dirs: string[] = []
 afterEach(async () => {
@@ -107,5 +107,18 @@ describe('createWikiNote', () => {
     await mkdir(join(root, 'Note.md'))
     // the write fails and the caller (the IPC handler) turns that into ok:false
     await expect(createWikiNote('Note', { root, fromDir: '' })).rejects.toThrow()
+  })
+})
+
+describe('mayCreateWikiNote', () => {
+  const bound = (path: string): boolean => path.startsWith('/work/bound/')
+
+  it('refuses a view holding a bound working copy', () => {
+    expect(mayCreateWikiNote('/work/bound/doc.md', bound)).toBe(false)
+  })
+
+  it('allows a local document and an untitled one', () => {
+    expect(mayCreateWikiNote('/notes/doc.md', bound)).toBe(true)
+    expect(mayCreateWikiNote('', bound)).toBe(true)
   })
 })
