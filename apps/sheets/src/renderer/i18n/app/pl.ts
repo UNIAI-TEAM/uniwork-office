@@ -1319,6 +1319,8 @@ export const pl = {
   appPasswordChangeUniwork: 'Hasła dokumentu UniWork nie można tutaj zmienić.',
   appPasswordChangeReadOnly:
     'Ten skoroszyt jest tylko do odczytu, więc nie można zmienić jego hasła.',
+  appEncryptedWrongPassword: 'Hasło jest nieprawidłowe. Spróbuj ponownie.',
+  appPasswordChangeRestored: 'Najpierw zapisz przywrócony skoroszyt, a potem zmień jego hasło.',
   appAllowEditRanges: 'Zezwalaj na edytowanie zakresów',
   appGroupClipboard: 'Schowek',
   appPaste: 'Wklej',

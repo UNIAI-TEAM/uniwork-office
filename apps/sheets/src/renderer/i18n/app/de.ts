@@ -1348,6 +1348,9 @@ export const de = {
   appPasswordChangeUniwork: 'Das Kennwort eines UniWork-Dokuments kann hier nicht geändert werden.',
   appPasswordChangeReadOnly:
     'Diese Arbeitsmappe ist schreibgeschützt, daher kann ihr Kennwort nicht geändert werden.',
+  appEncryptedWrongPassword: 'Das Kennwort ist falsch. Versuchen Sie es erneut.',
+  appPasswordChangeRestored:
+    'Speichern Sie zuerst die wiederhergestellte Arbeitsmappe und ändern Sie dann ihr Kennwort.',
   appAllowEditRanges: 'Bereiche zur Bearbeitung freigeben',
   appGroupClipboard: 'Zwischenablage',
   appPaste: 'Einfügen',

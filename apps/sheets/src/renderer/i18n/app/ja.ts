@@ -1343,6 +1343,8 @@ export const ja = {
     'パスワード付きのブックは UniWork ドキュメントに保存できません。「名前を付けて保存」で暗号化したコピーをこのコンピューターに残してください。',
   appPasswordChangeUniwork: 'UniWork ドキュメントのパスワードはここでは変更できません。',
   appPasswordChangeReadOnly: 'このブックは閲覧専用のため、パスワードを変更できません。',
+  appEncryptedWrongPassword: 'パスワードが正しくありません。もう一度お試しください。',
+  appPasswordChangeRestored: '復元したブックを先に保存してから、パスワードを変更してください。',
   appAllowEditRanges: '範囲の編集を許可',
   // Home tab
   appGroupClipboard: 'クリップボード',

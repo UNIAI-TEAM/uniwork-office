@@ -4940,7 +4940,10 @@ export function App({
               password,
             )
           } catch (error: unknown) {
-            passwordError = error instanceof Error ? error.message : t('appOpenFailed')
+            const detail = error instanceof Error ? stripIpcErrorWrapper(error.message) : ''
+            passwordError = /password is incorrect/i.test(detail)
+              ? t('appEncryptedWrongPassword')
+              : t('appOpenFailed')
           }
         }
         selected = decryptedWorkbook

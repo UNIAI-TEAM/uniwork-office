@@ -28,7 +28,8 @@ async function tempRoot(): Promise<string> {
 describe('session temporary resources', () => {
   it('closes the sidecar before removing the snapshot and converted import directory', async () => {
     const root = await tempRoot()
-    const snapshotDir = join(root, 'genoffice-sheets-sessions')
+    // the per-process directory the real snapshot lives in: <pid>-<uuid>
+    const snapshotDir = join(root, 'genoffice-sheets-sessions', `${process.pid}-${randomUUID()}`)
     const importDir = join(root, 'genoffice-imports', randomUUID())
     const snapshotPath = join(snapshotDir, `${randomUUID()}.xlsx`)
     await mkdir(importDir, { recursive: true })
@@ -50,6 +51,38 @@ describe('session temporary resources', () => {
     expect(closeObservedOpenFiles).toBe(true)
     expect(existsSync(snapshotPath)).toBe(false)
     expect(existsSync(importDir)).toBe(false)
+  })
+
+  it('still removes a snapshot placed directly in the sessions root', async () => {
+    const root = await tempRoot()
+    const snapshotDir = join(root, 'genoffice-sheets-sessions')
+    const snapshotPath = join(snapshotDir, `${randomUUID()}.xlsx`)
+    await mkdir(snapshotDir, { recursive: true })
+    await writeFile(snapshotPath, 'snapshot')
+
+    await cleanupSessionResources({ tempRoot: root, snapshotPath, closeSidecar: async () => {} })
+
+    expect(existsSync(snapshotPath)).toBe(false)
+  })
+
+  it('keeps a snapshot-shaped file outside an owned session directory', async () => {
+    const root = await tempRoot()
+    const sessions = join(root, 'genoffice-sheets-sessions')
+    const lookalikes = [
+      join(sessions, 'not-a-session-dir', `${randomUUID()}.xlsx`),
+      join(sessions, `${process.pid}-${randomUUID()}`, 'nested', `${randomUUID()}.xlsx`),
+      join(root, `${process.pid}-${randomUUID()}`, `${randomUUID()}.xlsx`),
+    ]
+    for (const path of lookalikes) {
+      await mkdir(join(path, '..'), { recursive: true })
+      await writeFile(path, 'keep')
+      await cleanupSessionResources({
+        tempRoot: root,
+        snapshotPath: path,
+        closeSidecar: async () => {},
+      })
+      expect(existsSync(path)).toBe(true)
+    }
   })
 
   it('never recursively deletes an unowned import path', async () => {

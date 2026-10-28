@@ -1335,6 +1335,8 @@ export const es = {
   appPasswordChangeUniwork: 'La contraseña de un documento de UniWork no se puede cambiar aquí.',
   appPasswordChangeReadOnly:
     'Este libro es de solo lectura, por lo que no se puede cambiar su contraseña.',
+  appEncryptedWrongPassword: 'La contraseña es incorrecta. Inténtalo de nuevo.',
+  appPasswordChangeRestored: 'Guarda primero el libro restaurado y después cambia su contraseña.',
   appAllowEditRanges: 'Permitir editar rangos',
   appGroupClipboard: 'Portapapeles',
   appPaste: 'Pegar',

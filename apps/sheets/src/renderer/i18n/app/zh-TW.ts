@@ -1204,6 +1204,8 @@ export const zhTW = {
     '設有密碼的活頁簿無法儲存到 UniWork 文件。請使用「另存新檔」在本機保留加密副本。',
   appPasswordChangeUniwork: '無法在此變更 UniWork 文件的密碼。',
   appPasswordChangeReadOnly: '此活頁簿為唯讀，無法變更密碼。',
+  appEncryptedWrongPassword: '密碼不正確，請再試一次。',
+  appPasswordChangeRestored: '請先儲存已復原的活頁簿，再變更其密碼。',
   appAllowEditRanges: '允許編輯範圍',
   appGroupClipboard: '剪貼簿',
   appPaste: '貼上',

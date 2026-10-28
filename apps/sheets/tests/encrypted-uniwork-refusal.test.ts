@@ -21,6 +21,7 @@ describe('encrypted workbooks on UniWork documents (Q1)', () => {
     ['ENCRYPTED_UNIWORK_SAVE_REFUSED', 'appSaveErrEncryptedUniwork'],
     ['PASSWORD_CHANGE_UNIWORK_REFUSED', 'appPasswordChangeUniwork'],
     ['PASSWORD_CHANGE_READ_ONLY_REFUSED', 'appPasswordChangeReadOnly'],
+    ['PASSWORD_CHANGE_RESTORED_REFUSED', 'appPasswordChangeRestored'],
   ] as const
 
   it.each(cases)('the renderer localizes the %s refusal', (constant, key) => {
@@ -53,5 +54,10 @@ describe('encrypted workbooks on UniWork documents (Q1)', () => {
     expect(body).toContain('uniworkIsReadOnly(documentPath)')
     expect(body).toContain('uniworkIsBound(documentPath)')
     expect(body.indexOf('uniworkIsBound(documentPath)')).toBeLessThan(body.indexOf('encryptOoxml('))
+    // a session restored from a recovery copy writes the copy, not the original
+    expect(body).toContain('session.restoreTarget !== undefined')
+    expect(body.indexOf('PASSWORD_CHANGE_RESTORED_REFUSED')).toBeLessThan(
+      body.indexOf('encryptOoxml('),
+    )
   })
 })

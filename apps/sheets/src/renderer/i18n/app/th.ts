@@ -1255,6 +1255,8 @@ export const th = {
     'ไม่สามารถบันทึกสมุดงานที่มีรหัสผ่านลงในเอกสาร UniWork ได้ ใช้ บันทึกเป็น เพื่อเก็บสำเนาที่เข้ารหัสไว้ในเครื่องนี้',
   appPasswordChangeUniwork: 'ไม่สามารถเปลี่ยนรหัสผ่านของเอกสาร UniWork ที่นี่ได้',
   appPasswordChangeReadOnly: 'สมุดงานนี้เป็นแบบอ่านอย่างเดียว จึงไม่สามารถเปลี่ยนรหัสผ่านได้',
+  appEncryptedWrongPassword: 'รหัสผ่านไม่ถูกต้อง ลองอีกครั้ง',
+  appPasswordChangeRestored: 'บันทึกสมุดงานที่กู้คืนก่อน แล้วจึงเปลี่ยนรหัสผ่าน',
   appAllowEditRanges: 'อนุญาตให้แก้ไขช่วง',
   appGroupClipboard: 'คลิปบอร์ด',
   appPaste: 'วาง',

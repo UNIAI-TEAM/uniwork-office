@@ -1229,6 +1229,8 @@ export const zh = {
     '设有密码的工作簿无法保存到 UniWork 文档。请使用“另存为”在本机保留加密副本。',
   appPasswordChangeUniwork: '无法在此更改 UniWork 文档的密码。',
   appPasswordChangeReadOnly: '此工作簿为只读，无法更改密码。',
+  appEncryptedWrongPassword: '密码不正确，请重试。',
+  appPasswordChangeRestored: '请先保存已恢复的工作簿，然后再更改其密码。',
   appAllowEditRanges: '允许编辑区域',
   // Home tab
   appGroupClipboard: '剪贴板',

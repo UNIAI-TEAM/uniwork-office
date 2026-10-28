@@ -1332,6 +1332,9 @@ export const pt = {
   appPasswordChangeUniwork: 'A senha de um documento do UniWork não pode ser alterada aqui.',
   appPasswordChangeReadOnly:
     'Esta pasta de trabalho é somente leitura, portanto a senha não pode ser alterada.',
+  appEncryptedWrongPassword: 'A senha está incorreta. Tente novamente.',
+  appPasswordChangeRestored:
+    'Salve primeiro a pasta de trabalho restaurada e depois altere a senha dela.',
   appAllowEditRanges: 'Permitir Edição de Intervalos',
   appGroupClipboard: 'Área de Transferência',
   appPaste: 'Colar',

@@ -1291,6 +1291,8 @@ export const hi = {
   appPasswordChangeUniwork: 'UniWork दस्तावेज़ का पासवर्ड यहाँ नहीं बदला जा सकता।',
   appPasswordChangeReadOnly:
     'यह वर्कबुक केवल देखने के लिए है, इसलिए इसका पासवर्ड नहीं बदला जा सकता।',
+  appEncryptedWrongPassword: 'पासवर्ड गलत है। फिर से कोशिश करें।',
+  appPasswordChangeRestored: 'पहले पुनर्स्थापित कार्यपुस्तिका सहेजें, फिर उसका पासवर्ड बदलें।',
   appAllowEditRanges: 'श्रेणियाँ संपादित करने दें',
   appGroupClipboard: 'क्लिपबोर्ड',
   appPaste: 'चिपकाएँ',
