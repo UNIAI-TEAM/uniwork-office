@@ -205,6 +205,10 @@ export function TabBar() {
   /** open the inline rename box on a file tab (double-click, or "Rename" in the tab menu) */
   const beginRename = (tab: TabSummary) => {
     if (tab.id === 'home' || !tab.filePath) return
+    // a UniWork document's working copy keeps its name: the binding follows the path
+    if (uniwork.statusOf(tab.filePath)) return
+    // a source view keeps its temp file's name: the shell keys the view-only mark by the path
+    if (sourceViews.stateOf(tab.filePath)) return
     // whole name, extension included: only the shell may change an extension
     setRenaming({ id: tab.id, value: tab.title })
   }
