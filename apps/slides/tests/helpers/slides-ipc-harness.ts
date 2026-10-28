@@ -208,6 +208,17 @@ function relPath(path: unknown): unknown {
 
 export const electronUtilsModule = {
   appMenuLabels: () => ({}),
+  // the shared menu builders have no subpath export, so they are stubbed with the real shapes:
+  // the app menu exists only on darwin, the settings item is a plain clickable entry
+  appMenuTemplate: (platform: string, _labels: unknown, opts: { extra?: unknown[] } = {}) =>
+    platform === 'darwin'
+      ? { label: 'UniWork Office', submenu: [...(opts.extra ?? [])] }
+      : undefined,
+  settingsMenuItem: (_labels: unknown, fallback?: () => void) => ({
+    label: 'Settings',
+    accelerator: 'CmdOrCtrl+,',
+    click: () => fallback?.(),
+  }),
   configuredDefaultSaveDir: () => harness.draftsDir,
   contextMenuLabels: () => ({}),
   // the real converted-document table and Save As target gate (pure, own subpath): the save
