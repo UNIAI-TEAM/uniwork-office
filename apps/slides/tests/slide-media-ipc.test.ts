@@ -940,6 +940,24 @@ describe('slide media IPC payload', () => {
       pngBase64 = pngHeader.toString('base64')
       for (let i = 1; i < 200; i++) expect(duplicateSlide(opened, 0)).toBeTruthy()
       expect(opened.deck.slides).toHaveLength(200)
+      for (let i = 0; i < 200; i++) {
+        addElement(opened.deck.slides[i]!, {
+          kind: 'textbox',
+          offset: { x: 0, y: 0, cx: 914400, cy: 457200 },
+          paragraphs: [
+            {
+              runs: [
+                {
+                  text:
+                    i === 0
+                      ? 'matrix-needle deterministic-slide-000'
+                      : `deterministic-slide-${String(i).padStart(3, '0')}`,
+                },
+              ],
+            },
+          ],
+        })
+      }
       for (let m = 0; m < 20; m++) {
         const distinctBytes = new Uint8Array(1024 * 1024 + 64)
         distinctBytes.set(pngHeader)
@@ -950,11 +968,6 @@ describe('slide media IPC payload', () => {
           offset: { x: 0, y: 0, cx: 457200, cy: 457200 },
         })
       }
-      addElement(opened.deck.slides[0]!, {
-        kind: 'textbox',
-        offset: { x: 0, y: 0, cx: 914400, cy: 457200 },
-        paragraphs: [{ runs: [{ text: 'matrix-needle' }] }],
-      })
       let mediaTotalBytes = 0
       for (const [p, b] of opened.archive.entries) {
         if (p.startsWith('ppt/media/')) mediaTotalBytes += b.byteLength
@@ -999,6 +1012,7 @@ describe('slide media IPC payload', () => {
       const layouts = call<{ layouts: Array<{ path: string }> }>('slides:get-layouts')
       layoutPath = layouts.layouts[0]!.path
       current = buildAllRenderSlides(largeDeckSession.opened, FIT)
+      expect(serialize(current).byteLength).toBeGreaterThan(64 * 1024)
       expect(serialize(current).byteLength).toBeLessThan(1024 * 1024)
     })
 
@@ -1133,7 +1147,11 @@ describe('slide media IPC payload', () => {
         expect(serialize(raw).byteLength).toBeLessThan(64 * 1024)
         const update = 'update' in raw ? raw.update : raw
         current = mergeSlideUpdate(current, update)
-        expect(current).toEqual(buildAllRenderSlides(largeDeckSession.opened, FIT))
+        const fullRender = buildAllRenderSlides(largeDeckSession.opened, FIT)
+        expect(
+          serialize({ order: fullRender.map((s) => s.partPath), slides: fullRender }).byteLength,
+        ).toBeGreaterThan(64 * 1024)
+        expect(current).toEqual(fullRender)
       },
     )
 
