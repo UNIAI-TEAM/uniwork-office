@@ -9,4 +9,6 @@ export const hi = {
   graphEmpty: 'वॉल्ट में अभी कोई नोट नहीं है।',
   graphTruncated: 'बहुत अधिक नोट्स: ग्राफ़ पहली {shown} / {total} दिखाता है।',
   suggestCreateNote: 'नया नोट बनाएँ',
+  tags: 'टैग',
+  tagsEmpty: 'वॉल्ट में अभी कोई #टैग नहीं है',
 } satisfies Record<keyof typeof zh, string>

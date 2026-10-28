@@ -8,4 +8,6 @@ export const zh = {
   graphEmpty: '库中还没有笔记。',
   graphTruncated: '笔记太多，图谱只画出了前 {shown} / {total} 篇。',
   suggestCreateNote: '新建笔记',
+  tags: '标签',
+  tagsEmpty: '知识库里还没有 #标签',
 }

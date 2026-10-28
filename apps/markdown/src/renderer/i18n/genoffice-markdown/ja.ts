@@ -9,4 +9,6 @@ export const ja = {
   graphEmpty: 'ボールトにノートがまだありません。',
   graphTruncated: 'ノートが多すぎます。グラフには先頭 {shown} / {total} 件のみ表示しています。',
   suggestCreateNote: '新規ノートを作成',
+  tags: 'タグ',
+  tagsEmpty: 'ボールトに #タグはまだありません',
 } satisfies Record<keyof typeof zh, string>

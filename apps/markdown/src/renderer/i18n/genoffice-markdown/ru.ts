@@ -9,4 +9,6 @@ export const ru = {
   graphEmpty: 'В хранилище ещё нет заметок.',
   graphTruncated: 'Слишком много заметок: на графике показаны первые {shown} из {total}.',
   suggestCreateNote: 'Создать новую заметку',
+  tags: 'Метки',
+  tagsEmpty: 'В хранилище пока нет #меток',
 } satisfies Record<keyof typeof zh, string>

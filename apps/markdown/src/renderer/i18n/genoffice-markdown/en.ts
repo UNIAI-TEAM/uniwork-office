@@ -9,4 +9,6 @@ export const en = {
   graphEmpty: 'The vault has no notes yet.',
   graphTruncated: 'Too many notes: the graph shows the first {shown} of {total}.',
   suggestCreateNote: 'Create new note',
+  tags: 'Tags',
+  tagsEmpty: 'No #tags in the vault yet',
 } satisfies Record<keyof typeof zh, string>

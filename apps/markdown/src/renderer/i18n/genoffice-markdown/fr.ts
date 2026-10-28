@@ -9,4 +9,6 @@ export const fr = {
   graphEmpty: 'Le coffre n’a pas encore de notes.',
   graphTruncated: 'Trop de notes : le graphique affiche les {shown} premières sur {total}.',
   suggestCreateNote: 'Créer une nouvelle note',
+  tags: 'Étiquettes',
+  tagsEmpty: 'Pas encore de #étiquette dans le coffre',
 } satisfies Record<keyof typeof zh, string>

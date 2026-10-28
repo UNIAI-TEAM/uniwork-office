@@ -9,4 +9,6 @@ export const nl = {
   graphEmpty: 'De kluis heeft nog geen notities.',
   graphTruncated: 'Te veel notities: de grafiek toont de eerste {shown} van {total}.',
   suggestCreateNote: 'Nieuwe notitie maken',
+  tags: 'Labels',
+  tagsEmpty: 'Nog geen #labels in de kluis',
 } satisfies Record<keyof typeof zh, string>

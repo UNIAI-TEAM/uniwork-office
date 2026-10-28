@@ -10,4 +10,6 @@ export const vi = {
   graphTruncated:
     'Quá nhiều ghi chú: biểu đồ chỉ hiển thị {shown} ghi chú đầu tiên trong tổng số {total}.',
   suggestCreateNote: 'Tạo ghi chú mới',
+  tags: 'Thẻ',
+  tagsEmpty: 'Chưa có #thẻ nào trong kho',
 } satisfies Record<keyof typeof zh, string>

@@ -9,4 +9,6 @@ export const th = {
   graphEmpty: 'ยังไม่มีโน้ตในไลบรารี',
   graphTruncated: 'มีโน้ตมากเกินไป: กราฟแสดง {shown} จาก {total} รายการแรก',
   suggestCreateNote: 'สร้างโน้ตใหม่',
+  tags: 'แท็ก',
+  tagsEmpty: 'ยังไม่มี #แท็กในห้องสมุด',
 } satisfies Record<keyof typeof zh, string>

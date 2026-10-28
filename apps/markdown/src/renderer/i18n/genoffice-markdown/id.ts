@@ -9,4 +9,6 @@ export const id = {
   graphEmpty: 'Vault belum memiliki catatan.',
   graphTruncated: 'Terlalu banyak catatan: graf menampilkan {shown} pertama dari {total}.',
   suggestCreateNote: 'Buat catatan baru',
+  tags: 'Tag',
+  tagsEmpty: 'Belum ada #tag di vault',
 } satisfies Record<keyof typeof zh, string>

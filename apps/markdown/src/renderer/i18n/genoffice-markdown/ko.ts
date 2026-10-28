@@ -9,4 +9,6 @@ export const ko = {
   graphEmpty: '볼트에 아직 노트가 없습니다.',
   graphTruncated: '노트가 너무 많아 그래프에 앞의 {shown} / {total}개만 표시됩니다.',
   suggestCreateNote: '새 노트 만들기',
+  tags: '태그',
+  tagsEmpty: '볼트에 아직 #태그가 없습니다',
 } satisfies Record<keyof typeof zh, string>

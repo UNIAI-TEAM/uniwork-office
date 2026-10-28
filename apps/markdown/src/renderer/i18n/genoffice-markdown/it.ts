@@ -9,4 +9,6 @@ export const it = {
   graphEmpty: 'La libreria non ha ancora note.',
   graphTruncated: 'Troppe note: il grafico mostra le prime {shown} su {total}.',
   suggestCreateNote: 'Crea nuova nota',
+  tags: 'Tag',
+  tagsEmpty: 'Ancora nessun #tag nel vault',
 } satisfies Record<keyof typeof zh, string>

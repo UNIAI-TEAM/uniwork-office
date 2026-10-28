@@ -9,4 +9,6 @@ export const ms = {
   graphEmpty: 'Vault belum mempunyai nota.',
   graphTruncated: 'Terlalu banyak nota: graf menunjukkan {shown} yang pertama daripada {total}.',
   suggestCreateNote: 'Cipta nota baharu',
+  tags: 'Tag',
+  tagsEmpty: 'Belum ada #tag dalam vault',
 } satisfies Record<keyof typeof zh, string>

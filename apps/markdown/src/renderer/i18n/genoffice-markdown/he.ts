@@ -9,4 +9,6 @@ export const he = {
   graphEmpty: 'עדיין אין פתקים בכספת.',
   graphTruncated: 'יותר מדי הערות: הגרף מציג את {shown} הראשונות מתוך {total}.',
   suggestCreateNote: 'צור פתק חדש',
+  tags: 'תגיות',
+  tagsEmpty: 'אין עדיין #תגיות בכספת',
 } satisfies Record<keyof typeof zh, string>

@@ -9,4 +9,6 @@ export const ar = {
   graphEmpty: 'لا توجد ملاحظات في المكتبة بعد.',
   graphTruncated: 'ملاحظات كثيرة جدًا: يعرض الرسم أول {shown} من {total}.',
   suggestCreateNote: 'إنشاء ملاحظة جديدة',
+  tags: 'الوسوم',
+  tagsEmpty: 'لا توجد #وسوم في الخزانة بعد',
 } satisfies Record<keyof typeof zh, string>

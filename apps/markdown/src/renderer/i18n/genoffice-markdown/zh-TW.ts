@@ -9,4 +9,6 @@ export const zhTW = {
   graphEmpty: '庫中還沒有筆記。',
   graphTruncated: '筆記太多，圖譜只畫出了前 {shown} / {total} 篇。',
   suggestCreateNote: '新增筆記',
+  tags: '標籤',
+  tagsEmpty: '知識庫裡還沒有 #標籤',
 } satisfies Record<keyof typeof zh, string>

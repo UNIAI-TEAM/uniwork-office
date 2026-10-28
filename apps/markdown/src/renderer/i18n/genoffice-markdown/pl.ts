@@ -9,4 +9,6 @@ export const pl = {
   graphEmpty: 'W sejfie nie ma jeszcze notatek.',
   graphTruncated: 'Za dużo notatek: wykres pokazuje pierwsze {shown} z {total}.',
   suggestCreateNote: 'Utwórz nową notatkę',
+  tags: 'Tagi',
+  tagsEmpty: 'W sejfie nie ma jeszcze #tagów',
 } satisfies Record<keyof typeof zh, string>
