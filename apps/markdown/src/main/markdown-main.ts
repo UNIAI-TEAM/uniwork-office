@@ -60,6 +60,7 @@ import {
   renameOwnedAssetDocument,
   resolveSafeRelativeImagePath,
   resolveSafeVaultImagePath,
+  vaultRootServesPictures,
   resolveSourcePendingAfterSaveAs,
   restoreOwnedAssetFiles,
   rollbackPreparedSaveAsAssets,
@@ -746,7 +747,8 @@ function registerImageProtocol(): void {
       return new Response(null, { status: 404 })
     }
     let served: string | null = null
-    for (const doc of new Set([...openPathByWc.values(), ...savePathByWc.values()])) {
+    const openDocs = new Set([...openPathByWc.values(), ...savePathByWc.values()])
+    for (const doc of openDocs) {
       const dir = resolve(dirname(doc))
       // isInDocDir handles filesystem-root docs ("/", "C:\") whose dir
       // already ends in a separator — dir + sep would 403 every sibling.
@@ -757,11 +759,12 @@ function registerImageProtocol(): void {
         break
       }
     }
-    if (!served) {
-      // a cross-folder embed resolves through the vault root the wiki resolver
-      // walks, so the picture next to the note (vault attachments/ from a
-      // nested note, the Obsidian layout) renders too: the same root decides,
-      // realpath-resolved so a symlink escape is refused
+    // a cross-folder embed resolves through the vault root the wiki resolver
+    // walks, so the picture next to the note (vault attachments/ from a
+    // nested note, the Obsidian layout) renders too: the same root decides,
+    // realpath-resolved so a symlink escape is refused. Local documents only:
+    // a bound UniWork working copy keeps the own-directory rule above.
+    if (!served && vaultRootServesPictures(openDocs, uniworkIsBound)) {
       served = await resolveSafeVaultImagePath(configuredDefaultSaveDir(app), target)
     }
     if (!served) return new Response(null, { status: 403 })

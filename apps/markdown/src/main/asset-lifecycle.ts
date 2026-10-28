@@ -472,6 +472,20 @@ export async function resolveSafeVaultImagePath(
   }
 }
 
+/**
+ * Whether the vault-root picture rule may apply at all. The md-asset protocol cannot tell
+ * which window asked, so one bound UniWork working copy among the open documents turns the
+ * rule off for every request: a document the user did not author must never show pictures
+ * from the local notes folder, and only the own-directory rule serves it.
+ */
+export function vaultRootServesPictures(
+  openDocs: Iterable<string>,
+  isBound: (path: string) => boolean,
+): boolean {
+  for (const doc of openDocs) if (isBound(doc)) return false
+  return true
+}
+
 function ownedNameForSource(source: string): string | null {
   const decoded = decodeLocalSource(source)
   if (!decoded) return null

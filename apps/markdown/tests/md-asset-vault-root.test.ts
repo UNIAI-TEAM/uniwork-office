@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { resolveSafeVaultImagePath } from '../src/main/asset-lifecycle'
+import { resolveSafeVaultImagePath, vaultRootServesPictures } from '../src/main/asset-lifecycle'
 
 /** symlinkSync needs privilege on Windows (developer mode); a machine without it skips those cases */
 const canSymlink = (() => {
@@ -91,4 +91,19 @@ describe('resolveSafeVaultImagePath (md-asset serve gate widened to the vault ro
       expect(served).toBeTruthy()
     },
   )
+})
+
+describe('vaultRootServesPictures (local documents only)', () => {
+  const bound = new Set(['/work/cloud-copy.md'])
+  const isBound = (path: string): boolean => bound.has(path)
+
+  it('applies while every open document is a local one', () => {
+    expect(vaultRootServesPictures(['/notes/a.md', '/notes/b.md'], isBound)).toBe(true)
+    expect(vaultRootServesPictures([], isBound)).toBe(true)
+  })
+
+  it('is off as soon as a bound working copy is open: the own-directory rule alone serves it', () => {
+    expect(vaultRootServesPictures(['/notes/a.md', '/work/cloud-copy.md'], isBound)).toBe(false)
+    expect(vaultRootServesPictures(new Set(['/work/cloud-copy.md']), isBound)).toBe(false)
+  })
 })
