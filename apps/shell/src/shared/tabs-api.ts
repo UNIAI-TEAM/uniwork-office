@@ -103,6 +103,8 @@ export interface TabsApi {
    * popover after Ctrl/Cmd+S) returns focus to the document with this.
    */
   focusActive(): void
+  /** subscribe to main process requesting inline rename of a tab */
+  onStartRename?(handler: (id: string) => void): () => void
 }
 
 export const TABS_CHANNELS = {
@@ -124,4 +126,5 @@ export const TABS_CHANNELS = {
   changed: 'tabs:changed',
   chromePressed: 'tabs:chrome-pressed',
   focusActive: 'tabs:focus-active',
+  startRename: 'tabs:start-rename',
 } as const

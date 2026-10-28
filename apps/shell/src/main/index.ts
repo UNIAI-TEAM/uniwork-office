@@ -19,6 +19,7 @@ import {
   BrowserWindow,
   Menu,
   app,
+  clipboard,
   dialog,
   ipcMain,
   nativeImage,
@@ -429,6 +430,16 @@ import { clearAiRun, isAiRunning, registerAiRunIpc } from './ai-run-registry'
 import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
 import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
 import { canonicalPath, TabManager } from './tab-manager'
+import {
+  tabMenuTemplate,
+  type TabMenuActions,
+  type TabMenuStringKey,
+  isProgramFile,
+} from './tab-menu'
+import { tTabMenu } from './tab-menu-strings'
+import { runTabDocumentAction, type TabDocumentAction } from './tab-document-actions'
+import { duplicateDocumentFile } from './tab-duplicate'
+import { closeTabsInOrder, createRecentlyClosedTracker } from './tab-lifecycle'
 import { createIpcSenderGuard, trustedUrlRules } from './ipc-sender-guard'
 import { reloadPathTarget } from './reload-view'
 import { listDeskDrafts } from './desk-drafts'
@@ -3357,6 +3368,8 @@ const tMain = createI18n({
 
 const tm = (key: Parameters<typeof tMain>[1], params?: Parameters<typeof tMain>[2]) =>
   tMain(currentLang(), key, params)
+const tmTab = (key: TabMenuStringKey): string =>
+  key === 'menuOpenInNewWindow' || key === 'menuClose' ? tm(key) : tTabMenu(currentLang(), key)
 
 // ---- the shell window + its tab manager (recreated if the user closes it on macOS) ----
 
@@ -3969,6 +3982,9 @@ function createShellWindow(): void {
   setDetachedTitleDecorator((filePath, title) =>
     withViewVersionTitle(title, filePath, currentLang(), inUniworkStore),
   )
+  manager.setClosedListener((closed) => {
+    if (!isUniworkBoundPath(closed.filePath)) recentlyClosed.push(closed)
+  })
 
   // Docking: a detached window dragged over this window's tab strip hands its
   // document back. The strip reports the insertion slot for each preview
@@ -5637,21 +5653,7 @@ function registerHomeIpc(): void {
   guardedIpc.handle(HOME_CHANNELS.duplicateFile, async (_event, path: unknown) => {
     if (typeof path !== 'string' || !existsSync(path)) return
     if (!isUserVisibleFile(path, fileTargetSources())) return
-    const ext = extname(path)
-    const base = basename(path, ext)
-    const dir = dirname(path)
-    for (let i = 1; ; i++) {
-      const target = join(dir, `${base} ${tm('copySuffix')}${i === 1 ? '' : ` ${i}`}${ext}`)
-      if (existsSync(target)) continue
-      try {
-        await atomicCopyFile(path, target)
-      } catch (err) {
-        showErrorDialog(shellWindow, tm('errDuplicateFailed'), err)
-        return
-      }
-      recordRecentFile(target)
-      return
-    }
+    await duplicateFile(path)
   })
 
   guardedIpc.handle(HOME_CHANNELS.deleteFiles, async (_event, paths: unknown) => {
@@ -6207,6 +6209,111 @@ function activeHtmlTarget() {
   return activeEditorTarget('html', () => tabManager?.activeHtmlTab())
 }
 
+/** files of tabs that were closed, newest last, so "Reopen closed tab" can bring them back */
+const recentlyClosed = createRecentlyClosedTracker()
+
+/**
+ * G5-05u (B8): the UniWork binding of a tab path - the document, its
+ * workspace and its org - or null for a plain local file (nothing to pin).
+ */
+function offlineBindingOf(
+  path: string | undefined,
+): { documentId: string; workspaceId: string; orgId: string } | null {
+  if (!path) return null
+  const bound = uniworkDocs?.aiBinding(path)
+  if (!bound || bound === 'hidden') return null
+  const doc = uniworkDocs?.service.store.lookup(path)
+  if (!doc) return null
+  return {
+    documentId: bound.documentId,
+    workspaceId: doc.binding.workspaceId,
+    orgId: bound.orgId,
+  }
+}
+
+function isUniworkBoundPath(path: string | undefined): boolean {
+  if (!path) return false
+  return (
+    offlineBindingOf(path) !== null ||
+    uniworkDocs?.service.store.isInside(path) === true ||
+    uniworkDocs?.service.sourceViews.has(path) === true
+  )
+}
+function duplicateFile(path: string): Promise<string | undefined> {
+  return duplicateDocumentFile(path, {
+    copySuffix: tm('copySuffix'),
+    recordRecentFile,
+    onError: (error) => showErrorDialog(shellWindow, tm('errDuplicateFailed'), error),
+  })
+}
+
+/** The shell's side of every entry of the tab menu (see tab-menu.ts for what is offered). */
+function tabMenuActions(): TabMenuActions {
+  const documentAction = (id: string, action: TabDocumentAction) => {
+    if (!tabManager) return
+    runTabDocumentAction(
+      {
+        tabs: tabManager,
+        savePdf: (contents) => {
+          void flushPdfSave(contents)
+        },
+        savePdfAs: (target) => {
+          void savePdfAs(target)
+        },
+        printPdf: sendPdfPrintRequest,
+        saveMarkdown: (contents, mode) => {
+          void requestMarkdownSave(contents, mode)
+        },
+        printMarkdown: sendMarkdownPrintRequest,
+        saveHtml: (contents, mode) => {
+          void requestHtmlSave(contents, mode)
+        },
+        printHtml: sendHtmlPrintRequest,
+      },
+      id,
+      action,
+    )
+  }
+  return {
+    save: (id) => documentAction(id, 'save'),
+    saveAs: (id) => documentAction(id, 'saveAs'),
+    print: (id) => documentAction(id, 'print'),
+    openInNewWindow: (id) => detachTabToWindow(id),
+    // two windows side by side, each on its own half of the screen the tab is on
+    splitBeside: (id) => {
+      if (!tabManager || !shellWindow) return
+      const record = tabManager.detachTab(id)
+      if (!record) return
+      const win = createDetachedEditorWindow({ ...record, applyMenuFor })
+      const area = screen.getDisplayMatching(shellWindow.getBounds()).workArea
+      const half = Math.floor(area.width / 2)
+      if (shellWindow.isMaximized()) shellWindow.unmaximize()
+      if (shellWindow.isFullScreen()) shellWindow.setFullScreen(false)
+      shellWindow.setBounds({ x: area.x, y: area.y, width: half, height: area.height })
+      win.setBounds({ x: area.x + half, y: area.y, width: area.width - half, height: area.height })
+      win.focus()
+    },
+    rename: (id) => {
+      if (shellWindow && !shellWindow.isDestroyed())
+        shellWindow.webContents.send(TABS_CHANNELS.startRename, id)
+    },
+    duplicate: (path) => {
+      void duplicateFile(path).then((target) => {
+        if (target) openDocumentPath(target)
+      })
+    },
+    copyText: (text) => clipboard.writeText(text),
+    reveal: (path) => shell.showItemInFolder(path),
+    openDefault: (path) => {
+      // a document tab is a document, never a program; keep it that way for a renamed one
+      if (!isProgramFile(path)) void shell.openPath(path)
+    },
+    move: (id, toIndex) => tabManager?.reorderTab(id, toIndex),
+    closeTabs: (ids) => void (tabManager && closeTabsInOrder(tabManager, ids)),
+    reopenClosed: () => recentlyClosed.reopenNext(openDocumentPath, existsSync),
+  }
+}
+
 function registerTabsIpc(): void {
   guardedIpc.on(TABS_CHANNELS.chromePressed, (event) => broadcastChromePressed(event.sender))
   // G5-06u: a shell popover opened for the editor gives focus back to it; only
@@ -6284,24 +6391,6 @@ function registerTabsIpc(): void {
     lastDockIndex = typeof index === 'number' && Number.isInteger(index) ? index : undefined
   })
   /**
-   * G5-05u (B8): the UniWork binding of a tab path - the document, its
-   * workspace and its org - or null for a plain local file (nothing to pin).
-   */
-  const offlineBindingOf = (
-    path: string | undefined,
-  ): { documentId: string; workspaceId: string; orgId: string } | null => {
-    if (!path) return null
-    const bound = uniworkDocs?.aiBinding(path)
-    if (!bound || bound === 'hidden') return null
-    const doc = uniworkDocs?.service.store.lookup(path)
-    if (!doc) return null
-    return {
-      documentId: bound.documentId,
-      workspaceId: doc.binding.workspaceId,
-      orgId: bound.orgId,
-    }
-  }
-  /**
    * G5-05u (B8, BE-R1-3): the tab menu's unpin confirms natively. A native menu
    * cannot host the renderer's confirm popover, so the message box is the tab
    * window's own; the item never unpins without it.
@@ -6337,20 +6426,11 @@ function registerTabsIpc(): void {
       if (!tabManager || !shellWindow || typeof id !== 'string') return
       const tab = tabManager.list().find((t) => t.id === id)
       if (!tab || tab.kind === 'home') return
-      const template: MenuItemConstructorOptions[] = []
-      // every document tab except a chrome-free Present tab (a live preview of
-      // another tab's document — it has nothing of its own to move)
-      if (tabManager.canDetachTab(id)) {
-        template.push({
-          label: tm('menuOpenInNewWindow'),
-          click: () => detachTabToWindow(id),
-        })
-        template.push({ type: 'separator' })
-      }
       // G5-05u (B8): a UniWork-bound tab can be pinned for offline use here; a
       // plain local file has no document to pin (and no item)
       const offlineBinding = offlineBindingOf(tab.filePath)
       const offline = uniworkDocs?.offline
+      const extraItems: MenuItemConstructorOptions[] = []
       if (offlineBinding && offline) {
         const item = offlineTabMenuItem({
           bound: offlineBinding,
@@ -6359,15 +6439,18 @@ function registerTabsIpc(): void {
           pin: () => void offline.pin(offlineBinding),
           unpin: () => void unpinFromTabMenu(offline, offlineBinding.documentId),
         })
-        if (item) {
-          template.push(item)
-          template.push({ type: 'separator' })
-        }
+        if (item) extraItems.push(item)
       }
-      template.push({
-        label: tm('menuClose'),
-        enabled: tab.closable,
-        click: () => void tabManager?.closeTab(id),
+      const template = tabMenuTemplate({
+        tab,
+        tabs: tabManager.list(),
+        canDetach: tabManager.canDetachTab(id),
+        fileExists: !!tab.filePath && existsSync(tab.filePath),
+        canReopen: recentlyClosed.getEntries().length > 0,
+        uniworkBound: isUniworkBoundPath(tab.filePath),
+        extraItems,
+        tm: tmTab,
+        actions: tabMenuActions(),
       })
       Menu.buildFromTemplate(template).popup({
         window: shellWindow,
@@ -6798,8 +6881,7 @@ function buildHtmlMenu(): void {
     waiter/target grant or clears its autosave pause early */
 let savingPdfAs = false
 
-async function savePdfAs(): Promise<void> {
-  const tab = activePdfTarget()
+async function savePdfAs(tab = activePdfTarget()): Promise<void> {
   const host = pdfHostWindow(tab)
   if (!tab?.filePath || !host || savingPdfAs) return
   savingPdfAs = true
