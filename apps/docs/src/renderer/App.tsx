@@ -4737,15 +4737,19 @@ export function App() {
               const elTop = b.el.getBoundingClientRect().top
               let matched = false
               let cutRow: Element | null = null
+              // the previous pass's gap rows sit exactly at their cut: matching one
+              // resolves to the table, not a row, and the boundary is silently lost
               for (const tr of Array.from(b.el.querySelectorAll('tr')).filter(
                 (r) =>
-                  !r.closest('.doc-nested-table') && !r.classList.contains('page-repeat-header'),
+                  !r.closest('.doc-nested-table') &&
+                  !r.classList.contains('page-repeat-header') &&
+                  !r.classList.contains('page-gap'),
               )) {
                 const trTop = tr.getBoundingClientRect().top
                 const gapsAbove = gapRects.reduce((s, g) => (g.top <= trTop ? s + g.height : s), 0)
                 const off = (trTop - elTop - gapsAbove) / factor
                 // last real row starting at/above the cut = the row the cut falls inside
-                if (!tr.classList.contains('page-gap') && off <= cutOff + 0.5) cutRow = tr
+                if (off <= cutOff + 0.5) cutRow = tr
                 if (Math.abs(off - cutOff) < 1.5) {
                   matched = true
                   try {

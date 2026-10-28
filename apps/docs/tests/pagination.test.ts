@@ -39,6 +39,7 @@ import {
   hfVariantOf,
   insertParityBlanks,
   lineBreakBoundaries,
+  indexedRowBoxes,
   lineStartAnchor,
   nextLineAnchor,
   anchorElement,
@@ -5849,5 +5850,34 @@ describe('lifted floats', () => {
   it('an unlifted float that does not fit still turns the page', () => {
     const blocks = [block(0, 600), block(600, 380, { floated: true }), block(600, 50)]
     expect(computePageSlices(blocks, 700, 650).length).toBe(2)
+  })
+})
+
+describe('indexedRowBoxes', () => {
+  it('keeps a collapsed 0px first row paired with its own tr', () => {
+    // rows 0 and 1 measure 0px (collapsed spacer rows); the long row 2 starts at 0
+    // and must stay the third box, not be dropped onto trs[0]
+    expect(indexedRowBoxes([0, 0, 0], 1200)).toEqual([
+      { offsetInBlock: 0, height: 0 },
+      { offsetInBlock: 0, height: 0 },
+      { offsetInBlock: 0, height: 1200 },
+    ])
+  })
+
+  it('tiles the block height from the measured row tops', () => {
+    expect(indexedRowBoxes([1, 40, 80], 100)).toEqual([
+      { offsetInBlock: 0, height: 40 },
+      { offsetInBlock: 40, height: 40 },
+      { offsetInBlock: 80, height: 20 },
+    ])
+  })
+
+  it('clamps offsets monotonic and within the block', () => {
+    expect(indexedRowBoxes([0, 50, 30, 500], 100)).toEqual([
+      { offsetInBlock: 0, height: 50 },
+      { offsetInBlock: 50, height: 0 },
+      { offsetInBlock: 50, height: 50 },
+      { offsetInBlock: 100, height: 0 },
+    ])
   })
 })
