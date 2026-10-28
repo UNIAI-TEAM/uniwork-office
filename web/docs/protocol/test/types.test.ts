@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DocsProtocolError,
   FRAME_REQUEST_TYPES,
+  HOST_REQUEST_TYPES,
   PROTOCOL_NS,
   PROTOCOL_VERSION,
   errorFromHttpStatus,
@@ -489,5 +490,51 @@ describe('read-only profile and close_requested event (UNI-1876, additive)', () 
       profile: 'readOnly',
     })
     expect(viewer).toMatchObject({ enabled: true, level: 'view', canCreate: false })
+  })
+})
+
+describe('ai.start envelope (UNI-2264, additive)', () => {
+  const req = (payload: unknown) =>
+    parseEnvelope({
+      ns: PROTOCOL_NS,
+      v: PROTOCOL_VERSION,
+      id: 'h1-ai',
+      kind: 'request',
+      type: 'ai.start',
+      payload,
+    }).ok
+  const ok = { handoffId: 'H01ABC', text: 'Draft the plan' }
+
+  it('lists the capability and the request type', () => {
+    expect(CAPABILITY_KEYS).toContain('aiStart')
+    expect(HOST_REQUEST_TYPES).toContain('ai.start')
+  })
+
+  it('validates the request payload', () => {
+    expect(req(ok)).toBe(true)
+    expect(req({ ...ok, displayText: 'Plan' })).toBe(true)
+    expect(req({ ...ok, text: 'x'.repeat(8000) })).toBe(true)
+    expect(req({ ...ok, handoffId: 'a'.repeat(64) })).toBe(true)
+    expect(req({ ...ok, handoffId: '' })).toBe(false)
+    expect(req({ ...ok, handoffId: 'a-b' })).toBe(false)
+    expect(req({ ...ok, handoffId: 'a'.repeat(65) })).toBe(false)
+    expect(req({ ...ok, text: '' })).toBe(false)
+    expect(req({ ...ok, text: 'x'.repeat(8001) })).toBe(false)
+    expect(req({ ...ok, displayText: 5 })).toBe(false)
+    expect(req({ ...ok, displayText: 'x'.repeat(8001) })).toBe(false)
+  })
+
+  it('validates the response payload', () => {
+    const res = (payload: unknown) =>
+      parseEnvelope({
+        ns: PROTOCOL_NS,
+        v: PROTOCOL_VERSION,
+        id: 'h1-ai',
+        kind: 'response',
+        type: 'ai.start',
+        payload,
+      }).ok
+    expect(res({ queued: true })).toBe(true)
+    expect(res({ queued: false })).toBe(false)
   })
 })

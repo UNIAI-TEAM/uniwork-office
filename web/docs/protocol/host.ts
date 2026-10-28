@@ -34,6 +34,8 @@ import {
   checkFrameModule,
   PROTOCOL_VERSION,
   toProtocolError,
+  type AiStartPayload,
+  type AiStartResult,
   type CommentsRevealResult,
   type DocBlockedPayload,
   type FileMeta,
@@ -139,6 +141,11 @@ export interface DocsFrameHost {
     commentId: string,
     options?: RequestOptions & { retry?: boolean },
   ): Promise<CommentsRevealResult>
+  /**
+   * hand an approved job to the frame's AI panel (additive, UNI-2264). Rejects `unsupported`
+   * without sending when the InitAck has no `aiStart` (host grant AND frame claim).
+   */
+  startAi(payload: AiStartPayload, options?: RequestOptions): Promise<AiStartResult>
   /**
    * the open document is blocked for this viewer (additive, G5-03w). A frame before it has no
    * listener and drops it silently; the host keeps refusing its saves either way.
@@ -371,6 +378,14 @@ export function createDocsFrameHost(options: DocsFrameHostOptions): DocsFrameHos
     return attempt()
   }
 
+  async function startAi(payload: AiStartPayload, o: RequestOptions = {}): Promise<AiStartResult> {
+    const a = await whenReady({ timeoutMs: o.timeoutMs, signal: o.signal })
+    if (a.capabilities.aiStart !== true) {
+      throw err('unsupported', 'the frame does not accept ai.start')
+    }
+    return (await ep.request('ai.start', payload, o)) as AiStartResult
+  }
+
   const emitIfReady = (type: string, payload: unknown): void => {
     if (!ack) return
     try {
@@ -399,6 +414,7 @@ export function createDocsFrameHost(options: DocsFrameHostOptions): DocsFrameHos
       for (const wake of [...commentsWakers]) wake()
     },
     revealComment,
+    startAi,
     notifyBlocked: (p) => emitIfReady('doc.blocked', { ...p }),
     setTheme: (theme) => emitIfReady('theme', { theme }),
     setLanguage: (locale) => emitIfReady('language', { locale }),

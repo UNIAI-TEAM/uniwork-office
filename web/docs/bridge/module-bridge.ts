@@ -76,6 +76,7 @@ export type ModuleBridgePort = Pick<
   | 'getToken'
   | 'refreshToken'
   | 'handleDownload'
+  | 'handleAiStart'
   | 'reportSizeWarning'
   | 'reportSaveBlocked'
   | 'reportLagDetected'
