@@ -215,6 +215,7 @@ describe('footnote probes', () => {
     expect(footnoteDefStart('text\nnot one\n[^2]: y')).toBe(13)
     expect(footnoteDefStart('first paragraph\n\n[^1]: next block')).toBe(-1)
     expect(footnoteDefStart('first paragraph\n   \n[^1]: next block')).toBe(-1)
+    expect(footnoteDefStart('a\n\t\n[^1]: x')).toBe(4)
   })
 
   it('footnoteRefStart finds references but not escaped ones', () => {
@@ -229,6 +230,12 @@ describe('footnote probes', () => {
     // on every paragraph, taking >25 s to parse after 60 editors (~250 ms now).
     for (let i = 0; i < 60; i++) createEditor()
     const editor = createEditor()
+    const other = createEditor()
+    // each editor owns its Marked instance and none accumulates tokenizers
+    expect(editor.markdown!.instance).not.toBe(other.markdown!.instance)
+    expect(editor.markdown!.instance.defaults.extensions?.startBlock?.length).toBe(
+      other.markdown!.instance.defaults.extensions?.startBlock?.length,
+    )
     const unit =
       'Paragraph with `a == b` comparison, ==highlight==, and a reference[^1] on line one\n' +
       'followed by a second line in the same paragraph where x == y holds and more prose.\n' +
