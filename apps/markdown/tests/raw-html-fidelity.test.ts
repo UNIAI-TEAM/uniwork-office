@@ -84,6 +84,11 @@ describe('raw HTML round-trips byte-identically (open → save without edit)', (
     'raw html table': '<table>\n  <tr><td>a</td></tr>\n</table>\n',
     'vault block id, picture embed with width and aliased wiki link':
       'Paragraph ^abc123\n\nSee [[Note|Alias]] and ![[pic.png|200]] here.\n\n<div>\n  [[Note|Alias]] ![[pic.png|200]] ^abc123\n</div>\n',
+    // footnotes and ==highlight== share paragraphs with raw HTML and must keep it byte-identical
+    'footnote beside raw html':
+      'Press <kbd>Ctrl</kbd> twice[^1] <!-- n --> then stop.\n\n<div class="x">raw</div>\n\n[^1]: The note, with **bold** and <span class="k">html</span>.\n',
+    'highlight beside raw html':
+      'a ==marked== and <kbd>x</kbd> ==more text== end <!-- c --> and <span class="k">y</span>.\n',
   }
 
   for (const [name, md] of Object.entries(cases)) {

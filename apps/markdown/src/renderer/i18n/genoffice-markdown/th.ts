@@ -14,4 +14,8 @@ export const th = {
   blockLink: 'คัดลอกลิงก์ไปยังบล็อก',
   blockLinkCopied: 'คัดลอก {link} แล้ว',
   blockLinkNone: 'ไม่มีบล็อกให้ลิงก์ที่นี่',
+  insertFootnote: 'เชิงอรรถ',
+  statusWords: '{n} คำ',
+  statusChars: '{n} อักขระ',
+  highlight: 'ไฮไลต์',
 } satisfies Record<keyof typeof zh, string>

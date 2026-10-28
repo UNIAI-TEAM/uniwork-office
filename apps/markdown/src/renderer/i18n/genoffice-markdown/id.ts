@@ -14,4 +14,8 @@ export const id = {
   blockLink: 'Salin tautan ke blok',
   blockLinkCopied: '{link} disalin',
   blockLinkNone: 'Tidak ada blok untuk ditautkan di sini',
+  insertFootnote: 'Catatan kaki',
+  statusWords: '{n} kata',
+  statusChars: '{n} karakter',
+  highlight: 'Sorot',
 } satisfies Record<keyof typeof zh, string>

@@ -14,4 +14,8 @@ export const it = {
   blockLink: 'Copia link al blocco',
   blockLinkCopied: '{link} copiato',
   blockLinkNone: 'Niente da collegare qui',
+  insertFootnote: 'Nota a piè di pagina',
+  statusWords: '{n} parole',
+  statusChars: '{n} caratteri',
+  highlight: 'Evidenzia',
 } satisfies Record<keyof typeof zh, string>

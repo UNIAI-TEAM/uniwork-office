@@ -256,6 +256,8 @@ export interface AiToolChip {
 export interface AiChatMessage {
   readonly role: 'user' | 'assistant'
   readonly text: string
+  /** a user bubble whose words (`text`) differ from what was sent: the sent text, for Retry */
+  readonly instruction?: string | undefined
   readonly tools: readonly AiToolChip[]
   readonly streaming?: boolean | undefined
   readonly isError?: boolean | undefined
@@ -370,6 +372,7 @@ export function AiChatPanel({
     instruction?: string,
     attachments?: readonly AttachmentMeta[],
     retryIndex?: number,
+    displayText?: string,
   ) => void
   /** a queued message is ready to run: return false to keep it queued (panel busy some other way) */
   readonly onSendQueued?: (instruction: string, attachments: readonly AttachmentMeta[]) => boolean
@@ -944,7 +947,16 @@ export function AiChatPanel({
                             className="ai-retry-btn"
                             onClick={() => {
                               if (uniworkGate.refuse()) return
-                              onSend(entry.text, entry.attachments ?? [], index)
+                              // a bubble that showed other words sends what it sent, keeping its words
+                              if (entry.instruction === undefined)
+                                onSend(entry.text, entry.attachments ?? [], index)
+                              else
+                                onSend(
+                                  entry.instruction,
+                                  entry.attachments ?? [],
+                                  index,
+                                  entry.text,
+                                )
                             }}
                           >
                             {t('aiRetry')}
@@ -987,7 +999,15 @@ export function AiChatPanel({
                         isLast && !aiBusy && asked
                           ? () => {
                               if (uniworkGate.refuse()) return
-                              onSend(asked.text, asked.attachments ?? [], askedIndex)
+                              if (asked.instruction === undefined)
+                                onSend(asked.text, asked.attachments ?? [], askedIndex)
+                              else
+                                onSend(
+                                  asked.instruction,
+                                  asked.attachments ?? [],
+                                  askedIndex,
+                                  asked.text,
+                                )
                             }
                           : undefined
                       }

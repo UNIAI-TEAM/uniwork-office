@@ -14,4 +14,8 @@ export const ms = {
   blockLink: 'Salin pautan ke blok',
   blockLinkCopied: '{link} disalin',
   blockLinkNone: 'Tiada blok untuk dipautkan di sini',
+  insertFootnote: 'Nota kaki',
+  statusWords: '{n} perkataan',
+  statusChars: '{n} aksara',
+  highlight: 'Serlahkan',
 } satisfies Record<keyof typeof zh, string>

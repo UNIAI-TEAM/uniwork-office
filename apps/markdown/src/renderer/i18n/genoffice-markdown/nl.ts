@@ -14,4 +14,8 @@ export const nl = {
   blockLink: 'Link naar blok kopiëren',
   blockLinkCopied: '{link} gekopieerd',
   blockLinkNone: 'Hier is geen blok om naar te linken',
+  insertFootnote: 'Voetnoot',
+  statusWords: '{n} woorden',
+  statusChars: '{n} tekens',
+  highlight: 'Markeren',
 } satisfies Record<keyof typeof zh, string>

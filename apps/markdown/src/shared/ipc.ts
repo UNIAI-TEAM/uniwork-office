@@ -493,6 +493,14 @@ export interface MarkdownApi {
   /** press on the shell chrome (tab strip is a sibling WebContentsView whose
    *  clicks produce no DOM event here) — dismiss open popovers */
   onChromePressed(handler: () => void): () => void
+  /**
+   * Web frame only (the web AI bridge; absent on the desktop): the job the host handed over
+   * (`ai.start`, UNI-2264). The one that arrived while nothing listened, once; then each as it comes
+   */
+  consumeAiPreset?(): Promise<{ text: string; autoRun?: boolean; displayText?: string } | null>
+  onAiPreset?(
+    handler: (preset: { text: string; autoRun?: boolean; displayText?: string }) => void,
+  ): () => void
   getAiSettings(): Promise<AiSettings>
   setAiSettings(settings: AiSettings, options?: AiSettingsSaveOptions): Promise<void>
   /** ai-settings.json was rewritten by any renderer; re-read it */

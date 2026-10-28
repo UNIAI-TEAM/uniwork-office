@@ -14,4 +14,8 @@ export const zhTW = {
   blockLink: '複製區塊連結',
   blockLinkCopied: '已複製 {link}',
   blockLinkNone: '此處沒有可連結的區塊',
+  insertFootnote: '腳注',
+  statusWords: '{n} 個字',
+  statusChars: '{n} 個字元',
+  highlight: '高亮',
 } satisfies Record<keyof typeof zh, string>

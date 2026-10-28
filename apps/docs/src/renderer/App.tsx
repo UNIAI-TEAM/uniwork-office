@@ -97,7 +97,13 @@ import {
   type PictureWatermarkSpec,
   type WatermarkSpec,
 } from '@genoffice/docx-engine'
-import type { AiDocContent, AiSettings, MenuCommand, OpenDocxResult } from '../shared/ipc'
+import type {
+  AiDocContent,
+  AiPresetPayload,
+  AiSettings,
+  MenuCommand,
+  OpenDocxResult,
+} from '../shared/ipc'
 import { AI_PROVIDERS } from '../shared/ipc'
 import { ZoteroDocumentController } from './zotero/controller'
 import { AiPanel, AI_REVISION_AUTHOR } from './ai/AiPanel'
@@ -127,7 +133,7 @@ import { hfFooterLine, hfLayoutResolved, hfPhantomSpec, hfWithPhantom } from './
 import { textColorValue } from './editor/text-color'
 import { textOutlineCssValue } from './editor/text-outline'
 import { AiAskPopover } from './components/AiAskPopover'
-import { cap, isReadOnlyProfile } from './capabilities'
+import { cap, isReadOnlyProfile, isWebFrame } from './capabilities'
 import { installReadModeEscape } from './read-mode-escape'
 import { isNarrowViewport, widthFitZoom } from './narrow-viewport'
 import { EDIT_QUEUE_MAX, selectionForAnchor, type DocsEditQueueItem } from './ai/edit-queue'
@@ -867,7 +873,7 @@ export function App() {
   const [docLoading, setDocLoading] = useState(false)
   /** true until the pending-open / new-blank boot checks settle; the start screen stays hidden meanwhile */
   const bootPendingRef = useRef<Promise<
-    [OpenDocxResult, boolean, AiDocContent | null, { text: string; autoRun?: boolean } | null]
+    [OpenDocxResult, boolean, AiDocContent | null, AiPresetPayload | null]
   > | null>(null)
   const bootHandledRef = useRef(false)
   /** password prompt for an ECMA-376 encrypted docx; submit retries via openDocxDecrypt */
@@ -1210,7 +1216,12 @@ export function App() {
     text: string
     nonce: number
     autoRun?: boolean
+    /** the bubble's words when they differ from what is sent (`text`) */
+    displayText?: string
+    /** a web host's job (`ai.start`): it runs only while the panel is on UniWork AI */
+    uniworkOnly?: boolean
   } | null>(null)
+  const aiPresetSeen = useRef<number | null>(null)
   // selection-scoped AI edit queue (anchors live as editor decorations)
   const [editQueue, setEditQueue] = useState<DocsEditQueueItem[]>([])
   const editQueueRef = useRef(editQueue)
@@ -2377,6 +2388,8 @@ export function App() {
             text: aiPresetQueued.text,
             nonce: Date.now(),
             autoRun: aiPresetQueued.autoRun !== false,
+            ...(aiPresetQueued.displayText ? { displayText: aiPresetQueued.displayText } : {}),
+            ...(isWebFrame() ? { uniworkOnly: true } : {}),
           })
         }
       })
@@ -2386,6 +2399,8 @@ export function App() {
         bootHandledRef.current = true
         void resetFile().catch(() => {})
       })
+    // subscribed in the same tick as the boot consume above: a preset in between is never lost.
+    // One that arrives before the document has loaded waits here: the panel mounts with the document
     const offAiPreset = window.desktop.onAiPreset?.((preset) => {
       if (!preset?.text) return
       setShowAi(true)
@@ -2394,6 +2409,8 @@ export function App() {
         text: preset.text,
         nonce: Date.now(),
         autoRun: preset.autoRun !== false,
+        ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        ...(isWebFrame() ? { uniworkOnly: true } : {}),
       })
     })
     return () => {
@@ -7373,6 +7390,7 @@ export function App() {
                 doc.isBlank ? { bullet: BLANK_BULLET_NUM_ID, ordered: BLANK_ORDERED_NUM_ID } : null
               }
               preset={aiPreset}
+              presetSeen={aiPresetSeen}
               open={showAi}
               dockHidden={readMode}
               hideRail={!aiSidebarEnabled}

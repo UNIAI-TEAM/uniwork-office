@@ -14,4 +14,8 @@ export const fr = {
   blockLink: 'Copier le lien vers le bloc',
   blockLinkCopied: '{link} copié',
   blockLinkNone: 'Rien à lier ici',
+  insertFootnote: 'Note de bas de page',
+  statusWords: '{n} mots',
+  statusChars: '{n} caractères',
+  highlight: 'Surligner',
 } satisfies Record<keyof typeof zh, string>

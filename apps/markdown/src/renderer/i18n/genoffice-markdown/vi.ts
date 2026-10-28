@@ -15,4 +15,8 @@ export const vi = {
   blockLink: 'Sao chép liên kết đến khối',
   blockLinkCopied: 'Đã sao chép {link}',
   blockLinkNone: 'Không có khối nào để liên kết ở đây',
+  insertFootnote: 'Chú thích cuối trang',
+  statusWords: '{n} từ',
+  statusChars: '{n} ký tự',
+  highlight: 'Đánh dấu',
 } satisfies Record<keyof typeof zh, string>

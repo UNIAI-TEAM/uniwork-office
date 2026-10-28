@@ -753,7 +753,7 @@ function registerImageProtocol(): void {
       // isInDocDir handles filesystem-root docs ("/", "C:\") whose dir
       // already ends in a separator — dir + sep would 403 every sibling.
       if (!isInDocDir(target, dir)) continue
-      const safe = await resolveSafeRelativeImagePath(doc, relative(dir, target))
+      const safe = await resolveSafeRelativeImagePath(doc, relative(dir, target), { decoded: true })
       if (safe) {
         served = safe
         break

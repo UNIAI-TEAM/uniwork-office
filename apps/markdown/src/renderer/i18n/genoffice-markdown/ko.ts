@@ -14,4 +14,8 @@ export const ko = {
   blockLink: '블록 링크 복사',
   blockLinkCopied: '{link} 복사됨',
   blockLinkNone: '여기에는 링크할 블록이 없습니다',
+  insertFootnote: '각주',
+  statusWords: '{n}단어',
+  statusChars: '{n}자',
+  highlight: '형광펜',
 } satisfies Record<keyof typeof zh, string>

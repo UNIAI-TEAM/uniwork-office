@@ -6,6 +6,8 @@
 //        (structured clone, never exported) in IndexedDB "uniwork-office-frame-drafts", store "keys",
 //        key "test-user": a frame reload, a host page reload and a second tab all get the same key
 //        &ai=1 grants `ai` + webSearch/imageSearch/imageGeneration (fake AI routes, web/server/fake-ai.mjs)
+//        &uniwork=1 grants UniWork AI (`uniworkAi`) and `aiStart`: the spec hands the panel a job with
+//        __host.request('ai.start', {handoffId, text, displayText?}) (UNI-2264)
 //        &images=1 grants `images`: api.images.upload keeps the bytes (__host.uploads()) and answers
 //        {imageId, url: /e2e-assets/<name>}; the spec serves that URL with page.route (UNI-1232 A1)
 //        &assets=<json> puts {path as written: same-origin URL} into api.open's OpenPayload.assets
@@ -302,6 +304,10 @@ if (params.get('ai') === '1') {
     imageSearch: true,
     imageGeneration: true,
   })
+}
+// uniwork=1: UniWork AI (the frame route uniwork/chat/completions) and the host's `ai.start`
+if (params.get('uniwork') === '1') {
+  Object.assign(initPayload.capabilities, { uniworkAi: true, aiStart: true })
 }
 if (params.get('pick') === '1') initPayload.capabilities.filePick = true
 if (params.get('images') === '1') initPayload.capabilities.images = true

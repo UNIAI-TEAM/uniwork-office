@@ -14,4 +14,8 @@ export const hi = {
   blockLink: 'ब्लॉक का लिंक कॉपी करें',
   blockLinkCopied: '{link} कॉपी किया गया',
   blockLinkNone: 'यहाँ लिंक करने के लिए कोई ब्लॉक नहीं है',
+  insertFootnote: 'फ़ुटनोट',
+  statusWords: '{n} शब्द',
+  statusChars: '{n} अक्षर',
+  highlight: 'हाइलाइट',
 } satisfies Record<keyof typeof zh, string>

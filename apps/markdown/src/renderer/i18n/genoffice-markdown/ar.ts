@@ -14,4 +14,8 @@ export const ar = {
   blockLink: 'نسخ رابط الكتلة',
   blockLinkCopied: 'تم نسخ {link}',
   blockLinkNone: 'لا توجد كتلة للربط هنا',
+  insertFootnote: 'حاشية سفلية',
+  statusWords: '{n} كلمة',
+  statusChars: '{n} حرفًا',
+  highlight: 'تظليل',
 } satisfies Record<keyof typeof zh, string>

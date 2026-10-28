@@ -14,4 +14,8 @@ export const ru = {
   blockLink: 'Скопировать ссылку на блок',
   blockLinkCopied: 'Скопировано: {link}',
   blockLinkNone: 'Здесь нет блока для ссылки',
+  insertFootnote: 'Сноска',
+  statusWords: '{n} слов',
+  statusChars: '{n} символов',
+  highlight: 'Выделить',
 } satisfies Record<keyof typeof zh, string>

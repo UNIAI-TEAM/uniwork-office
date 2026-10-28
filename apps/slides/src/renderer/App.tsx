@@ -568,7 +568,10 @@ export function App() {
     displayText?: string
     attachments?: AttachmentMeta[]
     slideShot?: boolean
+    /** a web host's job (`ai.start`): it runs only while the panel is on UniWork AI */
+    uniworkOnly?: boolean
   } | null>(null)
+  const aiPresetSeen = useRef<number | null>(null)
   const [_recent, setRecent] = useState<string[]>([])
   const consumePendingRef = useRef<ReturnType<typeof window.slidesApi.consumePendingOpen> | null>(
     null,
@@ -1381,6 +1384,7 @@ export function App() {
             nonce: Date.now(),
             autoRun: preset.autoRun !== false,
             ...(preset.displayText ? { displayText: preset.displayText } : {}),
+            ...(isWeb() ? { uniworkOnly: true } : {}),
           })
         }
       })
@@ -1390,6 +1394,8 @@ export function App() {
         bootHandledRef.current = true
         if (!isWeb()) void bootBlank()
       })
+    // subscribed before the boot consume above runs: a preset in between is never lost. One that
+    // arrives before the deck has loaded waits here: the panel mounts with the deck
     const offAiPreset = window.slidesApi.onAiPreset?.((preset) => {
       if (!preset?.text || !aiEnabled) return
       setShowAi(() => {
@@ -1401,6 +1407,7 @@ export function App() {
         nonce: Date.now(),
         autoRun: preset.autoRun !== false,
         ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        ...(isWeb() ? { uniworkOnly: true } : {}),
       })
     })
     return () => {
@@ -3817,6 +3824,7 @@ export function App() {
                   fitWidthPx={FIT_WIDTH}
                   settings={aiSettings}
                   preset={aiPreset}
+                  presetSeen={aiPresetSeen}
                   open={aiDockOpen}
                   dockHidden={!!slideShow || !!presenter}
                   onExpand={toggleAi}

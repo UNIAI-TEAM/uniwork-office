@@ -59,6 +59,16 @@ describe('frame base capabilities (X-02)', () => {
     })
   })
 
+  it('every frame claims aiStart exactly when it claims uniworkAi (UNI-2264)', () => {
+    expect(FRAME_BASE_CAPABILITIES.aiStart).toBe(FRAME_BASE_CAPABILITIES.uniworkAi === true)
+    expect(FRAME_BASE_CAPABILITIES.aiStart).toBe(true)
+  })
+
+  it.each(OFFICE_MODULES)('%s: aiStart is effective with the host grant only', async (m) => {
+    expect((await effective(m, { uniworkAi: true, aiStart: true })).aiStart).toBe(true)
+    expect((await effective(m, { uniworkAi: true })).aiStart).toBe(false)
+  })
+
   it.each(OFFICE_MODULES)(
     '%s: download is effective after init when the host advertises it',
     async (m) => {

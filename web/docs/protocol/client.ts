@@ -200,6 +200,8 @@ export interface DocsFrameClient {
   reportAiRun(payload: AiRunPayload): void
   /** answer the host's `doc.download` request (additive, SIZE-F1) */
   handleDownload(handler: HostRequestHandler<'doc.download'>): () => void
+  /** answer the host's `ai.start` request (additive, UNI-2264) */
+  handleAiStart(handler: HostRequestHandler<'ai.start'>): () => void
   /** serialized document size reached warn threshold on save (additive, SIZE-F1) */
   reportSizeWarning(payload: SizeWarningPayload): void
   /** save blocked because serialized document size exceeded max_bytes (additive, SIZE-F1) */
@@ -613,6 +615,8 @@ export function createDocsFrameClient(options: DocsFrameClientOptions): DocsFram
       guarded(() => ep.emit('aiRun', run_id ? { state, run_id } : { state })),
     handleDownload: (h) =>
       ep.handle('doc.download', (p, ctx) => h(p as HostRequests['doc.download']['payload'], ctx)),
+    handleAiStart: (h) =>
+      ep.handle('ai.start', (p, ctx) => h(p as HostRequests['ai.start']['payload'], ctx)),
     reportSizeWarning: (payload) => guarded(() => ep.emit('size_warning', { ...payload })),
     reportSaveBlocked: (payload) => guarded(() => ep.emit('save_blocked', { ...payload })),
     reportOpenRefused: (payload) => guarded(() => ep.emit('open_refused', payload)),

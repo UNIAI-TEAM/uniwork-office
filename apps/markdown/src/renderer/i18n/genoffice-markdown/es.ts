@@ -14,4 +14,8 @@ export const es = {
   blockLink: 'Copiar enlace al bloque',
   blockLinkCopied: '{link} copiado',
   blockLinkNone: 'Aquí no hay ningún bloque que enlazar',
+  insertFootnote: 'Nota al pie',
+  statusWords: '{n} palabras',
+  statusChars: '{n} caracteres',
+  highlight: 'Resaltar',
 } satisfies Record<keyof typeof zh, string>

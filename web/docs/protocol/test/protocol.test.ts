@@ -118,6 +118,7 @@ describe('handshake', () => {
         commentsShareView: false,
         commentsViewVersion: false,
         sizeUi: false,
+        aiStart: false,
       },
     })
     expect(session).toMatchObject({
@@ -1802,5 +1803,46 @@ describe('read-only profile and close_requested (UNI-1876, additive)', () => {
     )
     await flush()
     expect(session.profile).toBeUndefined()
+  })
+})
+
+describe('ai.start and the aiStart capability (UNI-2264, additive)', () => {
+  const JOB = { handoffId: 'H01ABC', text: 'Draft the plan', displayText: 'Plan' }
+
+  it('host grant + frame claim: startAi reaches handleAiStart and answers {queued:true}', async () => {
+    const { host, client } = setup(
+      { getInit: async () => baseInit({ capabilities: { save: true, aiStart: true } }) },
+      { capabilities: { save: true, aiStart: true } },
+    )
+    await host.whenReady()
+    const session = await client.whenInitialized()
+    expect(session.capabilities.aiStart).toBe(true)
+    const onStart = vi.fn(async () => ({ queued: true as const }))
+    client.handleAiStart(onStart)
+    await expect(host.startAi(JOB)).resolves.toEqual({ queued: true })
+    expect(onStart).toHaveBeenCalledWith(JOB, expect.anything())
+  })
+
+  it('the frame did not claim aiStart: startAi rejects unsupported and sends nothing', async () => {
+    const { host, client, hostWin } = setup(
+      { getInit: async () => baseInit({ capabilities: { save: true, aiStart: true } }) },
+      { capabilities: { save: true } },
+    )
+    await host.whenReady()
+    await client.whenInitialized()
+    const before = hostWin.sent.length
+    await expect(host.startAi(JOB)).rejects.toMatchObject({ code: 'unsupported' })
+    await flush()
+    expect(hostWin.sent.length).toBe(before)
+  })
+
+  it('a granted and claimed frame with no handler answers unknown_type', async () => {
+    const { host, client } = setup(
+      { getInit: async () => baseInit({ capabilities: { save: true, aiStart: true } }) },
+      { capabilities: { save: true, aiStart: true } },
+    )
+    await host.whenReady()
+    await client.whenInitialized()
+    await expect(host.startAi(JOB)).rejects.toMatchObject({ code: 'unknown_type' })
   })
 })

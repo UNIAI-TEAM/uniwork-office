@@ -14,4 +14,8 @@ export const cs = {
   blockLink: 'Kopírovat odkaz na blok',
   blockLinkCopied: 'Zkopírováno {link}',
   blockLinkNone: 'Tady není žádný blok k odkazování',
+  insertFootnote: 'Poznámka pod čarou',
+  statusWords: '{n} slov',
+  statusChars: '{n} znaků',
+  highlight: 'Zvýraznit',
 } satisfies Record<keyof typeof zh, string>

@@ -13,4 +13,8 @@ export const zh = {
   blockLink: '复制块链接',
   blockLinkCopied: '已复制 {link}',
   blockLinkNone: '此处没有可链接的块',
+  insertFootnote: '脚注',
+  statusWords: '{n} 个字',
+  statusChars: '{n} 个字符',
+  highlight: '高亮',
 }

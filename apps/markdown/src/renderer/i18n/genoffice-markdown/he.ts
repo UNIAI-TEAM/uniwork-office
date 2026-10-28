@@ -14,4 +14,8 @@ export const he = {
   blockLink: 'העתק קישור לבלוק',
   blockLinkCopied: '{link} הועתק',
   blockLinkNone: 'אין כאן בלוק לקישור',
+  insertFootnote: 'הערת שוליים',
+  statusWords: '{n} מילים',
+  statusChars: '{n} תווים',
+  highlight: 'הדגשה',
 } satisfies Record<keyof typeof zh, string>
