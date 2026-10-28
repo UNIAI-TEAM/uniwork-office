@@ -39,13 +39,22 @@ vi.mock('electron', () => ({
 
 vi.mock('@genoffice/cli/agent-skills', () => {
   const skillsDir = '/home/me/.claude/skills'
+  const agentsDir = '/home/me/.agents/skills'
+  const sharedLabel = '.agents (Codex / Cursor / Gemini CLI / Copilot / OpenCode / dsh …)'
   return {
     LEDGER_KEY: 'agentSkillInstalls',
     bundledSkillFrom: () => ({ name: 'genoffice', version: '1.0.0', text: 'x' }),
     buildSkillZip: async () => Buffer.alloc(0),
-    detectAgents: () => [{ id: 'claude-code', label: 'Claude Code', skillsDir }],
+    detectAgents: () => [
+      { id: 'claude-code', label: 'Claude Code', skillsDir },
+      { id: 'agents', label: sharedLabel, skillsDir: agentsDir },
+    ],
     agentTarget: (id: string) =>
-      id === 'claude-code' ? { id, label: 'Claude Code', skillsDir } : null,
+      id === 'claude-code'
+        ? { id, label: 'Claude Code', skillsDir }
+        : id === 'agents'
+          ? { id, label: sharedLabel, skillsDir: agentsDir }
+          : null,
     installSkill: (dir: string) => {
       h.installed.push(dir)
     },
@@ -61,6 +70,7 @@ import { registerIntegrationsIpc } from '../src/main/integrations-ipc'
 import { INTEGRATIONS_CHANNELS } from '../src/shared/integrations-api'
 
 const AGENT_SKILLS_DIR = '/home/me/.claude/skills'
+const SHARED_AGENTS_SKILLS_DIR = '/home/me/.agents/skills'
 
 function invoke(channel: string, ...args: unknown[]): unknown {
   const handler = h.handlers.get(channel)
@@ -113,9 +123,10 @@ afterEach(() => {
 })
 
 describe('integrations:install-skill', () => {
-  it('installs into an agent target resolved in the main process', () => {
+  it('installs into an agent target resolved in the main process (including the shared .agents row)', () => {
     invoke(INTEGRATIONS_CHANNELS.installSkill, { agentId: 'claude-code' })
-    expect(h.installed).toEqual([AGENT_SKILLS_DIR])
+    invoke(INTEGRATIONS_CHANNELS.installSkill, { agentId: 'agents' })
+    expect(h.installed).toEqual([AGENT_SKILLS_DIR, SHARED_AGENTS_SKILLS_DIR])
   })
 
   it('installs into a directory the user picked in the folder dialog', async () => {
