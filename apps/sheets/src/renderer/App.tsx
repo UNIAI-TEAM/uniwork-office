@@ -2494,7 +2494,7 @@ export function App({
     // The grid's right-click item that withholds the selected cells from the
     // AI. Contributed to Univer's own menu rather than replacing it, so every
     // built-in item keeps working.
-    const redactMenuDisposable = installRedactMenu(runtime, onRedactSelection)
+    const redactMenuDisposable = cap('ai') ? installRedactMenu(runtime, onRedactSelection) : null
     // A context-menu submenu re-hovered within Univer's close delay stays
     // invisible; re-trigger its positioning (genoffice#337).
     const contextSubmenuReopenDisposable = installContextSubmenuReopenFix()
@@ -3866,7 +3866,7 @@ export function App({
       sheetProtectionDisposable.dispose()
       viewOnlyGuardDisposable.dispose()
       ctrlDragFillDisposable.dispose()
-      redactMenuDisposable.dispose()
+      redactMenuDisposable?.dispose()
       contextSubmenuReopenDisposable.dispose()
       multiRowAutofitDisposable.dispose()
       cellContextMenuDisposable.dispose()

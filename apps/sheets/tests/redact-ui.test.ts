@@ -6,6 +6,7 @@ import { ICommandService } from '@univerjs/core'
 
 import { RedactDialog } from '../src/renderer/components/RedactDialog'
 import { HIDE_SELECTION_COMMAND_ID, installRedactMenu } from '../src/renderer/redact-menu'
+import { resetForTest } from '../src/renderer/capabilities'
 import { strings } from '../src/renderer/i18n/strings'
 import { hideFromAiLocale } from '../src/renderer/univer-locales'
 
@@ -230,6 +231,22 @@ describe('the grid menu item', () => {
     expect(h.merged).toHaveLength(1)
     // Keyed by the command it runs, which is what Univer invokes on press.
     expect(JSON.stringify(h.merged)).toContain(HIDE_SELECTION_COMMAND_ID)
+  })
+
+  it('is not installed when the ai capability is off', () => {
+    Reflect.set(window, 'desktopApi', { capabilities: { ai: false } })
+    resetForTest()
+    try {
+      const onRequest = vi.fn()
+      const h = harness({ startRow: 0, endRow: 0, startColumn: 0, endColumn: 0 })
+      installRedactMenu(h.runtime, onRequest).dispose()
+      expect(h.merged).toHaveLength(0)
+      expect(h.fire()).toBe(false)
+      expect(onRequest).not.toHaveBeenCalled()
+    } finally {
+      Reflect.deleteProperty(window, 'desktopApi')
+      resetForTest()
+    }
   })
 })
 
