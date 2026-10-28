@@ -64,6 +64,7 @@ import {
   DEFAULT_SAVE_DIR_KEY,
   DROP_OPEN_CHANNEL,
   appMenuLabels,
+  appMenuTemplate,
   contextMenuLabels,
   convertedDocumentFor,
   forgetConvertedDocument,
@@ -83,7 +84,9 @@ import {
   windowMenuTemplate,
   aboutMenuItem,
   checkUpdatesMenuItem,
+  setSettingsInvoker,
   setUpdateCheckInvoker,
+  settingsMenuItem,
   toggleDevToolsItem,
   installRendererProtocol,
 } from '@genoffice/electron-utils'
@@ -6527,10 +6530,16 @@ async function openFileViaDialog(): Promise<void> {
 }
 
 function buildHomeMenu(): void {
-  const isMac = process.platform === 'darwin'
   const a = fileMenuAccelerators('home')
+  const labels = appMenuLabels(currentLang())
+  // macOS only: the application menu is spelled out so it can carry a
+  // Settings entry of our own (role:'appMenu' is a fixed template)
+  const appMenu = appMenuTemplate(process.platform, labels, {
+    appLabel: app.name,
+    extra: [settingsMenuItem(labels)],
+  })
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    ...(appMenu ? [appMenu] : []),
     {
       label: tm('menuFile'),
       submenu: [
@@ -6557,6 +6566,8 @@ function buildHomeMenu(): void {
         },
         { type: 'separator' },
         { role: 'close', label: tm('menuClose'), ...acc(a.close) },
+        { type: 'separator' },
+        settingsMenuItem(labels),
       ],
     },
     viewMenuTemplate(),
@@ -6579,10 +6590,16 @@ function buildHomeMenu(): void {
 // ---- pdf menu (pdf-main has no menu of its own; the shell owns pdf tabs, so it builds one) ----
 
 function buildPdfMenu(): void {
-  const isMac = process.platform === 'darwin'
   const a = fileMenuAccelerators('pdf')
+  const labels = appMenuLabels(currentLang())
+  // macOS only: the application menu is spelled out so it can carry a
+  // Settings entry of our own (role:'appMenu' is a fixed template)
+  const appMenu = appMenuTemplate(process.platform, labels, {
+    appLabel: app.name,
+    extra: [settingsMenuItem(labels)],
+  })
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    ...(appMenu ? [appMenu] : []),
     {
       label: tm('menuFile'),
       submenu: [
@@ -6647,6 +6664,8 @@ function buildPdfMenu(): void {
           ...acc(a.close),
           click: () => closeFocusedEditor(),
         },
+        { type: 'separator' },
+        settingsMenuItem(labels),
       ],
     },
     moduleViewMenuTemplate(),
@@ -6669,10 +6688,16 @@ function buildPdfMenu(): void {
 // ---- markdown menu (markdown-main has no menu of its own; the shell owns markdown tabs) ----
 
 function buildMarkdownMenu(): void {
-  const isMac = process.platform === 'darwin'
   const a = fileMenuAccelerators('markdown')
+  const labels = appMenuLabels(currentLang())
+  // macOS only: the application menu is spelled out so it can carry a
+  // Settings entry of our own (role:'appMenu' is a fixed template)
+  const appMenu = appMenuTemplate(process.platform, labels, {
+    appLabel: app.name,
+    extra: [settingsMenuItem(labels)],
+  })
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    ...(appMenu ? [appMenu] : []),
     {
       label: tm('menuFile'),
       submenu: [
@@ -6753,6 +6778,8 @@ function buildMarkdownMenu(): void {
           ...acc(a.close),
           click: () => closeFocusedEditor(),
         },
+        { type: 'separator' },
+        settingsMenuItem(labels),
       ],
     },
     moduleViewMenuTemplate(),
@@ -6775,10 +6802,16 @@ function buildMarkdownMenu(): void {
 // ---- html menu (html-main has no menu of its own; the shell owns html tabs) ----
 
 function buildHtmlMenu(): void {
-  const isMac = process.platform === 'darwin'
   const a = fileMenuAccelerators('html')
+  const labels = appMenuLabels(currentLang())
+  // macOS only: the application menu is spelled out so it can carry a
+  // Settings entry of our own (role:'appMenu' is a fixed template)
+  const appMenu = appMenuTemplate(process.platform, labels, {
+    appLabel: app.name,
+    extra: [settingsMenuItem(labels)],
+  })
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    ...(appMenu ? [appMenu] : []),
     {
       label: tm('menuFile'),
       submenu: [
@@ -6852,6 +6885,8 @@ function buildHtmlMenu(): void {
           ...acc(a.close),
           click: () => closeFocusedEditor(),
         },
+        { type: 'separator' },
+        settingsMenuItem(labels),
       ],
     },
     moduleViewMenuTemplate(),
@@ -7206,6 +7241,21 @@ function installBackToHomeItems(): void {
   setSlidesExtraFileMenuItems([saveToUniWorkItem, backToHomeItem])
 }
 
+/** The Settings view lives in the Home tab, so every app's menu points here:
+ *  ⌘, lands on it from anywhere in the suite. The window comes back first if
+ *  it was hidden or minimized, and asking again re-opens the same panel —
+ *  the renderer keeps one. */
+function openSettingsView(section: 'general' | 'aiModel' = 'general'): void {
+  const win = shellWindow
+  if (!win || win.isDestroyed()) return
+  // the request may come from a detached window or while the shell is minimized
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+  tabManager?.openHomeTab()
+  win.webContents.send(HOME_CHANNELS.openSettings, { section })
+}
+
 function installDockMenu(): void {
   if (process.platform !== 'darwin') return
   app.dock?.setMenu(
@@ -7331,14 +7381,7 @@ installNavigationGuard(app)
 installContextMenu(app, () => contextMenuLabels(currentLang()))
 registerAiIpc()
 guardedIpc.handle('ai:open-model-settings', () => {
-  const win = shellWindow
-  if (!win || win.isDestroyed()) return
-  // the request may come from a detached window or while the shell is minimized
-  if (win.isMinimized()) win.restore()
-  win.show()
-  win.focus()
-  tabManager?.openHomeTab()
-  win.webContents.send(HOME_CHANNELS.openSettings, { section: 'aiModel' })
+  openSettingsView('aiModel')
 })
 registerProjectIpc()
 registerDocsIpc()
@@ -7610,6 +7653,8 @@ app.whenReady().then(async () => {
   installBackToHomeItems()
   installDockMenu()
   setUpdateCheckInvoker(() => void checkForUpdatesNow())
+  // every app's Settings entry (⌘, / Ctrl+,) lands on the shell's Settings view
+  setSettingsInvoker(() => openSettingsView())
   initAutoUpdater(() => shellWindow, currentUpdateChannel(), autoUpdateCheckEnabled)
   persistUniWorkApiOriginFromEnv(APP_SETTINGS_PATH())
   // UniWork account: register the active channel's sign-in scheme, restore the
@@ -7662,7 +7707,6 @@ app.whenReady().then(async () => {
   authCallbacks.start(routeAuthCallback)
   // UniWork document launch links (held since startup) route from here on
   uniworkDocs?.activate((route) => authCallbacks.startLaunch(route))
-
   // resource watchdog: a renderer that stays hot for minutes gets diagnostics
   // recorded and the user an offer to close the document (headless exports
   // are short-lived and unattended)

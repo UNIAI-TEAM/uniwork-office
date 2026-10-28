@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const electronMock = vi.hoisted(() => ({
@@ -24,10 +26,13 @@ vi.mock('electron', () => ({
 import {
   aboutMenuItem,
   appMenuLabels,
+  appMenuTemplate,
   checkUpdatesMenuItem,
   editMenuTemplate,
   helpMenuTemplate,
+  setSettingsInvoker,
   setUpdateCheckInvoker,
+  settingsMenuItem,
   viewMenuTemplate,
   windowMenuTemplate,
   type AppMenuLabels,
@@ -65,6 +70,7 @@ const submenuOf = (tpl: { submenu?: unknown }): Item[] => tpl.submenu as Item[]
 beforeEach(() => {
   vi.clearAllMocks()
   setUpdateCheckInvoker(null)
+  setSettingsInvoker(null)
 })
 
 describe('appMenuLabels', () => {
@@ -248,5 +254,143 @@ describe('checkUpdatesMenuItem / manual update check wiring', () => {
     electronMock.showMessageBox.mockResolvedValue({ response: 1 })
     await (aboutMenuItem(en) as { click: () => Promise<void> }).click()
     expect(electronMock.writeText).toHaveBeenCalledWith('UniWork Office 1.2.3')
+  })
+})
+
+const invokeClick = (item: { click?: unknown }): void => {
+  if (typeof item.click === 'function') (item.click as () => void)()
+}
+
+describe('settingsMenuItem', () => {
+  it('carries the Settings label and the ⌘, accelerator by default', () => {
+    const item = settingsMenuItem(en)
+    expect(item.label).toBe('Settings…')
+    expect(item.accelerator).toBe('CmdOrCtrl+,')
+  })
+
+  it('omits the accelerator when accelerator: false is passed (Windows/Linux editor menus)', () => {
+    const withoutAcc = settingsMenuItem(en, undefined, { accelerator: false })
+    expect(withoutAcc.label).toBe('Settings…')
+    expect(withoutAcc.accelerator).toBeUndefined()
+
+    const withAcc = settingsMenuItem(en, undefined, { accelerator: true })
+    expect(withAcc.accelerator).toBe('CmdOrCtrl+,')
+  })
+
+  it('pins the per-platform Q1 accelerator rule across shell and editor menus', () => {
+    const buildAppAndFileSettings = (platform: NodeJS.Platform, isShellMenu: boolean) => {
+      const appMenu = appMenuTemplate(platform, en, {
+        extra: [settingsMenuItem(en)],
+      })
+      const fileOrToolsSettings = isShellMenu
+        ? settingsMenuItem(en)
+        : settingsMenuItem(en, undefined, { accelerator: platform === 'darwin' })
+      return {
+        appMenuSettings: appMenu ? submenuOf(appMenu)[1] : undefined,
+        menuSettings: fileOrToolsSettings,
+      }
+    }
+
+    // macOS: Cmd+, in every app menu (shell Home/PDF/Markdown/HTML and Docs/Sheets/Slides)
+    expect(buildAppAndFileSettings('darwin', true).appMenuSettings?.accelerator).toBe('CmdOrCtrl+,')
+    expect(buildAppAndFileSettings('darwin', false).appMenuSettings?.accelerator).toBe(
+      'CmdOrCtrl+,',
+    )
+
+    // Windows/Linux shell-owned menus (Home, PDF, Markdown, HTML): Ctrl+, accelerator present
+    expect(buildAppAndFileSettings('win32', true).menuSettings.accelerator).toBe('CmdOrCtrl+,')
+    expect(buildAppAndFileSettings('linux', true).menuSettings.accelerator).toBe('CmdOrCtrl+,')
+
+    // Verify the actual menu builders in shell, docs, sheets, and slides match the Q1 rule
+    const root = resolve(__dirname, '../../..')
+    const shellSrc = readFileSync(resolve(root, 'apps/shell/src/main/index.ts'), 'utf8')
+    const docsSrc = readFileSync(resolve(root, 'apps/docs/src/main/docs-main.ts'), 'utf8')
+    const sheetsSrc = readFileSync(resolve(root, 'apps/sheets/src/main/sheets-main.ts'), 'utf8')
+    const slidesSrc = readFileSync(resolve(root, 'apps/slides/src/main/slides-main.ts'), 'utf8')
+
+    // Shell menus (Home, PDF, Markdown, HTML): 4 macOS appMenu entries + 4 File menu entries, all default accelerator
+    expect(shellSrc.match(/settingsMenuItem\(labels\)/g)).toHaveLength(8)
+    expect(shellSrc).not.toContain('accelerator: false')
+
+    // Docs: macOS appMenu has default accelerator; non-macOS Tools menu passes { accelerator: false }
+    expect(docsSrc).toContain("extra: [settingsMenuItem(labels, () => sendCommand('preferences'))]")
+    expect(docsSrc).toContain(
+      "settingsMenuItem(labels, () => sendCommand('preferences'), { accelerator: false })",
+    )
+
+    // Sheets & Slides: macOS appMenu has default accelerator; File menu passes { accelerator: isMac }
+    expect(sheetsSrc).toContain('extra: [settingsMenuItem(labels)]')
+    expect(sheetsSrc).toContain('settingsMenuItem(labels, undefined, { accelerator: isMac })')
+    expect(slidesSrc).toContain('extra: [settingsMenuItem(labels)]')
+    expect(slidesSrc).toContain('settingsMenuItem(labels, undefined, { accelerator: isMac })')
+    // Windows/Linux Docs/Sheets/Slides menus: no accelerator (preserves Docs Ctrl+Comma subscript)
+    expect(buildAppAndFileSettings('win32', false).menuSettings.accelerator).toBeUndefined()
+    expect(buildAppAndFileSettings('linux', false).menuSettings.accelerator).toBeUndefined()
+  })
+
+  it('routes the click to the registered action', () => {
+    const invoke = vi.fn()
+    setSettingsInvoker(invoke)
+    invokeClick(settingsMenuItem(en))
+    expect(invoke).toHaveBeenCalledOnce()
+  })
+
+  it('falls back to the app own preferences when nothing is registered', () => {
+    const fallback = vi.fn()
+    invokeClick(settingsMenuItem(en, fallback))
+    expect(fallback).toHaveBeenCalledOnce()
+  })
+
+  it('prefers the registered action over the fallback', () => {
+    const invoke = vi.fn()
+    const fallback = vi.fn()
+    setSettingsInvoker(invoke)
+    invokeClick(settingsMenuItem(en, fallback))
+    expect(invoke).toHaveBeenCalledOnce()
+    expect(fallback).not.toHaveBeenCalled()
+  })
+
+  it('no-ops without an action, and does not throw', () => {
+    expect(() => invokeClick(settingsMenuItem(en))).not.toThrow()
+  })
+
+  it('is localized', () => {
+    expect(settingsMenuItem(appMenuLabels('zh')).label).toBe('设置…')
+  })
+})
+
+describe('appMenuTemplate', () => {
+  it('puts the Settings entry right after About on macOS', () => {
+    const tpl = appMenuTemplate('darwin', en, { extra: [settingsMenuItem(en)] })!
+    const items = submenuOf(tpl)
+    expect(items[0]!.role).toBe('about')
+    expect(items[1]!.label).toBe(en.settings)
+    expect(items[1]!.accelerator).toBe('CmdOrCtrl+,')
+  })
+
+  it('keeps the native macOS roles around it', () => {
+    const tpl = appMenuTemplate('darwin', en, { extra: [settingsMenuItem(en)] })!
+    expect(submenuOf(tpl).map((i) => i.role ?? i.type)).toEqual([
+      'about',
+      undefined,
+      'separator',
+      'services',
+      'separator',
+      'hide',
+      'hideOthers',
+      'unhide',
+      'separator',
+      'quit',
+    ])
+  })
+
+  it('always carries a label — Electron rejects an item with neither label, role nor type', () => {
+    expect(appMenuTemplate('darwin', en)!.label).toBeTruthy()
+    expect(appMenuTemplate('darwin', en, { appLabel: 'Other' })!.label).toBe('Other')
+  })
+
+  it('has no application menu off macOS', () => {
+    expect(appMenuTemplate('win32', en)).toBeUndefined()
+    expect(appMenuTemplate('linux', en)).toBeUndefined()
   })
 })
