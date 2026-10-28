@@ -39,7 +39,7 @@ import {
   renderTable,
 } from './markdownStyleRenderers'
 import { boundOrderedList, boundTable, boundTaskList } from './boundedTokenizers'
-import { WikiLink, WikiLinkResolve } from './wikilink'
+import { WikiLink, WikiLinkResolve, WikiAliasDisplay } from './wikilink'
 import { WikiMarkOnInput } from './wikilinkInput'
 import type { WikiLinkOptions } from './wikilink'
 import type { SlashController, SlashItem } from './slashCommand'
@@ -158,6 +158,8 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     // where `![[x]]` stays literal text)
     ...(cap('wikiVault') ? [WikiEmbed] : []),
     WikiLinkResolve.configure(options.wikiLink ?? {}),
+    // an aliased link reads as its alias: the syntax is hidden in the view only
+    WikiAliasDisplay,
     ...(cap('wikiVault')
       ? [WikiSuggest.configure({ controller: options.wikiSuggestController })]
       : []),
