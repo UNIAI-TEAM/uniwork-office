@@ -197,7 +197,14 @@ export interface DeckAccess {
     /** Formatted template-chrome block (layout-skeleton.ts) for this page's role; absent without a template */
     skeleton?: string
     signal?: AbortSignal
-  }): Promise<{ ok: boolean; marker?: string; error?: string; imageFailures?: string[] }>
+  }): Promise<{
+    ok: boolean
+    marker?: string
+    error?: string
+    imageFailures?: string[]
+    /** UniWork AI: the code of the writer refusal the page ended on (e.g. run_limit_reached) */
+    code?: string
+  }>
   /**
    * In-tool Style Skill generation:
    * a dedicated LLM call focused on producing a complete structured visual style guide
@@ -1103,12 +1110,10 @@ function hiddenTools(access: DeckAccess): Set<string> {
 const UNIWORK_AI_HIDDEN_TOOLS: readonly string[] = [
   'insert_web_image',
   'replace_image',
-  'regenerate_slide',
   'save_style_template',
-  'generate_deck',
 ]
 
-const UNIWORK_AI_TOOLS_OFF_NOTE = `\n\nNote: ${UNIWORK_AI_HIDDEN_TOOLS.join(', ')} are not available here. generate_deck is unavailable: do not create a new deck; edit the open one with apply_ops and execute_slide_script. Do not call or promise those tools.`
+const UNIWORK_AI_TOOLS_OFF_NOTE = `\n\nNote: ${UNIWORK_AI_HIDDEN_TOOLS.join(', ')} are not available here. Do not call or promise those tools.`
 
 function mediaToolsOffNote(hidden: Set<string>, uniworkAi: boolean): string {
   if (hidden.size === 0) return ''
@@ -1949,7 +1954,11 @@ async function executeTool(
       const insertMode: 'replace' | 'append' =
         call.input.insert_mode === 'append' ? 'append' : 'replace'
       const PLAN_BATCH = 12 // Per-batch planning cap (kept slightly conservative against truncation)
-      const GEN_BATCH = 2 // Per-page generation concurrency (opus large output + proxy concurrent streams time out easily; lowered to 2, stability first)
+      // Per-page generation concurrency (opus large output + proxy concurrent streams time out easily; lowered to 2, stability first).
+      // UniWork AI: one page at a time. A run has a fixed number of model calls, and once a page is
+      // refused (run_limit_reached) no later page may have started, so the made pages are a prefix
+      // of the plan and the rest can be appended in order on the next question.
+      const GEN_BATCH = access.uniworkAi?.() ? 1 : 2
       const BACKOFF_MS = access.retryBackoffMs ?? 2000 // Retry backoff base (rate limits/overload are mostly transient; immediate retries would hit them again)
 
       let coreHook = String(call.input.core_hook ?? '').trim()
@@ -2261,6 +2270,7 @@ async function executeTool(
       const deckImageFails: { page: number; url: string }[] = [] // Image download/conversion failures (page numbers are deck-global 1-based)
       const pageErrors: (string | undefined)[] = new Array(total).fill(undefined) // Last failure reason per page
       let cloudFallbackReason: string | null = null // First cloud failure that switched the run to the local pipeline
+      let runLimited = false // UniWork AI refused a page: this run's model calls are used up, so no page is generated or retried after it
       let landedPages = 0
       let firstDone = false
       let baseOffset = 0 // Number of existing pages before generated page 0 in the deck (>0 in append mode); used to re-insert retries at their original position
@@ -2301,6 +2311,10 @@ async function executeTool(
             return { marker: res.marker, err: '' }
           }
           lastErr = res.error ?? t('aiErrUnknown')
+          if (res.code === 'run_limit_reached') {
+            runLimited = true
+            break
+          }
         }
         return { marker: null, err: lastErr }
       }
@@ -2423,7 +2437,7 @@ async function executeTool(
       }
 
       for (let start = 0; start < total; start += GEN_BATCH) {
-        if (cancelled()) break
+        if (cancelled() || runLimited) break
         const batchIdxs = []
         for (let k = start; k < Math.min(start + GEN_BATCH, total); k++) batchIdxs.push(k)
         const results = await Promise.all(
@@ -2455,13 +2469,13 @@ async function executeTool(
       //   pipeline (LLM calls are the user's own quota, and a JSON spec retry is cheap) — that
       //   includes pages that failed during a mid-run cloud→local switch.
       if (!cancelled()) {
-        const retryIdxs = [...new Set([...(cloudActive ? [] : genFailed), ...landFailed])].sort(
-          (a, b) => a - b,
-        )
+        const retryIdxs = [
+          ...new Set([...(cloudActive || runLimited ? [] : genFailed), ...landFailed]),
+        ].sort((a, b) => a - b)
         for (const idx of retryIdxs) {
           if (cancelled()) break
           let marker = markerByIndex[idx]
-          if (!marker && !cloudActive) marker = await genOne(pages[idx]!, idx + 1)
+          if (!marker && !cloudActive && !runLimited) marker = await genOne(pages[idx]!, idx + 1)
           if (!marker) {
             pageProgressItems[idx] = {
               ...pageProgressItems[idx]!,
@@ -2542,6 +2556,18 @@ async function executeTool(
         }
       }
 
+      // Pages not in the deck, by number (generation or landing failed, or never started)
+      const stillFailed: number[] = []
+      for (let i = 0; i < total; i++) if (!doneFlags[i]) stillFailed.push(i + 1)
+      const pagesNotMade = stillFailed
+        .map(
+          (n) => `page ${n} "${String(pages[n - 1]?.title ?? '').trim() || t('aiPageN', { n })}"`,
+        )
+        .join(', ')
+      const runLimitMsg = runLimited
+        ? ` ⚠️ This run's model calls are used up (run_limit_reached), so generation stopped and nothing was retried. Not made: ${pagesNotMade}. Do not call generate_deck or regenerate_slide again in this answer: they would be refused. Tell the user which pages are missing and that asking again continues them; then call generate_deck with briefs for just those pages and insert_mode:"append".`
+        : ''
+
       if (landedPages === 0) {
         access.onProgress?.({
           stage: 'done',
@@ -2551,7 +2577,9 @@ async function executeTool(
         })
         return fail(
           t('aiFailGenDeck'),
-          `All ${total} pages failed to generate; retry or check the AI model configuration.`,
+          runLimited
+            ? `No page was made.${runLimitMsg}`
+            : `All ${total} pages failed to generate; retry or check the AI model configuration.`,
         )
       }
 
@@ -2562,11 +2590,10 @@ async function executeTool(
         summary: t('aiStageDoneSummary', { n: landedPages }),
       })
 
-      const note = buildProgressNote(state)
+      // A used-up run: the progress note's "fill in the unfinished pages now" would be refused
+      const note = runLimited ? '' : buildProgressNote(state)
       const progressTail = note ? `\n${note}` : ''
       // Faithfully report all unfinished pages (both HTML generation failures and conversion/landing failures; all already retried once)
-      const stillFailed: number[] = []
-      for (let i = 0; i < total; i++) if (!doneFlags[i]) stillFailed.push(i + 1)
       const briefErr = (s?: string) => (s ? (s.length > 80 ? `${s.slice(0, 80)}…` : s) : '')
       const cloudNote = cloudFallbackReason
         ? ` Cloud page generation was unavailable (${briefErr(cloudFallbackReason)}); the deck was generated locally with your configured AI model instead.`
@@ -2575,9 +2602,11 @@ async function executeTool(
       const failDetail = stillFailed
         .map((n) => `page ${n}${pageErrors[n - 1] ? ` (${briefErr(pageErrors[n - 1])})` : ''}`)
         .join(', ')
-      const failMsg = stillFailed.length
-        ? ` ⚠️ ${failDetail} still failed after retry (these pages are missing from the deck; later pages shifted forward). To fill them in, call generate_deck again with briefs for just those pages and insert_mode:"append", and tell the user the page is at the end.`
-        : ' Fine-tune with the set_element_* / add_* tools.'
+      const failMsg = runLimited
+        ? runLimitMsg
+        : stillFailed.length
+          ? ` ⚠️ ${failDetail} still failed after retry (these pages are missing from the deck; later pages shifted forward). To fill them in, call generate_deck again with briefs for just those pages and insert_mode:"append", and tell the user the page is at the end.`
+          : ' Fine-tune with the set_element_* / add_* tools.'
       // Pages that went through the plain-text fallback: the page exists in the deck but all design is lost; the model must be told explicitly to redo it in place, not silently treat it as success
       const degradedMsg = degraded.length
         ? ` ⚠️ ${[...degraded]

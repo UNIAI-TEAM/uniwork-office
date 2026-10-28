@@ -1247,7 +1247,14 @@ export function AiPanel({
           if (!r.ok || !r.text) {
             lastErr = r.error ?? tGlobal('aiErrEmptyOutput')
             // a refusal the same request cannot get past is not a repair note: stop here
-            if (writerRefusalIsFinal(r.uniworkCode)) break
+            // (generate_deck reads its code: run_limit_reached ends the deck's page loop)
+            if (writerRefusalIsFinal(r.uniworkCode)) {
+              return {
+                ok: false,
+                error: lastErr,
+                ...(r.uniworkCode ? { code: r.uniworkCode } : {}),
+              }
+            }
             continue
           }
           try {

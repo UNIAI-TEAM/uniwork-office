@@ -133,13 +133,10 @@ const WEB_EDITABLE = { bound: false, readOnly: false }
 const uniworkSettings: AiSettings = { ...settings, provider: 'uniwork' }
 
 /** tools a UniWork AI turn never sees (signed policy; slides-skill UNIWORK_AI_HIDDEN_TOOLS) */
-const UNIWORK_AI_HIDDEN = [
-  'insert_web_image',
-  'replace_image',
-  'regenerate_slide',
-  'save_style_template',
-  'generate_deck',
-]
+const UNIWORK_AI_HIDDEN = ['insert_web_image', 'replace_image', 'save_style_template']
+
+/** deck generation runs under UniWork AI on the web frame (UNI-2276: pages via the writer route) */
+const UNIWORK_AI_DECK_TOOLS = ['generate_deck', 'regenerate_slide']
 
 const deckCall: AgentToolCall = {
   id: 'c-deck',
@@ -187,7 +184,7 @@ describe('the web slides frame is UniWork-bound for the AI', () => {
     expect(access().uniworkBound?.()).toBe(true)
   })
 
-  it('feeds the provider through uniworkAi so a UniWork AI turn loses the five hidden tools', async () => {
+  it('feeds the provider through uniworkAi so a UniWork AI turn loses the three hidden tools', async () => {
     installSlidesApi({ platform: 'web' })
     render({ uniworkBound: WEB_EDITABLE.bound, settings: uniworkSettings })
     // RPB-1: the whole shape the skill reads — provider 'uniwork' must reach uniworkAi(),
@@ -195,7 +192,9 @@ describe('the web slides frame is UniWork-bound for the AI', () => {
     expect(access().uniworkAi?.()).toBe(true)
     let names = createSlidesSkill(access()).tools.map((t) => t.name)
     for (const n of UNIWORK_AI_HIDDEN) expect(names, n).not.toContain(n)
+    for (const n of UNIWORK_AI_DECK_TOOLS) expect(names, n).toContain(n)
     expect(names).toContain('apply_ops')
+    expect(createSlidesSkill(access()).systemPrompt).not.toContain('generate_deck is unavailable')
 
     render({ uniworkBound: WEB_EDITABLE.bound })
     expect(access().uniworkAi?.()).toBe(false)

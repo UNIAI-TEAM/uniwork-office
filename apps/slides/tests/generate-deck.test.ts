@@ -24,6 +24,10 @@ function makeAccess(opts?: {
   searchImagesMulti?: number
   planImageQueries?: string[]
   styleTemplates?: Record<string, { topic: string; styleSkill: string; createdAt: string }>
+  /** the turn runs on UniWork AI (DeckAccess.uniworkAi) */
+  uniworkAi?: boolean
+  /** from this page on, the local writer is refused: this run's model calls are used up */
+  runLimitAt?: number
 }) {
   const failPages = new Set(opts?.failPages ?? [])
   const failAttempts = { ...(opts?.failAttempts ?? {}) } // pageIndex -> how many more times to fail
@@ -47,6 +51,7 @@ function makeAccess(opts?: {
       : {}),
   }
   const access: DeckAccess = {
+    ...(opts?.uniworkAi ? { uniworkAi: () => true } : {}),
     getSlides: () => [] as RenderSlide[],
     getCurrent: () => 0,
     getSelectedIds: () => [],
@@ -105,6 +110,8 @@ function makeAccess(opts?: {
       localPageCalls.push(args.pageIndex)
       stylesSeen.push(args.style)
       imagesSeen.push([...args.images])
+      if (opts?.runLimitAt !== undefined && args.pageIndex >= opts.runLimitAt)
+        return { ok: false, error: 'run used up', code: 'run_limit_reached' }
       if (failPages.has(args.pageIndex)) return { ok: false, error: 'mock fail' }
       if (failAttempts[args.pageIndex] && failAttempts[args.pageIndex] > 0) {
         failAttempts[args.pageIndex] -= 1
@@ -319,6 +326,47 @@ describe('generate_deck local page generation (cloud/gsk unavailable)', () => {
     const skill = createSlidesSkill(access)
     const r = (await skill.executeTool(deckCall(2))) as { isError?: boolean }
     expect(r.isError).toBe(true)
+  })
+})
+
+describe('generate_deck under UniWork AI when the run has no model calls left', () => {
+  it('a page refused with run_limit_reached ends generation: no retry, no later page, the made pages land, the result names the rest', async () => {
+    const { access, localPageCalls, landOrder, getPages } = makeAccess({
+      cloudEnabled: false,
+      uniworkAi: true,
+      runLimitAt: 3,
+    })
+    const skill = createSlidesSkill(access)
+    const res = (await skill.executeTool(deckCall(5))) as { output: string; isError?: boolean }
+    // page 3 is asked once (no retry, no retry round) and pages 4 and 5 never are
+    expect(localPageCalls).toEqual([1, 2, 3])
+    expect(getPages()).toBe(2)
+    expect(landOrder).toEqual([
+      'replace:localpptx:PAGE1:Page 1 Title',
+      'append:localpptx:PAGE2:Page 2 Title',
+    ])
+    expect(res.isError).toBeFalsy()
+    expect(res.output).toContain('2/5')
+    for (const n of [3, 4, 5]) expect(res.output).toContain(`page ${n} "Page ${n} Title"`)
+    expect(res.output).not.toContain('"Page 2 Title"')
+    expect(res.output).toContain("This run's model calls are used up")
+  })
+
+  it('a run used up on the first page lands nothing and says so', async () => {
+    const { access, localPageCalls, getPages } = makeAccess({
+      cloudEnabled: false,
+      uniworkAi: true,
+      runLimitAt: 1,
+    })
+    const res = (await createSlidesSkill(access).executeTool(deckCall(2))) as {
+      output: string
+      isError?: boolean
+    }
+    expect(localPageCalls).toEqual([1])
+    expect(getPages()).toBe(0)
+    expect(res.isError).toBe(true)
+    expect(res.output).toContain("This run's model calls are used up")
+    expect(res.output).toContain('page 2 "Page 2 Title"')
   })
 })
 

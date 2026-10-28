@@ -36,6 +36,7 @@ vi.mock('../../../apps/slides/src/session', () => {
     appClipboard: {},
     callSessionHandler: vi.fn(),
     configureSessionPlatform: vi.fn(),
+    createGeneratedPageStore: vi.fn(() => ({ put: vi.fn(), take: vi.fn(() => null) })),
     ELEMENTS_MARKER: 'slides-elements',
     openResultFor: vi.fn((s: { result: unknown }) => s.result),
     openSessionFromBytes: vi.fn(

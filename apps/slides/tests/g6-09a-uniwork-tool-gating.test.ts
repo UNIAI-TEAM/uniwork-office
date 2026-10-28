@@ -1,16 +1,15 @@
 // G6-09a (UNI-1374) N1: under UniWork AI the slides skill must not offer the tools the
-// signed policy turns off (web stubs, deck generation, style templates). BYOK turns keep
-// every tool. The predicate is live: it is re-read on every `tools` / `systemPrompt` read.
+// signed policy turns off (web stubs, style templates). BYOK turns keep every tool. The
+// predicate is live: it is re-read on every `tools` / `systemPrompt` read. Deck generation
+// (generate_deck, regenerate_slide) runs under UniWork AI since UNI-2276: its pages go
+// through the writer route.
 import { describe, expect, it } from 'vitest'
 import { createSlidesSkill, type DeckAccess } from '../src/renderer/ai/slides-skill'
 
-const UNIWORK_HIDDEN = [
-  'insert_web_image',
-  'replace_image',
-  'regenerate_slide',
-  'save_style_template',
-  'generate_deck',
-]
+const UNIWORK_HIDDEN = ['insert_web_image', 'replace_image', 'save_style_template']
+
+/** offered to a UniWork AI turn since UNI-2276 (the server drops them on unbound decks) */
+const UNIWORK_DECK_TOOLS = ['generate_deck', 'regenerate_slide']
 
 function mkAccess(extra: Record<string, unknown> = {}): DeckAccess {
   return {
@@ -26,9 +25,10 @@ function mkAccess(extra: Record<string, unknown> = {}): DeckAccess {
 const names = (skill: ReturnType<typeof createSlidesSkill>) => skill.tools.map((t) => t.name)
 
 describe('slides tools under UniWork AI', () => {
-  it('hides the five stub / generation tools when the provider is UniWork AI', () => {
+  it('hides the three stub / template tools when the provider is UniWork AI', () => {
     const got = names(createSlidesSkill(mkAccess({ uniworkAi: () => true })))
     for (const n of UNIWORK_HIDDEN) expect(got).not.toContain(n)
+    for (const n of UNIWORK_DECK_TOOLS) expect(got).toContain(n)
     // the rest of the editing surface stays
     expect(got).toContain('apply_ops')
     expect(got).toContain('read_slide')
@@ -44,19 +44,22 @@ describe('slides tools under UniWork AI', () => {
   it('reads the predicate live between two `tools` reads', () => {
     let uniwork = false
     const skill = createSlidesSkill(mkAccess({ uniworkAi: () => uniwork }))
-    expect(names(skill)).toContain('generate_deck')
+    expect(names(skill)).toContain('save_style_template')
     uniwork = true
-    expect(names(skill)).not.toContain('generate_deck')
+    expect(names(skill)).not.toContain('save_style_template')
     uniwork = false
-    expect(names(skill)).toContain('generate_deck')
+    expect(names(skill)).toContain('save_style_template')
   })
 
   it('tells the model the tools are gone only under UniWork AI (live)', () => {
     let uniwork = true
     const skill = createSlidesSkill(mkAccess({ uniworkAi: () => uniwork }))
-    expect(skill.systemPrompt).toContain('generate_deck is unavailable')
-    uniwork = false
+    const note = 'insert_web_image, replace_image, save_style_template are not available here'
+    expect(skill.systemPrompt).toContain(note)
+    // deck generation is offered again: the note no longer turns it away
     expect(skill.systemPrompt).not.toContain('generate_deck is unavailable')
+    uniwork = false
+    expect(skill.systemPrompt).not.toContain(note)
   })
 
   it('composes with the media-tool hides without dropping either set', () => {
@@ -107,6 +110,15 @@ describe('slides executeTool refuses what `tools` hides', () => {
     const { access, touched } = spy({ uniworkAi: () => false })
     await createSlidesSkill(access).executeTool(call('generate_deck'))
     expect(touched).toContain('getSlides')
+  })
+
+  it('runs the deck tools for a UniWork AI turn (not refused)', async () => {
+    for (const name of UNIWORK_DECK_TOOLS) {
+      const { access, touched } = spy({ uniworkAi: () => true })
+      const res = await createSlidesSkill(access).executeTool(call(name))
+      expect(res.output, name).not.toContain(`${name} is unavailable`)
+      expect(touched, name).toContain('getSlides')
+    }
   })
 
   it('follows the predicate live', async () => {

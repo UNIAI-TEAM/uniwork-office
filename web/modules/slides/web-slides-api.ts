@@ -23,6 +23,7 @@
  */
 import { createBlankPptx, savePptx, type OpenedPptx } from '@genoffice/pptx-engine'
 import { runTxn } from '@genoffice/pptx-ops'
+import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides/page-spec'
 import type { AiPanelPrefs } from '@genoffice/ui'
 import { readPendingTextEdit } from '../../../apps/slides/src/renderer/pending-text-edit'
 import { base64ToBytes, bytesToBase64 } from '../../../apps/slides/src/session/bytes'
@@ -30,13 +31,17 @@ import {
   appClipboard,
   callSessionHandler,
   configureSessionPlatform,
+  createGeneratedPageStore,
   ELEMENTS_MARKER,
+  getFontMetrics,
+  landGeneratedPagesInSession,
   openResultFor,
   openSessionFromBytes,
   resetFontMetricsCache,
   sessionDirty,
   sessions,
   SLIDE_MARKER,
+  type GeneratedPageStore,
   type HandlerContext,
   type HostIO,
   type SessionChannel,
@@ -69,7 +74,7 @@ import browser, { downloadBlob, safeFileName } from '../../docs/bridge/browser'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
-import { idFromPath, pathFor } from '../../docs/bridge/webapi'
+import { decodeDataUrl, idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { bridgeDownloadCap, downloadVia, revisionOf } from '../shared/conflict-dialog'
 import { createRemoteVersion, type RemoteVersion } from '../shared/remote-version'
 import { bindLagDetectorPort, documentMounted, queueDocumentLoaded } from '../shared/lag-detector'
@@ -89,6 +94,7 @@ import { createPresenterWindow, type PresenterWindow } from './presenter-window'
 import type { ScreenPlacer } from './screens'
 import { tiffToPng } from './tiff'
 import { pictureDpiFor } from '../../../apps/slides/src/main/picture-frame'
+import { rasterImageExt } from '../../../apps/slides/src/main/media-mime'
 import { createDocState, createWebHostIO, SENTINEL_PREFIX, WebSaveError } from './web-host-io'
 
 /**
@@ -199,6 +205,61 @@ function withExt(name: string, ext: string): string {
 const noop = (): void => {}
 const disposer = (): (() => void) => noop
 
+/**
+ * A picture of an AI-written page. The frame CSP has connect-src 'self' (no data:/blob:, no
+ * remote origin), so a remote URL is never fetched: it answers null, the picture lands in the
+ * page's imageFailures and the page still lands (plan 5 decision 7). A data: URL is decoded in
+ * place; a blob: URL is read only if the policy lets the fetch through. Raster bytes only.
+ */
+async function framePicture(
+  url: string,
+  dims: WeakMap<Uint8Array, { width: number; height: number }>,
+): Promise<{ bytes: Uint8Array; ext: string } | null> {
+  let bytes: Uint8Array
+  if (url.startsWith('data:')) {
+    const decoded = decodeDataUrl(url)
+    if (!decoded) return null
+    bytes = base64ToBytes(decoded.base64)
+  } else if (url.startsWith('blob:')) {
+    bytes = new Uint8Array(await (await fetch(url)).arrayBuffer())
+  } else return null
+  const ext = rasterImageExt(bytes)
+  if (!ext) return null
+  // buildPagePptx reads the size synchronously for the cover crop: decode it here
+  try {
+    const bitmap = await createImageBitmap(new Blob([bytes as Uint8Array<ArrayBuffer>]))
+    dims.set(bytes, { width: bitmap.width, height: bitmap.height })
+    bitmap.close()
+  } catch {
+    /* no size: the picture lands uncropped */
+  }
+  return { bytes, ext }
+}
+
+/** slides:local-page-generate of the frame: the page's one-slide pptx is kept in `store` */
+async function generatePage(
+  specJson: string,
+  store: GeneratedPageStore,
+): Promise<{ ok: boolean; marker?: string; error?: string; imageFailures?: string[] }> {
+  const parsed = parsePageSpec(specJson)
+  if (!parsed.ok) return { ok: false, error: parsed.error }
+  try {
+    const dims = new WeakMap<Uint8Array, { width: number; height: number }>()
+    const { bytes, imageFailures } = await buildPagePptx(parsed.spec, {
+      fontMetrics: getFontMetrics(),
+      fetchImage: (url) => framePicture(url, dims),
+      imageDims: (picture) => dims.get(picture) ?? null,
+    })
+    return {
+      ok: true,
+      marker: store.put(bytes),
+      ...(imageFailures.length ? { imageFailures } : {}),
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export function createWebSlidesApi(
   ctx: { client: ModuleBridgePort; capabilities: Record<string, unknown> },
   opts: WebSlidesOptions = {},
@@ -209,6 +270,8 @@ export function createWebSlidesApi(
   const refusedIds = new Set<string>()
   const download = opts.download ?? downloadBlob
   const editorStartMs = opts.editorStartMs ?? TIMEOUTS.editorStart
+  /** AI-generated pages waiting to land (the desktop keeps temp files) */
+  const generatedPages = createGeneratedPageStore()
 
   const historyEvents = listeners<{ canUndo: boolean; canRedo: boolean }>()
   const deckEvents = listeners<{ slides: OpenResult['slides']; size: { cx: number; cy: number } }>()
@@ -1337,8 +1400,22 @@ export function createWebSlidesApi(
     cloudGenStatus: async () => ({ enabled: false }),
     cloudPageCancel: async () => {},
     cloudGeneratePage: async () => ({ ok: false, error: aiUnavailableMessage('slide generation') }),
-    localGeneratePage: async () => ({ ok: false, error: aiUnavailableMessage('slide generation') }),
-    landGeneratedPages: async () => ({ error: aiUnavailableMessage('slide generation') }),
+    // generate_deck / regenerate_slide: pages land in the open document, never drafted
+    localGeneratePage: (op) => generatePage(String(op?.specJson ?? ''), generatedPages),
+    landGeneratedPages: async (pageMarkers, fitWidthPx, mode, atIndex) => {
+      if (state.fatal !== null) return { error: state.fatal.message || text('webFatalTitle') }
+      if (viewOnly()) return { error: text('webReadOnly') }
+      return clone(
+        await landGeneratedPagesInSession(
+          WEB_CLIENT_ID,
+          pageMarkers,
+          generatedPages,
+          fitWidthPx,
+          mode,
+          atIndex,
+        ),
+      )
+    },
     consumeAiPreset: async () => null,
     onAiPreset: disposer,
     saveStyleSidecar: async () => ({ ok: false }),
