@@ -12,19 +12,17 @@ export function mergeSlideUpdate(current: RenderSlide[], update: SlideUpdate): R
   })
 }
 
-/** A partial broadcast needs a full refresh when its base deck is unavailable. */
+/** Merge a partial broadcast into `current`, or return `null` when its base deck is unavailable. */
 export function mergeBroadcastUpdate(
   current: RenderSlide[] | null,
   update: SlideUpdate,
-  refresh: () => void,
 ): RenderSlide[] | null {
   const paths = new Set([
     ...(current ?? []).map((slide) => slide.partPath),
     ...update.slides.map((slide) => slide.partPath),
   ])
   if (!current?.length || update.order.some((path) => !paths.has(path))) {
-    queueMicrotask(refresh)
-    return current
+    return null
   }
   return mergeSlideUpdate(current, update)
 }
@@ -52,11 +50,11 @@ export function createBroadcastRecovery(
   onError?: (error: unknown) => void,
 ): BroadcastRecovery {
   let inFlight = false
+  let pendingRefresh = false
   let stale = false
   let retryOnStale = false
   let tries = 0
   let epoch = 0
-
   const startFetch = () => {
     if (inFlight || tries >= MAX_RECOVERY_TRIES) return
     inFlight = true
@@ -87,6 +85,7 @@ export function createBroadcastRecovery(
 
   return {
     onBroadcast(isPartial: boolean) {
+      if (!isPartial) pendingRefresh = false
       if (inFlight) {
         stale = true
         retryOnStale = isPartial
@@ -95,10 +94,17 @@ export function createBroadcastRecovery(
       }
     },
     requestRefresh() {
-      startFetch()
+      const requestedEpoch = epoch
+      pendingRefresh = true
+      queueMicrotask(() => {
+        if (requestedEpoch !== epoch || !pendingRefresh) return
+        pendingRefresh = false
+        startFetch()
+      })
     },
     invalidate() {
       epoch += 1
+      pendingRefresh = false
       inFlight = false
       stale = false
       retryOnStale = false

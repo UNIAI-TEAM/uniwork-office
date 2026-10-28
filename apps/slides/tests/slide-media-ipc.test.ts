@@ -1191,19 +1191,14 @@ describe('slide media IPC payload', () => {
     expect(partialPayload.slides).toHaveLength(1)
 
     // Client 1 has the base -> merges without refetching
-    const c1Refresh = vi.fn()
-    client1Slides = mergeBroadcastUpdate(client1Slides, partialPayload, c1Refresh)
-    await Promise.resolve()
-    expect(c1Refresh).not.toHaveBeenCalled()
+    const c1Merged = mergeBroadcastUpdate(client1Slides, partialPayload)
+    expect(c1Merged).not.toBeNull()
+    client1Slides = c1Merged
     expect(client1Slides).toEqual(buildAllRenderSlides(session.opened, FIT))
 
-    // Client 2 lacks the base -> schedules refetch via getRenderSlides
-    expect(
-      mergeBroadcastUpdate(client2Slides, partialPayload, () => {
-        client2Refetches.push(call<RenderSlide[]>('slides:get-render-slides'))
-      }),
-    ).toBeNull()
-    await Promise.resolve()
+    // Client 2 lacks the base -> mergeBroadcastUpdate returns null so caller refetches via getRenderSlides
+    expect(mergeBroadcastUpdate(client2Slides, partialPayload)).toBeNull()
+    client2Refetches.push(call<RenderSlide[]>('slides:get-render-slides'))
     expect(client2Refetches).toHaveLength(1)
     client2Slides = client2Refetches[0]!
     expect(client2Slides).toEqual(client1Slides)

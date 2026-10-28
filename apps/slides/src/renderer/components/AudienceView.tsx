@@ -101,6 +101,8 @@ export function AudienceView() {
   const { t } = useI18n()
   const fullscreen = useWebFullscreen()
   const [slides, setSlides] = useState<RenderSlide[] | null>(null)
+  const slidesRef = useRef<RenderSlide[] | null>(slides)
+  slidesRef.current = slides
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight })
   const images = useSlideImages(slides)
   const [sync, setSync] = useState<ShowSyncState | null>(null)
@@ -124,6 +126,7 @@ export function AudienceView() {
         if (stop) return
         if (r && r.length > 0) {
           broadcastRecoveryRef.current?.invalidate()
+          slidesRef.current = r
           setSlides(r)
         } else if (attempt < 20) window.setTimeout(() => tryLoad(attempt + 1), 250)
       })
@@ -141,7 +144,10 @@ export function AudienceView() {
   useEffect(() => {
     const recovery = createBroadcastRecovery(
       () => window.slidesApi.getRenderSlides(),
-      setSlides,
+      (next) => {
+        slidesRef.current = next
+        setSlides(next)
+      },
       (error) => console.error('Failed to refresh audience deck:', error),
     )
     broadcastRecoveryRef.current = recovery
@@ -149,11 +155,18 @@ export function AudienceView() {
       if ((order?.length ?? all.length) === 0) return
       cursorRef.current = ''
       recovery.onBroadcast(!!order)
-      setSlides((current) =>
-        order
-          ? mergeBroadcastUpdate(current, { slides: all, order }, recovery.requestRefresh)
-          : all,
-      )
+      if (order) {
+        const merged = mergeBroadcastUpdate(slidesRef.current, { slides: all, order })
+        if (merged) {
+          slidesRef.current = merged
+          setSlides(merged)
+        } else {
+          recovery.requestRefresh()
+        }
+      } else {
+        slidesRef.current = all
+        setSlides(all)
+      }
     })
     return () => {
       recovery.invalidate()

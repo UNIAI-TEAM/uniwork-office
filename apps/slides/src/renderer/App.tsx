@@ -403,6 +403,8 @@ function thumbBox(slide: RenderSlide, width: number) {
 export function App() {
   const { lang } = useI18n()
   const [slides, setSlides] = useState<RenderSlide[]>([])
+  const slidesRef = useRef<RenderSlide[]>(slides)
+  slidesRef.current = slides
   // Layouts may reference Office-private fonts (resolved in main); register them as FontFaces
   useEffect(() => {
     if (slides.length) void syncPrivateFonts()
@@ -981,6 +983,7 @@ export function App() {
   const applyOpen = useCallback(
     (result: { path: string; slides: RenderSlide[]; defaultFont?: string } | null) => {
       if (!result) return
+      slidesRef.current = result.slides
       setSlides(result.slides)
       broadcastRecoveryRef.current?.invalidate()
       setDefaultFont(result.defaultFont ?? null)
@@ -1096,18 +1099,27 @@ export function App() {
   useEffect(() => {
     const recovery = createBroadcastRecovery(
       () => window.slidesApi.getRenderSlides(),
-      setSlides,
+      (next) => {
+        slidesRef.current = next
+        setSlides(next)
+      },
       (error) => console.error('Failed to refresh deck:', error),
     )
     broadcastRecoveryRef.current = recovery
     const off = window.slidesApi.onDeckChanged?.(({ slides: all, order }) => {
       recovery.onBroadcast(!!order)
-      setSlides((current) =>
-        order
-          ? (mergeBroadcastUpdate(current, { slides: all, order }, recovery.requestRefresh) ??
-            current)
-          : all,
-      )
+      if (order) {
+        const merged = mergeBroadcastUpdate(slidesRef.current, { slides: all, order })
+        if (merged) {
+          slidesRef.current = merged
+          setSlides(merged)
+        } else {
+          recovery.requestRefresh()
+        }
+      } else {
+        slidesRef.current = all
+        setSlides(all)
+      }
       setCurrent((c) => Math.min(c, Math.max(0, (order?.length ?? all.length) - 1)))
       // The broadcast also fires for undo back to a clean state — ask the
       // session instead of assuming the change dirtied it
