@@ -318,12 +318,12 @@ describe('RV7-9: the coarse Starred actions track reaches the ladder', () => {
   it('moves every rung of Starred out so Cập nhật + Sao + ⋯ fit (the web ladder is untouched at 0)', () => {
     const fine = rungs('starred', 0)
     const coarse = rungs('starred', EXTRA)
-    expect(fine).toEqual([656, 784, 864])
-    expect(coarse).toEqual([688, 816, 896])
+    expect(fine).toEqual([672, 800, 880])
+    expect(coarse).toEqual([704, 832, 912])
   })
 
   it('never draws a row wider than the table just above a rung', () => {
-    for (const w of [656, 688, 784, 816, 864, 896, 1000]) {
+    for (const w of [672, 704, 800, 832, 880, 912, 1000]) {
       const columns = fitColumns('starred', columnsFor('starred', w, EXTRA), w, EXTRA)
       const floors = tracksOf(trackOf(columns, 'starred', true, isCompact('starred', w, EXTRA)))
         .map((track, i) => (columns[i] === 'actions' ? 108 : floorOf(track)))

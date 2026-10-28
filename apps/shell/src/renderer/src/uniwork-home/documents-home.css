@@ -870,6 +870,10 @@
   height: 20px;
 }
 
+.dh-folder-card .dh-folder-icon svg:not(.uwf-glyph-my-folder) {
+  color: inherit;
+}
+
 .dh-folder-card .dh-folder-icon svg:not(.uwf-glyph-my-folder) path {
   fill: none;
   stroke: currentColor;

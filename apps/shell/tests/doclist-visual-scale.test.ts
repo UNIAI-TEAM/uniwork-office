@@ -571,8 +571,11 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
     expect(rule).toMatch(/padding-inline:\s*8px;/)
     // the two buttons of "Sao · ⋯" (28 + 4 + 28) fill the 76px track's 60px of room exactly
     expect(76 - 2 * 8).toBe(28 + 4 + 28)
-    // the 120px Access track leaves 104px of content width for "Được chia sẻ" / "Workspace" (TV-2275-01)
-    expect(120 - 2 * 8).toBe(104)
+    // the 128px Access track leaves 112px of content width for "Được chia sẻ" / "Workspace" (TV-2275-01)
+    expect(128 - 2 * 8).toBe(112)
+    expect(ruleOf(src('doclist/access-button.css'), '.dh-access-btn')).toMatch(
+      /max-width:\s*calc\(100% \+ 12px\);/,
+    )
   })
 
   it('on a coarse pointer the Starred actions track holds Sao 44 + gap 4 + "…" 44 (RV7-3) and .dh-check::before is inset -14px (FE R2-5)', () => {
@@ -694,6 +697,9 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
     expect(ruleOf(css, '.dh-folder-open')).toMatch(/border-radius:\s*var\(--radius-12\);/)
     expect(ruleOf(css, '.dh-folder-card .dh-folder-icon')).toMatch(
       /border-radius:\s*var\(--radius-12\);/,
+    )
+    expect(ruleOf(css, '.dh-folder-card .dh-folder-icon svg:not(.uwf-glyph-my-folder)')).toMatch(
+      /color:\s*inherit;/,
     )
     const folderSvgPath = ruleOf(
       css,

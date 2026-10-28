@@ -64,7 +64,7 @@ describe('column order (Chọn · Tên · [đặc trưng] · Truy cập · Ngư�
   // than the others, so every rung is 100px further out or the row overflows the table. V-LAYOUT F-05:
   // Trash's Deleted cell is 160px (a name over "date · countdown"), 42px more than the other screen columns
   it('narrows Trash and Lưu trữ with their wide actions track in mind', () => {
-    const rungs = { shelved: [752, 880, 976], trash: [800, 928, 1008] } as const
+    const rungs = { shelved: [768, 896, 976], trash: [800, 944, 1024] } as const
     for (const screen of ['trash', 'shelved'] as const) {
       const [access, editor, size] = rungs[screen]
       expect(columnsFor(screen, access - 1)).not.toContain('access')
@@ -75,8 +75,8 @@ describe('column order (Chọn · Tên · [đặc trưng] · Truy cập · Ngư�
       expect(columnsFor(screen, size)).toContain('size')
     }
     // a screen with the 76px actions track keeps its rungs
-    expect(columnsFor('recent', 655)).not.toContain('access')
-    expect(columnsFor('recent', 656)).toContain('access')
+    expect(columnsFor('recent', 671)).not.toContain('access')
+    expect(columnsFor('recent', 672)).toContain('access')
   })
 
   it('no width means the full table', () => {
@@ -92,12 +92,12 @@ describe('column order (Chọn · Tên · [đặc trưng] · Truy cập · Ngư�
 })
 
 describe('the narrow ladder hides Dung lượng, then Người sửa, then Truy cập', () => {
-  it('walks the ladder on the workspace screen as the table narrows (34 / 42 / 47 rem)', () => {
+  it('walks the ladder on the workspace screen as the table narrows (34 / 42 / 48 rem)', () => {
     const at = (w: number) => columnsFor('workspace', w)
     expect(at(1400)).toContain('size')
-    expect(at(752)).toContain('size')
-    expect(at(751)).not.toContain('size')
-    expect(at(751)).toContain('editor')
+    expect(at(768)).toContain('size')
+    expect(at(767)).not.toContain('size')
+    expect(at(767)).toContain('editor')
     expect(at(672)).toContain('editor')
     expect(at(671)).not.toContain('editor')
     expect(at(671)).toContain('access')
@@ -105,7 +105,7 @@ describe('the narrow ladder hides Dung lượng, then Người sửa, then Truy 
     expect(at(543)).not.toContain('access')
   })
 
-  // RV-3: Từ nơi khác draws neither Chọn nor Truy cập, so its rungs budget neither (32 + 120 px less than
+  // RV-3: Từ nơi khác draws neither Chọn nor Truy cập, so its rungs budget neither (32 + 128 px less than
   // the workspace list): Người sửa joins at 32 rem, Dung lượng at 38 rem
   it('Từ nơi khác budgets no Chọn and no Truy cập column in its rungs', () => {
     const at = (w: number) => columnsFor('elsewhere', w)
@@ -141,15 +141,15 @@ describe('the narrow ladder hides Dung lượng, then Người sửa, then Truy 
     }
   })
 
-  it('a screen with a screen column needs a wider table for each column (41 / 49 / 54 rem)', () => {
-    expect(columnsFor('workspace', 752)).toContain('size')
-    expect(columnsFor('recent', 752)).not.toContain('size')
-    expect(columnsFor('recent', 864)).toContain('size')
-    expect(columnsFor('recent', 863)).not.toContain('size')
-    expect(columnsFor('recent', 784)).toContain('editor')
-    expect(columnsFor('recent', 783)).not.toContain('editor')
-    expect(columnsFor('recent', 656)).toContain('access')
-    expect(columnsFor('recent', 655)).not.toContain('access')
+  it('a screen with a screen column needs a wider table for each column (42 / 50 / 55 rem)', () => {
+    expect(columnsFor('workspace', 768)).toContain('size')
+    expect(columnsFor('recent', 768)).not.toContain('size')
+    expect(columnsFor('recent', 880)).toContain('size')
+    expect(columnsFor('recent', 879)).not.toContain('size')
+    expect(columnsFor('recent', 800)).toContain('editor')
+    expect(columnsFor('recent', 799)).not.toContain('editor')
+    expect(columnsFor('recent', 672)).toContain('access')
+    expect(columnsFor('recent', 671)).not.toContain('access')
   })
 
   // Trash and Lưu trữ have their own, 100px wider rungs (A-FIX4 m3, pinned above)
@@ -157,9 +157,9 @@ describe('the narrow ladder hides Dung lượng, then Người sửa, then Truy 
     (s) => s !== 'device' && s !== 'trash' && s !== 'shelved',
   )
 
-  it('a ~870 px list shows every column on the screens with the 76px actions track', () => {
+  it('a ~880 px list shows every column on the screens with the 76px actions track', () => {
     for (const screen of ON_76PX_ACTIONS) {
-      expect(columnsFor(screen, 870)).toEqual(columnsFor(screen, WIDE))
+      expect(columnsFor(screen, 880)).toEqual(columnsFor(screen, WIDE))
     }
   })
 

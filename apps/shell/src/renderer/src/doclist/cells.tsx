@@ -50,7 +50,7 @@ const TRACK: Record<ColumnId, string> = {
   shared_with: 'minmax(118px, 1.3fr)',
   shelved: 'minmax(118px, 1.3fr)',
   deleted: 'minmax(160px, 1.5fr)',
-  access: 'minmax(120px, 1fr)',
+  access: 'minmax(128px, 1fr)',
   editor: 'minmax(148px, 1.1fr)',
   updated: '118px',
   size: '92px',
