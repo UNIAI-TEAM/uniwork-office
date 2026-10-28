@@ -1444,4 +1444,347 @@ describe('member-name cache and org switch (S16)', () => {
     expect(afterLock.ok && afterLock.value.documents[0]!.updatedByUser).toEqual({ name: 'Editor' })
     expect(heldAvatars).toHaveLength(3)
   })
+
+  it('does not start avatar requests, populate cache, or emit refresh when held member/list responses settle after org switch, account switch, or sign-out (BE R3-1)', async () => {
+    const PNG_BYTES = new Uint8Array(
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    )
+    const flushMicrotasks = async () => {
+      for (let i = 0; i < 16; i++) {
+        await Promise.resolve()
+      }
+    }
+
+    let currentIdentity: {
+      accountId: string
+      deviceSessionId: string
+      deploymentId: string
+    } | null = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'dep_1' }
+    let currentOrg: { id: string; slug: string } | null = { id: 'org_a', slug: 'acme' }
+    const heldMembers: Array<() => void> = []
+    const heldSharedLists: Array<() => void> = []
+    let avatarRequests = 0
+    const treeChanged: Array<{ workspaceId: string }> = []
+    const avatarUrl = 'https://s3.example.com/avatars/r3-1-user.png?sig=1'
+
+    const fetch: FetchLike = async (url) => {
+      const parsed = new URL(url)
+      if (parsed.origin === 'https://s3.example.com') {
+        avatarRequests += 1
+        return new Response(PNG_BYTES, { status: 200, headers: { 'Content-Type': 'image/png' } })
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_a/members') {
+        const { promise, resolve } = Promise.withResolvers<void>()
+        heldMembers.push(resolve)
+        await promise
+        return json(200, { members: [{ user_id: 'u_1', display_name: 'Member One' }] })
+      }
+      if (
+        parsed.pathname === '/api/v1/workspaces/ws_a/documents/recent' ||
+        parsed.pathname === '/api/v1/workspaces/ws_a/documents'
+      ) {
+        return json(200, {
+          documents: [
+            {
+              id: 'doc_1',
+              workspace_id: 'ws_a',
+              title: 'Report.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T08:00:00Z',
+              updated_by: 'u_1',
+              updated_by_user: {
+                name: 'Editor',
+                avatar_url: avatarUrl,
+              },
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      if (parsed.pathname === '/api/v1/orgs/org_a/workspaces') {
+        return json(200, { workspaces: [{ id: 'ws_a', name: 'Workspace A' }] })
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_a/documents/shared-with-me') {
+        const { promise, resolve } = Promise.withResolvers<void>()
+        heldSharedLists.push(resolve)
+        await promise
+        return json(200, {
+          documents: [
+            {
+              id: 'shared_1',
+              workspace_id: 'ws_a',
+              title: 'Shared.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T08:00:00Z',
+              updated_by_user: {
+                name: 'Shared Editor',
+                avatar_url: avatarUrl,
+              },
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return json(404, { error: { code: 'not_found' } })
+    }
+
+    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-avatar-r3-1-'))
+    const service = new UniworkDocsService({
+      userDataDir: dir,
+      profile: () => profile,
+      channel: () => 'stable',
+      applyProfile: async () => 'unchanged',
+      identity: () => currentIdentity,
+      keystoreLocked: () => false,
+      selectedOrg: () => currentOrg,
+      authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+      fetch,
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      pushTreeChanged: (ev) => treeChanged.push(ev),
+      ui: {
+        chooseConflict: async () => 'later',
+        confirmDiscard: async () => false,
+        pickCopyPath: async () => null,
+        showOpenLatestFailed: () => undefined,
+        showCopyFailed: () => undefined,
+        chooseUnsavedClose: async () => 'cancel',
+      },
+      pushStatus: () => undefined,
+      pushLaunch: () => undefined,
+      reveal: () => undefined,
+    })
+
+    const assertClean = () => {
+      expect(avatarRequests).toBe(0)
+      expect(treeChanged).toEqual([])
+      const probe = service.avatarCache.materializeRows([
+        {
+          id: 'probe',
+          workspaceId: 'ws_a',
+          title: 'Probe.docx',
+          format: 'docx',
+          kind: 'file',
+          updatedAt: '2026-10-17T08:00:00Z',
+          updatedByUser: { name: 'Editor', avatarUrl },
+        },
+      ])
+      expect(probe[0]!.updatedByUser).toEqual({ name: 'Editor' })
+    }
+
+    service.noteSessionIdentity()
+    service.noteSelectedOrg('org_a')
+
+    // 1. Hold workspace members + shared list across an org switch (org_a -> org_b)
+    const docOrgSwitch = service.listDocuments({ workspaceId: 'ws_a' })
+    const shelvedOrgSwitch = service.listShelved({ workspaceId: 'ws_a' })
+    const sharedOrgSwitch = service.listSharedWithMe()
+    while (heldMembers.length < 1 || heldSharedLists.length < 1) {
+      await Promise.resolve()
+    }
+    currentOrg = { id: 'org_b', slug: 'beta' }
+    service.noteSelectedOrg('org_b')
+    heldMembers.shift()!()
+    heldSharedLists.shift()!()
+    const [docOrgRes, shelvedOrgRes, sharedOrgRes] = await Promise.all([
+      docOrgSwitch,
+      shelvedOrgSwitch,
+      sharedOrgSwitch,
+    ])
+    await flushMicrotasks()
+    expect(docOrgRes.ok && docOrgRes.value.documents[0]!.updatedByUser).toEqual({ name: 'Editor' })
+    expect(shelvedOrgRes.ok && shelvedOrgRes.value.documents[0]!.updatedByUser).toEqual({
+      name: 'Editor',
+    })
+    expect(sharedOrgRes.ok && sharedOrgRes.value.documents[0]!.updatedByUser).toEqual({
+      name: 'Shared Editor',
+    })
+    assertClean()
+
+    // 2. Hold workspace members + shared list across an account switch (acc_1 -> acc_2)
+    currentOrg = { id: 'org_a', slug: 'acme' }
+    service.noteSelectedOrg('org_a')
+    const docAccSwitch = service.listDocuments({ workspaceId: 'ws_a' })
+    const sharedAccSwitch = service.listSharedWithMe()
+    while (heldMembers.length < 1 || heldSharedLists.length < 1) {
+      await Promise.resolve()
+    }
+    currentIdentity = { accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'dep_1' }
+    service.noteSessionIdentity()
+    heldMembers.shift()!()
+    heldSharedLists.shift()!()
+    await Promise.all([docAccSwitch, sharedAccSwitch])
+    await flushMicrotasks()
+    assertClean()
+
+    // 3. Hold workspace members + shared list across sign-out (identity -> null, orgGone)
+    const docSignOut = service.listDocuments({ workspaceId: 'ws_a' })
+    const sharedSignOut = service.listSharedWithMe()
+    while (heldMembers.length < 1 || heldSharedLists.length < 1) {
+      await Promise.resolve()
+    }
+    currentIdentity = null
+    currentOrg = null
+    service.noteSessionIdentity()
+    service.noteSelectedOrg(null, true)
+    heldMembers.shift()!()
+    heldSharedLists.shift()!()
+    await Promise.all([docSignOut, sharedSignOut])
+    await flushMicrotasks()
+    assertClean()
+  })
+
+  it('warms the avatar cache without emitting pushTreeChanged on load-more pages (cursor/offset > 0) (R3-3)', async () => {
+    const PNG_BYTES = new Uint8Array(
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    )
+    const expectedDataUrl = `data:image/png;base64,${Buffer.from(PNG_BYTES).toString('base64')}`
+    const flushMicrotasks = async () => {
+      for (let i = 0; i < 16; i++) {
+        await Promise.resolve()
+      }
+    }
+
+    let avatarRequests = 0
+    const treeChanged: Array<{ workspaceId: string }> = []
+    const page2AvatarUrl = 'https://s3.example.com/avatars/page2-editor.png?sig=1'
+    const sharedPage2AvatarUrl = 'https://s3.example.com/avatars/shared-page2-editor.png?sig=1'
+
+    const fetch: FetchLike = async (url) => {
+      const parsed = new URL(url)
+      if (parsed.origin === 'https://s3.example.com') {
+        avatarRequests += 1
+        return new Response(PNG_BYTES, { status: 200, headers: { 'Content-Type': 'image/png' } })
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/members') {
+        return json(200, { members: [] })
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/documents/recent') {
+        const cursor = parsed.searchParams.get('cursor')
+        return json(200, {
+          documents: [
+            {
+              id: cursor ? 'doc_page_2' : 'doc_page_1',
+              workspace_id: 'ws_1',
+              title: cursor ? 'Page2.docx' : 'Page1.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T08:00:00Z',
+              updated_by_user: {
+                name: 'Page 2 Editor',
+                avatar_url: page2AvatarUrl,
+              },
+            },
+          ],
+          next_cursor: cursor ? null : 'cur_2',
+        })
+      }
+      if (parsed.pathname === '/api/v1/orgs/org_a/workspaces') {
+        return json(200, { workspaces: [{ id: 'ws_1', name: 'Workspace 1' }] })
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/documents/shared-with-me') {
+        return json(200, {
+          documents: [
+            {
+              id: 'shared_1',
+              workspace_id: 'ws_1',
+              title: 'Shared1.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T09:00:00Z',
+              updated_by_user: { name: 'Shared 1' },
+            },
+            {
+              id: 'shared_2',
+              workspace_id: 'ws_1',
+              title: 'Shared2.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T08:00:00Z',
+              updated_by_user: {
+                name: 'Shared 2',
+                avatar_url: sharedPage2AvatarUrl,
+              },
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return json(404, { error: { code: 'not_found' } })
+    }
+
+    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-avatar-r3-3-'))
+    const service = new UniworkDocsService({
+      userDataDir: dir,
+      profile: () => profile,
+      channel: () => 'stable',
+      applyProfile: async () => 'unchanged',
+      identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'dep_1' }),
+      keystoreLocked: () => false,
+      selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
+      authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+      fetch,
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      pushTreeChanged: (ev) => treeChanged.push(ev),
+      ui: {
+        chooseConflict: async () => 'later',
+        confirmDiscard: async () => false,
+        pickCopyPath: async () => null,
+        showOpenLatestFailed: () => undefined,
+        showCopyFailed: () => undefined,
+        chooseUnsavedClose: async () => 'cancel',
+      },
+      pushStatus: () => undefined,
+      pushLaunch: () => undefined,
+      reveal: () => undefined,
+    })
+
+    // 1. Load-more page (cursor: 'cur_2') warms the cache in background but sends NO refresh
+    const loadMorePage = await service.listDocuments({ workspaceId: 'ws_1', cursor: 'cur_2' })
+    expect(loadMorePage.ok).toBe(true)
+    if (!loadMorePage.ok) return
+    expect(loadMorePage.value.documents[0]!.updatedByUser).toEqual({ name: 'Page 2 Editor' })
+    await flushMicrotasks()
+    expect(avatarRequests).toBe(1)
+    expect(treeChanged).toEqual([])
+
+    // Next natural refresh materializes the warmed avatar from cache without a new avatar fetch
+    const refreshed = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(refreshed.ok).toBe(true)
+    if (!refreshed.ok) return
+    expect(refreshed.value.documents[0]!.updatedByUser).toEqual({
+      name: 'Page 2 Editor',
+      avatarUrl: expectedDataUrl,
+    })
+    await flushMicrotasks()
+    expect(avatarRequests).toBe(1)
+    expect(treeChanged).toEqual([])
+
+    // 2. Shared-with-me load-more page (cursor: 'shared:1', offset > 0) warms cache and sends NO refresh
+    const sharedLoadMore = await service.listSharedWithMe({ cursor: 'shared:1', limit: 1 })
+    expect(sharedLoadMore.ok).toBe(true)
+    if (!sharedLoadMore.ok) return
+    expect(sharedLoadMore.value.documents[0]!.updatedByUser).toEqual({ name: 'Shared 2' })
+    await flushMicrotasks()
+    expect(avatarRequests).toBe(2)
+    expect(treeChanged).toEqual([])
+
+    const sharedCached = await service.listSharedWithMe({ cursor: 'shared:1', limit: 1 })
+    expect(sharedCached.ok).toBe(true)
+    if (!sharedCached.ok) return
+    expect(sharedCached.value.documents[0]!.updatedByUser).toEqual({
+      name: 'Shared 2',
+      avatarUrl: expectedDataUrl,
+    })
+  })
 })

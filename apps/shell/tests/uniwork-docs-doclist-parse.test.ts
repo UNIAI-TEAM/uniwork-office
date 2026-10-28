@@ -374,7 +374,7 @@ describe('UNI-2275 R1-1 / R2-1..R2-4 shell CSP and main-process avatar fetcher',
   )
   const JPEG_BYTES = new Uint8Array(
     Buffer.from(
-      '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=',
+      '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AP//Z',
       'base64',
     ),
   )
@@ -398,6 +398,7 @@ describe('UNI-2275 R1-1 / R2-1..R2-4 shell CSP and main-process avatar fetcher',
 
   it('sniffs PNG, JPEG, GIF, and WebP magic bytes and refuses SVG, HTML, and truncated bytes', () => {
     expect(sniffAvatarMime(PNG_BYTES)).toBe('image/png')
+    expect(JPEG_BYTES.slice(-2)).toEqual(new Uint8Array([0xff, 0xd9]))
     expect(sniffAvatarMime(JPEG_BYTES)).toBe('image/jpeg')
     expect(sniffAvatarMime(GIF_BYTES)).toBe('image/gif')
     expect(sniffAvatarMime(WEBP_BYTES)).toBe('image/webp')
