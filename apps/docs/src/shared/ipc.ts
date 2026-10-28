@@ -335,6 +335,8 @@ export interface DesktopCapabilities {
   zotero?: boolean
   /** open-password fields of the Protect dialog (main-process crypto) */
   docPassword?: boolean
+  /** Mailings tab: merge a local data source into the document (local file dialog + folder writes) */
+  mailMerge?: boolean
   /** View > New Tab / Switch Tabs (shell tab strip) */
   tabs?: boolean
   /** local-disk persistence: the quick-access AutoSave toggle and the 30 s crash-recovery copy */

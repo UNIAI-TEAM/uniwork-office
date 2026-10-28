@@ -45,6 +45,7 @@ import type { Capabilities } from '../protocol/types'
  * | capability      | hides (renderer entry)                                              |
  * |-----------------|---------------------------------------------------------------------|
  * | zotero          | References tab > Zotero group (4 buttons)                           |
+ * | mailMerge       | Mailings tab (local data source dialog, per-record folder output)   |
  * | docPassword     | Protect dialog > open-password + confirm fields                     |
  * | tabs            | View > Window > New Tab, Switch Tabs                                |
  * | autoSaveToDisk  | quick-access AutoSave toggle, 30 s crash-recovery copy timer        |
@@ -69,6 +70,7 @@ import type { Capabilities } from '../protocol/types'
 export const webCapabilities: Readonly<Required<DesktopCapabilities>> = Object.freeze({
   platform: 'web',
   zotero: false,
+  mailMerge: false,
   docPassword: false,
   tabs: false,
   autoSaveToDisk: false,

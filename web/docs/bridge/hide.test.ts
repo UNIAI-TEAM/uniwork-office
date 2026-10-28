@@ -21,6 +21,7 @@ describe('webCapabilities (the single web capability source)', () => {
         'exportPdf',
         'imageGeneration',
         'imageSearch',
+        'mailMerge',
         'open',
         'print',
         'readOnlyProfile',

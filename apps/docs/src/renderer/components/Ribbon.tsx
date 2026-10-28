@@ -968,7 +968,11 @@ function RibbonInner({
 
   useEffect(() => {
     if (!tabRequest) return
-    if ((TABS as readonly string[]).includes(tabRequest.tab)) {
+    // Mailings reads a local data source and writes a folder: desktop only (cap 'mailMerge')
+    if (
+      (TABS as readonly string[]).includes(tabRequest.tab) &&
+      (tabRequest.tab !== 'mailings' || cap('mailMerge'))
+    ) {
       const requested = tabRequest.tab as (typeof TABS)[number]
       lastRegularTab.current = requested
       setTab(requested)
@@ -2204,7 +2208,9 @@ function RibbonInner({
           </div>
         )}
         {quickActions}
-        {TABS.filter((tabName) => tabName !== 'file').map((tabName) => (
+        {TABS.filter(
+          (tabName) => tabName !== 'file' && (tabName !== 'mailings' || cap('mailMerge')),
+        ).map((tabName) => (
           <button
             key={tabName}
             className={`ribbon-tab ${collapse.tabClass(tab === tabName)}`}
