@@ -228,12 +228,31 @@ export function rekeyRedactionStates(
     readonly sheetName: string
     readonly ops: readonly StructuralOp[]
   }[] = [],
+  additions: readonly {
+    readonly name: string
+    readonly sourceSheetName?: string | undefined
+  }[] = [],
 ): SheetRedactionState[] {
   const renamed = new Map(renames.map((rename) => [rename.sheetName, rename.newName]))
   const removed = new Set(removals)
-  return states
-    .filter((state) => !removed.has(state.sheetName))
-    .map((state) => {
+  const destinationNames = new Set(
+    states
+      .filter((state) => !removed.has(state.sheetName))
+      .map((state) => renamed.get(state.sheetName) ?? state.sheetName),
+  )
+  const clonedAdditions: SheetRedactionState[] = []
+  for (const addition of additions) {
+    if (addition.sourceSheetName === undefined || destinationNames.has(addition.name)) continue
+    const sourceState = states.find((state) => state.sheetName === addition.sourceSheetName)
+    if (sourceState === undefined) continue
+    destinationNames.add(addition.name)
+    clonedAdditions.push({
+      sheetName: addition.name,
+      marks: sourceState.marks.map((mark) => ({ ...mark })),
+    })
+  }
+  return [...states.filter((state) => !removed.has(state.sheetName)), ...clonedAdditions].map(
+    (state) => {
       const newName = renamed.get(state.sheetName)
       const renamedState = newName === undefined ? state : { ...state, sheetName: newName }
       const ops = structuralOps.find((entry) => entry.sheetName === state.sheetName)?.ops
@@ -248,7 +267,8 @@ export function rekeyRedactionStates(
         return moved === null ? [] : [{ ...mark, ...moved }]
       })
       return { ...renamedState, marks }
-    })
+    },
+  )
 }
 
 /**

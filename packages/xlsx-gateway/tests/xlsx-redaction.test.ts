@@ -257,6 +257,41 @@ describe('rekeying for sheet edits done in the same save', () => {
       STATES,
     )
   })
+
+  it('clones source marks onto duplicated sheets and applies the copy shifts without double-copying explicit destination states', () => {
+    expect(
+      rekeyRedactionStates(
+        STATES,
+        [{ sheetName: 'Sheet1', newName: 'SourceRenamed' }],
+        [],
+        [{ sheetName: 'Copy', ops: [{ kind: 'insert-rows', index: 0, count: 2 }] }],
+        [{ name: 'Copy', sourceSheetName: 'Sheet1' }],
+      ),
+    ).toEqual([
+      { sheetName: 'SourceRenamed', marks: [MARK] },
+      {
+        sheetName: 'Copy',
+        marks: [{ ...MARK, startRow: MARK.startRow + 2, endRow: MARK.endRow + 2 }],
+      },
+    ])
+
+    const explicitCopyMark = {
+      startRow: 5,
+      endRow: 5,
+      startColumn: 0,
+      endColumn: 0,
+      label: 'explicit copy mark',
+    }
+    expect(
+      rekeyRedactionStates(
+        [...STATES, { sheetName: 'Copy', marks: [explicitCopyMark] }],
+        [],
+        [],
+        [],
+        [{ name: 'Copy', sourceSheetName: 'Sheet1' }],
+      ),
+    ).toEqual([...STATES, { sheetName: 'Copy', marks: [explicitCopyMark] }])
+  })
 })
 
 describe('writing the part into the package', () => {

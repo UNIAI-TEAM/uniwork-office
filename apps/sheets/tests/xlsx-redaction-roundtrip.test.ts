@@ -210,6 +210,27 @@ describe('the redaction part survives a real save', () => {
     )
   })
 
+  it('duplicates a marked sheet and preserves its marks in both the part and mirror on reopen', async () => {
+    const plan: SheetEditPlan = {
+      renames: [],
+      removals: [],
+      additions: [{ name: 'Copy', sourceSheetName: 'Sheet1' }],
+      order: ['Sheet1', 'Copy'],
+    }
+    const mutation = await save(STATES, plan)
+    expect(() => assertOnlyTouchedEntriesChanged(mutation)).not.toThrow()
+    const parts = await savedParts(mutation.buffer)
+    expect(requiredPart(parts, 'xl/worksheets/sheet2.xml')).toContain('13800138000')
+    const expected: SheetRedactionState[] = [
+      { sheetName: 'Copy', marks: [MARK] },
+      { sheetName: 'Sheet1', marks: [MARK] },
+    ]
+    expect(parseRedactionPart(requiredPart(parts, REDACTION_PART_PATH))).toEqual(expected)
+    expect(
+      parseRedactionNameMirror(requiredPart(parts, 'xl/workbook.xml'), ['Sheet1', 'Copy']),
+    ).toEqual(expected)
+  })
+
   it('keeps the part when the save does not know the marks', async () => {
     // The CLI and the second phase of a split save never load the marks; an
     // empty list there cleared the part, un-hiding everything on any edit.
