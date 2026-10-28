@@ -116,7 +116,7 @@ export function parseRedactionPart(text: string): SheetRedactionState[] {
   if (root.version !== PART_VERSION) {
     throw new RedactionError(
       `${REDACTION_PART_PATH} has version ${JSON.stringify(root.version)}, but this ` +
-        `version of GenOffice only understands ${PART_VERSION}. Refusing to save.`,
+        `version of UniWork Office only understands ${PART_VERSION}. Refusing to save.`,
     )
   }
   const sheets = root.sheets
@@ -538,7 +538,7 @@ function mirrorMarkOf(
   if (record.v !== MIRROR_VERSION) {
     throw new RedactionError(
       `${where} holds mirror version ${JSON.stringify(record.v)}, but this version of ` +
-        `GenOffice only understands ${MIRROR_VERSION}. Refusing to open the workbook.`,
+        `UniWork Office only understands ${MIRROR_VERSION}. Refusing to open the workbook.`,
     )
   }
   if (!isNonNegativeInteger(record.sheet)) {

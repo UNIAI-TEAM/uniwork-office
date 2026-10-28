@@ -85,6 +85,12 @@
       "pattern": "genspark\\.ai/genoffice/redaction",
       "kind": "permanent",
       "reason": "XML namespace of the stored 'hidden from the model' marker (a go:redact element in a docx run's rPr and inside a pptx <a:ext>). It is part of the document format, like the docx/xlsx/pptx namespaces beside it: renaming it makes Word and PowerPoint treat the file as corrupt and repair drops the run carrying the mark, so the span silently becomes readable again. Never rendered in the UI."
+    },
+    {
+      "path": "packages/xlsx-gateway/src/gateway/xlsx-redaction.ts",
+      "pattern": "genspark\\.ai/genoffice/2026/relationships/redactions",
+      "kind": "permanent",
+      "reason": "Relationship type URI of the stored 'hidden from the model' workbook part (xl/_rels/workbook.xml.rels). It is an OPC identifier written into the file, like the schemas.openxmlformats.org types beside it: renaming it orphans the part in every file written so far, so the marked cells silently become readable again. Never rendered in the UI."
     }
   ]
 }
