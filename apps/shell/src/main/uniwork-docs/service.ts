@@ -146,6 +146,7 @@ import { pathKey } from '../../shared/path-key'
 import { isBlankDefaultTitle } from '../../shared/blank-default-names'
 import { LaunchController } from './launch'
 import { createDocumentLimitsCache, type DocumentLimits, type DocumentLimitsCache } from './limits'
+import { createAvatarCache, type AvatarCache } from './avatar'
 import { DRAFT_PREVIEW_DIR } from '@genoffice/electron-utils/draft-preview'
 import type { OpenSourceValue, SourceViewResult, SourceViewState } from '../../shared/source-view'
 import { SourceViewRegistry, createSourceViewOpener, type SourceViewOpener } from './source-view'
@@ -360,6 +361,8 @@ export interface UniworkDocsServiceDeps {
   selectedOrg(): { id: string; slug: string } | null
   authorized<T>(call: (token: string) => Promise<T>): Promise<T>
   fetch?: FetchLike
+  /** UNI-2275 R1-1: the fetch used for presigned avatar URLs (wiring passes Electron's `net.fetch`); defaults to `fetch` */
+  avatarFetch?: FetchLike
   /** the shell's single document router; false = nothing opened */
   openPath(path: string): boolean
   /** a tab or detached window shows this path */
@@ -1261,6 +1264,7 @@ export class UniworkDocsService {
   readonly coordinator: SaveCoordinator
   readonly launch: LaunchController
   readonly limitsCache: DocumentLimitsCache
+  readonly avatarCache: AvatarCache
   /** UNI-1993: the view-only source files (not documents); index.ts merges it into the module seams */
   readonly sourceViews = new SourceViewRegistry()
   private readonly sourceViewOpener: SourceViewOpener
@@ -1506,6 +1510,10 @@ export class UniworkDocsService {
         const client = this.api()
         return client.getDocumentLimits ? await client.getDocumentLimits() : null
       },
+    })
+    this.avatarCache = createAvatarCache({
+      fetch: deps.avatarFetch ?? deps.fetch,
+      now: deps.now,
     })
     this.sourceViewOpener = createSourceViewOpener({
       previewRoot: join(deps.userDataDir, DRAFT_PREVIEW_DIR),
@@ -2144,6 +2152,7 @@ export class UniworkDocsService {
       this.workspaceMemberNames.clear()
       this.workspaceMemberNamesInFlight.clear()
       this.workspaceMemberNamesOrg = null
+      this.avatarCache.clear()
     }
     if (identity) {
       // session boot / deployment switch: the new server's `documents.limits`
@@ -3793,6 +3802,7 @@ export class UniworkDocsService {
     this.workspaceMemberNames.clear()
     this.workspaceMemberNamesInFlight.clear()
     this.workspaceMemberNamesOrg = null
+    this.avatarCache.clear()
     this.sessionAccountKey = null
     this.migratedScopes.delete(scopeToken)
     this.limitsCache.reset()
@@ -4811,7 +4821,7 @@ export class UniworkDocsService {
         Math.max(1, Math.floor(Number(query.limit) || SHARED_PAGE_SIZE)),
       )
       const offset = parseOffsetCursor(query.cursor)
-      const slice = all.slice(offset, offset + limit)
+      const slice = await this.avatarCache.resolveRows(all.slice(offset, offset + limit))
       const next = offset + limit < all.length ? `shared:${offset + limit}` : null
       return { documents: slice, nextCursor: next }
     })
@@ -6762,9 +6772,12 @@ export class UniworkDocsService {
     workspaceId: string,
     rows: UniworkDocSummary[],
   ): Promise<UniworkDocSummary[]> {
-    const names = await this.memberNamesForWorkspace(workspaceId)
-    if (names.size === 0) return rows
-    return rows.map((row) => {
+    const [names, withAvatars] = await Promise.all([
+      this.memberNamesForWorkspace(workspaceId),
+      this.avatarCache.resolveRows(rows),
+    ])
+    if (names.size === 0) return withAvatars
+    return withAvatars.map((row) => {
       const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
       // UNI-2047: the trash's "deleted by"; a former member stays unnamed
       const archivedByName = row.archivedById ? names.get(row.archivedById)?.trim() : undefined
@@ -6958,9 +6971,12 @@ export class UniworkDocsService {
     workspaceId: string,
     rows: UniworkDocSummary[],
   ): Promise<UniworkDocSummary[]> {
-    const names = await this.memberNamesForWorkspace(workspaceId)
-    if (names.size === 0) return rows
-    return rows.map((row) => {
+    const [names, withAvatars] = await Promise.all([
+      this.memberNamesForWorkspace(workspaceId),
+      this.avatarCache.resolveRows(rows),
+    ])
+    if (names.size === 0) return withAvatars
+    return withAvatars.map((row) => {
       const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
       const shelvedByName = row.shelvedById ? names.get(row.shelvedById)?.trim() : undefined
       return {

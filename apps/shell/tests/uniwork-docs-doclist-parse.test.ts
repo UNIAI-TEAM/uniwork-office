@@ -1,4 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  AVATAR_MAX_BYTES,
+  createAvatarCache,
+  sniffAvatarMime,
+} from '../src/main/uniwork-docs/avatar'
 import {
   parseDocumentList,
   parseDocumentSummary,
@@ -113,11 +120,11 @@ describe('updated_by_user', () => {
     ).toEqual({ name: 'Lan Tran', avatarUrl: 'https://cdn.example/a.png?sig=1' })
   })
 
-  it('accepts an http avatar url too', () => {
+  it('drops an http avatar url and keeps the name (R1-1 https only)', () => {
     expect(
       parseOne({ updated_by_user: { name: 'Lan', avatar_url: 'http://cdn.example/a.png' } })
         .updatedByUser,
-    ).toEqual({ name: 'Lan', avatarUrl: 'http://cdn.example/a.png' })
+    ).toEqual({ name: 'Lan' })
   })
 
   it.each([
@@ -131,6 +138,7 @@ describe('updated_by_user', () => {
     ['not a url', 'not a url'],
     ['wrong type', 7],
     ['too long', `https://cdn.example/${'a'.repeat(2100)}`],
+    ['url with credentials', 'https://user:pass@cdn.example/a.png'],
   ])('avatar_url %s is dropped, the name stays', (_name, value) => {
     expect(parseOne({ updated_by_user: { name: 'Lan', avatar_url: value } }).updatedByUser).toEqual(
       {
@@ -352,5 +360,204 @@ describe('UNI-2212 a live legacy file is a row that opens', () => {
       parseOne({ title: 'Old.xls', file: { mime_type: xlsxMime, filename: 'old.xlsx' } }).format,
     ).toBe('xlsx')
     expect(parseOne({ title: 'Archive.zip' }).format).toBeNull()
+  })
+})
+
+describe('UNI-2275 R1-1 shell CSP and main-process avatar fetcher', () => {
+  const PNG_BYTES = new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+  ])
+  const JPEG_BYTES = new Uint8Array([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+  ])
+  const GIF_BYTES = new Uint8Array([
+    0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,
+  ])
+  const WEBP_BYTES = new Uint8Array([
+    0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+  ])
+
+  it('keeps shell index.html CSP img-src restricted to self, data:, and blob: (no https:, http:, or *)', () => {
+    const html = readFileSync(resolve(__dirname, '../src/renderer/index.html'), 'utf8')
+    const cspMatch = /http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html)
+    expect(cspMatch).not.toBeNull()
+    const imgSrcMatch = /(?:^|;\s*)img-src\s+([^;]+)/.exec(cspMatch![1]!)
+    expect(imgSrcMatch).not.toBeNull()
+    const imgSrc = imgSrcMatch![1]!.trim()
+    expect(imgSrc).toBe("'self' data: blob:")
+    expect(imgSrc).not.toMatch(/https:|http:|\*/)
+  })
+
+  it('sniffs PNG, JPEG, GIF, and WebP magic bytes and refuses SVG, HTML, and truncated bytes', () => {
+    expect(sniffAvatarMime(PNG_BYTES)).toBe('image/png')
+    expect(sniffAvatarMime(JPEG_BYTES)).toBe('image/jpeg')
+    expect(sniffAvatarMime(GIF_BYTES)).toBe('image/gif')
+    expect(sniffAvatarMime(WEBP_BYTES)).toBe('image/webp')
+    expect(
+      sniffAvatarMime(new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>')),
+    ).toBeNull()
+    expect(
+      sniffAvatarMime(new TextEncoder().encode('<!doctype html><html><body>x</body></html>')),
+    ).toBeNull()
+    expect(sniffAvatarMime(PNG_BYTES.slice(0, 6))).toBeNull()
+  })
+
+  it('fetches https avatars with credentials omitted and no referer, returning a data: URL', async () => {
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(init.credentials).toBe('omit')
+      expect(init.referrerPolicy).toBe('no-referrer')
+      expect(init.referrer).toBe('')
+      expect(init.redirect).toBe('manual')
+      return new Response(PNG_BYTES, { status: 200, headers: { 'Content-Type': 'image/png' } })
+    })
+    const cache = createAvatarCache({ fetch })
+    const dataUrl = await cache.resolveUrl('https://s3.example.com/avatars/u1.png?X-Amz-Signature=1')
+    expect(dataUrl).toBe(`data:image/png;base64,${Buffer.from(PNG_BYTES).toString('base64')}`)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses non-https URLs without making any network request', async () => {
+    const fetch = vi.fn()
+    const cache = createAvatarCache({ fetch })
+    expect(await cache.resolveUrl('http://s3.example.com/avatars/u1.png')).toBeNull()
+    expect(await cache.resolveUrl('data:image/png;base64,AAAA')).toBeNull()
+    expect(await cache.resolveUrl('https://user:pass@s3.example.com/u1.png')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('follows up to 2 https redirects and refuses a 3rd hop or an http redirect', async () => {
+    let calls = 0
+    const cacheOk = createAvatarCache({
+      fetch: async (url) => {
+        calls += 1
+        if (url === 'https://a.example/1') {
+          return new Response(null, { status: 302, headers: { Location: 'https://b.example/2' } })
+        }
+        if (url === 'https://b.example/2') {
+          return new Response(null, { status: 302, headers: { Location: '/final.jpg' } })
+        }
+        return new Response(JPEG_BYTES, { status: 200 })
+      },
+    })
+    expect(await cacheOk.resolveUrl('https://a.example/1')).toBe(
+      `data:image/jpeg;base64,${Buffer.from(JPEG_BYTES).toString('base64')}`,
+    )
+    expect(calls).toBe(3)
+
+    // 3rd redirect hop refused
+    const cacheTooMany = createAvatarCache({
+      fetch: async (url) =>
+        new Response(null, { status: 302, headers: { Location: `${url}/next` } }),
+    })
+    expect(await cacheTooMany.resolveUrl('https://a.example/start')).toBeNull()
+
+    // redirect to http: refused
+    const cacheHttpHop = createAvatarCache({
+      fetch: async () =>
+        new Response(null, { status: 302, headers: { Location: 'http://b.example/avatar.png' } }),
+    })
+    expect(await cacheHttpHop.resolveUrl('https://a.example/start')).toBeNull()
+  })
+
+  it('enforces the 2 MiB size cap from both Content-Length and streamed body', async () => {
+    const cacheHeader = createAvatarCache({
+      fetch: async () =>
+        new Response(PNG_BYTES, {
+          status: 200,
+          headers: { 'Content-Length': String(AVATAR_MAX_BYTES + 1) },
+        }),
+    })
+    expect(await cacheHeader.resolveUrl('https://s3.example.com/huge-header.png')).toBeNull()
+
+    const oversized = new Uint8Array(AVATAR_MAX_BYTES + 10)
+    oversized.set(PNG_BYTES, 0)
+    const cacheStream = createAvatarCache({
+      fetch: async () => new Response(oversized, { status: 200 }),
+    })
+    expect(await cacheStream.resolveUrl('https://s3.example.com/huge-stream.png')).toBeNull()
+  })
+
+  it('refuses SVG and HTML bodies even when served with image/png Content-Type', async () => {
+    const svgBody = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    const cache = createAvatarCache({
+      fetch: async () =>
+        new Response(svgBody, { status: 200, headers: { 'Content-Type': 'image/png' } }),
+    })
+    expect(await cache.resolveUrl('https://s3.example.com/evil.png')).toBeNull()
+  })
+
+  it('caches by origin+pathname (ignoring rotating query params), deduplicates per editor, and expires after TTL', async () => {
+    let now = 1_000
+    const fetch = vi.fn(async () => new Response(WEBP_BYTES, { status: 200 }))
+    const cache = createAvatarCache({ fetch, now: () => now, ttlMs: 10_000 })
+
+    // Concurrent resolveRows with rotating query strings for the same editor only fetches once
+    const docs = parseDocumentList(
+      {
+        documents: [
+          {
+            ...row,
+            id: 'd1',
+            updated_by_user: {
+              name: 'Minh',
+              avatar_url: 'https://s3.example.com/avatars/minh.webp?sig=first',
+            },
+          },
+          {
+            ...row,
+            id: 'd2',
+            updated_by_user: {
+              name: 'Minh',
+              avatar_url: 'https://s3.example.com/avatars/minh.webp?sig=second',
+            },
+          },
+        ],
+      },
+      'ws_1',
+    ).documents
+
+    const resolved = await cache.resolveRows(docs)
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const expectedDataUrl = `data:image/webp;base64,${Buffer.from(WEBP_BYTES).toString('base64')}`
+    expect(resolved[0]!.updatedByUser).toEqual({ name: 'Minh', avatarUrl: expectedDataUrl })
+    expect(resolved[1]!.updatedByUser).toEqual({ name: 'Minh', avatarUrl: expectedDataUrl })
+
+    // Subsequent list fetch with a new presigned signature hits cache
+    now += 5_000
+    expect(await cache.resolveUrl('https://s3.example.com/avatars/minh.webp?sig=third')).toBe(
+      expectedDataUrl,
+    )
+    expect(fetch).toHaveBeenCalledTimes(1)
+
+    // Past TTL refetches
+    now += 6_000
+    expect(await cache.resolveUrl('https://s3.example.com/avatars/minh.webp?sig=fourth')).toBe(
+      expectedDataUrl,
+    )
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns null and drops avatarUrl on timeout or network failure without failing the list', async () => {
+    const cache = createAvatarCache({
+      timeoutMs: 20,
+      fetch: (_url, init) => {
+        const { promise, reject } = Promise.withResolvers<Response>()
+        init.signal?.addEventListener('abort', () => reject(new Error('aborted')))
+        return promise
+      },
+    })
+    const docs = parseDocumentList(
+      {
+        documents: [
+          {
+            ...row,
+            updated_by_user: { name: 'Minh', avatar_url: 'https://s3.example.com/slow.png' },
+          },
+        ],
+      },
+      'ws_1',
+    ).documents
+    const resolved = await cache.resolveRows(docs)
+    expect(resolved[0]!.updatedByUser).toEqual({ name: 'Minh' })
   })
 })

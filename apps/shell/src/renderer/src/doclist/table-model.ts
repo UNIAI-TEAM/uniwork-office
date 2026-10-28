@@ -132,7 +132,7 @@ export function editorNameOf(doc: DocumentsHomeDoc): string | null {
   return name || null
 }
 
-/** the editor's avatar URL (https only, validated by main) if the server sent one */
+/** the editor's avatar URL (`data:` URL resolved by main) if the server sent one */
 export function editorAvatarUrlOf(doc: DocumentsHomeDoc): string | null {
   const url = doc.updatedByUser?.avatarUrl?.trim()
   return url || null
