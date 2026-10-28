@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import { mergeFieldInstruction } from '@genoffice/docx-engine'
 import type { MergeDataSource } from '../../shared/ipc'
@@ -45,8 +45,25 @@ export function MailingsTab({
   const { t } = useI18n()
   const [panelOpen, setPanelOpen] = useState(false)
   const [recordIndex, setRecordIndex] = useState(0)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   // a new list starts at its first record; the old index may be past its end
   useEffect(() => setRecordIndex(0), [source?.path])
+
+  const isOpen = dropdown === 'mergefield' && !!source && source.fields.length > 0
+  useEffect(() => {
+    if (!isOpen) return
+    listRef.current?.querySelector<HTMLButtonElement>('button.rb-field-item')?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setDropdown(() => null)
+        triggerRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [isOpen, setDropdown])
 
   const records = source?.records ?? []
   const hasRecords = records.length > 0
@@ -80,10 +97,19 @@ export function MailingsTab({
         <div className="ribbon-group-items">
           <div className="rb-split-wrap">
             <button
+              ref={triggerRef}
               className="rb-big"
               disabled={!hasDoc || !source || source.fields.length === 0}
+              aria-haspopup="menu"
+              aria-expanded={isOpen}
               data-tip={t('ribbonMailingsInsertFieldTip')}
               onClick={() => toggleDropdown(setDropdown, 'mergefield')}
+              onKeyDown={(e) => {
+                if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !isOpen) {
+                  e.preventDefault()
+                  setDropdown(() => 'mergefield')
+                }
+              }}
             >
               <span className="rb-big-icon">
                 <IconMergeField size={BIG} />
@@ -91,11 +117,53 @@ export function MailingsTab({
               </span>
               <span>{t('ribbonMailingsInsertField')}</span>
             </button>
-            {dropdown === 'mergefield' && source && (
-              <div data-rb-panel="" className="rb-field-list">
-                <div className="rb-drop-title">{t('ribbonMailingsFields')}</div>
+            {isOpen && source && (
+              <div
+                ref={listRef}
+                data-rb-panel=""
+                role="menu"
+                aria-label={t('ribbonMailingsFields')}
+                className="layout-menu layout-menu-scroll rb-field-list"
+                onKeyDown={(e) => {
+                  if (
+                    e.key !== 'ArrowDown' &&
+                    e.key !== 'ArrowUp' &&
+                    e.key !== 'Home' &&
+                    e.key !== 'End'
+                  ) {
+                    return
+                  }
+                  const items = [
+                    ...(listRef.current?.querySelectorAll<HTMLButtonElement>(
+                      'button.rb-field-item',
+                    ) ?? []),
+                  ]
+                  if (items.length === 0) return
+                  e.preventDefault()
+                  const cur = items.indexOf(document.activeElement as HTMLButtonElement)
+                  const next =
+                    e.key === 'Home'
+                      ? 0
+                      : e.key === 'End'
+                        ? items.length - 1
+                        : e.key === 'ArrowDown'
+                          ? cur < 0
+                            ? 0
+                            : (cur + 1) % items.length
+                          : cur <= 0
+                            ? items.length - 1
+                            : cur - 1
+                  items[next]?.focus()
+                }}
+              >
+                <div className="layout-menu-head rb-drop-title">{t('ribbonMailingsFields')}</div>
                 {source.fields.map((name) => (
-                  <button key={name} className="rb-field-item" onClick={() => insertField(name)}>
+                  <button
+                    key={name}
+                    role="menuitem"
+                    className="rb-field-item"
+                    onClick={() => insertField(name)}
+                  >
                     {name}
                   </button>
                 ))}

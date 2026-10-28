@@ -575,6 +575,7 @@ export const nl = {
     'Kan de kopie niet maken. Je wijzigingen zijn nog veilig; probeer het opnieuw.',
   appMergeSourceLoaded: '{name} geladen ({n} records)',
   appMergeWritten: '{n} documenten geschreven',
+  appMergeWrittenOne: '{n} document geschreven',
   appMergeNothingToWrite: 'Er is niets te schrijven',
   appMergeWarnPassword:
     'Dit document is met een wachtwoord beveiligd. De samengevoegde documenten worden als gewone bestanden zonder wachtwoord opgeslagen, dus iedereen die ze opent kan de inhoud lezen. Toch samenvoegen?',

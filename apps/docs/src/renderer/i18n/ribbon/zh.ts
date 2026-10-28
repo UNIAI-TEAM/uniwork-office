@@ -947,6 +947,7 @@ export const zh = {
   ribbonMailingsNamePatternPh: '留空则使用第一个字段',
   ribbonMailingsFinish: '完成并合并',
   ribbonMailingsMerged: '已合并 {n} 个文档',
+  ribbonMailingsMergedOne: '已合并 {n} 个文档',
   ribbonMailingsMergeFailed: '合并失败',
   ribbonMailingsClose: '关闭',
 }

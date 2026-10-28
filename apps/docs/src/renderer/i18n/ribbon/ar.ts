@@ -940,6 +940,7 @@ export const ar = {
   ribbonMailingsNamePatternPh: 'فارغ: يُستخدم الحقل الأول',
   ribbonMailingsFinish: 'إنهاء الدمج',
   ribbonMailingsMerged: 'تم دمج {n} مستندًا',
+  ribbonMailingsMergedOne: 'تم دمج مستند واحد',
   ribbonMailingsMergeFailed: 'فشل الدمج',
   ribbonMailingsClose: 'إغلاق',
 } satisfies Record<keyof typeof zh, string>

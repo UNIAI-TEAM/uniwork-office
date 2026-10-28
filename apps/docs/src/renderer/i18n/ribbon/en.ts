@@ -942,6 +942,7 @@ export const en = {
   ribbonMailingsNamePatternPh: 'Empty uses the first field',
   ribbonMailingsFinish: 'Finish & Merge',
   ribbonMailingsMerged: '{n} documents merged',
+  ribbonMailingsMergedOne: '{n} document merged',
   ribbonMailingsMergeFailed: 'The merge failed',
   ribbonMailingsClose: 'Close',
 } satisfies Record<keyof typeof zh, string>

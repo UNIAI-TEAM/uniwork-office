@@ -958,6 +958,7 @@ export const de = {
   ribbonMailingsNamePatternPh: 'Leer: das erste Feld wird verwendet',
   ribbonMailingsFinish: 'Fertigstellen und zusammenführen',
   ribbonMailingsMerged: '{n} Dokumente zusammengeführt',
+  ribbonMailingsMergedOne: '{n} Dokument zusammengeführt',
   ribbonMailingsMergeFailed: 'Die Zusammenführung ist fehlgeschlagen',
   ribbonMailingsClose: 'Schließen',
 } satisfies Record<keyof typeof zh, string>

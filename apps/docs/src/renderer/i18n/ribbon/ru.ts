@@ -951,6 +951,7 @@ export const ru = {
   ribbonMailingsNamePatternPh: 'Пусто: используется первое поле',
   ribbonMailingsFinish: 'Закончить и выполнить слияние',
   ribbonMailingsMerged: 'Объединено документов: {n}',
+  ribbonMailingsMergedOne: 'Объединён {n} документ',
   ribbonMailingsMergeFailed: 'Слияние не удалось',
   ribbonMailingsClose: 'Закрыть',
 } satisfies Record<keyof typeof zh, string>

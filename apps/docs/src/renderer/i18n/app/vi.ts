@@ -558,6 +558,7 @@ export const vi = {
   appCopySaveFailed: 'Chưa tạo được bản sao. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
   appMergeSourceLoaded: 'Đã tải {name} ({n} bản ghi)',
   appMergeWritten: 'Đã ghi {n} tài liệu',
+  appMergeWrittenOne: 'Đã ghi {n} tài liệu',
   appMergeNothingToWrite: 'Không có gì để ghi',
   appMergeWarnPassword:
     'Tài liệu này được bảo vệ bằng mật khẩu. Các tài liệu trộn được lưu thành tệp thường, không có mật khẩu, nên ai mở tệp cũng đọc được nội dung. Vẫn trộn?',

@@ -569,6 +569,7 @@ export const zh = {
   appCopySaveFailed: '无法创建副本。你的更改仍然安全；请重试。',
   appMergeSourceLoaded: '已加载数据源 {name}（{n} 条记录）',
   appMergeWritten: '已写出 {n} 个文档',
+  appMergeWrittenOne: '已写出 {n} 个文档',
   appMergeNothingToWrite: '没有可写出的文档',
   appMergeWarnPassword:
     '此文档设有打开密码。合并生成的文档将不带密码保存为普通文件，任何打开它们的人都能读取内容。仍要合并吗？',

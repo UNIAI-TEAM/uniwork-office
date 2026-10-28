@@ -933,6 +933,7 @@ export const he = {
   ribbonMailingsNamePatternPh: 'ריק: ייעשה שימוש בשדה הראשון',
   ribbonMailingsFinish: 'סיום ומיזוג',
   ribbonMailingsMerged: 'מוזגו {n} מסמכים',
+  ribbonMailingsMergedOne: 'מוזג מסמך אחד',
   ribbonMailingsMergeFailed: 'המיזוג נכשל',
   ribbonMailingsClose: 'סגירה',
 } satisfies Record<keyof typeof zh, string>

@@ -70,15 +70,59 @@ describe('the Mailings tab', () => {
     return container
   }
 
-  it('offers the fields of the data source', () => {
+  it('offers the fields of the data source in an anchored layout-menu popup', () => {
     const view = renderMailings()
     const fieldButton = [...view.querySelectorAll<HTMLButtonElement>('button.rb-big')].find(
       (b) => b.textContent === t('ribbonMailingsInsertField'),
     )!
     expect(fieldButton.disabled).toBe(false)
     act(() => fieldButton.click())
+    const menu = view.querySelector<HTMLElement>('.rb-field-list')!
+    expect(menu).not.toBeNull()
+    expect(menu.classList.contains('layout-menu')).toBe(true)
+    expect(menu.classList.contains('layout-menu-scroll')).toBe(true)
+    expect(menu.querySelector('.layout-menu-head.rb-drop-title')?.textContent).toBe(
+      t('ribbonMailingsFields'),
+    )
     const items = [...view.querySelectorAll<HTMLButtonElement>('button.rb-field-item')]
     expect(items.map((b) => b.textContent)).toEqual(['FirstName', 'LastName'])
+    expect(document.activeElement).toBe(items[0])
+  })
+
+  it('supports keyboard opening, arrow navigation, Escape returning focus, and outside-click dismissal', () => {
+    const view = renderMailings()
+    const fieldButton = [...view.querySelectorAll<HTMLButtonElement>('button.rb-big')].find(
+      (b) => b.textContent === t('ribbonMailingsInsertField'),
+    )!
+    fieldButton.focus()
+    act(() => {
+      fieldButton.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }),
+      )
+    })
+    const menu = view.querySelector<HTMLElement>('.rb-field-list')!
+    expect(menu).not.toBeNull()
+    const items = [...menu.querySelectorAll<HTMLButtonElement>('button.rb-field-item')]
+    expect(document.activeElement).toBe(items[0])
+    act(() => {
+      menu.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }),
+      )
+    })
+    expect(document.activeElement).toBe(items[1])
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      )
+    })
+    expect(view.querySelector('.rb-field-list')).toBeNull()
+    expect(document.activeElement).toBe(fieldButton)
+    act(() => fieldButton.click())
+    expect(view.querySelector('.rb-field-list')).not.toBeNull()
+    act(() => {
+      document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    })
+    expect(view.querySelector('.rb-field-list')).toBeNull()
   })
 
   it('inserts the merge field of the field the user clicked', () => {
@@ -105,5 +149,31 @@ describe('the Mailings tab', () => {
   it('shows the record the preview walks', () => {
     const view = renderMailings()
     expect(view.textContent).toContain(t('ribbonMailingsRecord', { n: 1, total: 2 }))
+  })
+
+  it('renders custom protect-check radios in the Mail Merge modal and singular/plural done copy', async () => {
+    const onMerge = vi.fn().mockResolvedValueOnce({ ok: true, count: 1 })
+    const view = renderMailings({ onMergeMailings: onMerge })
+    const startButton = [...view.querySelectorAll<HTMLButtonElement>('button.rb-big')].find(
+      (b) => b.textContent === t('ribbonMailingsStart'),
+    )!
+    act(() => startButton.click())
+    const radios = [
+      ...view.querySelectorAll<HTMLLabelElement>('label.protect-check.mailmerge-radio'),
+    ]
+    expect(radios).toHaveLength(2)
+    for (const label of radios) {
+      expect(label.querySelector('input[type="radio"]')).not.toBeNull()
+      expect(label.querySelector('span.ctl')).not.toBeNull()
+    }
+    const finishButton = [
+      ...view.querySelectorAll<HTMLButtonElement>('.modal button.btn-primary'),
+    ][0]!
+    await act(async () => {
+      finishButton.click()
+    })
+    expect(view.querySelector('.mailmerge-done')?.textContent).toBe(
+      t('ribbonMailingsMergedOne', { n: 1 }),
+    )
   })
 })

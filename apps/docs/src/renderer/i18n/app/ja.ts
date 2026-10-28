@@ -589,6 +589,7 @@ export const ja = {
     'コピーを作成できませんでした。変更は引き続き安全です。もう一度お試しください。',
   appMergeSourceLoaded: '{name}（{n} 件）を読み込みました',
   appMergeWritten: '{n} 個のドキュメントを書き出しました',
+  appMergeWrittenOne: '{n} 個のドキュメントを書き出しました',
   appMergeNothingToWrite: '書き出すものがありません',
   appMergeWarnPassword:
     'このドキュメントはパスワードで保護されています。差し込み印刷で作成されるドキュメントはパスワードなしの通常のファイルとして保存され、開いた人は誰でも内容を読めます。続行しますか？',

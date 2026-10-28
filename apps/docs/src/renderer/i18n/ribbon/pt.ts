@@ -950,6 +950,7 @@ export const pt = {
   ribbonMailingsNamePatternPh: 'Vazio: usa o primeiro campo',
   ribbonMailingsFinish: 'Concluir e mesclar',
   ribbonMailingsMerged: '{n} documentos mesclados',
+  ribbonMailingsMergedOne: '{n} documento mesclado',
   ribbonMailingsMergeFailed: 'A mesclagem falhou',
   ribbonMailingsClose: 'Fechar',
 } satisfies Record<keyof typeof zh, string>

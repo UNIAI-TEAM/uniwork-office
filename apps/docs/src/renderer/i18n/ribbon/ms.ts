@@ -952,6 +952,7 @@ export const ms = {
   ribbonMailingsNamePatternPh: 'Kosong: medan pertama digunakan',
   ribbonMailingsFinish: 'Tamat dan Gabung',
   ribbonMailingsMerged: '{n} dokumen digabungkan',
+  ribbonMailingsMergedOne: '{n} dokumen digabungkan',
   ribbonMailingsMergeFailed: 'Gabungan gagal',
   ribbonMailingsClose: 'Tutup',
 } satisfies Record<keyof typeof zh, string>

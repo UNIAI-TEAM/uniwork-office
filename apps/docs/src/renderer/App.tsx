@@ -109,6 +109,8 @@ import type {
 import { AI_PROVIDERS } from '../shared/ipc'
 import {
   buildMailMergeFiles,
+  fieldInsertedLabel,
+  mergeWrittenLabel,
   mergeWriteWarning,
   type MailMergeRequest,
   type MailMergeResponse,
@@ -386,7 +388,7 @@ import { stepHangingIndent, stepParagraphIndent } from './editor/indent'
 import { AppOnlyDialog } from './components/AppOnlyDialog'
 import { PasswordDialog } from './components/PasswordDialog'
 import { ProtectDialog, type ProtectDialogResult } from './components/ProtectDialog'
-import { t, statusText, useI18n, type StatusLine } from './i18n/locale'
+import { getLang, t, statusText, useI18n, type StatusLine } from './i18n/locale'
 import {
   getActiveSubEditor,
   setActiveSubEditor,
@@ -2597,7 +2599,7 @@ export function App() {
           })),
         })
         if (written.ok) {
-          setStatus(t('appMergeWritten', { n: written.count ?? files.length }))
+          setStatus(mergeWrittenLabel(t, getLang(), written.count ?? files.length))
         }
         return written
       } catch (err) {
@@ -2899,7 +2901,7 @@ export function App() {
         })
         .unsetMark('instrField')
         .run()
-      setStatus(t('appFieldInserted', { instr }))
+      setStatus(t('appFieldInserted', { instr: fieldInsertedLabel(instr) }))
     },
     [editor, fieldValue],
   )

@@ -583,6 +583,7 @@ export const ko = {
   appCopySaveFailed: '사본을 만들지 못했습니다. 변경 사항은 여전히 안전합니다. 다시 시도하세요.',
   appMergeSourceLoaded: '{name}({n}개 레코드)을 불러왔습니다',
   appMergeWritten: '문서 {n}개를 저장했습니다',
+  appMergeWrittenOne: '문서 {n}개를 저장했습니다',
   appMergeNothingToWrite: '저장할 문서가 없습니다',
   appMergeWarnPassword:
     '이 문서는 암호로 보호되어 있습니다. 편지 병합으로 만든 문서는 암호 없는 일반 파일로 저장되므로 파일을 여는 사람은 누구나 내용을 읽을 수 있습니다. 계속 병합할까요?',

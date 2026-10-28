@@ -1,9 +1,15 @@
-import { mergeOutputFileName, type MergeRecord } from '@genoffice/docx-engine'
+import {
+  mergeFieldName,
+  mergeOutputFileName,
+  placeholderText,
+  type MergeRecord,
+} from '@genoffice/docx-engine'
+import type { Lang } from '@genoffice/i18n'
 import type { MergeOutputMode } from '../../shared/ipc'
 import { buildDocBytes, type FileActionContext } from '../file-actions'
 import type { PmNode } from '../editor/convert'
+import type { TFunc } from '../i18n/locale'
 import { mergeAllRecords, substituteMergeFields } from './template'
-
 /**
  * The output half of the mail merge: the documents the merge writes.
  *
@@ -61,6 +67,36 @@ export function mergeWriteWarning(
   return uniworkBound ? 'appMergeWarnUniwork' : null
 }
 
+/**
+ * Friendly label for the status bar after inserting a field: a MERGEFIELD shows
+ * its guillemet placeholder (`«City»`) rather than the raw field instruction.
+ */
+export function fieldInsertedLabel(instr: string): string {
+  const kw = instr.trim().split(/\s+/)[0]?.toUpperCase()
+  if (kw === 'MERGEFIELD') {
+    const name = mergeFieldName(instr)
+    if (name) return placeholderText(name)
+  }
+  return instr
+}
+
+function isSingular(lang: Lang, n: number): boolean {
+  try {
+    return new Intl.PluralRules(lang).select(n) === 'one'
+  } catch {
+    return n === 1
+  }
+}
+
+/** "N documents merged" in the singular or plural form the language uses for N */
+export function mergedCountLabel(tr: TFunc, lang: Lang, n: number): string {
+  return tr(isSingular(lang, n) ? 'ribbonMailingsMergedOne' : 'ribbonMailingsMerged', { n })
+}
+
+/** "N documents written" in the singular or plural form the language uses for N */
+export function mergeWrittenLabel(tr: TFunc, lang: Lang, n: number): string {
+  return tr(isSingular(lang, n) ? 'appMergeWrittenOne' : 'appMergeWritten', { n })
+}
 /**
  * The documents a merge writes.
  *

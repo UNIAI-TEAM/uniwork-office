@@ -955,6 +955,7 @@ export const nl = {
   ribbonMailingsNamePatternPh: 'Leeg: het eerste veld wordt gebruikt',
   ribbonMailingsFinish: 'Voltooien en samenvoegen',
   ribbonMailingsMerged: '{n} documenten samengevoegd',
+  ribbonMailingsMergedOne: '{n} document samengevoegd',
   ribbonMailingsMergeFailed: 'Het samenvoegen is mislukt',
   ribbonMailingsClose: 'Sluiten',
 } satisfies Record<keyof typeof zh, string>

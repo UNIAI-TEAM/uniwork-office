@@ -935,6 +935,7 @@ export const th = {
   ribbonMailingsNamePatternPh: 'เว้นว่างจะใช้ฟิลด์แรก',
   ribbonMailingsFinish: 'เสร็จสิ้นและรวม',
   ribbonMailingsMerged: 'รวมเอกสารแล้ว {n} ฉบับ',
+  ribbonMailingsMergedOne: 'รวมเอกสารแล้ว {n} ฉบับ',
   ribbonMailingsMergeFailed: 'การรวมล้มเหลว',
   ribbonMailingsClose: 'ปิด',
 } satisfies Record<keyof typeof zh, string>

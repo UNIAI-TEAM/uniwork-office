@@ -568,6 +568,7 @@ export const it = {
   appCopySaveFailed: 'Impossibile creare la copia. Le modifiche sono ancora al sicuro; riprova.',
   appMergeSourceLoaded: '{name} caricato ({n} record)',
   appMergeWritten: '{n} documenti scritti',
+  appMergeWrittenOne: '{n} documento scritto',
   appMergeNothingToWrite: "Non c'è nulla da scrivere",
   appMergeWarnPassword:
     'Questo documento è protetto da password. I documenti uniti vengono salvati come file normali, senza password, quindi chiunque li apra può leggerne il contenuto. Unire comunque?',

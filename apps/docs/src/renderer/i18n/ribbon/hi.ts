@@ -948,6 +948,7 @@ export const hi = {
   ribbonMailingsNamePatternPh: 'खाली होने पर पहला फ़ील्ड उपयोग होगा',
   ribbonMailingsFinish: 'समाप्त करें और मर्ज करें',
   ribbonMailingsMerged: '{n} दस्तावेज़ मर्ज किए गए',
+  ribbonMailingsMergedOne: '{n} दस्तावेज़ मर्ज किया गया',
   ribbonMailingsMergeFailed: 'मर्ज विफल रहा',
   ribbonMailingsClose: 'बंद करें',
 } satisfies Record<keyof typeof zh, string>

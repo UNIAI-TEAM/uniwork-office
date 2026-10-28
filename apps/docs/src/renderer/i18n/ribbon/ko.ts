@@ -960,6 +960,7 @@ export const ko = {
   ribbonMailingsNamePatternPh: '비워 두면 첫 번째 필드 사용',
   ribbonMailingsFinish: '병합 완료',
   ribbonMailingsMerged: '문서 {n}개를 병합했습니다',
+  ribbonMailingsMergedOne: '문서 {n}개를 병합했습니다',
   ribbonMailingsMergeFailed: '병합에 실패했습니다',
   ribbonMailingsClose: '닫기',
 } satisfies Record<keyof typeof zh, string>

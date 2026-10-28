@@ -959,6 +959,7 @@ export const es = {
   ribbonMailingsNamePatternPh: 'Vacío: se usa el primer campo',
   ribbonMailingsFinish: 'Finalizar y combinar',
   ribbonMailingsMerged: '{n} documentos combinados',
+  ribbonMailingsMergedOne: '{n} documento combinado',
   ribbonMailingsMergeFailed: 'La combinación ha fallado',
   ribbonMailingsClose: 'Cerrar',
 } satisfies Record<keyof typeof zh, string>

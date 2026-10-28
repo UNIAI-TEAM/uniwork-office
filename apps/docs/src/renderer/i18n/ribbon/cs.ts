@@ -942,6 +942,7 @@ export const cs = {
   ribbonMailingsNamePatternPh: 'Prázdné: použije se první pole',
   ribbonMailingsFinish: 'Dokončit a sloučit',
   ribbonMailingsMerged: 'Sloučeno dokumentů: {n}',
+  ribbonMailingsMergedOne: 'Sloučen {n} dokument',
   ribbonMailingsMergeFailed: 'Sloučení se nezdařilo',
   ribbonMailingsClose: 'Zavřít',
 } satisfies Record<keyof typeof zh, string>

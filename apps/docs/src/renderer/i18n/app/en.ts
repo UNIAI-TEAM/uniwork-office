@@ -558,6 +558,7 @@ export const en = {
   appCopySaveFailed: 'Couldn’t create the copy. Your changes are still safe; try again.',
   appMergeSourceLoaded: 'Loaded {name} ({n} records)',
   appMergeWritten: '{n} documents written',
+  appMergeWrittenOne: '{n} document written',
   appMergeNothingToWrite: 'There is nothing to write',
   appMergeWarnPassword:
     'This document is password-protected. The merged documents are saved as ordinary files without the password, so anyone who opens them can read the content. Merge anyway?',

@@ -925,6 +925,7 @@ export const zhTW = {
   ribbonMailingsNamePatternPh: '留空則使用第一個欄位',
   ribbonMailingsFinish: '完成並合併',
   ribbonMailingsMerged: '已合併 {n} 個文件',
+  ribbonMailingsMergedOne: '已合併 {n} 個文件',
   ribbonMailingsMergeFailed: '合併失敗',
   ribbonMailingsClose: '關閉',
 } satisfies Record<keyof typeof zh, string>

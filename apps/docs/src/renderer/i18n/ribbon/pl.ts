@@ -952,6 +952,7 @@ export const pl = {
   ribbonMailingsNamePatternPh: 'Puste: użyj pierwszego pola',
   ribbonMailingsFinish: 'Zakończ i scal',
   ribbonMailingsMerged: 'Scalono dokumentów: {n}',
+  ribbonMailingsMergedOne: 'Scalono {n} dokument',
   ribbonMailingsMergeFailed: 'Scalanie nie powiodło się',
   ribbonMailingsClose: 'Zamknij',
 } satisfies Record<keyof typeof zh, string>

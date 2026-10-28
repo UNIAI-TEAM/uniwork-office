@@ -579,6 +579,7 @@ export const de = {
     'Die Kopie konnte nicht erstellt werden. Ihre Änderungen sind weiterhin sicher; versuchen Sie es erneut.',
   appMergeSourceLoaded: '{name} geladen ({n} Datensätze)',
   appMergeWritten: '{n} Dokumente geschrieben',
+  appMergeWrittenOne: '{n} Dokument geschrieben',
   appMergeNothingToWrite: 'Es gibt nichts zu schreiben',
   appMergeWarnPassword:
     'Dieses Dokument ist passwortgeschützt. Die zusammengeführten Dokumente werden als normale Dateien ohne Passwort gespeichert; jeder, der sie öffnet, kann den Inhalt lesen. Trotzdem zusammenführen?',

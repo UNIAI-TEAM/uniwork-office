@@ -7203,7 +7203,7 @@ body.docs-crop-active .doc-protected[data-doc-protected='image'] .doc-img-wrap {
   margin-bottom: 8px;
 }
 
-.modal-row input {
+.modal-row input:not([type='radio']):not([type='checkbox']) {
   flex: 1;
 }
 
@@ -9985,7 +9985,7 @@ body.docs-crop-active
   margin-bottom: 12px;
 }
 
-.modal input {
+.modal input:not([type='radio']):not([type='checkbox']) {
   display: block;
   width: 100%;
   margin-top: 4px;
@@ -9997,7 +9997,7 @@ body.docs-crop-active
   outline: none;
 }
 
-.modal input:focus {
+.modal input:not([type='radio']):not([type='checkbox']):focus {
   border-color: var(--word-blue);
 }
 
@@ -10381,7 +10381,7 @@ body.docs-crop-active
 
 /* checkbox / radio rows: the native input is visually replaced by the .ctl
    box (18px, black checked state per the Genspark DS palette) */
-.protect-dialog label.protect-check {
+.modal label.protect-check {
   position: relative;
   display: flex;
   align-items: center;
@@ -10392,7 +10392,7 @@ body.docs-crop-active
   cursor: pointer;
 }
 
-.protect-dialog label.protect-check input {
+.modal label.protect-check input {
   position: absolute;
   opacity: 0;
   width: 18px;
@@ -10401,7 +10401,7 @@ body.docs-crop-active
   cursor: pointer;
 }
 
-.protect-dialog .protect-check .ctl {
+.modal .protect-check .ctl {
   flex: 0 0 18px;
   width: 18px;
   height: 18px;
@@ -10414,16 +10414,16 @@ body.docs-crop-active
     box-shadow var(--transition-fast);
 }
 
-.protect-dialog .protect-check input[type='checkbox'] + .ctl {
+.modal .protect-check input[type='checkbox'] + .ctl {
   border-radius: 5px;
 }
 
-.protect-dialog .protect-check input[type='checkbox']:checked + .ctl {
+.modal .protect-check input[type='checkbox']:checked + .ctl {
   border-color: var(--color-btn-primary);
   background: var(--color-btn-primary);
 }
 
-.protect-dialog .protect-check input[type='checkbox']:checked + .ctl::after {
+.modal .protect-check input[type='checkbox']:checked + .ctl::after {
   content: '';
   position: absolute;
   left: 5px;
@@ -10435,31 +10435,31 @@ body.docs-crop-active
   transform: rotate(45deg);
 }
 
-.protect-dialog .protect-check input[type='radio'] + .ctl {
+.modal .protect-check input[type='radio'] + .ctl {
   border-radius: 50%;
 }
 
-.protect-dialog .protect-check input[type='radio']:checked + .ctl {
+.modal .protect-check input[type='radio']:checked + .ctl {
   border-color: var(--color-btn-primary);
   box-shadow: inset 0 0 0 4.5px var(--color-btn-primary);
 }
 
-.protect-dialog .protect-check input:focus-visible + .ctl {
+.modal .protect-check input:focus-visible + .ctl {
   box-shadow: 0 0 0 3px var(--docs-focus-ring);
 }
 
-.protect-dialog .protect-check input[type='radio']:checked:focus-visible + .ctl {
+.modal .protect-check input[type='radio']:checked:focus-visible + .ctl {
   /* the checked dot and the focus ring are both box-shadows: they must be combined */
   box-shadow:
     inset 0 0 0 4.5px var(--color-btn-primary),
     0 0 0 3px var(--docs-focus-ring);
 }
 
-.protect-dialog .protect-check input:disabled + .ctl {
+.modal .protect-check input:disabled + .ctl {
   opacity: 0.4;
 }
 
-.protect-dialog label.protect-check:has(> input:disabled) {
+.modal label.protect-check:has(> input:disabled) {
   color: var(--color-text-tertiary);
   cursor: default;
 }
@@ -14378,11 +14378,16 @@ tr > .page-gap-cut {
   white-space: pre-wrap;
 }
 
-.mailmerge-radio {
+.modal label.protect-check.mailmerge-radio {
   display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  margin-bottom: 0;
+  margin-right: 8px;
+}
+
+@media (pointer: coarse) {
+  .modal label.protect-check.mailmerge-radio {
+    min-height: 44px;
+  }
 }
 
 .mailmerge-pattern {
@@ -14401,25 +14406,13 @@ tr > .page-gap-cut {
   color: var(--color-text-primary);
 }
 
-.rb-field-list {
+.layout-menu.rb-field-list {
   width: 220px;
   max-height: 320px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
 }
 
-.rb-field-item {
-  border: none;
-  background: none;
-  text-align: left;
-  padding: 5px 8px;
-  font-size: 13px;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.rb-field-item:hover {
-  background: var(--color-bg-subtle);
+.layout-menu.rb-field-list button.rb-field-item:focus-visible {
+  background: var(--hover);
+  outline: 2px solid var(--docs-focus-ring);
+  outline-offset: -2px;
 }

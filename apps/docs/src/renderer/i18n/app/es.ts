@@ -570,6 +570,7 @@ export const es = {
   appCopySaveFailed: 'No se pudo crear la copia. Tus cambios siguen a salvo; vuelve a intentarlo.',
   appMergeSourceLoaded: '{name} cargado ({n} registros)',
   appMergeWritten: '{n} documentos escritos',
+  appMergeWrittenOne: '{n} documento escrito',
   appMergeNothingToWrite: 'No hay nada que escribir',
   appMergeWarnPassword:
     'Este documento está protegido con contraseña. Los documentos combinados se guardan como archivos normales, sin contraseña, así que cualquiera que los abra podrá leer el contenido. ¿Combinar de todos modos?',

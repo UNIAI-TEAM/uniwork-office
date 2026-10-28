@@ -961,6 +961,7 @@ export const fr = {
   ribbonMailingsNamePatternPh: 'Vide : le premier champ est utilisé',
   ribbonMailingsFinish: 'Terminer et fusionner',
   ribbonMailingsMerged: '{n} documents fusionnés',
+  ribbonMailingsMergedOne: '{n} document fusionné',
   ribbonMailingsMergeFailed: 'La fusion a échoué',
   ribbonMailingsClose: 'Fermer',
 } satisfies Record<keyof typeof zh, string>

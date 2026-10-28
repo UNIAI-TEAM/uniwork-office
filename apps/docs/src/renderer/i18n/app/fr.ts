@@ -576,6 +576,7 @@ export const fr = {
     'Impossible de créer la copie. Vos modifications sont toujours en sécurité ; réessayez.',
   appMergeSourceLoaded: '{name} chargé ({n} enregistrements)',
   appMergeWritten: '{n} documents écrits',
+  appMergeWrittenOne: '{n} document écrit',
   appMergeNothingToWrite: "Il n'y a rien à écrire",
   appMergeWarnPassword:
     'Ce document est protégé par mot de passe. Les documents fusionnés sont enregistrés comme fichiers ordinaires, sans mot de passe : toute personne qui les ouvre peut en lire le contenu. Fusionner quand même ?',

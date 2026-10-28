@@ -545,6 +545,7 @@ export const he = {
   appCopySaveFailed: 'לא ניתן היה ליצור את העותק. השינויים שלך עדיין בטוחים; נסה שוב.',
   appMergeSourceLoaded: '{name} נטען ({n} רשומות)',
   appMergeWritten: 'נכתבו {n} מסמכים',
+  appMergeWrittenOne: 'נכתב מסמך אחד',
   appMergeNothingToWrite: 'אין מה לכתוב',
   appMergeWarnPassword:
     'המסמך הזה מוגן בסיסמה. המסמכים הממוזגים נשמרים כקבצים רגילים ללא סיסמה, ולכן כל מי שיפתח אותם יוכל לקרוא את התוכן. למזג בכל זאת?',

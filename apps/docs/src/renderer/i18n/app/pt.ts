@@ -565,6 +565,7 @@ export const pt = {
     'Não foi possível criar a cópia. Suas alterações continuam seguras; tente novamente.',
   appMergeSourceLoaded: '{name} carregado ({n} registros)',
   appMergeWritten: '{n} documentos gravados',
+  appMergeWrittenOne: '{n} documento gravado',
   appMergeNothingToWrite: 'Não há nada a gravar',
   appMergeWarnPassword:
     'Este documento está protegido por senha. Os documentos mesclados são salvos como arquivos comuns, sem senha, e qualquer pessoa que os abrir poderá ler o conteúdo. Mesclar mesmo assim?',

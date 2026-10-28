@@ -565,6 +565,7 @@ export const id = {
   appCopySaveFailed: 'Tidak dapat membuat salinan. Perubahan Anda tetap aman; coba lagi.',
   appMergeSourceLoaded: '{name} dimuat ({n} record)',
   appMergeWritten: '{n} dokumen ditulis',
+  appMergeWrittenOne: '{n} dokumen ditulis',
   appMergeNothingToWrite: 'Tidak ada yang ditulis',
   appMergeWarnPassword:
     'Dokumen ini dilindungi kata sandi. Dokumen hasil penggabungan disimpan sebagai berkas biasa tanpa kata sandi, sehingga siapa pun yang membukanya dapat membaca isinya. Tetap gabungkan?',

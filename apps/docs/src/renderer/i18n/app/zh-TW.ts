@@ -541,6 +541,7 @@ export const zhTW = {
   appCopySaveFailed: '無法建立副本。你的變更仍然安全；請重試。',
   appMergeSourceLoaded: '已載入資料來源 {name}（{n} 筆記錄）',
   appMergeWritten: '已寫出 {n} 個文件',
+  appMergeWrittenOne: '已寫出 {n} 個文件',
   appMergeNothingToWrite: '沒有可寫出的文件',
   appMergeWarnPassword:
     '此文件設有開啟密碼。合併產生的文件會以不帶密碼的一般檔案儲存，任何打開它們的人都能讀取內容。仍要合併嗎？',

@@ -4,7 +4,11 @@ import { mergeFieldInstruction } from '@genoffice/docx-engine'
 import type { MergeDataSource } from '../../shared/ipc'
 import type { PmNode } from '../editor/convert'
 import { documentText, substituteMergeFields } from '../mail-merge/template'
-import type { MailMergeRequest, MailMergeResponse } from '../mail-merge/output'
+import {
+  mergedCountLabel,
+  type MailMergeRequest,
+  type MailMergeResponse,
+} from '../mail-merge/output'
 import { useI18n } from '../i18n/locale'
 import { useModalKeys } from './modal-keys'
 
@@ -44,7 +48,7 @@ export function MailMergePanel({
   onRecordIndex,
   onClose,
 }: MailMergePanelProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const modalKeys = useModalKeys(onClose)
   const [mode, setMode] = useState<'single' | 'perRecord'>('perRecord')
   const [namePattern, setNamePattern] = useState('')
@@ -85,7 +89,7 @@ export function MailMergePanel({
         setBusy(false)
         return
       }
-      setDone(t('ribbonMailingsMerged', { n: result.count ?? records.length }))
+      setDone(mergedCountLabel(t, lang, result.count ?? records.length))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -158,22 +162,24 @@ export function MailMergePanel({
           <div className="mailmerge-section">
             <div className="mailmerge-label">{t('ribbonMailingsOutput')}</div>
             <div className="modal-row">
-              <label className="mailmerge-radio">
+              <label className="protect-check mailmerge-radio">
                 <input
                   type="radio"
                   name="mailmerge-output"
                   checked={mode === 'perRecord'}
                   onChange={() => setMode('perRecord')}
                 />
+                <span className="ctl" aria-hidden="true" />
                 {t('ribbonMailingsOutputPerRecord')}
               </label>
-              <label className="mailmerge-radio">
+              <label className="protect-check mailmerge-radio">
                 <input
                   type="radio"
                   name="mailmerge-output"
                   checked={mode === 'single'}
                   onChange={() => setMode('single')}
                 />
+                <span className="ctl" aria-hidden="true" />
                 {t('ribbonMailingsOutputSingle')}
               </label>
             </div>

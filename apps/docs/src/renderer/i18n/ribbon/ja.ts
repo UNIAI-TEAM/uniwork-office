@@ -962,6 +962,7 @@ export const ja = {
   ribbonMailingsNamePatternPh: '空欄なら最初のフィールド',
   ribbonMailingsFinish: '差し込み完了',
   ribbonMailingsMerged: '{n} 個のドキュメントを差し込みました',
+  ribbonMailingsMergedOne: '{n} 個のドキュメントを差し込みました',
   ribbonMailingsMergeFailed: '差し込みに失敗しました',
   ribbonMailingsClose: '閉じる',
 } satisfies Record<keyof typeof zh, string>

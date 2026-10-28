@@ -949,6 +949,7 @@ export const id = {
   ribbonMailingsNamePatternPh: 'Kosong: memakai bidang pertama',
   ribbonMailingsFinish: 'Selesai dan Gabungkan',
   ribbonMailingsMerged: '{n} dokumen digabungkan',
+  ribbonMailingsMergedOne: '{n} dokumen digabungkan',
   ribbonMailingsMergeFailed: 'Penggabungan gagal',
   ribbonMailingsClose: 'Tutup',
 } satisfies Record<keyof typeof zh, string>

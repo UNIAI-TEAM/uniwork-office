@@ -942,6 +942,7 @@ export const vi = {
   ribbonMailingsNamePatternPh: 'Để trống thì dùng trường đầu tiên',
   ribbonMailingsFinish: 'Hoàn tất và trộn',
   ribbonMailingsMerged: 'Đã trộn {n} tài liệu',
+  ribbonMailingsMergedOne: 'Đã trộn {n} tài liệu',
   ribbonMailingsMergeFailed: 'Trộn thư thất bại',
   ribbonMailingsClose: 'Đóng',
 } satisfies Record<keyof typeof zh, string>

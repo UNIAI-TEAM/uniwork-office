@@ -561,6 +561,7 @@ export const cs = {
     'Kopii se nepodařilo vytvořit. Vaše změny jsou stále v bezpečí; zkuste to znovu.',
   appMergeSourceLoaded: 'Načteno {name} ({n} záznamů)',
   appMergeWritten: 'Zapsáno dokumentů: {n}',
+  appMergeWrittenOne: 'Zapsán {n} dokument',
   appMergeNothingToWrite: 'Není co zapsat',
   appMergeWarnPassword:
     'Tento dokument je chráněn heslem. Sloučené dokumenty se uloží jako běžné soubory bez hesla, takže jejich obsah přečte každý, kdo je otevře. Přesto sloučit?',

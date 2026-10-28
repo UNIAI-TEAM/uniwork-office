@@ -569,6 +569,7 @@ export const pl = {
   appCopySaveFailed: 'Nie udało się utworzyć kopii. Zmiany są nadal bezpieczne; spróbuj ponownie.',
   appMergeSourceLoaded: 'Wczytano {name} ({n} rekordów)',
   appMergeWritten: 'Zapisano dokumentów: {n}',
+  appMergeWrittenOne: 'Zapisano {n} dokument',
   appMergeNothingToWrite: 'Nie ma czego zapisać',
   appMergeWarnPassword:
     'Ten dokument jest chroniony hasłem. Scalone dokumenty zostaną zapisane jako zwykłe pliki bez hasła, więc każdy, kto je otworzy, przeczyta ich treść. Scalić mimo to?',
