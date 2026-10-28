@@ -318,6 +318,44 @@ describe('the paths that repeat the document to the model', () => {
     expect(String(resolved.target?.excerpt ?? '')).not.toContain(SECRET)
     expect(String(resolved.target?.excerpt ?? '')).toContain('{{client phone}}')
   })
+
+  it('a tracked-deleted block preview in document context carries the marker, not the words', () => {
+    const author = { author: 'Carol', date: '2026-03-01T10:00:00Z' }
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions,
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'docParagraph',
+            attrs: { docxIndex: null },
+            content: [
+              {
+                type: 'text',
+                text: 'Call ',
+                marks: [{ type: 'del', attrs: author }],
+              },
+              {
+                type: 'text',
+                text: SECRET,
+                marks: [
+                  { type: 'del', attrs: author },
+                  { type: REDACT_MARK, attrs: { label: 'client phone' } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    })
+    editors.add(editor)
+
+    const context = buildDocContext(editor)
+    expect(context).toContain('[tracked deletion]')
+    expect(context).toContain('{{client phone}}')
+    expect(context).not.toContain(SECRET)
+  })
 })
 
 describe('the echo a replacement sends back', () => {

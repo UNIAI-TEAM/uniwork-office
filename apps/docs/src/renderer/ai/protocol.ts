@@ -562,7 +562,7 @@ export function buildDocumentContext(
       const live = liveText(node)
       // deleted blocks show their struck text so the model can talk about the
       // revision, but that text never counts as current content
-      preview = deleted ? node.textContent : live
+      preview = deleted ? modelTextOf(node.toJSON() as RedactableNode) : live
       if (!deleted) fullText += live
       if (deleted || live !== node.textContent) hasPendingDeletions = true
       if (node.type.name === 'docHeading') {
