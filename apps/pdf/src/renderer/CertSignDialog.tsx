@@ -13,6 +13,7 @@ import { renderSignatureAppearance } from './cert-appearance'
 import { isConfirmKey } from './shortcuts'
 
 const BOX_WIDTH = 210
+const IS_MAC = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
 const BOX_HEIGHT = 70
 const POSITIONS: { value: SignaturePosition; key: Parameters<TFunc>[0] }[] = [
   { value: 'bottom-right', key: 'certPosBottomRight' },
@@ -38,6 +39,8 @@ export function certErrorKey(error: FailedResult['error']): Parameters<TFunc>[0]
       return 'certErrNotExportable'
     case 'cert-store-locked':
       return 'certErrStoreLocked'
+    case 'cert-store-unsupported':
+      return 'certStoreUnsupported'
     case 'cert-store-tool-missing':
       return 'certErrNoTools'
     case 'pdf-encrypted':
@@ -71,7 +74,7 @@ export function CertSignDialog({
   const [busy, setBusy] = useState(false)
   // Esc, like the backdrop and the buttons, must not abandon a signing run in flight
   const dialogRef = useModalDialog(onCancel, { escape: !busy })
-  const [source, setSource] = useState<'system' | 'file'>('system')
+  const [source, setSource] = useState<'system' | 'file'>(IS_MAC ? 'file' : 'system')
   const [cert, setCert] = useState<{ certId: string; fileName: string } | null>(null)
   const [systemCerts, setSystemCerts] = useState<SystemCertificateInfo[]>([])
   const [systemId, setSystemId] = useState('')
@@ -182,6 +185,7 @@ export function CertSignDialog({
         path: filePath,
         certId: activeId,
         password: source === 'file' ? password : '',
+        storePassword: source === 'system' && storePassword ? storePassword : undefined,
         reason: reason.trim() || undefined,
         location: location.trim() || undefined,
         contactInfo: contact.trim() || undefined,
@@ -229,7 +233,7 @@ export function CertSignDialog({
             disabled={busy}
             onChange={(e) => setSource(e.target.value as 'system' | 'file')}
           >
-            <option value="system">{t('certSourceSystem')}</option>
+            {!IS_MAC && <option value="system">{t('certSourceSystem')}</option>}
             <option value="file">{t('certSourceFile')}</option>
           </select>
         </div>
@@ -265,6 +269,9 @@ export function CertSignDialog({
             </div>
             {!listing && systemCerts.length === 0 && issues.length === 0 && (
               <div className="pdf-modal-hint">{t('certSystemEmpty')}</div>
+            )}
+            {issues.includes('platform-unsupported') && (
+              <div className="pdf-modal-hint">{t('certStoreUnsupported')}</div>
             )}
             {issues.includes('nss-tools-missing') && (
               <div className="pdf-modal-hint">{t('certStoreNoTools')}</div>

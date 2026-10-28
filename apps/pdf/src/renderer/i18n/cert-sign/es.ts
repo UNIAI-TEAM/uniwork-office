@@ -22,6 +22,8 @@ export const es = {
     'El almacén del sistema no entrega la clave privada de este certificado, por lo que no se puede usar aquí',
   certErrStoreLocked: 'Falta la contraseña del almacén de certificados o es incorrecta',
   certErrNoTools: 'No está instalada la herramienta necesaria para leer el almacén del sistema',
+  certStoreUnsupported:
+    'El almacén de certificados del sistema aún no está disponible en macOS: usa un archivo de certificado (.p12 / .pfx)',
   certChoose: 'Elegir certificado…',
   certNoFile: 'No se ha elegido ningún certificado',
   certPassword: 'Contraseña',
@@ -67,13 +69,13 @@ export const es = {
   sigPanelHint: 'Ver las firmas digitales de este PDF',
   sigPanelTitle: 'Firmas digitales',
   sigBannerValid: 'La firma es válida',
-  sigBannerUntrustedNote:
-    'la identidad del firmante no está confirmada por una autoridad de confianza',
+  sigBannerUntrusted: 'Firma intacta, firmante no de confianza',
   sigBannerWarning: 'Firmado: algunas firmas requieren su atención',
   sigBannerInvalid: 'Firmado: al menos una firma no es válida',
   sigBannerView: 'Ver firmas',
   sigStatusValid: 'Válida',
   sigStatusWarning: 'Válida, con advertencias',
+  sigStatusUntrusted: 'Intacta, firmante no de confianza',
   sigStatusInvalid: 'No válida',
   sigKindTimestamp: 'Sello de tiempo del documento',
   sigSignedBy: 'Firmado por {name}',
@@ -100,6 +102,8 @@ export const es = {
   sigFingerprint: 'Huella digital SHA-256',
   sigKey: 'Clave pública',
   sigSelfSigned: 'Autofirmado',
+  sigTrustRoots:
+    'La confianza se evalúa con los certificados raíz TLS de este equipo y el paquete de Mozilla (PKI web), no con las listas de confianza Adobe AATL ni de la UE para la firma de documentos.',
   sigNoRevocation: 'No se comprueba la revocación del certificado (CRL / OCSP).',
   sigProblemDigestMismatch:
     'El documento se modificó después de firmarlo: ya no coincide con la firma',

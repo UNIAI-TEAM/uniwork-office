@@ -22,6 +22,8 @@ export const id = {
     'Penyimpanan sistem tidak mengizinkan kunci privat sertifikat ini dikeluarkan, sehingga tidak dapat digunakan di sini',
   certErrStoreLocked: 'Kata sandi penyimpanan sertifikat kosong atau salah',
   certErrNoTools: 'Alat yang diperlukan untuk membaca penyimpanan sistem belum terpasang',
+  certStoreUnsupported:
+    'Penyimpanan sertifikat sistem belum tersedia di macOS — gunakan berkas sertifikat (.p12 / .pfx)',
   certChoose: 'Pilih sertifikat…',
   certNoFile: 'Belum ada sertifikat yang dipilih',
   certPassword: 'Kata sandi',
@@ -67,12 +69,13 @@ export const id = {
   sigPanelHint: 'Lihat tanda tangan digital di PDF ini',
   sigPanelTitle: 'Tanda tangan digital',
   sigBannerValid: 'Tanda tangan valid',
-  sigBannerUntrustedNote: 'identitas penandatangan belum dikonfirmasi oleh otoritas tepercaya',
+  sigBannerUntrusted: 'Tanda tangan utuh, penanda tangan tidak tepercaya',
   sigBannerWarning: 'Sudah ditandatangani — beberapa tanda tangan perlu perhatian Anda',
   sigBannerInvalid: 'Sudah ditandatangani — setidaknya satu tanda tangan tidak valid',
   sigBannerView: 'Lihat tanda tangan',
   sigStatusValid: 'Valid',
   sigStatusWarning: 'Valid, dengan peringatan',
+  sigStatusUntrusted: 'Utuh, penanda tangan tidak tepercaya',
   sigStatusInvalid: 'Tidak valid',
   sigKindTimestamp: 'Stempel waktu dokumen',
   sigSignedBy: 'Ditandatangani oleh {name}',
@@ -99,6 +102,8 @@ export const id = {
   sigFingerprint: 'Sidik jari SHA-256',
   sigKey: 'Kunci publik',
   sigSelfSigned: 'Ditandatangani sendiri',
+  sigTrustRoots:
+    'Kepercayaan dinilai berdasarkan sertifikat root TLS di komputer ini dan bundel Mozilla (web PKI), bukan daftar tepercaya Adobe AATL atau UE untuk penandatanganan dokumen.',
   sigNoRevocation: 'Pencabutan sertifikat (CRL / OCSP) tidak diperiksa.',
   sigProblemDigestMismatch:
     'Dokumen diubah setelah ditandatangani — tidak lagi cocok dengan tanda tangan',

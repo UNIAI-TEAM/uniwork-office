@@ -23,6 +23,8 @@ export const it = {
     "L'archivio di sistema non rilascia la chiave privata di questo certificato, quindi non può essere usato qui",
   certErrStoreLocked: "La password dell'archivio certificati manca o non è corretta",
   certErrNoTools: "Lo strumento necessario per leggere l'archivio di sistema non è installato",
+  certStoreUnsupported:
+    "L'archivio certificati di sistema non è ancora disponibile su macOS — usa un file di certificato (.p12 / .pfx)",
   certChoose: 'Scegli certificato…',
   certNoFile: 'Nessun certificato scelto',
   certPassword: 'Password',
@@ -67,12 +69,13 @@ export const it = {
   sigPanelHint: 'Visualizza le firme digitali di questo PDF',
   sigPanelTitle: 'Firme digitali',
   sigBannerValid: 'La firma è valida',
-  sigBannerUntrustedNote: "l'identità del firmatario non è confermata da un'autorità attendibile",
+  sigBannerUntrusted: 'Firma integra, firmatario non attendibile',
   sigBannerWarning: 'Firmato — alcune firme richiedono la tua attenzione',
   sigBannerInvalid: 'Firmato — almeno una firma non è valida',
   sigBannerView: 'Visualizza firme',
   sigStatusValid: 'Valida',
   sigStatusWarning: 'Valida, con avvisi',
+  sigStatusUntrusted: 'Integra, firmatario non attendibile',
   sigStatusInvalid: 'Non valida',
   sigKindTimestamp: 'Marca temporale del documento',
   sigSignedBy: 'Firmato da {name}',
@@ -99,6 +102,8 @@ export const it = {
   sigFingerprint: 'Impronta SHA-256',
   sigKey: 'Chiave pubblica',
   sigSelfSigned: 'Autofirmato',
+  sigTrustRoots:
+    "L'attendibilità è valutata in base ai certificati radice TLS di questo computer e al bundle Mozilla (PKI web), non alle liste di fiducia Adobe AATL o UE per la firma dei documenti.",
   sigNoRevocation: 'La revoca del certificato (CRL / OCSP) non viene verificata.',
   sigProblemDigestMismatch:
     'Il documento è stato modificato dopo la firma — non corrisponde più alla firma',

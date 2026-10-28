@@ -22,6 +22,8 @@ export const hi = {
     'सिस्टम स्टोर इस प्रमाणपत्र की निजी कुंजी देने की अनुमति नहीं देता, इसलिए इसे यहाँ उपयोग नहीं किया जा सकता',
   certErrStoreLocked: 'प्रमाणपत्र स्टोर का पासवर्ड नहीं दिया गया या गलत है',
   certErrNoTools: 'सिस्टम स्टोर पढ़ने के लिए ज़रूरी टूल इंस्टॉल नहीं है',
+  certStoreUnsupported:
+    'macOS पर सिस्टम प्रमाणपत्र स्टोर अभी उपलब्ध नहीं है — प्रमाणपत्र फ़ाइल (.p12 / .pfx) का उपयोग करें',
   certChoose: 'प्रमाणपत्र चुनें…',
   certNoFile: 'कोई प्रमाणपत्र नहीं चुना गया',
   certPassword: 'पासवर्ड',
@@ -67,12 +69,13 @@ export const hi = {
   sigPanelHint: 'इस PDF के डिजिटल हस्ताक्षर देखें',
   sigPanelTitle: 'डिजिटल हस्ताक्षर',
   sigBannerValid: 'हस्ताक्षर मान्य है',
-  sigBannerUntrustedNote: 'हस्ताक्षरकर्ता की पहचान की पुष्टि किसी भरोसेमंद प्राधिकरण ने नहीं की है',
+  sigBannerUntrusted: 'हस्ताक्षर सुरक्षित है, लेकिन हस्ताक्षरकर्ता पर भरोसा नहीं किया जा सकता',
   sigBannerWarning: 'हस्ताक्षरित — कुछ हस्ताक्षरों पर आपका ध्यान चाहिए',
   sigBannerInvalid: 'हस्ताक्षरित — कम से कम एक हस्ताक्षर अमान्य है',
   sigBannerView: 'हस्ताक्षर देखें',
   sigStatusValid: 'मान्य',
   sigStatusWarning: 'मान्य, चेतावनियों के साथ',
+  sigStatusUntrusted: 'सुरक्षित, हस्ताक्षरकर्ता भरोसेमंद नहीं',
   sigStatusInvalid: 'अमान्य',
   sigKindTimestamp: 'दस्तावेज़ टाइमस्टैम्प',
   sigSignedBy: '{name} द्वारा हस्ताक्षरित',
@@ -99,6 +102,8 @@ export const hi = {
   sigFingerprint: 'SHA-256 फ़िंगरप्रिंट',
   sigKey: 'सार्वजनिक कुंजी',
   sigSelfSigned: 'स्व-हस्ताक्षरित',
+  sigTrustRoots:
+    'भरोसे का आकलन इस कंप्यूटर के TLS रूट प्रमाणपत्रों और Mozilla बंडल (वेब PKI) के आधार पर होता है, दस्तावेज़ हस्ताक्षर के लिए Adobe AATL या EU की विश्वसनीय सूचियों के आधार पर नहीं।',
   sigNoRevocation: 'प्रमाणपत्र निरस्तीकरण (CRL / OCSP) की जाँच नहीं की जाती।',
   sigProblemDigestMismatch:
     'हस्ताक्षर के बाद दस्तावेज़ में बदलाव हुआ — अब वह हस्ताक्षर से मेल नहीं खाता',

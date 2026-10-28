@@ -1,12 +1,13 @@
 // @vitest-environment node
-import { PDFDocument, degrees } from 'pdf-lib'
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, degrees } from 'pdf-lib'
+import type { PDFObject, PDFRawStream } from 'pdf-lib'
 import forge from 'node-forge'
 import { PNG } from 'pngjs'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { inspectCertificate, signPdf, SignError } from '../src/main/pdf-sign'
 import { readPdfSignatures } from '../src/main/pdf-signatures'
 
-const PASSWORD = 'pw-测试'
+const PASSWORD = 'pw-\u6d4b\u8bd5'
 
 let p12: Uint8Array
 let otherP12: Uint8Array
@@ -54,7 +55,7 @@ function pngBox(width: number, height: number): Uint8Array {
 }
 
 beforeAll(() => {
-  p12 = makeP12('测试用户 Alice')
+  p12 = makeP12('\u6d4b\u8bd5\u7528\u6237 Alice')
   otherP12 = makeP12('Bob')
 }, 60_000)
 
@@ -64,22 +65,22 @@ describe('signing and reading back', () => {
       const signed = await signPdf(await samplePdf({ objectStreams }), {
         p12,
         password: PASSWORD,
-        reason: '审批通过',
+        reason: '\u5ba1\u6279\u901a\u8fc7',
         location: 'Hong Kong',
       })
       const sigs = await readPdfSignatures(signed)
       expect(sigs).toHaveLength(1)
       const [sig] = sigs
       expect(sig!.fieldName).toBe('Signature1')
-      expect(sig!.signer?.commonName).toBe('测试用户 Alice')
-      expect(sig!.reason).toBe('审批通过')
+      expect(sig!.signer?.commonName).toBe('\u6d4b\u8bd5\u7528\u6237 Alice')
+      expect(sig!.reason).toBe('\u5ba1\u6279\u901a\u8fc7')
       expect(sig!.location).toBe('Hong Kong')
       expect(sig!.coversWholeDocument).toBe(true)
       expect(sig!.signingTimeSigned).toBe(true)
       expect(sig!.digestAlgorithm).toBe('SHA256')
       // intact but nobody vouches for a throwaway self-signed certificate
       expect(sig!.problems).toEqual(['self-signed'])
-      expect(sig!.status).toBe('valid')
+      expect(sig!.status).toBe('untrusted')
       // the document is still a loadable PDF with both pages
       expect((await PDFDocument.load(signed)).getPageCount()).toBe(2)
     })
@@ -127,7 +128,7 @@ describe('signing and reading back', () => {
     const [sig] = await readPdfSignatures(signed)
     expect(sig!.signer?.selfSigned).toBe(true)
     expect(sig!.problems).toEqual(['self-signed'])
-    expect(sig!.status).toBe('valid')
+    expect(sig!.status).toBe('untrusted')
   })
 
   it('flags a document altered inside the signed bytes', async () => {
@@ -163,6 +164,7 @@ describe('signing and reading back', () => {
     expect(sigs[0]!.problems).toContain('document-changed-after-signing')
     expect(sigs[0]!.problems).not.toContain('digest-mismatch')
     expect(sigs[0]!.status).toBe('warning')
+    expect(sigs[1]!.status).toBe('untrusted')
     expect(sigs[1]!.coversWholeDocument).toBe(true)
     expect(sigs[1]!.signer?.commonName).toBe('Bob')
   })
@@ -177,6 +179,20 @@ describe('signing and reading back', () => {
     expect(sig!.coversWholeDocument).toBe(false)
     expect(sig!.problems).toContain('document-changed-after-signing')
     expect(sig!.problems).not.toContain('digest-mismatch')
+  })
+
+  it('keeps a binary trailer /ID byte-for-byte in the signature revision', async () => {
+    const doc = await PDFDocument.create()
+    doc.addPage([200, 200])
+    const bytes = Uint8Array.from([0xc3, 0x89, 0x80, 0xff, 0x00, 0x41, 0x7f, 0xa0])
+    doc.context.trailerInfo.ID = doc.context.obj([
+      PDFHexString.of(Buffer.from(bytes).toString('hex')),
+      PDFHexString.of('00112233445566778899AABBCCDDEEFF'),
+    ])
+    const original = await doc.save({ useObjectStreams: false })
+    const signed = await signPdf(original, { p12, password: PASSWORD })
+    const text = Buffer.from(signed).subarray(original.length).toString('latin1')
+    expect(text).toContain('/ID [ <C38980FF00417FA0> <00112233445566778899AABBCCDDEEFF> ]')
   })
 
   it('reports no signatures for an unsigned or non-PDF input', async () => {
@@ -223,6 +239,53 @@ describe('visible signatures', () => {
       expect(sig!.problems).toEqual(['self-signed'])
     })
   }
+
+  it('keeps the image behind a nested form: Acrobat rejects an appearance that paints it directly', async () => {
+    const signed = await signPdf(await samplePdf({ pages: 1 }), {
+      p12,
+      password: PASSWORD,
+      visible: {
+        pageIndex: 0,
+        position: 'bottom-right',
+        width: 160,
+        height: 60,
+        png: pngBox(32, 12),
+      },
+    })
+    const doc = await PDFDocument.load(signed, { updateMetadata: false })
+    const { context } = doc
+    const annots = context.lookup(doc.getPages()[0]!.node.get(PDFName.of('Annots')), PDFArray)
+    const widget = context.lookup(annots.get(0), PDFDict)
+    const ap = context.lookup(widget.get(PDFName.of('AP')), PDFDict)
+    const xobjectsOf = (stream: PDFObject): [string, PDFObject][] => {
+      const dict = (stream as PDFRawStream).dict
+      const resources = context.lookup(dict.get(PDFName.of('Resources')), PDFDict)
+      const xobject = context.lookupMaybe(resources.get(PDFName.of('XObject')), PDFDict)
+      return (xobject?.entries() ?? []).map(([name, ref]) => [
+        name.decodeText(),
+        context.lookup(ref),
+      ])
+    }
+    const subtype = (object: PDFObject) =>
+      (object as PDFRawStream).dict.get(PDFName.of('Subtype'))?.toString()
+    let level: PDFObject[] = [context.lookup(ap.get(PDFName.of('N')))]
+    const seen: string[] = []
+    while (level.length > 0) {
+      const next: PDFObject[] = []
+      for (const form of level) {
+        expect(subtype(form)).toBe('/Form')
+        for (const [, child] of xobjectsOf(form)) {
+          seen.push(subtype(child)!)
+          // A form that references an image is only fine when it is not the field's own N stream
+          if (subtype(child) === '/Image')
+            expect(form).not.toBe(context.lookup(ap.get(PDFName.of('N'))))
+          if (subtype(child) === '/Form') next.push(child)
+        }
+      }
+      level = next
+    }
+    expect(seen).toContain('/Image')
+  })
 })
 
 describe('certificate files', () => {
@@ -230,7 +293,7 @@ describe('certificate files', () => {
     const result = inspectCertificate(p12, PASSWORD)
     expect(result.ok).toBe(true)
     if (result.ok) {
-      expect(result.signer.commonName).toBe('测试用户 Alice')
+      expect(result.signer.commonName).toBe('\u6d4b\u8bd5\u7528\u6237 Alice')
       expect(result.signer.keyAlgorithm).toBe('RSA 2048')
       expect(result.signer.selfSigned).toBe(true)
     }

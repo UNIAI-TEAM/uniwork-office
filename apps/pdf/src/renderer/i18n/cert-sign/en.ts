@@ -22,6 +22,8 @@ export const en = {
     "The system store will not release this certificate's private key, so it cannot be used here",
   certErrStoreLocked: 'The certificate store password is missing or wrong',
   certErrNoTools: 'The tool needed to read the system store is not installed',
+  certStoreUnsupported:
+    'The system certificate store is not available on macOS yet — use a certificate file (.p12 / .pfx)',
   certChoose: 'Choose certificate…',
   certNoFile: 'No certificate chosen',
   certPassword: 'Password',
@@ -66,12 +68,13 @@ export const en = {
   sigPanelHint: 'View the digital signatures in this PDF',
   sigPanelTitle: 'Digital signatures',
   sigBannerValid: 'Signature is valid',
-  sigBannerUntrustedNote: "the signer's identity is not confirmed by a trusted authority",
+  sigBannerUntrusted: 'Signature intact, signer not trusted',
   sigBannerWarning: 'Signed — some signatures need your attention',
   sigBannerInvalid: 'Signed — at least one signature is invalid',
   sigBannerView: 'View signatures',
   sigStatusValid: 'Valid',
   sigStatusWarning: 'Valid, with warnings',
+  sigStatusUntrusted: 'Intact, signer not trusted',
   sigStatusInvalid: 'Invalid',
   sigKindTimestamp: 'Document timestamp',
   sigSignedBy: 'Signed by {name}',
@@ -98,6 +101,8 @@ export const en = {
   sigFingerprint: 'SHA-256 fingerprint',
   sigKey: 'Public key',
   sigSelfSigned: 'Self-signed',
+  sigTrustRoots:
+    'Trust is judged against the TLS root certificates of this computer and the Mozilla bundle (web PKI), not against the Adobe AATL or EU trusted lists for document signing.',
   sigNoRevocation: 'Certificate revocation (CRL / OCSP) is not checked.',
   sigProblemDigestMismatch:
     'The document was changed after signing — it no longer matches the signature',
