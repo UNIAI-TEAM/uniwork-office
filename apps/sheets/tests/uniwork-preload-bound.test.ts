@@ -134,6 +134,46 @@ describe('preload keeps uniworkBound on a workbook file', () => {
   })
 })
 
+describe('preload keeps passwordProtected on a workbook file', () => {
+  it('open result of an encrypted workbook (Change Password, save guards)', async () => {
+    bridge.reply = wireFile({ passwordProtected: true })
+    const file = (await call('openEncryptedWorkbook', 'C:/Users/u/Desktop/secret.xlsx', 'pw')) as {
+      passwordProtected?: boolean
+    }
+    expect(file.passwordProtected).toBe(true)
+  })
+
+  it('save result of an encrypted workbook (the file the renderer reopens from)', async () => {
+    bridge.reply = {
+      canceled: false,
+      touchedEntries: [],
+      file: wireFile({ passwordProtected: true }),
+    }
+    const result = (await call('saveWorkbookEdits', saveRequest())) as {
+      file: { passwordProtected?: boolean }
+    }
+    expect(result.file.passwordProtected).toBe(true)
+  })
+
+  it('a plain workbook reports false and an old sidecar stays unflagged', async () => {
+    bridge.reply = wireFile({ passwordProtected: false })
+    const plain = (await call('reopenWorkbook', 'C:/Users/u/Desktop/copy.xlsx')) as {
+      passwordProtected?: boolean
+    }
+    expect(plain.passwordProtected).toBe(false)
+    bridge.reply = wireFile({})
+    const legacy = (await call('reopenWorkbook', 'C:/Users/u/Desktop/copy.xlsx')) as object
+    expect('passwordProtected' in legacy).toBe(false)
+  })
+
+  it('rejects a non-boolean flag', async () => {
+    bridge.reply = wireFile({ passwordProtected: 'yes' })
+    await expect(call('reopenWorkbook', 'C:/Users/u/Desktop/copy.xlsx')).rejects.toThrow(
+      'Invalid workbook response.',
+    )
+  })
+})
+
 describe('preload save request guard', () => {
   it('accepts a save whose only change is a picture embedded in a cell', async () => {
     bridge.reply = { canceled: false, touchedEntries: [], file: wireFile({}) }

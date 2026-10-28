@@ -68,4 +68,20 @@ describe('preload whitelist names every sidecar wire field', () => {
       .map(([, where]) => where)
     expect(missing).toEqual([])
   })
+
+  it('parseWorkbookFile names every top-level workbookFileSchema field', () => {
+    // The whole-source check above is blind to a name that appears elsewhere in
+    // the preload (passwordProtected also rides the password-update reply, so
+    // parseWorkbookFile dropped it unnoticed): look inside the parser only.
+    const start = preloadSource.indexOf('function parseWorkbookFile')
+    const body = preloadSource.slice(start, preloadSource.indexOf('function parseRangeRequest'))
+    expect(start).toBeGreaterThan(-1)
+    // Known gaps that predate this check, kept visible instead of silently
+    // passing: both are sent by main and read by the renderer.
+    const knownDropped = new Set(['unsavedNew', 'automaticRecoveryDisabled'])
+    const missing = Object.keys(workbookFileSchema.shape).filter(
+      (key) => !knownDropped.has(key) && !new RegExp(`\\b${key}\\b`).test(body),
+    )
+    expect(missing).toEqual([])
+  })
 })

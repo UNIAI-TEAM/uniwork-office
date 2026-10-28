@@ -1233,14 +1233,17 @@ export function App({
   const openingWorkbookRef = useRef(openingWorkbook)
   openingWorkbookRef.current = openingWorkbook
   const openStallTimer = useMemo(() => createOpenStallTimer(() => setOpenStalled(true)), [])
+  // Waiting on the user's workbook password is not a stalled open: the timer
+  // pauses and the opening screen stays out from behind the password dialog.
+  const awaitingEncryptedPassword = encryptedPasswordPrompt !== null
   useEffect(() => {
-    if (openingWorkbook) {
+    if (openingWorkbook && !awaitingEncryptedPassword) {
       openStallTimer.start()
       return openStallTimer.done
     }
     setOpenStalled(false)
     return undefined
-  }, [openingWorkbook, openStallTimer])
+  }, [openingWorkbook, awaitingEncryptedPassword, openStallTimer])
   /// Retry: queue the tab's workbook again and start the tab over (a stalled
   /// open may never settle, so its pending state is not reused)
   const retryWorkbookOpen = (): void => {
@@ -5660,6 +5663,7 @@ export function App({
         onApplyHeaderFooter={(result) => handleApplyHeaderFooterImpl(pageLayoutContext(), result)}
       />
       {openingWorkbook &&
+        !awaitingEncryptedPassword &&
         (openStalled ? (
           <div className="workbook-opening-screen" role="alert">
             <div className="workbook-opening-card workbook-opening-failed">

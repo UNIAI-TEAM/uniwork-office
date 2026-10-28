@@ -3643,6 +3643,12 @@ textarea:focus {
   margin: 0;
 }
 
+/* `.format-cells-dialog .dialog-note` (declared later, same specificity as the
+   rule above) would otherwise repaint the error line in the secondary grey */
+.encrypted-workbook-password-dialog .dialog-note.dialog-error {
+  color: var(--sheets-error);
+}
+
 .format-cells-dialog header {
   font-size: 14px;
   font-weight: 600;
