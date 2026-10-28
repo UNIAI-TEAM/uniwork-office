@@ -1483,6 +1483,8 @@ export const he = {
     'גרסת האינטרנט של UniWork Sheets עדיין מקבלת את מנוע הגיליונות שלה. עד אז, פתחו את חוברת העבודה באפליקציית UniWork למחשב.',
   appWebEngineHint: 'הקובץ שלך לא השתנה.',
   appWebViewOnly: 'צפייה בלבד: לא ניתן לשמור שינויים בחוברת העבודה הזו.',
+  appWebEncryptedOpen:
+    'חוברת עבודה זו מוגנת בסיסמה ולא ניתן לפתוח אותה בגרסת האינטרנט. פתחו אותה באפליקציית שולחן העבודה של UniWork.',
   appWebConflictTitle: 'חוברת העבודה שונתה במקום אחר',
   appWebConflictBody: 'השינויים שלך עדיין לא ב-UniWork והם נשמרים בדפדפן הזה עד שתתנתק.',
   appWebConflictOverwrite: 'דריסה…',

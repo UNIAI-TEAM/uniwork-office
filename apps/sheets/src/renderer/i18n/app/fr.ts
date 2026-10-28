@@ -1616,6 +1616,8 @@ export const fr = {
   appWebEngineHint: "Votre fichier n'a pas été modifié.",
   appWebViewOnly:
     'Lecture seule : vous ne pouvez pas enregistrer les modifications de ce classeur.',
+  appWebEncryptedOpen:
+    'Ce classeur est protégé par un mot de passe que la version web ne peut pas ouvrir. Ouvrez-le dans l’application de bureau UniWork.',
   appWebConflictTitle: 'Ce classeur a été modifié ailleurs',
   appWebConflictBody:
     'Vos modifications ne sont pas encore sur UniWork et sont conservées dans ce navigateur jusqu’à votre déconnexion.',

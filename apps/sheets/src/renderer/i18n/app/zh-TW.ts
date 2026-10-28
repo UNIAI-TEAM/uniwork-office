@@ -1451,6 +1451,7 @@ export const zhTW = {
     '網頁版 UniWork 試算表的計算引擎仍在準備中。在此之前，請在 UniWork 桌面應用程式中開啟此活頁簿。',
   appWebEngineHint: '您的檔案未被變更。',
   appWebViewOnly: '僅供檢視：您無法儲存對此活頁簿的變更。',
+  appWebEncryptedOpen: '此活頁簿設有密碼，網頁版無法開啟。請在 UniWork 桌面應用程式中開啟。',
   appWebConflictTitle: '此活頁簿已在別處被修改',
   appWebConflictBody: '你的變更尚未存到 UniWork，會保留在此瀏覽器中，直到你登出。',
   appWebConflictOverwrite: '覆寫…',

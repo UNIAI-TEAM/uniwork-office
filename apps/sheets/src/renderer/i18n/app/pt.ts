@@ -1588,6 +1588,8 @@ export const pt = {
     'A versão web do UniWork Sheets ainda está recebendo seu mecanismo de planilhas. Até lá, abra esta pasta de trabalho no aplicativo UniWork para desktop.',
   appWebEngineHint: 'Seu arquivo não foi alterado.',
   appWebViewOnly: 'Somente leitura: você não pode salvar alterações nesta pasta de trabalho.',
+  appWebEncryptedOpen:
+    'Esta pasta de trabalho é protegida por senha e a versão web não consegue abri-la. Abra-a no aplicativo de desktop do UniWork.',
   appWebConflictTitle: 'Esta pasta de trabalho foi alterada em outro lugar',
   appWebConflictBody:
     'Suas alterações ainda não estão no UniWork e ficam neste navegador até você sair.',

@@ -1591,6 +1591,8 @@ export const es = {
     'La versión web de UniWork Sheets todavía está recibiendo su motor de hojas de cálculo. Mientras tanto, abre este libro en la aplicación de escritorio de UniWork.',
   appWebEngineHint: 'Tu archivo no ha cambiado.',
   appWebViewOnly: 'Solo lectura: no puedes guardar cambios en este libro.',
+  appWebEncryptedOpen:
+    'Este libro está protegido con contraseña y la versión web no puede abrirlo. Ábralo en la aplicación de escritorio de UniWork.',
   appWebConflictTitle: 'Este libro se modificó en otro lugar',
   appWebConflictBody:
     'Tus cambios aún no están en UniWork y se conservan en este navegador hasta que cierres sesión.',

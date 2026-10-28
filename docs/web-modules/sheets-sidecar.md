@@ -447,7 +447,7 @@ Tags as in `inventory-b4.md`: **PROTO** (existing protocol type), **BROWSER** (i
 GO-D3 engine; classed by the section 6 recommendation). Sites = renderer references `desktopApi\s*?.method` in
 `apps/sheets/src/renderer/**` (non-test), first three `file:line`. Aliased users are named.
 
-### 7.1 `window.desktopApi` (64 methods; `apps/sheets/src/shared/desktop-api.ts:2528`)
+### 7.1 `window.desktopApi` (66 methods; `apps/sheets/src/shared/desktop-api.ts:2528`)
 
 | #   | method                     | sites                                                                    | channel                          | desktop behaviour                                                  | web class                                                                                                               |
 | --- | -------------------------- | ------------------------------------------------------------------------ | -------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
@@ -515,9 +515,11 @@ GO-D3 engine; classed by the section 6 recommendation). Sites = renderer referen
 | 62  | `readAttachment`           | 1: ai/files-skill.ts:80                                                  | `sheets:files-read`              | ″                                                                  | HIDE `ai`                                                                                                               |
 | 63  | `readAttachmentImage`      | 2: App.tsx:1315, ai/AiChatPanel.tsx:320                                  | `sheets:files-read-image`        | ″                                                                  | HIDE `ai`                                                                                                               |
 | 64  | `getPathForFile`           | 2: ai/AiChatPanel.tsx:469, :479                                          | (sync, `webUtils`)               | OS path of a dropped file                                          | STUB `''`                                                                                                               |
+| 65  | `openEncryptedWorkbook`    | 1: App.tsx                                                               | `workbook:open-encrypted`        | open with the typed password                                       | STUB (never reached on web)                                                                                             |
+| 66  | `updateWorkbookPassword`   | 1: App.tsx                                                               | `workbook:update-password`       | re-encrypt with a new password                                     | HIDE `workbookPassword`                                                                                                 |
 
-Counts (64): PROTO 11 (1–4, 27, 34–38, 44) · SIDECAR 7 (10, 13, 14, 16, 17, 21, 32) · HIDE 30, of which 3
-sidecar-only (11, 12, 15) and 27 general (5, 7, 18–20, 25, 26, 31, 39, 42, 47–63) · STUB 7 (6, 8, 9, 40, 41, 43, 64) ·
+Counts (66): PROTO 11 (1–4, 27, 34–38, 44) · SIDECAR 7 (10, 13, 14, 16, 17, 21, 32) · HIDE 31, of which 3
+sidecar-only (11, 12, 15), 27 general (5, 7, 18–20, 25, 26, 31, 39, 42, 47–63) and 1 desktop-only (66) · STUB 8 (6, 8, 9, 40, 41, 43, 64, 65) ·
 BROWSER 4 (28–30, 33) · INFRA 5 (22–24, 45, 46). On desktop, 14 methods reach the sidecar (10–17, 21–25, 32), matching
 the 14 channels of section 2. 27 `exportPdf` also needs S4 for header/footer pictures.
 
@@ -539,25 +541,26 @@ the 14 channels of section 2. 27 `exportPdf` also needs S4 for header/footer pic
 
 Proposed Sheets capability keys (renderer-local; host protocol grants stay `save`/`saveAs`/`filePick`/`print`/`exportPdf`):
 
-| key               | hides                                                                                                                                                | kind                     |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `ai`              | AI panel/dock, AI ribbon entries, AI presets, op-executor image ops (on with the host's `ai` grant, section 7.4)                                     | general                  |
-| `webSearch`       | AI tool web_search                                                                                                                                   | general                  |
-| `imageSearch`     | AI tool image_search                                                                                                                                 | general                  |
-| `imageGeneration` | AI tool generate_image                                                                                                                               | general                  |
-| `createDocument`  | AI tool create_document                                                                                                                              | general                  |
-| `autoRename`      | post-AI rename of untitled workbooks                                                                                                                 | general                  |
-| `billing`         | GenSpark account/plan UI                                                                                                                             | general                  |
-| `screenshot`      | Insert > Screenshot                                                                                                                                  | general                  |
-| `autoSave`        | AutoSave pill + 30 s / blur autosave (web: explicit save only, `e977e00`)                                                                            | general                  |
-| `recoveryCopy`    | 30 s crash-recovery copy + restore prompt                                                                                                            | general (uses S6 path)   |
-| `open`            | File > Open / Ctrl+O (on only with the host's `filePick` grant)                                                                                      | general                  |
-| `exportCsv`       | File > Export CSV / CSV Save As (on: BROWSER download)                                                                                               | general                  |
-| `xlsxEngine`      | **the whole workbook surface** (S1–S6, S10): off means the frame shows "engine unavailable"; the host never routes xlsx to the frame while it is off | **sidecar-only (GO-D3)** |
-| `recalcFallback`  | IronCalc recalc fallback (S8)                                                                                                                        | **sidecar-only (GO-D3)** |
-| `xlsImport`       | `.xls` open (S9)                                                                                                                                     | **sidecar-only (GO-D3)** |
-| `pivotRefresh`    | PivotTable refresh (S10)                                                                                                                             | **sidecar-only (GO-D3)** |
-| `mergeWorkbooks`  | Data > Merge workbooks, AI attachment merge (S11)                                                                                                    | **sidecar-only (GO-D3)** |
+| key                | hides                                                                                                                                                | kind                     |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `ai`               | AI panel/dock, AI ribbon entries, AI presets, op-executor image ops (on with the host's `ai` grant, section 7.4)                                     | general                  |
+| `webSearch`        | AI tool web_search                                                                                                                                   | general                  |
+| `imageSearch`      | AI tool image_search                                                                                                                                 | general                  |
+| `imageGeneration`  | AI tool generate_image                                                                                                                               | general                  |
+| `createDocument`   | AI tool create_document                                                                                                                              | general                  |
+| `autoRename`       | post-AI rename of untitled workbooks                                                                                                                 | general                  |
+| `billing`          | GenSpark account/plan UI                                                                                                                             | general                  |
+| `screenshot`       | Insert > Screenshot                                                                                                                                  | general                  |
+| `autoSave`         | AutoSave pill + 30 s / blur autosave (web: explicit save only, `e977e00`)                                                                            | general                  |
+| `recoveryCopy`     | 30 s crash-recovery copy + restore prompt                                                                                                            | general (uses S6 path)   |
+| `open`             | File > Open / Ctrl+O (on only with the host's `filePick` grant)                                                                                      | general                  |
+| `exportCsv`        | File > Export CSV / CSV Save As (on: BROWSER download)                                                                                               | general                  |
+| `xlsxEngine`       | **the whole workbook surface** (S1–S6, S10): off means the frame shows "engine unavailable"; the host never routes xlsx to the frame while it is off | **sidecar-only (GO-D3)** |
+| `recalcFallback`   | IronCalc recalc fallback (S8)                                                                                                                        | **sidecar-only (GO-D3)** |
+| `xlsImport`        | `.xls` open (S9)                                                                                                                                     | **sidecar-only (GO-D3)** |
+| `pivotRefresh`     | PivotTable refresh (S10)                                                                                                                             | **sidecar-only (GO-D3)** |
+| `mergeWorkbooks`   | Data > Merge workbooks, AI attachment merge (S11)                                                                                                    | **sidecar-only (GO-D3)** |
+| `workbookPassword` | Review > Change Password (open password; Electron main only)                                                                                         | general (desktop-only)   |
 
 ### 7.4 Web AI (SH4, UNI-1016, CONTRACT C16)
 

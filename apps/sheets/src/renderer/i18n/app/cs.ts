@@ -1544,6 +1544,8 @@ export const cs = {
     'Webová verze UniWork Sheets teprve dostává svůj tabulkový engine. Do té doby otevřete tento sešit v desktopové aplikaci UniWork.',
   appWebEngineHint: 'Váš soubor nebyl změněn.',
   appWebViewOnly: 'Pouze ke čtení: změny v tomto sešitu nelze uložit.',
+  appWebEncryptedOpen:
+    'Tento sešit je chráněn heslem a webová verze jej nemůže otevřít. Otevřete jej v desktopové aplikaci UniWork.',
   appWebConflictTitle: 'Tento sešit byl změněn jinde',
   appWebConflictBody:
     'Vaše změny zatím nejsou v UniWork a zůstanou v tomto prohlížeči, dokud se neodhlásíte.',

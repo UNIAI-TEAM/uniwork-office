@@ -1589,6 +1589,8 @@ export const it = {
     "La versione web di UniWork Sheets sta ancora ricevendo il suo motore di calcolo. Nel frattempo, apri questa cartella di lavoro nell'app desktop di UniWork.",
   appWebEngineHint: 'Il file non è stato modificato.',
   appWebViewOnly: 'Sola lettura: non puoi salvare le modifiche a questa cartella di lavoro.',
+  appWebEncryptedOpen:
+    'Questa cartella di lavoro è protetta da password e la versione web non può aprirla. Aprila nell’app desktop di UniWork.',
   appWebConflictTitle: 'Questa cartella di lavoro è stata modificata altrove',
   appWebConflictBody:
     'Le modifiche non sono ancora su UniWork e restano in questo browser finché non esci.',

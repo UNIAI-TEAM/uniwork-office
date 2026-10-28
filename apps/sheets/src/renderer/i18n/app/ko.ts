@@ -1568,6 +1568,8 @@ export const ko = {
     '웹용 UniWork Sheets의 계산 엔진을 준비 중입니다. 그때까지는 UniWork 데스크톱 앱에서 이 통합 문서를 여세요.',
   appWebEngineHint: '파일은 변경되지 않았습니다.',
   appWebViewOnly: '보기 전용: 이 통합 문서의 변경 내용을 저장할 수 없습니다.',
+  appWebEncryptedOpen:
+    '이 통합 문서는 암호로 보호되어 있어 웹 버전에서 열 수 없습니다. UniWork 데스크톱 앱에서 여세요.',
   appWebConflictTitle: '이 통합 문서가 다른 곳에서 변경되었습니다',
   appWebConflictBody:
     '변경 사항은 아직 UniWork에 없으며 로그아웃할 때까지 이 브라우저에 보관됩니다.',

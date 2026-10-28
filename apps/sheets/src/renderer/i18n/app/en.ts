@@ -1523,6 +1523,8 @@ export const en = {
     'The web version of UniWork Sheets is still getting its spreadsheet engine. Until then, open this workbook in the UniWork desktop app.',
   appWebEngineHint: 'Your file is unchanged.',
   appWebViewOnly: "View only: you can't save changes to this workbook.",
+  appWebEncryptedOpen:
+    'This workbook is protected by a password, which the web version cannot open. Open it in the UniWork desktop app.',
   appWebConflictTitle: 'This workbook was changed elsewhere',
   appWebConflictBody:
     'Your changes aren’t on UniWork yet and are kept in this browser until you sign out.',

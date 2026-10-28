@@ -1532,6 +1532,8 @@ export const vi = {
     'Phiên bản web của UniWork Sheets đang được bổ sung bộ máy bảng tính. Trong thời gian này, hãy mở sổ làm việc trong ứng dụng UniWork trên máy tính.',
   appWebEngineHint: 'Tệp của bạn không bị thay đổi.',
   appWebViewOnly: 'Chỉ xem: bạn không thể lưu thay đổi cho sổ làm việc này.',
+  appWebEncryptedOpen:
+    'Sổ làm việc này được bảo vệ bằng mật khẩu nên phiên bản web không mở được. Hãy mở bằng ứng dụng UniWork trên máy tính.',
   appWebConflictTitle: 'Sổ làm việc này đã được thay đổi ở nơi khác',
   appWebConflictBody:
     'Thay đổi của bạn chưa lưu lên UniWork và vẫn được giữ trong trình duyệt này cho tới khi bạn đăng xuất.',

@@ -3598,7 +3598,7 @@ function Ribbon({
             symbol={workbookProtected ? '🔓' : '🔐'}
             onClick={() => onCommand('workbook-protect')}
           />
-          {passwordProtected && (
+          {cap('workbookPassword') && passwordProtected && (
             <RibbonButton
               large
               label={t('appChangePassword')}

@@ -1585,6 +1585,8 @@ export const nl = {
     'De webversie van UniWork Sheets krijgt zijn rekenmachine nog. Open deze werkmap tot die tijd in de UniWork-desktopapp.',
   appWebEngineHint: 'Je bestand is niet gewijzigd.',
   appWebViewOnly: 'Alleen-lezen: je kunt wijzigingen in deze werkmap niet opslaan.',
+  appWebEncryptedOpen:
+    'Deze werkmap is met een wachtwoord beveiligd en de webversie kan hem niet openen. Open hem in de UniWork-desktopapp.',
   appWebConflictTitle: 'Deze werkmap is ergens anders gewijzigd',
   appWebConflictBody:
     'Je wijzigingen staan nog niet op UniWork en blijven in deze browser tot je je afmeldt.',

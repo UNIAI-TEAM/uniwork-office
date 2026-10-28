@@ -1572,6 +1572,8 @@ export const pl = {
     'Wersja internetowa UniWork Sheets wciąż czeka na swój silnik arkuszy. Do tego czasu otwórz ten skoroszyt w aplikacji UniWork na komputer.',
   appWebEngineHint: 'Twój plik nie został zmieniony.',
   appWebViewOnly: 'Tylko do odczytu: nie możesz zapisać zmian w tym skoroszycie.',
+  appWebEncryptedOpen:
+    'Ten skoroszyt jest chroniony hasłem i wersja internetowa nie może go otworzyć. Otwórz go w aplikacji UniWork na komputer.',
   appWebConflictTitle: 'Ten skoroszyt został zmieniony w innym miejscu',
   appWebConflictBody:
     'Twoich zmian nie ma jeszcze w UniWork; są przechowywane w tej przeglądarce do czasu wylogowania.',

@@ -28,6 +28,8 @@
  * | xlsImport        | opening legacy .xls (until the engine converts it)                               |
  * | pivotRefresh     | PivotTable refresh (until the engine reads pivot definitions)                    |
  * | mergeWorkbooks   | Data > Merge workbooks + AI attachment merge (C11: hidden on the web)            |
+ * | workbookPassword | Review > Change Password (the open password is handled in the Electron main;     |
+ * |                  | the web engine cannot open encrypted workbooks, so there is nothing to change)   |
  */
 import { createCapabilityReader } from '@genoffice/ui/capabilities'
 
@@ -57,6 +59,7 @@ export type SheetsCapability =
   | 'xlsImport'
   | 'pivotRefresh'
   | 'mergeWorkbooks'
+  | 'workbookPassword'
   | 'viewOnlyChip'
   | 'statusEcho'
 

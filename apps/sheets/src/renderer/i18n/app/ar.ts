@@ -1505,6 +1505,8 @@ export const ar = {
     'لا يزال إصدار الويب من UniWork Sheets بانتظار محرك جداول البيانات. حتى ذلك الحين، افتح هذا المصنف في تطبيق UniWork لسطح المكتب.',
   appWebEngineHint: 'لم يتغير ملفك.',
   appWebViewOnly: 'عرض فقط: لا يمكنك حفظ التغييرات على هذا المصنف.',
+  appWebEncryptedOpen:
+    'هذا المصنف محمي بكلمة مرور ولا يمكن لإصدار الويب فتحه. افتحه في تطبيق UniWork لسطح المكتب.',
   appWebConflictTitle: 'تم تغيير هذا المصنف في مكان آخر',
   appWebConflictBody: 'تغييراتك ليست على UniWork بعد وتبقى في هذا المتصفح حتى تسجّل الخروج.',
   appWebConflictOverwrite: 'استبدال…',

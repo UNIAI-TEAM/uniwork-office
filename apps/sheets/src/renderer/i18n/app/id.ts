@@ -1547,6 +1547,8 @@ export const id = {
     'Versi web UniWork Sheets masih menunggu mesin spreadsheet-nya. Sementara itu, buka buku kerja ini di aplikasi desktop UniWork.',
   appWebEngineHint: 'File Anda tidak berubah.',
   appWebViewOnly: 'Hanya lihat: Anda tidak dapat menyimpan perubahan pada buku kerja ini.',
+  appWebEncryptedOpen:
+    'Buku kerja ini dilindungi kata sandi sehingga versi web tidak dapat membukanya. Buka di aplikasi desktop UniWork.',
   appWebConflictTitle: 'Buku kerja ini diubah di tempat lain',
   appWebConflictBody:
     'Perubahan Anda belum ada di UniWork dan disimpan di browser ini sampai Anda keluar.',

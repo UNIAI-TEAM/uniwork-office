@@ -1595,6 +1595,8 @@ export const ja = {
     'Web 版 UniWork Sheets の計算エンジンは準備中です。それまでは UniWork デスクトップ アプリでこのブックを開いてください。',
   appWebEngineHint: 'ファイルは変更されていません。',
   appWebViewOnly: '表示のみ: このブックの変更は保存できません。',
+  appWebEncryptedOpen:
+    'このブックはパスワードで保護されているため、Web 版では開けません。UniWork デスクトップアプリで開いてください。',
   appWebConflictTitle: 'このブックは別の場所で変更されました',
   appWebConflictBody: '変更はまだ UniWork になく、ログアウトするまでこのブラウザーに保持されます。',
   appWebConflictOverwrite: '上書き…',

@@ -1477,6 +1477,7 @@ export const zh = {
     '网页版 UniWork 表格的计算引擎正在准备中。在此之前，请在 UniWork 桌面应用中打开此工作簿。',
   appWebEngineHint: '您的文件未被更改。',
   appWebViewOnly: '仅查看：您无法保存对此工作簿的更改。',
+  appWebEncryptedOpen: '此工作簿设有密码，网页版无法打开。请在 UniWork 桌面应用中打开。',
   appWebConflictTitle: '此工作簿已在别处被修改',
   appWebConflictBody: '你的更改尚未存到 UniWork，会保留在此浏览器中，直到你退出登录。',
   appWebConflictOverwrite: '覆盖…',

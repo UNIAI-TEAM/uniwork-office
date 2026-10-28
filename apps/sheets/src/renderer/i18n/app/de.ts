@@ -1605,6 +1605,8 @@ export const de = {
     'Die Webversion von UniWork Sheets erhält ihre Tabellen-Engine erst noch. Öffnen Sie diese Arbeitsmappe bis dahin in der UniWork-Desktop-App.',
   appWebEngineHint: 'Ihre Datei wurde nicht verändert.',
   appWebViewOnly: 'Nur Ansicht: Sie können Änderungen an dieser Arbeitsmappe nicht speichern.',
+  appWebEncryptedOpen:
+    'Diese Arbeitsmappe ist kennwortgeschützt und lässt sich in der Webversion nicht öffnen. Öffnen Sie sie in der UniWork-Desktop-App.',
   appWebConflictTitle: 'Diese Arbeitsmappe wurde an anderer Stelle geändert',
   appWebConflictBody:
     'Ihre Änderungen sind noch nicht in UniWork und bleiben in diesem Browser, bis Sie sich abmelden.',
