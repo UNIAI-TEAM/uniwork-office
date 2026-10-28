@@ -142,14 +142,6 @@ export function Empty() {
   return <span className="dh-cell-empty">{EMPTY_CELL}</span>
 }
 
-/**
- * The Truy cập pill (Riêng tư / Workspace / Được chia sẻ) and the line under it (Chủ sở hữu / Bạn: Sửa);
- * nothing for a folder.
- * On a row that passes the Share gate (`onShare` given) the pill and the line are ONE button that
- * opens the Share dialog without opening the document; a manager reads "Quản lý quyền truy cập của …",
- * anyone else "Xem quyền truy cập của …". The name is the command plus the visible text (label in
- * name). Any other row stays text.
- */
 function AccessPillIcon({ pill }: { pill: AccessPill }) {
   return (
     <svg
@@ -190,6 +182,14 @@ function AccessPillIcon({ pill }: { pill: AccessPill }) {
   )
 }
 
+/**
+ * The Truy cập pill (Riêng tư / Workspace / Được chia sẻ) and the line under it (Chủ sở hữu / Bạn: Sửa);
+ * nothing for a folder.
+ * On a row that passes the Share gate (`onShare` given) the pill and the line are ONE button that
+ * opens the Share dialog without opening the document; a manager reads "Quản lý quyền truy cập của …",
+ * anyone else "Xem quyền truy cập của …". The name is the command plus the visible text (label in
+ * name). Any other row stays text.
+ */
 export function AccessContent({
   doc,
   onShare,
@@ -282,6 +282,8 @@ export function Person({
             ref={imgRef}
             src={cleanUrl ?? undefined}
             alt=""
+            referrerPolicy="no-referrer"
+            draggable={false}
             className={`dh-avatar-img${loaded ? ' is-loaded' : ''}`}
             onLoad={() => setLoadedSrc(cleanUrl)}
             onError={() => setImgError(true)}

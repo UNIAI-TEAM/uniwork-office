@@ -2,7 +2,6 @@
 // which columns its loaded rows can fill, which sort is in force and how the
 // rows read for it. DocList draws; this decides.
 import type { UniworkListSort } from '../../../shared/home-api'
-import { initials } from '../desk-model'
 import type {
   DocumentsHomeDoc,
   DocumentsHomeSubViewId,
@@ -138,9 +137,10 @@ export function editorAvatarUrlOf(doc: DocumentsHomeDoc): string | null {
   return url || null
 }
 
-/** up to two letters for the avatar: the app's one avatar helper */
+/** first letter for the avatar fallback, matching the web's CommentActorAvatar */
 export function editorInitials(name: string): string {
-  return initials(name)
+  const first = Array.from(name.trim())[0]
+  return first ? first.toLocaleUpperCase() : '?'
 }
 
 const epoch = (iso: string | undefined): number | null => {
