@@ -1329,6 +1329,13 @@ export type DeskToolResult =
         'busy' | 'bad-input' | 'not-found' | 'same-path' | 'target-open' | 'encrypted' | 'failed'
     }
 
+export interface AutoUpdateCheckStatus {
+  /** whether automatic background update checks are enabled (default true) */
+  on: boolean
+  /** whether this build supports background update checks (false on apt/.deb, no-feed builds, dev runs) */
+  supported: boolean
+}
+
 export interface HomeApi {
   /** unified recents across document types, newest first (paged) */
   recents(query?: RecentQuery): Promise<RecentPage>
@@ -1440,6 +1447,9 @@ export interface HomeApi {
   getPinnedUpdateChannel(): Promise<string | null>
   /** switch + persist the update channel; triggers an immediate update check */
   setUpdateChannel(channel: UpdateChannel): Promise<void>
+  /** whether the launch and periodic background update checks run (default on) and whether this build has a background check */
+  getAutoUpdateCheck(): Promise<AutoUpdateCheckStatus>
+  setAutoUpdateCheck(on: boolean): Promise<void>
   /** UniWork account status (desktop session sync TBD; Sign-in opens the UniWork web link) */
   accountStatus(): Promise<AccountStatus>
   /** open UniWork Sign-in in the system browser; returns whether the launch succeeded */
@@ -2306,6 +2316,8 @@ export const HOME_CHANNELS = {
   getUpdateChannel: 'home:get-update-channel',
   getPinnedUpdateChannel: 'home:get-pinned-update-channel',
   setUpdateChannel: 'home:set-update-channel',
+  getAutoUpdateCheck: 'home:get-auto-update-check',
+  setAutoUpdateCheck: 'home:set-auto-update-check',
   accountStatus: 'home:account-status',
   accountLogin: 'home:account-login',
   accountLoginEvent: 'home:account-login-event',

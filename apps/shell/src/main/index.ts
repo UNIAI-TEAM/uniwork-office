@@ -480,6 +480,7 @@ import {
 } from './detached-windows'
 import {
   applyUpdateChannel,
+  backgroundCheckSupported,
   checkForUpdatesNow,
   getPinnedUpdateChannel,
   initAutoUpdater,
@@ -679,6 +680,13 @@ function currentUpdateChannel(): UpdateChannel {
   const saved = readAppSettings(APP_SETTINGS_PATH()).updateChannel
   cachedUpdateChannel = isUpdateChannel(saved) ? saved : 'stable'
   return cachedUpdateChannel
+}
+
+let cachedAutoUpdateCheck: boolean | null = null
+
+function autoUpdateCheckEnabled(): boolean {
+  cachedAutoUpdateCheck ??= readAppSettings(APP_SETTINGS_PATH()).autoUpdateCheck !== false
+  return cachedAutoUpdateCheck
 }
 
 let cachedTheme: UiTheme | null = null
@@ -5702,6 +5710,17 @@ function registerHomeIpc(): void {
     applyUpdateChannel(channel)
   })
 
+  guardedIpc.handle(HOME_CHANNELS.getAutoUpdateCheck, () => ({
+    on: autoUpdateCheckEnabled(),
+    supported: backgroundCheckSupported(),
+  }))
+
+  guardedIpc.handle(HOME_CHANNELS.setAutoUpdateCheck, (_event, on: unknown) => {
+    if (typeof on !== 'boolean') return
+    writeAppSetting(APP_SETTINGS_PATH(), 'autoUpdateCheck', on)
+    cachedAutoUpdateCheck = on
+  })
+
   guardedIpc.handle(
     HOME_CHANNELS.onboardingSeen,
     (): boolean => readAppSettings(APP_SETTINGS_PATH()).onboardingSeen === true,
@@ -7508,7 +7527,7 @@ app.whenReady().then(async () => {
   installBackToHomeItems()
   installDockMenu()
   setUpdateCheckInvoker(() => void checkForUpdatesNow())
-  initAutoUpdater(() => shellWindow, currentUpdateChannel())
+  initAutoUpdater(() => shellWindow, currentUpdateChannel(), autoUpdateCheckEnabled)
   persistUniWorkApiOriginFromEnv(APP_SETTINGS_PATH())
   // UniWork account: register the active channel's sign-in scheme, restore the
   // session in the background (after the proxy install), then route held callbacks
