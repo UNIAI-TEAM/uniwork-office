@@ -56,4 +56,7 @@ export const ar = {
   // U-02 catalogue S10: workbook over the web AI size limit
   aiErrWorkbookTooLarge:
     'هذا المصنف كبير جدًا على الذكاء الاصطناعي على الويب. افتحه في تطبيق UniWork Office.',
+
+  // UNI-2264: the next turn of a job handed over from UniWork (ai.start)
+  aiHandoffContinue: 'تابع الجزء التالي.',
 } satisfies Record<keyof typeof zh, string>

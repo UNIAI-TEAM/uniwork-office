@@ -59,6 +59,7 @@ import {
 } from '../../../../packages/ai-provider/src/watchdog'
 import type { AiRunTracker } from '../ai-run'
 import type { AiWebClient } from './client'
+import { UNIWORK_HANDOFF_HEADER, UNIWORK_HANDOFF_REMAINING_HEADER, type AiHandoff } from './handoff'
 import {
   AiWebError,
   asUniworkFailure,
@@ -105,6 +106,8 @@ export interface StreamDeps {
   /** the frame's AI turn state: a chat stream is a running turn until it ends (X-02 `aiRun`, S6) */
   aiRun?: UniworkRunTracker
   uniwork?: UniworkStreamDeps
+  /** the job the host handed over (`ai.start`): its header on a UniWork AI question, the turn outcome */
+  handoff?: Pick<AiHandoff, 'question' | 'remaining' | 'ended'>
 }
 
 /** the request config ai-provider sees: proxy base URL, no key */
@@ -225,9 +228,18 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     const controller = new AbortController()
     active.set(requestId, controller)
     deps.aiRun?.begin(requestId, () => controller.abort())
+    // a question (never tool results) may run the handed-over job: every post of this turn is that
+    // question, its run_expired / 429 resends included, so each carries the id
+    const last = messages.at(-1)
+    const handoffId =
+      last?.role === 'user' ? (deps.handoff?.question(last.instruction ?? last.text) ?? null) : null
     const transport: UniworkChatTransport = {
       post: async (req) => {
-        const res = await chat({ headers: req.headers, body: req.body, signal: req.signal })
+        const headers = handoffId
+          ? { ...req.headers, [UNIWORK_HANDOFF_HEADER]: handoffId }
+          : req.headers
+        const res = await chat({ headers, body: req.body, signal: req.signal })
+        if (handoffId) deps.handoff?.remaining(res.headers.get(UNIWORK_HANDOFF_REMAINING_HEADER))
         // the run id of the turn is the one the server issued, as soon as a response carries it
         const runId = res.headers.get(UNIWORK_RUN_HEADER)
         if (runId) deps.aiRun?.setRunId?.(runId)
@@ -242,6 +254,8 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
       emit({ requestId, type: 'ping' })
     }
     let stopReason: string | undefined
+    let failed = false
+    let toolCalls = 0
     let off = false
     // the adapter sent `uniwork-off` (a 403 before any run id): the note is the whole answer
     let offNoticed = false
@@ -250,7 +264,10 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
       signal: controller.signal,
       onDelta: (text) => emit({ requestId, type: 'delta', text }),
       onReasoningDelta: (text) => emit({ requestId, type: 'reasoning', text }),
-      onToolCall: (toolCall) => emit({ requestId, type: 'tool-call', toolCall }),
+      onToolCall: (toolCall) => {
+        toolCalls++
+        emit({ requestId, type: 'tool-call', toolCall })
+      },
       onActivity: ping,
       onStopReason: (reason) => {
         stopReason = reason
@@ -265,7 +282,10 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
         }
         emit({ requestId, type: 'notice', notice })
       },
-      onTurnReset: () => emit({ requestId, type: 'reset' }),
+      onTurnReset: () => {
+        toolCalls = 0
+        emit({ requestId, type: 'reset' })
+      },
     }
     try {
       await (uniwork.stream ?? streamUniwork)(
@@ -284,6 +304,7 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
           : { requestId, type: 'done', stopReason },
       )
     } catch (err) {
+      failed = true
       if (controller.signal.aborted) {
         emit({ requestId, type: 'done' })
         return
@@ -322,6 +343,8 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
       })
     } finally {
       active.delete(requestId)
+      // before end(): the run may go idle inside it
+      deps.handoff?.ended({ failed, openToolCalls: toolCalls > 0 })
       deps.aiRun?.end(requestId)
     }
   }

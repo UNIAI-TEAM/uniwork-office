@@ -122,6 +122,8 @@ describe('hide stubs behind the hidden desktop-only entries', () => {
     expect(await hide.writeRecoveryCopy()).toEqual({ ok: false })
     expect(await hide.createDocument()).toMatchObject({ ok: false })
     expect(hide.getPathForFile()).toBe('')
+    // the off answer of the ai.start handoff (withWebAi replaces it while AI is on)
+    expect(await hide.consumeAiPreset()).toBeNull()
   })
 
   it('on* subscribers return a disposer', () => {
@@ -130,6 +132,7 @@ describe('hide stubs behind the hidden desktop-only entries', () => {
       'onMenuCommand',
       'onTeardown',
       'onAutoSaveDefaultChanged',
+      'onAiPreset',
     ] as const) {
       const off = hide[key](() => {})
       expect(typeof off).toBe('function')

@@ -150,13 +150,16 @@ export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
  *   - the web AI keys (CONTRACT C16; `uniworkAi` is the UniWork AI adapter's, effective with the host grant),
  *   - `desktopOpen`: the host's "Open in desktop app" flow for `app.open` (A7),
  *   - `download`: the host downloads the open bytes for `api.download` (X-02),
- *   - `sizeUi`: the host renders size warnings and save-blocked modals (SIZE-F1).
+ *   - `sizeUi`: the host renders size warnings and save-blocked modals (SIZE-F1),
+ *   - `aiStart`: the host hands a job to the AI panel (`ai.start`, UNI-2264); claimed exactly when
+ *     `uniworkAi` is, since the job runs only on UniWork AI.
  */
 export const FRAME_BASE_CAPABILITIES: Capabilities = Object.freeze({
   ...AI_FRAME_CAPABILITIES,
   desktopOpen: true,
   download: true,
   sizeUi: true,
+  aiStart: AI_FRAME_CAPABILITIES.uniworkAi === true,
 })
 
 /** NO_AUTO_SAVE_DEFAULT of @genoffice/ui auto-save-pref.ts: autosave off, never set */
@@ -213,6 +216,7 @@ export function installModuleBridge(spec: ModuleBridgeSpec): InstalledModuleBrid
   // the AI turns of this frame: the host hears `aiRun`, the new-version bar waits for idle
   frameAiRun.bind((payload) => client.reportAiRun?.(payload))
   const ai = createWebAi({ port: client, capabilities, aiRun: frameAiRun, module: spec.module })
+  client.handleAiStart?.((job) => ai.startHandoff(job))
 
   const ctx: ModuleBridgeContext = { module: spec.module, client, capabilities }
   const target = spec.target ?? (window as unknown as Record<string, unknown>)

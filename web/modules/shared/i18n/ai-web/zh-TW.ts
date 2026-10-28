@@ -53,4 +53,7 @@ export const zhTW = {
 
   // U-02 catalogue S10: workbook over the web AI size limit
   aiErrWorkbookTooLarge: '此活頁簿太大，無法在網頁上使用 AI。請在 UniWork Office 應用程式中開啟。',
+
+  // UNI-2264: the next turn of a job handed over from UniWork (ai.start)
+  aiHandoffContinue: '繼續下一部分。',
 } satisfies Record<keyof typeof zh, string>

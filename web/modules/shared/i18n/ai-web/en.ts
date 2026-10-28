@@ -56,4 +56,7 @@ export const en = {
   // U-02 catalogue S10: workbook over the web AI size limit
   aiErrWorkbookTooLarge:
     'This workbook is too large for AI on the web. Open it in the UniWork Office app.',
+
+  // UNI-2264: the next turn of a job handed over from UniWork (ai.start)
+  aiHandoffContinue: 'Continue with the next part.',
 } satisfies Record<keyof typeof zh, string>

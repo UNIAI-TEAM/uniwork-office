@@ -37,7 +37,13 @@ import {
   type UniworkFormat,
 } from '../../../../packages/ai-provider/src/uniwork/types'
 import { aiUniworkText } from '../../../../packages/ui/src/strings-ai-uniwork'
-import type { Capabilities, OfficeModule } from '../../../docs/protocol/types'
+import {
+  DocsProtocolError,
+  type AiStartPayload,
+  type AiStartResult,
+  type Capabilities,
+  type OfficeModule,
+} from '../../../docs/protocol/types'
 import type { BridgeObject } from '../../../docs/bridge/safe-api'
 import type { FramePort } from '../../../docs/bridge/frame-port'
 import { webLanguage } from '../../../docs/bridge/browser'
@@ -49,7 +55,9 @@ import {
   type AiWebClient,
 } from './client'
 import type { AiRunTracker } from '../ai-run'
+import { aiWebText } from '../i18n/strings-ai-web'
 import { AiWebError, isAiWebError, uniworkFailureKey, type UniworkFailure } from './errors'
+import { createAiHandoff, type AiHandoff, type AiPreset } from './handoff'
 import { createWebAiStreams, type WireProtocol, type WebAiStreams } from './stream'
 import { describeAiError, openAiSettingsDialog, showAiState } from './ui'
 
@@ -210,6 +218,13 @@ export interface WebAi {
   fail(err: unknown, provider?: string): string
   /** UniWork AI disclosure identity and org display name for this frame session; null before init */
   uniworkIdentity(): WebUniworkAiIdentity | null
+  /** the job the host handed to the panel (`ai.start`): its presets, header and parts */
+  handoff: Pick<AiHandoff, 'consumePreset' | 'onPreset'>
+  /**
+   * `ai.start`: accept the job when the panel runs UniWork AI (the provider a turn would use);
+   * otherwise refuse `unsupported`
+   */
+  startHandoff(job: AiStartPayload): Promise<AiStartResult>
 }
 
 const EMPTY: WebAiState = { credentials: { items: [], providers: [] }, cloud: null }
@@ -815,6 +830,26 @@ export function createWebAi(opts: {
     notifyChanged()
   }
 
+  const handoff = createAiHandoff({
+    ...(opts.aiRun ? { aiRun: opts.aiRun } : {}),
+    continueText: () => aiWebText(webLanguage(), 'aiHandoffContinue'),
+  })
+
+  async function startHandoff(job: AiStartPayload): Promise<AiStartResult> {
+    const on =
+      (await activation) &&
+      uniworkEffective() &&
+      (await settings()).provider === UNIWORK_PROVIDER_ID
+    if (!on) {
+      throw new DocsProtocolError({
+        code: 'unsupported',
+        message: 'the AI panel does not run UniWork AI',
+      })
+    }
+    handoff.start(job)
+    return { queued: true }
+  }
+
   const streams = createWebAiStreams({
     client: {
       get base() {
@@ -852,6 +887,7 @@ export function createWebAi(opts: {
       onOff: turnUniworkOff,
       ...(opts.uniworkStream ? { stream: opts.uniworkStream } : {}),
     },
+    handoff,
   })
 
   return {
@@ -869,6 +905,8 @@ export function createWebAi(opts: {
     streams,
     openSettings,
     fail,
+    handoff,
+    startHandoff,
     uniworkIdentity: () => {
       if (!frameSession) return null
       // InitPayload (web/docs/protocol/types.ts, frozen X-02) does not define dedicated orgId /
@@ -932,6 +970,8 @@ export const WEB_AI_MEMBERS = [
   'openAiSettings',
   'openAiModelSettings',
   'onAiSettingsChanged',
+  'consumeAiPreset',
+  'onAiPreset',
 ] as const
 
 type Fn = (...args: unknown[]) => unknown
@@ -998,6 +1038,22 @@ export function withWebAi(base: BridgeObject, ai: WebAi): BridgeObject {
       const h = handler as () => void
       const offOwn = own('onAiSettingsChanged')?.(h) as (() => void) | undefined
       const offWeb = ai.onChanged(h)
+      return () => {
+        offOwn?.()
+        offWeb()
+      }
+    },
+    // the job the host handed over (`ai.start`); the module's stub answers while AI is off
+    consumeAiPreset: when(
+      'consumeAiPreset',
+      async () => ai.handoff.consumePreset(),
+      async () => null,
+    ),
+    // sync subscriber like onAiStream: the module's own presets and the handed-over ones
+    onAiPreset: (handler: unknown) => {
+      const h = handler as (preset: AiPreset) => void
+      const offOwn = own('onAiPreset')?.(h) as (() => void) | undefined
+      const offWeb = ai.handoff.onPreset(h)
       return () => {
         offOwn?.()
         offWeb()
