@@ -16,9 +16,11 @@
  * preset goes out and its question carries the header again.
  *
  * A question the person asks themselves (any question that does not follow tool results and is not
- * the pending preset, on UniWork AI or another provider) drops the job: no continuation, no header,
- * no buffered preset. State lives in this frame page only; nothing is persisted.
+ * the pending preset nor one of the loop's own nudges, on UniWork AI or another provider) drops the
+ * job: no continuation, no header, no buffered preset. State lives in this frame page only; nothing is persisted.
  */
+import { TURN_LIMIT_NOTE } from '@genoffice/agent-core'
+import { SELECTION_CLAIM_CORRECTION } from '../../../../apps/sheets/src/renderer/ai/response-verify'
 import type { AiStartPayload } from '../../../docs/protocol/types'
 import type { AiRunTracker } from '../ai-run'
 
@@ -76,6 +78,14 @@ interface Part {
 function normalized(text: string): string {
   return text.replace(/\r\n?/g, '\n').normalize('NFC').replace(/\s+/g, ' ').trim()
 }
+
+/**
+ * What the loop itself pushes as a user message (its turn-limit note, a skill's claimed-action
+ * correction): part of the run, never the person's question
+ */
+const LOOP_NUDGES: ReadonlySet<string> = new Set(
+  [TURN_LIMIT_NOTE, SELECTION_CLAIM_CORRECTION].map(normalized),
+)
 
 export function createAiHandoff(deps: {
   /** the frame's run tracker: the continuation goes out at its idle (absent = no continuation) */
@@ -157,7 +167,9 @@ export function createAiHandoff(deps: {
       const followed = job
       // tool results continue (or resume) the part; nothing else changes
       if (!followed || words === null) return null
-      if (uniwork && followed.pendingHeader && normalized(words).includes(followed.expect)) {
+      const said = normalized(words)
+      if (LOOP_NUDGES.has(said)) return null
+      if (uniwork && followed.pendingHeader && said.includes(followed.expect)) {
         part = { failed: false, openToolCalls: false, remaining: 0 }
         return followed.id
       }

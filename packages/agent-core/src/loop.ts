@@ -372,7 +372,8 @@ const EMPTY_STREAM_RETRY_DELAYS_MS = [1_000, 3_000]
 const TOOL_ARGS_DROP_MARK = 'while sending tool arguments'
 const TOOL_ARGS_DROP_RETRIES = 1
 
-const TURN_LIMIT_NOTE =
+/** the loop's own user message once the turn limit is hit (a host may recognise it as not the user's) */
+export const TURN_LIMIT_NOTE =
   '[System] The tool-call turn limit for this request has been reached; no more tools may be called this turn. ' +
   'Answer directly from the information already gathered; if the task is unfinished, briefly state what is done and what remains.'
 

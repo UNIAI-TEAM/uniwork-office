@@ -3,15 +3,16 @@
 // frame route, with a real run tracker (a short grace): as in production only the streams begin and
 // end runs, the panel's next stream starts right after the previous one, and a slow tool step is a
 // pause longer than the grace.
-import type { AgentMessage } from '@genoffice/agent-core'
+import { TURN_LIMIT_NOTE, type AgentMessage } from '@genoffice/agent-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setUniworkAiAvailable } from '../../../../packages/ai-provider/src/providers'
 import { uniworkConversations } from '../../../../packages/ai-provider/src/uniwork/conversation'
 import { DocsProtocolError } from '../../../docs/protocol/types'
 import { webLanguage } from '../../../docs/bridge/browser'
 import { createAiRunTracker } from '../ai-run'
+import { SELECTION_CLAIM_CORRECTION } from '../../../../apps/sheets/src/renderer/ai/response-verify'
 import { aiWebText } from '../i18n/strings-ai-web'
-import type { AiPreset } from './handoff'
+import { createAiHandoff, type AiPreset } from './handoff'
 import { createWebAi, withWebAi } from './web-ai'
 
 const ORIGIN = 'https://app.test'
@@ -419,7 +420,7 @@ describe('ai.start handoff (UNI-2264)', () => {
     )
     await r.run(async () => {
       await r.stream(r.question(JOB))
-      // the loop's own follow-up question after the tool results (e.g. its turn-limit note)
+      // the loop's own follow-up question after the tool results
       await r.stream([...r.withResults(JOB), { role: 'user', text: 'Answer now without tools.' }])
     })
     const next = continueText()
@@ -439,6 +440,64 @@ describe('ai.start handoff (UNI-2264)', () => {
     })
     expect(r.posts.map((p) => p.handoff)).toEqual(['h1', null, 'h1', null])
     expect(r.presets).toHaveLength(2)
+  })
+
+  it("the loop's claimed-action correction during a part keeps the job and carries no header", async () => {
+    const r = rig()
+    r.listen()
+    await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
+    r.answer(
+      () => ok({ remaining: 1 }),
+      () => ok(),
+    )
+    await r.run(async () => {
+      await r.stream(r.question(JOB))
+      // the skill refused the reply ("I selected ...") and the loop asks once more, after the
+      // assistant turn (not after tool results)
+      await r.stream([
+        ...r.question(JOB),
+        { role: 'assistant', text: 'I selected A1 for you.' },
+        { role: 'user', text: SELECTION_CLAIM_CORRECTION },
+      ])
+    })
+    const next = continueText()
+    expect(r.presets.at(-1)).toEqual({ text: next, displayText: next, autoRun: true })
+    r.answer(() => ok({ remaining: 0 }))
+    await r.run(() => r.stream(r.question(next)))
+    expect(r.posts.map((p) => p.handoff)).toEqual(['h1', null, 'h1'])
+  })
+
+  it("the loop's turn-limit note keeps the job and carries no header", async () => {
+    const r = rig()
+    r.listen()
+    await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
+    r.answer(
+      () => ok({ calls: [CALL], remaining: 1 }),
+      () => ok(),
+    )
+    await r.run(async () => {
+      await r.stream(r.question(JOB))
+      await r.stream([...r.withResults(JOB), { role: 'user', text: TURN_LIMIT_NOTE }])
+    })
+    expect(r.posts.map((p) => p.handoff)).toEqual(['h1', null])
+    expect(r.presets.at(-1)!.text).toBe(continueText())
+    // the note is recognised by its text, wherever the loop puts it; a person's words still drop
+    const h = createAiHandoff({ continueText })
+    h.start({ handoffId: 'h2', text: JOB })
+    expect(h.stream({ words: JOB, afterTools: false, uniwork: true })).toBe('h2')
+    h.answered('h2', true, '1')
+    expect(h.stream({ words: TURN_LIMIT_NOTE, afterTools: false, uniwork: true })).toBeNull()
+    expect(
+      h.stream({ words: SELECTION_CLAIM_CORRECTION, afterTools: false, uniwork: true }),
+    ).toBeNull()
+    h.start({ handoffId: 'h3', text: JOB })
+    expect(
+      h.stream({ words: `  ${TURN_LIMIT_NOTE}\r\n`, afterTools: false, uniwork: true }),
+    ).toBeNull()
+    expect(h.stream({ words: JOB, afterTools: false, uniwork: true })).toBe('h3')
+    h.start({ handoffId: 'h4', text: JOB })
+    expect(h.stream({ words: 'Fix the title', afterTools: false, uniwork: true })).toBeNull()
+    expect(h.stream({ words: JOB, afterTools: false, uniwork: true })).toBeNull()
   })
 
   it('a dropped job takes its buffered preset with it', async () => {

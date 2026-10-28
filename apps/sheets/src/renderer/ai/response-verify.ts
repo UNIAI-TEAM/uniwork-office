@@ -25,7 +25,8 @@ const ZH_SELECTION_CLAIM =
 const EN_SELECTION_CLAIM =
   /\bI(?:'ve| have)?(?: now| already| just)? (?:selected|highlighted|located|jumped to|moved the selection)\b|\bselection (?:has been|is now|was) (?:moved|set|placed)\b/i
 
-const CORRECTION =
+/** the corrective user message the loop pushes (a host may recognise it as not the user's) */
+export const SELECTION_CLAIM_CORRECTION =
   '[System check] Your reply claims that something was located / selected / highlighted on screen for the user, ' +
   'but no successful select_range call happened during this run — the visible selection has NOT moved. ' +
   'Either call select_range now to actually perform the action, or rewrite your reply so it no longer claims an action that did not happen.'
@@ -41,5 +42,5 @@ export function verifySheetsResponse(
 ): string | null {
   if (!claimsSelection(finalText)) return null
   if (executed.some((call) => call.name === 'select_range' && call.ok)) return null
-  return CORRECTION
+  return SELECTION_CLAIM_CORRECTION
 }
