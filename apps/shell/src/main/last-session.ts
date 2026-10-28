@@ -158,6 +158,7 @@ export function createSessionSnapshotRecorder(
 
   return {
     onBeforeQuit(shellPaths, detachedPaths) {
+      if (quitInProgress) return
       const activeShell = shellPaths ? [...shellPaths] : closedShellPaths
       quitInProgress = true
       persist([...activeShell, ...detachedPaths])

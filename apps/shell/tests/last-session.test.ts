@@ -339,4 +339,24 @@ describe('createSessionSnapshotRecorder', () => {
       ['/shell/a.docx', '/shell/new.docx'],
     ])
   })
+
+  it('preserves the initial snapshot across repeated onBeforeQuit calls during one quit transaction and writes fresh only after a veto', () => {
+    const writes: string[][] = []
+    const recorder = createSessionSnapshotRecorder({
+      enabled: () => true,
+      filterDeps: () => ({}),
+      write: (paths) => writes.push(paths),
+    })
+
+    recorder.onBeforeQuit(['/shell/s.docx'], ['/detached/d.xlsx'])
+    recorder.onShellClosed(['/shell/s.docx'], [])
+    recorder.onBeforeQuit(null, [])
+
+    expect(writes).toEqual([['/shell/s.docx', '/detached/d.xlsx']])
+
+    recorder.onQuitVetoed()
+    recorder.onBeforeQuit(['/shell/fresh.docx'], [])
+
+    expect(writes).toEqual([['/shell/s.docx', '/detached/d.xlsx'], ['/shell/fresh.docx']])
+  })
 })
