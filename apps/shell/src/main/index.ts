@@ -100,6 +100,7 @@ import { OPEN_DOCUMENTS_FILE, clearOpenDocuments, publishOpenDocuments } from '.
 import {
   LAST_SESSION_DOCUMENTS_KEY,
   RESTORE_LAST_SESSION_KEY,
+  createLastSessionFilterDeps,
   filterLastSessionDocuments,
   launchPathsWithLastSession,
   openLaunchSequence,
@@ -3537,13 +3538,12 @@ function isAnyRoot(path: string): boolean {
 }
 
 function lastSessionFilterDeps(): LastSessionFilterDeps {
-  const unreachableRoots = extraFolderRoots().filter((root) => !describeExtraRoot(root).readable)
-  return {
-    inUniworkStore: (path) =>
-      uniworkDocs?.service.store.isInside(path) === true ||
-      uniworkDocs?.service.sourceViews.has(path) === true,
-    inUnreachableRoot: (path) => unreachableRoots.some((root) => isInsideRoot(root, path)),
-  }
+  return createLastSessionFilterDeps({
+    userDataDir: app.getPath('userData'),
+    extraRoots: extraFolderRoots(),
+    inStore: (path) => uniworkDocs?.service.store.isInside(path) === true,
+    inSourceViews: (path) => uniworkDocs?.service.sourceViews.has(path) === true,
+  })
 }
 
 const pendingNewFileDir = new Map<string, { dir: string; setAt: number }>()

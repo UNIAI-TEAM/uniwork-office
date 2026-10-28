@@ -1,7 +1,23 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  accessSync,
+  chmodSync,
+  constants,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual: typeof import('node:fs') = await importOriginal()
+  return {
+    ...actual,
+    accessSync: vi.fn(actual.accessSync),
+  }
+})
 import {
   describeExtraRoot,
   readExtraRoots,
@@ -72,6 +88,46 @@ describe('describeExtraRoot', () => {
       expect(describeExtraRoot(ro)).toMatchObject({ usable: false, readable: true })
     } finally {
       chmodSync(ro, 0o755)
+    }
+  })
+
+  it('reports readable: false when R_OK is denied even though statSync succeeds, and readable: true when only W_OK is denied', () => {
+    const denied = join(dir, 'traverse-only')
+    mkdirSync(denied)
+    vi.mocked(accessSync).mockImplementation((p, mode) => {
+      if (p === denied && mode === constants.R_OK) {
+        throw Object.assign(new Error('EACCES'), { code: 'EACCES' })
+      }
+    })
+    try {
+      expect(describeExtraRoot(denied)).toEqual({
+        path: denied,
+        name: 'traverse-only',
+        usable: false,
+        readable: false,
+        removable: true,
+      })
+    } finally {
+      vi.mocked(accessSync).mockRestore()
+    }
+
+    const readOnly = join(dir, 'read-only-mocked')
+    mkdirSync(readOnly)
+    vi.mocked(accessSync).mockImplementation((p, mode) => {
+      if (p === readOnly && mode === constants.W_OK) {
+        throw Object.assign(new Error('EACCES'), { code: 'EACCES' })
+      }
+    })
+    try {
+      expect(describeExtraRoot(readOnly)).toEqual({
+        path: readOnly,
+        name: 'read-only-mocked',
+        usable: false,
+        readable: true,
+        removable: true,
+      })
+    } finally {
+      vi.mocked(accessSync).mockRestore()
     }
   })
 })

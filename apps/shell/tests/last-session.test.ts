@@ -1,10 +1,24 @@
-import { describe, expect, it } from 'vitest'
+import { accessSync, constants, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+import { DRAFT_PREVIEW_DIR } from '@genoffice/electron-utils/draft-preview'
 import {
+  createLastSessionFilterDeps,
   filterLastSessionDocuments,
   launchPathsWithLastSession,
   openLaunchSequence,
   readLastSessionDocuments,
 } from '../src/main/last-session'
+import { SourceViewRegistry } from '../src/main/uniwork-docs/source-view'
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual: typeof import('node:fs') = await importOriginal()
+  return {
+    ...actual,
+    accessSync: vi.fn(actual.accessSync),
+  }
+})
 
 const all = () => true
 
@@ -80,6 +94,59 @@ describe('launchPathsWithLastSession', () => {
       '/local/keep.docx',
       '/local/arg.pdf',
     ])
+  })
+
+  it('excludes an existing file under the draft-preview root when the source-view registry is empty and drops files under an R_OK-denied extra root', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'last-session-real-'))
+    try {
+      const userDataDir = join(tmp, 'userData')
+      const previewDir = join(userDataDir, DRAFT_PREVIEW_DIR, 'src-1')
+      mkdirSync(previewDir, { recursive: true })
+      const previewFile = join(previewDir, 'preview.docx')
+      writeFileSync(previewFile, 'draft preview')
+
+      const deniedRoot = join(tmp, 'revoked-root')
+      mkdirSync(deniedRoot, { recursive: true })
+      const deniedFile = join(deniedRoot, 'secret.xlsx')
+      writeFileSync(deniedFile, 'secret')
+
+      const allowedDir = join(tmp, 'local')
+      mkdirSync(allowedDir, { recursive: true })
+      const allowedFile = join(allowedDir, 'keep.docx')
+      writeFileSync(allowedFile, 'keep')
+
+      const emptyRegistry = new SourceViewRegistry()
+      vi.mocked(accessSync).mockImplementation((p, mode) => {
+        if (p === deniedRoot && mode === constants.R_OK) {
+          throw Object.assign(new Error('EACCES'), { code: 'EACCES' })
+        }
+      })
+
+      const deps = createLastSessionFilterDeps({
+        userDataDir,
+        extraRoots: [deniedRoot, allowedDir],
+        inStore: () => false,
+        inSourceViews: (p) => emptyRegistry.has(p),
+      })
+
+      expect(filterLastSessionDocuments([previewFile, deniedFile, allowedFile], deps)).toEqual([
+        allowedFile,
+      ])
+      expect(
+        launchPathsWithLastSession(
+          {
+            restoreLastSession: true,
+            lastSessionDocuments: [previewFile, deniedFile, allowedFile],
+          },
+          [],
+          undefined,
+          deps,
+        ),
+      ).toEqual([allowedFile])
+    } finally {
+      vi.mocked(accessSync).mockRestore()
+      rmSync(tmp, { recursive: true, force: true })
+    }
   })
 })
 

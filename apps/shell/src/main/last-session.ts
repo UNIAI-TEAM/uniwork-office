@@ -1,5 +1,8 @@
 import { statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
+import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
+import { describeExtraRoot } from './folder-roots'
+import { isInsideRoot } from './folder-tree'
 
 /**
  * Reopen the documents of the previous session at launch.
@@ -18,6 +21,22 @@ export interface LastSessionFilterDeps {
   inUniworkStore?: (path: string) => boolean
   /** path lies under a revoked or unreachable folder root */
   inUnreachableRoot?: (path: string) => boolean
+}
+
+export interface LastSessionFilterEnv {
+  userDataDir: string
+  extraRoots: readonly string[]
+  inStore: (path: string) => boolean
+  inSourceViews: (path: string) => boolean
+}
+
+export function createLastSessionFilterDeps(env: LastSessionFilterEnv): LastSessionFilterDeps {
+  const unreachableRoots = env.extraRoots.filter((root) => !describeExtraRoot(root).readable)
+  return {
+    inUniworkStore: (path) =>
+      env.inStore(path) || env.inSourceViews(path) || isDraftPreviewPath(env.userDataDir, path),
+    inUnreachableRoot: (path) => unreachableRoots.some((root) => isInsideRoot(root, path)),
+  }
 }
 
 export function restoreLastSessionEnabled(settings: Record<string, unknown>): boolean {
