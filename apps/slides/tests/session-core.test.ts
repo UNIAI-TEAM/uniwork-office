@@ -205,4 +205,25 @@ describe('session handlers with the in-memory host', () => {
     await flush()
     expect(events.find((e) => e.kind === 'deck')?.ids).toEqual([107, 108])
   })
+
+  it('records, reads, and clears slide narration and timing through session handlers', async () => {
+    const host = new MemoryHostIO()
+    const ctx = await openClient(109, host)
+    const wavBase64 = 'UklGRiwAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQgAAAAAAAAAAAAAAA=='
+    expect(await callSessionHandler('slides:microphone-access', ctx)).toBe(true)
+    expect(callSessionHandler('slides:get-show-timing', ctx, 0)).toEqual({
+      advanceMs: null,
+      narrationIds: [],
+    })
+    const afterSave = callSessionHandler('slides:save-recording', ctx, {
+      slides: [{ slideIndex: 0, wavBase64, durationMs: 1200, advanceMs: 1500 }],
+    })
+    expect(afterSave).not.toBeNull()
+    const timing = callSessionHandler('slides:get-show-timing', ctx, 0)
+    expect(timing.advanceMs).toBe(1500)
+    expect(timing.narrationIds).toHaveLength(1)
+    const afterClear = callSessionHandler('slides:clear-narration', ctx, [0])
+    expect(afterClear).not.toBeNull()
+    expect(callSessionHandler('slides:get-show-timing', ctx, 0).narrationIds).toEqual([])
+  })
 })

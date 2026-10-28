@@ -53,6 +53,7 @@ const WEB_DEFAULTS = {
   fontDownload: false,
   fontInstallLocal: false,
   model3d: false,
+  slideRecord: false,
   presenterWindow: false,
 }
 
@@ -160,6 +161,8 @@ describe('Ribbon gating', () => {
     act(() => file.click())
     clickTab(el, 'Insert')
     expect(texts(el).some((t) => /3D/.test(t))).toBe(false)
+    clickTab(el, 'Slide Show')
+    expect(texts(el).some((t) => /Record/.test(t))).toBe(false)
     clickTab(el, 'Review')
     expect(el.querySelector('.ai-feature-icon')).toBeNull()
   })

@@ -172,6 +172,7 @@ describe('slidesApi contract', () => {
       'fontDownload',
       'fontInstallLocal',
       'model3d',
+      'slideRecord',
       'headlessExport',
     ])
       expect(SLIDES_WEB_CAPABILITIES[key]).toBe(false)

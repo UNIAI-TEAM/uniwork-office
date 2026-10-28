@@ -1224,6 +1224,8 @@ export function Ribbon({
   onPresenterView,
   onCustomShow,
   onRehearse,
+  onRecord,
+  onClearNarration,
   currentHidden,
   onToggleHidden,
   inkTool,
@@ -1358,6 +1360,7 @@ export function Ribbon({
   const [translateOpen, setTranslateOpen] = useState(false)
   const [arrangeOpen, setArrangeOpen] = useState(false)
   const [slideShowOpen, setSlideShowOpen] = useState(false)
+  const [recordOpen, setRecordOpen] = useState(false)
   const [slideShowFromStart, setSlideShowFromStart] = useState(false)
   // Insert tab dropdown galleries (at most one open at a time)
   const [insertDrop, setInsertDrop] = useState<
@@ -1404,6 +1407,7 @@ export function Ribbon({
     if (!keep.includes('collapse')) setCollapseOpen(null)
     if (!keep.includes('pen')) setPenFlyout(null)
     if (!keep.includes('slideShow')) setSlideShowOpen(false)
+    if (!keep.includes('record')) setRecordOpen(false)
   }, [])
 
   // Any ribbon popup open? Drives outside-press dismissal AND suspends the
@@ -1430,6 +1434,7 @@ export function Ribbon({
     slideSizeOpen ||
     transparencyOpen ||
     lineSpacingOpen ||
+    recordOpen ||
     collapseOpen != null ||
     penFlyout != null
 
@@ -2617,7 +2622,65 @@ export function Ribbon({
                 </span>
                 <span>{t('ribbonRehearse')}</span>
               </button>
-              <DisabledBig icon={<IconRecord size={BIG} />} label={t('ribbonRecord')} />
+              {cap('slideRecord') && (
+                <div className="rb-drop-wrap">
+                  <button
+                    className={`rb-big${recordOpen ? ' active' : ''}`}
+                    disabled={!hasDoc}
+                    onMouseDown={(e) => closeSiblingPanels(e, closePanels, 'record')}
+                    onClick={() => setRecordOpen((v) => !v)}
+                    data-tip={t('ribbonRecordTip')}
+                  >
+                    <span className="rb-big-icon">
+                      <IconRecord size={BIG} />
+                    </span>
+                    <span>{t('ribbonRecord')}</span>
+                  </button>
+                  {recordOpen && (
+                    <div className="rb-drop rb-menu" onMouseDown={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => {
+                          setRecordOpen(false)
+                          onRecord(true)
+                        }}
+                      >
+                        <span className="rb-menu-glyph">
+                          <IconPlayFromStart size={20} />
+                        </span>
+                        {t('ribbonRecordFromBeginning')}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRecordOpen(false)
+                          onRecord(false)
+                        }}
+                      >
+                        <span className="rb-menu-glyph">
+                          <IconPlayCurrent size={20} />
+                        </span>
+                        {t('ribbonRecordFromCurrent')}
+                      </button>
+                      <div className="rb-menu-sep" />
+                      <button
+                        onClick={() => {
+                          setRecordOpen(false)
+                          onClearNarration(false)
+                        }}
+                      >
+                        {t('ribbonClearNarrationCurrent')}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRecordOpen(false)
+                          onClearNarration(true)
+                        }}
+                      >
+                        {t('ribbonClearNarrationAll')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </Group>
           </>
         ) : tab === 'review' ? (

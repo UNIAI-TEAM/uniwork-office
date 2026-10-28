@@ -7,9 +7,11 @@ import {
   ensureBuiltinLayout,
   getSections,
   normalizeSections,
+  getSlideAdvanceTime,
   getSlideAnimations,
   getSlideTransition,
   listSlideLayouts,
+  narrationSpids,
   openPptx,
   shouldOfferBuiltinLayouts,
 } from '@genoffice/pptx-engine'
@@ -26,6 +28,7 @@ import type {
   MoveSlidesOp,
   RemoveSectionSlidesOp,
   OpenResult,
+  SaveRecordingOp,
   SetAdvanceTimesOp,
   SetAnimationsOp,
   SetSlideHiddenOp,
@@ -34,6 +37,7 @@ import type {
   SetSlideSizeOp,
   SetTransitionOp,
   ShapeKey,
+  ShowTiming,
 } from '../../shared/ipc'
 import type { HandlerContext } from '../host-io'
 import { buildAllRenderSlides, deckDefaultFont, rebuildSlide } from '../render'
@@ -239,6 +243,18 @@ export const slideHandlers = {
     return slide ? getSlideTransition(slide) : 'none'
   },
 
+  'slides:get-show-timing': (ctx: HandlerContext, slideIndex: number): ShowTiming => {
+    const slide = sessions.get(ctx.clientId)?.opened.deck.slides[slideIndex]
+    if (!slide) return { advanceMs: null, narrationIds: [] }
+    const narration = new Set(narrationSpids(slide))
+    return {
+      advanceMs: getSlideAdvanceTime(slide),
+      narrationIds: slide.elements
+        .filter((el) => narration.has(elementSpid(el) ?? -1))
+        .map((el) => el.id),
+    }
+  },
+
   // Rehearsal timing save: batch-write each page's auto-advance time (<p:transition advTm>, ms)
   'slides:set-advance-times': (ctx: HandlerContext, op: SetAdvanceTimesOp) => {
     const session = sessions.get(ctx.clientId)
@@ -254,6 +270,44 @@ export const slideHandlers = {
       })),
     })
     return r !== null
+  },
+
+  // ── Slide Show > Record: narration per slide plus its advance time, one undo step ──
+  'slides:save-recording': (ctx: HandlerContext, op: SaveRecordingOp) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session) return null
+    const slides = session.opened.deck.slides
+    const recorded = op.slides.filter((s) => slides[s.slideIndex])
+    if (recorded.length === 0) return null
+    const r = sessionTxn(session, {
+      ops: recorded.flatMap((s) => [
+        {
+          op: 'addNarration' as const,
+          target: { slide: s.slideIndex },
+          bytes: s.wavBase64,
+          ext: 'wav',
+          durationMs: s.durationMs,
+        },
+        { op: 'setAdvanceTime' as const, target: { slide: s.slideIndex }, ms: s.advanceMs },
+      ]),
+    })
+    return r ? slides.map((_, i) => rebuildSlide(session, i)) : null
+  },
+
+  'slides:clear-narration': (ctx: HandlerContext, slideIndexes: number[]) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session) return null
+    const slides = session.opened.deck.slides
+    const targets = slideIndexes.filter((i) => slides[i] && narrationSpids(slides[i]).length > 0)
+    if (targets.length === 0) return null
+    const r = sessionTxn(session, {
+      ops: targets.map((i) => ({ op: 'clearNarration' as const, target: { slide: i } })),
+    })
+    return r ? slides.map((_, i) => rebuildSlide(session, i)) : null
+  },
+
+  'slides:microphone-access': async (ctx: HandlerContext) => {
+    return ctx.host.microphoneAccess ? ctx.host.microphoneAccess() : true
   },
 
   // ── Shape animations (<p:timing>; the spid <-> temporary element id mapping happens here) ──

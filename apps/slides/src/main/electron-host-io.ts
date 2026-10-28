@@ -5,7 +5,7 @@
  * list, drafts folder and recovery-copy bookkeeping stay with slides-main, which
  * passes them in as `files`.
  */
-import { clipboard, dialog, nativeImage } from 'electron'
+import { clipboard, dialog, nativeImage, systemPreferences } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { savePptxToFile } from '@genoffice/pptx-engine'
 import { convertedDocumentFor, showOpenDialogWithMemory } from '@genoffice/electron-utils'
@@ -150,5 +150,10 @@ export function createElectronHostIO(files: ElectronFileHooks): HostIO {
     isLocked: (path) => uniworkIsLocked(path),
     saveGate: files.saveGate,
     userSaved: files.userSaved,
+    microphoneAccess: async () => {
+      if (process.platform !== 'darwin') return true
+      if (systemPreferences.getMediaAccessStatus('microphone') === 'granted') return true
+      return systemPreferences.askForMediaAccess('microphone')
+    },
   }
 }

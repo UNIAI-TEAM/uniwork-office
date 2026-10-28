@@ -24,6 +24,7 @@ export const SLIDES_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object
   fontInstallLocal: false,
   presenterWindow: true,
   model3d: false,
+  slideRecord: false,
   headlessExport: false,
   // the host's "Open in desktop app" flow (A7 contract, `app.open`): on with the host's grant; the
   // "use the app" notes show their action only then
