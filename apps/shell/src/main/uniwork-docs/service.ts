@@ -4180,6 +4180,7 @@ export class UniworkDocsService {
       this.workspaceMemberNames.clear()
       this.workspaceMemberNamesInFlight.clear()
       this.workspaceMemberNamesOrg = orgId
+      this.avatarCache.clear()
     }
     if (changed && orgId && this.deps.identity()) {
       void this.limitsCache.refresh().catch(() => undefined)
@@ -4821,7 +4822,15 @@ export class UniworkDocsService {
         Math.max(1, Math.floor(Number(query.limit) || SHARED_PAGE_SIZE)),
       )
       const offset = parseOffsetCursor(query.cursor)
-      const slice = await this.avatarCache.resolveRows(all.slice(offset, offset + limit))
+      const pageRows = all.slice(offset, offset + limit)
+      const slice = this.avatarCache.materializeRows(pageRows)
+      const workspaceIds = [
+        ...new Set([
+          ...workspaces.map((ws) => ws.id),
+          ...pageRows.map((doc) => doc.workspaceId).filter(Boolean),
+        ]),
+      ]
+      this.warmAvatarsInBackground(pageRows, workspaceIds)
       const next = offset + limit < all.length ? `shared:${offset + limit}` : null
       return { documents: slice, nextCursor: next }
     })
@@ -6709,12 +6718,14 @@ export class UniworkDocsService {
       this.workspaceMemberNames.clear()
       this.workspaceMemberNamesInFlight.clear()
       this.workspaceMemberNamesOrg = null
+      this.avatarCache.clear()
     }
     this.sessionAccountKey = accountKey
     const orgId = this.deps.selectedOrg()?.id ?? null
     if (this.workspaceMemberNamesOrg !== null && this.workspaceMemberNamesOrg !== orgId) {
       this.workspaceMemberNames.clear()
       this.workspaceMemberNamesInFlight.clear()
+      this.avatarCache.clear()
     }
     this.workspaceMemberNamesOrg = orgId
     const cached = this.workspaceMemberNames.get(workspaceId)
@@ -6768,14 +6779,39 @@ export class UniworkDocsService {
     }
   }
 
+  /**
+   * UNI-2275 R2-1: warm missing avatars in the background and emit ONE
+   * session-fenced `pushTreeChangedFor` per affected workspace only when at
+   * least one new `data:` URL actually entered the cache.
+   */
+  private warmAvatarsInBackground(
+    rows: readonly UniworkDocSummary[],
+    workspaceIds: readonly string[],
+  ): void {
+    const session = this.captureActionSessionOrNull()
+    void this.avatarCache
+      .warmRows(rows)
+      .then((changed) => {
+        if (!changed || !session) return
+        for (const wsId of workspaceIds) {
+          if (!wsId) continue
+          try {
+            this.pushTreeChangedFor(session, wsId)
+          } catch {
+            // a callback error never rejects into an unhandled promise
+          }
+        }
+      })
+      .catch(() => undefined)
+  }
+
   private async enrichWorkspaceRows(
     workspaceId: string,
     rows: UniworkDocSummary[],
   ): Promise<UniworkDocSummary[]> {
-    const [names, withAvatars] = await Promise.all([
-      this.memberNamesForWorkspace(workspaceId),
-      this.avatarCache.resolveRows(rows),
-    ])
+    const names = await this.memberNamesForWorkspace(workspaceId)
+    const withAvatars = this.avatarCache.materializeRows(rows)
+    this.warmAvatarsInBackground(rows, [workspaceId])
     if (names.size === 0) return withAvatars
     return withAvatars.map((row) => {
       const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
@@ -6971,10 +7007,9 @@ export class UniworkDocsService {
     workspaceId: string,
     rows: UniworkDocSummary[],
   ): Promise<UniworkDocSummary[]> {
-    const [names, withAvatars] = await Promise.all([
-      this.memberNamesForWorkspace(workspaceId),
-      this.avatarCache.resolveRows(rows),
-    ])
+    const names = await this.memberNamesForWorkspace(workspaceId)
+    const withAvatars = this.avatarCache.materializeRows(rows)
+    this.warmAvatarsInBackground(rows, [workspaceId])
     if (names.size === 0) return withAvatars
     return withAvatars.map((row) => {
       const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined

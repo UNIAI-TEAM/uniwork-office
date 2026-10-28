@@ -2,31 +2,50 @@ import type { UniworkDocSummary } from '../../shared/home-api'
 import type { FetchLike } from './client'
 
 /**
- * UNI-2275 R1-1: Main-process avatar fetcher for `updated_by_user.avatar_url`.
+ * UNI-2275 R1-1 / R2-1..R2-4: Main-process avatar fetcher for `updated_by_user.avatar_url`.
  *
  * Fetches an editor's avatar in main so the shell renderer keeps its strict
  * `img-src 'self' data: blob:` CSP and never receives or requests raw
  * presigned storage URLs directly.
  *
- * Security invariants:
- * - Only `https:` URLs (without embedded credentials) are accepted; redirects
- *   are handled manually (at most 2 hops, every hop validated as `https:`).
+ * Trust model & security invariants:
+ * - The avatar URL comes from the authenticated UniWork deployment (presigned
+ *   storage URLs or Google photo URLs). There is no private-address policy, by
+ *   design, under that trusted-deployment threat model; normal TLS validation
+ *   applies and main fetching is not a network sandbox.
+ * - Only `https:` URLs (without embedded credentials) are accepted.
+ * - Redirects are not followed: avatar URLs are direct presigned storage URLs
+ *   or Google photo URLs, so a redirect is not expected. Any 3xx response or
+ *   transport redirect rejection (`redirect: 'manual'`) resolves to `null` and
+ *   falls back to initials (fail closed).
  * - Credentials omitted, no Referer, cache bypassed on the wire, short timeout.
- * - Body stream capped at 2 MiB (`2 << 20`, matching the server's `MaxBytes`).
- * - Magic-byte sniffing accepts only PNG, JPEG, GIF, and WebP; SVG, HTML, and
- *   all other payloads are refused regardless of `Content-Type`.
+ * - Body stream capped at 2 MiB (`2 << 20`, matching the server's `MaxBytes`),
+ *   plus a 256 KiB display cap (`AVATAR_DISPLAY_MAX_BYTES`) so oversized rows
+ *   fall back to initials rather than duplicating multi-megabyte `data:` URLs
+ *   across IPC and React props.
+ * - Magic-byte sniffing accepts only PNG, JPEG, GIF, and WebP (raster MIME
+ *   containment under `<img>`; not a polyglot sanitizer); SVG, HTML, and all
+ *   other prefixes are refused regardless of `Content-Type`.
  * - Cached in memory by `origin + pathname` (ignoring rotating presigned query
- *   signatures) with a TTL under 12 hours, and in-flight requests are deduped
- *   per cache key.
- * - Any error or refusal resolves to `null` so the row falls back to initials
- *   and never fails the document list.
+ *   signatures) with a TTL under 12 hours, brief 5-minute negative caching per
+ *   key on failure so a dead host is not refetched on every list load (while a
+ *   changed URL path still fetches), and in-flight requests are deduped per
+ *   cache key.
+ * - `clear()` increments a cache generation and aborts in-flight requests so
+ *   outgoing account/deployment completions never seed or delete the next
+ *   session's entries.
+ * - List delivery never waits for network fetches: `materializeRows` reads only
+ *   cached `data:` URLs synchronously, while `warmRows` populates missing keys
+ *   in the background and reports whether any new `data:` URL entered the cache.
  */
 
 export const AVATAR_MAX_BYTES = 2 * 1024 * 1024
-export const AVATAR_MAX_REDIRECTS = 2
+export const AVATAR_DISPLAY_MAX_BYTES = 256 * 1024
 export const AVATAR_TIMEOUT_MS = 5_000
 /** 6 hours (< 12 h server presign window) */
 export const AVATAR_CACHE_TTL_MS = 6 * 60 * 60_000
+/** 5 minutes negative cache per key on failure */
+export const AVATAR_NEGATIVE_TTL_MS = 5 * 60_000
 const AVATAR_CACHE_MAX_ENTRIES = 500
 
 export interface AvatarCacheOptions {
@@ -34,13 +53,16 @@ export interface AvatarCacheOptions {
   now?: () => number
   timeoutMs?: number
   ttlMs?: number
+  negativeTtlMs?: number
   maxBytes?: number
-  maxRedirects?: number
+  displayMaxBytes?: number
 }
 
 export interface AvatarCache {
   resolveUrl(rawUrl: string): Promise<string | null>
   resolveRows(rows: readonly UniworkDocSummary[]): Promise<UniworkDocSummary[]>
+  materializeRows(rows: readonly UniworkDocSummary[]): UniworkDocSummary[]
+  warmRows(rows: readonly UniworkDocSummary[]): Promise<boolean>
   clear(): void
 }
 
@@ -62,10 +84,13 @@ export function avatarCacheKey(raw: string): string | null {
 }
 
 /**
- * Sniffs PNG, JPEG, GIF, or WebP magic bytes from the start of the payload.
+ * Sniffs PNG, JPEG, GIF, or WebP magic bytes from the start of the payload
+ * (raster MIME containment under `<img>`; not a polyglot sanitizer).
  * Returns the canonical MIME type, or `null` for SVG, HTML, or any other bytes.
  */
-export function sniffAvatarMime(bytes: Uint8Array): 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp' | null {
+export function sniffAvatarMime(
+  bytes: Uint8Array,
+): 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp' | null {
   if (bytes.byteLength < 12) return null
   // PNG: 89 50 4E 47 0D 0A 1A 0A
   if (
@@ -163,72 +188,79 @@ export function createAvatarCache(options: AvatarCacheOptions = {}): AvatarCache
   const now = options.now ?? (() => Date.now())
   const timeoutMs = options.timeoutMs ?? AVATAR_TIMEOUT_MS
   const ttlMs = Math.min(options.ttlMs ?? AVATAR_CACHE_TTL_MS, 12 * 60 * 60_000 - 1)
+  const negativeTtlMs = options.negativeTtlMs ?? AVATAR_NEGATIVE_TTL_MS
   const maxBytes = options.maxBytes ?? AVATAR_MAX_BYTES
-  const maxRedirects = options.maxRedirects ?? AVATAR_MAX_REDIRECTS
+  const displayMaxBytes = options.displayMaxBytes ?? AVATAR_DISPLAY_MAX_BYTES
+  const effectiveByteCap = Math.min(maxBytes, displayMaxBytes)
 
   const entries = new Map<string, { dataUrl: string; expiresAt: number }>()
-  const inFlight = new Map<string, Promise<string | null>>()
+  const failures = new Map<string, number>()
+  const inFlight = new Map<
+    string,
+    { generation: number; controller: AbortController; promise: Promise<string | null> }
+  >()
+  let generation = 0
 
-  async function fetchDataUrl(initialUrl: URL): Promise<string | null> {
-    const controller = new AbortController()
+  async function fetchDataUrl(
+    initialUrl: URL,
+    controller: AbortController,
+  ): Promise<string | null> {
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     try {
-      let current = initialUrl
-      for (let hop = 0; hop <= maxRedirects; hop += 1) {
-        if (controller.signal.aborted) return null
-        let response: Response
-        try {
-          response = await fetchImpl(current.toString(), {
-            method: 'GET',
-            credentials: 'omit',
-            referrerPolicy: 'no-referrer',
-            referrer: '',
-            redirect: 'manual',
-            cache: 'no-store',
-            headers: {
-              Accept: 'image/png, image/jpeg, image/gif, image/webp',
-            },
-            signal: controller.signal,
-          })
-        } catch {
-          return null
-        }
-        if (response.status >= 300 && response.status < 400) {
-          void response.body?.cancel().catch(() => undefined)
-          if (hop >= maxRedirects) return null
-          const location = response.headers.get('Location')
-          if (!location) return null
-          let target: URL
-          try {
-            target = new URL(location, current)
-          } catch {
-            return null
-          }
-          const validated = parseHttpsUrl(target.toString())
-          if (!validated) return null
-          current = validated
-          continue
-        }
-        if (response.redirected) {
-          if (!response.url || !parseHttpsUrl(response.url)) {
-            void response.body?.cancel().catch(() => undefined)
-            return null
-          }
-        }
-        if (response.status !== 200) {
-          void response.body?.cancel().catch(() => undefined)
-          return null
-        }
-        const bytes = await readCappedBytes(response, maxBytes, controller.signal)
-        if (!bytes) return null
-        const mime = sniffAvatarMime(bytes)
-        if (!mime) return null
-        return `data:${mime};base64,${Buffer.from(bytes).toString('base64')}`
+      if (controller.signal.aborted) return null
+      let response: Response
+      try {
+        response = await fetchImpl(initialUrl.toString(), {
+          method: 'GET',
+          credentials: 'omit',
+          referrerPolicy: 'no-referrer',
+          referrer: '',
+          redirect: 'manual',
+          cache: 'no-store',
+          headers: {
+            Accept: 'image/png, image/jpeg, image/gif, image/webp',
+          },
+          signal: controller.signal,
+        })
+      } catch {
+        return null
       }
-      return null
+      // Redirects are not expected for direct presigned storage or Google avatar URLs:
+      // fail closed on any 3xx or transparently redirected response.
+      if ((response.status >= 300 && response.status < 400) || response.redirected) {
+        void response.body?.cancel().catch(() => undefined)
+        return null
+      }
+      if (response.status !== 200) {
+        void response.body?.cancel().catch(() => undefined)
+        return null
+      }
+      const bytes = await readCappedBytes(response, effectiveByteCap, controller.signal)
+      if (!bytes) return null
+      const mime = sniffAvatarMime(bytes)
+      if (!mime) return null
+      return `data:${mime};base64,${Buffer.from(bytes).toString('base64')}`
     } finally {
       clearTimeout(timer)
     }
+  }
+
+  function getCachedDataUrl(rawUrl: string, ts = now()): string | null {
+    const key = avatarCacheKey(rawUrl)
+    if (!key) return null
+    const hit = entries.get(key)
+    if (!hit) return null
+    if (ts < hit.expiresAt) return hit.dataUrl
+    entries.delete(key)
+    return null
+  }
+
+  function setBounded<V>(map: Map<string, V>, key: string, value: V): void {
+    if (!map.has(key) && map.size >= AVATAR_CACHE_MAX_ENTRIES) {
+      const oldest = map.keys().next().value
+      if (oldest !== undefined) map.delete(oldest)
+    }
+    map.set(key, value)
   }
 
   function resolveUrl(rawUrl: string): Promise<string | null> {
@@ -241,28 +273,39 @@ export function createAvatarCache(options: AvatarCacheOptions = {}): AvatarCache
       if (ts < hit.expiresAt) return Promise.resolve(hit.dataUrl)
       entries.delete(key)
     }
+    const failedUntil = failures.get(key)
+    if (failedUntil !== undefined) {
+      if (ts < failedUntil) return Promise.resolve(null)
+      failures.delete(key)
+    }
     const existing = inFlight.get(key)
-    if (existing) return existing
-    const task = fetchDataUrl(parsed)
+    if (existing && existing.generation === generation) return existing.promise
+
+    const myGen = generation
+    const controller = new AbortController()
+    const promise = fetchDataUrl(parsed, controller)
       .then((dataUrl) => {
+        if (generation !== myGen) return null
         if (dataUrl) {
-          if (entries.size >= AVATAR_CACHE_MAX_ENTRIES) {
-            const oldest = entries.keys().next().value
-            if (oldest !== undefined) entries.delete(oldest)
-          }
-          entries.set(key, { dataUrl, expiresAt: now() + ttlMs })
+          failures.delete(key)
+          setBounded(entries, key, { dataUrl, expiresAt: now() + ttlMs })
+        } else if (negativeTtlMs > 0) {
+          setBounded(failures, key, now() + negativeTtlMs)
         }
         return dataUrl
       })
       .catch(() => null)
       .finally(() => {
-        inFlight.delete(key)
+        const current = inFlight.get(key)
+        if (current && current.promise === promise && current.generation === myGen) {
+          inFlight.delete(key)
+        }
       })
-    inFlight.set(key, task)
-    return task
+    inFlight.set(key, { generation: myGen, controller, promise })
+    return promise
   }
 
-  async function resolveRows(rows: readonly UniworkDocSummary[]): Promise<UniworkDocSummary[]> {
+  function materializeRows(rows: readonly UniworkDocSummary[]): UniworkDocSummary[] {
     let anyWithAvatar = false
     for (const row of rows) {
       if (row.updatedByUser?.avatarUrl) {
@@ -271,26 +314,11 @@ export function createAvatarCache(options: AvatarCacheOptions = {}): AvatarCache
       }
     }
     if (!anyWithAvatar) return rows as UniworkDocSummary[]
-
-    // Deduplicate per cache key across the page so each unique editor is fetched once
-    const byRawUrl = new Map<string, Promise<string | null>>()
-    for (const row of rows) {
-      const raw = row.updatedByUser?.avatarUrl
-      if (raw && !byRawUrl.has(raw)) {
-        byRawUrl.set(raw, resolveUrl(raw))
-      }
-    }
-    const resolved = new Map<string, string | null>()
-    await Promise.all(
-      [...byRawUrl.entries()].map(async ([raw, promise]) => {
-        resolved.set(raw, await promise)
-      }),
-    )
-
+    const ts = now()
     return rows.map((row) => {
       const user = row.updatedByUser
       if (!user?.avatarUrl) return row
-      const dataUrl = resolved.get(user.avatarUrl) ?? null
+      const dataUrl = getCachedDataUrl(user.avatarUrl, ts)
       return {
         ...row,
         updatedByUser: dataUrl ? { name: user.name, avatarUrl: dataUrl } : { name: user.name },
@@ -298,14 +326,54 @@ export function createAvatarCache(options: AvatarCacheOptions = {}): AvatarCache
     })
   }
 
+  async function warmRows(rows: readonly UniworkDocSummary[]): Promise<boolean> {
+    const ts = now()
+    const missingByKey = new Map<string, string>()
+    for (const row of rows) {
+      const raw = row.updatedByUser?.avatarUrl
+      if (!raw) continue
+      const key = avatarCacheKey(raw)
+      if (!key || missingByKey.has(key)) continue
+      const hit = entries.get(key)
+      if (hit && ts < hit.expiresAt) continue
+      const failedUntil = failures.get(key)
+      if (failedUntil !== undefined && ts < failedUntil) continue
+      const existing = inFlight.get(key)
+      if (existing && existing.generation === generation) continue
+      missingByKey.set(key, raw)
+    }
+    if (missingByKey.size === 0) return false
+    const myGen = generation
+    const results = await Promise.all([...missingByKey.values()].map((raw) => resolveUrl(raw)))
+    if (generation !== myGen) return false
+    return results.some((dataUrl) => dataUrl !== null)
+  }
+
+  async function resolveRows(rows: readonly UniworkDocSummary[]): Promise<UniworkDocSummary[]> {
+    const urls = new Set<string>()
+    for (const row of rows) {
+      const raw = row.updatedByUser?.avatarUrl
+      if (raw) urls.add(raw)
+    }
+    await Promise.all([...urls].map((raw) => resolveUrl(raw)))
+    return materializeRows(rows)
+  }
+
   function clear(): void {
-    entries.clear()
+    generation += 1
+    for (const task of inFlight.values()) {
+      task.controller.abort()
+    }
     inFlight.clear()
+    entries.clear()
+    failures.clear()
   }
 
   return {
     resolveUrl,
     resolveRows,
+    materializeRows,
+    warmRows,
     clear,
   }
 }
