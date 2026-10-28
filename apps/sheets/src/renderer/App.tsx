@@ -5706,6 +5706,7 @@ export function App({
         req,
         univerRef.current?.univerAPI.getActiveWorkbook(),
         lazyWorkbookRef.current !== null,
+        redactionIndexRef.current ?? NO_REDACTIONS,
       )
   })
 

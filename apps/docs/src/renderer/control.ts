@@ -1,5 +1,6 @@
 import type { Editor } from '@tiptap/core'
 import { navigateToBlock } from './ai/doc-nav'
+import { redactTextBetween, type RedactableNode } from './ai/redact-view'
 
 /** Request/reply the shell relays from `genoffice open --block` and `genoffice selection`. */
 export type ControlRequest =
@@ -31,7 +32,7 @@ export function handleDocsControl(
       status: 'ok',
       result: {
         blocks: [first, Math.max(first, last)],
-        text: empty ? '' : doc.textBetween(from, to, '\n'),
+        text: empty ? '' : redactTextBetween(editor.getJSON() as RedactableNode, from, to, '\n'),
         collapsed: empty,
       },
     }
