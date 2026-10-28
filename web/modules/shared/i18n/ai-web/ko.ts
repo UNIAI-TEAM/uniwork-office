@@ -56,4 +56,7 @@ export const ko = {
   // U-02 catalogue S10: workbook over the web AI size limit
   aiErrWorkbookTooLarge:
     '이 통합 문서는 너무 커서 웹에서 AI를 사용할 수 없습니다. UniWork Office 앱에서 여세요.',
+
+  // UNI-2264: the next turn of a job handed over from UniWork (ai.start)
+  aiHandoffContinue: '다음 부분을 이어서 진행하세요.',
 } satisfies Record<keyof typeof zh, string>

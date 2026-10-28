@@ -15,6 +15,7 @@ import { AiHighlight } from './aiHighlight'
 import { AiRunHistory } from './aiRunHistory'
 import { AiQueueAnchors } from './aiQueueAnchors'
 import { InactiveSelection } from './inactiveSelection'
+import { Highlight } from './highlight'
 import { SearchHighlight } from './searchHighlight'
 import { buildMathExtensions } from './math'
 import { RawHtmlBlock, RawHtmlInline } from './rawHtml'
@@ -43,6 +44,7 @@ import { WikiLink, WikiLinkResolve } from './wikilink'
 import { WikiMarkOnInput } from './wikilinkInput'
 import type { WikiLinkOptions } from './wikilink'
 import type { SlashController, SlashItem } from './slashCommand'
+import { FootnoteDefinition, FootnoteNav, FootnoteReference } from './footnote'
 import { t } from '../i18n/locale'
 
 export interface BuildExtensionsOptions {
@@ -137,6 +139,8 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     // raw HTML / comments survive open → save byte-identically
     RawHtmlBlock,
     RawHtmlInline,
+    // ==highlight== (Obsidian's text highlight)
+    Highlight,
     // text the reader withholds from the model: the words stay in the document
     // and in the file, and only the model-facing view replaces them
     Redaction,
@@ -145,6 +149,10 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     ImageAwareLink.configure({ openOnClick: false }),
     WikiLink,
     WikiMarkOnInput,
+    // GFM footnotes: `[^1]` references and `[^1]: text` definitions (see footnote.ts)
+    FootnoteDefinition,
+    FootnoteReference,
+    FootnoteNav,
     WikiLinkResolve.configure(options.wikiLink ?? {}),
     BlockDragHandle,
     BlockKeymap,

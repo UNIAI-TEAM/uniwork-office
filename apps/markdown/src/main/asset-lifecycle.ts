@@ -427,9 +427,10 @@ function isPathInside(root: string, candidate: string): boolean {
 export async function resolveSafeRelativeImagePath(
   documentPath: string,
   source: string,
+  options?: { decoded?: boolean },
 ): Promise<string | null> {
-  const decoded = decodeLocalSource(source)
-  if (!decoded) return null
+  const decoded = options?.decoded ? source : decodeLocalSource(source)
+  if (!decoded || decoded.includes('\0')) return null
   const documentDir = dirname(resolve(documentPath))
   const candidate = resolve(documentDir, decoded.replace(/[\\/]/g, sep))
   if (!isPathInside(documentDir, candidate)) return null

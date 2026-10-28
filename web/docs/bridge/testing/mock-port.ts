@@ -179,6 +179,7 @@ export function createMockPort(session: Partial<PortSession> = {}) {
     handlePrint: (h) => ((handlers.print = h as never), () => {}),
     handleCloseCheck: (h) => ((handlers['doc.closeCheck'] = h as never), () => {}),
     handleDownload: (h) => ((handlers['doc.download'] = h as never), () => {}),
+    handleAiStart: (h) => ((handlers['ai.start'] = h as never), () => {}),
     onFileRenamed: (l) => (renameListeners.push(l), () => {}),
     onRemoteVersion: (l) => (remoteListeners.push(l), () => {}),
     onBlocked: (l) => (blockedListeners.push(l), () => {}),

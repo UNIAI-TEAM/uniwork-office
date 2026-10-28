@@ -58,4 +58,7 @@ export const nl = {
   // U-02 catalogue S10: workbook over the web AI size limit
   aiErrWorkbookTooLarge:
     'Deze werkmap is te groot voor AI op het web. Open hem in de UniWork Office-app.',
+
+  // UNI-2264: the next turn of a job handed over from UniWork (ai.start)
+  aiHandoffContinue: 'Ga verder met het volgende deel.',
 } satisfies Record<keyof typeof zh, string>

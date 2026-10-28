@@ -555,6 +555,7 @@ describe('print and hidden members', () => {
     expect(await s.api.ocrPage('x')).toBeNull()
     expect(await s.api.autoRename('p', 'n')).toEqual({ renamed: false })
     expect(await s.api.isUntitled('p')).toBe(false)
+    // the off answer: while AI is on, withWebAi hands over the ai.start presets instead
     expect(await s.api.consumeAiPreset()).toBeNull()
     expect(typeof s.api.onAiPreset(() => {})).toBe('function')
     expect((await s.api.createDocument({} as never)).ok).toBe(false)

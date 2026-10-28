@@ -647,6 +647,10 @@ export function App({
     text: string
     nonce: number
     autoRun?: boolean
+    /** the bubble's words when they differ from what is sent (`text`) */
+    displayText?: string
+    /** a web host's job (`ai.start`): it runs only while the panel is on UniWork AI */
+    uniworkOnly?: boolean
   } | null>(null)
   const [preview, setPreview] = useState<ChangePlan | null>(null)
   const [_revision, setRevision] = useState(0)
@@ -2135,22 +2139,23 @@ export function App({
       // a reloaded tab whose path is gone: say so now instead of waiting
       else if (action === 'stalled') setOpenStalled(true)
     })
-    void window.desktopApi?.consumeAiPreset?.().then((preset) => {
+    // the boot read and the live subscription start in the same tick, so a preset in between is
+    // never lost; the shell runs it once the workbook has opened. A web host's job (`ai.start`,
+    // UNI-2264) runs only on UniWork AI
+    const takeAiPreset = (
+      preset: { text: string; autoRun?: boolean; displayText?: string } | null,
+    ): void => {
       if (!preset?.text) return
       setAiPreset({
         text: preset.text,
         nonce: Date.now(),
         autoRun: preset.autoRun !== false,
+        ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        ...(platform() === 'web' ? { uniworkOnly: true } : {}),
       })
-    })
-    const offAiPreset = window.desktopApi?.onAiPreset?.((preset) => {
-      if (!preset?.text) return
-      setAiPreset({
-        text: preset.text,
-        nonce: Date.now(),
-        autoRun: preset.autoRun !== false,
-      })
-    })
+    }
+    void window.desktopApi?.consumeAiPreset?.().then(takeAiPreset)
+    const offAiPreset = window.desktopApi?.onAiPreset?.(takeAiPreset)
     // Univer 0.25.1 also badges text parseable as date/time, phone numbers, and
     // other long numeric identifiers with "Number stored as text". Those values
     // should remain text, so clear the view type before the built-in marker
@@ -3678,16 +3683,24 @@ export function App({
     overrideInstruction?: string,
     overrideAttachments?: readonly AttachmentMeta[],
     retryIndex?: number,
+    /** the bubble's words when they differ from the sent instruction (a preset, its Retry) */
+    displayText?: string,
   ): boolean {
     const instruction = (overrideInstruction ?? prompt).trim()
     if (needModelHint !== null || !instruction || aiBusy) return false
+    // nothing can run before the AI settings are read (the regex planner would answer a question
+    // meant for the model), nor while the loop is busy or a run is still starting: the caller keeps
+    // the text (a preset waits in the composer)
+    if (!aiSettingsRef.current) return false
+    const agentConfigured = isAgentConfigured()
+    const loop = agentLoopRef.current
+    if (agentConfigured && (!loop || loop.busy || runStartingRef.current)) return false
     runToolsRef.current = []
     runUsageRef.current = undefined
     // The message consumes the composer attachments: they ride along (echoed on the
     // bubble, images multimodal, files via the files skill) and the composer clears.
     // Retry passes the failed message's original set instead.
     const sentAtts = overrideAttachments ?? attachmentsRef.current
-    const agentConfigured = isAgentConfigured()
     // Retry re-sends in place: drop the failed bubble and its error reply instead
     // of stacking a "Not sent" duplicate above the resent copy.
     const alreadyPersisted = retryIndex !== undefined && chat[retryIndex]?.persisted === true
@@ -3706,9 +3719,11 @@ export function App({
           : undefined
     const persisted =
       alreadyPersisted || persistChatMessage('user', instruction, undefined, sentAtts, scope)
+    const shown = displayText?.trim() || instruction
     appendChat({
       role: 'user',
-      text: instruction,
+      text: shown,
+      ...(shown !== instruction ? { instruction } : {}),
       tools: [],
       persisted,
       ...(sentAtts.length > 0 ? { attachments: sentAtts } : {}),

@@ -1162,7 +1162,11 @@ describe('hidden and browser features', () => {
     expect(prompts).toEqual([])
     expect(await t.desktop.selectWorkbooksForMerge()).toBeNull()
     expect(await t.desktop.autoRenameWorkbook('s', 'x')).toEqual({ renamed: false })
+    // AI is off here: the module's stub answers and a job handed over with ai.start is refused
     expect(await t.desktop.consumeAiPreset()).toBeNull()
+    await expect(t.mock.host['ai.start']({ handoffId: 'h1', text: 'Draft' })).rejects.toMatchObject(
+      { code: 'unsupported' },
+    )
     expect(t.desktop.getPathForFile({} as File)).toBe('')
     expect(withExt('A.xlsm', '.csv')).toBe('A.csv')
   })
