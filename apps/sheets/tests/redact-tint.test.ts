@@ -90,7 +90,10 @@ describe('painting a mark', () => {
     const range = {
       getCellStyleData: () => ({}),
       getRange: () => ({ startRow: 1, endRow: 2, startColumn: 1, endColumn: 1 }),
-      getCellDataGrid: () => [[{ ...cellB2 }], [{ ...cellB3 }]],
+      // Univer's real FRange.getCellDataGrid() returns the live getCellRaw(r, c)
+      // object references from the cell matrix (NOT shallow clones), which
+      // mergeCellData then mutates in-place during setBackground / set-style.
+      getCellDataGrid: () => [[cellB2], [cellB3]],
       _worksheet: {
         getCellMatrix: () => ({
           getValue: (r: number, c: number) => matrix[`${r}:${c}`],
@@ -204,7 +207,8 @@ describe('clearing a mark', () => {
     const range = {
       getCellStyleData: () => ({ bg: { rgb: MARK_FILL } }),
       getRange: () => ({ startRow: 4, endRow: 4, startColumn: 1, endColumn: 1 }),
-      getCellDataGrid: () => [[{ ...cell }]],
+      // Real FRange.getCellDataGrid() returns the live cell reference.
+      getCellDataGrid: () => [[cell]],
       _worksheet: {
         getCellMatrix: () => ({
           getValue: (r: number, c: number) => (r === 4 && c === 1 ? cell : undefined),

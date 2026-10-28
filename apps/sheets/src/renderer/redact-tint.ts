@@ -92,23 +92,37 @@ interface FacadeRangeWithWorksheet {
 function setBackgroundPreservingStrings(range: FacadeRange, applyFill: () => void): void {
   const rawGrid = typeof range.getCellDataGrid === 'function' ? range.getCellDataGrid() : null
   const bounds = typeof range.getRange === 'function' ? range.getRange() : null
+  // `getCellDataGrid()` returns live `ICellData` references from `getCellRaw`,
+  // which `mergeCellData` mutates in-place (`oldValue.t = NUMBER; oldValue.v = Number(v)`).
+  // Snapshot `{ r, c, v }` as primitive values BEFORE `applyFill()` runs.
+  const savedStrings: Array<{ r: number; c: number; v: string }> = []
+  if (rawGrid && bounds) {
+    for (let r = 0; r < rawGrid.length; r += 1) {
+      const row = rawGrid[r]
+      if (!row) continue
+      for (let c = 0; c < row.length; c += 1) {
+        const before = row[c]
+        if (
+          typeof before?.v === 'string' &&
+          (before.t === CellValueType.STRING || before.t === undefined)
+        ) {
+          savedStrings.push({ r, c, v: before.v })
+        }
+      }
+    }
+  }
   // FRange holds the core Worksheet on `_worksheet` (protected in its d.ts).
   const rangeWithSheet = range as unknown as FacadeRangeWithWorksheet
   applyFill()
-  if (!rawGrid || !bounds) return
+  if (!bounds || savedStrings.length === 0) return
   const matrix = rangeWithSheet._worksheet?.getCellMatrix?.()
-  if (!matrix) return
-  for (let r = 0; r < rawGrid.length; r += 1) {
-    const row = rawGrid[r]
-    if (!row) continue
-    for (let c = 0; c < row.length; c += 1) {
-      const before = row[c]
-      if (before?.t !== CellValueType.STRING || typeof before.v !== 'string') continue
-      const live = matrix.getValue(bounds.startRow + r, bounds.startColumn + c)
-      if (live && (live.t !== CellValueType.STRING || live.v !== before.v)) {
-        live.t = CellValueType.STRING
-        live.v = before.v
-      }
+  for (const { r, c, v } of savedStrings) {
+    const live = matrix
+      ? matrix.getValue(bounds.startRow + r, bounds.startColumn + c)
+      : rawGrid?.[r]?.[c]
+    if (live && (live.t !== CellValueType.STRING || live.v !== v)) {
+      live.t = CellValueType.STRING
+      live.v = v
     }
   }
 }
