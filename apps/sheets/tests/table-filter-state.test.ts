@@ -123,7 +123,8 @@ describe('tableFilterState', () => {
         columns: [{ colId: 1, values: ['East'] }],
       },
       hiddenRows: [2, 4],
-      visibilityRange: { startRow: 1, startColumn: 1, endRow: 5, endColumn: 3 },
+      // Header row included, like a worksheet autoFilter (SH-W4-V8).
+      visibilityRange: { startRow: 0, startColumn: 1, endRow: 5, endColumn: 3 },
     })
   })
 })
@@ -225,7 +226,7 @@ describe('a table filter edit reaches the save (SH-W4-V1) and Clear releases the
       },
       // Everything that is not East: rows 1, 3 (North) and 5 (West).
       hiddenRows: [1, 3, 5],
-      visibilityRange: { startRow: 1, startColumn: 0, endRow: 5, endColumn: 1 },
+      visibilityRange: { startRow: 0, startColumn: 0, endRow: 5, endColumn: 1 },
     })
   })
 

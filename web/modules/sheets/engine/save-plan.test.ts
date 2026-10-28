@@ -305,4 +305,44 @@ describe('save-plan: a table filter edited from the header dropdown (SH-W4-V1)',
     expect(sheet).toContain('<row r="4" hidden="1"')
     expect(sheet).not.toContain('<row r="2" hidden="1"')
   })
+
+  it('writes the first data row as hidden when the filter hides it (SH-W4-V8)', async () => {
+    const source = await tableFixture()
+    const { engine } = memoryEngine(source)
+    // Value >= 25 hides the first data row (R2, 0-based row 1) and keeps R3, R4.
+    const filterState = tableFilterState('sheet-1', {
+      id: 'file-table-sheet-1-0',
+      range: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 1 },
+      columnFilters: [
+        undefined,
+        {
+          filterType: 'condition',
+          filterInfo: {
+            conditionType: 'number',
+            compareType: 'greaterThanOrEqual',
+            expectedValue: 25,
+          },
+        } as never,
+      ],
+      filteredOutRows: [1],
+    })
+    const { data } = await saveWorkbookBytes({
+      engine,
+      sourcePath: '/work/Table.xlsx',
+      sourceBytes: source,
+      workDir: '/tmp/save',
+      save: resolveSaveRequest(
+        new Map([['sheet-1', 'Data']]),
+        request({ filterStates: [filterState] }),
+      ),
+    })
+    const sheet = await (
+      await JSZip.loadAsync(data)
+    )
+      .file('xl/worksheets/sheet1.xml')!
+      .async('text')
+    expect(sheet).toContain('<row r="2" hidden="1"')
+    expect(sheet).not.toContain('<row r="1" hidden="1"')
+    expect(sheet).not.toContain('<row r="3" hidden="1"')
+  })
 })

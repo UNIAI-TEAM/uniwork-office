@@ -121,7 +121,10 @@ export function tableFilterState(sheetId: string, table: TableFilterSource): Wor
     sheetId,
     filter: { range: { startRow, startColumn, endRow, endColumn }, columns },
     hiddenRows: [...table.filteredOutRows].sort((left, right) => left - right),
-    // Data rows only: the header row is never a filter result.
-    visibilityRange: { startRow: startRow + 1, startColumn, endRow, endColumn },
+    // Same convention as a worksheet autoFilter: the filter range including
+    // its header row. The gateway already skips the header when it rewrites
+    // row visibility, so a data-only range here would leave the first data
+    // row untouched (SH-W4-V8).
+    visibilityRange: { startRow, startColumn, endRow, endColumn },
   }
 }
