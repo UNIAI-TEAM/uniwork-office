@@ -226,4 +226,37 @@ describe('session handlers with the in-memory host', () => {
     expect(afterClear).not.toBeNull()
     expect(callSessionHandler('slides:get-show-timing', ctx, 0).narrationIds).toEqual([])
   })
+
+  it('picks, inserts, reads, and turns a 3D model through session handlers', async () => {
+    const host = new MemoryHostIO()
+    const ctx = await openClient(110, host)
+    const glb = base64ToBytes('Z2xURgIAAAAYAAAABAAAAEpTT057fSAg')
+    host.mediaPicks.push({ bytes: glb, name: 'cube', ext: 'glb' })
+    const picked = await callSessionHandler('slides:pick-model3d', ctx)
+    expect(picked).toEqual({ name: 'cube', bytes: glb })
+    const added = callSessionHandler('slides:add-model3d', ctx, {
+      slideIndex: 0,
+      bytes: glb,
+      name: 'cube',
+      posterBase64: bytesToBase64(PNG),
+      aspect: 1.5,
+      fitWidthPx: FIT,
+    })
+    expect(added).not.toBeNull()
+    const data = callSessionHandler('slides:model3d-data', ctx, 0, added!.sourceId)
+    expect(data).toEqual(glb)
+    const turned = callSessionHandler('slides:set-model3d-view', ctx, {
+      slideIndex: 0,
+      sourceId: added!.sourceId,
+      rot: { ax: 60000, ay: -120000, az: 0 },
+      posterBase64: bytesToBase64(PNG),
+    })
+    expect(turned).not.toBeNull()
+    const node = turned!.nodes.find((n) => n.sourceId === added!.sourceId)
+    expect(node && 'model3d' in node ? node.model3d : null).toEqual({
+      ax: 60000,
+      ay: -120000,
+      az: 0,
+    })
+  })
 })

@@ -21,6 +21,8 @@ export default defineConfig({
       '@genoffice/pptx-engine/background-promote': pkg('pptx-engine/src/background-promote.ts'),
       '@genoffice/pptx-engine/custgeom': pkg('pptx-engine/src/custgeom.ts'),
       '@genoffice/pptx-engine/named-action': pkg('pptx-engine/src/named-action.ts'),
+      '@genoffice/pptx-engine/model3d': pkg('pptx-engine/src/model3d.ts'),
+      '@genoffice/pptx-engine/chart-workbook': pkg('pptx-engine/src/chart-workbook.ts'),
       '@genoffice/pptx-engine': pkg('pptx-engine/src/index.ts'),
       '@genoffice/pptx-ops/op-docs': pkg('pptx-ops/src/op-docs.ts'),
       '@genoffice/pptx-ops/font-size': pkg('pptx-ops/src/font-size.ts'),

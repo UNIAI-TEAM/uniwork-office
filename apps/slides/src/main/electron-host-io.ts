@@ -77,7 +77,7 @@ export function createElectronHostIO(files: ElectronFileHooks): HostIO {
               }
             : {
                 title: tm('dlgInsert3d'),
-                filters: [{ name: tm('filter3d'), extensions: ['glb', 'gltf'] }],
+                filters: [{ name: tm('filter3d'), extensions: ['glb'] }],
               },
       ),
 

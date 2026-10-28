@@ -115,6 +115,7 @@ const READ_ONLY_CHANNELS: ReadonlySet<SessionChannel> = new Set<SessionChannel>(
   'slides:is-dirty',
   'slides:recent',
   'slides:media-data',
+  'slides:model3d-data',
   'slides:master-enter',
   'slides:master-open',
   'slides:master-close',
@@ -1226,7 +1227,10 @@ export function createWebSlidesApi(
         return { outcome: 'unavailable' as const }
       }
     },
-    insertModel3d: engine('slides:insert-model3d'),
+    pickModel3d: engine('slides:pick-model3d'),
+    addModel3d: engine('slides:add-model3d'),
+    getModel3dData: engine('slides:model3d-data'),
+    setModel3dView: engine('slides:set-model3d-view'),
     copySlides: engine('slides:copy-slides'),
     pasteSlide: engine('slides:paste-slide'),
     repasteSlide: engine('slides:repaste-slide'),
