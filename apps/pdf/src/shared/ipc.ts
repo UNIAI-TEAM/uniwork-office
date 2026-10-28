@@ -326,6 +326,17 @@ export type DrawingInput =
     })
   | (DrawBase & { kind: 'rect'; rect: [number, number, number, number] })
   | (DrawBase & { kind: 'ellipse'; rect: [number, number, number, number] })
+  | {
+      /** Hyperlink placed by the user; written as a Link annotation */
+      kind: 'link'
+      pageIndex: number
+      /** PDF user space [x1,y1,x2,y2] */
+      rect: [number, number, number, number]
+      /** External target (http/https/mailto/…); exactly one of url / destPage is set */
+      url?: string
+      /** In-document jump: 1-based page number */
+      destPage?: number
+    }
   | (DrawBase & { kind: 'line'; from: [number, number]; to: [number, number] })
   | (DrawBase & { kind: 'arrow'; from: [number, number]; to: [number, number] })
   | {
@@ -670,9 +681,24 @@ export interface SavePdfRequest {
   /** New page order (array of original page indices, excluding deleted); omitted if unreordered */
   pageOrder?: number[]
   metadata?: MetadataInput
+  /** Full bookmark-tree replacement, written when the user edited the outline.
+   * Every entry must carry an explicit page target (0-based index); entries
+   * the writer cannot rebuild exactly make the save refuse the replacement
+   * (the file's own /Outlines stay untouched). */
+  outline?: OutlineEntryInput[]
   /** Who asked: explicit Save (`user`), autosave (`auto`) or an app-internal flush
       (`internal`). Absent behaves as before (Save As never sets it). */
   origin?: 'user' | 'auto' | 'internal'
+}
+
+/** One bookmark of a replacement outline; children nest one level deeper */
+export interface OutlineEntryInput {
+  title: string
+  /** 0-based page index the bookmark jumps to */
+  pageIndex: number
+  /** Vertical position on the page, PDF user space; null keeps the default */
+  top?: number | null
+  children?: OutlineEntryInput[]
 }
 
 /** UniWork document state of the open file: bound working copy and/or view only */

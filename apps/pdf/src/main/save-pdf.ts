@@ -17,6 +17,7 @@ import type { PDFPage } from 'pdf-lib'
 import { VISUAL_SIGNATURE_CONTENT_PREFIX } from '../shared/ipc'
 import type {
   DrawingInput,
+  OutlineEntryInput,
   FormValueInput,
   ImageEditFailure,
   MarkupInput,
@@ -272,6 +273,149 @@ async function addImageStamp(
   appendAnnot(pdfDoc, page, pdfDoc.context.register(annot))
 }
 
+/**
+ * Full /Outlines replacement from an edited bookmark tree. Every entry
+ * carries an explicit page target (validated up front — a page index beyond
+ * the document aborts the whole replacement before anything is registered),
+ * so the graph is rebuilt deterministically: /First//Last//Next//Prev
+ * pointers, /Count as each item's visible-descendant tally, and /Dest
+ * [page /XYZ 0 top null] (top null keeps the viewer's zoom). The root dict
+ * replaces the catalog's /Outlines wholesale — untouched documents never
+ * reach this path (the request omits `outline`), so existing bookmarks stay
+ * byte-identical unless the user edited the tree.
+ *
+ * `deleted` is the set of pages the same save removes. A bookmark on a page
+ * that is leaving the document would carry a /Dest to a page no longer in the
+ * page tree, so that entry goes with the page — and so do its children, which
+ * hang off it. The /Dest itself is a page *reference*, not an index, so the
+ * entries that survive a deletion elsewhere still point at the right page.
+ */
+function applyOutline(
+  pdfDoc: PDFDocument,
+  entries: readonly OutlineEntryInput[],
+  deleted: ReadonlySet<number>,
+): void {
+  /** The tree without the entries whose page is being deleted. */
+  const prune = (list: readonly OutlineEntryInput[]): OutlineEntryInput[] =>
+    list
+      .filter((entry) => !deleted.has(entry.pageIndex))
+      .map((entry) => ({
+        ...entry,
+        children: entry.children?.length ? prune(entry.children) : undefined,
+      }))
+
+  const kept = prune(entries)
+  // Every entry went with a deleted page: the edit has nothing left to say,
+  // so the file's own /Outlines stay as they are rather than being replaced by
+  // an empty graph. An empty tree the reader made is a different thing — that
+  // is a deliberate "no bookmarks", and it is written.
+  if (entries.length > 0 && kept.length === 0) return
+
+  const verify = (list: readonly OutlineEntryInput[]): void => {
+    for (const entry of list) {
+      const title = typeof entry.title === 'string' ? entry.title.trim() : ''
+      if (title === '') throw new Error('Outline entries need a non-empty title.')
+      if (
+        !Number.isInteger(entry.pageIndex) ||
+        entry.pageIndex < 0 ||
+        entry.pageIndex >= pdfDoc.getPageCount()
+      ) {
+        throw new Error(`Outline entry "${title}" points at page ${entry.pageIndex}.`)
+      }
+      if (entry.children?.length) verify(entry.children)
+    }
+  }
+  verify(kept)
+
+  const pages = pdfDoc.getPages()
+  const rootRef = pdfDoc.context.register(pdfDoc.context.obj({ Type: 'Outlines' }))
+
+  /** Registers the list's items under parentRef; returns first/last refs and
+      the subtree's total item count (each item's /Count is set from its own
+      children's return). */
+  const build = (
+    list: readonly OutlineEntryInput[],
+    parentRef: PDFRef,
+  ): { first: PDFRef | null; last: PDFRef | null; total: number } => {
+    let first: PDFRef | null = null
+    let previous: PDFRef | null = null
+    let count = 0
+    for (const entry of list) {
+      const page = pages[entry.pageIndex]!
+      const dict = pdfDoc.context.obj({
+        Title: PDFHexString.fromText(entry.title.trim()),
+        Parent: parentRef,
+        Dest: pdfDoc.context.obj([
+          page.ref,
+          PDFName.of('XYZ'),
+          0,
+          typeof entry.top === 'number' ? num(entry.top) : null,
+          null,
+        ]),
+      })
+      const ref = pdfDoc.context.register(dict)
+      count += 1
+      if (previous !== null) {
+        ;(pdfDoc.context.lookup(previous, PDFDict) as PDFDict).set(PDFName.of('Next'), ref)
+        dict.set(PDFName.of('Prev'), previous)
+      }
+      if (first === null) first = ref
+      previous = ref
+      if (entry.children?.length) {
+        const child = build(entry.children, ref)
+        if (child.first) dict.set(PDFName.of('First'), child.first)
+        if (child.last) dict.set(PDFName.of('Last'), child.last)
+        dict.set(PDFName.of('Count'), PDFNumber.of(child.total))
+        count += child.total
+      }
+    }
+    return { first, last: previous, total: count }
+  }
+
+  const top = build(kept, rootRef)
+  const root = pdfDoc.context.lookup(rootRef, PDFDict) as PDFDict
+  // An empty tree is a valid outline root: no /First means no entries.
+  if (top.first) root.set(PDFName.of('First'), top.first)
+  if (top.last) root.set(PDFName.of('Last'), top.last)
+  root.set(PDFName.of('Count'), PDFNumber.of(top.total))
+  pdfDoc.catalog.set(PDFName.of('Outlines'), rootRef)
+}
+
+/**
+ * Hyperlink annotation: /A /URI for web targets, /Dest [page /XYZ null null null]
+ * for in-document jumps (nulls keep the viewer's current zoom/position). No
+ * appearance stream — every viewer draws its own hover affordance from /Rect,
+ * which is also what the read path (pdf.js getAnnotations) keys on.
+ */
+function addLinkAnnot(
+  pdfDoc: PDFDocument,
+  pages: PDFPage[],
+  page: PDFPage,
+  d: Extract<DrawingInput, { kind: 'link' }>,
+): void {
+  const annot = pdfDoc.context.obj({
+    Type: 'Annot',
+    Subtype: 'Link',
+    Rect: [num(d.rect[0]), num(d.rect[1]), num(d.rect[2]), num(d.rect[3])],
+    F: 4, // print
+    P: page.ref,
+  })
+  if (d.url) {
+    annot.set(
+      PDFName.of('A'),
+      pdfDoc.context.obj({ Type: 'Action', S: 'URI', URI: PDFString.of(d.url) }),
+    )
+  } else {
+    const target = pages[(d.destPage ?? 1) - 1]
+    if (!target) return
+    annot.set(
+      PDFName.of('Dest'),
+      pdfDoc.context.obj([target.ref, PDFName.of('XYZ'), null, null, null]),
+    )
+  }
+  appendAnnot(pdfDoc, page, pdfDoc.context.register(annot))
+}
+
 /** Epoch ms → PDF date string, e.g. D:20260812175959+08'00' */
 function pdfDateString(ms: number): string {
   const d = new Date(ms)
@@ -403,6 +547,7 @@ function addDrawing(
   noteRefs?: Map<string, PDFRef>,
 ): void {
   if (d.kind === 'image') return // handled by addImageStamp (needs async embed)
+  if (d.kind === 'link') return // handled by addLinkAnnot (needs the page list)
   const [r, g, b] = d.color
 
   if (d.kind === 'note') {
@@ -1042,6 +1187,7 @@ export async function applySaveRequest(
     const page = pages[d.pageIndex]
     if (!page) continue
     if (d.kind === 'image') await addImageStamp(pdfDoc, page, d)
+    else if (d.kind === 'link') addLinkAnnot(pdfDoc, pages, page, d)
     else addDrawing(pdfDoc, page, d, noteRefs)
   }
   // Note content edits go after the drawings: replies added above locate their /IRT
@@ -1074,6 +1220,11 @@ export async function applySaveRequest(
     })
   }
   if (request.metadata) applyMetadata(pdfDoc, request.metadata)
+  if (request.outline !== undefined && request.outline !== null) {
+    // A bookmark on a page this save removes cannot be written as a /Dest —
+    // that page is leaving the page tree — so those entries go with it.
+    applyOutline(pdfDoc, request.outline, new Set(request.deletedPages ?? []))
+  }
   // Page thumbnails and producer piece-info can retain a pre-redaction rendering of
   // the same page. They are page-local derived data, so remove them for every affected
   // page before the native final serialization.
