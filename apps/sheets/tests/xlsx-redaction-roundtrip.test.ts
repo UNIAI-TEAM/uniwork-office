@@ -170,6 +170,46 @@ describe('the redaction part survives a real save', () => {
     ])
   })
 
+  it('shifts and re-keys marks when the same save renames a sheet and inserts rows or columns', async () => {
+    const plan: SheetEditPlan = {
+      renames: [{ sheetName: 'Sheet1', newName: 'Q3' }],
+      removals: [],
+      additions: [],
+      order: ['Q3'],
+    }
+    const withRows = await applyCellEditsToXlsx(
+      ...argumentsFor(await buildFixture(), STATES, plan, [
+        { sheetName: 'Sheet1', ops: [{ kind: 'insert-rows', index: 0, count: 2 }] },
+      ]),
+    )
+    expect(() => assertOnlyTouchedEntriesChanged(withRows)).not.toThrow()
+    const rowParts = await savedParts(withRows.buffer)
+    expect(requiredPart(rowParts, 'xl/worksheets/sheet1.xml')).toContain('r="B4"')
+    const expectedRows: SheetRedactionState[] = [
+      { sheetName: 'Q3', marks: [{ ...MARK, startRow: 3, endRow: 3 }] },
+    ]
+    expect(parseRedactionPart(requiredPart(rowParts, REDACTION_PART_PATH))).toEqual(expectedRows)
+    expect(parseRedactionNameMirror(requiredPart(rowParts, 'xl/workbook.xml'), ['Q3'])).toEqual(
+      expectedRows,
+    )
+
+    const withCols = await applyCellEditsToXlsx(
+      ...argumentsFor(await buildFixture(), STATES, plan, [
+        { sheetName: 'Sheet1', ops: [{ kind: 'insert-cols', index: 0, count: 2 }] },
+      ]),
+    )
+    expect(() => assertOnlyTouchedEntriesChanged(withCols)).not.toThrow()
+    const colParts = await savedParts(withCols.buffer)
+    expect(requiredPart(colParts, 'xl/worksheets/sheet1.xml')).toContain('r="D2"')
+    const expectedCols: SheetRedactionState[] = [
+      { sheetName: 'Q3', marks: [{ ...MARK, startColumn: 3, endColumn: 3 }] },
+    ]
+    expect(parseRedactionPart(requiredPart(colParts, REDACTION_PART_PATH))).toEqual(expectedCols)
+    expect(parseRedactionNameMirror(requiredPart(colParts, 'xl/workbook.xml'), ['Q3'])).toEqual(
+      expectedCols,
+    )
+  })
+
   it('keeps the part when the save does not know the marks', async () => {
     // The CLI and the second phase of a split save never load the marks; an
     // empty list there cleared the part, un-hiding everything on any edit.

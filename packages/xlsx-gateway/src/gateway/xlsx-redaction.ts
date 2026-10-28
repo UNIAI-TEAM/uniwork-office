@@ -236,7 +236,7 @@ export function rekeyRedactionStates(
     .map((state) => {
       const newName = renamed.get(state.sheetName)
       const renamedState = newName === undefined ? state : { ...state, sheetName: newName }
-      const ops = structuralOps.find((entry) => entry.sheetName === renamedState.sheetName)?.ops
+      const ops = structuralOps.find((entry) => entry.sheetName === state.sheetName)?.ops
       if (!ops || ops.length === 0) return renamedState
       // The marks name cells the file is about to move: this same save
       // applies the ops to the grid XML, so a rectangle left where it was

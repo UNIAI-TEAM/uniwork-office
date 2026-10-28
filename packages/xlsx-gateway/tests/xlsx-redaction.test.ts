@@ -198,6 +198,35 @@ describe('rekeying for sheet edits done in the same save', () => {
     ])
   })
 
+  it('moves the marks before re-keying when the same save renames and inserts rows or columns', () => {
+    expect(
+      rekeyRedactionStates(
+        STATES,
+        [{ sheetName: 'Sheet1', newName: 'Q3' }],
+        [],
+        [{ sheetName: 'Sheet1', ops: [{ kind: 'insert-rows', index: 0, count: 2 }] }],
+      ),
+    ).toEqual([
+      {
+        sheetName: 'Q3',
+        marks: [{ ...MARK, startRow: MARK.startRow + 2, endRow: MARK.endRow + 2 }],
+      },
+    ])
+    expect(
+      rekeyRedactionStates(
+        STATES,
+        [{ sheetName: 'Sheet1', newName: 'Q3' }],
+        [],
+        [{ sheetName: 'Sheet1', ops: [{ kind: 'insert-cols', index: 0, count: 2 }] }],
+      ),
+    ).toEqual([
+      {
+        sheetName: 'Q3',
+        marks: [{ ...MARK, startColumn: MARK.startColumn + 2, endColumn: MARK.endColumn + 2 }],
+      },
+    ])
+  })
+
   it('drops a mark whose rows the same save deletes outright', () => {
     // The value it withheld is gone; a rectangle clamped onto a neighbour
     // would withhold something the reader never hid. A delete that only takes
