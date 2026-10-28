@@ -1023,6 +1023,14 @@ const homeApi: HomeApi = {
     if (typeof on !== 'boolean') throw new Error('Invalid AutoSave default.')
     await ipcRenderer.invoke(HOME_CHANNELS.setAutoSaveDefault, on)
   },
+  async getRestoreLastSession() {
+    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getRestoreLastSession)
+    return result === true
+  },
+  async setRestoreLastSession(on) {
+    if (typeof on !== 'boolean') throw new Error('Invalid restore session setting.')
+    await ipcRenderer.invoke(HOME_CHANNELS.setRestoreLastSession, on)
+  },
   async getMcpStatus() {
     const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.getMcpStatus)
     const r = result as {

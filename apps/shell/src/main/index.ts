@@ -93,6 +93,14 @@ import {
   writeAppSettingThen,
 } from './app-settings'
 import { OPEN_DOCUMENTS_FILE, clearOpenDocuments, publishOpenDocuments } from './open-documents'
+import {
+  LAST_SESSION_DOCUMENTS_KEY,
+  RESTORE_LAST_SESSION_KEY,
+  filterLastSessionDocuments,
+  launchPathsWithLastSession,
+  restoreLastSessionEnabled,
+  type LastSessionFilterDeps,
+} from './last-session'
 import { startControlServer, type ControlServer } from './control-server'
 import { controlHandler } from './control-handlers'
 import { cliLinkStatus, healCliLinks, installCliLinkOnRequest, recordCliLauncher } from './cli-link'
@@ -3503,6 +3511,16 @@ function isAnyRoot(path: string): boolean {
   return folderRootPaths().some((root) => resolve(root) === key)
 }
 
+function lastSessionFilterDeps(): LastSessionFilterDeps {
+  const unreachableRoots = extraFolderRoots().filter((root) => !describeExtraRoot(root).readable)
+  return {
+    inUniworkStore: (path) =>
+      uniworkDocs?.service.store.isInside(path) === true ||
+      uniworkDocs?.service.sourceViews.has(path) === true,
+    inUnreachableRoot: (path) => unreachableRoots.some((root) => isInsideRoot(root, path)),
+  }
+}
+
 const pendingNewFileDir = new Map<string, { dir: string; setAt: number }>()
 /** folder bound to a freshly created editor tab, keyed by its webContents id; consumed by the first save */
 const pendingDirByWc = new Map<number, { dir: string; setAt: number }>()
@@ -4129,6 +4147,19 @@ function createShellWindow(): void {
     if (tabManager === manager) {
       const dropped = manager.openFilePaths()
       if (dropped.length > 0) void uniworkDocs?.service.notePathsDropped(dropped)
+      // the close guard has already settled every unsaved tab, so the tabs left are the session
+      if (restoreLastSessionEnabled(readAppSettings(APP_SETTINGS_PATH()))) {
+        try {
+          writeAppSettings(APP_SETTINGS_PATH(), {
+            [LAST_SESSION_DOCUMENTS_KEY]: filterLastSessionDocuments(
+              [...dropped, ...detachedFilePaths()],
+              lastSessionFilterDeps(),
+            ),
+          })
+        } catch (err) {
+          console.warn('[shell] could not save the session documents:', err)
+        }
+      }
       tabManager = null
       setDockHost(null)
       publishAllOpenDocuments()
@@ -5727,6 +5758,18 @@ function registerHomeIpc(): void {
       autoSaveDefaultUpdatedAt: next.updatedAt,
     })
     for (const wc of webContents.getAllWebContents()) wc.send('app:auto-save-default-changed', next)
+  })
+
+  guardedIpc.handle(HOME_CHANNELS.getRestoreLastSession, () =>
+    restoreLastSessionEnabled(readAppSettings(APP_SETTINGS_PATH())),
+  )
+  guardedIpc.handle(HOME_CHANNELS.setRestoreLastSession, (_event, on: unknown) => {
+    if (typeof on !== 'boolean') return
+    // turning it off forgets the stored paths instead of keeping them around
+    writeAppSettings(APP_SETTINGS_PATH(), {
+      [RESTORE_LAST_SESSION_KEY]: on,
+      ...(on ? {} : { [LAST_SESSION_DOCUMENTS_KEY]: undefined }),
+    })
   })
 
   guardedIpc.handle(HOME_CHANNELS.getMcpStatus, () => mcpStatus())
@@ -7534,12 +7577,19 @@ app.whenReady().then(async () => {
     })
   }
 
+  const launchTargets = launchPathsWithLastSession(
+    readAppSettings(APP_SETTINGS_PATH()),
+    pendingLaunchPaths,
+    undefined,
+    lastSessionFilterDeps(),
+  )
   let urlOpened = false
   if (pendingLaunchUrl) {
+    if (launchTargets.length > 0) openLaunchPaths(launchTargets)
     urlOpened = await openOfficeBridgeUrl(pendingLaunchUrl)
     pendingLaunchUrl = null
   }
-  if (pendingLaunchPaths.length > 0 || !urlOpened) openLaunchPaths(pendingLaunchPaths)
+  if (!urlOpened) openLaunchPaths(launchTargets)
   pendingLaunchPaths = []
   for (const recoverAs of pendingUnsavedNewRecoveries()) void newSheetTab(recoverAs)
 

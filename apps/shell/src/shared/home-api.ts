@@ -1502,6 +1502,9 @@ export interface HomeApi {
   getAutoSaveDefault(): Promise<AutoSaveDefault>
   /** persist the AutoSave default; broadcasts 'app:auto-save-default-changed' to all web contents */
   setAutoSaveDefault(on: boolean): Promise<void>
+  /** whether the documents open at the last close reopen at launch (default off) */
+  getRestoreLastSession(): Promise<boolean>
+  setRestoreLastSession(on: boolean): Promise<void>
   /** current local MCP server state (running/enabled/port/url) */
   getMcpStatus(): Promise<McpStatus>
   /** enable/disable the MCP server and/or change its port/background/logging; applies and persists, returns the new state */
@@ -2331,6 +2334,8 @@ export const HOME_CHANNELS = {
   setDocumentTheme: 'home:set-document-theme',
   getAutoSaveDefault: 'home:get-auto-save-default',
   setAutoSaveDefault: 'home:set-auto-save-default',
+  getRestoreLastSession: 'home:get-restore-last-session',
+  setRestoreLastSession: 'home:set-restore-last-session',
   getMcpStatus: 'home:get-mcp-status',
   setMcpSettings: 'home:set-mcp-settings',
   getMcpLogs: 'home:get-mcp-logs',
