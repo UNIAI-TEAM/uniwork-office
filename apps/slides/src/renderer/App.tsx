@@ -42,7 +42,12 @@ import type {
   TransitionKind,
 } from '../shared/ipc'
 import { baseName } from '../shared/base-name'
-import { mergeBroadcastUpdate, mergeSlideUpdate } from '../shared/slide-update'
+import {
+  createBroadcastRecovery,
+  mergeBroadcastUpdate,
+  mergeSlideUpdate,
+  type BroadcastRecovery,
+} from '../shared/slide-update'
 import { openedStatusKey } from '../shared/opened-status'
 import { SlideCanvas, selectionChromeColor, type SlideCanvasHandle } from './SlideCanvas'
 import { tableCellOverlayBox } from './table-hit'
@@ -977,6 +982,7 @@ export function App() {
     (result: { path: string; slides: RenderSlide[]; defaultFont?: string } | null) => {
       if (!result) return
       setSlides(result.slides)
+      broadcastRecoveryRef.current?.invalidate()
       setDefaultFont(result.defaultFont ?? null)
       setPath(result.path)
       setCurrent(0)
@@ -1086,28 +1092,33 @@ export function App() {
   // Shared session (a second window on the same file): apply the other window's
   // edits without touching local selection or an open editor — the ids are stable,
   // so the selection stays valid; a same-element conflict resolves last-write-wins.
-  useEffect(
-    () =>
-      window.slidesApi.onDeckChanged?.(({ slides: all, order }) => {
-        setSlides((current) =>
-          order
-            ? (mergeBroadcastUpdate(current, { slides: all, order }, () => {
-                void window.slidesApi
-                  .getRenderSlides()
-                  .then((slides) => {
-                    if (slides) setSlides(slides)
-                  })
-                  .catch((error) => console.error('Failed to refresh deck:', error))
-              }) ?? current)
-            : all,
-        )
-        setCurrent((c) => Math.min(c, Math.max(0, (order?.length ?? all.length) - 1)))
-        // The broadcast also fires for undo back to a clean state — ask the
-        // session instead of assuming the change dirtied it
-        void window.slidesApi.isDirty?.().then((d) => setDirty(!!d))
-      }),
-    [],
-  )
+  const broadcastRecoveryRef = useRef<BroadcastRecovery | null>(null)
+  useEffect(() => {
+    const recovery = createBroadcastRecovery(
+      () => window.slidesApi.getRenderSlides(),
+      setSlides,
+      (error) => console.error('Failed to refresh deck:', error),
+    )
+    broadcastRecoveryRef.current = recovery
+    const off = window.slidesApi.onDeckChanged?.(({ slides: all, order }) => {
+      recovery.onBroadcast(!!order)
+      setSlides((current) =>
+        order
+          ? (mergeBroadcastUpdate(current, { slides: all, order }, recovery.requestRefresh) ??
+            current)
+          : all,
+      )
+      setCurrent((c) => Math.min(c, Math.max(0, (order?.length ?? all.length) - 1)))
+      // The broadcast also fires for undo back to a clean state — ask the
+      // session instead of assuming the change dirtied it
+      void window.slidesApi.isDirty?.().then((d) => setDirty(!!d))
+    })
+    return () => {
+      recovery.invalidate()
+      broadcastRecoveryRef.current = null
+      off?.()
+    }
+  }, [])
 
   // Auto-save (off by default): when on and a file path exists, silently write back every 30s + on blur.
   // Saving rebuilds element ids; skipped during text editing/mouse-down (dragging) to avoid interrupting the current operation.
