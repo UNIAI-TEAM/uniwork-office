@@ -634,19 +634,62 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
     expect(ruleOf(picker, '.dh-picker-head')).toMatch(/font-size:\s*12px;/)
   })
 
-  it('access badge is rounded-4px with inline-start icon, updated date uses tabular-nums, and checkbox uses drawn border/accent', () => {
+  it('shell index.html CSP keeps img-src strict without https:, http:, or * (R1-1)', () => {
+    const html = readFileSync(resolve(__dirname, '../src/renderer/index.html'), 'utf8')
+    const cspMatch = /http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html)
+    expect(cspMatch).not.toBeNull()
+    const imgSrc = /(?:^|;\s*)img-src\s+([^;]+)/.exec(cspMatch![1]!)?.[1]?.trim() ?? ''
+    expect(imgSrc).toBe("'self' data: blob:")
+    expect(imgSrc).not.toMatch(/https:|http:|\*/)
+  })
+
+  it('access badge is a 999px pill with min-height 20px, updated/size use monospace + tabular-nums, and checkbox/bulk-bar rules match web', () => {
     const badge = ruleOf(css, '.dh-vis-badge')
-    expect(badge).toMatch(/border-radius:\s*4px;/)
+    expect(badge).toMatch(/border-radius:\s*999px;/)
+    expect(badge).toMatch(/min-height:\s*20px;/)
+    expect(badge).not.toMatch(/(?:^|\n)\s*height:\s*20px;/)
     expect(badge).toMatch(/gap:\s*4px;/)
-    expect(ruleOf(css, '.dh-cell-time')).toMatch(/font-variant-numeric:\s*tabular-nums;/)
+    const driveBadge = ruleOf(css, '.dh-drive-badge')
+    expect(driveBadge).toMatch(/height:\s*auto;/)
+    expect(driveBadge).toMatch(/border:\s*0;/)
+
+    const time = ruleOf(css, '.dh-cell-time')
+    expect(time).toMatch(/font-family:\s*ui-monospace,/)
+    expect(time).toMatch(/font-variant-numeric:\s*tabular-nums;/)
+    const size = ruleOf(css, '.dh-cell-size')
+    expect(size).toMatch(/font-family:\s*ui-monospace,/)
+    expect(size).toMatch(/font-variant-numeric:\s*tabular-nums;/)
+
     const check = ruleOf(css, '.dh-check')
     expect(check).toMatch(/appearance:\s*none;/)
     expect(check).toMatch(/border:\s*1\.5px solid var\(--wb-check-border\);/)
     expect(check).toMatch(/border-radius:\s*4px;/)
+    expect(ruleOf(css, '.dh-check::before')).toMatch(/inset:\s*-8px -12px;/)
     expect(ruleOf(css, '.dh-check:checked')).toMatch(/background:\s*var\(--accent\);/)
+    expect(ruleOf(css, '.dh-check:indeterminate')).toMatch(/background:\s*var\(--accent\);/)
+    const indetAfter = ruleOf(css, '.dh-check:indeterminate::after')
+    expect(indetAfter).toMatch(/border-top:\s*1\.75px solid var\(--on-accent\);/)
+    expect(indetAfter).toMatch(/border-bottom:\s*0;/)
+    expect(indetAfter).toMatch(/border-left:\s*0;/)
+    expect(indetAfter).toMatch(/transform:\s*none;/)
+    expect(ruleOf(css, '.dh-check:focus-visible')).toMatch(/outline:\s*2px solid var\(--accent\);/)
+    expect(ruleOf(css, '.dh-check:disabled')).toMatch(/opacity:\s*0\.5;/)
+    expect(ruleOf(css, '.dh-check:disabled')).toMatch(/cursor:\s*not-allowed;/)
+
+    const folderGrid = ruleOf(css, '.dh-folder-grid')
+    expect(folderGrid).toMatch(/grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(220px,\s*1fr\)\);/)
+    expect(folderGrid).toMatch(/gap:\s*12px;/)
+    expect(ruleOf(css, '.dh-avatar')).toMatch(/background:\s*var\(--tint-gray\);/)
+
     const bulkAction = ruleOf(css, '.dl-bulk-action')
     expect(bulkAction).toMatch(/background:\s*transparent;/)
-    expect(ruleOf(css, '.dl-bulk-action.danger')).toMatch(/background:\s*var\(--danger-bg\);/)
-    expect(ruleOf(css, '.dl-bulk-action.danger')).toMatch(/color:\s*var\(--danger-text\);/)
+    expect(ruleOf(css, '.dl-bulk-action:hover:not(:disabled)')).toMatch(/background:\s*var\(--border\);/)
+    expect(ruleOf(css, '.dl-bulk-clear:hover')).toMatch(/background:\s*var\(--border\);/)
+    const danger = ruleOf(css, '.dl-bulk-action.danger')
+    expect(danger).toMatch(/background:\s*color-mix\(in srgb,\s*var\(--danger-text\)\s*10%,\s*transparent\);/)
+    expect(danger).toMatch(/color:\s*var\(--danger-text\);/)
+    expect(ruleOf(css, '.dl-bulk-action.danger:hover:not(:disabled)')).toMatch(
+      /background:\s*color-mix\(in srgb,\s*var\(--danger-text\)\s*18%,\s*transparent\);/,
+    )
   })
 })

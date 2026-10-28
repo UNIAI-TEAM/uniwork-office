@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { DocList, type DocListProps } from '../src/renderer/src/doclist/DocList'
+import { Person } from '../src/renderer/src/doclist/cells'
 import { useDocListSort } from '../src/renderer/src/doclist/use-doc-list-sort'
 import type { DocListScreen } from '../src/renderer/src/doclist/columns'
 import { readSort, writeSort } from '../src/renderer/src/doclist/persist'
@@ -51,7 +52,7 @@ const BUDGET = doc({
   visibility: 'workspace',
   shareScope: { ...NO_SHARES, homeWorkspace: true },
   myLevel: 'edit',
-  updatedByUser: { name: 'Minh Trần', avatarUrl: 'https://cdn.example.com/minh.png' },
+  updatedByUser: { name: 'Minh Trần', avatarUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==' },
   updatedByName: 'Minh Trần',
 })
 const NOTE = doc({
@@ -438,26 +439,83 @@ describe('DocList: the shared Documents table (UNI-2047 A2a)', () => {
       expect(cell('solo', 'access')?.querySelector('.dh-vis-badge')?.textContent).toBe('Private')
     })
 
-    it('shows the editor with avatar photo when avatarUrl is present and falls back to initials on error or when absent', async () => {
+    it('shows the editor with avatar photo (data: URL) when avatarUrl is present, handles load/cached/error/rerender, and falls back to 1-letter initial', async () => {
       await mount('workspace')
       const person = cell('budget', 'editor')!
-      expect(person.querySelector('.dh-avatar')?.textContent).toBe('MT')
+      const initials = person.querySelector('.dh-avatar-initials')!
+      expect(initials.textContent).toBe('M')
+      expect(initials.classList.contains('is-hidden')).toBe(false)
       expect(person.querySelector('.dh-person-name')?.textContent).toBe('Minh Trần')
       const img = person.querySelector<HTMLImageElement>('img.dh-avatar-img')
       expect(img).not.toBeNull()
-      expect(img?.getAttribute('src')).toBe('https://cdn.example.com/minh.png')
+      expect(img?.getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==')
+      expect(img?.getAttribute('referrerpolicy')).toBe('no-referrer')
+      expect(img?.getAttribute('draggable')).toBe('false')
+      expect(img?.classList.contains('is-loaded')).toBe(false)
+
+      // on image load, photo is marked loaded and initials are hidden
+      await act(async () => {
+        img!.dispatchEvent(new Event('load'))
+      })
+      expect(img?.classList.contains('is-loaded')).toBe(true)
+      expect(initials.classList.contains('is-hidden')).toBe(true)
+
       // on image error, falls back cleanly to initials
       await act(async () => {
         img!.dispatchEvent(new Event('error'))
       })
       expect(person.querySelector('img.dh-avatar-img')).toBeNull()
-      expect(person.querySelector('.dh-avatar')?.textContent).toBe('MT')
+      expect(initials.classList.contains('is-hidden')).toBe(false)
+      expect(person.querySelector('.dh-avatar')?.textContent).toBe('M')
+
+      // rerendering with a new avatarUrl after an error clears the error and renders the new image
+      await mount(
+        'workspace',
+        [
+          rowOf({
+            ...BUDGET,
+            updatedByUser: { name: 'Minh Trần', avatarUrl: 'data:image/png;base64,NEW_AVATAR==' },
+          }),
+          rowOf(NOTE),
+          rowOf(REPORT),
+        ],
+      )
+      const retryImg = cell('budget', 'editor')!.querySelector<HTMLImageElement>('img.dh-avatar-img')
+      expect(retryImg).not.toBeNull()
+      expect(retryImg?.getAttribute('src')).toBe('data:image/png;base64,NEW_AVATAR==')
+
       // the name the row already carries is the fallback; no name at all reads "—"
       const notePerson = cell('note', 'editor')!
       expect(notePerson.querySelector('.dh-person-name')?.textContent).toBe('Lan Nguyễn')
       expect(notePerson.querySelector('img.dh-avatar-img')).toBeNull()
-      expect(notePerson.querySelector('.dh-avatar')?.textContent).toBe('LN')
+      expect(notePerson.querySelector('.dh-avatar')?.textContent).toBe('L')
       expect(cell('report', 'editor')?.textContent).toBe('—')
+    })
+
+    it('marks a cached avatar (complete && naturalWidth > 0) as loaded on mount', async () => {
+      const completeSpy = vi
+        .spyOn(HTMLImageElement.prototype, 'complete', 'get')
+        .mockReturnValue(true)
+      const widthSpy = vi
+        .spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get')
+        .mockReturnValue(24)
+      try {
+        await act(async () => {
+          root.render(
+            createElement(Person, {
+              name: 'Minh Trần',
+              avatarUrl: 'data:image/png;base64,CACHED==',
+            }),
+          )
+        })
+        const img = host.querySelector<HTMLImageElement>('img.dh-avatar-img')
+        const initials = host.querySelector('.dh-avatar-initials')
+        expect(img?.classList.contains('is-loaded')).toBe(true)
+        expect(initials?.classList.contains('is-hidden')).toBe(true)
+      } finally {
+        completeSpy.mockRestore()
+        widthSpy.mockRestore()
+      }
     })
 
     it('puts the location on a second line under the name when the row has one', async () => {

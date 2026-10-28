@@ -99,7 +99,9 @@ describe('BulkBar: visible from one selected row, actions = what every row allow
     const bar = host.querySelector('[data-bulk-bar]')
     expect(bar).not.toBeNull()
     expect(bar!.getAttribute('role')).toBe('toolbar')
-    expect(bar!.querySelector('[data-bulk-count]')?.textContent).toBe('1 đã chọn')
+    const countEl = bar!.querySelector('[data-bulk-count]')
+    expect(countEl?.textContent).toBe('1 đã chọn')
+    expect(countEl?.getAttribute('aria-live')).toBe('polite')
     expect(actionIds()).toEqual(['share', 'move', 'download', 'shelve', 'trash'])
     expect(
       Array.from(host.querySelectorAll('[data-bulk-action] svg[data-icon]')).map((el) =>
