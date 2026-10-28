@@ -117,6 +117,31 @@ describe('trace_precedents with a withheld cell', () => {
     expect(out.output).not.toContain(SECRET)
     expect(out.output).toContain('{{client phone}}')
   })
+
+  it('projects cross-sheet precedents against the referenced sheet, not the formula sheet', () => {
+    const crossSheet = deps({
+      redactions: () => indexWithB2,
+      tracePrecedents: () => ({
+        formula: '=Sheet1!B2*2',
+        value: 24690,
+        refs: [
+          {
+            sheetId: 'sheet-1',
+            label: 'Sheet1!B2',
+            cellCount: 1,
+            hasError: false,
+            samples: [{ address: 'B2', value: SECRET }],
+          },
+        ],
+        usesNames: false,
+      }),
+    })
+    const out = run(crossSheet, 'trace_precedents', { sheetId: 'sheet-2', address: 'C1' })
+    expect(out.output).not.toContain(SECRET)
+    expect(out.output).not.toContain('24690')
+    expect(out.output).toContain('{{client phone}}')
+    expect(out.output).toContain('withheld from the model')
+  })
 })
 
 describe('trace_dependents with a withheld cell', () => {

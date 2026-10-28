@@ -77,7 +77,7 @@ describe('traceWorkbookPrecedents: demo workbook', () => {
 
   it('resolves sheet-qualified references', async () => {
     const result = await traceWorkbookPrecedents(demoCtx(DEMO), 's2', 'A1')
-    expect(result.refs[0]).toMatchObject({ label: 'Sheet1!B1', hasError: true })
+    expect(result.refs[0]).toMatchObject({ sheetId: 's1', label: 'Sheet1!B1', hasError: true })
   })
 
   it('surfaces defined-name usage it cannot expand', async () => {

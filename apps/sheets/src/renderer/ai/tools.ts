@@ -155,6 +155,8 @@ export interface TraceCellSample {
 }
 
 export interface TraceRefInfo {
+  /** resolved worksheet id of the referenced range, when known */
+  readonly sheetId?: string | undefined
   /** display label like "B2:B9" or "Data!A1" */
   readonly label: string
   readonly cellCount: number
@@ -2221,8 +2223,10 @@ export function executeWorkbookTool(
         // that reaches a withheld cell has to withhold the result too — showing
         // `C10 = 42` when `B2` is the withheld number gives the number away
         // just as plainly as printing `B2`.
-        const refValues = result.refs.flatMap((ref) => ref.samples)
-        const aPrecedentIsWithheld = refValues.some((s) => project(s.address, s.value) !== s.value)
+        const aPrecedentIsWithheld = result.refs.some((ref) => {
+          const projectRef = cellProjector(deps, ref.sheetId ?? parsed.sheetId)
+          return ref.samples.some((s) => projectRef(s.address, s.value) !== s.value)
+        })
         const lines = [
           `${parsed.address} = ${formatCellScalar({
             value: aPrecedentIsWithheld
@@ -2239,10 +2243,11 @@ export function executeWorkbookTool(
             )
             continue
           }
+          const projectRef = cellProjector(deps, ref.sheetId ?? parsed.sheetId)
           const shown = ref.samples
             .map(
               (sample) =>
-                `${sample.address}=${formatCellScalar({ ...sample, value: project(sample.address, sample.value) })}`,
+                `${sample.address}=${formatCellScalar({ ...sample, value: projectRef(sample.address, sample.value) })}`,
             )
             .join('; ')
           const rest = ref.cellCount - ref.samples.length
