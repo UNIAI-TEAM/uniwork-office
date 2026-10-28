@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 import type { TFunc } from './i18n/locale'
+import { normalizeLinkUrl } from './link-url'
 import { useModalDialog } from './modal-dialog'
 
 /** Pending link box drawn on a page (PDF user space), waiting for its target */
@@ -30,13 +31,14 @@ export function LinkDialog({
   const dialogRef = useModalDialog(onCancel)
 
   const pageNum = Number(page)
-  const urlValid = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url.trim()) || url.trim().startsWith('www.')
+  const normalizedUrl = normalizeLinkUrl(url)
+  const urlValid = normalizedUrl !== null
   const pageValid =
     page.trim() !== '' && Number.isInteger(pageNum) && pageNum >= 1 && pageNum <= pageCount
   // exactly one target: the field the user cleared last loses
   const target: { url: string } | { destPage: number } | null =
-    urlValid && !pageValid
-      ? { url: url.trim().startsWith('www.') ? `https://${url.trim()}` : url.trim() }
+    normalizedUrl !== null && !pageValid
+      ? { url: normalizedUrl }
       : pageValid && !urlValid
         ? { destPage: pageNum }
         : null

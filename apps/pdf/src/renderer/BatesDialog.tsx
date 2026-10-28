@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { TFunc } from './i18n/locale'
+import { useModalDialog } from './modal-dialog'
 import {
   BATES_MAX_FONT,
   BATES_MIN_FONT,
@@ -72,6 +73,7 @@ export function BatesDialog({
   const [firstPage, setFirstPage] = useState('1')
   const [lastPage, setLastPage] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const dialogRef = useModalDialog(onClose)
 
   const cfg: BatesConfig = {
     prefix,
@@ -129,6 +131,7 @@ export function BatesDialog({
   return (
     <div className="pdf-modal-mask" onClick={onClose}>
       <div
+        ref={dialogRef}
         className="pdf-modal"
         role="dialog"
         aria-modal="true"

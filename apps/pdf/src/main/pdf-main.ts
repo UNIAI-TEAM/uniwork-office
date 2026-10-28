@@ -44,6 +44,7 @@ import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-c
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { PDF_CHANNELS } from '../shared/ipc'
+import { hasPendingSaveEdits } from './save-pending'
 import { buildExportImagePaths, hasValidExportPageNumbers } from './export-images'
 import type {
   ExportImagesRequest,
@@ -566,29 +567,6 @@ const tDlg = createI18n({
     btnCancel: '取消',
   },
 })
-
-/** Whether a save request carries any edit to apply (staticFormFills is the complete
- * resulting set, sent on every save, so it does not count as pending on its own). */
-function hasPendingSaveEdits(request: SavePdfRequest): boolean {
-  return !!(
-    request.markups?.length ||
-    request.annotDeletes?.length ||
-    request.drawings?.length ||
-    request.noteEdits?.length ||
-    request.formValues?.length ||
-    request.stamps?.length ||
-    request.textEdits?.length ||
-    request.textInserts?.length ||
-    request.imageEdits?.length ||
-    request.redactions !== undefined ||
-    request.rotations?.length ||
-    request.deletedPages?.length ||
-    request.pageOrder?.length ||
-    request.metadata ||
-    // an empty tree is a deliberate "no bookmarks", which is still a write
-    request.outline !== undefined
-  )
-}
 
 /** A redaction copy must never be the same file through a symlink, `.`/`..`,
  * or an existing hard link. For a new destination, canonicalize its parent

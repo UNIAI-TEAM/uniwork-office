@@ -577,6 +577,17 @@ describe('link drawings', () => {
     expect(b.state.drawings).toHaveLength(1)
   })
 
+  it('only lets a link url use http, https, mailto or www', () => {
+    const plan = (drawing: Record<string, unknown>) =>
+      planEditOps([{ op: 'addDrawing', drawing }], ctx(), newId)
+    for (const url of ['javascript:alert(1)', 'file:///etc/passwd', 'foo:', 'example.com'])
+      expect(plan(link({ url })).failures[0]?.error).toMatch(/http/)
+    for (const url of ['https://a.com', 'http://a.com', 'mailto:a@b.com'])
+      expect(plan(link({ url })).failures).toHaveLength(0)
+    const www = run(empty(), [{ op: 'addDrawing', drawing: link({ url: 'www.a.com' }) }])
+    expect(www.state.drawings[0]?.input).toMatchObject({ url: 'https://www.a.com' })
+  })
+
   it('rejects a link with neither or both targets, and non-positive pages', () => {
     const plan = (drawing: Record<string, unknown>) =>
       planEditOps([{ op: 'addDrawing', drawing }], ctx(), newId)

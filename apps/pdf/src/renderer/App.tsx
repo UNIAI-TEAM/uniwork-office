@@ -4282,7 +4282,8 @@ export default function App() {
       rotations.size > 0 ||
       deleted.size > 0 ||
       order !== null ||
-      metadata !== null
+      metadata !== null ||
+      (pendingOutline?.edited ?? false)
     if (otherPending) {
       showNotice(t('redactSaveFirst'))
       return
@@ -6374,7 +6375,6 @@ export default function App() {
     })
   }
 
-  /** Internal destination of a Link annotation → jump to that page */
   // ── Bookmark editing (embedded outlines only; fail-closed on named dests) ──
 
   /** The original tree as the write model: every node gains pageIndex (0-based)
@@ -6547,6 +6547,7 @@ export default function App() {
     })
   }
 
+  /** Internal destination of a Link annotation → jump to that page */
   const goToDest = async (dest: unknown) => {
     if (!doc) return
     try {
@@ -8236,6 +8237,7 @@ export default function App() {
                       className="rb-icon"
                       aria-label={t('outlineEdit')}
                       data-tip={t('outlineEdit')}
+                      aria-pressed={pendingOutline?.editing ?? false}
                       disabled={status !== 'ready' || readOnly}
                       onClick={() =>
                         pendingOutline?.editing ? finishBookmarkEdit() : startBookmarkEdit()

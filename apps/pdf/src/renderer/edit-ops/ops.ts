@@ -25,6 +25,7 @@ import { imageRectKey } from '../ImageEditLayer'
 import type { LocalTextEdit, LocalTextInsert } from '../text-edit-preview'
 import type { SavedNoteAnnot } from '../note-threads'
 import type { SavedMarkupAnnot, StampConfig } from '../edit-state'
+import { normalizeLinkUrl } from '../link-url'
 import { GuidedError, register, type Op, type OpContext } from './registry'
 
 type Rect = [number, number, number, number]
@@ -159,10 +160,18 @@ register({
         throw new GuidedError('a link drawing needs exactly one of url or destPage')
       if (page !== undefined && (typeof page !== 'number' || !Number.isInteger(page) || page < 1))
         throw new GuidedError('a link drawing destPage is a 1-based page number')
+      if (hasUrl && normalizeLinkUrl(d.url as string) === null)
+        throw new GuidedError(
+          'a link drawing url must start with http://, https://, mailto: or www.',
+        )
     }
   },
   apply(op, s) {
-    const drawing = op.drawing as DrawingInput
+    const raw = op.drawing as DrawingInput
+    const drawing =
+      raw.kind === 'link' && typeof raw.url === 'string'
+        ? { ...raw, url: normalizeLinkUrl(raw.url) ?? raw.url }
+        : raw
     const added: LocalDrawing = {
       id: id(op),
       // Pending notes are keyed by their record id for replies and thread lookup
