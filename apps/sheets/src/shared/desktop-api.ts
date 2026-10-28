@@ -209,6 +209,9 @@ const worksheetMetadataSchema = z
           author: z.string(),
           text: z.string(),
           thread: sheetThreadSchema.extend({ text: z.string() }).optional(),
+          /// The picture the note's shape is showing, fetched with readMedia
+          /// under this id — the same shape a cell image would use.
+          image: z.object({ id: z.string() }).strict().optional(),
         })
         .strict(),
     ),
@@ -655,6 +658,11 @@ const visualObjectSchema = z
         /// c:chartSpace/c:spPr and c:plotArea/c:spPr fills (flat colors).
         chartAreaFill: z.string().optional(),
         plotAreaFill: z.string().optional(),
+        /// Session-added charts only: part path of the PivotTable the chart
+        /// was created from (`xl/pivotTables/…`). The save resolves it into a
+        /// chartSpace <c:pivotSource> so Excel recognizes the PivotChart.
+        /// The sidecar never emits this field.
+        pivotTablePath: z.string().min(1).max(255).optional(),
       })
       .strict()
       .optional(),
@@ -836,6 +844,8 @@ export const workbookFileSchema = z
     /// string-based patcher to rewrite safely every 30 seconds. Manual Save
     /// remains available; only the background crash-recovery copy is disabled.
     automaticRecoveryDisabled: z.boolean().optional(),
+    /// True when the OOXML package is encrypted with an Office open password.
+    passwordProtected: z.boolean().optional(),
     /// Theme palette as #RRGGBB in theme index order [lt1, dk1, lt2, dk2,
     /// accent1-6, hlink, folHlink]; absent without a readable theme.
     themeColors: z.array(z.string()).length(12).optional(),
@@ -1670,6 +1680,9 @@ export const workbookVisualAddSchema = z
           .optional(),
         gapWidthPct: z.number().int().min(0).max(500).optional(),
         holeSizePct: z.number().int().min(10).max(90).optional(),
+        /// PivotChart marker: part path of the PivotTable the chart is bound
+        /// to; the save writes chartSpace <c:pivotSource> from it.
+        pivotTablePath: z.string().min(1).max(255).optional(),
         altText: visualAddPropertiesShape.altText,
         editAs: visualAddPropertiesShape.editAs,
       })
@@ -1709,6 +1722,19 @@ export const workbookVisualAddSchema = z
     { message: 'A visual addition carries exactly one of chart, shape, or image.' },
   )
 
+/// A picture embedded in a cell ("Place in Cell"): the save writes Excel's
+/// rich-value parts and marks the host cell with `vm=`.
+export const workbookCellImageAddSchema = z
+  .object({
+    sheetId: z.string().min(1),
+    row: z.number().int().nonnegative().max(1_048_575),
+    column: z.number().int().nonnegative().max(16_383),
+    mediaType: z.enum(['image/png', 'image/jpeg', 'image/gif']),
+    /// ~20MB decoded
+    base64: z.string().min(1).max(28_000_000),
+  })
+  .strict()
+
 /// Declarative note snapshot: the sheet's full comment set after the edit
 /// (empty list removes all comments).
 export const workbookNoteStateSchema = z
@@ -1723,6 +1749,25 @@ export const workbookNoteStateSchema = z
             author: z.string().max(255),
             text: z.string().max(32_767),
             thread: sheetThreadSchema.nullable().optional(),
+            /**
+             * The picture this note shows. Absent keeps whatever the note was
+             * already carrying; `null` takes the picture away.
+             */
+            picture: z
+              .object({
+                mediaType: z.enum(['image/png', 'image/jpeg', 'image/gif']),
+                /// ~20MB decoded
+                base64: z.string().min(1).max(28_000_000),
+                /// The picture's pixel size: the note's shape is given it, so a
+                /// photograph is shown at its own proportions.
+                widthPx: z.number().int().positive().max(200_000),
+                heightPx: z.number().int().positive().max(200_000),
+                /// The file name, carried into the picture's title.
+                name: z.string().max(255).optional(),
+              })
+              .strict()
+              .nullable()
+              .optional(),
           })
           .strict(),
       )
@@ -2024,6 +2069,7 @@ export const workbookSaveRequestSchema = z
     chartEdits: z.array(workbookChartEditSchema).max(100),
     visualEdits: z.array(workbookVisualEditSchema).max(100),
     visualAdditions: z.array(workbookVisualAddSchema).max(50),
+    cellImageAdditions: z.array(workbookCellImageAddSchema).max(50).optional(),
     tableAdditions: z.array(workbookTableAddSchema).max(50),
     tableEdits: z.array(workbookTableEditSchema).max(100).optional(),
     pivotAdditions: z.array(workbookPivotAddSchema).max(20),
@@ -2167,7 +2213,9 @@ export const workbookSaveRequestSchema = z
       .strict()
       .nullable()
       .default(null),
-    /// Full allow-edit-range snapshots for sheets whose set changed.
+    /// Full allow-edit-range snapshots for sheets whose set changed. A range may
+    /// carry its password as the hash the renderer already computed (legacy or
+    /// spi form, see SheetPasswordHash); the file never hands hashes back.
     protectedRangeStates: z
       .array(
         z
@@ -2179,6 +2227,7 @@ export const workbookSaveRequestSchema = z
                   .object({
                     name: z.string().min(1).max(255),
                     sqref: z.string().min(1).max(1_024),
+                    password: sheetPasswordHashSchema.optional(),
                   })
                   .strict(),
               )
@@ -2218,6 +2267,7 @@ export const workbookSaveRequestSchema = z
       request.workbookProtectionState !== null ||
       request.protectedRangeStates.length > 0 ||
       request.visualAdditions.length > 0 ||
+      (request.cellImageAdditions?.length ?? 0) > 0 ||
       request.tableAdditions.length > 0 ||
       (request.tableEdits?.length ?? 0) > 0 ||
       request.pivotAdditions.length > 0 ||
@@ -2488,6 +2538,7 @@ export type ScreenCaptureRequest = z.infer<typeof screenCaptureRequestSchema>
 export type ScreenCaptureResult = z.infer<typeof screenCaptureResultSchema>
 export type WorkbookVisualObject = z.infer<typeof visualObjectSchema>
 export type WorkbookVisualAdd = z.infer<typeof workbookVisualAddSchema>
+export type WorkbookCellImageAdd = z.infer<typeof workbookCellImageAddSchema>
 export type WorkbookTableAdd = z.infer<typeof workbookTableAddSchema>
 export type WorkbookTableEdit = z.infer<typeof workbookTableEditSchema>
 export type WorkbookPivotAdd = z.infer<typeof workbookPivotAddSchema>
@@ -2913,7 +2964,12 @@ export interface DesktopApi {
    * press for dismissing open popovers
    */
   onChromePressed(handler: () => void): () => void
-  selectWorkbook(): Promise<WorkbookFile | null>
+  selectWorkbook(): Promise<WorkbookFile | { passwordRequired: true; path: string } | null>
+  openEncryptedWorkbook(path: string, password: string): Promise<WorkbookFile | null>
+  updateWorkbookPassword(
+    sessionId: string,
+    newPassword: string,
+  ): Promise<{ sha256: string; fileBytes: number; passwordProtected: true }>
   /** multi-select xlsx picker; each file opens a secondary sidecar session for merge reads */
   selectWorkbooksForMerge(): Promise<WorkbookFile[] | null>
   /** open explicit spreadsheet paths (chat attachments) as merge-source sessions */

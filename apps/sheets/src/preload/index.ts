@@ -111,7 +111,56 @@ const desktopApi: DesktopApi = {
   },
   async selectWorkbook() {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.selectWorkbook)
+    if (result === null) return null
+    if (
+      typeof result === 'object' &&
+      result !== null &&
+      (result as { passwordRequired?: unknown }).passwordRequired === true &&
+      typeof (result as { path?: unknown }).path === 'string'
+    ) {
+      return { passwordRequired: true, path: (result as { path: string }).path }
+    }
+    return parseWorkbookFile(result)
+  },
+  async openEncryptedWorkbook(path, password) {
+    if (
+      typeof path !== 'string' ||
+      path.length === 0 ||
+      typeof password !== 'string' ||
+      password.length === 0
+    ) {
+      throw new Error('Invalid encrypted workbook request.')
+    }
+    const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.openEncryptedWorkbook, {
+      path,
+      password,
+    })
     return result === null ? null : parseWorkbookFile(result)
+  },
+  async updateWorkbookPassword(sessionId, newPassword) {
+    if (!isUuid(sessionId) || typeof newPassword !== 'string' || newPassword.length === 0) {
+      throw new Error('Invalid workbook password update request.')
+    }
+    const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.updateWorkbookPassword, {
+      sessionId,
+      newPassword,
+    })
+    if (
+      !isRecord(result) ||
+      typeof result.sha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/i.test(result.sha256) ||
+      typeof result.fileBytes !== 'number' ||
+      !Number.isSafeInteger(result.fileBytes) ||
+      result.fileBytes < 0 ||
+      result.passwordProtected !== true
+    ) {
+      throw new Error('Invalid workbook password update response.')
+    }
+    return {
+      sha256: result.sha256,
+      fileBytes: result.fileBytes,
+      passwordProtected: true as const,
+    }
   },
   async selectWorkbooksForMerge() {
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.selectWorkbooksForMerge)
@@ -133,7 +182,11 @@ const desktopApi: DesktopApi = {
       throw new Error('Invalid reopen path.')
     }
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.reopenWorkbook, path)
-    return result === null ? null : parseWorkbookFile(result)
+    if (result === null) return null
+    // the password of a session that is already gone cannot be replayed; the
+    // recovery gives up cleanly and the user re-opens the file by hand
+    if (isRecord(result) && result.passwordRequired === true) return null
+    return parseWorkbookFile(result)
   },
   onSidecarCrashed(callback) {
     const listener = (): void => {
@@ -850,6 +903,7 @@ function parseWorkbookFile(input: unknown): WorkbookFile {
     emptyCsv,
     restoredFromRecovery,
     uniworkBound,
+    passwordProtected,
   } = input
   if (
     !isUuid(sessionId) ||
@@ -869,7 +923,8 @@ function parseWorkbookFile(input: unknown): WorkbookFile {
     (csvPath !== undefined && (typeof csvPath !== 'string' || csvPath.length === 0)) ||
     (emptyCsv !== undefined && typeof emptyCsv !== 'boolean') ||
     (restoredFromRecovery !== undefined && typeof restoredFromRecovery !== 'boolean') ||
-    (uniworkBound !== undefined && typeof uniworkBound !== 'boolean')
+    (uniworkBound !== undefined && typeof uniworkBound !== 'boolean') ||
+    (passwordProtected !== undefined && typeof passwordProtected !== 'boolean')
   ) {
     throw new Error('Invalid workbook response.')
   }
@@ -1156,6 +1211,7 @@ function parseWorkbookFile(input: unknown): WorkbookFile {
     ...(emptyCsv === undefined ? {} : { emptyCsv }),
     ...(restoredFromRecovery === undefined ? {} : { restoredFromRecovery }),
     ...(uniworkBound === undefined ? {} : { uniworkBound }),
+    ...(passwordProtected === undefined ? {} : { passwordProtected }),
     ...(themeColors === undefined ? {} : { themeColors: themeColors as string[] }),
     ...(parsedThemeFonts === undefined ? {} : { themeFonts: parsedThemeFonts }),
     ...(typeof input.normalFontName === 'string' && input.normalFontName !== ''
@@ -2079,6 +2135,7 @@ function parseSaveRequest(input: WorkbookSaveRequest): WorkbookSaveRequest {
   cappedArray('chart edits', input.chartEdits, 100)
   cappedArray('visual edits', input.visualEdits, 100)
   cappedArray('visual additions', input.visualAdditions, 100)
+  cappedArray('cell images', input.cellImageAdditions ?? [], 50)
   cappedArray('table additions', input.tableAdditions, 50)
   cappedArray('table edits', input.tableEdits ?? [], 100)
   cappedArray('pivot additions', input.pivotAdditions, 20)
@@ -2162,6 +2219,7 @@ function parseSaveRequest(input: WorkbookSaveRequest): WorkbookSaveRequest {
     input.chartEdits.length === 0 &&
     input.visualEdits.length === 0 &&
     input.visualAdditions.length === 0 &&
+    (input.cellImageAdditions?.length ?? 0) === 0 &&
     input.tableAdditions.length === 0 &&
     (input.tableEdits?.length ?? 0) === 0 &&
     input.pivotAdditions.length === 0 &&

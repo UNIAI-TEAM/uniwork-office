@@ -99,11 +99,13 @@ import {
   isSheetRemoved,
   journalEntriesInRange,
   NO_FILL_STYLE,
+  notePicturesFor,
   ooxmlTextRotationToUniver,
   plainCellValue,
   recordHyperlinkEdit,
   recordSetRangeValues,
   toRecalcUserInput,
+  type CellImageAdd,
   type EditJournal,
   type VisualEditEntry,
 } from './edit-journal'
@@ -160,6 +162,7 @@ import {
   installWorkbookVisuals,
   isChartEditorOpen,
   isVisualDragActive,
+  type CellImageState,
   type ChartEditData,
   type ChartVectorRead,
   type ShapeEditChanges,
@@ -400,9 +403,12 @@ export function applyFormatPatchToRange(
   }
   if (patch.numberFormat !== undefined) range.setNumberFormat(patch.numberFormat ?? 'General')
   if (patch.horizontalAlign !== undefined) {
-    range.setHorizontalAlignment(
-      (patch.horizontalAlign ?? 'normal') as 'left' | 'center' | 'normal',
-    )
+    // The facade helper only accepts 'left' | 'center' | 'normal' — and
+    // 'normal' (confusingly) maps to RIGHT — so a raw 'right' hits its
+    // throwing default branch; translate it first (same as the ribbon's align
+    // command). null keeps the existing fallback to 'normal'.
+    const align = (patch.horizontalAlign ?? 'normal') as 'left' | 'center' | 'right' | 'normal'
+    range.setHorizontalAlignment(align === 'right' ? 'normal' : align)
   }
   if (patch.verticalAlign !== undefined) {
     if (patch.verticalAlign === null) range.setValue({ s: { vt: null } } as unknown as ICellData)
@@ -6288,6 +6294,8 @@ export function collectNoteStates(
     const fromFile = new Map(
       (fileSheet?.comments ?? []).map((comment) => [`${comment.row}:${comment.column}`, comment]),
     )
+    // the pictures put into this sheet's notes this session
+    const pictures = notePicturesFor(state.editJournal, sheetId)
     const threads = threadStore.sheetThreads(sheetId)
     const threaded = new Set(threads.map((thread) => `${thread.row}:${thread.column}`))
     const notes: WorkbookNoteState['notes'] = worksheet
@@ -6321,6 +6329,27 @@ export function collectNoteStates(
           }
         }
         return { ...cell, author: '', text: note.note, ...converted }
+      })
+      // The picture the reader put into a note this session rides along with
+      // it: Univer's note model has no picture of its own, so the saver learns
+      // about it here.
+      .map((entry) => {
+        const picture = pictures.get(`${entry.row}:${entry.column}`)
+        if (picture === undefined) return entry
+        if (picture === null) return { ...entry, picture: null }
+        const base64 = picture.dataUrl.split(',')[1]
+        // a data URL without its payload carries no picture
+        if (!base64) return entry
+        return {
+          ...entry,
+          picture: {
+            mediaType: picture.mediaType,
+            base64,
+            widthPx: picture.widthPx,
+            heightPx: picture.heightPx,
+            name: picture.name,
+          },
+        }
       })
     for (const thread of threads) {
       const { row, column, text, ...rest } = thread
@@ -7816,6 +7845,26 @@ export function queueVisualInstall(
   }, 100)
 }
 
+/// Session embeds render from their inline bytes; one replaces the file's
+/// picture in the same cell (the save overwrites that cell's rich value too).
+export function mergeCellImages(
+  fileImages: readonly CellImageState[],
+  sessionAdds: readonly CellImageAdd[],
+  sheetId: string,
+): CellImageState[] {
+  const session = sessionAdds.filter((entry) => entry.sheetId === sheetId)
+  const taken = new Set(session.map((entry) => `${entry.row}:${entry.column}`))
+  return [
+    ...fileImages.filter((image) => !taken.has(`${image.row}:${image.column}`)),
+    ...session.map((entry) => ({
+      id: `session-${entry.row}-${entry.column}`,
+      row: entry.row,
+      column: entry.column,
+      dataUrl: entry.dataUrl,
+    })),
+  ]
+}
+
 /// Sparklines install separately from the floating visuals: dragging a
 /// chart re-installs the visual pool, and rebuilding up to 200 sparkline
 /// float DOMs with it would make every drag commit crawl.
@@ -7848,7 +7897,11 @@ export function queueSparklineInstall(
         })),
     ]
     // In-cell rich-value pictures share the per-cell float DOM lifecycle.
-    const cellImages = sheetMeta?.cellImages ?? []
+    const cellImages = mergeCellImages(
+      sheetMeta?.cellImages ?? [],
+      state.editJournal.cellImageAdds,
+      sheetId,
+    )
     sparklineDisposablesRef.current = [
       ...(sparklines.length === 0 ? [] : installSparklines(runtime, sparklines, sheetId)),
       ...(cellImages.length === 0

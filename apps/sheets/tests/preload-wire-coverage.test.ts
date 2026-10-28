@@ -52,10 +52,13 @@ describe('preload whitelist names every sidecar wire field', () => {
   it('covers the visual objects of workbookFileSchema', () => {
     const keys = new Map<string, string>()
     objectKeys(workbookFileSchema, 'file', keys)
-    // mediaDataUrl is renderer-only (session previews); the sidecar never
-    // sends it, so the preload rightly does not name it.
+    // Renderer-only fields the sidecar never sends, so the preload rightly
+    // does not name them: mediaDataUrl (session previews) and
+    // chart.pivotTablePath (the PivotTable a session-added chart was built
+    // from; the save resolves it into c:pivotSource, which the file then keeps).
+    const rendererOnly = new Set(['mediaDataUrl', 'pivotTablePath'])
     const visualKeys = [...keys.entries()].filter(
-      ([key, where]) => where.startsWith('file.visuals[]') && key !== 'mediaDataUrl',
+      ([key, where]) => where.startsWith('file.visuals[]') && !rendererOnly.has(key),
     )
     expect(visualKeys.length).toBeGreaterThan(20)
     // OLE embeds ride the same visual record; the preload must name them.
@@ -63,6 +66,22 @@ describe('preload whitelist names every sidecar wire field', () => {
     const missing = visualKeys
       .filter(([key]) => !preloadSource.includes(key))
       .map(([, where]) => where)
+    expect(missing).toEqual([])
+  })
+
+  it('parseWorkbookFile names every top-level workbookFileSchema field', () => {
+    // The whole-source check above is blind to a name that appears elsewhere in
+    // the preload (passwordProtected also rides the password-update reply, so
+    // parseWorkbookFile dropped it unnoticed): look inside the parser only.
+    const start = preloadSource.indexOf('function parseWorkbookFile')
+    const body = preloadSource.slice(start, preloadSource.indexOf('function parseRangeRequest'))
+    expect(start).toBeGreaterThan(-1)
+    // Known gaps that predate this check, kept visible instead of silently
+    // passing: both are sent by main and read by the renderer.
+    const knownDropped = new Set(['unsavedNew', 'automaticRecoveryDisabled'])
+    const missing = Object.keys(workbookFileSchema.shape).filter(
+      (key) => !knownDropped.has(key) && !new RegExp(`\\b${key}\\b`).test(body),
+    )
     expect(missing).toEqual([])
   })
 })

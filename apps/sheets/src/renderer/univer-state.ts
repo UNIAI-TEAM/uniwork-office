@@ -4,6 +4,7 @@
  * Used by both the App component (App.tsx) and the module-level sync
  * helpers (univer-sync.ts).
  */
+import type { SheetPasswordHash } from '@genoffice/xlsx-gateway/gateway/xlsx-protection-hash'
 import type { SheetProtectionInfo } from './sheet-protection'
 import { BorderType, LocalUndoRedoService, Worksheet, type IRange } from '@univerjs/core'
 import { SheetInterceptorService } from '@univerjs/sheets'
@@ -102,7 +103,12 @@ export interface LazyWorkbookState {
   /// File-side allow-edit ranges, known once a sheet finishes indexing.
   readonly sheetProtectedRanges: Map<
     string,
-    { name: string; sqref: string; hasPassword: boolean }[]
+    {
+      name: string
+      sqref: string
+      hasPassword: boolean
+      password?: SheetPasswordHash
+    }[]
   >
   /// Defined names the Univer engine rejected at install — preserved verbatim
   /// by the declarative defined-names save.
@@ -274,6 +280,12 @@ export const AI_UNDO_CELL_BUDGET = 100_000
 /// the activation; `dropped` reports the batch entry was discarded.
 export const aiBulkUndoGate = { active: false, dropped: false, cells: 0, pushed: 0 }
 
+/// Raised around writes that must leave no undo entry while still reaching
+/// the edit journal. A batched undo item replays its undo mutations in push
+/// order, so a cell written many times (a Data Table input) would come back
+/// as its LAST substituted value, not its original.
+export const undoSuppression = { active: false }
+
 export interface UndoRedoItemLike {
   readonly unitID: string
   readonly redoMutations?: readonly { params?: unknown }[]
@@ -312,7 +324,7 @@ export function installJournalSuppressionUndoFilter(): void {
   }
   const originalPush = proto.pushUndoRedo
   proto.pushUndoRedo = function (this: unknown, item: UndoRedoItemLike) {
-    if (journalSuppression.active) return
+    if (journalSuppression.active || undoSuppression.active) return
     if (aiBulkUndoGate.active) {
       if (aiBulkUndoGate.dropped) return
       aiBulkUndoGate.cells += undoPayloadCells(item, AI_UNDO_CELL_BUDGET + 1)

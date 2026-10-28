@@ -1281,6 +1281,10 @@ export const de = {
   appFontSizeTip: 'Schriftgrad',
   appZoomIn: 'Vergrößern',
   appZoomOut: 'Verkleinern',
+  appImgActualSize: 'Originalgröße',
+  appImgFitWindow: 'An Fenster anpassen',
+  appImgSaveAs: 'Bild speichern unter…',
+  appImgClose: 'Schließen (Esc)',
   appZoomSheetTitle: 'Blatt zoomen',
   appResetZoom: 'Zoom zurücksetzen',
   appZoomToSelection: 'An Markierung anpassen',
@@ -1323,6 +1327,30 @@ export const de = {
   appOpenFileFirst: 'Öffnen Sie zuerst eine Datei',
   appNoPassword: 'Kein Kennwort',
   appProtectWorkbook: 'Arbeitsmappe schützen',
+  appChangePassword: 'Kennwort ändern',
+  appWorkbookPasswordChanged: 'Das Arbeitsmappenkennwort wurde aktualisiert.',
+  appEncryptedOpenTitle: 'Kennwortgeschützte Arbeitsmappe öffnen',
+  appEncryptedOpenCopy: 'Geben Sie das Kennwort ein, um diese Arbeitsmappe zu entsperren.',
+  appEncryptedPasswordLabel: 'Kennwort',
+  appEncryptedOpen: 'Öffnen',
+  appChangePasswordTitle: 'Kennwort der Arbeitsmappe ändern',
+  appChangePasswordCopy: 'Wählen Sie ein neues Kennwort und bestätigen Sie es unten.',
+  appNewPasswordLabel: 'Neues Kennwort',
+  appConfirmPasswordLabel: 'Neues Kennwort bestätigen',
+  appPasswordsMismatch: 'Die Kennwörter stimmen nicht überein.',
+  appPasswordUpdateFailed: 'Das Kennwort der Arbeitsmappe konnte nicht aktualisiert werden.',
+  appPasswordUpdating: 'Wird aktualisiert…',
+  appUpdatePassword: 'Kennwort aktualisieren',
+  appWorkbookNotPasswordProtected:
+    'Diese Arbeitsmappe ist nicht durch ein Öffnungskennwort geschützt.',
+  appSaveErrEncryptedUniwork:
+    'Eine kennwortgeschützte Arbeitsmappe kann nicht in einem UniWork-Dokument gespeichert werden. Mit „Speichern unter“ behalten Sie eine verschlüsselte Kopie auf diesem Computer.',
+  appPasswordChangeUniwork: 'Das Kennwort eines UniWork-Dokuments kann hier nicht geändert werden.',
+  appPasswordChangeReadOnly:
+    'Diese Arbeitsmappe ist schreibgeschützt, daher kann ihr Kennwort nicht geändert werden.',
+  appEncryptedWrongPassword: 'Das Kennwort ist falsch. Versuchen Sie es erneut.',
+  appPasswordChangeRestored:
+    'Speichern Sie zuerst die wiederhergestellte Arbeitsmappe und ändern Sie dann ihr Kennwort.',
   appAllowEditRanges: 'Bereiche zur Bearbeitung freigeben',
   appGroupClipboard: 'Zwischenablage',
   appPaste: 'Einfügen',
@@ -1508,6 +1536,16 @@ export const de = {
   appTableRowsNotLoaded:
     'Die Tabellenzeilen werden noch geladen – versuchen Sie es gleich noch einmal.',
   appTableTotalLabel: 'Ergebnis',
+  appNotePicturesPaneTitle: 'Bilder in Notizen',
+  appNotePicturesClose: 'Schließen',
+  appNotePicturesNone: 'Keine Notiz in dieser Arbeitsmappe zeigt ein Bild.',
+  appNotePictureUnavailable: 'Dieses Bild kann nicht angezeigt werden.',
+  appNotePicturesToggle: 'Bilder in Notizen',
+  appNoteInsertPicture: 'Bild einfügen',
+  appNotePictureInserted:
+    'Bild dem Kommentar in {cell} hinzugefügt. Speichern, um es in die Datei zu schreiben.',
+  appNotePictureRemoved: 'Bild aus dem Kommentar in {cell} entfernt.',
+  appNotePictureRemove: 'Bild entfernen',
   appCommentsPaneTitle: 'Kommentare',
   appThreadReply: 'Antworten',
   appThreadReplyPlaceholder: 'Antworten…',
@@ -1554,6 +1592,8 @@ export const de = {
   appVisualSendBackward: 'Eine Ebene nach hinten',
   appVisualSizeProperties: 'Größe und Eigenschaften…',
   appVisualHyperlink: 'Link…',
+  appVisualEmbedInCell: 'Bild in Zelle einbetten',
+  appVisualEmbedFailed: 'Das Bild konnte nicht in die Zelle eingebettet werden.',
   appVisualDelete: 'Löschen',
   appVisualArranged: 'Objekt aktualisiert — mit {saveKeys} speichern.',
   appVisualCopied: 'Objekt kopiert.',
@@ -1584,6 +1624,8 @@ export const de = {
     'Die Webversion von UniWork Sheets erhält ihre Tabellen-Engine erst noch. Öffnen Sie diese Arbeitsmappe bis dahin in der UniWork-Desktop-App.',
   appWebEngineHint: 'Ihre Datei wurde nicht verändert.',
   appWebViewOnly: 'Nur Ansicht: Sie können Änderungen an dieser Arbeitsmappe nicht speichern.',
+  appWebEncryptedOpen:
+    'Diese Arbeitsmappe ist kennwortgeschützt und lässt sich in der Webversion nicht öffnen. Öffnen Sie sie in der UniWork-Desktop-App.',
   appWebConflictTitle: 'Diese Arbeitsmappe wurde an anderer Stelle geändert',
   appWebConflictBody:
     'Ihre Änderungen sind noch nicht in UniWork und bleiben in diesem Browser, bis Sie sich abmelden.',
@@ -1603,4 +1645,5 @@ export const de = {
     'Die Arbeitsmappen-Engine wurde unerwartet beendet und neu gestartet. Die Arbeitsmappe wurde aus der zuletzt gespeicherten Version erneut geöffnet; Ihre nicht gespeicherten Änderungen bleiben erhalten – speichern Sie bald.',
   appWebSavedReopenFailed:
     'Ihre Änderungen wurden in UniWork gespeichert, aber die Arbeitsmappe konnte hier nicht erneut geöffnet werden. Laden Sie den Editor neu, um weiterzuarbeiten.',
+  appDataTable: 'Datentabelle',
 } satisfies Record<keyof typeof zh, string>
