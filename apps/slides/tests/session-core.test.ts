@@ -259,4 +259,15 @@ describe('session handlers with the in-memory host', () => {
       az: 0,
     })
   })
+
+  it('creates a new blank deck with a custom valid size and ignores invalid sizes', async () => {
+    const host = new MemoryHostIO()
+    const ctx: HandlerContext = { clientId: 111, host }
+    const a4Portrait = { cx: 7560000, cy: 10692000 }
+    const r1 = await callSessionHandler('slides:new-blank', ctx, FIT, a4Portrait)
+    expect(r1.size).toEqual(a4Portrait)
+    expect(callSessionHandler('slides:get-slide-size', ctx)).toEqual(a4Portrait)
+    const r2 = await callSessionHandler('slides:new-blank', ctx, FIT, { cx: 100, cy: 100 })
+    expect(r2.size).toEqual({ cx: 12192000, cy: 6858000 })
+  })
 })

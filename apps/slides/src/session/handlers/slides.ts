@@ -13,6 +13,7 @@ import {
   listSlideLayouts,
   narrationSpids,
   openPptx,
+  setSlideSize,
   shouldOfferBuiltinLayouts,
 } from '@genoffice/pptx-engine'
 import { runTxn } from '@genoffice/pptx-ops'
@@ -58,8 +59,17 @@ const resolveLayoutPath = (session: Session, layoutPath?: string): string | unde
 }
 
 export const slideHandlers = {
-  'slides:new-blank': async (ctx: HandlerContext, fitWidthPx: number): Promise<OpenResult> => {
+  'slides:new-blank': async (
+    ctx: HandlerContext,
+    fitWidthPx: number,
+    size?: unknown,
+  ): Promise<OpenResult> => {
     const opened = await openPptx(await createBlankPptx())
+    // the renderer's saved default size; anything a .pptx cannot store keeps the template
+    const side = (v: unknown): v is number =>
+      typeof v === 'number' && Number.isInteger(v) && v >= 914400 && v <= 51206400
+    const s = size as { cx?: unknown; cy?: unknown } | undefined
+    if (s && side(s.cx) && side(s.cy)) setSlideSize(opened, s.cx, s.cy)
     createSession(ctx.clientId, { path: '', opened, fitWidthPx })
     return {
       path: '',
