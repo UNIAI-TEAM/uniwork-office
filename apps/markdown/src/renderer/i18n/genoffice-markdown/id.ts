@@ -11,4 +11,7 @@ export const id = {
   suggestCreateNote: 'Buat catatan baru',
   tags: 'Tag',
   tagsEmpty: 'Belum ada #tag di vault',
+  blockLink: 'Salin tautan ke blok',
+  blockLinkCopied: '{link} disalin',
+  blockLinkNone: 'Tidak ada blok untuk ditautkan di sini',
 } satisfies Record<keyof typeof zh, string>

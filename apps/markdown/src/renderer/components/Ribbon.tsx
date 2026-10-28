@@ -40,6 +40,7 @@ import {
   IconEyeOff,
   IconSourceCode,
   IconBacklinks,
+  IconBlockLink,
   IconTag,
   IconGraph,
   IconSpellcheck,
@@ -84,6 +85,8 @@ interface Props {
   onToggleTags: () => void
   onToggleBacklinks: () => void
   onOpenGraph: () => void
+  /** put a `[[Note#^id]]` for the block at the caret on the clipboard */
+  onCopyBlockLink: () => void
   spellcheck: boolean
   onToggleSpellcheck: () => void
   /** false on the web (cap 'autoSave'): no AutoSave toggle */
@@ -332,6 +335,7 @@ export function Ribbon({
   onToggleTags,
   onToggleBacklinks,
   onOpenGraph,
+  onCopyBlockLink,
   spellcheck,
   onToggleSpellcheck,
   showAutoSave = true,
@@ -707,6 +711,13 @@ export function Ribbon({
                   </span>
                 )}
               </span>
+              {/* writes a `^id` into the document and links by file name: the vault only (cap 'wikiVault'),
+                  and `off` already covers a view-only or locked copy */}
+              {cap('wikiVault') && (
+                <IconBtn title={t('blockLink')} disabled={off} onClick={onCopyBlockLink}>
+                  <IconBlockLink size={ICON} />
+                </IconBtn>
+              )}
             </div>
           </div>
         )}

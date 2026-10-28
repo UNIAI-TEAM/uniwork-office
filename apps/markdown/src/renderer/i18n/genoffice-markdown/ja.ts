@@ -11,4 +11,7 @@ export const ja = {
   suggestCreateNote: '新規ノートを作成',
   tags: 'タグ',
   tagsEmpty: 'ボールトに #タグはまだありません',
+  blockLink: 'ブロックへのリンクをコピー',
+  blockLinkCopied: '{link} をコピーしました',
+  blockLinkNone: 'ここにリンクできるブロックはありません',
 } satisfies Record<keyof typeof zh, string>

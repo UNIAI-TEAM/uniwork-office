@@ -11,4 +11,7 @@ export const zhTW = {
   suggestCreateNote: '新增筆記',
   tags: '標籤',
   tagsEmpty: '知識庫裡還沒有 #標籤',
+  blockLink: '複製區塊連結',
+  blockLinkCopied: '已複製 {link}',
+  blockLinkNone: '此處沒有可連結的區塊',
 } satisfies Record<keyof typeof zh, string>

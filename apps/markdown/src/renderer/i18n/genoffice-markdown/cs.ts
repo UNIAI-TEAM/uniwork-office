@@ -11,4 +11,7 @@ export const cs = {
   suggestCreateNote: 'Vytvořit novou poznámku',
   tags: 'Štítky',
   tagsEmpty: 'V trezoru zatím nejsou žádné #štítky',
+  blockLink: 'Kopírovat odkaz na blok',
+  blockLinkCopied: 'Zkopírováno {link}',
+  blockLinkNone: 'Tady není žádný blok k odkazování',
 } satisfies Record<keyof typeof zh, string>

@@ -11,4 +11,7 @@ export const ar = {
   suggestCreateNote: 'إنشاء ملاحظة جديدة',
   tags: 'الوسوم',
   tagsEmpty: 'لا توجد #وسوم في الخزانة بعد',
+  blockLink: 'نسخ رابط الكتلة',
+  blockLinkCopied: 'تم نسخ {link}',
+  blockLinkNone: 'لا توجد كتلة للربط هنا',
 } satisfies Record<keyof typeof zh, string>

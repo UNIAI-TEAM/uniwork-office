@@ -11,4 +11,7 @@ export const fr = {
   suggestCreateNote: 'Créer une nouvelle note',
   tags: 'Étiquettes',
   tagsEmpty: 'Pas encore de #étiquette dans le coffre',
+  blockLink: 'Copier le lien vers le bloc',
+  blockLinkCopied: '{link} copié',
+  blockLinkNone: 'Rien à lier ici',
 } satisfies Record<keyof typeof zh, string>

@@ -11,4 +11,7 @@ export const es = {
   suggestCreateNote: 'Crear nota nueva',
   tags: 'Etiquetas',
   tagsEmpty: 'Aún no hay #etiquetas en la bóveda',
+  blockLink: 'Copiar enlace al bloque',
+  blockLinkCopied: '{link} copiado',
+  blockLinkNone: 'Aquí no hay ningún bloque que enlazar',
 } satisfies Record<keyof typeof zh, string>

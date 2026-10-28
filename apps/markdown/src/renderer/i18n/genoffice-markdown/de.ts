@@ -11,4 +11,7 @@ export const de = {
   suggestCreateNote: 'Neue Notiz erstellen',
   tags: 'Schlagwörter',
   tagsEmpty: 'Noch keine #Schlagwörter im Vault',
+  blockLink: 'Link zum Block kopieren',
+  blockLinkCopied: '{link} kopiert',
+  blockLinkNone: 'Hier gibt es keinen Block zum Verlinken',
 } satisfies Record<keyof typeof zh, string>

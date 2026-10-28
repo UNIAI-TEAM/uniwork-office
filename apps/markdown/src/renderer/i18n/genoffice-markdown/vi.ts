@@ -12,4 +12,7 @@ export const vi = {
   suggestCreateNote: 'Tạo ghi chú mới',
   tags: 'Thẻ',
   tagsEmpty: 'Chưa có #thẻ nào trong kho',
+  blockLink: 'Sao chép liên kết đến khối',
+  blockLinkCopied: 'Đã sao chép {link}',
+  blockLinkNone: 'Không có khối nào để liên kết ở đây',
 } satisfies Record<keyof typeof zh, string>

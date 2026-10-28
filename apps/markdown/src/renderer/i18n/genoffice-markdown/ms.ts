@@ -11,4 +11,7 @@ export const ms = {
   suggestCreateNote: 'Cipta nota baharu',
   tags: 'Tag',
   tagsEmpty: 'Belum ada #tag dalam vault',
+  blockLink: 'Salin pautan ke blok',
+  blockLinkCopied: '{link} disalin',
+  blockLinkNone: 'Tiada blok untuk dipautkan di sini',
 } satisfies Record<keyof typeof zh, string>

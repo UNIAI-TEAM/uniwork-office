@@ -11,4 +11,7 @@ export const ru = {
   suggestCreateNote: 'Создать новую заметку',
   tags: 'Метки',
   tagsEmpty: 'В хранилище пока нет #меток',
+  blockLink: 'Скопировать ссылку на блок',
+  blockLinkCopied: 'Скопировано: {link}',
+  blockLinkNone: 'Здесь нет блока для ссылки',
 } satisfies Record<keyof typeof zh, string>

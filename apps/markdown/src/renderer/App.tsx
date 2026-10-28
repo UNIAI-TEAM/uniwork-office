@@ -418,6 +418,11 @@ export default function App() {
           createWikiNoteAndOpen(wikiTarget(target))
         },
       },
+      blockLink: {
+        getDocumentPath: () => filePathRef.current ?? '',
+        onCopied: (link) => showToast(translate('blockLinkCopied', { link })),
+        onNothing: () => showToast(translate('blockLinkNone'), 'error'),
+      },
     })
   }, [createWikiNoteAndOpen, insertImage, jumpToWikiFragment])
 
@@ -1402,6 +1407,7 @@ export default function App() {
         onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
         onToggleTags={() => setTagsOpen((v) => !v)}
         onOpenGraph={() => setGraphOpen(true)}
+        onCopyBlockLink={() => editor?.commands.copyBlockLink()}
         spellcheck={spellcheck}
         onToggleSpellcheck={() => setSpellcheck((v) => !v)}
         sourceMode={sourceMode}

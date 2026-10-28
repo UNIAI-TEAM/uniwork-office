@@ -10,4 +10,7 @@ export const zh = {
   suggestCreateNote: '新建笔记',
   tags: '标签',
   tagsEmpty: '知识库里还没有 #标签',
+  blockLink: '复制块链接',
+  blockLinkCopied: '已复制 {link}',
+  blockLinkNone: '此处没有可链接的块',
 }

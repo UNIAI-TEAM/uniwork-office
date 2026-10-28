@@ -11,4 +11,7 @@ export const pl = {
   suggestCreateNote: 'Utwórz nową notatkę',
   tags: 'Tagi',
   tagsEmpty: 'W sejfie nie ma jeszcze #tagów',
+  blockLink: 'Kopiuj link do bloku',
+  blockLinkCopied: 'Skopiowano {link}',
+  blockLinkNone: 'Nie ma tu bloku do podlinkowania',
 } satisfies Record<keyof typeof zh, string>

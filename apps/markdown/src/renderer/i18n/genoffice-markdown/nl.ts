@@ -11,4 +11,7 @@ export const nl = {
   suggestCreateNote: 'Nieuwe notitie maken',
   tags: 'Labels',
   tagsEmpty: 'Nog geen #labels in de kluis',
+  blockLink: 'Link naar blok kopiëren',
+  blockLinkCopied: '{link} gekopieerd',
+  blockLinkNone: 'Hier is geen blok om naar te linken',
 } satisfies Record<keyof typeof zh, string>

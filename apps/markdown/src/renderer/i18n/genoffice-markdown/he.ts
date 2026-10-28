@@ -11,4 +11,7 @@ export const he = {
   suggestCreateNote: 'צור פתק חדש',
   tags: 'תגיות',
   tagsEmpty: 'אין עדיין #תגיות בכספת',
+  blockLink: 'העתק קישור לבלוק',
+  blockLinkCopied: '{link} הועתק',
+  blockLinkNone: 'אין כאן בלוק לקישור',
 } satisfies Record<keyof typeof zh, string>

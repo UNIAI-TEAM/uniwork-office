@@ -46,6 +46,8 @@ import type { SlashController, SlashItem } from './slashCommand'
 import { WikiSuggest } from './wikiSuggest'
 import type { WikiSuggestController } from './wikiSuggest'
 import { WikiEmbed } from './wikiEmbed'
+import { BlockLink } from './blockId'
+import type { BlockLinkOptions } from './blockId'
 import { t } from '../i18n/locale'
 import { cap } from '../capabilities'
 
@@ -63,6 +65,11 @@ export interface BuildExtensionsOptions {
    * reaching for the filesystem.
    */
   wikiLink?: Partial<WikiLinkOptions>
+  /**
+   * Copy-link-to-block. Omitted in tests and headless paths: the command then
+   * reports to no one and writes to whatever clipboard the environment has.
+   */
+  blockLink?: Partial<BlockLinkOptions>
 }
 
 export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[] {
@@ -160,8 +167,13 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     WikiLinkResolve.configure(options.wikiLink ?? {}),
     // an aliased link reads as its alias: the syntax is hidden in the view only
     WikiAliasDisplay,
+    // block ids and the `[[` suggester work on the notes folder (cap 'wikiVault'): `^id` markers
+    // are written on demand, dimmed in the view, plain text in the file
     ...(cap('wikiVault')
-      ? [WikiSuggest.configure({ controller: options.wikiSuggestController })]
+      ? [
+          BlockLink.configure(options.blockLink ?? {}),
+          WikiSuggest.configure({ controller: options.wikiSuggestController }),
+        ]
       : []),
     BlockDragHandle,
     BlockKeymap,

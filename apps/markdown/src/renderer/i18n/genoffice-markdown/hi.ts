@@ -11,4 +11,7 @@ export const hi = {
   suggestCreateNote: 'नया नोट बनाएँ',
   tags: 'टैग',
   tagsEmpty: 'वॉल्ट में अभी कोई #टैग नहीं है',
+  blockLink: 'ब्लॉक का लिंक कॉपी करें',
+  blockLinkCopied: '{link} कॉपी किया गया',
+  blockLinkNone: 'यहाँ लिंक करने के लिए कोई ब्लॉक नहीं है',
 } satisfies Record<keyof typeof zh, string>

@@ -11,4 +11,7 @@ export const th = {
   suggestCreateNote: 'สร้างโน้ตใหม่',
   tags: 'แท็ก',
   tagsEmpty: 'ยังไม่มี #แท็กในห้องสมุด',
+  blockLink: 'คัดลอกลิงก์ไปยังบล็อก',
+  blockLinkCopied: 'คัดลอก {link} แล้ว',
+  blockLinkNone: 'ไม่มีบล็อกให้ลิงก์ที่นี่',
 } satisfies Record<keyof typeof zh, string>

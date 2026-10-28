@@ -11,4 +11,7 @@ export const ko = {
   suggestCreateNote: '새 노트 만들기',
   tags: '태그',
   tagsEmpty: '볼트에 아직 #태그가 없습니다',
+  blockLink: '블록 링크 복사',
+  blockLinkCopied: '{link} 복사됨',
+  blockLinkNone: '여기에는 링크할 블록이 없습니다',
 } satisfies Record<keyof typeof zh, string>

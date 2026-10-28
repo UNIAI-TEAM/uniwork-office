@@ -411,6 +411,14 @@ html[data-doc-theme='light'] .doc-page {
   display: none;
 }
 
+/* A `^id` block marker is document text that other notes link to; it reads as
+ * an address, not as prose, so the view dims it the way Obsidian does. */
+.md-block-id {
+  color: var(--text-muted);
+  font-size: 0.82em;
+  opacity: 0.8;
+}
+
 /* Obsidian-style ![[embeds]]. The literal renders as a card: a resolved one
  * shows its source, an unresolved one stays dashed so the typo is visible.
  * A resolved picture swaps the literal for the picture itself (the widget the
