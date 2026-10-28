@@ -43,11 +43,20 @@ import { WikiLink, WikiLinkResolve } from './wikilink'
 import { WikiMarkOnInput } from './wikilinkInput'
 import type { WikiLinkOptions } from './wikilink'
 import type { SlashController, SlashItem } from './slashCommand'
+import { WikiSuggest } from './wikiSuggest'
+import type { WikiSuggestController } from './wikiSuggest'
+import { WikiEmbed } from './wikiEmbed'
 import { t } from '../i18n/locale'
+import { cap } from '../capabilities'
 
 export interface BuildExtensionsOptions {
   slashController: SlashController
   slashItems: () => SlashItem[]
+  /**
+   * The `[[` suggester. Omitted in tests and headless paths: the plugin then
+   * runs with no menu sink, so nothing intercepts the keys around a `[[`.
+   */
+  wikiSuggestController?: WikiSuggestController
   /**
    * Wiki-link navigation. Omitted in tests and headless paths: the resolver is
    * then left on its default, which reports every link unresolved rather than
@@ -145,7 +154,13 @@ export function buildExtensions(options: BuildExtensionsOptions): AnyExtension[]
     ImageAwareLink.configure({ openOnClick: false }),
     WikiLink,
     WikiMarkOnInput,
+    // the vault's embeds and the `[[` suggester read the notes folder (cap 'wikiVault': off on the web,
+    // where `![[x]]` stays literal text)
+    ...(cap('wikiVault') ? [WikiEmbed] : []),
     WikiLinkResolve.configure(options.wikiLink ?? {}),
+    ...(cap('wikiVault')
+      ? [WikiSuggest.configure({ controller: options.wikiSuggestController })]
+      : []),
     BlockDragHandle,
     BlockKeymap,
     TableKeymap,

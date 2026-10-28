@@ -32,6 +32,7 @@ const api: MarkdownApi = {
     ipcRenderer.on(MARKDOWN_CHANNELS.wikiFragmentReady, listener)
     return () => ipcRenderer.removeListener(MARKDOWN_CHANNELS.wikiFragmentReady, listener)
   },
+  listWikiNotes: () => ipcRenderer.invoke(MARKDOWN_CHANNELS.listWikiNotes),
   wikiBacklinks: (path: string) => ipcRenderer.invoke(MARKDOWN_CHANNELS.wikiBacklinks, path),
   wikiGraph: () => ipcRenderer.invoke(MARKDOWN_CHANNELS.wikiGraph),
   consumeHeadlessExport: () => ipcRenderer.invoke(MARKDOWN_CHANNELS.consumeHeadlessExport),
