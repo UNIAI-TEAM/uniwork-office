@@ -457,6 +457,7 @@ import {
   SHELL_WINDOW_MIN_WIDTH,
 } from './window-bounds'
 import { installShellCloseGuard } from './window-close-guard'
+import { openShellSettingsView } from './settings-view'
 import {
   beginEditLockWillQuit,
   finishEditLockWillQuit,
@@ -7251,14 +7252,13 @@ function installBackToHomeItems(): void {
  *  it was hidden or minimized, and asking again re-opens the same panel —
  *  the renderer keeps one. */
 function openSettingsView(section: 'general' | 'aiModel' = 'general'): void {
-  const win = shellWindow
-  if (!win || win.isDestroyed()) return
-  // the request may come from a detached window or while the shell is minimized
-  if (win.isMinimized()) win.restore()
-  win.show()
-  win.focus()
-  tabManager?.openHomeTab()
-  win.webContents.send(HOME_CHANNELS.openSettings, { section })
+  openShellSettingsView(
+    {
+      ensureTabManager,
+      getShellWindow: () => shellWindow,
+    },
+    section,
+  )
 }
 
 function installDockMenu(): void {

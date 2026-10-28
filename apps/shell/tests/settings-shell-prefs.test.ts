@@ -6,7 +6,8 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LANGS } from '@genoffice/i18n'
-import type { HomeApi } from '../src/shared/home-api'
+import { HOME_CHANNELS, type HomeApi } from '../src/shared/home-api'
+import { openShellSettingsView } from '../src/main/settings-view'
 import { LocaleProvider, type Lang } from '../src/renderer/src/locale'
 import { SettingsModal, type SettingsSectionId } from '../src/renderer/src/SettingsModal'
 import { shellPrefsStrings } from '../src/renderer/src/i18n/strings-shell-prefs'
@@ -254,5 +255,83 @@ describe('Settings > About: automatic update checks row', () => {
     expect(sw).not.toBeNull()
     expect(sw!.getAttribute('aria-checked')).toBe('false')
     expect(host.textContent).toContain(shellPrefsStrings.vi.setAutoUpdateCheckDesc)
+  })
+})
+
+describe('openShellSettingsView (main-process Settings action)', () => {
+  it('recreates the shell window via ensureTabManager, opens Home, and sends openSettings after did-finish-load when the shell window was closed', () => {
+    const loadListeners: Array<() => void> = []
+    const mockWin = {
+      isDestroyed: vi.fn(() => false),
+      isMinimized: vi.fn(() => false),
+      restore: vi.fn(),
+      show: vi.fn(),
+      focus: vi.fn(),
+      webContents: {
+        isDestroyed: vi.fn(() => false),
+        isLoadingMainFrame: vi.fn(() => true),
+        send: vi.fn(),
+        once: vi.fn((event: string, cb: () => void) => {
+          if (event === 'did-finish-load') loadListeners.push(cb)
+        }),
+      },
+    }
+    let currentWin: typeof mockWin | null = null
+    const openHomeTab = vi.fn()
+    const ensureTabManager = vi.fn(() => {
+      currentWin = mockWin
+      return { openHomeTab }
+    })
+
+    openShellSettingsView({
+      ensureTabManager,
+      getShellWindow: () => currentWin,
+    })
+
+    expect(ensureTabManager).toHaveBeenCalledOnce()
+    expect(openHomeTab).toHaveBeenCalledOnce()
+    expect(mockWin.show).toHaveBeenCalledOnce()
+    expect(mockWin.focus).toHaveBeenCalledOnce()
+    expect(mockWin.webContents.send).not.toHaveBeenCalled()
+    expect(loadListeners).toHaveLength(1)
+
+    mockWin.webContents.isLoadingMainFrame.mockReturnValue(false)
+    loadListeners[0]!()
+    expect(mockWin.webContents.send).toHaveBeenCalledWith(HOME_CHANNELS.openSettings, {
+      section: 'general',
+    })
+  })
+
+  it('restores a minimized existing shell window and sends openSettings immediately when loaded', () => {
+    const mockWin = {
+      isDestroyed: vi.fn(() => false),
+      isMinimized: vi.fn(() => true),
+      restore: vi.fn(),
+      show: vi.fn(),
+      focus: vi.fn(),
+      webContents: {
+        isDestroyed: vi.fn(() => false),
+        isLoadingMainFrame: vi.fn(() => false),
+        send: vi.fn(),
+        once: vi.fn(),
+      },
+    }
+    const openHomeTab = vi.fn()
+
+    openShellSettingsView(
+      {
+        ensureTabManager: () => ({ openHomeTab }),
+        getShellWindow: () => mockWin,
+      },
+      'aiModel',
+    )
+
+    expect(mockWin.restore).toHaveBeenCalledOnce()
+    expect(mockWin.show).toHaveBeenCalledOnce()
+    expect(mockWin.focus).toHaveBeenCalledOnce()
+    expect(openHomeTab).toHaveBeenCalledOnce()
+    expect(mockWin.webContents.send).toHaveBeenCalledWith(HOME_CHANNELS.openSettings, {
+      section: 'aiModel',
+    })
   })
 })
