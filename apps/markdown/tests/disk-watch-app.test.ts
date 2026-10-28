@@ -266,4 +266,29 @@ describe('markdown App disk-watch behavior', () => {
     expect(buttons[0]?.textContent).toBe('Reload')
     expect(buttons[1]?.textContent).toBe('Overwrite anyway')
   })
+
+  it('Keep mine then a second outside change while dirty: save is blocked, never sent with overwrite:true', async () => {
+    const h = await mount()
+    open.push(h)
+
+    await typeInto(h.container.querySelector<HTMLTextAreaElement>('.fm-textarea')!, 'title: Mine')
+    h.setDiskFile('---\ntitle: Outside 1\n---\n\nOutside 1\n')
+    await h.emitDiskChanged()
+    const keepBtn = h.container.querySelectorAll<HTMLButtonElement>('.disk-notice button')[1]!
+    expect(keepBtn.textContent).toBe('Keep mine')
+    await act(async () => {
+      keepBtn.click()
+    })
+    await settle()
+    expect(h.container.querySelector('.disk-notice')).toBeNull()
+
+    // A second outside change lands while the document is still dirty
+    h.setDiskFile('---\ntitle: Outside 2\n---\n\nOutside 2\n')
+    await h.emitDiskChanged()
+    expect(h.container.querySelector('.disk-notice')).not.toBeNull()
+
+    await h.triggerSaveRequest('save')
+    expect(h.api.save).not.toHaveBeenCalled()
+    expect(h.api.sendSaveRequestAck).toHaveBeenLastCalledWith(false)
+  })
 })

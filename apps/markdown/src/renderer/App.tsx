@@ -1247,6 +1247,8 @@ export default function App() {
           const dirtyNow = dirtyRef.current || savingRef.current
           if (dirtyNow) {
             diskTextRef.current = raw
+            // A newer outside edit voids an earlier "Keep mine" so saves cannot clobber it.
+            overwriteRef.current = false
             setDiskNotice('changed')
             awaitingUser = true
             return
