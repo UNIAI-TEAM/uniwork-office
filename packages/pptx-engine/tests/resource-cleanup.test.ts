@@ -36,6 +36,22 @@ const OFF = { x: 914400, y: 914400, cx: 3657600, cy: 2057400 }
 const mediaParts = (opened: Awaited<ReturnType<typeof openPptx>>) =>
   [...opened.archive.entries.keys()].filter((path) => path.startsWith('ppt/media/'))
 
+/** Smallest valid GLB 2.0 container: header plus one space-padded JSON chunk. */
+function minimalGlb(): Uint8Array {
+  const json = new TextEncoder().encode('{"asset":{"version":"2.0"}}')
+  const padded = new Uint8Array(Math.ceil(json.length / 4) * 4).fill(0x20)
+  padded.set(json)
+  const out = new Uint8Array(20 + padded.length)
+  const view = new DataView(out.buffer)
+  view.setUint32(0, 0x46546c67, true)
+  view.setUint32(4, 2, true)
+  view.setUint32(8, out.length, true)
+  view.setUint32(12, padded.length, true)
+  view.setUint32(16, 0x4e4f534a, true)
+  out.set(padded, 20)
+  return out
+}
+
 describe('deleted resource cleanup', () => {
   it('removes an unshared picture relationship and media part', async () => {
     const opened = await openPptx(await createBlankPptx())
@@ -105,7 +121,7 @@ describe('deleted resource cleanup', () => {
   it('collects a shared 3D model after deleting its final live placeholder', async () => {
     const opened = await openPptx(await createBlankPptx())
     const added = addModel3d(opened, 0, {
-      bytes: new Uint8Array([0x67, 0x6c, 0x54, 0x46]),
+      bytes: minimalGlb(),
       ext: 'glb',
       offset: OFF,
     })!
