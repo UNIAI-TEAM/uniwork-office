@@ -281,8 +281,8 @@ export interface SheetsWebApiOptions {
 interface Session {
   fileId: string | null
   name: string
-  /** workbook bytes the session was opened from (for reading package parts such as redactions) */
-  data: ArrayBuffer
+  /** redaction package read started from the opened or saved bytes, so the bridge never retains a second workbook copy */
+  redactions: Promise<RedactionPartRead>
 }
 
 const WORKBOOK_PART_PATH = 'xl/workbook.xml'
@@ -519,11 +519,10 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
   async function openPayload(payload: OpenPayload, offer = true): Promise<WorkbookFile> {
     const server = await readSource(payload.source)
     const draft = offer ? await offerDraft(payload.file) : null
-    // the engine may take ownership of the buffer: keep our own copy for package reads
     const data = draft ? copyBuffer(draft) : server
-    const sessionData = copyBuffer(data)
     let opened: WorkbookFile
-    const oleContainer = hasOleMagic(sessionData)
+    const oleContainer = hasOleMagic(data)
+    const redactions = readWorkbookRedactionBytes(copyBuffer(data))
     try {
       opened = await transport.open({ name: payload.file.name, data, locale: locale() })
     } catch (err) {
@@ -575,7 +574,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     sessions.set(opened.sessionId, {
       fileId: payload.file.fileId,
       name: payload.file.name,
-      data: sessionData,
+      redactions,
     })
     restored = draft !== null
     latest = draft ? { sessionId: opened.sessionId, data: draft } : null
@@ -1030,7 +1029,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     ): Promise<WorkbookRedactionsResult> {
       const session = sessions.get(request.sessionId)
       if (!session) throw new Error('Unknown workbook session.')
-      return workbookRedactionsResultSchema.parse(await readWorkbookRedactionBytes(session.data))
+      return workbookRedactionsResultSchema.parse(await session.redactions)
     },
     recalcWorkbook: (request) =>
       capabilities.recalcFallback === false
@@ -1061,9 +1060,9 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       const session = sessions.get(request.sessionId)
       if (!session) throw new Error('Unknown workbook session.')
       const { data, touchedEntries } = await transport.serialize(request)
-      // the bytes are transferred to the host and the engine: keep copies for the session swap and package reads
+      // the bytes are transferred to the host and the engine: keep one copy for the session swap
       const kept = copyBuffer(data)
-      const sessionData = copyBuffer(data)
+      const redactions = readWorkbookRedactionBytes(copyBuffer(data))
       const landed: Landed =
         request.mode === 'save' && session.fileId !== null && !hostSaveAs
           ? await saveInPlace(session.fileId, data)
@@ -1110,7 +1109,7 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
           : new Error(text('appWebSavedReopenFailed'))
       }
       sessions.delete(request.sessionId)
-      sessions.set(swapped.sessionId, { fileId: meta.fileId, name: meta.name, data: sessionData })
+      sessions.set(swapped.sessionId, { fileId: meta.fileId, name: meta.name, redactions })
       return { canceled: false, file: decorate(swapped, meta), touchedEntries }
     },
 

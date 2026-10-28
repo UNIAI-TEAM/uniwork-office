@@ -1756,4 +1756,33 @@ describe('readWorkbookRedactions', () => {
     expect(res.status).toBe('unreadable')
     if (res.status === 'unreadable') expect(res.error).toContain('version')
   })
+
+  it('re-reads marks from the saved bytes after a save swaps the session', async () => {
+    const initialBytes = await buildZip({ 'xl/workbook.xml': WORKBOOK_XML })
+    const savedBytes = await buildZip({
+      'xl/workbook.xml': applyRedactionNameMirror(WORKBOOK_XML, STATES, ['Sheet1']),
+      [REDACTION_PART_PATH]: JSON.stringify({
+        version: 1,
+        sheets: [{ name: 'Sheet1', marks: [MARK] }],
+      }),
+    })
+    const fake = fakeTransport()
+    fake.transport.serialize = async () => ({
+      data: savedBytes.slice().buffer,
+      touchedEntries: ['xl/workbook.xml', REDACTION_PART_PATH],
+    })
+    const t = setup({ fileBytes: initialBytes, transport: fake.transport })
+    const wb = await t.boot()
+    expect(await t.desktop.readWorkbookRedactions({ sessionId: wb.sessionId })).toEqual({
+      status: 'absent',
+    })
+    const saved = await t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, []))
+    expect(saved.canceled).toBe(false)
+    if (saved.canceled) return
+    expect(await t.desktop.readWorkbookRedactions({ sessionId: saved.file.sessionId })).toEqual({
+      status: 'ok',
+      source: 'part',
+      states: STATES,
+    })
+  })
 })
