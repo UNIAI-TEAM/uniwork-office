@@ -5,14 +5,16 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::Path;
 
 use calamine::{Data, Reader, Sheets, open_workbook_auto};
-use zip::write::SimpleFileOptions;
-use zip::{CompressionMethod, ZipWriter};
 
 use crate::SidecarError;
+use crate::spreadsheetml;
+use crate::xlsx_package::{
+    SheetSpec, cell_reference, escape_xml, worksheet_document, write_package,
+};
 
 pub struct ConvertResult {
     pub sheets: usize,
@@ -56,11 +58,25 @@ fn unreadable_container_hint(source: &Path) -> Option<String> {
 }
 
 pub fn convert_to_xlsx(source: &Path, target: &Path) -> Result<ConvertResult, SidecarError> {
-    let mut workbook =
-        open_workbook_auto(source).map_err(|error| match unreadable_container_hint(source) {
-            Some(hint) => SidecarError::Workbook(hint),
-            None => SidecarError::Workbook(format!("Unable to read the workbook: {error}")),
-        })?;
+    let mut workbook = match open_workbook_auto(source) {
+        Ok(workbook) => workbook,
+        Err(error) => {
+            // Excel opens an XML spreadsheet saved under a legacy name by
+            // sniffing content rather than extension, so one reaches here with
+            // nothing in its header for calamine to go on. The SpreadsheetML
+            // importer is the only reader that can still make sense of it;
+            // the container hint below covers everything left over.
+            if spreadsheetml::probe(source) {
+                return spreadsheetml::convert_to_xlsx(source, target);
+            }
+            return Err(SidecarError::Workbook(
+                match unreadable_container_hint(source) {
+                    Some(hint) => hint,
+                    None => format!("Unable to read the workbook: {error}"),
+                },
+            ));
+        }
+    };
     let names: Vec<String> = workbook.sheet_names().to_vec();
     if names.is_empty() {
         return Err(SidecarError::Workbook("The workbook has no sheets.".into()));
@@ -102,27 +118,14 @@ pub fn convert_to_xlsx(source: &Path, target: &Path) -> Result<ConvertResult, Si
         sheet_xmls.push(xml);
     }
 
-    let file = File::create(target)?;
-    let mut writer = ZipWriter::new(file);
-    let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-    let mut add = |name: &str, content: &str| -> Result<(), SidecarError> {
-        writer.start_file(name, options)?;
-        writer.write_all(content.as_bytes())?;
-        Ok(())
-    };
-
-    add("[Content_Types].xml", &content_types_xml(names.len()))?;
-    add("_rels/.rels", ROOT_RELS)?;
-    add("xl/workbook.xml", &workbook_xml(&names))?;
-    add(
-        "xl/_rels/workbook.xml.rels",
-        &workbook_rels_xml(names.len()),
-    )?;
-    add("xl/styles.xml", STYLES_XML)?;
-    for (index, xml) in sheet_xmls.iter().enumerate() {
-        add(&format!("xl/worksheets/sheet{}.xml", index + 1), xml)?;
-    }
-    writer.finish()?.sync_all()?;
+    let sheets: Vec<SheetSpec> = names
+        .iter()
+        .map(|name| SheetSpec {
+            name: name.clone(),
+            state: None,
+        })
+        .collect();
+    write_package(target, &sheets, "", &sheet_xmls)?;
     Ok(ConvertResult {
         sheets: names.len(),
         cells,
@@ -183,13 +186,7 @@ fn worksheet_xml(
         ),
         _ => "A1:A1".into(),
     };
-    (
-        format!(
-            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="{dimension}"/><sheetData>{body}</sheetData></worksheet>"#,
-        ),
-        cells,
-    )
+    (worksheet_document(&dimension, "", &body, ""), cells)
 }
 
 fn cell_xml(position: (u32, u32), value: &Data, formula: Option<&str>) -> Option<String> {
@@ -231,82 +228,13 @@ fn cell_xml(position: (u32, u32), value: &Data, formula: Option<&str>) -> Option
     Some(cell)
 }
 
-fn cell_reference(row: u32, column: u32) -> String {
-    let mut letters = String::new();
-    let mut remaining = column + 1;
-    while remaining > 0 {
-        remaining -= 1;
-        letters.insert(0, char::from(b'A' + (remaining % 26) as u8));
-        remaining /= 26;
-    }
-    format!("{letters}{}", row + 1)
-}
-
-fn escape_xml(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
-
-fn content_types_xml(sheet_count: usize) -> String {
-    let overrides: String = (1..=sheet_count)
-        .map(|index| format!(
-            r#"<Override PartName="/xl/worksheets/sheet{index}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>"#,
-        ))
-        .collect();
-    format!(
-        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>{overrides}</Types>"#,
-    )
-}
-
-const ROOT_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#;
-
-fn workbook_xml(names: &[String]) -> String {
-    let sheets: String = names
-        .iter()
-        .enumerate()
-        .map(|(index, name)| {
-            format!(
-                r#"<sheet name="{}" sheetId="{}" r:id="rId{}"/>"#,
-                escape_xml(name),
-                index + 1,
-                index + 1,
-            )
-        })
-        .collect();
-    format!(
-        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>{sheets}</sheets></workbook>"#,
-    )
-}
-
-fn workbook_rels_xml(sheet_count: usize) -> String {
-    let mut relationships: String = (1..=sheet_count)
-        .map(|index| format!(
-            r#"<Relationship Id="rId{index}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet{index}.xml"/>"#,
-        ))
-        .collect();
-    relationships.push_str(&format!(
-        r#"<Relationship Id="rId{}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>"#,
-        sheet_count + 1,
-    ));
-    format!(
-        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{relationships}</Relationships>"#,
-    )
-}
-
-/// xf 1 = short date (numFmt 14), xf 2 = date+time (numFmt 22).
-const STYLES_XML: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="22" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>"#;
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Read;
+    use std::fs::File;
+    use std::io::{Read, Write};
+    use zip::ZipWriter;
+    use zip::write::SimpleFileOptions;
 
     fn read_entry(path: &Path, name: &str) -> String {
         let mut archive = zip::ZipArchive::new(File::open(path).unwrap()).unwrap();
@@ -354,7 +282,10 @@ mod tests {
 
         // Never emit corrupted calamine BIFF8 formulas ($USN, $USO, unquoted 3D ref)
         for xml in [&sheet1, &sheet2, &sheet3] {
-            assert!(!xml.contains("<f>"), "expected no <f> in BIFF8 conversion, got: {xml}");
+            assert!(
+                !xml.contains("<f>"),
+                "expected no <f> in BIFF8 conversion, got: {xml}"
+            );
             assert!(!xml.contains("USN"));
             assert!(!xml.contains("USO"));
             assert!(!xml.contains("USP"));
@@ -403,10 +334,9 @@ mod tests {
 
     #[test]
     fn an_xml_spreadsheet_is_the_converter_s_business_not_a_dead_end() {
-        // genoffice#2044 opens this shape instead of refusing it. Until that
-        // lands the reader still turns it away, and all this PR promises about
-        // it is that the refusal is a sentence about the file rather than a
-        // quoted byte signature.
+        // genoffice#2044 opens this shape instead of refusing it: the XML
+        // spreadsheet converts, and the container hint keeps speaking only
+        // for text a reader cannot open at all.
         let dir = tempfile::tempdir().unwrap();
         let source = dir.path().join("report.xls");
         std::fs::write(
@@ -422,12 +352,10 @@ mod tests {
 "#,
         )
         .unwrap();
-        let Err(error) = convert_to_xlsx(&source, &dir.path().join("out.xlsx")) else {
-            panic!("without genoffice#2044 this file must still be refused");
-        };
-        let message = error.to_string();
-        assert!(message.contains("not a workbook container"), "{message}");
-        assert!(message.contains("<?xml"), "{message}");
+        let result = convert_to_xlsx(&source, &dir.path().join("out.xlsx"))
+            .expect("an XML spreadsheet under a legacy name converts (genoffice#2044)");
+        assert_eq!(result.sheets, 1, "sheets: {}", result.sheets);
+        assert_eq!(result.cells, 1, "cells: {}", result.cells);
     }
 
     #[test]
