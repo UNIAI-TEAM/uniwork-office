@@ -806,7 +806,7 @@
   min-height: 64px;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-12);
   background: var(--surface);
   transition: background-color var(--transition-fast);
 }
@@ -824,7 +824,7 @@
   min-width: 0;
   padding: 14px 48px 14px 16px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-12);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -862,7 +862,7 @@
 .dh-folder-card .dh-folder-icon {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius-12);
 }
 
 .dh-folder-card .dh-folder-icon svg {
@@ -933,7 +933,7 @@
   background: var(--surface-subtle);
   color: var(--text-secondary);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .dh-doc-head > [role='columnheader'] {
@@ -1029,13 +1029,6 @@
   background: var(--hover);
 }
 
-.dh-doc-row.selected {
-  background: transparent;
-}
-
-.dh-doc-row.selected:hover {
-  background: var(--hover);
-}
 .dh-doc-row.opening {
   opacity: 0.65;
   cursor: progress;
@@ -1286,7 +1279,7 @@
 .dh-cell-time {
   color: var(--text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1394,7 +1387,7 @@
 .dh-cell-size {
   color: var(--text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

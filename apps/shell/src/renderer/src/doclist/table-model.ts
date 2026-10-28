@@ -139,7 +139,7 @@ export function editorAvatarUrlOf(doc: DocumentsHomeDoc): string | null {
 
 /** first letter for the avatar fallback, matching the web's CommentActorAvatar */
 export function editorInitials(name: string): string {
-  const first = Array.from(name.trim())[0]
+  const first = Array.from(name.trim().normalize('NFC'))[0]
   return first ? first.toLocaleUpperCase() : '?'
 }
 
