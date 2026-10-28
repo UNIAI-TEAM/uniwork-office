@@ -1523,9 +1523,12 @@ export function pmTableToModel(table: PmNode): TableModel {
 export function runsToInline(runs: Run[]): PmNode[] {
   const nodes: PmNode[] = []
   for (const run of runs) {
+    const marks = runMarks(run)
+    const atomMarks = marks.length > 0 ? { marks } : {}
     if (run.math) {
       nodes.push({
         type: 'docInlineMath',
+        ...atomMarks,
         attrs: {
           omml: run.math.omml,
           mathml: inlineMathML(run.math.omml),
@@ -1540,6 +1543,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
     if (run.ruby) {
       nodes.push({
         type: 'docRuby',
+        ...atomMarks,
         attrs: { base: run.text, rt: run.ruby.rt, xml: run.ruby.xml },
       })
       continue
@@ -1547,6 +1551,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
     if (run.noteRef) {
       nodes.push({
         type: 'docNoteRef',
+        ...atomMarks,
         attrs: {
           kind: run.noteRef.kind,
           id: run.noteRef.id,
@@ -1556,7 +1561,6 @@ export function runsToInline(runs: Run[]): PmNode[] {
       })
       continue
     }
-    const marks = runMarks(run)
     // \n = soft line break, \f = in-paragraph page break, \v = column break, \u001e = text wrapping break
     const breakMarks = marks.length > 0 ? { marks } : {}
     // eslint-disable-next-line no-control-regex
@@ -1577,6 +1581,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
     if (run.image) {
       nodes.push({
         type: 'docInlineImage',
+        ...atomMarks,
         attrs: {
           dataUrl: run.image.dataUrl,
           widthPx: run.image.widthPx ?? null,
@@ -1607,7 +1612,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
       })
     }
     if (run.xeTerm !== undefined) {
-      nodes.push({ type: 'docXeMark', attrs: { term: run.xeTerm } })
+      nodes.push({ type: 'docXeMark', ...atomMarks, attrs: { term: run.xeTerm } })
     }
   }
   markLeadRule(nodes)
@@ -3331,6 +3336,7 @@ export function inlineToRuns(content: PmNode[]): Run[] {
     if (node.type === 'docNoteRef') {
       const markerRawRPr = node.attrs?.rawRPr
       runs.push({
+        ...atomBase(node),
         text: String(node.attrs?.num ?? 1),
         noteRef: {
           kind: (node.attrs?.kind as 'footnote' | 'endnote') ?? 'footnote',
@@ -3341,21 +3347,24 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       continue
     }
     if (node.type === 'docXeMark') {
-      runs.push({ text: '', xeTerm: String(node.attrs?.term ?? '') })
+      runs.push({ ...atomBase(node), text: '', xeTerm: String(node.attrs?.term ?? '') })
       continue
     }
     if (node.type === 'docInlineMath') {
       const omml = String(node.attrs?.omml ?? '')
-      if (omml) runs.push({ text: String(node.attrs?.text ?? ''), math: { omml } })
+      if (omml)
+        runs.push({ ...atomBase(node), text: String(node.attrs?.text ?? ''), math: { omml } })
       continue
     }
     if (node.type === 'docRuby') {
       const base = String(node.attrs?.base ?? '')
       const xml = String(node.attrs?.xml ?? '')
       if (base) {
-        runs.push(
-          xml ? { text: base, ruby: { rt: String(node.attrs?.rt ?? ''), xml } } : { text: base },
-        )
+        runs.push({
+          ...atomBase(node),
+          text: base,
+          ...(xml ? { ruby: { rt: String(node.attrs?.rt ?? ''), xml } } : {}),
+        })
       }
       continue
     }
@@ -3365,6 +3374,7 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       const rule = node.attrs?.rule as NonNullable<Run['image']>['rule'] | null | undefined
       if ((dataUrl || rule) && xml) {
         runs.push({
+          ...atomBase(node),
           text: '',
           ...(node.attrs?.rawRPr ? { rawRPr: String(node.attrs.rawRPr) } : {}),
           image: {
@@ -3403,6 +3413,13 @@ function symRuns(run: Run): Run[] {
   if (run.text === glyph) return [run]
   const { sym, ...plain } = run
   return [...run.text].map((ch) => ({ ...plain, text: ch, ...(ch === glyph ? { sym } : {}) }))
+}
+
+/** an atom's marks carry its revision / comment / character style; dropping them lost the w:ins wrapper */
+function atomBase(node: PmNode): Partial<Run> {
+  if (!node.marks?.length) return {}
+  const { text: _text, ...rest } = runFromMarks('', node.marks)
+  return rest
 }
 
 function runFromMarks(text: string, marks: PmMark[]): Run {
