@@ -2328,12 +2328,27 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
         const hasNonEmptyTextbox =
           genTextboxes != null &&
           genTextboxes.length > 0 &&
-          genTextboxes.some((box) => box.paras.some((p) => p.runs.some((r) => r.text !== '')))
+          genTextboxes.some((box) =>
+            box.paras.some(
+              (p) =>
+                p.runs.some((r) => r.text !== '') ||
+                p.listMarker?.numId != null ||
+                p.indentLeft != null,
+            ),
+          )
         if (hasNonEmptyTextbox) {
           // editor-built XML has exactly one txbxContent per box, in box order
           xml = patchTextboxParas(xml, {
             byIndex: genTextboxes!.map((box) =>
-              box.paras.map((p) => ({ runs: mergeRuns(p.runs), align: p.align ?? null })),
+              box.paras.map((p) => ({
+                runs: mergeRuns(p.runs),
+                align: p.align ?? null,
+                numPr:
+                  p.listMarker?.numId != null
+                    ? { numId: p.listMarker.numId, ilvl: p.listMarker.ilvl ?? 0 }
+                    : null,
+                ...(p.indentLeft != null ? { indentLeft: p.indentLeft } : {}),
+              })),
             ),
           })
         }
@@ -2876,7 +2891,12 @@ function nestedTextsDiff(
 export function textboxParaSignature(para: TextboxDisplay['paras'][number]): string {
   const m = para.listMarker
   const list = m ? [m.numId ?? null, m.ilvl ?? null, m.kind ?? null] : null
-  return JSON.stringify([para.align ?? null, normalizedRuns(para.runs), list])
+  return JSON.stringify([
+    para.align ?? null,
+    para.indentLeft ?? null,
+    normalizedRuns(para.runs),
+    list,
+  ])
 }
 
 /** all-empty sub-editor content counts as "still no text" for a paras:[] box */
@@ -2914,10 +2934,15 @@ function textboxParasPatch(node: PmNode, original: Block): TextboxParasPatchSet 
         // align/numPr are always explicit so a removed alignment or list
         // membership also clears w:jc / w:numPr
         const m = p.listMarker
+        // indentLeft may be inherited (style character units), so it is only
+        // written when the editor moved it; align/numPr stay always explicit
+        const origIndent = origParas[j]?.indentLeft ?? null
+        const indent = p.indentLeft ?? null
         return {
           runs: mergeRuns(p.runs),
           align: p.align ?? null,
           numPr: m?.numId != null ? { numId: m.numId, ilvl: m.ilvl ?? 0 } : null,
+          ...(indent !== origIndent ? { indentLeft: indent } : {}),
         }
       })
     } else if (origBox.shapeId) {
@@ -2930,6 +2955,7 @@ function textboxParasPatch(node: PmNode, original: Block): TextboxParasPatchSet 
             p.listMarker?.numId != null
               ? { numId: p.listMarker.numId, ilvl: p.listMarker.ilvl ?? 0 }
               : null,
+          ...(p.indentLeft != null ? { indentLeft: p.indentLeft } : {}),
         })),
       })
     }
