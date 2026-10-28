@@ -543,4 +543,7 @@ export const he = {
   appFileSaveCopy: 'שמירה כעותק…',
   appCopySaved: 'הגרסה שלך נשמרה כמסמך חדש: {title}.',
   appCopySaveFailed: 'לא ניתן היה ליצור את העותק. השינויים שלך עדיין בטוחים; נסה שוב.',
+  appMergeSourceLoaded: '{name} נטען ({n} רשומות)',
+  appMergeWritten: 'נכתבו {n} מסמכים',
+  appMergeNothingToWrite: 'אין מה לכתוב',
 } satisfies Record<keyof typeof zh, string>

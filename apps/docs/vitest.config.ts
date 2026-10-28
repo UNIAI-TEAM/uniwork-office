@@ -79,6 +79,7 @@ export default defineConfig({
       // subpath before the bare name (string aliases are prefix replacements)
       '@genoffice/ui/capabilities': local('../../packages/ui/src/capabilities.ts'),
       '@genoffice/ui': local('../../packages/ui/src/index.ts'),
+      '@genoffice/xlsx-gateway/*': local('../../packages/xlsx-gateway/src/*'),
     },
   },
   test: {

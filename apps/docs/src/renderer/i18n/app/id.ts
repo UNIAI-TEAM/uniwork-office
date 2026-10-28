@@ -563,4 +563,7 @@ export const id = {
   appFileSaveCopy: 'Simpan sebagai salinan…',
   appCopySaved: 'Versi Anda disimpan sebagai dokumen baru: {title}.',
   appCopySaveFailed: 'Tidak dapat membuat salinan. Perubahan Anda tetap aman; coba lagi.',
+  appMergeSourceLoaded: '{name} dimuat ({n} record)',
+  appMergeWritten: '{n} dokumen ditulis',
+  appMergeNothingToWrite: 'Tidak ada yang ditulis',
 } satisfies Record<keyof typeof zh, string>

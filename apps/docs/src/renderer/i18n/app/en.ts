@@ -556,4 +556,7 @@ export const en = {
   appFileSaveCopy: 'Save as a copy…',
   appCopySaved: 'Your version was saved as a new document: {title}.',
   appCopySaveFailed: 'Couldn’t create the copy. Your changes are still safe; try again.',
+  appMergeSourceLoaded: 'Loaded {name} ({n} records)',
+  appMergeWritten: '{n} documents written',
+  appMergeNothingToWrite: 'There is nothing to write',
 } satisfies Record<keyof typeof zh, string>

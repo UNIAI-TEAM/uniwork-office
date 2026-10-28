@@ -117,6 +117,8 @@ import {
   toggleRepeatHeaderRows,
 } from '../editor/table-properties'
 import { useI18n, type StringKey } from '../i18n/locale'
+import type { MergeDataSource } from '../../shared/ipc'
+import type { MailMergeRequest, MailMergeResponse } from '../mail-merge/output'
 import { pxToTwips, twipsToPx } from '../units'
 import { LengthInput } from './LengthInput'
 import {
@@ -152,6 +154,7 @@ import {
   imageSizeOf,
   InsertTab,
   LayoutTab,
+  MailingsTab,
   ReferencesTab,
   ReviewTab,
   ViewTab,
@@ -389,6 +392,12 @@ interface RibbonProps {
   protectActive: boolean
   onProtectDoc: () => void
   onCompare: () => void
+  /** Mailings: the data source the user picked, null when there is none yet */
+  mergeSource: MergeDataSource | null
+  /** Mailings: open the file dialog and read the recipient list */
+  onPickMergeDataSource: () => void
+  /** Mailings: build the merged documents and write them */
+  onMergeMailings: (request: MailMergeRequest) => Promise<MailMergeResponse>
   /** current document path (View → New Window opens it in another window) */
   filePath: string | null
   viewMode: ViewMode
@@ -516,8 +525,19 @@ const matchFormatClipKey = createShortcutMatcher(['copy-format', 'paste-format']
 
 const TABS = (
   IS_MAC
-    ? ['home', 'insert', 'draw', 'design', 'layout', 'references', 'review', 'view']
-    : ['file', 'home', 'insert', 'draw', 'design', 'layout', 'references', 'review', 'view']
+    ? ['home', 'insert', 'draw', 'design', 'layout', 'references', 'mailings', 'review', 'view']
+    : [
+        'file',
+        'home',
+        'insert',
+        'draw',
+        'design',
+        'layout',
+        'references',
+        'mailings',
+        'review',
+        'view',
+      ]
 ) as readonly string[]
 const TABLE_TABS = ['tableDesign', 'tableLayout'] as const
 
@@ -649,6 +669,7 @@ const TAB_LABEL_KEYS: Record<string, StringKey> = {
   design: 'ribbonTabDesign',
   layout: 'ribbonTabLayout',
   references: 'ribbonTabReferences',
+  mailings: 'ribbonTabMailings',
   review: 'ribbonTabReview',
   view: 'ribbonTabView',
   tableDesign: 'ribbonTabTableDesign',
@@ -815,6 +836,9 @@ function RibbonInner({
   onHeader,
   onPageNumFormat,
   onInsertField,
+  mergeSource,
+  onPickMergeDataSource,
+  onMergeMailings,
   footer,
   onFooter,
   hfEditing,
@@ -4463,6 +4487,17 @@ function RibbonInner({
             zoteroNoteFields={zoteroNoteFields}
             onAddSource={onAddSource}
             headingPages={headingPages}
+          />
+        ) : tab === 'mailings' ? (
+          <MailingsTab
+            editor={editor}
+            hasDoc={canEdit}
+            dropdown={dropdown}
+            setDropdown={setDropdown}
+            source={mergeSource}
+            onPickSource={onPickMergeDataSource}
+            onInsertField={onInsertField}
+            onMerge={onMergeMailings}
           />
         ) : tab === 'review' ? (
           <ReviewTab

@@ -566,4 +566,7 @@ export const ru = {
   appFileSaveCopy: 'Сохранить как копию…',
   appCopySaved: 'Ваша версия сохранена как новый документ: {title}.',
   appCopySaveFailed: 'Не удалось создать копию. Ваши изменения в безопасности; повторите попытку.',
+  appMergeSourceLoaded: 'Загружено {name} (записей: {n})',
+  appMergeWritten: 'Записано документов: {n}',
+  appMergeNothingToWrite: 'Нечего записывать',
 } satisfies Record<keyof typeof zh, string>

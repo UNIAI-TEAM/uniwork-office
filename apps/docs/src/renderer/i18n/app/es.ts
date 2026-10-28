@@ -568,4 +568,7 @@ export const es = {
   appFileSaveCopy: 'Guardar como copia…',
   appCopySaved: 'Tu versión se guardó como documento nuevo: {title}.',
   appCopySaveFailed: 'No se pudo crear la copia. Tus cambios siguen a salvo; vuelve a intentarlo.',
+  appMergeSourceLoaded: '{name} cargado ({n} registros)',
+  appMergeWritten: '{n} documentos escritos',
+  appMergeNothingToWrite: 'No hay nada que escribir',
 } satisfies Record<keyof typeof zh, string>

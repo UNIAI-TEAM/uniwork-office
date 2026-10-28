@@ -567,4 +567,7 @@ export const zh = {
   appFileSaveCopy: '另存为副本…',
   appCopySaved: '你的版本已另存为新文档：{title}。',
   appCopySaveFailed: '无法创建副本。你的更改仍然安全；请重试。',
+  appMergeSourceLoaded: '已加载数据源 {name}（{n} 条记录）',
+  appMergeWritten: '已写出 {n} 个文档',
+  appMergeNothingToWrite: '没有可写出的文档',
 }

@@ -539,4 +539,7 @@ export const zhTW = {
   appFileSaveCopy: '另存為副本…',
   appCopySaved: '你的版本已另存為新文件：{title}。',
   appCopySaveFailed: '無法建立副本。你的變更仍然安全；請重試。',
+  appMergeSourceLoaded: '已載入資料來源 {name}（{n} 筆記錄）',
+  appMergeWritten: '已寫出 {n} 個文件',
+  appMergeNothingToWrite: '沒有可寫出的文件',
 } satisfies Record<keyof typeof zh, string>

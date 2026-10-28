@@ -556,4 +556,7 @@ export const vi = {
   appFileSaveCopy: 'Lưu thành bản sao…',
   appCopySaved: 'Đã lưu bản của bạn thành tài liệu mới: {title}.',
   appCopySaveFailed: 'Chưa tạo được bản sao. Thay đổi của bạn vẫn an toàn; hãy thử lại.',
+  appMergeSourceLoaded: 'Đã tải {name} ({n} bản ghi)',
+  appMergeWritten: 'Đã ghi {n} tài liệu',
+  appMergeNothingToWrite: 'Không có gì để ghi',
 } satisfies Record<keyof typeof zh, string>

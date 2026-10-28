@@ -560,4 +560,7 @@ export const hi = {
   appFileSaveCopy: 'प्रति के रूप में सहेजें…',
   appCopySaved: 'आपका संस्करण नए दस्तावेज़ के रूप में सहेजा गया: {title}।',
   appCopySaveFailed: 'प्रति नहीं बन सकी। आपके बदलाव अब भी सुरक्षित हैं; फिर से कोशिश करें।',
+  appMergeSourceLoaded: '{name} लोड हुई ({n} रिकॉर्ड)',
+  appMergeWritten: '{n} दस्तावेज़ लिखे गए',
+  appMergeNothingToWrite: 'लिखने के लिए कुछ नहीं है',
 } satisfies Record<keyof typeof zh, string>

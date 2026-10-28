@@ -577,4 +577,7 @@ export const de = {
   appCopySaved: 'Ihre Version wurde als neues Dokument gespeichert: {title}.',
   appCopySaveFailed:
     'Die Kopie konnte nicht erstellt werden. Ihre Änderungen sind weiterhin sicher; versuchen Sie es erneut.',
+  appMergeSourceLoaded: '{name} geladen ({n} Datensätze)',
+  appMergeWritten: '{n} Dokumente geschrieben',
+  appMergeNothingToWrite: 'Es gibt nichts zu schreiben',
 } satisfies Record<keyof typeof zh, string>

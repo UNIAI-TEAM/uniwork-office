@@ -553,4 +553,7 @@ export const th = {
   appFileSaveCopy: 'บันทึกเป็นสำเนา…',
   appCopySaved: 'บันทึกเวอร์ชันของคุณเป็นเอกสารใหม่แล้ว: {title}',
   appCopySaveFailed: 'สร้างสำเนาไม่ได้ การเปลี่ยนแปลงของคุณยังปลอดภัย โปรดลองอีกครั้ง',
+  appMergeSourceLoaded: 'โหลด {name} แล้ว ({n} ระเบียน)',
+  appMergeWritten: 'เขียนเอกสารแล้ว {n} ฉบับ',
+  appMergeNothingToWrite: 'ไม่มีเอกสารให้เขียน',
 } satisfies Record<keyof typeof zh, string>

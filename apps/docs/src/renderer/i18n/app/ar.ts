@@ -547,4 +547,7 @@ export const ar = {
   appFileSaveCopy: 'الحفظ كنسخة…',
   appCopySaved: 'حُفظت نسختك كمستند جديد: {title}.',
   appCopySaveFailed: 'تعذّر إنشاء النسخة. لا تزال تغييراتك آمنة؛ حاول مرة أخرى.',
+  appMergeSourceLoaded: 'تم تحميل {name} ({n} سجلًا)',
+  appMergeWritten: 'تمت كتابة {n} مستندًا',
+  appMergeNothingToWrite: 'لا يوجد ما يكتب',
 } satisfies Record<keyof typeof zh, string>

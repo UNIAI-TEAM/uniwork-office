@@ -559,4 +559,7 @@ export const cs = {
   appCopySaved: 'Vaše verze byla uložena jako nový dokument: {title}.',
   appCopySaveFailed:
     'Kopii se nepodařilo vytvořit. Vaše změny jsou stále v bezpečí; zkuste to znovu.',
+  appMergeSourceLoaded: 'Načteno {name} ({n} záznamů)',
+  appMergeWritten: 'Zapsáno dokumentů: {n}',
+  appMergeNothingToWrite: 'Není co zapsat',
 } satisfies Record<keyof typeof zh, string>

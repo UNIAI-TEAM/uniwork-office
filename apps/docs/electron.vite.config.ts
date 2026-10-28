@@ -32,6 +32,7 @@ export default defineConfig({
           '@genoffice/electron-utils',
           '@genoffice/font-metrics',
           '@genoffice/shortcuts',
+          '@genoffice/xlsx-gateway',
         ],
       }),
     ],

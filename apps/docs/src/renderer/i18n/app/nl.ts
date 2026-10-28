@@ -573,4 +573,7 @@ export const nl = {
   appCopySaved: 'Je versie is opgeslagen als nieuw document: {title}.',
   appCopySaveFailed:
     'Kan de kopie niet maken. Je wijzigingen zijn nog veilig; probeer het opnieuw.',
+  appMergeSourceLoaded: '{name} geladen ({n} records)',
+  appMergeWritten: '{n} documenten geschreven',
+  appMergeNothingToWrite: 'Er is niets te schrijven',
 } satisfies Record<keyof typeof zh, string>
