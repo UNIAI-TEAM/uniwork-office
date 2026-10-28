@@ -154,6 +154,26 @@ describe('the redaction dialog', () => {
     })
     expect(onCancel).toHaveBeenCalledTimes(2)
   })
+
+  it('cancels on Escape from a dialog button, restores focus on unmount, and uses phrasing markup inside label', () => {
+    const opener = document.createElement('button')
+    document.body.appendChild(opener)
+    opener.focus()
+    const onCancel = vi.fn()
+    const container = mount(dialog({ onCancel }))
+    const labelEl = container.querySelector('label.redact-dialog-desc')!
+    expect(labelEl.querySelector('p')).toBeNull()
+    expect(labelEl.querySelector('span.redact-dialog-scope')).not.toBeNull()
+    const cancelBtn = container.querySelector<HTMLButtonElement>('.btn-ghost')!
+    act(() => {
+      cancelBtn.focus()
+      cancelBtn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    cleanups.splice(0).forEach((cleanup) => cleanup())
+    expect(document.activeElement).toBe(opener)
+    opener.remove()
+  })
 })
 
 describe('the grid menu item', () => {

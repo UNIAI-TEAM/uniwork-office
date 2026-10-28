@@ -193,6 +193,18 @@ describe('RedactDialog', () => {
     esc.unmount()
   })
 
+  it('gives the input an accessible name and cancels on Escape from a dialog button', () => {
+    const { container, input, primary, onCancel, unmount } = open()
+    expect(input.getAttribute('aria-label')).toBe('Placeholder name, e.g. client phone')
+    const cancelBtn = [...container.querySelectorAll('button')].find((b) => b !== primary)!
+    act(() => {
+      cancelBtn.focus()
+      cancelBtn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(onCancel).toHaveBeenCalledOnce()
+    unmount()
+  })
+
   it('cancels without submitting when the backdrop is dismissed', () => {
     const { container, onSubmit, onCancel, unmount } = open()
     act(() => {
@@ -440,10 +452,14 @@ describe('the item and the dialog together', () => {
       target &&
         createElement(RedactDialog, {
           seed: target.seed,
-          onCancel: () => setTarget(null),
+          onCancel: () => {
+            setTarget(null)
+            editor.view.focus()
+          },
           onSubmit: (label: string) => {
             editor
               .chain()
+              .focus()
               .setTextSelection({ from: target.from, to: target.to })
               .setRedaction(label)
               .run()

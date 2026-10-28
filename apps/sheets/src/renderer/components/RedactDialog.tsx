@@ -1,6 +1,7 @@
 import { useRedactLabelField } from '@genoffice/ui'
 
 import { useI18n } from '../i18n/locale'
+import { useModalDialog } from '../modal-dialog'
 
 interface Props {
   /**
@@ -34,6 +35,7 @@ interface Props {
 export function RedactDialog({ seed, rangeLabel, onSubmit, onCancel }: Props) {
   const { t } = useI18n()
   const field = useRedactLabelField(seed, onSubmit, onCancel)
+  const modal = useModalDialog(onCancel)
 
   return (
     <div
@@ -42,12 +44,12 @@ export function RedactDialog({ seed, rangeLabel, onSubmit, onCancel }: Props) {
         if (e.target === e.currentTarget) onCancel()
       }}
     >
-      <div className="modal" role="dialog" aria-modal="true" aria-label={t('redactMenuLabel')}>
+      <div className="modal" role="dialog" {...modal} aria-label={t('redactMenuLabel')}>
         <h2>{t('redactMenuLabel')}</h2>
         <label className="redact-dialog-desc" htmlFor="gx-redact-label">
           {t('redactDialogDesc')}
           {/* the claim above is about this app's AI; the file still has the words */}
-          <p className="redact-dialog-scope">{t('redactDialogScope')}</p>
+          <span className="redact-dialog-scope">{t('redactDialogScope')}</span>
         </label>
         <p className="redact-dialog-range">{rangeLabel}</p>
         <div className="redact-dialog-preview" aria-live="polite">
@@ -61,13 +63,7 @@ export function RedactDialog({ seed, rangeLabel, onSubmit, onCancel }: Props) {
           placeholder={t('redactDialogPlaceholder')}
           onChange={(e) => field.setValue(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && field.label) {
-              e.preventDefault()
-              onSubmit(field.label)
-            } else if (e.key === 'Escape') {
-              e.preventDefault()
-              onCancel()
-            }
+            if (e.key !== 'Escape') field.onKeyDown(e)
           }}
         />
         <div className="modal-actions">

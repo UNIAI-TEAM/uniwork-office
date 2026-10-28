@@ -1,5 +1,6 @@
 import { useI18n } from '../i18n/locale'
 import { useRedactLabelField } from '@genoffice/ui'
+import { useModalKeys } from '../components/modal-keys'
 
 interface Props {
   /** the text the span covers, offered as a starting label */
@@ -19,10 +20,13 @@ interface Props {
 export function RedactDialog({ seed, onSubmit, onCancel }: Props) {
   const { t } = useI18n()
   const field = useRedactLabelField(seed, onSubmit, onCancel)
+  const modalKeys = useModalKeys(onCancel)
 
   return (
     <div
       className="modal-backdrop"
+      ref={modalKeys.ref}
+      onKeyDown={modalKeys.onKeyDown}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel()
       }}
@@ -38,9 +42,12 @@ export function RedactDialog({ seed, onSubmit, onCancel }: Props) {
           ref={field.inputRef}
           value={field.value}
           maxLength={field.maxLength}
+          aria-label={t('redactDialogPlaceholder')}
           placeholder={t('redactDialogPlaceholder')}
           onChange={(e) => field.setValue(e.target.value)}
-          onKeyDown={field.onKeyDown}
+          onKeyDown={(e) => {
+            if (e.key !== 'Escape') field.onKeyDown(e)
+          }}
         />
         <div className="modal-actions">
           <button type="button" onClick={onCancel}>

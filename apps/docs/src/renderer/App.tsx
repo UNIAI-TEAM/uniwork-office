@@ -8128,13 +8128,17 @@ export function App() {
       {doc && redactTarget && (
         <RedactDialog
           seed={redactTarget.seed}
-          onCancel={() => setRedactTarget(null)}
+          onCancel={() => {
+            setRedactTarget(null)
+            editor?.view.focus()
+          }}
           onSubmit={(label) => {
             // re-assert the captured range: the command marks the selection,
             // and the reader may have clicked somewhere while deciding
             if (editor)
               editor
                 .chain()
+                .focus()
                 .setTextSelection({ from: redactTarget.from, to: redactTarget.to })
                 .setRedaction(label)
                 .run()

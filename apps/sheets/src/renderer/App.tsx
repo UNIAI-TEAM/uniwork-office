@@ -2077,9 +2077,14 @@ export function App({
   }
 
   /** Commit the label the reader typed. */
+  function focusGrid(): void {
+    univerRef.current?.univer.__getInjector().get(ILayoutService).focus()
+  }
+
   function onRedactConfirm(label: string) {
     const pending = redactDialog
     setRedactDialog(null)
+    focusGrid()
     if (!pending) return
     const clean = sanitizeLabel(label)
     if (!clean) return
@@ -6015,7 +6020,10 @@ export function App({
           seed={redactDialog.seed}
           rangeLabel={redactDialog.rangeLabel}
           onSubmit={onRedactConfirm}
-          onCancel={() => setRedactDialog(null)}
+          onCancel={() => {
+            setRedactDialog(null)
+            focusGrid()
+          }}
         />
       )}
       {findReplaceService && (

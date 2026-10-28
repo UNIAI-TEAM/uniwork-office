@@ -7992,6 +7992,11 @@ body > div:has([data-u-comp='find-replace-dialog']) {
   line-height: 1.5;
 }
 
+.redact-dialog-scope {
+  display: block;
+  margin-top: 6px;
+}
+
 .redact-dialog-range {
   margin: 0 0 12px;
   font-size: 12px;
