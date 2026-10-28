@@ -7,4 +7,9 @@ export const it = {
   commentsFilter: 'Фильтровать комментарии по тексту или автору',
   commentsEmpty: 'В этом документе пока нет комментариев',
   commentsLoading: 'Загрузка комментариев',
+  editLink: 'Ссылка',
+  editLinkHint: 'Выделите рамку на странице, чтобы добавить гиперссылку',
+  linkDialogTitle: 'Добавить ссылку',
+  linkUrlLabel: 'Веб-адрес',
+  linkPageLabel: 'Или страница в этом документе (1–{n})',
 } satisfies Record<keyof typeof zh, string>
