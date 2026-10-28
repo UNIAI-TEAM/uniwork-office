@@ -1301,6 +1301,11 @@ export const ru = {
   appPasswordUpdating: 'Обновление…',
   appUpdatePassword: 'Обновить пароль',
   appWorkbookNotPasswordProtected: 'Эта книга не защищена паролем на открытие.',
+  appSaveErrEncryptedUniwork:
+    'Книгу, защищённую паролем, нельзя сохранить в документ UniWork. Используйте «Сохранить как», чтобы оставить зашифрованную копию на этом компьютере.',
+  appPasswordChangeUniwork: 'Пароль документа UniWork нельзя изменить здесь.',
+  appPasswordChangeReadOnly:
+    'Эта книга доступна только для просмотра, поэтому её пароль изменить нельзя.',
   appAllowEditRanges: 'Разрешить изменение диапазонов',
   appGroupClipboard: 'Буфер обмена',
   appPaste: 'Вставить',

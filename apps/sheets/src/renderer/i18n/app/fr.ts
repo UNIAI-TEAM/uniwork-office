@@ -1349,6 +1349,11 @@ export const fr = {
   appPasswordUpdating: 'Mise à jour…',
   appUpdatePassword: 'Mettre à jour le mot de passe',
   appWorkbookNotPasswordProtected: "Ce classeur n'est pas protégé par un mot de passe d'ouverture.",
+  appSaveErrEncryptedUniwork:
+    'Un classeur protégé par mot de passe ne peut pas être enregistré dans un document UniWork. Utilisez Enregistrer sous pour conserver une copie chiffrée sur cet ordinateur.',
+  appPasswordChangeUniwork: 'Le mot de passe d’un document UniWork ne peut pas être modifié ici.',
+  appPasswordChangeReadOnly:
+    'Ce classeur est en lecture seule : son mot de passe ne peut pas être modifié.',
   appAllowEditRanges: 'Permettre la modification des plages',
   appGroupClipboard: 'Presse-papiers',
   appPaste: 'Coller',

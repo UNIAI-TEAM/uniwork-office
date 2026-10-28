@@ -2935,6 +2935,9 @@ export function registerSheetsIpc(): void {
     if (session.password === undefined) {
       throw new Error('This workbook is not protected by an open password.')
     }
+    const documentPath = sessionDocumentPath(session)
+    if (uniworkIsReadOnly(documentPath)) throw new Error(PASSWORD_CHANGE_READ_ONLY_REFUSED)
+    if (uniworkIsBound(documentPath)) throw new Error(PASSWORD_CHANGE_UNIWORK_REFUSED)
 
     const currentSha = await sha256File(session.path).catch(() => undefined)
     if (currentSha !== undefined && currentSha !== session.sha256) {
@@ -3571,6 +3574,10 @@ export function registerSheetsIpc(): void {
     if (!uniworkDecision.write) {
       if (mcpSave) throw new Error('save target is read-only')
       return { canceled: true }
+    }
+
+    if (session.password !== undefined && uniworkIsBound(userTargetPath)) {
+      throw new Error(ENCRYPTED_UNIWORK_SAVE_REFUSED)
     }
 
     const mutation = await writeWorkbookTo(client, session, request, targetPath)
@@ -4521,6 +4528,16 @@ async function writeWorkbookTo(
   }
   return mutation
 }
+
+// UniWork seam (Q1): encrypted workbooks stay local. The server store keeps
+// the plain package, so a password-protected session is never written to a
+// UniWork document and its password is never set or changed on a bound or
+// view-only one. The renderer localizes these by substring (save-actions.ts).
+const ENCRYPTED_UNIWORK_SAVE_REFUSED =
+  'A password-protected workbook cannot be saved to a UniWork document. Use Save As to keep an encrypted copy on this computer.'
+const PASSWORD_CHANGE_UNIWORK_REFUSED = 'The password of a UniWork document cannot be changed here.'
+const PASSWORD_CHANGE_READ_ONLY_REFUSED =
+  'This workbook is view-only, so its password cannot be changed.'
 
 let sessionSnapshotDirectoryPromise: Promise<string> | undefined
 

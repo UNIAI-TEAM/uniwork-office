@@ -1335,6 +1335,10 @@ export const ja = {
   appPasswordUpdating: '更新中…',
   appUpdatePassword: 'パスワードを更新',
   appWorkbookNotPasswordProtected: 'このブックには読み取りパスワードが設定されていません。',
+  appSaveErrEncryptedUniwork:
+    'パスワード付きのブックは UniWork ドキュメントに保存できません。「名前を付けて保存」で暗号化したコピーをこのコンピューターに残してください。',
+  appPasswordChangeUniwork: 'UniWork ドキュメントのパスワードはここでは変更できません。',
+  appPasswordChangeReadOnly: 'このブックは閲覧専用のため、パスワードを変更できません。',
   appAllowEditRanges: '範囲の編集を許可',
   // Home tab
   appGroupClipboard: 'クリップボード',

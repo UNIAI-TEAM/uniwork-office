@@ -1247,6 +1247,10 @@ export const th = {
   appPasswordUpdating: 'กำลังอัปเดต…',
   appUpdatePassword: 'อัปเดตรหัสผ่าน',
   appWorkbookNotPasswordProtected: 'เวิร์กบุ๊กนี้ไม่ได้ป้องกันด้วยรหัสผ่านสำหรับเปิด',
+  appSaveErrEncryptedUniwork:
+    'ไม่สามารถบันทึกสมุดงานที่มีรหัสผ่านลงในเอกสาร UniWork ได้ ใช้ บันทึกเป็น เพื่อเก็บสำเนาที่เข้ารหัสไว้ในเครื่องนี้',
+  appPasswordChangeUniwork: 'ไม่สามารถเปลี่ยนรหัสผ่านของเอกสาร UniWork ที่นี่ได้',
+  appPasswordChangeReadOnly: 'สมุดงานนี้เป็นแบบอ่านอย่างเดียว จึงไม่สามารถเปลี่ยนรหัสผ่านได้',
   appAllowEditRanges: 'อนุญาตให้แก้ไขช่วง',
   appGroupClipboard: 'คลิปบอร์ด',
   appPaste: 'วาง',

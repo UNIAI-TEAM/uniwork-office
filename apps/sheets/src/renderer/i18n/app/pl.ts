@@ -1310,6 +1310,11 @@ export const pl = {
   appPasswordUpdating: 'Aktualizowanie…',
   appUpdatePassword: 'Aktualizuj hasło',
   appWorkbookNotPasswordProtected: 'Ten skoroszyt nie jest chroniony hasłem otwarcia.',
+  appSaveErrEncryptedUniwork:
+    'Skoroszyt chroniony hasłem nie może zostać zapisany w dokumencie UniWork. Użyj opcji Zapisz jako, aby zachować zaszyfrowaną kopię na tym komputerze.',
+  appPasswordChangeUniwork: 'Hasła dokumentu UniWork nie można tutaj zmienić.',
+  appPasswordChangeReadOnly:
+    'Ten skoroszyt jest tylko do odczytu, więc nie można zmienić jego hasła.',
   appAllowEditRanges: 'Zezwalaj na edytowanie zakresów',
   appGroupClipboard: 'Schowek',
   appPaste: 'Wklej',

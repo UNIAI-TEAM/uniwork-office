@@ -447,6 +447,8 @@ import { effectivePageBreaks, installPageBreakPreview } from './page-break-previ
 import { mapProtectedRanges } from './protected-ranges'
 import {
   handleSave as handleSaveImpl,
+  localizeSaveError,
+  stripIpcErrorWrapper,
   uniworkAutoSaveLocked,
   type SaveContext,
   type SaveOutcome,
@@ -4236,9 +4238,17 @@ export function App({
 
   function handleRibbonCommand(command: string): void {
     if (command === 'workbook-change-password') {
-      if (lazyWorkbookRef.current?.file.passwordProtected) {
-        setChangeWorkbookPasswordOpen(true)
+      const file = lazyWorkbookRef.current?.file
+      if (!file?.passwordProtected) return
+      // A view-only or UniWork-bound document keeps its password out of reach:
+      // say why instead of opening a dialog whose save would be refused.
+      const refusal = passwordChangeRefusal(file)
+      if (refusal !== null) {
+        setMessage(refusal)
+        showToast(refusal, 'error')
+        return
       }
+      setChangeWorkbookPasswordOpen(true)
       return
     }
     if (command === 'watch-window') {
@@ -4910,6 +4920,11 @@ export function App({
       return handleSaveImpl(saveContext(), mode, quiet, explicitTarget, inPlace)
     })
   }
+  function passwordChangeRefusal(file: WorkbookFile): string | null {
+    if (file.readOnly) return t('appPasswordChangeReadOnly')
+    if (file.uniworkBound === true) return t('appPasswordChangeUniwork')
+    return null
+  }
   async function updateWorkbookPassword(newPassword: string): Promise<string | null> {
     try {
       return await saveGateRef.current.run(async () => {
@@ -4918,6 +4933,8 @@ export function App({
         if (!beforeSave?.file.passwordProtected) {
           return t('appWorkbookNotPasswordProtected')
         }
+        const refusal = passwordChangeRefusal(beforeSave.file)
+        if (refusal !== null) return refusal
 
         // Commit all current sheet edits before changing the package password.
         // The sidecar snapshot stays plaintext for this session, while the
@@ -4943,7 +4960,9 @@ export function App({
         return null
       })
     } catch (error: unknown) {
-      return error instanceof Error ? error.message : t('appSaveFailed')
+      if (!(error instanceof Error)) return t('appSaveFailed')
+      const message = stripIpcErrorWrapper(error.message)
+      return localizeSaveError(message) ?? message
     }
   }
   closeSaveRef.current = async () => {

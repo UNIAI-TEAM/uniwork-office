@@ -1284,6 +1284,11 @@ export const ms = {
   appPasswordUpdating: 'Mengemas kini…',
   appUpdatePassword: 'Kemas Kini Kata Laluan',
   appWorkbookNotPasswordProtected: 'Buku kerja ini tidak dilindungi oleh kata laluan pembukaan.',
+  appSaveErrEncryptedUniwork:
+    'Buku kerja yang dilindungi kata laluan tidak boleh disimpan ke dokumen UniWork. Gunakan Simpan Sebagai untuk menyimpan salinan disulitkan pada komputer ini.',
+  appPasswordChangeUniwork: 'Kata laluan dokumen UniWork tidak boleh ditukar di sini.',
+  appPasswordChangeReadOnly:
+    'Buku kerja ini hanya untuk dibaca, jadi kata laluannya tidak boleh ditukar.',
   appAllowEditRanges: 'Benarkan Edit Julat',
   appGroupClipboard: 'Papan Klip',
   appPaste: 'Tampal',

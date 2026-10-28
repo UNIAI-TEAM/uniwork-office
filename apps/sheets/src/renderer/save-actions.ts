@@ -668,6 +668,9 @@ const SAVE_ERROR_PATTERNS = [
   ['overlaps the moved rows', 'appSaveErrMoveOverlap'],
   ['Moving the header row of table', 'appSaveErrMoveOverlap'],
   ['Moving the totals row of table', 'appSaveErrMoveOverlap'],
+  ['A password-protected workbook cannot be saved to a UniWork', 'appSaveErrEncryptedUniwork'],
+  ['The password of a UniWork document cannot be changed', 'appPasswordChangeUniwork'],
+  ['its password cannot be changed', 'appPasswordChangeReadOnly'],
 ] as const
 
 export function localizeSaveError(message: string): string | null {

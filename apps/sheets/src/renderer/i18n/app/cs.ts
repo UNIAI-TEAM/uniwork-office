@@ -1284,6 +1284,10 @@ export const cs = {
   appPasswordUpdating: 'Aktualizuje se…',
   appUpdatePassword: 'Aktualizovat heslo',
   appWorkbookNotPasswordProtected: 'Tento sešit není chráněn heslem pro otevření.',
+  appSaveErrEncryptedUniwork:
+    'Sešit chráněný heslem nelze uložit do dokumentu UniWork. Pomocí Uložit jako ponechte šifrovanou kopii v tomto počítači.',
+  appPasswordChangeUniwork: 'Heslo dokumentu UniWork zde nelze změnit.',
+  appPasswordChangeReadOnly: 'Tento sešit je jen pro čtení, takže jeho heslo nelze změnit.',
   appAllowEditRanges: 'Povolit úpravy oblastí',
   appGroupClipboard: 'Schránka',
   appPaste: 'Vložit',

@@ -1282,6 +1282,11 @@ export const hi = {
   appPasswordUpdating: 'अपडेट हो रहा है…',
   appUpdatePassword: 'पासवर्ड अपडेट करें',
   appWorkbookNotPasswordProtected: 'यह वर्कबुक खोलने वाले पासवर्ड से सुरक्षित नहीं है।',
+  appSaveErrEncryptedUniwork:
+    'पासवर्ड से सुरक्षित वर्कबुक को UniWork दस्तावेज़ में सहेजा नहीं जा सकता। इस कंप्यूटर पर एन्क्रिप्टेड प्रति रखने के लिए इस रूप में सहेजें का उपयोग करें।',
+  appPasswordChangeUniwork: 'UniWork दस्तावेज़ का पासवर्ड यहाँ नहीं बदला जा सकता।',
+  appPasswordChangeReadOnly:
+    'यह वर्कबुक केवल देखने के लिए है, इसलिए इसका पासवर्ड नहीं बदला जा सकता।',
   appAllowEditRanges: 'श्रेणियाँ संपादित करने दें',
   appGroupClipboard: 'क्लिपबोर्ड',
   appPaste: 'चिपकाएँ',

@@ -1227,6 +1227,10 @@ export const he = {
   appPasswordUpdating: 'מעדכן…',
   appUpdatePassword: 'עדכן סיסמה',
   appWorkbookNotPasswordProtected: 'חוברת עבודה זו אינה מוגנת בסיסמת פתיחה.',
+  appSaveErrEncryptedUniwork:
+    'לא ניתן לשמור חוברת עבודה מוגנת בסיסמה במסמך UniWork. השתמשו ב״שמירה בשם״ כדי לשמור עותק מוצפן במחשב זה.',
+  appPasswordChangeUniwork: 'לא ניתן לשנות כאן את הסיסמה של מסמך UniWork.',
+  appPasswordChangeReadOnly: 'חוברת עבודה זו היא לקריאה בלבד, ולכן לא ניתן לשנות את הסיסמה שלה.',
   appAllowEditRanges: 'אפשר עריכת טווחים',
   appGroupClipboard: 'לוח',
   appPaste: 'הדבק',

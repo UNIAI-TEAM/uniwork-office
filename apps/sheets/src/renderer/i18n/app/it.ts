@@ -1325,6 +1325,11 @@ export const it = {
   appUpdatePassword: 'Aggiorna password',
   appWorkbookNotPasswordProtected:
     'Questa cartella di lavoro non è protetta da una password di apertura.',
+  appSaveErrEncryptedUniwork:
+    'Una cartella di lavoro protetta da password non può essere salvata in un documento UniWork. Usa Salva con nome per conservare una copia cifrata su questo computer.',
+  appPasswordChangeUniwork: 'La password di un documento UniWork non può essere modificata qui.',
+  appPasswordChangeReadOnly:
+    'Questa cartella di lavoro è di sola lettura, quindi la password non può essere modificata.',
   appAllowEditRanges: 'Consenti modifica intervalli',
   appGroupClipboard: 'Appunti',
   appPaste: 'Incolla',

@@ -1326,6 +1326,11 @@ export const es = {
   appPasswordUpdating: 'Actualizando…',
   appUpdatePassword: 'Actualizar contraseña',
   appWorkbookNotPasswordProtected: 'Este libro no está protegido con una contraseña de apertura.',
+  appSaveErrEncryptedUniwork:
+    'Un libro protegido con contraseña no se puede guardar en un documento de UniWork. Use Guardar como para conservar una copia cifrada en este equipo.',
+  appPasswordChangeUniwork: 'La contraseña de un documento de UniWork no se puede cambiar aquí.',
+  appPasswordChangeReadOnly:
+    'Este libro es de solo lectura, por lo que no se puede cambiar su contraseña.',
   appAllowEditRanges: 'Permitir editar rangos',
   appGroupClipboard: 'Portapapeles',
   appPaste: 'Pegar',

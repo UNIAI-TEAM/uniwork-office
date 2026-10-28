@@ -1221,6 +1221,10 @@ export const zh = {
   appPasswordUpdating: '正在更新…',
   appUpdatePassword: '更新密码',
   appWorkbookNotPasswordProtected: '此工作簿没有设置打开密码。',
+  appSaveErrEncryptedUniwork:
+    '设有密码的工作簿无法保存到 UniWork 文档。请使用“另存为”在本机保留加密副本。',
+  appPasswordChangeUniwork: '无法在此更改 UniWork 文档的密码。',
+  appPasswordChangeReadOnly: '此工作簿为只读，无法更改密码。',
   appAllowEditRanges: '允许编辑区域',
   // Home tab
   appGroupClipboard: '剪贴板',

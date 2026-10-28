@@ -1323,6 +1323,11 @@ export const pt = {
   appUpdatePassword: 'Atualizar senha',
   appWorkbookNotPasswordProtected:
     'Esta pasta de trabalho não está protegida por uma senha de abertura.',
+  appSaveErrEncryptedUniwork:
+    'Uma pasta de trabalho protegida por senha não pode ser salva em um documento do UniWork. Use Salvar como para manter uma cópia criptografada neste computador.',
+  appPasswordChangeUniwork: 'A senha de um documento do UniWork não pode ser alterada aqui.',
+  appPasswordChangeReadOnly:
+    'Esta pasta de trabalho é somente leitura, portanto a senha não pode ser alterada.',
   appAllowEditRanges: 'Permitir Edição de Intervalos',
   appGroupClipboard: 'Área de Transferência',
   appPaste: 'Colar',

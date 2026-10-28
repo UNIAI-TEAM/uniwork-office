@@ -1263,6 +1263,10 @@ export const en = {
   appPasswordUpdating: 'Updating…',
   appUpdatePassword: 'Update Password',
   appWorkbookNotPasswordProtected: 'This workbook is not protected by an open password.',
+  appSaveErrEncryptedUniwork:
+    'A password-protected workbook cannot be saved to a UniWork document. Use Save As to keep an encrypted copy on this computer.',
+  appPasswordChangeUniwork: 'The password of a UniWork document cannot be changed here.',
+  appPasswordChangeReadOnly: 'This workbook is view-only, so its password cannot be changed.',
   appAllowEditRanges: 'Allow Edit Ranges',
   appGroupClipboard: 'Clipboard',
   appPaste: 'Paste',

@@ -1196,6 +1196,10 @@ export const zhTW = {
   appPasswordUpdating: '正在更新…',
   appUpdatePassword: '更新密碼',
   appWorkbookNotPasswordProtected: '此活頁簿沒有設定開啟密碼。',
+  appSaveErrEncryptedUniwork:
+    '設有密碼的活頁簿無法儲存到 UniWork 文件。請使用「另存新檔」在本機保留加密副本。',
+  appPasswordChangeUniwork: '無法在此變更 UniWork 文件的密碼。',
+  appPasswordChangeReadOnly: '此活頁簿為唯讀，無法變更密碼。',
   appAllowEditRanges: '允許編輯範圍',
   appGroupClipboard: '剪貼簿',
   appPaste: '貼上',

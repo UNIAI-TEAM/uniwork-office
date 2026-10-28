@@ -1339,6 +1339,11 @@ export const de = {
   appUpdatePassword: 'Kennwort aktualisieren',
   appWorkbookNotPasswordProtected:
     'Diese Arbeitsmappe ist nicht durch ein Öffnungskennwort geschützt.',
+  appSaveErrEncryptedUniwork:
+    'Eine kennwortgeschützte Arbeitsmappe kann nicht in einem UniWork-Dokument gespeichert werden. Mit „Speichern unter“ behalten Sie eine verschlüsselte Kopie auf diesem Computer.',
+  appPasswordChangeUniwork: 'Das Kennwort eines UniWork-Dokuments kann hier nicht geändert werden.',
+  appPasswordChangeReadOnly:
+    'Diese Arbeitsmappe ist schreibgeschützt, daher kann ihr Kennwort nicht geändert werden.',
   appAllowEditRanges: 'Bereiche zur Bearbeitung freigeben',
   appGroupClipboard: 'Zwischenablage',
   appPaste: 'Einfügen',

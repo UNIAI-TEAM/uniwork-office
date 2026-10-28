@@ -1319,6 +1319,12 @@ export const nl = {
   appPasswordUpdating: 'Bijwerken…',
   appUpdatePassword: 'Wachtwoord bijwerken',
   appWorkbookNotPasswordProtected: 'Deze werkmap is niet beveiligd met een openingswachtwoord.',
+  appSaveErrEncryptedUniwork:
+    'Een met een wachtwoord beveiligde werkmap kan niet worden opgeslagen in een UniWork-document. Gebruik Opslaan als om een versleutelde kopie op deze computer te bewaren.',
+  appPasswordChangeUniwork:
+    'Het wachtwoord van een UniWork-document kan hier niet worden gewijzigd.',
+  appPasswordChangeReadOnly:
+    'Deze werkmap is alleen-lezen, dus het wachtwoord kan niet worden gewijzigd.',
   appAllowEditRanges: 'Bewerken van bereiken toestaan',
   appGroupClipboard: 'Klembord',
   appPaste: 'Plakken',

@@ -1283,6 +1283,11 @@ export const id = {
   appPasswordUpdating: 'Memperbarui…',
   appUpdatePassword: 'Perbarui Kata Sandi',
   appWorkbookNotPasswordProtected: 'Buku kerja ini tidak dilindungi kata sandi pembuka.',
+  appSaveErrEncryptedUniwork:
+    'Buku kerja yang dilindungi kata sandi tidak dapat disimpan ke dokumen UniWork. Gunakan Simpan Sebagai untuk menyimpan salinan terenkripsi di komputer ini.',
+  appPasswordChangeUniwork: 'Kata sandi dokumen UniWork tidak dapat diubah di sini.',
+  appPasswordChangeReadOnly:
+    'Buku kerja ini hanya dapat dilihat, sehingga kata sandinya tidak dapat diubah.',
   appAllowEditRanges: 'Izinkan Edit Rentang',
   appGroupClipboard: 'Papan Klip',
   appPaste: 'Tempel',

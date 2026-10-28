@@ -1273,6 +1273,10 @@ export const vi = {
   appPasswordUpdating: 'Đang cập nhật…',
   appUpdatePassword: 'Cập nhật mật khẩu',
   appWorkbookNotPasswordProtected: 'Sổ làm việc này không được bảo vệ bằng mật khẩu mở.',
+  appSaveErrEncryptedUniwork:
+    'Sổ làm việc có mật khẩu không thể lưu vào tài liệu UniWork. Hãy dùng Lưu dưới dạng để giữ bản mã hóa trên máy này.',
+  appPasswordChangeUniwork: 'Không thể đổi mật khẩu của tài liệu UniWork tại đây.',
+  appPasswordChangeReadOnly: 'Sổ làm việc này chỉ để xem nên không thể đổi mật khẩu.',
   appAllowEditRanges: 'Cho phép chỉnh sửa các vùng',
   appGroupClipboard: 'Bảng nhớ tạm',
   appPaste: 'Dán',

@@ -1248,6 +1248,10 @@ export const ar = {
   appPasswordUpdating: 'جارٍ التحديث…',
   appUpdatePassword: 'تحديث كلمة المرور',
   appWorkbookNotPasswordProtected: 'هذا المصنف غير محمي بكلمة مرور للفتح.',
+  appSaveErrEncryptedUniwork:
+    'لا يمكن حفظ مصنف محمي بكلمة مرور في مستند UniWork. استخدم «حفظ باسم» للاحتفاظ بنسخة مشفرة على هذا الكمبيوتر.',
+  appPasswordChangeUniwork: 'لا يمكن تغيير كلمة مرور مستند UniWork هنا.',
+  appPasswordChangeReadOnly: 'هذا المصنف للعرض فقط، لذلك لا يمكن تغيير كلمة المرور الخاصة به.',
   appAllowEditRanges: 'السماح بتحرير النطاقات',
   appGroupClipboard: 'الحافظة',
   appPaste: 'لصق',
