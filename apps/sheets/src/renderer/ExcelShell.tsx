@@ -2680,19 +2680,21 @@ function Ribbon({
               <ToolSymbol symbol="𝄜" />
             </button>
           </div>
-          {largeMenu(
-            t('appPivotChart'),
-            '🗠',
-            onIsSelectionInPivot() ? t('appPivotChartHintIn') : t('appPivotChartHintOut'),
-            [
-              { value: 'insert-pivot-chart:column', label: t('appChartColumn') },
-              { value: 'insert-pivot-chart:bar', label: t('appChartBar') },
-              { value: 'insert-pivot-chart:line', label: t('appChartLine') },
-              { value: 'insert-pivot-chart:pie', label: t('appChartPie') },
-              { value: 'insert-pivot-chart:doughnut', label: t('appChartDoughnut') },
-              { value: 'insert-pivot-chart:radar', label: t('appChartRadar') },
-            ],
-          )}
+          {/* web has no pivot definitions until the engine reads them: no PivotChart to bind */}
+          {cap('pivotRefresh') &&
+            largeMenu(
+              t('appPivotChart'),
+              '🗠',
+              onIsSelectionInPivot() ? t('appPivotChartHintIn') : t('appPivotChartHintOut'),
+              [
+                { value: 'insert-pivot-chart:column', label: t('appChartColumn') },
+                { value: 'insert-pivot-chart:bar', label: t('appChartBar') },
+                { value: 'insert-pivot-chart:line', label: t('appChartLine') },
+                { value: 'insert-pivot-chart:pie', label: t('appChartPie') },
+                { value: 'insert-pivot-chart:doughnut', label: t('appChartDoughnut') },
+                { value: 'insert-pivot-chart:radar', label: t('appChartRadar') },
+              ],
+            )}
         </RibbonGroup>
         <RibbonGroup label={t('appGroupSparklines')}>
           {largeMenu(t('appGroupSparklines'), '〜', t('appSparklinesTitle'), [

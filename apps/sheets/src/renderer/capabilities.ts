@@ -26,7 +26,7 @@
  * | xlsxEngine       | the whole workbook surface: off = the "cannot be opened on the web yet" screen   |
  * | recalcFallback   | IronCalc recalc fallback (C11: hidden on the web)                                |
  * | xlsImport        | opening legacy .xls (until the engine converts it)                               |
- * | pivotRefresh     | PivotTable refresh (until the engine reads pivot definitions)                    |
+ * | pivotRefresh     | PivotTable refresh + Insert > PivotChart (until the engine reads pivot defs)     |
  * | mergeWorkbooks   | Data > Merge workbooks + AI attachment merge (C11: hidden on the web)            |
  */
 import { createCapabilityReader } from '@genoffice/ui/capabilities'
