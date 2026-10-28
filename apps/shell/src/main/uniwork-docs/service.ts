@@ -634,6 +634,32 @@ function parseOffsetCursor(cursor: string | undefined): number {
   return match ? Number(match[1]) : 0
 }
 
+/** `true` when `cursor` requests a page after the first page */
+function isLoadMoreCursor(cursor: unknown): boolean {
+  if (typeof cursor !== 'string') return false
+  const trimmed = cursor.trim()
+  return trimmed.length > 0 && trimmed !== '0' && trimmed !== 'shared:0'
+}
+
+function stripRowAvatars(rows: UniworkDocSummary[]): UniworkDocSummary[] {
+  let anyWithAvatar = false
+  for (const row of rows) {
+    if (row.updatedByUser?.avatarUrl) {
+      anyWithAvatar = true
+      break
+    }
+  }
+  if (!anyWithAvatar) return rows
+  return rows.map((row) => {
+    const user = row.updatedByUser
+    if (!user?.avatarUrl) return row
+    return {
+      ...row,
+      updatedByUser: { name: user.name },
+    }
+  })
+}
+
 /**
  * UNI-2047: the merge order of "Shared with me". Every workspace answers in the
  * server's own order, so the aggregate re-sorts by the requested key. Each key
@@ -4771,7 +4797,8 @@ export class UniworkDocsService {
    */
   listSharedWithMe(query: UniworkSharedQuery = {}): Promise<UniworkResult<UniworkSharedPage>> {
     return result(async () => {
-      if (!this.liveIdentity()) throw new UniworkDocError('not_signed_in')
+      const session = this.captureActionSessionOrNull()
+      if (!session) throw new UniworkDocError('not_signed_in')
       this.noteLibraryReload()
       const org = this.deps.selectedOrg()
       if (!org) return { documents: [], nextCursor: null }
@@ -4823,14 +4850,13 @@ export class UniworkDocsService {
       )
       const offset = parseOffsetCursor(query.cursor)
       const pageRows = all.slice(offset, offset + limit)
-      const slice = this.avatarCache.materializeRows(pageRows)
       const workspaceIds = [
         ...new Set([
           ...workspaces.map((ws) => ws.id),
           ...pageRows.map((doc) => doc.workspaceId).filter(Boolean),
         ]),
       ]
-      this.warmAvatarsInBackground(pageRows, workspaceIds)
+      const slice = this.enrichSharedRows(pageRows, workspaceIds, session, offset === 0)
       const next = offset + limit < all.length ? `shared:${offset + limit}` : null
       return { documents: slice, nextCursor: next }
     })
@@ -4902,6 +4928,7 @@ export class UniworkDocsService {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
+      const session = this.captureActionSessionOrNull()
       const page = await this.api().listChildren({
         workspaceId: q.workspaceId,
         parentId: typeof q.parentId === 'string' && q.parentId ? q.parentId : null,
@@ -4909,7 +4936,12 @@ export class UniworkDocsService {
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
         ...this.listFiltersOf(q),
       })
-      const items = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      const items = await this.enrichWorkspaceRows(
+        q.workspaceId,
+        page.documents,
+        session,
+        !isLoadMoreCursor(q.cursor),
+      )
       return { items, nextCursor: page.nextCursor }
     })
   }
@@ -4920,6 +4952,7 @@ export class UniworkDocsService {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
+      const session = this.captureActionSessionOrNull()
       const types = normalizeTypePicks(q.types)
       const shelved = q.shelved === true
       const page = await this.api().searchDocuments({
@@ -4931,10 +4964,11 @@ export class UniworkDocsService {
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
       })
+      const notifyOnWarm = !isLoadMoreCursor(q.cursor)
       // a shelf hit carries its shelver by name like a shelf row, for the Lưu trữ bởi chip and column
       const items = shelved
-        ? await this.enrichShelvedRows(q.workspaceId, page.documents)
-        : await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+        ? await this.enrichShelvedRows(q.workspaceId, page.documents, session, notifyOnWarm)
+        : await this.enrichWorkspaceRows(q.workspaceId, page.documents, session, notifyOnWarm)
       return { items, nextCursor: page.nextCursor }
     })
   }
@@ -4958,7 +4992,7 @@ export class UniworkDocsService {
   } | null {
     const identity = this.liveIdentity()
     if (!identity) return null
-    if (this.sessionOrgId === undefined) {
+    if (this.sessionOrgId == null) {
       this.sessionOrgId = this.deps.selectedOrg?.()?.id ?? null
     }
     return {
@@ -6787,12 +6821,13 @@ export class UniworkDocsService {
   private warmAvatarsInBackground(
     rows: readonly UniworkDocSummary[],
     workspaceIds: readonly string[],
+    session: { identity: SessionIdentity; epoch: number; apiOrigin?: string | null } | null,
   ): void {
-    const session = this.captureActionSessionOrNull()
+    if (!session || !this.sessionLive(session)) return
     void this.avatarCache
       .warmRows(rows)
       .then((changed) => {
-        if (!changed || !session) return
+        if (!changed || !this.sessionLive(session)) return
         for (const wsId of workspaceIds) {
           if (!wsId) continue
           try {
@@ -6805,13 +6840,35 @@ export class UniworkDocsService {
       .catch(() => undefined)
   }
 
+  private enrichSharedRows(
+    rows: UniworkDocSummary[],
+    workspaceIds: readonly string[],
+    session: { identity: SessionIdentity; epoch: number; apiOrigin?: string | null } | null,
+    notifyOnWarm = true,
+  ): UniworkDocSummary[] {
+    if (!session || !this.sessionLive(session)) {
+      return stripRowAvatars(rows)
+    }
+    const withAvatars = this.avatarCache.materializeRows(rows)
+    this.warmAvatarsInBackground(rows, notifyOnWarm ? workspaceIds : [], session)
+    return withAvatars
+  }
+
   private async enrichWorkspaceRows(
     workspaceId: string,
     rows: UniworkDocSummary[],
+    session: { identity: SessionIdentity; epoch: number; apiOrigin?: string | null } | null,
+    notifyOnWarm = true,
   ): Promise<UniworkDocSummary[]> {
+    const liveBeforeMembers = session !== null && this.sessionLive(session)
     const names = await this.memberNamesForWorkspace(workspaceId)
-    const withAvatars = this.avatarCache.materializeRows(rows)
-    this.warmAvatarsInBackground(rows, [workspaceId])
+    const canEnrichAvatars = liveBeforeMembers && session !== null && this.sessionLive(session)
+    const withAvatars = canEnrichAvatars
+      ? this.avatarCache.materializeRows(rows)
+      : stripRowAvatars(rows)
+    if (canEnrichAvatars) {
+      this.warmAvatarsInBackground(rows, notifyOnWarm ? [workspaceId] : [], session)
+    }
     if (names.size === 0) return withAvatars
     return withAvatars.map((row) => {
       const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
@@ -6863,6 +6920,7 @@ export class UniworkDocsService {
       if (!query || typeof query.workspaceId !== 'string' || !query.workspaceId) {
         throw new UniworkDocError('not_found')
       }
+      const session = this.captureActionSessionOrNull()
       const page = await this.api().listDocuments({
         workspaceId: query.workspaceId,
         ...(typeof query.query === 'string' ? { query: query.query } : {}),
@@ -6871,7 +6929,12 @@ export class UniworkDocsService {
         ...(query.includePages === true ? { includePages: true } : {}),
         ...this.listFiltersOf(query),
       })
-      const documents = await this.enrichWorkspaceRows(query.workspaceId, page.documents)
+      const documents = await this.enrichWorkspaceRows(
+        query.workspaceId,
+        page.documents,
+        session,
+        !isLoadMoreCursor(query.cursor),
+      )
       return { documents, nextCursor: page.nextCursor }
     })
   }
@@ -6884,13 +6947,19 @@ export class UniworkDocsService {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
+      const session = this.captureActionSessionOrNull()
       const page = await this.api().listSharedByMe({
         workspaceId: q.workspaceId,
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
         ...this.listFiltersOf(q),
       })
-      const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      const documents = await this.enrichWorkspaceRows(
+        q.workspaceId,
+        page.documents,
+        session,
+        !isLoadMoreCursor(q.cursor),
+      )
       return { documents, nextCursor: page.nextCursor }
     })
   }
@@ -6903,13 +6972,19 @@ export class UniworkDocsService {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
+      const session = this.captureActionSessionOrNull()
       const page = await this.api().listTrash({
         workspaceId: q.workspaceId,
         ...(typeof q.cursor === 'string' ? { cursor: q.cursor } : {}),
         ...(typeof q.limit === 'number' ? { limit: q.limit } : {}),
         ...this.listFiltersOf(q),
       })
-      const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      const documents = await this.enrichWorkspaceRows(
+        q.workspaceId,
+        page.documents,
+        session,
+        !isLoadMoreCursor(q.cursor),
+      )
       return { documents, nextCursor: page.nextCursor }
     })
   }
@@ -6926,6 +7001,7 @@ export class UniworkDocsService {
       if (!q || typeof q.workspaceId !== 'string' || !q.workspaceId) {
         throw new UniworkDocError('not_found')
       }
+      const session = this.captureActionSessionOrNull()
       const { types, sort, order } = this.listFiltersOf(q)
       const page = await this.api().listFavorites({
         workspaceId: q.workspaceId,
@@ -6935,7 +7011,12 @@ export class UniworkDocsService {
         ...(sort ? { sort } : {}),
         ...(order ? { order } : {}),
       })
-      const documents = await this.enrichWorkspaceRows(q.workspaceId, page.documents)
+      const documents = await this.enrichWorkspaceRows(
+        q.workspaceId,
+        page.documents,
+        session,
+        !isLoadMoreCursor(q.cursor),
+      )
       return { documents, nextCursor: page.nextCursor }
     })
   }
@@ -6966,6 +7047,7 @@ export class UniworkDocsService {
         throw new UniworkDocError('not_found')
       }
       // UNI-2047: the shelf takes the type filter and the sort, nothing else
+      const session = this.captureActionSessionOrNull()
       const { types, sort, order } = this.listFiltersOf(q)
       const page = await this.api().listShelved({
         workspaceId: q.workspaceId,
@@ -6975,7 +7057,12 @@ export class UniworkDocsService {
         ...(sort ? { sort } : {}),
         ...(order ? { order } : {}),
       })
-      const documents = await this.enrichShelvedRows(q.workspaceId, page.documents)
+      const documents = await this.enrichShelvedRows(
+        q.workspaceId,
+        page.documents,
+        session,
+        !isLoadMoreCursor(q.cursor),
+      )
       return { documents, nextCursor: page.nextCursor }
     })
   }
@@ -7006,10 +7093,18 @@ export class UniworkDocsService {
   private async enrichShelvedRows(
     workspaceId: string,
     rows: UniworkDocSummary[],
+    session: { identity: SessionIdentity; epoch: number; apiOrigin?: string | null } | null,
+    notifyOnWarm = true,
   ): Promise<UniworkDocSummary[]> {
+    const liveBeforeMembers = session !== null && this.sessionLive(session)
     const names = await this.memberNamesForWorkspace(workspaceId)
-    const withAvatars = this.avatarCache.materializeRows(rows)
-    this.warmAvatarsInBackground(rows, [workspaceId])
+    const canEnrichAvatars = liveBeforeMembers && session !== null && this.sessionLive(session)
+    const withAvatars = canEnrichAvatars
+      ? this.avatarCache.materializeRows(rows)
+      : stripRowAvatars(rows)
+    if (canEnrichAvatars) {
+      this.warmAvatarsInBackground(rows, notifyOnWarm ? [workspaceId] : [], session)
+    }
     if (names.size === 0) return withAvatars
     return withAvatars.map((row) => {
       const updatedByName = row.updatedById ? names.get(row.updatedById) : undefined
