@@ -201,6 +201,10 @@ export interface EditJournal {
   /// Sheets whose filter changed; the save snapshots their live filter model
   /// instead of replaying mutations.
   readonly filterDirty: Set<string>
+  /// Tables (by plugin id) whose own filter changed, per sheet. A table's
+  /// header dropdown edits the table plugin's model, so the save snapshots
+  /// exactly these tables; other tables keep their file filter untouched.
+  readonly tableFilterDirty: Map<string, Set<string>>
   /// Sheets whose conditional formatting changed; the save snapshots the full
   /// rule set declaratively (same recipe as filters).
   readonly cfDirty: Set<string>
@@ -331,6 +335,7 @@ export function createEditJournal(): EditJournal {
       orderDirty: false,
     },
     filterDirty: new Set(),
+    tableFilterDirty: new Map(),
     cfDirty: new Set(),
     dvDirty: new Set(),
     sheetProtection: new Map(),
@@ -477,6 +482,17 @@ export function toSaveHyperlinkEdits(journal: EditJournal): WorkbookHyperlinkEdi
 
 export function recordFilterChange(journal: EditJournal, sheetId: string): void {
   journal.filterDirty.add(sheetId)
+}
+
+export function recordTableFilterChange(
+  journal: EditJournal,
+  sheetId: string,
+  tableId: string,
+): void {
+  journal.filterDirty.add(sheetId)
+  const tables = journal.tableFilterDirty.get(sheetId) ?? new Set<string>()
+  tables.add(tableId)
+  journal.tableFilterDirty.set(sheetId, tables)
 }
 
 export function recordSheetInsert(journal: EditJournal, sheetId: string, name: string): void {
@@ -1256,6 +1272,12 @@ export function toSaveVisualAdds(journal: EditJournal): WorkbookVisualAdd[] {
                   ]),
                 ),
               }),
+          // Combo Select Data tags ride along; other families never reach a
+          // 'combo' chartType above.
+          ...(series.plot === 'barChart' || series.plot === 'lineChart'
+            ? { plot: series.plot }
+            : {}),
+          ...(series.secondaryAxis === undefined ? {} : { secondaryAxis: series.secondaryAxis }),
         })),
         ...(visual.chart.legend === undefined ? {} : { legend: visual.chart.legend }),
         // The read-only combined mode narrows to the closest writable one.

@@ -268,6 +268,58 @@ export function insertRowsBelowLocale(pack: LocalePack): LocalePack {
   }
 }
 
+/**
+ * Univer's own vi / ko / ja / fr / es / ru table packs ship the three header
+ * column actions of the table-filter popup in English (the upstream pack was
+ * never translated). Fill them in; the guard keys each patch to the English
+ * text so a pack that gains a real translation wins.
+ */
+const TABLE_COLUMN_MENU: Record<
+  string,
+  Record<'insert-left' | 'insert-right' | 'delete', string>
+> = {
+  vi: {
+    'insert-left': 'Chèn 1 cột bảng bên trái',
+    'insert-right': 'Chèn 1 cột bảng bên phải',
+    delete: 'Xóa cột bảng',
+  },
+  ko: {
+    'insert-left': '표 열 1개를 왼쪽에 삽입',
+    'insert-right': '표 열 1개를 오른쪽에 삽입',
+    delete: '표 열 삭제',
+  },
+  ja: {
+    'insert-left': 'テーブルの列を左に1列挿入',
+    'insert-right': 'テーブルの列を右に1列挿入',
+    delete: 'テーブルの列を削除',
+  },
+  fr: {
+    'insert-left': 'Insérer 1 colonne de tableau à gauche',
+    'insert-right': 'Insérer 1 colonne de tableau à droite',
+    delete: 'Supprimer la colonne du tableau',
+  },
+  es: {
+    'insert-left': 'Insertar 1 columna de tabla a la izquierda',
+    'insert-right': 'Insertar 1 columna de tabla a la derecha',
+    delete: 'Eliminar columna de tabla',
+  },
+  ru: {
+    'insert-left': 'Вставить 1 столбец таблицы слева',
+    'insert-right': 'Вставить 1 столбец таблицы справа',
+    delete: 'Удалить столбец таблицы',
+  },
+}
+
+export function tableColumnMenuLocale(pack: LocalePack, lang: string): LocalePack {
+  const tableUi = (pack['sheets-table-ui'] ?? {}) as Record<string, unknown>
+  const menu = (tableUi.columnMenu ?? {}) as Record<string, string>
+  const translated = TABLE_COLUMN_MENU[lang]
+  if (!translated || menu['insert-left'] !== 'Insert 1 table column left') {
+    return { 'sheets-table-ui': tableUi }
+  }
+  return { 'sheets-table-ui': { ...tableUi, columnMenu: { ...menu, ...translated } } }
+}
+
 export function univerLocaleFor(lang: string): LocaleType | null {
   return UNIVER_LOCALES[lang]?.type ?? null
 }
@@ -279,6 +331,7 @@ export async function applyUniverLocale(runtime: UniverRuntime, lang: string): P
   const merged = mergeLocales(...packs) as LocalePack
   Object.assign(merged, numberAsTextAlertLocale(merged))
   Object.assign(merged, insertRowsBelowLocale(merged))
+  Object.assign(merged, tableColumnMenuLocale(merged, lang))
   const localeService = runtime.univer.__getInjector().get(LocaleService)
   localeService.load({ [entry.type]: merged } as unknown as ILocales)
   localeService.setLocale(entry.type)

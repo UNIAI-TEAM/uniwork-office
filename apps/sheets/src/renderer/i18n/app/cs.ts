@@ -100,8 +100,10 @@ export const cs = {
   appChartNoRepoint: 'Tento graf nepodporuje změnu svých datových oblastí.',
   appKeepOneSeries: 'Ponechte alespoň jednu řadu.',
   appNoCategoriesToSwitch: 'Žádné kategorie k přepnutí.',
-  appComboNoSelectData: 'Změna zdroje dat kombinovaného grafu zatím není podporována.',
+  appSelectDataUnsupported: 'Změna zdroje dat tohoto typu grafu není podporována.',
   appSeriesName: 'Název řady',
+  appSeriesType: 'Typ řady',
+  appSecondaryAxis: 'Sekundární osa',
   appValuesRange: 'Oblast hodnot',
   appCategoriesRange: 'Oblast kategorií',
   appKeepUnchanged: 'Ponechat beze změny',
@@ -321,7 +323,6 @@ export const cs = {
     'Tento list obsahuje kontingenční tabulku — přesouvání oblastí zatím není podporováno.',
   appMergeOverTable:
     'Výběr se překrývá s tabulkou Excelu — slučování buněk v tabulce zatím není podporováno.',
-  appTableFilterNoEdit: 'Filtr tohoto listu patří tabulce Excelu — jeho úpravu zatím nelze uložit.',
   appAutofillStreaming:
     'Automatické vyplnění do oblasti, která se stále načítá, zatím není povoleno.',
   appDvNeedsIndexed:
@@ -565,8 +566,6 @@ export const cs = {
   appSaveFailed: 'Sešit nelze uložit.',
   appCfRuleUnsaveable:
     'Toto pravidlo podmíněného formátování nelze uložit do xlsx — přepněte na jiný typ pravidla.',
-  appSaveErrX14Dv:
-    'Tento list má rozšířené (x14) ověření dat; úprava jeho pravidel ověření zatím není podporována.',
   appSaveErrMultiSelectList:
     'Ověření seznamem s vícenásobným výběrem nelze uložit do xlsx — před uložením pravidlo odstraňte.',
   appSaveErrX14Cf: 'Tato oblast má rozšířené (x14) podmíněné formátování a zatím ji nelze měnit.',
