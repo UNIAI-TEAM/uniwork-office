@@ -67,4 +67,17 @@ describe('GraphView close paths', () => {
     root = null
     expect(document.documentElement.classList.contains('markdown-graph-open')).toBe(false)
   })
+
+  it('is a modal dialog: focus moves to the close button and returns to the opener on close', async () => {
+    const opener = document.createElement('button')
+    document.body.appendChild(opener)
+    opener.focus()
+    expect(document.activeElement).toBe(opener)
+    await renderGraph()
+    expect(document.querySelector('.graph-overlay')?.getAttribute('aria-modal')).toBe('true')
+    expect(document.activeElement).toBe(document.querySelector('.graph-close'))
+    act(() => root!.unmount())
+    root = null
+    expect(document.activeElement).toBe(opener)
+  })
 })

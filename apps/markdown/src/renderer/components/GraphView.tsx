@@ -38,6 +38,7 @@ export function GraphView({
   const { t } = useI18n()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
   const drawRef = useRef<() => void>(() => {})
   const viewportRef = useRef<Viewport>({ x: 0, y: 0, scale: 1 })
   const layoutRef = useRef<Map<string, LayoutPoint>>(new Map())
@@ -237,8 +238,17 @@ export function GraphView({
     }
   }, [onClose])
 
+  // focus moves into the dialog on open and returns to whatever opened it on close
+  useEffect(() => {
+    const opener = document.activeElement
+    closeRef.current?.focus()
+    return () => {
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus()
+    }
+  }, [])
+
   return (
-    <div className="graph-overlay" role="dialog" aria-label={t('graph')}>
+    <div className="graph-overlay" role="dialog" aria-modal="true" aria-label={t('graph')}>
       <div className="graph-head">
         <span className="graph-title">{t('graph')}</span>
         {graph?.truncated === true && (
@@ -247,6 +257,7 @@ export function GraphView({
           </span>
         )}
         <button
+          ref={closeRef}
           type="button"
           className="graph-close"
           aria-label={t('graphClose')}
@@ -256,11 +267,13 @@ export function GraphView({
         </button>
       </div>
       <div className="graph-body" ref={wrapRef}>
-        {failed || (graph !== null && graph.nodes.length === 0) ? (
-          <div className="graph-empty">{failed ? t('slashNoResults') : t('graphEmpty')}</div>
+        {failed ? null : graph !== null && graph.nodes.length === 0 ? (
+          <div className="graph-empty">{t('graphEmpty')}</div>
         ) : graph !== null ? (
           <canvas
             ref={canvasRef}
+            role="img"
+            aria-label={t('graph')}
             className="graph-canvas"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}

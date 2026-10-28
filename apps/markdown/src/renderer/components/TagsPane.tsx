@@ -56,9 +56,7 @@ export function TagsPane({ onOpen }: { onOpen: (path: string) => void }): ReactE
           ⟳
         </button>
       </div>
-      {tags === null ? (
-        <div className="md-backlinks-empty">{t('loading')}</div>
-      ) : tags.length === 0 ? (
+      {tags === null ? null : tags.length === 0 ? (
         <div className="md-backlinks-empty">{t('tagsEmpty')}</div>
       ) : (
         <ul className="md-backlinks-list">
@@ -67,6 +65,7 @@ export function TagsPane({ onOpen }: { onOpen: (path: string) => void }): ReactE
               <button
                 type="button"
                 className="md-backlinks-item"
+                aria-expanded={openTag === tag}
                 onClick={() => setOpenTag((v) => (v === tag ? null : tag))}
               >
                 <span className="md-backlinks-name">#{tag}</span>
