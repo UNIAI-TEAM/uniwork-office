@@ -4,5 +4,5 @@ export const it = {
   insertFootnote: 'Nota a piè di pagina',
   statusWords: '{n} parole',
   statusChars: '{n} caratteri',
-  highlight: 'Выделить',
+  highlight: 'Evidenzia',
 } satisfies Record<keyof typeof zh, string>

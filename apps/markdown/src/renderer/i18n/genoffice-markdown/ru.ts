@@ -4,5 +4,5 @@ export const ru = {
   insertFootnote: 'Сноска',
   statusWords: '{n} слов',
   statusChars: '{n} символов',
-  highlight: 'Evidenzia',
+  highlight: 'Выделить',
 } satisfies Record<keyof typeof zh, string>
