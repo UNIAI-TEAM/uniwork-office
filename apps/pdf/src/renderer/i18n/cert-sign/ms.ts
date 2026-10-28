@@ -22,6 +22,8 @@ export const ms = {
     'Stor sistem tidak membenarkan kunci persendirian sijil ini dikeluarkan, jadi sijil ini tidak boleh digunakan di sini',
   certErrStoreLocked: 'Kata laluan stor sijil tiada atau salah',
   certErrNoTools: 'Alat yang diperlukan untuk membaca stor sistem belum dipasang',
+  certStoreUnsupported:
+    'Stor sijil sistem belum tersedia pada macOS — gunakan fail sijil (.p12 / .pfx)',
   certChoose: 'Pilih sijil…',
   certNoFile: 'Tiada sijil dipilih',
   certPassword: 'Kata laluan',
@@ -67,13 +69,13 @@ export const ms = {
   sigPanelHint: 'Lihat tandatangan digital dalam PDF ini',
   sigPanelTitle: 'Tandatangan digital',
   sigBannerValid: 'Tandatangan sah',
-  sigBannerUntrustedNote:
-    'identiti penandatangan tidak disahkan oleh pihak berkuasa yang dipercayai',
+  sigBannerUntrusted: 'Tandatangan utuh, penandatangan tidak dipercayai',
   sigBannerWarning: 'Telah ditandatangani — sesetengah tandatangan memerlukan perhatian anda',
   sigBannerInvalid: 'Telah ditandatangani — sekurang-kurangnya satu tandatangan tidak sah',
   sigBannerView: 'Lihat tandatangan',
   sigStatusValid: 'Sah',
   sigStatusWarning: 'Sah, dengan amaran',
+  sigStatusUntrusted: 'Utuh, penandatangan tidak dipercayai',
   sigStatusInvalid: 'Tidak sah',
   sigKindTimestamp: 'Cap masa dokumen',
   sigSignedBy: 'Ditandatangani oleh {name}',
@@ -100,6 +102,8 @@ export const ms = {
   sigFingerprint: 'Cap jari SHA-256',
   sigKey: 'Kunci awam',
   sigSelfSigned: 'Ditandatangani sendiri',
+  sigTrustRoots:
+    'Kepercayaan dinilai berdasarkan sijil akar TLS komputer ini dan himpunan Mozilla (web PKI), bukan senarai dipercayai Adobe AATL atau EU untuk penandatanganan dokumen.',
   sigNoRevocation: 'Pembatalan sijil (CRL / OCSP) tidak disemak.',
   sigProblemDigestMismatch:
     'Dokumen telah diubah selepas ditandatangani — tidak lagi sepadan dengan tandatangan',

@@ -22,6 +22,8 @@ export const pt = {
     'O repositório do sistema não libera a chave privada deste certificado, por isso não pode ser usado aqui',
   certErrStoreLocked: 'A senha do repositório de certificados está ausente ou incorreta',
   certErrNoTools: 'A ferramenta necessária para ler o repositório do sistema não está instalada',
+  certStoreUnsupported:
+    'O repositório de certificados do sistema ainda não está disponível no macOS — use um arquivo de certificado (.p12 / .pfx)',
   certChoose: 'Escolher certificado…',
   certNoFile: 'Nenhum certificado escolhido',
   certPassword: 'Senha',
@@ -67,13 +69,13 @@ export const pt = {
   sigPanelHint: 'Ver as assinaturas digitais neste PDF',
   sigPanelTitle: 'Assinaturas digitais',
   sigBannerValid: 'A assinatura é válida',
-  sigBannerUntrustedNote:
-    'a identidade do signatário não é confirmada por uma entidade de confiança',
+  sigBannerUntrusted: 'Assinatura íntegra, signatário não confiável',
   sigBannerWarning: 'Assinado — algumas assinaturas requerem a sua atenção',
   sigBannerInvalid: 'Assinado — pelo menos uma assinatura é inválida',
   sigBannerView: 'Ver assinaturas',
   sigStatusValid: 'Válida',
   sigStatusWarning: 'Válida, com avisos',
+  sigStatusUntrusted: 'Íntegra, signatário não confiável',
   sigStatusInvalid: 'Inválida',
   sigKindTimestamp: 'Carimbo de data/hora do documento',
   sigSignedBy: 'Assinado por {name}',
@@ -100,6 +102,8 @@ export const pt = {
   sigFingerprint: 'Impressão digital SHA-256',
   sigKey: 'Chave pública',
   sigSelfSigned: 'Autoassinado',
+  sigTrustRoots:
+    'A confiança é avaliada com base nos certificados raiz TLS deste computador e no pacote da Mozilla (PKI da web), não nas listas de confiança Adobe AATL ou da UE para assinatura de documentos.',
   sigNoRevocation: 'A revogação do certificado (CRL / OCSP) não é verificada.',
   sigProblemDigestMismatch:
     'O documento foi alterado depois de assinado — já não corresponde à assinatura',

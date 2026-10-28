@@ -7863,15 +7863,11 @@ export default function App() {
                 {t(
                   {
                     valid: 'sigBannerValid',
+                    untrusted: 'sigBannerUntrusted',
                     warning: 'sigBannerWarning',
                     invalid: 'sigBannerInvalid',
                   }[overallSignatureStatus(digitalSignatures)] as 'sigBannerValid',
                 )}
-                {overallSignatureStatus(digitalSignatures) === 'valid' &&
-                  digitalSignatures.some((sig) =>
-                    sig.problems.some((p) => p === 'self-signed' || p === 'untrusted-issuer'),
-                  ) &&
-                  ` — ${t('sigBannerUntrustedNote')}`}
               </span>
               <button className="pdf-modal-btn" onClick={() => setSignaturesDlg(true)}>
                 {t('sigBannerView')}

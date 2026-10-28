@@ -23,6 +23,8 @@ export const fr = {
     'Le magasin du système refuse de libérer la clé privée de ce certificat, il ne peut donc pas être utilisé ici',
   certErrStoreLocked: 'Le mot de passe du magasin de certificats est manquant ou incorrect',
   certErrNoTools: "L'outil nécessaire pour lire le magasin du système n'est pas installé",
+  certStoreUnsupported:
+    "Le magasin de certificats du système n'est pas encore disponible sur macOS — utilisez un fichier de certificat (.p12 / .pfx)",
   certChoose: 'Choisir un certificat…',
   certNoFile: 'Aucun certificat choisi',
   certPassword: 'Mot de passe',
@@ -68,13 +70,13 @@ export const fr = {
   sigPanelHint: 'Afficher les signatures numériques de ce PDF',
   sigPanelTitle: 'Signatures numériques',
   sigBannerValid: 'La signature est valide',
-  sigBannerUntrustedNote:
-    "l'identité du signataire n'est pas confirmée par une autorité de confiance",
+  sigBannerUntrusted: 'Signature intacte, signataire non approuvé',
   sigBannerWarning: 'Signé — certaines signatures demandent votre attention',
   sigBannerInvalid: 'Signé — au moins une signature est invalide',
   sigBannerView: 'Afficher les signatures',
   sigStatusValid: 'Valide',
   sigStatusWarning: 'Valide, avec avertissements',
+  sigStatusUntrusted: 'Intacte, signataire non approuvé',
   sigStatusInvalid: 'Invalide',
   sigKindTimestamp: 'Horodatage du document',
   sigSignedBy: 'Signé par {name}',
@@ -101,6 +103,8 @@ export const fr = {
   sigFingerprint: 'Empreinte SHA-256',
   sigKey: 'Clé publique',
   sigSelfSigned: 'Auto-signé',
+  sigTrustRoots:
+    "La confiance est évaluée d'après les certificats racine TLS de cet ordinateur et le bundle Mozilla (PKI web), et non d'après les listes de confiance Adobe AATL ou de l'UE pour la signature de documents.",
   sigNoRevocation: "La révocation du certificat (CRL / OCSP) n'est pas vérifiée.",
   sigProblemDigestMismatch:
     'Le document a été modifié après la signature — il ne correspond plus à la signature',

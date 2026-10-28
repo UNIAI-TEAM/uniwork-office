@@ -5216,7 +5216,8 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   border-inline-start: 3px solid var(--pdf-ok);
 }
 
-.pdf-sig-banner.warning {
+.pdf-sig-banner.warning,
+.pdf-sig-banner.untrusted {
   border-inline-start-color: var(--pdf-sig-warn);
 }
 
@@ -5247,7 +5248,8 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   border-radius: 8px;
 }
 
-.pdf-sig-card.warning {
+.pdf-sig-card.warning,
+.pdf-sig-card.untrusted {
   border-inline-start-color: var(--pdf-sig-warn);
 }
 
@@ -5280,7 +5282,8 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   border: 1px solid var(--pdf-ok);
 }
 
-.pdf-sig-pill.warning {
+.pdf-sig-pill.warning,
+.pdf-sig-pill.untrusted {
   color: var(--pdf-sig-warn);
   border-color: var(--pdf-sig-warn);
 }

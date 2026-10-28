@@ -23,6 +23,8 @@ export const de = {
     'Der Systemspeicher gibt den privaten Schlüssel dieses Zertifikats nicht heraus, daher kann es hier nicht verwendet werden',
   certErrStoreLocked: 'Das Kennwort des Zertifikatspeichers fehlt oder ist falsch',
   certErrNoTools: 'Das zum Lesen des Systemspeichers benötigte Tool ist nicht installiert',
+  certStoreUnsupported:
+    'Der Zertifikatspeicher des Systems ist unter macOS noch nicht verfügbar – verwenden Sie eine Zertifikatdatei (.p12 / .pfx)',
   certChoose: 'Zertifikat auswählen…',
   certNoFile: 'Kein Zertifikat ausgewählt',
   certPassword: 'Kennwort',
@@ -68,13 +70,13 @@ export const de = {
   sigPanelHint: 'Die digitalen Signaturen in diesem PDF anzeigen',
   sigPanelTitle: 'Digitale Signaturen',
   sigBannerValid: 'Signatur ist gültig',
-  sigBannerUntrustedNote:
-    'die Identität des Unterzeichners wird von keiner vertrauenswürdigen Stelle bestätigt',
+  sigBannerUntrusted: 'Signatur intakt, Unterzeichner nicht vertrauenswürdig',
   sigBannerWarning: 'Signiert — einige Signaturen erfordern Ihre Aufmerksamkeit',
   sigBannerInvalid: 'Signiert — mindestens eine Signatur ist ungültig',
   sigBannerView: 'Signaturen anzeigen',
   sigStatusValid: 'Gültig',
   sigStatusWarning: 'Gültig, mit Warnungen',
+  sigStatusUntrusted: 'Intakt, Unterzeichner nicht vertrauenswürdig',
   sigStatusInvalid: 'Ungültig',
   sigKindTimestamp: 'Dokument-Zeitstempel',
   sigSignedBy: 'Signiert von {name}',
@@ -101,6 +103,8 @@ export const de = {
   sigFingerprint: 'SHA-256-Fingerabdruck',
   sigKey: 'Öffentlicher Schlüssel',
   sigSelfSigned: 'Selbstsigniert',
+  sigTrustRoots:
+    'Die Vertrauensprüfung stützt sich auf die TLS-Stammzertifikate dieses Computers und das Mozilla-Bundle (Web-PKI), nicht auf die Adobe-AATL- oder EU-Vertrauenslisten für Dokumentsignaturen.',
   sigNoRevocation: 'Die Sperrung des Zertifikats (CRL / OCSP) wird nicht geprüft.',
   sigProblemDigestMismatch:
     'Das Dokument wurde nach dem Signieren geändert — es stimmt nicht mehr mit der Signatur überein',

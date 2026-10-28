@@ -23,6 +23,8 @@ export const nl = {
     'De systeemopslag geeft de privésleutel van dit certificaat niet vrij, dus het kan hier niet worden gebruikt',
   certErrStoreLocked: 'Het wachtwoord van de certificaatopslag ontbreekt of is onjuist',
   certErrNoTools: 'De tool die nodig is om de systeemopslag te lezen is niet geïnstalleerd',
+  certStoreUnsupported:
+    'De certificaatopslag van het systeem is nog niet beschikbaar op macOS — gebruik een certificaatbestand (.p12 / .pfx)',
   certChoose: 'Certificaat kiezen…',
   certNoFile: 'Geen certificaat gekozen',
   certPassword: 'Wachtwoord',
@@ -68,13 +70,13 @@ export const nl = {
   sigPanelHint: 'De digitale handtekeningen in deze pdf bekijken',
   sigPanelTitle: 'Digitale handtekeningen',
   sigBannerValid: 'Handtekening is geldig',
-  sigBannerUntrustedNote:
-    'de identiteit van de ondertekenaar wordt niet bevestigd door een vertrouwde instantie',
+  sigBannerUntrusted: 'Handtekening intact, ondertekenaar niet vertrouwd',
   sigBannerWarning: 'Ondertekend — sommige handtekeningen vragen uw aandacht',
   sigBannerInvalid: 'Ondertekend — minstens één handtekening is ongeldig',
   sigBannerView: 'Handtekeningen bekijken',
   sigStatusValid: 'Geldig',
   sigStatusWarning: 'Geldig, met waarschuwingen',
+  sigStatusUntrusted: 'Intact, ondertekenaar niet vertrouwd',
   sigStatusInvalid: 'Ongeldig',
   sigKindTimestamp: 'Tijdstempel van het document',
   sigSignedBy: 'Ondertekend door {name}',
@@ -101,6 +103,8 @@ export const nl = {
   sigFingerprint: 'SHA-256-vingerafdruk',
   sigKey: 'Openbare sleutel',
   sigSelfSigned: 'Zelfondertekend',
+  sigTrustRoots:
+    'Vertrouwen wordt beoordeeld aan de hand van de TLS-basiscertificaten van deze computer en het Mozilla-pakket (web-PKI), niet aan de Adobe AATL- of EU-vertrouwenslijsten voor documentondertekening.',
   sigNoRevocation: 'Intrekking van het certificaat (CRL / OCSP) wordt niet gecontroleerd.',
   sigProblemDigestMismatch:
     'Het document is na het ondertekenen gewijzigd — het komt niet meer overeen met de handtekening',
