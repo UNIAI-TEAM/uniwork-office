@@ -2014,7 +2014,6 @@ export function App({
     const state = lazyWorkbookRef.current
     if (!state) return
     const workbook = univerRef.current?.univerAPI.getActiveWorkbook()
-    const sheetName = workbook?.getSheetBySheetId(request.sheetId)?.getSheetName()
     const intent = redactIntentFor(request, redactionIndexRef.current ?? NO_REDACTIONS, (id) =>
       workbook?.getSheetBySheetId(id)?.getSheetName(),
     )
@@ -2072,24 +2071,9 @@ export function App({
       }
       return
     }
-    // A single cell offers its own text as the label, so the common case is
-    // one word of typing; a range has no text and starts empty.
-    let seed = ''
-    if (request.isSingleCell) {
-      try {
-        seed =
-          (
-            workbook
-              ?.getSheetBySheetId(request.sheetId)
-              ?.getRange(`${columnLabel(request.startColumn)}${request.startRow + 1}`)
-              .getValue() as string | undefined
-          )?.slice(0, 24) ?? ''
-      } catch {
-        // An unreadable cell just means no seed offered.
-      }
-    }
-    setRedactDialog({ ...intent.dialog, seed })
-    if (sheetName === undefined) setRedactDialog(null)
+    // Never seed with the cell value: the label is what the model sees, so
+    // pre-filling the hidden value would leak it on a bare Enter press.
+    setRedactDialog({ ...intent.dialog, seed: '' })
   }
 
   /** Commit the label the reader typed. */

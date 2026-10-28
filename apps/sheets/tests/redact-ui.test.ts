@@ -73,12 +73,16 @@ function click(element: Element) {
 }
 
 describe('the redaction dialog', () => {
-  it('offers the cell text as a starting label, selected so typing replaces it', () => {
+  it('starts with an empty label by default so the hidden cell value is never pre-filled', () => {
+    const container = mount(dialog())
+    const input = container.querySelector('input')!
+    expect(input.value).toBe('')
+    expect(container.querySelector<HTMLButtonElement>('.btn-primary')!.disabled).toBe(true)
+  })
+
+  it('selects any explicit seed so typing replaces it', () => {
     const input = mount(dialog({ seed: '13800138000' })).querySelector('input')!
     expect(input.value).toBe('13800138000')
-    // Pre-selected: the reader types over the phone number rather than
-    // appending to it. A seed that is not selected is a very easy mistake to
-    // make here, and the label is the only thing the model will ever see.
     expect(input.selectionStart).toBe(0)
     expect(input.selectionEnd).toBe('13800138000'.length)
   })

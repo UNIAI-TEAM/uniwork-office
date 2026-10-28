@@ -3247,10 +3247,12 @@ export function App() {
     if (!editor) return
     const { from, to } = editor.state.selection
     if (from === to) return
+    // Never seed with the selected text: the label is what the model sees, so
+    // pre-filling the hidden value would leak it on a bare Enter press.
     setRedactTarget({
       from,
       to,
-      seed: editor.state.doc.textBetween(from, to, ' ').trim().slice(0, 24),
+      seed: '',
     })
   }, [editor])
 

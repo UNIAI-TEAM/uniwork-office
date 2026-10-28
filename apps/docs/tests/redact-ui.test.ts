@@ -116,6 +116,13 @@ describe('RedactDialog', () => {
     unmount()
   })
 
+  it('starts with an empty label when seeded empty so the hidden text is never pre-filled', () => {
+    const { input, primary, unmount } = open({ seed: '' })
+    expect(input.value).toBe('')
+    expect(primary.disabled).toBe(true)
+    unmount()
+  })
+
   it('shows the marker the model will see, and follows what is typed', () => {
     // the reader must know what is about to be exposed before committing
     const { container, input, unmount } = open()
@@ -425,7 +432,7 @@ describe('the item and the dialog together', () => {
         onRedact: () => {
           const { from, to } = editor.state.selection
           if (from === to) return
-          setTarget({ from, to, seed: editor.state.doc.textBetween(from, to, ' ').trim() })
+          setTarget({ from, to, seed: '' })
         },
         // the App.tsx wiring, trimmed: the command reads the selection itself
         onUnredact: () => editor.commands.unsetRedaction(),
@@ -453,7 +460,7 @@ describe('the item and the dialog together', () => {
 
     act(() => item(container, LABEL)!.click())
     const input = container.querySelector<HTMLInputElement>('input')!
-    expect(input.value).toBe('client')
+    expect(input.value).toBe('')
     act(() => {
       const setter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
