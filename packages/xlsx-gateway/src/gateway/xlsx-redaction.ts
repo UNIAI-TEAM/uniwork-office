@@ -445,13 +445,22 @@ function unmirrorFormula(body: string): string {
  * passing itself off as the whole string.
  */
 function labelFitter(payload: Omit<MirrorPayload, 'label'>): (label: string) => string {
-  const overhead = Array.from(mirrorFormula({ ...payload, label: '' })).length
-  const room = MIRROR_FORMULA_LIMIT - overhead
+  const fits = (candidate: string) =>
+    mirrorFormula({ ...payload, label: candidate }).length <= MIRROR_FORMULA_LIMIT
   return (label) => {
+    if (fits(label)) return label
     const characters = Array.from(label)
-    if (characters.length <= room) return label
-    const kept = Math.max(0, room - 1)
-    return characters.slice(0, kept).join('') + MIRROR_TRUNCATION_MARK
+    let low = 0
+    let high = characters.length
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2)
+      if (fits(characters.slice(0, mid).join('') + MIRROR_TRUNCATION_MARK)) {
+        low = mid
+      } else {
+        high = mid - 1
+      }
+    }
+    return characters.slice(0, low).join('') + MIRROR_TRUNCATION_MARK
   }
 }
 
