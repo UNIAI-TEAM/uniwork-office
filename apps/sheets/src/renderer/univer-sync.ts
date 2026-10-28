@@ -104,6 +104,7 @@ import {
   recordHyperlinkEdit,
   recordSetRangeValues,
   toRecalcUserInput,
+  type CellImageAdd,
   type EditJournal,
   type VisualEditEntry,
 } from './edit-journal'
@@ -7817,6 +7818,26 @@ export function queueVisualInstall(
   }, 100)
 }
 
+/// Session embeds render from their inline bytes; one replaces the file's
+/// picture in the same cell (the save overwrites that cell's rich value too).
+export function mergeCellImages(
+  fileImages: readonly CellImageState[],
+  sessionAdds: readonly CellImageAdd[],
+  sheetId: string,
+): CellImageState[] {
+  const session = sessionAdds.filter((entry) => entry.sheetId === sheetId)
+  const taken = new Set(session.map((entry) => `${entry.row}:${entry.column}`))
+  return [
+    ...fileImages.filter((image) => !taken.has(`${image.row}:${image.column}`)),
+    ...session.map((entry) => ({
+      id: `session-${entry.row}-${entry.column}`,
+      row: entry.row,
+      column: entry.column,
+      dataUrl: entry.dataUrl,
+    })),
+  ]
+}
+
 /// Sparklines install separately from the floating visuals: dragging a
 /// chart re-installs the visual pool, and rebuilding up to 200 sparkline
 /// float DOMs with it would make every drag commit crawl.
@@ -7848,19 +7869,12 @@ export function queueSparklineInstall(
           cells: entry.cells,
         })),
     ]
-    // In-cell rich-value pictures share the per-cell float DOM lifecycle;
-    // session embeds render from their inline bytes on top of the file's.
-    const cellImages: CellImageState[] = [
-      ...(sheetMeta?.cellImages ?? []),
-      ...state.editJournal.cellImageAdds
-        .filter((entry) => entry.sheetId === sheetId)
-        .map((entry) => ({
-          id: `session-${entry.row}-${entry.column}`,
-          row: entry.row,
-          column: entry.column,
-          dataUrl: entry.dataUrl,
-        })),
-    ]
+    // In-cell rich-value pictures share the per-cell float DOM lifecycle.
+    const cellImages = mergeCellImages(
+      sheetMeta?.cellImages ?? [],
+      state.editJournal.cellImageAdds,
+      sheetId,
+    )
     sparklineDisposablesRef.current = [
       ...(sparklines.length === 0 ? [] : installSparklines(runtime, sparklines, sheetId)),
       ...(cellImages.length === 0
