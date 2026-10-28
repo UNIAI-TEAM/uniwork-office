@@ -45,6 +45,7 @@ export const ALLOWLIST = [
   {
     path: 'packages/xlsx-gateway/src/gateway/xlsx-redaction.ts',
     pattern: 'genspark.ai',
+    line: "const REDACTION_REL_TYPE = 'https://schemas.genspark.ai/genoffice/2026/relationships/redactions'",
     reason:
       "Relationship type URI of the stored 'hidden from the model' part of a workbook (xl/_rels/workbook.xml.rels). It is an OPC identifier written into the file, like the schemas.openxmlformats.org types beside it: renaming it orphans the part for every file written so far, so the marked cells silently become readable again. A document identifier, never rendered and never contacted.",
   },
@@ -88,8 +89,11 @@ export function scanText(text) {
   return hits
 }
 
-function allowed(path, pattern, allowlist) {
-  return allowlist.some((a) => a.path === path && a.pattern === pattern)
+function allowed(path, hit, allowlist) {
+  return allowlist.some(
+    (a) =>
+      a.path === path && a.pattern === hit.pattern && (a.line === undefined || a.line === hit.text),
+  )
 }
 
 function* walk(root, dir) {
@@ -118,7 +122,7 @@ export function scanTree(root, { allowlist = ALLOWLIST } = {}) {
       if (!inScope(path) || BINARY_EXT.test(path)) continue
       const text = readFileSync(join(root, path), 'utf8')
       for (const hit of scanText(text)) {
-        if (!allowed(path, hit.pattern, allowlist)) violations.push({ path, ...hit })
+        if (!allowed(path, hit, allowlist)) violations.push({ path, ...hit })
       }
     }
   }
