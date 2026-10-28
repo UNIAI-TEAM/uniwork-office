@@ -1,0 +1,32 @@
+import type { zh } from './zh'
+
+export const ar = {
+  setSecSkills: 'المهارات',
+  intgSkillsDesc:
+    'يستخدم UniWork Office المهارات الموجودة في مجلد مهاراته فقط. استيراد مجلد أو ملف zip ينسخ المهارة كاملة؛ ولا يُشغَّل شيء عند الاستيراد.',
+  intgSkillsEmpty: 'لم تُثبَّت أي مهارات بعد.',
+  intgSkillsImportFolder: 'استيراد مجلد…',
+  intgSkillsImportZip: 'استيراد حزمة مهارة (zip / .md)…',
+  intgSkillsImportFolderTitle: 'اختر مجلد المهارة',
+  intgSkillsImportZipTitle: 'اختر ملف zip أو .md للمهارة',
+  intgSkillsImportDone: 'تم استيراد {name}',
+  intgSkillsImportFailed: 'فشل الاستيراد: {reason}',
+  intgSkillsRemove: 'إزالة',
+  intgSkillsRemoveConfirm: 'هل تريد إزالة المهارة "{name}"؟ سيتم حذف مجلدها من UniWork Office.',
+  intgSkillsRemoved: 'تمت إزالة {name}',
+  intgSkillsRead: 'التفاصيل',
+  intgSkillsMine: 'مهاراتي',
+  intgSkillsRecommended: 'موصى بها',
+  intgSkillsCatOffice: 'مكتب',
+  intgSkillsCatBusiness: 'أعمال',
+  intgSkillsCatData: 'بيانات',
+  intgSkillsCatFinance: 'مالية',
+  intgSkillsCatHr: 'موارد بشرية',
+  intgSkillsCatLegal: 'قانوني',
+  intgSkillsCatMarketing: 'تسويق',
+  intgSkillsCatEducation: 'تعليم',
+  intgSkillsCatOther: 'أخرى',
+  intgSkillsInstall: 'تثبيت',
+  intgSkillsUpdate: 'تحديث',
+  intgSkillsInstalledTag: 'مثبّتة',
+} satisfies Record<keyof typeof zh, string>

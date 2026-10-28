@@ -1,0 +1,32 @@
+import type { zh } from './zh'
+
+export const en = {
+  setSecSkills: 'Skills',
+  intgSkillsDesc:
+    'UniWork Office only uses skills in its own skills folder. Importing a folder or a zip copies the whole skill in; nothing runs on import.',
+  intgSkillsEmpty: 'No skills installed yet.',
+  intgSkillsImportFolder: 'Import folder…',
+  intgSkillsImportZip: 'Import skill package (zip / .md)…',
+  intgSkillsImportFolderTitle: 'Choose a skill folder',
+  intgSkillsImportZipTitle: 'Choose a skill zip or .md',
+  intgSkillsImportDone: 'Imported {name}',
+  intgSkillsImportFailed: 'Import failed: {reason}',
+  intgSkillsRemove: 'Remove',
+  intgSkillsRemoveConfirm: 'Remove the skill "{name}"? Its folder is deleted from UniWork Office.',
+  intgSkillsRemoved: 'Removed {name}',
+  intgSkillsRead: 'Details',
+  intgSkillsMine: 'My skills',
+  intgSkillsRecommended: 'Recommended',
+  intgSkillsCatOffice: 'Office',
+  intgSkillsCatBusiness: 'Business',
+  intgSkillsCatData: 'Data',
+  intgSkillsCatFinance: 'Finance',
+  intgSkillsCatHr: 'HR',
+  intgSkillsCatLegal: 'Legal',
+  intgSkillsCatMarketing: 'Marketing',
+  intgSkillsCatEducation: 'Education',
+  intgSkillsCatOther: 'Other',
+  intgSkillsInstall: 'Install',
+  intgSkillsUpdate: 'Update',
+  intgSkillsInstalledTag: 'Installed',
+} satisfies Record<keyof typeof zh, string>

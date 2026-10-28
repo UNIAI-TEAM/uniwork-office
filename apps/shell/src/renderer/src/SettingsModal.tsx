@@ -62,6 +62,7 @@ import {
 } from './UniworkCloudPane'
 import type { UniworkCloudStatus } from '@genoffice/ai-provider/browser'
 import { IntegrationsPane, skillUpdateDue } from './IntegrationsPane'
+import { FoundSkills } from './FoundSkills'
 import { SyncCenterPane } from './SyncCenterPane'
 import './settings.css'
 
@@ -185,6 +186,7 @@ export type SettingsSectionId =
   | 'general'
   | 'backup'
   | 'integrations'
+  | 'skills'
   | 'about'
   // G5-10: Settings › Sync center (S2)
   | 'sync'
@@ -201,6 +203,7 @@ const SECTIONS: readonly { id: SectionId; labelKey: StringKey }[] = [
   { id: 'general', labelKey: 'setSecGeneral' },
   { id: 'backup', labelKey: 'setSecBackup' },
   { id: 'integrations', labelKey: 'setSecIntegrations' },
+  { id: 'skills', labelKey: 'setSecSkills' },
   { id: 'about', labelKey: 'setSecAbout' },
 ]
 
@@ -248,6 +251,20 @@ function SectionIcon({ id }: { id: SectionId }) {
           strokeWidth="1.3"
           strokeLinecap="round"
         />
+      </svg>
+    )
+  }
+  if (id === 'skills') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path
+          d="M3 3.5h6.5l3.5 3.5v5.5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinejoin="round"
+        />
+        <path d="M9.5 3.5V7H13" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M5 10.5h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
       </svg>
     )
   }
@@ -2357,6 +2374,7 @@ export function SettingsModal({
             {section === 'integrations' && (
               <IntegrationsPane t={t} onStatus={(st) => onSkillUpdateDue?.(skillUpdateDue(st))} />
             )}
+            {section === 'skills' && <FoundSkills t={t} />}
             {section === 'about' && (
               <>
                 <h3 className="set-pane-title">{t('setSecAbout')}</h3>

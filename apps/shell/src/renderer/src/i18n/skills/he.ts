@@ -1,0 +1,32 @@
+import type { zh } from './zh'
+
+export const he = {
+  setSecSkills: 'מיומנויות',
+  intgSkillsDesc:
+    'UniWork Office משתמש רק במיומנויות שבתיקיית המיומנויות שלו. ייבוא תיקייה או zip מעתיק את המיומנות כולה; שום דבר לא מופעל בייבוא.',
+  intgSkillsEmpty: 'עדיין לא הותקנו מיומנויות.',
+  intgSkillsImportFolder: 'ייבוא תיקייה…',
+  intgSkillsImportZip: 'ייבוא חבילת מיומנות (zip / .md)…',
+  intgSkillsImportFolderTitle: 'בחירת תיקיית מיומנות',
+  intgSkillsImportZipTitle: 'בחירת zip או .md של מיומנות',
+  intgSkillsImportDone: '{name} יובאה',
+  intgSkillsImportFailed: 'הייבוא נכשל: {reason}',
+  intgSkillsRemove: 'הסרה',
+  intgSkillsRemoveConfirm: 'להסיר את המיומנות "{name}"? התיקייה שלה תימחק מ-UniWork Office.',
+  intgSkillsRemoved: '{name} הוסרה',
+  intgSkillsRead: 'פרטים',
+  intgSkillsMine: 'הכישורים שלי',
+  intgSkillsRecommended: 'מומלצות',
+  intgSkillsCatOffice: 'משרד',
+  intgSkillsCatBusiness: 'עסקים',
+  intgSkillsCatData: 'נתונים',
+  intgSkillsCatFinance: 'כספים',
+  intgSkillsCatHr: 'משאבי אנוש',
+  intgSkillsCatLegal: 'משפטי',
+  intgSkillsCatMarketing: 'שיווק',
+  intgSkillsCatEducation: 'חינוך',
+  intgSkillsCatOther: 'אחר',
+  intgSkillsInstall: 'התקנה',
+  intgSkillsUpdate: 'עדכון',
+  intgSkillsInstalledTag: 'מותקנת',
+} satisfies Record<keyof typeof zh, string>

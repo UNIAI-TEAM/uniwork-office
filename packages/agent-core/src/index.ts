@@ -108,3 +108,10 @@ export type {
   UniworkPanelEntryLike,
   UniworkTranslateFn,
 } from './uniwork-panel'
+export {
+  classifySkill,
+  parseSkillFrontmatter,
+  SKILL_FORMAT_PHRASES,
+  SKILL_FORMAT_TOKENS,
+} from './imported-skill'
+export type { SkillFrontmatter, SkillRelevance } from './imported-skill'
