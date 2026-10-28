@@ -74,7 +74,7 @@ import browser, { downloadBlob, safeFileName } from '../../docs/bridge/browser'
 import type { DraftHost, DraftRecovery } from '../../docs/bridge/draft-recovery'
 import { TIMEOUTS, errorCode } from '../../docs/bridge/frame-port'
 import type { ModuleBridgePort } from '../../docs/bridge/module-bridge'
-import { decodeDataUrl, idFromPath, pathFor } from '../../docs/bridge/webapi'
+import { idFromPath, pathFor } from '../../docs/bridge/webapi'
 import { bridgeDownloadCap, downloadVia, revisionOf } from '../shared/conflict-dialog'
 import { createRemoteVersion, type RemoteVersion } from '../shared/remote-version'
 import { bindLagDetectorPort, documentMounted, queueDocumentLoaded } from '../shared/lag-detector'
@@ -94,7 +94,6 @@ import { createPresenterWindow, type PresenterWindow } from './presenter-window'
 import type { ScreenPlacer } from './screens'
 import { tiffToPng } from './tiff'
 import { pictureDpiFor } from '../../../apps/slides/src/main/picture-frame'
-import { rasterImageExt } from '../../../apps/slides/src/main/media-mime'
 import { createDocState, createWebHostIO, SENTINEL_PREFIX, WebSaveError } from './web-host-io'
 
 /**
@@ -205,37 +204,6 @@ function withExt(name: string, ext: string): string {
 const noop = (): void => {}
 const disposer = (): (() => void) => noop
 
-/**
- * A picture of an AI-written page. The frame CSP has connect-src 'self' (no data:/blob:, no
- * remote origin), so a remote URL is never fetched: it answers null, the picture lands in the
- * page's imageFailures and the page still lands (plan 5 decision 7). A data: URL is decoded in
- * place; a blob: URL is read only if the policy lets the fetch through. Raster bytes only.
- */
-async function framePicture(
-  url: string,
-  dims: WeakMap<Uint8Array, { width: number; height: number }>,
-): Promise<{ bytes: Uint8Array; ext: string } | null> {
-  let bytes: Uint8Array
-  if (url.startsWith('data:')) {
-    const decoded = decodeDataUrl(url)
-    if (!decoded) return null
-    bytes = base64ToBytes(decoded.base64)
-  } else if (url.startsWith('blob:')) {
-    bytes = new Uint8Array(await (await fetch(url)).arrayBuffer())
-  } else return null
-  const ext = rasterImageExt(bytes)
-  if (!ext) return null
-  // buildPagePptx reads the size synchronously for the cover crop: decode it here
-  try {
-    const bitmap = await createImageBitmap(new Blob([bytes as Uint8Array<ArrayBuffer>]))
-    dims.set(bytes, { width: bitmap.width, height: bitmap.height })
-    bitmap.close()
-  } catch {
-    /* no size: the picture lands uncropped */
-  }
-  return { bytes, ext }
-}
-
 /** slides:local-page-generate of the frame: the page's one-slide pptx is kept in `store` */
 async function generatePage(
   specJson: string,
@@ -244,11 +212,12 @@ async function generatePage(
   const parsed = parsePageSpec(specJson)
   if (!parsed.ok) return { ok: false, error: parsed.error }
   try {
-    const dims = new WeakMap<Uint8Array, { width: number; height: number }>()
     const { bytes, imageFailures } = await buildPagePptx(parsed.spec, {
       fontMetrics: getFontMetrics(),
-      fetchImage: (url) => framePicture(url, dims),
-      imageDims: (picture) => dims.get(picture) ?? null,
+      // The frame fetches no picture (plan 5 decision 7): its CSP has connect-src 'self' (no
+      // remote origin, no data:/blob:) and the spec admits only http(s) URLs, so every picture
+      // lands in imageFailures and the page lands without it.
+      fetchImage: async () => null,
     })
     return {
       ok: true,

@@ -1055,6 +1055,8 @@ export function AiPanel({
       // the adapter bound feeds the AI through the shared rule: a web frame reads as bound
       uniworkBound: () => uniworkBoundForAi(uniworkBoundRef.current ?? false, platform()),
       uniworkAi: () => settingsRef.current.provider === 'uniwork',
+      // only the web frame reaches the UniWork AI writer route; the desktop refuses writer calls
+      uniworkWriterRoute: () => platform() === 'web',
       imageUrls: createImageUrlRegistry({
         enforce: () => settingsRef.current.provider === 'uniwork',
         attachments: () =>

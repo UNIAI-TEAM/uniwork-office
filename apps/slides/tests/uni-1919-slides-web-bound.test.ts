@@ -86,20 +86,25 @@ const access = () => seen.accesses.at(-1)!
  * `window.slidesApi` like the harness installs it; `caps === undefined` is the
  * desktop (the web bridge assigns { platform: 'web' } before the renderer runs).
  */
-function installSlidesApi(caps: Record<string, unknown> | undefined) {
+function installSlidesApi(
+  caps: Record<string, unknown> | undefined,
+  members: Record<string, unknown> = {},
+) {
   ;(window as unknown as { slidesApi?: unknown }).slidesApi = new Proxy(
     {},
     {
       get: (_obj, key: string) =>
-        key === 'capabilities'
-          ? caps
-          : key === 'uniworkState'
-            ? async () => ({ bound: false, readOnly: false })
-            : key === 'getAiSettings'
-              ? async () => settings
-              : key.startsWith('on')
-                ? () => () => {}
-                : () => Promise.resolve(undefined),
+        key in members
+          ? members[key]
+          : key === 'capabilities'
+            ? caps
+            : key === 'uniworkState'
+              ? async () => ({ bound: false, readOnly: false })
+              : key === 'getAiSettings'
+                ? async () => settings
+                : key.startsWith('on')
+                  ? () => () => {}
+                  : () => Promise.resolve(undefined),
     },
   )
   resetForTest()
@@ -132,10 +137,13 @@ const WEB_EDITABLE = { bound: false, readOnly: false }
 /** the UniWork AI selection: the provider switch is the whole signal DeckAccess.uniworkAi reads */
 const uniworkSettings: AiSettings = { ...settings, provider: 'uniwork' }
 
-/** tools a UniWork AI turn never sees (signed policy; slides-skill UNIWORK_AI_HIDDEN_TOOLS) */
+/** tools a web-frame UniWork AI turn never sees (signed policy; slides-skill UNIWORK_AI_HIDDEN_TOOLS) */
 const UNIWORK_AI_HIDDEN = ['insert_web_image', 'replace_image', 'save_style_template']
 
-/** deck generation runs under UniWork AI on the web frame (UNI-2276: pages via the writer route) */
+/**
+ * deck generation runs under UniWork AI in the web frame (UNI-2276: pages via the writer route);
+ * the desktop refuses writer calls and keeps it hidden
+ */
 const UNIWORK_AI_DECK_TOOLS = ['generate_deck', 'regenerate_slide']
 
 const deckCall: AgentToolCall = {
@@ -202,6 +210,17 @@ describe('the web slides frame is UniWork-bound for the AI', () => {
     for (const n of UNIWORK_AI_HIDDEN) expect(names, n).toContain(n)
   })
 
+  it('a desktop UniWork AI turn keeps the deck tools hidden and the "unavailable" sentence', async () => {
+    installSlidesApi(undefined)
+    render({ uniworkBound: true, settings: uniworkSettings })
+    expect(access().uniworkAi?.()).toBe(true)
+    const skill = createSlidesSkill(access())
+    const names = skill.tools.map((t) => t.name)
+    for (const n of [...UNIWORK_AI_HIDDEN, ...UNIWORK_AI_DECK_TOOLS])
+      expect(names, n).not.toContain(n)
+    expect(skill.systemPrompt).toContain('generate_deck is unavailable')
+  })
+
   it('a bound-web deck writes no .styleskill.json sidecar even on a forced generate_deck', async () => {
     installSlidesApi({ platform: 'web' })
     render({ uniworkBound: WEB_EDITABLE.bound })
@@ -234,5 +253,47 @@ describe('the web save path is untouched', () => {
     expect(await api.uniworkState()).toEqual(WEB_EDITABLE)
     // …while the AI filter reads the same frame as bound
     expect(access().uniworkBound?.()).toBe(true)
+  })
+})
+
+// R3 (UNI-2276): the panel's page generator hands generate_deck the writer refusal's code, so a
+// used-up run ends the deck's page loop instead of being retried
+describe('the panel page generator under UniWork AI', () => {
+  it('turns a run_limit_reached writer refusal into code run_limit_reached, with no repair round', async () => {
+    const handlers = new Set<(chunk: Record<string, unknown>) => void>()
+    const aiStream = vi.fn(async (req: { requestId: string }) => {
+      for (const h of [...handlers])
+        h({
+          requestId: req.requestId,
+          type: 'error',
+          error: 'the run is used up',
+          uniworkCode: 'run_limit_reached',
+        })
+    })
+    installSlidesApi(
+      { platform: 'web' },
+      {
+        aiStream,
+        onAiStream: (h: (chunk: Record<string, unknown>) => void) => {
+          handlers.add(h)
+          return () => handlers.delete(h)
+        },
+      },
+    )
+    render({ uniworkBound: WEB_EDITABLE.bound, settings: uniworkSettings })
+    const r = await access().generatePageLocal!({
+      pageIndex: 3,
+      totalPages: 5,
+      coreHook: 'Hook',
+      style: 'Style',
+      title: 'Revenue',
+      brief: 'KPIs',
+      layout: '',
+      images: [],
+      canvasW: 1280,
+      canvasH: 720,
+    })
+    expect(r).toMatchObject({ ok: false, code: 'run_limit_reached', error: 'the run is used up' })
+    expect(aiStream).toHaveBeenCalledTimes(1)
   })
 })

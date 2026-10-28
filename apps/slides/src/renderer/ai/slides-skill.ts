@@ -18,6 +18,7 @@ import {
   type LayoutSkeleton,
 } from './layout-skeleton'
 import { t } from '../i18n/locale'
+import { writerRefusalIsFinal } from './llm-request'
 import systemPrompt from './prompts/system.md?raw'
 import { placeholderInstruction } from './redact'
 import { textForModel, redactLabelsOf } from './redact-view'
@@ -146,6 +147,12 @@ export interface DeckAccess {
   uniworkBound?(): boolean
   /** live predicate: the active AI provider is UniWork AI (absent = BYOK); read before every model request */
   uniworkAi?(): boolean
+  /**
+   * the host reaches the UniWork AI writer route (the web frame), so a UniWork AI turn can write
+   * pages: generate_deck and regenerate_slide are offered. Absent/false (the desktop, which
+   * refuses writer calls) keeps them hidden under UniWork AI.
+   */
+  uniworkWriterRoute?(): boolean
   /**
    * image URLs this run's image_search / generate_image returned, reset at every run. Recording only:
    * UniWork AI turns are not offered insert_web_image / replace_image at all, and BYOK keeps today's
@@ -1102,7 +1109,7 @@ function hiddenMediaTools(access: DeckAccess): Set<string> {
 /** every tool withheld this request: media tools, plus (provider = UniWork AI only; BYOK keeps them) the UniWork set */
 function hiddenTools(access: DeckAccess): Set<string> {
   const hidden = hiddenMediaTools(access)
-  if (access.uniworkAi?.()) for (const n of UNIWORK_AI_HIDDEN_TOOLS) hidden.add(n)
+  if (access.uniworkAi?.()) for (const n of uniworkHiddenTools(access)) hidden.add(n)
   return hidden
 }
 
@@ -1110,10 +1117,26 @@ function hiddenTools(access: DeckAccess): Set<string> {
 const UNIWORK_AI_HIDDEN_TOOLS: readonly string[] = [
   'insert_web_image',
   'replace_image',
+  'regenerate_slide',
   'save_style_template',
+  'generate_deck',
 ]
 
-const UNIWORK_AI_TOOLS_OFF_NOTE = `\n\nNote: ${UNIWORK_AI_HIDDEN_TOOLS.join(', ')} are not available here. Do not call or promise those tools.`
+/** offered back where the host reaches the writer route (the web frame: pages via slides.page) */
+const WRITER_ROUTE_TOOLS: ReadonlySet<string> = new Set(['regenerate_slide', 'generate_deck'])
+
+function uniworkHiddenTools(access: DeckAccess): readonly string[] {
+  return access.uniworkWriterRoute?.()
+    ? UNIWORK_AI_HIDDEN_TOOLS.filter((n) => !WRITER_ROUTE_TOOLS.has(n))
+    : UNIWORK_AI_HIDDEN_TOOLS
+}
+
+function uniworkToolsOffNote(access: DeckAccess): string {
+  const noDeck = access.uniworkWriterRoute?.()
+    ? ''
+    : ' generate_deck is unavailable: do not create a new deck; edit the open one with apply_ops and execute_slide_script.'
+  return `\n\nNote: ${uniworkHiddenTools(access).join(', ')} are not available here.${noDeck} Do not call or promise those tools.`
+}
 
 function mediaToolsOffNote(hidden: Set<string>, uniworkAi: boolean): string {
   if (hidden.size === 0) return ''
@@ -1168,7 +1191,7 @@ export function createSlidesSkill(access: DeckAccess): AgentSkill {
       return (
         systemPrompt +
         mediaToolsOffNote(hiddenMediaTools(access), access.uniworkAi?.() === true) +
-        (access.uniworkAi?.() ? UNIWORK_AI_TOOLS_OFF_NOTE : '') +
+        (access.uniworkAi?.() ? uniworkToolsOffNote(access) : '') +
         (access.readOnly?.() ? VIEW_ONLY_NOTE : '') +
         redact
       )
@@ -1954,11 +1977,7 @@ async function executeTool(
       const insertMode: 'replace' | 'append' =
         call.input.insert_mode === 'append' ? 'append' : 'replace'
       const PLAN_BATCH = 12 // Per-batch planning cap (kept slightly conservative against truncation)
-      // Per-page generation concurrency (opus large output + proxy concurrent streams time out easily; lowered to 2, stability first).
-      // UniWork AI: one page at a time. A run has a fixed number of model calls, and once a page is
-      // refused (run_limit_reached) no later page may have started, so the made pages are a prefix
-      // of the plan and the rest can be appended in order on the next question.
-      const GEN_BATCH = access.uniworkAi?.() ? 1 : 2
+      const GEN_BATCH = 2 // Per-page generation concurrency (opus large output + proxy concurrent streams time out easily; lowered to 2, stability first)
       const BACKOFF_MS = access.retryBackoffMs ?? 2000 // Retry backoff base (rate limits/overload are mostly transient; immediate retries would hit them again)
 
       let coreHook = String(call.input.core_hook ?? '').trim()
@@ -2270,7 +2289,8 @@ async function executeTool(
       const deckImageFails: { page: number; url: string }[] = [] // Image download/conversion failures (page numbers are deck-global 1-based)
       const pageErrors: (string | undefined)[] = new Array(total).fill(undefined) // Last failure reason per page
       let cloudFallbackReason: string | null = null // First cloud failure that switched the run to the local pipeline
-      let runLimited = false // UniWork AI refused a page: this run's model calls are used up, so no page is generated or retried after it
+      let runLimited = false // UniWork AI refused a page: this run's model calls are used up, so no page is launched or retried after it
+      const refusedPages = new Set<number>() // Pages (1-based) a final writer refusal ended: the same request cannot get past it, so no resend
       let landedPages = 0
       let firstDone = false
       let baseOffset = 0 // Number of existing pages before generated page 0 in the deck (>0 in append mode); used to re-insert retries at their original position
@@ -2302,7 +2322,7 @@ async function executeTool(
       ): Promise<{ marker: string | null; err: string }> => {
         let lastErr = ''
         for (let attempt = 0; attempt < 2; attempt++) {
-          if (cancelled()) return { marker: null, err: lastErr }
+          if (cancelled() || runLimited) return { marker: null, err: lastErr }
           if (attempt > 0 && BACKOFF_MS > 0) await new Promise((r) => setTimeout(r, BACKOFF_MS))
           const res = await gen(pageArgs)
           if (res.ok && res.marker) {
@@ -2311,8 +2331,9 @@ async function executeTool(
             return { marker: res.marker, err: '' }
           }
           lastErr = res.error ?? t('aiErrUnknown')
-          if (res.code === 'run_limit_reached') {
-            runLimited = true
+          if (writerRefusalIsFinal(res.code)) {
+            if (res.code === 'run_limit_reached') runLimited = true
+            refusedPages.add(pageIndex)
             break
           }
         }
@@ -2469,8 +2490,9 @@ async function executeTool(
       //   pipeline (LLM calls are the user's own quota, and a JSON spec retry is cheap) — that
       //   includes pages that failed during a mid-run cloud→local switch.
       if (!cancelled()) {
+        const regen = cloudActive || runLimited ? [] : genFailed
         const retryIdxs = [
-          ...new Set([...(cloudActive || runLimited ? [] : genFailed), ...landFailed]),
+          ...new Set([...regen.filter((i) => !refusedPages.has(i + 1)), ...landFailed]),
         ].sort((a, b) => a - b)
         for (const idx of retryIdxs) {
           if (cancelled()) break
@@ -2565,7 +2587,7 @@ async function executeTool(
         )
         .join(', ')
       const runLimitMsg = runLimited
-        ? ` ⚠️ This run's model calls are used up (run_limit_reached), so generation stopped and nothing was retried. Not made: ${pagesNotMade}. Do not call generate_deck or regenerate_slide again in this answer: they would be refused. Tell the user which pages are missing and that asking again continues them; then call generate_deck with briefs for just those pages and insert_mode:"append".`
+        ? ` ⚠️ This run's model calls are used up (run_limit_reached), so generation stopped and nothing was retried. Not made: ${pagesNotMade} (missing from the deck; later pages may have shifted forward). They can be made in the next question, not in this answer (generate_deck and regenerate_slide would be refused now): tell the user which pages are missing and that asking again continues them, with generate_deck, briefs for just those pages and insert_mode:"append".`
         : ''
 
       if (landedPages === 0) {
