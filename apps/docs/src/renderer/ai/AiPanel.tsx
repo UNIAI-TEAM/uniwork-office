@@ -952,7 +952,7 @@ export function AiPanel({
     onProgress: (html: string) => void,
     signal?: AbortSignal,
   ): Promise<DocWriteResult> => {
-    const { system, user } = buildDocWriterRequest(spec, aiLangDirective())
+    const { system, user, writer } = buildDocWriterRequest(spec, aiLangDirective())
     const epoch = writerEpochRef.current
     let closed = false
     let chipTimer: ReturnType<typeof setTimeout> | null = null
@@ -974,6 +974,7 @@ export function AiPanel({
         user,
         signal,
         maxChars: DOC_MAX_CHARS,
+        writer,
         extract: (raw) => ({ text: extractFragment(raw) }),
         onProgress: (html) => {
           if (closed) return

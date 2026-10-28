@@ -86,6 +86,32 @@ describe('buildBriefWriterRequest', () => {
       '## Current page',
     )
   })
+
+  it('names the UniWork AI writer with the input of the server table', () => {
+    const page = '<html><head><style>:root{--brief-bg:#fff}</style></head>'
+    const r = buildBriefWriterRequest({ mode: 'restyle', notes: 'greener', page }, history, '')
+    expect(r.writer).toEqual({
+      kind: 'html.brief',
+      input: {
+        mode: 'restyle',
+        transcript: transcriptOf(history),
+        notes: 'greener',
+        page_head: page,
+      },
+    })
+    expect(r.system).toContain('brief writer')
+    // the page head goes only with restyle / extract, and notes are cut at their cap
+    const fresh = buildBriefWriterRequest(
+      { mode: 'new', notes: 'n'.repeat(2000), page },
+      history,
+      '',
+    )
+    expect(fresh.writer.input).toEqual({
+      mode: 'new',
+      transcript: transcriptOf(history),
+      notes: 'n'.repeat(1200),
+    })
+  })
 })
 
 describe('extractBriefJson / parseBriefJson', () => {
@@ -119,6 +145,19 @@ describe('streamBrief', () => {
       raw: { core_hook: 'Costs fell 20%', style: { tone: 'executive' } },
     })
     expect(requests[0]?.tools).toEqual([])
+    expect(requests[0]).not.toHaveProperty('writer')
+  })
+
+  it('sends the writer with the BYOK prompt', async () => {
+    const { transport, requests } = scripted([
+      (cb) => {
+        cb.onDelta('{"core_hook": "x"}')
+        cb.onDone()
+      },
+    ])
+    const writer = buildBriefWriterRequest({ mode: 'new' }, history, '').writer
+    await streamBrief({ transport, system: 's', user: 'u', writer })
+    expect(requests[0]).toMatchObject({ system: 's', purpose: 'one-shot', writer })
   })
 
   it('a dropped connection mid-object or an empty reply fails with the reason', async () => {

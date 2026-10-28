@@ -703,7 +703,7 @@ export function AiPanel({
     spec: PageWriteSpec,
     signal?: AbortSignal,
   ): Promise<PageWriteResult> => {
-    const { system, user } = buildPageWriterRequest(spec, aiLangDirective(langRef.current))
+    const { system, user, writer } = buildPageWriterRequest(spec, aiLangDirective(langRef.current))
     let draft = ''
     let timer: number | null = null
     let closed = false
@@ -724,6 +724,7 @@ export function AiPanel({
         system,
         user,
         signal,
+        writer,
         onProgress: (html) => {
           if (closed) return
           draft = html
@@ -767,7 +768,7 @@ export function AiPanel({
     spec: BriefPlanSpec,
     signal?: AbortSignal,
   ): Promise<BriefPlanResult> => {
-    const { system, user } = buildBriefWriterRequest(
+    const { system, user, writer } = buildBriefWriterRequest(
       spec,
       loopRef.current?.messages ?? [],
       aiLangDirective(langRef.current),
@@ -777,7 +778,8 @@ export function AiPanel({
         tl.running ? { ...tl, summary: tGlobal('aiDraftingBrief') } : tl,
       ),
     }))
-    const attempt = () => streamBrief({ transport: transportRef.current!, system, user, signal })
+    const attempt = () =>
+      streamBrief({ transport: transportRef.current!, system, user, signal, writer })
     let result = await attempt()
     if (!result.ok && !signal?.aborted) result = await attempt()
     return result

@@ -863,6 +863,10 @@ export function createWebAi(opts: {
         if (!clientRef) return Promise.reject(new AiWebError({ code: 'unknown', status: 0 }))
         return clientRef.uniworkChat(request)
       },
+      uniworkWrite: (body, headers, signal) => {
+        if (!clientRef) return Promise.reject(new AiWebError({ code: 'unknown', status: 0 }))
+        return clientRef.uniworkWrite(body, headers, signal)
+      },
     },
     protocolOf,
     // a failed chat turn is announced once, by the panel's inline error (the typed text below);
@@ -885,6 +889,8 @@ export function createWebAi(opts: {
       describeFailure: (failure: UniworkFailure) =>
         aiUniworkText(webLanguage(), uniworkFailureKey(failure)),
       onOff: turnUniworkOff,
+      // the frame's UI language is the module's (its LocaleProvider follows it)
+      lang: webLanguage,
       ...(opts.uniworkStream ? { stream: opts.uniworkStream } : {}),
     },
     handoff,

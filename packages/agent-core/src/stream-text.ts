@@ -1,4 +1,4 @@
-import type { AgentStreamHandle, AgentTransport } from './types'
+import type { AgentStreamHandle, AgentTransport, WriterCall } from './types'
 
 /**
  * One tool-less streaming request whose reply body IS the artifact (a page, a
@@ -22,6 +22,19 @@ export interface StreamTextOptions {
   extract(raw: string): { text: string; complete?: boolean }
   /** cumulative extracted text; throttle on the caller's side */
   onProgress?(text: string): void
+  /** the same request as a UniWork AI writer (kind + input); BYOK keeps reading system/user */
+  writer?: WriterCall | undefined
+}
+
+/** a writer's input without its empty fields: the server reads an absent optional field as unset */
+export function writerInput(
+  fields: Record<string, string | number | string[] | undefined>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(fields).filter(([, v]) =>
+      typeof v === 'string' ? v.trim() !== '' : Array.isArray(v) ? v.length > 0 : v !== undefined,
+    ),
+  )
 }
 
 export type StreamTextOutcome =
@@ -86,6 +99,7 @@ export function streamText(opts: StreamTextOptions): Promise<StreamTextOutcome> 
         messages: [{ role: 'user', text: opts.user }],
         tools: [],
         purpose: 'one-shot',
+        ...(opts.writer ? { writer: opts.writer } : {}),
       },
       {
         onDelta: (delta) => {

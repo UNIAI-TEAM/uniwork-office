@@ -32,8 +32,11 @@ const MAX_ELEMENTS = 48
 const MAX_IMAGES = 8
 const MAX_TEXT_LEN = 4000
 
-/** Preset geometries the spec may use; unknown kinds fall back to rect instead of emitting invalid prst XML. */
-const SHAPE_KINDS = new Set([
+/**
+ * Preset geometries the spec may use; unknown kinds fall back to rect instead of emitting invalid prst XML.
+ * Exported for the UniWork AI writer contract test (the server's slides.page prompt names the same set).
+ */
+export const SHAPE_KINDS: ReadonlySet<string> = new Set([
   'rect',
   'roundRect',
   'ellipse',

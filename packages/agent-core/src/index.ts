@@ -15,6 +15,8 @@ export type {
   MindMapTreeNode,
   ToolDisplay,
   ToolExecution,
+  WriterCall,
+  WriterKind,
 } from './types'
 export { AI_RUN_IDLE_GRACE_MS, createAiRunTracker } from './ai-run-tracker'
 export type { AiRunPayload, AiRunState, AiRunTracker, AiRunTrackerOptions } from './ai-run-tracker'
@@ -88,9 +90,14 @@ export {
   desktopAiRun,
   IPC_STREAM_SILENCE_TIMEOUT_MS,
 } from './electron-transport'
-export { streamText } from './stream-text'
+export { streamText, writerInput } from './stream-text'
 export type { StreamTextOptions, StreamTextOutcome } from './stream-text'
-export type { IpcStreamChunk, IpcStreamStart, IpcTransportOptions } from './electron-transport'
+export type {
+  IpcStreamChunk,
+  IpcStreamStart,
+  IpcTransport,
+  IpcTransportOptions,
+} from './electron-transport'
 export {
   getEntryResultChipView,
   isTurnEnded,

@@ -69,6 +69,33 @@ describe('buildDocWriterRequest', () => {
     expect(user).toContain('founded 1999')
     expect(user).toContain('write it')
   })
+
+  it('names the UniWork AI writer with the input of the server table, beside the BYOK prompt', () => {
+    const r = buildDocWriterRequest(
+      { plan: 'intro, body', title: 'Guide', context: 'founded 1999', instruction: 'write it' },
+      '',
+    )
+    expect(r.writer).toEqual({
+      kind: 'docs.write_document',
+      input: {
+        plan: 'intro, body',
+        title: 'Guide',
+        context: 'founded 1999',
+        instruction: 'write it',
+      },
+    })
+    expect(r.system).toContain('restricted HTML fragment only')
+    expect(r.user).toContain('intro, body')
+    // empty optional fields stay out; every text is cut at its cap
+    const bare = buildDocWriterRequest(
+      { plan: 'p'.repeat(7000), context: '  ', instruction: '', title: 't'.repeat(400) },
+      '',
+    )
+    expect(bare.writer).toEqual({
+      kind: 'docs.write_document',
+      input: { plan: 'p'.repeat(6000), title: 't'.repeat(300) },
+    })
+  })
 })
 
 describe('DraftLanding', () => {

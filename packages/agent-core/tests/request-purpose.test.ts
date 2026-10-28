@@ -107,4 +107,46 @@ describe('AgentStreamRequest.purpose', () => {
     expect(starts[0]!.purpose).toBe('summary')
     expect(starts[1]).not.toHaveProperty('purpose')
   })
+
+  it('streamText with a writer hands it through the IPC transport, beside system and user', async () => {
+    const starts: Array<IpcStreamStart<unknown>> = []
+    const transport = createIpcTransport<unknown>({
+      onStream: () => () => undefined,
+      start: (req) => {
+        starts.push(req)
+        // the main process answers nothing here: the test only reads what went out
+        throw new Error('stop')
+      },
+      cancel: () => undefined,
+      getSettings: () => ({}),
+      unknownErrorText: () => 'unknown',
+      aiRun: createAiRunTracker(),
+    })
+    const writer = { kind: 'html.page' as const, input: { mode: 'content', plan: 'p' } }
+    await streamText({
+      transport,
+      system: 's',
+      user: 'write a page',
+      maxChars: 1000,
+      extract: (raw) => ({ text: raw }),
+      writer,
+    })
+    expect(starts).toHaveLength(1)
+    expect(starts[0]).toMatchObject({
+      purpose: 'one-shot',
+      system: 's',
+      messages: [{ role: 'user', text: 'write a page' }],
+      writer,
+      sessionId: transport.sessionId,
+    })
+    // without a writer nothing extra goes out
+    await streamText({
+      transport,
+      system: 's',
+      user: 'u',
+      maxChars: 1000,
+      extract: (raw) => ({ text: raw }),
+    })
+    expect(starts[1]).not.toHaveProperty('writer')
+  })
 })

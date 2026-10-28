@@ -1,3 +1,4 @@
+import { writerInput, type WriterCall } from '@genoffice/agent-core'
 import type { Editor } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import type { Transaction } from '@tiptap/pm/state'
@@ -42,7 +43,7 @@ export function buildDocWriterRequest(
   spec: DocWriteSpec,
   markdownRules: string,
   langDirective: string,
-): { system: string; user: string } {
+): { system: string; user: string; writer: WriterCall } {
   const system = [
     'You are the document writer of UniWork Markdown, a markdown editor. You receive a plan (title, sections, key points, tone, length) and reference material, and you write the complete content.',
     '',
@@ -62,6 +63,15 @@ export function buildDocWriterRequest(
   return {
     system: system + langDirective,
     user: `## Plan\n${spec.title ? `Title: ${spec.title}\n` : ''}${spec.plan.slice(0, 6000)}${context}\n\nWrite the content now.`,
+    // UniWork AI: the same inputs, cut at the server's field caps
+    writer: {
+      kind: 'markdown.write_document',
+      input: writerInput({
+        plan: spec.plan.slice(0, 6000),
+        title: spec.title?.slice(0, 300),
+        context: spec.context?.slice(0, CONTEXT_CAP),
+      }),
+    },
   }
 }
 
