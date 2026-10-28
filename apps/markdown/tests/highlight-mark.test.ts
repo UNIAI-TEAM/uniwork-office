@@ -72,7 +72,12 @@ describe('==highlight== mark', () => {
   })
 
   it('keeps plain equations like a == b unhighlighted across saves', () => {
-    for (const md of ['if a == b then c', 'if a == **b** == c', 'x == *y* and z == w']) {
+    for (const md of [
+      'if a == b then c',
+      'a == b == c',
+      'if a == **b** == c',
+      'x == *y* and z == w',
+    ]) {
       const editor = open(md)
       expect(hlCount(editor)).toBe(0)
       expect(editor.getMarkdown()).toBe(md)

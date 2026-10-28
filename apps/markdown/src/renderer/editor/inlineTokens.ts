@@ -156,7 +156,7 @@ function dropNewlineAfterHardBreak(nodes: JSONContent[]): JSONContent[] {
  * The pass runs after the entity pass: the parent's text is already decoded,
  * and re-running it on the inner tokens would decode twice.
  */
-const HIGHLIGHT_SAME_RE = /==([^=\n]+)==/g
+const HIGHLIGHT_SAME_RE = /==(?=\S)([^=\n]*?\S)==/g
 /**
  * the last `==` of a text token, the run's opener; what precedes it stays
  * outside. Like `**`, it must be left-flanking: followed by non-space or

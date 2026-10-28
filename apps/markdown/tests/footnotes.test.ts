@@ -329,21 +329,25 @@ describe('footnote editing', () => {
     expect(nextFootnoteLabel(editor.state.doc)).toBe('1')
   })
 
-  it('a click in a definition body is an edit; only the label jumps back to the reference', () => {
+  it('a click in a definition body is an edit; only the label jumps back, and the reference → definition flash survives a selection transaction', () => {
     const editor = createEditor()
     editor.commands.setContent('A[^1].\n\n[^1]: First', { contentType: 'markdown' })
+    let refPos = -1
     let defPos = -1
     editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'footnoteReference') refPos = pos
       if (node.type.name === 'footnoteDefinition') defPos = pos
     })
+    expect(refPos).toBeGreaterThan(-1)
     expect(defPos).toBeGreaterThan(-1)
+    const ref = editor.state.doc.nodeAt(refPos)!
     const def = editor.state.doc.nodeAt(defPos)!
-    const click = (target: Element) => {
+    const clickOn = (pos: number, node: typeof def, target: Element) => {
       const event = new MouseEvent('click')
       Object.defineProperty(event, 'target', { value: target })
       return Boolean(
         editor.view.someProp('handleClickOn', (f) =>
-          f(editor.view, defPos + 2, def, defPos, event, true),
+          f(editor.view, pos + 1, node, pos, event, true),
         ),
       )
     }
@@ -351,10 +355,27 @@ describe('footnote editing', () => {
     Element.prototype.scrollIntoView = () => {}
     try {
       const body = document.createElement('p')
-      expect(click(body)).toBe(false)
+      expect(clickOn(defPos, def, body)).toBe(false)
+
+      // Reference → definition jump: even when the click is followed by a selection/replace
+      // transaction that causes ProseMirror to re-render the definition DOM, the flash stays.
+      const refEl = editor.view.nodeDOM(refPos) as Element
+      expect(clickOn(refPos, ref, refEl)).toBe(true)
+      editor.commands.setTextSelection(defPos + 2)
+      const defDom = editor.view.nodeDOM(defPos) as HTMLElement | null
+      expect(defDom?.classList.contains('md-footnote-flash')).toBe(true)
+
+      // Label → reference jump moves the flash to the reference.
       const label = document.createElement('span')
       label.className = 'md-footnote-def-label'
-      expect(click(label)).toBe(true)
+      expect(clickOn(defPos, def, label)).toBe(true)
+      const refDom = editor.view.nodeDOM(refPos) as HTMLElement | null
+      expect(refDom?.classList.contains('md-footnote-flash')).toBe(true)
+      expect(
+        (editor.view.nodeDOM(defPos) as HTMLElement | null)?.classList.contains(
+          'md-footnote-flash',
+        ),
+      ).toBe(false)
     } finally {
       Element.prototype.scrollIntoView = original
     }

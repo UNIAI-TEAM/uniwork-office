@@ -1,8 +1,8 @@
 import { Extension, Node, mergeAttributes, nodeInputRule } from '@tiptap/core'
 import type { Editor, MarkdownLexerConfiguration, MarkdownToken } from '@tiptap/core'
-import { Plugin, TextSelection } from '@tiptap/pm/state'
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import type { Node as PmNode } from '@tiptap/pm/model'
-import type { EditorView } from '@tiptap/pm/view'
+import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import { renderItem } from './markdownStyleRenderers'
 
 /**
@@ -244,13 +244,24 @@ const firstOfType = (doc: PmNode, type: string, label: string): number | null =>
   return found
 }
 
-/** brief highlight on the jumped-to node; a class on the node's own DOM, no document state */
+const flashKey = new PluginKey<DecorationSet>('footnoteFlash')
+let flashTimer: number | null = null
+
+/** brief highlight on the jumped-to node; a node decoration survives the click's selection transaction */
 function flash(view: EditorView, pos: number): void {
+  const node = view.state.doc.nodeAt(pos)
+  if (!node) return
+  if (flashTimer !== null) window.clearTimeout(flashTimer)
+  const deco = Decoration.node(pos, pos + node.nodeSize, { class: 'md-footnote-flash' })
+  view.dispatch(view.state.tr.setMeta(flashKey, DecorationSet.create(view.state.doc, [deco])))
   const el = view.nodeDOM(pos) as HTMLElement | null
-  if (!el) return
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  el.classList.add('md-footnote-flash')
-  window.setTimeout(() => el.classList.remove('md-footnote-flash'), 1200)
+  el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  flashTimer = window.setTimeout(() => {
+    flashTimer = null
+    if (!view.isDestroyed) {
+      view.dispatch(view.state.tr.setMeta(flashKey, DecorationSet.empty))
+    }
+  }, 1200)
 }
 
 /** click a reference to jump to its definition, and a definition back to its first reference */
@@ -262,8 +273,20 @@ export const FootnoteNav = Extension.create({
 
   addProseMirrorPlugins() {
     return [
-      new Plugin({
+      new Plugin<DecorationSet>({
+        key: flashKey,
+        state: {
+          init: () => DecorationSet.empty,
+          apply(tr, set) {
+            const next = tr.getMeta(flashKey) as DecorationSet | undefined
+            if (next) return next
+            return tr.docChanged ? set.map(tr.mapping, tr.doc) : set
+          },
+        },
         props: {
+          decorations(state) {
+            return flashKey.getState(state)
+          },
           handleClickOn: (view, _pos, node, _nodePos, event) => {
             if (node.type.name !== 'footnoteReference' && node.type.name !== 'footnoteDefinition') {
               return false
