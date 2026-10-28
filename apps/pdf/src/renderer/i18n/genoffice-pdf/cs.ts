@@ -4,7 +4,7 @@ export const cs = {
   searchMatchCase: 'Rozlišovat velikost písmen',
   searchWholeWord: 'Celá slova',
   commentsPanel: 'Komentáře',
-  commentsFilter: 'Filtrovat komentáře podle textu nebo autora',
+  commentsFilter: 'Filtrovat komentáře',
   commentsEmpty: 'V tomto dokumentu zatím nejsou žádné komentáře',
   commentsLoading: 'Načítání komentářů',
   editLink: 'Odkaz',

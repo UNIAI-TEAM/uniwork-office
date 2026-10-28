@@ -132,7 +132,7 @@ export function BatesDialog({
     <div className="pdf-modal-mask" onClick={onClose}>
       <div
         ref={dialogRef}
-        className="pdf-modal"
+        className="pdf-modal pdf-bates-dialog"
         role="dialog"
         aria-modal="true"
         aria-label={t('batesTitle')}
@@ -141,7 +141,7 @@ export function BatesDialog({
         <div className="pdf-modal-title">{t('batesTitle')}</div>
         <div className="pdf-modal-hint">{t('batesHint')}</div>
 
-        <div className="pdf-field">
+        <div className="pdf-field pdf-bates-grid">
           <label className="pdf-perm-row">
             <span>{t('batesPrefix')}</span>
             <input
@@ -207,7 +207,7 @@ export function BatesDialog({
           </div>
         </div>
 
-        <div className="pdf-field">
+        <div className="pdf-field pdf-bates-grid">
           <label className="pdf-perm-row">
             <span>{t('batesFirstPage')}</span>
             {numberInput(firstPage, setFirstPage, { min: 1 })}

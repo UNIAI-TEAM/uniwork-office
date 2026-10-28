@@ -4,7 +4,7 @@ export const id = {
   searchMatchCase: 'Cocokkan huruf besar/kecil',
   searchWholeWord: 'Seluruh kata',
   commentsPanel: 'Komentar',
-  commentsFilter: 'Saring komentar berdasarkan teks atau penulis',
+  commentsFilter: 'Saring komentar',
   commentsEmpty: 'Belum ada komentar dalam dokumen ini',
   commentsLoading: 'Memuat komentar',
   editLink: 'Tautan',

@@ -4,7 +4,7 @@ export const fr = {
   searchMatchCase: 'Respecter la casse',
   searchWholeWord: 'Mot entier',
   commentsPanel: 'Commentaires',
-  commentsFilter: 'Filtrer les commentaires par texte ou auteur',
+  commentsFilter: 'Filtrer les commentaires',
   commentsEmpty: 'Pas encore de commentaires dans ce document',
   commentsLoading: 'Chargement des commentaires',
   editLink: 'Lien',

@@ -4,7 +4,7 @@ export const ru = {
   searchMatchCase: 'Учитывать регистр',
   searchWholeWord: 'Слово целиком',
   commentsPanel: 'Commenti',
-  commentsFilter: 'Filtra i commenti per testo o autore',
+  commentsFilter: 'Filtra i commenti',
   commentsEmpty: 'Ancora nessun commento in questo documento',
   commentsLoading: 'Caricamento dei commenti',
   editLink: 'Link',

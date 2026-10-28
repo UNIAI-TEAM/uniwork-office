@@ -105,6 +105,7 @@ export function CommentsPanel({
         className="pdf-comments-filter"
         type="search"
         placeholder={t('commentsFilter')}
+        aria-label={t('commentsFilter')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />

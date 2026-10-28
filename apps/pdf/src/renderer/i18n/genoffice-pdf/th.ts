@@ -4,7 +4,7 @@ export const th = {
   searchMatchCase: 'จับคู่ตามตัวพิมพ์',
   searchWholeWord: 'จับคู่ทั้งคำ',
   commentsPanel: 'ความคิดเห็น',
-  commentsFilter: 'กรองความคิดเห็นตามข้อความหรือผู้เขียน',
+  commentsFilter: 'กรองความคิดเห็น',
   commentsEmpty: 'ยังไม่มีความคิดเห็นในเอกสารนี้',
   commentsLoading: 'กำลังโหลดความคิดเห็น',
   editLink: 'ลิงก์',

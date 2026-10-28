@@ -4,7 +4,7 @@ export const ms = {
   searchMatchCase: 'Padankan huruf besar/kecil',
   searchWholeWord: 'Seluruh perkataan',
   commentsPanel: 'Komen',
-  commentsFilter: 'Tapis komen mengikut teks atau pengarang',
+  commentsFilter: 'Tapis komen',
   commentsEmpty: 'Belum ada komen dalam dokumen ini',
   commentsLoading: 'Memuatkan komen',
   editLink: 'Pautan',

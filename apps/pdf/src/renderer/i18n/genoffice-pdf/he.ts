@@ -4,7 +4,7 @@ export const he = {
   searchMatchCase: 'התאמת רישיות',
   searchWholeWord: 'מילים שלמות',
   commentsPanel: 'הערות',
-  commentsFilter: 'סינון הערות לפי טקסט או מחבר',
+  commentsFilter: 'סינון הערות',
   commentsEmpty: 'אין עדיין הערות במסמך זה',
   commentsLoading: 'טוען הערות',
   editLink: 'קישור',

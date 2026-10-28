@@ -4,7 +4,7 @@ export const ar = {
   searchMatchCase: 'مطابقة حالة الأحرف',
   searchWholeWord: 'كلمة كاملة',
   commentsPanel: 'تعليقات',
-  commentsFilter: 'تصفية التعليقات حسب النص أو المؤلف',
+  commentsFilter: 'تصفية التعليقات',
   commentsEmpty: 'لا توجد تعليقات في هذا المستند بعد',
   commentsLoading: 'جارٍ تحميل التعليقات',
   editLink: 'رابط',

@@ -1314,7 +1314,24 @@ button {
   overflow-y: auto;
 }
 .pdf-comments-filter {
+  box-sizing: border-box;
+  width: 100%;
+  height: 28px;
   margin-bottom: 4px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+}
+.pdf-comments-filter:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.pdf-comments-filter::placeholder {
+  color: var(--text-muted);
 }
 .pdf-comment-row {
   display: flex;
@@ -1688,19 +1705,45 @@ button {
   flex: 1;
 }
 
-/* Bates preview: a page outline with the number strips where the position puts them */
+/* Bates dialog: the card never outgrows the viewport; the numeric fields sit in a
+ * grid that wraps to one column when the pane is narrow */
+.pdf-modal.pdf-bates-dialog {
+  box-sizing: border-box;
+  width: min(520px, calc(100% - 32px));
+  max-height: calc(100% - 112px);
+  overflow-y: auto;
+}
+
+.pdf-bates-dialog .pdf-bates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 6px 16px;
+}
+
+.pdf-bates-dialog .pdf-bates-grid > * {
+  min-width: 0;
+}
+
+.pdf-bates-dialog .pdf-bates-grid > .pdf-perm-row > span:first-child {
+  flex: 0 0 96px;
+  min-width: 0;
+}
+
+/* Bates preview: a page outline with the number strips where the position puts them.
+ * The preview is a sheet of paper so every ink colour choice stays readable in dark. */
 .pdf-bates-preview {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
+  background: var(--pdf-paper);
 }
 
 .pdf-bates-preview-page {
   height: 64px;
-  border: 1px dashed var(--border-strong);
+  border: 1px dashed var(--pdf-thumb-border-hover);
   border-radius: 4px;
 }
 
@@ -5455,6 +5498,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 
 /* Bookmark editing (pending outline tree) */
 .pdf-bookmark-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -5472,9 +5516,15 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   text-align: left;
   cursor: pointer;
 }
+/* Row actions overlay the end of the row so a long title keeps its full width */
 .pdf-bookmark-actions {
   display: none;
-  flex-shrink: 0;
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  align-items: center;
+  padding-inline: 4px;
+  background: var(--hover);
 }
 .pdf-bookmark-row:hover .pdf-bookmark-actions,
 .pdf-bookmark-row:focus-within .pdf-bookmark-actions {

@@ -4,7 +4,7 @@ export const nl = {
   searchMatchCase: 'Hoofdlettergevoelig',
   searchWholeWord: 'Alleen hele woorden',
   commentsPanel: 'Opmerkingen',
-  commentsFilter: 'Opmerkingen filteren op tekst of auteur',
+  commentsFilter: 'Opmerkingen filteren',
   commentsEmpty: 'Nog geen opmerkingen in dit document',
   commentsLoading: 'Opmerkingen laden',
   editLink: 'Koppeling',

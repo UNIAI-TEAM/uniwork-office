@@ -4,7 +4,7 @@ export const pl = {
   searchMatchCase: 'Rozróżniaj wielkość liter',
   searchWholeWord: 'Całe słowa',
   commentsPanel: 'Komentarze',
-  commentsFilter: 'Filtruj komentarze według tekstu lub autora',
+  commentsFilter: 'Filtruj komentarze',
   commentsEmpty: 'Brak komentarzy w tym dokumencie',
   commentsLoading: 'Wczytywanie komentarzy',
   editLink: 'Łącze',

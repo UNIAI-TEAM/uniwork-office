@@ -4,7 +4,7 @@ export const es = {
   searchMatchCase: 'Coincidir mayúsculas y minúsculas',
   searchWholeWord: 'Palabra completa',
   commentsPanel: 'Comentarios',
-  commentsFilter: 'Filtrar comentarios por texto o autor',
+  commentsFilter: 'Filtrar comentarios',
   commentsEmpty: 'Aún no hay comentarios en este documento',
   commentsLoading: 'Cargando comentarios',
   editLink: 'Enlace',

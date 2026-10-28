@@ -4,7 +4,7 @@ export const en = {
   searchMatchCase: 'Match case',
   searchWholeWord: 'Whole words',
   commentsPanel: 'Comments',
-  commentsFilter: 'Filter comments by text or author',
+  commentsFilter: 'Filter comments',
   commentsEmpty: 'No comments in this document yet',
   commentsLoading: 'Loading comments',
   editLink: 'Link',

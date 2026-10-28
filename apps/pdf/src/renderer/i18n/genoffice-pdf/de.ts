@@ -4,7 +4,7 @@ export const de = {
   searchMatchCase: 'Groß-/Kleinschreibung beachten',
   searchWholeWord: 'Ganzes Wort',
   commentsPanel: 'Kommentare',
-  commentsFilter: 'Kommentare nach Text oder Autor filtern',
+  commentsFilter: 'Kommentare filtern',
   commentsEmpty: 'Noch keine Kommentare in diesem Dokument',
   commentsLoading: 'Kommentare werden geladen',
   editLink: 'Link',
