@@ -48,6 +48,7 @@ Treat these as **expected conflict areas**. Prefer UniWork display strings and i
 - `apps/shell/src/renderer/src/assets/`
 - `packages/electron-utils/src/github-menu.ts`
 - `docs/go1/**` (ours; keep)
+- `packages/docx-engine/src/compare.ts` (`DEFAULT_COMPARE_AUTHOR`), `packages/cli/src/commands/docs.ts` (compare `--author` default help), `packages/cli/tests/docs-compare.test.ts` (redline default author `UniWork Office`)
 
 ## How to avoid overwriting UniWork branding
 

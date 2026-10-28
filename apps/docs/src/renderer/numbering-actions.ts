@@ -341,6 +341,13 @@ export function pruneUnreferencedNumbering(
   const used = new Set<string>()
   const walk = (node: PmJsonNode) => {
     if (node.type === 'docListItem' && node.attrs?.numId != null) used.add(String(node.attrs.numId))
+    const boxes = node.attrs?.textboxes as
+      Array<{ paras?: Array<{ listMarker?: { numId?: string } }> }> | undefined
+    for (const box of boxes ?? []) {
+      for (const p of box.paras ?? []) {
+        if (p.listMarker?.numId != null) used.add(String(p.listMarker.numId))
+      }
+    }
     node.content?.forEach(walk)
   }
   walk(doc)

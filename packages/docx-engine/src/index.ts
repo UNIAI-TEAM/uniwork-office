@@ -10,20 +10,70 @@ export { decodeEntities } from './parse-xml-text'
 export { UNDRAWABLE_FRAME_COLOR } from './parse-vml'
 export { sdtCheckboxGlyphs, sdtCheckboxIsChecked } from './checkbox-control'
 export {
+  buildContentControlXml,
+  isContentControlLock,
+  nextContentControlId,
+  CONTENT_CONTROL_LOCKS,
+  type ContentControlLock,
+  type ContentControlShell,
+  type ContentControlSpec,
+} from './content-control'
+export {
   parseDocx,
   reconcileGridColumns,
   styleRunFormat,
   type ParseExtras,
   type ParseOptions,
 } from './parse'
+export {
+  compareOperands,
+  conditionHolds,
+  controlEffect,
+  ifBranch,
+  mergeBlockTree,
+  mergeDataFromRows,
+  mergeFieldInstruction,
+  mergeFieldName,
+  mergeFieldSwitches,
+  mergeFieldText,
+  mergeOutputFileName,
+  mergeRecords,
+  placeholderText,
+  splitInstruction,
+  valueOf,
+  type ControlEffect,
+  type MergeCursorState,
+  type MergeData,
+  type MergeFieldSwitches,
+  type MergeRecord,
+} from './mail-merge'
 export { assertZipInflatesWithinLimits, assertZipWithinLimits, DOCX_ZIP_LIMITS } from './zip-load'
 export { LAZY_MEDIA_SCHEME, isLazyMediaPart, lazyMediaUrl, parseLazyMediaUrl } from './lazy-media'
 export { setAltChunkHtmlConverter, type AltChunkHtmlConverter } from './alt-chunk'
 export { tocLevelOf } from './parse-fields'
 export { mergeStyleBorders } from './parse-props'
 export {
+  APP_PROPERTIES_PATH,
+  APP_PROPERTY_KEYS,
+  CORE_PROPERTIES_PATH,
+  CORE_PROPERTY_KEYS,
+  applyPropertyChanges,
+  emptyDocumentProperties,
+  parseAppPropertiesXml,
+  parseCorePropertiesXml,
+  parseCustomPropertiesXml,
+  parsePropertyChanges,
+  patchAppPropertiesXml,
+  patchCorePropertiesXml,
+  patchCustomPropertiesXml,
+  readDocumentProperties,
+  type DocumentProperties,
+  type PropertyChanges,
+} from './doc-properties'
+export {
   saveDocx,
   findChartWorkbookPath,
+  missingHeadingLevels,
   readDocxPartBase64,
   type SaveBlock,
   type SaveOptions,
@@ -136,6 +186,7 @@ export {
   type WatermarkSpec,
 } from './watermark'
 export {
+  builtInHeadingStyleUpsert,
   mergeStyleXml,
   mergeDefaultFontsXml,
   type DefaultFonts,
@@ -185,3 +236,13 @@ export {
 } from './list-markers'
 
 export { previewFontSettings } from './font-settings'
+export {
+  compareBlocks,
+  compareDocuments,
+  DEFAULT_COMPARE_AUTHOR,
+  type CompareGranularity,
+  type CompareIgnore,
+  type CompareOptions,
+  type CompareResult,
+  type CompareSummary,
+} from './compare'

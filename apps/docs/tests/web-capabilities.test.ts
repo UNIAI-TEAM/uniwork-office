@@ -21,6 +21,7 @@ import { ribbonProps } from './helpers/ribbon-props'
 const WEB: DesktopCapabilities = {
   platform: 'web',
   zotero: false,
+  mailMerge: false,
   docPassword: false,
   tabs: false,
   autoSaveToDisk: false,
@@ -163,6 +164,23 @@ describe('Ribbon entries', () => {
 
     useCapabilities({ ...WEB, open: true })
     expect(hasOpen(fileMenu())).toBe(true)
+  })
+
+  it('Mailings: the tab exists on desktop and is gone on the web', () => {
+    const tabLabels = (): string[] =>
+      [...container.querySelectorAll('.ribbon-tab')].map((b) => b.textContent ?? '')
+    useCapabilities(undefined)
+    openTab(t('ribbonTabHome'))
+    expect(tabLabels()).toContain(t('ribbonTabMailings'))
+    act(() => root.unmount())
+    root = createRoot(container)
+
+    useCapabilities(WEB)
+    openTab(t('ribbonTabHome'))
+    const web = tabLabels()
+    expect(web).not.toContain(t('ribbonTabMailings'))
+    expect(web).toContain(t('ribbonTabReferences'))
+    expect(web).toContain(t('ribbonTabReview'))
   })
 
   it('File: Save, Save As, Export PDF and Print follow their own capability flags', () => {

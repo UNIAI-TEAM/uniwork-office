@@ -563,4 +563,12 @@ export const id = {
   appFileSaveCopy: 'Simpan sebagai salinan…',
   appCopySaved: 'Versi Anda disimpan sebagai dokumen baru: {title}.',
   appCopySaveFailed: 'Tidak dapat membuat salinan. Perubahan Anda tetap aman; coba lagi.',
+  appMergeSourceLoaded: '{name} dimuat ({n} record)',
+  appMergeWritten: '{n} dokumen ditulis',
+  appMergeWrittenOne: '{n} dokumen ditulis',
+  appMergeNothingToWrite: 'Tidak ada yang ditulis',
+  appMergeWarnPassword:
+    'Dokumen ini dilindungi kata sandi. Dokumen hasil penggabungan disimpan sebagai berkas biasa tanpa kata sandi, sehingga siapa pun yang membukanya dapat membaca isinya. Tetap gabungkan?',
+  appMergeWarnUniwork:
+    'Dokumen ini milik UniWork. Dokumen hasil penggabungan disimpan di komputer Anda sebagai berkas lokal biasa di luar UniWork. Tetap gabungkan?',
 } satisfies Record<keyof typeof zh, string>

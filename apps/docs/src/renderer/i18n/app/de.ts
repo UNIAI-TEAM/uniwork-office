@@ -577,4 +577,12 @@ export const de = {
   appCopySaved: 'Ihre Version wurde als neues Dokument gespeichert: {title}.',
   appCopySaveFailed:
     'Die Kopie konnte nicht erstellt werden. Ihre Änderungen sind weiterhin sicher; versuchen Sie es erneut.',
+  appMergeSourceLoaded: '{name} geladen ({n} Datensätze)',
+  appMergeWritten: '{n} Dokumente geschrieben',
+  appMergeWrittenOne: '{n} Dokument geschrieben',
+  appMergeNothingToWrite: 'Es gibt nichts zu schreiben',
+  appMergeWarnPassword:
+    'Dieses Dokument ist passwortgeschützt. Die zusammengeführten Dokumente werden als normale Dateien ohne Passwort gespeichert; jeder, der sie öffnet, kann den Inhalt lesen. Trotzdem zusammenführen?',
+  appMergeWarnUniwork:
+    'Dieses Dokument gehört zu UniWork. Die zusammengeführten Dokumente werden als normale lokale Dateien außerhalb von UniWork auf Ihrem Computer gespeichert. Trotzdem zusammenführen?',
 } satisfies Record<keyof typeof zh, string>

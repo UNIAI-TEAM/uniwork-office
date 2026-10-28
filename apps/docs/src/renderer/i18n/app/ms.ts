@@ -565,4 +565,12 @@ export const ms = {
   appFileSaveCopy: 'Simpan sebagai salinan…',
   appCopySaved: 'Versi anda disimpan sebagai dokumen baharu: {title}.',
   appCopySaveFailed: 'Tidak dapat mencipta salinan. Perubahan anda masih selamat; cuba lagi.',
+  appMergeSourceLoaded: '{name} dimuatkan ({n} rekod)',
+  appMergeWritten: '{n} dokumen ditulis',
+  appMergeWrittenOne: '{n} dokumen ditulis',
+  appMergeNothingToWrite: 'Tiada untuk ditulis',
+  appMergeWarnPassword:
+    'Dokumen ini dilindungi kata laluan. Dokumen yang digabungkan disimpan sebagai fail biasa tanpa kata laluan, jadi sesiapa yang membukanya boleh membaca kandungannya. Gabung juga?',
+  appMergeWarnUniwork:
+    'Dokumen ini milik UniWork. Dokumen yang digabungkan disimpan pada komputer anda sebagai fail setempat biasa di luar UniWork. Gabung juga?',
 } satisfies Record<keyof typeof zh, string>

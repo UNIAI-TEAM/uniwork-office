@@ -568,4 +568,12 @@ export const es = {
   appFileSaveCopy: 'Guardar como copia…',
   appCopySaved: 'Tu versión se guardó como documento nuevo: {title}.',
   appCopySaveFailed: 'No se pudo crear la copia. Tus cambios siguen a salvo; vuelve a intentarlo.',
+  appMergeSourceLoaded: '{name} cargado ({n} registros)',
+  appMergeWritten: '{n} documentos escritos',
+  appMergeWrittenOne: '{n} documento escrito',
+  appMergeNothingToWrite: 'No hay nada que escribir',
+  appMergeWarnPassword:
+    'Este documento está protegido con contraseña. Los documentos combinados se guardan como archivos normales, sin contraseña, así que cualquiera que los abra podrá leer el contenido. ¿Combinar de todos modos?',
+  appMergeWarnUniwork:
+    'Este documento pertenece a UniWork. Los documentos combinados se guardan en tu equipo como archivos locales normales, fuera de UniWork. ¿Combinar de todos modos?',
 } satisfies Record<keyof typeof zh, string>
