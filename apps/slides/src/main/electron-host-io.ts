@@ -9,6 +9,7 @@ import { clipboard, dialog, nativeImage, systemPreferences } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { savePptxToFile } from '@genoffice/pptx-engine'
 import { convertedDocumentFor, showOpenDialogWithMemory } from '@genoffice/electron-utils'
+import { atomicWriteVia } from '@genoffice/electron-utils/atomic-write'
 import type {
   HostIO,
   HostMessageBox,
@@ -143,7 +144,7 @@ export function createElectronHostIO(files: ElectronFileHooks): HostIO {
       saveAs: (currentPath, defaultName) => files.saveAsTarget(currentPath, defaultName),
       convertedSaveAs: (currentPath) => convertedDocumentFor(currentPath)?.suggestSaveAs,
     },
-    writeDeck: (opened, target) => savePptxToFile(opened, target),
+    writeDeck: (opened, target) => atomicWriteVia(target, (tmp) => savePptxToFile(opened, tmp)),
     saved: (event) => files.saved(event),
     // G5-03a: the lock answer the environment-neutral session core asks for — the
     // same policy helper the module's own IPC guards use
