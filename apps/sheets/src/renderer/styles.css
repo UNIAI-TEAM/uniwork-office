@@ -2868,6 +2868,14 @@ textarea:focus {
   cursor: pointer;
 }
 
+/* The handle is a body-level portal above the grid (z-index 59); a modal
+   dialog (backdrops sit at 40 / 100 and cover the app) must not leave it
+   drawn over its mask and clickable. */
+body:has(.dialog-backdrop, .modal-backdrop) .shape-delete-button {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .shape-delete-button:not([data-ready='true']) {
   visibility: hidden;
 }

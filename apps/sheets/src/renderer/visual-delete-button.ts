@@ -36,6 +36,16 @@ export function shouldShowVisualDeleteButton(state: VisualDeleteButtonState): bo
   return state.selected && !state.textEditing
 }
 
+/// Modal dialogs (Select Data, Format Cells, AI settings) stack above the
+/// grid. The delete handle is a body-level portal, so it must stand down while
+/// one is open: deleting the chart a dialog is editing leaves the dialog
+/// reading a visual that no longer exists.
+export const MODAL_DIALOG_SELECTOR = '.dialog-backdrop, .modal-backdrop'
+
+export function isModalDialogOpen(root: Pick<ParentNode, 'querySelector'>): boolean {
+  return root.querySelector(MODAL_DIALOG_SELECTOR) !== null
+}
+
 export type VisualDeleteButtonPlacement = 'above' | 'below' | 'inside'
 
 export interface VisualDeleteButtonPosition {
