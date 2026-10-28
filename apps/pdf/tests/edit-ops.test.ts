@@ -561,3 +561,41 @@ describe('edit-op geometry rejects non-finite numbers', () => {
     expect(plan.failures).toHaveLength(1)
   })
 })
+
+describe('link drawings', () => {
+  const link = (over: Record<string, unknown> = {}) => ({
+    kind: 'link' as const,
+    pageIndex: 0,
+    rect: [10, 10, 100, 40] as [number, number, number, number],
+    ...over,
+  })
+
+  it('accepts a link with exactly one of url or destPage', () => {
+    const a = run(empty(), [{ op: 'addDrawing', drawing: link({ url: 'https://example.com' }) }])
+    expect(a.state.drawings).toHaveLength(1)
+    const b = run(empty(), [{ op: 'addDrawing', drawing: link({ destPage: 2 }) }])
+    expect(b.state.drawings).toHaveLength(1)
+  })
+
+  it('only lets a link url use http, https, mailto or www', () => {
+    const plan = (drawing: Record<string, unknown>) =>
+      planEditOps([{ op: 'addDrawing', drawing }], ctx(), newId)
+    for (const url of ['javascript:alert(1)', 'file:///etc/passwd', 'foo:', 'example.com'])
+      expect(plan(link({ url })).failures[0]?.error).toMatch(/http/)
+    for (const url of ['https://a.com', 'http://a.com', 'mailto:a@b.com'])
+      expect(plan(link({ url })).failures).toHaveLength(0)
+    const www = run(empty(), [{ op: 'addDrawing', drawing: link({ url: 'www.a.com' }) }])
+    expect(www.state.drawings[0]?.input).toMatchObject({ url: 'https://www.a.com' })
+  })
+
+  it('rejects a link with neither or both targets, and non-positive pages', () => {
+    const plan = (drawing: Record<string, unknown>) =>
+      planEditOps([{ op: 'addDrawing', drawing }], ctx(), newId)
+    expect(plan(link()).failures[0]?.error).toMatch(/exactly one/)
+    expect(plan(link({ url: 'https://a.com', destPage: 1 })).failures[0]?.error).toMatch(
+      /exactly one/,
+    )
+    expect(plan(link({ destPage: 0 })).failures[0]?.error).toMatch(/1-based/)
+    expect(plan(link({ destPage: 1.5 })).failures[0]?.error).toMatch(/1-based/)
+  })
+})

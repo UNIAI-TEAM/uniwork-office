@@ -1305,6 +1305,62 @@ button {
   justify-content: center;
 }
 
+/* All-document comments panel (sidebar pane, same chrome as the outline pane) */
+.pdf-comments {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+}
+.pdf-comments-filter {
+  margin-bottom: 4px;
+}
+.pdf-comment-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.pdf-comment-row:hover {
+  background: var(--hover);
+}
+.pdf-comment-page {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.pdf-comment-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pdf-comment-author {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.pdf-comment-text {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pdf-comment-replies {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
 .pdf-outline {
   display: flex;
   flex-direction: column;
@@ -1614,6 +1670,52 @@ button {
   gap: 8px;
 }
 
+/* Label rows inside form dialogs: control left, label beside it, one per line */
+.pdf-perm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.pdf-perm-row > span:first-child {
+  min-width: 150px;
+}
+
+.pdf-perm-row > input[type='text'],
+.pdf-perm-row > input[type='number'],
+.pdf-perm-row > input[type='password'] {
+  flex: 1;
+}
+
+/* Bates preview: a page outline with the number strips where the position puts them */
+.pdf-bates-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.pdf-bates-preview-page {
+  height: 64px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+}
+
+.pdf-bates-preview-strip {
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.pdf-bates-positions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+}
+
 /* Genspark DS modal footer buttons: secondary = bg-subtle, primary = black (#232425) */
 .pdf-modal-btn {
   display: inline-flex;
@@ -1716,6 +1818,16 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
+}
+
+/* Option toggles (Aa / W): same word-style active plate as the selection markup bar */
+.pdf-search-bar .pdf-search-opt {
+  font-size: 12px;
+}
+
+.pdf-search-bar .pdf-search-opt.is-active {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .pdf-search-layer {
@@ -5339,4 +5451,42 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   background: var(--danger-bg);
   border: 1px solid var(--danger-border);
   border-radius: 6px;
+}
+
+/* Bookmark editing (pending outline tree) */
+.pdf-bookmark-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+.pdf-bookmark-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: none;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.pdf-bookmark-actions {
+  display: none;
+  flex-shrink: 0;
+}
+.pdf-bookmark-row:hover .pdf-bookmark-actions,
+.pdf-bookmark-row:focus-within .pdf-bookmark-actions {
+  display: inline-flex;
+}
+.pdf-bookmark-add {
+  margin: 4px 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
 }
