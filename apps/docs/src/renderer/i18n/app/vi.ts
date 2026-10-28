@@ -559,4 +559,8 @@ export const vi = {
   appMergeSourceLoaded: 'Đã tải {name} ({n} bản ghi)',
   appMergeWritten: 'Đã ghi {n} tài liệu',
   appMergeNothingToWrite: 'Không có gì để ghi',
+  appMergeWarnPassword:
+    'Tài liệu này được bảo vệ bằng mật khẩu. Các tài liệu trộn được lưu thành tệp thường, không có mật khẩu, nên ai mở tệp cũng đọc được nội dung. Vẫn trộn?',
+  appMergeWarnUniwork:
+    'Tài liệu này thuộc UniWork. Các tài liệu trộn được lưu vào máy tính của bạn thành tệp cục bộ thông thường, nằm ngoài UniWork. Vẫn trộn?',
 } satisfies Record<keyof typeof zh, string>

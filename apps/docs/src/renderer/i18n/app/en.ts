@@ -559,4 +559,8 @@ export const en = {
   appMergeSourceLoaded: 'Loaded {name} ({n} records)',
   appMergeWritten: '{n} documents written',
   appMergeNothingToWrite: 'There is nothing to write',
+  appMergeWarnPassword:
+    'This document is password-protected. The merged documents are saved as ordinary files without the password, so anyone who opens them can read the content. Merge anyway?',
+  appMergeWarnUniwork:
+    'This document belongs to UniWork. The merged documents are saved to your computer as ordinary local files outside UniWork. Merge anyway?',
 } satisfies Record<keyof typeof zh, string>

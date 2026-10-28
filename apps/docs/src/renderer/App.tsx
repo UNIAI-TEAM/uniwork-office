@@ -109,6 +109,7 @@ import type {
 import { AI_PROVIDERS } from '../shared/ipc'
 import {
   buildMailMergeFiles,
+  mergeWriteWarning,
   type MailMergeRequest,
   type MailMergeResponse,
 } from './mail-merge/output'
@@ -2568,6 +2569,12 @@ export function App() {
   const mergeMailings = useCallback(
     async (request: MailMergeRequest): Promise<MailMergeResponse> => {
       try {
+        const doc = fileCtxRef.current.doc
+        const warning = mergeWriteWarning(
+          doc,
+          uniworkStateFor(uniworkRef.current, doc?.filePath).bound,
+        )
+        if (warning && !window.confirm(t(warning))) return { ok: false, canceled: true }
         const files = await buildMailMergeFiles(fileCtxRef.current, request)
         if (files.length === 0) return { ok: false, error: t('appMergeNothingToWrite') }
         const written = await window.desktop.writeMergeOutput({

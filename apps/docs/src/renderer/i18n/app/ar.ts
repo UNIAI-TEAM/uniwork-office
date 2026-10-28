@@ -550,4 +550,8 @@ export const ar = {
   appMergeSourceLoaded: 'تم تحميل {name} ({n} سجلًا)',
   appMergeWritten: 'تمت كتابة {n} مستندًا',
   appMergeNothingToWrite: 'لا يوجد ما يكتب',
+  appMergeWarnPassword:
+    'هذا المستند محمي بكلمة مرور. تُحفظ المستندات المدمجة كملفات عادية بدون كلمة مرور، لذا يمكن لأي شخص يفتحها قراءة محتواها. هل تريد الدمج على أي حال؟',
+  appMergeWarnUniwork:
+    'هذا المستند ينتمي إلى UniWork. تُحفظ المستندات المدمجة على جهازك كملفات محلية عادية خارج UniWork. هل تريد الدمج على أي حال؟',
 } satisfies Record<keyof typeof zh, string>

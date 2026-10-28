@@ -48,6 +48,20 @@ export interface MailMergeResponse {
 }
 
 /**
+ * A merge writes ordinary local .docx copies of the template: no open password and no UniWork
+ * binding. For a password-protected or UniWork-bound document the user must confirm that first
+ * (never a silent plaintext copy); the returned string is the i18n key of the question, null
+ * when the document is a plain local file.
+ */
+export function mergeWriteWarning(
+  doc: { encrypted?: boolean } | null | undefined,
+  uniworkBound: boolean,
+): 'appMergeWarnPassword' | 'appMergeWarnUniwork' | null {
+  if (doc?.encrypted) return 'appMergeWarnPassword'
+  return uniworkBound ? 'appMergeWarnUniwork' : null
+}
+
+/**
  * The documents a merge writes.
  *
  * One document per record is the letter case: every record gets its own

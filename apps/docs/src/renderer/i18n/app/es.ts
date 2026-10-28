@@ -571,4 +571,8 @@ export const es = {
   appMergeSourceLoaded: '{name} cargado ({n} registros)',
   appMergeWritten: '{n} documentos escritos',
   appMergeNothingToWrite: 'No hay nada que escribir',
+  appMergeWarnPassword:
+    'Este documento está protegido con contraseña. Los documentos combinados se guardan como archivos normales, sin contraseña, así que cualquiera que los abra podrá leer el contenido. ¿Combinar de todos modos?',
+  appMergeWarnUniwork:
+    'Este documento pertenece a UniWork. Los documentos combinados se guardan en tu equipo como archivos locales normales, fuera de UniWork. ¿Combinar de todos modos?',
 } satisfies Record<keyof typeof zh, string>

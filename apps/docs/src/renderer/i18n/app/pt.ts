@@ -566,4 +566,8 @@ export const pt = {
   appMergeSourceLoaded: '{name} carregado ({n} registros)',
   appMergeWritten: '{n} documentos gravados',
   appMergeNothingToWrite: 'Não há nada a gravar',
+  appMergeWarnPassword:
+    'Este documento está protegido por senha. Os documentos mesclados são salvos como arquivos comuns, sem senha, e qualquer pessoa que os abrir poderá ler o conteúdo. Mesclar mesmo assim?',
+  appMergeWarnUniwork:
+    'Este documento pertence ao UniWork. Os documentos mesclados são salvos no seu computador como arquivos locais comuns, fora do UniWork. Mesclar mesmo assim?',
 } satisfies Record<keyof typeof zh, string>

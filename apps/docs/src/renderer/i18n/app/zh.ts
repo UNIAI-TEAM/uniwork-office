@@ -570,4 +570,8 @@ export const zh = {
   appMergeSourceLoaded: '已加载数据源 {name}（{n} 条记录）',
   appMergeWritten: '已写出 {n} 个文档',
   appMergeNothingToWrite: '没有可写出的文档',
+  appMergeWarnPassword:
+    '此文档设有打开密码。合并生成的文档将不带密码保存为普通文件，任何打开它们的人都能读取内容。仍要合并吗？',
+  appMergeWarnUniwork:
+    '此文档属于 UniWork。合并生成的文档将作为普通本地文件保存到你的电脑，不再受 UniWork 管理。仍要合并吗？',
 }

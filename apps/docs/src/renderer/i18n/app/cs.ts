@@ -562,4 +562,8 @@ export const cs = {
   appMergeSourceLoaded: 'Načteno {name} ({n} záznamů)',
   appMergeWritten: 'Zapsáno dokumentů: {n}',
   appMergeNothingToWrite: 'Není co zapsat',
+  appMergeWarnPassword:
+    'Tento dokument je chráněn heslem. Sloučené dokumenty se uloží jako běžné soubory bez hesla, takže jejich obsah přečte každý, kdo je otevře. Přesto sloučit?',
+  appMergeWarnUniwork:
+    'Tento dokument patří do UniWork. Sloučené dokumenty se uloží do vašeho počítače jako běžné místní soubory mimo UniWork. Přesto sloučit?',
 } satisfies Record<keyof typeof zh, string>

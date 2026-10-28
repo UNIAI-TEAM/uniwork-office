@@ -542,4 +542,8 @@ export const zhTW = {
   appMergeSourceLoaded: '已載入資料來源 {name}（{n} 筆記錄）',
   appMergeWritten: '已寫出 {n} 個文件',
   appMergeNothingToWrite: '沒有可寫出的文件',
+  appMergeWarnPassword:
+    '此文件設有開啟密碼。合併產生的文件會以不帶密碼的一般檔案儲存，任何打開它們的人都能讀取內容。仍要合併嗎？',
+  appMergeWarnUniwork:
+    '此文件屬於 UniWork。合併產生的文件會以一般本機檔案儲存到你的電腦，不再受 UniWork 管理。仍要合併嗎？',
 } satisfies Record<keyof typeof zh, string>

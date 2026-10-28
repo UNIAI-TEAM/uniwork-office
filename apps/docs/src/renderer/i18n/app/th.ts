@@ -556,4 +556,8 @@ export const th = {
   appMergeSourceLoaded: 'โหลด {name} แล้ว ({n} ระเบียน)',
   appMergeWritten: 'เขียนเอกสารแล้ว {n} ฉบับ',
   appMergeNothingToWrite: 'ไม่มีเอกสารให้เขียน',
+  appMergeWarnPassword:
+    'เอกสารนี้ป้องกันด้วยรหัสผ่าน เอกสารที่ผสานจะถูกบันทึกเป็นไฟล์ธรรมดาที่ไม่มีรหัสผ่าน ทุกคนที่เปิดไฟล์จึงอ่านเนื้อหาได้ ต้องการผสานต่อหรือไม่',
+  appMergeWarnUniwork:
+    'เอกสารนี้เป็นของ UniWork เอกสารที่ผสานจะถูกบันทึกลงคอมพิวเตอร์ของคุณเป็นไฟล์ในเครื่องธรรมดา นอก UniWork ต้องการผสานต่อหรือไม่',
 } satisfies Record<keyof typeof zh, string>

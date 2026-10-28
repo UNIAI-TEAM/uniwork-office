@@ -563,4 +563,8 @@ export const hi = {
   appMergeSourceLoaded: '{name} लोड हुई ({n} रिकॉर्ड)',
   appMergeWritten: '{n} दस्तावेज़ लिखे गए',
   appMergeNothingToWrite: 'लिखने के लिए कुछ नहीं है',
+  appMergeWarnPassword:
+    'यह दस्तावेज़ पासवर्ड से सुरक्षित है। मर्ज किए गए दस्तावेज़ बिना पासवर्ड के सामान्य फ़ाइलों के रूप में सहेजे जाएंगे, इसलिए इन्हें खोलने वाला कोई भी सामग्री पढ़ सकता है। फिर भी मर्ज करें?',
+  appMergeWarnUniwork:
+    'यह दस्तावेज़ UniWork का है। मर्ज किए गए दस्तावेज़ आपके कंप्यूटर पर UniWork के बाहर सामान्य स्थानीय फ़ाइलों के रूप में सहेजे जाएंगे। फिर भी मर्ज करें?',
 } satisfies Record<keyof typeof zh, string>

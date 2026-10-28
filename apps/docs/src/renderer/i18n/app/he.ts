@@ -546,4 +546,8 @@ export const he = {
   appMergeSourceLoaded: '{name} נטען ({n} רשומות)',
   appMergeWritten: 'נכתבו {n} מסמכים',
   appMergeNothingToWrite: 'אין מה לכתוב',
+  appMergeWarnPassword:
+    'המסמך הזה מוגן בסיסמה. המסמכים הממוזגים נשמרים כקבצים רגילים ללא סיסמה, ולכן כל מי שיפתח אותם יוכל לקרוא את התוכן. למזג בכל זאת?',
+  appMergeWarnUniwork:
+    'המסמך הזה שייך ל-UniWork. המסמכים הממוזגים נשמרים במחשב שלך כקבצים מקומיים רגילים מחוץ ל-UniWork. למזג בכל זאת?',
 } satisfies Record<keyof typeof zh, string>
