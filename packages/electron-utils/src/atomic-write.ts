@@ -153,7 +153,10 @@ export async function atomicCopyFileExclusive(source: string, filePath: string):
     return
   } catch (error) {
     await unlink(tmp).catch(() => {})
-    if (!HARDLINK_UNSUPPORTED_CODES[errorCode(error)]) throw error
+    const code = errorCode(error)
+    if (!HARDLINK_UNSUPPORTED_CODES[code] && !(process.platform === 'win32' && code === 'EISDIR')) {
+      throw error
+    }
   }
   await copyFile(source, filePath, constants.COPYFILE_EXCL)
 }

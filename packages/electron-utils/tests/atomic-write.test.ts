@@ -242,6 +242,39 @@ describe('atomicCopyFileExclusive', () => {
     await expect(atomicCopyFileExclusive(source, target)).rejects.toMatchObject({ code: 'EEXIST' })
     expect(readFileSync(target, 'utf8')).toBe('pdf-bytes')
   })
+
+  it('falls back to COPYFILE_EXCL on Windows exFAT EISDIR and rethrows EISDIR on non-win32', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'eu-ace-'))
+    const source = join(dir, 'a.pdf')
+    const target = join(dir, 'b.pdf')
+    writeFileSync(source, 'pdf-bytes')
+    const origPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+    try {
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+      vi.mocked(link).mockRejectedValueOnce(errnoError('EISDIR'))
+      await atomicCopyFileExclusive(source, target)
+      expect(readFileSync(target, 'utf8')).toBe('pdf-bytes')
+      expect(readdirSync(dir).sort()).toEqual(['a.pdf', 'b.pdf'])
+
+      writeFileSync(source, 'later-bytes')
+      vi.mocked(link).mockRejectedValueOnce(errnoError('EISDIR'))
+      await expect(atomicCopyFileExclusive(source, target)).rejects.toMatchObject({
+        code: 'EEXIST',
+      })
+      expect(readFileSync(target, 'utf8')).toBe('pdf-bytes')
+      expect(readdirSync(dir).sort()).toEqual(['a.pdf', 'b.pdf'])
+
+      Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+      const nonWinTarget = join(dir, 'c.pdf')
+      vi.mocked(link).mockRejectedValueOnce(errnoError('EISDIR'))
+      await expect(atomicCopyFileExclusive(source, nonWinTarget)).rejects.toMatchObject({
+        code: 'EISDIR',
+      })
+      expect(readdirSync(dir).sort()).toEqual(['a.pdf', 'b.pdf'])
+    } finally {
+      if (origPlatform) Object.defineProperty(process, 'platform', origPlatform)
+    }
+  })
 })
 
 describe('writeJsonAtomic', () => {
