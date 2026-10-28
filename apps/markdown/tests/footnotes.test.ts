@@ -208,17 +208,38 @@ describe('footnote round-trip', () => {
 })
 
 describe('footnote probes', () => {
-  it('footnoteDefStart finds line-start definitions only', () => {
+  it('footnoteDefStart finds line-start definitions only within the current paragraph', () => {
     expect(footnoteDefStart('Some text\n[^1]: x')).toBe(10)
     expect(footnoteDefStart('a [^1]: x')).toBe(-1)
     expect(footnoteDefStart('no markers')).toBe(-1)
     expect(footnoteDefStart('text\nnot one\n[^2]: y')).toBe(13)
+    expect(footnoteDefStart('first paragraph\n\n[^1]: next block')).toBe(-1)
+    expect(footnoteDefStart('first paragraph\n   \n[^1]: next block')).toBe(-1)
   })
 
   it('footnoteRefStart finds references but not escaped ones', () => {
     expect(footnoteRefStart('see [^1] here')).toBe(4)
     expect(footnoteRefStart('an \\[^1] escape')).toBe(-1)
     expect(footnoteRefStart('plain text')).toBe(-1)
+  })
+
+  it('parses a 500 KB document after many editor creations in linear time', () => {
+    // Before the fix, each Editor appended duplicate tokenizers onto the global
+    // marked singleton and footnoteDefStart scanned the entire remaining source
+    // on every paragraph, taking >25 s to parse after 60 editors (~250 ms now).
+    for (let i = 0; i < 60; i++) createEditor()
+    const editor = createEditor()
+    const unit =
+      'Paragraph with `a == b` comparison, ==highlight==, and a reference[^1] on line one\n' +
+      'followed by a second line in the same paragraph where x == y holds and more prose.\n' +
+      'A third line in the paragraph keeps the block realistic while scanning lines.\n\n'
+    const body = unit.repeat(2200) + '[^1]: Trailing footnote definition body.\n'
+    expect(body.length).toBeGreaterThan(500_000)
+    const t0 = performance.now()
+    const parsed = editor.markdown!.parse(body)
+    const elapsed = performance.now() - t0
+    expect(elapsed).toBeLessThan(3000)
+    expect(parsed.content?.at(-1)?.type).toBe('footnoteDefinition')
   })
 })
 
