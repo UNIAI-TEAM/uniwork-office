@@ -9,6 +9,10 @@
 //     byok/{provider}/messages         POST           Anthropic Messages, SSE when stream: true
 //     byok/{provider}/generate         POST           { model, stream, request } -> Gemini (SSE when stream)
 //     byok/{provider}/models           GET            { data: [{ id }] }
+//     uniwork/chat/completions         POST           UniWork AI: openai-compatible SSE, with the
+//                                                     conversation and run headers; a request that carries
+//                                                     X-UniWork-AI-Handoff answers the next `handoffRemaining`
+//                                                     value as X-UniWork-AI-Handoff-Remaining (UNI-2264)
 //     cloud                            GET            { enabled, reason?, tools, credits }
 //     cloud/search|images|media/analyze|transcribe  POST
 // Every route wants `Authorization: Bearer <token>` (401 otherwise) and refuses a request that
@@ -32,13 +36,16 @@
 //     hold?: boolean                                   stream a chunk, then pause between chunks until
 //                                                      { hold: false } (or reset): for mid-stream abort
 //                                                      and frame/port-loss cases (UNI-1923)
-//     credentials?: [{ provider, api_key, base_url? }] seed stored keys }
+//     credentials?: [{ provider, api_key, base_url? }] seed stored keys
+//     handoffRemaining?: number[]                      the Remaining header of the next handed-over
+//                                                      questions, in order (none left: no header) }
 // Real vendor for local verification only (env, no defaults; nothing is read from or written to a
 // file): with FAKE_AI_UPSTREAM_URL (an OpenAI-compatible base, e.g. http://host:port/v1) and
 // FAKE_AI_UPSTREAM_KEY set, an openai-compatible chat/completions call for a seeded provider is
 // forwarded there with that key (FAKE_AI_UPSTREAM_MODEL replaces the request's model when set), and
 // the answer is piped back, SSE included. The key never reaches the frame or the request log.
-// GET /__fake-ai/log -> [{ method, path, authorization, cookie, body }] of the AI requests.
+// GET /__fake-ai/log -> [{ method, path, authorization, cookie, handoff, body }] of the AI requests
+// (handoff = the request's X-UniWork-AI-Handoff, or null).
 
 const upstream = () => {
   const url = process.env.FAKE_AI_UPSTREAM_URL
@@ -101,6 +108,9 @@ function freshState() {
     unauthorizedOnce: null,
     reply: 'Hello from the UniWork AI proxy.',
     toolCalls: [],
+    handoffRemaining: [],
+    // UniWork AI run ids handed out so far
+    runs: 0,
     hold: false,
     // res.resolve of streams paused between chunks on `hold`
     held: [],
@@ -187,11 +197,12 @@ function parts(text) {
   return [text.slice(0, a), text.slice(a, 2 * a), text.slice(2 * a)].filter(Boolean)
 }
 
-async function sse(res, events) {
+async function sse(res, events, headers = {}) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-store',
     Connection: 'keep-alive',
+    ...headers,
   })
   for (const e of events) {
     res.write(e)
@@ -297,6 +308,30 @@ async function byok(req, res, provider, tail, body) {
     )
   }
   return fail(res, 404, 'not_found', `no ${row.protocol} route ${tail}`)
+}
+
+/** one UniWork AI turn (the frame route): the plain reply, streamed */
+async function uniwork(req, res, body) {
+  if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed')
+  if (body.__invalid) return fail(res, 400, 'invalid_json')
+  const headers = {
+    'X-UniWork-AI-Conversation': req.headers['x-uniwork-ai-conversation'] || 'conv-1',
+    'X-UniWork-AI-Run': `run-${++state.runs}`,
+  }
+  if (req.headers['x-uniwork-ai-handoff'] && state.handoffRemaining.length > 0) {
+    headers['X-UniWork-AI-Handoff-Remaining'] = String(state.handoffRemaining.shift())
+  }
+  return sse(
+    res,
+    [
+      ...parts(state.reply).map(
+        (p) => `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: p } }] })}\n\n`,
+      ),
+      `data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`,
+      'data: [DONE]\n\n',
+    ],
+    headers,
+  )
 }
 
 async function cloud(req, res, tail, body) {
@@ -425,6 +460,7 @@ export async function handleFakeAiControl(req, res, pathname) {
       releaseHeld()
     }
     if (Array.isArray(body.toolCalls)) state.toolCalls.push(...body.toolCalls)
+    if (Array.isArray(body.handoffRemaining)) state.handoffRemaining.push(...body.handoffRemaining)
     if (body.cloud)
       state.cloud = {
         ...state.cloud,
@@ -451,6 +487,7 @@ export async function handleFakeAi(req, res, pathname) {
     path: pathname,
     authorization: req.headers.authorization ?? null,
     cookie: req.headers.cookie ?? null,
+    handoff: req.headers['x-uniwork-ai-handoff'] ?? null,
     body: tail.startsWith('/credentials')
       ? { ...body, api_key: body.api_key ? '<set>' : undefined }
       : body,
@@ -489,6 +526,10 @@ export async function handleFakeAi(req, res, pathname) {
   const bm = /^\/byok\/([^/]+)(\/.*)$/.exec(tail)
   if (bm) {
     await byok(req, res, decodeURIComponent(bm[1]), bm[2], body)
+    return true
+  }
+  if (tail === '/uniwork/chat/completions') {
+    await uniwork(req, res, body)
     return true
   }
   if (tail === '/cloud' || tail.startsWith('/cloud/')) {

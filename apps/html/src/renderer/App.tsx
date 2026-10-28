@@ -9,6 +9,7 @@ import {
   type FindPanelStrings,
   type FindTarget,
   aiPanelInitiallyOpen,
+  aiPresetAutoRuns,
   rememberAiPanelOpen,
   UniAiMark,
   useAiSidebarEnabled,
@@ -300,6 +301,28 @@ export default function App() {
   // web frame (capabilities.ts): AI, autosave and visual edit off, view only without `save`
   const aiEnabled = cap('ai')
   const canEdit = cap('save')
+  // the job a web host hands over (`ai.start`, UNI-2264): the boot read and the live subscription
+  // start in the same tick, so a preset in between is never lost; the panel takes it once the page
+  // has loaded (the `preset` prop below)
+  useEffect(() => {
+    if (!aiEnabled) return
+    const take = (preset: { text: string; autoRun?: boolean; displayText?: string } | null) => {
+      if (!preset?.text) return
+      setAiOpen(true)
+      void aiPresetAutoRuns(preset, platform() === 'web', () =>
+        window.htmlApi.getAiSettings(),
+      ).then((autoRun) =>
+        setAiPreset({
+          text: preset.text,
+          nonce: Date.now(),
+          autoRun,
+          ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        }),
+      )
+    }
+    void window.htmlApi.consumeAiPreset?.().then(take)
+    return window.htmlApi.onAiPreset?.(take)
+  }, [aiEnabled])
   // both previews (the web bundle's preview.html and the desktop html-preview:// document) block
   // fetch/XHR and nested frames, so a page using them gets one note
   const previewLimited = useMemo(() => usesBlockedPreviewFeatures(text), [text])
@@ -1875,7 +1898,7 @@ export default function App() {
             <AiPanel
               deps={aiDeps}
               filePath={path}
-              preset={aiPreset}
+              preset={status === 'ready' ? aiPreset : null}
               editQueue={editQueue}
               onQueueEditInstruction={queueUpdate}
               onQueueRemove={queueRemove}

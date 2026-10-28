@@ -173,6 +173,8 @@ interface ToolActivity {
 interface ChatEntry {
   role: 'user' | 'assistant'
   text: string
+  /** a user bubble whose words (`text`) differ from what was sent: the sent text, for Retry */
+  instruction?: string
   streaming?: boolean
   isError?: boolean
   /** the S9 key the transport chose for this UniWork AI error; absent for any other failure */
@@ -227,10 +229,15 @@ interface Snapshot {
   runId: string | null
 }
 
-/** Ribbon preset instruction; a new nonce triggers one auto-send */
+/**
+ * Ribbon preset instruction, or the job a web host handed over; a new nonce triggers one auto-send
+ * (unless autoRun is false). displayText is the bubble when it differs from the sent text
+ */
 export interface AiPreset {
   text: string
   nonce: number
+  autoRun?: boolean
+  displayText?: string
 }
 
 export interface MarkdownAiDeps {
@@ -990,6 +997,7 @@ export function AiPanel({
       {
         role: 'user',
         text: displayText ?? instruction,
+        ...(displayText !== undefined && displayText !== instruction ? { instruction } : {}),
         ...(scope ? { scope } : {}),
         ...(fence ? { fence: { fenced: true, ranges: fence } } : {}),
       },
@@ -1138,8 +1146,9 @@ export function AiPanel({
     presetNonceRef.current = preset.nonce
     // the run lands in the chat: leave Ask UNI so it is the one on screen
     askUni.leave()
-    if (loopRef.current?.busy) setPrompt(preset.text)
-    else send(preset.text)
+    // the text goes out word for word (a host job is recognised by it, UNI-2264). One that cannot
+    // run now (busy, no model yet, the UniWork AI disclosure not acknowledged) waits in the composer
+    if (preset.autoRun === false || !send(preset.text, preset.displayText)) setPrompt(preset.text)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset])
 
@@ -1450,7 +1459,13 @@ export function AiPanel({
                       {canRetryEntry(entry, busy) && !uniworkErrorFollows && (
                         <button
                           className="ai-retry-btn"
-                          onClick={() => send(entry.text, undefined, entry)}
+                          onClick={() =>
+                            send(
+                              entry.instruction ?? entry.text,
+                              entry.instruction === undefined ? undefined : entry.text,
+                              entry,
+                            )
+                          }
                         >
                           {t('aiRetry')}
                         </button>

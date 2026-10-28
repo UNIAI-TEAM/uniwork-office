@@ -4,6 +4,8 @@
 //                no cookies, 401 -> token refresh) -> AI settings = UniWork credentials (PUT/DELETE,
 //                masked key_hint) -> every typed error state renders (402/403/404/424/429/502/503)
 //   grant off -> no AI UI anywhere and no AI request.
+//   UniWork AI + `ai.start` (UNI-2264) -> the host hands the panel a job: its question carries
+//                X-UniWork-AI-Handoff, each next part goes out by itself while parts are left.
 // Docs (`npm run build:web`), Markdown and HTML (`npm run build:web -- --module markdown|html`). Zero console
 // errors and CSP violations; the only HTTP errors are the ones a test injects on the AI routes.
 // Screenshots (settings dialog + a state card, light/dark, en/vi): docs/web-modules/screenshots/ai/.
@@ -26,6 +28,8 @@ interface LogEntry {
   path: string
   authorization: string | null
   cookie: string | null
+  /** the request's X-UniWork-AI-Handoff */
+  handoff: string | null
   body: Record<string, unknown>
 }
 
@@ -366,4 +370,98 @@ for (const theme of ['light', 'dark'] as const) {
       await settings
     })
   }
+}
+
+// UNI-2264: on a UniWork AI frame the host hands the panel a job with `ai.start`. The question that
+// runs it carries X-UniWork-AI-Handoff; while the server says parts are left
+// (X-UniWork-AI-Handoff-Remaining >= 1) the next part's question goes out by itself and carries it
+// too; the last part (0) ends the job.
+const JOB = 'Draft this document from the job Ask UNI handed over: Plan'
+const HANDOFF_ID = 'h1'
+
+async function uniworkQuestions(request: APIRequestContext): Promise<LogEntry[]> {
+  return (await aiLog(request)).filter((l) => l.path.endsWith('/uniwork/chat/completions'))
+}
+
+/** the host's `ai.start`, as the UniWork host sends it once the document is open */
+function startJob(page: Page): Promise<unknown> {
+  return page.evaluate(
+    ([handoffId, text]) =>
+      (
+        window as unknown as {
+          __host: { request(type: string, payload: unknown): Promise<unknown> }
+        }
+      ).__host.request('ai.start', { handoffId, text, displayText: text }),
+    [HANDOFF_ID, JOB] as const,
+  )
+}
+
+/** the words of a question: its last user message */
+function asked(entry: LogEntry): string {
+  const messages = (entry.body.messages ?? []) as Array<{ role: string; content: unknown }>
+  const last = messages.filter((m) => m.role === 'user').at(-1)
+  return typeof last?.content === 'string' ? last.content : JSON.stringify(last?.content ?? null)
+}
+
+for (const module of ['docs', 'markdown', 'html'] as const) {
+  test.describe(`${module}: a job handed over with ai.start`, () => {
+    test.skip(
+      !built(module),
+      `no dist-web/${module} build: npm run build:web${module === 'docs' ? '' : ` -- --module ${module}`}`,
+    )
+
+    test('the job runs part by part, every question tagged with the job', async ({
+      page,
+      request,
+    }) => {
+      await fake(request)
+      await fake(request, { handoffRemaining: [1, 0] })
+      const problems = await watch(page)
+      const frame = await open(page, module, { lang: 'en', uniwork: '1' })
+      await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+      await frame.locator('.ai-uniwork-disclosure-ack').click()
+      expect(await startJob(page)).toEqual({ queued: true })
+      // the job's question, then the next part by itself: both carry the job id
+      await expect
+        .poll(async () => (await uniworkQuestions(request)).map((l) => l.handoff), {
+          timeout: 60_000,
+        })
+        .toEqual([HANDOFF_ID, HANDOFF_ID])
+      const [first, next] = await uniworkQuestions(request)
+      expect(asked(first!)).toContain(JOB)
+      expect(asked(next!)).toContain('Continue with the next part.')
+      // the second part said none are left: no third question
+      await frame.waitForTimeout(4_000)
+      expect(await uniworkQuestions(request)).toHaveLength(2)
+      await expect(frame.locator('.ai-msg-user')).toHaveCount(2)
+      await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY)
+      await expectClean(page, frame, problems)
+    })
+
+    test('a job that arrives before the disclosure is acknowledged waits in the composer', async ({
+      page,
+      request,
+    }) => {
+      await fake(request)
+      await fake(request, { handoffRemaining: [0] })
+      const problems = await watch(page)
+      const frame = await open(page, module, { lang: 'en', uniwork: '1' })
+      await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+      expect(await startJob(page)).toEqual({ queued: true })
+      const box = frame.locator('.ai-input-box textarea').first()
+      await expect(box).toHaveValue(JOB)
+      expect(await uniworkQuestions(request)).toEqual([])
+      // the person acknowledges and sends what waits there: it is still the job's question
+      await frame.locator('.ai-uniwork-disclosure-ack').click()
+      await box.press('Enter')
+      await expect
+        .poll(async () => (await uniworkQuestions(request)).map((l) => l.handoff), {
+          timeout: 60_000,
+        })
+        .toEqual([HANDOFF_ID])
+      await frame.waitForTimeout(4_000)
+      expect(await uniworkQuestions(request)).toHaveLength(1)
+      await expectClean(page, frame, problems)
+    })
+  })
 }

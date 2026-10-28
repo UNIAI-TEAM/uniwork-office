@@ -297,10 +297,14 @@ interface Snapshot {
   doc: DocSnapshot
 }
 
-/** Preset instruction (ribbon / Ask AI "send now"); a new nonce triggers one auto-send */
+/**
+ * Preset instruction (ribbon / Ask AI "send now" / the job a web host handed over); a new nonce
+ * triggers one auto-send (unless autoRun is false)
+ */
 export interface AiPreset {
   text: string
   nonce: number
+  autoRun?: boolean
   /** what the chat bubble shows when the instruction itself carries protocol text */
   displayText?: string
   scope?: AiScopeQuoteData
@@ -1258,9 +1262,13 @@ export function AiPanel({
     presetNonceRef.current = preset.nonce
     // the run lands in the chat: leave Ask UNI so it is the one on screen
     askUni.leave()
-    // while a run is active the request lands in the composer as the user phrased it, never as protocol text
-    if (loopRef.current?.busy) setPrompt(preset.displayText ?? preset.text)
-    else send(preset.text, preset.displayText, false, undefined, preset.scope, preset.fenceSids)
+    // the text goes out word for word (a host job is recognised by it, UNI-2264). One that cannot
+    // run now (busy, no model yet, the UniWork AI disclosure not acknowledged) waits in the
+    // composer: an element ask as the user phrased it (never its protocol text), anything else as is
+    const sent =
+      preset.autoRun !== false &&
+      send(preset.text, preset.displayText, false, undefined, preset.scope, preset.fenceSids)
+    if (!sent) setPrompt(preset.fenceSids ? (preset.displayText ?? preset.text) : preset.text)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset])
 

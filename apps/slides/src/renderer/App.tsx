@@ -133,6 +133,7 @@ import {
   type AiScopeQuoteData,
   type WordArtPreset,
   aiPanelInitiallyOpen,
+  aiPresetAutoRuns,
   rememberAiPanelOpen,
   UniAiMark,
   useAiSidebarEnabled,
@@ -569,6 +570,7 @@ export function App() {
     attachments?: AttachmentMeta[]
     slideShot?: boolean
   } | null>(null)
+  const aiPresetSeen = useRef<number | null>(null)
   const [_recent, setRecent] = useState<string[]>([])
   const consumePendingRef = useRef<ReturnType<typeof window.slidesApi.consumePendingOpen> | null>(
     null,
@@ -1375,11 +1377,14 @@ export function App() {
             localStorage.setItem('ai-slides-show-ai', '1')
             return true
           })
+          const autoRun = await aiPresetAutoRuns(preset, isWeb(), () =>
+            window.slidesApi.getAiSettings(),
+          )
           await new Promise((resolve) => setTimeout(resolve, 120))
           setAiPreset({
             text: preset.text,
             nonce: Date.now(),
-            autoRun: preset.autoRun !== false,
+            autoRun,
             ...(preset.displayText ? { displayText: preset.displayText } : {}),
           })
         }
@@ -1390,18 +1395,23 @@ export function App() {
         bootHandledRef.current = true
         if (!isWeb()) void bootBlank()
       })
+    // subscribed before the boot consume above runs: a preset in between is never lost. One that
+    // arrives before the deck has loaded waits here: the panel mounts with the deck
     const offAiPreset = window.slidesApi.onAiPreset?.((preset) => {
       if (!preset?.text || !aiEnabled) return
       setShowAi(() => {
         localStorage.setItem('ai-slides-show-ai', '1')
         return true
       })
-      setAiPreset({
-        text: preset.text,
-        nonce: Date.now(),
-        autoRun: preset.autoRun !== false,
-        ...(preset.displayText ? { displayText: preset.displayText } : {}),
-      })
+      void aiPresetAutoRuns(preset, isWeb(), () => window.slidesApi.getAiSettings()).then(
+        (autoRun) =>
+          setAiPreset({
+            text: preset.text,
+            nonce: Date.now(),
+            autoRun,
+            ...(preset.displayText ? { displayText: preset.displayText } : {}),
+          }),
+      )
     })
     return () => {
       off()
@@ -3817,6 +3827,7 @@ export function App() {
                   fitWidthPx={FIT_WIDTH}
                   settings={aiSettings}
                   preset={aiPreset}
+                  presetSeen={aiPresetSeen}
                   open={aiDockOpen}
                   dockHidden={!!slideShow || !!presenter}
                   onExpand={toggleAi}

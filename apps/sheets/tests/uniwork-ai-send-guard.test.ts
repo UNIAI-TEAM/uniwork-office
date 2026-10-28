@@ -418,8 +418,9 @@ describe('sheets panel send entry and queue submit with model-need hint (RF3-3)'
     const here = dirname(fileURLToPath(import.meta.url))
     const shell = readFileSync(join(here, '../src/renderer/ExcelShell.tsx'), 'utf8')
     expect(shell).toContain('const uniworkSendGate = useUniworkSendGate()')
+    // it answers whether the send went out (a preset that did not waits in the composer, UNI-2264)
     expect(shell).toMatch(
-      /const onSend: typeof onSendRaw = [^{]*\{\s*if \(uniworkSendGate\.refuse\(\)\) return\s*onSendRaw\(/,
+      /const onSend: typeof onSendRaw = [^{]*\{\s*if \(uniworkSendGate\.refuse\(\)\) return false\s*return onSendRaw\(/,
     )
     expect(shell).toContain('sendGate={uniworkSendGate}')
     // no entry calls the raw prop around the gate

@@ -278,14 +278,21 @@ interface ExcelShellProps {
   /** Send the composer text, or the given instruction when provided (Retry also
    *  resends that message's original attachments and passes the failed bubble's
    *  chat index so the send replaces it in place) */
-  readonly aiPreset?: { text: string; nonce: number; autoRun?: boolean } | null
+  readonly aiPreset?: {
+    text: string
+    nonce: number
+    autoRun?: boolean
+    displayText?: string
+  } | null
   /** the AI dock was opened (or starts open): the app re-reads the UniWork cloud plan */
   readonly onAiPanelOpen?: () => void
+  /** false when nothing was sent (busy, no model yet, nothing to send) */
   readonly onSend: (
     instruction?: string,
     attachments?: readonly AttachmentMeta[],
     retryIndex?: number,
-  ) => void
+    displayText?: string,
+  ) => boolean | void
   readonly onStop: () => void
   readonly onNewChat: () => void
   readonly onUndo: (steps?: number) => void
@@ -637,24 +644,35 @@ export function ExcelShell({
   // every AI entry of the shell (panel Send, retry, presets, ribbon runs, the selection ask) goes
   // through this one gate; the AI panel feeds it the UniWork disclosure state
   const uniworkSendGate = useUniworkSendGate()
-  const onSend: typeof onSendRaw = (instruction, attachments, retryIndex) => {
-    if (uniworkSendGate.refuse()) return
-    onSendRaw(instruction, attachments, retryIndex)
+  const onSend: typeof onSendRaw = (instruction, attachments, retryIndex, displayText) => {
+    if (uniworkSendGate.refuse()) return false
+    return onSendRaw(instruction, attachments, retryIndex, displayText)
   }
   useEffect(() => {
     if (isCopilotOpen) onAiPanelOpenRef.current?.()
   }, [isCopilotOpen])
+  // one question per preset; one that arrives while the workbook opens runs once it has opened
+  const presetNonceRef = useRef<number | null>(null)
   useEffect(() => {
-    if (!aiPreset?.text) return
+    if (!aiPreset?.text || openingWorkbook || presetNonceRef.current === aiPreset.nonce) return
     setIsCopilotOpen(true)
     if (aiPreset.autoRun === false) {
+      presetNonceRef.current = aiPreset.nonce
       onPromptChange(aiPreset.text)
       return
     }
-    const timer = window.setTimeout(() => onSend(aiPreset.text), 120)
+    const timer = window.setTimeout(() => {
+      presetNonceRef.current = aiPreset.nonce
+      // the text goes out word for word (a host job is recognised by it, UNI-2264). One that
+      // cannot run now (busy, no model yet, the UniWork AI disclosure not acknowledged) waits in the
+      // composer
+      if (onSend(aiPreset.text, undefined, undefined, aiPreset.displayText) !== true) {
+        onPromptChange(aiPreset.text)
+      }
+    }, 120)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiPreset?.nonce])
+  }, [aiPreset?.nonce, openingWorkbook])
   // the "show the AI sidebar" setting off hides the copilot rail (soft hide):
   // an explicit AI action (ribbon run, toggle) still opens the panel, and
   // closing it returns to hidden — no dead affordances, no invisible runs

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ImageViewer,
   aiPanelInitiallyOpen,
+  aiPresetAutoRuns,
   rememberAiPanelOpen,
   useAutoSavePref,
   useImageGenerationOffered,
@@ -287,6 +288,28 @@ export default function App() {
   const imageGenerationOffered = useImageGenerationOffered(cap('imageGeneration'), aiSettings, () =>
     window.markdownApi?.aiGskStatus?.(),
   )
+  // the job a web host hands over (`ai.start`, UNI-2264): the boot read and the live subscription
+  // start in the same tick, so a preset in between is never lost; the panel mounts (and takes it)
+  // once the file has loaded
+  useEffect(() => {
+    if (!aiEnabled) return
+    const take = (preset: { text: string; autoRun?: boolean; displayText?: string } | null) => {
+      if (!preset?.text) return
+      setAiOpen(true)
+      void aiPresetAutoRuns(preset, platform() === 'web', () =>
+        window.markdownApi.getAiSettings(),
+      ).then((autoRun) =>
+        setAiPreset((prev) => ({
+          text: preset.text,
+          nonce: (prev?.nonce ?? 0) + 1,
+          autoRun,
+          ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        })),
+      )
+    }
+    void window.markdownApi.consumeAiPreset?.().then(take)
+    return window.markdownApi.onAiPreset?.(take)
+  }, [aiEnabled])
   const canEdit = cap('save')
 
   const markDirty = useCallback(() => {

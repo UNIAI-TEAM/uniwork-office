@@ -76,6 +76,7 @@ import { consumePendingUndoCarry, undoStackDepth } from './undo-carry'
 import { createSaveGate, recoveryCopyBacksSession, shouldRunSaveTick } from './save-scheduler'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
+  aiPresetAutoRuns,
   aiUniworkText,
   isUniworkRefusalErrorKey,
   useAutoSavePref,
@@ -628,6 +629,8 @@ export function App({
     text: string
     nonce: number
     autoRun?: boolean
+    /** the bubble's words when they differ from what is sent (`text`) */
+    displayText?: string
   } | null>(null)
   const [preview, setPreview] = useState<ChangePlan | null>(null)
   const [_revision, setRevision] = useState(0)
@@ -2082,22 +2085,26 @@ export function App({
       // a reloaded tab whose path is gone: say so now instead of waiting
       else if (action === 'stalled') setOpenStalled(true)
     })
-    void window.desktopApi?.consumeAiPreset?.().then((preset) => {
+    // the boot read and the live subscription start in the same tick, so a preset in between is
+    // never lost; the shell runs it once the workbook has opened. A web host's job (`ai.start`,
+    // UNI-2264) runs only on UniWork AI
+    const takeAiPreset = (
+      preset: { text: string; autoRun?: boolean; displayText?: string } | null,
+    ): void => {
       if (!preset?.text) return
-      setAiPreset({
-        text: preset.text,
-        nonce: Date.now(),
-        autoRun: preset.autoRun !== false,
-      })
-    })
-    const offAiPreset = window.desktopApi?.onAiPreset?.((preset) => {
-      if (!preset?.text) return
-      setAiPreset({
-        text: preset.text,
-        nonce: Date.now(),
-        autoRun: preset.autoRun !== false,
-      })
-    })
+      void aiPresetAutoRuns(preset, platform() === 'web', () =>
+        window.desktopApi.getAiSettings(),
+      ).then((autoRun) =>
+        setAiPreset({
+          text: preset.text,
+          nonce: Date.now(),
+          autoRun,
+          ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        }),
+      )
+    }
+    void window.desktopApi?.consumeAiPreset?.().then(takeAiPreset)
+    const offAiPreset = window.desktopApi?.onAiPreset?.(takeAiPreset)
     // Univer 0.25.1 also badges text parseable as date/time, phone numbers, and
     // other long numeric identifiers with "Number stored as text". Those values
     // should remain text, so clear the view type before the built-in marker
@@ -3589,6 +3596,8 @@ export function App({
     overrideInstruction?: string,
     overrideAttachments?: readonly AttachmentMeta[],
     retryIndex?: number,
+    /** the bubble's words when they differ from the sent instruction (a preset, its Retry) */
+    displayText?: string,
   ): boolean {
     const instruction = (overrideInstruction ?? prompt).trim()
     if (needModelHint !== null || !instruction || aiBusy) return false
@@ -3617,9 +3626,11 @@ export function App({
           : undefined
     const persisted =
       alreadyPersisted || persistChatMessage('user', instruction, undefined, sentAtts, scope)
+    const shown = displayText?.trim() || instruction
     appendChat({
       role: 'user',
-      text: instruction,
+      text: shown,
+      ...(shown !== instruction ? { instruction } : {}),
       tools: [],
       persisted,
       ...(sentAtts.length > 0 ? { attachments: sentAtts } : {}),

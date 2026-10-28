@@ -149,6 +149,7 @@ import type { CharStyle } from './color-runs'
 import {
   Dropdown,
   aiPanelInitiallyOpen,
+  aiPresetAutoRuns,
   rememberAiPanelOpen,
   useDismissablePopover,
   useRibbonCollapse,
@@ -443,8 +444,16 @@ export default function App() {
   const aiDock = useAiDockLayout(aiCollapsed, setAiCollapsed, serverPanelOpen)
   const aiDockRef = useRef(aiDock)
   aiDockRef.current = aiDock
-  /** One-shot prompt pushed by the ribbon AI buttons; the panel auto-runs it (docs preset pattern) */
-  const [aiPreset, setAiPreset] = useState<{ text: string; nonce: number } | null>(null)
+  /**
+   * One-shot prompt pushed by the ribbon AI buttons or the web host's job (`ai.start`); the panel
+   * auto-runs it (docs preset pattern) once the document is ready. displayText = the bubble's words
+   */
+  const [aiPreset, setAiPreset] = useState<{
+    text: string
+    nonce: number
+    autoRun?: boolean
+    displayText?: string
+  } | null>(null)
   const [ribbonTab, setRibbonTab] = useState<RibbonTab>('home')
   const [spread, setSpread] = useState<1 | 2>(1)
   const [nightMode, setNightMode] = useState(false)
@@ -1470,18 +1479,36 @@ export default function App() {
       const preset = await window.pdfApi.consumeAiPreset()
       if (preset?.text) {
         setAiCollapsed(false)
-        setAiPreset({ text: preset.text, nonce: Date.now() })
+        const autoRun = await aiPresetAutoRuns(preset, platform() === 'web', () =>
+          window.pdfApi.getAiSettings(),
+        )
+        setAiPreset({
+          text: preset.text,
+          nonce: Date.now(),
+          autoRun,
+          ...(preset.displayText ? { displayText: preset.displayText } : {}),
+        })
       }
     })()
   }, [openPath])
 
   useEffect(() => window.pdfApi.onReloadRequest?.((path) => void openPath(path)), [openPath])
 
+  // subscribed in the same commit as the boot read above, which consumes only after the open:
+  // a preset in between is never lost. The panel takes it once the document is ready
   useEffect(() => {
     return window.pdfApi.onAiPreset?.((preset) => {
       if (!preset?.text) return
       aiDockRef.current.open()
-      setAiPreset({ text: preset.text, nonce: Date.now() })
+      void aiPresetAutoRuns(preset, platform() === 'web', () => window.pdfApi.getAiSettings()).then(
+        (autoRun) =>
+          setAiPreset({
+            text: preset.text,
+            nonce: Date.now(),
+            autoRun,
+            ...(preset.displayText ? { displayText: preset.displayText } : {}),
+          }),
+      )
     })
   }, [])
 
@@ -7844,7 +7871,7 @@ export default function App() {
             <AiPanel
               api={aiApi}
               filePath={filePath}
-              preset={aiPreset}
+              preset={status === 'ready' ? aiPreset : null}
               open={!aiDock.collapsed}
               onExpand={aiDock.open}
               onCollapse={aiDock.collapse}

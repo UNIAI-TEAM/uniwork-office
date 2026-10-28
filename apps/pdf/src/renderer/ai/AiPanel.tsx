@@ -120,6 +120,8 @@ interface ToolActivity {
 interface ChatEntry {
   role: 'user' | 'assistant'
   text: string
+  /** a user bubble whose words (`text`) differ from what was sent: the sent text, for Retry */
+  instruction?: string
   streaming?: boolean
   isError?: boolean
   /** the S9 key the transport chose for this UniWork AI error; absent for any other failure */
@@ -186,8 +188,11 @@ export function AiPanel({
   /** Absolute path of the open PDF (chat history is keyed to it) */
   filePath?: string
   onCollapse: () => void
-  /** Ribbon AI buttons push a one-shot prompt; a new nonce triggers an auto-run */
-  preset?: { text: string; nonce: number } | null
+  /**
+   * Ribbon AI buttons and the web host's job push a one-shot prompt; a new nonce triggers an
+   * auto-run (unless autoRun is false). displayText is the bubble when it differs from the sent text
+   */
+  preset?: { text: string; nonce: number; autoRun?: boolean; displayText?: string } | null
   /**
    * Fired when a run that mutated the document finishes. Resolves to the file name to offer saving
    * under when the document is a blank the user has not named (the panel then asks, nothing is
@@ -710,8 +715,15 @@ export function AiPanel({
     stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
   }
 
-  /** retryScope: null = a retry that had no scope; undefined = capture the live selection */
-  const send = (text: string, retryScope?: AiScopeQuoteData | null): boolean => {
+  /**
+   * retryScope: null = a retry that had no scope; undefined = capture the live selection.
+   * displayText: the bubble's words when they differ from the sent text
+   */
+  const send = (
+    text: string,
+    retryScope?: AiScopeQuoteData | null,
+    displayText?: string,
+  ): boolean => {
     const instruction = text.trim()
     const loop = loopRef.current
     if (needModelHint !== null || !instruction || !loop || loop.busy) return false
@@ -727,9 +739,15 @@ export function AiPanel({
     runTextsRef.current = []
     runToolsRef.current = []
     runUsageRef.current = undefined
+    const shown = displayText?.trim() || instruction
     setChat((prev) => [
       ...prev,
-      { role: 'user', text: instruction, ...(scope ? { scope } : {}) },
+      {
+        role: 'user',
+        text: shown,
+        ...(shown !== instruction ? { instruction } : {}),
+        ...(scope ? { scope } : {}),
+      },
       { role: 'assistant', text: '', streaming: true },
     ])
     setPrompt('')
@@ -769,12 +787,18 @@ export function AiPanel({
 
   // One-click AI actions from the ribbon / Ask popover; while a run is active the
   // preset lands in the composer instead of being dropped silently (markdown parity)
+  // one question per preset, also when StrictMode runs the effect twice
+  const presetNonceRef = useRef<number | null>(null)
   useEffect(() => {
-    if (!preset) return
+    if (!preset || presetNonceRef.current === preset.nonce) return
+    presetNonceRef.current = preset.nonce
     // the run lands in the chat: leave Ask UNI so it is the one on screen
     askUni.leave()
-    if (loopRef.current?.busy) setPrompt(preset.text)
-    else send(preset.text)
+    // the text goes out word for word (a host job is recognised by it, UNI-2264). One that cannot
+    // run now (busy, no model yet, the UniWork AI disclosure not acknowledged) waits in the composer
+    if (preset.autoRun === false || !send(preset.text, undefined, preset.displayText)) {
+      setPrompt(preset.text)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per nonce
   }, [preset?.nonce])
 
@@ -1086,7 +1110,9 @@ export function AiPanel({
                       {!busy && !uniworkErrorFollows && (
                         <button
                           className="ai-retry-btn"
-                          onClick={() => send(entry.text, entry.scope ?? null)}
+                          onClick={() =>
+                            send(entry.instruction ?? entry.text, entry.scope ?? null, entry.text)
+                          }
                         >
                           {t('aiRetry')}
                         </button>
@@ -1206,7 +1232,7 @@ export function AiPanel({
                   waiting={Boolean(entry.waitLine)}
                   onRetry={
                     isLast && !busy && asked
-                      ? () => send(asked.text, asked.scope ?? null)
+                      ? () => send(asked.instruction ?? asked.text, asked.scope ?? null, asked.text)
                       : undefined
                   }
                   onChooseProvider={() => void window.pdfApi?.openAiModelSettings?.()}

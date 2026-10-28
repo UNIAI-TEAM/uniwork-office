@@ -426,8 +426,13 @@ interface AiPanelProps {
   docEmpty?: boolean
   /** fallback numbering ids for documents created from the blank template */
   numIdFallback?: NumIds | null
-  /** preset instruction pushed from the ribbon or start screen; autoRun sends it immediately */
-  preset?: { text: string; nonce: number; autoRun?: boolean } | null
+  /**
+   * preset instruction pushed from the ribbon, the start screen or the web host's job (`ai.start`);
+   * autoRun sends it immediately. displayText is the bubble when it differs from the sent text
+   */
+  preset?: { text: string; nonce: number; autoRun?: boolean; displayText?: string } | null
+  /** the last preset nonce taken, kept by App so a remounted panel (a new document key) never runs it again */
+  presetSeen?: { current: number | null }
   /** false shows only the collapsed rail; the component stays mounted so panel state survives */
   open?: boolean
   /** the dock is hidden by the frame (Read Mode): it is not an active dialog, whatever `open` says */
@@ -488,6 +493,7 @@ export function AiPanel({
   docEmpty,
   numIdFallback,
   preset,
+  presetSeen,
   open = true,
   dockHidden = false,
   hideRail = false,
@@ -1208,13 +1214,18 @@ export function AiPanel({
     })
   }
 
+  // one question per preset: StrictMode's second effect run and a remount find it taken
+  const ownPresetSeen = useRef<number | null>(null)
+  const presetNonceRef = presetSeen ?? ownPresetSeen
   useEffect(() => {
-    if (!preset) return
+    if (!preset || presetNonceRef.current === preset.nonce) return
+    presetNonceRef.current = preset.nonce
     // the run lands in the chat: leave Ask UNI so it is the one on screen (a prefilled composer takes
     // focus once the chat pane is shown again)
     askUni.leave(preset.autoRun ? undefined : () => inputRef.current?.focus())
-    if (preset.autoRun) runWith(preset.text)
-    else {
+    // the text goes out word for word (a host job is recognised by it, UNI-2264). One that cannot
+    // run now (busy, no model yet, the UniWork AI disclosure not acknowledged) waits in the composer
+    if (!preset.autoRun || !runWith(preset.text, preset.displayText ?? preset.text)) {
       setInput(preset.text)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
