@@ -153,4 +153,49 @@ describe('save-plan: cell pictures', () => {
     expect([...plan.added.keys()].some((name) => name.startsWith('xl/richData/'))).toBe(false)
     expect(plan.addedBinary.size).toBe(0)
   })
+
+  it('forwards redactionStates (including previousFill) and writes the redaction part and mirror', async () => {
+    const source = new Uint8Array(await buildEditFixture())
+    const { engine } = memoryEngine(source)
+    const states = [
+      {
+        sheetName: 'Data',
+        marks: [
+          {
+            startRow: 1,
+            endRow: 1,
+            startColumn: 1,
+            endColumn: 1,
+            label: 'client phone',
+            previousFill: '#FF0000',
+          },
+        ],
+      },
+    ]
+    const save = resolveSaveRequest(
+      new Map([['sheet-1', 'Data']]),
+      request({ redactionStates: states }),
+    )
+    expect(save.args.redactionStates).toEqual(states)
+    expect(
+      resolveSaveRequest(new Map([['sheet-1', 'Data']]), request({})).args.redactionStates,
+    ).toBeNull()
+
+    const { data, plan } = await saveWorkbookBytes({
+      engine,
+      sourcePath: '/work/Edit.xlsx',
+      sourceBytes: source,
+      workDir: '/tmp/save',
+      save,
+    })
+    expect([...plan.added.keys()]).toContain('xl/gxRedactions.json')
+    const saved = await JSZip.loadAsync(data)
+    const part = JSON.parse(await saved.file('xl/gxRedactions.json')!.async('text'))
+    expect(part.sheets[0].marks[0]).toMatchObject({
+      label: 'client phone',
+      previousFill: '#FF0000',
+    })
+    const workbookXml = await saved.file('xl/workbook.xml')!.async('text')
+    expect(workbookXml).toContain('_gxRedaction_1')
+  })
 })

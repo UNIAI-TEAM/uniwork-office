@@ -49,6 +49,7 @@ Treat these as **expected conflict areas**. Prefer UniWork display strings and i
 - `packages/electron-utils/src/github-menu.ts`
 - `docs/go1/**` (ours; keep)
 - `packages/docx-engine/src/compare.ts` (`DEFAULT_COMPARE_AUTHOR`), `packages/cli/src/commands/docs.ts` (compare `--author` default help), `packages/cli/tests/docs-compare.test.ts` (redline default author `UniWork Office`)
+- `packages/xlsx-gateway/src/gateway/xlsx-redaction.ts` (`REDACTION_REL_TYPE` OPC relationship-type URL stays byte-identical and is allowlisted in `tools/check-egress.mjs` and `tools/rebrand/brand-allowlist.json`; the two version-mismatch error strings name `UniWork Office`)
 
 ## How to avoid overwriting UniWork branding
 

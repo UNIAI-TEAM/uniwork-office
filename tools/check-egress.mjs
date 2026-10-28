@@ -42,6 +42,12 @@ export const ALLOWLIST = [
     reason:
       "XML namespace of the stored 'hidden from the model' marker (a go:redact element in a docx run's rPr and inside a pptx <a:ext>). It is part of the document format: renaming it makes Word and PowerPoint treat the file as corrupt and repair drops the run carrying the mark. A document identifier, never rendered and never contacted.",
   },
+  {
+    path: 'packages/xlsx-gateway/src/gateway/xlsx-redaction.ts',
+    pattern: 'genspark.ai',
+    reason:
+      "Relationship type URI of the stored 'hidden from the model' part of a workbook (xl/_rels/workbook.xml.rels). It is an OPC identifier written into the file, like the schemas.openxmlformats.org types beside it: renaming it orphans the part for every file written so far, so the marked cells silently become readable again. A document identifier, never rendered and never contacted.",
+  },
 ]
 
 const SCOPE = [
