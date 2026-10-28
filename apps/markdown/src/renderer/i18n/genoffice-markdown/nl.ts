@@ -18,4 +18,9 @@ export const nl = {
   statusWords: '{n} woorden',
   statusChars: '{n} tekens',
   highlight: 'Markeren',
+  diskChangedMsg: 'Dit bestand is door een ander programma gewijzigd.',
+  diskConflictMsg: 'Dit bestand is op schijf gewijzigd; opslaan overschrijft die wijzigingen.',
+  diskReload: 'Opnieuw laden',
+  diskKeepMine: 'Mijn versie behouden',
+  diskOverwrite: 'Toch overschrijven',
 } satisfies Record<keyof typeof zh, string>

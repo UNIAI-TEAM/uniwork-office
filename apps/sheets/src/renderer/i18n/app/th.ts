@@ -114,8 +114,10 @@ export const th = {
   appChartNoRepoint: 'แผนภูมินี้ไม่รองรับการกำหนดช่วงข้อมูลใหม่',
   appKeepOneSeries: 'ต้องเก็บชุดข้อมูลไว้อย่างน้อยหนึ่งชุด',
   appNoCategoriesToSwitch: 'ไม่มีประเภทให้สลับ',
-  appComboNoSelectData: 'ยังไม่รองรับการเปลี่ยนแหล่งข้อมูลของแผนภูมิผสม',
+  appSelectDataUnsupported: 'ยังไม่รองรับการเปลี่ยนแหล่งข้อมูลของชนิดแผนภูมินี้',
   appSeriesName: 'ชื่อชุดข้อมูล',
+  appSeriesType: 'ชนิดของชุดข้อมูล',
+  appSecondaryAxis: 'แกนรอง',
   appValuesRange: 'ช่วงค่า',
   appCategoriesRange: 'ช่วงประเภท',
   appKeepUnchanged: 'คงเดิม',
@@ -319,7 +321,6 @@ export const th = {
   appDialogCancel: 'ยกเลิก',
   appPivotSheetNoMove: 'แผ่นงานนี้มี PivotTable — ยังไม่รองรับการย้ายช่วง',
   appMergeOverTable: 'ส่วนที่เลือกซ้อนทับตาราง Excel — ยังไม่รองรับการผสานเซลล์ภายในตาราง',
-  appTableFilterNoEdit: 'ตัวกรองของแผ่นงานนี้เป็นของตาราง Excel — การแก้ไขยังบันทึกไม่ได้',
   appAutofillStreaming: 'ยังไม่อนุญาตให้เติมอัตโนมัติลงในพื้นที่ที่กำลังโหลดแบบสตรีม',
   appDvNeedsIndexed:
     'การแก้ไขการตรวจสอบความถูกต้องของข้อมูลต้องรอให้แผ่นงานนี้ทำดัชนีเสร็จก่อน — ลองใหม่อีกสักครู่',
@@ -550,8 +551,6 @@ export const th = {
   appSaveFailed: 'บันทึกเวิร์กบุ๊กไม่ได้',
   appCfRuleUnsaveable:
     'กฎการจัดรูปแบบตามเงื่อนไขนี้ไม่สามารถบันทึกเป็น xlsx ได้ — โปรดใช้กฎประเภทอื่น',
-  appSaveErrX14Dv:
-    'ชีตนี้มีการตรวจสอบความถูกต้องของข้อมูลแบบขยาย (x14) ยังไม่รองรับการแก้ไขกฎการตรวจสอบของชีตนี้',
   appSaveErrMultiSelectList:
     'การตรวจสอบแบบรายการเลือกหลายรายการไม่สามารถบันทึกเป็น xlsx ได้ — โปรดลบกฎนั้นก่อนบันทึก',
   appSaveErrX14Cf: 'ช่วงนี้มีการจัดรูปแบบตามเงื่อนไขแบบขยาย (x14) จึงยังแก้ไขไม่ได้ในขณะนี้',

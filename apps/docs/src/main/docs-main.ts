@@ -66,6 +66,7 @@ import {
 import {
   abortOnDestroyed,
   appMenuLabels,
+  appMenuTemplate,
   buildPrintableHtml,
   configuredDefaultSaveDir,
   contextMenuLabels,
@@ -86,6 +87,7 @@ import {
   aboutMenuItem,
   checkUpdatesMenuItem,
   toggleDevToolsItem,
+  settingsMenuItem,
   windowMenuTemplate,
   type HeadlessExportFormat,
   type HeadlessExportTarget,
@@ -6206,27 +6208,13 @@ export function buildDocsMenu(): void {
         }))
       : [{ label: tm('menuNoRecent'), enabled: false }]
 
+  const labels = appMenuLabels(getUiLang())
+  const appMenu = appMenuTemplate(process.platform, labels, {
+    appLabel: app.name,
+    extra: [settingsMenuItem(labels, () => sendCommand('preferences'))],
+  })
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac
-      ? [
-          {
-            label: app.name,
-            submenu: [
-              { role: 'about' as const },
-              { type: 'separator' as const },
-              { label: tm('menuPreferences'), click: () => sendCommand('preferences') },
-              { type: 'separator' as const },
-              { role: 'services' as const },
-              { type: 'separator' as const },
-              { role: 'hide' as const },
-              { role: 'hideOthers' as const },
-              { role: 'unhide' as const },
-              { type: 'separator' as const },
-              { role: 'quit' as const },
-            ],
-          },
-        ]
-      : []),
+    ...(appMenu ? [appMenu] : []),
     {
       label: tm('menuFile'),
       submenu: [
@@ -6492,10 +6480,11 @@ export function buildDocsMenu(): void {
       submenu: [
         { label: tm('menuWordCount'), click: () => sendCommand('word-count') },
         { label: tm('menuAutoCorrect'), click: () => sendCommand('autocorrect-options') },
-        // Word for Mac keeps Preferences in the application menu
+        // Word for Mac keeps Settings in the application menu; on Windows/Linux omit the
+        // accelerator so Docs Ctrl+Comma subscript (docs-027) is not swallowed
         ...(isMac
           ? []
-          : [{ label: tm('menuPreferences'), click: () => sendCommand('preferences') }]),
+          : [settingsMenuItem(labels, () => sendCommand('preferences'), { accelerator: false })]),
         { type: 'separator' },
         // Runs the same AI proofread as Review > Editor (renderer shows the one-time ack)
         { label: tm('menuAiProofread'), click: () => sendCommand('ai-proofread') },

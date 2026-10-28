@@ -18,4 +18,9 @@ export const th = {
   statusWords: '{n} คำ',
   statusChars: '{n} อักขระ',
   highlight: 'ไฮไลต์',
+  diskChangedMsg: 'ไฟล์นี้ถูกแก้ไขโดยโปรแกรมอื่น',
+  diskConflictMsg: 'ไฟล์นี้ถูกแก้ไขในดิสก์ การบันทึกจะเขียนทับการเปลี่ยนแปลงเหล่านั้น',
+  diskReload: 'โหลดใหม่',
+  diskKeepMine: 'เก็บของฉันไว้',
+  diskOverwrite: 'เขียนทับต่อไป',
 } satisfies Record<keyof typeof zh, string>

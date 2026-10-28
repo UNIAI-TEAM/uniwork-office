@@ -10,12 +10,14 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SOURCE_VIEW_CHANNELS, type OpenSourceInput } from '../src/shared/source-view'
 import type { AccountStatus } from '../src/shared/home-api'
+import type { TabSummary } from '../src/shared/tabs-api'
+import { tabMenuTemplate, type TabMenuActions } from '../src/main/tab-menu'
 import {
   SourceViewRegistry,
   createSourceSaveHint,
   withSourceViews,
 } from '../src/main/uniwork-docs/source-view'
-
+import { tm } from './helpers/main-menu-strings'
 let dir = ''
 let statusListener: ((status: AccountStatus) => void) | null = null
 let identity: { accountId: string; deviceSessionId: string; deploymentId: string } | null = null
@@ -464,9 +466,62 @@ describe('main-side entries that act on a path must not touch a source view', ()
   it('the native tab menu has only Open in new window, the bound-document offline pin and Close', () => {
     const from = index.indexOf('TABS_CHANNELS.showTabMenu,')
     const menu = index.slice(from, index.indexOf('TABS_CHANNELS.showNewMenu', from))
-    const labels = [...menu.matchAll(/label: (tm\('\w+'\))/g)].map((m) => m[1])
-    expect(labels).toEqual(["tm('menuOpenInNewWindow')", "tm('menuClose')"])
     // the one document-only entry is keyed by a stored binding, which a source never has
     expect(menu).toContain('offlineBindingOf(tab.filePath)')
+    expect(menu).toContain('uniworkBound: isUniworkBoundPath(tab.filePath)')
+    // isUniworkBoundPath includes sourceViews.has(path), so a source-view tab gets uniworkBound: true
+    const isBound = index.slice(
+      index.indexOf('function isUniworkBoundPath('),
+      index.indexOf('function duplicateFile('),
+    )
+    expect(isBound).toContain('uniworkDocs?.service.sourceViews.has(path) === true')
+
+    const home: TabSummary = {
+      id: 'home',
+      kind: 'home',
+      title: 'Home',
+      closable: false,
+      active: false,
+    }
+    const src: TabSummary = {
+      id: 'src',
+      kind: 'docs',
+      title: 'Plan.docx',
+      filePath: '/tmp/uniwork-drafts-preview/sources-s1/ab12/Plan.docx',
+      closable: true,
+      active: true,
+    }
+    const noopActions: TabMenuActions = {
+      save: vi.fn(),
+      saveAs: vi.fn(),
+      print: vi.fn(),
+      openInNewWindow: vi.fn(),
+      splitBeside: vi.fn(),
+      rename: vi.fn(),
+      duplicate: vi.fn(),
+      copyText: vi.fn(),
+      reveal: vi.fn(),
+      openDefault: vi.fn(),
+      move: vi.fn(),
+      closeTabs: vi.fn(),
+      reopenClosed: vi.fn(),
+    }
+    const emitted = tabMenuTemplate({
+      tab: src,
+      tabs: [home, src],
+      canDetach: true,
+      fileExists: true,
+      canReopen: false,
+      uniworkBound: true,
+      extraItems: [],
+      tm,
+      actions: noopActions,
+    })
+    const ids = emitted.flatMap((item) => (item.id ? [item.id] : []))
+    expect(ids).toContain('openInNewWindow')
+    expect(ids).toContain('close')
+    for (const forbidden of ['rename', 'duplicate', 'copyPath', 'reveal', 'openDefault']) {
+      expect(ids, forbidden).not.toContain(forbidden)
+    }
   })
 })

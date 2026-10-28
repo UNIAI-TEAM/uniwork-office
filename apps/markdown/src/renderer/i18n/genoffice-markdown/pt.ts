@@ -18,4 +18,9 @@ export const pt = {
   statusWords: '{n} palavras',
   statusChars: '{n} caracteres',
   highlight: 'Realçar',
+  diskChangedMsg: 'Este arquivo foi alterado por outro programa.',
+  diskConflictMsg: 'Este arquivo mudou no disco; salvar substituirá essas alterações.',
+  diskReload: 'Recarregar',
+  diskKeepMine: 'Manter o meu',
+  diskOverwrite: 'Substituir mesmo assim',
 } satisfies Record<keyof typeof zh, string>

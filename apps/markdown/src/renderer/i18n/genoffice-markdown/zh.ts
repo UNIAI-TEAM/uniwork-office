@@ -17,4 +17,9 @@ export const zh = {
   statusWords: '{n} 个字',
   statusChars: '{n} 个字符',
   highlight: '高亮',
+  diskChangedMsg: '这个文件已被其他程序修改。',
+  diskConflictMsg: '这个文件在磁盘上已被修改，保存会覆盖那些改动。',
+  diskReload: '重新载入',
+  diskKeepMine: '保留我的',
+  diskOverwrite: '仍然覆盖',
 }

@@ -18,4 +18,9 @@ export const en = {
   statusWords: '{n} words',
   statusChars: '{n} characters',
   highlight: 'Highlight',
+  diskChangedMsg: 'This file was changed by another program.',
+  diskConflictMsg: 'This file changed on disk; saving will overwrite those changes.',
+  diskReload: 'Reload',
+  diskKeepMine: 'Keep mine',
+  diskOverwrite: 'Overwrite anyway',
 } satisfies Record<keyof typeof zh, string>

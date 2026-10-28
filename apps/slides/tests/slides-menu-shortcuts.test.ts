@@ -78,7 +78,7 @@ afterEach(() => {
 })
 
 /** The template buildSlidesMenu hands to Menu.buildFromTemplate, flattened. */
-function menuItems(os: NodeJS.Platform, packaged: boolean): Item[] {
+function menuItems(os: NodeJS.Platform, packaged: boolean, tabMode = true): Item[] {
   Object.defineProperty(process, 'platform', { ...platform, value: os })
   electronModule.app.isPackaged = packaged
   let template: Item[] = []
@@ -89,7 +89,7 @@ function menuItems(os: NodeJS.Platform, packaged: boolean): Item[] {
     template = t
     return {}
   }
-  setSlidesCloseTabHook(() => {})
+  setSlidesCloseTabHook(tabMode ? () => {} : null)
   buildSlidesMenu()
   menu.buildFromTemplate = original
   const flat = (items: Item[]): Item[] =>
@@ -123,5 +123,27 @@ describe('slides menu', () => {
     expect(labels(menuItems('win32', true))).not.toContain('Developer Tools')
     expect(labels(menuItems('darwin', true))).not.toContain('Developer Tools')
     expect(labels(menuItems('win32', false))).toContain('Developer Tools')
+  })
+
+  it('win32: includes Settings in File without an accelerator and retains Close/Quit roles', () => {
+    const tabItems = menuItems('win32', true, true)
+    const winSettings = tabItems.filter((i) => i.label === 'Settings')
+    expect(winSettings).toHaveLength(1)
+    expect(winSettings[0]!.accelerator).toBeUndefined()
+
+    const standaloneWin = menuItems('win32', true, false)
+    expect(standaloneWin.find((i) => i.label === 'menuQuit')?.role).toBe('quit')
+  })
+
+  it('darwin: includes Settings with CmdOrCtrl+, accelerator and retains standalone close role', () => {
+    const macItems = menuItems('darwin', true, true)
+    const macSettings = macItems.filter((i) => i.label === 'Settings')
+    expect(macSettings.length).toBeGreaterThanOrEqual(1)
+    for (const item of macSettings) {
+      expect(item.accelerator).toBe('CmdOrCtrl+,')
+    }
+
+    const standaloneMac = menuItems('darwin', true, false)
+    expect(standaloneMac.find((i) => i.label === 'menuClose')?.role).toBe('close')
   })
 })

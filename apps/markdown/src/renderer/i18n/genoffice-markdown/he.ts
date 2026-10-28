@@ -18,4 +18,9 @@ export const he = {
   statusWords: '{n} מילים',
   statusChars: '{n} תווים',
   highlight: 'הדגשה',
+  diskChangedMsg: 'קובץ זה שונה על ידי תוכנית אחרת.',
+  diskConflictMsg: 'קובץ זה השתנה בדיסק; שמירה תדרוס את השינויים האלה.',
+  diskReload: 'טען מחדש',
+  diskKeepMine: 'השאר את שלי',
+  diskOverwrite: 'דרוס בכל זאת',
 } satisfies Record<keyof typeof zh, string>

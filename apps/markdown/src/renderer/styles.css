@@ -2619,6 +2619,42 @@ html.markdown-graph-open .ribbon-tabs {
   container: md-page / inline-size;
 }
 
+.disk-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+}
+
+.disk-notice span {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.disk-notice button {
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.disk-notice button:hover {
+  background: var(--hover);
+}
+
+.disk-notice button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* ---- main layout: AI dock (left) + editor ---- */
 
 .app-main {

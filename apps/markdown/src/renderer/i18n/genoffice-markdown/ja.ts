@@ -18,4 +18,9 @@ export const ja = {
   statusWords: '{n} 語',
   statusChars: '{n} 文字',
   highlight: 'ハイライト',
+  diskChangedMsg: 'このファイルは他のプログラムによって変更されました。',
+  diskConflictMsg: 'このファイルはディスク上で変更されています。保存するとその変更を上書きします。',
+  diskReload: '再読み込み',
+  diskKeepMine: '自分の内容を保持',
+  diskOverwrite: '上書きする',
 } satisfies Record<keyof typeof zh, string>

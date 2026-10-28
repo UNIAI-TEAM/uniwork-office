@@ -18,4 +18,9 @@ export const zhTW = {
   statusWords: '{n} 個字',
   statusChars: '{n} 個字元',
   highlight: '高亮',
+  diskChangedMsg: '這個檔案已被其他程式修改。',
+  diskConflictMsg: '這個檔案在磁碟上已被修改，儲存會覆寫那些變更。',
+  diskReload: '重新載入',
+  diskKeepMine: '保留我的',
+  diskOverwrite: '仍然覆寫',
 } satisfies Record<keyof typeof zh, string>

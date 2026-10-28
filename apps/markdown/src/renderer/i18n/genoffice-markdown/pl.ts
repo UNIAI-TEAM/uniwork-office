@@ -18,4 +18,9 @@ export const pl = {
   statusWords: '{n} słów',
   statusChars: '{n} znaków',
   highlight: 'Wyróżnij',
+  diskChangedMsg: 'Ten plik został zmieniony przez inny program.',
+  diskConflictMsg: 'Ten plik zmienił się na dysku; zapisanie nadpisze te zmiany.',
+  diskReload: 'Wczytaj ponownie',
+  diskKeepMine: 'Zachowaj moje',
+  diskOverwrite: 'Nadpisz mimo to',
 } satisfies Record<keyof typeof zh, string>

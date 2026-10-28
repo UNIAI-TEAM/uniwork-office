@@ -121,8 +121,10 @@ export const es = {
   appChartNoRepoint: 'Este gráfico no admite reasignar sus rangos de datos.',
   appKeepOneSeries: 'Conserve al menos una serie.',
   appNoCategoriesToSwitch: 'No hay categorías que intercambiar.',
-  appComboNoSelectData: 'Cambiar el origen de datos de un gráfico combinado aún no se admite.',
+  appSelectDataUnsupported: 'No se admite cambiar el origen de datos de este tipo de gráfico.',
   appSeriesName: 'Nombre de la serie',
+  appSeriesType: 'Tipo de serie',
+  appSecondaryAxis: 'Eje secundario',
   appValuesRange: 'Rango de valores',
   appCategoriesRange: 'Rango de categorías',
   appKeepUnchanged: 'Mantener sin cambios',
@@ -353,8 +355,6 @@ export const es = {
   appPivotSheetNoMove: 'Esta hoja contiene una tabla dinámica — mover rangos aún no se admite.',
   appMergeOverTable:
     'La selección se superpone con una tabla de Excel — combinar celdas dentro de una tabla aún no es compatible.',
-  appTableFilterNoEdit:
-    'El filtro de esta hoja pertenece a una tabla de Excel — su edición aún no se puede guardar.',
   appAutofillStreaming:
     'Aún no se permite el autorrelleno hacia un área que todavía se está cargando por streaming.',
   appDvNeedsIndexed:
@@ -617,8 +617,6 @@ export const es = {
   appSaveFailed: 'No se puede guardar el libro.',
   appCfRuleUnsaveable:
     'Esta regla de formato condicional no se puede guardar en xlsx — use otro tipo de regla.',
-  appSaveErrX14Dv:
-    'Esta hoja tiene validación de datos extendida (x14); editar sus reglas de validación aún no es compatible.',
   appSaveErrMultiSelectList:
     'La validación de lista de selección múltiple no se puede guardar en xlsx — elimine la regla antes de guardar.',
   appSaveErrX14Cf:

@@ -115,8 +115,10 @@ export const hi = {
   appChartNoRepoint: 'यह चार्ट अपनी डेटा श्रेणियों को फिर से निर्दिष्ट करने का समर्थन नहीं करता।',
   appKeepOneSeries: 'कम से कम एक शृंखला रखें।',
   appNoCategoriesToSwitch: 'बदलने के लिए कोई श्रेणियाँ नहीं हैं।',
-  appComboNoSelectData: 'कॉम्बो चार्ट का डेटा स्रोत बदलना अभी समर्थित नहीं है।',
+  appSelectDataUnsupported: 'इस चार्ट प्रकार का डेटा स्रोत बदलना समर्थित नहीं है।',
   appSeriesName: 'शृंखला नाम',
+  appSeriesType: 'श्रृंखला प्रकार',
+  appSecondaryAxis: 'द्वितीय अक्ष',
   appValuesRange: 'मान श्रेणी',
   appCategoriesRange: 'श्रेणी सीमा',
   appKeepUnchanged: 'अपरिवर्तित रखें',
@@ -334,8 +336,6 @@ export const hi = {
   appPivotSheetNoMove: 'इस शीट में पिवट टेबल है — श्रेणियाँ स्थानांतरित करना अभी समर्थित नहीं है।',
   appMergeOverTable:
     'चयन Excel तालिका से ओवरलैप करता है — तालिका के भीतर सेल मर्ज करना अभी समर्थित नहीं है।',
-  appTableFilterNoEdit:
-    'इस शीट का फ़िल्टर एक Excel तालिका का है — इसका संपादन अभी सहेजा नहीं जा सकता।',
   appAutofillStreaming:
     'जो क्षेत्र अभी स्ट्रीम होकर लोड हो रहा है, उसमें स्वतः भरण की अनुमति अभी नहीं है।',
   appDvNeedsIndexed:
@@ -577,8 +577,6 @@ export const hi = {
   appSaveFailed: 'कार्यपुस्तिका सहेजी नहीं जा सकी।',
   appCfRuleUnsaveable:
     'यह सशर्त स्वरूपण नियम xlsx में सहेजा नहीं जा सकता — कृपया दूसरा नियम प्रकार चुनें।',
-  appSaveErrX14Dv:
-    'इस शीट में विस्तारित (x14) डेटा सत्यापन है; इसके सत्यापन नियमों का संपादन अभी समर्थित नहीं है।',
   appSaveErrMultiSelectList:
     'बहु-चयन सूची सत्यापन xlsx में सहेजा नहीं जा सकता — सहेजने से पहले वह नियम हटाएँ।',
   appSaveErrX14Cf: 'इस श्रेणी में विस्तारित (x14) सशर्त स्वरूपण है, इसे अभी बदला नहीं जा सकता।',

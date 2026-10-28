@@ -90,10 +90,14 @@ export function tokenizeFootnoteDefinition(
 }
 
 /**
- * Offset of the first line-start `[^label]:` after a newline. marked consults
- * this to cut the paragraph that would otherwise swallow the definition line,
- * and it probes the source minus its first character, so position 0 — never a
- * true line start when a paragraph is being cut — is skipped.
+ * Offset of the first line-start `[^label]:` before the paragraph ends. marked
+ * consults this to cut the paragraph that would otherwise swallow the
+ * definition line, and it probes the source minus its first character, so
+ * position 0 — never a true line start when a paragraph is being cut — is
+ * skipped. A blank line already ends the paragraph on its own, so scanning
+ * stops at the first blank line instead of walking the rest of the document.
+ * Blank means spaces only, as in marked's paragraph rule: a tab-only line does
+ * not end the paragraph, so the scan continues past it.
  */
 export function footnoteDefStart(src: string): number {
   let br = src.indexOf('\n')
@@ -101,6 +105,7 @@ export function footnoteDefStart(src: string): number {
     const lineStart = br + 1
     const next = src.indexOf('\n', lineStart)
     const line = src.slice(lineStart, next < 0 ? undefined : next)
+    if (/^ *$/.test(line)) return -1
     if (DEF_OPEN_RE.test(line)) return lineStart
     br = next
   }

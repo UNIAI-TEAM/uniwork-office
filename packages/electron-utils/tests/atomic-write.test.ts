@@ -7,17 +7,23 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs'
-import { open, rename, writeFile } from 'node:fs/promises'
+import { link, open, rename, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { atomicCopyFile, atomicWriteFile, writeJsonAtomic } from '../src/atomic-write'
+import {
+  atomicCopyFile,
+  atomicCopyFileExclusive,
+  atomicWriteFile,
+  writeJsonAtomic,
+} from '../src/atomic-write'
 
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  const actual: typeof import('node:fs/promises') = await importOriginal()
   return {
     ...actual,
     rename: vi.fn(actual.rename),
+    link: vi.fn(actual.link),
     open: vi.fn(actual.open),
     writeFile: vi.fn(actual.writeFile),
     copyFile: vi.fn(actual.copyFile),
@@ -196,6 +202,78 @@ describe('atomicCopyFile', () => {
     await atomicCopyFile(source, target)
     expect(readFileSync(target, 'utf8')).toBe('pdf-bytes')
     expect(readdirSync(dir).sort()).toEqual(['a.pdf', 'b.pdf'])
+  })
+})
+
+describe('atomicCopyFileExclusive', () => {
+  it('publishes via hard link and cleans up the temp file', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'eu-ace-'))
+    const source = join(dir, 'a.pdf')
+    const target = join(dir, 'b.pdf')
+    writeFileSync(source, 'pdf-bytes')
+    await atomicCopyFileExclusive(source, target)
+    expect(readFileSync(target, 'utf8')).toBe('pdf-bytes')
+    expect(readdirSync(dir).sort()).toEqual(['a.pdf', 'b.pdf'])
+  })
+
+  it('rejects with EEXIST without replacing an existing target or leaving a temp file', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'eu-ace-'))
+    const source = join(dir, 'a.pdf')
+    const target = join(dir, 'b.pdf')
+    writeFileSync(source, 'new-bytes')
+    writeFileSync(target, 'existing-bytes')
+    await expect(atomicCopyFileExclusive(source, target)).rejects.toMatchObject({ code: 'EEXIST' })
+    expect(readFileSync(target, 'utf8')).toBe('existing-bytes')
+    expect(readdirSync(dir).sort()).toEqual(['a.pdf', 'b.pdf'])
+  })
+
+  it('falls back to COPYFILE_EXCL when the filesystem does not support hard links', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'eu-ace-'))
+    const source = join(dir, 'a.pdf')
+    const target = join(dir, 'b.pdf')
+    writeFileSync(source, 'pdf-bytes')
+    vi.mocked(link).mockRejectedValueOnce(errnoError('EPERM'))
+    await atomicCopyFileExclusive(source, target)
+    expect(readFileSync(target, 'utf8')).toBe('pdf-bytes')
+    expect(readdirSync(dir).sort()).toEqual(['a.pdf', 'b.pdf'])
+
+    writeFileSync(source, 'later-bytes')
+    vi.mocked(link).mockRejectedValueOnce(errnoError('EPERM'))
+    await expect(atomicCopyFileExclusive(source, target)).rejects.toMatchObject({ code: 'EEXIST' })
+    expect(readFileSync(target, 'utf8')).toBe('pdf-bytes')
+  })
+
+  it('falls back to COPYFILE_EXCL on Windows exFAT EISDIR and rethrows EISDIR on non-win32', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'eu-ace-'))
+    const source = join(dir, 'a.pdf')
+    const target = join(dir, 'b.pdf')
+    writeFileSync(source, 'pdf-bytes')
+    const origPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+    try {
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+      vi.mocked(link).mockRejectedValueOnce(errnoError('EISDIR'))
+      await atomicCopyFileExclusive(source, target)
+      expect(readFileSync(target, 'utf8')).toBe('pdf-bytes')
+      expect(readdirSync(dir).sort()).toEqual(['a.pdf', 'b.pdf'])
+
+      writeFileSync(source, 'later-bytes')
+      vi.mocked(link).mockRejectedValueOnce(errnoError('EISDIR'))
+      await expect(atomicCopyFileExclusive(source, target)).rejects.toMatchObject({
+        code: 'EEXIST',
+      })
+      expect(readFileSync(target, 'utf8')).toBe('pdf-bytes')
+      expect(readdirSync(dir).sort()).toEqual(['a.pdf', 'b.pdf'])
+
+      Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+      const nonWinTarget = join(dir, 'c.pdf')
+      vi.mocked(link).mockRejectedValueOnce(errnoError('EISDIR'))
+      await expect(atomicCopyFileExclusive(source, nonWinTarget)).rejects.toMatchObject({
+        code: 'EISDIR',
+      })
+      expect(readdirSync(dir).sort()).toEqual(['a.pdf', 'b.pdf'])
+    } finally {
+      if (origPlatform) Object.defineProperty(process, 'platform', origPlatform)
+    }
   })
 })
 

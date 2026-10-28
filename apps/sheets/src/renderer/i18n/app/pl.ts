@@ -117,8 +117,10 @@ export const pl = {
   appChartNoRepoint: 'Ten wykres nie obsługuje zmiany zakresów danych.',
   appKeepOneSeries: 'Zachowaj co najmniej jedną serię.',
   appNoCategoriesToSwitch: 'Brak kategorii do przełączenia.',
-  appComboNoSelectData: 'Zmiana źródła danych wykresu kombi nie jest jeszcze obsługiwana.',
+  appSelectDataUnsupported: 'Zmiana źródła danych tego typu wykresu nie jest obsługiwana.',
   appSeriesName: 'Nazwa serii',
+  appSeriesType: 'Typ serii',
+  appSecondaryAxis: 'Oś pomocnicza',
   appValuesRange: 'Zakres wartości',
   appCategoriesRange: 'Zakres kategorii',
   appKeepUnchanged: 'Pozostaw bez zmian',
@@ -349,8 +351,6 @@ export const pl = {
     'Ten arkusz zawiera tabelę przestawną — przenoszenie zakresów nie jest jeszcze obsługiwane.',
   appMergeOverTable:
     'Zaznaczenie nachodzi na tabelę programu Excel — scalanie komórek w tabeli nie jest jeszcze obsługiwane.',
-  appTableFilterNoEdit:
-    'Filtr tego arkusza należy do tabeli programu Excel — edycji nie można jeszcze zapisać.',
   appAutofillStreaming:
     'Autouzupełnianie do obszaru, który wciąż jest ładowany strumieniowo, nie jest jeszcze dozwolone.',
   appDvNeedsIndexed:
@@ -602,8 +602,6 @@ export const pl = {
   appSaveFailed: 'Nie można zapisać skoroszytu.',
   appCfRuleUnsaveable:
     'Tej reguły formatowania warunkowego nie można zapisać w xlsx — użyj innego typu reguły.',
-  appSaveErrX14Dv:
-    'Ten arkusz ma rozszerzoną (x14) poprawność danych; edytowanie jej reguł nie jest jeszcze obsługiwane.',
   appSaveErrMultiSelectList:
     'Poprawności danych z listą wielokrotnego wyboru nie można zapisać w xlsx — usuń regułę przed zapisaniem.',
   appSaveErrX14Cf:
