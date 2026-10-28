@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { applySheetNotes, type SheetNote } from '../src/gateway/xlsx-notes'
 
@@ -86,7 +86,17 @@ const PICTURE = {
   name: 'pedigree.png',
 }
 
+afterEach(() => vi.unstubAllGlobals())
+
 describe('putting a picture into a note', () => {
+  it('decodes the picture without a Buffer global (the Sheets web frame has none)', async () => {
+    vi.stubGlobal('Buffer', undefined)
+    const { binary } = await run([{ ...NOTE, picture: PICTURE }])
+    expect([...binary.get('xl/media/image1.png')!]).toEqual([
+      ...Uint8Array.from(atob(PICTURE.base64), (c) => c.charCodeAt(0)),
+    ])
+  })
+
   it("paints the picture onto the note's shape", async () => {
     const { files } = await run([{ ...NOTE, picture: PICTURE }])
     const vml = files.get(VML_PATH)!

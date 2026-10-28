@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   assertOnlyTouchedEntriesChanged,
@@ -87,7 +87,17 @@ async function applyDirect(
   return pkg
 }
 
+afterEach(() => vi.unstubAllGlobals())
+
 describe('cell image additions: fresh rich-value parts', () => {
+  it('decodes the picture without a Buffer global (the Sheets web frame has none)', async () => {
+    vi.stubGlobal('Buffer', undefined)
+    const pkg = await applyDirect([addition()])
+    expect([...(pkg.files.get('xl/media/image1.png') as Uint8Array)]).toEqual([
+      ...Uint8Array.from(atob(PNG_BASE64), (c) => c.charCodeAt(0)),
+    ])
+  })
+
   it('writes media, rich-value bookkeeping, and vm-marked cells', async () => {
     const pkg = await applyDirect([addition(), addition({ row: 6, column: 3 })])
 

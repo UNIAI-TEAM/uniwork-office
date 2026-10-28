@@ -8,6 +8,7 @@ import { encodeXlsxEscapes } from './xlsx-escapes'
 import {
   allocatePartPath,
   appendRelationship,
+  base64ToBytes,
   registerContentTypeDefault,
   relativeTarget,
   relsPathFor,
@@ -270,7 +271,7 @@ async function writeNotePicture(
 ): Promise<NoteShapePicture> {
   const extension = IMAGE_EXTENSIONS[picture.mediaType]
   const mediaPath = await allocatePartPath(pkg, 'xl/media/image', `.${extension}`)
-  pkg.addBinary(mediaPath, Uint8Array.from(Buffer.from(picture.base64, 'base64')))
+  pkg.addBinary(mediaPath, base64ToBytes(picture.base64))
   touchedEntries.add(mediaPath)
   await registerContentTypeDefault(pkg, extension, picture.mediaType, touchedEntries)
   const relId = await appendRelationship(
