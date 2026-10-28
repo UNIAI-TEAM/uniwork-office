@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   filterLastSessionDocuments,
   launchPathsWithLastSession,
+  openLaunchSequence,
   readLastSessionDocuments,
 } from '../src/main/last-session'
 
@@ -79,5 +80,115 @@ describe('launchPathsWithLastSession', () => {
       '/local/keep.docx',
       '/local/arg.pdf',
     ])
+  })
+})
+
+describe('openLaunchSequence', () => {
+  it('opens the Home tab when there are no targets and no launch URL', async () => {
+    const events: string[] = []
+    await openLaunchSequence({
+      targets: [],
+      launchUrl: null,
+      openPath: (p) => {
+        events.push(`path:${p}`)
+        return true
+      },
+      openUrl: async (u) => {
+        events.push(`url:${u}`)
+        return true
+      },
+      openHomeTab: () => events.push('home'),
+    })
+    expect(events).toEqual(['home'])
+  })
+
+  it('opens only the URL when there are no targets and the launch URL succeeds', async () => {
+    const events: string[] = []
+    await openLaunchSequence({
+      targets: [],
+      launchUrl: 'uniwork-office://open?doc=1',
+      openPath: (p) => {
+        events.push(`path:${p}`)
+        return true
+      },
+      openUrl: async (u) => {
+        events.push(`url:${u}`)
+        return true
+      },
+      openHomeTab: () => events.push('home'),
+    })
+    expect(events).toEqual(['url:uniwork-office://open?doc=1'])
+  })
+
+  it('falls back to the Home tab when there are no targets and the launch URL fails', async () => {
+    const events: string[] = []
+    await openLaunchSequence({
+      targets: [],
+      launchUrl: 'uniwork-office://open?doc=bad',
+      openPath: (p) => {
+        events.push(`path:${p}`)
+        return true
+      },
+      openUrl: async (u) => {
+        events.push(`url:${u}`)
+        return false
+      },
+      openHomeTab: () => events.push('home'),
+    })
+    expect(events).toEqual(['url:uniwork-office://open?doc=bad', 'home'])
+  })
+
+  it('opens restored targets first and the launch URL last when both exist and the URL succeeds', async () => {
+    const events: string[] = []
+    await openLaunchSequence({
+      targets: ['/a.docx', '/b.xlsx'],
+      launchUrl: 'uniwork-office://open?doc=1',
+      openPath: (p) => {
+        events.push(`path:${p}`)
+        return true
+      },
+      openUrl: async (u) => {
+        events.push(`url:${u}`)
+        return true
+      },
+      openHomeTab: () => events.push('home'),
+    })
+    expect(events).toEqual(['path:/a.docx', 'path:/b.xlsx', 'url:uniwork-office://open?doc=1'])
+  })
+
+  it('opens restored targets only once and skips the Home tab when the launch URL fails', async () => {
+    const events: string[] = []
+    await openLaunchSequence({
+      targets: ['/a.docx', '/b.xlsx'],
+      launchUrl: 'uniwork-office://open?doc=bad',
+      openPath: (p) => {
+        events.push(`path:${p}`)
+        return true
+      },
+      openUrl: async (u) => {
+        events.push(`url:${u}`)
+        return false
+      },
+      openHomeTab: () => events.push('home'),
+    })
+    expect(events).toEqual(['path:/a.docx', 'path:/b.xlsx', 'url:uniwork-office://open?doc=bad'])
+  })
+
+  it('opens the Home tab when all targets and the launch URL fail to open', async () => {
+    const events: string[] = []
+    await openLaunchSequence({
+      targets: ['/missing.docx'],
+      launchUrl: 'uniwork-office://open?doc=bad',
+      openPath: (p) => {
+        events.push(`path:${p}`)
+        return false
+      },
+      openUrl: async (u) => {
+        events.push(`url:${u}`)
+        return false
+      },
+      openHomeTab: () => events.push('home'),
+    })
+    expect(events).toEqual(['path:/missing.docx', 'url:uniwork-office://open?doc=bad', 'home'])
   })
 })

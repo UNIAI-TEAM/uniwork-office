@@ -76,3 +76,32 @@ export function launchPathsWithLastSession(
   )
   return [...restored, ...launchPaths]
 }
+
+export interface LaunchSequenceDeps {
+  targets: readonly string[]
+  launchUrl: string | null
+  openPath: (path: string) => boolean
+  openUrl: (url: string) => Promise<boolean> | boolean
+  openHomeTab: () => void
+}
+
+/**
+ * Execute the startup open sequence:
+ * - Each target in `targets` (restored session documents + launch paths) is opened at most once.
+ * - When `launchUrl` is present, it is opened after `targets` so the URL document becomes active.
+ * - The Home tab opens only when neither a target nor the launch URL opened a document.
+ */
+export async function openLaunchSequence(deps: LaunchSequenceDeps): Promise<void> {
+  const { targets, launchUrl, openPath, openUrl, openHomeTab } = deps
+  let targetOpened = false
+  for (const filePath of targets) {
+    targetOpened = openPath(filePath) || targetOpened
+  }
+  let urlOpened = false
+  if (launchUrl) {
+    urlOpened = await openUrl(launchUrl)
+  }
+  if (!targetOpened && !urlOpened) {
+    openHomeTab()
+  }
+}

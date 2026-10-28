@@ -98,6 +98,7 @@ import {
   RESTORE_LAST_SESSION_KEY,
   filterLastSessionDocuments,
   launchPathsWithLastSession,
+  openLaunchSequence,
   restoreLastSessionEnabled,
   type LastSessionFilterDeps,
 } from './last-session'
@@ -7602,13 +7603,15 @@ app.whenReady().then(async () => {
     undefined,
     lastSessionFilterDeps(),
   )
-  let urlOpened = false
-  if (pendingLaunchUrl) {
-    if (launchTargets.length > 0) openLaunchPaths(launchTargets)
-    urlOpened = await openOfficeBridgeUrl(pendingLaunchUrl)
-    pendingLaunchUrl = null
-  }
-  if (!urlOpened) openLaunchPaths(launchTargets)
+  const launchUrl = pendingLaunchUrl
+  pendingLaunchUrl = null
+  await openLaunchSequence({
+    targets: launchTargets,
+    launchUrl,
+    openPath: openDocumentPath,
+    openUrl: openOfficeBridgeUrl,
+    openHomeTab: () => tabManager?.openHomeTab(),
+  })
   pendingLaunchPaths = []
   for (const recoverAs of pendingUnsavedNewRecoveries()) void newSheetTab(recoverAs)
 
