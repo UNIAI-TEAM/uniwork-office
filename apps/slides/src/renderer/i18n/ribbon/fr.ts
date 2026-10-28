@@ -199,7 +199,7 @@ export const fr = {
   ribbonIconsTip: "Insérer une icône intégrée (pixellisée en tant qu'image)",
   ribbon3dModel: 'Modèles 3D',
   ribbon3dModelTip:
-    'Insérer un modèle 3D (fichier glb/gltf incorporé ; le canevas affiche un espace réservé)',
+    'Insérer un modèle 3D (.glb) : sélectionnez-le pour le faire pivoter ; PowerPoint le garde en 3D',
   ribbonGroupIllustrations: 'Illustrations',
   ribbonShapes: 'Formes',
   ribbonShapesTip: 'Insérer une forme (formes de base / flèches / étoiles)',

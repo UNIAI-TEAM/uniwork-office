@@ -66,7 +66,7 @@ export const pt = {
     'Vídeo inserido (incorporado ao .pptx; pode ser reproduzido no PowerPoint)',
   appStatusAudioInserted: 'Áudio inserido (incorporado ao .pptx)',
   appStatusModel3dInserted:
-    'Modelo 3D incorporado (a tela mostra um espaço reservado; o arquivo do modelo é salvo no .pptx)',
+    'Modelo 3D inserido: selecione-o para girá-lo (o PowerPoint também o mostra em 3D)',
   appStatusRecordingEmpty: 'A gravação está vazia; nada foi inserido',
   appStatusRecordingInserted: 'Gravação de tela inserida no slide atual (webm incorporado)',
   appStatusRecording:

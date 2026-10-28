@@ -64,7 +64,7 @@ export const id = {
   appStatusVideoInserted: 'Video disisipkan (disematkan dalam .pptx; dapat diputar di PowerPoint)',
   appStatusAudioInserted: 'Audio disisipkan (disematkan dalam .pptx)',
   appStatusModel3dInserted:
-    'Model 3D disematkan (kanvas menampilkan placeholder; file model disimpan dalam .pptx)',
+    'Model 3D disisipkan: pilih untuk memutarnya (PowerPoint juga menampilkannya dalam 3D)',
   appStatusRecordingEmpty: 'Rekaman kosong; tidak ada yang disisipkan',
   appStatusRecordingInserted: 'Rekaman layar disisipkan pada slide saat ini (webm disematkan)',
   appStatusRecording: 'Merekam… klik "Rekaman Layar" lagi untuk berhenti dan menyisipkan',

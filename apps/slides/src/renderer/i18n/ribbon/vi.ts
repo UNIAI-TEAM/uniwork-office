@@ -192,8 +192,7 @@ export const vi = {
   ribbonIcons: 'Biểu tượng',
   ribbonIconsTip: 'Chèn biểu tượng tích hợp (raster hóa dưới dạng hình ảnh)',
   ribbon3dModel: 'Mô hình 3D',
-  ribbon3dModelTip:
-    'Chèn mô hình 3D (nhúng tệp glb/gltf; canvas hiển thị khung giữ chỗ dạng poster)',
+  ribbon3dModelTip: 'Chèn mô hình 3D (.glb): chọn để xoay; PowerPoint vẫn giữ ở dạng 3D',
   ribbonGroupIllustrations: 'Hình minh họa',
   ribbonShapes: 'Hình dạng',
   ribbonShapesTip: 'Chèn hình dạng (hình cơ bản / mũi tên / ngôi sao)',

@@ -67,7 +67,7 @@ export const pl = {
     'Wstawiono wideo (osadzone w pliku .pptx; można je odtwarzać w programie PowerPoint)',
   appStatusAudioInserted: 'Wstawiono dźwięk (osadzony w pliku .pptx)',
   appStatusModel3dInserted:
-    'Osadzono model 3D (na kanwie widoczny jest symbol zastępczy; plik modelu jest zapisany w pliku .pptx)',
+    'Wstawiono model 3D: zaznacz go, aby go obrócić (PowerPoint także pokazuje go w 3D)',
   appStatusRecordingEmpty: 'Nagranie jest puste; niczego nie wstawiono',
   appStatusRecordingInserted: 'Wstawiono nagranie ekranu na bieżący slajd (osadzony plik webm)',
   appStatusRecording:

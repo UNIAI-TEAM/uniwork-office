@@ -68,7 +68,7 @@ export const nl = {
     'Video ingevoegd (ingesloten in het .pptx-bestand; afspeelbaar in PowerPoint)',
   appStatusAudioInserted: 'Audio ingevoegd (ingesloten in het .pptx-bestand)',
   appStatusModel3dInserted:
-    '3D-model ingesloten (het canvas toont een tijdelijke aanduiding; het modelbestand is opgeslagen in het .pptx-bestand)',
+    '3D-model ingevoegd: selecteer het om het te draaien (PowerPoint toont het ook in 3D)',
   appStatusRecordingEmpty: 'De opname is leeg; er is niets ingevoegd',
   appStatusRecordingInserted: 'Schermopname ingevoegd op de huidige dia (ingesloten webm)',
   appStatusRecording:

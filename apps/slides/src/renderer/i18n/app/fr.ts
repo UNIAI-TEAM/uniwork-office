@@ -66,7 +66,7 @@ export const fr = {
   appStatusVideoInserted: 'Vidéo insérée (incorporée dans le .pptx ; lisible dans PowerPoint)',
   appStatusAudioInserted: 'Audio inséré (incorporé dans le .pptx)',
   appStatusModel3dInserted:
-    'Modèle 3D incorporé (le canevas affiche un espace réservé ; le fichier du modèle est stocké dans le .pptx)',
+    'Modèle 3D inséré : sélectionnez-le pour le faire pivoter (PowerPoint l’affiche aussi en 3D)',
   appStatusRecordingEmpty: 'L’enregistrement est vide ; rien n’a été inséré',
   appStatusRecordingInserted:
     'Enregistrement d’écran inséré dans la diapositive actuelle (webm incorporé)',
