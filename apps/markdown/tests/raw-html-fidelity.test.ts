@@ -82,6 +82,8 @@ describe('raw HTML round-trips byte-identically (open → save without edit)', (
       '**bold <span class="k">html</span> inside** and [a <kbd>b</kbd> c](https://e.com)\n',
     'html in a list': '- item <sup>1</sup>\n- <kbd>Ctrl</kbd>\n',
     'raw html table': '<table>\n  <tr><td>a</td></tr>\n</table>\n',
+    'vault block id, picture embed with width and aliased wiki link':
+      'Paragraph ^abc123\n\nSee [[Note|Alias]] and ![[pic.png|200]] here.\n\n<div>\n  [[Note|Alias]] ![[pic.png|200]] ^abc123\n</div>\n',
   }
 
   for (const [name, md] of Object.entries(cases)) {
