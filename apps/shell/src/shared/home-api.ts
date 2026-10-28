@@ -426,7 +426,7 @@ export interface UniworkDocSummary {
   ownerKind?: string
 }
 
-/** UNI-2047: the server's `updated_by_user`; `avatarUrl` is absolute http(s) and loads with no auth header */
+/** UNI-2047 / UNI-2275: the server's `updated_by_user`; `avatarUrl` is resolved by main to a `data:` URL (or https on parse) */
 export interface UniworkDocUpdatedByUser {
   name: string
   avatarUrl?: string

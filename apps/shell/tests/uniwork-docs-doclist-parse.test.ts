@@ -1,4 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  AVATAR_DISPLAY_MAX_BYTES,
+  AVATAR_MAX_BYTES,
+  createAvatarCache,
+  sniffAvatarMime,
+} from '../src/main/uniwork-docs/avatar'
 import {
   parseDocumentList,
   parseDocumentSummary,
@@ -113,11 +121,11 @@ describe('updated_by_user', () => {
     ).toEqual({ name: 'Lan Tran', avatarUrl: 'https://cdn.example/a.png?sig=1' })
   })
 
-  it('accepts an http avatar url too', () => {
+  it('drops an http avatar url and keeps the name (R1-1 https only)', () => {
     expect(
       parseOne({ updated_by_user: { name: 'Lan', avatar_url: 'http://cdn.example/a.png' } })
         .updatedByUser,
-    ).toEqual({ name: 'Lan', avatarUrl: 'http://cdn.example/a.png' })
+    ).toEqual({ name: 'Lan' })
   })
 
   it.each([
@@ -131,6 +139,7 @@ describe('updated_by_user', () => {
     ['not a url', 'not a url'],
     ['wrong type', 7],
     ['too long', `https://cdn.example/${'a'.repeat(2100)}`],
+    ['url with credentials', 'https://user:pass@cdn.example/a.png'],
   ])('avatar_url %s is dropped, the name stays', (_name, value) => {
     expect(parseOne({ updated_by_user: { name: 'Lan', avatar_url: value } }).updatedByUser).toEqual(
       {
@@ -352,5 +361,308 @@ describe('UNI-2212 a live legacy file is a row that opens', () => {
       parseOne({ title: 'Old.xls', file: { mime_type: xlsxMime, filename: 'old.xlsx' } }).format,
     ).toBe('xlsx')
     expect(parseOne({ title: 'Archive.zip' }).format).toBeNull()
+  })
+})
+
+describe('UNI-2275 R1-1 / R2-1..R2-4 shell CSP and main-process avatar fetcher', () => {
+  // Complete 1x1 raster images (not short magic prefixes)
+  const PNG_BYTES = new Uint8Array(
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  )
+  const JPEG_BYTES = new Uint8Array(
+    Buffer.from(
+      '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AP//Z',
+      'base64',
+    ),
+  )
+  const GIF_BYTES = new Uint8Array(
+    Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'),
+  )
+  const WEBP_BYTES = new Uint8Array(
+    Buffer.from('UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=', 'base64'),
+  )
+
+  it('keeps shell index.html CSP img-src restricted to self, data:, and blob: (no https:, http:, or *)', () => {
+    const html = readFileSync(resolve(__dirname, '../src/renderer/index.html'), 'utf8')
+    const cspMatch = /http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html)
+    expect(cspMatch).not.toBeNull()
+    const imgSrcMatch = /(?:^|;\s*)img-src\s+([^;]+)/.exec(cspMatch![1]!)
+    expect(imgSrcMatch).not.toBeNull()
+    const imgSrc = imgSrcMatch![1]!.trim()
+    expect(imgSrc).toBe("'self' data: blob:")
+    expect(imgSrc).not.toMatch(/https:|http:|\*/)
+  })
+
+  it('sniffs PNG, JPEG, GIF, and WebP magic bytes and refuses SVG, HTML, and truncated bytes', () => {
+    expect(sniffAvatarMime(PNG_BYTES)).toBe('image/png')
+    expect(JPEG_BYTES.slice(-2)).toEqual(new Uint8Array([0xff, 0xd9]))
+    expect(sniffAvatarMime(JPEG_BYTES)).toBe('image/jpeg')
+    expect(sniffAvatarMime(GIF_BYTES)).toBe('image/gif')
+    expect(sniffAvatarMime(WEBP_BYTES)).toBe('image/webp')
+    expect(
+      sniffAvatarMime(new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>')),
+    ).toBeNull()
+    expect(
+      sniffAvatarMime(new TextEncoder().encode('<!doctype html><html><body>x</body></html>')),
+    ).toBeNull()
+    expect(sniffAvatarMime(PNG_BYTES.slice(0, 6))).toBeNull()
+  })
+
+  it('fetches https avatars with credentials omitted and no referer, returning a data: URL', async () => {
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(init.credentials).toBe('omit')
+      expect(init.referrerPolicy).toBe('no-referrer')
+      expect(init.referrer).toBe('')
+      expect(init.redirect).toBe('manual')
+      return new Response(PNG_BYTES, { status: 200, headers: { 'Content-Type': 'image/png' } })
+    })
+    const cache = createAvatarCache({ fetch })
+    const dataUrl = await cache.resolveUrl(
+      'https://s3.example.com/avatars/u1.png?X-Amz-Signature=1',
+    )
+    expect(dataUrl).toBe(`data:image/png;base64,${Buffer.from(PNG_BYTES).toString('base64')}`)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses non-https URLs without making any network request', async () => {
+    const fetch = vi.fn()
+    const cache = createAvatarCache({ fetch })
+    expect(await cache.resolveUrl('http://s3.example.com/avatars/u1.png')).toBeNull()
+    expect(await cache.resolveUrl('data:image/png;base64,AAAA')).toBeNull()
+    expect(await cache.resolveUrl('https://user:pass@s3.example.com/u1.png')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('fails closed on any 3xx redirect response or transport redirect rejection with no second request (BE R2-3)', async () => {
+    for (const status of [301, 302, 303, 307, 308]) {
+      const fetch = vi.fn(
+        async () =>
+          new Response(null, { status, headers: { Location: 'https://b.example/2.png' } }),
+      )
+      const cache = createAvatarCache({ fetch })
+      expect(await cache.resolveUrl(`https://a.example/redirect-${status}.png`)).toBeNull()
+      expect(fetch).toHaveBeenCalledTimes(1)
+    }
+
+    const fetchReject = vi.fn(async () => {
+      throw new Error('Redirect was cancelled')
+    })
+    const cacheReject = createAvatarCache({ fetch: fetchReject })
+    expect(await cacheReject.resolveUrl('https://a.example/net-redirect.png')).toBeNull()
+    expect(fetchReject).toHaveBeenCalledTimes(1)
+  })
+
+  it('enforces the 256 KiB display cap (FE R2-2) and the 2 MiB download cap from both Content-Length and streamed body', async () => {
+    // 300 KiB image (> 256 KiB display cap) falls back to initials (null)
+    const threeHundredKib = new Uint8Array(300 * 1024)
+    threeHundredKib.set(PNG_BYTES, 0)
+    const cache300k = createAvatarCache({
+      fetch: async () => new Response(threeHundredKib, { status: 200 }),
+    })
+    expect(await cache300k.resolveUrl('https://s3.example.com/300k.png')).toBeNull()
+
+    const cache300kHeader = createAvatarCache({
+      fetch: async () =>
+        new Response(PNG_BYTES, {
+          status: 200,
+          headers: { 'Content-Length': String(AVATAR_DISPLAY_MAX_BYTES + 1) },
+        }),
+    })
+    expect(await cache300kHeader.resolveUrl('https://s3.example.com/300k-header.png')).toBeNull()
+
+    // 2 MiB download cap
+    const cacheHeader = createAvatarCache({
+      displayMaxBytes: AVATAR_MAX_BYTES,
+      fetch: async () =>
+        new Response(PNG_BYTES, {
+          status: 200,
+          headers: { 'Content-Length': String(AVATAR_MAX_BYTES + 1) },
+        }),
+    })
+    expect(await cacheHeader.resolveUrl('https://s3.example.com/huge-header.png')).toBeNull()
+
+    const oversized = new Uint8Array(AVATAR_MAX_BYTES + 10)
+    oversized.set(PNG_BYTES, 0)
+    const cacheStream = createAvatarCache({
+      displayMaxBytes: AVATAR_MAX_BYTES,
+      fetch: async () => new Response(oversized, { status: 200 }),
+    })
+    expect(await cacheStream.resolveUrl('https://s3.example.com/huge-stream.png')).toBeNull()
+  })
+
+  it('refuses SVG and HTML bodies even when served with image/png Content-Type', async () => {
+    const svgBody = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    const cache = createAvatarCache({
+      fetch: async () =>
+        new Response(svgBody, { status: 200, headers: { 'Content-Type': 'image/png' } }),
+    })
+    expect(await cache.resolveUrl('https://s3.example.com/evil.png')).toBeNull()
+  })
+
+  it('caches by origin+pathname (ignoring rotating query params), deduplicates per editor, and expires after TTL', async () => {
+    let now = 1_000
+    const fetch = vi.fn(async () => new Response(WEBP_BYTES, { status: 200 }))
+    const cache = createAvatarCache({ fetch, now: () => now, ttlMs: 10_000 })
+
+    const docs = parseDocumentList(
+      {
+        documents: [
+          {
+            ...row,
+            id: 'd1',
+            updated_by_user: {
+              name: 'Minh',
+              avatar_url: 'https://s3.example.com/avatars/minh.webp?sig=first',
+            },
+          },
+          {
+            ...row,
+            id: 'd2',
+            updated_by_user: {
+              name: 'Minh',
+              avatar_url: 'https://s3.example.com/avatars/minh.webp?sig=second',
+            },
+          },
+        ],
+      },
+      'ws_1',
+    ).documents
+
+    // Cold cache materializes without avatarUrl
+    const cold = cache.materializeRows(docs)
+    expect(cold[0]!.updatedByUser).toEqual({ name: 'Minh' })
+    expect(cold[1]!.updatedByUser).toEqual({ name: 'Minh' })
+    expect(fetch).not.toHaveBeenCalled()
+
+    // Warming fetches once and populates the cache
+    expect(await cache.warmRows(docs)).toBe(true)
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const expectedDataUrl = `data:image/webp;base64,${Buffer.from(WEBP_BYTES).toString('base64')}`
+    const warmed = cache.materializeRows(docs)
+    expect(warmed[0]!.updatedByUser).toEqual({ name: 'Minh', avatarUrl: expectedDataUrl })
+    expect(warmed[1]!.updatedByUser).toEqual({ name: 'Minh', avatarUrl: expectedDataUrl })
+
+    // Subsequent warm on cached keys is a no-op (returns false, no fetch)
+    expect(await cache.warmRows(docs)).toBe(false)
+    expect(fetch).toHaveBeenCalledTimes(1)
+
+    // Subsequent lookup with a new presigned signature hits cache
+    now += 5_000
+    expect(await cache.resolveUrl('https://s3.example.com/avatars/minh.webp?sig=third')).toBe(
+      expectedDataUrl,
+    )
+    expect(fetch).toHaveBeenCalledTimes(1)
+
+    // Past TTL refetches
+    now += 6_000
+    expect(await cache.resolveUrl('https://s3.example.com/avatars/minh.webp?sig=fourth')).toBe(
+      expectedDataUrl,
+    )
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('remembers failures for 5 minutes per key while still fetching a changed URL path (negative cache)', async () => {
+    let now = 10_000
+    let failV1 = true
+    const fetch = vi.fn(async (url: string) => {
+      if (url.includes('/avatars/v1.png') && failV1) {
+        return new Response(null, { status: 503 })
+      }
+      return new Response(GIF_BYTES, { status: 200 })
+    })
+    const cache = createAvatarCache({ fetch, now: () => now })
+    const expectedGif = `data:image/gif;base64,${Buffer.from(GIF_BYTES).toString('base64')}`
+
+    // First attempt fails and enters negative cache
+    expect(await cache.resolveUrl('https://s3.example.com/avatars/v1.png?sig=1')).toBeNull()
+    expect(fetch).toHaveBeenCalledTimes(1)
+
+    // Within 5 min, same key (even with new query signature) does not refetch
+    failV1 = false
+    now += 4 * 60_000
+    expect(await cache.resolveUrl('https://s3.example.com/avatars/v1.png?sig=2')).toBeNull()
+    expect(fetch).toHaveBeenCalledTimes(1)
+
+    // A changed URL path fetches immediately even while v1 is negatively cached
+    expect(await cache.resolveUrl('https://s3.example.com/avatars/v2.png?sig=1')).toBe(expectedGif)
+    expect(fetch).toHaveBeenCalledTimes(2)
+
+    // Past 5 min, v1 is retried and succeeds
+    now += 60_001
+    expect(await cache.resolveUrl('https://s3.example.com/avatars/v1.png?sig=3')).toBe(expectedGif)
+    expect(fetch).toHaveBeenCalledTimes(3)
+  })
+
+  it('fences clear() with a generation and aborts in-flight requests so stale tasks never write or delete newer tasks (BE R2-2)', async () => {
+    const pending: Array<{
+      signal: AbortSignal | null | undefined
+      resolve: (res: Response) => void
+    }> = []
+    const fetch = vi.fn((_url: string, init: RequestInit) => {
+      const { promise, resolve } = Promise.withResolvers<Response>()
+      pending.push({ signal: init.signal, resolve })
+      return promise
+    })
+    const cache = createAvatarCache({ fetch })
+
+    // 1. Start generation 0 request
+    const stalePromise = cache.resolveUrl('https://s3.example.com/avatars/u1.png?sig=old')
+    expect(pending).toHaveLength(1)
+    expect(pending[0]!.signal?.aborted).toBe(false)
+
+    // 2. Clear while pending -> aborts generation 0 controller
+    cache.clear()
+    expect(pending[0]!.signal?.aborted).toBe(true)
+
+    // 3. Start generation 1 request for the same key before generation 0 settles
+    const freshPromise1 = cache.resolveUrl('https://s3.example.com/avatars/u1.png?sig=new1')
+    const freshPromise2 = cache.resolveUrl('https://s3.example.com/avatars/u1.png?sig=new2')
+    expect(pending).toHaveLength(2)
+
+    // 4. Settle the old request with PNG_BYTES: must return null, must not seed cache,
+    // and must not delete generation 1's in-flight entry
+    pending[0]!.resolve(new Response(PNG_BYTES, { status: 200 }))
+    expect(await stalePromise).toBeNull()
+
+    // A concurrent lookup in generation 1 still dedupes against freshPromise1
+    const freshPromise3 = cache.resolveUrl('https://s3.example.com/avatars/u1.png?sig=new3')
+    expect(pending).toHaveLength(2)
+
+    // 5. Settle generation 1 request with JPEG_BYTES
+    const expectedJpeg = `data:image/jpeg;base64,${Buffer.from(JPEG_BYTES).toString('base64')}`
+    pending[1]!.resolve(new Response(JPEG_BYTES, { status: 200 }))
+    expect(await freshPromise1).toBe(expectedJpeg)
+    expect(await freshPromise2).toBe(expectedJpeg)
+    expect(await freshPromise3).toBe(expectedJpeg)
+    expect(await cache.resolveUrl('https://s3.example.com/avatars/u1.png?sig=after')).toBe(
+      expectedJpeg,
+    )
+  })
+
+  it('returns null and drops avatarUrl on timeout or network failure without failing the list', async () => {
+    const cache = createAvatarCache({
+      timeoutMs: 20,
+      fetch: (_url, init) => {
+        const { promise, reject } = Promise.withResolvers<Response>()
+        init.signal?.addEventListener('abort', () => reject(new Error('aborted')))
+        return promise
+      },
+    })
+    const docs = parseDocumentList(
+      {
+        documents: [
+          {
+            ...row,
+            updated_by_user: { name: 'Minh', avatar_url: 'https://s3.example.com/slow.png' },
+          },
+        ],
+      },
+      'ws_1',
+    ).documents
+    const resolved = await cache.resolveRows(docs)
+    expect(resolved[0]!.updatedByUser).toEqual({ name: 'Minh' })
   })
 })

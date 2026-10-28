@@ -27,7 +27,7 @@ import {
   pickerTrackOf,
   type PickerColumnId,
 } from './picker'
-import { editorNameOf } from './table-model'
+import { editorAvatarUrlOf, editorNameOf } from './table-model'
 
 /** what a row is, for the classes the Open dialog styles */
 export interface PickerRowState {
@@ -231,7 +231,7 @@ export function DocPickerList({
                     case 'editor':
                       return (
                         <span key={column} data-col={column} className={COLUMN_CLASS[column]}>
-                          <Person name={editor} />
+                          <Person name={editor} avatarUrl={editorAvatarUrlOf(doc)} />
                         </span>
                       )
                     case 'updated':

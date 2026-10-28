@@ -1025,15 +1025,16 @@ function optText(value: unknown, max: number): string | null {
 }
 
 /**
- * UNI-2047: `updated_by_user.avatar_url` loads with no auth header from the
- * renderer, so only an absolute http(s) URL is kept; anything else is dropped.
+ * UNI-2047 / UNI-2275 R1-1: `updated_by_user.avatar_url` is fetched in the main
+ * process without an auth header and handed to the renderer as a `data:` URL;
+ * only an absolute `https:` URL (without credentials) is kept.
  */
 function avatarUrlOf(value: unknown): string | null {
   const text = optText(value, 2048)
   if (!text) return null
   try {
     const url = new URL(text)
-    return url.protocol === 'https:' || url.protocol === 'http:' ? text : null
+    return url.protocol === 'https:' && !url.username && !url.password ? text : null
   } catch {
     return null
   }

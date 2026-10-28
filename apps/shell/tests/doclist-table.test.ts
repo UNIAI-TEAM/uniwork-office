@@ -6,6 +6,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { DocList, type DocListProps } from '../src/renderer/src/doclist/DocList'
+import { Person } from '../src/renderer/src/doclist/cells'
+import { editorInitials } from '../src/renderer/src/doclist/table-model'
 import { useDocListSort } from '../src/renderer/src/doclist/use-doc-list-sort'
 import type { DocListScreen } from '../src/renderer/src/doclist/columns'
 import { readSort, writeSort } from '../src/renderer/src/doclist/persist'
@@ -51,7 +53,7 @@ const BUDGET = doc({
   visibility: 'workspace',
   shareScope: { ...NO_SHARES, homeWorkspace: true },
   myLevel: 'edit',
-  updatedByUser: { name: 'Minh Trần', avatarUrl: 'https://cdn.example.com/minh.png' },
+  updatedByUser: { name: 'Minh Trần', avatarUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==' },
   updatedByName: 'Minh Trần',
 })
 const NOTE = doc({
@@ -400,15 +402,33 @@ describe('DocList: the shared Documents table (UNI-2047 A2a)', () => {
       expect(ROWS.map((r) => cell(r.id, 'size')?.textContent)).toEqual(['2.9 KB', '—', '4.8 MB'])
     })
 
-    it('draws the Truy cập pill and the level line from the shared rules', async () => {
+    it('draws the Truy cập pill with its scope icon and the level line from the shared rules', async () => {
       await mount('workspace')
       const pill = (id: string) => cell(id, 'access')?.querySelector('.dh-vis-badge')?.textContent
+      const icon = (id: string) =>
+        cell(id, 'access')?.querySelector('.dh-vis-badge svg[data-icon="inline-start"]')
+      const kind = (id: string) =>
+        cell(id, 'access')?.querySelector('.dh-vis-badge')?.getAttribute('data-access-kind')
       const line = (id: string) => cell(id, 'access')?.querySelector('.dh-level-sub')?.textContent
-      expect([pill('budget'), line('budget')]).toEqual(['Workspace', 'Bạn: Sửa'])
-      // restricted with people shared = "Được chia sẻ"; the owner reads "Chủ sở hữu", not a level
-      expect([pill('note'), line('note')]).toEqual(['Được chia sẻ', 'Chủ sở hữu'])
+      expect([pill('budget'), kind('budget'), line('budget')]).toEqual([
+        'Workspace',
+        'workspace',
+        'Bạn: Sửa',
+      ])
+      expect(icon('budget')).not.toBeNull()
+      expect([pill('note'), kind('note'), line('note')]).toEqual([
+        'Được chia sẻ',
+        'shared',
+        'Chủ sở hữu',
+      ])
+      expect(icon('note')).not.toBeNull()
       // no share scope is never guessed: a private row, and no level line without a level
-      expect([pill('report'), line('report')]).toEqual(['Riêng tư', undefined])
+      expect([pill('report'), kind('report'), line('report')]).toEqual([
+        'Riêng tư',
+        'restricted',
+        undefined,
+      ])
+      expect(icon('report')).not.toBeNull()
     })
 
     it('says Private for a restricted row with nobody else, in English', async () => {
@@ -420,18 +440,88 @@ describe('DocList: the shared Documents table (UNI-2047 A2a)', () => {
       expect(cell('solo', 'access')?.querySelector('.dh-vis-badge')?.textContent).toBe('Private')
     })
 
-    it('shows the editor as initials and a name, never a remote avatar', async () => {
+    it('shows the editor with avatar photo (data: URL) when avatarUrl is present, handles load/cached/error/rerender, and falls back to 1-letter initial', async () => {
       await mount('workspace')
       const person = cell('budget', 'editor')!
-      expect(person.querySelector('.dh-avatar')?.textContent).toBe('MT')
+      const initials = person.querySelector('.dh-avatar-initials')!
+      expect(initials.textContent).toBe('M')
+      expect(initials.classList.contains('is-hidden')).toBe(false)
       expect(person.querySelector('.dh-person-name')?.textContent).toBe('Minh Trần')
-      // the renderer CSP blocks remote images: avatar_url is parsed but not drawn
-      expect(person.querySelector('img')).toBeNull()
-      // the name the row already carries is the fallback; no name at all reads "—"
-      expect(cell('note', 'editor')?.querySelector('.dh-person-name')?.textContent).toBe(
-        'Lan Nguyễn',
+      const img = person.querySelector<HTMLImageElement>('img.dh-avatar-img')
+      expect(img).not.toBeNull()
+      expect(img?.getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==')
+      expect(img?.getAttribute('referrerpolicy')).toBe('no-referrer')
+      expect(img?.getAttribute('draggable')).toBe('false')
+      expect(img?.classList.contains('is-loaded')).toBe(false)
+
+      // on image load, photo is marked loaded and initials are hidden
+      await act(async () => {
+        img!.dispatchEvent(new Event('load'))
+      })
+      expect(img?.classList.contains('is-loaded')).toBe(true)
+      expect(initials.classList.contains('is-hidden')).toBe(true)
+
+      // on image error, falls back cleanly to initials
+      await act(async () => {
+        img!.dispatchEvent(new Event('error'))
+      })
+      expect(person.querySelector('img.dh-avatar-img')).toBeNull()
+      expect(initials.classList.contains('is-hidden')).toBe(false)
+      expect(person.querySelector('.dh-avatar')?.textContent).toBe('M')
+
+      // rerendering with a new avatarUrl after an error clears the error and renders the new image
+      await mount('workspace', [
+        rowOf({
+          ...BUDGET,
+          updatedByUser: { name: 'Minh Trần', avatarUrl: 'data:image/png;base64,NEW_AVATAR==' },
+        }),
+        rowOf(NOTE),
+        rowOf(REPORT),
+      ])
+      const retryImg = cell('budget', 'editor')!.querySelector<HTMLImageElement>(
+        'img.dh-avatar-img',
       )
+      expect(retryImg).not.toBeNull()
+      expect(retryImg?.getAttribute('src')).toBe('data:image/png;base64,NEW_AVATAR==')
+
+      // the name the row already carries is the fallback; no name at all reads "—"
+      const notePerson = cell('note', 'editor')!
+      expect(notePerson.querySelector('.dh-person-name')?.textContent).toBe('Lan Nguyễn')
+      expect(notePerson.querySelector('img.dh-avatar-img')).toBeNull()
+      expect(notePerson.querySelector('.dh-avatar')?.textContent).toBe('L')
       expect(cell('report', 'editor')?.textContent).toBe('—')
+    })
+
+    it('marks a cached avatar (complete && naturalWidth > 0) as loaded on mount', async () => {
+      const completeSpy = vi
+        .spyOn(HTMLImageElement.prototype, 'complete', 'get')
+        .mockReturnValue(true)
+      const widthSpy = vi
+        .spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get')
+        .mockReturnValue(24)
+      try {
+        await act(async () => {
+          root.render(
+            createElement(Person, {
+              name: 'Minh Trần',
+              avatarUrl: 'data:image/png;base64,CACHED==',
+            }),
+          )
+        })
+        const img = host.querySelector<HTMLImageElement>('img.dh-avatar-img')
+        const initials = host.querySelector('.dh-avatar-initials')
+        expect(img?.classList.contains('is-loaded')).toBe(true)
+        expect(initials?.classList.contains('is-hidden')).toBe(true)
+      } finally {
+        completeSpy.mockRestore()
+        widthSpy.mockRestore()
+      }
+    })
+
+    it('normalizes decomposed names to NFC in editorInitials so accented initials stay intact (FE R2-5)', () => {
+      expect(editorInitials('Ánh'.normalize('NFD'))).toBe('Á')
+      expect(editorInitials('  đạt  '.normalize('NFD'))).toBe('Đ')
+      expect(editorInitials('   ')).toBe('?')
     })
 
     it('puts the location on a second line under the name when the row has one', async () => {

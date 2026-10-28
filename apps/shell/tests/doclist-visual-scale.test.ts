@@ -546,6 +546,7 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
   it('table head 12px, 38px high, cells 9px / 12px', () => {
     const head = ruleOf(css, '.dh-doc-head')
     expect(head).toMatch(/font-size:\s*12px;/)
+    expect(head).toMatch(/font-weight:\s*500;/)
     expect(head).toMatch(/height:\s*38px;/)
     expect(
       ruleOf(css, ".dh-doc-head > [role='columnheader'],\n.dh-doc-row > [role='cell']"),
@@ -563,19 +564,25 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
     }
   })
 
-  it('the four fixed tracks keep 8px at the sides, in the head and in the rows', () => {
+  it('the five fixed tracks keep 8px at the sides, in the head and in the rows', () => {
     const fixed =
-      ":is([data-col='select'], [data-col='updated'], [data-col='size'], [data-col='actions'])"
+      ":is(\n    [data-col='select'],\n    [data-col='access'],\n    [data-col='updated'],\n    [data-col='size'],\n    [data-col='actions']\n  )"
     const rule = ruleOf(css, `.dh-doc-head\n  > ${fixed},\n.dh-doc-row\n  > ${fixed}`)
     expect(rule).toMatch(/padding-inline:\s*8px;/)
     // the two buttons of "Sao · ⋯" (28 + 4 + 28) fill the 76px track's 60px of room exactly
     expect(76 - 2 * 8).toBe(28 + 4 + 28)
+    // the 128px Access track leaves 112px of content width for "Được chia sẻ" / "Workspace" (TV-2275-01)
+    expect(128 - 2 * 8).toBe(112)
+    expect(ruleOf(src('doclist/access-button.css'), '.dh-access-btn')).toMatch(
+      /max-width:\s*calc\(100% \+ 12px\);/,
+    )
   })
 
-  it('on a coarse pointer the Starred actions track holds Sao 44 + gap 4 + "…" 44 (RV7-3)', () => {
+  it('on a coarse pointer the Starred actions track holds Sao 44 + gap 4 + "…" 44 (RV7-3) and .dh-check::before is inset -14px (FE R2-5)', () => {
     const coarse = css.slice(css.indexOf('@media (pointer: coarse) {'))
     const media = coarse.slice(0, coarse.indexOf('\n}\n'))
     expect(media).toMatch(/\.dh-row-btn[^{]*\{[^}]*min-width:\s*44px;/)
+    expect(ruleOf(media, '.dh-check::before')).toMatch(/inset:\s*-14px;/)
     const track = /--dh-star-actions-track:\s*(\d+)px;/.exec(media)
     expect(track, 'the coarse track variable').not.toBeNull()
     // 44 + 4 + 44 of buttons and the cell's 8px on each side
@@ -632,5 +639,107 @@ describe('the doclist-canvas scale (CSS rule text)', () => {
 
   it('the picker variant heads its columns at the same 12px', () => {
     expect(ruleOf(picker, '.dh-picker-head')).toMatch(/font-size:\s*12px;/)
+  })
+
+  it('shell index.html CSP keeps img-src strict without https:, http:, or * (R1-1)', () => {
+    const html = readFileSync(resolve(__dirname, '../src/renderer/index.html'), 'utf8')
+    const cspMatch = /http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html)
+    expect(cspMatch).not.toBeNull()
+    const imgSrc = /(?:^|;\s*)img-src\s+([^;]+)/.exec(cspMatch![1]!)?.[1]?.trim() ?? ''
+    expect(imgSrc).toBe("'self' data: blob:")
+    expect(imgSrc).not.toMatch(/https:|http:|\*/)
+  })
+
+  it('access badge is a 999px pill with min-height 20px, updated/size use monospace + tabular-nums, and checkbox/bulk-bar rules match web', () => {
+    const badge = ruleOf(css, '.dh-vis-badge')
+    expect(badge).toMatch(/border-radius:\s*999px;/)
+    expect(badge).toMatch(/min-height:\s*20px;/)
+    expect(badge).not.toMatch(/(?:^|\n)\s*height:\s*20px;/)
+    expect(badge).toMatch(/gap:\s*4px;/)
+    expect(badge).toMatch(/flex-shrink:\s*0;/)
+    const driveBadge = ruleOf(css, '.dh-drive-badge')
+    expect(driveBadge).toMatch(/height:\s*auto;/)
+    expect(driveBadge).toMatch(/border:\s*0;/)
+
+    const time = ruleOf(css, '.dh-cell-time')
+    expect(time).toMatch(/font-family:\s*ui-monospace,/)
+    expect(time).toMatch(/font-size:\s*12px;/)
+    expect(time).toMatch(/font-variant-numeric:\s*tabular-nums;/)
+    const size = ruleOf(css, '.dh-cell-size')
+    expect(size).toMatch(/font-family:\s*ui-monospace,/)
+    expect(size).toMatch(/font-size:\s*12px;/)
+    expect(size).toMatch(/font-variant-numeric:\s*tabular-nums;/)
+
+    const check = ruleOf(css, '.dh-check')
+    expect(check).toMatch(/position:\s*relative;/)
+    expect(check).toMatch(/appearance:\s*none;/)
+    expect(check).toMatch(/border:\s*1\.5px solid var\(--wb-check-border\);/)
+    expect(check).toMatch(/border-radius:\s*4px;/)
+    expect(ruleOf(css, '.dh-check::before')).toMatch(/inset:\s*-8px -12px;/)
+    expect(ruleOf(css, '.dh-check:checked')).toMatch(/background:\s*var\(--accent\);/)
+    expect(ruleOf(css, '.dh-check:indeterminate')).toMatch(/background:\s*var\(--accent\);/)
+    const indetAfter = ruleOf(css, '.dh-check:indeterminate::after')
+    expect(indetAfter).toMatch(/border-top:\s*1\.75px solid var\(--on-accent\);/)
+    expect(indetAfter).toMatch(/border-bottom:\s*0;/)
+    expect(indetAfter).toMatch(/border-left:\s*0;/)
+    expect(indetAfter).toMatch(/transform:\s*none;/)
+    expect(ruleOf(css, '.dh-check:focus-visible')).toMatch(/outline:\s*2px solid var\(--accent\);/)
+    expect(ruleOf(css, '.dh-check:disabled')).toMatch(/opacity:\s*0\.5;/)
+    expect(ruleOf(css, '.dh-check:disabled')).toMatch(/cursor:\s*not-allowed;/)
+
+    const folderGrid = ruleOf(css, '.dh-folder-grid')
+    expect(folderGrid).toMatch(
+      /grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(220px,\s*1fr\)\);/,
+    )
+    expect(folderGrid).toMatch(/gap:\s*12px;/)
+    expect(ruleOf(css, '.dh-folder-card')).toMatch(/border-radius:\s*var\(--radius-12\);/)
+    expect(ruleOf(css, '.dh-folder-card')).toMatch(/min-height:\s*69px;/)
+    expect(ruleOf(css, '.dh-folder-open')).toMatch(/border-radius:\s*var\(--radius-12\);/)
+    expect(ruleOf(css, '.dh-folder-card .dh-folder-icon')).toMatch(
+      /border-radius:\s*var\(--radius-12\);/,
+    )
+    expect(ruleOf(css, '.dh-folder-card .dh-folder-icon svg:not(.uwf-glyph-my-folder)')).toMatch(
+      /color:\s*inherit;/,
+    )
+    const folderSvgPath = ruleOf(
+      css,
+      '.dh-folder-card .dh-folder-icon svg:not(.uwf-glyph-my-folder) path',
+    )
+    expect(folderSvgPath).toMatch(/fill:\s*none;/)
+    expect(folderSvgPath).toMatch(/stroke:\s*currentColor;/)
+    const folderName = ruleOf(css, '.dh-folder-name')
+    expect(folderName).toMatch(/font-size:\s*14px;/)
+    expect(folderName).toMatch(/font-weight:\s*500;/)
+
+    expect(ruleOf(css, '.dh-doc-row')).toMatch(/font-size:\s*14px;/)
+    const docOpen = ruleOf(css, '.dh-doc-open')
+    expect(docOpen).toMatch(/font-size:\s*14px;/)
+    expect(docOpen).toMatch(/font-weight:\s*400;/)
+    const docTitle = ruleOf(css, '.dh-doc-title')
+    expect(docTitle).toMatch(/font-size:\s*14px;/)
+    expect(docTitle).toMatch(/font-weight:\s*400;/)
+    expect(ruleOf(css, '.dh-cell-person')).toMatch(/font-size:\s*14px;/)
+
+    expect(ruleOf(css, '.dh-avatar')).toMatch(/background:\s*var\(--tint-gray\);/)
+    const bulkBar = ruleOf(css, '.dl-bulk-bar')
+    expect(bulkBar).toMatch(/border-radius:\s*var\(--radius-12\);/)
+    expect(bulkBar).toMatch(/gap:\s*6px;/)
+    expect(ruleOf(css, '.dl-bulk-actions')).toMatch(/gap:\s*6px;/)
+    const bulkAction = ruleOf(css, '.dl-bulk-action')
+    expect(bulkAction).toMatch(/background:\s*transparent;/)
+    expect(bulkAction).toMatch(/border-radius:\s*var\(--radius-8\);/)
+    expect(ruleOf(css, '.dl-bulk-clear')).toMatch(/border-radius:\s*var\(--radius-8\);/)
+    expect(ruleOf(css, '.dl-bulk-action:hover:not(:disabled)')).toMatch(
+      /background:\s*var\(--border\);/,
+    )
+    expect(ruleOf(css, '.dl-bulk-clear:hover')).toMatch(/background:\s*var\(--border\);/)
+    const danger = ruleOf(css, '.dl-bulk-action.danger')
+    expect(danger).toMatch(
+      /background:\s*color-mix\(in srgb,\s*var\(--danger-text\)\s*10%,\s*transparent\);/,
+    )
+    expect(danger).toMatch(/color:\s*var\(--danger-text\);/)
+    expect(ruleOf(css, '.dl-bulk-action.danger:hover:not(:disabled)')).toMatch(
+      /background:\s*color-mix\(in srgb,\s*var\(--danger-text\)\s*18%,\s*transparent\);/,
+    )
   })
 })

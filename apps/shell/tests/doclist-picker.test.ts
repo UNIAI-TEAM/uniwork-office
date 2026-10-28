@@ -209,7 +209,7 @@ describe('DocPickerList: the compact picker variant (UNI-2047 B2)', () => {
   it('writes Người sửa as the shared avatar and name, — when the row has none', async () => {
     await mount()
     const minh = cell('budget', 'editor')!
-    expect(minh.querySelector('.dh-avatar')?.textContent).toBe('MT')
+    expect(minh.querySelector('.dh-avatar')?.textContent).toBe('M')
     expect(minh.querySelector('.dh-person-name')?.textContent).toBe('Minh Trần')
     expect(cell('report', 'editor')!.textContent).toBe('—')
   })

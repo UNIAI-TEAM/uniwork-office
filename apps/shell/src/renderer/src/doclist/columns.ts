@@ -73,7 +73,7 @@ const WIDTH = {
   updated: 118,
   actions: 76,
   special: 118,
-  access: 120,
+  access: 128,
   editor: 130,
   size: 84,
 }
@@ -104,8 +104,8 @@ const NAME_FLOOR = 184
 /**
  * Table width (px) a hideable column needs to show, derived the way the web's
  * `docListRungs` does: every column on screen up to and including it + the
- * border + the Name floor, rounded up to the next rem. That is 34 / 42 / 47 rem
- * for Truy cập / Người sửa / Dung lượng, and 41 / 49 / 54 rem with a screen
+ * border + the Name floor, rounded up to the next rem. That is 34 / 42 / 48 rem
+ * for Truy cập / Người sửa / Dung lượng, and 42 / 50 / 55 rem with a screen
  * column, so a ~870 px list shows everything and ~710 px hides at most Dung
  * lượng (plus Người sửa with a screen column). Tên, Chọn, Cập nhật, Thao tác
  * and the screen column never hide.

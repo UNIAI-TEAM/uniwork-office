@@ -1,10 +1,19 @@
 // The cells of a Documents table row, one component per column kind. Rows
 // (DocRow, DocumentsSourceRow) lay them out in the order `visibleColumns`
 // gives; every cell is a `role="cell"` carrying its column id.
-import { createContext, useContext, useId, type MouseEvent, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from 'react'
 import { useI18n } from '../locale'
 import { shelverLabelOf, type DocumentsHomeDoc } from '../uniwork-home/documents-home-model'
-import { ACCESS_PILL_KEY, accessPill, levelLine } from './access'
+import { ACCESS_PILL_KEY, accessPill, levelLine, type AccessPill } from './access'
 import {
   BUTTON_ACTIONS_WIDTH,
   COMPACT_WIDTH,
@@ -17,7 +26,7 @@ import {
 import { EMPTY_CELL, formatDaysLeft, formatListDate } from './format'
 import { DELETING_SOON_DAYS, daysLeft } from './groups'
 import { accessCellName, canShareRow } from './share-gate'
-import { editorInitials, editorNameOf } from './table-model'
+import { editorAvatarUrlOf, editorInitials, editorNameOf } from './table-model'
 import './access-button.css'
 
 /** the file / folder icon box of a table row (doclist-canvas: 32px on every screen) */
@@ -41,7 +50,7 @@ const TRACK: Record<ColumnId, string> = {
   shared_with: 'minmax(118px, 1.3fr)',
   shelved: 'minmax(118px, 1.3fr)',
   deleted: 'minmax(160px, 1.5fr)',
-  access: 'minmax(120px, 1fr)',
+  access: 'minmax(128px, 1fr)',
   editor: 'minmax(148px, 1.1fr)',
   updated: '118px',
   size: '92px',
@@ -133,6 +142,46 @@ export function Empty() {
   return <span className="dh-cell-empty">{EMPTY_CELL}</span>
 }
 
+function AccessPillIcon({ pill }: { pill: AccessPill }) {
+  return (
+    <svg
+      className="dh-vis-icon"
+      data-icon="inline-start"
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {pill === 'restricted' ? (
+        <>
+          <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </>
+      ) : pill === 'workspace' ? (
+        <>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </>
+      ) : (
+        <>
+          <circle cx="18" cy="5" r="3" />
+          <circle cx="6" cy="12" r="3" />
+          <circle cx="18" cy="19" r="3" />
+          <line x1="8.59" x2="15.42" y1="13.51" y2="17.49" />
+          <line x1="15.41" x2="8.59" y1="6.51" y2="10.49" />
+        </>
+      )}
+    </svg>
+  )
+}
+
 /**
  * The Truy cập pill (Riêng tư / Workspace / Được chia sẻ) and the line under it (Chủ sở hữu / Bạn: Sửa);
  * nothing for a folder.
@@ -158,7 +207,10 @@ export function AccessContent({
   const level = levelLine(doc, t)
   const content = (
     <>
-      <span className={`dh-vis-badge dh-vis-${pill}`}>{t(ACCESS_PILL_KEY[pill])}</span>
+      <span className={`dh-vis-badge dh-vis-${pill}`} data-access-kind={pill}>
+        <AccessPillIcon pill={pill} />
+        <span className="dh-vis-label">{t(ACCESS_PILL_KEY[pill])}</span>
+      </span>
       {level && (
         <>
           {/* the accessible name concatenates inline spans: keep the pill and the line apart */}
@@ -194,16 +246,43 @@ export function AccessContent({
 }
 
 /**
- * An avatar and a name. The avatar is the initials: the renderer's content
- * security policy lets no remote image in, so `avatar_url` is parsed by main
- * but never drawn.
+ * An avatar and a name: renders the photo from `avatar_url` when available,
+ * falling back to the person's initials if absent or if the image fails to load.
  */
-export function Person({ name }: { name: string | null }) {
+export function Person({ name, avatarUrl }: { name: string | null; avatarUrl?: string | null }) {
+  const [imgError, setImgError] = useState(false)
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
+  const imgRef = useRef<HTMLImageElement | null>(null)
+  useEffect(() => {
+    setImgError(false)
+  }, [avatarUrl])
+  useEffect(() => {
+    const el = imgRef.current
+    if (!el || !avatarUrl) return
+    if (el.complete && el.naturalWidth > 0) setLoadedSrc(avatarUrl)
+  }, [avatarUrl])
   if (!name) return <Empty />
+  const cleanUrl = avatarUrl?.trim() || null
+  const photo = Boolean(cleanUrl) && !imgError
+  const loaded = photo && loadedSrc === cleanUrl
   return (
     <>
-      <span className="dh-avatar" aria-hidden="true">
-        {editorInitials(name)}
+      <span className="dh-avatar" data-slot="avatar" aria-hidden="true">
+        <span className={`dh-avatar-initials${loaded ? ' is-hidden' : ''}`}>
+          {editorInitials(name)}
+        </span>
+        {photo && (
+          <img
+            ref={imgRef}
+            src={cleanUrl ?? undefined}
+            alt=""
+            referrerPolicy="no-referrer"
+            draggable={false}
+            className={`dh-avatar-img${loaded ? ' is-loaded' : ''}`}
+            onLoad={() => setLoadedSrc(cleanUrl)}
+            onError={() => setImgError(true)}
+          />
+        )}
       </span>
       <span className="dh-person-name" title={name}>
         {name}
@@ -213,7 +292,7 @@ export function Person({ name }: { name: string | null }) {
 }
 
 export function EditorContent({ doc }: { doc: DocumentsHomeDoc }) {
-  return <Person name={editorNameOf(doc)} />
+  return <Person name={editorNameOf(doc)} avatarUrl={editorAvatarUrlOf(doc)} />
 }
 
 /** two lines: the main text and a muted 12px line under it */

@@ -2,6 +2,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  net,
   safeStorage,
   shell,
   type IpcMain,
@@ -939,6 +940,7 @@ export function createUniworkDocs(ipcMain: IpcMain, wiring: UniworkDocsWiring): 
       return org ? { id: org.id, slug: org.slug } : null
     },
     authorized: (call) => authorizedRequest(call),
+    avatarFetch: (input, init) => net.fetch(input, init),
     openPath: (path) => {
       // G5-04g: a newer store is refused before any module sees the path
       if (wiring.refuseLockedPath(path)) return false

@@ -268,7 +268,7 @@ describe('picker dialog', () => {
     )
     await openPicker()
     expect(host.querySelector('.dh-picker-head')!.textContent).toBe('NameLast edited byUpdated')
-    expect(rows()[0]!.querySelector('[data-col="editor"] .dh-avatar')!.textContent).toBe('LT')
+    expect(rows()[0]!.querySelector('[data-col="editor"] .dh-avatar')!.textContent).toBe('L')
     expect(rows()[0]!.querySelector('[data-col="editor"] .dh-person-name')!.textContent).toBe(
       'Linh Tran',
     )
