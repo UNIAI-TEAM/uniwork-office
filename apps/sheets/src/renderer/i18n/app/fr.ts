@@ -1334,6 +1334,26 @@ export const fr = {
   appOpenFileFirst: "Ouvrez d'abord un fichier",
   appNoPassword: 'Sans mot de passe',
   appProtectWorkbook: 'Protéger le classeur',
+  appChangePassword: 'Modifier le mot de passe',
+  appWorkbookPasswordChanged: 'Le mot de passe du classeur a été mis à jour.',
+  appEncryptedOpenTitle: 'Ouvrir un classeur protégé par mot de passe',
+  appEncryptedOpenCopy: 'Saisissez le mot de passe pour déverrouiller ce classeur.',
+  appEncryptedPasswordLabel: 'Mot de passe',
+  appEncryptedOpen: 'Ouvrir',
+  appChangePasswordTitle: 'Modifier le mot de passe du classeur',
+  appChangePasswordCopy: 'Choisissez un nouveau mot de passe et confirmez-le ci-dessous.',
+  appNewPasswordLabel: 'Nouveau mot de passe',
+  appConfirmPasswordLabel: 'Confirmer le nouveau mot de passe',
+  appPasswordsMismatch: 'Les mots de passe ne correspondent pas.',
+  appPasswordUpdateFailed: 'Impossible de mettre à jour le mot de passe du classeur.',
+  appPasswordUpdating: 'Mise à jour…',
+  appUpdatePassword: 'Mettre à jour le mot de passe',
+  appWorkbookNotPasswordProtected: "Ce classeur n'est pas protégé par un mot de passe d'ouverture.",
+  appSaveErrEncryptedUniwork:
+    'Un classeur protégé par mot de passe ne peut pas être enregistré dans un document UniWork. Utilisez Enregistrer sous pour conserver une copie chiffrée sur cet ordinateur.',
+  appPasswordChangeUniwork: 'Le mot de passe d’un document UniWork ne peut pas être modifié ici.',
+  appPasswordChangeReadOnly:
+    'Ce classeur est en lecture seule : son mot de passe ne peut pas être modifié.',
   appAllowEditRanges: 'Permettre la modification des plages',
   appGroupClipboard: 'Presse-papiers',
   appPaste: 'Coller',
@@ -1596,6 +1616,8 @@ export const fr = {
   appWebEngineHint: "Votre fichier n'a pas été modifié.",
   appWebViewOnly:
     'Lecture seule : vous ne pouvez pas enregistrer les modifications de ce classeur.',
+  appWebEncryptedOpen:
+    'Ce classeur est protégé par un mot de passe que la version web ne peut pas ouvrir. Ouvrez-le dans l’application de bureau UniWork.',
   appWebConflictTitle: 'Ce classeur a été modifié ailleurs',
   appWebConflictBody:
     'Vos modifications ne sont pas encore sur UniWork et sont conservées dans ce navigateur jusqu’à votre déconnexion.',

@@ -1307,6 +1307,27 @@ export const pt = {
   appOpenFileFirst: 'Abra um arquivo primeiro',
   appNoPassword: 'Sem senha',
   appProtectWorkbook: 'Proteger Pasta de Trabalho',
+  appChangePassword: 'Alterar Senha',
+  appWorkbookPasswordChanged: 'A senha da pasta de trabalho foi atualizada.',
+  appEncryptedOpenTitle: 'Abrir pasta de trabalho protegida por senha',
+  appEncryptedOpenCopy: 'Digite a senha para desbloquear esta pasta de trabalho.',
+  appEncryptedPasswordLabel: 'Senha',
+  appEncryptedOpen: 'Abrir',
+  appChangePasswordTitle: 'Alterar a senha da pasta de trabalho',
+  appChangePasswordCopy: 'Escolha uma nova senha e confirme-a abaixo.',
+  appNewPasswordLabel: 'Nova senha',
+  appConfirmPasswordLabel: 'Confirmar nova senha',
+  appPasswordsMismatch: 'As senhas não coincidem.',
+  appPasswordUpdateFailed: 'Não foi possível atualizar a senha da pasta de trabalho.',
+  appPasswordUpdating: 'Atualizando…',
+  appUpdatePassword: 'Atualizar senha',
+  appWorkbookNotPasswordProtected:
+    'Esta pasta de trabalho não está protegida por uma senha de abertura.',
+  appSaveErrEncryptedUniwork:
+    'Uma pasta de trabalho protegida por senha não pode ser salva em um documento do UniWork. Use Salvar como para manter uma cópia criptografada neste computador.',
+  appPasswordChangeUniwork: 'A senha de um documento do UniWork não pode ser alterada aqui.',
+  appPasswordChangeReadOnly:
+    'Esta pasta de trabalho é somente leitura, portanto a senha não pode ser alterada.',
   appAllowEditRanges: 'Permitir Edição de Intervalos',
   appGroupClipboard: 'Área de Transferência',
   appPaste: 'Colar',
@@ -1567,6 +1588,8 @@ export const pt = {
     'A versão web do UniWork Sheets ainda está recebendo seu mecanismo de planilhas. Até lá, abra esta pasta de trabalho no aplicativo UniWork para desktop.',
   appWebEngineHint: 'Seu arquivo não foi alterado.',
   appWebViewOnly: 'Somente leitura: você não pode salvar alterações nesta pasta de trabalho.',
+  appWebEncryptedOpen:
+    'Esta pasta de trabalho é protegida por senha e a versão web não consegue abri-la. Abra-a no aplicativo de desktop do UniWork.',
   appWebConflictTitle: 'Esta pasta de trabalho foi alterada em outro lugar',
   appWebConflictBody:
     'Suas alterações ainda não estão no UniWork e ficam neste navegador até você sair.',

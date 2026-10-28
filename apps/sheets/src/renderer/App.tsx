@@ -57,6 +57,10 @@ import {
   watchSheetsUniworkState,
   type SheetsUniworkSeam,
 } from './uniwork-state'
+import {
+  hashSheetPassword,
+  type SheetPasswordHash,
+} from '@genoffice/xlsx-gateway/gateway/xlsx-protection-hash'
 import { applyChangePlan, planFromOps, type OpExecutorContext } from './op-executor'
 import { installSheetsMcpBridge, type McpSheetHandlers } from './mcp-bridge'
 import { renameChartRefsForSheet } from './workbook-ops'
@@ -445,6 +449,8 @@ import { effectivePageBreaks, installPageBreakPreview } from './page-break-previ
 import { mapProtectedRanges } from './protected-ranges'
 import {
   handleSave as handleSaveImpl,
+  localizeSaveError,
+  stripIpcErrorWrapper,
   uniworkAutoSaveLocked,
   type SaveContext,
   type SaveOutcome,
@@ -500,6 +506,8 @@ import { lastSurvivingScreenLine, netAxisDelta, screenToFile } from './view-tran
 import { selectionFormatEquals, toSelectionFormat, type SelectionFormat } from './selection-format'
 import { ExcelShell, type SelectedShapeRibbon } from './ExcelShell'
 import { RecoveryDialog } from './RecoveryDialog'
+import { EncryptedWorkbookPasswordDialog } from './EncryptedWorkbookPasswordDialog'
+import { ChangeWorkbookPasswordDialog } from './ChangeWorkbookPasswordDialog'
 import { ToastHost } from './toast'
 import { showToast } from './toast-bus'
 import { AdvancedFilterDialog, type AdvancedFilterColumn } from './AdvancedFilterDialog'
@@ -767,6 +775,18 @@ export function App({
   /// cancelled, so instead of a silent no-op the user gets an explicit offer
   /// to fully load the workbook first.
   const [fullLoadPrompt, setFullLoadPrompt] = useState<'ask' | 'tooLarge' | null>(null)
+  const [encryptedPasswordPrompt, setEncryptedPasswordPrompt] = useState<{
+    readonly error: string | null
+    readonly resolve: (password: string | null) => void
+  } | null>(null)
+  const requestEncryptedWorkbookPassword = (error: string | null): Promise<string | null> =>
+    new Promise((resolve) => setEncryptedPasswordPrompt({ error, resolve }))
+  const answerEncryptedWorkbookPassword = (password: string | null): void => {
+    const prompt = encryptedPasswordPrompt
+    setEncryptedPasswordPrompt(null)
+    prompt?.resolve(password)
+  }
+  const [changeWorkbookPasswordOpen, setChangeWorkbookPasswordOpen] = useState(false)
   const [message, setMessage] = useState(t('appReadyInitial'))
   /// Web frame: the open failed because no workbook engine is installed
   /// (web-engine.ts); the whole window shows EngineUnavailableScreen.
@@ -4225,6 +4245,20 @@ export function App({
   }
 
   function handleRibbonCommand(command: string): void {
+    if (command === 'workbook-change-password') {
+      const file = lazyWorkbookRef.current?.file
+      if (!file?.passwordProtected) return
+      // A view-only or UniWork-bound document keeps its password out of reach:
+      // say why instead of opening a dialog whose save would be refused.
+      const refusal = passwordChangeRefusal(file)
+      if (refusal !== null) {
+        setMessage(refusal)
+        showToast(refusal, 'error')
+        return
+      }
+      setChangeWorkbookPasswordOpen(true)
+      return
+    }
     if (command === 'watch-window') {
       setWatchOpen((open) => !open)
       return
@@ -4817,11 +4851,34 @@ export function App({
       if (!window.desktopApi) {
         throw new Error(t('appBridgeUnavailable'))
       }
-      const selected = await window.desktopApi.selectWorkbook()
+      let selected = await window.desktopApi.selectWorkbook()
       if (!selected) {
         setMessage(t('appOpenCanceled'))
         finishOpening()
         return
+      }
+      if ('passwordRequired' in selected) {
+        const encryptedPath = selected.path
+        let passwordError: string | null = null
+        let decryptedWorkbook: WorkbookFile | null = null
+        while (decryptedWorkbook === null) {
+          const password = await requestEncryptedWorkbookPassword(passwordError)
+          if (password === null) break
+          try {
+            decryptedWorkbook = await window.desktopApi.openEncryptedWorkbook(
+              encryptedPath,
+              password,
+            )
+          } catch (error: unknown) {
+            passwordError = error instanceof Error ? error.message : t('appOpenFailed')
+          }
+        }
+        selected = decryptedWorkbook
+        if (!selected) {
+          setMessage(t('appOpenCanceled'))
+          finishOpening()
+          return
+        }
       }
       if (!(await openLazyWorkbook(selected, { onInitialRangeLoaded: finishOpening }))) {
         finishOpening()
@@ -4870,6 +4927,51 @@ export function App({
       if (!(await commitActiveEditor())) return { ok: false }
       return handleSaveImpl(saveContext(), mode, quiet, explicitTarget, inPlace)
     })
+  }
+  function passwordChangeRefusal(file: WorkbookFile): string | null {
+    if (file.readOnly) return t('appPasswordChangeReadOnly')
+    if (file.uniworkBound === true) return t('appPasswordChangeUniwork')
+    return null
+  }
+  async function updateWorkbookPassword(newPassword: string): Promise<string | null> {
+    try {
+      return await saveGateRef.current.run(async () => {
+        if (!(await commitActiveEditor())) return t('appSaveFailed')
+        const beforeSave = lazyWorkbookRef.current
+        if (!beforeSave?.file.passwordProtected) {
+          return t('appWorkbookNotPasswordProtected')
+        }
+        const refusal = passwordChangeRefusal(beforeSave.file)
+        if (refusal !== null) return refusal
+
+        // Commit all current sheet edits before changing the package password.
+        // The sidecar snapshot stays plaintext for this session, while the
+        // main process updates the encrypted file atomically on disk.
+        const saved = await handleSaveImpl(saveContext(), 'save', true)
+        const current = lazyWorkbookRef.current
+        if (!current) return t('appWorkbookNotReady')
+        if (!saved.ok && journalSize(current.editJournal) > 0) {
+          return saved.error ?? t('appSaveFailed')
+        }
+        if (!current.file.passwordProtected) {
+          return t('appWorkbookNotPasswordProtected')
+        }
+
+        const result = await window.desktopApi.updateWorkbookPassword(
+          current.file.sessionId,
+          newPassword,
+        )
+        const file: WorkbookFile = { ...current.file, ...result }
+        lazyWorkbookRef.current = { ...current, file }
+        setWorkbookFile(file)
+        setMessage(t('appWorkbookPasswordChanged'))
+        return null
+      })
+    } catch (error: unknown) {
+      if (!(error instanceof Error)) return t('appSaveFailed')
+      const message = stripIpcErrorWrapper(error.message)
+      return localizeSaveError(message) ?? message
+    }
   }
   closeSaveRef.current = async () => {
     if (!(await commitActiveEditor())) {
@@ -5425,6 +5527,7 @@ export function App({
         onUnprotectSheet={unprotectActiveSheet}
         sheetTabActions={sheetTabActions}
         onGetWorkbookProtection={workbookProtectionEcho}
+        passwordProtected={workbookFile?.passwordProtected === true}
         formulaBarVisible={formulaBarVisible}
         crossHighlightVisible={crossHighlightVisible}
         onGetProtectedRanges={protectedRangesSnapshot}
@@ -5470,6 +5573,19 @@ export function App({
         ) : (
           <WorkbookOpeningScreen />
         ))}
+      {encryptedPasswordPrompt && (
+        <EncryptedWorkbookPasswordDialog
+          error={encryptedPasswordPrompt.error}
+          onSubmit={(password) => answerEncryptedWorkbookPassword(password)}
+          onClose={() => answerEncryptedWorkbookPassword(null)}
+        />
+      )}
+      {changeWorkbookPasswordOpen && (
+        <ChangeWorkbookPasswordDialog
+          onSubmit={updateWorkbookPassword}
+          onClose={() => setChangeWorkbookPasswordOpen(false)}
+        />
+      )}
       <SheetsCommentsSurface getRuntime={getRuntime} file={workbookFile} onStatus={setMessage} />
       <ThreadHoverCard hover={threadHover} />
       {findReplaceService && (
@@ -5712,7 +5828,13 @@ export function App({
 
   /// The active sheet's allow-edit ranges, or an error the dialog surfaces.
   function protectedRangesSnapshot(): {
-    ranges: readonly { name: string; sqref: string; hasPassword: boolean }[]
+    ranges: readonly {
+      name: string
+      sqref: string
+      hasPassword: boolean
+      /** the hash, when this session computed it; a file's own hashes stay in the file */
+      password?: SheetPasswordHash
+    }[]
     error: string | null
   } {
     const state = lazyWorkbookRef.current
@@ -5725,20 +5847,43 @@ export function App({
     return { ranges: file ?? [], error: null }
   }
 
-  function applyProtectedRanges(ranges: readonly { name: string; sqref: string }[]): string | null {
+  async function applyProtectedRanges(
+    ranges: readonly { name: string; sqref: string; password?: string }[],
+  ): Promise<string | null> {
     const state = lazyWorkbookRef.current
     const sheetId = univerRef.current?.univerAPI.getActiveWorkbook()?.getActiveSheet()?.getSheetId()
     if (!state || !sheetId) return t('appProtectionNeedsFile')
     const snapshot = protectedRangesSnapshot()
     if (snapshot.error !== null) return snapshot.error
-    // A rewrite cannot preserve per-range password hashes; fail closed.
-    if (snapshot.ranges.some((range) => range.hasPassword)) {
+    // A rewrite cannot preserve password hashes it does not know; fail closed.
+    // A hash this session computed travels in the request and survives.
+    if (snapshot.ranges.some((range) => range.hasPassword && range.password === undefined)) {
       return t('appRangesPasswordBlocked')
     }
-    state.sheetProtectedRanges.set(
-      sheetId,
-      ranges.map((range) => ({ name: range.name, sqref: range.sqref, hasPassword: false })),
+    const kept = new Map(snapshot.ranges.map((range) => [range.name, range]))
+    const hashed = await Promise.all(
+      ranges.map(async (range) => {
+        if (range.password) {
+          return {
+            name: range.name,
+            sqref: range.sqref,
+            hasPassword: true,
+            password: await hashSheetPassword(range.password),
+          }
+        }
+        const prior = kept.get(range.name)
+        if (prior?.password !== undefined) {
+          return {
+            name: range.name,
+            sqref: range.sqref,
+            hasPassword: true,
+            password: prior.password,
+          }
+        }
+        return { name: range.name, sqref: range.sqref, hasPassword: false }
+      }),
     )
+    state.sheetProtectedRanges.set(sheetId, hashed)
     recordProtectedRangesChange(state.editJournal, sheetId)
     setPendingEdits(journalSize(state.editJournal))
     setMessage(t('appRangesRecorded', { count: ranges.length }))

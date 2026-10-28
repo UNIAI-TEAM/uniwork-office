@@ -129,6 +129,11 @@ function describe(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+/** the engine's answer to an Office-encrypted workbook (the OLE2 container, not a zip package) */
+function isEncryptedOpenError(err: unknown): boolean {
+  return /password-protected/i.test(describe(err))
+}
+
 function classifyOpenRefusal(err: unknown): {
   reason: OpenRefusedReason
   measure?: OpenRefusedMeasure
@@ -448,7 +453,10 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
       opened = await transport.open({ name: payload.file.name, data, locale: locale() })
     } catch (err) {
       if (isEngineUnavailable(err)) reportEngineUnavailable()
-      else {
+      else if (isEncryptedOpenError(err)) {
+        // the engine only sniffs the encrypted container; decrypting is a desktop job
+        throw new Error(text('appWebEncryptedOpen'), { cause: err })
+      } else {
         const refusal = classifyOpenRefusal(err)
         if (refusal) {
           const message = describe(err)

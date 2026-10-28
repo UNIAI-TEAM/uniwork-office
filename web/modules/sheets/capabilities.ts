@@ -55,6 +55,9 @@ export function sheetsWebCapabilities(
     // hidden on the web whatever the engine supports (C11)
     recalcFallback: false,
     mergeWorkbooks: false,
+    // the open password lives in the Electron main (officecrypto-tool); the web engine reports
+    // encrypted workbooks as unopenable, so Review > Change Password never applies
+    workbookPassword: false,
   })
 }
 

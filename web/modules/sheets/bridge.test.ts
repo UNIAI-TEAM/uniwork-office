@@ -205,6 +205,8 @@ describe('capabilities', () => {
       'screenshot',
       'recalcFallback',
       'mergeWorkbooks',
+      // the open password is a desktop (Electron main) feature
+      'workbookPassword',
       'save',
       'saveAs',
       'open',
@@ -750,6 +752,31 @@ describe('view-only (no save grant)', () => {
       ok: false,
       error: { code: 'unsupported' },
     })
+  })
+})
+
+describe('encrypted workbook open', () => {
+  it('says the web version cannot open a password-protected workbook, without engine jargon', async () => {
+    const fake = fakeTransport()
+    const encrypted = {
+      ...fake.transport,
+      open: async () => {
+        throw new Error(
+          'This workbook is password-protected and must be decrypted by the host application.',
+        )
+      },
+    }
+    const t = setup({ transport: encrypted })
+    t.mock.init({ documentId: t.file.fileId, capabilities: ALL_GRANTS })
+    await flush()
+    const err = await t.desktop.selectWorkbook().catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(Error)
+    const message = (err as Error).message
+    expect(message).toMatch(/password/i)
+    expect(message).toMatch(/desktop app/i)
+    expect(message).not.toMatch(/host application|decrypted/i)
+    // a refusal for this reason is not a size refusal: the host hears no open_refused
+    expect(t.mock.openRefused).toEqual([])
   })
 })
 

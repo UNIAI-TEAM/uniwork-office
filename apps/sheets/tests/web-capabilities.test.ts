@@ -136,6 +136,7 @@ describe('ExcelShell view-only ribbon (UNI-1876 SVF-1)', () => {
     onUnprotectSheet: async () => null,
     sheetTabActions: null,
     onGetWorkbookProtection: () => null,
+    passwordProtected: false,
     formulaBarVisible: true,
     crossHighlightVisible: false,
     onGetProtectedRanges: () => ({ ranges: [], error: null }),

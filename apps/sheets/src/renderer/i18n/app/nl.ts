@@ -1304,6 +1304,27 @@ export const nl = {
   appOpenFileFirst: 'Open eerst een bestand',
   appNoPassword: 'Geen wachtwoord',
   appProtectWorkbook: 'Werkmap beveiligen',
+  appChangePassword: 'Wachtwoord wijzigen',
+  appWorkbookPasswordChanged: 'Het wachtwoord van de werkmap is bijgewerkt.',
+  appEncryptedOpenTitle: 'Met wachtwoord beveiligde werkmap openen',
+  appEncryptedOpenCopy: 'Voer het wachtwoord in om deze werkmap te ontgrendelen.',
+  appEncryptedPasswordLabel: 'Wachtwoord',
+  appEncryptedOpen: 'Openen',
+  appChangePasswordTitle: 'Wachtwoord van werkmap wijzigen',
+  appChangePasswordCopy: 'Kies een nieuw wachtwoord en bevestig het hieronder.',
+  appNewPasswordLabel: 'Nieuw wachtwoord',
+  appConfirmPasswordLabel: 'Nieuw wachtwoord bevestigen',
+  appPasswordsMismatch: 'De wachtwoorden komen niet overeen.',
+  appPasswordUpdateFailed: 'Het wachtwoord van de werkmap kon niet worden bijgewerkt.',
+  appPasswordUpdating: 'Bijwerken…',
+  appUpdatePassword: 'Wachtwoord bijwerken',
+  appWorkbookNotPasswordProtected: 'Deze werkmap is niet beveiligd met een openingswachtwoord.',
+  appSaveErrEncryptedUniwork:
+    'Een met een wachtwoord beveiligde werkmap kan niet worden opgeslagen in een UniWork-document. Gebruik Opslaan als om een versleutelde kopie op deze computer te bewaren.',
+  appPasswordChangeUniwork:
+    'Het wachtwoord van een UniWork-document kan hier niet worden gewijzigd.',
+  appPasswordChangeReadOnly:
+    'Deze werkmap is alleen-lezen, dus het wachtwoord kan niet worden gewijzigd.',
   appAllowEditRanges: 'Bewerken van bereiken toestaan',
   appGroupClipboard: 'Klembord',
   appPaste: 'Plakken',
@@ -1564,6 +1585,8 @@ export const nl = {
     'De webversie van UniWork Sheets krijgt zijn rekenmachine nog. Open deze werkmap tot die tijd in de UniWork-desktopapp.',
   appWebEngineHint: 'Je bestand is niet gewijzigd.',
   appWebViewOnly: 'Alleen-lezen: je kunt wijzigingen in deze werkmap niet opslaan.',
+  appWebEncryptedOpen:
+    'Deze werkmap is met een wachtwoord beveiligd en de webversie kan hem niet openen. Open hem in de UniWork-desktopapp.',
   appWebConflictTitle: 'Deze werkmap is ergens anders gewijzigd',
   appWebConflictBody:
     'Je wijzigingen staan nog niet op UniWork en blijven in deze browser tot je je afmeldt.',

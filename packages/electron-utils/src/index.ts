@@ -42,6 +42,14 @@ export {
   resolveDefaultSaveDir,
   type PathProvider,
 } from './default-save-dir'
+export {
+  decryptOoxml,
+  encryptOoxml,
+  isCfbFile,
+  isEncryptedOoxml,
+  OoxmlDecryptError,
+  type OoxmlDecryptFailReason,
+} from './ooxml-encryption'
 export { installNavigationGuard } from './navigation-guard'
 export {
   DROP_OPEN_CHANNEL,

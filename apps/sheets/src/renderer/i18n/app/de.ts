@@ -1323,6 +1323,27 @@ export const de = {
   appOpenFileFirst: 'Öffnen Sie zuerst eine Datei',
   appNoPassword: 'Kein Kennwort',
   appProtectWorkbook: 'Arbeitsmappe schützen',
+  appChangePassword: 'Kennwort ändern',
+  appWorkbookPasswordChanged: 'Das Arbeitsmappenkennwort wurde aktualisiert.',
+  appEncryptedOpenTitle: 'Kennwortgeschützte Arbeitsmappe öffnen',
+  appEncryptedOpenCopy: 'Geben Sie das Kennwort ein, um diese Arbeitsmappe zu entsperren.',
+  appEncryptedPasswordLabel: 'Kennwort',
+  appEncryptedOpen: 'Öffnen',
+  appChangePasswordTitle: 'Kennwort der Arbeitsmappe ändern',
+  appChangePasswordCopy: 'Wählen Sie ein neues Kennwort und bestätigen Sie es unten.',
+  appNewPasswordLabel: 'Neues Kennwort',
+  appConfirmPasswordLabel: 'Neues Kennwort bestätigen',
+  appPasswordsMismatch: 'Die Kennwörter stimmen nicht überein.',
+  appPasswordUpdateFailed: 'Das Kennwort der Arbeitsmappe konnte nicht aktualisiert werden.',
+  appPasswordUpdating: 'Wird aktualisiert…',
+  appUpdatePassword: 'Kennwort aktualisieren',
+  appWorkbookNotPasswordProtected:
+    'Diese Arbeitsmappe ist nicht durch ein Öffnungskennwort geschützt.',
+  appSaveErrEncryptedUniwork:
+    'Eine kennwortgeschützte Arbeitsmappe kann nicht in einem UniWork-Dokument gespeichert werden. Mit „Speichern unter“ behalten Sie eine verschlüsselte Kopie auf diesem Computer.',
+  appPasswordChangeUniwork: 'Das Kennwort eines UniWork-Dokuments kann hier nicht geändert werden.',
+  appPasswordChangeReadOnly:
+    'Diese Arbeitsmappe ist schreibgeschützt, daher kann ihr Kennwort nicht geändert werden.',
   appAllowEditRanges: 'Bereiche zur Bearbeitung freigeben',
   appGroupClipboard: 'Zwischenablage',
   appPaste: 'Einfügen',
@@ -1584,6 +1605,8 @@ export const de = {
     'Die Webversion von UniWork Sheets erhält ihre Tabellen-Engine erst noch. Öffnen Sie diese Arbeitsmappe bis dahin in der UniWork-Desktop-App.',
   appWebEngineHint: 'Ihre Datei wurde nicht verändert.',
   appWebViewOnly: 'Nur Ansicht: Sie können Änderungen an dieser Arbeitsmappe nicht speichern.',
+  appWebEncryptedOpen:
+    'Diese Arbeitsmappe ist kennwortgeschützt und lässt sich in der Webversion nicht öffnen. Öffnen Sie sie in der UniWork-Desktop-App.',
   appWebConflictTitle: 'Diese Arbeitsmappe wurde an anderer Stelle geändert',
   appWebConflictBody:
     'Ihre Änderungen sind noch nicht in UniWork und bleiben in diesem Browser, bis Sie sich abmelden.',

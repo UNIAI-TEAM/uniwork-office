@@ -1309,6 +1309,27 @@ export const it = {
   appOpenFileFirst: 'Apri prima un file',
   appNoPassword: 'Nessuna password',
   appProtectWorkbook: 'Proteggi cartella di lavoro',
+  appChangePassword: 'Cambia password',
+  appWorkbookPasswordChanged: 'La password della cartella di lavoro è stata aggiornata.',
+  appEncryptedOpenTitle: 'Apri cartella di lavoro protetta da password',
+  appEncryptedOpenCopy: 'Inserisci la password per sbloccare questa cartella di lavoro.',
+  appEncryptedPasswordLabel: 'Password',
+  appEncryptedOpen: 'Apri',
+  appChangePasswordTitle: 'Cambia la password della cartella di lavoro',
+  appChangePasswordCopy: 'Scegli una nuova password e confermala qui sotto.',
+  appNewPasswordLabel: 'Nuova password',
+  appConfirmPasswordLabel: 'Conferma nuova password',
+  appPasswordsMismatch: 'Le password non corrispondono.',
+  appPasswordUpdateFailed: 'Impossibile aggiornare la password della cartella di lavoro.',
+  appPasswordUpdating: 'Aggiornamento…',
+  appUpdatePassword: 'Aggiorna password',
+  appWorkbookNotPasswordProtected:
+    'Questa cartella di lavoro non è protetta da una password di apertura.',
+  appSaveErrEncryptedUniwork:
+    'Una cartella di lavoro protetta da password non può essere salvata in un documento UniWork. Usa Salva con nome per conservare una copia cifrata su questo computer.',
+  appPasswordChangeUniwork: 'La password di un documento UniWork non può essere modificata qui.',
+  appPasswordChangeReadOnly:
+    'Questa cartella di lavoro è di sola lettura, quindi la password non può essere modificata.',
   appAllowEditRanges: 'Consenti modifica intervalli',
   appGroupClipboard: 'Appunti',
   appPaste: 'Incolla',
@@ -1568,6 +1589,8 @@ export const it = {
     "La versione web di UniWork Sheets sta ancora ricevendo il suo motore di calcolo. Nel frattempo, apri questa cartella di lavoro nell'app desktop di UniWork.",
   appWebEngineHint: 'Il file non è stato modificato.',
   appWebViewOnly: 'Sola lettura: non puoi salvare le modifiche a questa cartella di lavoro.',
+  appWebEncryptedOpen:
+    'Questa cartella di lavoro è protetta da password e la versione web non può aprirla. Aprila nell’app desktop di UniWork.',
   appWebConflictTitle: 'Questa cartella di lavoro è stata modificata altrove',
   appWebConflictBody:
     'Le modifiche non sono ancora su UniWork e restano in questo browser finché non esci.',

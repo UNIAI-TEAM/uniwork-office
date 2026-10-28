@@ -56,6 +56,7 @@ describe('Sheets ribbon status message under the interface scale', () => {
       '.app-shell',
       '.format-cells-dialog',
       '.recovery-dialog',
+      '.encrypted-workbook-password-dialog',
       '.format-cells-dialog.pivot-dialog',
       '.fn-args-rows',
       '.recommended-charts-dialog',
