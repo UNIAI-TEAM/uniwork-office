@@ -170,6 +170,53 @@ describe('a saved file is XML a word processor can open', () => {
     )
     expect(xml).toMatch(/mc:PreserveElements="w14:plc go:redact"/)
   })
+
+  it('extends single-quoted mc:Ignorable and mc:PreserveElements without duplicating attributes', async () => {
+    const from = await buildDocx({
+      bodyXml: '<w:p><w:r><w:t>Call 13800138000 now</w:t></w:r></w:p>',
+      docRootExtraAttrs:
+        "xmlns:mc='http://schemas.openxmlformats.org/markup-compatibility/2006' " +
+        "xmlns:w14='urn:ignore' mc:Ignorable='w14' mc:PreserveElements='w14:plc'",
+    })
+    const editor = await open(from)
+    selectText(editor, SECRET)
+    editor.commands.setRedaction('client phone')
+    const parsed = await parseDocx(from)
+    const plan = pmDocToSavePlan(editor.getJSON() as PmNode, parsed.blocks)
+    const saved = await saveDocx(parsed, plan.saveBlocks)
+    const xml = await JSZip.loadAsync(saved).then((zip) =>
+      zip.file('word/document.xml')!.async('string'),
+    )
+    const doc = new DOMParser().parseFromString(xml, 'application/xml')
+    expect(doc.querySelector('parsererror')).toBeNull()
+    expect(xml.match(/xmlns:mc=/g)?.length).toBe(1)
+    expect(xml.match(/mc:Ignorable=/g)?.length).toBe(1)
+    expect(xml.match(/mc:PreserveElements=/g)?.length).toBe(1)
+    expect(xml).toMatch(/mc:Ignorable=['"]w14 go['"]/)
+    expect(xml).toMatch(/mc:PreserveElements=['"]w14:plc go:redact['"]/)
+  })
+
+  it('installs mc:Ignorable and mc:PreserveElements when root already declares xmlns:go', async () => {
+    const from = await buildDocx({
+      bodyXml: '<w:p><w:r><w:t>Call 13800138000 now</w:t></w:r></w:p>',
+      docRootExtraAttrs: `xmlns:${REDACT_PREFIX}="${REDACT_NS}"`,
+    })
+    const editor = await open(from)
+    selectText(editor, SECRET)
+    editor.commands.setRedaction('client phone')
+    const parsed = await parseDocx(from)
+    const plan = pmDocToSavePlan(editor.getJSON() as PmNode, parsed.blocks)
+    const saved = await saveDocx(parsed, plan.saveBlocks)
+    const xml = await JSZip.loadAsync(saved).then((zip) =>
+      zip.file('word/document.xml')!.async('string'),
+    )
+    const doc = new DOMParser().parseFromString(xml, 'application/xml')
+    expect(doc.querySelector('parsererror')).toBeNull()
+    expect(xml.match(new RegExp(`xmlns:${REDACT_PREFIX}=`, 'g'))?.length).toBe(1)
+    expect(xml.match(/xmlns:mc=/g)?.length).toBe(1)
+    expect(xml).toMatch(/mc:Ignorable=['"][^'"]*\bgo\b/)
+    expect(xml).toMatch(/mc:PreserveElements=['"][^'"]*\bgo:redact\b/)
+  })
 })
 
 describe('a withheld span survives the .docx', () => {
