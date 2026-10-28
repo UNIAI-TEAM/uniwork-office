@@ -1504,6 +1504,11 @@ export const es = {
   appNotePicturesNone: 'Ninguna nota de este libro muestra una imagen.',
   appNotePictureUnavailable: 'No se puede mostrar esta imagen.',
   appNotePicturesToggle: 'Imágenes de notas',
+  appNoteInsertPicture: 'Insertar imagen',
+  appNotePictureInserted:
+    'Imagen añadida a la nota de {cell}. Guarda para escribirla en el archivo.',
+  appNotePictureRemoved: 'Imagen quitada de la nota de {cell}.',
+  appNotePictureRemove: 'Quitar imagen',
   appCommentsPaneTitle: 'Comentarios',
   appThreadReply: 'Responder',
   appThreadReplyPlaceholder: 'Responder…',

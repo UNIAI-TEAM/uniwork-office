@@ -423,6 +423,8 @@ import { SheetsCommentsSurface } from './server-comments/CommentsSurface'
 import { serverComments } from './server-comments/SheetsServerComments'
 import { liveSheetNames } from './server-comments/univer-view'
 import { NotePicturesPane } from './NotePicturesPane'
+import type { PendingNotePicture } from './note-pictures'
+import { handleRemoveNotePicture } from './note-picture-actions'
 import { installFormulaNullResultFix } from './formula-null-result'
 import { installNumberFormatFix } from './numfmt-fix'
 import { installIfsEmptySetFix } from './ifs-empty-set'
@@ -4195,6 +4197,21 @@ export function App({
     setMessage(t('appPageBreakPreviewOn'))
   }
 
+  /**
+   * The pictures put into notes this session, so the pane can show them
+   * before the save writes them into the file.
+   */
+  function pendingNotePictures(): PendingNotePicture[] {
+    const journal = lazyWorkbookRef.current?.editJournal
+    if (!journal) return []
+    return journal.notePictures.map((entry) => ({
+      sheetId: entry.sheetId,
+      row: entry.row,
+      column: entry.column,
+      dataUrl: entry.picture?.dataUrl ?? null,
+    }))
+  }
+
   /** App-scope refs/state bundle for the extracted ribbon dispatcher (ribbon-actions.ts). */
   function ribbonContext(): RibbonCommandContext {
     return {
@@ -5530,7 +5547,14 @@ export function App({
           <WorkbookOpeningScreen />
         ))}
       <SheetsCommentsSurface getRuntime={getRuntime} file={workbookFile} onStatus={setMessage} />
-      <NotePicturesPane file={workbookFile} getRuntime={getRuntime} />
+      <NotePicturesPane
+        file={workbookFile}
+        pending={pendingNotePictures()}
+        onRemove={(sheetId, row, column) =>
+          handleRemoveNotePicture(ribbonContext(), sheetId, row, column)
+        }
+        getRuntime={getRuntime}
+      />
       <ThreadHoverCard hover={threadHover} />
       {findReplaceService && (
         <FindReplacePanel
