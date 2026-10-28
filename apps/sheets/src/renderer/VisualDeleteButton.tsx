@@ -7,6 +7,7 @@ import {
   VISUAL_DELETE_BUTTON_GAP,
   VISUAL_DELETE_BUTTON_SIZE,
   gridTopInset,
+  isModalDialogOpen,
   visualDeleteButtonPosition,
 } from './visual-delete-button'
 
@@ -110,6 +111,7 @@ export function VisualDeleteButton({
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation()
+        if (isModalDialogOpen(document)) return
         onDelete()
       }}
     >

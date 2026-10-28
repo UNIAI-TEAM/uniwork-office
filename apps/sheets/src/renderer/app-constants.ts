@@ -151,6 +151,10 @@ export const FILTER_MUTATIONS = new Set([
   'sheet.mutation.remove-filter',
   'sheet.mutation.re-calc-filter',
 ])
+// A table's header dropdown writes the table plugin's own filter model; the
+// mutation only marks that table filter-dirty (see recordTableFilterChange).
+export const TABLE_FILTER_MUTATION = 'sheet.mutation.set-table-filter'
+export const TABLE_FILTER_COMMAND = 'sheet.command.set-table-filter'
 // Conditional-formatting changes mark the sheet dirty; the save snapshots
 // the full rule model declaratively (same recipe as filters).
 export const CF_MUTATIONS = new Set([
@@ -179,6 +183,8 @@ export const NOTE_MUTATIONS = new Set(['sheet.mutation.update-note', 'sheet.muta
 // rules installed first (a declarative save would silently drop them).
 export const DV_EDIT_COMMAND_PATTERN =
   /^sheets?\.command\.(addDataValidation|updateDataValidationRuleRange|update-data-validation-(?:setting|options)|clear-range-data-validation|remove-data-validation-rule|remove-all-data-validation)$/
+export const CLEAR_FILTER_COMMAND = 'sheet.command.clear-filter-criteria'
+export const REAPPLY_FILTER_COMMAND = 'sheet.command.re-calc-filter'
 export const FILTER_COMMAND_PATTERN =
   /^sheet\.command\.(set-filter-criteria|set-filter-range|smart-toggle-filter|clear-filter-criteria|remove-sheet-filter|re-calc-filter)$/
 // Sheet management is journaled and replayed at save time. Renames rewrite

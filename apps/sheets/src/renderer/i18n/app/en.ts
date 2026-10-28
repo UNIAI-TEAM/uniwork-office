@@ -101,8 +101,10 @@ export const en = {
   appChartNoRepoint: 'This chart does not support repointing its data ranges.',
   appKeepOneSeries: 'Keep at least one series.',
   appNoCategoriesToSwitch: 'No categories to switch.',
-  appComboNoSelectData: 'Changing the data source of a combo chart is not supported yet.',
+  appSelectDataUnsupported: 'Changing the data source of this chart type is not supported.',
   appSeriesName: 'Series Name',
+  appSeriesType: 'Series Type',
+  appSecondaryAxis: 'Secondary Axis',
   appValuesRange: 'Values Range',
   appCategoriesRange: 'Categories Range',
   appKeepUnchanged: 'Keep unchanged',
@@ -312,8 +314,6 @@ export const en = {
   appPivotSheetNoMove: 'This sheet contains a PivotTable — moving ranges is not supported yet.',
   appMergeOverTable:
     'The selection overlaps an Excel table — merging cells inside a table is not supported yet.',
-  appTableFilterNoEdit:
-    "This sheet's filter belongs to an Excel table — editing it cannot be saved yet.",
   appAutofillStreaming: 'Autofill into an area that is still streaming in is not allowed yet.',
   appDvNeedsIndexed:
     'Editing data validation needs this sheet fully indexed first — try again in a moment.',
@@ -547,8 +547,6 @@ export const en = {
   appSaveFailed: 'Unable to save the workbook.',
   appCfRuleUnsaveable:
     'This conditional formatting rule cannot be saved to xlsx — switch to another rule type.',
-  appSaveErrX14Dv:
-    'This sheet has extended (x14) data validation; editing its validation rules is not supported yet.',
   appSaveErrMultiSelectList:
     'Multi-select list validation cannot be saved to xlsx — delete the rule before saving.',
   appSaveErrX14Cf:

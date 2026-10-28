@@ -31,6 +31,10 @@ import {
   installInjectorResolutionGuard,
   installWrapMeasureLifecycle,
   noteSidecarCrash,
+  clearSheetTableFilters,
+  journalTableFilterMutation,
+  registerFileTables,
+  reapplySheetTableFilters,
 } from './univer-sync'
 import { installGridGrowth } from './grid-growth'
 import {
@@ -142,7 +146,6 @@ import UniverPresetSheetsTableEnUS from '@univerjs/preset-sheets-table/locales/e
 import '@univerjs/preset-sheets-table/lib/index.css'
 import { greenTheme } from '@univerjs/themes'
 import { createUniver } from './create-univer'
-import { planFileTableRegistrations } from './file-tables'
 import {
   createTableDefaultRange,
   selectedTableEcho,
@@ -255,6 +258,9 @@ import {
   EMPTY_CHART_EDITS,
   FILTER_COMMAND_PATTERN,
   FILTER_MUTATIONS,
+  TABLE_FILTER_MUTATION,
+  CLEAR_FILTER_COMMAND,
+  REAPPLY_FILTER_COMMAND,
   initialSnapshot,
   MERGE_MUTATIONS,
   MOVE_RANGE_COMMAND,
@@ -2544,6 +2550,7 @@ export function App({
           !SHEET_LIFECYCLE_MUTATIONS.has(event.id) &&
           event.id !== REORDER_RANGE_MUTATION &&
           !FILTER_MUTATIONS.has(event.id) &&
+          event.id !== TABLE_FILTER_MUTATION &&
           !CF_MUTATIONS.has(event.id) &&
           !DV_MUTATIONS.has(event.id) &&
           !DEFINED_NAME_MUTATIONS.has(event.id) &&
@@ -2699,6 +2706,14 @@ export function App({
           const noteSheetId = (params as { sheetId?: string }).sheetId ?? params.subUnitId
           if (noteSheetId) {
             recordNoteChange(state.editJournal, noteSheetId)
+            setPendingEdits(journalSize(state.editJournal))
+          }
+          return
+        }
+        // A table filter mutation names its table, not a sheet (no subUnitId),
+        // so it must be handled before the generic subUnitId guard below.
+        if (event.id === TABLE_FILTER_MUTATION) {
+          if (journalTableFilterMutation(runtime, state, event.params)) {
             setPendingEdits(journalSize(state.editJournal))
           }
           return
@@ -3283,13 +3298,16 @@ export function App({
             setMessage(t('appPivotSheetNoMove'))
             return
           }
-          if (
-            FILTER_COMMAND_PATTERN.test(event.id) &&
-            subUnitId !== undefined &&
-            state.filterOrigins.get(subUnitId)?.origin === 'table'
-          ) {
-            event.cancel = true
-            setMessage(t('appTableFilterNoEdit'))
+          // Univer's Clear / Reapply only know the sheet filter model; a
+          // table's own filter lives in the table plugin and follows them.
+          if (subUnitId !== undefined && event.id === CLEAR_FILTER_COMMAND) {
+            clearSheetTableFilters(runtime, state, subUnitId)
+            // On an untouched file nothing is dispatched, so no mutation
+            // listener refreshes the count that enables Save.
+            setPendingEdits(journalSize(state.editJournal))
+          } else if (subUnitId !== undefined && event.id === REAPPLY_FILTER_COMMAND) {
+            reapplySheetTableFilters(runtime, state, subUnitId)
+            setPendingEdits(journalSize(state.editJournal))
           }
           return
         }
@@ -4769,53 +4787,11 @@ export function App({
         // A web frame without the save grant is locked by the view-only command
         // guard instead (view-only-guard.ts: no Univer permission dialog, its own toast).
         viewOnlyLock.set(selected.readOnly && !isViewOnly() ? workbook : null)
-        // Register existing file tables under their displayName so Univer
-        // renders filter dropdowns and resolves structured references. The
-        // journal stays empty for file tables, so failures are swallowed —
-        // the data is still usable.
-        const tableInstalls: Promise<unknown>[] = []
-        const sessionNames = state.editJournal.tableAdds.map((table) => table.name)
-        for (const entry of planFileTableRegistrations(selected.sheets, sessionNames)) {
-          const ws = workbook.getSheetBySheetId(entry.sheetId)
-          if (!ws) continue
-          const { tableId, tableName } = entry
-          try {
-            // File column names must reach Univer, or empty header cells
-            // fall back to its locale template ("Column 1" with a space)
-            // where Excel shows the table part's names ("Column1").
-            const columnOptions = entry.columns
-              ? {
-                  columns: entry.columns.map((name, columnIndex) => ({
-                    id: `${tableId}-col-${columnIndex}`,
-                    displayName: name,
-                  })),
-                }
-              : undefined
-            const added = ws.addTable(
-              tableName,
-              entry.range,
-              tableId,
-              columnOptions as never,
-            ) as unknown
-            // Univer paints its own lavender default table theme over the
-            // cells; file tables carry Excel's real banding in the cell
-            // fills (applyTableBanding), so mute the theme to plain.
-            tableInstalls.push(
-              Promise.resolve(added)
-                .then(() =>
-                  (
-                    ws as unknown as {
-                      addTableTheme(id: string, theme: { name: string }): unknown
-                    }
-                  ).addTableTheme(tableId, { name: `plain-${tableId}` }),
-                )
-                // Theme muting is cosmetic; the table itself is registered.
-                .catch(() => undefined),
-            )
-          } catch {
-            // Best-effort: skip if Univer rejects (e.g. overlapping ranges)
-          }
-        }
+        const tableInstalls = registerFileTables(
+          workbook,
+          selected,
+          state.editJournal.tableAdds.map((table) => table.name),
+        )
         // Post-save reopen: swap the load-time decoration's undo entries
         // (table/note/name installs are load artifacts, not edits) for the
         // pre-save user history carried across the session swap. Table

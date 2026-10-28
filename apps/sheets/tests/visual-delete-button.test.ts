@@ -3,6 +3,8 @@ import { BooleanNumber } from '@univerjs/core'
 import {
   type GridInsetSource,
   gridTopInset,
+  isModalDialogOpen,
+  MODAL_DIALOG_SELECTOR,
   shouldShowVisualDeleteButton,
   visualDeleteButtonPosition,
 } from '../src/renderer/visual-delete-button'
@@ -110,5 +112,23 @@ describe('grid top inset', () => {
     expect(
       gridTopInset(fakeWorksheet({ freeze: { ySplit: 3, startRow: 3 }, hiddenRows: [1] })),
     ).toBe(62)
+  })
+})
+
+describe('visual delete button under a modal dialog (SH-W4-V4)', () => {
+  it('stands down while a dialog or modal backdrop is mounted', () => {
+    const root = (open: boolean) => ({
+      querySelector: (selector: string) =>
+        open && selector === MODAL_DIALOG_SELECTOR ? ({} as Element) : null,
+    })
+    expect(isModalDialogOpen(root(true))).toBe(true)
+    expect(isModalDialogOpen(root(false))).toBe(false)
+  })
+
+  it('matches both backdrop classes the app stacks above the grid', () => {
+    expect(MODAL_DIALOG_SELECTOR.split(',').map((part) => part.trim())).toEqual([
+      '.dialog-backdrop',
+      '.modal-backdrop',
+    ])
   })
 })
