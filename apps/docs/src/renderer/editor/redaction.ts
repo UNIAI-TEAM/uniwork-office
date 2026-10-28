@@ -14,7 +14,8 @@ declare module '@tiptap/core' {
 }
 
 /** 0.75pt solid line, the same weight the docs border UI offers */
-const BDR = { val: 'single', sz: 6, color: '6B4FC0' }
+export const REDACT_BDR = { val: 'single', sz: 6, color: '6B4FC0' } as const
+const BDR = REDACT_BDR
 
 /**
  * A mark over the real words, so the reader keeps their data and only the

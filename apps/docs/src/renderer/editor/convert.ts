@@ -64,6 +64,7 @@ import { parseRunBorderAttr } from './run-border'
 import { parseTextOutlineAttr } from './text-outline'
 import { charScaleXAttr, parseGlowAttr, parseTextEffectAttr } from './text-effects'
 import { SHAPE_INLINE_WRAP, shapeWrapOf } from './floating-z-order'
+import { REDACT_BDR } from './redaction'
 
 /** minimal ProseMirror JSON shapes */
 export interface PmMark {
@@ -123,13 +124,52 @@ function redactLabelIn(rawRPr: string): string {
     .replace(/&amp;/g, '&')
 }
 
-/** strip the custom redaction element from generic retained rPr while keeping unrelated children */
+const REDACT_BDR_ELEMENT_RE = /<w:bdr\b[^>]*>[\s\S]*?<\/w:bdr>|<w:bdr\b[^>]*\/>/g
+
+/** whether a w:bdr element is the exact border written by setRedaction (no author attributes) */
+function isRedactBdrElement(xml: string): boolean {
+  const match = /^<w:bdr\b([^>]*?)(?:\/>|>\s*<\/w:bdr>)$/.exec(xml.trim())
+  if (!match) return false
+  const attrRe = /([A-Za-z0-9:._-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
+  const rawAttrs = match[1]
+  if (rawAttrs.replace(attrRe, '').trim() !== '') return false
+  const attrs = new Map<string, string>()
+  let attrMatch: RegExpExecArray | null
+  attrRe.lastIndex = 0
+  while ((attrMatch = attrRe.exec(rawAttrs)) !== null) {
+    if (attrs.has(attrMatch[1])) return false
+    attrs.set(attrMatch[1], attrMatch[2] ?? attrMatch[3] ?? '')
+  }
+  return (
+    attrs.size === 3 &&
+    attrs.get('w:val') === REDACT_BDR.val &&
+    attrs.get('w:sz') === String(REDACT_BDR.sz) &&
+    attrs.get('w:color')?.toUpperCase() === REDACT_BDR.color
+  )
+}
+
+function isRedactRunBorder(bdr: Run['bdr']): boolean {
+  return (
+    bdr !== undefined &&
+    bdr.val === REDACT_BDR.val &&
+    bdr.sz === REDACT_BDR.sz &&
+    bdr.color?.toUpperCase() === REDACT_BDR.color &&
+    bdr.space === undefined
+  )
+}
+
+function hasRedactBdrInRPr(rawRPr: string): boolean {
+  if (!REDACT_RPR_RE.test(rawRPr)) return false
+  const matches = rawRPr.match(REDACT_BDR_ELEMENT_RE)
+  return matches ? matches.some(isRedactBdrElement) : false
+}
+
+/** strip the custom redaction element and its paired hide border from generic retained rPr while keeping unrelated children */
 function stripRedactRPr(rawRPr: string): string | undefined {
   if (!REDACT_RPR_RE.test(rawRPr)) return rawRPr
-  const stripped = rawRPr.replace(
-    /<go:redact\b[^>]*>[\s\S]*?<\/go:redact>|<go:redact\b[^>]*\/>/g,
-    '',
-  )
+  const stripped = rawRPr
+    .replace(/<go:redact\b[^>]*>[\s\S]*?<\/go:redact>|<go:redact\b[^>]*\/>/g, '')
+    .replace(REDACT_BDR_ELEMENT_RE, (m) => (isRedactBdrElement(m) ? '' : m))
   if (/^<w:rPr(?:\s[^>]*)?>\s*<\/w:rPr>$/.test(stripped) || stripped.trim() === '') {
     return undefined
   }
@@ -1769,14 +1809,20 @@ function runMarks(run: Run): PmMark[] {
     // lifted out of the raw rPr and the run is re-tagged: without it the
     // border survives a reopen but the document quietly stops withholding
     // anything, and a model can read the whole thing again.
-    if (typeof run.rawRPr === 'string' && REDACT_RPR_RE.test(run.rawRPr)) {
+    const isRedacted = typeof run.rawRPr === 'string' && REDACT_RPR_RE.test(run.rawRPr)
+    if (isRedacted) {
       marks.push({
         type: 'redaction',
-        // bdr and rawRPr are what the save path needs to write the mark back;
-        // docTextStyle already carries the border, this re-asserts it on ours
-        attrs: { label: redactLabelIn(run.rawRPr), rawRPr: run.rawRPr },
+        // bdr and rawRPr live on the redaction mark's rawRPr for the save path;
+        // docTextStyle drops the paired hide border so reopen neither draws a
+        // second box nor leaves an orphan border after unhiding
+        attrs: { label: redactLabelIn(run.rawRPr!), rawRPr: run.rawRPr },
       })
     }
+    const styleBdr =
+      isRedacted && hasRedactBdrInRPr(run.rawRPr!) && isRedactRunBorder(run.bdr)
+        ? undefined
+        : run.bdr
     marks.push({
       type: 'docTextStyle',
       attrs: {
@@ -1802,7 +1848,7 @@ function runMarks(run: Run): PmMark[] {
         dstrike: run.dstrike ?? null,
         glow: run.glow ? JSON.stringify(run.glow) : null,
         positionHalfPoints: run.positionHalfPoints ?? null,
-        bdr: run.bdr ? JSON.stringify(run.bdr) : null,
+        bdr: styleBdr ? JSON.stringify(styleBdr) : null,
         vertAlign: run.vertAlign ?? null,
         em: run.em ?? null,
         boldOff: run.bold === false || null,
@@ -3613,9 +3659,12 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       }
       if (mark.attrs?.positionHalfPoints)
         run.positionHalfPoints = Number(mark.attrs.positionHalfPoints)
+      const rawRPrAttr = typeof mark.attrs?.rawRPr === 'string' ? mark.attrs.rawRPr : undefined
       if (mark.attrs?.bdr) {
         const bdr = parseRunBorderAttr(String(mark.attrs.bdr))
-        if (bdr) run.bdr = bdr
+        if (bdr && !(rawRPrAttr && hasRedactBdrInRPr(rawRPrAttr) && isRedactRunBorder(bdr))) {
+          run.bdr = bdr
+        }
       }
       if (mark.attrs?.vertAlign === 'superscript' || mark.attrs?.vertAlign === 'subscript') {
         run.vertAlign = mark.attrs.vertAlign
@@ -3628,7 +3677,7 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       if (mark.attrs?.eaLang) run.eastAsiaLang = String(mark.attrs.eaLang)
       if (mark.attrs?.rtl != null) run.rtl = Boolean(mark.attrs.rtl)
       if (mark.attrs?.styleId) run.styleId = String(mark.attrs.styleId)
-      if (mark.attrs?.rawRPr) styleRawRPr = stripRedactRPr(String(mark.attrs.rawRPr))
+      if (rawRPrAttr) styleRawRPr = stripRedactRPr(rawRPrAttr)
       if (mark.attrs?.themeRFonts) {
         run.themeRFonts = JSON.parse(String(mark.attrs.themeRFonts)) as Run['themeRFonts']
       }

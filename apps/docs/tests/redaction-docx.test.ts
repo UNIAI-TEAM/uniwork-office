@@ -328,7 +328,7 @@ describe('a withheld span survives the .docx', () => {
     expect(editor.state.doc.textContent).toContain(SECRET)
   })
 
-  it('showing a saved hidden span to AI again survives save and reopen while keeping unrelated rPr', async () => {
+  it('showing a saved hidden span to AI again strips the hide border and go:redact while keeping unrelated rPr', async () => {
     const docx = await makeDocx('<w:r><w:rPr><w:em w:val="dot"/></w:rPr><w:t>secret</w:t></w:r>')
     const editor = await open(docx)
     selectText(editor, 'secret')
@@ -338,18 +338,78 @@ describe('a withheld span survives the .docx', () => {
     const reopenedHidden = await open(savedHidden)
     expect(redactionCount(reopenedHidden.getJSON() as never)).toBe(1)
     expect(modelTextOf(reopenedHidden.getJSON() as never)).toBe('{{client}}')
+    // HFA-V6: reopened hidden span draws .redact-span only, not a second character-border box
+    expect(reopenedHidden.view.dom.querySelectorAll('span.redact-span').length).toBe(1)
+    expect(reopenedHidden.view.dom.querySelectorAll('span[style*="border:"]').length).toBe(0)
 
     selectText(reopenedHidden, 'secret')
     reopenedHidden.commands.unsetRedaction()
     expect(redactionCount(reopenedHidden.getJSON() as never)).toBe(0)
+    // HFA-V1 (live unhide): no leftover character border in the live editor
+    expect(reopenedHidden.view.dom.querySelectorAll('span[style*="border:"]').length).toBe(0)
 
     const savedShown = await save(reopenedHidden, savedHidden)
     const reopenedShown = await open(savedShown)
     expect(redactionCount(reopenedShown.getJSON() as never)).toBe(0)
     expect(redactionMarks(reopenedShown)).toEqual([])
     expect(modelTextOf(reopenedShown.getJSON() as never)).toBe('secret')
+    expect(reopenedShown.view.dom.querySelectorAll('span[style*="border:"]').length).toBe(0)
     const reparsed = await parseDocx(savedShown)
-    expect(reparsed.blocks[0]?.runs?.[0]?.em).toBe('dot')
+    const shownRun = reparsed.blocks[0]?.runs?.[0]
+    expect(shownRun?.em).toBe('dot')
+    expect(shownRun?.bdr).toBeUndefined()
+    expect(shownRun?.rawRPr ?? '').not.toContain('w:bdr')
+    expect(shownRun?.rawRPr ?? '').not.toContain('go:redact')
+  })
+
+  it('keeps an author border on live hide + unhide + save and on reopened runs with non-hide borders', async () => {
+    // 1. Live hide + unhide + save on a run that already had an author border restores it
+    const authorDocx = await makeDocx(
+      '<w:r><w:rPr><w:bdr w:val="single" w:sz="6" w:color="000000"/></w:rPr><w:t>boxed</w:t></w:r>',
+    )
+    const liveEditor = await open(authorDocx)
+    selectText(liveEditor, 'boxed')
+    liveEditor.commands.setRedaction('client')
+    liveEditor.commands.unsetRedaction()
+    const savedLive = await save(liveEditor, authorDocx)
+    const reparsedLive = await parseDocx(savedLive)
+    expect(reparsedLive.blocks[0]?.runs?.[0]?.bdr).toEqual({
+      val: 'single',
+      sz: 6,
+      color: '000000',
+    })
+
+    // 2. Reopened run carrying go:redact alongside an author border keeps the author border on unhide + save
+    const mixedDocx = await makeDocx(
+      '<w:r><w:rPr><w:bdr w:val="single" w:sz="6" w:color="000000"/><go:redact w:label="client"/></w:rPr><w:t>boxed</w:t></w:r>',
+    )
+    const mixedEditor = await open(mixedDocx)
+    expect(redactionCount(mixedEditor.getJSON() as never)).toBe(1)
+    selectText(mixedEditor, 'boxed')
+    mixedEditor.commands.unsetRedaction()
+    const savedMixed = await save(mixedEditor, mixedDocx)
+    const reparsedMixed = await parseDocx(savedMixed)
+    expect(reparsedMixed.blocks[0]?.runs?.[0]?.bdr).toEqual({
+      val: 'single',
+      sz: 6,
+      color: '000000',
+    })
+    expect(reparsedMixed.blocks[0]?.runs?.[0]?.rawRPr ?? '').not.toContain('go:redact')
+
+    // 3. Unredacted run whose author border matches the hide border's visual parameters is untouched
+    const purpleAuthorDocx = await makeDocx(
+      '<w:r><w:rPr><w:bdr w:val="single" w:sz="6" w:color="6B4FC0"/></w:rPr><w:t>author purple</w:t></w:r>',
+    )
+    const purpleEditor = await open(purpleAuthorDocx)
+    expect(redactionMarks(purpleEditor)).toEqual([])
+    expect(purpleEditor.view.dom.querySelectorAll('span[style*="border:"]').length).toBe(1)
+    const savedPurple = await save(purpleEditor, purpleAuthorDocx)
+    const reparsedPurple = await parseDocx(savedPurple)
+    expect(reparsedPurple.blocks[0]?.runs?.[0]?.bdr).toEqual({
+      val: 'single',
+      sz: 6,
+      color: '6B4FC0',
+    })
   })
 })
 

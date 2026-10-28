@@ -138,13 +138,34 @@ describe('a picture and the withhold mark — what sticks, what round-trips', ()
     expect(editor.commands.setRedaction('id-photo')).toBe(true)
     expect(redactionCount(editor.getJSON() as never)).toBe(1)
 
-    const reloaded = await roundTrip(editor, parsed)
-    const { node } = findNode(reloaded, 'docInlineImage')
+    const planHidden = pmDocToSavePlan(editor.getJSON() as PmNode, parsed.blocks)
+    const savedHidden = await saveDocx(parsed, planHidden.saveBlocks)
+    const parsedHidden = await parseDocx(savedHidden)
+    const reloaded = new Editor({
+      element: document.createElement('div'),
+      extensions: editorExtensions,
+      content: blocksToPmDoc(parsedHidden.blocks) as never,
+    })
+    editors.add(reloaded)
+    const { node, pos: reloadedPos } = findNode(reloaded, 'docInlineImage')
     expect(markNames(node)).toContain('redaction')
     expect(markNames(node)).toContain('bold')
     expect(String(node.attrs.rawRPr ?? '')).toContain('<w:b/>')
     expect(String(node.attrs.rawRPr ?? '')).toContain('go:redact')
     expect(redactionCount(reloaded.getJSON() as never)).toBe(1)
+
+    reloaded.view.dispatch(
+      reloaded.state.tr.setSelection(NodeSelection.create(reloaded.state.doc, reloadedPos)),
+    )
+    expect(reloaded.commands.unsetRedaction()).toBe(true)
+    const planShown = pmDocToSavePlan(reloaded.getJSON() as PmNode, parsedHidden.blocks)
+    const savedShown = await saveDocx(parsedHidden, planShown.saveBlocks)
+    const parsedShown = await parseDocx(savedShown)
+    const imageRun = parsedShown.blocks[0]?.runs?.find((r) => r.image)
+    expect(imageRun?.bold).toBe(true)
+    expect(imageRun?.rawRPr ?? '').toContain('<w:b/>')
+    expect(imageRun?.rawRPr ?? '').not.toContain('w:bdr')
+    expect(imageRun?.rawRPr ?? '').not.toContain('go:redact')
   })
 
   it('a formatted note reference (<w:b/>) hidden via NodeSelection survives save and reopen', async () => {
