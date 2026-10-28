@@ -194,6 +194,13 @@ export const es = {
   appInvalidGroupField: 'Campo de agrupación no válido.',
   appInvalidPageField: 'Campo de filtro de informe no válido.',
   appPivotPageItemMissing: 'El elemento de filtro "{item}" no pertenece al campo "{label}".',
+  appInvalidPivotBaseField:
+    'El campo base de "Mostrar valores como" debe estar en filas o columnas.',
+  appPivotBaseFieldMissing:
+    'El modo "Mostrar valores como" de un campo de valores necesita un campo base.',
+  appPivotBaseFieldNotAxis:
+    'El campo base "{label}" debe estar en las filas o columnas de la tabla dinámica.',
+  appPivotBaseItemMissing: 'El elemento base "{item}" no pertenece al campo "{label}".',
   appInvalidLabelFilterField: 'El campo del filtro de etiquetas no es válido.',
   appInvalidValueFieldIndex: 'El índice de campo de valores {index} no es válido.',
   appInvalidValueField: 'Campo de valores no válido.',
@@ -340,6 +347,7 @@ export const es = {
   appPivotSheetNoMove: 'Esta hoja contiene una tabla dinámica — mover rangos aún no se admite.',
   appMergeOverTable:
     'La selección se superpone con una tabla de Excel — combinar celdas dentro de una tabla aún no es compatible.',
+  appFilterToggleFailed: 'No se aplicó el filtro: seleccione primero el rango con los datos.',
   appAutofillStreaming:
     'Aún no se permite el autorrelleno hacia un área que todavía se está cargando por streaming.',
   appDvNeedsIndexed:
