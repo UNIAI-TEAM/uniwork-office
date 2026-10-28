@@ -3,4 +3,5 @@ export const zh = {
   insertFootnote: '脚注',
   statusWords: '{n} 个字',
   statusChars: '{n} 个字符',
+  highlight: '高亮',
 }
