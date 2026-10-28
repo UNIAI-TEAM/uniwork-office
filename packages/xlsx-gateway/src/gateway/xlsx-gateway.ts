@@ -1228,6 +1228,7 @@ export async function planCellEditsToXlsx(
           sheetPlan?.renames ?? [],
           sheetPlan?.removals ?? [],
           structuralOps,
+          sheetPlan?.additions ?? [],
         )
   if (rekeyed !== null) await applyRedactionPart(pkg, touchedEntries, rekeyed)
 

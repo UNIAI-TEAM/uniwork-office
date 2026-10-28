@@ -15,6 +15,7 @@ import {
   type SheetRedactionState,
 } from '../src/gateway/xlsx-redaction'
 import { shiftDefinedNames } from '../src/gateway/xlsx-structure'
+import { unescapeXml } from '../src/gateway/xlsx-defined-names'
 
 const MARK = { startRow: 1, endRow: 3, startColumn: 2, endColumn: 2, label: 'client phone' }
 
@@ -198,6 +199,35 @@ describe('rekeying for sheet edits done in the same save', () => {
     ])
   })
 
+  it('moves the marks before re-keying when the same save renames and inserts rows or columns', () => {
+    expect(
+      rekeyRedactionStates(
+        STATES,
+        [{ sheetName: 'Sheet1', newName: 'Q3' }],
+        [],
+        [{ sheetName: 'Sheet1', ops: [{ kind: 'insert-rows', index: 0, count: 2 }] }],
+      ),
+    ).toEqual([
+      {
+        sheetName: 'Q3',
+        marks: [{ ...MARK, startRow: MARK.startRow + 2, endRow: MARK.endRow + 2 }],
+      },
+    ])
+    expect(
+      rekeyRedactionStates(
+        STATES,
+        [{ sheetName: 'Sheet1', newName: 'Q3' }],
+        [],
+        [{ sheetName: 'Sheet1', ops: [{ kind: 'insert-cols', index: 0, count: 2 }] }],
+      ),
+    ).toEqual([
+      {
+        sheetName: 'Q3',
+        marks: [{ ...MARK, startColumn: MARK.startColumn + 2, endColumn: MARK.endColumn + 2 }],
+      },
+    ])
+  })
+
   it('drops a mark whose rows the same save deletes outright', () => {
     // The value it withheld is gone; a rectangle clamped onto a neighbour
     // would withhold something the reader never hid. A delete that only takes
@@ -227,6 +257,41 @@ describe('rekeying for sheet edits done in the same save', () => {
     expect(rekeyRedactionStates(STATES, [{ sheetName: 'Other', newName: 'X' }], ['Other'])).toEqual(
       STATES,
     )
+  })
+
+  it('clones source marks onto duplicated sheets and applies the copy shifts without double-copying explicit destination states', () => {
+    expect(
+      rekeyRedactionStates(
+        STATES,
+        [{ sheetName: 'Sheet1', newName: 'SourceRenamed' }],
+        [],
+        [{ sheetName: 'Copy', ops: [{ kind: 'insert-rows', index: 0, count: 2 }] }],
+        [{ name: 'Copy', sourceSheetName: 'Sheet1' }],
+      ),
+    ).toEqual([
+      { sheetName: 'SourceRenamed', marks: [MARK] },
+      {
+        sheetName: 'Copy',
+        marks: [{ ...MARK, startRow: MARK.startRow + 2, endRow: MARK.endRow + 2 }],
+      },
+    ])
+
+    const explicitCopyMark = {
+      startRow: 5,
+      endRow: 5,
+      startColumn: 0,
+      endColumn: 0,
+      label: 'explicit copy mark',
+    }
+    expect(
+      rekeyRedactionStates(
+        [...STATES, { sheetName: 'Copy', marks: [explicitCopyMark] }],
+        [],
+        [],
+        [],
+        [{ name: 'Copy', sourceSheetName: 'Sheet1' }],
+      ),
+    ).toEqual([...STATES, { sheetName: 'Copy', marks: [explicitCopyMark] }])
   })
 })
 
@@ -484,6 +549,27 @@ describe('the defined-name mirror', () => {
     })
     expect(mark.label.endsWith('…')).toBe(true)
     expect(mark.label.length).toBeLessThan(label.length)
+  })
+
+  it('budgets the fully encoded formula within 255 characters for quotes, backslashes, and newlines', () => {
+    for (const char of ['"', '\\', '\n']) {
+      const label = char.repeat(255)
+      const states: SheetRedactionState[] = [{ sheetName: 'Data', marks: [{ ...MARK, label }] }]
+      const written = applyRedactionNameMirror(WORKBOOK_XML, states, SHEET_ORDER)
+      const body = /<definedName\b[^>]*>([\s\S]*?)<\/definedName>/.exec(written)?.[1] ?? ''
+      const formula = unescapeXml(body)
+      expect(formula.length).toBeLessThanOrEqual(255)
+      expect(Array.from(formula).length).toBeLessThanOrEqual(255)
+      const mark = mirrorMark(written, SHEET_ORDER)
+      expect(mark).toMatchObject({
+        startRow: MARK.startRow,
+        startColumn: MARK.startColumn,
+        endRow: MARK.endRow,
+        endColumn: MARK.endColumn,
+      })
+      expect(mark.label.endsWith('…')).toBe(true)
+      expect(mark.label.slice(0, -1)).toBe(char.repeat(mark.label.length - 1))
+    }
   })
 
   it('drops marks for a sheet the file no longer has', () => {

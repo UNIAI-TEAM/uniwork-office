@@ -198,4 +198,41 @@ describe('save-plan: cell pictures', () => {
     const workbookXml = await saved.file('xl/workbook.xml')!.async('text')
     expect(workbookXml).toContain('_gxRedaction_1')
   })
+
+  it('passes duplicate-sheet additions through so the duplicated sheet keeps its redaction marks', async () => {
+    const source = new Uint8Array(await buildEditFixture())
+    const { engine } = memoryEngine(source)
+    const states = [
+      {
+        sheetName: 'Data',
+        marks: [{ startRow: 1, endRow: 1, startColumn: 1, endColumn: 1, label: 'client phone' }],
+      },
+    ]
+    const save = resolveSaveRequest(
+      new Map([['sheet-1', 'Data']]),
+      request({
+        sheetOps: [
+          {
+            kind: 'duplicate-sheet',
+            sheetId: 'u-copy',
+            name: 'Data Copy',
+            sourceSheetId: 'sheet-1',
+          },
+        ],
+        sheetOrder: ['sheet-1', 'u-copy'],
+        redactionStates: states,
+      }),
+    )
+    expect(save.args.sheetPlan?.additions).toEqual([{ name: 'Data Copy', sourceSheetName: 'Data' }])
+    const { data } = await saveWorkbookBytes({
+      engine,
+      sourcePath: '/work/Edit.xlsx',
+      sourceBytes: source,
+      workDir: '/tmp/save',
+      save,
+    })
+    const saved = await JSZip.loadAsync(data)
+    const part = JSON.parse(await saved.file('xl/gxRedactions.json')!.async('text'))
+    expect(part.sheets.map((s: { name: string }) => s.name)).toEqual(['Data', 'Data Copy'])
+  })
 })
