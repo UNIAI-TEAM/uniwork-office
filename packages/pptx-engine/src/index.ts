@@ -324,7 +324,7 @@ export {
   readModel3dRotation,
   type Model3dRotation,
 } from './model3d'
-export { glbBounds, type GlbBounds } from './glb-bounds'
+export { glbBounds, isGlbContainer, type GlbBounds } from './glb-bounds'
 export {
   addMedia,
   addModel3d,

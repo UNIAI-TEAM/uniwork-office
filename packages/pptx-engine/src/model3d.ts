@@ -5,7 +5,8 @@
  * The editor treats the model as that picture (move, resize, thumbnails, export) and keeps
  * the Choice in step: frame, rotation and the rendering it caches (am3d:raster).
  */
-import type { GlbBounds } from './glb-bounds'
+import { isGlbContainer, type GlbBounds } from './glb-bounds'
+export { isGlbContainer }
 import type { EmuRect } from './types'
 import { creationIdXml, escapeXmlAttr } from './xml-utils'
 

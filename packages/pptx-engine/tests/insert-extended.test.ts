@@ -475,7 +475,7 @@ describe('addMedia / addModel3d', () => {
 
   it('3d model embeds the glb as a model3d part behind its picture', async () => {
     const opened = await openPptx(fx('01_standard_business.pptx'))
-    const glb = new Uint8Array([0x67, 0x6c, 0x54, 0x46]) // "glTF"
+    const glb = new Uint8Array(Buffer.from('Z2xURgIAAAAYAAAABAAAAEpTT057fSAg', 'base64'))
     const r = addModel3d(opened, 0, { bytes: glb, ext: 'glb', offset: { ...OFF } })
     expect(r).not.toBeNull()
 
@@ -484,6 +484,25 @@ describe('addMedia / addModel3d', () => {
     expect(el.type).toBe('picture')
     expect(el.model3d?.target).toMatch(/^ppt\/media\/model3d\d+\.glb$/)
     expect(reopened.archive.readBytes(el.model3d!.target!)).toEqual(glb)
+  })
+
+  it('addModel3d rejects malformed glb bytes without mutating the archive', async () => {
+    const opened = await openPptx(fx('01_standard_business.pptx'))
+    const entriesBefore = [...opened.archive.entries.keys()].sort()
+    const countBefore = opened.deck.slides[0]!.elements.length
+
+    const badCases = [
+      new Uint8Array([0x67, 0x6c, 0x54, 0x46]), // truncated 4-byte magic
+      new Uint8Array(Buffer.from('Z2xURgEAAAAYAAAABAAAAEpTT057fSAg', 'base64')), // version 1
+      new Uint8Array(Buffer.from('Z2xURgIAAAAgAAAABAAAAEpTT057fSAg', 'base64')), // declared length 32 > 24
+      new Uint8Array(Buffer.from('Z2xURgIAAAAYAAAADAAAAEpTT057fSAg', 'base64')), // chunk length 12 > declared 24 - 20
+      new Uint8Array(Buffer.from('Z2xURgIAAAAYAAAABAAAAEJJTgB7fSAg', 'base64')), // first chunk BIN instead of JSON
+    ]
+    for (const bad of badCases) {
+      expect(addModel3d(opened, 0, { bytes: bad, ext: 'glb', offset: { ...OFF } })).toBeNull()
+    }
+    expect([...opened.archive.entries.keys()].sort()).toEqual(entriesBefore)
+    expect(opened.deck.slides[0]!.elements).toHaveLength(countBefore)
   })
 
   it('solidPng produces a decodable png signature', () => {
