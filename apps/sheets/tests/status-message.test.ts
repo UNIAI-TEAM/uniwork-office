@@ -7,6 +7,12 @@ describe('retranslateStatus', () => {
     expect(retranslateStatus(strings.en.appFullyLoaded, 'vi')).toBe(strings.vi.appFullyLoaded)
     expect(retranslateStatus(strings.vi.appFullyLoaded, 'en')).toBe(strings.en.appFullyLoaded)
     expect(retranslateStatus(strings.ja.appReadyInitial, 'fr')).toBe(strings.fr.appReadyInitial)
+    expect(retranslateStatus(strings.en.redactRecoveredFromNames, 'vi')).toBe(
+      strings.vi.redactRecoveredFromNames,
+    )
+    expect(retranslateStatus(strings.vi.redactRecoveredFromNames, 'en')).toBe(
+      strings.en.redactRecoveredFromNames,
+    )
   })
 
   it('moves the streaming-rows status to the new language and keeps its name and row count', () => {

@@ -195,6 +195,9 @@ export interface LazyWorkbookState {
     running: boolean
     lastRunAt: number
   }
+  /// Redaction load error or mirror-recovery notice from open: kept on the
+  /// status bar ahead of routine streaming / full-load status lines.
+  redactionMessage?: string | null
 }
 
 export interface PinnedClosureCell {

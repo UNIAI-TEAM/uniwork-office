@@ -2059,7 +2059,7 @@ export function App({
         try {
           restoreCellFill(
             univerRef.current!,
-            intent.sheetName,
+            request.sheetId,
             workbook.getSheetBySheetId(request.sheetId)!.getRange(a1Of(intent.mark)) as never,
             marked.previousFill,
             workbook.getId(),
@@ -3919,7 +3919,9 @@ export function App({
       window.removeEventListener('blur', cancelSelectionPointer)
       if (selectionAskRaf !== null) cancelAnimationFrame(selectionAskRaf)
       if (selectionAskSettleRaf !== null) cancelAnimationFrame(selectionAskSettleRaf)
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- ref holds latest timer id
       if (visualInstallTimerRef.current) clearTimeout(visualInstallTimerRef.current)
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- ref holds latest disposables array
       disposeVisuals(visualDisposablesRef.current)
       visualViewportKeyRef.current = ''
       const lazyState = lazyWorkbookRef.current
@@ -3931,6 +3933,7 @@ export function App({
       runtime.univer.dispose()
       univerRef.current = null
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per mount; callbacks read latest state through refs
   }, [])
 
   // Canvas render state lives outside React; mirror the toggle into it.
@@ -4960,7 +4963,11 @@ export function App({
         loadedRedactionStatesRef.current =
           result.status === 'unreadable' ? null : redactionStatesRef.current
         const redactionMessage = session.error ?? session.notice
-        if (redactionMessage !== null) setMessage(redactionMessage)
+        state.redactionMessage = redactionMessage
+        if (redactionMessage !== null) {
+          setMessage(redactionMessage)
+          showToast(redactionMessage, session.error !== null ? 'error' : 'success')
+        }
       })
       .catch((error: unknown) => {
         if (lazyWorkbookRef.current !== state) return
@@ -4972,7 +4979,9 @@ export function App({
           [],
           t,
         ).index
+        state.redactionMessage = reason
         setMessage(reason)
+        showToast(reason, 'error')
       })
     // Pivot definitions load eagerly so refresh (a synchronous apply step)
     // never waits on IPC. Best effort: a failed parse just disables refresh.
@@ -5279,7 +5288,10 @@ export function App({
       // LAG-F1 (web frame): the workbook is mounted; the lag detector's settle stamp starts now
       window.desktopApi.noteDocumentMounted?.()
       setEmptyCsvNotice(selected.emptyCsv === true)
-      setMessage(selected.emptyCsv ? '' : t('appOpened', { name: selected.name }))
+      setMessage(
+        lazyWorkbookRef.current?.redactionMessage ??
+          (selected.emptyCsv ? '' : t('appOpened', { name: selected.name })),
+      )
     } catch (error: unknown) {
       if (isEngineUnavailableError(error) || isTooLargeError(error)) {
         setEngineUnavailable(isTooLargeError(error) ? 'too-large' : 'engine')

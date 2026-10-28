@@ -1,3 +1,4 @@
+import { CellValueType, type ICellData } from '@univerjs/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -74,6 +75,40 @@ describe('painting a mark', () => {
     const channel = (offset: number) => parseInt(MARK_FILL.slice(offset, offset + 2), 16)
     const luminance = (0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5)) / 255
     expect(luminance).toBeGreaterThan(0.75)
+  })
+
+  it('preserves STRING cell type and leading zeros when setBackground coerces numeric strings to NUMBER', () => {
+    // HFA-V4: Univer's SetRangeValuesMutation re-evaluates getCellType on
+    // style-only updates ({ s: { bg } }) and flips numeric-looking STRING
+    // cells ("13800138000", "0600136000") to NUMBER in the live cell matrix.
+    const cellB2: ICellData = { v: '13800138000', t: CellValueType.STRING }
+    const cellB3: ICellData = { v: '0600136000', t: CellValueType.STRING }
+    const matrix: Record<string, ICellData> = {
+      '1:1': cellB2,
+      '2:1': cellB3,
+    }
+    const range = {
+      getCellStyleData: () => ({}),
+      getRange: () => ({ startRow: 1, endRow: 2, startColumn: 1, endColumn: 1 }),
+      getCellDataGrid: () => [[{ ...cellB2 }], [{ ...cellB3 }]],
+      _worksheet: {
+        getCellMatrix: () => ({
+          getValue: (r: number, c: number) => matrix[`${r}:${c}`],
+        }),
+      },
+      setBackground: vi.fn((color: string) => {
+        // Simulate Univer's mergeCellData coercion on style-only update
+        cellB2.t = CellValueType.NUMBER
+        cellB2.v = 13800138000
+        cellB2.s = { bg: { rgb: color } }
+        cellB3.t = CellValueType.NUMBER
+        cellB3.v = 600136000
+        cellB3.s = { bg: { rgb: color } }
+      }),
+    }
+    tintRange(range as never)
+    expect(cellB2).toMatchObject({ v: '13800138000', t: CellValueType.STRING })
+    expect(cellB3).toMatchObject({ v: '0600136000', t: CellValueType.STRING })
   })
 })
 
@@ -162,5 +197,32 @@ describe('clearing a mark', () => {
     const { range, state } = fakeRange(MARK_FILL)
     restoreCellFill(runtime as never, 'sh1', range as never, null, 'wb')
     expect(state.painted).toEqual([])
+  })
+
+  it('preserves STRING cell type and leading zeros when restoring or clearing the fill', () => {
+    const cell: ICellData = { v: '0600136000', t: CellValueType.STRING }
+    const range = {
+      getCellStyleData: () => ({ bg: { rgb: MARK_FILL } }),
+      getRange: () => ({ startRow: 4, endRow: 4, startColumn: 1, endColumn: 1 }),
+      getCellDataGrid: () => [[{ ...cell }]],
+      _worksheet: {
+        getCellMatrix: () => ({
+          getValue: (r: number, c: number) => (r === 4 && c === 1 ? cell : undefined),
+        }),
+      },
+      setBackground: vi.fn(() => {
+        cell.t = CellValueType.NUMBER
+        cell.v = 600136000
+      }),
+    }
+    runtime.univerAPI.syncExecuteCommand.mockImplementationOnce(() => {
+      cell.t = CellValueType.NUMBER
+      cell.v = 600136000
+    })
+    restoreCellFill(runtime as never, 'sh1', range as never, null, 'wb')
+    expect(cell).toMatchObject({ v: '0600136000', t: CellValueType.STRING })
+
+    restoreCellFill(runtime as never, 'sh1', range as never, '#FFF2CC', 'wb')
+    expect(cell).toMatchObject({ v: '0600136000', t: CellValueType.STRING })
   })
 })
