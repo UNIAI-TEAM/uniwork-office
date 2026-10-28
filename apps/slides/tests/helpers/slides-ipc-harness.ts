@@ -214,9 +214,13 @@ export const electronUtilsModule = {
     platform === 'darwin'
       ? { label: 'UniWork Office', submenu: [...(opts.extra ?? [])] }
       : undefined,
-  settingsMenuItem: (_labels: unknown, fallback?: () => void) => ({
+  settingsMenuItem: (
+    _labels: unknown,
+    fallback?: () => void,
+    options: { accelerator?: boolean } = {},
+  ) => ({
     label: 'Settings',
-    accelerator: 'CmdOrCtrl+,',
+    ...(options.accelerator !== false ? { accelerator: 'CmdOrCtrl+,' } : {}),
     click: () => fallback?.(),
   }),
   configuredDefaultSaveDir: () => harness.draftsDir,

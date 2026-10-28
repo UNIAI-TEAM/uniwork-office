@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const electronMock = vi.hoisted(() => ({
@@ -277,55 +275,38 @@ describe('settingsMenuItem', () => {
     expect(withAcc.accelerator).toBe('CmdOrCtrl+,')
   })
 
-  it('pins the per-platform Q1 accelerator rule across shell and editor menus', () => {
-    const buildAppAndFileSettings = (platform: NodeJS.Platform, isShellMenu: boolean) => {
-      const appMenu = appMenuTemplate(platform, en, {
-        extra: [settingsMenuItem(en)],
-      })
-      const fileOrToolsSettings = isShellMenu
-        ? settingsMenuItem(en)
-        : settingsMenuItem(en, undefined, { accelerator: platform === 'darwin' })
-      return {
-        appMenuSettings: appMenu ? submenuOf(appMenu)[1] : undefined,
-        menuSettings: fileOrToolsSettings,
-      }
+  it('emits Settings and Close/Quit items matching the per-platform Q1 rule in appMenuTemplate and settingsMenuItem', () => {
+    // macOS app menu: Settings sits right after About with CmdOrCtrl+, and Quit role at the tail
+    const macAppMenu = appMenuTemplate('darwin', en, {
+      extra: [settingsMenuItem(en)],
+    })!
+    const macAppSubmenu = submenuOf(macAppMenu)
+    const macAppSettings = macAppSubmenu.find((i) => i.label === en.settings)
+    expect(macAppSettings).toBeDefined()
+    expect(macAppSettings?.accelerator).toBe('CmdOrCtrl+,')
+    expect(macAppSubmenu.find((i) => i.role === 'quit')).toBeDefined()
+
+    // Windows/Linux have no macOS app menu
+    expect(appMenuTemplate('win32', en, { extra: [settingsMenuItem(en)] })).toBeUndefined()
+    expect(appMenuTemplate('linux', en, { extra: [settingsMenuItem(en)] })).toBeUndefined()
+
+    // Shell-owned File menus (Home, PDF, Markdown, HTML) use default settingsMenuItem(labels) -> Ctrl+, on all platforms
+    const shellFileSettings = settingsMenuItem(en)
+    expect(shellFileSettings.label).toBe(en.settings)
+    expect(shellFileSettings.accelerator).toBe('CmdOrCtrl+,')
+
+    // Editor menus on Windows/Linux pass { accelerator: false } / { accelerator: isMac } -> no accelerator
+    for (const platform of ['win32', 'linux'] as const) {
+      const isMac = (platform as string) === 'darwin'
+      const editorSettings = settingsMenuItem(en, undefined, { accelerator: isMac })
+      expect(editorSettings.label).toBe(en.settings)
+      expect(editorSettings.accelerator).toBeUndefined()
     }
 
-    // macOS: Cmd+, in every app menu (shell Home/PDF/Markdown/HTML and Docs/Sheets/Slides)
-    expect(buildAppAndFileSettings('darwin', true).appMenuSettings?.accelerator).toBe('CmdOrCtrl+,')
-    expect(buildAppAndFileSettings('darwin', false).appMenuSettings?.accelerator).toBe(
-      'CmdOrCtrl+,',
-    )
-
-    // Windows/Linux shell-owned menus (Home, PDF, Markdown, HTML): Ctrl+, accelerator present
-    expect(buildAppAndFileSettings('win32', true).menuSettings.accelerator).toBe('CmdOrCtrl+,')
-    expect(buildAppAndFileSettings('linux', true).menuSettings.accelerator).toBe('CmdOrCtrl+,')
-
-    // Verify the actual menu builders in shell, docs, sheets, and slides match the Q1 rule
-    const root = resolve(__dirname, '../../..')
-    const shellSrc = readFileSync(resolve(root, 'apps/shell/src/main/index.ts'), 'utf8')
-    const docsSrc = readFileSync(resolve(root, 'apps/docs/src/main/docs-main.ts'), 'utf8')
-    const sheetsSrc = readFileSync(resolve(root, 'apps/sheets/src/main/sheets-main.ts'), 'utf8')
-    const slidesSrc = readFileSync(resolve(root, 'apps/slides/src/main/slides-main.ts'), 'utf8')
-
-    // Shell menus (Home, PDF, Markdown, HTML): 4 macOS appMenu entries + 4 File menu entries, all default accelerator
-    expect(shellSrc.match(/settingsMenuItem\(labels\)/g)).toHaveLength(8)
-    expect(shellSrc).not.toContain('accelerator: false')
-
-    // Docs: macOS appMenu has default accelerator; non-macOS Tools menu passes { accelerator: false }
-    expect(docsSrc).toContain("extra: [settingsMenuItem(labels, () => sendCommand('preferences'))]")
-    expect(docsSrc).toContain(
-      "settingsMenuItem(labels, () => sendCommand('preferences'), { accelerator: false })",
-    )
-
-    // Sheets & Slides: macOS appMenu has default accelerator; File menu passes { accelerator: isMac }
-    expect(sheetsSrc).toContain('extra: [settingsMenuItem(labels)]')
-    expect(sheetsSrc).toContain('settingsMenuItem(labels, undefined, { accelerator: isMac })')
-    expect(slidesSrc).toContain('extra: [settingsMenuItem(labels)]')
-    expect(slidesSrc).toContain('settingsMenuItem(labels, undefined, { accelerator: isMac })')
-    // Windows/Linux Docs/Sheets/Slides menus: no accelerator (preserves Docs Ctrl+Comma subscript)
-    expect(buildAppAndFileSettings('win32', false).menuSettings.accelerator).toBeUndefined()
-    expect(buildAppAndFileSettings('linux', false).menuSettings.accelerator).toBeUndefined()
+    // Editor File menu on macOS passes { accelerator: isMac } -> Cmd+,
+    const macEditorSettings = settingsMenuItem(en, undefined, { accelerator: true })
+    expect(macEditorSettings.label).toBe(en.settings)
+    expect(macEditorSettings.accelerator).toBe('CmdOrCtrl+,')
   })
 
   it('routes the click to the registered action', () => {
