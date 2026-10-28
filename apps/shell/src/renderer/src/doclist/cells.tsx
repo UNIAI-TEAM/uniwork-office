@@ -249,13 +249,7 @@ export function AccessContent({
  * An avatar and a name: renders the photo from `avatar_url` when available,
  * falling back to the person's initials if absent or if the image fails to load.
  */
-export function Person({
-  name,
-  avatarUrl,
-}: {
-  name: string | null
-  avatarUrl?: string | null
-}) {
+export function Person({ name, avatarUrl }: { name: string | null; avatarUrl?: string | null }) {
   const [imgError, setImgError] = useState(false)
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)

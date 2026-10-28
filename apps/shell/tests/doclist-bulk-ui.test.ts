@@ -117,9 +117,7 @@ describe('BulkBar: visible from one selected row, actions = what every row allow
     expect(host.querySelector('[data-bulk-action="share"]')?.classList.contains('danger')).toBe(
       false,
     )
-    expect(
-      host.querySelector('[data-bulk-clear] svg[data-icon="x"]'),
-    ).not.toBeNull()
+    expect(host.querySelector('[data-bulk-clear] svg[data-icon="x"]')).not.toBeNull()
     await act(async () => host.querySelector<HTMLElement>('[data-bulk-action="shelve"]')!.click())
     expect(onAction).toHaveBeenCalledWith('shelve')
     await act(async () => host.querySelector<HTMLElement>('[data-bulk-clear]')!.click())
