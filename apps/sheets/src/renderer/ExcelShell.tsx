@@ -368,6 +368,8 @@ interface ExcelShellProps {
   readonly sheetTabActions: SheetTabActions | null
   /// Effective workbook structure lock (null = no file open).
   readonly onGetWorkbookProtection: () => boolean | null
+  /// True when the current OOXML file is encrypted with a workbook-open password.
+  readonly passwordProtected: boolean
   readonly formulaBarVisible: boolean
   /// Cross-highlight ("reading mode") of the active row/column, echoed by the View checkbox.
   readonly crossHighlightVisible: boolean
@@ -504,6 +506,7 @@ export function ExcelShell({
   onUnprotectSheet,
   sheetTabActions,
   onGetWorkbookProtection,
+  passwordProtected,
   formulaBarVisible,
   crossHighlightVisible,
   onGetProtectedRanges,
@@ -1093,6 +1096,7 @@ export function ExcelShell({
           sheetHasContent={sheetHasContent}
           sheetProtected={onGetSheetProtection()?.protected ?? null}
           workbookProtected={onGetWorkbookProtection()}
+          passwordProtected={passwordProtected}
           formulaBarVisible={formulaBarVisible}
           crossHighlightVisible={crossHighlightVisible}
           pageLayout={pageLayout}
@@ -2064,6 +2068,7 @@ function Ribbon({
   sheetHasContent,
   sheetProtected,
   workbookProtected,
+  passwordProtected,
   formulaBarVisible,
   crossHighlightVisible,
   pageLayout,
@@ -2090,6 +2095,7 @@ function Ribbon({
   readonly sheetHasContent: boolean
   readonly sheetProtected: boolean | null
   readonly workbookProtected: boolean | null
+  readonly passwordProtected: boolean
   /// View > Show echo for the formula bar toggle (app-level, not per sheet).
   readonly formulaBarVisible: boolean
   readonly crossHighlightVisible: boolean
@@ -3574,6 +3580,15 @@ function Ribbon({
             symbol={workbookProtected ? '🔓' : '🔐'}
             onClick={() => onCommand('workbook-protect')}
           />
+          {passwordProtected && (
+            <RibbonButton
+              large
+              label={t('appChangePassword')}
+              detail={t('appChangePassword')}
+              symbol="🔑"
+              onClick={() => onCommand('workbook-change-password')}
+            />
+          )}
           <RibbonButton
             large
             label={t('appAllowEditRanges')}
