@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { DRAFT_PREVIEW_DIR } from '@genoffice/electron-utils/draft-preview'
 import {
   createLastSessionFilterDeps,
+  createSessionSnapshotRecorder,
   filterLastSessionDocuments,
   launchPathsWithLastSession,
   openLaunchSequence,
@@ -257,5 +258,85 @@ describe('openLaunchSequence', () => {
       openHomeTab: () => events.push('home'),
     })
     expect(events).toEqual(['path:/missing.docx', 'url:uniwork-office://open?doc=bad', 'home'])
+  })
+})
+
+describe('createSessionSnapshotRecorder', () => {
+  it('writes shell paths on a shell-only quit and prevents the subsequent shell closed event from overwriting with a smaller list', () => {
+    const writes: string[][] = []
+    const shellOpen = ['/shell/a.docx', '/shell/b.xlsx']
+    const detachedOpen: string[] = []
+    const recorder = createSessionSnapshotRecorder({
+      enabled: () => true,
+      filterDeps: () => ({}),
+      write: (paths) => writes.push(paths),
+    })
+
+    recorder.onBeforeQuit(shellOpen, detachedOpen)
+    recorder.onShellClosed(['/shell/a.docx', '/shell/b.xlsx'], detachedOpen)
+
+    expect(writes).toEqual([['/shell/a.docx', '/shell/b.xlsx']])
+  })
+
+  it('reflects a later detached Save As at quit when the shell window closed first', () => {
+    const writes: string[][] = []
+    let shellOpen: string[] | null = ['/shell/a.docx']
+    let detachedOpen: string[] = ['/detached/initial.pptx']
+    const recorder = createSessionSnapshotRecorder({
+      enabled: () => true,
+      filterDeps: () => ({}),
+      write: (paths) => writes.push(paths),
+    })
+
+    // Shell closes first while detached remains open
+    const dropped = shellOpen
+    shellOpen = null
+    recorder.onShellClosed(dropped, detachedOpen)
+    expect(writes).toEqual([['/shell/a.docx', '/detached/initial.pptx']])
+
+    // Detached editor performs Save As and then the app quits
+    detachedOpen = ['/detached/saved-as.pptx']
+    recorder.onBeforeQuit(shellOpen, detachedOpen)
+    expect(writes).toEqual([
+      ['/shell/a.docx', '/detached/initial.pptx'],
+      ['/shell/a.docx', '/detached/saved-as.pptx'],
+    ])
+  })
+
+  it('preserves both shell and detached paths during a multi-window quit when detached windows close before the shell window', () => {
+    const writes: string[][] = []
+    const shellOpen = ['/shell/a.docx']
+    let detachedOpen: string[] = ['/detached/d.xlsx']
+    const recorder = createSessionSnapshotRecorder({
+      enabled: () => true,
+      filterDeps: () => ({}),
+      write: (paths) => writes.push(paths),
+    })
+
+    // Quit starts while both shell and detached are alive
+    recorder.onBeforeQuit(shellOpen, detachedOpen)
+    // Detached window closes first, emptying detachedOpen before shell 'closed' fires
+    detachedOpen = []
+    recorder.onShellClosed(shellOpen, detachedOpen)
+
+    expect(writes).toEqual([['/shell/a.docx', '/detached/d.xlsx']])
+  })
+
+  it('allows the next shell close or quit to rewrite the snapshot after a vetoed quit', () => {
+    const writes: string[][] = []
+    const recorder = createSessionSnapshotRecorder({
+      enabled: () => true,
+      filterDeps: () => ({}),
+      write: (paths) => writes.push(paths),
+    })
+
+    recorder.onBeforeQuit(['/shell/a.docx'], ['/detached/d.xlsx'])
+    recorder.onQuitVetoed()
+    recorder.onShellClosed(['/shell/a.docx', '/shell/new.docx'], [])
+
+    expect(writes).toEqual([
+      ['/shell/a.docx', '/detached/d.xlsx'],
+      ['/shell/a.docx', '/shell/new.docx'],
+    ])
   })
 })

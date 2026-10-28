@@ -124,3 +124,54 @@ export async function openLaunchSequence(deps: LaunchSequenceDeps): Promise<void
     openHomeTab()
   }
 }
+
+export interface SessionSnapshotRecorderDeps {
+  enabled: () => boolean
+  filterDeps: () => LastSessionFilterDeps
+  write: (paths: string[]) => void
+}
+
+export interface SessionSnapshotRecorder {
+  onBeforeQuit: (shellPaths: readonly string[] | null, detachedPaths: readonly string[]) => void
+  onShellClosed: (droppedShellPaths: readonly string[], detachedPaths: readonly string[]) => void
+  onShellCreated: () => void
+  onQuitVetoed: () => void
+}
+
+/**
+ * Process-wide session snapshot state:
+ * - `onBeforeQuit` writes `[...shellPaths (or paths captured when the shell closed earlier), ...detachedPaths]`
+ *   and marks quit in progress so the shell `closed` listener does not overwrite it with a smaller list.
+ * - `onShellClosed` captures the shell's closed paths and writes `[...droppedShellPaths, ...detachedPaths]`
+ *   when a quit is not already in progress.
+ */
+export function createSessionSnapshotRecorder(
+  deps: SessionSnapshotRecorderDeps,
+): SessionSnapshotRecorder {
+  let quitInProgress = false
+  let closedShellPaths: string[] = []
+
+  const persist = (raw: readonly string[]): void => {
+    if (!deps.enabled()) return
+    deps.write(filterLastSessionDocuments(raw, deps.filterDeps()))
+  }
+
+  return {
+    onBeforeQuit(shellPaths, detachedPaths) {
+      const activeShell = shellPaths ? [...shellPaths] : closedShellPaths
+      quitInProgress = true
+      persist([...activeShell, ...detachedPaths])
+    },
+    onShellClosed(droppedShellPaths, detachedPaths) {
+      closedShellPaths = [...droppedShellPaths]
+      if (quitInProgress) return
+      persist([...droppedShellPaths, ...detachedPaths])
+    },
+    onShellCreated() {
+      closedShellPaths = []
+    },
+    onQuitVetoed() {
+      quitInProgress = false
+    },
+  }
+}

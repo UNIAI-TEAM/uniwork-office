@@ -101,7 +101,7 @@ import {
   LAST_SESSION_DOCUMENTS_KEY,
   RESTORE_LAST_SESSION_KEY,
   createLastSessionFilterDeps,
-  filterLastSessionDocuments,
+  createSessionSnapshotRecorder,
   launchPathsWithLastSession,
   openLaunchSequence,
   restoreLastSessionEnabled,
@@ -3546,6 +3546,20 @@ function lastSessionFilterDeps(): LastSessionFilterDeps {
   })
 }
 
+const sessionSnapshot = createSessionSnapshotRecorder({
+  enabled: () => restoreLastSessionEnabled(readAppSettings(APP_SETTINGS_PATH())),
+  filterDeps: lastSessionFilterDeps,
+  write: (paths) => {
+    try {
+      writeAppSettings(APP_SETTINGS_PATH(), {
+        [LAST_SESSION_DOCUMENTS_KEY]: paths,
+      })
+    } catch (err) {
+      console.warn('[shell] could not save the session documents:', err)
+    }
+  },
+})
+
 const pendingNewFileDir = new Map<string, { dir: string; setAt: number }>()
 /** folder bound to a freshly created editor tab, keyed by its webContents id; consumed by the first save */
 const pendingDirByWc = new Map<number, { dir: string; setAt: number }>()
@@ -3930,6 +3944,7 @@ function createShellWindow(): void {
   // reopens maximized instead of as a screen-sized ordinary window
   if (restored?.maximized) win.maximize()
   shellWindow = win
+  sessionSnapshot.onShellCreated()
   nativeTheme.on('updated', refreshTitleBarOverlay)
   win.once('closed', () => nativeTheme.off('updated', refreshTitleBarOverlay))
   // dragging the window by the tab strip's blank (draggable) area produces no
@@ -4166,6 +4181,7 @@ function createShellWindow(): void {
     inFlight: () => appQuitInFlight,
     clear: () => {
       appQuitInFlight = false
+      sessionSnapshot.onQuitVetoed()
     },
     resume: () => app.quit(),
   })
@@ -4176,18 +4192,7 @@ function createShellWindow(): void {
       const dropped = manager.openFilePaths()
       if (dropped.length > 0) void uniworkDocs?.service.notePathsDropped(dropped)
       // the close guard has already settled every unsaved tab, so the tabs left are the session
-      if (restoreLastSessionEnabled(readAppSettings(APP_SETTINGS_PATH()))) {
-        try {
-          writeAppSettings(APP_SETTINGS_PATH(), {
-            [LAST_SESSION_DOCUMENTS_KEY]: filterLastSessionDocuments(
-              [...dropped, ...detachedFilePaths()],
-              lastSessionFilterDeps(),
-            ),
-          })
-        } catch (err) {
-          console.warn('[shell] could not save the session documents:', err)
-        }
-      }
+      sessionSnapshot.onShellClosed(dropped, detachedFilePaths())
       tabManager = null
       setDockHost(null)
       publishAllOpenDocuments()
@@ -7775,6 +7780,7 @@ let appQuitInFlight = false
 
 app.on('before-quit', () => {
   appQuitInFlight = true
+  sessionSnapshot.onBeforeQuit(tabManager ? tabManager.openFilePaths() : null, detachedFilePaths())
   // No close prompt may fall through to "Save" during shutdown
   markSheetsShuttingDown()
   stopSheetsSidecar()
