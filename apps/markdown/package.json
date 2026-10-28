@@ -70,6 +70,7 @@
     "@tiptap/extension-mathematics": "3.31.0",
     "katex": "^0.16.47",
     "json5": "^2.2.3",
+    "marked": "^17.0.6",
     "mermaid": "^11.17.2",
     "wavedrom": "^3.7.0",
     "pdfjs-dist": "^6.2.108",
