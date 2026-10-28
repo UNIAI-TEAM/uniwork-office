@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import {
   closeSync,
+  constants,
   fsyncSync,
   mkdirSync,
   openSync,
@@ -8,7 +9,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
-import { copyFile, open, rename, unlink, writeFile } from 'node:fs/promises'
+import { copyFile, link, open, rename, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
 /** Transient Windows codes: antivirus/indexer briefly locks the rename target. */
@@ -22,6 +23,13 @@ const RENAME_RETRY_DELAYS_MS = [50, 100, 200, 400]
  */
 const TOLERATED_SYNC_CODES = new Set(['EPERM', 'EACCES', 'EBUSY', 'EINVAL', 'ENOSYS'])
 
+const HARDLINK_UNSUPPORTED_CODES: Record<string, true> = {
+  EPERM: true,
+  EXDEV: true,
+  ENOTSUP: true,
+  ENOSYS: true,
+  EINVAL: true,
+}
 const errorCode = (error: unknown) => (error as NodeJS.ErrnoException).code ?? ''
 const isRetryableRename = (error: unknown) => RETRYABLE_RENAME_CODES.has(errorCode(error))
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -122,6 +130,32 @@ export async function atomicCopyFile(source: string, filePath: string): Promise<
   // Keep the completed temp until the fallback lands, as atomicWriteFile does.
   await copyFile(source, filePath)
   await unlink(tmp).catch(() => {})
+}
+
+/**
+ * Exclusive copy via sibling temp: publishes with `link(tmp, filePath)` so an
+ * existing destination fails with `EEXIST` instead of being replaced. On
+ * filesystems without hard links (FAT/exFAT), falls back to `copyFile` with
+ * `COPYFILE_EXCL` so a destination is never overwritten.
+ */
+export async function atomicCopyFileExclusive(source: string, filePath: string): Promise<void> {
+  const tmp = tempPathBeside(filePath)
+  try {
+    await copyFile(source, tmp)
+    await syncFileBestEffort(tmp)
+  } catch (error) {
+    await unlink(tmp).catch(() => {})
+    throw error
+  }
+  try {
+    await link(tmp, filePath)
+    await unlink(tmp).catch(() => {})
+    return
+  } catch (error) {
+    await unlink(tmp).catch(() => {})
+    if (!HARDLINK_UNSUPPORTED_CODES[errorCode(error)]) throw error
+  }
+  await copyFile(source, filePath, constants.COPYFILE_EXCL)
 }
 
 /**

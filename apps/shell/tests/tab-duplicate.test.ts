@@ -1,8 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { existsSync, writeFileSync } from 'node:fs'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { duplicateDocumentFile } from '../src/main/tab-duplicate'
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual: typeof import('node:fs') = await importOriginal()
+  return {
+    ...actual,
+    existsSync: vi.fn(actual.existsSync),
+  }
+})
 
 let directory: string
 beforeEach(async () => {
@@ -43,5 +52,43 @@ describe('shared document duplication', () => {
     expect(await duplicateDocumentFile(join(directory, 'missing.docx'), deps)).toBeUndefined()
     expect(deps.onError).toHaveBeenCalledWith(expect.objectContaining({ code: 'ENOENT' }))
     expect(deps.recordRecentFile).not.toHaveBeenCalled()
+  })
+
+  it('does not overwrite a target created between candidate selection and publication, and uses the next suffix', async () => {
+    const source = join(directory, 'report.docx')
+    const firstCandidate = join(directory, 'report Copy.docx')
+    await writeFile(source, 'source content')
+    const deps = callbacks()
+    // Two concurrent duplicates of the same file race for 'report Copy.docx';
+    // if publication replaces instead of failing with EEXIST, both return the same path
+    // or overwrite a file created after the initial check.
+    const [first, second] = await Promise.all([
+      duplicateDocumentFile(source, deps),
+      duplicateDocumentFile(source, deps),
+    ])
+    expect(new Set([first, second])).toEqual(
+      new Set([join(directory, 'report Copy.docx'), join(directory, 'report Copy 2.docx')]),
+    )
+    expect(await readFile(firstCandidate, 'utf8')).toBe('source content')
+    expect(await readFile(join(directory, 'report Copy 2.docx'), 'utf8')).toBe('source content')
+  })
+
+  it('does not overwrite a destination file injected right before publish and advances to the next suffix', async () => {
+    const actualFs: typeof import('node:fs') = await vi.importActual('node:fs')
+    const source = join(directory, 'budget.xlsx')
+    const racedTarget = join(directory, 'budget Copy.xlsx')
+    await writeFile(source, 'duplicated bytes')
+    vi.mocked(existsSync).mockImplementationOnce((p) => {
+      const res = actualFs.existsSync(p)
+      if (p === racedTarget && !res) {
+        writeFileSync(racedTarget, 'competing writer bytes')
+      }
+      return res
+    })
+    const deps = callbacks()
+    const target = await duplicateDocumentFile(source, deps)
+    expect(target).toBe(join(directory, 'budget Copy 2.xlsx'))
+    expect(await readFile(racedTarget, 'utf8')).toBe('competing writer bytes')
+    expect(await readFile(target!, 'utf8')).toBe('duplicated bytes')
   })
 })
