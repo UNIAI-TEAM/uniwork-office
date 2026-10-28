@@ -1199,4 +1199,249 @@ describe('member-name cache and org switch (S16)', () => {
     expect(beyond!.updatedById).toBe('u_2000')
     expect(beyond!.updatedByName).toBeUndefined()
   })
+
+  const flushMicrotasks = async () => {
+    for (let i = 0; i < 50; i += 1) {
+      await Promise.resolve()
+    }
+  }
+
+  it('returns list rows immediately while avatar fetch is held, emits one session-fenced refresh when warmed, and suppresses refresh on failure (BE R2-1)', async () => {
+    const PNG_BYTES = new Uint8Array(
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    )
+    const expectedDataUrl = `data:image/png;base64,${Buffer.from(PNG_BYTES).toString('base64')}`
+    const heldAvatars: Array<{ url: string; resolve: (res: Response) => void }> = []
+    const treeChanged: Array<{ workspaceId: string }> = []
+    let failAvatar = false
+
+    const fetch: FetchLike = async (url) => {
+      const parsed = new URL(url)
+      if (parsed.origin === 'https://s3.example.com') {
+        const { promise, resolve } = Promise.withResolvers<Response>()
+        heldAvatars.push({ url, resolve })
+        return promise
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/members') {
+        return json(200, {
+          members: [{ user_id: 'u_1', display_name: 'Minh Tran' }],
+        })
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/documents/recent') {
+        return json(200, {
+          documents: [
+            {
+              id: 'doc_1',
+              workspace_id: 'ws_1',
+              title: 'Report.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T08:00:00Z',
+              updated_by: 'u_1',
+              updated_by_user: {
+                name: 'Minh Tran',
+                avatar_url: failAvatar
+                  ? 'https://s3.example.com/avatars/fail.png'
+                  : 'https://s3.example.com/avatars/minh.png?sig=1',
+              },
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return json(404, { error: { code: 'not_found' } })
+    }
+
+    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-avatar-r2-1-'))
+    const service = new UniworkDocsService({
+      userDataDir: dir,
+      profile: () => profile,
+      channel: () => 'stable',
+      applyProfile: async () => 'unchanged',
+      identity: () => ({ accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'default' }),
+      keystoreLocked: () => false,
+      selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
+      authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+      fetch,
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      pushTreeChanged: (ev) => treeChanged.push(ev),
+      ui: {
+        chooseConflict: async () => 'later',
+        confirmDiscard: async () => false,
+        pickCopyPath: async () => null,
+        showOpenLatestFailed: () => undefined,
+        showCopyFailed: () => undefined,
+        chooseUnsavedClose: async () => 'cancel',
+      },
+      pushStatus: () => undefined,
+      pushLaunch: () => undefined,
+      reveal: () => undefined,
+    })
+
+    // 1. Cold avatar response is held: list rows arrive immediately without avatarUrl
+    const first = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    expect(first.value.documents[0]!.updatedByUser).toEqual({ name: 'Minh Tran' })
+    expect(heldAvatars).toHaveLength(1)
+    expect(treeChanged).toEqual([])
+
+    // 2. Release the held avatar: background warm finishes and emits one session-fenced refresh
+    heldAvatars[0]!.resolve(new Response(PNG_BYTES, { status: 200 }))
+    await flushMicrotasks()
+    expect(treeChanged).toEqual([{ workspaceId: 'ws_1' }])
+
+    // 3. Re-read materializes the cached data: URL immediately and does NOT emit another refresh
+    const second = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(second.ok).toBe(true)
+    if (!second.ok) return
+    expect(second.value.documents[0]!.updatedByUser).toEqual({
+      name: 'Minh Tran',
+      avatarUrl: expectedDataUrl,
+    })
+    await flushMicrotasks()
+    expect(treeChanged).toHaveLength(1)
+    expect(heldAvatars).toHaveLength(1)
+
+    // 4. Failed avatar warm never emits a refresh
+    failAvatar = true
+    const failList = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(failList.ok).toBe(true)
+    expect(heldAvatars).toHaveLength(2)
+    heldAvatars[1]!.resolve(new Response(null, { status: 500 }))
+    await flushMicrotasks()
+    expect(treeChanged).toHaveLength(1)
+  })
+
+  it('clears and fences in-flight avatars across account/deployment switch and lockSession sign-out (BE R2-2)', async () => {
+    const PNG_BYTES = new Uint8Array(
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    )
+    const GIF_BYTES = new Uint8Array(
+      Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'),
+    )
+    const expectedGif = `data:image/gif;base64,${Buffer.from(GIF_BYTES).toString('base64')}`
+
+    let currentIdentity: {
+      accountId: string
+      deviceSessionId: string
+      deploymentId: string
+    } | null = { accountId: 'acc_1', deviceSessionId: 'dev_1', deploymentId: 'dep_1' }
+    const heldAvatars: Array<{
+      signal: AbortSignal | null | undefined
+      resolve: (res: Response) => void
+    }> = []
+    const treeChanged: Array<{ workspaceId: string }> = []
+
+    const fetch: FetchLike = async (url, init) => {
+      const parsed = new URL(url)
+      if (parsed.origin === 'https://s3.example.com') {
+        const { promise, resolve } = Promise.withResolvers<Response>()
+        heldAvatars.push({ signal: init.signal, resolve })
+        return promise
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/members') {
+        return json(200, { members: [] })
+      }
+      if (parsed.pathname === '/api/v1/workspaces/ws_1/documents/recent') {
+        return json(200, {
+          documents: [
+            {
+              id: 'doc_1',
+              workspace_id: 'ws_1',
+              title: 'Report.docx',
+              kind: 'file',
+              updated_at: '2026-10-17T08:00:00Z',
+              updated_by_user: {
+                name: 'Editor',
+                avatar_url: 'https://s3.example.com/avatars/shared-path.png?sig=1',
+              },
+            },
+          ],
+          next_cursor: null,
+        })
+      }
+      return json(404, { error: { code: 'not_found' } })
+    }
+
+    const dir = mkdtempSync(join(tmpdir(), 'uw-docs-library-avatar-r2-2-'))
+    const service = new UniworkDocsService({
+      userDataDir: dir,
+      profile: () => profile,
+      channel: () => 'stable',
+      applyProfile: async () => 'unchanged',
+      identity: () => currentIdentity,
+      keystoreLocked: () => false,
+      selectedOrg: () => ({ id: 'org_a', slug: 'acme' }),
+      authorized: <T>(call: (token: string) => Promise<T>) => call(TOKEN),
+      fetch,
+      openPath: () => true,
+      isPathOpen: () => false,
+      requestModuleSave: () => false,
+      reloadPath: () => undefined,
+      activePath: () => undefined,
+      pushTreeChanged: (ev) => treeChanged.push(ev),
+      ui: {
+        chooseConflict: async () => 'later',
+        confirmDiscard: async () => false,
+        pickCopyPath: async () => null,
+        showOpenLatestFailed: () => undefined,
+        showCopyFailed: () => undefined,
+        chooseUnsavedClose: async () => 'cancel',
+      },
+      pushStatus: () => undefined,
+      pushLaunch: () => undefined,
+      reveal: () => undefined,
+    })
+
+    service.noteSessionIdentity()
+
+    // 1. Start list load under dep_1/acc_1 -> kicks off avatar fetch 0
+    await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(heldAvatars).toHaveLength(1)
+    expect(heldAvatars[0]!.signal?.aborted).toBe(false)
+
+    // 2. Switch deployment/account via noteSessionIdentity() while fetch 0 is pending
+    currentIdentity = { accountId: 'acc_2', deviceSessionId: 'dev_2', deploymentId: 'dep_2' }
+    service.noteSessionIdentity()
+    expect(heldAvatars[0]!.signal?.aborted).toBe(true)
+
+    // Start list load under dep_2/acc_2 for the same key before fetch 0 settles
+    await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(heldAvatars).toHaveLength(2)
+
+    // Settle stale fetch 0 with PNG: must not seed cache or emit pushTreeChanged
+    heldAvatars[0]!.resolve(new Response(PNG_BYTES, { status: 200 }))
+    await flushMicrotasks()
+    expect(treeChanged).toEqual([])
+    const checkBeforeNewSettles = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(
+      checkBeforeNewSettles.ok && checkBeforeNewSettles.value.documents[0]!.updatedByUser,
+    ).toEqual({ name: 'Editor' })
+
+    // Settle fresh fetch 1 with GIF: seeds dep_2/acc_2 cache and emits refresh
+    heldAvatars[1]!.resolve(new Response(GIF_BYTES, { status: 200 }))
+    await flushMicrotasks()
+    expect(treeChanged).toEqual([{ workspaceId: 'ws_1' }])
+    const warmedAcc2 = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(warmedAcc2.ok && warmedAcc2.value.documents[0]!.updatedByUser).toEqual({
+      name: 'Editor',
+      avatarUrl: expectedGif,
+    })
+
+    // 3. Sign out via lockSession(): clears cached avatar and aborts any in-flight avatar fetch
+    await service.lockSession({ accountId: 'acc_2', deploymentId: 'dep_2' })
+    const afterLock = await service.listDocuments({ workspaceId: 'ws_1' })
+    expect(afterLock.ok && afterLock.value.documents[0]!.updatedByUser).toEqual({ name: 'Editor' })
+    expect(heldAvatars).toHaveLength(3)
+  })
 })

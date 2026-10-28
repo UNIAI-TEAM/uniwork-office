@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { DocList, type DocListProps } from '../src/renderer/src/doclist/DocList'
 import { Person } from '../src/renderer/src/doclist/cells'
+import { editorInitials } from '../src/renderer/src/doclist/table-model'
 import { useDocListSort } from '../src/renderer/src/doclist/use-doc-list-sort'
 import type { DocListScreen } from '../src/renderer/src/doclist/columns'
 import { readSort, writeSort } from '../src/renderer/src/doclist/persist'
@@ -469,18 +470,17 @@ describe('DocList: the shared Documents table (UNI-2047 A2a)', () => {
       expect(person.querySelector('.dh-avatar')?.textContent).toBe('M')
 
       // rerendering with a new avatarUrl after an error clears the error and renders the new image
-      await mount(
-        'workspace',
-        [
-          rowOf({
-            ...BUDGET,
-            updatedByUser: { name: 'Minh Trần', avatarUrl: 'data:image/png;base64,NEW_AVATAR==' },
-          }),
-          rowOf(NOTE),
-          rowOf(REPORT),
-        ],
+      await mount('workspace', [
+        rowOf({
+          ...BUDGET,
+          updatedByUser: { name: 'Minh Trần', avatarUrl: 'data:image/png;base64,NEW_AVATAR==' },
+        }),
+        rowOf(NOTE),
+        rowOf(REPORT),
+      ])
+      const retryImg = cell('budget', 'editor')!.querySelector<HTMLImageElement>(
+        'img.dh-avatar-img',
       )
-      const retryImg = cell('budget', 'editor')!.querySelector<HTMLImageElement>('img.dh-avatar-img')
       expect(retryImg).not.toBeNull()
       expect(retryImg?.getAttribute('src')).toBe('data:image/png;base64,NEW_AVATAR==')
 
@@ -516,6 +516,12 @@ describe('DocList: the shared Documents table (UNI-2047 A2a)', () => {
         completeSpy.mockRestore()
         widthSpy.mockRestore()
       }
+    })
+
+    it('normalizes decomposed names to NFC in editorInitials so accented initials stay intact (FE R2-5)', () => {
+      expect(editorInitials('Ánh'.normalize('NFD'))).toBe('Á')
+      expect(editorInitials('  đạt  '.normalize('NFD'))).toBe('Đ')
+      expect(editorInitials('   ')).toBe('?')
     })
 
     it('puts the location on a second line under the name when the row has one', async () => {
