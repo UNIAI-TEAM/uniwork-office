@@ -120,7 +120,6 @@ function handoffTurn(messages: AiStreamRequest['messages'], uniwork: boolean): A
   const last = messages.at(-1)
   return {
     words: last?.role === 'user' ? (last.instruction ?? last.text) : null,
-    afterTools: messages.at(-2)?.role === 'tool',
     uniwork,
   }
 }

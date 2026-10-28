@@ -1,4 +1,4 @@
-import type { ExecutedToolCall } from '@genoffice/agent-core'
+import { SELECTION_CLAIM_CORRECTION, type ExecutedToolCall } from '@genoffice/agent-core'
 
 /**
  * Claimed-selection guard for the sheets skill (AgentSkill.verifyResponse):
@@ -24,12 +24,6 @@ const ZH_SELECTION_CLAIM =
   /已[^。．.!！?？，,;；:：\n]{0,8}?(?:定位|选中|選中|选定|選定|圈选|圈選|高亮|跳转|跳轉)(?!的)/
 const EN_SELECTION_CLAIM =
   /\bI(?:'ve| have)?(?: now| already| just)? (?:selected|highlighted|located|jumped to|moved the selection)\b|\bselection (?:has been|is now|was) (?:moved|set|placed)\b/i
-
-/** the corrective user message the loop pushes (a host may recognise it as not the user's) */
-export const SELECTION_CLAIM_CORRECTION =
-  '[System check] Your reply claims that something was located / selected / highlighted on screen for the user, ' +
-  'but no successful select_range call happened during this run — the visible selection has NOT moved. ' +
-  'Either call select_range now to actually perform the action, or rewrite your reply so it no longer claims an action that did not happen.'
 
 export function claimsSelection(text: string): boolean {
   return ZH_SELECTION_CLAIM.test(text) || EN_SELECTION_CLAIM.test(text)

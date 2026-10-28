@@ -11,16 +11,17 @@
  *
  * A part ends with the stream that leaves no tool call unanswered, not when the run tracker idles:
  * a tool step slower than the tracker's grace (a search, an image, a confirm card) idles the
- * tracker mid-part, and the tool results that follow resume the same part. At the idle after the
- * part's end, with no stream failed or stopped and at least one part left, a short continuation
- * preset goes out and its question carries the header again.
+ * tracker mid-part, and the tool results that follow resume the same part; a question instead ends
+ * it (the person moved on, or stopped it). At the idle after the part's end, with no stream failed
+ * or stopped and at least one part left, a short continuation preset goes out and its question
+ * carries the header again.
  *
- * A question the person asks themselves (any question that does not follow tool results and is not
- * the pending preset nor one of the loop's own nudges, on UniWork AI or another provider) drops the
- * job: no continuation, no header, no buffered preset. State lives in this frame page only; nothing is persisted.
+ * A question the person asks themselves (any question that is not the pending preset nor one of the
+ * loop's own nudges, `LOOP_NUDGE_TEXTS`, on UniWork AI or another provider) drops the job: no
+ * continuation, no header, no buffered preset. State lives in this frame page only; nothing is
+ * persisted.
  */
-import { TURN_LIMIT_NOTE } from '@genoffice/agent-core'
-import { SELECTION_CLAIM_CORRECTION } from '../../../../apps/sheets/src/renderer/ai/response-verify'
+import { LOOP_NUDGE_TEXTS } from '@genoffice/agent-core'
 import type { AiStartPayload } from '../../../docs/protocol/types'
 import type { AiRunTracker } from '../ai-run'
 
@@ -38,8 +39,6 @@ export interface AiPreset {
 export interface AiHandoffStream {
   /** the question's own words (the instruction, else the text); null = a tool-result stream */
   words: string | null
-  /** the question follows tool results: the loop's own (the adapter's `continuesRun` rule) */
-  afterTools: boolean
   /** a UniWork AI turn (only those carry the header) */
   uniwork: boolean
 }
@@ -83,9 +82,7 @@ function normalized(text: string): string {
  * What the loop itself pushes as a user message (its turn-limit note, a skill's claimed-action
  * correction): part of the run, never the person's question
  */
-const LOOP_NUDGES: ReadonlySet<string> = new Set(
-  [TURN_LIMIT_NOTE, SELECTION_CLAIM_CORRECTION].map(normalized),
-)
+const LOOP_NUDGES: ReadonlySet<string> = new Set(LOOP_NUDGE_TEXTS.map(normalized))
 
 export function createAiHandoff(deps: {
   /** the frame's run tracker: the continuation goes out at its idle (absent = no continuation) */
@@ -163,7 +160,7 @@ export function createAiHandoff(deps: {
         listeners.delete(listener)
       }
     },
-    stream({ words, afterTools, uniwork }) {
+    stream({ words, uniwork }) {
       const followed = job
       // tool results continue (or resume) the part; nothing else changes
       if (!followed || words === null) return null
@@ -173,8 +170,9 @@ export function createAiHandoff(deps: {
         part = { failed: false, openToolCalls: false, remaining: 0 }
         return followed.id
       }
-      // the person asked something else; a question after tool results is the loop's own
-      if (!afterTools) drop()
+      // the person asked something else (after a Stop too: the history then ends in aborted
+      // tool results, so following tool results says nothing about who asked)
+      drop()
       return null
     },
     answered(id, ok, remaining) {

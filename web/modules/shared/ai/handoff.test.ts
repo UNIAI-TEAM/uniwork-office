@@ -1,16 +1,20 @@
 // UNI-2264: a job the host hands to the AI panel (`ai.start`), followed part by part. Driven end to
 // end through the web AI bridge (createWebAi + withWebAi, the real UniWork AI adapter) over a fake
-// frame route, with a real run tracker (a short grace): as in production only the streams begin and
-// end runs, the panel's next stream starts right after the previous one, and a slow tool step is a
-// pause longer than the grace.
-import { TURN_LIMIT_NOTE, type AgentMessage } from '@genoffice/agent-core'
+// frame route, with a real run tracker on its production grace and fake timers: as in production
+// only the streams begin and end runs, the panel's next stream starts right after the previous one,
+// and a slow tool step is a pause longer than the grace (no real-time race under load).
+import {
+  SELECTION_CLAIM_CORRECTION,
+  TOOL_ABORTED_OUTPUT,
+  TURN_LIMIT_NOTE,
+  type AgentMessage,
+} from '@genoffice/agent-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setUniworkAiAvailable } from '../../../../packages/ai-provider/src/providers'
 import { uniworkConversations } from '../../../../packages/ai-provider/src/uniwork/conversation'
 import { DocsProtocolError } from '../../../docs/protocol/types'
 import { webLanguage } from '../../../docs/bridge/browser'
-import { createAiRunTracker } from '../ai-run'
-import { SELECTION_CLAIM_CORRECTION } from '../../../../apps/sheets/src/renderer/ai/response-verify'
+import { AI_RUN_IDLE_GRACE_MS, createAiRunTracker } from '../ai-run'
 import { aiWebText } from '../i18n/strings-ai-web'
 import { createAiHandoff, type AiPreset } from './handoff'
 import { createWebAi, withWebAi } from './web-ai'
@@ -19,14 +23,13 @@ const ORIGIN = 'https://app.test'
 const ROUTE = `${ORIGIN}/api/v1/office-frame/documents/doc-1/ai/uniwork/chat/completions`
 const JOB = 'Draft the approved plan'
 const CALL = { id: 'call-1', name: 'edit_doc', args: { at: 0 } }
-const GRACE_MS = 20
+const GRACE_MS = AI_RUN_IDLE_GRACE_MS
 
 afterEach(() => {
+  vi.useRealTimers()
   setUniworkAiAvailable(false)
   uniworkConversations.clear()
 })
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
@@ -82,6 +85,8 @@ type Answer = (init: RequestInit) => Response | Promise<Response>
 
 function rig(opts: { caps?: Record<string, boolean>; credentials?: unknown } = {}) {
   const caps = opts.caps ?? { uniworkAi: true }
+  // the tracker's grace (and nothing the streams wait on) runs on the test's clock
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
   const queue: Answer[] = []
   const posts: Array<{ handoff: string | null; body: { messages: unknown[] } }> = []
   const fetch = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
@@ -143,7 +148,7 @@ function rig(opts: { caps?: Record<string, boolean>; credentials?: unknown } = {
     } as never)
   /** the tracker's grace runs out: the run is idle (and the continuation microtask ran) */
   const idle = async () => {
-    await sleep(GRACE_MS * 3)
+    await vi.advanceTimersByTimeAsync(GRACE_MS)
     await Promise.resolve()
   }
   /** the panel's run: its streams back to back, then idle */
@@ -152,15 +157,22 @@ function rig(opts: { caps?: Record<string, boolean>; credentials?: unknown } = {
     await idle()
   }
   const question = (words: string): AgentMessage[] => [{ role: 'user', text: words }]
-  /** the question, its CALL, and the tool results */
-  const withResults = (words: string): AgentMessage[] => [
+  /** the question, its CALL, and the tool results (`stopped`: what the loop keeps after a Stop) */
+  const withResults = (words: string, stopped = false): AgentMessage[] => [
     ...question(words),
     {
       role: 'assistant',
       text: '',
       toolCalls: [{ id: CALL.id, name: CALL.name, input: CALL.args }],
     },
-    { role: 'tool', results: [{ id: CALL.id, name: CALL.name, output: 'edited' }] },
+    {
+      role: 'tool',
+      results: [
+        stopped
+          ? { id: CALL.id, name: CALL.name, output: TOOL_ABORTED_OUTPUT, isError: true }
+          : { id: CALL.id, name: CALL.name, output: 'edited' },
+      ],
+    },
   ]
   return {
     ai,
@@ -337,12 +349,48 @@ describe('ai.start handoff (UNI-2264)', () => {
       // 'stopped': the panel never sends the tool results
     })
     expect(r.presets).toHaveLength(1)
-    // the same words asked again are the person's own question: they carry no id
+    // the person's own question next: after a Stop the loop's history ends in aborted tool results
+    r.answer(() => ok({ remaining: 1 }))
+    await r.run(() =>
+      r.stream(
+        outcome === 'stopped'
+          ? [...r.withResults(JOB, true), { role: 'user', text: 'Summarise this page' }]
+          : r.question(JOB),
+      ),
+    )
+    expect(r.posts.at(-1)!.handoff).toBeNull()
+    expect(r.presets).toHaveLength(1)
+    // nothing of the job is left: its own words asked once more carry no id either
     r.answer(() => ok({ remaining: 1 }))
     await r.run(() => r.stream(r.question(JOB)))
     expect(r.posts.at(-1)!.handoff).toBeNull()
     expect(r.presets).toHaveLength(1)
   })
+
+  it.each([
+    ['UniWork AI', 'uniwork'],
+    ['another provider', 'openai'],
+  ] as const)(
+    "a Stop while tools ran, then the person's own question on %s, drops the job",
+    async (_name, provider) => {
+      const r = rig()
+      r.listen()
+      await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
+      r.answer(() => ok({ calls: [CALL], remaining: 1 }))
+      await r.run(() => r.stream(r.question(JOB)))
+      // Stop: the loop keeps the aborted tool results; the person then asks their own question,
+      // which follows tool results in the history and ends cleanly
+      if (provider === 'uniwork') r.answer(() => ok())
+      await r.run(() =>
+        r.stream(
+          [...r.withResults(JOB, true), { role: 'user', text: 'Summarise this page' }],
+          provider,
+        ),
+      )
+      expect(r.presets).toHaveLength(1)
+      expect(r.posts.map((p) => p.handoff)).toEqual(provider === 'uniwork' ? ['h1', null] : ['h1'])
+    },
+  )
 
   it.each([
     ['offline', 'offline'],
@@ -410,7 +458,7 @@ describe('ai.start handoff (UNI-2264)', () => {
     expect(r.posts.map((p) => p.handoff)).toEqual(['h1'])
   })
 
-  it("a loop nudge after tool results keeps the job; the person's question inside the grace drops it", async () => {
+  it("the turn-limit note after tool results keeps the job; the person's question inside the grace drops it", async () => {
     const r = rig()
     r.listen()
     await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
@@ -421,7 +469,7 @@ describe('ai.start handoff (UNI-2264)', () => {
     await r.run(async () => {
       await r.stream(r.question(JOB))
       // the loop's own follow-up question after the tool results
-      await r.stream([...r.withResults(JOB), { role: 'user', text: 'Answer now without tools.' }])
+      await r.stream([...r.withResults(JOB), { role: 'user', text: TURN_LIMIT_NOTE }])
     })
     const next = continueText()
     expect(r.presets.at(-1)!.text).toBe(next)
@@ -484,20 +532,16 @@ describe('ai.start handoff (UNI-2264)', () => {
     // the note is recognised by its text, wherever the loop puts it; a person's words still drop
     const h = createAiHandoff({ continueText })
     h.start({ handoffId: 'h2', text: JOB })
-    expect(h.stream({ words: JOB, afterTools: false, uniwork: true })).toBe('h2')
+    expect(h.stream({ words: JOB, uniwork: true })).toBe('h2')
     h.answered('h2', true, '1')
-    expect(h.stream({ words: TURN_LIMIT_NOTE, afterTools: false, uniwork: true })).toBeNull()
-    expect(
-      h.stream({ words: SELECTION_CLAIM_CORRECTION, afterTools: false, uniwork: true }),
-    ).toBeNull()
+    expect(h.stream({ words: TURN_LIMIT_NOTE, uniwork: true })).toBeNull()
+    expect(h.stream({ words: SELECTION_CLAIM_CORRECTION, uniwork: true })).toBeNull()
     h.start({ handoffId: 'h3', text: JOB })
-    expect(
-      h.stream({ words: `  ${TURN_LIMIT_NOTE}\r\n`, afterTools: false, uniwork: true }),
-    ).toBeNull()
-    expect(h.stream({ words: JOB, afterTools: false, uniwork: true })).toBe('h3')
+    expect(h.stream({ words: `  ${TURN_LIMIT_NOTE}\r\n`, uniwork: true })).toBeNull()
+    expect(h.stream({ words: JOB, uniwork: true })).toBe('h3')
     h.start({ handoffId: 'h4', text: JOB })
-    expect(h.stream({ words: 'Fix the title', afterTools: false, uniwork: true })).toBeNull()
-    expect(h.stream({ words: JOB, afterTools: false, uniwork: true })).toBeNull()
+    expect(h.stream({ words: 'Fix the title', uniwork: true })).toBeNull()
+    expect(h.stream({ words: JOB, uniwork: true })).toBeNull()
   })
 
   it('a dropped job takes its buffered preset with it', async () => {
