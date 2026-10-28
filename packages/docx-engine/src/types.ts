@@ -1,3 +1,5 @@
+import type { DocumentProperties } from './doc-properties'
+
 /** Picture watermark found in a header part (VML picture frame behind the body). */
 export interface PictureWatermarkInfo {
   /** header-part relationship of the image */
@@ -283,6 +285,14 @@ export interface SdtShell {
   alias: string
   /** programmatic tag (w:sdtPr/w:tag @w:val), may be empty */
   tag: string
+  /**
+   * lock state (w:sdtPr/w:lock @w:val): 'sdtLocked' (the control cannot be
+   * deleted), 'contentLocked' (its content cannot be edited),
+   * 'sdtContentLocked' (both) or 'unlocked'; empty when the control has no lock
+   */
+  lock: string
+  /** control id (w:sdtPr/w:id @w:val), empty when the control carries none */
+  id: string
   /**
    * control type: 'text' = plain/rich text, 'date' = date picker,
    * 'dropdown' = drop-down list/combo box, 'checkbox' = Word 2013 checkbox,
@@ -2250,6 +2260,8 @@ export interface ParsedDoc {
   blocks: Block[]
   /** Zotero document preferences stored in Word custom properties */
   zoteroDocumentData: string
+  /** the docProps parts of the package: core, extended (app) and custom properties */
+  properties: DocumentProperties
   /** comments from word/comments.xml, in file order */
   comments: CommentInfo[]
   /** footnotes from word/footnotes.xml (separators excluded), file order */

@@ -10,6 +10,15 @@ export { decodeEntities } from './parse-xml-text'
 export { UNDRAWABLE_FRAME_COLOR } from './parse-vml'
 export { sdtCheckboxGlyphs, sdtCheckboxIsChecked } from './checkbox-control'
 export {
+  buildContentControlXml,
+  isContentControlLock,
+  nextContentControlId,
+  CONTENT_CONTROL_LOCKS,
+  type ContentControlLock,
+  type ContentControlShell,
+  type ContentControlSpec,
+} from './content-control'
+export {
   parseDocx,
   reconcileGridColumns,
   styleRunFormat,
@@ -44,8 +53,27 @@ export { setAltChunkHtmlConverter, type AltChunkHtmlConverter } from './alt-chun
 export { tocLevelOf } from './parse-fields'
 export { mergeStyleBorders } from './parse-props'
 export {
+  APP_PROPERTIES_PATH,
+  APP_PROPERTY_KEYS,
+  CORE_PROPERTIES_PATH,
+  CORE_PROPERTY_KEYS,
+  applyPropertyChanges,
+  emptyDocumentProperties,
+  parseAppPropertiesXml,
+  parseCorePropertiesXml,
+  parseCustomPropertiesXml,
+  parsePropertyChanges,
+  patchAppPropertiesXml,
+  patchCorePropertiesXml,
+  patchCustomPropertiesXml,
+  readDocumentProperties,
+  type DocumentProperties,
+  type PropertyChanges,
+} from './doc-properties'
+export {
   saveDocx,
   findChartWorkbookPath,
+  missingHeadingLevels,
   readDocxPartBase64,
   type SaveBlock,
   type SaveOptions,
@@ -158,6 +186,7 @@ export {
   type WatermarkSpec,
 } from './watermark'
 export {
+  builtInHeadingStyleUpsert,
   mergeStyleXml,
   mergeDefaultFontsXml,
   type DefaultFonts,
@@ -207,3 +236,13 @@ export {
 } from './list-markers'
 
 export { previewFontSettings } from './font-settings'
+export {
+  compareBlocks,
+  compareDocuments,
+  DEFAULT_COMPARE_AUTHOR,
+  type CompareGranularity,
+  type CompareIgnore,
+  type CompareOptions,
+  type CompareResult,
+  type CompareSummary,
+} from './compare'
