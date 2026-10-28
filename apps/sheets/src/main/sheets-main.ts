@@ -2822,6 +2822,16 @@ export function registerSheetsIpc(): void {
       // Retry on a stalled open restarts this pick, not an earlier shell open
       rememberOpenedWorkbook(event.sender, path)
     }
+    // Password first, recovery prompt second: the prompt's Restore/Discard
+    // choice is consumed by prepareWorkbookForOpen, so asking for the
+    // password (or rejecting a wrong one) must happen before it runs.
+    if (await isCfbWorkbookFile(path)) {
+      const bytes = await readFile(path)
+      if (isEncryptedOoxml(bytes)) {
+        if (password === undefined) return { passwordRequired: true as const, path }
+        await decryptOoxml(bytes, password)
+      }
+    }
     const prepared = await prepareWorkbookForOpen(
       entry.client,
       path,
@@ -2889,7 +2899,11 @@ export function registerSheetsIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.selectWorkbook, async (event) => {
     try {
-      return await openSelectedWorkbook(event)
+      const result = await openSelectedWorkbook(event)
+      if (result !== null && 'passwordRequired' in result) {
+        failHeadlessExport(event.sender.id, 'the input workbook is password-protected')
+      }
+      return result
     } catch (err) {
       // A headless export has no dialog to report a failed open through, and
       // its renderer would poll to the deadline waiting for a workbook that
@@ -2944,7 +2958,7 @@ export function registerSheetsIpc(): void {
     const ext = validated.slice(validated.lastIndexOf('.') + 1).toLowerCase()
     if (!WORKBOOK_EXTS.has(ext)) throw new Error(`Unsupported workbook: ${ext}`)
     const priorSession = [...sessionFor(event).sessions.values()].find(
-      (session) => session.path === validated,
+      (session) => session.path === validated || session.restoreTarget === validated,
     )
     return openSelectedWorkbook(event, validated, priorSession?.password)
   })

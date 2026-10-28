@@ -182,7 +182,11 @@ const desktopApi: DesktopApi = {
       throw new Error('Invalid reopen path.')
     }
     const result: unknown = await ipcRenderer.invoke(IPC_CHANNELS.reopenWorkbook, path)
-    return result === null ? null : parseWorkbookFile(result)
+    if (result === null) return null
+    // the password of a session that is already gone cannot be replayed; the
+    // recovery gives up cleanly and the user re-opens the file by hand
+    if (isRecord(result) && result.passwordRequired === true) return null
+    return parseWorkbookFile(result)
   },
   onSidecarCrashed(callback) {
     const listener = (): void => {
