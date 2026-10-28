@@ -7,6 +7,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Editor } from '@tiptap/core'
 
 import { buildExtensions } from '../src/renderer/editor/extensions'
+import { placeWikiSuggestMenu } from '../src/renderer/components/WikiSuggestMenu'
 import {
   filterWikiNotes,
   refreshWikiNotes,
@@ -243,5 +244,24 @@ describe('create new note', () => {
     states.at(-1)!.create()
     await new Promise((r) => setTimeout(r, 0))
     expect(editor.state.doc.textContent).toBe('See [[../evil')
+  })
+})
+
+describe('placeWikiSuggestMenu', () => {
+  it('places the menu below the caret when it fits above the status bar', () => {
+    const style = placeWikiSuggestMenu({ top: 200, bottom: 220, left: 120 }, 2, 760)
+    expect(style.top).toBe(224)
+    expect(style.bottom).toBeUndefined()
+    expect(style.left).toBe(120)
+  })
+
+  it('flips the menu above the caret when it would run off the bottom or under the status bar', () => {
+    // Caret near the bottom of a 760 px viewport (e.g. top 711, bottom 731)
+    const style = placeWikiSuggestMenu({ top: 711, bottom: 731, left: 570 }, 2, 760)
+    expect(style.top).toBeUndefined()
+    expect(style.bottom).toBe(760 - 711 + 4)
+    expect(style.left).toBe(570)
+    // Menu bottom edge in viewport coordinates is 760 - bottom = 707, well above the 24 px status bar
+    expect(760 - Number(style.bottom)).toBeLessThanOrEqual(760 - 24 - 8)
   })
 })

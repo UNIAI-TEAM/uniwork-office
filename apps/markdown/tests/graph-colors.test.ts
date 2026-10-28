@@ -20,7 +20,7 @@ describe('graph colours', () => {
         '--text': ' tok-text ',
         '--text-tertiary': 'tok-dim',
         '--accent': 'tok-accent',
-        '--border-strong': 'tok-line',
+        '--border-control': 'tok-line',
       }),
     )
     expect(colors).toEqual({

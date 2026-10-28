@@ -14,8 +14,8 @@ export interface GraphColors {
 export type GraphTheme = 'light' | 'dark'
 
 export const GRAPH_COLOR_FALLBACKS: Readonly<Record<GraphTheme, Readonly<GraphColors>>> = {
-  light: { text: '#333333', dim: '#999999', accent: '#4a7d00', line: '#cccccc' },
-  dark: { text: '#e6e6e6', dim: '#a0a0a0', accent: '#8fc43a', line: '#555555' },
+  light: { text: '#333333', dim: '#999999', accent: '#4a7d00', line: '#878c93' },
+  dark: { text: '#e6e6e6', dim: '#a0a0a0', accent: '#8fc43a', line: '#707070' },
 }
 
 /** the theme the window shows: the explicit `data-theme`, else the system preference */
@@ -29,7 +29,7 @@ const TOKENS: Readonly<Record<keyof GraphColors, string>> = {
   text: '--text',
   dim: '--text-tertiary',
   accent: '--accent',
-  line: '--border-strong',
+  line: '--border-control',
 }
 
 /** tokens of the canvas's computed style first, the per-theme table for any that is unset */

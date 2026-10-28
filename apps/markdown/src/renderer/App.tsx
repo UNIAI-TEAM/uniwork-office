@@ -1404,8 +1404,18 @@ export default function App() {
         hasOutline={outlineItems.length > 0}
         backlinksOpen={backlinksOpen}
         tagsOpen={tagsOpen}
-        onToggleBacklinks={() => setBacklinksOpen((v) => !v)}
-        onToggleTags={() => setTagsOpen((v) => !v)}
+        onToggleBacklinks={() =>
+          setBacklinksOpen((v) => {
+            if (!v) setTagsOpen(false)
+            return !v
+          })
+        }
+        onToggleTags={() =>
+          setTagsOpen((v) => {
+            if (!v) setBacklinksOpen(false)
+            return !v
+          })
+        }
         onOpenGraph={() => setGraphOpen(true)}
         onCopyBlockLink={() => editor?.commands.copyBlockLink()}
         spellcheck={spellcheck}

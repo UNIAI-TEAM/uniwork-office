@@ -2516,7 +2516,7 @@ html.markdown-graph-open .ribbon-tabs {
  * goes so the zoom buttons get the room; the save text stays (it is the only place a failed save
  * shows) and shrinks with an ellipsis. The bar tightens its padding and clips (overflow: hidden)
  * what still does not fit, instead of widening the page. */
-@media (max-width: 600px) {
+@container md-page (max-width: 600px) {
   .status-bar {
     padding: 0 6px;
     overflow: hidden;
@@ -2564,6 +2564,7 @@ html.markdown-graph-open .ribbon-tabs {
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  container: md-page / inline-size;
 }
 
 /* ---- main layout: AI dock (left) + editor ---- */
@@ -4415,6 +4416,12 @@ div.tiptap-mathematics-render {
   overflow-y: auto;
 }
 
+@media (max-width: 900px) {
+  .md-backlinks {
+    width: 200px;
+  }
+}
+
 .md-backlinks-head {
   display: flex;
   align-items: center;
@@ -4450,6 +4457,9 @@ div.tiptap-mathematics-render {
 .md-backlinks-list {
   display: flex;
   flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .md-backlinks-item {
@@ -4498,7 +4508,7 @@ div.tiptap-mathematics-render {
 .graph-overlay {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 70;
   display: flex;
   flex-direction: column;
   background: var(--surface);
