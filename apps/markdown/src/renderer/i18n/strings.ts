@@ -1,5 +1,8 @@
+import { genofficeMarkdownStrings } from './strings-genoffice-markdown'
+
 export const strings = {
   zh: {
+    ...genofficeMarkdownStrings.zh,
     aiRedoPictureLost: '无法恢复这次运行插入的图片，所以未能重做。',
     aiClarifyTitle: '继续之前先确认几个问题',
     aiClarifyDecide: '帮我决定',
@@ -279,6 +282,7 @@ export const strings = {
     zoomOut: '缩小',
   },
   en: {
+    ...genofficeMarkdownStrings.en,
     aiRedoPictureLost: "Couldn't put the picture back, so the redo was not applied.",
     aiClarifyTitle: 'A few questions before I continue',
     aiClarifyDecide: 'Decide for me',
@@ -568,6 +572,7 @@ export const strings = {
     zoomOut: 'Zoom out',
   },
   vi: {
+    ...genofficeMarkdownStrings.vi,
     aiRedoPictureLost: 'Không khôi phục được ảnh nên chưa làm lại được.',
     aiClarifyTitle: 'Vài câu hỏi trước khi tiếp tục',
     aiClarifyDecide: 'Quyết định giúp tôi',
@@ -855,6 +860,7 @@ export const strings = {
     zoomOut: 'Thu nhỏ',
   },
   ja: {
+    ...genofficeMarkdownStrings.ja,
     aiRedoPictureLost: '画像を元に戻せなかったため、やり直しできませんでした。',
     aiClarifyTitle: '続ける前にいくつか確認させてください',
     aiClarifyDecide: 'おまかせ',
@@ -1142,6 +1148,7 @@ export const strings = {
     zoomOut: '縮小',
   },
   ko: {
+    ...genofficeMarkdownStrings.ko,
     aiRedoPictureLost: '이미지를 되돌리지 못해 다시 실행하지 못했습니다.',
     aiClarifyTitle: '계속하기 전에 몇 가지 확인할게요',
     aiClarifyDecide: '알아서 결정',
@@ -1430,6 +1437,7 @@ export const strings = {
     zoomOut: '축소',
   },
   fr: {
+    ...genofficeMarkdownStrings.fr,
     aiRedoPictureLost:
       "L'image n'a pas pu être remise en place, le rétablissement n'a donc pas été appliqué.",
     aiClarifyTitle: 'Quelques questions avant de continuer',
@@ -1724,6 +1732,7 @@ export const strings = {
     zoomOut: 'Zoom arrière',
   },
   de: {
+    ...genofficeMarkdownStrings.de,
     aiRedoPictureLost:
       'Das Bild konnte nicht wiederhergestellt werden, daher wurde das Wiederholen nicht ausgeführt.',
     aiClarifyTitle: 'Ein paar Fragen, bevor ich weitermache',
@@ -2018,6 +2027,7 @@ export const strings = {
     zoomOut: 'Verkleinern',
   },
   es: {
+    ...genofficeMarkdownStrings.es,
     aiRedoPictureLost: 'No se pudo devolver la imagen, así que no se rehízo el cambio.',
     aiClarifyTitle: 'Unas preguntas antes de continuar',
     aiClarifyDecide: 'Decide por mí',
@@ -2311,6 +2321,7 @@ export const strings = {
     zoomOut: 'Alejar',
   },
   th: {
+    ...genofficeMarkdownStrings.th,
     aiRedoPictureLost: 'ไม่สามารถนำรูปภาพกลับมาได้ จึงทำซ้ำไม่ได้',
     aiClarifyTitle: 'ขอถามสักครู่ก่อนดำเนินการต่อ',
     aiClarifyDecide: 'ตัดสินใจให้ฉัน',
@@ -2595,6 +2606,7 @@ export const strings = {
     zoomOut: 'ย่อ',
   },
   id: {
+    ...genofficeMarkdownStrings.id,
     aiRedoPictureLost: 'Gambar tidak dapat dikembalikan, jadi pengulangan tidak diterapkan.',
     aiClarifyTitle: 'Beberapa pertanyaan sebelum melanjutkan',
     aiClarifyDecide: 'Putuskan untuk saya',
@@ -2883,6 +2895,7 @@ export const strings = {
     zoomOut: 'Perkecil',
   },
   ru: {
+    ...genofficeMarkdownStrings.ru,
     aiRedoPictureLost: 'Не удалось вернуть изображение, поэтому повтор не выполнен.',
     aiClarifyTitle: 'Несколько вопросов, прежде чем продолжить',
     aiClarifyDecide: 'Решите за меня',
@@ -3172,6 +3185,7 @@ export const strings = {
     zoomOut: 'Уменьшить',
   },
   ar: {
+    ...genofficeMarkdownStrings.ar,
     aiRedoPictureLost: 'تعذّرت إعادة الصورة، لذلك لم تُطبَّق الإعادة.',
     aiClarifyTitle: 'بعض الأسئلة قبل المتابعة',
     aiClarifyDecide: 'قرِّر بالنيابة عني',
@@ -3457,6 +3471,7 @@ export const strings = {
     zoomOut: 'تصغير',
   },
   pt: {
+    ...genofficeMarkdownStrings.pt,
     aiRedoPictureLost: 'Não foi possível restaurar a imagem, então o refazer não foi aplicado.',
     aiClarifyTitle: 'Algumas perguntas antes de continuar',
     aiClarifyDecide: 'Decida por mim',
@@ -3748,6 +3763,7 @@ export const strings = {
     zoomOut: 'Reduzir',
   },
   it: {
+    ...genofficeMarkdownStrings.it,
     aiRedoPictureLost:
       "Non è stato possibile ripristinare l'immagine, quindi il ripristino non è stato applicato.",
     aiClarifyTitle: 'Qualche domanda prima di continuare',
@@ -4040,6 +4056,7 @@ export const strings = {
     zoomOut: 'Riduci',
   },
   pl: {
+    ...genofficeMarkdownStrings.pl,
     aiRedoPictureLost: 'Nie udało się przywrócić obrazu, więc ponowienie nie zostało zastosowane.',
     aiClarifyTitle: 'Kilka pytań, zanim przejdę dalej',
     aiClarifyDecide: 'Zdecyduj za mnie',
@@ -4329,6 +4346,7 @@ export const strings = {
     zoomOut: 'Pomniejsz',
   },
   cs: {
+    ...genofficeMarkdownStrings.cs,
     aiRedoPictureLost: 'Obrázek se nepodařilo vrátit, takže opakování nebylo provedeno.',
     aiClarifyTitle: 'Pár otázek, než budu pokračovat',
     aiClarifyDecide: 'Rozhodni za mě',
@@ -4617,6 +4635,7 @@ export const strings = {
     mermaidErrorDetails: 'Technické podrobnosti',
   },
   nl: {
+    ...genofficeMarkdownStrings.nl,
     aiRedoPictureLost:
       'De afbeelding kon niet worden teruggezet, dus het opnieuw uitvoeren is niet toegepast.',
     aiClarifyTitle: 'Een paar vragen voordat ik verder ga',
@@ -4908,6 +4927,7 @@ export const strings = {
     zoomOut: 'Uitzoomen',
   },
   ms: {
+    ...genofficeMarkdownStrings.ms,
     aiRedoPictureLost: 'Gambar tidak dapat dikembalikan, jadi ulang semula tidak dilaksanakan.',
     aiClarifyTitle: 'Beberapa soalan sebelum meneruskan',
     aiClarifyDecide: 'Putuskan untuk saya',
@@ -5196,6 +5216,7 @@ export const strings = {
     zoomOut: 'Zum keluar',
   },
   he: {
+    ...genofficeMarkdownStrings.he,
     aiRedoPictureLost: 'לא ניתן היה להחזיר את התמונה, ולכן הפעולה לא בוצעה מחדש.',
     aiClarifyTitle: 'כמה שאלות לפני שאמשיך',
     aiClarifyDecide: 'החלט בשבילי',
@@ -5478,6 +5499,7 @@ export const strings = {
     zoomOut: 'הקטנה',
   },
   hi: {
+    ...genofficeMarkdownStrings.hi,
     aiRedoPictureLost: 'तस्वीर वापस नहीं रखी जा सकी, इसलिए दोबारा लागू नहीं हो सका।',
     aiClarifyTitle: 'आगे बढ़ने से पहले कुछ सवाल',
     aiClarifyDecide: 'मेरे लिए तय करें',
@@ -5766,6 +5788,7 @@ export const strings = {
     zoomOut: 'ज़ूम आउट',
   },
   'zh-TW': {
+    ...genofficeMarkdownStrings['zh-TW'],
     aiRedoPictureLost: '無法復原這次執行插入的圖片，所以未能重做。',
     aiClarifyTitle: '繼續之前先確認幾個問題',
     aiClarifyDecide: '幫我決定',
