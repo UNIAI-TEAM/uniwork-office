@@ -31,6 +31,7 @@ import { CELL_HIDDEN_KEY, CELL_LOCKED_KEY, effectiveSheetProtection } from './sh
 import { fullColumnSpans, fullRowSpans } from './autofit-selection'
 import { applyFormatPainterClick } from './format-painter'
 import { nextSheetName } from './op-executor'
+import { handleInsertNotePicture } from './note-picture-actions'
 import {
   transposeChartSeries,
   type ChartSeriesVisualState,
@@ -775,10 +776,15 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
     case 'comment-prev':
     case 'comment-next':
     case 'comments-pane-toggle':
+    case 'note-pictures-pane-toggle':
     case 'note-show-all':
     case 'notes-convert':
       handleThreadedCommentCommand(ctx, command, (fallback) => handleRibbonCommand(ctx, fallback))
       return
+    case 'note-insert-picture': {
+      handleInsertNotePicture(ctx, runtime)
+      return
+    }
     case 'note-open': {
       // A cell holds either a thread or a note (Excel); the save keeps the thread.
       const active = runtime.univerAPI.getActiveWorkbook()?.getActiveRange()

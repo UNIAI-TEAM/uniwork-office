@@ -133,3 +133,32 @@ describe('preload keeps uniworkBound on a workbook file', () => {
     )
   })
 })
+
+describe('preload save request guard', () => {
+  it('accepts a save whose only change is a picture embedded in a cell', async () => {
+    bridge.reply = { canceled: false, touchedEntries: [], file: wireFile({}) }
+    const { forceWrite: _forceWrite, ...request } = saveRequest()
+    await expect(call('saveWorkbookEdits', request)).rejects.toThrow('no changes to save')
+    const withImage = {
+      ...request,
+      cellImageAdditions: [
+        {
+          sheetId: 'sheet-1',
+          row: 1,
+          column: 1,
+          mediaType: 'image/png',
+          base64: 'AAAA',
+        },
+      ],
+    }
+    await expect(call('saveWorkbookEdits', withImage)).resolves.toBeDefined()
+  })
+
+  it('caps the cell pictures of one save at 50', async () => {
+    const request = {
+      ...saveRequest(),
+      cellImageAdditions: Array.from({ length: 51 }, () => ({})),
+    }
+    await expect(call('saveWorkbookEdits', request)).rejects.toThrow('cell images')
+  })
+})

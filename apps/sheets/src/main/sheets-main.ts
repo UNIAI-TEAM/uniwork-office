@@ -4395,6 +4395,10 @@ async function writeWorkbookTo(
     shape: addition.shape,
     image: addition.image,
   }))
+  const cellImageAdditions = (request.cellImageAdditions ?? []).map(({ sheetId, ...addition }) => ({
+    sheetName: resolveSheetName(sheetId),
+    ...addition,
+  }))
   const tableAdditions = request.tableAdditions.map((table) => ({
     sheetName: resolveSheetName(table.sheetId),
     area: table.area,
@@ -4493,6 +4497,7 @@ async function writeWorkbookTo(
       workbookProtectionState: request.workbookProtectionState,
       protectedRangeStates,
       visualAdditions,
+      cellImageAdditions,
       pageSetupStates,
       noteStates,
       tableAdditions,

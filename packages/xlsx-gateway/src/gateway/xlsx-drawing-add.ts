@@ -208,7 +208,9 @@ export async function applyVisualAdditions(
   }
 }
 
-function base64ToBytes(base64: string): Uint8Array {
+/// atob, not Buffer: the Sheets web frame runs this planner in a browser,
+/// where there is no Buffer global.
+export function base64ToBytes(base64: string): Uint8Array {
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
@@ -959,7 +961,7 @@ export async function appendRelationship(
 }
 
 /// Media extensions register as package-wide Defaults rather than per-part Overrides.
-async function registerContentTypeDefault(
+export async function registerContentTypeDefault(
   pkg: MutablePackage,
   extension: string,
   contentType: string,

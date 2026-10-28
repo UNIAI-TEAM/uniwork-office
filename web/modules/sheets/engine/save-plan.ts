@@ -58,6 +58,7 @@ export interface ResolvedSave {
       bulkConstantFills: PlanArgs[24]
       tabColorStates: PlanArgs[25]
       tableEdits: PlanArgs[26]
+      cellImageAdditions: PlanArgs[27]
     },
     never
   >
@@ -254,6 +255,10 @@ export function resolveSaveRequest(
       tableEdits: (request.tableEdits ?? []).map(({ sheetId, ...edit }) => ({
         ...edit,
         sheetName: resolveSheetName(sheetId),
+      })),
+      cellImageAdditions: (request.cellImageAdditions ?? []).map(({ sheetId, ...addition }) => ({
+        sheetName: resolveSheetName(sheetId),
+        ...addition,
       })),
       pivotAdditions: request.pivotAdditions.map((pivot) => ({
         sheetName: resolveSheetName(pivot.sheetId),
@@ -455,6 +460,7 @@ export async function saveWorkbookBytes(input: {
     a.bulkConstantFills,
     a.tabColorStates,
     a.tableEdits,
+    a.cellImageAdditions,
   )
   const plan = input.cachedValues
     ? await rewriteCachedValues(planned, source, input.cachedValues)

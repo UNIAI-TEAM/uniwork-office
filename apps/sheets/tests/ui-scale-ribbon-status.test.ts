@@ -65,6 +65,7 @@ describe('Sheets ribbon status message under the interface scale', () => {
       '.find-replace-panel',
       '.threaded-comments-pane',
       '.sheets-server-comments',
+      '.note-pictures-pane',
       '.thread-hover-card',
       '.format-cells-dialog.print-dialog',
       '.engine-unavailable',
