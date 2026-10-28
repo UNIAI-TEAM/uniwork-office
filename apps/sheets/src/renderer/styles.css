@@ -3942,7 +3942,9 @@ textarea:focus {
 
 /* Genspark DS modal footer buttons: secondary = bg-subtle, primary = black (#232425) */
 .dialog-actions button,
-.select-data-actions button {
+.select-data-actions button,
+.dialog-actions-inline button,
+.allow-edit-list button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3961,25 +3963,33 @@ textarea:focus {
 }
 
 .dialog-actions button:hover:not(:disabled),
-.select-data-actions button:hover:not(:disabled) {
+.select-data-actions button:hover:not(:disabled),
+.dialog-actions-inline button:hover:not(:disabled),
+.allow-edit-list button:hover:not(:disabled) {
   background: var(--color-bg-subtle);
   color: var(--color-text-primary);
 }
 
 .dialog-actions button:active:not(:disabled),
-.select-data-actions button:active:not(:disabled) {
+.select-data-actions button:active:not(:disabled),
+.dialog-actions-inline button:active:not(:disabled),
+.allow-edit-list button:active:not(:disabled) {
   filter: brightness(0.88);
   transform: scale(0.98);
 }
 
 .dialog-actions button:focus-visible,
-.select-data-actions button:focus-visible {
+.select-data-actions button:focus-visible,
+.dialog-actions-inline button:focus-visible,
+.allow-edit-list button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--sheets-focus-ring);
 }
 
 .dialog-actions button:disabled,
-.select-data-actions button:disabled {
+.select-data-actions button:disabled,
+.dialog-actions-inline button:disabled,
+.allow-edit-list button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

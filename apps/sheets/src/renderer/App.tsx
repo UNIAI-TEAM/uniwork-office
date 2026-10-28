@@ -361,6 +361,7 @@ import { installCellFilenameFunction } from './cell-function'
 import { installRightToLeftCommand, refreshSheetRender, sheetIsRightToLeft } from './sheet-rtl-view'
 import { installFormulaLexerFix } from './formula-lexer-fix'
 import { installErrorValueAlignment } from './error-value-align'
+import { installTableThemePaint } from './table-theme-paint'
 import { installFormulaNewlineDisplay } from './formula-newline-display'
 import { installCfDisplayKeyCompare } from './cf-duplicate-key'
 import { installCfFormulaFold } from './cf-formula-fold'
@@ -2197,6 +2198,7 @@ export function App({
       () => lazyWorkbookRef.current?.file.date1904 === true,
     )
     const errorAlignDisposable = installErrorValueAlignment(runtime)
+    const tableThemePaintDisposable = installTableThemePaint(runtime)
     // CELL("filename") resolves the session's on-disk path; converted
     // imports (needsSaveAs) count as never-saved, like Excel.
     const cellFilenameDisposable = installCellFilenameFunction(runtime, () => {
@@ -3594,6 +3596,7 @@ export function App({
       functionProbeDisposable.dispose()
       numberFormatFixDisposable.dispose()
       errorAlignDisposable.dispose()
+      tableThemePaintDisposable.dispose()
       cellFilenameDisposable.dispose()
       rateFallbackDisposable.dispose()
       ifsEmptySetDisposable.dispose()
