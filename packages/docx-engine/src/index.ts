@@ -212,3 +212,13 @@ export {
 } from './list-markers'
 
 export { previewFontSettings } from './font-settings'
+export {
+  compareBlocks,
+  compareDocuments,
+  DEFAULT_COMPARE_AUTHOR,
+  type CompareGranularity,
+  type CompareIgnore,
+  type CompareOptions,
+  type CompareResult,
+  type CompareSummary,
+} from './compare'
