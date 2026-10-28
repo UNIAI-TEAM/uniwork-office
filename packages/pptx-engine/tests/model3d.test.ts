@@ -12,6 +12,7 @@ import {
   createBlankPptx,
   deleteElement,
   glbBounds,
+  isGlbContainer,
   openPptx,
   savePptx,
   setModel3dView,
@@ -67,6 +68,46 @@ describe('glbBounds', () => {
   it('reads nothing from bytes that are not glTF binary', () => {
     expect(glbBounds(new Uint8Array([1, 2, 3, 4]))).toBeNull()
     expect(glbBounds(cubeScene([{}]))).toBeNull()
+  })
+
+  it('validates 4-byte alignment while accepting padded JSON, JSON+BIN, byteOffset views, and Draco containers (R2-01)', async () => {
+    // 22-byte misaligned container: magic glTF, version 2, totalLength 22, chunkLength 2, JSON "{}"
+    const misaligned22 = new Uint8Array(Buffer.from('Z2xURgIAAAAWAAAAAgAAAEpTT057fQ==', 'base64'))
+    expect(misaligned22.byteLength).toBe(22)
+    expect(isGlbContainer(misaligned22)).toBe(false)
+
+    // Aligned totalLength (24) with misaligned JSON chunkLength (2)
+    const misalignedChunk = new Uint8Array(
+      Buffer.from('Z2xURgIAAAAYAAAAAgAAAEpTT057fSAg', 'base64'),
+    )
+    expect(isGlbContainer(misalignedChunk)).toBe(false)
+
+    // Space-padded JSON positive ("{}  ", 24 bytes total) + nonzero byteOffset view
+    const paddedJson = new Uint8Array(Buffer.from('Z2xURgIAAAAYAAAABAAAAEpTT057fSAg', 'base64'))
+    expect(isGlbContainer(paddedJson)).toBe(true)
+    const offsetBuf = new Uint8Array(paddedJson.byteLength + 6)
+    offsetBuf.set(paddedJson, 3)
+    expect(isGlbContainer(offsetBuf.subarray(3, 3 + paddedJson.byteLength))).toBe(true)
+
+    // JSON + BIN chunk positive (24-byte header+JSON + 8-byte BIN chunk header + 4-byte BIN data = 36 bytes)
+    const jsonPlusBin = Buffer.alloc(36)
+    paddedJson.forEach((b, i) => {
+      jsonPlusBin[i] = b
+    })
+    jsonPlusBin.writeUInt32LE(36, 8)
+    jsonPlusBin.writeUInt32LE(4, 24)
+    jsonPlusBin.writeUInt32LE(0x004e4942, 28)
+    expect(isGlbContainer(new Uint8Array(jsonPlusBin))).toBe(true)
+
+    // Draco-extension container positive
+    const dracoGlb = glb({
+      asset: { version: '2.0' },
+      extensionsUsed: ['KHR_draco_mesh_compression'],
+      extensionsRequired: ['KHR_draco_mesh_compression'],
+    })
+    expect(isGlbContainer(dracoGlb)).toBe(true)
+    const opened = await openPptx(await createBlankPptx())
+    expect(addModel3d(opened, 0, { bytes: dracoGlb, ext: 'glb', offset: OFF })).not.toBeNull()
   })
 })
 

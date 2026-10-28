@@ -38,9 +38,14 @@ export function isGlbContainer(bytes: Uint8Array): boolean {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   if (view.getUint32(0, true) !== GLB_MAGIC || view.getUint32(4, true) !== 2) return false
   const totalLength = view.getUint32(8, true)
-  if (totalLength < 20 || totalLength > bytes.byteLength) return false
+  if (totalLength < 20 || totalLength > bytes.byteLength || totalLength % 4 !== 0) return false
   const chunkLength = view.getUint32(12, true)
-  if (view.getUint32(16, true) !== JSON_CHUNK || 20 + chunkLength > totalLength) return false
+  if (
+    chunkLength % 4 !== 0 ||
+    view.getUint32(16, true) !== JSON_CHUNK ||
+    20 + chunkLength > totalLength
+  )
+    return false
   return true
 }
 

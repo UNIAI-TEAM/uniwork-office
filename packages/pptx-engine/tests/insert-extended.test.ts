@@ -497,6 +497,7 @@ describe('addMedia / addModel3d', () => {
       new Uint8Array(Buffer.from('Z2xURgIAAAAgAAAABAAAAEpTT057fSAg', 'base64')), // declared length 32 > 24
       new Uint8Array(Buffer.from('Z2xURgIAAAAYAAAADAAAAEpTT057fSAg', 'base64')), // chunk length 12 > declared 24 - 20
       new Uint8Array(Buffer.from('Z2xURgIAAAAYAAAABAAAAEJJTgB7fSAg', 'base64')), // first chunk BIN instead of JSON
+      new Uint8Array(Buffer.from('Z2xURgIAAAAWAAAAAgAAAEpTT057fQ==', 'base64')), // 22-byte misaligned total & JSON chunk length
     ]
     for (const bad of badCases) {
       expect(addModel3d(opened, 0, { bytes: bad, ext: 'glb', offset: { ...OFF } })).toBeNull()

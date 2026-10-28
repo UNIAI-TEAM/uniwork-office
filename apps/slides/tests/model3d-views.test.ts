@@ -46,8 +46,8 @@ describe('3D Model Views', () => {
         slidesApi: {
           pickModel3d: () =>
             Promise.resolve({
-              bytes: new Uint8Array([0x67, 0x6c, 0x54, 0x46]),
-              name: 'broken.glb',
+              bytes: new Uint8Array(Buffer.from('Z2xURgIAAAAWAAAAAgAAAEpTT057fQ==', 'base64')),
+              name: 'misaligned.glb',
             }),
           addModel3d,
         },
