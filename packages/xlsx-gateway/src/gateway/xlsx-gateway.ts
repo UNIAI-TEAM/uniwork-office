@@ -99,6 +99,12 @@ import { applyTabColor } from './xlsx-tab-color'
 import { applyThemeState, type WorkbookThemeState } from './xlsx-theme'
 import { applySheetNotes, type SheetNote } from './xlsx-notes'
 import {
+  applyRedactionNameMirror,
+  applyRedactionPart,
+  rekeyRedactionStates,
+  type SheetRedactionState,
+} from './xlsx-redaction'
+import {
   applySparklineAdditions,
   type SheetSparklineAddition,
   type SparklineGroupAdd,
@@ -775,6 +781,7 @@ export async function applyCellEditsToXlsx(
   pageSetupStates: readonly SheetPageSetupState[] = [],
   noteStates: readonly SheetNoteState[] = [],
   formulaValues: readonly SheetFormulaValues[] = [],
+  redactionStates: readonly SheetRedactionState[] | null = null,
 ): Promise<XlsxMutation> {
   const plan = await planCellEditsToXlsx(
     await createBufferEntrySource(source),
@@ -798,6 +805,20 @@ export async function applyCellEditsToXlsx(
     [],
     [],
     formulaValues,
+    // The slots between formulaValues and redactionStates (theme, workbook
+    // protection, protected ranges, bulk fills, tab colours, table edits) are
+    // features this wrapper does not expose. They must stay positional:
+    // planCellEditsToXlsx takes one long ordered list, so inserting a
+    // placeholder here shifts nothing — but dropping one would silently
+    // re-target every later argument, a table edit included.
+    null,
+    null,
+    [],
+    [],
+    [],
+    [],
+    [],
+    redactionStates,
   )
   return assembleWithJsZip(source, plan)
 }
@@ -918,6 +939,11 @@ export async function planCellEditsToXlsx(
   tabColorStates: readonly SheetTabColorState[] = [],
   tableEdits: readonly SheetTableEdit[] = [],
   cellImageAdditions: readonly SheetCellImageAddition[] = [],
+  // Last, deliberately: every caller written against an older order would
+  // otherwise see `tabColorStates` or a cell image land here and a parsed
+  // table edit parsed as a tab colour. null = the caller does not know the
+  // marks (CLI, the second phase of a split save), so the part stays as it is.
+  redactionStates: readonly SheetRedactionState[] | null = null,
 ): Promise<MutationPlan> {
   // A pending pivot pins final coordinates for its source and output; shifts
   // on either sheet, and sheet renames (worksheetSource@sheet), would desync
@@ -1187,6 +1213,23 @@ export async function planCellEditsToXlsx(
   )
   const dynamicArrayCm =
     spillEdits.length > 0 ? await ensureDynamicArrayMetadata(pkg, touchedEntries) : null
+
+  // Withheld cells travel in a package part of their own, so they are written
+  // here rather than with the worksheets. A sheet renamed or removed in this
+  // same save takes its marks with it first — see rekeyRedactionStates.
+  // An empty list clears the part (the reader un-hid everything); null leaves
+  // it untouched, because a caller that never loaded the marks must not drop
+  // them.
+  const rekeyed =
+    redactionStates === null
+      ? null
+      : rekeyRedactionStates(
+          redactionStates,
+          sheetPlan?.renames ?? [],
+          sheetPlan?.removals ?? [],
+          structuralOps,
+        )
+  if (rekeyed !== null) await applyRedactionPart(pkg, touchedEntries, rekeyed)
 
   const editsBySheet = groupBySheet(edits)
   const fillsBySheet = groupBySheet(bulkConstantFills)
@@ -1653,6 +1696,20 @@ export async function planCellEditsToXlsx(
   // Excel trusts cached formula values on open, so formulas that depend on an
   // edited cell would show stale results without a forced recalculation.
   workbookXml = ensureFullCalcOnLoad(workbookXml)
+
+  // The defined-name mirror goes in last, on the final XML: it records each
+  // sheet by its position in workbook order, so it has to be written against
+  // the sheet list this save actually produced, not the one it started from.
+  // (The part above is the record; this is only what survives a reader that
+  // rebuilds the package and drops the part — see applyRedactionNameMirror.)
+  if (rekeyed !== null) {
+    workbookXml = applyRedactionNameMirror(
+      workbookXml,
+      rekeyed,
+      parseSheetElements(workbookXml).map((sheet) => sheet.name),
+    )
+  }
+
   if (workbookXml !== originalWorkbookXml) {
     pkg.write(workbookPath, workbookXml)
     touchedEntries.add(workbookPath)
