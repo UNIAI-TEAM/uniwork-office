@@ -6674,14 +6674,18 @@ export function registerFileTables(
 
 /// Ribbon / context-menu Clear on a sheet with tables: clears every table
 /// column filter and releases the file's open-time hidden rows, so the rows
-/// reappear and the save writes a bare table autoFilter.
+/// reappear and the save writes a bare table autoFilter. Returns whether the
+/// journal changed: a file's own criteria are not in the table model, so a
+/// Clear of an untouched file runs no set-table-filter mutation and the app
+/// must refresh its pending count itself.
 export function clearSheetTableFilters(
   runtime: UniverRuntime,
   state: LazyWorkbookState,
   sheetId: string,
-): void {
+): boolean {
   const unitId = runtime.univerAPI.getActiveWorkbook()?.getId()
-  if (unitId === undefined) return
+  if (unitId === undefined) return false
+  let journaled = false
   for (const table of tableManagerOf(runtime).getTablesBySubunitId(unitId, sheetId)) {
     const range = tableFilterRange(table)
     if (!range) continue
@@ -6697,8 +6701,12 @@ export function clearSheetTableFilters(
       touched = true
     }
     if (releaseFileHiddenTableRows(runtime, state, sheetId, range)) touched = true
-    if (touched) recordTableFilterChange(state.editJournal, sheetId, table.getId())
+    if (touched) {
+      recordTableFilterChange(state.editJournal, sheetId, table.getId())
+      journaled = true
+    }
   }
+  return journaled
 }
 
 /// Ribbon Reapply on a sheet with filtered tables: re-evaluates every table

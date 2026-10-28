@@ -3302,8 +3302,12 @@ export function App({
           // table's own filter lives in the table plugin and follows them.
           if (subUnitId !== undefined && event.id === CLEAR_FILTER_COMMAND) {
             clearSheetTableFilters(runtime, state, subUnitId)
+            // On an untouched file nothing is dispatched, so no mutation
+            // listener refreshes the count that enables Save.
+            setPendingEdits(journalSize(state.editJournal))
           } else if (subUnitId !== undefined && event.id === REAPPLY_FILTER_COMMAND) {
             reapplySheetTableFilters(runtime, state, subUnitId)
+            setPendingEdits(journalSize(state.editJournal))
           }
           return
         }

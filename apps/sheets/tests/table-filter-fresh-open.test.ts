@@ -261,6 +261,99 @@ describe.skipIf(!existsSync(WASM))(
   },
 )
 
+describe.skipIf(!existsSync(WASM))(
+  'Clear pressed on a freshly opened filtered table, with no other edit',
+  { timeout: 60_000 },
+  () => {
+    let transport: Transport
+    let univer: Univer
+    let api: FUniver
+    let runtime: UniverRuntime
+    let file: WorkbookFile
+    let state: LazyWorkbookState
+
+    beforeAll(async () => {
+      const host = await EngineHost.create(new WebAssembly.Module(readFileSync(WASM)))
+      transport = createWasmTransport({ connect: () => createDirectChannel(host) })
+      const bytes = readFileSync(FIXTURE)
+      file = await transport.open({
+        name: 'w4.xlsx',
+        data: bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer,
+        locale: 'en',
+      })
+      vi.stubGlobal('window', {
+        desktopApi: {
+          readWorkbookRange: (request: never) => transport.readRange(request),
+          readWorkbookFormulas: (request: never) => transport.readFormulaCells(request),
+        },
+      })
+      univer = new Univer({
+        locale: LocaleType.EN_US,
+        locales: { [LocaleType.EN_US]: tableLocale },
+        logLevel: LogLevel.ERROR,
+      })
+      univer.registerPlugin(UniverFormulaEnginePlugin)
+      univer.registerPlugin(UniverSheetsPlugin)
+      univer.registerPlugin(UniverSheetsFilterPlugin)
+      univer.registerPlugin(UniverSheetsTablePlugin)
+      api = FUniver.newAPI(univer)
+      runtime = { univer, univerAPI: api } as unknown as UniverRuntime
+      state = lazyState(file)
+      loadWorkbookSkeleton(runtime, file)
+      const workbook = api.getActiveWorkbook()!
+      await Promise.all(registerFileTables(workbook, file, []))
+      await loadVisibleRange(
+        runtime,
+        { current: state },
+        workbook.getActiveSheet()!,
+        () => undefined,
+      )
+    }, 60_000)
+
+    afterAll(() => {
+      univer.dispose()
+      vi.unstubAllGlobals()
+    })
+
+    it('reports the journaled change so the app can raise its pending count (SH-W4-V9)', async () => {
+      expect(journalSize(state.editJournal)).toBe(0)
+      // The file's own criteria are not in the table model, so Clear runs no
+      // set-table-filter mutation: only the journal mark tells the app that
+      // something changed. Without the report the pending count stayed 0, Save
+      // stayed disabled and the cleared state never reached the file.
+      expect(clearSheetTableFilters(runtime, state, 'sheet-1')).toBe(true)
+      expect(journalSize(state.editJournal)).toBeGreaterThan(0)
+
+      const saved = await transport.serialize(saveRequest(file, state, runtime))
+      const zip = await JSZip.loadAsync(saved.data)
+      const table = await zip.file('xl/tables/table1.xml')!.async('text')
+      expect(table).toContain('<autoFilter ref="A1:C7"/>')
+      expect(table).not.toContain('<filterColumn')
+      const sheetXml = await zip.file('xl/worksheets/sheet1.xml')!.async('text')
+      expect(hiddenRowNumbers(sheetXml)).toEqual([])
+    })
+
+    it('reports nothing when there is nothing to clear', () => {
+      expect(clearSheetTableFilters(runtime, state, 'sheet-1')).toBe(false)
+    })
+  },
+)
+
+describe('the App Clear / Reapply hook', () => {
+  it('refreshes the pending count after clearing or reapplying table filters', () => {
+    const source = readFileSync(resolve(__dirname, '../src/renderer/App.tsx'), 'utf8')
+    const clear = source.indexOf('clearSheetTableFilters(runtime, state, subUnitId)')
+    const reapply = source.indexOf('reapplySheetTableFilters(runtime, state, subUnitId)')
+    expect(clear).toBeGreaterThan(0)
+    expect(reapply).toBeGreaterThan(clear)
+    expect(source.slice(clear, clear + 320)).toContain('setPendingEdits(journalSize(')
+    expect(source.slice(reapply, reapply + 200)).toContain('setPendingEdits(journalSize(')
+  })
+})
+
 describe('the App journal listener', () => {
   it('handles a table filter mutation before its generic subUnitId guard', () => {
     // The listener is a closure inside App's effect, so its ORDER is checked in source:
