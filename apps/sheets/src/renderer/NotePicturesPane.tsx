@@ -55,11 +55,13 @@ function Card({
   sessionId,
   onJump,
   onRemove,
+  readOnly,
 }: {
   readonly picture: NotePicture
   readonly sessionId: string
   readonly onJump: (sheetId: string, row: number, column: number) => void
   readonly onRemove: (sheetId: string, row: number, column: number) => void
+  readonly readOnly: boolean
 }) {
   const { t } = useI18n()
   return (
@@ -74,15 +76,17 @@ function Card({
           {picture.sheetName}!{formatAddress(picture.row, picture.column)}
         </button>
         {picture.author && <span className="np-author">{picture.author}</span>}
-        <button
-          type="button"
-          className="np-remove"
-          aria-label={t('appNotePictureRemove')}
-          title={t('appNotePictureRemove')}
-          onClick={() => onRemove(picture.sheetId, picture.row, picture.column)}
-        >
-          ×
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            className="np-remove"
+            aria-label={t('appNotePictureRemove')}
+            title={t('appNotePictureRemove')}
+            onClick={() => onRemove(picture.sheetId, picture.row, picture.column)}
+          >
+            ×
+          </button>
+        )}
       </header>
       <Picture sessionId={sessionId} picture={picture} />
       {picture.text && <p className="np-text">{picture.text}</p>}
@@ -95,11 +99,14 @@ export function NotePicturesPane({
   pending,
   onRemove,
   getRuntime,
+  readOnly,
 }: {
   readonly file: WorkbookFile | null
   readonly pending: readonly PendingNotePicture[]
   readonly onRemove: (sheetId: string, row: number, column: number) => void
   readonly getRuntime: () => UniverRuntime | null
+  /** a view-only or locked document: the pane still lists pictures but cannot remove one */
+  readonly readOnly: boolean
 }): React.JSX.Element | null {
   const { t } = useI18n()
   const pane = useSyncExternalStore(notePicturesPane.subscribe, notePicturesPane.getState)
@@ -141,6 +148,7 @@ export function NotePicturesPane({
               sessionId={sessionId}
               onJump={jump}
               onRemove={onRemove}
+              readOnly={readOnly}
             />
           ))
         )}

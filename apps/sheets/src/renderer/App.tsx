@@ -5554,6 +5554,7 @@ export function App({
           handleRemoveNotePicture(ribbonContext(), sheetId, row, column)
         }
         getRuntime={getRuntime}
+        readOnly={workbookFile?.readOnly === true || isViewOnly()}
       />
       <ThreadHoverCard hover={threadHover} />
       {findReplaceService && (

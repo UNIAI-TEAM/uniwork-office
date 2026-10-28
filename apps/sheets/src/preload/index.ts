@@ -2079,6 +2079,7 @@ function parseSaveRequest(input: WorkbookSaveRequest): WorkbookSaveRequest {
   cappedArray('chart edits', input.chartEdits, 100)
   cappedArray('visual edits', input.visualEdits, 100)
   cappedArray('visual additions', input.visualAdditions, 100)
+  cappedArray('cell images', input.cellImageAdditions ?? [], 50)
   cappedArray('table additions', input.tableAdditions, 50)
   cappedArray('table edits', input.tableEdits ?? [], 100)
   cappedArray('pivot additions', input.pivotAdditions, 20)
@@ -2162,6 +2163,7 @@ function parseSaveRequest(input: WorkbookSaveRequest): WorkbookSaveRequest {
     input.chartEdits.length === 0 &&
     input.visualEdits.length === 0 &&
     input.visualAdditions.length === 0 &&
+    (input.cellImageAdditions?.length ?? 0) === 0 &&
     input.tableAdditions.length === 0 &&
     (input.tableEdits?.length ?? 0) === 0 &&
     input.pivotAdditions.length === 0 &&

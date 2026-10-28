@@ -7892,7 +7892,7 @@ body > div:has([data-u-comp='find-replace-dialog']) {
    the other is open rather than covering it. */
 .note-pictures-pane {
   position: fixed;
-  top: 96px;
+  top: calc(96px + var(--uw-disc-bar-h, 0px));
   right: 24px;
   bottom: 48px;
   z-index: 121;
