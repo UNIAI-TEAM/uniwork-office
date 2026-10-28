@@ -8,7 +8,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
-import { copyFile, open, rename, unlink, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, open, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
 /** Transient Windows codes: antivirus/indexer briefly locks the rename target. */
@@ -138,8 +138,19 @@ export async function atomicWriteVia(
   write: (tempPath: string) => Promise<void>,
 ): Promise<void> {
   const tmp = tempPathBeside(filePath)
+  const existingMode =
+    process.platform === 'win32'
+      ? null
+      : await stat(filePath).then(
+          (s) => s.mode & 0o777,
+          (error) => {
+            if (errorCode(error) === 'ENOENT') return null
+            throw error
+          },
+        )
   try {
     await write(tmp)
+    if (existingMode !== null) await chmod(tmp, existingMode)
     await syncFileBestEffort(tmp)
   } catch (error) {
     await unlink(tmp).catch(() => {})

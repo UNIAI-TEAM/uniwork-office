@@ -1,10 +1,12 @@
 import {
+  chmodSync,
   fsyncSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs'
 import { open, rename, writeFile, copyFile } from 'node:fs/promises'
@@ -300,6 +302,26 @@ describe('atomicWriteVia', () => {
     expect(leftovers[1]).toMatch(/a\.pptx\..{12}\.tmp$/)
     expect(readFileSync(join(dir, leftovers[1]!), 'utf8')).toBe('new')
   })
+
+  it.skipIf(process.platform === 'win32')(
+    'preserves an existing 0600 target permission bits under umask 022',
+    async () => {
+      dir = mkdtempSync(join(tmpdir(), 'eu-av-'))
+      const target = join(dir, 'a.pptx')
+      writeFileSync(target, 'old')
+      chmodSync(target, 0o600)
+      const prevUmask = process.umask(0o022)
+      try {
+        await atomicWriteVia(target, async (tempPath) => {
+          writeFileSync(tempPath, 'new')
+        })
+      } finally {
+        process.umask(prevUmask)
+      }
+      expect(readFileSync(target, 'utf8')).toBe('new')
+      expect(statSync(target).mode & 0o777).toBe(0o600)
+    },
+  )
 })
 
 describe('writeJsonAtomic', () => {
