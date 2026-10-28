@@ -31,6 +31,9 @@ import {
   installInjectorResolutionGuard,
   installWrapMeasureLifecycle,
   noteSidecarCrash,
+  clearSheetTableFilters,
+  noteTableFilterEdit,
+  reapplySheetTableFilters,
 } from './univer-sync'
 import { installGridGrowth } from './grid-growth'
 import {
@@ -255,6 +258,9 @@ import {
   EMPTY_CHART_EDITS,
   FILTER_COMMAND_PATTERN,
   FILTER_MUTATIONS,
+  TABLE_FILTER_MUTATION,
+  CLEAR_FILTER_COMMAND,
+  REAPPLY_FILTER_COMMAND,
   initialSnapshot,
   MERGE_MUTATIONS,
   MOVE_RANGE_COMMAND,
@@ -2544,6 +2550,7 @@ export function App({
           !SHEET_LIFECYCLE_MUTATIONS.has(event.id) &&
           event.id !== REORDER_RANGE_MUTATION &&
           !FILTER_MUTATIONS.has(event.id) &&
+          event.id !== TABLE_FILTER_MUTATION &&
           !CF_MUTATIONS.has(event.id) &&
           !DV_MUTATIONS.has(event.id) &&
           !DEFINED_NAME_MUTATIONS.has(event.id) &&
@@ -2779,6 +2786,16 @@ export function App({
             installPageBreakLayers(params.subUnitId)
           }
           setPendingEdits(journalSize(state.editJournal))
+          return
+        }
+        if (event.id === TABLE_FILTER_MUTATION) {
+          const tableId = (event.params as { tableId?: string } | undefined)?.tableId
+          if (
+            tableId !== undefined &&
+            noteTableFilterEdit(runtime, state, params.unitId, tableId)
+          ) {
+            setPendingEdits(journalSize(state.editJournal))
+          }
           return
         }
         if (FILTER_MUTATIONS.has(event.id)) {
@@ -3282,6 +3299,13 @@ export function App({
             event.cancel = true
             setMessage(t('appPivotSheetNoMove'))
             return
+          }
+          // Univer's Clear / Reapply only know the sheet filter model; a
+          // table's own filter lives in the table plugin and follows them.
+          if (subUnitId !== undefined && event.id === CLEAR_FILTER_COMMAND) {
+            clearSheetTableFilters(runtime, state, subUnitId)
+          } else if (subUnitId !== undefined && event.id === REAPPLY_FILTER_COMMAND) {
+            reapplySheetTableFilters(runtime, state, subUnitId)
           }
           return
         }

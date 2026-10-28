@@ -4,6 +4,7 @@
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
 import type { WorkbookSaveRequest } from '../../../../apps/sheets/src/shared/desktop-api'
+import { tableFilterState } from '../../../../apps/sheets/src/renderer/table-filter-state'
 import { buildEditFixture } from '../../../../apps/sheets/tests/fixture-builder'
 import type { ArchiveEntry } from '../../../../packages/xlsx-gateway/src/gateway/xlsx-package-io'
 import { resolveSaveRequest, saveWorkbookBytes, type ArchiveEngine } from './save-plan'
@@ -262,5 +263,46 @@ describe('save-plan: table filters and x14 data validation', () => {
     expect(sheet).toContain('<x14:formula1><xm:f>Lists!$A$1:$A$5</xm:f></x14:formula1>')
     expect(sheet).toContain('<xm:sqref>D1:D4</xm:sqref>')
     expect(sheet).not.toContain('<dataValidations count=')
+  })
+})
+
+describe('save-plan: a table filter edited from the header dropdown (SH-W4-V1)', () => {
+  it('the snapshot the renderer builds from the table plugin lands in the table part', async () => {
+    const source = await tableFixture()
+    const { engine } = memoryEngine(source)
+    // What collectFilterStates emits after Value >= 15 AND Value <= 35 on A1:B4.
+    const filterState = tableFilterState('sheet-1', {
+      id: 'file-table-sheet-1-0',
+      range: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 1 },
+      columnFilters: [
+        undefined,
+        {
+          filterType: 'condition',
+          filterInfo: { conditionType: 'number', compareType: 'between', expectedValue: [15, 35] },
+        } as never,
+      ],
+      filteredOutRows: [3],
+    })
+    const { data } = await saveWorkbookBytes({
+      engine,
+      sourcePath: '/work/Table.xlsx',
+      sourceBytes: source,
+      workDir: '/tmp/save',
+      save: resolveSaveRequest(
+        new Map([['sheet-1', 'Data']]),
+        request({ filterStates: [filterState] }),
+      ),
+    })
+    const saved = await JSZip.loadAsync(data)
+    const table = await saved.file('xl/tables/table1.xml')!.async('text')
+    expect(table).toContain(
+      '<autoFilter ref="A1:B4"><filterColumn colId="1"><customFilters and="1">' +
+        '<customFilter operator="greaterThanOrEqual" val="15"/>' +
+        '<customFilter operator="lessThanOrEqual" val="35"/></customFilters></filterColumn></autoFilter>',
+    )
+    const sheet = await saved.file('xl/worksheets/sheet1.xml')!.async('text')
+    expect(sheet).not.toContain('<autoFilter')
+    expect(sheet).toContain('<row r="4" hidden="1"')
+    expect(sheet).not.toContain('<row r="2" hidden="1"')
   })
 })
