@@ -17,13 +17,16 @@ export interface OpenShellSettingsDeps {
   getShellWindow: () => ShellSettingsWindow | null
 }
 
+const pendingSectionByWc = new WeakMap<LaunchPushTarget, SettingsSection>()
+
 /**
  * Open the shell's Settings view on the Home tab:
  * - If the shell window was closed while a detached editor remained alive,
  *   recreates it via `ensureTabManager()`.
  * - Restores/shows/focuses the shell window and opens the Home tab.
  * - Sends `openSettings` immediately if the shell renderer has loaded, or
- *   once `did-finish-load` fires when the window was just created.
+ *   coalesces repeated loading calls into one `did-finish-load` listener that
+ *   sends the latest section once.
  */
 export function openShellSettingsView(
   deps: OpenShellSettingsDeps,
@@ -39,12 +42,18 @@ export function openShellSettingsView(
   const wc = win.webContents
   if (wc.isDestroyed()) return
   if (!wc.isLoadingMainFrame()) {
+    pendingSectionByWc.delete(wc)
     wc.send(HOME_CHANNELS.openSettings, { section })
     return
   }
+  const waiting = pendingSectionByWc.has(wc)
+  pendingSectionByWc.set(wc, section)
+  if (waiting) return
   wc.once('did-finish-load', () => {
-    if (!wc.isDestroyed()) {
-      wc.send(HOME_CHANNELS.openSettings, { section })
+    const latest = pendingSectionByWc.get(wc)
+    pendingSectionByWc.delete(wc)
+    if (latest !== undefined && !wc.isDestroyed()) {
+      wc.send(HOME_CHANNELS.openSettings, { section: latest })
     }
   })
 }

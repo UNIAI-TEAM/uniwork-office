@@ -334,4 +334,48 @@ describe('openShellSettingsView (main-process Settings action)', () => {
       section: 'aiModel',
     })
   })
+
+  it('coalesces repeated calls while loading into one listener and one send of the latest section, with no replay on a later load', () => {
+    const loadListeners: Array<() => void> = []
+    const mockWin = {
+      isDestroyed: vi.fn(() => false),
+      isMinimized: vi.fn(() => false),
+      restore: vi.fn(),
+      show: vi.fn(),
+      focus: vi.fn(),
+      webContents: {
+        isDestroyed: vi.fn(() => false),
+        isLoadingMainFrame: vi.fn(() => true),
+        send: vi.fn(),
+        once: vi.fn((event: string, cb: () => void) => {
+          if (event === 'did-finish-load') loadListeners.push(cb)
+        }),
+      },
+    }
+    const openHomeTab = vi.fn()
+    const deps = {
+      ensureTabManager: () => ({ openHomeTab }),
+      getShellWindow: () => mockWin,
+    }
+
+    openShellSettingsView(deps, 'general')
+    openShellSettingsView(deps, 'aiModel')
+    openShellSettingsView(deps, 'general')
+
+    expect(mockWin.webContents.once).toHaveBeenCalledTimes(1)
+    expect(loadListeners).toHaveLength(1)
+    expect(mockWin.webContents.send).not.toHaveBeenCalled()
+
+    mockWin.webContents.isLoadingMainFrame.mockReturnValue(false)
+    const firstFinishLoad = loadListeners[0]!
+    firstFinishLoad()
+    expect(mockWin.webContents.send).toHaveBeenCalledTimes(1)
+    expect(mockWin.webContents.send).toHaveBeenCalledWith(HOME_CHANNELS.openSettings, {
+      section: 'general',
+    })
+
+    // Re-invoking the load callback (or a later load event) does not replay
+    firstFinishLoad()
+    expect(mockWin.webContents.send).toHaveBeenCalledTimes(1)
+  })
 })
