@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
+import { parseDocx, saveDocx } from '@genoffice/docx-engine'
+import { buildDocx } from '../../../packages/docx-engine/tests/helpers/build-docx'
+import { blocksToPmDoc, pmDocToSavePlan, type PmNode } from '../src/renderer/editor/convert'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { deleteTableColumn, selectTablePart } from '../src/renderer/editor/table-ops'
 
@@ -184,5 +187,38 @@ describe('table delete column keeps the width grid', () => {
     expect(tableNode(editor).attrs.widthPx).toBeNull()
     // [30, 50] renormalized (37.5, 62.5)
     expect(pctRounded(editor)).toEqual([38, 63])
+  })
+
+  it('keeps saved w:tblW in step with the grid (dxa) when the table width is fixed (DOCS-V23)', async () => {
+    const bodyXml =
+      '<w:tbl><w:tblPr><w:tblW w:w="9000" w:type="dxa"/></w:tblPr>' +
+      '<w:tblGrid><w:gridCol w:w="1500"/><w:gridCol w:w="2505"/><w:gridCol w:w="3000"/><w:gridCol w:w="1995"/></w:tblGrid>' +
+      '<w:tr>' +
+      '<w:tc><w:tcPr><w:tcW w:w="1500" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>C1</w:t></w:r></w:p></w:tc>' +
+      '<w:tc><w:tcPr><w:tcW w:w="2505" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>C2</w:t></w:r></w:p></w:tc>' +
+      '<w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>C3</w:t></w:r></w:p></w:tc>' +
+      '<w:tc><w:tcPr><w:tcW w:w="1995" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>C4</w:t></w:r></w:p></w:tc>' +
+      '</w:tr></w:tbl>'
+    const parsed = await parseDocx(await buildDocx({ bodyXml }))
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions: editorExtensions,
+      content: blocksToPmDoc(parsed.blocks) as never,
+    })
+    editors.add(editor)
+
+    caretInto(editor, 'C2')
+    expect(deleteTableColumn(editor.state, editor.view.dispatch)).toBe(true)
+
+    const plan = pmDocToSavePlan(editor.getJSON() as PmNode, parsed.blocks)
+    const xmlBlock = plan.saveBlocks.find((b) => b.kind === 'xml') as
+      { kind: 'xml'; xml: string } | undefined
+    expect(xmlBlock?.xml).toContain('<w:tblW w:w="6495" w:type="dxa"/>')
+    expect(xmlBlock?.xml).toContain(
+      '<w:tblGrid><w:gridCol w:w="1500"/><w:gridCol w:w="3000"/><w:gridCol w:w="1995"/></w:tblGrid>',
+    )
+
+    const reparsed = await parseDocx(await saveDocx(parsed, plan.saveBlocks))
+    expect(reparsed.blocks[0].table?.colWidthsTwips).toEqual([1500, 3000, 1995])
   })
 })
