@@ -422,6 +422,7 @@ import { serverAnchorStore } from './server-comments/anchor-store'
 import { SheetsCommentsSurface } from './server-comments/CommentsSurface'
 import { serverComments } from './server-comments/SheetsServerComments'
 import { liveSheetNames } from './server-comments/univer-view'
+import { NotePicturesPane } from './NotePicturesPane'
 import { installFormulaNullResultFix } from './formula-null-result'
 import { installNumberFormatFix } from './numfmt-fix'
 import { installIfsEmptySetFix } from './ifs-empty-set'
@@ -529,6 +530,7 @@ import { SlicerFieldPicker, SlicerPanels, type SlicerUiState } from './SlicerPan
 import { WatchWindowPanel, watchKey, type WatchCell, type WatchRowValue } from './WatchWindowPanel'
 import { TimelineFieldPicker, TimelinePanels, type TimelineUiState } from './TimelinePanel'
 import type { DefinedNameAction, DefinedNameRow } from './NameManagerDialog'
+import { workbookMediaDataUrl } from './workbook-media'
 import {
   clearVisualSelection,
   convertibleType,
@@ -539,7 +541,6 @@ import {
   setVisualCommandListener,
   setVisualSelectionListener,
   subscribeChartElementSelection,
-  workbookMediaDataUrl,
   type ChartDialogKind,
   type ChartEditData,
   type ChartVectorRead,
@@ -5529,6 +5530,7 @@ export function App({
           <WorkbookOpeningScreen />
         ))}
       <SheetsCommentsSurface getRuntime={getRuntime} file={workbookFile} onStatus={setMessage} />
+      <NotePicturesPane file={workbookFile} getRuntime={getRuntime} />
       <ThreadHoverCard hover={threadHover} />
       {findReplaceService && (
         <FindReplacePanel
