@@ -39,6 +39,8 @@ import {
   IconSearch,
   IconEyeOff,
   IconSourceCode,
+  IconBacklinks,
+  IconGraph,
   IconSpellcheck,
   IconTable,
   IconTaskList,
@@ -76,6 +78,9 @@ interface Props {
   outlineOpen: boolean
   onToggleOutline: () => void
   hasOutline: boolean
+  backlinksOpen: boolean
+  onToggleBacklinks: () => void
+  onOpenGraph: () => void
   spellcheck: boolean
   onToggleSpellcheck: () => void
   /** false on the web (cap 'autoSave'): no AutoSave toggle */
@@ -319,6 +324,9 @@ export function Ribbon({
   outlineOpen,
   onToggleOutline,
   hasOutline,
+  backlinksOpen,
+  onToggleBacklinks,
+  onOpenGraph,
   spellcheck,
   onToggleSpellcheck,
   showAutoSave = true,
@@ -808,6 +816,22 @@ export function Ribbon({
             {/* the paper theme persists through the desktop's config file (cap 'mdTheme': no web store) */}
             {cap('mdTheme') && (
               <ThemePicker mdTheme={mdTheme} disabled={disabled} onPick={onMarkdownTheme} />
+            )}
+            {/* the vault views read the desktop's notes folder (cap 'wikiVault': off on the web) */}
+            {cap('wikiVault') && !sourceMode && (
+              <IconBtn
+                title={t('backlinks')}
+                active={backlinksOpen}
+                disabled={disabled}
+                onClick={onToggleBacklinks}
+              >
+                <IconBacklinks size={ICON} />
+              </IconBtn>
+            )}
+            {cap('wikiVault') && !sourceMode && (
+              <IconBtn title={t('graph')} disabled={disabled} onClick={onOpenGraph}>
+                <IconGraph size={ICON} />
+              </IconBtn>
             )}
             <IconBtn
               title={t('spellcheck')}
