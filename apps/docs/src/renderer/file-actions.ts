@@ -1432,7 +1432,12 @@ async function saveOnce(
     // Equal doc: skip the rewrite so undo history, caret and scroll survive.
     if (!unchanged) {
       // an autosave keeps the AI marker on screen (a user Save cleared it before writing)
-      editor.commands.setContent(carryAiMarks(editor.state.doc, rebasedPm) as never)
+      // Rebase saved anchors without recording the reload as a user edit.
+      editor
+        .chain()
+        .setMeta(TRACK_IGNORE, true)
+        .setContent(carryAiMarks(editor.state.doc, rebasedPm) as never)
+        .run()
       resetEditorHistory(editor)
       const chain = editor
         .chain()
