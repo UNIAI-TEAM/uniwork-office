@@ -1817,6 +1817,9 @@ export function SettingsModal({
   const [docTheme, setDocTheme] = useState<DocTheme>('follow')
   const [saveDir, setSaveDir] = useState('')
   const [autoSaveOn, setAutoSaveOn] = useState(false)
+  const [restoreSessionOn, setRestoreSessionOn] = useState(false)
+  const [autoUpdateCheckOn, setAutoUpdateCheckOn] = useState(true)
+  const [autoUpdateSupported, setAutoUpdateSupported] = useState(false)
   const [defaultApp, setDefaultApp] = useState<DefaultAppStatus | null>(null)
   const [defaultAppBusy, setDefaultAppBusy] = useState(false)
   const [defaultAppFailed, setDefaultAppFailed] = useState(false)
@@ -1859,6 +1862,9 @@ export function SettingsModal({
     void window.aiOffice.getAutoSaveDefault?.().then((v) => {
       if (alive) setAutoSaveOn(v.on)
     })
+    void window.aiOffice.getRestoreLastSession?.().then((on) => {
+      if (alive) setRestoreSessionOn(on)
+    })
     void window.aiOffice.getDefaultAppStatus?.().then((st) => {
       if (alive) setDefaultApp(st)
     })
@@ -1873,6 +1879,12 @@ export function SettingsModal({
     })
     void window.aiOffice.getPinnedUpdateChannel?.().then((ch) => {
       if (alive) setPinnedChannel(ch)
+    })
+    void window.aiOffice.getAutoUpdateCheck?.().then((st) => {
+      if (alive && st) {
+        setAutoUpdateCheckOn(st.on)
+        setAutoUpdateSupported(st.supported)
+      }
     })
     void window.aiOffice.getAppVersion?.().then((v) => {
       if (alive && v) setAppVersion(v)
@@ -2276,6 +2288,27 @@ export function SettingsModal({
                     }}
                   />
                 </div>
+                <div className="set-field">
+                  <div className="set-field-text">
+                    <div className="set-field-stack">
+                      <div className="set-field-label">{t('setRestoreSession')}</div>
+                      <div className="set-field-desc">{t('setRestoreSessionDesc')}</div>
+                    </div>
+                  </div>
+                  <button
+                    className="set-switch"
+                    role="switch"
+                    aria-checked={restoreSessionOn}
+                    aria-label={t('setRestoreSession')}
+                    onClick={() => {
+                      const next = !restoreSessionOn
+                      setRestoreSessionOn(next)
+                      void window.aiOffice
+                        .setRestoreLastSession?.(next)
+                        .catch(() => setRestoreSessionOn(!next))
+                    }}
+                  />
+                </div>
                 {((defaultApp && defaultApp.state !== 'unsupported') ||
                   (cliLink && cliLink.state !== 'unsupported')) && (
                   <h4 className="set-pane-subtitle">{t('setGrpSystem')}</h4>
@@ -2391,6 +2424,29 @@ export function SettingsModal({
                 </div>
                 {pinnedChannel !== null && (
                   <p className="set-field-desc">{t('updateChannelPinnedNote')}</p>
+                )}
+                {autoUpdateSupported && (
+                  <div className="set-field">
+                    <div className="set-field-text">
+                      <div className="set-field-stack">
+                        <div className="set-field-label">{t('setAutoUpdateCheck')}</div>
+                        <div className="set-field-desc">{t('setAutoUpdateCheckDesc')}</div>
+                      </div>
+                    </div>
+                    <button
+                      className="set-switch"
+                      role="switch"
+                      aria-checked={autoUpdateCheckOn}
+                      aria-label={t('setAutoUpdateCheck')}
+                      onClick={() => {
+                        const next = !autoUpdateCheckOn
+                        setAutoUpdateCheckOn(next)
+                        void window.aiOffice
+                          .setAutoUpdateCheck?.(next)
+                          .catch(() => setAutoUpdateCheckOn(!next))
+                      }}
+                    />
+                  </div>
                 )}
                 <div className="set-about-legal">
                   <p className="set-about-copyright">

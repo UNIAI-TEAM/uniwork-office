@@ -69,6 +69,7 @@ import {
   isCfbFile,
   isEncryptedOoxml,
   appMenuLabels,
+  appMenuTemplate,
   buildPrintableHtml,
   configuredDefaultSaveDir,
   contextMenuLabels,
@@ -83,6 +84,7 @@ import {
   helpMenuTemplate,
   viewMenuTemplate,
   windowMenuTemplate,
+  settingsMenuItem,
   installRendererProtocol,
   registerRendererScheme,
   rendererUrl,
@@ -4925,14 +4927,19 @@ export function setSheetsCloseTabHook(fn: (() => void) | null): void {
 function installApplicationMenu(): void {
   const sendMenuAction = sendSheetsMenuAction
   const labels = appMenuLabels(getUiLang())
+  const isMac = process.platform === 'darwin'
   // the menu item's accelerator from the shortcut table (none when its key has no menu form)
   const acc = (item: SheetsMenuShortcut): { accelerator?: string } => {
-    const accelerator = sheetsMenuAccelerator(item, process.platform === 'darwin' ? 'mac' : 'win')
+    const accelerator = sheetsMenuAccelerator(item, isMac ? 'mac' : 'win')
     return accelerator ? { accelerator } : {}
   }
+  const appMenu = appMenuTemplate(process.platform, labels, {
+    appLabel: app.name,
+    extra: [settingsMenuItem(labels)],
+  })
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
+      ...(appMenu ? [appMenu] : []),
       {
         label: tm('menuFile'),
         submenu: [
@@ -4982,6 +4989,8 @@ function installApplicationMenu(): void {
             : process.platform === 'darwin'
               ? { role: 'close' as const, label: tm('menuClose') }
               : { role: 'quit' as const, label: tm('menuQuit') },
+          { type: 'separator' },
+          settingsMenuItem(labels, undefined, { accelerator: isMac }),
         ],
       },
       {

@@ -1705,6 +1705,7 @@ describe('registrars under the real guard', () => {
 const FAMILY_PUSH_ONLY: readonly string[] = [
   TABS_CHANNELS.changed,
   TABS_CHANNELS.dockPreview,
+  TABS_CHANNELS.startRename,
   UPDATE_CHANNELS.changed,
   UPDATE_CHANNELS.stateChanged,
   PDF_PASSWORD_CHANNELS.changed,
@@ -1813,7 +1814,7 @@ describe('policy of every channel of the remaining shell families', () => {
   const policyOf = (table: Record<string, string>, push: readonly string[] = []): string[] =>
     Object.values(table).filter((channel) => !push.includes(channel))
 
-  it('TABS_CHANNELS: shell (16 handlers; changed and dockPreview are pushes)', () => {
+  it('TABS_CHANNELS: shell (16 handlers; changed, dockPreview and startRename are pushes)', () => {
     const values = policyOf(TABS_CHANNELS, FAMILY_PUSH_ONLY)
     expect(values).toHaveLength(16)
     for (const channel of values) expect(policyForChannel(channel), channel).toBe('shell')

@@ -625,6 +625,11 @@ let pinnedChannel: string | null = null
 export function getPinnedUpdateChannel(): string | null {
   return pinnedChannel
 }
+
+/** Whether a background update check exists in this build (electron-updater or mac release notifier). */
+export function backgroundCheckSupported(): boolean {
+  return updaterActive || macReleaseCheck !== null
+}
 // true for a packaged build shipped without resources/app-update.yml (the
 // unsigned mac release app, local packs): the manual check then explains where updates come
 // from instead of reporting a failed automatic update
@@ -792,7 +797,11 @@ function bakedMacReleaseFeed(): ReleaseFeed | null {
 
 /// The unsigned mac app cannot install updates; it checks the GitHub releases
 /// of its channel and offers the newer dmg for its arch in the update window.
-function initMacReleaseNotifier(getWindow: () => BrowserWindow | null, feed: ReleaseFeed): void {
+function initMacReleaseNotifier(
+  getWindow: () => BrowserWindow | null,
+  feed: ReleaseFeed,
+  autoCheckEnabled: () => boolean,
+): void {
   let shownVersion: string | null = null
   let downloadUrl: string | null = null
   const actions = {
@@ -820,6 +829,7 @@ function initMacReleaseNotifier(getWindow: () => BrowserWindow | null, feed: Rel
     return true
   }
   const check = (): void => {
+    if (!autoCheckEnabled()) return
     macReleaseCheck?.(false).catch((err) => log('release check failed:', err?.message ?? err))
   }
   setTimeout(check, FIRST_CHECK_DELAY_MS)
@@ -829,6 +839,8 @@ function initMacReleaseNotifier(getWindow: () => BrowserWindow | null, feed: Rel
 export function initAutoUpdater(
   getWindow: () => BrowserWindow | null,
   initialChannel: UpdateChannel = 'stable',
+  /** Settings › "Check for updates automatically"; read at every background check */
+  autoCheckEnabled: () => boolean = () => true,
 ): void {
   if (started) return
   started = true
@@ -859,7 +871,7 @@ export function initAutoUpdater(
     if (macFeed !== null) {
       pinnedChannel = macFeed.channel
       log('no app-update.yml; notifying of', macFeed.channel, 'releases')
-      initMacReleaseNotifier(getWindow, macFeed)
+      initMacReleaseNotifier(getWindow, macFeed, autoCheckEnabled)
       return
     }
     log('no app-update.yml in this build; updater inactive')
@@ -1023,6 +1035,8 @@ export function initAutoUpdater(
   })
 
   const check = (): void => {
+    // turned off: only an explicit check (Help › Check for Updates…, a channel switch) asks the feed
+    if (!autoCheckEnabled()) return
     autoUpdater.checkForUpdates().catch((err) => log('check failed:', err?.message ?? err))
   }
   setTimeout(check, FIRST_CHECK_DELAY_MS)

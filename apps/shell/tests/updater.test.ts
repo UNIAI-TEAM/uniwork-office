@@ -198,8 +198,9 @@ afterEach(() => {
 describe('initAutoUpdater', () => {
   it('does nothing in unpacked (dev) runs without the fake-update env', async () => {
     appState.isPackaged = false
-    const { initAutoUpdater } = await loadUpdater()
+    const { initAutoUpdater, backgroundCheckSupported } = await loadUpdater()
     initAutoUpdater(() => null)
+    expect(backgroundCheckSupported()).toBe(false)
     vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
     expect(updaterState.listeners.size).toBe(0)
     expect(checkForUpdates).not.toHaveBeenCalled()
@@ -209,8 +210,9 @@ describe('initAutoUpdater', () => {
   it('does nothing on unsupported platforms', async () => {
     platformSpy?.restore()
     setPlatform('linux')
-    const { initAutoUpdater } = await loadUpdater()
+    const { initAutoUpdater, backgroundCheckSupported } = await loadUpdater()
     initAutoUpdater(() => null)
+    expect(backgroundCheckSupported()).toBe(false)
     vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
     expect(updaterState.listeners.size).toBe(0)
     expect(checkForUpdates).not.toHaveBeenCalled()
@@ -218,8 +220,9 @@ describe('initAutoUpdater', () => {
 
   it('stays inactive in a packaged build without app-update.yml', async () => {
     existsSyncMock.mockReturnValue(false)
-    const { initAutoUpdater, applyUpdateChannel } = await loadUpdater()
+    const { initAutoUpdater, applyUpdateChannel, backgroundCheckSupported } = await loadUpdater()
     initAutoUpdater(() => null, 'beta')
+    expect(backgroundCheckSupported()).toBe(false)
     vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
     expect(existsSyncMock).toHaveBeenCalledWith(path.join('/res', 'app-update.yml'))
     expect(updaterState.listeners.size).toBe(0)
@@ -274,8 +277,9 @@ describe('initAutoUpdater', () => {
   })
 
   it('configures manual full-package download and checks after the initial delay', async () => {
-    const { initAutoUpdater } = await loadUpdater()
+    const { initAutoUpdater, backgroundCheckSupported } = await loadUpdater()
     initAutoUpdater(() => null)
+    expect(backgroundCheckSupported()).toBe(true)
     expect(updaterState.autoDownload).toBe(false)
     expect(updaterState.autoInstallOnAppQuit).toBe(true)
     expect(updaterState.disableDifferentialDownload).toBe(true)
@@ -289,6 +293,24 @@ describe('initAutoUpdater', () => {
     initAutoUpdater(() => null)
     vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
     expect(checkForUpdates).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(RECHECK_INTERVAL_MS)
+    expect(checkForUpdates).toHaveBeenCalledTimes(2)
+  })
+
+  it('skips background checks while automatic checking is off, and resumes when it is back on', async () => {
+    let auto = false
+    const { initAutoUpdater, checkForUpdatesNow } = await loadUpdater()
+    initAutoUpdater(
+      () => null,
+      'stable',
+      () => auto,
+    )
+    vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS + RECHECK_INTERVAL_MS)
+    expect(checkForUpdates).not.toHaveBeenCalled()
+    // an explicit Help › Check for Updates… still asks the feed
+    void checkForUpdatesNow()
+    expect(checkForUpdates).toHaveBeenCalledTimes(1)
+    auto = true
     vi.advanceTimersByTime(RECHECK_INTERVAL_MS)
     expect(checkForUpdates).toHaveBeenCalledTimes(2)
   })
@@ -1024,9 +1046,11 @@ describe('unsigned mac release app (release notice)', () => {
 
   it('offers the newer dmg of its own arch after the initial delay', async () => {
     answer([release('0.11.0-dev.3'), release('0.11.0-dev.2')])
-    const { initAutoUpdater, getPinnedUpdateChannel } = await loadUpdater()
+    const { initAutoUpdater, getPinnedUpdateChannel, backgroundCheckSupported } =
+      await loadUpdater()
     initAutoUpdater(() => null)
     expect(getPinnedUpdateChannel()).toBe('dev')
+    expect(backgroundCheckSupported()).toBe(true)
     await vi.advanceTimersByTimeAsync(FIRST_CHECK_DELAY_MS)
 
     expect(netFetch.mock.calls[0][0]).toBe(
@@ -1041,6 +1065,33 @@ describe('unsigned mac release app (release notice)', () => {
       'https://github.com/UNIAI-TEAM/uniwork-office/releases/download/v0.11.0-dev.3/' +
         dmg('0.11.0-dev.3', process.arch),
     )
+  })
+
+  it('skips background mac release checks while automatic checking is off, and still answers manual checks', async () => {
+    let auto = false
+    answer([release('0.11.0-dev.3')])
+    const { initAutoUpdater, checkForUpdatesNow } = await loadUpdater()
+    initAutoUpdater(
+      () => null,
+      'stable',
+      () => auto,
+    )
+    await vi.advanceTimersByTimeAsync(FIRST_CHECK_DELAY_MS + RECHECK_INTERVAL_MS)
+    expect(netFetch).not.toHaveBeenCalled()
+    expect(showUpdateWindow).not.toHaveBeenCalled()
+
+    // an explicit Help › Check for Updates… still asks the GitHub feed
+    await checkForUpdatesNow()
+    expect(netFetch).toHaveBeenCalledTimes(1)
+    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+
+    // turning automatic checks back on resumes periodic polling
+    auto = true
+    answer([release('0.11.0-dev.4')])
+    await vi.advanceTimersByTimeAsync(RECHECK_INTERVAL_MS)
+    expect(netFetch).toHaveBeenCalledTimes(2)
+    expect(showUpdateWindow).toHaveBeenCalledTimes(2)
+    expect(lastShownState().version).toBe('0.11.0-dev.4')
   })
 
   it('stays quiet about a version put off with later until a manual check', async () => {

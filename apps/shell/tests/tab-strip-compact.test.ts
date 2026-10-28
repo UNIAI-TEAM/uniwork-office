@@ -7,6 +7,7 @@ import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { SHELL_WINDOW_MIN_WIDTH } from '../src/main/window-bounds'
 import type { HomeApi } from '../src/shared/home-api'
 import type { TabSummary } from '../src/shared/tabs-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
@@ -89,9 +90,8 @@ describe('compactStripOf: the trigger', () => {
 
   it('the threshold is the window minWidth (main/index.ts), so scale 1 can never be below it', () => {
     const main = readFileSync(resolve(__dirname, '../src/main/index.ts'), 'utf8')
-    const minWidth = /minWidth:\s*(\d+)/.exec(main)
-    expect(minWidth, 'main window minWidth').not.toBeNull()
-    expect(Number(minWidth![1])).toBe(TAB_STRIP_COMPACT_BELOW_PX)
+    expect(main).toMatch(/minWidth:\s*SHELL_WINDOW_MIN_WIDTH\b/)
+    expect(SHELL_WINDOW_MIN_WIDTH).toBe(TAB_STRIP_COMPACT_BELOW_PX)
   })
 })
 
