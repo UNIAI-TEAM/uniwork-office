@@ -69,10 +69,16 @@ const detached = new Map<number, DetachedRecord>()
 const ID_PREFIX = 'detached:'
 
 let onChanged: () => void = () => {}
+let onQuitVetoed: () => void = () => {}
 
 /** fires whenever a detached window opens, closes, or changes file (open-documents publishing) */
 export function setDetachedChangedListener(listener: () => void): void {
   onChanged = listener
+}
+
+/** fires when a detached close prompt is cancelled or fails, vetoing any quit in flight */
+export function setDetachedQuitVetoedListener(listener: () => void): void {
+  onQuitVetoed = listener
 }
 
 /**
@@ -229,7 +235,10 @@ export async function closeDetachedByPath(path: string): Promise<boolean> {
   for (const rec of showing()) {
     if (rec.released) continue
     if (await confirmDetachedClose(rec)) rec.closeWithoutPrompt()
-    else resetSheetsShuttingDown()
+    else {
+      resetSheetsShuttingDown()
+      onQuitVetoed()
+    }
   }
   return showing().length === 0
 }
@@ -247,6 +256,7 @@ export async function confirmCloseDetachedByPath(path: string): Promise<boolean>
     if (rec.released) continue
     if (!(await confirmDetachedClose(rec))) {
       resetSheetsShuttingDown()
+      onQuitVetoed()
       return false
     }
   }
@@ -646,10 +656,14 @@ export function createDetachedEditorWindow(options: {
         // a denied close vetoes any quit that was in flight: the sheets close
         // guard must prompt again on later closes instead of silently proceeding
         if (await confirmDetachedClose(rec)) tearDown()
-        else resetSheetsShuttingDown()
+        else {
+          resetSheetsShuttingDown()
+          onQuitVetoed()
+        }
       } catch (err) {
         console.error('[shell] detached window close prompt failed:', err)
         resetSheetsShuttingDown()
+        onQuitVetoed()
       } finally {
         promptInFlight = false
       }
