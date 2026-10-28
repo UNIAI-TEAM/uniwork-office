@@ -38,4 +38,9 @@ export const cs = {
   batesErrDigits: 'Počet číslic musí být celé číslo od 1 do 15',
   batesErrFontSize: 'Velikost písma musí být 6–36',
   batesErrRange: 'Rozsah stran je neplatný',
+  outlineAdd: 'Přidat záložku',
+  outlineRename: 'Přejmenovat záložku',
+  outlineDelete: 'Smazat záložku',
+  outlineNewTitle: 'Záložka bez názvu',
+  outlineEdit: 'Upravit záložky',
 } satisfies Record<keyof typeof zh, string>

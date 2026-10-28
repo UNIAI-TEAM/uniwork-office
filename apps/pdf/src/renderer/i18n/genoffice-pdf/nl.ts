@@ -38,4 +38,9 @@ export const nl = {
   batesErrDigits: 'De cijfers moeten een geheel getal van 1 tot 15 zijn',
   batesErrFontSize: 'De lettergrootte moet 6–36 zijn',
   batesErrRange: 'Het paginabereik is ongeldig',
+  outlineAdd: 'Bladwijzer toevoegen',
+  outlineRename: 'Bladwijzer hernoemen',
+  outlineDelete: 'Bladwijzer verwijderen',
+  outlineNewTitle: 'Naamloze bladwijzer',
+  outlineEdit: 'Bladwijzers bewerken',
 } satisfies Record<keyof typeof zh, string>

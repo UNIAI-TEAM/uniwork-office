@@ -584,7 +584,9 @@ function hasPendingSaveEdits(request: SavePdfRequest): boolean {
     request.rotations?.length ||
     request.deletedPages?.length ||
     request.pageOrder?.length ||
-    request.metadata
+    request.metadata ||
+    // an empty tree is a deliberate "no bookmarks", which is still a write
+    request.outline !== undefined
   )
 }
 
@@ -1310,7 +1312,8 @@ function registerPdfIpc(): void {
         request.rotations?.length ||
         request.deletedPages?.length ||
         request.pageOrder?.length ||
-        request.metadata
+        request.metadata ||
+        request.outline !== undefined
       ) {
         return { ok: false, error: 'pdf: save other pending edits before applying redactions' }
       }

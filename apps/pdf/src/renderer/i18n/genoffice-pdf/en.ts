@@ -38,4 +38,9 @@ export const en = {
   batesErrDigits: 'Digits must be an integer from 1 to 15',
   batesErrFontSize: 'Font size must be 6–36',
   batesErrRange: 'The page range is invalid',
+  outlineAdd: 'Add bookmark',
+  outlineRename: 'Rename bookmark',
+  outlineDelete: 'Delete bookmark',
+  outlineNewTitle: 'Untitled bookmark',
+  outlineEdit: 'Edit bookmarks',
 } satisfies Record<keyof typeof zh, string>

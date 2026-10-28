@@ -36,4 +36,9 @@ export const zh = {
   batesErrDigits: '位数须为 1–15 的整数',
   batesErrFontSize: '字号须为 6–36',
   batesErrRange: '页码范围无效',
+  outlineAdd: '添加书签',
+  outlineRename: '重命名书签',
+  outlineDelete: '删除书签',
+  outlineNewTitle: '未命名书签',
+  outlineEdit: '编辑书签',
 }

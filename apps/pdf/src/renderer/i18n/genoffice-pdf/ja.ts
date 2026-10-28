@@ -38,4 +38,9 @@ export const ja = {
   batesErrDigits: '桁数は 1〜15 の整数にしてください',
   batesErrFontSize: 'フォントサイズは 6〜36 にしてください',
   batesErrRange: 'ページ範囲が無効です',
+  outlineAdd: 'しおりを追加',
+  outlineRename: 'しおり名を変更',
+  outlineDelete: 'しおりを削除',
+  outlineNewTitle: '無題のしおり',
+  outlineEdit: 'しおりを編集',
 } satisfies Record<keyof typeof zh, string>

@@ -38,4 +38,9 @@ export const de = {
   batesErrDigits: 'Die Stellen müssen eine ganze Zahl von 1 bis 15 sein',
   batesErrFontSize: 'Die Schriftgröße muss 6–36 sein',
   batesErrRange: 'Der Seitenbereich ist ungültig',
+  outlineAdd: 'Lesezeichen hinzufügen',
+  outlineRename: 'Lesezeichen umbenennen',
+  outlineDelete: 'Lesezeichen löschen',
+  outlineNewTitle: 'Unbenanntes Lesezeichen',
+  outlineEdit: 'Lesezeichen bearbeiten',
 } satisfies Record<keyof typeof zh, string>

@@ -38,4 +38,9 @@ export const ko = {
   batesErrDigits: '자릿수는 1~15의 정수여야 합니다',
   batesErrFontSize: '글자 크기는 6~36이어야 합니다',
   batesErrRange: '페이지 범위가 잘못되었습니다',
+  outlineAdd: '책갈피 추가',
+  outlineRename: '책갈피 이름 바꾸기',
+  outlineDelete: '책갈피 삭제',
+  outlineNewTitle: '제목 없는 책갈피',
+  outlineEdit: '책갈피 편집',
 } satisfies Record<keyof typeof zh, string>

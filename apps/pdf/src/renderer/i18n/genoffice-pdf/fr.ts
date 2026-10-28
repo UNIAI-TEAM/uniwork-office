@@ -38,4 +38,9 @@ export const fr = {
   batesErrDigits: 'Les chiffres doivent être un entier de 1 à 15',
   batesErrFontSize: 'La taille de police doit être de 6 à 36',
   batesErrRange: 'La plage de pages est invalide',
+  outlineAdd: 'Ajouter un signet',
+  outlineRename: 'Renommer le signet',
+  outlineDelete: 'Supprimer le signet',
+  outlineNewTitle: 'Signet sans titre',
+  outlineEdit: 'Modifier les signets',
 } satisfies Record<keyof typeof zh, string>

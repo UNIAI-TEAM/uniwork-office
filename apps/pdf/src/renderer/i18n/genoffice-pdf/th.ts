@@ -38,4 +38,9 @@ export const th = {
   batesErrDigits: 'จำนวนหลักต้องเป็นจำนวนเต็ม 1 ถึง 15',
   batesErrFontSize: 'ขนาดฟอนต์ต้องเป็น 6–36',
   batesErrRange: 'ช่วงหน้าไม่ถูกต้อง',
+  outlineAdd: 'เพิ่มที่คั่น',
+  outlineRename: 'เปลี่ยนชื่อที่คั่น',
+  outlineDelete: 'ลบที่คั่น',
+  outlineNewTitle: 'ที่คั่นหน้าไม่มีชื่อ',
+  outlineEdit: 'แก้ไขที่คั่น',
 } satisfies Record<keyof typeof zh, string>

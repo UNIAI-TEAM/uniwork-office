@@ -38,4 +38,9 @@ export const vi = {
   batesErrDigits: 'Số chữ số phải là số nguyên từ 1 đến 15',
   batesErrFontSize: 'Cỡ chữ phải từ 6–36',
   batesErrRange: 'Khoảng trang không hợp lệ',
+  outlineAdd: 'Thêm dấu trang',
+  outlineRename: 'Đổi tên dấu trang',
+  outlineDelete: 'Xóa dấu trang',
+  outlineNewTitle: 'Dấu trang chưa đặt tên',
+  outlineEdit: 'Chỉnh sửa dấu trang',
 } satisfies Record<keyof typeof zh, string>

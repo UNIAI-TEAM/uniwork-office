@@ -38,4 +38,9 @@ export const it = {
   batesErrDigits: 'Le cifre devono essere un intero da 1 a 15',
   batesErrFontSize: 'La dimensione del carattere deve essere 6–36',
   batesErrRange: "L'intervallo di pagine non è valido",
+  outlineAdd: 'Aggiungi segnalibro',
+  outlineRename: 'Rinomina segnalibro',
+  outlineDelete: 'Elimina segnalibro',
+  outlineNewTitle: 'Segnalibro senza titolo',
+  outlineEdit: 'Modifica segnalibri',
 } satisfies Record<keyof typeof zh, string>

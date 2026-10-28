@@ -38,4 +38,9 @@ export const hi = {
   batesErrDigits: 'अंक 1 से 15 तक का पूर्णांक होने चाहिए',
   batesErrFontSize: 'फ़ॉन्ट आकार 6–36 होना चाहिए',
   batesErrRange: 'पृष्ठ श्रेणी अमान्य है',
+  outlineAdd: 'बुकमार्क जोड़ें',
+  outlineRename: 'बुकमार्क का नाम बदलें',
+  outlineDelete: 'बुकमार्क हटाएँ',
+  outlineNewTitle: 'अनाम बुकमार्क',
+  outlineEdit: 'बुकमार्क संपादित करें',
 } satisfies Record<keyof typeof zh, string>

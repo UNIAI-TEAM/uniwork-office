@@ -37,4 +37,9 @@ export const he = {
   batesErrDigits: 'הספרות חייבות להיות מספר שלם מ־1 עד 15',
   batesErrFontSize: 'גודל הגופן חייב להיות 6–36',
   batesErrRange: 'טווח העמודים אינו תקין',
+  outlineAdd: 'הוספת סימנייה',
+  outlineRename: 'שינוי שם סימנייה',
+  outlineDelete: 'מחיקת סימנייה',
+  outlineNewTitle: 'סימנייה ללא שם',
+  outlineEdit: 'עריכת סימניות',
 } satisfies Record<keyof typeof zh, string>

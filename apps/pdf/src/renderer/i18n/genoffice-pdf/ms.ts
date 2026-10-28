@@ -38,4 +38,9 @@ export const ms = {
   batesErrDigits: 'Digit mesti integer 1 hingga 15',
   batesErrFontSize: 'Saiz fon mesti 6–36',
   batesErrRange: 'Julat halaman tidak sah',
+  outlineAdd: 'Tambah penanda buku',
+  outlineRename: 'Namakan semula penanda',
+  outlineDelete: 'Padam penanda',
+  outlineNewTitle: 'Penanda tanpa tajuk',
+  outlineEdit: 'Sunting penanda',
 } satisfies Record<keyof typeof zh, string>

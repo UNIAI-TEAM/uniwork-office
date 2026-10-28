@@ -37,4 +37,9 @@ export const zhTW = {
   batesErrDigits: '位數須為 1–15 的整數',
   batesErrFontSize: '字號須為 6–36',
   batesErrRange: '頁碼範圍無效',
+  outlineAdd: '新增書籤',
+  outlineRename: '重新命名書籤',
+  outlineDelete: '刪除書籤',
+  outlineNewTitle: '未命名書籤',
+  outlineEdit: '編輯書籤',
 } satisfies Record<keyof typeof zh, string>

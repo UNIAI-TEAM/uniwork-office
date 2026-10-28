@@ -38,4 +38,9 @@ export const ar = {
   batesErrDigits: 'يجب أن تكون الخانات عدداً صحيحاً من 1 إلى 15',
   batesErrFontSize: 'يجب أن يكون حجم الخط 6–36',
   batesErrRange: 'نطاق الصفحات غير صالح',
+  outlineAdd: 'إضافة إشارة مرجعية',
+  outlineRename: 'إعادة تسمية الإشارة المرجعية',
+  outlineDelete: 'حذف الإشارة المرجعية',
+  outlineNewTitle: 'إشارة مرجعية بدون عنوان',
+  outlineEdit: 'تحرير الإشارات المرجعية',
 } satisfies Record<keyof typeof zh, string>

@@ -38,4 +38,9 @@ export const pl = {
   batesErrDigits: 'Liczba cyfr musi być liczbą całkowitą od 1 do 15',
   batesErrFontSize: 'Rozmiar czcionki musi wynosić 6–36',
   batesErrRange: 'Zakres stron jest nieprawidłowy',
+  outlineAdd: 'Dodaj zakładkę',
+  outlineRename: 'Zmień nazwę zakładki',
+  outlineDelete: 'Usuń zakładkę',
+  outlineNewTitle: 'Zakładka bez tytułu',
+  outlineEdit: 'Edytuj zakładki',
 } satisfies Record<keyof typeof zh, string>

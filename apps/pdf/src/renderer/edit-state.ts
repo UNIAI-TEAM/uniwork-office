@@ -4,7 +4,13 @@ import type { LocalImageEdit } from './ImageEditLayer'
 import type { SavedNoteAnnot } from './note-threads'
 import type { HeaderFooterConfig, WatermarkConfig } from './stamps'
 import type { LocalTextEdit, LocalTextInsert } from './text-edit-preview'
-import type { FormValueInput, MarkupType, MetadataInput, PageImageRef } from '../shared/ipc'
+import type {
+  FormValueInput,
+  MarkupType,
+  MetadataInput,
+  OutlineEntryInput,
+  PageImageRef,
+} from '../shared/ipc'
 
 /** pdf.js AnnotationType codes for the markup subtypes we can delete */
 export const MARKUP_TYPE_BY_ANNOT: Record<number, MarkupType> = {
@@ -90,6 +96,8 @@ export interface SavedSnapshot {
   formEdits: Map<string, FormValueInput>
   rotations: Map<number, number>
   metadata: MetadataInput | null
+  /** The edited bookmark tree this save wrote (same object the pending edit holds), or null */
+  outline: OutlineEntryInput[] | null
   /** Old original page index → its index in the saved file (saved deletions/reorder applied) */
   pageMap: Map<number, number>
 }

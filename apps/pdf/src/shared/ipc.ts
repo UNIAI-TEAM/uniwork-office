@@ -677,9 +677,24 @@ export interface SavePdfRequest {
   /** New page order (array of original page indices, excluding deleted); omitted if unreordered */
   pageOrder?: number[]
   metadata?: MetadataInput
+  /** Full bookmark-tree replacement, written when the user edited the outline.
+   * Every entry must carry an explicit page target (0-based index); entries
+   * the writer cannot rebuild exactly make the save refuse the replacement
+   * (the file's own /Outlines stay untouched). */
+  outline?: OutlineEntryInput[]
   /** Who asked: explicit Save (`user`), autosave (`auto`) or an app-internal flush
       (`internal`). Absent behaves as before (Save As never sets it). */
   origin?: 'user' | 'auto' | 'internal'
+}
+
+/** One bookmark of a replacement outline; children nest one level deeper */
+export interface OutlineEntryInput {
+  title: string
+  /** 0-based page index the bookmark jumps to */
+  pageIndex: number
+  /** Vertical position on the page, PDF user space; null keeps the default */
+  top?: number | null
+  children?: OutlineEntryInput[]
 }
 
 /** UniWork document state of the open file: bound working copy and/or view only */

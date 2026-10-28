@@ -38,4 +38,9 @@ export const es = {
   batesErrDigits: 'Los dígitos deben ser un entero de 1 a 15',
   batesErrFontSize: 'El tamaño de fuente debe ser 6–36',
   batesErrRange: 'El rango de páginas no es válido',
+  outlineAdd: 'Añadir marcador',
+  outlineRename: 'Renombrar marcador',
+  outlineDelete: 'Eliminar marcador',
+  outlineNewTitle: 'Marcador sin título',
+  outlineEdit: 'Editar marcadores',
 } satisfies Record<keyof typeof zh, string>

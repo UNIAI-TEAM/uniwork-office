@@ -38,4 +38,9 @@ export const id = {
   batesErrDigits: 'Digit harus bilangan bulat 1 sampai 15',
   batesErrFontSize: 'Ukuran font harus 6–36',
   batesErrRange: 'Rentang halaman tidak valid',
+  outlineAdd: 'Tambah penanda',
+  outlineRename: 'Ganti nama penanda',
+  outlineDelete: 'Hapus penanda',
+  outlineNewTitle: 'Penanda tanpa judul',
+  outlineEdit: 'Edit penanda',
 } satisfies Record<keyof typeof zh, string>

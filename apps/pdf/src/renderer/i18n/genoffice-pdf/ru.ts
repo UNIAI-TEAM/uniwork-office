@@ -38,4 +38,9 @@ export const ru = {
   batesErrDigits: 'Цифр должно быть целое число от 1 до 15',
   batesErrFontSize: 'Размер шрифта должен быть 6–36',
   batesErrRange: 'Недопустимый диапазон страниц',
+  outlineAdd: 'Добавить закладку',
+  outlineRename: 'Переименовать закладку',
+  outlineDelete: 'Удалить закладку',
+  outlineNewTitle: 'Закладка без названия',
+  outlineEdit: 'Изменить закладки',
 } satisfies Record<keyof typeof zh, string>
