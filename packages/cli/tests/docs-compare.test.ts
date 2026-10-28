@@ -83,7 +83,7 @@ describe('genoffice docs compare', () => {
     ).toContain('red fox jumps.')
     const revisions = read.json().detail.revisions as { author: string }[]
     expect(revisions.length).toBeGreaterThan(0)
-    expect(revisions.every((r) => r.author === 'GenOffice')).toBe(true)
+    expect(revisions.every((r) => r.author === 'UniWork Office')).toBe(true)
   })
 
   it('reports the counts and the output path as JSON', async () => {
