@@ -41,6 +41,8 @@ export function RecordingBar({
   )
 }
 
+const keepTake = (): void => {}
+
 /** Post-recording confirmation modal: shares the Custom Size dialog's useModalDialog contract. */
 export function RecordNarrationDialog({
   durationMs,
@@ -51,11 +53,13 @@ export function RecordNarrationDialog({
   onSave: () => void
   onDiscard: () => void
 }) {
-  const { titleId, dialogProps } = useModalDialog(onDiscard)
+  // Escape is a no-op on purpose: closing here would discard the take just recorded,
+  // so only the two buttons decide. The hook still registers the Escape overlay.
+  const { titleId, dialogProps } = useModalDialog(keepTake)
   const { t } = useI18n()
   return (
-    <div className="modal-backdrop" onClick={onDiscard}>
-      <div className="modal" {...dialogProps} onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop">
+      <div className="modal" {...dialogProps}>
         <h2 id={titleId}>{t('appRecordTitle')}</h2>
         <p className="rehearse-summary">
           {t('appRecordSummary', { duration: formatClock(durationMs) })}

@@ -112,6 +112,31 @@ describe('RecordNarrationDialog', () => {
     expect(dlg?.getAttribute('aria-labelledby')).toBe(heading?.id)
     expect(heading?.textContent).toBe(t('appRecordTitle'))
   })
+
+  it('keeps the take on backdrop click and Escape; only the buttons decide', async () => {
+    const onSave = vi.fn()
+    const onDiscard = vi.fn()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(createElement(RecordNarrationDialog, { durationMs: 5000, onSave, onDiscard }))
+    })
+    roots.push({ root, container })
+    await act(async () => {
+      container
+        .querySelector('.modal-backdrop')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(container.querySelector('.modal')).not.toBeNull()
+    expect(onDiscard).not.toHaveBeenCalled()
+    expect(onSave).not.toHaveBeenCalled()
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('.modal-actions button')?.click()
+    })
+    expect(onDiscard).toHaveBeenCalledTimes(1)
+  })
 })
 
 const translateGenofficeSlides = createI18n(genofficeSlidesStrings)
