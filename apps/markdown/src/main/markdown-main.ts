@@ -79,6 +79,8 @@ import type {
   WikiCreateNoteRequest,
   WikiCreateNoteResult,
   WikiGraph,
+  WikiHeadEntry,
+  WikiHeadsRequest,
   WikiLinkResolveRequest,
   WikiLinkResolved,
   WikiNoteEntry,
@@ -87,6 +89,7 @@ import { nodeFs, resolveWikiLinks } from './wiki-resolve'
 import { cleanDraftName } from '../shared/draft-name'
 import { listWikiNotes } from './wiki-notes'
 import { createWikiNote, mayCreateWikiNote } from './wiki-create'
+import { wikiHeads } from './wiki-heads'
 import { nodeVaultFs, warmWikiIndex, wikiBacklinks, wikiGraph, wikiTags } from './wiki-index'
 import { notifyViewsShowingNote, takeWikiFragment } from './wiki-fragment'
 import { isImageHostUsable, normalizeImageHostConfig, uploadImageToHost } from './image-host'
@@ -879,6 +882,16 @@ function registerMarkdownIpc(): void {
 
   ipcMain.handle(MARKDOWN_CHANNELS.listWikiNotes, async (): Promise<WikiNoteEntry[]> =>
     listWikiNotes(configuredDefaultSaveDir(app), nodeFs()),
+  )
+
+  ipcMain.handle(
+    MARKDOWN_CHANNELS.wikiHeads,
+    async (e, request: WikiHeadsRequest): Promise<WikiHeadEntry[]> => {
+      const target = typeof request?.target === 'string' ? request.target : ''
+      // the view's open/saved path is main-owned, never trusted from the renderer
+      const fromPath = savePathByWc.get(e.sender.id) ?? openPathByWc.get(e.sender.id) ?? ''
+      return wikiHeads(target, fromPath, configuredDefaultSaveDir(app), vaultFs)
+    },
   )
 
   ipcMain.handle(

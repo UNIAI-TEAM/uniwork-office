@@ -29,6 +29,9 @@ export const PDF_CHANNELS = {
   insertPdf: 'pdf:insert-pdf',
   compareReadPdf: 'pdf:compare-read-pdf',
   compareReadOpen: 'pdf:compare-read-open',
+  reduceFileSize: 'pdf:reduce-file-size',
+  pickAttachmentFile: 'pdf:pick-attachment-file',
+  exportAttachment: 'pdf:export-attachment',
   insertBlankPage: 'pdf:insert-blank-page',
   splitPdf: 'pdf:split-pdf',
   mergePdf: 'pdf:merge-pdf',
@@ -340,6 +343,18 @@ export type DrawingInput =
       destPage?: number
     }
   | (DrawBase & { kind: 'line'; from: [number, number]; to: [number, number] })
+  | {
+      /** Calibrated measurement: a Line annotation whose label shows the real-world
+          length the session computed (the file stays geometry-only). */
+      kind: 'measure'
+      pageIndex: number
+      color: [number, number, number]
+      width: number
+      from: [number, number]
+      to: [number, number]
+      /** Displayed text, e.g. "2.35 m" — non-empty, ≤ 64 chars */
+      label: string
+    }
   | (DrawBase & { kind: 'arrow'; from: [number, number]; to: [number, number] })
   | {
       /** Text insertion mark placed by a click; written as a Caret annotation with
@@ -709,6 +724,8 @@ export interface SavePdfRequest {
   outline?: OutlineEntryInput[]
   /** Who asked: explicit Save (`user`), autosave (`auto`) or an app-internal flush
       (`internal`). Absent behaves as before (Save As never sets it). */
+  /** Add or remove embedded files (/Names → /EmbeddedFiles) on this save */
+  attachments?: PdfAttachmentOps
   origin?: 'user' | 'auto' | 'internal'
 }
 
@@ -723,6 +740,23 @@ export interface OutlineEntryInput {
 }
 
 /** UniWork document state of the open file: bound working copy and/or view only */
+
+/** One embedded file added to /Names → /EmbeddedFiles on save */
+export interface PdfAttachmentAdd {
+  /** Display and file name (both /UF and /F in the Filespec) */
+  name: string
+  /** Raw file bytes, base64-encoded — same IPC shape as image stamps */
+  bytesBase64: string
+  description?: string
+}
+
+/** Changes to the document's embedded-files name tree applied on save */
+export interface PdfAttachmentOps {
+  /** Names of existing attachments to remove before adding */
+  remove?: string[]
+  /** Files to embed; a name that survives removal is an error */
+  add?: PdfAttachmentAdd[]
+}
 /**
  * What main asks the renderer to save on closeSaveRequest. `user`: the close
  * prompt's Save or the menu Save. `internal`: an app-driven flush before an
@@ -1000,6 +1034,34 @@ export interface PdfApi {
   pagePreviewPng(request: PagePreviewRequest): Promise<PagePreviewResult | null>
   extractPages(request: ExtractPagesRequest): Promise<ExtractPagesResult>
   insertPdf(request: InsertPdfRequest): Promise<InsertPdfResult>
+  /** Reduce file size: re-compress streams and downsample oversized Flate images.
+      The picked save target (main-side dialog) receives the shrunk copy; the open
+      document is untouched and reloads from the target when the caller asks. */
+  reduceFileSize(path: string): Promise<
+    | {
+        ok: true
+        targetPath: string
+        bytesBefore: number
+        bytesAfter: number
+        streamsRecompressed: number
+        imagesDownsampled: number
+      }
+    | { ok: false; canceled: true }
+    | { ok: false; reason: string }
+  >
+  /** Pick a local file to attach to the PDF; bytes come back base64-encoded */
+  pickAttachmentFile(): Promise<
+    | { ok: true; name: string; bytesBase64: string; size: number }
+    | { ok: false; canceled: true }
+    | { ok: false; reason: string }
+  >
+  /** Save one embedded attachment's bytes to a user-chosen path */
+  exportAttachment(request: {
+    name: string
+    bytesBase64: string
+  }): Promise<
+    { ok: true; path: string } | { ok: false; canceled: true } | { ok: false; reason: string }
+  >
   insertBlankPage(request: InsertBlankPageRequest): Promise<InsertBlankPageResult>
   splitPdf(request: SplitPdfRequest): Promise<SplitPdfResult>
   mergePdf(request: MergePdfRequest): Promise<MergePdfResult>
