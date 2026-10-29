@@ -87,6 +87,7 @@ import {
   type ContextTabRequest,
 } from './components/context-tabs'
 import { SlideShowView } from './components/SlideShowView'
+import { RecordNarrationDialog } from './narration/RecordingBar'
 import type { NarrationTake } from './narration/use-recording'
 import { IconNotes, IconPlayBoxed } from './components/icons'
 import { PresenterView } from './components/PresenterView'
@@ -4990,20 +4991,11 @@ export function App() {
       )}
 
       {pendingRecording && (
-        <div className="modal-backdrop">
-          <div className="modal">
-            <h2>{t('appRecordTitle')}</h2>
-            <p className="rehearse-summary">
-              {t('appRecordSummary', { duration: formatClock(pendingRecording.endMs) })}
-            </p>
-            <div className="modal-actions">
-              <button onClick={() => setPendingRecording(null)}>{t('appRecordDiscard')}</button>
-              <button className="primary" onClick={() => void saveRecording()}>
-                {t('appRecordSave')}
-              </button>
-            </div>
-          </div>
-        </div>
+        <RecordNarrationDialog
+          durationMs={pendingRecording.endMs}
+          onDiscard={() => setPendingRecording(null)}
+          onSave={() => void saveRecording()}
+        />
       )}
 
       {aiEnabled &&

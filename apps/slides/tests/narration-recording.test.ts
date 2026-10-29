@@ -1,7 +1,21 @@
 /** Slide Show > Record: cutting one recording into slides, and the WAV each slide gets. */
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { t } from '../src/renderer/i18n/locale'
+import { RecordNarrationDialog } from '../src/renderer/narration/RecordingBar'
 import { joinSpans, slideNarrations } from '../src/renderer/narration/segments'
 import { encodeWav } from '../src/renderer/narration/wav'
+
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true)
+
+const roots: Array<{ root: Root; container: HTMLElement }> = []
+afterEach(() => {
+  for (const { root, container } of roots.splice(0)) {
+    act(() => root.unmount())
+    container.remove()
+  }
+})
 
 describe('slideNarrations', () => {
   it('gives each slide the time spoken on it, revisits added in order', () => {
@@ -73,5 +87,26 @@ describe('encodeWav', () => {
     expect([0, 1, 2, 3].map((i) => view.getInt16(44 + i * 2, true))).toEqual([
       0, 32767, -32768, 32767,
     ])
+  })
+})
+
+describe('RecordNarrationDialog', () => {
+  it('exposes role="dialog", aria-modal="true", and aria-labelledby pointing at its heading', async () => {
+    const onSave = vi.fn()
+    const onDiscard = vi.fn()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(createElement(RecordNarrationDialog, { durationMs: 5000, onSave, onDiscard }))
+    })
+    roots.push({ root, container })
+    const dlg = container.querySelector('.modal')
+    const heading = dlg?.querySelector('h2')
+    expect(dlg?.getAttribute('role')).toBe('dialog')
+    expect(dlg?.getAttribute('aria-modal')).toBe('true')
+    expect(heading?.id).toBeTruthy()
+    expect(dlg?.getAttribute('aria-labelledby')).toBe(heading?.id)
+    expect(heading?.textContent).toBe(t('appRecordTitle'))
   })
 })

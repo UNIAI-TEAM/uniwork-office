@@ -1,3 +1,4 @@
+import { useModalDialog } from '../components/modal-dialog'
 import { useI18n } from '../i18n/locale'
 import { formatClock } from '../slideshow-utils'
 import type { RecordingPhase } from './use-recording'
@@ -36,6 +37,36 @@ export function RecordingBar({
       >
         {t(phase === 'paused' ? 'paneShowRecordResume' : 'paneShowRecordPause')}
       </button>
+    </div>
+  )
+}
+
+/** Post-recording confirmation modal: shares the Custom Size dialog's useModalDialog contract. */
+export function RecordNarrationDialog({
+  durationMs,
+  onSave,
+  onDiscard,
+}: {
+  durationMs: number
+  onSave: () => void
+  onDiscard: () => void
+}) {
+  const { titleId, dialogProps } = useModalDialog(onDiscard)
+  const { t } = useI18n()
+  return (
+    <div className="modal-backdrop" onClick={onDiscard}>
+      <div className="modal" {...dialogProps} onClick={(e) => e.stopPropagation()}>
+        <h2 id={titleId}>{t('appRecordTitle')}</h2>
+        <p className="rehearse-summary">
+          {t('appRecordSummary', { duration: formatClock(durationMs) })}
+        </p>
+        <div className="modal-actions">
+          <button onClick={onDiscard}>{t('appRecordDiscard')}</button>
+          <button className="primary" onClick={onSave}>
+            {t('appRecordSave')}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
