@@ -50,9 +50,9 @@ async function appearanceOps(
   const out = await PDFDocument.load(bytes)
   const annot = out.getPage(0).node.lookup(PDFName.of('Annots'), PDFArray).lookup(0, PDFDict)
   const apRef = annot.lookup(PDFName.of('AP'), PDFDict).lookup(PDFName.of('N'))
-  return Buffer.from(decodePDFRawStream(out.context.lookup(apRef) as PDFRawStream).decode()).toString(
-    'latin1',
-  )
+  return Buffer.from(
+    decodePDFRawStream(out.context.lookup(apRef) as PDFRawStream).decode(),
+  ).toString('latin1')
 }
 
 // canonical quad [x1,yMax,x2,yMax,x1,yMin,x2,yMin]

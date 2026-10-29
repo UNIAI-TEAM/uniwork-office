@@ -33,7 +33,13 @@ function identifiersIn(node: ts.Node, out: ts.Identifier[] = []): ts.Identifier[
 
 /** render-time reads of a component-level const that is declared after the read */
 export function renderTimeUseBeforeDeclaration(source: string): string[] {
-  const file = ts.createSourceFile('App.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const file = ts.createSourceFile(
+    'App.tsx',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  )
   const problems: string[] = []
   const lineOf = (pos: number) => file.getLineAndCharacterOfPosition(pos).line + 1
 
@@ -57,7 +63,9 @@ export function renderTimeUseBeforeDeclaration(source: string): string[] {
           for (const id of identifiersIn(arg)) {
             const at = declaredAt.get(id.text)
             if (at !== undefined && at > id.getStart()) {
-              problems.push(`line ${lineOf(id.getStart())}: ${hook}() reads '${id.text}' declared at line ${lineOf(at)}`)
+              problems.push(
+                `line ${lineOf(id.getStart())}: ${hook}() reads '${id.text}' declared at line ${lineOf(at)}`,
+              )
             }
           }
         })
@@ -97,6 +105,8 @@ describe('pdf App render order', () => {
 
   it('ocrBakeAll is declared after pageGeomRef', () => {
     const src = readFileSync(APP_PATH, 'utf8')
-    expect(src.indexOf('const ocrBakeAll = useMemo')).toBeGreaterThan(src.indexOf('const pageGeomRef = useRef'))
+    expect(src.indexOf('const ocrBakeAll = useMemo')).toBeGreaterThan(
+      src.indexOf('const pageGeomRef = useRef'),
+    )
   })
 })
