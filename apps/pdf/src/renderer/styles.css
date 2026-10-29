@@ -5548,10 +5548,20 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   gap: 8px;
   padding: 8px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
+/* the sidebar can be ~130px wide: the label wraps inside the button instead of leaving its fixed 32px */
 .pdf-compare-pick {
   align-self: flex-start;
+  max-width: 100%;
+  height: auto;
+  min-height: 32px;
+  padding-block: 6px;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .pdf-compare-swap {
@@ -5566,6 +5576,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 
 .pdf-compare-other {
   color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .pdf-compare-list {
@@ -5579,8 +5590,9 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 
 .pdf-compare-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 2px 8px;
   width: 100%;
   border: none;
   background: none;
@@ -5598,6 +5610,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 
 .pdf-compare-page {
   min-width: 72px;
+  max-width: 100%;
   font-size: 0.88em;
 }
 

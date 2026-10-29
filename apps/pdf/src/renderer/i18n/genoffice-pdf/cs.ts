@@ -56,4 +56,5 @@ export const cs = {
   compareAdded: '+{count} řádků',
   compareRemoved: '−{count} řádků',
   compareTruncated: 'strana je příliš velká — jen počty',
+  compareUnreadable: 'Tento soubor se nepodařilo přečíst jako PDF',
 } satisfies Record<keyof typeof zh, string>

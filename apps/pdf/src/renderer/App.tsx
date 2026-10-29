@@ -105,7 +105,12 @@ import { OutlinePanel } from './OutlinePanel'
 import { RibbonTabScroller } from './RibbonTabScroller'
 import { CommentsPanel, type CommentEntry } from './CommentsPanel'
 import { ComparePanel } from './ComparePanel'
-import { compareDocuments, type CompareResult, type PageText } from './compare-text'
+import {
+  compareDocuments,
+  isCompareUnreadable,
+  type CompareResult,
+  type PageText,
+} from './compare-text'
 import type { OutlineNode } from './OutlinePanel'
 import {
   buildHeadingOutline,
@@ -3870,6 +3875,10 @@ export default function App() {
     toastTimerRef.current = window.setTimeout(() => setDeleteToast(false), 5000)
   }
 
+  /** The main process gives fixed English reasons; the unreadable-file ones get a translated sentence */
+  const compareReason = (reason: string): string =>
+    isCompareUnreadable(reason) ? t('compareUnreadable') : reason
+
   const runCompare = async (): Promise<void> => {
     if (!doc || compareBusy) return
     // Both sides must come from the same extraction engine — pdf.js and pdfium
@@ -3883,12 +3892,12 @@ export default function App() {
     try {
       const picked = await window.pdfApi.compareReadPdf()
       if (!picked.ok) {
-        if (!('canceled' in picked)) showNotice(picked.reason)
+        if (!('canceled' in picked)) showNotice(compareReason(picked.reason))
         return
       }
       const mine = await window.pdfApi.compareReadOpen(filePath)
       if (!mine.ok) {
-        showNotice(mine.reason)
+        showNotice(compareReason(mine.reason))
         return
       }
       const mineSide: PageText[] = mine.pages.map((text, pageIndex) => ({ pageIndex, text }))

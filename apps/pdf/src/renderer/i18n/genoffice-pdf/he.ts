@@ -55,4 +55,5 @@ export const he = {
   compareAdded: '+{count} שורות',
   compareRemoved: '−{count} שורות',
   compareTruncated: 'העמוד גדול מדי — ספירה בלבד',
+  compareUnreadable: 'לא ניתן לקרוא את הקובץ כ-PDF',
 } satisfies Record<keyof typeof zh, string>

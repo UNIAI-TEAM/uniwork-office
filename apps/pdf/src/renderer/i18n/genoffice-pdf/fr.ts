@@ -56,4 +56,5 @@ export const fr = {
   compareAdded: '+{count} lignes',
   compareRemoved: '−{count} lignes',
   compareTruncated: 'page trop grande — décompte seul',
+  compareUnreadable: "Ce fichier n'a pas pu être lu comme un PDF",
 } satisfies Record<keyof typeof zh, string>

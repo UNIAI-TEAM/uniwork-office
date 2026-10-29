@@ -56,4 +56,5 @@ export const pl = {
   compareAdded: '+{count} wierszy',
   compareRemoved: '−{count} wierszy',
   compareTruncated: 'strona zbyt duża — tylko liczby',
+  compareUnreadable: 'Nie udało się odczytać tego pliku jako PDF',
 } satisfies Record<keyof typeof zh, string>

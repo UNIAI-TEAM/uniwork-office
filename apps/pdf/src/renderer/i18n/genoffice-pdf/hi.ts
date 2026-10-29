@@ -56,4 +56,5 @@ export const hi = {
   compareAdded: '+{count} पंक्तियाँ',
   compareRemoved: '−{count} पंक्तियाँ',
   compareTruncated: 'पृष्ठ बहुत बड़ा है — केवल गणना',
+  compareUnreadable: 'इस फ़ाइल को PDF के रूप में पढ़ा नहीं जा सका',
 } satisfies Record<keyof typeof zh, string>

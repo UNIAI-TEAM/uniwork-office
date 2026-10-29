@@ -56,4 +56,5 @@ export const ar = {
   compareAdded: '+{count} سطور',
   compareRemoved: '−{count} سطور',
   compareTruncated: 'الصفحة كبيرة جداً — العد فقط',
+  compareUnreadable: 'تعذّرت قراءة هذا الملف بوصفه ملف PDF',
 } satisfies Record<keyof typeof zh, string>

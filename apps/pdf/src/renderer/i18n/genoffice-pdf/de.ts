@@ -56,4 +56,5 @@ export const de = {
   compareAdded: '+{count} Zeilen',
   compareRemoved: '−{count} Zeilen',
   compareTruncated: 'Seite zu groß — nur Zählung',
+  compareUnreadable: 'Diese Datei konnte nicht als PDF gelesen werden',
 } satisfies Record<keyof typeof zh, string>

@@ -55,4 +55,5 @@ export const zhTW = {
   compareAdded: '+{count} 行',
   compareRemoved: '−{count} 行',
   compareTruncated: '頁面過大，僅統計行數',
+  compareUnreadable: '無法讀取該檔案，請確認它是有效的 PDF',
 } satisfies Record<keyof typeof zh, string>

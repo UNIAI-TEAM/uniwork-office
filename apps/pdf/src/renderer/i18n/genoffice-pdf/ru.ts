@@ -56,4 +56,5 @@ export const ru = {
   compareAdded: '+{count} строк',
   compareRemoved: '−{count} строк',
   compareTruncated: 'страница слишком велика — только подсчёт',
+  compareUnreadable: 'Не удалось прочитать этот файл как PDF',
 } satisfies Record<keyof typeof zh, string>

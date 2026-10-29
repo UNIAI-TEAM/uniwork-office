@@ -54,4 +54,5 @@ export const zh = {
   compareAdded: '+{count} 行',
   compareRemoved: '−{count} 行',
   compareTruncated: '页面过大，仅统计行数',
+  compareUnreadable: '无法读取该文件，请确认它是有效的 PDF',
 }

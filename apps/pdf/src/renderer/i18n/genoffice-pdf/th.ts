@@ -56,4 +56,5 @@ export const th = {
   compareAdded: '+{count} บรรทัด',
   compareRemoved: '−{count} บรรทัด',
   compareTruncated: 'หน้าใหญ่เกินไป — นับเฉพาะจำนวน',
+  compareUnreadable: 'ไม่สามารถอ่านไฟล์นี้เป็น PDF ได้',
 } satisfies Record<keyof typeof zh, string>

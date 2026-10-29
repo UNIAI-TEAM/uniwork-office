@@ -56,4 +56,5 @@ export const it = {
   compareAdded: '+{count} righe',
   compareRemoved: '−{count} righe',
   compareTruncated: 'pagina troppo grande — solo conteggio',
+  compareUnreadable: 'Impossibile leggere questo file come PDF',
 } satisfies Record<keyof typeof zh, string>
