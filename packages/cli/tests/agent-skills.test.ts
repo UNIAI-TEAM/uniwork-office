@@ -4,14 +4,16 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
+import type * as FsModule from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   agentConfigDir,
   agentTarget,
@@ -28,6 +30,15 @@ import {
   uninstallSkill,
   type SkillLedger,
 } from '../src/agent-skills'
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof FsModule>()
+  return {
+    ...actual,
+    rmdirSync: vi.fn(actual.rmdirSync),
+    rmSync: vi.fn(actual.rmSync),
+  }
+})
 
 const skillText = (version: string, body = 'Run `genoffice --version` first.') =>
   `---\nname: genoffice\ndescription: test\nmetadata:\n  version: ${version}\n  cli: '>=0.4.0'\n---\n\n${body}\n`
@@ -426,23 +437,40 @@ describe('the legacy per-tool skill copies', () => {
     expect(ledger[codexPath]).toBeDefined()
   })
 
-  it('uses non-recursive rmdirSync so a file appearing in genoffice/ is never deleted (R1-04)', () => {
+  it('uses non-recursive rmdirSync so a file appearing in genoffice/ at directory removal is never deleted (R1-04, R2-02)', () => {
     const h = home()
     const ledger: SkillLedger = {}
     const b = bundled()
     installSkill(join(h, '.agents', 'skills'), b, ledger)
+    const codexDir = join(h, '.codex', 'skills', 'genoffice')
     const codexPath = installSkill(join(h, '.codex', 'skills'), b, ledger)
-    const extraFile = join(h, '.codex', 'skills', 'genoffice', 'user-note.txt')
+    const extraFile = join(codexDir, 'user-note.txt')
 
-    const sweep = sweepLegacySkillCopies(ledger, {}, h, {
-      beforeUnlink: () => {
+    const realRmdirSync = vi.mocked(rmdirSync).getMockImplementation()!
+    const realRmSync = vi.mocked(rmSync).getMockImplementation()!
+    vi.mocked(rmdirSync).mockImplementation((target, ...rest) => {
+      if (String(target) === codexDir) {
         writeFileSync(extraFile, 'do not delete me\n')
-      },
+      }
+      return realRmdirSync(target, ...rest)
     })
-    expect(sweep.removed.map((c) => c.agent)).toEqual(['codex'])
-    expect(existsSync(codexPath)).toBe(false)
-    expect(existsSync(extraFile)).toBe(true)
-    expect(readFileSync(extraFile, 'utf-8')).toBe('do not delete me\n')
+    vi.mocked(rmSync).mockImplementation((target, options) => {
+      if (String(target) === codexDir) {
+        writeFileSync(extraFile, 'do not delete me\n')
+      }
+      return realRmSync(target, options)
+    })
+
+    try {
+      const sweep = sweepLegacySkillCopies(ledger, {}, h)
+      expect(sweep.removed.map((c) => c.agent)).toEqual(['codex'])
+      expect(existsSync(codexPath)).toBe(false)
+      expect(existsSync(extraFile)).toBe(true)
+      expect(readFileSync(extraFile, 'utf-8')).toBe('do not delete me\n')
+    } finally {
+      vi.mocked(rmdirSync).mockImplementation(realRmdirSync)
+      vi.mocked(rmSync).mockImplementation(realRmSync)
+    }
   })
 
   it('isolates per-candidate unlink failures so completed removals persist and failed ones are reported (R1-06)', () => {

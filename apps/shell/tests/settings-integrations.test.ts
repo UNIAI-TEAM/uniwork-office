@@ -291,6 +291,93 @@ describe('Settings → Integrations', () => {
     expect(document.activeElement).toBe(finalNotice)
   })
 
+  it('surfaces a resolved partial legacy sweep failure as a single role="alert" notice with counts and recovers on retry (R2-03)', async () => {
+    const codexCopy = {
+      agent: 'codex' as const,
+      label: 'Codex',
+      skillsDir: '/home/u/.codex/skills',
+      path: '/home/u/.codex/skills/genoffice/SKILL.md',
+      ours: true,
+    }
+    const copilotCopy = {
+      agent: 'copilot' as const,
+      label: 'Copilot',
+      skillsDir: '/home/u/.copilot/skills',
+      path: '/home/u/.copilot/skills/genoffice/SKILL.md',
+      ours: true,
+    }
+    const cursorCopy = {
+      agent: 'cursor' as const,
+      label: 'Cursor',
+      skillsDir: '/home/u/.cursor/skills',
+      path: '/home/u/.cursor/skills/genoffice/SKILL.md',
+      ours: false,
+      reason: 'edited' as const,
+    }
+    const geminiCopy = {
+      agent: 'gemini' as const,
+      label: 'Gemini CLI',
+      skillsDir: '/home/u/.gemini/skills',
+      path: '/home/u/.gemini/skills/genoffice/SKILL.md',
+      ours: true,
+    }
+    const status = baseStatus()
+    status.legacy = [codexCopy, copilotCopy, cursorCopy, geminiCopy]
+
+    let call = 0
+    await openIntegrations({
+      status: async () => status,
+      copyText: async () => {},
+      sweepLegacySkillCopies: async () => {
+        call += 1
+        if (call === 1) {
+          status.legacy = [{ ...geminiCopy, ours: false, reason: 'error' }]
+          return {
+            removed: [codexCopy, copilotCopy],
+            kept: [{ ...cursorCopy, reason: 'edited' }],
+            failed: [{ ...geminiCopy, ours: false, reason: 'error' }],
+          }
+        }
+        status.legacy = []
+        return {
+          removed: [geminiCopy],
+          kept: [],
+          failed: [],
+        }
+      },
+    })
+
+    const initialRow = host.querySelector('.set-intg-row[data-agent="legacy"]')
+    expect(initialRow).toBeTruthy()
+    await click(buttonWithText('Remove old copies', initialRow!))
+
+    expect(host.querySelectorAll('.set-intg-notice')).toHaveLength(1)
+    expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
+    const partialAlert = host.querySelector('.set-intg-notice[role="alert"]')
+    expect(partialAlert).toBeTruthy()
+    expect(partialAlert!.textContent).toBe(
+      'Removed 2 old copies, 1 left in place, 1 failed to remove.',
+    )
+
+    const rowAfterPartial = host.querySelector('.set-intg-row[data-agent="legacy"]')
+    expect(rowAfterPartial).toBeTruthy()
+    expect(rowAfterPartial!.textContent).not.toContain(codexCopy.path)
+    expect(rowAfterPartial!.textContent).toContain(geminiCopy.path)
+    const retryBtn = buttonWithText('Remove old copies', rowAfterPartial!)!
+    expect(retryBtn).toBeTruthy()
+    expect(retryBtn.disabled).toBe(false)
+
+    await click(retryBtn)
+    expect(host.querySelector('.set-intg-row[data-agent="legacy"]')).toBeNull()
+    expect(host.querySelector('.set-intg-notice[role="alert"]')).toBeNull()
+    expect(host.querySelectorAll('.set-intg-notice')).toHaveLength(1)
+    expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
+    const finalStatus = host.querySelector('.set-intg-notice[role="status"]') as HTMLElement | null
+    expect(finalStatus).toBeTruthy()
+    expect(finalStatus!.textContent).toBe('Removed 1 old copies, 0 edited by hand left in place.')
+    expect(document.activeElement).toBe(finalStatus)
+  })
+
   it('names the bare command once it is on the PATH and runs the app as Node on Windows', () => {
     const launcherDir = '/Applications/GenOffice.app/Contents/Resources/cli'
     expect(mcpLaunch({ status: 'present', launcherDir })).toEqual({
