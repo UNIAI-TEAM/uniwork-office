@@ -11,6 +11,7 @@ import {
   type ShortcutAction,
 } from '@genoffice/shortcuts'
 import {
+  isRibbonCompactShortcut,
   RibbonCollapseButton,
   RibbonExpandButton,
   useRibbonCollapse,
@@ -335,5 +336,30 @@ describe('the accessible name and aria-keyshortcuts', () => {
     mount({ options: { platform: 'mac' } })
     expect(latest.ariaKeyshortcuts).toBe('Alt+Meta+R')
     for (const c of controls()) expect(findDisplayChord(c.name)).toBeNull()
+  })
+})
+
+// SB-V1: the hard-coded Ctrl+Alt+K must not swallow AltGr+K (Polish / German style layouts)
+describe('isRibbonCompactShortcut and AltGraph', () => {
+  const ctrlAltK = { key: 'k', code: 'KeyK', ctrlKey: true, altKey: true }
+  const ev = (init: KeyboardEventInit, altGraph?: boolean): KeyboardEvent => {
+    const e = new KeyboardEvent('keydown', init)
+    if (altGraph !== undefined) e.getModifierState = (k: string) => k === 'AltGraph' && altGraph
+    return e
+  }
+
+  it('ignores AltGr+K, where the layout reports Ctrl+Alt plus AltGraph', () => {
+    expect(isRibbonCompactShortcut(ev({ ...ctrlAltK, key: 'ĸ' }, true))).toBe(false)
+  })
+
+  it('keeps plain Ctrl+Alt+K working', () => {
+    expect(isRibbonCompactShortcut(ev(ctrlAltK, false))).toBe(true)
+    expect(isRibbonCompactShortcut(ev(ctrlAltK))).toBe(true)
+  })
+
+  it('behaves as before for an event without getModifierState', () => {
+    const e = ev(ctrlAltK)
+    Object.defineProperty(e, 'getModifierState', { value: undefined })
+    expect(isRibbonCompactShortcut(e)).toBe(true)
   })
 })
