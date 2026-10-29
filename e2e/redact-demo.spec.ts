@@ -120,7 +120,7 @@ test.describe('withholding a span from the model', () => {
       await expect(editor).toContainText(SECRET)
       await page.screenshot({ path: screenshotPath('docs-5-marked') })
 
-      await page.keyboard.press('Meta+s')
+      await page.keyboard.press('ControlOrMeta+s')
       // a .docx is a zip: document.xml is deflated, so the run properties can
       // only be read after inflating the part, not by scanning the raw bytes
       const readDocumentXml = async (): Promise<string> => {
