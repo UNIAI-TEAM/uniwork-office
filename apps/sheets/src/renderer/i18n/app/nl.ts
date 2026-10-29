@@ -1653,7 +1653,7 @@ export const nl = {
   appSpellBtnDetail: 'Bladtekst controleren (F7)',
   appSpellToggle: 'Spelling controleren',
   appSpellToggleTip:
-    'Zet de spellingcontrole aan (F7 en de Review-knop); uitgeschakeld tonen commentaarvakken geen golflijnen meer',
+    'Zet de spellingcontrole aan (F7 en de Controleren-knop); uitgeschakeld tonen commentaarvakken geen golflijnen meer',
   appSpellOn: 'Spellingcontrole ingeschakeld.',
   appSpellOff: 'Spellingcontrole staat uit. Schakel deze in bij Controleren ▸ Controle.',
   appSpellRecheck: 'Opnieuw controleren',

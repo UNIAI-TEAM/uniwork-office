@@ -1661,9 +1661,9 @@ export const ja = {
   appSpellBtnDetail: 'ワークシートのテキストをチェック (F7)',
   appSpellToggle: 'スペル チェック',
   appSpellToggleTip:
-    'スペル チェック（F7 と Review ボタン）を有効にします。オフにするとコメント入力欄のスペルの波線が消えます',
+    'スペル チェック（F7 と校閲ボタン）を有効にします。オフにするとコメント入力欄のスペルの波線が消えます',
   appSpellOn: 'スペル チェックをオンにしました。',
-  appSpellOff: 'スペル チェックはオフです。Review ▸ 校対 からオンにできます。',
+  appSpellOff: 'スペル チェックはオフです。校閲 ▸ 文章校正 からオンにできます。',
   appSpellRecheck: '再チェック',
   appSpellNone: '疑わしいスペルミスは見つかりませんでした。',
   appSpellFindings: '疑わしいスペルミスが {count} 件あります。行をクリックすると移動します。',

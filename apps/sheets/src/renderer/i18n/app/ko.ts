@@ -1631,9 +1631,9 @@ export const ko = {
   appSpellBtnDetail: '시트 텍스트 검사 (F7)',
   appSpellToggle: '맞춤법 검사',
   appSpellToggleTip:
-    '맞춤법 검사(F7 및 Review 버튼)를 켭니다. 끄면 댓글 입력란에 맞춤법 물결표가 표시되지 않습니다',
+    '맞춤법 검사(F7 및 검토 버튼)를 켭니다. 끄면 댓글 입력란에 맞춤법 물결표가 표시되지 않습니다',
   appSpellOn: '맞춤법 검사를 켰습니다.',
-  appSpellOff: '맞춤법 검사가 꺼져 있습니다. Review ▸ 교정에서 켤 수 있습니다.',
+  appSpellOff: '맞춤법 검사가 꺼져 있습니다. 검토 ▸ 언어 교정에서 켤 수 있습니다.',
   appSpellRecheck: '다시 검사',
   appSpellNone: '의심되는 맞춤법 오류가 없습니다.',
   appSpellFindings: '의심되는 맞춤법 오류 {count}건. 행을 클릭하면 이동합니다.',

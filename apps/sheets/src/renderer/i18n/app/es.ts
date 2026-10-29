@@ -1660,7 +1660,7 @@ export const es = {
   appSpellToggleTip:
     'Activa la comprobación ortográfica (F7 y el botón de Revisar); desactivada, los cuadros de comentarios dejan de mostrar subrayados',
   appSpellOn: 'Comprobación ortográfica activada.',
-  appSpellOff: 'La comprobación ortográfica está desactivada. Actívala en Revisar ▸ Corrección.',
+  appSpellOff: 'La comprobación ortográfica está desactivada. Actívala en Revisar ▸ Revisión.',
   appSpellRecheck: 'Volver a comprobar',
   appSpellNone: 'No se encontraron errores ortográficos sospechosos.',
   appSpellFindings: '{count} errores sospechosos. Haz clic en una fila para localizarlo.',

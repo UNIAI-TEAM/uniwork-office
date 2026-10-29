@@ -1613,9 +1613,9 @@ export const ms = {
   appSpellBtnDetail: 'Semak teks helaian (F7)',
   appSpellToggle: 'Semak ejaan',
   appSpellToggleTip:
-    'Mengaktifkan semakan ejaan (F7 dan butang Semak Semula); apabila dimatikan, kotak komen tidak lagi menampilkan garis bergelombang',
+    'Mengaktifkan semakan ejaan (F7 dan butang Semakan); apabila dimatikan, kotak komen tidak lagi menampilkan garis bergelombang',
   appSpellOn: 'Semakan ejaan diaktifkan.',
-  appSpellOff: 'Semakan ejaan dimatikan. Aktifkannya pada Semak Semula ▸ Semakan.',
+  appSpellOff: 'Semakan ejaan dimatikan. Aktifkannya pada Semakan ▸ Pembacaan Pruf.',
   appSpellRecheck: 'Semak semula',
   appSpellNone: 'Tiada kesalahan ejaan yang disyaki ditemui.',
   appSpellFindings: '{count} kesalahan disyaki. Klik baris untuk ke lokasinya.',

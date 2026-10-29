@@ -1611,7 +1611,7 @@ export const cs = {
   appSpellToggleTip:
     'Zapne kontrolu pravopisu (F7 a tlačítko Revize); po vypnutí pole komentářů nezobrazují vlnkové podtržení',
   appSpellOn: 'Kontrola pravopisu zapnuta.',
-  appSpellOff: 'Kontrola pravopisu je vypnutá. Zapněte ji v Revize ▸ Kontrola.',
+  appSpellOff: 'Kontrola pravopisu je vypnutá. Zapněte ji v Revize ▸ Kontrola pravopisu.',
   appSpellRecheck: 'Zkontrolovat znovu',
   appSpellNone: 'Nenalezeny žádné podezřelé pravopisné chyby.',
   appSpellFindings: 'Podezřelých chyb: {count}. Kliknutím na řádek přejdete na buňku.',

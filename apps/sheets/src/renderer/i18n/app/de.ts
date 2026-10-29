@@ -1675,10 +1675,10 @@ export const de = {
   appSpellBtnDetail: 'Blatttext prüfen (F7)',
   appSpellToggle: 'Rechtschreibung prüfen',
   appSpellToggleTip:
-    'Aktiviert die Rechtschreibprüfung (F7 und die Review-Schaltfläche); ausgeschaltet zeigen Kommentarfelder keine Wellenlinien mehr',
+    'Aktiviert die Rechtschreibprüfung (F7 und die Überprüfen-Schaltfläche); ausgeschaltet zeigen Kommentarfelder keine Wellenlinien mehr',
   appSpellOn: 'Rechtschreibprüfung eingeschaltet.',
   appSpellOff:
-    'Die Rechtschreibprüfung ist aus. Aktivieren Sie sie unter Review ▸ Korrekturhilfen.',
+    'Die Rechtschreibprüfung ist aus. Aktivieren Sie sie unter Überprüfen ▸ Rechtschreibung.',
   appSpellRecheck: 'Erneut prüfen',
   appSpellNone: 'Keine verdächtigen Rechtschreibfehler gefunden.',
   appSpellFindings:

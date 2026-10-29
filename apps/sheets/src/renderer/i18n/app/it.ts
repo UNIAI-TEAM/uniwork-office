@@ -1658,7 +1658,8 @@ export const it = {
   appSpellToggleTip:
     'Attiva il controllo ortografico (F7 e il pulsante Revisione); disattivato, le caselle dei commenti non mostrano più le sottolineature',
   appSpellOn: 'Controllo ortografico attivato.',
-  appSpellOff: 'Il controllo ortografico è disattivato. Attivalo in Revisione ▸ Correzione.',
+  appSpellOff:
+    'Il controllo ortografico è disattivato. Attivalo in Revisione ▸ Strumenti di correzione.',
   appSpellRecheck: 'Ricontrolla',
   appSpellNone: 'Nessun errore ortografico sospetto trovato.',
   appSpellFindings: '{count} errori sospetti. Fai clic su una riga per individuarlo.',
