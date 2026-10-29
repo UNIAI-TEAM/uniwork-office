@@ -118,6 +118,33 @@ describe('applyTextInserts', () => {
     expect(await extractText(result.bytes)).toContain('New searchable text')
   })
 
+  it('writes an invisible insert with text render mode 3 (the OCR layer form)', async () => {
+    const f = await makeFixture('Existing text')
+    const base = (
+      await applyTextInserts(f.bytes, [
+        { pageIndex: 0, origin: [50, 650], text: 'Plain', fontSize: 14, color: [0, 0, 0] },
+      ])
+    ).bytes
+    expect(strokeOps(base).renderModes).not.toContain(3)
+    const result = await applyTextInserts(f.bytes, [
+      {
+        pageIndex: 0,
+        origin: [50, 650],
+        text: 'Scanned words',
+        fontSize: 14,
+        color: [255, 255, 255],
+        invisible: true,
+      },
+    ])
+    expect(result.skipped).toEqual([])
+    const ops = strokeOps(result.bytes)
+    expect(ops.renderModes).toContain(3)
+    // no synthetic-bold stroke rides with an invisible run
+    expect(ops.strokeColors).toEqual([])
+    // still extractable, so the page is searchable
+    expect(await extractText(result.bytes)).toContain('Scanned words')
+  })
+
   it('embeds a subset font for inserted CJK text', async () => {
     if (!existsSync('/System/Library/Fonts/Supplemental/Arial Unicode.ttf')) return
     const f = await makeFixture('Existing text')
