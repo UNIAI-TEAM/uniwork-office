@@ -406,8 +406,8 @@ import {
   createCloudLegacyConverter,
   createLegacyOpener,
   createWorkerOdfFallbackEngine,
-  legacyProgressDetailKey,
 } from './legacy-open'
+import { createLegacyProgress } from './legacy-progress'
 import type { CloudLegacyConvertInput } from './uniwork-docs/legacy-cloud-open'
 import { tLegacyOpen } from './legacy-open-strings'
 import {
@@ -4227,7 +4227,7 @@ function notifyUnsupportedFile(filePath: string): void {
 /** shell-hosted warning box; focused when a shell window exists, standalone otherwise */
 function showAppWarning(message: string): void {
   if (process.env.UNIWORK_BRIDGE_SILENT === '1') return
-  const options = { type: 'warning' as const, message }
+  const options = { type: 'warning' as const, message, buttons: [tm('pdfPwdOk')], noLink: true }
   if (shellWindow) {
     shellWindow.show()
     shellWindow.focus()
@@ -4239,7 +4239,7 @@ function showAppWarning(message: string): void {
 
 function showAppInfo(message: string): void {
   if (process.env.UNIWORK_BRIDGE_SILENT === '1') return
-  const options = { type: 'info' as const, message }
+  const options = { type: 'info' as const, message, buttons: [tm('pdfPwdOk')], noLink: true }
   if (shellWindow) {
     shellWindow.show()
     shellWindow.focus()
@@ -4639,36 +4639,46 @@ function recordRecentFile(filePath: string): void {
  * when it takes longer than a blink, a box with Cancel (the file converts with
  * a bundled LibreOffice, a few seconds for a typical document).
  */
-const LEGACY_PROGRESS_DELAY_MS = 600
-function beginLegacyProgress(fileName: string, cancel: () => void): () => void {
-  const host = shellWindow && !shellWindow.isDestroyed() ? shellWindow : null
-  host?.setProgressBar(2, { mode: 'indeterminate' })
-  const box = new AbortController()
-  let finished = false
-  const timer = setTimeout(() => {
-    const options = {
-      type: 'info' as const,
-      message: tLegacyOpen(currentLang(), 'legacyConvertingMsg', { name: fileName }),
-      detail: tLegacyOpen(currentLang(), legacyProgressDetailKey(fileName)),
-      buttons: [tm('btnCancel')],
-      cancelId: 0,
-      noLink: true,
-      signal: box.signal,
+let legacyProgressParent: BrowserWindow | null = null
+const beginLegacyProgress = createLegacyProgress({
+  showMessageBox: (options) => {
+    if (process.platform === 'linux') {
+      if (legacyProgressParent && !legacyProgressParent.isDestroyed()) {
+        legacyProgressParent.destroy()
+      }
+      legacyProgressParent = new BrowserWindow({
+        show: false,
+        width: 1,
+        height: 1,
+        frame: false,
+        transparent: true,
+        skipTaskbar: true,
+        focusable: false,
+      })
+      return dialog.showMessageBox(legacyProgressParent, options)
     }
-    const shown = host ? dialog.showMessageBox(host, options) : dialog.showMessageBox(options)
-    // our own abort closes the box the same way a click on Cancel does
-    void shown.then(() => {
-      if (!finished) cancel()
-    })
-  }, LEGACY_PROGRESS_DELAY_MS)
-  return () => {
-    if (finished) return
-    finished = true
-    clearTimeout(timer)
-    box.abort()
-    if (host && !host.isDestroyed()) host.setProgressBar(-1)
-  }
-}
+    const host = shellWindow && !shellWindow.isDestroyed() ? shellWindow : null
+    return host ? dialog.showMessageBox(host, options) : dialog.showMessageBox(options)
+  },
+  closeBox: () => {
+    if (legacyProgressParent) {
+      const win = legacyProgressParent
+      legacyProgressParent = null
+      if (!win.isDestroyed()) win.destroy()
+    }
+  },
+  setProgressBar: (value, options) => {
+    const host = shellWindow && !shellWindow.isDestroyed() ? shellWindow : null
+    if (!host) return
+    if (options) {
+      host.setProgressBar(value, options)
+    } else {
+      host.setProgressBar(value)
+    }
+  },
+  t: (key, params) => tLegacyOpen(currentLang(), key, params),
+  cancelLabel: () => tm('btnCancel'),
+})
 
 const legacyOpener = createLegacyOpener({
   convert: (path, options) => convertLegacyFile(path, options),
