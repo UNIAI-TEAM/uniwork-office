@@ -24,9 +24,9 @@ describe('agentConfigured', () => {
     expect(agentConfigured(anthropicSlot())).toBe(false)
   })
 
-  it('a key saved on UniWork no longer serves a provider', () => {
+  it('a model source never stands in for the missing key', () => {
     const s = anthropicSlot()
-    s.modelSources = { anthropic: { origin: 'org', chosen: 'claude-org' } }
+    s.modelSources = { anthropic: { chosen: 'claude-source' } }
     expect(agentConfigured(s)).toBe(false)
   })
 

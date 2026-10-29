@@ -159,9 +159,6 @@ export interface AiModelSource {
   readonly listed?: readonly string[] | undefined
   /** 'loading' while a first listing runs, 'error' after a failed one (the catalog is shown); absent = ok or not asked */
   readonly listState?: 'loading' | 'error' | undefined
-  /** where calls for this provider go (G6-05k). Absent or 'local' = the key on this machine (or the
-   *  web host's own rows); 'org' = the key saved on UniWork, through the UniWork proxy. Derived, never saved. */
-  readonly origin?: 'local' | 'org' | undefined
 }
 
 /** the model the user picked for one provider (chip or Settings), sent beside `ai:set-settings` */
@@ -173,11 +170,11 @@ export interface AiModelPick {
 /**
  * What a renderer may say beside the settings it saves (`ai:set-settings` second argument).
  * `modelPick` is the one signal that a model was chosen: a plain echo of the loaded settings
- * carries none, so a provider served by a key saved on UniWork records no pick from it.
+ * carries none.
  */
 export interface AiSettingsSaveOptions {
   readonly modelPick?: AiModelPick | undefined
-  /** several picks in one save (the Settings pane keeps one per provider); main takes at most one per provider */
+  /** several picks in one save (the Settings pane keeps one per provider) */
   readonly modelPicks?: readonly AiModelPick[] | undefined
 }
 

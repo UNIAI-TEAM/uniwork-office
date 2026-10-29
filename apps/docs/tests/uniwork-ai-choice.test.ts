@@ -4,7 +4,7 @@
  * `uniwork.ai.uniwork-choice`); the BYOK settings stay in ai-settings.json. The real handlers run
  * here with electron mocked; the account store is a fake keyed by "account".
  */
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -356,6 +356,65 @@ describe('UniWork AI choice per account (desktop)', () => {
     expect(accounts.writes.at(-1)).toEqual(['a-1', false])
     expect((await getSettings(HOME, true)).provider).toBe('anthropic')
     expect((await getSettings(EDITOR)).provider).toBe('anthropic')
+  })
+
+  it('a saved provider whose slot has no key reads as stored and sends nothing, whatever an old host offers', async () => {
+    fakeAccounts()
+    // what a shell that served keys from UniWork registered beside ai-settings.json
+    const keysHost = {
+      list: vi.fn(async () => undefined),
+      sources: vi.fn(() => ({ anthropic: { chosen: 'claude-org', origin: 'org' } })),
+      hasOrgSource: vi.fn(() => true),
+      chosenModelFor: vi.fn(() => 'claude-org'),
+      recordModelPick: vi.fn(),
+      byokBaseUrl: vi.fn(() => 'https://uniwork.test/api/v1/orgs/o-1/ai/byok/anthropic'),
+      fetchFor: vi.fn(() => vi.fn()),
+      clear: vi.fn(),
+    }
+    const hostSymbol = Symbol.for('genoffice.uniworkKeysHost')
+    ;(globalThis as Record<symbol, unknown>)[hostSymbol] = keysHost
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    try {
+      writeFileSync(
+        join(dirs.userData, 'ai-settings.json'),
+        JSON.stringify({
+          provider: 'anthropic',
+          providers: { anthropic: { apiKey: '', model: 'claude-test' } },
+        }),
+      )
+      const settings = await getSettings(HOME, true)
+      // the stored choice and slot, as saved: no source stands in for the missing key
+      expect(settings.provider).toBe('anthropic')
+      expect(settings.providers.anthropic).toMatchObject({ apiKey: '', model: 'claude-test' })
+      expect(settings.modelSources?.anthropic).toBeUndefined()
+
+      const chunks: Array<{ type: string }> = []
+      await handlers.get('ai:stream')!(
+        {
+          sender: {
+            id: EDITOR,
+            isDestroyed: () => false,
+            send: (_c: string, chunk: never) => chunks.push(chunk),
+          },
+        },
+        { requestId: 'r-2', settings, system: 's', messages: [{ role: 'user', content: 'hi' }] },
+      )
+      expect(chunks.map((c) => c.type)).toEqual(['error'])
+      const test = (await handlers.get('ai:settings-test')!(from(HOME), {
+        settings,
+        system: 's',
+        user: 'u',
+      })) as { ok: boolean }
+      expect(test.ok).toBe(false)
+
+      expect(streamForProvider).not.toHaveBeenCalled()
+      expect(testChatConnection).not.toHaveBeenCalled()
+      for (const fn of Object.values(keysHost)) expect(fn).not.toHaveBeenCalled()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+      ;(globalThis as Record<symbol, unknown>)[hostSymbol] = null
+    }
   })
 
   it('a Settings save that keeps UniWork AI keeps the pick and the BYOK provider underneath', async () => {

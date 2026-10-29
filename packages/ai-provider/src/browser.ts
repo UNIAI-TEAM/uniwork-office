@@ -18,7 +18,6 @@ export {
   MIN_MAX_OUTPUT_TOKENS,
   clampMaxOutputTokens,
   aiEffectiveModel,
-  isOrgServedReady,
   isProviderUsable,
   providerNeed,
   selectedProvider,
