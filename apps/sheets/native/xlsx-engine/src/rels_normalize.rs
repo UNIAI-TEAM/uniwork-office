@@ -38,6 +38,7 @@ const RELATIONSHIPS_NAMESPACE: &str =
 /// Imports the workbook at `path` into an IronCalc model, repairing absolute
 /// relationship targets first when the package uses them.
 pub(crate) fn load_model(path: &Path) -> Result<Model<'static>, SidecarError> {
+    require_cell_styles(path)?;
     let Some(normalized) = normalized_package(path)? else {
         let path_text = path.to_str().ok_or_else(|| {
             SidecarError::InvalidRequest("Workbook path is not valid UTF-8.".into())
@@ -50,6 +51,35 @@ pub(crate) fn load_model(path: &Path) -> Result<Model<'static>, SidecarError> {
         .unwrap_or_default();
     let workbook = load_from_xlsx_bytes(&normalized, &name, "en", "UTC").map_err(import_error)?;
     Model::from_workbook(workbook, "en").map_err(import_error)
+}
+
+/// IronCalc 0.9.1's style importer takes the first `<cellStyles>` child of the
+/// style sheet without checking that one exists (import/styles.rs), so a
+/// styles part without it panics. Natively the recalc request catches the
+/// unwind and answers with an error; the wasm reactor is built with
+/// `panic = "abort"`, where the same panic would stop the whole engine and
+/// take every open session with it. Refuse such a workbook up front with the
+/// error the native path ends in.
+fn require_cell_styles(path: &Path) -> Result<(), SidecarError> {
+    let mut archive = ZipArchive::new(File::open(path)?)?;
+    let Some(index) = archive.index_for_name("xl/styles.xml") else {
+        return Ok(());
+    };
+    let xml = read_part(&mut archive, index)?;
+    // an unparsable part is the importer's to report
+    let has_cell_styles = Document::parse(&xml).map_or(true, |document| {
+        document
+            .root_element()
+            .children()
+            .any(|node| node.is_element() && node.tag_name().name() == "cellStyles")
+    });
+    if has_cell_styles {
+        Ok(())
+    } else {
+        Err(SidecarError::Workbook(
+            "The formula engine could not process this workbook.".into(),
+        ))
+    }
 }
 
 fn import_error(error: impl std::fmt::Display) -> SidecarError {
@@ -446,6 +476,25 @@ mod tests {
         let mut text = String::new();
         entry.read_to_string(&mut text).unwrap();
         text
+    }
+
+    #[test]
+    fn a_styles_part_without_cell_styles_is_refused_instead_of_panicking_the_importer() {
+        let (_dir, path) = crate::tests::open_fixture(&[(
+            "xl/styles.xml",
+            r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cellXfs count="1"><xf/></cellXfs></styleSheet>"#,
+        )]);
+        let error = load_model(&path).err().expect("must be refused");
+        assert!(
+            error.to_string().contains("could not process"),
+            "unexpected error: {error}"
+        );
+        // with the element present the guard lets the importer go ahead
+        let (_dir, path) = crate::tests::open_fixture(&[(
+            "xl/styles.xml",
+            r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cellStyles count="1"><cellStyle name="Normal" xfId="0"/></cellStyles></styleSheet>"#,
+        )]);
+        assert!(require_cell_styles(&path).is_ok());
     }
 
     #[test]
