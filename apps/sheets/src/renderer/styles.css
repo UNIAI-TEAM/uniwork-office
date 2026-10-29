@@ -6544,10 +6544,13 @@ body:has(.dialog-backdrop, .modal-backdrop) .shape-delete-button {
 }
 
 /* The shared results table is display:block (it scrolls itself), which sizes it
-   to its content; here the wrapper scrolls so the table fills the panel width. */
+   to its content; here the wrapper scrolls so the table fills the panel width.
+   No top padding: the sticky header sticks to the wrapper's top edge, and any
+   padding above it would let scrolled rows show through as a sliver. */
 .find-replace-panel.spell-panel .fr-results {
   max-height: 220px;
   overflow-y: auto;
+  padding-top: 0;
 }
 
 .find-replace-panel.spell-panel .fr-results table {
