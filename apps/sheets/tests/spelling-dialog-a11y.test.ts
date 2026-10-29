@@ -95,6 +95,55 @@ describe('SpellingDialog keyboard contract', () => {
     opener.remove()
   })
 
+  it('keeps focus in the dialog when Ignore removes the focused button, so Escape still closes', async () => {
+    vi.stubGlobal('desktopApi', { onLanguageChanged: () => () => {} })
+    vi.stubGlobal('nativeSpell', {
+      isWordMisspelled: (word: string) =>
+        word === 'teh' || word === 'recieve' || word === SPELL_PROBE_WORD,
+      getWordSuggestions: (word: string) => (word === 'teh' ? ['the'] : ['receive']),
+    })
+    const onClose = vi.fn()
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en', children: null },
+          createElement(SpellingDialog, {
+            onClose,
+            getWorkbook: () => workbook,
+            isWithheld: () => false,
+            onJumpTo: () => {},
+            lazyNote: '',
+            sessionIgnoredRef: { current: new Set<string>() },
+            setMessage: () => {},
+          }),
+        ),
+      )
+    })
+    const dialog = container.querySelector('[role="dialog"]') as HTMLElement
+    const ignore = [...container.querySelectorAll<HTMLButtonElement>('.spell-actions button')].find(
+      (button) => button.textContent === 'Ignore',
+    )!
+    ignore.focus()
+    expect(document.activeElement).toBe(ignore)
+
+    // Ignore drops the finding; the selection clears and the whole detail block unmounts
+    await act(async () => {
+      ignore.click()
+    })
+    expect(ignore.isConnected).toBe(false)
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+    expect(document.activeElement).toBe(dialog)
+
+    await act(async () => {
+      dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('reports unavailable instead of an all-clear when the engine never flags the probe word', async () => {
     vi.stubGlobal('desktopApi', { onLanguageChanged: () => () => {} })
     vi.stubGlobal('nativeSpell', {

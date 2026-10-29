@@ -114,6 +114,13 @@ export function SpellingDialog({
     }
   }, [opener])
 
+  // Replace All / Ignore / Ignore All remove the focused row or button; the
+  // browser then drops focus to <body> and Escape stops working. Take it back.
+  useEffect(() => {
+    const active = document.activeElement
+    if (!active || active === document.body) panelRef.current?.focus()
+  }, [findings, selectedKey])
+
   const selectFinding = (finding: SpellFinding): void => {
     setSelectedKey(findingKey(finding))
     onJumpTo(finding.cell.sheetId, finding.cell.row, finding.cell.column)
