@@ -140,6 +140,47 @@ describe('convertOdtToDocx', () => {
     )
   })
 
+  it('does not shift cells when a vertical merge emits covered-table-cell elements', async () => {
+    // LibreOffice writes <table:covered-table-cell/> in the row below a vertical
+    // merge; the occupancy grid already reserves those slots from rowSpan, so
+    // emitting a cell for covered-table-cell would shift the remaining cells
+    // right and drop the last column.
+    const body =
+      '<table:table table:name="Bang1">' +
+      '<table:table-column table:number-columns-repeated="3"/>' +
+      '<table:table-row>' +
+      '<table:table-cell table:number-columns-spanned="3"><text:p>Header 3 cols</text:p></table:table-cell>' +
+      '<table:covered-table-cell/><table:covered-table-cell/>' +
+      '</table:table-row>' +
+      '<table:table-row>' +
+      '<table:table-cell table:number-rows-spanned="2"><text:p>Span 2 rows</text:p></table:table-cell>' +
+      '<table:table-cell><text:p>B2</text:p></table:table-cell>' +
+      '<table:table-cell><text:p>C2</text:p></table:table-cell>' +
+      '</table:table-row>' +
+      '<table:table-row>' +
+      '<table:covered-table-cell/>' +
+      '<table:table-cell><text:p>B3</text:p></table:table-cell>' +
+      '<table:table-cell><text:p>C3</text:p></table:table-cell>' +
+      '</table:table-row>' +
+      '</table:table>'
+    const result = await convertOdtToDocx(await buildOdt(contentXml(body)))
+    const document = (await readDocxEntry(result.docx, 'word/document.xml')) ?? ''
+    expect(document).toContain('<w:vMerge w:val="restart"/>')
+    expect(document).toContain('<w:vMerge/>')
+    expect(document).toContain('B2')
+    expect(document).toContain('C2')
+    expect(document).toContain('B3')
+    expect(document).toContain('C3')
+    const rows = [...document.matchAll(/<w:tr>([\s\S]*?)<\/w:tr>/g)].map((m) => m[1])
+    expect(rows).toHaveLength(3)
+    // Row 3 has 3 cells: the vMerge continuation, B3, and C3
+    const row3Cells = [...rows[2].matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map((m) => m[1])
+    expect(row3Cells).toHaveLength(3)
+    expect(row3Cells[0]).toContain('<w:vMerge/>')
+    expect(row3Cells[1]).toContain('B3')
+    expect(row3Cells[2]).toContain('C3')
+  })
+
   it('carries the page geometry into the section properties', async () => {
     const body = '<text:p>page</text:p>'
     const result = await convertOdtToDocx(await buildOdt(contentXml(body), stylesXml('', PAGE_A4)))
@@ -206,6 +247,33 @@ describe('convertOdtToDocx', () => {
     const document = (await readDocxEntry(result.docx, 'word/document.xml')) ?? ''
     expect(document).toContain('keep')
     expect(document).not.toContain('lost')
+  })
+
+  it('reports master-page headers/footers and tracked changes in dropped', async () => {
+    const body =
+      '<text:tracked-changes text:track-changes="true">' +
+      '<text:changed-region text:id="ct1"><text:insertion><office:change-info/></text:insertion></text:changed-region>' +
+      '<text:changed-region text:id="ct2"><text:deletion><office:change-info/><text:p>deleted words</text:p></text:deletion></text:changed-region>' +
+      '</text:tracked-changes>' +
+      '<text:p>body with <text:change-start text:change-id="ct1"/>inserted<text:change-end text:change-id="ct1"/> and <text:change text:change-id="ct2"/>text</text:p>'
+    const styles =
+      `<?xml version="1.0" encoding="UTF-8"?><office:document-styles ${NAMESPACES} office:version="1.2">` +
+      '<office:master-styles>' +
+      '<style:master-page style:name="Standard" style:page-layout-name="PM1">' +
+      '<style:header><text:p>Header text</text:p></style:header>' +
+      '<style:footer><text:p>Footer text</text:p></style:footer>' +
+      '<style:header-left style:display="false"><text:p>Hidden</text:p></style:header-left>' +
+      '</style:master-page>' +
+      '</office:master-styles>' +
+      '</office:document-styles>'
+    const result = await convertOdtToDocx(await buildOdt(contentXml(body), styles))
+    expect(result.dropped).toEqual([
+      { what: 'headers-footers', count: 2 },
+      { what: 'tracked-changes', count: 2 },
+    ])
+    const document = (await readDocxEntry(result.docx, 'word/document.xml')) ?? ''
+    expect(document).toContain('body with inserted and text')
+    expect(document).not.toContain('deleted words')
   })
 
   it('flattens a text frame into the flow and says so', async () => {
