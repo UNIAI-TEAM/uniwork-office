@@ -42,7 +42,7 @@ test('sheets: compact ribbon fits every tab without clipping', async () => {
     expect(await compact(), 'compact density did not engage').toBe(true)
 
     const tabs = await page.evaluate(() =>
-      [...document.querySelectorAll('.ribbon-tabs > button:not(.qa-btn)')]
+      [...document.querySelectorAll('.ribbon-tabs .ribbon-tab')]
         .map((t) => t.textContent?.trim() ?? '')
         .filter(Boolean),
     )
@@ -50,7 +50,7 @@ test('sheets: compact ribbon fits every tab without clipping', async () => {
 
     for (const tab of tabs) {
       await page.evaluate((name) => {
-        const el = [...document.querySelectorAll('.ribbon-tabs > button:not(.qa-btn)')].find(
+        const el = [...document.querySelectorAll('.ribbon-tabs .ribbon-tab')].find(
           (x) => x.textContent?.trim() === name,
         )
         ;(el as HTMLElement | undefined)?.click()
