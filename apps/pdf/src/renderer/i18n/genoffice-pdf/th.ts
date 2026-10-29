@@ -58,4 +58,8 @@ export const th = {
   compareTruncated: 'หน้าใหญ่เกินไป — นับเฉพาะจำนวน',
   compareUnreadable: 'ไม่สามารถอ่านไฟล์นี้เป็น PDF ได้',
   ribbonCompact: 'Ribbon แบบกระชับ (ไอคอนเท่านั้น)',
+  reduce: 'ลดขนาดไฟล์',
+  reduceHint: 'บีบอัดสตรีม deflate ใหม่และย่อภาพที่ใหญ่กว่า 2480 px แล้วบันทึกเป็นสำเนา',
+  reduceDone: 'ลดลงประมาณ {pct}% — บันทึกสำเนาแล้ว',
+  reduceAlreadySmall: 'ไฟล์นี้เล็กพอแล้ว ไม่มีอะไรให้บีบ',
 } satisfies Record<keyof typeof zh, string>

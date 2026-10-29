@@ -58,4 +58,8 @@ export const en = {
   compareTruncated: 'page too large — counts only',
   compareUnreadable: 'That file could not be read as a PDF',
   ribbonCompact: 'Compact Ribbon (icons only)',
+  reduce: 'Reduce file size',
+  reduceHint: 'Re-compresses deflate streams and downsamples images over 2480 px; writes a copy',
+  reduceDone: 'Reduced by about {pct}% — the copy is saved',
+  reduceAlreadySmall: 'This file is already small; nothing to squeeze',
 } satisfies Record<keyof typeof zh, string>

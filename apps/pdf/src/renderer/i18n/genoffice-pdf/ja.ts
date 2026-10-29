@@ -58,4 +58,8 @@ export const ja = {
   compareTruncated: 'ページが大きすぎるため行数のみ',
   compareUnreadable: 'このファイルを PDF として読み込めませんでした',
   ribbonCompact: 'コンパクトリボン（アイコンのみ）',
+  reduce: 'ファイルサイズを縮小',
+  reduceHint: 'deflate ストリームを再圧縮し、2480 px を超える画像を縮小してコピーに保存します',
+  reduceDone: '約 {pct}% 縮小しました。コピーを保存済みです',
+  reduceAlreadySmall: 'このファイルは十分小さく、圧縮の余地がありません',
 } satisfies Record<keyof typeof zh, string>

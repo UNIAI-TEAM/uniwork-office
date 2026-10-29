@@ -56,4 +56,8 @@ export const zh = {
   compareTruncated: '页面过大，仅统计行数',
   compareUnreadable: '无法读取该文件，请确认它是有效的 PDF',
   ribbonCompact: '紧凑功能区（仅图标）',
+  reduce: '减小文件大小',
+  reduceHint: '重新压缩 deflate 流，仅对超过 2480 px 的图片降采样；另存为副本',
+  reduceDone: '已减小约 {pct}%，副本已保存',
+  reduceAlreadySmall: '文件已经足够小，没有可压缩的空间',
 }

@@ -1188,6 +1188,8 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     // Compare is desktop-only (the `pdfCompare` capability hides the button): typed not-available answers
     compareReadPdf: async () => ({ ok: false, reason: NOT_AVAILABLE }),
     compareReadOpen: async () => ({ ok: false, reason: NOT_AVAILABLE }),
+    // Reduce file size is desktop-only (the `pdfReduceSize` capability hides the button): typed not-available answer
+    reduceFileSize: async () => ({ ok: false, reason: NOT_AVAILABLE }),
     // the host's file.renamed only renames: the web document id (its "path") never changes
     onFileRenamed: () => () => {},
     aiStream: ai.aiStream,

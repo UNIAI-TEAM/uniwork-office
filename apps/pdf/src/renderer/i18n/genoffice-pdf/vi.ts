@@ -58,4 +58,8 @@ export const vi = {
   compareTruncated: 'trang quá lớn — chỉ đếm dòng',
   compareUnreadable: 'Không đọc được tệp này; hãy kiểm tra đó là tệp PDF hợp lệ',
   ribbonCompact: 'Dải băng thu gọn (chỉ biểu tượng)',
+  reduce: 'Giảm kích thước tệp',
+  reduceHint: 'Nén lại các luồng deflate và thu nhỏ ảnh trên 2480 px; ghi thành bản sao',
+  reduceDone: 'Đã giảm khoảng {pct}% — bản sao đã được lưu',
+  reduceAlreadySmall: 'Tệp đã đủ nhỏ, không còn gì để nén',
 } satisfies Record<keyof typeof zh, string>

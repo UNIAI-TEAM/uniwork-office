@@ -58,4 +58,9 @@ export const ms = {
   compareTruncated: 'halaman terlalu besar — kiraan sahaja',
   compareUnreadable: 'Fail ini tidak dapat dibaca sebagai PDF',
   ribbonCompact: 'Reben Padat (ikon sahaja)',
+  reduce: 'Kurangkan saiz fail',
+  reduceHint:
+    'Memampat semula strim deflate dan mengecilkan imej melebihi 2480 px; menulis salinan',
+  reduceDone: 'Dikurangkan kira-kira {pct}% — salinan disimpan',
+  reduceAlreadySmall: 'Fail ini sudah cukup kecil; tiada apa untuk dimampatkan',
 } satisfies Record<keyof typeof zh, string>

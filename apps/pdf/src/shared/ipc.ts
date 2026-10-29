@@ -29,6 +29,7 @@ export const PDF_CHANNELS = {
   insertPdf: 'pdf:insert-pdf',
   compareReadPdf: 'pdf:compare-read-pdf',
   compareReadOpen: 'pdf:compare-read-open',
+  reduceFileSize: 'pdf:reduce-file-size',
   insertBlankPage: 'pdf:insert-blank-page',
   splitPdf: 'pdf:split-pdf',
   mergePdf: 'pdf:merge-pdf',
@@ -1000,6 +1001,21 @@ export interface PdfApi {
   pagePreviewPng(request: PagePreviewRequest): Promise<PagePreviewResult | null>
   extractPages(request: ExtractPagesRequest): Promise<ExtractPagesResult>
   insertPdf(request: InsertPdfRequest): Promise<InsertPdfResult>
+  /** Reduce file size: re-compress streams and downsample oversized Flate images.
+      The picked save target (main-side dialog) receives the shrunk copy; the open
+      document is untouched and reloads from the target when the caller asks. */
+  reduceFileSize(path: string): Promise<
+    | {
+        ok: true
+        targetPath: string
+        bytesBefore: number
+        bytesAfter: number
+        streamsRecompressed: number
+        imagesDownsampled: number
+      }
+    | { ok: false; canceled: true }
+    | { ok: false; reason: string }
+  >
   insertBlankPage(request: InsertBlankPageRequest): Promise<InsertBlankPageResult>
   splitPdf(request: SplitPdfRequest): Promise<SplitPdfResult>
   mergePdf(request: MergePdfRequest): Promise<MergePdfResult>

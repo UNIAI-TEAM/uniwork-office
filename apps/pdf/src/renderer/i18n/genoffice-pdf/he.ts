@@ -57,4 +57,8 @@ export const he = {
   compareTruncated: 'העמוד גדול מדי — ספירה בלבד',
   compareUnreadable: 'לא ניתן לקרוא את הקובץ כ-PDF',
   ribbonCompact: 'רצועת כלים מצומצמת (סמלים בלבד)',
+  reduce: 'הקטנת גודל הקובץ',
+  reduceHint: 'דחיסה מחדש של תזרימי deflate והקטנת תמונות מעל 2480 פיקסלים; כותב עותק',
+  reduceDone: 'הגודל הוקטן בכ־{pct}% — העותק נשמר',
+  reduceAlreadySmall: 'הקובץ הזה כבר קטן; אין מה למחוץ',
 } satisfies Record<keyof typeof zh, string>

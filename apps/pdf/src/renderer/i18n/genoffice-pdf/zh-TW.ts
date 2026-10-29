@@ -57,4 +57,8 @@ export const zhTW = {
   compareTruncated: '頁面過大，僅統計行數',
   compareUnreadable: '無法讀取該檔案，請確認它是有效的 PDF',
   ribbonCompact: '緊湊功能區（僅圖示）',
+  reduce: '減小檔案大小',
+  reduceHint: '重新壓縮 deflate 串流，僅對超過 2480 px 的圖片降取樣；另存為副本',
+  reduceDone: '已減小約 {pct}%，副本已儲存',
+  reduceAlreadySmall: '檔案已經足夠小，沒有可壓縮的空間',
 } satisfies Record<keyof typeof zh, string>

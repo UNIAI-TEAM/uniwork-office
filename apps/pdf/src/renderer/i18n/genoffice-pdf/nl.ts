@@ -58,4 +58,9 @@ export const nl = {
   compareTruncated: 'pagina te groot — alleen aantallen',
   compareUnreadable: 'Dit bestand kon niet als PDF worden gelezen',
   ribbonCompact: 'Compact lint (alleen pictogrammen)',
+  reduce: 'Bestandsgrootte verkleinen',
+  reduceHint:
+    'Comprimeert deflate-streams opnieuw en verkleint afbeeldingen boven 2480 px; schrijft een kopie',
+  reduceDone: 'Ongeveer {pct}% kleiner — de kopie is opgeslagen',
+  reduceAlreadySmall: 'Dit bestand is al klein genoeg; niets te halen',
 } satisfies Record<keyof typeof zh, string>

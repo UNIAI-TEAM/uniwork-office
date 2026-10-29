@@ -25,6 +25,8 @@ import { createCapabilityReader } from '@genoffice/ui/capabilities'
  * |                  | on disk and writes a signed copy next to it (node:crypto, pdf-lib)      |
  * | pdfCompare       | the Compare panel and its ribbon button: both sides' text is read main-side |
  * |                  | by pdfium from files on disk (desktop only)                             |
+ * | pdfReduceSize    | the Reduce file size button: reads the file on disk and writes a shrunk |
+ * |                  | copy through the OS save dialog (desktop only)                          |
  * | redaction        | the Redact tool (applies into a working copy of the file)               |
  * | saveStatus       | the ribbon-row Saving / Unsaved / Saved / Save failed text (the web     |
  * |                  | host header owns the save state)                                        |
@@ -52,6 +54,7 @@ export type PdfCapability =
   | 'savedSignatures'
   | 'certSign'
   | 'pdfCompare'
+  | 'pdfReduceSize'
   | 'redaction'
   | 'saveStatus'
   | 'viewOnlyChip'

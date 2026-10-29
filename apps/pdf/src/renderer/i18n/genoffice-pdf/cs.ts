@@ -58,4 +58,8 @@ export const cs = {
   compareTruncated: 'strana je příliš velká — jen počty',
   compareUnreadable: 'Tento soubor se nepodařilo přečíst jako PDF',
   ribbonCompact: 'Kompaktní pás karet (pouze ikony)',
+  reduce: 'Zmenšit velikost souboru',
+  reduceHint: 'Znovu komprimuje deflate streamy a zmenší obrázky nad 2480 px; zapíše kopii',
+  reduceDone: 'Zmenšeno asi o {pct} % — kopie je uložena',
+  reduceAlreadySmall: 'Tento soubor je už dost malý; nic ke zmačkání',
 } satisfies Record<keyof typeof zh, string>

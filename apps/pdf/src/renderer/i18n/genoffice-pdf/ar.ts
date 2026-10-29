@@ -58,4 +58,8 @@ export const ar = {
   compareTruncated: 'الصفحة كبيرة جداً — العد فقط',
   compareUnreadable: 'تعذّرت قراءة هذا الملف بوصفه ملف PDF',
   ribbonCompact: 'شريط مضغوط (أيقونات فقط)',
+  reduce: 'تقليل حجم الملف',
+  reduceHint: 'إعادة ضغط تدفقات deflate وتصغير الصور التي تتجاوز 2480 بكسل؛ يكتب نسخة',
+  reduceDone: 'انخفض الحجم بنحو {pct}% — حفظت النسخة',
+  reduceAlreadySmall: 'هذا الملف صغير بما يكفي؛ لا شيء لضغطه',
 } satisfies Record<keyof typeof zh, string>

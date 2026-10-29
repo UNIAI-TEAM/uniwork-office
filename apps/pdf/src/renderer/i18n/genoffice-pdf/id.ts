@@ -58,4 +58,8 @@ export const id = {
   compareTruncated: 'halaman terlalu besar — hitungan saja',
   compareUnreadable: 'Berkas ini tidak dapat dibaca sebagai PDF',
   ribbonCompact: 'Pita Ringkas (hanya ikon)',
+  reduce: 'Kurangi ukuran berkas',
+  reduceHint: 'Kompres ulang stream deflate dan perkecil gambar di atas 2480 px; menulis salinan',
+  reduceDone: 'Dikurangi sekitar {pct}% — salinan tersimpan',
+  reduceAlreadySmall: 'Berkas ini sudah cukup kecil; tidak ada yang bisa diperas',
 } satisfies Record<keyof typeof zh, string>

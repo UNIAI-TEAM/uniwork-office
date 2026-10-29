@@ -579,6 +579,16 @@ describe('print and hidden members', () => {
     const table = await readFile(join(__dirname, 'install.ts'), 'utf8')
     expect(table).toMatch(/^ {2}pdfCompare: false,$/m)
   })
+
+  it('Reduce file size is desktop-only: the stub answers not-available and the capability is off', async () => {
+    const s = await setup()
+    expect(await s.api.reduceFileSize('p')).toEqual({
+      ok: false,
+      reason: 'Not available in the web build',
+    })
+    const table = await readFile(join(__dirname, 'install.ts'), 'utf8')
+    expect(table).toMatch(/^ {2}pdfReduceSize: false,$/m)
+  })
 })
 
 describe('draft recovery (C18)', () => {

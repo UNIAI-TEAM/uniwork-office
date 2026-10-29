@@ -58,4 +58,8 @@ export const ru = {
   compareTruncated: 'страница слишком велика — только подсчёт',
   compareUnreadable: 'Не удалось прочитать этот файл как PDF',
   ribbonCompact: 'Компактная лента (только значки)',
+  reduce: 'Уменьшить размер файла',
+  reduceHint: 'Пережать deflate-потоки и уменьшить изображения больше 2480 px; записывает копию',
+  reduceDone: 'Размер уменьшен примерно на {pct}% — копия сохранена',
+  reduceAlreadySmall: 'Файл и так невелик; сжимать нечего',
 } satisfies Record<keyof typeof zh, string>

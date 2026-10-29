@@ -58,4 +58,9 @@ export const hi = {
   compareTruncated: 'पृष्ठ बहुत बड़ा है — केवल गणना',
   compareUnreadable: 'इस फ़ाइल को PDF के रूप में पढ़ा नहीं जा सका',
   ribbonCompact: 'कॉम्पैक्ट रिबन (केवल आइकन)',
+  reduce: 'फ़ाइल का आकार घटाएँ',
+  reduceHint:
+    'deflate स्ट्रीम दोबारा कंप्रेस करें और 2480 px से बड़ी तस्वीरें छोटी करें; एक प्रति लिखता है',
+  reduceDone: 'लगभग {pct}% घटाया गया — प्रति सहेजी गई',
+  reduceAlreadySmall: 'यह फ़ाइल पहले से छोटी है; कुछ निचोड़ने को नहीं',
 } satisfies Record<keyof typeof zh, string>

@@ -58,4 +58,8 @@ export const ko = {
   compareTruncated: '페이지가 너무 커서 줄 수만 표시',
   compareUnreadable: '이 파일을 PDF로 읽을 수 없습니다',
   ribbonCompact: '간단 리본(아이콘만)',
+  reduce: '파일 크기 줄이기',
+  reduceHint: 'deflate 스트림을 다시 압축하고 2480 px를 넘는 이미지를 줄여 사본으로 저장합니다',
+  reduceDone: '약 {pct}% 줄였습니다. 사본이 저장되었습니다',
+  reduceAlreadySmall: '이 파일은 이미 충분히 작습니다',
 } satisfies Record<keyof typeof zh, string>
