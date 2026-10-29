@@ -178,6 +178,10 @@ export function createMarkdownWebApi(ctx: ModuleBridgeContext, opts: TextWebApiO
     // go through the shared text-module server conflict dialog instead)
     | 'onFileChangedOnDisk'
     | 'ackFileChangedOnDisk'
+    // desktop skills are stored in userData/skills; a web frame has no local skills folder
+    | 'openSkillsSettings'
+    | 'skillsList'
+    | 'skillText'
   >
   return Object.assign(api, {
     // web-only (renderer: editor/localImage.ts): relative pictures through OpenPayload.assets

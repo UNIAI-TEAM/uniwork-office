@@ -6,6 +6,10 @@ import {
   AiPanelSideButton,
   AiSaveDraftCard,
   AiModelPicker,
+  AI_SKILLS_LABELS,
+  AiSkillChips,
+  AiSkillsMenu,
+  MAX_ATTACHED_SKILLS,
   useCloudSignedIn,
   useAiModelNeedHint,
   type AiModelPickerBridge,
@@ -31,6 +35,7 @@ import {
   composeSkills,
   runHistoryEvents,
   streamText,
+  withAttachedSkills,
   type RunHistoryGroup,
 } from '@genoffice/agent-core'
 import {
@@ -128,6 +133,13 @@ function countWords(text: string): number {
   return (text.match(ASIAN_RE) ?? []).length + (text.match(NON_ASIAN_WORD_RE) ?? []).length
 }
 
+const UNIWORK_QUESTION_MAX_RUNES = 8000
+function runeCount(text: string): number {
+  let n = 0
+  for (const _ of text) n++
+  return n
+}
+
 const PANEL_WIDTH_KEY = 'markdown-ai-panel-width'
 const PANEL_WIDTH_DEFAULT = 360
 const PANEL_WIDTH_MIN = 280
@@ -198,6 +210,8 @@ interface ChatEntry {
   mindmap?: MindMapTreeNode
   /** the selection this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+  /** skills the user attached to this message from the composer menu */
+  skills?: string[]
   /** the edit fence of this user turn (selection scope or queue submission): a retry reuses it, never runs the turn unfenced */
   fence?: EntryFence
   /** restored from a stored transcript: no retry, its fence ranges are unknown */
@@ -321,6 +335,10 @@ export function AiPanel({
   const uniworkGate = useUniworkSendGate()
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
+  const [attachedSkills, setAttachedSkills] = useState<string[]>([])
+  const attachedSkillsRef = useRef(attachedSkills)
+  attachedSkillsRef.current = attachedSkills
+  const [skillsTooLong, setSkillsTooLong] = useState(false)
   const [chat, setChat] = useState<ChatEntry[]>([])
   /** a streamed write stopped early: the draft stays in the document until the user keeps or discards it */
   const [activePartial, setActivePartial] = useState<{ blocks: number } | null>(null)
@@ -958,17 +976,121 @@ export function AiPanel({
    * retryOf: the user entry being retried (its scope quote and fence); undefined = a new turn,
    * which captures the live selection. queueFence: the anchored ranges of a queue submission.
    */
+  /** the attached skills' full text in front of the request; a skill that vanished is skipped */
+  const withSkillBodies = async (instruction: string, names: readonly string[]) => {
+    if (names.length === 0) return instruction
+    const bodies = await Promise.all(
+      names.map(async (name) => {
+        try {
+          const body = await window.markdownApi?.skillText?.(name)
+          return typeof body === 'string' ? { name, body } : null
+        } catch {
+          return null
+        }
+      }),
+    )
+    return withAttachedSkills(
+      instruction,
+      bodies.filter((b): b is { name: string; body: string } => b !== null),
+    )
+  }
+
+  const listSkillsForMenu = async () =>
+    ((await window.markdownApi?.skillsList?.()) ?? []).map(({ name, description }) => ({
+      name,
+      description,
+    }))
+  const toggleSkill = (name: string) => {
+    setSkillsTooLong(false)
+    setAttachedSkills((prev) => {
+      if (prev.includes(name)) return prev.filter((n) => n !== name)
+      if (prev.length >= MAX_ATTACHED_SKILLS) return prev
+      return [...prev, name]
+    })
+  }
+
   const send = (
     text: string,
     displayText?: string,
     retryOf?: Pick<ChatEntry, 'scope' | 'fence'>,
     queueFence?: FenceRange[],
+    /** only the composer's own send takes the attached skills along */
+    attachSkills = false,
   ): boolean => {
     const instruction = text.trim()
     const loop = loopRef.current
     if (needModelHint !== null || !instruction || !loop || loop.busy) return false
     // presets, retry and continue refuse like Send until the UniWork disclosure is acknowledged
     if (uniworkGate.refuse()) return false
+    setSkillsTooLong(false)
+    // skills ride with this one message only; a queue batch or retry carries none
+    const sentSkills = attachSkills ? attachedSkillsRef.current : []
+    const scope = retryOf
+      ? retryOf.scope
+      : displayText === undefined
+        ? selectionScopeQuote()
+        : undefined
+    if (sentSkills.length > 0) {
+      setBusy(true)
+      void (async () => {
+        try {
+          const s = await window.markdownApi?.getAiSettings?.()
+          if (s) settingsRef.current = s
+          const activeProvider = s?.provider ?? settingsRef.current?.provider ?? provider
+          setProvider(activeProvider)
+          const withSkills = await withSkillBodies(instruction, sentSkills)
+          if (!mountedRef.current) return
+          if (activeProvider === 'uniwork' && runeCount(withSkills) > UNIWORK_QUESTION_MAX_RUNES) {
+            setSkillsTooLong(true)
+            setBusy(false)
+            return
+          }
+          setAttachedSkills([])
+          stickToBottomRef.current = true
+          runInstructionRef.current = instruction
+          runDisplayRef.current = displayText ?? instruction
+          runMutatedRef.current = false
+          setSaveOffer(null)
+          runAssetsRef.current = []
+          runToolsRef.current = []
+          runUsageRef.current = undefined
+          const ed = depsRef.current.getEditor()
+          const fence = retryOf
+            ? retryFence(retryOf.fence ?? { fenced: scope !== undefined })
+            : ed
+              ? turnFence(ed, { scoped: scope !== undefined, queueFence })
+              : null
+          if (ed) setEditFence(ed, fence)
+          if (scope) setInactiveSelectionShown(depsRef.current.getEditor(), true)
+          setChat((prev) => [
+            ...prev,
+            {
+              role: 'user',
+              text: displayText ?? instruction,
+              ...(displayText !== undefined && displayText !== instruction ? { instruction } : {}),
+              ...(scope ? { scope } : {}),
+              ...(fence ? { fence: { fenced: true, ranges: fence } } : {}),
+              skills: sentSkills,
+            },
+            { role: 'assistant', text: '', streaming: true },
+          ])
+          setPrompt('')
+          persistMessage('user', displayText ?? instruction, undefined, scope)
+          await loop.run(withSkills)
+        } catch (err) {
+          if (!mountedRef.current) return
+          const editor = depsRef.current.getEditor()
+          if (editor) endRunFence(editor)
+          patchLast({
+            streaming: false,
+            text: err instanceof Error ? err.message : String(err),
+            isError: true,
+          })
+          setBusy(false)
+        }
+      })()
+      return true
+    }
     stickToBottomRef.current = true
     runInstructionRef.current = instruction
     runDisplayRef.current = displayText ?? instruction
@@ -977,12 +1099,6 @@ export function AiPanel({
     runAssetsRef.current = []
     runToolsRef.current = []
     runUsageRef.current = undefined
-    // a queue batch carries its own display text: no selection quote
-    const scope = retryOf
-      ? retryOf.scope
-      : displayText === undefined
-        ? selectionScopeQuote()
-        : undefined
     // a scoped send (selection chip) or a queue submission may only edit its targets; tools
     // enforce it in code. A new turn is fenced to its own scope; a retry, header or bubble, to
     // the ranges its entry's run ended with, so a fenced turn is never retried unfenced.
@@ -1208,6 +1324,7 @@ export function AiPanel({
           if (!alive) return
           settingsRef.current = s
           setProvider(s?.provider)
+          if ((s?.provider ?? settingsRef.current?.provider) !== 'uniwork') setSkillsTooLong(false)
         })
         .catch(() => {})
     }
@@ -1376,6 +1493,8 @@ export function AiPanel({
                 setBusy(false)
                 setSaveOffer(null)
                 setChat([])
+                setAttachedSkills([])
+                setSkillsTooLong(false)
               }}
               data-tip={t('aiNewChat')}
               aria-label={t('aiNewChat')}
@@ -1460,6 +1579,7 @@ export function AiPanel({
               return (
                 <div key={i} className="ai-msg ai-msg-user">
                   {entry.scope && <AiScopeQuote scope={entry.scope} />}
+                  {entry.skills && <AiSkillChips lang={lang} names={entry.skills} />}
                   <span dir="auto">{entry.text}</span>
                   {entry.clarifyReceipts?.map((qa, k) => (
                     <div key={`ca${k}`} className="ai-clarify-answered">
@@ -1738,6 +1858,11 @@ export function AiPanel({
               {t('aiRedoPictureLost')}
             </div>
           )}
+          {skillsTooLong && (
+            <div className="ai-skills-too-long-notice" role="status">
+              {AI_SKILLS_LABELS[lang].uniworkTooLongNotice}
+            </div>
+          )}
           {activePartial && (
             <div className="ai-queue ai-partial-card" role="group" aria-label={t('aiPartialTitle')}>
               <div className="ai-queue-head">
@@ -1815,42 +1940,47 @@ export function AiPanel({
                 : undefined
             }
             header={
-              hasScopeSelection && (
-                <div className="ai-scope-row">
-                  <span className="ai-scope-hint">
-                    <button
-                      className="ai-scope-label"
-                      onClick={() => setScopePreviewOpen((v) => !v)}
-                      aria-expanded={scopePreviewOpen}
-                      data-tip={t('aiScopeSelectionTip')}
-                    >
-                      {t('aiScopeSelection', { words: countWords(selectionText) })}
-                    </button>
-                    <button
-                      className="ai-scope-clear"
-                      onClick={clearScopeSelection}
-                      data-tip={t('aiScopeClearTitle')}
-                      aria-label={t('aiScopeClearTitle')}
-                    >
-                      <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
-                        <path
-                          d="M4 4l8 8M12 4l-8 8"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                    </button>
-                  </span>
-                  {scopePreviewOpen && (
-                    <div className="ai-scope-preview">
-                      {selectionText.length > 400
-                        ? `${selectionText.slice(0, 400)}…`
-                        : selectionText}
+              (hasScopeSelection || attachedSkills.length > 0) && (
+                <>
+                  <AiSkillChips lang={lang} names={attachedSkills} onRemove={toggleSkill} />
+                  {hasScopeSelection && (
+                    <div className="ai-scope-row">
+                      <span className="ai-scope-hint">
+                        <button
+                          className="ai-scope-label"
+                          onClick={() => setScopePreviewOpen((v) => !v)}
+                          aria-expanded={scopePreviewOpen}
+                          data-tip={t('aiScopeSelectionTip')}
+                        >
+                          {t('aiScopeSelection', { words: countWords(selectionText) })}
+                        </button>
+                        <button
+                          className="ai-scope-clear"
+                          onClick={clearScopeSelection}
+                          data-tip={t('aiScopeClearTitle')}
+                          aria-label={t('aiScopeClearTitle')}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden>
+                            <path
+                              d="M4 4l8 8M12 4l-8 8"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </button>
+                      </span>
+                      {scopePreviewOpen && (
+                        <div className="ai-scope-preview">
+                          {selectionText.length > 400
+                            ? `${selectionText.slice(0, 400)}…`
+                            : selectionText}
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
+                </>
               )
             }
             placeholder={t('aiComposerPlaceholder')}
@@ -1867,14 +1997,24 @@ export function AiPanel({
                   onAnnounce={(text) => setPickerNote({ text, over: panelLiveAnnouncement })}
                 />
                 {sessionUsage && <AiUsageChip usage={sessionUsage} session lang={lang} />}
+                <AiSkillsMenu
+                  lang={lang}
+                  listSkills={listSkillsForMenu}
+                  selected={attachedSkills}
+                  onToggle={toggleSkill}
+                  onManage={() => void window.markdownApi?.openSkillsSettings?.()}
+                />
               </>
             }
             sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
             sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
             stopIcon={<img src={sendStop} alt="" aria-hidden />}
             textareaRef={inputRef}
-            onChange={setPrompt}
-            onSend={() => send(prompt)}
+            onChange={(next) => {
+              setSkillsTooLong(false)
+              setPrompt(next)
+            }}
+            onSend={() => send(prompt, undefined, undefined, undefined, true)}
             onStop={stop}
           />
         </div>
