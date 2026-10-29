@@ -55,8 +55,18 @@ describe('assertModernSaveTarget (R2-2)', () => {
     expect(assertModernSaveTarget('/home/me/Budget', 'xlsx')).toBe('/home/me/Budget')
   })
 
-  it('refuses every legacy extension, any case, instead of retargeting it', () => {
-    for (const name of ['/h/A.doc', '/h/A.XLS', '/h/A.Ppt']) {
+  it('refuses every legacy and OpenDocument extension, any case, instead of retargeting it', () => {
+    for (const name of [
+      '/h/A.doc',
+      '/h/A.XLS',
+      '/h/A.Ppt',
+      '/h/A.odt',
+      '/h/A.OTT',
+      '/h/A.ods',
+      '/h/A.OTS',
+      '/h/A.odp',
+      '/h/A.OTP',
+    ]) {
       expect(() => assertModernSaveTarget(name, 'docx')).toThrow(/\.docx/)
     }
   })

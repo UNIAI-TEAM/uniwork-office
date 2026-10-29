@@ -18,6 +18,19 @@ describe('collectLaunchPaths', () => {
       collectLaunchPaths(['GenOffice.app', '/data/variants.tsv'], undefined, () => true),
     ).toEqual(['/data/variants.tsv'])
   })
+  it('accepts all six OpenDocument extensions (.odt/.ott/.ods/.ots/.odp/.otp) from argv', () => {
+    const odfPaths = [
+      '/docs/report.odt',
+      '/docs/template.OTT',
+      '/docs/budget.ods',
+      '/docs/template.OTS',
+      '/docs/slides.odp',
+      '/docs/template.OTP',
+    ]
+    expect(collectLaunchPaths(['GenOffice.app', ...odfPaths], undefined, () => true)).toEqual(
+      odfPaths,
+    )
+  })
 
   /**
    * A `.txt` or `.json` is now a document the text app opens, so dropping one

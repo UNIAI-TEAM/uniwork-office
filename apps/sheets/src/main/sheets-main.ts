@@ -1757,9 +1757,10 @@ async function saveFileDialog(event: IpcMainInvokeEvent, options: SaveDialogOpti
 }
 
 /** Workbook file extensions the open pipeline accepts. Single source for the
- *  picker filters, the merge-source check, and the crash re-open check. */
-const WORKBOOK_EXTS = new Set(['xlsx', 'xlsm', 'xls', 'csv', 'tsv'])
-
+ *  picker filters, the merge-source check, and the crash re-open check.
+ *  .ods/.ots open through the shell's converter route, like .xls. */
+const WORKBOOK_EXTS = new Set(['xlsx', 'xlsm', 'xls', 'csv', 'tsv', 'ods', 'ots'])
+const WORKBOOK_FILTER_EXTENSIONS = [...WORKBOOK_EXTS]
 /** register a tab's webContents/client pair and wire up cleanup on teardown */
 /** Clients whose process-death notification is already wired. A sidecar client
  *  is shared by every tab (the `sidecar ?? new XlsxSidecarClient(...)` reuse),
@@ -2815,15 +2816,13 @@ export function registerSheetsIpc(): void {
     if (!path) {
       const selection = await openFileDialog(event, {
         properties: ['openFile'],
-        filters: [
-          { name: tm('filterSpreadsheets'), extensions: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'] },
-        ],
+        filters: [{ name: tm('filterSpreadsheets'), extensions: WORKBOOK_FILTER_EXTENSIONS }],
       })
       if (selection.canceled || !selection.filePaths[0]) return null
       path = selection.filePaths[0]
-      // a picked legacy .xls goes to the shell's converter route; only a missing converter
-      // falls back (shell side) to the values-only open of this same file
-      if (/\.xls$/i.test(path) && legacyOpenHook?.(path)) return null
+      // a picked legacy .xls or OpenDocument .ods/.ots goes to the shell's converter route; only a
+      // missing converter falls back (shell side) to the values-only open of an .xls
+      if (/\.(xls|ods|ots)$/i.test(path) && legacyOpenHook?.(path)) return null
       // Retry on a stalled open restarts this pick, not an earlier shell open
       rememberOpenedWorkbook(event.sender, path)
     }
@@ -3048,9 +3047,7 @@ export function registerSheetsIpc(): void {
   ipcMain.handle(IPC_CHANNELS.selectWorkbooksForMerge, async (event) => {
     const selection = await openFileDialog(event, {
       properties: ['openFile', 'multiSelections'],
-      filters: [
-        { name: tm('filterSpreadsheets'), extensions: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'] },
-      ],
+      filters: [{ name: tm('filterSpreadsheets'), extensions: WORKBOOK_FILTER_EXTENSIONS }],
     })
     if (selection.canceled || selection.filePaths.length === 0) return null
     return openMergeSources(event, selection.filePaths)

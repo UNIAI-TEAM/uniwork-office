@@ -50,24 +50,35 @@ describe('handleDroppedFiles', () => {
 
   it('warns once with the combined extensions for known-unsupported drops', () => {
     const deps = fakeDeps()
-    handleDroppedFiles(['/tmp/old.odt', '/tmp/deck.pages', '/tmp/note.rtf'], deps)
+    handleDroppedFiles(['/tmp/old.xlsb', '/tmp/deck.pages', '/tmp/note.rtf'], deps)
     expect(deps.opened).toEqual([])
     expect(deps.revealed).not.toHaveBeenCalled()
-    expect(deps.warned).toEqual(['unsupported: odt, pages, rtf'])
+    expect(deps.warned).toEqual(['unsupported: xlsb, pages, rtf'])
   })
 
   it('opens the supported files and warns about the rest in a mixed drop', () => {
     const deps = fakeDeps()
-    handleDroppedFiles(['/tmp/new.docx', '/tmp/old.odt'], deps)
+    handleDroppedFiles(['/tmp/new.docx', '/tmp/old.pages'], deps)
     expect(deps.opened).toEqual(['/tmp/new.docx'])
     expect(deps.revealed).toHaveBeenCalledOnce()
-    expect(deps.warned).toEqual(['unsupported: odt'])
+    expect(deps.warned).toEqual(['unsupported: pages'])
   })
 
-  it('sends a dropped legacy .doc / .xls / .ppt through the open pipeline (the converter)', () => {
+  it('sends dropped legacy .doc/.xls/.ppt and OpenDocument .odt/.ods/.odp (+ templates) through the open pipeline', () => {
     const deps = fakeDeps()
-    handleDroppedFiles(['/tmp/old.doc', '/tmp/old.xls', '/tmp/old.ppt'], deps)
-    expect(deps.opened).toEqual(['/tmp/old.doc', '/tmp/old.xls', '/tmp/old.ppt'])
+    const paths = [
+      '/tmp/old.doc',
+      '/tmp/old.xls',
+      '/tmp/old.ppt',
+      '/tmp/doc.odt',
+      '/tmp/tpl.ott',
+      '/tmp/sheet.ods',
+      '/tmp/tpl.ots',
+      '/tmp/deck.odp',
+      '/tmp/tpl.otp',
+    ]
+    handleDroppedFiles(paths, deps)
+    expect(deps.opened).toEqual(paths)
     expect(deps.warned).toEqual([])
   })
 

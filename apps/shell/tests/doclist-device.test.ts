@@ -505,4 +505,26 @@ describe('DocList on the device screen (UNI-2047 B1)', () => {
     await mount()
     expect(headers().filter(Boolean)).toEqual(['Name', 'Updated'])
   })
+
+  it('draws the doc/sheet/slide file-type icon tile (not a generic letter svg) for the six OpenDocument extensions', async () => {
+    const odfFiles = [
+      'Report.odt',
+      'Letter.ott',
+      'Budget.ods',
+      'Sheet.ots',
+      'Deck.odp',
+      'Slide.otp',
+    ]
+    await mount({
+      rows: deviceRows(
+        [],
+        odfFiles.map((name, i) => file(name, at(2026, 10, 21, 9, i), 1000)),
+      ),
+    })
+    for (const name of odfFiles) {
+      const row = host.querySelector(`[data-doc-id="/Users/linh/Documents/${name}"]`)
+      const img = row?.querySelector('[data-col="name"] img')
+      expect(img, `expected img tile for ${name}`).not.toBeNull()
+    }
+  })
 })

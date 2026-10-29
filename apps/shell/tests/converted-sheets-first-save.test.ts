@@ -255,6 +255,16 @@ describe("Sheets' own File > Open of a legacy .xls (R1-1)", () => {
     expect(result).toBeNull()
     expect(hooks.opened).toEqual([])
   })
+  it.each(['Budget.ods', 'Template.ots'])(
+    'hands a picked OpenDocument %s to the shell converter route and opens nothing itself',
+    async (fileName) => {
+      const { result, handedOver } = await pick(fileName, true)
+
+      expect(handedOver).toEqual([hooks.picked])
+      expect(result).toBeNull()
+      expect(hooks.opened).toEqual([])
+    },
+  )
 
   it('without a taker (no shell, or the shell declined) the local open pipeline stays as it was', async () => {
     const declined = await pick('Declined.xls', false)

@@ -4,10 +4,25 @@ import { cp, mkdir, mkdtemp, open, readFile, rm, stat, writeFile } from 'node:fs
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { inflateRawSync } from 'node:zlib'
 import { killProcessTree, type KillProcessTreeDeps } from './pdf-convert/convert-host'
 
-export type LegacySourceFormat = 'doc' | 'xls' | 'ppt'
+export type OdfSourceFormat = 'odt' | 'ott' | 'ods' | 'ots' | 'odp' | 'otp'
+export type LegacySourceFormat = 'doc' | 'xls' | 'ppt' | OdfSourceFormat
 export type LegacyTargetFormat = 'docx' | 'xlsx' | 'pptx'
+
+const ODF_SOURCE_FORMATS: Readonly<Record<string, true>> = {
+  odt: true,
+  ott: true,
+  ods: true,
+  ots: true,
+  odp: true,
+  otp: true,
+}
+
+export function isOdfFormat(format: string): format is OdfSourceFormat {
+  return Object.hasOwn(ODF_SOURCE_FORMATS, format)
+}
 
 export type LegacyConvertErrorCode =
   'encrypted' | 'corrupt' | 'unsupported' | 'timeout' | 'converter_missing' | 'cancelled' | 'failed'
@@ -32,14 +47,26 @@ export class LegacyConvertError extends Error {
 
 export const LEGACY_TARGET_FOR_SOURCE: Readonly<Record<LegacySourceFormat, LegacyTargetFormat>> = {
   doc: 'docx',
+  odt: 'docx',
+  ott: 'docx',
   xls: 'xlsx',
+  ods: 'xlsx',
+  ots: 'xlsx',
   ppt: 'pptx',
+  odp: 'pptx',
+  otp: 'pptx',
 }
 
 export const LEGACY_INFILTER_FOR_SOURCE: Readonly<Record<LegacySourceFormat, string>> = {
   doc: 'MS Word 97',
+  odt: 'writer8',
+  ott: 'writer8',
   xls: 'MS Excel 97',
+  ods: 'calc8',
+  ots: 'calc8',
   ppt: 'MS PowerPoint 97',
+  odp: 'impress8',
+  otp: 'impress8',
 }
 
 export const OOXML_REQUIRED_MAIN_PART: Readonly<Record<LegacyTargetFormat, string>> = {
@@ -70,7 +97,7 @@ const MAX_BIFF_SCAN_RECORDS = 500_000
 
 export function legacyFormatForPath(filePath: string): LegacySourceFormat | null {
   const ext = extname(filePath).slice(1).toLowerCase()
-  if (ext === 'doc' || ext === 'xls' || ext === 'ppt') return ext
+  if (ext === 'doc' || ext === 'xls' || ext === 'ppt' || isOdfFormat(ext)) return ext
   return null
 }
 
@@ -439,6 +466,39 @@ function hasUsableZipPart(bytes: Uint8Array, entries: readonly ZipEntry[], name:
     return dataStart <= bytes.byteLength && entry.compressedSize <= bytes.byteLength - dataStart
   })
 }
+/** Largest uncompressed part size allowed in an ODF ZIP package (64 MiB). */
+export const MAX_ODF_PART_BYTES = 64 * 1024 * 1024
+
+/**
+ * Read and decompress one entry from an in-memory ZIP archive after checking its
+ * declared uncompressed size against `MAX_ODF_PART_BYTES`.
+ */
+function readZipEntryBytes(bytes: Uint8Array, entry: ZipEntry): Uint8Array | null {
+  if (entry.size > MAX_ODF_PART_BYTES) return null
+  if (entry.method !== 0 && entry.method !== 8) return null
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  if (
+    entry.localOffset + 30 > bytes.byteLength ||
+    view.getUint32(entry.localOffset, true) !== ZIP_LOCAL_SIG
+  ) {
+    return null
+  }
+  const dataStart =
+    entry.localOffset +
+    30 +
+    view.getUint16(entry.localOffset + 26, true) +
+    view.getUint16(entry.localOffset + 28, true)
+  if (dataStart > bytes.byteLength || entry.compressedSize > bytes.byteLength - dataStart) {
+    return null
+  }
+  const raw = bytes.subarray(dataStart, dataStart + entry.compressedSize)
+  if (entry.method === 0) return raw
+  try {
+    return new Uint8Array(inflateRawSync(raw, { maxOutputLength: MAX_ODF_PART_BYTES }))
+  } catch {
+    return null
+  }
+}
 
 /**
  * Inspect a ZIP buffer to determine whether it is a valid OOXML package and which
@@ -606,6 +666,114 @@ function checkPptStreams(streams: Map<string, Uint8Array>): void {
 }
 
 /**
+ * Pure TypeScript preflight check on OpenDocument (`.odt`/`.ott`/`.ods`/`.ots`/`.odp`/`.otp`)
+ * bytes before spawning `soffice.bin`:
+ * - Rejects empty or non-ZIP files as `corrupt`.
+ * - Rejects any ZIP entry whose central directory declares an uncompressed size > 64 MiB as `corrupt`.
+ * - Reads `META-INF/manifest.xml` (or `mimetype`) via the ZIP reader, detects
+ *   `manifest:encryption-data` as `encrypted`, and requires `content.xml` or `styles.xml`.
+ * - Detects OOXML files misnamed with an ODF extension as `ooxml_misnamed`.
+ */
+export function preflightOdfBytes(
+  bytes: Uint8Array,
+  sourceFormat: OdfSourceFormat,
+): LegacyPreflightResult {
+  if (bytes.byteLength === 0) {
+    throw new LegacyConvertError('corrupt', 'File is empty (0 bytes)', { format: sourceFormat })
+  }
+  if (!isZipSignature(bytes)) {
+    throw new LegacyConvertError('corrupt', `File is not a valid OpenDocument ZIP archive`, {
+      format: sourceFormat,
+    })
+  }
+  const detectedOoxml = detectOoxmlKindFromZipBytes(bytes)
+  if (detectedOoxml) {
+    return {
+      kind: 'ooxml_misnamed',
+      sourceFormat,
+      detectedFormat: detectedOoxml,
+    }
+  }
+  let entries: ZipEntry[]
+  try {
+    entries = listZipEntries(bytes)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (/encrypted/i.test(msg)) {
+      throw new LegacyConvertError(
+        'encrypted',
+        `Password-protected OpenDocument (.${sourceFormat})`,
+        {
+          format: sourceFormat,
+          cause: err,
+        },
+      )
+    }
+    throw new LegacyConvertError('corrupt', `Invalid OpenDocument ZIP container: ${msg}`, {
+      format: sourceFormat,
+      cause: err,
+    })
+  }
+  for (const entry of entries) {
+    if (entry.size > MAX_ODF_PART_BYTES) {
+      throw new LegacyConvertError(
+        'corrupt',
+        `OpenDocument part "${entry.name}" exceeds the ${MAX_ODF_PART_BYTES / (1024 * 1024)} MiB size limit`,
+        { format: sourceFormat },
+      )
+    }
+  }
+  const manifestEntry = entries.find((e) => e.name === 'META-INF/manifest.xml')
+  const mimetypeEntry = entries.find((e) => e.name === 'mimetype')
+  if (!manifestEntry && !mimetypeEntry) {
+    throw new LegacyConvertError(
+      'corrupt',
+      'OpenDocument archive is missing META-INF/manifest.xml and mimetype',
+      { format: sourceFormat },
+    )
+  }
+  if (manifestEntry) {
+    const manifestBytes = readZipEntryBytes(bytes, manifestEntry)
+    if (!manifestBytes) {
+      throw new LegacyConvertError('corrupt', 'OpenDocument META-INF/manifest.xml is unreadable', {
+        format: sourceFormat,
+      })
+    }
+    const manifestXml = new TextDecoder('utf-8').decode(manifestBytes)
+    if (/<\s*(?:[A-Za-z0-9_-]+:)?encryption-data\b/.test(manifestXml)) {
+      throw new LegacyConvertError(
+        'encrypted',
+        `Password-protected OpenDocument (.${sourceFormat})`,
+        { format: sourceFormat },
+      )
+    }
+  }
+  if (mimetypeEntry && mimetypeEntry.size > 0) {
+    const mimetypeBytes = readZipEntryBytes(bytes, mimetypeEntry)
+    if (!mimetypeBytes) {
+      throw new LegacyConvertError('corrupt', 'OpenDocument mimetype entry is unreadable', {
+        format: sourceFormat,
+      })
+    }
+  }
+  if (
+    !hasUsableZipPart(bytes, entries, 'content.xml') &&
+    !hasUsableZipPart(bytes, entries, 'styles.xml')
+  ) {
+    throw new LegacyConvertError(
+      'corrupt',
+      'OpenDocument archive is missing content.xml and styles.xml',
+      { format: sourceFormat },
+    )
+  }
+  return {
+    kind: 'legacy',
+    sourceFormat,
+    targetFormat: LEGACY_TARGET_FOR_SOURCE[sourceFormat],
+  }
+}
+
+/**
  * Pure TypeScript preflight check on legacy `.doc`/`.xls`/`.ppt` bytes before
  * spawning `soffice.bin`.
  *
@@ -620,10 +788,12 @@ export function preflightLegacyBytes(
   bytes: Uint8Array,
   sourceFormat: LegacySourceFormat,
 ): LegacyPreflightResult {
+  if (isOdfFormat(sourceFormat)) {
+    return preflightOdfBytes(bytes, sourceFormat)
+  }
   if (bytes.byteLength === 0) {
     throw new LegacyConvertError('corrupt', 'File is empty (0 bytes)', { format: sourceFormat })
   }
-
   if (isZipSignature(bytes)) {
     const detected = detectOoxmlKindFromZipBytes(bytes)
     if (detected) {

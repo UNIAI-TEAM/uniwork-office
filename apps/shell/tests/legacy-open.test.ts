@@ -129,13 +129,20 @@ describe('createLegacyOpener', () => {
 
   it.each([
     ['docx', '/a/x.doc', 'docs'],
+    ['docx', '/a/x.odt', 'docs'],
+    ['docx', '/a/x.ott', 'docs'],
     ['xlsx', '/a/x.xls', 'sheets'],
+    ['xlsx', '/a/x.ods', 'sheets'],
+    ['xlsx', '/a/x.ots', 'sheets'],
     ['pptx', '/a/x.ppt', 'slides'],
+    ['pptx', '/a/x.odp', 'slides'],
+    ['pptx', '/a/x.otp', 'slides'],
   ] as const)('routes a %s result of %s to %s', async (target, path, kind) => {
     const h = harness(async (p) => converted(target, p))
     createLegacyOpener(h.deps).open(path)
     await vi.waitFor(() => expect(h.opened).toHaveLength(1))
     expect(h.opened[0]!.kind).toBe(kind)
+    expect(h.opened[0]!.suggestSaveAs).toBe(path.replace(/\.[^.]+$/, `.${target}`))
   })
 
   it('opens an OOXML file misnamed as legacy in the editor of its real format', async () => {
@@ -248,15 +255,18 @@ describe('createLegacyOpener', () => {
     expect(h.opened).toEqual([])
   })
 
-  it('has no fallback for .doc/.ppt without the converter', async () => {
-    const h = harness(async () => {
-      throw new LegacyConvertError('converter_missing', 'no converter')
-    })
-    createLegacyOpener(h.deps).open('/w/old.ppt')
-    await vi.waitFor(() => expect(h.notices).toHaveLength(1))
-    expect(h.xlsOpened).toEqual([])
-    expect(h.notices[0]).toMatch(/converter is missing/)
-  })
+  it.each(['/w/old.ppt', '/w/old.odt', '/w/old.ods', '/w/old.odp'])(
+    'shows the converter-missing notice for %s when the converter is absent',
+    async (path) => {
+      const h = harness(async () => {
+        throw new LegacyConvertError('converter_missing', 'no converter')
+      })
+      createLegacyOpener(h.deps).open(path)
+      await vi.waitFor(() => expect(h.notices).toHaveLength(1))
+      expect(h.xlsOpened).toEqual([])
+      expect(h.notices[0]).toMatch(/converter is missing/)
+    },
+  )
 
   it('does not fall back for an .xls that is encrypted or corrupt', async () => {
     const h = harness(async () => {
@@ -514,8 +524,11 @@ describe('temp ownership of a converted copy (R1-5, R1-6, R1-9, R1-11, R1-12, F4
 describe('names a converted tab consistently (R1-13)', () => {
   it.each([
     ['/w/Budget.xls', 'xlsx', 'Budget', '.xlsx'],
+    ['/w/Budget.ods', 'xlsx', 'Budget', '.xlsx'],
     ['/w/Q3 report.v2.doc', 'docx', 'Q3 report.v2', '.docx'],
+    ['/w/Q3 report.v2.odt', 'docx', 'Q3 report.v2', '.docx'],
     ['/w/Deck.ppt', 'pptx', 'Deck', '.pptx'],
+    ['/w/Deck.odp', 'pptx', 'Deck', '.pptx'],
   ] as const)(
     '%s: the tab, the Save dialog name and the upload title all say the OOXML name',
     async (path, target, base, ext) => {

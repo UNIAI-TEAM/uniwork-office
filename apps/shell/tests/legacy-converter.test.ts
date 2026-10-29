@@ -21,9 +21,12 @@ import {
   convertLegacyFile,
   detectOoxmlKindFromZipBytes,
   killAllActiveLegacyConversions,
+  LEGACY_INFILTER_FOR_SOURCE,
+  LEGACY_TARGET_FOR_SOURCE,
   legacyFormatForPath,
   preflightLegacyBytes,
   preflightLegacyFile,
+  preflightOdfBytes,
   resolveLibreOfficePaths,
   sofficeRelativePathForPlatform,
   suggestedOoxmlPathForLegacy,
@@ -32,6 +35,7 @@ import {
 } from '../src/main/legacy-converter'
 
 const FIXTURES_DIR = resolve(import.meta.dirname, 'fixtures', 'legacy')
+const ODF_FIXTURES_DIR = resolve(import.meta.dirname, 'fixtures', 'odf')
 const LO_DIR = process.env.GENOFFICE_LO_DIR?.trim() || ''
 const hasRealLo = Boolean(LO_DIR && resolveLibreOfficePaths({ envDir: LO_DIR }))
 
@@ -249,17 +253,54 @@ describe('legacy-converter', () => {
   })
 
   describe('format helpers & LibreOffice path resolution', () => {
-    it('maps legacy extensions to target OOXML extensions and suggested Save As paths', () => {
+    it('maps legacy and OpenDocument extensions to target OOXML extensions, infilters and suggested Save As paths', () => {
       expect(legacyFormatForPath('/tmp/report.doc')).toBe('doc')
       expect(legacyFormatForPath('/tmp/sheet.XLS')).toBe('xls')
       expect(legacyFormatForPath('/tmp/slides.Ppt')).toBe('ppt')
+      expect(legacyFormatForPath('/tmp/report.odt')).toBe('odt')
+      expect(legacyFormatForPath('/tmp/template.OTT')).toBe('ott')
+      expect(legacyFormatForPath('/tmp/sheet.ods')).toBe('ods')
+      expect(legacyFormatForPath('/tmp/template.OTS')).toBe('ots')
+      expect(legacyFormatForPath('/tmp/slides.odp')).toBe('odp')
+      expect(legacyFormatForPath('/tmp/template.OTP')).toBe('otp')
       expect(legacyFormatForPath('/tmp/modern.docx')).toBeNull()
+
+      expect(LEGACY_TARGET_FOR_SOURCE).toEqual({
+        doc: 'docx',
+        odt: 'docx',
+        ott: 'docx',
+        xls: 'xlsx',
+        ods: 'xlsx',
+        ots: 'xlsx',
+        ppt: 'pptx',
+        odp: 'pptx',
+        otp: 'pptx',
+      })
+
+      // R1: the trimmed LibreOffice pack requires explicit writer8 / calc8 / impress8 infilters for ODF
+      expect(LEGACY_INFILTER_FOR_SOURCE).toEqual({
+        doc: 'MS Word 97',
+        odt: 'writer8',
+        ott: 'writer8',
+        xls: 'MS Excel 97',
+        ods: 'calc8',
+        ots: 'calc8',
+        ppt: 'MS PowerPoint 97',
+        odp: 'impress8',
+        otp: 'impress8',
+      })
 
       expect(suggestedOoxmlPathForLegacy('/Users/a/Quarterly Report.doc')).toBe(
         '/Users/a/Quarterly Report.docx',
       )
       expect(suggestedOoxmlPathForLegacy('/Users/a/budget.XLS')).toBe('/Users/a/budget.xlsx')
       expect(suggestedOoxmlPathForLegacy('/Users/a/deck.ppt')).toBe('/Users/a/deck.pptx')
+      expect(suggestedOoxmlPathForLegacy('/Users/a/report.odt')).toBe('/Users/a/report.docx')
+      expect(suggestedOoxmlPathForLegacy('/Users/a/letter.OTT')).toBe('/Users/a/letter.docx')
+      expect(suggestedOoxmlPathForLegacy('/Users/a/budget.ods')).toBe('/Users/a/budget.xlsx')
+      expect(suggestedOoxmlPathForLegacy('/Users/a/budget.ots')).toBe('/Users/a/budget.xlsx')
+      expect(suggestedOoxmlPathForLegacy('/Users/a/deck.odp')).toBe('/Users/a/deck.pptx')
+      expect(suggestedOoxmlPathForLegacy('/Users/a/deck.otp')).toBe('/Users/a/deck.pptx')
     })
 
     it('resolves platform-specific soffice paths under resourcesPath or GENOFFICE_LO_DIR', () => {
@@ -322,6 +363,24 @@ describe('legacy-converter', () => {
       expect(args).toContain('--convert-to')
       expect(args).toContain('xlsx')
 
+      for (const [sourceFormat, targetFormat, infilter] of [
+        ['odt', 'docx', 'writer8'],
+        ['ott', 'docx', 'writer8'],
+        ['ods', 'xlsx', 'calc8'],
+        ['ots', 'xlsx', 'calc8'],
+        ['odp', 'pptx', 'impress8'],
+        ['otp', 'pptx', 'impress8'],
+      ] as const) {
+        const odfArgs = buildSofficeArgs({
+          profileDir: '/tmp/job-1/profile',
+          sourceFormat,
+          targetFormat,
+          outDir: '/tmp/job-1/out',
+          inputPath: `/tmp/input.${sourceFormat}`,
+        })
+        expect(odfArgs).toContain(`--infilter=${infilter}`)
+        expect(odfArgs).toContain(targetFormat)
+      }
       const env = buildSofficeEnv(
         {
           rootDir: '/opt/lo',
@@ -439,6 +498,116 @@ describe('legacy-converter', () => {
         targetFormat: 'pptx',
       })
     })
+
+    it.each([
+      ['native-writer.odt', 'odt'],
+      ['native-calc.ods', 'ods'],
+      ['native-impress.odp', 'odp'],
+    ] as const)(
+      'refuses password-protected ODF fixture %s (%s) with code "encrypted" without spawning soffice',
+      async (fileName, format) => {
+        const filePath = join(ODF_FIXTURES_DIR, 'pw', fileName)
+        expect(() => preflightLegacyFile(filePath, format)).toThrowError(
+          expect.objectContaining({
+            name: 'LegacyConvertError',
+            code: 'encrypted',
+            format,
+          }),
+        )
+
+        const { spawnFn, getSpawnCount } = createFakeChildProcess({})
+        await expect(
+          convertLegacyFile(filePath, {
+            sourceFormat: format,
+            spawnFn,
+          }),
+        ).rejects.toMatchObject({
+          code: 'encrypted',
+          format,
+        })
+        expect(getSpawnCount()).toBe(0)
+      },
+    )
+
+    it.each([
+      ['empty.odt', 'odt'],
+      ['not-a-zip.odt', 'odt'],
+      ['truncated.odt', 'odt'],
+      ['bomb-content-80mib.odt', 'odt'],
+    ] as const)(
+      'refuses hostile/corrupt ODF fixture %s (%s) in pre-check with code "corrupt" without spawning soffice (R2)',
+      async (fileName, format) => {
+        const filePath = join(ODF_FIXTURES_DIR, 'security', fileName)
+        expect(() => preflightLegacyFile(filePath, format)).toThrowError(
+          expect.objectContaining({
+            name: 'LegacyConvertError',
+            code: 'corrupt',
+            format,
+          }),
+        )
+
+        const { spawnFn, getSpawnCount } = createFakeChildProcess({})
+        await expect(
+          convertLegacyFile(filePath, {
+            sourceFormat: format,
+            spawnFn,
+          }),
+        ).rejects.toMatchObject({
+          code: 'corrupt',
+          format,
+        })
+        expect(getSpawnCount()).toBe(0)
+      },
+    )
+
+    it.each([
+      ['native-writer.odt', 'odt', 'docx'],
+      ['native-writer.ott', 'ott', 'docx'],
+      ['native-calc.ods', 'ods', 'xlsx'],
+      ['native-calc.ots', 'ots', 'xlsx'],
+      ['native-impress.odp', 'odp', 'pptx'],
+      ['native-impress.otp', 'otp', 'pptx'],
+    ] as const)(
+      'accepts valid ODF fixture %s (%s -> %s) in preflight and converts via soffice with explicit infilter',
+      async (fileName, sourceFormat, targetFormat) => {
+        const filePath = join(ODF_FIXTURES_DIR, fileName)
+        expect(preflightLegacyFile(filePath)).toEqual({
+          kind: 'legacy',
+          sourceFormat,
+          targetFormat,
+        })
+        expect(preflightOdfBytes(new Uint8Array(readFileSync(filePath)), sourceFormat)).toEqual({
+          kind: 'legacy',
+          sourceFormat,
+          targetFormat,
+        })
+
+        const root = makeTempDir()
+        const loDir = join(root, 'lo')
+        mkdirSync(join(loDir, 'program'), { recursive: true })
+        writeFileSync(join(loDir, 'program', 'soffice.bin'), '')
+        const outZip = await makeMinimalOoxmlZip(targetFormat)
+        let seenArgs: readonly string[] = []
+        const { spawnFn } = createFakeChildProcess({
+          onSpawn: (args) => {
+            seenArgs = args
+            const outDir = args[args.indexOf('--outdir') + 1]!
+            const stem = fileName.replace(/\.[^.]+$/, '')
+            writeFileSync(join(outDir, `${stem}.${targetFormat}`), outZip)
+          },
+        })
+        const res = await convertLegacyFile(filePath, {
+          loOptions: { platform: 'linux', envDir: loDir },
+          tempRoot: root,
+          spawnFn,
+          killTreeDeps: { killGroup: () => {} },
+        })
+        expect(res.kind).toBe('converted')
+        expect(res.sourceFormat).toBe(sourceFormat)
+        expect(res.targetFormat).toBe(targetFormat)
+        expect(seenArgs).toContain(`--infilter=${LEGACY_INFILTER_FOR_SOURCE[sourceFormat]}`)
+      },
+    )
   })
 
   describe('OOXML output validation, timeout, cancellation & converter_missing', () => {
