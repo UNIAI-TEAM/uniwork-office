@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
+import { Worker } from 'node:worker_threads'
 import { forgetConvertedDocument, registerConvertedDocument } from '@genoffice/electron-utils'
 import {
   isOdfFormat,
@@ -18,6 +21,7 @@ import {
 } from './legacy-converter'
 import type { LegacyOpenStringKey } from './legacy-open-strings'
 import type { CloudConvertOutcome, CloudLegacyConvertInput } from './uniwork-docs/legacy-cloud-open'
+import type { OdfWorkerKind, OdfWorkerRequest, OdfWorkerResponse } from './odf-fallback-worker'
 
 const FOLDING_FS = process.platform === 'win32' || process.platform === 'darwin'
 const sameDir = (a: string, b: string): boolean =>
@@ -54,17 +58,230 @@ export interface OdfDroppedItem {
   readonly count: number
 }
 
+export interface OdfFallbackCallOptions {
+  readonly signal?: AbortSignal
+}
+
 export interface OdfFallbackEngine {
-  convertOdtToDocx(bytes: Uint8Array): Promise<{
+  convertOdtToDocx(
+    bytes: Uint8Array,
+    options?: OdfFallbackCallOptions,
+  ): Promise<{
     docx: Uint8Array
     blocks: number
     dropped: OdfDroppedItem[]
   }>
-  convertOdpToPptx(bytes: Uint8Array): Promise<{
+  convertOdpToPptx(
+    bytes: Uint8Array,
+    options?: OdfFallbackCallOptions,
+  ): Promise<{
     pptx: Uint8Array
     slides: number
     dropped: OdfDroppedItem[]
   }>
+}
+
+/**
+ * Default deadline for one pure-JS ODF fallback worker job (60 s, matching the
+ * bundled LibreOffice subprocess job timeout in `legacy-converter.ts`).
+ */
+export const DEFAULT_ODF_FALLBACK_TIMEOUT_MS = 60_000
+
+/**
+ * Old-generation heap limit for each ODF fallback worker (512 MiB).
+ * Why 512 MiB: preflight caps declared ODF parts at 64 MiB, and valid rich
+ * documents / presentations stay well below 512 MiB during DOM + JSZip
+ * assembly, whereas hostile XML or span amplification that would otherwise
+ * trigger a fatal process-wide V8 OOM in the Electron main process is confined
+ * to the worker (`ERR_WORKER_OUT_OF_MEMORY`) so every open tab survives.
+ */
+export const DEFAULT_ODF_FALLBACK_HEAP_LIMIT_MB = 512
+
+export interface OdfFallbackWorkerOptions {
+  readonly workerPath?: string
+  readonly timeoutMs?: number
+  readonly maxOldGenerationSizeMb?: number
+}
+
+export function defaultOdfFallbackWorkerPath(): string {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const sibling = join(here, 'odf-fallback-worker.js')
+  if (existsSync(sibling)) return sibling
+  const built = resolve(here, '../../out/main/odf-fallback-worker.js')
+  if (existsSync(built)) return built
+  return sibling
+}
+
+/**
+ * Create an `OdfFallbackEngine` that runs each conversion in a dedicated
+ * `node:worker_threads` Worker with `resourceLimits`, a per-job timeout, and
+ * immediate `worker.terminate()` on cancel/dispose.
+ */
+export function createWorkerOdfFallbackEngine(
+  options: OdfFallbackWorkerOptions = {},
+): OdfFallbackEngine {
+  const workerPath = options.workerPath ?? defaultOdfFallbackWorkerPath()
+  const timeoutMs = options.timeoutMs ?? DEFAULT_ODF_FALLBACK_TIMEOUT_MS
+  const maxOldGenerationSizeMb =
+    options.maxOldGenerationSizeMb ?? DEFAULT_ODF_FALLBACK_HEAP_LIMIT_MB
+
+  function runJob(
+    kind: OdfWorkerKind,
+    bytes: Uint8Array,
+    callOptions?: OdfFallbackCallOptions,
+  ): Promise<Extract<OdfWorkerResponse, { ok: true }>> {
+    const signal = callOptions?.signal
+    if (signal?.aborted) {
+      return Promise.reject(new LegacyConvertError('cancelled', 'cancelled'))
+    }
+    return new Promise((resolveJob, rejectJob) => {
+      let settled = false
+      let timer: ReturnType<typeof setTimeout> | null = null
+      let worker: Worker | null = null
+
+      const cleanup = () => {
+        if (timer) {
+          clearTimeout(timer)
+          timer = null
+        }
+        if (signal) {
+          signal.removeEventListener('abort', onAbort)
+        }
+      }
+
+      const finishReject = (err: unknown) => {
+        if (settled) return
+        settled = true
+        cleanup()
+        rejectJob(err)
+      }
+
+      const finishResolve = (res: Extract<OdfWorkerResponse, { ok: true }>) => {
+        if (settled) return
+        settled = true
+        cleanup()
+        resolveJob(res)
+      }
+
+      const onAbort = () => {
+        if (settled) return
+        const w = worker
+        worker = null
+        if (w) void w.terminate()
+        finishReject(new LegacyConvertError('cancelled', 'cancelled'))
+      }
+
+      if (signal) {
+        signal.addEventListener('abort', onAbort, { once: true })
+      }
+
+      try {
+        worker = new Worker(workerPath, {
+          resourceLimits: { maxOldGenerationSizeMb },
+        })
+      } catch (err) {
+        finishReject(
+          new LegacyConvertError('failed', err instanceof Error ? err.message : String(err), {
+            cause: err,
+          }),
+        )
+        return
+      }
+
+      if (timeoutMs > 0) {
+        timer = setTimeout(() => {
+          const w = worker
+          worker = null
+          if (w) void w.terminate()
+          finishReject(
+            new LegacyConvertError(
+              'timeout',
+              `ODF fallback worker timed out after ${timeoutMs} ms`,
+            ),
+          )
+        }, timeoutMs)
+      }
+
+      worker.on('message', (msg: OdfWorkerResponse) => {
+        const w = worker
+        worker = null
+        if (w) void w.terminate()
+        if (!msg || typeof msg !== 'object' || !('ok' in msg)) {
+          finishReject(new LegacyConvertError('failed', 'Invalid ODF worker response'))
+          return
+        }
+        if (msg.ok) {
+          const copy =
+            msg.bytes instanceof Uint8Array
+              ? new Uint8Array(msg.bytes.buffer, msg.bytes.byteOffset, msg.bytes.byteLength)
+              : new Uint8Array(msg.bytes)
+          finishResolve({ ...msg, bytes: copy })
+          return
+        }
+        const err = Object.assign(new Error(msg.message), {
+          name: msg.name,
+          ...(msg.code ? { code: msg.code } : {}),
+        })
+        finishReject(err)
+      })
+
+      worker.on('error', (err) => {
+        const w = worker
+        worker = null
+        if (w) void w.terminate()
+        finishReject(
+          new LegacyConvertError('failed', err instanceof Error ? err.message : String(err), {
+            cause: err,
+          }),
+        )
+      })
+
+      worker.on('exit', (exitCode) => {
+        worker = null
+        if (!settled) {
+          finishReject(
+            new LegacyConvertError(
+              'failed',
+              `ODF fallback worker exited before answering (code ${exitCode})`,
+            ),
+          )
+        }
+      })
+
+      const req: OdfWorkerRequest = { kind, bytes }
+      try {
+        worker.postMessage(req)
+      } catch (err) {
+        const w = worker
+        worker = null
+        if (w) void w.terminate()
+        finishReject(
+          new LegacyConvertError('failed', err instanceof Error ? err.message : String(err), {
+            cause: err,
+          }),
+        )
+      }
+    })
+  }
+
+  return {
+    async convertOdtToDocx(bytes, callOptions) {
+      const res = await runJob('odt', bytes, callOptions)
+      return {
+        docx: res.bytes,
+        blocks: res.kind === 'odt' ? res.blocks : 0,
+        dropped: res.dropped,
+      }
+    },
+    async convertOdpToPptx(bytes, callOptions) {
+      const res = await runJob('odp', bytes, callOptions)
+      return {
+        pptx: res.bytes,
+        slides: res.kind === 'odp' ? res.slides : 0,
+        dropped: res.dropped,
+      }
+    },
+  }
 }
 
 export function isOdfFallbackFormat(source: LegacySourceFormat): source is OdfFallbackSourceFormat {
@@ -148,6 +365,8 @@ const ODF_DROPPED_LABEL_KEYS: Readonly<Record<string, LegacyOpenStringKey>> = {
  * shown raw), or tells the user once that a simpler converter was used when
  * `dropped` is empty.
  */
+const MAX_LISTED_DROPS = 6
+
 export function formatOdfFallbackNotice(
   fileName: string,
   dropped: readonly OdfDroppedItem[],
@@ -160,7 +379,7 @@ export function formatOdfFallbackNotice(
     const key = Object.hasOwn(ODF_DROPPED_LABEL_KEYS, item.what)
       ? ODF_DROPPED_LABEL_KEYS[item.what]
       : undefined
-    if (key) {
+    if (key && parts.length < MAX_LISTED_DROPS) {
       parts.push(t(key, { count: item.count }))
     } else {
       otherCount += item.count
@@ -330,12 +549,12 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
     let dropped: OdfDroppedItem[]
     try {
       if (source === 'odt' || source === 'ott') {
-        const converted = await engine.convertOdtToDocx(inputBytes)
+        const converted = await engine.convertOdtToDocx(inputBytes, { signal })
         bytes = converted.docx
         targetFormat = 'docx'
         dropped = converted.dropped
       } else {
-        const converted = await engine.convertOdpToPptx(inputBytes)
+        const converted = await engine.convertOdpToPptx(inputBytes, { signal })
         bytes = converted.pptx
         targetFormat = 'pptx'
         dropped = converted.dropped
@@ -390,7 +609,11 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
           await runOdfFallback(filePath, fileName, source, controller.signal, endProgress)
           return
         } catch (fallbackErr) {
-          err = fallbackErr
+          // an engine failure keeps the actionable "converter is missing" notice
+          err =
+            fallbackErr instanceof LegacyConvertError && fallbackErr.code === 'failed'
+              ? caughtErr
+              : fallbackErr
         }
       }
       endProgress()
