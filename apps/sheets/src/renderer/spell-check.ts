@@ -15,6 +15,23 @@ export interface SpellEngine {
   getWordSuggestions(word: string): string[]
 }
 
+/** A fixed nonsense word no dictionary contains; see {@link spellEngineHasDictionary}. */
+export const SPELL_PROBE_WORD = 'xqzvjkwpt'
+
+/**
+ * Whether the engine can really flag a misspelling. Without a loaded
+ * dictionary (e.g. signed-out Linux) the frame reports every word as fine,
+ * which would read as a false all-clear: a known-bad probe word that is not
+ * flagged means nothing can be checked.
+ */
+export function spellEngineHasDictionary(engine: SpellEngine): boolean {
+  try {
+    return engine.isWordMisspelled(SPELL_PROBE_WORD)
+  } catch {
+    return false
+  }
+}
+
 /** One string cell candidate for the checker (raw in-memory snapshot value). */
 export interface SpellCellRef {
   readonly sheetId: string

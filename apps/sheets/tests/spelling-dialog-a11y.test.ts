@@ -7,6 +7,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 import { SpellingDialog } from '../src/renderer/SpellingDialog'
+import { SPELL_PROBE_WORD } from '../src/renderer/spell-check'
 import type { SpellWorkbookLike } from '../src/renderer/spell-apply'
 
 const workbook: SpellWorkbookLike = {
@@ -36,7 +37,8 @@ describe('SpellingDialog keyboard contract', () => {
   it('focuses itself, opens on the first finding, selects rows by key and restores focus', async () => {
     vi.stubGlobal('desktopApi', { onLanguageChanged: () => () => {} })
     vi.stubGlobal('nativeSpell', {
-      isWordMisspelled: (word: string) => word === 'teh' || word === 'recieve',
+      isWordMisspelled: (word: string) =>
+        word === 'teh' || word === 'recieve' || word === SPELL_PROBE_WORD,
       getWordSuggestions: (word: string) => (word === 'teh' ? ['the'] : ['receive']),
     })
     const opener = document.createElement('button')
@@ -91,5 +93,37 @@ describe('SpellingDialog keyboard contract', () => {
     root = null
     expect(document.activeElement).toBe(opener)
     opener.remove()
+  })
+
+  it('reports unavailable instead of an all-clear when the engine never flags the probe word', async () => {
+    vi.stubGlobal('desktopApi', { onLanguageChanged: () => () => {} })
+    vi.stubGlobal('nativeSpell', {
+      isWordMisspelled: () => false,
+      getWordSuggestions: () => [],
+    })
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(
+        createElement(
+          LocaleProvider,
+          { initial: 'en', children: null },
+          createElement(SpellingDialog, {
+            onClose: () => {},
+            getWorkbook: () => workbook,
+            isWithheld: () => false,
+            onJumpTo: () => {},
+            lazyNote: '',
+            sessionIgnoredRef: { current: new Set<string>() },
+            setMessage: () => {},
+          }),
+        ),
+      )
+    })
+    const status = container.querySelector('[role="status"]')?.textContent ?? ''
+    expect(status).toContain('unavailable')
+    expect(status).not.toContain('No suspected')
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(0)
   })
 })

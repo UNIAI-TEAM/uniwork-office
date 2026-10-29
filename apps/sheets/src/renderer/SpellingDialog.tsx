@@ -6,6 +6,7 @@ import {
   collectWorkbookTextCells,
   indexOfWordOf,
   runSheetSpellCheck,
+  spellEngineHasDictionary,
   type SpellFinding,
   type SpellSnapshot,
 } from './spell-check'
@@ -58,6 +59,8 @@ export function SpellingDialog({
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [truncated, setTruncated] = useState(false)
   const learnedRef = useRef<Set<string>>(new Set())
+  // the dictionary probe is answered once per dialog open; Recheck reuses it
+  const hasDictionaryRef = useRef<boolean | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   // read during render, before effects: whatever owned focus when F7 was hit
   const [opener] = useState(() => document.activeElement as HTMLElement | null)
@@ -71,6 +74,11 @@ export function SpellingDialog({
     const workbook = getWorkbook()
     const sheets = workbook?.getSheets()
     if (!engine || !workbook || !sheets || sheets.length === 0) {
+      setPhase('unavailable')
+      return
+    }
+    hasDictionaryRef.current ??= spellEngineHasDictionary(engine)
+    if (!hasDictionaryRef.current) {
       setPhase('unavailable')
       return
     }

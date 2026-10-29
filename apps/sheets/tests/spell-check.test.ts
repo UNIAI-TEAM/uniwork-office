@@ -14,6 +14,8 @@ import {
   replaceInRichDoc,
   replaceSuggestion,
   runSheetSpellCheck,
+  SPELL_PROBE_WORD,
+  spellEngineHasDictionary,
   tokenizeCellText,
   type SpellCellRef,
   type SpellEngine,
@@ -234,6 +236,28 @@ describe('replaceInRichDoc', () => {
   it('returns null when the word does not occur standalone', () => {
     expect(replaceInRichDoc({ body: { dataStream: 'scatter' } }, 'cat', 'dog')).toBeNull()
     expect(replaceInRichDoc({ body: {} }, 'cat', 'dog')).toBeNull()
+  })
+})
+
+describe('spellEngineHasDictionary', () => {
+  it('is true only when the engine flags the known-bad probe word', () => {
+    const flags = (word: string) => word === SPELL_PROBE_WORD
+    expect(
+      spellEngineHasDictionary({ isWordMisspelled: flags, getWordSuggestions: () => [] }),
+    ).toBe(true)
+    expect(
+      spellEngineHasDictionary({ isWordMisspelled: () => false, getWordSuggestions: () => [] }),
+    ).toBe(false)
+  })
+
+  it('treats a throwing engine as having no dictionary', () => {
+    const engine: SpellEngine = {
+      isWordMisspelled: () => {
+        throw new Error('no frame')
+      },
+      getWordSuggestions: () => [],
+    }
+    expect(spellEngineHasDictionary(engine)).toBe(false)
   })
 })
 
