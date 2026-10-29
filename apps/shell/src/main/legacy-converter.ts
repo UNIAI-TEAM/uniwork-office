@@ -736,6 +736,40 @@ function checkPptStreams(streams: Map<string, Uint8Array>): void {
   }
 }
 
+const ODF_TARGET_FOR_MEDIA_TYPE: Readonly<Record<string, LegacyTargetFormat>> = {
+  'application/vnd.oasis.opendocument.text': 'docx',
+  'application/vnd.oasis.opendocument.text-template': 'docx',
+  'application/vnd.oasis.opendocument.spreadsheet': 'xlsx',
+  'application/vnd.oasis.opendocument.spreadsheet-template': 'xlsx',
+  'application/vnd.oasis.opendocument.presentation': 'pptx',
+  'application/vnd.oasis.opendocument.presentation-template': 'pptx',
+}
+
+function matchesOdfFamily(mediaType: string, expectedTarget: LegacyTargetFormat): boolean {
+  return (
+    Object.hasOwn(ODF_TARGET_FOR_MEDIA_TYPE, mediaType) &&
+    ODF_TARGET_FOR_MEDIA_TYPE[mediaType] === expectedTarget
+  )
+}
+
+function extractManifestRootMediaType(manifestXml: string): string | null {
+  const tagRe = /<\s*(?:[A-Za-z0-9_-]+:)?file-entry\b([^>]*?)>/g
+  let match: RegExpExecArray | null
+  while ((match = tagRe.exec(manifestXml)) !== null) {
+    const attrs = match[1] ?? ''
+    if (!/(?:^|\s)(?:[A-Za-z0-9_-]+:)?full-path\s*=\s*(?:"\/"|'\/')(?=\s|\/|$)/.test(attrs)) {
+      continue
+    }
+    const mediaMatch = /(?:^|\s)(?:[A-Za-z0-9_-]+:)?media-type\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(
+      attrs,
+    )
+    if (mediaMatch) {
+      return (mediaMatch[1] ?? mediaMatch[2] ?? '').trim()
+    }
+  }
+  return null
+}
+
 /**
  * Pure TypeScript preflight check on OpenDocument (`.odt`/`.ott`/`.ods`/`.ots`/`.odp`/`.otp`)
  * bytes before spawning `soffice.bin`:
@@ -810,6 +844,7 @@ export function preflightOdfBytes(
       { format: sourceFormat },
     )
   }
+  let manifestRootMediaType: string | null = null
   if (manifestEntry) {
     const manifestBytes = readZipEntryBytes(bytes, manifestEntry)
     if (!manifestBytes) {
@@ -825,14 +860,33 @@ export function preflightOdfBytes(
         { format: sourceFormat },
       )
     }
+    manifestRootMediaType = extractManifestRootMediaType(manifestXml)
   }
-  if (mimetypeEntry && mimetypeEntry.size > 0) {
+  let declaredMediaType: string | null = null
+  if (mimetypeEntry) {
     const mimetypeBytes = readZipEntryBytes(bytes, mimetypeEntry)
     if (!mimetypeBytes) {
       throw new LegacyConvertError('corrupt', 'OpenDocument mimetype entry is unreadable', {
         format: sourceFormat,
       })
     }
+    declaredMediaType = new TextDecoder('utf-8').decode(mimetypeBytes).trim()
+  } else {
+    declaredMediaType = manifestRootMediaType
+  }
+  const expectedTarget = LEGACY_TARGET_FOR_SOURCE[sourceFormat]
+  if (
+    !declaredMediaType ||
+    !matchesOdfFamily(declaredMediaType, expectedTarget) ||
+    (manifestRootMediaType !== null &&
+      manifestRootMediaType.length > 0 &&
+      !matchesOdfFamily(manifestRootMediaType, expectedTarget))
+  ) {
+    throw new LegacyConvertError(
+      'corrupt',
+      `OpenDocument media type does not match .${sourceFormat}`,
+      { format: sourceFormat },
+    )
   }
   if (
     !hasUsableZipPart(bytes, entries, 'content.xml') &&

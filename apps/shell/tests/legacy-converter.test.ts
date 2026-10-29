@@ -534,6 +534,7 @@ describe('legacy-converter', () => {
       ['not-a-zip.odt', 'odt'],
       ['truncated.odt', 'odt'],
       ['bomb-content-80mib.odt', 'odt'],
+      ['wrong-mimetype.odt', 'odt'],
     ] as const)(
       'refuses hostile/corrupt ODF fixture %s (%s) in pre-check with code "corrupt" without spawning soffice (R2)',
       async (fileName, format) => {
@@ -686,6 +687,76 @@ describe('legacy-converter', () => {
         { name: 'content.xml', method: 0, data: contentBytes, size: contentBytes.length },
       ])
       expect(() => preflightOdfBytes(mismatchedDeflate, 'odt')).toThrowError(
+        expect.objectContaining({
+          name: 'LegacyConvertError',
+          code: 'corrupt',
+          format: 'odt',
+        }),
+      )
+    })
+
+    it('refuses cross-family ODF media types (mimetype or manifest root) while allowing document/template within the same family (F3)', async () => {
+      const calcPath = join(ODF_FIXTURES_DIR, 'native-calc.ods')
+      const calcBytes = new Uint8Array(readFileSync(calcPath))
+      expect(() => preflightOdfBytes(calcBytes, 'odt')).toThrowError(
+        expect.objectContaining({
+          name: 'LegacyConvertError',
+          code: 'corrupt',
+          format: 'odt',
+        }),
+      )
+
+      const dir = makeTempDir()
+      const misnamedOdt = join(dir, 'actually-calc.odt')
+      copyFileSync(calcPath, misnamedOdt)
+      const { spawnFn, getSpawnCount } = createFakeChildProcess({})
+      await expect(
+        convertLegacyFile(misnamedOdt, {
+          sourceFormat: 'odt',
+          spawnFn,
+        }),
+      ).rejects.toMatchObject({
+        code: 'corrupt',
+        format: 'odt',
+      })
+      expect(getSpawnCount()).toBe(0)
+
+      // Same-family document vs template is accepted
+      const writerTemplateBytes = new Uint8Array(
+        readFileSync(join(ODF_FIXTURES_DIR, 'native-writer.ott')),
+      )
+      expect(preflightOdfBytes(writerTemplateBytes, 'odt')).toEqual({
+        kind: 'legacy',
+        sourceFormat: 'odt',
+        targetFormat: 'docx',
+      })
+
+      // Manifest root media-type fallback when mimetype entry is absent
+      const manifestOnlyBytes = Buffer.from(
+        '<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet"/></manifest:manifest>',
+        'utf8',
+      )
+      const contentOnlyBytes = Buffer.from('<office:document-content/>', 'utf8')
+      const manifestOnlyCalc = buildZip([
+        {
+          name: 'META-INF/manifest.xml',
+          method: 0,
+          data: manifestOnlyBytes,
+          size: manifestOnlyBytes.length,
+        },
+        {
+          name: 'content.xml',
+          method: 0,
+          data: contentOnlyBytes,
+          size: contentOnlyBytes.length,
+        },
+      ])
+      expect(preflightOdfBytes(manifestOnlyCalc, 'ods')).toEqual({
+        kind: 'legacy',
+        sourceFormat: 'ods',
+        targetFormat: 'xlsx',
+      })
+      expect(() => preflightOdfBytes(manifestOnlyCalc, 'odt')).toThrowError(
         expect.objectContaining({
           name: 'LegacyConvertError',
           code: 'corrupt',
