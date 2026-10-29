@@ -224,9 +224,20 @@ describe('Settings → Integrations', () => {
       sweepLegacySkillCopies: () => {
         call += 1
         if (call === 1) {
-          return Promise.reject(new Error('the shared .agents copy is not installed yet'))
+          return Promise.reject(
+            new Error(
+              "Error invoking remote method 'integrations:sweep-legacy-skill-copies': Error: the shared .agents copy is not installed yet",
+            ),
+          )
         }
         if (call === 2) {
+          return Promise.reject(
+            new Error(
+              "Error invoking remote method 'integrations:sweep-legacy-skill-copies': Error: EACCES: permission denied",
+            ),
+          )
+        }
+        if (call === 3) {
           return pendingSweep.promise
         }
         status.legacy = []
@@ -238,22 +249,33 @@ describe('Settings → Integrations', () => {
       },
     })
 
-    // 1. Initial render shows both legacy copies
+    // 1. Initial render shows both legacy copies with count-safe description and LTR paths (TV-2299-03, TV-2299-06)
     const legacyRow1 = host.querySelector('.set-intg-row[data-agent="legacy"]')
     expect(legacyRow1).toBeTruthy()
+    expect(legacyRow1!.textContent).toContain('Copies still in place: 2.')
     expect(legacyRow1!.textContent).toContain(codexCopy.path)
     expect(legacyRow1!.textContent).toContain(cursorCopy.path)
+    const pathSpans = [...legacyRow1!.querySelectorAll('.set-intg-legacy-item [dir="ltr"]')]
+    expect(pathSpans.map((el) => el.textContent)).toEqual([codexCopy.path, cursorCopy.path])
 
-    // 2. First attempt rejects: error notice has role="alert", row stays, button recovers from busy
+    // 2a. First attempt rejects with no shared .agents copy: shows dedicated translated line, no Electron IPC wrapper (TV-2299-01)
     const cleanBtn1 = buttonWithText('Remove old copies', legacyRow1!)!
     await click(cleanBtn1)
-    const alertNotice = host.querySelector('.set-intg-notice[role="alert"]')
-    expect(alertNotice?.textContent).toContain(
-      'Could not remove the old copies: Error: the shared .agents copy is not installed yet',
+    const alertNotice1 = host.querySelector('.set-intg-notice[role="alert"]')
+    expect(alertNotice1?.textContent).toBe(
+      'Install the skill into the shared .agents folder first, then remove the old copies.',
     )
+    expect(alertNotice1?.textContent).not.toContain('Error invoking remote method')
     expect(cleanBtn1.disabled).toBe(false)
     expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
 
+    // 2b. Second attempt rejects with another error: shows translated failure line without raw error or IPC wrapper (TV-2299-01)
+    await click(cleanBtn1)
+    const alertNotice2 = host.querySelector('.set-intg-notice[role="alert"]')
+    expect(alertNotice2?.textContent).toBe('Could not remove the old copies.')
+    expect(alertNotice2?.textContent).not.toContain('Error invoking remote method')
+    expect(alertNotice2?.textContent).not.toContain('EACCES')
+    expect(cleanBtn1.disabled).toBe(false)
     // 3. Second attempt: test busy state while pending, then resolve with mixed kept state (unsafe_link)
     await act(async () => {
       cleanBtn1.click()
@@ -277,16 +299,18 @@ describe('Settings → Integrations', () => {
     expect(legacyRow2!.textContent).toContain(cursorCopy.path)
     const keptNotice = host.querySelector('.set-intg-notice[role="status"]')
     expect(keptNotice?.textContent).toBe(
-      'Removed 1 old copies, 1 left in place (behind a symlink).',
+      'Old copies removed: 1. Left in place: 1 (behind a symlink).',
     )
     expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
 
-    // 4. Third attempt removes the last copy: row disappears, notice remains visible outside row & details, and receives focus
+    // 4. Fourth attempt removes the last copy: row disappears, notice remains visible outside row & details, and receives focus
     await click(buttonWithText('Remove old copies', legacyRow2!))
     expect(host.querySelector('.set-intg-row[data-agent="legacy"]')).toBeNull()
     const finalNotice = host.querySelector('.set-intg-notice[role="status"]') as HTMLElement | null
     expect(finalNotice).toBeTruthy()
-    expect(finalNotice!.textContent).toBe('Removed 1 old copies, 0 edited by hand left in place.')
+    expect(finalNotice!.textContent).toBe(
+      'Old copies removed: 1. Edited by hand and left in place: 0.',
+    )
     expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
     expect(document.activeElement).toBe(finalNotice)
   })
@@ -356,7 +380,7 @@ describe('Settings → Integrations', () => {
     const partialAlert = host.querySelector('.set-intg-notice[role="alert"]')
     expect(partialAlert).toBeTruthy()
     expect(partialAlert!.textContent).toBe(
-      'Removed 2 old copies, 1 left in place, 1 failed to remove.',
+      'Old copies removed: 2. Left in place: 1. Failed to remove: 1.',
     )
 
     const rowAfterPartial = host.querySelector('.set-intg-row[data-agent="legacy"]')
@@ -374,7 +398,9 @@ describe('Settings → Integrations', () => {
     expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
     const finalStatus = host.querySelector('.set-intg-notice[role="status"]') as HTMLElement | null
     expect(finalStatus).toBeTruthy()
-    expect(finalStatus!.textContent).toBe('Removed 1 old copies, 0 edited by hand left in place.')
+    expect(finalStatus!.textContent).toBe(
+      'Old copies removed: 1. Edited by hand and left in place: 0.',
+    )
     expect(document.activeElement).toBe(finalStatus)
   })
 

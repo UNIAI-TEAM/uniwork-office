@@ -2,6 +2,7 @@ import { mcpLaunch, type McpLaunch } from '@genoffice/cli/mcp-launch'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TFunc } from './locale'
 import { McpServerSection } from './McpServerSection'
+import { toastError } from './WbToastHost'
 import type {
   AgentId,
   AgentTarget,
@@ -180,10 +181,14 @@ export function IntegrationsPane({
       await refresh()
     } catch (err) {
       focusLegacyNoticeRef.current = false
+      const cause = toastError(err)
       setNotice({
         legacy: true,
         alert: true,
-        text: t('intgLegacyFailed', { msg: String(err) }),
+        text:
+          cause === 'the shared .agents copy is not installed yet'
+            ? t('intgLegacyFailedNoSharedCopy')
+            : t('intgLegacyFailed'),
       })
     } finally {
       setBusy(false)
@@ -366,7 +371,7 @@ export function IntegrationsPane({
                   <ul className="set-intg-legacy">
                     {legacy.map((c) => (
                       <li key={c.path} className="set-intg-legacy-item">
-                        {c.label} — {c.path}
+                        {c.label} — <span dir="ltr">{c.path}</span>
                       </li>
                     ))}
                   </ul>
