@@ -1,6 +1,20 @@
 import type { zh } from './zh'
 
 export const en = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Hide the selection from AI',
+  redactDialogDesc:
+    'The selection stays in the document and in the file; the model sees the placeholder below instead. Name it so the model knows what it stands for.',
+  redactDialogScope:
+    "Hiding covers this app's AI. The CLI, MCP tools and headless export read the file directly, and they still see these words.",
+  redactDialogPlaceholder: 'Placeholder name, e.g. client phone',
+  redactCancel: 'Cancel',
+  redactInsert: 'Hide',
+  redactEnable: 'Right-click a selection to hide it from AI.',
+  redactNeedsSavedRow: 'This row is not in the file yet. Save first, then hide a cell in it.',
+  redactRecoveredFromNames:
+    'Another app rewrote this file and dropped the record of what is hidden. The hidden cells were recovered from the names in the workbook; saving restores the full record.',
+
   appMergeWorkbooks: 'Merge Workbooks',
   appMergeWorkbooksTip: 'Append sheets from other Excel files into this workbook',
   appMergeWorkbooksPicking: 'Choose files to merge…',
@@ -184,6 +198,10 @@ export const en = {
   appInvalidGroupField: 'Invalid grouping field.',
   appInvalidPageField: 'Invalid report filter field.',
   appPivotPageItemMissing: 'Report filter item "{item}" is not a member of field "{label}".',
+  appInvalidPivotBaseField: 'A "show values as" base field must sit on Rows or Columns.',
+  appPivotBaseFieldMissing: 'The "show values as" mode of a value field needs a base field.',
+  appPivotBaseFieldNotAxis: 'Base field "{label}" must sit on the pivot rows or columns.',
+  appPivotBaseItemMissing: 'Base item "{item}" is not a member of field "{label}".',
   appInvalidLabelFilterField: 'The label filter field is invalid.',
   appInvalidValueFieldIndex: 'Value field index {index} is invalid.',
   appInvalidValueField: 'Invalid value field.',
@@ -314,6 +332,7 @@ export const en = {
   appPivotSheetNoMove: 'This sheet contains a PivotTable — moving ranges is not supported yet.',
   appMergeOverTable:
     'The selection overlaps an Excel table — merging cells inside a table is not supported yet.',
+  appFilterToggleFailed: 'The filter was not applied — select the range with your data first.',
   appAutofillStreaming: 'Autofill into an area that is still streaming in is not allowed yet.',
   appDvNeedsIndexed:
     'Editing data validation needs this sheet fully indexed first — try again in a moment.',

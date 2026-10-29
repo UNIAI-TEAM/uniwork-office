@@ -159,6 +159,20 @@ describe('scanTree', () => {
       ['genoffice.ai'],
     )
   })
+
+  it('allows only the exact REDACTION_REL_TYPE declaration in xlsx-redaction.ts and flags unrelated genspark.ai URLs in the same file', () => {
+    const root = tree({
+      'packages/xlsx-gateway/src/gateway/xlsx-redaction.ts': [
+        "const REDACTION_REL_TYPE = 'https://schemas.genspark.ai/genoffice/2026/relationships/redactions'",
+        "fetch('https://api.genspark.ai/not-the-relationship-identifier')",
+      ].join('\n'),
+    })
+    const v = scanTree(root)
+    assert.deepEqual(
+      v.map((h) => [h.path, h.line, h.pattern]),
+      [['packages/xlsx-gateway/src/gateway/xlsx-redaction.ts', 2, 'genspark.ai']],
+    )
+  })
 })
 
 describe('CLI', () => {

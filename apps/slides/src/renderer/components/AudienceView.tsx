@@ -21,6 +21,12 @@ import { ShowMediaLayer } from './ShowMediaLayer'
 import { useI18n } from '../i18n/locale'
 import { MorphStage } from './MorphStage'
 import { InkLayer, type InkStroke } from './ShowInk'
+import {
+  createBroadcastRecovery,
+  mergeBroadcastUpdate,
+  type BroadcastRecovery,
+} from '../../shared/slide-update'
+import { setImageSource } from '../image-loader'
 import { isWeb } from '../capabilities'
 import { showNavKey } from '../show-keys'
 import { shortcutPlatform, shortcutSurface } from '../shortcuts'
@@ -70,7 +76,7 @@ function useSlideImages(slides: RenderSlide[] | null): Map<string, HTMLImageElem
         done()
       }
       img.onerror = done
-      img.src = u
+      setImageSource(img, u)
     })
     return () => {
       cancelled = true
@@ -95,6 +101,8 @@ export function AudienceView() {
   const { t } = useI18n()
   const fullscreen = useWebFullscreen()
   const [slides, setSlides] = useState<RenderSlide[] | null>(null)
+  const slidesRef = useRef<RenderSlide[] | null>(slides)
+  slidesRef.current = slides
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight })
   const images = useSlideImages(slides)
   const [sync, setSync] = useState<ShowSyncState | null>(null)
@@ -109,14 +117,18 @@ export function AudienceView() {
   const [strokes, setStrokes] = useState<InkStroke[]>([])
   const [laser, setLaser] = useState<{ x: number; y: number } | null>(null)
 
+  const broadcastRecoveryRef = useRef<BroadcastRecovery | null>(null)
   // Document load: session already shared; retry covers the occasional timing where the window beats the sharing
   useEffect(() => {
     let stop = false
     const tryLoad = (attempt: number) => {
       void window.slidesApi.getRenderSlides().then((r) => {
         if (stop) return
-        if (r && r.length > 0) setSlides(r)
-        else if (attempt < 20) window.setTimeout(() => tryLoad(attempt + 1), 250)
+        if (r && r.length > 0) {
+          broadcastRecoveryRef.current?.invalidate()
+          slidesRef.current = r
+          setSlides(r)
+        } else if (attempt < 20) window.setTimeout(() => tryLoad(attempt + 1), 250)
       })
     }
     tryLoad(0)
@@ -129,15 +141,39 @@ export function AudienceView() {
   // The sync cursor doesn't change on a content edit, so clear it: once the
   // reloaded animation lists land, the seek effect re-aligns the player against
   // the fresh deck instead of keeping stale animation state.
-  useEffect(
-    () =>
-      window.slidesApi.onDeckChanged?.(({ slides: all }) => {
-        if (all.length === 0) return
-        cursorRef.current = ''
+  useEffect(() => {
+    const recovery = createBroadcastRecovery(
+      () => window.slidesApi.getRenderSlides(),
+      (next) => {
+        slidesRef.current = next
+        setSlides(next)
+      },
+      (error) => console.error('Failed to refresh audience deck:', error),
+    )
+    broadcastRecoveryRef.current = recovery
+    const off = window.slidesApi.onDeckChanged?.(({ slides: all, order }) => {
+      if ((order?.length ?? all.length) === 0) return
+      cursorRef.current = ''
+      recovery.onBroadcast(!!order)
+      if (order) {
+        const merged = mergeBroadcastUpdate(slidesRef.current, { slides: all, order })
+        if (merged) {
+          slidesRef.current = merged
+          setSlides(merged)
+        } else {
+          recovery.requestRefresh()
+        }
+      } else {
+        slidesRef.current = all
         setSlides(all)
-      }),
-    [],
-  )
+      }
+    })
+    return () => {
+      recovery.invalidate()
+      broadcastRecoveryRef.current = null
+      off?.()
+    }
+  }, [])
 
   useEffect(() => {
     if (!slides) return

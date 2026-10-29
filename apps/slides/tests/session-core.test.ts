@@ -205,4 +205,73 @@ describe('session handlers with the in-memory host', () => {
     await flush()
     expect(events.find((e) => e.kind === 'deck')?.ids).toEqual([107, 108])
   })
+
+  it('records, reads, and clears slide narration and timing through session handlers', async () => {
+    const host = new MemoryHostIO()
+    const ctx = await openClient(109, host)
+    const wavBase64 = 'UklGRiwAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQgAAAAAAAAAAAAAAA=='
+    expect(await callSessionHandler('slides:microphone-access', ctx)).toBe(true)
+    expect(callSessionHandler('slides:get-show-timing', ctx, 0)).toEqual({
+      advanceMs: null,
+      narrationIds: [],
+    })
+    const afterSave = callSessionHandler('slides:save-recording', ctx, {
+      slides: [{ slideIndex: 0, wavBase64, durationMs: 1200, advanceMs: 1500 }],
+    })
+    expect(afterSave).not.toBeNull()
+    expect(afterSave!.order).toHaveLength(5)
+    expect(afterSave!.slides).toHaveLength(1)
+    const timing = callSessionHandler('slides:get-show-timing', ctx, 0)
+    expect(timing.advanceMs).toBe(1500)
+    expect(timing.narrationIds).toHaveLength(1)
+    const afterClear = callSessionHandler('slides:clear-narration', ctx, [0])
+    expect(afterClear).not.toBeNull()
+    expect(afterClear!.order).toHaveLength(5)
+    expect(afterClear!.slides).toHaveLength(1)
+    expect(callSessionHandler('slides:get-show-timing', ctx, 0).narrationIds).toEqual([])
+  })
+
+  it('picks, inserts, reads, and turns a 3D model through session handlers', async () => {
+    const host = new MemoryHostIO()
+    const ctx = await openClient(110, host)
+    const glb = base64ToBytes('Z2xURgIAAAAYAAAABAAAAEpTT057fSAg')
+    host.mediaPicks.push({ bytes: glb, name: 'cube', ext: 'glb' })
+    const picked = await callSessionHandler('slides:pick-model3d', ctx)
+    expect(picked).toEqual({ name: 'cube', bytes: glb })
+    const added = callSessionHandler('slides:add-model3d', ctx, {
+      slideIndex: 0,
+      bytes: glb,
+      name: 'cube',
+      posterBase64: bytesToBase64(PNG),
+      aspect: 1.5,
+      fitWidthPx: FIT,
+    })
+    expect(added).not.toBeNull()
+    const data = callSessionHandler('slides:model3d-data', ctx, 0, added!.sourceId)
+    expect(data).toEqual(glb)
+    const turned = callSessionHandler('slides:set-model3d-view', ctx, {
+      slideIndex: 0,
+      sourceId: added!.sourceId,
+      rot: { ax: 60000, ay: -120000, az: 0 },
+      posterBase64: bytesToBase64(PNG),
+    })
+    expect(turned).not.toBeNull()
+    const node = turned!.nodes.find((n) => n.sourceId === added!.sourceId)
+    expect(node && 'model3d' in node ? node.model3d : null).toEqual({
+      ax: 60000,
+      ay: -120000,
+      az: 0,
+    })
+  })
+
+  it('creates a new blank deck with a custom valid size and ignores invalid sizes', async () => {
+    const host = new MemoryHostIO()
+    const ctx: HandlerContext = { clientId: 111, host }
+    const a4Portrait = { cx: 7560000, cy: 10692000 }
+    const r1 = await callSessionHandler('slides:new-blank', ctx, FIT, a4Portrait)
+    expect(r1.size).toEqual(a4Portrait)
+    expect(callSessionHandler('slides:get-slide-size', ctx)).toEqual(a4Portrait)
+    const r2 = await callSessionHandler('slides:new-blank', ctx, FIT, { cx: 100, cy: 100 })
+    expect(r2.size).toEqual({ cx: 12192000, cy: 6858000 })
+  })
 })

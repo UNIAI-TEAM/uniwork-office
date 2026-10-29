@@ -1,6 +1,20 @@
 import type { zh } from './zh'
 
 export const cs = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Skrýt výběr před AI',
+  redactDialogDesc:
+    'Vybraný obsah zůstane v dokumentu i v souboru; model uvidí jen zástupný symbol. Pojmenujte ho, aby věděl, co zastupuje.',
+  redactDialogScope:
+    'Skrýtí se týká jen AI v této aplikaci. CLI, nástroje MCP a headless export čtou soubor přímo a tato slova stále vidí.',
+  redactDialogPlaceholder: 'Název zástupného symbolu, např. telefon zákazníka',
+  redactCancel: 'Zrušit',
+  redactInsert: 'Skrýt',
+  redactEnable: 'Pravým klikem na výběr jej skryjete před AI.',
+  redactNeedsSavedRow: 'Tento řádek zatím není v souboru. Nejprve uložte, pak buňku skryjte.',
+  redactRecoveredFromNames:
+    'Jiná aplikace tento soubor přepsala a zahodila záznam o tom, co je skrytoé. Skryté buňky byly obnoveny z názvů v sešitě; uložením se obnoví celý záznam.',
+
   appMergeWorkbooks: 'Sloučit sešity',
   appMergeWorkbooksTip: 'Připojit listy z jiných souborů Excelu do tohoto sešitu',
   appMergeWorkbooksPicking: 'Vyberte soubory ke sloučení…',
@@ -185,6 +199,12 @@ export const cs = {
   appInvalidGroupField: 'Neplatné pole seskupení.',
   appInvalidPageField: 'Neplatné pole filtru sestavy.',
   appPivotPageItemMissing: 'Položka filtru „{item}“ není členem pole „{label}“.',
+  appInvalidPivotBaseField:
+    'Základní pole režimu „Zobrazit hodnoty jako“ musí být v řádcích nebo sloupcích.',
+  appPivotBaseFieldMissing: 'Režim „Zobrazit hodnoty jako“ pole hodnot vyžaduje základní pole.',
+  appPivotBaseFieldNotAxis:
+    'Základní pole „{label}“ musí být v řádcích nebo sloupcích kontingenční tabulky.',
+  appPivotBaseItemMissing: 'Základní položka „{item}“ není členem pole „{label}“.',
   appInvalidLabelFilterField: 'Pole filtru popisků je neplatné.',
   appInvalidValueFieldIndex: 'Index pole hodnot {index} je neplatný.',
   appInvalidValueField: 'Neplatné pole hodnot.',
@@ -323,6 +343,7 @@ export const cs = {
     'Tento list obsahuje kontingenční tabulku — přesouvání oblastí zatím není podporováno.',
   appMergeOverTable:
     'Výběr se překrývá s tabulkou Excelu — slučování buněk v tabulce zatím není podporováno.',
+  appFilterToggleFailed: 'Filtr nebyl použit — nejprve vyberte oblast s daty.',
   appAutofillStreaming:
     'Automatické vyplnění do oblasti, která se stále načítá, zatím není povoleno.',
   appDvNeedsIndexed:

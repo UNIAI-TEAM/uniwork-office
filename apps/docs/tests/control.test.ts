@@ -67,4 +67,22 @@ describe('docs control hook', () => {
       result: { blocks: [0, 0], text: 'Alpha beta.', collapsed: false },
     })
   })
+
+  it('projects withheld spans to placeholders in selection text', () => {
+    const editor = createEditor(['Call 13800138000 today.'])
+    editor
+      .chain()
+      .setTextSelection({ from: 6, to: 17 })
+      .setRedaction('client phone')
+      .setTextSelection({ from: 1, to: 24 })
+      .run()
+    expect(handleDocsControl({ cmd: 'selection' }, editor, true)).toEqual({
+      status: 'ok',
+      result: {
+        blocks: [0, 0],
+        text: 'Call {{client phone}} today.',
+        collapsed: false,
+      },
+    })
+  })
 })

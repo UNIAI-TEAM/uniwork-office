@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const es = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Ocultar la selección a la IA',
+  redactDialogDesc:
+    'Lo seleccionado sigue en el documento y en el archivo; el modelo solo ve el marcador. Ponle un nombre para que sepa qué representa.',
+  redactDialogScope:
+    'Ocultar solo se aplica a la IA de esta aplicación. La CLI, las herramientas MCP y la exportación headless leen el archivo directamente y siguen viendo estas palabras.',
+  redactDialogPlaceholder: 'Nombre del marcador, p. ej.: teléfono del cliente',
+  redactCancel: 'Cancelar',
+  redactInsert: 'Ocultar',
+  redactEnable: 'Clic derecho en una selección para ocultarla a la IA.',
+  redactNeedsSavedRow:
+    'Esta fila todavía no está en el archivo. Guarda primero y luego oculta la celda.',
+  redactRecoveredFromNames:
+    'Otra aplicación reescribió este archivo y descartó el registro de lo que está oculto. Las celdas ocultas se recuperaron de los nombres del libro; al guardar se restaura el registro completo.',
+
   appMergeWorkbooks: 'Combinar libros',
   appMergeWorkbooksTip: 'Añadir las hojas de otros archivos de Excel a este libro',
   appMergeWorkbooksPicking: 'Elige los archivos para combinar…',
@@ -194,6 +209,13 @@ export const es = {
   appInvalidGroupField: 'Campo de agrupación no válido.',
   appInvalidPageField: 'Campo de filtro de informe no válido.',
   appPivotPageItemMissing: 'El elemento de filtro "{item}" no pertenece al campo "{label}".',
+  appInvalidPivotBaseField:
+    'El campo base de "Mostrar valores como" debe estar en filas o columnas.',
+  appPivotBaseFieldMissing:
+    'El modo "Mostrar valores como" de un campo de valores necesita un campo base.',
+  appPivotBaseFieldNotAxis:
+    'El campo base "{label}" debe estar en las filas o columnas de la tabla dinámica.',
+  appPivotBaseItemMissing: 'El elemento base "{item}" no pertenece al campo "{label}".',
   appInvalidLabelFilterField: 'El campo del filtro de etiquetas no es válido.',
   appInvalidValueFieldIndex: 'El índice de campo de valores {index} no es válido.',
   appInvalidValueField: 'Campo de valores no válido.',
@@ -340,6 +362,7 @@ export const es = {
   appPivotSheetNoMove: 'Esta hoja contiene una tabla dinámica — mover rangos aún no se admite.',
   appMergeOverTable:
     'La selección se superpone con una tabla de Excel — combinar celdas dentro de una tabla aún no es compatible.',
+  appFilterToggleFailed: 'No se aplicó el filtro: seleccione primero el rango con los datos.',
   appAutofillStreaming:
     'Aún no se permite el autorrelleno hacia un área que todavía se está cargando por streaming.',
   appDvNeedsIndexed:

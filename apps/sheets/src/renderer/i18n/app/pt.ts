@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const pt = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Ocultar a seleção da IA',
+  redactDialogDesc:
+    'O conteúdo selecionado continua no documento e no arquivo; o modelo vê apenas o marcador. Dê-lhe um nome para que saiba o que representa.',
+  redactDialogScope:
+    'Isso se aplica apenas à IA deste aplicativo. A CLI, as ferramentas MCP e a exportação sem interface leem o arquivo diretamente e ainda veem essas palavras.',
+  redactDialogPlaceholder: 'Nome do marcador, ex.: telefone do cliente',
+  redactCancel: 'Cancelar',
+  redactInsert: 'Ocultar',
+  redactEnable: 'Clique com o botão direito numa seleção para ocultá-la da IA.',
+  redactNeedsSavedRow:
+    'Esta linha ainda não está no ficheiro. Guarde primeiro e depois oculte a célula.',
+  redactRecoveredFromNames:
+    'Outra aplicação reescreveu este ficheiro e descartou o registo do que está oculto. As células ocultas foram recuperadas a partir dos nomes na pasta de trabalho; guardar restaura o registo completo.',
+
   appMergeWorkbooks: 'Mesclar pastas de trabalho',
   appMergeWorkbooksTip: 'Adicionar planilhas de outros arquivos do Excel a esta pasta de trabalho',
   appMergeWorkbooksPicking: 'Escolha os arquivos para mesclar…',
@@ -194,6 +209,13 @@ export const pt = {
   appInvalidGroupField: 'Campo de agrupamento inválido.',
   appInvalidPageField: 'Campo de filtro de relatório inválido.',
   appPivotPageItemMissing: 'O item de filtro "{item}" não pertence ao campo "{label}".',
+  appInvalidPivotBaseField:
+    'O campo base de "Mostrar valores como" deve estar em linhas ou colunas.',
+  appPivotBaseFieldMissing:
+    'O modo "Mostrar valores como" de um campo de valores precisa de um campo base.',
+  appPivotBaseFieldNotAxis:
+    'O campo base "{label}" deve estar nas linhas ou colunas da tabela dinâmica.',
+  appPivotBaseItemMissing: 'O item base "{item}" não pertence ao campo "{label}".',
   appInvalidLabelFilterField: 'O campo do filtro de rótulo é inválido.',
   appInvalidValueFieldIndex: 'O índice do campo de valores {index} é inválido.',
   appInvalidValueField: 'Campo de valores inválido.',
@@ -342,6 +364,8 @@ export const pt = {
     'Esta planilha contém uma Tabela Dinâmica — mover intervalos ainda não é suportado.',
   appMergeOverTable:
     'A seleção sobrepõe uma tabela do Excel — mesclar células dentro de uma tabela ainda não é suportado.',
+  appFilterToggleFailed:
+    'O filtro não foi aplicado — selecione primeiro o intervalo com seus dados.',
   appAutofillStreaming:
     'O preenchimento automático em uma área ainda em streaming não é permitido por enquanto.',
   appDvNeedsIndexed:

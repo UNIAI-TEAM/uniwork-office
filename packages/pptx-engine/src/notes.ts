@@ -145,7 +145,7 @@ export function setSlideNotes(opened: OpenedPptx, slideIndex: number, text: stri
 }
 
 /** Add an Override to [Content_Types].xml (skipped if already present). */
-function addContentTypeOverride(
+export function addContentTypeOverride(
   archive: PackageArchive,
   partPath: string,
   contentType: string,

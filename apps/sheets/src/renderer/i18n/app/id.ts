@@ -1,6 +1,20 @@
 import type { zh } from './zh'
 
 export const id = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Sembunyikan pilihan dari AI',
+  redactDialogDesc:
+    'Konten yang dipilih tetap ada di dokumen dan berkas; model hanya melihat placeholder di bawah. Beri nama agar model tahu apa yang diwakili.',
+  redactDialogScope:
+    'Penyembunyian ini hanya berlaku untuk AI di aplikasi ini. CLI, alat MCP, dan ekspor tanpa antarmuka membaca berkas secara langsung, sehingga kata-kata ini tetap terlihat olehnya.',
+  redactDialogPlaceholder: 'Nama placeholder, mis. telepon pelanggan',
+  redactCancel: 'Batal',
+  redactInsert: 'Sembunyikan',
+  redactEnable: 'Klik kanan pada pilihan untuk menyembunyikannya dari AI.',
+  redactNeedsSavedRow: 'Baris ini belum ada di berkas. Simpan dulu, lalu sembunyikan selnya.',
+  redactRecoveredFromNames:
+    'Aplikasi lain menulis ulang berkas ini dan membuang catatan apa yang disembunyikan. Sel yang disembunyikan dipulihkan dari nama-nama di dalam buku kerja; menyimpan akan memulihkan catatan lengkapnya.',
+
   appMergeWorkbooks: 'Gabungkan Buku Kerja',
   appMergeWorkbooksTip: 'Tambahkan sheet dari file Excel lain ke buku kerja ini',
   appMergeWorkbooksPicking: 'Pilih file yang akan digabungkan…',
@@ -187,6 +201,12 @@ export const id = {
   appInvalidGroupField: 'Bidang pengelompokan tidak valid.',
   appInvalidPageField: 'Bidang filter laporan tidak valid.',
   appPivotPageItemMissing: 'Item filter laporan "{item}" bukan anggota bidang "{label}".',
+  appInvalidPivotBaseField:
+    'Bidang dasar "Tampilkan nilai sebagai" harus berada di baris atau kolom.',
+  appPivotBaseFieldMissing:
+    'Mode "Tampilkan nilai sebagai" pada bidang nilai memerlukan bidang dasar.',
+  appPivotBaseFieldNotAxis: 'Bidang dasar "{label}" harus berada di baris atau kolom tabel pivot.',
+  appPivotBaseItemMissing: 'Item dasar "{item}" bukan anggota bidang "{label}".',
   appInvalidLabelFilterField: 'Bidang filter label tidak valid.',
   appInvalidValueFieldIndex: 'Indeks bidang nilai {index} tidak valid.',
   appInvalidValueField: 'Bidang nilai tidak valid.',
@@ -319,6 +339,7 @@ export const id = {
   appPivotSheetNoMove: 'Lembar ini berisi PivotTable — memindahkan rentang belum didukung.',
   appMergeOverTable:
     'Pilihan tumpang tindih dengan tabel Excel — menggabungkan sel di dalam tabel belum didukung.',
+  appFilterToggleFailed: 'Filter tidak diterapkan — pilih dulu rentang yang berisi data Anda.',
   appAutofillStreaming: 'IsiOtomatis ke area yang masih dimuat secara streaming belum diizinkan.',
   appDvNeedsIndexed:
     'Mengedit validasi data memerlukan lembar ini terindeks penuh dahulu — coba lagi sebentar lagi.',

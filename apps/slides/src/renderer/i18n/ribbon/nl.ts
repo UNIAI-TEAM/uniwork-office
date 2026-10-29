@@ -195,7 +195,7 @@ export const nl = {
   ribbonIconsTip: 'Een ingebouwd pictogram invoegen (gerasterd als afbeelding)',
   ribbon3dModel: '3D-modellen',
   ribbon3dModelTip:
-    'Een 3D-model invoegen (sluit glb/gltf in; het canvas toont een poster als tijdelijke aanduiding)',
+    'Een 3D-model invoegen (.glb): selecteer het om het te draaien; PowerPoint houdt het in 3D',
   ribbonGroupIllustrations: 'Illustraties',
   ribbonShapes: 'Vormen',
   ribbonShapesTip: 'Een vorm invoegen (basisvormen / pijlen / sterren)',

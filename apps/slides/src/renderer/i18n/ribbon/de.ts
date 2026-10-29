@@ -195,8 +195,7 @@ export const de = {
   ribbonIcons: 'Piktogramme',
   ribbonIconsTip: 'Integriertes Piktogramm einfügen (als Bildelement gerastert)',
   ribbon3dModel: '3D-Modelle',
-  ribbon3dModelTip:
-    '3D-Modell einfügen (bettet glb/gltf ein; der Canvas zeigt einen Posterplatzhalter)',
+  ribbon3dModelTip: '3D-Modell einfügen (.glb): zum Drehen auswählen; PowerPoint behält es in 3D',
   ribbonGroupIllustrations: 'Illustrationen',
   ribbonShapes: 'Formen',
   ribbonShapesTip: 'Form einfügen (Standardformen / Pfeile / Sterne)',

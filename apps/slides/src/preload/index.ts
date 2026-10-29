@@ -1,7 +1,6 @@
 import type { AiPanelPrefs } from '@genoffice/ui'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
-import type { RenderSlide } from '@genoffice/pptx-render'
 import type { ProjectApi } from '@genoffice/project-store'
 import { installAiRunBridge } from '@genoffice/electron-utils/ai-run-bridge'
 import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
@@ -10,6 +9,7 @@ import { installUniworkCloudStatusBridge } from '@genoffice/electron-utils/uniwo
 import { installUniworkCommentsBridge } from '@genoffice/electron-utils/comments-bridge'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import type {
+  DeckChange,
   AddChartOp,
   AddElementOp,
   AiRunFailure,
@@ -19,6 +19,8 @@ import type {
   AddInkOp,
   AddMediaBytesOp,
   ReplacePictureBytesOp,
+  AddModel3dOp,
+  SetModel3dViewOp,
   AddSmartArtOp,
   ApplyThemeOp,
   AddBlankSlideOp,
@@ -51,6 +53,7 @@ import type {
   TableStructureIpcOp,
   TableMergeIpcOp,
   ReorderElementOp,
+  SaveRecordingOp,
   SetAdvanceTimesOp,
   SetAnimationsOp,
   SetSlideHiddenOp,
@@ -163,7 +166,7 @@ const api: SlidesApi = {
   consumeHeadlessExport: () => ipcRenderer.invoke('slides:consume-headless-export'),
   headlessExportDone: (result: { ok: boolean; error?: string }) =>
     ipcRenderer.send('slides:headless-export-done', result),
-  newBlank: (fitWidthPx) => ipcRenderer.invoke('slides:new-blank', fitWidthPx),
+  newBlank: (fitWidthPx, size) => ipcRenderer.invoke('slides:new-blank', fitWidthPx, size),
   landGeneratedPages: (
     pageMarkers: string[],
     fitWidthPx: number,
@@ -309,8 +312,11 @@ const api: SlidesApi = {
   addMediaBytes: (op: AddMediaBytesOp) => ipcRenderer.invoke('slides:add-media-bytes', op),
   getMediaData: (slideIndex: number, sourceId: string) =>
     ipcRenderer.invoke('slides:media-data', slideIndex, sourceId),
-  insertModel3d: (slideIndex: number, fitWidthPx: number) =>
-    ipcRenderer.invoke('slides:insert-model3d', slideIndex, fitWidthPx),
+  pickModel3d: () => ipcRenderer.invoke('slides:pick-model3d'),
+  addModel3d: (op: AddModel3dOp) => ipcRenderer.invoke('slides:add-model3d', op),
+  getModel3dData: (slideIndex: number, sourceId: string) =>
+    ipcRenderer.invoke('slides:model3d-data', slideIndex, sourceId),
+  setModel3dView: (op: SetModel3dViewOp) => ipcRenderer.invoke('slides:set-model3d-view', op),
   setLink: (op: SetLinkOp) => ipcRenderer.invoke('slides:set-link', op),
   getLink: (slideIndex: number, sourceId: string) =>
     ipcRenderer.invoke('slides:get-link', slideIndex, sourceId),
@@ -322,7 +328,12 @@ const api: SlidesApi = {
   applyTheme: (op: ApplyThemeOp) => ipcRenderer.invoke('slides:apply-theme', op),
   setTransition: (op: SetTransitionOp) => ipcRenderer.invoke('slides:set-transition', op),
   getTransition: (slideIndex: number) => ipcRenderer.invoke('slides:get-transition', slideIndex),
+  getShowTiming: (slideIndex: number) => ipcRenderer.invoke('slides:get-show-timing', slideIndex),
   setAdvanceTimes: (op: SetAdvanceTimesOp) => ipcRenderer.invoke('slides:set-advance-times', op),
+  saveRecording: (op: SaveRecordingOp) => ipcRenderer.invoke('slides:save-recording', op),
+  clearNarration: (slideIndexes: number[]) =>
+    ipcRenderer.invoke('slides:clear-narration', slideIndexes),
+  microphoneAccess: () => ipcRenderer.invoke('slides:microphone-access'),
   getAnimations: (slideIndex: number) => ipcRenderer.invoke('slides:get-animations', slideIndex),
   getShapeKeys: (slideIndex: number) => ipcRenderer.invoke('slides:get-shape-keys', slideIndex),
   setAnimations: (op: SetAnimationsOp) => ipcRenderer.invoke('slides:set-animations', op),
@@ -389,13 +400,8 @@ const api: SlidesApi = {
     ipcRenderer.on('slides:history-changed', listener)
     return () => ipcRenderer.removeListener('slides:history-changed', listener)
   },
-  onDeckChanged: (
-    handler: (state: { slides: RenderSlide[]; size: { cx: number; cy: number } }) => void,
-  ) => {
-    const listener = (
-      _e: IpcRendererEvent,
-      state: { slides: RenderSlide[]; size: { cx: number; cy: number } },
-    ) => handler(state)
+  onDeckChanged: (handler: (state: DeckChange) => void) => {
+    const listener = (_e: IpcRendererEvent, state: DeckChange) => handler(state)
     ipcRenderer.on('slides:deck-changed', listener)
     return () => ipcRenderer.removeListener('slides:deck-changed', listener)
   },

@@ -1984,6 +1984,12 @@ export const workbookPivotAddSchema = z
             numFmt: z.string().min(1).max(255).optional(),
             /// "Show values as" mode; absent = plain aggregate value.
             showDataAs: z.enum(PIVOT_SHOW_DATA_AS).optional(),
+            /// "Show values as" base field (index into fieldNames; must sit on
+            /// rows/columns); present for the base-field modes.
+            baseFieldIndex: z.number().int().nonnegative().max(199).optional(),
+            /// Base item index within the base field's member list; present for
+            /// difference / percentDiff / percentOf.
+            baseItemIndex: z.number().int().nonnegative().max(9_999).optional(),
             /// Custom data-field caption; absent = "Sum of <field>".
             name: z.string().min(1).max(255).optional(),
             /// Calculated field: formula (referencing source field names) plus the new
@@ -2038,6 +2044,53 @@ export const workbookSaveEditsAbortSchema = z
     transferId: z.string().uuid(),
   })
   .strict()
+
+/**
+ * One withheld rectangle, in zero-based screen coordinates — the shape the
+ * gateway's own `RedactionMark` uses, restated here so the renderer never has
+ * to trust a main-process payload it did not validate.
+ */
+const redactionMarkSchema = z
+  .object({
+    startRow: z.number().int().nonnegative(),
+    endRow: z.number().int().nonnegative(),
+    startColumn: z.number().int().nonnegative(),
+    endColumn: z.number().int().nonnegative(),
+    label: z.string().min(1).max(255),
+    /**
+     * The fill the cell carried before the mark, so clearing can restore it.
+     *
+     * Optional and nullable, and it has to be: `.strict()` on this schema
+     * rejects an unknown key outright, so a renderer that starts sending
+     * `previousFill` without a matching field here would have every save
+     * refused — the mark would silently never reach the file. `#RRGGBB` only,
+     * because it is written back onto a cell as a literal fill.
+     */
+    previousFill: z
+      .string()
+      .regex(/^#[0-9A-Fa-f]{6}$/)
+      .nullish(),
+  })
+  .strict()
+
+/** Marks per sheet are bounded so a damaged part cannot balloon a session. */
+const MAX_REDACTION_MARKS = 100_000
+
+/**
+ * Exported for the test that pins this boundary: the fill a mark displaced has
+ * to survive `.strict()` here, or every save is refused and the mark silently
+ * never reaches the file.
+ */
+export const redactionStatesSchema = z
+  .array(
+    z
+      .object({
+        sheetName: z.string().min(1).max(255),
+        marks: z.array(redactionMarkSchema).max(MAX_REDACTION_MARKS),
+      })
+      .strict(),
+  )
+  .max(1_000)
 
 export const workbookSaveRequestSchema = z
   .object({
@@ -2247,6 +2300,14 @@ export const workbookSaveRequestSchema = z
       )
       .max(1_000)
       .default([]),
+    /**
+     * The cells the reader withheld from the model. Keyed by sheet NAME rather
+     * than by id, like the part itself: the marks are re-keyed for the renames
+     * and removals this save performs, and that re-keying maps the name the
+     * session loaded onto the name the file ends up with. Main passes them
+     * through without a translation step.
+     */
+    redactionStates: redactionStatesSchema.nullable().default(null),
   })
   .strict()
   .refine(
@@ -2281,7 +2342,8 @@ export const workbookSaveRequestSchema = z
       request.tableAdditions.length > 0 ||
       (request.tableEdits?.length ?? 0) > 0 ||
       request.pivotAdditions.length > 0 ||
-      request.sparklineAdditions.length > 0,
+      request.sparklineAdditions.length > 0 ||
+      (request.redactionStates?.length ?? 0) > 0,
     { message: 'A save needs at least one edit.' },
   )
   .refine((request) => request.sheetOps.length === 0 || request.sheetOrder.length > 0, {
@@ -2375,6 +2437,37 @@ export const workbookPivotRequestSchema = z
   })
   .strict()
 
+export const workbookRedactionsRequestSchema = z
+  .object({
+    sessionId: z.string().uuid(),
+  })
+  .strict()
+
+/**
+ * The redaction part read at open, in three states rather than two.
+ *
+ * `absent` and `unreadable` must stay distinguishable: the first is the common
+ * case of a workbook that withholds nothing, the second is a part this version
+ * cannot understand. Collapsing the second into an empty `states` array would
+ * read as "nothing is withheld" and hand the model exactly the values the
+ * reader hid, so the failure is carried to the renderer instead of being
+ * smoothed over here.
+ */
+export const workbookRedactionsResultSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('absent') }).strict(),
+  z
+    .object({
+      status: z.literal('ok'),
+      states: redactionStatesSchema,
+      /// Which copy answered — the package part, or the defined-name mirror that
+      /// stands in when a reader dropped the part. Same cells either way; the
+      /// difference is whether the workbook is intact.
+      source: z.enum(['part', 'mirror']),
+    })
+    .strict(),
+  z.object({ status: z.literal('unreadable'), error: z.string().min(1).max(4_000) }).strict(),
+])
+
 const pivotLayoutLineSchema = z
   .object({
     t: z.string().max(32),
@@ -2451,6 +2544,10 @@ export const workbookPivotDefinitionSchema = z
             subtotal: z.string().max(32),
             /// "Show values as" mode; the parser only carries it over when supported.
             showDataAs: z.enum(PIVOT_SHOW_DATA_AS).optional(),
+            /// Base field (cache-field index) / base item (fieldItems index) of
+            /// the "show values as" calculation; present for the base modes.
+            baseField: z.number().int().nonnegative().max(1_000).optional(),
+            baseItem: z.number().int().nonnegative().max(100_000).optional(),
             /// Calculated-field formula (carried when fld points at a cacheField with a
             /// formula).
             formula: z.string().max(2_048).optional(),
@@ -2541,6 +2638,8 @@ export type WorkbookMediaRequest = z.infer<typeof workbookMediaRequestSchema>
 export type WorkbookMediaResult = z.infer<typeof workbookMediaResultSchema>
 export type WorkbookPivotRequest = z.infer<typeof workbookPivotRequestSchema>
 export type WorkbookPivotDefinition = z.infer<typeof workbookPivotDefinitionSchema>
+export type WorkbookRedactionsRequest = z.infer<typeof workbookRedactionsRequestSchema>
+export type WorkbookRedactionsResult = z.infer<typeof workbookRedactionsResultSchema>
 export type LocalImageRequest = z.infer<typeof localImageRequestSchema>
 export type LocalImageResult = z.infer<typeof localImageResultSchema>
 export type ScreenSourcesResult = z.infer<typeof screenSourcesResultSchema>
@@ -3000,6 +3099,12 @@ export interface DesktopApi {
   recalcWorkbook(request: WorkbookRecalcRequest): Promise<WorkbookRecalcResult>
   readWorkbookMedia(request: WorkbookMediaRequest): Promise<WorkbookMediaResult>
   readPivotDefinition(request: WorkbookPivotRequest): Promise<WorkbookPivotDefinition>
+  /**
+   * The cells the reader withheld from the model, read once per open. An
+   * unreadable part is reported as such rather than as "nothing withheld" —
+   * see `workbookRedactionsResultSchema`.
+   */
+  readWorkbookRedactions(request: WorkbookRedactionsRequest): Promise<WorkbookRedactionsResult>
   readLocalImage(request: LocalImageRequest): Promise<LocalImageResult>
   captureScreenSources(): Promise<ScreenSourcesResult>
   /// null when the source vanished between listing and capture.

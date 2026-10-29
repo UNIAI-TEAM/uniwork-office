@@ -190,7 +190,8 @@ export const cs = {
   ribbonIcons: 'Ikony',
   ribbonIconsTip: 'Vložit předdefinovanou ikonu (rastrovanou jako obrázek)',
   ribbon3dModel: '3D modely',
-  ribbon3dModelTip: 'Vložit 3D model (vloží glb/gltf; na plátně se zobrazí zástupný náhled)',
+  ribbon3dModelTip:
+    'Vložit 3D model (.glb): po výběru ho můžete otáčet; PowerPoint ho zachová ve 3D',
   ribbonGroupIllustrations: 'Ilustrace',
   ribbonShapes: 'Obrazce',
   ribbonShapesTip: 'Vložit obrazec (základní obrazce / šipky / hvězdy)',

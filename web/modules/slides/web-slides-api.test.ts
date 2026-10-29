@@ -172,6 +172,7 @@ describe('slidesApi contract', () => {
       'fontDownload',
       'fontInstallLocal',
       'model3d',
+      'slideRecord',
       'headlessExport',
     ])
       expect(SLIDES_WEB_CAPABILITIES[key]).toBe(false)
@@ -1326,5 +1327,144 @@ describe('FRAME-RO-01: capability flags and readOnly profile (UNI-1876)', () => 
       }),
     ).toEqual({ ok: true })
     expect(printFn).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('partial SlideUpdate channels and web data-URL media invariant (7d1ffc4cc)', () => {
+  it('returns SlideUpdate from all 15 slide channels (+ Record narration), keeps data: URLs in web render trees, and sends full slides to presenter', async () => {
+    const png = encodePng(new Uint8Array(4 * 4), 2, 2)
+    const { api, web } = await setup({
+      pickFiles: async () => [
+        new File([png as Uint8Array<ArrayBuffer>], 'pic.png', { type: 'image/png' }),
+      ],
+    })
+    const opened = (await api.consumePendingOpen(FIT))!
+    expect(opened.slides).toHaveLength(5)
+
+    // Insert an image and verify web render trees use data: URLs (never genoffice-slide-media:)
+    const inserted = await api.insertImage(0, FIT)
+    expect(inserted && 'slide' in inserted).toBe(true)
+    const picJson = JSON.stringify(inserted)
+    expect(picJson).toContain('data:image/png;base64,')
+    expect(picJson).not.toContain('genoffice-slide-media:')
+
+    // Exercise all 15 SlideUpdate channels on the web bridge
+    const added = (await api.addSlide({ sourceIndex: 0, fitWidthPx: FIT }))!
+    expect(added.order).toHaveLength(6)
+    expect(added.slides).toHaveLength(1)
+    expect(JSON.stringify(added)).not.toContain('genoffice-slide-media:')
+
+    const blank = (await api.addBlankSlide({ sourceIndex: 0, fitWidthPx: FIT }))!
+    expect(blank.order).toHaveLength(7)
+    expect(blank.slides).toHaveLength(1)
+
+    const layouts = (await api.getLayouts())!
+    const withLayout = (await api.addSlideWithLayout({
+      sourceIndex: 0,
+      layoutPath: layouts.layouts[0]!.path,
+      fitWidthPx: FIT,
+    }))!
+    expect(withLayout.order).toHaveLength(8)
+    expect(withLayout.slides).toHaveLength(1)
+
+    const deletedOne = (await api.deleteSlide(7))!
+    expect(deletedOne.order).toHaveLength(7)
+
+    const deletedMulti = (await api.deleteSlides({ slideIndexes: [5, 6] }))!
+    expect(deletedMulti.order).toHaveLength(5)
+
+    const duped = (await api.duplicateSlides({ slideIndexes: [0], fitWidthPx: FIT }))!
+    expect(duped.order).toHaveLength(6)
+    expect(duped.slides).toHaveLength(1)
+
+    const hidden = (await api.setSlidesHidden({ slideIndexes: [1], hidden: true }))!
+    expect(hidden.order).toHaveLength(6)
+    expect(hidden.slides).toHaveLength(1)
+
+    const movedOne = (await api.moveSlide({ fromIndex: 0, toIndex: 2 }))!
+    expect(movedOne.order).toHaveLength(6)
+    expect(Array.isArray(movedOne.sections)).toBe(true)
+
+    const movedMulti = (await api.moveSlides({ slideIndexes: [1, 2], insertAt: 0 }))!
+    expect(movedMulti.order).toHaveLength(6)
+    expect(Array.isArray(movedMulti.sections)).toBe(true)
+
+    await api.addSection({ atSlideIndex: 0, name: 'A' })
+    const secs = (await api.addSection({ atSlideIndex: 3, name: 'B' }))!
+    const secB = secs.find((s) => s.name === 'B')!
+    const movedSec = (await api.moveSection({ id: secB.id, dir: 'up' }))!
+    expect(movedSec.order).toHaveLength(6)
+    expect(Array.isArray(movedSec.sections)).toBe(true)
+
+    const removedSec = (await api.removeSectionSlides({ id: secB.id }))!
+    expect(removedSec.order.length).toBeLessThan(6)
+    expect(Array.isArray(removedSec.sections)).toBe(true)
+
+    const bg = (await api.editBackground({
+      slideIndex: 0,
+      kind: 'solid',
+      color: 'FFF2CC',
+      fitWidthPx: FIT,
+    }))!
+    expect(bg.order).toHaveLength(removedSec.order.length)
+    expect(bg.slides).toHaveLength(1)
+
+    await api.addElement({
+      slideIndex: 0,
+      kind: 'textbox',
+      xPx: 20,
+      yPx: 20,
+      wPx: 200,
+      hPx: 60,
+      fitWidthPx: FIT,
+      text: 'web-find-token',
+    })
+    const fr = (await api.findReplace({ find: 'web-find-token', replace: 'web-replaced' }))!
+    expect(fr.count).toBe(1)
+    expect(fr.update?.order).toHaveLength(removedSec.order.length)
+    expect(fr.update?.slides).toHaveLength(1)
+
+    await api.copySlides({ slideIndexes: [0], pngs: [btoa('png')] })
+    const pasted = (await api.pasteSlide({ afterIndex: 0, fitWidthPx: FIT, mode: 'theme' }))!
+    expect(pasted.order).toHaveLength(removedSec.order.length + 1)
+    expect(pasted.slides).toHaveLength(1)
+
+    const repasted = (await api.repasteSlide({ fitWidthPx: FIT, mode: 'picture' }))!
+    expect(repasted.order).toHaveLength(removedSec.order.length)
+    expect(repasted.slides).toHaveLength(1)
+
+    // Record narration channels also return SlideUpdate on the web bridge
+    const wavBase64 = 'UklGRiwAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQgAAAAAAAAAAAAAAA=='
+    const recSaved = (await api.saveRecording({
+      slides: [{ slideIndex: 0, wavBase64, durationMs: 800, advanceMs: 1000 }],
+    }))!
+    expect(recSaved.order).toHaveLength(removedSec.order.length)
+    expect(recSaved.slides).toHaveLength(1)
+    const recCleared = (await api.clearNarration([0]))!
+    expect(recCleared.order).toHaveLength(removedSec.order.length)
+    expect(recCleared.slides).toHaveLength(1)
+
+    // Full render tree check: no genoffice-slide-media URL anywhere
+    const allSlides = (await api.getRenderSlides())!
+    expect(JSON.stringify(allSlides)).not.toContain('genoffice-slide-media:')
+    expect(JSON.stringify(allSlides)).toContain('data:image/png;base64,')
+
+    // Presenter window receives full RenderSlide[] even when a partial broadcast fires for >=2 attached clients
+    const presenterSpy = vi.spyOn(web.presenter, 'deckChanged')
+    sessions.set(99, sessions.get(1)!)
+    await api.setSlidesHidden({ slideIndexes: [0], hidden: false })
+    await flush()
+    expect(presenterSpy).toHaveBeenCalled()
+    const forwarded = presenterSpy.mock.calls.at(-1)![0]
+    expect(forwarded).toHaveLength(removedSec.order.length)
+    sessions.delete(99)
+
+    // View-only frame still blocks all 15 mutating channels while serving READ_ONLY_CHANNELS
+    const ro = await setup({ capabilities: { ...SLIDES_WEB_CAPABILITIES } })
+    await ro.api.consumePendingOpen(FIT)
+    expect(await ro.api.getRenderSlides()).toHaveLength(5)
+    expect(await ro.api.addSlide({ sourceIndex: 0, fitWidthPx: FIT })).toBeNull()
+    expect(await ro.api.deleteSlide(0)).toBeNull()
+    expect(await ro.api.findReplace({ find: 'a', replace: 'b' })).toBeNull()
   })
 })

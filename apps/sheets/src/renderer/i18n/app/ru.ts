@@ -1,6 +1,20 @@
 import type { zh } from './zh'
 
 export const ru = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Скрыть выделение от ИИ',
+  redactDialogDesc:
+    'Выбранное остается в документе и в файле, а модель видит только метку. Дайте ей имя, чтобы было понятно, что она обозначает.',
+  redactDialogScope:
+    'Это касается только ИИ в этом приложении. CLI, инструменты MCP и экспорт без интерфейса читают файл напрямую и по-прежнему видят эти слова.',
+  redactDialogPlaceholder: 'Имя метки, напр. телефон клиента',
+  redactCancel: 'Отмена',
+  redactInsert: 'Скрыть',
+  redactEnable: 'Правый клик по выделению скрывает его от ИИ.',
+  redactNeedsSavedRow: 'Этой строки ещё нет в файле. Сначала сохраните, затем скройте ячейку.',
+  redactRecoveredFromNames:
+    'Другая программа переписала этот файл и потеряла запись о том, что скрыто. Скрытые ячейки восстановлены по именам в книге; сохранение возвращает полную запись.',
+
   appMergeWorkbooks: 'Объединить книги',
   appMergeWorkbooksTip: 'Добавить листы из других файлов Excel в эту книгу',
   appMergeWorkbooksPicking: 'Выберите файлы для объединения…',
@@ -188,6 +202,13 @@ export const ru = {
   appInvalidGroupField: 'Недопустимое поле группировки.',
   appInvalidPageField: 'Недопустимое поле фильтра отчёта.',
   appPivotPageItemMissing: 'Элемент фильтра «{item}» не входит в поле «{label}».',
+  appInvalidPivotBaseField:
+    'Базовое поле режима «Показать значения как» должно находиться в строках или столбцах.',
+  appPivotBaseFieldMissing:
+    'Для режима «Показать значения как» поля значений требуется базовое поле.',
+  appPivotBaseFieldNotAxis:
+    'Базовое поле «{label}» должно находиться в строках или столбцах сводной таблицы.',
+  appPivotBaseItemMissing: 'Базовый элемент «{item}» не входит в поле «{label}».',
   appInvalidLabelFilterField: 'Поле фильтра подписей недопустимо.',
   appInvalidValueFieldIndex: 'Индекс поля значений {index} недопустим.',
   appInvalidValueField: 'Недопустимое поле значений.',
@@ -328,6 +349,7 @@ export const ru = {
     'Этот лист содержит сводную таблицу — перемещение диапазонов пока не поддерживается.',
   appMergeOverTable:
     'Выделение пересекается с таблицей Excel — объединение ячеек внутри таблицы пока не поддерживается.',
+  appFilterToggleFailed: 'Фильтр не применён — сначала выделите диапазон с данными.',
   appAutofillStreaming:
     'Автозаполнение в область, которая ещё загружается потоково, пока не разрешено.',
   appDvNeedsIndexed:

@@ -26,7 +26,7 @@ import type {
 import { safeExternalUrl } from '@genoffice/electron-utils/safe-external-url'
 import { DECK_LINK_PROTOCOLS } from '../../shared/run-link'
 import type { HandlerContext } from '../host-io'
-import { buildAllRenderSlides, rebuildSlide } from '../render'
+import { buildAllRenderSlides, buildSlideUpdate, rebuildSlide } from '../render'
 import { markMetaDirty, pushHistory, sessions } from '../state'
 import { journaledTxn, sessionTxn } from '../txn'
 
@@ -224,15 +224,16 @@ export const documentHandlers = {
   'slides:remove-section': (ctx: HandlerContext, op: RemoveSectionOp) =>
     sectionShim(ctx, { op: 'removeSection', id: op.id }),
 
-  // Moving a whole section changes slide order (sldIdLst + deck.slides); must send back the full RenderSlide set
+  // Moving a whole section changes slide order (sldIdLst + deck.slides)
   'slides:move-section': (ctx: HandlerContext, op: MoveSectionOp) => {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     const sections = sectionShim(ctx, { op: 'moveSection', id: op.id, dir: op.dir })
     if (!sections) return null
     return {
-      slides: buildAllRenderSlides(session.opened, session.fitWidthPx),
-      sections,
+      ...buildSlideUpdate(session, before),
+      sections: sections as SectionInfo[],
     }
   },
 

@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const fr = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Masquer la sélection à l’IA',
+  redactDialogDesc:
+    'La sélection reste dans le document et dans le fichier ; le modèle ne voit que le marqueur ci-dessous. Donnez-lui un nom pour qu’il sache ce qu’il désigne.',
+  redactDialogScope:
+    'Le masquage ne concerne que l’IA de cette application. La CLI, les outils MCP et l’exportation sans interface lisent le fichier directement et voient toujours ces mots.',
+  redactDialogPlaceholder: 'Nom du placeholder, ex. : téléphone du client',
+  redactCancel: 'Annuler',
+  redactInsert: 'Masquer',
+  redactEnable: 'Clic droit sur une sélection pour la masquer à l’IA.',
+  redactNeedsSavedRow:
+    "Cette ligne n'est pas encore dans le fichier. Enregistrez d'abord, puis masquez la cellule.",
+  redactRecoveredFromNames:
+    'Une autre application a réécrit ce fichier et effacé la trace de ce qui est masqué. Les cellules masquées ont été retrouvées dans les noms du classeur ; la sauvegarde restaure la trace complète.',
+
   appMergeWorkbooks: 'Fusionner des classeurs',
   appMergeWorkbooksTip: "Ajouter les feuilles d'autres fichiers Excel à ce classeur",
   appMergeWorkbooksPicking: 'Choisissez les fichiers à fusionner…',
@@ -200,6 +215,13 @@ export const fr = {
   appInvalidPageField: 'Champ de filtre du rapport non valide.',
   appPivotPageItemMissing:
     "L'élément de filtre « {item} » n'est pas un membre du champ « {label} ».",
+  appInvalidPivotBaseField:
+    'Le champ de base de « Afficher les valeurs en » doit se trouver en lignes ou en colonnes.',
+  appPivotBaseFieldMissing:
+    "Le mode « Afficher les valeurs en » d'un champ de valeurs nécessite un champ de base.",
+  appPivotBaseFieldNotAxis:
+    'Le champ de base « {label} » doit se trouver dans les lignes ou les colonnes du tableau croisé.',
+  appPivotBaseItemMissing: "L'élément de base « {item} » n'est pas un membre du champ « {label} ».",
   appInvalidLabelFilterField: "Le champ du filtre d'étiquettes n'est pas valide.",
   appInvalidValueFieldIndex: "L'index de champ de valeurs {index} n'est pas valide.",
   appInvalidValueField: 'Champ de valeurs non valide.',
@@ -353,6 +375,8 @@ export const fr = {
     "Cette feuille contient un tableau croisé dynamique — le déplacement de plages n'est pas encore pris en charge.",
   appMergeOverTable:
     'La sélection chevauche un tableau Excel — la fusion de cellules dans un tableau n’est pas encore prise en charge.',
+  appFilterToggleFailed:
+    'Le filtre n’a pas été appliqué — sélectionnez d’abord la plage qui contient vos données.',
   appAutofillStreaming:
     "La recopie automatique vers une zone encore en cours de chargement en flux n'est pas encore autorisée.",
   appDvNeedsIndexed:

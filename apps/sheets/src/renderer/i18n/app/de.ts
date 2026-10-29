@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const de = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Auswahl vor der KI verbergen',
+  redactDialogDesc:
+    'Das Ausgewählte bleibt im Dokument und in der Datei; das Modell sieht nur den Platzhalter. Geben Sie ihm einen Namen.',
+  redactDialogScope:
+    'Das Verbergen gilt nur für die KI dieser App. CLI, MCP-Tools und der Headless-Export lesen die Datei direkt und sehen diese Wörter weiterhin.',
+  redactDialogPlaceholder: 'Name des Platzhalters, z. B. Telefonnummer des Kunden',
+  redactCancel: 'Abbrechen',
+  redactInsert: 'Verbergen',
+  redactEnable: 'Rechtsklick auf eine Auswahl, um sie vor der KI zu verbergen.',
+  redactNeedsSavedRow:
+    'Diese Zeile ist noch nicht in der Datei. Bitte zuerst speichern und dann die Zelle ausblenden.',
+  redactRecoveredFromNames:
+    'Eine andere App hat diese Datei neu geschrieben und den Eintrag darüber, was ausgeblendet ist, verworfen. Die ausgeblendeten Zellen wurden aus den Namen in der Arbeitsmappe wiederhergestellt; beim Speichern wird der vollständige Eintrag zurückgeschrieben.',
+
   appMergeWorkbooks: 'Arbeitsmappen zusammenführen',
   appMergeWorkbooksTip: 'Blätter aus anderen Excel-Dateien in diese Arbeitsmappe übernehmen',
   appMergeWorkbooksPicking: 'Dateien zum Zusammenführen wählen…',
@@ -196,6 +211,13 @@ export const de = {
   appInvalidPageField: 'Ungültiges Berichtsfilterfeld.',
   appPivotPageItemMissing:
     'Das Berichtsfilterelement „{item}“ ist kein Element des Felds „{label}“.',
+  appInvalidPivotBaseField:
+    'Das Basisfeld von „Werte anzeigen als“ muss sich in Zeilen oder Spalten befinden.',
+  appPivotBaseFieldMissing:
+    'Der Modus „Werte anzeigen als“ eines Wertefelds benötigt ein Basisfeld.',
+  appPivotBaseFieldNotAxis:
+    'Basisfeld „{label}“ muss sich in den Zeilen oder Spalten der PivotTable befinden.',
+  appPivotBaseItemMissing: 'Basiselement „{item}“ ist kein Mitglied des Felds „{label}“.',
   appInvalidLabelFilterField: 'Das Feld des Beschriftungsfilters ist ungültig.',
   appInvalidValueFieldIndex: 'Wertfeldindex {index} ist ungültig.',
   appInvalidValueField: 'Ungültiges Wertfeld.',
@@ -343,6 +365,8 @@ export const de = {
     'Dieses Blatt enthält eine PivotTable — das Verschieben von Bereichen wird noch nicht unterstützt.',
   appMergeOverTable:
     'Die Auswahl überschneidet sich mit einer Excel-Tabelle — das Verbinden von Zellen in einer Tabelle wird noch nicht unterstützt.',
+  appFilterToggleFailed:
+    'Der Filter wurde nicht angewendet — wählen Sie zuerst den Bereich mit den Daten aus.',
   appAutofillStreaming:
     'Automatisches Ausfüllen in einen noch per Streaming geladenen Bereich ist noch nicht erlaubt.',
   appDvNeedsIndexed:

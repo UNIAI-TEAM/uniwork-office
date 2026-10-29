@@ -19,7 +19,6 @@ import {
   addSmartArt,
   addMedia,
   addModel3d,
-  model3dPartOf,
   solidPng,
   setElementLink,
   getElementLink,
@@ -474,18 +473,37 @@ describe('addMedia / addModel3d', () => {
     expect(el.media?.kind).toBe('audio')
   })
 
-  it('3d model embeds glb part and poster picture with descr marker', async () => {
+  it('3d model embeds the glb as a model3d part behind its picture', async () => {
     const opened = await openPptx(fx('01_standard_business.pptx'))
-    const glb = new Uint8Array([0x67, 0x6c, 0x54, 0x46]) // "glTF"
+    const glb = new Uint8Array(Buffer.from('Z2xURgIAAAAYAAAABAAAAEpTT057fSAg', 'base64'))
     const r = addModel3d(opened, 0, { bytes: glb, ext: 'glb', offset: { ...OFF } })
     expect(r).not.toBeNull()
 
     const reopened = await openPptx(await savePptx(opened))
     const el = reopened.deck.slides[0]!.elements.at(-1) as PictureElement
     expect(el.type).toBe('picture')
-    const part = model3dPartOf(el)
-    expect(part).toMatch(/^ppt\/media\/media\d+\.glb$/)
-    expect(reopened.archive.readBytes(part!)).toEqual(glb)
+    expect(el.model3d?.target).toMatch(/^ppt\/media\/model3d\d+\.glb$/)
+    expect(reopened.archive.readBytes(el.model3d!.target!)).toEqual(glb)
+  })
+
+  it('addModel3d rejects malformed glb bytes without mutating the archive', async () => {
+    const opened = await openPptx(fx('01_standard_business.pptx'))
+    const entriesBefore = [...opened.archive.entries.keys()].sort()
+    const countBefore = opened.deck.slides[0]!.elements.length
+
+    const badCases = [
+      new Uint8Array([0x67, 0x6c, 0x54, 0x46]), // truncated 4-byte magic
+      new Uint8Array(Buffer.from('Z2xURgEAAAAYAAAABAAAAEpTT057fSAg', 'base64')), // version 1
+      new Uint8Array(Buffer.from('Z2xURgIAAAAgAAAABAAAAEpTT057fSAg', 'base64')), // declared length 32 > 24
+      new Uint8Array(Buffer.from('Z2xURgIAAAAYAAAADAAAAEpTT057fSAg', 'base64')), // chunk length 12 > declared 24 - 20
+      new Uint8Array(Buffer.from('Z2xURgIAAAAYAAAABAAAAEJJTgB7fSAg', 'base64')), // first chunk BIN instead of JSON
+      new Uint8Array(Buffer.from('Z2xURgIAAAAWAAAAAgAAAEpTT057fQ==', 'base64')), // 22-byte misaligned total & JSON chunk length
+    ]
+    for (const bad of badCases) {
+      expect(addModel3d(opened, 0, { bytes: bad, ext: 'glb', offset: { ...OFF } })).toBeNull()
+    }
+    expect([...opened.archive.entries.keys()].sort()).toEqual(entriesBefore)
+    expect(opened.deck.slides[0]!.elements).toHaveLength(countBefore)
   })
 
   it('solidPng produces a decodable png signature', () => {

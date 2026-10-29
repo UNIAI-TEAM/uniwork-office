@@ -1,4 +1,6 @@
 import type { FWorkbook, FWorksheet } from '@univerjs/sheets/facade'
+import type { CellScalar } from '@genoffice/xlsx-gateway/domain/workbook.types'
+import { NO_REDACTIONS, modelCellValue, type RedactionIndex } from './ai/redact'
 
 /** Request/reply the shell relays from `genoffice open --range` and `genoffice selection`. */
 export type ControlRequest =
@@ -28,6 +30,7 @@ export function handleSheetsControl(
   req: ControlRequest,
   workbook: FWorkbook | null | undefined,
   fileLoaded: boolean,
+  redactions: RedactionIndex = NO_REDACTIONS,
 ): ControlReply {
   // a pre-warmed spare view has a placeholder workbook mounted before the file is in
   if (!workbook || !fileLoaded) return { status: 'not_ready' }
@@ -41,12 +44,34 @@ export function handleSheetsControl(
     const range = workbook.getActiveRange()
     if (!range) return { status: 'ok', result: { none: true, sheet: sheet.getSheetName() } }
     const cells = range.getWidth() * range.getHeight()
+    let values: unknown[][] | undefined
+    if (cells <= MAX_SELECTION_VALUES) {
+      const rawValues = range.getValues()
+      if (redactions.isEmpty) {
+        values = rawValues
+      } else {
+        const sheetId = sheet.getSheetId()
+        const startRow = range.getRow()
+        const startCol = range.getColumn()
+        values = rawValues.map((rowValues, rIdx) =>
+          rowValues.map((val, cIdx) =>
+            modelCellValue(
+              redactions,
+              sheetId,
+              startRow + rIdx,
+              startCol + cIdx,
+              val as CellScalar,
+            ),
+          ),
+        )
+      }
+    }
     return {
       status: 'ok',
       result: {
         sheet: sheet.getSheetName(),
         range: range.getA1Notation(),
-        ...(cells <= MAX_SELECTION_VALUES ? { values: range.getValues() } : { cells }),
+        ...(values !== undefined ? { values } : { cells }),
       },
     }
   }

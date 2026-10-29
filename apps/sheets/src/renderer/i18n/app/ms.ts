@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const ms = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Sembunyikan pilihan daripada AI',
+  redactDialogDesc:
+    'Kandungan yang dipilih kekal dalam dokumen dan fail; model hanya melihat placeholder di bawah. Beri nama supaya model tahu apa yang diwakili.',
+  redactDialogScope:
+    'Penyembunyian ini hanya untuk AI dalam aplikasi ini. CLI, alat MCP dan eksport tanpa antara muka membaca fail secara terus, jadi perkataan ini masih kelihatan kepada mereka.',
+  redactDialogPlaceholder: 'Nama placeholder, cth. telefon pelanggan',
+  redactCancel: 'Batal',
+  redactInsert: 'Sembunyikan',
+  redactEnable: 'Klik kanan pada pilihan untuk menyembunyikannya daripada AI.',
+  redactNeedsSavedRow:
+    'Baris ini belum lagi dalam fail. Simpan dahulu, kemudian sembunyikan selnya.',
+  redactRecoveredFromNames:
+    'Aplikasi lain menulis semula fail ini dan membuang rekod apa yang disembunyikan. Sel yang disembunyikan itu dipulihkan daripada nama yang ada dalam buku kerja; menyimpan akan memulihkan rekod penuh.',
+
   appMergeWorkbooks: 'Gabung Buku Kerja',
   appMergeWorkbooksTip: 'Tambah helaian daripada fail Excel lain ke buku kerja ini',
   appMergeWorkbooksPicking: 'Pilih fail untuk digabungkan…',
@@ -187,6 +202,12 @@ export const ms = {
   appInvalidGroupField: 'Medan pengumpulan tidak sah.',
   appInvalidPageField: 'Medan penapis laporan tidak sah.',
   appPivotPageItemMissing: 'Item penapis laporan "{item}" bukan ahli medan "{label}".',
+  appInvalidPivotBaseField:
+    'Medan asas "Tunjuk nilai sebagai" mesti berada dalam baris atau lajur.',
+  appPivotBaseFieldMissing: 'Mod "Tunjuk nilai sebagai" bagi medan nilai memerlukan medan asas.',
+  appPivotBaseFieldNotAxis:
+    'Medan asas "{label}" mesti berada dalam baris atau lajur jadual pangsi.',
+  appPivotBaseItemMissing: 'Item asas "{item}" bukan ahli medan "{label}".',
   appInvalidLabelFilterField: 'Medan penapis label tidak sah.',
   appInvalidValueFieldIndex: 'Indeks medan nilai {index} tidak sah.',
   appInvalidValueField: 'Medan nilai tidak sah.',
@@ -321,6 +342,7 @@ export const ms = {
   appPivotSheetNoMove: 'Helaian ini mengandungi Jadual Pangsi — pengalihan julat belum disokong.',
   appMergeOverTable:
     'Pilihan bertindih dengan jadual Excel — mencantumkan sel di dalam jadual belum disokong.',
+  appFilterToggleFailed: 'Penapis tidak digunakan — pilih dahulu julat yang mengandungi data anda.',
   appAutofillStreaming: 'AutoIsi ke kawasan yang masih distrim belum dibenarkan.',
   appDvNeedsIndexed:
     'Mengedit pengesahihan data memerlukan helaian ini diindeks sepenuhnya dahulu — cuba lagi sebentar.',

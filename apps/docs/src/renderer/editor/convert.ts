@@ -64,6 +64,7 @@ import { parseRunBorderAttr } from './run-border'
 import { parseTextOutlineAttr } from './text-outline'
 import { charScaleXAttr, parseGlowAttr, parseTextEffectAttr } from './text-effects'
 import { SHAPE_INLINE_WRAP, shapeWrapOf } from './floating-z-order'
+import { REDACT_BDR } from './redaction'
 
 /** minimal ProseMirror JSON shapes */
 export interface PmMark {
@@ -107,6 +108,72 @@ export function pmDocOptions(parsed: {
       ...(asciiFont ? { font: asciiFont } : {}),
     },
   }
+}
+
+/** the element this editor writes into a run's rPr to carry the label */
+const REDACT_RPR_RE = /<go:redact\b/
+const REDACT_LABEL_RE = /<go:redact\b[^>]*\bw:label="([^"]*)"/
+
+function redactLabelIn(rawRPr: string): string {
+  const found = REDACT_LABEL_RE.exec(rawRPr)
+  const label = found?.[1] ?? 'private'
+  return label
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+}
+
+const REDACT_BDR_ELEMENT_RE = /<w:bdr\b[^>]*>[\s\S]*?<\/w:bdr>|<w:bdr\b[^>]*\/>/g
+
+/** whether a w:bdr element is the exact border written by setRedaction (no author attributes) */
+function isRedactBdrElement(xml: string): boolean {
+  const match = /^<w:bdr\b([^>]*?)(?:\/>|>\s*<\/w:bdr>)$/.exec(xml.trim())
+  if (!match) return false
+  const attrRe = /([A-Za-z0-9:._-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
+  const rawAttrs = match[1]
+  if (rawAttrs.replace(attrRe, '').trim() !== '') return false
+  const attrs = new Map<string, string>()
+  let attrMatch: RegExpExecArray | null
+  attrRe.lastIndex = 0
+  while ((attrMatch = attrRe.exec(rawAttrs)) !== null) {
+    if (attrs.has(attrMatch[1])) return false
+    attrs.set(attrMatch[1], attrMatch[2] ?? attrMatch[3] ?? '')
+  }
+  return (
+    attrs.size === 3 &&
+    attrs.get('w:val') === REDACT_BDR.val &&
+    attrs.get('w:sz') === String(REDACT_BDR.sz) &&
+    attrs.get('w:color')?.toUpperCase() === REDACT_BDR.color
+  )
+}
+
+function isRedactRunBorder(bdr: Run['bdr']): boolean {
+  return (
+    bdr !== undefined &&
+    bdr.val === REDACT_BDR.val &&
+    bdr.sz === REDACT_BDR.sz &&
+    bdr.color?.toUpperCase() === REDACT_BDR.color &&
+    bdr.space === undefined
+  )
+}
+
+function hasRedactBdrInRPr(rawRPr: string): boolean {
+  if (!REDACT_RPR_RE.test(rawRPr)) return false
+  const matches = rawRPr.match(REDACT_BDR_ELEMENT_RE)
+  return matches ? matches.some(isRedactBdrElement) : false
+}
+
+/** strip the custom redaction element and its paired hide border from generic retained rPr while keeping unrelated children */
+function stripRedactRPr(rawRPr: string): string | undefined {
+  if (!REDACT_RPR_RE.test(rawRPr)) return rawRPr
+  const stripped = rawRPr
+    .replace(/<go:redact\b[^>]*>[\s\S]*?<\/go:redact>|<go:redact\b[^>]*\/>/g, '')
+    .replace(REDACT_BDR_ELEMENT_RE, (m) => (isRedactBdrElement(m) ? '' : m))
+  if (/^<w:rPr(?:\s[^>]*)?>\s*<\/w:rPr>$/.test(stripped) || stripped.trim() === '') {
+    return undefined
+  }
+  return stripped
 }
 
 export function blocksToPmDoc(
@@ -1523,9 +1590,12 @@ export function pmTableToModel(table: PmNode): TableModel {
 export function runsToInline(runs: Run[]): PmNode[] {
   const nodes: PmNode[] = []
   for (const run of runs) {
+    const marks = runMarks(run)
+    const atomMarks = marks.length > 0 ? { marks } : {}
     if (run.math) {
       nodes.push({
         type: 'docInlineMath',
+        ...atomMarks,
         attrs: {
           omml: run.math.omml,
           mathml: inlineMathML(run.math.omml),
@@ -1540,6 +1610,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
     if (run.ruby) {
       nodes.push({
         type: 'docRuby',
+        ...atomMarks,
         attrs: { base: run.text, rt: run.ruby.rt, xml: run.ruby.xml },
       })
       continue
@@ -1547,6 +1618,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
     if (run.noteRef) {
       nodes.push({
         type: 'docNoteRef',
+        ...atomMarks,
         attrs: {
           kind: run.noteRef.kind,
           id: run.noteRef.id,
@@ -1556,7 +1628,6 @@ export function runsToInline(runs: Run[]): PmNode[] {
       })
       continue
     }
-    const marks = runMarks(run)
     // \n = soft line break, \f = in-paragraph page break, \v = column break, \u001e = text wrapping break
     const breakMarks = marks.length > 0 ? { marks } : {}
     // eslint-disable-next-line no-control-regex
@@ -1577,6 +1648,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
     if (run.image) {
       nodes.push({
         type: 'docInlineImage',
+        ...atomMarks,
         attrs: {
           dataUrl: run.image.dataUrl,
           widthPx: run.image.widthPx ?? null,
@@ -1607,7 +1679,7 @@ export function runsToInline(runs: Run[]): PmNode[] {
       })
     }
     if (run.xeTerm !== undefined) {
-      nodes.push({ type: 'docXeMark', attrs: { term: run.xeTerm } })
+      nodes.push({ type: 'docXeMark', ...atomMarks, attrs: { term: run.xeTerm } })
     }
   }
   markLeadRule(nodes)
@@ -1732,6 +1804,25 @@ function runMarks(run: Run): PmMark[] {
       run.charScalePct && !/\s/.test(run.text) && !run.underline && !run.strike && !run.link
         ? charScaleXAttr(run.text, run.charScalePct, charScaleEm(run.text, run.charScalePct))
         : null
+    // A run whose rPr carries our element came back from a file this editor
+    // wrote. The parser has no schema for a custom element, so the label is
+    // lifted out of the raw rPr and the run is re-tagged: without it the
+    // border survives a reopen but the document quietly stops withholding
+    // anything, and a model can read the whole thing again.
+    const isRedacted = typeof run.rawRPr === 'string' && REDACT_RPR_RE.test(run.rawRPr)
+    if (isRedacted) {
+      marks.push({
+        type: 'redaction',
+        // bdr and rawRPr live on the redaction mark's rawRPr for the save path;
+        // docTextStyle drops the paired hide border so reopen neither draws a
+        // second box nor leaves an orphan border after unhiding
+        attrs: { label: redactLabelIn(run.rawRPr!), rawRPr: run.rawRPr },
+      })
+    }
+    const styleBdr =
+      isRedacted && hasRedactBdrInRPr(run.rawRPr!) && isRedactRunBorder(run.bdr)
+        ? undefined
+        : run.bdr
     marks.push({
       type: 'docTextStyle',
       attrs: {
@@ -1757,7 +1848,7 @@ function runMarks(run: Run): PmMark[] {
         dstrike: run.dstrike ?? null,
         glow: run.glow ? JSON.stringify(run.glow) : null,
         positionHalfPoints: run.positionHalfPoints ?? null,
-        bdr: run.bdr ? JSON.stringify(run.bdr) : null,
+        bdr: styleBdr ? JSON.stringify(styleBdr) : null,
         vertAlign: run.vertAlign ?? null,
         em: run.em ?? null,
         boldOff: run.bold === false || null,
@@ -1769,7 +1860,7 @@ function runMarks(run: Run): PmMark[] {
         cs: run.cs ?? null,
         rtl: run.rtl ?? null,
         styleId: run.styleId ?? null,
-        rawRPr: run.rawRPr ?? null,
+        rawRPr: (typeof run.rawRPr === 'string' ? stripRedactRPr(run.rawRPr) : null) ?? null,
         themeRFonts: run.themeRFonts ? JSON.stringify(run.themeRFonts) : null,
         themeColor: run.themeColor ?? null,
       },
@@ -3329,33 +3420,45 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       continue
     }
     if (node.type === 'docNoteRef') {
-      const markerRawRPr = node.attrs?.rawRPr
+      const base = atomBase(node)
+      const hasRedact = node.marks?.some((m) => m.type === 'redaction') ?? false
+      const markerRawRPr =
+        typeof node.attrs?.rawRPr === 'string' && node.attrs.rawRPr
+          ? hasRedact
+            ? node.attrs.rawRPr
+            : stripRedactRPr(node.attrs.rawRPr)
+          : undefined
+      const rawRPr = mergeRawRPr(markerRawRPr, base.rawRPr)
       runs.push({
+        ...base,
         text: String(node.attrs?.num ?? 1),
         noteRef: {
           kind: (node.attrs?.kind as 'footnote' | 'endnote') ?? 'footnote',
           id: String(node.attrs?.id ?? ''),
         },
-        ...(typeof markerRawRPr === 'string' && markerRawRPr ? { rawRPr: markerRawRPr } : {}),
+        ...(rawRPr ? { rawRPr } : {}),
       })
       continue
     }
     if (node.type === 'docXeMark') {
-      runs.push({ text: '', xeTerm: String(node.attrs?.term ?? '') })
+      runs.push({ ...atomBase(node), text: '', xeTerm: String(node.attrs?.term ?? '') })
       continue
     }
     if (node.type === 'docInlineMath') {
       const omml = String(node.attrs?.omml ?? '')
-      if (omml) runs.push({ text: String(node.attrs?.text ?? ''), math: { omml } })
+      if (omml)
+        runs.push({ ...atomBase(node), text: String(node.attrs?.text ?? ''), math: { omml } })
       continue
     }
     if (node.type === 'docRuby') {
       const base = String(node.attrs?.base ?? '')
       const xml = String(node.attrs?.xml ?? '')
       if (base) {
-        runs.push(
-          xml ? { text: base, ruby: { rt: String(node.attrs?.rt ?? ''), xml } } : { text: base },
-        )
+        runs.push({
+          ...atomBase(node),
+          text: base,
+          ...(xml ? { ruby: { rt: String(node.attrs?.rt ?? ''), xml } } : {}),
+        })
       }
       continue
     }
@@ -3364,9 +3467,19 @@ export function inlineToRuns(content: PmNode[]): Run[] {
       const xml = String(node.attrs?.xml ?? '')
       const rule = node.attrs?.rule as NonNullable<Run['image']>['rule'] | null | undefined
       if ((dataUrl || rule) && xml) {
+        const base = atomBase(node)
+        const hasRedact = node.marks?.some((m) => m.type === 'redaction') ?? false
+        const imageRawRPr =
+          typeof node.attrs?.rawRPr === 'string' && node.attrs.rawRPr
+            ? hasRedact
+              ? String(node.attrs.rawRPr)
+              : stripRedactRPr(String(node.attrs.rawRPr))
+            : undefined
+        const rawRPr = mergeRawRPr(imageRawRPr, base.rawRPr)
         runs.push({
+          ...base,
           text: '',
-          ...(node.attrs?.rawRPr ? { rawRPr: String(node.attrs.rawRPr) } : {}),
+          ...(rawRPr ? { rawRPr } : {}),
           image: {
             dataUrl,
             xml,
@@ -3405,10 +3518,73 @@ function symRuns(run: Run): Run[] {
   return [...run.text].map((ch) => ({ ...plain, text: ch, ...(ch === glyph ? { sym } : {}) }))
 }
 
+/** top-level child elements of an rPr fragment (depth-aware, attrs kept) */
+function splitRPrChildren(xml: string): Array<{ name: string; xml: string }> {
+  const out: Array<{ name: string; xml: string }> = []
+  const tagRe = /<(\/?)([A-Za-z0-9:._-]+)((?:"[^"]*"|'[^']*'|[^"'>])*)>/g
+  let depth = 0
+  let start = -1
+  let name = ''
+  let match: RegExpExecArray | null
+  while ((match = tagRe.exec(xml)) !== null) {
+    const closing = match[1] === '/'
+    const selfClosing = match[3].endsWith('/')
+    if (closing) {
+      depth--
+      if (depth === 0) out.push({ name, xml: xml.slice(start, match.index + match[0].length) })
+    } else if (selfClosing) {
+      if (depth === 0) out.push({ name: match[2], xml: match[0] })
+    } else {
+      if (depth === 0) {
+        start = match.index
+        name = match[2]
+      }
+      depth++
+    }
+  }
+  return out
+}
+
+/** merge mark-derived rPr with fallback rPr so mark properties win while keeping unrelated original children */
+function mergeRawRPr(
+  fallback: string | undefined,
+  authoritative: string | undefined,
+): string | undefined {
+  if (!authoritative) return fallback || undefined
+  if (!fallback || fallback === authoritative) return authoritative
+  const fbOpen = /^<w:rPr(?:\s[^>]*)?>/.exec(fallback)?.[0]
+  const authOpen = /^<w:rPr(?:\s[^>]*)?>/.exec(authoritative)?.[0]
+  if (!fbOpen || !fallback.endsWith('</w:rPr>') || !authOpen || !authoritative.endsWith('</w:rPr>'))
+    return authoritative
+  const fbChildren = splitRPrChildren(fallback.slice(fbOpen.length, -'</w:rPr>'.length))
+  const authChildren = splitRPrChildren(authoritative.slice(authOpen.length, -'</w:rPr>'.length))
+  const authNames = new Set(authChildren.map((c) => c.name))
+  const kept = fbChildren.filter((c) => !authNames.has(c.name))
+  if (kept.length === 0) return authoritative
+  return `${authOpen}${kept.map((c) => c.xml).join('')}${authChildren.map((c) => c.xml).join('')}</w:rPr>`
+}
+
+/** an atom's marks carry its revision / comment / character style; dropping them lost the w:ins wrapper */
+function atomBase(node: PmNode): Partial<Run> {
+  if (!node.marks?.length) return {}
+  const { text: _text, ...rest } = runFromMarks('', node.marks)
+  return rest
+}
+
 function runFromMarks(text: string, marks: PmMark[]): Run {
   const run: Run = { text }
+  let redactRawRPr: string | undefined
+  let styleRawRPr: string | undefined
   for (const mark of marks) {
-    if (mark.type === 'bold') run.bold = true
+    if (mark.type === 'redaction') {
+      // rawRPr is the whole story: it carries both the w:bdr Word draws and the
+      // custom element holding the label, and the save path writes it back
+      // byte for byte because the run model never manages a custom element.
+      // Setting run.bdr as well would only duplicate what rPr already has.
+      if (typeof mark.attrs?.rawRPr === 'string' && mark.attrs.rawRPr) {
+        redactRawRPr = mark.attrs.rawRPr
+      }
+    } else if (mark.type === 'bold') run.bold = true
     else if (mark.type === 'italic') run.italic = true
     else if (mark.type === 'underline') run.underline = true
     else if (mark.type === 'strike') run.strike = true
@@ -3483,9 +3659,12 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       }
       if (mark.attrs?.positionHalfPoints)
         run.positionHalfPoints = Number(mark.attrs.positionHalfPoints)
+      const rawRPrAttr = typeof mark.attrs?.rawRPr === 'string' ? mark.attrs.rawRPr : undefined
       if (mark.attrs?.bdr) {
         const bdr = parseRunBorderAttr(String(mark.attrs.bdr))
-        if (bdr) run.bdr = bdr
+        if (bdr && !(rawRPrAttr && hasRedactBdrInRPr(rawRPrAttr) && isRedactRunBorder(bdr))) {
+          run.bdr = bdr
+        }
       }
       if (mark.attrs?.vertAlign === 'superscript' || mark.attrs?.vertAlign === 'subscript') {
         run.vertAlign = mark.attrs.vertAlign
@@ -3498,7 +3677,7 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       if (mark.attrs?.eaLang) run.eastAsiaLang = String(mark.attrs.eaLang)
       if (mark.attrs?.rtl != null) run.rtl = Boolean(mark.attrs.rtl)
       if (mark.attrs?.styleId) run.styleId = String(mark.attrs.styleId)
-      if (mark.attrs?.rawRPr) run.rawRPr = String(mark.attrs.rawRPr)
+      if (rawRPrAttr) styleRawRPr = stripRedactRPr(rawRPrAttr)
       if (mark.attrs?.themeRFonts) {
         run.themeRFonts = JSON.parse(String(mark.attrs.themeRFonts)) as Run['themeRFonts']
       }
@@ -3512,6 +3691,8 @@ function runFromMarks(text: string, marks: PmMark[]): Run {
       }
     }
   }
+  const mergedRawRPr = mergeRawRPr(styleRawRPr, redactRawRPr)
+  if (mergedRawRPr) run.rawRPr = mergedRawRPr
   return run
 }
 
