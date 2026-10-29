@@ -106,6 +106,8 @@ export function isRibbonToggleShortcut(e: KeyboardEvent): boolean {
  * editors bind — G/M/A/F/E/D — are already taken, hence K. */
 export function isRibbonCompactShortcut(e: KeyboardEvent): boolean {
   if (e.repeat || e.shiftKey) return false
+  // AltGr is reported as Ctrl+Alt on Windows layouts (Polish, German...): AltGr+K types a character
+  if (typeof e.getModifierState === 'function' && e.getModifierState('AltGraph')) return false
   if (IS_MAC) return e.metaKey && e.altKey && !e.ctrlKey && e.code === 'KeyK'
   return e.ctrlKey && e.altKey && !e.metaKey && e.code === 'KeyK'
 }

@@ -7354,6 +7354,7 @@ export default function App() {
       <div className="ribbon-group-items">
         <button
           className={`rb-big${sidebar === 'thumbs' ? ' active' : ''}`}
+          data-tip={t('thumbs')}
           onClick={() => setSidebar((v) => (v === 'thumbs' ? null : 'thumbs'))}
         >
           <span className="rb-big-icon">
@@ -7363,6 +7364,7 @@ export default function App() {
         </button>
         <button
           className={`rb-big${sidebar === 'outline' ? ' active' : ''}`}
+          data-tip={t('outline')}
           disabled={!outline}
           onClick={() => setSidebar((v) => (v === 'outline' ? null : 'outline'))}
         >
@@ -7375,6 +7377,7 @@ export default function App() {
         {!serverComments && (
           <button
             className={`rb-big${sidebar === 'comments' ? ' active' : ''}`}
+            data-tip={t('commentsPanel')}
             onClick={() => setSidebar((v) => (v === 'comments' ? null : 'comments'))}
           >
             <span className="rb-big-icon">
@@ -7386,6 +7389,7 @@ export default function App() {
         {cap('pdfCompare') && (
           <button
             className={`rb-big${sidebar === 'compare' ? ' active' : ''}`}
+            data-tip={t('compare')}
             disabled={status !== 'ready'}
             onClick={() => setSidebar((v) => (v === 'compare' ? null : 'compare'))}
           >

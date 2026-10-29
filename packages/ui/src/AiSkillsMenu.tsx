@@ -118,10 +118,37 @@ export function AiSkillsMenu({
           style={popStyle}
           onKeyDown={(e) => {
             // Escape from the search field or any row closes the menu and hands focus back to `+`
-            if (e.key !== 'Escape') return
-            e.stopPropagation()
-            setOpen(false)
-            btnRef.current?.focus()
+            if (e.key === 'Escape') {
+              e.stopPropagation()
+              setOpen(false)
+              btnRef.current?.focus()
+              return
+            }
+            if (page === 'skills' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+              const rows = [
+                ...e.currentTarget.querySelectorAll<HTMLButtonElement>(
+                  '.ai-plus-skill:not(:disabled)',
+                ),
+              ]
+              if (e.target === searchRef.current) {
+                if (e.key === 'ArrowDown' && rows[0]) {
+                  e.preventDefault()
+                  rows[0].focus()
+                }
+                return
+              }
+              const idx = rows.indexOf(e.target as HTMLButtonElement)
+              if (idx >= 0) {
+                e.preventDefault()
+                if (e.key === 'ArrowDown') {
+                  rows[idx + 1]?.focus()
+                } else if (idx === 0) {
+                  searchRef.current?.focus()
+                } else {
+                  rows[idx - 1]?.focus()
+                }
+              }
+            }
           }}
         >
           {page === 'root' ? (

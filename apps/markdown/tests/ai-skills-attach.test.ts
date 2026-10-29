@@ -405,6 +405,14 @@ describe('markdown AI panel skills attach (X4)', () => {
     if (ackBtn) click(ackBtn)
     await flush()
 
+    // The panel's one persistent live region announces the notice; it is empty before it appears
+    expect(container!.querySelectorAll('[aria-live]').length).toBe(1)
+    const liveRegion = container!.querySelector<HTMLElement>('.ai-sr-status')
+    expect(liveRegion).not.toBeNull()
+    const quietText = liveRegion!.textContent
+    expect(quietText).not.toContain(AI_SKILLS_LABELS.en.uniworkTooLongNotice)
+    expect(container!.querySelector('.ai-skills-too-long-notice')).toBeNull()
+
     click(container!.querySelector('.ai-plus-btn'))
     await flush()
     const items = [...container!.querySelectorAll<HTMLButtonElement>('.ai-plus-skill')]
@@ -416,8 +424,14 @@ describe('markdown AI panel skills attach (X4)', () => {
     await flush()
     await flush()
 
-    // Not sent; notice shown; prompt and chips preserved
+    // Not sent; notice shown inside the same mounted live region; prompt and chips preserved
     expect(harness.runs).toEqual([])
+    expect(container!.querySelector('.ai-sr-status')).toBe(liveRegion)
+    expect(
+      container!.querySelector('.ai-skills-too-long-notice')?.closest('[aria-live]'),
+    ).toBeNull()
+    expect(container!.querySelector('.ai-skills-too-long-notice')?.getAttribute('role')).toBeNull()
+    expect(liveRegion!.textContent).toBe(AI_SKILLS_LABELS.en.uniworkTooLongNotice)
     expect(container!.querySelector('.ai-skills-too-long-notice')?.textContent).toBe(
       AI_SKILLS_LABELS.en.uniworkTooLongNotice,
     )
@@ -430,8 +444,10 @@ describe('markdown AI panel skills attach (X4)', () => {
       ),
     ).toEqual(['tables', 'tone'])
 
-    // Removing one long skill clears the notice and allows sending when under 8,000 runes
+    // Removing one long skill clears the notice text while keeping the live region mounted
     click(container!.querySelectorAll('.ai-composer .ai-skill-chip-remove')[1]) // remove tone
+    expect(container!.querySelector('.ai-sr-status')).toBe(liveRegion)
+    expect(liveRegion!.textContent).not.toContain(AI_SKILLS_LABELS.en.uniworkTooLongNotice)
     expect(container!.querySelector('.ai-skills-too-long-notice')).toBeNull()
     pressEnterInComposer(container!)
     await flush()
