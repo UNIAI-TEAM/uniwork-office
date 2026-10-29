@@ -399,7 +399,11 @@ import {
   killAllActiveLegacyConversions,
   legacyFormatForPath,
 } from './legacy-converter'
-import { createCloudLegacyConverter, createLegacyOpener } from './legacy-open'
+import {
+  createCloudLegacyConverter,
+  createLegacyOpener,
+  legacyProgressDetailKey,
+} from './legacy-open'
 import type { CloudLegacyConvertInput } from './uniwork-docs/legacy-cloud-open'
 import { tLegacyOpen } from './legacy-open-strings'
 import {
@@ -4637,7 +4641,7 @@ function beginLegacyProgress(fileName: string, cancel: () => void): () => void {
     const options = {
       type: 'info' as const,
       message: tLegacyOpen(currentLang(), 'legacyConvertingMsg', { name: fileName }),
-      detail: tLegacyOpen(currentLang(), 'legacyConvertingDetail'),
+      detail: tLegacyOpen(currentLang(), legacyProgressDetailKey(fileName)),
       buttons: [tm('btnCancel')],
       cancelId: 0,
       noLink: true,

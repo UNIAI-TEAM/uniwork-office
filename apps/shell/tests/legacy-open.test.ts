@@ -10,12 +10,13 @@ import {
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { convertedDocumentFor } from '@genoffice/electron-utils'
+import { LANGS } from '@genoffice/i18n'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LegacyConvertError, type ConvertLegacyResult } from '../src/main/legacy-converter'
 import {
   createLegacyOpener,
   legacyErrorMessage,
-  type ConvertedDocument,
+  legacyProgressDetailKey,
   type LegacyOpenDeps,
 } from '../src/main/legacy-open'
 import { nameParts } from '../src/renderer/src/uniwork-folders/SaveDialog'
@@ -565,6 +566,32 @@ describe('legacyErrorMessage', () => {
     expect(tLegacyOpen('vi', 'legacyXlsValuesOnly', { name: 'Old.xls' })).toMatch(
       /vì thiếu bộ chuyển đổi\. Hãy cài đặt lại ứng dụng để khôi phục chúng\.$/,
     )
+  })
+
+  it('uses legacyOdfDetail for the six OpenDocument extensions and legacyConvertingDetail for .doc/.xls/.ppt across all 21 locales', () => {
+    for (const name of [
+      'Report.odt',
+      'Letter.OTT',
+      'Budget.ods',
+      'Sheet.ots',
+      'Deck.odp',
+      'Slide.OTP',
+    ]) {
+      expect(legacyProgressDetailKey(name)).toBe('legacyOdfDetail')
+    }
+    for (const name of ['Report.doc', 'Budget.xls', 'Deck.ppt']) {
+      expect(legacyProgressDetailKey(name)).toBe('legacyConvertingDetail')
+    }
+    expect(tLegacyOpen('en', 'legacyOdfDetail')).toBe(
+      'The OpenDocument file is being converted so you can edit it here. The original file is not changed.',
+    )
+    expect(tLegacyOpen('vi', 'legacyOdfDetail')).toBe(
+      'Tệp OpenDocument đang được chuyển đổi để bạn chỉnh sửa tại đây. Tệp gốc không bị thay đổi.',
+    )
+    for (const lang of LANGS) {
+      expect(tLegacyOpen(lang, 'legacyOdfDetail').length).toBeGreaterThan(10)
+      expect(tLegacyOpen(lang, 'legacyOdfDetail')).toContain('OpenDocument')
+    }
   })
 })
 

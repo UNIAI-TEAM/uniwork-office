@@ -80,6 +80,12 @@ const ERROR_COPY: Readonly<Partial<Record<LegacyConvertErrorCode, LegacyOpenStri
   converter_missing: 'legacyMissing',
 }
 
+/** the progress-box detail line: OpenDocument files say "OpenDocument file", legacy binaries say "older Office file" */
+export function legacyProgressDetailKey(fileName: string): LegacyOpenStringKey {
+  const ext = extname(fileName).slice(1).toLowerCase()
+  return isOdfFormat(ext) ? 'legacyOdfDetail' : 'legacyConvertingDetail'
+}
+
 /** the user-facing text of a conversion failure (unmapped codes read as a plain failure) */
 export function legacyErrorMessage(
   err: LegacyConvertError,
