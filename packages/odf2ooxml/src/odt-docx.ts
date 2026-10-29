@@ -478,18 +478,6 @@ function placeCells(
       if (name === 'table:table-cell') {
         const repeat = clampRepeat(attr(node, 'table:number-columns-repeated'), 64)
         for (let index = 0; index < repeat; index++) out.push(makeCell(node, ctx))
-      } else if (name === 'table:covered-table-cell') {
-        const repeat = clampRepeat(attr(node, 'table:number-columns-repeated'), 64)
-        for (let index = 0; index < repeat; index++) {
-          out.push({
-            row: -1,
-            column: -1,
-            colSpan: 1,
-            rowSpan: 1,
-            contentXml: '<w:p/>',
-            fill: null,
-          })
-        }
       }
     }
     return out

@@ -140,6 +140,47 @@ describe('convertOdtToDocx', () => {
     )
   })
 
+  it('does not shift cells when a vertical merge emits covered-table-cell elements', async () => {
+    // LibreOffice writes <table:covered-table-cell/> in the row below a vertical
+    // merge; the occupancy grid already reserves those slots from rowSpan, so
+    // emitting a cell for covered-table-cell would shift the remaining cells
+    // right and drop the last column.
+    const body =
+      '<table:table table:name="Bang1">' +
+      '<table:table-column table:number-columns-repeated="3"/>' +
+      '<table:table-row>' +
+      '<table:table-cell table:number-columns-spanned="3"><text:p>Header 3 cols</text:p></table:table-cell>' +
+      '<table:covered-table-cell/><table:covered-table-cell/>' +
+      '</table:table-row>' +
+      '<table:table-row>' +
+      '<table:table-cell table:number-rows-spanned="2"><text:p>Span 2 rows</text:p></table:table-cell>' +
+      '<table:table-cell><text:p>B2</text:p></table:table-cell>' +
+      '<table:table-cell><text:p>C2</text:p></table:table-cell>' +
+      '</table:table-row>' +
+      '<table:table-row>' +
+      '<table:covered-table-cell/>' +
+      '<table:table-cell><text:p>B3</text:p></table:table-cell>' +
+      '<table:table-cell><text:p>C3</text:p></table:table-cell>' +
+      '</table:table-row>' +
+      '</table:table>'
+    const result = await convertOdtToDocx(await buildOdt(contentXml(body)))
+    const document = (await readDocxEntry(result.docx, 'word/document.xml')) ?? ''
+    expect(document).toContain('<w:vMerge w:val="restart"/>')
+    expect(document).toContain('<w:vMerge/>')
+    expect(document).toContain('B2')
+    expect(document).toContain('C2')
+    expect(document).toContain('B3')
+    expect(document).toContain('C3')
+    const rows = [...document.matchAll(/<w:tr>([\s\S]*?)<\/w:tr>/g)].map((m) => m[1])
+    expect(rows).toHaveLength(3)
+    // Row 3 has 3 cells: the vMerge continuation, B3, and C3
+    const row3Cells = [...rows[2].matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map((m) => m[1])
+    expect(row3Cells).toHaveLength(3)
+    expect(row3Cells[0]).toContain('<w:vMerge/>')
+    expect(row3Cells[1]).toContain('B3')
+    expect(row3Cells[2]).toContain('C3')
+  })
+
   it('carries the page geometry into the section properties', async () => {
     const body = '<text:p>page</text:p>'
     const result = await convertOdtToDocx(await buildOdt(contentXml(body), stylesXml('', PAGE_A4)))
