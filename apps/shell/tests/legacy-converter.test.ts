@@ -1243,12 +1243,14 @@ describe('legacy-converter', () => {
       expect(resDoc.kind).toBe('converted')
       expect(resOdt.kind).toBe('converted')
       expect(maxRunning).toBe(1)
-      expect(order).toEqual([
-        'start:vn-template',
-        'end:vn-template',
-        'start:native-writer',
-        'end:native-writer',
-      ])
+      // The queue promises one soffice at a time, not FIFO across async preflight:
+      // assert two non-overlapping start/end pairs, in whichever order they ran.
+      expect(order).toHaveLength(4)
+      expect(order[0]).toMatch(/^start:/)
+      expect(order[1]).toBe(order[0]!.replace('start:', 'end:'))
+      expect(order[2]).toMatch(/^start:/)
+      expect(order[3]).toBe(order[2]!.replace('start:', 'end:'))
+      expect([order[0], order[2]].sort()).toEqual(['start:native-writer', 'start:vn-template'])
     })
 
     it.skipIf(process.platform === 'win32')(
