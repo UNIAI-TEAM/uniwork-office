@@ -15,6 +15,7 @@ import {
 } from 'pdf-lib'
 import type { PDFPage } from 'pdf-lib'
 import { VISUAL_SIGNATURE_CONTENT_PREFIX } from '../shared/ipc'
+import { markupLineRotation } from '../shared/markup-line'
 import type {
   DrawingInput,
   OutlineEntryInput,
@@ -112,8 +113,9 @@ const quadBounds = (q: number[]) => {
  * Acrobat/Preview/pdfjs all render from AP for consistent results.
  * Highlight uses Multiply blending to mimic a highlighter; underline/strikeout are stroked
  * segments drawn along the "visual bottom edge" (pageRot is the page's final /Rotate;
- * at 90/270 line height runs along the x axis); squiggly is a repeating wave on the
- * same edge.
+ * at 90/270 line height runs along the x axis, unless the quad is wide: ordinary content on
+ * a rotated page, whose baseline is the low-y edge, see markupLineRotation); squiggly is a
+ * repeating wave on the same edge.
  */
 function markupAppearance(
   pdfDoc: PDFDocument,
@@ -134,17 +136,18 @@ function markupAppearance(
     ops.push(`${r} ${g} ${b} RG`)
     for (const q of m.quads) {
       const [x1, y1, x2, y2] = quadBounds(q)
-      const h = pageRot % 180 === 0 ? y2 - y1 : x2 - x1
+      const rot = markupLineRotation(pageRot, [x1, y1, x2, y2])
+      const h = rot % 180 === 0 ? y2 - y1 : x2 - x1
       ops.push(`${Math.max(0.8, num(h * 0.06))} w`)
       // The perpendicular points the way the wave bulges: from the visual bottom
       // edge into the text, which is -x at rot 90 and -y at rot 180
-      if (pageRot === 90) {
+      if (rot === 90) {
         squigglyOps(ops, x2 - h * t, y1, 0, 1, -1, 0, y2 - y1)
-      } else if (pageRot === 270) {
+      } else if (rot === 270) {
         squigglyOps(ops, x1 + h * t, y1, 0, 1, 1, 0, y2 - y1)
       } else {
-        const y = pageRot === 180 ? y2 - h * t : y1 + h * t
-        squigglyOps(ops, x1, y, 1, 0, 0, pageRot === 180 ? -1 : 1, x2 - x1)
+        const y = rot === 180 ? y2 - h * t : y1 + h * t
+        squigglyOps(ops, x1, y, 1, 0, 0, rot === 180 ? -1 : 1, x2 - x1)
       }
     }
   } else {
@@ -152,16 +155,17 @@ function markupAppearance(
     ops.push(`${r} ${g} ${b} RG`)
     for (const q of m.quads) {
       const [x1, y1, x2, y2] = quadBounds(q)
-      const h = pageRot % 180 === 0 ? y2 - y1 : x2 - x1
+      const rot = markupLineRotation(pageRot, [x1, y1, x2, y2])
+      const h = rot % 180 === 0 ? y2 - y1 : x2 - x1
       ops.push(`${Math.max(0.8, num(h * 0.06))} w`)
-      if (pageRot === 90) {
+      if (rot === 90) {
         const x = x2 - h * t
         ops.push(`${num(x)} ${num(y1)} m ${num(x)} ${num(y2)} l S`)
-      } else if (pageRot === 270) {
+      } else if (rot === 270) {
         const x = x1 + h * t
         ops.push(`${num(x)} ${num(y1)} m ${num(x)} ${num(y2)} l S`)
       } else {
-        const y = pageRot === 180 ? y2 - h * t : y1 + h * t
+        const y = rot === 180 ? y2 - h * t : y1 + h * t
         ops.push(`${num(x1)} ${num(y)} m ${num(x2)} ${num(y)} l S`)
       }
     }

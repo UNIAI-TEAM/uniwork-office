@@ -3,6 +3,7 @@ import type { CSSProperties, RefObject } from 'react'
 import { AnnotationMode, TextLayer } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import { pdfRectToCss, quadToRect } from './annotations'
+import { markupLineRotation } from '../shared/markup-line'
 import type { LocalMarkup, PageGeom } from './annotations'
 import { MAX_PAGE_RENDER_PIXELS } from './view-config'
 
@@ -154,17 +155,24 @@ export function MarkupOverlay({
       {markups.flatMap((m) =>
         m.quads.map((q, i) => {
           const [r, g, b] = m.color
-          const style: CSSProperties = pdfRectToCss(geom, quadToRect(q), scale)
+          const rect = quadToRect(q)
+          const style: CSSProperties = pdfRectToCss(geom, rect, scale)
+          // Ordinary content on a page rotated by 90/270 runs top to bottom on screen: the
+          // stroke is then a vertical line on the baseline side (left at 90, right at 270)
+          // instead of the box's bottom edge, which is only the end of the line
+          const pageRot = ((geom.rot % 360) + 360) % 360
+          const sideways = pageRot % 180 !== 0 && markupLineRotation(pageRot, rect) === 0
+          const baselineLeft = pageRot === 90
           if (m.type === 'highlight') {
             style.background = `rgba(${r * 255}, ${g * 255}, ${b * 255}, 0.4)`
           } else if (m.type === 'squiggly') {
-            // Wavy line pinned to the quad's bottom edge; the stretched viewBox keeps
+            // Wavy line pinned to the quad's baseline edge; the stretched viewBox keeps
             // the wave periodic at any quad width while non-scaling-stroke keeps the
             // stroke 2px at any zoom (matches the saved annotation's appearance)
             const bar = `rgb(${r * 255}, ${g * 255}, ${b * 255})`
             const points = Array.from({ length: 21 }, (_, k) => {
               const y = k % 2 === 0 ? 3 : k % 4 === 1 ? 0.7 : 5.3
-              return `${k * 5},${y}`
+              return sideways ? `${baselineLeft ? y : 6 - y},${k * 5}` : `${k * 5},${y}`
             }).join(' ')
             return (
               <div
@@ -173,11 +181,17 @@ export function MarkupOverlay({
                 style={style}
               >
                 <svg
-                  width="100%"
-                  height="6"
-                  viewBox="0 0 100 6"
+                  width={sideways ? '6' : '100%'}
+                  height={sideways ? '100%' : '6'}
+                  viewBox={sideways ? '0 0 6 100' : '0 0 100 6'}
                   preserveAspectRatio="none"
-                  style={{ position: 'absolute', bottom: 0, left: 0, overflow: 'visible' }}
+                  style={{
+                    position: 'absolute',
+                    overflow: 'visible',
+                    ...(sideways
+                      ? { top: 0, ...(baselineLeft ? { left: 0 } : { right: 0 }) }
+                      : { bottom: 0, left: 0 }),
+                  }}
                   aria-hidden
                 >
                   <polyline
@@ -192,8 +206,16 @@ export function MarkupOverlay({
             )
           } else {
             const bar = `rgb(${r * 255}, ${g * 255}, ${b * 255})`
-            if (m.type === 'underline') style.borderBottom = `2px solid ${bar}`
-            else style.backgroundImage = `linear-gradient(${bar}, ${bar})`
+            if (m.type === 'underline') {
+              if (sideways) style[baselineLeft ? 'borderLeft' : 'borderRight'] = `2px solid ${bar}`
+              else style.borderBottom = `2px solid ${bar}`
+            } else {
+              style.backgroundImage = `linear-gradient(${bar}, ${bar})`
+              if (sideways) {
+                style.backgroundSize = '2px 100%'
+                style.backgroundPosition = baselineLeft ? '46% 0' : '54% 0'
+              }
+            }
           }
           return (
             <div
