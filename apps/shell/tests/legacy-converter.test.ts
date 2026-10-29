@@ -764,6 +764,91 @@ describe('legacy-converter', () => {
         }),
       )
     })
+
+    it('honours UTF-16 BOM on encrypted ODF manifests with code "encrypted" and refuses malformed/unsupported manifest encodings as "corrupt" (F6)', async () => {
+      const mimeBytes = Buffer.from('application/vnd.oasis.opendocument.text', 'utf8')
+      const contentBytes = Buffer.from('encrypted-payload', 'utf8')
+      const manifestText =
+        '<?xml version="1.0" encoding="UTF-16"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"><manifest:encryption-data manifest:checksum-type="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0#sha256-1k" manifest:checksum="abc="/></manifest:file-entry></manifest:manifest>'
+      const utf16LeManifest = Buffer.concat([
+        Buffer.from([0xff, 0xfe]),
+        Buffer.from(manifestText, 'utf16le'),
+      ])
+      const utf16LeArchive = buildZip([
+        { name: 'mimetype', method: 0, data: mimeBytes, size: mimeBytes.length },
+        {
+          name: 'META-INF/manifest.xml',
+          method: 8,
+          data: deflateRawSync(utf16LeManifest),
+          size: utf16LeManifest.length,
+        },
+        { name: 'content.xml', method: 0, data: contentBytes, size: contentBytes.length },
+      ])
+      expect(() => preflightOdfBytes(utf16LeArchive, 'odt')).toThrowError(
+        expect.objectContaining({
+          name: 'LegacyConvertError',
+          code: 'encrypted',
+          format: 'odt',
+        }),
+      )
+
+      const dir = makeTempDir()
+      const utf16LePath = join(dir, 'utf16le-pw.odt')
+      writeFileSync(utf16LePath, utf16LeArchive)
+      const { spawnFn, getSpawnCount } = createFakeChildProcess({})
+      await expect(
+        convertLegacyFile(utf16LePath, {
+          sourceFormat: 'odt',
+          spawnFn,
+        }),
+      ).rejects.toMatchObject({
+        code: 'encrypted',
+        format: 'odt',
+      })
+      expect(getSpawnCount()).toBe(0)
+
+      // UTF-16BE BOM encrypted manifest also throws encrypted
+      const utf16BeBody = Buffer.from(manifestText, 'utf16le')
+      utf16BeBody.swap16()
+      const utf16BeManifest = Buffer.concat([Buffer.from([0xfe, 0xff]), utf16BeBody])
+      const utf16BeArchive = buildZip([
+        { name: 'mimetype', method: 0, data: mimeBytes, size: mimeBytes.length },
+        {
+          name: 'META-INF/manifest.xml',
+          method: 0,
+          data: utf16BeManifest,
+          size: utf16BeManifest.length,
+        },
+        { name: 'content.xml', method: 0, data: contentBytes, size: contentBytes.length },
+      ])
+      expect(() => preflightOdfBytes(utf16BeArchive, 'odt')).toThrowError(
+        expect.objectContaining({
+          name: 'LegacyConvertError',
+          code: 'encrypted',
+          format: 'odt',
+        }),
+      )
+
+      // Invalid UTF-8 bytes in manifest -> corrupt
+      const invalidUtf8Manifest = Buffer.from([0xff, 0xff, 0xff, 0x3c, 0x3f, 0x78, 0x6d, 0x6c])
+      const badEncodingArchive = buildZip([
+        { name: 'mimetype', method: 0, data: mimeBytes, size: mimeBytes.length },
+        {
+          name: 'META-INF/manifest.xml',
+          method: 0,
+          data: invalidUtf8Manifest,
+          size: invalidUtf8Manifest.length,
+        },
+        { name: 'content.xml', method: 0, data: contentBytes, size: contentBytes.length },
+      ])
+      expect(() => preflightOdfBytes(badEncodingArchive, 'odt')).toThrowError(
+        expect.objectContaining({
+          name: 'LegacyConvertError',
+          code: 'corrupt',
+          format: 'odt',
+        }),
+      )
+    })
   })
 
   describe('OOXML output validation, timeout, cancellation & converter_missing', () => {

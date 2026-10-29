@@ -752,6 +752,58 @@ function matchesOdfFamily(mediaType: string, expectedTarget: LegacyTargetFormat)
   )
 }
 
+function decodeOdfManifestXml(bytes: Uint8Array): string | null {
+  try {
+    let encoding: 'utf-8' | 'utf-16le' | 'utf-16be' = 'utf-8'
+    if (
+      bytes.byteLength >= 4 &&
+      ((bytes[0] === 0x00 && bytes[1] === 0x00 && bytes[2] === 0xfe && bytes[3] === 0xff) ||
+        (bytes[0] === 0xff && bytes[1] === 0xfe && bytes[2] === 0x00 && bytes[3] === 0x00))
+    ) {
+      return null
+    }
+    if (
+      bytes.byteLength >= 2 &&
+      ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0x3c && bytes[1] === 0x00))
+    ) {
+      if (bytes.byteLength % 2 !== 0) return null
+      encoding = 'utf-16le'
+    } else if (
+      bytes.byteLength >= 2 &&
+      ((bytes[0] === 0xfe && bytes[1] === 0xff) || (bytes[0] === 0x00 && bytes[1] === 0x3c))
+    ) {
+      if (bytes.byteLength % 2 !== 0) return null
+      encoding = 'utf-16be'
+    }
+    const decoded = new TextDecoder(encoding, { fatal: true }).decode(bytes)
+    if (decoded.includes('\0')) return null
+    const declMatch = /^\s*<\?xml\b[^>]*?\bencoding\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(decoded)
+    if (declMatch) {
+      const declared = (declMatch[1] ?? declMatch[2] ?? '').trim().toLowerCase()
+      if (encoding === 'utf-8') {
+        if (
+          declared !== 'utf-8' &&
+          declared !== 'utf8' &&
+          declared !== 'us-ascii' &&
+          declared !== 'ascii'
+        ) {
+          return null
+        }
+      } else if (
+        declared !== 'utf-16' &&
+        declared !== 'utf16' &&
+        declared !== 'utf-16le' &&
+        declared !== 'utf-16be'
+      ) {
+        return null
+      }
+    }
+    return decoded
+  } catch {
+    return null
+  }
+}
+
 function extractManifestRootMediaType(manifestXml: string): string | null {
   const tagRe = /<\s*(?:[A-Za-z0-9_-]+:)?file-entry\b([^>]*?)>/g
   let match: RegExpExecArray | null
@@ -847,12 +899,12 @@ export function preflightOdfBytes(
   let manifestRootMediaType: string | null = null
   if (manifestEntry) {
     const manifestBytes = readZipEntryBytes(bytes, manifestEntry)
-    if (!manifestBytes) {
+    const manifestXml = manifestBytes ? decodeOdfManifestXml(manifestBytes) : null
+    if (!manifestXml) {
       throw new LegacyConvertError('corrupt', 'OpenDocument META-INF/manifest.xml is unreadable', {
         format: sourceFormat,
       })
     }
-    const manifestXml = new TextDecoder('utf-8').decode(manifestBytes)
     if (/<\s*(?:[A-Za-z0-9_-]+:)?encryption-data\b/.test(manifestXml)) {
       throw new LegacyConvertError(
         'encrypted',
@@ -862,7 +914,7 @@ export function preflightOdfBytes(
     }
     manifestRootMediaType = extractManifestRootMediaType(manifestXml)
   }
-  let declaredMediaType: string | null = null
+  let declaredMediaType: string | null
   if (mimetypeEntry) {
     const mimetypeBytes = readZipEntryBytes(bytes, mimetypeEntry)
     if (!mimetypeBytes) {
