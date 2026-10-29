@@ -48,13 +48,11 @@ export function AttachmentsPanel({
           >
             <div className="pdf-attachment-name" title={row.name}>
               {row.name}
-              {!row.saved && (
-                <span className="pdf-attachment-tag">{t('attachmentsPendingAdd')}</span>
-              )}
-              {row.removing && (
-                <span className="pdf-attachment-tag">{t('attachmentsPendingRemove')}</span>
-              )}
             </div>
+            {!row.saved && <span className="pdf-attachment-tag">{t('attachmentsPendingAdd')}</span>}
+            {row.removing && (
+              <span className="pdf-attachment-tag">{t('attachmentsPendingRemove')}</span>
+            )}
             <div className="pdf-attachment-size">{humanBytes(row.bytes)}</div>
             {!row.removing && (
               <button

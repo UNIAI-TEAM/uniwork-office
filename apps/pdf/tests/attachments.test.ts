@@ -1,9 +1,15 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { PDFDocument, PDFName, PDFRawStream, PDFString } from 'pdf-lib'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { applyAttachments, attachmentLabels, AttachmentsError } from '../src/main/pdf-attachments'
 import { applySaveRequest } from '../src/main/save-pdf'
 import type { SavePdfRequest } from '../src/shared/ipc'
+import { AttachmentsPanel } from '../src/renderer/AttachmentsPanel'
+import type { TFunc } from '../src/renderer/i18n/locale'
 
 const b64 = (text: string): string => Buffer.from(text, 'utf8').toString('base64')
 
@@ -125,5 +131,37 @@ describe('the embedded-files tree helper', () => {
     expect(() =>
       applyAttachments(doc, { add: [{ name: 'x.txt', bytesBase64: b64('x') }] }),
     ).toThrow(AttachmentsError)
+  })
+})
+
+describe('AttachmentsPanel narrow sidebar layout', () => {
+  it('renders the file name on its own full-width row and badges as sibling items on the wrapped second row', () => {
+    const html = renderToStaticMarkup(
+      createElement(AttachmentsPanel, {
+        t: ((key: string) => key) as TFunc,
+        rows: [
+          { name: 'data-table.csv', bytes: 920, saved: true, removing: true },
+          { name: 'extra-note.txt', bytes: 4608, saved: false },
+        ],
+        onAdd: () => {},
+        onExport: () => {},
+        onToggleRemove: () => {},
+      }),
+    )
+    expect(html).toContain(
+      '<div class="pdf-attachment-name" title="data-table.csv">data-table.csv</div><span class="pdf-attachment-tag">attachmentsPendingRemove</span><div class="pdf-attachment-size">920 B</div>',
+    )
+    expect(html).toContain(
+      '<div class="pdf-attachment-name" title="extra-note.txt">extra-note.txt</div><span class="pdf-attachment-tag">attachmentsPendingAdd</span><div class="pdf-attachment-size">4.5 KB</div>',
+    )
+
+    const css = readFileSync(resolve(__dirname, '../src/renderer/styles.css'), 'utf8')
+    const attachStart = css.indexOf('\n.pdf-attachment {')
+    expect(attachStart).toBeGreaterThan(0)
+    expect(css.slice(attachStart, css.indexOf('}', attachStart))).toContain('flex-wrap: wrap')
+
+    const nameStart = css.indexOf('\n.pdf-attachment-name {')
+    expect(nameStart).toBeGreaterThan(0)
+    expect(css.slice(nameStart, css.indexOf('}', nameStart))).toContain('flex: 1 0 100%')
   })
 })

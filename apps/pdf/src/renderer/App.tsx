@@ -8912,7 +8912,8 @@ export default function App() {
             )}
             {(sidebar === 'thumbs' ||
               (sidebar === 'outline' && !!outline) ||
-              sidebar === 'comments') && (
+              sidebar === 'comments' ||
+              sidebar === 'attachments') && (
               <div className="pdf-side-resizer" onPointerDown={startSidebarResize} />
             )}
             <div
