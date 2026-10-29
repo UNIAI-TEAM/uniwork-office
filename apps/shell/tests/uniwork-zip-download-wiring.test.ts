@@ -137,8 +137,9 @@ const readyJob = {
   error: null,
 }
 const input = { workspaceId: WS, documentIds: [DOC_A, DOC_B] }
-const tick = () => new Promise((resolve) => setTimeout(resolve, 30))
 const tmpLeft = () => readdirSync(dir).filter((name) => name.endsWith('.tmp'))
+const lastProgress = (asker: { sent: Array<{ channel: string; payload: unknown }> }) =>
+  asker.sent.filter((s) => s.channel === ZIP_DOWNLOAD_CHANNELS.progress).at(-1)?.payload
 
 function stubNetwork(routes: (url: string, init: RequestInit) => Response | Promise<Response>) {
   const fetchMock = vi.fn(async (url: string, init: RequestInit) => routes(String(url), init))
@@ -208,8 +209,12 @@ describe('the zip download IPC', () => {
       runId: string
     }
     expect(started.ok).toBe(true)
-    // the poll waits 2 s: let the real timer run out
-    await new Promise((resolve) => setTimeout(resolve, 2_300))
+    // the poll waits 2 s: wait until the run commits and emits the terminal `done` event
+    await vi.waitFor(
+      () =>
+        expect(lastProgress(asker)).toMatchObject({ phase: 'done', path: join(dir, 'mine.zip') }),
+      { timeout: 8_000, interval: 10 },
+    )
     expect(readFileSync(join(dir, 'mine.zip'))).toEqual(Buffer.from([80, 75, 3, 4]))
     expect(tmpLeft()).toEqual([])
     expect(seen[0]).toBe(
@@ -224,7 +229,7 @@ describe('the zip download IPC', () => {
   }, 10_000)
 
   it('quit removes the temp file of a stalled download', async () => {
-    const { call, handle } = await setup()
+    const { call, handle, asker } = await setup()
     dialogs.save = { canceled: false, filePath: join(dir, 'stalled.zip') }
     stubNetwork((url, init) => {
       if (init.method === 'POST') return json(202, readyJob)
@@ -238,12 +243,19 @@ describe('the zip download IPC', () => {
       )
     })
     await call(ZIP_DOWNLOAD_CHANNELS.start, input)
-    await tick()
-    await tick()
-    expect(tmpLeft()).toHaveLength(1)
+    await vi.waitFor(
+      () => {
+        expect(tmpLeft()).toHaveLength(1)
+        expect(lastProgress(asker)).toMatchObject({ phase: 'downloading' })
+      },
+      { timeout: 5_000, interval: 10 },
+    )
     handle.disposeZipDownloads()
     expect(tmpLeft()).toEqual([])
-    await tick()
+    await vi.waitFor(() => expect(lastProgress(asker)).toMatchObject({ phase: 'canceled' }), {
+      timeout: 5_000,
+      interval: 10,
+    })
     expect(existsSync(join(dir, 'stalled.zip'))).toBe(false)
   })
 
@@ -262,13 +274,21 @@ describe('the zip download IPC', () => {
       )
     })
     await call(ZIP_DOWNLOAD_CHANNELS.start, input)
-    await tick()
-    await tick()
+    await vi.waitFor(() => expect(lastProgress(asker)).toMatchObject({ phase: 'downloading' }), {
+      timeout: 5_000,
+      interval: 10,
+    })
     handle.boundary.afterSignOut()
-    await tick()
-    await tick()
-    const last = asker.sent.filter((s) => s.channel === ZIP_DOWNLOAD_CHANNELS.progress).at(-1)!
-    expect(last.payload).toMatchObject({ phase: 'failed', error: { code: 'signed_out' } })
+    await vi.waitFor(
+      () => {
+        expect(lastProgress(asker)).toMatchObject({
+          phase: 'failed',
+          error: { code: 'signed_out' },
+        })
+        expect(tmpLeft()).toEqual([])
+      },
+      { timeout: 5_000, interval: 10 },
+    )
     expect(tmpLeft()).toEqual([])
     expect(existsSync(join(dir, 'gone.zip'))).toBe(false)
   })
