@@ -76,8 +76,11 @@ export function registerIntegrationsIpc(
   ipc.handle(INTEGRATIONS_CHANNELS.status, (): IntegrationsStatus => {
     const skill = bundled()
     const l = ledger()
+    const beforeKeys = Object.keys(l).length
     const launcher = join(deps.cliDir, process.platform === 'win32' ? 'genoffice.cmd' : 'genoffice')
     const outcome = inspectCliLink(linkTarget(launcher))
+    const legacy = findLegacySkillCopies(l)
+    if (Object.keys(l).length !== beforeKeys) saveLedger(l)
     return {
       cli: {
         ...outcome,
@@ -89,7 +92,7 @@ export function registerIntegrationsIpc(
       skillVersion: skill.version,
       skillNeedsCli: /^\s+cli:\s*['"]?>=\s*(\d+\.\d+\.\d+)/m.exec(skill.text)?.[1] ?? '',
       agents: detectAgents().map((a) => ({ ...a, state: readInstallState(a.skillsDir, skill, l) })),
-      legacy: findLegacySkillCopies(l),
+      legacy,
     }
   })
 
@@ -113,12 +116,13 @@ export function registerIntegrationsIpc(
 
   ipc.handle(INTEGRATIONS_CHANNELS.sweepLegacySkillCopies, (): LegacySweepResult => {
     const l = ledger()
+    const beforeKeys = Object.keys(l).length
     // without the current copy the legacy ones are all the user has
     if (!currentSkillInstalled(l)) {
       throw new Error('the shared .agents copy is not installed yet')
     }
     const sweep = sweepLegacySkillCopies(l)
-    if (sweep.removed.length) saveLedger(l)
+    if (sweep.removed.length || Object.keys(l).length !== beforeKeys) saveLedger(l)
     return sweep
   })
 

@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -230,6 +231,7 @@ describe('the legacy per-tool skill copies', () => {
     const h = home()
     const ledger: SkillLedger = {}
     const b = bundled()
+    installSkill(join(h, '.agents', 'skills'), b, ledger)
     const codexPath = installSkill(join(h, '.codex', 'skills'), b, ledger)
     const cursorPath = installSkill(join(h, '.cursor', 'skills'), b, ledger)
     // someone edited this one by hand
@@ -237,7 +239,8 @@ describe('the legacy per-tool skill copies', () => {
 
     const sweep = sweepLegacySkillCopies(ledger, {}, h)
     expect(sweep.removed.map((c) => c.agent)).toEqual(['codex'])
-    expect(sweep.kept.map((c) => c.agent)).toEqual(['cursor'])
+    expect(sweep.kept).toMatchObject([{ agent: 'cursor', reason: 'edited' }])
+    expect(sweep.failed).toEqual([])
     expect(existsSync(codexPath)).toBe(false)
     expect(existsSync(join(h, '.codex', 'skills', 'genoffice'))).toBe(false)
     expect(existsSync(cursorPath)).toBe(true)
@@ -260,21 +263,62 @@ describe('the legacy per-tool skill copies', () => {
     expect(found.map((c) => c.path).sort()).toEqual([codexPath, opencodePath].sort())
   })
 
-  it('the shared .agents copy gates the sweep', () => {
+  it('never lists or deletes the shared .agents copy when CODEX_HOME points at .agents (R1-01)', () => {
     const h = home()
     const ledger: SkillLedger = {}
     const b = bundled()
-    installSkill(join(h, '.codex', 'skills'), b, ledger)
+    const env = { CODEX_HOME: join(h, '.agents') }
+    const sharedPath = installSkill(join(h, '.agents', 'skills'), b, ledger)
+    const cursorPath = installSkill(join(h, '.cursor', 'skills'), b, ledger)
+
+    const found = findLegacySkillCopies(ledger, env, h)
+    expect(found.map((c) => c.agent)).toEqual(['cursor'])
+
+    const sweep = sweepLegacySkillCopies(ledger, env, h)
+    expect(sweep.removed.map((c) => c.agent)).toEqual(['cursor'])
+    expect(existsSync(sharedPath)).toBe(true)
+    expect(readFileSync(sharedPath, 'utf-8')).toBe(b.text)
+    expect(ledger[sharedPath]).toBeDefined()
+    expect(existsSync(cursorPath)).toBe(false)
+  })
+
+  it('the shared .agents copy gates the sweep and must exist with matching bytes (R1-05)', () => {
+    const h = home()
+    const ledger: SkillLedger = {}
+    const b = bundled()
+    const codexPath = installSkill(join(h, '.codex', 'skills'), b, ledger)
     expect(currentSkillInstalled(ledger, {}, h)).toBe(false)
 
-    installSkill(join(h, '.agents', 'skills'), b, ledger)
+    const noSharedSweep = sweepLegacySkillCopies(ledger, {}, h)
+    expect(noSharedSweep.removed).toEqual([])
+    expect(noSharedSweep.kept).toMatchObject([{ agent: 'codex', reason: 'no_shared_copy' }])
+    expect(existsSync(codexPath)).toBe(true)
+
+    const sharedPath = installSkill(join(h, '.agents', 'skills'), b, ledger)
     expect(currentSkillInstalled(ledger, {}, h)).toBe(true)
+
+    // Replace shared file with modified content: gate closes and nothing is deleted
+    writeFileSync(sharedPath, 'replaced by hand\n')
+    expect(currentSkillInstalled(ledger, {}, h)).toBe(false)
+    const replacedSweep = sweepLegacySkillCopies(ledger, {}, h)
+    expect(replacedSweep.removed).toEqual([])
+    expect(replacedSweep.kept).toMatchObject([{ agent: 'codex', reason: 'no_shared_copy' }])
+    expect(existsSync(codexPath)).toBe(true)
+
+    // Remove shared file while keeping ledger entry: gate closes and nothing is deleted
+    rmSync(sharedPath, { force: true })
+    expect(currentSkillInstalled(ledger, {}, h)).toBe(false)
+    const missingSweep = sweepLegacySkillCopies(ledger, {}, h)
+    expect(missingSweep.removed).toEqual([])
+    expect(missingSweep.kept).toMatchObject([{ agent: 'codex', reason: 'no_shared_copy' }])
+    expect(existsSync(codexPath)).toBe(true)
   })
 
   it('leaves a user-made genoffice folder with no ledger entry untouched during sweep', () => {
     const h = home()
     const ledger: SkillLedger = {}
     const b = bundled()
+    installSkill(join(h, '.agents', 'skills'), b, ledger)
     installSkill(join(h, '.codex', 'skills'), b, ledger)
     const userMade = join(h, '.gemini', 'skills', 'genoffice', 'SKILL.md')
     mkdirSync(join(h, '.gemini', 'skills', 'genoffice'), { recursive: true })
@@ -285,36 +329,165 @@ describe('the legacy per-tool skill copies', () => {
     expect(existsSync(userMade)).toBe(true)
   })
 
-  it('does not follow a symlinked skill directory or file out of the tool skills root', () => {
+  it('rejects symlinks at .config, tool dotfolder, skills, genoffice, or SKILL.md (R1-02)', () => {
     const h = home()
     const outside = mkdtempSync(join(tmpdir(), 'genoffice-outside-'))
     const ledger: SkillLedger = {}
     const b = bundled()
+    installSkill(join(h, '.agents', 'skills'), b, ledger)
 
-    // Plant a real skill in an outside folder
-    const outsideSkillDir = join(outside, 'genoffice')
-    mkdirSync(outsideSkillDir, { recursive: true })
-    const outsideSkillFile = join(outsideSkillDir, 'SKILL.md')
-    writeFileSync(outsideSkillFile, b.bytes)
-
-    // Record the codex path in the ledger, then replace ~/.codex/skills/genoffice with a symlink to outsideSkillDir
+    // 1. Symlinked genoffice dir (.codex/skills/genoffice -> outside/genoffice)
+    const outsideGenoffice = join(outside, 'genoffice-dir')
+    mkdirSync(outsideGenoffice, { recursive: true })
+    const outsideGenofficeFile = join(outsideGenoffice, 'SKILL.md')
+    writeFileSync(outsideGenofficeFile, b.bytes)
     const codexSkillsDir = join(h, '.codex', 'skills')
     const codexPath = installSkill(codexSkillsDir, b, ledger)
     rmSync(join(codexSkillsDir, 'genoffice'), { recursive: true, force: true })
-    symlinkSync(outsideSkillDir, join(codexSkillsDir, 'genoffice'), 'dir')
+    symlinkSync(outsideGenoffice, join(codexSkillsDir, 'genoffice'), 'dir')
 
-    // Also record the cursor path in the ledger, then replace SKILL.md itself with a symlink
+    // 2. Symlinked SKILL.md file (.cursor/skills/genoffice/SKILL.md -> outside/SKILL.md)
+    const outsideFile = join(outside, 'cursor-SKILL.md')
+    writeFileSync(outsideFile, b.bytes)
     const cursorSkillsDir = join(h, '.cursor', 'skills')
     const cursorPath = installSkill(cursorSkillsDir, b, ledger)
     rmSync(cursorPath, { force: true })
-    symlinkSync(outsideSkillFile, cursorPath, 'file')
+    symlinkSync(outsideFile, cursorPath, 'file')
+
+    // 3. Symlinked tool dotfolder (.gemini -> outside/gemini-dot)
+    const outsideGemini = join(outside, 'gemini-dot')
+    mkdirSync(join(outsideGemini, 'skills', 'genoffice'), { recursive: true })
+    const outsideGeminiFile = join(outsideGemini, 'skills', 'genoffice', 'SKILL.md')
+    writeFileSync(outsideGeminiFile, b.bytes)
+    const geminiPath = installSkill(join(h, '.gemini', 'skills'), b, ledger)
+    rmSync(join(h, '.gemini'), { recursive: true, force: true })
+    symlinkSync(outsideGemini, join(h, '.gemini'), 'dir')
+
+    // 4. Symlinked skills folder (.copilot/skills -> outside/copilot-skills)
+    const outsideCopilotSkills = join(outside, 'copilot-skills')
+    mkdirSync(join(outsideCopilotSkills, 'genoffice'), { recursive: true })
+    const outsideCopilotFile = join(outsideCopilotSkills, 'genoffice', 'SKILL.md')
+    writeFileSync(outsideCopilotFile, b.bytes)
+    const copilotPath = installSkill(join(h, '.copilot', 'skills'), b, ledger)
+    rmSync(join(h, '.copilot', 'skills'), { recursive: true, force: true })
+    symlinkSync(outsideCopilotSkills, join(h, '.copilot', 'skills'), 'dir')
+
+    // 5. Symlinked .config (.config -> outside/config-root)
+    const outsideConfig = join(outside, 'config-root')
+    mkdirSync(join(outsideConfig, 'opencode', 'skills', 'genoffice'), { recursive: true })
+    const outsideOpencodeFile = join(outsideConfig, 'opencode', 'skills', 'genoffice', 'SKILL.md')
+    writeFileSync(outsideOpencodeFile, b.bytes)
+    const opencodePath = installSkill(join(h, '.config', 'opencode', 'skills'), b, ledger)
+    rmSync(join(h, '.config'), { recursive: true, force: true })
+    symlinkSync(outsideConfig, join(h, '.config'), 'dir')
 
     const sweep = sweepLegacySkillCopies(ledger, {}, h)
     expect(sweep.removed).toEqual([])
-    expect(sweep.kept.map((c) => c.agent).sort()).toEqual(['codex', 'cursor'])
-    expect(existsSync(outsideSkillFile)).toBe(true)
-    expect(readFileSync(outsideSkillFile, 'utf-8')).toBe(b.text)
+    expect(sweep.kept.map((c) => ({ agent: c.agent, reason: c.reason }))).toEqual([
+      { agent: 'codex', reason: 'unsafe_link' },
+      { agent: 'cursor', reason: 'unsafe_link' },
+      { agent: 'gemini', reason: 'unsafe_link' },
+      { agent: 'copilot', reason: 'unsafe_link' },
+      { agent: 'opencode', reason: 'unsafe_link' },
+    ])
+    for (const f of [
+      outsideGenofficeFile,
+      outsideFile,
+      outsideGeminiFile,
+      outsideCopilotFile,
+      outsideOpencodeFile,
+    ]) {
+      expect(existsSync(f)).toBe(true)
+      expect(readFileSync(f, 'utf-8')).toBe(b.text)
+    }
+    for (const p of [codexPath, cursorPath, geminiPath, copilotPath, opencodePath]) {
+      expect(ledger[p]).toBeDefined()
+    }
+  })
+
+  it('re-reads and re-hashes SKILL.md immediately before unlink and keeps a copy edited after discovery (R1-03)', () => {
+    const h = home()
+    const ledger: SkillLedger = {}
+    const b = bundled()
+    installSkill(join(h, '.agents', 'skills'), b, ledger)
+    const codexPath = installSkill(join(h, '.codex', 'skills'), b, ledger)
+
+    const sweep = sweepLegacySkillCopies(ledger, {}, h, {
+      beforeUnlink: (copy) => {
+        if (copy.agent === 'codex') {
+          writeFileSync(copy.path, 'edited after discovery\n')
+        }
+      },
+    })
+    expect(sweep.removed).toEqual([])
+    expect(sweep.kept).toMatchObject([{ agent: 'codex', reason: 'edited' }])
+    expect(existsSync(codexPath)).toBe(true)
+    expect(readFileSync(codexPath, 'utf-8')).toBe('edited after discovery\n')
     expect(ledger[codexPath]).toBeDefined()
-    expect(ledger[cursorPath]).toBeDefined()
+  })
+
+  it('uses non-recursive rmdirSync so a file appearing in genoffice/ is never deleted (R1-04)', () => {
+    const h = home()
+    const ledger: SkillLedger = {}
+    const b = bundled()
+    installSkill(join(h, '.agents', 'skills'), b, ledger)
+    const codexPath = installSkill(join(h, '.codex', 'skills'), b, ledger)
+    const extraFile = join(h, '.codex', 'skills', 'genoffice', 'user-note.txt')
+
+    const sweep = sweepLegacySkillCopies(ledger, {}, h, {
+      beforeUnlink: () => {
+        writeFileSync(extraFile, 'do not delete me\n')
+      },
+    })
+    expect(sweep.removed.map((c) => c.agent)).toEqual(['codex'])
+    expect(existsSync(codexPath)).toBe(false)
+    expect(existsSync(extraFile)).toBe(true)
+    expect(readFileSync(extraFile, 'utf-8')).toBe('do not delete me\n')
+  })
+
+  it('isolates per-candidate unlink failures so completed removals persist and failed ones are reported (R1-06)', () => {
+    const h = home()
+    const ledger: SkillLedger = {}
+    const b = bundled()
+    installSkill(join(h, '.agents', 'skills'), b, ledger)
+    const codexPath = installSkill(join(h, '.codex', 'skills'), b, ledger)
+    const cursorDir = join(h, '.cursor', 'skills', 'genoffice')
+    const cursorPath = installSkill(join(h, '.cursor', 'skills'), b, ledger)
+
+    chmodSync(cursorDir, 0o500)
+    try {
+      const sweep = sweepLegacySkillCopies(ledger, {}, h)
+      expect(sweep.removed.map((c) => c.agent)).toEqual(['codex'])
+      expect(sweep.kept).toEqual([])
+      expect(sweep.failed).toMatchObject([{ agent: 'cursor', path: cursorPath, reason: 'error' }])
+      expect(existsSync(codexPath)).toBe(false)
+      expect(ledger[codexPath]).toBeUndefined()
+      expect(existsSync(cursorPath)).toBe(true)
+      expect(ledger[cursorPath]).toBeDefined()
+    } finally {
+      chmodSync(cursorDir, 0o700)
+    }
+  })
+
+  it('prunes absent ledger entries without listing them and keeps unreadable entries with reason error (R1-07)', () => {
+    const h = home()
+    const ledger: SkillLedger = {}
+    const b = bundled()
+    const codexPath = installSkill(join(h, '.codex', 'skills'), b, ledger)
+    const cursorDir = join(h, '.cursor', 'skills', 'genoffice')
+    const cursorPath = installSkill(join(h, '.cursor', 'skills'), b, ledger)
+    rmSync(join(h, '.codex'), { recursive: true, force: true })
+    chmodSync(cursorDir, 0o000)
+
+    try {
+      const found = findLegacySkillCopies(ledger, {}, h)
+      expect(found).toMatchObject([
+        { agent: 'cursor', path: cursorPath, ours: false, reason: 'error' },
+      ])
+      expect(ledger[codexPath]).toBeUndefined()
+      expect(ledger[cursorPath]).toBeDefined()
+    } finally {
+      chmodSync(cursorDir, 0o700)
+    }
   })
 })

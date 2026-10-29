@@ -3,15 +3,16 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  readdirSync,
   readFileSync,
+  realpathSync,
+  rmdirSync,
   rmSync,
   statSync,
   writeFileSync,
   type Stats,
 } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import JSZip from 'jszip'
 
 /**
@@ -174,14 +175,32 @@ const AGENTS: readonly AgentDef[] = [
  */
 const LEGACY_SKILL_DIRS: readonly {
   id: AgentId
+  root: (env: NodeJS.ProcessEnv, home: string) => string
   dir: (env: NodeJS.ProcessEnv, home: string) => string
 }[] = [
-  { id: 'codex', dir: (env, home) => join(env.CODEX_HOME || join(home, '.codex'), 'skills') },
-  { id: 'cursor', dir: (_env, home) => join(home, '.cursor', 'skills') },
-  { id: 'gemini', dir: (_env, home) => join(home, '.gemini', 'skills') },
-  { id: 'copilot', dir: (_env, home) => join(home, '.copilot', 'skills') },
+  {
+    id: 'codex',
+    root: (env, home) => env.CODEX_HOME || home,
+    dir: (env, home) => join(env.CODEX_HOME || join(home, '.codex'), 'skills'),
+  },
+  {
+    id: 'cursor',
+    root: (_env, home) => home,
+    dir: (_env, home) => join(home, '.cursor', 'skills'),
+  },
+  {
+    id: 'gemini',
+    root: (_env, home) => home,
+    dir: (_env, home) => join(home, '.gemini', 'skills'),
+  },
+  {
+    id: 'copilot',
+    root: (_env, home) => home,
+    dir: (_env, home) => join(home, '.copilot', 'skills'),
+  },
   {
     id: 'opencode',
+    root: (env, home) => env.XDG_CONFIG_HOME || home,
     dir: (env, home) => join(env.XDG_CONFIG_HOME || join(home, '.config'), 'opencode', 'skills'),
   },
 ]
@@ -366,11 +385,13 @@ export function uninstallSkill(skillsDir: string, ledger: SkillLedger): boolean 
   rmSync(path, { force: true })
   const dir = join(skillsDir, SKILL_NAME)
   try {
-    if (readdirSync(dir).length === 0) rmSync(dir, { recursive: true })
+    rmdirSync(dir)
   } catch {}
   delete ledger[path]
   return true
 }
+
+export type LegacyKeepReason = 'edited' | 'unsafe_link' | 'no_shared_copy' | 'error'
 
 export interface LegacySkillCopy {
   /** the tool whose dotfolder held the copy */
@@ -383,13 +404,21 @@ export interface LegacySkillCopy {
   path: string
   /** the copy still holds the bytes this app wrote */
   ours: boolean
+  /** why the copy is not treated as ours or could not be removed */
+  reason?: LegacyKeepReason
 }
 
 export interface LegacySweep {
   /** the copies this app wrote and removed */
   removed: LegacySkillCopy[]
-  /** the copies edited by hand: left in place, for the user to judge */
-  kept: LegacySkillCopy[]
+  /** the copies left in place (edited, unsafe symlink chain, or no shared copy) */
+  kept: Array<LegacySkillCopy & { reason: LegacyKeepReason }>
+  /** the copies whose removal threw a filesystem error */
+  failed: Array<LegacySkillCopy & { reason: 'error' }>
+}
+
+export interface LegacyCandidateHooks {
+  beforeUnlink?: (copy: LegacySkillCopy) => void
 }
 
 /**
@@ -402,26 +431,34 @@ export function findLegacySkillCopies(
   home = homedir(),
 ): LegacySkillCopy[] {
   const out: LegacySkillCopy[] = []
+  const shared = AGENTS.find((a) => a.id === 'agents')
+  const sharedDir = shared
+    ? shared.skills(shared.probe(env, home), env, home)
+    : join(home, '.agents', 'skills')
+  const sharedFile = skillFilePath(sharedDir)
+  const seen = new Set<string>()
   for (const legacy of LEGACY_SKILL_DIRS) {
     const skillsDir = legacy.dir(env, home)
     const path = skillFilePath(skillsDir)
     const entry = ledger[path]
     if (!entry) continue
-    let ours = false
-    try {
-      const dirStat = lstatSync(join(skillsDir, SKILL_NAME))
-      const fileStat = lstatSync(path)
-      if (
-        !isSymbolicLinkInChain(skillsDir) &&
-        dirStat.isDirectory() &&
-        !dirStat.isSymbolicLink() &&
-        fileStat.isFile() &&
-        !fileStat.isSymbolicLink()
-      ) {
-        ours = sha256(readFileSync(path, 'utf-8')) === entry.sha256
-      }
-    } catch {}
-    out.push({ agent: legacy.id, label: agentLabel(legacy.id), skillsDir, path, ours })
+    if (isSameOrInsideShared(path, sharedFile, sharedDir)) continue
+    const key = normKey(resolveExistingOrPath(path))
+    if (seen.has(key)) continue
+    const inspected = inspectCandidate(path, legacy.root(env, home), entry.sha256)
+    if (inspected.state === 'absent') {
+      delete ledger[path]
+      continue
+    }
+    seen.add(key)
+    out.push({
+      agent: legacy.id,
+      label: agentLabel(legacy.id),
+      skillsDir,
+      path,
+      ours: inspected.state === 'ours',
+      ...(inspected.reason ? { reason: inspected.reason } : {}),
+    })
   }
   return out
 }
@@ -435,40 +472,61 @@ export function sweepLegacySkillCopies(
   ledger: SkillLedger,
   env: NodeJS.ProcessEnv = process.env,
   home = homedir(),
+  hooks?: LegacyCandidateHooks,
 ): LegacySweep {
   const removed: LegacySkillCopy[] = []
-  const kept: LegacySkillCopy[] = []
-  for (const copy of findLegacySkillCopies(ledger, env, home)) {
+  const kept: Array<LegacySkillCopy & { reason: LegacyKeepReason }> = []
+  const failed: Array<LegacySkillCopy & { reason: 'error' }> = []
+  const copies = findLegacySkillCopies(ledger, env, home)
+  if (!currentSkillInstalled(ledger, env, home)) {
+    for (const copy of copies) {
+      kept.push({ ...copy, ours: false, reason: 'no_shared_copy' })
+    }
+    return { removed, kept, failed }
+  }
+  for (const copy of copies) {
     if (!copy.ours) {
-      kept.push(copy)
+      const reason = copy.reason ?? 'edited'
+      if (reason === 'error') {
+        failed.push({ ...copy, ours: false, reason: 'error' })
+      } else {
+        kept.push({ ...copy, ours: false, reason })
+      }
+      continue
+    }
+    const entry = ledger[copy.path]
+    if (!entry) continue
+    const rootDef = LEGACY_SKILL_DIRS.find((d) => d.id === copy.agent)
+    const root = rootDef ? rootDef.root(env, home) : home
+    hooks?.beforeUnlink?.(copy)
+    const recheck = inspectCandidate(copy.path, root, entry.sha256)
+    if (recheck.state === 'absent') {
+      delete ledger[copy.path]
+      continue
+    }
+    if (recheck.state !== 'ours') {
+      const reason = recheck.reason ?? 'edited'
+      if (reason === 'error') {
+        failed.push({ ...copy, ours: false, reason: 'error' })
+      } else {
+        kept.push({ ...copy, ours: false, reason })
+      }
+      continue
+    }
+    try {
+      rmSync(copy.path)
+    } catch {
+      failed.push({ ...copy, ours: false, reason: 'error' })
       continue
     }
     const dir = join(copy.skillsDir, SKILL_NAME)
     try {
-      const dirStat = lstatSync(dir)
-      const fileStat = lstatSync(copy.path)
-      if (
-        isSymbolicLinkInChain(copy.skillsDir) ||
-        !dirStat.isDirectory() ||
-        dirStat.isSymbolicLink() ||
-        !fileStat.isFile() ||
-        fileStat.isSymbolicLink()
-      ) {
-        kept.push({ ...copy, ours: false })
-        continue
-      }
-    } catch {
-      kept.push({ ...copy, ours: false })
-      continue
-    }
-    rmSync(copy.path, { force: true })
-    try {
-      if (readdirSync(dir).length === 0) rmSync(dir, { recursive: true })
+      rmdirSync(dir)
     } catch {}
     delete ledger[copy.path]
     removed.push(copy)
   }
-  return { removed, kept }
+  return { removed, kept, failed }
 }
 
 /**
@@ -483,7 +541,10 @@ export function currentSkillInstalled(
 ): boolean {
   const shared = AGENTS.find((a) => a.id === 'agents')
   if (!shared) return false
-  return Boolean(ledger[skillFilePath(shared.skills(shared.probe(env, home), env, home))])
+  const sharedPath = skillFilePath(shared.skills(shared.probe(env, home), env, home))
+  const entry = ledger[sharedPath]
+  if (!entry) return false
+  return inspectCandidate(sharedPath, home, entry.sha256).state === 'ours'
 }
 
 /** `genoffice/SKILL.md` inside a zip: the layout claude.ai and the desktop apps accept for an uploaded skill. */
@@ -501,11 +562,103 @@ function isDir(path: string): boolean {
   }
 }
 
-function isSymbolicLinkInChain(dir: string): boolean {
+const CASE_FOLD = process.platform === 'darwin' || process.platform === 'win32'
+function normKey(p: string): string {
+  return CASE_FOLD ? p.toLowerCase() : p
+}
+
+function resolveExistingOrPath(p: string): string {
   try {
-    if (lstatSync(dir).isSymbolicLink()) return true
-    const parent = join(dir, '..')
-    if (parent !== dir && lstatSync(parent).isSymbolicLink()) return true
-  } catch {}
-  return false
+    return realpathSync(p)
+  } catch {
+    return resolve(p)
+  }
+}
+
+function isSameOrInsideShared(
+  candidateFile: string,
+  sharedFile: string,
+  sharedDir: string,
+): boolean {
+  const cand = normKey(resolveExistingOrPath(candidateFile))
+  const sFile = normKey(resolveExistingOrPath(sharedFile))
+  if (cand === sFile) return true
+  const sDir = normKey(resolveExistingOrPath(sharedDir))
+  const rel = relative(sDir, cand)
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+}
+
+function rebuildUnderTrustedRoot(file: string, trustedRoot: string): string | null {
+  let cur = resolve(trustedRoot)
+  const tail: string[] = []
+  while (true) {
+    try {
+      const realCur = realpathSync(cur)
+      const rebuiltRoot = tail.length ? join(realCur, ...tail.reverse()) : realCur
+      const rel = relative(resolve(trustedRoot), resolve(file))
+      if (rel.startsWith('..') || isAbsolute(rel)) return null
+      return rel ? join(rebuiltRoot, rel) : rebuiltRoot
+    } catch {
+      const parent = dirname(cur)
+      if (parent === cur) return null
+      tail.push(relative(parent, cur))
+      cur = parent
+    }
+  }
+}
+
+function inspectCandidate(
+  file: string,
+  trustedRoot: string,
+  expectedSha256: string,
+): { state: 'ours' | 'absent' | 'kept'; reason?: LegacyKeepReason } {
+  const expectedReal = rebuildUnderTrustedRoot(file, trustedRoot)
+  let cur = resolve(trustedRoot)
+  const rel = relative(cur, resolve(file))
+  if (!expectedReal || !rel || rel.startsWith('..') || isAbsolute(rel)) {
+    return { state: 'kept', reason: 'unsafe_link' }
+  }
+  const parts = rel.split(sep).filter(Boolean)
+  for (let i = 0; i < parts.length; i++) {
+    cur = join(cur, parts[i]!)
+    const isLast = i === parts.length - 1
+    let st: Stats
+    try {
+      st = lstatSync(cur)
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException | undefined)?.code
+      if (code === 'ENOENT' || code === 'ENOTDIR') {
+        return { state: 'absent' }
+      }
+      return { state: 'kept', reason: 'error' }
+    }
+    if (st.isSymbolicLink()) return { state: 'kept', reason: 'unsafe_link' }
+    if (isLast ? !st.isFile() : !st.isDirectory()) {
+      return { state: 'kept', reason: 'unsafe_link' }
+    }
+  }
+  let actualReal: string
+  try {
+    actualReal = realpathSync(file)
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException | undefined)?.code
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      return { state: 'absent' }
+    }
+    return { state: 'kept', reason: 'unsafe_link' }
+  }
+  if (normKey(actualReal) !== normKey(expectedReal)) {
+    return { state: 'kept', reason: 'unsafe_link' }
+  }
+  let content: string
+  try {
+    content = readFileSync(file, 'utf-8')
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') return { state: 'absent' }
+    return { state: 'kept', reason: 'error' }
+  }
+  if (sha256(content) !== expectedSha256) {
+    return { state: 'kept', reason: 'edited' }
+  }
+  return { state: 'ours' }
 }

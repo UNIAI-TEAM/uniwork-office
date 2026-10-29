@@ -62,7 +62,7 @@ vi.mock('@genoffice/cli/agent-skills', () => {
     ledgerFromSettings: () => ({ version: '1.0.0', installs: {} }),
     readInstallState: (dir: string) => ({ status: 'missing', path: `${dir}/genoffice/SKILL.md` }),
     findLegacySkillCopies: () => [],
-    sweepLegacySkillCopies: () => ({ removed: [], kept: [] }),
+    sweepLegacySkillCopies: () => ({ removed: [], kept: [], failed: [] }),
     currentSkillInstalled: () => false,
   }
 })

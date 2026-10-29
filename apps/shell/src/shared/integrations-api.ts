@@ -1,14 +1,23 @@
 import type {
   AgentId,
   AgentTarget,
+  LegacyKeepReason,
   LegacySkillCopy,
+  LegacySweep,
   SkillInstallState,
   SkillInstallStatus,
 } from '@genoffice/cli/agent-skills'
 import type { InstallOutcome } from '@genoffice/cli/install'
 import type { FoundSkill, RecommendedSkill } from './found-skill'
 
-export type { AgentId, AgentTarget, LegacySkillCopy, SkillInstallState, SkillInstallStatus }
+export type {
+  AgentId,
+  AgentTarget,
+  LegacyKeepReason,
+  LegacySkillCopy,
+  SkillInstallState,
+  SkillInstallStatus,
+}
 
 export interface CliStatus extends InstallOutcome {
   /** the name to type in a terminal (filled by the main process) */
@@ -35,12 +44,7 @@ export interface IntegrationsStatus {
   legacy: LegacySkillCopy[]
 }
 
-export interface LegacySweepResult {
-  /** the copies this app wrote and removed */
-  removed: LegacySkillCopy[]
-  /** the copies edited by hand: left in place, for the user to judge */
-  kept: LegacySkillCopy[]
-}
+export type LegacySweepResult = LegacySweep
 
 export interface IntegrationsApi {
   /** probe the CLI link and every detected agent's skills directory (no writes) */

@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { run, tempDir } from './helpers'
@@ -248,5 +256,124 @@ describe('genoffice skill', () => {
     expect(r.code).toBe(0)
     // without the shared copy the old one is all the tool has
     expect(existsSync(m.legacyPath)).toBe(true)
+  })
+
+  it('reports partial cleanup and persists completed removals when a second legacy removal fails (R1-06)', async () => {
+    const m = fakeLegacyMachine()
+    const text = readFileSync(join(REPO, 'skills/genoffice/SKILL.md'), 'utf-8')
+    const sha = createHash('sha256').update(text).digest('hex')
+    const cursorDir = join(m.home, '.cursor', 'skills', 'genoffice')
+    const cursorPath = join(cursorDir, 'SKILL.md')
+    mkdirSync(cursorDir, { recursive: true })
+    writeFileSync(cursorPath, text)
+    writeFileSync(
+      join(m.env.GENOFFICE_USER_DATA, 'app-settings.json'),
+      JSON.stringify({
+        agentSkillInstalls: {
+          [m.legacyPath]: {
+            version: bundledVersion,
+            sha256: sha,
+            at: new Date().toISOString(),
+            channel: 'app',
+          },
+          [cursorPath]: {
+            version: bundledVersion,
+            sha256: sha,
+            at: new Date().toISOString(),
+            channel: 'app',
+          },
+        },
+      }),
+    )
+    chmodSync(cursorDir, 0o500)
+    try {
+      const r = await run(['skill', 'install', 'agents', '--json'], { env: m.env })
+      expect(r.code).toBe(0)
+      const payload = r.json()
+      expect(payload.status).toBe('partial')
+      expect(payload.warnings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'legacy_copy_removed' }),
+          expect.objectContaining({
+            code: 'legacy_copy_failed',
+            message: expect.stringContaining('could not remove the stale copy'),
+          }),
+        ]),
+      )
+      expect(existsSync(m.legacyPath)).toBe(false)
+      expect(existsSync(cursorPath)).toBe(true)
+      const settings = JSON.parse(
+        readFileSync(join(m.env.GENOFFICE_USER_DATA, 'app-settings.json'), 'utf-8'),
+      )
+      const sharedPath = join(m.home, '.agents', 'skills', 'genoffice', 'SKILL.md')
+      expect(settings.agentSkillInstalls[sharedPath]).toBeDefined()
+      expect(settings.agentSkillInstalls[m.legacyPath]).toBeUndefined()
+      expect(settings.agentSkillInstalls[cursorPath]).toBeDefined()
+    } finally {
+      chmodSync(cursorDir, 0o700)
+    }
+  })
+
+  it('prunes absent legacy entries on list and distinguishes symlink refusal from hand edits (R1-07)', async () => {
+    const m = fakeLegacyMachine()
+    const text = readFileSync(join(REPO, 'skills/genoffice/SKILL.md'), 'utf-8')
+    const sha = createHash('sha256').update(text).digest('hex')
+
+    // Delete codex copy from disk so it is absent
+    rmSync(m.legacyPath, { force: true })
+
+    // Create cursor copy as a symlink
+    const outside = tempDir()
+    const outsideFile = join(outside, 'SKILL.md')
+    writeFileSync(outsideFile, text)
+    const cursorDir = join(m.home, '.cursor', 'skills', 'genoffice')
+    const cursorPath = join(cursorDir, 'SKILL.md')
+    mkdirSync(cursorDir, { recursive: true })
+    symlinkSync(outsideFile, cursorPath, 'file')
+
+    writeFileSync(
+      join(m.env.GENOFFICE_USER_DATA, 'app-settings.json'),
+      JSON.stringify({
+        agentSkillInstalls: {
+          [m.legacyPath]: {
+            version: bundledVersion,
+            sha256: sha,
+            at: new Date().toISOString(),
+            channel: 'app',
+          },
+          [cursorPath]: {
+            version: bundledVersion,
+            sha256: sha,
+            at: new Date().toISOString(),
+            channel: 'app',
+          },
+        },
+      }),
+    )
+
+    const listed = await run(['skill', 'list', '--json'], { env: m.env })
+    expect(listed.code).toBe(0)
+    expect(listed.json().detail.legacy).toEqual([
+      {
+        agent: 'cursor',
+        label: 'Cursor',
+        skills_dir: join(m.home, '.cursor', 'skills'),
+        path: cursorPath,
+        ours: false,
+        reason: 'unsafe_link',
+      },
+    ])
+    const afterListSettings = JSON.parse(
+      readFileSync(join(m.env.GENOFFICE_USER_DATA, 'app-settings.json'), 'utf-8'),
+    )
+    expect(afterListSettings.agentSkillInstalls[m.legacyPath]).toBeUndefined()
+
+    const installed = await run(['skill', 'install', 'agents', '--json'], { env: m.env })
+    expect(installed.code).toBe(0)
+    const keptWarning = installed
+      .json()
+      .warnings.find((w: { code: string }) => w.code === 'legacy_copy_kept')
+    expect(keptWarning.message).toContain('is behind a symlink; left in place')
+    expect(keptWarning.message).not.toContain('edited by hand')
   })
 })
