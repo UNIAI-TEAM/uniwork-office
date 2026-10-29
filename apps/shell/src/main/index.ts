@@ -4228,25 +4228,29 @@ function notifyUnsupportedFile(filePath: string): void {
 function showAppWarning(message: string): void {
   if (process.env.UNIWORK_BRIDGE_SILENT === '1') return
   const options = { type: 'warning' as const, message, buttons: [tm('pdfPwdOk')], noLink: true }
-  if (shellWindow) {
-    shellWindow.show()
-    shellWindow.focus()
-    void dialog.showMessageBox(shellWindow, options)
-  } else {
-    void dialog.showMessageBox(options)
-  }
+  void beginLegacyProgress.waitForIdle().then(() => {
+    if (shellWindow && !shellWindow.isDestroyed()) {
+      shellWindow.show()
+      shellWindow.focus()
+      void dialog.showMessageBox(shellWindow, options)
+    } else {
+      void dialog.showMessageBox(options)
+    }
+  })
 }
 
 function showAppInfo(message: string): void {
   if (process.env.UNIWORK_BRIDGE_SILENT === '1') return
   const options = { type: 'info' as const, message, buttons: [tm('pdfPwdOk')], noLink: true }
-  if (shellWindow) {
-    shellWindow.show()
-    shellWindow.focus()
-    void dialog.showMessageBox(shellWindow, options)
-  } else {
-    void dialog.showMessageBox(options)
-  }
+  void beginLegacyProgress.waitForIdle().then(() => {
+    if (shellWindow && !shellWindow.isDestroyed()) {
+      shellWindow.show()
+      shellWindow.focus()
+      void dialog.showMessageBox(shellWindow, options)
+    } else {
+      void dialog.showMessageBox(options)
+    }
+  })
 }
 
 function officeBridgeDeps() {

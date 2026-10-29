@@ -34,6 +34,13 @@ export interface LegacyProgressDeps {
   clearTimer?(handle: LegacyProgressTimerHandle): void
 }
 
+export type EndLegacyProgress = () => Promise<void>
+
+export type BeginLegacyProgress = ((fileName: string, cancel: () => void) => EndLegacyProgress) & {
+  /** resolves once any shown progress box has settled its native dialog lifecycle */
+  waitForIdle(): Promise<void>
+}
+
 interface ActiveProgressJob {
   readonly fileName: string
   readonly cancel: () => void
@@ -46,9 +53,9 @@ interface ProgressSession {
   timer: LegacyProgressTimerHandle | null
   boxShown: boolean
   boxSettled: boolean
+  boxDone: Promise<void>
   abortedByUs: boolean
 }
-
 /**
  * Shared progress box and taskbar indicator for concurrent legacy/ODF conversions.
  *
@@ -59,9 +66,7 @@ interface ProgressSession {
  * `AbortController` abort when the last job finishes) cancels nothing. The taskbar/dock
  * progress bar stays indeterminate until the last job ends.
  */
-export function createLegacyProgress(
-  deps: LegacyProgressDeps,
-): (fileName: string, cancel: () => void) => () => void {
+export function createLegacyProgress(deps: LegacyProgressDeps): BeginLegacyProgress {
   const delayMs = deps.delayMs ?? LEGACY_PROGRESS_DELAY_MS
   const setTimer = deps.setTimer ?? ((cb: () => void, ms: number) => setTimeout(cb, ms))
   const clearTimer =
@@ -69,6 +74,7 @@ export function createLegacyProgress(
     ((handle: LegacyProgressTimerHandle) => clearTimeout(handle as NodeJS.Timeout))
 
   let session: ProgressSession | null = null
+  let lastBoxDone: Promise<void> = Promise.resolve()
 
   function startSession(firstJob: ActiveProgressJob): ProgressSession {
     const current: ProgressSession = {
@@ -77,11 +83,11 @@ export function createLegacyProgress(
       timer: null,
       boxShown: false,
       boxSettled: false,
+      boxDone: Promise.resolve(),
       abortedByUs: false,
     }
     session = current
     deps.setProgressBar(2, { mode: 'indeterminate' })
-
     current.timer = setTimer(() => {
       current.timer = null
       if (session !== current || current.abortedByUs) return
@@ -100,7 +106,7 @@ export function createLegacyProgress(
       }
       current.boxShown = true
       const shown = deps.showMessageBox(options)
-      void Promise.resolve(shown)
+      const done = Promise.resolve(shown)
         .then((res) => {
           current.boxSettled = true
           if (current.abortedByUs || current.box.signal.aborted) return
@@ -119,12 +125,14 @@ export function createLegacyProgress(
         .catch(() => {
           current.boxSettled = true
         })
+      current.boxDone = done
+      lastBoxDone = done
     }, delayMs)
 
     return current
   }
 
-  return function beginLegacyProgress(fileName: string, cancel: () => void): () => void {
+  function beginLegacyProgress(fileName: string, cancel: () => void): EndLegacyProgress {
     const job: ActiveProgressJob = {
       fileName,
       cancel,
@@ -137,9 +145,11 @@ export function createLegacyProgress(
     }
 
     return () => {
-      if (job.finished) return
+      if (job.finished) {
+        return current.boxShown && !current.boxSettled ? current.boxDone : Promise.resolve()
+      }
       job.finished = true
-      if (current.jobs.some((j) => !j.finished)) return
+      if (current.jobs.some((j) => !j.finished)) return Promise.resolve()
       current.abortedByUs = true
       if (current.timer !== null) {
         clearTimer(current.timer)
@@ -153,6 +163,11 @@ export function createLegacyProgress(
         session = null
         deps.setProgressBar(-1)
       }
+      return current.boxShown && !current.boxSettled ? current.boxDone : Promise.resolve()
     }
   }
+
+  return Object.assign(beginLegacyProgress, {
+    waitForIdle: () => lastBoxDone,
+  })
 }
