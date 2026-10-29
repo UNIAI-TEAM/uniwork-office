@@ -4,6 +4,7 @@ import type {
   AgentStreamNotice,
   AgentToolCall,
   AgentToolDef,
+  WriterCall,
 } from '@genoffice/agent-core'
 
 export type AiProviderId =
@@ -259,8 +260,13 @@ export interface AiStreamRequest {
   messages: AgentMessage[]
   tools?: AgentToolDef[]
   maxTokens?: number
-  /** not an agent turn: the loop's context summary or a one-shot writer (UniWork AI refuses both) */
+  /**
+   * not an agent turn: the loop's context summary or a one-shot writer. UniWork AI refuses both,
+   * except a one-shot that names its `writer`, which the web frame sends to the writer route
+   */
   purpose?: AgentRequestPurpose
+  /** the one-shot as a UniWork AI writer (kind + input); BYOK ignores it */
+  writer?: WriterCall
 }
 
 /** Token usage a provider reported for one model turn. Both fields are best-effort:

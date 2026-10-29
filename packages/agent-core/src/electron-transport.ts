@@ -7,6 +7,7 @@ import type {
   AgentMessage,
   AgentStreamNotice,
   AgentRequestPurpose,
+  WriterCall,
 } from './types'
 import { createAiRunTracker, type AiRunTracker } from './ai-run-tracker'
 
@@ -52,7 +53,12 @@ export interface IpcStreamStart<S> {
   tools: AgentToolDef[]
   /** not an agent turn (the loop's summary, a one-shot writer); absent for agent turns */
   purpose?: AgentRequestPurpose
+  /** a one-shot writer UniWork AI can run (web frame only; the desktop runner refuses it) */
+  writer?: WriterCall
 }
+
+/** the IPC transport; its sessionId is the one every request it starts carries */
+export type IpcTransport = AgentTransport & { readonly sessionId: string }
 
 /**
  * Renderer-side silence watchdog: the main process re-arms it with keepalive
@@ -119,11 +125,12 @@ export const desktopAiRun: AiRunTracker = createAiRunTracker({
  * LLM providers (avoids renderer CORS) and streams chunks back per requestId.
  * Each app wires in its own preload bridge and i18n via the options.
  */
-export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTransport {
+export function createIpcTransport<S>(options: IpcTransportOptions<S>): IpcTransport {
   const timeoutText = () => options.timeoutErrorText?.() ?? options.unknownErrorText()
   const sessionId = crypto.randomUUID()
   const aiRun = options.aiRun ?? desktopAiRun
   return {
+    sessionId,
     stream(request: AgentStreamRequest, cb) {
       const requestId = crypto.randomUUID()
       let settled = false
@@ -216,6 +223,7 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
             messages: request.messages,
             tools: request.tools,
             ...(request.purpose ? { purpose: request.purpose } : {}),
+            ...(request.writer ? { writer: request.writer } : {}),
           }),
         ).catch((err: unknown) => {
           fail(err instanceof Error ? err.message : options.unknownErrorText())

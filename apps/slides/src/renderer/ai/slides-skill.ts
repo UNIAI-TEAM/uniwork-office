@@ -18,6 +18,7 @@ import {
   type LayoutSkeleton,
 } from './layout-skeleton'
 import { t } from '../i18n/locale'
+import { writerRefusalIsFinal } from './llm-request'
 import systemPrompt from './prompts/system.md?raw'
 import { placeholderInstruction } from './redact'
 import { textForModel, redactLabelsOf } from './redact-view'
@@ -34,6 +35,9 @@ import { redactGuardFor } from './redact-guard'
 
 /** Upper bound on generate_deck approx_pages; bounds planner round trips and the progress note. */
 export const MAX_APPROX_PAGES = 200
+/** the style a deck is generated in when neither a style template nor a Style Skill gives one */
+export const DEFAULT_DECK_STYLE =
+  'Unified clean modern style: main background #FFFFFF, main text #1A1A2E, primary accent #2563EB, secondary accent #F59E0B, cards #F8FAFC, borders #E2E8F0; sans-serif fonts; titles 40-56px, body 16-20px'
 const MAX_PROGRESS_NOTE_PAGES = 40
 
 /** Per-page progress status */
@@ -144,6 +148,12 @@ export interface DeckAccess {
   /** live predicate: the active AI provider is UniWork AI (absent = BYOK); read before every model request */
   uniworkAi?(): boolean
   /**
+   * the host reaches the UniWork AI writer route (the web frame), so a UniWork AI turn can write
+   * pages: generate_deck and regenerate_slide are offered. Absent/false (the desktop, which
+   * refuses writer calls) keeps them hidden under UniWork AI.
+   */
+  uniworkWriterRoute?(): boolean
+  /**
    * image URLs this run's image_search / generate_image returned, reset at every run. Recording only:
    * UniWork AI turns are not offered insert_web_image / replace_image at all, and BYOK keeps today's
    * rules (no enforcement), so no slides tool consults it for a refusal.
@@ -194,7 +204,14 @@ export interface DeckAccess {
     /** Formatted template-chrome block (layout-skeleton.ts) for this page's role; absent without a template */
     skeleton?: string
     signal?: AbortSignal
-  }): Promise<{ ok: boolean; marker?: string; error?: string; imageFailures?: string[] }>
+  }): Promise<{
+    ok: boolean
+    marker?: string
+    error?: string
+    imageFailures?: string[]
+    /** UniWork AI: the code of the writer refusal the page ended on (e.g. run_limit_reached) */
+    code?: string
+  }>
   /**
    * In-tool Style Skill generation:
    * a dedicated LLM call focused on producing a complete structured visual style guide
@@ -1092,7 +1109,7 @@ function hiddenMediaTools(access: DeckAccess): Set<string> {
 /** every tool withheld this request: media tools, plus (provider = UniWork AI only; BYOK keeps them) the UniWork set */
 function hiddenTools(access: DeckAccess): Set<string> {
   const hidden = hiddenMediaTools(access)
-  if (access.uniworkAi?.()) for (const n of UNIWORK_AI_HIDDEN_TOOLS) hidden.add(n)
+  if (access.uniworkAi?.()) for (const n of uniworkHiddenTools(access)) hidden.add(n)
   return hidden
 }
 
@@ -1105,7 +1122,21 @@ const UNIWORK_AI_HIDDEN_TOOLS: readonly string[] = [
   'generate_deck',
 ]
 
-const UNIWORK_AI_TOOLS_OFF_NOTE = `\n\nNote: ${UNIWORK_AI_HIDDEN_TOOLS.join(', ')} are not available here. generate_deck is unavailable: do not create a new deck; edit the open one with apply_ops and execute_slide_script. Do not call or promise those tools.`
+/** offered back where the host reaches the writer route (the web frame: pages via slides.page) */
+const WRITER_ROUTE_TOOLS: ReadonlySet<string> = new Set(['regenerate_slide', 'generate_deck'])
+
+function uniworkHiddenTools(access: DeckAccess): readonly string[] {
+  return access.uniworkWriterRoute?.()
+    ? UNIWORK_AI_HIDDEN_TOOLS.filter((n) => !WRITER_ROUTE_TOOLS.has(n))
+    : UNIWORK_AI_HIDDEN_TOOLS
+}
+
+function uniworkToolsOffNote(access: DeckAccess): string {
+  const noDeck = access.uniworkWriterRoute?.()
+    ? ''
+    : ' generate_deck is unavailable: do not create a new deck; edit the open one with apply_ops and execute_slide_script.'
+  return `\n\nNote: ${uniworkHiddenTools(access).join(', ')} are not available here.${noDeck} Do not call or promise those tools.`
+}
 
 function mediaToolsOffNote(hidden: Set<string>, uniworkAi: boolean): string {
   if (hidden.size === 0) return ''
@@ -1160,7 +1191,7 @@ export function createSlidesSkill(access: DeckAccess): AgentSkill {
       return (
         systemPrompt +
         mediaToolsOffNote(hiddenMediaTools(access), access.uniworkAi?.() === true) +
-        (access.uniworkAi?.() ? UNIWORK_AI_TOOLS_OFF_NOTE : '') +
+        (access.uniworkAi?.() ? uniworkToolsOffNote(access) : '') +
         (access.readOnly?.() ? VIEW_ONLY_NOTE : '') +
         redact
       )
@@ -2227,9 +2258,7 @@ async function executeTool(
       }
 
       if (!coreHook) coreHook = topic || 'Presentation'
-      if (!styleSkill)
-        styleSkill =
-          'Unified clean modern style: main background #FFFFFF, main text #1A1A2E, primary accent #2563EB, secondary accent #F59E0B, cards #F8FAFC, borders #E2E8F0; sans-serif fonts; titles 40-56px, body 16-20px'
+      if (!styleSkill) styleSkill = DEFAULT_DECK_STYLE
       const total = pages.length
       if (total === 0) return fail(t('aiFailGenDeck'), 'No pages to generate (the plan is empty).')
 
@@ -2260,6 +2289,8 @@ async function executeTool(
       const deckImageFails: { page: number; url: string }[] = [] // Image download/conversion failures (page numbers are deck-global 1-based)
       const pageErrors: (string | undefined)[] = new Array(total).fill(undefined) // Last failure reason per page
       let cloudFallbackReason: string | null = null // First cloud failure that switched the run to the local pipeline
+      let runLimited = false // UniWork AI refused a page: this run's model calls are used up, so no page is launched or retried after it
+      const refusedPages = new Set<number>() // Pages (1-based) a final writer refusal ended: the same request cannot get past it, so no resend
       let landedPages = 0
       let firstDone = false
       let baseOffset = 0 // Number of existing pages before generated page 0 in the deck (>0 in append mode); used to re-insert retries at their original position
@@ -2291,7 +2322,7 @@ async function executeTool(
       ): Promise<{ marker: string | null; err: string }> => {
         let lastErr = ''
         for (let attempt = 0; attempt < 2; attempt++) {
-          if (cancelled()) return { marker: null, err: lastErr }
+          if (cancelled() || runLimited) return { marker: null, err: lastErr }
           if (attempt > 0 && BACKOFF_MS > 0) await new Promise((r) => setTimeout(r, BACKOFF_MS))
           const res = await gen(pageArgs)
           if (res.ok && res.marker) {
@@ -2300,6 +2331,11 @@ async function executeTool(
             return { marker: res.marker, err: '' }
           }
           lastErr = res.error ?? t('aiErrUnknown')
+          if (writerRefusalIsFinal(res.code)) {
+            if (res.code === 'run_limit_reached') runLimited = true
+            refusedPages.add(pageIndex)
+            break
+          }
         }
         return { marker: null, err: lastErr }
       }
@@ -2422,7 +2458,7 @@ async function executeTool(
       }
 
       for (let start = 0; start < total; start += GEN_BATCH) {
-        if (cancelled()) break
+        if (cancelled() || runLimited) break
         const batchIdxs = []
         for (let k = start; k < Math.min(start + GEN_BATCH, total); k++) batchIdxs.push(k)
         const results = await Promise.all(
@@ -2454,13 +2490,14 @@ async function executeTool(
       //   pipeline (LLM calls are the user's own quota, and a JSON spec retry is cheap) — that
       //   includes pages that failed during a mid-run cloud→local switch.
       if (!cancelled()) {
-        const retryIdxs = [...new Set([...(cloudActive ? [] : genFailed), ...landFailed])].sort(
-          (a, b) => a - b,
-        )
+        const regen = cloudActive || runLimited ? [] : genFailed
+        const retryIdxs = [
+          ...new Set([...regen.filter((i) => !refusedPages.has(i + 1)), ...landFailed]),
+        ].sort((a, b) => a - b)
         for (const idx of retryIdxs) {
           if (cancelled()) break
           let marker = markerByIndex[idx]
-          if (!marker && !cloudActive) marker = await genOne(pages[idx]!, idx + 1)
+          if (!marker && !cloudActive && !runLimited) marker = await genOne(pages[idx]!, idx + 1)
           if (!marker) {
             pageProgressItems[idx] = {
               ...pageProgressItems[idx]!,
@@ -2541,6 +2578,18 @@ async function executeTool(
         }
       }
 
+      // Pages not in the deck, by number (generation or landing failed, or never started)
+      const stillFailed: number[] = []
+      for (let i = 0; i < total; i++) if (!doneFlags[i]) stillFailed.push(i + 1)
+      const pagesNotMade = stillFailed
+        .map(
+          (n) => `page ${n} "${String(pages[n - 1]?.title ?? '').trim() || t('aiPageN', { n })}"`,
+        )
+        .join(', ')
+      const runLimitMsg = runLimited
+        ? ` ⚠️ This run's model calls are used up (run_limit_reached), so generation stopped and nothing was retried. Not made: ${pagesNotMade} (missing from the deck; later pages may have shifted forward). They can be made in the next question, not in this answer (generate_deck and regenerate_slide would be refused now): tell the user which pages are missing and that asking again continues them, with generate_deck, briefs for just those pages and insert_mode:"append".`
+        : ''
+
       if (landedPages === 0) {
         access.onProgress?.({
           stage: 'done',
@@ -2550,7 +2599,9 @@ async function executeTool(
         })
         return fail(
           t('aiFailGenDeck'),
-          `All ${total} pages failed to generate; retry or check the AI model configuration.`,
+          runLimited
+            ? `No page was made.${runLimitMsg}`
+            : `All ${total} pages failed to generate; retry or check the AI model configuration.`,
         )
       }
 
@@ -2561,11 +2612,10 @@ async function executeTool(
         summary: t('aiStageDoneSummary', { n: landedPages }),
       })
 
-      const note = buildProgressNote(state)
+      // A used-up run: the progress note's "fill in the unfinished pages now" would be refused
+      const note = runLimited ? '' : buildProgressNote(state)
       const progressTail = note ? `\n${note}` : ''
       // Faithfully report all unfinished pages (both HTML generation failures and conversion/landing failures; all already retried once)
-      const stillFailed: number[] = []
-      for (let i = 0; i < total; i++) if (!doneFlags[i]) stillFailed.push(i + 1)
       const briefErr = (s?: string) => (s ? (s.length > 80 ? `${s.slice(0, 80)}…` : s) : '')
       const cloudNote = cloudFallbackReason
         ? ` Cloud page generation was unavailable (${briefErr(cloudFallbackReason)}); the deck was generated locally with your configured AI model instead.`
@@ -2574,9 +2624,11 @@ async function executeTool(
       const failDetail = stillFailed
         .map((n) => `page ${n}${pageErrors[n - 1] ? ` (${briefErr(pageErrors[n - 1])})` : ''}`)
         .join(', ')
-      const failMsg = stillFailed.length
-        ? ` ⚠️ ${failDetail} still failed after retry (these pages are missing from the deck; later pages shifted forward). To fill them in, call generate_deck again with briefs for just those pages and insert_mode:"append", and tell the user the page is at the end.`
-        : ' Fine-tune with the set_element_* / add_* tools.'
+      const failMsg = runLimited
+        ? runLimitMsg
+        : stillFailed.length
+          ? ` ⚠️ ${failDetail} still failed after retry (these pages are missing from the deck; later pages shifted forward). To fill them in, call generate_deck again with briefs for just those pages and insert_mode:"append", and tell the user the page is at the end.`
+          : ' Fine-tune with the set_element_* / add_* tools.'
       // Pages that went through the plain-text fallback: the page exists in the deck but all design is lost; the model must be told explicitly to redo it in place, not silently treat it as success
       const degradedMsg = degraded.length
         ? ` ⚠️ ${[...degraded]

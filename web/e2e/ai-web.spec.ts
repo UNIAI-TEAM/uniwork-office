@@ -6,6 +6,8 @@
 //   grant off -> no AI UI anywhere and no AI request.
 //   UniWork AI + `ai.start` (UNI-2264) -> the host hands the panel a job: its question carries
 //                X-UniWork-AI-Handoff, each next part goes out by itself while parts are left.
+//   UniWork AI writer (UNI-2276) -> write_document goes to uniwork/write in the turn's run, its text
+//                lands in the document, then the tool result goes back on the chat route.
 // Docs (`npm run build:web`), Markdown and HTML (`npm run build:web -- --module markdown|html`). Zero console
 // errors and CSP violations; the only HTTP errors are the ones a test injects on the AI routes.
 // Screenshots (settings dialog + a state card, light/dark, en/vi): docs/web-modules/screenshots/ai/.
@@ -30,6 +32,9 @@ interface LogEntry {
   cookie: string | null
   /** the request's X-UniWork-AI-Handoff */
   handoff: string | null
+  /** the request's X-UniWork-AI-Run / X-UniWork-AI-Conversation */
+  run: string | null
+  conversation: string | null
   body: Record<string, unknown>
 }
 
@@ -465,3 +470,58 @@ for (const module of ['docs', 'markdown', 'html'] as const) {
     })
   })
 }
+
+// UNI-2276: under UniWork AI the Word writer behind write_document runs on the writer route, inside
+// the run of the turn that called it (the run header the chat answer issued); the reply streams into
+// the document and the tool result then goes back on the chat route.
+test.describe('docs: the UniWork AI writer route', () => {
+  test.skip(!built('docs'), 'no dist-web/docs build: npm run build:web')
+
+  test('write_document streams from uniwork/write in the turn run, then the tool result follows', async ({
+    page,
+    request,
+  }) => {
+    await fake(request)
+    await fake(request, {
+      toolCalls: [
+        { name: 'write_document', input: { plan: 'One short section', afterBlockIndex: -1 } },
+      ],
+    })
+    const problems = await watch(page)
+    const frame = await open(page, 'docs', { lang: 'en', uniwork: '1' })
+    await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+    await frame.locator('.ai-uniwork-disclosure-ack').click()
+    await ask(frame, 'Write a short document')
+    await expect(frame.locator('.ProseMirror').first()).toContainText(
+      'Written by the fake writer route.',
+      { timeout: 60_000 },
+    )
+    await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
+      timeout: 60_000,
+    })
+    const log = (await aiLog(request)).filter((l) => l.path.includes('/uniwork/'))
+    // the question, the writer call, then the tool result
+    expect(log.map((l) => (l.path.endsWith('/uniwork/write') ? 'write' : 'chat'))).toEqual([
+      'chat',
+      'write',
+      'chat',
+    ])
+    const [question, write, toolResult] = log
+    expect(question!.run).toBeNull()
+    // the writer goes out in the run the question's answer issued, never a run of its own
+    expect(write!.run).toBe('run-1')
+    expect(write!.conversation).toBe('conv-1')
+    expect(write!.authorization).toBe('Bearer test-token')
+    expect(write!.body).toMatchObject({
+      kind: 'docs.write_document',
+      lang: 'en',
+      input: { plan: 'One short section' },
+    })
+    // the server holds the prompt: the writer call carries no prompt text
+    expect(JSON.stringify(write!.body)).not.toContain('restricted HTML')
+    expect(toolResult!.run).toBe('run-1')
+    const messages = (toolResult!.body.messages ?? []) as Array<{ role: string }>
+    expect(messages.map((m) => m.role)).toContain('tool')
+    await expectClean(page, frame, problems)
+  })
+})

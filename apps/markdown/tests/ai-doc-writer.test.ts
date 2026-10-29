@@ -63,6 +63,25 @@ describe('buildDocWriterRequest', () => {
     expect(user).toContain('intro, body')
     expect(user).toContain('founded 1999')
   })
+
+  it('names the UniWork AI writer with the input of the server table, beside the BYOK prompt', () => {
+    const r = buildDocWriterRequest(
+      { plan: 'intro, body', title: 'Guide', context: 'founded 1999' },
+      MARKDOWN_RULES,
+      '',
+    )
+    expect(r.writer).toEqual({
+      kind: 'markdown.write_document',
+      input: { plan: 'intro, body', title: 'Guide', context: 'founded 1999' },
+    })
+    expect(r.system).toContain('pure GFM plus math')
+    expect(r.user).toContain('intro, body')
+    const bare = buildDocWriterRequest({ plan: 'p'.repeat(7000), context: '' }, MARKDOWN_RULES, '')
+    expect(bare.writer).toEqual({
+      kind: 'markdown.write_document',
+      input: { plan: 'p'.repeat(6000) },
+    })
+  })
 })
 
 describe('DraftLanding', () => {

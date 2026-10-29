@@ -34,6 +34,7 @@ import {
   type AgentImage,
   type PanelNote,
   type ToolDisplay,
+  type WriterCall,
 } from '@genoffice/agent-core'
 import type {
   UniworkCloudStatusBridge,
@@ -79,7 +80,13 @@ import {
   deckTemplateLabel,
 } from './deck-templates'
 import { createElectronTransport } from './transport'
-import { oneShotStreamRequest } from './llm-request'
+import {
+  deckOutlineWriter,
+  deckStyleWriter,
+  oneShotStreamRequest,
+  slidePageWriter,
+  writerRefusalIsFinal,
+} from './llm-request'
 import { renderSlidesToPngBase64 } from '../export-render'
 import {
   isQcEnabled,
@@ -926,7 +933,11 @@ export function AiPanel({
       text?: string
       error?: string
       errKind?: 'timeout' | 'empty' | 'stopped'
+      /** a UniWork AI failure: the server's code (writerRefusalIsFinal ends the retries) */
+      uniworkCode?: string
     }
+    // the chat loop's transport: under UniWork AI a generator runs in the run of its session
+    const chatTransport = createElectronTransport(() => settingsRef.current)
     const runLlmAttempt = (
       settings: AiSettings,
       system: string,
@@ -934,6 +945,7 @@ export function AiPanel({
       timeoutMs: number,
       signal?: AbortSignal,
       maxTokens?: number,
+      writer?: WriterCall,
     ): Promise<LlmResult> =>
       new Promise((resolve) => {
         if (signal?.aborted) {
@@ -993,20 +1005,23 @@ export function AiPanel({
               // tags them with this suffix); keep classifying them as empty output
               // so retry ladders fail fast instead of burning billed attempts
               ...(chunk.error?.includes('(empty stream)') ? { errKind: 'empty' as const } : {}),
+              ...(chunk.uniworkCode ? { uniworkCode: chunk.uniworkCode } : {}),
             })
         })
         signal?.addEventListener('abort', onAbort, { once: true })
+        // only a UniWork AI writer joins the chat session (its run); a BYOK generator stays
+        // sessionless as before, so a provider's native session (Codex) is never shared
+        const sessionId = settings.provider === 'uniwork' ? chatTransport.sessionId : undefined
+        const args = { requestId, settings, system, user, maxTokens, sessionId }
         // If invoke itself rejects (IPC-layer failure), fail immediately instead of waiting out the timeout
-        window.slidesApi
-          .aiStream(oneShotStreamRequest({ requestId, settings, system, user, maxTokens }))
-          .catch((e) =>
-            finish({
-              ok: false,
-              error: tGlobal('aiErrRequestFailed', {
-                msg: e instanceof Error ? e.message : String(e),
-              }),
+        window.slidesApi.aiStream(oneShotStreamRequest(args, writer)).catch((e) =>
+          finish({
+            ok: false,
+            error: tGlobal('aiErrRequestFailed', {
+              msg: e instanceof Error ? e.message : String(e),
             }),
-          )
+          }),
+        )
       })
     const runLlmOnce = async (
       system: string,
@@ -1015,6 +1030,7 @@ export function AiPanel({
       useGenModel = true,
       signal?: AbortSignal,
       maxTokens?: number,
+      writer?: WriterCall,
     ): Promise<LlmResult> => {
       const first = await runLlmAttempt(
         useGenModel ? settingsForGen() : settingsRef.current,
@@ -1023,6 +1039,7 @@ export function AiPanel({
         timeoutMs,
         signal,
         maxTokens,
+        writer,
       )
       if (first.ok || !useGenModel || signal?.aborted) return first
       // Only "request errors" fall back to the user's model for a retry; timeouts/empty output don't switch models (mostly network/output problems, switching won't help)
@@ -1030,7 +1047,7 @@ export function AiPanel({
       const cur = settingsRef.current
       if (cur.provider !== 'anthropic') return first // The gen-model override only applies with anthropic
       if (cur.providers.anthropic?.model === SLIDES_GEN_MODEL) return first
-      return runLlmAttempt(cur, system, user, timeoutMs, signal, maxTokens)
+      return runLlmAttempt(cur, system, user, timeoutMs, signal, maxTokens, writer)
     }
 
     const access: DeckAccess = {
@@ -1038,6 +1055,8 @@ export function AiPanel({
       // the adapter bound feeds the AI through the shared rule: a web frame reads as bound
       uniworkBound: () => uniworkBoundForAi(uniworkBoundRef.current ?? false, platform()),
       uniworkAi: () => settingsRef.current.provider === 'uniwork',
+      // only the web frame reaches the UniWork AI writer route; the desktop refuses writer calls
+      uniworkWriterRoute: () => platform() === 'web',
       imageUrls: createImageUrlRegistry({
         enforce: () => settingsRef.current.provider === 'uniwork',
         attachments: () =>
@@ -1225,9 +1244,19 @@ export function AiPanel({
               ? userMsg
               : `${userMsg}\n\nYour previous output was rejected: ${lastErr}. Output the corrected JSON object only.`
           // Text-heavy spec JSON can exceed the default 8192 tokens; single-page requests get a higher cap
-          const r = await runLlmOnce(sys, msg, 120000, true, args.signal, 16384)
+          const writer = slidePageWriter(args, attempt === 0 ? undefined : lastErr)
+          const r = await runLlmOnce(sys, msg, 120000, true, args.signal, 16384, writer)
           if (!r.ok || !r.text) {
             lastErr = r.error ?? tGlobal('aiErrEmptyOutput')
+            // a refusal the same request cannot get past is not a repair note: stop here
+            // (generate_deck reads its code: run_limit_reached ends the deck's page loop)
+            if (writerRefusalIsFinal(r.uniworkCode)) {
+              return {
+                ok: false,
+                error: lastErr,
+                ...(r.uniworkCode ? { code: r.uniworkCode } : {}),
+              }
+            }
             continue
           }
           try {
@@ -1307,7 +1336,8 @@ export function AiPanel({
         const q = a.questionnaire ? `\nUser questionnaire answers: ${a.questionnaire}` : ''
         const hint = a.styleHint ? `\nStyle preference: ${a.styleHint}` : ''
         const userMsg = `Topic and style preferences: ${a.topic}${hint}${q}\nOutput the Style Skill.`
-        const r = await runLlmOnce(sys, userMsg, undefined, true, a.signal)
+        const writer = deckStyleWriter(a)
+        const r = await runLlmOnce(sys, userMsg, undefined, true, a.signal, undefined, writer)
         return r.ok && r.text
           ? { ok: true, styleSkill: r.text.trim() }
           : { ok: false, error: r.error ?? tGlobal('aiErrEmptyOutput') }
@@ -1357,11 +1387,14 @@ export function AiPanel({
         let lastErr = tGlobal('aiErrEmptyOutput')
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           if (a.signal?.aborted) return { ok: false, error: tGlobal('aiErrStopped') }
-          const r = await runLlmOnce(sys, userMsg, undefined, true, a.signal)
+          const writer = deckOutlineWriter(a)
+          const r = await runLlmOnce(sys, userMsg, undefined, true, a.signal, undefined, writer)
           if (!r.ok || !r.text) {
             lastErr = r.error ?? tGlobal('aiErrEmptyOutput')
-            // Empty output/timeout doesn't burn another attempt; request-level errors may retry
+            // Empty output/timeout doesn't burn another attempt; request-level errors may retry,
+            // except a UniWork AI refusal the same request cannot get past
             if (r.errKind === 'timeout' || r.errKind === 'empty' || r.errKind === 'stopped') break
+            if (writerRefusalIsFinal(r.uniworkCode)) break
             continue
           }
           const parsed = parseOutline(r.text)
@@ -1507,7 +1540,7 @@ export function AiPanel({
     }
     accessRef.current = access
     loopRef.current = new AgentLoop({
-      transport: createElectronTransport(() => settingsRef.current),
+      transport: chatTransport,
       systemSuffix: aiLangDirective,
       skill: composeSkills('slides+files', '', [
         createSlidesSkill(access),
