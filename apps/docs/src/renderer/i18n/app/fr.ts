@@ -574,4 +574,12 @@ export const fr = {
   appCopySaved: 'Votre version a été enregistrée comme nouveau document : {title}.',
   appCopySaveFailed:
     'Impossible de créer la copie. Vos modifications sont toujours en sécurité ; réessayez.',
+  appMergeSourceLoaded: '{name} chargé ({n} enregistrements)',
+  appMergeWritten: '{n} documents écrits',
+  appMergeWrittenOne: '{n} document écrit',
+  appMergeNothingToWrite: "Il n'y a rien à écrire",
+  appMergeWarnPassword:
+    'Ce document est protégé par mot de passe. Les documents fusionnés sont enregistrés comme fichiers ordinaires, sans mot de passe : toute personne qui les ouvre peut en lire le contenu. Fusionner quand même ?',
+  appMergeWarnUniwork:
+    'Ce document appartient à UniWork. Les documents fusionnés sont enregistrés sur votre ordinateur comme fichiers locaux ordinaires, en dehors d’UniWork. Fusionner quand même ?',
 } satisfies Record<keyof typeof zh, string>

@@ -484,12 +484,12 @@
       {
         "columns": ["select", "name", "access", "editor", "updated", "size", "actions"],
         "screen": "workspace",
-        "width": 752
+        "width": 768
       },
       {
         "columns": ["select", "name", "access", "editor", "updated", "actions"],
         "screen": "workspace",
-        "width": 751
+        "width": 767
       },
       {
         "columns": ["select", "name", "access", "editor", "updated", "actions"],
@@ -529,27 +529,27 @@
       {
         "columns": ["select", "name", "activity", "access", "editor", "updated", "size", "actions"],
         "screen": "recent",
-        "width": 870
+        "width": 896
       },
       {
         "columns": ["select", "name", "activity", "access", "editor", "updated", "size", "actions"],
         "screen": "recent",
-        "width": 864
+        "width": 880
       },
       {
         "columns": ["select", "name", "activity", "access", "editor", "updated", "actions"],
         "screen": "recent",
-        "width": 863
+        "width": 879
       },
       {
         "columns": ["select", "name", "activity", "access", "editor", "updated", "actions"],
         "screen": "recent",
-        "width": 784
+        "width": 800
       },
       {
         "columns": ["select", "name", "activity", "access", "updated", "actions"],
         "screen": "recent",
-        "width": 783
+        "width": 799
       },
       {
         "columns": ["select", "name", "activity", "access", "updated", "actions"],
@@ -559,12 +559,12 @@
       {
         "columns": ["select", "name", "activity", "access", "updated", "actions"],
         "screen": "recent",
-        "width": 656
+        "width": 672
       },
       {
         "columns": ["select", "name", "activity", "updated", "actions"],
         "screen": "recent",
-        "width": 655
+        "width": 671
       },
       {
         "columns": ["select", "name", "deleted", "access", "editor", "updated", "size", "actions"],
@@ -579,7 +579,7 @@
       {
         "columns": ["select", "name", "deleted", "access", "editor", "updated", "size", "actions"],
         "screen": "trash",
-        "width": 1008
+        "width": 1024
       },
       {
         "columns": [
@@ -654,6 +654,11 @@
         "columns": ["select", "name", "updated", "actions"],
         "screen": "device",
         "width": 639
+      },
+      {
+        "columns": ["select", "name", "deleted", "access", "editor", "updated", "actions"],
+        "screen": "trash",
+        "width": 1023
       }
     ]
   },

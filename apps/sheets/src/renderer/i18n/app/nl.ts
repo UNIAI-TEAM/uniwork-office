@@ -104,9 +104,11 @@ export const nl = {
   appChartNoRepoint: 'Deze grafiek ondersteunt het opnieuw toewijzen van gegevensbereiken niet.',
   appKeepOneSeries: 'Behoud ten minste één reeks.',
   appNoCategoriesToSwitch: 'Geen categorieën om te wisselen.',
-  appComboNoSelectData:
-    'Het wijzigen van de gegevensbron van een combinatiegrafiek wordt nog niet ondersteund.',
+  appSelectDataUnsupported:
+    'Het wijzigen van de gegevensbron van dit diagramtype wordt niet ondersteund.',
   appSeriesName: 'Reeksnaam',
+  appSeriesType: 'Serietype',
+  appSecondaryAxis: 'Secundaire as',
   appValuesRange: 'Waardenbereik',
   appCategoriesRange: 'Categoriebereik',
   appKeepUnchanged: 'Ongewijzigd laten',
@@ -192,6 +194,13 @@ export const nl = {
   appInvalidGroupField: 'Ongeldig groeperingsveld.',
   appInvalidPageField: 'Ongeldig rapportfilterveld.',
   appPivotPageItemMissing: 'Rapportfilteritem "{item}" is geen lid van veld "{label}".',
+  appInvalidPivotBaseField:
+    'Het basisveld van "Waarden weergeven als" moet in rijen of kolommen staan.',
+  appPivotBaseFieldMissing:
+    'De modus "Waarden weergeven als" van een waardeveld heeft een basisveld nodig.',
+  appPivotBaseFieldNotAxis:
+    'Basisveld "{label}" moet in de rijen of kolommen van de draaitabel staan.',
+  appPivotBaseItemMissing: 'Basisitem "{item}" is geen lid van veld "{label}".',
   appInvalidLabelFilterField: 'Het veld van het labelfilter is ongeldig.',
   appInvalidValueFieldIndex: 'Waardeveldindex {index} is ongeldig.',
   appInvalidValueField: 'Ongeldig waardeveld.',
@@ -333,8 +342,8 @@ export const nl = {
     'Dit werkblad bevat een draaitabel — bereiken verplaatsen wordt nog niet ondersteund.',
   appMergeOverTable:
     'De selectie overlapt een Excel-tabel — cellen samenvoegen in een tabel wordt nog niet ondersteund.',
-  appTableFilterNoEdit:
-    'Het filter van dit werkblad hoort bij een Excel-tabel — de bewerking kan nog niet worden opgeslagen.',
+  appFilterToggleFailed:
+    'Het filter is niet toegepast — selecteer eerst het bereik met uw gegevens.',
   appAutofillStreaming:
     'Automatisch doorvoeren naar een gebied dat nog streamend wordt geladen, is nog niet toegestaan.',
   appDvNeedsIndexed:
@@ -596,8 +605,6 @@ export const nl = {
   appSaveFailed: 'Kan de werkmap niet opslaan.',
   appCfRuleUnsaveable:
     'Deze regel voor voorwaardelijke opmaak kan niet in xlsx worden opgeslagen — gebruik een ander regeltype.',
-  appSaveErrX14Dv:
-    'Dit blad heeft uitgebreide (x14) gegevensvalidatie; het bewerken van de validatieregels wordt nog niet ondersteund.',
   appSaveErrMultiSelectList:
     'Validatie met een meerkeuzelijst kan niet in xlsx worden opgeslagen — verwijder de regel voordat u opslaat.',
   appSaveErrX14Cf:
@@ -1262,6 +1269,10 @@ export const nl = {
   appFontSizeTip: 'Tekengrootte',
   appZoomIn: 'Inzoomen',
   appZoomOut: 'Uitzoomen',
+  appImgActualSize: 'Ware grootte',
+  appImgFitWindow: 'Aanpassen aan venster',
+  appImgSaveAs: 'Afbeelding opslaan als…',
+  appImgClose: 'Sluiten (Esc)',
   appZoomSheetTitle: 'In-/uitzoomen op het werkblad',
   appResetZoom: 'Zoomniveau herstellen',
   appZoomToSelection: 'Inzoomen op selectie',
@@ -1304,6 +1315,29 @@ export const nl = {
   appOpenFileFirst: 'Open eerst een bestand',
   appNoPassword: 'Geen wachtwoord',
   appProtectWorkbook: 'Werkmap beveiligen',
+  appChangePassword: 'Wachtwoord wijzigen',
+  appWorkbookPasswordChanged: 'Het wachtwoord van de werkmap is bijgewerkt.',
+  appEncryptedOpenTitle: 'Met wachtwoord beveiligde werkmap openen',
+  appEncryptedOpenCopy: 'Voer het wachtwoord in om deze werkmap te ontgrendelen.',
+  appEncryptedPasswordLabel: 'Wachtwoord',
+  appEncryptedOpen: 'Openen',
+  appChangePasswordTitle: 'Wachtwoord van werkmap wijzigen',
+  appChangePasswordCopy: 'Kies een nieuw wachtwoord en bevestig het hieronder.',
+  appNewPasswordLabel: 'Nieuw wachtwoord',
+  appConfirmPasswordLabel: 'Nieuw wachtwoord bevestigen',
+  appPasswordsMismatch: 'De wachtwoorden komen niet overeen.',
+  appPasswordUpdateFailed: 'Het wachtwoord van de werkmap kon niet worden bijgewerkt.',
+  appPasswordUpdating: 'Bijwerken…',
+  appUpdatePassword: 'Wachtwoord bijwerken',
+  appWorkbookNotPasswordProtected: 'Deze werkmap is niet beveiligd met een openingswachtwoord.',
+  appSaveErrEncryptedUniwork:
+    'Een met een wachtwoord beveiligde werkmap kan niet worden opgeslagen in een UniWork-document. Gebruik Opslaan als om een versleutelde kopie op deze computer te bewaren.',
+  appPasswordChangeUniwork:
+    'Het wachtwoord van een UniWork-document kan hier niet worden gewijzigd.',
+  appPasswordChangeReadOnly:
+    'Deze werkmap is alleen-lezen, dus het wachtwoord kan niet worden gewijzigd.',
+  appEncryptedWrongPassword: 'Het wachtwoord is onjuist. Probeer het opnieuw.',
+  appPasswordChangeRestored: 'Sla eerst de herstelde werkmap op en wijzig daarna het wachtwoord.',
   appAllowEditRanges: 'Bewerken van bereiken toestaan',
   appGroupClipboard: 'Klembord',
   appPaste: 'Plakken',
@@ -1488,6 +1522,16 @@ export const nl = {
     'Deze tabel heeft geen naam in het bestand en kan hier niet worden gewijzigd.',
   appTableRowsNotLoaded: 'De tabelrijen worden nog geladen; probeer het zo opnieuw.',
   appTableTotalLabel: 'Totaal',
+  appNotePicturesPaneTitle: 'Afbeeldingen bij notities',
+  appNotePicturesClose: 'Sluiten',
+  appNotePicturesNone: 'Geen enkele notitie in deze werkmap toont een afbeelding.',
+  appNotePictureUnavailable: 'Deze afbeelding kan niet worden getoond.',
+  appNotePicturesToggle: 'Afbeeldingen bij notities',
+  appNoteInsertPicture: 'Afbeelding invoegen',
+  appNotePictureInserted:
+    'Afbeelding toegevoegd aan de notitie in {cell}. Opslaan om die naar het bestand te schrijven.',
+  appNotePictureRemoved: 'Afbeelding verwijderd uit de notitie in {cell}.',
+  appNotePictureRemove: 'Afbeelding verwijderen',
   appCommentsPaneTitle: 'Opmerkingen',
   appThreadReply: 'Beantwoorden',
   appThreadReplyPlaceholder: 'Beantwoorden…',
@@ -1534,6 +1578,8 @@ export const nl = {
   appVisualSendBackward: 'Naar achteren',
   appVisualSizeProperties: 'Grootte en eigenschappen…',
   appVisualHyperlink: 'Hyperlink…',
+  appVisualEmbedInCell: 'Afbeelding in cel insluiten',
+  appVisualEmbedFailed: 'Deze afbeelding kon niet in de cel worden ingesloten.',
   appVisualDelete: 'Verwijderen',
   appVisualArranged: 'Object bijgewerkt — opslaan met {saveKeys}.',
   appVisualCopied: 'Object gekopieerd.',
@@ -1564,6 +1610,8 @@ export const nl = {
     'De webversie van UniWork Sheets krijgt zijn rekenmachine nog. Open deze werkmap tot die tijd in de UniWork-desktopapp.',
   appWebEngineHint: 'Je bestand is niet gewijzigd.',
   appWebViewOnly: 'Alleen-lezen: je kunt wijzigingen in deze werkmap niet opslaan.',
+  appWebEncryptedOpen:
+    'Deze werkmap is met een wachtwoord beveiligd en de webversie kan hem niet openen. Open hem in de UniWork-desktopapp.',
   appWebConflictTitle: 'Deze werkmap is ergens anders gewijzigd',
   appWebConflictBody:
     'Je wijzigingen staan nog niet op UniWork en blijven in deze browser tot je je afmeldt.',
@@ -1582,4 +1630,5 @@ export const nl = {
     'De werkmap-engine is onverwacht gestopt en opnieuw gestart. De werkmap is opnieuw geopend vanaf de laatst opgeslagen versie; uw niet-opgeslagen wijzigingen blijven behouden, sla snel op.',
   appWebSavedReopenFailed:
     'Je wijzigingen zijn opgeslagen in UniWork, maar de werkmap kon hier niet opnieuw worden geopend. Laad de editor opnieuw om verder te werken.',
+  appDataTable: 'Gegevenstabel',
 } satisfies Record<keyof typeof zh, string>

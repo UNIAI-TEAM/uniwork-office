@@ -226,13 +226,28 @@ describe('each open chokepoint refuses before its first file read', () => {
     )
   })
 
+  it('sheets: openSelectedWorkbook guards before the encrypted sniff', () => {
+    const source = readRepo('apps/sheets/src/main/sheets-main.ts')
+    const fn = source.slice(source.indexOf('const openSelectedWorkbook = async ('))
+    const guard = fn.indexOf('if (uniworkRefusesOpen(path)) return null')
+    const sniff = fn.indexOf('await isCfbWorkbookFile(path)')
+    expect(guard).toBeGreaterThan(-1)
+    expect(sniff).toBeGreaterThan(-1)
+    expect(guard).toBeLessThan(sniff)
+    expect(guard).toBeLessThan(fn.indexOf('await readFile(path)'))
+    expect(guard).toBeLessThan(fn.indexOf('await prepareWorkbookForOpen('))
+  })
+
   it('sheets: openWorkbookSession guards before the snapshot copy', () => {
     const source = readRepo('apps/sheets/src/main/sheets-main.ts')
     const fn = source.slice(source.indexOf('async function openWorkbookSession('))
     const guard = fn.indexOf('if (uniworkRefusesOpen(path)) return null')
-    const firstRead = fn.indexOf('await snapshotWorkbook(path)')
+    // the header sniff for an encrypted workbook is now the first read of the file
+    const firstRead = fn.indexOf('await isCfbWorkbookFile(path)')
     expect(guard).toBeGreaterThan(-1)
+    expect(firstRead).toBeGreaterThan(-1)
     expect(guard).toBeLessThan(firstRead)
+    expect(guard).toBeLessThan(fn.indexOf('await snapshotWorkbook(path'))
     expect(fn.slice(0, guard)).toMatch(/Promise<WorkbookFile \| null>/)
     // the widened result type is handled at both call sites (open, merge source)
     expect(source).toMatch(/if \(result === null\) return null/)

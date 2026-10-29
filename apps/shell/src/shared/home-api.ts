@@ -426,7 +426,7 @@ export interface UniworkDocSummary {
   ownerKind?: string
 }
 
-/** UNI-2047: the server's `updated_by_user`; `avatarUrl` is absolute http(s) and loads with no auth header */
+/** UNI-2047 / UNI-2275: the server's `updated_by_user`; `avatarUrl` is resolved by main to a `data:` URL (or https on parse) */
 export interface UniworkDocUpdatedByUser {
   name: string
   avatarUrl?: string
@@ -1329,6 +1329,13 @@ export type DeskToolResult =
         'busy' | 'bad-input' | 'not-found' | 'same-path' | 'target-open' | 'encrypted' | 'failed'
     }
 
+export interface AutoUpdateCheckStatus {
+  /** whether automatic background update checks are enabled (default true) */
+  on: boolean
+  /** whether this build supports background update checks (false on apt/.deb, no-feed builds, dev runs) */
+  supported: boolean
+}
+
 export interface HomeApi {
   /** unified recents across document types, newest first (paged) */
   recents(query?: RecentQuery): Promise<RecentPage>
@@ -1440,6 +1447,9 @@ export interface HomeApi {
   getPinnedUpdateChannel(): Promise<string | null>
   /** switch + persist the update channel; triggers an immediate update check */
   setUpdateChannel(channel: UpdateChannel): Promise<void>
+  /** whether the launch and periodic background update checks run (default on) and whether this build has a background check */
+  getAutoUpdateCheck(): Promise<AutoUpdateCheckStatus>
+  setAutoUpdateCheck(on: boolean): Promise<void>
   /** UniWork account status (desktop session sync TBD; Sign-in opens the UniWork web link) */
   accountStatus(): Promise<AccountStatus>
   /** open UniWork Sign-in in the system browser; returns whether the launch succeeded */
@@ -1502,6 +1512,9 @@ export interface HomeApi {
   getAutoSaveDefault(): Promise<AutoSaveDefault>
   /** persist the AutoSave default; broadcasts 'app:auto-save-default-changed' to all web contents */
   setAutoSaveDefault(on: boolean): Promise<void>
+  /** whether the documents open at the last close reopen at launch (default off) */
+  getRestoreLastSession(): Promise<boolean>
+  setRestoreLastSession(on: boolean): Promise<void>
   /** current local MCP server state (running/enabled/port/url) */
   getMcpStatus(): Promise<McpStatus>
   /** enable/disable the MCP server and/or change its port/background/logging; applies and persists, returns the new state */
@@ -2303,6 +2316,8 @@ export const HOME_CHANNELS = {
   getUpdateChannel: 'home:get-update-channel',
   getPinnedUpdateChannel: 'home:get-pinned-update-channel',
   setUpdateChannel: 'home:set-update-channel',
+  getAutoUpdateCheck: 'home:get-auto-update-check',
+  setAutoUpdateCheck: 'home:set-auto-update-check',
   accountStatus: 'home:account-status',
   accountLogin: 'home:account-login',
   accountLoginEvent: 'home:account-login-event',
@@ -2331,6 +2346,8 @@ export const HOME_CHANNELS = {
   setDocumentTheme: 'home:set-document-theme',
   getAutoSaveDefault: 'home:get-auto-save-default',
   setAutoSaveDefault: 'home:set-auto-save-default',
+  getRestoreLastSession: 'home:get-restore-last-session',
+  setRestoreLastSession: 'home:set-restore-last-session',
   getMcpStatus: 'home:get-mcp-status',
   setMcpSettings: 'home:set-mcp-settings',
   getMcpLogs: 'home:get-mcp-logs',

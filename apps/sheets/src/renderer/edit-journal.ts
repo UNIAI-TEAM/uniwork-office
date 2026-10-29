@@ -15,6 +15,7 @@ import type {
   WorkbookVisualAdd,
   WorkbookVisualEdit,
   WorkbookVisualObject,
+  WorkbookCellImageAdd,
 } from '../shared/desktop-api'
 import { columnLabel, parseRange } from '@genoffice/xlsx-gateway/domain/cell-address'
 import { fillDisplayColor, resolveStyleColor } from '@genoffice/xlsx-gateway/domain/style-color'
@@ -138,6 +139,33 @@ export interface SheetJournal {
   orderDirty: boolean
 }
 
+/// A picture embedded in a cell this session: the bytes stay as a data URL so
+/// the in-session overlay renders without a media round trip, and the save
+/// splits off the base64 payload.
+export interface CellImageAdd {
+  readonly sheetId: string
+  readonly row: number
+  readonly column: number
+  readonly mediaType: 'image/png' | 'image/jpeg' | 'image/gif'
+  readonly dataUrl: string
+}
+
+/// A picture the reader put into a note this session: the bytes stay as a
+/// data URL so the in-session view can show them, and the save splits off the
+/// base64 payload. `picture: null` takes a picture away.
+export interface NotePictureAdd {
+  readonly sheetId: string
+  readonly row: number
+  readonly column: number
+  readonly picture: {
+    readonly mediaType: 'image/png' | 'image/jpeg' | 'image/gif'
+    readonly dataUrl: string
+    readonly widthPx: number
+    readonly heightPx: number
+    readonly name: string
+  } | null
+}
+
 export interface EditJournal {
   readonly cells: Map<string, Map<string, JournalEntry>>
   /// Constant range fills stay declarative so whole-column AI operations do
@@ -150,6 +178,11 @@ export interface EditJournal {
   /// Floating visuals created this session; the save writes each as a new
   /// drawing/chart part pair.
   readonly visualAdds: WorkbookVisualObject[]
+  /// Pictures embedded in cells this session ("Place in Cell"); the save
+  /// writes each into the workbook's Excel rich-value parts and marks its
+  /// host cell with vm=. Coordinates live in post-operation space, like
+  /// cell entries.
+  readonly cellImageAdds: CellImageAdd[]
   /// Edits to visuals already in the file, keyed by visual id: an anchor
   /// rewrite (move/resize) or a removal, located by (drawingPath, index).
   readonly visualEdits: Map<string, VisualEditEntry>
@@ -168,6 +201,10 @@ export interface EditJournal {
   /// Sheets whose filter changed; the save snapshots their live filter model
   /// instead of replaying mutations.
   readonly filterDirty: Set<string>
+  /// Tables (by plugin id) whose own filter changed, per sheet. A table's
+  /// header dropdown edits the table plugin's model, so the save snapshots
+  /// exactly these tables; other tables keep their file filter untouched.
+  readonly tableFilterDirty: Map<string, Set<string>>
   /// Sheets whose conditional formatting changed; the save snapshots the full
   /// rule set declaratively (same recipe as filters).
   readonly cfDirty: Set<string>
@@ -198,6 +235,10 @@ export interface EditJournal {
   /// Sheets whose notes changed; the save snapshots the live note set (same
   /// recipe as filters).
   readonly noteDirty: Set<string>
+  /// Pictures put into notes this session, keyed by cell. The save sends them
+  /// with the note they belong to; a picture the note was already carrying
+  /// needs no entry, because the saver keeps it.
+  readonly notePictures: NotePictureAdd[]
   /// pivotCacheDefinition part paths whose pivots were recomputed this
   /// session; the save flags them refreshOnLoad so Excel rebuilds its cache.
   readonly pivotCacheRefresh: Set<string>
@@ -280,6 +321,7 @@ export function createEditJournal(): EditJournal {
     chartEdits: new Map(),
     visualAdds: [],
     visualEdits: new Map(),
+    cellImageAdds: [],
     tableAdds: [],
     tableEdits: new Map(),
     pivotAdds: [],
@@ -293,6 +335,7 @@ export function createEditJournal(): EditJournal {
       orderDirty: false,
     },
     filterDirty: new Set(),
+    tableFilterDirty: new Map(),
     cfDirty: new Set(),
     dvDirty: new Set(),
     sheetProtection: new Map(),
@@ -303,6 +346,7 @@ export function createEditJournal(): EditJournal {
     hyperlinks: new Map(),
     pageSetup: new Map(),
     noteDirty: new Set(),
+    notePictures: [],
     pivotCacheRefresh: new Set(),
     pivotRefreshUpdates: new Map(),
   }
@@ -438,6 +482,17 @@ export function toSaveHyperlinkEdits(journal: EditJournal): WorkbookHyperlinkEdi
 
 export function recordFilterChange(journal: EditJournal, sheetId: string): void {
   journal.filterDirty.add(sheetId)
+}
+
+export function recordTableFilterChange(
+  journal: EditJournal,
+  sheetId: string,
+  tableId: string,
+): void {
+  journal.filterDirty.add(sheetId)
+  const tables = journal.tableFilterDirty.get(sheetId) ?? new Set<string>()
+  tables.add(tableId)
+  journal.tableFilterDirty.set(sheetId, tables)
 }
 
 export function recordSheetInsert(journal: EditJournal, sheetId: string, name: string): void {
@@ -803,6 +858,79 @@ export function recordVisualAdd(journal: EditJournal, visual: WorkbookVisualObje
   journal.visualAdds.push(visual)
 }
 
+/// Records a picture embedded in a cell; a second embed on the same cell
+/// replaces the earlier bytes (the save writes one picture per cell).
+/// Returns the session picture the new one displaces from that cell, if any.
+export function recordCellImageAdd(
+  journal: EditJournal,
+  entry: CellImageAdd,
+): CellImageAdd | undefined {
+  const displaced = removeCellImageAdd(journal, entry.sheetId, entry.row, entry.column)
+  journal.cellImageAdds.push(entry)
+  return displaced
+}
+
+export function removeCellImageAdd(
+  journal: EditJournal,
+  sheetId: string,
+  row: number,
+  column: number,
+): CellImageAdd | undefined {
+  const at = journal.cellImageAdds.findIndex(
+    (existing) =>
+      existing.sheetId === sheetId && existing.row === row && existing.column === column,
+  )
+  return at >= 0 ? journal.cellImageAdds.splice(at, 1)[0] : undefined
+}
+
+export function cellImageAddAt(
+  journal: EditJournal,
+  sheetId: string,
+  row: number,
+  column: number,
+): CellImageAdd | undefined {
+  return journal.cellImageAdds.find(
+    (entry) => entry.sheetId === sheetId && entry.row === row && entry.column === column,
+  )
+}
+
+/// Records a picture put into a note; a second picture on the same note
+/// replaces the earlier one (a note carries one picture).
+export function recordNotePicture(journal: EditJournal, entry: NotePictureAdd): void {
+  removeNotePicture(journal, entry.sheetId, entry.row, entry.column)
+  journal.notePictures.push(entry)
+}
+
+export function removeNotePicture(
+  journal: EditJournal,
+  sheetId: string,
+  row: number,
+  column: number,
+): void {
+  const at = journal.notePictures.findIndex(
+    (entry) => entry.sheetId === sheetId && entry.row === row && entry.column === column,
+  )
+  if (at >= 0) journal.notePictures.splice(at, 1)
+}
+
+/**
+ * The pictures one sheet's notes carry this session, keyed by "row:column".
+ *
+ * A `null` value is a picture taken away: the note keeps its text and loses
+ * its picture. A note with no entry says nothing about its picture, and the
+ * saver keeps the one the note was already carrying.
+ */
+export function notePicturesFor(
+  journal: EditJournal,
+  sheetId: string,
+): Map<string, NotePictureAdd['picture']> {
+  const pictures = new Map<string, NotePictureAdd['picture']>()
+  for (const entry of journal.notePictures) {
+    if (entry.sheetId === sheetId) pictures.set(`${entry.row}:${entry.column}`, entry.picture)
+  }
+  return pictures
+}
+
 /// Arrange-tab properties shared by file-visual edits and session visuals.
 export interface VisualArrangeChanges {
   readonly rotation?: number
@@ -1013,6 +1141,25 @@ function clampCategories(categories: readonly string[]): string[] {
   return categories.map((label) => clampWireText(label, CHART_CATEGORY_WIRE_MAX))
 }
 
+/// Converts session pictures in cells to the save-request wire shape. Skips
+/// entries on removed sheets and anything with no usable bytes.
+export function toSaveCellImageAdds(journal: EditJournal): WorkbookCellImageAdd[] {
+  const additions: WorkbookCellImageAdd[] = []
+  for (const entry of journal.cellImageAdds) {
+    if (isSheetRemoved(journal, entry.sheetId)) continue
+    const base64 = entry.dataUrl.split(',')[1]
+    if (!base64) continue
+    additions.push({
+      sheetId: entry.sheetId,
+      row: entry.row,
+      column: entry.column,
+      mediaType: entry.mediaType,
+      base64,
+    })
+  }
+  return additions
+}
+
 /// Converts session visuals to the save-request wire shape. Skips visuals on
 /// removed sheets and anything that is not a supported chart or shape.
 export function toSaveVisualAdds(journal: EditJournal): WorkbookVisualAdd[] {
@@ -1125,6 +1272,12 @@ export function toSaveVisualAdds(journal: EditJournal): WorkbookVisualAdd[] {
                   ]),
                 ),
               }),
+          // Combo Select Data tags ride along; other families never reach a
+          // 'combo' chartType above.
+          ...(series.plot === 'barChart' || series.plot === 'lineChart'
+            ? { plot: series.plot }
+            : {}),
+          ...(series.secondaryAxis === undefined ? {} : { secondaryAxis: series.secondaryAxis }),
         })),
         ...(visual.chart.legend === undefined ? {} : { legend: visual.chart.legend }),
         // The read-only combined mode narrows to the closest writable one.
@@ -1152,6 +1305,10 @@ export function toSaveVisualAdds(journal: EditJournal): WorkbookVisualAdd[] {
         ...(visual.chart.holeSizePct === undefined
           ? {}
           : { holeSizePct: Math.round(visual.chart.holeSizePct) }),
+        // PivotChart marker rides along so the save writes c:pivotSource.
+        ...(visual.chart.pivotTablePath === undefined
+          ? {}
+          : { pivotTablePath: visual.chart.pivotTablePath }),
       },
     })
   }
@@ -1566,6 +1723,14 @@ export function recordStructuralOp(
   journal.visualAdds.forEach((visual, at) => {
     journal.visualAdds[at] = shiftVisualForStructuralOp(visual, sheetId, sheetName, op)
   })
+  for (let at = journal.cellImageAdds.length - 1; at >= 0; at -= 1) {
+    const entry = journal.cellImageAdds[at]
+    if (!entry || entry.sheetId !== sheetId) continue
+    const moved = movePosition(axis === 'row' ? entry.row : entry.column)
+    if (moved === null) journal.cellImageAdds.splice(at, 1)
+    else if (axis === 'row') journal.cellImageAdds[at] = { ...entry, row: moved }
+    else journal.cellImageAdds[at] = { ...entry, column: moved }
+  }
   for (const [id, entry] of journal.visualEdits) {
     if (entry.sheetId !== sheetId || entry.anchor === undefined) continue
     journal.visualEdits.set(id, { ...entry, anchor: shiftVisualAnchor(entry.anchor, shift) })
@@ -2397,6 +2562,9 @@ export function journalSize(journal: EditJournal): number {
   for (const sparkline of journal.sparklineAdds) {
     if (!isSheetRemoved(journal, sparkline.sheetId)) total += 1
   }
+  for (const image of journal.cellImageAdds) {
+    if (!isSheetRemoved(journal, image.sheetId)) total += 1
+  }
   for (const sheetId of journal.filterDirty) {
     if (!isSheetRemoved(journal, sheetId)) total += 1
   }
@@ -2421,6 +2589,9 @@ export function journalSize(journal: EditJournal): number {
   }
   for (const sheetId of journal.noteDirty) {
     if (!isSheetRemoved(journal, sheetId)) total += 1
+  }
+  for (const picture of journal.notePictures) {
+    if (!isSheetRemoved(journal, picture.sheetId)) total += 1
   }
   total += journal.pivotCacheRefresh.size
   for (const [sheetId, links] of journal.hyperlinks) {

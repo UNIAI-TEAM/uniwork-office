@@ -6,6 +6,7 @@ import {
   aiBulkUndoGate,
   installJournalSuppressionUndoFilter,
   undoPayloadCells,
+  undoSuppression,
 } from '../src/renderer/univer-state'
 
 function setRangeItem(cells: number) {
@@ -44,6 +45,25 @@ describe('AI bulk-apply undo budget', () => {
     expect(
       undoPayloadCells({ unitID: 'wb', redoMutations: [{ params: { style: {} } }] }, 1000),
     ).toBe(0)
+  })
+
+  it('keeps entries pushed while undoSuppression is active off the stack', () => {
+    const stack: unknown[] = []
+    const push = (item: unknown) =>
+      (LocalUndoRedoService.prototype.pushUndoRedo as (i: unknown) => void).call(
+        fakeService(stack),
+        item,
+      )
+    aiBulkUndoGate.active = true
+    undoSuppression.active = true
+    try {
+      push(setRangeItem(1))
+    } finally {
+      undoSuppression.active = false
+    }
+    push(setRangeItem(1))
+    expect(stack.length).toBe(1)
+    expect(aiBulkUndoGate.pushed).toBe(1)
   })
 
   it('keeps a batch under the budget on the stack', () => {

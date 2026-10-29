@@ -7,6 +7,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/renderer/editor/extensions'
+import { resetForTest } from '../src/renderer/capabilities'
 import { parseDocText } from '../src/renderer/markdown/docText'
 import { buildSourceMap, spliceMarkdown } from '../src/renderer/markdown/sourceSplice'
 import type { WikiLinkResolved } from '../src/shared/ipc'
@@ -16,6 +17,7 @@ import type { WikiLinkResolved } from '../src/shared/ipc'
 // jsdom has no ClipboardEvent; the view still runs its real clipboard parser.
 beforeAll(() => vi.stubGlobal('ClipboardEvent', Event))
 afterAll(() => vi.unstubAllGlobals())
+afterEach(() => resetForTest())
 
 const editors: Editor[] = []
 afterEach(() => {
@@ -616,6 +618,75 @@ describe('a literal with a backslash, typed or pasted, saves stable', () => {
       expect(again.save(), `save ${i}`).toBe(current)
       expect(again.editor.getMarkdown(), `full ${i}`).toBe(first)
       current = again.save()
+    }
+  })
+})
+
+/** every inline atom of the document: `<wikiEmbed ![[x]]>` */
+function atoms(editor: Editor): string[] {
+  const out: string[] = []
+  editor.state.doc.descendants((node) => {
+    if (node.isAtom && node.isInline && !node.isText)
+      out.push(`<${node.type.name} ${String(node.attrs.raw ?? '')}>`)
+  })
+  return out
+}
+
+describe('wiki embeds typed and pasted', () => {
+  it('turns a pasted ![[embed]] into the embed node, not into a link on its inner [[x]]', () => {
+    const { editor } = open('Start')
+    caretAfter(editor, 'Start')
+    paste(editor, ' ![[Pic.png|200]] tail')
+    expect(atoms(editor)).toEqual(['<wikiEmbed ![[Pic.png|200]]>'])
+    expect(wikiTexts(editor)).toEqual([])
+    // the file reads exactly as pasted
+    expect(editor.getMarkdown()).toBe('Start ![[Pic.png|200]] tail')
+  })
+
+  it('handles an embed next to links in one paste, in one undo step', () => {
+    const { editor } = open('Start')
+    caretAfter(editor, 'Start')
+    paste(editor, ' [[A]] and ![[B.png]] and [[C|c]]')
+    expect(wikiTexts(editor)).toEqual(['[[A]]', '[[C|c]]'])
+    expect(atoms(editor)).toEqual(['<wikiEmbed ![[B.png]]>'])
+    expect(editor.getMarkdown()).toBe('Start [[A]] and ![[B.png]] and [[C|c]]')
+  })
+
+  it('an escaped bang is a link, not an embed', () => {
+    const { editor } = open('Start')
+    caretAfter(editor, 'Start')
+    paste(editor, ' \\![[x]]')
+    expect(atoms(editor)).toEqual([])
+    expect(wikiTexts(editor)).toEqual(['[[x]]'])
+  })
+
+  it('typing ![[x]] does not mark its inner [[x]] as a link; typing [[x]] still does', () => {
+    const embed = open('a  b').editor
+    embed.commands.setTextSelection(3)
+    type(embed, '![[x]]')
+    expect(wikiTexts(embed)).toEqual([])
+    expect(embed.state.doc.textContent).toBe('a ![[x]] b')
+
+    const link = open('a  b').editor
+    link.commands.setTextSelection(3)
+    type(link, '[[x]]')
+    expect(wikiTexts(link)).toEqual(['[[x]]'])
+  })
+
+  it('without the vault (cap wikiVault off) a pasted embed stays text and its [[x]] keeps the link mark', () => {
+    ;(window as unknown as { markdownApi: unknown }).markdownApi = {
+      capabilities: { wikiVault: false },
+    }
+    resetForTest()
+    try {
+      const { editor } = open('Start')
+      caretAfter(editor, 'Start')
+      paste(editor, ' ![[Pic.png]]')
+      expect(atoms(editor)).toEqual([])
+      expect(wikiTexts(editor)).toEqual(['[[Pic.png]]'])
+      expect(editor.getMarkdown()).toBe('Start ![[Pic.png]]')
+    } finally {
+      delete (window as unknown as { markdownApi?: unknown }).markdownApi
     }
   })
 })

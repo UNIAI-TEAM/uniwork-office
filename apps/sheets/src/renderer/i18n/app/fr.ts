@@ -107,9 +107,11 @@ export const fr = {
   appChartNoRepoint: 'Ce graphique ne permet pas de redéfinir ses plages de données.',
   appKeepOneSeries: 'Conservez au moins une série.',
   appNoCategoriesToSwitch: 'Aucune catégorie à permuter.',
-  appComboNoSelectData:
-    "La modification de la source de données d'un graphique combiné n'est pas encore prise en charge.",
+  appSelectDataUnsupported:
+    "La modification de la source de données de ce type de graphique n'est pas prise en charge.",
   appSeriesName: 'Nom de la série',
+  appSeriesType: 'Type de série',
+  appSecondaryAxis: 'Axe secondaire',
   appValuesRange: 'Plage de valeurs',
   appCategoriesRange: 'Plage de catégories',
   appKeepUnchanged: 'Conserver tel quel',
@@ -198,6 +200,13 @@ export const fr = {
   appInvalidPageField: 'Champ de filtre du rapport non valide.',
   appPivotPageItemMissing:
     "L'élément de filtre « {item} » n'est pas un membre du champ « {label} ».",
+  appInvalidPivotBaseField:
+    'Le champ de base de « Afficher les valeurs en » doit se trouver en lignes ou en colonnes.',
+  appPivotBaseFieldMissing:
+    "Le mode « Afficher les valeurs en » d'un champ de valeurs nécessite un champ de base.",
+  appPivotBaseFieldNotAxis:
+    'Le champ de base « {label} » doit se trouver dans les lignes ou les colonnes du tableau croisé.',
+  appPivotBaseItemMissing: "L'élément de base « {item} » n'est pas un membre du champ « {label} ».",
   appInvalidLabelFilterField: "Le champ du filtre d'étiquettes n'est pas valide.",
   appInvalidValueFieldIndex: "L'index de champ de valeurs {index} n'est pas valide.",
   appInvalidValueField: 'Champ de valeurs non valide.',
@@ -351,8 +360,8 @@ export const fr = {
     "Cette feuille contient un tableau croisé dynamique — le déplacement de plages n'est pas encore pris en charge.",
   appMergeOverTable:
     'La sélection chevauche un tableau Excel — la fusion de cellules dans un tableau n’est pas encore prise en charge.',
-  appTableFilterNoEdit:
-    'Le filtre de cette feuille appartient à un tableau Excel — sa modification ne peut pas encore être enregistrée.',
+  appFilterToggleFailed:
+    'Le filtre n’a pas été appliqué — sélectionnez d’abord la plage qui contient vos données.',
   appAutofillStreaming:
     "La recopie automatique vers une zone encore en cours de chargement en flux n'est pas encore autorisée.",
   appDvNeedsIndexed:
@@ -622,8 +631,6 @@ export const fr = {
   appSaveFailed: "Impossible d'enregistrer le classeur.",
   appCfRuleUnsaveable:
     'Cette règle de mise en forme conditionnelle ne peut pas être enregistrée en xlsx — utilisez un autre type de règle.',
-  appSaveErrX14Dv:
-    "Cette feuille comporte une validation des données étendue (x14) ; la modification de ses règles de validation n'est pas encore prise en charge.",
   appSaveErrMultiSelectList:
     "La validation par liste à sélection multiple ne peut pas être enregistrée en xlsx — supprimez la règle avant d'enregistrer.",
   appSaveErrX14Cf:
@@ -1292,6 +1299,10 @@ export const fr = {
   appFontSizeTip: 'Taille de police',
   appZoomIn: 'Zoom avant',
   appZoomOut: 'Zoom arrière',
+  appImgActualSize: 'Taille réelle',
+  appImgFitWindow: 'Ajuster à la fenêtre',
+  appImgSaveAs: "Enregistrer l'image sous…",
+  appImgClose: 'Fermer (Échap)',
   appZoomSheetTitle: 'Zoomer la feuille',
   appResetZoom: 'Réinitialiser le zoom',
   appZoomToSelection: 'Zoom sur la sélection',
@@ -1334,6 +1345,29 @@ export const fr = {
   appOpenFileFirst: "Ouvrez d'abord un fichier",
   appNoPassword: 'Sans mot de passe',
   appProtectWorkbook: 'Protéger le classeur',
+  appChangePassword: 'Modifier le mot de passe',
+  appWorkbookPasswordChanged: 'Le mot de passe du classeur a été mis à jour.',
+  appEncryptedOpenTitle: 'Ouvrir un classeur protégé par mot de passe',
+  appEncryptedOpenCopy: 'Saisissez le mot de passe pour déverrouiller ce classeur.',
+  appEncryptedPasswordLabel: 'Mot de passe',
+  appEncryptedOpen: 'Ouvrir',
+  appChangePasswordTitle: 'Modifier le mot de passe du classeur',
+  appChangePasswordCopy: 'Choisissez un nouveau mot de passe et confirmez-le ci-dessous.',
+  appNewPasswordLabel: 'Nouveau mot de passe',
+  appConfirmPasswordLabel: 'Confirmer le nouveau mot de passe',
+  appPasswordsMismatch: 'Les mots de passe ne correspondent pas.',
+  appPasswordUpdateFailed: 'Impossible de mettre à jour le mot de passe du classeur.',
+  appPasswordUpdating: 'Mise à jour…',
+  appUpdatePassword: 'Mettre à jour le mot de passe',
+  appWorkbookNotPasswordProtected: "Ce classeur n'est pas protégé par un mot de passe d'ouverture.",
+  appSaveErrEncryptedUniwork:
+    'Un classeur protégé par mot de passe ne peut pas être enregistré dans un document UniWork. Utilisez Enregistrer sous pour conserver une copie chiffrée sur cet ordinateur.',
+  appPasswordChangeUniwork: 'Le mot de passe d’un document UniWork ne peut pas être modifié ici.',
+  appPasswordChangeReadOnly:
+    'Ce classeur est en lecture seule : son mot de passe ne peut pas être modifié.',
+  appEncryptedWrongPassword: 'Le mot de passe est incorrect. Réessayez.',
+  appPasswordChangeRestored:
+    "Enregistrez d'abord le classeur restauré, puis modifiez son mot de passe.",
   appAllowEditRanges: 'Permettre la modification des plages',
   appGroupClipboard: 'Presse-papiers',
   appPaste: 'Coller',
@@ -1519,6 +1553,16 @@ export const fr = {
   appTableRowsNotLoaded:
     'Les lignes du tableau sont encore en cours de chargement : réessayez dans un instant.',
   appTableTotalLabel: 'Total',
+  appNotePicturesPaneTitle: 'Images des notes',
+  appNotePicturesClose: 'Fermer',
+  appNotePicturesNone: "Aucune note de ce classeur ne contient d'image.",
+  appNotePictureUnavailable: 'Cette image ne peut pas être affichée.',
+  appNotePicturesToggle: 'Images des notes',
+  appNoteInsertPicture: 'Insérer une image',
+  appNotePictureInserted:
+    'Image ajoutée au commentaire de {cell}. Enregistrez pour l’écrire dans le fichier.',
+  appNotePictureRemoved: 'Image retirée du commentaire de {cell}.',
+  appNotePictureRemove: 'Retirer l’image',
   appCommentsPaneTitle: 'Commentaires',
   appThreadReply: 'Répondre',
   appThreadReplyPlaceholder: 'Répondre…',
@@ -1565,6 +1609,8 @@ export const fr = {
   appVisualSendBackward: 'Reculer',
   appVisualSizeProperties: 'Taille et propriétés…',
   appVisualHyperlink: 'Lien hypertexte…',
+  appVisualEmbedInCell: "Incorporer l'image dans la cellule",
+  appVisualEmbedFailed: "Impossible d'incorporer cette image dans la cellule.",
   appVisualDelete: 'Supprimer',
   appVisualArranged: 'Objet mis à jour — enregistrez avec {saveKeys}.',
   appVisualCopied: 'Objet copié.',
@@ -1596,6 +1642,8 @@ export const fr = {
   appWebEngineHint: "Votre fichier n'a pas été modifié.",
   appWebViewOnly:
     'Lecture seule : vous ne pouvez pas enregistrer les modifications de ce classeur.',
+  appWebEncryptedOpen:
+    'Ce classeur est protégé par un mot de passe que la version web ne peut pas ouvrir. Ouvrez-le dans l’application de bureau UniWork.',
   appWebConflictTitle: 'Ce classeur a été modifié ailleurs',
   appWebConflictBody:
     'Vos modifications ne sont pas encore sur UniWork et sont conservées dans ce navigateur jusqu’à votre déconnexion.',
@@ -1614,4 +1662,5 @@ export const fr = {
     "Le moteur du classeur s'est arrêté de façon inattendue et a redémarré. Le classeur a été rouvert à partir de sa dernière version enregistrée ; vos modifications non enregistrées sont conservées, pensez à enregistrer rapidement.",
   appWebSavedReopenFailed:
     "Vos modifications ont été enregistrées dans UniWork, mais le classeur n'a pas pu être rouvert ici. Rechargez l'éditeur pour continuer.",
+  appDataTable: 'Table de données',
 } satisfies Record<keyof typeof zh, string>

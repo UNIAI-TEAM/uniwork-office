@@ -37,6 +37,7 @@ let host: HTMLDivElement
 let root: Root
 let tabs: TabSummary[]
 let tabListeners: Set<(next: TabSummary[]) => void>
+let startRenameListeners: Set<(id: string) => void>
 let hintListeners: Set<(payload: { path: string; copy?: true }) => void>
 let unsubscribed: number
 let states: Record<string, SourceViewState | null>
@@ -63,6 +64,12 @@ function installWindow(): void {
       }
     }),
     activate: vi.fn(async () => undefined),
+    onStartRename: vi.fn((cb: (id: string) => void) => {
+      startRenameListeners.add(cb)
+      return () => {
+        startRenameListeners.delete(cb)
+      }
+    }),
   }
   api = {
     uniworkDocStatus: vi.fn(async (path: string) => (path === DOC ? docStatus : null)),
@@ -164,6 +171,7 @@ beforeEach(() => {
   document.body.append(host)
   root = createRoot(host)
   tabListeners = new Set()
+  startRenameListeners = new Set()
   hintListeners = new Set()
   unsubscribed = 0
   states = { ...STATES }
@@ -243,12 +251,19 @@ describe('the source view chip in the tab strip', () => {
   it('a source tab cannot be renamed inline; a local file still can', async () => {
     await mount()
     const mousedown = (title: string) => {
-      const tab = host.querySelector<HTMLElement>(`.tab-item[title="${title}"]`)!
+      const tab = Array.from(host.querySelectorAll<HTMLElement>('.tab-item')).find(
+        (el) => el.querySelector('.tab-title')?.textContent === title,
+      )!
       return act(async () => {
         tab.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, detail: 2 }))
       })
     }
     await mousedown('Plan.docx')
+    expect(host.querySelector('.tab-rename-input')).toBeNull()
+    await act(async () => {
+      for (const listener of [...startRenameListeners]) listener('src')
+      for (const listener of [...startRenameListeners]) listener('doc')
+    })
     expect(host.querySelector('.tab-rename-input')).toBeNull()
     await mousedown('todo')
     expect(host.querySelector('.tab-rename-input')).not.toBeNull()

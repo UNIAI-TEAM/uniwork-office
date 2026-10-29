@@ -1,4 +1,5 @@
-import { Markdown } from '@tiptap/markdown'
+import { Markdown, type MarkdownExtensionOptions } from '@tiptap/markdown'
+import { Marked } from 'marked'
 import { ImageParagraph } from './localImage'
 import { Paragraph } from '@tiptap/extension-paragraph'
 import { patchInlineParsing } from './inlineTokens'
@@ -131,6 +132,18 @@ function wikiText(text: string, encode: (text: string) => string): string {
 }
 
 export const SelectiveEscapeMarkdown = Markdown.extend({
+  addOptions(): MarkdownExtensionOptions {
+    const parent = this.parent?.()
+    // Marked's singleton `marked.use()` appends to a module-wide `defaults.extensions`
+    // array without deduplicating, so every Editor created in the process would add
+    // another copy of every custom tokenizer (`startBlock`, `block`, `startInline`,
+    // `inline`). Give each extension configuration its own isolated Marked instance.
+    return {
+      indentation: parent?.indentation ?? { style: 'space', size: 2 },
+      marked: (parent?.marked ?? new Marked()) as MarkdownExtensionOptions['marked'],
+      markedOptions: parent?.markedOptions ?? {},
+    }
+  },
   onBeforeCreate(props) {
     this.parent?.(props)
     const manager = this.editor.markdown as unknown as Serializer | undefined

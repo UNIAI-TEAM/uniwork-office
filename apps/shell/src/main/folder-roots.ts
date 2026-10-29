@@ -41,9 +41,9 @@ export function describeExtraRoot(path: string): FolderRoot {
   let readable = false
   let usable = false
   try {
-    readable = statSync(path).isDirectory()
-    if (readable) {
+    if (statSync(path).isDirectory()) {
       accessSync(path, constants.R_OK)
+      readable = true
       accessSync(path, constants.W_OK)
       usable = true
     }

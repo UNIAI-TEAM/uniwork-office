@@ -105,9 +105,11 @@ export const it = {
   appChartNoRepoint: 'Questo grafico non supporta la ridefinizione degli intervalli di dati.',
   appKeepOneSeries: 'Mantieni almeno una serie.',
   appNoCategoriesToSwitch: 'Nessuna categoria da scambiare.',
-  appComboNoSelectData:
-    "La modifica dell'origine dati di un grafico combinato non è ancora supportata.",
+  appSelectDataUnsupported:
+    "La modifica dell'origine dati di questo tipo di grafico non è supportata.",
   appSeriesName: 'Nome serie',
+  appSeriesType: 'Tipo di serie',
+  appSecondaryAxis: 'Asse secondario',
   appValuesRange: 'Intervallo valori',
   appCategoriesRange: 'Intervallo categorie',
   appKeepUnchanged: 'Mantieni invariato',
@@ -193,6 +195,13 @@ export const it = {
   appInvalidGroupField: 'Campo di raggruppamento non valido.',
   appInvalidPageField: 'Campo del filtro rapporto non valido.',
   appPivotPageItemMissing: 'L\'elemento del filtro "{item}" non appartiene al campo "{label}".',
+  appInvalidPivotBaseField:
+    'Il campo base di "Mostra valori come" deve trovarsi in righe o colonne.',
+  appPivotBaseFieldMissing:
+    'La modalità "Mostra valori come" di un campo valore richiede un campo base.',
+  appPivotBaseFieldNotAxis:
+    'Il campo base "{label}" deve trovarsi nelle righe o nelle colonne della tabella pivot.',
+  appPivotBaseItemMissing: 'L\'elemento base "{item}" non appartiene al campo "{label}".',
   appInvalidLabelFilterField: 'Il campo del filtro etichette non è valido.',
   appInvalidValueFieldIndex: "L'indice del campo valori {index} non è valido.",
   appInvalidValueField: 'Campo valori non valido.',
@@ -344,8 +353,8 @@ export const it = {
     'Questo foglio contiene una tabella pivot — lo spostamento di intervalli non è ancora supportato.',
   appMergeOverTable:
     'La selezione si sovrappone a una tabella di Excel — l’unione di celle in una tabella non è ancora supportata.',
-  appTableFilterNoEdit:
-    'Il filtro di questo foglio appartiene a una tabella di Excel — la modifica non può ancora essere salvata.',
+  appFilterToggleFailed:
+    'Il filtro non è stato applicato — seleziona prima l’intervallo con i tuoi dati.',
   appAutofillStreaming:
     "Il riempimento automatico in un'area ancora in streaming non è ancora consentito.",
   appDvNeedsIndexed:
@@ -597,8 +606,6 @@ export const it = {
   appSaveFailed: 'Impossibile salvare la cartella di lavoro.',
   appCfRuleUnsaveable:
     'Questa regola di formattazione condizionale non può essere salvata in xlsx — usa un altro tipo di regola.',
-  appSaveErrX14Dv:
-    'Questo foglio ha una convalida dati estesa (x14); la modifica delle sue regole di convalida non è ancora supportata.',
   appSaveErrMultiSelectList:
     'La convalida con elenco a selezione multipla non può essere salvata in xlsx — elimina la regola prima di salvare.',
   appSaveErrX14Cf:
@@ -1267,6 +1274,10 @@ export const it = {
   appFontSizeTip: 'Dimensione carattere',
   appZoomIn: 'Ingrandisci',
   appZoomOut: 'Riduci',
+  appImgActualSize: 'Dimensioni originali',
+  appImgFitWindow: 'Adatta alla finestra',
+  appImgSaveAs: 'Salva immagine con nome…',
+  appImgClose: 'Chiudi (Esc)',
   appZoomSheetTitle: 'Zoom sul foglio',
   appResetZoom: 'Reimposta zoom',
   appZoomToSelection: 'Zoom sulla selezione',
@@ -1309,6 +1320,30 @@ export const it = {
   appOpenFileFirst: 'Apri prima un file',
   appNoPassword: 'Nessuna password',
   appProtectWorkbook: 'Proteggi cartella di lavoro',
+  appChangePassword: 'Cambia password',
+  appWorkbookPasswordChanged: 'La password della cartella di lavoro è stata aggiornata.',
+  appEncryptedOpenTitle: 'Apri cartella di lavoro protetta da password',
+  appEncryptedOpenCopy: 'Inserisci la password per sbloccare questa cartella di lavoro.',
+  appEncryptedPasswordLabel: 'Password',
+  appEncryptedOpen: 'Apri',
+  appChangePasswordTitle: 'Cambia la password della cartella di lavoro',
+  appChangePasswordCopy: 'Scegli una nuova password e confermala qui sotto.',
+  appNewPasswordLabel: 'Nuova password',
+  appConfirmPasswordLabel: 'Conferma nuova password',
+  appPasswordsMismatch: 'Le password non corrispondono.',
+  appPasswordUpdateFailed: 'Impossibile aggiornare la password della cartella di lavoro.',
+  appPasswordUpdating: 'Aggiornamento…',
+  appUpdatePassword: 'Aggiorna password',
+  appWorkbookNotPasswordProtected:
+    'Questa cartella di lavoro non è protetta da una password di apertura.',
+  appSaveErrEncryptedUniwork:
+    'Una cartella di lavoro protetta da password non può essere salvata in un documento UniWork. Usa Salva con nome per conservare una copia cifrata su questo computer.',
+  appPasswordChangeUniwork: 'La password di un documento UniWork non può essere modificata qui.',
+  appPasswordChangeReadOnly:
+    'Questa cartella di lavoro è di sola lettura, quindi la password non può essere modificata.',
+  appEncryptedWrongPassword: 'La password non è corretta. Riprova.',
+  appPasswordChangeRestored:
+    'Salva prima la cartella di lavoro ripristinata, poi cambia la sua password.',
   appAllowEditRanges: 'Consenti modifica intervalli',
   appGroupClipboard: 'Appunti',
   appPaste: 'Incolla',
@@ -1493,6 +1528,15 @@ export const it = {
   appTableRowsNotLoaded:
     'Le righe della tabella sono ancora in caricamento: riprovare tra un istante.',
   appTableTotalLabel: 'Totale',
+  appNotePicturesPaneTitle: 'Immagini delle note',
+  appNotePicturesClose: 'Chiudi',
+  appNotePicturesNone: "Nessuna nota di questa cartella di lavoro contiene un'immagine.",
+  appNotePictureUnavailable: 'Non è possibile mostrare questa immagine.',
+  appNotePicturesToggle: 'Immagini delle note',
+  appNoteInsertPicture: 'Inserisci immagine',
+  appNotePictureInserted: 'Immagine aggiunta alla nota in {cell}. Salva per scriverla nel file.',
+  appNotePictureRemoved: 'Immagine rimossa dalla nota in {cell}.',
+  appNotePictureRemove: 'Rimuovi immagine',
   appCommentsPaneTitle: 'Commenti',
   appThreadReply: 'Rispondi',
   appThreadReplyPlaceholder: 'Rispondi…',
@@ -1538,6 +1582,8 @@ export const it = {
   appVisualSendBackward: 'Porta indietro',
   appVisualSizeProperties: 'Dimensioni e proprietà…',
   appVisualHyperlink: 'Collegamento ipertestuale…',
+  appVisualEmbedInCell: "Incorpora l'immagine nella cella",
+  appVisualEmbedFailed: 'Impossibile incorporare questa immagine nella cella.',
   appVisualDelete: 'Elimina',
   appVisualArranged: 'Oggetto aggiornato — salva con {saveKeys}.',
   appVisualCopied: 'Oggetto copiato.',
@@ -1568,6 +1614,8 @@ export const it = {
     "La versione web di UniWork Sheets sta ancora ricevendo il suo motore di calcolo. Nel frattempo, apri questa cartella di lavoro nell'app desktop di UniWork.",
   appWebEngineHint: 'Il file non è stato modificato.',
   appWebViewOnly: 'Sola lettura: non puoi salvare le modifiche a questa cartella di lavoro.',
+  appWebEncryptedOpen:
+    'Questa cartella di lavoro è protetta da password e la versione web non può aprirla. Aprila nell’app desktop di UniWork.',
   appWebConflictTitle: 'Questa cartella di lavoro è stata modificata altrove',
   appWebConflictBody:
     'Le modifiche non sono ancora su UniWork e restano in questo browser finché non esci.',
@@ -1586,4 +1634,5 @@ export const it = {
     "Il motore della cartella di lavoro si è arrestato in modo imprevisto ed è stato riavviato. La cartella è stata riaperta dall'ultima versione salvata; le modifiche non salvate sono conservate, salva presto.",
   appWebSavedReopenFailed:
     "Le modifiche sono state salvate in UniWork, ma non è stato possibile riaprire qui la cartella di lavoro. Ricarica l'editor per continuare.",
+  appDataTable: 'Tabella dati',
 } satisfies Record<keyof typeof zh, string>

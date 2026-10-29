@@ -1,8 +1,26 @@
 import type { zh } from './zh'
 
 export const cs = {
+  backlinks: 'Zpětné odkazy',
+  backlinksEmpty: 'Zatím žádná poznámka nelinkuje sem.',
+  backlinksRefresh: 'Aktualizovat zpětné odkazy',
+  graph: 'Zobrazení grafu',
+  graphClose: 'Zavřít graf',
+  graphEmpty: 'V trezoru ještě nejsou poznámky.',
+  graphTruncated: 'Příliš poznámek: graf zobrazuje prvních {shown} z {total}.',
+  suggestCreateNote: 'Vytvořit novou poznámku',
+  tags: 'Štítky',
+  tagsEmpty: 'V trezoru zatím nejsou žádné #štítky',
+  blockLink: 'Kopírovat odkaz na blok',
+  blockLinkCopied: 'Zkopírováno {link}',
+  blockLinkNone: 'Tady není žádný blok k odkazování',
   insertFootnote: 'Poznámka pod čarou',
   statusWords: '{n} slov',
   statusChars: '{n} znaků',
   highlight: 'Zvýraznit',
+  diskChangedMsg: 'Tento soubor změnil jiný program.',
+  diskConflictMsg: 'Tento soubor se na disku změnil; uložení tyto změny přepíše.',
+  diskReload: 'Znovu načíst',
+  diskKeepMine: 'Ponechat moje',
+  diskOverwrite: 'Přesto přepsat',
 } satisfies Record<keyof typeof zh, string>

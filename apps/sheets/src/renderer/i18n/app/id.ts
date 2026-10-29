@@ -103,8 +103,10 @@ export const id = {
   appChartNoRepoint: 'Bagan ini tidak mendukung penetapan ulang rentang datanya.',
   appKeepOneSeries: 'Pertahankan setidaknya satu seri.',
   appNoCategoriesToSwitch: 'Tidak ada kategori untuk ditukar.',
-  appComboNoSelectData: 'Mengubah sumber data bagan kombinasi belum didukung.',
+  appSelectDataUnsupported: 'Mengubah sumber data jenis bagan ini belum didukung.',
   appSeriesName: 'Nama Seri',
+  appSeriesType: 'Jenis seri',
+  appSecondaryAxis: 'Sumbu sekunder',
   appValuesRange: 'Rentang Nilai',
   appCategoriesRange: 'Rentang Kategori',
   appKeepUnchanged: 'Biarkan tidak berubah',
@@ -185,6 +187,12 @@ export const id = {
   appInvalidGroupField: 'Bidang pengelompokan tidak valid.',
   appInvalidPageField: 'Bidang filter laporan tidak valid.',
   appPivotPageItemMissing: 'Item filter laporan "{item}" bukan anggota bidang "{label}".',
+  appInvalidPivotBaseField:
+    'Bidang dasar "Tampilkan nilai sebagai" harus berada di baris atau kolom.',
+  appPivotBaseFieldMissing:
+    'Mode "Tampilkan nilai sebagai" pada bidang nilai memerlukan bidang dasar.',
+  appPivotBaseFieldNotAxis: 'Bidang dasar "{label}" harus berada di baris atau kolom tabel pivot.',
+  appPivotBaseItemMissing: 'Item dasar "{item}" bukan anggota bidang "{label}".',
   appInvalidLabelFilterField: 'Bidang filter label tidak valid.',
   appInvalidValueFieldIndex: 'Indeks bidang nilai {index} tidak valid.',
   appInvalidValueField: 'Bidang nilai tidak valid.',
@@ -317,7 +325,7 @@ export const id = {
   appPivotSheetNoMove: 'Lembar ini berisi PivotTable — memindahkan rentang belum didukung.',
   appMergeOverTable:
     'Pilihan tumpang tindih dengan tabel Excel — menggabungkan sel di dalam tabel belum didukung.',
-  appTableFilterNoEdit: 'Filter lembar ini milik tabel Excel — pengeditannya belum dapat disimpan.',
+  appFilterToggleFailed: 'Filter tidak diterapkan — pilih dulu rentang yang berisi data Anda.',
   appAutofillStreaming: 'IsiOtomatis ke area yang masih dimuat secara streaming belum diizinkan.',
   appDvNeedsIndexed:
     'Mengedit validasi data memerlukan lembar ini terindeks penuh dahulu — coba lagi sebentar lagi.',
@@ -562,8 +570,6 @@ export const id = {
   appSaveFailed: 'Tidak dapat menyimpan buku kerja.',
   appCfRuleUnsaveable:
     'Aturan pemformatan bersyarat ini tidak dapat disimpan ke xlsx — gunakan jenis aturan lain.',
-  appSaveErrX14Dv:
-    'Sheet ini memiliki validasi data yang diperluas (x14); mengedit aturan validasinya belum didukung.',
   appSaveErrMultiSelectList:
     'Validasi daftar pilihan ganda tidak dapat disimpan ke xlsx — hapus aturan tersebut sebelum menyimpan.',
   appSaveErrX14Cf:
@@ -1226,6 +1232,10 @@ export const id = {
   appFontSizeTip: 'Ukuran font',
   appZoomIn: 'Perbesar',
   appZoomOut: 'Perkecil',
+  appImgActualSize: 'Ukuran asli',
+  appImgFitWindow: 'Sesuaikan dengan jendela',
+  appImgSaveAs: 'Simpan gambar sebagai…',
+  appImgClose: 'Tutup (Esc)',
   appZoomSheetTitle: 'Zoom lembar',
   appResetZoom: 'Atur ulang zoom',
   appZoomToSelection: 'Zoom ke Pilihan',
@@ -1268,6 +1278,28 @@ export const id = {
   appOpenFileFirst: 'Buka file dahulu',
   appNoPassword: 'Tanpa kata sandi',
   appProtectWorkbook: 'Proteksi Buku Kerja',
+  appChangePassword: 'Ubah Kata Sandi',
+  appWorkbookPasswordChanged: 'Kata sandi buku kerja diperbarui.',
+  appEncryptedOpenTitle: 'Buka buku kerja yang dilindungi kata sandi',
+  appEncryptedOpenCopy: 'Masukkan kata sandi untuk membuka kunci buku kerja ini.',
+  appEncryptedPasswordLabel: 'Kata sandi',
+  appEncryptedOpen: 'Buka',
+  appChangePasswordTitle: 'Ubah kata sandi buku kerja',
+  appChangePasswordCopy: 'Pilih kata sandi baru dan konfirmasi di bawah.',
+  appNewPasswordLabel: 'Kata sandi baru',
+  appConfirmPasswordLabel: 'Konfirmasi kata sandi baru',
+  appPasswordsMismatch: 'Kata sandi tidak cocok.',
+  appPasswordUpdateFailed: 'Tidak dapat memperbarui kata sandi buku kerja.',
+  appPasswordUpdating: 'Memperbarui…',
+  appUpdatePassword: 'Perbarui Kata Sandi',
+  appWorkbookNotPasswordProtected: 'Buku kerja ini tidak dilindungi kata sandi pembuka.',
+  appSaveErrEncryptedUniwork:
+    'Buku kerja yang dilindungi kata sandi tidak dapat disimpan ke dokumen UniWork. Gunakan Simpan Sebagai untuk menyimpan salinan terenkripsi di komputer ini.',
+  appPasswordChangeUniwork: 'Kata sandi dokumen UniWork tidak dapat diubah di sini.',
+  appPasswordChangeReadOnly:
+    'Buku kerja ini hanya dapat dilihat, sehingga kata sandinya tidak dapat diubah.',
+  appEncryptedWrongPassword: 'Kata sandi salah. Coba lagi.',
+  appPasswordChangeRestored: 'Simpan dulu buku kerja yang dipulihkan, lalu ubah kata sandinya.',
   appAllowEditRanges: 'Izinkan Edit Rentang',
   appGroupClipboard: 'Papan Klip',
   appPaste: 'Tempel',
@@ -1451,6 +1483,16 @@ export const id = {
     'Tabel ini tidak memiliki nama di dalam file dan tidak dapat diubah di sini.',
   appTableRowsNotLoaded: 'Baris tabel masih dimuat — coba lagi sebentar lagi.',
   appTableTotalLabel: 'Total',
+  appNotePicturesPaneTitle: 'Gambar catatan',
+  appNotePicturesClose: 'Tutup',
+  appNotePicturesNone: 'Tidak ada catatan di buku kerja ini yang menampilkan gambar.',
+  appNotePictureUnavailable: 'Gambar ini tidak dapat ditampilkan.',
+  appNotePicturesToggle: 'Gambar catatan',
+  appNoteInsertPicture: 'Sisipkan gambar',
+  appNotePictureInserted:
+    'Gambar ditambahkan ke catatan di {cell}. Simpan untuk menulisnya ke file.',
+  appNotePictureRemoved: 'Gambar dihapus dari catatan di {cell}.',
+  appNotePictureRemove: 'Hapus gambar',
   appCommentsPaneTitle: 'Komentar',
   appThreadReply: 'Balas',
   appThreadReplyPlaceholder: 'Balas…',
@@ -1497,6 +1539,8 @@ export const id = {
   appVisualSendBackward: 'Mundurkan',
   appVisualSizeProperties: 'Ukuran dan Properti…',
   appVisualHyperlink: 'Hyperlink…',
+  appVisualEmbedInCell: 'Sematkan gambar di sel',
+  appVisualEmbedFailed: 'Tidak dapat menyematkan gambar ini di sel.',
   appVisualDelete: 'Hapus',
   appVisualArranged: 'Objek diperbarui — simpan dengan {saveKeys}.',
   appVisualCopied: 'Objek disalin.',
@@ -1527,6 +1571,8 @@ export const id = {
     'Versi web UniWork Sheets masih menunggu mesin spreadsheet-nya. Sementara itu, buka buku kerja ini di aplikasi desktop UniWork.',
   appWebEngineHint: 'File Anda tidak berubah.',
   appWebViewOnly: 'Hanya lihat: Anda tidak dapat menyimpan perubahan pada buku kerja ini.',
+  appWebEncryptedOpen:
+    'Buku kerja ini dilindungi kata sandi sehingga versi web tidak dapat membukanya. Buka di aplikasi desktop UniWork.',
   appWebConflictTitle: 'Buku kerja ini diubah di tempat lain',
   appWebConflictBody:
     'Perubahan Anda belum ada di UniWork dan disimpan di browser ini sampai Anda keluar.',
@@ -1545,4 +1591,5 @@ export const id = {
     'Mesin buku kerja berhenti secara tak terduga dan telah dimulai ulang. Buku kerja dibuka kembali dari versi terakhir yang disimpan; perubahan yang belum disimpan tetap ada, segera simpan.',
   appWebSavedReopenFailed:
     'Perubahan Anda sudah disimpan ke UniWork, tetapi buku kerja tidak dapat dibuka ulang di sini. Muat ulang editor untuk melanjutkan.',
+  appDataTable: 'Tabel Data',
 } satisfies Record<keyof typeof zh, string>

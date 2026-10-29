@@ -25,6 +25,7 @@ import {
   toSaveTableEdits,
   toSaveVisualAdds,
   toSaveVisualEdits,
+  toSaveCellImageAdds,
 } from './edit-journal'
 import { cap, isViewOnly, platform } from './capabilities'
 import { activeCsvSheet, handleExportCsv, serializeActiveSheetCsv } from './csv-export'
@@ -173,6 +174,7 @@ export async function handleSave(
   const chartEdits = toSaveChartEdits(state.editJournal)
   const visualEdits = toSaveVisualEdits(state.editJournal)
   const visualAdditions = toSaveVisualAdds(state.editJournal)
+  const cellImageAdditions = toSaveCellImageAdds(state.editJournal)
   const tableAdditions = toSaveTableAdds(state.editJournal)
   const tableEdits = toSaveTableEdits(state.editJournal)
   const pivotAdditions = toSavePivotAdds(state.editJournal)
@@ -221,9 +223,10 @@ export async function handleSave(
     .filter((sheetId) => !isSheetRemoved(state.editJournal, sheetId))
     .map((sheetId) => ({
       sheetId,
-      ranges: (state.sheetProtectedRanges.get(sheetId) ?? []).map(({ name, sqref }) => ({
+      ranges: (state.sheetProtectedRanges.get(sheetId) ?? []).map(({ name, sqref, password }) => ({
         name,
         sqref,
+        ...(password ? { password } : {}),
       })),
     }))
   const themeState =
@@ -314,6 +317,7 @@ export async function handleSave(
     (themeState === null ? 0 : 1) +
     protectedRangeStates.length +
     visualAdditions.length +
+    cellImageAdditions.length +
     visualEdits.length +
     tableAdditions.length +
     tableEdits.length +
@@ -418,6 +422,7 @@ export async function handleSave(
     chartEdits,
     visualEdits,
     visualAdditions,
+    cellImageAdditions,
     tableAdditions,
     tableEdits,
     pivotAdditions,
@@ -475,6 +480,7 @@ export async function handleSave(
       chartEdits,
       visualEdits,
       visualAdditions,
+      cellImageAdditions,
       tableAdditions: splitSave && heldTables.length > 0 ? [] : tableAdditions,
       tableEdits: phaseOneTableEdits,
       pivotAdditions: splitSave && heldPivots.length > 0 ? [] : pivotAdditions,
@@ -553,6 +559,7 @@ export async function handleSave(
         chartEdits: [],
         visualEdits: [],
         visualAdditions: [],
+        cellImageAdditions: [],
         tableAdditions: heldTables,
         tableEdits: heldTableEdits,
         pivotAdditions: heldPivots,
@@ -646,7 +653,6 @@ export function stripIpcErrorWrapper(message: string): string {
 /// stable substring; unmatched messages surface verbatim (English) as before.
 const SAVE_ERROR_PATTERNS = [
   ['cannot shift here', 'appStructuralShiftBlocked'],
-  ['extended (x14) data validation', 'appSaveErrX14Dv'],
   ['Multi-select list rules', 'appSaveErrMultiSelectList'],
   ['extended conditional formatting (x14)', 'appSaveErrX14Cf'],
   ['data-bar extension format (x14)', 'appSaveErrX14Cf'],
@@ -667,6 +673,10 @@ const SAVE_ERROR_PATTERNS = [
   ['overlaps the moved rows', 'appSaveErrMoveOverlap'],
   ['Moving the header row of table', 'appSaveErrMoveOverlap'],
   ['Moving the totals row of table', 'appSaveErrMoveOverlap'],
+  ['A password-protected workbook cannot be saved to a UniWork', 'appSaveErrEncryptedUniwork'],
+  ['The password of a UniWork document cannot be changed', 'appPasswordChangeUniwork'],
+  ['its password cannot be changed', 'appPasswordChangeReadOnly'],
+  ['Save the restored workbook first', 'appPasswordChangeRestored'],
 ] as const
 
 export function localizeSaveError(message: string): string | null {

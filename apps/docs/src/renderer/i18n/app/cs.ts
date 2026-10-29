@@ -559,4 +559,12 @@ export const cs = {
   appCopySaved: 'Vaše verze byla uložena jako nový dokument: {title}.',
   appCopySaveFailed:
     'Kopii se nepodařilo vytvořit. Vaše změny jsou stále v bezpečí; zkuste to znovu.',
+  appMergeSourceLoaded: 'Načteno {name} ({n} záznamů)',
+  appMergeWritten: 'Zapsáno dokumentů: {n}',
+  appMergeWrittenOne: 'Zapsán {n} dokument',
+  appMergeNothingToWrite: 'Není co zapsat',
+  appMergeWarnPassword:
+    'Tento dokument je chráněn heslem. Sloučené dokumenty se uloží jako běžné soubory bez hesla, takže jejich obsah přečte každý, kdo je otevře. Přesto sloučit?',
+  appMergeWarnUniwork:
+    'Tento dokument patří do UniWork. Sloučené dokumenty se uloží do vašeho počítače jako běžné místní soubory mimo UniWork. Přesto sloučit?',
 } satisfies Record<keyof typeof zh, string>

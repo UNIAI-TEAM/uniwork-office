@@ -103,8 +103,10 @@ export const ja = {
   appChartNoRepoint: 'このグラフはデータ範囲の再指定に対応していません。',
   appKeepOneSeries: '少なくとも 1 つの系列を残してください。',
   appNoCategoriesToSwitch: '切り替えられる分類がありません。',
-  appComboNoSelectData: '組み合わせグラフのデータソース変更には未対応です。',
+  appSelectDataUnsupported: 'このグラフの種類はデータソースの変更に未対応です。',
   appSeriesName: '系列名',
+  appSeriesType: '系列の種類',
+  appSecondaryAxis: '第2軸',
   appValuesRange: '数値範囲',
   appCategoriesRange: '分類範囲',
   appKeepUnchanged: '変更しない',
@@ -191,6 +193,12 @@ export const ja = {
   appInvalidPageField: 'レポート フィルターのフィールドが無効です。',
   appPivotPageItemMissing:
     'レポート フィルターの項目「{item}」はフィールド「{label}」のメンバーではありません。',
+  appInvalidPivotBaseField: '「値の表示方法」の基準フィールドは行または列に配置してください。',
+  appPivotBaseFieldMissing: '値フィールドの「値の表示方法」には基準フィールドが必要です。',
+  appPivotBaseFieldNotAxis:
+    '基準フィールド「{label}」はピボットテーブルの行または列に配置してください。',
+  appPivotBaseItemMissing:
+    '基準アイテム「{item}」はフィールド「{label}」のメンバーではありません。',
   appInvalidLabelFilterField: 'ラベルフィルターのフィールドが無効です。',
   appInvalidValueFieldIndex: '値フィールドのインデックス {index} が無効です。',
   appInvalidValueField: '値フィールドが無効です。',
@@ -333,8 +341,8 @@ export const ja = {
     'このシートにはピボットテーブルが含まれています — 範囲の移動には未対応です。',
   appMergeOverTable:
     '選択範囲が Excel テーブルと重なっています — テーブル内のセル結合は現時点では対応していません。',
-  appTableFilterNoEdit:
-    'このシートのフィルターは Excel テーブルに属しています — 編集内容は現時点では保存できません。',
+  appFilterToggleFailed:
+    'フィルターは適用されませんでした — 先にデータを含む範囲を選択してください。',
   appAutofillStreaming: 'ストリーミング読み込み中の範囲へのオートフィルはまだ許可されていません。',
   appDvNeedsIndexed:
     'データの入力規則を編集するには、このシートのインデックス作成が完了している必要があります — しばらくしてからお試しください。',
@@ -599,8 +607,6 @@ export const ja = {
   appSaveFailed: 'ブックを保存できません。',
   appCfRuleUnsaveable:
     'この条件付き書式ルールは xlsx に保存できません — 別のルールの種類をお使いください。',
-  appSaveErrX14Dv:
-    'このシートには拡張(x14)のデータの入力規則があり、その入力規則の編集はまだサポートされていません。',
   appSaveErrMultiSelectList:
     '複数選択リストの入力規則は xlsx に保存できません — 保存する前にそのルールを削除してください。',
   appSaveErrX14Cf: 'この範囲には拡張(x14)の条件付き書式があり、今のところ変更できません。',
@@ -1277,6 +1283,10 @@ export const ja = {
   appFontSizeTip: 'フォントサイズ',
   appZoomIn: '拡大',
   appZoomOut: '縮小',
+  appImgActualSize: '実際のサイズ',
+  appImgFitWindow: 'ウィンドウに合わせる',
+  appImgSaveAs: '画像を名前を付けて保存…',
+  appImgClose: '閉じる (Esc)',
   appZoomSheetTitle: 'シートをズーム',
   appResetZoom: 'ズームのリセット',
   appZoomToSelection: '選択範囲に合わせて拡大/縮小',
@@ -1320,6 +1330,27 @@ export const ja = {
   appOpenFileFirst: '先にファイルを開いてください',
   appNoPassword: 'パスワードなし',
   appProtectWorkbook: 'ブックの保護',
+  appChangePassword: 'パスワードの変更',
+  appWorkbookPasswordChanged: 'ブックのパスワードを更新しました。',
+  appEncryptedOpenTitle: 'パスワード保護されたブックを開く',
+  appEncryptedOpenCopy: 'このブックのロックを解除するパスワードを入力してください。',
+  appEncryptedPasswordLabel: 'パスワード',
+  appEncryptedOpen: '開く',
+  appChangePasswordTitle: 'ブックのパスワードを変更',
+  appChangePasswordCopy: '新しいパスワードを入力し、下で確認してください。',
+  appNewPasswordLabel: '新しいパスワード',
+  appConfirmPasswordLabel: '新しいパスワードの確認',
+  appPasswordsMismatch: 'パスワードが一致しません。',
+  appPasswordUpdateFailed: 'ブックのパスワードを更新できませんでした。',
+  appPasswordUpdating: '更新中…',
+  appUpdatePassword: 'パスワードを更新',
+  appWorkbookNotPasswordProtected: 'このブックには読み取りパスワードが設定されていません。',
+  appSaveErrEncryptedUniwork:
+    'パスワード付きのブックは UniWork ドキュメントに保存できません。「名前を付けて保存」で暗号化したコピーをこのコンピューターに残してください。',
+  appPasswordChangeUniwork: 'UniWork ドキュメントのパスワードはここでは変更できません。',
+  appPasswordChangeReadOnly: 'このブックは閲覧専用のため、パスワードを変更できません。',
+  appEncryptedWrongPassword: 'パスワードが正しくありません。もう一度お試しください。',
+  appPasswordChangeRestored: '復元したブックを先に保存してから、パスワードを変更してください。',
   appAllowEditRanges: '範囲の編集を許可',
   // Home tab
   appGroupClipboard: 'クリップボード',
@@ -1502,6 +1533,16 @@ export const ja = {
   appTableFileUnnamed: 'このテーブルはファイル内に名前がないため、ここでは変更できません。',
   appTableRowsNotLoaded: 'テーブルの行をまだ読み込み中です。しばらくしてからやり直してください。',
   appTableTotalLabel: '集計',
+  appNotePicturesPaneTitle: 'メモの画像',
+  appNotePicturesClose: '閉じる',
+  appNotePicturesNone: 'このブックに画像を表示しているメモはありません。',
+  appNotePictureUnavailable: 'この画像は表示できません。',
+  appNotePicturesToggle: 'メモの画像',
+  appNoteInsertPicture: '画像を挿入',
+  appNotePictureInserted:
+    '{cell} のコメントに画像を追加しました。保存するとファイルに書き込まれます。',
+  appNotePictureRemoved: '{cell} のコメントから画像を取り除きました。',
+  appNotePictureRemove: '画像を削除',
   appCommentsPaneTitle: 'コメント',
   appThreadReply: '返信',
   appThreadReplyPlaceholder: '返信…',
@@ -1546,6 +1587,8 @@ export const ja = {
   appVisualSendBackward: '背面へ移動',
   appVisualSizeProperties: 'サイズとプロパティ…',
   appVisualHyperlink: 'ハイパーリンク…',
+  appVisualEmbedInCell: 'セルに画像を埋め込む',
+  appVisualEmbedFailed: 'この画像をセルに埋め込めませんでした。',
   appVisualDelete: '削除',
   appVisualArranged: 'オブジェクトを更新しました — {saveKeys} で保存。',
   appVisualCopied: 'オブジェクトをコピーしました。',
@@ -1576,6 +1619,8 @@ export const ja = {
     'Web 版 UniWork Sheets の計算エンジンは準備中です。それまでは UniWork デスクトップ アプリでこのブックを開いてください。',
   appWebEngineHint: 'ファイルは変更されていません。',
   appWebViewOnly: '表示のみ: このブックの変更は保存できません。',
+  appWebEncryptedOpen:
+    'このブックはパスワードで保護されているため、Web 版では開けません。UniWork デスクトップアプリで開いてください。',
   appWebConflictTitle: 'このブックは別の場所で変更されました',
   appWebConflictBody: '変更はまだ UniWork になく、ログアウトするまでこのブラウザーに保持されます。',
   appWebConflictOverwrite: '上書き…',
@@ -1593,4 +1638,5 @@ export const ja = {
     'ブックのエンジンが予期せず停止し、再起動しました。ブックは最後に保存した状態から開き直しました。未保存の変更は保持されているので、早めに保存してください。',
   appWebSavedReopenFailed:
     '変更は UniWork に保存されましたが、ここでブックを開き直せませんでした。エディターを再読み込みして作業を続けてください。',
+  appDataTable: 'データテーブル',
 } satisfies Record<keyof typeof zh, string>

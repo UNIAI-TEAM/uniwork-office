@@ -101,9 +101,10 @@ export const ru = {
   appChartNoRepoint: 'Эта диаграмма не поддерживает переназначение диапазонов данных.',
   appKeepOneSeries: 'Оставьте хотя бы один ряд.',
   appNoCategoriesToSwitch: 'Нет категорий для переключения.',
-  appComboNoSelectData:
-    'Изменение источника данных комбинированной диаграммы пока не поддерживается.',
+  appSelectDataUnsupported: 'Изменение источника данных для этого типа диаграмм не поддерживается.',
   appSeriesName: 'Имя ряда',
+  appSeriesType: 'Тип ряда',
+  appSecondaryAxis: 'Вспомогательная ось',
   appValuesRange: 'Диапазон значений',
   appCategoriesRange: 'Диапазон категорий',
   appKeepUnchanged: 'Оставить без изменений',
@@ -187,6 +188,13 @@ export const ru = {
   appInvalidGroupField: 'Недопустимое поле группировки.',
   appInvalidPageField: 'Недопустимое поле фильтра отчёта.',
   appPivotPageItemMissing: 'Элемент фильтра «{item}» не входит в поле «{label}».',
+  appInvalidPivotBaseField:
+    'Базовое поле режима «Показать значения как» должно находиться в строках или столбцах.',
+  appPivotBaseFieldMissing:
+    'Для режима «Показать значения как» поля значений требуется базовое поле.',
+  appPivotBaseFieldNotAxis:
+    'Базовое поле «{label}» должно находиться в строках или столбцах сводной таблицы.',
+  appPivotBaseItemMissing: 'Базовый элемент «{item}» не входит в поле «{label}».',
   appInvalidLabelFilterField: 'Поле фильтра подписей недопустимо.',
   appInvalidValueFieldIndex: 'Индекс поля значений {index} недопустим.',
   appInvalidValueField: 'Недопустимое поле значений.',
@@ -327,8 +335,7 @@ export const ru = {
     'Этот лист содержит сводную таблицу — перемещение диапазонов пока не поддерживается.',
   appMergeOverTable:
     'Выделение пересекается с таблицей Excel — объединение ячеек внутри таблицы пока не поддерживается.',
-  appTableFilterNoEdit:
-    'Фильтр этого листа принадлежит таблице Excel — его изменение пока нельзя сохранить.',
+  appFilterToggleFailed: 'Фильтр не применён — сначала выделите диапазон с данными.',
   appAutofillStreaming:
     'Автозаполнение в область, которая ещё загружается потоково, пока не разрешено.',
   appDvNeedsIndexed:
@@ -577,8 +584,6 @@ export const ru = {
   appSaveFailed: 'Не удаётся сохранить книгу.',
   appCfRuleUnsaveable:
     'Это правило условного форматирования нельзя сохранить в xlsx — выберите другой тип правила.',
-  appSaveErrX14Dv:
-    'На этом листе есть расширенная (x14) проверка данных; редактирование её правил проверки пока не поддерживается.',
   appSaveErrMultiSelectList:
     'Проверку данных со списком множественного выбора нельзя сохранить в xlsx — удалите это правило перед сохранением.',
   appSaveErrX14Cf:
@@ -1244,6 +1249,10 @@ export const ru = {
   appFontSizeTip: 'Размер шрифта',
   appZoomIn: 'Увеличить',
   appZoomOut: 'Уменьшить',
+  appImgActualSize: 'Реальный размер',
+  appImgFitWindow: 'По размеру окна',
+  appImgSaveAs: 'Сохранить изображение как…',
+  appImgClose: 'Закрыть (Esc)',
   appZoomSheetTitle: 'Масштабировать лист',
   appResetZoom: 'Сбросить масштаб',
   appZoomToSelection: 'Масштаб по выделенному',
@@ -1286,6 +1295,28 @@ export const ru = {
   appOpenFileFirst: 'Сначала откройте файл',
   appNoPassword: 'Без пароля',
   appProtectWorkbook: 'Защитить книгу',
+  appChangePassword: 'Изменить пароль',
+  appWorkbookPasswordChanged: 'Пароль книги обновлён.',
+  appEncryptedOpenTitle: 'Открыть книгу, защищённую паролем',
+  appEncryptedOpenCopy: 'Введите пароль, чтобы разблокировать эту книгу.',
+  appEncryptedPasswordLabel: 'Пароль',
+  appEncryptedOpen: 'Открыть',
+  appChangePasswordTitle: 'Изменить пароль книги',
+  appChangePasswordCopy: 'Введите новый пароль и подтвердите его ниже.',
+  appNewPasswordLabel: 'Новый пароль',
+  appConfirmPasswordLabel: 'Подтвердите новый пароль',
+  appPasswordsMismatch: 'Пароли не совпадают.',
+  appPasswordUpdateFailed: 'Не удалось обновить пароль книги.',
+  appPasswordUpdating: 'Обновление…',
+  appUpdatePassword: 'Обновить пароль',
+  appWorkbookNotPasswordProtected: 'Эта книга не защищена паролем на открытие.',
+  appSaveErrEncryptedUniwork:
+    'Книгу, защищённую паролем, нельзя сохранить в документ UniWork. Используйте «Сохранить как», чтобы оставить зашифрованную копию на этом компьютере.',
+  appPasswordChangeUniwork: 'Пароль документа UniWork нельзя изменить здесь.',
+  appPasswordChangeReadOnly:
+    'Эта книга доступна только для просмотра, поэтому её пароль изменить нельзя.',
+  appEncryptedWrongPassword: 'Неверный пароль. Повторите попытку.',
+  appPasswordChangeRestored: 'Сначала сохраните восстановленную книгу, затем измените её пароль.',
   appAllowEditRanges: 'Разрешить изменение диапазонов',
   appGroupClipboard: 'Буфер обмена',
   appPaste: 'Вставить',
@@ -1467,6 +1498,16 @@ export const ru = {
   appTableFileUnnamed: 'У этой таблицы нет имени в файле, и ее нельзя изменить здесь.',
   appTableRowsNotLoaded: 'Строки таблицы еще загружаются — повторите попытку через мгновение.',
   appTableTotalLabel: 'Итог',
+  appNotePicturesPaneTitle: 'Изображения заметок',
+  appNotePicturesClose: 'Закрыть',
+  appNotePicturesNone: 'Ни одна заметка в этой книге не содержит изображения.',
+  appNotePictureUnavailable: 'Это изображение не может быть показано.',
+  appNotePicturesToggle: 'Изображения заметок',
+  appNoteInsertPicture: 'Вставить изображение',
+  appNotePictureInserted:
+    'Изображение добавлено в примечание в {cell}. Сохраните, чтобы записать его в файл.',
+  appNotePictureRemoved: 'Изображение удалено из примечания в {cell}.',
+  appNotePictureRemove: 'Убрать изображение',
   appCommentsPaneTitle: 'Примечания',
   appThreadReply: 'Ответить',
   appThreadReplyPlaceholder: 'Ответить…',
@@ -1511,6 +1552,8 @@ export const ru = {
   appVisualSendBackward: 'Переместить назад',
   appVisualSizeProperties: 'Размер и свойства…',
   appVisualHyperlink: 'Гиперссылка…',
+  appVisualEmbedInCell: 'Встроить изображение в ячейку',
+  appVisualEmbedFailed: 'Не удалось встроить это изображение в ячейку.',
   appVisualDelete: 'Удалить',
   appVisualArranged: 'Объект обновлён — сохраните через {saveKeys}.',
   appVisualCopied: 'Объект скопирован.',
@@ -1541,6 +1584,8 @@ export const ru = {
     'Веб-версия UniWork Sheets ещё получает свой табличный движок. До тех пор откройте эту книгу в настольном приложении UniWork.',
   appWebEngineHint: 'Ваш файл не изменён.',
   appWebViewOnly: 'Только просмотр: сохранить изменения в этой книге нельзя.',
+  appWebEncryptedOpen:
+    'Эта книга защищена паролем, и веб-версия не может её открыть. Откройте её в настольном приложении UniWork.',
   appWebConflictTitle: 'Эта книга была изменена в другом месте',
   appWebConflictBody:
     'Ваших изменений ещё нет в UniWork; они хранятся в этом браузере, пока вы не выйдете.',
@@ -1559,4 +1604,5 @@ export const ru = {
     'Движок книги неожиданно остановился и был перезапущен. Книга снова открыта из последней сохранённой версии; несохранённые изменения не потеряны — сохраните книгу как можно скорее.',
   appWebSavedReopenFailed:
     'Ваши изменения сохранены в UniWork, но книгу не удалось открыть заново здесь. Перезагрузите редактор, чтобы продолжить работу.',
+  appDataTable: 'Таблица данных',
 } satisfies Record<keyof typeof zh, string>

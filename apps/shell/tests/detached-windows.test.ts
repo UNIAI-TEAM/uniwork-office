@@ -121,6 +121,8 @@ vi.mock('../src/main/tab-manager', () => ({
 }))
 
 import { fakeSender } from './fixtures/ai-run-contract'
+import { htmlIsDirty, requestHtmlClose } from '../../html/src/main/html-main'
+import { createSessionSnapshotRecorder } from '../src/main/last-session'
 
 type DetachedModule = typeof import('../src/main/detached-windows')
 
@@ -353,6 +355,69 @@ describe('close guard', () => {
     win.emit('close', { preventDefault: vi.fn() })
     await flush()
     expect(win.destroyed).toBe(true)
+  })
+
+  it('routes a detached close denial or error through the quit-veto path and lets a recreated shell close write its list', async () => {
+    const writes: string[][] = []
+    let appQuitInFlight = true
+    const recorder = createSessionSnapshotRecorder({
+      enabled: () => true,
+      filterDeps: () => ({}),
+      write: (paths) => writes.push(paths),
+    })
+    detached.setDetachedQuitVetoedListener(() => {
+      appQuitInFlight = false
+      recorder.onQuitVetoed()
+    })
+    // Quit starts while clean shell and dirty detached window are open
+    recorder.onBeforeQuit(['/shell/s.docx'], ['/detached/d.html'])
+    // Clean shell closes first during the quit
+    recorder.onShellClosed(['/shell/s.docx'], ['/detached/d.html'])
+
+    vi.mocked(htmlIsDirty).mockReturnValue(true)
+    vi.mocked(requestHtmlClose).mockResolvedValueOnce(false)
+    const view = fakeView(88)
+    detached.createDetachedEditorWindow({
+      view: view as never,
+      kind: 'html',
+      title: 'd.html',
+      filePath: '/detached/d.html',
+      applyMenuFor: () => {},
+    })
+    const win = instances[0]!
+    win.emit('close', { preventDefault: vi.fn() })
+    await flush()
+
+    expect(win.destroyed).toBe(false)
+    expect(appQuitInFlight).toBe(false)
+
+    // Recreate shell after the vetoed quit and close it ordinarily
+    recorder.onShellCreated()
+    recorder.onShellClosed(['/shell/recreated.docx'], detached.detachedFilePaths())
+    expect(writes).toEqual([
+      ['/shell/s.docx', '/detached/d.html'],
+      ['/shell/recreated.docx', '/detached/d.html'],
+    ])
+
+    // Also verify a thrown close prompt vetoes an in-flight quit
+    appQuitInFlight = true
+    recorder.onBeforeQuit(['/shell/recreated.docx'], ['/detached/d.html'])
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      vi.mocked(requestHtmlClose).mockRejectedValueOnce(new Error('prompt boom'))
+      win.emit('close', { preventDefault: vi.fn() })
+      await flush()
+      expect(appQuitInFlight).toBe(false)
+      recorder.onShellClosed(['/shell/after-throw.docx'], detached.detachedFilePaths())
+      expect(writes).toEqual([
+        ['/shell/s.docx', '/detached/d.html'],
+        ['/shell/recreated.docx', '/detached/d.html'],
+        ['/shell/recreated.docx', '/detached/d.html'],
+        ['/shell/after-throw.docx', '/detached/d.html'],
+      ])
+    } finally {
+      consoleError.mockRestore()
+    }
   })
 
   it('docs never has its webContents closed: the teardown path owns it', async () => {

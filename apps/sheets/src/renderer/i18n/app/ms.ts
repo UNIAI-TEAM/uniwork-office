@@ -103,8 +103,10 @@ export const ms = {
   appChartNoRepoint: 'Carta ini tidak menyokong penetapan semula julat datanya.',
   appKeepOneSeries: 'Kekalkan sekurang-kurangnya satu siri.',
   appNoCategoriesToSwitch: 'Tiada kategori untuk ditukar.',
-  appComboNoSelectData: 'Menukar sumber data carta kombo belum disokong.',
+  appSelectDataUnsupported: 'Menukar sumber data jenis carta ini tidak disokong.',
   appSeriesName: 'Nama Siri',
+  appSeriesType: 'Jenis siri',
+  appSecondaryAxis: 'Paksi sekunder',
   appValuesRange: 'Julat Nilai',
   appCategoriesRange: 'Julat Kategori',
   appKeepUnchanged: 'Kekalkan tanpa perubahan',
@@ -185,6 +187,12 @@ export const ms = {
   appInvalidGroupField: 'Medan pengumpulan tidak sah.',
   appInvalidPageField: 'Medan penapis laporan tidak sah.',
   appPivotPageItemMissing: 'Item penapis laporan "{item}" bukan ahli medan "{label}".',
+  appInvalidPivotBaseField:
+    'Medan asas "Tunjuk nilai sebagai" mesti berada dalam baris atau lajur.',
+  appPivotBaseFieldMissing: 'Mod "Tunjuk nilai sebagai" bagi medan nilai memerlukan medan asas.',
+  appPivotBaseFieldNotAxis:
+    'Medan asas "{label}" mesti berada dalam baris atau lajur jadual pangsi.',
+  appPivotBaseItemMissing: 'Item asas "{item}" bukan ahli medan "{label}".',
   appInvalidLabelFilterField: 'Medan penapis label tidak sah.',
   appInvalidValueFieldIndex: 'Indeks medan nilai {index} tidak sah.',
   appInvalidValueField: 'Medan nilai tidak sah.',
@@ -319,8 +327,7 @@ export const ms = {
   appPivotSheetNoMove: 'Helaian ini mengandungi Jadual Pangsi — pengalihan julat belum disokong.',
   appMergeOverTable:
     'Pilihan bertindih dengan jadual Excel — mencantumkan sel di dalam jadual belum disokong.',
-  appTableFilterNoEdit:
-    'Penapis helaian ini milik jadual Excel — pengeditannya belum boleh disimpan.',
+  appFilterToggleFailed: 'Penapis tidak digunakan — pilih dahulu julat yang mengandungi data anda.',
   appAutofillStreaming: 'AutoIsi ke kawasan yang masih distrim belum dibenarkan.',
   appDvNeedsIndexed:
     'Mengedit pengesahihan data memerlukan helaian ini diindeks sepenuhnya dahulu — cuba lagi sebentar.',
@@ -564,8 +571,6 @@ export const ms = {
   appSaveFailed: 'Tidak dapat menyimpan buku kerja.',
   appCfRuleUnsaveable:
     'Peraturan pemformatan bersyarat ini tidak boleh disimpan ke xlsx — gunakan jenis peraturan lain.',
-  appSaveErrX14Dv:
-    'Helaian ini mempunyai pengesahihan data lanjutan (x14); pengeditan peraturan pengesahihannya belum disokong.',
   appSaveErrMultiSelectList:
     'Pengesahihan senarai berbilang pilihan tidak boleh disimpan ke xlsx — padamkan peraturan itu sebelum menyimpan.',
   appSaveErrX14Cf:
@@ -1227,6 +1232,10 @@ export const ms = {
   appFontSizeTip: 'Saiz fon',
   appZoomIn: 'Zum masuk',
   appZoomOut: 'Zum keluar',
+  appImgActualSize: 'Saiz sebenar',
+  appImgFitWindow: 'Muat ke tetingkap',
+  appImgSaveAs: 'Simpan imej sebagai…',
+  appImgClose: 'Tutup (Esc)',
   appZoomSheetTitle: 'Zum helaian',
   appResetZoom: 'Tetapkan semula zum',
   appZoomToSelection: 'Zum ke Pilihan',
@@ -1269,6 +1278,29 @@ export const ms = {
   appOpenFileFirst: 'Buka fail dahulu',
   appNoPassword: 'Tiada kata laluan',
   appProtectWorkbook: 'Lindungi Buku Kerja',
+  appChangePassword: 'Tukar Kata Laluan',
+  appWorkbookPasswordChanged: 'Kata laluan buku kerja telah dikemas kini.',
+  appEncryptedOpenTitle: 'Buka buku kerja yang dilindungi kata laluan',
+  appEncryptedOpenCopy: 'Masukkan kata laluan untuk membuka kunci buku kerja ini.',
+  appEncryptedPasswordLabel: 'Kata laluan',
+  appEncryptedOpen: 'Buka',
+  appChangePasswordTitle: 'Tukar kata laluan buku kerja',
+  appChangePasswordCopy: 'Pilih kata laluan baharu dan sahkan di bawah.',
+  appNewPasswordLabel: 'Kata laluan baharu',
+  appConfirmPasswordLabel: 'Sahkan kata laluan baharu',
+  appPasswordsMismatch: 'Kata laluan tidak sepadan.',
+  appPasswordUpdateFailed: 'Tidak dapat mengemas kini kata laluan buku kerja.',
+  appPasswordUpdating: 'Mengemas kini…',
+  appUpdatePassword: 'Kemas Kini Kata Laluan',
+  appWorkbookNotPasswordProtected: 'Buku kerja ini tidak dilindungi oleh kata laluan pembukaan.',
+  appSaveErrEncryptedUniwork:
+    'Buku kerja yang dilindungi kata laluan tidak boleh disimpan ke dokumen UniWork. Gunakan Simpan Sebagai untuk menyimpan salinan disulitkan pada komputer ini.',
+  appPasswordChangeUniwork: 'Kata laluan dokumen UniWork tidak boleh ditukar di sini.',
+  appPasswordChangeReadOnly:
+    'Buku kerja ini hanya untuk dibaca, jadi kata laluannya tidak boleh ditukar.',
+  appEncryptedWrongPassword: 'Kata laluan salah. Cuba lagi.',
+  appPasswordChangeRestored:
+    'Simpan dahulu buku kerja yang dipulihkan, kemudian tukar kata laluannya.',
   appAllowEditRanges: 'Benarkan Edit Julat',
   appGroupClipboard: 'Papan Klip',
   appPaste: 'Tampal',
@@ -1452,6 +1484,15 @@ export const ms = {
   appTableFileUnnamed: 'Jadual ini tiada nama dalam fail dan tidak boleh diubah di sini.',
   appTableRowsNotLoaded: 'Baris jadual masih dimuatkan — cuba lagi sebentar.',
   appTableTotalLabel: 'Jumlah',
+  appNotePicturesPaneTitle: 'Gambar nota',
+  appNotePicturesClose: 'Tutup',
+  appNotePicturesNone: 'Tiada nota dalam buku kerja ini memaparkan gambar.',
+  appNotePictureUnavailable: 'Gambar ini tidak dapat dipaparkan.',
+  appNotePicturesToggle: 'Gambar nota',
+  appNoteInsertPicture: 'Sisipkan gambar',
+  appNotePictureInserted: 'Gambar ditambah ke nota dalam {cell}. Simpan untuk menulisnya ke fail.',
+  appNotePictureRemoved: 'Gambar dibuang daripada nota dalam {cell}.',
+  appNotePictureRemove: 'Buang gambar',
   appCommentsPaneTitle: 'Komen',
   appThreadReply: 'Balas',
   appThreadReplyPlaceholder: 'Balas…',
@@ -1497,6 +1538,8 @@ export const ms = {
   appVisualSendBackward: 'Undurkan',
   appVisualSizeProperties: 'Saiz dan Sifat…',
   appVisualHyperlink: 'Hiperpautan…',
+  appVisualEmbedInCell: 'Benamkan imej dalam sel',
+  appVisualEmbedFailed: 'Tidak dapat membenamkan imej ini dalam sel.',
   appVisualDelete: 'Padam',
   appVisualArranged: 'Objek dikemas kini — simpan dengan {saveKeys}.',
   appVisualCopied: 'Objek disalin.',
@@ -1527,6 +1570,8 @@ export const ms = {
     'Versi web UniWork Sheets masih menunggu enjin hamparannya. Sementara itu, buka buku kerja ini dalam apl desktop UniWork.',
   appWebEngineHint: 'Fail anda tidak berubah.',
   appWebViewOnly: 'Lihat sahaja: anda tidak boleh menyimpan perubahan pada buku kerja ini.',
+  appWebEncryptedOpen:
+    'Buku kerja ini dilindungi kata laluan dan versi web tidak dapat membukanya. Buka dalam aplikasi desktop UniWork.',
   appWebConflictTitle: 'Buku kerja ini telah diubah di tempat lain',
   appWebConflictBody:
     'Perubahan anda belum ada di UniWork dan disimpan dalam pelayar ini sehingga anda log keluar.',
@@ -1545,4 +1590,5 @@ export const ms = {
     'Enjin buku kerja berhenti secara tidak dijangka dan telah dimulakan semula. Buku kerja dibuka semula daripada versi terakhir yang disimpan; perubahan yang belum disimpan dikekalkan, sila simpan segera.',
   appWebSavedReopenFailed:
     'Perubahan anda telah disimpan ke UniWork, tetapi buku kerja tidak dapat dibuka semula di sini. Muat semula editor untuk teruskan.',
+  appDataTable: 'Jadual Data',
 } satisfies Record<keyof typeof zh, string>

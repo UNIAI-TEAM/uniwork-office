@@ -198,7 +198,7 @@ describe('DocList: the special cells and groups (UNI-2047 A2c)', () => {
         shared('s-anon', iso(2026, 10, 20, 7, 30), null),
       ])
       const lan = cell('s-lan', 'shared')!
-      expect(lan.querySelector('.dh-avatar')?.textContent).toBe('LN')
+      expect(lan.querySelector('.dh-avatar')?.textContent).toBe('L')
       expect(lan.querySelector('.dh-person-name')?.textContent).toBe('Lan Nguyễn')
       expect(lan.querySelector('.dh-special-sub')?.textContent).toBe('07:00')
       const anon = cell('s-anon', 'shared')!

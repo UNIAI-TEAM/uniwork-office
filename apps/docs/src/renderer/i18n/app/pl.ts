@@ -567,4 +567,12 @@ export const pl = {
   appFileSaveCopy: 'Zapisz jako kopię…',
   appCopySaved: 'Twoja wersja została zapisana jako nowy dokument: {title}.',
   appCopySaveFailed: 'Nie udało się utworzyć kopii. Zmiany są nadal bezpieczne; spróbuj ponownie.',
+  appMergeSourceLoaded: 'Wczytano {name} ({n} rekordów)',
+  appMergeWritten: 'Zapisano dokumentów: {n}',
+  appMergeWrittenOne: 'Zapisano {n} dokument',
+  appMergeNothingToWrite: 'Nie ma czego zapisać',
+  appMergeWarnPassword:
+    'Ten dokument jest chroniony hasłem. Scalone dokumenty zostaną zapisane jako zwykłe pliki bez hasła, więc każdy, kto je otworzy, przeczyta ich treść. Scalić mimo to?',
+  appMergeWarnUniwork:
+    'Ten dokument należy do UniWork. Scalone dokumenty zostaną zapisane na Twoim komputerze jako zwykłe pliki lokalne poza UniWork. Scalić mimo to?',
 } satisfies Record<keyof typeof zh, string>

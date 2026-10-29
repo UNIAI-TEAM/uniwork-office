@@ -1,3 +1,5 @@
+import type { DocumentProperties } from './doc-properties'
+
 /** Picture watermark found in a header part (VML picture frame behind the body). */
 export interface PictureWatermarkInfo {
   /** header-part relationship of the image */
@@ -283,6 +285,14 @@ export interface SdtShell {
   alias: string
   /** programmatic tag (w:sdtPr/w:tag @w:val), may be empty */
   tag: string
+  /**
+   * lock state (w:sdtPr/w:lock @w:val): 'sdtLocked' (the control cannot be
+   * deleted), 'contentLocked' (its content cannot be edited),
+   * 'sdtContentLocked' (both) or 'unlocked'; empty when the control has no lock
+   */
+  lock: string
+  /** control id (w:sdtPr/w:id @w:val), empty when the control carries none */
+  id: string
   /**
    * control type: 'text' = plain/rich text, 'date' = date picker,
    * 'dropdown' = drop-down list/combo box, 'checkbox' = Word 2013 checkbox,
@@ -1450,6 +1460,15 @@ export interface NewImage {
    */
   posOffsetEmu?: { x: number; y: number; relativeTo?: 'page' | 'margin' }
   /**
+   * margin-relative align pair (Word position-gallery presets; only with
+   * `wrap`): written as <wp:align> relative to the margin box — the same
+   * bytes the original-image patch path (imagePatchOf.posH/posV) produces.
+   * Ignored when `posOffsetEmu` is set (numeric offsets win, like the patch
+   * path); needs both axes to take effect.
+   */
+  posH?: 'left' | 'center' | 'right'
+  posV?: 'top' | 'center' | 'bottom'
+  /**
    * stacking rank among anchored drawings (only with `wrap`): written as
    * relativeHeight base + zOrder, so overlapping behindDoc anchors keep a
    * deterministic paint order (higher = in front). Absent = base value.
@@ -1696,6 +1715,14 @@ export interface Block {
 /** numbering marker of a textbox paragraph, resolved at parse time (display only) */
 export interface TextboxListMarker {
   text: string
+  /** list identity for save-back (w:numPr): which numbering definition this
+   * marker comes from; absent on synthesized/edited markers is fine — the
+   * editor sets it when the user toggles a list inside the box */
+  numId?: string
+  ilvl?: number
+  /** 'bullet' | 'ordered', from the numbering level's numFmt; drives the
+   * sub-editor's list toggle state */
+  kind?: 'bullet' | 'ordered'
   /** bullet declared in a symbol-encoded font: drawn with the substitute-glyph styling */
   symbol?: boolean
   /** picture bullet (w:lvlPicBulletId): data URL drawn in place of the text */
@@ -2250,6 +2277,8 @@ export interface ParsedDoc {
   blocks: Block[]
   /** Zotero document preferences stored in Word custom properties */
   zoteroDocumentData: string
+  /** the docProps parts of the package: core, extended (app) and custom properties */
+  properties: DocumentProperties
   /** comments from word/comments.xml, in file order */
   comments: CommentInfo[]
   /** footnotes from word/footnotes.xml (separators excluded), file order */

@@ -102,8 +102,10 @@ export const pl = {
   appChartNoRepoint: 'Ten wykres nie obsługuje zmiany zakresów danych.',
   appKeepOneSeries: 'Zachowaj co najmniej jedną serię.',
   appNoCategoriesToSwitch: 'Brak kategorii do przełączenia.',
-  appComboNoSelectData: 'Zmiana źródła danych wykresu kombi nie jest jeszcze obsługiwana.',
+  appSelectDataUnsupported: 'Zmiana źródła danych tego typu wykresu nie jest obsługiwana.',
   appSeriesName: 'Nazwa serii',
+  appSeriesType: 'Typ serii',
+  appSecondaryAxis: 'Oś pomocnicza',
   appValuesRange: 'Zakres wartości',
   appCategoriesRange: 'Zakres kategorii',
   appKeepUnchanged: 'Pozostaw bez zmian',
@@ -188,6 +190,12 @@ export const pl = {
   appInvalidGroupField: 'Nieprawidłowe pole grupowania.',
   appInvalidPageField: 'Nieprawidłowe pole filtru raportu.',
   appPivotPageItemMissing: 'Element filtru „{item}” nie należy do pola „{label}”.',
+  appInvalidPivotBaseField:
+    'Pole podstawowe trybu „Pokaż wartości jako” musi znajdować się w wierszach lub kolumnach.',
+  appPivotBaseFieldMissing: 'Tryb „Pokaż wartości jako” pola wartości wymaga pola podstawowego.',
+  appPivotBaseFieldNotAxis:
+    'Pole podstawowe „{label}” musi znajdować się w wierszach lub kolumnach tabeli przestawnej.',
+  appPivotBaseItemMissing: 'Element podstawowy „{item}” nie należy do pola „{label}”.',
   appInvalidLabelFilterField: 'Pole filtru etykiet jest nieprawidłowe.',
   appInvalidValueFieldIndex: 'Indeks pola wartości {index} jest nieprawidłowy.',
   appInvalidValueField: 'Nieprawidłowe pole wartości.',
@@ -334,8 +342,7 @@ export const pl = {
     'Ten arkusz zawiera tabelę przestawną — przenoszenie zakresów nie jest jeszcze obsługiwane.',
   appMergeOverTable:
     'Zaznaczenie nachodzi na tabelę programu Excel — scalanie komórek w tabeli nie jest jeszcze obsługiwane.',
-  appTableFilterNoEdit:
-    'Filtr tego arkusza należy do tabeli programu Excel — edycji nie można jeszcze zapisać.',
+  appFilterToggleFailed: 'Filtr nie został zastosowany — najpierw zaznacz zakres z danymi.',
   appAutofillStreaming:
     'Autouzupełnianie do obszaru, który wciąż jest ładowany strumieniowo, nie jest jeszcze dozwolone.',
   appDvNeedsIndexed:
@@ -587,8 +594,6 @@ export const pl = {
   appSaveFailed: 'Nie można zapisać skoroszytu.',
   appCfRuleUnsaveable:
     'Tej reguły formatowania warunkowego nie można zapisać w xlsx — użyj innego typu reguły.',
-  appSaveErrX14Dv:
-    'Ten arkusz ma rozszerzoną (x14) poprawność danych; edytowanie jej reguł nie jest jeszcze obsługiwane.',
   appSaveErrMultiSelectList:
     'Poprawności danych z listą wielokrotnego wyboru nie można zapisać w xlsx — usuń regułę przed zapisaniem.',
   appSaveErrX14Cf:
@@ -1253,6 +1258,10 @@ export const pl = {
   appFontSizeTip: 'Rozmiar czcionki',
   appZoomIn: 'Powiększ',
   appZoomOut: 'Pomniejsz',
+  appImgActualSize: 'Rzeczywisty rozmiar',
+  appImgFitWindow: 'Dopasuj do okna',
+  appImgSaveAs: 'Zapisz obraz jako…',
+  appImgClose: 'Zamknij (Esc)',
   appZoomSheetTitle: 'Powiększ arkusz',
   appResetZoom: 'Resetuj powiększenie',
   appZoomToSelection: 'Powiększ do zaznaczenia',
@@ -1295,6 +1304,28 @@ export const pl = {
   appOpenFileFirst: 'Najpierw otwórz plik',
   appNoPassword: 'Bez hasła',
   appProtectWorkbook: 'Chroń skoroszyt',
+  appChangePassword: 'Zmień hasło',
+  appWorkbookPasswordChanged: 'Hasło skoroszytu zostało zaktualizowane.',
+  appEncryptedOpenTitle: 'Otwórz skoroszyt chroniony hasłem',
+  appEncryptedOpenCopy: 'Wprowadź hasło, aby odblokować ten skoroszyt.',
+  appEncryptedPasswordLabel: 'Hasło',
+  appEncryptedOpen: 'Otwórz',
+  appChangePasswordTitle: 'Zmień hasło skoroszytu',
+  appChangePasswordCopy: 'Wybierz nowe hasło i potwierdź je poniżej.',
+  appNewPasswordLabel: 'Nowe hasło',
+  appConfirmPasswordLabel: 'Potwierdź nowe hasło',
+  appPasswordsMismatch: 'Hasła nie są zgodne.',
+  appPasswordUpdateFailed: 'Nie udało się zaktualizować hasła skoroszytu.',
+  appPasswordUpdating: 'Aktualizowanie…',
+  appUpdatePassword: 'Aktualizuj hasło',
+  appWorkbookNotPasswordProtected: 'Ten skoroszyt nie jest chroniony hasłem otwarcia.',
+  appSaveErrEncryptedUniwork:
+    'Skoroszyt chroniony hasłem nie może zostać zapisany w dokumencie UniWork. Użyj opcji Zapisz jako, aby zachować zaszyfrowaną kopię na tym komputerze.',
+  appPasswordChangeUniwork: 'Hasła dokumentu UniWork nie można tutaj zmienić.',
+  appPasswordChangeReadOnly:
+    'Ten skoroszyt jest tylko do odczytu, więc nie można zmienić jego hasła.',
+  appEncryptedWrongPassword: 'Hasło jest nieprawidłowe. Spróbuj ponownie.',
+  appPasswordChangeRestored: 'Najpierw zapisz przywrócony skoroszyt, a potem zmień jego hasło.',
   appAllowEditRanges: 'Zezwalaj na edytowanie zakresów',
   appGroupClipboard: 'Schowek',
   appPaste: 'Wklej',
@@ -1478,6 +1509,15 @@ export const pl = {
   appTableFileUnnamed: 'Ta tabela nie ma nazwy w pliku i nie można jej tutaj zmienić.',
   appTableRowsNotLoaded: 'Wiersze tabeli nadal się ładują — spróbuj ponownie za chwilę.',
   appTableTotalLabel: 'Suma',
+  appNotePicturesPaneTitle: 'Obrazy notatek',
+  appNotePicturesClose: 'Zamknij',
+  appNotePicturesNone: 'Żadna notatka w tym skoroszycie nie zawiera obrazu.',
+  appNotePictureUnavailable: 'Tego obrazu nie można wyświetlić.',
+  appNotePicturesToggle: 'Obrazy notatek',
+  appNoteInsertPicture: 'Wstaw obraz',
+  appNotePictureInserted: 'Dodano obraz do notatki w {cell}. Zapisz, aby zapisać go w pliku.',
+  appNotePictureRemoved: 'Usunięto obraz z notatki w {cell}.',
+  appNotePictureRemove: 'Usuń obraz',
   appCommentsPaneTitle: 'Komentarze',
   appThreadReply: 'Odpowiedz',
   appThreadReplyPlaceholder: 'Odpowiedz…',
@@ -1522,6 +1562,8 @@ export const pl = {
   appVisualSendBackward: 'Przesuń do tyłu',
   appVisualSizeProperties: 'Rozmiar i właściwości…',
   appVisualHyperlink: 'Hiperłącze…',
+  appVisualEmbedInCell: 'Osadź obraz w komórce',
+  appVisualEmbedFailed: 'Nie udało się osadzić tego obrazu w komórce.',
   appVisualDelete: 'Usuń',
   appVisualArranged: 'Obiekt zaktualizowany — zapisz za pomocą {saveKeys}.',
   appVisualCopied: 'Obiekt skopiowany.',
@@ -1552,6 +1594,8 @@ export const pl = {
     'Wersja internetowa UniWork Sheets wciąż czeka na swój silnik arkuszy. Do tego czasu otwórz ten skoroszyt w aplikacji UniWork na komputer.',
   appWebEngineHint: 'Twój plik nie został zmieniony.',
   appWebViewOnly: 'Tylko do odczytu: nie możesz zapisać zmian w tym skoroszycie.',
+  appWebEncryptedOpen:
+    'Ten skoroszyt jest chroniony hasłem i wersja internetowa nie może go otworzyć. Otwórz go w aplikacji UniWork na komputer.',
   appWebConflictTitle: 'Ten skoroszyt został zmieniony w innym miejscu',
   appWebConflictBody:
     'Twoich zmian nie ma jeszcze w UniWork; są przechowywane w tej przeglądarce do czasu wylogowania.',
@@ -1570,4 +1614,5 @@ export const pl = {
     'Silnik skoroszytu nieoczekiwanie się zatrzymał i został uruchomiony ponownie. Skoroszyt otwarto ponownie z ostatnio zapisanej wersji; niezapisane zmiany zostały zachowane — zapisz je wkrótce.',
   appWebSavedReopenFailed:
     'Twoje zmiany zapisano w UniWork, ale nie udało się ponownie otworzyć skoroszytu tutaj. Załaduj edytor ponownie, aby kontynuować.',
+  appDataTable: 'Tabela danych',
 } satisfies Record<keyof typeof zh, string>

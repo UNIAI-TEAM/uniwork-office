@@ -13,6 +13,10 @@ import { createCapabilityReader, type CapabilityObject } from '@genoffice/ui/cap
  *                                                (desktop main process; the web frame has no such route)
  *   mdTheme                                      the paper theme picker (the choice persists in the desktop's
  *                                                image-host config file; no web store to remember it)
+ *   wikiVault                                    the note vault: backlinks panel, graph view, tags sidebar, the `[[`
+ *                                                suggester, create-note on click, block ids and `![[embed]]` paste
+ *                                                conversion (they read the desktop's notes folder; a web frame
+ *                                                holds one document and no file tree)
  *   saveStatus, viewOnlyChip                     the renderer's own save-state label (status bar) and "view only" chip;
  *                                                false on the web: the host header + one banner announce them
  *   save                                         false = view only (host withheld `save`)
@@ -28,6 +32,7 @@ export type MarkdownCapability =
   | 'imageHost'
   | 'aiImageFetch'
   | 'mdTheme'
+  | 'wikiVault'
   | 'save'
   | 'saveAs'
   | 'print'

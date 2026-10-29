@@ -587,4 +587,12 @@ export const ja = {
   appCopySaved: 'あなたのバージョンを新しいドキュメントとして保存しました：{title}。',
   appCopySaveFailed:
     'コピーを作成できませんでした。変更は引き続き安全です。もう一度お試しください。',
+  appMergeSourceLoaded: '{name}（{n} 件）を読み込みました',
+  appMergeWritten: '{n} 個のドキュメントを書き出しました',
+  appMergeWrittenOne: '{n} 個のドキュメントを書き出しました',
+  appMergeNothingToWrite: '書き出すものがありません',
+  appMergeWarnPassword:
+    'このドキュメントはパスワードで保護されています。差し込み印刷で作成されるドキュメントはパスワードなしの通常のファイルとして保存され、開いた人は誰でも内容を読めます。続行しますか？',
+  appMergeWarnUniwork:
+    'このドキュメントは UniWork のものです。差し込み印刷で作成されるドキュメントは、UniWork の管理外の通常のローカルファイルとしてこのコンピューターに保存されます。続行しますか？',
 } satisfies Record<keyof typeof zh, string>

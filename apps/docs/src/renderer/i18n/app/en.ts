@@ -556,4 +556,12 @@ export const en = {
   appFileSaveCopy: 'Save as a copy…',
   appCopySaved: 'Your version was saved as a new document: {title}.',
   appCopySaveFailed: 'Couldn’t create the copy. Your changes are still safe; try again.',
+  appMergeSourceLoaded: 'Loaded {name} ({n} records)',
+  appMergeWritten: '{n} documents written',
+  appMergeWrittenOne: '{n} document written',
+  appMergeNothingToWrite: 'There is nothing to write',
+  appMergeWarnPassword:
+    'This document is password-protected. The merged documents are saved as ordinary files without the password, so anyone who opens them can read the content. Merge anyway?',
+  appMergeWarnUniwork:
+    'This document belongs to UniWork. The merged documents are saved to your computer as ordinary local files outside UniWork. Merge anyway?',
 } satisfies Record<keyof typeof zh, string>

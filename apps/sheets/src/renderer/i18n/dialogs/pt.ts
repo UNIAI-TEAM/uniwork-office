@@ -3,11 +3,14 @@ import type { zh } from './zh'
 export const pt = {
   dlgAllowEditRangesTitle: 'Permitir Edição de Intervalos',
   dlgAllowEditRangesHint:
-    'Estes intervalos permanecem editáveis enquanto a planilha está protegida. Gravados ao salvar; senhas não são suportadas.',
+    'Estes intervalos permanecem editáveis enquanto a planilha está protegida. Gravados ao salvar. Um intervalo que já tem senha não pode ser alterado nem removido aqui.',
   dlgRangeName: 'Título',
   dlgRangeRef: 'Intervalo',
   dlgRangeAdd: 'Adicionar',
   dlgRangeDelete: 'Excluir',
+  dlgRangeLocked:
+    'Este intervalo carrega uma senha no arquivo; não pode ser alterado nem removido aqui.',
+  dlgRangePassword: 'Palavra-passe (opcional)',
   dlgRangeNameTaken: 'Insira um título exclusivo e não vazio.',
   dlgRangeRefInvalid: 'Insira um intervalo como A1:B4.',
   dlgCancel: 'Cancelar',
@@ -214,6 +217,8 @@ export const pt = {
   dlgPivotShowAsRankDesc: 'Classificar do Maior para o Menor…',
   dlgPivotShowAsIndex: 'Índice',
   dlgPivotNotSupportedYet: 'ainda não disponível',
+  dlgPivotBaseField: 'Campo base',
+  dlgPivotBaseItem: 'Item base',
   dlgPivotReportFilterItem: 'Item do filtro de relatório',
   dlgPivotAllItems: '(Tudo)',
   dlgPivotErrNeedValue: 'Adicione pelo menos um campo a Valores.',
@@ -663,4 +668,25 @@ export const pt = {
   dlgSizeMoveOnly: 'Mover mas não dimensionar com as células',
   dlgSizeFixed: 'Não mover nem dimensionar com as células',
   dlgSizeInvalid: 'Introduza um tamanho e uma rotação válidos.',
+  dlgDataTableTitle: 'Tabela de dados',
+  dlgDataTableRange: 'Intervalo da tabela',
+  dlgDataTableRowInput: 'Célula de entrada da linha',
+  dlgDataTableColumnInput: 'Célula de entrada da coluna',
+  dlgDataTableNote:
+    'Os resultados são gravados como valores comuns e não são atualizados no recálculo (diferente das tabelas com fórmula de matriz do Excel); a tabela inteira pode ser desfeita em uma etapa.',
+  dlgDataTableNeedInput:
+    'Preencha pelo menos uma célula de entrada: somente uma é uma variável, as duas são duas variáveis.',
+  dlgDataTableBadRange: 'O intervalo da tabela deve ser uma referência como A1 ou A1:B4.',
+  dlgDataTableBadShape:
+    'Forma do intervalo incorreta: uma variável em coluna exige 2 colunas e 2+ linhas, em linha 2 linhas e 2+ colunas, duas variáveis no mínimo 2×2.',
+  dlgDataTableTooManyCells: 'A tabela excede o limite de {limit} células de resultado.',
+  dlgDataTableInputInside: 'As células de entrada não podem ficar dentro do intervalo da tabela.',
+  dlgDataTableSameInput: 'As células de entrada da linha e da coluna devem ser diferentes.',
+  dlgDataTableNeedsFormula: 'A célula de fórmula deve conter uma fórmula.',
+  dlgDataTableInputNotNumber:
+    'As células de entrada devem conter um número simples ou estar vazias.',
+  dlgDataTableValuesNotNumber: 'Os valores de substituição devem ser números.',
+  dlgDataTableRunning: 'Calculando… {done}/{total}',
+  dlgDataTableRunningShort: 'Calculando…',
+  dlgDataTableDone: '{count} resultados gravados (valores comuns; não atualizados no recálculo).',
 } satisfies Record<keyof typeof zh, string>

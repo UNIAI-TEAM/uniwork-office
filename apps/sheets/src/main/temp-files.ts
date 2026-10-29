@@ -5,6 +5,8 @@ export const PASTED_FILE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
 const SESSION_SNAPSHOT_NAME = new RegExp(`^${UUID}\\.xlsx$`, 'i')
+// per-process directory the session snapshot lives in: <pid>-<uuid>
+const SESSION_DIRECTORY_NAME = /^\d+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const IMPORT_DIRECTORY_NAME = new RegExp(`^${UUID}$`, 'i')
 const OWNED_PASTED_FILE = /^pasted-[0-9]{8}-[0-9]{6}-[0-9]+\.(?:png|jpe?g|gif|webp)$/i
 
@@ -23,6 +25,17 @@ function isDirectOwnedChild(path: string, parent: string, namePattern: RegExp): 
   return dirname(resolvedPath) === resolve(parent) && namePattern.test(basename(resolvedPath))
 }
 
+/** A snapshot sits directly in the root (old layout) or one <pid>-<uuid> level below it. */
+function isOwnedSessionSnapshot(snapshotPath: string, snapshotRoot: string): boolean {
+  if (isDirectOwnedChild(snapshotPath, snapshotRoot, SESSION_SNAPSHOT_NAME)) return true
+  const resolvedPath = resolve(snapshotPath)
+  const directory = dirname(resolvedPath)
+  return (
+    SESSION_SNAPSHOT_NAME.test(basename(resolvedPath)) &&
+    isDirectOwnedChild(directory, snapshotRoot, SESSION_DIRECTORY_NAME)
+  )
+}
+
 /**
  * Close the sidecar first, remove its snapshot second, then remove a converted
  * CSV/XLS directory. Every filesystem deletion is constrained to an app-owned
@@ -37,7 +50,7 @@ export async function cleanupSessionResources(
     // Continue with owned temp cleanup even when the sidecar is already gone.
   }
   const snapshotRoot = join(options.tempRoot, 'genoffice-sheets-sessions')
-  if (isDirectOwnedChild(options.snapshotPath, snapshotRoot, SESSION_SNAPSHOT_NAME)) {
+  if (isOwnedSessionSnapshot(options.snapshotPath, snapshotRoot)) {
     await rm(options.snapshotPath, { force: true }).catch(() => undefined)
   }
   if (options.importTempDir !== undefined) {

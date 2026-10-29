@@ -5,12 +5,21 @@
  * as callbacks.
  */
 import {
+  BaselineOffset,
   BooleanNumber,
   BorderStyleTypes,
+  EDITOR_ACTIVATED,
+  FOCUSING_EDITOR_INPUT_FORMULA,
+  FOCUSING_EDITOR_STANDALONE,
+  IContextService,
   WrapStrategy,
   type ICellData,
   type IStyleData,
 } from '@univerjs/core'
+import {
+  SetInlineFormatSubscriptCommand,
+  SetInlineFormatSuperscriptCommand,
+} from '@univerjs/docs-ui'
 import { IRenderManagerService, SHEET_VIEWPORT_KEY } from '@univerjs/engine-render'
 import { SheetSkeletonManagerService } from '@univerjs/preset-sheets-core'
 import { columnLabel, formatAddress } from '@genoffice/xlsx-gateway/domain/cell-address'
@@ -22,7 +31,9 @@ import { CELL_HIDDEN_KEY, CELL_LOCKED_KEY, effectiveSheetProtection } from './sh
 import { fullColumnSpans, fullRowSpans } from './autofit-selection'
 import { applyFormatPainterClick } from './format-painter'
 import { nextSheetName } from './op-executor'
+import { handleInsertNotePicture } from './note-picture-actions'
 import {
+  comboSeriesSetDefaults,
   transposeChartSeries,
   type ChartSeriesVisualState,
 } from '@genoffice/xlsx-gateway/domain/chart-visual'
@@ -51,7 +62,11 @@ import {
   openAdvancedFilterDialog,
   type DataToolsContext,
 } from './data-tools-actions'
-import { handleTableDesignCommand, type TableDesignContext } from './table-design-actions'
+import {
+  handleTableDesignCommand,
+  selectedTableEcho,
+  type TableDesignContext,
+} from './table-design-actions'
 import { outlineSummarySettings, setOutlineSummary } from './outline-actions'
 import { handleVisualCommand, type VisualArrangeContext } from './visual-arrange-actions'
 import { dedupeRows } from './dedupe'
@@ -138,6 +153,9 @@ export interface RibbonCommandContext {
     readonly canLabel: boolean
     readonly seriesCount: number
     readonly categoryCount: number
+    /// Current chart type echo ('combo' for a bar+line combo) — drives the
+    /// combo tagging of Switch Row/Column.
+    readonly currentType: string | null
     /// Current series (pending edits applied) for Switch Row/Column.
     readonly series: readonly ChartSeriesVisualState[]
   } | null
@@ -165,6 +183,21 @@ function selectionStyle(
   range: NonNullable<ReturnType<ActiveWorkbook['getActiveRange']>>,
 ): IStyleData {
   return range.getCellStyleData() ?? {}
+}
+
+/// The in-cell editor holds a text edit (not a formula, and not the formula
+/// bar's standalone editor): a font button then formats the selected
+/// characters — or arms the typing style at a caret — as Excel does, instead
+/// of restyling the whole cell behind the editor. EDITOR_ACTIVATED tracks the
+/// edit session itself; the FOCUSING_* bits follow DOM focus, which the
+/// clicked ribbon button holds at this point.
+function cellEditorHoldsText(runtime: UniverRuntime): boolean {
+  const context = runtime.univer.__getInjector().get(IContextService)
+  return (
+    context.getContextValue(EDITOR_ACTIVATED) &&
+    !context.getContextValue(FOCUSING_EDITOR_INPUT_FORMULA) &&
+    !context.getContextValue(FOCUSING_EDITOR_STANDALONE)
+  )
 }
 
 /// Commands whose wire format is `name:argument:extra` (three segments).
@@ -323,8 +356,18 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
       const seriesSet = transposeChartSeries(ctx.selectedChart?.series ?? [], (n) =>
         t('appSeriesN', { n }),
       )
-      if (seriesSet) ctx.chartEditRef.current(editKey, { seriesSet })
-      else ctx.setMessage(t('appNoCategoriesToSwitch'))
+      if (!seriesSet) {
+        ctx.setMessage(t('appNoCategoriesToSwitch'))
+      } else {
+        // A transposed combo keeps Insert Chart's shape; an untagged set
+        // would collapse it into plain bars.
+        ctx.chartEditRef.current(editKey, {
+          seriesSet:
+            ctx.selectedChart?.currentType === 'combo'
+              ? comboSeriesSetDefaults(seriesSet)
+              : seriesSet,
+        })
+      }
     }
     return
   }
@@ -608,9 +651,27 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
           : 'sheet.command.numfmt.subtract.decimal.command',
       )
       return
-    case 'filter-toggle':
-      void runtime.univerAPI.executeCommand('sheet.command.smart-toggle-filter')
+    case 'filter-toggle': {
+      // A declined command — nothing selected, a range the filter cannot take —
+      // says nothing on its own, and a filter that never appeared reads as a dead
+      // button. While the sheet is still loading, the gate in App.tsx already
+      // says why (a footer note, a "load it all" prompt, or the projection
+      // path's own progress), so this stays quiet rather than talking over it.
+      const lazy = ctx.lazyWorkbookRef.current
+      const stillLoading = lazy !== null && !lazy.flags.preloadComplete
+      void runtime.univerAPI.executeCommand('sheet.command.smart-toggle-filter').then((ok) => {
+        if (ok !== false || stillLoading) return
+        // A canceling guard also answers `false`: when the sheet's protection
+        // has already spoken — blocked outright, or unknown while still being
+        // indexed — this notice would overwrite it with the wrong advice.
+        const state = ctx.lazyWorkbookRef.current
+        const sheetId = worksheet?.getSheetId()
+        const protection = state && sheetId ? effectiveSheetProtection(state, sheetId) : null
+        if (!protection || (protection.protected && !protection.allow.autoFilter)) return
+        ctx.setMessage(t('appFilterToggleFailed'))
+      })
       return
+    }
     case 'autofit-row-height':
     case 'autofit-col-width': {
       if (!worksheet) return
@@ -747,10 +808,15 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
     case 'comment-prev':
     case 'comment-next':
     case 'comments-pane-toggle':
+    case 'note-pictures-pane-toggle':
     case 'note-show-all':
     case 'notes-convert':
       handleThreadedCommentCommand(ctx, command, (fallback) => handleRibbonCommand(ctx, fallback))
       return
+    case 'note-insert-picture': {
+      handleInsertNotePicture(ctx, runtime)
+      return
+    }
     case 'note-open': {
       // A cell holds either a thread or a note (Excel); the save keeps the thread.
       const active = runtime.univerAPI.getActiveWorkbook()?.getActiveRange()
@@ -1216,7 +1282,13 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
       break
   }
   if (command.startsWith('format-as-table:')) {
-    handleFormatAsTable(ctx.dataToolsContext(), command.slice('format-as-table:'.length))
+    const style = command.slice('format-as-table:'.length)
+    const tableContext = ctx.tableDesignContext()
+    if (selectedTableEcho(tableContext)) {
+      handleTableDesignCommand(tableContext, `table-style:${style}`)
+    } else {
+      handleFormatAsTable(ctx.dataToolsContext(), style)
+    }
     return
   }
   if (command.startsWith('use-in-formula:')) {
@@ -1492,9 +1564,21 @@ export function handleRibbonCommand(ctx: RibbonCommandContext, command: string):
       }
       case 'superscript':
       case 'subscript': {
+        // Inside the cell editor the buttons work on the selected characters
+        // ("1st" with a raised "st"); Univer's inline command toggles the run
+        // style and arms the typing style when the caret is collapsed.
+        if (cellEditorHoldsText(runtime)) {
+          void runtime.univerAPI.executeCommand(
+            name === 'superscript'
+              ? SetInlineFormatSuperscriptCommand.id
+              : SetInlineFormatSubscriptCommand.id,
+          )
+          break
+        }
         // Whole-cell font vertAlign; the two are mutually exclusive, and
         // pressing the active one returns the cell to the baseline.
-        const offset = name === 'superscript' ? 3 : 2
+        const offset =
+          name === 'superscript' ? BaselineOffset.SUPERSCRIPT : BaselineOffset.SUBSCRIPT
         range.setValue({
           s: { va: style.va === offset ? null : offset },
         } as unknown as ICellData)

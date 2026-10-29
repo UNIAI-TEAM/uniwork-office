@@ -106,9 +106,10 @@ export const pt = {
   appChartNoRepoint: 'Este gráfico não permite redefinir os intervalos de dados.',
   appKeepOneSeries: 'Mantenha pelo menos uma série.',
   appNoCategoriesToSwitch: 'Não há categorias para alternar.',
-  appComboNoSelectData:
-    'Alterar a fonte de dados de um gráfico de combinação ainda não é suportado.',
+  appSelectDataUnsupported: 'Não há suporte para alterar a origem de dados deste tipo de gráfico.',
   appSeriesName: 'Nome da série',
+  appSeriesType: 'Tipo de série',
+  appSecondaryAxis: 'Eixo secundário',
   appValuesRange: 'Intervalo de valores',
   appCategoriesRange: 'Intervalo de categorias',
   appKeepUnchanged: 'Manter inalterado',
@@ -193,6 +194,13 @@ export const pt = {
   appInvalidGroupField: 'Campo de agrupamento inválido.',
   appInvalidPageField: 'Campo de filtro de relatório inválido.',
   appPivotPageItemMissing: 'O item de filtro "{item}" não pertence ao campo "{label}".',
+  appInvalidPivotBaseField:
+    'O campo base de "Mostrar valores como" deve estar em linhas ou colunas.',
+  appPivotBaseFieldMissing:
+    'O modo "Mostrar valores como" de um campo de valores precisa de um campo base.',
+  appPivotBaseFieldNotAxis:
+    'O campo base "{label}" deve estar nas linhas ou colunas da tabela dinâmica.',
+  appPivotBaseItemMissing: 'O item base "{item}" não pertence ao campo "{label}".',
   appInvalidLabelFilterField: 'O campo do filtro de rótulo é inválido.',
   appInvalidValueFieldIndex: 'O índice do campo de valores {index} é inválido.',
   appInvalidValueField: 'Campo de valores inválido.',
@@ -341,8 +349,8 @@ export const pt = {
     'Esta planilha contém uma Tabela Dinâmica — mover intervalos ainda não é suportado.',
   appMergeOverTable:
     'A seleção sobrepõe uma tabela do Excel — mesclar células dentro de uma tabela ainda não é suportado.',
-  appTableFilterNoEdit:
-    'O filtro desta planilha pertence a uma tabela do Excel — a edição ainda não pode ser salva.',
+  appFilterToggleFailed:
+    'O filtro não foi aplicado — selecione primeiro o intervalo com seus dados.',
   appAutofillStreaming:
     'O preenchimento automático em uma área ainda em streaming não é permitido por enquanto.',
   appDvNeedsIndexed:
@@ -599,8 +607,6 @@ export const pt = {
   appSaveFailed: 'Não foi possível salvar a pasta de trabalho.',
   appCfRuleUnsaveable:
     'Esta regra de formatação condicional não pode ser salva em xlsx — use outro tipo de regra.',
-  appSaveErrX14Dv:
-    'Esta planilha tem validação de dados estendida (x14); editar suas regras de validação ainda não é suportado.',
   appSaveErrMultiSelectList:
     'A validação de lista de seleção múltipla não pode ser salva em xlsx — exclua a regra antes de salvar.',
   appSaveErrX14Cf:
@@ -1265,6 +1271,10 @@ export const pt = {
   appFontSizeTip: 'Tamanho da fonte',
   appZoomIn: 'Ampliar',
   appZoomOut: 'Reduzir',
+  appImgActualSize: 'Tamanho real',
+  appImgFitWindow: 'Ajustar à janela',
+  appImgSaveAs: 'Salvar imagem como…',
+  appImgClose: 'Fechar (Esc)',
   appZoomSheetTitle: 'Aplicar zoom na planilha',
   appResetZoom: 'Redefinir zoom',
   appZoomToSelection: 'Zoom na Seleção',
@@ -1307,6 +1317,30 @@ export const pt = {
   appOpenFileFirst: 'Abra um arquivo primeiro',
   appNoPassword: 'Sem senha',
   appProtectWorkbook: 'Proteger Pasta de Trabalho',
+  appChangePassword: 'Alterar Senha',
+  appWorkbookPasswordChanged: 'A senha da pasta de trabalho foi atualizada.',
+  appEncryptedOpenTitle: 'Abrir pasta de trabalho protegida por senha',
+  appEncryptedOpenCopy: 'Digite a senha para desbloquear esta pasta de trabalho.',
+  appEncryptedPasswordLabel: 'Senha',
+  appEncryptedOpen: 'Abrir',
+  appChangePasswordTitle: 'Alterar a senha da pasta de trabalho',
+  appChangePasswordCopy: 'Escolha uma nova senha e confirme-a abaixo.',
+  appNewPasswordLabel: 'Nova senha',
+  appConfirmPasswordLabel: 'Confirmar nova senha',
+  appPasswordsMismatch: 'As senhas não coincidem.',
+  appPasswordUpdateFailed: 'Não foi possível atualizar a senha da pasta de trabalho.',
+  appPasswordUpdating: 'Atualizando…',
+  appUpdatePassword: 'Atualizar senha',
+  appWorkbookNotPasswordProtected:
+    'Esta pasta de trabalho não está protegida por uma senha de abertura.',
+  appSaveErrEncryptedUniwork:
+    'Uma pasta de trabalho protegida por senha não pode ser salva em um documento do UniWork. Use Salvar como para manter uma cópia criptografada neste computador.',
+  appPasswordChangeUniwork: 'A senha de um documento do UniWork não pode ser alterada aqui.',
+  appPasswordChangeReadOnly:
+    'Esta pasta de trabalho é somente leitura, portanto a senha não pode ser alterada.',
+  appEncryptedWrongPassword: 'A senha está incorreta. Tente novamente.',
+  appPasswordChangeRestored:
+    'Salve primeiro a pasta de trabalho restaurada e depois altere a senha dela.',
   appAllowEditRanges: 'Permitir Edição de Intervalos',
   appGroupClipboard: 'Área de Transferência',
   appPaste: 'Colar',
@@ -1491,6 +1525,15 @@ export const pt = {
   appTableRowsNotLoaded:
     'As linhas da tabela ainda estão carregando — tente novamente em instantes.',
   appTableTotalLabel: 'Total',
+  appNotePicturesPaneTitle: 'Imagens das anotações',
+  appNotePicturesClose: 'Fechar',
+  appNotePicturesNone: 'Nenhuma anotação desta pasta de trabalho exibe uma imagem.',
+  appNotePictureUnavailable: 'Não é possível exibir esta imagem.',
+  appNotePicturesToggle: 'Imagens das anotações',
+  appNoteInsertPicture: 'Inserir imagem',
+  appNotePictureInserted: 'Imagem adicionada à nota em {cell}. Salve para gravá-la no ficheiro.',
+  appNotePictureRemoved: 'Imagem removida da nota em {cell}.',
+  appNotePictureRemove: 'Remover imagem',
   appCommentsPaneTitle: 'Comentários',
   appThreadReply: 'Responder',
   appThreadReplyPlaceholder: 'Responder…',
@@ -1537,6 +1580,8 @@ export const pt = {
   appVisualSendBackward: 'Recuar',
   appVisualSizeProperties: 'Tamanho e propriedades…',
   appVisualHyperlink: 'Hiperligação…',
+  appVisualEmbedInCell: 'Inserir imagem na célula',
+  appVisualEmbedFailed: 'Não foi possível inserir esta imagem na célula.',
   appVisualDelete: 'Eliminar',
   appVisualArranged: 'Objeto atualizado — guarde com {saveKeys}.',
   appVisualCopied: 'Objeto copiado.',
@@ -1567,6 +1612,8 @@ export const pt = {
     'A versão web do UniWork Sheets ainda está recebendo seu mecanismo de planilhas. Até lá, abra esta pasta de trabalho no aplicativo UniWork para desktop.',
   appWebEngineHint: 'Seu arquivo não foi alterado.',
   appWebViewOnly: 'Somente leitura: você não pode salvar alterações nesta pasta de trabalho.',
+  appWebEncryptedOpen:
+    'Esta pasta de trabalho é protegida por senha e a versão web não consegue abri-la. Abra-a no aplicativo de desktop do UniWork.',
   appWebConflictTitle: 'Esta pasta de trabalho foi alterada em outro lugar',
   appWebConflictBody:
     'Suas alterações ainda não estão no UniWork e ficam neste navegador até você sair.',
@@ -1585,4 +1632,5 @@ export const pt = {
     'O motor da pasta de trabalho parou inesperadamente e foi reiniciado. A pasta de trabalho foi reaberta a partir da última versão salva; as alterações não salvas foram mantidas, salve em breve.',
   appWebSavedReopenFailed:
     'Suas alterações foram salvas no UniWork, mas não foi possível reabrir a pasta de trabalho aqui. Recarregue o editor para continuar.',
+  appDataTable: 'Tabela de dados',
 } satisfies Record<keyof typeof zh, string>

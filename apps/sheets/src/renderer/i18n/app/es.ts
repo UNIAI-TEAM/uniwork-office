@@ -106,8 +106,10 @@ export const es = {
   appChartNoRepoint: 'Este gráfico no admite reasignar sus rangos de datos.',
   appKeepOneSeries: 'Conserve al menos una serie.',
   appNoCategoriesToSwitch: 'No hay categorías que intercambiar.',
-  appComboNoSelectData: 'Cambiar el origen de datos de un gráfico combinado aún no se admite.',
+  appSelectDataUnsupported: 'No se admite cambiar el origen de datos de este tipo de gráfico.',
   appSeriesName: 'Nombre de la serie',
+  appSeriesType: 'Tipo de serie',
+  appSecondaryAxis: 'Eje secundario',
   appValuesRange: 'Rango de valores',
   appCategoriesRange: 'Rango de categorías',
   appKeepUnchanged: 'Mantener sin cambios',
@@ -192,6 +194,13 @@ export const es = {
   appInvalidGroupField: 'Campo de agrupación no válido.',
   appInvalidPageField: 'Campo de filtro de informe no válido.',
   appPivotPageItemMissing: 'El elemento de filtro "{item}" no pertenece al campo "{label}".',
+  appInvalidPivotBaseField:
+    'El campo base de "Mostrar valores como" debe estar en filas o columnas.',
+  appPivotBaseFieldMissing:
+    'El modo "Mostrar valores como" de un campo de valores necesita un campo base.',
+  appPivotBaseFieldNotAxis:
+    'El campo base "{label}" debe estar en las filas o columnas de la tabla dinámica.',
+  appPivotBaseItemMissing: 'El elemento base "{item}" no pertenece al campo "{label}".',
   appInvalidLabelFilterField: 'El campo del filtro de etiquetas no es válido.',
   appInvalidValueFieldIndex: 'El índice de campo de valores {index} no es válido.',
   appInvalidValueField: 'Campo de valores no válido.',
@@ -338,8 +347,7 @@ export const es = {
   appPivotSheetNoMove: 'Esta hoja contiene una tabla dinámica — mover rangos aún no se admite.',
   appMergeOverTable:
     'La selección se superpone con una tabla de Excel — combinar celdas dentro de una tabla aún no es compatible.',
-  appTableFilterNoEdit:
-    'El filtro de esta hoja pertenece a una tabla de Excel — su edición aún no se puede guardar.',
+  appFilterToggleFailed: 'No se aplicó el filtro: seleccione primero el rango con los datos.',
   appAutofillStreaming:
     'Aún no se permite el autorrelleno hacia un área que todavía se está cargando por streaming.',
   appDvNeedsIndexed:
@@ -602,8 +610,6 @@ export const es = {
   appSaveFailed: 'No se puede guardar el libro.',
   appCfRuleUnsaveable:
     'Esta regla de formato condicional no se puede guardar en xlsx — use otro tipo de regla.',
-  appSaveErrX14Dv:
-    'Esta hoja tiene validación de datos extendida (x14); editar sus reglas de validación aún no es compatible.',
   appSaveErrMultiSelectList:
     'La validación de lista de selección múltiple no se puede guardar en xlsx — elimine la regla antes de guardar.',
   appSaveErrX14Cf:
@@ -1269,6 +1275,10 @@ export const es = {
   appFontSizeTip: 'Tamaño de fuente',
   appZoomIn: 'Acercar',
   appZoomOut: 'Alejar',
+  appImgActualSize: 'Tamaño real',
+  appImgFitWindow: 'Ajustar a la ventana',
+  appImgSaveAs: 'Guardar imagen como…',
+  appImgClose: 'Cerrar (Esc)',
   appZoomSheetTitle: 'Hacer zoom en la hoja',
   appResetZoom: 'Restablecer zoom',
   appZoomToSelection: 'Ampliar selección',
@@ -1311,6 +1321,28 @@ export const es = {
   appOpenFileFirst: 'Abra primero un archivo',
   appNoPassword: 'Sin contraseña',
   appProtectWorkbook: 'Proteger libro',
+  appChangePassword: 'Cambiar contraseña',
+  appWorkbookPasswordChanged: 'Se actualizó la contraseña del libro.',
+  appEncryptedOpenTitle: 'Abrir libro protegido con contraseña',
+  appEncryptedOpenCopy: 'Introduce la contraseña para desbloquear este libro.',
+  appEncryptedPasswordLabel: 'Contraseña',
+  appEncryptedOpen: 'Abrir',
+  appChangePasswordTitle: 'Cambiar la contraseña del libro',
+  appChangePasswordCopy: 'Elige una nueva contraseña y confírmala abajo.',
+  appNewPasswordLabel: 'Nueva contraseña',
+  appConfirmPasswordLabel: 'Confirmar nueva contraseña',
+  appPasswordsMismatch: 'Las contraseñas no coinciden.',
+  appPasswordUpdateFailed: 'No se pudo actualizar la contraseña del libro.',
+  appPasswordUpdating: 'Actualizando…',
+  appUpdatePassword: 'Actualizar contraseña',
+  appWorkbookNotPasswordProtected: 'Este libro no está protegido con una contraseña de apertura.',
+  appSaveErrEncryptedUniwork:
+    'Un libro protegido con contraseña no se puede guardar en un documento de UniWork. Use Guardar como para conservar una copia cifrada en este equipo.',
+  appPasswordChangeUniwork: 'La contraseña de un documento de UniWork no se puede cambiar aquí.',
+  appPasswordChangeReadOnly:
+    'Este libro es de solo lectura, por lo que no se puede cambiar su contraseña.',
+  appEncryptedWrongPassword: 'La contraseña es incorrecta. Inténtalo de nuevo.',
+  appPasswordChangeRestored: 'Guarda primero el libro restaurado y después cambia su contraseña.',
   appAllowEditRanges: 'Permitir editar rangos',
   appGroupClipboard: 'Portapapeles',
   appPaste: 'Pegar',
@@ -1495,6 +1527,16 @@ export const es = {
   appTableRowsNotLoaded:
     'Las filas de la tabla aún se están cargando; inténtelo de nuevo en un momento.',
   appTableTotalLabel: 'Total',
+  appNotePicturesPaneTitle: 'Imágenes de notas',
+  appNotePicturesClose: 'Cerrar',
+  appNotePicturesNone: 'Ninguna nota de este libro muestra una imagen.',
+  appNotePictureUnavailable: 'No se puede mostrar esta imagen.',
+  appNotePicturesToggle: 'Imágenes de notas',
+  appNoteInsertPicture: 'Insertar imagen',
+  appNotePictureInserted:
+    'Imagen añadida a la nota de {cell}. Guarda para escribirla en el archivo.',
+  appNotePictureRemoved: 'Imagen quitada de la nota de {cell}.',
+  appNotePictureRemove: 'Quitar imagen',
   appCommentsPaneTitle: 'Comentarios',
   appThreadReply: 'Responder',
   appThreadReplyPlaceholder: 'Responder…',
@@ -1541,6 +1583,8 @@ export const es = {
   appVisualSendBackward: 'Enviar atrás',
   appVisualSizeProperties: 'Tamaño y propiedades…',
   appVisualHyperlink: 'Hipervínculo…',
+  appVisualEmbedInCell: 'Insertar imagen en la celda',
+  appVisualEmbedFailed: 'No se pudo insertar esta imagen en la celda.',
   appVisualDelete: 'Eliminar',
   appVisualArranged: 'Objeto actualizado — guarda con {saveKeys}.',
   appVisualCopied: 'Objeto copiado.',
@@ -1571,6 +1615,8 @@ export const es = {
     'La versión web de UniWork Sheets todavía está recibiendo su motor de hojas de cálculo. Mientras tanto, abre este libro en la aplicación de escritorio de UniWork.',
   appWebEngineHint: 'Tu archivo no ha cambiado.',
   appWebViewOnly: 'Solo lectura: no puedes guardar cambios en este libro.',
+  appWebEncryptedOpen:
+    'Este libro está protegido con contraseña y la versión web no puede abrirlo. Ábralo en la aplicación de escritorio de UniWork.',
   appWebConflictTitle: 'Este libro se modificó en otro lugar',
   appWebConflictBody:
     'Tus cambios aún no están en UniWork y se conservan en este navegador hasta que cierres sesión.',
@@ -1589,4 +1635,5 @@ export const es = {
     'El motor del libro se detuvo de forma inesperada y se reinició. El libro se volvió a abrir desde su última versión guardada; los cambios sin guardar se conservan, guarde pronto.',
   appWebSavedReopenFailed:
     'Tus cambios se guardaron en UniWork, pero no se pudo volver a abrir el libro aquí. Recarga el editor para seguir trabajando.',
+  appDataTable: 'Tabla de datos',
 } satisfies Record<keyof typeof zh, string>

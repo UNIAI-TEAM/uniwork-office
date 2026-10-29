@@ -101,8 +101,10 @@ export const hi = {
   appChartNoRepoint: 'यह चार्ट अपनी डेटा श्रेणियों को फिर से निर्दिष्ट करने का समर्थन नहीं करता।',
   appKeepOneSeries: 'कम से कम एक शृंखला रखें।',
   appNoCategoriesToSwitch: 'बदलने के लिए कोई श्रेणियाँ नहीं हैं।',
-  appComboNoSelectData: 'कॉम्बो चार्ट का डेटा स्रोत बदलना अभी समर्थित नहीं है।',
+  appSelectDataUnsupported: 'इस चार्ट प्रकार का डेटा स्रोत बदलना समर्थित नहीं है।',
   appSeriesName: 'शृंखला नाम',
+  appSeriesType: 'श्रृंखला प्रकार',
+  appSecondaryAxis: 'द्वितीय अक्ष',
   appValuesRange: 'मान श्रेणी',
   appCategoriesRange: 'श्रेणी सीमा',
   appKeepUnchanged: 'अपरिवर्तित रखें',
@@ -182,6 +184,13 @@ export const hi = {
   appInvalidGroupField: 'अमान्य समूहन फ़ील्ड।',
   appInvalidPageField: 'अमान्य रिपोर्ट फ़िल्टर फ़ील्ड।',
   appPivotPageItemMissing: 'रिपोर्ट फ़िल्टर आइटम "{item}" फ़ील्ड "{label}" का सदस्य नहीं है।',
+  appInvalidPivotBaseField:
+    '"मान इस रूप में दिखाएँ" का आधार फ़ील्ड पंक्तियों या कॉलम में होना चाहिए।',
+  appPivotBaseFieldMissing:
+    'वैल्यू फ़ील्ड के "मान इस रूप में दिखाएँ" मोड के लिए आधार फ़ील्ड आवश्यक है।',
+  appPivotBaseFieldNotAxis:
+    'आधार फ़ील्ड "{label}" पिवट तालिका की पंक्तियों या कॉलम में होना चाहिए।',
+  appPivotBaseItemMissing: 'आधार आइटम "{item}" फ़ील्ड "{label}" का सदस्य नहीं है।',
   appInvalidLabelFilterField: 'लेबल फ़िल्टर फ़ील्ड अमान्य है।',
   appInvalidValueFieldIndex: 'मान फ़ील्ड अनुक्रमांक {index} अमान्य है।',
   appInvalidValueField: 'अमान्य मान फ़ील्ड।',
@@ -320,8 +329,7 @@ export const hi = {
   appPivotSheetNoMove: 'इस शीट में पिवट टेबल है — श्रेणियाँ स्थानांतरित करना अभी समर्थित नहीं है।',
   appMergeOverTable:
     'चयन Excel तालिका से ओवरलैप करता है — तालिका के भीतर सेल मर्ज करना अभी समर्थित नहीं है।',
-  appTableFilterNoEdit:
-    'इस शीट का फ़िल्टर एक Excel तालिका का है — इसका संपादन अभी सहेजा नहीं जा सकता।',
+  appFilterToggleFailed: 'फ़िल्टर लागू नहीं हुआ — पहले वह रेंज चुनें जिसमें आपका डेटा है।',
   appAutofillStreaming:
     'जो क्षेत्र अभी स्ट्रीम होकर लोड हो रहा है, उसमें स्वतः भरण की अनुमति अभी नहीं है।',
   appDvNeedsIndexed:
@@ -563,8 +571,6 @@ export const hi = {
   appSaveFailed: 'कार्यपुस्तिका सहेजी नहीं जा सकी।',
   appCfRuleUnsaveable:
     'यह सशर्त स्वरूपण नियम xlsx में सहेजा नहीं जा सकता — कृपया दूसरा नियम प्रकार चुनें।',
-  appSaveErrX14Dv:
-    'इस शीट में विस्तारित (x14) डेटा सत्यापन है; इसके सत्यापन नियमों का संपादन अभी समर्थित नहीं है।',
   appSaveErrMultiSelectList:
     'बहु-चयन सूची सत्यापन xlsx में सहेजा नहीं जा सकता — सहेजने से पहले वह नियम हटाएँ।',
   appSaveErrX14Cf: 'इस श्रेणी में विस्तारित (x14) सशर्त स्वरूपण है, इसे अभी बदला नहीं जा सकता।',
@@ -1225,6 +1231,10 @@ export const hi = {
   appFontSizeTip: 'फ़ॉन्ट का आकार',
   appZoomIn: 'ज़ूम इन',
   appZoomOut: 'ज़ूम आउट',
+  appImgActualSize: 'वास्तविक आकार',
+  appImgFitWindow: 'विंडो में फ़िट करें',
+  appImgSaveAs: 'चित्र इस रूप में सहेजें…',
+  appImgClose: 'बंद करें (Esc)',
   appZoomSheetTitle: 'शीट ज़ूम करें',
   appResetZoom: 'ज़ूम रीसेट करें',
   appZoomToSelection: 'चयन पर ज़ूम करें',
@@ -1267,6 +1277,28 @@ export const hi = {
   appOpenFileFirst: 'पहले एक फ़ाइल खोलें',
   appNoPassword: 'कोई पासवर्ड नहीं',
   appProtectWorkbook: 'कार्यपुस्तिका सुरक्षित करें',
+  appChangePassword: 'पासवर्ड बदलें',
+  appWorkbookPasswordChanged: 'कार्यपुस्तिका का पासवर्ड अपडेट किया गया।',
+  appEncryptedOpenTitle: 'पासवर्ड से सुरक्षित वर्कबुक खोलें',
+  appEncryptedOpenCopy: 'इस वर्कबुक को अनलॉक करने के लिए पासवर्ड दर्ज करें।',
+  appEncryptedPasswordLabel: 'पासवर्ड',
+  appEncryptedOpen: 'खोलें',
+  appChangePasswordTitle: 'वर्कबुक पासवर्ड बदलें',
+  appChangePasswordCopy: 'नया पासवर्ड चुनें और नीचे उसकी पुष्टि करें।',
+  appNewPasswordLabel: 'नया पासवर्ड',
+  appConfirmPasswordLabel: 'नए पासवर्ड की पुष्टि करें',
+  appPasswordsMismatch: 'पासवर्ड मेल नहीं खाते।',
+  appPasswordUpdateFailed: 'वर्कबुक पासवर्ड अपडेट नहीं किया जा सका।',
+  appPasswordUpdating: 'अपडेट हो रहा है…',
+  appUpdatePassword: 'पासवर्ड अपडेट करें',
+  appWorkbookNotPasswordProtected: 'यह वर्कबुक खोलने वाले पासवर्ड से सुरक्षित नहीं है।',
+  appSaveErrEncryptedUniwork:
+    'पासवर्ड से सुरक्षित वर्कबुक को UniWork दस्तावेज़ में सहेजा नहीं जा सकता। इस कंप्यूटर पर एन्क्रिप्टेड प्रति रखने के लिए इस रूप में सहेजें का उपयोग करें।',
+  appPasswordChangeUniwork: 'UniWork दस्तावेज़ का पासवर्ड यहाँ नहीं बदला जा सकता।',
+  appPasswordChangeReadOnly:
+    'यह वर्कबुक केवल देखने के लिए है, इसलिए इसका पासवर्ड नहीं बदला जा सकता।',
+  appEncryptedWrongPassword: 'पासवर्ड गलत है। फिर से कोशिश करें।',
+  appPasswordChangeRestored: 'पहले पुनर्स्थापित कार्यपुस्तिका सहेजें, फिर उसका पासवर्ड बदलें।',
   appAllowEditRanges: 'श्रेणियाँ संपादित करने दें',
   appGroupClipboard: 'क्लिपबोर्ड',
   appPaste: 'चिपकाएँ',
@@ -1449,6 +1481,15 @@ export const hi = {
   appTableFileUnnamed: 'इस तालिका का फ़ाइल में कोई नाम नहीं है और इसे यहाँ बदला नहीं जा सकता।',
   appTableRowsNotLoaded: 'तालिका की पंक्तियाँ अभी लोड हो रही हैं — कुछ देर बाद पुनः प्रयास करें।',
   appTableTotalLabel: 'कुल',
+  appNotePicturesPaneTitle: 'नोट चित्र',
+  appNotePicturesClose: 'बंद करें',
+  appNotePicturesNone: 'इस कार्यपुस्तिका में ऐसा कोई नोट नहीं है जो चित्र दिखा रहा हो।',
+  appNotePictureUnavailable: 'यह चित्र प्रदर्शित नहीं किया जा सकता।',
+  appNotePicturesToggle: 'नोट चित्र',
+  appNoteInsertPicture: 'चित्र सम्मिलित करें',
+  appNotePictureInserted: '{cell} की टिप्पणी में चित्र जोड़ा गया। फ़ाइल में लिखने के लिए सहेजें।',
+  appNotePictureRemoved: '{cell} की टिप्पणी से चित्र हटा दिया गया।',
+  appNotePictureRemove: 'चित्र हटाएँ',
   appCommentsPaneTitle: 'टिप्पणियाँ',
   appThreadReply: 'उत्तर दें',
   appThreadReplyPlaceholder: 'उत्तर दें…',
@@ -1493,6 +1534,8 @@ export const hi = {
   appVisualSendBackward: 'पीछे भेजें (एक स्तर)',
   appVisualSizeProperties: 'आकार और गुण…',
   appVisualHyperlink: 'हाइपरलिंक…',
+  appVisualEmbedInCell: 'छवि को कक्ष में एम्बेड करें',
+  appVisualEmbedFailed: 'इस छवि को कक्ष में एम्बेड नहीं किया जा सका।',
   appVisualDelete: 'हटाएँ',
   appVisualArranged: 'ऑब्जेक्ट अपडेट हुआ — {saveKeys} से सहेजें।',
   appVisualCopied: 'ऑब्जेक्ट कॉपी हुआ।',
@@ -1523,6 +1566,8 @@ export const hi = {
     'UniWork Sheets के वेब संस्करण को अभी उसका स्प्रेडशीट इंजन मिल रहा है। तब तक, इस वर्कबुक को UniWork डेस्कटॉप ऐप में खोलें।',
   appWebEngineHint: 'आपकी फ़ाइल नहीं बदली गई है।',
   appWebViewOnly: 'केवल देखें: आप इस वर्कबुक में परिवर्तन सहेज नहीं सकते।',
+  appWebEncryptedOpen:
+    'यह वर्कबुक पासवर्ड से सुरक्षित है, जिसे वेब संस्करण नहीं खोल सकता। इसे UniWork डेस्कटॉप ऐप में खोलें।',
   appWebConflictTitle: 'यह वर्कबुक कहीं और बदली गई थी',
   appWebConflictBody:
     'आपके बदलाव अभी UniWork पर नहीं हैं और साइन आउट करने तक इस ब्राउज़र में रखे जाते हैं।',
@@ -1541,4 +1586,5 @@ export const hi = {
     'वर्कबुक इंजन अप्रत्याशित रूप से रुक गया और फिर से शुरू किया गया। वर्कबुक को पिछली सहेजी गई प्रति से दोबारा खोला गया है; आपके असहेजे बदलाव सुरक्षित हैं, कृपया जल्द सहेजें।',
   appWebSavedReopenFailed:
     'आपके बदलाव UniWork में सहेज लिए गए, लेकिन वर्कबुक यहाँ दोबारा नहीं खुल सकी। काम जारी रखने के लिए एडिटर को फिर से लोड करें।',
+  appDataTable: 'डेटा टेबल',
 } satisfies Record<keyof typeof zh, string>

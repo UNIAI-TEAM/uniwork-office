@@ -782,6 +782,11 @@ function patchNestedInCell(
 export interface TextboxParaPatch {
   runs: Run[]
   align?: 'left' | 'center' | 'right' | 'justify' | 'distribute' | null
+  /** list membership write-back: sets or clears the paragraph's w:numPr.
+   * Always explicit (null clears) so leaving a list lands in the file. */
+  numPr?: { numId: string; ilvl: number } | null
+  /** left indent in twips; null clears w:ind/@w:left, undefined keeps the original */
+  indentLeft?: number | null
 }
 
 /** plain text of one w:p fragment (w:t + tabs/breaks), for change detection */
@@ -805,7 +810,46 @@ function paraPlainText(pXml: string): string {
   return out
 }
 
-/** set or remove w:jc inside a pPr fragment (creating pPr when needed) */
+/** Set or clear w:numPr in a paragraph's pPr. CT_PPr order places numPr after
+ * pStyle and the keep-together flags, before pBdr, shd, tabs, spacing, ind and
+ * jc — so it is inserted after pStyle when present (the common textbox shape)
+ * and otherwise directly after the pPr opening tag. */
+function pPrWithNumPr(pPr: string, numPr: TextboxParaPatch['numPr']): string {
+  const out = pPr.replace(/<w:pPr([^>]*)\/>/, '<w:pPr$1></w:pPr>')
+  const stripped = out.replace(/<w:numPr>[\s\S]*?<\/w:numPr>/, '').replace(/<w:numPr\/>/, '')
+  if (!numPr) return stripped === '<w:pPr></w:pPr>' ? '' : stripped
+  const num = `<w:numPr><w:ilvl w:val="${numPr.ilvl}"/><w:numId w:val="${numPr.numId}"/></w:numPr>`
+  const styleEnd = stripped.indexOf('<w:pStyle ')
+  const afterStyle = styleEnd === -1 ? -1 : stripped.indexOf('/>', styleEnd)
+  const pPrOpen = stripped.indexOf('>')
+  const insertAt = afterStyle !== -1 ? afterStyle + 2 : pPrOpen !== -1 ? pPrOpen + 1 : -1
+  if (insertAt === -1) return `<w:pPr>${num}</w:pPr>`
+  return stripped.slice(0, insertAt) + num + stripped.slice(insertAt)
+}
+
+/** Set or clear the left indent on the paragraph's w:ind (other w:ind
+ * attributes survive). Word prefers a character-unit left indent, own or from
+ * the style chain, over the twips twin, so a twips write also pins
+ * w:leftChars="0" the way Word itself writes pt indents. CT_PPr places ind
+ * before jc and the paragraph-mark rPr. */
+function pPrWithIndLeft(pPr: string, left: number | null): string {
+  let out = pPr.replace(/<w:pPr([^>]*)\/>/, '<w:pPr$1></w:pPr>')
+  const value = left == null ? '' : ` w:left="${left}" w:leftChars="0"`
+  const ind = /<w:ind\b([^>]*)\/>/.exec(out)
+  if (ind) {
+    const attrs = ind[1].replace(/\s+w:(left|start|leftChars|startChars)="[^"]*"/g, '')
+    const next = `${attrs}${value}`
+    out = out.replace(ind[0], next.trim() ? `<w:ind${next}/>` : '')
+  } else if (left != null) {
+    const tag = `<w:ind${value}/>`
+    if (!out) return `<w:pPr>${tag}</w:pPr>`
+    const at = [out.indexOf('<w:jc '), out.indexOf('<w:rPr')].filter((i) => i !== -1)
+    const insertAt = at.length ? Math.min(...at) : out.lastIndexOf('</w:pPr>')
+    out = out.slice(0, insertAt) + tag + out.slice(insertAt)
+  }
+  return out === '<w:pPr></w:pPr>' ? '' : out
+}
+
 function pPrWithJc(pPr: string, align: TextboxParaPatch['align']): string {
   const out = pPr.replace(/<w:pPr([^>]*)\/>/, '<w:pPr$1></w:pPr>').replace(/<w:jc [^>]*\/>/, '')
   const jcVal = align === 'justify' ? 'both' : align
@@ -843,6 +887,8 @@ function patchTxbxContent(
     }
     const template = originals[Math.min(i, originals.length - 1)]
     let pPr = /<w:pPr[\s\S]*?<\/w:pPr>|<w:pPr[^>]*\/>/.exec(template)?.[0] ?? ''
+    if (patch.numPr !== undefined) pPr = pPrWithNumPr(pPr, patch.numPr)
+    if (patch.indentLeft !== undefined) pPr = pPrWithIndLeft(pPr, patch.indentLeft)
     if (patch.align !== undefined) pPr = pPrWithJc(pPr, patch.align)
     // no rel allocation inside textboxes: only links that already have an rId
     // survive re-generation, new links degrade to plain text
@@ -929,7 +975,10 @@ function injectShapeText(
         shapeXml.slice(content.end)
     } else {
       const body = entry.paras
-        .map((p) => `<w:p>${pPrWithJc('', p.align)}${runsXml(p.runs, null)}</w:p>`)
+        .map(
+          (p) =>
+            `<w:p>${pPrWithJc(pPrWithIndLeft(pPrWithNumPr('', p.numPr ?? null), p.indentLeft ?? null), p.align)}${runsXml(p.runs, null)}</w:p>`,
+        )
         .join('')
       const txbx = `<wps:txbx><w:txbxContent>${body}</w:txbxContent></wps:txbx>`
       const bodyPrAt = shapeXml.search(/<wps:bodyPr[\s/>]/)

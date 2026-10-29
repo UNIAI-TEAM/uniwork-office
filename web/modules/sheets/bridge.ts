@@ -129,6 +129,23 @@ function describe(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+/** the engine's answer to an Office-encrypted workbook (the OLE2 container, not a zip package) */
+function isEncryptedOpenError(err: unknown, oleContainer: boolean): boolean {
+  const msg = describe(err)
+  if (/password-protected/i.test(msg)) return true
+  // the web engine reads an OLE2 container as a zip and stops at the missing end-of-directory record
+  return oleContainer && /invalid zip archive|could not find eocd/i.test(msg)
+}
+
+const OLE_MAGIC = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
+
+/** read before the open: the engine may take ownership of the buffer */
+function hasOleMagic(data: ArrayBuffer): boolean {
+  if (data.byteLength < OLE_MAGIC.length) return false
+  const head = new Uint8Array(data, 0, OLE_MAGIC.length)
+  return OLE_MAGIC.every((byte, index) => head[index] === byte)
+}
+
 function classifyOpenRefusal(err: unknown): {
   reason: OpenRefusedReason
   measure?: OpenRefusedMeasure
@@ -444,11 +461,15 @@ export function createSheetsWebApi(port: ModuleBridgePort, opts: SheetsWebApiOpt
     // the engine may take ownership of the buffer: open a copy of the draft
     const data = draft ? copyBuffer(draft) : server
     let opened: WorkbookFile
+    const oleContainer = hasOleMagic(data)
     try {
       opened = await transport.open({ name: payload.file.name, data, locale: locale() })
     } catch (err) {
       if (isEngineUnavailable(err)) reportEngineUnavailable()
-      else {
+      else if (isEncryptedOpenError(err, oleContainer)) {
+        // the engine only sniffs the encrypted container; decrypting is a desktop job
+        throw new Error(text('appWebEncryptedOpen'), { cause: err })
+      } else {
         const refusal = classifyOpenRefusal(err)
         if (refusal) {
           const message = describe(err)

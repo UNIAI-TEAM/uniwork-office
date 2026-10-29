@@ -447,6 +447,46 @@ export async function resolveSafeRelativeImagePath(
   }
 }
 
+/**
+ * The realpath of an image target served from the vault wiki root — the same
+ * root {@link resolveWikiLinks} walks (no second definition), so a cross-folder
+ * picture embed `![[attachments/x.png]]` that resolves also renders. A target
+ * must sit under the root lexically and after realpath resolution (a symlink
+ * out of the vault is refused); `null` = refuse the serve.
+ */
+export async function resolveSafeVaultImagePath(
+  root: string,
+  target: string,
+): Promise<string | null> {
+  const vaultRoot = resolve(root)
+  if (!isInDocDir(target, vaultRoot)) return null
+  try {
+    const [realRoot, realCandidate, info] = await Promise.all([
+      realpath(vaultRoot),
+      realpath(target),
+      stat(target),
+    ])
+    if (!info.isFile() || !isInDocDir(realCandidate, realRoot)) return null
+    return realCandidate
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Whether the vault-root picture rule may apply at all. The md-asset protocol cannot tell
+ * which window asked, so one bound UniWork working copy among the open documents turns the
+ * rule off for every request: a document the user did not author must never show pictures
+ * from the local notes folder, and only the own-directory rule serves it.
+ */
+export function vaultRootServesPictures(
+  openDocs: Iterable<string>,
+  isBound: (path: string) => boolean,
+): boolean {
+  for (const doc of openDocs) if (isBound(doc)) return false
+  return true
+}
+
 function ownedNameForSource(source: string): string | null {
   const decoded = decodeLocalSource(source)
   if (!decoded) return null

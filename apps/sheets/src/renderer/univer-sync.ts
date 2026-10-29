@@ -29,6 +29,7 @@ import {
 import { IFindReplaceService } from '@univerjs/preset-sheets-find-replace'
 import type { IFilterColumn } from '@univerjs/preset-sheets-filter'
 import { CustomFilterOperator, SheetsFilterService } from '@univerjs/sheets-filter'
+import { TableManager } from '@univerjs/preset-sheets-table'
 import { FontCache, getFontStyleString, IRenderManagerService } from '@univerjs/engine-render'
 import { SheetSkeletonManagerService } from '@univerjs/sheets-ui'
 import { CFValueType, type IValueConfig } from '@univerjs/preset-sheets-conditional-formatting'
@@ -99,11 +100,14 @@ import {
   isSheetRemoved,
   journalEntriesInRange,
   NO_FILL_STYLE,
+  notePicturesFor,
   ooxmlTextRotationToUniver,
   plainCellValue,
   recordHyperlinkEdit,
   recordSetRangeValues,
+  recordTableFilterChange,
   toRecalcUserInput,
+  type CellImageAdd,
   type EditJournal,
   type VisualEditEntry,
 } from './edit-journal'
@@ -122,7 +126,14 @@ import { isPlainArithmeticFormula } from './formula-cached-fallback'
 import { degradeQuadraticFormulaCells } from './formula-cost'
 import { extractFunctionNames } from './formula-functions'
 import { DEFAULT_SHORT_DATE, setSystemShortDate } from '@genoffice/xlsx-gateway/shared/short-date'
-import { getWorkbookMdw, REORDER_JOURNAL_MAX_CELLS, setWorkbookMdw } from './app-constants'
+import {
+  getWorkbookMdw,
+  REORDER_JOURNAL_MAX_CELLS,
+  setWorkbookMdw,
+  TABLE_FILTER_COMMAND,
+} from './app-constants'
+import { planFileTableRegistrations } from './file-tables'
+import { tableFilterState } from './table-filter-state'
 import { excelRowPitchPx } from './autofit-line-pitch'
 import { batchWrapRowHeights, createUniverWrapMeasurer } from './wrap-row-height-batch'
 import {
@@ -160,6 +171,7 @@ import {
   installWorkbookVisuals,
   isChartEditorOpen,
   isVisualDragActive,
+  type CellImageState,
   type ChartEditData,
   type ChartVectorRead,
   type ShapeEditChanges,
@@ -400,9 +412,12 @@ export function applyFormatPatchToRange(
   }
   if (patch.numberFormat !== undefined) range.setNumberFormat(patch.numberFormat ?? 'General')
   if (patch.horizontalAlign !== undefined) {
-    range.setHorizontalAlignment(
-      (patch.horizontalAlign ?? 'normal') as 'left' | 'center' | 'normal',
-    )
+    // The facade helper only accepts 'left' | 'center' | 'normal' — and
+    // 'normal' (confusingly) maps to RIGHT — so a raw 'right' hits its
+    // throwing default branch; translate it first (same as the ribbon's align
+    // command). null keeps the existing fallback to 'normal'.
+    const align = (patch.horizontalAlign ?? 'normal') as 'left' | 'center' | 'right' | 'normal'
+    range.setHorizontalAlignment(align === 'right' ? 'normal' : align)
   }
   if (patch.verticalAlign !== undefined) {
     if (patch.verticalAlign === null) range.setValue({ s: { vt: null } } as unknown as ICellData)
@@ -6288,6 +6303,8 @@ export function collectNoteStates(
     const fromFile = new Map(
       (fileSheet?.comments ?? []).map((comment) => [`${comment.row}:${comment.column}`, comment]),
     )
+    // the pictures put into this sheet's notes this session
+    const pictures = notePicturesFor(state.editJournal, sheetId)
     const threads = threadStore.sheetThreads(sheetId)
     const threaded = new Set(threads.map((thread) => `${thread.row}:${thread.column}`))
     const notes: WorkbookNoteState['notes'] = worksheet
@@ -6321,6 +6338,27 @@ export function collectNoteStates(
           }
         }
         return { ...cell, author: '', text: note.note, ...converted }
+      })
+      // The picture the reader put into a note this session rides along with
+      // it: Univer's note model has no picture of its own, so the saver learns
+      // about it here.
+      .map((entry) => {
+        const picture = pictures.get(`${entry.row}:${entry.column}`)
+        if (picture === undefined) return entry
+        if (picture === null) return { ...entry, picture: null }
+        const base64 = picture.dataUrl.split(',')[1]
+        // a data URL without its payload carries no picture
+        if (!base64) return entry
+        return {
+          ...entry,
+          picture: {
+            mediaType: picture.mediaType,
+            base64,
+            widthPx: picture.widthPx,
+            heightPx: picture.heightPx,
+            name: picture.name,
+          },
+        }
       })
     for (const thread of threads) {
       const { row, column, text, ...rest } = thread
@@ -6406,13 +6444,19 @@ export function collectFilterStates(
   state: LazyWorkbookState,
 ): WorkbookFilterState[] {
   const workbook = runtime?.univerAPI.getActiveWorkbook()
-  if (!workbook) return []
+  if (!runtime || !workbook) return []
   const filterStates: WorkbookFilterState[] = []
   for (const sheetId of state.editJournal.filterDirty) {
     if (isSheetRemoved(state.editJournal, sheetId)) continue
     const worksheet = workbook.getSheetBySheetId(sheetId)
     if (!worksheet) continue
     const origin = state.filterOrigins.get(sheetId)
+    // A table's header dropdown edits the table plugin's own model; for the
+    // tables edited this session that model is the truth, not the sheet
+    // filter model installed over the table range at open.
+    const tableStates = collectTableFilterStates(runtime, state, workbook.getId(), sheetId)
+    filterStates.push(...tableStates)
+    if (origin?.origin === 'table' && tableStates.length > 0) continue
     const filter = worksheet.getFilter()
     if (!filter) {
       // The user removed the filter; unhide what it was hiding.
@@ -6473,6 +6517,220 @@ export function collectFilterStates(
     })
   }
   return filterStates
+}
+
+function tableManagerOf(runtime: UniverRuntime): TableManager {
+  return runtime.univer.__getInjector().get(TableManager)
+}
+
+/// Header-to-last-data-row range of a table with a header; null without one
+/// (a headerless table has no filter buttons and nothing to save).
+type PluginTable = NonNullable<ReturnType<TableManager['getTable']>>
+
+function tableFilterRange(table: PluginTable): IRange | null {
+  if (!table.isShowHeader()) return null
+  const { startRow, startColumn, endRow, endColumn } = table.getTableFilterRange()
+  return { startRow: startRow - 1, startColumn, endRow, endColumn }
+}
+
+function collectTableFilterStates(
+  runtime: UniverRuntime,
+  state: LazyWorkbookState,
+  unitId: string,
+  sheetId: string,
+): WorkbookFilterState[] {
+  const dirty = state.editJournal.tableFilterDirty.get(sheetId)
+  if (!dirty || dirty.size === 0) return []
+  const manager = tableManagerOf(runtime)
+  const states: WorkbookFilterState[] = []
+  for (const table of manager.getTablesBySubunitId(unitId, sheetId)) {
+    if (!dirty.has(table.getId())) continue
+    const range = tableFilterRange(table)
+    if (!range) continue
+    const width = range.endColumn - range.startColumn + 1
+    states.push(
+      tableFilterState(sheetId, {
+        id: table.getId(),
+        range,
+        columnFilters: Array.from({ length: width }, (unused, column) =>
+          table.getTableFilterColumn(column),
+        ),
+        filteredOutRows: table.getTableFilters().getFilterOutRows() ?? [],
+      }),
+    )
+  }
+  return states
+}
+
+/// Rows a file table hid when it was opened belong to a filter whose
+/// criteria the reader does not expose, so the table model cannot own them:
+/// once the table's filter is edited or cleared they are released, leaving
+/// the grid exactly what the model says (and what the save writes). Returns
+/// whether any row was released.
+function releaseFileHiddenTableRows(
+  runtime: UniverRuntime,
+  state: LazyWorkbookState,
+  sheetId: string,
+  range: IRange,
+): boolean {
+  const hidden = state.hiddenFileRows.get(sheetId)
+  if (!hidden) return false
+  const released = [...hidden].filter((row) => row > range.startRow && row <= range.endRow)
+  const worksheet = runtime.univerAPI.getActiveWorkbook()?.getSheetBySheetId(sheetId)
+  if (released.length === 0 || !worksheet) return false
+  for (const row of released) hidden.delete(row)
+  // Derived from the table model, not a user unhide: it must stay out of the
+  // edit journal (a journaled unhide would replay at save as a manual show).
+  journalSuppression.active = true
+  try {
+    runtime.univerAPI.syncExecuteCommand('sheet.mutation.set-row-visible', {
+      unitId: worksheet.getSheet().getUnitId(),
+      subUnitId: sheetId,
+      ranges: rowIndexRanges(worksheet, released),
+    })
+  } finally {
+    journalSuppression.active = false
+  }
+  return true
+}
+
+/// A table filter changed (header dropdown, undo or redo): journals the
+/// table for the save and releases the file's open-time hidden rows.
+/// Returns the table's sheet id, or null when the table is gone.
+export function noteTableFilterEdit(
+  runtime: UniverRuntime,
+  state: LazyWorkbookState,
+  unitId: string,
+  tableId: string,
+): string | null {
+  const table = tableManagerOf(runtime).getTable(unitId, tableId)
+  if (!table) return null
+  const sheetId = table.getSubunitId()
+  const range = tableFilterRange(table)
+  if (range) releaseFileHiddenTableRows(runtime, state, sheetId, range)
+  recordTableFilterChange(state.editJournal, sheetId, tableId)
+  return sheetId
+}
+
+/// The journal's view of `sheet.mutation.set-table-filter`. The mutation
+/// names its table, not a sheet (no `subUnitId`), and belongs to the open
+/// workbook only. Returns whether the edit was journaled.
+export function journalTableFilterMutation(
+  runtime: UniverRuntime,
+  state: LazyWorkbookState,
+  params: unknown,
+): boolean {
+  const { unitId, tableId } = (params ?? {}) as { unitId?: unknown; tableId?: unknown }
+  if (unitId !== `file-${state.file.sha256}` || typeof tableId !== 'string') return false
+  return noteTableFilterEdit(runtime, state, unitId, tableId) !== null
+}
+
+/// Registers the file's header-bearing tables with Univer under their
+/// displayName so it renders filter dropdowns and resolves structured
+/// references. The journal stays empty for file tables, so failures are
+/// swallowed: the data is still usable. Returns the pending installs.
+export function registerFileTables(
+  workbook: ActiveWorkbook,
+  file: WorkbookFile,
+  sessionNames: readonly string[],
+): Promise<unknown>[] {
+  const installs: Promise<unknown>[] = []
+  for (const entry of planFileTableRegistrations(file.sheets, sessionNames)) {
+    const ws = workbook.getSheetBySheetId(entry.sheetId)
+    if (!ws) continue
+    const { tableId, tableName } = entry
+    try {
+      // File column names must reach Univer, or empty header cells fall back
+      // to its locale template ("Column 1" with a space) where Excel shows
+      // the table part's names ("Column1").
+      const columnOptions = entry.columns
+        ? {
+            columns: entry.columns.map((name, columnIndex) => ({
+              id: `${tableId}-col-${columnIndex}`,
+              displayName: name,
+            })),
+          }
+        : undefined
+      const added = ws.addTable(tableName, entry.range, tableId, columnOptions as never) as unknown
+      // Univer paints its own lavender default table theme over the cells;
+      // file tables carry Excel's real banding in the cell fills
+      // (applyTableBanding), so mute the theme to plain.
+      installs.push(
+        Promise.resolve(added)
+          .then(() =>
+            (
+              ws as unknown as { addTableTheme(id: string, theme: { name: string }): unknown }
+            ).addTableTheme(tableId, { name: `plain-${tableId}` }),
+          )
+          // Theme muting is cosmetic; the table itself is registered.
+          .catch(() => undefined),
+      )
+    } catch {
+      // Best-effort: skip if Univer rejects (e.g. overlapping ranges)
+    }
+  }
+  return installs
+}
+
+/// Ribbon / context-menu Clear on a sheet with tables: clears every table
+/// column filter and releases the file's open-time hidden rows, so the rows
+/// reappear and the save writes a bare table autoFilter. Returns whether the
+/// journal changed: a file's own criteria are not in the table model, so a
+/// Clear of an untouched file runs no set-table-filter mutation and the app
+/// must refresh its pending count itself.
+export function clearSheetTableFilters(
+  runtime: UniverRuntime,
+  state: LazyWorkbookState,
+  sheetId: string,
+): boolean {
+  const unitId = runtime.univerAPI.getActiveWorkbook()?.getId()
+  if (unitId === undefined) return false
+  let journaled = false
+  for (const table of tableManagerOf(runtime).getTablesBySubunitId(unitId, sheetId)) {
+    const range = tableFilterRange(table)
+    if (!range) continue
+    let touched = false
+    for (let column = 0; column <= range.endColumn - range.startColumn; column += 1) {
+      if (!table.getTableFilterColumn(column)) continue
+      runtime.univerAPI.syncExecuteCommand(TABLE_FILTER_COMMAND, {
+        unitId,
+        tableId: table.getId(),
+        column,
+        tableFilter: undefined,
+      })
+      touched = true
+    }
+    if (releaseFileHiddenTableRows(runtime, state, sheetId, range)) touched = true
+    if (touched) {
+      recordTableFilterChange(state.editJournal, sheetId, table.getId())
+      journaled = true
+    }
+  }
+  return journaled
+}
+
+/// Ribbon Reapply on a sheet with filtered tables: re-evaluates every table
+/// filter against the current cells (re-setting a column's own criteria
+/// makes the plugin recompute all of them) and journals the result.
+export function reapplySheetTableFilters(
+  runtime: UniverRuntime,
+  state: LazyWorkbookState,
+  sheetId: string,
+): void {
+  const unitId = runtime.univerAPI.getActiveWorkbook()?.getId()
+  if (unitId === undefined) return
+  const manager = tableManagerOf(runtime)
+  for (const table of manager.getTablesBySubunitId(unitId, sheetId)) {
+    const range = tableFilterRange(table)
+    if (!range) continue
+    for (let column = 0; column <= range.endColumn - range.startColumn; column += 1) {
+      const filter = table.getTableFilterColumn(column)
+      if (!filter) continue
+      manager.addFilter(unitId, table.getId(), column, filter)
+      recordTableFilterChange(state.editJournal, sheetId, table.getId())
+      break
+    }
+  }
 }
 
 function toCellArea(range: IRange): WorkbookFilterState['visibilityRange'] {
@@ -7816,6 +8074,26 @@ export function queueVisualInstall(
   }, 100)
 }
 
+/// Session embeds render from their inline bytes; one replaces the file's
+/// picture in the same cell (the save overwrites that cell's rich value too).
+export function mergeCellImages(
+  fileImages: readonly CellImageState[],
+  sessionAdds: readonly CellImageAdd[],
+  sheetId: string,
+): CellImageState[] {
+  const session = sessionAdds.filter((entry) => entry.sheetId === sheetId)
+  const taken = new Set(session.map((entry) => `${entry.row}:${entry.column}`))
+  return [
+    ...fileImages.filter((image) => !taken.has(`${image.row}:${image.column}`)),
+    ...session.map((entry) => ({
+      id: `session-${entry.row}-${entry.column}`,
+      row: entry.row,
+      column: entry.column,
+      dataUrl: entry.dataUrl,
+    })),
+  ]
+}
+
 /// Sparklines install separately from the floating visuals: dragging a
 /// chart re-installs the visual pool, and rebuilding up to 200 sparkline
 /// float DOMs with it would make every drag commit crawl.
@@ -7848,7 +8126,11 @@ export function queueSparklineInstall(
         })),
     ]
     // In-cell rich-value pictures share the per-cell float DOM lifecycle.
-    const cellImages = sheetMeta?.cellImages ?? []
+    const cellImages = mergeCellImages(
+      sheetMeta?.cellImages ?? [],
+      state.editJournal.cellImageAdds,
+      sheetId,
+    )
     sparklineDisposablesRef.current = [
       ...(sparklines.length === 0 ? [] : installSparklines(runtime, sparklines, sheetId)),
       ...(cellImages.length === 0

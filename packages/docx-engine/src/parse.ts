@@ -21,6 +21,7 @@ import {
 import { findSourcesPart, parseSourcesXml } from './sources'
 import { decodeSymbolText, symbolGlyph } from './symbol-fonts'
 import { readZoteroDocumentData } from './zotero-doc-props'
+import { emptyDocumentProperties, readDocumentProperties } from './doc-properties'
 import { computeListMarkerInfos, type ListItemRef } from './list-markers'
 import { FONT_TABLE_PART_PATH, parseFontTable, readEmbeddedFonts } from './font-table'
 import { DEFAULT_THEME_COLORS, THEME_PART_PATH, readThemeColors, readThemeFonts } from './theme'
@@ -150,6 +151,7 @@ import {
 import {
   IMAGE_RUN_CHILDREN,
   JC_ALIGN,
+  MERGEFIELD_INSTR_RE,
   SIMPLE_INLINE_FIELD_RE,
   ZOTERO_INLINE_FIELD_RE,
   activeCharIndents,
@@ -373,6 +375,8 @@ export async function parseDocx(
   const sources = await parseSources(zip)
   // a damaged docProps/custom.xml must not keep the document from opening
   const zoteroDocumentData = await readZoteroDocumentData(zip).catch(() => '')
+  // the same goes for the other docProps parts: a broken one is simply empty
+  const properties = await readDocumentProperties(zip).catch(() => emptyDocumentProperties())
   const fontTableFile = zip.file(FONT_TABLE_PART_PATH)
   const fontTable = fontTableFile ? parseFontTable(await fontTableFile.async('string')) : []
   const embeddedFonts = await readEmbeddedFonts(zip, fontTable)
@@ -576,6 +580,7 @@ export async function parseDocx(
   return {
     blocks,
     zoteroDocumentData,
+    properties,
     comments,
     protection,
     writeProtection,
@@ -2268,6 +2273,13 @@ function txbxContentParas(
     const level = ctx.numbering.get(ref.numId ?? '')?.levels[Math.max(0, ref.ilvl)]
     para.listMarker = {
       text: info.text,
+      // identity + kind ride along so an edit inside the sub-editor can keep,
+      // clear or re-point the paragraph's w:numPr on save
+      ...(ref.numId != null ? { numId: ref.numId } : {}),
+      ilvl: Math.max(0, ref.ilvl),
+      ...(level
+        ? { kind: level.numFmt === 'bullet' ? ('bullet' as const) : ('ordered' as const) }
+        : {}),
       ...(info.symbolFont ? { symbol: true } : {}),
       ...(info.picBulletSrc ? { picBulletSrc: info.picBulletSrc } : {}),
       ...(level?.indentLeft !== undefined ? { indentLeft: level.indentLeft } : {}),
@@ -4061,6 +4073,22 @@ function extractRuns(
           } else if (ZOTERO_INLINE_FIELD_RE.test(fieldInstr)) {
             if (zoteroField) pushZoteroCachedRuns(zoteroField.part, rev)
             else pushZoteroCachedRuns('single', rev)
+          } else if (MERGEFIELD_INSTR_RE.test(fieldInstr)) {
+            // Mail merge: Word fills the result in from a data source, so an
+            // unmerged main document caches nothing. Show the guillemet
+            // placeholder Word uses instead of an empty run; the value is not
+            // dirtied because only the merge itself can supply it.
+            const merge = MERGEFIELD_INSTR_RE.exec(fieldInstr)!
+            pushRun(
+              {
+                ...resultFormat(),
+                text: fieldCached || `«${merge[1] ?? merge[2]}»`,
+                instrField: fieldInstr.trim(),
+                ...(fieldDirty ? { fldDirty: true } : {}),
+                ...(link ? { link } : {}),
+              },
+              rev,
+            )
           } else if (SIMPLE_INLINE_FIELD_RE.test(fieldInstr)) {
             // an unformatted result run would drop to the paragraph default size
             pushRun(
@@ -4077,11 +4105,12 @@ function extractRuns(
             const eq = eqField(fieldInstr)!
             pushRun({ ...resultFormat(), text: eq.text, math: { omml: eq.omml } }, rev)
           } else if (fieldCachedRuns.length > 0) {
-            // any other field (HYPERLINK with switches, MERGEFIELD mail-merge
-            // labels...): the cached result is still the visible text — keep it
-            // as plain runs. Body paragraphs with these fields stay on the
-            // passthrough path (onlyXeFields rejects them), so this only feeds
-            // display-only contexts such as table cells and textbox content.
+            // any other field (HYPERLINK with switches, ASK / FILLIN, the
+            // mail-merge control fields NEXT / SKIPIF...): the cached result is
+            // still the visible text — keep it as plain runs. Body paragraphs
+            // with these fields stay on the passthrough path (onlyXeFields
+            // rejects them), so this only feeds display-only contexts such as
+            // table cells and textbox content.
             for (const cached of fieldCachedRuns) pushRun(cached, rev)
           }
           fieldInstr = ''
@@ -4204,7 +4233,8 @@ function extractRuns(
     const instr = decodeNumericCharRefs(String(attrsOf(node)['w:instr'] ?? ''))
     const xe = XE_INSTR_RE.exec(instr)
     const ref = REF_INSTR_RE.exec(instr)
-    if (!xe && !ref && !SIMPLE_INLINE_FIELD_RE.test(instr)) {
+    const merge = MERGEFIELD_INSTR_RE.exec(instr)
+    if (!xe && !ref && !merge && !SIMPLE_INLINE_FIELD_RE.test(instr)) {
       walk(childrenOf(node), link, rev)
       return
     }
@@ -4225,6 +4255,17 @@ function extractRuns(
           text: text || name,
           refField: name,
           refInstr: ` ${instr.trim()} `,
+          ...(dirty ? { fldDirty: true } : {}),
+          ...(link ? { link } : {}),
+        },
+        rev,
+      )
+    } else if (merge) {
+      pushRun(
+        {
+          ...format,
+          text: text || `«${merge[1] ?? merge[2]}»`,
+          instrField: instr.trim(),
           ...(dirty ? { fldDirty: true } : {}),
           ...(link ? { link } : {}),
         },
