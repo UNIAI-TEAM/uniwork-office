@@ -6,12 +6,6 @@
  * once with a refreshed token after a 401. There is no postMessage relay for AI.
  *
  *   <same-origin api prefix>/v1/office-frame/documents/{documentID}/ai/
- *     credentials                      GET            { items: [Credential], providers: [...] }
- *     credentials/{provider}           PUT / DELETE   { api_key?, base_url?, label?, model? } -> Credential
- *     byok/{provider}/chat/completions POST           openai-compatible wire format (SSE stays SSE)
- *     byok/{provider}/messages         POST           Anthropic Messages wire format
- *     byok/{provider}/generate         POST           { model, stream, request: <Gemini body> }
- *     byok/{provider}/models           GET            the provider's own JSON
  *     cloud                            GET            { enabled, reason?, tools, credits, uniwork_model? }
  *     cloud/search                     POST           { query, kind, max_results } -> { results, answer? }
  *     cloud/images                     POST           { prompt, aspect_ratio?, ... } -> { images, model }
@@ -20,45 +14,10 @@
  *     uniwork/chat/completions         POST           UniWork AI: one agent turn, openai-compatible, raw Response
  *     uniwork/write                    POST           { kind, lang, input }: a one-shot writer of the open run, SSE, raw Response
  *
- * A key is never read back: `key_hint` is "…" + the last four characters. `model` is the model the
- * person chose for that provider, saved with the credential (an older server omits it: read as "").
+ * UniWork AI is the only AI of the frame (UNI-2289): it never reads or stores a key.
  */
 import { isInsideAiMount } from './mount'
 import { AiWebError, aiErrorFromResponse } from './errors'
-
-export interface AiCredential {
-  provider: string
-  label: string
-  base_url: string
-  key_hint: string
-  /** the model chosen for this provider, saved on the server ("" = none yet / an older server) */
-  model: string
-  /** RFC 3339; the credential with the latest one (and a model) is the default provider */
-  model_updated_at: string
-  created_at: string
-  updated_at: string
-}
-
-export interface AiServerProvider {
-  id: string
-  protocol: string
-  requires_base_url: boolean
-  default_base_url: string
-}
-
-export interface AiCredentialList {
-  items: AiCredential[]
-  providers: AiServerProvider[]
-}
-
-export interface AiCredentialInput {
-  /** required on create (<= 4096); omitted on update keeps the stored key */
-  api_key?: string
-  base_url?: string
-  label?: string
-  /** left out keeps the stored model; "" clears it. A model-only body needs a stored key. */
-  model?: string
-}
 
 export interface AiCloudTools {
   web_search: boolean
@@ -140,11 +99,6 @@ export interface AiWebClient {
     headers: Record<string, string>,
     signal?: AbortSignal,
   ): Promise<Response>
-  /** as fetch, but a non-2xx answer throws its AiWebError and the JSON body is returned */
-  json<T>(path: string, init?: RequestInit): Promise<T>
-  listCredentials(): Promise<AiCredentialList>
-  saveCredential(provider: string, input: AiCredentialInput): Promise<AiCredential>
-  deleteCredential(provider: string): Promise<void>
   cloudStatus(): Promise<AiCloudStatus>
   search(input: {
     query: string
@@ -207,38 +161,6 @@ export function readCloudStatus(raw: unknown): AiCloudStatus {
   }
 }
 
-function readCredential(raw: unknown, fallbackProvider = ''): AiCredential {
-  const r = (raw ?? {}) as Partial<AiCredential>
-  const s = (v: unknown): string => (typeof v === 'string' ? v : '')
-  return {
-    provider: s(r.provider) || fallbackProvider,
-    label: s(r.label),
-    base_url: s(r.base_url),
-    key_hint: s(r.key_hint),
-    model: s(r.model).trim(),
-    model_updated_at: s(r.model_updated_at),
-    created_at: s(r.created_at),
-    updated_at: s(r.updated_at),
-  }
-}
-
-function readCredentialList(raw: unknown): AiCredentialList {
-  const r = (raw ?? {}) as { items?: unknown; providers?: unknown }
-  const items = Array.isArray(r.items) ? r.items.map((c) => readCredential(c)) : []
-  const providers = Array.isArray(r.providers)
-    ? r.providers
-        .map((p) => p as Partial<AiServerProvider>)
-        .filter((p) => typeof p.id === 'string' && p.id)
-        .map((p) => ({
-          id: p.id as string,
-          protocol: typeof p.protocol === 'string' ? p.protocol : '',
-          requires_base_url: p.requires_base_url === true,
-          default_base_url: typeof p.default_base_url === 'string' ? p.default_base_url : '',
-        }))
-    : []
-  return { items, providers }
-}
-
 export function createAiWebClient(options: AiWebClientOptions): AiWebClient {
   const origin = options.origin ?? location.origin
   const base = aiRouteBase(options.apiBase, options.documentId, origin)
@@ -260,6 +182,7 @@ export function createAiWebClient(options: AiWebClientOptions): AiWebClient {
     return res
   }
 
+  /** as authorised, but a non-2xx answer throws its AiWebError and the JSON body is returned */
   async function json<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await authorised(path, init)
     if (!res.ok) throw await aiErrorFromResponse(res)
@@ -286,20 +209,6 @@ export function createAiWebClient(options: AiWebClientOptions): AiWebClient {
       }),
     uniworkWrite: (body, headers, signal) =>
       authorised('uniwork/write', { method: 'POST', headers, body, ...(signal ? { signal } : {}) }),
-    json,
-    listCredentials: async () => readCredentialList(await json('credentials')),
-    saveCredential: async (provider, input) =>
-      readCredential(
-        await json(`credentials/${encodeURIComponent(provider)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(input),
-        }),
-        provider,
-      ),
-    deleteCredential: async (provider) => {
-      await json(`credentials/${encodeURIComponent(provider)}`, { method: 'DELETE' })
-    },
     cloudStatus: async () => readCloudStatus(await json('cloud')),
     search: async (input) => {
       const r = await post<{ results?: AiSearchResult[]; answer?: string }>('cloud/search', input)

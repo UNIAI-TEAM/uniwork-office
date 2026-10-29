@@ -1,45 +1,17 @@
 /**
  * aiStream / aiChat in the frame (the desktop runs them in the main process, e.g.
- * apps/slides/src/main/ai-ipc.ts `ai:stream`): the same ai-provider protocol code, the same
- * AiStreamChunk sequence (delta / reasoning / tool-call / ping, then one done or error), with the
- * base URL pointed at the BYOK proxy route of the chosen provider and no key in the config.
+ * apps/slides/src/main/ai-ipc.ts `ai:stream`), with the same AiStreamChunk sequence (delta /
+ * reasoning / tool-call / ping, then one done or error).
  *
- * The protocol modules are imported one by one (not the package index): the index also pulls the
- * Codex app-server bridge, which needs Node. Codex and Genspark have no web route; a request for
- * them, or for a provider the server table does not list, fails with `credential_missing`.
- *
- * `uniwork` (UniWork AI) is not a BYOK provider: it never goes through the proxy fetch or a vendor
- * protocol. The ai-provider adapter (`streamUniwork`) runs one agent turn per request over the frame
- * transport below (`client.uniworkChat`, the frame route), and its notices / turn reset / failures
- * are mapped to the same chunk sequence the panel already reads.
+ * UniWork AI is the only AI of the frame (UNI-2289): every turn is a UniWork AI turn, whatever
+ * provider the renderer's settings still name, and no vendor protocol runs here. The ai-provider
+ * adapter (`streamUniwork`) runs one agent turn per request over the frame transport below
+ * (`client.uniworkChat`, the frame route), and its notices / turn reset / failures are mapped to the
+ * same chunk sequence the panel already reads.
  */
-import type { AgentMessage, AgentToolDef } from '@genoffice/agent-core'
-import { setPrimaryFetch } from '../../../../packages/ai-provider/src/fetch'
-import { isAiNetworkError } from '../../../../packages/ai-provider/src/network-error'
-import { isAiOverloadedError } from '../../../../packages/ai-provider/src/overload-error'
-import { withOutputCapFallback } from '../../../../packages/ai-provider/src/output-cap'
-import {
-  chatAnthropic,
-  streamAnthropic,
-} from '../../../../packages/ai-provider/src/protocols/anthropic'
-import { chatGemini, streamGemini } from '../../../../packages/ai-provider/src/protocols/gemini'
-import {
-  chatOpenAiCompatible,
-  streamOpenAiCompatible,
-} from '../../../../packages/ai-provider/src/protocols/openai-compatible'
-import {
-  AiCreditsError,
-  type StreamCallbacks,
-} from '../../../../packages/ai-provider/src/protocols/shared'
-import { maxOutputTokensOf } from '../../../../packages/ai-provider/src/providers'
-import {
-  getProviderAdapter,
-  type ResolvedEndpoint,
-} from '../../../../packages/ai-provider/src/registry'
+import type { StreamCallbacks } from '../../../../packages/ai-provider/src/protocols/shared'
 import type {
   AiChatResponse,
-  AiProviderConfig,
-  AiProviderId,
   AiSettings,
   AiStreamChunk,
   AiStreamRequest,
@@ -47,16 +19,10 @@ import type {
 import { uniworkConversations } from '../../../../packages/ai-provider/src/uniwork/conversation'
 import { streamUniwork } from '../../../../packages/ai-provider/src/uniwork/protocol'
 import {
-  UNIWORK_PROVIDER_ID,
   UNIWORK_RUN_HEADER,
   type UniworkChatTransport,
   type UniworkScope,
 } from '../../../../packages/ai-provider/src/uniwork/types'
-import {
-  AI_CHAT_RESPONSE_TIMEOUT_MS,
-  AiTimeoutError,
-  createStreamWatchdog,
-} from '../../../../packages/ai-provider/src/watchdog'
 import type { AiRunTracker } from '../ai-run'
 import type { AiWebClient } from './client'
 import {
@@ -65,16 +31,13 @@ import {
   type AiHandoff,
   type AiHandoffStream,
 } from './handoff'
-import { AiWebError, findAiWebError, rawFailureAsTyped, type UniworkFailure } from './errors'
-import { createProxyFetch } from './transport'
+import type { UniworkFailure } from './errors'
 import { runUniworkWriter, uniworkFailureOf } from './writer'
-
-export type WireProtocol = 'openai-compatible' | 'anthropic' | 'gemini'
 
 /** the tracker as the UniWork AI turn uses it: it may also take the run id the server issued */
 export type UniworkRunTracker = AiRunTracker & { setRunId?(runId: string): void }
 
-/** what the UniWork AI branch of aiStream needs from the frame session (absent = no UniWork AI) */
+/** what a UniWork AI turn needs from the frame session (absent = no UniWork AI) */
 export interface UniworkStreamDeps {
   /** the frame route scope of this document and module; null = UniWork AI is not available here */
   scope(): UniworkScope | null
@@ -91,21 +54,7 @@ export interface UniworkStreamDeps {
 }
 
 export interface StreamDeps {
-  client: Pick<AiWebClient, 'base' | 'fetch'> &
-    Partial<Pick<AiWebClient, 'uniworkChat' | 'uniworkWrite'>>
-  /** the server's wire protocol of a provider id (from GET credentials `providers`); null = unknown */
-  protocolOf(provider: string): WireProtocol | null
-  /**
-   * the localized text of a typed failure: the panel shows it as the turn's error, and that inline
-   * error is the ONE surface of a failed turn (no floating card beside it)
-   */
-  describe(error: AiWebError, provider: string): string
-  /**
-   * a one-shot `aiChat` failed with a typed state. Only that path: a chat turn (`aiStream`) has
-   * the panel's inline error, a one-shot call (feature actions, hints) may have no surface at all,
-   * so the bridge raises its in-frame state card for it.
-   */
-  onChatFailure?(error: AiWebError, provider: string): void
+  client: Partial<Pick<AiWebClient, 'uniworkChat' | 'uniworkWrite'>>
   /** the frame's AI turn state: a chat stream is a running turn until it ends (X-02 `aiRun`, S6) */
   aiRun?: UniworkRunTracker
   uniwork?: UniworkStreamDeps
@@ -114,74 +63,12 @@ export interface StreamDeps {
 }
 
 /** what the handoff needs of a stream's history: its question's own words, or tool results */
-function handoffTurn(messages: AiStreamRequest['messages'], uniwork: boolean): AiHandoffStream {
+function handoffTurn(messages: AiStreamRequest['messages']): AiHandoffStream {
   const last = messages.at(-1)
   return {
     words: last?.role === 'user' ? (last.instruction ?? last.text) : null,
-    uniwork,
+    uniwork: true,
   }
-}
-
-/** the request config ai-provider sees: proxy base URL, no key */
-export function proxyConfig(
-  client: Pick<AiWebClient, 'base'>,
-  provider: AiProviderId,
-  settings: AiSettings,
-): AiProviderConfig {
-  const own = settings.providers?.[provider]
-  return {
-    apiKey: '',
-    model: own?.model ?? '',
-    baseUrl: `${client.base}/byok/${encodeURIComponent(provider)}`,
-  }
-}
-
-/** protocol = the server's; request shaping (temperature, token field, body extras) = the adapter's */
-export function resolveWebEndpoint(
-  provider: AiProviderId,
-  config: AiProviderConfig,
-  protocol: WireProtocol,
-): ResolvedEndpoint & { protocol: WireProtocol } {
-  let shaping: Partial<ResolvedEndpoint> = {}
-  try {
-    const native = getProviderAdapter(provider).resolveEndpoint(config)
-    if (native.protocol === protocol) shaping = native
-  } catch {
-    // an id the adapter table does not know: plain request shaping
-  }
-  return {
-    ...(shaping.omitTemperature ? { omitTemperature: true } : {}),
-    ...(shaping.useMaxCompletionTokens ? { useMaxCompletionTokens: true } : {}),
-    ...(shaping.bodyExtras ? { bodyExtras: shaping.bodyExtras } : {}),
-    protocol,
-    baseUrl: config.baseUrl ?? '',
-  }
-}
-
-let installedFor: unknown = null
-
-/** route every ai-provider fetch of this frame through the proxy (idempotent per client) */
-export function installProxyTransport(client: Pick<AiWebClient, 'base' | 'fetch'>): void {
-  if (installedFor === client) return
-  installedFor = client
-  setPrimaryFetch(createProxyFetch(client))
-}
-
-function missing(provider: string): AiWebError {
-  return new AiWebError({ code: 'credential_missing', status: 404, message: provider })
-}
-
-/** a provider with a key but no model: the server would answer a bare 400, so nothing is sent */
-function modelRequired(provider: string): AiWebError {
-  return new AiWebError({ code: 'model_required', status: 0, message: provider })
-}
-
-export function errorCodeOf(err: unknown): AiStreamChunk['errorCode'] | undefined {
-  if (err instanceof AiTimeoutError) return 'timeout'
-  if (err instanceof AiCreditsError) return 'credits'
-  if (isAiNetworkError(err)) return 'network'
-  if (isAiOverloadedError(err)) return 'overloaded'
-  return undefined
 }
 
 export interface WebAiStreams {
@@ -203,12 +90,6 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
         console.error('[web-ai] onAiStream listener threw', err)
       }
     }
-  }
-
-  const typed = (err: AiWebError, provider: string): string => deps.describe(err, provider)
-  const chatTyped = (err: AiWebError, provider: string): string => {
-    deps.onChatFailure?.(err, provider)
-    return typed(err, provider)
   }
 
   /** a UniWork AI turn: the adapter over the frame transport, mapped to the panel's chunks */
@@ -263,7 +144,7 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     }
     // a question (never tool results) may run the handed-over job: every post of this turn is that
     // question, its run_expired / 429 resends included, so each carries the id
-    const handoffId = deps.handoff?.stream(handoffTurn(messages, true)) ?? null
+    const handoffId = deps.handoff?.stream(handoffTurn(messages)) ?? null
     const transport: UniworkChatTransport = {
       post: async (req) => {
         const headers = handoffId
@@ -377,141 +258,20 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     }
   }
 
-  async function aiStream(request: AiStreamRequest): Promise<void> {
-    const { requestId, settings, system, messages } = request
-    const provider = settings.provider
-    if (provider === UNIWORK_PROVIDER_ID) return uniworkTurn(request)
-    // a question the person asks another provider ends a handed-over job
-    if (!request.purpose) deps.handoff?.stream(handoffTurn(messages, false))
-    // a turn of another provider on this session ends the UniWork AI conversation (the next UniWork
-    // turn opens a new one with a boundary notice)
-    uniworkConversations.observe(request.sessionId, provider)
-    const protocol = deps.protocolOf(provider)
-    if (!protocol) {
-      emit({ requestId, type: 'error', error: typed(missing(provider), provider) })
-      return
-    }
-    const config = proxyConfig(deps.client, provider, settings)
-    if (!config.model.trim()) {
-      emit({ requestId, type: 'error', error: typed(modelRequired(provider), provider) })
-      return
-    }
-    installProxyTransport(deps.client)
-    const endpoint = resolveWebEndpoint(provider, config, protocol)
-    const tools: AgentToolDef[] = request.tools ?? []
-    const maxTokens = request.maxTokens ?? maxOutputTokensOf(settings)
-    const controller = new AbortController()
-    active.set(requestId, controller)
-    deps.aiRun?.begin(requestId, () => controller.abort())
-    let lastPing = 0
-    const ping = (): void => {
-      const now = Date.now()
-      if (now - lastPing < 5_000) return
-      lastPing = now
-      emit({ requestId, type: 'ping' })
-    }
-    let stopReason: string | undefined
-    const cb = {
-      ...(request.sessionId ? { sessionId: request.sessionId } : {}),
-      signal: controller.signal,
-      onDelta: (text: string) => emit({ requestId, type: 'delta', text }),
-      onReasoningDelta: (text: string) => emit({ requestId, type: 'reasoning', text }),
-      onToolCall: (toolCall: NonNullable<AiStreamChunk['toolCall']>) =>
-        emit({ requestId, type: 'tool-call', toolCall }),
-      onActivity: ping,
-      onStopReason: (reason: string) => {
-        stopReason = reason
-      },
-    }
-    try {
-      await withOutputCapFallback(endpoint.baseUrl, config.model, maxTokens, (cap) =>
-        runTurn(endpoint, config, system, messages, tools, cap, cb),
-      )
-      emit(
-        stopReason === undefined
-          ? { requestId, type: 'done' }
-          : { requestId, type: 'done', stopReason },
-      )
-    } catch (err) {
-      const web = findAiWebError(err) ?? (errorCodeOf(err) ? undefined : rawFailureAsTyped(err))
-      if (controller.signal.aborted) {
-        emit({ requestId, type: 'done' })
-      } else if (web) {
-        emit({ requestId, type: 'error', error: typed(web, provider) })
-      } else {
-        const code = errorCodeOf(err)
-        emit({
-          requestId,
-          type: 'error',
-          error: err instanceof Error ? err.message : String(err),
-          ...(code ? { errorCode: code } : {}),
-        })
-      }
-    } finally {
-      active.delete(requestId)
-      deps.aiRun?.end(requestId)
-    }
-  }
-
-  async function aiChat(request: {
-    settings: AiSettings
-    system: string
-    user: string
-  }): Promise<AiChatResponse> {
-    const provider = request.settings.provider
-    // UniWork AI is one agent turn per request (aiStream): it has no one-shot chat route
-    if (provider === UNIWORK_PROVIDER_ID) {
-      return {
-        ok: false,
-        error:
-          deps.uniwork?.describeFailure({ code: 'ai_disabled' }) ?? 'UniWork AI is not available',
-      }
-    }
-    const protocol = deps.protocolOf(provider)
-    if (!protocol) return { ok: false, error: chatTyped(missing(provider), provider) }
-    const config = proxyConfig(deps.client, provider, request.settings)
-    if (!config.model.trim())
-      return { ok: false, error: chatTyped(modelRequired(provider), provider) }
-    installProxyTransport(deps.client)
-    const endpoint = resolveWebEndpoint(provider, config, protocol)
-    const wd = createStreamWatchdog(undefined, AI_CHAT_RESPONSE_TIMEOUT_MS)
-    try {
-      return await wd.guard(() => {
-        switch (endpoint.protocol) {
-          case 'anthropic':
-            return chatAnthropic(wd, config, request.system, request.user, endpoint.baseUrl)
-          case 'gemini':
-            return chatGemini(wd, config, request.system, request.user, endpoint.baseUrl, {
-              omitTemperature: endpoint.omitTemperature,
-            })
-          case 'openai-compatible':
-            return chatOpenAiCompatible(
-              wd,
-              endpoint.baseUrl,
-              config,
-              request.system,
-              request.user,
-              {
-                omitTemperature: endpoint.omitTemperature,
-                bodyExtras: endpoint.bodyExtras,
-              },
-            )
-        }
-      })
-    } catch (err) {
-      const web = findAiWebError(err) ?? (errorCodeOf(err) ? undefined : rawFailureAsTyped(err))
-      if (web) return { ok: false, error: chatTyped(web, provider) }
-      const code = errorCodeOf(err)
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : String(err),
-        ...(code ? { errorCode: code } : {}),
-      }
+  /**
+   * UniWork AI only: no one-shot chat route, so a one-shot answers with the failure text and sends
+   * nothing (no editor panel calls aiChat on the web)
+   */
+  async function aiChat(): Promise<AiChatResponse> {
+    return {
+      ok: false,
+      error:
+        deps.uniwork?.describeFailure({ code: 'ai_disabled' }) ?? 'UniWork AI is not available',
     }
   }
 
   return {
-    aiStream,
+    aiStream: uniworkTurn,
     aiStreamCancel: async (requestId) => {
       active.get(requestId)?.abort()
     },
@@ -522,39 +282,5 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
       }
     },
     aiChat,
-  }
-}
-
-function runTurn(
-  endpoint: ResolvedEndpoint & { protocol: WireProtocol },
-  config: AiProviderConfig,
-  system: string,
-  messages: AgentMessage[],
-  tools: AgentToolDef[],
-  maxTokens: number,
-  cb: Parameters<typeof streamAnthropic>[5],
-): Promise<void> {
-  switch (endpoint.protocol) {
-    case 'anthropic':
-      return streamAnthropic(config, system, messages, tools, maxTokens, cb, endpoint.baseUrl)
-    case 'gemini':
-      return streamGemini(config, system, messages, tools, maxTokens, cb, endpoint.baseUrl, {
-        omitTemperature: endpoint.omitTemperature,
-      })
-    case 'openai-compatible':
-      return streamOpenAiCompatible(
-        endpoint.baseUrl,
-        config,
-        system,
-        messages,
-        tools,
-        maxTokens,
-        cb,
-        {
-          omitTemperature: endpoint.omitTemperature,
-          useMaxCompletionTokens: endpoint.useMaxCompletionTokens,
-          bodyExtras: endpoint.bodyExtras,
-        },
-      )
   }
 }

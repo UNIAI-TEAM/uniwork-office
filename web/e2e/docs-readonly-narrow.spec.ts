@@ -69,7 +69,7 @@ test('docs-web: editable with the save grant (control)', async ({ page }) => {
 for (const width of [768, 390]) {
   test(`docs-web: ${width}px frame is usable`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 })
-    const ed = await openDoc(page, '&ai=1&lang=en')
+    const ed = await openDoc(page, '&uniwork=1&lang=en')
     await page.waitForTimeout(1_500)
     // no sideways scrolling of the frame document
     const overflow = await ed.evaluate(() => ({

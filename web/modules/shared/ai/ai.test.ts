@@ -1,47 +1,35 @@
 // Web AI bridge (CONTRACT C16): contract shapes, frame-token auth + 401 refresh, error mapping,
-// the ai-provider proxy transport, streaming chunks, the off/on member switch, the in-frame UI.
+// the UniWork AI turn, the off/on member switch, the in-frame state card. The frame runs UniWork AI
+// only (UNI-2289): no key store, no BYOK proxy, no provider choice.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setPrimaryFetch } from '../../../../packages/ai-provider/src/fetch'
 import {
   getUniworkCloudStatus,
   setUniworkCloudStatus,
 } from '../../../../packages/ai-provider/src/uniwork-cloud'
 import { aiRouteBase, createAiWebClient, readCloudStatus } from './client'
 import {
+  AI_WEB_ERROR_CODES,
   AiWebError,
   aiErrorCodeFor,
   aiErrorFromResponse,
   errorBodyFields,
-  rawFailureAsTyped,
   retryAfterSeconds,
   uniworkFailureKey,
 } from './errors'
-import { aiNoticeBody, aiNoticeKind } from '../../../../packages/ai-provider/src/ai-notice'
 import {
   setUniworkAiAvailable,
   uniworkAiAvailable,
 } from '../../../../packages/ai-provider/src/providers'
 import { uniworkConversations } from '../../../../packages/ai-provider/src/uniwork/conversation'
 import { UniworkError } from '../../../../packages/ai-provider/src/uniwork/errors'
-import { createProxyFetch, toProxyRequest } from './transport'
 import { createAiRunTracker, type AiRunTracker } from '../ai-run'
 import { createWebAiStreams } from './stream'
-import {
-  CREDENTIALS_TTL_MS,
-  aiHostGrants,
-  createWebAi,
-  mediaFromUrl,
-  modelIdsOf,
-  withWebAi,
-} from './web-ai'
-import { describeAiError, hideAiState, openAiSettingsDialog, showAiState } from './ui'
-import { aiWebStrings, aiWebText } from '../i18n/strings-ai-web'
-import type { Lang } from '@genoffice/i18n'
+import { aiHostGrants, createWebAi, mediaFromUrl, withWebAi } from './web-ai'
+import { describeAiError, hideAiState, showAiState } from './ui'
+import type { Capabilities } from '../../../docs/protocol/types'
 
 const ORIGIN = 'https://app.test'
 const BASE = `${ORIGIN}/api/v1/office-frame/documents/doc-1/ai`
-// a clock after every credential stamp of these fixtures: a local pick made "now" is newer than the server rows
-const AFTER_STAMPS = Date.parse('2026-10-14T00:00:00Z')
 
 interface Call {
   url: string
@@ -55,7 +43,7 @@ function jsonResponse(status: number, body?: unknown, headers: Record<string, st
   })
 }
 
-function sseResponse(lines: string[]): Response {
+function sseResponse(lines: string[], headers: Record<string, string> = {}): Response {
   const enc = new TextEncoder()
   const stream = new ReadableStream<Uint8Array>({
     start(c) {
@@ -63,7 +51,22 @@ function sseResponse(lines: string[]): Response {
       c.close()
     },
   })
-  return new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+  return new Response(stream, {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream', ...headers },
+  })
+}
+
+/** one finished UniWork AI answer of the frame route, as the server streams it */
+function uniworkOk(): Response {
+  const chunk = {
+    choices: [{ index: 0, delta: { content: 'Done.' }, finish_reason: 'stop' }],
+    x_uniwork: { step: 0, limit: 8 },
+  }
+  return sseResponse([`data: ${JSON.stringify(chunk)}\n\n`, 'data: [DONE]\n\n'], {
+    'X-UniWork-AI-Conversation': 'conv-1',
+    'X-UniWork-AI-Run': 'run-1',
+  })
 }
 
 function tokens(first = 'tok-1', next = 'tok-2') {
@@ -85,31 +88,17 @@ function recorder(answer: (call: Call, n: number) => Response | Promise<Response
 
 const header = (call: Call, name: string) => new Headers(call.init.headers).get(name)
 
-const CREDENTIALS = {
-  items: [
-    {
-      provider: 'openai',
-      label: '',
-      base_url: '',
-      key_hint: '…abcd',
-      created_at: '2026-10-09T00:00:00Z',
-      updated_at: '2026-10-09T00:00:00Z',
-      model: '',
-      model_updated_at: '',
-    },
-  ],
-  providers: [
-    { id: 'anthropic', protocol: 'anthropic', requires_base_url: false, default_base_url: '' },
-    { id: 'gemini', protocol: 'gemini', requires_base_url: false, default_base_url: '' },
-    { id: 'openai', protocol: 'openai-compatible', requires_base_url: false, default_base_url: '' },
-    { id: 'custom', protocol: 'openai-compatible', requires_base_url: true, default_base_url: '' },
-    {
-      id: 'hunyuan',
-      protocol: 'openai-compatible',
-      requires_base_url: false,
-      default_base_url: '',
-    },
-  ],
+/** a frame port whose session grants `caps`; `withToken` = false is the headless entry */
+function port(caps: Record<string, boolean> | undefined, withToken = true, module?: string) {
+  return {
+    whenInitialized: async () => ({
+      documentId: 'doc-1',
+      apiBase: 'https://app.test/api/v1',
+      ...(caps ? { capabilities: caps } : {}),
+      ...(module ? { module } : {}),
+    }),
+    ...(withToken ? tokens() : {}),
+  }
 }
 
 const CLOUD = {
@@ -124,17 +113,21 @@ const CLOUD = {
   credits: { unit: 'ai.tokens', used: 10, limit: 100, remaining: 90, period_end: null },
 }
 
+/** what the frame publishes for the model chip and the panels (as the desktop preload does) */
+interface WindowCloudStatus {
+  get(): Promise<unknown>
+  onChange(handler: (status: unknown) => void): () => void
+}
+const windowCloudStatus = (): WindowCloudStatus | undefined =>
+  (window as unknown as { uniworkCloudStatus?: WindowCloudStatus }).uniworkCloudStatus
+
 afterEach(() => {
-  setPrimaryFetch(null)
   setUniworkAiAvailable(false)
+  setUniworkCloudStatus(null)
+  delete (window as unknown as { uniworkCloudStatus?: unknown }).uniworkCloudStatus
   uniworkConversations.clear()
   hideAiState()
   document.body.replaceChildren()
-  try {
-    localStorage.clear()
-  } catch {
-    // no storage in this environment
-  }
 })
 
 describe('routes', () => {
@@ -151,9 +144,7 @@ describe('routes', () => {
 
 describe('client', () => {
   it('sends the frame token as Bearer, never cookies, and reads the contract shapes', async () => {
-    const { calls, fetch } = recorder((c) =>
-      c.url.endsWith('/credentials') ? jsonResponse(200, CREDENTIALS) : jsonResponse(200, CLOUD),
-    )
+    const { calls, fetch } = recorder(() => jsonResponse(200, CLOUD))
     const client = createAiWebClient({
       documentId: 'doc-1',
       apiBase: 'https://app.test/api/v1',
@@ -161,22 +152,32 @@ describe('client', () => {
       origin: ORIGIN,
       fetch,
     })
-    const list = await client.listCredentials()
-    // an older server omits model / model_updated_at: read as ""
-    expect(list.items[0]).toEqual({ ...CREDENTIALS.items[0], model: '', model_updated_at: '' })
-    expect(list.providers.map((p) => p.id)).toContain('anthropic')
     const cloud = await client.cloudStatus()
     expect(cloud.tools.image_search).toBe(false)
-    expect(calls[0]!.url).toBe(`${BASE}/credentials`)
+    expect(cloud.credits).toMatchObject({ limit: 100, remaining: 90 })
+    expect(calls[0]!.url).toBe(`${BASE}/cloud`)
     expect(header(calls[0]!, 'authorization')).toBe('Bearer tok-1')
     expect(calls[0]!.init.credentials).toBe('omit')
     expect(calls[0]!.init.mode).toBe('same-origin')
   })
 
+  it('has no key store and no provider listing: only the cloud tools and the UniWork AI routes', () => {
+    const client = createAiWebClient({
+      documentId: 'doc-1',
+      apiBase: '/api',
+      tokens: tokens(),
+      origin: ORIGIN,
+      fetch: recorder(() => jsonResponse(200, {})).fetch,
+    })
+    for (const gone of ['listCredentials', 'saveCredential', 'deleteCredential', 'json']) {
+      expect(client, gone).not.toHaveProperty(gone)
+    }
+  })
+
   it('refreshes the token once after a 401 and retries', async () => {
     const t = tokens('old', 'new')
     const { calls, fetch } = recorder((_c, n) =>
-      n === 1 ? jsonResponse(401, { code: 'unauthorized' }) : jsonResponse(200, CREDENTIALS),
+      n === 1 ? jsonResponse(401, { code: 'unauthorized' }) : jsonResponse(200, CLOUD),
     )
     const client = createAiWebClient({
       documentId: 'doc-1',
@@ -185,7 +186,7 @@ describe('client', () => {
       origin: ORIGIN,
       fetch,
     })
-    await client.listCredentials()
+    await client.cloudStatus()
     expect(t.refreshToken).toHaveBeenCalledWith('unauthorized')
     expect(calls.map((c) => header(c, 'authorization'))).toEqual(['Bearer old', 'Bearer new'])
   })
@@ -205,12 +206,13 @@ describe('client', () => {
   it.each([
     [402, 'credits_exhausted', 'credits_exhausted'],
     [403, 'entitlement_required', 'entitlement_required'],
-    [404, 'credential_missing', 'credential_missing'],
-    [424, 'provider_auth_failed', 'provider_auth_failed'],
+    // no key store behind these routes: the old key codes are no state of their own
+    [404, 'credential_missing', 'unknown'],
+    [424, 'provider_auth_failed', 'unknown'],
     [502, 'provider_unreachable', 'provider_unreachable'],
     [503, 'cloud_unavailable', 'cloud_unavailable'],
-    [400, 'base_url_refused', 'base_url_refused'],
-    [400, 'provider_not_supported', 'provider_not_supported'],
+    [400, 'base_url_refused', 'bad_request'],
+    [400, 'provider_not_supported', 'bad_request'],
     [400, 'invalid_request', 'bad_request'],
     [500, 'internal', 'unknown'],
   ])('maps HTTP %i %s to %s', async (status, code, typed) => {
@@ -248,28 +250,6 @@ describe('client', () => {
     })
   })
 
-  it('credential PUT / DELETE: write-only key, masked hint back', async () => {
-    const { calls, fetch } = recorder((c) =>
-      c.init.method === 'DELETE'
-        ? new Response(null, { status: 204 })
-        : jsonResponse(201, { ...CREDENTIALS.items[0], provider: 'anthropic', key_hint: '…wxyz' }),
-    )
-    const client = createAiWebClient({
-      documentId: 'doc-1',
-      apiBase: '/api',
-      tokens: tokens(),
-      origin: ORIGIN,
-      fetch,
-    })
-    const saved = await client.saveCredential('anthropic', { api_key: 'sk-secret-wxyz' })
-    expect(saved.key_hint).toBe('…wxyz')
-    expect(JSON.stringify(saved)).not.toContain('sk-secret')
-    expect(calls[0]!.init.method).toBe('PUT')
-    expect(calls[0]!.url).toBe(`${BASE}/credentials/anthropic`)
-    await client.deleteCredential('anthropic')
-    expect(calls[1]!.init.method).toBe('DELETE')
-  })
-
   it('refuses to send the token outside the AI mount', async () => {
     const { fetch } = recorder(() => jsonResponse(200, {}))
     const client = createAiWebClient({
@@ -297,15 +277,15 @@ describe('client', () => {
     for (const path of [
       `${BASE}/../../../me`,
       `${BASE}/%2e%2e/%2e%2e/x`,
-      `${BASE}/credentials%2f..%2f..%2fx`,
+      `${BASE}/cloud%2f..%2f..%2fx`,
       `${BASE}\\..\\x`,
-      `${BASE.replace('app.test', 'app.test.evil.test')}/credentials`,
+      `${BASE.replace('app.test', 'app.test.evil.test')}/cloud`,
     ]) {
       await expect(client.fetch(path), path).rejects.toBeInstanceOf(AiWebError)
     }
     expect(fetch).not.toHaveBeenCalled()
     // a normal route below the mount still goes out
-    await client.fetch(`${BASE}/credentials`)
+    await client.fetch(`${BASE}/cloud`)
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
@@ -317,345 +297,6 @@ describe('client', () => {
       credits: { limit: null, remaining: null },
     })
   })
-})
-
-describe('proxy transport (ai-provider wire format -> BYOK routes)', () => {
-  const p = `${BASE}/byok`
-
-  it('keeps chat/completions, maps Anthropic /v1/messages, drops vendor keys and the user agent', () => {
-    const o = toProxyRequest(BASE, `${p}/openai/chat/completions`, {
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer sk-x',
-        'Content-Type': 'application/json',
-        'User-Agent': 'UniWorkOffice',
-      },
-      body: '{}',
-    })
-    expect(o.url).toBe(`${p}/openai/chat/completions`)
-    expect(o.init.headers).toEqual({ 'content-type': 'application/json' })
-    const a = toProxyRequest(BASE, `${p}/anthropic/v1/messages`, {
-      method: 'POST',
-      headers: { 'x-api-key': '', 'anthropic-version': '2023-06-01' },
-      body: '{}',
-    })
-    expect(a.url).toBe(`${p}/anthropic/messages`)
-    expect(a.init.headers).toEqual({ 'anthropic-version': '2023-06-01' })
-  })
-
-  it('wraps a Gemini call into /generate {model, stream, request}', () => {
-    const body = JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'hi' }] }] })
-    const s = toProxyRequest(
-      BASE,
-      `${p}/gemini/models/gemini-3.8-flash:streamGenerateContent?alt=sse`,
-      {
-        method: 'POST',
-        headers: { 'x-goog-api-key': 'k', 'Content-Type': 'application/json' },
-        body,
-      },
-    )
-    expect(s.url).toBe(`${p}/gemini/generate`)
-    expect(JSON.parse(String(s.init.body))).toEqual({
-      model: 'gemini-3.8-flash',
-      stream: true,
-      request: JSON.parse(body),
-    })
-    expect(s.init.headers).not.toHaveProperty('x-goog-api-key')
-    const n = toProxyRequest(BASE, `${p}/gemini/models/gemini-3.8-flash:generateContent`, { body })
-    expect(JSON.parse(String(n.init.body)).stream).toBe(false)
-  })
-
-  it('refuses any vendor URL (the frame never calls a provider directly)', () => {
-    expect(() => toProxyRequest(BASE, 'https://api.openai.com/v1/chat/completions')).toThrow(
-      AiWebError,
-    )
-  })
-
-  it('rethrows a malformed Gemini body as the parser error, not a typed refusal', () => {
-    expect(() =>
-      toProxyRequest(BASE, `${p}/gemini/models/gemini-3.8-flash:generateContent`, {
-        body: '{not json',
-      }),
-    ).toThrow(SyntaxError)
-  })
-
-  it('passes a vendor 402 / 503 through; a UniWork-coded one is the typed state', async () => {
-    let answer = jsonResponse(402, { error: { message: 'Insufficient Balance' } })
-    const proxied = createProxyFetch({ base: BASE, fetch: vi.fn(async () => answer) })
-    expect((await proxied(`${p}/openai/chat/completions`, { body: '{}' })).status).toBe(402)
-    answer = jsonResponse(503, { error: { type: 'overloaded_error', message: 'busy' } })
-    expect((await proxied(`${p}/openai/chat/completions`, { body: '{}' })).status).toBe(503)
-    answer = jsonResponse(503, { error: { code: 'cloud_unavailable' } })
-    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
-      code: 'cloud_unavailable',
-    })
-    // the server without a BYOK service answers its own 503 code
-    answer = jsonResponse(503, { error: { code: 'ai_byok_not_configured' } })
-    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
-      code: 'cloud_unavailable',
-    })
-  })
-
-  it('a 503 without a JSON error body (gateway page, empty body) is the typed cloud_outage state', async () => {
-    let answer = new Response('<html>502 Bad Gateway</html>', { status: 503 })
-    const proxied = createProxyFetch({ base: BASE, fetch: vi.fn(async () => answer) })
-    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
-      code: 'cloud_outage',
-      status: 503,
-    })
-    answer = new Response('', { status: 503 })
-    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
-      code: 'cloud_outage',
-    })
-    // the outage text asks for a retry, it never says the tool is not set up on the server
-    const text = describeAiError(new AiWebError({ code: 'cloud_outage', status: 503 }), 'X')
-    expect(text).toMatch(/try again/i)
-    expect(text).not.toMatch(/not set up/i)
-    // a coded 503 keeps its own state
-    answer = jsonResponse(503, { error: { code: 'cloud_unavailable' } })
-    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
-      code: 'cloud_unavailable',
-    })
-    // a vendor's JSON 503 still passes through
-    answer = jsonResponse(503, { error: { type: 'overloaded_error', message: 'busy' } })
-    expect((await proxied(`${p}/openai/chat/completions`, { body: '{}' })).status).toBe(503)
-  })
-
-  it('refuses a proxy URL that leaves the byok mount after normalisation', () => {
-    for (const url of [
-      `${BASE}/byok/../../x`,
-      `${BASE}/byok/openai/../../../me`,
-      `${BASE}/byok/%2e%2e/credentials`,
-      `${BASE}/byok/open%2fai/models`,
-    ]) {
-      expect(() => toProxyRequest(BASE, url), url).toThrow(AiWebError)
-    }
-  })
-
-  it('throws contract failures, passes a provider 404 / 400 through to ai-provider', async () => {
-    let answer = jsonResponse(404, { code: 'credential_missing' })
-    const client = { base: BASE, fetch: vi.fn(async () => answer) }
-    const proxied = createProxyFetch(client)
-    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
-      code: 'credential_missing',
-    })
-    // the UniWork API's own envelope: { error: { code, message } }
-    answer = jsonResponse(404, {
-      error: { code: 'credential_missing', message: 'chưa lưu khóa cho nhà cung cấp này' },
-    })
-    await expect(proxied(`${p}/openai/chat/completions`, { body: '{}' })).rejects.toMatchObject({
-      code: 'credential_missing',
-      serverCode: 'credential_missing',
-    })
-    answer = jsonResponse(404, { error: { message: 'model not found' } })
-    expect((await proxied(`${p}/openai/chat/completions`, { body: '{}' })).status).toBe(404)
-    answer = jsonResponse(400, { error: { message: 'max_tokens too large' } })
-    expect((await proxied(`${p}/openai/chat/completions`, { body: '{}' })).status).toBe(400)
-  })
-})
-
-describe('streams', () => {
-  const settings = (provider: string) =>
-    ({
-      provider,
-      providers: { [provider]: { apiKey: 'never-sent', model: 'm-1' } },
-    }) as never
-
-  function streams(answer: (c: Call) => Response, aiRun?: AiRunTracker) {
-    const { calls, fetch } = recorder((c) => answer(c))
-    const client = { base: BASE, fetch: (u: string, i?: RequestInit) => fetch(u, i) }
-    const onChatFailure = vi.fn()
-    const s = createWebAiStreams({
-      client,
-      protocolOf: (id) =>
-        id === 'openai'
-          ? 'openai-compatible'
-          : id === 'anthropic'
-            ? 'anthropic'
-            : id === 'gemini'
-              ? 'gemini'
-              : null,
-      describe: (err) => `typed:${err.code}`,
-      onChatFailure,
-      ...(aiRun ? { aiRun } : {}),
-    })
-    const chunks: Array<{ type: string; text?: string; error?: string }> = []
-    s.onAiStream((c) => chunks.push(c))
-    return { s, calls, chunks, onChatFailure }
-  }
-
-  it('streams an openai-compatible turn through the proxy (native wire format, no key)', async () => {
-    const { s, calls, chunks } = streams(() =>
-      sseResponse([
-        `data: ${JSON.stringify({ choices: [{ delta: { content: 'Hel' } }] })}\n\n`,
-        `data: ${JSON.stringify({ choices: [{ delta: { content: 'lo' }, finish_reason: 'stop' }] })}\n\n`,
-        'data: [DONE]\n\n',
-      ]),
-    )
-    await s.aiStream({
-      requestId: 'r1',
-      settings: settings('openai'),
-      system: 's',
-      messages: [{ role: 'user', content: 'hi' }],
-    } as never)
-    expect(
-      chunks
-        .filter((c) => c.type === 'delta')
-        .map((c) => c.text)
-        .join(''),
-    ).toBe('Hello')
-    expect(chunks.at(-1)!.type).toBe('done')
-    expect(calls[0]!.url).toBe(`${BASE}/byok/openai/chat/completions`)
-    expect(header(calls[0]!, 'authorization')).toBeNull() // the client adds the frame token, not the protocol
-    const body = JSON.parse(String(calls[0]!.init.body))
-    expect(body.model).toBe('m-1')
-    expect(body.stream).toBe(true)
-    expect(JSON.stringify(calls[0]!.init)).not.toContain('never-sent')
-  })
-
-  it('a chat stream is a running turn until it ends: aiRun running, then one idle (X-02, S6)', async () => {
-    const sent: string[] = []
-    const aiRun = createAiRunTracker({ report: (p) => sent.push(p.state), graceMs: 0 })
-    const { s } = streams(
-      () =>
-        sseResponse([
-          `data: ${JSON.stringify({ choices: [{ delta: { content: 'x' } }] })}\n\n`,
-          'data: [DONE]\n\n',
-        ]),
-      aiRun,
-    )
-    const turn = s.aiStream({
-      requestId: 'run1',
-      settings: settings('openai'),
-      system: 's',
-      messages: [{ role: 'user', content: 'hi' }],
-    } as never)
-    expect(aiRun.running()).toBe(true)
-    await turn
-    expect(aiRun.running()).toBe(false)
-    expect(sent).toEqual(['running', 'idle'])
-  })
-
-  it('a stream that cannot start (no model) is not a running turn; a stopped one ends the run', async () => {
-    const sent: string[] = []
-    const aiRun = createAiRunTracker({ report: (p) => sent.push(p.state), graceMs: 0 })
-    const { s } = streams(() => jsonResponse(400, {}), aiRun)
-    const noModel = { provider: 'openai', providers: { openai: { apiKey: 'k', model: ' ' } } }
-    await s.aiStream({ requestId: 'r0', settings: noModel, system: 's', messages: [] } as never)
-    expect(sent).toEqual([])
-    // a stream that hangs until it is cancelled (the "stop to reload" path)
-    const hang = streams(
-      (c) =>
-        new Response(
-          new ReadableStream({
-            start(controller) {
-              c.init.signal?.addEventListener('abort', () => controller.error(new Error('aborted')))
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'text/event-stream' } },
-        ),
-      aiRun,
-    )
-    const turn = hang.s.aiStream({
-      requestId: 'r1',
-      settings: settings('openai'),
-      system: 's',
-      messages: [{ role: 'user', content: 'hi' }],
-    } as never)
-    await new Promise((r) => setTimeout(r, 0))
-    expect(aiRun.running()).toBe(true)
-    await aiRun.stop()
-    await turn
-    expect(aiRun.running()).toBe(false)
-    expect(sent).toEqual(['running', 'idle'])
-  })
-
-  it('a provider with no model sends nothing and says to choose one (never the generic refusal)', async () => {
-    const { s, calls, chunks, onChatFailure } = streams(() => jsonResponse(400, {}))
-    const noModel = { provider: 'openai', providers: { openai: { apiKey: 'k', model: '  ' } } }
-    await s.aiStream({
-      requestId: 'r0',
-      settings: noModel,
-      system: 's',
-      messages: [{ role: 'user', content: 'hi' }],
-    } as never)
-    expect(calls).toHaveLength(0)
-    expect(chunks).toEqual([{ requestId: 'r0', type: 'error', error: 'typed:model_required' }])
-    const chat = await s.aiChat({ settings: noModel as never, system: 's', user: 'hi' })
-    expect(chat).toEqual({ ok: false, error: 'typed:model_required' })
-    expect(calls).toHaveLength(0)
-    expect(onChatFailure).toHaveBeenCalledTimes(1)
-  })
-
-  it('streams an Anthropic turn on /messages', async () => {
-    const ev = (type: string, data: object) =>
-      `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`
-    const { s, calls, chunks } = streams(() =>
-      sseResponse([
-        ev('message_start', { message: {} }),
-        ev('content_block_start', { index: 0, content_block: { type: 'text', text: '' } }),
-        ev('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'Hi there' } }),
-        ev('content_block_stop', { index: 0 }),
-        ev('message_delta', { delta: { stop_reason: 'end_turn' } }),
-        ev('message_stop', {}),
-      ]),
-    )
-    await s.aiStream({
-      requestId: 'r2',
-      settings: settings('anthropic'),
-      system: 's',
-      messages: [{ role: 'user', content: 'hi' }],
-    } as never)
-    expect(calls[0]!.url).toBe(`${BASE}/byok/anthropic/messages`)
-    expect(chunks.find((c) => c.type === 'delta')?.text).toBe('Hi there')
-    expect(chunks.at(-1)!.type).toBe('done')
-  })
-
-  // anthropic / gemini rethrow a failed fetch wrapped in `cause`: still the typed state, not "network"
-  it.each(
-    ['openai', 'anthropic', 'gemini'].flatMap((provider) =>
-      (
-        [
-          [402, 'credits_exhausted'],
-          [403, 'entitlement_required'],
-          [404, 'credential_missing'],
-          [424, 'provider_auth_failed'],
-          [429, 'rate_limited'],
-          [502, 'provider_unreachable'],
-        ] as const
-      ).map(([status, code]) => [provider, status, code] as const),
-    ),
-  )('%s: a proxy %i ends the turn with the typed %s state', async (provider, status, code) => {
-    const { s, chunks } = streams(() =>
-      jsonResponse(status, status === 429 ? { message: 'x' } : { error: { code, message: 'm' } }),
-    )
-    await s.aiStream({
-      requestId: 'r3',
-      settings: settings(provider),
-      system: 's',
-      messages: [{ role: 'user', content: 'hi' }],
-    } as never)
-    expect(chunks.at(-1)).toMatchObject({ type: 'error', error: `typed:${code}` })
-    expect(chunks.filter((c) => c.type === 'error')).toHaveLength(1)
-  })
-
-  it('a typed chat turn never raises the card; a typed one-shot aiChat does (no transcript to show it)', async () => {
-    const { s, chunks, onChatFailure } = streams(() =>
-      jsonResponse(404, { error: { code: 'credential_missing', message: 'm' } }),
-    )
-    await s.aiStream({
-      requestId: 'r-turn',
-      settings: settings('openai'),
-      system: 's',
-      messages: [{ role: 'user', content: 'hi' }],
-    } as never)
-    expect(chunks.at(-1)).toMatchObject({ type: 'error', error: 'typed:credential_missing' })
-    expect(onChatFailure).not.toHaveBeenCalled()
-    const r = await s.aiChat({ settings: settings('openai'), system: 's', user: 'hi' })
-    expect(r).toMatchObject({ ok: false, error: 'typed:credential_missing' })
-    expect(onChatFailure).toHaveBeenCalledTimes(1)
-    expect(onChatFailure.mock.calls[0]![0].code).toBe('credential_missing')
-  })
 
   it('reads the code and message from the wrapped and the flat error body', async () => {
     expect(errorBodyFields({ error: { code: 'a', message: 'b' } })).toEqual({
@@ -666,73 +307,13 @@ describe('streams', () => {
     expect(errorBodyFields({ error: { message: 'only' } })).toEqual({})
     expect(errorBodyFields('x')).toEqual({})
     const err = await aiErrorFromResponse(
-      jsonResponse(400, { error: { code: 'base_url_refused', message: 'm' } }),
+      jsonResponse(400, { error: { code: 'invalid_request', message: 'm' } }),
     )
-    expect(err).toMatchObject({ code: 'base_url_refused', serverCode: 'base_url_refused' })
-  })
-
-  it('maps a vendor adapter failure text to a typed state, never the raw payload', async () => {
-    expect(rawFailureAsTyped(new Error('Claude HTTP 404: {"error":{"code":"x"}}'))).toMatchObject({
-      code: 'credential_missing',
-      status: 404,
-    })
-    expect(rawFailureAsTyped(new Error('OpenAI HTTP 401: bad key'))).toMatchObject({
-      code: 'provider_auth_failed',
-    })
-    expect(rawFailureAsTyped(new Error('Gemini HTTP 500: boom'))).toMatchObject({ code: 'unknown' })
-    expect(rawFailureAsTyped(new Error('{"detail":"nope"}'))).toMatchObject({ code: 'unknown' })
-    expect(rawFailureAsTyped(new Error('The model returned no text'))).toBeUndefined()
-    const { s, chunks } = streams(() =>
-      jsonResponse(500, { error: { type: 'api_error', message: 'upstream exploded' } }),
-    )
-    await s.aiStream({
-      requestId: 'r5',
-      settings: settings('openai'),
-      system: 's',
-      messages: [{ role: 'user', content: 'hi' }],
-    } as never)
-    const last = chunks.at(-1) as { type: string; error: string }
-    expect(last.type).toBe('error')
-    expect(last.error).toBe('typed:unknown')
-    expect(chunks.filter((c) => c.type === 'error')).toHaveLength(1)
-  })
-
-  it('a provider without a server route is credential_missing (no request sent)', async () => {
-    const { s, calls, chunks } = streams(() => jsonResponse(200, {}))
-    await s.aiStream({
-      requestId: 'r4',
-      settings: settings('codex'),
-      system: 's',
-      messages: [],
-    } as never)
-    expect(calls).toHaveLength(0)
-    expect(chunks).toEqual([
-      expect.objectContaining({ type: 'error', error: 'typed:credential_missing' }),
-    ])
-  })
-
-  it('aiChat (one-shot) uses the same route without stream', async () => {
-    const { s, calls } = streams(() =>
-      jsonResponse(200, { choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] }),
-    )
-    const r = await s.aiChat({ settings: settings('openai'), system: 's', user: 'u' })
-    expect(r).toMatchObject({ ok: true, content: 'ok' })
-    expect(JSON.parse(String(calls[0]!.init.body)).stream).toBeFalsy()
+    expect(err).toMatchObject({ code: 'bad_request', serverCode: 'invalid_request' })
   })
 })
 
 describe('members (off = as today, on = UniWork routes)', () => {
-  function port(caps: Record<string, boolean> | undefined, withToken = true) {
-    return {
-      whenInitialized: async () => ({
-        documentId: 'doc-1',
-        apiBase: 'https://app.test/api/v1',
-        ...(caps ? { capabilities: caps } : {}),
-      }),
-      ...(withToken ? tokens() : {}),
-    }
-  }
-
   const stubs = {
     getAiSettings: vi.fn(async () => ({ provider: 'genspark', providers: {} })),
     webSearch: vi.fn(async () => ({
@@ -748,10 +329,9 @@ describe('members (off = as today, on = UniWork routes)', () => {
     for (const s of Object.values(stubs)) s.mockClear()
   })
 
-  it('aiHostGrants: tools need ai too; nothing without the ai grant', () => {
+  it('aiHostGrants: tools need the UniWork AI grant too; nothing without it', () => {
     expect(aiHostGrants(undefined)).toEqual({
       ai: false,
-      aiCredentials: false,
       uniworkAi: false,
       webSearch: false,
       imageSearch: false,
@@ -761,19 +341,23 @@ describe('members (off = as today, on = UniWork routes)', () => {
       ai: false,
       webSearch: false,
     })
-    expect(aiHostGrants({ ai: true, webSearch: true })).toEqual({
+    expect(aiHostGrants({ uniworkAi: true, webSearch: true })).toEqual({
       ai: true,
-      aiCredentials: true,
-      uniworkAi: false,
+      uniworkAi: true,
       webSearch: true,
       imageSearch: false,
       imageGeneration: false,
     })
   })
 
-  it('without the ai grant every member is the module stub and no request is made', async () => {
+  it('without the UniWork AI grant every member is the module stub and no request is made (the old ai grant alone opens nothing)', async () => {
     const { fetch } = recorder(() => jsonResponse(200, {}))
-    const ai = createWebAi({ port: port({ ai: false }), capabilities: {}, fetch, origin: ORIGIN })
+    const ai = createWebAi({
+      port: port({ ai: true, webSearch: true }),
+      capabilities: {},
+      fetch,
+      origin: ORIGIN,
+    })
     const api = withWebAi({ ...stubs }, ai)
     expect(await ai.active()).toBe(false)
     expect(await (api.webSearch as (q: string) => Promise<unknown>)('q')).toMatchObject({
@@ -783,16 +367,17 @@ describe('members (off = as today, on = UniWork routes)', () => {
     await (api.getAiSettings as () => Promise<unknown>)()
     expect(stubs.getAiSettings).toHaveBeenCalled()
     expect(fetch).not.toHaveBeenCalled()
+    // nothing is published for the model chip either
+    expect(windowCloudStatus()).toBeUndefined()
   })
 
   it('a port without a frame token (headless) keeps AI off even with the grant', async () => {
-    const ai = createWebAi({ port: port({ ai: true }, false), capabilities: {} })
+    const ai = createWebAi({ port: port({ uniworkAi: true }, false), capabilities: {} })
     expect(await ai.active()).toBe(false)
   })
 
-  it('with the grant: settings from stored credentials (no key), cloud switches, search shapes', async () => {
+  it('with the grant: UniWork AI settings, cloud switches, search shapes', async () => {
     const { calls, fetch } = recorder((c) => {
-      if (c.url.endsWith('/credentials')) return jsonResponse(200, CREDENTIALS)
       if (c.url.endsWith('/cloud')) return jsonResponse(200, CLOUD)
       if (c.url.endsWith('/cloud/search')) {
         return jsonResponse(200, {
@@ -808,26 +393,17 @@ describe('members (off = as today, on = UniWork routes)', () => {
       }
       return jsonResponse(404, { code: 'not_found' })
     })
-    const capabilities: Record<string, unknown> = {
-      ai: true,
-      webSearch: true,
-      imageSearch: true,
-      imageGeneration: true,
-    }
-    const ai = createWebAi({ port: port({ ai: true }), capabilities, fetch, origin: ORIGIN })
+    const grants = { uniworkAi: true, webSearch: true, imageSearch: true, imageGeneration: true }
+    const capabilities: Record<string, unknown> = { ai: true, ...grants }
+    const ai = createWebAi({ port: port(grants), capabilities, fetch, origin: ORIGIN })
     const api = withWebAi({ ...stubs }, ai)
     const settings = (await (api.getAiSettings as () => Promise<Record<string, unknown>>)()) as {
       provider: string
       providers: Record<string, { apiKey: string }>
       gskToolsEnabled: boolean
     }
-    expect(settings.provider).toBe('openai')
-    // never the key: only the masked hint of a provider that has one stored, '' for the rest
-    expect(
-      Object.entries(settings.providers).every(([id, p]) =>
-        id === 'openai' ? p.apiKey === '…abcd' : p.apiKey === '',
-      ),
-    ).toBe(true)
+    expect(settings.provider).toBe('uniwork')
+    expect(Object.keys(settings.providers)).toEqual(['uniwork'])
     expect(settings.gskToolsEnabled).toBe(true)
     // GET cloud says image_search is not available: its capability goes off
     expect(capabilities.imageSearch).toBe(false)
@@ -858,17 +434,19 @@ describe('members (off = as today, on = UniWork routes)', () => {
     expect(img).toEqual({ url: 'data:image/png;base64,AAAA' })
     expect(stubs.webSearch).not.toHaveBeenCalled()
     expect(await (api.aiGskStatus as () => Promise<unknown>)()).toEqual({ loggedIn: true })
+    // every request went to the cloud tools
+    expect(calls.every((c) => c.url.startsWith(`${BASE}/cloud`))).toBe(true)
   })
 
-  it('a cloud failure returns the module error shape with the typed text and shows the card', async () => {
-    const { fetch } = recorder((c) => {
-      if (c.url.endsWith('/credentials')) return jsonResponse(200, CREDENTIALS)
-      if (c.url.endsWith('/cloud')) return jsonResponse(200, CLOUD)
-      return jsonResponse(402, { code: 'credits_exhausted' })
-    })
+  it('a 402 on a cloud tool returns the module error shape with the typed text and a card that offers no settings', async () => {
+    const { fetch } = recorder((c) =>
+      c.url.endsWith('/cloud')
+        ? jsonResponse(200, CLOUD)
+        : jsonResponse(402, { code: 'credits_exhausted' }),
+    )
     const ai = createWebAi({
-      port: port({ ai: true }),
-      capabilities: { ai: true },
+      port: port({ uniworkAi: true, webSearch: true }),
+      capabilities: { ai: true, uniworkAi: true, webSearch: true },
       fetch,
       origin: ORIGIN,
     })
@@ -878,71 +456,70 @@ describe('members (off = as today, on = UniWork routes)', () => {
     )
     expect(r.method).toBe('error')
     expect(r.error).toBe(
-      describeAiError(new AiWebError({ code: 'credits_exhausted', status: 402 }), ''),
+      describeAiError(new AiWebError({ code: 'credits_exhausted', status: 402 })),
     )
-    expect(document.querySelector('[data-ai-state="credits_exhausted"]')).not.toBeNull()
+    const card = document.querySelector('[data-ai-state="credits_exhausted"]')!
+    expect(card).not.toBeNull()
+    expect([...card.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Close'])
   })
 
-  it('a typed stream failure reaches the panel once: one error chunk, no floating card', async () => {
-    const { fetch } = recorder((c) => {
-      if (c.url.endsWith('/credentials'))
-        return jsonResponse(200, { items: [], providers: CREDENTIALS.providers })
-      if (c.url.endsWith('/cloud')) return jsonResponse(200, CLOUD)
-      return jsonResponse(404, { error: { code: 'credential_missing', message: 'm' } })
-    })
+  it('a 403 before the first run turns the panel off: one quiet turn, no route but the UniWork AI one', async () => {
+    const { calls, fetch } = recorder((c) =>
+      c.url.endsWith('/uniwork/chat/completions')
+        ? jsonResponse(403, { code: 'office_capability_off', message: 'off' })
+        : jsonResponse(200, CLOUD),
+    )
+    // an older host still sends the old `ai` grant beside `uniworkAi`
+    const capabilities: Record<string, unknown> = { ai: true, uniworkAi: true }
     const ai = createWebAi({
-      port: port({ ai: true }),
-      capabilities: { ai: true },
+      port: port({ ai: true, uniworkAi: true }),
+      capabilities,
       fetch,
       origin: ORIGIN,
     })
     const api = withWebAi({ ...stubs }, ai)
-    const chunks: Array<{ type: string; error?: string }> = []
-    ;(api.onAiStream as (h: (c: { type: string; error?: string }) => void) => () => void)((c) =>
-      chunks.push(c),
-    )
+    const changed = vi.fn()
+    ai.onChanged(changed)
+    const chunks: Array<{ type: string }> = []
+    ;(api.onAiStream as (h: (c: { type: string }) => void) => () => void)((c) => chunks.push(c))
     await (api.aiStream as (r: object) => Promise<void>)({
-      requestId: 'once',
-      settings: { provider: 'openai', providers: { openai: { apiKey: '', model: 'm' } } },
+      requestId: 'off-1',
+      sessionId: 'sess-off',
+      settings: { provider: 'uniwork', providers: {} },
       system: 's',
-      messages: [{ role: 'user', content: 'hi' }],
+      messages: [{ role: 'user', text: 'hi' }],
     })
-    const errors = chunks.filter((c) => c.type === 'error')
-    expect(errors).toHaveLength(1)
-    expect(errors[0]!.error).toMatch(/No AI key yet/)
-    // the panel's inline error is the one surface: no .ow-ai-state toast beside it
+    expect(capabilities.ai).toBe(false)
+    expect(capabilities.uniworkAi).toBe(false)
+    expect(changed).toHaveBeenCalled()
+    // the note is the whole answer (the adapter's activity pings aside): no error chunk
+    expect(chunks.filter((c) => c.type !== 'ping').map((c) => c.type)).toEqual(['notice', 'done'])
     expect(document.querySelector('.ow-ai-state')).toBeNull()
+    expect(new Set(calls.map((c) => c.url.slice(BASE.length)))).toEqual(
+      new Set(['/cloud', '/uniwork/chat/completions']),
+    )
   })
 
-  it('the model chip manage row opens the AI settings while AI is on (module stub when off)', async () => {
+  it('the model chip manage row, the AI settings entry and the sign-in prompt open nothing while AI is on', async () => {
     const stub = vi.fn(async () => {})
-    const { fetch } = recorder((c) => {
-      if (c.url.endsWith('/credentials')) return jsonResponse(200, CREDENTIALS)
-      return jsonResponse(200, CLOUD)
-    })
-    const off = createWebAi({ port: port({ ai: false }), capabilities: {}, fetch, origin: ORIGIN })
-    const apiOff = withWebAi({ ...stubs, openAiModelSettings: stub }, off)
-    await (apiOff.openAiModelSettings as () => Promise<void>)()
-    expect(stub).toHaveBeenCalledTimes(1)
-    expect(document.querySelector('[data-office-web="ai-settings"]')).toBeNull()
-
+    const { calls, fetch } = recorder(() => jsonResponse(200, CLOUD))
     const on = createWebAi({
-      port: port({ ai: true }),
-      capabilities: { ai: true },
+      port: port({ uniworkAi: true }),
+      capabilities: { ai: true, uniworkAi: true },
       fetch,
       origin: ORIGIN,
     })
-    const apiOn = withWebAi({ ...stubs, openAiModelSettings: stub }, on)
-    void (apiOn.openAiModelSettings as () => Promise<void>)()
-    await vi.waitFor(() =>
-      expect(document.querySelector('[data-office-web="ai-settings"]')).not.toBeNull(),
-    )
-    expect(stub).toHaveBeenCalledTimes(1)
-    // the dialog is a module singleton: close it so the next case opens its own
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    await vi.waitFor(() =>
-      expect(document.querySelector('[data-office-web="ai-settings"]')).toBeNull(),
-    )
+    const api = withWebAi({ ...stubs, openAiModelSettings: stub, openAiSettings: stub }, on)
+    expect(await on.active()).toBe(true)
+    await (api.openAiModelSettings as () => Promise<void>)()
+    await (api.openAiSettings as () => Promise<void>)()
+    // the module's own members answer: there is no key dialog to open
+    expect(stub).toHaveBeenCalledTimes(2)
+    // the web viewer is always signed in: the prompt resolves at once
+    await expect((api.aiGskLogin as () => Promise<unknown>)()).resolves.toBeUndefined()
+    expect(document.querySelector('[data-office-web="ai-settings"]')).toBeNull()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(calls.every((c) => c.url === `${BASE}/cloud`)).toBe(true)
   })
 
   it('reads data: URLs as media bytes only', () => {
@@ -955,185 +532,50 @@ describe('members (off = as today, on = UniWork routes)', () => {
 })
 
 describe('in-frame UI', () => {
-  it('one typed state card at a time; key states offer AI settings', () => {
-    const openSettings = vi.fn()
-    showAiState(new AiWebError({ code: 'rate_limited', status: 429, retryAfterSec: 5 }), 'OpenAI', {
-      openSettings,
-    })
-    const card = showAiState(
-      new AiWebError({ code: 'credential_missing', status: 404 }),
-      'OpenAI',
-      { openSettings },
-    )
-    expect(document.querySelectorAll('.ow-ai-state')).toHaveLength(1)
-    expect(card.dataset.aiState).toBe('credential_missing')
-    expect(card.textContent).toContain('No AI key yet')
-    const settingsBtn = card.querySelector('button.primary') as HTMLButtonElement
-    settingsBtn.click()
-    expect(openSettings).toHaveBeenCalled()
+  it('one typed state card at a time, and no state offers AI settings (there are no keys to fix)', () => {
+    showAiState(new AiWebError({ code: 'rate_limited', status: 429, retryAfterSec: 5 }))
+    let card: HTMLElement | null = null
+    for (const code of AI_WEB_ERROR_CODES) {
+      card = showAiState(new AiWebError({ code, status: 0 }))
+      expect(document.querySelectorAll('.ow-ai-state')).toHaveLength(1)
+      expect(card.dataset.aiState).toBe(code)
+      expect(
+        [...card.querySelectorAll('button')].map((b) => b.textContent),
+        code,
+      ).toEqual(['Close'])
+    }
+    ;(card!.querySelector('button') as HTMLButtonElement).click()
     expect(document.querySelector('.ow-ai-state')).toBeNull()
   })
 
-  it('the key-state copy names no vendor, so it cannot disagree with the model chip, in any locale', () => {
-    const keys = [
-      'aiWebStateKeyMissingTitle',
-      'aiWebStateKeyMissingBody',
-      'aiWebStateKeyRejectedTitle',
-    ] as const
-    const langs = Object.keys(aiWebStrings) as Lang[]
-    expect(langs).toHaveLength(21)
-    for (const lang of langs) {
-      for (const key of keys) {
-        const withOpenAi = aiWebText(lang, key, { provider: 'OpenAI' })
-        const withClaude = aiWebText(lang, key, { provider: 'Claude' })
-        expect(withOpenAi, `${lang} ${key}`).toBe(withClaude)
-        expect(withOpenAi).not.toMatch(/OpenAI|Claude|\{provider\}/)
-      }
-    }
-    const missing = describeAiError(
-      new AiWebError({ code: 'credential_missing', status: 404 }),
-      'OpenAI',
-    )
-    expect(missing).toBe(
-      describeAiError(new AiWebError({ code: 'credential_missing', status: 404 }), 'Claude'),
-    )
-  })
-
-  it('every error code has its own text', () => {
-    const codes = [
+  it('every error code has its own text, and the codes are the UniWork AI routes ones only', () => {
+    expect([...AI_WEB_ERROR_CODES]).toEqual([
       'credits_exhausted',
       'entitlement_required',
-      'credential_missing',
-      'provider_auth_failed',
       'rate_limited',
       'provider_unreachable',
       'cloud_unavailable',
       'cloud_outage',
       'unauthorized',
-      'base_url_refused',
-      'provider_not_supported',
       'bad_request',
-      'model_required',
       'unknown',
-    ] as const
-    const texts = codes.map((code) => describeAiError(new AiWebError({ code, status: 0 }), 'X'))
-    expect(new Set(texts).size).toBe(texts.length)
-    for (const t of texts) expect(t).not.toMatch(/aiWeb/)
-    // the no-model hint tells the person what to do, not that the server refused
-    const model = describeAiError(new AiWebError({ code: 'model_required', status: 0 }), 'X')
-    expect(model).toMatch(/Choose a model/)
-    expect(model).not.toMatch(/refused/i)
-  })
-
-  it('settings dialog: masked hint, write-only key, save + remove through the client', async () => {
-    let items = [...CREDENTIALS.items]
-    const client = {
-      saveCredential: vi.fn(async (provider: string) => {
-        items = [...items, { ...CREDENTIALS.items[0]!, provider, key_hint: '…9999' }]
-        return items.at(-1)!
-      }),
-      deleteCredential: vi.fn(async (provider: string) => {
-        items = items.filter((c) => c.provider !== provider)
-      }),
-    }
-    const choose = vi.fn()
-    const closed = openAiSettingsDialog({
-      load: async () => ({
-        credentials: { items, providers: CREDENTIALS.providers },
-        cloud: readCloudStatus(CLOUD),
-      }),
-      client,
-      current: async () => ({ provider: 'openai', model: 'gpt-x' }),
-      choose,
-      supported: (id) => id !== 'hunyuan',
-      label: (id) => id.toUpperCase(),
-      models: () => ['m-a', 'm-b'],
-    })
-    await vi.waitFor(() => expect(document.querySelector('select[name="provider"]')).not.toBeNull())
-    const select = document.querySelector('select[name="provider"]') as HTMLSelectElement
-    // hunyuan has no genoffice adapter: not offered
-    expect([...select.options].map((o) => o.value)).toEqual([
-      'anthropic',
-      'gemini',
-      'openai',
-      'custom',
     ])
-    expect(select.value).toBe('openai')
-    expect(document.body.textContent).toContain('…abcd')
-    expect((document.querySelector('input[name="model"]') as HTMLInputElement).value).toBe('gpt-x')
-    // add an Anthropic key
-    select.value = 'anthropic'
-    select.dispatchEvent(new Event('change'))
-    const key = document.querySelector('input[name="api_key"]') as HTMLInputElement
-    expect(key.type).toBe('password')
-    key.value = 'sk-ant-9999'
-    ;(document.querySelector('.ow-ai-dialog button.primary') as HTMLButtonElement).click()
-    await vi.waitFor(() =>
-      expect(client.saveCredential).toHaveBeenCalledWith('anthropic', { api_key: 'sk-ant-9999' }),
+    const texts = AI_WEB_ERROR_CODES.map((code) =>
+      describeAiError(new AiWebError({ code, status: 0 })),
     )
-    await vi.waitFor(() => expect(document.body.textContent).toContain('…9999'))
-    expect(key.value).toBe('')
-    // remove it again
-    ;(document.querySelector('.ow-ai-dialog button.danger') as HTMLButtonElement).click()
-    await vi.waitFor(() => expect(client.deleteCredential).toHaveBeenCalledWith('anthropic'))
-    // custom shows the base URL field
-    select.value = 'custom'
-    select.dispatchEvent(new Event('change'))
-    expect(
-      (document.querySelector('input[name="base_url"]')!.closest('label') as HTMLElement).hidden,
-    ).toBe(false)
-    // Done keeps the choice
-    select.value = 'openai'
-    select.dispatchEvent(new Event('change'))
-    const done = document.querySelector('.ow-ai-done') as HTMLButtonElement
-    done.click()
-    await closed
-    expect(choose).toHaveBeenCalledWith('openai', 'gpt-x')
-    expect(document.querySelector('.ow-ai-dialog')).toBeNull()
-  })
-
-  // visual r3 N3-03: the settings dialog was a flat card with black pill buttons and a native
-  // select; it is the frame dialog family now (blur scrim, close X, filled blue primary)
-  it('the settings dialog is the frame dialog: scrim, close X, filled primary, no gs-imgdlg chrome', async () => {
-    const closed = openAiSettingsDialog({
-      load: async () => ({
-        credentials: { items: CREDENTIALS.items, providers: CREDENTIALS.providers },
-        cloud: readCloudStatus(CLOUD),
-      }),
-      client: { saveCredential: vi.fn(), deleteCredential: vi.fn() },
-      current: async () => ({ provider: 'openai', model: 'gpt-x' }),
-      choose: vi.fn(),
-      supported: () => true,
-      label: (id) => id,
-      models: () => [],
-    })
-    await vi.waitFor(() => expect(document.querySelector('select[name="provider"]')).not.toBeNull())
-    const mask = document.querySelector('[data-office-web="ai-settings"]')!
-    expect(mask.classList.contains('ow-dlg-mask')).toBe(true)
-    const box = mask.querySelector('.ow-dlg.ow-ai-dialog')!
-    expect(box.getAttribute('role')).toBe('dialog')
-    expect(box.querySelector('h2.ow-dlg-title')).not.toBeNull()
-    expect(document.querySelector('[class*="gs-imgdlg"]')).toBeNull()
-    // Done is the filled primary in the footer band, Save key the other primary
-    expect(box.querySelector(':scope > .ow-dlg-actions .ow-dlg-btn.primary')?.textContent).toBe(
-      'Done',
-    )
-    expect(box.querySelector('.ow-dlg-btn.danger')).not.toBeNull()
-    const x = box.querySelector<HTMLButtonElement>('.ow-dlg-close')!
-    expect(x.getAttribute('aria-label')).toBe('Close')
-    x.click()
-    await closed
-    expect(document.querySelector('[data-office-web="ai-settings"]')).toBeNull()
+    expect(new Set(texts).size).toBe(texts.length)
+    for (const t of texts) {
+      expect(t).not.toMatch(/aiWeb/)
+      expect(t).not.toMatch(/\bkey\b/i)
+    }
   })
 })
 
 describe('installModuleBridge wiring', () => {
-  it('AI members only on globals that have them; the ai grant turns the keys on', async () => {
+  it('AI members only on globals that have them; the UniWork AI grant turns the keys on', async () => {
     const { installModuleBridge } = await import('../../../docs/bridge/module-bridge')
     const { createMockPort } = await import('../../../docs/bridge/testing/mock-port')
-    const { fetch } = recorder((c) =>
-      c.url.endsWith('/credentials') ? jsonResponse(200, CREDENTIALS) : jsonResponse(200, CLOUD),
-    )
+    const { fetch } = recorder(() => jsonResponse(200, CLOUD))
     vi.stubGlobal('fetch', fetch)
     const mock = createMockPort({ documentId: 'doc-1' })
     const ownStream = vi.fn(async () => {})
@@ -1148,13 +590,13 @@ describe('installModuleBridge wiring', () => {
         other: () => ({}),
       },
     })
-    expect(capabilities).toMatchObject({ ai: false, aiCredentials: false })
-    expect(typeof (target.markdownApi as Record<string, unknown>).openAiSettings).toBe('function')
-    expect(Object.prototype.hasOwnProperty.call(target.other, 'openAiSettings')).toBe(false)
-    mock.init({ apiBase: '/api/v1', capabilities: { ai: true, webSearch: true } })
+    expect(capabilities).toMatchObject({ ai: false })
+    expect(typeof (target.markdownApi as Record<string, unknown>).aiGskLogin).toBe('function')
+    expect(Object.prototype.hasOwnProperty.call(target.other, 'aiGskLogin')).toBe(false)
+    mock.init({ apiBase: '/api/v1', capabilities: { uniworkAi: true, webSearch: true } })
     await vi.waitFor(() => expect(capabilities.ai).toBe(true))
     expect(capabilities).toMatchObject({
-      aiCredentials: true,
+      uniworkAi: true,
       webSearch: true,
       imageGeneration: false,
     })
@@ -1162,1069 +604,8 @@ describe('installModuleBridge wiring', () => {
   })
 })
 
-describe('model chip source and credential refresh (UNI-1232 A4)', () => {
-  const port = {
-    whenInitialized: async () => ({
-      documentId: 'doc-1',
-      apiBase: 'https://app.test/api/v1',
-      capabilities: { ai: true },
-    }),
-    ...tokens(),
-  }
-
-  /** a credential list that tests can change between calls */
-  function liveCredentials(initial: typeof CREDENTIALS.items) {
-    const live = { items: initial }
-    const { calls, fetch } = recorder((c) =>
-      c.url.endsWith('/credentials')
-        ? jsonResponse(200, { items: live.items, providers: CREDENTIALS.providers })
-        : jsonResponse(200, CLOUD),
-    )
-    return {
-      live,
-      calls,
-      fetch,
-      credentialCalls: () => calls.filter((c) => c.url.endsWith('/credentials')).length,
-    }
-  }
-
-  const anthropicCred = { ...CREDENTIALS.items[0]!, provider: 'anthropic', key_hint: '…wxyz' }
-
-  function createAi(fetch: typeof globalThis.fetch, now: () => number, win?: EventTarget) {
-    return createWebAi({
-      port,
-      capabilities: { ai: true },
-      fetch,
-      origin: ORIGIN,
-      now,
-      ...(win ? { win: win as never } : {}),
-    })
-  }
-
-  it('the settings the chip reads carry the viewer provider with a masked key and no UniAI', async () => {
-    const { fetch } = liveCredentials(CREDENTIALS.items)
-    const ai = createAi(fetch, () => 0)
-    const s = await ai.settings()
-    expect(s.provider).toBe('openai')
-    expect(s.providers.openai.apiKey).toBe('…abcd')
-    expect(s.providers.openai.apiKey).not.toMatch(/^sk-/)
-    expect(s.providers.anthropic.apiKey).toBe('')
-    expect(s.uniAiAvailable).toBe(false)
-  })
-
-  it('no stored key: no provider carries a key, so the chip has nothing to name', async () => {
-    const { fetch } = liveCredentials([])
-    const ai = createAi(fetch, () => 0)
-    const s = await ai.settings()
-    expect(Object.values(s.providers).every((p) => p.apiKey === '')).toBe(true)
-    expect(s.uniAiAvailable).toBe(false)
-  })
-
-  it('a key added after the frame booted is picked up after the TTL, without a dialog save', async () => {
-    let t = 1000
-    const { live, fetch, credentialCalls } = liveCredentials([])
-    const ai = createAi(fetch, () => t)
-    const api = withWebAi({}, ai)
-    expect((await ai.settings()).providers.anthropic.apiKey).toBe('')
-    const before = credentialCalls()
-    // still fresh: no new request
-    live.items = [anthropicCred]
-    await ai.settings()
-    expect(credentialCalls()).toBe(before)
-    // stale: the next settings read (and so the next AI call) sees the new key
-    t += CREDENTIALS_TTL_MS + 1
-    const s = await (
-      api.getAiSettings as () => Promise<{
-        provider: string
-        providers: Record<string, { apiKey: string }>
-      }>
-    )()
-    expect(credentialCalls()).toBe(before + 1)
-    expect(s.provider).toBe('anthropic')
-    expect(s.providers.anthropic.apiKey).toBe('…wxyz')
-  })
-
-  it('a key removed in UniWork stops being offered on the next read after the TTL', async () => {
-    let t = 0
-    const { live, fetch } = liveCredentials(CREDENTIALS.items)
-    const ai = createAi(fetch, () => t)
-    expect((await ai.settings()).providers.openai.apiKey).toBe('…abcd')
-    live.items = []
-    t += CREDENTIALS_TTL_MS + 1
-    expect((await ai.settings()).providers.openai.apiKey).toBe('')
-  })
-
-  it('window focus re-fetches at once and tells the chips (onAiSettingsChanged) about a change', async () => {
-    const t = 0
-    const { live, fetch } = liveCredentials([])
-    const win = new EventTarget() as EventTarget & { document?: EventTarget }
-    const ai = createAi(fetch, () => t, win)
-    const api = withWebAi({}, ai)
-    await ai.settings()
-    // the background listing of the first read is over before the count starts
-    await new Promise((r) => setTimeout(r, 0))
-    const changed = vi.fn()
-    const off = (api.onAiSettingsChanged as (h: () => void) => () => void)(changed)
-    live.items = [anthropicCred]
-    win.dispatchEvent(new Event('focus'))
-    await vi.waitFor(() => expect(changed).toHaveBeenCalled())
-    expect((await ai.settings()).providers.anthropic.apiKey).toBe('…wxyz')
-    // the new key's background listing is over before the count starts
-    await new Promise((r) => setTimeout(r, 10))
-    const heard = changed.mock.calls.length
-    // an unchanged list is not a change
-    win.dispatchEvent(new Event('focus'))
-    await new Promise((r) => setTimeout(r, 10))
-    expect(changed).toHaveBeenCalledTimes(heard)
-    off()
-    live.items = []
-    win.dispatchEvent(new Event('focus'))
-    await new Promise((r) => setTimeout(r, 10))
-    expect(changed).toHaveBeenCalledTimes(heard)
-  })
-
-  it('choosing a model notifies the chips and a failed refresh keeps the last answer', async () => {
-    let t = 0
-    let fail = false
-    const { fetch: inner } = liveCredentials(CREDENTIALS.items)
-    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
-      fail
-        ? jsonResponse(503, { code: 'cloud_unavailable' })
-        : (inner as typeof globalThis.fetch)(input, init),
-    ) as unknown as typeof globalThis.fetch
-    const ai = createAi(fetch, () => t)
-    expect((await ai.settings()).providers.openai.apiKey).toBe('…abcd')
-    const changed = vi.fn()
-    ai.onChanged(changed)
-    ai.choose('openai', 'gpt-x')
-    expect(changed).toHaveBeenCalledTimes(1)
-    fail = true
-    t += CREDENTIALS_TTL_MS + 1
-    // the refresh fails: settings() answers from the last good list instead of going blank
-    const s = await ai.settings()
-    expect(s.providers.openai.model).toBe('gpt-x')
-  })
-})
-
-describe('the chosen model is saved on the server (UNI-1240 4b)', () => {
-  const port = {
-    whenInitialized: async () => ({
-      documentId: 'doc-1',
-      apiBase: 'https://app.test/api/v1',
-      capabilities: { ai: true },
-    }),
-    ...tokens(),
-  }
-  const CHOICE_KEY = 'uniwork.office.web.ai.choice'
-  // an in-memory Storage: the cache under test must not depend on the runner's own localStorage
-  beforeEach(() => {
-    const data = new Map<string, string>()
-    vi.stubGlobal('localStorage', {
-      getItem: (k: string) => data.get(k) ?? null,
-      setItem: (k: string, v: string) => void data.set(k, String(v)),
-      removeItem: (k: string) => void data.delete(k),
-      clear: () => data.clear(),
-    })
-  })
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-  const cred = (provider: string, model?: string, at = '') => ({
-    ...CREDENTIALS.items[0]!,
-    provider,
-    key_hint: '…wxyz',
-    ...(model === undefined ? {} : { model, model_updated_at: at }),
-  })
-
-  /** the credential list + a recorder for the model PUTs (`put` answers them, default: echo + a new time) */
-  function create(
-    items: Array<{ provider: string }>,
-    put?: (call: Call) => Response | Promise<Response>,
-  ) {
-    const { calls, fetch } = recorder((c) =>
-      c.init.method === 'PUT'
-        ? put
-          ? put(c)
-          : jsonResponse(200, {
-              ...items.find((i) => c.url.endsWith(`/${i.provider}`)),
-              ...(JSON.parse(String(c.init.body)) as object),
-              model_updated_at: '2026-10-11T09:00:00Z',
-            })
-        : c.url.endsWith('/credentials')
-          ? jsonResponse(200, { items, providers: CREDENTIALS.providers })
-          : jsonResponse(200, CLOUD),
-    )
-    const ai = createWebAi({
-      port,
-      capabilities: { ai: true },
-      fetch,
-      origin: ORIGIN,
-      now: () => AFTER_STAMPS,
-    })
-    const puts = () => calls.filter((c) => c.init.method === 'PUT')
-    return { ai, puts }
-  }
-
-  it('reads model and model_updated_at leniently: an older server omits both', async () => {
-    const { fetch } = recorder((c) =>
-      c.url.endsWith('/credentials')
-        ? jsonResponse(200, {
-            items: [CREDENTIALS.items[0], { ...cred('anthropic'), model: 7 }],
-            providers: [],
-          })
-        : jsonResponse(200, CLOUD),
-    )
-    const client = createAiWebClient({
-      documentId: 'doc-1',
-      apiBase: '/api',
-      tokens: tokens(),
-      origin: ORIGIN,
-      fetch,
-    })
-    const list = await client.listCredentials()
-    expect(list.items.map((i) => [i.model, i.model_updated_at])).toEqual([
-      ['', ''],
-      ['', ''],
-    ])
-  })
-
-  it('a model-only PUT sends exactly {"model"} and reads the model back', async () => {
-    const { calls, fetch } = recorder(() =>
-      jsonResponse(200, cred('openai', 'gpt-4.1-mini', '2026-10-11T08:00:00Z')),
-    )
-    const client = createAiWebClient({
-      documentId: 'doc-1',
-      apiBase: '/api',
-      tokens: tokens(),
-      origin: ORIGIN,
-      fetch,
-    })
-    const saved = await client.saveCredential('openai', { model: 'gpt-4.1-mini' })
-    expect(calls[0]!.init.method).toBe('PUT')
-    expect(calls[0]!.url).toBe(`${BASE}/credentials/openai`)
-    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ model: 'gpt-4.1-mini' })
-    expect(saved).toMatchObject({ model: 'gpt-4.1-mini', model_updated_at: '2026-10-11T08:00:00Z' })
-  })
-
-  it('no choice in this browser: the server default (latest model_updated_at) is the provider and model', async () => {
-    const { ai } = create([
-      cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z'),
-      cred('anthropic', 'claude-sonnet-4-5', '2026-10-11T08:00:00Z'),
-    ])
-    const s = await ai.settings()
-    expect(s.provider).toBe('anthropic')
-    expect(s.providers.anthropic.model).toBe('claude-sonnet-4-5')
-    expect(s.providers.openai.model).toBe('gpt-4.1-mini')
-  })
-
-  it('a tie on model_updated_at goes to the provider id order', async () => {
-    const at = '2026-10-11T08:00:00Z'
-    const { ai } = create([cred('openai', 'gpt-4.1-mini', at), cred('anthropic', 'claude-x', at)])
-    expect((await ai.settings()).provider).toBe('anthropic')
-  })
-
-  it('a provider with a key but no saved model is not the default', async () => {
-    const { ai } = create([
-      cred('anthropic', ''),
-      cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z'),
-    ])
-    expect((await ai.settings()).provider).toBe('openai')
-  })
-
-  it('this browser has a provider that no longer has a key: the server default is used', async () => {
-    localStorage.setItem(
-      CHOICE_KEY,
-      JSON.stringify({ provider: 'gemini', models: { gemini: 'g-1' } }),
-    )
-    const { ai } = create([cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z')])
-    const s = await ai.settings()
-    expect(s.provider).toBe('openai')
-    expect(s.providers.openai.model).toBe('gpt-4.1-mini')
-  })
-
-  it('the local cache wins while its provider has a key', async () => {
-    localStorage.setItem(
-      CHOICE_KEY,
-      JSON.stringify({
-        provider: 'openai',
-        providerAt: AFTER_STAMPS,
-        models: { openai: 'local-model' },
-        at: { openai: AFTER_STAMPS },
-      }),
-    )
-    const { ai } = create([
-      cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z'),
-      cred('anthropic', 'claude-sonnet-4-5', '2026-10-11T08:00:00Z'),
-    ])
-    const s = await ai.settings()
-    expect(s.provider).toBe('openai')
-    expect(s.providers.openai.model).toBe('local-model')
-    // a provider the cache has no model for still shows the server's
-    expect(s.providers.anthropic.model).toBe('claude-sonnet-4-5')
-  })
-
-  it('an older server (no model field): nothing changes, the provider default model runs', async () => {
-    const { ai, puts } = create([CREDENTIALS.items[0]!])
-    const s = await ai.settings()
-    expect(s.provider).toBe('openai')
-    expect(s.providers.openai.model).toBeTruthy()
-    expect(puts()).toEqual([])
-  })
-
-  it('choosing a model sends PUT {"model"} to that provider and updates the cache', async () => {
-    const { ai, puts } = create([
-      cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z'),
-      cred('anthropic', ''),
-    ])
-    await ai.settings()
-    // the background listings of the first read are over before the count starts
-    await new Promise((r) => setTimeout(r, 10))
-    const changed = vi.fn()
-    ai.onChanged(changed)
-    ai.choose('anthropic', 'claude-sonnet-4-5')
-    expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!)).toEqual({
-      provider: 'anthropic',
-      providerAt: AFTER_STAMPS,
-      models: { anthropic: 'claude-sonnet-4-5' },
-      at: { anthropic: AFTER_STAMPS },
-    })
-    await vi.waitFor(() => expect(puts()).toHaveLength(1))
-    expect(puts()[0]!.url).toBe(`${BASE}/credentials/anthropic`)
-    expect(JSON.parse(String(puts()[0]!.init.body))).toEqual({ model: 'claude-sonnet-4-5' })
-    // the answer replaces the cached item: the chips hear about it again
-    await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(2))
-    expect((await ai.settings()).providers.anthropic.model).toBe('claude-sonnet-4-5')
-  })
-
-  it('a failed PUT keeps the local choice, shows nothing and does not block chatting', async () => {
-    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const { ai, puts } = create([cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z')], () =>
-      jsonResponse(503, { code: 'cloud_unavailable' }),
-    )
-    await ai.settings()
-    ai.choose('openai', 'gpt-4.1')
-    await vi.waitFor(() => expect(puts()).toHaveLength(1))
-    await new Promise((r) => setTimeout(r, 0))
-    const s = await ai.settings()
-    expect(s.provider).toBe('openai')
-    expect(s.providers.openai.model).toBe('gpt-4.1')
-    expect(document.querySelector('.ow-ai-state')).toBeNull()
-    expect(errors).not.toHaveBeenCalled()
-    errors.mockRestore()
-  })
-
-  it('two quick picks reach the server one at a time, the last pick wins and an old answer never overwrites it', async () => {
-    const gates: Array<(r: Response) => void> = []
-    const { ai, puts } = create(
-      [cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z')],
-      () => new Promise<Response>((resolve) => gates.push(resolve)),
-    )
-    await ai.settings()
-    const echo = (model: string) =>
-      jsonResponse(200, {
-        ...cred('openai', model, '2026-10-11T09:00:00Z'),
-      })
-    ai.choose('openai', 'gpt-4.1')
-    await vi.waitFor(() => expect(puts()).toHaveLength(1))
-    ai.choose('openai', 'gpt-4.1-nano')
-    await new Promise((r) => setTimeout(r, 0))
-    // the second pick waits behind the first: no second PUT while the first is in flight
-    expect(puts()).toHaveLength(1)
-    gates[0]!(echo('gpt-4.1'))
-    await vi.waitFor(() => expect(puts()).toHaveLength(2))
-    expect(JSON.parse(String(puts()[1]!.init.body))).toEqual({ model: 'gpt-4.1-nano' })
-    gates[1]!(echo('gpt-4.1-nano'))
-    await new Promise((r) => setTimeout(r, 0))
-    // the cached item holds the last pick: choosing it again has nothing left to send
-    ai.choose('openai', 'gpt-4.1-nano')
-    await new Promise((r) => setTimeout(r, 0))
-    expect(puts()).toHaveLength(2)
-    expect((await ai.settings()).providers.openai.model).toBe('gpt-4.1-nano')
-  })
-
-  it('picks that return to the model the server already holds send nothing more, and a failed first PUT still sends the last pick', async () => {
-    const gates: Array<(r: Response) => void> = []
-    const { ai, puts } = create(
-      [cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z')],
-      () => new Promise<Response>((resolve) => gates.push(resolve)),
-    )
-    await ai.settings()
-    ai.choose('openai', 'gpt-4.1')
-    await vi.waitFor(() => expect(puts()).toHaveLength(1))
-    ai.choose('openai', 'gpt-4.1-nano')
-    ai.choose('openai', 'gpt-4.1')
-    gates[0]!(jsonResponse(200, cred('openai', 'gpt-4.1', '2026-10-11T09:00:00Z')))
-    await new Promise((r) => setTimeout(r, 0))
-    // the server already holds the last pick
-    expect(puts()).toHaveLength(1)
-
-    ai.choose('openai', 'gpt-4.1-nano')
-    await vi.waitFor(() => expect(puts()).toHaveLength(2))
-    ai.choose('openai', 'gpt-4.1-mini')
-    gates[1]!(jsonResponse(503, { code: 'cloud_unavailable' }))
-    await vi.waitFor(() => expect(puts()).toHaveLength(3))
-    expect(JSON.parse(String(puts()[2]!.init.body))).toEqual({ model: 'gpt-4.1-mini' })
-    gates[2]!(jsonResponse(200, cred('openai', 'gpt-4.1-mini', '2026-10-11T09:01:00Z')))
-    await new Promise((r) => setTimeout(r, 0))
-    expect((await ai.settings()).providers.openai.model).toBe('gpt-4.1-mini')
-  })
-
-  it('a key list that failed to load is not "no key": the settings say the keys are unknown, and a later read recovers', async () => {
-    let listing = false
-    const { fetch } = recorder((c) =>
-      c.url.endsWith('/credentials')
-        ? listing
-          ? jsonResponse(200, {
-              items: [cred('openai', 'gpt-4.1')],
-              providers: CREDENTIALS.providers,
-            })
-          : jsonResponse(503, { code: 'cloud_unavailable' })
-        : jsonResponse(200, CLOUD),
-    )
-    const ai = createWebAi({
-      port,
-      capabilities: { ai: true },
-      fetch,
-      origin: ORIGIN,
-      now: () => 0,
-    })
-    const down = await ai.settings()
-    expect(down.credentialsUnavailable).toBe(true)
-    expect(down.providers.openai.apiKey).toBe('')
-    listing = true
-    const up = await ai.settings()
-    expect(up.credentialsUnavailable).toBeUndefined()
-    expect(up.providers.openai.apiKey).not.toBe('')
-    // a refresh that fails after one good load keeps the last answer instead of reporting unknown
-    listing = false
-    await ai.state(true).catch(() => null)
-    expect((await ai.settings()).credentialsUnavailable).toBeUndefined()
-  })
-
-  it('nothing is sent for a provider without a stored key, or for the model the server already holds', async () => {
-    const { ai, puts } = create([cred('openai', 'gpt-4.1-mini', '2026-10-10T08:00:00Z')])
-    await ai.settings()
-    ai.choose('gemini', 'gemini-2.5-pro')
-    ai.choose('openai', 'gpt-4.1-mini')
-    ai.choose('openai')
-    await new Promise((r) => setTimeout(r, 0))
-    expect(puts()).toEqual([])
-  })
-})
-
-describe('the model of a provider with a key (UNI-1232 FX2: N3-01 / G-N1)', () => {
-  const port = {
-    whenInitialized: async () => ({
-      documentId: 'doc-1',
-      apiBase: 'https://app.test/api/v1',
-      capabilities: { ai: true },
-    }),
-    ...tokens(),
-  }
-  const stored = (provider: string) => ({
-    ...CREDENTIALS.items[0]!,
-    provider,
-    key_hint: '…wxyz',
-    base_url: provider === 'custom' ? 'https://router.example/v1' : '',
-  })
-
-  function aiWith(provider: string, models: unknown, opts: { choose?: string } = {}) {
-    const { calls, fetch } = recorder((c) =>
-      c.url.endsWith('/credentials')
-        ? jsonResponse(200, { items: [stored(provider)], providers: CREDENTIALS.providers })
-        : c.url.endsWith('/models')
-          ? jsonResponse(200, models)
-          : jsonResponse(200, CLOUD),
-    )
-    const ai = createWebAi({
-      port,
-      capabilities: { ai: true },
-      fetch,
-      origin: ORIGIN,
-      now: () => 0,
-    })
-    if (opts.choose) ai.choose(provider, opts.choose)
-    return { ai, calls }
-  }
-
-  it('a provider with a default model runs on it with nothing picked in this browser', async () => {
-    const { ai, calls } = aiWith('openai', { data: [] })
-    const s = await ai.settings()
-    expect(s.provider).toBe('openai')
-    expect(s.providers.openai.model).toBeTruthy()
-    // its live list is asked in the background (the chip's rows), never needed to run
-    await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/models'))).toBe(true))
-  })
-
-  it('a model-less provider that lists exactly one model runs on it', async () => {
-    const { ai } = aiWith('custom', { data: [{ id: 'router-one' }] })
-    await ai.settings()
-    await vi.waitFor(async () =>
-      expect((await ai.settings()).providers.custom.model).toBe('router-one'),
-    )
-  })
-
-  it('a model-less provider that lists several keeps the model empty (the panel asks for a pick)', async () => {
-    const { ai, calls } = aiWith('custom', { data: [{ id: 'a' }, { id: 'b' }] })
-    await ai.settings()
-    await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/models'))).toBe(true))
-    await new Promise((r) => setTimeout(r, 0))
-    expect((await ai.settings()).providers.custom.model).toBe('')
-  })
-
-  it('a pick made in this browser wins over the listing', async () => {
-    const { ai } = aiWith('custom', { data: [{ id: 'router-one' }] }, { choose: 'mine' })
-    expect((await ai.settings()).providers.custom.model).toBe('mine')
-  })
-
-  it('a failed listing is silent', async () => {
-    const { fetch } = recorder((c) =>
-      c.url.endsWith('/credentials')
-        ? jsonResponse(200, { items: [stored('custom')], providers: CREDENTIALS.providers })
-        : c.url.endsWith('/models')
-          ? jsonResponse(502, { code: 'provider_unreachable' })
-          : jsonResponse(200, CLOUD),
-    )
-    const ai = createWebAi({
-      port,
-      capabilities: { ai: true },
-      fetch,
-      origin: ORIGIN,
-      now: () => 0,
-    })
-    expect((await ai.settings()).providers.custom.model).toBe('')
-  })
-
-  // N-01 (post-A9 sweep): the panel draws a setup state as a plain notice, never in error red
-  it('a send without a model answers with a tagged notice, the typed text intact', async () => {
-    const { ai } = aiWith('custom', { data: [{ id: 'a' }, { id: 'b' }] })
-    const settings = await ai.settings()
-    const chat = await ai.streams.aiChat({ settings, system: 's', user: 'hi' })
-    expect(chat.ok).toBe(false)
-    const error = (chat as { error: string }).error
-    expect(aiNoticeKind(error)).toBe('no_model')
-    expect(aiNoticeBody(error)).toMatch(/^Choose a model\. Pick a model in the model menu/)
-  })
-
-  it('a send with no key stored answers with a tagged notice too, a real failure stays an error', async () => {
-    const failing = (status: number, code: string) => {
-      const { fetch } = recorder((c) =>
-        c.url.endsWith('/credentials')
-          ? jsonResponse(200, { items: [stored('openai')], providers: CREDENTIALS.providers })
-          : c.url.includes('/byok/')
-            ? jsonResponse(status, { code })
-            : jsonResponse(200, CLOUD),
-      )
-      return createWebAi({ port, capabilities: { ai: true }, fetch, origin: ORIGIN, now: () => 0 })
-    }
-    const missing = failing(404, 'credential_missing')
-    const settings = await missing.settings()
-    const first = (await missing.streams.aiChat({ settings, system: 's', user: 'hi' })) as {
-      error: string
-    }
-    expect(aiNoticeKind(first.error)).toBe('no_model')
-    expect(aiNoticeBody(first.error)).toMatch(/^No AI key yet\./)
-    const down = failing(502, 'provider_unreachable')
-    const second = (await down.streams.aiChat({
-      settings: await down.settings(),
-      system: 's',
-      user: 'hi',
-    })) as { error: string }
-    expect(aiNoticeKind(second.error)).toBeNull()
-  })
-
-  it('reads the model ids of the three wire formats', () => {
-    expect(modelIdsOf({ data: [{ id: 'gpt-x' }, { id: 'gpt-x' }, {}] })).toEqual(['gpt-x'])
-    expect(modelIdsOf({ models: [{ name: 'models/gemini-x' }] })).toEqual(['gemini-x'])
-    expect(modelIdsOf(null)).toEqual([])
-  })
-})
-
-// ------------------------------------------------------------------ the chip data (G6-05m slice B)
-// What the model chip reads on the web: the person's own Settings row (`modelSources[p].chosen`), the
-// provider's live list (background, cached, never blocking), the newer of this browser's pick and
-// the server stamp, a choice key per user, and the model UniWork AI serves.
-describe('the model chip data on the web (G6-05m)', () => {
-  const CHOICE = 'uniwork.office.web.ai.choice'
-  const T0 = Date.parse('2026-10-14T08:00:00Z')
-  const MIN = 60_000
-  beforeEach(() => {
-    const data = new Map<string, string>()
-    vi.stubGlobal('localStorage', {
-      getItem: (k: string) => data.get(k) ?? null,
-      setItem: (k: string, v: string) => void data.set(k, String(v)),
-      removeItem: (k: string) => void data.delete(k),
-      clear: () => data.clear(),
-    })
-  })
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  const row = (provider: string, model = '', at = '', updated = '2026-10-09T00:00:00Z') => ({
-    ...CREDENTIALS.items[0]!,
-    provider,
-    key_hint: '…ab12',
-    updated_at: updated,
-    model,
-    model_updated_at: at,
-  })
-  /** an older server: no model fields at all */
-  const bare = (provider: string) => {
-    const { model: _m, model_updated_at: _t, ...rest } = row(provider)
-    return rest
-  }
-
-  type Answer = Response | Promise<Response>
-  /** a fake world: credentials, per-provider `/models` answers, the cloud status, every call recorded */
-  function world(
-    opts: {
-      items?: unknown[]
-      models?: Record<string, (n: number) => Answer>
-      cloud?: unknown
-      user?: { displayName: string; id?: string }
-      put?: (c: Call) => Answer
-    } = {},
-  ) {
-    const live = { items: opts.items ?? [], cloud: opts.cloud ?? CLOUD }
-    const asked: Record<string, number> = {}
-    const { calls, fetch } = recorder((c) => {
-      if (c.init.method === 'PUT') {
-        return opts.put
-          ? opts.put(c)
-          : jsonResponse(200, {
-              ...(live.items.find((i) =>
-                c.url.endsWith(`/${(i as { provider: string }).provider}`),
-              ) as object),
-              ...(JSON.parse(String(c.init.body)) as object),
-              model_updated_at: new Date(T0).toISOString(),
-            })
-      }
-      if (c.url.endsWith('/credentials')) {
-        return jsonResponse(200, { items: live.items, providers: CREDENTIALS.providers })
-      }
-      const m = /\/byok\/([^/]+)\/models$/.exec(c.url)
-      if (m) {
-        asked[m[1]!] = (asked[m[1]!] ?? 0) + 1
-        const answer = opts.models?.[m[1]!]
-        return answer ? answer(asked[m[1]!]!) : jsonResponse(200, { data: [] })
-      }
-      return jsonResponse(200, live.cloud)
-    })
-    const clock = { t: T0 }
-    const ai = createWebAi({
-      port: {
-        whenInitialized: async () => ({
-          documentId: 'doc-1',
-          apiBase: 'https://app.test/api/v1',
-          capabilities: { ai: true, uniworkAi: true },
-          ...(opts.user ? { user: opts.user } : {}),
-        }),
-        ...tokens(),
-      },
-      capabilities: { ai: true, uniworkAi: true },
-      fetch,
-      origin: ORIGIN,
-      now: () => clock.t,
-    })
-    const listCalls = (p: string) => calls.filter((c) => c.url.endsWith(`/byok/${p}/models`)).length
-    const credentialGets = () =>
-      calls.filter((c) => c.url.endsWith('/credentials') && c.init.method !== 'PUT').length
-    return { ai, live, calls, clock, listCalls, credentialGets }
-  }
-  const listedOf = async (ai: ReturnType<typeof world>['ai'], p: string) =>
-    (await ai.settings()).modelSources?.[p as 'openai']?.listed
-  const settled = () => new Promise((r) => setTimeout(r, 0))
-
-  describe('chip matches Settings', () => {
-    it('the Settings rows are the chosen models and the latest stamp is the default provider', async () => {
-      const { ai } = world({
-        items: [
-          row('openai', 'gpt-5.6-sol', '2026-10-14T07:00:00Z'),
-          row('anthropic', 'claude-sonnet-5', '2026-10-13T07:00:00Z'),
-        ],
-      })
-      const s = await ai.settings()
-      expect(s.provider).toBe('openai')
-      expect(s.providers.openai.model).toBe('gpt-5.6-sol')
-      expect(s.modelSources?.openai?.chosen).toBe('gpt-5.6-sol')
-      expect(s.modelSources?.anthropic?.chosen).toBe('claude-sonnet-5')
-      // a provider with no key has no source: the chip never lists it
-      expect(s.modelSources?.gemini).toBeUndefined()
-    })
-
-    it('a model changed in Settings after an older local pick wins over that pick', async () => {
-      localStorage.setItem(
-        CHOICE,
-        JSON.stringify({
-          provider: 'anthropic',
-          providerAt: T0 - 2 * 60 * MIN,
-          models: { anthropic: 'claude-old' },
-          at: { anthropic: T0 - 2 * 60 * MIN },
-        }),
-      )
-      const { ai } = world({
-        items: [
-          row('anthropic', 'claude-new', new Date(T0 - 60 * MIN).toISOString()),
-          row('openai', 'gpt-5.6-sol', new Date(T0 - 3 * 60 * MIN).toISOString()),
-        ],
-      })
-      const s = await ai.settings()
-      expect(s.provider).toBe('anthropic')
-      expect(s.providers.anthropic.model).toBe('claude-new')
-    })
-
-    it('a Settings change on another provider after the pick moves the default provider too', async () => {
-      localStorage.setItem(
-        CHOICE,
-        JSON.stringify({
-          provider: 'anthropic',
-          providerAt: T0 - 2 * 60 * MIN,
-          models: { anthropic: 'claude-old' },
-          at: { anthropic: T0 - 2 * 60 * MIN },
-        }),
-      )
-      const { ai } = world({
-        items: [
-          row('anthropic', 'claude-old', new Date(T0 - 2 * 60 * MIN).toISOString()),
-          row('openai', 'gpt-5.6-sol', new Date(T0 - 60 * MIN).toISOString()),
-        ],
-      })
-      const s = await ai.settings()
-      expect(s.provider).toBe('openai')
-      expect(s.providers.openai.model).toBe('gpt-5.6-sol')
-    })
-
-    it('a local pick newer than the server stamp wins (a save that did not reach the server)', async () => {
-      const { ai, clock } = world({
-        items: [row('openai', 'gpt-5.6-sol', new Date(T0 - 60 * MIN).toISOString())],
-        put: () => jsonResponse(503, { code: 'cloud_unavailable' }),
-      })
-      await ai.settings()
-      ai.choose('openai', 'gpt-mine')
-      clock.t += MIN
-      await settled()
-      const s = await ai.settings()
-      expect(s.providers.openai.model).toBe('gpt-mine')
-      expect(s.modelSources?.openai?.chosen).toBe('gpt-5.6-sol')
-    })
-
-    it('a local entry without a time (an older build) loses to any server stamp', async () => {
-      localStorage.setItem(
-        CHOICE,
-        JSON.stringify({ provider: 'anthropic', models: { anthropic: 'claude-local' } }),
-      )
-      const { ai } = world({
-        items: [
-          row('anthropic', 'claude-server', '2026-10-01T00:00:00Z'),
-          row('openai', 'gpt-5.6-sol', '2026-10-02T00:00:00Z'),
-        ],
-      })
-      const s = await ai.settings()
-      expect(s.provider).toBe('openai')
-      expect(s.providers.anthropic.model).toBe('claude-server')
-    })
-
-    it('after a saved pick the local time is the server stamp, so a later Settings change wins despite a fast clock', async () => {
-      const { ai, live, clock } = world({
-        items: [row('openai', 'gpt-5.6-sol', '2026-10-01T00:00:00Z')],
-        put: (c) =>
-          jsonResponse(200, {
-            ...row('openai', (JSON.parse(String(c.init.body)) as { model: string }).model),
-            // the server clock is 10 min behind this browser
-            model_updated_at: new Date(T0 - 10 * MIN).toISOString(),
-          }),
-      })
-      await ai.settings()
-      ai.choose('openai', 'gpt-mine')
-      await vi.waitFor(async () =>
-        expect((await ai.settings()).modelSources?.openai?.chosen).toBe('gpt-mine'),
-      )
-      // Settings (another tab) changes it 5 min later by the server clock: still before this browser's own clock
-      live.items = [row('openai', 'gpt-settings', new Date(T0 - 5 * MIN).toISOString())]
-      clock.t += 5_000
-      await ai.state(true)
-      expect((await ai.settings()).providers.openai.model).toBe('gpt-settings')
-    })
-
-    it('a pick of UniWork AI loses to a later Settings change, and wins while the server has no stamp', async () => {
-      localStorage.setItem(
-        CHOICE,
-        JSON.stringify({ provider: 'uniwork', providerAt: T0 - 60 * MIN, models: {} }),
-      )
-      const newer = world({ items: [row('openai', 'gpt-5.6-sol', new Date(T0).toISOString())] })
-      expect((await newer.ai.settings()).provider).toBe('openai')
-      const none = world({ items: [row('openai')] })
-      expect((await none.ai.settings()).provider).toBe('uniwork')
-    })
-  })
-
-  describe('a server with missing fields never breaks the chip', () => {
-    it('no model fields: no chosen model, the catalog default runs, nothing is listed', async () => {
-      const { ai } = world({ items: [bare('openai')] })
-      const s = await ai.settings()
-      expect(s.provider).toBe('openai')
-      expect(s.providers.openai.model).toBeTruthy()
-      expect(s.modelSources?.openai?.chosen).toBe('')
-      expect(s.modelSources?.openai?.listed).toBeUndefined()
-    })
-
-    it('a local pick still wins when the server has no stamp', async () => {
-      localStorage.setItem(
-        CHOICE,
-        JSON.stringify({ provider: 'openai', models: { openai: 'gpt-mine' } }),
-      )
-      const { ai } = world({ items: [bare('openai')] })
-      expect((await ai.settings()).providers.openai.model).toBe('gpt-mine')
-    })
-
-    it.each([
-      ['a 502', () => jsonResponse(502, { code: 'provider_unreachable' })],
-      ['a 405 of an older server', () => jsonResponse(405, { code: 'method_not_allowed' })],
-      ['a body that is not JSON', () => new Response('<html>nope</html>', { status: 200 })],
-      ['a network failure', () => Promise.reject(new TypeError('Failed to fetch'))],
-    ])(
-      '%s on the listing: the catalog stays, the state says error, nothing throws',
-      async (_n, answer) => {
-        const { ai } = world({
-          items: [row('openai', 'gpt-5.6-sol', '2026-10-14T07:00:00Z')],
-          models: { openai: answer },
-        })
-        const first = await ai.settings()
-        expect(first.modelSources?.openai?.listState).toBe('loading')
-        await vi.waitFor(async () =>
-          expect((await ai.settings()).modelSources?.openai?.listState).toBe('error'),
-        )
-        const s = await ai.settings()
-        expect(s.modelSources?.openai?.listed).toBeUndefined()
-        expect(s.modelSources?.openai?.chosen).toBe('gpt-5.6-sol')
-        expect(s.credentialsUnavailable).toBeUndefined()
-      },
-    )
-
-    it('an empty list is not an error and shows the catalog', async () => {
-      const { ai } = world({
-        items: [row('openai')],
-        models: { openai: () => jsonResponse(200, { data: [] }) },
-      })
-      await ai.settings()
-      await settled()
-      await settled()
-      const s = await ai.settings()
-      expect(s.modelSources?.openai?.listed).toBeUndefined()
-      expect(s.modelSources?.openai?.listState).toBeUndefined()
-    })
-
-    it('no uniwork_model (an older server): no model for the UniWork AI row', async () => {
-      const { ai } = world({ items: [row('openai')] })
-      const s = await ai.settings()
-      expect(s.providers.uniwork).toBeDefined()
-      expect(s.uniworkModel ?? '').toBe('')
-    })
-
-    it('uniwork_model names the model of the UniWork AI row', async () => {
-      const { ai } = world({
-        items: [row('openai')],
-        cloud: { ...CLOUD, uniwork_model: ' claude-opus-5 ' },
-      })
-      expect((await ai.settings()).uniworkModel).toBe('claude-opus-5')
-    })
-
-    it('readCloudStatus reads uniwork_model, a missing or non-text one is ""', () => {
-      expect(readCloudStatus({ ...CLOUD, uniwork_model: 'claude-opus-5' }).uniwork_model).toBe(
-        'claude-opus-5',
-      )
-      expect(readCloudStatus(CLOUD).uniwork_model).toBe('')
-      expect(readCloudStatus({ ...CLOUD, uniwork_model: 7 }).uniwork_model).toBe('')
-    })
-  })
-
-  describe('the live list', () => {
-    it('lists every provider with a key in the background and tells the chips', async () => {
-      const { ai, listCalls } = world({
-        items: [row('openai'), row('gemini')],
-        models: {
-          openai: () => jsonResponse(200, { data: [{ id: 'gpt-5.6-sol' }, { id: 'gpt-5.7-x' }] }),
-          gemini: () => jsonResponse(200, { models: [{ name: 'models/gemini-3.8-flash' }] }),
-        },
-      })
-      const changed = vi.fn()
-      ai.onChanged(changed)
-      const first = await ai.settings()
-      // the read never waits for a listing
-      expect(first.modelSources?.openai?.listed).toBeUndefined()
-      expect(first.modelSources?.openai?.listState).toBe('loading')
-      await vi.waitFor(() => expect(changed).toHaveBeenCalled())
-      expect(await listedOf(ai, 'openai')).toEqual(['gpt-5.6-sol', 'gpt-5.7-x'])
-      expect(await listedOf(ai, 'gemini')).toEqual(['gemini-3.8-flash'])
-      expect((await ai.settings()).modelSources?.openai?.listState).toBeUndefined()
-      expect(listCalls('openai')).toBe(1)
-    })
-
-    it('one listing per provider and key stamp within 10 minutes, then again; a changed key lists again', async () => {
-      const { ai, live, clock, listCalls } = world({
-        items: [row('openai')],
-        models: { openai: () => jsonResponse(200, { data: [{ id: 'a' }] }) },
-      })
-      await ai.settings()
-      await vi.waitFor(async () => expect(await listedOf(ai, 'openai')).toEqual(['a']))
-      await ai.settings()
-      clock.t += 9 * MIN
-      await ai.settings()
-      await settled()
-      expect(listCalls('openai')).toBe(1)
-      clock.t += 2 * MIN
-      await ai.settings()
-      await vi.waitFor(() => expect(listCalls('openai')).toBe(2))
-      // a key replaced in Settings (new stamp) is listed at once, not after the TTL
-      live.items = [row('openai', '', '', '2026-10-14T08:05:00Z')]
-      await ai.state(true)
-      await ai.settings()
-      await vi.waitFor(() => expect(listCalls('openai')).toBe(3))
-    })
-
-    it('a refresh over a kept list leaves the state unset, and a failed refresh keeps the list without an error', async () => {
-      const { ai, clock, listCalls } = world({
-        items: [row('openai')],
-        models: {
-          openai: (n) =>
-            n === 1 ? jsonResponse(200, { data: [{ id: 'a' }] }) : jsonResponse(502, {}),
-        },
-      })
-      await ai.settings()
-      await vi.waitFor(async () => expect(await listedOf(ai, 'openai')).toEqual(['a']))
-      clock.t += 11 * MIN
-      const during = await ai.settings()
-      expect(during.modelSources?.openai?.listed).toEqual(['a'])
-      expect(during.modelSources?.openai?.listState).toBeUndefined()
-      await vi.waitFor(() => expect(listCalls('openai')).toBe(2))
-      await settled()
-      const after = await ai.settings()
-      expect(after.modelSources?.openai?.listed).toEqual(['a'])
-      expect(after.modelSources?.openai?.listState).toBeUndefined()
-    })
-
-    it("a replaced key whose listing fails shows the error, not the old key's list", async () => {
-      const { ai, live, listCalls } = world({
-        items: [row('openai')],
-        models: {
-          openai: (n) =>
-            n === 1
-              ? jsonResponse(200, { data: [{ id: 'old-key-model' }] })
-              : jsonResponse(403, {}),
-        },
-      })
-      await ai.settings()
-      await vi.waitFor(async () => expect(await listedOf(ai, 'openai')).toEqual(['old-key-model']))
-      // the key is replaced in UniWork settings (new stamp) and the new key cannot list
-      live.items = [row('openai', '', '', '2026-10-14T08:05:00Z')]
-      await ai.state(true)
-      await ai.settings()
-      await vi.waitFor(() => expect(listCalls('openai')).toBe(2))
-      await vi.waitFor(async () =>
-        expect((await ai.settings()).modelSources?.openai?.listState).toBe('error'),
-      )
-      expect(await listedOf(ai, 'openai')).toBeUndefined()
-    })
-
-    it('a failed listing is not retried on every chip open, only after a pause', async () => {
-      const { ai, clock, listCalls } = world({
-        items: [row('openai')],
-        models: { openai: () => jsonResponse(502, {}) },
-      })
-      await ai.settings()
-      await vi.waitFor(async () =>
-        expect((await ai.settings()).modelSources?.openai?.listState).toBe('error'),
-      )
-      for (let i = 0; i < 5; i++) await ai.settings()
-      await settled()
-      expect(listCalls('openai')).toBe(1)
-      clock.t += 2 * MIN
-      await ai.settings()
-      await vi.waitFor(() => expect(listCalls('openai')).toBe(2))
-    })
-
-    it('a 404 credential_missing reloads the credentials, and the provider stops being listed', async () => {
-      const { ai, live, credentialGets } = world({
-        items: [row('openai')],
-        models: { openai: () => jsonResponse(404, { code: 'credential_missing' }) },
-      })
-      await ai.settings()
-      const before = credentialGets()
-      live.items = []
-      await vi.waitFor(() => expect(credentialGets()).toBeGreaterThan(before))
-      await vi.waitFor(async () =>
-        expect((await ai.settings()).modelSources?.openai).toBeUndefined(),
-      )
-    })
-
-    it('the model-less discovery still runs on the same cache: one model runs, several keep the model empty', async () => {
-      const { ai } = world({
-        items: [row('custom')],
-        models: { custom: () => jsonResponse(200, { data: [{ id: 'router-one' }] }) },
-      })
-      await ai.settings()
-      await vi.waitFor(async () =>
-        expect((await ai.settings()).providers.custom.model).toBe('router-one'),
-      )
-    })
-  })
-
-  describe('the choice key per user', () => {
-    it('a pick is stored under the viewer, and a second viewer of the same storage does not inherit it', async () => {
-      const first = world({
-        user: { displayName: 'A', id: 'u-1' },
-        items: [row('anthropic', 'claude-server', '2026-10-01T00:00:00Z'), row('openai')],
-      })
-      first.ai.choose('openai', 'gpt-mine')
-      await first.ai.settings()
-      expect(localStorage.getItem(CHOICE)).toBeNull()
-      expect(JSON.parse(localStorage.getItem(`${CHOICE}:u-1`)!)).toMatchObject({
-        provider: 'openai',
-        models: { openai: 'gpt-mine' },
-      })
-      const again = world({
-        user: { displayName: 'A', id: 'u-1' },
-        items: [row('anthropic', 'claude-server', '2026-10-01T00:00:00Z'), row('openai')],
-      })
-      expect((await again.ai.settings()).providers.openai.model).toBe('gpt-mine')
-      const other = world({
-        user: { displayName: 'B', id: 'u-2' },
-        items: [row('anthropic', 'claude-server', '2026-10-01T00:00:00Z'), row('openai')],
-      })
-      const s = await other.ai.settings()
-      expect(s.provider).toBe('anthropic')
-      expect(s.providers.openai.model).not.toBe('gpt-mine')
-    })
-
-    it('a viewer without an id keeps the old key', async () => {
-      const { ai } = world({ items: [row('openai')] })
-      await ai.settings()
-      ai.choose('openai', 'gpt-mine')
-      expect(JSON.parse(localStorage.getItem(CHOICE)!)).toMatchObject({
-        models: { openai: 'gpt-mine' },
-      })
-    })
-  })
-})
-
-// ------------------------------------------------------------------ UniWork AI (G6-05 slice C)
-// The frame side of the `uniwork` provider: the frame route client, the host transport handed to
-// the adapter, the aiStream branch (never the BYOK proxy), the Grant formula, the unlocked settings
-// entry, capability off -> hidden with no error, the server run id on aiRun. The adapter itself
-// (slicing, conversation ids, Retry-After) is slice A: these tests drive a fake `streamUniwork`.
 describe('UniWork AI on the web (G6-05)', () => {
   const ROUTE = `${BASE}/uniwork/chat/completions`
-  const stored = (provider: string) => ({
-    provider,
-    label: '',
-    base_url: '',
-    key_hint: '…abcd',
-    created_at: '2026-10-09T00:00:00Z',
-    updated_at: '2026-10-09T00:00:00Z',
-    model: 'm-1',
-    model_updated_at: '2026-10-09T00:00:00Z',
-  })
 
   type FakeStream = NonNullable<
     NonNullable<Parameters<typeof createWebAiStreams>[0]['uniwork']>['stream']
@@ -2271,8 +652,6 @@ describe('UniWork AI on the web (G6-05)', () => {
       : undefined
     const s = createWebAiStreams({
       client,
-      protocolOf: (id) => (id === 'openai' ? 'openai-compatible' : null),
-      describe: (err) => `typed:${err.code}`,
       ...(aiRun ? { aiRun } : {}),
       uniwork: {
         scope: () =>
@@ -2308,33 +687,36 @@ describe('UniWork AI on the web (G6-05)', () => {
   ) => new UniworkError(code as never, { status, ...more })
 
   describe('Grant formula', () => {
-    it('aiHostGrants: uniworkAi alone opens the panel, no credentials, no cloud tools', () => {
-      expect(aiHostGrants({ uniworkAi: true })).toEqual({
+    it('aiHostGrants: only the UniWork AI grant opens the panel, the old ai grant opens nothing, no key settings entry', () => {
+      expect(aiHostGrants({ ai: true, uniworkAi: false } as Capabilities)).toMatchObject({
+        ai: false,
+      })
+      const on = aiHostGrants({ uniworkAi: true })
+      expect(on).toEqual({
         ai: true,
-        aiCredentials: false,
         uniworkAi: true,
         webSearch: false,
         imageSearch: false,
         imageGeneration: false,
       })
-      // a cloud tool follows its own grant under either of the two
+      expect(on).not.toHaveProperty('aiCredentials')
+      // a cloud tool follows its own grant, under the UniWork AI one only
       expect(aiHostGrants({ uniworkAi: true, webSearch: true })).toMatchObject({
         ai: true,
-        aiCredentials: false,
         webSearch: true,
       })
-      expect(aiHostGrants({ ai: true, uniworkAi: true, imageSearch: true })).toMatchObject({
-        aiCredentials: true,
-        uniworkAi: true,
-        imageSearch: true,
+      expect(aiHostGrants({ ai: true, imageSearch: true } as Capabilities)).toMatchObject({
+        ai: false,
+        imageSearch: false,
       })
       // the tool grants alone still open nothing
       expect(aiHostGrants({ webSearch: true })).toMatchObject({ ai: false, webSearch: false })
     })
 
-    it('the frame claims uniworkAi', async () => {
+    it('the frame claims uniworkAi and never the old ai key', async () => {
       const { AI_FRAME_CAPABILITIES } = await import('./web-ai')
       expect(AI_FRAME_CAPABILITIES.uniworkAi).toBe(true)
+      expect(AI_FRAME_CAPABILITIES).not.toHaveProperty('ai')
     })
   })
 
@@ -2535,35 +917,77 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(r.chunks.some((c) => c.type === 'error')).toBe(false)
     })
 
-    it('uniwork 503 then a BYOK turn completes (G6-A08)', async () => {
+    it('a chat turn is a running turn until it ends: aiRun running, then one idle (X-02, S6)', async () => {
+      const sent: string[] = []
+      const aiRun = createAiRunTracker({ report: (p) => sent.push(p.state), graceMs: 0 })
       const r = rig(
-        async () => {
-          throw failure('cloud_unavailable', 503)
+        async (_t, _req, cb) => {
+          cb.onDelta('x')
         },
-        {
-          answer: (c) =>
-            c.url.includes('/byok/')
-              ? sseResponse([
-                  `data: ${JSON.stringify({ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] })}\n\n`,
-                  'data: [DONE]\n\n',
-                ])
-              : jsonResponse(200, {}),
-        },
+        { aiRun },
       )
-      await uniworkTurn(r.s, 'u-503')
-      expect(r.chunks.at(-1)).toMatchObject({ type: 'error', uniworkCode: 'cloud_unavailable' })
+      const turn = uniworkTurn(r.s, 'run1')
+      expect(aiRun.running()).toBe(true)
+      await turn
+      expect(aiRun.running()).toBe(false)
+      expect(sent).toEqual(['running', 'idle'])
+    })
+
+    it('a turn that cannot start (no UniWork AI scope, a refused purpose) is not a running turn; a stopped one ends the run', async () => {
+      const sent: string[] = []
+      const aiRun = createAiRunTracker({ report: (p) => sent.push(p.state), graceMs: 0 })
+      await uniworkTurn(rig(async () => {}, { aiRun, scope: null }).s, 'r0')
+      await uniworkTurn(rig(async () => {}, { aiRun }).s, 'r1', { purpose: 'summary' })
+      expect(sent).toEqual([])
+      // a turn that hangs until it is cancelled (the "stop to reload" path)
+      const hang = rig(
+        (_t, _req, cb) =>
+          new Promise<void>((_resolve, reject) =>
+            cb.signal.addEventListener('abort', () =>
+              reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+            ),
+          ),
+        { aiRun },
+      )
+      const turn = uniworkTurn(hang.s, 'r2')
+      await new Promise((r) => setTimeout(r, 0))
+      expect(aiRun.running()).toBe(true)
+      await aiRun.stop()
+      await turn
+      expect(aiRun.running()).toBe(false)
+      expect(sent).toEqual(['running', 'idle'])
+    })
+
+    it('every turn is a UniWork AI turn: a vendor provider left in the settings never reaches a vendor route', async () => {
+      const r = rig(async (transport, request, cb) => {
+        await transport.post({ scope: request.scope, ...wire(), signal: cb.signal })
+      })
       await r.s.aiStream({
-        requestId: 'b1',
+        requestId: 'v1',
         sessionId: 'sess-1',
-        settings: { provider: 'openai', providers: { openai: { apiKey: 'x', model: 'm-1' } } },
+        settings: { provider: 'openai', providers: { openai: { apiKey: 'sk-x', model: 'gpt-x' } } },
         system: 's',
         messages: [{ role: 'user', content: 'hi' }],
       } as never)
-      expect(r.chunks.filter((c) => c.requestId === 'b1').at(-1)).toEqual({
-        requestId: 'b1',
-        type: 'done',
-      })
-      expect(r.calls.at(-1)!.url).toBe(`${BASE}/byok/openai/chat/completions`)
+      expect(r.stream).toHaveBeenCalledTimes(1)
+      expect(r.calls.map((c) => c.url)).toEqual([ROUTE])
+      expect(JSON.stringify(r.calls[0]!.init)).not.toContain('sk-x')
+      expect(r.chunks.at(-1)).toEqual({ requestId: 'v1', type: 'done' })
+    })
+
+    it('aiChat (one-shot) has no UniWork AI route: its failure text, nothing sent', async () => {
+      const r = rig(async () => {})
+      for (const provider of ['uniwork', 'openai']) {
+        expect(
+          await r.s.aiChat({
+            settings: { provider, providers: {} } as never,
+            system: 's',
+            user: 'u',
+          }),
+        ).toEqual({ ok: false, error: 'uniwork:ai_disabled' })
+      }
+      expect(r.calls).toEqual([])
+      expect(r.stream).not.toHaveBeenCalled()
     })
 
     describe('uniwork turn: one idle per ending path', () => {
@@ -2681,37 +1105,125 @@ describe('UniWork AI on the web (G6-05)', () => {
   })
 
   describe('createWebAi with uniworkAi', () => {
-    function uniworkPort(caps: Record<string, boolean>, module?: string) {
-      return {
-        whenInitialized: async () => ({
-          documentId: 'doc-1',
-          apiBase: 'https://app.test/api/v1',
-          capabilities: caps,
-          ...(module ? { module } : {}),
-        }),
-        ...tokens(),
-      }
-    }
+    const uniworkPort = (caps: Record<string, boolean>, module?: string) => port(caps, true, module)
 
-    it('uniworkAi alone: active, no credential list read, an unlocked UniWork AI entry chosen by default', async () => {
-      const { calls, fetch } = recorder(() => jsonResponse(404, { code: 'not_found' }))
-      const capabilities: Record<string, unknown> = { ai: true, uniworkAi: true }
+    it('settings name UniWork AI only: one provider, an unlocked slot, the model the server names', async () => {
+      const { fetch } = recorder(() =>
+        jsonResponse(200, { ...CLOUD, uniwork_model: 'claude-opus-5' }),
+      )
       const ai = createWebAi({
-        port: uniworkPort({ uniworkAi: true }),
-        capabilities,
+        port: uniworkPort({ ai: true, uniworkAi: true }),
+        capabilities: { ai: true, uniworkAi: true },
         fetch,
         origin: ORIGIN,
       })
       expect(await ai.active()).toBe(true)
       const s = await ai.settings()
       expect(s.provider).toBe('uniwork')
-      // not locked: the picker sees a non-empty key slot; no credential-list failure either
-      expect(s.providers.uniwork.apiKey).not.toBe('')
-      expect(s.credentialsUnavailable).toBeUndefined()
+      expect(Object.keys(s.providers)).toEqual(['uniwork'])
+      // not locked: the picker sees a non-empty slot; the server's policy picks the model
+      expect(s.providers.uniwork).toEqual({ apiKey: '…', model: '' })
+      expect(s.uniworkModel).toBe('claude-opus-5')
       expect(s.uniAiAvailable).toBe(false)
-      // no BYOK listing; the only read is the cloud status (it names the UniWork AI model)
-      expect(calls.length).toBeGreaterThan(0)
-      expect(new Set(calls.map((c) => c.url))).toEqual(new Set([`${BASE}/cloud`]))
+      expect(s.modelSources).toBeUndefined()
+    })
+
+    it('publishes the cloud status (credits included) on window.uniworkCloudStatus for the model chip, also without a cloud tool', async () => {
+      const { fetch } = recorder(() => jsonResponse(200, CLOUD))
+      const ai = createWebAi({
+        port: uniworkPort({ uniworkAi: true }),
+        capabilities: { ai: true, uniworkAi: true },
+        fetch,
+        origin: ORIGIN,
+      })
+      expect(await ai.active()).toBe(true)
+      const bridge = windowCloudStatus()
+      expect(bridge).toBeDefined()
+      const pushed: unknown[] = []
+      const off = bridge!.onChange((status) => pushed.push(status))
+      await ai.state(true)
+      const status = {
+        state: 'ready',
+        signedIn: true,
+        enabled: true,
+        credits: { remaining: 90, limit: 100 },
+      }
+      expect(await bridge!.get()).toMatchObject(status)
+      expect(pushed.at(-1)).toMatchObject(status)
+      off()
+      // no account or organization: the panels keep their own disclosure identity
+      expect(await bridge!.get()).not.toHaveProperty('accountId', expect.any(String))
+    })
+
+    it('a listener subscribed before the first GET cloud hears the credits on its first call', async () => {
+      let answer: (r: Response) => void = () => {}
+      const cloud = new Promise<Response>((resolve) => (answer = resolve))
+      const { fetch } = recorder(() => cloud)
+      const ai = createWebAi({
+        port: uniworkPort({ uniworkAi: true }),
+        capabilities: { ai: true, uniworkAi: true },
+        fetch,
+        origin: ORIGIN,
+      })
+      expect(await ai.active()).toBe(true)
+      const pushed: unknown[] = []
+      windowCloudStatus()!.onChange((status) => pushed.push(status))
+      answer(jsonResponse(200, CLOUD))
+      await ai.state()
+      expect(pushed[0]).toMatchObject({ state: 'ready', credits: { remaining: 90, limit: 100 } })
+    })
+
+    it('used-up credits keep the chip row: the bridge reads ready with nothing left', async () => {
+      const { fetch } = recorder(() =>
+        jsonResponse(200, { ...CLOUD, credits: { ...CLOUD.credits, used: 100, remaining: 0 } }),
+      )
+      const ai = createWebAi({
+        port: uniworkPort({ uniworkAi: true }),
+        capabilities: { ai: true, uniworkAi: true },
+        fetch,
+        origin: ORIGIN,
+      })
+      await ai.state(true)
+      expect(await windowCloudStatus()!.get()).toMatchObject({
+        state: 'ready',
+        credits: { remaining: 0, limit: 100 },
+      })
+    })
+
+    it('activation, settings, a turn and a return to the tab touch only the cloud status and the UniWork AI routes', async () => {
+      const { calls, fetch } = recorder((c) =>
+        c.url === ROUTE ? uniworkOk() : jsonResponse(200, CLOUD),
+      )
+      // an older host still sends the old `ai` grant beside `uniworkAi`
+      const grants = { ai: true, uniworkAi: true, webSearch: true }
+      const ai = createWebAi({
+        port: uniworkPort(grants),
+        capabilities: { ...grants },
+        fetch,
+        origin: ORIGIN,
+      })
+      const api = withWebAi({}, ai)
+      expect(await ai.active()).toBe(true)
+      await ai.settings()
+      const chunks: Array<{ type: string }> = []
+      ;(api.onAiStream as (h: (c: { type: string }) => void) => () => void)((c) => chunks.push(c))
+      await (api.aiStream as (r: object) => Promise<void>)({
+        requestId: 'q1',
+        sessionId: 'sess-routes',
+        settings: { provider: 'uniwork', providers: {} },
+        system: 's',
+        messages: [{ role: 'user', text: 'hi' }],
+      })
+      expect(chunks.at(-1)!.type).toBe('done')
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+      await new Promise((r) => setTimeout(r, 0))
+      await ai.settings()
+      const paths = calls.map((c) => c.url.slice(BASE.length))
+      expect(paths).toContain('/cloud')
+      expect(paths).toContain('/uniwork/chat/completions')
+      expect(paths.filter((p) => p !== '/cloud' && !p.startsWith('/uniwork/'))).toEqual([])
+      expect(calls.filter((c) => /\/ai\/(credentials|byok\/)/.test(c.url))).toEqual([])
     })
 
     it('uniworkAi alone with no cloud-tool grant still shows the model the server names, and leaves the tools off', async () => {
@@ -2745,11 +1257,14 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(s.uniworkModel).toBeUndefined()
     })
 
-    it('neither grant: nothing is asked of the server', async () => {
+    it.each([
+      ['no grant', {}],
+      ['the old ai grant alone', { ai: true, webSearch: true }],
+    ])('%s: nothing is asked of the server', async (_name, grants) => {
       const { calls, fetch } = recorder(() => jsonResponse(200, CLOUD))
       const ai = createWebAi({
-        port: uniworkPort({}),
-        capabilities: {},
+        port: uniworkPort(grants),
+        capabilities: { ...grants },
         fetch,
         origin: ORIGIN,
       })
@@ -2780,69 +1295,39 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(uniworkAiAvailable()).toBe(false)
     })
 
-    it('a BYOK turn between two UniWork turns ends the UniWork conversation; a lost session clears them', async () => {
+    it('a lost session clears every UniWork AI conversation', async () => {
       const r = rig(async () => {
         throw failure('session_expired', 401)
       })
-      uniworkConversations.update('sess-1', { conversationId: 'c1', runId: 'r1' })
-      await r.s.aiStream({
-        requestId: 'b2',
-        sessionId: 'sess-1',
-        settings: { provider: 'openai', providers: { openai: { apiKey: 'x', model: 'm' } } },
-        system: '',
-        messages: [{ role: 'user', content: 'hi' }],
-      } as never)
-      expect(uniworkConversations.ids('sess-1')).toEqual({})
       uniworkConversations.update('sess-2', { conversationId: 'c2' })
       await uniworkTurn(r.s)
       expect(r.chunks.at(-1)).toMatchObject({ uniworkCode: 'session_expired' })
       expect(uniworkConversations.ids('sess-2')).toEqual({})
     })
 
-    it('with ai and uniworkAi both: BYOK stays the default, UniWork AI is chosen on request', async () => {
-      const { fetch } = recorder((c) =>
-        c.url.endsWith('/credentials')
-          ? jsonResponse(200, { items: [stored('openai')], providers: CREDENTIALS.providers })
-          : jsonResponse(200, CLOUD),
-      )
+    it('a provider or model pick from the renderer changes nothing: UniWork AI stays the one provider', async () => {
+      const { calls, fetch } = recorder(() => jsonResponse(200, CLOUD))
       const ai = createWebAi({
-        port: uniworkPort({ ai: true, uniworkAi: true }),
+        port: uniworkPort({ uniworkAi: true }),
         capabilities: { ai: true, uniworkAi: true },
         fetch,
         origin: ORIGIN,
-        now: () => AFTER_STAMPS,
       })
-      expect((await ai.settings()).provider).toBe('openai')
-      ai.choose('uniwork')
-      const s = await ai.settings()
-      expect(s.provider).toBe('uniwork')
-      expect(s.providers.uniwork.apiKey).not.toBe('')
-      expect(s.providers.openai.apiKey).toBe('…abcd')
-    })
-
-    it('without the uniworkAi grant there is no UniWork AI entry, and a stored choice of it stays selected (no silent switch to a BYOK provider)', async () => {
-      // the pick is newer than the server's model stamp, so only availability could move it
-      localStorage.setItem(
-        'uniwork.office.web.ai.choice',
-        JSON.stringify({ provider: 'uniwork', providerAt: AFTER_STAMPS, models: {} }),
-      )
-      const { fetch } = recorder((c) =>
-        c.url.endsWith('/credentials')
-          ? jsonResponse(200, { items: [stored('openai')], providers: CREDENTIALS.providers })
-          : jsonResponse(200, CLOUD),
-      )
-      const ai = createWebAi({
-        port: uniworkPort({ ai: true }),
-        capabilities: { ai: true },
-        fetch,
-        origin: ORIGIN,
-        now: () => 0,
+      const api = withWebAi({}, ai)
+      expect(await ai.active()).toBe(true)
+      const changed = vi.fn()
+      ai.onChanged(changed)
+      ai.choose('openai', 'gpt-x')
+      await (api.setAiSettings as (s: object) => Promise<void>)({
+        provider: 'openai',
+        providers: { openai: { apiKey: 'sk-x', model: 'gpt-x' } },
       })
       const s = await ai.settings()
-      // the picker shows the unavailable state and Send is blocked; a send ends in a notice, no request
       expect(s.provider).toBe('uniwork')
-      expect(s.providers.uniwork?.apiKey ?? '').toBe('')
-      expect(s.providers.openai.apiKey).toBe('…abcd')
+      expect(Object.keys(s.providers)).toEqual(['uniwork'])
+      expect(changed).not.toHaveBeenCalled()
+      // nothing is saved anywhere: only the cloud status is read
+      expect(calls.every((c) => c.url === `${BASE}/cloud` && !c.init.method)).toBe(true)
     })
 
     it('the scope carries the document and the module of the session as the format token', async () => {
@@ -2867,25 +1352,20 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(seen).toEqual([{ kind: 'frame', documentId: 'doc-1', format: 'xlsx' }])
     })
 
-    it('office_capability_off before any run: the entry hides, the key goes off, no error chip, BYOK untouched', async () => {
-      const { fetch } = recorder((c) =>
-        c.url.endsWith('/credentials')
-          ? jsonResponse(200, { items: [stored('openai')], providers: CREDENTIALS.providers })
-          : jsonResponse(200, CLOUD),
-      )
+    it('office_capability_off before any run: the entry and the panel hide, no error chip', async () => {
+      const { fetch } = recorder(() => jsonResponse(200, CLOUD))
+      // an older host still sends the old `ai` grant beside `uniworkAi`
       const capabilities: Record<string, unknown> = { ai: true, uniworkAi: true }
       const ai = createWebAi({
         port: uniworkPort({ ai: true, uniworkAi: true }),
         capabilities,
         fetch,
         origin: ORIGIN,
-        now: () => AFTER_STAMPS,
         uniworkStream: async (_t, _r, cb) => {
           cb.onNotice?.({ kind: 'uniwork-off' })
           throw failure('office_capability_off', 403)
         },
       })
-      ai.choose('uniwork')
       expect((await ai.settings()).provider).toBe('uniwork')
       const changed = vi.fn()
       ai.onChanged(changed)
@@ -2898,13 +1378,13 @@ describe('UniWork AI on the web (G6-05)', () => {
         messages: [{ role: 'user', content: 'hi' }],
       } as never)
       expect(capabilities.uniworkAi).toBe(false)
+      expect(capabilities.ai).toBe(false)
       expect(changed).toHaveBeenCalled()
       expect(document.querySelector('.ow-ai-state')).toBeNull()
+      // the one provider stays, unavailable (an empty slot: Send blocked), never another provider
       const s = await ai.settings()
-      expect(s.providers.uniwork?.apiKey ?? '').toBe('')
-      // the viewer's pick stays (unavailable state, Send blocked) instead of turning into their BYOK provider
       expect(s.provider).toBe('uniwork')
-      expect(s.providers.openai.apiKey).toBe('…abcd')
+      expect(s.providers).toEqual({ uniwork: { apiKey: '', model: '' } })
       expect(chunks.at(-1)!.type).toBe('done')
       expect(chunks.some((c) => c.type === 'error')).toBe(false)
     })

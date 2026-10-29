@@ -16,7 +16,7 @@ import {
   uniAiOpenRouterKey,
   withUniAiOpenRouterAuth,
 } from '../src/providers'
-import type { AiProviderId } from '../src/types'
+import type { AiModelSource, AiProviderId } from '../src/types'
 
 describe('defaultAiSettings', () => {
   it('gives every provider its default model and an empty key by default', () => {
@@ -421,45 +421,23 @@ describe('selectedProvider / isProviderUsable', () => {
     expect(isProviderUsable(settings, 'genspark')).toBe(true)
   })
 
-  it('treats origin: org on modelSources as configured without a local key or base URL, leaving absent/local unchanged', () => {
+  it('reads only the stored slot: a model source never stands in for a key, base URL or model', () => {
     const settings = defaultAiSettings()
     settings.provider = 'openai'
-    expect(settings.providers.openai.apiKey).toBe('')
-    expect(providerNeed(settings, 'openai')).toBe('key')
-    expect(isProviderUsable(settings, 'openai')).toBe(false)
-
-    // origin absent or 'local' still requires a local key
+    settings.providers.custom.model = ''
+    // a source carrying an unknown `origin` marker is read like any other
     settings.modelSources = {
-      openai: { chosen: 'gpt-5.6-sol' },
-      anthropic: { chosen: 'claude-sonnet-5', origin: 'local' },
+      openai: { chosen: 'gpt-5.6-sol', origin: 'org' } as AiModelSource,
+      anthropic: { chosen: 'claude-sonnet-5' },
+      custom: { chosen: 'org-hosted-model', origin: 'org' } as AiModelSource,
     }
     expect(providerNeed(settings, 'openai')).toBe('key')
-    expect(isProviderUsable(settings, 'openai')).toBe(false)
     expect(providerNeed(settings, 'anthropic')).toBe('key')
-    expect(isProviderUsable(settings, 'anthropic')).toBe(false)
-
-    // origin: 'org' is usable without copying any key_hint into providers[id].apiKey
-    settings.modelSources = {
-      openai: { chosen: 'gpt-5.6-sol', origin: 'org' },
-    }
-    expect(settings.providers.openai.apiKey).toBe('')
-    expect(providerNeed(settings, 'openai')).toBeNull()
-    expect(isProviderUsable(settings, 'openai')).toBe(true)
-
-    // custom with origin: 'org' needs no local baseUrl or apiKey once a model is chosen
-    settings.modelSources = {
-      custom: { chosen: '', origin: 'org' },
-    }
     expect(providerNeed(settings, 'custom')).toBe('model')
-    expect(isProviderUsable(settings, 'custom')).toBe(false)
-
-    settings.modelSources = {
-      custom: { chosen: 'org-hosted-model', origin: 'org' },
-    }
-    expect(settings.providers.custom.apiKey).toBe('')
-    expect(settings.providers.custom.baseUrl).toBe('')
-    expect(providerNeed(settings, 'custom')).toBeNull()
-    expect(isProviderUsable(settings, 'custom')).toBe(true)
+    const usable = AI_PROVIDERS.filter((m) => isProviderUsable(settings, m.id)).map((m) => m.id)
+    expect(usable).not.toContain('openai')
+    expect(usable).not.toContain('anthropic')
+    expect(usable).not.toContain('custom')
   })
 })
 

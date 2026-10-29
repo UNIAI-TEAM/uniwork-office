@@ -16,7 +16,7 @@ export function sheetsWebCapabilities(
 ): Readonly<Omit<SheetsCapabilities, 'platform'>> {
   return Object.freeze({
     ...(MODULE_WEB_CAPABILITIES as Record<
-      'ai' | 'aiCredentials' | 'open' | 'recents' | 'autoSave' | 'viewOnlyChip',
+      'ai' | 'open' | 'recents' | 'autoSave' | 'viewOnlyChip',
       boolean
     >),
     // one announcement per state: the status bar says it once, the ribbon row does not repeat it
@@ -77,14 +77,12 @@ export function sheetsHostGrants(
   | 'webSearch'
   | 'imageSearch'
   | 'imageGeneration'
-> & { aiCredentials: boolean; uniworkAi: boolean } {
+> & { uniworkAi: boolean } {
   const ai = aiHostGrants(granted)
   return {
-    // `ai` family (with the AI settings entry): the shared web AI bridge's mapping (the Grant
-    // formula: `ai` opens for BYOK or UniWork AI, `aiCredentials` is BYOK only); each cloud tool
-    // needs one of the two AI grants too
+    // `ai` family: the shared web AI bridge's mapping (the Grant formula: `ai` opens with the
+    // UniWork AI grant, the only AI); each cloud tool needs the UniWork AI grant too
     ai: ai.ai!,
-    aiCredentials: ai.aiCredentials!,
     uniworkAi: ai.uniworkAi!,
     webSearch: ai.webSearch!,
     imageSearch: ai.imageSearch!,

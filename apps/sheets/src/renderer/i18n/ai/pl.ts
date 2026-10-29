@@ -13,7 +13,6 @@ export const pl = {
     'Sprawdź ten arkusz pod kątem problemów: 1) błędy formuł (#REF!, #DIV/0! itd.), zakresy nieobejmujące wszystkich danych, brakujące kolumny w wierszach sum; 2) liczby i tekst wymieszane w jednej kolumnie, niespójne formaty dat, wyraźne wartości odstające i zduplikowane wiersze; 3) sumy niezgodne ze szczegółami, kolumny procentowe niesumujące się do 100%. Wypisz znalezione problemy i zaproponuj poprawki',
   aiAnalyzeBtn: 'Analiza AI',
   aiAnalyzePrompt: 'Przeanalizuj dane w tym arkuszu i podsumuj kluczowe wnioski, trendy i anomalie',
-  aiSettingsTitle: 'Ustawienia AI',
   aiSetUp: 'Skonfiguruj AI',
   aiNewChat: 'Nowa rozmowa',
   aiCollapsePanel: 'Zwiń panel AI',

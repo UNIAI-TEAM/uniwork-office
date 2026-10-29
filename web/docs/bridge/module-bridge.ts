@@ -12,8 +12,8 @@
  *   ./safe-api            safe no-op Proxy: a member nobody implements never throws
  *   ./project-memory      in-memory projectApi (AI-only)
  *   modules/shared/ai     the web AI bridge (CONTRACT C16): every global with AI members gets them
- *                         from it while the host grants `ai`; without the grant they stay the
- *                         module's own "unavailable" stubs and every AI key stays false
+ *                         from it while the host grants `uniworkAi`; without the grant they stay
+ *                         the module's own "unavailable" stubs and every AI key stays false
  *
  * Every global starts with the shared members (`sharedMembers`: getTheme, onThemeChanged,
  * getLanguage, onLanguageChanged, and the autosave preference pinned off, CONTRACT C10) and then
@@ -123,14 +123,12 @@ export interface InstalledModuleBridge {
 }
 
 /**
- * What every module starts with on the web: AI hidden until the host grants `ai` (as Docs), File > Open / recents until
+ * What every module starts with on the web: AI hidden until the host grants `uniworkAi` (as Docs), File > Open / recents until
  * granted, and no autosave of any kind (CONTRACT C10: explicit user save only; the renderers'
  * autosave toggles, timers and crash-recovery copies are hidden behind these keys).
  */
 export const MODULE_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.freeze({
   ai: false,
-  // web only: the AI settings entry (UniWork-stored keys), on with the `ai` grant
-  aiCredentials: false,
   // the host's own "Open in desktop app" action (A7): on only with the `desktopOpen` grant
   desktopOpen: false,
   open: false,

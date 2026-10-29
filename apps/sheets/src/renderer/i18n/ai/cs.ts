@@ -14,7 +14,6 @@ export const cs = {
     'Zkontroluj tento list a najdi problémy: 1) chyby vzorců (#REF!, #DIV/0! atd.), oblasti nepokrývající všechna data, chybějící sloupce v řádcích součtů; 2) čísla a text smíchané v jednom sloupci, nekonzistentní formáty dat, zjevné odlehlé hodnoty a duplicitní řádky; 3) součty neodpovídající detailním řádkům, procentní sloupce, které nedávají dohromady 100 %. Vypiš nalezené problémy a navrhni opravy',
   aiAnalyzeBtn: 'Analýza AI',
   aiAnalyzePrompt: 'Analyzuj data v tomto listu a shrň klíčová zjištění, trendy a anomálie',
-  aiSettingsTitle: 'Nastavení AI',
   aiSetUp: 'Nastavit AI',
   aiNewChat: 'Nová konverzace',
   aiCollapsePanel: 'Sbalit panel AI',

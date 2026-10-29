@@ -1,8 +1,9 @@
 // Web AI (CONTRACT C16, GO-A7 web AI contract) end to end on production builds in the protocol
-// test host, against the fake frame-token AI routes (web/server/fake-ai.mjs):
-//   grant on  -> AI panel visible -> a reply streams through the BYOK proxy (Bearer frame token,
-//                no cookies, 401 -> token refresh) -> AI settings = UniWork credentials (PUT/DELETE,
-//                masked key_hint) -> every typed error state renders (402/403/404/424/429/502/503)
+// test host, against the fake frame-token AI routes (web/server/fake-ai.mjs). UniWork AI is the only
+// AI of the frame (UNI-2289):
+//   grant on  -> AI panel visible -> a reply streams on the UniWork AI route (Bearer frame token,
+//                no cookies, 401 -> token refresh), never on a key or vendor route -> every typed
+//                error state renders (402/403/429/502 on a turn, 503 on a cloud tool)
 //   grant off -> no AI UI anywhere and no AI request.
 //   UniWork AI + `ai.start` (UNI-2264) -> the host hands the panel a job: its question carries
 //                X-UniWork-AI-Handoff, each next part goes out by itself while parts are left.
@@ -10,19 +11,19 @@
 //                lands in the document, then the tool result goes back on the chat route.
 // Docs (`npm run build:web`), Markdown and HTML (`npm run build:web -- --module markdown|html`). Zero console
 // errors and CSP violations; the only HTTP errors are the ones a test injects on the AI routes.
-// Screenshots (settings dialog + a state card, light/dark, en/vi): docs/web-modules/screenshots/ai/.
+// Screenshots (a reply, light/dark, en/vi): docs/web-modules/screenshots/ai/.
 // Run: npx playwright test -c web/e2e ai-web
 import { test, expect, type APIRequestContext, type Frame, type Page } from '@playwright/test'
 import { built, cspViolations, screenshotPath, watch, type Problems } from './text-modules'
 
 const REPLY = 'Hello from the UniWork AI proxy.'
-const KEY_CODES = [
-  { status: 402, code: 'credits_exhausted', title: 'AI credits used up' },
-  { status: 403, code: 'entitlement_required', title: 'AI is not in your plan' },
-  { status: 404, code: 'credential_missing', title: 'No AI key yet' },
-  { status: 424, code: 'provider_auth_failed', title: 'The AI key was refused' },
-  { status: 429, code: 'rate_limited', title: 'Too many AI requests', retryAfter: 7 },
-  { status: 502, code: 'provider_unreachable', title: 'AI provider unreachable' },
+/** a failed UniWork AI turn: its text (packages/ui/src/ai-uniwork/en.ts) is the panel's inline error */
+const TURN_FAILURES = [
+  { status: 402, code: 'credits_exhausted', text: 'out of AI credits' },
+  { status: 403, code: 'entitlement_required', text: 'no longer includes UniWork AI' },
+  // no Retry-After: the turn gives up at once instead of waiting
+  { status: 429, code: 'rate_limited', text: 'sending too fast' },
+  { status: 502, code: 'provider_unreachable', text: 'responding right now' },
 ] as const
 
 interface LogEntry {
@@ -46,7 +47,7 @@ async function fake(request: APIRequestContext, control?: Record<string, unknown
   expect((await request.post('/__fake-ai/control', { data: control })).ok()).toBe(true)
 }
 
-// the fake server is per-run and its state outlives this file: a credential or fail rule seeded here
+// the fake server is per-run and its state outlives this file: a fail rule or a scripted turn seeded here
 // would still be stored when the next spec's tests run (UNI-1919). Reset on the way out too, the same
 // endpoint every test above already calls on the way in.
 test.afterEach(async ({ request }) => {
@@ -57,13 +58,8 @@ async function aiLog(request: APIRequestContext): Promise<LogEntry[]> {
   return (await (await request.get('/__fake-ai/log')).json()) as LogEntry[]
 }
 
-const OPENAI_KEY = [{ provider: 'openai', api_key: 'sk-test-openai-abcd' }]
-/** the composer's one-line view-only notice: each panel kept its own class name */
-const VIEW_ONLY_NOTICE = {
-  docs: '.ai-readonly-notice',
-  markdown: '.ai-readonly-notice',
-  html: '.ai-readonly-notice',
-} as const
+/** the UniWork AI composer's one-line view-only notice (the same in every panel) */
+const VIEW_ONLY_NOTICE = '.ai-uniwork-view-only'
 
 /** tool names that change the document, across docs / markdown / html (the read-only set is read_*, get_*, web_search, ...) */
 const EDIT_TOOLS =
@@ -86,6 +82,11 @@ async function open(
 }
 
 const panel = (frame: Frame) => frame.locator('.ai-panel-header')
+
+/** UniWork AI asks once per document before the first question (S8): acknowledge it */
+async function acknowledge(frame: Frame) {
+  await frame.locator('.ai-uniwork-disclosure-ack').click()
+}
 
 async function ask(frame: Frame, text: string) {
   const box = frame.locator('.ai-input-box textarea').first()
@@ -138,67 +139,79 @@ for (const module of ['docs', 'markdown'] as const) {
       )
       expect(caps).toMatchObject({
         ai: false,
-        aiCredentials: false,
         webSearch: false,
         imageGeneration: false,
       })
+      expect(caps).not.toHaveProperty('aiCredentials')
       expect(await aiLog(request)).toEqual([])
       await expectClean(page, frame, problems)
     })
 
-    test('grant on: panel visible, reply streams through the proxy with the frame token', async ({
+    test('grant on: panel visible, reply streams on the UniWork AI route with the frame token', async ({
       page,
       request,
     }) => {
       await fake(request)
-      await fake(request, { credentials: OPENAI_KEY })
       const problems = await watch(page)
-      const frame = await open(page, module, { lang: 'en', ai: '1' })
+      const frame = await open(page, module, { lang: 'en', uniwork: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+      await acknowledge(frame)
       await ask(frame, 'Say hello')
       await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
         timeout: 60_000,
       })
       const log = await aiLog(request)
-      const chat = log.find((l) => l.path.endsWith('/byok/openai/chat/completions'))!
+      const chat = log.find((l) => l.path.endsWith('/uniwork/chat/completions'))!
       expect(chat, JSON.stringify(log)).toBeTruthy()
       expect(chat.method).toBe('POST')
       expect(chat.authorization).toBe('Bearer test-token')
       expect(chat.cookie).toBeNull()
       expect(chat.body.stream).toBe(true)
-      expect(JSON.stringify(chat.body)).not.toContain('sk-test')
       for (const l of log) expect(l.path).toMatch(/^\/api\/v1\/office-frame\/documents\/f1\/ai\//)
       await expectClean(page, frame, problems)
     })
 
-    for (const s of KEY_CODES) {
+    test('grant on: opening the panel and a turn never reach a key or vendor route (UNI-2289)', async ({
+      page,
+      request,
+    }) => {
+      await fake(request)
+      const frame = await open(page, module, { lang: 'en', uniwork: '1' })
+      await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+      await acknowledge(frame)
+      await ask(frame, 'Say hello')
+      await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
+        timeout: 60_000,
+      })
+      const paths = (await aiLog(request)).map((l) => l.path)
+      expect(paths.some((p) => p.endsWith('/uniwork/chat/completions'))).toBe(true)
+      expect(paths.filter((p) => /\/ai\/credentials|\/ai\/byok\//.test(p))).toEqual([])
+    })
+
+    for (const s of TURN_FAILURES) {
       test(`grant on: HTTP ${s.status} renders the ${s.code} state`, async ({ page, request }) => {
         await fake(request)
         await fake(request, {
-          credentials: OPENAI_KEY,
           fail: [
             {
               status: s.status,
               ...(s.status === 429 ? {} : { code: s.code }),
-              ...('retryAfter' in s ? { retryAfter: s.retryAfter } : {}),
-              // the chat call only: the background /byok/<p>/models listing would eat a one-shot rule
+              // the chat call only: a background cloud read would eat an unscoped one-shot rule
               path: '/chat/completions',
             },
           ],
         })
         const problems = await watch(page)
-        const frame = await open(page, module, { lang: 'en', ai: '1' })
+        const frame = await open(page, module, { lang: 'en', uniwork: '1' })
         await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+        await acknowledge(frame)
         await ask(frame, 'Say hello')
         // one surface: the panel's inline error carries the whole typed text; no card beside it
         const inline = frame.locator('.ai-msg-assistant').last()
-        await expect(inline).toContainText(s.title, { timeout: 30_000 })
-        if (s.status === 429) await expect(inline).toContainText('7 s')
+        await expect(inline).toContainText(s.text, { timeout: 30_000 })
         await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
-        // the way to the keys stays in reach: the panel's own AI settings entry
-        await expect(
-          frame.locator('.ai-panel-header').getByRole('button', { name: 'AI settings' }),
-        ).toBeVisible()
+        // no other provider exists on the web: the error offers no way to pick one
+        await expect(frame.locator('[data-action="choose-provider"]')).toHaveCount(0)
         await expectClean(page, frame, problems, true)
       })
     }
@@ -209,12 +222,12 @@ for (const module of ['docs', 'markdown'] as const) {
     }) => {
       await fake(request)
       await fake(request, {
-        credentials: OPENAI_KEY,
         fail: [{ status: 503, code: 'cloud_unavailable', path: '/cloud/search' }],
       })
       const problems = await watch(page)
-      const frame = await open(page, module, { lang: 'en', ai: '1' })
+      const frame = await open(page, module, { lang: 'en', uniwork: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+      await acknowledge(frame)
       const global = module === 'docs' ? 'desktop' : 'markdownApi'
       const r = await frame.evaluate(
         (g) =>
@@ -229,8 +242,8 @@ for (const module of ['docs', 'markdown'] as const) {
       expect(r.method).toBe('error')
       await expect(frame.locator('.ow-ai-state[data-ai-state="cloud_unavailable"]')).toBeVisible()
       // the next chat call gets a 401: the frame refreshes its token (host token.refresh) and retries once.
-      // Aimed at the chat only: the background /byok/<p>/models listing and cloud status reads would
-      // eat an unscoped one-shot and the chat would then go out once, with the new token
+      // Aimed at the chat only: a background cloud status read would eat an unscoped one-shot and the
+      // chat would then go out once, with the new token
       await fake(request, { unauthorizedOnce: { path: '/chat/completions' } })
       await ask(frame, 'Say hello')
       await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
@@ -241,59 +254,6 @@ for (const module of ['docs', 'markdown'] as const) {
         'Bearer test-token',
         expect.stringMatching(/^Bearer t-\d+$/),
       ])
-      await expectClean(page, frame, problems, true)
-    })
-
-    test('AI settings = UniWork credentials: add a key from the missing-key state, reply, remove it', async ({
-      page,
-      request,
-    }) => {
-      await fake(request)
-      const problems = await watch(page)
-      const frame = await open(page, module, { lang: 'en', ai: '1' })
-      await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
-      // no key stored yet: the chip reads "Choose model", Send is off (as in a viewer) and the hint above
-      // the footer says what to do; it opens the AI settings
-      const box = frame.locator('.ai-input-box textarea').first()
-      await expect(box).toBeVisible({ timeout: 30_000 })
-      await box.fill('Say hello')
-      await expect(frame.locator('.ai-send-btn')).toBeDisabled()
-      await box.press('Enter')
-      await expect(frame.locator('.ai-msg-assistant')).toHaveCount(0)
-      const need = frame.locator('.ai-input-need')
-      await expect(need).toContainText('Add an API key in AI settings')
-      await expect(frame.locator('.ai-msg-error, .ai-msg-undelivered')).toHaveCount(0)
-      await need.getByRole('button').click()
-      const dialog = frame.locator('.ow-ai-dialog')
-      await expect(dialog).toBeVisible()
-      await expect(dialog).toContainText('No key saved')
-      await expect(dialog).toContainText('Credits left: 98,500 of 100,000')
-      await dialog.locator('select[name="provider"]').selectOption('openai')
-      await dialog.locator('input[name="api_key"]').fill('sk-live-key-9876')
-      await dialog.getByRole('button', { name: 'Save key' }).click()
-      await expect(dialog).toContainText('Saved key …9876')
-      await expect(dialog.locator('input[name="api_key"]')).toHaveValue('')
-      const html = await dialog.innerHTML()
-      expect(html).not.toContain('sk-live-key')
-      await page.screenshot({ path: screenshotPath('ai', `${module}-settings-light-en`) })
-      await dialog.getByRole('button', { name: 'Done' }).click()
-      await expect(dialog).toHaveCount(0)
-      await ask(frame, 'Say hello again')
-      await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
-        timeout: 60_000,
-      })
-      // the header entry opens the same dialog; remove the key there
-      await frame.locator('.ai-panel-header').getByRole('button', { name: 'AI settings' }).click()
-      await expect(dialog).toBeVisible()
-      await dialog.getByRole('button', { name: 'Remove key' }).click()
-      await expect(dialog).toContainText('No key saved')
-      const log = await aiLog(request)
-      const put = log.find((l) => l.method === 'PUT')!
-      expect(put.path).toMatch(/\/ai\/credentials\/openai$/)
-      expect(put.body.api_key).toBe('<set>')
-      expect(log.some((l) => l.method === 'DELETE' && l.path.endsWith('/credentials/openai'))).toBe(
-        true,
-      )
       await expectClean(page, frame, problems, true)
     })
   })
@@ -314,21 +274,19 @@ for (const module of ['docs', 'markdown', 'html'] as const) {
       request,
     }) => {
       await fake(request)
-      await fake(request, { credentials: OPENAI_KEY })
       const problems = await watch(page)
-      const frame = await open(page, module, { lang: 'en', ai: '1', readonly: '1' })
+      const frame = await open(page, module, { lang: 'en', uniwork: '1', readonly: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
-      const notice = frame.locator(VIEW_ONLY_NOTICE[module])
+      await acknowledge(frame)
+      const notice = frame.locator(VIEW_ONLY_NOTICE)
       await expect(notice).toBeVisible()
-      await expect(notice).toContainText('View-only document')
+      await expect(notice).toContainText('View only')
       // it still answers questions
       await ask(frame, 'Say hello')
       await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
         timeout: 60_000,
       })
-      const chat = (await aiLog(request)).find((l) =>
-        l.path.endsWith('/byok/openai/chat/completions'),
-      )!
+      const chat = (await aiLog(request)).find((l) => l.path.endsWith('/uniwork/chat/completions'))!
       expect(chat).toBeTruthy()
       const tools = ((chat.body.tools ?? []) as Array<{ function: { name: string } }>).map(
         (t) => t.function.name,
@@ -339,40 +297,28 @@ for (const module of ['docs', 'markdown', 'html'] as const) {
 
     test('with the save grant there is no view-only notice', async ({ page, request }) => {
       await fake(request)
-      await fake(request, { credentials: OPENAI_KEY })
-      const frame = await open(page, module, { lang: 'en', ai: '1' })
+      const frame = await open(page, module, { lang: 'en', uniwork: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
-      await expect(frame.locator(VIEW_ONLY_NOTICE[module])).toHaveCount(0)
+      await expect(frame.locator(VIEW_ONLY_NOTICE)).toHaveCount(0)
     })
   })
 }
 
-// visual evidence for tester_visual: the state card and the settings dialog in both themes and languages
+// visual evidence for tester_visual: a reply in the panel in both themes and languages
 for (const theme of ['light', 'dark'] as const) {
   for (const lang of ['en', 'vi'] as const) {
     test(`docs: AI screenshots ${theme} ${lang}`, async ({ page, request }) => {
       test.skip(!built('docs'), 'no dist-web/docs build')
       await fake(request)
-      await fake(request, { credentials: [{ provider: 'openai', api_key: 'bad-key-0000' }] })
-      const frame = await open(page, 'docs', { lang, theme, ai: '1' })
+      const frame = await open(page, 'docs', { lang, theme, uniwork: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+      await acknowledge(frame)
       await ask(frame, 'Hello')
-      await expect(frame.locator('.ai-msg-assistant').last()).toBeVisible({ timeout: 30_000 })
+      await expect(frame.locator('.ai-msg-assistant').last()).toContainText(REPLY, {
+        timeout: 30_000,
+      })
       await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
       await page.screenshot({ path: screenshotPath('ai', `docs-state-${theme}-${lang}`) })
-      // the header gear is localized: open the same dialog through the member it calls
-      // the call settles only when the dialog closes, so hold the promise and await it after Escape
-      const settings = frame.evaluate(() =>
-        (
-          window as unknown as { desktop: { openAiSettings(): Promise<void> } }
-        ).desktop.openAiSettings(),
-      )
-      const dialog = frame.locator('.ow-ai-dialog')
-      await expect(dialog.locator('select[name="provider"]')).toBeVisible()
-      await page.screenshot({ path: screenshotPath('ai', `docs-settings-${theme}-${lang}`) })
-      await frame.locator('body').press('Escape')
-      await expect(dialog).toHaveCount(0)
-      await settings
     })
   }
 }
@@ -424,7 +370,7 @@ for (const module of ['docs', 'markdown', 'html'] as const) {
       const problems = await watch(page)
       const frame = await open(page, module, { lang: 'en', uniwork: '1' })
       await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
-      await frame.locator('.ai-uniwork-disclosure-ack').click()
+      await acknowledge(frame)
       expect(await startJob(page)).toEqual({ queued: true })
       // the job's question, then the next part by itself: both carry the job id
       await expect
@@ -457,7 +403,7 @@ for (const module of ['docs', 'markdown', 'html'] as const) {
       await expect(box).toHaveValue(JOB)
       expect(await uniworkQuestions(request)).toEqual([])
       // the person acknowledges and sends what waits there: it is still the job's question
-      await frame.locator('.ai-uniwork-disclosure-ack').click()
+      await acknowledge(frame)
       await box.press('Enter')
       await expect
         .poll(async () => (await uniworkQuestions(request)).map((l) => l.handoff), {
@@ -490,7 +436,7 @@ test.describe('docs: the UniWork AI writer route', () => {
     const problems = await watch(page)
     const frame = await open(page, 'docs', { lang: 'en', uniwork: '1' })
     await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
-    await frame.locator('.ai-uniwork-disclosure-ack').click()
+    await acknowledge(frame)
     await ask(frame, 'Write a short document')
     await expect(frame.locator('.ProseMirror').first()).toContainText(
       'Written by the fake writer route.',

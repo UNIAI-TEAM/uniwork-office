@@ -5,9 +5,9 @@
 //        AES-GCM key and the scope "test-user:<documentId>". Like the real host, the key is persisted
 //        (structured clone, never exported) in IndexedDB "uniwork-office-frame-drafts", store "keys",
 //        key "test-user": a frame reload, a host page reload and a second tab all get the same key
-//        &ai=1 grants `ai` + webSearch/imageSearch/imageGeneration (fake AI routes, web/server/fake-ai.mjs)
-//        &uniwork=1 grants UniWork AI (`uniworkAi`) and `aiStart`: the spec hands the panel a job with
-//        __host.request('ai.start', {handoffId, text, displayText?}) (UNI-2264)
+//        &uniwork=1 grants UniWork AI (`uniworkAi`), its cloud tools (webSearch/imageSearch/imageGeneration)
+//        and `aiStart` (fake AI routes, web/server/fake-ai.mjs): the spec hands the panel a job with
+//        __host.request('ai.start', {handoffId, text, displayText?}) (UNI-2264); &ai=1 is an alias
 //        &images=1 grants `images`: api.images.upload keeps the bytes (__host.uploads()) and answers
 //        {imageId, url: /e2e-assets/<name>}; the spec serves that URL with page.route (UNI-1232 A1)
 //        &assets=<json> puts {path as written: same-origin URL} into api.open's OpenPayload.assets
@@ -295,19 +295,17 @@ if (params.get('readonly') === '1') delete initPayload.capabilities.save
 if (params.get('saveCopy') === '1') initPayload.capabilities.saveCopy = true
 if (params.get('noprint') === '1') delete initPayload.capabilities.print
 if (params.get('profile') === 'readOnly') initPayload.profile = 'readOnly'
-// ai=1: grant the web AI (CONTRACT C16) and its cloud tools; the frame then calls the fake
-// frame-token AI routes of web/server/fake-ai.mjs. Absent = no AI grant (AI hidden, as before).
-if (params.get('ai') === '1') {
+// uniwork=1 (or its alias ai=1): UniWork AI, the frame's only AI (CONTRACT C16, UNI-2289), with its
+// cloud tools and the host's `ai.start`; the frame then calls the fake frame-token AI routes of
+// web/server/fake-ai.mjs. Absent = no AI grant (AI hidden).
+if (params.get('uniwork') === '1' || params.get('ai') === '1') {
   Object.assign(initPayload.capabilities, {
-    ai: true,
+    uniworkAi: true,
+    aiStart: true,
     webSearch: true,
     imageSearch: true,
     imageGeneration: true,
   })
-}
-// uniwork=1: UniWork AI (the frame route uniwork/chat/completions) and the host's `ai.start`
-if (params.get('uniwork') === '1') {
-  Object.assign(initPayload.capabilities, { uniworkAi: true, aiStart: true })
 }
 if (params.get('pick') === '1') initPayload.capabilities.filePick = true
 if (params.get('images') === '1') initPayload.capabilities.images = true

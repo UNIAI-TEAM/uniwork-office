@@ -256,17 +256,11 @@ export type Capability =
   | 'exportHtml'
   | 'attachments'
   | 'images'
-  /**
-   * AI panels (GO-A7 web AI contract, CONTRACT C16): the frame calls the frame-token AI routes
-   * itself (/office-frame/documents/{id}/ai/...). Grant it only when the org entitlement and those
-   * routes are live; without it every AI entry stays hidden.
-   */
-  | 'ai'
-  /** additive (C16): UniWork cloud web search for the AI tools; effective only together with `ai` */
+  /** additive (C16): UniWork cloud web search for the AI tools; effective only with `uniworkAi` */
   | 'webSearch'
-  /** additive (C16): UniWork cloud image search for the AI tools; effective only together with `ai` */
+  /** additive (C16): UniWork cloud image search for the AI tools; effective only with `uniworkAi` */
   | 'imageSearch'
-  /** additive (C16): UniWork cloud image generation (and media analysis); effective only with `ai` */
+  /** additive (C16): UniWork cloud image generation (and media analysis); effective only with `uniworkAi` */
   | 'imageGeneration'
   /**
    * additive (A7 contract): the host can run its own "Open in desktop app" flow for the frame's
@@ -281,8 +275,11 @@ export type Capability =
    */
   | 'download'
   /**
-   * additive (X-02): UniWork AI (the cloud agent behind the org entitlement) in the frame's AI panel.
-   * The frame claims it once it has the adapter (G6-05); effective = host grant AND frame claim.
+   * additive (X-02): UniWork AI (the cloud agent behind the org entitlement) in the frame's AI panel,
+   * the only AI of the frame (UNI-2289): the frame calls the frame-token AI routes itself
+   * (/office-frame/documents/{id}/ai/...). Grant it only when the org entitlement and those routes
+   * are live; without it every AI entry stays hidden. The frame claims it once it has the adapter
+   * (G6-05); effective = host grant AND frame claim.
    */
   | 'uniworkAi'
   /**
@@ -330,7 +327,6 @@ export const CAPABILITY_KEYS: readonly Capability[] = [
   'exportHtml',
   'attachments',
   'images',
-  'ai',
   'webSearch',
   'imageSearch',
   'imageGeneration',
@@ -849,7 +845,7 @@ export interface DocBlockedPayload {
 export type AiRunState = 'running' | 'idle'
 
 /**
- * additive (X-02): an AI turn (UniWork AI, BYOK, CLI) started (`running`) or ended (`idle`, exactly
+ * additive (X-02): an AI turn (UniWork AI) started (`running`) or ended (`idle`, exactly
  * once per turn). The emit rules and end paths live in EXPERIENCE.md › Foundation; a host treats the
  * turn as idle when the frame unloads.
  */

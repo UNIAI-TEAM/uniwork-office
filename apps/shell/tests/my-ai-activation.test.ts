@@ -6,7 +6,7 @@ import {
   openAiSettingsLabel,
   softAiActivationMessage,
 } from '../src/renderer/src/my-ai-activation'
-import { defaultAiSettings } from '@genoffice/ai-provider'
+import { defaultAiSettings, type AiModelSource } from '@genoffice/ai-provider'
 
 describe('my-ai-activation', () => {
   it('treats default empty genspark install as not ready', () => {
@@ -25,26 +25,34 @@ describe('my-ai-activation', () => {
     expect(aiSettingsReady(s)).toBe(true)
   })
 
-  it('is ready for a provider served by a key saved on UniWork, not without that source', () => {
+  it('a model source never makes a provider without a key ready', () => {
     const s = defaultAiSettings()
     s.provider = 'anthropic'
     s.providers.anthropic = { ...s.providers.anthropic, apiKey: '', model: 'claude-slot' }
     expect(aiSettingsReady(s)).toBe(false)
-    s.modelSources = { anthropic: { origin: 'org', chosen: 'claude-org' } }
-    expect(aiSettingsReady(s)).toBe(true)
-    // a local source is not a key on UniWork
-    s.modelSources = { anthropic: { origin: 'local', chosen: 'claude-slot' } }
+    // a source carrying an unknown `origin` marker is read like any other
+    s.modelSources = { anthropic: { origin: 'org', chosen: 'claude-source' } as AiModelSource }
     expect(aiSettingsReady(s)).toBe(false)
+    s.providers.anthropic = { ...s.providers.anthropic, apiKey: 'sk-ant-local' }
+    expect(aiSettingsReady(s)).toBe(true)
   })
 
-  it('the My AI usage record carries the model main serves for an org-served provider', () => {
+  it('the My AI usage record carries the model main serves (the source chosen, else the slot)', () => {
     const s = defaultAiSettings()
     s.provider = 'anthropic'
-    s.providers.anthropic = { ...s.providers.anthropic, apiKey: '', model: 'claude-slot' }
-    s.modelSources = { anthropic: { origin: 'org', chosen: 'claude-org' } }
-    expect(myAiTurnTarget(s)).toEqual({ provider: 'anthropic', model: 'claude-org', ready: true })
+    s.providers.anthropic = {
+      ...s.providers.anthropic,
+      apiKey: 'sk-ant-local',
+      model: 'claude-slot',
+    }
+    s.modelSources = { anthropic: { chosen: 'claude-source' } }
+    expect(myAiTurnTarget(s)).toEqual({
+      provider: 'anthropic',
+      model: 'claude-source',
+      ready: true,
+    })
     s.modelSources = undefined
-    expect(myAiTurnTarget(s)).toMatchObject({ model: 'claude-slot', ready: false })
+    expect(myAiTurnTarget(s)).toMatchObject({ model: 'claude-slot', ready: true })
   })
 
   it('matches soft / legacy no-key errors and the product notices', () => {

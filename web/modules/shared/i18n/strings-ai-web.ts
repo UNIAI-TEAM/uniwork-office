@@ -22,8 +22,9 @@ import { vi } from './ai-web/vi'
 import { zhTW } from './ai-web/zh-TW'
 
 /**
- * Web-only strings of the frame AI bridge (CONTRACT C16, every module incl. Docs): the AI settings
- * dialog (UniWork-stored provider keys) and the typed failure states of the AI routes.
+ * Web-only strings of the frame AI bridge (CONTRACT C16, every module incl. Docs): the typed failure
+ * states of the AI routes and the handed-over job's next turn. UniWork AI is the only AI of the
+ * frame (UNI-2289): no key settings strings.
  * Thin aggregator over ./ai-web/<lang>.ts (zh defines the key set; every sibling `satisfies` it).
  */
 export const aiWebStrings = defineStrings({

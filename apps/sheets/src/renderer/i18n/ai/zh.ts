@@ -12,7 +12,6 @@ export const zh = {
     '检查这个表格的问题:1) 公式错误(#REF!、#DIV/0! 等)、引用范围没覆盖全部数据、合计行漏加列;2) 同一列数字和文本混用、日期格式不统一、明显的异常值和重复行;3) 合计与明细对不上、百分比加总不是 100% 等结构问题。列出发现的问题并给出修复建议',
   aiAnalyzeBtn: 'AI 分析',
   aiAnalyzePrompt: '分析这个表格的数据,总结关键发现、趋势和异常',
-  aiSettingsTitle: 'AI 设置',
   aiSetUp: '设置 AI',
   aiNewChat: '新对话',
   aiCollapsePanel: '收起 AI 面板',

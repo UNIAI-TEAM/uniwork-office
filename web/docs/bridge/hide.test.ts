@@ -11,7 +11,6 @@ describe('webCapabilities (the single web capability source)', () => {
     expect(flags.map(([key]) => key).sort()).toEqual(
       [
         'ai',
-        'aiCredentials',
         'autoSaveToDisk',
         'billing',
         'createDocument',

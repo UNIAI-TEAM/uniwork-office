@@ -130,18 +130,18 @@ describe('vision capability fallback', () => {
     expect(settingsSupportVision(settings)).toBe(true)
   })
 
-  it('decides from the model main will use for a provider served by a key on UniWork', () => {
-    // the slot holds the stored default (vision-capable); the org source serves a text-only model
+  it('decides from the model main will use: the source chosen model before the slot', () => {
+    // the slot holds a vision-capable model; the source names a text-only one
     const settings: AiSettings = { ...defaultAiSettings(), provider: 'anthropic' }
     settings.providers.anthropic.model = 'claude-opus-4-7'
-    settings.modelSources = { anthropic: { chosen: 'deep-seek-v4-flash', origin: 'org' } }
+    settings.modelSources = { anthropic: { chosen: 'deep-seek-v4-flash' } }
     expect(settingsSupportVision(settings)).toBe(false)
-    // and the other way round: a text-only slot, a vision-capable served model
+    // and the other way round: a text-only slot, a vision-capable source model
     settings.providers.anthropic.model = 'deep-seek-v4-flash'
-    settings.modelSources = { anthropic: { chosen: 'claude-opus-4-7', origin: 'org' } }
+    settings.modelSources = { anthropic: { chosen: 'claude-opus-4-7' } }
     expect(settingsSupportVision(settings)).toBe(true)
     // a source without a chosen model falls back to the slot
-    settings.modelSources = { anthropic: { chosen: '', origin: 'org' } }
+    settings.modelSources = { anthropic: { chosen: '' } }
     expect(settingsSupportVision(settings)).toBe(false)
   })
 

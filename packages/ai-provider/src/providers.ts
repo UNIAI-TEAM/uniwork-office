@@ -459,12 +459,7 @@ export function providerNeed(settings: AiSettings, id: AiProviderId): ProviderNe
   if (!meta) return 'key'
   if (meta.needsCliPath) return null
   const config = settings.providers?.[id]
-  const source = settings.modelSources?.[id]
-  const model = config?.model?.trim() || (source?.origin === 'org' ? source.chosen?.trim() : '')
-  if (!model) return 'model'
-  // A key saved on UniWork (`origin: 'org'`) authenticates and resolves its base URL through the
-  // UniWork proxy, without storing a key or placeholder in ai-settings.json.
-  if (source?.origin === 'org') return null
+  if (!config?.model?.trim()) return 'model'
   if (meta.needsBaseUrl) {
     // Custom OpenAI-compatible endpoints (Ollama, LM Studio, vLLM) accept
     // anonymous requests: base URL + model suffice, the key stays optional.
@@ -476,15 +471,6 @@ export function providerNeed(settings: AiSettings, id: AiProviderId): ProviderNe
 /** True when the provider's stored config can send a request right now. */
 export function isProviderUsable(settings: AiSettings, id: AiProviderId): boolean {
   return providerNeed(settings, id) === null
-}
-
-/**
- * True when a key saved on UniWork serves `id` (the host resolved an `origin: 'org'` source) and a
- * model is known, so a call can go out although the slot holds no key. main's ai:chat / ai:stream
- * route such a provider through the UniWork proxy, so My AI and the agents treat it as ready.
- */
-export function isOrgServedReady(settings: AiSettings, id: AiProviderId): boolean {
-  return settings.modelSources?.[id]?.origin === 'org' && providerNeed(settings, id) === null
 }
 
 /**
@@ -503,10 +489,9 @@ export function selectedProvider(settings: AiSettings): AiProviderId {
 }
 
 /**
- * The model a call for `provider` will use: the source's `chosen` (what the host resolved, e.g. a
- * model served by a key saved on UniWork) before the slot's own model. For an org-served provider
- * the slot holds the stored default, not the model main uses, so readers of "the current model"
- * (vision checks, usage records) go through this instead of `providers[id].model`.
+ * The model a call for `provider` will use: the source's `chosen` (what the host resolved) before
+ * the slot's own model. Readers of "the current model" (vision checks, usage records) go through
+ * this instead of `providers[id].model`.
  */
 export function aiEffectiveModel(
   settings: Pick<AiSettings, 'providers' | 'modelSources'>,

@@ -14,7 +14,6 @@ export const vi = {
   aiAnalyzeBtn: 'Phân tích bằng AI',
   aiAnalyzePrompt:
     'Phân tích dữ liệu trong trang tính này và tóm tắt các phát hiện chính, xu hướng và điểm bất thường',
-  aiSettingsTitle: 'Cài đặt AI',
   aiSetUp: 'Thiết lập AI',
   aiNewChat: 'Cuộc trò chuyện mới',
   aiCollapsePanel: 'Thu gọn bảng điều khiển AI',

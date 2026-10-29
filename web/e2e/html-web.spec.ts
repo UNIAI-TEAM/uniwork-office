@@ -449,7 +449,7 @@ test('html: a phone shows the AI panel over the page and a status bar that fits'
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await serveFixture(page, PAGE_PATH, FIXTURE, 'text/html')
-  const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en', ai: '1' })
+  const frame = await openModule(page, 'html', { open: PAGE_PATH, lang: 'en', uniwork: '1' })
   await ready(page, frame, /UniWork HTML web fixture/)
   // the dock keeps its 34 px rail; the page keeps its width and does not scroll sideways
   const box = (sel: string) =>

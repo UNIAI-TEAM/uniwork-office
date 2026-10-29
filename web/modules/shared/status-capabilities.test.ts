@@ -9,7 +9,7 @@ import { sheetsWebCapabilities } from '../sheets/capabilities'
 import { TEXT_MODULE_WEB_CAPABILITIES, textModuleGrants } from './capabilities'
 
 const ALL_GRANTS = {
-  ai: true,
+  uniworkAi: true,
   save: true,
   saveAs: true,
   filePick: true,

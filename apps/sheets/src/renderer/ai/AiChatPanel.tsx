@@ -291,15 +291,17 @@ export interface AiChatMessage {
     | undefined
 }
 
+/** the model chip's "manage" row (one function: the picker keys an effect on its identity) */
+const openDesktopModelSettings = () => window.desktopApi.openAiModelSettings().catch(() => {})
+
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.desktopApi.getAiSettings(),
   setSettings: (settings, options) => window.desktopApi.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.desktopApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.desktopApi.aiGskStatus().then((s) => !!s?.loggedIn),
-  openModelSettings: () => window.desktopApi.openAiModelSettings().catch(() => {}),
-  // web frames: no key or no model keeps send off with a hint (see AiModelPicker)
-  get requireModel() {
-    return platform() === 'web'
+  // the chip's "manage" row opens the desktop model settings; a web frame has none to open
+  get openModelSettings() {
+    return platform() === 'web' ? undefined : openDesktopModelSettings
   },
 }
 
@@ -813,16 +815,6 @@ export function AiChatPanel({
               <IconNewChat size={15} />
             </button>
           )}
-          {cap('aiCredentials') && window.desktopApi?.openAiSettings && (
-            <button
-              className="ai-header-btn"
-              onClick={() => void window.desktopApi.openAiSettings?.()}
-              data-tip={t('aiSettingsTitle')}
-              aria-label={t('aiSettingsTitle')}
-            >
-              <IconGear size={15} />
-            </button>
-          )}
           <button
             className="ai-header-btn ai-panel-collapse"
             onClick={onCollapse}
@@ -1011,7 +1003,12 @@ export function AiChatPanel({
                             }
                           : undefined
                       }
-                      onChooseProvider={() => void window.desktopApi?.openAiSettings?.()}
+                      // a web frame has no other provider to choose: no action there
+                      onChooseProvider={
+                        platform() === 'web'
+                          ? undefined
+                          : () => void window.desktopApi?.openAiSettings?.()
+                      }
                       onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                       onAskAgain={isLast && !aiBusy ? () => inputRef.current?.focus() : undefined}
                     />
@@ -1283,7 +1280,10 @@ export function AiChatPanel({
                     lang,
                     note: composerNoteState,
                     onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
-                    onChooseProvider: () => void window.desktopApi?.openAiSettings?.(),
+                    onChooseProvider:
+                      platform() === 'web'
+                        ? undefined
+                        : () => void window.desktopApi?.openAiSettings?.(),
                     onAnnounce: setComposerAnnouncement,
                     onSendBlockedChange: uniworkGate.onSendBlockedChange,
                     registerBlockedHandler,
@@ -1370,15 +1370,6 @@ function IconNewChat({ size }: { size: number }): React.JSX.Element {
         strokeLinejoin="round"
       />
       <path d="M12.2 9.4v4M10.2 11.4h4" />
-    </Svg>
-  )
-}
-
-function IconGear({ size }: { size: number }): React.JSX.Element {
-  return (
-    <Svg size={size}>
-      <circle cx="8" cy="8" r="1.78" />
-      <path d="M8 2.98v1.62M8 11.4v1.62M13.02 8h-1.62M4.6 8H2.98M11.56 4.44l-1.13 1.13M5.57 10.43l-1.13 1.13M11.56 11.56l-1.13-1.13M5.57 5.57 4.44 4.44" />
     </Svg>
   )
 }

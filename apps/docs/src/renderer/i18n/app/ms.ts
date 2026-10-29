@@ -318,7 +318,6 @@ export const ms = {
   appTabDecimal: 'Perpuluhan',
   appTabBar: 'Bar',
   appTabClear: 'Padam',
-  appAiSettings: 'Tetapan AI',
   appCut: 'Potong',
   appCopy: 'Salin',
   appPaste: 'Tampal',

@@ -2,13 +2,7 @@
 // contract (dev-uniwork docs/office/g3g4/uniwork-office-app-api-contract.md section 3) on the
 // frame-token mount, in memory, no network. Not the UniWork server.
 //
-//   /api/v1/office-frame/documents/{documentID}/ai/
-//     credentials                      GET            { items, providers }
-//     credentials/{provider}           PUT / DELETE   201 create / 200 update / 204 delete, key_hint only; model kept with it
-//     byok/{provider}/chat/completions POST           openai-compatible, SSE when stream: true
-//     byok/{provider}/messages         POST           Anthropic Messages, SSE when stream: true
-//     byok/{provider}/generate         POST           { model, stream, request } -> Gemini (SSE when stream)
-//     byok/{provider}/models           GET            { data: [{ id }] }
+//   /api/v1/office-frame/documents/{documentID}/ai/   (UniWork AI only, UNI-2289: no key routes)
 //     uniwork/chat/completions         POST           UniWork AI: openai-compatible SSE, with the
 //                                                     conversation and run headers; a request that carries
 //                                                     X-UniWork-AI-Handoff answers the next `handoffRemaining`
@@ -22,16 +16,15 @@
 // Every route wants `Authorization: Bearer <token>` (401 otherwise) and refuses a request that
 // carries a Cookie (the frame must send credentials: 'omit'). Errors use the UniWork envelope
 // `{ error: { code, message } }`:
-// 400 provider_not_supported / base_url_refused, 402 credits_exhausted, 403 entitlement_required,
-// 404 credential_missing, 424 provider_auth_failed (a stored key starting with "bad-"), 429 (+
-// retry-after), 502 provider_unreachable, 503 cloud_unavailable.
+// 402 credits_exhausted, 403 entitlement_required, 429 (+ retry-after), 502 provider_unreachable,
+// 503 cloud_unavailable.
 //
 // Test control (web/e2e, Node side): POST /__fake-ai/reset, POST /__fake-ai/control
 //   { fail?: [{ status, code?, retryAfter?, path? }]   next matching AI request answers this error
 //     unauthorizedOnce?: true | { path: string }       next AI request answers 401 (token refresh); with a
 //                                                      path, the next request whose route tail includes it
 //                                                      (aim it at '/chat/completions': a background
-//                                                      /byok/<p>/models or cloud read would eat it)
+//                                                      cloud read would eat it)
 //     cloud?: { enabled?, reason?, tools?, credits? }  GET cloud state
 //     reply?: string                                   the model's streamed answer
 //     writerReply?: string                             the writer route's streamed text
@@ -41,67 +34,13 @@
 //     hold?: boolean                                   stream a chunk, then pause between chunks until
 //                                                      { hold: false } (or reset): for mid-stream abort
 //                                                      and frame/port-loss cases (UNI-1923)
-//     credentials?: [{ provider, api_key, base_url? }] seed stored keys
 //     handoffRemaining?: number[]                      the Remaining header of the next handed-over
 //                                                      questions, in order (none left: no header) }
-// Real vendor for local verification only (env, no defaults; nothing is read from or written to a
-// file): with FAKE_AI_UPSTREAM_URL (an OpenAI-compatible base, e.g. http://host:port/v1) and
-// FAKE_AI_UPSTREAM_KEY set, an openai-compatible chat/completions call for a seeded provider is
-// forwarded there with that key (FAKE_AI_UPSTREAM_MODEL replaces the request's model when set), and
-// the answer is piped back, SSE included. The key never reaches the frame or the request log.
 // GET /__fake-ai/log -> [{ method, path, authorization, cookie, handoff, run, conversation, body }] of
 // the AI requests (handoff / run / conversation = the request's X-UniWork-AI-Handoff / -Run /
 // -Conversation header, or null).
 
-const upstream = () => {
-  const url = process.env.FAKE_AI_UPSTREAM_URL
-  const key = process.env.FAKE_AI_UPSTREAM_KEY
-  return url && key
-    ? { url: url.replace(/\/+$/, ''), key, model: process.env.FAKE_AI_UPSTREAM_MODEL || '' }
-    : null
-}
-
-/** forward an openai-compatible chat call to the env-configured vendor; pipes status + body back */
-async function forward(res, up, body) {
-  const r = await fetch(`${up.url}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${up.key}` },
-    body: JSON.stringify(up.model ? { ...body, model: up.model } : body),
-  })
-  res.writeHead(r.status, {
-    'Content-Type': r.headers.get('content-type') ?? 'application/json',
-    'Cache-Control': 'no-store',
-  })
-  if (!r.body) return res.end()
-  for await (const chunk of r.body) res.write(chunk)
-  res.end()
-}
-
 const MOUNT = /^\/api\/v1\/office-frame\/documents\/([^/]+)\/ai(\/.*)?$/
-
-// the server's BYOK table (server/internal/ai/provider/byok.go), display order
-const PROVIDERS = [
-  ['anthropic', 'anthropic', 'https://api.anthropic.com'],
-  ['gemini', 'gemini', 'https://generativelanguage.googleapis.com/v1beta'],
-  ['openai', 'openai-compatible', 'https://api.openai.com/v1'],
-  ['deepseek', 'openai-compatible', 'https://api.deepseek.com/v1'],
-  ['kimi', 'openai-compatible', 'https://api.moonshot.ai/v1'],
-  ['glm', 'openai-compatible', 'https://open.bigmodel.cn/api/paas/v4'],
-  ['qwen', 'openai-compatible', 'https://dashscope.aliyuncs.com/compatible-mode/v1'],
-  ['doubao', 'openai-compatible', 'https://ark.cn-beijing.volces.com/api/v3'],
-  ['hunyuan', 'openai-compatible', 'https://tokenhub.tencentcloudmaas.com/v1'],
-  ['minimax', 'openai-compatible', 'https://api.minimax.io/v1'],
-  ['xai', 'openai-compatible', 'https://api.x.ai/v1'],
-  ['mistral', 'openai-compatible', 'https://api.mistral.ai/v1'],
-  ['openrouter', 'openai-compatible', 'https://openrouter.ai/api/v1'],
-  ['requesty', 'openai-compatible', 'https://router.requesty.ai/v1'],
-  ['custom', 'openai-compatible', ''],
-].map(([id, protocol, base]) => ({
-  id,
-  protocol,
-  requires_base_url: id === 'custom',
-  default_base_url: base,
-}))
 
 // 1x1 transparent PNG
 const PNG_1PX =
@@ -109,7 +48,6 @@ const PNG_1PX =
 
 function freshState() {
   return {
-    credentials: new Map(),
     fail: [],
     unauthorizedOnce: null,
     reply: 'Hello from the UniWork AI proxy.',
@@ -144,29 +82,6 @@ function freshState() {
 }
 
 let state = freshState()
-
-const hint = (key) => `…${key.slice(-4)}`
-const now = () => new Date().toISOString()
-
-function credentialView(provider, c) {
-  return {
-    provider,
-    label: c.label ?? '',
-    base_url: c.base_url ?? '',
-    key_hint: hint(c.api_key),
-    model: c.model ?? '',
-    model_updated_at: c.model_updated_at ?? '',
-    created_at: c.created_at,
-    updated_at: c.updated_at,
-  }
-}
-
-function seed(list) {
-  for (const c of list ?? []) {
-    const t = now()
-    state.credentials.set(c.provider, { ...c, created_at: t, updated_at: t })
-  }
-}
 
 function json(res, status, body, headers = {}) {
   res.writeHead(status, {
@@ -227,97 +142,6 @@ async function sse(res, events, headers = {}) {
   res.end()
 }
 
-async function byok(req, res, provider, tail, body) {
-  const row = PROVIDERS.find((p) => p.id === provider)
-  if (!row) return fail(res, 400, 'provider_not_supported')
-  const cred = state.credentials.get(provider)
-  if (!cred) return fail(res, 404, 'credential_missing', `no ${provider} key stored`)
-  if (cred.api_key.startsWith('bad-')) return fail(res, 424, 'provider_auth_failed')
-  const reply = state.reply
-  if (tail === '/models' && req.method === 'GET') {
-    return json(res, 200, { data: [{ id: 'fake-model-1' }, { id: 'fake-model-2' }] })
-  }
-  if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed')
-  if (body.__invalid) return fail(res, 400, 'invalid_json')
-
-  if (tail === '/chat/completions' && row.protocol === 'openai-compatible') {
-    const up = upstream()
-    if (up) return forward(res, up, body)
-    if (!body.stream) {
-      return json(res, 200, {
-        choices: [
-          { index: 0, message: { role: 'assistant', content: reply }, finish_reason: 'stop' },
-        ],
-      })
-    }
-    // a scripted tool call (agent turns): one per streamed turn, then the plain reply
-    const call = state.toolCalls.shift()
-    if (call) {
-      const delta = {
-        tool_calls: [
-          {
-            index: 0,
-            id: `call_${Date.now()}`,
-            type: 'function',
-            function: { name: call.name, arguments: JSON.stringify(call.input ?? {}) },
-          },
-        ],
-      }
-      return sse(res, [
-        `data: ${JSON.stringify({ choices: [{ index: 0, delta }] })}\n\n`,
-        `data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] })}\n\n`,
-        'data: [DONE]\n\n',
-      ])
-    }
-    return sse(res, [
-      ...parts(reply).map(
-        (p) => `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: p } }] })}\n\n`,
-      ),
-      `data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`,
-      'data: [DONE]\n\n',
-    ])
-  }
-  if (tail === '/messages' && row.protocol === 'anthropic') {
-    if (!body.stream) {
-      return json(res, 200, {
-        type: 'message',
-        role: 'assistant',
-        content: [{ type: 'text', text: reply }],
-        stop_reason: 'end_turn',
-      })
-    }
-    const ev = (type, data) => `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`
-    return sse(res, [
-      ev('message_start', { message: { role: 'assistant', content: [] } }),
-      ev('content_block_start', { index: 0, content_block: { type: 'text', text: '' } }),
-      ...parts(reply).map((p) =>
-        ev('content_block_delta', { index: 0, delta: { type: 'text_delta', text: p } }),
-      ),
-      ev('content_block_stop', { index: 0 }),
-      ev('message_delta', { delta: { stop_reason: 'end_turn' } }),
-      ev('message_stop', {}),
-    ])
-  }
-  if (tail === '/generate' && row.protocol === 'gemini') {
-    if (typeof body.model !== 'string' || !body.request) return fail(res, 400, 'invalid_request')
-    const chunk = (text, finish) => ({
-      candidates: [
-        {
-          content: { role: 'model', parts: [{ text }] },
-          ...(finish ? { finishReason: 'STOP' } : {}),
-        },
-      ],
-    })
-    if (!body.stream) return json(res, 200, chunk(reply, true))
-    const ps = parts(reply)
-    return sse(
-      res,
-      ps.map((p, i) => `data: ${JSON.stringify(chunk(p, i === ps.length - 1))}\n\n`),
-    )
-  }
-  return fail(res, 404, 'not_found', `no ${row.protocol} route ${tail}`)
-}
-
 /** one UniWork AI turn (the frame route): the plain reply, streamed */
 async function uniwork(req, res, body) {
   if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed')
@@ -329,7 +153,7 @@ async function uniwork(req, res, body) {
   if (req.headers['x-uniwork-ai-handoff'] && state.handoffRemaining.length > 0) {
     headers['X-UniWork-AI-Handoff-Remaining'] = String(state.handoffRemaining.shift())
   }
-  // a scripted tool call: one per streamed turn, as on the BYOK route
+  // a scripted tool call: one per streamed turn, then the plain reply
   const call = body.stream ? state.toolCalls.shift() : undefined
   if (call) {
     const delta = {
@@ -436,47 +260,6 @@ async function cloud(req, res, tail, body) {
   return json(res, 200, { text: 'Fake transcript.' })
 }
 
-async function credentials(req, res, provider, body) {
-  if (!provider) {
-    if (req.method !== 'GET') return fail(res, 405, 'method_not_allowed')
-    return json(res, 200, {
-      items: [...state.credentials].map(([p, c]) => credentialView(p, c)),
-      providers: PROVIDERS,
-    })
-  }
-  const row = PROVIDERS.find((p) => p.id === provider)
-  if (!row) return fail(res, 400, 'provider_not_supported')
-  const existing = state.credentials.get(provider)
-  if (req.method === 'DELETE') {
-    if (!existing) return fail(res, 404, 'credential_missing')
-    state.credentials.delete(provider)
-    res.writeHead(204, { 'Cache-Control': 'no-store' })
-    return res.end()
-  }
-  if (req.method !== 'PUT') return fail(res, 405, 'method_not_allowed')
-  if (body.__invalid) return fail(res, 400, 'invalid_json')
-  const key = typeof body.api_key === 'string' ? body.api_key : undefined
-  if (!existing && !key) return fail(res, 400, 'invalid_request', 'api_key is required')
-  const baseUrl = typeof body.base_url === 'string' ? body.base_url : (existing?.base_url ?? '')
-  if (row.requires_base_url && !/^https:\/\/[^/]+\.[^/]+/.test(baseUrl)) {
-    return fail(res, 400, 'base_url_refused')
-  }
-  const t = now()
-  const next = {
-    api_key: key ?? existing.api_key,
-    base_url: baseUrl,
-    label: typeof body.label === 'string' ? body.label : (existing?.label ?? ''),
-    created_at: existing?.created_at ?? t,
-    updated_at: t,
-    // the chosen model is part of the credential: left out keeps it, '' clears it (UNI-1240)
-    model: typeof body.model === 'string' ? body.model.trim() : (existing?.model ?? ''),
-    model_updated_at: existing?.model_updated_at ?? '',
-  }
-  if (typeof body.model === 'string') next.model_updated_at = next.model ? t : ''
-  state.credentials.set(provider, next)
-  return json(res, existing ? 200 : 201, credentialView(provider, next))
-}
-
 /** the test control endpoints; true when handled */
 export async function handleFakeAiControl(req, res, pathname) {
   if (!pathname.startsWith('/__fake-ai/')) return false
@@ -518,7 +301,6 @@ export async function handleFakeAiControl(req, res, pathname) {
         tools: { ...state.cloud.tools, ...(body.cloud.tools ?? {}) },
         credits: { ...state.cloud.credits, ...(body.cloud.credits ?? {}) },
       }
-    if (Array.isArray(body.credentials)) seed(body.credentials)
     json(res, 200, { ok: true })
     return true
   }
@@ -540,9 +322,7 @@ export async function handleFakeAi(req, res, pathname) {
     handoff: req.headers['x-uniwork-ai-handoff'] ?? null,
     run: req.headers['x-uniwork-ai-run'] ?? null,
     conversation: req.headers['x-uniwork-ai-conversation'] ?? null,
-    body: tail.startsWith('/credentials')
-      ? { ...body, api_key: body.api_key ? '<set>' : undefined }
-      : body,
+    body,
   })
   const auth = String(req.headers.authorization ?? '')
   if (!/^Bearer \S+$/.test(auth)) {
@@ -559,7 +339,7 @@ export async function handleFakeAi(req, res, pathname) {
     return true
   }
   const i = state.fail.findIndex((f) => !f.path || tail.includes(f.path))
-  if (i >= 0 && !tail.startsWith('/credentials')) {
+  if (i >= 0) {
     const [f] = state.fail.splice(i, 1)
     const code = f.code ?? (f.status === 429 ? undefined : 'error')
     json(
@@ -568,16 +348,6 @@ export async function handleFakeAi(req, res, pathname) {
       code ? { code, message: code } : { message: 'rate limited' },
       f.retryAfter ? { 'Retry-After': String(f.retryAfter) } : {},
     )
-    return true
-  }
-  const cm = /^\/credentials(?:\/([^/]+))?$/.exec(tail)
-  if (cm) {
-    await credentials(req, res, cm[1] ? decodeURIComponent(cm[1]) : '', body)
-    return true
-  }
-  const bm = /^\/byok\/([^/]+)(\/.*)$/.exec(tail)
-  if (bm) {
-    await byok(req, res, decodeURIComponent(bm[1]), bm[2], body)
     return true
   }
   if (tail === '/uniwork/chat/completions') {

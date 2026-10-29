@@ -15,7 +15,6 @@ export const de = {
   aiAnalyzeBtn: 'KI-Analyse',
   aiAnalyzePrompt:
     'Analysiere die Daten in diesem Blatt und fasse wichtige Erkenntnisse, Trends und Auffälligkeiten zusammen',
-  aiSettingsTitle: 'KI-Einstellungen',
   aiSetUp: 'KI einrichten',
   aiNewChat: 'Neue Unterhaltung',
   aiCollapsePanel: 'KI-Bereich einklappen',

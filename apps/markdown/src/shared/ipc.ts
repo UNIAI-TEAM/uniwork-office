@@ -543,8 +543,6 @@ export interface MarkdownApi {
   unresolveAssetUrl?(url: string): string | null
   /** Web frame only: the asset map changed (fresh URLs, a picture became missing): redraw the pictures */
   onAssetsChanged?(listener: () => void): () => void
-  /** Web frame only (absent on desktop): the in-frame AI settings (keys stored in UniWork) */
-  openAiSettings?(): Promise<void>
   /** AI image generation via the configured media provider (markdown-owned channel) */
   aiGenerateImage(op: { prompt: string; aspectRatio?: string }): Promise<{
     url?: string

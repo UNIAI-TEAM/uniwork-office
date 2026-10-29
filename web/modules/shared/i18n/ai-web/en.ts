@@ -1,27 +1,6 @@
 import type { zh } from './zh'
 
 export const en = {
-  aiWebSettingsTitle: 'AI settings',
-  aiWebSettingsIntro:
-    'The assistant uses your own provider API key. UniWork stores it encrypted; the key is never sent to this page.',
-  aiWebProvider: 'Provider',
-  aiWebModel: 'Model',
-  aiWebKeySaved: 'Saved key {hint}',
-  aiWebNoKey: 'No key saved',
-  aiWebApiKey: 'API key',
-  aiWebApiKeyKeep: 'New API key (leave empty to keep the saved one)',
-  aiWebBaseUrl: 'Base URL',
-  aiWebSaveKey: 'Save key',
-  aiWebRemoveKey: 'Remove key',
-  aiWebDone: 'Done',
-  aiWebLoading: 'Loading…',
-  aiWebLoadFailed: 'AI settings could not be loaded. Try again later.',
-  aiWebCloudTitle: 'UniWork AI cloud tools',
-  aiWebCloudOff: "Not included in your organization's plan",
-  aiWebCredits: 'Credits left: {remaining} of {limit}',
-  aiWebCreditsUnlimited: 'Credits: no limit',
-  aiWebCreditsRenew: 'Renews on {date}',
-  aiWebOpenSettings: 'AI settings',
   aiWebClose: 'Close',
   aiWebStateCreditsTitle: 'AI credits used up',
   aiWebStateCreditsBody:
@@ -29,10 +8,6 @@ export const en = {
   aiWebStateEntitlementTitle: 'AI is not in your plan',
   aiWebStateEntitlementBody:
     "Your organization's UniWork plan does not include this AI feature. Ask your administrator.",
-  aiWebStateKeyMissingTitle: 'No AI key yet',
-  aiWebStateKeyMissingBody: 'Add an API key in AI settings to use the assistant.',
-  aiWebStateKeyRejectedTitle: 'The AI key was refused',
-  aiWebStateKeyRejectedBody: 'The provider refused the saved key. Replace it in AI settings.',
   aiWebStateRateTitle: 'Too many AI requests',
   aiWebStateRateBody: 'Wait {seconds} s and try again.',
   aiWebStateRateBodyNow: 'Wait a moment and try again.',
@@ -46,10 +21,6 @@ export const en = {
   aiWebStateSessionBody: 'Reopen the document from UniWork to continue.',
   aiWebStateRefusedTitle: 'Request refused',
   aiWebStateRefusedBody: 'The server refused the AI request.',
-  aiWebStateModelTitle: 'Choose a model',
-  aiWebStateModelBody: 'Pick a model in the model menu next to the message box, then send again.',
-  aiWebStateBaseUrlBody: 'This base URL is not allowed. Use a public https:// address.',
-  aiWebStateProviderBody: 'This provider is not supported.',
   aiWebStateUnknownTitle: 'AI request failed',
   aiWebStateUnknownBody: 'Something went wrong. Try again.',
 

@@ -350,15 +350,17 @@ export interface HtmlAiDeps {
 /** how often the streaming draft is pushed into the preview mirror */
 const DRAFT_PREVIEW_MS = 400
 
+/** the model chip's "manage" row (one function: the picker keys an effect on its identity) */
+const openDesktopModelSettings = () => window.htmlApi.openAiModelSettings().catch(() => {})
+
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.htmlApi.getAiSettings(),
   setSettings: (settings, options) => window.htmlApi.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.htmlApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.htmlApi.aiGskStatus().then((s) => !!s?.loggedIn),
-  openModelSettings: () => window.htmlApi.openAiModelSettings().catch(() => {}),
-  // web frames: no key or no model keeps send off with a hint (see AiModelPicker)
-  get requireModel() {
-    return platform() === 'web'
+  // the chip's "manage" row opens the desktop model settings; a web frame has none to open
+  get openModelSettings() {
+    return platform() === 'web' ? undefined : openDesktopModelSettings
   },
 }
 
@@ -1736,7 +1738,12 @@ export function AiPanel({
                   lang={lang}
                   waiting={Boolean(entry.waitLine)}
                   onRetry={isLast && !busy && runInstructionRef.current ? retry : undefined}
-                  onChooseProvider={() => void window.htmlApi?.openAiModelSettings?.()}
+                  // a web frame has no other provider to choose: no action there
+                  onChooseProvider={
+                    platform() === 'web'
+                      ? undefined
+                      : () => void window.htmlApi?.openAiModelSettings?.()
+                  }
                   onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                   onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
                 />
@@ -2027,7 +2034,10 @@ export function AiPanel({
                     lang,
                     note: composerNoteState,
                     onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
-                    onChooseProvider: () => void window.htmlApi?.openAiModelSettings?.(),
+                    onChooseProvider:
+                      platform() === 'web'
+                        ? undefined
+                        : () => void window.htmlApi?.openAiModelSettings?.(),
                     onAnnounce: setComposerAnnouncement,
                     onSendBlockedChange: uniworkGate.onSendBlockedChange,
                     registerBlockedHandler: uniworkGate.registerBlockedHandler,

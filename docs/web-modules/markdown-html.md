@@ -105,15 +105,14 @@ text-module bridge. Contract: lane CONTRACT C1-C13, protocol `web/docs/protocol`
   schema on the first save), and Mermaid diagrams render as `<img src="data:image/svg+xml,...">` instead of injected
   markup. A desktop document that relied on rendered raw HTML or inline diagram DOM looks different there. Listed in
   `docs/upstream/UPSTREAM_SYNC.md` so an upstream sync keeps it.
-- **AI follows the host grant.** The AI family (`ai`, `aiCredentials`, `webSearch`, `imageSearch`, `imageGeneration`)
-  is **shown with the host's `ai` grant** (organization entitlement + the frame-token AI routes live, AI1/AI2) and
-  **hidden without it**: the panel, the ribbon AI group (HTML: AI, Restyle, Theme, Summarize) and every AI tool
-  disappear and the page takes the width. The panels call the document's AI routes directly (shared web AI bridge,
-  `web/modules/shared/ai/`, CONTRACT C16: same origin, frame token, no cookies, SSE native). Failures are typed,
-  translated state cards, never the server's JSON: the `{ "error": { code, message } }` envelope and a vendor
-  adapter's own failure text (e.g. "Claude HTTP 404: {...}" for a missing key) map to missing / refused key (with an
-  "AI settings" action), credits used up, not in the plan, rate limit, provider or cloud unavailable, session
-  expired. Below 900 px the panel starts closed unless the user opened it before.
+- **AI follows the host grant.** The AI family (`ai`, `webSearch`, `imageSearch`, `imageGeneration`) is **shown
+  with the host's `uniworkAi` grant** (organization entitlement + the frame-token AI routes live, AI1/AI2; UniWork AI
+  is the only AI, UNI-2289) and **hidden without it**; each of the three cloud tools also needs its own grant. Without
+  it the panel, the ribbon AI group (HTML: AI, Restyle, Theme, Summarize) and every AI tool disappear and the page
+  takes the width. The panels call the document's AI routes directly (shared web AI bridge, `web/modules/shared/ai/`,
+  CONTRACT C16: same origin, frame token, no cookies, SSE native). Failures are typed, translated texts, never the
+  server's JSON: the `{ "error": { code, message } }` envelope maps to credits used up, not in the plan, rate limit,
+  UniWork AI or cloud unavailable, session expired. Below 900 px the panel starts closed unless the user opened it before.
 - **Export entries (UNI-1232 A5).** On the desktop Word and single-file HTML come from the shell File menu; the web
   frame has no menu, so the ribbon's quick-access row carries one entry each, shown when the platform is `web`:
   Markdown **Export Word** (the renderer builds the .docx, `exportDocx` downloads it) and HTML **Export HTML**

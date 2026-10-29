@@ -24,7 +24,7 @@ conflict/view-only/print, pictures, static HTML copy for the sandboxed preview);
 `docs/web-modules/markdown-html.md`. Tests: `npx vitest run --root web/modules` (part of `npm run test:web`).
 
 Capabilities: `installModuleBridge()` puts one mutable object on each global as `.capabilities` (web defaults
-`MODULE_WEB_CAPABILITIES`: `ai`, `aiCredentials`, `open`, `recents`, `autoSave`, `autoSaveToDisk`, `saveStatus`,
+`MODULE_WEB_CAPABILITIES`: `ai`, `open`, `recents`, `autoSave`, `autoSaveToDisk`, `saveStatus`,
 `viewOnlyChip` false; host grants assigned on `init`). `saveStatus` / `viewOnlyChip` (GO-B8): the host header owns
 the save state and one host banner owns "view only", so a renderer shows its own Unsaved / Saved / Save failed label
 and its own "View only" chip only while `cap('saveStatus')` / `cap('viewOnlyChip')` is on (desktop: no object, on).
@@ -43,13 +43,14 @@ returns to where it was. Tested for contrast (>= 4.5:1 in light, dark and system
 `shared/frame-dialog-contrast.test.ts`.
 
 AI (CONTRACT C16): `shared/ai/` is the `ai` web bridge of every frame (Docs too, through web/docs/bridge/install.ts).
-`installModuleBridge()` wraps each global that has AI members (`withWebAi`): while the host grants `ai` they call the
-frame-token AI routes (BYOK proxy for aiStream/aiChat with ai-provider's native wire format, UniWork cloud tools,
-in-frame AI settings over the UniWork credentials, typed state card per error code); without the grant every member is
-the module's own "unavailable" stub and every AI key stays false. Routes and grants: web/docs/protocol/README.md
-"AI (web)". A failed chat turn (`aiStream`) is announced once: its typed, vendor-neutral text is the panel's inline error, no
-floating card beside it (the card, `.ow-ai-state`, stays for the one-shot `aiChat` and the tool members, which have no
-transcript); the model chip's "manage" row (`openAiModelSettings`) opens the AI settings in every panel.
+`installModuleBridge()` wraps each global that has AI members (`withWebAi`): while the host grants `uniworkAi` they
+call the frame-token AI routes (UniWork AI turns for aiStream, the UniWork cloud tools, typed state card per error
+code); UniWork AI is the only AI (UNI-2289): no provider key, no key settings, no provider choice. Without the grant
+every member is the module's own "unavailable" stub and every AI key stays false. Routes and grants:
+web/docs/protocol/README.md "AI (web)". A failed chat turn (`aiStream`) is announced once: its typed text is the panel's
+inline error, no floating card beside it (the card, `.ow-ai-state`, stays for the one-shot `aiChat` and the tool members,
+which have no transcript). The model chip has no "manage" row on the web (no model settings to open) and reads its
+credits from `window.uniworkCloudStatus`, which the frame publishes from its own `GET cloud`.
 Tests: `shared/ai/ai.test.ts`, e2e `web/e2e/ai-web.spec.ts` (Docs + Markdown), `web/e2e/sheets-ai.spec.ts`.
 A renderer reads it with `createCapabilityReader()` from `@genoffice/ui/capabilities` (`cap(key)`: on unless explicitly
 false, so desktop keeps everything). No autosave on the web (CONTRACT C10): the shared `getAutoSaveDefault` answers
