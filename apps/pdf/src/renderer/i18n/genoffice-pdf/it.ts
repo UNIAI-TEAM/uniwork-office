@@ -43,4 +43,7 @@ export const it = {
   outlineDelete: 'Elimina segnalibro',
   outlineNewTitle: 'Segnalibro senza titolo',
   outlineEdit: 'Modifica segnalibri',
+  squiggly: 'Ondulato',
+  drawPolygon: 'Poligono',
+  drawCaret: 'Inserimento',
 } satisfies Record<keyof typeof zh, string>

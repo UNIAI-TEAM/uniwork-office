@@ -43,4 +43,7 @@ export const hi = {
   outlineDelete: 'बुकमार्क हटाएँ',
   outlineNewTitle: 'अनाम बुकमार्क',
   outlineEdit: 'बुकमार्क संपादित करें',
+  squiggly: 'लहरदार रेखा',
+  drawPolygon: 'बहुभुज',
+  drawCaret: 'कैरेट',
 } satisfies Record<keyof typeof zh, string>

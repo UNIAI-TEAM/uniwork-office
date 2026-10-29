@@ -43,4 +43,7 @@ export const id = {
   outlineDelete: 'Hapus penanda',
   outlineNewTitle: 'Penanda tanpa judul',
   outlineEdit: 'Edit penanda',
+  squiggly: 'Gelombang',
+  drawPolygon: 'Poligon',
+  drawCaret: 'Tanda sisip',
 } satisfies Record<keyof typeof zh, string>

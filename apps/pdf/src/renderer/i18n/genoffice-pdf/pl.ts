@@ -43,4 +43,7 @@ export const pl = {
   outlineDelete: 'Usuń zakładkę',
   outlineNewTitle: 'Zakładka bez tytułu',
   outlineEdit: 'Edytuj zakładki',
+  squiggly: 'Falista',
+  drawPolygon: 'Wielokąt',
+  drawCaret: 'Znak wstawiania',
 } satisfies Record<keyof typeof zh, string>

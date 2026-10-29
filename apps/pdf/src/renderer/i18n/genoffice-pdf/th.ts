@@ -43,4 +43,7 @@ export const th = {
   outlineDelete: 'ลบที่คั่น',
   outlineNewTitle: 'ที่คั่นหน้าไม่มีชื่อ',
   outlineEdit: 'แก้ไขที่คั่น',
+  squiggly: 'เส้นหยัก',
+  drawPolygon: 'รูปหลายเหลี่ยม',
+  drawCaret: 'เครื่องหมายแทรก',
 } satisfies Record<keyof typeof zh, string>

@@ -43,4 +43,7 @@ export const ko = {
   outlineDelete: '책갈피 삭제',
   outlineNewTitle: '제목 없는 책갈피',
   outlineEdit: '책갈피 편집',
+  squiggly: '물결 밑줄',
+  drawPolygon: '다각형',
+  drawCaret: '캐럿',
 } satisfies Record<keyof typeof zh, string>

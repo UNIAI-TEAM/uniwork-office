@@ -43,4 +43,7 @@ export const ru = {
   outlineDelete: 'Удалить закладку',
   outlineNewTitle: 'Закладка без названия',
   outlineEdit: 'Изменить закладки',
+  squiggly: 'Волнистая линия',
+  drawPolygon: 'Многоугольник',
+  drawCaret: 'Знак вставки',
 } satisfies Record<keyof typeof zh, string>

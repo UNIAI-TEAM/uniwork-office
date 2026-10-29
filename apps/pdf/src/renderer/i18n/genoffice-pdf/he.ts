@@ -42,4 +42,7 @@ export const he = {
   outlineDelete: 'מחיקת סימנייה',
   outlineNewTitle: 'סימנייה ללא שם',
   outlineEdit: 'עריכת סימניות',
+  squiggly: 'קו גלי',
+  drawPolygon: 'מצולע',
+  drawCaret: 'סימן הוספה',
 } satisfies Record<keyof typeof zh, string>

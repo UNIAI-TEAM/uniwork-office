@@ -43,4 +43,7 @@ export const ja = {
   outlineDelete: 'しおりを削除',
   outlineNewTitle: '無題のしおり',
   outlineEdit: 'しおりを編集',
+  squiggly: '波線',
+  drawPolygon: '多角形',
+  drawCaret: 'キャレット',
 } satisfies Record<keyof typeof zh, string>

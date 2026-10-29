@@ -43,4 +43,7 @@ export const en = {
   outlineDelete: 'Delete bookmark',
   outlineNewTitle: 'Untitled bookmark',
   outlineEdit: 'Edit bookmarks',
+  squiggly: 'Squiggly',
+  drawPolygon: 'Polygon',
+  drawCaret: 'Caret',
 } satisfies Record<keyof typeof zh, string>

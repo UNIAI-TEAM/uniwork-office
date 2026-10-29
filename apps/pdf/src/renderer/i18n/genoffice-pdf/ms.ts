@@ -43,4 +43,7 @@ export const ms = {
   outlineDelete: 'Padam penanda',
   outlineNewTitle: 'Penanda tanpa tajuk',
   outlineEdit: 'Sunting penanda',
+  squiggly: 'Berombak',
+  drawPolygon: 'Poligon',
+  drawCaret: 'Tanda sisipan',
 } satisfies Record<keyof typeof zh, string>

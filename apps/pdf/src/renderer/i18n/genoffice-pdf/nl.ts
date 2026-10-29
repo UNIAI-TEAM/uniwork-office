@@ -43,4 +43,7 @@ export const nl = {
   outlineDelete: 'Bladwijzer verwijderen',
   outlineNewTitle: 'Naamloze bladwijzer',
   outlineEdit: 'Bladwijzers bewerken',
+  squiggly: 'Golflijn',
+  drawPolygon: 'Veelhoek',
+  drawCaret: 'Invoegteken',
 } satisfies Record<keyof typeof zh, string>

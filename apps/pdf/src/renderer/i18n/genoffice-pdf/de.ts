@@ -43,4 +43,7 @@ export const de = {
   outlineDelete: 'Lesezeichen löschen',
   outlineNewTitle: 'Unbenanntes Lesezeichen',
   outlineEdit: 'Lesezeichen bearbeiten',
+  squiggly: 'Wellenlinie',
+  drawPolygon: 'Polygon',
+  drawCaret: 'Einfügemarke',
 } satisfies Record<keyof typeof zh, string>

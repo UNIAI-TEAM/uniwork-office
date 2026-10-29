@@ -41,4 +41,7 @@ export const zh = {
   outlineDelete: '删除书签',
   outlineNewTitle: '未命名书签',
   outlineEdit: '编辑书签',
+  squiggly: '波浪线',
+  drawPolygon: '多边形',
+  drawCaret: '插入符',
 }

@@ -43,4 +43,7 @@ export const vi = {
   outlineDelete: 'Xóa dấu trang',
   outlineNewTitle: 'Dấu trang chưa đặt tên',
   outlineEdit: 'Chỉnh sửa dấu trang',
+  squiggly: 'Gạch sóng',
+  drawPolygon: 'Đa giác',
+  drawCaret: 'Dấu chèn',
 } satisfies Record<keyof typeof zh, string>

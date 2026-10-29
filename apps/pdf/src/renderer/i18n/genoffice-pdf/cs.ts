@@ -43,4 +43,7 @@ export const cs = {
   outlineDelete: 'Smazat záložku',
   outlineNewTitle: 'Záložka bez názvu',
   outlineEdit: 'Upravit záložky',
+  squiggly: 'Vlnovka',
+  drawPolygon: 'Mnohoúhelník',
+  drawCaret: 'Stříška',
 } satisfies Record<keyof typeof zh, string>

@@ -43,4 +43,7 @@ export const ar = {
   outlineDelete: 'حذف الإشارة المرجعية',
   outlineNewTitle: 'إشارة مرجعية بدون عنوان',
   outlineEdit: 'تحرير الإشارات المرجعية',
+  squiggly: 'خط متموج',
+  drawPolygon: 'مضلع',
+  drawCaret: 'علامة الإدراج',
 } satisfies Record<keyof typeof zh, string>

@@ -42,4 +42,7 @@ export const zhTW = {
   outlineDelete: '刪除書籤',
   outlineNewTitle: '未命名書籤',
   outlineEdit: '編輯書籤',
+  squiggly: '波浪線',
+  drawPolygon: '多邊形',
+  drawCaret: '插入符號',
 } satisfies Record<keyof typeof zh, string>

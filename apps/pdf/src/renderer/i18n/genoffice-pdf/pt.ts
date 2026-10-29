@@ -43,4 +43,7 @@ export const pt = {
   outlineDelete: 'Eliminar marcador',
   outlineNewTitle: 'Marcador sem título',
   outlineEdit: 'Editar marcadores',
+  squiggly: 'Ondulado',
+  drawPolygon: 'Polígono',
+  drawCaret: 'Inserção',
 } satisfies Record<keyof typeof zh, string>

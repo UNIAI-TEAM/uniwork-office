@@ -304,7 +304,7 @@ export const AGENT_TOOLS: AgentToolDef[] = [
   {
     name: 'markup_text',
     description:
-      'Add a markup (highlight/underline/strikeout) to a text passage on the given page. text must be a verbatim fragment that actually exists on that page (confirm with read_pages or search_text first); by default only the first occurrence is marked, all=true marks every occurrence on that page.',
+      'Add a markup (highlight/underline/squiggly/strikeout) to a text passage on the given page. text must be a verbatim fragment that actually exists on that page (confirm with read_pages or search_text first); by default only the first occurrence is marked, all=true marks every occurrence on that page.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -312,7 +312,7 @@ export const AGENT_TOOLS: AgentToolDef[] = [
         text: { type: 'string', description: 'Verbatim text fragment from the page' },
         type: {
           type: 'string',
-          enum: ['highlight', 'underline', 'strikeout'],
+          enum: ['highlight', 'underline', 'squiggly', 'strikeout'],
           description: 'Markup type',
         },
         all: {
@@ -409,7 +409,7 @@ export const AGENT_TOOLS: AgentToolDef[] = [
         },
         type: {
           type: 'string',
-          enum: ['highlight', 'underline', 'strikeout'],
+          enum: ['highlight', 'underline', 'squiggly', 'strikeout'],
           description: 'Only remove markups of this kind',
         },
       },
@@ -1341,7 +1341,7 @@ async function markupText(deps: PdfAiDeps, input: Record<string, unknown>): Prom
   const type = String(input.type) as MarkupType
   const summary = t('aiToolMarkup', { page: Number(input.page) })
   if (deps.readOnly()) return err(READONLY_OUTPUT, summary)
-  if (!['highlight', 'underline', 'strikeout'].includes(type))
+  if (!['highlight', 'underline', 'squiggly', 'strikeout'].includes(type))
     return err(`Invalid type: ${type}`, summary)
   const r = resolvePage(deps, input.page)
   if ('bad' in r) return err(r.bad, summary)
@@ -1665,7 +1665,7 @@ const hexToRgb255 = (hex: string): [number, number, number] => {
 const withColorNote = (output: string, note: string | undefined): string =>
   note ? `${output} Note: ${note}.` : output
 
-const MARKUP_TYPES: MarkupType[] = ['highlight', 'underline', 'strikeout']
+const MARKUP_TYPES: MarkupType[] = ['highlight', 'underline', 'squiggly', 'strikeout']
 
 async function deleteMarkupTool(
   deps: PdfAiDeps,

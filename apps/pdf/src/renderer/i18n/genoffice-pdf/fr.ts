@@ -43,4 +43,7 @@ export const fr = {
   outlineDelete: 'Supprimer le signet',
   outlineNewTitle: 'Signet sans titre',
   outlineEdit: 'Modifier les signets',
+  squiggly: 'Ondulé',
+  drawPolygon: 'Polygone',
+  drawCaret: 'Insertion',
 } satisfies Record<keyof typeof zh, string>
