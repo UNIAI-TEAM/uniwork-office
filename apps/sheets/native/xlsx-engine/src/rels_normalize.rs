@@ -38,7 +38,7 @@ const RELATIONSHIPS_NAMESPACE: &str =
 /// Imports the workbook at `path` into an IronCalc model, repairing absolute
 /// relationship targets first when the package uses them.
 pub(crate) fn load_model(path: &Path) -> Result<Model<'static>, SidecarError> {
-    require_cell_styles(path)?;
+    require_style_parts(path)?;
     let Some(normalized) = normalized_package(path)? else {
         let path_text = path.to_str().ok_or_else(|| {
             SidecarError::InvalidRequest("Workbook path is not valid UTF-8.".into())
@@ -53,27 +53,40 @@ pub(crate) fn load_model(path: &Path) -> Result<Model<'static>, SidecarError> {
     Model::from_workbook(workbook, "en").map_err(import_error)
 }
 
-/// IronCalc 0.9.1's style importer takes the first `<cellStyles>` child of the
-/// style sheet without checking that one exists (import/styles.rs), so a
-/// styles part without it panics. Natively the recalc request catches the
+/// The children of the style sheet IronCalc 0.9.1's importer takes the first
+/// of without checking that one exists (import/styles.rs).
+const REQUIRED_STYLE_PARTS: [&str; 6] = [
+    "fonts",
+    "fills",
+    "borders",
+    "cellStyleXfs",
+    "cellXfs",
+    "cellStyles",
+];
+
+/// IronCalc 0.9.1's style importer indexes the first child of each of
+/// `REQUIRED_STYLE_PARTS` unchecked, so a styles part missing any of them
+/// panics. Natively the recalc request catches the
 /// unwind and answers with an error; the wasm reactor is built with
 /// `panic = "abort"`, where the same panic would stop the whole engine and
 /// take every open session with it. Refuse such a workbook up front with the
 /// error the native path ends in.
-fn require_cell_styles(path: &Path) -> Result<(), SidecarError> {
+fn require_style_parts(path: &Path) -> Result<(), SidecarError> {
     let mut archive = ZipArchive::new(File::open(path)?)?;
     let Some(index) = archive.index_for_name("xl/styles.xml") else {
         return Ok(());
     };
     let xml = read_part(&mut archive, index)?;
     // an unparsable part is the importer's to report
-    let has_cell_styles = Document::parse(&xml).map_or(true, |document| {
-        document
-            .root_element()
-            .children()
-            .any(|node| node.is_element() && node.tag_name().name() == "cellStyles")
+    let complete = Document::parse(&xml).map_or(true, |document| {
+        REQUIRED_STYLE_PARTS.iter().all(|name| {
+            document
+                .root_element()
+                .children()
+                .any(|node| node.is_element() && node.tag_name().name() == *name)
+        })
     });
-    if has_cell_styles {
+    if complete {
         Ok(())
     } else {
         Err(SidecarError::Workbook(
@@ -479,22 +492,31 @@ mod tests {
     }
 
     #[test]
-    fn a_styles_part_without_cell_styles_is_refused_instead_of_panicking_the_importer() {
-        let (_dir, path) = crate::tests::open_fixture(&[(
-            "xl/styles.xml",
-            r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cellXfs count="1"><xf/></cellXfs></styleSheet>"#,
-        )]);
-        let error = load_model(&path).err().expect("must be refused");
-        assert!(
-            error.to_string().contains("could not process"),
-            "unexpected error: {error}"
-        );
-        // with the element present the guard lets the importer go ahead
-        let (_dir, path) = crate::tests::open_fixture(&[(
-            "xl/styles.xml",
-            r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cellStyles count="1"><cellStyle name="Normal" xfId="0"/></cellStyles></styleSheet>"#,
-        )]);
-        assert!(require_cell_styles(&path).is_ok());
+    fn a_styles_part_missing_a_required_child_is_refused_instead_of_panicking_the_importer() {
+        const ALL: &str = r#"<fonts count="1"/><fills count="1"/><borders count="1"/><cellStyleXfs count="1"/><cellXfs count="1"/><cellStyles count="1"/>"#;
+        let styles = |body: &str| {
+            format!(
+                r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">{body}</styleSheet>"#
+            )
+        };
+        let guard = |xml: String| {
+            let (_dir, path) = crate::tests::open_fixture(&[("xl/styles.xml", &xml)]);
+            require_style_parts(&path)
+        };
+        // each required child missing in turn is refused
+        for name in REQUIRED_STYLE_PARTS {
+            let without = ALL
+                .split_inclusive("/>")
+                .filter(|part| !part.starts_with(&format!("<{name} ")))
+                .collect::<String>();
+            let error = guard(styles(&without)).expect_err(name);
+            assert!(
+                error.to_string().contains("could not process"),
+                "{name}: unexpected error: {error}"
+            );
+        }
+        // with all of them present the guard lets the importer go ahead
+        assert!(guard(styles(ALL)).is_ok());
     }
 
     #[test]
