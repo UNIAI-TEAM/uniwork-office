@@ -80,6 +80,8 @@ const BINDINGS: readonly Binding[] = [
   { id: 'sheets-61', gate: 'grid', action: { kind: 'dialog', dialog: 'formatCells' } },
   { id: 'sheets-62', gate: 'grid', action: { kind: 'dialog', dialog: 'formatCells', tab: 'Font' } },
   { id: 'sheets-42', gate: 'grid', action: { kind: 'dialog', dialog: 'goTo' } },
+  // Excel's F7: the Spelling dialog (Review ▸ Proofing here)
+  { id: 'sheets-58', gate: 'grid', action: command('spell-check') },
   { id: 'sheets-55', gate: 'grid', action: command('toggle-show-formulas') },
   { id: 'sheets-78', gate: 'grid', action: command('link-open') },
   { id: 'sheets-79', gate: 'grid', action: command('note-open') },

@@ -1652,4 +1652,29 @@ export const es = {
   appWebSavedReopenFailed:
     'Tus cambios se guardaron en UniWork, pero no se pudo volver a abrir el libro aquí. Recarga el editor para seguir trabajando.',
   appDataTable: 'Tabla de datos',
+
+  // ── Spelling check (F7 / Review ▸ Proofing) ──
+  appSpellTitle: 'Ortografía',
+  appSpellBtnDetail: 'Comprobar el texto de la hoja (F7)',
+  appSpellToggle: 'Comprobar ortografía',
+  appSpellToggleTip:
+    'Activa la comprobación ortográfica (F7 y el botón de Revisar); desactivada, los cuadros de comentarios dejan de mostrar subrayados',
+  appSpellOn: 'Comprobación ortográfica activada.',
+  appSpellOff: 'La comprobación ortográfica está desactivada. Actívala en Revisar ▸ Corrección.',
+  appSpellRecheck: 'Volver a comprobar',
+  appSpellNone: 'No se encontraron errores ortográficos sospechosos.',
+  appSpellFindings: '{count} errores sospechosos. Haz clic en una fila para localizarlo.',
+  appSpellTruncated: 'Demasiadas celdas de texto; solo se comprobaron las primeras.',
+  appSpellColWord: 'Sospechoso',
+  appSpellIgnore: 'Omitir',
+  appSpellIgnoreAll: 'Omitir todos',
+  appSpellLearn: 'Agregar al diccionario',
+  appSpellNoSuggestions: 'Sin sugerencias',
+  appSpellIgnoredAll: '"{word}" no se volverá a marcar en esta sesión.',
+  appSpellLearned: '"{word}" se agregó al diccionario.',
+  appSpellChanged: '{address} corregido.',
+  appSpellChangeFailed: 'No se pudo corregir {address}.',
+  appSpellUnavailable: 'La corrección ortográfica no está disponible en esta ventana.',
+  appSpellReplaceAll: 'Reemplazar todo por «{suggestion}»',
+  appSpellChangedAll: 'Se corrigieron {count} celdas de «{word}».',
 } satisfies Record<keyof typeof zh, string>

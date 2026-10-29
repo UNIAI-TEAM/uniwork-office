@@ -1655,4 +1655,29 @@ export const ja = {
   appWebSavedReopenFailed:
     '変更は UniWork に保存されましたが、ここでブックを開き直せませんでした。エディターを再読み込みして作業を続けてください。',
   appDataTable: 'データテーブル',
+
+  // ── Spelling check (F7 / Review ▸ Proofing) ──
+  appSpellTitle: 'スペル チェック',
+  appSpellBtnDetail: 'ワークシートのテキストをチェック (F7)',
+  appSpellToggle: 'スペル チェック',
+  appSpellToggleTip:
+    'スペル チェック（F7 と Review ボタン）を有効にします。オフにするとコメント入力欄のスペルの波線が消えます',
+  appSpellOn: 'スペル チェックをオンにしました。',
+  appSpellOff: 'スペル チェックはオフです。Review ▸ 校対 からオンにできます。',
+  appSpellRecheck: '再チェック',
+  appSpellNone: '疑わしいスペルミスは見つかりませんでした。',
+  appSpellFindings: '疑わしいスペルミスが {count} 件あります。行をクリックすると移動します。',
+  appSpellTruncated: 'テキスト セルが多すぎるため、前半のみチェックしました。',
+  appSpellColWord: '疑わしい語',
+  appSpellIgnore: '無視',
+  appSpellIgnoreAll: 'すべて無視',
+  appSpellLearn: '辞書に追加',
+  appSpellNoSuggestions: '修正候補なし',
+  appSpellIgnoredAll: 'このセッションでは「{word}」を表示しません。',
+  appSpellLearned: '「{word}」を辞書に追加しました。',
+  appSpellChanged: '{address} を修正しました。',
+  appSpellChangeFailed: '{address} を修正できませんでした。',
+  appSpellUnavailable: 'このウィンドウではスペルチェックを利用できません。',
+  appSpellReplaceAll: 'すべて「{suggestion}」に置換',
+  appSpellChangedAll: '「{word}」を {count} か所修正しました。',
 } satisfies Record<keyof typeof zh, string>

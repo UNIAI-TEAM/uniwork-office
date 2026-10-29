@@ -1607,4 +1607,29 @@ export const id = {
   appWebSavedReopenFailed:
     'Perubahan Anda sudah disimpan ke UniWork, tetapi buku kerja tidak dapat dibuka ulang di sini. Muat ulang editor untuk melanjutkan.',
   appDataTable: 'Tabel Data',
+
+  // ── Spelling check (F7 / Review ▸ Proofing) ──
+  appSpellTitle: 'Ejaan',
+  appSpellBtnDetail: 'Periksa teks lembar (F7)',
+  appSpellToggle: 'Periksa ejaan',
+  appSpellToggleTip:
+    'Mengaktifkan pemeriksaan ejaan (F7 dan tombol Tinjau); saat nonaktif, kotak komentar tidak lagi menampilkan garis bergelombang',
+  appSpellOn: 'Pemeriksaan ejaan diaktifkan.',
+  appSpellOff: 'Pemeriksaan ejaan nonaktif. Aktifkan di Tinjau ▸ Pemeriksaan.',
+  appSpellRecheck: 'Periksa ulang',
+  appSpellNone: 'Tidak ditemukan kesalahan ejaan yang dicurigai.',
+  appSpellFindings: '{count} kesalahan yang dicurigai. Klik baris untuk menemukannya.',
+  appSpellTruncated: 'Terlalu banyak sel teks; hanya bagian awal yang diperiksa.',
+  appSpellColWord: 'Dicurigai',
+  appSpellIgnore: 'Abaikan',
+  appSpellIgnoreAll: 'Abaikan semua',
+  appSpellLearn: 'Tambahkan ke kamus',
+  appSpellNoSuggestions: 'Tidak ada saran',
+  appSpellIgnoredAll: '"{word}" tidak akan ditandai lagi pada sesi ini.',
+  appSpellLearned: '"{word}" ditambahkan ke kamus.',
+  appSpellChanged: '{address} diperbaiki.',
+  appSpellChangeFailed: 'Gagal memperbaiki {address}.',
+  appSpellUnavailable: 'Pemeriksaan ejaan tidak tersedia di jendela ini.',
+  appSpellReplaceAll: 'Ganti semua dengan "{suggestion}"',
+  appSpellChangedAll: '{count} sel dengan "{word}" telah diperbaiki.',
 } satisfies Record<keyof typeof zh, string>

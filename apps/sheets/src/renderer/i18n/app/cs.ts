@@ -1603,4 +1603,29 @@ export const cs = {
   appWebSavedReopenFailed:
     'Vaše změny byly uloženy do UniWork, ale sešit se zde nepodařilo znovu otevřít. Chcete-li pokračovat, načtěte editor znovu.',
   appDataTable: 'Datová tabulka',
+
+  // ── Spelling check (F7 / Review ▸ Proofing) ──
+  appSpellTitle: 'Pravopis',
+  appSpellBtnDetail: 'Zkontrolovat text listu (F7)',
+  appSpellToggle: 'Kontrola pravopisu',
+  appSpellToggleTip:
+    'Zapne kontrolu pravopisu (F7 a tlačítko Revize); po vypnutí pole komentářů nezobrazují vlnkové podtržení',
+  appSpellOn: 'Kontrola pravopisu zapnuta.',
+  appSpellOff: 'Kontrola pravopisu je vypnutá. Zapněte ji v Revize ▸ Kontrola.',
+  appSpellRecheck: 'Zkontrolovat znovu',
+  appSpellNone: 'Nenalezeny žádné podezřelé pravopisné chyby.',
+  appSpellFindings: 'Podezřelých chyb: {count}. Kliknutím na řádek přejdete na buňku.',
+  appSpellTruncated: 'Příliš mnoho textových buněk; zkontrolovány byly jen první.',
+  appSpellColWord: 'Podezřelé',
+  appSpellIgnore: 'Ignorovat',
+  appSpellIgnoreAll: 'Ignorovat vše',
+  appSpellLearn: 'Přidat do slovníku',
+  appSpellNoSuggestions: 'Žádné návrhy',
+  appSpellIgnoredAll: 'Slovo „{word}“ už se v této relaci nebude označovat.',
+  appSpellLearned: 'Slovo „{word}“ bylo přidáno do slovníku.',
+  appSpellChanged: 'Opraveno {address}.',
+  appSpellChangeFailed: '{address} se nepodařilo opravit.',
+  appSpellUnavailable: 'Kontrola pravopisu není v tomto okně k dispozici.',
+  appSpellReplaceAll: 'Nahradit vše za „{suggestion}“',
+  appSpellChangedAll: 'Opraveno {count} buněk se slovem „{word}“.',
 } satisfies Record<keyof typeof zh, string>

@@ -1590,4 +1590,29 @@ export const vi = {
   appWebSavedReopenFailed:
     'Các thay đổi của bạn đã được lưu vào UniWork, nhưng không thể mở lại sổ làm việc tại đây. Hãy tải lại trình soạn thảo để tiếp tục.',
   appDataTable: 'Bảng dữ liệu',
+
+  // ── Spelling check (F7 / Review ▸ Proofing) ──
+  appSpellTitle: 'Chính tả',
+  appSpellBtnDetail: 'Kiểm tra văn bản trang tính (F7)',
+  appSpellToggle: 'Kiểm tra chính tả',
+  appSpellToggleTip:
+    'Bật kiểm tra chính tả (F7 và nút trong thẻ Xem lại); khi tắt, hộp nhận xét không còn hiện gạch chân sóng',
+  appSpellOn: 'Đã bật kiểm tra chính tả.',
+  appSpellOff: 'Kiểm tra chính tả đang tắt. Bật trong Xem lại ▸ Soát lỗi.',
+  appSpellRecheck: 'Kiểm tra lại',
+  appSpellNone: 'Không tìm thấy lỗi chính tả đáng ngờ.',
+  appSpellFindings: '{count} lỗi đáng ngờ. Bấm một hàng để đi tới.',
+  appSpellTruncated: 'Quá nhiều ô văn bản; chỉ kiểm tra các ô đầu tiên.',
+  appSpellColWord: 'Đáng ngờ',
+  appSpellIgnore: 'Bỏ qua',
+  appSpellIgnoreAll: 'Bỏ qua tất cả',
+  appSpellLearn: 'Thêm vào từ điển',
+  appSpellNoSuggestions: 'Không có gợi ý',
+  appSpellIgnoredAll: '"{word}" sẽ không bị đánh dấu nữa trong phiên này.',
+  appSpellLearned: 'Đã thêm "{word}" vào từ điển.',
+  appSpellChanged: 'Đã sửa {address}.',
+  appSpellChangeFailed: 'Không thể sửa {address}.',
+  appSpellUnavailable: 'Kiểm tra chính tả không khả dụng trong cửa sổ này.',
+  appSpellReplaceAll: 'Thay tất cả bằng "{suggestion}"',
+  appSpellChangedAll: 'Đã sửa {count} ô chứa "{word}".',
 } satisfies Record<keyof typeof zh, string>
