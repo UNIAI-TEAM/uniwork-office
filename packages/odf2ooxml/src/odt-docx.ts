@@ -127,8 +127,19 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
           for (let index = 0; index < count; index++) drops.add('tracked-changes')
           break
         }
+        // The decl/settings elements are pure declarations: no visible content, only definitions for fields elsewhere.
         case 'text:sequence-decls':
         case 'text:soft-page-break':
+        case 'text:variable-decls':
+        case 'text:user-field-decls':
+        case 'text:dde-connection-decls':
+        case 'table:calculation-settings':
+        case 'table:content-validations':
+        case 'text:alphabetical-index-auto-mark-file':
+          break
+        case 'office:forms':
+          // LibreOffice writes an empty office:forms into nearly every file; only real form controls are a loss.
+          if (childElements(element.node).length > 0) drops.add('unhandled-blocks')
           break
         case 'draw:frame':
           emitFrame(element.node, context)

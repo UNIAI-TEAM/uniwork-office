@@ -237,6 +237,22 @@ describe('convertOdtToDocx', () => {
     expect(await docxHasMedia(result.docx, '.png')).toBe(false)
   })
 
+  it('does not report an empty office:forms as a dropped block, but does report form controls', async () => {
+    const FORM_NS = 'xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0"'
+    const empty =
+      `<office:forms ${FORM_NS} form:automatic-focus="false" form:apply-design-mode="false"/>` +
+      '<text:p>hello</text:p>'
+    const emptyResult = await convertOdtToDocx(await buildOdt(contentXml(empty)))
+    expect(emptyResult.dropped).not.toContainEqual(
+      expect.objectContaining({ what: 'unhandled-blocks' }),
+    )
+    const withControl =
+      `<office:forms ${FORM_NS}><form:form form:name="F1"><form:text form:name="t"/></form:form></office:forms>` +
+      '<text:p>hello</text:p>'
+    const controlResult = await convertOdtToDocx(await buildOdt(contentXml(withControl)))
+    expect(controlResult.dropped).toContainEqual({ what: 'unhandled-blocks', count: 1 })
+  })
+
   it('counts constructs it cannot represent instead of guessing', async () => {
     const body =
       '<text:p>keep <text:note text:id="n1" text:note-class="footnote"><text:note-body><text:p>lost</text:p></text:note-body></text:note></text:p>' +
