@@ -10,12 +10,14 @@ import {
   PDFOptionList,
   PDFRef,
   PDFString,
+  StandardFonts,
   degrees,
   rgb,
 } from 'pdf-lib'
-import type { PDFPage } from 'pdf-lib'
+import type { PDFFont, PDFPage } from 'pdf-lib'
 import { VISUAL_SIGNATURE_CONTENT_PREFIX } from '../shared/ipc'
 import { markupLineRotation } from '../shared/markup-line'
+import { applyAttachments } from './pdf-attachments'
 import type {
   DrawingInput,
   OutlineEntryInput,
@@ -617,6 +619,8 @@ function addDrawing(
   d: DrawingInput,
   /** localId → registered ref of notes written earlier in this request (reply parenting) */
   noteRefs?: Map<string, PDFRef>,
+  /** the label font for measure drawings (their appearance names /F1) */
+  measureFont?: PDFFont,
 ): void {
   if (d.kind === 'image') return // handled by addImageStamp (needs async embed)
   if (d.kind === 'link') return // handled by addLinkAnnot (needs the page list)
@@ -749,6 +753,42 @@ function addDrawing(
     ops.push(`${num(fx)} ${num(fy)} m ${num(tx)} ${num(ty)} l S`)
     xs = [fx, tx]
     ys = [fy, ty]
+    if (d.kind === 'measure') {
+      // the label rides the line's own angle at its midpoint, flipped into
+      // left-to-right when the line runs right-to-left; the whole appearance
+      // rotates with the page like any other annotation's. The label takes the
+      // drawing's own colour, matching the on-screen preview.
+      const mx = (fx + tx) / 2
+      const my = (fy + ty) / 2
+      const ang = Math.atan2(ty - fy, tx - fx)
+      const flip = Math.abs(ang) > Math.PI / 2
+      const tilt = flip ? ang + Math.PI : ang
+      ops.push(`BT ${r} ${g} ${b} rg /F1 9 Tf`)
+      ops.push(
+        `${num(Math.cos(tilt))} ${num(Math.sin(tilt))} ${num(-Math.sin(tilt))} ${num(Math.cos(tilt))} ${num(mx)} ${num(my + 6)} Tm`,
+      )
+      const esc = d.label.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
+      ops.push(`(${esc}) Tj ET`)
+      // Tj draws from (mx, my + 6) along the tilted baseline by the label's
+      // advance width and extends above/below the baseline by the font height,
+      // so the annotation Rect and AP BBox must cover all four corners of the
+      // rotated text box for any line angle.
+      const labelW = measureFont ? measureFont.widthOfTextAtSize(d.label, 9) : d.label.length * 4.5
+      const labelH = measureFont ? measureFont.heightAtSize(9) : 9
+      const labelDesc = measureFont
+        ? Math.max(2, labelH - measureFont.heightAtSize(9, { descender: false }))
+        : 2.5
+      const cos = Math.cos(tilt)
+      const sin = Math.sin(tilt)
+      const ox = mx
+      const oy = my + 6
+      for (const lx of [0, labelW]) {
+        for (const ly of [-labelDesc, labelH]) {
+          xs.push(ox + lx * cos - ly * sin)
+          ys.push(oy + lx * sin + ly * cos)
+        }
+      }
+    }
     if (d.kind === 'arrow') {
       const ang = Math.atan2(ty - fy, tx - fx)
       const len = Math.max(9, d.width * 4.5)
@@ -769,7 +809,16 @@ function addDrawing(
     Math.max(...xs) + pad,
     Math.max(...ys) + pad,
   ]
-  const ap = pdfDoc.context.stream(ops.join('\n'), { Type: 'XObject', Subtype: 'Form', BBox: rect })
+  // Preview and Acrobat synthesize nothing for an unresolvable font reference:
+  // the label's /F1 must be reachable through the form's /Resources
+  const ap = pdfDoc.context.stream(ops.join('\n'), {
+    Type: 'XObject',
+    Subtype: 'Form',
+    BBox: rect,
+    ...(d.kind === 'measure' && measureFont
+      ? { Resources: { Font: { F1: measureFont.ref } } }
+      : {}),
+  })
   const annot = pdfDoc.context.obj({
     Type: 'Annot',
     Subtype: subtype,
@@ -783,6 +832,10 @@ function addDrawing(
   if (d.kind === 'ink') annot.set(PDFName.of('InkList'), pdfDoc.context.obj(d.paths))
   if (d.kind === 'line' || d.kind === 'arrow') {
     annot.set(PDFName.of('L'), pdfDoc.context.obj([...d.from, ...d.to]))
+  }
+  if (d.kind === 'measure') {
+    annot.set(PDFName.of('L'), pdfDoc.context.obj([...d.from, ...d.to]))
+    annot.set(PDFName.of('Contents'), PDFHexString.fromText(d.label))
   }
   annot.set(PDFName.of('T'), PDFHexString.fromText('UniWork Office'))
   if (d.kind === 'ink') setVisualSignatureMetadata(annot, d.formFieldName)
@@ -1316,12 +1369,19 @@ export async function applySaveRequest(
     if (page && validMarkup(m)) addMarkup(pdfDoc, page, m)
   }
   const noteRefs = new Map<string, PDFRef>()
-  for (const d of request.drawings ?? []) {
+  // the measure label's font: standard-14 Helvetica, no bytes to embed — but
+  // only when a measure drawing is actually written, so saves without one
+  // leave the document's font dict untouched
+  const drawings = request.drawings ?? []
+  const measureFont = drawings.some((d) => d.kind === 'measure')
+    ? await pdfDoc.embedFont(StandardFonts.Helvetica)
+    : undefined
+  for (const d of drawings) {
     const page = pages[d.pageIndex]
     if (!page) continue
     if (d.kind === 'image') await addImageStamp(pdfDoc, page, d)
     else if (d.kind === 'link') addLinkAnnot(pdfDoc, pages, page, d)
-    else addDrawing(pdfDoc, page, d, noteRefs)
+    else addDrawing(pdfDoc, page, d, noteRefs, measureFont)
   }
   // Note content edits go after the drawings: replies added above locate their /IRT
   // parent by its old contents, which an earlier in-place rewrite would break. An
@@ -1395,6 +1455,7 @@ export async function applySaveRequest(
         PDFHexString.fromText(JSON.stringify(staticFormFills)),
       )
   }
+  if (request.attachments) applyAttachments(pdfDoc, request.attachments)
   try {
     let saved = await pdfDoc.save({ useObjectStreams: false })
     // Redaction is the final serializer. EmbedPDF's full SaveAsCopy writes only the

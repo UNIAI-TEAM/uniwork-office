@@ -1767,9 +1767,9 @@ describe('every channel of the remaining shell families is accounted for and gua
       neither: FAMILY_VALUES.filter((c) => !registered.has(c) && !FAMILY_PUSH_ONLY.includes(c)),
       both: FAMILY_PUSH_ONLY.filter((c) => registered.has(c)),
     }).toEqual({ neither: [], both: [] })
-    // tabs 16, integrations 13, update 6, pdf-password 3, the drop and the model settings opener
-    expect(FAMILY_REGISTERED).toHaveLength(40)
-    expect(registered.size).toBe(40)
+    // tabs 16, integrations 14, update 6, pdf-password 3, the drop and the model settings opener
+    expect(FAMILY_REGISTERED).toHaveLength(41)
+    expect(registered.size).toBe(41)
   })
 
   it('is registered once', () => {
@@ -1789,7 +1789,7 @@ describe('every channel of the remaining shell families is accounted for and gua
     expect(wrong).toEqual([])
   })
 
-  it('is registered on no raw ipcMain: none of the 40 channels stays unguarded', () => {
+  it('is registered on no raw ipcMain: none of the 41 channels stays unguarded', () => {
     expect(rawFamilyRegistrations(sources)).toEqual([])
   })
 
@@ -1830,7 +1830,7 @@ describe('policy of every channel of the remaining shell families', () => {
 
   it('INTEGRATIONS_CHANNELS: shell', () => {
     const values = policyOf(INTEGRATIONS_CHANNELS)
-    expect(values).toHaveLength(13)
+    expect(values).toHaveLength(14)
     for (const channel of values) expect(policyForChannel(channel), channel).toBe('shell')
   })
 

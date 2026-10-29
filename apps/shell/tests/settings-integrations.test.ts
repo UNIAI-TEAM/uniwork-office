@@ -6,7 +6,11 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HomeApi } from '../src/shared/home-api'
-import type { IntegrationsApi, IntegrationsStatus } from '../src/shared/integrations-api'
+import type {
+  IntegrationsApi,
+  IntegrationsStatus,
+  LegacySweepResult,
+} from '../src/shared/integrations-api'
 import { mcpClaudeCommand, mcpConfigJson, mcpLaunch } from '../src/renderer/src/IntegrationsPane'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { SettingsModal, type SettingsModalProps } from '../src/renderer/src/SettingsModal'
@@ -70,6 +74,7 @@ function baseStatus(): IntegrationsStatus {
     },
     skillVersion: '2.1.0',
     skillNeedsCli: '0.4.0',
+    legacy: [],
     agents: [
       {
         id: 'claude-code',
@@ -190,6 +195,213 @@ describe('Settings → Integrations', () => {
       },
     })
     expect(host.textContent).toContain('assistant picks one')
+  })
+
+  it('shows the copies the shared row replaced, removes them, keeps the outcome visible and focused, and handles kept/failure/busy states (R1-08, R1-10)', async () => {
+    const codexCopy = {
+      agent: 'codex' as const,
+      label: 'Codex',
+      skillsDir: '/home/u/.codex/skills',
+      path: '/home/u/.codex/skills/genoffice/SKILL.md',
+      ours: true,
+    }
+    const cursorCopy = {
+      agent: 'cursor' as const,
+      label: 'Cursor',
+      skillsDir: '/home/u/.cursor/skills',
+      path: '/home/u/.cursor/skills/genoffice/SKILL.md',
+      ours: false,
+      reason: 'unsafe_link' as const,
+    }
+    const status = baseStatus()
+    status.legacy = [codexCopy, cursorCopy]
+
+    let call = 0
+    const pendingSweep = Promise.withResolvers<LegacySweepResult>()
+    await openIntegrations({
+      status: async () => status,
+      copyText: async () => {},
+      sweepLegacySkillCopies: () => {
+        call += 1
+        if (call === 1) {
+          return Promise.reject(
+            new Error(
+              "Error invoking remote method 'integrations:sweep-legacy-skill-copies': Error: the shared .agents copy is not installed yet",
+            ),
+          )
+        }
+        if (call === 2) {
+          return Promise.reject(
+            new Error(
+              "Error invoking remote method 'integrations:sweep-legacy-skill-copies': Error: EACCES: permission denied",
+            ),
+          )
+        }
+        if (call === 3) {
+          return pendingSweep.promise
+        }
+        status.legacy = []
+        return Promise.resolve({
+          removed: [cursorCopy],
+          kept: [],
+          failed: [],
+        })
+      },
+    })
+
+    // 1. Initial render shows both legacy copies with count-safe description and LTR paths (TV-2299-03, TV-2299-06)
+    const legacyRow1 = host.querySelector('.set-intg-row[data-agent="legacy"]')
+    expect(legacyRow1).toBeTruthy()
+    expect(legacyRow1!.textContent).toContain('Copies still in place: 2.')
+    expect(legacyRow1!.textContent).toContain(codexCopy.path)
+    expect(legacyRow1!.textContent).toContain(cursorCopy.path)
+    const pathSpans = [...legacyRow1!.querySelectorAll('.set-intg-legacy-item [dir="ltr"]')]
+    expect(pathSpans.map((el) => el.textContent)).toEqual([codexCopy.path, cursorCopy.path])
+
+    // 2a. First attempt rejects with no shared .agents copy: shows dedicated translated line, no Electron IPC wrapper (TV-2299-01)
+    const cleanBtn1 = buttonWithText('Remove old copies', legacyRow1!)!
+    await click(cleanBtn1)
+    const alertNotice1 = host.querySelector('.set-intg-notice[role="alert"]')
+    expect(alertNotice1?.textContent).toBe(
+      'Install the skill into the shared .agents folder first, then remove the old copies.',
+    )
+    expect(alertNotice1?.textContent).not.toContain('Error invoking remote method')
+    expect(cleanBtn1.disabled).toBe(false)
+    expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
+
+    // 2b. Second attempt rejects with another error: shows translated failure line without raw error or IPC wrapper (TV-2299-01)
+    await click(cleanBtn1)
+    const alertNotice2 = host.querySelector('.set-intg-notice[role="alert"]')
+    expect(alertNotice2?.textContent).toBe('Could not remove the old copies.')
+    expect(alertNotice2?.textContent).not.toContain('Error invoking remote method')
+    expect(alertNotice2?.textContent).not.toContain('EACCES')
+    expect(cleanBtn1.disabled).toBe(false)
+    // 3. Second attempt: test busy state while pending, then resolve with mixed kept state (unsafe_link)
+    await act(async () => {
+      cleanBtn1.click()
+      await Promise.resolve()
+    })
+    expect(cleanBtn1.disabled).toBe(true)
+    status.legacy = [cursorCopy]
+    await act(async () => {
+      pendingSweep.resolve({
+        removed: [codexCopy],
+        kept: [{ ...cursorCopy, reason: 'unsafe_link' }],
+        failed: [],
+      })
+      await Promise.resolve()
+    })
+    await flush()
+    expect(cleanBtn1.disabled).toBe(false)
+    const legacyRow2 = host.querySelector('.set-intg-row[data-agent="legacy"]')
+    expect(legacyRow2).toBeTruthy()
+    expect(legacyRow2!.textContent).not.toContain(codexCopy.path)
+    expect(legacyRow2!.textContent).toContain(cursorCopy.path)
+    const keptNotice = host.querySelector('.set-intg-notice[role="status"]')
+    expect(keptNotice?.textContent).toBe(
+      'Old copies removed: 1. Left in place: 1 (behind a symlink).',
+    )
+    expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
+
+    // 4. Fourth attempt removes the last copy: row disappears, notice remains visible outside row & details, and receives focus
+    await click(buttonWithText('Remove old copies', legacyRow2!))
+    expect(host.querySelector('.set-intg-row[data-agent="legacy"]')).toBeNull()
+    const finalNotice = host.querySelector('.set-intg-notice[role="status"]') as HTMLElement | null
+    expect(finalNotice).toBeTruthy()
+    expect(finalNotice!.textContent).toBe(
+      'Old copies removed: 1. Edited by hand and left in place: 0.',
+    )
+    expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
+    expect(document.activeElement).toBe(finalNotice)
+  })
+
+  it('surfaces a resolved partial legacy sweep failure as a single role="alert" notice with counts and recovers on retry (R2-03)', async () => {
+    const codexCopy = {
+      agent: 'codex' as const,
+      label: 'Codex',
+      skillsDir: '/home/u/.codex/skills',
+      path: '/home/u/.codex/skills/genoffice/SKILL.md',
+      ours: true,
+    }
+    const copilotCopy = {
+      agent: 'copilot' as const,
+      label: 'Copilot',
+      skillsDir: '/home/u/.copilot/skills',
+      path: '/home/u/.copilot/skills/genoffice/SKILL.md',
+      ours: true,
+    }
+    const cursorCopy = {
+      agent: 'cursor' as const,
+      label: 'Cursor',
+      skillsDir: '/home/u/.cursor/skills',
+      path: '/home/u/.cursor/skills/genoffice/SKILL.md',
+      ours: false,
+      reason: 'edited' as const,
+    }
+    const geminiCopy = {
+      agent: 'gemini' as const,
+      label: 'Gemini CLI',
+      skillsDir: '/home/u/.gemini/skills',
+      path: '/home/u/.gemini/skills/genoffice/SKILL.md',
+      ours: true,
+    }
+    const status = baseStatus()
+    status.legacy = [codexCopy, copilotCopy, cursorCopy, geminiCopy]
+
+    let call = 0
+    await openIntegrations({
+      status: async () => status,
+      copyText: async () => {},
+      sweepLegacySkillCopies: async () => {
+        call += 1
+        if (call === 1) {
+          status.legacy = [{ ...geminiCopy, ours: false, reason: 'error' }]
+          return {
+            removed: [codexCopy, copilotCopy],
+            kept: [{ ...cursorCopy, reason: 'edited' }],
+            failed: [{ ...geminiCopy, ours: false, reason: 'error' }],
+          }
+        }
+        status.legacy = []
+        return {
+          removed: [geminiCopy],
+          kept: [],
+          failed: [],
+        }
+      },
+    })
+
+    const initialRow = host.querySelector('.set-intg-row[data-agent="legacy"]')
+    expect(initialRow).toBeTruthy()
+    await click(buttonWithText('Remove old copies', initialRow!))
+
+    expect(host.querySelectorAll('.set-intg-notice')).toHaveLength(1)
+    expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
+    const partialAlert = host.querySelector('.set-intg-notice[role="alert"]')
+    expect(partialAlert).toBeTruthy()
+    expect(partialAlert!.textContent).toBe(
+      'Old copies removed: 2. Left in place: 1. Failed to remove: 1.',
+    )
+
+    const rowAfterPartial = host.querySelector('.set-intg-row[data-agent="legacy"]')
+    expect(rowAfterPartial).toBeTruthy()
+    expect(rowAfterPartial!.textContent).not.toContain(codexCopy.path)
+    expect(rowAfterPartial!.textContent).toContain(geminiCopy.path)
+    const retryBtn = buttonWithText('Remove old copies', rowAfterPartial!)!
+    expect(retryBtn).toBeTruthy()
+    expect(retryBtn.disabled).toBe(false)
+
+    await click(retryBtn)
+    expect(host.querySelector('.set-intg-row[data-agent="legacy"]')).toBeNull()
+    expect(host.querySelector('.set-intg-notice[role="alert"]')).toBeNull()
+    expect(host.querySelectorAll('.set-intg-notice')).toHaveLength(1)
+    expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
+    const finalStatus = host.querySelector('.set-intg-notice[role="status"]') as HTMLElement | null
+    expect(finalStatus).toBeTruthy()
+    expect(finalStatus!.textContent).toBe(
+      'Old copies removed: 1. Edited by hand and left in place: 0.',
+    )
+    expect(document.activeElement).toBe(finalStatus)
   })
 
   it('names the bare command once it is on the PATH and runs the app as Node on Windows', () => {

@@ -5,11 +5,14 @@ import {
   agentTarget,
   bundledSkillFrom,
   buildSkillZip,
+  currentSkillInstalled,
   detectAgents,
+  findLegacySkillCopies,
   installSkill,
   LEDGER_KEY,
   ledgerFromSettings,
   readInstallState,
+  sweepLegacySkillCopies,
   uninstallSkill,
   type BundledSkill,
   type SkillLedger,
@@ -34,6 +37,7 @@ import {
   INTEGRATIONS_CHANNELS,
   type AgentId,
   type IntegrationsStatus,
+  type LegacySweepResult,
   type SkillInstallState,
 } from '../shared/integrations-api'
 import type { FoundSkill, RecommendedSkill } from '../shared/found-skill'
@@ -72,8 +76,11 @@ export function registerIntegrationsIpc(
   ipc.handle(INTEGRATIONS_CHANNELS.status, (): IntegrationsStatus => {
     const skill = bundled()
     const l = ledger()
+    const beforeKeys = Object.keys(l).length
     const launcher = join(deps.cliDir, process.platform === 'win32' ? 'genoffice.cmd' : 'genoffice')
     const outcome = inspectCliLink(linkTarget(launcher))
+    const legacy = findLegacySkillCopies(l)
+    if (Object.keys(l).length !== beforeKeys) saveLedger(l)
     return {
       cli: {
         ...outcome,
@@ -85,6 +92,7 @@ export function registerIntegrationsIpc(
       skillVersion: skill.version,
       skillNeedsCli: /^\s+cli:\s*['"]?>=\s*(\d+\.\d+\.\d+)/m.exec(skill.text)?.[1] ?? '',
       agents: detectAgents().map((a) => ({ ...a, state: readInstallState(a.skillsDir, skill, l) })),
+      legacy,
     }
   })
 
@@ -98,10 +106,25 @@ export function registerIntegrationsIpc(
       }
       const l = ledger()
       installSkill(skillsDir, bundled(), l)
+      // the shared `.agents` row replaced the per-tool copies; once it holds our
+      // skill the old ones are stale duplicates, so they go with it
+      if (currentSkillInstalled(l)) sweepLegacySkillCopies(l)
       saveLedger(l)
       return stateOf(skillsDir)
     },
   )
+
+  ipc.handle(INTEGRATIONS_CHANNELS.sweepLegacySkillCopies, (): LegacySweepResult => {
+    const l = ledger()
+    const beforeKeys = Object.keys(l).length
+    // without the current copy the legacy ones are all the user has
+    if (!currentSkillInstalled(l)) {
+      throw new Error('the shared .agents copy is not installed yet')
+    }
+    const sweep = sweepLegacySkillCopies(l)
+    if (sweep.removed.length || Object.keys(l).length !== beforeKeys) saveLedger(l)
+    return sweep
+  })
 
   ipc.handle(INTEGRATIONS_CHANNELS.uninstallSkill, (_e, agentId: AgentId): SkillInstallState => {
     const target = agentTarget(agentId)

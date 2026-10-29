@@ -133,6 +133,13 @@ export const IconBates = () => (
     <path d="M9 5 L7 19 M13 5 L11 19 M6.5 9 L17.5 9 M5.8 14 L16.8 14" />
   </Icon>
 )
+/** Measurement: a ruler with tick marks */
+export const IconMeasure = () => (
+  <Icon>
+    <rect x="3.5" y="9" width="17" height="7" rx="1" />
+    <path d="M7.5 9 V12 M12 9 V13.5 M16.5 9 V12" />
+  </Icon>
+)
 /** Signature panel: a shield with a check mark */
 export const IconSignatures = () => (
   <Icon>
@@ -265,6 +272,14 @@ export const IconInsertPdf = () => (
     <path d="M7.7 4.5 H13.7 L17.2 8 V18.5 A1 1 0 0 1 16.2 19.5 H7.7 A1 1 0 0 1 6.7 18.5 V5.5 A1 1 0 0 1 7.7 4.5 Z" />
     <path d="M13.7 4.5 V8 H17.2" />
     <path d="M11.95 11 V17 M8.95 14 H14.95" />
+  </Icon>
+)
+export const IconReduceSize = () => (
+  <Icon>
+    <path d="M5 9.5 H9.5 V5 M5.5 5.5 L9.5 9.5" />
+    <path d="M19 9.5 H14.5 V5 M18.5 5.5 L14.5 9.5" />
+    <path d="M5 14.5 H9.5 V19 M5.5 18.5 L9.5 14.5" />
+    <path d="M19 14.5 H14.5 V19 M18.5 18.5 L14.5 14.5" />
   </Icon>
 )
 export const IconInsertBlank = () => (

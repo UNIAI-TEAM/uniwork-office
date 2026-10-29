@@ -130,6 +130,7 @@ import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
 import type {
   IntegrationsApi,
   IntegrationsStatus,
+  LegacySweepResult,
   SkillInstallState,
 } from '../shared/integrations-api'
 import type { FoundSkill, RecommendedSkill } from '../shared/found-skill'
@@ -2012,6 +2013,11 @@ const integrationsApi: IntegrationsApi = {
       INTEGRATIONS_CHANNELS.uninstallSkill,
       agentId,
     )) as SkillInstallState
+  },
+  async sweepLegacySkillCopies() {
+    return (await ipcRenderer.invoke(
+      INTEGRATIONS_CHANNELS.sweepLegacySkillCopies,
+    )) as LegacySweepResult
   },
   async pickSkillDir(title) {
     const r: unknown = await ipcRenderer.invoke(INTEGRATIONS_CHANNELS.pickSkillDir, title)
