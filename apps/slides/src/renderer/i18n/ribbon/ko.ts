@@ -196,7 +196,8 @@ export const ko = {
   ribbonIcons: '아이콘',
   ribbonIconsTip: '기본 제공 아이콘 삽입(그림 요소로 래스터화)',
   ribbon3dModel: '3D 모델',
-  ribbon3dModelTip: '3D 모델 삽입(glb/gltf 파일 포함, 캔버스에는 포스터 자리 표시자 표시)',
+  ribbon3dModelTip:
+    '3D 모델 삽입(.glb): 선택하면 회전할 수 있으며 PowerPoint에서도 3D로 유지됩니다',
   ribbonGroupIllustrations: '일러스트레이션',
   ribbonShapes: '도형',
   ribbonShapesTip: '도형 삽입(기본 도형 / 화살표 / 별)',

@@ -15,7 +15,8 @@ import { isSheetRemoved, journalEntriesInRange } from '../edit-journal'
 import type { LazyWorkbookState } from '../univer-state'
 import { createRangeAggregator, type RangeAggregate } from './aggregate'
 import { sessionHasInputEdits } from './cell-read'
-import { rowVisibilityProbe, type WorkbookReadContext } from './workbook-readers'
+import { redactionsOf, rowVisibilityProbe, type WorkbookReadContext } from './workbook-readers'
+import { countWithheldIn } from './redact'
 
 interface ConstantFill {
   readonly startRow: number
@@ -374,6 +375,7 @@ export async function aggregateWorkbookRange(
   options: AggregateRangeOptions = {},
 ): Promise<AggregateRangeOutcome> {
   const aggregator = createRangeAggregator()
+  const redactions = redactionsOf(ctx)
   const tracking = options.hiddenRows !== undefined
   const skipHidden = options.skipFileHiddenRows === true || options.hiddenRows === 'skip'
 
@@ -412,6 +414,12 @@ export async function aggregateWorkbookRange(
         position.column > bounds.endColumn ||
         (skipHidden && demoHidden.has(position.row))
       ) {
+        continue
+      }
+      if (redactions.labelAt(sheet.id, position.row, position.column) !== null) {
+        // Counted, never summed: see addWithheld in ./aggregate.
+        aggregator.addWithheld(1)
+        counted += 1
         continue
       }
       let value = cell.value
@@ -519,6 +527,11 @@ export async function aggregateWorkbookRange(
         ) {
           continue
         }
+        if (redactions.labelAt(sheetId, cell.row, cell.column) !== null) {
+          aggregator.addWithheld(1)
+          counted += 1
+          continue
+        }
         aggregator.add(cell.value)
         counted += 1
         // The sidecar serves the file's cached <v> for formula cells — shared
@@ -543,10 +556,16 @@ export async function aggregateWorkbookRange(
   const dropped = skipHidden ? hiddenRows : new Set<number>()
   // Fills and journal values land after the reads so file-hidden rows are known.
   const fillOverrideCounts = new Map<FillSegment, number>()
+  // overrides on withheld cells, separately: only those shrink the withheld share
+  const withheldOverrideCounts = new Map<FillSegment, number>()
   for (const entry of journalValues.values()) {
     if (dropped.has(entry.row)) continue
     const segment = fillSegmentAt(fillBands, entry.row, entry.column)
-    if (segment) fillOverrideCounts.set(segment, (fillOverrideCounts.get(segment) ?? 0) + 1)
+    if (!segment) continue
+    fillOverrideCounts.set(segment, (fillOverrideCounts.get(segment) ?? 0) + 1)
+    if (redactions.labelAt(sheetId, entry.row, entry.column) !== null) {
+      withheldOverrideCounts.set(segment, (withheldOverrideCounts.get(segment) ?? 0) + 1)
+    }
   }
   for (const band of fillBands) {
     let rowCount = band.endRow - band.startRow + 1
@@ -555,12 +574,31 @@ export async function aggregateWorkbookRange(
       const repetitions =
         rowCount * (segment.endColumn - segment.startColumn + 1) -
         (fillOverrideCounts.get(segment) ?? 0)
-      aggregator.addRepeated(segment.value, repetitions)
+      // A fill band is one value repeated over a rectangle, so the withheld
+      // share is the area intersection rather than a per-cell lookup. The
+      // repetition count is what would otherwise add the reader's own value
+      // into the sum once per row — exactly the leak addWithheld exists to stop.
+      const withheldHere = Math.min(
+        repetitions,
+        countWithheldIn(redactions.marksFor(sheetId), {
+          startRow: Math.max(band.startRow, clamped.startRow),
+          endRow: Math.min(band.endRow, clamped.endRow),
+          startColumn: Math.max(segment.startColumn, clamped.startColumn),
+          endColumn: Math.min(segment.endColumn, clamped.endColumn),
+        }) - (withheldOverrideCounts.get(segment) ?? 0),
+      )
+      aggregator.addWithheld(Math.max(0, withheldHere))
+      aggregator.addRepeated(segment.value, repetitions - Math.max(0, withheldHere))
       counted += repetitions
     }
   }
-  for (const { row, value } of journalValues.values()) {
+  for (const { row, column, value } of journalValues.values()) {
     if (dropped.has(row)) continue
+    if (redactions.labelAt(sheetId, row, column) !== null) {
+      aggregator.addWithheld(1)
+      counted += 1
+      continue
+    }
     aggregator.add(value)
     counted += 1
   }

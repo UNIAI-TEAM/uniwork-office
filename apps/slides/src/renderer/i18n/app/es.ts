@@ -66,7 +66,7 @@ export const es = {
   appStatusVideoInserted: 'Video insertado (incrustado en el .pptx; se reproduce en PowerPoint)',
   appStatusAudioInserted: 'Audio insertado (incrustado en el .pptx)',
   appStatusModel3dInserted:
-    'Modelo 3D incrustado (el lienzo muestra un marcador de posición; el archivo del modelo se guarda en el .pptx)',
+    'Modelo 3D insertado: selecciónelo para girarlo (PowerPoint también lo muestra en 3D)',
   appStatusRecordingEmpty: 'La grabación está vacía; no se insertó nada',
   appStatusRecordingInserted:
     'Grabación de pantalla insertada en la diapositiva actual (webm incrustado)',

@@ -62,7 +62,7 @@ export const ar = {
   appStatusVideoInserted: 'تم إدراج الفيديو (مضمّن في ملف pptx؛ يمكن تشغيله في PowerPoint)',
   appStatusAudioInserted: 'تم إدراج الصوت (مضمّن في ملف pptx)',
   appStatusModel3dInserted:
-    'تم تضمين النموذج ثلاثي الأبعاد (تعرض اللوحة عنصرًا نائبًا؛ تم حفظ ملف النموذج في pptx)',
+    'تم إدراج النموذج ثلاثي الأبعاد: حدده لتدويره (يعرضه PowerPoint ثلاثي الأبعاد أيضًا)',
   appStatusRecordingEmpty: 'التسجيل فارغ؛ لم يتم إدراج أي شيء',
   appStatusRecordingInserted: 'تم إدراج تسجيل الشاشة في الشريحة الحالية (webm مضمّن)',
   appStatusRecording: 'جارٍ تسجيل الشاشة… انقر فوق «تسجيل الشاشة» مرة أخرى للإيقاف والإدراج',

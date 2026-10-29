@@ -4,6 +4,9 @@
  * Functions take the ActionCtx built fresh per call.
  */
 import type { ActionCtx } from './action-context'
+import { mergeSlideUpdate } from '../shared/slide-update'
+import { recordedSlides } from './narration/encode'
+import type { NarrationTake } from './narration/use-recording'
 import type { CustomShow } from './slideshow-utils'
 import { t } from './i18n/locale'
 
@@ -88,6 +91,55 @@ export async function saveRehearseTimings(ctx: ActionCtx): Promise<void> {
   }
 }
 
+export function startRecordShow(ctx: ActionCtx, fromStart: boolean): void {
+  if (ctx.slides.length === 0 || ctx.slideShow || ctx.presenter) return
+  dropShowCurtain()
+  ctx.setEditing(null)
+  ctx.setCtxMenu(null)
+  const first = ctx.slides.findIndex((s) => !s.hidden)
+  ctx.setSlideShow({ startAt: fromStart ? Math.max(0, first) : ctx.current, record: true })
+}
+
+/** Recording ended: once the microphone stops, prompt "keep the recording?" */
+export function onRecordDone(ctx: ActionCtx, take: Promise<NarrationTake | null>): void {
+  void take.then((recorded) => {
+    if (recorded && recorded.endMs > 0) ctx.setPendingRecording(recorded)
+  })
+}
+
+/** Status bar text key after saving narration: one slide gets the singular form (matches openedStatusKey). */
+export function recordSavedStatusKey(
+  slideCount: number,
+): 'appStatusRecordSaved' | 'appStatusRecordSavedOne' {
+  return slideCount === 1 ? 'appStatusRecordSavedOne' : 'appStatusRecordSaved'
+}
+
+/** Keep the recording: each recorded slide gets its narration and its time as advance time */
+export async function saveRecording(ctx: ActionCtx): Promise<void> {
+  const take = ctx.pendingRecording
+  if (!take) return
+  ctx.setPendingRecording(null)
+  try {
+    const slides = await recordedSlides(take.audio, take.marks, take.endMs)
+    const update = slides.length > 0 ? await window.slidesApi.saveRecording({ slides }) : null
+    if (!update) throw new Error('the recording was not saved')
+    ctx.setSlides((current) => mergeSlideUpdate(current, update))
+    ctx.setDirty(true)
+    ctx.setStatus(t(recordSavedStatusKey(slides.length), { count: slides.length }))
+  } catch {
+    ctx.setStatus(t('appStatusRecordFailed'))
+  }
+}
+
+export async function clearNarration(ctx: ActionCtx, all: boolean): Promise<void> {
+  const indexes = all ? ctx.slides.map((_, i) => i) : [ctx.current]
+  const update = await window.slidesApi.clearNarration(indexes)
+  if (!update) return
+  ctx.setSlides((current) => mergeSlideUpdate(current, update))
+  ctx.setDirty(true)
+  ctx.setStatus(t('appStatusNarrationCleared'))
+}
+
 /** Presenter view (single-window version, entry aligned with the show) */
 export function startPresenterView(ctx: ActionCtx, fromStart: boolean): void {
   if (ctx.slides.length === 0 || ctx.slideShow || ctx.presenter) return
@@ -120,7 +172,7 @@ export async function setSlidesHidden(
   if (!sel.length) return
   const r = await window.slidesApi.setSlidesHidden({ slideIndexes: sel, hidden })
   if (!r) return
-  ctx.setSlides(r)
+  ctx.setSlides((current) => mergeSlideUpdate(current, r))
   ctx.setDirty(true)
   if (sel.length === 1) {
     const page = sel[0]! + 1

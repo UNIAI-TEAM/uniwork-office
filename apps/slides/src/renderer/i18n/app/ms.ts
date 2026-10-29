@@ -66,7 +66,7 @@ export const ms = {
     'Video diselitkan (dibenamkan dalam .pptx; boleh dimainkan dalam PowerPoint)',
   appStatusAudioInserted: 'Audio diselitkan (dibenamkan dalam .pptx)',
   appStatusModel3dInserted:
-    'Model 3D dibenamkan (kanvas memaparkan ruang letak; fail model disimpan dalam .pptx)',
+    'Model 3D disisipkan: pilih untuk memutarnya (PowerPoint juga memaparkannya dalam 3D)',
   appStatusRecordingEmpty: 'Rakaman kosong; tiada apa-apa diselitkan',
   appStatusRecordingInserted: 'Rakaman skrin diselitkan pada slaid semasa (webm dibenamkan)',
   appStatusRecording:

@@ -191,7 +191,7 @@ export const th = {
   ribbonIcons: 'ไอคอน',
   ribbonIconsTip: 'แทรกไอคอนในตัว (แรสเตอร์เป็นองค์ประกอบรูปภาพ)',
   ribbon3dModel: 'โมเดล 3D',
-  ribbon3dModelTip: 'แทรกโมเดล 3D (ฝังไฟล์ glb/gltf ผืนผ้าใบแสดงตัวแทนโปสเตอร์)',
+  ribbon3dModelTip: 'แทรกโมเดล 3 มิติ (.glb): เลือกเพื่อหมุน; PowerPoint ยังคงแสดงเป็น 3 มิติ',
   ribbonGroupIllustrations: 'ภาพประกอบ',
   ribbonShapes: 'รูปร่าง',
   ribbonShapesTip: 'แทรกรูปร่าง (รูปร่างพื้นฐาน / ลูกศร / ดาว)',

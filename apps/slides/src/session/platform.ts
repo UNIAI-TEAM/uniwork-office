@@ -10,15 +10,16 @@ import {
   type RenderSlide,
 } from '@genoffice/pptx-render'
 import type { OpenedPptx } from '@genoffice/pptx-engine'
+import type { Session } from './state'
 
 /** Push notifications from the session to the renderer(s) attached to it. */
 export interface SessionEventSink {
   /** slides:history-changed — the undo/redo button states of every attached client */
   historyChanged(clientIds: number[], state: { canUndo: boolean; canRedo: boolean }): void
-  /** slides:deck-changed — full render state for a session shared by two or more clients */
+  /** slides:deck-changed — render state for a session shared by two or more clients */
   deckChanged(
     clientIds: number[],
-    payload: { slides: RenderSlide[]; size: { cx: number; cy: number } },
+    payload: { slides: RenderSlide[]; size: { cx: number; cy: number }; order?: string[] },
   ): void
 }
 
@@ -40,6 +41,10 @@ export interface SessionPlatform {
   defaultPictureDpi: number
   /** A deck was opened from bytes (open.ts): register its embedded fonts before the first layout */
   deckOpened?(opened: OpenedPptx): void
+  /** Optional lazy media URL resolver (desktop: genoffice-slide-media:// scheme; web: undefined, falls back to data: URLs). */
+  mediaUrl?(opened: OpenedPptx, mediaRef: string, slidePath?: string): string | undefined
+  /** Optional media source pruning hook run when history settles (desktop: pruneMediaSources). */
+  pruneMedia?(session: Session): void
 }
 
 const platform: SessionPlatform = {

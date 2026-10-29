@@ -10,16 +10,18 @@ import type {
   AddInkOp,
   AddMediaBytesOp,
   AddMediaResult,
+  AddModel3dOp,
   EditBackgroundOp,
   EditFillImageOp,
   EditPictureOpacityOp,
   EditPictureSrcRectOp,
   ReplacePictureBytesOp,
+  SetModel3dViewOp,
 } from '../../shared/ipc'
 import { base64ToBytes, bytesToBase64 } from '../bytes'
 import type { HandlerContext, PickedFile } from '../host-io'
 import { sessionPlatform } from '../platform'
-import { buildAllRenderSlides, rebuildSlide } from '../render'
+import { buildSlideUpdate, rebuildSlide } from '../render'
 import { pushHistory, sessions, type Session } from '../state'
 import { journaledTxn, sessionTxn } from '../txn'
 
@@ -310,6 +312,7 @@ export const pictureMediaHandlers = {
     const session = sessions.get(ctx.clientId)
     if (!session) return null
     const slides = session.opened.deck.slides
+    const before = slides.map((s) => s.path)
     const targets = op.slideIndex === -1 ? slides : [slides[op.slideIndex]].filter(Boolean)
     if (targets.length === 0) return null
 
@@ -379,7 +382,11 @@ export const pictureMediaHandlers = {
       }
     }
     session.fitWidthPx = op.fitWidthPx
-    return buildAllRenderSlides(session.opened, op.fitWidthPx)
+    return buildSlideUpdate(
+      session,
+      before,
+      targets.map((s) => slides.indexOf(s)),
+    )
   },
 
   // Freehand ink stroke commit: one transparent PNG picture element per stroke (cNvPr name has
@@ -492,41 +499,70 @@ export const pictureMediaHandlers = {
     })
   },
 
-  // 3D model (simplified): glb embed + poster placeholder image
-  'slides:insert-model3d': async (ctx: HandlerContext, slideIndex: number, fitWidthPx: number) => {
-    const session = sessions.get(ctx.clientId)
-    if (!session || !session.opened.deck.slides[slideIndex]) return null
+  'slides:pick-model3d': async (ctx: HandlerContext) => {
     const file = await ctx.host.pickMedia('model3d')
     if (!file) return null
-    const { bytes, ext } = file
+    return { name: file.name, bytes: new Uint8Array(file.bytes) }
+  },
 
-    // Dark-gray fallback when the host has no poster frame
-    const poster = await ctx.host.readMediaPoster(file, 'model3d')
-
+  'slides:add-model3d': (ctx: HandlerContext, op: AddModel3dOp) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session || !session.opened.deck.slides[op.slideIndex]) return null
     const deckSize = session.opened.deck.size
     const cy = Math.round(deckSize.cy * 0.5)
-    const cx = cy
+    const cx = Math.round(cy * op.aspect)
     const txn = sessionTxn(session, {
       ops: [
         {
           op: 'addModel3d',
-          target: { slide: slideIndex },
-          bytes: new Uint8Array(bytes),
-          ext,
-          ...(poster ? { poster } : {}),
+          target: { slide: op.slideIndex },
+          bytes: op.bytes,
+          ext: 'glb',
+          ...(op.posterBase64
+            ? {
+                poster: {
+                  bytes: base64ToBytes(op.posterBase64),
+                  ext: 'png',
+                },
+              }
+            : {}),
           offset: {
             x: Math.round((deckSize.cx - cx) / 2),
             y: Math.round((deckSize.cy - cy) / 2),
             cx,
             cy,
           },
-          name: file.name,
+          name: op.name,
         },
       ],
     })
     if (!txn) return null
-    session.fitWidthPx = fitWidthPx
-    const rebuilt = rebuildSlide(session, slideIndex)
+    session.fitWidthPx = op.fitWidthPx
+    const rebuilt = rebuildSlide(session, op.slideIndex)
     return rebuilt ? { slide: rebuilt, sourceId: txn.records![0]!.created![0]! } : null
+  },
+
+  'slides:model3d-data': (ctx: HandlerContext, slideIndex: number, sourceId: string) => {
+    const session = sessions.get(ctx.clientId)
+    const el = session?.opened.deck.slides[slideIndex]?.elements.find((x) => x.id === sourceId)
+    const target = el?.type === 'picture' ? el.model3d?.target : undefined
+    const bytes = target ? session!.opened.archive.readBytes(target) : undefined
+    return bytes ? new Uint8Array(bytes) : null
+  },
+
+  'slides:set-model3d-view': (ctx: HandlerContext, op: SetModel3dViewOp) => {
+    const session = sessions.get(ctx.clientId)
+    if (!session?.opened.deck.slides[op.slideIndex]) return null
+    const r = sessionTxn(session, {
+      ops: [
+        {
+          op: 'setModel3dView',
+          target: { slide: op.slideIndex, el: op.sourceId },
+          ...op.rot,
+          ...(op.posterBase64 ? { poster: op.posterBase64, posterExt: 'png' } : {}),
+        },
+      ],
+    })
+    return r ? rebuildSlide(session, op.slideIndex) : null
   },
 }

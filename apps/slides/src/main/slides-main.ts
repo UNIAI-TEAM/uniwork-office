@@ -67,6 +67,7 @@ import {
   recoveryEpochKey,
 } from '@genoffice/electron-utils'
 import { isDraftPreviewPath } from '@genoffice/electron-utils/draft-preview'
+import { atomicWriteVia } from '@genoffice/electron-utils/atomic-write'
 import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
 import { answerUniworkCloudStatusOff } from '@genoffice/electron-utils/uniwork-cloud-status'
 import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides'
@@ -114,6 +115,7 @@ import {
   markMetaDirty,
   resetFontMetrics,
   pushHistory,
+  readSlideMedia,
   runtime,
   scheduleDeckBroadcast,
   scheduleHistoryNotify,
@@ -330,6 +332,16 @@ function syncAttachedPaths(session: Session, path: string): void {
 }
 
 /**
+ * savePptxToFile streams into whatever path it is given and truncates it
+ * first, so the deck goes out through a sibling temp that is renamed over
+ * `filePath` only once the stream has finished: a save that dies mid-way —
+ * the app killed, power lost — leaves the previous deck on disk, not a
+ * cut-off one.
+ */
+const writeDeckFile = (opened: OpenedPptx, filePath: string) =>
+  atomicWriteVia(filePath, (tmp) => savePptxToFile(opened, tmp))
+
+/**
  * MCP save: write a visible session's deck to an explicit path with no dialogs
  * — the slides:save-as pipeline minus the dialog. Overwrite policy is the
  * caller's (the MCP tool layer guards clobbering); this commits the save side
@@ -349,7 +361,7 @@ export async function saveSessionDeckTo(session: Session, filePath: string): Pro
   // yet (the dialog-driven paths always land in an existing folder)
   await mkdir(dirname(filePath), { recursive: true })
   const metaRevAtSave = session.metaRev ?? 0
-  await savePptxToFile(session.opened, filePath)
+  await writeDeckFile(session.opened, filePath)
   session.path = filePath
   autosaveBackoff.delete(filePath)
   // mirror slides:save-as: a saved deck is no longer an unsaved untitled draft
@@ -546,7 +558,7 @@ setInterval(() => {
       const ticket = recoveryClearEpochs.begin(backoffKey)
       try {
         await mkdir(dirname(target), { recursive: true })
-        await savePptxToFile(session.opened, target)
+        await writeDeckFile(session.opened, target)
         if (recoveryClearEpochs.cleared(ticket)) {
           await rm(target, { force: true }).catch(() => {})
           continue
@@ -1019,6 +1031,18 @@ export function registerSlidesIpc(): void {
   // Screen recording: source dispatch for the renderer's navigator.mediaDevices.getDisplayMedia.
   // macOS prefers the system picker (with its permission flow), falling back to the first screen.
   void app.whenReady().then(() => {
+    electronSession.defaultSession.protocol.handle('genoffice-slide-media', (request) => {
+      const media = readSlideMedia(request.url)
+      if (!media) return new Response(null, { status: 404 })
+      return new Response(media.body as BodyInit, {
+        headers: {
+          'Content-Type': media.mime,
+          'Content-Length': String(media.body.byteLength),
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store',
+        },
+      })
+    })
     try {
       electronSession.defaultSession.setDisplayMediaRequestHandler(
         (_request, callback) => {

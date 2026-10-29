@@ -90,6 +90,7 @@ function saveRequest(): Record<string, unknown> {
     themeState: null,
     workbookProtectionState: null,
     protectedRangeStates: [],
+    redactionStates: [],
   }
 }
 

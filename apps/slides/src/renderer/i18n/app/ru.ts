@@ -65,7 +65,7 @@ export const ru = {
   appStatusVideoInserted: 'Видео вставлено (внедрено в .pptx; воспроизводится в PowerPoint)',
   appStatusAudioInserted: 'Звук вставлен (внедрен в .pptx)',
   appStatusModel3dInserted:
-    'Трехмерная модель внедрена (на холсте отображается заполнитель; файл модели сохранен в .pptx)',
+    '3D-модель вставлена: выделите ее, чтобы повернуть (PowerPoint тоже показывает ее в 3D)',
   appStatusRecordingEmpty: 'Запись пуста; ничего не вставлено',
   appStatusRecordingInserted: 'Запись экрана вставлена на текущий слайд (внедрен webm)',
   appStatusRecording:

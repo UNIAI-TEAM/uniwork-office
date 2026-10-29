@@ -2,6 +2,7 @@ import type { AgentSkill } from '@genoffice/agent-core'
 import { cap } from '../capabilities'
 import basePrompt from './prompts/base.md?raw'
 import { verifySheetsResponse } from './response-verify'
+import { placeholderInstruction } from './redact'
 import {
   WORKBOOK_TOOLS,
   buildWorkbookContext,
@@ -36,7 +37,17 @@ export function createWorkbookSkill(deps: SheetsSkillDeps): AgentSkill {
     id: 'sheets',
     // live: the loop re-reads both before every request
     get systemPrompt() {
-      return basePromptFor(createDocument())
+      // The base prompt is imported raw and therefore fixed at build time, so
+      // the placeholder section is appended here: which labels exist is a
+      // property of the open workbook, and a model told about a placeholder
+      // that is not there — or not told about one that is — misreads the sheet.
+      const index = deps.redactions?.()
+      const labels = index?.isEmpty
+        ? []
+        : (deps.getActiveSheetInfo().sheets.flatMap((sheet) => index?.labelsFor(sheet.id) ?? []) ??
+          [])
+      const base = basePromptFor(createDocument())
+      return labels.length > 0 ? `${base}\n\n${placeholderInstruction(labels)}` : base
     },
     get tools() {
       return workbookToolsFor(createDocument())

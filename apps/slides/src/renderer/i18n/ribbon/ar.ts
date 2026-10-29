@@ -191,7 +191,8 @@ export const ar = {
   ribbonIcons: 'أيقونات',
   ribbonIconsTip: 'إدراج أيقونة مضمنة (تُحوَّل إلى صورة نقطية)',
   ribbon3dModel: 'نماذج ثلاثية الأبعاد',
-  ribbon3dModelTip: 'إدراج نموذج ثلاثي الأبعاد (يضمّن ملف glb/gltf؛ تعرض اللوحة عنصرًا نائبًا)',
+  ribbon3dModelTip:
+    'إدراج نموذج ثلاثي الأبعاد (.glb): حدده لتدويره؛ يحتفظ به PowerPoint ثلاثي الأبعاد',
   ribbonGroupIllustrations: 'رسومات توضيحية',
   ribbonShapes: 'أشكال',
   ribbonShapesTip: 'إدراج شكل (أشكال أساسية / أسهم / نجوم)',

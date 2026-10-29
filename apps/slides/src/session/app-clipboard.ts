@@ -30,7 +30,10 @@ export function isElementClipboardToken(value: unknown): value is string {
 }
 
 /** The immediately preceding slide paste per client, so the paste-options floater can redo it with another mode. */
-export const lastSlidePaste = new Map<number, { afterIndex: number; undoLen: number }>()
+export const lastSlidePaste = new Map<
+  number,
+  { afterIndex: number; undoLen: number; changed: number[] }
+>()
 
 /** Drop per-client clipboard state when a client goes away. */
 export function forgetClient(clientId: number): void {

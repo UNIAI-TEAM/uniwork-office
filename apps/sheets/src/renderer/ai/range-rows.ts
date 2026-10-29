@@ -11,7 +11,8 @@ import type { CellScalar } from '@genoffice/xlsx-gateway/domain/workbook.types'
 import { plainCellValue } from '../edit-journal'
 import { fillSegmentAt, prepareLazyRange } from './aggregate-range'
 import { sessionHasInputEdits } from './cell-read'
-import { rowVisibilityProbe, type WorkbookReadContext } from './workbook-readers'
+import { placeholderSource } from './redact'
+import { redactionsOf, rowVisibilityProbe, type WorkbookReadContext } from './workbook-readers'
 
 export interface RangeRow {
   readonly row: number
@@ -23,6 +24,8 @@ export interface RangeRow {
   readonly cached?: boolean[]
   /** per column: formula text with a leading '=', when the cell holds one */
   readonly formulas?: (string | undefined)[]
+  /** per column: the cell is withheld from the model */
+  readonly withheld?: boolean[]
 }
 
 export type RangeRowsOutcome =
@@ -46,6 +49,7 @@ export async function collectWorkbookRows(
 ): Promise<RangeRowsOutcome> {
   const width = bounds.endColumn - bounds.startColumn + 1
   const state = ctx.lazyWorkbookRef.current
+  const redactions = redactionsOf(ctx)
   const workbook = ctx.univerRef.current?.univerAPI.getActiveWorkbook()
   const activeSheetId = workbook?.getActiveSheet()?.getSheetId()
   if (!state) {
@@ -68,7 +72,16 @@ export async function collectWorkbookRows(
     for (let row = bounds.startRow; row <= bounds.endRow; row += 1) {
       const values: CellScalar[] = []
       let formulas: (string | undefined)[] | undefined
+      let withheld: boolean[] | undefined
       for (let column = bounds.startColumn; column <= bounds.endColumn; column += 1) {
+        const colIdx = column - bounds.startColumn
+        const label = redactions.labelAt(sheet.id, row, column)
+        if (label !== null) {
+          values.push(placeholderSource(label))
+          withheld ??= new Array<boolean>(width).fill(false)
+          withheld[colIdx] = true
+          continue
+        }
         const address = formatAddress(row, column)
         const cell = sheet.cells[address]
         let value: CellScalar = cell?.value ?? null
@@ -88,7 +101,7 @@ export async function collectWorkbookRows(
         values.push(value)
         if (cell?.formula) {
           formulas ??= new Array<string | undefined>(width).fill(undefined)
-          formulas[column - bounds.startColumn] = withEquals(cell.formula)
+          formulas[colIdx] = withEquals(cell.formula)
         }
       }
       rows.push({
@@ -96,6 +109,7 @@ export async function collectWorkbookRows(
         hidden: probe?.(row) != null,
         values,
         ...(formulas ? { formulas } : {}),
+        ...(withheld ? { withheld } : {}),
       })
     }
     return { ok: true, rows }
@@ -205,13 +219,32 @@ export async function collectWorkbookRows(
   // Rows past the data extent are dropped; columns past it read as empty.
   const rows: RangeRow[] = values.map((rowValues, offset) => {
     const row = clamped.startRow + offset
-    const rowFormulas = formulaTexts.get(row)
+    const rowCached = cached[offset]!
+    let rowFormulas = formulaTexts.get(row)
+    let withheld: boolean[] | undefined
+    if (!redactions.isEmpty) {
+      for (let colIdx = 0; colIdx < width; colIdx += 1) {
+        const column = clamped.startColumn + colIdx
+        const label = redactions.labelAt(sheetId, row, column)
+        if (label !== null) {
+          rowValues[colIdx] = placeholderSource(label)
+          rowCached[colIdx] = false
+          if (rowFormulas) rowFormulas[colIdx] = undefined
+          withheld ??= new Array<boolean>(width).fill(false)
+          withheld[colIdx] = true
+        }
+      }
+      if (rowFormulas && rowFormulas.every((f) => f === undefined)) {
+        rowFormulas = undefined
+      }
+    }
     return {
       row,
       hidden: fileHidden.has(row) || probe?.(row) != null,
       values: rowValues,
-      cached: cached[offset]!,
+      cached: rowCached,
       ...(rowFormulas ? { formulas: rowFormulas } : {}),
+      ...(withheld ? { withheld } : {}),
     }
   })
   return { ok: true, rows, staleInputs: sessionHasInputEdits(state.editJournal) }

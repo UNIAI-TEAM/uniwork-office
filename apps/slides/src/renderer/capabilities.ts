@@ -19,6 +19,7 @@
  * | fontDownload     | font catalog download and the missing-font auto-download                         |
  * | fontInstallLocal | install a local font file                                                        |
  * | model3d          | Insert > 3D model                                                                |
+ * | slideRecord      | Slide Show > Record narration                                                    |
  * | presenterWindow  | the presenter view's second-screen audience window and swap button               |
  * | desktopOpen      | the Open-in-app action of the "use the app" notes (on with the host's grant)     |
  * | errorLabel      | the "Error:" prefix of the AI panel's inline error (web errors are full sentences) |
@@ -41,6 +42,7 @@ export type SlidesCapability =
   | 'fontDownload'
   | 'fontInstallLocal'
   | 'model3d'
+  | 'slideRecord'
   | 'presenterWindow'
   | 'desktopOpen'
   | 'errorLabel'

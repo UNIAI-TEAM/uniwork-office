@@ -314,6 +314,7 @@ export async function traceWorkbookPrecedents(
       (bounds.endRow - bounds.startRow + 1) * (bounds.endColumn - bounds.startColumn + 1)
     const samples = await sampleCells(ctx, targetSheet.id, bounds, MAX_SAMPLE_CELLS)
     refs.push({
+      sheetId: targetSheet.id,
       label: rectLabel(targetSheet, bounds, targetSheet.id === sheet.id),
       cellCount,
       samples,

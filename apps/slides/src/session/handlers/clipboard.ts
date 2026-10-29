@@ -19,12 +19,17 @@ import {
 } from '../app-clipboard'
 import { bytesToBase64 } from '../bytes'
 import type { HandlerContext } from '../host-io'
-import { buildAllRenderSlides, rebuildSlide } from '../render'
+import { buildSlideUpdate, rebuildSlide } from '../render'
 import { markMetaDirty, pushHistory, restoreSnapshot, sessions, type Session } from '../state'
 import { journaledTxn, sessionTxn } from '../txn'
 
 // Several copied slides paste in order; 'picture' mode stacks every bitmap on the anchor slide.
-const performSlidePaste = (session: Session, op: PasteSlideOp): PasteSlideResult | null => {
+const performSlidePaste = (
+  session: Session,
+  op: PasteSlideOp,
+  before = session.opened.deck.slides.map((s) => s.path),
+  restored: number[] = [],
+): PasteSlideResult | null => {
   const clip = appClipboard.slide
   if (!clip) return null
   const picture = op.mode === 'picture'
@@ -46,9 +51,13 @@ const performSlidePaste = (session: Session, op: PasteSlideOp): PasteSlideResult
   // repaste-slide re-runs this after restoring a snapshot that cleared the flag.
   markMetaDirty(session)
   const created = r.records!.flatMap((x) => x.created ?? [])
+  const { index } = rec.after as { index: number }
   return {
-    slides: buildAllRenderSlides(session.opened, op.fitWidthPx),
-    index: (rec.after as { index: number }).index,
+    ...buildSlideUpdate(session, before, [
+      ...restored,
+      ...Array.from({ length: picture ? 1 : bundles.length }, (_, j) => index + j),
+    ]),
+    index,
     count: picture ? 0 : bundles.length,
     ...(created.length ? { sourceIds: created } : {}),
   }
@@ -165,6 +174,7 @@ export const clipboardHandlers = {
     lastSlidePaste.set(ctx.clientId, {
       afterIndex: op.afterIndex,
       undoLen: session.undoStack.length,
+      changed: op.mode === 'picture' ? [r.index] : [],
     })
     return r
   },
@@ -178,18 +188,25 @@ export const clipboardHandlers = {
     if (session.undoStack.length !== rec.undoLen) return null
     const snap = session.undoStack.pop()
     if (!snap) return null
+    const before = session.opened.deck.slides.map((s) => s.path)
     restoreSnapshot(session, snap)
     pushHistory(session)
-    const r = performSlidePaste(session, {
-      afterIndex: rec.afterIndex,
-      fitWidthPx: op.fitWidthPx,
-      mode: op.mode,
-    })
+    const r = performSlidePaste(
+      session,
+      {
+        afterIndex: rec.afterIndex,
+        fitWidthPx: op.fitWidthPx,
+        mode: op.mode,
+      },
+      before,
+      rec.changed,
+    )
     if (!r) {
       session.undoStack.pop()
       return null
     }
     rec.undoLen = session.undoStack.length
+    rec.changed = op.mode === 'picture' ? [r.index] : []
     return r
   },
 }

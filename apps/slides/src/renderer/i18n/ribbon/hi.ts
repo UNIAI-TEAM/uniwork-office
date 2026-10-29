@@ -190,8 +190,7 @@ export const hi = {
   ribbonIcons: 'आइकन',
   ribbonIconsTip: 'अंतर्निहित आइकन सम्मिलित करें (चित्र के रूप में रास्टराइज़ किया गया)',
   ribbon3dModel: '3D मॉडल',
-  ribbon3dModelTip:
-    '3D मॉडल सम्मिलित करें (glb/gltf एम्बेड करता है; कैनवास पोस्टर प्लेसहोल्डर दिखाता है)',
+  ribbon3dModelTip: '3D मॉडल डालें (.glb): घुमाने के लिए इसे चुनें; PowerPoint इसे 3D में रखता है',
   ribbonGroupIllustrations: 'चित्रण',
   ribbonShapes: 'आकृतियाँ',
   ribbonShapesTip: 'आकृति सम्मिलित करें (मूल आकृतियाँ / तीर / तारे)',
