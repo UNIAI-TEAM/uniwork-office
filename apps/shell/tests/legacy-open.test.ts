@@ -1016,7 +1016,7 @@ describe('ODF pure-JS fallback when LibreOffice converter is missing (Slice 2a)'
     createLegacyOpener(hWriter.deps).open(writerPath)
     await vi.waitFor(() => expect(hWriter.opened).toHaveLength(1))
     expect(hWriter.notices).toEqual([
-      'Some parts of “native-writer.odt” could not be carried over: comments (1), footnotes (1), headers and footers (2), text boxes (1, kept as plain text), tracked changes (2), unsupported content (1). To convert it in full, reinstall the app and open the file again.',
+      'Some parts of “native-writer.odt” could not be carried over: comments (1), footnotes (1), headers and footers (2), text boxes (1, kept as plain text), tracked changes (2). To convert it in full, reinstall the app and open the file again.',
     ])
   })
 
