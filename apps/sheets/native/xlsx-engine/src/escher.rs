@@ -62,20 +62,32 @@ fn children(data: &[u8]) -> Vec<Node<'_>> {
     while pos + 8 <= data.len() {
         let ver_inst = u16le(data, pos);
         let kind = u16le(data, pos + 2);
-        let len = u32le(data, pos + 4) as usize;
+        let len = u32le(data, pos + 4);
         if kind == 0 {
             break;
         }
-        let end = (pos + 8 + len).min(data.len());
+        let start = pos + 8;
+        let end = record_end(start, len, data.len());
         out.push(Node {
             ver_inst,
             kind,
-            data: &data[pos + 8..end],
+            data: &data[start..end],
         });
-        pos += 8 + len;
+        pos = end;
     }
     out
 }
+
+/// End of a record's body, clamped to the stream. The sum is done in u64 so a
+/// declared length near `u32::MAX` cannot wrap a 32-bit `usize` (wasm32) into
+/// a small value and panic on the slice; the wasm reactor aborts on panic.
+fn record_end(start: usize, len: u32, limit: usize) -> usize {
+    (start as u64 + u64::from(len)).min(limit as u64) as usize
+}
+
+/// Real drawing trees nest four or five containers deep; anything deeper is a
+/// hostile file, and each level costs only eight bytes of input.
+const MAX_DEPTH: usize = 16;
 
 fn is_container(ver_inst: u16) -> bool {
     ver_inst & 0xF == 0xF
@@ -96,7 +108,7 @@ const PROP_BLIP_PIB: u16 = 0x0104;
 /// each carrying one image after a fixed header and an optional name.
 pub(crate) fn parse_blips(dgg: &[u8]) -> Vec<Blip> {
     let mut out = Vec::new();
-    for store in containers_of(dgg, BSTORE_CONTAINER) {
+    for store in containers_of(dgg, BSTORE_CONTAINER, 0) {
         for entry in children(store.data) {
             if entry.kind != BSE || entry.data.len() < 36 {
                 continue;
@@ -129,15 +141,15 @@ pub(crate) fn parse_blips(dgg: &[u8]) -> Vec<Blip> {
 }
 
 /// Every container of `kind` anywhere in the tree, outermost first.
-fn containers_of<'a>(data: &'a [u8], kind: u16) -> Vec<Node<'a>> {
+fn containers_of<'a>(data: &'a [u8], kind: u16, depth: usize) -> Vec<Node<'a>> {
     let mut out = Vec::new();
     for node in children(data) {
         if node.kind == kind {
             out.push(node);
             continue;
         }
-        if is_container(node.ver_inst) {
-            out.extend(containers_of(node.data, kind));
+        if is_container(node.ver_inst) && depth < MAX_DEPTH {
+            out.extend(containers_of(node.data, kind, depth + 1));
         }
     }
     out
@@ -148,12 +160,12 @@ fn containers_of<'a>(data: &'a [u8], kind: u16) -> Vec<Node<'a>> {
 pub(crate) fn parse_pictures(drawing: &[u8]) -> Vec<Picture> {
     let mut out = Vec::new();
     for node in children(drawing) {
-        visit(&node, &mut out);
+        visit(&node, 0, &mut out);
     }
     out
 }
 
-fn visit(node: &Node<'_>, out: &mut Vec<Picture>) {
+fn visit(node: &Node<'_>, depth: usize, out: &mut Vec<Picture>) {
     if node.kind == SP_CONTAINER {
         let mut anchor: Option<[u16; 8]> = None;
         let mut blip: Option<u32> = None;
@@ -182,9 +194,9 @@ fn visit(node: &Node<'_>, out: &mut Vec<Picture>) {
         }
         return;
     }
-    if is_container(node.ver_inst) {
+    if is_container(node.ver_inst) && depth < MAX_DEPTH {
         for child in children(node.data) {
-            visit(&child, out);
+            visit(&child, depth + 1, out);
         }
     }
 }
@@ -208,4 +220,64 @@ fn blip_pib(data: &[u8]) -> Option<u32> {
         at += 6;
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn record(ver_inst: u16, kind: u16, len: u32, body: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&ver_inst.to_le_bytes());
+        out.extend_from_slice(&kind.to_le_bytes());
+        out.extend_from_slice(&len.to_le_bytes());
+        out.extend_from_slice(body);
+        out
+    }
+
+    #[test]
+    fn record_end_does_not_wrap_for_a_declared_length_near_u32_max() {
+        // On wasm32 `start + len` in usize would wrap to 4 here; the u64 sum
+        // clamps to the stream instead.
+        assert_eq!(record_end(8, u32::MAX, 100), 100);
+        assert_eq!(record_end(0xFFFF_FFF0, 0x20, 0xFFFF_FFF8), 0xFFFF_FFF8);
+        assert_eq!(record_end(8, 4, 100), 12);
+    }
+
+    #[test]
+    fn children_survives_a_record_declaring_a_length_near_u32_max() {
+        let data = record(0x0, SP_CONTAINER, u32::MAX, &[1, 2, 3]);
+        let nodes = children(&data);
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].data, &[1, 2, 3]);
+        assert!(parse_pictures(&data).is_empty());
+        assert!(parse_blips(&data).is_empty());
+    }
+
+    #[test]
+    fn deeply_nested_containers_return_without_overflowing_the_stack() {
+        // Each container declares a length longer than the rest, so it nests
+        // the remainder: 100 000 levels for 800 KB of input.
+        let mut data = Vec::new();
+        for _ in 0..100_000 {
+            data.extend(record(0xF, 0xF002, u32::MAX, &[]));
+        }
+        assert!(parse_pictures(&data).is_empty());
+
+        let mut store = Vec::new();
+        for _ in 0..100_000 {
+            store.extend(record(0xF, 0xF000, u32::MAX, &[]));
+        }
+        assert!(parse_blips(&store).is_empty());
+    }
+
+    #[test]
+    fn a_bstore_inside_the_depth_cap_is_still_found() {
+        let bse = record(0x2, BSE, 4, &[0; 4]);
+        let mut data = record(0xF, BSTORE_CONTAINER, bse.len() as u32, &bse);
+        for _ in 0..4 {
+            data = record(0xF, 0xF000, data.len() as u32, &data);
+        }
+        assert_eq!(containers_of(&data, BSTORE_CONTAINER, 0).len(), 1);
+    }
 }
