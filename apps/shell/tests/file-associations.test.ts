@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { LAUNCHABLE_EXTS } from '../src/main/launch-paths'
+import { OFFICE_TYPES } from '../src/main/default-app'
 
 const require = createRequire(import.meta.url)
 // Inspect packaging metadata without downloading Electron or compiling OCR
@@ -24,13 +25,10 @@ describe('packaged file associations', () => {
   // declares. A routing entry without a matching declaration means a file the
   // app opens fine can never reach it from Finder/Explorer — the .txt/.json
   // gap this closes.
-  it('advertises every extension the app launches', () => {
-    for (const ext of LAUNCHABLE_EXTS) {
-      const association = config.fileAssociations.find(
-        (entry: { ext: string }) => entry.ext === ext,
-      )
-      expect(association, `no file association declared for .${ext}`).toBeTruthy()
-    }
+  it('keeps LAUNCHABLE_EXTS and electron-builder fileAssociations in 1-to-1 agreement', () => {
+    const declaredExts = config.fileAssociations.map((entry: { ext: string }) => entry.ext)
+    expect(new Set(declaredExts)).toEqual(new Set(LAUNCHABLE_EXTS))
+    expect(declaredExts).toHaveLength(LAUNCHABLE_EXTS.length)
   })
 
   it('gives every association the mimeType the Linux desktop entry needs', () => {
@@ -39,6 +37,94 @@ describe('packaged file associations', () => {
         association.mimeType,
         `.${association.ext} declares no mimeType — the Linux target drops it`,
       ).toBeTruthy()
+    }
+  })
+
+  it('registers the six OpenDocument formats as rank Alternate with plain descriptions and matching Linux MimeType entries', () => {
+    const expectedOdf = [
+      {
+        ext: 'ods',
+        name: 'OpenDocument Spreadsheet',
+        description: 'OpenDocument Spreadsheet',
+        role: 'Editor',
+        rank: 'Alternate',
+        icon: 'xlsx',
+        mimeType: 'application/vnd.oasis.opendocument.spreadsheet',
+      },
+      {
+        ext: 'ots',
+        name: 'OpenDocument Spreadsheet Template',
+        description: 'OpenDocument Spreadsheet Template',
+        role: 'Editor',
+        rank: 'Alternate',
+        icon: 'xlsx',
+        mimeType: 'application/vnd.oasis.opendocument.spreadsheet-template',
+      },
+      {
+        ext: 'odt',
+        name: 'OpenDocument Text',
+        description: 'OpenDocument Text',
+        role: 'Editor',
+        rank: 'Alternate',
+        icon: 'docx',
+        mimeType: 'application/vnd.oasis.opendocument.text',
+      },
+      {
+        ext: 'ott',
+        name: 'OpenDocument Text Template',
+        description: 'OpenDocument Text Template',
+        role: 'Editor',
+        rank: 'Alternate',
+        icon: 'docx',
+        mimeType: 'application/vnd.oasis.opendocument.text-template',
+      },
+      {
+        ext: 'odp',
+        name: 'OpenDocument Presentation',
+        description: 'OpenDocument Presentation',
+        role: 'Editor',
+        rank: 'Alternate',
+        icon: 'pptx',
+        mimeType: 'application/vnd.oasis.opendocument.presentation',
+      },
+      {
+        ext: 'otp',
+        name: 'OpenDocument Presentation Template',
+        description: 'OpenDocument Presentation Template',
+        role: 'Editor',
+        rank: 'Alternate',
+        icon: 'pptx',
+        mimeType: 'application/vnd.oasis.opendocument.presentation-template',
+      },
+    ]
+
+    const repoRoot = resolve(import.meta.dirname, '../../..')
+    const flatpakDesktop = readFileSync(
+      resolve(repoRoot, 'packaging/flatpak/com.genoffice.app.desktop'),
+      'utf8',
+    )
+    const nixRecipe = readFileSync(resolve(repoRoot, 'packaging/nix/genoffice.nix'), 'utf8')
+    const flatpakMetainfo = readFileSync(
+      resolve(repoRoot, 'packaging/flatpak/com.genoffice.app.metainfo.xml'),
+      'utf8',
+    )
+    const flatpakMimes = (flatpakDesktop.match(/^MimeType=(.+)$/m)?.[1] ?? '')
+      .split(';')
+      .filter(Boolean)
+    const nixMimes = (nixRecipe.match(/^\s*MimeType=(.+)$/m)?.[1] ?? '').split(';').filter(Boolean)
+
+    for (const expected of expectedOdf) {
+      expect(LAUNCHABLE_EXTS).toContain(expected.ext)
+      const entry = config.fileAssociations.find(
+        (item: { ext: string }) => item.ext === expected.ext,
+      )
+      expect(entry).toEqual(expected)
+      expect(flatpakMimes).toContain(expected.mimeType)
+      expect(nixMimes).toContain(expected.mimeType)
+      expect(flatpakMetainfo).toContain(`<mediatype type="${expected.mimeType}" />`)
+      expect(OFFICE_TYPES.some((t) => t.ext === expected.ext || t.mime === expected.mimeType)).toBe(
+        false,
+      )
     }
   })
 })

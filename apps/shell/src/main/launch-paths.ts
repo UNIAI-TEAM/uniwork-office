@@ -6,13 +6,19 @@ import { existsSync } from 'node:fs'
 export const LAUNCHABLE_EXTS = [
   'docx',
   'doc',
+  'odt',
+  'ott',
   'xlsx',
   'xlsm',
   'xls',
   'csv',
   'tsv',
+  'ods',
+  'ots',
   'pptx',
   'ppt',
+  'odp',
+  'otp',
   'pdf',
   'md',
   'markdown',
@@ -22,17 +28,7 @@ export const LAUNCHABLE_EXTS = [
   'htm',
 ] as const
 
-/**
- * OpenDocument formats accepted from OS launch argv / second-instance payloads in slice 1.
- * Kept separate from LAUNCHABLE_EXTS until slice 3 declares their packaged fileAssociations
- * (tests/file-associations.test.ts pairs LAUNCHABLE_EXTS with electron-builder.cjs).
- */
-export const ODF_LAUNCH_EXTS = ['odt', 'ott', 'ods', 'ots', 'odp', 'otp'] as const
-
-const SUPPORTED_LAUNCH_RE = new RegExp(
-  `\\.(${[...LAUNCHABLE_EXTS, ...ODF_LAUNCH_EXTS].join('|')})$`,
-  'i',
-)
+const SUPPORTED_LAUNCH_RE = new RegExp(`\\.(${LAUNCHABLE_EXTS.join('|')})$`, 'i')
 const UNSUPPORTED_LAUNCH_RE = /\.(rtf|pps|xlsb|pages|key|numbers)$/i
 
 interface LaunchPayload {

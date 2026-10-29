@@ -36,6 +36,12 @@
     <mediatype type="application/vnd.ms-excel" />
     <mediatype type="text/csv" />
     <mediatype type="text/tab-separated-values" />
+    <mediatype type="application/vnd.oasis.opendocument.spreadsheet" />
+    <mediatype type="application/vnd.oasis.opendocument.spreadsheet-template" />
+    <mediatype type="application/vnd.oasis.opendocument.text" />
+    <mediatype type="application/vnd.oasis.opendocument.text-template" />
+    <mediatype type="application/vnd.oasis.opendocument.presentation" />
+    <mediatype type="application/vnd.oasis.opendocument.presentation-template" />
     <mediatype type="application/pdf" />
     <mediatype type="text/markdown" />
     <mediatype type="text/html" />
