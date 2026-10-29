@@ -67,7 +67,5 @@ export function assertModernSaveTarget(
   ext: 'docx' | 'xlsx' | 'xlsm' | 'pptx',
 ): string {
   if (!LEGACY_EXTENSION_RE.test(chosen)) return chosen
-  throw new Error(
-    `Choose a name ending in .${ext}: a legacy .doc/.xls/.ppt or OpenDocument name cannot be used`,
-  )
+  throw new Error(`Save it as a .${ext} file. This app can't save in the original file's format.`)
 }

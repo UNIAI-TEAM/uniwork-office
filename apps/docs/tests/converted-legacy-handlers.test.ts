@@ -89,6 +89,7 @@ import {
   forgetConvertedDocument,
   registerConvertedDocument,
 } from '@genoffice/electron-utils'
+import { setUiLang } from '@genoffice/i18n'
 import {
   authorizeMcpDocWrite,
   registerDocsIpc,
@@ -225,6 +226,31 @@ describe('docs real handlers on a converted legacy .doc', () => {
     expect(r).toMatchObject({ ok: false })
     expect(readFileSync(other, 'utf8')).toBe('someone else')
     expect(existsSync(`${other}.docx`)).toBe(false)
+  })
+
+  it('localizes the Save As refusal message when a legacy or OpenDocument name is picked (ODF-V1)', async () => {
+    const odtAnswer = join(dir, 'Memo.odt')
+    showSaveDialog.mockResolvedValue({ canceled: false, filePath: odtAnswer })
+    try {
+      setUiLang('en')
+      await expect(
+        call('docs:save-as', wc, 'Memo.docx', bytes('edited'), tempPath),
+      ).resolves.toEqual({
+        ok: false,
+        error: "Save it as a .docx file. This app can't save in the original file's format.",
+      })
+
+      setUiLang('vi')
+      await expect(
+        call('docs:save-as', wc, 'Memo.docx', bytes('edited'), tempPath),
+      ).resolves.toEqual({
+        ok: false,
+        error: 'Hãy lưu thành tệp .docx. Ứng dụng không lưu được ở định dạng của tệp gốc.',
+      })
+    } finally {
+      setUiLang('zh')
+    }
+    expect(existsSync(odtAnswer)).toBe(false)
   })
 
   it("the UniWork first save's in-place flush writes the temp copy and reports the user save, no dialog", async () => {

@@ -18,6 +18,7 @@ const { handlers, views, hooks, userData } = vi.hoisted(() => ({
   hooks: {
     duringWrite: null as null | (() => void),
     picked: '',
+    savePicked: null as string | null,
     opened: [] as string[],
     converted: [] as string[],
     sent: [] as Array<{ channel: string; payload: unknown }>,
@@ -64,6 +65,10 @@ vi.mock('electron', () => {
         }
         hooks.dialogOptions.push(opts)
         return { canceled: false, filePaths: hooks.picked ? [hooks.picked] : [] }
+      }),
+      showSaveDialog: vi.fn(async () => {
+        if (hooks.savePicked === null) throw new Error('unexpected showSaveDialog')
+        return { canceled: !hooks.savePicked, filePath: hooks.savePicked }
       }),
     },
     Menu: { buildFromTemplate: vi.fn(), setApplicationMenu: vi.fn() },
@@ -146,6 +151,7 @@ import {
   setUniworkDocumentPolicy,
   sheetsFileRenamed,
 } from '../../sheets/src/main/sheets-main'
+import { setUiLang } from '@genoffice/i18n'
 import { IPC_CHANNELS } from '../../sheets/src/shared/ipc-channels'
 import { workbookSaveRequestSchema } from '../../sheets/src/shared/desktop-api'
 import { handleSave } from '../../sheets/src/renderer/save-actions'
@@ -159,6 +165,7 @@ afterEach(() => {
   setSheetsUserSaveHook(null)
   setSheetsLegacyOpenHook(null)
   setUniworkDocumentPolicy(null)
+  hooks.savePicked = null
   hooks.opened.length = 0
   hooks.converted.length = 0
   hooks.sent.length = 0
@@ -233,6 +240,57 @@ describe('the first Save to UniWork of a converted .xls', () => {
     expect(onUserSave).toHaveBeenCalledExactlyOnceWith(tempPath)
     // the original is never offered a write, and no chooser opened
     expect(existsSync(join(dir, 'Budget.xlsx'))).toBe(false)
+  })
+
+  it('localizes the Save As refusal message when a legacy or OpenDocument name is picked (ODF-V1)', async () => {
+    const { event, tempPath } = await openedConverted()
+    const odsAnswer = join(dir, 'Budget.ods')
+    hooks.savePicked = odsAnswer
+    const req = { ...(await flushRequest(true)), mode: 'save-as' as const }
+    try {
+      setUiLang('en')
+      await expect(handlers.get(IPC_CHANNELS.saveWorkbook)!(event, req)).rejects.toThrow(
+        "Save it as a .xlsx file. This app can't save in the original file's format.",
+      )
+
+      setUiLang('vi')
+      await expect(handlers.get(IPC_CHANNELS.saveWorkbook)!(event, req)).rejects.toThrow(
+        'Hãy lưu thành tệp .xlsx. Ứng dụng không lưu được ở định dạng của tệp gốc.',
+      )
+    } finally {
+      setUiLang('zh')
+    }
+    expect(existsSync(odsAnswer)).toBe(false)
+    expect(readFileSync(tempPath, 'utf8')).toBe('PK\u0003\u0004 converted')
+  })
+
+  it('uses .xlsm in the localized Save As refusal for a macro-enabled workbook (ODF-V1)', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'sheets-converted-xlsm-save-'))
+    userData.dir = join(dir, 'userData')
+    const tempDir = join(dir, 'genoffice-imports', 'u1')
+    mkdirSync(tempDir, { recursive: true })
+    const tempPath = join(tempDir, 'Macros.xlsm')
+    writeFileSync(tempPath, 'PK\u0003\u0004 converted xlsm')
+    markSheetsUnsavedNew(tempPath, join(dir, 'Macros.xlsm'), tempDir)
+    createSheetsView({ includeAiHandlers: false })
+    const event = { sender: views.last as never }
+    await handlers.get(IPC_CHANNELS.reopenWorkbook)!(event, tempPath)
+
+    hooks.savePicked = join(dir, 'Macros.ods')
+    const req = { ...(await flushRequest(true)), mode: 'save-as' as const }
+    try {
+      setUiLang('en')
+      await expect(handlers.get(IPC_CHANNELS.saveWorkbook)!(event, req)).rejects.toThrow(
+        "Save it as a .xlsm file. This app can't save in the original file's format.",
+      )
+
+      setUiLang('vi')
+      await expect(handlers.get(IPC_CHANNELS.saveWorkbook)!(event, req)).rejects.toThrow(
+        'Hãy lưu thành tệp .xlsm. Ứng dụng không lưu được ở định dạng của tệp gốc.',
+      )
+    } finally {
+      setUiLang('zh')
+    }
   })
 })
 

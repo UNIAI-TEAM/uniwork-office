@@ -67,7 +67,18 @@ describe('assertModernSaveTarget (R2-2)', () => {
       '/h/A.odp',
       '/h/A.OTP',
     ]) {
-      expect(() => assertModernSaveTarget(name, 'docx')).toThrow(/\.docx/)
+      expect(() => assertModernSaveTarget(name, 'docx')).toThrow(
+        "Save it as a .docx file. This app can't save in the original file's format.",
+      )
     }
+    expect(() => assertModernSaveTarget('/h/A.ods', 'xlsx')).toThrow(
+      "Save it as a .xlsx file. This app can't save in the original file's format.",
+    )
+    expect(() => assertModernSaveTarget('/h/A.ods', 'xlsm')).toThrow(
+      "Save it as a .xlsm file. This app can't save in the original file's format.",
+    )
+    expect(() => assertModernSaveTarget('/h/A.odp', 'pptx')).toThrow(
+      "Save it as a .pptx file. This app can't save in the original file's format.",
+    )
   })
 })

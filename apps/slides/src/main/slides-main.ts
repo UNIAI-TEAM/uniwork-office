@@ -693,7 +693,12 @@ function hostFor(wc: WebContents): HostIO {
         filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
       }
       const r = await showSaveDialogWithMemory(dialog, dialogParent(), options, getDraftsDir())
-      return r.canceled || !r.filePath ? null : assertModernSaveTarget(r.filePath, 'pptx')
+      if (r.canceled || !r.filePath) return null
+      try {
+        return assertModernSaveTarget(r.filePath, 'pptx')
+      } catch {
+        throw new Error(tm('errSaveOriginalFormat', { ext: 'pptx' }))
+      }
     },
     saveGate: (input) => uniworkSaveDecision(input),
     userSaved: (path) => notifyUniworkUserSave(path),

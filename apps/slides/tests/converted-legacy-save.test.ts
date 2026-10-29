@@ -74,6 +74,7 @@ import {
   forgetConvertedDocument,
   registerConvertedDocument,
 } from '@genoffice/electron-utils'
+import { setUiLang } from '@genoffice/i18n'
 import {
   registerSlidesIpc,
   setSlidesLegacyOpenHook,
@@ -278,6 +279,27 @@ describe('slides:save of a converted legacy deck', () => {
     expect(ordinary).toMatchObject({ ok: false })
     expect(readFileSync(other, 'utf8')).toBe(ORIGINAL)
     expect(written(`${other}.pptx`)).toBe(false)
+  })
+
+  it('localizes the Save As refusal message when a legacy or OpenDocument name is picked (ODF-V1)', async () => {
+    const odpAnswer = join(env.dir, 'Deck.odp')
+    env.saveDialogPath = odpAnswer
+    try {
+      setUiLang('en')
+      await expect(call('slides:save')).resolves.toEqual({
+        ok: false,
+        error: "Save it as a .pptx file. This app can't save in the original file's format.",
+      })
+
+      setUiLang('vi')
+      await expect(call('slides:save')).resolves.toEqual({
+        ok: false,
+        error: 'Hãy lưu thành tệp .pptx. Ứng dụng không lưu được ở định dạng của tệp gốc.',
+      })
+    } finally {
+      setUiLang('zh')
+    }
+    expect(existsSync(odpAnswer)).toBe(false)
   })
 
   it('offers .odp and .otp in slides:open and hands them to the shell legacy-open hook instead of openAndBuild', async () => {
