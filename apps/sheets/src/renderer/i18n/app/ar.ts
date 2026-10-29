@@ -667,6 +667,7 @@ export const ar = {
   appTabReview: 'مراجعة',
   appRibbonCollapse: 'طي الشريط',
   appRibbonExpand: 'توسيع الشريط',
+  appRibbonCompact: 'شريط مضغوط (أيقونات فقط)',
   appTabView: 'عرض',
   appTabAi: 'الذكاء الاصطناعي',
   appTabChartDesign: 'تصميم المخطط',

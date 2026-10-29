@@ -57,4 +57,5 @@ export const nl = {
   compareRemoved: '−{count} regels',
   compareTruncated: 'pagina te groot — alleen aantallen',
   compareUnreadable: 'Dit bestand kon niet als PDF worden gelezen',
+  ribbonCompact: 'Compact lint (alleen pictogrammen)',
 } satisfies Record<keyof typeof zh, string>

@@ -57,4 +57,5 @@ export const it = {
   compareRemoved: '−{count} righe',
   compareTruncated: 'pagina troppo grande — solo conteggio',
   compareUnreadable: 'Impossibile leggere questo file come PDF',
+  ribbonCompact: 'Barra multifunzione compatta (solo icone)',
 } satisfies Record<keyof typeof zh, string>

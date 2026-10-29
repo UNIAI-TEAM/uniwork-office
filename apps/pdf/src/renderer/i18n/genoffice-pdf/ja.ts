@@ -57,4 +57,5 @@ export const ja = {
   compareRemoved: '−{count} 行',
   compareTruncated: 'ページが大きすぎるため行数のみ',
   compareUnreadable: 'このファイルを PDF として読み込めませんでした',
+  ribbonCompact: 'コンパクトリボン（アイコンのみ）',
 } satisfies Record<keyof typeof zh, string>

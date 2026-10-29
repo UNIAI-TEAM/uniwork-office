@@ -57,4 +57,5 @@ export const en = {
   compareRemoved: '−{count} lines',
   compareTruncated: 'page too large — counts only',
   compareUnreadable: 'That file could not be read as a PDF',
+  ribbonCompact: 'Compact Ribbon (icons only)',
 } satisfies Record<keyof typeof zh, string>

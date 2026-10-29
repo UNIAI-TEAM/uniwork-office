@@ -57,4 +57,5 @@ export const fr = {
   compareRemoved: '−{count} lignes',
   compareTruncated: 'page trop grande — décompte seul',
   compareUnreadable: "Ce fichier n'a pas pu être lu comme un PDF",
+  ribbonCompact: 'Ruban compact (icônes uniquement)',
 } satisfies Record<keyof typeof zh, string>

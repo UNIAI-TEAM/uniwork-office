@@ -57,4 +57,5 @@ export const cs = {
   compareRemoved: '−{count} řádků',
   compareTruncated: 'strana je příliš velká — jen počty',
   compareUnreadable: 'Tento soubor se nepodařilo přečíst jako PDF',
+  ribbonCompact: 'Kompaktní pás karet (pouze ikony)',
 } satisfies Record<keyof typeof zh, string>
