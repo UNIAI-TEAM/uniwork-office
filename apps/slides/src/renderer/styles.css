@@ -7718,7 +7718,7 @@ body.show-curtain::after {
 .modal .dlg-note {
   margin: 4px 0 0;
   font-size: 12px;
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 /* Override .modal label / .modal input full-row styles: checkbox/radio rows lay out inline */
