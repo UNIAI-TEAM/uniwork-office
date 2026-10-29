@@ -1,6 +1,23 @@
 import { join, resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
-import { rendererUrl, resolveRendererFile } from '../src/renderer-scheme'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  DOCX_MEDIA_SCHEME_PRIVILEGE,
+  RENDERER_SCHEME_PRIVILEGE,
+  SLIDE_MEDIA_SCHEME_PRIVILEGE,
+  rendererUrl,
+  resolveRendererFile,
+} from '../src/renderer-scheme'
+
+const registeredSchemes = vi.hoisted(() => [] as unknown[])
+vi.mock('electron', () => ({
+  protocol: {
+    registerSchemesAsPrivileged: (schemes: unknown[]) => registeredSchemes.push(...schemes),
+    handle: vi.fn(),
+  },
+  net: { fetch: vi.fn() },
+}))
+
+import { registerRendererScheme } from '../src/renderer-protocol'
 
 describe('rendererUrl', () => {
   it('builds the scheme URL with the query when no dev server is configured', () => {
@@ -79,5 +96,30 @@ describe('resolveRendererFile', () => {
 
   it('rejects overlong and NUL paths', () => {
     expect(resolveRendererFile(roots, `genoffice-app://sheets/${'a'.repeat(5000)}.js`)).toBeNull()
+  })
+})
+
+describe('SLIDE_MEDIA_SCHEME_PRIVILEGE and registerRendererScheme', () => {
+  it('defines genoffice-slide-media with standard, secure, fetch, CORS, and stream privileges', () => {
+    expect(SLIDE_MEDIA_SCHEME_PRIVILEGE).toEqual({
+      scheme: 'genoffice-slide-media',
+      privileges: {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+        stream: true,
+      },
+    })
+  })
+
+  it('registers renderer, docx-media, and slide-media schemes together', () => {
+    registeredSchemes.length = 0
+    registerRendererScheme()
+    expect(registeredSchemes).toEqual([
+      RENDERER_SCHEME_PRIVILEGE,
+      DOCX_MEDIA_SCHEME_PRIVILEGE,
+      SLIDE_MEDIA_SCHEME_PRIVILEGE,
+    ])
   })
 })

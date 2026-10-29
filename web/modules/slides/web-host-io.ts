@@ -59,7 +59,7 @@ const IMAGE_ACCEPT = '.png,.jpg,.jpeg,.gif,.bmp,.webp,.tif,.tiff'
 const MEDIA_ACCEPT: Record<MediaPickKind, string> = {
   video: '.mp4,.m4v,.mov,.webm,.avi',
   audio: '.mp3,.wav,.m4a,.aac,.ogg',
-  model3d: '.glb,.gltf',
+  model3d: '.glb',
 }
 const NEW_PREFIX = 'uniwork://new/'
 

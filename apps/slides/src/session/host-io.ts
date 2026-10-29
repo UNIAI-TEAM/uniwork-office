@@ -100,6 +100,8 @@ export interface HostIO {
   saveGate?(input: SaveGateInput): { write: boolean; fireHook: boolean }
   /** Desktop UniWork seam: an explicit user Save wrote the open document's own path */
   userSaved?(path: string): void
+  /** Asks the OS for the microphone where it gates it (macOS); absent = true. */
+  microphoneAccess?(): Promise<boolean>
 }
 
 export interface SaveGateInput {

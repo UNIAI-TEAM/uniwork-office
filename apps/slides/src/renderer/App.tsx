@@ -42,6 +42,12 @@ import type {
   TransitionKind,
 } from '../shared/ipc'
 import { baseName } from '../shared/base-name'
+import {
+  createBroadcastRecovery,
+  mergeBroadcastUpdate,
+  mergeSlideUpdate,
+  type BroadcastRecovery,
+} from '../shared/slide-update'
 import { openedStatusKey } from '../shared/opened-status'
 import { SlideCanvas, selectionChromeColor, type SlideCanvasHandle } from './SlideCanvas'
 import { tableCellOverlayBox } from './table-hit'
@@ -81,6 +87,8 @@ import {
   type ContextTabRequest,
 } from './components/context-tabs'
 import { SlideShowView } from './components/SlideShowView'
+import { RecordNarrationDialog } from './narration/RecordingBar'
+import type { NarrationTake } from './narration/use-recording'
 import { IconNotes, IconPlayBoxed } from './components/icons'
 import { PresenterView } from './components/PresenterView'
 import { CustomShowDialog } from './components/CustomShowDialog'
@@ -124,6 +132,8 @@ import { EquationDialog, HeaderFooterDialog, LinkDialog } from './components/Ins
 import { UseAppDialog } from './components/UseAppDialog'
 import { RedactDialog } from './components/RedactDialog'
 import { ZoomDialog } from './components/ZoomDialog'
+import { SlideSizeDialog } from './components/SlideSizeDialog'
+import { defaultNewSlideSize } from './slide-size'
 import { CutoutDialog } from './components/CutoutDialog'
 import {
   createWheelPager,
@@ -171,6 +181,9 @@ import { formatRulerValue, type RulerUnit } from './ruler-ticks'
 import * as fileActions from './file-actions'
 import * as clipboardActions from './clipboard-actions'
 import * as insertActions from './insert-actions'
+import * as model3dActions from './model3d/actions'
+import { Model3dTurnHandle } from './model3d/Model3dTurnHandle'
+import type { Model3dRotation } from '@genoffice/pptx-engine/model3d'
 import { bytesToBase64 } from './insert-actions'
 import { classifyDroppedFile, fileExt } from '../shared/media-kinds'
 import * as animationActions from './animation-actions'
@@ -391,6 +404,8 @@ function thumbBox(slide: RenderSlide, width: number) {
 export function App() {
   const { lang } = useI18n()
   const [slides, setSlides] = useState<RenderSlide[]>([])
+  const slidesRef = useRef<RenderSlide[]>(slides)
+  slidesRef.current = slides
   // Layouts may reference Office-private fonts (resolved in main); register them as FontFaces
   useEffect(() => {
     if (slides.length) void syncPrivateFonts()
@@ -635,6 +650,7 @@ export function App() {
   const [findOpen, setFindOpen] = useState(false)
   /** Per-page dwell seconds awaiting confirmation after rehearsal (non-null shows the "save?" confirmation dialog) */
   const [pendingRehearse, setPendingRehearse] = useState<number[] | null>(null)
+  const [pendingRecording, setPendingRecording] = useState<NarrationTake | null>(null)
   const [showRuler, setShowRuler] = useState(false)
   const [showGrid, setShowGrid] = useState(false)
   const [showGuides, setShowGuides] = useState(false)
@@ -716,6 +732,8 @@ export function App() {
   const [hfDialog, setHfDialog] = useState<HfDialogState | null>(null)
   const [eqDialogOpen, setEqDialogOpen] = useState(false)
   const [zoomDialog, setZoomDialog] = useState<zoomActions.ZoomMode | null>(null)
+  /** Design › Slide Size › Custom Size… open, with the deck size it opened on */
+  const [slideSizeDialog, setSlideSizeDialog] = useState<{ cx: number; cy: number } | null>(null)
   const recorderRef = useRef<{ rec: MediaRecorder; stream: MediaStream } | null>(null)
   const [recording, setRecording] = useState(false)
   // ── Layout picking: layout list + slide size (loaded after the file opens) ─────────────────
@@ -966,7 +984,9 @@ export function App() {
   const applyOpen = useCallback(
     (result: { path: string; slides: RenderSlide[]; defaultFont?: string } | null) => {
       if (!result) return
+      slidesRef.current = result.slides
       setSlides(result.slides)
+      broadcastRecoveryRef.current?.invalidate()
       setDefaultFont(result.defaultFont ?? null)
       setPath(result.path)
       setCurrent(0)
@@ -1076,17 +1096,42 @@ export function App() {
   // Shared session (a second window on the same file): apply the other window's
   // edits without touching local selection or an open editor — the ids are stable,
   // so the selection stays valid; a same-element conflict resolves last-write-wins.
-  useEffect(
-    () =>
-      window.slidesApi.onDeckChanged?.(({ slides: all }) => {
+  const broadcastRecoveryRef = useRef<BroadcastRecovery | null>(null)
+  useEffect(() => {
+    const recovery = createBroadcastRecovery(
+      () => window.slidesApi.getRenderSlides(),
+      (next) => {
+        slidesRef.current = next
+        setSlides(next)
+      },
+      (error) => console.error('Failed to refresh deck:', error),
+    )
+    broadcastRecoveryRef.current = recovery
+    const off = window.slidesApi.onDeckChanged?.(({ slides: all, order }) => {
+      recovery.onBroadcast(!!order)
+      if (order) {
+        const merged = mergeBroadcastUpdate(slidesRef.current, { slides: all, order })
+        if (merged) {
+          slidesRef.current = merged
+          setSlides(merged)
+        } else {
+          recovery.requestRefresh()
+        }
+      } else {
+        slidesRef.current = all
         setSlides(all)
-        setCurrent((c) => Math.min(c, Math.max(0, all.length - 1)))
-        // The broadcast also fires for undo back to a clean state — ask the
-        // session instead of assuming the change dirtied it
-        void window.slidesApi.isDirty?.().then((d) => setDirty(!!d))
-      }),
-    [],
-  )
+      }
+      setCurrent((c) => Math.min(c, Math.max(0, (order?.length ?? all.length) - 1)))
+      // The broadcast also fires for undo back to a clean state — ask the
+      // session instead of assuming the change dirtied it
+      void window.slidesApi.isDirty?.().then((d) => setDirty(!!d))
+    })
+    return () => {
+      recovery.invalidate()
+      broadcastRecoveryRef.current = null
+      off?.()
+    }
+  }, [])
 
   // Auto-save (off by default): when on and a file path exists, silently write back every 30s + on blur.
   // Saving rebuilds element ids; skipped during text editing/mouse-down (dragging) to avoid interrupting the current operation.
@@ -1345,7 +1390,7 @@ export function App() {
   }, [hasDoc, viewMode, previewZoom, slides.length])
 
   const newBlank = useCallback(async () => {
-    const r = await window.slidesApi.newBlank(FIT_WIDTH)
+    const r = await window.slidesApi.newBlank(FIT_WIDTH, defaultNewSlideSize() ?? undefined)
     applyOpen(r)
     return r
   }, [applyOpen])
@@ -1869,7 +1914,7 @@ export function App() {
     (kind: 'video' | 'audio') => insertActions.insertMediaFile(ctxRef.current, kind),
     [],
   )
-  const insertModel3dFile = useCallback(() => insertActions.insertModel3dFile(ctxRef.current), [])
+  const insertModel3dFile = useCallback(() => model3dActions.insertModel3dFile(ctxRef.current), [])
   const toggleScreenRecord = useCallback(() => insertActions.toggleScreenRecord(ctxRef.current), [])
 
   // Reflect the current page's transition effect on page/document changes
@@ -2071,6 +2116,19 @@ export function App() {
     [],
   )
   const saveRehearseTimings = useCallback(() => showActions.saveRehearseTimings(ctxRef.current), [])
+  const startRecordShow = useCallback(
+    (fromStart: boolean) => showActions.startRecordShow(ctxRef.current, fromStart),
+    [],
+  )
+  const onRecordDone = useCallback(
+    (take: Promise<NarrationTake | null>) => showActions.onRecordDone(ctxRef.current, take),
+    [],
+  )
+  const saveRecording = useCallback(() => showActions.saveRecording(ctxRef.current), [])
+  const clearNarration = useCallback(
+    (all: boolean) => void showActions.clearNarration(ctxRef.current, all),
+    [],
+  )
   const startPresenterView = useCallback(
     (fromStart: boolean) => showActions.startPresenterView(ctxRef.current, fromStart),
     [],
@@ -3048,6 +3106,14 @@ export function App() {
     [selectedIds, findNodeCtx],
   )
 
+  const model3dNode = useMemo(
+    () =>
+      cap('model3d') && selectedNode?.type === 'picture' && selectedNode.model3d
+        ? (selectedNode as PictureRenderNode & { model3d: Model3dRotation })
+        : null,
+    [selectedNode],
+  )
+
   const [selectedChartData, setSelectedChartData] = useState<Awaited<
     ReturnType<typeof window.slidesApi.getChartData>
   > | null>(null)
@@ -3328,6 +3394,8 @@ export function App() {
     setCustomShowDlgOpen,
     pendingRehearse,
     setPendingRehearse,
+    pendingRecording,
+    setPendingRecording,
     sections,
     setSections,
     renamingSec,
@@ -3444,6 +3512,17 @@ export function App() {
       })
   })
 
+  const applySlideSize = (cx: number, cy: number) =>
+    void window.slidesApi.setSlideSize({ cx, cy }).then((all) => {
+      if (all) {
+        setSlides(all)
+        // Every slide re-materializes with fresh element ids
+        setSelectedIds([])
+        setEditing(null)
+        setDirty(true)
+      }
+    })
+
   return (
     <div
       className="app"
@@ -3542,25 +3621,12 @@ export function App() {
           void slideActions.setSlideLayoutAt(ctxRef.current, current, layoutPath)
         }
         onResetLayout={() => void slideActions.setSlideLayoutAt(ctxRef.current, current)}
-        onSlideSize={(cx, cy) =>
-          void window.slidesApi.setSlideSize({ cx, cy }).then((all) => {
-            if (all) {
-              setSlides(all)
-              // Every slide re-materializes with fresh element ids
-              setSelectedIds([])
-              setEditing(null)
-              setDirty(true)
-            }
+        onSlideSize={applySlideSize}
+        getSlideSize={() => window.slidesApi.getSlideSize()}
+        onCustomSlideSize={() =>
+          void window.slidesApi.getSlideSize().then((size) => {
+            if (size) setSlideSizeDialog(size)
           })
-        }
-        slideSizeKey={
-          slide
-            ? Math.abs(slide.widthPx / slide.heightPx - 16 / 9) < 0.02
-              ? '16:9'
-              : Math.abs(slide.widthPx / slide.heightPx - 4 / 3) < 0.02
-                ? '4:3'
-                : null
-            : null
         }
         onParagraphFormat={onParagraphFormat}
         onDirection={onDirection}
@@ -3597,6 +3663,8 @@ export function App() {
         onPresenterView={startPresenterView}
         onCustomShow={() => setCustomShowDlgOpen(true)}
         onRehearse={startRehearseShow}
+        onRecord={startRecordShow}
+        onClearNarration={clearNarration}
         currentHidden={!!slide?.hidden}
         onToggleHidden={() => void toggleHidden()}
         inkTool={inkTool}
@@ -3641,6 +3709,17 @@ export function App() {
         recording={recording}
         onToggleScreenRecord={() => void toggleScreenRecord()}
         contextElementType={contextElementType}
+        onModel3dView={
+          model3dNode
+            ? (rot) =>
+                void model3dActions.storeModel3dView(
+                  ctxRef.current,
+                  model3dNode.sourceId,
+                  model3dNode.box,
+                  rot,
+                )
+            : undefined
+        }
         tabRequest={contextTabRequest}
         contextElementId={selectedNode?.sourceId}
         contextSlideIndex={current}
@@ -4483,6 +4562,22 @@ export function App() {
                                 onContextMenu={onTextContextMenu}
                               />
                             )}
+                            {model3dNode && !mediaPlay && !cropTarget && (
+                              <Model3dTurnHandle
+                                key={model3dNode.sourceId}
+                                node={model3dNode}
+                                slideIndex={current}
+                                onTurn={(rot, view) =>
+                                  model3dActions.storeModel3dView(
+                                    ctxRef.current,
+                                    model3dNode.sourceId,
+                                    model3dNode.box,
+                                    rot,
+                                    view,
+                                  )
+                                }
+                              />
+                            )}
                             {mediaPlay && mediaPlayNode && (
                               <div
                                 style={{
@@ -4750,6 +4845,8 @@ export function App() {
           customOrder={slideShow.customOrder}
           rehearseMode={slideShow.rehearse}
           onRehearseDone={onRehearseDone}
+          recordMode={slideShow.record}
+          onRecordDone={onRecordDone}
           onExit={exitSlideShow}
         />
       )}
@@ -4819,6 +4916,18 @@ export function App() {
         />
       )}
 
+      {slideSizeDialog && (
+        <SlideSizeDialog
+          initial={slideSizeDialog}
+          defaultUnit={rulerUnit}
+          onApply={(cx, cy) => {
+            setSlideSizeDialog(null)
+            applySlideSize(cx, cy)
+          }}
+          onClose={() => setSlideSizeDialog(null)}
+        />
+      )}
+
       {cutoutTarget && (
         <CutoutDialog
           dataUrl={cutoutTarget.dataUrl}
@@ -4854,8 +4963,8 @@ export function App() {
             setCurrent(si)
             setSelectedIds([id])
           }}
-          onReplaced={(all) => {
-            setSlides(all)
+          onReplaced={(update) => {
+            setSlides((current) => mergeSlideUpdate(current, update))
             setDirty(true)
           }}
           onClose={() => setFindOpen(false)}
@@ -4879,6 +4988,14 @@ export function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {pendingRecording && (
+        <RecordNarrationDialog
+          durationMs={pendingRecording.endMs}
+          onDiscard={() => setPendingRecording(null)}
+          onSave={() => void saveRecording()}
+        />
       )}
 
       {aiEnabled &&

@@ -589,7 +589,9 @@ function buildPicture(
   // GDI metafiles play back on an opaque white DC: PowerPoint shows a white panel for
   // an EMF/WMF that never paints its background (PlanS academy banner, measured)
   const isMetafile =
-    typeof dataUrl === 'string' && /^data:image\/(x-)?(emf|wmf|emz|wmz)[;,]/.test(dataUrl)
+    typeof dataUrl === 'string' &&
+    (/^data:image\/(x-)?(emf|wmf|emz|wmz)[;,]/.test(dataUrl) ||
+      /^genoffice-slide-media:.*[?&]mime=image%2F(?:x-)?(emf|wmf)(?:&|$)/i.test(dataUrl))
   const node: PictureRenderNode = {
     id: `r_${el.id}`,
     type: 'picture',
@@ -601,6 +603,7 @@ function buildPicture(
     ...(el.opacity != null ? { opacity: el.opacity } : {}),
     ...(el.softEdge ? { softEdgePx: emuToPx(el.softEdge, vp.scale) } : {}),
     ...(el.media ? { media: el.media.kind } : {}),
+    ...(el.model3d ? { model3d: { ...el.model3d.rot } } : {}),
     ...(el.redact ? { redact: el.redact } : {}),
     ...(el.name ? { name: el.name } : {}),
     ...(el.descr ? { descr: el.descr } : {}),

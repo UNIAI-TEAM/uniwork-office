@@ -189,7 +189,7 @@ export const zhTW = {
   ribbonIcons: '圖示',
   ribbonIconsTip: '插入內建圖示（點陣化為圖片元素）',
   ribbon3dModel: '3D 模型',
-  ribbon3dModelTip: '插入 3D 模型（glb/gltf 內嵌檔案，畫布顯示海報預留位置）',
+  ribbon3dModelTip: '插入 3D 模型（.glb）：選取後可旋轉；在 PowerPoint 中仍為 3D',
   ribbonGroupIllustrations: '插圖',
   ribbonShapes: '圖案',
   ribbonShapesTip: '插入圖案（基本圖案 / 箭頭 / 星形）',
