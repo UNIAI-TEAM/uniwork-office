@@ -333,6 +333,7 @@ import {
   IconDeletePage,
   IconExtract,
   IconInsertPdf,
+  IconReduceSize,
   IconInsertBlank,
   IconRotateAll,
   IconReverse,
@@ -8428,20 +8429,7 @@ export default function App() {
                       onClick={() => void reduceFileSize()}
                     >
                       <span className="rb-big-icon">
-                        <svg
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M15.5 4.5 A 8.5 8.5 0 1 0 19.5 11" />
-                          <path d="M15.5 2.5 L15.5 7.5 L10.5 7.5" />
-                        </svg>
+                        <IconReduceSize />
                       </span>
                       <span>{t('reduce')}</span>
                     </button>
