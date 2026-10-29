@@ -212,18 +212,18 @@ describe('the Shape Format outline-weight picker', () => {
     const { container, root, render } = mountRibbon(editor)
 
     // no explicit width: the trigger names the control instead of reading blank
-    expect(container.querySelector('.rb-wrap-dd .gs-dd-value')?.textContent).toBe(
-      t('ribbonShapeOutlineWeight'),
-    )
+    const valSpan = container.querySelector('.rb-wrap-dd .gs-dd-value')
+    expect(valSpan?.textContent).toBe(t('ribbonShapeOutlineWeight'))
+    expect(valSpan?.getAttribute('title')).toBe(t('ribbonShapeOutlineWeight'))
 
     pickDropdown(container, tipped(container, 'ribbonShapeOutlineWeight'), '1.5')
     expect(boxOf(editor, pos).borderWidthPx).toBe(2)
 
     // the ribbon is fed by computeFormatState: re-render and it reads 1.5 pt
     render()
-    expect(container.querySelector('.rb-wrap-dd .gs-dd-value')?.textContent).toBe(
-      t('ribbonPtValue', { n: '1.5' }),
-    )
+    const updatedVal = container.querySelector('.rb-wrap-dd .gs-dd-value')
+    expect(updatedVal?.textContent).toBe(t('ribbonPtValue', { n: '1.5' }))
+    expect(updatedVal?.getAttribute('title')).toBe(t('ribbonPtValue', { n: '1.5' }))
 
     act(() => root.unmount())
     container.remove()

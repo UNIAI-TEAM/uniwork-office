@@ -10494,6 +10494,13 @@ body.docs-crop-active
   height: 28px;
 }
 
+.rb-wrap-dd .gs-dd-value {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .rb-wrap-dd .gs-dd-btn:disabled {
   opacity: 0.55;
 }
