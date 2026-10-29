@@ -227,6 +227,41 @@ describe('importSkillDir', () => {
     expect(importSkillDir(join(src, 'pdf-tools'), save).name).toBe('pdf-tools')
     cleanup()
   })
+
+  it('refuses a folder whose name cannot be used as a skill name', () => {
+    const { save, src, cleanup } = scaffold(
+      {},
+      { '.hidden-skill': SKILL('hidden', 'A docx thing'), 'draft:v2': SKILL('draft', 'docx') },
+    )
+    expect(() => importSkillDir(join(src, '.hidden-skill'), save)).toThrow(
+      'the folder name cannot be used as a skill name',
+    )
+    expect(existsSync(join(save, 'skills', '.hidden-skill'))).toBe(false)
+    if (process.platform !== 'win32') {
+      expect(() => importSkillDir(join(src, 'draft:v2'), save)).toThrow(
+        'the folder name cannot be used as a skill name',
+      )
+      expect(existsSync(join(save, 'skills', 'draft:v2'))).toBe(false)
+    }
+    cleanup()
+  })
+
+  it('cleans up the scratch copy and leaves no partial skill when importSkillDir fails', () => {
+    const { save, src, cleanup } = scaffold(
+      {},
+      { 'half-skill': SKILL('half-skill', 'A docx thing') },
+    )
+    const dest = join(save, 'skills', 'half-skill')
+    h.failRenameTo = dest
+    try {
+      expect(() => importSkillDir(join(src, 'half-skill'), save)).toThrow('disk full')
+    } finally {
+      h.failRenameTo = ''
+    }
+    expect(existsSync(dest)).toBe(false)
+    expect(readdirSync(join(save, 'skills'))).toEqual([])
+    cleanup()
+  })
 })
 
 describe('importSkillZip', () => {
@@ -286,11 +321,31 @@ describe('importSkillZip', () => {
     cleanup()
   })
 
-  it('removes a listed skill and refuses anything else', () => {
+  it('cleans up the scratch copy when importSkillMd fails', () => {
+    const { root, save, cleanup } = scaffold()
+    const md = join(root, 'trip.md')
+    writeFileSync(md, SKILL('trip-planner', 'Plan a docx itinerary'))
+    const dest = join(save, 'skills', 'trip-planner')
+    h.failRenameTo = dest
+    try {
+      expect(() => importSkillMd(md, save)).toThrow('disk full')
+    } finally {
+      h.failRenameTo = ''
+    }
+    expect(existsSync(dest)).toBe(false)
+    expect(readdirSync(join(save, 'skills'))).toEqual([])
+    cleanup()
+  })
+
+  it('removes a listed skill and refuses anything else, even when a sibling SKILL.md exists', () => {
     const { save, cleanup } = scaffold({ mine: SKILL('mine', 'docx') })
     writeFileSync(join(save, 'stray.txt'), 'x')
+    mkdirSync(join(save, 'other'), { recursive: true })
+    writeFileSync(join(save, 'other', 'SKILL.md'), SKILL('other', 'docx'))
     expect(() => removeSkill('../stray.txt', save)).toThrow(/unknown skill/)
+    expect(() => removeSkill('../other', save)).toThrow(/unknown skill/)
     expect(() => removeSkill('absent', save)).toThrow(/unknown skill/)
+    expect(existsSync(join(save, 'other', 'SKILL.md'))).toBe(true)
     removeSkill('mine', save)
     expect(existsSync(join(save, 'skills', 'mine'))).toBe(false)
     expect(existsSync(join(save, 'stray.txt'))).toBe(true)
@@ -298,10 +353,9 @@ describe('importSkillZip', () => {
   })
 
   it.skipIf(process.platform === 'win32')(
-    'removes a folder-imported skill whose name a zip would refuse',
+    'removes a skill in our folder whose name importSkillDir/Zip would refuse',
     async () => {
-      const { save, src, cleanup } = scaffold({}, { 'draft:v2': SKILL('draft', 'docx') })
-      importSkillDir(join(src, 'draft:v2'), save)
+      const { save, cleanup } = scaffold({ 'draft:v2': SKILL('draft', 'docx') })
       expect((await usableSkills(save)).map((s) => s.name)).toEqual(['draft:v2'])
       removeSkill('draft:v2', save)
       expect(existsSync(join(save, 'skills', 'draft:v2'))).toBe(false)
@@ -335,7 +389,7 @@ describe('importSkillZip', () => {
     cleanup()
   })
 
-  it('refuses an entry that climbs out, and writes nothing', async () => {
+  it('refuses an entry that climbs out or uses an absolute or backslash name, and writes nothing', async () => {
     const { root, save, cleanup } = scaffold()
     const zip = await zipOf(
       { 'tool/SKILL.md': SKILL('tool', 'docx'), '../escape.txt': 'out' },
@@ -344,6 +398,20 @@ describe('importSkillZip', () => {
     // jszip itself may fold the `..` away; either way it is refused and nothing lands
     await expect(importSkillZip(zip, save)).rejects.toThrow()
     expect(existsSync(join(root, 'escape.txt'))).toBe(false)
+    expect(existsSync(join(save, 'skills', 'tool'))).toBe(false)
+
+    const absZip = await zipOf(
+      { 'tool/SKILL.md': SKILL('tool', 'docx'), '/abs.txt': 'out' },
+      join(root, 'abs.zip'),
+    )
+    await expect(importSkillZip(absZip, save)).rejects.toThrow('unsafe entry name')
+    expect(existsSync(join(save, 'skills', 'tool'))).toBe(false)
+
+    const backslashZip = await zipOf(
+      { 'tool/SKILL.md': SKILL('tool', 'docx'), 'a\\b.txt': 'out' },
+      join(root, 'backslash.zip'),
+    )
+    await expect(importSkillZip(backslashZip, save)).rejects.toThrow('unsafe entry name')
     expect(existsSync(join(save, 'skills', 'tool'))).toBe(false)
     cleanup()
   })
@@ -368,6 +436,35 @@ describe('importSkillZip', () => {
     )
     await expect(importSkillZip(zip, save)).rejects.toThrow('import cap')
     expect(readdirSync(join(save, 'skills'))).toEqual([])
+    cleanup()
+  })
+
+  it('refuses a zip whose combined entries exceed the running import cap and leaves no scratch behind', async () => {
+    const { root, save, cleanup } = scaffold()
+    const zip = await zipOf(
+      {
+        'heavy/SKILL.md': SKILL('heavy', 'docx'),
+        'heavy/one.bin': Buffer.alloc(6 * 1024 * 1024),
+        'heavy/two.bin': Buffer.alloc(6 * 1024 * 1024),
+      },
+      join(root, 'running-heavy.zip'),
+    )
+    await expect(importSkillZip(zip, save)).rejects.toThrow('import cap')
+    expect(readdirSync(join(save, 'skills'))).toEqual([])
+    cleanup()
+  })
+
+  it('refuses a zip with more than 2000 entries', async () => {
+    const { root, save, cleanup } = scaffold()
+    const z = new JSZip()
+    z.file('many/SKILL.md', SKILL('many', 'docx'))
+    for (let i = 0; i < 2000; i++) {
+      z.file(`many/f-${i}.txt`, '')
+    }
+    const zip = join(root, 'many.zip')
+    writeFileSync(zip, await z.generateAsync({ type: 'nodebuffer' }))
+    await expect(importSkillZip(zip, save)).rejects.toThrow('2000-entry import cap')
+    expect(existsSync(join(save, 'skills', 'many'))).toBe(false)
     cleanup()
   })
 
@@ -554,14 +651,18 @@ describe('recommendedSkills / installRecommendedSkill', () => {
     cleanup()
   })
 
-  it('refuses a name that is not a shipped skill, including path-shaped ones', () => {
+  it('refuses a name that is not a shipped skill, including path-shaped ones even when a sibling SKILL.md exists', () => {
     const { root, save, cleanup } = scaffold()
     const rec = join(root, 'recommended')
     mkdirSync(rec, { recursive: true })
-    for (const bad of ['nope', '../save', '/etc', '.hidden', 'a/b']) {
+    mkdirSync(join(root, 'other'), { recursive: true })
+    writeFileSync(join(root, 'other', 'SKILL.md'), VERSIONED('other', '1.0.0'))
+    for (const bad of ['nope', '../save', '../other', '/etc', '.hidden', 'a/b']) {
       expect(() => installRecommendedSkill(bad, rec, save)).toThrow('unknown skill')
     }
     expect(existsSync(join(save, 'skills'))).toBe(false)
+    expect(existsSync(join(save, 'other'))).toBe(false)
+    expect(existsSync(join(root, 'other', 'SKILL.md'))).toBe(true)
     cleanup()
   })
 })

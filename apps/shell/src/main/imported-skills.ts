@@ -86,6 +86,7 @@ export function readSkillBody(path: string): string {
 }
 
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024
+const MAX_ZIP_ENTRIES = 2000
 
 /**
  * A symlink is refused rather than dereferenced: `cpSync` without
@@ -164,11 +165,23 @@ function requireSkillMd(dir: string): void {
  * instructions. Refuses rather than overwrites when the name is taken.
  */
 export function importSkillDir(skillDir: string, userDataDir: string): FoundSkill {
-  const dest = join(skillsRoot(userDataDir), basename(skillDir))
+  const name = basename(skillDir)
+  if (!isSkillName(name)) {
+    throw new Error('the folder name cannot be used as a skill name')
+  }
+  const dest = join(skillsRoot(userDataDir), name)
   if (existsSync(dest)) throw new Error('a skill of that name is already there')
   requireSkillMd(skillDir)
   inspectSkillDir(skillDir)
-  cpSync(skillDir, dest, { recursive: true })
+  mkdirSync(skillsRoot(userDataDir), { recursive: true })
+  const scratch = mkdtempSync(join(skillsRoot(userDataDir), '.import-'))
+  try {
+    cpSync(skillDir, scratch, { recursive: true })
+    renameSync(scratch, dest)
+  } catch (e) {
+    rmSync(scratch, { recursive: true, force: true })
+    throw e
+  }
   return readBack(dest)
 }
 
@@ -264,6 +277,9 @@ export async function importSkillZip(zipPath: string, userDataDir: string): Prom
     throw new Error('the file is not a zip archive')
   }
   const files = Object.values(zip.files).filter((f) => !f.dir && !f.name.startsWith('__MACOSX/'))
+  if (files.length > MAX_ZIP_ENTRIES) {
+    throw new Error(`the archive has more than the ${MAX_ZIP_ENTRIES}-entry import cap`)
+  }
   for (const f of files) {
     const parts = f.name.split('/')
     if (isAbsolute(f.name) || f.name.includes('\\') || parts.some((p) => p === '..' || p === '')) {
