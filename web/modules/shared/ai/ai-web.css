@@ -1,120 +1,7 @@
-/* Web AI bridge chrome (CONTRACT C16): the AI settings dialog and the typed failure card. Theme
-   tokens only (packages/ui/src/tokens.css); the dialog box itself is the shared frame dialog. */
+/* Web AI bridge chrome (CONTRACT C16): the typed failure card. Theme tokens only
+   (packages/ui/src/tokens.css); its buttons are the shared frame dialog ones. */
 
-/* the dialog box is the shared frame dialog (../frame-dialog.css: blur scrim, close X, filled
-   primary); this adds the form between its head and its footer band */
-.ow-ai-dialog {
-  max-width: 520px;
-}
-
-.ow-ai-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 0;
-  padding: 0 16px 16px;
-  overflow-y: auto;
-}
-
-.ow-ai-hint {
-  color: var(--text-dim);
-  font-size: var(--text-caption);
-}
-
-.ow-ai-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.ow-ai-field > span {
-  color: var(--text-dim);
-  font-size: var(--text-caption);
-  font-weight: 500;
-}
-
-.ow-ai-input {
-  box-sizing: border-box;
-  height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-}
-
-.ow-ai-input:hover {
-  border-color: var(--border-hover);
-}
-
-.ow-ai-input:focus-visible,
-.ow-ai-dialog .ow-dlg-btn:focus-visible {
-  outline: 2px solid var(--color-dialog-primary);
-  outline-offset: 1px;
-}
-
-/* the provider list: no native arrow (it ignores the theme), a token-coloured chevron instead;
-   the opened list is the browser's own */
-.ow-ai-select {
-  padding-inline-end: 30px;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
-    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
-  background-position:
-    calc(100% - 17px) 15px,
-    calc(100% - 12px) 15px;
-  background-size: 5px 5px;
-  background-repeat: no-repeat;
-  color-scheme: light dark;
-}
-
-.ow-ai-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.ow-ai-keystate {
-  color: var(--text-dim);
-  font-size: var(--text-caption);
-}
-
-.ow-ai-keystate[data-saved='true'] {
-  color: var(--success);
-}
-
-.ow-ai-section {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-}
-
-.ow-ai-section-title {
-  font-weight: 600;
-}
-
-.ow-ai-error {
-  padding: 6px 10px;
-  border: 1px solid var(--danger-border);
-  border-radius: 8px;
-  background: var(--danger-bg);
-  color: var(--danger-text);
-  font-size: var(--text-caption);
-}
-
-.ow-ai-error:empty {
-  display: none;
-}
-
-/* inline action rows (Remove / Save key, the failure card): buttons sized to their label, the
-   same fills as the dialog family */
+/* the card's action row: buttons sized to their label, the same fills as the dialog family */
 .ow-ai-actions {
   display: flex;
   flex-wrap: wrap;
@@ -124,16 +11,6 @@
 
 .ow-ai-actions .ow-dlg-btn {
   width: auto;
-}
-
-.ow-ai-dialog [hidden] {
-  display: none !important; /* beats the flex / inline-flex of the field and button classes */
-}
-
-.ow-ai-dialog .ow-dlg-btn:disabled,
-.ow-ai-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* typed failure card: non-modal, over the editor's corner */

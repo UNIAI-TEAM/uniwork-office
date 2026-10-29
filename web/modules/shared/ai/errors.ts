@@ -7,27 +7,22 @@
  *
  * | HTTP | server `code`                              | AiWebErrorCode         |
  * |------|--------------------------------------------|------------------------|
- * | 400  | provider_not_supported / base_url_refused  | same                   |
- * | 400  | other                                      | bad_request            |
+ * | 400  |                                            | bad_request            |
  * | 401  | (after one token refresh)                  | unauthorized           |
  * | 402  | credits_exhausted                          | credits_exhausted      |
  * | 403  | entitlement_required                       | entitlement_required   |
- * | 404  | credential_missing                         | credential_missing     |
- * | 424  | provider_auth_failed                       | provider_auth_failed   |
  * | 429  | (none; `retry-after` forwarded)            | rate_limited           |
  * | 502  | provider_unreachable                       | provider_unreachable   |
  * | 503  | cloud_unavailable                          | cloud_unavailable      |
  * | 503  | (no JSON error body: gateway page, empty)  | cloud_outage           |
  * | else |                                            | unknown                |
  *
- * The status decides; the body's `code` only refines a 400 (and is kept in `serverCode`).
+ * The status decides; the body's `code` is kept in `serverCode` (diagnostics only). The frame runs
+ * UniWork AI only (UNI-2289): there is no key store, so no key state either.
  */
 
 import { UniworkError, uniworkErrorKey } from '../../../../packages/ai-provider/src/uniwork/errors'
-import {
-  isProxyContractStatus,
-  proxyErrorBodyFields,
-} from '../../../../packages/ai-provider/src/proxy-url'
+import { proxyErrorBodyFields } from '../../../../packages/ai-provider/src/proxy-url'
 import {
   aiUniworkStrings,
   type AiUniworkStringKey,
@@ -36,35 +31,24 @@ import {
 export type AiWebErrorCode =
   | 'credits_exhausted'
   | 'entitlement_required'
-  | 'credential_missing'
-  | 'provider_auth_failed'
   | 'rate_limited'
   | 'provider_unreachable'
   | 'cloud_unavailable'
   /** a 503 with no JSON error body (a gateway page while the UniWork API is down): retry, not "not set up" */
   | 'cloud_outage'
   | 'unauthorized'
-  | 'provider_not_supported'
-  | 'base_url_refused'
   | 'bad_request'
-  /** raised in the frame, never by the server: no model is known for the provider, nothing was sent */
-  | 'model_required'
   | 'unknown'
 
 export const AI_WEB_ERROR_CODES: readonly AiWebErrorCode[] = [
   'credits_exhausted',
   'entitlement_required',
-  'credential_missing',
-  'provider_auth_failed',
   'rate_limited',
   'provider_unreachable',
   'cloud_unavailable',
   'cloud_outage',
   'unauthorized',
-  'provider_not_supported',
-  'base_url_refused',
   'bad_request',
-  'model_required',
   'unknown',
 ]
 
@@ -96,38 +80,18 @@ export function isAiWebError(err: unknown): err is AiWebError {
   return err instanceof AiWebError
 }
 
-/**
- * The proxy's typed error inside a protocol adapter's wrapper: anthropic/gemini rethrow a failed
- * fetch as `new Error('... fetch failed ...', { cause })`, which would otherwise read as a network
- * problem.
- */
-export function findAiWebError(err: unknown): AiWebError | undefined {
-  let current: unknown = err
-  for (let depth = 0; current && depth < 5; depth++) {
-    if (current instanceof AiWebError) return current
-    current = (current as { cause?: unknown }).cause
-  }
-  return undefined
-}
-
 const BY_STATUS: Record<number, AiWebErrorCode> = {
+  400: 'bad_request',
   401: 'unauthorized',
   402: 'credits_exhausted',
   403: 'entitlement_required',
-  404: 'credential_missing',
-  424: 'provider_auth_failed',
   429: 'rate_limited',
   502: 'provider_unreachable',
   503: 'cloud_unavailable',
 }
 
-/** HTTP status (+ the body's `code` for a 400) -> the typed code */
-export function aiErrorCodeFor(status: number, serverCode?: string): AiWebErrorCode {
-  if (status === 400) {
-    return serverCode === 'provider_not_supported' || serverCode === 'base_url_refused'
-      ? serverCode
-      : 'bad_request'
-  }
+/** HTTP status -> the typed code */
+export function aiErrorCodeFor(status: number): AiWebErrorCode {
   return BY_STATUS[status] ?? 'unknown'
 }
 
@@ -142,7 +106,7 @@ export function retryAfterSeconds(value: string | null, now = Date.now()): numbe
 
 /**
  * `code` / `message` of a server error body (`{ "error": { code, message } }` or the flat shape);
- * the shared reader of the BYOK proxy (packages/ai-provider/src/proxy-url.ts).
+ * the reader shared with the desktop (packages/ai-provider/src/proxy-url.ts).
  */
 export const errorBodyFields = proxyErrorBodyFields
 
@@ -156,12 +120,11 @@ export async function aiErrorFromResponse(res: Response): Promise<AiWebError> {
     ;({ code: serverCode, message } = errorBodyFields(body))
     hasJsonError = !!body && typeof body === 'object' && ('error' in body || 'code' in body)
   } catch {
-    // not JSON (a provider 429 page, a proxy error): the status alone decides
+    // not JSON (a 429 page, a gateway error): the status alone decides
   }
   return new AiWebError({
     // only a 503 with no JSON error body is an outage; a coded or JSON 503 keeps cloud_unavailable
-    code:
-      res.status === 503 && !hasJsonError ? 'cloud_outage' : aiErrorCodeFor(res.status, serverCode),
+    code: res.status === 503 && !hasJsonError ? 'cloud_outage' : aiErrorCodeFor(res.status),
     status: res.status,
     ...(message ? { message } : {}),
     ...(serverCode ? { serverCode } : {}),
@@ -171,36 +134,12 @@ export async function aiErrorFromResponse(res: Response): Promise<AiWebError> {
   })
 }
 
-const RAW_HTTP = /\bHTTP (\d{3})\b/
-const RAW_PAYLOAD = /[{[]\s*"/
-
-/**
- * A vendor adapter's own failure text ("Claude HTTP 502: {...}", a JSON body) as a typed failure,
- * so the panel shows a translated state instead of the raw payload. undefined for a message that
- * carries no status or payload (those keep their own readable text). A provider's 401 is a key
- * problem here, never a UniWork session problem (the proxy maps provider auth failures to 424).
- */
-export function rawFailureAsTyped(err: unknown): AiWebError | undefined {
-  const message = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
-  const status = RAW_HTTP.exec(message)?.[1]
-  if (!status && !RAW_PAYLOAD.test(message)) return undefined
-  const http = status ? Number(status) : 0
-  const code = http === 401 ? 'provider_auth_failed' : aiErrorCodeFor(http)
-  return new AiWebError({ code, status: http })
-}
-
-/**
- * Statuses the BYOK proxy answers itself (contract errors). A provider's own 400/422 (bad model,
- * output cap) is passed to ai-provider unchanged: its output-cap fallback reads that body.
- */
-export const isContractFailure = isProxyContractStatus
-
 // ------------------------------------------------------------------ UniWork AI (G6-05)
 
 /**
  * What the panel text of a failed UniWork AI turn is picked from: the adapter's `UniworkError`
  * (the façade's `code`, `Retry-After` seconds, the run id when one was open). The text comes from
- * the code, never from the message; these are not AiWebErrors (no card, no BYOK state).
+ * the code, never from the message; these are not AiWebErrors (no card).
  */
 export interface UniworkFailure {
   code: string

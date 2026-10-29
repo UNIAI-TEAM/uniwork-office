@@ -1,27 +1,6 @@
 import type { zh } from './zh'
 
 export const th = {
-  aiWebSettingsTitle: 'การตั้งค่า AI',
-  aiWebSettingsIntro:
-    'ผู้ช่วยใช้คีย์ API ของผู้ให้บริการที่เป็นของคุณ UniWork จัดเก็บคีย์แบบเข้ารหัส และจะไม่ส่งคีย์มายังหน้านี้',
-  aiWebProvider: 'ผู้ให้บริการ',
-  aiWebModel: 'โมเดล',
-  aiWebKeySaved: 'คีย์ที่บันทึกไว้ {hint}',
-  aiWebNoKey: 'ยังไม่ได้บันทึกคีย์',
-  aiWebApiKey: 'คีย์ API',
-  aiWebApiKeyKeep: 'คีย์ API ใหม่ (เว้นว่างไว้เพื่อใช้คีย์ที่บันทึกไว้)',
-  aiWebBaseUrl: 'Base URL',
-  aiWebSaveKey: 'บันทึกคีย์',
-  aiWebRemoveKey: 'ลบคีย์',
-  aiWebDone: 'เสร็จสิ้น',
-  aiWebLoading: 'กำลังโหลด…',
-  aiWebLoadFailed: 'โหลดการตั้งค่า AI ไม่ได้ โปรดลองอีกครั้งในภายหลัง',
-  aiWebCloudTitle: 'เครื่องมือคลาวด์ UniWork AI',
-  aiWebCloudOff: 'ไม่รวมอยู่ในแพ็กเกจขององค์กรคุณ',
-  aiWebCredits: 'เครดิตคงเหลือ: {remaining} จาก {limit}',
-  aiWebCreditsUnlimited: 'เครดิต: ไม่จำกัด',
-  aiWebCreditsRenew: 'รีเซ็ตวันที่ {date}',
-  aiWebOpenSettings: 'การตั้งค่า AI',
   aiWebClose: 'ปิด',
   aiWebStateCreditsTitle: 'เครดิต AI หมดแล้ว',
   aiWebStateCreditsBody:
@@ -29,10 +8,6 @@ export const th = {
   aiWebStateEntitlementTitle: 'แพ็กเกจไม่มี AI',
   aiWebStateEntitlementBody:
     'แพ็กเกจ UniWork ขององค์กรคุณไม่รวมฟีเจอร์ AI นี้ โปรดติดต่อผู้ดูแลระบบ',
-  aiWebStateKeyMissingTitle: 'ยังไม่มีคีย์ AI',
-  aiWebStateKeyMissingBody: 'เพิ่มคีย์ API ในการตั้งค่า AI เพื่อใช้ผู้ช่วย',
-  aiWebStateKeyRejectedTitle: 'คีย์ AI ถูกปฏิเสธ',
-  aiWebStateKeyRejectedBody: 'ผู้ให้บริการปฏิเสธคีย์ที่บันทึกไว้ โปรดเปลี่ยนคีย์ในการตั้งค่า AI',
   aiWebStateRateTitle: 'คำขอ AI มากเกินไป',
   aiWebStateRateBody: 'โปรดรอ {seconds} วินาทีแล้วลองอีกครั้ง',
   aiWebStateRateBodyNow: 'โปรดรอสักครู่แล้วลองอีกครั้ง',
@@ -46,10 +21,6 @@ export const th = {
   aiWebStateSessionBody: 'เปิดเอกสารอีกครั้งจาก UniWork เพื่อดำเนินการต่อ',
   aiWebStateRefusedTitle: 'คำขอถูกปฏิเสธ',
   aiWebStateRefusedBody: 'เซิร์ฟเวอร์ปฏิเสธคำขอ AI',
-  aiWebStateModelTitle: 'เลือกโมเดล',
-  aiWebStateModelBody: 'เลือกโมเดลจากเมนูโมเดลข้างช่องข้อความ แล้วส่งอีกครั้ง',
-  aiWebStateBaseUrlBody: 'ไม่อนุญาต Base URL นี้ โปรดใช้ที่อยู่ https:// สาธารณะ',
-  aiWebStateProviderBody: 'ไม่รองรับผู้ให้บริการนี้',
   aiWebStateUnknownTitle: 'คำขอ AI ล้มเหลว',
   aiWebStateUnknownBody: 'เกิดข้อผิดพลาด โปรดลองอีกครั้ง',
 

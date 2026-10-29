@@ -46,16 +46,7 @@ export {
   withUniAiOpenRouterAuth,
 } from './providers'
 export type { ProviderNeed } from './providers'
-export {
-  ProxyUrlError,
-  isInsideAiMount,
-  isProxy404,
-  isProxyContractStatus,
-  proxyAnswered,
-  proxyErrorBodyFields,
-  toProxyRequest,
-} from './proxy-url'
-export type { ProxyRequest } from './proxy-url'
+export { isInsideAiMount, proxyErrorBodyFields } from './proxy-url'
 export {
   AI_MEDIA_PROVIDERS,
   GEMINI_MEDIA_BASE_URL,

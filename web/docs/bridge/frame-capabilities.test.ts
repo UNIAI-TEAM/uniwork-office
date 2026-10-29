@@ -99,7 +99,6 @@ describe('frame base capabilities (X-02)', () => {
       // what the module's capability object is built from (aiHostGrants over the effective set)
       expect(aiHostGrants(caps)).toMatchObject({
         ai: true,
-        aiCredentials: false,
         uniworkAi: true,
         webSearch: false,
         imageSearch: false,

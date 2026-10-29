@@ -17,6 +17,35 @@ describe('ai-web string shards', () => {
     expect(Object.keys(aiWebStrings).sort()).toEqual([...LANGS].sort())
   })
 
+  it('holds the failure states and the handoff text only: no key settings, provider or model strings (UNI-2289)', () => {
+    expect(referenceKeys).toEqual(
+      [
+        'aiWebClose',
+        'aiWebStateCreditsTitle',
+        'aiWebStateCreditsBody',
+        'aiWebStateEntitlementTitle',
+        'aiWebStateEntitlementBody',
+        'aiWebStateRateTitle',
+        'aiWebStateRateBody',
+        'aiWebStateRateBodyNow',
+        'aiWebStateUnreachableTitle',
+        'aiWebStateUnreachableBody',
+        'aiWebStateCloudTitle',
+        'aiWebStateCloudBody',
+        'aiWebStateOutageTitle',
+        'aiWebStateOutageBody',
+        'aiWebStateSessionTitle',
+        'aiWebStateSessionBody',
+        'aiWebStateRefusedTitle',
+        'aiWebStateRefusedBody',
+        'aiWebStateUnknownTitle',
+        'aiWebStateUnknownBody',
+        'aiErrWorkbookTooLarge',
+        'aiHandoffContinue',
+      ].sort(),
+    )
+  })
+
   it.each([...LANGS])('locale %s has exactly the zh key set, no empty values', (lang) => {
     expect(Object.keys(table(lang)).sort()).toEqual(referenceKeys)
     expect(Object.entries(table(lang)).filter(([, v]) => !v.trim())).toEqual([])

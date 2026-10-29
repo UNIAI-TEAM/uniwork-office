@@ -1,27 +1,6 @@
 import type { zh } from './zh'
 
 export const ar = {
-  aiWebSettingsTitle: 'إعدادات الذكاء الاصطناعي',
-  aiWebSettingsIntro:
-    'يستخدم المساعد مفتاح API الخاص بك لدى المزوّد. يحفظ UniWork المفتاح مشفّرًا، ولا يُرسَل المفتاح إلى هذه الصفحة أبدًا.',
-  aiWebProvider: 'المزوّد',
-  aiWebModel: 'النموذج',
-  aiWebKeySaved: 'المفتاح المحفوظ {hint}',
-  aiWebNoKey: 'لا يوجد مفتاح محفوظ',
-  aiWebApiKey: 'مفتاح API',
-  aiWebApiKeyKeep: 'مفتاح API جديد (اتركه فارغًا للإبقاء على المفتاح المحفوظ)',
-  aiWebBaseUrl: 'عنوان URL الأساسي',
-  aiWebSaveKey: 'حفظ المفتاح',
-  aiWebRemoveKey: 'إزالة المفتاح',
-  aiWebDone: 'تم',
-  aiWebLoading: 'جارٍ التحميل…',
-  aiWebLoadFailed: 'تعذّر تحميل إعدادات الذكاء الاصطناعي. حاول لاحقًا.',
-  aiWebCloudTitle: 'أدوات UniWork AI السحابية',
-  aiWebCloudOff: 'غير مضمّن في خطة مؤسستك',
-  aiWebCredits: 'الأرصدة المتبقية: {remaining} من {limit}',
-  aiWebCreditsUnlimited: 'الأرصدة: بلا حد',
-  aiWebCreditsRenew: 'يتجدد في {date}',
-  aiWebOpenSettings: 'إعدادات الذكاء الاصطناعي',
   aiWebClose: 'إغلاق',
   aiWebStateCreditsTitle: 'نفدت أرصدة الذكاء الاصطناعي',
   aiWebStateCreditsBody:
@@ -29,10 +8,6 @@ export const ar = {
   aiWebStateEntitlementTitle: 'الذكاء الاصطناعي غير مضمّن في خطتك',
   aiWebStateEntitlementBody:
     'لا تتضمن خطة UniWork لمؤسستك ميزة الذكاء الاصطناعي هذه. تواصل مع المسؤول.',
-  aiWebStateKeyMissingTitle: 'لا يوجد مفتاح ذكاء اصطناعي بعد',
-  aiWebStateKeyMissingBody: 'أضف مفتاح API في إعدادات الذكاء الاصطناعي لاستخدام المساعد.',
-  aiWebStateKeyRejectedTitle: 'تم رفض مفتاح الذكاء الاصطناعي',
-  aiWebStateKeyRejectedBody: 'رفض المزوّد المفتاح المحفوظ. استبدله في إعدادات الذكاء الاصطناعي.',
   aiWebStateRateTitle: 'طلبات ذكاء اصطناعي كثيرة جدًا',
   aiWebStateRateBody: 'انتظر {seconds} ثانية ثم حاول مرة أخرى.',
   aiWebStateRateBodyNow: 'انتظر قليلًا ثم حاول مرة أخرى.',
@@ -46,10 +21,6 @@ export const ar = {
   aiWebStateSessionBody: 'أعد فتح المستند من UniWork للمتابعة.',
   aiWebStateRefusedTitle: 'رُفض الطلب',
   aiWebStateRefusedBody: 'رفض الخادم طلب الذكاء الاصطناعي.',
-  aiWebStateModelTitle: 'اختر نموذجًا',
-  aiWebStateModelBody: 'اختر نموذجًا من قائمة النماذج بجانب مربع الرسالة ثم أرسل مرة أخرى.',
-  aiWebStateBaseUrlBody: 'عنوان URL الأساسي هذا غير مسموح به. استخدم عنوان https:// عامًا.',
-  aiWebStateProviderBody: 'هذا المزوّد غير مدعوم.',
   aiWebStateUnknownTitle: 'فشل طلب الذكاء الاصطناعي',
   aiWebStateUnknownBody: 'حدث خطأ ما. حاول مرة أخرى.',
 
