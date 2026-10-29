@@ -25,11 +25,10 @@ parses spread over background passes. The Worker runs `xlsx_sidecar_index_step` 
 ## UniWork-owned: `apps/sheets/native/xlsx-engine/wasm/`
 
 - `Cargo.toml`: a `cdylib` reactor that depends on the parent crate and compiles `../src/main.rs` as a module, with its
-  own `Cargo.lock` (seeded from the parent's) and a `[patch.crates-io]` for zip 0.6.6.
+  own `Cargo.lock` (seeded from the parent's). It has no `[patch]` section: ironcalc 0.9.1 reads xlsx through zip 9
+  (deflate only, no C libraries), so the zip 0.6 vendoring that ironcalc 0.7.1 needed is gone.
 - `build-wasm.mjs` (run by `build:web --module sheets`):
-  - `cargo fetch`, then vendors the registry's zip 0.6.6 with `default = ["deflate"]`. ironcalc 0.7.1 pulls zip 0.6
-    with bzip2/zstd, which are C libraries that need a C toolchain for wasm, and IronCalc reads only deflate parts. The
-    registry `Cargo.toml` sha256 is checked first.
+  - `cargo fetch` with the parent's lock, so the registry holds the exact published crates;
   - builds with the toolchain pinned in `rust-toolchain.toml` (1.90.0 + wasm32-wasip1, installed by rustup on demand),
     `--locked`, with remapped paths;
   - checks the module against `xlsx-sidecar.wasm.sha256`, or `--update-checksum` after an intended engine change. The
@@ -42,7 +41,8 @@ parses spread over background passes. The Worker runs `xlsx_sidecar_index_step` 
     module**, so it comes with `--update-checksum` for both platforms in the same commit.
   - `WEB_SHEETS_WASM=<file>` supplies a prebuilt module, still checksum-verified.
 - Upstream `cargo` changes to the parent's dependency versions flow in through `cargo fetch`. If a new upstream
-  dependency needs C code for wasm, the build fails at `cargo build`; patch it the way zip is patched.
+  dependency needs C code for wasm, the build fails at `cargo build`; add a `[patch.crates-io]` entry in `wasm/Cargo.toml` for it (the build script
+  once vendored zip 0.6.6 that way, see git history).
 
 ## After an upstream sync
 

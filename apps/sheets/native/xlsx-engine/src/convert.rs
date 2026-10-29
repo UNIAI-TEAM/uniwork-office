@@ -1,19 +1,24 @@
 //! Legacy-format import: reads an .xls (or anything calamine understands)
 //! and writes a minimal .xlsx with values, formulas, and date number formats.
-//! Styles beyond date formats are not carried over — the converted file is a
-//! fresh workbook, not a byte-preserving edit.
+//! What the binary layer of an .xls holds beyond cells comes along too — the
+//! drawing group's embedded pictures with their anchors, merges, column
+//! widths and hand-set row heights (see `xls_biff` and `escher`). Styles
+//! beyond date formats are not carried over — the converted file is a fresh
+//! workbook, not a byte-preserving edit.
 
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use calamine::{Data, Reader, Sheets, open_workbook_auto};
+use calamine::{Data, Dimensions, Reader, Sheets, open_workbook_auto};
 
 use crate::SidecarError;
+use crate::escher::{self, Blip, BlipKind};
 use crate::spreadsheetml;
+use crate::xls_biff::{self, XlsSheetBinary};
 use crate::xlsx_package::{
-    SheetSpec, cell_reference, escape_xml, worksheet_document, write_package,
+    SheetArt, SheetSpec, cell_reference, escape_xml, worksheet_document, write_package,
 };
 
 pub struct ConvertResult {
@@ -81,11 +86,14 @@ pub fn convert_to_xlsx(source: &Path, target: &Path) -> Result<ConvertResult, Si
     if names.is_empty() {
         return Err(SidecarError::Workbook("The workbook has no sheets.".into()));
     }
+    // The binary layer only exists for real .xls containers; XML spreadsheets
+    // convert without it.
+    let binary = xls_biff::read_xls_binary(source);
 
     let is_xls = matches!(workbook, Sheets::Xls(_));
     let mut sheet_xmls: Vec<String> = Vec::new();
     let mut cells = 0usize;
-    for name in &names {
+    for (index, name) in names.iter().enumerate() {
         let range = workbook
             .worksheet_range(name)
             .map_err(|error| SidecarError::Workbook(format!("Sheet {name}: {error}")))?;
@@ -113,10 +121,42 @@ pub fn convert_to_xlsx(source: &Path, target: &Path) -> Result<ConvertResult, Si
                 }
             }
         }
-        let (xml, sheet_cells) = worksheet_xml(&range, &formula_map);
+        let sheet_binary = binary.as_ref().and_then(|b| b.sheets.get(index));
+        let columns = sheet_binary.map(cols_xml).unwrap_or_default();
+        let heights = match sheet_binary {
+            Some(sheet) => sheet
+                .row_heights
+                .iter()
+                .map(|(row, twips, custom)| (*row, (*twips, *custom)))
+                .collect(),
+            None => HashMap::new(),
+        };
+        let mut tail = match &mut workbook {
+            Sheets::Xls(reader) => {
+                merges_xml(&reader.merge_cells_by_sheet_name(name).unwrap_or_default())
+            }
+            _ => String::new(),
+        };
+        if sheet_binary.is_some_and(|sheet| sheet.drawing.is_some()) {
+            // the drawing part is written beside this sheet, always rId1 there
+            tail.push_str(r#"<drawing r:id="rId1"/>"#);
+        }
+        let (xml, sheet_cells) = worksheet_xml(&range, &formula_map, &columns, &tail, &heights);
         cells += sheet_cells;
         sheet_xmls.push(xml);
     }
+
+    let mut media_names: HashMap<usize, String> = HashMap::new();
+    let art: Vec<Option<SheetArt>> = names
+        .iter()
+        .enumerate()
+        .map(|(index, _)| {
+            let binary = binary.as_ref()?;
+            let sheet = binary.sheets.get(index)?;
+            let drawing = sheet.drawing.as_ref()?;
+            sheet_art(sheet, drawing, &binary.blips, &mut media_names)
+        })
+        .collect();
 
     let sheets: Vec<SheetSpec> = names
         .iter()
@@ -125,18 +165,245 @@ pub fn convert_to_xlsx(source: &Path, target: &Path) -> Result<ConvertResult, Si
             state: None,
         })
         .collect();
-    write_package(target, &sheets, "", &sheet_xmls)?;
+    write_package(target, &sheets, "", &sheet_xmls, &art)?;
     Ok(ConvertResult {
         sheets: names.len(),
         cells,
     })
 }
 
+/// `<mergeCells>` for the ranges calamine reports, or nothing at zero.
+fn merges_xml(merges: &[Dimensions]) -> String {
+    if merges.is_empty() {
+        return String::new();
+    }
+    let cells: String = merges
+        .iter()
+        .map(|range| {
+            format!(
+                r#"<mergeCell ref="{}:{}"/>"#,
+                cell_reference(range.start.0, range.start.1),
+                cell_reference(range.end.0, range.end.1),
+            )
+        })
+        .collect();
+    format!(
+        r#"<mergeCells count="{}">{cells}</mergeCells>"#,
+        merges.len()
+    )
+}
+
+/// `<cols>` from the sheet's COLINFO entries. LibreOffice echoes the sheet's
+/// default width as one span covering every column; a span that wide is the
+/// default, not a custom width, and goes back out only through the anchor
+/// arithmetic.
+fn cols_xml(sheet: &XlsSheetBinary) -> String {
+    let custom: Vec<_> = sheet
+        .col_infos
+        .iter()
+        .filter(|(first, last, _)| *first <= *last && *first < 16384 && *last < CUSTOM_COLUMN_LIMIT)
+        .collect();
+    if custom.is_empty() {
+        return String::new();
+    }
+    let entries: String = custom
+        .iter()
+        .map(|(first, last, width)| {
+            format!(
+                r#"<col min="{}" max="{}" width="{:.2}" customWidth="1"/>"#,
+                first + 1,
+                (*last).min(16383) + 1,
+                f64::from(*width) / 256.0,
+            )
+        })
+        .collect();
+    format!("<cols>{entries}</cols>")
+}
+
+/// Column widths below this index can carry their own COLINFO width; a span
+/// reaching past it is the sheet's default echoed back (see `cols_xml`).
+const CUSTOM_COLUMN_LIMIT: u16 = 100;
+
+/// The most pictures taken from one sheet; a drawing with more is hostile and
+/// the rest are skipped.
+const MAX_PICTURES_PER_SHEET: usize = 1_000;
+
+/// A sheet's column and row geometry in pixels, built once so each picture
+/// anchor is a lookup instead of a scan over every COLINFO / ROW record.
+/// `*_edge[n]` is the sum of the first `n` sizes, added in order.
+struct SheetMetrics {
+    col_px: Vec<f64>,
+    row_px: Vec<f64>,
+    col_edge: Vec<f64>,
+    row_edge: Vec<f64>,
+}
+
+impl SheetMetrics {
+    fn new(sheet: &XlsSheetBinary) -> Self {
+        // Width in characters of the default font: the first custom COLINFO
+        // entry covering the column, else the wide default span, else the
+        // spec's 8.43. Only columns below the limit can be custom.
+        let mut default = 8.43;
+        let mut custom: Vec<Option<f64>> = vec![None; usize::from(CUSTOM_COLUMN_LIMIT)];
+        for (first, last, width) in &sheet.col_infos {
+            let chars = f64::from(*width) / 256.0;
+            if *last >= CUSTOM_COLUMN_LIMIT {
+                default = chars;
+            } else {
+                for column in *first..=*last {
+                    custom[usize::from(column)].get_or_insert(chars);
+                }
+            }
+        }
+        // Calibri-11 metrics: the same 7 px per character the workbook DSL's
+        // width ops use.
+        let col_px: Vec<f64> = (0..=u16::MAX)
+            .map(|column| {
+                let chars = custom.get(usize::from(column)).copied().flatten();
+                (chars.unwrap_or(default) * 7.0).round() + 5.0
+            })
+            .collect();
+        // Twips -> points -> pixels at 96 dpi. Rows the file describes carry
+        // their own height (the first record wins); the rest get 12.75 pt.
+        let mut twips = vec![255u16; usize::from(u16::MAX) + 1];
+        let mut seen = vec![false; twips.len()];
+        for (row, height, _) in &sheet.row_heights {
+            if !seen[usize::from(*row)] {
+                seen[usize::from(*row)] = true;
+                twips[usize::from(*row)] = *height;
+            }
+        }
+        let row_px: Vec<f64> = twips.iter().map(|t| f64::from(*t) / 15.0).collect();
+        SheetMetrics {
+            col_edge: edges(&col_px),
+            row_edge: edges(&row_px),
+            col_px,
+            row_px,
+        }
+    }
+
+    /// The left edge of `column` plus `offset` 1024ths of its width, in pixels.
+    fn column_span_px(&self, column: u16, offset: u16) -> f64 {
+        let column = usize::from(column);
+        self.col_edge[column] + self.col_px[column] * f64::from(offset) / 1024.0
+    }
+
+    /// The top edge of `row` plus `offset` 1024ths of its height, in pixels.
+    fn row_span_px(&self, row: u16, offset: u16) -> f64 {
+        let row = usize::from(row);
+        self.row_edge[row] + self.row_px[row] * f64::from(offset) / 1024.0
+    }
+}
+
+fn edges(sizes: &[f64]) -> Vec<f64> {
+    let mut out = Vec::with_capacity(sizes.len());
+    let mut sum = 0.0;
+    for size in sizes {
+        out.push(sum);
+        sum += size;
+    }
+    out
+}
+
+fn px_to_emu(px: f64) -> i64 {
+    (px * 9525.0).round() as i64
+}
+
+/// The drawing part of one sheet: every picture the Escher stream holds, as a
+/// twoCellAnchor over the sheet's own column widths and row heights. Pictures
+/// with an unsupported blip format, an out-of-range BSE index or an edge
+/// sentinel in the anchor are left out.
+fn sheet_art(
+    sheet: &XlsSheetBinary,
+    drawing: &[u8],
+    blips: &[Blip],
+    media_names: &mut HashMap<usize, String>,
+) -> Option<SheetArt> {
+    let pictures = escher::parse_pictures(drawing);
+    let metrics = SheetMetrics::new(sheet);
+    let mut anchors_xml = String::new();
+    let mut rels_xml = String::new();
+    let mut media: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut rel_count = 0usize;
+    let mut rel_of_blip: HashMap<usize, usize> = HashMap::new();
+    for (position, picture) in pictures.iter().take(MAX_PICTURES_PER_SHEET).enumerate() {
+        let [col_l, dx_l, row_t, dy_t, col_r, dx_r, row_b, dy_b] = picture.anchor;
+        if col_r == u16::MAX || row_b == u16::MAX {
+            // "runs to the sheet's edge" — an extent the cell grid cannot name
+            continue;
+        }
+        let blip_index = match picture.blip.checked_sub(1) {
+            Some(index) if (index as usize) < blips.len() => index as usize,
+            _ => continue,
+        };
+        let blip = &blips[blip_index];
+        if blip.bytes.is_empty() || matches!(blip.kind, BlipKind::Other) {
+            continue;
+        }
+        let rel = match rel_of_blip.get(&blip_index) {
+            Some(rel) => *rel,
+            None => {
+                rel_count += 1;
+                let rel = rel_count;
+                // the media map carries the bare file name (the drawing's
+                // relationship target); the package part gets the media path
+                let name = match media_names.get(&blip_index) {
+                    Some(name) => name.clone(),
+                    None => {
+                        let name =
+                            format!("image{}.{}", media_names.len() + 1, blip.kind.extension());
+                        media_names.insert(blip_index, name.clone());
+                        media.push((format!("xl/media/{name}"), blip.bytes.clone()));
+                        name
+                    }
+                };
+                rels_xml.push_str(&format!(
+                    r#"<Relationship Id="rId{rel}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/{name}"/>"#,
+                ));
+                rel_of_blip.insert(blip_index, rel);
+                rel
+            }
+        };
+        let from_x = metrics.column_span_px(col_l, dx_l);
+        let from_y = metrics.row_span_px(row_t, dy_t);
+        let to_x = metrics.column_span_px(col_r, dx_r);
+        let to_y = metrics.row_span_px(row_b, dy_b);
+        anchors_xml.push_str(&format!(
+            r#"<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>{col_l}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{row_t}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:from><xdr:to><xdr:col>{col_r}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{row_b}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="{}" name="Picture {}"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId{rel}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="{}" y="{}"/><a:ext cx="{}" cy="{}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>"#,
+            px_to_emu(metrics.col_px[usize::from(col_l)] * f64::from(dx_l) / 1024.0),
+            px_to_emu(metrics.row_px[usize::from(row_t)] * f64::from(dy_t) / 1024.0),
+            px_to_emu(metrics.col_px[usize::from(col_r)] * f64::from(dx_r) / 1024.0),
+            px_to_emu(metrics.row_px[usize::from(row_b)] * f64::from(dy_b) / 1024.0),
+            position + 1,
+            position + 1,
+            px_to_emu(from_x),
+            px_to_emu(from_y),
+            px_to_emu((to_x - from_x).max(0.0)),
+            px_to_emu((to_y - from_y).max(0.0)),
+        ));
+    }
+    if rel_count == 0 {
+        return None;
+    }
+    Some(SheetArt {
+        xml: format!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{anchors_xml}</xdr:wsDr>"#,
+        ),
+        rels: format!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{rels_xml}</Relationships>"#,
+        ),
+        media,
+    })
+}
+
 fn worksheet_xml(
     range: &calamine::Range<Data>,
     formulas: &HashMap<(u32, u32), String>,
+    columns: &str,
+    tail: &str,
+    heights: &HashMap<u16, (u16, bool)>,
 ) -> (String, usize) {
-    // Rows carrying values plus rows carrying only formulas.
+    // Rows carrying values plus rows carrying only formulas or a height.
     let mut rows: HashMap<u32, Vec<(u32, String)>> = HashMap::new();
     let mut cells = 0usize;
     let (start_row, start_col) = range.start().unwrap_or((0, 0));
@@ -164,6 +431,11 @@ fn worksheet_xml(
             ));
         }
     }
+    for (row, (_, custom)) in heights {
+        if *custom && !rows.contains_key(&u32::from(*row)) {
+            rows.insert(u32::from(*row), Vec::new());
+        }
+    }
 
     let mut row_numbers: Vec<u32> = rows.keys().copied().collect();
     row_numbers.sort_unstable();
@@ -171,7 +443,15 @@ fn worksheet_xml(
     for row in row_numbers {
         let mut line = rows.remove(&row).unwrap_or_default();
         line.sort_unstable_by_key(|(column, _)| *column);
-        body.push_str(&format!(r#"<row r="{}">"#, row + 1));
+        let height = match heights.get(&u16::try_from(row).unwrap_or(u16::MAX)) {
+            // a hand-set height goes out with the custom flag; the sheet
+            // default the file echoed back stays with the reader
+            Some((twips, true)) => {
+                format!(r#" ht="{:.2}" customHeight="1""#, f64::from(*twips) / 20.0)
+            }
+            _ => String::new(),
+        };
+        body.push_str(&format!(r#"<row r="{}"{height}>"#, row + 1));
         for (_, cell) in line {
             body.push_str(&cell);
         }
@@ -186,7 +466,7 @@ fn worksheet_xml(
         ),
         _ => "A1:A1".into(),
     };
-    (worksheet_document(&dimension, "", &body, ""), cells)
+    (worksheet_document(&dimension, columns, &body, tail), cells)
 }
 
 fn cell_xml(position: (u32, u32), value: &Data, formula: Option<&str>) -> Option<String> {
@@ -242,6 +522,128 @@ mod tests {
         let mut content = String::new();
         entry.read_to_string(&mut content).unwrap();
         content
+    }
+
+    fn read_bytes(path: &Path, name: &str) -> Vec<u8> {
+        let mut archive = zip::ZipArchive::new(File::open(path).unwrap()).unwrap();
+        let mut entry = archive.by_name(name).unwrap();
+        let mut content = Vec::new();
+        entry.read_to_end(&mut content).unwrap();
+        content
+    }
+
+    #[test]
+    fn carries_pictures_merges_widths_and_heights_from_a_legacy_workbook() {
+        // A real BIFF8 file written by LibreOffice: one PNG anchored beside
+        // the data, a merged banner, a custom first column and row height,
+        // and borders (which stay behind with the other styles).
+        let fixture = Path::new("tests/fixtures/merges-widths-picture.xls");
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("converted.xlsx");
+        convert_to_xlsx(fixture, &target).unwrap();
+
+        let image = read_bytes(&target, "xl/media/image1.png");
+        assert!(
+            image.starts_with(&[0x89, b'P', b'N', b'G']),
+            "the extracted picture is not a PNG: {:02x?}",
+            &image[..image.len().min(32)]
+        );
+        let drawing = read_entry(&target, "xl/drawings/drawing1.xml");
+        assert!(drawing.contains("<xdr:twoCellAnchor"));
+        assert!(drawing.contains("<xdr:col>4</xdr:col>"));
+        assert!(drawing.contains("<xdr:row>1</xdr:row>"));
+        assert!(drawing.contains(r#"<a:blip r:embed="rId1"/>"#));
+        let sheet = read_entry(&target, "xl/worksheets/sheet1.xml");
+        assert!(sheet.contains(r#"<mergeCells count="1"><mergeCell ref="A5:C5"/></mergeCells>"#));
+        assert!(sheet.contains(r#"<col min="1" max="1" width="27.98" customWidth="1"/>"#));
+        assert!(sheet.contains(r#"<row r="2" ht="30.00" customHeight="1">"#));
+        assert!(sheet.contains(r#"<drawing r:id="rId1"/>"#));
+        let types = read_entry(&target, "[Content_Types].xml");
+        assert!(types.contains(r#"<Default Extension="png" ContentType="image/png"/>"#));
+        assert!(types.contains(r#"<Override PartName="/xl/drawings/drawing1.xml""#));
+    }
+
+    fn sheet_binary(
+        col_infos: Vec<(u16, u16, u16)>,
+        row_heights: Vec<(u16, u16, bool)>,
+    ) -> XlsSheetBinary {
+        XlsSheetBinary {
+            col_infos,
+            row_heights,
+            drawing: None,
+        }
+    }
+
+    #[test]
+    fn cols_xml_skips_spans_that_would_wrap_or_run_backwards() {
+        let sheet = sheet_binary(
+            vec![(65535, 5, 2560), (3, 1, 2560), (2, 2, 2560), (0, 400, 2304)],
+            Vec::new(),
+        );
+        assert_eq!(
+            cols_xml(&sheet),
+            r#"<cols><col min="3" max="3" width="10.00" customWidth="1"/></cols>"#
+        );
+    }
+
+    #[test]
+    fn sheet_metrics_match_the_per_step_scan_they_replace() {
+        let sheet = sheet_binary(
+            vec![(0, 400, 2304), (1, 2, 4096), (2, 3, 1024)],
+            vec![(2, 600, true), (2, 900, true), (65535, 300, false)],
+        );
+        let metrics = SheetMetrics::new(&sheet);
+        // first matching COLINFO wins, then the wide default span
+        assert_eq!(metrics.col_px[1], (16.0f64 * 7.0).round() + 5.0);
+        assert_eq!(metrics.col_px[3], (4.0f64 * 7.0).round() + 5.0);
+        assert_eq!(metrics.col_px[200], (9.0f64 * 7.0).round() + 5.0);
+        // first ROW record wins, rows without one get 12.75 pt
+        assert_eq!(metrics.row_px[2], 600.0 / 15.0);
+        assert_eq!(metrics.row_px[7], 255.0 / 15.0);
+        // the edge is the in-order sum of everything before it
+        let by_sum: f64 = metrics.col_px[..150].iter().sum();
+        assert_eq!(metrics.column_span_px(150, 0), by_sum);
+        let by_sum: f64 = metrics.row_px[..65535].iter().sum();
+        assert_eq!(
+            metrics.row_span_px(65535, 512),
+            by_sum + metrics.row_px[65535] / 2.0
+        );
+    }
+
+    #[test]
+    fn a_sheet_takes_at_most_the_picture_cap() {
+        fn record(ver_inst: u16, kind: u16, body: &[u8]) -> Vec<u8> {
+            let mut out = Vec::new();
+            out.extend_from_slice(&ver_inst.to_le_bytes());
+            out.extend_from_slice(&kind.to_le_bytes());
+            out.extend_from_slice(&(body.len() as u32).to_le_bytes());
+            out.extend_from_slice(body);
+            out
+        }
+        let mut anchor = vec![0u8; 18];
+        anchor[4..6].copy_from_slice(&1u16.to_le_bytes());
+        anchor[12..14].copy_from_slice(&2u16.to_le_bytes());
+        anchor[14..16].copy_from_slice(&3u16.to_le_bytes());
+        anchor[16..18].copy_from_slice(&4u16.to_le_bytes());
+        let mut opt = Vec::new();
+        opt.extend_from_slice(&0x0104u16.to_le_bytes());
+        opt.extend_from_slice(&1u32.to_le_bytes());
+        let mut shape = record(0x0, 0xF010, &anchor);
+        shape.extend(record(0x0, 0xF00B, &opt));
+        let shape = record(0xF, 0xF004, &shape);
+        let drawing: Vec<u8> = (0..MAX_PICTURES_PER_SHEET + 5)
+            .flat_map(|_| shape.clone())
+            .collect();
+        let blips = [Blip {
+            kind: BlipKind::Png,
+            bytes: vec![1, 2, 3],
+        }];
+        let sheet = sheet_binary(Vec::new(), Vec::new());
+        let art = sheet_art(&sheet, &drawing, &blips, &mut HashMap::new()).unwrap();
+        assert_eq!(
+            art.xml.matches("<xdr:twoCellAnchor ").count(),
+            MAX_PICTURES_PER_SHEET
+        );
     }
 
     #[test]
