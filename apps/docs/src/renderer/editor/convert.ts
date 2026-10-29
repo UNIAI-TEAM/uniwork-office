@@ -3,6 +3,7 @@ import {
   parseLazyMediaUrl,
   setPPrChange,
   stripPPrChange,
+  stripParaMarkRevision,
   ommlToLatex,
   patchFieldParagraphXml,
   applyImageWrap,
@@ -21,6 +22,8 @@ import {
   type TextboxSizePatch,
   patchTextboxParas,
   generateTableModelXml,
+  patchRunPictureXml,
+  type RunPictureGeometry,
   symbolGlyph,
   symbolPuaChar,
   type Block,
@@ -809,6 +812,7 @@ function blockToPmNode(
           commentEnds: block.commentEnds ?? null,
           pPrChange: block.pPrChangeInfo ? JSON.stringify(block.pPrChangeInfo) : null,
           paraMarkDel: block.paraMarkDel ? JSON.stringify(block.paraMarkDel) : null,
+          paraMarkIns: block.paraMarkIns ? JSON.stringify(block.paraMarkIns) : null,
           blockRevision: block.blockRevision ?? null,
           ...formatAttrs(block.format, block.runs),
         },
@@ -830,6 +834,7 @@ function blockToPmNode(
           commentEnds: block.commentEnds ?? null,
           pPrChange: block.pPrChangeInfo ? JSON.stringify(block.pPrChangeInfo) : null,
           paraMarkDel: block.paraMarkDel ? JSON.stringify(block.paraMarkDel) : null,
+          paraMarkIns: block.paraMarkIns ? JSON.stringify(block.paraMarkIns) : null,
           blockRevision: block.blockRevision ?? null,
           ...formatAttrs(block.format, block.runs),
         },
@@ -850,6 +855,7 @@ function blockToPmNode(
           moveRevision: block.moveRevision ?? null,
           pPrChange: block.pPrChangeInfo ? JSON.stringify(block.pPrChangeInfo) : null,
           paraMarkDel: block.paraMarkDel ? JSON.stringify(block.paraMarkDel) : null,
+          paraMarkIns: block.paraMarkIns ? JSON.stringify(block.paraMarkIns) : null,
           blockRevision: block.blockRevision ?? null,
           ...formatAttrs(block.format, block.runs),
         },
@@ -2456,7 +2462,13 @@ export function pmDocToSavePlan(inputDoc: PmNode, originalBlocks: Block[]): Save
         }
         if (genBox) {
           xml = patchShapeStyles(xml, [
-            { fillHex: genBox.fill ?? null, borderHex: genBox.borderColor ?? null },
+            {
+              fillHex: genBox.fill ?? null,
+              borderHex: genBox.borderColor ?? null,
+              // undefined keeps the generated XML untouched when never edited
+              rotDeg: genBox.rotDeg ?? undefined,
+              borderWidthPx: genBox.borderWidthPx ?? undefined,
+            },
           ])
         }
         // apply wrap changes for floating textboxes/shapes
@@ -3087,9 +3099,23 @@ function textboxStylesPatch(node: PmNode, original: Block): (ShapeStylePatch | n
       (box.borderColor ?? null) !== (initial[index].borderColor ?? null)
         ? (box.borderColor ?? null)
         : undefined
-    if (fillHex === undefined && borderHex === undefined) return null
+    // rotation 0 is the cleared state: patch@rot is removed (null/0), so an
+    // absent attribute and rotDeg 0 compare equal
+    const rotDeg =
+      (box.rotDeg ?? 0) !== (initial[index].rotDeg ?? 0) ? (box.rotDeg ?? 0) : undefined
+    const borderWidthPx =
+      (box.borderWidthPx ?? null) !== (initial[index].borderWidthPx ?? null)
+        ? (box.borderWidthPx ?? null)
+        : undefined
+    if (
+      fillHex === undefined &&
+      borderHex === undefined &&
+      rotDeg === undefined &&
+      borderWidthPx === undefined
+    )
+      return null
     changed = true
-    return { fillHex, borderHex }
+    return { fillHex, borderHex, rotDeg, borderWidthPx }
   })
   return changed ? styles : null
 }
@@ -3195,6 +3221,10 @@ function applyRawPPr(generated: GeneratedBlock, original: Block): void {
   } else if (generated.pPrChange) {
     rawPPr = setPPrChange(rawPPr, generated.pPrChange)
   }
+  if (generated.paraMarkDel === null && original.paraMarkDel)
+    rawPPr = stripParaMarkRevision(rawPPr, 'del')
+  if (generated.paraMarkIns === null && original.paraMarkIns)
+    rawPPr = stripParaMarkRevision(rawPPr, 'ins')
   generated.rawPPr = rawPPr
 }
 
@@ -3320,6 +3350,7 @@ export function pmNodeToGeneratedBlock(node: PmNode): GeneratedBlock {
       runs,
       ...(pPrChange !== undefined ? { pPrChange: pPrChange ?? null } : {}),
       ...(blockRevision !== undefined ? { blockRevision: blockRevision ?? null } : {}),
+      ...paraMarkRevisions(node),
     }
   }
   if (node.type === 'docListItem') {
@@ -3343,6 +3374,7 @@ export function pmNodeToGeneratedBlock(node: PmNode): GeneratedBlock {
         runs,
         ...(pPrChange !== undefined ? { pPrChange: pPrChange ?? null } : {}),
         ...(blockRevision !== undefined ? { blockRevision: blockRevision ?? null } : {}),
+        ...paraMarkRevisions(node),
       }
     }
     // list item without a docx numbering id degrades to a plain paragraph with marker
@@ -3383,6 +3415,15 @@ export function pmNodeToGeneratedBlock(node: PmNode): GeneratedBlock {
     // carry pPrChange through: null means "user accepted/rejected, strip from rawPPr"
     ...(pPrChange !== undefined ? { pPrChange: pPrChange ?? null } : {}),
     ...(blockRevision !== undefined ? { blockRevision: blockRevision ?? null } : {}),
+    ...paraMarkRevisions(node),
+  }
+}
+
+/** null = no pending paragraph-mark revision; applyRawPPr strips the record the original carried */
+function paraMarkRevisions(node: PmNode): Pick<GeneratedBlock, 'paraMarkDel' | 'paraMarkIns'> {
+  return {
+    paraMarkDel: (node.attrs?.paraMarkDel as string | null | undefined) ?? null,
+    paraMarkIns: (node.attrs?.paraMarkIns as string | null | undefined) ?? null,
   }
 }
 
@@ -3464,8 +3505,24 @@ export function inlineToRuns(content: PmNode[]): Run[] {
     }
     if (node.type === 'docInlineImage') {
       const dataUrl = String(node.attrs?.dataUrl ?? '')
-      const xml = String(node.attrs?.xml ?? '')
+      let xml = String(node.attrs?.xml ?? '')
       const rule = node.attrs?.rule as NonNullable<Run['image']>['rule'] | null | undefined
+      const w = Number(node.attrs?.widthPx)
+      const h = Number(node.attrs?.heightPx)
+      // size, wrap and position edits; untouched geometry keeps the bytes
+      if (xml && !rule) {
+        const a = node.attrs ?? {}
+        xml = patchRunPictureXml(xml, {
+          widthPx: w > 0 ? w : null,
+          heightPx: h > 0 ? h : null,
+          wrap: (a.wrap as ImageWrap | null) ?? null,
+          offsetXEmu: (a.offsetXEmu as number | null) ?? null,
+          offsetYEmu: (a.offsetYEmu as number | null) ?? null,
+          relH: (a.relH as RunPictureGeometry['relH']) ?? null,
+          relV: (a.relV as RunPictureGeometry['relV']) ?? null,
+          lineCenterV: !!a.lineCenterV,
+        })
+      }
       if ((dataUrl || rule) && xml) {
         const base = atomBase(node)
         const hasRedact = node.marks?.some((m) => m.type === 'redaction') ?? false
@@ -3890,6 +3947,8 @@ export function signatureOfBlock(block: Block): string {
     runs: normalizedRuns(block.runs ?? []),
     // include pPrChangeInfo in signature: present = has pPrChange, absent = clean
     pPrChange: block.pPrChangeInfo ? JSON.stringify(block.pPrChangeInfo) : null,
+    paraMarkDel: block.paraMarkDel ? JSON.stringify(block.paraMarkDel) : null,
+    paraMarkIns: block.paraMarkIns ? JSON.stringify(block.paraMarkIns) : null,
     blockRevision: block.blockRevision ?? null,
   })
 }
@@ -3908,6 +3967,8 @@ export function signatureOfGenerated(block: GeneratedBlock): string {
     runs: normalizedRuns(block.runs),
     // include pPrChange in signature: null (accepted/rejected) != non-null (has pPrChange)
     pPrChange: block.pPrChange ?? null,
+    paraMarkDel: block.paraMarkDel ?? null,
+    paraMarkIns: block.paraMarkIns ?? null,
     blockRevision: block.blockRevision ?? null,
   })
 }

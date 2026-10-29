@@ -1706,10 +1706,12 @@ export interface Block {
       ilvl?: number
     }
   }
-  /** Top-level block insertion/deletion wrapper (w:ins/w:del around w:p or w:tbl). */
+  /** Block insertion/deletion wrapper (w:ins/w:del around a w:tbl &c). A whole paragraph takes the paragraph-mark record instead — the shape readers resolve. */
   blockRevision?: { kind: 'ins' | 'del' } & RevisionInfo
   /** Tracked deletion of the paragraph mark (w:pPr/w:rPr/w:del): Word joins the paragraph into the next one. */
   paraMarkDel?: { author: string; date?: string; id?: string }
+  /** Tracked insertion of the paragraph mark (w:pPr/w:rPr/w:ins): rejecting joins the paragraph into the next one. */
+  paraMarkIns?: { author: string; date?: string; id?: string }
 }
 
 /** numbering marker of a textbox paragraph, resolved at parse time (display only) */
@@ -1920,6 +1922,9 @@ export interface GeneratedBlock {
    * applyRawPPr then strips <w:pPrChange> from rawPPr so the saved file is clean.
    */
   pPrChange?: string | null
+  /** JSON paragraph-mark revision; null = accepted/rejected, strip the w:del / w:ins from the mark's rPr */
+  paraMarkDel?: string | null
+  paraMarkIns?: string | null
   /** Used by editor dirty detection; SaveBlock carries the actual wrapper metadata. */
   blockRevision?: ({ kind: 'ins' | 'del' } & RevisionInfo) | null
 }
