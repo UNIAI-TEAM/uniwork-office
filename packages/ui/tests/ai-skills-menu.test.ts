@@ -103,6 +103,21 @@ describe('AiSkillsMenu', () => {
     expect(host.querySelector('.ai-plus-pop')).not.toBeNull()
   })
 
+  it('closes on Escape from a focused skill row and returns focus to the + button', async () => {
+    mount()
+    const btn = host.querySelector<HTMLButtonElement>('.ai-plus-btn')!
+    click(btn)
+    await settle()
+    const row = host.querySelector<HTMLElement>('.ai-plus-skill')!
+    act(() => row.focus())
+    expect(document.activeElement).toBe(row)
+    act(() => {
+      row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(host.querySelector('.ai-plus-pop')).toBeNull()
+    expect(document.activeElement).toBe(btn)
+  })
+
   it('marks selected skills and offers Manage only when a handler is given', async () => {
     const onManage = vi.fn()
     mount({ selected: ['tables'], onManage })

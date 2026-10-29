@@ -111,7 +111,19 @@ export function AiSkillsMenu({
         </svg>
       </button>
       {open && (
-        <div ref={popRef} className="ai-plus-pop" role="menu" style={popStyle}>
+        <div
+          ref={popRef}
+          className="ai-plus-pop"
+          role="menu"
+          style={popStyle}
+          onKeyDown={(e) => {
+            // Escape from the search field or any row closes the menu and hands focus back to `+`
+            if (e.key !== 'Escape') return
+            e.stopPropagation()
+            setOpen(false)
+            btnRef.current?.focus()
+          }}
+        >
           {page === 'root' ? (
             <>
               <button
@@ -162,9 +174,6 @@ export function AiSkillsMenu({
                   value={query}
                   placeholder={strings.searchPlaceholder}
                   onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') setOpen(false)
-                  }}
                 />
               </div>
               {atLimit && (
