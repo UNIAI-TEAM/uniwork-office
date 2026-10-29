@@ -53,6 +53,7 @@ import { collectOutline, type OutlineItem } from './editor/outline'
 import { rewriteRawHtmlImages } from './editor/rawHtml'
 import { buildSlashItems } from './editor/slashCommand'
 import type { SlashController, SlashMenuState } from './editor/slashCommand'
+import { invalidateWikiHeads } from './editor/wikiSuggest'
 import { revealWikiFragment, wikiFragmentPosition, wikiTarget } from './editor/wikilink'
 import type { WikiSuggestController, WikiSuggestState } from './editor/wikiSuggest'
 import { dirOf, refreshWebPictures, setImageBaseDir, VIEW_IMAGE_EVENT } from './editor/localImage'
@@ -849,6 +850,8 @@ export default function App() {
           diskTextRef.current = result.writtenText ?? text
           overwriteRef.current = false
           setDiskNotice(null)
+          // what this note offers `[[...#` has just changed on disk
+          invalidateWikiHeads()
           const unchanged =
             editorRef.current?.state.doc === docAtSave &&
             envelopeRef.current.frontmatter === fmAtSave
