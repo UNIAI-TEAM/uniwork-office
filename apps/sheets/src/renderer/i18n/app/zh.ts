@@ -1,5 +1,19 @@
 /** app strings, zh: defines the key set every other locale shard must match. */
 export const zh = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: '把选中的内容对 AI 隐藏',
+  redactDialogDesc:
+    '选中的内容会留在文档和文件里，AI 读到的却是下面的标记。给它起个名字，AI 才知道它是什么。',
+  redactDialogScope:
+    '这只针对本应用的 AI。命令行、MCP 工具和无界面导出会直接读取文件，仍然看得到这些文字。',
+  redactDialogPlaceholder: '占位名称，例如：客户电话',
+  redactCancel: '取消',
+  redactInsert: '隐藏',
+  redactEnable: '选中单元格后右键，即可对 AI 隐藏。',
+  redactNeedsSavedRow: '这一行还没存进文件。请先存盘，再隐藏其中的单元格。',
+  redactRecoveredFromNames:
+    '这个文件被别的软件改写过，隐藏记录的部件被丢掉了。已从工作簿里的名称把隐藏单元格找回来；存一次盘就能恢复完整记录。',
+
   appMergeWorkbooks: '合并工作簿',
   appMergeWorkbooksTip: '将其他 Excel 文件的工作表并入当前工作簿',
   appMergeWorkbooksPicking: '选择要合并的文件…',
@@ -173,6 +187,10 @@ export const zh = {
   appInvalidGroupField: '分组字段无效。',
   appInvalidPageField: '无效的报表筛选字段。',
   appPivotPageItemMissing: '报表筛选项“{item}”不是字段“{label}”的成员。',
+  appInvalidPivotBaseField: '“显示方式”的基字段必须位于行或列区域。',
+  appPivotBaseFieldMissing: '值字段的“显示方式”需要选择基字段。',
+  appPivotBaseFieldNotAxis: '基字段“{label}”必须位于透视表的行或列。',
+  appPivotBaseItemMissing: '基项“{item}”不是字段“{label}”的成员。',
   appInvalidLabelFilterField: '标签筛选的字段无效。',
   appInvalidValueFieldIndex: '值字段索引 {index} 无效。',
   appInvalidValueField: '值字段无效。',
@@ -283,6 +301,7 @@ export const zh = {
   appDialogCancel: '取消',
   appPivotSheetNoMove: '该工作表含数据透视表——暂不支持移动区域。',
   appMergeOverTable: '所选区域位于 Excel 表格内——暂不支持合并表格中的单元格。',
+  appFilterToggleFailed: '筛选没有应用——请先选中包含数据的区域。',
   appAutofillStreaming: '暂不允许向仍在流式加载的区域自动填充。',
   appDvNeedsIndexed: '编辑数据验证需要该工作表先完成索引——稍后再试。',
   appPivotSheetNoDuplicate: '该工作表含数据透视表——暂不支持复制该表。',

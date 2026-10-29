@@ -1,6 +1,20 @@
 import type { zh } from './zh'
 
 export const ar = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'إخفاء التحديد عن الذكاء الاصطناعي',
+  redactDialogDesc:
+    'يبقى ما تختاره في المستند وفي الملف؛ يرى النموذج العلامة أدناه. سمِّها ليعرف ما تمثّله.',
+  redactDialogScope:
+    'الإخفاء يشمل الذكاء الاصطناعي في هذا التطبيق فقط. أما CLI وأدوات MCP والتصدير بدون واجهة فيقرأون الملف مباشرة، وما زالوا يرون هذه الكلمات.',
+  redactDialogPlaceholder: 'اسم العنصر، مثال: هاتف العميل',
+  redactCancel: 'إلغاء',
+  redactInsert: 'إخفاء',
+  redactEnable: 'انقر بزر الفأرة الأيمن على التحديد لإخفائه عن الذكاء الاصطناعي.',
+  redactNeedsSavedRow: 'هذا الصف ليس في الملف بعد. احفظ الملف أولاً ثم أخفِ الخلية.',
+  redactRecoveredFromNames:
+    'أعاد تطبيق آخر كتابة هذا الملف وأسقط سجل ما هو مخفي. استُعيدت الخلايا المخفية من الأسماء في المصنف؛ ويؤدي الحفظ إلى استعادة السجل الكامل.',
+
   appMergeWorkbooks: 'دمج المصنفات',
   appMergeWorkbooksTip: 'إضافة أوراق من ملفات Excel أخرى إلى هذا المصنف',
   appMergeWorkbooksPicking: 'اختر الملفات المراد دمجها…',
@@ -181,6 +195,10 @@ export const ar = {
   appInvalidGroupField: 'حقل التجميع غير صالح.',
   appInvalidPageField: 'حقل عامل تصفية التقرير غير صالح.',
   appPivotPageItemMissing: 'عنصر عامل التصفية "{item}" ليس عضوًا في الحقل "{label}".',
+  appInvalidPivotBaseField: 'يجب أن يكون الحقل الأساسي لـ "إظهار القيم باسم" في الصفوف أو الأعمدة.',
+  appPivotBaseFieldMissing: 'يحتاج وضع "إظهار القيم باسم" لحقل قيم إلى حقل أساسي.',
+  appPivotBaseFieldNotAxis: 'يجب أن يكون الحقل الأساسي "{label}" في صفوف الجدول المحوري أو أعمدته.',
+  appPivotBaseItemMissing: 'العنصر الأساسي "{item}" ليس عضوًا في الحقل "{label}".',
   appInvalidLabelFilterField: 'حقل تصفية التسميات غير صالح.',
   appInvalidValueFieldIndex: 'فهرس حقل القيمة {index} غير صالح.',
   appInvalidValueField: 'حقل القيمة غير صالح.',
@@ -311,6 +329,7 @@ export const ar = {
   appDialogCancel: 'إلغاء',
   appPivotSheetNoMove: 'تحتوي هذه الورقة على جدول محوري — نقل النطاقات غير مدعوم بعد.',
   appMergeOverTable: 'التحديد يتداخل مع جدول Excel — دمج الخلايا داخل الجدول غير مدعوم حتى الآن.',
+  appFilterToggleFailed: 'لم يتم تطبيق عامل التصفية — حدد أولاً النطاق الذي يحتوي على بياناتك.',
   appAutofillStreaming: 'التعبئة التلقائية في ناحية لا تزال قيد التحميل بالبث غير مسموح بها بعد.',
   appDvNeedsIndexed:
     'يتطلب تحرير التحقق من صحة البيانات فهرسة الورقة بالكامل أولاً — أعد المحاولة لاحقًا.',

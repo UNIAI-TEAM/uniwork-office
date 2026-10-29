@@ -80,7 +80,12 @@ import type {
   ReflectionEffect,
 } from './types'
 import { patchTableStyleXml, ensureTableStyleXml, type TableStyleEdit } from './table-edit'
-import { buildChartSpaceXml, type NewChartKind, type NewChartOptions } from './chart-insert'
+import {
+  buildChartSpaceXml,
+  writeChartWorkbook,
+  type NewChartKind,
+  type NewChartOptions,
+} from './chart-insert'
 import { parseLayoutPlaceholders, placeholderSpXml, prepareInsertSlideWithLayout } from './layout'
 import {
   chooseLayout,
@@ -92,6 +97,7 @@ import {
   type SlideBundle,
 } from './slide-transfer'
 import { moveSlide } from './sections'
+import { MODEL3D_REL_TYPE, syncModel3dFrame } from './model3d'
 import { cleanupSupersededSlideResources, removePartWithOwnedResources } from './resource-cleanup'
 
 export * from './types'
@@ -295,9 +301,16 @@ export { NAMED_ACTIONS, namedActionOf, type NamedAction } from './named-action'
 export {
   addChart,
   buildChartSpaceXml,
+  writeChartWorkbook,
   type NewChartKind,
   type NewChartOptions,
 } from './chart-insert'
+export {
+  CHART_WORKBOOK_REL_TYPE,
+  chartWorkbookParts,
+  chartWorkbookXlsx,
+  type ChartWorkbookData,
+} from './chart-workbook'
 export {
   addSmartArt,
   buildSmartArtXml,
@@ -305,13 +318,30 @@ export {
   type NewSmartArtOptions,
 } from './smartart'
 export {
+  AM3D_NS,
+  MODEL3D_REL_TYPE,
+  NO_ROTATION,
+  readModel3dRotation,
+  type Model3dRotation,
+} from './model3d'
+export { glbBounds, isGlbContainer, type GlbBounds } from './glb-bounds'
+export {
   addMedia,
   addModel3d,
+  setModel3dView,
   model3dPartOf,
   solidPng,
   type NewMediaOptions,
   type NewModel3dOptions,
 } from './media-insert'
+export {
+  addNarration,
+  clearNarration,
+  narrationSpids,
+  setShowNarration,
+  NARRATION_NAME,
+  type NarrationAudio,
+} from './narration'
 export { applyHeaderFooter, readHeaderFooter, type HeaderFooterOptions } from './headerfooter'
 export {
   getSections,
@@ -403,6 +433,7 @@ function parseSlideFromArchive(archive: PackageArchive, slidePath: string): Slid
   const diagramColors = new Map<string, string>()
   const vmlPreviews = new Map<string, string>()
   const hlinkRels = new Map<string, string>()
+  const model3dRels = new Map<string, string>()
   let slideOrder: string[] | undefined
   for (const rel of rels.values()) {
     if (rel.type.endsWith('/hyperlink')) {
@@ -441,6 +472,8 @@ function parseSlideFromArchive(archive: PackageArchive, slidePath: string): Slid
         target: external ? rel.target : resolveTarget(slidePath, rel.target),
         ...(external ? { external: true } : {}),
       })
+    } else if (rel.type === MODEL3D_REL_TYPE) {
+      model3dRels.set(rel.id, resolveTarget(slidePath, rel.target))
     } else if (rel.type.endsWith('/vmlDrawing')) {
       // Legacy OLE previews: v:shape (matched by oleObj spid) → v:imagedata → the VML part's own image rel
       const vmlPath = resolveTarget(slidePath, rel.target)
@@ -493,6 +526,7 @@ function parseSlideFromArchive(archive: PackageArchive, slidePath: string): Slid
   ctx.chartThemeOverrides = chartThemeOverrides
   if (hlinkRels.size) ctx.hlinkRels = hlinkRels
   if (avRels.size) ctx.avRels = avRels
+  if (model3dRels.size) ctx.model3dRels = model3dRels
   if (diagramDrawings.size) ctx.diagramDrawings = diagramDrawings
   if (diagramDatas.size) ctx.diagramDatas = diagramDatas
   if (diagramMediaRels.size) ctx.diagramMediaRels = diagramMediaRels
@@ -719,6 +753,11 @@ export async function savePptx(opened: OpenedPptx): Promise<Uint8Array> {
  * time. JSZip throws stream errors from inside its own scheduled callbacks, so the
  * stream's 'error' event — not just the returned promise — has to be handled or the
  * throw escapes as an uncaught exception and takes the process down.
+ *
+ * The stream truncates `filePath` before its first chunk lands, so a caller that
+ * replaces an existing deck hands this a sibling temp path and renames it over the
+ * deck once the promise resolves (Slides does so through atomicWriteVia); given the
+ * deck's own path, a save that dies mid-stream leaves it cut off.
  */
 export async function savePptxToFile(opened: OpenedPptx, filePath: string): Promise<void> {
   const { createWriteStream } = await import('node:fs')
@@ -898,6 +937,8 @@ export function patchedElementXml(el: SlideElement): string {
   // graphicFrame (table/chart/passthrough) uses the p:xfrm patch, everything else a:xfrm
   if (el.dirtyTransform) {
     xml = patchAnchorXml(el, xml, (x) => patchElementXfrm(el, x), true)
+    // PowerPoint shows a model's Choice, while the editor moves its Fallback picture
+    if (el.type === 'picture' && el.model3d) xml = syncModel3dFrame(xml)
   }
   if (el.dirtyFill && (el.type === 'text' || el.type === 'shape')) {
     const fill = (el as TextElement).fill
@@ -1845,6 +1886,7 @@ export function replacePictureBytes(
   const added = addImageMediaAndRel(opened, slide, bytes, ext)
   if (!added) return false
   let tag = blip[0]
+  const previousRId = /r:embed="([^"]*)"/.exec(tag)?.[1]
   // A coexisting r:link ("insert and link" pictures) would keep refreshing from
   // the old external file, so it is dropped once the embed points at new bytes
   if (/r:embed="/.test(tag))
@@ -1852,6 +1894,13 @@ export function replacePictureBytes(
   else if (/r:link="/.test(tag)) tag = tag.replace(/r:link="[^"]*"/, `r:embed="${added.rid}"`)
   else tag = tag.replace(/<a:blip\b/, `<a:blip r:embed="${added.rid}"`)
   xml = xml.slice(0, blip.index) + tag + xml.slice(blip.index + blip[0].length)
+  // A 3D model's Choice caches the same rendering (am3d:raster), which PowerPoint shows
+  if (pic.model3d && previousRId) {
+    xml = xml.replace(
+      new RegExp(`(<am3d:blip\\b[^>]*\\br:embed=")${previousRId}"`),
+      `$1${added.rid}"`,
+    )
+  }
   // The replacement is always raster (IMAGE_MIME gate), and PowerPoint prefers a
   // leftover Office-2016 <asvg:svgBlip> extension over the retargeted r:embed —
   // drop that extension entry (and its wrapper when nothing else remains)
@@ -2351,6 +2400,8 @@ export function materializeSlide(opened: OpenedPptx, slideIndex: number): Slide 
   archive.entries.set(slide.path, Buffer.from(patchSlideXml(slide), 'utf8'))
   const fresh = parseSlideFromArchive(archive, slide.path)
   if (!fresh) return null
+  // a reparse is not a save: the edits it baked into the XML are still unsaved
+  if (slideIsDirty(slide)) fresh.structureDirty = true
   deck.slides[slideIndex] = fresh
   return fresh
 }
@@ -2998,8 +3049,8 @@ export function editChartElement(
     ...(colorScheme ? { colorScheme } : {}),
     ...(holeSizePct != null ? { holeSizePct } : {}),
   }
-  const newXml = buildChartSpaceXml(opts)
-  archive.entries.set(chartPath, Buffer.from(newXml, 'utf8'))
+  const workbookRId = writeChartWorkbook(opened, chartPath, opts)
+  archive.entries.set(chartPath, Buffer.from(buildChartSpaceXml(opts, workbookRId), 'utf8'))
   slide.structureDirty = true
   return true
 }

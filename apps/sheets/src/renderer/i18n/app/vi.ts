@@ -1,6 +1,20 @@
 import type { zh } from './zh'
 
 export const vi = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Ẩn phần đã chọn khỏi AI',
+  redactDialogDesc:
+    'Nội dung đã chọn vẫn còn trong tài liệu và tệp; mô hình chỉ thấy nhãn thay thế bên dưới. Đặt tên để mô hình biết nó đại diện cho điều gì.',
+  redactDialogScope:
+    'Điều này chỉ áp dụng cho AI trong ứng dụng này. CLI, các công cụ MCP và bản xuất chạy nền đều đọc thẳng tệp, nên chúng vẫn thấy những từ này.',
+  redactDialogPlaceholder: 'Tên nhãn thay thế, ví dụ: số điện thoại khách hàng',
+  redactCancel: 'Hủy',
+  redactInsert: 'Ẩn',
+  redactEnable: 'Nhấp chuột phải vào phần đã chọn để ẩn khỏi AI.',
+  redactNeedsSavedRow: 'Hàng này chưa có trong tệp. Hãy lưu trước, rồi ẩn ô.',
+  redactRecoveredFromNames:
+    'Ứng dụng khác đã ghi lại tệp này và làm mất bản ghi về những ô đang ẩn. Các ô bị ẩn đã được khôi phục từ các tên trong sổ làm việc; lưu sẽ khôi phục lại toàn bộ bản ghi.',
+
   appMergeWorkbooks: 'Hợp nhất sổ làm việc',
   appMergeWorkbooksTip: 'Thêm các trang tính từ tệp Excel khác vào sổ làm việc này',
   appMergeWorkbooksPicking: 'Chọn các tệp để hợp nhất…',
@@ -186,6 +200,12 @@ export const vi = {
   appInvalidGroupField: 'Trường nhóm không hợp lệ.',
   appInvalidPageField: 'Trường bộ lọc báo cáo không hợp lệ.',
   appPivotPageItemMissing: 'Mục bộ lọc "{item}" không thuộc trường "{label}".',
+  appInvalidPivotBaseField:
+    'Trường cơ sở của "Hiển thị giá trị dưới dạng" phải nằm trong hàng hoặc cột.',
+  appPivotBaseFieldMissing:
+    'Chế độ "Hiển thị giá trị dưới dạng" của trường giá trị cần một trường cơ sở.',
+  appPivotBaseFieldNotAxis: 'Trường cơ sở "{label}" phải nằm trong hàng hoặc cột của bảng trục.',
+  appPivotBaseItemMissing: 'Mục cơ sở "{item}" không thuộc trường "{label}".',
   appInvalidLabelFilterField: 'Trường lọc nhãn không hợp lệ.',
   appInvalidValueFieldIndex: 'Chỉ mục trường giá trị {index} không hợp lệ.',
   appInvalidValueField: 'Trường giá trị không hợp lệ.',
@@ -317,6 +337,7 @@ export const vi = {
   appPivotSheetNoMove: 'Trang tính này chứa PivotTable — chưa hỗ trợ di chuyển vùng.',
   appMergeOverTable:
     'Vùng chọn chồng chéo với một bảng Excel — chưa hỗ trợ hợp nhất các ô bên trong bảng.',
+  appFilterToggleFailed: 'Bộ lọc chưa được áp dụng — hãy chọn phạm vi chứa dữ liệu trước.',
   appAutofillStreaming: 'Chưa cho phép tự động điền vào khu vực vẫn đang tải theo luồng.',
   appDvNeedsIndexed:
     'Chỉnh sửa xác thực dữ liệu yêu cầu trang tính này phải được lập chỉ mục đầy đủ trước — vui lòng thử lại sau giây lát.',

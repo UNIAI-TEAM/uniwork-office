@@ -154,6 +154,88 @@ describe('save-plan: cell pictures', () => {
     expect([...plan.added.keys()].some((name) => name.startsWith('xl/richData/'))).toBe(false)
     expect(plan.addedBinary.size).toBe(0)
   })
+
+  it('forwards redactionStates (including previousFill) and writes the redaction part and mirror', async () => {
+    const source = new Uint8Array(await buildEditFixture())
+    const { engine } = memoryEngine(source)
+    const states = [
+      {
+        sheetName: 'Data',
+        marks: [
+          {
+            startRow: 1,
+            endRow: 1,
+            startColumn: 1,
+            endColumn: 1,
+            label: 'client phone',
+            previousFill: '#FF0000',
+          },
+        ],
+      },
+    ]
+    const save = resolveSaveRequest(
+      new Map([['sheet-1', 'Data']]),
+      request({ redactionStates: states }),
+    )
+    expect(save.args.redactionStates).toEqual(states)
+    expect(
+      resolveSaveRequest(new Map([['sheet-1', 'Data']]), request({})).args.redactionStates,
+    ).toBeNull()
+
+    const { data, plan } = await saveWorkbookBytes({
+      engine,
+      sourcePath: '/work/Edit.xlsx',
+      sourceBytes: source,
+      workDir: '/tmp/save',
+      save,
+    })
+    expect([...plan.added.keys()]).toContain('xl/gxRedactions.json')
+    const saved = await JSZip.loadAsync(data)
+    const part = JSON.parse(await saved.file('xl/gxRedactions.json')!.async('text'))
+    expect(part.sheets[0].marks[0]).toMatchObject({
+      label: 'client phone',
+      previousFill: '#FF0000',
+    })
+    const workbookXml = await saved.file('xl/workbook.xml')!.async('text')
+    expect(workbookXml).toContain('_gxRedaction_1')
+  })
+
+  it('passes duplicate-sheet additions through so the duplicated sheet keeps its redaction marks', async () => {
+    const source = new Uint8Array(await buildEditFixture())
+    const { engine } = memoryEngine(source)
+    const states = [
+      {
+        sheetName: 'Data',
+        marks: [{ startRow: 1, endRow: 1, startColumn: 1, endColumn: 1, label: 'client phone' }],
+      },
+    ]
+    const save = resolveSaveRequest(
+      new Map([['sheet-1', 'Data']]),
+      request({
+        sheetOps: [
+          {
+            kind: 'duplicate-sheet',
+            sheetId: 'u-copy',
+            name: 'Data Copy',
+            sourceSheetId: 'sheet-1',
+          },
+        ],
+        sheetOrder: ['sheet-1', 'u-copy'],
+        redactionStates: states,
+      }),
+    )
+    expect(save.args.sheetPlan?.additions).toEqual([{ name: 'Data Copy', sourceSheetName: 'Data' }])
+    const { data } = await saveWorkbookBytes({
+      engine,
+      sourcePath: '/work/Edit.xlsx',
+      sourceBytes: source,
+      workDir: '/tmp/save',
+      save,
+    })
+    const saved = await JSZip.loadAsync(data)
+    const part = JSON.parse(await saved.file('xl/gxRedactions.json')!.async('text'))
+    expect(part.sheets.map((s: { name: string }) => s.name)).toEqual(['Data', 'Data Copy'])
+  })
 })
 
 /// A one-sheet workbook with an Excel table over A1:C4, the shape a ListObject filter is saved into.
@@ -344,5 +426,52 @@ describe('save-plan: a table filter edited from the header dropdown (SH-W4-V1)',
     expect(sheet).toContain('<row r="2" hidden="1"')
     expect(sheet).not.toContain('<row r="1" hidden="1"')
     expect(sheet).not.toContain('<row r="3" hidden="1"')
+  })
+})
+
+describe('save-plan: pivot Show Values As base field / item', () => {
+  const value = {
+    fieldIndex: 1,
+    agg: 'sum',
+    showDataAs: 'difference',
+    baseFieldIndex: 0,
+    baseItemIndex: 2,
+  }
+  const pivot = {
+    sheetId: 'sheet-2',
+    sourceSheetId: 'sheet-1',
+    name: 'PivotTable1',
+    values: [value],
+  }
+
+  it('keeps baseFieldIndex / baseItemIndex on a new pivot value field', () => {
+    const save = resolveSaveRequest(
+      new Map([
+        ['sheet-1', 'Data'],
+        ['sheet-2', 'Summary'],
+      ]),
+      request({ pivotAdditions: [pivot] }),
+    )
+    expect(save.args.pivotAdditions?.[0]?.values).toEqual([value])
+  })
+
+  it('keeps them on a refreshed pivot relayout', () => {
+    const save = resolveSaveRequest(
+      new Map([
+        ['sheet-1', 'Data'],
+        ['sheet-2', 'Summary'],
+      ]),
+      request({
+        pivotRefreshUpdates: [
+          {
+            cachePath: 'xl/pivotCache/pivotCacheDefinition1.xml',
+            sheetId: 'sheet-2',
+            newOutputRef: 'A1:C9',
+            relayout: pivot,
+          },
+        ],
+      }),
+    )
+    expect(save.args.pivotRefreshUpdates?.[0]?.relayout?.values).toEqual([value])
   })
 })

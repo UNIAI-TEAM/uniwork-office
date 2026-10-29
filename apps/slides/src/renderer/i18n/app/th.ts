@@ -60,8 +60,7 @@ export const th = {
   appStatusEquationInserted: 'แทรกสมการแล้ว',
   appStatusVideoInserted: 'แทรกวิดีโอแล้ว (ฝังใน pptx เล่นได้ใน PowerPoint)',
   appStatusAudioInserted: 'แทรกเสียงแล้ว (ฝังใน pptx)',
-  appStatusModel3dInserted:
-    'ฝังโมเดล 3D แล้ว (พื้นที่วาดแสดงตัวแทนชั่วคราว ไฟล์โมเดลถูกเก็บไว้ใน pptx)',
+  appStatusModel3dInserted: 'แทรกโมเดล 3 มิติแล้ว: เลือกเพื่อหมุน (PowerPoint แสดงเป็น 3 มิติด้วย)',
   appStatusRecordingEmpty: 'การบันทึกว่างเปล่า จึงไม่มีการแทรก',
   appStatusRecordingInserted: 'แทรกการบันทึกหน้าจอลงในสไลด์ปัจจุบันแล้ว (ฝังเป็น webm)',
   appStatusRecording: 'กำลังบันทึกหน้าจอ… คลิก "บันทึกหน้าจอ" อีกครั้งเพื่อหยุดและแทรก',

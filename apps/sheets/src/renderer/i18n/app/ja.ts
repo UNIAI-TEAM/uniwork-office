@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const ja = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: '選択範囲をAIから隠す',
+  redactDialogDesc:
+    '選択した内容はドキュメントとファイルに残り、AI には下のマーカーしか見えません。名前をつけると、何を表すかAIが理解できます。',
+  redactDialogScope:
+    'これはこのアプリの AI に限られます。CLI、MCP ツール、GUI なしのエクスポートはファイルを直接読み込むため、これらの文字はまだ見えています。',
+  redactDialogPlaceholder: 'プレースホルダー名（例：顧客電話）',
+  redactCancel: 'キャンセル',
+  redactInsert: '隠す',
+  redactEnable: '選択範囲を右クリックしてAIから隠します。',
+  redactNeedsSavedRow:
+    'この行はまだファイルに保存されていません。保存してからセルを非表示にしてください。',
+  redactRecoveredFromNames:
+    '別のアプリがこのファイルを書き換え、非表示にする情報を記録した部品が失われました。非表示のセルはワークブックの名前から復元されました。保存すれば完全な記録が書き戻されます。',
+
   appMergeWorkbooks: 'ブックの結合',
   appMergeWorkbooksTip: '他の Excel ファイルのシートをこのブックに追加します',
   appMergeWorkbooksPicking: '結合するファイルを選択…',
@@ -193,6 +208,12 @@ export const ja = {
   appInvalidPageField: 'レポート フィルターのフィールドが無効です。',
   appPivotPageItemMissing:
     'レポート フィルターの項目「{item}」はフィールド「{label}」のメンバーではありません。',
+  appInvalidPivotBaseField: '「値の表示方法」の基準フィールドは行または列に配置してください。',
+  appPivotBaseFieldMissing: '値フィールドの「値の表示方法」には基準フィールドが必要です。',
+  appPivotBaseFieldNotAxis:
+    '基準フィールド「{label}」はピボットテーブルの行または列に配置してください。',
+  appPivotBaseItemMissing:
+    '基準アイテム「{item}」はフィールド「{label}」のメンバーではありません。',
   appInvalidLabelFilterField: 'ラベルフィルターのフィールドが無効です。',
   appInvalidValueFieldIndex: '値フィールドのインデックス {index} が無効です。',
   appInvalidValueField: '値フィールドが無効です。',
@@ -335,6 +356,8 @@ export const ja = {
     'このシートにはピボットテーブルが含まれています — 範囲の移動には未対応です。',
   appMergeOverTable:
     '選択範囲が Excel テーブルと重なっています — テーブル内のセル結合は現時点では対応していません。',
+  appFilterToggleFailed:
+    'フィルターは適用されませんでした — 先にデータを含む範囲を選択してください。',
   appAutofillStreaming: 'ストリーミング読み込み中の範囲へのオートフィルはまだ許可されていません。',
   appDvNeedsIndexed:
     'データの入力規則を編集するには、このシートのインデックス作成が完了している必要があります — しばらくしてからお試しください。',

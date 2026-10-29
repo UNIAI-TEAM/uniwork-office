@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const pl = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Ukryj zaznaczenie przed AI',
+  redactDialogDesc:
+    'Zaznaczona zawartość zostaje w dokumencie i w pliku; model widzi tylko symbol. Nadaj mu nazwę, by wiedział, co oznacza.',
+  redactDialogScope:
+    'Ukrywanie dotyczy tylko AI w tej aplikacji. CLI, narzędzia MCP i eksport bez okienka czytują plik bezpośrednio i nadal widzą te słowa.',
+  redactDialogPlaceholder: 'Nazwa symbolu, np. telefon klienta',
+  redactCancel: 'Anuluj',
+  redactInsert: 'Ukryj',
+  redactEnable: 'Kliknij prawym na zaznaczeniu, aby ukryć je przed AI.',
+  redactNeedsSavedRow:
+    'Ten wiersz nie jest jeszcze w pliku. Zapisz najpierw, a potem ukryj komórkę.',
+  redactRecoveredFromNames:
+    'Inna aplikacja zapisała ten plik od nowa i usunęła rejestr tego, co jest ukryte. Ukryte komórki odtworzono z nazw w skoroszycie; zapisanie przywraca pełny rejestr.',
+
   appMergeWorkbooks: 'Scal skoroszyty',
   appMergeWorkbooksTip: 'Dodaj arkusze z innych plików Excel do tego skoroszytu',
   appMergeWorkbooksPicking: 'Wybierz pliki do scalenia…',
@@ -190,6 +205,12 @@ export const pl = {
   appInvalidGroupField: 'Nieprawidłowe pole grupowania.',
   appInvalidPageField: 'Nieprawidłowe pole filtru raportu.',
   appPivotPageItemMissing: 'Element filtru „{item}” nie należy do pola „{label}”.',
+  appInvalidPivotBaseField:
+    'Pole podstawowe trybu „Pokaż wartości jako” musi znajdować się w wierszach lub kolumnach.',
+  appPivotBaseFieldMissing: 'Tryb „Pokaż wartości jako” pola wartości wymaga pola podstawowego.',
+  appPivotBaseFieldNotAxis:
+    'Pole podstawowe „{label}” musi znajdować się w wierszach lub kolumnach tabeli przestawnej.',
+  appPivotBaseItemMissing: 'Element podstawowy „{item}” nie należy do pola „{label}”.',
   appInvalidLabelFilterField: 'Pole filtru etykiet jest nieprawidłowe.',
   appInvalidValueFieldIndex: 'Indeks pola wartości {index} jest nieprawidłowy.',
   appInvalidValueField: 'Nieprawidłowe pole wartości.',
@@ -336,6 +357,7 @@ export const pl = {
     'Ten arkusz zawiera tabelę przestawną — przenoszenie zakresów nie jest jeszcze obsługiwane.',
   appMergeOverTable:
     'Zaznaczenie nachodzi na tabelę programu Excel — scalanie komórek w tabeli nie jest jeszcze obsługiwane.',
+  appFilterToggleFailed: 'Filtr nie został zastosowany — najpierw zaznacz zakres z danymi.',
   appAutofillStreaming:
     'Autouzupełnianie do obszaru, który wciąż jest ładowany strumieniowo, nie jest jeszcze dozwolone.',
   appDvNeedsIndexed:

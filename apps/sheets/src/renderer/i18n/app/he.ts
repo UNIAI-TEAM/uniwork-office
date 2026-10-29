@@ -1,6 +1,20 @@
 import type { zh } from './zh'
 
 export const he = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'הסתרת הבחירה מה-AI',
+  redactDialogDesc:
+    'הבחירה נשארת במסמך ובקובץ; המודל רואה רק את הסימון. תן לו שם כדי שיהיה ברור מה הוא מייצג.',
+  redactDialogScope:
+    'ההסתרה חלה רק על המודל באפליקציה הזו. CLI, כלי MCP וייצוא ללא ממשק קוראים את הקובץ ישירות ועדיין רואים את המילות האלה.',
+  redactDialogPlaceholder: 'שם הסימון, לדוגמה: טלפון הלקוח',
+  redactCancel: 'ביטול',
+  redactInsert: 'הסתר',
+  redactEnable: 'לחיצה ימנית על הבחירה מסתירה אותה מה-AI.',
+  redactNeedsSavedRow: 'השורה הזו עדיין אינה בקובץ. שמור תחילה, ואז הסתר את התא.',
+  redactRecoveredFromNames:
+    'יישום אחר כתב מחדש את הקובץ הזה והשמיט את הרשומה של מה מוסתר. התאים המוסתרים שוחזרו מהשמות שבחוברת העבודה; שמירה משחזרת את הרשומה המלאה.',
+
   appMergeWorkbooks: 'מיזוג חוברות עבודה',
   appMergeWorkbooksTip: 'הוספת גיליונות מקובצי Excel אחרים לחוברת העבודה הזו',
   appMergeWorkbooksPicking: 'בחרו קבצים למיזוג…',
@@ -175,6 +189,10 @@ export const he = {
   appInvalidGroupField: 'שדה קיבוץ לא חוקי.',
   appInvalidPageField: 'שדה מסנן דוח לא חוקי.',
   appPivotPageItemMissing: 'פריט המסנן "{item}" אינו חבר בשדה "{label}".',
+  appInvalidPivotBaseField: 'שדה הבסיס של "הצג ערכים בתור" חייב להימצא בשורות או בעמודות.',
+  appPivotBaseFieldMissing: 'מצב "הצג ערכים בתור" של שדה ערכים דורש שדה בסיס.',
+  appPivotBaseFieldNotAxis: 'שדה הבסיס "{label}" חייב להימצא בשורות או בעמודות של טבלת הציר.',
+  appPivotBaseItemMissing: 'פריט הבסיס "{item}" אינו חבר בשדה "{label}".',
   appInvalidLabelFilterField: 'שדה מסנן התוויות אינו חוקי.',
   appInvalidValueFieldIndex: 'אינדקס שדה הערכים {index} אינו חוקי.',
   appInvalidValueField: 'שדה ערכים לא חוקי.',
@@ -296,6 +314,7 @@ export const he = {
   appDialogCancel: 'ביטול',
   appPivotSheetNoMove: 'גיליון זה מכיל טבלת ציר — הזזת טווחים אינה נתמכת עדיין.',
   appMergeOverTable: 'הבחירה חופפת לטבלת Excel — מיזוג תאים בתוך טבלה עדיין אינו נתמך.',
+  appFilterToggleFailed: 'המסנן לא הוחל — בחר תחילה את הטווח שמכיל את הנתונים שלך.',
   appAutofillStreaming: 'מילוי אוטומטי לאזור שעדיין נטען בהזרמה אינו מותר עדיין.',
   appDvNeedsIndexed:
     'עריכת אימות נתונים דורשת שגיליון זה יסיים תחילה את יצירת האינדקס — נסה שוב בעוד רגע.',

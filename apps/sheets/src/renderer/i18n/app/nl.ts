@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const nl = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'Selectie verbergen voor de AI',
+  redactDialogDesc:
+    'De selectie blijft in het document en het bestand; het model ziet alleen de placeholder. Geef hem een naam.',
+  redactDialogScope:
+    'Verbergen geldt alleen voor de AI in deze app. De CLI, MCP-tools en de export zonder venster lezen het bestand rechtstreeks en zien deze woorden nog steeds.',
+  redactDialogPlaceholder: 'Naam van placeholder, bv. telefoonnummer klant',
+  redactCancel: 'Annuleren',
+  redactInsert: 'Verbergen',
+  redactEnable: 'Rechtsklik op een selectie om die voor de AI te verbergen.',
+  redactNeedsSavedRow:
+    'Deze rij staat nog niet in het bestand. Sla eerst op en verberg daarna de cel.',
+  redactRecoveredFromNames:
+    'Een andere app heeft dit bestand herschreven en het overzicht van wat verborgen is weggegooid. De verborgen cellen zijn teruggevonden in de namen van de werkmap; bij opslaan wordt het volledige overzicht teruggeschreven.',
+
   appMergeWorkbooks: 'Werkmappen samenvoegen',
   appMergeWorkbooksTip: 'Bladen uit andere Excel-bestanden aan deze werkmap toevoegen',
   appMergeWorkbooksPicking: 'Kies bestanden om samen te voegen…',
@@ -194,6 +209,13 @@ export const nl = {
   appInvalidGroupField: 'Ongeldig groeperingsveld.',
   appInvalidPageField: 'Ongeldig rapportfilterveld.',
   appPivotPageItemMissing: 'Rapportfilteritem "{item}" is geen lid van veld "{label}".',
+  appInvalidPivotBaseField:
+    'Het basisveld van "Waarden weergeven als" moet in rijen of kolommen staan.',
+  appPivotBaseFieldMissing:
+    'De modus "Waarden weergeven als" van een waardeveld heeft een basisveld nodig.',
+  appPivotBaseFieldNotAxis:
+    'Basisveld "{label}" moet in de rijen of kolommen van de draaitabel staan.',
+  appPivotBaseItemMissing: 'Basisitem "{item}" is geen lid van veld "{label}".',
   appInvalidLabelFilterField: 'Het veld van het labelfilter is ongeldig.',
   appInvalidValueFieldIndex: 'Waardeveldindex {index} is ongeldig.',
   appInvalidValueField: 'Ongeldig waardeveld.',
@@ -335,6 +357,8 @@ export const nl = {
     'Dit werkblad bevat een draaitabel — bereiken verplaatsen wordt nog niet ondersteund.',
   appMergeOverTable:
     'De selectie overlapt een Excel-tabel — cellen samenvoegen in een tabel wordt nog niet ondersteund.',
+  appFilterToggleFailed:
+    'Het filter is niet toegepast — selecteer eerst het bereik met uw gegevens.',
   appAutofillStreaming:
     'Automatisch doorvoeren naar een gebied dat nog streamend wordt geladen, is nog niet toegestaan.',
   appDvNeedsIndexed:

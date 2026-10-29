@@ -1,6 +1,20 @@
 import type { zh } from './zh'
 
 export const th = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'ซ่อนส่วนที่เลือกจาก AI',
+  redactDialogDesc:
+    'เนื้อหาที่เลือกยังอยู่ในเอกสารและไฟล์ แต่ AI จะเห็นเพียงตัวแทนด้านล่าง ตั้งชื่อเพื่อให้ AI รู้ว่าแทนอะไร',
+  redactDialogScope:
+    'การซ่อนครอบคลุมเฉพาะ AI ในแอปนี้ CLI เครื่องมือ MCP และการส่งออกแบบไม่มีหน้าต่างอ่านไฟล์โดยตรง และยังเห็นคำเหล่านี้อยู่',
+  redactDialogPlaceholder: 'ชื่อตัวแทน เช่น เบอร์โทรศัพท์ลูกค้า',
+  redactCancel: 'ยกเลิก',
+  redactInsert: 'ซ่อน',
+  redactEnable: 'คลิกขวาที่ส่วนที่เลือกเพื่อซ่อนจาก AI',
+  redactNeedsSavedRow: 'แถวนี้ยังไม่อยู่ในไฟล์ กรุณาบันทึกก่อน แล้วจึงซ่อนเซลล์',
+  redactRecoveredFromNames:
+    'แอปอื่นเขียนไฟล์นี้ขึ้นใหม่และทำให้บันทึกสิ่งที่ถูกซ่อนหายไป เซลล์ที่ซ่อนไว้กู้คืนมาจากชื่อที่กำหนดไว้ในเวิร์กบุ๊ก การบันทึกจะคืนบันทึกทั้งหมด',
+
   appMergeWorkbooks: 'รวมเวิร์กบุ๊ก',
   appMergeWorkbooksTip: 'นำชีตจากไฟล์ Excel อื่นมารวมในเวิร์กบุ๊กนี้',
   appMergeWorkbooksPicking: 'เลือกไฟล์ที่จะรวม…',
@@ -181,6 +195,10 @@ export const th = {
   appInvalidGroupField: 'เขตข้อมูลการจัดกลุ่มไม่ถูกต้อง',
   appInvalidPageField: 'เขตข้อมูลตัวกรองรายงานไม่ถูกต้อง',
   appPivotPageItemMissing: 'รายการตัวกรองรายงาน "{item}" ไม่ใช่สมาชิกของเขตข้อมูล "{label}"',
+  appInvalidPivotBaseField: 'ฟิลด์ฐานของ "แสดงค่าเป็น" ต้องอยู่ในแถวหรือคอลัมน์',
+  appPivotBaseFieldMissing: 'โหมด "แสดงค่าเป็น" ของฟิลด์ค่าต้องมีฟิลด์ฐาน',
+  appPivotBaseFieldNotAxis: 'ฟิลด์ฐาน "{label}" ต้องอยู่ในแถวหรือคอลัมน์ของตาราง Pivot',
+  appPivotBaseItemMissing: 'รายการฐาน "{item}" ไม่ใช่สมาชิกของเขตข้อมูล "{label}"',
   appInvalidLabelFilterField: 'เขตข้อมูลของตัวกรองป้ายชื่อไม่ถูกต้อง',
   appInvalidValueFieldIndex: 'ดัชนีเขตข้อมูลค่า {index} ไม่ถูกต้อง',
   appInvalidValueField: 'เขตข้อมูลค่าไม่ถูกต้อง',
@@ -307,6 +325,7 @@ export const th = {
   appDialogCancel: 'ยกเลิก',
   appPivotSheetNoMove: 'แผ่นงานนี้มี PivotTable — ยังไม่รองรับการย้ายช่วง',
   appMergeOverTable: 'ส่วนที่เลือกซ้อนทับตาราง Excel — ยังไม่รองรับการผสานเซลล์ภายในตาราง',
+  appFilterToggleFailed: 'ไม่ได้ใช้ตัวกรอง — เลือกช่วงที่มีข้อมูลก่อน',
   appAutofillStreaming: 'ยังไม่อนุญาตให้เติมอัตโนมัติลงในพื้นที่ที่กำลังโหลดแบบสตรีม',
   appDvNeedsIndexed:
     'การแก้ไขการตรวจสอบความถูกต้องของข้อมูลต้องรอให้แผ่นงานนี้ทำดัชนีเสร็จก่อน — ลองใหม่อีกสักครู่',

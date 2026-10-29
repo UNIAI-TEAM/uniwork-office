@@ -1,6 +1,20 @@
 import type { zh } from './zh'
 
 export const hi = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: 'चयन को AI से छिपाएँ',
+  redactDialogDesc:
+    'चुनी हुई सामग्री दस्तावेज़ और फ़ाइल में बनी रहती है; मॉडल को केवल नीचे वाला प्लेसहोल्डर दिखता है। नाम दें ताकि उसे पता चले कि यह किसका स्थान है।',
+  redactDialogScope:
+    'यह छिपाना केवल इस ऐप के AI पर लागू होता है। CLI, MCP टूल और बिना इंटरफ़ेस वाला निर्यात फ़ाइल को सीधे पढ़ते हैं, इसलिए ये शब्द उन्हें अब भी दिखते हैं।',
+  redactDialogPlaceholder: 'प्लेसहोल्डर का नाम, जैसे ग्राहक का फ़ोन',
+  redactCancel: 'रद्द करें',
+  redactInsert: 'छिपाएँ',
+  redactEnable: 'चयन पर राइट-क्लिक करके इसे AI से छिपाएँ।',
+  redactNeedsSavedRow: 'यह पंक्ति अभी फ़ाइल में नहीं है। पहले सहेजें, फिर सेल छिपाएँ।',
+  redactRecoveredFromNames:
+    'किसी अन्य ऐप ने इस फ़ाइल को दोबारा लिखा और छिपे हुए चीज़ों का रिकॉर्ड हटा दिया। छिपे हुए सेल वर्कबुक के नामों से वापस मिला लिए गए थे; सहेजने पर पूरा रिकॉर्ड वापस आ जाता है।',
+
   appMergeWorkbooks: 'वर्कबुक मर्ज करें',
   appMergeWorkbooksTip: 'अन्य Excel फ़ाइलों की शीट इस वर्कबुक में जोड़ें',
   appMergeWorkbooksPicking: 'मर्ज करने के लिए फ़ाइलें चुनें…',
@@ -184,6 +198,13 @@ export const hi = {
   appInvalidGroupField: 'अमान्य समूहन फ़ील्ड।',
   appInvalidPageField: 'अमान्य रिपोर्ट फ़िल्टर फ़ील्ड।',
   appPivotPageItemMissing: 'रिपोर्ट फ़िल्टर आइटम "{item}" फ़ील्ड "{label}" का सदस्य नहीं है।',
+  appInvalidPivotBaseField:
+    '"मान इस रूप में दिखाएँ" का आधार फ़ील्ड पंक्तियों या कॉलम में होना चाहिए।',
+  appPivotBaseFieldMissing:
+    'वैल्यू फ़ील्ड के "मान इस रूप में दिखाएँ" मोड के लिए आधार फ़ील्ड आवश्यक है।',
+  appPivotBaseFieldNotAxis:
+    'आधार फ़ील्ड "{label}" पिवट तालिका की पंक्तियों या कॉलम में होना चाहिए।',
+  appPivotBaseItemMissing: 'आधार आइटम "{item}" फ़ील्ड "{label}" का सदस्य नहीं है।',
   appInvalidLabelFilterField: 'लेबल फ़िल्टर फ़ील्ड अमान्य है।',
   appInvalidValueFieldIndex: 'मान फ़ील्ड अनुक्रमांक {index} अमान्य है।',
   appInvalidValueField: 'अमान्य मान फ़ील्ड।',
@@ -322,6 +343,7 @@ export const hi = {
   appPivotSheetNoMove: 'इस शीट में पिवट टेबल है — श्रेणियाँ स्थानांतरित करना अभी समर्थित नहीं है।',
   appMergeOverTable:
     'चयन Excel तालिका से ओवरलैप करता है — तालिका के भीतर सेल मर्ज करना अभी समर्थित नहीं है।',
+  appFilterToggleFailed: 'फ़िल्टर लागू नहीं हुआ — पहले वह रेंज चुनें जिसमें आपका डेटा है।',
   appAutofillStreaming:
     'जो क्षेत्र अभी स्ट्रीम होकर लोड हो रहा है, उसमें स्वतः भरण की अनुमति अभी नहीं है।',
   appDvNeedsIndexed:

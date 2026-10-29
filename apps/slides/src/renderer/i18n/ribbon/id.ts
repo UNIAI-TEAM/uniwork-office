@@ -195,7 +195,7 @@ export const id = {
   ribbonIconsTip: 'Sisipkan ikon bawaan (dirasterisasi sebagai elemen gambar)',
   ribbon3dModel: 'Model 3D',
   ribbon3dModelTip:
-    'Sisipkan model 3D (menyematkan file glb/gltf; kanvas menampilkan placeholder poster)',
+    'Sisipkan model 3D (.glb): pilih untuk memutarnya; PowerPoint tetap menyimpannya dalam 3D',
   ribbonGroupIllustrations: 'Ilustrasi',
   ribbonShapes: 'Bentuk',
   ribbonShapesTip: 'Sisipkan bentuk (bentuk dasar / panah / bintang)',

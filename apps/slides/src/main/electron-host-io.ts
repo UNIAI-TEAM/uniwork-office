@@ -5,10 +5,11 @@
  * list, drafts folder and recovery-copy bookkeeping stay with slides-main, which
  * passes them in as `files`.
  */
-import { clipboard, dialog, nativeImage } from 'electron'
+import { clipboard, dialog, nativeImage, systemPreferences } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { savePptxToFile } from '@genoffice/pptx-engine'
 import { convertedDocumentFor, showOpenDialogWithMemory } from '@genoffice/electron-utils'
+import { atomicWriteVia } from '@genoffice/electron-utils/atomic-write'
 import type {
   HostIO,
   HostMessageBox,
@@ -77,7 +78,7 @@ export function createElectronHostIO(files: ElectronFileHooks): HostIO {
               }
             : {
                 title: tm('dlgInsert3d'),
-                filters: [{ name: tm('filter3d'), extensions: ['glb', 'gltf'] }],
+                filters: [{ name: tm('filter3d'), extensions: ['glb'] }],
               },
       ),
 
@@ -143,12 +144,17 @@ export function createElectronHostIO(files: ElectronFileHooks): HostIO {
       saveAs: (currentPath, defaultName) => files.saveAsTarget(currentPath, defaultName),
       convertedSaveAs: (currentPath) => convertedDocumentFor(currentPath)?.suggestSaveAs,
     },
-    writeDeck: (opened, target) => savePptxToFile(opened, target),
+    writeDeck: (opened, target) => atomicWriteVia(target, (tmp) => savePptxToFile(opened, tmp)),
     saved: (event) => files.saved(event),
     // G5-03a: the lock answer the environment-neutral session core asks for — the
     // same policy helper the module's own IPC guards use
     isLocked: (path) => uniworkIsLocked(path),
     saveGate: files.saveGate,
     userSaved: files.userSaved,
+    microphoneAccess: async () => {
+      if (process.platform !== 'darwin') return true
+      if (systemPreferences.getMediaAccessStatus('microphone') === 'granted') return true
+      return systemPreferences.askForMediaAccess('microphone')
+    },
   }
 }

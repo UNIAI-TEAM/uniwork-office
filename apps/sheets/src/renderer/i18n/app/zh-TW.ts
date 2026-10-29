@@ -1,6 +1,20 @@
 import type { zh } from './zh'
 
 export const zhTW = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: '把選中的內容對 AI 隱藏',
+  redactDialogDesc:
+    '選取的內容會留在文件裡，AI 讀到的卻是下面的標記。給它起個名字，AI 才知道它是什麼。',
+  redactDialogScope:
+    '這只針對本應用的 AI。命令列、MCP 工具和無介面匯出會直接讀取文件，仍然看得到這些文字。',
+  redactDialogPlaceholder: '佔位名稱，例如：客戶電話',
+  redactCancel: '取消',
+  redactInsert: '隱藏',
+  redactEnable: '選中儲存格後右鍵，即可對 AI 隱藏。',
+  redactNeedsSavedRow: '這一列還沒存進檔案。請先存檔，再隱藏其中的儲存格。',
+  redactRecoveredFromNames:
+    '這個檔案被其他軟體改寫過，記錄隱藏內容的元件不見了。已從活頁簿裡的名稱找回隱藏的儲存格；存檔一次即可還原完整記錄。',
+
   appMergeWorkbooks: '合併活頁簿',
   appMergeWorkbooksTip: '將其他 Excel 檔案的工作表併入目前活頁簿',
   appMergeWorkbooksPicking: '選擇要合併的檔案…',
@@ -174,6 +188,10 @@ export const zhTW = {
   appInvalidGroupField: '群組欄位無效。',
   appInvalidPageField: '報表篩選欄位無效。',
   appPivotPageItemMissing: '報表篩選項目「{item}」不是欄位「{label}」的成員。',
+  appInvalidPivotBaseField: '「顯示方式」的基準欄位必須位於列或欄區域。',
+  appPivotBaseFieldMissing: '值欄位的「顯示方式」需要選擇基準欄位。',
+  appPivotBaseFieldNotAxis: '基準欄位「{label}」必須位於樞紐分析表的列或欄。',
+  appPivotBaseItemMissing: '基準項目「{item}」不是欄位「{label}」的成員。',
   appInvalidLabelFilterField: '標籤篩選的欄位無效。',
   appInvalidValueFieldIndex: '值欄位索引 {index} 無效。',
   appInvalidValueField: '值欄位無效。',
@@ -284,6 +302,7 @@ export const zhTW = {
   appDialogCancel: '取消',
   appPivotSheetNoMove: '該工作表含樞紐分析表——暫不支援移動範圍。',
   appMergeOverTable: '所選範圍位於 Excel 表格內——暫不支援合併表格中的儲存格。',
+  appFilterToggleFailed: '篩選沒有套用——請先選取包含資料的範圍。',
   appAutofillStreaming: '暫不允許向仍在串流載入的範圍自動填入。',
   appDvNeedsIndexed: '編輯資料驗證需要該工作表先完成索引——請稍後再試。',
   appPivotSheetNoDuplicate: '該工作表含樞紐分析表——暫不支援複製該表。',

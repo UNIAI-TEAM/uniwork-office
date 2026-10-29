@@ -13,6 +13,7 @@ import {
   slideIdsByPath,
   type OpenedPptx,
   type Slide,
+  type SlideElement,
   type TextElement,
 } from '@genoffice/pptx-engine'
 import { matchesElementRef } from '@genoffice/pptx-engine/identity'
@@ -26,6 +27,7 @@ import {
 } from '@genoffice/pptx-render'
 import { displayMime } from '../main/media-mime'
 import { neutralizeJpegOrientation } from '../main/jpeg-orientation'
+import type { SlideUpdate } from '../shared/ipc'
 import { bytesToBase64, utf8Decode, utf8Encode } from './bytes'
 import { getFontMetrics, sessionPlatform } from './platform'
 import type { Session } from './state'
@@ -44,6 +46,40 @@ export function buildAllRenderSlides(opened: OpenedPptx, fitWidthPx: number): Re
       sldId: sldIds.get(s.path),
     }),
   )
+}
+
+/** Insertions only change new pages and shifted slide-number fields. Order is cheap
+ * metadata; unchanged render trees stay in the renderer, keyed by their part path. */
+export function buildSlideUpdate(
+  session: Session,
+  before: string[],
+  changed: number[] = [],
+): SlideUpdate {
+  const previous = new Map(before.map((path, i) => [path, i]))
+  const hasNumber = (el: SlideElement): boolean =>
+    el.type === 'group'
+      ? el.children.some(hasNumber)
+      : !!(el as TextElement).text?.paragraphs.some((p) =>
+          p.runs.some((r) => r.field === 'slidenum'),
+        )
+  const update: SlideUpdate = {
+    order: session.opened.deck.slides.map((s) => s.path),
+    slides: session.opened.deck.slides.flatMap((s, i) => {
+      const oldIndex = previous.get(s.path)
+      const renumber =
+        oldIndex !== undefined &&
+        oldIndex !== i &&
+        [...s.elements, ...(s.decorations ?? [])].some(hasNumber)
+      return oldIndex === undefined || changed.includes(i) || renumber
+        ? [rebuildSlide(session, i)!]
+        : []
+    }),
+  }
+  // The transaction just queued this edit. Supply its partial state to other attached
+  // windows too; any unrelated edit in the same task still forces a full resync.
+  const pending = session.deckBroadcastUpdates
+  if (pending?.length) pending[pending.length - 1] = update
+  return update
 }
 
 /** Office theme-class slot (MsftOfcThm_<slot>_Fill/_Stroke) → schemeClr name. */
@@ -104,6 +140,8 @@ export function retintThemedSvg(svg: string, opened: OpenedPptx, slidePath?: str
     The mime comes from magic-byte sniffing first (legacy decks mislabel media — a PNG
     stored as .emf must not enter the EMF parser), extension second. */
 export function makeMediaResolver(opened: OpenedPptx, slidePath?: string) {
+  const custom = sessionPlatform().mediaUrl
+  if (custom) return (mediaRef: string): string | undefined => custom(opened, mediaRef, slidePath)
   const cache = new Map<string, string | undefined>()
   return (mediaRef: string): string | undefined => {
     if (cache.has(mediaRef)) return cache.get(mediaRef)

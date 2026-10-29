@@ -5,6 +5,8 @@ import { defineConfig } from 'vitest/config'
 const here = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+  // Workspace packages' `?raw` markdown assets live outside apps/slides
+  server: { fs: { allow: [resolve(here, '../..')] } },
   // Pin resolution to this repo's workspace sources (matches tsconfig paths)
   resolve: {
     alias: {
@@ -28,6 +30,11 @@ export default defineConfig({
       '@genoffice/pptx-engine/custgeom': resolve(
         here,
         '../../packages/pptx-engine/src/custgeom.ts',
+      ),
+      '@genoffice/pptx-engine/model3d': resolve(here, '../../packages/pptx-engine/src/model3d.ts'),
+      '@genoffice/pptx-engine/chart-workbook': resolve(
+        here,
+        '../../packages/pptx-engine/src/chart-workbook.ts',
       ),
       '@genoffice/pptx-engine': resolve(here, '../../packages/pptx-engine/src/index.ts'),
       '@genoffice/pptx-ops/op-docs': resolve(here, '../../packages/pptx-ops/src/op-docs.ts'),

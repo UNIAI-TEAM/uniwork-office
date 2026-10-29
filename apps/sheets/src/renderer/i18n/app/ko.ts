@@ -1,6 +1,21 @@
 import type { zh } from './zh'
 
 export const ko = {
+  // ── Withholding cells from the model ──
+  redactMenuLabel: '선택한 부분을 AI에서 숨기기',
+  redactDialogDesc:
+    '선택한 내용은 그대로 두고 AI에게는 아래 자리표시자만 보냅니다. 이름을 붙이면 AI가 무엇을 뜻하는지 알 수 있습니다.',
+  redactDialogScope:
+    '이 앱의 AI에만 적용됩니다. CLI, MCP 도구, 창 없는 내보내기는 파일을 직접 읽으므로 이 단어들은 여전히 보입니다.',
+  redactDialogPlaceholder: '자리표시자 이름, 예: 고객 전화',
+  redactCancel: '취소',
+  redactInsert: '숨기기',
+  redactEnable: '선택한 부분을 오른쪽 클릭해 AI에서 숨깁니다.',
+  redactNeedsSavedRow:
+    '이 행은 아직 파일에 저장되지 않았습니다. 먼저 저장한 다음 셀을 숨겨 주세요.',
+  redactRecoveredFromNames:
+    '다른 앱이 이 파일을 다시 저장하며 숨겨진 내용을 기록한 부품이 사라졌습니다. 숨겨진 셀은 통합 문서의 이름에서 복구되었습니다. 저장하면 전체 기록이 다시 기록됩니다.',
+
   appMergeWorkbooks: '통합 문서 병합',
   appMergeWorkbooksTip: '다른 Excel 파일의 시트를 현재 통합 문서에 추가합니다',
   appMergeWorkbooksPicking: '병합할 파일 선택…',
@@ -187,6 +202,10 @@ export const ko = {
   appInvalidGroupField: '그룹 필드가 잘못되었습니다.',
   appInvalidPageField: '보고서 필터 필드가 잘못되었습니다.',
   appPivotPageItemMissing: '보고서 필터 항목 "{item}"은(는) 필드 "{label}"의 구성원이 아닙니다.',
+  appInvalidPivotBaseField: '"값 표시 방법"의 기준 필드는 행 또는 열에 있어야 합니다.',
+  appPivotBaseFieldMissing: '값 필드의 "값 표시 방법"에는 기준 필드가 필요합니다.',
+  appPivotBaseFieldNotAxis: '기준 필드 "{label}"은(는) 피벗 테이블의 행 또는 열에 있어야 합니다.',
+  appPivotBaseItemMissing: '기준 항목 "{item}"은(는) 필드 "{label}"의 구성원이 아닙니다.',
   appInvalidLabelFilterField: '레이블 필터 필드가 잘못되었습니다.',
   appInvalidValueFieldIndex: '값 필드 인덱스 {index}이(가) 잘못되었습니다.',
   appInvalidValueField: '값 필드가 잘못되었습니다.',
@@ -324,6 +343,7 @@ export const ko = {
   appDialogCancel: '취소',
   appPivotSheetNoMove: '이 시트에는 피벗 테이블이 있어 아직 범위 이동을 지원하지 않습니다.',
   appMergeOverTable: '선택 영역이 Excel 표와 겹칩니다 — 표 안의 셀 병합은 아직 지원되지 않습니다.',
+  appFilterToggleFailed: '필터가 적용되지 않았습니다 — 먼저 데이터가 있는 범위를 선택하세요.',
   appAutofillStreaming: '아직 스트리밍 로드 중인 영역으로는 자동 채우기를 할 수 없습니다.',
   appDvNeedsIndexed:
     '데이터 유효성 검사를 편집하려면 먼저 이 시트의 인덱싱이 완료되어야 합니다 — 잠시 후 다시 시도하십시오.',
