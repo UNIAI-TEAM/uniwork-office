@@ -1480,6 +1480,9 @@ export function Ribbon({
     {
       collapse: t('ribbonCollapse'),
       expand: t('ribbonExpand'),
+      // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (docs parity, see #362)
+      compact: t('ribbonCompact'),
+      expandFull: t('ribbonExpand'),
     },
     {
       action: findShortcut('common', 'common-10'),

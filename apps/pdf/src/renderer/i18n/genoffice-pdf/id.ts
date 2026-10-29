@@ -57,4 +57,5 @@ export const id = {
   compareRemoved: '−{count} baris',
   compareTruncated: 'halaman terlalu besar — hitungan saja',
   compareUnreadable: 'Berkas ini tidak dapat dibaca sebagai PDF',
+  ribbonCompact: 'Pita Ringkas (hanya ikon)',
 } satisfies Record<keyof typeof zh, string>
