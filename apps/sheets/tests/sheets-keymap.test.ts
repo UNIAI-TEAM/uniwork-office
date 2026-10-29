@@ -93,12 +93,20 @@ describe('hints', () => {
     expect(sheetsHint('sheets-81', mac)).toBe('⇧⌘F')
   })
 
-  it('promises no key for spell check: no command listens to F7 (sheets-58)', () => {
+  it('promises F7 for spell check on every platform and surface (sheets-58)', () => {
     for (const platform of ['win', 'mac'] as const) {
       for (const surface of ['desktop', 'web'] as const) {
-        expect(sheetsHint('sheets-58', { platform, surface })).toBe('')
-        const f7 = { key: 'F7', code: 'F7' }
-        expect(matchShortcut(f7 as never, sheetsShortcuts, platform, surface)).toBeNull()
+        expect(sheetsHint('sheets-58', { platform, surface })).toBe('F7')
+        const f7 = {
+          key: 'F7',
+          code: 'F7',
+          altKey: false,
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          repeat: false,
+        }
+        expect(matchShortcut(f7, sheetsShortcuts, platform, surface)?.id).toBe('sheets-58')
       }
     }
   })
