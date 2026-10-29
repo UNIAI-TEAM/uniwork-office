@@ -230,6 +230,19 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'skill 未安装',
     intgStateInstalled: '已安装 skill {v} · 下次对话即可使用',
+    intgLegacyTitle: '旧版 skill 副本',
+    intgLegacyDesc:
+      'UniWork Office 以前会把副本写进每个工具自己的目录。现在还有 {n} 份留在那里:工具仍在读取它们,所以永远拿不到当前版本。',
+    intgLegacyClean: '删除旧副本',
+    intgLegacyCleaned: '已删除 {n} 份旧副本,{k} 份被手动改过的保留未动。',
+    intgLegacyFailed: '无法删除旧副本。',
+    intgLegacyFailedNoSharedCopy: '请先将 skill 安装到共享 .agents 目录，然后再删除旧副本。',
+    intgLegacyCleanedKept: '已删除 {n} 份旧副本，{k} 份保留未动（{reasons}）。',
+    intgLegacyCleanedPartial: '已删除 {n} 份旧副本，{k} 份保留未动，{f} 份删除失败。',
+    intgLegacyReasonEdited: '手动修改过',
+    intgLegacyReasonUnsafeLink: '符号链接路径',
+    intgLegacyReasonNoSharedCopy: '共享 .agents 副本不可用',
+    intgLegacyReasonError: '无法读取',
     intgOtherToggle: '没有列出我的助手',
     intgOtherDesc: '以下三种方式任选一种即可。装的是同一份 skill，不需要重复操作。',
     intgOtherFolderTitle: '任何能读取 SKILL.md 目录的助手',
@@ -615,6 +628,20 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'Skill not installed',
     intgStateInstalled: 'Skill {v} installed · ready in your next chat',
+    intgLegacyTitle: 'Older skill copies',
+    intgLegacyDesc:
+      'UniWork Office used to write a copy into the folder of each tool. Copies still in place: {n}. The tool keeps reading them, so they never get the current skill.',
+    intgLegacyClean: 'Remove old copies',
+    intgLegacyCleaned: 'Old copies removed: {n}. Edited by hand and left in place: {k}.',
+    intgLegacyFailed: 'Could not remove the old copies.',
+    intgLegacyFailedNoSharedCopy:
+      'Install the skill into the shared .agents folder first, then remove the old copies.',
+    intgLegacyCleanedKept: 'Old copies removed: {n}. Left in place: {k} ({reasons}).',
+    intgLegacyCleanedPartial: 'Old copies removed: {n}. Left in place: {k}. Failed to remove: {f}.',
+    intgLegacyReasonEdited: 'edited by hand',
+    intgLegacyReasonUnsafeLink: 'behind a symlink',
+    intgLegacyReasonNoSharedCopy: 'shared .agents copy missing',
+    intgLegacyReasonError: 'could not be read',
     intgOtherToggle: 'My assistant is not listed',
     intgOtherDesc:
       'Pick any one of these three ways. They all install the same skill, so there is no need to do more than one.',
@@ -1017,6 +1044,22 @@ export const strings = {
     intgSkillVersion: 'スキル {v}',
     intgStateMissing: 'スキル未インストール',
     intgStateInstalled: 'スキル {v} をインストール済み · 次のチャットから使えます',
+    intgLegacyTitle: '古い skill のコピー',
+    intgLegacyDesc:
+      'UniWork Office はかつて各ツールのフォルダーごとにコピーを書き込んでいました。まだ {n} 個残っています:ツールはそれらを読み続けるため、現在の skill に更新されません。',
+    intgLegacyClean: '古いコピーを削除',
+    intgLegacyCleaned:
+      '古いコピーを {n} 個削除しました。手動で編集した {k} 個はそのまま残しました。',
+    intgLegacyFailed: '古いコピーを削除できませんでした。',
+    intgLegacyFailedNoSharedCopy:
+      '先に共有 .agents フォルダーに skill をインストールしてから、古いコピーを削除してください。',
+    intgLegacyCleanedKept: '古いコピーを {n} 個削除し、{k} 個はそのまま残しました（{reasons}）。',
+    intgLegacyCleanedPartial:
+      '古いコピーを {n} 個削除し、{k} 個はそのまま残し、{f} 個は削除できませんでした。',
+    intgLegacyReasonEdited: '手動で編集済み',
+    intgLegacyReasonUnsafeLink: 'シンボリックリンク経由',
+    intgLegacyReasonNoSharedCopy: '共有 .agents コピーが未検出',
+    intgLegacyReasonError: '読み取り不可',
     intgOtherToggle: '使っているアシスタントが一覧にない',
     intgOtherDesc:
       '次の 3 つの方法からどれか 1 つを選んでください。どれも同じスキルをインストールするので、複数行う必要はありません。',
@@ -1423,6 +1466,21 @@ export const strings = {
     intgSkillVersion: '스킬 {v}',
     intgStateMissing: '스킬 미설치',
     intgStateInstalled: '스킬 {v} 설치됨 · 다음 대화부터 사용 가능',
+    intgLegacyTitle: '오래된 skill 사본',
+    intgLegacyDesc:
+      'UniWork Office는 예전에 각 도구 폴더마다 사본을 썼습니다. 아직 {n}개가 남아 있습니다: 도구가 계속 읽기 때문에 현재 skill로 갱신되지 않습니다.',
+    intgLegacyClean: '오래된 사본 삭제',
+    intgLegacyCleaned: '오래된 사본 {n}개를 삭제했고, 직접 수정한 {k}개는 그대로 두었습니다.',
+    intgLegacyFailed: '오래된 사본을 삭제하지 못했습니다.',
+    intgLegacyFailedNoSharedCopy:
+      '먼저 공유 .agents 폴더에 skill을 설치한 다음 오래된 사본을 삭제하세요.',
+    intgLegacyCleanedKept: '오래된 사본 {n}개를 삭제했고, {k}개는 그대로 두었습니다({reasons}).',
+    intgLegacyCleanedPartial:
+      '오래된 사본 {n}개를 삭제했고, {k}개는 그대로 두었으며, {f}개는 삭제하지 못했습니다.',
+    intgLegacyReasonEdited: '직접 수정됨',
+    intgLegacyReasonUnsafeLink: '심볼릭 링크 경로',
+    intgLegacyReasonNoSharedCopy: '공유 .agents 사본 없음',
+    intgLegacyReasonError: '읽을 수 없음',
     intgOtherToggle: '내 어시스턴트가 목록에 없음',
     intgOtherDesc:
       '다음 세 가지 방법 중 하나만 선택하세요. 모두 같은 스킬을 설치하므로 여러 번 할 필요가 없습니다.',
@@ -1831,6 +1889,23 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'Skill non installé',
     intgStateInstalled: 'Skill {v} installé · prêt pour votre prochaine discussion',
+    intgLegacyTitle: 'Anciennes copies du skill',
+    intgLegacyDesc:
+      "UniWork Office écrivait autrefois une copie dans le dossier de chaque outil. Il en reste {n} : l'outil continue de les lire, donc elles ne reçoivent jamais le skill actuel.",
+    intgLegacyClean: 'Supprimer les anciennes copies',
+    intgLegacyCleaned:
+      'Anciennes copies supprimées : {n}. Modifiées à la main et laissées en place : {k}.',
+    intgLegacyFailed: 'Impossible de supprimer les anciennes copies.',
+    intgLegacyFailedNoSharedCopy:
+      "Installez d'abord le skill dans le dossier partagé .agents, puis supprimez les anciennes copies.",
+    intgLegacyCleanedKept:
+      'Anciennes copies supprimées : {n}. Laissées en place : {k} ({reasons}).',
+    intgLegacyCleanedPartial:
+      'Anciennes copies supprimées : {n}. Laissées en place : {k}. Échecs de suppression : {f}.',
+    intgLegacyReasonEdited: 'modifié à la main',
+    intgLegacyReasonUnsafeLink: 'derrière un lien symbolique',
+    intgLegacyReasonNoSharedCopy: 'copie partagée .agents absente',
+    intgLegacyReasonError: 'illisible',
     intgOtherToggle: "Mon assistant n'est pas dans la liste",
     intgOtherDesc:
       "Choisissez une seule de ces trois méthodes. Elles installent toutes le même skill : inutile d'en faire plusieurs.",
@@ -2248,6 +2323,21 @@ export const strings = {
     intgSkillVersion: 'Skill {v}',
     intgStateMissing: 'Skill nicht installiert',
     intgStateInstalled: 'Skill {v} installiert · ab dem nächsten Chat bereit',
+    intgLegacyTitle: 'Alte Skill-Kopien',
+    intgLegacyDesc:
+      'UniWork Office schrieb früher eine Kopie in den Ordner jedes Werkzeugs. Noch vorhandene Kopien: {n}. Das Werkzeug liest sie weiter, sie bekommen also nie den aktuellen Skill.',
+    intgLegacyClean: 'Alte Kopien entfernen',
+    intgLegacyCleaned: 'Alte Kopien entfernt: {n}. Von Hand bearbeitet und stehen gelassen: {k}.',
+    intgLegacyFailed: 'Alte Kopien konnten nicht entfernt werden.',
+    intgLegacyFailedNoSharedCopy:
+      'Installieren Sie den Skill zuerst im gemeinsamen Ordner .agents und entfernen Sie dann die alten Kopien.',
+    intgLegacyCleanedKept: 'Alte Kopien entfernt: {n}. Stehen gelassen: {k} ({reasons}).',
+    intgLegacyCleanedPartial:
+      'Alte Kopien entfernt: {n}. Stehen gelassen: {k}. Entfernen fehlgeschlagen: {f}.',
+    intgLegacyReasonEdited: 'von Hand bearbeitet',
+    intgLegacyReasonUnsafeLink: 'hinter einem Symlink',
+    intgLegacyReasonNoSharedCopy: 'gemeinsame .agents-Kopie fehlt',
+    intgLegacyReasonError: 'nicht lesbar',
     intgOtherToggle: 'Mein Assistent ist nicht aufgeführt',
     intgOtherDesc:
       'Wählen Sie genau einen dieser drei Wege. Alle installieren denselben Skill, mehr als einer ist nicht nötig.',
@@ -2665,6 +2755,21 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'Skill no instalado',
     intgStateInstalled: 'Skill {v} instalado · listo en tu próximo chat',
+    intgLegacyTitle: 'Copias antiguas de la skill',
+    intgLegacyDesc:
+      'UniWork Office escribía antes una copia en la carpeta de cada herramienta. Copias que siguen ahí: {n}. La herramienta sigue leyéndolas, así que nunca reciben la skill actual.',
+    intgLegacyClean: 'Quitar las copias antiguas',
+    intgLegacyCleaned: 'Copias antiguas quitadas: {n}. Editadas a mano y dejadas en su sitio: {k}.',
+    intgLegacyFailed: 'No se pudieron quitar las copias antiguas.',
+    intgLegacyFailedNoSharedCopy:
+      'Instala primero la skill en la carpeta compartida .agents y luego quita las copias antiguas.',
+    intgLegacyCleanedKept: 'Copias antiguas quitadas: {n}. Dejadas en su sitio: {k} ({reasons}).',
+    intgLegacyCleanedPartial:
+      'Copias antiguas quitadas: {n}. Dejadas en su sitio: {k}. No se pudieron quitar: {f}.',
+    intgLegacyReasonEdited: 'editada a mano',
+    intgLegacyReasonUnsafeLink: 'tras un enlace simbólico',
+    intgLegacyReasonNoSharedCopy: 'falta la copia compartida de .agents',
+    intgLegacyReasonError: 'no se pudo leer',
     intgOtherToggle: 'Mi asistente no aparece',
     intgOtherDesc:
       'Elige solo una de estas tres formas. Todas instalan el mismo skill, así que no hace falta hacer más de una.',
@@ -3070,6 +3175,20 @@ export const strings = {
     intgSkillVersion: 'สกิล {v}',
     intgStateMissing: 'ยังไม่ติดตั้งสกิล',
     intgStateInstalled: 'ติดตั้งสกิล {v} แล้ว · พร้อมใช้ในแชตถัดไป',
+    intgLegacyTitle: 'สำเนา skill เก่า',
+    intgLegacyDesc:
+      'เมื่อก่อน UniWork Office เขียนสำเนาไว้ในโฟลเดอร์ของแต่ละเครื่องมือ ตอนนี้ยังเหลือ {n} ชุด: เครื่องมือยังอ่านไฟล์เหล่านั้น จึงไม่เคยได้ skill ปัจจุบัน',
+    intgLegacyClean: 'ลบสำเนาเก่า',
+    intgLegacyCleaned: 'ลบสำเนาเก่าแล้ว {n} ชุด เก็บไว้ {k} ชุดที่แก้ไขด้วยมือ',
+    intgLegacyFailed: 'ลบสำเนาเก่าไม่สำเร็จ',
+    intgLegacyFailedNoSharedCopy:
+      'ติดตั้งสกิลลงในโฟลเดอร์ .agents ที่ใช้ร่วมกันก่อน แล้วจึงลบสำเนาเก่า',
+    intgLegacyCleanedKept: 'ลบสำเนาเก่าแล้ว {n} ชุด เก็บไว้ {k} ชุด ({reasons})',
+    intgLegacyCleanedPartial: 'ลบสำเนาเก่าแล้ว {n} ชุด เก็บไว้ {k} ชุด และลบไม่สำเร็จ {f} ชุด',
+    intgLegacyReasonEdited: 'แก้ไขด้วยมือ',
+    intgLegacyReasonUnsafeLink: 'ผ่านลิงก์สัญลักษณ์',
+    intgLegacyReasonNoSharedCopy: 'ไม่พบสำเนา .agents ที่ใช้ร่วมกัน',
+    intgLegacyReasonError: 'อ่านไม่ได้',
     intgOtherToggle: 'ไม่พบผู้ช่วยของฉันในรายการ',
     intgOtherDesc:
       'เลือกเพียงวิธีใดวิธีหนึ่งจากสามวิธีนี้ ทุกวิธีติดตั้งสกิลเดียวกัน จึงไม่ต้องทำมากกว่าหนึ่งวิธี',
@@ -3475,6 +3594,20 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'Skill belum terpasang',
     intgStateInstalled: 'Skill {v} terpasang · siap di obrolan berikutnya',
+    intgLegacyTitle: 'Salinan skill lama',
+    intgLegacyDesc:
+      'Dulu UniWork Office menulis satu salinan ke folder tiap alat. Masih ada {n} yang tertinggal: alat itu tetap membacanya, jadi tidak pernah dapat skill yang sekarang.',
+    intgLegacyClean: 'Hapus salinan lama',
+    intgLegacyCleaned: '{n} salinan lama dihapus, {k} yang diedit manual tetap dibiarkan.',
+    intgLegacyFailed: 'Gagal menghapus salinan lama.',
+    intgLegacyFailedNoSharedCopy:
+      'Pasang skill ke folder .agents bersama terlebih dahulu, lalu hapus salinan lama.',
+    intgLegacyCleanedKept: '{n} salinan lama dihapus, {k} tetap dibiarkan ({reasons}).',
+    intgLegacyCleanedPartial: '{n} salinan lama dihapus, {k} tetap dibiarkan, {f} gagal dihapus.',
+    intgLegacyReasonEdited: 'diedit manual',
+    intgLegacyReasonUnsafeLink: 'di balik symlink',
+    intgLegacyReasonNoSharedCopy: 'salinan .agents bersama tidak ada',
+    intgLegacyReasonError: 'tidak dapat dibaca',
     intgOtherToggle: 'Asisten saya tidak ada di daftar',
     intgOtherDesc:
       'Pilih salah satu saja dari tiga cara ini. Semuanya memasang skill yang sama, jadi tidak perlu lebih dari satu.',
@@ -3881,6 +4014,20 @@ export const strings = {
     intgSkillVersion: 'скилл {v}',
     intgStateMissing: 'Скилл не установлен',
     intgStateInstalled: 'Скилл {v} установлен · готов к следующему чату',
+    intgLegacyTitle: 'Старые копии skill',
+    intgLegacyDesc:
+      'Раньше UniWork Office записывал копию в папку каждого инструмента. Оставшихся копий: {n}. Инструмент продолжает их читать, поэтому они никогда не получают текущий skill.',
+    intgLegacyClean: 'Удалить старые копии',
+    intgLegacyCleaned: 'Удалено старых копий: {n}. Отредактировано вручную и оставлено: {k}.',
+    intgLegacyFailed: 'Не удалось удалить старые копии.',
+    intgLegacyFailedNoSharedCopy:
+      'Сначала установите skill в общую папку .agents, а затем удалите старые копии.',
+    intgLegacyCleanedKept: 'Удалено старых копий: {n}. Оставлено: {k} ({reasons}).',
+    intgLegacyCleanedPartial: 'Удалено старых копий: {n}. Оставлено: {k}. Не удалось удалить: {f}.',
+    intgLegacyReasonEdited: 'отредактировано вручную',
+    intgLegacyReasonUnsafeLink: 'за символической ссылкой',
+    intgLegacyReasonNoSharedCopy: 'нет общей копии .agents',
+    intgLegacyReasonError: 'не удалось прочитать',
     intgOtherToggle: 'Моего ассистента нет в списке',
     intgOtherDesc:
       'Выберите только один из трёх способов. Все они устанавливают один и тот же скилл, повторять не нужно.',
@@ -4289,6 +4436,20 @@ export const strings = {
     intgSkillVersion: 'المهارة {v}',
     intgStateMissing: 'المهارة غير مثبّتة',
     intgStateInstalled: 'المهارة {v} مثبّتة · جاهزة في محادثتك التالية',
+    intgLegacyTitle: 'نسخ skill القديمة',
+    intgLegacyDesc:
+      'كان UniWork Office يكتب نسخة في مجلد كل أداة. النسخ المتبقية: {n}. الأداة ما زالت تقرأها، فلا تصل إليها نسخة skill الحالية أبدًا.',
+    intgLegacyClean: 'إزالة النسخ القديمة',
+    intgLegacyCleaned: 'النسخ القديمة المُزالة: {n}. المُعدَّلة يدويًا والمُبقاة: {k}.',
+    intgLegacyFailed: 'تعذّرت إزالة النسخ القديمة.',
+    intgLegacyFailedNoSharedCopy:
+      'ثبّت المهارة في مجلد .agents المشترك أولًا، ثم أزل النسخ القديمة.',
+    intgLegacyCleanedKept: 'النسخ القديمة المُزالة: {n}. المُبقاة: {k} ({reasons}).',
+    intgLegacyCleanedPartial: 'النسخ القديمة المُزالة: {n}. المُبقاة: {k}. تعذّرت إزالتها: {f}.',
+    intgLegacyReasonEdited: 'معدّلة يدويًا',
+    intgLegacyReasonUnsafeLink: 'خلف رابط رمزي',
+    intgLegacyReasonNoSharedCopy: 'نسخة .agents المشتركة مفقودة',
+    intgLegacyReasonError: 'تعذّرت قراءتها',
     intgOtherToggle: 'مساعدي غير موجود في القائمة',
     intgOtherDesc:
       'اختر طريقة واحدة فقط من هذه الطرق الثلاث. جميعها تثبّت المهارة نفسها، فلا حاجة لأكثر من واحدة.',
@@ -4690,6 +4851,21 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'Skill não instalado',
     intgStateInstalled: 'Skill {v} instalado · pronto no seu próximo chat',
+    intgLegacyTitle: 'Cópias antigas do skill',
+    intgLegacyDesc:
+      'O UniWork Office antes gravava uma cópia na pasta de cada ferramenta. Ainda há {n} lá: a ferramenta continua a lê-las, por isso nunca recebem o skill atual.',
+    intgLegacyClean: 'Remover cópias antigas',
+    intgLegacyCleaned: 'Cópias antigas removidas: {n}. Editadas à mão e mantidas: {k}.',
+    intgLegacyFailed: 'Não foi possível remover as cópias antigas.',
+    intgLegacyFailedNoSharedCopy:
+      'Instale primeiro o skill na pasta compartilhada .agents e depois remova as cópias antigas.',
+    intgLegacyCleanedKept: 'Cópias antigas removidas: {n}. Mantidas: {k} ({reasons}).',
+    intgLegacyCleanedPartial:
+      'Cópias antigas removidas: {n}. Mantidas: {k}. Falha ao remover: {f}.',
+    intgLegacyReasonEdited: 'editada à mão',
+    intgLegacyReasonUnsafeLink: 'atrás de um link simbólico',
+    intgLegacyReasonNoSharedCopy: 'cópia compartilhada .agents ausente',
+    intgLegacyReasonError: 'não pôde ser lida',
     intgOtherToggle: 'Meu assistente não está na lista',
     intgOtherDesc:
       'Escolha apenas uma destas três formas. Todas instalam o mesmo skill, então não é preciso fazer mais de uma.',
@@ -5092,6 +5268,22 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'Skill non installato',
     intgStateInstalled: 'Skill {v} installato · pronto nella prossima chat',
+    intgLegacyTitle: 'Copie obsolete dello skill',
+    intgLegacyDesc:
+      'Prima UniWork Office scriveva una copia nella cartella di ogni strumento. Copie rimaste: {n}. Lo strumento continua a leggerle, quindi non ricevono mai lo skill attuale.',
+    intgLegacyClean: 'Rimuovi le copie obsolete',
+    intgLegacyCleaned:
+      'Copie obsolete rimosse: {n}. Modificate a mano e lasciate al loro posto: {k}.',
+    intgLegacyFailed: 'Impossibile rimuovere le copie obsolete.',
+    intgLegacyFailedNoSharedCopy:
+      'Installa prima lo skill nella cartella condivisa .agents, poi rimuovi le copie obsolete.',
+    intgLegacyCleanedKept: 'Copie obsolete rimosse: {n}. Lasciate al loro posto: {k} ({reasons}).',
+    intgLegacyCleanedPartial:
+      'Copie obsolete rimosse: {n}. Lasciate al loro posto: {k}. Non rimosse: {f}.',
+    intgLegacyReasonEdited: 'modificata a mano',
+    intgLegacyReasonUnsafeLink: 'dietro un link simbolico',
+    intgLegacyReasonNoSharedCopy: 'copia condivisa .agents mancante',
+    intgLegacyReasonError: 'non leggibile',
     intgOtherToggle: 'Il mio assistente non è in elenco',
     intgOtherDesc:
       'Scegli una sola di queste tre strade. Installano tutte lo stesso skill, quindi non serve farne più di una.',
@@ -5493,6 +5685,21 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'Skill niezainstalowany',
     intgStateInstalled: 'Skill {v} zainstalowany · gotowy w następnym czacie',
+    intgLegacyTitle: 'Stare kopie wtyczki',
+    intgLegacyDesc:
+      'UniWork Office wcześniej zapisywał kopię w folderze każdego narzędzia. Wciąż jest tam {n}: narzędzie czyta je dalej, więc nigdy nie dostają aktualnej wtyczki.',
+    intgLegacyClean: 'Usuń stare kopie',
+    intgLegacyCleaned: 'Usunięte stare kopie: {n}. Edytowane ręcznie i pozostawione: {k}.',
+    intgLegacyFailed: 'Nie udało się usunąć starych kopii.',
+    intgLegacyFailedNoSharedCopy:
+      'Najpierw zainstaluj skill we wspólnym folderze .agents, a potem usuń stare kopie.',
+    intgLegacyCleanedKept: 'Usunięte stare kopie: {n}. Pozostawione: {k} ({reasons}).',
+    intgLegacyCleanedPartial:
+      'Usunięte stare kopie: {n}. Pozostawione: {k}. Nie udało się usunąć: {f}.',
+    intgLegacyReasonEdited: 'edytowano ręcznie',
+    intgLegacyReasonUnsafeLink: 'za dowiązaniem symbolicznym',
+    intgLegacyReasonNoSharedCopy: 'brak wspólnej kopii .agents',
+    intgLegacyReasonError: 'nie można odczytać',
     intgOtherToggle: 'Mojego asystenta nie ma na liście',
     intgOtherDesc:
       'Wybierz tylko jeden z tych trzech sposobów. Wszystkie instalują ten sam skill, więc nie trzeba robić więcej niż jednego.',
@@ -5849,6 +6056,21 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'Skill není nainstalován',
     intgStateInstalled: 'Skill {v} nainstalován · připraven v příštím chatu',
+    intgLegacyTitle: 'Staré kopie skillu',
+    intgLegacyDesc:
+      'UniWork Office dříve zapisoval kopii do složky každého nástroje. Zbývající kopie: {n}. Nástroj je stále čte, takže se k nim nikdy nedostane aktuální skill.',
+    intgLegacyClean: 'Odebrat staré kopie',
+    intgLegacyCleaned: 'Odebrané staré kopie: {n}. Ručně upravené a ponechané: {k}.',
+    intgLegacyFailed: 'Staré kopie se nepodařilo odebrat.',
+    intgLegacyFailedNoSharedCopy:
+      'Nejprve nainstalujte skill do sdílené složky .agents a poté odeberte staré kopie.',
+    intgLegacyCleanedKept: 'Odebrané staré kopie: {n}. Ponechané: {k} ({reasons}).',
+    intgLegacyCleanedPartial:
+      'Odebrané staré kopie: {n}. Ponechané: {k}. Nepodařilo se odebrat: {f}.',
+    intgLegacyReasonEdited: 'ručně upraveno',
+    intgLegacyReasonUnsafeLink: 'za symbolickým odkazem',
+    intgLegacyReasonNoSharedCopy: 'chybí sdílená kopie .agents',
+    intgLegacyReasonError: 'nelze přečíst',
     intgOtherToggle: 'Můj asistent v seznamu není',
     intgOtherDesc:
       'Zvolte pouze jeden z těchto tří způsobů. Všechny instalují stejný skill, takže není třeba dělat více než jeden.',
@@ -6292,6 +6514,21 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'Skill niet geïnstalleerd',
     intgStateInstalled: 'Skill {v} geïnstalleerd · klaar in uw volgende chat',
+    intgLegacyTitle: 'Oude skillkopieën',
+    intgLegacyDesc:
+      'UniWork Office schreef vroeger een kopie in de map van elke tool. Resterende kopieën: {n}. De tool leest ze nog, dus ze krijgen nooit de huidige skill.',
+    intgLegacyClean: 'Oude kopieën verwijderen',
+    intgLegacyCleaned: 'Oude kopieën verwijderd: {n}. Met de hand bewerkt en laten staan: {k}.',
+    intgLegacyFailed: 'Kon de oude kopieën niet verwijderen.',
+    intgLegacyFailedNoSharedCopy:
+      'Installeer de skill eerst in de gedeelde map .agents en verwijder daarna de oude kopieën.',
+    intgLegacyCleanedKept: 'Oude kopieën verwijderd: {n}. Laten staan: {k} ({reasons}).',
+    intgLegacyCleanedPartial:
+      'Oude kopieën verwijderd: {n}. Laten staan: {k}. Niet verwijderd: {f}.',
+    intgLegacyReasonEdited: 'met de hand bewerkt',
+    intgLegacyReasonUnsafeLink: 'achter een symlink',
+    intgLegacyReasonNoSharedCopy: 'gedeelde .agents-kopie ontbreekt',
+    intgLegacyReasonError: 'kon niet worden gelezen',
     intgOtherToggle: 'Mijn assistent staat er niet bij',
     intgOtherDesc:
       'Kies één van deze drie manieren. Ze installeren allemaal dezelfde skill, dus meer dan één is niet nodig.',
@@ -6695,6 +6932,20 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'Skill belum dipasang',
     intgStateInstalled: 'Skill {v} dipasang · sedia dalam sembang seterusnya',
+    intgLegacyTitle: 'Salinan skill lama',
+    intgLegacyDesc:
+      'UniWork Office dahulu menulis salinan ke dalam folder setiap alatan. Masih ada {n} di sana: alatan itu masih membacanya, jadi ia tidak pernah menerima skill semasa.',
+    intgLegacyClean: 'Buang salinan lama',
+    intgLegacyCleaned: '{n} salinan lama dibuang, {k} yang disunting secara manual dikekalkan.',
+    intgLegacyFailed: 'Gagal membuang salinan lama.',
+    intgLegacyFailedNoSharedCopy:
+      'Pasang skill ke dalam folder .agents dikongsi dahulu, kemudian buang salinan lama.',
+    intgLegacyCleanedKept: '{n} salinan lama dibuang, {k} dikekalkan ({reasons}).',
+    intgLegacyCleanedPartial: '{n} salinan lama dibuang, {k} dikekalkan, {f} gagal dibuang.',
+    intgLegacyReasonEdited: 'disunting secara manual',
+    intgLegacyReasonUnsafeLink: 'di sebalik pautan simbolik',
+    intgLegacyReasonNoSharedCopy: 'salinan .agents dikongsi tiada',
+    intgLegacyReasonError: 'tidak dapat dibaca',
     intgOtherToggle: 'Pembantu saya tiada dalam senarai',
     intgOtherDesc:
       'Pilih satu sahaja daripada tiga cara ini. Semuanya memasang skill yang sama, jadi tidak perlu lebih daripada satu.',
@@ -7093,6 +7344,20 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'ה-skill לא מותקן',
     intgStateInstalled: 'skill {v} מותקן · מוכן בשיחה הבאה',
+    intgLegacyTitle: 'עותקי skill ישנים',
+    intgLegacyDesc:
+      'UniWork Office כתב בעבר עותק בתיקייה של כל כלי. עותקים שנותרו: {n}. הכלי ממשיך לקרוא אותם, ולכן הם לעולם לא מקבלים את ה-skill הנוכחי.',
+    intgLegacyClean: 'הסר עותקים ישנים',
+    intgLegacyCleaned: 'עותקים ישנים שהוסרו: {n}. נערכו ידנית ונותרו במקומם: {k}.',
+    intgLegacyFailed: 'לא ניתן להסיר את העותקים הישנים.',
+    intgLegacyFailedNoSharedCopy:
+      'התקינו תחילה את ה-skill בתיקיית .agents המשותפת, ואז הסירו את העותקים הישנים.',
+    intgLegacyCleanedKept: 'עותקים ישנים שהוסרו: {n}. נותרו במקומם: {k} ({reasons}).',
+    intgLegacyCleanedPartial: 'עותקים ישנים שהוסרו: {n}. נותרו במקומם: {k}. הסרה נכשלה: {f}.',
+    intgLegacyReasonEdited: 'נערך ידנית',
+    intgLegacyReasonUnsafeLink: 'מאחורי קישור סמלי',
+    intgLegacyReasonNoSharedCopy: 'עותק .agents משותף חסר',
+    intgLegacyReasonError: 'לא ניתן לקרוא',
     intgOtherToggle: 'העוזר שלי לא מופיע ברשימה',
     intgOtherDesc:
       'בחרו רק דרך אחת מבין השלוש. כולן מתקינות את אותו skill, ולכן אין צורך ביותר מאחת.',
@@ -7484,6 +7749,21 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'skill इंस्टॉल नहीं है',
     intgStateInstalled: 'skill {v} इंस्टॉल हो गया · अगली चैट में तैयार',
+    intgLegacyTitle: 'पुरानी skill प्रतियाँ',
+    intgLegacyDesc:
+      'UniWork Office पहले हर टूल के अपने फ़ोल्डर में एक प्रति लिखता था। बची हुई प्रतियाँ: {n}। टूल उन्हें पढ़ता रहता है, इसलिए उन्हें कभी मौजूदा skill नहीं मिलती।',
+    intgLegacyClean: 'पुरानी प्रतियाँ हटाएँ',
+    intgLegacyCleaned: 'हटाई गई पुरानी प्रतियाँ: {n}। हाथ से बदली और छोड़ी गईं: {k}।',
+    intgLegacyFailed: 'पुरानी प्रतियाँ नहीं हटाई जा सकीं।',
+    intgLegacyFailedNoSharedCopy:
+      'पहले साझा .agents फ़ोल्डर में skill इंस्टॉल करें, फिर पुरानी प्रतियाँ हटाएँ।',
+    intgLegacyCleanedKept: 'हटाई गई पुरानी प्रतियाँ: {n}। छोड़ी गईं: {k} ({reasons})।',
+    intgLegacyCleanedPartial:
+      'हटाई गई पुरानी प्रतियाँ: {n}। छोड़ी गईं: {k}। हटाई नहीं जा सकीं: {f}।',
+    intgLegacyReasonEdited: 'हाथ से बदली गई',
+    intgLegacyReasonUnsafeLink: 'सिम्लिंक के पीछे',
+    intgLegacyReasonNoSharedCopy: 'साझा .agents प्रति अनुपस्थित',
+    intgLegacyReasonError: 'पढ़ी नहीं जा सकी',
     intgOtherToggle: 'मेरा असिस्टेंट सूची में नहीं है',
     intgOtherDesc:
       'इन तीन तरीकों में से कोई एक ही चुनें। सभी एक ही skill इंस्टॉल करते हैं, इसलिए एक से ज़्यादा की ज़रूरत नहीं।',
@@ -7793,6 +8073,20 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'Chưa cài skill',
     intgStateInstalled: 'Đã cài skill {v} · sẵn sàng ở chat tiếp theo',
+    intgLegacyTitle: 'Bản sao skill cũ',
+    intgLegacyDesc:
+      'Trước đây UniWork Office ghi một bản sao vào thư mục riêng của từng công cụ. Còn {n} bản vẫn nằm đó: công cụ vẫn đọc chúng, nên chúng không bao giờ có bản skill hiện hành.',
+    intgLegacyClean: 'Xóa bản sao cũ',
+    intgLegacyCleaned: 'Đã xóa {n} bản sao cũ, giữ lại {k} bản đã sửa tay.',
+    intgLegacyFailed: 'Không xóa được bản sao cũ.',
+    intgLegacyFailedNoSharedCopy:
+      'Hãy cài skill vào thư mục .agents dùng chung trước, rồi xóa các bản sao cũ.',
+    intgLegacyCleanedKept: 'Đã xóa {n} bản sao cũ, giữ lại {k} bản ({reasons}).',
+    intgLegacyCleanedPartial: 'Đã xóa {n} bản sao cũ, giữ lại {k} bản, {f} bản xóa thất bại.',
+    intgLegacyReasonEdited: 'đã sửa tay',
+    intgLegacyReasonUnsafeLink: 'nằm sau một liên kết tượng trưng (symlink)',
+    intgLegacyReasonNoSharedCopy: 'thiếu bản sao .agents dùng chung',
+    intgLegacyReasonError: 'không đọc được',
     intgOtherToggle: 'Trợ lý của tôi không có trong danh sách',
     intgOtherDesc:
       'Chọn một trong ba cách sau. Tất cả đều cài cùng một skill, nên chỉ cần làm một lần.',
@@ -8263,6 +8557,19 @@ export const strings = {
     intgSkillVersion: 'skill {v}',
     intgStateMissing: 'skill 未安裝',
     intgStateInstalled: '已安裝 skill {v} · 下次對話即可使用',
+    intgLegacyTitle: '舊版 skill 副本',
+    intgLegacyDesc:
+      'UniWork Office 以前會把副本寫進每個工具自己的目錄。現在還有 {n} 份留在那裡:工具仍在讀取它們,所以永遠拿不到目前版本。',
+    intgLegacyClean: '刪除舊副本',
+    intgLegacyCleaned: '已刪除 {n} 份舊副本,{k} 份被手動改過的保留不動。',
+    intgLegacyFailed: '無法刪除舊副本。',
+    intgLegacyFailedNoSharedCopy: '請先將 skill 安裝到共享 .agents 目錄，然後再刪除舊副本。',
+    intgLegacyCleanedKept: '已刪除 {n} 份舊副本，{k} 份保留不動（{reasons}）。',
+    intgLegacyCleanedPartial: '已刪除 {n} 份舊副本，{k} 份保留不動，{f} 份刪除失敗。',
+    intgLegacyReasonEdited: '手動修改過',
+    intgLegacyReasonUnsafeLink: '符號連結路徑',
+    intgLegacyReasonNoSharedCopy: '共享 .agents 副本不可用',
+    intgLegacyReasonError: '無法讀取',
     intgOtherToggle: '沒有列出我的助理',
     intgOtherDesc: '以下三種方式任選一種即可。安裝的是同一份 skill，不需要重複操作。',
     intgOtherFolderTitle: '任何能讀取 SKILL.md 資料夾的助理',

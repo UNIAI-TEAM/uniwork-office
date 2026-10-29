@@ -1,11 +1,14 @@
 import { mcpLaunch, type McpLaunch } from '@genoffice/cli/mcp-launch'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TFunc } from './locale'
 import { McpServerSection } from './McpServerSection'
+import { toastError } from './WbToastHost'
 import type {
   AgentId,
   AgentTarget,
   IntegrationsStatus,
+  LegacyKeepReason,
+  LegacySweepResult,
   SkillInstallState,
 } from '../../shared/integrations-api'
 
@@ -65,10 +68,16 @@ export function IntegrationsPane({
   const [pending, setPending] = useState<Pending | null>(null)
   const [busy, setBusy] = useState(false)
   /** one-line outcome shown until the next action: installed hint, saved zip path, copied */
-  const [notice, setNotice] = useState<{ agentId?: AgentId; text: string } | null>(null)
+  const [notice, setNotice] = useState<{
+    agentId?: AgentId
+    legacy?: boolean
+    alert?: boolean
+    text: string
+  } | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
-
+  const legacyNoticeRef = useRef<HTMLDivElement>(null)
+  const focusLegacyNoticeRef = useRef(false)
   const refresh = useCallback(async () => {
     const s = await api()
       ?.status()
@@ -81,6 +90,13 @@ export function IntegrationsPane({
     setStatus(s)
     onStatus?.(s)
   }, [onStatus])
+
+  useEffect(() => {
+    if ((status?.legacy ?? []).length === 0 && notice?.legacy && focusLegacyNoticeRef.current) {
+      focusLegacyNoticeRef.current = false
+      legacyNoticeRef.current?.focus()
+    }
+  }, [status, notice])
 
   useEffect(() => {
     void refresh()
@@ -149,6 +165,36 @@ export function IntegrationsPane({
     if (path) setNotice({ text: t('intgSavedTo', { path }) })
   }
 
+  /** the per-tool copies the shared `.agents` row replaced: still read, never updated */
+  const cleanLegacy = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const res = await api()!.sweepLegacySkillCopies()
+      const failedCount = res.failed?.length ?? 0
+      focusLegacyNoticeRef.current = res.kept.length === 0 && failedCount === 0
+      setNotice({
+        legacy: true,
+        alert: failedCount > 0,
+        text: legacySweepNoticeText(t, res),
+      })
+      await refresh()
+    } catch (err) {
+      focusLegacyNoticeRef.current = false
+      const cause = toastError(err)
+      setNotice({
+        legacy: true,
+        alert: true,
+        text:
+          cause === 'the shared .agents copy is not installed yet'
+            ? t('intgLegacyFailedNoSharedCopy')
+            : t('intgLegacyFailed'),
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const confirmBlock = (p: Pending) => (
     <div className="set-intg-confirm" role="group">
       <div className="set-field-desc">
@@ -189,6 +235,7 @@ export function IntegrationsPane({
   }
 
   const bundled = status.skillVersion
+  const legacy = status.legacy ?? []
   const cliTooOld =
     status.skillNeedsCli &&
     status.cli.version &&
@@ -314,6 +361,42 @@ export function IntegrationsPane({
           )
         })}
 
+        {legacy.length > 0 && (
+          <div className="set-intg-row" data-agent="legacy">
+            <div className="set-field">
+              <div className="set-field-text">
+                <div className="set-field-stack">
+                  <div className="set-field-label">{t('intgLegacyTitle')}</div>
+                  <div className="set-field-desc">{t('intgLegacyDesc', { n: legacy.length })}</div>
+                  <ul className="set-intg-legacy">
+                    {legacy.map((c) => (
+                      <li key={c.path} className="set-intg-legacy-item">
+                        {c.label} — <span dir="ltr">{c.path}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div className="set-intg-actions">
+                <button className="set-btn" disabled={busy} onClick={() => void cleanLegacy()}>
+                  {t('intgLegacyClean')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {notice?.legacy && (
+          <div
+            ref={legacyNoticeRef}
+            className="set-field-desc set-intg-notice"
+            role={notice.alert ? 'alert' : 'status'}
+            tabIndex={-1}
+          >
+            {notice.text}
+          </div>
+        )}
+
         <details className="set-intg-details" open={status.agents.length === 0}>
           <summary>{t('intgOtherToggle')}</summary>
           <div className="set-field-desc set-intg-lead">{t('intgOtherDesc')}</div>
@@ -352,7 +435,7 @@ export function IntegrationsPane({
           </div>
 
           {pending && !pending.agentId && confirmBlock(pending)}
-          {notice && !notice.agentId && (
+          {notice && !notice.agentId && !notice.legacy && (
             <div className="set-field-desc set-intg-notice">{notice.text}</div>
           )}
         </details>
@@ -490,6 +573,41 @@ function stateText(t: TFunc, state: SkillInstallState, bundled: string): string 
       return t('intgStateNewer', { v })
     case 'occupied':
       return t('intgStateOccupied')
+  }
+}
+
+function legacySweepNoticeText(t: TFunc, res: LegacySweepResult): string {
+  const n = res.removed.length
+  const k = res.kept.length
+  const f = res.failed?.length ?? 0
+  if (f > 0) {
+    return t('intgLegacyCleanedPartial', { n, k, f })
+  }
+  const nonEdited = res.kept.some((item) => item.reason && item.reason !== 'edited')
+  if (k > 0 && nonEdited) {
+    const seen = new Set<LegacyKeepReason>()
+    const labels: string[] = []
+    for (const item of res.kept) {
+      const reason = item.reason ?? 'edited'
+      if (seen.has(reason)) continue
+      seen.add(reason)
+      labels.push(legacyKeepReasonLabel(t, reason))
+    }
+    return t('intgLegacyCleanedKept', { n, k, reasons: labels.join(', ') })
+  }
+  return t('intgLegacyCleaned', { n, k })
+}
+
+function legacyKeepReasonLabel(t: TFunc, reason: LegacyKeepReason): string {
+  switch (reason) {
+    case 'edited':
+      return t('intgLegacyReasonEdited')
+    case 'unsafe_link':
+      return t('intgLegacyReasonUnsafeLink')
+    case 'no_shared_copy':
+      return t('intgLegacyReasonNoSharedCopy')
+    case 'error':
+      return t('intgLegacyReasonError')
   }
 }
 
