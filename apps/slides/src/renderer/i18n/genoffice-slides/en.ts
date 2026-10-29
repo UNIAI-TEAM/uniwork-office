@@ -6,6 +6,7 @@ export const en = {
   appRecordDiscard: "Don't Save",
   appRecordSave: 'Save',
   appStatusRecordSaved: 'Narration saved on {count} slides (PowerPoint plays it too)',
+  appStatusRecordSavedOne: 'Narration saved on 1 slide (PowerPoint plays it too)',
   appStatusRecordFailed: 'The recording could not be saved',
   appStatusNarrationCleared: 'Narration cleared',
   paneShowRecording: 'Recording',

@@ -6,6 +6,7 @@ export const zhTW = {
   appRecordDiscard: '不儲存',
   appRecordSave: '儲存',
   appStatusRecordSaved: '已為 {count} 頁儲存旁白（PowerPoint 中同樣可以播放）',
+  appStatusRecordSavedOne: '已為 1 頁儲存旁白（PowerPoint 中同樣可以播放）',
   appStatusRecordFailed: '無法儲存錄製內容',
   appStatusNarrationCleared: '已清除旁白',
   paneShowRecording: '正在錄製',

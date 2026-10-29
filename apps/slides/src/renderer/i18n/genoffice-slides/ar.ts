@@ -6,6 +6,7 @@ export const ar = {
   appRecordDiscard: 'عدم الحفظ',
   appRecordSave: 'حفظ',
   appStatusRecordSaved: 'تم حفظ التعليق الصوتي في {count} شرائح (يشغّله PowerPoint أيضًا)',
+  appStatusRecordSavedOne: 'تم حفظ التعليق الصوتي في شريحة واحدة (يشغّله PowerPoint أيضًا)',
   appStatusRecordFailed: 'تعذّر حفظ التسجيل',
   appStatusNarrationCleared: 'تم مسح التعليق الصوتي',
   paneShowRecording: 'جارٍ التسجيل',

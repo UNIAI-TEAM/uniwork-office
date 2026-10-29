@@ -6,6 +6,7 @@ export const pl = {
   appRecordDiscard: 'Nie zapisuj',
   appRecordSave: 'Zapisz',
   appStatusRecordSaved: 'Zapisano narrację na slajdach: {count} (odtwarza ją także PowerPoint)',
+  appStatusRecordSavedOne: 'Zapisano narrację na 1 slajdzie (odtwarza ją także PowerPoint)',
   appStatusRecordFailed: 'Nie udało się zapisać nagrania',
   appStatusNarrationCleared: 'Wyczyszczono narrację',
   paneShowRecording: 'Nagrywanie',

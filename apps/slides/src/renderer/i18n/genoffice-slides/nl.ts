@@ -7,6 +7,7 @@ export const nl = {
   appRecordSave: 'Opslaan',
   appStatusRecordSaved:
     'Gesproken tekst opgeslagen op {count} dia’s (PowerPoint speelt die ook af)',
+  appStatusRecordSavedOne: 'Gesproken tekst opgeslagen op 1 dia (PowerPoint speelt die ook af)',
   appStatusRecordFailed: 'De opname kan niet worden opgeslagen',
   appStatusNarrationCleared: 'Gesproken tekst gewist',
   paneShowRecording: 'Opname loopt',

@@ -5,6 +5,7 @@ export const zh = {
   appRecordDiscard: '不保存',
   appRecordSave: '保存',
   appStatusRecordSaved: '已为 {count} 页保存旁白（PowerPoint 中同样可以播放）',
+  appStatusRecordSavedOne: '已为 1 页保存旁白（PowerPoint 中同样可以播放）',
   appStatusRecordFailed: '无法保存录制内容',
   appStatusNarrationCleared: '已清除旁白',
   paneShowRecording: '正在录制',

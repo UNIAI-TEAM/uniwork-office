@@ -6,6 +6,7 @@ export const id = {
   appRecordDiscard: 'Jangan Simpan',
   appRecordSave: 'Simpan',
   appStatusRecordSaved: 'Narasi disimpan di {count} slide (PowerPoint juga memutarnya)',
+  appStatusRecordSavedOne: 'Narasi disimpan di 1 slide (PowerPoint juga memutarnya)',
   appStatusRecordFailed: 'Rekaman tidak dapat disimpan',
   appStatusNarrationCleared: 'Narasi dihapus',
   paneShowRecording: 'Merekam',

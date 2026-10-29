@@ -7,6 +7,7 @@ export const de = {
   appRecordSave: 'Speichern',
   appStatusRecordSaved:
     'Kommentar auf {count} Folien gespeichert (PowerPoint spielt ihn ebenfalls ab)',
+  appStatusRecordSavedOne: 'Kommentar auf 1 Folie gespeichert (PowerPoint spielt ihn ebenfalls ab)',
   appStatusRecordFailed: 'Die Aufnahme konnte nicht gespeichert werden',
   appStatusNarrationCleared: 'Kommentar gelöscht',
   paneShowRecording: 'Aufnahme läuft',

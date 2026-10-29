@@ -6,6 +6,7 @@ export const th = {
   appRecordDiscard: 'ไม่บันทึก',
   appRecordSave: 'บันทึก',
   appStatusRecordSaved: 'บันทึกคำบรรยายใน {count} สไลด์แล้ว (PowerPoint เล่นได้เช่นกัน)',
+  appStatusRecordSavedOne: 'บันทึกคำบรรยายใน 1 สไลด์แล้ว (PowerPoint เล่นได้เช่นกัน)',
   appStatusRecordFailed: 'ไม่สามารถบันทึกการบันทึกเสียงได้',
   appStatusNarrationCleared: 'ล้างคำบรรยายแล้ว',
   paneShowRecording: 'กำลังบันทึก',

@@ -6,6 +6,7 @@ export const cs = {
   appRecordDiscard: 'Neukládat',
   appRecordSave: 'Uložit',
   appStatusRecordSaved: 'Komentář uložen na snímcích: {count} (přehraje ho i PowerPoint)',
+  appStatusRecordSavedOne: 'Komentář uložen na 1 snímku (přehraje ho i PowerPoint)',
   appStatusRecordFailed: 'Nahrávku se nepodařilo uložit',
   appStatusNarrationCleared: 'Komentář byl vymazán',
   paneShowRecording: 'Nahrává se',

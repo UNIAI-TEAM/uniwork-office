@@ -2,8 +2,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { createI18n, LANGS } from '@genoffice/i18n'
 import { t } from '../src/renderer/i18n/locale'
+import { genofficeSlidesStrings } from '../src/renderer/i18n/strings-genoffice-slides'
 import { RecordNarrationDialog } from '../src/renderer/narration/RecordingBar'
+import { recordSavedStatusKey } from '../src/renderer/show-actions'
 import { joinSpans, slideNarrations } from '../src/renderer/narration/segments'
 import { encodeWav } from '../src/renderer/narration/wav'
 
@@ -108,5 +111,27 @@ describe('RecordNarrationDialog', () => {
     expect(heading?.id).toBeTruthy()
     expect(dlg?.getAttribute('aria-labelledby')).toBe(heading?.id)
     expect(heading?.textContent).toBe(t('appRecordTitle'))
+  })
+})
+
+const translateGenofficeSlides = createI18n(genofficeSlidesStrings)
+
+describe('recordSavedStatusKey', () => {
+  it('uses the singular form for one slide and plural otherwise', () => {
+    expect(recordSavedStatusKey(1)).toBe('appStatusRecordSavedOne')
+    expect(recordSavedStatusKey(2)).toBe('appStatusRecordSaved')
+    expect(translateGenofficeSlides('en', recordSavedStatusKey(1), { count: 1 })).toBe(
+      'Narration saved on 1 slide (PowerPoint plays it too)',
+    )
+    expect(translateGenofficeSlides('en', recordSavedStatusKey(3), { count: 3 })).toBe(
+      'Narration saved on 3 slides (PowerPoint plays it too)',
+    )
+  })
+
+  it('every language carries the singular without an uninterpolated {count} placeholder', () => {
+    for (const lang of LANGS) {
+      const text = translateGenofficeSlides(lang, 'appStatusRecordSavedOne')
+      expect(text, lang).not.toContain('{count}')
+    }
   })
 })

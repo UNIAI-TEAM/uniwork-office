@@ -8,6 +8,8 @@ export const ru = {
   appRecordSave: 'Сохранить',
   appStatusRecordSaved:
     'Речевое сопровождение сохранено, слайдов: {count} (PowerPoint его тоже воспроизводит)',
+  appStatusRecordSavedOne:
+    'Речевое сопровождение сохранено на 1 слайде (PowerPoint его тоже воспроизводит)',
   appStatusRecordFailed: 'Не удалось сохранить запись',
   appStatusNarrationCleared: 'Речевое сопровождение очищено',
   paneShowRecording: 'Идёт запись',

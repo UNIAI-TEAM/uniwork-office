@@ -7,6 +7,8 @@ export const ja = {
   appRecordSave: '保存',
   appStatusRecordSaved:
     '{count} 枚のスライドにナレーションを保存しました（PowerPoint でも再生できます）',
+  appStatusRecordSavedOne:
+    '1 枚のスライドにナレーションを保存しました（PowerPoint でも再生できます）',
   appStatusRecordFailed: '録音を保存できませんでした',
   appStatusNarrationCleared: 'ナレーションをクリアしました',
   paneShowRecording: '録音中',

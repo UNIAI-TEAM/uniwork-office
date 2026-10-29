@@ -6,6 +6,7 @@ export const vi = {
   appRecordDiscard: 'Không lưu',
   appRecordSave: 'Lưu',
   appStatusRecordSaved: 'Đã lưu tường thuật trên {count} trang chiếu (PowerPoint cũng phát được)',
+  appStatusRecordSavedOne: 'Đã lưu tường thuật trên 1 trang chiếu (PowerPoint cũng phát được)',
   appStatusRecordFailed: 'Không thể lưu bản ghi',
   appStatusNarrationCleared: 'Đã xóa tường thuật',
   paneShowRecording: 'Đang ghi',

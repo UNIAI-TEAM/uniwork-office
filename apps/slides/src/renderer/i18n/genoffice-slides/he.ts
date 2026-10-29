@@ -6,6 +6,7 @@ export const he = {
   appRecordDiscard: 'אל תשמור',
   appRecordSave: 'שמור',
   appStatusRecordSaved: 'הקריינות נשמרה ב-{count} שקופיות (גם PowerPoint משמיע אותה)',
+  appStatusRecordSavedOne: 'הקריינות נשמרה בשקופית אחת (גם PowerPoint משמיע אותה)',
   appStatusRecordFailed: 'לא ניתן לשמור את ההקלטה',
   appStatusNarrationCleared: 'הקריינות נוקתה',
   paneShowRecording: 'מקליט',

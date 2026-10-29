@@ -6,6 +6,7 @@ export const ms = {
   appRecordDiscard: 'Jangan Simpan',
   appRecordSave: 'Simpan',
   appStatusRecordSaved: 'Naratif disimpan pada {count} slaid (PowerPoint turut memainkannya)',
+  appStatusRecordSavedOne: 'Naratif disimpan pada 1 slaid (PowerPoint turut memainkannya)',
   appStatusRecordFailed: 'Rakaman tidak dapat disimpan',
   appStatusNarrationCleared: 'Naratif dikosongkan',
   paneShowRecording: 'Merakam',

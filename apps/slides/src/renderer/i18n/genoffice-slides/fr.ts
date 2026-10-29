@@ -7,6 +7,7 @@ export const fr = {
   appRecordDiscard: 'Ne pas enregistrer',
   appRecordSave: 'Enregistrer',
   appStatusRecordSaved: 'Narration enregistrée sur {count} diapositives (PowerPoint la lit aussi)',
+  appStatusRecordSavedOne: 'Narration enregistrée sur 1 diapositive (PowerPoint la lit aussi)',
   appStatusRecordFailed: 'L’enregistrement n’a pas pu être sauvegardé',
   appStatusNarrationCleared: 'Narration effacée',
   paneShowRecording: 'Enregistrement',

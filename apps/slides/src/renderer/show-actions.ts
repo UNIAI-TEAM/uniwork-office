@@ -107,6 +107,13 @@ export function onRecordDone(ctx: ActionCtx, take: Promise<NarrationTake | null>
   })
 }
 
+/** Status bar text key after saving narration: one slide gets the singular form (matches openedStatusKey). */
+export function recordSavedStatusKey(
+  slideCount: number,
+): 'appStatusRecordSaved' | 'appStatusRecordSavedOne' {
+  return slideCount === 1 ? 'appStatusRecordSavedOne' : 'appStatusRecordSaved'
+}
+
 /** Keep the recording: each recorded slide gets its narration and its time as advance time */
 export async function saveRecording(ctx: ActionCtx): Promise<void> {
   const take = ctx.pendingRecording
@@ -118,7 +125,7 @@ export async function saveRecording(ctx: ActionCtx): Promise<void> {
     if (!update) throw new Error('the recording was not saved')
     ctx.setSlides((current) => mergeSlideUpdate(current, update))
     ctx.setDirty(true)
-    ctx.setStatus(t('appStatusRecordSaved', { count: slides.length }))
+    ctx.setStatus(t(recordSavedStatusKey(slides.length), { count: slides.length }))
   } catch {
     ctx.setStatus(t('appStatusRecordFailed'))
   }

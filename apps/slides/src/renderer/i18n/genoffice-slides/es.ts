@@ -8,6 +8,7 @@ export const es = {
   appRecordSave: 'Guardar',
   appStatusRecordSaved:
     'Narración guardada en {count} diapositivas (PowerPoint también la reproduce)',
+  appStatusRecordSavedOne: 'Narración guardada en 1 diapositiva (PowerPoint también la reproduce)',
   appStatusRecordFailed: 'No se pudo guardar la grabación',
   appStatusNarrationCleared: 'Narración borrada',
   paneShowRecording: 'Grabando',

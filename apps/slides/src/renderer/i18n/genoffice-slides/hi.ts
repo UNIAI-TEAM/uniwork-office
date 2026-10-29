@@ -6,6 +6,7 @@ export const hi = {
   appRecordDiscard: 'न सहेजें',
   appRecordSave: 'सहेजें',
   appStatusRecordSaved: '{count} स्लाइडों पर कथन सहेजा गया (PowerPoint भी इसे चलाता है)',
+  appStatusRecordSavedOne: '1 स्लाइड पर कथन सहेजा गया (PowerPoint भी इसे चलाता है)',
   appStatusRecordFailed: 'रिकॉर्डिंग सहेजी नहीं जा सकी',
   appStatusNarrationCleared: 'कथन साफ़ किया गया',
   paneShowRecording: 'रिकॉर्ड हो रहा है',

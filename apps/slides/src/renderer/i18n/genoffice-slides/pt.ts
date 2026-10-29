@@ -6,6 +6,7 @@ export const pt = {
   appRecordDiscard: 'Não Salvar',
   appRecordSave: 'Salvar',
   appStatusRecordSaved: 'Narração salva em {count} slides (o PowerPoint também a reproduz)',
+  appStatusRecordSavedOne: 'Narração salva em 1 slide (o PowerPoint também a reproduz)',
   appStatusRecordFailed: 'Não foi possível salvar a gravação',
   appStatusNarrationCleared: 'Narração limpa',
   paneShowRecording: 'Gravando',

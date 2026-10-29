@@ -7,6 +7,7 @@ export const it = {
   appRecordDiscard: 'Non salvare',
   appRecordSave: 'Salva',
   appStatusRecordSaved: 'Commento salvato in {count} diapositive (riprodotto anche da PowerPoint)',
+  appStatusRecordSavedOne: 'Commento salvato in 1 diapositiva (riprodotto anche da PowerPoint)',
   appStatusRecordFailed: 'Impossibile salvare la registrazione',
   appStatusNarrationCleared: 'Commento cancellato',
   paneShowRecording: 'Registrazione in corso',

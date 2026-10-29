@@ -6,6 +6,7 @@ export const ko = {
   appRecordDiscard: '저장 안 함',
   appRecordSave: '저장',
   appStatusRecordSaved: '슬라이드 {count}개에 내레이션을 저장했습니다(PowerPoint에서도 재생됨)',
+  appStatusRecordSavedOne: '슬라이드 1개에 내레이션을 저장했습니다(PowerPoint에서도 재생됨)',
   appStatusRecordFailed: '녹음을 저장할 수 없습니다',
   appStatusNarrationCleared: '내레이션을 지웠습니다',
   paneShowRecording: '녹음 중',
