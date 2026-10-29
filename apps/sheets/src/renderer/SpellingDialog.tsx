@@ -1,32 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { useI18n } from './i18n/locale'
+import { applySpellReplacement, type SpellWorkbookLike } from './spell-apply'
 import {
   collectWorkbookTextCells,
   indexOfWordOf,
-  replaceInRichDoc,
-  replaceSuggestion,
   runSheetSpellCheck,
-  type RichDoc,
-  type SpellCellRef,
   type SpellFinding,
   type SpellSnapshot,
 } from './spell-check'
 import { loadLearnedWords, saveLearnedWords } from './spellcheck-pref'
-
-/**
- * Structural slice of Univer's FWorkbook/FWorksheet the dialog needs; keeps
- * the component off the full facade types (and unit-testable in principle).
- */
-interface SpellWorkbookLike {
-  getSheets(): { getSheetId(): string; getSheetName(): string }[] | null
-  getSnapshot(): unknown
-  getSheetBySheetId(sheetId: string): SpellWorksheetLike | null
-}
-
-interface SpellWorksheetLike {
-  getRange(row: number, column: number): { setValue(value: string): unknown }
-}
 
 /** Stable identity for one finding row: the flagged word in one cell. */
 const findingKey = (finding: SpellFinding): string =>
@@ -37,18 +20,6 @@ const excerpt = (text: string, at: number, keep = 90): string => {
   if (text.length <= keep) return text
   const start = Math.max(0, Math.min(at - Math.floor(keep / 3), text.length - keep))
   return `${start > 0 ? '…' : ''}${text.slice(start, start + keep)}${start + keep < text.length ? '…' : ''}`
-}
-
-/** The live snapshot cell, as the replacement's starting point. */
-function liveCell(
-  snapshot: SpellSnapshot,
-  sheetId: string,
-  row: number,
-  column: number,
-): SpellCellRef | null {
-  const cell = snapshot.sheets[sheetId]?.cellData?.[String(row)]?.[String(column)]
-  if (!cell || typeof cell.v !== 'string') return null
-  return { sheetId, sheetName: '', address: '', row, column, text: cell.v }
 }
 
 /**
@@ -142,44 +113,8 @@ export function SpellingDialog({
     setMessage(t('appSpellLearned', { word }))
   }
 
-  /**
-   * Writes one replacement into a cell, against its CURRENT value — the user
-   * may have edited it since the scan — through Univer so undo, journal and
-   * dirty state all see it. A rich-text cell (cell.p) keeps its runs: the
-   * replacement rewrites the document's dataStream and shifts the runs, the
-   * shape Excel's own in-cell corrector leaves behind.
-   */
-  const applyToCell = (finding: SpellFinding, suggestion: string): boolean => {
-    const workbook = getWorkbook()
-    const worksheet = workbook?.getSheetBySheetId(finding.cell.sheetId)
-    if (!workbook || !worksheet) return false
-    const snapshot = workbook.getSnapshot() as SpellSnapshot
-    const live = liveCell(snapshot, finding.cell.sheetId, finding.cell.row, finding.cell.column)
-    if (live === null) return false
-    const rich = (
-      snapshot.sheets[finding.cell.sheetId]?.cellData?.[String(finding.cell.row)]?.[
-        String(finding.cell.column)
-      ] as { p?: RichDoc } | undefined
-    )?.p
-    if (rich !== undefined && rich !== null) {
-      const doc = replaceInRichDoc(rich, finding.word, suggestion)
-      if (doc === null) return false
-      // setValues takes the full cell object (ICellData), which is what
-      // carries the document; the cast only erases the facade's branded types
-      const range = worksheet.getRange(finding.cell.row, finding.cell.column) as unknown as {
-        setValues(values: { v: string; p: RichDoc }[][]): unknown
-      }
-      range.setValues([[{ v: replaceSuggestion(live.text, finding.word, suggestion), p: doc }]])
-      return true
-    }
-    const next = replaceSuggestion(live.text, finding.word, suggestion)
-    if (next === live.text) return false
-    worksheet.getRange(finding.cell.row, finding.cell.column).setValue(next)
-    return true
-  }
-
   const applySuggestion = (finding: SpellFinding, suggestion: string): void => {
-    if (applyToCell(finding, suggestion)) {
+    if (applySpellReplacement(getWorkbook(), finding, suggestion)) {
       dropFinding(findingKey(finding))
       setMessage(t('appSpellChanged', { address: finding.cell.address }))
     } else {
@@ -191,7 +126,7 @@ export function SpellingDialog({
     const same = findings.filter((entry) => entry.word === finding.word)
     let changed = 0
     for (const entry of same) {
-      if (applyToCell(entry, suggestion)) changed += 1
+      if (applySpellReplacement(getWorkbook(), entry, suggestion)) changed += 1
     }
     if (changed > 0) {
       setFindings((previous) => previous.filter((entry) => entry.word !== finding.word))
