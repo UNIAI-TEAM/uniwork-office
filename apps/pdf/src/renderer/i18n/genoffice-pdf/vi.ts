@@ -57,4 +57,5 @@ export const vi = {
   compareRemoved: '−{count} dòng',
   compareTruncated: 'trang quá lớn — chỉ đếm dòng',
   compareUnreadable: 'Không đọc được tệp này; hãy kiểm tra đó là tệp PDF hợp lệ',
+  ribbonCompact: 'Dải băng thu gọn (chỉ biểu tượng)',
 } satisfies Record<keyof typeof zh, string>

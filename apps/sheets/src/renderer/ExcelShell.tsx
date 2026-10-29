@@ -620,6 +620,9 @@ export function ExcelShell({
     {
       collapse: t('appRibbonCollapse'),
       expand: t('appRibbonExpand'),
+      // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (docs parity, see #362)
+      compact: t('appRibbonCompact'),
+      expandFull: t('appRibbonExpand'),
     },
     {
       ...(RIBBON_COLLAPSE_ACTION ? { action: RIBBON_COLLAPSE_ACTION } : {}),

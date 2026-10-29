@@ -57,4 +57,5 @@ export const th = {
   compareRemoved: '−{count} บรรทัด',
   compareTruncated: 'หน้าใหญ่เกินไป — นับเฉพาะจำนวน',
   compareUnreadable: 'ไม่สามารถอ่านไฟล์นี้เป็น PDF ได้',
+  ribbonCompact: 'Ribbon แบบกระชับ (ไอคอนเท่านั้น)',
 } satisfies Record<keyof typeof zh, string>

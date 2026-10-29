@@ -394,7 +394,13 @@ export default function App() {
   const { lang, t } = useI18n()
   const collapse = useRibbonCollapse(
     'genoffice-pdf-ribbon-collapsed',
-    { collapse: t('ribbonCollapse'), expand: t('ribbonExpand') },
+    {
+      collapse: t('ribbonCollapse'),
+      expand: t('ribbonExpand'),
+      // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (docs parity, see #362)
+      compact: t('ribbonCompact'),
+      expandFull: t('ribbonExpand'),
+    },
     pdfRibbonCollapseOptions(),
   )
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
@@ -7088,7 +7094,7 @@ export default function App() {
                 <span className="rb-color-bar" style={{ background: cssRgb(highlightColor) }} />
               </span>
             </span>
-            {t('highlight')}
+            <span>{t('highlight')}</span>
           </button>
           <button
             className={`rb-highlight-caret${highlightColorOpen ? ' active' : ''}`}
@@ -7118,7 +7124,7 @@ export default function App() {
           <span className="rb-big-icon">
             <IconUnderline />
           </span>
-          {t('underline')}
+          <span>{t('underline')}</span>
         </button>
         <button
           className={`rb-big${markupTool === 'squiggly' ? ' active' : ''}`}
@@ -7142,7 +7148,7 @@ export default function App() {
           <span className="rb-big-icon">
             <IconStrike />
           </span>
-          {t('strikeout')}
+          <span>{t('strikeout')}</span>
         </button>
       </div>
     </div>
@@ -7193,7 +7199,7 @@ export default function App() {
           <span className="rb-big-icon">
             <IconFitWidth />
           </span>
-          {t('fitWidth')}
+          <span>{t('fitWidth')}</span>
         </button>
         <button
           className="rb-big"
@@ -7206,7 +7212,7 @@ export default function App() {
           <span className="rb-big-icon">
             <IconFitPage />
           </span>
-          {t('fitPage')}
+          <span>{t('fitPage')}</span>
         </button>
       </div>
     </div>
@@ -7221,7 +7227,7 @@ export default function App() {
       <span className="rb-big-icon">
         <IconSearch />
       </span>
-      {t('search')}
+      <span>{t('search')}</span>
     </button>
   )
 
@@ -7244,7 +7250,7 @@ export default function App() {
       <span className="rb-big-icon">
         <IconEditText />
       </span>
-      {t('editText')}
+      <span>{t('editText')}</span>
     </button>
   )
 
@@ -7276,7 +7282,7 @@ export default function App() {
       <span className="rb-big-icon">
         <IconFormText />
       </span>
-      {t('insertText')}
+      <span>{t('insertText')}</span>
     </button>
   )
 
@@ -7353,7 +7359,7 @@ export default function App() {
           <span className="rb-big-icon">
             <IconThumbs />
           </span>
-          {t('thumbs')}
+          <span>{t('thumbs')}</span>
         </button>
         <button
           className={`rb-big${sidebar === 'outline' ? ' active' : ''}`}
@@ -7363,7 +7369,7 @@ export default function App() {
           <span className="rb-big-icon">
             <IconOutline />
           </span>
-          {t('outline')}
+          <span>{t('outline')}</span>
         </button>
         {/* a UniWork-bound document keeps the server comments panel instead of the file-annotation list */}
         {!serverComments && (
@@ -7409,7 +7415,7 @@ export default function App() {
           onClick={() => setSpread((v) => (v === 1 ? 2 : 1))}
         >
           <span className="rb-big-icon">{spread === 2 ? <IconSinglePage /> : <IconSpread />}</span>
-          {spread === 2 ? t('singlePage') : t('twoPage')}
+          <span>{spread === 2 ? t('singlePage') : t('twoPage')}</span>
         </button>
         <button
           className={`rb-big${nightMode ? ' active' : ''}`}
@@ -7419,7 +7425,7 @@ export default function App() {
           <span className="rb-big-icon">
             <IconNight />
           </span>
-          {t('nightMode')}
+          <span>{t('nightMode')}</span>
         </button>
       </div>
     </div>
@@ -7600,7 +7606,7 @@ export default function App() {
                         <IconConvertPdf />
                         <RbCaret />
                       </span>
-                      {t('convertPdf')}
+                      <span>{t('convertPdf')}</span>
                     </button>
                     {convertOpen &&
                       (cap('convertOffice') ? (
@@ -7649,7 +7655,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconPrint />
                       </span>
-                      {printing ? t('printPreparing') : t('print')}
+                      <span>{printing ? t('printPreparing') : t('print')}</span>
                     </button>
                   )}
                   {cap('saveAs') && (
@@ -7662,7 +7668,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconExportImg />
                       </span>
-                      {exporting ? t('exporting') : t('exportImages')}
+                      <span>{exporting ? t('exporting') : t('exportImages')}</span>
                     </button>
                   )}
                   <button
@@ -7673,7 +7679,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconProps />
                     </span>
-                    {t('props')}
+                    <span>{t('props')}</span>
                   </button>
                 </div>
               </div>
@@ -7737,7 +7743,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <DrawIcon />
                       </span>
-                      {t(key)}
+                      <span>{t(key)}</span>
                     </button>
                   ))}
                   {/* G8-15: the server comments panel of a bound document (spine S12: the
@@ -7754,7 +7760,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconNote />
                       </span>
-                      {commentStrings.collabComments}
+                      <span>{commentStrings.collabComments}</span>
                     </button>
                   )}
                   {/* redaction writes a working copy next to the file: desktop only (cap 'redaction');
@@ -7770,7 +7776,7 @@ export default function App() {
                           <IconRect />
                           <RbCaret />
                         </span>
-                        {t('redact')}
+                        <span>{t('redact')}</span>
                       </button>
                       {redactAppOpen && (
                         <div className="rb-drop">
@@ -7804,7 +7810,7 @@ export default function App() {
                         <span className="rb-big-icon">
                           <IconRect />
                         </span>
-                        {t('redact')}
+                        <span>{t('redact')}</span>
                       </button>
                       {redactions.length > 0 && (
                         <>
@@ -7838,7 +7844,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconSign />
                     </span>
-                    {t('sign')}
+                    <span>{t('sign')}</span>
                   </button>
                   {/* certificate signing reads the file on disk and writes a new one: desktop only
                       (cap 'certSign'); the web frame hides the entries */}
@@ -7852,7 +7858,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconCertSign />
                       </span>
-                      {t('certSign')}
+                      <span>{t('certSign')}</span>
                     </button>
                   )}
                   {cap('certSign') && digitalSignatures.length > 0 && (
@@ -7864,7 +7870,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconSignatures />
                       </span>
-                      {t('sigPanel')}
+                      <span>{t('sigPanel')}</span>
                     </button>
                   )}
                   <div ref={drawColorWrapRef} className="rb-drop-wrap">
@@ -7884,7 +7890,7 @@ export default function App() {
                         </span>
                         <RbCaret />
                       </span>
-                      {t('drawColor')}
+                      <span>{t('drawColor')}</span>
                     </button>
                     {colorOpen && (
                       <ColorPickerPopover
@@ -7914,7 +7920,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconInsertImage />
                     </span>
-                    {t('insertImage')}
+                    <span>{t('insertImage')}</span>
                   </button>
                   {cap('pdfImageEdit') && (
                     <button
@@ -7935,7 +7941,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconEditImage />
                       </span>
-                      {t('editImage')}
+                      <span>{t('editImage')}</span>
                     </button>
                   )}
                   <button
@@ -7971,7 +7977,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconWatermark />
                     </span>
-                    {t('watermark')}
+                    <span>{t('watermark')}</span>
                   </button>
                 </div>
               </div>
@@ -8012,7 +8018,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconFormText />
                     </span>
-                    {t('formAddText')}
+                    <span>{t('formAddText')}</span>
                   </button>
                   <button
                     className={`rb-big${pendingStaticFill === 'check' ? ' active' : ''}`}
@@ -8023,7 +8029,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconFormCheck />
                     </span>
-                    {t('formAddCheck')}
+                    <span>{t('formAddCheck')}</span>
                   </button>
                   <button
                     className={`rb-big${pendingStaticFill === 'cross' ? ' active' : ''}`}
@@ -8034,7 +8040,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconFormCross />
                     </span>
-                    {t('formAddCross')}
+                    <span>{t('formAddCross')}</span>
                   </button>
                 </div>
               </div>
@@ -8051,7 +8057,7 @@ export default function App() {
                         <span className="rb-big-icon">
                           <IconPreviousField />
                         </span>
-                        {t('formPreviousField')}
+                        <span>{t('formPreviousField')}</span>
                       </button>
                       <button
                         className="rb-big"
@@ -8061,7 +8067,7 @@ export default function App() {
                         <span className="rb-big-icon">
                           <IconNextField />
                         </span>
-                        {t('formNextField')}
+                        <span>{t('formNextField')}</span>
                       </button>
                       <span className="form-ribbon-progress">
                         {t('formFieldProgress', {
@@ -8092,7 +8098,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconSign />
                     </span>
-                    {t('sign')}
+                    <span>{t('sign')}</span>
                   </button>
                   <button
                     className={`rb-big${imagePick && !pendingStaticFill ? ' active' : ''}`}
@@ -8103,7 +8109,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconInsertImage />
                     </span>
-                    {t('insertImage')}
+                    <span>{t('insertImage')}</span>
                   </button>
                 </div>
               </div>
@@ -8114,7 +8120,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconCompleteForm />
                     </span>
-                    {t('formComplete')}
+                    <span>{t('formComplete')}</span>
                   </button>
                 </div>
               </div>
@@ -8132,7 +8138,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconRotateL />
                     </span>
-                    {t('rotateLeft')}
+                    <span>{t('rotateLeft')}</span>
                   </button>
                   <button
                     className="rb-big"
@@ -8142,7 +8148,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconRotateR />
                     </span>
-                    {t('rotateRight')}
+                    <span>{t('rotateRight')}</span>
                   </button>
                   <button
                     className="rb-big"
@@ -8152,7 +8158,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconRotateAll />
                     </span>
-                    {t('rotateAllPages')}
+                    <span>{t('rotateAllPages')}</span>
                   </button>
                 </div>
               </div>
@@ -8167,7 +8173,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconDeletePage />
                     </span>
-                    {t('deletePage')}
+                    <span>{t('deletePage')}</span>
                   </button>
                   {cap('saveAs') && (
                     <button
@@ -8178,7 +8184,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconExtract />
                       </span>
-                      {t('extractPage')}
+                      <span>{t('extractPage')}</span>
                     </button>
                   )}
                   {cap('insertPages') && (
@@ -8190,7 +8196,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconInsertPdf />
                       </span>
-                      {t('insertPdf')}
+                      <span>{t('insertPdf')}</span>
                     </button>
                   )}
                   <button
@@ -8201,7 +8207,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconInsertBlank />
                     </span>
-                    {t('insertBlankPage')}
+                    <span>{t('insertBlankPage')}</span>
                   </button>
                   {/* Bates stamps ride the text-insert pipeline, so they need the same capability */}
                   {cap('pdfTextEdit') && (
@@ -8214,7 +8220,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconBates />
                       </span>
-                      {t('bates')}
+                      <span>{t('bates')}</span>
                     </button>
                   )}
                   {cap('insertPages') && (
@@ -8226,7 +8232,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconReplacePages />
                       </span>
-                      {t('replacePages')}
+                      <span>{t('replacePages')}</span>
                     </button>
                   )}
                 </div>
@@ -8242,7 +8248,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconCropPages />
                     </span>
-                    {t('cropPages')}
+                    <span>{t('cropPages')}</span>
                   </button>
                   <button
                     className="rb-big"
@@ -8252,7 +8258,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconPageSize />
                     </span>
-                    {t('pageSize')}
+                    <span>{t('pageSize')}</span>
                   </button>
                 </div>
               </div>
@@ -8267,7 +8273,7 @@ export default function App() {
                     <span className="rb-big-icon">
                       <IconReverse />
                     </span>
-                    {t('reversePages')}
+                    <span>{t('reversePages')}</span>
                   </button>
                   {cap('saveAs') && (
                     <button
@@ -8278,7 +8284,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconSplitPdf />
                       </span>
-                      {t('splitPdf')}
+                      <span>{t('splitPdf')}</span>
                     </button>
                   )}
                   {cap('saveAs') && cap('insertPages') && (
@@ -8286,7 +8292,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconMergePdf />
                       </span>
-                      {t('mergePdf')}
+                      <span>{t('mergePdf')}</span>
                     </button>
                   )}
                   {cap('saveAs') && (
@@ -8298,7 +8304,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconMergePages />
                       </span>
-                      {t('mergePages')}
+                      <span>{t('mergePages')}</span>
                     </button>
                   )}
                   {cap('saveAs') && (
@@ -8310,7 +8316,7 @@ export default function App() {
                       <span className="rb-big-icon">
                         <IconSplitPages />
                       </span>
-                      {t('splitPages')}
+                      <span>{t('splitPages')}</span>
                     </button>
                   )}
                 </div>

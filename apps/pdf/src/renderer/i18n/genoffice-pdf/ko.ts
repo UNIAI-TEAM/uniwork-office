@@ -57,4 +57,5 @@ export const ko = {
   compareRemoved: '−{count}줄',
   compareTruncated: '페이지가 너무 커서 줄 수만 표시',
   compareUnreadable: '이 파일을 PDF로 읽을 수 없습니다',
+  ribbonCompact: '간단 리본(아이콘만)',
 } satisfies Record<keyof typeof zh, string>

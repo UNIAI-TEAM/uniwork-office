@@ -55,4 +55,5 @@ export const zh = {
   compareRemoved: '−{count} 行',
   compareTruncated: '页面过大，仅统计行数',
   compareUnreadable: '无法读取该文件，请确认它是有效的 PDF',
+  ribbonCompact: '紧凑功能区（仅图标）',
 }

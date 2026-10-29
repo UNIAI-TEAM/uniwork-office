@@ -701,6 +701,7 @@ export const id = {
   appTabReview: 'Tinjau',
   appRibbonCollapse: 'Ciutkan Pita',
   appRibbonExpand: 'Perluas Pita',
+  appRibbonCompact: 'Pita Ringkas (hanya ikon)',
   appTabView: 'Tampilan',
   appTabAi: 'AI',
   appTabChartDesign: 'Desain Bagan',
