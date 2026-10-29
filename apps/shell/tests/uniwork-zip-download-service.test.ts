@@ -1,4 +1,5 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import type * as FsPromises from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +8,21 @@ import { UniworkDocError } from '../src/main/uniwork-docs/errors'
 import type { ZipDownloadClient } from '../src/main/uniwork-docs/zip-download/client'
 import { createZipDownloadService } from '../src/main/uniwork-docs/zip-download/service'
 import type { ZipJob } from '../src/main/uniwork-docs/zip-download/wire'
+
+type OpenFn = typeof FsPromises.open
+const fsHooks = vi.hoisted(() => ({
+  open: null as
+    ((realOpen: OpenFn, ...args: Parameters<OpenFn>) => Promise<FsPromises.FileHandle>) | null,
+}))
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof FsPromises>()
+  return {
+    ...actual,
+    open: (...args: Parameters<OpenFn>) =>
+      fsHooks.open ? fsHooks.open(actual.open, ...args) : actual.open(...args),
+  }
+})
 
 const WS = 'ws_1'
 const A = '01J8X4D0C0N1P2Q3R4S5T6V7WA'
@@ -25,7 +41,10 @@ let dir: string
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'uw-zip-service-'))
 })
-afterEach(() => rmSync(dir, { recursive: true, force: true }))
+afterEach(() => {
+  fsHooks.open = null
+  rmSync(dir, { recursive: true, force: true })
+})
 
 const files = () => readdirSync(dir).sort()
 const tmpFiles = () => files().filter((name) => name.startsWith('.uw-dl-') && name.endsWith('.tmp'))
@@ -263,6 +282,114 @@ describe('a run', () => {
     await runSettled(h)
     expect(aborted).toBe(true)
     expect(files()).toEqual([])
+  })
+
+  it('dispose while open is still pending removes the temp file synchronously once the file exists', async () => {
+    const created = gateOf()
+    const hold = gateOf()
+    let closed = 0
+    fsHooks.open = async (realOpen, ...args) => {
+      const handle = await realOpen(...args)
+      const realClose = handle.close.bind(handle)
+      vi.spyOn(handle, 'close').mockImplementation(async () => {
+        closed++
+        await realClose()
+      })
+      created.open()
+      await hold.opened
+      return handle
+    }
+    const h = harness()
+    await h.service.start(input, h.push)
+    await created.opened
+    expect(tmpFiles()).toHaveLength(1)
+    h.service.dispose()
+    try {
+      expect(tmpFiles()).toEqual([])
+    } finally {
+      hold.open()
+      await runSettled(h)
+    }
+    expect(closed).toBe(1)
+    expect(files()).toEqual([])
+  })
+
+  it('releasing a held open after dispose closes the handle and leaves no temp file when the run settles', async () => {
+    const created = gateOf()
+    const hold = gateOf()
+    const settled = gateOf()
+    let closed = 0
+    fsHooks.open = async (realOpen, ...args) => {
+      const handle = await realOpen(...args)
+      const realClose = handle.close.bind(handle)
+      vi.spyOn(handle, 'close').mockImplementation(async () => {
+        closed++
+        await realClose()
+      })
+      created.open()
+      await hold.opened
+      return handle
+    }
+    const h = harness()
+    h.push.mockImplementation((event: ZipDownloadProgress) => {
+      h.events.push(event)
+      if (event.phase === 'canceled' || event.phase === 'failed' || event.phase === 'done') {
+        settled.open()
+      }
+    })
+    await h.service.start(input, h.push)
+    await created.opened
+    expect(tmpFiles()).toHaveLength(1)
+    h.service.dispose()
+    hold.open()
+    await settled.opened
+    try {
+      expect(tmpFiles()).toEqual([])
+      expect(closed).toBe(1)
+      expect(h.createJob).not.toHaveBeenCalled()
+      expect(last(h)).toMatchObject({ phase: 'canceled' })
+    } finally {
+      await runSettled(h)
+    }
+  })
+
+  it('sign-out while open is held closes the handle, removes the temp file, and ends with signed_out', async () => {
+    const created = gateOf()
+    const hold = gateOf()
+    const settled = gateOf()
+    let closed = 0
+    fsHooks.open = async (realOpen, ...args) => {
+      const handle = await realOpen(...args)
+      const realClose = handle.close.bind(handle)
+      vi.spyOn(handle, 'close').mockImplementation(async () => {
+        closed++
+        await realClose()
+      })
+      created.open()
+      await hold.opened
+      return handle
+    }
+    const h = harness()
+    h.push.mockImplementation((event: ZipDownloadProgress) => {
+      h.events.push(event)
+      if (event.phase === 'canceled' || event.phase === 'failed' || event.phase === 'done') {
+        settled.open()
+      }
+    })
+    await h.service.start(input, h.push)
+    await created.opened
+    expect(tmpFiles()).toHaveLength(1)
+    h.service.abortAll('signed_out')
+    hold.open()
+    await settled.opened
+    try {
+      expect(tmpFiles()).toEqual([])
+      expect(closed).toBe(1)
+      expect(h.createJob).not.toHaveBeenCalled()
+      expect(last(h)).toMatchObject({ phase: 'failed', error: { code: 'signed_out' } })
+    } finally {
+      await runSettled(h)
+    }
   })
 
   it('a target that turns forbidden before the rename fails the run and leaves nothing', async () => {
