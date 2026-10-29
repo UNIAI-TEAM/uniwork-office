@@ -61,6 +61,7 @@ export type {
 } from './image-url-registry'
 export { composeSkills } from './skill'
 export type { AgentSkill, ExecutedToolCall } from './skill'
+export { withAttachedSkills, type AttachedSkill } from './attached-skills'
 export {
   AgentLoop,
   COMPLETED_VIA_TOOLS_TEXT,
