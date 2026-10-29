@@ -114,6 +114,7 @@ vi.mock('@genoffice/xlsx-gateway/gateway/xlsx-package-io', async (importOriginal
   }),
 }))
 
+import { setUiLang } from '@genoffice/i18n'
 import { createSheetsView } from '../src/main/sheets-main'
 import { IPC_CHANNELS } from '../src/shared/ipc-channels'
 import { workbookSaveRequestSchema } from '../src/shared/desktop-api'
@@ -169,11 +170,12 @@ async function openedWorkbook() {
 describe('sheets Save As answered with a legacy name', () => {
   it('refuses a .xls answer: nothing is written, nothing is retargeted to <name>.xls.xlsx', async () => {
     const event = await openedWorkbook()
+    setUiLang('en')
     saveDialog.answer = join(dir, 'Original.xls')
     writeFileSync(`${saveDialog.answer}.xlsx`, 'someone else')
 
     await expect(handlers.get(IPC_CHANNELS.saveWorkbook)!(event, saveAsRequest())).rejects.toThrow(
-      /Choose a name ending in \.xlsx/,
+      /Save it as a \.xlsx file/,
     )
 
     expect(hooks.writes).toEqual([])

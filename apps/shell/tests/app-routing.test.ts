@@ -18,10 +18,16 @@ describe('appForPath', () => {
     expect(appForPath('/x/a.html')).toBe('html')
   })
 
-  it('routes the legacy binaries to the app of the OOXML they convert to', () => {
+  it('routes the legacy binaries and OpenDocument formats to the app of the OOXML they convert to', () => {
     expect(appForPath('/x/old.doc')).toBe('docs')
+    expect(appForPath('/x/old.odt')).toBe('docs')
+    expect(appForPath('/x/old.ott')).toBe('docs')
     expect(appForPath('/x/old.xls')).toBe('sheets')
+    expect(appForPath('/x/old.ods')).toBe('sheets')
+    expect(appForPath('/x/old.ots')).toBe('sheets')
     expect(appForPath('/x/old.ppt')).toBe('slides')
+    expect(appForPath('/x/old.odp')).toBe('slides')
+    expect(appForPath('/x/old.otp')).toBe('slides')
   })
 
   it('has no app for an extension nothing opens', () => {
@@ -78,21 +84,32 @@ describe('renameStaysInApp', () => {
     expect(renameStaysInApp('/x/a.png', 'a.png')).toBe(true)
   })
 
-  it('never renames a modern document to a legacy extension, or a legacy one to a modern format (R1-4)', () => {
+  it('never renames a modern document to a legacy/ODF extension, or a legacy/ODF one to a modern format (R1-4)', () => {
     for (const [from, to] of [
       ['/x/a.docx', 'b.doc'],
+      ['/x/a.docx', 'b.odt'],
+      ['/x/a.docx', 'b.ott'],
       ['/x/a.pptx', 'b.ppt'],
+      ['/x/a.pptx', 'b.odp'],
+      ['/x/a.pptx', 'b.otp'],
       ['/x/a.xlsx', 'b.xls'],
+      ['/x/a.xlsx', 'b.ods'],
+      ['/x/a.xlsx', 'b.ots'],
       ['/x/a.docx', 'b.DOC'],
+      ['/x/a.docx', 'b.ODT'],
       ['/x/a.doc', 'a.docx'],
+      ['/x/a.odt', 'a.docx'],
       ['/x/a.xls', 'a.xlsx'],
+      ['/x/a.ods', 'a.xlsx'],
       ['/x/a.ppt', 'a.pptx'],
+      ['/x/a.odp', 'a.pptx'],
     ] as const) {
       expect(renameStaysInApp(from, to), `${from} -> ${to}`).toBe(false)
     }
-    // an ordinary same-format rename, and a legacy file keeping its own extension, still pass
+    // an ordinary same-format rename, and a legacy/ODF file keeping its own extension, still pass
     expect(renameStaysInApp('/x/a.docx', 'b.docx')).toBe(true)
     expect(renameStaysInApp('/x/a.doc', 'b.doc')).toBe(true)
+    expect(renameStaysInApp('/x/a.odt', 'b.odt')).toBe(true)
   })
 
   it('stays put when the file was never openable to begin with', () => {

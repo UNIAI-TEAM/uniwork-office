@@ -144,14 +144,34 @@ describe('partitionDropPayload', () => {
   })
 
   it('collects known-unsupported extensions uniquely, first-seen order', () => {
-    const result = partitionDropPayload(['old.odt', 'x.pages', 'y.rtf', 'z.odt'])
+    const result = partitionDropPayload(['old.xlsb', 'x.pages', 'y.rtf', 'z.xlsb'])
     expect(result.supported).toEqual([])
-    expect(result.unsupportedExts).toEqual(['odt', 'pages', 'rtf'])
+    expect(result.unsupportedExts).toEqual(['xlsb', 'pages', 'rtf'])
   })
 
-  it('treats the legacy .doc / .xls / .ppt binaries as openable (the shell converts them)', () => {
-    const result = partitionDropPayload(['/x/old.doc', '/x/OLD.XLS', '/x/old.ppt'])
-    expect(result.supported).toEqual(['/x/old.doc', '/x/OLD.XLS', '/x/old.ppt'])
+  it('treats the legacy .doc / .xls / .ppt and OpenDocument .odt / .ods / .odp (+ templates) as openable', () => {
+    const result = partitionDropPayload([
+      '/x/old.doc',
+      '/x/OLD.XLS',
+      '/x/old.ppt',
+      '/x/doc.odt',
+      '/x/tpl.OTT',
+      '/x/sheet.ods',
+      '/x/tpl.OTS',
+      '/x/deck.odp',
+      '/x/tpl.OTP',
+    ])
+    expect(result.supported).toEqual([
+      '/x/old.doc',
+      '/x/OLD.XLS',
+      '/x/old.ppt',
+      '/x/doc.odt',
+      '/x/tpl.OTT',
+      '/x/sheet.ods',
+      '/x/tpl.OTS',
+      '/x/deck.odp',
+      '/x/tpl.OTP',
+    ])
     expect(result.unsupportedExts).toEqual([])
   })
 

@@ -258,6 +258,30 @@ describe('a folder run from pick to done', () => {
     const last = await settled(h)
     expect(last).toMatchObject({ phase: 'done', done: 1, sentBytes: 123 })
   })
+
+  it('skips a small .odt in a batch as unsupported_format before planning, with zero transport calls when only ODF files are present', async () => {
+    const h = setup({
+      runLimits: { ...RUN_LIMITS, chunkedThresholdBytes: 1_000_000 },
+    })
+    file('Docs/small.odt', 10)
+    const onlyOdf = await pickFolder(h)
+    expect(onlyOdf.totals).toEqual({ files: 0, bytes: 0 })
+    expect(onlyOdf.skipped).toEqual([{ path: 'Docs/small.odt', reason: 'unsupported_format' }])
+    expect(onlyOdf.refusal).toEqual({ code: 'nothing_to_upload' })
+    expect(
+      h.service.start({ preflightId: onlyOdf.preflightId, shareWithWorkspace: false }, h.sink),
+    ).toEqual({ ok: false, error: 'refused' })
+    expect(h.transport.calls).toHaveLength(0)
+
+    file('Docs/ok.docx', 10)
+    const mixed = await pickFolder(h)
+    expect(mixed.totals).toEqual({ files: 1, bytes: 10 })
+    expect(mixed.skipped).toEqual([{ path: 'Docs/small.odt', reason: 'unsupported_format' }])
+    startRun(h, mixed)
+    const last = await settled(h)
+    expect(last).toMatchObject({ phase: 'done', done: 1, failed: 0, total: 1 })
+    expect(planBody(h).files.map((f) => f.filename)).toEqual(['ok.docx'])
+  })
 })
 
 describe('files mode', () => {

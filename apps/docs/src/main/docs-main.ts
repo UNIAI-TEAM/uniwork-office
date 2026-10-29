@@ -388,6 +388,7 @@ const tMain = createI18n({
     menuHelp: '帮助',
     menuShortcuts: '键盘快捷键',
     menuDocsHelp: 'UniWork Docs 帮助',
+    errSaveOriginalFormat: '请另存为 .{ext} 文件。此应用无法按原文件的格式保存。',
   },
   // en and vi are ours (UniWork wording, e.g. errNoApiKey: no AI model set up yet); the other locales keep
   // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
@@ -523,6 +524,8 @@ const tMain = createI18n({
     menuHelp: 'Help',
     menuShortcuts: 'Keyboard Shortcuts',
     menuDocsHelp: 'UniWork Docs Help',
+    errSaveOriginalFormat:
+      "Save it as a .{ext} file. This app can't save in the original file's format.",
   },
   vi: {
     dlgOpenDoc: 'Mở tài liệu',
@@ -657,6 +660,8 @@ const tMain = createI18n({
     menuHelp: 'Trợ giúp',
     menuShortcuts: 'Phím tắt bàn phím',
     menuDocsHelp: 'Trợ giúp UniWork Docs',
+    errSaveOriginalFormat:
+      'Hãy lưu thành tệp .{ext}. Ứng dụng không lưu được ở định dạng của tệp gốc.',
   },
   ja: {
     dlgOpenDoc: '文書を開く',
@@ -789,6 +794,8 @@ const tMain = createI18n({
     menuHelp: 'ヘルプ',
     menuShortcuts: 'キーボードショートカット',
     menuDocsHelp: 'UniWork Docs ヘルプ',
+    errSaveOriginalFormat:
+      '.{ext} ファイルとして保存してください。元のファイルの形式では保存できません。',
   },
   ko: {
     dlgOpenDoc: '문서 열기',
@@ -922,6 +929,8 @@ const tMain = createI18n({
     menuHelp: '도움말',
     menuShortcuts: '키보드 바로 가기',
     menuDocsHelp: 'UniWork Docs 도움말',
+    errSaveOriginalFormat:
+      '.{ext} 파일로 저장하세요. 이 앱에서는 원본 파일 형식으로 저장할 수 없습니다.',
   },
   fr: {
     dlgOpenDoc: 'Ouvrir un document',
@@ -1056,6 +1065,8 @@ const tMain = createI18n({
     menuHelp: 'Aide',
     menuShortcuts: 'Raccourcis clavier',
     menuDocsHelp: 'Aide UniWork Docs',
+    errSaveOriginalFormat:
+      'Enregistrez-le en tant que fichier .{ext}. Cette application ne peut pas enregistrer dans le format du fichier d’origine.',
   },
   de: {
     dlgOpenDoc: 'Dokument öffnen',
@@ -1190,6 +1201,8 @@ const tMain = createI18n({
     menuHelp: 'Hilfe',
     menuShortcuts: 'Tastenkombinationen',
     menuDocsHelp: 'UniWork Docs-Hilfe',
+    errSaveOriginalFormat:
+      'Speichern Sie die Datei als .{ext}-Datei. Diese App kann nicht im Format der Originaldatei speichern.',
   },
   es: {
     dlgOpenDoc: 'Abrir documento',
@@ -1324,6 +1337,8 @@ const tMain = createI18n({
     menuHelp: 'Ayuda',
     menuShortcuts: 'Atajos de teclado',
     menuDocsHelp: 'Ayuda de UniWork Docs',
+    errSaveOriginalFormat:
+      'Guárdelo como un archivo .{ext}. Esta aplicación no puede guardar en el formato del archivo original.',
   },
   th: {
     dlgOpenDoc: 'เปิดเอกสาร',
@@ -1456,6 +1471,8 @@ const tMain = createI18n({
     menuHelp: 'วิธีใช้',
     menuShortcuts: 'แป้นพิมพ์ลัด',
     menuDocsHelp: 'วิธีใช้ UniWork Docs',
+    errSaveOriginalFormat:
+      'โปรดบันทึกเป็นไฟล์ .{ext} แอปนี้ไม่สามารถบันทึกในรูปแบบของไฟล์ต้นฉบับได้',
   },
   id: {
     dlgOpenDoc: 'Buka Dokumen',
@@ -1589,6 +1606,8 @@ const tMain = createI18n({
     menuHelp: 'Bantuan',
     menuShortcuts: 'Pintasan Papan Ketik',
     menuDocsHelp: 'Bantuan UniWork Docs',
+    errSaveOriginalFormat:
+      'Simpan sebagai file .{ext}. Aplikasi ini tidak dapat menyimpan dalam format file asli.',
   },
   ru: {
     dlgOpenDoc: 'Открыть документ',
@@ -1722,6 +1741,8 @@ const tMain = createI18n({
     menuHelp: 'Справка',
     menuShortcuts: 'Сочетания клавиш',
     menuDocsHelp: 'Справка UniWork Docs',
+    errSaveOriginalFormat:
+      'Сохраните файл в формате .{ext}. Это приложение не может сохранять в исходном формате файла.',
   },
   ar: {
     dlgOpenDoc: 'فتح مستند',
@@ -1855,6 +1876,7 @@ const tMain = createI18n({
     menuHelp: 'تعليمات',
     menuShortcuts: 'اختصارات لوحة المفاتيح',
     menuDocsHelp: 'تعليمات UniWork Docs',
+    errSaveOriginalFormat: 'احفظه كملف .{ext}. لا يمكن لهذا التطبيق الحفظ بتنسيق الملف الأصلي.',
   },
   pt: {
     dlgOpenDoc: 'Abrir Documento',
@@ -1988,6 +2010,8 @@ const tMain = createI18n({
     menuHelp: 'Ajuda',
     menuShortcuts: 'Atalhos de Teclado',
     menuDocsHelp: 'Ajuda do UniWork Docs',
+    errSaveOriginalFormat:
+      'Salve como um arquivo .{ext}. Este aplicativo não pode salvar no formato do arquivo original.',
   },
   it: {
     dlgOpenDoc: 'Apri documento',
@@ -2121,6 +2145,8 @@ const tMain = createI18n({
     menuHelp: 'Aiuto',
     menuShortcuts: 'Scelte rapide da tastiera',
     menuDocsHelp: 'Guida di UniWork Docs',
+    errSaveOriginalFormat:
+      'Salvalo come file .{ext}. Questa app non può salvare nel formato del file originale.',
   },
   pl: {
     dlgOpenDoc: 'Otwórz dokument',
@@ -2254,6 +2280,8 @@ const tMain = createI18n({
     menuHelp: 'Pomoc',
     menuShortcuts: 'Skróty klawiaturowe',
     menuDocsHelp: 'Pomoc UniWork Docs',
+    errSaveOriginalFormat:
+      'Zapisz go jako plik .{ext}. Ta aplikacja nie może zapisywać w formacie oryginalnego pliku.',
   },
   cs: {
     dlgOpenDoc: 'Otevřít dokument',
@@ -2387,6 +2415,8 @@ const tMain = createI18n({
     menuHelp: 'Nápověda',
     menuShortcuts: 'Klávesové zkratky',
     menuDocsHelp: 'Nápověda UniWork Docs',
+    errSaveOriginalFormat:
+      'Uložte jej jako soubor .{ext}. Tato aplikace neumí ukládat ve formátu původního souboru.',
   },
   nl: {
     dlgOpenDoc: 'Document openen',
@@ -2520,6 +2550,8 @@ const tMain = createI18n({
     menuHelp: 'Help',
     menuShortcuts: 'Sneltoetsen',
     menuDocsHelp: 'UniWork Docs Help',
+    errSaveOriginalFormat:
+      'Sla het op als een .{ext}-bestand. Deze app kan niet opslaan in de indeling van het oorspronkelijke bestand.',
   },
   ms: {
     dlgOpenDoc: 'Buka Dokumen',
@@ -2653,6 +2685,8 @@ const tMain = createI18n({
     menuHelp: 'Bantuan',
     menuShortcuts: 'Pintasan Papan Kekunci',
     menuDocsHelp: 'Bantuan UniWork Docs',
+    errSaveOriginalFormat:
+      'Simpan sebagai fail .{ext}. Aplikasi ini tidak dapat menyimpan dalam format fail asal.',
   },
   he: {
     dlgOpenDoc: 'פתיחת מסמך',
@@ -2785,6 +2819,7 @@ const tMain = createI18n({
     menuHelp: 'עזרה',
     menuShortcuts: 'קיצורי מקלדת',
     menuDocsHelp: 'עזרה של UniWork Docs',
+    errSaveOriginalFormat: 'שמרו אותו כקובץ .{ext}. יישום זה אינו יכול לשמור בפורמט של קובץ המקור.',
   },
   hi: {
     dlgOpenDoc: 'दस्तावेज़ खोलें',
@@ -2918,6 +2953,8 @@ const tMain = createI18n({
     menuHelp: 'सहायता',
     menuShortcuts: 'कीबोर्ड शॉर्टकट',
     menuDocsHelp: 'UniWork Docs सहायता',
+    errSaveOriginalFormat:
+      'इसे .{ext} फ़ाइल के रूप में सहेजें। यह ऐप मूल फ़ाइल के प्रारूप में सहेज नहीं सकता।',
   },
   'zh-TW': {
     dlgOpenDoc: '開啟文件',
@@ -3049,6 +3086,7 @@ const tMain = createI18n({
     menuHelp: '說明',
     menuShortcuts: '鍵盤快速鍵',
     menuDocsHelp: 'UniWork Docs 說明',
+    errSaveOriginalFormat: '請另存為 .{ext} 檔案。此應用程式無法以原始檔案的格式儲存。',
   },
 })
 const tm = (key: Parameters<typeof tMain>[1], params?: Parameters<typeof tMain>[2]) =>
@@ -4625,6 +4663,11 @@ export function setDocsFileOpenedHook(hook: (wcId: number, filePath: string) => 
   fileOpenedHook = hook
 }
 
+let legacyOpenHook: ((path: string) => boolean) | null = null
+export function setDocsLegacyOpenHook(fn: ((path: string) => boolean) | null): void {
+  legacyOpenHook = fn
+}
+
 /**
  * Reverse lookup from a sheets sessionId to its file path. In shell mode the
  * project:* handlers are registered by this file, but only sheets-main knows the
@@ -4933,10 +4976,12 @@ export function registerDocsIpc(): void {
   ipcMain.handle('docs:open', async (event) => {
     const result = await openDialog(event, {
       title: tm('dlgOpenDoc'),
-      filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
+      filters: [{ name: tm('filterWord'), extensions: ['docx', 'odt', 'ott'] }],
       properties: ['openFile'],
     })
     if (result.canceled || result.filePaths.length === 0) return null
+    if (/\.(odt|ott)$/i.test(result.filePaths[0]) && legacyOpenHook?.(result.filePaths[0]))
+      return null
     return loadDocx(result.filePaths[0], event.sender.id)
   })
 
@@ -5376,8 +5421,8 @@ export function registerDocsIpc(): void {
       let target: string
       try {
         target = assertModernSaveTarget(result.filePath, 'docx')
-      } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      } catch {
+        return { ok: false, error: tm('errSaveOriginalFormat', { ext: 'docx' }) }
       }
       // the tab may have been closed while the dialog was open; checked before the
       // write because Save As may overwrite an existing file (no safe rollback)

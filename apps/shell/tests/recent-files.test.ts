@@ -16,8 +16,12 @@ describe('matchesExtFamily', () => {
   it('maps sidebar filter keys onto their extension families', () => {
     expect(matchesExtFamily('doc', 'docx')).toBe(true)
     expect(matchesExtFamily('docx', 'docx')).toBe(true)
+    expect(matchesExtFamily('odt', 'docx')).toBe(true)
+    expect(matchesExtFamily('ott', 'docx')).toBe(true)
     expect(matchesExtFamily('ppt', 'pptx')).toBe(true)
     expect(matchesExtFamily('pptx', 'pptx')).toBe(true)
+    expect(matchesExtFamily('odp', 'pptx')).toBe(true)
+    expect(matchesExtFamily('otp', 'pptx')).toBe(true)
     expect(matchesExtFamily('markdown', 'md')).toBe(true)
     expect(matchesExtFamily('md', 'md')).toBe(true)
     // UNI-2047: .txt is its own filter and the "md" filter no longer covers it (or .json)
@@ -25,6 +29,8 @@ describe('matchesExtFamily', () => {
     expect(matchesExtFamily('json', 'md')).toBe(false)
     expect(matchesExtFamily('txt', 'txt')).toBe(true)
     expect(matchesExtFamily('csv', 'xlsx')).toBe(true)
+    expect(matchesExtFamily('ods', 'xlsx')).toBe(true)
+    expect(matchesExtFamily('ots', 'xlsx')).toBe(true)
     expect(matchesExtFamily('htm', 'html')).toBe(true)
   })
 

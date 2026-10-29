@@ -208,6 +208,7 @@ import {
   setDocsShellWindow,
   setDocsFileSavedHook,
   setDocsFileOpenedHook,
+  setDocsLegacyOpenHook,
   setSessionPathResolver,
   setUniworkAiHost,
   setUniworkAiChoiceStore,
@@ -274,6 +275,7 @@ import {
   setSlidesCloseTabHook,
   setSlidesExtraFileMenuItems,
   setSlidesOpenedHook,
+  setSlidesLegacyOpenHook,
   setSlidesHostWindowHook,
   setSlidesShellWindow,
   setSlidesShowBleed,
@@ -400,7 +402,11 @@ import {
   killAllActiveLegacyConversions,
   legacyFormatForPath,
 } from './legacy-converter'
-import { createCloudLegacyConverter, createLegacyOpener } from './legacy-open'
+import {
+  createCloudLegacyConverter,
+  createLegacyOpener,
+  legacyProgressDetailKey,
+} from './legacy-open'
 import type { CloudLegacyConvertInput } from './uniwork-docs/legacy-cloud-open'
 import { tLegacyOpen } from './legacy-open-strings'
 import {
@@ -3767,9 +3773,9 @@ function ensureFileIndexer(): FileIndexer | null {
 }
 
 const SEARCH_EXT_FAMILY: Record<string, readonly string[]> = {
-  docx: ['docx', 'doc'],
-  xlsx: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'],
-  pptx: ['pptx', 'ppt'],
+  docx: ['docx', 'doc', 'odt', 'ott'],
+  xlsx: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv', 'ods', 'ots'],
+  pptx: ['pptx', 'ppt', 'odp', 'otp'],
   md: ['md', 'markdown'],
   html: ['html', 'htm'],
 }
@@ -4095,8 +4101,12 @@ function createShellWindow(): void {
   })
   // When ⌘O opens a file inside a tab, sync the tab title/path (used for de-dup by path) and record it as recent.
   // The first save / save-as fires this too, so applyPendingDir also runs here.
-  // Sheets' own File > Open picked a legacy .xls: the converter route, not the calamine reader
-  setSheetsLegacyOpenHook((path) => legacyFormatForPath(path) !== null && legacyOpener.open(path))
+  // Editor File > Open picked a legacy or OpenDocument file: route through the shell converter seam
+  const openLegacyFromPicker = (path: string) =>
+    legacyFormatForPath(path) !== null && legacyOpener.open(path)
+  setDocsLegacyOpenHook(openLegacyFromPicker)
+  setSheetsLegacyOpenHook(openLegacyFromPicker)
+  setSlidesLegacyOpenHook(openLegacyFromPicker)
   setSheetsWorkbookOpenedHook((wc, path) => {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)
@@ -4638,7 +4648,7 @@ function beginLegacyProgress(fileName: string, cancel: () => void): () => void {
     const options = {
       type: 'info' as const,
       message: tLegacyOpen(currentLang(), 'legacyConvertingMsg', { name: fileName }),
-      detail: tLegacyOpen(currentLang(), 'legacyConvertingDetail'),
+      detail: tLegacyOpen(currentLang(), legacyProgressDetailKey(fileName)),
       buttons: [tm('btnCancel')],
       cancelId: 0,
       noLink: true,
@@ -5440,9 +5450,12 @@ function registerHomeIpc(): void {
       title: tm('dlgOpenTitle'),
       filters: [
         { name: tm('filterSupported'), extensions: [...OPEN_DIALOG_EXTENSIONS] },
-        { name: tm('filterWord'), extensions: ['docx', 'doc'] },
-        { name: tm('filterExcel'), extensions: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'] },
-        { name: tm('filterPpt'), extensions: ['pptx', 'ppt'] },
+        { name: tm('filterWord'), extensions: ['docx', 'doc', 'odt', 'ott'] },
+        {
+          name: tm('filterExcel'),
+          extensions: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv', 'ods', 'ots'],
+        },
+        { name: tm('filterPpt'), extensions: ['pptx', 'ppt', 'odp', 'otp'] },
         { name: tm('filterPdf'), extensions: ['pdf'] },
         { name: tm('filterMarkdown'), extensions: ['md', 'markdown', 'txt', 'json'] },
         { name: tm('filterHtml'), extensions: ['html', 'htm'] },

@@ -9,6 +9,7 @@ const legacyOpenStrings = defineStrings({
   zh: {
     legacyConvertingMsg: '正在转换“{name}”…',
     legacyConvertingDetail: '正在把旧版 Office 文件转换为可编辑的新格式，原文件不会被修改。',
+    legacyOdfDetail: '正在把 OpenDocument 文件转换为可编辑的新格式，原文件不会被修改。',
     legacyEncrypted: '“{name}”设置了密码，无法转换。请先在原应用中取消密码后再打开。',
     legacyCorrupt:
       '“{name}”已损坏，或不是有效的 {ext} 文件，无法打开。请尝试使用原文件或备份副本。',
@@ -17,11 +18,13 @@ const legacyOpenStrings = defineStrings({
     legacyMissing: '无法打开“{name}”：此安装缺少文件转换组件。请重新安装应用。',
     legacyXlsValuesOnly:
       '“{name}”仅以数值打开：因缺少转换组件，公式、图表和部分格式不会保留。重新安装应用即可恢复。',
-  },
+  } satisfies Record<string, string>,
   en: {
     legacyConvertingMsg: 'Converting “{name}”…',
     legacyConvertingDetail:
       'The older Office file is being converted so you can edit it here. The original file is not changed.',
+    legacyOdfDetail:
+      'The OpenDocument file is being converted so you can edit it here. The original file is not changed.',
     legacyEncrypted:
       '“{name}” is password-protected, so it can’t be converted. Remove the password in the app that created it, then open it again.',
     legacyCorrupt:
@@ -38,6 +41,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'Đang chuyển đổi “{name}”…',
     legacyConvertingDetail:
       'Tệp Office đời cũ đang được chuyển đổi để bạn chỉnh sửa tại đây. Tệp gốc không bị thay đổi.',
+    legacyOdfDetail:
+      'Tệp OpenDocument đang được chuyển đổi để bạn chỉnh sửa tại đây. Tệp gốc không bị thay đổi.',
     legacyEncrypted:
       '“{name}” được bảo vệ bằng mật khẩu nên không thể chuyển đổi. Hãy gỡ mật khẩu trong ứng dụng đã tạo tệp rồi mở lại.',
     legacyCorrupt:
@@ -54,6 +59,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: '「{name}」を変換しています…',
     legacyConvertingDetail:
       '古い形式の Office ファイルを編集できる形式に変換しています。元のファイルは変更されません。',
+    legacyOdfDetail:
+      'OpenDocument ファイルを編集できる形式に変換しています。元のファイルは変更されません。',
     legacyEncrypted:
       '「{name}」はパスワードで保護されているため変換できません。作成したアプリでパスワードを解除してから開き直してください。',
     legacyCorrupt:
@@ -70,6 +77,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: '“{name}” 변환 중…',
     legacyConvertingDetail:
       '이전 형식의 Office 파일을 편집할 수 있도록 변환하고 있습니다. 원본 파일은 변경되지 않습니다.',
+    legacyOdfDetail:
+      'OpenDocument 파일을 편집할 수 있도록 변환하고 있습니다. 원본 파일은 변경되지 않습니다.',
     legacyEncrypted:
       '“{name}” 파일은 암호로 보호되어 있어 변환할 수 없습니다. 만든 앱에서 암호를 해제한 뒤 다시 여세요.',
     legacyCorrupt:
@@ -85,6 +94,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'Conversion de « {name} »…',
     legacyConvertingDetail:
       'Ce fichier Office ancien format est converti pour pouvoir être modifié ici. Le fichier d’origine n’est pas modifié.',
+    legacyOdfDetail:
+      'Ce fichier OpenDocument est converti pour pouvoir être modifié ici. Le fichier d’origine n’est pas modifié.',
     legacyEncrypted:
       '« {name} » est protégé par mot de passe et ne peut pas être converti. Supprimez le mot de passe dans l’application d’origine, puis rouvrez-le.',
     legacyCorrupt:
@@ -101,6 +112,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: '„{name}“ wird konvertiert…',
     legacyConvertingDetail:
       'Die ältere Office-Datei wird konvertiert, damit Sie sie hier bearbeiten können. Die Originaldatei bleibt unverändert.',
+    legacyOdfDetail:
+      'Die OpenDocument-Datei wird konvertiert, damit Sie sie hier bearbeiten können. Die Originaldatei bleibt unverändert.',
     legacyEncrypted:
       '„{name}“ ist passwortgeschützt und kann nicht konvertiert werden. Entfernen Sie das Passwort in der erstellenden App und öffnen Sie die Datei erneut.',
     legacyCorrupt:
@@ -117,6 +130,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'Convirtiendo «{name}»…',
     legacyConvertingDetail:
       'Se está convirtiendo el archivo de Office antiguo para que pueda editarlo aquí. El archivo original no se modifica.',
+    legacyOdfDetail:
+      'Se está convirtiendo el archivo OpenDocument para que pueda editarlo aquí. El archivo original no se modifica.',
     legacyEncrypted:
       '«{name}» está protegido con contraseña y no se puede convertir. Quite la contraseña en la aplicación que lo creó y vuelva a abrirlo.',
     legacyCorrupt:
@@ -133,6 +148,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'กำลังแปลง “{name}”…',
     legacyConvertingDetail:
       'กำลังแปลงไฟล์ Office รุ่นเก่าเพื่อให้แก้ไขที่นี่ได้ ไฟล์ต้นฉบับจะไม่ถูกเปลี่ยนแปลง',
+    legacyOdfDetail:
+      'กำลังแปลงไฟล์ OpenDocument เพื่อให้แก้ไขที่นี่ได้ ไฟล์ต้นฉบับจะไม่ถูกเปลี่ยนแปลง',
     legacyEncrypted:
       '“{name}” ถูกป้องกันด้วยรหัสผ่านจึงแปลงไม่ได้ โปรดนำรหัสผ่านออกในแอปที่สร้างไฟล์ แล้วเปิดใหม่อีกครั้ง',
     legacyCorrupt:
@@ -148,6 +165,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'Mengonversi “{name}”…',
     legacyConvertingDetail:
       'File Office lama sedang dikonversi agar dapat diedit di sini. File asli tidak diubah.',
+    legacyOdfDetail:
+      'File OpenDocument sedang dikonversi agar dapat diedit di sini. File asli tidak diubah.',
     legacyEncrypted:
       '“{name}” dilindungi kata sandi sehingga tidak dapat dikonversi. Hapus kata sandi di aplikasi pembuatnya, lalu buka lagi.',
     legacyCorrupt:
@@ -164,6 +183,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'Преобразование «{name}»…',
     legacyConvertingDetail:
       'Файл Office старого формата преобразуется, чтобы его можно было редактировать здесь. Исходный файл не изменяется.',
+    legacyOdfDetail:
+      'Файл OpenDocument преобразуется, чтобы его можно было редактировать здесь. Исходный файл не изменяется.',
     legacyEncrypted:
       '«{name}» защищён паролем, поэтому его нельзя преобразовать. Снимите пароль в приложении, где файл был создан, и откройте его снова.',
     legacyCorrupt:
@@ -180,6 +201,7 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'جارٍ تحويل «{name}»…',
     legacyConvertingDetail:
       'يجري تحويل ملف Office القديم لتتمكن من تحريره هنا. لن يتغير الملف الأصلي.',
+    legacyOdfDetail: 'يجري تحويل ملف OpenDocument لتتمكن من تحريره هنا. لن يتغير الملف الأصلي.',
     legacyEncrypted:
       '«{name}» محمي بكلمة مرور ولا يمكن تحويله. أزل كلمة المرور في التطبيق الذي أنشأه ثم افتحه مرة أخرى.',
     legacyCorrupt:
@@ -195,6 +217,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'Convertendo “{name}”…',
     legacyConvertingDetail:
       'O arquivo Office antigo está sendo convertido para que você possa editá-lo aqui. O arquivo original não é alterado.',
+    legacyOdfDetail:
+      'O arquivo OpenDocument está sendo convertido para que você possa editá-lo aqui. O arquivo original não é alterado.',
     legacyEncrypted:
       '“{name}” está protegido por senha e não pode ser convertido. Remova a senha no aplicativo que o criou e abra-o novamente.',
     legacyCorrupt:
@@ -211,6 +235,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'Conversione di “{name}”…',
     legacyConvertingDetail:
       'Il file Office di vecchio formato viene convertito per poterlo modificare qui. Il file originale non viene modificato.',
+    legacyOdfDetail:
+      'Il file OpenDocument viene convertito per poterlo modificare qui. Il file originale non viene modificato.',
     legacyEncrypted:
       '“{name}” è protetto da password e non può essere convertito. Rimuovi la password nell’app che lo ha creato e riaprilo.',
     legacyCorrupt:
@@ -227,6 +253,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'Konwertowanie „{name}”…',
     legacyConvertingDetail:
       'Starszy plik Office jest konwertowany, aby można go było edytować tutaj. Oryginalny plik nie jest zmieniany.',
+    legacyOdfDetail:
+      'Plik OpenDocument jest konwertowany, aby można go było edytować tutaj. Oryginalny plik nie jest zmieniany.',
     legacyEncrypted:
       '„{name}” jest chroniony hasłem i nie można go skonwertować. Usuń hasło w aplikacji, w której utworzono plik, i otwórz go ponownie.',
     legacyCorrupt:
@@ -243,6 +271,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'Převádí se „{name}“…',
     legacyConvertingDetail:
       'Starší soubor Office se převádí, aby jej šlo upravovat zde. Původní soubor se nemění.',
+    legacyOdfDetail:
+      'Soubor OpenDocument se převádí, aby jej šlo upravovat zde. Původní soubor se nemění.',
     legacyEncrypted:
       '„{name}“ je chráněn heslem, a proto jej nelze převést. Odeberte heslo v aplikaci, která soubor vytvořila, a otevřete jej znovu.',
     legacyCorrupt:
@@ -259,6 +289,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: '“{name}” wordt geconverteerd…',
     legacyConvertingDetail:
       'Het oudere Office-bestand wordt geconverteerd zodat u het hier kunt bewerken. Het originele bestand blijft ongewijzigd.',
+    legacyOdfDetail:
+      'Het OpenDocument-bestand wordt geconverteerd zodat u het hier kunt bewerken. Het originele bestand blijft ongewijzigd.',
     legacyEncrypted:
       '“{name}” is met een wachtwoord beveiligd en kan niet worden geconverteerd. Verwijder het wachtwoord in de app waarmee het is gemaakt en open het opnieuw.',
     legacyCorrupt:
@@ -275,6 +307,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'Menukar “{name}”…',
     legacyConvertingDetail:
       'Fail Office lama sedang ditukar supaya anda boleh mengeditnya di sini. Fail asal tidak diubah.',
+    legacyOdfDetail:
+      'Fail OpenDocument sedang ditukar supaya anda boleh mengeditnya di sini. Fail asal tidak diubah.',
     legacyEncrypted:
       '“{name}” dilindungi kata laluan dan tidak boleh ditukar. Alih keluar kata laluan dalam aplikasi yang mencipta fail itu, kemudian buka semula.',
     legacyCorrupt:
@@ -291,6 +325,7 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: 'ממיר את “{name}”…',
     legacyConvertingDetail:
       'קובץ ה-Office הישן מומר כדי שתוכלו לערוך אותו כאן. קובץ המקור אינו משתנה.',
+    legacyOdfDetail: 'קובץ ה-OpenDocument מומר כדי שתוכלו לערוך אותו כאן. קובץ המקור אינו משתנה.',
     legacyEncrypted:
       '“{name}” מוגן בסיסמה ולכן אי אפשר להמיר אותו. הסירו את הסיסמה ביישום שיצר אותו ופתחו אותו שוב.',
     legacyCorrupt:
@@ -305,6 +340,8 @@ const legacyOpenStrings = defineStrings({
     legacyConvertingMsg: '“{name}” को बदला जा रहा है…',
     legacyConvertingDetail:
       'पुरानी Office फ़ाइल को बदला जा रहा है ताकि आप उसे यहाँ संपादित कर सकें। मूल फ़ाइल में कोई बदलाव नहीं होता।',
+    legacyOdfDetail:
+      'OpenDocument फ़ाइल को बदला जा रहा है ताकि आप उसे यहाँ संपादित कर सकें। मूल फ़ाइल में कोई बदलाव नहीं होता।',
     legacyEncrypted:
       '“{name}” पासवर्ड से सुरक्षित है, इसलिए उसे बदला नहीं जा सकता। जिस ऐप में बनी थी उसमें पासवर्ड हटाएँ और फिर खोलें।',
     legacyCorrupt:
@@ -320,6 +357,7 @@ const legacyOpenStrings = defineStrings({
   'zh-TW': {
     legacyConvertingMsg: '正在轉換「{name}」…',
     legacyConvertingDetail: '正在把舊版 Office 檔案轉換為可編輯的新格式，原始檔案不會被修改。',
+    legacyOdfDetail: '正在把 OpenDocument 檔案轉換為可編輯的新格式，原始檔案不會被修改。',
     legacyEncrypted: '「{name}」設有密碼，無法轉換。請先在原應用程式中移除密碼後再開啟。',
     legacyCorrupt:
       '「{name}」已損毀，或不是有效的 {ext} 檔案，無法開啟。請嘗試使用原始檔案或備份副本。',

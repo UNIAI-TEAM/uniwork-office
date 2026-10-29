@@ -109,6 +109,7 @@ export const tMain = createI18n({
     menuZoomIn: '放大',
     menuZoomOut: '缩小',
     menuActualSize: '实际大小',
+    errSaveOriginalFormat: '请另存为 .{ext} 文件。此应用无法按原文件的格式保存。',
   },
   // en and vi are ours (UniWork wording, e.g. errNoApiKey: no AI model set up yet); the other locales keep
   // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
@@ -222,6 +223,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Zoom In',
     menuZoomOut: 'Zoom Out',
     menuActualSize: 'Actual Size',
+    errSaveOriginalFormat:
+      "Save it as a .{ext} file. This app can't save in the original file's format.",
   },
   vi: {
     dlgInsertImage: 'Chèn hình ảnh',
@@ -337,6 +340,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Phóng to',
     menuZoomOut: 'Thu nhỏ',
     menuActualSize: 'Kích thước thực tế',
+    errSaveOriginalFormat:
+      'Hãy lưu thành tệp .{ext}. Ứng dụng không lưu được ở định dạng của tệp gốc.',
   },
   ja: {
     dlgInsertImage: '画像の挿入',
@@ -450,6 +455,8 @@ export const tMain = createI18n({
     menuZoomIn: '拡大',
     menuZoomOut: '縮小',
     menuActualSize: '実際のサイズ',
+    errSaveOriginalFormat:
+      '.{ext} ファイルとして保存してください。元のファイルの形式では保存できません。',
   },
   ko: {
     dlgInsertImage: '그림 삽입',
@@ -561,6 +568,8 @@ export const tMain = createI18n({
     menuZoomIn: '확대',
     menuZoomOut: '축소',
     menuActualSize: '실제 크기',
+    errSaveOriginalFormat:
+      '.{ext} 파일로 저장하세요. 이 앱에서는 원본 파일 형식으로 저장할 수 없습니다.',
   },
   fr: {
     dlgInsertImage: 'Insérer une image',
@@ -677,6 +686,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Zoom avant',
     menuZoomOut: 'Zoom arrière',
     menuActualSize: 'Taille réelle',
+    errSaveOriginalFormat:
+      'Enregistrez-le en tant que fichier .{ext}. Cette application ne peut pas enregistrer dans le format du fichier d’origine.',
   },
   de: {
     dlgInsertImage: 'Bild einfügen',
@@ -792,6 +803,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Vergrößern',
     menuZoomOut: 'Verkleinern',
     menuActualSize: 'Originalgröße',
+    errSaveOriginalFormat:
+      'Speichern Sie die Datei als .{ext}-Datei. Diese App kann nicht im Format der Originaldatei speichern.',
   },
   es: {
     dlgInsertImage: 'Insertar imagen',
@@ -907,6 +920,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Acercar',
     menuZoomOut: 'Alejar',
     menuActualSize: 'Tamaño real',
+    errSaveOriginalFormat:
+      'Guárdelo como un archivo .{ext}. Esta aplicación no puede guardar en el formato del archivo original.',
   },
   th: {
     dlgInsertImage: 'แทรกรูปภาพ',
@@ -1017,6 +1032,8 @@ export const tMain = createI18n({
     menuZoomIn: 'ขยาย',
     menuZoomOut: 'ย่อ',
     menuActualSize: 'ขนาดจริง',
+    errSaveOriginalFormat:
+      'โปรดบันทึกเป็นไฟล์ .{ext} แอปนี้ไม่สามารถบันทึกในรูปแบบของไฟล์ต้นฉบับได้',
   },
   id: {
     dlgInsertImage: 'Sisipkan Gambar',
@@ -1132,6 +1149,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Perbesar',
     menuZoomOut: 'Perkecil',
     menuActualSize: 'Ukuran Sebenarnya',
+    errSaveOriginalFormat:
+      'Simpan sebagai file .{ext}. Aplikasi ini tidak dapat menyimpan dalam format file asli.',
   },
   ru: {
     dlgInsertImage: 'Вставка рисунка',
@@ -1246,6 +1265,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Увеличить',
     menuZoomOut: 'Уменьшить',
     menuActualSize: 'Реальный размер',
+    errSaveOriginalFormat:
+      'Сохраните файл в формате .{ext}. Это приложение не может сохранять в исходном формате файла.',
   },
   ar: {
     dlgInsertImage: 'إدراج صورة',
@@ -1357,6 +1378,7 @@ export const tMain = createI18n({
     menuZoomIn: 'تكبير',
     menuZoomOut: 'تصغير',
     menuActualSize: 'الحجم الفعلي',
+    errSaveOriginalFormat: 'احفظه كملف .{ext}. لا يمكن لهذا التطبيق الحفظ بتنسيق الملف الأصلي.',
   },
   pt: {
     dlgInsertImage: 'Inserir Imagem',
@@ -1472,6 +1494,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Ampliar',
     menuZoomOut: 'Reduzir',
     menuActualSize: 'Tamanho Real',
+    errSaveOriginalFormat:
+      'Salve como um arquivo .{ext}. Este aplicativo não pode salvar no formato do arquivo original.',
   },
   it: {
     dlgInsertImage: 'Inserisci immagine',
@@ -1588,6 +1612,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Ingrandisci',
     menuZoomOut: 'Riduci',
     menuActualSize: 'Dimensioni effettive',
+    errSaveOriginalFormat:
+      'Salvalo come file .{ext}. Questa app non può salvare nel formato del file originale.',
   },
   pl: {
     dlgInsertImage: 'Wstaw obraz',
@@ -1702,6 +1728,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Powiększ',
     menuZoomOut: 'Pomniejsz',
     menuActualSize: 'Rzeczywisty rozmiar',
+    errSaveOriginalFormat:
+      'Zapisz go jako plik .{ext}. Ta aplikacja nie może zapisywać w formacie oryginalnego pliku.',
   },
   cs: {
     dlgInsertImage: 'Vložit obrázek',
@@ -1815,6 +1843,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Přiblížit',
     menuZoomOut: 'Oddálit',
     menuActualSize: 'Skutečná velikost',
+    errSaveOriginalFormat:
+      'Uložte jej jako soubor .{ext}. Tato aplikace neumí ukládat ve formátu původního souboru.',
   },
   nl: {
     dlgInsertImage: 'Afbeelding invoegen',
@@ -1929,6 +1959,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Inzoomen',
     menuZoomOut: 'Uitzoomen',
     menuActualSize: 'Ware grootte',
+    errSaveOriginalFormat:
+      'Sla het op als een .{ext}-bestand. Deze app kan niet opslaan in de indeling van het oorspronkelijke bestand.',
   },
   ms: {
     dlgInsertImage: 'Sisipkan Imej',
@@ -2042,6 +2074,8 @@ export const tMain = createI18n({
     menuZoomIn: 'Zum Masuk',
     menuZoomOut: 'Zum Keluar',
     menuActualSize: 'Saiz Sebenar',
+    errSaveOriginalFormat:
+      'Simpan sebagai fail .{ext}. Aplikasi ini tidak dapat menyimpan dalam format fail asal.',
   },
   he: {
     dlgInsertImage: 'הוספת תמונה',
@@ -2150,6 +2184,7 @@ export const tMain = createI18n({
     menuZoomIn: 'התקרבות',
     menuZoomOut: 'התרחקות',
     menuActualSize: 'גודל אמיתי',
+    errSaveOriginalFormat: 'שמרו אותו כקובץ .{ext}. יישום זה אינו יכול לשמור בפורמט של קובץ המקור.',
   },
   hi: {
     dlgInsertImage: 'छवि सम्मिलित करें',
@@ -2263,6 +2298,8 @@ export const tMain = createI18n({
     menuZoomIn: 'ज़ूम इन',
     menuZoomOut: 'ज़ूम आउट',
     menuActualSize: 'वास्तविक आकार',
+    errSaveOriginalFormat:
+      'इसे .{ext} फ़ाइल के रूप में सहेजें। यह ऐप मूल फ़ाइल के प्रारूप में सहेज नहीं सकता।',
   },
   'zh-TW': {
     dlgInsertImage: '插入圖片',
@@ -2371,6 +2408,7 @@ export const tMain = createI18n({
     menuZoomIn: '放大',
     menuZoomOut: '縮小',
     menuActualSize: '實際大小',
+    errSaveOriginalFormat: '請另存為 .{ext} 檔案。此應用程式無法以原始檔案的格式儲存。',
   },
 })
 

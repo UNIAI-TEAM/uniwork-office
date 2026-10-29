@@ -7,6 +7,12 @@
 *.docx binary
 *.xlsx binary
 *.pptx binary
+*.odt binary
+*.ott binary
+*.ods binary
+*.ots binary
+*.odp binary
+*.otp binary
 *.pdf binary
 *.gpg binary
 *.png binary
