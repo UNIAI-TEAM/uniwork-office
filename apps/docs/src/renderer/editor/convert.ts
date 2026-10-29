@@ -22,6 +22,8 @@ import {
   type TextboxSizePatch,
   patchTextboxParas,
   generateTableModelXml,
+  patchRunPictureXml,
+  type RunPictureGeometry,
   symbolGlyph,
   symbolPuaChar,
   type Block,
@@ -3503,8 +3505,24 @@ export function inlineToRuns(content: PmNode[]): Run[] {
     }
     if (node.type === 'docInlineImage') {
       const dataUrl = String(node.attrs?.dataUrl ?? '')
-      const xml = String(node.attrs?.xml ?? '')
+      let xml = String(node.attrs?.xml ?? '')
       const rule = node.attrs?.rule as NonNullable<Run['image']>['rule'] | null | undefined
+      const w = Number(node.attrs?.widthPx)
+      const h = Number(node.attrs?.heightPx)
+      // size, wrap and position edits; untouched geometry keeps the bytes
+      if (xml && !rule) {
+        const a = node.attrs ?? {}
+        xml = patchRunPictureXml(xml, {
+          widthPx: w > 0 ? w : null,
+          heightPx: h > 0 ? h : null,
+          wrap: (a.wrap as ImageWrap | null) ?? null,
+          offsetXEmu: (a.offsetXEmu as number | null) ?? null,
+          offsetYEmu: (a.offsetYEmu as number | null) ?? null,
+          relH: (a.relH as RunPictureGeometry['relH']) ?? null,
+          relV: (a.relV as RunPictureGeometry['relV']) ?? null,
+          lineCenterV: !!a.lineCenterV,
+        })
+      }
       if ((dataUrl || rule) && xml) {
         const base = atomBase(node)
         const hasRedact = node.marks?.some((m) => m.type === 'redaction') ?? false

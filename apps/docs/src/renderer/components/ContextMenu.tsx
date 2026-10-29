@@ -322,9 +322,18 @@ export function EditorContextMenu({
     isImage ||
     (Array.isArray(protAttrs?.textboxes) && (protAttrs.textboxes as unknown[]).length > 0)
   const boxes = protAttrs?.textboxes as TextboxDisplay[] | undefined
-  const currentWrap = boxes?.length
-    ? shapeWrapOf(boxes[0])
-    : ((protAttrs?.imageWrap as string | null) ?? null)
+  // a run picture (in line or floating) wraps through its own node
+  const runPicture =
+    editor.state.selection instanceof NodeSelection &&
+    editor.state.selection.node.type.name === 'docInlineImage' &&
+    !editor.state.selection.node.attrs.rule
+      ? editor.state.selection.node
+      : null
+  const currentWrap = runPicture
+    ? ((runPicture.attrs.wrap as string | null) ?? null)
+    : boxes?.length
+      ? shapeWrapOf(boxes[0])
+      : ((protAttrs?.imageWrap as string | null) ?? null)
 
   const clipboard = (action: 'cut' | 'copy') => {
     editor.commands.focus()
@@ -756,7 +765,7 @@ export function EditorContextMenu({
             })}
         </>
       )}
-      {isFloating && (
+      {(isFloating || runPicture) && (
         <>
           <div className="ctx-sep" />
           <div className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)}>
@@ -778,25 +787,28 @@ export function EditorContextMenu({
               </div>
             )}
           </div>
-          <div className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)}>
-            {item(t('appArrangeMenu'), { submenuKey: 'arrange' })}
-            {submenu === 'arrange' && (
-              <div className="ctx-submenu">
-                <button className="ctx-item" onClick={run(() => bringToFront(editor))}>
-                  <span className="ctx-label">{t('appBringToFront')}</span>
-                </button>
-                <button className="ctx-item" onClick={run(() => bringForward(editor))}>
-                  <span className="ctx-label">{t('appBringForward')}</span>
-                </button>
-                <button className="ctx-item" onClick={run(() => sendBackward(editor))}>
-                  <span className="ctx-label">{t('appSendBackward')}</span>
-                </button>
-                <button className="ctx-item" onClick={run(() => sendToBack(editor))}>
-                  <span className="ctx-label">{t('appSendToBack')}</span>
-                </button>
-              </div>
-            )}
-          </div>
+          {/* stacking ranks live on block anchors and shapes, not on run pictures */}
+          {isFloating && (
+            <div className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)}>
+              {item(t('appArrangeMenu'), { submenuKey: 'arrange' })}
+              {submenu === 'arrange' && (
+                <div className="ctx-submenu">
+                  <button className="ctx-item" onClick={run(() => bringToFront(editor))}>
+                    <span className="ctx-label">{t('appBringToFront')}</span>
+                  </button>
+                  <button className="ctx-item" onClick={run(() => bringForward(editor))}>
+                    <span className="ctx-label">{t('appBringForward')}</span>
+                  </button>
+                  <button className="ctx-item" onClick={run(() => sendBackward(editor))}>
+                    <span className="ctx-label">{t('appSendBackward')}</span>
+                  </button>
+                  <button className="ctx-item" onClick={run(() => sendToBack(editor))}>
+                    <span className="ctx-label">{t('appSendToBack')}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
       <div className="ctx-sep" />
