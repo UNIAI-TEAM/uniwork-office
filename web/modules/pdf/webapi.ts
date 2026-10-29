@@ -1185,6 +1185,9 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     releaseCertificate: () => {},
     inspectCertificate: async () => ({ ok: false, error: 'cert-invalid' }),
     signWithCertificate: async () => ({ ok: false, error: 'sign-failed', message: NOT_AVAILABLE }),
+    // Compare is desktop-only (the `pdfCompare` capability hides the button): typed not-available answers
+    compareReadPdf: async () => ({ ok: false, reason: NOT_AVAILABLE }),
+    compareReadOpen: async () => ({ ok: false, reason: NOT_AVAILABLE }),
     // the host's file.renamed only renames: the web document id (its "path") never changes
     onFileRenamed: () => () => {},
     aiStream: ai.aiStream,
