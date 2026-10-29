@@ -29,4 +29,27 @@ export const vi = {
   intgSkillsInstall: 'Cài đặt',
   intgSkillsUpdate: 'Cập nhật',
   intgSkillsInstalledTag: 'Đã cài',
+  intgSkillsErrDirUnreadable: 'không thể đọc thư mục kỹ năng',
+  intgSkillsErrDirSymlink:
+    'thư mục kỹ năng là liên kết tượng trưng (symlink) và không được phép nhập',
+  intgSkillsErrContainsSymlink:
+    'kỹ năng có chứa liên kết tượng trưng (symlink) và không được phép nhập',
+  intgSkillsErrTooLarge: 'kỹ năng vượt quá giới hạn nhập 10 MB',
+  intgSkillsErrReadBackFailed: 'không thể đọc lại kỹ năng sau khi nhập',
+  intgSkillsErrMissingSkillMd: 'thư mục không có tệp SKILL.md',
+  intgSkillsErrInvalidFrontmatter: 'SKILL.md cần có frontmatter name và description',
+  intgSkillsErrInvalidFolderName: 'tên thư mục không thể dùng làm tên kỹ năng',
+  intgSkillsErrAlreadyExists: 'đã có kỹ năng cùng tên',
+  intgSkillsErrFileUnreadable: 'không thể đọc tệp',
+  intgSkillsErrInvalidFileName: 'tên tệp không thể dùng làm tên kỹ năng',
+  intgSkillsErrNotZip: 'tệp không phải là gói nén zip',
+  intgSkillsErrTooManyEntries: 'gói nén vượt quá giới hạn nhập {max} mục',
+  intgSkillsErrUnsafeEntry: 'gói nén có tên mục không an toàn: {name}',
+  intgSkillsErrArchiveSymlink:
+    'gói nén có chứa liên kết tượng trưng (symlink) và không được phép nhập',
+  intgSkillsErrArchiveMissingSkillMd:
+    'gói nén không có SKILL.md ở gốc hoặc trong một thư mục duy nhất',
+  intgSkillsErrInvalidArchiveName: 'tên gói nén không thể dùng làm tên kỹ năng',
+  intgSkillsErrUnknownSkill: 'kỹ năng không xác định',
+  intgSkillsErrUnknownTarget: 'đích cài kỹ năng không xác định',
 } satisfies Record<keyof typeof zh, string>

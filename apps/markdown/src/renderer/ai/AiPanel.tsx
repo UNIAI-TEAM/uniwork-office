@@ -1456,8 +1456,11 @@ export function AiPanel({
     resizer.setPointerCapture(e.pointerId)
   }
 
-  const liveText =
-    pickerNote && pickerNote.over === panelLiveAnnouncement
+  // The too-long skills notice is announced through the panel's one live region (the banner
+  // below is visible only, so it is not announced twice); it clears with the notice.
+  const liveText = skillsTooLong
+    ? AI_SKILLS_LABELS[lang].uniworkTooLongNotice
+    : pickerNote && pickerNote.over === panelLiveAnnouncement
       ? pickerNote.text
       : panelLiveAnnouncement
   return (
@@ -1862,7 +1865,7 @@ export function AiPanel({
             </div>
           )}
           {skillsTooLong && (
-            <div className="ai-skills-too-long-notice" role="status">
+            <div className="ai-skills-too-long-notice">
               {AI_SKILLS_LABELS[lang].uniworkTooLongNotice}
             </div>
           )}

@@ -142,7 +142,7 @@ describe('integrations:install-skill', () => {
       Promise.resolve().then(() =>
         invoke(INTEGRATIONS_CHANNELS.installSkill, { dir: '/etc/cron.d' }),
       ),
-    ).rejects.toThrow('unknown skill target')
+    ).rejects.toThrow('skill-import:unknown-target')
     expect(h.installed).toEqual([])
   })
 })
@@ -200,14 +200,22 @@ describe('integrations:list-skills', () => {
     ours('pdf-to-html')
     const outside = join(userData, 'secrets.txt')
     writeFileSync(outside, 'private')
-    expect(() => invoke(INTEGRATIONS_CHANNELS.skillBody, outside)).toThrow('unknown skill')
+    expect(() => invoke(INTEGRATIONS_CHANNELS.skillBody, outside)).toThrow(
+      'skill-import:unknown-skill',
+    )
     expect(() =>
       invoke(INTEGRATIONS_CHANNELS.skillBody, join(userData, 'skills', '..', 'secrets.txt')),
-    ).toThrow('unknown skill')
+    ).toThrow('skill-import:unknown-skill')
     // an agent's SKILL.md is a real skill file, but not one this app listed
-    expect(() => invoke(INTEGRATIONS_CHANNELS.skillBody, agents('theirs'))).toThrow('unknown skill')
-    expect(() => invoke(INTEGRATIONS_CHANNELS.skillBody, '/etc/passwd')).toThrow('unknown skill')
-    expect(() => invoke(INTEGRATIONS_CHANNELS.skillBody, null)).toThrow('unknown skill')
+    expect(() => invoke(INTEGRATIONS_CHANNELS.skillBody, agents('theirs'))).toThrow(
+      'skill-import:unknown-skill',
+    )
+    expect(() => invoke(INTEGRATIONS_CHANNELS.skillBody, '/etc/passwd')).toThrow(
+      'skill-import:unknown-skill',
+    )
+    expect(() => invoke(INTEGRATIONS_CHANNELS.skillBody, null)).toThrow(
+      'skill-import:unknown-skill',
+    )
   })
 
   it('refuses another file that happens to sit in a skills folder', () => {
@@ -215,7 +223,9 @@ describe('integrations:list-skills', () => {
     mkdirSync(at, { recursive: true })
     const note = join(at, 'reference.md')
     writeFileSync(note, 'a helper note')
-    expect(() => invoke(INTEGRATIONS_CHANNELS.skillBody, note)).toThrow('unknown skill')
+    expect(() => invoke(INTEGRATIONS_CHANNELS.skillBody, note)).toThrow(
+      'skill-import:unknown-skill',
+    )
   })
 })
 
@@ -266,7 +276,7 @@ describe('integrations:import-skill-folder / -zip', () => {
     h.dialogResult = { canceled: false, filePaths: [plantSrc('shared', 'Theirs', 'theirs')] }
 
     await expect(invoke(INTEGRATIONS_CHANNELS.importSkillFolder, 'Pick')).rejects.toThrow(
-      'already there',
+      'skill-import:already-exists',
     )
     expect(invoke(INTEGRATIONS_CHANNELS.skillBody, join(at, 'SKILL.md'))).toBe('mine\n')
   })
@@ -313,7 +323,7 @@ describe('integrations:list-recommended-skills / install-recommended-skill', () 
     ship('business-report')
     for (const bad of ['other', '../recommended/business-report', 42, null]) {
       expect(() => invoke(INTEGRATIONS_CHANNELS.installRecommendedSkill, bad)).toThrow(
-        'unknown skill',
+        'skill-import:unknown-skill',
       )
     }
   })

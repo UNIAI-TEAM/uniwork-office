@@ -118,6 +118,65 @@ describe('AiSkillsMenu', () => {
     expect(document.activeElement).toBe(btn)
   })
 
+  it('navigates between search and enabled skill rows with ArrowDown/ArrowUp, skips disabled rows at cap, and toggles on Enter/Space', async () => {
+    // At the 3-skill cap: tables (0, enabled), tone (1, disabled), citations (2, enabled), summary (3, enabled)
+    const { onToggle } = mount({ selected: ['tables', 'citations', 'summary'] })
+    const btn = host.querySelector<HTMLButtonElement>('.ai-plus-btn')!
+    click(btn)
+    await settle()
+    const search = host.querySelector<HTMLInputElement>('.ai-plus-search')!
+    const rows = [...host.querySelectorAll<HTMLButtonElement>('.ai-plus-skill')]
+    expect(rows[0]!.disabled).toBe(false)
+    expect(rows[1]!.disabled).toBe(true)
+    expect(rows[2]!.disabled).toBe(false)
+    expect(rows[3]!.disabled).toBe(false)
+    expect(document.activeElement).toBe(search)
+
+    // ArrowDown in search moves focus to the first enabled row
+    act(() => {
+      search.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(rows[0])
+
+    // ArrowDown on row 0 skips disabled row 1 and moves to row 2
+    act(() => {
+      rows[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(rows[2])
+
+    // ArrowDown moves to row 3
+    act(() => {
+      rows[2]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(rows[3])
+
+    // ArrowUp moves back to row 2, then skips disabled row 1 back to row 0
+    act(() => {
+      rows[3]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(rows[2])
+    act(() => {
+      rows[2]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(rows[0])
+
+    // Enter/Space on focused row still toggles the skill
+    click(rows[0])
+    expect(onToggle).toHaveBeenCalledWith('tables')
+
+    // ArrowUp on the first enabled row returns focus to search
+    act(() => {
+      rows[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(search)
+
+    // Escape closes and returns focus to +
+    act(() => {
+      search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(host.querySelector('.ai-plus-pop')).toBeNull()
+    expect(document.activeElement).toBe(btn)
+  })
   it('marks selected skills and offers Manage only when a handler is given', async () => {
     const onManage = vi.fn()
     mount({ selected: ['tables'], onManage })

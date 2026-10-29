@@ -152,14 +152,57 @@ describe('FoundSkills', () => {
     expect(host.textContent).not.toContain('Import failed')
   })
 
-  it('shows the reason when an import is refused', async () => {
+  it('maps a skill-import error code to its localized string', async () => {
     mountApi([])
     ;(window.aiOfficeIntegrations as IntegrationsApi).importSkillZip = async () => {
-      throw new Error('the archive contains a symlink, and imports refuse those')
+      throw new Error(
+        "Error invoking remote method 'integrations:import-skill-zip': Error: skill-import:archive-symlink",
+      )
     }
     await render()
     await click(buttonWithText('Import skill package (zip / .md)…'))
-    expect(host.textContent).toContain('Import failed: the archive contains a symlink')
+    expect(host.textContent).toContain(
+      'Import failed: the archive contains a symlink, and imports refuse those',
+    )
+    expect(host.textContent).not.toContain('skill-import:')
+  })
+
+  it('localizes parameterized skill-import codes in Vietnamese and passes unknown codes through', async () => {
+    const viDict = skillsStrings.vi as Record<string, string>
+    const tVi = ((key: string, params?: Record<string, string>) =>
+      (viDict[key] ?? key).replace(
+        /\{(\w+)\}/g,
+        (_, name) => params?.[name] ?? `{${name}}`,
+      )) as never
+    mountApi([])
+    ;(window.aiOfficeIntegrations as IntegrationsApi).importSkillZip = async () => {
+      throw new Error('skill-import:too-many-entries:2000')
+    }
+    await act(async () => {
+      root.render(
+        createElement(LocaleProvider, { initial: 'vi' }, createElement(FoundSkills, { t: tVi })),
+      )
+    })
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    await click(buttonWithText('Nhập gói kỹ năng (zip / .md)…'))
+    expect(host.textContent).toContain('Nhập thất bại: gói nén vượt quá giới hạn nhập 2000 mục')
+
+    ;(window.aiOfficeIntegrations as IntegrationsApi).importSkillZip = async () => {
+      throw new Error('skill-import:unsafe-entry:../evil.txt')
+    }
+    await click(buttonWithText('Nhập gói kỹ năng (zip / .md)…'))
+    expect(host.textContent).toContain(
+      'Nhập thất bại: gói nén có tên mục không an toàn: ../evil.txt',
+    )
+
+    ;(window.aiOfficeIntegrations as IntegrationsApi).importSkillZip = async () => {
+      throw new Error('skill-import:future-code')
+    }
+    await click(buttonWithText('Nhập gói kỹ năng (zip / .md)…'))
+    expect(host.textContent).toContain('Nhập thất bại: skill-import:future-code')
   })
 
   it('drops the Electron IPC prefix from a refused import', async () => {
