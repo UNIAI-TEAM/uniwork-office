@@ -1561,4 +1561,29 @@ export const th = {
   appWebSavedReopenFailed:
     'บันทึกการเปลี่ยนแปลงของคุณไปยัง UniWork แล้ว แต่เปิดสมุดงานนี้ซ้ำที่นี่ไม่ได้ โปรดโหลดตัวแก้ไขใหม่เพื่อทำงานต่อ',
   appDataTable: 'ตารางข้อมูล',
+
+  // ── Spelling check (F7 / Review ▸ Proofing) ──
+  appSpellTitle: 'ตรวจการสะกดคำ',
+  appSpellBtnDetail: 'ตรวจข้อความในชีต (F7)',
+  appSpellToggle: 'ตรวจการสะกด',
+  appSpellToggleTip:
+    'เปิดการตรวจการสะกดคำ (F7 และปุ่มในแท็บรีวิว) เมื่อปิด กล่องความคิดเห็นจะไม่แสดงเส้นใต้คลื่นอีกต่อไป',
+  appSpellOn: 'เปิดการตรวจการสะกดคำแล้ว',
+  appSpellOff: 'การตรวจการสะกดคำถูกปิดอยู่ เปิดได้ที่ รีวิว ▸ การพิสูจน์อักษร',
+  appSpellRecheck: 'ตรวจอีกครั้ง',
+  appSpellNone: 'ไม่พบคำสะกดผิดที่น่าสงสัย',
+  appSpellFindings: 'พบข้อผิดพลาดที่น่าสงสัย {count} จุด คลิกแถวเพื่อไปยังตำแหน่ง',
+  appSpellTruncated: 'มีเซลล์ข้อความมากเกินไป ตรวจเฉพาะส่วนแรกเท่านั้น',
+  appSpellColWord: 'คำที่สงสัย',
+  appSpellIgnore: 'ละเว้น',
+  appSpellIgnoreAll: 'ละเว้นทั้งหมด',
+  appSpellLearn: 'เพิ่มในพจนานุกรม',
+  appSpellNoSuggestions: 'ไม่มีคำแนะนำ',
+  appSpellIgnoredAll: 'จะไม่แจ้งเตือน "{word}" อีกในเซสชันนี้',
+  appSpellLearned: 'เพิ่ม "{word}" ในพจนานุกรมแล้ว',
+  appSpellChanged: 'แก้ไข {address} แล้ว',
+  appSpellChangeFailed: 'แก้ไข {address} ไม่สำเร็จ',
+  appSpellUnavailable: 'การตรวจการสะกดไม่พร้อมใช้งานในหน้าต่างนี้',
+  appSpellReplaceAll: 'แทนที่ทั้งหมดด้วย "{suggestion}"',
+  appSpellChangedAll: 'แก้ไขแล้ว {count} เซลล์ของ "{word}"',
 } satisfies Record<keyof typeof zh, string>

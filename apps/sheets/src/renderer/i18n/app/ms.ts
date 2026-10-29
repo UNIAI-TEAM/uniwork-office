@@ -1607,4 +1607,29 @@ export const ms = {
   appWebSavedReopenFailed:
     'Perubahan anda telah disimpan ke UniWork, tetapi buku kerja tidak dapat dibuka semula di sini. Muat semula editor untuk teruskan.',
   appDataTable: 'Jadual Data',
+
+  // ── Spelling check (F7 / Review ▸ Proofing) ──
+  appSpellTitle: 'Ejaan',
+  appSpellBtnDetail: 'Semak teks helaian (F7)',
+  appSpellToggle: 'Semak ejaan',
+  appSpellToggleTip:
+    'Mengaktifkan semakan ejaan (F7 dan butang Semakan); apabila dimatikan, kotak komen tidak lagi menampilkan garis bergelombang',
+  appSpellOn: 'Semakan ejaan diaktifkan.',
+  appSpellOff: 'Semakan ejaan dimatikan. Aktifkannya pada Semakan ▸ Pembacaan Pruf.',
+  appSpellRecheck: 'Semak semula',
+  appSpellNone: 'Tiada kesalahan ejaan yang disyaki ditemui.',
+  appSpellFindings: '{count} kesalahan disyaki. Klik baris untuk ke lokasinya.',
+  appSpellTruncated: 'Terlalu banyak sel teks; hanya bahagian awal disemak.',
+  appSpellColWord: 'Disyaki',
+  appSpellIgnore: 'Abaikan',
+  appSpellIgnoreAll: 'Abaikan semua',
+  appSpellLearn: 'Tambah ke kamus',
+  appSpellNoSuggestions: 'Tiada cadangan',
+  appSpellIgnoredAll: '"{word}" tidak akan ditandakan lagi dalam sesi ini.',
+  appSpellLearned: '"{word}" ditambah ke kamus.',
+  appSpellChanged: '{address} dibetulkan.',
+  appSpellChangeFailed: 'Gagal membetulkan {address}.',
+  appSpellUnavailable: 'Semakan ejaan tidak tersedia dalam tetingkap ini.',
+  appSpellReplaceAll: 'Ganti semua dengan "{suggestion}"',
+  appSpellChangedAll: '{count} sel dengan "{word}" telah dibetulkan.',
 } satisfies Record<keyof typeof zh, string>

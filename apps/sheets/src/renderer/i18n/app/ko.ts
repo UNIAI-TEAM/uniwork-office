@@ -1625,4 +1625,29 @@ export const ko = {
   appWebSavedReopenFailed:
     '변경 사항은 UniWork에 저장되었지만 여기서 통합 문서를 다시 열 수 없습니다. 편집기를 새로 고쳐 계속 작업하세요.',
   appDataTable: '데이터 테이블',
+
+  // ── Spelling check (F7 / Review ▸ Proofing) ──
+  appSpellTitle: '맞춤법 검사',
+  appSpellBtnDetail: '시트 텍스트 검사 (F7)',
+  appSpellToggle: '맞춤법 검사',
+  appSpellToggleTip:
+    '맞춤법 검사(F7 및 검토 버튼)를 켭니다. 끄면 댓글 입력란에 맞춤법 물결표가 표시되지 않습니다',
+  appSpellOn: '맞춤법 검사를 켰습니다.',
+  appSpellOff: '맞춤법 검사가 꺼져 있습니다. 검토 ▸ 언어 교정에서 켤 수 있습니다.',
+  appSpellRecheck: '다시 검사',
+  appSpellNone: '의심되는 맞춤법 오류가 없습니다.',
+  appSpellFindings: '의심되는 맞춤법 오류 {count}건. 행을 클릭하면 이동합니다.',
+  appSpellTruncated: '텍스트 셀이 너무 많아 앞부분만 검사했습니다.',
+  appSpellColWord: '의심 단어',
+  appSpellIgnore: '무시',
+  appSpellIgnoreAll: '모두 무시',
+  appSpellLearn: '사전에 추가',
+  appSpellNoSuggestions: '추천 없음',
+  appSpellIgnoredAll: '이 세션에서는 "{word}"을(를) 다시 표시하지 않습니다.',
+  appSpellLearned: '"{word}"을(를) 사전에 추가했습니다.',
+  appSpellChanged: '{address}을(를) 수정했습니다.',
+  appSpellChangeFailed: '{address}을(를) 수정하지 못했습니다.',
+  appSpellUnavailable: '이 창에서는 맞춤법 검사를 사용할 수 없습니다.',
+  appSpellReplaceAll: '모두 "{suggestion}"(으)로 바꾸기',
+  appSpellChangedAll: '"{word}"을(를) {count}곳 수정했습니다.',
 } satisfies Record<keyof typeof zh, string>

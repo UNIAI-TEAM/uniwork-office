@@ -1539,4 +1539,29 @@ export const he = {
   appWebSavedReopenFailed:
     'השינויים שלך נשמרו ב-UniWork, אך לא ניתן היה לפתוח את החוברת מחדש כאן. טען מחדש את העורך כדי להמשיך.',
   appDataTable: 'טבלת נתונים',
+
+  // ── Spelling check (F7 / Review ▸ Proofing) ──
+  appSpellTitle: 'איות',
+  appSpellBtnDetail: 'בדיקת טקסט הגיליון (F7)',
+  appSpellToggle: 'בדיקת איות',
+  appSpellToggleTip:
+    'מפעיל את בדיקת האיות (F7 ולחצן סקירה); כשהיא כבויה, תיבות הערה לא מציגות קווים אדומים',
+  appSpellOn: 'בדיקת האיות הופעלה.',
+  appSpellOff: 'בדיקת האיות כבויה. ניתן להפעיל אותה בסקירה ▸ הגהה.',
+  appSpellRecheck: 'בדיקה חוזרת',
+  appSpellNone: 'לא נמצאו שגיאות איות חשודות.',
+  appSpellFindings: '{count} שגיאות חשודות. לחץ על שורה כדי לעבור אליה.',
+  appSpellTruncated: 'יותר מדי תאי טקסט; נבדקו רק הראשונים.',
+  appSpellColWord: 'חשוד',
+  appSpellIgnore: 'התעלמות',
+  appSpellIgnoreAll: 'התעלמות מהכול',
+  appSpellLearn: 'הוספה למילון',
+  appSpellNoSuggestions: 'אין הצעות',
+  appSpellIgnoredAll: '"{word}" לא יסומן שוב בהפעלה זו.',
+  appSpellLearned: '"{word}" נוסף למילון.',
+  appSpellChanged: '{address} תוקן.',
+  appSpellChangeFailed: 'לא ניתן לתקן את {address}.',
+  appSpellUnavailable: 'בדיקת האיות אינה זמינה בחלון זה.',
+  appSpellReplaceAll: 'החלף הכול ב־«{suggestion}»',
+  appSpellChangedAll: 'תוקנו {count} תאים של «{word}».',
 } satisfies Record<keyof typeof zh, string>
