@@ -63,4 +63,14 @@ export const ms = {
     'Memampat semula strim deflate dan mengecilkan imej melebihi 2480 px; menulis salinan',
   reduceDone: 'Dikurangkan kira-kira {pct}% — salinan disimpan',
   reduceAlreadySmall: 'Fail ini sudah cukup kecil; tiada apa untuk dimampatkan',
+  drawMeasure: 'Ukur',
+  measureHint: 'Tentukanskalakan satu jarak yang diketahui, kemudian ukur mana-mana garisan',
+  measureScaleTitle: 'Kalibrasi skala',
+  measureScalePrompt:
+    'Lukis garisan di atas jarak yang anda tahu, kemudian masukkan panjang sebenar yang diwakili garisan itu',
+  measureScaleValue: 'Panjang sebenar garisan',
+  measureScaleUnit: 'Unit',
+  measureScaleApply: 'Kalibrasi',
+  measureCalibrated: 'Skala dikalibrasi ({unit})',
+  measureScaleErr: 'Masukkan panjang positif dan unit maksimum 12 aksara',
 } satisfies Record<keyof typeof zh, string>

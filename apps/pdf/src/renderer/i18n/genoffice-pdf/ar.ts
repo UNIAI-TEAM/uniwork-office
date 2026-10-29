@@ -62,4 +62,13 @@ export const ar = {
   reduceHint: 'إعادة ضغط تدفقات deflate وتصغير الصور التي تتجاوز 2480 بكسل؛ يكتب نسخة',
   reduceDone: 'انخفض الحجم بنحو {pct}% — حفظت النسخة',
   reduceAlreadySmall: 'هذا الملف صغير بما يكفي؛ لا شيء لضغطه',
+  drawMeasure: 'قياس',
+  measureHint: 'عاير مسافة معروفة مرة واحدة ثم قِس أي خط',
+  measureScaleTitle: 'معايرة المقياس',
+  measureScalePrompt: 'ارسم خطاً فوق مسافة تعرفها ثم أدخل الطول الحقيقي الذي يمثله هذا الخط',
+  measureScaleValue: 'الطول الحقيقي للخط',
+  measureScaleUnit: 'الوحدة',
+  measureScaleApply: 'معايرة',
+  measureCalibrated: 'تمت معايرة المقياس ({unit})',
+  measureScaleErr: 'أدخل طولاً موجباً ووحدة لا تتجاوز 12 حرفاً',
 } satisfies Record<keyof typeof zh, string>

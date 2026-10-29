@@ -62,4 +62,14 @@ export const it = {
   reduceHint: 'Ricomprime i flussi deflate e riduce le immagini oltre 2480 px; scrive una copia',
   reduceDone: 'Ridotto di circa il {pct}% — la copia è salvata',
   reduceAlreadySmall: 'Questo file è già piccolo; niente da stringere',
+  drawMeasure: 'Misura',
+  measureHint: 'Calibra una distanza nota, poi misura qualsiasi segmento',
+  measureScaleTitle: 'Calibrazione della scala',
+  measureScalePrompt:
+    'Traccia una linea su una distanza nota e inserisci la lunghezza reale che rappresenta',
+  measureScaleValue: 'Lunghezza reale della linea',
+  measureScaleUnit: 'Unità',
+  measureScaleApply: 'Calibra',
+  measureCalibrated: 'Scala calibrata ({unit})',
+  measureScaleErr: "Inserisci una lunghezza positiva e un'unità di massimo 12 caratteri",
 } satisfies Record<keyof typeof zh, string>

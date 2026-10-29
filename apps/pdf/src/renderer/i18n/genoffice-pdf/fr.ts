@@ -63,4 +63,14 @@ export const fr = {
     'Recompresse les flux deflate et réduit les images de plus de 2480 px ; écrit une copie',
   reduceDone: "Réduit d'environ {pct} % — la copie est enregistrée",
   reduceAlreadySmall: 'Ce fichier est déjà assez petit ; rien à gagner',
+  drawMeasure: 'Mesurer',
+  measureHint: 'Étalonner une distance connue, puis mesurer tout segment',
+  measureScaleTitle: "Étalonner l'échelle",
+  measureScalePrompt:
+    'Tracez un trait sur une distance que vous connaissez, puis saisissez la longueur réelle que représente ce trait',
+  measureScaleValue: 'Longueur réelle du trait',
+  measureScaleUnit: 'Unité',
+  measureScaleApply: 'Étalonner',
+  measureCalibrated: 'Échelle étalonnée ({unit})',
+  measureScaleErr: 'Saisissez une longueur positive et une unité de 12 caractères au plus',
 } satisfies Record<keyof typeof zh, string>

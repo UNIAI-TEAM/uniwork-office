@@ -62,4 +62,13 @@ export const th = {
   reduceHint: 'บีบอัดสตรีม deflate ใหม่และย่อภาพที่ใหญ่กว่า 2480 px แล้วบันทึกเป็นสำเนา',
   reduceDone: 'ลดลงประมาณ {pct}% — บันทึกสำเนาแล้ว',
   reduceAlreadySmall: 'ไฟล์นี้เล็กพอแล้ว ไม่มีอะไรให้บีบ',
+  drawMeasure: 'วัดระยะ',
+  measureHint: 'ปรับมาตราส่วนด้วยระยะที่รู้จักหนึ่งครั้ง แล้ววัดได้ทุกเส้น',
+  measureScaleTitle: 'ปรับมาตราส่วน',
+  measureScalePrompt: 'ลากเส้นบนระยะที่คุณรู้จริง แล้วกรอกความยาวจริงที่เส้นนั้นแทน',
+  measureScaleValue: 'ความยาวจริงของเส้น',
+  measureScaleUnit: 'หน่วย',
+  measureScaleApply: 'ปรับมาตราส่วน',
+  measureCalibrated: 'ปรับมาตราส่วนแล้ว ({unit})',
+  measureScaleErr: 'กรอกความยาวเป็นบวกและหน่วยไม่เกิน 12 ตัวอักษร',
 } satisfies Record<keyof typeof zh, string>

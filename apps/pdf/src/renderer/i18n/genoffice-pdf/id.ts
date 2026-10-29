@@ -62,4 +62,14 @@ export const id = {
   reduceHint: 'Kompres ulang stream deflate dan perkecil gambar di atas 2480 px; menulis salinan',
   reduceDone: 'Dikurangi sekitar {pct}% — salinan tersimpan',
   reduceAlreadySmall: 'Berkas ini sudah cukup kecil; tidak ada yang bisa diperas',
+  drawMeasure: 'Ukur',
+  measureHint: 'Kalibrasi satu jarak yang diketahui, lalu ukur apa saja',
+  measureScaleTitle: 'Kalibrasi skala',
+  measureScalePrompt:
+    'Gambar garis di atas jarak yang Anda ketahui, lalu masukkan panjang nyata yang diwakili garis itu',
+  measureScaleValue: 'Panjang nyata garis',
+  measureScaleUnit: 'Satuan',
+  measureScaleApply: 'Kalibrasi',
+  measureCalibrated: 'Skala terkalibrasi ({unit})',
+  measureScaleErr: 'Masukkan panjang positif dan satuan maksimal 12 karakter',
 } satisfies Record<keyof typeof zh, string>

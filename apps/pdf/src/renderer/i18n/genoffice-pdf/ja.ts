@@ -62,4 +62,13 @@ export const ja = {
   reduceHint: 'deflate ストリームを再圧縮し、2480 px を超える画像を縮小してコピーに保存します',
   reduceDone: '約 {pct}% 縮小しました。コピーを保存済みです',
   reduceAlreadySmall: 'このファイルは十分小さく、圧縮の余地がありません',
+  drawMeasure: '計測',
+  measureHint: '既知の距離で基準を合わせれば、どの線も測れます',
+  measureScaleTitle: '縮尺のキャリブレーション',
+  measureScalePrompt: '実際の長さが分かっている距離に線を引き、その線が表す実長を入力してください',
+  measureScaleValue: '線の実長',
+  measureScaleUnit: '単位',
+  measureScaleApply: 'キャリブレーション',
+  measureCalibrated: '縮尺を合わせました（{unit}）',
+  measureScaleErr: '正の長さと 12 文字以内の単位を入力してください',
 } satisfies Record<keyof typeof zh, string>

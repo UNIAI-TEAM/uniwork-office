@@ -63,4 +63,14 @@ export const nl = {
     'Comprimeert deflate-streams opnieuw en verkleint afbeeldingen boven 2480 px; schrijft een kopie',
   reduceDone: 'Ongeveer {pct}% kleiner — de kopie is opgeslagen',
   reduceAlreadySmall: 'Dit bestand is al klein genoeg; niets te halen',
+  drawMeasure: 'Meten',
+  measureHint: 'Kalibreer één bekende afstand en meet alles',
+  measureScaleTitle: 'Schaal kalibreren',
+  measureScalePrompt:
+    'Trek een lijn over een afstand die u kent en voer de echte lengte in die die lijn vertegenwoordigt',
+  measureScaleValue: 'Echte lengte van de lijn',
+  measureScaleUnit: 'Eenheid',
+  measureScaleApply: 'Kalibreren',
+  measureCalibrated: 'Schaal gekalibreerd ({unit})',
+  measureScaleErr: 'Voer een positieve lengte en een eenheid van maximaal 12 tekens in',
 } satisfies Record<keyof typeof zh, string>

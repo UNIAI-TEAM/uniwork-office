@@ -61,4 +61,13 @@ export const zhTW = {
   reduceHint: '重新壓縮 deflate 串流，僅對超過 2480 px 的圖片降取樣；另存為副本',
   reduceDone: '已減小約 {pct}%，副本已儲存',
   reduceAlreadySmall: '檔案已經足夠小，沒有可壓縮的空間',
+  drawMeasure: '測量',
+  measureHint: '先標定已知距離，再量任意線段',
+  measureScaleTitle: '標定比例尺',
+  measureScalePrompt: '沿已知真實距離畫一條線後，輸入這條線代表的實際長度',
+  measureScaleValue: '線長代表的實際長度',
+  measureScaleUnit: '單位',
+  measureScaleApply: '標定',
+  measureCalibrated: '比例尺已標定（{unit}）',
+  measureScaleErr: '請輸入正數長度和不超過 12 字元的單位',
 } satisfies Record<keyof typeof zh, string>

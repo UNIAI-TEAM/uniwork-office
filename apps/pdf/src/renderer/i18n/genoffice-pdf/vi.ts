@@ -62,4 +62,14 @@ export const vi = {
   reduceHint: 'Nén lại các luồng deflate và thu nhỏ ảnh trên 2480 px; ghi thành bản sao',
   reduceDone: 'Đã giảm khoảng {pct}% — bản sao đã được lưu',
   reduceAlreadySmall: 'Tệp đã đủ nhỏ, không còn gì để nén',
+  drawMeasure: 'Đo',
+  measureHint: 'Hiệu chuẩn một khoảng cách đã biết, rồi đo bất kỳ đoạn nào',
+  measureScaleTitle: 'Hiệu chuẩn tỷ lệ',
+  measureScalePrompt:
+    'Vẽ một đường trên khoảng cách bạn biết, rồi nhập độ dài thực mà đường đó đại diện',
+  measureScaleValue: 'Độ dài thực của đường',
+  measureScaleUnit: 'Đơn vị',
+  measureScaleApply: 'Hiệu chuẩn',
+  measureCalibrated: 'Đã hiệu chuẩn tỷ lệ ({unit})',
+  measureScaleErr: 'Nhập độ dài dương và đơn vị tối đa 12 ký tự',
 } satisfies Record<keyof typeof zh, string>

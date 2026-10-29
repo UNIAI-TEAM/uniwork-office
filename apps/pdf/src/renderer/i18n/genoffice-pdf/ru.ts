@@ -62,4 +62,14 @@ export const ru = {
   reduceHint: 'Пережать deflate-потоки и уменьшить изображения больше 2480 px; записывает копию',
   reduceDone: 'Размер уменьшен примерно на {pct}% — копия сохранена',
   reduceAlreadySmall: 'Файл и так невелик; сжимать нечего',
+  drawMeasure: 'Измерить',
+  measureHint: 'Откалибруйте одну известную дистанцию — и меряйте что угодно',
+  measureScaleTitle: 'Калибровка масштаба',
+  measureScalePrompt:
+    'Нарисуйте линию поверх известного расстояния и укажите, какую реальную длину она представляет',
+  measureScaleValue: 'Реальная длина линии',
+  measureScaleUnit: 'Единица',
+  measureScaleApply: 'Калибровать',
+  measureCalibrated: 'Масштаб откалиброван ({unit})',
+  measureScaleErr: 'Введите положительную длину и единицу не длиннее 12 символов',
 } satisfies Record<keyof typeof zh, string>

@@ -62,4 +62,14 @@ export const pt = {
   reduceHint: 'Recomprime fluxos deflate e reduz imagens acima de 2480 px; grava uma cópia',
   reduceDone: 'Reduzido cerca de {pct}% — a cópia está salva',
   reduceAlreadySmall: 'Este arquivo já é pequeno; nada a espremer',
+  drawMeasure: 'Medir',
+  measureHint: 'Calibre uma distância conhecida e meça o que quiser',
+  measureScaleTitle: 'Calibrar a escala',
+  measureScalePrompt:
+    'Desenhe uma linha sobre uma distância conhecida e informe a longitude real que ela representa',
+  measureScaleValue: 'Longitude real da linha',
+  measureScaleUnit: 'Unidade',
+  measureScaleApply: 'Calibrar',
+  measureCalibrated: 'Escala calibrada ({unit})',
+  measureScaleErr: 'Informe uma longitude positiva e uma unidade de no máximo 12 caracteres',
 } satisfies Record<keyof typeof zh, string>

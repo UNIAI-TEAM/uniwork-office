@@ -62,4 +62,14 @@ export const cs = {
   reduceHint: 'Znovu komprimuje deflate streamy a zmenší obrázky nad 2480 px; zapíše kopii',
   reduceDone: 'Zmenšeno asi o {pct} % — kopie je uložena',
   reduceAlreadySmall: 'Tento soubor je už dost malý; nic ke zmačkání',
+  drawMeasure: 'Měřit',
+  measureHint: 'Jednou zkalibrujte známou vzdálenost a měřte cokoli',
+  measureScaleTitle: 'Kalibrace měřítka',
+  measureScalePrompt:
+    'Nakreslete čáru přes vzdálenost, kterou znáte, a zadejte skutečnou délku, kterou představuje',
+  measureScaleValue: 'Skutečná délka čáry',
+  measureScaleUnit: 'Jednostka',
+  measureScaleApply: 'Kalibrovat',
+  measureCalibrated: 'Měřítko zkalibrováno ({unit})',
+  measureScaleErr: 'Zadejte kladnou délku a jednotku nejvýše 12 znaků',
 } satisfies Record<keyof typeof zh, string>

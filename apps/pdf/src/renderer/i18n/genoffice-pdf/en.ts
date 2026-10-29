@@ -62,4 +62,14 @@ export const en = {
   reduceHint: 'Re-compresses deflate streams and downsamples images over 2480 px; writes a copy',
   reduceDone: 'Reduced by about {pct}% — the copy is saved',
   reduceAlreadySmall: 'This file is already small; nothing to squeeze',
+  drawMeasure: 'Measure',
+  measureHint: 'Calibrate a known distance once, then measure anything',
+  measureScaleTitle: 'Calibrate the scale',
+  measureScalePrompt:
+    'Draw a line over a distance you know, then enter what real length that line represents',
+  measureScaleValue: 'Real length of the line',
+  measureScaleUnit: 'Unit',
+  measureScaleApply: 'Calibrate',
+  measureCalibrated: 'Scale calibrated ({unit})',
+  measureScaleErr: 'Enter a positive length and a unit of at most 12 characters',
 } satisfies Record<keyof typeof zh, string>

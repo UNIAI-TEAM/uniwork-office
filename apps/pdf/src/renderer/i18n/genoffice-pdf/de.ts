@@ -63,4 +63,14 @@ export const de = {
     'Deflate-Streams neu komprimieren und Bilder über 2480 px verkleinern; schreibt eine Kopie',
   reduceDone: 'Um etwa {pct} % verringert — die Kopie ist gespeichert',
   reduceAlreadySmall: 'Diese Datei ist bereits klein; nichts zu holen',
+  drawMeasure: 'Messen',
+  measureHint: 'Einmal eine bekannte Strecke kalibrieren, dann alles messen',
+  measureScaleTitle: 'Maßstab kalibrieren',
+  measureScalePrompt:
+    'Ziehen Sie eine Linie über eine bekannte Strecke und geben Sie ein, welche reale Länge sie darstellt',
+  measureScaleValue: 'Reale Länge der Linie',
+  measureScaleUnit: 'Einheit',
+  measureScaleApply: 'Kalibrieren',
+  measureCalibrated: 'Maßstab kalibriert ({unit})',
+  measureScaleErr: 'Geben Sie eine positive Länge und eine Einheit mit höchstens 12 Zeichen ein',
 } satisfies Record<keyof typeof zh, string>

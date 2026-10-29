@@ -60,4 +60,13 @@ export const zh = {
   reduceHint: '重新压缩 deflate 流，仅对超过 2480 px 的图片降采样；另存为副本',
   reduceDone: '已减小约 {pct}%，副本已保存',
   reduceAlreadySmall: '文件已经足够小，没有可压缩的空间',
+  drawMeasure: '测量',
+  measureHint: '先标定已知距离，再量任意线段',
+  measureScaleTitle: '标定比例尺',
+  measureScalePrompt: '沿已知真实距离画一条线后，输入这条线代表的实际长度',
+  measureScaleValue: '线长代表的实际长度',
+  measureScaleUnit: '单位',
+  measureScaleApply: '标定',
+  measureCalibrated: '比例尺已标定（{unit}）',
+  measureScaleErr: '请输入正数长度和不超过 12 字符的单位',
 }

@@ -61,4 +61,13 @@ export const he = {
   reduceHint: 'דחיסה מחדש של תזרימי deflate והקטנת תמונות מעל 2480 פיקסלים; כותב עותק',
   reduceDone: 'הגודל הוקטן בכ־{pct}% — העותק נשמר',
   reduceAlreadySmall: 'הקובץ הזה כבר קטן; אין מה למחוץ',
+  drawMeasure: 'מדידה',
+  measureHint: 'כיילו פעם אחת מרחק מוכר ואז מדדו כל קו',
+  measureScaleTitle: 'כיול הסקאלה',
+  measureScalePrompt: 'ציירו קו מעל מרחק שאתם יודעים והזינו את האורך האמיתי שהקו מייצג',
+  measureScaleValue: 'האורך האמיתי של הקו',
+  measureScaleUnit: 'יחידה',
+  measureScaleApply: 'כיול',
+  measureCalibrated: 'הסקאלה כוילה ({unit})',
+  measureScaleErr: 'הזינו אורך חיובי ויחידה של 12 תווים לכל היותר',
 } satisfies Record<keyof typeof zh, string>

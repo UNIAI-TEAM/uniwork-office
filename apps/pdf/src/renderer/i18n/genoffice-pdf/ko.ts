@@ -62,4 +62,14 @@ export const ko = {
   reduceHint: 'deflate 스트림을 다시 압축하고 2480 px를 넘는 이미지를 줄여 사본으로 저장합니다',
   reduceDone: '약 {pct}% 줄였습니다. 사본이 저장되었습니다',
   reduceAlreadySmall: '이 파일은 이미 충분히 작습니다',
+  drawMeasure: '측정',
+  measureHint: '알려진 거리로 기준을 맞추면 어떤 선이든 잴 수 있습니다',
+  measureScaleTitle: '축척 보정',
+  measureScalePrompt:
+    '실제 길이를 아는 거리 위에 선을 그린 뒤, 그 선이 나타내는 실제 길이를 입력하세요',
+  measureScaleValue: '선의 실제 길이',
+  measureScaleUnit: '단위',
+  measureScaleApply: '보정',
+  measureCalibrated: '축척이 보정되었습니다({unit})',
+  measureScaleErr: '양수 길이와 12자 이하 단위를 입력하세요',
 } satisfies Record<keyof typeof zh, string>

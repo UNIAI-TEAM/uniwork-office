@@ -63,4 +63,14 @@ export const hi = {
     'deflate स्ट्रीम दोबारा कंप्रेस करें और 2480 px से बड़ी तस्वीरें छोटी करें; एक प्रति लिखता है',
   reduceDone: 'लगभग {pct}% घटाया गया — प्रति सहेजी गई',
   reduceAlreadySmall: 'यह फ़ाइल पहले से छोटी है; कुछ निचोड़ने को नहीं',
+  drawMeasure: 'मापें',
+  measureHint: 'एक ज्ञात दूरी कैलिब्रेट करें, फिर कुछ भी मापें',
+  measureScaleTitle: 'पैमाना कैलिब्रेट करें',
+  measureScalePrompt:
+    'किसी ज्ञात दूरी पर एक रेखा खींचें और बताएँ कि वह रेखा कितनी वास्तविक लंबाई दर्शाती है',
+  measureScaleValue: 'रेखा की वास्तविक लंबाई',
+  measureScaleUnit: 'इकाई',
+  measureScaleApply: 'कैलिब्रेट करें',
+  measureCalibrated: 'पैमाना कैलिब्रेट हो गया ({unit})',
+  measureScaleErr: 'धनात्मक लंबाई और अधिकतम 12 अक्षरों की इकाई दर्ज करें',
 } satisfies Record<keyof typeof zh, string>

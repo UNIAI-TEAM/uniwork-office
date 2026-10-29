@@ -63,4 +63,14 @@ export const pl = {
     'Ponownie kompresuje strumienie deflate i pomniejsza obrazy powyżej 2480 px; zapisuje kopię',
   reduceDone: 'Zmniejszono o około {pct}% — kopia zapisana',
   reduceAlreadySmall: 'Ten plik jest już mały; nie ma czego ściskać',
+  drawMeasure: 'Mierz',
+  measureHint: 'Skalibruj jedną znaną odległość i mierz dowolny odcinek',
+  measureScaleTitle: 'Kalibracja skali',
+  measureScalePrompt:
+    'Narysuj linię nad znaną odległością i podaj rzeczywistą długość, którą reprezentuje',
+  measureScaleValue: 'Rzeczywista długość linii',
+  measureScaleUnit: 'Jednostka',
+  measureScaleApply: 'Kalibruj',
+  measureCalibrated: 'Skala skalibrowana ({unit})',
+  measureScaleErr: 'Podaj dodatnią długość i jednostkę do 12 znaków',
 } satisfies Record<keyof typeof zh, string>
