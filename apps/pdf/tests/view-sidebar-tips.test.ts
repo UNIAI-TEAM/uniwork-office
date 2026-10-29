@@ -17,6 +17,7 @@ const SIDEBAR_BUTTONS = [
   { sidebar: 'outline', key: 'outline' },
   { sidebar: 'comments', key: 'commentsPanel' },
   { sidebar: 'compare', key: 'compare' },
+  { sidebar: 'attachments', key: 'attachments' },
 ] as const
 
 const source = ts.createSourceFile(

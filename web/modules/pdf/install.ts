@@ -19,6 +19,9 @@
  * |                              |   copy next to it: node:crypto + pdf-lib, desktop only)              |
  * | pdfCompare                   | off (Compare reads both files main-side from disk with pdfium: desktop |
  * |                              |   only; the web stubs answer not-available)                          |
+ * | pdfReduceSize                | off (Reduce file size reads the file on disk and writes a shrunk |
+ * |                              |   copy through the OS save dialog: desktop only; the web stub    |
+ * |                              |   answers not-available)                                         |
  * | redaction                    | off (the desktop redacts into a working copy file next to the PDF); |
  * |                              |   the Redact entry stays with the 'use the app' message             |
  * | saveStatus, viewOnlyChip     | off, from MODULE_WEB_CAPABILITIES (the host header owns the save    |
@@ -58,6 +61,10 @@ export const PDF_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.fr
   certSign: false,
   // Compare reads both documents' text main-side from files on disk (desktop only)
   pdfCompare: false,
+  // Reduce file size reads the file on disk and writes a shrunk copy (desktop only)
+  pdfReduceSize: false,
+  // Attachments panel file dialogs (Add / Export) use main-side OS dialogs (desktop only)
+  pdfAttachmentsWrite: false,
   // redaction writes a working copy next to the file (desktop only)
   redaction: false,
   autoRename: false,

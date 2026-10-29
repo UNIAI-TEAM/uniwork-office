@@ -106,6 +106,8 @@ import {
   splitPdfBytes,
 } from './save-pdf'
 import { readPdfText } from './read-text'
+import { shrinkDocument } from './pdf-shrink'
+import { PDFDocument } from 'pdf-lib'
 import {
   addSignature,
   isSignatureData,
@@ -1322,6 +1324,7 @@ function registerPdfIpc(): void {
         request.rotations?.length ||
         request.deletedPages?.length ||
         request.pageOrder?.length ||
+        Boolean(request.attachments?.add?.length || request.attachments?.remove?.length) ||
         request.metadata ||
         request.outline !== undefined
       ) {
@@ -1684,6 +1687,112 @@ function registerPdfIpc(): void {
       return { ok: false as const, reason: 'pdf: could not read the document' }
     }
   })
+
+  // Reduce File Size: shrink a copy picked through the save dialog; the open
+  // document is untouched
+  ipcMain.handle(PDF_CHANNELS.reduceFileSize, async (e, path: unknown) => {
+    if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {
+      return { ok: false as const, reason: 'pdf: path not granted to this view' }
+    }
+    if (uniworkIsLocked(path)) return { ok: false as const, canceled: true }
+    const parent = BrowserWindow.fromWebContents(e.sender)
+    const base = basename(path).replace(/\.pdf$/i, '')
+    // the file name belongs in defaultPath: `title` only labels the dialog and
+    // leaves the name field empty with no directory
+    const defaultPath = join(dirname(path), `${base}-small.pdf`)
+    const filters = [{ name: tm('filterPdf'), extensions: ['pdf'] }]
+    const picked = parent
+      ? await dialog.showSaveDialog(parent, { defaultPath, filters })
+      : await dialog.showSaveDialog({ defaultPath, filters })
+    if (picked.canceled || !picked.filePath) return { ok: false as const, canceled: true }
+    try {
+      if (isSameRedactionCopyPath(path, picked.filePath)) {
+        return { ok: false as const, canceled: true }
+      }
+      const source = new Uint8Array(await readFile(path))
+      const doc = await PDFDocument.load(source, { updateMetadata: false })
+      const result = shrinkDocument(doc)
+      // Object streams stay on: turning them off expands any file whose
+      // producer used them — bigger output that the toast reported as a
+      // reduction. A run that does not come out smaller writes nothing.
+      const after = await doc.save({ useObjectStreams: true })
+      if (after.length >= source.length) {
+        return {
+          ok: true as const,
+          targetPath: picked.filePath,
+          bytesBefore: source.length,
+          bytesAfter: after.length,
+          streamsRecompressed: result.streamsRecompressed,
+          imagesDownsampled: result.imagesDownsampled,
+        }
+      }
+      await writePdfAtomically(picked.filePath, after)
+      return {
+        ok: true as const,
+        targetPath: picked.filePath,
+        bytesBefore: source.length,
+        bytesAfter: after.length,
+        streamsRecompressed: result.streamsRecompressed,
+        imagesDownsampled: result.imagesDownsampled,
+      }
+    } catch (err) {
+      return { ok: false as const, reason: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Attachments panel: pick a local file to embed (open dialog); the bytes come back base64-encoded
+  ipcMain.handle(PDF_CHANNELS.pickAttachmentFile, async (e) => {
+    if (!allowedByWc.has(e.sender.id)) {
+      return { ok: false as const, reason: 'pdf: sender is not a registered PDF view' }
+    }
+    const parent = BrowserWindow.fromWebContents(e.sender)
+    const picked = await showOpenDialogWithMemory(dialog, parent ?? undefined, {
+      properties: ['openFile'],
+    })
+    if (picked.canceled || !picked.filePaths[0]) return { ok: false as const, canceled: true }
+    try {
+      const filePath = picked.filePaths[0]
+      const info = await stat(filePath)
+      if (info.size > 50 * 1024 * 1024) {
+        return { ok: false as const, reason: 'pdf: attachment exceeds 50 MB' }
+      }
+      const bytes = await readFile(filePath)
+      return {
+        ok: true as const,
+        name: basename(filePath),
+        bytesBase64: bytes.toString('base64'),
+        size: bytes.length,
+      }
+    } catch (err) {
+      return { ok: false as const, reason: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Attachments panel: save one embedded file to a user-chosen path (save dialog)
+  ipcMain.handle(
+    PDF_CHANNELS.exportAttachment,
+    async (e, request: { name: string; bytesBase64: string }) => {
+      if (!allowedByWc.has(e.sender.id)) {
+        return { ok: false as const, reason: 'pdf: sender is not a registered PDF view' }
+      }
+      if (typeof request?.name !== 'string' || typeof request?.bytesBase64 !== 'string') {
+        return { ok: false as const, reason: 'pdf: malformed export request' }
+      }
+      const parent = BrowserWindow.fromWebContents(e.sender)
+      const defaultPath = basename(request.name || 'attachment')
+      const picked = parent
+        ? await dialog.showSaveDialog(parent, { defaultPath })
+        : await dialog.showSaveDialog({ defaultPath })
+      if (picked.canceled || !picked.filePath) return { ok: false as const, canceled: true }
+      try {
+        const bytes = Buffer.from(request.bytesBase64, 'base64')
+        await writeFile(picked.filePath, bytes)
+        return { ok: true as const, path: picked.filePath }
+      } catch (err) {
+        return { ok: false as const, reason: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
 
   ipcMain.handle(
     PDF_CHANNELS.insertBlankPage,
