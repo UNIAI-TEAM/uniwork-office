@@ -1324,6 +1324,7 @@ function registerPdfIpc(): void {
         request.rotations?.length ||
         request.deletedPages?.length ||
         request.pageOrder?.length ||
+        Boolean(request.attachments?.add?.length || request.attachments?.remove?.length) ||
         request.metadata ||
         request.outline !== undefined
       ) {
@@ -1736,6 +1737,51 @@ function registerPdfIpc(): void {
       return { ok: false as const, reason: err instanceof Error ? err.message : String(err) }
     }
   })
+
+  // Attachments panel: pick a local file to embed (open dialog); the bytes come back base64-encoded
+  ipcMain.handle(PDF_CHANNELS.pickAttachmentFile, async (e) => {
+    const parent = BrowserWindow.fromWebContents(e.sender)
+    const picked = await showOpenDialogWithMemory(dialog, parent ?? undefined, {
+      properties: ['openFile'],
+    })
+    if (picked.canceled || !picked.filePaths[0]) return { ok: false as const, canceled: true }
+    try {
+      const filePath = picked.filePaths[0]
+      const info = await stat(filePath)
+      if (info.size > 50 * 1024 * 1024) {
+        return { ok: false as const, reason: 'pdf: attachment exceeds 50 MB' }
+      }
+      const bytes = await readFile(filePath)
+      return {
+        ok: true as const,
+        name: basename(filePath),
+        bytesBase64: bytes.toString('base64'),
+        size: bytes.length,
+      }
+    } catch (err) {
+      return { ok: false as const, reason: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Attachments panel: save one embedded file to a user-chosen path (save dialog)
+  ipcMain.handle(
+    PDF_CHANNELS.exportAttachment,
+    async (e, request: { name: string; bytesBase64: string }) => {
+      const parent = BrowserWindow.fromWebContents(e.sender)
+      const defaultPath = basename(String(request?.name || 'attachment'))
+      const picked = parent
+        ? await dialog.showSaveDialog(parent, { defaultPath })
+        : await dialog.showSaveDialog({ defaultPath })
+      if (picked.canceled || !picked.filePath) return { ok: false as const, canceled: true }
+      try {
+        const bytes = Buffer.from(String(request?.bytesBase64 || ''), 'base64')
+        await writeFile(picked.filePath, bytes)
+        return { ok: true as const, path: picked.filePath }
+      } catch (err) {
+        return { ok: false as const, reason: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
 
   ipcMain.handle(
     PDF_CHANNELS.insertBlankPage,

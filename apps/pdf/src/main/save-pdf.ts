@@ -17,6 +17,7 @@ import {
 import type { PDFPage } from 'pdf-lib'
 import { VISUAL_SIGNATURE_CONTENT_PREFIX } from '../shared/ipc'
 import { markupLineRotation } from '../shared/markup-line'
+import { applyAttachments } from './pdf-attachments'
 import type {
   DrawingInput,
   OutlineEntryInput,
@@ -1440,6 +1441,7 @@ export async function applySaveRequest(
         PDFHexString.fromText(JSON.stringify(staticFormFills)),
       )
   }
+  if (request.attachments) applyAttachments(pdfDoc, request.attachments)
   try {
     let saved = await pdfDoc.save({ useObjectStreams: false })
     // Redaction is the final serializer. EmbedPDF's full SaveAsCopy writes only the

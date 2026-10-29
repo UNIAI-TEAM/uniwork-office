@@ -63,6 +63,8 @@ export const PDF_WEB_CAPABILITIES: Readonly<Record<string, unknown>> = Object.fr
   pdfCompare: false,
   // Reduce file size reads the file on disk and writes a shrunk copy (desktop only)
   pdfReduceSize: false,
+  // Attachments panel file dialogs (Add / Export) use main-side OS dialogs (desktop only)
+  pdfAttachmentsWrite: false,
   // redaction writes a working copy next to the file (desktop only)
   redaction: false,
   autoRename: false,

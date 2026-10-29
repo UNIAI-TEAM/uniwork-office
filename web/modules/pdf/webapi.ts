@@ -1190,6 +1190,9 @@ export function createPdfWebApi(port: ModuleBridgePort, deps: PdfWebDeps) {
     compareReadOpen: async () => ({ ok: false, reason: NOT_AVAILABLE }),
     // Reduce file size is desktop-only (the `pdfReduceSize` capability hides the button): typed not-available answer
     reduceFileSize: async () => ({ ok: false, reason: NOT_AVAILABLE }),
+    // Attachment file dialogs (Add / Export) are desktop-only (`pdfAttachmentsWrite` capability): typed not-available answers
+    pickAttachmentFile: async () => ({ ok: false, reason: NOT_AVAILABLE }),
+    exportAttachment: async () => ({ ok: false, reason: NOT_AVAILABLE }),
     // the host's file.renamed only renames: the web document id (its "path") never changes
     onFileRenamed: () => () => {},
     aiStream: ai.aiStream,

@@ -30,6 +30,8 @@ export const PDF_CHANNELS = {
   compareReadPdf: 'pdf:compare-read-pdf',
   compareReadOpen: 'pdf:compare-read-open',
   reduceFileSize: 'pdf:reduce-file-size',
+  pickAttachmentFile: 'pdf:pick-attachment-file',
+  exportAttachment: 'pdf:export-attachment',
   insertBlankPage: 'pdf:insert-blank-page',
   splitPdf: 'pdf:split-pdf',
   mergePdf: 'pdf:merge-pdf',
@@ -722,6 +724,8 @@ export interface SavePdfRequest {
   outline?: OutlineEntryInput[]
   /** Who asked: explicit Save (`user`), autosave (`auto`) or an app-internal flush
       (`internal`). Absent behaves as before (Save As never sets it). */
+  /** Add or remove embedded files (/Names → /EmbeddedFiles) on this save */
+  attachments?: PdfAttachmentOps
   origin?: 'user' | 'auto' | 'internal'
 }
 
@@ -736,6 +740,23 @@ export interface OutlineEntryInput {
 }
 
 /** UniWork document state of the open file: bound working copy and/or view only */
+
+/** One embedded file added to /Names → /EmbeddedFiles on save */
+export interface PdfAttachmentAdd {
+  /** Display and file name (both /UF and /F in the Filespec) */
+  name: string
+  /** Raw file bytes, base64-encoded — same IPC shape as image stamps */
+  bytesBase64: string
+  description?: string
+}
+
+/** Changes to the document's embedded-files name tree applied on save */
+export interface PdfAttachmentOps {
+  /** Names of existing attachments to remove before adding */
+  remove?: string[]
+  /** Files to embed; a name that survives removal is an error */
+  add?: PdfAttachmentAdd[]
+}
 /**
  * What main asks the renderer to save on closeSaveRequest. `user`: the close
  * prompt's Save or the menu Save. `internal`: an app-driven flush before an
@@ -1027,6 +1048,19 @@ export interface PdfApi {
       }
     | { ok: false; canceled: true }
     | { ok: false; reason: string }
+  >
+  /** Pick a local file to attach to the PDF; bytes come back base64-encoded */
+  pickAttachmentFile(): Promise<
+    | { ok: true; name: string; bytesBase64: string; size: number }
+    | { ok: false; canceled: true }
+    | { ok: false; reason: string }
+  >
+  /** Save one embedded attachment's bytes to a user-chosen path */
+  exportAttachment(request: {
+    name: string
+    bytesBase64: string
+  }): Promise<
+    { ok: true; path: string } | { ok: false; canceled: true } | { ok: false; reason: string }
   >
   insertBlankPage(request: InsertBlankPageRequest): Promise<InsertBlankPageResult>
   splitPdf(request: SplitPdfRequest): Promise<SplitPdfResult>

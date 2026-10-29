@@ -19,6 +19,8 @@ export function hasPendingSaveEdits(request: SavePdfRequest): boolean {
     request.pageOrder?.length ||
     request.metadata ||
     // an empty tree is a deliberate "no bookmarks", which is still a write
-    request.outline !== undefined
+    request.outline !== undefined ||
+    request.attachments?.add?.length ||
+    request.attachments?.remove?.length
   )
 }

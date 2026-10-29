@@ -111,6 +111,7 @@ import {
   type CompareResult,
   type PageText,
 } from './compare-text'
+import { AttachmentsPanel, type AttachmentRow } from './AttachmentsPanel'
 import type { OutlineNode } from './OutlinePanel'
 import {
   buildHeadingOutline,
@@ -211,6 +212,7 @@ import type {
   NoteEditInput,
   OutlineEntryInput,
   PageImageRef,
+  PdfAttachmentAdd,
   PdfConvertFormat,
   PdfSignatureInfo,
   SavePdfRequest,
@@ -420,9 +422,9 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
   // a narrow pane (a phone-width frame) keeps its width for the page: the strip is one tap away
-  const [sidebar, setSidebar] = useState<'thumbs' | 'outline' | 'comments' | 'compare' | null>(
-    () => (narrowPane(window.innerWidth) ? null : 'thumbs'),
-  )
+  const [sidebar, setSidebar] = useState<
+    'thumbs' | 'outline' | 'comments' | 'compare' | 'attachments' | null
+  >(() => (narrowPane(window.innerWidth) ? null : 'thumbs'))
   const [compareResult, setCompareResult] = useState<CompareResult | null>(null)
   const [compareName, setCompareName] = useState<string | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
@@ -964,6 +966,16 @@ export default function App() {
   } | null>(null)
   /** Ask-AI popover opened from the markup bar; the anchor rect is captured at open */
   const [askPop, setAskPop] = useState<{ rect: AskAnchorRect; excerpt: string } | null>(null)
+  /** Embedded files currently in the document on disk (from pdf.js's getAttachments) */
+  const [savedAttachments, setSavedAttachments] = useState<{ name: string; bytes: Uint8Array }[]>(
+    [],
+  )
+  /** Attachments added in this session, written by the next save */
+  const [addedAttachments, setAddedAttachments] = useState<
+    (PdfAttachmentAdd & { byteLength: number })[]
+  >([])
+  /** Names of saved attachments marked for removal on the next save */
+  const [removedAttachments, setRemovedAttachments] = useState<Set<string>>(() => new Set())
   /** Whole-document saved-annotation counts per original page for the AI context.
       The scan starts on first AI use, not when the document opens. */
   const [aiAnnotCounts, setAiAnnotCounts] = useState<SavedAnnotCounts | null>(null)
@@ -1300,6 +1312,29 @@ export default function App() {
       } catch {
         setSavedStaticFormFills([])
       }
+      try {
+        const raw = (await loaded.getAttachments()) as Map<
+          string,
+          { filename?: string; content?: Uint8Array }
+        > | null
+        const list: { name: string; bytes: Uint8Array }[] = []
+        if (raw) {
+          for (const [id, entry] of raw) {
+            // id is the name-tree key (what applyAttachments keys on); pdf.js's
+            // getAttachmentContent takes that id, not /UF
+            const docWithAttachments: {
+              getAttachmentContent(key: string): Promise<Uint8Array | null>
+            } = loaded as unknown as {
+              getAttachmentContent(key: string): Promise<Uint8Array | null>
+            }
+            const content = entry.content ?? (await docWithAttachments.getAttachmentContent(id))
+            if (content) list.push({ name: id, bytes: new Uint8Array(content) })
+          }
+        }
+        setSavedAttachments(list)
+      } catch {
+        setSavedAttachments([])
+      }
       setSizes(all)
       setPageOrigins(origins)
       setPageUserUnits(userUnits)
@@ -1358,6 +1393,8 @@ export default function App() {
           order: () => setOrder(null),
           metadata: () => setMetadata(null),
         })
+        setAddedAttachments([])
+        setRemovedAttachments(new Set())
       } else {
         // Post-save reload: subtract exactly what the save wrote. Edits made while the
         // write was in flight stay pending, with page indices remapped through the
@@ -1507,6 +1544,9 @@ export default function App() {
           })
           return mapped.every((n, i) => n === i) ? null : mapped
         })
+        // the save wrote the pending attachment ops; the reloaded file reflects them
+        setAddedAttachments([])
+        setRemovedAttachments(new Set())
       }
       setFileSize(data.byteLength)
       setSelected(null)
@@ -2129,7 +2169,9 @@ export default function App() {
     order !== null ||
     metadata !== null ||
     recovered ||
-    (pendingOutline?.edited ?? false)
+    (pendingOutline?.edited ?? false) ||
+    addedAttachments.length > 0 ||
+    removedAttachments.size > 0
   // The pending OCR bake deliberately stays out of dirty: a scan the user only
   // opened to read must not show the modified marker, prompt on close or feed
   // the save-in-flight plumbing. The bake still rides the save request
@@ -3948,6 +3990,65 @@ export default function App() {
     }
   }
 
+  const attachmentRows = useMemo((): AttachmentRow[] => {
+    const rows: AttachmentRow[] = savedAttachments.map((a) => ({
+      name: a.name,
+      bytes: a.bytes.byteLength,
+      saved: true,
+      ...(removedAttachments.has(a.name) ? { removing: true } : {}),
+    }))
+    for (const a of addedAttachments) {
+      rows.push({ name: a.name, bytes: a.byteLength, saved: false })
+    }
+    return rows
+  }, [savedAttachments, addedAttachments, removedAttachments])
+
+  const addAttachmentFromDisk = async (): Promise<void> => {
+    const picked = await window.pdfApi.pickAttachmentFile()
+    if (!picked.ok) {
+      if (!('canceled' in picked)) showNotice(picked.reason)
+      return
+    }
+    const occupied = new Set(
+      savedAttachments.filter((a) => !removedAttachments.has(a.name)).map((a) => a.name),
+    )
+    for (const a of addedAttachments) occupied.add(a.name)
+    if (occupied.has(picked.name)) {
+      showNotice(t('attachmentsDuplicate', { name: picked.name }))
+      return
+    }
+    setAddedAttachments((prev) => [
+      ...prev,
+      { name: picked.name, bytesBase64: picked.bytesBase64, byteLength: picked.size },
+    ])
+  }
+
+  const exportAttachmentToDisk = async (row: AttachmentRow): Promise<void> => {
+    const saved = savedAttachments.find((a) => a.name === row.name)
+    if (!saved) return
+    let bin = ''
+    for (let i = 0; i < saved.bytes.length; i++) bin += String.fromCharCode(saved.bytes[i]!)
+    const res = await window.pdfApi.exportAttachment({ name: saved.name, bytesBase64: btoa(bin) })
+    if (!res.ok) {
+      if (!('canceled' in res)) showNotice(res.reason)
+      return
+    }
+    showNotice(t('attachmentsExported'))
+  }
+
+  const toggleAttachmentRemove = (row: AttachmentRow): void => {
+    if (!row.saved) {
+      setAddedAttachments((prev) => prev.filter((a) => a.name !== row.name))
+      return
+    }
+    setRemovedAttachments((prev) => {
+      const next = new Set(prev)
+      if (next.has(row.name)) next.delete(row.name)
+      else next.add(row.name)
+      return next
+    })
+  }
+
   /** Show a transient toast; the save-failure badge alone hides the actual reason */
   const showNotice = (msg: string) => {
     if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
@@ -4071,6 +4172,22 @@ export default function App() {
     ...(order ? { pageOrder: visList } : {}),
     ...(metadata ? { metadata } : {}),
     ...(pendingOutline?.edited && pendingOutline.tree ? { outline: pendingOutline.tree } : {}),
+    ...(addedAttachments.length > 0 || removedAttachments.size > 0
+      ? {
+          attachments: {
+            ...(removedAttachments.size > 0 ? { remove: [...removedAttachments] } : {}),
+            ...(addedAttachments.length > 0
+              ? {
+                  add: addedAttachments.map(({ name, bytesBase64, description }) => ({
+                    name,
+                    bytesBase64,
+                    ...(description ? { description } : {}),
+                  })),
+                }
+              : {}),
+          },
+        }
+      : {}),
   })
 
   // Web draft recovery: what a Save would send right now, open editor boxes included (A6). It
@@ -4449,7 +4566,9 @@ export default function App() {
       deleted.size > 0 ||
       order !== null ||
       metadata !== null ||
-      (pendingOutline?.edited ?? false)
+      (pendingOutline?.edited ?? false) ||
+      addedAttachments.length > 0 ||
+      removedAttachments.size > 0
     if (otherPending) {
       showNotice(t('redactSaveFirst'))
       return
@@ -7477,6 +7596,31 @@ export default function App() {
             <span>{t('compare')}</span>
           </button>
         )}
+        {cap('pdfAttachmentsWrite') && (
+          <button
+            className={`rb-big${sidebar === 'attachments' ? ' active' : ''}`}
+            data-tip={t('attachments')}
+            disabled={status !== 'ready'}
+            onClick={() => setSidebar((v) => (v === 'attachments' ? null : 'attachments'))}
+          >
+            <span className="rb-big-icon">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+            </span>
+            <span>{t('attachments')}</span>
+          </button>
+        )}
         {searchBtn}
         <button
           className={`rb-big${spread === 2 ? ' active' : ''}`}
@@ -8624,6 +8768,28 @@ export default function App() {
                     setCompareResult(null)
                   }}
                   onGoToPage={(pageNo) => scrollToPage(pageNo)}
+                />
+              </div>
+            )}
+            {sidebar === 'attachments' && (
+              <div className="pdf-thumbs" style={{ width: sidebarW }}>
+                <div className="pdf-outline-header">
+                  <span>{t('attachments')}</span>
+                  <button
+                    type="button"
+                    className="rb-icon"
+                    aria-label={t('aiCollapsePanel')}
+                    onClick={() => setSidebar(null)}
+                  >
+                    ×
+                  </button>
+                </div>
+                <AttachmentsPanel
+                  t={t}
+                  rows={attachmentRows}
+                  onAdd={() => void addAttachmentFromDisk()}
+                  onExport={(row) => void exportAttachmentToDisk(row)}
+                  onToggleRemove={toggleAttachmentRemove}
                 />
               </div>
             )}
