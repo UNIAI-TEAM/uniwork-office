@@ -1,7 +1,7 @@
 import { HOME_CHANNELS } from '../shared/home-api'
 import type { LaunchPushTarget } from './uniwork-docs/launch'
 
-export type SettingsSection = 'general' | 'aiModel'
+export type SettingsSection = 'general' | 'aiModel' | 'skills'
 
 export interface ShellSettingsWindow {
   isDestroyed(): boolean

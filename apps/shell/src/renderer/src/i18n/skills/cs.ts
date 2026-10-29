@@ -1,0 +1,32 @@
+import type { zh } from './zh'
+
+export const cs = {
+  setSecSkills: 'Dovednosti',
+  intgSkillsDesc:
+    'UniWork Office používá pouze dovednosti ze své vlastní složky. Import složky nebo zipu zkopíruje celou dovednost; při importu se nic nespouští.',
+  intgSkillsEmpty: 'Zatím nejsou nainstalovány žádné dovednosti.',
+  intgSkillsImportFolder: 'Importovat složku…',
+  intgSkillsImportZip: 'Importovat balíček dovednosti (zip / .md)…',
+  intgSkillsImportFolderTitle: 'Vyberte složku dovednosti',
+  intgSkillsImportZipTitle: 'Vyberte zip nebo .md dovednosti',
+  intgSkillsImportDone: 'Importováno: {name}',
+  intgSkillsImportFailed: 'Import se nezdařil: {reason}',
+  intgSkillsRemove: 'Odebrat',
+  intgSkillsRemoveConfirm: 'Odebrat dovednost „{name}“? Její složka bude z UniWork Office smazána.',
+  intgSkillsRemoved: '{name} odebrána',
+  intgSkillsRead: 'Podrobnosti',
+  intgSkillsMine: 'Moje dovednosti',
+  intgSkillsRecommended: 'Doporučené',
+  intgSkillsCatOffice: 'Kancelář',
+  intgSkillsCatBusiness: 'Byznys',
+  intgSkillsCatData: 'Data',
+  intgSkillsCatFinance: 'Finance',
+  intgSkillsCatHr: 'HR',
+  intgSkillsCatLegal: 'Právo',
+  intgSkillsCatMarketing: 'Marketing',
+  intgSkillsCatEducation: 'Vzdělávání',
+  intgSkillsCatOther: 'Ostatní',
+  intgSkillsInstall: 'Nainstalovat',
+  intgSkillsUpdate: 'Aktualizovat',
+  intgSkillsInstalledTag: 'Nainstalováno',
+} satisfies Record<keyof typeof zh, string>

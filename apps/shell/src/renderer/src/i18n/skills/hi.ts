@@ -1,0 +1,32 @@
+import type { zh } from './zh'
+
+export const hi = {
+  setSecSkills: 'कौशल',
+  intgSkillsDesc:
+    'UniWork Office केवल अपने कौशल फ़ोल्डर के कौशल उपयोग करता है। फ़ोल्डर या zip से आयात पूरा कौशल कॉपी करता है; आयात पर कुछ नहीं चलता।',
+  intgSkillsEmpty: 'अभी कोई कौशल इंस्टॉल नहीं है।',
+  intgSkillsImportFolder: 'फ़ोल्डर आयात करें…',
+  intgSkillsImportZip: 'कौशल पैकेज आयात करें (zip / .md)…',
+  intgSkillsImportFolderTitle: 'कौशल फ़ोल्डर चुनें',
+  intgSkillsImportZipTitle: 'कौशल zip या .md चुनें',
+  intgSkillsImportDone: '{name} आयात हुआ',
+  intgSkillsImportFailed: 'आयात विफल: {reason}',
+  intgSkillsRemove: 'हटाएँ',
+  intgSkillsRemoveConfirm: 'कौशल "{name}" हटाएँ? इसका फ़ोल्डर UniWork Office से हटा दिया जाएगा।',
+  intgSkillsRemoved: '{name} हटाया गया',
+  intgSkillsRead: 'विवरण',
+  intgSkillsMine: 'मेरे कौशल',
+  intgSkillsRecommended: 'अनुशंसित',
+  intgSkillsCatOffice: 'ऑफ़िस',
+  intgSkillsCatBusiness: 'व्यवसाय',
+  intgSkillsCatData: 'डेटा',
+  intgSkillsCatFinance: 'वित्त',
+  intgSkillsCatHr: 'मानव संसाधन',
+  intgSkillsCatLegal: 'कानूनी',
+  intgSkillsCatMarketing: 'मार्केटिंग',
+  intgSkillsCatEducation: 'शिक्षा',
+  intgSkillsCatOther: 'अन्य',
+  intgSkillsInstall: 'इंस्टॉल करें',
+  intgSkillsUpdate: 'अपडेट करें',
+  intgSkillsInstalledTag: 'इंस्टॉल है',
+} satisfies Record<keyof typeof zh, string>
