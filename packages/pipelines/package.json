@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./slides": "./src/slides/index.ts",
-    "./slides/layout-audit": "./src/slides/layout-audit.ts"
+    "./slides/layout-audit": "./src/slides/layout-audit.ts",
+    "./slides/page-spec": "./src/slides/page-spec.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

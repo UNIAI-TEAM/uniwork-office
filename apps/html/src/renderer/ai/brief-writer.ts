@@ -1,4 +1,10 @@
-import { streamText, type AgentMessage, type AgentTransport } from '@genoffice/agent-core'
+import {
+  streamText,
+  writerInput,
+  type AgentMessage,
+  type AgentTransport,
+  type WriterCall,
+} from '@genoffice/agent-core'
 import type { PlanMode } from './tools'
 
 /**
@@ -83,17 +89,29 @@ export function buildBriefWriterRequest(
   spec: BriefPlanSpec,
   messages: readonly AgentMessage[],
   langDirective: string,
-): { system: string; user: string } {
+): { system: string; user: string; writer: WriterCall } {
   const notes = spec.notes?.trim()
     ? `\n\n## Notes from the assistant\n${clip(spec.notes, NOTES_CAP)}`
     : ''
+  const withPage = spec.mode === 'restyle' || spec.mode === 'extract'
   const page =
-    spec.page?.trim() && (spec.mode === 'restyle' || spec.mode === 'extract')
+    spec.page?.trim() && withPage
       ? `\n\n## Current page (head and start of body)\n${clip(spec.page, PAGE_CAP)}`
       : ''
+  const transcript = transcriptOf(messages)
   return {
     system: SYSTEM + langDirective,
-    user: `## Conversation\n${transcriptOf(messages)}\n\n## Task\n${MODE_TASK[spec.mode]}${notes}${page}\n\nWrite the brief JSON now.`,
+    user: `## Conversation\n${transcript}\n\n## Task\n${MODE_TASK[spec.mode]}${notes}${page}\n\nWrite the brief JSON now.`,
+    // UniWork AI: the same inputs, cut at the server's field caps (the newest turns kept)
+    writer: {
+      kind: 'html.brief',
+      input: writerInput({
+        mode: spec.mode,
+        transcript: transcript.slice(-TRANSCRIPT_CAP),
+        notes: spec.notes?.slice(0, NOTES_CAP),
+        page_head: withPage ? spec.page?.slice(0, PAGE_CAP) : undefined,
+      }),
+    },
   }
 }
 
@@ -124,6 +142,8 @@ export interface StreamBriefOptions {
   system: string
   user: string
   signal?: AbortSignal
+  /** the request as a UniWork AI writer (buildBriefWriterRequest) */
+  writer?: WriterCall
 }
 
 /** One tool-less streaming request; resolves with the parsed brief or the reason it failed. */
@@ -133,6 +153,7 @@ export async function streamBrief(opts: StreamBriefOptions): Promise<BriefPlanRe
     system: opts.system,
     user: opts.user,
     signal: opts.signal,
+    writer: opts.writer,
     maxChars: BRIEF_MAX_CHARS,
     extract: extractBriefJson,
   })

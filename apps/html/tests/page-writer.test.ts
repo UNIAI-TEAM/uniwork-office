@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentStreamCallbacks, AgentTransport } from '@genoffice/agent-core'
+import type {
+  AgentStreamCallbacks,
+  AgentStreamRequest,
+  AgentTransport,
+} from '@genoffice/agent-core'
 import {
   buildPageWriterRequest,
   extractPageHtml,
@@ -74,6 +78,69 @@ describe('buildPageWriterRequest', () => {
     expect(system).toContain('single-column')
     expect(user).toContain('Title: Guide')
     expect(user).toContain('steps')
+  })
+  it('names the UniWork AI writer of each mode with the input of the server table', () => {
+    const design = buildPageWriterRequest(
+      {
+        kind: 'design',
+        brief: {
+          core_hook: 'Hook',
+          style: { tone: 'bold', palette: {}, typography: {} },
+          alternatives: [{ tone: 'soft', palette: {}, typography: {} }],
+          sections: [],
+          version: 1,
+        },
+        instruction: 'make a landing page',
+        context: 'founded 1999',
+      },
+      '',
+    )
+    expect(design.writer.kind).toBe('html.page')
+    expect(design.writer.input).toEqual({
+      mode: 'design',
+      brief: expect.stringContaining('"core_hook": "Hook"'),
+      context: 'founded 1999',
+      instruction: 'make a landing page',
+    })
+    expect(design.writer.input.brief).not.toContain('soft')
+    expect(design.system).toContain('--brief-primary')
+    const content = buildPageWriterRequest(
+      { kind: 'content', title: 'Guide', plan: 's'.repeat(5000), instruction: '' },
+      '',
+    )
+    expect(content.writer).toEqual({
+      kind: 'html.page',
+      input: { mode: 'content', plan: 's'.repeat(4000), title: 'Guide' },
+    })
+    expect(content.user).toContain('Title: Guide')
+  })
+})
+
+describe('streamPage writer', () => {
+  it('sends the writer with the BYOK prompt', async () => {
+    const requests: AgentStreamRequest[] = []
+    const writer = { kind: 'html.page' as const, input: { mode: 'content', plan: 'p' } }
+    await streamPage({
+      transport: {
+        stream: (req, cb) => {
+          requests.push(req)
+          queueMicrotask(() => {
+            cb.onDelta(PAGE)
+            cb.onDone()
+          })
+          return { cancel: () => undefined }
+        },
+      },
+      system: 's',
+      user: 'u',
+      writer,
+    })
+    expect(requests[0]).toMatchObject({
+      system: 's',
+      messages: [{ role: 'user', text: 'u' }],
+      purpose: 'one-shot',
+      writer,
+    })
   })
 })
 

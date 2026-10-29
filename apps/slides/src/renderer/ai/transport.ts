@@ -1,11 +1,11 @@
-import { createIpcTransport, type AgentTransport } from '@genoffice/agent-core'
+import { createIpcTransport, type IpcTransport } from '@genoffice/agent-core'
 import type { AiSettings } from '../../shared/ipc'
 import { aiUniworkText, type AiUniworkStringKey } from '@genoffice/ui'
 import { uniworkErrorKey } from '@genoffice/ai-provider/browser'
 import { getLang, t } from '../i18n/locale'
 
 /** The shared IPC transport wired to the slides preload bridge (window.slidesApi). */
-export function createElectronTransport(getSettings: () => AiSettings): AgentTransport {
+export function createElectronTransport(getSettings: () => AiSettings): IpcTransport {
   return createIpcTransport<AiSettings>({
     onStream: (listener) => window.slidesApi.onAiStream(listener),
     start: (request) => window.slidesApi.aiStream(request),
