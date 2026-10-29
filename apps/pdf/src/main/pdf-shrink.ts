@@ -86,11 +86,15 @@ function asInt(value: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
-function decodeFlate(contents: Uint8Array, dict: PDFDict): Uint8Array | null {
+// A hostile stream can inflate to gigabytes in the shell main process; past the
+// cap the stream is left untouched (the throw lands in the catch below).
+const DEFAULT_MAX_INFLATE = 256 * 1024 * 1024
+
+function decodeFlate(contents: Uint8Array, dict: PDFDict, maxInflate: number): Uint8Array | null {
   // /DecodeParms (predictors) change byte semantics — those streams stay as they are
   if (dict.get(PDFName.of('DecodeParms')) !== undefined) return null
   try {
-    return new Uint8Array(inflateSync(Buffer.from(contents)))
+    return new Uint8Array(inflateSync(Buffer.from(contents), { maxOutputLength: maxInflate }))
   } catch {
     return null
   }
@@ -119,6 +123,7 @@ function channelCount(name: PDFName | undefined): 1 | 3 | 4 | 0 {
 export function shrinkDocument(
   doc: PDFDocument,
   maxDimension = DEFAULT_MAX_DIMENSION,
+  maxInflate = DEFAULT_MAX_INFLATE,
 ): ShrinkResult {
   let streamsRecompressed = 0
   let imagesDownsampled = 0
@@ -161,7 +166,7 @@ export function shrinkDocument(
       }
       const base = baseOfMask.get(refKey(ref))
       if (base && !pairShrinksToo(base, cand)) continue
-      const decoded = decodeFlate(obj.contents, dict)
+      const decoded = decodeFlate(obj.contents, dict, maxInflate)
       if (!decoded || decoded.length < cand.width * cand.height * cand.channels) continue
       const scale = maxDimension / Math.max(cand.width, cand.height)
       const newWidth = Math.max(1, Math.floor(cand.width * scale))
@@ -190,7 +195,7 @@ export function shrinkDocument(
     }
 
     if (filter === '/FlateDecode') {
-      const decoded = decodeFlate(obj.contents, dict)
+      const decoded = decodeFlate(obj.contents, dict, maxInflate)
       if (!decoded) continue
       const packed = deflateSync(decoded, { level: 9 })
       if (packed.length >= obj.contents.length) continue

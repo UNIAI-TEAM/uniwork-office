@@ -33,6 +33,24 @@ describe('shrinkDocument', () => {
     expect(after.length).toBeLessThan(before)
   })
 
+  it('leaves a stream whose inflated size exceeds the cap byte-identical', async () => {
+    const doc = await PDFDocument.create()
+    doc.addPage([200, 200])
+    const weak = deflateSync(Buffer.from('repeated content '.repeat(500)), { level: 1 })
+    const ref = doc.context.nextRef()
+    doc.context.assign(
+      ref,
+      PDFRawStream.of(
+        doc.context.obj({ Length: weak.length, Filter: 'FlateDecode' }),
+        new Uint8Array(weak),
+      ),
+    )
+    const result = shrinkDocument(doc, 2480, 1024)
+    expect(result.streamsRecompressed).toBe(0)
+    const kept = doc.context.lookup(ref) as PDFRawStream
+    expect(Buffer.from(kept.contents).equals(weak)).toBe(true)
+  })
+
   it('downsamples an oversized Flate image and rewrites its dimensions', async () => {
     const doc = await PDFDocument.create()
     doc.addPage([300, 300])

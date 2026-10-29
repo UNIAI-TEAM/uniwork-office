@@ -5752,7 +5752,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 0.78em;
-  background: var(--surface-alt);
+  background: var(--pdf-prop-bg);
   color: var(--text-secondary);
 }
 

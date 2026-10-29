@@ -1704,9 +1704,11 @@ function registerPdfIpc(): void {
     const picked = parent
       ? await dialog.showSaveDialog(parent, { defaultPath, filters })
       : await dialog.showSaveDialog({ defaultPath, filters })
-    if (picked.canceled || !picked.filePath || isSameRedactionCopyPath(path, picked.filePath))
-      return { ok: false as const, canceled: true }
+    if (picked.canceled || !picked.filePath) return { ok: false as const, canceled: true }
     try {
+      if (isSameRedactionCopyPath(path, picked.filePath)) {
+        return { ok: false as const, canceled: true }
+      }
       const source = new Uint8Array(await readFile(path))
       const doc = await PDFDocument.load(source, { updateMetadata: false })
       const result = shrinkDocument(doc)
@@ -1740,6 +1742,9 @@ function registerPdfIpc(): void {
 
   // Attachments panel: pick a local file to embed (open dialog); the bytes come back base64-encoded
   ipcMain.handle(PDF_CHANNELS.pickAttachmentFile, async (e) => {
+    if (!allowedByWc.has(e.sender.id)) {
+      return { ok: false as const, reason: 'pdf: sender is not a registered PDF view' }
+    }
     const parent = BrowserWindow.fromWebContents(e.sender)
     const picked = await showOpenDialogWithMemory(dialog, parent ?? undefined, {
       properties: ['openFile'],
@@ -1767,14 +1772,20 @@ function registerPdfIpc(): void {
   ipcMain.handle(
     PDF_CHANNELS.exportAttachment,
     async (e, request: { name: string; bytesBase64: string }) => {
+      if (!allowedByWc.has(e.sender.id)) {
+        return { ok: false as const, reason: 'pdf: sender is not a registered PDF view' }
+      }
+      if (typeof request?.name !== 'string' || typeof request?.bytesBase64 !== 'string') {
+        return { ok: false as const, reason: 'pdf: malformed export request' }
+      }
       const parent = BrowserWindow.fromWebContents(e.sender)
-      const defaultPath = basename(String(request?.name || 'attachment'))
+      const defaultPath = basename(request.name || 'attachment')
       const picked = parent
         ? await dialog.showSaveDialog(parent, { defaultPath })
         : await dialog.showSaveDialog({ defaultPath })
       if (picked.canceled || !picked.filePath) return { ok: false as const, canceled: true }
       try {
-        const bytes = Buffer.from(String(request?.bytesBase64 || ''), 'base64')
+        const bytes = Buffer.from(request.bytesBase64, 'base64')
         await writeFile(picked.filePath, bytes)
         return { ok: true as const, path: picked.filePath }
       } catch (err) {
