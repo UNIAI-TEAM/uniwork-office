@@ -11,7 +11,7 @@
  *   ./ai       aiStream / webSearch / imageSearch / aiGenerateImage /
  *              getAiSettings / aiChat / fetchImage stubs (AI hidden).
  * The merged object then gets the web AI bridge (web/modules/shared/ai,
- * CONTRACT C16): while the host grants `ai` its members replace the stubs
+ * CONTRACT C16): while the host grants `uniworkAi` its members replace the stubs
  * (frame-token AI routes); without the grant the stubs answer as before.
  *   ./webapi   WEB-API class: open/save/recents/export over the host
  *              protocol (../protocol/client.ts) + in-memory projectApi.

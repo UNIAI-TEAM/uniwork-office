@@ -14,7 +14,6 @@ export const ru = {
   aiAnalyzeBtn: 'ИИ-анализ',
   aiAnalyzePrompt:
     'Проанализируйте данные на этом листе и кратко изложите ключевые выводы, тенденции и аномалии',
-  aiSettingsTitle: 'Параметры ИИ',
   aiSetUp: 'Настроить ИИ',
   aiNewChat: 'Новый диалог',
   aiCollapsePanel: 'Свернуть панель ИИ',

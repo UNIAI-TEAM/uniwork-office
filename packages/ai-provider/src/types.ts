@@ -205,12 +205,6 @@ export interface AiSettings {
    */
   uniAiAvailable?: boolean
   /**
-   * true = the host could not read which keys are stored (a network or sign-in failure on the
-   * list). Nothing is known about the keys, so the model chip must not claim "no key" and send
-   * stays available (the server decides); the next read retries. Absent means the keys are known.
-   */
-  credentialsUnavailable?: boolean
-  /**
    * Per provider: the model chosen in Settings and the provider's live model list (G6-05m).
    * Derived by the host on every read and never saved: a host writing settings back drops it.
    * A provider without an entry (older host or server) gets the hard-coded catalog.

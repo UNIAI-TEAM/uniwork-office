@@ -26,6 +26,7 @@ import { createAiRunTracker, type AiRunTracker } from '../ai-run'
 import { createWebAiStreams } from './stream'
 import { aiHostGrants, createWebAi, mediaFromUrl, withWebAi } from './web-ai'
 import { describeAiError, hideAiState, showAiState } from './ui'
+import type { Capabilities } from '../../../docs/protocol/types'
 
 const ORIGIN = 'https://app.test'
 const BASE = `${ORIGIN}/api/v1/office-frame/documents/doc-1/ai`
@@ -112,9 +113,18 @@ const CLOUD = {
   credits: { unit: 'ai.tokens', used: 10, limit: 100, remaining: 90, period_end: null },
 }
 
+/** what the frame publishes for the model chip and the panels (as the desktop preload does) */
+interface WindowCloudStatus {
+  get(): Promise<unknown>
+  onChange(handler: (status: unknown) => void): () => void
+}
+const windowCloudStatus = (): WindowCloudStatus | undefined =>
+  (window as unknown as { uniworkCloudStatus?: WindowCloudStatus }).uniworkCloudStatus
+
 afterEach(() => {
   setUniworkAiAvailable(false)
   setUniworkCloudStatus(null)
+  delete (window as unknown as { uniworkCloudStatus?: unknown }).uniworkCloudStatus
   uniworkConversations.clear()
   hideAiState()
   document.body.replaceChildren()
@@ -357,6 +367,8 @@ describe('members (off = as today, on = UniWork routes)', () => {
     await (api.getAiSettings as () => Promise<unknown>)()
     expect(stubs.getAiSettings).toHaveBeenCalled()
     expect(fetch).not.toHaveBeenCalled()
+    // nothing is published for the model chip either
+    expect(windowCloudStatus()).toBeUndefined()
   })
 
   it('a port without a frame token (headless) keeps AI off even with the grant', async () => {
@@ -676,7 +688,9 @@ describe('UniWork AI on the web (G6-05)', () => {
 
   describe('Grant formula', () => {
     it('aiHostGrants: only the UniWork AI grant opens the panel, the old ai grant opens nothing, no key settings entry', () => {
-      expect(aiHostGrants({ ai: true, uniworkAi: false })).toMatchObject({ ai: false })
+      expect(aiHostGrants({ ai: true, uniworkAi: false } as Capabilities)).toMatchObject({
+        ai: false,
+      })
       const on = aiHostGrants({ uniworkAi: true })
       expect(on).toEqual({
         ai: true,
@@ -691,7 +705,7 @@ describe('UniWork AI on the web (G6-05)', () => {
         ai: true,
         webSearch: true,
       })
-      expect(aiHostGrants({ ai: true, imageSearch: true })).toMatchObject({
+      expect(aiHostGrants({ ai: true, imageSearch: true } as Capabilities)).toMatchObject({
         ai: false,
         imageSearch: false,
       })
@@ -699,9 +713,10 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(aiHostGrants({ webSearch: true })).toMatchObject({ ai: false, webSearch: false })
     })
 
-    it('the frame claims uniworkAi', async () => {
+    it('the frame claims uniworkAi and never the old ai key', async () => {
       const { AI_FRAME_CAPABILITIES } = await import('./web-ai')
       expect(AI_FRAME_CAPABILITIES.uniworkAi).toBe(true)
+      expect(AI_FRAME_CAPABILITIES).not.toHaveProperty('ai')
     })
   })
 
@@ -1111,6 +1126,50 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(s.uniworkModel).toBe('claude-opus-5')
       expect(s.uniAiAvailable).toBe(false)
       expect(s.modelSources).toBeUndefined()
+    })
+
+    it('publishes the cloud status (credits included) on window.uniworkCloudStatus for the model chip, also without a cloud tool', async () => {
+      const { fetch } = recorder(() => jsonResponse(200, CLOUD))
+      const ai = createWebAi({
+        port: uniworkPort({ uniworkAi: true }),
+        capabilities: { ai: true, uniworkAi: true },
+        fetch,
+        origin: ORIGIN,
+      })
+      expect(await ai.active()).toBe(true)
+      const bridge = windowCloudStatus()
+      expect(bridge).toBeDefined()
+      const pushed: unknown[] = []
+      const off = bridge!.onChange((status) => pushed.push(status))
+      await ai.state(true)
+      const status = {
+        state: 'ready',
+        signedIn: true,
+        enabled: true,
+        credits: { remaining: 90, limit: 100 },
+      }
+      expect(await bridge!.get()).toMatchObject(status)
+      expect(pushed.at(-1)).toMatchObject(status)
+      off()
+      // no account or organization: the panels keep their own disclosure identity
+      expect(await bridge!.get()).not.toHaveProperty('accountId', expect.any(String))
+    })
+
+    it('used-up credits keep the chip row: the bridge reads ready with nothing left', async () => {
+      const { fetch } = recorder(() =>
+        jsonResponse(200, { ...CLOUD, credits: { ...CLOUD.credits, used: 100, remaining: 0 } }),
+      )
+      const ai = createWebAi({
+        port: uniworkPort({ uniworkAi: true }),
+        capabilities: { ai: true, uniworkAi: true },
+        fetch,
+        origin: ORIGIN,
+      })
+      await ai.state(true)
+      expect(await windowCloudStatus()!.get()).toMatchObject({
+        state: 'ready',
+        credits: { remaining: 0, limit: 100 },
+      })
     })
 
     it('activation, settings, a turn and a return to the tab touch only the cloud status and the UniWork AI routes', async () => {

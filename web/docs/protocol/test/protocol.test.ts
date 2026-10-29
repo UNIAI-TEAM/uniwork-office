@@ -32,7 +32,7 @@ function baseInit(over: Partial<InitPayload> = {}): Omit<InitPayload, 'protocolV
     apiMode: 'host-proxy',
     locale: 'vi',
     theme: 'light',
-    capabilities: { save: true, saveAs: true, print: true, ai: false },
+    capabilities: { save: true, saveAs: true, print: true },
     ...over,
   }
 }
@@ -107,7 +107,6 @@ describe('handshake', () => {
         exportHtml: false,
         attachments: false,
         images: false,
-        ai: false,
         webSearch: false,
         imageSearch: false,
         imageGeneration: false,
@@ -1130,6 +1129,10 @@ describe('X-02 protocol shape', () => {
     expect(FRAME_REQUEST_TYPES).toContain('api.download')
     expect(FRAME_EVENT_TYPES).toContain('aiRun')
     expect(CAPABILITY_KEYS).toEqual(expect.arrayContaining(['download', 'uniworkAi']))
+  })
+
+  it('has no `ai` capability: UniWork AI (`uniworkAi`) is the only AI grant (UNI-2289)', () => {
+    expect(CAPABILITY_KEYS).not.toContain('ai')
   })
 
   it('FileMeta.revision is optional and decimal', () => {

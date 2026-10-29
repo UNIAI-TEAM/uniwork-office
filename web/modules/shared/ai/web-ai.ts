@@ -15,7 +15,9 @@
  *     tools, each behind its capability (`webSearch`, `imageSearch`, `imageGeneration`) AND the
  *     server's `GET cloud` tool switch,
  *   - aiGskStatus / gskStatus: signed in (the viewer is a UniWork user), cloud availability;
- *     aiGskLogin has nothing to open.
+ *     aiGskLogin has nothing to open,
+ *   - window.uniworkCloudStatus: the credits the model chip reads, on the bridge a desktop
+ *     preload exposes, fed by this frame's own GET cloud.
  * Every typed failure of a cloud tool (402/403/429/502/503, 401 after a refresh) is returned in the
  * member's own error shape with its translated text and raises the in-frame state card, because no
  * transcript would tell the user. A failed chat turn shows its text once, as the panel's inline error.
@@ -25,7 +27,16 @@ import {
   setUniworkAiAvailable,
 } from '../../../../packages/ai-provider/src/providers'
 import type { AiSettings, AiStreamChunk } from '../../../../packages/ai-provider/src/types'
-import { setUniworkCloudStatus } from '../../../../packages/ai-provider/src/uniwork-cloud'
+import {
+  getUniworkCloudStatus,
+  onUniworkCloudStatus,
+  setUniworkCloudStatus,
+} from '../../../../packages/ai-provider/src/uniwork-cloud'
+import {
+  UNIWORK_CLOUD_STATUS_BRIDGE_KEY,
+  parseUniworkCloudStatusSnapshot,
+  type UniworkCloudStatusSnapshot,
+} from '../../../../packages/electron-utils/src/uniwork-cloud-status'
 import type { streamUniwork } from '../../../../packages/ai-provider/src/uniwork/protocol'
 import {
   UNIWORK_PROVIDER_ID,
@@ -52,7 +63,6 @@ import { describeAiError, showAiState } from './ui'
 
 /** what the frame supports (sent in `ready`; effective = frame ∩ host grant) */
 export const AI_FRAME_CAPABILITIES: Capabilities = Object.freeze({
-  ai: true,
   webSearch: true,
   imageSearch: true,
   imageGeneration: true,
@@ -160,6 +170,8 @@ export function createWebAi(opts: {
   // what the host granted this frame (set at activation): UniWork AI, and which cloud tools
   let uniworkGranted = false
   let cloudWanted = false
+  /** a cloud status was published: before it, the window bridge answers "not read yet" (null) */
+  let cloudPublished = false
   /** UniWork AI turned off by the server after the grant was minted (capability / format off) */
   let uniworkOff = false
   let frameSession: {
@@ -224,6 +236,7 @@ export function createWebAi(opts: {
         ...(opts.fetch ? { fetch: opts.fetch } : {}),
         ...(opts.origin ? { origin: opts.origin } : {}),
       })
+      installCloudStatusBridge()
       // early: the cloud tool switches land before the first AI run; a failure is retried on use
       void load(true).catch(() => {})
       return true
@@ -241,8 +254,11 @@ export function createWebAi(opts: {
         (cloud?.org_name ?? '') !== (state.cloud?.org_name ?? '')
       state = { cloud }
       loadedAt = now()
-      // the tool switches and the process-wide status follow a granted tool only
-      if (cloudWanted) applyCloud(cloud)
+      // the tool switches follow a granted tool only; the status (credits) is always published
+      if (cloud) {
+        if (cloudWanted) applyCloud(cloud)
+        publishCloudStatus(cloud)
+      }
       if (changed) notifyChanged()
       return state
     })()
@@ -257,8 +273,7 @@ export function createWebAi(opts: {
   }
 
   /** the server switches a cloud tool off (not configured, no entitlement): its entries hide */
-  function applyCloud(cloud: AiCloudStatus | null): void {
-    if (!cloud) return
+  function applyCloud(cloud: AiCloudStatus): void {
     const caps = opts.capabilities
     const on = (key: string, tool: boolean): void => {
       if (caps[key] === true && !(cloud.enabled && tool)) caps[key] = false
@@ -266,7 +281,6 @@ export function createWebAi(opts: {
     on('webSearch', cloud.tools.web_search)
     on('imageSearch', cloud.tools.image_search)
     on('imageGeneration', cloud.tools.image_generate)
-    publishCloudStatus(cloud)
   }
 
   /**
@@ -296,6 +310,37 @@ export function createWebAi(opts: {
         periodEnd: cloud.credits.period_end,
       },
     })
+    cloudPublished = true
+  }
+
+  /**
+   * The published credits as the window bridge hands them over; null until the first read
+   * answered. The state is `ready`: the host granted UniWork AI and there is no other provider to
+   * switch to, so an off state comes back as the turn's own answer (a 403 hides the panel, a 402 is
+   * the turn's error) and never hides the chip's one row or raises a "choose another" note.
+   */
+  function cloudSnapshot(): UniworkCloudStatusSnapshot | null {
+    if (!cloudPublished) return null
+    const { credits } = getUniworkCloudStatus()
+    return parseUniworkCloudStatusSnapshot({
+      state: 'ready',
+      signedIn: true,
+      enabled: true,
+      credits,
+    })
+  }
+
+  /**
+   * window.uniworkCloudStatus, as a desktop preload exposes it: the model chip reads the credits
+   * from it. Nothing to open on the web (no account settings, no sign-in: the viewer is a UniWork
+   * user), and no account or organization: the panels keep their own disclosure identity.
+   */
+  function installCloudStatusBridge(): void {
+    ;(window as unknown as Record<string, unknown>)[UNIWORK_CLOUD_STATUS_BRIDGE_KEY] = {
+      get: async () => cloudSnapshot(),
+      onChange: (handler: (status: UniworkCloudStatusSnapshot | null) => void) =>
+        onUniworkCloudStatus(() => handler(cloudSnapshot())),
+    }
   }
 
   /** the grant is there and the server has not turned UniWork AI off since */
@@ -330,7 +375,7 @@ export function createWebAi(opts: {
   async function settings(): Promise<AiSettings> {
     const base = defaultAiSettings()
     if (!(await activation)) return base
-    // a failed status read keeps the last answer, or none: the row shows the plain name
+    // a failed status read leaves no answer (null): the row shows the plain name
     await load().catch(() => {})
     const uniworkOn = uniworkEffective()
     const uniworkModel = uniworkOn ? (state.cloud?.uniwork_model ?? '') : ''

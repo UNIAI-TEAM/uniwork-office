@@ -278,26 +278,31 @@ describe('AiModelPicker S7 — row UniWork AI & credits sub-line', () => {
     expect(document.getElementById(descId!)?.textContent).toBe('Unlimited')
   })
 
-  it('web (requireModel: true): shows UniWork AI name only, no credits sub-line and no aria-describedby', async () => {
+  it('web: the chip reads the credits from window.uniworkCloudStatus and has no manage row', async () => {
     setUniworkAiAvailable(true)
-    const { getChip, getOptions, getFooter } = await mountPicker(
-      {
-        requireModel: true,
-        getCloudStatus: async () => ({
-          state: 'ready',
-          signedIn: true,
-          hasCompletedRead: true,
-          credits: { remaining: 100, limit: 500 },
-        }),
-      },
-      'vi',
+    // what a web frame publishes (web/modules/shared/ai/web-ai.ts): the same window bridge as a
+    // desktop preload, fed by the frame's own GET cloud
+    ;(window as unknown as { uniworkCloudStatus?: unknown }).uniworkCloudStatus = {
+      get: async () => ({
+        state: 'ready',
+        signedIn: true,
+        enabled: true,
+        credits: { remaining: 380000, limit: 500000 },
+      }),
+      onChange: () => () => {},
+    }
+    // a web panel's bridge: no model settings to open, so no openModelSettings
+    const { getChip, getOptions, getManageBtn } = await mountPicker(
+      { openModelSettings: undefined },
+      'en',
     )
     await openPopup(getChip())
     const uniworkOpt = getOptions()[0]!
-    expect(uniworkOpt.textContent).toBe('UniWork AI')
-    expect(uniworkOpt.querySelector('.ai-model-item-sub')).toBeNull()
-    expect(uniworkOpt.getAttribute('aria-describedby')).toBeNull()
-    expect(getFooter()).toBeNull()
+    expect(uniworkOpt.querySelector('.ai-model-item-sub')!.textContent).toBe(
+      aiUniworkText('en', 'cloudCreditsLeft', { remaining: '380,000', limit: '500,000' }),
+    )
+    expect(uniworkOpt.getAttribute('aria-describedby')).toBeTruthy()
+    expect(getManageBtn()).toBeNull()
   })
 })
 
@@ -453,7 +458,7 @@ describe('AiModelPicker S7 — picker footer per cloud state (desktop only)', ()
     expect(getFooterBtn()!.textContent).toBe('Chi tiết')
   })
 
-  it('reads window.uniworkCloudStatus on desktop when bridge does not pass getCloudStatus, and ignores it on web', async () => {
+  it('reads window.uniworkCloudStatus when the bridge does not pass getCloudStatus', async () => {
     ;(window as unknown as { uniworkCloudStatus?: unknown }).uniworkCloudStatus = {
       get: async () => ({
         state: 'credits-exhausted',
@@ -468,16 +473,6 @@ describe('AiModelPicker S7 — picker footer per cloud state (desktop only)', ()
     await openPopup(desktop.getChip())
     expect(desktop.getFooter()).not.toBeNull()
     expect(desktop.getFooter()!.textContent).toContain('Đã hết tín dụng AI')
-
-    act(() => root.unmount())
-    root = createRoot(host)
-    const web = await mountPicker(
-      { requireModel: true },
-      'vi',
-      buildSettings({ provider: 'anthropic' }),
-    )
-    await openPopup(web.getChip())
-    expect(web.getFooter()).toBeNull()
   })
 })
 

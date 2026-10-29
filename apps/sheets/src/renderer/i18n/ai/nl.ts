@@ -15,7 +15,6 @@ export const nl = {
   aiAnalyzeBtn: 'AI-analyse',
   aiAnalyzePrompt:
     'Analyseer de gegevens in dit blad en vat de belangrijkste bevindingen, trends en afwijkingen samen',
-  aiSettingsTitle: 'AI-instellingen',
   aiSetUp: 'AI instellen',
   aiNewChat: 'Nieuw gesprek',
   aiCollapsePanel: 'AI-paneel samenvouwen',

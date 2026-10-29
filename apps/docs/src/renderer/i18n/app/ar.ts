@@ -306,7 +306,6 @@ export const ar = {
   appTabDecimal: 'عشري',
   appTabBar: 'شريط',
   appTabClear: 'مسح',
-  appAiSettings: 'إعدادات الذكاء الاصطناعي',
   appCut: 'قص',
   appCopy: 'نسخ',
   appPaste: 'لصق',

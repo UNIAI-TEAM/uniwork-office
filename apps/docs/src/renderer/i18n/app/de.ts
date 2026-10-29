@@ -326,7 +326,6 @@ export const de = {
   appTabDecimal: 'Dezimal',
   appTabBar: 'Vertikale Linie',
   appTabClear: 'Löschen',
-  appAiSettings: 'KI-Einstellungen',
   appCut: 'Ausschneiden',
   appCopy: 'Kopieren',
   appPaste: 'Einfügen',

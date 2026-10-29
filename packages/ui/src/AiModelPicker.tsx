@@ -51,13 +51,13 @@ export interface AiModelPickerBridge {
   /** fires after any renderer (this one, another tab, the shell settings page) saved ai-settings.json */
   readonly onSettingsChanged?: ((handler: () => void) => () => void) | undefined
   readonly gskLoggedIn?: (() => Promise<boolean>) | undefined
-  /** shell: switch to Home and open Settings › AI Model */
+  /** shell: switch to Home and open Settings › AI Model; absent = no "manage" row (a web frame) */
   readonly openModelSettings?: (() => Promise<void> | void) | undefined
   /** shell: switch to Home and open Settings › Account */
   readonly openAccountSettings?: (() => Promise<void> | void) | undefined
   /** shell: trigger or open UniWork sign-in */
   readonly signIn?: (() => Promise<void> | void) | undefined
-  /** desktop: read current UniWork cloud status (falls back to window.uniworkCloudStatus.get) */
+  /** read current UniWork cloud status (falls back to window.uniworkCloudStatus.get) */
   readonly getCloudStatus?:
     (() => Promise<AiModelPickerCloudStatus | null> | AiModelPickerCloudStatus | null) | undefined
   /** alias for getCloudStatus */
@@ -66,14 +66,9 @@ export interface AiModelPickerBridge {
     | AiModelPickerCloudStatus
     | null
     | undefined
-  /** desktop: subscribe to UniWork cloud status updates (falls back to window.uniworkCloudStatus.onChange) */
+  /** subscribe to UniWork cloud status updates (falls back to window.uniworkCloudStatus.onChange) */
   readonly onCloudStatusChanged?:
     ((handler: (status: AiModelPickerCloudStatus | null) => void) => () => void) | undefined
-  /**
-   * web frames: while the chip reads "Choose model" (no key, or a key without a known model) the
-   * composer's send stays off with a hint saying which; other hosts leave it undefined
-   */
-  readonly requireModel?: boolean | undefined
 }
 
 interface WindowCloudStatusBridge {
@@ -213,10 +208,6 @@ export function AiModelPicker({
   const refresh = useCallback(() => {
     const b = bridgeRef.current
     refreshSettings()
-    if (b.requireModel === true) {
-      setCloudStatus(null)
-      return
-    }
     const winCloud = getWindowCloudStatusBridge()
     const rawCloud = b.getCloudStatus ?? b.cloudStatus ?? winCloud?.get
     if (typeof rawCloud === 'function') {
@@ -242,21 +233,19 @@ export function AiModelPicker({
       offSettings = undefined
     }
     let offCloud: (() => void) | undefined
-    if (b.requireModel !== true) {
-      const winCloud = getWindowCloudStatusBridge()
-      const sub = b.onCloudStatusChanged ?? winCloud?.onChange ?? winCloud?.onChanged
-      try {
-        offCloud = sub?.((next) => setCloudStatus(next ?? null))
-      } catch {
-        offCloud = undefined
-      }
+    const winCloud = getWindowCloudStatusBridge()
+    const sub = b.onCloudStatusChanged ?? winCloud?.onChange ?? winCloud?.onChanged
+    try {
+      offCloud = sub?.((next) => setCloudStatus(next ?? null))
+    } catch {
+      offCloud = undefined
     }
     return () => {
       window.removeEventListener('focus', refresh)
       offSettings?.()
       offCloud?.()
     }
-  }, [refresh, bridge.requireModel])
+  }, [refresh])
 
   const close = useCallback(() => {
     setOpen(false)
@@ -267,7 +256,6 @@ export function AiModelPicker({
   })
 
   const hideUniworkByCloudStatus =
-    bridge.requireModel !== true &&
     cloudStatus !== null &&
     cloudStatus.hasCompletedRead !== false &&
     (cloudStatus.state !== 'ready' || cloudStatus.enabled === false)
@@ -318,33 +306,23 @@ export function AiModelPicker({
       ? selectedKey!
       : (flatOptions[0]?.key ?? null)
 
-  // the wanted provider is read raw (a key list that failed to load masks nothing here)
-  const wanted = settings?.provider
-  const wantedConfig = wanted ? settings?.providers?.[wanted] : undefined
-  const hasKey = (wantedConfig?.apiKey ?? '') !== ''
   // The chip reads "Choose model" while the chosen provider cannot send yet; the composer's send
-  // is then off and the hint says what is missing: a model (a key is stored) or a key. This holds
-  // on every host: a chosen vendor is never swapped for UniAI, so the chip and the request agree.
-  // Web frames apply it to UniAI too (nothing usable at all). A key list that failed to load says
-  // nothing about keys: no hint, send stays on, the server decides
+  // is then off and the hint says what is missing: a model (a key is stored), a key or a server
+  // URL. A chosen vendor is never swapped for UniAI, so the chip and the request agree
   const need = settings
     ? current?.provider === 'uniwork' && !currentUsable
       ? 'model'
       : aiModelPickerNeed(settings)
     : null
   const needHint =
-    settings !== null && !currentUsable && settings.credentialsUnavailable !== true
+    settings !== null && !currentUsable
       ? need === 'base-url'
         ? strings.needBaseUrl
-        : bridge.requireModel === true
-          ? hasKey || current?.provider === 'uniwork'
-            ? strings.needModel
-            : strings.needKey
-          : need === 'model'
-            ? strings.needModel
-            : need === 'key'
-              ? strings.needKey
-              : null
+        : need === 'model'
+          ? strings.needModel
+          : need === 'key'
+            ? strings.needKey
+            : null
       : null
   const openSettings = bridge.openModelSettings
   const openSettingsOnce = useCallback(() => {
@@ -500,25 +478,24 @@ export function AiModelPicker({
     buttons?.[nextIdx]?.focus()
   }
 
-  const desktopCredits =
-    bridge.requireModel !== true && cloudStatus?.credits ? cloudStatus.credits : null
-  const creditsVisibleText = desktopCredits
-    ? desktopCredits.limit === null
+  const credits = cloudStatus?.credits ?? null
+  const creditsVisibleText = credits
+    ? credits.limit === null
       ? pickerCloudText(lang, 'cloudCreditsUnlimited')
-      : desktopCredits.remaining !== null
+      : credits.remaining !== null
         ? pickerCloudText(lang, 'cloudCreditsLeft', {
-            remaining: formatCreditCount(lang, desktopCredits.remaining),
-            limit: formatCreditCount(lang, desktopCredits.limit),
+            remaining: formatCreditCount(lang, credits.remaining),
+            limit: formatCreditCount(lang, credits.limit),
           })
         : null
     : null
-  const creditsAriaText = desktopCredits
-    ? desktopCredits.limit === null
+  const creditsAriaText = credits
+    ? credits.limit === null
       ? pickerCloudText(lang, 'cloudCreditsUnlimited')
-      : desktopCredits.remaining !== null
+      : credits.remaining !== null
         ? aiUniworkText(lang, 'aiUniworkCreditsAria', {
-            remaining: formatCreditCount(lang, desktopCredits.remaining),
-            limit: formatCreditCount(lang, desktopCredits.limit),
+            remaining: formatCreditCount(lang, credits.remaining),
+            limit: formatCreditCount(lang, credits.limit),
           })
         : null
     : null
@@ -528,9 +505,7 @@ export function AiModelPicker({
     creditsAriaText !== null
 
   const footerInfo = useMemo(() => {
-    if (bridge.requireModel === true || !cloudStatus || cloudStatus.hasCompletedRead === false) {
-      return null
-    }
+    if (!cloudStatus || cloudStatus.hasCompletedRead === false) return null
     switch (cloudStatus.state) {
       case 'signed-out':
         return {
@@ -569,7 +544,7 @@ export function AiModelPicker({
       default:
         return null
     }
-  }, [bridge.requireModel, cloudStatus, lang])
+  }, [cloudStatus, lang])
 
   const onFooterAction = () => {
     const pop = popRef.current

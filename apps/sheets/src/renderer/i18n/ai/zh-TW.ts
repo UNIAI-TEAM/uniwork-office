@@ -13,7 +13,6 @@ export const zhTW = {
     '檢查這個表格的問題:1) 公式錯誤(#REF!、#DIV/0! 等)、參照範圍沒涵蓋全部資料、合計列漏加欄位;2) 同一欄數字和文字混用、日期格式不一致、明顯的異常值和重複列;3) 合計與明細對不上、百分比加總不是 100% 等結構問題。列出發現的問題並提出修復建議',
   aiAnalyzeBtn: 'AI 分析',
   aiAnalyzePrompt: '分析這個表格的資料,總結關鍵發現、趨勢和異常',
-  aiSettingsTitle: 'AI 設定',
   aiSetUp: '設定 AI',
   aiNewChat: '新對話',
   aiCollapsePanel: '收合 AI 面板',

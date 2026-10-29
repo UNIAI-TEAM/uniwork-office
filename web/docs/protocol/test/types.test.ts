@@ -33,7 +33,7 @@ const init: InitPayload = {
   apiMode: 'host-proxy',
   locale: 'vi',
   theme: 'dark',
-  capabilities: { save: true, ai: false },
+  capabilities: { save: true },
 }
 
 describe('parseEnvelope', () => {

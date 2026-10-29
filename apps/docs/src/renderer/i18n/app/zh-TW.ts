@@ -299,7 +299,6 @@ export const zhTW = {
   appTabDecimal: '小數點',
   appTabBar: '分隔線',
   appTabClear: '清除',
-  appAiSettings: 'AI 設定',
   appCut: '剪下',
   appCopy: '複製',
   appPaste: '貼上',

@@ -315,7 +315,6 @@ export const id = {
   appTabDecimal: 'Desimal',
   appTabBar: 'Batang',
   appTabClear: 'Hapus',
-  appAiSettings: 'Pengaturan AI',
   appCut: 'Potong',
   appCopy: 'Salin',
   appPaste: 'Tempel',

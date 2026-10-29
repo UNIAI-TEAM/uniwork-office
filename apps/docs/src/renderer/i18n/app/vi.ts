@@ -310,7 +310,6 @@ export const vi = {
   appTabDecimal: 'Thập phân',
   appTabBar: 'Thanh dọc',
   appTabClear: 'Xóa',
-  appAiSettings: 'Cài đặt AI',
   appCut: 'Cắt',
   appCopy: 'Sao chép',
   appPaste: 'Dán',

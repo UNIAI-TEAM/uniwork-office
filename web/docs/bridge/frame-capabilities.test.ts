@@ -54,9 +54,15 @@ describe('frame base capabilities (X-02)', () => {
     expect(FRAME_BASE_CAPABILITIES).toMatchObject({
       download: true,
       desktopOpen: true,
-      ai: true,
       uniworkAi: true,
+      webSearch: true,
+      imageSearch: true,
+      imageGeneration: true,
     })
+  })
+
+  it('no frame claims the old ai key: UniWork AI is the only AI (UNI-2289)', () => {
+    expect(FRAME_BASE_CAPABILITIES).not.toHaveProperty('ai')
   })
 
   it('every frame claims aiStart exactly when it claims uniworkAi (UNI-2264)', () => {
@@ -81,25 +87,36 @@ describe('frame base capabilities (X-02)', () => {
   })
 
   it.each(OFFICE_MODULES)(
-    '%s: a host advertising uniworkAi gets the effective grant',
+    '%s: uniworkAi alone opens the panel; each cloud tool follows its own grant',
     async (m) => {
-      expect((await effective(m, { ai: true, uniworkAi: true })).uniworkAi).toBe(true)
+      const caps = await effective(m, { uniworkAi: true, webSearch: true, imageGeneration: true })
+      expect(caps.uniworkAi).toBe(true)
+      // what the module's capability object is built from (aiHostGrants over the effective set)
+      expect(aiHostGrants(caps)).toEqual({
+        ai: true,
+        uniworkAi: true,
+        webSearch: true,
+        imageSearch: false,
+        imageGeneration: true,
+      })
     },
   )
 
-  it.each(OFFICE_MODULES)('%s: no uniworkAi without the host grant', async (m) => {
-    expect((await effective(m, { ai: true })).uniworkAi).toBe(false)
-  })
-
   it.each(OFFICE_MODULES)(
-    '%s: uniworkAi alone is effective and opens AI without credentials',
+    '%s: without uniworkAi there is no panel and no cloud tool, whatever else the host sends',
     async (m) => {
-      const caps = await effective(m, { uniworkAi: true })
-      expect(caps.uniworkAi).toBe(true)
-      // what the module's capability object is built from (aiHostGrants over the effective set)
-      expect(aiHostGrants(caps)).toMatchObject({
+      // an older host still sends `ai`: an unknown key, ignored on the way in
+      const caps = await effective(m, {
         ai: true,
-        uniworkAi: true,
+        webSearch: true,
+        imageSearch: true,
+        imageGeneration: true,
+      } as Capabilities)
+      expect(caps).not.toHaveProperty('ai')
+      expect(caps.uniworkAi).toBe(false)
+      expect(aiHostGrants(caps)).toEqual({
+        ai: false,
+        uniworkAi: false,
         webSearch: false,
         imageSearch: false,
         imageGeneration: false,

@@ -15,7 +15,6 @@ export const es = {
   aiAnalyzeBtn: 'Análisis IA',
   aiAnalyzePrompt:
     'Analiza los datos de esta hoja y resume los hallazgos clave, tendencias y anomalías',
-  aiSettingsTitle: 'Configuración de IA',
   aiSetUp: 'Configurar IA',
   aiNewChat: 'Nueva conversación',
   aiCollapsePanel: 'Contraer el panel de IA',
