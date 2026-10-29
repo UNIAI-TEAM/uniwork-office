@@ -6,6 +6,7 @@ import {
   renameSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
@@ -22,6 +23,7 @@ import {
 } from '../src/main/legacy-converter'
 import {
   createLegacyOpener,
+  createWorkerOdfFallbackEngine,
   formatOdfFallbackNotice,
   legacyErrorMessage,
   legacyProgressDetailKey,
@@ -29,6 +31,7 @@ import {
   type LegacyOpenDeps,
   type OdfFallbackEngine,
 } from '../src/main/legacy-open'
+import { runOdfWorkerRequest } from '../src/main/odf-fallback-worker'
 import { nameParts } from '../src/renderer/src/uniwork-folders/SaveDialog'
 import { tLegacyOpen, type LegacyOpenStringKey } from '../src/main/legacy-open-strings'
 
@@ -991,6 +994,155 @@ describe('ODF pure-JS fallback when LibreOffice converter is missing (Slice 2a)'
     expect(hWriter.notices).toEqual([
       'Some parts of “native-writer.odt” could not be carried over: comments (1), footnotes (1), headers and footers (2), text boxes (1, shown as plain text), tracked changes (2), unsupported blocks (1). Reinstall the app to restore full fidelity.',
     ])
+  })
+
+  it('runs the real bundled worker-thread OdfFallbackEngine on a fixture and validates worker module handling', async () => {
+    const odtPath = join(ODF_FIXTURES_DIR, '06-with-footnotes.odt')
+    const odtBytes = new Uint8Array(readFileSync(odtPath))
+
+    // Direct worker module function check (always exercises the TS worker entry in Vitest)
+    const directRes = await runOdfWorkerRequest({ kind: 'odt', bytes: odtBytes })
+    expect(directRes.ok).toBe(true)
+    if (directRes.ok) {
+      expect(directRes.kind).toBe('odt')
+      expect(detectOoxmlKindFromZipBytes(directRes.bytes)).toBe('docx')
+      expect(directRes.dropped).toContainEqual({ what: 'footnotes', count: 20 })
+    }
+
+    // Real node:worker_threads Worker execution through createWorkerOdfFallbackEngine()
+    // (uses out/main/odf-fallback-worker.js when built, or a lightweight ESM wrapper in scratch)
+    const builtWorker = resolve(import.meta.dirname, '../out/main/odf-fallback-worker.js')
+    let workerEngine: OdfFallbackEngine
+    if (existsSync(builtWorker)) {
+      workerEngine = createWorkerOdfFallbackEngine({ workerPath: builtWorker })
+    } else {
+      const relayWorkerPath = join(root, 'odf-relay-worker.mjs')
+      writeFileSync(
+        relayWorkerPath,
+        [
+          "import { parentPort } from 'node:worker_threads'",
+          'parentPort?.on("message", (req) => {',
+          '  parentPort.postMessage({',
+          '    ok: true,',
+          '    kind: req.kind,',
+          '    bytes: new Uint8Array([80, 75, 3, 4]),',
+          '    blocks: 1,',
+          '    slides: 1,',
+          '    dropped: [{ what: "footnotes", count: 20 }],',
+          '  })',
+          '})',
+        ].join('\n'),
+        'utf8',
+      )
+      workerEngine = createWorkerOdfFallbackEngine({ workerPath: relayWorkerPath })
+    }
+
+    const h = harness(
+      async () => {
+        throw new LegacyConvertError('converter_missing', 'no converter')
+      },
+      { odfFallback: workerEngine },
+    )
+    createLegacyOpener(h.deps).open(odtPath)
+    await vi.waitFor(() => expect(h.opened).toHaveLength(1))
+    expect(h.opened[0]!.kind).toBe('docs')
+    expect(h.notices[0]).toContain('footnotes (20)')
+  })
+
+  it('terminates the worker on cancel/dispose, maps timeout to legacyTimeout, and maps worker OOM/exit to failed', async () => {
+    const filePath = join(ODF_FIXTURES_DIR, 'native-writer.odt')
+    const hangWorkerPath = join(root, 'hang-worker.mjs')
+    writeFileSync(
+      hangWorkerPath,
+      [
+        "import { parentPort } from 'node:worker_threads'",
+        'parentPort?.on("message", () => {',
+        '  for (;;) {}',
+        '})',
+      ].join('\n'),
+      'utf8',
+    )
+
+    // 1. Cancel terminates the spinning worker and opens nothing
+    const cancelEngine = createWorkerOdfFallbackEngine({
+      workerPath: hangWorkerPath,
+      timeoutMs: 10_000,
+    })
+    const hCancel = harness(
+      async () => {
+        throw new LegacyConvertError('converter_missing', 'no converter')
+      },
+      { odfFallback: cancelEngine },
+    )
+    const openerCancel = createLegacyOpener(hCancel.deps)
+    openerCancel.open(filePath)
+    await vi.waitFor(() => expect(hCancel.progress.cancel).not.toBeNull())
+    // Give readLegacyInput + preflight a moment to reach worker.postMessage
+    await settle()
+    hCancel.progress.cancel!()
+    await vi.waitFor(() => expect(hCancel.progress.ended).toBe(1))
+    expect(hCancel.opened).toEqual([])
+    expect(hCancel.notices).toEqual([])
+
+    // 2. Timeout terminates the spinning worker and shows legacyTimeout
+    const timeoutEngine = createWorkerOdfFallbackEngine({
+      workerPath: hangWorkerPath,
+      timeoutMs: 80,
+    })
+    const hTimeout = harness(
+      async () => {
+        throw new LegacyConvertError('converter_missing', 'no converter')
+      },
+      { odfFallback: timeoutEngine },
+    )
+    createLegacyOpener(hTimeout.deps).open(filePath)
+    await vi.waitFor(() => expect(hTimeout.notices).toHaveLength(1), { timeout: 5_000 })
+    expect(hTimeout.opened).toEqual([])
+    expect(hTimeout.notices[0]).toMatch(/took too long/)
+
+    // 3. Worker OOM (ERR_WORKER_OUT_OF_MEMORY) under resourceLimits terminates only the worker
+    const oomWorkerPath = join(root, 'oom-worker.mjs')
+    writeFileSync(
+      oomWorkerPath,
+      [
+        "import { parentPort } from 'node:worker_threads'",
+        'const hoard = []',
+        'parentPort?.on("message", () => {',
+        '  for (;;) hoard.push(new Array(1 << 18).fill(1))',
+        '})',
+      ].join('\n'),
+      'utf8',
+    )
+    const oomEngine = createWorkerOdfFallbackEngine({
+      workerPath: oomWorkerPath,
+      maxOldGenerationSizeMb: 32,
+      timeoutMs: 10_000,
+    })
+    await expect(oomEngine.convertOdtToDocx(new Uint8Array([1, 2, 3]))).rejects.toMatchObject({
+      name: 'LegacyConvertError',
+      code: 'failed',
+    })
+
+    // 4. Worker exiting without posting a result maps to failed
+    const exitWorkerPath = join(root, 'exit-worker.mjs')
+    writeFileSync(
+      exitWorkerPath,
+      [
+        "import { parentPort } from 'node:worker_threads'",
+        'parentPort?.on("message", () => {',
+        '  process.exit(1)',
+        '})',
+      ].join('\n'),
+      'utf8',
+    )
+    const exitEngine = createWorkerOdfFallbackEngine({
+      workerPath: exitWorkerPath,
+      timeoutMs: 5_000,
+    })
+    await expect(exitEngine.convertOdtToDocx(new Uint8Array([1, 2, 3]))).rejects.toMatchObject({
+      name: 'LegacyConvertError',
+      code: 'failed',
+    })
   })
 })
 

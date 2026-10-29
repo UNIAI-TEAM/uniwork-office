@@ -405,10 +405,10 @@ import {
 import {
   createCloudLegacyConverter,
   createLegacyOpener,
+  createWorkerOdfFallbackEngine,
   legacyProgressDetailKey,
 } from './legacy-open'
 import type { CloudLegacyConvertInput } from './uniwork-docs/legacy-cloud-open'
-import { convertOdpToPptx, convertOdtToDocx } from '@genoffice/odf2ooxml'
 import { tLegacyOpen } from './legacy-open-strings'
 import {
   FolderWatcher,
@@ -4711,7 +4711,7 @@ const legacyOpener = createLegacyOpener({
     return true
   },
   recordRecent: recordRecentFile,
-  odfFallback: { convertOdtToDocx, convertOdpToPptx },
+  odfFallback: createWorkerOdfFallbackEngine(),
   beginProgress: beginLegacyProgress,
   notice: showAppWarning,
   t: (key, params) => tLegacyOpen(currentLang(), key, params),
