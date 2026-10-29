@@ -983,6 +983,14 @@ describe('ODF pure-JS fallback when LibreOffice converter is missing (Slice 2a)'
     expect(hOdp.notices[0]).toBe(
       'Some parts of “native-impress.odp” could not be carried over: images (1), speaker notes (3), shapes (3). Reinstall the app to restore full fidelity.',
     )
+
+    const writerPath = join(ODF_FIXTURES_DIR, 'native-writer.odt')
+    const hWriter = harness(missingLoConvert, { odfFallback: realEngine })
+    createLegacyOpener(hWriter.deps).open(writerPath)
+    await vi.waitFor(() => expect(hWriter.opened).toHaveLength(1))
+    expect(hWriter.notices).toEqual([
+      'Some parts of “native-writer.odt” could not be carried over: comments (1), footnotes (1), headers and footers (2), text boxes (1, shown as plain text), tracked changes (2), unsupported blocks (1). Reinstall the app to restore full fidelity.',
+    ])
   })
 })
 
