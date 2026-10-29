@@ -2,6 +2,8 @@
 // GO-B4 P-1/P-3/P-5: window.pdfApi of the web frame over a mocked protocol port (the pattern of
 // web/docs/bridge/webapi.test.ts). The save core is a fake here (bytes in -> marked bytes out);
 // the real core runs in save-core.golden.test.ts.
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SavePdfRequest } from '../../../apps/pdf/src/shared/ipc'
 import { createMockPort, protocolError, type MockPort } from '../../docs/bridge/testing/mock-port'
@@ -561,6 +563,21 @@ describe('print and hidden members', () => {
     expect((await s.api.createDocument({} as never)).ok).toBe(false)
     expect(await s.api.gskStatus()).toEqual({ loggedIn: false })
     expect(await s.api.listEditFonts()).toEqual(['arial'])
+  })
+
+  it('Compare is desktop-only: the stubs answer not-available and the capability is off', async () => {
+    const s = await setup()
+    expect(await s.api.compareReadPdf()).toEqual({
+      ok: false,
+      reason: 'Not available in the web build',
+    })
+    expect(await s.api.compareReadOpen('p')).toEqual({
+      ok: false,
+      reason: 'Not available in the web build',
+    })
+    // install.ts pulls the wasm asset urls (not loadable under vitest): read the table from source
+    const table = await readFile(join(__dirname, 'install.ts'), 'utf8')
+    expect(table).toMatch(/^ {2}pdfCompare: false,$/m)
   })
 })
 
