@@ -162,6 +162,19 @@ describe('FoundSkills', () => {
     expect(host.textContent).toContain('Import failed: the archive contains a symlink')
   })
 
+  it('drops the Electron IPC prefix from a refused import', async () => {
+    mountApi([])
+    ;(window.aiOfficeIntegrations as IntegrationsApi).importSkillZip = async () => {
+      throw new Error(
+        "Error invoking remote method 'integrations:import-skill-zip': Error: too big",
+      )
+    }
+    await render()
+    await click(buttonWithText('Import skill package (zip / .md)…'))
+    expect(host.textContent).toContain('Import failed: too big')
+    expect(host.textContent).not.toContain('remote method')
+  })
+
   it('shows a skill about another format like any other', async () => {
     mountApi([
       skill({

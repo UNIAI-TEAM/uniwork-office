@@ -814,12 +814,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   margin-top: 10px;
 }
 
 .set-intg-warn {
-  padding: 0 0 8px;
+  padding: 8px 0;
   color: var(--danger);
 }
 
@@ -838,6 +839,7 @@
 .set-intg-actions {
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -1060,7 +1062,7 @@
 }
 
 .set-intg-notice {
-  padding: 0 0 10px;
+  padding: 8px 0 10px;
 }
 
 .set-intg-path {

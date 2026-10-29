@@ -12,6 +12,13 @@ import type { FoundSkill, RecommendedSkill } from '../../shared/found-skill'
 
 const api = () => window.aiOfficeIntegrations
 
+/** Electron wraps a handler's throw as "Error invoking remote method 'chan': Error: msg"; only msg is for the user. */
+const failureReason = (e: unknown): string =>
+  (e instanceof Error ? e.message : String(e)).replace(
+    /^Error invoking remote method '[^']*': (?:\w*Error: )?/,
+    '',
+  )
+
 type Notice = { kind: 'done' | 'removed'; name: string } | { kind: 'failed'; reason: string }
 
 export function FoundSkills({ t }: { t: TFunc }) {
@@ -53,7 +60,7 @@ export function FoundSkills({ t }: { t: TFunc }) {
       setNotice({ kind: 'done', name: skill.name })
       await load()
     } catch (e) {
-      setNotice({ kind: 'failed', reason: e instanceof Error ? e.message : String(e) })
+      setNotice({ kind: 'failed', reason: failureReason(e) })
     } finally {
       setBusy(false)
     }
@@ -67,7 +74,7 @@ export function FoundSkills({ t }: { t: TFunc }) {
       setNotice({ kind: 'removed', name: skill.name })
       await load()
     } catch (e) {
-      setNotice({ kind: 'failed', reason: e instanceof Error ? e.message : String(e) })
+      setNotice({ kind: 'failed', reason: failureReason(e) })
     } finally {
       setBusy(false)
     }
