@@ -1704,7 +1704,10 @@ async function runSingleSofficeJob(opts: {
  * open non-blocking, fstat the handle, refuse anything that is not a regular
  * file or exceeds the size cap, then read exactly that many bytes.
  */
-async function readLegacyInput(path: string, format: LegacySourceFormat): Promise<Uint8Array> {
+export async function readLegacyInput(
+  path: string,
+  format: LegacySourceFormat,
+): Promise<Uint8Array> {
   let handle: Awaited<ReturnType<typeof open>> | undefined
   try {
     handle = await open(path, fsConstants.O_RDONLY | (fsConstants.O_NONBLOCK ?? 0))

@@ -62,6 +62,7 @@
     "email": "hello@uniwork.app"
   },
   "dependencies": {
+    "@genoffice/odf2ooxml": "*",
     "qrcode": "^1.5.4"
   }
 }

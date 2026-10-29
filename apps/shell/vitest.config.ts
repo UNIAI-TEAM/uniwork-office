@@ -8,6 +8,9 @@ export default defineConfig({
       '@genoffice/shortcuts': fileURLToPath(
         new URL('../../packages/shortcuts/src/index.ts', import.meta.url),
       ),
+      '@genoffice/odf2ooxml': fileURLToPath(
+        new URL('../../packages/odf2ooxml/src/index.ts', import.meta.url),
+      ),
     },
   },
   test: {

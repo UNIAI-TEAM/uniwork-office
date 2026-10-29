@@ -7,6 +7,9 @@ import {
   isOdfFormat,
   LegacyConvertError,
   legacyFormatForPath,
+  preflightOdfBytes,
+  readLegacyInput,
+  suggestedOoxmlPathForLegacy,
   type ConvertLegacyResult,
   type LegacyConvertErrorCode,
   type LegacySourceFormat,
@@ -44,6 +47,30 @@ export interface ConvertedDocument {
   readonly suggestSaveAs: string
 }
 
+export type OdfFallbackSourceFormat = 'odt' | 'ott' | 'odp' | 'otp'
+
+export interface OdfDroppedItem {
+  readonly what: string
+  readonly count: number
+}
+
+export interface OdfFallbackEngine {
+  convertOdtToDocx(bytes: Uint8Array): Promise<{
+    docx: Uint8Array
+    blocks: number
+    dropped: OdfDroppedItem[]
+  }>
+  convertOdpToPptx(bytes: Uint8Array): Promise<{
+    pptx: Uint8Array
+    slides: number
+    dropped: OdfDroppedItem[]
+  }>
+}
+
+export function isOdfFallbackFormat(source: LegacySourceFormat): source is OdfFallbackSourceFormat {
+  return source === 'odt' || source === 'ott' || source === 'odp' || source === 'otp'
+}
+
 export interface LegacyOpenDeps {
   convert(
     path: string,
@@ -60,6 +87,8 @@ export interface LegacyOpenDeps {
   /** the calamine route for an .xls when the converter is not installed; false = nothing opened */
   openXlsValuesOnly(path: string): boolean
   recordRecent(path: string): void
+  /** the pure-JS odf2ooxml fallback for .odt/.ott/.odp/.otp when LibreOffice is missing */
+  odfFallback?: OdfFallbackEngine
   /**
    * How long a sweep waits before it judges ownership (default 1000 ms). A tab that moves
    * between the strip and a detached window is owned by neither for a moment, and a sweep
@@ -94,6 +123,69 @@ export function legacyErrorMessage(
 ): string {
   const key = ERROR_COPY[err.code] ?? 'legacyFailed'
   return t(key, { name: fileName, ext: extname(fileName) })
+}
+const ODF_DROPPED_LABEL_KEYS: Readonly<Record<string, LegacyOpenStringKey>> = {
+  footnotes: 'legacyOdfDropFootnotes',
+  comments: 'legacyOdfDropComments',
+  'textboxes-flattened': 'legacyOdfDropTextboxesFlattened',
+  shapes: 'legacyOdfDropShapes',
+  images: 'legacyOdfDropImages',
+  objects: 'legacyOdfDropObjects',
+  tables: 'legacyOdfDropTables',
+  'nested-tables': 'legacyOdfDropNestedTables',
+  notes: 'legacyOdfDropNotes',
+  'frames-without-geometry': 'legacyOdfDropFramesWithoutGeometry',
+  'stale-indexes': 'legacyOdfDropStaleIndexes',
+  'unhandled-blocks': 'legacyOdfDropUnhandledBlocks',
+  'headers-footers': 'legacyOdfDropHeadersFooters',
+  'tracked-changes': 'legacyOdfDropTrackedChanges',
+}
+
+/**
+ * Format the post-open notice when an ODF document was converted by the pure-JS
+ * fallback engine: lists every dropped construct with its count in the user's
+ * language (unknown keys folded into the localized "other items" bucket, never
+ * shown raw), or tells the user once that a simpler converter was used when
+ * `dropped` is empty.
+ */
+export function formatOdfFallbackNotice(
+  fileName: string,
+  dropped: readonly OdfDroppedItem[],
+  t: LegacyOpenDeps['t'],
+): string {
+  const parts: string[] = []
+  let otherCount = 0
+  for (const item of dropped) {
+    if (!Number.isFinite(item.count) || item.count <= 0) continue
+    const key = Object.hasOwn(ODF_DROPPED_LABEL_KEYS, item.what)
+      ? ODF_DROPPED_LABEL_KEYS[item.what]
+      : undefined
+    if (key) {
+      parts.push(t(key, { count: item.count }))
+    } else {
+      otherCount += item.count
+    }
+  }
+  if (otherCount > 0) {
+    parts.push(t('legacyOdfDropOther', { count: otherCount }))
+  }
+  if (parts.length === 0) {
+    return t('legacyOdfSimplified', { name: fileName })
+  }
+  const sep = t('legacyOdfListSep')
+  return t('legacyOdfDropped', { name: fileName, items: parts.join(sep) })
+}
+
+function mapOdfFallbackError(err: unknown, source: OdfFallbackSourceFormat): LegacyConvertError {
+  if (err instanceof LegacyConvertError) return err
+  const code = typeof err === 'object' && err !== null && 'code' in err ? err.code : undefined
+  if (code === 'unreadable' || code === 'not-a-text-document' || code === 'not-a-presentation') {
+    return new LegacyConvertError('corrupt', code, { format: source, cause: err })
+  }
+  return new LegacyConvertError('failed', err instanceof Error ? err.message : String(err), {
+    format: source,
+    cause: err,
+  })
 }
 
 /**
@@ -137,19 +229,19 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
     }
   }
 
-  async function runConversion(filePath: string, source: LegacySourceFormat): Promise<void> {
-    const fileName = basename(filePath)
-    const controller = new AbortController()
-    controllers.add(controller)
-    const endProgress = deps.beginProgress(fileName, () => controller.abort())
+  async function stageAndOpenConverted(opts: {
+    filePath: string
+    fileName: string
+    result: ConvertLegacyResult
+    signal: AbortSignal
+    endProgress: () => void
+    afterOpenNotice?: string
+  }): Promise<void> {
+    const { filePath, fileName, result, signal, endProgress, afterOpenNotice } = opts
     let tempDir: string | null = null
     try {
-      const result = await deps.convert(filePath, {
-        signal: controller.signal,
-        sourceFormat: source,
-      })
       const kind = KIND_FOR_TARGET[result.targetFormat]
-      throwIfStopped(controller.signal)
+      throwIfStopped(signal)
       // the shared root keeps the default mode; the document's own dir and file are private
       // (a shared temp dir is traversable by other local users)
       const importRoot = deps.importRoot()
@@ -159,7 +251,7 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
       const stem = fileName.replace(/\.[^.]+$/, '')
       const tempPath = join(tempDir, `${stem}.${result.targetFormat}`)
       await writeFile(tempPath, result.bytes, { mode: 0o600 })
-      throwIfStopped(controller.signal)
+      throwIfStopped(signal)
       const doc: ConvertedDocument = {
         kind,
         originalPath: filePath,
@@ -191,9 +283,117 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
       } catch {
         // a lost recents entry does not undo an open tab
       }
+      if (afterOpenNotice) {
+        deps.notice(afterOpenNotice)
+      }
     } catch (err) {
-      endProgress()
       if (tempDir) await rm(tempDir, { recursive: true, force: true }).catch(() => undefined)
+      throw err
+    }
+  }
+
+  async function runOdfFallback(
+    filePath: string,
+    fileName: string,
+    source: OdfFallbackSourceFormat,
+    signal: AbortSignal,
+    endProgress: () => void,
+  ): Promise<void> {
+    const engine = deps.odfFallback!
+    throwIfStopped(signal)
+    const resolvedPath = resolve(filePath)
+    const inputBytes = await readLegacyInput(resolvedPath, source)
+    throwIfStopped(signal)
+    // Run the slice 1 ODF pre-check (encrypted, damaged, >64 MiB part, wrong family)
+    // before the fallback engine ever sees the bytes, even when `deps.convert`
+    // raised `converter_missing` without preflighting.
+    const preflight = preflightOdfBytes(inputBytes, source)
+    if (preflight.kind === 'ooxml_misnamed') {
+      const suggestedSaveAsPath = resolvedPath.replace(/\.[^.]+$/, `.${preflight.detectedFormat}`)
+      await stageAndOpenConverted({
+        filePath,
+        fileName,
+        result: {
+          kind: 'ooxml_misnamed',
+          sourceFormat: source,
+          targetFormat: preflight.detectedFormat,
+          bytes: inputBytes,
+          suggestedSaveAsPath,
+        },
+        signal,
+        endProgress,
+      })
+      return
+    }
+    let bytes: Uint8Array
+    let targetFormat: LegacyTargetFormat
+    let dropped: OdfDroppedItem[]
+    try {
+      if (source === 'odt' || source === 'ott') {
+        const converted = await engine.convertOdtToDocx(inputBytes)
+        bytes = converted.docx
+        targetFormat = 'docx'
+        dropped = converted.dropped
+      } else {
+        const converted = await engine.convertOdpToPptx(inputBytes)
+        bytes = converted.pptx
+        targetFormat = 'pptx'
+        dropped = converted.dropped
+      }
+    } catch (err) {
+      throw mapOdfFallbackError(err, source)
+    }
+    const afterOpenNotice = formatOdfFallbackNotice(fileName, dropped, deps.t)
+    await stageAndOpenConverted({
+      filePath,
+      fileName,
+      result: {
+        kind: 'converted',
+        sourceFormat: source,
+        targetFormat,
+        bytes,
+        suggestedSaveAsPath: suggestedOoxmlPathForLegacy(resolvedPath),
+      },
+      signal,
+      endProgress,
+      afterOpenNotice,
+    })
+  }
+
+  async function runConversion(filePath: string, source: LegacySourceFormat): Promise<void> {
+    const fileName = basename(filePath)
+    const controller = new AbortController()
+    controllers.add(controller)
+    const endProgress = deps.beginProgress(fileName, () => controller.abort())
+    try {
+      const result = await deps.convert(filePath, {
+        signal: controller.signal,
+        sourceFormat: source,
+      })
+      await stageAndOpenConverted({
+        filePath,
+        fileName,
+        result,
+        signal: controller.signal,
+        endProgress,
+      })
+    } catch (caughtErr) {
+      let err: unknown = caughtErr
+      if (
+        !(controller.signal.aborted || disposed) &&
+        err instanceof LegacyConvertError &&
+        err.code === 'converter_missing' &&
+        isOdfFallbackFormat(source) &&
+        deps.odfFallback
+      ) {
+        try {
+          await runOdfFallback(filePath, fileName, source, controller.signal, endProgress)
+          return
+        } catch (fallbackErr) {
+          err = fallbackErr
+        }
+      }
+      endProgress()
       // a cancelled or disposed job ends silently, whatever error the converter raised after
       // the stop (a missing converter must not open the values-only fallback or show a notice)
       if (controller.signal.aborted || disposed) return
@@ -206,12 +406,6 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
             return
           }
         }
-        if (err.code === 'converter_missing' && isOdfFormat(source)) {
-          // Slice 2a hooks the pure-JS odf2ooxml fallback engine here when the bundled
-          // LibreOffice converter is missing; in slice 1 it surfaces the typed missing notice.
-          deps.notice(legacyErrorMessage(err, fileName, deps.t))
-          return
-        }
         deps.notice(legacyErrorMessage(err, fileName, deps.t))
         return
       }
@@ -222,7 +416,6 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
       controllers.delete(controller)
     }
   }
-
   return {
     /** true = accepted (the conversion runs in the background and opens the tab when done) */
     open(filePath: string): boolean {
