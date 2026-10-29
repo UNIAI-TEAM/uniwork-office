@@ -651,6 +651,8 @@ const REVISION_KIND_LABEL: Record<RevisionRange['kind'], string> = {
   // never part of the base document; both accept and reject remove it
   both: 'inserted then deleted (not in the base document)',
   pPrChange: 'paragraph formatting changed',
+  paraMarkDel: 'paragraph break deleted',
+  paraMarkIns: 'paragraph break inserted',
   rPrChange: 'text formatting changed',
   moveFrom: 'moved away',
   moveTo: 'moved here',

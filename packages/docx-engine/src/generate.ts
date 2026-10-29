@@ -1941,6 +1941,19 @@ export function mergePPrFormat(
   return `${open}${parts.join('')}</w:pPr>`
 }
 
+/** drop the paragraph mark's tracked w:del / w:ins record (pPr/rPr) once the revision is accepted or rejected */
+export function stripParaMarkRevision(rawPPr: string, kind: 'del' | 'ins'): string {
+  const changeStart = rawPPr.indexOf('<w:pPrChange')
+  const live = changeStart === -1 ? rawPPr : rawPPr.slice(0, changeStart)
+  const tail = changeStart === -1 ? '' : rawPPr.slice(changeStart)
+  const tags = kind === 'del' ? 'del|moveFrom' : 'ins|moveTo'
+  const stripped = live.replace(/<w:rPr>([\s\S]*?)<\/w:rPr>/, (_m, inner: string) => {
+    const rest = inner.replace(new RegExp(`<w:(?:${tags})\\b[^>]*/>`), '')
+    return rest.trim() ? `<w:rPr>${rest}</w:rPr>` : ''
+  })
+  return stripped + tail
+}
+
 /**
  * Strip <w:pPrChange>...</w:pPrChange> from a raw <w:pPr> slice.
  * Used when the editor accepts or rejects a paragraph-property revision,
