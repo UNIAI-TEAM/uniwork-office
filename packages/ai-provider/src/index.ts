@@ -113,7 +113,7 @@ export { aiChatFailure, aiChatFailureFromError, aiStreamErrorFields } from './ai
 export { aiChatFailureText } from './ai-chat-error-text'
 export type { AiChatFailure, AiStreamErrorCode, AiStreamErrorFields } from './ai-chat-error'
 export { AI_CHAT_TEST_TIMEOUT_MS, testChatConnection } from './ai-chat-test'
-export { setAiUserAgent, setPrimaryFetch, setRescueFetch } from './fetch'
+export { setAiUserAgent, setRescueFetch } from './fetch'
 export { isAiNetworkError } from './network-error'
 export { isAiOverloadedError } from './overload-error'
 export { parseOutputCapRejection } from './output-cap'

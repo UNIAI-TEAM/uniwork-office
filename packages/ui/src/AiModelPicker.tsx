@@ -42,7 +42,7 @@ export interface AiModelPickerCloudStatus {
 /** Each app's preload exposes these under its own namespace; the panel adapts them. */
 export interface AiModelPickerBridge {
   readonly getSettings: () => Promise<AiSettings>
-  /** `options.modelPick` names the model the user chose; main records a pick only from that */
+  /** `options.modelPick` names the model the user chose (a plain echo of the settings carries none) */
   readonly setSettings: (settings: AiSettings, options?: AiSettingsSaveOptions) => Promise<void>
   /** fires after any renderer (this one, another tab, the shell settings page) saved ai-settings.json */
   readonly onSettingsChanged?: ((handler: () => void) => () => void) | undefined
