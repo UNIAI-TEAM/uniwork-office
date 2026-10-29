@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 // UNI-1016: the Sheets web bridge over a fake engine transport and the mocked protocol port.
+import JSZip from 'jszip'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  REDACTION_PART_PATH,
+  applyRedactionNameMirror,
+} from '../../../packages/xlsx-gateway/src/gateway/xlsx-redaction'
 import type {
   DesktopApi,
   WorkbookFile,
@@ -1676,5 +1681,108 @@ describe('FRAME-RO-01: capability flags, readOnly profile, and Escape (UNI-1876)
       path: 'Budget.pdf (print dialog)',
     })
     expect(t.print).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('readWorkbookRedactions', () => {
+  const WORKBOOK_XML =
+    '<workbook xmlns:r="urn:r"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>'
+  const MARK = {
+    startRow: 1,
+    endRow: 1,
+    startColumn: 1,
+    endColumn: 1,
+    label: 'client phone',
+    previousFill: '#FF0000',
+  }
+  const STATES = [{ sheetName: 'Sheet1', marks: [MARK] }]
+
+  async function buildZip(entries: Record<string, string>): Promise<Uint8Array> {
+    const zip = new JSZip()
+    for (const [name, content] of Object.entries(entries)) zip.file(name, content)
+    return zip.generateAsync({ type: 'uint8array' })
+  }
+
+  it('loads marks when the workbook has a redactions part', async () => {
+    const bytes = await buildZip({
+      'xl/workbook.xml': applyRedactionNameMirror(WORKBOOK_XML, STATES, ['Sheet1']),
+      [REDACTION_PART_PATH]: JSON.stringify({
+        version: 1,
+        sheets: [{ name: 'Sheet1', marks: [MARK] }],
+      }),
+    })
+    const t = setup({ fileBytes: bytes })
+    const wb = await t.boot()
+    expect(await t.desktop.readWorkbookRedactions({ sessionId: wb.sessionId })).toEqual({
+      status: 'ok',
+      source: 'part',
+      states: STATES,
+    })
+  })
+
+  it('recovers marks when the workbook only has the defined-name mirror', async () => {
+    const bytes = await buildZip({
+      'xl/workbook.xml': applyRedactionNameMirror(WORKBOOK_XML, STATES, ['Sheet1']),
+    })
+    const t = setup({ fileBytes: bytes })
+    const wb = await t.boot()
+    expect(await t.desktop.readWorkbookRedactions({ sessionId: wb.sessionId })).toEqual({
+      status: 'ok',
+      source: 'mirror',
+      states: [{ sheetName: 'Sheet1', marks: [{ ...MARK, previousFill: undefined }] }],
+    })
+  })
+
+  it('returns absent (no error bar) when the workbook has neither part nor mirror', async () => {
+    const bytes = await buildZip({ 'xl/workbook.xml': WORKBOOK_XML })
+    const t = setup({ fileBytes: bytes })
+    const wb = await t.boot()
+    expect(await t.desktop.readWorkbookRedactions({ sessionId: wb.sessionId })).toEqual({
+      status: 'absent',
+    })
+  })
+
+  it('returns unreadable when the redactions part is corrupt and there is no mirror', async () => {
+    const bytes = await buildZip({
+      'xl/workbook.xml': WORKBOOK_XML,
+      [REDACTION_PART_PATH]: JSON.stringify({
+        version: 2,
+        sheets: [{ name: 'Sheet1', marks: [MARK] }],
+      }),
+    })
+    const t = setup({ fileBytes: bytes })
+    const wb = await t.boot()
+    const res = await t.desktop.readWorkbookRedactions({ sessionId: wb.sessionId })
+    expect(res.status).toBe('unreadable')
+    if (res.status === 'unreadable') expect(res.error).toContain('version')
+  })
+
+  it('re-reads marks from the saved bytes after a save swaps the session', async () => {
+    const initialBytes = await buildZip({ 'xl/workbook.xml': WORKBOOK_XML })
+    const savedBytes = await buildZip({
+      'xl/workbook.xml': applyRedactionNameMirror(WORKBOOK_XML, STATES, ['Sheet1']),
+      [REDACTION_PART_PATH]: JSON.stringify({
+        version: 1,
+        sheets: [{ name: 'Sheet1', marks: [MARK] }],
+      }),
+    })
+    const fake = fakeTransport()
+    fake.transport.serialize = async () => ({
+      data: savedBytes.slice().buffer,
+      touchedEntries: ['xl/workbook.xml', REDACTION_PART_PATH],
+    })
+    const t = setup({ fileBytes: initialBytes, transport: fake.transport })
+    const wb = await t.boot()
+    expect(await t.desktop.readWorkbookRedactions({ sessionId: wb.sessionId })).toEqual({
+      status: 'absent',
+    })
+    const saved = await t.desktop.saveWorkbookEdits(saveRequest(wb.sessionId, []))
+    expect(saved.canceled).toBe(false)
+    if (saved.canceled) return
+    expect(await t.desktop.readWorkbookRedactions({ sessionId: saved.file.sessionId })).toEqual({
+      status: 'ok',
+      source: 'part',
+      states: STATES,
+    })
   })
 })

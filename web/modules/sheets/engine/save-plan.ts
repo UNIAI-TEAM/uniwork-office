@@ -59,6 +59,7 @@ export interface ResolvedSave {
       tabColorStates: PlanArgs[25]
       tableEdits: PlanArgs[26]
       cellImageAdditions: PlanArgs[27]
+      redactionStates: PlanArgs[28]
     },
     never
   >
@@ -195,6 +196,18 @@ export function resolveSaveRequest(
     list.push({ row: cell.row, column: cell.column, value: cell.value })
     formulaValuesBySheet.set(sheetName, list)
   }
+  const redactionStates =
+    (request.redactionStates ?? null)?.map((state) => ({
+      sheetName: state.sheetName,
+      marks: state.marks.map((mark) => ({
+        startRow: mark.startRow,
+        endRow: mark.endRow,
+        startColumn: mark.startColumn,
+        endColumn: mark.endColumn,
+        label: mark.label,
+        ...('previousFill' in mark ? { previousFill: mark.previousFill ?? null } : {}),
+      })),
+    })) ?? null
   return {
     edits,
     args: {
@@ -313,6 +326,7 @@ export function resolveSaveRequest(
       })),
       bulkConstantFills,
       tabColorStates,
+      redactionStates,
     },
   }
 }
@@ -461,6 +475,7 @@ export async function saveWorkbookBytes(input: {
     a.tabColorStates,
     a.tableEdits,
     a.cellImageAdditions,
+    a.redactionStates,
   )
   const plan = input.cachedValues
     ? await rewriteCachedValues(planned, source, input.cachedValues)

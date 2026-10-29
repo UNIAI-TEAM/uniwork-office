@@ -345,6 +345,15 @@ export const vi = {
   appAiBadgeTip: 'Sử dụng AI',
   appTranslate: 'Dịch',
   appTranslateTo: 'Dịch sang {lang}',
+  redactMenuLabel: 'Ẩn phần đã chọn khỏi AI',
+  redactDialogDesc:
+    'Văn bản vẫn còn trong tài liệu và tệp; mô hình chỉ thấy nhãn thay thế bên dưới. Đặt tên để mô hình biết nó đại diện cho điều gì.',
+  redactDialogScope:
+    'Điều này chỉ áp dụng cho AI trong ứng dụng này. CLI, các công cụ MCP và bản xuất chạy nền đều đọc thẳng tệp, nên chúng vẫn thấy những từ này.',
+  redactDialogPlaceholder: 'Tên nhãn thay thế, ví dụ: số điện thoại khách hàng',
+  redactCancel: 'Hủy',
+  redactInsert: 'Ẩn',
+  redactShowLabel: 'Hiển thị lại phần đã chọn cho AI',
   appLangEnglish: 'Tiếng Anh',
   appLangSimplifiedChinese: 'Tiếng Trung giản thể',
   appLangJapanese: 'Tiếng Nhật',

@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FWorkbook } from '@univerjs/sheets/facade'
 import { handleSheetsControl, splitSheetRange } from '../src/renderer/control'
+import { buildRedactionIndex } from '../src/renderer/ai/redact'
 
 function fakeWorkbook(names: string[], active = names[0]!, booted = true) {
   const ranges: Array<{ a1: string; activate: ReturnType<typeof vi.fn> }> = []
   let activeRange: { getA1Notation(): string } | null = null
-  const sheets = names.map((name) => {
+  const sheets = names.map((name, idx) => {
     const sheet = {
+      getSheetId: () => `sh-${idx + 1}`,
       getSheetName: () => name,
       getVisibleRange: () => {
         if (!booted) throw new Error('no scroll render controller')
@@ -147,6 +149,31 @@ describe('sheets control hook', () => {
         range: 'A1:B2',
         values: [
           [1, 2],
+          [3, 4],
+        ],
+      },
+    })
+  })
+
+  it('projects withheld cells to placeholders in selection values', () => {
+    const wb = fakeWorkbook(['Data'])
+    wb.setActiveRange('B2:C3')
+    const redactions = buildRedactionIndex(
+      [
+        {
+          sheetName: 'Data',
+          marks: [{ startRow: 1, endRow: 1, startColumn: 2, endColumn: 2, label: 'client phone' }],
+        },
+      ],
+      [{ id: 'sh-1', name: 'Data' }],
+    )
+    expect(handleSheetsControl({ cmd: 'selection' }, wb.workbook, true, redactions)).toEqual({
+      status: 'ok',
+      result: {
+        sheet: 'Data',
+        range: 'B2:C3',
+        values: [
+          [1, '{{client phone}}'],
           [3, 4],
         ],
       },

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-
+import { collectWorkbookRows } from '../src/renderer/ai/range-rows'
+import { buildRedactionIndex } from '../src/renderer/ai/redact'
 import { reconcileRows, type ReconcileSpec } from '../src/renderer/ai/reconcile'
 import {
   WORKBOOK_TOOLS,
@@ -8,6 +9,7 @@ import {
   type ToolExecution,
 } from '../src/renderer/ai/tools'
 import { VIEW_ONLY_TOOLS } from '../src/renderer/ai/view-only-skill'
+import type { WorkbookReadContext } from '../src/renderer/ai/workbook-readers'
 
 type Scalar = string | number | boolean | null
 type Row = { row: number; hidden: boolean; values: Scalar[]; cached?: boolean[] }
@@ -221,5 +223,81 @@ describe('g6-12 #24b: compare_ranges tool', () => {
     )) as ToolExecution
     expect(result.output).toContain('NOT RECALCULATED')
     expect(result.output).not.toContain('matched keys')
+  })
+
+  it('projects withheld keys and values to placeholders via collectWorkbookRows', async () => {
+    const redactions = buildRedactionIndex(
+      [
+        {
+          sheetName: 'Sổ cái',
+          marks: [
+            { startRow: 1, endRow: 1, startColumn: 0, endColumn: 0, label: 'secret key' },
+            { startRow: 2, endRow: 2, startColumn: 1, endColumn: 1, label: 'secret amount' },
+          ],
+        },
+      ],
+      [
+        { id: 's-ledger', name: 'Sổ cái' },
+        { id: 's-bank', name: 'Ngân hàng' },
+      ],
+    )
+    const ctx = {
+      univerRef: { current: null },
+      lazyWorkbookRef: { current: null },
+      adapterRef: {
+        current: {
+          getSnapshot: () => ({
+            revision: 0,
+            sheets: [
+              {
+                id: 's-ledger',
+                name: 'Sổ cái',
+                cells: {
+                  A1: { value: 'Mã' },
+                  B1: { value: 'Số tiền' },
+                  A2: { value: 'K-SECRET' },
+                  B2: { value: 100 },
+                  A3: { value: 'K002' },
+                  B3: { value: 987654 },
+                },
+              },
+              {
+                id: 's-bank',
+                name: 'Ngân hàng',
+                cells: {
+                  A1: { value: 'Mã' },
+                  B1: { value: 'Số tiền' },
+                  A2: { value: 'K002' },
+                  B2: { value: 250 },
+                },
+              },
+            ],
+          }),
+        },
+      },
+      redactionIndexRef: { current: redactions },
+    } as unknown as WorkbookReadContext
+
+    const result = (await executeWorkbookTool(
+      {
+        id: 'c',
+        name: 'compare_ranges',
+        input: {
+          leftRange: 'A1:B3',
+          leftKey: 'A',
+          rightRange: 'A1:B2',
+          rightSheetId: 's-bank',
+          rightKey: 'A',
+        },
+      },
+      deps({
+        collectRows: (sheetId, bounds) => collectWorkbookRows(ctx, sheetId ?? 's-ledger', bounds),
+      }),
+    )) as ToolExecution
+    expect(result.isError).toBeFalsy()
+    expect(result.output).toContain('{{secret key}}')
+    expect(result.output).toContain('{{secret amount}}')
+    expect(result.output).not.toContain('K-SECRET')
+    expect(result.output).not.toContain('987654')
   })
 })
