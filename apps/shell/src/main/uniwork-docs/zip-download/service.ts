@@ -107,10 +107,17 @@ export function createZipDownloadService(deps: ZipDownloadServiceDeps): ZipDownl
     try {
       const existing = await lstat(resolvedTarget).catch(() => null)
       const mode = existing?.isFile() ? existing.mode & 0o777 : 0o600
-      handle = await open(tmp, 'wx', 0o600)
       run.tmp = tmp
+      handle = await open(tmp, 'wx', 0o600)
+      if (run.controller.signal.aborted) {
+        await handle.close().catch(() => undefined)
+        await unlink(tmp).catch(() => undefined)
+        run.tmp = null
+        throw new ZipRunError('write_failed')
+      }
       return makeSink(handle, tmp, resolvedTarget, mode, target, run)
     } catch {
+      run.tmp = null
       throw new ZipRunError('write_failed')
     }
   }
