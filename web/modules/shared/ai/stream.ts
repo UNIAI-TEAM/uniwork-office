@@ -65,14 +65,9 @@ import {
   type AiHandoff,
   type AiHandoffStream,
 } from './handoff'
-import {
-  AiWebError,
-  asUniworkFailure,
-  findAiWebError,
-  rawFailureAsTyped,
-  type UniworkFailure,
-} from './errors'
+import { AiWebError, findAiWebError, rawFailureAsTyped, type UniworkFailure } from './errors'
 import { createProxyFetch } from './transport'
+import { runUniworkWriter, uniworkFailureOf } from './writer'
 
 export type WireProtocol = 'openai-compatible' | 'anthropic' | 'gemini'
 
@@ -89,12 +84,15 @@ export interface UniworkStreamDeps {
   describeFailure(failure: UniworkFailure): string
   /** UniWork AI is off for this organization or format (before any run): hide the entry */
   onOff(): void
+  /** the module's UI language: a writer call asks for vi or en (default: en) */
+  lang?(): string
   /** test seam: the adapter (default: ai-provider `streamUniwork`) */
   stream?: typeof streamUniwork
 }
 
 export interface StreamDeps {
-  client: Pick<AiWebClient, 'base' | 'fetch'> & Partial<Pick<AiWebClient, 'uniworkChat'>>
+  client: Pick<AiWebClient, 'base' | 'fetch'> &
+    Partial<Pick<AiWebClient, 'uniworkChat' | 'uniworkWrite'>>
   /** the server's wire protocol of a provider id (from GET credentials `providers`); null = unknown */
   protocolOf(provider: string): WireProtocol | null
   /**
@@ -218,8 +216,11 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     const { requestId, messages } = request
     const uniwork = deps.uniwork
     const chat = deps.client.uniworkChat
-    if (request.purpose) {
-      // the loop's context summary and the one-shot writers are not the user's question: the
+    const write = deps.client.uniworkWrite
+    // a one-shot that names its writer runs on the writer route, inside the turn that called it
+    const writer = request.purpose === 'one-shot' && write ? request.writer : undefined
+    if (request.purpose && !writer) {
+      // the loop's context summary and the other one-shots are not the user's question: the
       // server keeps the conversation, so they never go out (the loop folds old turns mechanically)
       const failure: UniworkFailure = { code: 'unsupported' }
       emit({
@@ -242,6 +243,24 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
     const controller = new AbortController()
     active.set(requestId, controller)
     deps.aiRun?.begin(requestId, () => controller.abort())
+    if (writer && write) {
+      try {
+        await runUniworkWriter(
+          {
+            write,
+            lang: () => uniwork.lang?.() ?? 'en',
+            describeFailure: uniwork.describeFailure,
+            signal: controller.signal,
+          },
+          { ...request, writer },
+          emit,
+        )
+      } finally {
+        active.delete(requestId)
+        deps.aiRun?.end(requestId)
+      }
+      return
+    }
     // a question (never tool results) may run the handed-over job: every post of this turn is that
     // question, its run_expired / 429 resends included, so each carries the id
     const handoffId = deps.handoff?.stream(handoffTurn(messages, true)) ?? null
@@ -327,16 +346,7 @@ export function createWebAiStreams(deps: StreamDeps): WebAiStreams {
         emit({ requestId, type: 'done' })
         return
       }
-      const failure =
-        asUniworkFailure(err) ??
-        (isAiNetworkError(err)
-          ? ({
-              code:
-                typeof navigator !== 'undefined' && navigator.onLine === false
-                  ? 'offline'
-                  : 'disconnected',
-            } satisfies UniworkFailure)
-          : undefined)
+      const failure = uniworkFailureOf(err)
       // a lost session may come back as another account: nothing of this one is sent again
       if (failure?.code === 'session_expired') uniworkConversations.clear()
       if (failure?.code === 'office_capability_off' && !off) {

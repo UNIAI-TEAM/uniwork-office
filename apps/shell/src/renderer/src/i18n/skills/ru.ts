@@ -1,0 +1,32 @@
+import type { zh } from './zh'
+
+export const ru = {
+  setSecSkills: 'Навыки',
+  intgSkillsDesc:
+    'UniWork Office использует только навыки из своей папки навыков. Импорт папки или zip копирует навык целиком; при импорте ничего не запускается.',
+  intgSkillsEmpty: 'Навыки ещё не установлены.',
+  intgSkillsImportFolder: 'Импорт папки…',
+  intgSkillsImportZip: 'Импорт пакета навыка (zip / .md)…',
+  intgSkillsImportFolderTitle: 'Выберите папку навыка',
+  intgSkillsImportZipTitle: 'Выберите zip или .md навыка',
+  intgSkillsImportDone: 'Импортирован {name}',
+  intgSkillsImportFailed: 'Ошибка импорта: {reason}',
+  intgSkillsRemove: 'Удалить',
+  intgSkillsRemoveConfirm: 'Удалить навык «{name}»? Его папка будет удалена из UniWork Office.',
+  intgSkillsRemoved: '{name} удалён',
+  intgSkillsRead: 'Подробнее',
+  intgSkillsMine: 'Мои навыки',
+  intgSkillsRecommended: 'Рекомендуемые',
+  intgSkillsCatOffice: 'Офис',
+  intgSkillsCatBusiness: 'Бизнес',
+  intgSkillsCatData: 'Данные',
+  intgSkillsCatFinance: 'Финансы',
+  intgSkillsCatHr: 'Кадры',
+  intgSkillsCatLegal: 'Юридическое',
+  intgSkillsCatMarketing: 'Маркетинг',
+  intgSkillsCatEducation: 'Образование',
+  intgSkillsCatOther: 'Другое',
+  intgSkillsInstall: 'Установить',
+  intgSkillsUpdate: 'Обновить',
+  intgSkillsInstalledTag: 'Установлен',
+} satisfies Record<keyof typeof zh, string>

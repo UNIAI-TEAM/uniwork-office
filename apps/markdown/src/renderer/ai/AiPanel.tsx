@@ -506,7 +506,7 @@ export function AiPanel({
     onProgress: (markdown: string) => void,
     signal?: AbortSignal,
   ): Promise<DocWriteResult> => {
-    const { system, user } = buildDocWriterRequest(
+    const { system, user, writer } = buildDocWriterRequest(
       spec,
       MARKDOWN_RULES,
       aiLangDirective(langRef.current),
@@ -532,6 +532,7 @@ export function AiPanel({
         user,
         signal,
         maxChars: DOC_MAX_CHARS,
+        writer,
         extract: (raw) => ({ text: extractMarkdown(raw) }),
         onProgress: (markdown) => {
           if (closed) return

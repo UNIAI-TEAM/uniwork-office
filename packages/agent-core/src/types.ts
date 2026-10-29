@@ -132,11 +132,29 @@ export interface AgentPhase {
  */
 export type AgentRequestPurpose = 'summary' | 'one-shot'
 
+/** the one-shot writers UniWork AI runs from its own prompts (the server's writer route kinds) */
+export type WriterKind =
+  | 'docs.write_document'
+  | 'markdown.write_document'
+  | 'html.page'
+  | 'html.brief'
+  | 'slides.deck_style'
+  | 'slides.deck_outline'
+  | 'slides.page'
+
+/**
+ * A one-shot writer as UniWork AI takes it: the kind and its structured input (the server's
+ * field names), never prompt text. A BYOK provider ignores it and reads `system` / the user text.
+ */
+export type WriterCall = { kind: WriterKind; input: Record<string, unknown> }
+
 export interface AgentStreamRequest {
   system: string
   messages: AgentMessage[]
   tools: AgentToolDef[]
   purpose?: AgentRequestPurpose | undefined
+  /** a one-shot writer UniWork AI can run inside the open turn (with `purpose: 'one-shot'`) */
+  writer?: WriterCall | undefined
 }
 
 export interface AgentStreamCallbacks {

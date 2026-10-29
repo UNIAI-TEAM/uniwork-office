@@ -18,6 +18,7 @@
  *     cloud/media/analyze              POST           { requirements, media: [...] } -> { text }
  *     cloud/transcribe                 POST           { prompt?, audio } -> { text }
  *     uniwork/chat/completions         POST           UniWork AI: one agent turn, openai-compatible, raw Response
+ *     uniwork/write                    POST           { kind, lang, input }: a one-shot writer of the open run, SSE, raw Response
  *
  * A key is never read back: `key_hint` is "…" + the last four characters. `model` is the model the
  * person chose for that provider, saved with the credential (an older server omits it: read as "").
@@ -130,6 +131,15 @@ export interface AiWebClient {
     body: string
     signal?: AbortSignal
   }): Promise<Response>
+  /**
+   * One UniWork AI writer call (`uniwork/write`): a one-shot writer inside the run the headers
+   * name, authorised and returned RAW like `uniworkChat`.
+   */
+  uniworkWrite(
+    body: string,
+    headers: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<Response>
   /** as fetch, but a non-2xx answer throws its AiWebError and the JSON body is returned */
   json<T>(path: string, init?: RequestInit): Promise<T>
   listCredentials(): Promise<AiCredentialList>
@@ -274,6 +284,8 @@ export function createAiWebClient(options: AiWebClientOptions): AiWebClient {
         body: request.body,
         ...(request.signal ? { signal: request.signal } : {}),
       }),
+    uniworkWrite: (body, headers, signal) =>
+      authorised('uniwork/write', { method: 'POST', headers, body, ...(signal ? { signal } : {}) }),
     json,
     listCredentials: async () => readCredentialList(await json('credentials')),
     saveCredential: async (provider, input) =>

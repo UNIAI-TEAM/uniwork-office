@@ -112,6 +112,7 @@ import { controlHandler } from './control-handlers'
 import { cliLinkStatus, healCliLinks, installCliLinkOnRequest, recordCliLauncher } from './cli-link'
 import { createDefaultAppService, execFileRunner } from './default-app'
 import { registerIntegrationsIpc } from './integrations-ipc'
+import { registerUserSkillsIpc } from './user-skills-ipc'
 import { handleDroppedFiles } from './dropped-files'
 import {
   handleOfficeLaunchUrl,
@@ -7248,7 +7249,7 @@ function installBackToHomeItems(): void {
  *  ⌘, lands on it from anywhere in the suite. The window comes back first if
  *  it was hidden or minimized, and asking again re-opens the same panel —
  *  the renderer keeps one. */
-function openSettingsView(section: 'general' | 'aiModel' = 'general'): void {
+function openSettingsView(section: 'general' | 'aiModel' | 'skills' = 'general'): void {
   openShellSettingsView(
     {
       ensureTabManager,
@@ -7385,6 +7386,9 @@ registerAiIpc()
 guardedIpc.handle('ai:open-model-settings', () => {
   openSettingsView('aiModel')
 })
+guardedIpc.handle('ai:open-skills-settings', () => {
+  openSettingsView('skills')
+})
 registerProjectIpc()
 registerDocsIpc()
 registerHomeIpc()
@@ -7400,9 +7404,13 @@ registerIntegrationsIpc(guardedIpc, {
   cliPackageJson: app.isPackaged
     ? join(process.resourcesPath, 'cli', 'package.json')
     : join(APPS_ROOT, '..', 'packages', 'cli', 'package.json'),
+  recommendedSkillsDir: app.isPackaged
+    ? join(process.resourcesPath, 'cli', 'skills', 'recommended')
+    : join(APPS_ROOT, '..', 'skills', 'recommended'),
 })
 registerTabsIpc()
 registerDroppedFilesIpc()
+registerUserSkillsIpc(guardedIpc)
 // editors report a running AI turn per webContents (TabManager.editorDirtyStates reads it)
 registerAiRunIpc(guardedIpc)
 // the renderers' own provider lists learn whether UniWork AI is offered (pull + push)

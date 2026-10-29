@@ -1,0 +1,32 @@
+import type { zh } from './zh'
+
+export const zhTW = {
+  setSecSkills: '技能',
+  intgSkillsDesc:
+    'UniWork Office 只使用自己技能資料夾裡的技能。從資料夾或 zip 匯入會把整個技能複製進來；匯入不會自動執行任何東西。',
+  intgSkillsEmpty: '尚未安裝技能。',
+  intgSkillsImportFolder: '匯入資料夾…',
+  intgSkillsImportZip: '匯入技能包（zip / .md）…',
+  intgSkillsImportFolderTitle: '選擇技能資料夾',
+  intgSkillsImportZipTitle: '選擇技能 zip 或 .md',
+  intgSkillsImportDone: '已匯入 {name}',
+  intgSkillsImportFailed: '匯入失敗：{reason}',
+  intgSkillsRemove: '移除',
+  intgSkillsRemoveConfirm: '移除技能「{name}」？其資料夾會從 UniWork Office 中刪除。',
+  intgSkillsRemoved: '已移除 {name}',
+  intgSkillsRead: '詳情',
+  intgSkillsMine: '我的技能',
+  intgSkillsRecommended: '推薦',
+  intgSkillsCatOffice: '辦公',
+  intgSkillsCatBusiness: '商務',
+  intgSkillsCatData: '資料',
+  intgSkillsCatFinance: '財務',
+  intgSkillsCatHr: '人力資源',
+  intgSkillsCatLegal: '法務',
+  intgSkillsCatMarketing: '行銷',
+  intgSkillsCatEducation: '教育',
+  intgSkillsCatOther: '其他',
+  intgSkillsInstall: '安裝',
+  intgSkillsUpdate: '更新',
+  intgSkillsInstalledTag: '已安裝',
+} satisfies Record<keyof typeof zh, string>

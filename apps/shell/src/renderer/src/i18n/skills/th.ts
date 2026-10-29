@@ -1,0 +1,32 @@
+import type { zh } from './zh'
+
+export const th = {
+  setSecSkills: 'ทักษะ',
+  intgSkillsDesc:
+    'UniWork Office ใช้เฉพาะทักษะในโฟลเดอร์ทักษะของตัวเอง การนำเข้าจากโฟลเดอร์หรือ zip จะคัดลอกทักษะทั้งชุด และไม่มีสิ่งใดทำงานเมื่อนำเข้า',
+  intgSkillsEmpty: 'ยังไม่ได้ติดตั้งทักษะ',
+  intgSkillsImportFolder: 'นำเข้าโฟลเดอร์…',
+  intgSkillsImportZip: 'นำเข้าแพ็กเกจทักษะ (zip / .md)…',
+  intgSkillsImportFolderTitle: 'เลือกโฟลเดอร์ทักษะ',
+  intgSkillsImportZipTitle: 'เลือกไฟล์ zip หรือ .md ทักษะ',
+  intgSkillsImportDone: 'นำเข้า {name} แล้ว',
+  intgSkillsImportFailed: 'นำเข้าไม่สำเร็จ: {reason}',
+  intgSkillsRemove: 'ลบ',
+  intgSkillsRemoveConfirm: 'ลบทักษะ "{name}" หรือไม่ โฟลเดอร์ของทักษะจะถูกลบออกจาก UniWork Office',
+  intgSkillsRemoved: 'ลบ {name} แล้ว',
+  intgSkillsRead: 'รายละเอียด',
+  intgSkillsMine: 'สกิลของฉัน',
+  intgSkillsRecommended: 'แนะนำ',
+  intgSkillsCatOffice: 'สำนักงาน',
+  intgSkillsCatBusiness: 'ธุรกิจ',
+  intgSkillsCatData: 'ข้อมูล',
+  intgSkillsCatFinance: 'การเงิน',
+  intgSkillsCatHr: 'ทรัพยากรบุคคล',
+  intgSkillsCatLegal: 'กฎหมาย',
+  intgSkillsCatMarketing: 'การตลาด',
+  intgSkillsCatEducation: 'การศึกษา',
+  intgSkillsCatOther: 'อื่นๆ',
+  intgSkillsInstall: 'ติดตั้ง',
+  intgSkillsUpdate: 'อัปเดต',
+  intgSkillsInstalledTag: 'ติดตั้งแล้ว',
+} satisfies Record<keyof typeof zh, string>
