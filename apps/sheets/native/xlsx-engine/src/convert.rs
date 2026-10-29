@@ -201,7 +201,7 @@ fn cols_xml(sheet: &XlsSheetBinary) -> String {
     let custom: Vec<_> = sheet
         .col_infos
         .iter()
-        .filter(|(_, last, _)| *last < 100)
+        .filter(|(first, last, _)| *first <= *last && *first < 16384 && *last < CUSTOM_COLUMN_LIMIT)
         .collect();
     if custom.is_empty() {
         return String::new();
@@ -220,38 +220,89 @@ fn cols_xml(sheet: &XlsSheetBinary) -> String {
     format!("<cols>{entries}</cols>")
 }
 
-/// The width of one column in characters of the default font, for the anchor
-/// arithmetic: a custom COLINFO entry when one covers it, else the wide
-/// default span, else the spec's 8.43.
-fn col_width_chars(sheet: &XlsSheetBinary, column: u16) -> f64 {
-    let mut default = 8.43;
-    for (first, last, width) in &sheet.col_infos {
-        let chars = f64::from(*width) / 256.0;
-        if *last >= 100 {
-            default = chars;
-        } else if column >= *first && column <= *last {
-            return chars;
+/// Column widths below this index can carry their own COLINFO width; a span
+/// reaching past it is the sheet's default echoed back (see `cols_xml`).
+const CUSTOM_COLUMN_LIMIT: u16 = 100;
+
+/// The most pictures taken from one sheet; a drawing with more is hostile and
+/// the rest are skipped.
+const MAX_PICTURES_PER_SHEET: usize = 1_000;
+
+/// A sheet's column and row geometry in pixels, built once so each picture
+/// anchor is a lookup instead of a scan over every COLINFO / ROW record.
+/// `*_edge[n]` is the sum of the first `n` sizes, added in order.
+struct SheetMetrics {
+    col_px: Vec<f64>,
+    row_px: Vec<f64>,
+    col_edge: Vec<f64>,
+    row_edge: Vec<f64>,
+}
+
+impl SheetMetrics {
+    fn new(sheet: &XlsSheetBinary) -> Self {
+        // Width in characters of the default font: the first custom COLINFO
+        // entry covering the column, else the wide default span, else the
+        // spec's 8.43. Only columns below the limit can be custom.
+        let mut default = 8.43;
+        let mut custom: Vec<Option<f64>> = vec![None; usize::from(CUSTOM_COLUMN_LIMIT)];
+        for (first, last, width) in &sheet.col_infos {
+            let chars = f64::from(*width) / 256.0;
+            if *last >= CUSTOM_COLUMN_LIMIT {
+                default = chars;
+            } else {
+                for column in *first..=*last {
+                    custom[usize::from(column)].get_or_insert(chars);
+                }
+            }
+        }
+        // Calibri-11 metrics: the same 7 px per character the workbook DSL's
+        // width ops use.
+        let col_px: Vec<f64> = (0..=u16::MAX)
+            .map(|column| {
+                let chars = custom.get(usize::from(column)).copied().flatten();
+                (chars.unwrap_or(default) * 7.0).round() + 5.0
+            })
+            .collect();
+        // Twips -> points -> pixels at 96 dpi. Rows the file describes carry
+        // their own height (the first record wins); the rest get 12.75 pt.
+        let mut twips = vec![255u16; usize::from(u16::MAX) + 1];
+        let mut seen = vec![false; twips.len()];
+        for (row, height, _) in &sheet.row_heights {
+            if !seen[usize::from(*row)] {
+                seen[usize::from(*row)] = true;
+                twips[usize::from(*row)] = *height;
+            }
+        }
+        let row_px: Vec<f64> = twips.iter().map(|t| f64::from(*t) / 15.0).collect();
+        SheetMetrics {
+            col_edge: edges(&col_px),
+            row_edge: edges(&row_px),
+            col_px,
+            row_px,
         }
     }
-    default
+
+    /// The left edge of `column` plus `offset` 1024ths of its width, in pixels.
+    fn column_span_px(&self, column: u16, offset: u16) -> f64 {
+        let column = usize::from(column);
+        self.col_edge[column] + self.col_px[column] * f64::from(offset) / 1024.0
+    }
+
+    /// The top edge of `row` plus `offset` 1024ths of its height, in pixels.
+    fn row_span_px(&self, row: u16, offset: u16) -> f64 {
+        let row = usize::from(row);
+        self.row_edge[row] + self.row_px[row] * f64::from(offset) / 1024.0
+    }
 }
 
-/// Column width in pixels under Calibri-11 metrics — the same 7 px per
-/// character the workbook DSL's width ops use.
-fn col_px(sheet: &XlsSheetBinary, column: u16) -> f64 {
-    (col_width_chars(sheet, column) * 7.0).round() + 5.0
-}
-
-/// Row height in pixels: twips → points → pixels at 96 dpi. Rows the file
-/// describes carry their own height; the rest get the 12.75 pt default.
-fn row_px(sheet: &XlsSheetBinary, row: u16) -> f64 {
-    let twips = sheet
-        .row_heights
-        .iter()
-        .find(|(candidate, _, _)| *candidate == row)
-        .map(|(_, twips, _)| *twips)
-        .unwrap_or(255);
-    f64::from(twips) / 15.0
+fn edges(sizes: &[f64]) -> Vec<f64> {
+    let mut out = Vec::with_capacity(sizes.len());
+    let mut sum = 0.0;
+    for size in sizes {
+        out.push(sum);
+        sum += size;
+    }
+    out
 }
 
 fn px_to_emu(px: f64) -> i64 {
@@ -269,12 +320,13 @@ fn sheet_art(
     media_names: &mut HashMap<usize, String>,
 ) -> Option<SheetArt> {
     let pictures = escher::parse_pictures(drawing);
+    let metrics = SheetMetrics::new(sheet);
     let mut anchors_xml = String::new();
     let mut rels_xml = String::new();
     let mut media: Vec<(String, Vec<u8>)> = Vec::new();
     let mut rel_count = 0usize;
     let mut rel_of_blip: HashMap<usize, usize> = HashMap::new();
-    for (position, picture) in pictures.iter().enumerate() {
+    for (position, picture) in pictures.iter().take(MAX_PICTURES_PER_SHEET).enumerate() {
         let [col_l, dx_l, row_t, dy_t, col_r, dx_r, row_b, dy_b] = picture.anchor;
         if col_r == u16::MAX || row_b == u16::MAX {
             // "runs to the sheet's edge" — an extent the cell grid cannot name
@@ -312,16 +364,16 @@ fn sheet_art(
                 rel
             }
         };
-        let from_x = column_span_px(sheet, col_l, dx_l);
-        let from_y = row_span_px(sheet, row_t, dy_t);
-        let to_x = column_span_px(sheet, col_r, dx_r);
-        let to_y = row_span_px(sheet, row_b, dy_b);
+        let from_x = metrics.column_span_px(col_l, dx_l);
+        let from_y = metrics.row_span_px(row_t, dy_t);
+        let to_x = metrics.column_span_px(col_r, dx_r);
+        let to_y = metrics.row_span_px(row_b, dy_b);
         anchors_xml.push_str(&format!(
             r#"<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>{col_l}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{row_t}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:from><xdr:to><xdr:col>{col_r}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{row_b}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="{}" name="Picture {}"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId{rel}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="{}" y="{}"/><a:ext cx="{}" cy="{}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>"#,
-            px_to_emu(col_px(sheet, col_l) * f64::from(dx_l) / 1024.0),
-            px_to_emu(row_px(sheet, row_t) * f64::from(dy_t) / 1024.0),
-            px_to_emu(col_px(sheet, col_r) * f64::from(dx_r) / 1024.0),
-            px_to_emu(row_px(sheet, row_b) * f64::from(dy_b) / 1024.0),
+            px_to_emu(metrics.col_px[usize::from(col_l)] * f64::from(dx_l) / 1024.0),
+            px_to_emu(metrics.row_px[usize::from(row_t)] * f64::from(dy_t) / 1024.0),
+            px_to_emu(metrics.col_px[usize::from(col_r)] * f64::from(dx_r) / 1024.0),
+            px_to_emu(metrics.row_px[usize::from(row_b)] * f64::from(dy_b) / 1024.0),
             position + 1,
             position + 1,
             px_to_emu(from_x),
@@ -342,18 +394,6 @@ fn sheet_art(
         ),
         media,
     })
-}
-
-/// The left edge of `column` plus `offset` 1024ths of its width, in pixels.
-fn column_span_px(sheet: &XlsSheetBinary, column: u16, offset: u16) -> f64 {
-    let full: f64 = (0..column).map(|step| col_px(sheet, step)).sum();
-    full + col_px(sheet, column) * f64::from(offset) / 1024.0
-}
-
-/// The top edge of `row` plus `offset` 1024ths of its height, in pixels.
-fn row_span_px(sheet: &XlsSheetBinary, row: u16, offset: u16) -> f64 {
-    let full: f64 = (0..row).map(|step| row_px(sheet, step)).sum();
-    full + row_px(sheet, row) * f64::from(offset) / 1024.0
 }
 
 fn worksheet_xml(
@@ -521,6 +561,89 @@ mod tests {
         let types = read_entry(&target, "[Content_Types].xml");
         assert!(types.contains(r#"<Default Extension="png" ContentType="image/png"/>"#));
         assert!(types.contains(r#"<Override PartName="/xl/drawings/drawing1.xml""#));
+    }
+
+    fn sheet_binary(
+        col_infos: Vec<(u16, u16, u16)>,
+        row_heights: Vec<(u16, u16, bool)>,
+    ) -> XlsSheetBinary {
+        XlsSheetBinary {
+            col_infos,
+            row_heights,
+            drawing: None,
+        }
+    }
+
+    #[test]
+    fn cols_xml_skips_spans_that_would_wrap_or_run_backwards() {
+        let sheet = sheet_binary(
+            vec![(65535, 5, 2560), (3, 1, 2560), (2, 2, 2560), (0, 400, 2304)],
+            Vec::new(),
+        );
+        assert_eq!(
+            cols_xml(&sheet),
+            r#"<cols><col min="3" max="3" width="10.00" customWidth="1"/></cols>"#
+        );
+    }
+
+    #[test]
+    fn sheet_metrics_match_the_per_step_scan_they_replace() {
+        let sheet = sheet_binary(
+            vec![(0, 400, 2304), (1, 2, 4096), (2, 3, 1024)],
+            vec![(2, 600, true), (2, 900, true), (65535, 300, false)],
+        );
+        let metrics = SheetMetrics::new(&sheet);
+        // first matching COLINFO wins, then the wide default span
+        assert_eq!(metrics.col_px[1], (16.0f64 * 7.0).round() + 5.0);
+        assert_eq!(metrics.col_px[3], (4.0f64 * 7.0).round() + 5.0);
+        assert_eq!(metrics.col_px[200], (9.0f64 * 7.0).round() + 5.0);
+        // first ROW record wins, rows without one get 12.75 pt
+        assert_eq!(metrics.row_px[2], 600.0 / 15.0);
+        assert_eq!(metrics.row_px[7], 255.0 / 15.0);
+        // the edge is the in-order sum of everything before it
+        let by_sum: f64 = metrics.col_px[..150].iter().sum();
+        assert_eq!(metrics.column_span_px(150, 0), by_sum);
+        let by_sum: f64 = metrics.row_px[..65535].iter().sum();
+        assert_eq!(
+            metrics.row_span_px(65535, 512),
+            by_sum + metrics.row_px[65535] / 2.0
+        );
+    }
+
+    #[test]
+    fn a_sheet_takes_at_most_the_picture_cap() {
+        fn record(ver_inst: u16, kind: u16, body: &[u8]) -> Vec<u8> {
+            let mut out = Vec::new();
+            out.extend_from_slice(&ver_inst.to_le_bytes());
+            out.extend_from_slice(&kind.to_le_bytes());
+            out.extend_from_slice(&(body.len() as u32).to_le_bytes());
+            out.extend_from_slice(body);
+            out
+        }
+        let mut anchor = vec![0u8; 18];
+        anchor[4..6].copy_from_slice(&1u16.to_le_bytes());
+        anchor[12..14].copy_from_slice(&2u16.to_le_bytes());
+        anchor[14..16].copy_from_slice(&3u16.to_le_bytes());
+        anchor[16..18].copy_from_slice(&4u16.to_le_bytes());
+        let mut opt = Vec::new();
+        opt.extend_from_slice(&0x0104u16.to_le_bytes());
+        opt.extend_from_slice(&1u32.to_le_bytes());
+        let mut shape = record(0x0, 0xF010, &anchor);
+        shape.extend(record(0x0, 0xF00B, &opt));
+        let shape = record(0xF, 0xF004, &shape);
+        let drawing: Vec<u8> = (0..MAX_PICTURES_PER_SHEET + 5)
+            .flat_map(|_| shape.clone())
+            .collect();
+        let blips = [Blip {
+            kind: BlipKind::Png,
+            bytes: vec![1, 2, 3],
+        }];
+        let sheet = sheet_binary(Vec::new(), Vec::new());
+        let art = sheet_art(&sheet, &drawing, &blips, &mut HashMap::new()).unwrap();
+        assert_eq!(
+            art.xml.matches("<xdr:twoCellAnchor ").count(),
+            MAX_PICTURES_PER_SHEET
+        );
     }
 
     #[test]
