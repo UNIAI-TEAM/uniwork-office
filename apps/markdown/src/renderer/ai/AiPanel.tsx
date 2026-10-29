@@ -1861,11 +1861,13 @@ export function AiPanel({
               {t('aiRedoPictureLost')}
             </div>
           )}
-          {skillsTooLong && (
-            <div className="ai-skills-too-long-notice" role="status">
-              {AI_SKILLS_LABELS[lang].uniworkTooLongNotice}
-            </div>
-          )}
+          <div role="status" aria-live="polite">
+            {skillsTooLong && (
+              <div className="ai-skills-too-long-notice">
+                {AI_SKILLS_LABELS[lang].uniworkTooLongNotice}
+              </div>
+            )}
+          </div>
           {activePartial && (
             <div className="ai-queue ai-partial-card" role="group" aria-label={t('aiPartialTitle')}>
               <div className="ai-queue-head">

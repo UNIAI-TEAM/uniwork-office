@@ -405,6 +405,14 @@ describe('markdown AI panel skills attach (X4)', () => {
     if (ackBtn) click(ackBtn)
     await flush()
 
+    // Persistent live region is mounted near the composer before any notice appears
+    const liveRegion = container!.querySelector<HTMLElement>(
+      '.ai-composer [role="status"][aria-live="polite"]',
+    )
+    expect(liveRegion).not.toBeNull()
+    expect(liveRegion!.textContent).toBe('')
+    expect(container!.querySelector('.ai-skills-too-long-notice')).toBeNull()
+
     click(container!.querySelector('.ai-plus-btn'))
     await flush()
     const items = [...container!.querySelectorAll<HTMLButtonElement>('.ai-plus-skill')]
@@ -416,8 +424,12 @@ describe('markdown AI panel skills attach (X4)', () => {
     await flush()
     await flush()
 
-    // Not sent; notice shown; prompt and chips preserved
+    // Not sent; notice shown inside the same mounted live region; prompt and chips preserved
     expect(harness.runs).toEqual([])
+    expect(container!.querySelector('.ai-composer [role="status"][aria-live="polite"]')).toBe(
+      liveRegion,
+    )
+    expect(liveRegion!.textContent).toBe(AI_SKILLS_LABELS.en.uniworkTooLongNotice)
     expect(container!.querySelector('.ai-skills-too-long-notice')?.textContent).toBe(
       AI_SKILLS_LABELS.en.uniworkTooLongNotice,
     )
@@ -430,8 +442,12 @@ describe('markdown AI panel skills attach (X4)', () => {
       ),
     ).toEqual(['tables', 'tone'])
 
-    // Removing one long skill clears the notice and allows sending when under 8,000 runes
+    // Removing one long skill clears the notice text while keeping the live region mounted
     click(container!.querySelectorAll('.ai-composer .ai-skill-chip-remove')[1]) // remove tone
+    expect(container!.querySelector('.ai-composer [role="status"][aria-live="polite"]')).toBe(
+      liveRegion,
+    )
+    expect(liveRegion!.textContent).toBe('')
     expect(container!.querySelector('.ai-skills-too-long-notice')).toBeNull()
     pressEnterInComposer(container!)
     await flush()
