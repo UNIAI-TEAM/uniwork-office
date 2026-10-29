@@ -13,7 +13,7 @@ import { UPLOAD_EXTENSIONS } from '../formats'
 import { planFileUpload, planFolderUpload } from './plan'
 import type { FolderUploadRunnerPort, FolderUploadRunProgress } from './runner-port'
 import { filesEntries, mergeScanSkips, scanFolder } from './scan'
-import type { AppFolderUploadPlan } from './scan'
+import type { AppFolderUploadPlan, AppSkip } from './scan'
 import type { FolderUploadLimits } from './types'
 
 /**
@@ -72,6 +72,23 @@ const MAX_RUNS = 32
 const MAX_DROPPED_PATHS = 2000
 const MAX_PATH_LENGTH = 4096
 const MAX_ID_LENGTH = 200
+
+/** Q4: OpenDocument files are local-only this wave; batch/multi-file upload refuses all six before planning/network. */
+const ODF_EXTENSION_RE = /\.(odt|ott|ods|ots|odp|otp)$/i
+
+function partitionOdfEntries(entries: readonly { path: string; size: number }[]): {
+  entries: { path: string; size: number }[]
+  skipped: { path: string; reason: 'unsupported_format' }[]
+} {
+  const kept: { path: string; size: number }[] = []
+  const skipped: { path: string; reason: 'unsupported_format' }[] = []
+  for (const entry of entries) {
+    if (ODF_EXTENSION_RE.test(entry.path.trim()))
+      skipped.push({ path: entry.path, reason: 'unsupported_format' })
+    else kept.push(entry)
+  }
+  return { entries: kept, skipped }
+}
 
 interface PreflightRecord {
   workspaceId: string
@@ -255,20 +272,23 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
     const scan = await scanFolder(absolute, {
       maxFiles: limits.maxFiles,
       maxDepth: limits.maxDepth,
-      uploadExtensions: limits.uploadExtensions,
+      uploadExtensions: limits.uploadExtensions?.filter(
+        (ext) => !ODF_EXTENSION_RE.test(`.${ext.trim()}`),
+      ),
     })
+    const filtered = partitionOdfEntries(scan.entries)
     const plan = mergeScanSkips(
-      planFolderUpload(scan.entries, {
+      planFolderUpload(filtered.entries, {
         limits,
         parentLevel: target.level,
         siblingNames: target.siblingNames,
       }),
-      scan,
+      { skipped: [...filtered.skipped, ...scan.skipped], truncated: scan.truncated },
       limits,
     )
     // entry paths start with the folder's own name, so they sit under its parent
     const parent = dirname(absolute)
-    const paths = scan.entries.map((entry) => join(parent, ...entry.path.split('/')))
+    const paths = filtered.entries.map((entry) => join(parent, ...entry.path.split('/')))
     const preflightId = remember(workspaceId, target, plan, paths, false)
     const rootName = plan.rootName || basename(absolute)
     return {
@@ -294,12 +314,18 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
   ): Promise<PreflightSDO> {
     const entries: { path: string; size: number }[] = []
     const absolute: string[] = []
-    const skipped: Awaited<ReturnType<typeof filesEntries>>['skipped'] = []
+    const skipped: Array<AppSkip | { path: string; reason: 'unsupported_format' }> = []
     for (const path of paths) {
       // one path at a time, so each entry keeps the path it was read from
       const read = await filesEntries([path])
-      entries.push(...read.entries)
-      if (read.entries.length > 0) absolute.push(path)
+      for (const entry of read.entries) {
+        if (ODF_EXTENSION_RE.test(entry.path.trim()))
+          skipped.push({ path: entry.path, reason: 'unsupported_format' })
+        else {
+          entries.push(entry)
+          absolute.push(path)
+        }
+      }
       skipped.push(...read.skipped)
     }
     const plan = mergeScanSkips(
@@ -407,7 +433,11 @@ export function createFolderUploadService(deps: FolderUploadServiceDeps): Folder
         null
       )
     }
-    const files = await deps.pickFiles(limits?.uploadExtensions ?? UPLOAD_EXTENSIONS)
+    const files = await deps.pickFiles(
+      (limits?.uploadExtensions ?? UPLOAD_EXTENSIONS).filter(
+        (ext) => !ODF_EXTENSION_RE.test(`.${ext.trim()}`),
+      ),
+    )
     if (files.length === 0) return null
     return (await build(where.workspaceId, where.folderId, { files, dirs: [] }, limits))[0] ?? null
   }

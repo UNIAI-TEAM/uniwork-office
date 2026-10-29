@@ -336,8 +336,64 @@ describe('refusals reach the renderer', () => {
     const sdo = await service.pick({ workspaceId: 'w', folderId: 'f1', mode: 'folder' })
     expect(sdo?.skipped).toContainEqual({ path: 'Case/ln.docx', reason: 'link' })
   })
-})
 
+  it('skips all six OpenDocument extensions as unsupported_format at the desktop boundary in both folder and files modes, even when server uploadExtensions includes them', async () => {
+    const odfExts = ['odt', 'ott', 'ods', 'ots', 'odp', 'otp'] as const
+    file('Case/a.docx', 10)
+    const loose = [file('loose/a.docx', 10)]
+    for (const ext of odfExts) {
+      file(`Case/sample.${ext}`, 10)
+      loose.push(file(`loose/sample.${ext}`, 10))
+    }
+    const withServerOdf = setup({
+      limits: { ...LIMITS, uploadExtensions: ['docx', ...odfExts] },
+      picked: { dir: join(root, 'Case') },
+    })
+    const folderSdo = await withServerOdf.service.pick({
+      workspaceId: 'w',
+      folderId: 'f1',
+      mode: 'folder',
+    })
+    expect(folderSdo?.totals).toEqual({ files: 1, bytes: 10 })
+    expect(folderSdo?.refusal).toBeNull()
+    for (const ext of odfExts) {
+      expect(folderSdo?.skipped).toContainEqual({
+        path: `Case/sample.${ext}`,
+        reason: 'unsupported_format',
+      })
+    }
+
+    await withServerOdf.service.pick({ workspaceId: 'w', folderId: 'f1', mode: 'files' })
+    expect(withServerOdf.dialogs.files[0]).toEqual(['docx'])
+
+    const withoutServerList = setup({ picked: { dir: join(root, 'Case') } })
+    const fallbackFolderSdo = await withoutServerList.service.pick({
+      workspaceId: 'w',
+      folderId: 'f1',
+      mode: 'folder',
+    })
+    expect(fallbackFolderSdo?.totals).toEqual({ files: 1, bytes: 10 })
+    for (const ext of odfExts) {
+      expect(fallbackFolderSdo?.skipped).toContainEqual({
+        path: `Case/sample.${ext}`,
+        reason: 'unsupported_format',
+      })
+    }
+
+    const filesOut = await withServerOdf.service.preflight({
+      workspaceId: 'w',
+      folderId: 'f1',
+      paths: loose,
+    })
+    expect(filesOut[0]?.totals).toEqual({ files: 1, bytes: 10 })
+    for (const ext of odfExts) {
+      expect(filesOut[0]?.skipped).toContainEqual({
+        path: `sample.${ext}`,
+        reason: 'unsupported_format',
+      })
+    }
+  })
+})
 describe('preflight from a drop', () => {
   it('groups loose files into one files preflight first, then one folder preflight per directory', async () => {
     const f1 = file('loose/one.docx', 1)
