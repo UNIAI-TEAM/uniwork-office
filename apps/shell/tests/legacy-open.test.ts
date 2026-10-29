@@ -67,6 +67,7 @@ interface Harness {
   deps: LegacyOpenDeps
   opened: ConvertedDocument[]
   notices: string[]
+  events: Array<'open' | 'notice'>
   recents: string[]
   progress: { begun: string[]; ended: number; cancel: (() => void) | null }
   openPaths: Set<string>
@@ -81,6 +82,7 @@ function harness(
     deps: undefined as never,
     opened: [],
     notices: [],
+    events: [],
     recents: [],
     progress: { begun: [], ended: 0, cancel: null },
     openPaths: new Set(),
@@ -92,6 +94,7 @@ function harness(
     openConverted: (doc) => {
       h.opened.push(doc)
       h.openPaths.add(doc.tempPath)
+      h.events.push('open')
     },
     activateConverted: (doc) => h.openPaths.has(doc.tempPath),
     isPathOpen: (path) => h.openPaths.has(path),
@@ -107,7 +110,10 @@ function harness(
         h.progress.ended++
       }
     },
-    notice: (message) => h.notices.push(message),
+    notice: (message) => {
+      h.notices.push(message)
+      h.events.push('notice')
+    },
     t,
     ...overrides,
   }
@@ -619,7 +625,7 @@ describe('legacyErrorMessage', () => {
         t,
       ),
     ).toBe(
-      'Some parts of “Report.odt” could not be carried over: footnotes (3), comments (1), text boxes (2, shown as plain text). Reinstall the app to restore full fidelity.',
+      'Some parts of “Report.odt” could not be carried over: footnotes (3), comments (1), text boxes (2, kept as plain text). To convert it in full, reinstall the app and open the file again.',
     )
     expect(
       formatOdfFallbackNotice(
@@ -632,13 +638,13 @@ describe('legacyErrorMessage', () => {
         (k, p) => tLegacyOpen('vi', k, p),
       ),
     ).toBe(
-      'Một số phần của “Report.odt” không thể giữ nguyên khi chuyển đổi: chú thích cuối trang (3), nhận xét (1), hộp văn bản (2, hiển thị dạng văn bản thuần). Hãy cài đặt lại ứng dụng để khôi phục chuyển đổi đầy đủ.',
+      'Một số phần của “Report.odt” không thể giữ nguyên khi chuyển đổi: chú thích cuối trang (3), nhận xét (1), hộp văn bản (2, giữ lại dạng văn bản thuần). Để chuyển đổi đầy đủ, hãy cài đặt lại ứng dụng rồi mở lại tệp.',
     )
     expect(formatOdfFallbackNotice('Report.odt', [], t)).toBe(
-      '“Report.odt” was opened with a simpler converter, so the layout may differ from the original. Reinstall the app to restore full fidelity.',
+      '“Report.odt” was opened with a simpler converter, so the layout may differ from the original. To convert it in full, reinstall the app and open the file again.',
     )
     expect(formatOdfFallbackNotice('Report.odt', [], (k, p) => tLegacyOpen('vi', k, p))).toBe(
-      '“Report.odt” được mở bằng bộ chuyển đổi rút gọn nên bố cục có thể khác đôi chút so với bản gốc. Hãy cài đặt lại ứng dụng để khôi phục chuyển đổi đầy đủ.',
+      '“Report.odt” được mở bằng bộ chuyển đổi đơn giản hơn nên bố cục có thể khác so với bản gốc. Để chuyển đổi đầy đủ, hãy cài đặt lại ứng dụng rồi mở lại tệp.',
     )
     // unknown keys fold into the localized "other items" bucket, never raw
     const withUnknown = formatOdfFallbackNotice(
@@ -652,6 +658,24 @@ describe('legacyErrorMessage', () => {
     expect(withUnknown).toContain('speaker notes (2), other items (4)')
     expect(withUnknown).not.toContain('custom-future-item')
 
+    // L1: cap listed kinds at 6 in engine order and fold the remaining kinds into "other items"
+    const eightKinds = formatOdfFallbackNotice(
+      'Many.odt',
+      [
+        { what: 'footnotes', count: 1 },
+        { what: 'comments', count: 2 },
+        { what: 'textboxes-flattened', count: 3 },
+        { what: 'shapes', count: 4 },
+        { what: 'images', count: 5 },
+        { what: 'objects', count: 6 },
+        { what: 'tables', count: 7 },
+        { what: 'nested-tables', count: 8 },
+      ],
+      t,
+    )
+    expect(eightKinds).toBe(
+      'Some parts of “Many.odt” could not be carried over: footnotes (1), comments (2), text boxes (3, kept as plain text), shapes (4), images (5), embedded objects (6), other items (15). To convert it in full, reinstall the app and open the file again.',
+    )
     const allKnownKeys = [
       'footnotes',
       'comments',
@@ -759,18 +783,18 @@ describe('ODF pure-JS fallback when LibreOffice converter is missing (Slice 2a)'
       expect(h.recents).toEqual([filePath])
       expect(h.progress.ended).toBe(1)
       expect(Buffer.compare(beforeBytes, readFileSync(filePath))).toBe(0)
-
+      expect(h.events).toEqual(['open', 'notice'])
       if (expectedTarget === 'docx') {
         expect(odtCalls).toEqual([beforeBytes.byteLength])
         expect(odpCalls).toEqual([])
         expect(h.notices).toEqual([
-          `Some parts of “${fixtureName}” could not be carried over: footnotes (2), text boxes (1, shown as plain text). Reinstall the app to restore full fidelity.`,
+          `Some parts of “${fixtureName}” could not be carried over: footnotes (2), text boxes (1, kept as plain text). To convert it in full, reinstall the app and open the file again.`,
         ])
       } else {
         expect(odpCalls).toEqual([beforeBytes.byteLength])
         expect(odtCalls).toEqual([])
         expect(h.notices).toEqual([
-          `Some parts of “${fixtureName}” could not be carried over: speaker notes (1). Reinstall the app to restore full fidelity.`,
+          `Some parts of “${fixtureName}” could not be carried over: speaker notes (1). To convert it in full, reinstall the app and open the file again.`,
         ])
       }
     },
@@ -795,7 +819,7 @@ describe('ODF pure-JS fallback when LibreOffice converter is missing (Slice 2a)'
     createLegacyOpener(h.deps).open(filePath)
     await vi.waitFor(() => expect(h.opened).toHaveLength(1))
     expect(h.notices).toEqual([
-      '“native-writer.odt” was opened with a simpler converter, so the layout may differ from the original. Reinstall the app to restore full fidelity.',
+      '“native-writer.odt” was opened with a simpler converter, so the layout may differ from the original. To convert it in full, reinstall the app and open the file again.',
     ])
   })
 
@@ -919,7 +943,7 @@ describe('ODF pure-JS fallback when LibreOffice converter is missing (Slice 2a)'
       Object.assign(new Error('unreadable'), { name: 'OdfConvertError', code: 'unreadable' }),
       /damaged or isn’t a valid \.odt file/,
     ],
-    [new Error('raw internal engine stacktrace'), /“native-writer\.odt” couldn’t be converted\./],
+    [new Error('raw internal engine stacktrace'), /converter is missing/],
   ] as const)(
     'maps fallback engine errors to typed damaged/failed notices and never shows raw error messages',
     async (thrown, expectedPattern) => {
@@ -984,7 +1008,7 @@ describe('ODF pure-JS fallback when LibreOffice converter is missing (Slice 2a)'
     expect(Buffer.compare(odpBefore, readFileSync(odpPath))).toBe(0)
     expect(hOdp.notices).toHaveLength(1)
     expect(hOdp.notices[0]).toBe(
-      'Some parts of “native-impress.odp” could not be carried over: images (1), speaker notes (3), shapes (3). Reinstall the app to restore full fidelity.',
+      'Some parts of “native-impress.odp” could not be carried over: images (1), speaker notes (3), shapes (3). To convert it in full, reinstall the app and open the file again.',
     )
 
     const writerPath = join(ODF_FIXTURES_DIR, 'native-writer.odt')
@@ -992,7 +1016,7 @@ describe('ODF pure-JS fallback when LibreOffice converter is missing (Slice 2a)'
     createLegacyOpener(hWriter.deps).open(writerPath)
     await vi.waitFor(() => expect(hWriter.opened).toHaveLength(1))
     expect(hWriter.notices).toEqual([
-      'Some parts of “native-writer.odt” could not be carried over: comments (1), footnotes (1), headers and footers (2), text boxes (1, shown as plain text), tracked changes (2), unsupported blocks (1). Reinstall the app to restore full fidelity.',
+      'Some parts of “native-writer.odt” could not be carried over: comments (1), footnotes (1), headers and footers (2), text boxes (1, kept as plain text), tracked changes (2), unsupported content (1). To convert it in full, reinstall the app and open the file again.',
     ])
   })
 

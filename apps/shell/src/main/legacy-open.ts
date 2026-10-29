@@ -365,6 +365,8 @@ const ODF_DROPPED_LABEL_KEYS: Readonly<Record<string, LegacyOpenStringKey>> = {
  * shown raw), or tells the user once that a simpler converter was used when
  * `dropped` is empty.
  */
+const MAX_LISTED_DROPS = 6
+
 export function formatOdfFallbackNotice(
   fileName: string,
   dropped: readonly OdfDroppedItem[],
@@ -377,7 +379,7 @@ export function formatOdfFallbackNotice(
     const key = Object.hasOwn(ODF_DROPPED_LABEL_KEYS, item.what)
       ? ODF_DROPPED_LABEL_KEYS[item.what]
       : undefined
-    if (key) {
+    if (key && parts.length < MAX_LISTED_DROPS) {
       parts.push(t(key, { count: item.count }))
     } else {
       otherCount += item.count
@@ -607,7 +609,11 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
           await runOdfFallback(filePath, fileName, source, controller.signal, endProgress)
           return
         } catch (fallbackErr) {
-          err = fallbackErr
+          // an engine failure keeps the actionable "converter is missing" notice
+          err =
+            fallbackErr instanceof LegacyConvertError && fallbackErr.code === 'failed'
+              ? caughtErr
+              : fallbackErr
         }
       }
       endProgress()
