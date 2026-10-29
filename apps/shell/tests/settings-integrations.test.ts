@@ -6,7 +6,11 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HomeApi } from '../src/shared/home-api'
-import type { IntegrationsApi, IntegrationsStatus } from '../src/shared/integrations-api'
+import type {
+  IntegrationsApi,
+  IntegrationsStatus,
+  LegacySweepResult,
+} from '../src/shared/integrations-api'
 import { mcpClaudeCommand, mcpConfigJson, mcpLaunch } from '../src/renderer/src/IntegrationsPane'
 import { LocaleProvider } from '../src/renderer/src/locale'
 import { SettingsModal, type SettingsModalProps } from '../src/renderer/src/SettingsModal'
@@ -193,31 +197,98 @@ describe('Settings → Integrations', () => {
     expect(host.textContent).toContain('assistant picks one')
   })
 
-  it('shows the copies the shared row replaced and removes them on request', async () => {
+  it('shows the copies the shared row replaced, removes them, keeps the outcome visible and focused, and handles kept/failure/busy states (R1-08, R1-10)', async () => {
+    const codexCopy = {
+      agent: 'codex' as const,
+      label: 'Codex',
+      skillsDir: '/home/u/.codex/skills',
+      path: '/home/u/.codex/skills/genoffice/SKILL.md',
+      ours: true,
+    }
+    const cursorCopy = {
+      agent: 'cursor' as const,
+      label: 'Cursor',
+      skillsDir: '/home/u/.cursor/skills',
+      path: '/home/u/.cursor/skills/genoffice/SKILL.md',
+      ours: false,
+      reason: 'unsafe_link' as const,
+    }
     const status = baseStatus()
-    status.legacy = [
-      {
-        agent: 'codex',
-        label: 'Codex',
-        skillsDir: '/home/u/.codex/skills',
-        path: '/home/u/.codex/skills/genoffice/SKILL.md',
-        ours: true,
-      },
-    ]
-    let swept = 0
+    status.legacy = [codexCopy, cursorCopy]
+
+    let call = 0
+    const pendingSweep = Promise.withResolvers<LegacySweepResult>()
     await openIntegrations({
       status: async () => status,
       copyText: async () => {},
-      sweepLegacySkillCopies: async () => {
-        swept += 1
-        return { removed: status.legacy, kept: [] }
+      sweepLegacySkillCopies: () => {
+        call += 1
+        if (call === 1) {
+          return Promise.reject(new Error('the shared .agents copy is not installed yet'))
+        }
+        if (call === 2) {
+          return pendingSweep.promise
+        }
+        status.legacy = []
+        return Promise.resolve({
+          removed: [cursorCopy],
+          kept: [],
+          failed: [],
+        })
       },
     })
-    const legacyRow = host.querySelector('.set-intg-row[data-agent="legacy"]')
-    expect(legacyRow).toBeTruthy()
-    expect(legacyRow!.textContent).toContain('/home/u/.codex/skills/genoffice/SKILL.md')
-    await click(buttonWithText('Remove old copies', legacyRow!))
-    expect(swept).toBe(1)
+
+    // 1. Initial render shows both legacy copies
+    const legacyRow1 = host.querySelector('.set-intg-row[data-agent="legacy"]')
+    expect(legacyRow1).toBeTruthy()
+    expect(legacyRow1!.textContent).toContain(codexCopy.path)
+    expect(legacyRow1!.textContent).toContain(cursorCopy.path)
+
+    // 2. First attempt rejects: error notice has role="alert", row stays, button recovers from busy
+    const cleanBtn1 = buttonWithText('Remove old copies', legacyRow1!)!
+    await click(cleanBtn1)
+    const alertNotice = host.querySelector('.set-intg-notice[role="alert"]')
+    expect(alertNotice?.textContent).toContain(
+      'Could not remove the old copies: Error: the shared .agents copy is not installed yet',
+    )
+    expect(cleanBtn1.disabled).toBe(false)
+    expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
+
+    // 3. Second attempt: test busy state while pending, then resolve with mixed kept state (unsafe_link)
+    await act(async () => {
+      cleanBtn1.click()
+      await Promise.resolve()
+    })
+    expect(cleanBtn1.disabled).toBe(true)
+    status.legacy = [cursorCopy]
+    await act(async () => {
+      pendingSweep.resolve({
+        removed: [codexCopy],
+        kept: [{ ...cursorCopy, reason: 'unsafe_link' }],
+        failed: [],
+      })
+      await Promise.resolve()
+    })
+    await flush()
+    expect(cleanBtn1.disabled).toBe(false)
+    const legacyRow2 = host.querySelector('.set-intg-row[data-agent="legacy"]')
+    expect(legacyRow2).toBeTruthy()
+    expect(legacyRow2!.textContent).not.toContain(codexCopy.path)
+    expect(legacyRow2!.textContent).toContain(cursorCopy.path)
+    const keptNotice = host.querySelector('.set-intg-notice[role="status"]')
+    expect(keptNotice?.textContent).toBe(
+      'Removed 1 old copies, 1 left in place (behind a symlink).',
+    )
+    expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
+
+    // 4. Third attempt removes the last copy: row disappears, notice remains visible outside row & details, and receives focus
+    await click(buttonWithText('Remove old copies', legacyRow2!))
+    expect(host.querySelector('.set-intg-row[data-agent="legacy"]')).toBeNull()
+    const finalNotice = host.querySelector('.set-intg-notice[role="status"]') as HTMLElement | null
+    expect(finalNotice).toBeTruthy()
+    expect(finalNotice!.textContent).toBe('Removed 1 old copies, 0 edited by hand left in place.')
+    expect(host.querySelector('.set-intg-details .set-intg-notice')).toBeNull()
+    expect(document.activeElement).toBe(finalNotice)
   })
 
   it('names the bare command once it is on the PATH and runs the app as Node on Windows', () => {
