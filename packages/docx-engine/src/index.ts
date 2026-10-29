@@ -104,6 +104,7 @@ export {
   mergePPrFormat,
   setPPrChange,
   stripPPrChange,
+  stripParaMarkRevision,
   patchFieldParagraphXml,
   patchImageParagraphXml,
   patchMathTokens,
@@ -147,6 +148,7 @@ export {
   ommlToLatex,
   ommlToMathML,
 } from './math'
+export { patchRunPictureXml, type RunPictureGeometry } from './run-picture'
 export { scanBody, type BodyElement, type BodyScan } from './scan'
 export {
   BLANK_BULLET_NUM_ID,
@@ -238,6 +240,14 @@ export {
 } from './list-markers'
 
 export { previewFontSettings } from './font-settings'
+export {
+  applyTrackedChangesXml,
+  countTrackedChangesXml,
+  type RevisionXmlFilter,
+  type RevisionXmlMode,
+  type RevisionXmlResult,
+  type RevisionXmlType,
+} from './revision-xml'
 export {
   compareBlocks,
   compareDocuments,

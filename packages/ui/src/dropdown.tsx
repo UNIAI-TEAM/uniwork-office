@@ -171,7 +171,9 @@ export function Dropdown<K extends string>({
           if (!wrapRef.current?.contains(e.relatedTarget as Node)) setOpen(false)
         }}
       >
-        <span className="gs-dd-value">{current ? (current.render ?? current.label) : value}</span>
+        <span className="gs-dd-value" title={current?.label ?? value}>
+          {current ? (current.render ?? current.label) : value}
+        </span>
         <span className="gs-dd-caret" aria-hidden="true">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
             <path

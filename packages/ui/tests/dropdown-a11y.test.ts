@@ -223,4 +223,13 @@ describe('Dropdown option keyshortcuts', () => {
       'Plain',
     ])
   })
+
+  it('exposes the full label as title on .gs-dd-value for both matched and off-list values', () => {
+    mount({ options: BOUND, initial: 'h1' })
+    expect(host.querySelector('.gs-dd-value')?.getAttribute('title')).toBe('Heading 1')
+    act(() =>
+      root.render(createElement(Dropdown, { value: 'Off-list label', options: BOUND, onPick })),
+    )
+    expect(host.querySelector('.gs-dd-value')?.getAttribute('title')).toBe('Off-list label')
+  })
 })
