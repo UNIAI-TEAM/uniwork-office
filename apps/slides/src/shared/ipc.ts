@@ -628,6 +628,18 @@ export interface SetAdvanceTimesOp {
   times: Array<{ slideIndex: number; ms: number | null }>
 }
 
+/** What the show needs to play a slide by itself: its saved advance time and its narration. */
+export interface ShowTiming {
+  advanceMs: number | null
+  /** Element ids of the slide's recorded narration pictures, hidden during the show */
+  narrationIds: string[]
+}
+
+/** Slide Show > Record: each recorded slide's narration (16-bit WAV) and time on screen. */
+export interface SaveRecordingOp {
+  slides: Array<{ slideIndex: number; wavBase64: string; durationMs: number; advanceMs: number }>
+}
+
 // ── Section management ────────────────────────────────────────────────
 
 /** Add a section before slide atSlideIndex (the section covers this page to the end of its containing section). */
@@ -726,8 +738,20 @@ export interface RepasteSlideOp {
   fitWidthPx: number
 }
 
-export interface PasteSlideResult {
+/** Partial render update; order includes every part path, slides only changed pages. */
+export interface SlideUpdate {
+  order: string[]
   slides: RenderSlide[]
+}
+
+export interface DeckChange {
+  slides: RenderSlide[]
+  size: { cx: number; cy: number }
+  /** Present for a partial update; omitted for a full resync. */
+  order?: string[]
+}
+
+export interface PasteSlideResult extends SlideUpdate {
   /** First pasted slide ('picture': the anchor slide the bitmaps landed on) */
   index: number
   /** Slides inserted ('picture': 0) */
@@ -1025,6 +1049,28 @@ export type AddImageBytesOp = {
 )
 
 /** Swap a picture's backing image in place: frame, z-order, border and effects survive. */
+/** A 3D model the renderer read and rendered: inserted centred, half the slide high. */
+export interface AddModel3dOp {
+  slideIndex: number
+  /** glTF binary */
+  bytes: Uint8Array
+  name: string
+  /** The model's first rendering, base64 PNG without the data: prefix */
+  posterBase64?: string
+  /** Frame width / height */
+  aspect: number
+  fitWidthPx: number
+}
+
+/** Turn a 3D model (am3d:rot, 60,000ths of a degree) and store the rendering the renderer drew. */
+export interface SetModel3dViewOp {
+  slideIndex: number
+  sourceId: string
+  rot: { ax: number; ay: number; az: number }
+  /** base64 PNG without the data: prefix */
+  posterBase64?: string
+}
+
 export interface ReplacePictureBytesOp {
   slideIndex: number
   sourceId: string
@@ -1341,7 +1387,8 @@ export interface SlidesApi {
   /** Headless export mode: report the export outcome so the main process can quit */
   headlessExportDone: (result: { ok: boolean; error?: string }) => void
   /** New blank presentation (single blank 16:9 page, untitled) */
-  newBlank: (fitWidthPx: number) => Promise<OpenResult>
+  /** `size` (EMU): the "Use for New Presentations" slide size; omitted keeps the 16:9 template */
+  newBlank: (fitWidthPx: number, size?: { cx: number; cy: number }) => Promise<OpenResult>
   /** Land generated pages: each pageMarkers entry is a marker (cloudpptx:<path>) redeemable for a one-slide pptx.
    *  mode="append" merges the new pages onto the existing deck (appendedFrom = existing page count);
    *  mode="replace_at" redoes page atIndex in place from a single marker (other pages untouched, undoable, replacedIndex = that page's index);
@@ -1387,10 +1434,8 @@ export interface SlidesApi {
   setElementFont: (op: SetElementFontOp) => Promise<RenderSlide | null>
   /** Change paragraph format on selected elements (bullet/line spacing/paragraph spacing/align; elements without text ignored) */
   setElementParagraphFormat: (op: SetElementParagraphFormatOp) => Promise<RenderSlide | null>
-  /** Replace (when count=0, slides is null and no history step is created) */
-  findReplace: (
-    op: FindReplaceOp,
-  ) => Promise<{ count: number; slides: RenderSlide[] | null } | null>
+  /** Replace (when count=0, update is null and no history step is created) */
+  findReplace: (op: FindReplaceOp) => Promise<{ count: number; update: SlideUpdate | null } | null>
   /** Switch/reset the layout of an existing page */
   setSlideLayout: (op: SetSlideLayoutOp) => Promise<RenderSlide | null>
   /** Slide size (returns the fully rebuilt RenderSlide set + current size marker) */
@@ -1471,9 +1516,9 @@ export interface SlidesApi {
   deleteElement: (op: DeleteElementOp) => Promise<RenderSlide | null>
   /** Multi-selection delete in one undo step */
   deleteElements: (op: DeleteElementsOp) => Promise<RenderSlide | null>
-  addSlide: (op: AddSlideOp) => Promise<{ slides: RenderSlide[]; index: number } | null>
+  addSlide: (op: AddSlideOp) => Promise<(SlideUpdate & { index: number }) | null>
   /** New blank page (reuses slide sourceIndex's layout, content empty) */
-  addBlankSlide: (op: AddBlankSlideOp) => Promise<{ slides: RenderSlide[]; index: number } | null>
+  addBlankSlide: (op: AddBlankSlideOp) => Promise<(SlideUpdate & { index: number }) | null>
   /** Copy slides onto the app-wide slide clipboard, so another open deck can paste them */
   copySlides: (op: CopySlidesOp) => Promise<boolean>
   /** Paste the clipboard slides after afterIndex (mode: destination theme / source formatting / picture); index = first pasted slide, count = slides inserted */
@@ -1484,14 +1529,12 @@ export interface SlidesApi {
   hasSlideClipboard: () => Promise<boolean>
   /** Is there anything a paste would act on (internal elements/slide, or external image/text)? Drives the Paste menu item */
   clipboardProbe: () => Promise<boolean>
-  /** Delete a slide (refused when only one page remains); returns the full RenderSlide array */
-  deleteSlide: (slideIndex: number) => Promise<RenderSlide[] | null>
-  /** Delete a thumbnail selection in one undo step; returns the full RenderSlide array */
-  deleteSlides: (op: DeleteSlidesOp) => Promise<RenderSlide[] | null>
+  /** Delete a slide (refused when only one page remains); returns a partial update */
+  deleteSlide: (slideIndex: number) => Promise<SlideUpdate | null>
+  /** Delete a thumbnail selection in one undo step; returns a partial update */
+  deleteSlides: (op: DeleteSlidesOp) => Promise<SlideUpdate | null>
   /** Duplicate a thumbnail selection in one undo step; index = first copy */
-  duplicateSlides: (
-    op: DuplicateSlidesOp,
-  ) => Promise<{ slides: RenderSlide[]; index: number } | null>
+  duplicateSlides: (op: DuplicateSlidesOp) => Promise<(SlideUpdate & { index: number }) | null>
   /** Bring element to front/back or move one layer forward/backward */
   reorderElement: (op: ReorderElementOp) => Promise<RenderSlide | null>
   /** Table cell text edit */
@@ -1510,8 +1553,8 @@ export interface SlidesApi {
   editStroke: (op: EditStrokeOp) => Promise<RenderSlide | null>
   /** Mirror selected elements horizontally/vertically */
   flipElements: (op: FlipElementOp) => Promise<RenderSlide | null>
-  /** Returns the full affected RenderSlide array (when applied to all pages) */
-  editBackground: (op: EditBackgroundOp) => Promise<RenderSlide[] | null>
+  /** Returns the affected slides and their order */
+  editBackground: (op: EditBackgroundOp) => Promise<SlideUpdate | null>
   /** Show the system image picker and return the file's bytes (for Replace Picture); cancel returns null */
   pickPictureFile: () => Promise<{ base64: string; ext: string } | null>
   /** Show the system image picker and insert into the current page; returns the updated page + new element id, cancel returns null, undecodable format returns the error */
@@ -1570,11 +1613,12 @@ export interface SlidesApi {
     slideIndex: number,
     sourceId: string,
   ) => Promise<{ kind: 'video' | 'audio'; dataUrl: string } | null>
-  /** Show a dialog to pick a 3D model (glb/gltf), embed + poster placeholder */
-  insertModel3d: (
-    slideIndex: number,
-    fitWidthPx: number,
-  ) => Promise<{ slide: RenderSlide; sourceId: string } | null>
+  /** Show a dialog to pick a 3D model (.glb) and read it */
+  pickModel3d: () => Promise<{ name: string; bytes: Uint8Array } | null>
+  addModel3d: (op: AddModel3dOp) => Promise<{ slide: RenderSlide; sourceId: string } | null>
+  /** A 3D model element's glTF binary */
+  getModel3dData: (slideIndex: number, sourceId: string) => Promise<Uint8Array | null>
+  setModel3dView: (op: SetModel3dViewOp) => Promise<RenderSlide | null>
   /** Set/clear an element hyperlink; the whole page's element ids update, requiring a whole-page replace and clearing the selection */
   setLink: (op: SetLinkOp) => Promise<RenderSlide | null>
   /** Read the element's current hyperlink (dialog echo) */
@@ -1599,8 +1643,14 @@ export interface SlidesApi {
   setTransition: (op: SetTransitionOp) => Promise<boolean>
   /** The current page's transition effect (echoed on page switch) */
   getTransition: (slideIndex: number) => Promise<TransitionKind>
+  getShowTiming: (slideIndex: number) => Promise<ShowTiming>
   /** Batch-write each page's auto-advance time (rehearsal timing save; the saved pptx auto-advances in PowerPoint shows); returns success */
   setAdvanceTimes: (op: SetAdvanceTimesOp) => Promise<boolean>
+  /** Replaces the recorded slides' narration and advance time in one undo step; returns a partial update. */
+  saveRecording: (op: SaveRecordingOp) => Promise<SlideUpdate | null>
+  clearNarration: (slideIndexes: number[]) => Promise<SlideUpdate | null>
+  /** Asks the OS for the microphone where it gates it (macOS); false when refused. */
+  microphoneAccess: () => Promise<boolean>
   /** The current page's animation list (read by the Animations tab / during shows) */
   getAnimations: (slideIndex: number) => Promise<AnimationItem[]>
   /** Morph pairing keys of the current page's elements (matched against same-name/same-id elements on the previous page during morph tweening) */
@@ -1609,8 +1659,8 @@ export interface SlidesApi {
   setAnimations: (op: SetAnimationsOp) => Promise<boolean>
   /** Hide/unhide a slide; returns the updated page's RenderSlide (hidden flag), null on failure */
   setSlideHidden: (op: SetSlideHiddenOp) => Promise<RenderSlide | null>
-  /** Hide/unhide a thumbnail selection in one undo step; returns the full RenderSlide array */
-  setSlidesHidden: (op: SetSlidesHiddenOp) => Promise<RenderSlide[] | null>
+  /** Hide/unhide a thumbnail selection in one undo step; returns a partial update */
+  setSlidesHidden: (op: SetSlidesHiddenOp) => Promise<SlideUpdate | null>
   /** The current document's section list ([] when there are no sections) */
   getSections: () => Promise<SectionInfo[]>
   /** Overwrite-write the section structure; returns the updated section list */
@@ -1623,17 +1673,13 @@ export interface SlidesApi {
   /** Delete the section header and every slide in it (one undo step); null when it would empty the deck */
   removeSectionSlides: (
     op: RemoveSectionSlidesOp,
-  ) => Promise<{ slides: RenderSlide[]; sections: SectionInfo[] } | null>
-  /** Move a whole section up/down; slide order changes, returns the full RenderSlide set + section list */
-  moveSection: (
-    op: MoveSectionOp,
-  ) => Promise<{ slides: RenderSlide[]; sections: SectionInfo[] } | null>
-  /** Drag to reorder slides; returns the full RenderSlide set + section list, null on failure */
-  moveSlide: (op: MoveSlideOp) => Promise<{ slides: RenderSlide[]; sections: SectionInfo[] } | null>
+  ) => Promise<(SlideUpdate & { sections: SectionInfo[] }) | null>
+  /** Move a whole section up/down; slide order changes, returns a partial update and section list */
+  moveSection: (op: MoveSectionOp) => Promise<(SlideUpdate & { sections: SectionInfo[] }) | null>
+  /** Drag to reorder slides; returns a partial update and section list, null on failure */
+  moveSlide: (op: MoveSlideOp) => Promise<(SlideUpdate & { sections: SectionInfo[] }) | null>
   /** Drag-reorder a thumbnail selection as one undo step */
-  moveSlides: (
-    op: MoveSlidesOp,
-  ) => Promise<{ slides: RenderSlide[]; sections: SectionInfo[] } | null>
+  moveSlides: (op: MoveSlidesOp) => Promise<(SlideUpdate & { sections: SectionInfo[] }) | null>
   /** Plain text of the current page's speaker notes ('' when there are none) */
   getNotes: (slideIndex: number) => Promise<string>
   /** Overwrite-write notes (into the pptx's notesSlide part); returns success */
@@ -1725,9 +1771,7 @@ export interface SlidesApi {
   /** Undo/redo stack occupancy pushed by the main process (drives the QAT button gray states) */
   onHistoryChanged: (handler: (state: { canUndo: boolean; canRedo: boolean }) => void) => () => void
   /** Another window attached to the same file changed the deck (shared session): fresh render state to apply */
-  onDeckChanged: (
-    handler: (state: { slides: RenderSlide[]; size: { cx: number; cy: number } }) => void,
-  ) => () => void
+  onDeckChanged: (handler: (state: DeckChange) => void) => () => void
   reportCloseSaveResult: (ok: boolean) => void
   /** Mirror the autosave toggle state to the main process: files with it on save silently on close, no dialog */
   setAutoSavePref: (on: boolean) => void
@@ -1842,7 +1886,7 @@ export interface SlidesApi {
   /** New blank page (with a specific layout): inserted after slide sourceIndex, rels pointing at the chosen layout */
   addSlideWithLayout: (
     op: AddSlideWithLayoutOp,
-  ) => Promise<{ slides: RenderSlide[]; index: number } | null>
+  ) => Promise<(SlideUpdate & { index: number }) | null>
   /** Query the current pptx's slideLayout list (for the new-slide dropdown panel) */
   getLayouts: () => Promise<GetLayoutsResult | null>
   // ── Master edit view ──────────────────────────────────────────────

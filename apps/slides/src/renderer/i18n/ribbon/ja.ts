@@ -196,8 +196,7 @@ export const ja = {
   ribbonIcons: 'アイコン',
   ribbonIconsTip: '組み込みアイコンを挿入（画像要素としてラスタライズ）',
   ribbon3dModel: '3D モデル',
-  ribbon3dModelTip:
-    '3D モデルを挿入（glb/gltf ファイルを埋め込み、キャンバスにはポスターのプレースホルダーを表示）',
+  ribbon3dModelTip: '3D モデルを挿入 (.glb)：選択すると回転できます。PowerPoint でも 3D のままです',
   ribbonGroupIllustrations: '図',
   ribbonShapes: '図形',
   ribbonShapesTip: '図形の挿入（基本図形 / 矢印 / 星）',

@@ -189,7 +189,8 @@ export const he = {
   ribbonIcons: 'צלמיות',
   ribbonIconsTip: 'הוספת צלמית מובנית (מומרת לתמונה)',
   ribbon3dModel: 'מודלים תלת-ממדיים',
-  ribbon3dModelTip: 'הוספת מודל תלת-ממדי (מטביע glb/gltf; הקנבס מציג כרזה כממלא מקום)',
+  ribbon3dModelTip:
+    'הוספת מודל תלת-ממדי (.glb): בחר בו כדי לסובב אותו; PowerPoint שומר אותו בתלת-ממד',
   ribbonGroupIllustrations: 'איורים',
   ribbonShapes: 'צורות',
   ribbonShapesTip: 'הוספת צורה (צורות בסיסיות / חצים / כוכבים)',

@@ -190,7 +190,7 @@ export const en = {
   ribbonIcons: 'Icons',
   ribbonIconsTip: 'Insert a built-in icon (rasterized as a picture)',
   ribbon3dModel: '3D Models',
-  ribbon3dModelTip: 'Insert a 3D model (embeds glb/gltf; the canvas shows a poster placeholder)',
+  ribbon3dModelTip: 'Insert a 3D model (.glb): select it to turn it; PowerPoint keeps it in 3D',
   ribbonGroupIllustrations: 'Illustrations',
   ribbonShapes: 'Shapes',
   ribbonShapesTip: 'Insert a shape (basic shapes / arrows / stars)',

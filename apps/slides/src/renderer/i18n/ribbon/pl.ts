@@ -195,7 +195,8 @@ export const pl = {
   ribbonIcons: 'Ikony',
   ribbonIconsTip: 'Wstaw wbudowaną ikonę (rasteryzowaną jako obraz)',
   ribbon3dModel: 'Modele 3D',
-  ribbon3dModelTip: 'Wstaw model 3D (osadza glb/gltf; kanwa wyświetla plakat zastępczy)',
+  ribbon3dModelTip:
+    'Wstaw model 3D (.glb): zaznacz go, aby go obrócić; PowerPoint zachowuje go w 3D',
   ribbonGroupIllustrations: 'Ilustracje',
   ribbonShapes: 'Kształty',
   ribbonShapesTip: 'Wstaw kształt (kształty podstawowe / strzałki / gwiazdy)',

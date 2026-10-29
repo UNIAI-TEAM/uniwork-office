@@ -6,6 +6,8 @@
  * desktop, a frame instance on the web. Two clients on the same file share one Session.
  */
 import type { OpenedPptx, Slide } from '@genoffice/pptx-engine'
+import type { RenderSlide } from '@genoffice/pptx-render'
+import type { SlideUpdate } from '../shared/ipc'
 import { sessionPlatform } from './platform'
 import { buildAllRenderSlides } from './render'
 
@@ -30,12 +32,16 @@ export interface Session {
   metaRev?: number
   /** Transform preview gesture in progress (the first preview already pushed an undo snapshot; later previews/final commit do not) */
   transformPreview?: boolean
+  /** Saved redo stack while a transform preview gesture is in flight */
+  previewRedo?: HistorySnapshot[]
   /** The part currently edited in master view (exception to the fidelity rule: only that part is written back) */
   masterEdit?: { partPath: string; slide: Slide } | null
   /** A history-state notification is already queued for this session (coalesces per task) */
   historyNotifyScheduled?: boolean
   /** A deck-changed broadcast is already queued for this session (coalesces per task) */
   deckBroadcastScheduled?: boolean
+  /** One entry per queued edit; null requires a full resync, otherwise patches coalesce. */
+  deckBroadcastUpdates?: Array<SlideUpdate | null>
   /** Monotonic sequence of the last journaled op entry (collab groundwork) */
   opSeq?: number
   /** Applied-op journal, capped ring — the attachment point for a future sync transport */
@@ -163,6 +169,7 @@ export function scheduleHistoryNotify(session: Session): void {
   const platform = sessionPlatform()
   platform.defer(() => {
     session.historyNotifyScheduled = false
+    platform.pruneMedia?.(session)
     // A shared session (second window on the same file, presenter audience) has
     // several attached clients; the undo/redo button states change for all.
     platform.events.historyChanged(attachedIds(session), {
@@ -200,15 +207,29 @@ export function editorAttachedIds(session: Session): number[] {
  * receives the same state again.
  */
 export function scheduleDeckBroadcast(session: Session): void {
+  ;(session.deckBroadcastUpdates ??= []).push(null)
   if (session.deckBroadcastScheduled) return
   session.deckBroadcastScheduled = true
   const platform = sessionPlatform()
   platform.defer(() => {
     session.deckBroadcastScheduled = false
+    const updates = session.deckBroadcastUpdates ?? []
+    session.deckBroadcastUpdates = undefined
     const ids = attachedIds(session)
     if (ids.length < 2) return
+    const last = updates.at(-1)
+    const partial = last && updates.every((update) => update !== null)
+    const changed = new Map<string | undefined, RenderSlide>()
+    if (partial) {
+      for (const update of updates) {
+        for (const slide of update!.slides) changed.set(slide.partPath, slide)
+      }
+    }
     const payload = {
-      slides: buildAllRenderSlides(session.opened, session.fitWidthPx),
+      ...(partial ? { order: last.order } : {}),
+      slides: partial
+        ? [...changed.values()].filter((s) => last.order.includes(s.partPath!))
+        : buildAllRenderSlides(session.opened, session.fitWidthPx),
       size: { cx: session.opened.deck.size.cx, cy: session.opened.deck.size.cy },
     }
     platform.events.deckChanged(ids, payload)

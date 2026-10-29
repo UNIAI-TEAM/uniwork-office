@@ -24,7 +24,16 @@ afterEach(() => {
 })
 
 const names = (skill: { tools: readonly { name: string }[] }) => skill.tools.map((t) => t.name)
-const workbook = () => createWorkbookSkill({} as SheetsSkillDeps)
+const workbook = () =>
+  createWorkbookSkill({
+    getActiveSheetInfo: () => ({
+      mode: 'demo',
+      sheetId: 'sheet-1',
+      sheetName: 'Sheet1',
+      sheets: [{ id: 'sheet-1', name: 'Sheet1' }],
+      knownAddresses: [],
+    }),
+  } as unknown as SheetsSkillDeps)
 
 describe('create_document (desktop-only)', () => {
   it('desktop: the tool and its prompt bullet are offered', () => {

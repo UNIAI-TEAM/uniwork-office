@@ -193,7 +193,7 @@ export const ms = {
   ribbonIconsTip: 'Sisipkan ikon terbina dalam (dirasterkan sebagai gambar)',
   ribbon3dModel: 'Model 3D',
   ribbon3dModelTip:
-    'Sisipkan model 3D (membenamkan glb/gltf; kanvas memaparkan poster sebagai pemegang tempat)',
+    'Sisipkan model 3D (.glb): pilih untuk memutarnya; PowerPoint mengekalkannya dalam 3D',
   ribbonGroupIllustrations: 'Ilustrasi',
   ribbonShapes: 'Bentuk',
   ribbonShapesTip: 'Sisipkan bentuk (bentuk asas / anak panah / bintang)',

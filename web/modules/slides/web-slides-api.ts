@@ -29,6 +29,7 @@ import { readPendingTextEdit } from '../../../apps/slides/src/renderer/pending-t
 import { base64ToBytes, bytesToBase64 } from '../../../apps/slides/src/session/bytes'
 import {
   appClipboard,
+  buildAllRenderSlides,
   callSessionHandler,
   configureSessionPlatform,
   createGeneratedPageStore,
@@ -47,6 +48,7 @@ import {
   type SessionChannel,
 } from '../../../apps/slides/src/session'
 import type {
+  DeckChange,
   ExportImagesOp,
   ExportImagesResult,
   ExportPdfOp,
@@ -111,6 +113,7 @@ const READ_ONLY_CHANNELS: ReadonlySet<SessionChannel> = new Set<SessionChannel>(
   'slides:get-run-links',
   'slides:get-header-footer',
   'slides:get-transition',
+  'slides:get-show-timing',
   'slides:get-animations',
   'slides:get-shape-keys',
   'slides:get-sections',
@@ -119,6 +122,7 @@ const READ_ONLY_CHANNELS: ReadonlySet<SessionChannel> = new Set<SessionChannel>(
   'slides:is-dirty',
   'slides:recent',
   'slides:media-data',
+  'slides:model3d-data',
   'slides:master-enter',
   'slides:master-open',
   'slides:master-close',
@@ -243,7 +247,7 @@ export function createWebSlidesApi(
   const generatedPages = createGeneratedPageStore()
 
   const historyEvents = listeners<{ canUndo: boolean; canRedo: boolean }>()
-  const deckEvents = listeners<{ slides: OpenResult['slides']; size: { cx: number; cy: number } }>()
+  const deckEvents = listeners<DeckChange>()
   const openedEvents = listeners<OpenResult>()
   const renamedEvents = listeners<string>()
   const menuEvents = listeners<MenuCommand>()
@@ -260,6 +264,8 @@ export function createWebSlidesApi(
     decodeTiff: tiffToPng,
     defer: (fn) => void setTimeout(fn, 0),
     defaultPictureDpi: pictureDpiFor(/Mac/i.test(navigator.platform)),
+    mediaUrl: undefined,
+    pruneMedia: undefined,
     events: {
       historyChanged: (ids, s) => {
         if (!ids.includes(WEB_CLIENT_ID)) return
@@ -269,7 +275,12 @@ export function createWebSlidesApi(
       deckChanged: (ids, payload) => {
         if (!ids.includes(WEB_CLIENT_ID)) return
         deckEvents.emit(payload)
-        presenter?.deckChanged(payload.slides)
+        if (presenter) {
+          const s = sessions.get(WEB_CLIENT_ID)
+          const fullSlides =
+            payload.order && s ? buildAllRenderSlides(s.opened, s.fitWidthPx) : payload.slides
+          presenter.deckChanged(fullSlides)
+        }
       },
     },
     deckOpened: (opened) => {
@@ -1214,7 +1225,11 @@ export function createWebSlidesApi(
     // engine: show data, sections, notes, comments, history, scripting
     setTransition: engine('slides:set-transition'),
     getTransition: engine('slides:get-transition'),
+    getShowTiming: engine('slides:get-show-timing'),
     setAdvanceTimes: engine('slides:set-advance-times'),
+    saveRecording: engine('slides:save-recording'),
+    clearNarration: engine('slides:clear-narration'),
+    microphoneAccess: async () => false,
     getAnimations: engine('slides:get-animations'),
     getShapeKeys: engine('slides:get-shape-keys'),
     setAnimations: engine('slides:set-animations'),
@@ -1253,7 +1268,10 @@ export function createWebSlidesApi(
         return { outcome: 'unavailable' as const }
       }
     },
-    insertModel3d: engine('slides:insert-model3d'),
+    pickModel3d: engine('slides:pick-model3d'),
+    addModel3d: engine('slides:add-model3d'),
+    getModel3dData: engine('slides:model3d-data'),
+    setModel3dView: engine('slides:set-model3d-view'),
     copySlides: engine('slides:copy-slides'),
     pasteSlide: engine('slides:paste-slide'),
     repasteSlide: engine('slides:repaste-slide'),

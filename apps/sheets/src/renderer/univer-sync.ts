@@ -1568,7 +1568,10 @@ export async function activateFormulaClosure(
     state.closure.pinned.set(sheetId, pinned)
   }
   state.closure.status = 'active'
-  setMessage(t('appClosureActive', { count: closure.formulaCount.toLocaleString() }))
+  setMessage(
+    state.redactionMessage ??
+      t('appClosureActive', { count: closure.formulaCount.toLocaleString() }),
+  )
 }
 
 /// On-demand precedent pinning for formulas written onto a streamed
@@ -2718,9 +2721,10 @@ async function runFormulaRecalc(
     state.recalc.failures = 0
     if (isActiveSheet(runtime, sheetId)) {
       setMessage(
-        unsupported > 0
-          ? t('appRecalcPartial', { count: unsupported })
-          : t('appRecalcDone', { count: overlay.size }),
+        state.redactionMessage ??
+          (unsupported > 0
+            ? t('appRecalcPartial', { count: unsupported })
+            : t('appRecalcDone', { count: overlay.size })),
       )
     }
   } catch (error: unknown) {
@@ -3396,7 +3400,7 @@ async function loadRange(
         // Indexing is done and every row sits in the grid: nothing is
         // streaming any more, so the "Indexing"/"Streaming" line must not
         // linger on a loaded sheet (small workbooks never run the full preload).
-        setMessage('')
+        setMessage(state.redactionMessage ?? '')
       } else {
         setMessage(
           t('appStreamingRows', {
@@ -5923,7 +5927,7 @@ async function preloadEntireWorkbookInner(
   if (lazyWorkbookRef.current === state) {
     state.flags.preloadComplete = true
     if (state.formulaMode && !isManualCalculation(runtime)) requestFullRecalcAfterStream()
-    setMessage(t('appFullyLoaded'))
+    setMessage(state.redactionMessage ?? t('appFullyLoaded'))
   }
 }
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { parseRange } from '@genoffice/xlsx-gateway/domain/cell-address'
 import { collectWorkbookRows } from '../src/renderer/ai/range-rows'
+import { buildRedactionIndex } from '../src/renderer/ai/redact'
 import { summarizeRows, type SummarizeSpec } from '../src/renderer/ai/summarize'
 import {
   WORKBOOK_TOOLS,
@@ -310,5 +311,125 @@ describe('g6-12 #21: collectWorkbookRows', () => {
         { row: 2, hidden: true, values: [3, 'k'], cached: [false, false] },
       ],
     })
+  })
+
+  it('projects withheld cells to placeholders in demo and lazy modes and excludes them from sums', async () => {
+    const redactions = buildRedactionIndex(
+      [
+        {
+          sheetName: 'Data',
+          marks: [
+            { startRow: 1, endRow: 1, startColumn: 0, endColumn: 0, label: 'region' },
+            { startRow: 2, endRow: 2, startColumn: 1, endColumn: 1, label: 'amount' },
+          ],
+        },
+      ],
+      [{ id: 'sheet-1', name: 'Data' }],
+    )
+    const demoCtx = {
+      univerRef: { current: null },
+      lazyWorkbookRef: { current: null },
+      adapterRef: {
+        current: {
+          getSnapshot: () => ({
+            revision: 0,
+            sheets: [
+              {
+                id: 'sheet-1',
+                name: 'Data',
+                cells: {
+                  A1: { value: 'Region' },
+                  B1: { value: 'Sales' },
+                  A2: { value: 'SecretRegion' },
+                  B2: { value: 10 },
+                  A3: { value: 'North', formula: '=A2' },
+                  B3: { value: 999, formula: '=1000-1' },
+                },
+              },
+            ],
+          }),
+        },
+      },
+      redactionIndexRef: { current: redactions },
+    } as unknown as WorkbookReadContext
+
+    const demoOutcome = await collectWorkbookRows(demoCtx, 'sheet-1', parseRange('A1:B3'))
+    expect(demoOutcome.ok).toBe(true)
+    if (!demoOutcome.ok) return
+    expect(demoOutcome.rows[1]?.values).toEqual(['{{region}}', 10])
+    expect(demoOutcome.rows[1]?.withheld).toEqual([true, false])
+    expect(demoOutcome.rows[2]?.values).toEqual(['North', '{{amount}}'])
+    expect(demoOutcome.rows[2]?.withheld).toEqual([false, true])
+    expect(demoOutcome.rows[2]?.formulas?.[1]).toBeUndefined()
+
+    const summary = summarizeRows(demoOutcome.rows, base({ valueColumn: 1, groupBy: 0 }))
+    expect(summary.result).toBe(10)
+    expect(summary.withheld).toBe(1)
+    expect(summary.skipped.text.count).toBe(0)
+    expect(summary.groups).toEqual([
+      { key: '{{region}}', rows: 1, valuesUsed: 1, result: 10 },
+      { key: 'North', rows: 1, valuesUsed: 0, result: 0 },
+    ])
+    expect(JSON.stringify(summary)).not.toContain('SecretRegion')
+    expect(JSON.stringify(summary)).not.toContain('999')
+
+    const toolResult = await run(
+      { range: 'A1:B3', function: 'sum', valueColumn: 'B', groupBy: 'A' },
+      deps({ collectRows: vi.fn().mockResolvedValue(demoOutcome) }),
+    )
+    expect(toolResult.output).toContain('withheld: 1')
+    expect(toolResult.output).toContain('{{region}}: 10')
+    expect(toolResult.output).not.toContain('SecretRegion')
+    expect(toolResult.output).not.toContain('999')
+
+    vi.stubGlobal('window', {
+      desktopApi: {
+        readWorkbookRange: vi.fn().mockResolvedValue({
+          cells: [
+            { row: 0, column: 0, value: 'Region' },
+            { row: 0, column: 1, value: 'Sales' },
+            { row: 1, column: 0, value: 'SecretRegion' },
+            { row: 1, column: 1, value: 10 },
+            { row: 2, column: 0, value: 'North' },
+            { row: 2, column: 1, value: 999, formula: '1000-1' },
+          ],
+          rows: [],
+          indexedThroughRow: Number.MAX_SAFE_INTEGER,
+        }),
+      },
+    })
+    const lazyCtx = {
+      univerRef: { current: null },
+      lazyWorkbookRef: {
+        current: {
+          file: {
+            sessionId: 's',
+            sheets: [{ id: 'sheet-1', name: 'Data', rowCount: 3, columnCount: 2 }],
+          },
+          hiddenFileRows: new Map(),
+          formulaText: new Map(),
+          sharedFormulaGroups: new Map(),
+          editJournal: {
+            cells: new Map(),
+            bulkConstantFills: new Map(),
+            structuralOps: new Map(),
+            definedNames: { dirty: false },
+            sheets: { added: new Set(), removed: new Set() },
+          },
+        },
+      },
+      adapterRef: { current: { getSnapshot: () => ({ revision: 0, sheets: [] }) } },
+      redactionIndexRef: { current: redactions },
+    } as unknown as WorkbookReadContext
+
+    const lazyOutcome = await collectWorkbookRows(lazyCtx, 'sheet-1', parseRange('A1:B3'))
+    expect(lazyOutcome.ok).toBe(true)
+    if (!lazyOutcome.ok) return
+    expect(lazyOutcome.rows[1]?.values).toEqual(['{{region}}', 10])
+    expect(lazyOutcome.rows[1]?.withheld).toEqual([true, false])
+    expect(lazyOutcome.rows[2]?.values).toEqual(['North', '{{amount}}'])
+    expect(lazyOutcome.rows[2]?.withheld).toEqual([false, true])
+    expect(lazyOutcome.rows[2]?.cached).toEqual([false, false])
+    expect(lazyOutcome.rows[2]?.formulas).toBeUndefined()
   })
 })

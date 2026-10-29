@@ -198,7 +198,7 @@ export const es = {
   ribbonIconsTip: 'Insertar un icono integrado (rasterizado como imagen)',
   ribbon3dModel: 'Modelos 3D',
   ribbon3dModelTip:
-    'Insertar un modelo 3D (incrusta glb/gltf; el lienzo muestra un marcador de posición)',
+    'Insertar un modelo 3D (.glb): selecciónelo para girarlo; PowerPoint lo mantiene en 3D',
   ribbonGroupIllustrations: 'Ilustraciones',
   ribbonShapes: 'Formas',
   ribbonShapesTip: 'Insertar una forma (formas básicas / flechas / estrellas)',
