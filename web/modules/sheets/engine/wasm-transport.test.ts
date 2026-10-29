@@ -589,6 +589,35 @@ describe.skipIf(!hasWasm)(
       },
     )
 
+    it('opens an XML spreadsheet saved as .xls, with a merge past column Z anchored in the right column', async () => {
+      const { transport } = await engine()
+      const xml = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Plain"><Table><Row>
+ <Cell><Data ss:Type="String">first</Data></Cell>
+ <Cell ss:Index="27" ss:MergeAcross="1"><Data ss:Type="String">anchor</Data></Cell>
+ <Cell ss:Index="28"><Data ss:Type="String">swallowed</Data></Cell>
+ <Cell><Data ss:Type="Number">7</Data></Cell>
+</Row></Table></Worksheet></Workbook>`
+      const wb = await transport.open({
+        name: 'Saved.xls',
+        data: toArrayBuffer(new TextEncoder().encode(xml)),
+        locale: 'en',
+      })
+      expect(wb.needsSaveAs).toBe(true)
+      expect(wb.sheets[0]?.name).toBe('Plain')
+      const range = await transport.readRange({
+        sessionId: wb.sessionId,
+        sheetId: wb.sheets[0]!.id,
+        range: { startRow: 0, endRow: 0, startColumn: 0, endColumn: 28 },
+      })
+      const at = (column: number) => range.cells.find((c) => c.row === 0 && c.column === column)
+      expect(at(0)?.value).toBe('first')
+      // AA1 (column 26) keeps the merge anchor; the cell spelled over AB1 is swallowed
+      expect(at(26)?.value).toBe('anchor')
+      expect(at(27)?.value ?? '').toBe('')
+      expect(at(28)?.value).toBe(7)
+    })
+
     it('the first viewport needs only its own chunk; background passes finish the index', async () => {
       const { host, transport } = await engine()
       const rows = 20_000

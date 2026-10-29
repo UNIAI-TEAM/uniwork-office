@@ -188,6 +188,13 @@ export const ru = {
   appInvalidGroupField: 'Недопустимое поле группировки.',
   appInvalidPageField: 'Недопустимое поле фильтра отчёта.',
   appPivotPageItemMissing: 'Элемент фильтра «{item}» не входит в поле «{label}».',
+  appInvalidPivotBaseField:
+    'Базовое поле режима «Показать значения как» должно находиться в строках или столбцах.',
+  appPivotBaseFieldMissing:
+    'Для режима «Показать значения как» поля значений требуется базовое поле.',
+  appPivotBaseFieldNotAxis:
+    'Базовое поле «{label}» должно находиться в строках или столбцах сводной таблицы.',
+  appPivotBaseItemMissing: 'Базовый элемент «{item}» не входит в поле «{label}».',
   appInvalidLabelFilterField: 'Поле фильтра подписей недопустимо.',
   appInvalidValueFieldIndex: 'Индекс поля значений {index} недопустим.',
   appInvalidValueField: 'Недопустимое поле значений.',
@@ -328,6 +335,7 @@ export const ru = {
     'Этот лист содержит сводную таблицу — перемещение диапазонов пока не поддерживается.',
   appMergeOverTable:
     'Выделение пересекается с таблицей Excel — объединение ячеек внутри таблицы пока не поддерживается.',
+  appFilterToggleFailed: 'Фильтр не применён — сначала выделите диапазон с данными.',
   appAutofillStreaming:
     'Автозаполнение в область, которая ещё загружается потоково, пока не разрешено.',
   appDvNeedsIndexed:

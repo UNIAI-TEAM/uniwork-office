@@ -184,6 +184,13 @@ export const hi = {
   appInvalidGroupField: 'अमान्य समूहन फ़ील्ड।',
   appInvalidPageField: 'अमान्य रिपोर्ट फ़िल्टर फ़ील्ड।',
   appPivotPageItemMissing: 'रिपोर्ट फ़िल्टर आइटम "{item}" फ़ील्ड "{label}" का सदस्य नहीं है।',
+  appInvalidPivotBaseField:
+    '"मान इस रूप में दिखाएँ" का आधार फ़ील्ड पंक्तियों या कॉलम में होना चाहिए।',
+  appPivotBaseFieldMissing:
+    'वैल्यू फ़ील्ड के "मान इस रूप में दिखाएँ" मोड के लिए आधार फ़ील्ड आवश्यक है।',
+  appPivotBaseFieldNotAxis:
+    'आधार फ़ील्ड "{label}" पिवट तालिका की पंक्तियों या कॉलम में होना चाहिए।',
+  appPivotBaseItemMissing: 'आधार आइटम "{item}" फ़ील्ड "{label}" का सदस्य नहीं है।',
   appInvalidLabelFilterField: 'लेबल फ़िल्टर फ़ील्ड अमान्य है।',
   appInvalidValueFieldIndex: 'मान फ़ील्ड अनुक्रमांक {index} अमान्य है।',
   appInvalidValueField: 'अमान्य मान फ़ील्ड।',
@@ -322,6 +329,7 @@ export const hi = {
   appPivotSheetNoMove: 'इस शीट में पिवट टेबल है — श्रेणियाँ स्थानांतरित करना अभी समर्थित नहीं है।',
   appMergeOverTable:
     'चयन Excel तालिका से ओवरलैप करता है — तालिका के भीतर सेल मर्ज करना अभी समर्थित नहीं है।',
+  appFilterToggleFailed: 'फ़िल्टर लागू नहीं हुआ — पहले वह रेंज चुनें जिसमें आपका डेटा है।',
   appAutofillStreaming:
     'जो क्षेत्र अभी स्ट्रीम होकर लोड हो रहा है, उसमें स्वतः भरण की अनुमति अभी नहीं है।',
   appDvNeedsIndexed:

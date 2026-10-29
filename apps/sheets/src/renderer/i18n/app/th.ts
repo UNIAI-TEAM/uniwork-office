@@ -181,6 +181,10 @@ export const th = {
   appInvalidGroupField: 'เขตข้อมูลการจัดกลุ่มไม่ถูกต้อง',
   appInvalidPageField: 'เขตข้อมูลตัวกรองรายงานไม่ถูกต้อง',
   appPivotPageItemMissing: 'รายการตัวกรองรายงาน "{item}" ไม่ใช่สมาชิกของเขตข้อมูล "{label}"',
+  appInvalidPivotBaseField: 'ฟิลด์ฐานของ "แสดงค่าเป็น" ต้องอยู่ในแถวหรือคอลัมน์',
+  appPivotBaseFieldMissing: 'โหมด "แสดงค่าเป็น" ของฟิลด์ค่าต้องมีฟิลด์ฐาน',
+  appPivotBaseFieldNotAxis: 'ฟิลด์ฐาน "{label}" ต้องอยู่ในแถวหรือคอลัมน์ของตาราง Pivot',
+  appPivotBaseItemMissing: 'รายการฐาน "{item}" ไม่ใช่สมาชิกของเขตข้อมูล "{label}"',
   appInvalidLabelFilterField: 'เขตข้อมูลของตัวกรองป้ายชื่อไม่ถูกต้อง',
   appInvalidValueFieldIndex: 'ดัชนีเขตข้อมูลค่า {index} ไม่ถูกต้อง',
   appInvalidValueField: 'เขตข้อมูลค่าไม่ถูกต้อง',
@@ -307,6 +311,7 @@ export const th = {
   appDialogCancel: 'ยกเลิก',
   appPivotSheetNoMove: 'แผ่นงานนี้มี PivotTable — ยังไม่รองรับการย้ายช่วง',
   appMergeOverTable: 'ส่วนที่เลือกซ้อนทับตาราง Excel — ยังไม่รองรับการผสานเซลล์ภายในตาราง',
+  appFilterToggleFailed: 'ไม่ได้ใช้ตัวกรอง — เลือกช่วงที่มีข้อมูลก่อน',
   appAutofillStreaming: 'ยังไม่อนุญาตให้เติมอัตโนมัติลงในพื้นที่ที่กำลังโหลดแบบสตรีม',
   appDvNeedsIndexed:
     'การแก้ไขการตรวจสอบความถูกต้องของข้อมูลต้องรอให้แผ่นงานนี้ทำดัชนีเสร็จก่อน — ลองใหม่อีกสักครู่',
