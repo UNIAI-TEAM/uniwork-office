@@ -1658,8 +1658,9 @@ function registerPdfIpc(): void {
         pageCount: text.pageCount,
         pages: text.pages.map((page) => page.text),
       }
-    } catch (err) {
-      return { ok: false as const, reason: err instanceof Error ? err.message : String(err) }
+    } catch {
+      // a fixed reason: the system error text would carry the file path to the renderer
+      return { ok: false as const, reason: 'pdf: could not read the document' }
     }
   })
 
@@ -1678,8 +1679,9 @@ function registerPdfIpc(): void {
         pageCount: text.pageCount,
         pages: text.pages.map((page) => page.text),
       }
-    } catch (err) {
-      return { ok: false as const, reason: err instanceof Error ? err.message : String(err) }
+    } catch {
+      // a fixed reason: the system error text would carry the file path to the renderer
+      return { ok: false as const, reason: 'pdf: could not read the document' }
     }
   })
 

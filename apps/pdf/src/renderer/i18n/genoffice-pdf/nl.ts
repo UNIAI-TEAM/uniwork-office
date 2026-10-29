@@ -52,7 +52,7 @@ export const nl = {
   compareSwap: 'Oud en nieuw wisselen',
   compareIdentical: 'Beide documenten bevatten dezelfde tekst',
   compareDiffPages: "{count} pagina's verschillen",
-  comparePage: 'Pagina {page}',
+  comparePage: 'Blz. {page}',
   compareAdded: '+{count} regels',
   compareRemoved: '−{count} regels',
   compareTruncated: 'pagina te groot — alleen aantallen',

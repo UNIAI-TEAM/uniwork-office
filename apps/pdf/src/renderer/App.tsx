@@ -3870,7 +3870,6 @@ export default function App() {
     toastTimerRef.current = window.setTimeout(() => setDeleteToast(false), 5000)
   }
 
-  /** Show a transient toast; the save-failure badge alone hides the actual reason */
   const runCompare = async (): Promise<void> => {
     if (!doc || compareBusy) return
     // Both sides must come from the same extraction engine — pdf.js and pdfium
@@ -3904,6 +3903,7 @@ export default function App() {
     }
   }
 
+  /** Show a transient toast; the save-failure badge alone hides the actual reason */
   const showNotice = (msg: string) => {
     if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
     setNotice(msg)
@@ -7112,11 +7112,11 @@ export default function App() {
           {t('underline')}
         </button>
         <button
-          className={`rb-big${markupTool === 'strikeout' ? ' active' : ''}`}
-          aria-pressed={markupTool === 'strikeout'}
+          className={`rb-big${markupTool === 'squiggly' ? ' active' : ''}`}
+          aria-pressed={markupTool === 'squiggly'}
           disabled={readOnly}
           data-tip={t('squiggly')}
-          onClick={() => applyMarkup('squiggly')}
+          onClick={() => onRibbonMarkupClick('squiggly')}
         >
           <span className="rb-big-icon">
             <IconSquiggly />
@@ -7124,7 +7124,8 @@ export default function App() {
           <span>{t('squiggly')}</span>
         </button>
         <button
-          className="rb-big"
+          className={`rb-big${markupTool === 'strikeout' ? ' active' : ''}`}
+          aria-pressed={markupTool === 'strikeout'}
           disabled={readOnly}
           data-tip={t('strikeout')}
           onClick={() => onRibbonMarkupClick('strikeout')}
