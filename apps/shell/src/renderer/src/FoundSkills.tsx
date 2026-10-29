@@ -12,12 +12,41 @@ import type { FoundSkill, RecommendedSkill } from '../../shared/found-skill'
 
 const api = () => window.aiOfficeIntegrations
 
+const ERROR_REASON_KEYS: Record<string, StringKey> = {
+  'dir-unreadable': 'intgSkillsErrDirUnreadable',
+  'dir-symlink': 'intgSkillsErrDirSymlink',
+  'contains-symlink': 'intgSkillsErrContainsSymlink',
+  'too-large': 'intgSkillsErrTooLarge',
+  'read-back-failed': 'intgSkillsErrReadBackFailed',
+  'missing-skill-md': 'intgSkillsErrMissingSkillMd',
+  'invalid-frontmatter': 'intgSkillsErrInvalidFrontmatter',
+  'invalid-folder-name': 'intgSkillsErrInvalidFolderName',
+  'already-exists': 'intgSkillsErrAlreadyExists',
+  'file-unreadable': 'intgSkillsErrFileUnreadable',
+  'invalid-file-name': 'intgSkillsErrInvalidFileName',
+  'not-zip': 'intgSkillsErrNotZip',
+  'too-many-entries': 'intgSkillsErrTooManyEntries',
+  'unsafe-entry': 'intgSkillsErrUnsafeEntry',
+  'archive-symlink': 'intgSkillsErrArchiveSymlink',
+  'archive-missing-skill-md': 'intgSkillsErrArchiveMissingSkillMd',
+  'invalid-archive-name': 'intgSkillsErrInvalidArchiveName',
+  'unknown-skill': 'intgSkillsErrUnknownSkill',
+  'unknown-target': 'intgSkillsErrUnknownTarget',
+}
+
 /** Electron wraps a handler's throw as "Error invoking remote method 'chan': Error: msg"; only msg is for the user. */
-const failureReason = (e: unknown): string =>
-  (e instanceof Error ? e.message : String(e)).replace(
+const failureReason = (e: unknown, t: TFunc): string => {
+  const raw = (e instanceof Error ? e.message : String(e)).replace(
     /^Error invoking remote method '[^']*': (?:\w*Error: )?/,
     '',
   )
+  const match = /^skill-import:([a-z-]+)(?::([\s\S]*))?$/.exec(raw)
+  if (!match) return raw
+  const key = ERROR_REASON_KEYS[match[1]]
+  if (!key) return raw
+  const detail = match[2] ?? ''
+  return t(key, { max: detail, name: detail })
+}
 
 type Notice = { kind: 'done' | 'removed'; name: string } | { kind: 'failed'; reason: string }
 
@@ -60,7 +89,13 @@ export function FoundSkills({ t }: { t: TFunc }) {
       setNotice({ kind: 'done', name: skill.name })
       await load()
     } catch (e) {
-      setNotice({ kind: 'failed', reason: failureReason(e) })
+      setNotice({
+        kind: 'failed',
+        reason: (e instanceof Error ? e.message : String(e)).replace(
+          /^Error invoking remote method '[^']*': (?:\w*Error: )?/,
+          '',
+        ),
+      })
     } finally {
       setBusy(false)
     }
@@ -74,7 +109,13 @@ export function FoundSkills({ t }: { t: TFunc }) {
       setNotice({ kind: 'removed', name: skill.name })
       await load()
     } catch (e) {
-      setNotice({ kind: 'failed', reason: failureReason(e) })
+      setNotice({
+        kind: 'failed',
+        reason: (e instanceof Error ? e.message : String(e)).replace(
+          /^Error invoking remote method '[^']*': (?:\w*Error: )?/,
+          '',
+        ),
+      })
     } finally {
       setBusy(false)
     }
@@ -155,7 +196,7 @@ export function FoundSkills({ t }: { t: TFunc }) {
           }
         >
           {notice.kind === 'failed'
-            ? t('intgSkillsImportFailed', { reason: notice.reason })
+            ? t('intgSkillsImportFailed', { reason: failureReason(notice.reason, t) })
             : notice.kind === 'done'
               ? t('intgSkillsImportDone', { name: notice.name })
               : t('intgSkillsRemoved', { name: notice.name })}

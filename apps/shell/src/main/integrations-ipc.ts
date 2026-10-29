@@ -92,9 +92,9 @@ export function registerIntegrationsIpc(
     INTEGRATIONS_CHANNELS.installSkill,
     (_e, target: { agentId?: AgentId; dir?: string }): SkillInstallState => {
       const skillsDir = target.dir ?? agentTarget(target.agentId!)?.skillsDir
-      if (!skillsDir) throw new Error('unknown skill target')
+      if (!skillsDir) throw new Error('skill-import:unknown-target')
       if (target.dir && !isInstallableSkillDir(skillsDir, vouchedSkillDirs())) {
-        throw new Error('unknown skill target')
+        throw new Error('skill-import:unknown-target')
       }
       const l = ledger()
       installSkill(skillsDir, bundled(), l)
@@ -105,7 +105,7 @@ export function registerIntegrationsIpc(
 
   ipc.handle(INTEGRATIONS_CHANNELS.uninstallSkill, (_e, agentId: AgentId): SkillInstallState => {
     const target = agentTarget(agentId)
-    if (!target) throw new Error('unknown skill target')
+    if (!target) throw new Error('skill-import:unknown-target')
     const l = ledger()
     if (uninstallSkill(target.skillsDir, l)) saveLedger(l)
     return stateOf(target.skillsDir)
@@ -161,7 +161,7 @@ export function registerIntegrationsIpc(
   )
 
   ipc.handle(INTEGRATIONS_CHANNELS.installRecommendedSkill, (_e, name: unknown): FoundSkill => {
-    if (typeof name !== 'string') throw new Error('unknown skill')
+    if (typeof name !== 'string') throw new Error('skill-import:unknown-skill')
     return installRecommendedSkill(name, deps.recommendedSkillsDir, app.getPath('userData'))
   })
 
@@ -169,7 +169,7 @@ export function registerIntegrationsIpc(
     // the path came from the renderer, so it is only a file we just listed
     const roots = [skillsRoot(app.getPath('userData')), deps.recommendedSkillsDir]
     if (!roots.some((root) => isKnownSkillPath(path, root))) {
-      throw new Error('unknown skill')
+      throw new Error('skill-import:unknown-skill')
     }
     return readSkillBody(path)
   })

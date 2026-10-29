@@ -177,10 +177,12 @@ describe('importSkillDir', () => {
     const { save, src, cleanup } = scaffold()
     mkdirSync(join(src, 'plain'))
     writeFileSync(join(src, 'plain', 'README.md'), 'not a skill')
-    expect(() => importSkillDir(join(src, 'plain'), save)).toThrow('no SKILL.md')
+    expect(() => importSkillDir(join(src, 'plain'), save)).toThrow('skill-import:missing-skill-md')
     mkdirSync(join(src, 'bare'))
     writeFileSync(join(src, 'bare', 'SKILL.md'), 'no frontmatter')
-    expect(() => importSkillDir(join(src, 'bare'), save)).toThrow('frontmatter')
+    expect(() => importSkillDir(join(src, 'bare'), save)).toThrow(
+      'skill-import:invalid-frontmatter',
+    )
     expect(existsSync(join(save, 'skills'))).toBe(false)
     cleanup()
   })
@@ -190,7 +192,7 @@ describe('importSkillDir', () => {
       { shared: SKILL('shared', 'Mine', 'mine wins') },
       { shared: SKILL('shared', 'Theirs', 'theirs loses') },
     )
-    expect(() => importSkillDir(join(src, 'shared'), save)).toThrow('already there')
+    expect(() => importSkillDir(join(src, 'shared'), save)).toThrow('skill-import:already-exists')
     expect(readSkillBody(join(save, 'skills', 'shared', 'SKILL.md'))).toBe('mine wins\n')
     cleanup()
   })
@@ -198,7 +200,7 @@ describe('importSkillDir', () => {
   it('refuses a skill directory that is itself a symlink', () => {
     const { save, src, cleanup } = scaffold({}, { real: SKILL('real', 'A docx thing') })
     symlinkSync(join(src, 'real'), join(src, 'linked'))
-    expect(() => importSkillDir(join(src, 'linked'), save)).toThrow('symlink')
+    expect(() => importSkillDir(join(src, 'linked'), save)).toThrow('skill-import:dir-symlink')
     expect(existsSync(join(save, 'skills', 'linked'))).toBe(false)
     cleanup()
   })
@@ -208,7 +210,7 @@ describe('importSkillDir', () => {
     const dir = join(src, 'linked')
     writeFileSync(join(dir, 'outside.md'), 'somewhere else')
     symlinkSync(join(dir, 'outside.md'), join(dir, 'reference.md'))
-    expect(() => importSkillDir(dir, save)).toThrow('symlink')
+    expect(() => importSkillDir(dir, save)).toThrow('skill-import:contains-symlink')
     expect(existsSync(join(save, 'skills', 'linked'))).toBe(false)
     cleanup()
   })
@@ -217,7 +219,7 @@ describe('importSkillDir', () => {
     const { save, src, cleanup } = scaffold({}, { heavy: SKILL('heavy', 'A docx thing') })
     mkdirSync(join(src, 'heavy', 'corpus'), { recursive: true })
     writeFileSync(join(src, 'heavy', 'corpus', 'big.bin'), Buffer.alloc(11 * 1024 * 1024, 0))
-    expect(() => importSkillDir(join(src, 'heavy'), save)).toThrow('import cap')
+    expect(() => importSkillDir(join(src, 'heavy'), save)).toThrow('skill-import:too-large')
     expect(existsSync(join(save, 'skills', 'heavy'))).toBe(false)
     cleanup()
   })
@@ -234,12 +236,12 @@ describe('importSkillDir', () => {
       { '.hidden-skill': SKILL('hidden', 'A docx thing'), 'draft:v2': SKILL('draft', 'docx') },
     )
     expect(() => importSkillDir(join(src, '.hidden-skill'), save)).toThrow(
-      'the folder name cannot be used as a skill name',
+      'skill-import:invalid-folder-name',
     )
     expect(existsSync(join(save, 'skills', '.hidden-skill'))).toBe(false)
     if (process.platform !== 'win32') {
       expect(() => importSkillDir(join(src, 'draft:v2'), save)).toThrow(
-        'the folder name cannot be used as a skill name',
+        'skill-import:invalid-folder-name',
       )
       expect(existsSync(join(save, 'skills', 'draft:v2'))).toBe(false)
     }
@@ -300,7 +302,7 @@ describe('importSkillZip', () => {
     expect(imported.name).toBe('trip-planner')
     expect(imported.path).toBe(join(save, 'skills', 'trip-planner', 'SKILL.md'))
     expect(readSkillBody(imported.path)).toBe('Do the thing.\n')
-    expect(() => importSkillMd(md, save)).toThrow(/already there/)
+    expect(() => importSkillMd(md, save)).toThrow('skill-import:already-exists')
     cleanup()
   })
 
@@ -316,7 +318,7 @@ describe('importSkillZip', () => {
     const { root, save, cleanup } = scaffold()
     const md = join(root, 'notes.md')
     writeFileSync(md, '# just notes\n')
-    expect(() => importSkillMd(md, save)).toThrow(/frontmatter/)
+    expect(() => importSkillMd(md, save)).toThrow('skill-import:invalid-frontmatter')
     expect(existsSync(join(save, 'skills', 'notes'))).toBe(false)
     cleanup()
   })
@@ -342,9 +344,9 @@ describe('importSkillZip', () => {
     writeFileSync(join(save, 'stray.txt'), 'x')
     mkdirSync(join(save, 'other'), { recursive: true })
     writeFileSync(join(save, 'other', 'SKILL.md'), SKILL('other', 'docx'))
-    expect(() => removeSkill('../stray.txt', save)).toThrow(/unknown skill/)
-    expect(() => removeSkill('../other', save)).toThrow(/unknown skill/)
-    expect(() => removeSkill('absent', save)).toThrow(/unknown skill/)
+    expect(() => removeSkill('../stray.txt', save)).toThrow('skill-import:unknown-skill')
+    expect(() => removeSkill('../other', save)).toThrow('skill-import:unknown-skill')
+    expect(() => removeSkill('absent', save)).toThrow('skill-import:unknown-skill')
     expect(existsSync(join(save, 'other', 'SKILL.md'))).toBe(true)
     removeSkill('mine', save)
     expect(existsSync(join(save, 'skills', 'mine'))).toBe(false)
@@ -383,9 +385,11 @@ describe('importSkillZip', () => {
       { 'a/SKILL.md': SKILL('a', 'docx'), 'b/SKILL.md': SKILL('b', 'pdf') },
       join(root, 'two.zip'),
     )
-    await expect(importSkillZip(two, save)).rejects.toThrow('no SKILL.md')
+    await expect(importSkillZip(two, save)).rejects.toThrow('skill-import:archive-missing-skill-md')
     const none = await zipOf({ 'a/README.md': 'hi' }, join(root, 'none.zip'))
-    await expect(importSkillZip(none, save)).rejects.toThrow('no SKILL.md')
+    await expect(importSkillZip(none, save)).rejects.toThrow(
+      'skill-import:archive-missing-skill-md',
+    )
     cleanup()
   })
 
@@ -404,15 +408,16 @@ describe('importSkillZip', () => {
       { 'tool/SKILL.md': SKILL('tool', 'docx'), '/abs.txt': 'out' },
       join(root, 'abs.zip'),
     )
-    await expect(importSkillZip(absZip, save)).rejects.toThrow('unsafe entry name')
+    await expect(importSkillZip(absZip, save)).rejects.toThrow('skill-import:unsafe-entry:/abs.txt')
     expect(existsSync(join(save, 'skills', 'tool'))).toBe(false)
 
     const backslashZip = await zipOf(
       { 'tool/SKILL.md': SKILL('tool', 'docx'), 'a\\b.txt': 'out' },
       join(root, 'backslash.zip'),
     )
-    await expect(importSkillZip(backslashZip, save)).rejects.toThrow('unsafe entry name')
-    expect(existsSync(join(save, 'skills', 'tool'))).toBe(false)
+    await expect(importSkillZip(backslashZip, save)).rejects.toThrow(
+      'skill-import:unsafe-entry:a\\b.txt',
+    )
     cleanup()
   })
 
@@ -423,7 +428,7 @@ describe('importSkillZip', () => {
     z.file('tool/link', '/etc/passwd', { unixPermissions: 0o120777 })
     const zip = join(root, 'link.zip')
     writeFileSync(zip, await z.generateAsync({ type: 'nodebuffer', platform: 'UNIX' }))
-    await expect(importSkillZip(zip, save)).rejects.toThrow('symlink')
+    await expect(importSkillZip(zip, save)).rejects.toThrow('skill-import:archive-symlink')
     expect(existsSync(join(save, 'skills', 'tool'))).toBe(false)
     cleanup()
   })
@@ -434,7 +439,7 @@ describe('importSkillZip', () => {
       { 'heavy/SKILL.md': SKILL('heavy', 'docx'), 'heavy/big.bin': Buffer.alloc(11 * 1024 * 1024) },
       join(root, 'heavy.zip'),
     )
-    await expect(importSkillZip(zip, save)).rejects.toThrow('import cap')
+    await expect(importSkillZip(zip, save)).rejects.toThrow('skill-import:too-large')
     expect(readdirSync(join(save, 'skills'))).toEqual([])
     cleanup()
   })
@@ -449,7 +454,7 @@ describe('importSkillZip', () => {
       },
       join(root, 'running-heavy.zip'),
     )
-    await expect(importSkillZip(zip, save)).rejects.toThrow('import cap')
+    await expect(importSkillZip(zip, save)).rejects.toThrow('skill-import:too-large')
     expect(readdirSync(join(save, 'skills'))).toEqual([])
     cleanup()
   })
@@ -463,7 +468,7 @@ describe('importSkillZip', () => {
     }
     const zip = join(root, 'many.zip')
     writeFileSync(zip, await z.generateAsync({ type: 'nodebuffer' }))
-    await expect(importSkillZip(zip, save)).rejects.toThrow('2000-entry import cap')
+    await expect(importSkillZip(zip, save)).rejects.toThrow('skill-import:too-many-entries:2000')
     expect(existsSync(join(save, 'skills', 'many'))).toBe(false)
     cleanup()
   })
@@ -471,7 +476,7 @@ describe('importSkillZip', () => {
   it('refuses to overwrite an installed skill', async () => {
     const { root, save, cleanup } = scaffold({ tool: SKILL('tool', 'Mine', 'mine wins') })
     const zip = await zipOf({ 'tool/SKILL.md': SKILL('tool', 'Theirs') }, join(root, 't.zip'))
-    await expect(importSkillZip(zip, save)).rejects.toThrow('already there')
+    await expect(importSkillZip(zip, save)).rejects.toThrow('skill-import:already-exists')
     expect(readSkillBody(join(save, 'skills', 'tool', 'SKILL.md'))).toBe('mine wins\n')
     cleanup()
   })
@@ -480,7 +485,7 @@ describe('importSkillZip', () => {
     const { root, save, cleanup } = scaffold()
     const file = join(root, 'not.zip')
     writeFileSync(file, 'plain text')
-    await expect(importSkillZip(file, save)).rejects.toThrow('not a zip')
+    await expect(importSkillZip(file, save)).rejects.toThrow('skill-import:not-zip')
     cleanup()
   })
 })
@@ -658,7 +663,7 @@ describe('recommendedSkills / installRecommendedSkill', () => {
     mkdirSync(join(root, 'other'), { recursive: true })
     writeFileSync(join(root, 'other', 'SKILL.md'), VERSIONED('other', '1.0.0'))
     for (const bad of ['nope', '../save', '../other', '/etc', '.hidden', 'a/b']) {
-      expect(() => installRecommendedSkill(bad, rec, save)).toThrow('unknown skill')
+      expect(() => installRecommendedSkill(bad, rec, save)).toThrow('skill-import:unknown-skill')
     }
     expect(existsSync(join(save, 'skills'))).toBe(false)
     expect(existsSync(join(save, 'other'))).toBe(false)

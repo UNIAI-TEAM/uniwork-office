@@ -29,4 +29,27 @@ export const hi = {
   intgSkillsInstall: 'इंस्टॉल करें',
   intgSkillsUpdate: 'अपडेट करें',
   intgSkillsInstalledTag: 'इंस्टॉल है',
+  intgSkillsErrDirUnreadable: 'कौशल फ़ोल्डर पढ़ा नहीं जा सका',
+  intgSkillsErrDirSymlink:
+    'कौशल फ़ोल्डर एक सिमलिक (symlink) है, और आयात में इन्हें अस्वीकार किया जाता है',
+  intgSkillsErrContainsSymlink:
+    'कौशल में एक सिमलिक (symlink) है, और आयात में इन्हें अस्वीकार किया जाता है',
+  intgSkillsErrTooLarge: 'कौशल 10 MB आयात सीमा से बड़ा है',
+  intgSkillsErrReadBackFailed: 'कौशल को दोबारा पढ़ा नहीं जा सका',
+  intgSkillsErrMissingSkillMd: 'फ़ोल्डर में SKILL.md नहीं है',
+  intgSkillsErrInvalidFrontmatter: 'SKILL.md में name और description फ्रंटमैटर होना चाहिए',
+  intgSkillsErrInvalidFolderName: 'फ़ोल्डर के नाम को कौशल नाम के रूप में उपयोग नहीं किया जा सकता',
+  intgSkillsErrAlreadyExists: 'उस नाम का कौशल पहले से मौजूद है',
+  intgSkillsErrFileUnreadable: 'फ़ाइल पढ़ी नहीं जा सकी',
+  intgSkillsErrInvalidFileName: 'फ़ाइल के नाम को कौशल नाम के रूप में उपयोग नहीं किया जा सकता',
+  intgSkillsErrNotZip: 'फ़ाइल एक zip संग्रह नहीं है',
+  intgSkillsErrTooManyEntries: 'संग्रह में {max}-प्रविष्टि आयात सीमा से अधिक प्रविष्टियाँ हैं',
+  intgSkillsErrUnsafeEntry: 'संग्रह में एक असुरक्षित प्रविष्टि नाम है: {name}',
+  intgSkillsErrArchiveSymlink:
+    'संग्रह में एक सिमलिक (symlink) है, और आयात में इन्हें अस्वीकार किया जाता है',
+  intgSkillsErrArchiveMissingSkillMd:
+    'संग्रह के रूट में या किसी एक फ़ोल्डर के भीतर SKILL.md नहीं है',
+  intgSkillsErrInvalidArchiveName: 'संग्रह के नाम को कौशल नाम के रूप में उपयोग नहीं किया जा सकता',
+  intgSkillsErrUnknownSkill: 'अज्ञात कौशल',
+  intgSkillsErrUnknownTarget: 'अज्ञात कौशल लक्ष्य',
 } satisfies Record<keyof typeof zh, string>

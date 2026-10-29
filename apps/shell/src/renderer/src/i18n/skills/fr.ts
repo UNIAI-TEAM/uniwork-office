@@ -30,4 +30,27 @@ export const fr = {
   intgSkillsInstall: 'Installer',
   intgSkillsUpdate: 'Mettre à jour',
   intgSkillsInstalledTag: 'Installée',
+  intgSkillsErrDirUnreadable: 'le dossier de la compétence n’a pas pu être lu',
+  intgSkillsErrDirSymlink:
+    'le dossier de la compétence est un lien symbolique, ce qui est refusé à l’import',
+  intgSkillsErrContainsSymlink:
+    'la compétence contient un lien symbolique, ce qui est refusé à l’import',
+  intgSkillsErrTooLarge: 'la compétence dépasse la limite d’import de 10 Mo',
+  intgSkillsErrReadBackFailed: 'la compétence n’a pas pu être relue',
+  intgSkillsErrMissingSkillMd: 'le dossier ne contient pas de SKILL.md',
+  intgSkillsErrInvalidFrontmatter: 'SKILL.md doit contenir les métadonnées name et description',
+  intgSkillsErrInvalidFolderName: 'le nom du dossier ne peut pas servir de nom de compétence',
+  intgSkillsErrAlreadyExists: 'une compétence portant ce nom existe déjà',
+  intgSkillsErrFileUnreadable: 'le fichier n’a pas pu être lu',
+  intgSkillsErrInvalidFileName: 'le nom du fichier ne peut pas servir de nom de compétence',
+  intgSkillsErrNotZip: 'le fichier n’est pas une archive zip',
+  intgSkillsErrTooManyEntries: 'l’archive dépasse la limite d’import de {max} entrées',
+  intgSkillsErrUnsafeEntry: 'l’archive contient un nom d’entrée non sûr : {name}',
+  intgSkillsErrArchiveSymlink:
+    'l’archive contient un lien symbolique, ce qui est refusé à l’import',
+  intgSkillsErrArchiveMissingSkillMd:
+    'l’archive n’a pas de SKILL.md à sa racine ou dans un seul dossier',
+  intgSkillsErrInvalidArchiveName: 'le nom de l’archive ne peut pas servir de nom de compétence',
+  intgSkillsErrUnknownSkill: 'compétence inconnue',
+  intgSkillsErrUnknownTarget: 'cible de compétence inconnue',
 } satisfies Record<keyof typeof zh, string>
