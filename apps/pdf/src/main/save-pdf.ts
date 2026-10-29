@@ -14,7 +14,7 @@ import {
   degrees,
   rgb,
 } from 'pdf-lib'
-import type { PDFPage } from 'pdf-lib'
+import type { PDFFont, PDFPage } from 'pdf-lib'
 import { VISUAL_SIGNATURE_CONTENT_PREFIX } from '../shared/ipc'
 import { markupLineRotation } from '../shared/markup-line'
 import { applyAttachments } from './pdf-attachments'
@@ -619,8 +619,8 @@ function addDrawing(
   d: DrawingInput,
   /** localId → registered ref of notes written earlier in this request (reply parenting) */
   noteRefs?: Map<string, PDFRef>,
-  /** the label font's ref for measure drawings (their appearance names /F1) */
-  measureFontRef?: PDFRef,
+  /** the label font for measure drawings (their appearance names /F1) */
+  measureFont?: PDFFont,
 ): void {
   if (d.kind === 'image') return // handled by addImageStamp (needs async embed)
   if (d.kind === 'link') return // handled by addLinkAnnot (needs the page list)
@@ -769,11 +769,25 @@ function addDrawing(
       )
       const esc = d.label.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
       ops.push(`(${esc}) Tj ET`)
-      // Helvetica 9pt averages ~4.5pt per glyph, and the extent follows the
-      // label's tilt — an axis-aligned half-width clipped steep lines
-      const halfW = (d.label.length * 4.5) / 2
-      xs.push(mx + Math.cos(tilt) * halfW, mx - Math.cos(tilt) * halfW)
-      ys.push(my + 6 + Math.sin(tilt) * halfW, my + 6 - Math.sin(tilt) * halfW)
+      // Tj draws from (mx, my + 6) along the tilted baseline by the label's
+      // advance width and extends above/below the baseline by the font height,
+      // so the annotation Rect and AP BBox must cover all four corners of the
+      // rotated text box for any line angle.
+      const labelW = measureFont ? measureFont.widthOfTextAtSize(d.label, 9) : d.label.length * 4.5
+      const labelH = measureFont ? measureFont.heightAtSize(9) : 9
+      const labelDesc = measureFont
+        ? Math.max(2, labelH - measureFont.heightAtSize(9, { descender: false }))
+        : 2.5
+      const cos = Math.cos(tilt)
+      const sin = Math.sin(tilt)
+      const ox = mx
+      const oy = my + 6
+      for (const lx of [0, labelW]) {
+        for (const ly of [-labelDesc, labelH]) {
+          xs.push(ox + lx * cos - ly * sin)
+          ys.push(oy + lx * sin + ly * cos)
+        }
+      }
     }
     if (d.kind === 'arrow') {
       const ang = Math.atan2(ty - fy, tx - fx)
@@ -801,8 +815,8 @@ function addDrawing(
     Type: 'XObject',
     Subtype: 'Form',
     BBox: rect,
-    ...(d.kind === 'measure' && measureFontRef
-      ? { Resources: { Font: { F1: measureFontRef } } }
+    ...(d.kind === 'measure' && measureFont
+      ? { Resources: { Font: { F1: measureFont.ref } } }
       : {}),
   })
   const annot = pdfDoc.context.obj({
@@ -1359,15 +1373,15 @@ export async function applySaveRequest(
   // only when a measure drawing is actually written, so saves without one
   // leave the document's font dict untouched
   const drawings = request.drawings ?? []
-  const measureFontRef = drawings.some((d) => d.kind === 'measure')
-    ? (await pdfDoc.embedFont(StandardFonts.Helvetica)).ref
+  const measureFont = drawings.some((d) => d.kind === 'measure')
+    ? await pdfDoc.embedFont(StandardFonts.Helvetica)
     : undefined
   for (const d of drawings) {
     const page = pages[d.pageIndex]
     if (!page) continue
     if (d.kind === 'image') await addImageStamp(pdfDoc, page, d)
     else if (d.kind === 'link') addLinkAnnot(pdfDoc, pages, page, d)
-    else addDrawing(pdfDoc, page, d, noteRefs, measureFontRef)
+    else addDrawing(pdfDoc, page, d, noteRefs, measureFont)
   }
   // Note content edits go after the drawings: replies added above locate their /IRT
   // parent by its old contents, which an earlier in-place rewrite would break. An

@@ -274,6 +274,14 @@ export const IconInsertPdf = () => (
     <path d="M11.95 11 V17 M8.95 14 H14.95" />
   </Icon>
 )
+export const IconReduceSize = () => (
+  <Icon>
+    <path d="M5 9.5 H9.5 V5 M5.5 5.5 L9.5 9.5" />
+    <path d="M19 9.5 H14.5 V5 M18.5 5.5 L14.5 9.5" />
+    <path d="M5 14.5 H9.5 V19 M5.5 18.5 L9.5 14.5" />
+    <path d="M19 14.5 H14.5 V19 M18.5 18.5 L14.5 14.5" />
+  </Icon>
+)
 export const IconInsertBlank = () => (
   <Icon>
     <rect x="6.7" y="4.5" width="10.5" height="15" rx="1" strokeDasharray="2.2 1.8" />

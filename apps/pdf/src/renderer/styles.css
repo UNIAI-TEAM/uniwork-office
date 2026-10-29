@@ -5724,8 +5724,9 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 
 .pdf-attachment {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
   padding: 4px 6px;
   border-radius: 6px;
 }
@@ -5740,7 +5741,7 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 }
 
 .pdf-attachment-name {
-  flex: 1;
+  flex: 1 0 100%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5748,7 +5749,6 @@ html[data-web-frame] .pdf-modal-btn.primary:hover:not(:disabled) {
 }
 
 .pdf-attachment-tag {
-  margin-inline-start: 6px;
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 0.78em;

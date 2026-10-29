@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { formatLength, parseCalibration } from '../src/renderer/measure'
 import { applySaveRequest } from '../src/main/save-pdf'
 import { AnnotationMode, OPS, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { PDFDocument } from 'pdf-lib'
+import {
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFNumber,
+  PDFRawStream,
+  StandardFonts,
+} from 'pdf-lib'
 import type { SavePdfRequest } from '../src/shared/ipc'
 
 describe('formatLength', () => {
@@ -100,5 +108,67 @@ describe('the measure annotation in a save', () => {
     // standard-14 Helvetica carries no bytes, but its /BaseFont dict would sit
     // in the file if the save embedded it for a document that draws no label
     expect(Buffer.from(plain.bytes).toString('latin1')).not.toContain('/BaseFont /Helvetica')
+  })
+
+  it('grows /Rect and the appearance /BBox to contain the label box for any line angle', async () => {
+    const cases: { from: [number, number]; to: [number, number]; label: string }[] = [
+      { from: [50, 60], to: [250, 60], label: '2.40 m' },
+      { from: [250, 60], to: [50, 60], label: '1.20 m' },
+      { from: [120, 40], to: [120, 180], label: '14.00 cm' },
+      { from: [200, 180], to: [80, 50], label: '99.99 mm' },
+    ]
+    for (const c of cases) {
+      const doc = await PDFDocument.create()
+      doc.addPage([300, 300])
+      const font = await doc.embedFont(StandardFonts.Helvetica)
+      const labelW = font.widthOfTextAtSize(c.label, 9)
+      const labelH = font.heightAtSize(9)
+      const labelDesc = Math.max(2, labelH - font.heightAtSize(9, { descender: false }))
+      const { bytes } = await applySaveRequest(await doc.save(), {
+        path: 'fixture.pdf',
+        markups: [],
+        drawings: [
+          {
+            kind: 'measure',
+            pageIndex: 0,
+            color: [0.86, 0.22, 0.18],
+            width: 1.5,
+            from: c.from,
+            to: c.to,
+            label: c.label,
+          },
+        ],
+        formValues: [],
+        stamps: [],
+      })
+      const saved = await PDFDocument.load(bytes, { updateMetadata: false })
+      const { context } = saved
+      const annots = context.lookup(saved.getPages()[0]!.node.get(PDFName.of('Annots')), PDFArray)
+      const annot = context.lookup(annots.get(0), PDFDict)
+      const rectArr = context.lookup(annot.get(PDFName.of('Rect')), PDFArray)
+      const ap = context.lookup(annot.get(PDFName.of('AP')), PDFDict)
+      const stream = context.lookup(ap.get(PDFName.of('N')), PDFRawStream)
+      const bboxArr = context.lookup(stream.dict.get(PDFName.of('BBox')), PDFArray)
+      const rect = rectArr.asArray().map((n) => (n as PDFNumber).asNumber())
+      const bbox = bboxArr.asArray().map((n) => (n as PDFNumber).asNumber())
+      expect(bbox).toEqual(rect)
+
+      const mx = (c.from[0] + c.to[0]) / 2
+      const my = (c.from[1] + c.to[1]) / 2
+      const ang = Math.atan2(c.to[1] - c.from[1], c.to[0] - c.from[0])
+      const tilt = Math.abs(ang) > Math.PI / 2 ? ang + Math.PI : ang
+      const cos = Math.cos(tilt)
+      const sin = Math.sin(tilt)
+      for (const lx of [0, labelW]) {
+        for (const ly of [-labelDesc, labelH]) {
+          const px = mx + lx * cos - ly * sin
+          const py = my + 6 + lx * sin + ly * cos
+          expect(px).toBeGreaterThanOrEqual(rect[0])
+          expect(px).toBeLessThanOrEqual(rect[2])
+          expect(py).toBeGreaterThanOrEqual(rect[1])
+          expect(py).toBeLessThanOrEqual(rect[3])
+        }
+      }
+    }
   })
 })
