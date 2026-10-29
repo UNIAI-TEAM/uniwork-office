@@ -1756,11 +1756,12 @@ async function saveFileDialog(event: IpcMainInvokeEvent, options: SaveDialogOpti
   )
 }
 
-/** Workbook file extensions the open pipeline accepts. Single source for the
- *  picker filters, the merge-source check, and the crash re-open check.
- *  .ods/.ots open through the shell's converter route, like .xls. */
-const WORKBOOK_EXTS = new Set(['xlsx', 'xlsm', 'xls', 'csv', 'tsv', 'ods', 'ots'])
+/** Workbook file extensions the native sidecar pipeline accepts (merge sources,
+ *  encrypted open, and crash re-open). .ods/.ots are picker-only until converted
+ *  through the shell's converter route into a temp .xlsx. */
+const WORKBOOK_EXTS = new Set(['xlsx', 'xlsm', 'xls', 'csv', 'tsv'])
 const WORKBOOK_FILTER_EXTENSIONS = [...WORKBOOK_EXTS]
+const WORKBOOK_OPEN_PICKER_EXTENSIONS = [...WORKBOOK_FILTER_EXTENSIONS, 'ods', 'ots']
 /** register a tab's webContents/client pair and wire up cleanup on teardown */
 /** Clients whose process-death notification is already wired. A sidecar client
  *  is shared by every tab (the `sidecar ?? new XlsxSidecarClient(...)` reuse),
@@ -2816,15 +2817,20 @@ export function registerSheetsIpc(): void {
     if (!path) {
       const selection = await openFileDialog(event, {
         properties: ['openFile'],
-        filters: [{ name: tm('filterSpreadsheets'), extensions: WORKBOOK_FILTER_EXTENSIONS }],
+        filters: [{ name: tm('filterSpreadsheets'), extensions: WORKBOOK_OPEN_PICKER_EXTENSIONS }],
       })
       if (selection.canceled || !selection.filePaths[0]) return null
       path = selection.filePaths[0]
       // a picked legacy .xls or OpenDocument .ods/.ots goes to the shell's converter route; only a
       // missing converter falls back (shell side) to the values-only open of an .xls
-      if (/\.(xls|ods|ots)$/i.test(path) && legacyOpenHook?.(path)) return null
+      if (/\.xls$/i.test(path) && legacyOpenHook?.(path)) return null
       // Retry on a stalled open restarts this pick, not an earlier shell open
       rememberOpenedWorkbook(event.sender, path)
+    }
+    if (/\.(ods|ots)$/i.test(path)) {
+      if (legacyOpenHook?.(path)) return null
+      const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+      throw new Error(`Unsupported workbook: ${ext}`)
     }
     // Password first, recovery prompt second: the prompt's Restore/Discard
     // choice is consumed by prepareWorkbookForOpen, so asking for the
@@ -4880,8 +4886,8 @@ async function prepareWorkbookForOpen(
     return { openPath: path, ...base }
   }
   const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+  if (!WORKBOOK_EXTS.has(extension)) throw new Error(`Unsupported workbook: ${extension}`)
   if (extension !== 'csv' && extension !== 'tsv' && extension !== 'xls') {
-    // Unsaved work from a lost session: offer the recovery copy. Restoring
     // opens it with restoreTarget pointing back at the original, so a plain
     // Save writes straight back over the file the user opened — the restore
     // prompt (which spells out the overwrite) was the confirmation.

@@ -8,9 +8,10 @@ import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 type IpcHandler = (event: unknown, ...args: unknown[]) => unknown
-const { handlers, showSaveDialog, userData, writeHooks } = vi.hoisted(() => ({
+const { handlers, showSaveDialog, showOpenDialog, userData, writeHooks } = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => unknown>(),
   showSaveDialog: vi.fn(),
+  showOpenDialog: vi.fn(),
   userData: { dir: '' },
   writeHooks: { duringWrite: null as null | (() => void) },
 }))
@@ -62,7 +63,7 @@ vi.mock('electron', () => ({
   dialog: {
     showSaveDialog: (...args: unknown[]) => showSaveDialog(...args),
     showMessageBox: vi.fn(),
-    showOpenDialog: vi.fn(),
+    showOpenDialog: (...args: unknown[]) => showOpenDialog(...args),
   },
   ipcMain: {
     handle: vi.fn((channel: string, handler: IpcHandler) => handlers.set(channel, handler)),
@@ -91,6 +92,7 @@ import {
 import {
   authorizeMcpDocWrite,
   registerDocsIpc,
+  setDocsLegacyOpenHook,
   setDocsUserSaveHook,
   setUniworkDocumentPolicy,
 } from '../src/main/docs-main'
@@ -156,6 +158,8 @@ describe('docs real handlers on a converted legacy .doc', () => {
     forgetConvertedDocument(tempPath)
     setUniworkDocumentPolicy(null)
     setDocsUserSaveHook(null)
+    setDocsLegacyOpenHook(null)
+    showOpenDialog.mockReset()
     rmSync(dir, { recursive: true, force: true })
   })
 
@@ -232,5 +236,33 @@ describe('docs real handlers on a converted legacy .doc', () => {
     expect(hook).toHaveBeenCalledExactlyOnceWith(tempPath)
     // still a converted copy until the UniWork binding moves the tab
     expect(convertedDocumentFor(tempPath)).toBeDefined()
+  })
+
+  it('offers .odt and .ott in docs:open and hands them to the shell legacy-open hook instead of loadDocx', async () => {
+    const handed: string[] = []
+    setDocsLegacyOpenHook((p) => {
+      handed.push(p)
+      return true
+    })
+    const odtPath = join(dir, 'Notes.odt')
+    const ottPath = join(dir, 'Template.ott')
+    writeFileSync(odtPath, 'PK\u0003\u0004')
+    writeFileSync(ottPath, 'PK\u0003\u0004')
+
+    showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [odtPath] })
+    await expect(call('docs:open', wc)).resolves.toBeNull()
+    expect(showOpenDialog.mock.calls.at(-1)?.at(-1)).toMatchObject({
+      filters: [{ extensions: ['docx', 'odt', 'ott'] }],
+    })
+    expect(handed).toEqual([odtPath])
+
+    showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [ottPath] })
+    await expect(call('docs:open', wc)).resolves.toBeNull()
+    expect(handed).toEqual([odtPath, ottPath])
+
+    // without the hook (standalone), loadDocx still rejects non-.docx
+    setDocsLegacyOpenHook(null)
+    showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [odtPath] })
+    await expect(call('docs:open', wc)).resolves.toBeNull()
   })
 })

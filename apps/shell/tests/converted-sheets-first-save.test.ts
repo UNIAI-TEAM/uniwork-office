@@ -21,6 +21,7 @@ const { handlers, views, hooks, userData } = vi.hoisted(() => ({
     opened: [] as string[],
     converted: [] as string[],
     sent: [] as Array<{ channel: string; payload: unknown }>,
+    dialogOptions: [] as Array<{ filters?: Array<{ extensions: string[] }> }>,
   },
   userData: { dir: '' },
 }))
@@ -57,7 +58,13 @@ vi.mock('electron', () => {
     },
     desktopCapturer: {},
     dialog: {
-      showOpenDialog: vi.fn(async () => ({ canceled: false, filePaths: [hooks.picked] })),
+      showOpenDialog: vi.fn(async (...args: unknown[]) => {
+        const opts = (args.length > 1 ? args[1] : args[0]) as {
+          filters?: Array<{ extensions: string[] }>
+        }
+        hooks.dialogOptions.push(opts)
+        return { canceled: false, filePaths: hooks.picked ? [hooks.picked] : [] }
+      }),
     },
     Menu: { buildFromTemplate: vi.fn(), setApplicationMenu: vi.fn() },
     net: {},
@@ -133,6 +140,7 @@ vi.mock('@genoffice/xlsx-gateway/gateway/xlsx-package-io', async (importOriginal
 import {
   createSheetsView,
   markSheetsUnsavedNew,
+  queueWorkbookForView,
   setSheetsLegacyOpenHook,
   setSheetsUserSaveHook,
   setUniworkDocumentPolicy,
@@ -154,6 +162,7 @@ afterEach(() => {
   hooks.opened.length = 0
   hooks.converted.length = 0
   hooks.sent.length = 0
+  hooks.dialogOptions.length = 0
   if (dir) rmSync(dir, { recursive: true, force: true })
 })
 
@@ -281,6 +290,97 @@ describe("Sheets' own File > Open of a legacy .xls (R1-1)", () => {
     expect(result).not.toBeNull()
     expect(hooks.converted).toEqual([])
     expect(hooks.opened.length).toBe(1)
+  })
+  it('refuses an .ods pick when the legacy-open hook declines or is absent instead of reaching the sidecar', async () => {
+    const declined = await pick('Declined.ods', false)
+
+    expect(declined.handedOver).toEqual([hooks.picked])
+    expect(declined.result).toBeInstanceOf(Error)
+    expect((declined.result as Error).message).toContain('Unsupported workbook: ods')
+    expect(hooks.converted).toEqual([])
+    expect(hooks.opened).toEqual([])
+  })
+
+  it('refuses .ods/.ots in reopenWorkbook, openEncryptedWorkbook, and openWorkbooksForMerge without opening a sidecar snapshot', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'sheets-odf-native-refusal-'))
+    userData.dir = join(dir, 'userData')
+    const odsPath = join(__dirname, 'fixtures', 'odf', 'native-calc.ods')
+    const otsPath = join(dir, 'Template.ots')
+    writeFileSync(otsPath, readFileSync(odsPath))
+    const handedOver: string[] = []
+    setSheetsLegacyOpenHook((p) => {
+      handedOver.push(p)
+      return true
+    })
+    createSheetsView({ includeAiHandlers: false })
+    const event = { sender: views.last as never }
+
+    await expect(handlers.get(IPC_CHANNELS.reopenWorkbook)!(event, odsPath)).rejects.toThrow(
+      'Unsupported workbook: ods',
+    )
+    await expect(handlers.get(IPC_CHANNELS.reopenWorkbook)!(event, otsPath)).rejects.toThrow(
+      'Unsupported workbook: ots',
+    )
+    await expect(
+      handlers.get(IPC_CHANNELS.openEncryptedWorkbook)!(event, {
+        path: odsPath,
+        password: 'secret',
+      }),
+    ).rejects.toThrow('Unsupported workbook: ods')
+    await expect(
+      handlers.get(IPC_CHANNELS.openWorkbooksForMerge)!(event, [odsPath]),
+    ).rejects.toThrow('Unsupported merge source: ods')
+    await expect(
+      handlers.get(IPC_CHANNELS.openWorkbooksForMerge)!(event, [otsPath]),
+    ).rejects.toThrow('Unsupported merge source: ots')
+
+    expect(handedOver).toEqual([])
+    expect(hooks.converted).toEqual([])
+    expect(hooks.opened).toEqual([])
+  })
+
+  it('offers .ods/.ots in the File > Open picker but excludes them from the merge-source picker', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'sheets-odf-picker-filters-'))
+    userData.dir = join(dir, 'userData')
+    hooks.picked = ''
+    createSheetsView({ includeAiHandlers: false })
+    const event = { sender: views.last as never }
+
+    await handlers.get(IPC_CHANNELS.selectWorkbook)!(event)
+    await handlers.get(IPC_CHANNELS.selectWorkbooksForMerge)!(event)
+
+    const openExts = hooks.dialogOptions[0]?.filters?.[0]?.extensions ?? []
+    const mergeExts = hooks.dialogOptions[1]?.filters?.[0]?.extensions ?? []
+    expect(openExts).toEqual(expect.arrayContaining(['xlsx', 'xls', 'ods', 'ots']))
+    expect(mergeExts).toEqual(expect.arrayContaining(['xlsx', 'xls', 'csv', 'tsv']))
+    expect(mergeExts).not.toContain('ods')
+    expect(mergeExts).not.toContain('ots')
+  })
+
+  it('hands a queued .ods path to the shell converter hook or refuses before native preparation', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'sheets-odf-queued-'))
+    userData.dir = join(dir, 'userData')
+    const odsPath = join(__dirname, 'fixtures', 'odf', 'native-calc.ods')
+    const handedOver: string[] = []
+    setSheetsLegacyOpenHook((p) => {
+      handedOver.push(p)
+      return true
+    })
+    createSheetsView({ includeAiHandlers: false })
+    const wc = views.last as never
+    const event = { sender: wc }
+
+    queueWorkbookForView(wc, odsPath)
+    await expect(handlers.get(IPC_CHANNELS.selectWorkbook)!(event)).resolves.toBeNull()
+    expect(handedOver).toEqual([odsPath])
+    expect(hooks.opened).toEqual([])
+
+    setSheetsLegacyOpenHook(null)
+    queueWorkbookForView(wc, odsPath)
+    await expect(handlers.get(IPC_CHANNELS.selectWorkbook)!(event)).rejects.toThrow(
+      'Unsupported workbook: ods',
+    )
+    expect(hooks.opened).toEqual([])
   })
 })
 

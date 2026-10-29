@@ -47,6 +47,7 @@ export interface ScanResult {
 const UPLOADABLE_BOUND_FACTOR = 2
 /** Hard ceiling on every entry read (also those the planner skips), so a flood of junk cannot hang the scan. */
 const VISITED_BOUND_FACTOR = 20
+const ODF_EXTENSION_RE = /\.(odt|ott|ods|ots|odp|otp)$/i
 
 interface WalkState {
   entries: FolderUploadEntry[]
@@ -144,7 +145,11 @@ async function walk(dir: string, rel: string, depth: number, state: WalkState): 
       if (!(await walk(full, path, depth + 1, state))) return false
     } else {
       state.entries.push({ path, size })
-      if (isUploadableName(item.name, state.uploadExtensions)) state.uploadable += 1
+      if (
+        !ODF_EXTENSION_RE.test(item.name.trim()) &&
+        isUploadableName(item.name, state.uploadExtensions)
+      )
+        state.uploadable += 1
       if (state.uploadable > state.uploadableBound) {
         state.truncated = 'entries'
         return false
@@ -221,8 +226,10 @@ export type AppFolderUploadPlan = Omit<FolderUploadPlan, 'skipped'> & {
  */
 export function mergeScanSkips(
   plan: FolderUploadPlan,
-  scan:
-    Pick<ScanResult, 'skipped' | 'truncated'> | { skipped: readonly AppSkip[]; truncated: null },
+  scan: {
+    skipped: readonly { path: string; reason: FolderUploadSkipReason | AppSkipReason }[]
+    truncated: ScanResult['truncated']
+  },
   limits: Pick<FolderUploadLimits, 'maxFiles' | 'maxDepth'>,
 ): AppFolderUploadPlan {
   let refusal = plan.refusal

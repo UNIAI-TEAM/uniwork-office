@@ -42,6 +42,9 @@ describe('the upload format table', () => {
     expect(formatForName('plan')).toBeNull()
     expect(formatForName('photo.constructor')).toBeNull()
     expect(formatForName('photo.__proto__')).toBeNull()
+    for (const ext of ['odt', 'ott', 'ods', 'ots', 'odp', 'otp']) {
+      expect(formatForName(`plan.${ext}`), ext).toBeNull()
+    }
   })
 
   it('resolves the extensions case-insensitively, as the file system does', () => {
