@@ -1024,7 +1024,7 @@ export function AiPanel({
     if (uniworkGate.refuse()) return false
     setSkillsTooLong(false)
     // skills ride with this one message only; a queue batch or retry carries none
-    const sentSkills = attachSkills ? attachedSkillsRef.current : []
+    const sentSkills = attachSkills ? attachedSkillsRef.current.slice(0, MAX_ATTACHED_SKILLS) : []
     const scope = retryOf
       ? retryOf.scope
       : displayText === undefined
@@ -1034,7 +1034,9 @@ export function AiPanel({
       setBusy(true)
       void (async () => {
         try {
-          const s = await window.markdownApi?.getAiSettings?.()
+          // a settings read failure falls back to the last known provider, never to the error path
+          // below, which would overwrite the previous reply
+          const s = await window.markdownApi?.getAiSettings?.().catch(() => undefined)
           if (s) settingsRef.current = s
           const activeProvider = s?.provider ?? settingsRef.current?.provider ?? provider
           setProvider(activeProvider)

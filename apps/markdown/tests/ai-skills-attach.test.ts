@@ -13,7 +13,23 @@ const harness = vi.hoisted(() => ({
   runs: [] as string[],
   finishRun: null as (() => void) | null,
   failRun: null as ((err: string) => void) | null,
+  settingsFail: false,
+  onToggle: null as ((name: string) => void) | null,
 }))
+// expose the panel's own onToggle so the cap can be driven past the menu's disabled button
+vi.mock('@genoffice/ui', async (orig) => {
+  const real: Record<string, unknown> = await orig()
+  const RealMenu = real.AiSkillsMenu as (p: {
+    onToggle: (name: string) => void
+  }) => ReturnType<typeof createElement>
+  return {
+    ...real,
+    AiSkillsMenu: (p: { onToggle: (name: string) => void }) => {
+      harness.onToggle = p.onToggle
+      return createElement(RealMenu, p as never)
+    },
+  }
+})
 vi.mock('@genoffice/agent-core', async (orig) => {
   const real: Record<string, unknown> = await orig()
   class FakeLoop {
@@ -107,6 +123,7 @@ describe('markdown AI panel skills attach (X4)', () => {
     harness.runs.length = 0
     harness.finishRun = null
     harness.failRun = null
+    harness.settingsFail = false
     act(() => setAiModelNeedHint(null))
     clearUniworkAcks()
     setUniworkAiAvailable(false)
@@ -149,7 +166,10 @@ describe('markdown AI panel skills attach (X4)', () => {
       openSkillsSettings,
       skillsList,
       skillText,
-      getAiSettings: vi.fn(async () => ({ ...usableAiSettings(), provider })),
+      getAiSettings: vi.fn(async () => {
+        if (harness.settingsFail) throw new Error('settings unavailable')
+        return { ...usableAiSettings(), provider }
+      }),
     }
     vi.stubGlobal(
       'markdownApi',
@@ -260,6 +280,52 @@ describe('markdown AI panel skills attach (X4)', () => {
       (n) => n.textContent,
     )
     expect(draftChips).toEqual(['tables', 'tone', 'citations'])
+  })
+
+  it('never attaches or sends more than 3 skills even when onToggle is driven past the cap', async () => {
+    await mountPanel()
+    click(container!.querySelector('.ai-plus-btn'))
+    await flush()
+    const items = [...container!.querySelectorAll<HTMLButtonElement>('.ai-plus-skill')]
+    click(items[0])
+    click(items[1])
+    click(items[2])
+    // call the panel's own toggle past the cap: the state guard, not the menu button, must hold
+    act(() => harness.onToggle?.('summary'))
+    const draftChips = [...container!.querySelectorAll('.ai-composer .ai-skill-chip-name')].map(
+      (n) => n.textContent,
+    )
+    expect(draftChips).toEqual(['tables', 'tone', 'citations'])
+    typeInComposer(container!, 'Go')
+    pressEnterInComposer(container!)
+    await flush()
+    await flush()
+    expect(harness.runs).toHaveLength(1)
+    expect(harness.runs[0]!.match(/<skill name=/g)).toHaveLength(3)
+    expect(harness.runs[0]).not.toContain('Keep it brief.')
+  })
+
+  it('a failing settings read does not overwrite the previous reply and still sends', async () => {
+    await mountPanel()
+    typeInComposer(container!, 'First')
+    pressEnterInComposer(container!)
+    await flush()
+    act(() => harness.finishRun?.())
+    await flush()
+    expect(container!.querySelector('.ai-msg-assistant')?.textContent).toContain('reply')
+    harness.settingsFail = true
+
+    click(container!.querySelector('.ai-plus-btn'))
+    await flush()
+    click(container!.querySelector('.ai-plus-skill'))
+    typeInComposer(container!, 'Second')
+    pressEnterInComposer(container!)
+    await flush()
+    await flush()
+    expect(harness.runs).toHaveLength(2)
+    expect(harness.runs[1]).toContain('<skill name="tables">')
+    expect(container!.textContent).not.toContain('settings unavailable')
+    expect(container!.querySelector('.ai-msg-assistant')?.textContent).toContain('reply')
   })
 
   it('carries skills only from composer send: queued messages and retries never carry skills', async () => {
