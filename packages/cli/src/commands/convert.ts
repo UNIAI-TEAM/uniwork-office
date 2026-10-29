@@ -19,8 +19,6 @@ const NODE_ROUTES: Record<string, readonly string[]> = {
   csv: ['xlsx'],
   xls: ['xlsx'],
   xlsb: ['xlsx'],
-  ods: ['xlsx'],
-  ots: ['xlsx'],
   odt: ['docx'],
   ott: ['docx'],
   odp: ['pptx'],
@@ -85,6 +83,18 @@ export const convertCommand: CommandDef = {
       throw new CliError(EXIT.usage, 'missing --to <format>', undefined, {
         reason: 'missing_argument',
       })
+    if (from === 'ods' || from === 'ots') {
+      throw new CliError(
+        EXIT.usage,
+        'converting OpenDocument spreadsheets in the CLI is not available yet',
+        { supported: describeRoutes() },
+        {
+          reason: 'unsupported',
+          suggestion:
+            'open the file in UniWork Office to convert it, or pick a route from detail.supported',
+        },
+      )
+    }
     const targets = ROUTES[from]
     if (!targets?.includes(to)) {
       throw new CliError(
@@ -94,8 +104,24 @@ export const convertCommand: CommandDef = {
         { reason: 'unsupported', suggestion: 'pick a route from detail.supported' },
       )
     }
+    const outFlag = flagString(args, 'out')
+    if (
+      (from === 'odt' || from === 'ott' || from === 'odp' || from === 'otp') &&
+      outFlag &&
+      extension(outFlag) !== to
+    ) {
+      throw new CliError(
+        EXIT.usage,
+        `output file for .${from} conversion must end with .${to}: ${outFlag}`,
+        { expected_extension: `.${to}` },
+        {
+          reason: 'invalid_argument',
+          suggestion: `pass an --out path ending in .${to}`,
+        },
+      )
+    }
     // before run(): the sidecar and app routes write the output themselves
-    const output = resolveOutput(flagString(args, 'out'), ctx, {
+    const output = resolveOutput(outFlag, ctx, {
       fallback: join(dirname(input), `${basename(input, extname(input))}.${to}`),
       force: flagBool(args, 'force'),
       fresh: true,

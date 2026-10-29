@@ -1,6 +1,11 @@
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
-import { convertOdtToDocx, OdfConvertError } from '../src/index'
+import {
+  convertOdtToDocx,
+  MAX_ODT_DOCUMENT_TABLE_CELLS,
+  MAX_ODT_TABLE_CELLS,
+  OdfConvertError,
+} from '../src/index'
 
 const NAMESPACES =
   'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"' +
@@ -179,6 +184,76 @@ describe('convertOdtToDocx', () => {
     expect(row3Cells[0]).toContain('<w:vMerge/>')
     expect(row3Cells[1]).toContain('B3')
     expect(row3Cells[2]).toContain('C3')
+  })
+
+  it('clamps oversized and non-finite row/column spans to existing table dimensions instead of hanging or OOM', async () => {
+    // Reviewer B1 case 1: 1x1 table declaring table:number-rows-spanned="1000000"
+    const spanMillion =
+      '<table:table><table:table-column/>' +
+      '<table:table-row><table:table-cell table:number-rows-spanned="1000000"><text:p>X</text:p></table:table-cell></table:table-row>' +
+      '</table:table>'
+    const r1 = await convertOdtToDocx(await buildOdt(contentXml(spanMillion)))
+    const doc1 = (await readDocxEntry(r1.docx, 'word/document.xml')) ?? ''
+    expect([...doc1.matchAll(/<w:tr>/g)]).toHaveLength(1)
+    expect(doc1).toContain('X')
+    expect(doc1).not.toContain('vMerge')
+
+    // Reviewer B1 case 2: 1x1 table declaring table:number-rows-spanned="Infinity" and non-integer colSpan
+    const spanInfinity =
+      '<table:table><table:table-column/>' +
+      '<table:table-row><table:table-cell table:number-rows-spanned="Infinity" table:number-columns-spanned="Infinity"><text:p>Y</text:p></table:table-cell></table:table-row>' +
+      '</table:table>'
+    const r2 = await convertOdtToDocx(await buildOdt(contentXml(spanInfinity)))
+    const doc2 = (await readDocxEntry(r2.docx, 'word/document.xml')) ?? ''
+    expect([...doc2.matchAll(/<w:tr>/g)]).toHaveLength(1)
+    expect(doc2).toContain('Y')
+  })
+
+  it('refuses tables that exceed the per-table or per-document occupancy cell budget', async () => {
+    // Single table over MAX_ODT_TABLE_CELLS (200 rows x 600 cols = 120,000 > 100,000)
+    const rowXml =
+      '<table:table-row><table:table-cell><text:p>x</text:p></table:table-cell></table:table-row>'
+    const overTable =
+      '<table:table>' +
+      '<table:table-column table:number-columns-repeated="600"/>' +
+      rowXml.repeat(200) +
+      '</table:table>'
+    expect(600 * 200).toBeGreaterThan(MAX_ODT_TABLE_CELLS)
+    await expect(convertOdtToDocx(await buildOdt(contentXml(overTable)))).rejects.toThrow(
+      new OdfConvertError('unreadable'),
+    )
+
+    // Three tables each within MAX_ODT_TABLE_CELLS (90,000 cells each) whose sum (270,000) exceeds MAX_ODT_DOCUMENT_TABLE_CELLS (250,000)
+    const oneTable90k =
+      '<table:table>' +
+      '<table:table-column table:number-columns-repeated="900"/>' +
+      rowXml.repeat(100) +
+      '</table:table>'
+    expect(900 * 100).toBeLessThanOrEqual(MAX_ODT_TABLE_CELLS)
+    expect(900 * 100 * 3).toBeGreaterThan(MAX_ODT_DOCUMENT_TABLE_CELLS)
+    await expect(
+      convertOdtToDocx(await buildOdt(contentXml(oneTable90k.repeat(3)))),
+    ).rejects.toThrow(new OdfConvertError('unreadable'))
+  })
+
+  it('preserves text:index-title paragraphs inside a table of contents without reporting unhandled-blocks', async () => {
+    const body =
+      '<text:table-of-content text:name="Table of Contents1">' +
+      '<text:table-of-content-source text:outline-level="10">' +
+      '<text:index-title-template text:style-name="Contents_20_Heading">Mục lục</text:index-title-template>' +
+      '</text:table-of-content-source>' +
+      '<text:index-body>' +
+      '<text:index-title text:name="Table of Contents1_Head">' +
+      '<text:p text:style-name="Contents_20_Heading">Mục lục</text:p>' +
+      '</text:index-title>' +
+      '<text:p text:style-name="Contents_20_1">1. Giới thiệu OpenDocument<text:tab/>1</text:p>' +
+      '</text:index-body>' +
+      '</text:table-of-content>'
+    const result = await convertOdtToDocx(await buildOdt(contentXml(body)))
+    expect(result.dropped).toEqual([])
+    const document = (await readDocxEntry(result.docx, 'word/document.xml')) ?? ''
+    expect(document).toContain('Mục lục')
+    expect(document).toContain('1. Giới thiệu OpenDocument')
   })
 
   it('carries the page geometry into the section properties', async () => {

@@ -72,6 +72,14 @@ interface BlockContext {
 
 const HEADING_MAX = 6
 
+/**
+ * Occupancy-grid slot limits so a wide or many-row table cannot exhaust the
+ * heap before XML generation finishes. Checked per table and across all tables
+ * in the document before allocating the occupancy grid.
+ */
+export const MAX_ODT_TABLE_CELLS = 100_000
+export const MAX_ODT_DOCUMENT_TABLE_CELLS = 250_000
+
 export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult> {
   const pack = await loadOdfPackage(odt)
   if (!pack) throw new OdfConvertError('unreadable')
@@ -84,6 +92,23 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
   const drafts: Draft[] = []
   const listFrames: ListFrame[] = []
   let listCounter = 0
+  let documentTableCells = 0
+
+  function emitTable(node: XNode): Draft {
+    const columns = readColumns(node, ctx)
+    const rows = readRows(node)
+    const tableCells = rows.length * columns.length
+    if (
+      !Number.isSafeInteger(tableCells) ||
+      tableCells > MAX_ODT_TABLE_CELLS ||
+      documentTableCells + tableCells > MAX_ODT_DOCUMENT_TABLE_CELLS
+    ) {
+      throw new OdfConvertError('unreadable')
+    }
+    documentTableCells += tableCells
+    const grid = placeCells(rows, columns.length, ctx)
+    return { kind: 'xml', xml: tableXml(columns, grid) }
+  }
 
   const walkElements = (nodes: XNode[], context: BlockContext): void => {
     for (const element of elements(nodes)) {
@@ -101,9 +126,10 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
           walkList(element.node, null, 0, context)
           break
         case 'table:table':
-          drafts.push(tableDraft(element.node, ctx))
+          drafts.push(emitTable(element.node))
           break
         case 'text:section':
+        case 'text:index-title':
           if (attr(element.node, 'text:display') !== 'none') {
             walkElements(nodeChildren(element.node), context)
           }
@@ -197,7 +223,7 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
           } else if (inner.name === 'text:list') {
             walkList(inner.node, frame, depth, context)
           } else if (inner.name === 'table:table') {
-            drafts.push(tableDraft(inner.node, ctx))
+            drafts.push(emitTable(inner.node))
           } else if (inner.name === 'draw:frame') {
             emitFrame(inner.node, context)
           }
@@ -470,19 +496,15 @@ const CELL_GEN_CTX = {
   },
 }
 
-function tableDraft(node: XNode, ctx: WalkContext): Draft {
-  const columns = readColumns(node, ctx)
-  const rows = readRows(node)
-  const grid = placeCells(rows, columns.length, ctx)
-  return { kind: 'xml', xml: tableXml(columns, grid) }
-}
+const MAX_TABLE_COLUMNS = 1024
 
 function readColumns(table: XNode, ctx: WalkContext): ColumnSpec[] {
   const out: ColumnSpec[] = []
   const push = (node: XNode): void => {
     const width = ctx.styles.columnWidthEmu(attr(node, 'table:style-name'))
     const repeat = clampRepeat(attr(node, 'table:number-columns-repeated'))
-    for (let index = 0; index < repeat; index++) out.push({ widthEmu: width })
+    const count = Math.min(repeat, Math.max(0, MAX_TABLE_COLUMNS - out.length))
+    for (let index = 0; index < count; index++) out.push({ widthEmu: width })
   }
   const walk = (node: XNode): void => {
     for (const { name, node: child } of childElements(node)) {
@@ -514,6 +536,11 @@ function clampRepeat(text: string | undefined, cap = 1024): number {
   return Math.min(value, cap)
 }
 
+function parsePositiveSpan(text: string | undefined): number {
+  const value = Number(text ?? '1')
+  if (!Number.isSafeInteger(value) || value < 1) return 1
+  return value
+}
 /** resolve the occupancy grid: every (row, column) slot names the cell that paints it */
 function placeCells(
   rows: XNode[],
@@ -540,7 +567,8 @@ function placeCells(
       while (column < columnCount && slotRow[column]) column++
       if (column >= columnCount) break
       const colSpan = Math.max(1, Math.min(cell.colSpan, columnCount - column))
-      for (let dr = 0; dr < cell.rowSpan; dr++) {
+      const rowSpan = Math.max(1, Math.min(cell.rowSpan, rows.length - rowIndex))
+      for (let dr = 0; dr < rowSpan; dr++) {
         while (occupancy.length <= rowIndex + dr) occupancy.push(new Array(columnCount).fill(null))
         const slot = occupancy[rowIndex + dr]
         for (let dc = 0; dc < colSpan; dc++) slot[column + dc] = cell
@@ -548,6 +576,7 @@ function placeCells(
       cell.row = rowIndex
       cell.column = column
       cell.colSpan = colSpan
+      cell.rowSpan = rowSpan
       column += colSpan
     }
     rowIndex++
@@ -607,8 +636,8 @@ function makeCell(node: XNode, ctx: WalkContext): GridCell {
   return {
     row: -1,
     column: -1,
-    colSpan: Math.max(1, Number(attr(node, 'table:number-columns-spanned') ?? '1') || 1),
-    rowSpan: Math.max(1, Number(attr(node, 'table:number-rows-spanned') ?? '1') || 1),
+    colSpan: parsePositiveSpan(attr(node, 'table:number-columns-spanned')),
+    rowSpan: parsePositiveSpan(attr(node, 'table:number-rows-spanned')),
     contentXml,
     fill: ctx.styles.cellFill(attr(node, 'table:style-name')),
   }
