@@ -1186,22 +1186,71 @@ describe('legacy-converter', () => {
           })
           .catch((err: unknown) => err)
       const a = new AbortController()
-      const b = new AbortController()
-      const active = [run(a.signal), run(b.signal)]
-      await vi.waitFor(() => expect(getSpawnCount()).toBe(2))
-      const queued = run()
+      const active = [run(a.signal)]
+      await vi.waitFor(() => expect(getSpawnCount()).toBe(1))
+      const queued = [run(), run()]
 
       fresh.disposeLegacyConverter({ killGroup: (pid) => killed.push(pid) })
-      expect(await queued).toMatchObject({ code: 'cancelled' })
-      expect(await run()).toMatchObject({ code: 'cancelled' })
-      a.abort()
-      b.abort()
-      expect(await Promise.all(active)).toEqual([
+      expect(await Promise.all(queued)).toEqual([
         expect.objectContaining({ code: 'cancelled' }),
         expect.objectContaining({ code: 'cancelled' }),
       ])
-      expect(getSpawnCount()).toBe(2)
+      expect(await run()).toMatchObject({ code: 'cancelled' })
+      a.abort()
+      expect(await Promise.all(active)).toEqual([expect.objectContaining({ code: 'cancelled' })])
+      expect(getSpawnCount()).toBe(1)
       expect(killed).toContain(31337)
+    })
+
+    it('runs concurrent legacy conversions sequentially (one soffice process at a time) so two simultaneous opens both succeed', async () => {
+      const { root, loDir } = makeFakeLo()
+      const docx = await makeMinimalOoxmlZip('docx')
+      let running = 0
+      let maxRunning = 0
+      const order: string[] = []
+      const spawnFn: SpawnSofficeFn = (_cmd, args) => {
+        running++
+        maxRunning = Math.max(maxRunning, running)
+        const outDir = args[args.indexOf('--outdir') + 1]!
+        const input = args[args.length - 1]!
+        const stem = basename(input, '.doc').replace(/\.odt$/, '')
+        order.push(`start:${stem}`)
+        const { child, emitter } = makeFakeChild(60_000 + order.length)
+        setImmediate(() => {
+          writeFileSync(join(outDir, `${stem}.docx`), docx)
+          order.push(`end:${stem}`)
+          running--
+          emitter.emit('exit', 0)
+        })
+        return child
+      }
+
+      const [resDoc, resOdt] = await Promise.all([
+        convertLegacyFile(join(FIXTURES_DIR, 'vn-template.doc'), {
+          loOptions: { platform: 'linux', envDir: loDir },
+          tempRoot: root,
+          spawnFn,
+          killTreeDeps: { killGroup: () => {} },
+        }),
+        convertLegacyFile(join(ODF_FIXTURES_DIR, 'native-writer.odt'), {
+          loOptions: { platform: 'linux', envDir: loDir },
+          tempRoot: root,
+          spawnFn,
+          killTreeDeps: { killGroup: () => {} },
+        }),
+      ])
+
+      expect(resDoc.kind).toBe('converted')
+      expect(resOdt.kind).toBe('converted')
+      expect(maxRunning).toBe(1)
+      // The queue promises one soffice at a time, not FIFO across async preflight:
+      // assert two non-overlapping start/end pairs, in whichever order they ran.
+      expect(order).toHaveLength(4)
+      expect(order[0]).toMatch(/^start:/)
+      expect(order[1]).toBe(order[0]!.replace('start:', 'end:'))
+      expect(order[2]).toMatch(/^start:/)
+      expect(order[3]).toBe(order[2]!.replace('start:', 'end:'))
+      expect([order[0], order[2]].sort()).toEqual(['start:native-writer', 'start:vn-template'])
     })
 
     it.skipIf(process.platform === 'win32')(

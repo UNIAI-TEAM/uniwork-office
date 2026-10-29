@@ -76,7 +76,7 @@ export const OOXML_REQUIRED_MAIN_PART: Readonly<Record<LegacyTargetFormat, strin
 }
 
 const DEFAULT_TIMEOUT_MS = 60_000
-const DEFAULT_MAX_CONCURRENCY = 2
+const DEFAULT_MAX_CONCURRENCY = 1
 /** Largest legacy input read into memory; anything bigger is refused before reading. */
 const MAX_LEGACY_INPUT_BYTES = 200 * 1024 * 1024
 
@@ -1704,7 +1704,10 @@ async function runSingleSofficeJob(opts: {
  * open non-blocking, fstat the handle, refuse anything that is not a regular
  * file or exceeds the size cap, then read exactly that many bytes.
  */
-async function readLegacyInput(path: string, format: LegacySourceFormat): Promise<Uint8Array> {
+export async function readLegacyInput(
+  path: string,
+  format: LegacySourceFormat,
+): Promise<Uint8Array> {
   let handle: Awaited<ReturnType<typeof open>> | undefined
   try {
     handle = await open(path, fsConstants.O_RDONLY | (fsConstants.O_NONBLOCK ?? 0))
@@ -1748,7 +1751,7 @@ async function readLegacyInput(path: string, format: LegacySourceFormat): Promis
  *    LibreOffice, and detects OOXML files misnamed with a legacy extension.
  * 2. Resolves the bundled LibreOffice 26.8.2.2 converter (`GENOFFICE_LO_DIR` or
  *    `<resourcesPath>/libreoffice`). Throws `converter_missing` if absent.
- * 3. Queues the job (max 2 concurrent `soffice.bin` processes), writes the inspected
+ * 3. Queues the job (one `soffice.bin` process at a time), writes the inspected
  *    bytes into a private (0700) per-job dir and converts that copy, never the
  *    original, with the pre-initialised `template-profile`, explicit `--infilter`,
  *    network blocked, and one 60 s deadline (killing the process group on exit,

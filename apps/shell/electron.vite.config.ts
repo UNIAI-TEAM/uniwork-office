@@ -1,12 +1,13 @@
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'electron-vite'
+import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 
 export default defineConfig({
   // Bundle everything into the shell main (same policy as apps/docs): the
   // imported docs/sheets main modules are TS source with no build artifacts,
   // so externalizing them would break Node ESM resolution at runtime.
   main: {
+    plugins: [externalizeDepsPlugin({ exclude: ['@genoffice/odf2ooxml'] })],
     // node:sqlite is a Node 22+ builtin the bundler's builtin list may predate
     build: {
       rollupOptions: {
@@ -14,6 +15,7 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
           'convert-child': resolve(__dirname, 'src/main/pdf-convert/convert-child.ts'),
+          'odf-fallback-worker': resolve(__dirname, 'src/main/odf-fallback-worker.ts'),
         },
       },
     },

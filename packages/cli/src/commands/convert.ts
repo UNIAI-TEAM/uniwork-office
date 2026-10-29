@@ -3,6 +3,7 @@ import { basename, dirname, extname, join } from 'node:path'
 import { PdfLoadError } from '@genoffice/pdf2docx'
 import { flagBool, flagString, type ParsedArgs } from '../args'
 import { csvToXlsx, sheetNameFromStem } from '../formats/csv'
+import { convertOdp, convertOdt } from '../formats/odf'
 import { convertPdf, type PdfTarget } from '../formats/pdf'
 import { convertLegacyWorkbook, sheetToCsv } from '../formats/xlsx'
 import { exportViaApp, type AppExportTarget } from '../formats/app-export'
@@ -18,7 +19,10 @@ const NODE_ROUTES: Record<string, readonly string[]> = {
   csv: ['xlsx'],
   xls: ['xlsx'],
   xlsb: ['xlsx'],
-  ods: ['xlsx'],
+  odt: ['docx'],
+  ott: ['docx'],
+  odp: ['pptx'],
+  otp: ['pptx'],
   md: ['docx', 'html'],
   markdown: ['docx', 'html'],
   docx: ['md'],
@@ -79,6 +83,18 @@ export const convertCommand: CommandDef = {
       throw new CliError(EXIT.usage, 'missing --to <format>', undefined, {
         reason: 'missing_argument',
       })
+    if (from === 'ods' || from === 'ots') {
+      throw new CliError(
+        EXIT.usage,
+        'converting OpenDocument spreadsheets in the CLI is not available yet',
+        { supported: describeRoutes() },
+        {
+          reason: 'unsupported',
+          suggestion:
+            'open the file in UniWork Office to convert it, or pick a route from detail.supported',
+        },
+      )
+    }
     const targets = ROUTES[from]
     if (!targets?.includes(to)) {
       throw new CliError(
@@ -88,8 +104,24 @@ export const convertCommand: CommandDef = {
         { reason: 'unsupported', suggestion: 'pick a route from detail.supported' },
       )
     }
+    const outFlag = flagString(args, 'out')
+    if (
+      (from === 'odt' || from === 'ott' || from === 'odp' || from === 'otp') &&
+      outFlag &&
+      extension(outFlag) !== to
+    ) {
+      throw new CliError(
+        EXIT.usage,
+        `output file for .${from} conversion must end with .${to}: ${outFlag}`,
+        { expected_extension: `.${to}` },
+        {
+          reason: 'invalid_argument',
+          suggestion: `pass an --out path ending in .${to}`,
+        },
+      )
+    }
     // before run(): the sidecar and app routes write the output themselves
-    const output = resolveOutput(flagString(args, 'out'), ctx, {
+    const output = resolveOutput(outFlag, ctx, {
       fallback: join(dirname(input), `${basename(input, extname(input))}.${to}`),
       force: flagBool(args, 'force'),
       fresh: true,
@@ -200,6 +232,14 @@ async function run(
     } finally {
       closeDocument(doc)
     }
+  }
+  if (from === 'odt' || from === 'ott') {
+    const r = await convertOdt(readInput(input))
+    return { bytes: r.bytes, detail: r.detail }
+  }
+  if (from === 'odp' || from === 'otp') {
+    const r = await convertOdp(readInput(input))
+    return { bytes: r.bytes, detail: r.detail }
   }
   const r = await convertLegacyWorkbook(input, output)
   return { detail: { sheets: r.sheets, cells: r.cells } }
