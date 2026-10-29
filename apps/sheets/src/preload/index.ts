@@ -2097,6 +2097,38 @@ const TABLE_OPTION_KEYS = [
   'filterButton',
 ] as const
 
+// Mirrors PIVOT_AGGREGATIONS / PIVOT_SHOW_DATA_AS (xlsx-gateway pivot-value-modes); the preload
+// only imports types from shared/desktop-api, and pivot-preload-modes.test.ts pins the two lists.
+const PIVOT_AGGREGATION_NAMES = [
+  'sum',
+  'count',
+  'average',
+  'max',
+  'min',
+  'product',
+  'countNums',
+  'stdDev',
+  'stdDevp',
+  'var',
+  'varp',
+]
+const PIVOT_SHOW_DATA_AS_NAMES = [
+  'percentOfTotal',
+  'percentOfRow',
+  'percentOfCol',
+  'percentOfParentRow',
+  'percentOfParentCol',
+  'index',
+  'percentOf',
+  'percentOfParent',
+  'difference',
+  'percentDiff',
+  'runTotal',
+  'percentOfRunningTotal',
+  'rankAscending',
+  'rankDescending',
+]
+
 function parseSaveRequest(input: WorkbookSaveRequest): WorkbookSaveRequest {
   // Every rejection names the failing part: this one message ends up in the
   // save-failure toast, and "Invalid workbook save request." alone gave user
@@ -2412,9 +2444,9 @@ function parseSaveRequest(input: WorkbookSaveRequest): WorkbookSaveRequest {
         (value) =>
           !isRecord(value) ||
           !isNonnegativeInteger(value.fieldIndex) ||
-          !['sum', 'count', 'average', 'max', 'min'].includes(String(value.agg)) ||
+          !PIVOT_AGGREGATION_NAMES.includes(String(value.agg)) ||
           (value.showDataAs !== undefined &&
-            !['percentOfTotal', 'percentOfRow', 'percentOfCol'].includes(String(value.showDataAs))),
+            !PIVOT_SHOW_DATA_AS_NAMES.includes(String(value.showDataAs))),
       )
     ) {
       throw new Error('Invalid workbook pivot addition.')

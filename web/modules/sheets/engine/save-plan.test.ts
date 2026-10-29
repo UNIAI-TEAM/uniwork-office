@@ -428,3 +428,50 @@ describe('save-plan: a table filter edited from the header dropdown (SH-W4-V1)',
     expect(sheet).not.toContain('<row r="3" hidden="1"')
   })
 })
+
+describe('save-plan: pivot Show Values As base field / item', () => {
+  const value = {
+    fieldIndex: 1,
+    agg: 'sum',
+    showDataAs: 'difference',
+    baseFieldIndex: 0,
+    baseItemIndex: 2,
+  }
+  const pivot = {
+    sheetId: 'sheet-2',
+    sourceSheetId: 'sheet-1',
+    name: 'PivotTable1',
+    values: [value],
+  }
+
+  it('keeps baseFieldIndex / baseItemIndex on a new pivot value field', () => {
+    const save = resolveSaveRequest(
+      new Map([
+        ['sheet-1', 'Data'],
+        ['sheet-2', 'Summary'],
+      ]),
+      request({ pivotAdditions: [pivot] }),
+    )
+    expect(save.args.pivotAdditions?.[0]?.values).toEqual([value])
+  })
+
+  it('keeps them on a refreshed pivot relayout', () => {
+    const save = resolveSaveRequest(
+      new Map([
+        ['sheet-1', 'Data'],
+        ['sheet-2', 'Summary'],
+      ]),
+      request({
+        pivotRefreshUpdates: [
+          {
+            cachePath: 'xl/pivotCache/pivotCacheDefinition1.xml',
+            sheetId: 'sheet-2',
+            newOutputRef: 'A1:C9',
+            relayout: pivot,
+          },
+        ],
+      }),
+    )
+    expect(save.args.pivotRefreshUpdates?.[0]?.relayout?.values).toEqual([value])
+  })
+})

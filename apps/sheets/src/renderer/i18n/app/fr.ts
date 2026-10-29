@@ -215,6 +215,13 @@ export const fr = {
   appInvalidPageField: 'Champ de filtre du rapport non valide.',
   appPivotPageItemMissing:
     "L'élément de filtre « {item} » n'est pas un membre du champ « {label} ».",
+  appInvalidPivotBaseField:
+    'Le champ de base de « Afficher les valeurs en » doit se trouver en lignes ou en colonnes.',
+  appPivotBaseFieldMissing:
+    "Le mode « Afficher les valeurs en » d'un champ de valeurs nécessite un champ de base.",
+  appPivotBaseFieldNotAxis:
+    'Le champ de base « {label} » doit se trouver dans les lignes ou les colonnes du tableau croisé.',
+  appPivotBaseItemMissing: "L'élément de base « {item} » n'est pas un membre du champ « {label} ».",
   appInvalidLabelFilterField: "Le champ du filtre d'étiquettes n'est pas valide.",
   appInvalidValueFieldIndex: "L'index de champ de valeurs {index} n'est pas valide.",
   appInvalidValueField: 'Champ de valeurs non valide.',
@@ -368,6 +375,8 @@ export const fr = {
     "Cette feuille contient un tableau croisé dynamique — le déplacement de plages n'est pas encore pris en charge.",
   appMergeOverTable:
     'La sélection chevauche un tableau Excel — la fusion de cellules dans un tableau n’est pas encore prise en charge.',
+  appFilterToggleFailed:
+    'Le filtre n’a pas été appliqué — sélectionnez d’abord la plage qui contient vos données.',
   appAutofillStreaming:
     "La recopie automatique vers une zone encore en cours de chargement en flux n'est pas encore autorisée.",
   appDvNeedsIndexed:

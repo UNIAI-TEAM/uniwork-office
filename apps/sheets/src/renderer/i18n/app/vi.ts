@@ -200,6 +200,12 @@ export const vi = {
   appInvalidGroupField: 'Trường nhóm không hợp lệ.',
   appInvalidPageField: 'Trường bộ lọc báo cáo không hợp lệ.',
   appPivotPageItemMissing: 'Mục bộ lọc "{item}" không thuộc trường "{label}".',
+  appInvalidPivotBaseField:
+    'Trường cơ sở của "Hiển thị giá trị dưới dạng" phải nằm trong hàng hoặc cột.',
+  appPivotBaseFieldMissing:
+    'Chế độ "Hiển thị giá trị dưới dạng" của trường giá trị cần một trường cơ sở.',
+  appPivotBaseFieldNotAxis: 'Trường cơ sở "{label}" phải nằm trong hàng hoặc cột của bảng trục.',
+  appPivotBaseItemMissing: 'Mục cơ sở "{item}" không thuộc trường "{label}".',
   appInvalidLabelFilterField: 'Trường lọc nhãn không hợp lệ.',
   appInvalidValueFieldIndex: 'Chỉ mục trường giá trị {index} không hợp lệ.',
   appInvalidValueField: 'Trường giá trị không hợp lệ.',
@@ -331,6 +337,7 @@ export const vi = {
   appPivotSheetNoMove: 'Trang tính này chứa PivotTable — chưa hỗ trợ di chuyển vùng.',
   appMergeOverTable:
     'Vùng chọn chồng chéo với một bảng Excel — chưa hỗ trợ hợp nhất các ô bên trong bảng.',
+  appFilterToggleFailed: 'Bộ lọc chưa được áp dụng — hãy chọn phạm vi chứa dữ liệu trước.',
   appAutofillStreaming: 'Chưa cho phép tự động điền vào khu vực vẫn đang tải theo luồng.',
   appDvNeedsIndexed:
     'Chỉnh sửa xác thực dữ liệu yêu cầu trang tính này phải được lập chỉ mục đầy đủ trước — vui lòng thử lại sau giây lát.',

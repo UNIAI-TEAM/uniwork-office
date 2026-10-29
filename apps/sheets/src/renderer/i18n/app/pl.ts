@@ -205,6 +205,12 @@ export const pl = {
   appInvalidGroupField: 'Nieprawidłowe pole grupowania.',
   appInvalidPageField: 'Nieprawidłowe pole filtru raportu.',
   appPivotPageItemMissing: 'Element filtru „{item}” nie należy do pola „{label}”.',
+  appInvalidPivotBaseField:
+    'Pole podstawowe trybu „Pokaż wartości jako” musi znajdować się w wierszach lub kolumnach.',
+  appPivotBaseFieldMissing: 'Tryb „Pokaż wartości jako” pola wartości wymaga pola podstawowego.',
+  appPivotBaseFieldNotAxis:
+    'Pole podstawowe „{label}” musi znajdować się w wierszach lub kolumnach tabeli przestawnej.',
+  appPivotBaseItemMissing: 'Element podstawowy „{item}” nie należy do pola „{label}”.',
   appInvalidLabelFilterField: 'Pole filtru etykiet jest nieprawidłowe.',
   appInvalidValueFieldIndex: 'Indeks pola wartości {index} jest nieprawidłowy.',
   appInvalidValueField: 'Nieprawidłowe pole wartości.',
@@ -351,6 +357,7 @@ export const pl = {
     'Ten arkusz zawiera tabelę przestawną — przenoszenie zakresów nie jest jeszcze obsługiwane.',
   appMergeOverTable:
     'Zaznaczenie nachodzi na tabelę programu Excel — scalanie komórek w tabeli nie jest jeszcze obsługiwane.',
+  appFilterToggleFailed: 'Filtr nie został zastosowany — najpierw zaznacz zakres z danymi.',
   appAutofillStreaming:
     'Autouzupełnianie do obszaru, który wciąż jest ładowany strumieniowo, nie jest jeszcze dozwolone.',
   appDvNeedsIndexed:

@@ -198,6 +198,10 @@ export const en = {
   appInvalidGroupField: 'Invalid grouping field.',
   appInvalidPageField: 'Invalid report filter field.',
   appPivotPageItemMissing: 'Report filter item "{item}" is not a member of field "{label}".',
+  appInvalidPivotBaseField: 'A "show values as" base field must sit on Rows or Columns.',
+  appPivotBaseFieldMissing: 'The "show values as" mode of a value field needs a base field.',
+  appPivotBaseFieldNotAxis: 'Base field "{label}" must sit on the pivot rows or columns.',
+  appPivotBaseItemMissing: 'Base item "{item}" is not a member of field "{label}".',
   appInvalidLabelFilterField: 'The label filter field is invalid.',
   appInvalidValueFieldIndex: 'Value field index {index} is invalid.',
   appInvalidValueField: 'Invalid value field.',
@@ -328,6 +332,7 @@ export const en = {
   appPivotSheetNoMove: 'This sheet contains a PivotTable — moving ranges is not supported yet.',
   appMergeOverTable:
     'The selection overlaps an Excel table — merging cells inside a table is not supported yet.',
+  appFilterToggleFailed: 'The filter was not applied — select the range with your data first.',
   appAutofillStreaming: 'Autofill into an area that is still streaming in is not allowed yet.',
   appDvNeedsIndexed:
     'Editing data validation needs this sheet fully indexed first — try again in a moment.',

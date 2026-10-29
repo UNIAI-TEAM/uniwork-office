@@ -195,6 +195,10 @@ export const ar = {
   appInvalidGroupField: 'حقل التجميع غير صالح.',
   appInvalidPageField: 'حقل عامل تصفية التقرير غير صالح.',
   appPivotPageItemMissing: 'عنصر عامل التصفية "{item}" ليس عضوًا في الحقل "{label}".',
+  appInvalidPivotBaseField: 'يجب أن يكون الحقل الأساسي لـ "إظهار القيم باسم" في الصفوف أو الأعمدة.',
+  appPivotBaseFieldMissing: 'يحتاج وضع "إظهار القيم باسم" لحقل قيم إلى حقل أساسي.',
+  appPivotBaseFieldNotAxis: 'يجب أن يكون الحقل الأساسي "{label}" في صفوف الجدول المحوري أو أعمدته.',
+  appPivotBaseItemMissing: 'العنصر الأساسي "{item}" ليس عضوًا في الحقل "{label}".',
   appInvalidLabelFilterField: 'حقل تصفية التسميات غير صالح.',
   appInvalidValueFieldIndex: 'فهرس حقل القيمة {index} غير صالح.',
   appInvalidValueField: 'حقل القيمة غير صالح.',
@@ -325,6 +329,7 @@ export const ar = {
   appDialogCancel: 'إلغاء',
   appPivotSheetNoMove: 'تحتوي هذه الورقة على جدول محوري — نقل النطاقات غير مدعوم بعد.',
   appMergeOverTable: 'التحديد يتداخل مع جدول Excel — دمج الخلايا داخل الجدول غير مدعوم حتى الآن.',
+  appFilterToggleFailed: 'لم يتم تطبيق عامل التصفية — حدد أولاً النطاق الذي يحتوي على بياناتك.',
   appAutofillStreaming: 'التعبئة التلقائية في ناحية لا تزال قيد التحميل بالبث غير مسموح بها بعد.',
   appDvNeedsIndexed:
     'يتطلب تحرير التحقق من صحة البيانات فهرسة الورقة بالكامل أولاً — أعد المحاولة لاحقًا.',
