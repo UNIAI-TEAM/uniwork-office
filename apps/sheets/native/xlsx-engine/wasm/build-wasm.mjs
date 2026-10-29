@@ -4,16 +4,14 @@
 //
 //   node apps/sheets/native/xlsx-engine/wasm/build-wasm.mjs [--verify|--update-checksum|--print-path]
 //
-// 1. `cargo fetch` of the parent crate (its own Cargo.lock) puts zip 0.6.6 in the registry.
-// 2. That crate is copied to .vendor/zip-0.6.6 with `default = ["deflate"]` (no bzip2/zstd C
-//    code; see Cargo.toml) and its registry sha256 is checked first.
-// 3. cargo builds wasm32-wasip1 release with the toolchain pinned in rust-toolchain.toml and the
+// 1. `cargo fetch` of the parent crate (its own Cargo.lock) fills the registry.
+// 2. cargo builds wasm32-wasip1 release with the toolchain pinned in rust-toolchain.toml and the
 //    committed wasm/Cargo.lock (--locked), from a staging copy at
 //    /tmp/uniwork-xlsx-sidecar-wasm/<input hash>/ with paths remapped, so the output does not
 //    depend on where the checkout, the target dir or CARGO_HOME live.
-// 4. wasm-opt -O2 runs when it is on PATH (recorded in the checksum file's tool line; the
+// 3. wasm-opt -O2 runs when it is on PATH (recorded in the checksum file's tool line; the
 //    checked-in checksum is for the module *without* wasm-opt unless that line says otherwise).
-// 5. dist/xlsx-sidecar.wasm is compared with xlsx-sidecar.wasm.sha256. A mismatch fails the
+// 4. dist/xlsx-sidecar.wasm is compared with xlsx-sidecar.wasm.sha256. A mismatch fails the
 //    build (a different toolchain or source than the committed checksum describes); after an
 //    intended source change run --update-checksum and commit the new checksum.
 //    The module is byte-identical on every machine of one platform (same toolchain, any checkout
@@ -47,10 +45,6 @@ const distDir = join(here, 'dist')
 export const WASM_OUT = join(distDir, 'xlsx-sidecar.wasm')
 const CHECKSUM_FILE = join(here, 'xlsx-sidecar.wasm.sha256')
 const STAMP = join(distDir, '.stamp')
-
-const ZIP_VERSION = '0.6.6'
-// sha256 of zip-0.6.6/Cargo.toml as published on crates.io (the file we rewrite)
-const ZIP_CARGO_TOML_SHA256 = '7cb213851ac9541dc7dd3ce163ef72c302985c9fb7d5bfed8859cb7988afd766'
 
 const args = new Set(process.argv.slice(2))
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
@@ -121,26 +115,6 @@ function cargoHome() {
   return process.env.CARGO_HOME || join(homedir(), '.cargo')
 }
 
-function vendorZip(wasmDir) {
-  const registry = join(cargoHome(), 'registry', 'src')
-  const source = readdirSync(registry)
-    .map((index) => join(registry, index, `zip-${ZIP_VERSION}`))
-    .find((p) => existsSync(p))
-  if (!source) throw new Error(`zip-${ZIP_VERSION} is not in ${registry} (cargo fetch failed?)`)
-  const toml = readFileSync(join(source, 'Cargo.toml'))
-  if (sha256(toml) !== ZIP_CARGO_TOML_SHA256) {
-    throw new Error(`unexpected zip-${ZIP_VERSION}/Cargo.toml (sha256 ${sha256(toml)})`)
-  }
-  const target = join(wasmDir, '.vendor', `zip-${ZIP_VERSION}`)
-  rmSync(target, { recursive: true, force: true })
-  cpSync(source, target, { recursive: true })
-  const patched = toml.toString('utf8').replace(/^default = \[[^\]]*\]/m, 'default = ["deflate"]')
-  if (patched === toml.toString('utf8')) throw new Error('zip default features not found')
-  writeFileSync(join(target, 'Cargo.toml'), patched)
-  // the registry's checksum manifest no longer matches the edited file; a path crate needs none
-  rmSync(join(target, '.cargo-checksum.json'), { force: true })
-}
-
 /**
  * Cargo derives symbol metadata from a path dependency's absolute location, which
  * --remap-path-prefix does not touch: the same sources built from two checkouts differ. So the
@@ -163,9 +137,8 @@ function stage(stamp) {
 
 function build(stamp) {
   const staged = stage(stamp)
-  // fetch with the parent crate's lock so zip 0.6.6 is the exact published crate
+  // fetch with the parent crate's lock so the registry holds the exact published crates
   run('cargo', ['fetch', '--manifest-path', join(staged.crate, 'Cargo.toml')], { cwd: staged.wasm })
-  vendorZip(staged.wasm)
   const targetDir = join(here, 'target')
   const remap = [
     `--remap-path-prefix=${staged.root}=/src`,

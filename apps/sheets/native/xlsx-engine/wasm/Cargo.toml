@@ -30,9 +30,5 @@ codegen-units = 1
 panic = "abort"
 strip = "debuginfo"
 
-# ironcalc 0.7.1 depends on zip 0.6 with its default features, which pull the C libraries
-# bzip2-sys and zstd-sys (they need a C toolchain for wasm). IronCalc only reads deflate
-# xlsx parts, so build-wasm.mjs vendors the registry's zip 0.6.6 into .vendor/ with
-# `default = ["deflate"]` (the only change) and this patch points at it.
-[patch.crates-io]
-zip_06 = { package = "zip", path = ".vendor/zip-0.6.6" }
+# No [patch] section: ironcalc 0.9 reads xlsx through zip 9 (deflate only, no C libraries), so the
+# zip 0.6 vendoring that ironcalc 0.7.1 needed (bzip2-sys / zstd-sys have no wasm toolchain) is gone.
