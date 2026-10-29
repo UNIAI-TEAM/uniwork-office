@@ -372,8 +372,9 @@ export function readCfbStreams(bytes: Uint8Array): Map<string, Uint8Array> {
 const ZIP_LOCAL_SIG = 0x04034b50
 const ZIP_CENTRAL_SIG = 0x02014b50
 const ZIP_EOCD_SIG = 0x06054b50
+const ZIP_ZIP64_LOCATOR_SIG = 0x07064b50
+const ZIP_EXTRA_ZIP64 = 0x0001
 const ZIP_FLAG_ENCRYPTED = 1
-
 function isZipSignature(bytes: Uint8Array): boolean {
   if (bytes.byteLength < 4) return false
   for (let i = 0; i < ZIP_SIGNATURE.length; i++) {
@@ -407,37 +408,91 @@ function listZipEntries(bytes: Uint8Array): ZipEntry[] {
     }
   }
   if (eocd < 0) throw new Error('zip: end of central directory not found')
+  const diskNum = view.getUint16(eocd + 4, true)
+  const cdDisk = view.getUint16(eocd + 6, true)
+  const diskCount = view.getUint16(eocd + 8, true)
   const count = view.getUint16(eocd + 10, true)
   const cdSize = view.getUint32(eocd + 12, true)
   const cdOffset = view.getUint32(eocd + 16, true)
-  if (cdOffset > bytes.byteLength || cdSize > bytes.byteLength - cdOffset) {
+  const eocdCommentLen = view.getUint16(eocd + 20, true)
+  if (
+    diskNum !== 0 ||
+    cdDisk !== 0 ||
+    diskCount !== count ||
+    count === 0xffff ||
+    cdSize === 0xffffffff ||
+    cdOffset === 0xffffffff ||
+    (eocd >= 20 && view.getUint32(eocd - 20, true) === ZIP_ZIP64_LOCATOR_SIG)
+  ) {
+    throw new Error('zip: unsupported multi-disk or ZIP64 archive')
+  }
+  if (
+    cdOffset > eocd ||
+    cdSize > eocd - cdOffset ||
+    eocd + 22 + eocdCommentLen > bytes.byteLength
+  ) {
     throw new Error('zip: corrupt central directory')
   }
+  const cdEnd = cdOffset + cdSize
   const entries: ZipEntry[] = []
   let pos = cdOffset
   const decoder = new TextDecoder('utf-8')
-  for (let i = 0; i < count; i++) {
-    if (pos + 46 > cdOffset + cdSize || view.getUint32(pos, true) !== ZIP_CENTRAL_SIG) {
+  while (pos < cdEnd) {
+    if (pos + 46 > cdEnd || view.getUint32(pos, true) !== ZIP_CENTRAL_SIG) {
       throw new Error('zip: corrupt central directory')
     }
     if ((view.getUint16(pos + 8, true) & ZIP_FLAG_ENCRYPTED) !== 0) {
       throw new Error('zip: encrypted entries are not supported')
     }
+    const method = view.getUint16(pos + 10, true)
+    const compressedSize = view.getUint32(pos + 20, true)
+    const size = view.getUint32(pos + 24, true)
     const nameLen = view.getUint16(pos + 28, true)
     const extraLen = view.getUint16(pos + 30, true)
     const commentLen = view.getUint16(pos + 32, true)
+    const diskStart = view.getUint16(pos + 34, true)
+    const localOffset = view.getUint32(pos + 42, true)
+    if (
+      diskStart !== 0 ||
+      compressedSize === 0xffffffff ||
+      size === 0xffffffff ||
+      localOffset === 0xffffffff
+    ) {
+      throw new Error('zip: unsupported multi-disk or ZIP64 entry')
+    }
     const nameStart = pos + 46
-    if (nameStart + nameLen > cdOffset + cdSize) {
+    const extraStart = nameStart + nameLen
+    const extraEnd = extraStart + extraLen
+    const recordEnd = extraEnd + commentLen
+    if (recordEnd > cdEnd) {
       throw new Error('zip: corrupt central directory')
+    }
+    let extraPos = extraStart
+    while (extraPos < extraEnd) {
+      if (extraPos + 4 > extraEnd) {
+        throw new Error('zip: corrupt central directory extra field')
+      }
+      const headerId = view.getUint16(extraPos, true)
+      const dataSize = view.getUint16(extraPos + 2, true)
+      if (headerId === ZIP_EXTRA_ZIP64) {
+        throw new Error('zip: ZIP64 extra field is not supported')
+      }
+      if (extraPos + 4 + dataSize > extraEnd) {
+        throw new Error('zip: corrupt central directory extra field')
+      }
+      extraPos += 4 + dataSize
     }
     entries.push({
       name: decoder.decode(bytes.subarray(nameStart, nameStart + nameLen)).replace(/\\/g, '/'),
-      method: view.getUint16(pos + 10, true),
-      compressedSize: view.getUint32(pos + 20, true),
-      size: view.getUint32(pos + 24, true),
-      localOffset: view.getUint32(pos + 42, true),
+      method,
+      compressedSize,
+      size,
+      localOffset,
     })
-    pos = nameStart + nameLen + extraLen + commentLen
+    pos = recordEnd
+  }
+  if (pos !== cdEnd || entries.length !== count) {
+    throw new Error('zip: corrupt central directory')
   }
   return entries
 }
@@ -450,6 +505,9 @@ function hasUsableZipPart(bytes: Uint8Array, entries: readonly ZipEntry[], name:
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   return entries.some((entry) => {
     if (entry.name !== name || entry.size === 0 || (entry.method !== 0 && entry.method !== 8)) {
+      return false
+    }
+    if (entry.method === 0 && entry.compressedSize !== entry.size) {
       return false
     }
     if (
@@ -474,13 +532,20 @@ export const MAX_ODF_PART_BYTES = 64 * 1024 * 1024
  * declared uncompressed size against `MAX_ODF_PART_BYTES`.
  */
 function readZipEntryBytes(bytes: Uint8Array, entry: ZipEntry): Uint8Array | null {
-  if (entry.size > MAX_ODF_PART_BYTES) return null
+  if (entry.size > MAX_ODF_PART_BYTES || entry.compressedSize > MAX_ODF_PART_BYTES) return null
   if (entry.method !== 0 && entry.method !== 8) return null
+  if (entry.method === 0 && entry.compressedSize !== entry.size) return null
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   if (
     entry.localOffset + 30 > bytes.byteLength ||
     view.getUint32(entry.localOffset, true) !== ZIP_LOCAL_SIG
   ) {
+    return null
+  }
+  if ((view.getUint16(entry.localOffset + 6, true) & ZIP_FLAG_ENCRYPTED) !== 0) {
+    return null
+  }
+  if (view.getUint16(entry.localOffset + 8, true) !== entry.method) {
     return null
   }
   const dataStart =
@@ -492,9 +557,15 @@ function readZipEntryBytes(bytes: Uint8Array, entry: ZipEntry): Uint8Array | nul
     return null
   }
   const raw = bytes.subarray(dataStart, dataStart + entry.compressedSize)
-  if (entry.method === 0) return raw
+  if (entry.method === 0) {
+    return raw.byteLength === entry.size && raw.byteLength <= MAX_ODF_PART_BYTES ? raw : null
+  }
   try {
-    return new Uint8Array(inflateRawSync(raw, { maxOutputLength: MAX_ODF_PART_BYTES }))
+    const inflated = new Uint8Array(inflateRawSync(raw, { maxOutputLength: MAX_ODF_PART_BYTES }))
+    if (inflated.byteLength !== entry.size || inflated.byteLength > MAX_ODF_PART_BYTES) {
+      return null
+    }
+    return inflated
   } catch {
     return null
   }
@@ -715,6 +786,13 @@ export function preflightOdfBytes(
     })
   }
   for (const entry of entries) {
+    if (entry.method === 0 && entry.compressedSize !== entry.size) {
+      throw new LegacyConvertError(
+        'corrupt',
+        `OpenDocument stored part "${entry.name}" has mismatched compressed and uncompressed sizes`,
+        { format: sourceFormat },
+      )
+    }
     if (entry.size > MAX_ODF_PART_BYTES) {
       throw new LegacyConvertError(
         'corrupt',

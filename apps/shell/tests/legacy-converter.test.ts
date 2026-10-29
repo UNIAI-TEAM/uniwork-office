@@ -608,6 +608,91 @@ describe('legacy-converter', () => {
         expect(seenArgs).toContain(`--infilter=${LEGACY_INFILTER_FOR_SOURCE[sourceFormat]}`)
       },
     )
+
+    it('refuses an ODF archive whose shortened EOCD count hides an oversized central-directory record without spawning soffice (F1)', async () => {
+      const mimeBytes = Buffer.from('application/vnd.oasis.opendocument.text', 'utf8')
+      const stylesBytes = deflateRawSync(Buffer.from('<office:document-styles/>', 'utf8'))
+      const bombBytes = deflateRawSync(Buffer.from('<office:document-content/>', 'utf8'))
+      const archive = buildZip([
+        { name: 'mimetype', method: 0, data: mimeBytes, size: mimeBytes.length },
+        { name: 'styles.xml', method: 8, data: stylesBytes, size: 25 },
+        { name: 'content.xml', method: 8, data: bombBytes, size: 80 * 1024 * 1024 },
+      ])
+      const eocdOffset = archive.length - 22
+      archive.writeUInt16LE(2, eocdOffset + 8)
+      archive.writeUInt16LE(2, eocdOffset + 10)
+
+      expect(() => preflightOdfBytes(archive, 'odt')).toThrowError(
+        expect.objectContaining({
+          name: 'LegacyConvertError',
+          code: 'corrupt',
+          format: 'odt',
+        }),
+      )
+
+      const dir = makeTempDir()
+      const filePath = join(dir, 'short-eocd.odt')
+      writeFileSync(filePath, archive)
+      const { spawnFn, getSpawnCount } = createFakeChildProcess({})
+      await expect(
+        convertLegacyFile(filePath, {
+          sourceFormat: 'odt',
+          spawnFn,
+        }),
+      ).rejects.toMatchObject({
+        code: 'corrupt',
+        format: 'odt',
+      })
+      expect(getSpawnCount()).toBe(0)
+    })
+
+    it('refuses a stored ODF manifest exceeding 64 MiB with forged uncompressed size 1 and refuses deflated length mismatches (F2)', () => {
+      const mimeBytes = Buffer.from('application/vnd.oasis.opendocument.text', 'utf8')
+      const contentBytes = Buffer.from('<office:document-content/>', 'utf8')
+      const hugeManifest = Buffer.alloc(65 * 1024 * 1024, 0x20)
+      Buffer.from(
+        '<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">',
+      ).copy(hugeManifest, 0)
+      const tail = Buffer.from(
+        '<manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/></manifest:manifest>',
+      )
+      tail.copy(hugeManifest, hugeManifest.length - tail.length)
+
+      const forgedStoredManifest = buildZip([
+        { name: 'mimetype', method: 0, data: mimeBytes, size: mimeBytes.length },
+        { name: 'META-INF/manifest.xml', method: 0, data: hugeManifest, size: 1 },
+        { name: 'content.xml', method: 0, data: contentBytes, size: contentBytes.length },
+      ])
+      expect(() => preflightOdfBytes(forgedStoredManifest, 'odt')).toThrowError(
+        expect.objectContaining({
+          name: 'LegacyConvertError',
+          code: 'corrupt',
+          format: 'odt',
+        }),
+      )
+
+      const realManifest = Buffer.from(
+        '<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/></manifest:manifest>',
+        'utf8',
+      )
+      const mismatchedDeflate = buildZip([
+        { name: 'mimetype', method: 0, data: mimeBytes, size: mimeBytes.length },
+        {
+          name: 'META-INF/manifest.xml',
+          method: 8,
+          data: deflateRawSync(realManifest),
+          size: realManifest.length + 10,
+        },
+        { name: 'content.xml', method: 0, data: contentBytes, size: contentBytes.length },
+      ])
+      expect(() => preflightOdfBytes(mismatchedDeflate, 'odt')).toThrowError(
+        expect.objectContaining({
+          name: 'LegacyConvertError',
+          code: 'corrupt',
+          format: 'odt',
+        }),
+      )
+    })
   })
 
   describe('OOXML output validation, timeout, cancellation & converter_missing', () => {
