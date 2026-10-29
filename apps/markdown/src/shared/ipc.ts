@@ -515,6 +515,12 @@ export interface MarkdownApi {
   onAiSettingsChanged(handler: () => void): () => void
   /** shell only: switch to Home and open Settings › AI Model (rejects in standalone) */
   openAiModelSettings(): Promise<void>
+  /** shell only: switch to Home and open Settings › Skills (the skills list) */
+  openSkillsSettings(): Promise<void>
+  /** the skills the user installed into UniWork Office (userData/skills) */
+  skillsList(): Promise<UserSkillEntry[]>
+  /** the body of one installed skill, by name — the main process resolves the path */
+  skillText(name: string): Promise<string>
   /** UniWork cloud sign-in state (shell-registered ai:gsk-status; loggedIn = signed in + entitled) */
   aiGskStatus(): Promise<GenSparkAccountStatus>
   aiStream(request: AiStreamRequest): Promise<void>
@@ -544,4 +550,10 @@ export interface MarkdownApi {
     url?: string
     error?: string
   }>
+}
+
+export interface UserSkillEntry {
+  name: string
+  description: string
+  relevant: boolean
 }

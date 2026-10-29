@@ -104,6 +104,13 @@ import { LinkLayer } from './LinkLayer'
 import { OutlinePanel } from './OutlinePanel'
 import { RibbonTabScroller } from './RibbonTabScroller'
 import { CommentsPanel, type CommentEntry } from './CommentsPanel'
+import { ComparePanel } from './ComparePanel'
+import {
+  compareDocuments,
+  isCompareUnreadable,
+  type CompareResult,
+  type PageText,
+} from './compare-text'
 import type { OutlineNode } from './OutlinePanel'
 import {
   buildHeadingOutline,
@@ -265,6 +272,7 @@ import {
 } from './text-edit-preview'
 import { samplePaperColor } from './paper-sample'
 import type { LocalTextEdit, LocalTextInsert, TextDraft } from './text-edit-preview'
+import { buildOcrBakeInserts, ocrBakeForSave } from './ocr-bake'
 import { planEditOps, reduceBucket } from './edit-ops'
 import type { Bucket, Op, OpContext, PlanResult } from './edit-ops'
 import { rectsNear } from './edit-state'
@@ -285,6 +293,7 @@ import {
   IconThumbs,
   IconHighlight,
   IconUnderline,
+  IconSquiggly,
   IconStrike,
   IconEditText,
   IconInk,
@@ -292,6 +301,8 @@ import {
   IconEllipse,
   IconArrow,
   IconNote,
+  IconCaret,
+  IconPolygon,
   IconSign,
   IconCertSign,
   IconSignatures,
@@ -364,6 +375,8 @@ const DRAW_TOOLS = [
   { tool: 'rect' as const, icon: IconRect, key: 'drawRect' as const },
   { tool: 'ellipse' as const, icon: IconEllipse, key: 'drawEllipse' as const },
   { tool: 'arrow' as const, icon: IconArrow, key: 'drawArrow' as const },
+  { tool: 'polygon' as const, icon: IconPolygon, key: 'drawPolygon' as const },
+  { tool: 'caret' as const, icon: IconCaret, key: 'drawCaret' as const },
   { tool: 'note' as const, icon: IconNote, key: 'drawNote' as const },
 ]
 
@@ -397,9 +410,13 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
   // a narrow pane (a phone-width frame) keeps its width for the page: the strip is one tap away
-  const [sidebar, setSidebar] = useState<'thumbs' | 'outline' | 'comments' | null>(() =>
-    narrowPane(window.innerWidth) ? null : 'thumbs',
+  const [sidebar, setSidebar] = useState<'thumbs' | 'outline' | 'comments' | 'compare' | null>(
+    () => (narrowPane(window.innerWidth) ? null : 'thumbs'),
   )
+  const [compareResult, setCompareResult] = useState<CompareResult | null>(null)
+  const [compareName, setCompareName] = useState<string | null>(null)
+  const [compareBusy, setCompareBusy] = useState(false)
+  const [compareSwapped, setCompareSwapped] = useState(false)
   const [sidebarW, setSidebarW] = useState(loadSidebarW)
   /** raster width for thumbnails — only updated when a drag ends (re-rastering every frame would jank) */
   const [thumbRasterW, setThumbRasterW] = useState(() => loadSidebarW() - SIDEBAR_CHROME)
@@ -1090,6 +1107,20 @@ export default function App() {
   /** Latest geometry for async pipelines that must not rebind on rotation (OCR) */
   const pageGeomRef = useRef(pageGeom)
   pageGeomRef.current = pageGeom
+  /** the auto-OCR's words as white text inserts: baked into every save while the
+      recognition data is in the session (the post-save reload finds a text layer,
+      so the pass never re-runs and the bake never doubles) */
+  const ocrBakeAll = useMemo(() => {
+    const out: LocalTextInsert[] = []
+    for (const [origIdx, data] of ocrPages) {
+      const geom = pageGeomRef.current(origIdx)
+      if (!geom) continue
+      for (const input of buildOcrBakeInserts(origIdx, data.words, geom)) {
+        out.push({ id: `ocr-bake-${origIdx}-${out.length}`, input })
+      }
+    }
+    return out
+  }, [ocrPages])
   /** Current original page index, readable without rebinding the OCR pass on scroll */
   const currentOrigIdxRef = useRef(0)
   currentOrigIdxRef.current = visList[currentPage - 1] ?? 0
@@ -1565,6 +1596,12 @@ export default function App() {
   const viewOnly = !cap('edit')
   /** View-only UniWork documents reuse the same read-only mode (edit tools and Save off) */
   const readOnly = viewOnly || encryptedReadOnly || uniwork.readOnly
+  /** The bake a save writes: never for a document the user cannot edit (view-only, encrypted,
+      bound read-only), which would otherwise gain a text layer through a plain Save */
+  const ocrBakeInserts = useMemo(
+    () => ocrBakeForSave(ocrBakeAll, { readOnly, drainedAfterBake: false }),
+    [ocrBakeAll, readOnly],
+  )
 
   useEffect(() => {
     if (readOnly && markupTool) setMarkupTool(null)
@@ -2057,6 +2094,11 @@ export default function App() {
     metadata !== null ||
     recovered ||
     (pendingOutline?.edited ?? false)
+  // The pending OCR bake deliberately stays out of dirty: a scan the user only
+  // opened to read must not show the modified marker, prompt on close or feed
+  // the save-in-flight plumbing. The bake still rides the save request
+  // (anythingToSave keeps it), so an explicit ⌘S writes it — a user action —
+  // and everything the reader does afterwards sees a text layer.
   const ordinaryDirty = hasOrdinaryDirty({
     markups,
     annotDeletes,
@@ -2768,7 +2810,7 @@ export default function App() {
   const activeMarkupTypes = useMemo(() => {
     const active = new Set<MarkupType>()
     if (!selPopup) return active
-    for (const type of ['highlight', 'underline', 'strikeout'] as const) {
+    for (const type of ['highlight', 'underline', 'squiggly', 'strikeout'] as const) {
       if ([...selPopup.quads].every(([origIdx, quads]) => markupMatching(origIdx, type, quads)))
         active.add(type)
     }
@@ -3833,6 +3875,43 @@ export default function App() {
     toastTimerRef.current = window.setTimeout(() => setDeleteToast(false), 5000)
   }
 
+  /** The main process gives fixed English reasons; the unreadable-file ones get a translated sentence */
+  const compareReason = (reason: string): string =>
+    isCompareUnreadable(reason) ? t('compareUnreadable') : reason
+
+  const runCompare = async (): Promise<void> => {
+    if (!doc || compareBusy) return
+    // Both sides must come from the same extraction engine — pdf.js and pdfium
+    // break lines differently, and a cross-engine diff reports phantom changes
+    // on identical files. The open document therefore needs a file on disk.
+    if (!filePath) {
+      showNotice(t('compareNeedsSaved'))
+      return
+    }
+    setCompareBusy(true)
+    try {
+      const picked = await window.pdfApi.compareReadPdf()
+      if (!picked.ok) {
+        if (!('canceled' in picked)) showNotice(compareReason(picked.reason))
+        return
+      }
+      const mine = await window.pdfApi.compareReadOpen(filePath)
+      if (!mine.ok) {
+        showNotice(compareReason(mine.reason))
+        return
+      }
+      const mineSide: PageText[] = mine.pages.map((text, pageIndex) => ({ pageIndex, text }))
+      const theirs: PageText[] = picked.pages.map((text, pageIndex) => ({ pageIndex, text }))
+      const [oldSide, newSide] = compareSwapped ? [theirs, mineSide] : [mineSide, theirs]
+      setCompareName(picked.name)
+      setCompareResult(compareDocuments(oldSide, newSide))
+    } catch (err) {
+      showNotice(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCompareBusy(false)
+    }
+  }
+
   /** Show a transient toast; the save-failure badge alone hides the actual reason */
   const showNotice = (msg: string) => {
     if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
@@ -3891,8 +3970,15 @@ export default function App() {
   }
 
   const noticeSkippedTextInserts = (skipped: TextInsertFailure[]) => {
-    const pages = [...new Set(skipped.map((s) => s.pageIndex + 1))].sort((a, b) => a - b).join(', ')
-    showNotice(`${t('textInsertSkipped', { pages })}${skipDetail(skipped)}`)
+    // The bake layer's inserts ride the tail of the same textInserts array; a
+    // glyph no face covers there is OCR noise on a page the reader never
+    // edited, and nagging about it on every save is worse than the silence.
+    // An insert the reader typed is still worth its toast.
+    const userCount = textInsertsRef.current.length
+    const mine = skipped.filter((s) => s.editIndex < userCount)
+    if (mine.length === 0) return
+    const pages = [...new Set(mine.map((s) => s.pageIndex + 1))].sort((a, b) => a - b).join(', ')
+    showNotice(`${t('textInsertSkipped', { pages })}${skipDetail(mine)}`)
   }
 
   /** Pending edits in SavePdfRequest form; shared by in-place Save and Save As.
@@ -3904,13 +3990,19 @@ export default function App() {
     noteFlush?: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] },
     extraDrawings: LocalDrawing[] = [],
     pending?: Pick<PendingLists, 'markups' | 'annotDeletes' | 'textInserts' | 'imageEdits'>,
+    bake: readonly LocalTextInsert[] = ocrBakeInserts,
   ) =>
-    withoutFileNoteWrites(rawEditsPayload(edits, noteFlush, extraDrawings, pending), serverComments)
+    withoutFileNoteWrites(
+      rawEditsPayload(edits, noteFlush, extraDrawings, pending, bake),
+      serverComments,
+    )
   const rawEditsPayload = (
     edits: LocalTextEdit[],
     noteFlush: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] } | undefined,
     extraDrawings: LocalDrawing[],
-    pending?: Pick<PendingLists, 'markups' | 'annotDeletes' | 'textInserts' | 'imageEdits'>,
+    pending:
+      Pick<PendingLists, 'markups' | 'annotDeletes' | 'textInserts' | 'imageEdits'> | undefined,
+    bake: readonly LocalTextInsert[],
   ) => ({
     markups: (pending?.markups ?? markups).map(({ id: _id, ...rest }) => rest),
     annotDeletes: (pending?.annotDeletes ?? annotDeletes).map((d): AnnotDeleteInput => ({
@@ -3930,7 +4022,10 @@ export default function App() {
     })),
     drawings: [...(noteFlush?.drawings ?? drawings), ...extraDrawings].map((d) => d.input),
     textEdits: edits.map((e) => e.input),
-    textInserts: (pending?.textInserts ?? textInserts).map((insert) => insert.input),
+    textInserts: [
+      ...(pending?.textInserts ?? textInserts).map((insert) => insert.input),
+      ...bake.map((insert) => insert.input),
+    ],
     imageEdits: (pending?.imageEdits ?? imageEdits).map((e) => e.input),
     staticFormFills,
     stamps: stampCfg ? renderStamps(stampCfg, visList) : [],
@@ -3974,6 +4069,9 @@ export default function App() {
       only: it covers the id-carrying lists (not rotations, deleted pages, order, metadata, stamp or
       form edits); the primary guard is draining from the render after `saveSettled` */
   const lastWrittenRef = useRef<PendingLists | null>(null)
+  /** Whether that save also wrote the OCR bake: the recognition data can outlive its reload for a
+      render, so a drained save must not bake the same layer a second time */
+  const lastBakedRef = useRef(false)
   /** Bumped each time a save settles, after `saveInFlightRef` is cleared and the post-save
       subtractions are queued: the drain effect runs from the render that carries both */
   const [saveSettled, setSaveSettled] = useState(0)
@@ -4027,11 +4125,16 @@ export default function App() {
       textInserts: written ? dropWrittenPending(textInserts, written.textInserts) : textInserts,
       imageEdits: written ? dropWrittenPending(imageEdits, written.imageEdits) : imageEdits,
     }
+    const bake = ocrBakeForSave(ocrBakeInserts, {
+      readOnly: false, // ocrBakeInserts is already empty for a document the user cannot edit
+      drainedAfterBake: written !== null && lastBakedRef.current,
+    })
     const anythingToSave =
       (written ? hasOrdinaryDirty(toWrite) : ordinaryDirty) ||
       edits !== textEdits ||
       noteFlush.drawings !== drawings ||
-      noteFlush.noteEdits !== noteEdits
+      noteFlush.noteEdits !== noteEdits ||
+      bake.length > 0
     // A UniWork-bound (editable) document saves on every explicit Save, even when
     // clean, so a retry after a failed upload still reaches UniWork
     const forceBound = forcesBoundSave({
@@ -4074,11 +4177,13 @@ export default function App() {
           { drawings: toWrite.drawings, noteEdits: toWrite.noteEdits },
           [],
           toWrite,
+          bake,
         ),
         origin,
       })
       if (!result.ok) {
         lastWrittenRef.current = null
+        lastBakedRef.current = false
         // main declining an autosave tick that raced the document's UniWork state is
         // not a failure the user can act on
         if (!(origin === 'auto' && isUniworkRefusal(result.error))) opFailed(result.error)
@@ -4093,6 +4198,7 @@ export default function App() {
         textInserts,
         imageEdits,
       }
+      lastBakedRef.current = bake.length > 0
       // the restored draft is the file's new version now
       setRecovered(false)
       // G8-15: the server anchors follow this save's page layout once UniWork reports the version
@@ -7015,6 +7121,18 @@ export default function App() {
           {t('underline')}
         </button>
         <button
+          className={`rb-big${markupTool === 'squiggly' ? ' active' : ''}`}
+          aria-pressed={markupTool === 'squiggly'}
+          disabled={readOnly}
+          data-tip={t('squiggly')}
+          onClick={() => onRibbonMarkupClick('squiggly')}
+        >
+          <span className="rb-big-icon">
+            <IconSquiggly />
+          </span>
+          <span>{t('squiggly')}</span>
+        </button>
+        <button
           className={`rb-big${markupTool === 'strikeout' ? ' active' : ''}`}
           aria-pressed={markupTool === 'strikeout'}
           disabled={readOnly}
@@ -7257,6 +7375,31 @@ export default function App() {
               <IconComments />
             </span>
             <span>{t('commentsPanel')}</span>
+          </button>
+        )}
+        {cap('pdfCompare') && (
+          <button
+            className={`rb-big${sidebar === 'compare' ? ' active' : ''}`}
+            disabled={status !== 'ready'}
+            onClick={() => setSidebar((v) => (v === 'compare' ? null : 'compare'))}
+          >
+            <span className="rb-big-icon">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="4" y="4" width="9" height="16" rx="1" />
+                <path d="M16 6.5 L20 6.5 M16 12 L20 12 M16 17.5 L20 17.5" />
+              </svg>
+            </span>
+            <span>{t('compare')}</span>
           </button>
         )}
         {searchBtn}
@@ -8345,6 +8488,33 @@ export default function App() {
                     setNoteDraft(null)
                     setActiveNote({ origIdx: e.origIdx, rootKey: e.root.key })
                   }}
+                />
+              </div>
+            )}
+            {sidebar === 'compare' && (
+              <div className="pdf-thumbs" style={{ width: sidebarW }}>
+                <div className="pdf-outline-header">
+                  <span>{t('compare')}</span>
+                  <button
+                    type="button"
+                    className="rb-icon"
+                    aria-label={t('aiCollapsePanel')}
+                    onClick={() => setSidebar(null)}
+                  >
+                    ×
+                  </button>
+                </div>
+                <ComparePanel
+                  t={t}
+                  result={compareResult}
+                  otherName={compareName}
+                  busy={compareBusy}
+                  onPick={() => void runCompare()}
+                  onSwap={() => {
+                    setCompareSwapped((v) => !v)
+                    setCompareResult(null)
+                  }}
+                  onGoToPage={(pageNo) => scrollToPage(pageNo)}
                 />
               </div>
             )}
@@ -9791,6 +9961,30 @@ export default function App() {
                       onClick={() => applyMarkup('underline')}
                     >
                       <span className="sel-swatch sel-swatch-ul">U</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={activeMarkupTypes.has('squiggly') ? 'is-active' : undefined}
+                      data-tip={
+                        activeMarkupTypes.has('squiggly') ? t('removeMarkup') : t('squiggly')
+                      }
+                      aria-label={
+                        activeMarkupTypes.has('squiggly') ? t('removeMarkup') : t('squiggly')
+                      }
+                      onClick={() => applyMarkup('squiggly')}
+                    >
+                      {/* Swatch painted inline from the palette so it always matches the applied color */}
+                      <span className="sel-swatch">
+                        <svg width="14" height="10" viewBox="0 0 28 10" fill="none" aria-hidden>
+                          <polyline
+                            points="1,5 4.5,1.5 8,8.5 11.5,1.5 15,8.5 18.5,1.5 22,8.5 25.5,5"
+                            stroke={cssRgb(MARKUP_COLORS.squiggly)}
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
                     </button>
                     <button
                       type="button"

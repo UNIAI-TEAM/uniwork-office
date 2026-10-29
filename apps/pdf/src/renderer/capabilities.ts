@@ -23,6 +23,8 @@ import { createCapabilityReader } from '@genoffice/ui/capabilities'
  * | savedSignatures  | the reusable signature library                                          |
  * | certSign         | certificate (digital) signing and the signatures panel: reads the file  |
  * |                  | on disk and writes a signed copy next to it (node:crypto, pdf-lib)      |
+ * | pdfCompare       | the Compare panel and its ribbon button: both sides' text is read main-side |
+ * |                  | by pdfium from files on disk (desktop only)                             |
  * | redaction        | the Redact tool (applies into a working copy of the file)               |
  * | saveStatus       | the ribbon-row Saving / Unsaved / Saved / Save failed text (the web     |
  * |                  | host header owns the save state)                                        |
@@ -49,6 +51,7 @@ export type PdfCapability =
   | 'insertPages'
   | 'savedSignatures'
   | 'certSign'
+  | 'pdfCompare'
   | 'redaction'
   | 'saveStatus'
   | 'viewOnlyChip'
