@@ -26,15 +26,85 @@ export class OdfConvertError extends Error {
  */
 export const MAX_ODF_PART_BYTES = 64 * 1024 * 1024
 
-/** JSZip keeps the central-directory size on the entry's lazy compressed data */
-function declaredSize(entry: JSZipObject): number {
-  return (
-    (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0
-  )
+/**
+ * Total uncompressed bytes a single ODF conversion may inflate across
+ * `content.xml`, `styles.xml`, and every referenced media read combined.
+ */
+export const MAX_ODF_TOTAL_BYTES = 64 * 1024 * 1024
+
+/**
+ * Maximum central-directory entries allowed in an ODF archive, matching
+ * `DEFAULT_ZIP_LIMITS.maxParts` (10,000) in `@genoffice/zip-gate`. Checked
+ * from the ZIP End-of-Central-Directory record before JSZip materializes per-entry
+ * objects so a 30,000-entry archive is refused in O(1) before loading.
+ */
+export const MAX_ODF_ENTRIES = 10_000
+
+const EOCD_SIG = 0x06054b50
+const ZIP64_LOCATOR_SIG = 0x07064b50
+const ZIP64_EOCD_SIG = 0x06064b50
+
+/**
+ * Check the archive's EOCD entry count before JSZip parses the central
+ * directory. Returns false when no valid EOCD is found or when the declared
+ * entry count exceeds `MAX_ODF_ENTRIES`.
+ */
+function hasValidEntryCount(bytes: Uint8Array): boolean {
+  if (bytes.byteLength < 22) return false
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const stop = Math.max(0, bytes.byteLength - 22 - 0xffff)
+  let eocd = -1
+  for (let index = bytes.byteLength - 22; index >= stop; index--) {
+    if (view.getUint32(index, true) === EOCD_SIG) {
+      eocd = index
+      break
+    }
+  }
+  if (eocd < 0) return false
+  let count = view.getUint16(eocd + 10, true)
+  const cdSize = view.getUint32(eocd + 12, true)
+  const cdOffset = view.getUint32(eocd + 16, true)
+  const overflowed =
+    view.getUint16(eocd + 4, true) === 0xffff ||
+    view.getUint16(eocd + 6, true) === 0xffff ||
+    view.getUint16(eocd + 8, true) === 0xffff ||
+    count === 0xffff ||
+    cdSize === 0xffffffff ||
+    cdOffset === 0xffffffff
+  if (overflowed) {
+    if (eocd < 20 || view.getUint32(eocd - 20, true) !== ZIP64_LOCATOR_SIG) return false
+    const eocd64Offset = Number(view.getBigUint64(eocd - 12, true))
+    if (
+      !Number.isSafeInteger(eocd64Offset) ||
+      eocd64Offset < 0 ||
+      eocd64Offset + 56 > bytes.byteLength ||
+      view.getUint32(eocd64Offset, true) !== ZIP64_EOCD_SIG
+    ) {
+      return false
+    }
+    count = Number(view.getBigUint64(eocd64Offset + 32, true))
+  }
+  return Number.isSafeInteger(count) && count >= 0 && count <= MAX_ODF_ENTRIES
 }
 
-function exceedsCap(entry: JSZipObject): boolean {
-  return declaredSize(entry) > MAX_ODF_PART_BYTES
+interface InflationBudget {
+  inflatedBytes: number
+}
+
+/** JSZip keeps the central-directory size on the entry's lazy compressed data */
+interface JSZipEntryInternal extends JSZipObject {
+  _data?: { uncompressedSize?: number }
+  internalStream(type: 'uint8array'): ChunkStream
+}
+
+function declaredSize(entry: JSZipObject): number {
+  const internal: JSZipEntryInternal = entry as JSZipEntryInternal
+  return internal._data?.uncompressedSize ?? 0
+}
+
+function exceedsCap(entry: JSZipObject, budget: InflationBudget): boolean {
+  const size = declaredSize(entry)
+  return size > MAX_ODF_PART_BYTES || budget.inflatedBytes + size > MAX_ODF_TOTAL_BYTES
 }
 
 /**
@@ -50,17 +120,17 @@ interface ChunkStream {
   resume(): ChunkStream
 }
 
-function inflateCapped(entry: JSZipObject): Promise<Uint8Array> {
+function inflateCapped(entry: JSZipObject, budget: InflationBudget): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const chunks: Uint8Array[] = []
     let total = 0
     // JSZip's typings stop at async(); internalStream is the public chunked API
-    const stream = (
-      entry as unknown as { internalStream(type: 'uint8array'): ChunkStream }
-    ).internalStream('uint8array')
+    const internal: JSZipEntryInternal = entry as JSZipEntryInternal
+    const stream = internal.internalStream('uint8array')
     stream.on('data', (chunk) => {
       total += chunk.length
-      if (total > MAX_ODF_PART_BYTES) {
+      budget.inflatedBytes += chunk.length
+      if (total > MAX_ODF_PART_BYTES || budget.inflatedBytes > MAX_ODF_TOTAL_BYTES) {
         stream.pause()
         reject(new OdfConvertError('unreadable'))
         return
@@ -81,10 +151,10 @@ function inflateCapped(entry: JSZipObject): Promise<Uint8Array> {
   })
 }
 
-async function inflateText(entry: JSZipObject): Promise<string | null> {
-  if (exceedsCap(entry)) return null
+async function inflateText(entry: JSZipObject, budget: InflationBudget): Promise<string | null> {
+  if (exceedsCap(entry, budget)) return null
   try {
-    return new TextDecoder().decode(await inflateCapped(entry))
+    return new TextDecoder().decode(await inflateCapped(entry, budget))
   } catch {
     return null
   }
@@ -98,22 +168,25 @@ export interface OdfPackage {
 }
 
 export async function loadOdfPackage(bytes: Uint8Array): Promise<OdfPackage | null> {
+  if (!hasValidEntryCount(bytes)) return null
   let zip: JSZip
   try {
     zip = await JSZip.loadAsync(bytes)
   } catch {
     return null
   }
+  if (Object.keys(zip.files).length > MAX_ODF_ENTRIES) return null
+  const budget: InflationBudget = { inflatedBytes: 0 }
   const contentEntry = zip.file('content.xml')
   if (!contentEntry) return null
-  const content = await inflateText(contentEntry)
+  const content = await inflateText(contentEntry, budget)
   if (!content) return null
   const contentRoots = parseOdfXml(content)
   if (!contentRoots) return null
   const stylesEntry = zip.file('styles.xml')
   let stylesXml: string | null = null
   if (stylesEntry) {
-    stylesXml = await inflateText(stylesEntry)
+    stylesXml = await inflateText(stylesEntry, budget)
     if (stylesXml === null) return null
   }
   const stylesRoots = stylesXml ? parseOdfXml(stylesXml) : null
@@ -124,14 +197,14 @@ export async function loadOdfPackage(bytes: Uint8Array): Promise<OdfPackage | nu
       const clean = path.replace(/^\.\//, '')
       const entry = zip.file(clean) ?? zip.file(decodeURIComponent(clean))
       if (!entry) return null
-      if (exceedsCap(entry)) {
+      if (exceedsCap(entry, budget)) {
         // Unlike a missing entry, which only costs the caller this one image, a
         // part this large is a file the app cannot convert: say so instead of
         // inflating it or silently handing back a document with holes in it.
         throw new OdfConvertError('unreadable')
       }
       try {
-        return await inflateCapped(entry)
+        return await inflateCapped(entry, budget)
       } catch (err) {
         if (err instanceof OdfConvertError) throw err
         return null

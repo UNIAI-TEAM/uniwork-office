@@ -9,7 +9,9 @@ import { describe, expect, it } from 'vitest'
 import {
   convertOdpToPptx,
   convertOdtToDocx,
+  MAX_ODF_ENTRIES,
   MAX_ODF_PART_BYTES,
+  MAX_ODF_TOTAL_BYTES,
   OdfConvertError,
 } from '../src/index'
 
@@ -129,4 +131,63 @@ describe('oversized zip entries', () => {
   it('refuses the same archive on the presentation route', async () => {
     await expect(convertOdpToPptx(await buildOdp(true))).rejects.toThrow(OdfConvertError)
   })
+
+  it('refuses three 24 MiB parts that exceed the 64 MiB archive-wide inflation budget', async () => {
+    const partSize = 24 * 1024 * 1024
+    expect(partSize).toBeLessThanOrEqual(MAX_ODF_PART_BYTES)
+    expect(partSize * 3).toBeGreaterThan(MAX_ODF_TOTAL_BYTES)
+    const partBytes = new Uint8Array(partSize)
+
+    // ODT route: sequential media reads + forging lying small central-directory sizes
+    const odtZip = new JSZip()
+    const odtBody =
+      PARAGRAPH +
+      [0, 1, 2]
+        .map(
+          (i) =>
+            `<text:p><draw:frame svg:x="0cm" svg:y="0cm" svg:width="2cm" svg:height="2cm"><draw:image xlink:href="Pictures/${i}.png"/></draw:frame></text:p>`,
+        )
+        .join('')
+    odtZip.file(
+      'content.xml',
+      `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${NAMESPACES} office:version="1.2"><office:body><office:text>${odtBody}</office:text></office:body></office:document-content>`,
+    )
+    for (let i = 0; i < 3; i++) odtZip.file(`Pictures/${i}.png`, partBytes)
+    let odtArchive = await odtZip.generateAsync({ type: 'uint8array' })
+    // Also test when headers lie about uncompressed size so streamed chunk counting must catch it
+    for (let i = 0; i < 3; i++) odtArchive = forgeDeclaredSize(odtArchive, `Pictures/${i}.png`, 100)
+    await expect(convertOdtToDocx(odtArchive)).rejects.toThrow(new OdfConvertError('unreadable'))
+
+    // ODP route: concurrent media reads via Promise.all
+    const odpZip = new JSZip()
+    const odpSlides = [0, 1, 2]
+      .map(
+        (i) =>
+          `<draw:page draw:name="page${i}"><draw:frame draw:layer="layout" svg:x="1cm" svg:y="1cm" svg:width="2cm" svg:height="2cm"><draw:image xlink:href="Pictures/${i}.png"/></draw:frame></draw:page>`,
+      )
+      .join('')
+    odpZip.file(
+      'content.xml',
+      `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${NAMESPACES} office:version="1.2"><office:body><office:presentation>${odpSlides}</office:presentation></office:body></office:document-content>`,
+    )
+    for (let i = 0; i < 3; i++) odpZip.file(`Pictures/${i}.png`, partBytes)
+    let odpArchive = await odpZip.generateAsync({ type: 'uint8array' })
+    for (let i = 0; i < 3; i++) odpArchive = forgeDeclaredSize(odpArchive, `Pictures/${i}.png`, 100)
+    await expect(convertOdpToPptx(odpArchive)).rejects.toThrow(new OdfConvertError('unreadable'))
+  }, 30_000)
+
+  it('refuses a 30,000-entry archive before JSZip materializes the directory', async () => {
+    const entryCount = 30_000
+    expect(entryCount).toBeGreaterThan(MAX_ODF_ENTRIES)
+    const zip = new JSZip()
+    zip.file(
+      'content.xml',
+      `<?xml version="1.0" encoding="UTF-8"?><office:document-content ${NAMESPACES} office:version="1.2"><office:body><office:text>${PARAGRAPH}</office:text></office:body></office:document-content>`,
+    )
+    for (let i = 0; i < entryCount; i++) zip.file(`extra/${i}.txt`, 'x')
+    const archive = await zip.generateAsync({ type: 'uint8array' })
+    const start = performance.now()
+    await expect(convertOdtToDocx(archive)).rejects.toThrow(new OdfConvertError('unreadable'))
+    expect(performance.now() - start).toBeLessThan(100)
+  }, 30_000)
 })
