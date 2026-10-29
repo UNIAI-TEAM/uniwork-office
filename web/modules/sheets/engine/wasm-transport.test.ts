@@ -24,6 +24,11 @@ import {
 const repoRoot = resolve(__dirname, '../../../..')
 const WASM = resolve(repoRoot, 'apps/sheets/native/xlsx-engine/wasm/dist/xlsx-sidecar.wasm')
 const XLS = resolve(repoRoot, 'web/fixtures/legacy-xls.xls')
+// a BIFF8 workbook written by LibreOffice: a picture, a merged banner, a custom column width and row height
+const XLS_ART = resolve(
+  repoRoot,
+  'apps/sheets/native/xlsx-engine/tests/fixtures/merges-widths-picture.xls',
+)
 const hasWasm = existsSync(WASM)
 
 const toArrayBuffer = (b: Uint8Array) =>
@@ -586,6 +591,28 @@ describe.skipIf(!hasWasm)(
           range: { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0 },
         })
         expect(range.cells[0]?.value).toBe('replaceMe')
+      },
+    )
+
+    it.skipIf(!existsSync(XLS_ART))(
+      'a legacy .xls carries its picture, merge, column width and row height into the saved workbook (genoffice#2302)',
+      async () => {
+        const { transport } = await engine()
+        const wb = await transport.open({
+          name: 'Art.xls',
+          data: toArrayBuffer(readFileSync(XLS_ART)),
+          locale: 'en',
+        })
+        expect(wb.needsSaveAs).toBe(true)
+        const saved = await transport.serialize(saveRequest(wb.sessionId, []))
+        const zip = await JSZip.loadAsync(saved.data)
+        const picture = await zip.file('xl/media/image1.png')?.async('uint8array')
+        expect(Array.from(picture?.slice(0, 4) ?? [])).toEqual([0x89, 0x50, 0x4e, 0x47])
+        const sheet = await zip.file('xl/worksheets/sheet1.xml')!.async('string')
+        expect(sheet).toContain('<mergeCell ref="A5:C5"/>')
+        expect(sheet).toContain('customWidth="1"')
+        expect(sheet).toContain('customHeight="1"')
+        expect(sheet).toContain('<drawing r:id="rId1"/>')
       },
     )
 
