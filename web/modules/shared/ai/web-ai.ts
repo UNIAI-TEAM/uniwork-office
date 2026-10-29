@@ -292,6 +292,8 @@ export function createWebAi(opts: {
     const caps = opts.capabilities
     const media = caps.imageGeneration === true
     const exhausted = cloud.credits.remaining !== null && cloud.credits.remaining <= 0
+    // before the set: it notifies the window bridge's listeners synchronously
+    cloudPublished = true
     setUniworkCloudStatus({
       state: !cloud.enabled ? 'not-entitled' : exhausted ? 'credits-exhausted' : 'ready',
       enabled: cloud.enabled,
@@ -310,7 +312,6 @@ export function createWebAi(opts: {
         periodEnd: cloud.credits.period_end,
       },
     })
-    cloudPublished = true
   }
 
   /**

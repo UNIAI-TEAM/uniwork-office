@@ -210,6 +210,8 @@ for (const module of ['docs', 'markdown'] as const) {
         const inline = frame.locator('.ai-msg-assistant').last()
         await expect(inline).toContainText(s.text, { timeout: 30_000 })
         await expect(frame.locator('.ow-ai-state')).toHaveCount(0)
+        // no other provider exists on the web: the error offers no way to pick one
+        await expect(frame.locator('[data-action="choose-provider"]')).toHaveCount(0)
         await expectClean(page, frame, problems, true)
       })
     }

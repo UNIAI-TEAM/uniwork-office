@@ -9,6 +9,7 @@ import { AI_RUN_IDLE_GRACE_MS } from '@genoffice/agent-core'
 import { aiUniworkText } from '@genoffice/ui'
 import { editorExtensions } from '../src/renderer/editor/extensions'
 import { AiPanel } from '../src/renderer/ai/AiPanel'
+import { resetCapabilitiesForTest } from '../src/renderer/capabilities'
 import { getLang, LocaleProvider, setModuleLang } from '../src/renderer/i18n/locale'
 import { AI_PROVIDERS, type AiSettings } from '../src/shared/ipc'
 
@@ -236,6 +237,21 @@ describe('UniWork AI chip wiring (docs panel)', () => {
     await failWith('credits_exhausted', 'aiErrCredits')
     await clickAction()
     expect(openSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('F1: a web frame has no other provider: a credits error offers no Chọn nhà cung cấp khác', async () => {
+    ;(window as any).desktop.capabilities = { platform: 'web' }
+    ;(window as any).desktop.openAiModelSettings = vi.fn(async () => {})
+    resetCapabilitiesForTest()
+    try {
+      await uniworkTurn()
+      await failWith('credits_exhausted', 'aiErrCredits')
+      expect(visibleErrorText()).toBe(ui('aiErrCredits'))
+      expect(root_().querySelector('[data-action="choose-provider"]')).toBeNull()
+    } finally {
+      delete (window as any).desktop.capabilities
+      resetCapabilitiesForTest()
+    }
   })
 
   it('F1: Hỏi tiếp returns to the composer for the next question', async () => {

@@ -1003,7 +1003,12 @@ export function AiChatPanel({
                             }
                           : undefined
                       }
-                      onChooseProvider={() => void window.desktopApi?.openAiSettings?.()}
+                      // a web frame has no other provider to choose: no action there
+                      onChooseProvider={
+                        platform() === 'web'
+                          ? undefined
+                          : () => void window.desktopApi?.openAiSettings?.()
+                      }
                       onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                       onAskAgain={isLast && !aiBusy ? () => inputRef.current?.focus() : undefined}
                     />
@@ -1275,7 +1280,10 @@ export function AiChatPanel({
                     lang,
                     note: composerNoteState,
                     onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
-                    onChooseProvider: () => void window.desktopApi?.openAiSettings?.(),
+                    onChooseProvider:
+                      platform() === 'web'
+                        ? undefined
+                        : () => void window.desktopApi?.openAiSettings?.(),
                     onAnnounce: setComposerAnnouncement,
                     onSendBlockedChange: uniworkGate.onSendBlockedChange,
                     registerBlockedHandler,

@@ -8,6 +8,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { AiChatPanel, type AiChatMessage } from '../src/renderer/ai/AiChatPanel'
+import { resetForTest } from '../src/renderer/capabilities'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 
 const ui = (key: Parameters<typeof aiUniworkText>[1], params?: Record<string, string | number>) =>
@@ -33,8 +34,12 @@ describe('UniWork AI chip wiring (sheets panel)', () => {
   })
 
   const user: AiChatMessage = { role: 'user', text: 'sum column B', tools: [] }
-  const mount = async (chat: readonly AiChatMessage[]): Promise<HTMLElement> => {
-    desktopApi = {}
+  const mount = async (
+    chat: readonly AiChatMessage[],
+    capabilities?: Record<string, unknown>,
+  ): Promise<HTMLElement> => {
+    desktopApi = capabilities ? { capabilities: capabilities as never } : {}
+    resetForTest()
     vi.stubGlobal(
       'desktopApi',
       new Proxy(desktopApi, {
@@ -144,6 +149,13 @@ describe('UniWork AI chip wiring (sheets panel)', () => {
     const c2 = await mount(errorTurn(ui('aiErrCredits'), 'aiErrCredits'))
     await act(async () => c2.querySelector<HTMLButtonElement>('.ai-error-action button')!.click())
     expect(desktopApi.openAiSettings).toHaveBeenCalled()
+  })
+
+  it('F1: a web frame has no other provider: a credits error offers no Chọn nhà cung cấp khác', async () => {
+    const c = await mount(errorTurn(ui('aiErrCredits'), 'aiErrCredits'), { platform: 'web' })
+    expect(c.querySelector('.ai-result-chip')?.textContent).toBe(ui('aiResultError'))
+    expect(c.querySelector('[data-action="choose-provider"]')).toBeNull()
+    resetForTest()
   })
 
   it('F3: dropped calls on the turn read Chưa hỗ trợ with their reason', async () => {

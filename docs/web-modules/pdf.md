@@ -49,30 +49,29 @@ copy and its etag (`saved` event); the renderer then reloads from it exactly as 
 
 ## 2. Capabilities (`window.pdfApi.capabilities`)
 
-| Key                                                                                             | Web                                                                                                                                                                                                                                                                                                         |
-| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `edit`                                                                                          | host grant `save`. Absent = **view-only**: joins the renderer's read-only mode (all edit entries disabled, Fill Form tab hidden, "View only" badge); `save` and every write path refuse; print works                                                                                                        |
-| `insertPages`                                                                                   | host grant `filePick` (Import pages, Replace pages, Merge PDF)                                                                                                                                                                                                                                              |
-| `pdfTextEdit`, `pdfImageEdit`, `pdfAnnotDelete`                                                 | on; switched off when pdfium cannot be compiled in the frame (checked once after `init` when `edit` is granted)                                                                                                                                                                                             |
-| `savedSignatures`                                                                               | on (encrypted per-user library)                                                                                                                                                                                                                                                                             |
-| `ai`, `aiCredentials`, `webSearch`, `imageSearch`, `imageGeneration`                            | follow the host grant: **shown with the host's `ai` grant** (organization entitlement + the frame-token AI routes live; the three cloud keys also need their own grant), **hidden without it** (AI panel, ribbon AI group, ask-AI popover and AI tools all disappear and the page reflows). See section 2.1 |
-| `autoSave`, `autoSaveToDisk`, `autoRename`, `convertOffice`, `ocr`, `createDocument`, `billing` | off: no autosave on the web, the rest need the desktop shell or an OS engine (OCR answers "no engine")                                                                                                                                                                                                      |
-| `open`, `recents`                                                                               | from `filePick` / `recents` like Docs (the PDF renderer has no File > Open of its own)                                                                                                                                                                                                                      |
+| Key                                                                                             | Web                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `edit`                                                                                          | host grant `save`. Absent = **view-only**: joins the renderer's read-only mode (all edit entries disabled, Fill Form tab hidden, "View only" badge); `save` and every write path refuse; print works                                                                                                               |
+| `insertPages`                                                                                   | host grant `filePick` (Import pages, Replace pages, Merge PDF)                                                                                                                                                                                                                                                     |
+| `pdfTextEdit`, `pdfImageEdit`, `pdfAnnotDelete`                                                 | on; switched off when pdfium cannot be compiled in the frame (checked once after `init` when `edit` is granted)                                                                                                                                                                                                    |
+| `savedSignatures`                                                                               | on (encrypted per-user library)                                                                                                                                                                                                                                                                                    |
+| `ai`, `webSearch`, `imageSearch`, `imageGeneration`                                             | follow the host grant: **shown with the host's `uniworkAi` grant** (organization entitlement + the frame-token AI routes live; the three cloud keys also need their own grant), **hidden without it** (AI panel, ribbon AI group, ask-AI popover and AI tools all disappear and the page reflows). See section 2.1 |
+| `autoSave`, `autoSaveToDisk`, `autoRename`, `convertOffice`, `ocr`, `createDocument`, `billing` | off: no autosave on the web, the rest need the desktop shell or an OS engine (OCR answers "no engine")                                                                                                                                                                                                             |
+| `open`, `recents`                                                                               | from `filePick` / `recents` like Docs (the PDF renderer has no File > Open of its own)                                                                                                                                                                                                                             |
 
 ### 2.1 AI on the web
 
 AI is built by the shared web AI bridge (`web/modules/shared/ai/`, CONTRACT C16), the same one Docs, Markdown, HTML,
 Slides and Sheets use; the PDF frame adds nothing of its own.
 
-- **Grant.** The host grants `ai` only when the organization has the entitlement and the frame-token AI mount is live
-  (AI1/AI2). With the grant the panel and every AI entry show; without it they stay hidden, exactly as before.
+- **Grant.** The host grants `uniworkAi` (UniWork AI, the only AI, UNI-2289) only when the organization has the
+  entitlement and the frame-token AI mount is live (AI1/AI2). With the grant the panel and every AI entry show;
+  without it they stay hidden.
 - **Calls.** The frame talks to the AI routes of its own document directly (same origin, `connect-src 'self'`,
-  `Authorization: Bearer <frame token>`, no cookies, SSE streaming native); keys are stored by the server and the
-  frame never sees one.
-- **Failures.** The server's error envelope (`{ "error": { code, message } }`) and a vendor adapter's own failure
-  text ("... HTTP 502: {...}") never reach the panel as raw text: they become a typed, translated state card
-  (missing or refused key with an "AI settings" action, credits used up, not in the plan, rate limit, provider or
-  cloud unavailable, session expired, generic failure).
+  `Authorization: Bearer <frame token>`, no cookies, SSE streaming native); the frame holds no provider key.
+- **Failures.** The server's error envelope (`{ "error": { code, message } }`) never reaches the panel as raw text:
+  it becomes a typed, translated text (credits used up, not in the plan, rate limit, UniWork AI or cloud
+  unavailable, session expired, generic failure).
 - **Narrow windows.** Below 900 px the AI panel starts closed unless the user opened it before, so the page keeps
   its width on a phone.
 
@@ -136,7 +135,7 @@ ghostscript cannot write them) - pdf.js decodes both with its wasm codecs, which
   The Redact entry (Annotate tab; it writes a working copy next to the file) stays too and opens the same note. All three offer
   Open in app when the host grants `desktopOpen` (`pdfApi.openInApp` -> `app.open`, protocol README). The "no installed
   font" message adds the same hint on the web unless the text has emoji (the app draws with installed system fonts: CJK and most
-  symbols, never emoji). AI is shown with the host's `ai` grant and hidden without it (section 2.1).
+  symbols, never emoji). AI is shown with the host's `uniworkAi` grant and hidden without it (section 2.1).
 - Width-fit never goes below 60 % in a pane of 600 px or less (the page then scrolls sideways), as in Docs.
 - Draft recovery (`draft-recovery.md`) includes the editor boxes that are open: a comment typed into the margin card, a comment
   being rewritten and the floating text editor. They make the document unsaved and are in the draft copy and in Save.

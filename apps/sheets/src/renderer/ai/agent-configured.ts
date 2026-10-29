@@ -1,8 +1,9 @@
 import type { AiSettings } from '@genoffice/ai-provider/browser'
 
 /**
- * True when the Sheets agent can send a request with the current AI settings. A web frame names
- * UniWork AI only (UNI-2289); a provider key never reaches it, so any other provider is not ready there.
+ * True when the Sheets agent can send a request with the current AI settings: UniWork AI as it is;
+ * any other provider once its slot names a model and, except the built-in UniAI (`genspark`), holds
+ * a key. A web frame names UniWork AI only and gets no provider key (UNI-2289).
  */
 export function agentConfigured(settings: AiSettings | null | undefined): boolean {
   if (!settings) return false

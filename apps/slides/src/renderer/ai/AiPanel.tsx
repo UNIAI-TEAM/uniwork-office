@@ -2721,8 +2721,11 @@ export function AiPanel({
                     lang={lang}
                     waiting={Boolean(entry.waitLine)}
                     onRetry={isLast && !busy && lastInstructionRef.current ? retry : undefined}
-                    onChooseProvider={() =>
-                      void window.slidesApi.openAiModelSettings().catch(() => {})
+                    // a web frame has no other provider to choose: no action there
+                    onChooseProvider={
+                      platform() === 'web'
+                        ? undefined
+                        : () => void window.slidesApi.openAiModelSettings().catch(() => {})
                     }
                     onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                     onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
@@ -2876,8 +2879,10 @@ export function AiPanel({
                   lang={lang}
                   provider={settings.provider}
                   onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
-                  onChooseProvider={() =>
-                    void window.slidesApi.openAiModelSettings().catch(() => {})
+                  onChooseProvider={
+                    platform() === 'web'
+                      ? undefined
+                      : () => void window.slidesApi.openAiModelSettings().catch(() => {})
                   }
                   onAnnounce={setComposerAnnouncement}
                 />

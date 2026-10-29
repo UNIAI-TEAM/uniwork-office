@@ -1,5 +1,5 @@
 // The Sheets agent's readiness gate: UniWork AI is ready as it is; any other provider needs a model
-// and a key in its slot (UNI-2289: no key reaches a web frame, so there only UniWork AI is ready).
+// and, except the built-in UniAI, a key in its slot (UNI-2289: no key reaches a web frame).
 import { describe, expect, it } from 'vitest'
 import { defaultAiSettings } from '@genoffice/ai-provider'
 

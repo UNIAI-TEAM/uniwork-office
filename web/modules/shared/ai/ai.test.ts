@@ -1155,6 +1155,24 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(await bridge!.get()).not.toHaveProperty('accountId', expect.any(String))
     })
 
+    it('a listener subscribed before the first GET cloud hears the credits on its first call', async () => {
+      let answer: (r: Response) => void = () => {}
+      const cloud = new Promise<Response>((resolve) => (answer = resolve))
+      const { fetch } = recorder(() => cloud)
+      const ai = createWebAi({
+        port: uniworkPort({ uniworkAi: true }),
+        capabilities: { ai: true, uniworkAi: true },
+        fetch,
+        origin: ORIGIN,
+      })
+      expect(await ai.active()).toBe(true)
+      const pushed: unknown[] = []
+      windowCloudStatus()!.onChange((status) => pushed.push(status))
+      answer(jsonResponse(200, CLOUD))
+      await ai.state()
+      expect(pushed[0]).toMatchObject({ state: 'ready', credits: { remaining: 90, limit: 100 } })
+    })
+
     it('used-up credits keep the chip row: the bridge reads ready with nothing left', async () => {
       const { fetch } = recorder(() =>
         jsonResponse(200, { ...CLOUD, credits: { ...CLOUD.credits, used: 100, remaining: 0 } }),

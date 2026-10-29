@@ -1738,7 +1738,12 @@ export function AiPanel({
                   lang={lang}
                   waiting={Boolean(entry.waitLine)}
                   onRetry={isLast && !busy && runInstructionRef.current ? retry : undefined}
-                  onChooseProvider={() => void window.htmlApi?.openAiModelSettings?.()}
+                  // a web frame has no other provider to choose: no action there
+                  onChooseProvider={
+                    platform() === 'web'
+                      ? undefined
+                      : () => void window.htmlApi?.openAiModelSettings?.()
+                  }
                   onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                   onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
                 />
@@ -2029,7 +2034,10 @@ export function AiPanel({
                     lang,
                     note: composerNoteState,
                     onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
-                    onChooseProvider: () => void window.htmlApi?.openAiModelSettings?.(),
+                    onChooseProvider:
+                      platform() === 'web'
+                        ? undefined
+                        : () => void window.htmlApi?.openAiModelSettings?.(),
                     onAnnounce: setComposerAnnouncement,
                     onSendBlockedChange: uniworkGate.onSendBlockedChange,
                     registerBlockedHandler: uniworkGate.registerBlockedHandler,

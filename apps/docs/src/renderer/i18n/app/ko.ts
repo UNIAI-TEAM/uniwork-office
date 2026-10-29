@@ -329,7 +329,6 @@ export const ko = {
   appTabDecimal: '소수점',
   appTabBar: '세로 막대',
   appTabClear: '지우기',
-  // AI settings
   // Context menu
   appCut: '잘라내기',
   appCopy: '복사',
