@@ -58,6 +58,9 @@ export function SpellingDialog({
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [truncated, setTruncated] = useState(false)
   const learnedRef = useRef<Set<string>>(new Set())
+  const panelRef = useRef<HTMLDivElement>(null)
+  // read during render, before effects: whatever owned focus when F7 was hit
+  const [opener] = useState(() => document.activeElement as HTMLElement | null)
 
   /** One synchronous pass over the workbook; bumped by Recheck and re-open. */
   const startRun = () => {
@@ -84,13 +87,29 @@ export function SpellingDialog({
       isWithheld,
     )
     setTruncated(capped)
-    setFindings(runSheetSpellCheck(cells, engine, learnedRef.current, sessionIgnoredRef.current))
+    const found = runSheetSpellCheck(cells, engine, learnedRef.current, sessionIgnoredRef.current)
+    setFindings(found)
+    // the actions only render for the selected finding: open on the first one
+    setSelectedKey(found[0] ? findingKey(found[0]) : null)
   }
 
   useEffect(() => {
     startRun()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Take focus on open so Escape works at once; give it back on close.
+  useEffect(() => {
+    panelRef.current?.focus()
+    return () => {
+      if (opener && opener !== document.body && opener.isConnected) opener.focus()
+    }
+  }, [opener])
+
+  const selectFinding = (finding: SpellFinding): void => {
+    setSelectedKey(findingKey(finding))
+    onJumpTo(finding.cell.sheetId, finding.cell.row, finding.cell.column)
+  }
 
   const dropFinding = (key: string): void => {
     setFindings((previous) => previous.filter((finding) => findingKey(finding) !== key))
@@ -150,7 +169,9 @@ export function SpellingDialog({
 
   return (
     <div
-      className="find-replace-panel"
+      ref={panelRef}
+      tabIndex={-1}
+      className="find-replace-panel spell-panel"
       role="dialog"
       aria-label={t('appSpellTitle')}
       onKeyDown={(event) => {
@@ -188,9 +209,13 @@ export function SpellingDialog({
                   <tr
                     key={key}
                     className={key === selectedKey ? 'spell-selected' : undefined}
-                    onClick={() => {
-                      setSelectedKey(key)
-                      onJumpTo(finding.cell.sheetId, finding.cell.row, finding.cell.column)
+                    tabIndex={0}
+                    aria-selected={key === selectedKey}
+                    onClick={() => selectFinding(finding)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return
+                      event.preventDefault()
+                      selectFinding(finding)
                     }}
                   >
                     <td>{`${finding.cell.sheetName}!${finding.cell.address}`}</td>

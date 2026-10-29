@@ -6526,11 +6526,21 @@ body:has(.dialog-backdrop, .modal-backdrop) .shape-delete-button {
 }
 
 /* Spelling panel (F7 / Review ▸ Proofing) rides the find-replace panel chrome;
-   these only add its note line, selected row and the suggestion chips. */
+   these only add its selected row and the suggestion chips. The panel is not
+   draggable, so its header drops the move cursor; the root takes focus
+   programmatically (Escape), which needs no ring. */
 
-.find-replace-panel .spell-note {
-  font-size: 11px;
-  color: var(--text-muted);
+.find-replace-panel.spell-panel header {
+  cursor: default;
+}
+
+.find-replace-panel.spell-panel:focus {
+  outline: none;
+}
+
+.find-replace-panel.spell-panel .fr-results tbody tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .find-replace-panel .fr-results tbody tr.spell-selected {
