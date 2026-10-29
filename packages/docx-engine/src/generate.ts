@@ -1229,6 +1229,15 @@ function replaceFillSlot(xml: string, hex: string | null): string {
   return xml
 }
 
+/** Any DrawingML shape (wps:wsp with wps:spPr and preset or custom geometry) or box drawing. */
+function isShapeStyleDrawing(drawingXml: string): boolean {
+  if (isBoxDrawing(drawingXml)) return true
+  if (!/<wps:wsp[\s>]/.test(drawingXml)) return false
+  const spPr = /<wps:spPr\b[^>]*>[\s\S]*?<\/wps:spPr>/.exec(drawingXml)?.[0]
+  if (!spPr) return false
+  return /<a:(?:prstGeom|custGeom)[\s/>]/.test(spPr)
+}
+
 /** Recolor floating shapes/textboxes/lines (same drawing set as extractTextboxes). */
 export function patchShapeStyles(
   paragraphXml: string,
@@ -1251,7 +1260,7 @@ export function patchShapeStyles(
   let boxIndex = -1
   for (const drawing of drawings) {
     let drawingXml = paragraphXml.slice(drawing.start, drawing.end)
-    if (!isBoxDrawing(drawingXml)) continue
+    if (!isShapeStyleDrawing(drawingXml)) continue
     boxIndex++
     const style = styles[boxIndex]
     if (

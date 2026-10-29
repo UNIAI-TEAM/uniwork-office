@@ -100,6 +100,42 @@ describe('patchShapeStyles no-op', () => {
     expect(patchShapeStyles(SHAPE, [{}])).toBe(SHAPE)
     expect(patchShapeStyles(SHAPE, [null, undefined])).toBe(SHAPE)
   })
+
+  it('patches rotation, outline width, fill, and border on a text-less shape and keeps an untouched one byte-identical', () => {
+    const textless = buildShapeParagraphXml({
+      prst: 'rect',
+      fillHex: '4472C4',
+      borderHex: '2F5496',
+      withTextbox: false,
+    })
+    expect(textless).not.toContain('<w:txbxContent')
+    expect(patchShapeStyles(textless, [{}])).toBe(textless)
+    expect(patchShapeStyles(textless, [null, undefined])).toBe(textless)
+
+    const patched = patchShapeStyles(textless, [
+      { rotDeg: 285, borderWidthPx: 8, fillHex: 'FF0000', borderHex: '00B050' },
+    ])
+    expect(patched).toContain('<a:xfrm rot="17100000">')
+    expect(patched).toContain(
+      '<a:ln w="76200"><a:solidFill><a:srgbClr val="00B050"/></a:solidFill></a:ln>',
+    )
+    expect(patched).toContain('<a:solidFill><a:srgbClr val="FF0000"/></a:solidFill>')
+  })
+
+  it('patches rotation and outline width on a text-less custom-geometry shape', () => {
+    const custXml = buildShapeParagraphXml({
+      prst: 'rect',
+      fillHex: '4472C4',
+      borderHex: '2F5496',
+      withTextbox: false,
+    }).replace(
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>',
+      '<a:custGeom><a:pathLst/></a:custGeom>',
+    )
+    const out = patchShapeStyles(custXml, [{ rotDeg: 90, borderWidthPx: 2 }])
+    expect(out).toContain('<a:xfrm rot="5400000">')
+    expect(out).toContain('<a:ln w="19050">')
+  })
 })
 
 describe('rotation and outline width round-trip through the parser', () => {

@@ -152,4 +152,41 @@ describe('shape rotation and outline width survive save', () => {
     expect(firstBox(await parseDocx(saved)).borderWidthPx).toBe(3)
     editor.destroy()
   })
+
+  it('persists rotation, outline width, fill, and border color on a shape without text', async () => {
+    const textlessXml = buildShapeParagraphXml({
+      prst: 'rect',
+      withTextbox: false,
+      id: 43,
+    }).replace(
+      '<wp:positionH relativeFrom="column"><wp:align>center</wp:align></wp:positionH>',
+      '<wp:positionH relativeFrom="column"><wp:posOffset>500000</wp:posOffset></wp:positionH>',
+    )
+    const { editor, parsed, source } = await openShapeDoc(textlessXml)
+    // untouched text-less shape stays byte-identical
+    const untouchedPlan = pmDocToSavePlan(editor.getJSON() as PmNode, parsed.blocks)
+    expect(untouchedPlan.changedCount).toBe(0)
+    expect(await saveDocx(parsed, untouchedPlan.saveBlocks)).toEqual(source)
+
+    selectShape(editor)
+    patchFirstBox(editor, {
+      rotDeg: 285,
+      borderWidthPx: 8,
+      fill: 'FF0000',
+      borderColor: '00B050',
+    })
+    const saved = await saveShape(editor, parsed)
+    const xml = await documentXml(saved)
+    expect(xml).toContain('rot="17100000"')
+    expect(xml).toMatch(/<a:ln w="76200"/)
+    expect(xml).toContain('<a:srgbClr val="FF0000"/>')
+    expect(xml).toContain('<a:srgbClr val="00B050"/>')
+
+    const reopened = firstBox(await parseDocx(saved))
+    expect(reopened.rotDeg).toBe(285)
+    expect(reopened.borderWidthPx).toBe(8)
+    expect(reopened.fill).toBe('FF0000')
+    expect(reopened.borderColor).toBe('00B050')
+    editor.destroy()
+  })
 })
