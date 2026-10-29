@@ -276,6 +276,7 @@ const tMain = createI18n({
     csvKeepFormatMsg: '继续以 CSV 格式保存吗?',
     csvKeepFormatDetail:
       'CSV 只保留单张工作表的纯文本值——公式、格式和其他工作表不会存入 .csv 文件。',
+    errSaveOriginalFormat: '请另存为 .{ext} 文件。此应用无法按原文件的格式保存。',
   },
   // en and vi are ours (UniWork wording, e.g. errNoApiKey: no AI model set up yet); the other locales keep
   // upstream's wording. tools/rebrand re-applies the vi errNoApiKey (rule vi-no-api-key).
@@ -337,6 +338,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Keep saving in CSV format?',
     csvKeepFormatDetail:
       'CSV keeps plain values of a single sheet only — formulas, formatting, and any additional sheets are not saved to the .csv file.',
+    errSaveOriginalFormat:
+      "Save it as a .{ext} file. This app can't save in the original file's format.",
   },
   vi: {
     filterSpreadsheets: 'Bảng tính',
@@ -398,6 +401,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Tiếp tục lưu ở định dạng CSV?',
     csvKeepFormatDetail:
       'CSV chỉ giữ các giá trị thuần của một trang tính duy nhất — các công thức, định dạng và mọi trang tính bổ sung sẽ không được lưu vào tệp .csv.',
+    errSaveOriginalFormat:
+      'Hãy lưu thành tệp .{ext}. Ứng dụng không lưu được ở định dạng của tệp gốc.',
   },
   ja: {
     filterSpreadsheets: 'スプレッドシート',
@@ -459,6 +464,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'CSV 形式のまま保存しますか?',
     csvKeepFormatDetail:
       'CSV は 1 枚のシートの値のみを保持します。数式、書式、追加のシートは .csv ファイルには保存されません。',
+    errSaveOriginalFormat:
+      '.{ext} ファイルとして保存してください。元のファイルの形式では保存できません。',
   },
   ko: {
     filterSpreadsheets: '스프레드시트',
@@ -520,6 +527,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'CSV 형식으로 계속 저장하시겠습니까?',
     csvKeepFormatDetail:
       'CSV는 시트 하나의 값만 유지합니다 — 수식, 서식, 추가 시트는 .csv 파일에 저장되지 않습니다.',
+    errSaveOriginalFormat:
+      '.{ext} 파일로 저장하세요. 이 앱에서는 원본 파일 형식으로 저장할 수 없습니다.',
   },
   fr: {
     filterSpreadsheets: 'Feuilles de calcul',
@@ -582,6 +591,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Continuer à enregistrer au format CSV ?',
     csvKeepFormatDetail:
       "Le CSV ne conserve que les valeurs d'une seule feuille — les formules, la mise en forme et les feuilles supplémentaires ne sont pas enregistrées dans le fichier .csv.",
+    errSaveOriginalFormat:
+      'Enregistrez-le en tant que fichier .{ext}. Cette application ne peut pas enregistrer dans le format du fichier d’origine.',
   },
   de: {
     filterSpreadsheets: 'Tabellenkalkulationen',
@@ -643,6 +654,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Weiter im CSV-Format speichern?',
     csvKeepFormatDetail:
       'CSV speichert nur die Werte eines einzelnen Blatts – Formeln, Formatierungen und weitere Blätter werden nicht in der .csv-Datei gespeichert.',
+    errSaveOriginalFormat:
+      'Speichern Sie die Datei als .{ext}-Datei. Diese App kann nicht im Format der Originaldatei speichern.',
   },
   es: {
     filterSpreadsheets: 'Hojas de cálculo',
@@ -704,6 +717,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: '¿Seguir guardando en formato CSV?',
     csvKeepFormatDetail:
       'CSV solo conserva los valores de una única hoja: las fórmulas, el formato y las hojas adicionales no se guardan en el archivo .csv.',
+    errSaveOriginalFormat:
+      'Guárdelo como un archivo .{ext}. Esta aplicación no puede guardar en el formato del archivo original.',
   },
   th: {
     filterSpreadsheets: 'สเปรดชีต',
@@ -764,6 +779,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'บันทึกเป็นรูปแบบ CSV ต่อไปหรือไม่',
     csvKeepFormatDetail:
       'CSV เก็บเฉพาะค่าของชีตเดียวเท่านั้น — สูตร การจัดรูปแบบ และชีตอื่น ๆ จะไม่ถูกบันทึกลงในไฟล์ .csv',
+    errSaveOriginalFormat:
+      'โปรดบันทึกเป็นไฟล์ .{ext} แอปนี้ไม่สามารถบันทึกในรูปแบบของไฟล์ต้นฉบับได้',
   },
   id: {
     filterSpreadsheets: 'Lembar bentang',
@@ -823,6 +840,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Terus menyimpan dalam format CSV?',
     csvKeepFormatDetail:
       'CSV hanya menyimpan nilai dari satu lembar — rumus, pemformatan, dan lembar tambahan tidak disimpan ke file .csv.',
+    errSaveOriginalFormat:
+      'Simpan sebagai file .{ext}. Aplikasi ini tidak dapat menyimpan dalam format file asli.',
   },
   ru: {
     filterSpreadsheets: 'Электронные таблицы',
@@ -883,6 +902,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Продолжить сохранение в формате CSV?',
     csvKeepFormatDetail:
       'CSV сохраняет только значения одного листа — формулы, форматирование и дополнительные листы не сохраняются в файле .csv.',
+    errSaveOriginalFormat:
+      'Сохраните файл в формате .{ext}. Это приложение не может сохранять в исходном формате файла.',
   },
   ar: {
     filterSpreadsheets: 'جداول البيانات',
@@ -940,6 +961,7 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'هل تريد متابعة الحفظ بتنسيق CSV؟',
     csvKeepFormatDetail:
       'يحتفظ CSV بقيم ورقة واحدة فقط — لا تُحفظ الصيغ والتنسيق والأوراق الإضافية في ملف .csv.',
+    errSaveOriginalFormat: 'احفظه كملف .{ext}. لا يمكن لهذا التطبيق الحفظ بتنسيق الملف الأصلي.',
   },
   pt: {
     filterSpreadsheets: 'Planilhas',
@@ -1000,6 +1022,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Continuar salvando no formato CSV?',
     csvKeepFormatDetail:
       'O CSV mantém apenas os valores de uma única planilha — fórmulas, formatação e planilhas adicionais não são salvas no arquivo .csv.',
+    errSaveOriginalFormat:
+      'Salve como um arquivo .{ext}. Este aplicativo não pode salvar no formato do arquivo original.',
   },
   it: {
     filterSpreadsheets: 'Fogli di calcolo',
@@ -1061,6 +1085,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Continuare a salvare in formato CSV?',
     csvKeepFormatDetail:
       'Il CSV conserva solo i valori di un singolo foglio: formule, formattazione e fogli aggiuntivi non vengono salvati nel file .csv.',
+    errSaveOriginalFormat:
+      'Salvalo come file .{ext}. Questa app non può salvare nel formato del file originale.',
   },
   pl: {
     filterSpreadsheets: 'Arkusze kalkulacyjne',
@@ -1121,6 +1147,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Kontynuować zapisywanie w formacie CSV?',
     csvKeepFormatDetail:
       'CSV zachowuje tylko wartości jednego arkusza — formuły, formatowanie i dodatkowe arkusze nie są zapisywane w pliku .csv.',
+    errSaveOriginalFormat:
+      'Zapisz go jako plik .{ext}. Ta aplikacja nie może zapisywać w formacie oryginalnego pliku.',
   },
   cs: {
     filterSpreadsheets: 'Tabulky',
@@ -1181,6 +1209,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Pokračovat v ukládání ve formátu CSV?',
     csvKeepFormatDetail:
       'CSV zachovává pouze hodnoty jednoho listu — vzorce, formátování a další listy se do souboru .csv neuloží.',
+    errSaveOriginalFormat:
+      'Uložte jej jako soubor .{ext}. Tato aplikace neumí ukládat ve formátu původního souboru.',
   },
   nl: {
     filterSpreadsheets: 'Spreadsheets',
@@ -1242,6 +1272,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Doorgaan met opslaan in CSV-indeling?',
     csvKeepFormatDetail:
       'CSV bewaart alleen de waarden van één blad — formules, opmaak en extra bladen worden niet in het .csv-bestand opgeslagen.',
+    errSaveOriginalFormat:
+      'Sla het op als een .{ext}-bestand. Deze app kan niet opslaan in de indeling van het oorspronkelijke bestand.',
   },
   ms: {
     filterSpreadsheets: 'Hamparan',
@@ -1302,6 +1334,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'Terus simpan dalam format CSV?',
     csvKeepFormatDetail:
       'CSV hanya menyimpan nilai satu helaian — formula, pemformatan dan helaian tambahan tidak disimpan ke fail .csv.',
+    errSaveOriginalFormat:
+      'Simpan sebagai fail .{ext}. Aplikasi ini tidak dapat menyimpan dalam format fail asal.',
   },
   he: {
     filterSpreadsheets: 'גיליונות אלקטרוניים',
@@ -1359,6 +1393,7 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'להמשיך לשמור בתבנית CSV?',
     csvKeepFormatDetail:
       'CSV שומר רק את הערכים של גיליון אחד — נוסחאות, עיצוב וגיליונות נוספים אינם נשמרים בקובץ ה-.csv.',
+    errSaveOriginalFormat: 'שמרו אותו כקובץ .{ext}. יישום זה אינו יכול לשמור בפורמט של קובץ המקור.',
   },
   hi: {
     filterSpreadsheets: 'स्प्रेडशीट',
@@ -1419,6 +1454,8 @@ const tMain = createI18n({
     csvKeepFormatMsg: 'CSV प्रारूप में सहेजना जारी रखें?',
     csvKeepFormatDetail:
       'CSV केवल एक शीट के मान रखता है — सूत्र, स्वरूपण और अतिरिक्त शीट .csv फ़ाइल में सहेजे नहीं जाते।',
+    errSaveOriginalFormat:
+      'इसे .{ext} फ़ाइल के रूप में सहेजें। यह ऐप मूल फ़ाइल के प्रारूप में सहेज नहीं सकता।',
   },
   'zh-TW': {
     filterSpreadsheets: '電子試算表',
@@ -1474,6 +1511,7 @@ const tMain = createI18n({
     csvActiveSheetOnlyNotice: 'CSV 檔案只包含一張工作表——只會匯出目前工作表「{name}」。',
     csvKeepFormatMsg: '要繼續以 CSV 格式儲存嗎?',
     csvKeepFormatDetail: 'CSV 只保留單張工作表的純值——公式、格式和其他工作表不會存入 .csv 檔案。',
+    errSaveOriginalFormat: '請另存為 .{ext} 檔案。此應用程式無法以原始檔案的格式儲存。',
   },
 })
 const tm = (key: Parameters<typeof tMain>[1], params?: Parameters<typeof tMain>[2]) =>
@@ -1756,10 +1794,12 @@ async function saveFileDialog(event: IpcMainInvokeEvent, options: SaveDialogOpti
   )
 }
 
-/** Workbook file extensions the open pipeline accepts. Single source for the
- *  picker filters, the merge-source check, and the crash re-open check. */
+/** Workbook file extensions the native sidecar pipeline accepts (merge sources,
+ *  encrypted open, and crash re-open). .ods/.ots are picker-only until converted
+ *  through the shell's converter route into a temp .xlsx. */
 const WORKBOOK_EXTS = new Set(['xlsx', 'xlsm', 'xls', 'csv', 'tsv'])
-
+const WORKBOOK_FILTER_EXTENSIONS = [...WORKBOOK_EXTS]
+const WORKBOOK_OPEN_PICKER_EXTENSIONS = [...WORKBOOK_FILTER_EXTENSIONS, 'ods', 'ots']
 /** register a tab's webContents/client pair and wire up cleanup on teardown */
 /** Clients whose process-death notification is already wired. A sidecar client
  *  is shared by every tab (the `sidecar ?? new XlsxSidecarClient(...)` reuse),
@@ -2815,17 +2855,20 @@ export function registerSheetsIpc(): void {
     if (!path) {
       const selection = await openFileDialog(event, {
         properties: ['openFile'],
-        filters: [
-          { name: tm('filterSpreadsheets'), extensions: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'] },
-        ],
+        filters: [{ name: tm('filterSpreadsheets'), extensions: WORKBOOK_OPEN_PICKER_EXTENSIONS }],
       })
       if (selection.canceled || !selection.filePaths[0]) return null
       path = selection.filePaths[0]
-      // a picked legacy .xls goes to the shell's converter route; only a missing converter
-      // falls back (shell side) to the values-only open of this same file
+      // a picked legacy .xls or OpenDocument .ods/.ots goes to the shell's converter route; only a
+      // missing converter falls back (shell side) to the values-only open of an .xls
       if (/\.xls$/i.test(path) && legacyOpenHook?.(path)) return null
       // Retry on a stalled open restarts this pick, not an earlier shell open
       rememberOpenedWorkbook(event.sender, path)
+    }
+    if (/\.(ods|ots)$/i.test(path)) {
+      if (legacyOpenHook?.(path)) return null
+      const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+      throw new Error(`Unsupported workbook: ${ext}`)
     }
     // Password first, recovery prompt second: the prompt's Restore/Discard
     // choice is consumed by prepareWorkbookForOpen, so asking for the
@@ -3048,9 +3091,7 @@ export function registerSheetsIpc(): void {
   ipcMain.handle(IPC_CHANNELS.selectWorkbooksForMerge, async (event) => {
     const selection = await openFileDialog(event, {
       properties: ['openFile', 'multiSelections'],
-      filters: [
-        { name: tm('filterSpreadsheets'), extensions: ['xlsx', 'xlsm', 'xls', 'csv', 'tsv'] },
-      ],
+      filters: [{ name: tm('filterSpreadsheets'), extensions: WORKBOOK_FILTER_EXTENSIONS }],
     })
     if (selection.canceled || selection.filePaths.length === 0) return null
     return openMergeSources(event, selection.filePaths)
@@ -3550,7 +3591,11 @@ export function registerSheetsIpc(): void {
       }
       // a typed .xls/.doc/.ppt answer is refused, never retargeted to `<name>.xls.xlsx`: the
       // chooser's overwrite confirmation covered the path it returned, not that one
-      assertModernSaveTarget(selection.filePath, ext)
+      try {
+        assertModernSaveTarget(selection.filePath, ext)
+      } catch {
+        throw new Error(tm('errSaveOriginalFormat', { ext }))
+      }
       targetPath = selection.filePath.toLowerCase().endsWith(`.${ext}`)
         ? selection.filePath
         : `${selection.filePath}.${ext}`
@@ -4883,8 +4928,8 @@ async function prepareWorkbookForOpen(
     return { openPath: path, ...base }
   }
   const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+  if (!WORKBOOK_EXTS.has(extension)) throw new Error(`Unsupported workbook: ${extension}`)
   if (extension !== 'csv' && extension !== 'tsv' && extension !== 'xls') {
-    // Unsaved work from a lost session: offer the recovery copy. Restoring
     // opens it with restoreTarget pointing back at the original, so a plain
     // Save writes straight back over the file the user opened — the restore
     // prompt (which spells out the overwrite) was the confirmation.

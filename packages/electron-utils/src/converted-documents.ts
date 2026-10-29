@@ -52,19 +52,20 @@ export function forgetConvertedDocument(path: string | null | undefined): void {
   if (path) table().delete(keyOf(path))
 }
 
-const LEGACY_EXTENSION_RE = /\.(doc|xls|ppt)$/i
+const LEGACY_EXTENSION_RE = /\.(doc|xls|ppt|odt|ott|ods|ots|odp|otp)$/i
 
 /**
  * Where a Save As chooser's answer may be written. The editors write OOXML, so an answer with
- * a legacy extension (the recorded original, or any other .doc/.xls/.ppt) is refused: filters
- * and suggested names are not a write-target guarantee, and OOXML bytes must never land under
- * a legacy name. Nor is the answer retargeted to `<name>.doc.docx`: the chooser's overwrite
- * confirmation covered the path it returned, not that one.
+ * a legacy or OpenDocument extension (the recorded original, or any other .doc/.xls/.ppt or
+ * .odt/.ods/.odp/.ott/.ots/.otp) is refused: filters and suggested names are not a write-target
+ * guarantee, and OOXML bytes must never land under a legacy or OpenDocument name. Nor is the answer
+ * retargeted to `<name>.doc.docx`: the chooser's overwrite confirmation covered the path it returned,
+ * not that one.
  */
 export function assertModernSaveTarget(
   chosen: string,
   ext: 'docx' | 'xlsx' | 'xlsm' | 'pptx',
 ): string {
   if (!LEGACY_EXTENSION_RE.test(chosen)) return chosen
-  throw new Error(`Choose a name ending in .${ext}: a legacy .doc/.xls/.ppt name cannot be used`)
+  throw new Error(`Save it as a .${ext} file. This app can't save in the original file's format.`)
 }

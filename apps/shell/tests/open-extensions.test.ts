@@ -23,13 +23,19 @@ describe('the shared open-dialog extensions', () => {
     expect(OPEN_DIALOG_EXTENSIONS).toEqual([
       'docx',
       'doc',
+      'odt',
+      'ott',
       'xlsx',
       'xlsm',
       'xls',
       'csv',
       'tsv',
+      'ods',
+      'ots',
       'pptx',
       'ppt',
+      'odp',
+      'otp',
       'pdf',
       'md',
       'markdown',
@@ -41,8 +47,8 @@ describe('the shared open-dialog extensions', () => {
   })
 
   it('lists each extension once, with no all-files entry', () => {
-    expect(OPEN_DIALOG_EXTENSIONS).toHaveLength(16)
-    expect(new Set(OPEN_DIALOG_EXTENSIONS).size).toBe(16)
+    expect(OPEN_DIALOG_EXTENSIONS).toHaveLength(22)
+    expect(new Set(OPEN_DIALOG_EXTENSIONS).size).toBe(22)
     expect(OPEN_DIALOG_EXTENSIONS).not.toContain('*')
   })
 })
@@ -54,7 +60,7 @@ describe('the Home "Open local file" hint', () => {
 
   it('is the dialog list in the same order, minus the unsupported ones', () => {
     expect(openLocalHint()).toBe(
-      '.docx / .doc / .xlsx / .xlsm / .xls / .csv / .tsv / .pptx / .ppt / .pdf / .md / .markdown / .txt / .json / .html / .htm',
+      '.docx / .doc / .odt / .ott / .xlsx / .xlsm / .xls / .csv / .tsv / .ods / .ots / .pptx / .ppt / .odp / .otp / .pdf / .md / .markdown / .txt / .json / .html / .htm',
     )
     const shown = openLocalHint()
       .split(' / ')
@@ -64,6 +70,9 @@ describe('the Home "Open local file" hint', () => {
     )
     expect(shown).toContain('doc')
     expect(shown).toContain('ppt')
+    expect(shown).toContain('odt')
+    expect(shown).toContain('ods')
+    expect(shown).toContain('odp')
   })
 
   it('Home reads the shared list instead of a hand-typed copy', () => {

@@ -303,6 +303,11 @@ export function setSlidesOpenedHook(fn: ((wc: WebContents, path: string) => void
   slidesOpenedHook = fn
 }
 
+let legacyOpenHook: ((path: string) => boolean) | null = null
+export function setSlidesLegacyOpenHook(fn: ((path: string) => boolean) | null): void {
+  legacyOpenHook = fn
+}
+
 /** Detached editor windows (createSlidesWindow), keyed by webContents id — their titles are owned here */
 const standaloneWindows = new Map<number, BrowserWindow>()
 
@@ -688,7 +693,12 @@ function hostFor(wc: WebContents): HostIO {
         filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
       }
       const r = await showSaveDialogWithMemory(dialog, dialogParent(), options, getDraftsDir())
-      return r.canceled || !r.filePath ? null : assertModernSaveTarget(r.filePath, 'pptx')
+      if (r.canceled || !r.filePath) return null
+      try {
+        return assertModernSaveTarget(r.filePath, 'pptx')
+      } catch {
+        throw new Error(tm('errSaveOriginalFormat', { ext: 'pptx' }))
+      }
     },
     saveGate: (input) => uniworkSaveDecision(input),
     userSaved: (path) => notifyUniworkUserSave(path),
@@ -1135,10 +1145,14 @@ export function registerSlidesIpc(): void {
     const parent = dialogParent()
     const options = {
       properties: ['openFile' as const],
-      filters: [{ name: 'PowerPoint', extensions: ['pptx', 'ppt'] }],
+      filters: [{ name: 'PowerPoint', extensions: ['pptx', 'ppt', 'odp', 'otp'] }],
     }
     const r = await showOpenDialogWithMemory(dialog, parent, options)
     if (r.canceled || !r.filePaths[0]) return null
+    if (/\.(odp|otp)$/i.test(r.filePaths[0])) {
+      if (legacyOpenHook?.(r.filePaths[0])) return null
+      return null
+    }
     // G5-04g: a locked working copy is refused before rejectLegacyPpt reads it
     if (uniworkRefusesOpen(r.filePaths[0])) return null
     if (await rejectLegacyPpt(r.filePaths[0])) return null

@@ -20,16 +20,22 @@ const FILE_ICONS: Record<string, string> = {
   htm: iconHtml,
 }
 
-// Legacy Office formats draw a lighter copy of their modern format's icon (same rule as the web DocumentTypeIcon).
+// Legacy Office and OpenDocument formats draw a lighter copy of their modern format's icon (same rule as the web DocumentTypeIcon).
 const LEGACY_ICONS: Record<string, string> = {
   doc: iconDocx,
   dot: iconDocx,
   rtf: iconDocx,
+  odt: iconDocx,
+  ott: iconDocx,
   xls: iconXlsx,
   xlt: iconXlsx,
+  ods: iconXlsx,
+  ots: iconXlsx,
   ppt: iconPptx,
   pps: iconPptx,
   pot: iconPptx,
+  odp: iconPptx,
+  otp: iconPptx,
 }
 
 /** file-type icon by extension ('page' = UniNote, the shared option J tile); an unknown extension gets a neutral letter tile */

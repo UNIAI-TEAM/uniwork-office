@@ -4,6 +4,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { forgetConvertedDocument, registerConvertedDocument } from '@genoffice/electron-utils'
 import {
+  isOdfFormat,
   LegacyConvertError,
   legacyFormatForPath,
   type ConvertLegacyResult,
@@ -77,6 +78,12 @@ const ERROR_COPY: Readonly<Partial<Record<LegacyConvertErrorCode, LegacyOpenStri
   corrupt: 'legacyCorrupt',
   timeout: 'legacyTimeout',
   converter_missing: 'legacyMissing',
+}
+
+/** the progress-box detail line: OpenDocument files say "OpenDocument file", legacy binaries say "older Office file" */
+export function legacyProgressDetailKey(fileName: string): LegacyOpenStringKey {
+  const ext = extname(fileName).slice(1).toLowerCase()
+  return isOdfFormat(ext) ? 'legacyOdfDetail' : 'legacyConvertingDetail'
 }
 
 /** the user-facing text of a conversion failure (unmapped codes read as a plain failure) */
@@ -198,6 +205,12 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
             deps.notice(deps.t('legacyXlsValuesOnly', { name: fileName, ext: extname(fileName) }))
             return
           }
+        }
+        if (err.code === 'converter_missing' && isOdfFormat(source)) {
+          // Slice 2a hooks the pure-JS odf2ooxml fallback engine here when the bundled
+          // LibreOffice converter is missing; in slice 1 it surfaces the typed missing notice.
+          deps.notice(legacyErrorMessage(err, fileName, deps.t))
+          return
         }
         deps.notice(legacyErrorMessage(err, fileName, deps.t))
         return

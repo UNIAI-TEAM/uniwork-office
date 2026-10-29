@@ -22,8 +22,18 @@ export const LAUNCHABLE_EXTS = [
   'htm',
 ] as const
 
-const SUPPORTED_LAUNCH_RE = new RegExp(`\\.(${LAUNCHABLE_EXTS.join('|')})$`, 'i')
-const UNSUPPORTED_LAUNCH_RE = /\.(rtf|odt|pps|odp|ods|xlsb|pages|key|numbers)$/i
+/**
+ * OpenDocument formats accepted from OS launch argv / second-instance payloads in slice 1.
+ * Kept separate from LAUNCHABLE_EXTS until slice 3 declares their packaged fileAssociations
+ * (tests/file-associations.test.ts pairs LAUNCHABLE_EXTS with electron-builder.cjs).
+ */
+export const ODF_LAUNCH_EXTS = ['odt', 'ott', 'ods', 'ots', 'odp', 'otp'] as const
+
+const SUPPORTED_LAUNCH_RE = new RegExp(
+  `\\.(${[...LAUNCHABLE_EXTS, ...ODF_LAUNCH_EXTS].join('|')})$`,
+  'i',
+)
+const UNSUPPORTED_LAUNCH_RE = /\.(rtf|pps|xlsb|pages|key|numbers)$/i
 
 interface LaunchPayload {
   launchPaths?: unknown

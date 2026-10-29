@@ -55,9 +55,30 @@ describe('assertModernSaveTarget (R2-2)', () => {
     expect(assertModernSaveTarget('/home/me/Budget', 'xlsx')).toBe('/home/me/Budget')
   })
 
-  it('refuses every legacy extension, any case, instead of retargeting it', () => {
-    for (const name of ['/h/A.doc', '/h/A.XLS', '/h/A.Ppt']) {
-      expect(() => assertModernSaveTarget(name, 'docx')).toThrow(/\.docx/)
+  it('refuses every legacy and OpenDocument extension, any case, instead of retargeting it', () => {
+    for (const name of [
+      '/h/A.doc',
+      '/h/A.XLS',
+      '/h/A.Ppt',
+      '/h/A.odt',
+      '/h/A.OTT',
+      '/h/A.ods',
+      '/h/A.OTS',
+      '/h/A.odp',
+      '/h/A.OTP',
+    ]) {
+      expect(() => assertModernSaveTarget(name, 'docx')).toThrow(
+        "Save it as a .docx file. This app can't save in the original file's format.",
+      )
     }
+    expect(() => assertModernSaveTarget('/h/A.ods', 'xlsx')).toThrow(
+      "Save it as a .xlsx file. This app can't save in the original file's format.",
+    )
+    expect(() => assertModernSaveTarget('/h/A.ods', 'xlsm')).toThrow(
+      "Save it as a .xlsm file. This app can't save in the original file's format.",
+    )
+    expect(() => assertModernSaveTarget('/h/A.odp', 'pptx')).toThrow(
+      "Save it as a .pptx file. This app can't save in the original file's format.",
+    )
   })
 })

@@ -4,10 +4,25 @@ import { cp, mkdir, mkdtemp, open, readFile, rm, stat, writeFile } from 'node:fs
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { inflateRawSync } from 'node:zlib'
 import { killProcessTree, type KillProcessTreeDeps } from './pdf-convert/convert-host'
 
-export type LegacySourceFormat = 'doc' | 'xls' | 'ppt'
+export type OdfSourceFormat = 'odt' | 'ott' | 'ods' | 'ots' | 'odp' | 'otp'
+export type LegacySourceFormat = 'doc' | 'xls' | 'ppt' | OdfSourceFormat
 export type LegacyTargetFormat = 'docx' | 'xlsx' | 'pptx'
+
+const ODF_SOURCE_FORMATS: Readonly<Record<string, true>> = {
+  odt: true,
+  ott: true,
+  ods: true,
+  ots: true,
+  odp: true,
+  otp: true,
+}
+
+export function isOdfFormat(format: string): format is OdfSourceFormat {
+  return Object.hasOwn(ODF_SOURCE_FORMATS, format)
+}
 
 export type LegacyConvertErrorCode =
   'encrypted' | 'corrupt' | 'unsupported' | 'timeout' | 'converter_missing' | 'cancelled' | 'failed'
@@ -32,14 +47,26 @@ export class LegacyConvertError extends Error {
 
 export const LEGACY_TARGET_FOR_SOURCE: Readonly<Record<LegacySourceFormat, LegacyTargetFormat>> = {
   doc: 'docx',
+  odt: 'docx',
+  ott: 'docx',
   xls: 'xlsx',
+  ods: 'xlsx',
+  ots: 'xlsx',
   ppt: 'pptx',
+  odp: 'pptx',
+  otp: 'pptx',
 }
 
 export const LEGACY_INFILTER_FOR_SOURCE: Readonly<Record<LegacySourceFormat, string>> = {
   doc: 'MS Word 97',
+  odt: 'writer8',
+  ott: 'writer8',
   xls: 'MS Excel 97',
+  ods: 'calc8',
+  ots: 'calc8',
   ppt: 'MS PowerPoint 97',
+  odp: 'impress8',
+  otp: 'impress8',
 }
 
 export const OOXML_REQUIRED_MAIN_PART: Readonly<Record<LegacyTargetFormat, string>> = {
@@ -70,7 +97,7 @@ const MAX_BIFF_SCAN_RECORDS = 500_000
 
 export function legacyFormatForPath(filePath: string): LegacySourceFormat | null {
   const ext = extname(filePath).slice(1).toLowerCase()
-  if (ext === 'doc' || ext === 'xls' || ext === 'ppt') return ext
+  if (ext === 'doc' || ext === 'xls' || ext === 'ppt' || isOdfFormat(ext)) return ext
   return null
 }
 
@@ -345,8 +372,9 @@ export function readCfbStreams(bytes: Uint8Array): Map<string, Uint8Array> {
 const ZIP_LOCAL_SIG = 0x04034b50
 const ZIP_CENTRAL_SIG = 0x02014b50
 const ZIP_EOCD_SIG = 0x06054b50
+const ZIP_ZIP64_LOCATOR_SIG = 0x07064b50
+const ZIP_EXTRA_ZIP64 = 0x0001
 const ZIP_FLAG_ENCRYPTED = 1
-
 function isZipSignature(bytes: Uint8Array): boolean {
   if (bytes.byteLength < 4) return false
   for (let i = 0; i < ZIP_SIGNATURE.length; i++) {
@@ -380,37 +408,91 @@ function listZipEntries(bytes: Uint8Array): ZipEntry[] {
     }
   }
   if (eocd < 0) throw new Error('zip: end of central directory not found')
+  const diskNum = view.getUint16(eocd + 4, true)
+  const cdDisk = view.getUint16(eocd + 6, true)
+  const diskCount = view.getUint16(eocd + 8, true)
   const count = view.getUint16(eocd + 10, true)
   const cdSize = view.getUint32(eocd + 12, true)
   const cdOffset = view.getUint32(eocd + 16, true)
-  if (cdOffset > bytes.byteLength || cdSize > bytes.byteLength - cdOffset) {
+  const eocdCommentLen = view.getUint16(eocd + 20, true)
+  if (
+    diskNum !== 0 ||
+    cdDisk !== 0 ||
+    diskCount !== count ||
+    count === 0xffff ||
+    cdSize === 0xffffffff ||
+    cdOffset === 0xffffffff ||
+    (eocd >= 20 && view.getUint32(eocd - 20, true) === ZIP_ZIP64_LOCATOR_SIG)
+  ) {
+    throw new Error('zip: unsupported multi-disk or ZIP64 archive')
+  }
+  if (
+    cdOffset > eocd ||
+    cdSize > eocd - cdOffset ||
+    eocd + 22 + eocdCommentLen > bytes.byteLength
+  ) {
     throw new Error('zip: corrupt central directory')
   }
+  const cdEnd = cdOffset + cdSize
   const entries: ZipEntry[] = []
   let pos = cdOffset
   const decoder = new TextDecoder('utf-8')
-  for (let i = 0; i < count; i++) {
-    if (pos + 46 > cdOffset + cdSize || view.getUint32(pos, true) !== ZIP_CENTRAL_SIG) {
+  while (pos < cdEnd) {
+    if (pos + 46 > cdEnd || view.getUint32(pos, true) !== ZIP_CENTRAL_SIG) {
       throw new Error('zip: corrupt central directory')
     }
     if ((view.getUint16(pos + 8, true) & ZIP_FLAG_ENCRYPTED) !== 0) {
       throw new Error('zip: encrypted entries are not supported')
     }
+    const method = view.getUint16(pos + 10, true)
+    const compressedSize = view.getUint32(pos + 20, true)
+    const size = view.getUint32(pos + 24, true)
     const nameLen = view.getUint16(pos + 28, true)
     const extraLen = view.getUint16(pos + 30, true)
     const commentLen = view.getUint16(pos + 32, true)
+    const diskStart = view.getUint16(pos + 34, true)
+    const localOffset = view.getUint32(pos + 42, true)
+    if (
+      diskStart !== 0 ||
+      compressedSize === 0xffffffff ||
+      size === 0xffffffff ||
+      localOffset === 0xffffffff
+    ) {
+      throw new Error('zip: unsupported multi-disk or ZIP64 entry')
+    }
     const nameStart = pos + 46
-    if (nameStart + nameLen > cdOffset + cdSize) {
+    const extraStart = nameStart + nameLen
+    const extraEnd = extraStart + extraLen
+    const recordEnd = extraEnd + commentLen
+    if (recordEnd > cdEnd) {
       throw new Error('zip: corrupt central directory')
+    }
+    let extraPos = extraStart
+    while (extraPos < extraEnd) {
+      if (extraPos + 4 > extraEnd) {
+        throw new Error('zip: corrupt central directory extra field')
+      }
+      const headerId = view.getUint16(extraPos, true)
+      const dataSize = view.getUint16(extraPos + 2, true)
+      if (headerId === ZIP_EXTRA_ZIP64) {
+        throw new Error('zip: ZIP64 extra field is not supported')
+      }
+      if (extraPos + 4 + dataSize > extraEnd) {
+        throw new Error('zip: corrupt central directory extra field')
+      }
+      extraPos += 4 + dataSize
     }
     entries.push({
       name: decoder.decode(bytes.subarray(nameStart, nameStart + nameLen)).replace(/\\/g, '/'),
-      method: view.getUint16(pos + 10, true),
-      compressedSize: view.getUint32(pos + 20, true),
-      size: view.getUint32(pos + 24, true),
-      localOffset: view.getUint32(pos + 42, true),
+      method,
+      compressedSize,
+      size,
+      localOffset,
     })
-    pos = nameStart + nameLen + extraLen + commentLen
+    pos = recordEnd
+  }
+  if (pos !== cdEnd || entries.length !== count) {
+    throw new Error('zip: corrupt central directory')
   }
   return entries
 }
@@ -423,6 +505,9 @@ function hasUsableZipPart(bytes: Uint8Array, entries: readonly ZipEntry[], name:
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   return entries.some((entry) => {
     if (entry.name !== name || entry.size === 0 || (entry.method !== 0 && entry.method !== 8)) {
+      return false
+    }
+    if (entry.method === 0 && entry.compressedSize !== entry.size) {
       return false
     }
     if (
@@ -438,6 +523,52 @@ function hasUsableZipPart(bytes: Uint8Array, entries: readonly ZipEntry[], name:
       view.getUint16(entry.localOffset + 28, true)
     return dataStart <= bytes.byteLength && entry.compressedSize <= bytes.byteLength - dataStart
   })
+}
+/** Largest uncompressed part size allowed in an ODF ZIP package (64 MiB). */
+export const MAX_ODF_PART_BYTES = 64 * 1024 * 1024
+
+/**
+ * Read and decompress one entry from an in-memory ZIP archive after checking its
+ * declared uncompressed size against `MAX_ODF_PART_BYTES`.
+ */
+function readZipEntryBytes(bytes: Uint8Array, entry: ZipEntry): Uint8Array | null {
+  if (entry.size > MAX_ODF_PART_BYTES || entry.compressedSize > MAX_ODF_PART_BYTES) return null
+  if (entry.method !== 0 && entry.method !== 8) return null
+  if (entry.method === 0 && entry.compressedSize !== entry.size) return null
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  if (
+    entry.localOffset + 30 > bytes.byteLength ||
+    view.getUint32(entry.localOffset, true) !== ZIP_LOCAL_SIG
+  ) {
+    return null
+  }
+  if ((view.getUint16(entry.localOffset + 6, true) & ZIP_FLAG_ENCRYPTED) !== 0) {
+    return null
+  }
+  if (view.getUint16(entry.localOffset + 8, true) !== entry.method) {
+    return null
+  }
+  const dataStart =
+    entry.localOffset +
+    30 +
+    view.getUint16(entry.localOffset + 26, true) +
+    view.getUint16(entry.localOffset + 28, true)
+  if (dataStart > bytes.byteLength || entry.compressedSize > bytes.byteLength - dataStart) {
+    return null
+  }
+  const raw = bytes.subarray(dataStart, dataStart + entry.compressedSize)
+  if (entry.method === 0) {
+    return raw.byteLength === entry.size && raw.byteLength <= MAX_ODF_PART_BYTES ? raw : null
+  }
+  try {
+    const inflated = new Uint8Array(inflateRawSync(raw, { maxOutputLength: MAX_ODF_PART_BYTES }))
+    if (inflated.byteLength !== entry.size || inflated.byteLength > MAX_ODF_PART_BYTES) {
+      return null
+    }
+    return inflated
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -605,6 +736,227 @@ function checkPptStreams(streams: Map<string, Uint8Array>): void {
   }
 }
 
+const ODF_TARGET_FOR_MEDIA_TYPE: Readonly<Record<string, LegacyTargetFormat>> = {
+  'application/vnd.oasis.opendocument.text': 'docx',
+  'application/vnd.oasis.opendocument.text-template': 'docx',
+  'application/vnd.oasis.opendocument.spreadsheet': 'xlsx',
+  'application/vnd.oasis.opendocument.spreadsheet-template': 'xlsx',
+  'application/vnd.oasis.opendocument.presentation': 'pptx',
+  'application/vnd.oasis.opendocument.presentation-template': 'pptx',
+}
+
+function matchesOdfFamily(mediaType: string, expectedTarget: LegacyTargetFormat): boolean {
+  return (
+    Object.hasOwn(ODF_TARGET_FOR_MEDIA_TYPE, mediaType) &&
+    ODF_TARGET_FOR_MEDIA_TYPE[mediaType] === expectedTarget
+  )
+}
+
+function decodeOdfManifestXml(bytes: Uint8Array): string | null {
+  try {
+    let encoding: 'utf-8' | 'utf-16le' | 'utf-16be' = 'utf-8'
+    if (
+      bytes.byteLength >= 4 &&
+      ((bytes[0] === 0x00 && bytes[1] === 0x00 && bytes[2] === 0xfe && bytes[3] === 0xff) ||
+        (bytes[0] === 0xff && bytes[1] === 0xfe && bytes[2] === 0x00 && bytes[3] === 0x00))
+    ) {
+      return null
+    }
+    if (
+      bytes.byteLength >= 2 &&
+      ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0x3c && bytes[1] === 0x00))
+    ) {
+      if (bytes.byteLength % 2 !== 0) return null
+      encoding = 'utf-16le'
+    } else if (
+      bytes.byteLength >= 2 &&
+      ((bytes[0] === 0xfe && bytes[1] === 0xff) || (bytes[0] === 0x00 && bytes[1] === 0x3c))
+    ) {
+      if (bytes.byteLength % 2 !== 0) return null
+      encoding = 'utf-16be'
+    }
+    const decoded = new TextDecoder(encoding, { fatal: true }).decode(bytes)
+    if (decoded.includes('\0')) return null
+    const declMatch = /^\s*<\?xml\b[^>]*?\bencoding\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(decoded)
+    if (declMatch) {
+      const declared = (declMatch[1] ?? declMatch[2] ?? '').trim().toLowerCase()
+      if (encoding === 'utf-8') {
+        if (
+          declared !== 'utf-8' &&
+          declared !== 'utf8' &&
+          declared !== 'us-ascii' &&
+          declared !== 'ascii'
+        ) {
+          return null
+        }
+      } else if (
+        declared !== 'utf-16' &&
+        declared !== 'utf16' &&
+        declared !== 'utf-16le' &&
+        declared !== 'utf-16be'
+      ) {
+        return null
+      }
+    }
+    return decoded
+  } catch {
+    return null
+  }
+}
+
+function extractManifestRootMediaType(manifestXml: string): string | null {
+  const tagRe = /<\s*(?:[A-Za-z0-9_-]+:)?file-entry\b([^>]*?)>/g
+  let match: RegExpExecArray | null
+  while ((match = tagRe.exec(manifestXml)) !== null) {
+    const attrs = match[1] ?? ''
+    if (!/(?:^|\s)(?:[A-Za-z0-9_-]+:)?full-path\s*=\s*(?:"\/"|'\/')(?=\s|\/|$)/.test(attrs)) {
+      continue
+    }
+    const mediaMatch = /(?:^|\s)(?:[A-Za-z0-9_-]+:)?media-type\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(
+      attrs,
+    )
+    if (mediaMatch) {
+      return (mediaMatch[1] ?? mediaMatch[2] ?? '').trim()
+    }
+  }
+  return null
+}
+
+/**
+ * Pure TypeScript preflight check on OpenDocument (`.odt`/`.ott`/`.ods`/`.ots`/`.odp`/`.otp`)
+ * bytes before spawning `soffice.bin`:
+ * - Rejects empty or non-ZIP files as `corrupt`.
+ * - Rejects any ZIP entry whose central directory declares an uncompressed size > 64 MiB as `corrupt`.
+ * - Reads `META-INF/manifest.xml` (or `mimetype`) via the ZIP reader, detects
+ *   `manifest:encryption-data` as `encrypted`, and requires `content.xml` or `styles.xml`.
+ * - Detects OOXML files misnamed with an ODF extension as `ooxml_misnamed`.
+ */
+export function preflightOdfBytes(
+  bytes: Uint8Array,
+  sourceFormat: OdfSourceFormat,
+): LegacyPreflightResult {
+  if (bytes.byteLength === 0) {
+    throw new LegacyConvertError('corrupt', 'File is empty (0 bytes)', { format: sourceFormat })
+  }
+  if (!isZipSignature(bytes)) {
+    throw new LegacyConvertError('corrupt', `File is not a valid OpenDocument ZIP archive`, {
+      format: sourceFormat,
+    })
+  }
+  const detectedOoxml = detectOoxmlKindFromZipBytes(bytes)
+  if (detectedOoxml) {
+    return {
+      kind: 'ooxml_misnamed',
+      sourceFormat,
+      detectedFormat: detectedOoxml,
+    }
+  }
+  let entries: ZipEntry[]
+  try {
+    entries = listZipEntries(bytes)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (/encrypted/i.test(msg)) {
+      throw new LegacyConvertError(
+        'encrypted',
+        `Password-protected OpenDocument (.${sourceFormat})`,
+        {
+          format: sourceFormat,
+          cause: err,
+        },
+      )
+    }
+    throw new LegacyConvertError('corrupt', `Invalid OpenDocument ZIP container: ${msg}`, {
+      format: sourceFormat,
+      cause: err,
+    })
+  }
+  for (const entry of entries) {
+    if (entry.method === 0 && entry.compressedSize !== entry.size) {
+      throw new LegacyConvertError(
+        'corrupt',
+        `OpenDocument stored part "${entry.name}" has mismatched compressed and uncompressed sizes`,
+        { format: sourceFormat },
+      )
+    }
+    if (entry.size > MAX_ODF_PART_BYTES) {
+      throw new LegacyConvertError(
+        'corrupt',
+        `OpenDocument part "${entry.name}" exceeds the ${MAX_ODF_PART_BYTES / (1024 * 1024)} MiB size limit`,
+        { format: sourceFormat },
+      )
+    }
+  }
+  const manifestEntry = entries.find((e) => e.name === 'META-INF/manifest.xml')
+  const mimetypeEntry = entries.find((e) => e.name === 'mimetype')
+  if (!manifestEntry && !mimetypeEntry) {
+    throw new LegacyConvertError(
+      'corrupt',
+      'OpenDocument archive is missing META-INF/manifest.xml and mimetype',
+      { format: sourceFormat },
+    )
+  }
+  let manifestRootMediaType: string | null = null
+  if (manifestEntry) {
+    const manifestBytes = readZipEntryBytes(bytes, manifestEntry)
+    const manifestXml = manifestBytes ? decodeOdfManifestXml(manifestBytes) : null
+    if (!manifestXml) {
+      throw new LegacyConvertError('corrupt', 'OpenDocument META-INF/manifest.xml is unreadable', {
+        format: sourceFormat,
+      })
+    }
+    if (/<\s*(?:[A-Za-z0-9_-]+:)?encryption-data\b/.test(manifestXml)) {
+      throw new LegacyConvertError(
+        'encrypted',
+        `Password-protected OpenDocument (.${sourceFormat})`,
+        { format: sourceFormat },
+      )
+    }
+    manifestRootMediaType = extractManifestRootMediaType(manifestXml)
+  }
+  let declaredMediaType: string | null
+  if (mimetypeEntry) {
+    const mimetypeBytes = readZipEntryBytes(bytes, mimetypeEntry)
+    if (!mimetypeBytes) {
+      throw new LegacyConvertError('corrupt', 'OpenDocument mimetype entry is unreadable', {
+        format: sourceFormat,
+      })
+    }
+    declaredMediaType = new TextDecoder('utf-8').decode(mimetypeBytes).trim()
+  } else {
+    declaredMediaType = manifestRootMediaType
+  }
+  const expectedTarget = LEGACY_TARGET_FOR_SOURCE[sourceFormat]
+  if (
+    !declaredMediaType ||
+    !matchesOdfFamily(declaredMediaType, expectedTarget) ||
+    (manifestRootMediaType !== null &&
+      manifestRootMediaType.length > 0 &&
+      !matchesOdfFamily(manifestRootMediaType, expectedTarget))
+  ) {
+    throw new LegacyConvertError(
+      'corrupt',
+      `OpenDocument media type does not match .${sourceFormat}`,
+      { format: sourceFormat },
+    )
+  }
+  if (
+    !hasUsableZipPart(bytes, entries, 'content.xml') &&
+    !hasUsableZipPart(bytes, entries, 'styles.xml')
+  ) {
+    throw new LegacyConvertError(
+      'corrupt',
+      'OpenDocument archive is missing content.xml and styles.xml',
+      { format: sourceFormat },
+    )
+  }
+  return {
+    kind: 'legacy',
+    sourceFormat,
+    targetFormat: LEGACY_TARGET_FOR_SOURCE[sourceFormat],
+  }
+}
+
 /**
  * Pure TypeScript preflight check on legacy `.doc`/`.xls`/`.ppt` bytes before
  * spawning `soffice.bin`.
@@ -620,10 +972,12 @@ export function preflightLegacyBytes(
   bytes: Uint8Array,
   sourceFormat: LegacySourceFormat,
 ): LegacyPreflightResult {
+  if (isOdfFormat(sourceFormat)) {
+    return preflightOdfBytes(bytes, sourceFormat)
+  }
   if (bytes.byteLength === 0) {
     throw new LegacyConvertError('corrupt', 'File is empty (0 bytes)', { format: sourceFormat })
   }
-
   if (isZipSignature(bytes)) {
     const detected = detectOoxmlKindFromZipBytes(bytes)
     if (detected) {
