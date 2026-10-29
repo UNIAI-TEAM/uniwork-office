@@ -265,6 +265,7 @@ import {
 } from './text-edit-preview'
 import { samplePaperColor } from './paper-sample'
 import type { LocalTextEdit, LocalTextInsert, TextDraft } from './text-edit-preview'
+import { buildOcrBakeInserts, ocrBakeForSave } from './ocr-bake'
 import { planEditOps, reduceBucket } from './edit-ops'
 import type { Bucket, Op, OpContext, PlanResult } from './edit-ops'
 import { rectsNear } from './edit-state'
@@ -1027,6 +1028,20 @@ export default function App() {
   docFontsRef.current = docFonts
   /** OCR results for scanned pages, keyed by original page index (reset per doc) */
   const [ocrPages, setOcrPages] = useState<Map<number, OcrPageData>>(new Map())
+  /** the auto-OCR's words as white text inserts: baked into every save while the
+      recognition data is in the session (the post-save reload finds a text layer,
+      so the pass never re-runs and the bake never doubles) */
+  const ocrBakeAll = useMemo(() => {
+    const out: LocalTextInsert[] = []
+    for (const [origIdx, data] of ocrPages) {
+      const geom = pageGeomRef.current(origIdx)
+      if (!geom) continue
+      for (const input of buildOcrBakeInserts(origIdx, data.words, geom)) {
+        out.push({ id: `ocr-bake-${origIdx}-${out.length}`, input })
+      }
+    }
+    return out
+  }, [ocrPages])
   /** One text extraction per loaded document, shared by search, paragraph boxes,
       the AI tools and the auto-OCR pass */
   const [searchIndexCache] = useState(createSearchIndexCache)
@@ -1570,6 +1585,12 @@ export default function App() {
   const viewOnly = !cap('edit')
   /** View-only UniWork documents reuse the same read-only mode (edit tools and Save off) */
   const readOnly = viewOnly || encryptedReadOnly || uniwork.readOnly
+  /** The bake a save writes: never for a document the user cannot edit (view-only, encrypted,
+      bound read-only), which would otherwise gain a text layer through a plain Save */
+  const ocrBakeInserts = useMemo(
+    () => ocrBakeForSave(ocrBakeAll, { readOnly, drainedAfterBake: false }),
+    [ocrBakeAll, readOnly],
+  )
 
   useEffect(() => {
     if (readOnly && markupTool) setMarkupTool(null)
@@ -2062,6 +2083,11 @@ export default function App() {
     metadata !== null ||
     recovered ||
     (pendingOutline?.edited ?? false)
+  // The pending OCR bake deliberately stays out of dirty: a scan the user only
+  // opened to read must not show the modified marker, prompt on close or feed
+  // the save-in-flight plumbing. The bake still rides the save request
+  // (anythingToSave keeps it), so an explicit ⌘S writes it — a user action —
+  // and everything the reader does afterwards sees a text layer.
   const ordinaryDirty = hasOrdinaryDirty({
     markups,
     annotDeletes,
@@ -3896,8 +3922,15 @@ export default function App() {
   }
 
   const noticeSkippedTextInserts = (skipped: TextInsertFailure[]) => {
-    const pages = [...new Set(skipped.map((s) => s.pageIndex + 1))].sort((a, b) => a - b).join(', ')
-    showNotice(`${t('textInsertSkipped', { pages })}${skipDetail(skipped)}`)
+    // The bake layer's inserts ride the tail of the same textInserts array; a
+    // glyph no face covers there is OCR noise on a page the reader never
+    // edited, and nagging about it on every save is worse than the silence.
+    // An insert the reader typed is still worth its toast.
+    const userCount = textInsertsRef.current.length
+    const mine = skipped.filter((s) => s.editIndex < userCount)
+    if (mine.length === 0) return
+    const pages = [...new Set(mine.map((s) => s.pageIndex + 1))].sort((a, b) => a - b).join(', ')
+    showNotice(`${t('textInsertSkipped', { pages })}${skipDetail(mine)}`)
   }
 
   /** Pending edits in SavePdfRequest form; shared by in-place Save and Save As.
@@ -3909,13 +3942,19 @@ export default function App() {
     noteFlush?: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] },
     extraDrawings: LocalDrawing[] = [],
     pending?: Pick<PendingLists, 'markups' | 'annotDeletes' | 'textInserts' | 'imageEdits'>,
+    bake: readonly LocalTextInsert[] = ocrBakeInserts,
   ) =>
-    withoutFileNoteWrites(rawEditsPayload(edits, noteFlush, extraDrawings, pending), serverComments)
+    withoutFileNoteWrites(
+      rawEditsPayload(edits, noteFlush, extraDrawings, pending, bake),
+      serverComments,
+    )
   const rawEditsPayload = (
     edits: LocalTextEdit[],
     noteFlush: { drawings: LocalDrawing[]; noteEdits: LocalNoteEdit[] } | undefined,
     extraDrawings: LocalDrawing[],
-    pending?: Pick<PendingLists, 'markups' | 'annotDeletes' | 'textInserts' | 'imageEdits'>,
+    pending:
+      Pick<PendingLists, 'markups' | 'annotDeletes' | 'textInserts' | 'imageEdits'> | undefined,
+    bake: readonly LocalTextInsert[],
   ) => ({
     markups: (pending?.markups ?? markups).map(({ id: _id, ...rest }) => rest),
     annotDeletes: (pending?.annotDeletes ?? annotDeletes).map((d): AnnotDeleteInput => ({
@@ -3935,7 +3974,10 @@ export default function App() {
     })),
     drawings: [...(noteFlush?.drawings ?? drawings), ...extraDrawings].map((d) => d.input),
     textEdits: edits.map((e) => e.input),
-    textInserts: (pending?.textInserts ?? textInserts).map((insert) => insert.input),
+    textInserts: [
+      ...(pending?.textInserts ?? textInserts).map((insert) => insert.input),
+      ...bake.map((insert) => insert.input),
+    ],
     imageEdits: (pending?.imageEdits ?? imageEdits).map((e) => e.input),
     staticFormFills,
     stamps: stampCfg ? renderStamps(stampCfg, visList) : [],
@@ -3979,6 +4021,9 @@ export default function App() {
       only: it covers the id-carrying lists (not rotations, deleted pages, order, metadata, stamp or
       form edits); the primary guard is draining from the render after `saveSettled` */
   const lastWrittenRef = useRef<PendingLists | null>(null)
+  /** Whether that save also wrote the OCR bake: the recognition data can outlive its reload for a
+      render, so a drained save must not bake the same layer a second time */
+  const lastBakedRef = useRef(false)
   /** Bumped each time a save settles, after `saveInFlightRef` is cleared and the post-save
       subtractions are queued: the drain effect runs from the render that carries both */
   const [saveSettled, setSaveSettled] = useState(0)
@@ -4032,11 +4077,16 @@ export default function App() {
       textInserts: written ? dropWrittenPending(textInserts, written.textInserts) : textInserts,
       imageEdits: written ? dropWrittenPending(imageEdits, written.imageEdits) : imageEdits,
     }
+    const bake = ocrBakeForSave(ocrBakeInserts, {
+      readOnly: false, // ocrBakeInserts is already empty for a document the user cannot edit
+      drainedAfterBake: written !== null && lastBakedRef.current,
+    })
     const anythingToSave =
       (written ? hasOrdinaryDirty(toWrite) : ordinaryDirty) ||
       edits !== textEdits ||
       noteFlush.drawings !== drawings ||
-      noteFlush.noteEdits !== noteEdits
+      noteFlush.noteEdits !== noteEdits ||
+      bake.length > 0
     // A UniWork-bound (editable) document saves on every explicit Save, even when
     // clean, so a retry after a failed upload still reaches UniWork
     const forceBound = forcesBoundSave({
@@ -4079,11 +4129,13 @@ export default function App() {
           { drawings: toWrite.drawings, noteEdits: toWrite.noteEdits },
           [],
           toWrite,
+          bake,
         ),
         origin,
       })
       if (!result.ok) {
         lastWrittenRef.current = null
+        lastBakedRef.current = false
         // main declining an autosave tick that raced the document's UniWork state is
         // not a failure the user can act on
         if (!(origin === 'auto' && isUniworkRefusal(result.error))) opFailed(result.error)
@@ -4098,6 +4150,7 @@ export default function App() {
         textInserts,
         imageEdits,
       }
+      lastBakedRef.current = bake.length > 0
       // the restored draft is the file's new version now
       setRecovered(false)
       // G8-15: the server anchors follow this save's page layout once UniWork reports the version
