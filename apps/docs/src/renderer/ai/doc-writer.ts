@@ -1,3 +1,4 @@
+import { writerInput, type WriterCall } from '@genoffice/agent-core'
 import type { Editor } from '@tiptap/core'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import type { Transaction } from '@tiptap/pm/state'
@@ -58,7 +59,7 @@ const WRITER_SYSTEM = [
 export function buildDocWriterRequest(
   spec: DocWriteSpec,
   langDirective: string,
-): { system: string; user: string } {
+): { system: string; user: string; writer: WriterCall } {
   const context = spec.context?.trim()
     ? `\n\n## Reference material (all names, figures and facts come from here)\n${spec.context.slice(0, CONTEXT_CAP)}`
     : ''
@@ -68,6 +69,16 @@ export function buildDocWriterRequest(
   return {
     system: WRITER_SYSTEM + langDirective,
     user: `## Plan\n${spec.title ? `Title: ${spec.title}\n` : ''}${spec.plan.slice(0, 6000)}${context}${instruction}\n\nWrite the content now.`,
+    // UniWork AI: the same inputs, cut at the server's field caps
+    writer: {
+      kind: 'docs.write_document',
+      input: writerInput({
+        plan: spec.plan.slice(0, 6000),
+        title: spec.title?.slice(0, 300),
+        context: spec.context?.slice(0, CONTEXT_CAP),
+        instruction: spec.instruction.slice(0, 2000),
+      }),
+    },
   }
 }
 

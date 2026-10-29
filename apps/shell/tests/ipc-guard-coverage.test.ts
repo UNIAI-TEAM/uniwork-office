@@ -402,7 +402,7 @@ const COMPOSED_IN_INDEX = REGISTRARS.filter((name) => name !== 'registerUniworkC
  */
 const REGISTRAR_FILES: Record<string, string> = {
   'apps/shell/src/main/index.ts':
-    'uniwork-doc:bar-inset, the home channels, tabs:*, app:open-dropped-files and ai:open-model-settings, registered on the guarded object',
+    'uniwork-doc:bar-inset, the home channels, tabs:*, app:open-dropped-files, ai:open-model-settings and ai:open-skills-settings, registered on the guarded object',
   'apps/shell/src/main/uniwork-docs/wiring.ts': 'createUniworkDocs',
   'apps/shell/src/main/uniwork-docs/comments-wiring.ts':
     'createUniworkComments (in createUniworkDocs)',
@@ -431,6 +431,7 @@ const REGISTRAR_FILES: Record<string, string> = {
     'registerUniworkCloudStatusIpc (in registerAccountIpc)',
   'apps/shell/src/main/uniwork-ai-flag.ts': 'registerUniworkAiFlagIpc',
   'apps/shell/src/main/ai-run-registry.ts': 'registerAiRunIpc',
+  'apps/shell/src/main/user-skills-ipc.ts': 'registerUserSkillsIpc',
   'apps/shell/src/main/integrations-ipc.ts': 'registerIntegrationsIpc',
   'apps/shell/src/main/update-window.ts': 'registerUpdateIpc',
   'apps/shell/src/main/pdf-password-dialog.ts': 'registerPdfPasswordIpc',
@@ -1343,8 +1344,15 @@ function expectedPolicy(channel: string): ExpectedPolicy | null {
   if (channel.startsWith('tabs:') || channel.startsWith('integrations:')) return 'shell'
   // the shell preload and the six editor preloads install the drop bridge
   if (channel === 'app:open-dropped-files') return 'shell-or-editor'
-  // only the six editor preloads call it; the shell never does
-  if (channel === 'ai:open-model-settings') return 'editor'
+  // only the editor preloads call them; the shell never does
+  if (
+    channel === 'ai:open-model-settings' ||
+    channel === 'ai:open-skills-settings' ||
+    channel === 'ai:skills-list' ||
+    channel === 'ai:skill-text'
+  ) {
+    return 'editor'
+  }
   // Settings > About (shell) opens the update dialog, and reads the state the update window reads too
   if (channel === 'update:open-for-update') return 'shell'
   if (channel === 'update:get-state') return 'shell-or-own-window:update'
@@ -1759,9 +1767,9 @@ describe('every channel of the remaining shell families is accounted for and gua
       neither: FAMILY_VALUES.filter((c) => !registered.has(c) && !FAMILY_PUSH_ONLY.includes(c)),
       both: FAMILY_PUSH_ONLY.filter((c) => registered.has(c)),
     }).toEqual({ neither: [], both: [] })
-    // tabs 16, integrations 6, update 6, pdf-password 3, the drop and the model settings opener
-    expect(FAMILY_REGISTERED).toHaveLength(33)
-    expect(registered.size).toBe(33)
+    // tabs 16, integrations 13, update 6, pdf-password 3, the drop and the model settings opener
+    expect(FAMILY_REGISTERED).toHaveLength(40)
+    expect(registered.size).toBe(40)
   })
 
   it('is registered once', () => {
@@ -1781,7 +1789,7 @@ describe('every channel of the remaining shell families is accounted for and gua
     expect(wrong).toEqual([])
   })
 
-  it('is registered on no raw ipcMain: none of the 33 channels stays unguarded', () => {
+  it('is registered on no raw ipcMain: none of the 40 channels stays unguarded', () => {
     expect(rawFamilyRegistrations(sources)).toEqual([])
   })
 
@@ -1822,13 +1830,16 @@ describe('policy of every channel of the remaining shell families', () => {
 
   it('INTEGRATIONS_CHANNELS: shell', () => {
     const values = policyOf(INTEGRATIONS_CHANNELS)
-    expect(values).toHaveLength(6)
+    expect(values).toHaveLength(13)
     for (const channel of values) expect(policyForChannel(channel), channel).toBe('shell')
   })
 
-  it('app:open-dropped-files is shell or editor, ai:open-model-settings is editor', () => {
+  it('app:open-dropped-files is shell or editor, ai:open-model-settings and the ai skills channels are editor', () => {
     expect(policyForChannel(DROP_CHANNEL)).toBe('shell-or-editor')
     expect(policyForChannel(MODEL_SETTINGS_CHANNEL)).toBe('editor')
+    expect(policyForChannel('ai:open-skills-settings')).toBe('editor')
+    expect(policyForChannel('ai:skills-list')).toBe('editor')
+    expect(policyForChannel('ai:skill-text')).toBe('editor')
   })
 
   it('update:*: the shell opens it and reads its state, only the update window drives it', () => {
@@ -1884,6 +1895,9 @@ describe('the scan catches a raw registration of the remaining shell families', 
     ['the drop constant', 'ipcMain.on(DROP_OPEN_CHANNEL, f)'],
     ['the drop literal', "ipcMain.on('app:open-dropped-files', f)"],
     ['the model settings opener', "ipcMain.handle('ai:open-model-settings', f)"],
+    ['the skills settings opener', "ipcMain.handle('ai:open-skills-settings', f)"],
+    ['the skills list handler', "ipcMain.handle('ai:skills-list', f)"],
+    ['the skill text handler', "ipcMain.handle('ai:skill-text', f)"],
     ['an update constant', 'ipcMain.handle(UPDATE_CHANNELS.install, f)'],
     ['an update literal', "ipcMain.handle('update:open-for-update', f)"],
     ['a pdf-password constant', 'ipcMain.handle(PDF_PASSWORD_CHANNELS.submit, f)'],

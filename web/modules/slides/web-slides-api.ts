@@ -23,6 +23,7 @@
  */
 import { createBlankPptx, savePptx, type OpenedPptx } from '@genoffice/pptx-engine'
 import { runTxn } from '@genoffice/pptx-ops'
+import { buildPagePptx, parsePageSpec } from '@genoffice/pipelines/slides/page-spec'
 import type { AiPanelPrefs } from '@genoffice/ui'
 import { readPendingTextEdit } from '../../../apps/slides/src/renderer/pending-text-edit'
 import { base64ToBytes, bytesToBase64 } from '../../../apps/slides/src/session/bytes'
@@ -31,13 +32,17 @@ import {
   buildAllRenderSlides,
   callSessionHandler,
   configureSessionPlatform,
+  createGeneratedPageStore,
   ELEMENTS_MARKER,
+  getFontMetrics,
+  landGeneratedPagesInSession,
   openResultFor,
   openSessionFromBytes,
   resetFontMetricsCache,
   sessionDirty,
   sessions,
   SLIDE_MARKER,
+  type GeneratedPageStore,
   type HandlerContext,
   type HostIO,
   type SessionChannel,
@@ -203,6 +208,31 @@ function withExt(name: string, ext: string): string {
 const noop = (): void => {}
 const disposer = (): (() => void) => noop
 
+/** slides:local-page-generate of the frame: the page's one-slide pptx is kept in `store` */
+async function generatePage(
+  specJson: string,
+  store: GeneratedPageStore,
+): Promise<{ ok: boolean; marker?: string; error?: string; imageFailures?: string[] }> {
+  const parsed = parsePageSpec(specJson)
+  if (!parsed.ok) return { ok: false, error: parsed.error }
+  try {
+    const { bytes, imageFailures } = await buildPagePptx(parsed.spec, {
+      fontMetrics: getFontMetrics(),
+      // The frame fetches no picture (plan 5 decision 7): its CSP has connect-src 'self' (no
+      // remote origin, no data:/blob:) and the spec admits only http(s) URLs, so every picture
+      // lands in imageFailures and the page lands without it.
+      fetchImage: async () => null,
+    })
+    return {
+      ok: true,
+      marker: store.put(bytes),
+      ...(imageFailures.length ? { imageFailures } : {}),
+    }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export function createWebSlidesApi(
   ctx: { client: ModuleBridgePort; capabilities: Record<string, unknown> },
   opts: WebSlidesOptions = {},
@@ -213,6 +243,8 @@ export function createWebSlidesApi(
   const refusedIds = new Set<string>()
   const download = opts.download ?? downloadBlob
   const editorStartMs = opts.editorStartMs ?? TIMEOUTS.editorStart
+  /** AI-generated pages waiting to land (the desktop keeps temp files) */
+  const generatedPages = createGeneratedPageStore()
 
   const historyEvents = listeners<{ canUndo: boolean; canRedo: boolean }>()
   const deckEvents = listeners<DeckChange>()
@@ -1355,8 +1387,22 @@ export function createWebSlidesApi(
     cloudGenStatus: async () => ({ enabled: false }),
     cloudPageCancel: async () => {},
     cloudGeneratePage: async () => ({ ok: false, error: aiUnavailableMessage('slide generation') }),
-    localGeneratePage: async () => ({ ok: false, error: aiUnavailableMessage('slide generation') }),
-    landGeneratedPages: async () => ({ error: aiUnavailableMessage('slide generation') }),
+    // generate_deck / regenerate_slide: pages land in the open document, never drafted
+    localGeneratePage: (op) => generatePage(String(op?.specJson ?? ''), generatedPages),
+    landGeneratedPages: async (pageMarkers, fitWidthPx, mode, atIndex) => {
+      if (state.fatal !== null) return { error: state.fatal.message || text('webFatalTitle') }
+      if (viewOnly()) return { error: text('webReadOnly') }
+      return clone(
+        await landGeneratedPagesInSession(
+          WEB_CLIENT_ID,
+          pageMarkers,
+          generatedPages,
+          fitWidthPx,
+          mode,
+          atIndex,
+        ),
+      )
+    },
     consumeAiPreset: async () => null,
     onAiPreset: disposer,
     saveStyleSidecar: async () => ({ ok: false }),

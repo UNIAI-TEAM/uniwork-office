@@ -293,4 +293,39 @@ describe('Settings → Integrations', () => {
     expect(buttonWithText('Integrations')!.querySelector('.set-nav-dot')).toBeNull()
     expect(onDue).toHaveBeenLastCalledWith(false)
   })
+
+  it('shows the shared .agents row and confirms its absolute target path before writing', async () => {
+    const status = baseStatus()
+    status.agents = [
+      {
+        id: 'claude-code',
+        label: 'Claude Code',
+        skillsDir: '/home/u/.claude/skills',
+        state: { status: 'missing', path: '/home/u/.claude/skills/genoffice/SKILL.md' },
+      },
+      {
+        id: 'agents',
+        label: '.agents (Codex / Cursor / Gemini CLI / Copilot / OpenCode / dsh …)',
+        skillsDir: '/home/u/.agents/skills',
+        state: { status: 'missing', path: '/home/u/.agents/skills/genoffice/SKILL.md' },
+      },
+    ]
+    const install = vi.fn(async () => ({
+      status: 'installed' as const,
+      path: '/home/u/.agents/skills/genoffice/SKILL.md',
+      installedVersion: '2.1.0',
+    }))
+    await openIntegrations({
+      status: async () => status,
+      installSkill: install,
+    })
+    const row = host.querySelector('[data-agent="agents"]')!
+    expect(row.textContent).toContain(
+      '.agents (Codex / Cursor / Gemini CLI / Copilot / OpenCode / dsh …)',
+    )
+    await click(buttonWithText('Install', row))
+    expect(row.textContent).toContain('Will write: /home/u/.agents/skills/genoffice/SKILL.md')
+    await click(buttonWithText('Confirm', row))
+    expect(install).toHaveBeenCalledWith({ agentId: 'agents' })
+  })
 })

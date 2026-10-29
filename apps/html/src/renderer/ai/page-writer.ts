@@ -1,4 +1,9 @@
-import { streamText, type AgentTransport } from '@genoffice/agent-core'
+import {
+  streamText,
+  writerInput,
+  type AgentTransport,
+  type WriterCall,
+} from '@genoffice/agent-core'
 import type { Brief } from '../document/brief'
 
 /**
@@ -64,21 +69,40 @@ const CONTENT_SYSTEM = [
 export function buildPageWriterRequest(
   spec: PageWriteSpec,
   langDirective: string,
-): { system: string; user: string } {
+): { system: string; user: string; writer: WriterCall } {
   const context = spec.context?.trim()
     ? `\n\n## Reference material (all names, figures and facts come from here)\n${spec.context.slice(0, CONTEXT_CAP)}`
     : ''
   const instruction = `\n\n## The user's request\n${spec.instruction.slice(0, 2000)}`
+  // UniWork AI: the same inputs, cut at the server's field caps
+  const shared = {
+    context: spec.context?.slice(0, CONTEXT_CAP),
+    instruction: spec.instruction.slice(0, 2000),
+  }
   if (spec.kind === 'design') {
     const { alternatives: _alternatives, ...brief } = spec.brief
+    const briefJson = JSON.stringify(brief, null, 1)
     return {
       system: DESIGN_SYSTEM + langDirective,
-      user: `## Confirmed brief\n${JSON.stringify(brief, null, 1)}${context}${instruction}\n\nWrite the page now.`,
+      user: `## Confirmed brief\n${briefJson}${context}${instruction}\n\nWrite the page now.`,
+      writer: {
+        kind: 'html.page',
+        input: writerInput({ mode: 'design', brief: briefJson.slice(0, 12000), ...shared }),
+      },
     }
   }
   return {
     system: CONTENT_SYSTEM + langDirective,
     user: `## Plan\n${spec.title ? `Title: ${spec.title}\n` : ''}${spec.plan.slice(0, 4000)}${context}${instruction}\n\nWrite the document now.`,
+    writer: {
+      kind: 'html.page',
+      input: writerInput({
+        mode: 'content',
+        plan: spec.plan.slice(0, 4000),
+        title: spec.title?.slice(0, 300),
+        ...shared,
+      }),
+    },
   }
 }
 
@@ -102,6 +126,8 @@ export interface StreamPageOptions {
   signal?: AbortSignal
   /** cumulative extracted HTML, throttled by the caller */
   onProgress?(html: string): void
+  /** the request as a UniWork AI writer (buildPageWriterRequest) */
+  writer?: WriterCall
 }
 
 export type StreamPageOutcome =
@@ -116,6 +142,7 @@ export async function streamPage(opts: StreamPageOptions): Promise<StreamPageOut
     system: opts.system,
     user: opts.user,
     signal: opts.signal,
+    writer: opts.writer,
     maxChars: PAGE_MAX_CHARS,
     extract: (raw) => {
       const { html, complete } = extractPageHtml(raw)

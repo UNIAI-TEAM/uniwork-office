@@ -2419,17 +2419,49 @@ describe('UniWork AI on the web (G6-05)', () => {
       expect(cb.sessionId).toBe('sess-1')
     })
 
-    it.each(['summary', 'one-shot'])(
-      'a %s request (not an agent turn) is refused with unsupported before any request',
-      async (purpose) => {
+    const WRITER = { kind: 'docs.write_document', input: { plan: 'intro, body' } }
+    it.each([
+      ['summary', {}],
+      ['one-shot', {}],
+      // a writer is only ever a one-shot: the loop's summary never names one
+      ['summary', { writer: WRITER }],
+    ])(
+      'a %s request (not an agent turn, no writer) is refused with unsupported before any request',
+      async (purpose, extra) => {
         const r = rig(async () => {})
-        await uniworkTurn(r.s, 'u1', { purpose })
+        await uniworkTurn(r.s, 'u1', { purpose, ...extra })
         expect(r.stream).not.toHaveBeenCalled()
         expect(r.calls).toHaveLength(0)
         expect(r.chunks).toHaveLength(1)
         expect(r.chunks[0]).toMatchObject({ type: 'error', uniworkCode: 'unsupported' })
       },
     )
+
+    it('a one-shot with a writer goes to the writer route in the open run, never the chat route', async () => {
+      uniworkConversations.update('sess-1', { conversationId: 'conv-w', runId: 'run-w' })
+      try {
+        const r = rig(async () => {}, {
+          answer: () =>
+            sseResponse([
+              `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: '<p>hi</p>' } }] })}\n\n`,
+              `data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`,
+              'data: [DONE]\n\n',
+            ]),
+        })
+        await uniworkTurn(r.s, 'u1', { purpose: 'one-shot', writer: WRITER })
+        expect(r.stream).not.toHaveBeenCalled()
+        expect(r.calls.map((c) => c.url)).toEqual([`${BASE}/uniwork/write`])
+        expect(header(r.calls[0]!, 'x-uniwork-ai-run')).toBe('run-w')
+        expect(header(r.calls[0]!, 'x-uniwork-ai-conversation')).toBe('conv-w')
+        expect(JSON.parse(String(r.calls[0]!.init.body))).toEqual({ ...WRITER, lang: 'en' })
+        expect(r.chunks).toEqual([
+          { requestId: 'u1', type: 'delta', text: '<p>hi</p>' },
+          { requestId: 'u1', type: 'done' },
+        ])
+      } finally {
+        uniworkConversations.forget('sess-1')
+      }
+    })
 
     it('passes the adapter notices and a turn reset on to the panel, in order', async () => {
       const r = rig(async (_t, _req, cb) => {

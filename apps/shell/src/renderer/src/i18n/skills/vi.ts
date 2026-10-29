@@ -1,0 +1,32 @@
+import type { zh } from './zh'
+
+export const vi = {
+  setSecSkills: 'Kỹ năng',
+  intgSkillsDesc:
+    'UniWork Office chỉ dùng kỹ năng trong thư mục kỹ năng của chính nó. Nhập từ thư mục hoặc zip sẽ sao chép toàn bộ kỹ năng vào; không có gì chạy khi nhập.',
+  intgSkillsEmpty: 'Chưa cài kỹ năng nào.',
+  intgSkillsImportFolder: 'Nhập thư mục…',
+  intgSkillsImportZip: 'Nhập gói kỹ năng (zip / .md)…',
+  intgSkillsImportFolderTitle: 'Chọn thư mục kỹ năng',
+  intgSkillsImportZipTitle: 'Chọn tệp zip hoặc .md kỹ năng',
+  intgSkillsImportDone: 'Đã nhập {name}',
+  intgSkillsImportFailed: 'Nhập thất bại: {reason}',
+  intgSkillsRemove: 'Gỡ bỏ',
+  intgSkillsRemoveConfirm: 'Gỡ kỹ năng "{name}"? Thư mục của nó sẽ bị xóa khỏi UniWork Office.',
+  intgSkillsRemoved: 'Đã gỡ {name}',
+  intgSkillsRead: 'Chi tiết',
+  intgSkillsMine: 'Kỹ năng của tôi',
+  intgSkillsRecommended: 'Đề xuất',
+  intgSkillsCatOffice: 'Văn phòng',
+  intgSkillsCatBusiness: 'Kinh doanh',
+  intgSkillsCatData: 'Dữ liệu',
+  intgSkillsCatFinance: 'Tài chính',
+  intgSkillsCatHr: 'Nhân sự',
+  intgSkillsCatLegal: 'Pháp lý',
+  intgSkillsCatMarketing: 'Tiếp thị',
+  intgSkillsCatEducation: 'Giáo dục',
+  intgSkillsCatOther: 'Khác',
+  intgSkillsInstall: 'Cài đặt',
+  intgSkillsUpdate: 'Cập nhật',
+  intgSkillsInstalledTag: 'Đã cài',
+} satisfies Record<keyof typeof zh, string>

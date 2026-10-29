@@ -12,7 +12,11 @@
 //     uniwork/chat/completions         POST           UniWork AI: openai-compatible SSE, with the
 //                                                     conversation and run headers; a request that carries
 //                                                     X-UniWork-AI-Handoff answers the next `handoffRemaining`
-//                                                     value as X-UniWork-AI-Handoff-Remaining (UNI-2264)
+//                                                     value as X-UniWork-AI-Handoff-Remaining (UNI-2264);
+//                                                     scripted `toolCalls` are answered here too
+//     uniwork/write                    POST           UniWork AI writer (UNI-2276): { kind, lang, input } with the
+//                                                     run header (400 without it); `writerReply` in three SSE
+//                                                     chunks, then [DONE]
 //     cloud                            GET            { enabled, reason?, tools, credits }
 //     cloud/search|images|media/analyze|transcribe  POST
 // Every route wants `Authorization: Bearer <token>` (401 otherwise) and refuses a request that
@@ -30,6 +34,7 @@
 //                                                      /byok/<p>/models or cloud read would eat it)
 //     cloud?: { enabled?, reason?, tools?, credits? }  GET cloud state
 //     reply?: string                                   the model's streamed answer
+//     writerReply?: string                             the writer route's streamed text
 //     toolCalls?: [{ name, input }]                    scripted tool calls (openai-compatible stream):
 //                                                      the next streamed turns answer one each; the
 //                                                      turn after them is the plain `reply`
@@ -44,8 +49,9 @@
 // FAKE_AI_UPSTREAM_KEY set, an openai-compatible chat/completions call for a seeded provider is
 // forwarded there with that key (FAKE_AI_UPSTREAM_MODEL replaces the request's model when set), and
 // the answer is piped back, SSE included. The key never reaches the frame or the request log.
-// GET /__fake-ai/log -> [{ method, path, authorization, cookie, handoff, body }] of the AI requests
-// (handoff = the request's X-UniWork-AI-Handoff, or null).
+// GET /__fake-ai/log -> [{ method, path, authorization, cookie, handoff, run, conversation, body }] of
+// the AI requests (handoff / run / conversation = the request's X-UniWork-AI-Handoff / -Run /
+// -Conversation header, or null).
 
 const upstream = () => {
   const url = process.env.FAKE_AI_UPSTREAM_URL
@@ -107,6 +113,8 @@ function freshState() {
     fail: [],
     unauthorizedOnce: null,
     reply: 'Hello from the UniWork AI proxy.',
+    // the UniWork AI writer route's streamed text
+    writerReply: '<h2>Fake writer section</h2><p>Written by the fake writer route.</p>',
     toolCalls: [],
     handoffRemaining: [],
     // UniWork AI run ids handed out so far
@@ -321,6 +329,29 @@ async function uniwork(req, res, body) {
   if (req.headers['x-uniwork-ai-handoff'] && state.handoffRemaining.length > 0) {
     headers['X-UniWork-AI-Handoff-Remaining'] = String(state.handoffRemaining.shift())
   }
+  // a scripted tool call: one per streamed turn, as on the BYOK route
+  const call = body.stream ? state.toolCalls.shift() : undefined
+  if (call) {
+    const delta = {
+      tool_calls: [
+        {
+          index: 0,
+          id: `call_${Date.now()}`,
+          type: 'function',
+          function: { name: call.name, arguments: JSON.stringify(call.input ?? {}) },
+        },
+      ],
+    }
+    return sse(
+      res,
+      [
+        `data: ${JSON.stringify({ choices: [{ index: 0, delta }] })}\n\n`,
+        `data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] })}\n\n`,
+        'data: [DONE]\n\n',
+      ],
+      headers,
+    )
+  }
   return sse(
     res,
     [
@@ -332,6 +363,24 @@ async function uniwork(req, res, body) {
     ],
     headers,
   )
+}
+
+/** one UniWork AI writer call (UNI-2276): the `writerReply` in three SSE chunks, then [DONE] */
+async function uniworkWrite(req, res, body) {
+  if (req.method !== 'POST') return fail(res, 405, 'method_not_allowed')
+  if (body.__invalid || typeof body.kind !== 'string' || !body.input) {
+    return fail(res, 400, 'invalid_request')
+  }
+  // a writer runs inside the turn's run; it never opens one
+  if (!req.headers['x-uniwork-ai-run']) return fail(res, 400, 'invalid_request')
+  return sse(res, [
+    ...parts(state.writerReply).map(
+      (p) =>
+        `data: ${JSON.stringify({ model: '', choices: [{ index: 0, delta: { content: p } }] })}\n\n`,
+    ),
+    `data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1 } })}\n\n`,
+    'data: [DONE]\n\n',
+  ])
 }
 
 async function cloud(req, res, tail, body) {
@@ -454,6 +503,7 @@ export async function handleFakeAiControl(req, res, pathname) {
       state.unauthorizedOnce = { path: typeof path === 'string' ? path : '' }
     }
     if (typeof body.reply === 'string') state.reply = body.reply
+    if (typeof body.writerReply === 'string') state.writerReply = body.writerReply
     if (body.hold === true) state.hold = true
     if (body.hold === false) {
       state.hold = false
@@ -488,6 +538,8 @@ export async function handleFakeAi(req, res, pathname) {
     authorization: req.headers.authorization ?? null,
     cookie: req.headers.cookie ?? null,
     handoff: req.headers['x-uniwork-ai-handoff'] ?? null,
+    run: req.headers['x-uniwork-ai-run'] ?? null,
+    conversation: req.headers['x-uniwork-ai-conversation'] ?? null,
     body: tail.startsWith('/credentials')
       ? { ...body, api_key: body.api_key ? '<set>' : undefined }
       : body,
@@ -530,6 +582,10 @@ export async function handleFakeAi(req, res, pathname) {
   }
   if (tail === '/uniwork/chat/completions') {
     await uniwork(req, res, body)
+    return true
+  }
+  if (tail === '/uniwork/write') {
+    await uniworkWrite(req, res, body)
     return true
   }
   if (tail === '/cloud' || tail.startsWith('/cloud/')) {

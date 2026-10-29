@@ -79,11 +79,6 @@ import {
   createBlankPptx,
   listEmbeddedFonts,
   openPptx,
-  mergeSlideFromPptx,
-  extractMergeSlideSource,
-  type MergeSlideSource,
-  promoteSlideBackground,
-  autofitGeneratedTextBoxes,
   savePptx,
   savePptxToFile,
   commitSaved,
@@ -108,13 +103,11 @@ import {
   attachedIds,
   editorAttachedIds,
   buildAllRenderSlides,
-  carryHistoryForReplacement,
   dialogParent,
   getFontMetrics,
   hostWindowFor,
   markMetaDirty,
   resetFontMetrics,
-  pushHistory,
   readSlideMedia,
   runtime,
   scheduleDeckBroadcast,
@@ -130,10 +123,12 @@ import {
   appClipboard,
   deckDefaultFont,
   forgetClient,
-  journaledTxn,
+  landGeneratedPagesInSession,
   sessionDirty,
   sessionHandlers,
   type HostIO,
+  type LandedPages,
+  type LandMode,
   type SessionHandler,
 } from '../session'
 import { createElectronHostIO } from './electron-host-io'
@@ -1397,223 +1392,39 @@ export function registerSlidesIpc(): void {
       e,
       pageMarkers: string[],
       fitWidthPx: number,
-      mode?: 'replace' | 'append' | 'replace_at' | 'insert_at',
+      mode?: LandMode,
       atIndex?: number,
       deckName?: string,
-    ): Promise<
-      | (OpenResult & {
-          appendedFrom?: number
-          replacedIndex?: number
-          insertedIndex?: number
-          fallbackReason?: string
-          imageFailures?: { page: number; url: string }[]
-        })
-      | { error: string }
-    > => {
+    ): Promise<LandedPages> => {
       // Every page arrives as a cloud marker (cloudpptx:<path> written by
       // slides:cloud-page-generate, pointing at a one-slide pptx temp file); this handler only
-      // reads and lands the bytes.
-      // replace: assemble the whole batch into one multi-page pptx as the new deck base.
-      // append/replace_at/insert_at: land the extracted pages as insertSlidePptx ops
-      // (earlier pages are untouched; landing shows up in the op journal like any edit).
-      const readCloudPage = async (marker: string): Promise<{ bytes: Uint8Array }> => {
-        if (!marker.startsWith(CLOUD_PAGE_PREFIX)) throw new Error('expected a cloud page marker')
-        const path = marker.slice(CLOUD_PAGE_PREFIX.length)
-        if (!issuedCloudPages.has(path)) throw new Error('unknown cloud page marker')
-        return { bytes: new Uint8Array(await readFile(path)) }
+      // reads and lands the bytes (src/session/generated-pages.ts).
+      const issuedPages = {
+        take: async (marker: string): Promise<Uint8Array> => {
+          if (!marker.startsWith(CLOUD_PAGE_PREFIX)) throw new Error('expected a cloud page marker')
+          const path = marker.slice(CLOUD_PAGE_PREFIX.length)
+          if (!issuedCloudPages.has(path)) throw new Error('unknown cloud page marker')
+          return new Uint8Array(await readFile(path))
+        },
       }
-      const assembleDeck = async (): Promise<{ bytes: Uint8Array }> => {
-        const perPage = await Promise.all(pageMarkers.map(readCloudPage))
-        const base = await openPptx(perPage[0]!.bytes)
-        for (const one of perPage.slice(1)) await mergeSlideFromPptx(base, one.bytes)
-        for (const s of base.deck.slides) {
-          promoteSlideBackground(s, base.deck.size)
-          autofitGeneratedTextBoxes(s)
-        }
-        return { bytes: await savePptx(base) }
-      }
-
-      try {
-        // Append: extract only the "new pages" and land them into the existing in-memory
-        // deck as one per_op transaction. Already-landed pages stay untouched
-        // (O(N) rather than O(N²)); no dependency on stored PageVisualData.
-        if (mode === 'append') {
-          const existing = sessions.get(e.sender.id)
-          if (!existing) {
-            return { error: tm('errNoDeckAppend') }
+      // An unbound deck is saved as a draft after landing; a UniWork-bound deck is not: its
+      // generated pages stay unsaved in the editor (no draft, the document's path is kept)
+      const draft = uniworkIsBound(sessions.get(e.sender.id)?.path)
+        ? undefined
+        : {
+            pages: (session: Session) => draftLandedPages(e.sender, session, deckName),
+            deck: (session: Session, bytes: Uint8Array) =>
+              saveDraftAfterGenerate(e.sender, session, bytes, 'replace', deckName),
           }
-          const opened = existing.opened
-          const beforeCount = opened.deck.slides.length
-          // Push an undo snapshot: appending is an ordinary edit, ⌘Z should return to the
-          // pre-append state (previously the undoStack was simply cleared, making all of the
-          // user's prior manual edits non-undoable — inconsistent with replace_at behavior)
-          // Extract every page first (pure reads), then land them as insertSlidePptx ops so
-          // the journal and undo see generation like any other edit.
-          const sources: MergeSlideSource[] = []
-          let lastErr: string | undefined
-          for (const marker of pageMarkers) {
-            try {
-              const one = await readCloudPage(marker)
-              const source = await extractMergeSlideSource(one.bytes)
-              if (source) sources.push(source)
-              else lastErr = tm('errMergeFailed')
-            } catch (pageErr) {
-              lastErr = pageErr instanceof Error ? pageErr.message : String(pageErr)
-            }
-          }
-          let merged = 0
-          if (sources.length > 0) {
-            pushHistory(existing)
-            const r = journaledTxn(existing, 'generate', {
-              isolation: 'per_op',
-              ops: sources.map((source) => ({ op: 'insertSlidePptx', source })),
-            })
-            merged = r.records?.length ?? 0
-            if (merged === 0) existing.undoStack.pop() // Nothing happened, pop the just-pushed snapshot
-            if (!lastErr) lastErr = r.failures?.[0]?.error
-          }
-          if (merged === 0) {
-            return { error: tm('errAppendFailed', { reason: lastErr ?? tm('errUnknown') }) }
-          }
-          existing.fitWidthPx = fitWidthPx
-          // Save the draft: persist the current complete deck
-          const drafted = await draftLandedPages(e.sender, existing, deckName)
-          return {
-            // bound: no path change for the panel (title, dirty flag): the deck is unsaved
-            path: drafted ? existing.path : '',
-            slides: buildAllRenderSlides(existing.opened, fitWidthPx),
-            size: { cx: existing.opened.deck.size.cx, cy: existing.opened.deck.size.cy },
-            defaultFont: deckDefaultFont(existing.opened),
-            appendedFrom: beforeCount,
-            ...(lastErr && merged < pageMarkers.length
-              ? { fallbackReason: tm('errPartialAppend', { reason: lastErr }) }
-              : {}),
-          }
-        }
-
-        // Redo one page in place: the insertSlidePptx op merges the extracted page at the
-        // end, moves it to atIndex and drops the displaced old page — one atomic txn, one
-        // undo snapshot, so ⌘Z rolls back to the old page.
-        if (mode === 'replace_at') {
-          const existing = sessions.get(e.sender.id)
-          if (!existing) {
-            return { error: tm('errNoDeckReplace') }
-          }
-          const opened = existing.opened
-          const total = opened.deck.slides.length
-          if (atIndex == null || !Number.isInteger(atIndex) || atIndex < 0 || atIndex >= total) {
-            return { error: tm('errIndexRange', { max: total - 1 }) }
-          }
-          const marker = pageMarkers[0]
-          if (!marker || pageMarkers.length !== 1) {
-            return { error: tm('errReplaceNeedsOne') }
-          }
-          const one = await readCloudPage(marker)
-          const source = await extractMergeSlideSource(one.bytes)
-          if (!source) {
-            return { error: tm('errMergeFailed') }
-          }
-          pushHistory(existing)
-          const r = journaledTxn(existing, 'generate', {
-            ops: [{ op: 'insertSlidePptx', source, at: atIndex, replace: true }],
-          })
-          if (!r.applied) {
-            existing.undoStack.pop() // The executor already restored the deck
-            return { error: r.failures?.[0]?.error ?? tm('errReplaceFailed') }
-          }
-          existing.fitWidthPx = fitWidthPx
-          const drafted = await draftLandedPages(e.sender, existing, deckName)
-          return {
-            // bound: no path change for the panel (title, dirty flag): the deck is unsaved
-            path: drafted ? existing.path : '',
-            slides: buildAllRenderSlides(existing.opened, fitWidthPx),
-            size: { cx: existing.opened.deck.size.cx, cy: existing.opened.deck.size.cy },
-            defaultFont: deckDefaultFont(existing.opened),
-            replacedIndex: atIndex,
-          }
-        }
-
-        // Insert one page at atIndex (later pages shift back): used to regenerate a failed middle
-        // page from generate_deck and put it back in place. Same op as replace_at but without
-        // dropping an old page; atIndex=total lands at the end without a move.
-        if (mode === 'insert_at') {
-          const existing = sessions.get(e.sender.id)
-          if (!existing) {
-            return { error: tm('errNoDeckInsert') }
-          }
-          const opened = existing.opened
-          const total = opened.deck.slides.length
-          if (atIndex == null || !Number.isInteger(atIndex) || atIndex < 0 || atIndex > total) {
-            return { error: tm('errIndexRange', { max: total }) }
-          }
-          const marker = pageMarkers[0]
-          if (!marker || pageMarkers.length !== 1) {
-            return { error: tm('errInsertNeedsOne') }
-          }
-          const one = await readCloudPage(marker)
-          const source = await extractMergeSlideSource(one.bytes)
-          if (!source) {
-            return { error: tm('errMergeFailed') }
-          }
-          pushHistory(existing)
-          const r = journaledTxn(existing, 'generate', {
-            ops: [{ op: 'insertSlidePptx', source, at: atIndex }],
-          })
-          if (!r.applied) {
-            existing.undoStack.pop() // The executor already restored the deck
-            return { error: r.failures?.[0]?.error ?? tm('errInsertFailed') }
-          }
-          existing.fitWidthPx = fitWidthPx
-          const drafted = await draftLandedPages(e.sender, existing, deckName)
-          return {
-            // bound: no path change for the panel (title, dirty flag): the deck is unsaved
-            path: drafted ? existing.path : '',
-            slides: buildAllRenderSlides(existing.opened, fitWidthPx),
-            size: { cx: existing.opened.deck.size.cx, cy: existing.opened.deck.size.cy },
-            defaultFont: deckDefaultFont(existing.opened),
-            insertedIndex: atIndex,
-          }
-        }
-
-        // replace mode: assemble the whole batch into one multi-page pptx as the new deck base.
-        const { bytes } = await assembleDeck()
-        const opened = await openPptx(bytes)
-        const replaceSession: Session = {
-          path: '',
-          opened,
-          fitWidthPx,
-          undoStack: [],
-          redoStack: [],
-        }
-        const old = sessions.get(e.sender.id)
-        // A UniWork-bound deck keeps its document: the new deck replaces the content of the
-        // same working copy and stays unsaved until the user saves (no draft below)
-        if (old && uniworkIsBound(old.path)) {
-          replaceSession.path = old.path
-          markMetaDirty(replaceSession)
-        }
-        carryHistoryForReplacement(old, replaceSession)
-        sessions.set(e.sender.id, replaceSession)
-        // Re-point windows that shared the old session, or they diverge onto a dead deck
-        if (old) for (const id of attachedIds(old)) sessions.set(id, replaceSession)
-        // Save the draft: await completion so the real path is returned; on failure degrade silently (session.path stays '')
-        const drafted = await saveDraftAfterGenerate(
-          e.sender,
-          replaceSession,
-          bytes,
-          'replace',
-          deckName,
-        )
-        scheduleDeckBroadcast(replaceSession)
-        return {
-          path: drafted ? replaceSession.path : '',
-          slides: buildAllRenderSlides(opened, fitWidthPx),
-          size: { cx: opened.deck.size.cx, cy: opened.deck.size.cy },
-          defaultFont: deckDefaultFont(opened),
-        }
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : String(err) }
-      }
+      return landGeneratedPagesInSession(
+        e.sender.id,
+        pageMarkers,
+        issuedPages,
+        fitWidthPx,
+        mode,
+        atIndex,
+        draft,
+      )
     },
   )
 

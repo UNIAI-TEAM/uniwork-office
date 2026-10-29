@@ -48,8 +48,11 @@ export function policyForChannel(channel: string): IpcSenderPolicy | null {
     channel.startsWith('uniwork:askuni-doc:') ||
     channel.startsWith('uniwork:cloud-status') ||
     channel === 'uniwork:ai-run' ||
-    // the editor AI panels open the shell's model settings
-    channel === 'ai:open-model-settings'
+    // the editor AI panels open the shell's model/skills settings and read the installed skills
+    channel === 'ai:open-model-settings' ||
+    channel === 'ai:open-skills-settings' ||
+    channel === 'ai:skills-list' ||
+    channel === 'ai:skill-text'
   ) {
     return 'editor'
   }

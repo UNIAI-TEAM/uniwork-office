@@ -27,6 +27,7 @@ import { settingsStrings } from './i18n/strings-settings'
 import { askUniStrings } from './i18n/strings-askuni'
 import { inboxStrings } from './i18n/strings-inbox'
 import { shellPrefsStrings } from './i18n/strings-shell-prefs'
+import { skillsStrings } from './i18n/strings-skills'
 
 export type StringKey =
   | keyof typeof strings.zh
@@ -47,6 +48,7 @@ export type StringKey =
   | keyof typeof askUniStrings.zh
   | keyof typeof inboxStrings.zh
   | keyof typeof shellPrefsStrings.zh
+  | keyof typeof skillsStrings.zh
 
 // the home table plus the sharded domains (each shard type-checks its own key set;
 // widening to Record<Lang, Record<string, string>> here avoids a 21 * 2^N union
@@ -70,6 +72,7 @@ const shards: readonly Record<Lang, Record<string, string>>[] = [
   askUniStrings,
   inboxStrings,
   shellPrefsStrings,
+  skillsStrings,
 ]
 
 const dicts = Object.fromEntries(
