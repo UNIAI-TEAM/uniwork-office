@@ -1602,4 +1602,29 @@ export const hi = {
   appWebSavedReopenFailed:
     'आपके बदलाव UniWork में सहेज लिए गए, लेकिन वर्कबुक यहाँ दोबारा नहीं खुल सकी। काम जारी रखने के लिए एडिटर को फिर से लोड करें।',
   appDataTable: 'डेटा टेबल',
+
+  // ── Spelling check (F7 / Review ▸ Proofing) ──
+  appSpellTitle: 'वर्तनी',
+  appSpellBtnDetail: 'शीट टेक्स्ट जाँचें (F7)',
+  appSpellToggle: 'वर्तनी जाँचें',
+  appSpellToggleTip:
+    'वर्तनी जाँच (F7 और समीक्षा बटन) चालू करता है; बंद होने पर टिप्पणी बॉक्स लहरदार रेखाएँ नहीं दिखाते',
+  appSpellOn: 'वर्तनी जाँच चालू कर दी गई।',
+  appSpellOff: 'वर्तनी जाँच बंद है। इसे समीक्षा ▸ प्रूफ़िंग में चालू करें।',
+  appSpellRecheck: 'फिर जाँचें',
+  appSpellNone: 'कोई संदिग्ध वर्तनी त्रुटि नहीं मिली।',
+  appSpellFindings: '{count} संदिग्ध त्रुटियाँ। स्थान पर जाने के लिए किसी पंक्ति पर क्लिक करें।',
+  appSpellTruncated: 'टेक्स्ट सेल बहुत अधिक हैं; केवल पहले वाले जाँचे गए।',
+  appSpellColWord: 'संदिग्ध',
+  appSpellIgnore: 'अनदेखा करें',
+  appSpellIgnoreAll: 'सभी अनदेखा करें',
+  appSpellLearn: 'शब्दकोश में जोड़ें',
+  appSpellNoSuggestions: 'कोई सुझाव नहीं',
+  appSpellIgnoredAll: 'इस सत्र में "{word}" को दोबारा चिह्नित नहीं किया जाएगा।',
+  appSpellLearned: '"{word}" शब्दकोश में जोड़ा गया।',
+  appSpellChanged: '{address} ठीक किया गया।',
+  appSpellChangeFailed: '{address} ठीक नहीं किया जा सका।',
+  appSpellUnavailable: 'इस विंडो में वर्तनी जाँच उपलब्ध नहीं है।',
+  appSpellReplaceAll: 'सबको "{suggestion}" से बदलें',
+  appSpellChangedAll: '"{word}" वाले {count} सेल ठीक किए गए।',
 } satisfies Record<keyof typeof zh, string>

@@ -1647,4 +1647,29 @@ export const nl = {
   appWebSavedReopenFailed:
     'Je wijzigingen zijn opgeslagen in UniWork, maar de werkmap kon hier niet opnieuw worden geopend. Laad de editor opnieuw om verder te werken.',
   appDataTable: 'Gegevenstabel',
+
+  // ── Spelling check (F7 / Review ▸ Proofing) ──
+  appSpellTitle: 'Spelling',
+  appSpellBtnDetail: 'Bladtekst controleren (F7)',
+  appSpellToggle: 'Spelling controleren',
+  appSpellToggleTip:
+    'Zet de spellingcontrole aan (F7 en de Controleren-knop); uitgeschakeld tonen commentaarvakken geen golflijnen meer',
+  appSpellOn: 'Spellingcontrole ingeschakeld.',
+  appSpellOff: 'Spellingcontrole staat uit. Schakel deze in bij Controleren ▸ Controle.',
+  appSpellRecheck: 'Opnieuw controleren',
+  appSpellNone: 'Geen verdachte spelfouten gevonden.',
+  appSpellFindings: '{count} verdachte fouten. Klik op een rij om erheen te springen.',
+  appSpellTruncated: 'Te veel tekstcellen; alleen de eerste zijn gecontroleerd.',
+  appSpellColWord: 'Verdacht',
+  appSpellIgnore: 'Negeren',
+  appSpellIgnoreAll: 'Alles negeren',
+  appSpellLearn: 'Toevoegen aan woordenlijst',
+  appSpellNoSuggestions: 'Geen suggesties',
+  appSpellIgnoredAll: '"{word}" wordt in deze sessie niet meer gemarkeerd.',
+  appSpellLearned: '"{word}" is toegevoegd aan de woordenlijst.',
+  appSpellChanged: '{address} gecorrigeerd.',
+  appSpellChangeFailed: 'Kan {address} niet corrigeren.',
+  appSpellUnavailable: 'Spellingcontrole is niet beschikbaar in dit venster.',
+  appSpellReplaceAll: 'Alle vervangen door "{suggestion}"',
+  appSpellChangedAll: '{count} cellen met "{word}" gecorrigeerd.',
 } satisfies Record<keyof typeof zh, string>

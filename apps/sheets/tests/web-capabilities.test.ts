@@ -85,6 +85,7 @@ describe('ExcelShell view-only ribbon (UNI-1876 SVF-1)', () => {
     formatPainterActive: false,
     sheetHasContent: true,
     aiBusy: false,
+    spellcheckOn: true,
     chat: [],
     attachments: [],
     attachNotice: null,
