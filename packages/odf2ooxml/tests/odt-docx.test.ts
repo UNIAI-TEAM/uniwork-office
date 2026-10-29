@@ -249,6 +249,33 @@ describe('convertOdtToDocx', () => {
     expect(document).not.toContain('lost')
   })
 
+  it('reports master-page headers/footers and tracked changes in dropped', async () => {
+    const body =
+      '<text:tracked-changes text:track-changes="true">' +
+      '<text:changed-region text:id="ct1"><text:insertion><office:change-info/></text:insertion></text:changed-region>' +
+      '<text:changed-region text:id="ct2"><text:deletion><office:change-info/><text:p>deleted words</text:p></text:deletion></text:changed-region>' +
+      '</text:tracked-changes>' +
+      '<text:p>body with <text:change-start text:change-id="ct1"/>inserted<text:change-end text:change-id="ct1"/> and <text:change text:change-id="ct2"/>text</text:p>'
+    const styles =
+      `<?xml version="1.0" encoding="UTF-8"?><office:document-styles ${NAMESPACES} office:version="1.2">` +
+      '<office:master-styles>' +
+      '<style:master-page style:name="Standard" style:page-layout-name="PM1">' +
+      '<style:header><text:p>Header text</text:p></style:header>' +
+      '<style:footer><text:p>Footer text</text:p></style:footer>' +
+      '<style:header-left style:display="false"><text:p>Hidden</text:p></style:header-left>' +
+      '</style:master-page>' +
+      '</office:master-styles>' +
+      '</office:document-styles>'
+    const result = await convertOdtToDocx(await buildOdt(contentXml(body), styles))
+    expect(result.dropped).toEqual([
+      { what: 'headers-footers', count: 2 },
+      { what: 'tracked-changes', count: 2 },
+    ])
+    const document = (await readDocxEntry(result.docx, 'word/document.xml')) ?? ''
+    expect(document).toContain('body with inserted and text')
+    expect(document).not.toContain('deleted words')
+  })
+
   it('flattens a text frame into the flow and says so', async () => {
     const body =
       '<draw:frame svg:width="8cm" svg:height="2cm"><draw:text-box><text:p>boxed words</text:p></draw:text-box></draw:frame>'

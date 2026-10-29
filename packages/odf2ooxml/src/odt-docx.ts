@@ -119,6 +119,14 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
           else drops.add('stale-indexes')
           break
         }
+        case 'text:tracked-changes': {
+          const regions = childElements(element.node).filter(
+            ({ name }) => name === 'text:changed-region',
+          ).length
+          const count = Math.max(1, regions)
+          for (let index = 0; index < count; index++) drops.add('tracked-changes')
+          break
+        }
         case 'text:sequence-decls':
         case 'text:soft-page-break':
           break
@@ -247,6 +255,7 @@ export async function convertOdtToDocx(odt: Uint8Array): Promise<OdtToDocxResult
   }
 
   walkElements(nodeChildren(body), { list: null, depth: 0 })
+  countDroppedMasterPageParts(pack.stylesRoots, drops)
 
   // -- assembly ---------------------------------------------------------------
 
@@ -300,6 +309,35 @@ function elements(nodes: XNode[]): Array<{ name: string; node: XNode }> {
     if (name && name !== '#comment') out.push({ name, node: child })
   }
   return out
+}
+
+const HEADER_FOOTER_ELEMENTS: Record<string, true> = {
+  'style:header': true,
+  'style:header-left': true,
+  'style:header-first': true,
+  'style:footer': true,
+  'style:footer-left': true,
+  'style:footer-first': true,
+}
+
+function countDroppedMasterPageParts(stylesRoots: XNode[] | null, drops: Drops): void {
+  if (!stylesRoots) return
+  const walk = (node: XNode): void => {
+    if (nodeName(node) === 'style:master-page') {
+      for (const { name, node: child } of childElements(node)) {
+        if (
+          HEADER_FOOTER_ELEMENTS[name] &&
+          attr(child, 'style:display') !== 'false' &&
+          childElements(child).length > 0
+        ) {
+          drops.add('headers-footers')
+        }
+      }
+      return
+    }
+    for (const child of nodeChildren(node)) walk(child)
+  }
+  for (const root of stylesRoots) walk(root)
 }
 
 function clampHeadingLevel(text: string | undefined): number {
