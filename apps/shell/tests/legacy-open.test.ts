@@ -8,20 +8,31 @@ import {
   statSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { convertedDocumentFor } from '@genoffice/electron-utils'
 import { LANGS } from '@genoffice/i18n'
+import { convertOdpToPptx, convertOdtToDocx } from '@genoffice/odf2ooxml'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { LegacyConvertError, type ConvertLegacyResult } from '../src/main/legacy-converter'
+import {
+  convertLegacyFile,
+  detectOoxmlKindFromZipBytes,
+  LegacyConvertError,
+  validateOoxmlOutputBytes,
+  type ConvertLegacyResult,
+} from '../src/main/legacy-converter'
 import {
   createLegacyOpener,
+  formatOdfFallbackNotice,
   legacyErrorMessage,
   legacyProgressDetailKey,
+  type ConvertedDocument,
   type LegacyOpenDeps,
+  type OdfFallbackEngine,
 } from '../src/main/legacy-open'
 import { nameParts } from '../src/renderer/src/uniwork-folders/SaveDialog'
 import { tLegacyOpen, type LegacyOpenStringKey } from '../src/main/legacy-open-strings'
 
+const ODF_FIXTURES_DIR = resolve(import.meta.dirname, 'fixtures', 'odf')
 const t: LegacyOpenDeps['t'] = (key: LegacyOpenStringKey, params) => tLegacyOpen('en', key, params)
 
 let root: string
@@ -592,6 +603,386 @@ describe('legacyErrorMessage', () => {
       expect(tLegacyOpen(lang, 'legacyOdfDetail').length).toBeGreaterThan(10)
       expect(tLegacyOpen(lang, 'legacyOdfDetail')).toContain('OpenDocument')
     }
+  })
+  it('formats the ODF fallback dropped-items and simplified notices across all 21 locales with no internal names', () => {
+    expect(
+      formatOdfFallbackNotice(
+        'Report.odt',
+        [
+          { what: 'footnotes', count: 3 },
+          { what: 'comments', count: 1 },
+          { what: 'textboxes-flattened', count: 2 },
+        ],
+        t,
+      ),
+    ).toBe(
+      'Some parts of “Report.odt” could not be carried over: footnotes (3), comments (1), text boxes (2, shown as plain text). Reinstall the app to restore full fidelity.',
+    )
+    expect(
+      formatOdfFallbackNotice(
+        'Report.odt',
+        [
+          { what: 'footnotes', count: 3 },
+          { what: 'comments', count: 1 },
+          { what: 'textboxes-flattened', count: 2 },
+        ],
+        (k, p) => tLegacyOpen('vi', k, p),
+      ),
+    ).toBe(
+      'Một số phần của “Report.odt” không thể giữ nguyên khi chuyển đổi: chú thích cuối trang (3), nhận xét (1), hộp văn bản (2, hiển thị dạng văn bản thuần). Hãy cài đặt lại ứng dụng để khôi phục chuyển đổi đầy đủ.',
+    )
+    expect(formatOdfFallbackNotice('Report.odt', [], t)).toBe(
+      '“Report.odt” was opened with a simpler converter, so the layout may differ from the original. Reinstall the app to restore full fidelity.',
+    )
+    expect(formatOdfFallbackNotice('Report.odt', [], (k, p) => tLegacyOpen('vi', k, p))).toBe(
+      '“Report.odt” được mở bằng bộ chuyển đổi rút gọn nên bố cục có thể khác đôi chút so với bản gốc. Hãy cài đặt lại ứng dụng để khôi phục chuyển đổi đầy đủ.',
+    )
+    // unknown keys fold into the localized "other items" bucket, never raw
+    const withUnknown = formatOdfFallbackNotice(
+      'Deck.odp',
+      [
+        { what: 'notes', count: 2 },
+        { what: 'custom-future-item', count: 4 },
+      ],
+      t,
+    )
+    expect(withUnknown).toContain('speaker notes (2), other items (4)')
+    expect(withUnknown).not.toContain('custom-future-item')
+
+    const allKnownKeys = [
+      'footnotes',
+      'comments',
+      'textboxes-flattened',
+      'shapes',
+      'images',
+      'objects',
+      'tables',
+      'nested-tables',
+      'notes',
+      'frames-without-geometry',
+      'stale-indexes',
+      'unhandled-blocks',
+      'headers-footers',
+      'tracked-changes',
+    ]
+    for (const lang of LANGS) {
+      const tl: LegacyOpenDeps['t'] = (k, p) => tLegacyOpen(lang, k, p)
+      const droppedMsg = formatOdfFallbackNotice(
+        'Sample.odt',
+        allKnownKeys.map((what, idx) => ({ what, count: idx + 1 })),
+        tl,
+      )
+      const simpleMsg = formatOdfFallbackNotice('Sample.odt', [], tl)
+      expect(droppedMsg).toContain('Sample.odt')
+      expect(simpleMsg).toContain('Sample.odt')
+      for (const rawKey of allKnownKeys) {
+        if (rawKey.includes('-')) {
+          expect(droppedMsg).not.toContain(rawKey)
+        }
+      }
+      for (const msg of [droppedMsg, simpleMsg]) {
+        expect(msg.toLowerCase()).not.toContain('odf2ooxml')
+        expect(msg.toLowerCase()).not.toContain('libreoffice')
+        expect(msg.toLowerCase()).not.toContain('fallback')
+        expect(msg.toLowerCase()).not.toContain('engine')
+      }
+    }
+  })
+})
+
+describe('ODF pure-JS fallback when LibreOffice converter is missing (Slice 2a)', () => {
+  function fakeFallbackEngine(overrides: Partial<OdfFallbackEngine> = {}): {
+    engine: OdfFallbackEngine
+    odtCalls: number[]
+    odpCalls: number[]
+  } {
+    const odtCalls: number[] = []
+    const odpCalls: number[] = []
+    const engine: OdfFallbackEngine = {
+      convertOdtToDocx: vi.fn(async (bytes: Uint8Array) => {
+        odtCalls.push(bytes.byteLength)
+        return {
+          docx: new Uint8Array([80, 75, 3, 4, 1]),
+          blocks: 3,
+          dropped: [
+            { what: 'footnotes', count: 2 },
+            { what: 'textboxes-flattened', count: 1 },
+          ],
+        }
+      }),
+      convertOdpToPptx: vi.fn(async (bytes: Uint8Array) => {
+        odpCalls.push(bytes.byteLength)
+        return {
+          pptx: new Uint8Array([80, 75, 3, 4, 2]),
+          slides: 2,
+          dropped: [{ what: 'notes', count: 1 }],
+        }
+      }),
+      ...overrides,
+    }
+    return { engine, odtCalls, odpCalls }
+  }
+
+  it.each([
+    ['native-writer.odt', 'docs', 'docx', 'native-writer.docx'],
+    ['native-writer.ott', 'docs', 'docx', 'native-writer.docx'],
+    ['native-impress.odp', 'slides', 'pptx', 'native-impress.pptx'],
+    ['native-impress.otp', 'slides', 'pptx', 'native-impress.pptx'],
+  ] as const)(
+    'uses odfFallback on converter_missing for %s, stages an unsaved %s tab with Save As next to the original, and shows the dropped-items notice',
+    async (fixtureName, expectedKind, expectedTarget, expectedSaveName) => {
+      const filePath = join(ODF_FIXTURES_DIR, fixtureName)
+      const beforeBytes = readFileSync(filePath)
+      const { engine, odtCalls, odpCalls } = fakeFallbackEngine()
+      const h = harness(
+        async () => {
+          throw new LegacyConvertError('converter_missing', 'no converter')
+        },
+        { odfFallback: engine },
+      )
+
+      expect(createLegacyOpener(h.deps).open(filePath)).toBe(true)
+      await vi.waitFor(() => expect(h.opened).toHaveLength(1))
+
+      const doc = h.opened[0]!
+      expect(doc.kind).toBe(expectedKind)
+      expect(doc.originalPath).toBe(filePath)
+      expect(doc.suggestSaveAs).toBe(join(ODF_FIXTURES_DIR, expectedSaveName))
+      expect(basename(doc.tempPath)).toBe(expectedSaveName)
+      expect(convertedDocumentFor(doc.tempPath)).toMatchObject({
+        originalPath: filePath,
+        suggestSaveAs: join(ODF_FIXTURES_DIR, expectedSaveName),
+      })
+      expect(h.recents).toEqual([filePath])
+      expect(h.progress.ended).toBe(1)
+      expect(Buffer.compare(beforeBytes, readFileSync(filePath))).toBe(0)
+
+      if (expectedTarget === 'docx') {
+        expect(odtCalls).toEqual([beforeBytes.byteLength])
+        expect(odpCalls).toEqual([])
+        expect(h.notices).toEqual([
+          `Some parts of “${fixtureName}” could not be carried over: footnotes (2), text boxes (1, shown as plain text). Reinstall the app to restore full fidelity.`,
+        ])
+      } else {
+        expect(odpCalls).toEqual([beforeBytes.byteLength])
+        expect(odtCalls).toEqual([])
+        expect(h.notices).toEqual([
+          `Some parts of “${fixtureName}” could not be carried over: speaker notes (1). Reinstall the app to restore full fidelity.`,
+        ])
+      }
+    },
+  )
+
+  it('shows the short simpler-converter notice when dropped is empty', async () => {
+    const filePath = join(ODF_FIXTURES_DIR, 'native-writer.odt')
+    const { engine } = fakeFallbackEngine({
+      convertOdtToDocx: vi.fn(async () => ({
+        docx: new Uint8Array([80, 75, 3, 4]),
+        blocks: 1,
+        dropped: [],
+      })),
+    })
+    const h = harness(
+      async () => {
+        throw new LegacyConvertError('converter_missing', 'no converter')
+      },
+      { odfFallback: engine },
+    )
+
+    createLegacyOpener(h.deps).open(filePath)
+    await vi.waitFor(() => expect(h.opened).toHaveLength(1))
+    expect(h.notices).toEqual([
+      '“native-writer.odt” was opened with a simpler converter, so the layout may differ from the original. Reinstall the app to restore full fidelity.',
+    ])
+  })
+
+  it.each(['native-calc.ods', 'native-calc.ots'] as const)(
+    'keeps the converter-missing notice for %s and never calls the ODF fallback engine',
+    async (fixtureName) => {
+      const filePath = join(ODF_FIXTURES_DIR, fixtureName)
+      const { engine, odtCalls, odpCalls } = fakeFallbackEngine()
+      const h = harness(
+        async () => {
+          throw new LegacyConvertError('converter_missing', 'no converter')
+        },
+        { odfFallback: engine },
+      )
+
+      createLegacyOpener(h.deps).open(filePath)
+      await vi.waitFor(() => expect(h.notices).toHaveLength(1))
+      expect(h.opened).toEqual([])
+      expect(odtCalls).toEqual([])
+      expect(odpCalls).toEqual([])
+      expect(h.notices[0]).toMatch(/converter is missing/)
+    },
+  )
+
+  it.each(['timeout', 'failed', 'corrupt', 'encrypted'] as const)(
+    'never calls the fallback engine when the primary converter fails with %s',
+    async (code) => {
+      const filePath = join(ODF_FIXTURES_DIR, 'native-writer.odt')
+      const { engine, odtCalls, odpCalls } = fakeFallbackEngine()
+      const h = harness(
+        async () => {
+          throw new LegacyConvertError(code, code)
+        },
+        { odfFallback: engine },
+      )
+
+      createLegacyOpener(h.deps).open(filePath)
+      await vi.waitFor(() => expect(h.notices).toHaveLength(1))
+      expect(h.opened).toEqual([])
+      expect(odtCalls).toEqual([])
+      expect(odpCalls).toEqual([])
+    },
+  )
+
+  it.each([
+    [join(ODF_FIXTURES_DIR, 'pw', 'native-writer.odt'), /password-protected/],
+    [
+      join(ODF_FIXTURES_DIR, 'security', 'bomb-content-80mib.odt'),
+      /damaged or isn’t a valid \.odt file/,
+    ],
+    [join(ODF_FIXTURES_DIR, 'security', 'empty.odt'), /damaged or isn’t a valid \.odt file/],
+    [join(ODF_FIXTURES_DIR, 'security', 'not-a-zip.odt'), /damaged or isn’t a valid \.odt file/],
+    [
+      join(ODF_FIXTURES_DIR, 'security', 'wrong-mimetype.odt'),
+      /damaged or isn’t a valid \.odt file/,
+    ],
+  ] as const)(
+    'runs preflightOdfBytes before the fallback engine and rejects %s without calling the engine',
+    async (filePath, expectedPattern) => {
+      const { engine, odtCalls, odpCalls } = fakeFallbackEngine()
+      // Even if `deps.convert` throws converter_missing directly without preflighting,
+      // the fallback path must run preflightOdfBytes before passing bytes to the engine.
+      const h = harness(
+        async () => {
+          throw new LegacyConvertError('converter_missing', 'no converter')
+        },
+        { odfFallback: engine },
+      )
+
+      createLegacyOpener(h.deps).open(filePath)
+      await vi.waitFor(() => expect(h.notices).toHaveLength(1))
+      expect(h.opened).toEqual([])
+      expect(odtCalls).toEqual([])
+      expect(odpCalls).toEqual([])
+      expect(h.notices[0]).toMatch(expectedPattern)
+    },
+  )
+
+  it.each(['cancel', 'dispose'] as const)(
+    'opens nothing and shows no notice when %s lands while the fallback engine is running',
+    async (how) => {
+      const filePath = join(ODF_FIXTURES_DIR, 'native-writer.odt')
+      let resolveEngine: (() => void) | null = null
+      const { engine } = fakeFallbackEngine({
+        convertOdtToDocx: vi.fn(
+          () =>
+            new Promise((resolve) => {
+              resolveEngine = () =>
+                resolve({
+                  docx: new Uint8Array([80, 75, 3, 4]),
+                  blocks: 1,
+                  dropped: [{ what: 'footnotes', count: 1 }],
+                })
+            }),
+        ),
+      })
+      const h = harness(
+        async () => {
+          throw new LegacyConvertError('converter_missing', 'no converter')
+        },
+        { odfFallback: engine },
+      )
+
+      const opener = createLegacyOpener(h.deps)
+      opener.open(filePath)
+      await vi.waitFor(() => expect(resolveEngine).not.toBeNull())
+
+      if (how === 'cancel') h.progress.cancel!()
+      else await opener.dispose()
+      resolveEngine!()
+      await settle()
+
+      expect(h.opened).toEqual([])
+      expect(h.notices).toEqual([])
+      expect(readDirCount(importRoot)).toBe(0)
+    },
+  )
+
+  it.each([
+    [
+      Object.assign(new Error('unreadable'), { name: 'OdfConvertError', code: 'unreadable' }),
+      /damaged or isn’t a valid \.odt file/,
+    ],
+    [new Error('raw internal engine stacktrace'), /“native-writer\.odt” couldn’t be converted\./],
+  ] as const)(
+    'maps fallback engine errors to typed damaged/failed notices and never shows raw error messages',
+    async (thrown, expectedPattern) => {
+      const filePath = join(ODF_FIXTURES_DIR, 'native-writer.odt')
+      const { engine } = fakeFallbackEngine({
+        convertOdtToDocx: vi.fn(async () => {
+          throw thrown
+        }),
+      })
+      const h = harness(
+        async () => {
+          throw new LegacyConvertError('converter_missing', 'no converter')
+        },
+        { odfFallback: engine },
+      )
+
+      createLegacyOpener(h.deps).open(filePath)
+      await vi.waitFor(() => expect(h.notices).toHaveLength(1))
+      expect(h.opened).toEqual([])
+      expect(h.notices[0]).toMatch(expectedPattern)
+      expect(h.notices[0]).not.toContain('raw internal engine stacktrace')
+    },
+  )
+
+  it('runs the real @genoffice/odf2ooxml engine through convertLegacyFile + createLegacyOpener on 06-with-footnotes.odt and native-impress.odp when LibreOffice is missing', async () => {
+    const realEngine: OdfFallbackEngine = { convertOdtToDocx, convertOdpToPptx }
+    const missingLoConvert: LegacyOpenDeps['convert'] = (path, options) =>
+      convertLegacyFile(path, {
+        ...options,
+        loOptions: { envDir: join(root, 'missing-lo'), resourcesPath: join(root, 'missing-res') },
+      })
+
+    const odtPath = join(ODF_FIXTURES_DIR, '06-with-footnotes.odt')
+    const odtBefore = readFileSync(odtPath)
+    const hOdt = harness(missingLoConvert, { odfFallback: realEngine })
+    createLegacyOpener(hOdt.deps).open(odtPath)
+    await vi.waitFor(() => expect(hOdt.opened).toHaveLength(1))
+
+    const odtDoc = hOdt.opened[0]!
+    expect(odtDoc.kind).toBe('docs')
+    expect(odtDoc.suggestSaveAs).toBe(join(ODF_FIXTURES_DIR, '06-with-footnotes.docx'))
+    const docxBytes = new Uint8Array(readFileSync(odtDoc.tempPath))
+    expect(detectOoxmlKindFromZipBytes(docxBytes)).toBe('docx')
+    expect(() => validateOoxmlOutputBytes(docxBytes, 'docx')).not.toThrow()
+    expect(Buffer.compare(odtBefore, readFileSync(odtPath))).toBe(0)
+    expect(hOdt.notices).toHaveLength(1)
+    expect(hOdt.notices[0]).toContain('06-with-footnotes.odt')
+    expect(hOdt.notices[0]).toContain('footnotes (20)')
+
+    const odpPath = join(ODF_FIXTURES_DIR, 'native-impress.odp')
+    const odpBefore = readFileSync(odpPath)
+    const hOdp = harness(missingLoConvert, { odfFallback: realEngine })
+    createLegacyOpener(hOdp.deps).open(odpPath)
+    await vi.waitFor(() => expect(hOdp.opened).toHaveLength(1))
+
+    const odpDoc = hOdp.opened[0]!
+    expect(odpDoc.kind).toBe('slides')
+    expect(odpDoc.suggestSaveAs).toBe(join(ODF_FIXTURES_DIR, 'native-impress.pptx'))
+    const pptxBytes = new Uint8Array(readFileSync(odpDoc.tempPath))
+    expect(detectOoxmlKindFromZipBytes(pptxBytes)).toBe('pptx')
+    expect(() => validateOoxmlOutputBytes(pptxBytes, 'pptx')).not.toThrow()
+    expect(Buffer.compare(odpBefore, readFileSync(odpPath))).toBe(0)
+    expect(hOdp.notices).toHaveLength(1)
+    expect(hOdp.notices[0]).toBe(
+      'Some parts of “native-impress.odp” could not be carried over: images (1), speaker notes (3), shapes (3). Reinstall the app to restore full fidelity.',
+    )
   })
 })
 
