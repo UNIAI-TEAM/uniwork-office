@@ -65,7 +65,8 @@ interface OpenOptions {
   theme?: 'light' | 'dark'
   readonly?: boolean
   pick?: boolean
-  ai?: boolean
+  /** UniWork AI (the frame's only AI) and its cloud tools */
+  uniwork?: boolean
   /** the host grants `desktopOpen` and records the frame's `app.open` requests */
   desktopOpen?: boolean
 }
@@ -78,7 +79,7 @@ async function openPdf(page: Page, o: OpenOptions = {}): Promise<Frame> {
     theme: o.theme ?? 'light',
     ...(o.readonly ? { readonly: '1' } : {}),
     ...(o.pick ? { pick: '1' } : {}),
-    ...(o.ai ? { ai: '1' } : {}),
+    ...(o.uniwork ? { uniwork: '1' } : {}),
     ...(o.desktopOpen ? { desktopopen: '1' } : {}),
   })
   await page.goto(`/test-host/?${q}`)
@@ -407,7 +408,7 @@ test.describe('pdf module on the web', () => {
   }) => {
     await page.setViewportSize({ width: 1176, height: 800 })
     const problems = await watch(page)
-    const frame = await openPdf(page, { lang: 'vi', ai: true })
+    const frame = await openPdf(page, { lang: 'vi', uniwork: true })
     await waitRendered(frame)
     const band = await frame.evaluate(() => {
       const b = document.querySelector('[data-ribbon-body]') as HTMLElement
@@ -586,6 +587,8 @@ test.describe('pdf module on the web: a second Save commits nothing', () => {
     })
     const box = frame.locator('.ai-input-box textarea').first()
     await expect(box).toBeVisible({ timeout: 30_000 })
+    // UniWork AI asks once per document before the first question (S8)
+    await frame.locator('.ai-uniwork-disclosure-ack').click()
     await box.fill('replace the first line')
     await box.press('Enter')
     await expect(frame.locator('.ai-msg-assistant').last()).toBeVisible({ timeout: 30_000 })
@@ -640,9 +643,8 @@ test.describe('pdf module on the web: a second Save commits nothing', () => {
     request,
   }) => {
     await fakeAi(request, null)
-    await fakeAi(request, { credentials: [{ provider: 'openai', api_key: 'sk-test-openai-abcd' }] })
     const problems = await watch(page)
-    const frame = await openPdf(page, { fixture: 'sample.pdf', ai: true })
+    const frame = await openPdf(page, { fixture: 'sample.pdf', uniwork: true })
     await waitRendered(frame)
     await aiEditFirstLine(request, frame)
     await host(page, 'holdNextReload', 2500)

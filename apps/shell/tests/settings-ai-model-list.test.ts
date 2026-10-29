@@ -1,9 +1,6 @@
 /**
  * @vitest-environment jsdom
  */
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
@@ -69,12 +66,6 @@ function installApi(settings: AiSettings): void {
     getAiSettings: async () => settings,
     setAiSettings: vi.fn(async () => undefined),
   } as unknown as HomeApi
-}
-
-/** React-controlled inputs only see the value through the native setter */
-function setNativeValue(input: HTMLInputElement, value: string): void {
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
-  input.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
 async function click(button: HTMLButtonElement): Promise<void> {
@@ -147,429 +138,43 @@ describe('Settings › AI model: the Model dropdown', () => {
   })
 })
 
-describe('Settings › AI model: org-managed provider row (G6-05k)', () => {
-  async function openAiPaneWithLocale(locale: 'en' | 'vi'): Promise<void> {
+describe('Settings › AI model: a provider without a key', () => {
+  /** a keyless slot whose source carries a model and an unknown `origin` marker (read like any other) */
+  function keyless(): AiSettings {
+    const settings = stored('claude-opus-5', {
+      chosen: 'claude-sonnet-5',
+      origin: 'org',
+      listed: CATALOG,
+    } as AiModelSource)
+    settings.providers.anthropic.apiKey = ''
+    return settings
+  }
+
+  it('shows the key and base URL fields, the own-key hint and the slot model, whatever its source says', async () => {
+    installApi(keyless())
+    await openAiPane()
+    expect(host.querySelector<HTMLInputElement>('#set-ai-key')?.value).toBe('')
+    expect(host.querySelector('#set-ai-base-url')).not.toBeNull()
+    expect(host.querySelector('.set-ai-note')!.textContent).toContain('Chats use your own key')
+    const trigger = host.querySelector<HTMLButtonElement>('.gs-dd-btn[aria-label="Model"]')!
+    expect(trigger.textContent).toContain('claude-opus-5')
+    expect(host.textContent).not.toContain('Key on UniWork')
+  })
+
+  it('offers no "Khóa trên UniWork" row in Vietnamese either', async () => {
+    installApi(keyless())
     await act(async () => {
       root.render(
         createElement(
           LocaleProvider,
-          { key: locale, initial: locale },
+          { initial: 'vi' },
           createElement(SettingsModal, { onClose: vi.fn(), initialSection: 'aiModel' }),
         ),
       )
       await Promise.resolve()
       await Promise.resolve()
     })
-  }
-
-  it('renders an org provider as a read-only row in English and Vietnamese with no key or base-url inputs', async () => {
-    const settings = stored('claude-sonnet-5', {
-      chosen: 'claude-sonnet-5',
-      origin: 'org',
-      listed: CATALOG,
-    })
-    // Even if a caller passed a placeholder/hint in apiKey, it must not render as an input
-    settings.providers.anthropic.apiKey = ''
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
-    installApi(settings)
-
-    await openAiPaneWithLocale('en')
-
-    expect(host.querySelector('#set-ai-key')).toBeNull()
-    expect(host.querySelector('#set-ai-base-url')).toBeNull()
-    const rowEn = host.querySelector<HTMLElement>('[data-org-key-row]')
-    expect(rowEn).not.toBeNull()
-    expect(rowEn!.querySelector('[data-org-key-tag]')?.textContent).toBe('Key on UniWork')
-    expect(rowEn!.querySelector('[data-org-key-note]')?.textContent).toBe(
-      "Sent through your organization's UniWork server with the key you saved on UniWork. UniWork records usage only and does not store the content.",
-    )
-    const manageBtnEn = rowEn!.querySelector<HTMLButtonElement>('[data-org-key-manage]')
-    expect(manageBtnEn?.textContent).toBe('Manage keys on UniWork (web)')
-    await click(manageBtnEn!)
-    expect(openSpy).toHaveBeenCalledWith(
-      'https://uniworkos.com/settings/ai',
-      '_blank',
-      'noopener,noreferrer',
-    )
-    openSpy.mockRestore()
-
-    await openAiPaneWithLocale('vi')
-    expect(host.querySelector('#set-ai-key')).toBeNull()
-    expect(host.querySelector('#set-ai-base-url')).toBeNull()
-    const rowVi = host.querySelector<HTMLElement>('[data-org-key-row]')
-    expect(rowVi).not.toBeNull()
-    expect(rowVi!.querySelector('[data-org-key-tag]')?.textContent).toBe('Khóa trên UniWork')
-    expect(rowVi!.querySelector('[data-org-key-note]')?.textContent).toBe(
-      'Gửi qua máy chủ UniWork của tổ chức bằng khóa bạn đã lưu trên UniWork. UniWork chỉ ghi số liệu sử dụng, không lưu nội dung.',
-    )
-    expect(rowVi!.querySelector('[data-org-key-manage]')?.textContent).toBe(
-      'Quản lý khóa trên UniWork (web)',
-    )
-  })
-
-  /** the model dropdown pick that marks the pane dirty, then Save; returns what was sent */
-  async function pickOpusAndSave(): Promise<AiSettings> {
-    const trigger = host.querySelector<HTMLButtonElement>('.gs-dd-btn[aria-label="Model"]')!
-    await click(trigger)
-    const opusOption = Array.from(
-      host.querySelectorAll<HTMLButtonElement>('.gs-dd-pop [role="option"]'),
-    ).find((opt) => (opt.getAttribute('aria-label') ?? opt.textContent) === 'claude-opus-5')!
-    await click(opusOption)
-    const saveBtn = host.querySelector<HTMLButtonElement>('button.set-btn.primary')!
-    expect(saveBtn.disabled).toBe(false)
-    await click(saveBtn)
-    const setAiSettingsMock = vi.mocked(window.aiOffice.setAiSettings)
-    expect(setAiSettingsMock).toHaveBeenCalledTimes(1)
-    // the dropdown pick is the explicit pick signal main records
-    expect(setAiSettingsMock.mock.calls[0][1]).toEqual({
-      includeUniworkPick: true,
-      modelPicks: [{ provider: 'anthropic', model: 'claude-opus-5' }],
-    })
-    return setAiSettingsMock.mock.calls[0][0]
-  }
-
-  it('saving Settings keeps the local key and base URL of the org provider and of every other provider byte-identical', async () => {
-    const settings = stored('claude-sonnet-5', {
-      chosen: 'claude-sonnet-5',
-      origin: 'org',
-      listed: CATALOG,
-    })
-    // a key typed on this machine earlier that is not "usable" yet, next to other local slots
-    settings.providers.anthropic = {
-      apiKey: 'sk-ant-local-9f2a',
-      baseUrl: 'https://anthropic.local.example',
-      model: '',
-    }
-    settings.providers.openai = {
-      apiKey: 'sk-openai-local',
-      baseUrl: 'https://openai.local.example/v1',
-      model: 'gpt-local',
-    }
-    settings.providers.custom = { apiKey: '', baseUrl: 'http://127.0.0.1:11434/v1', model: 'llama' }
-    const before = JSON.stringify(settings.providers)
-    installApi(settings)
-
-    await openAiPane()
-    const saved = await pickOpusAndSave()
-
-    // only the edited provider's model moved; no key or base URL slot was rewritten
-    expect(saved.providers.anthropic).toEqual({
-      apiKey: 'sk-ant-local-9f2a',
-      baseUrl: 'https://anthropic.local.example',
-      model: 'claude-opus-5',
-    })
-    expect(JSON.stringify({ ...saved.providers, anthropic: settings.providers.anthropic })).toBe(
-      before,
-    )
-  })
-
-  it('shows the model main resolved (modelSources chosen) for an org row, not a model left in the local slot', async () => {
-    const settings = stored('claude-stale-local', {
-      chosen: 'claude-sonnet-5',
-      origin: 'org',
-      listed: CATALOG,
-    })
-    settings.providers.anthropic = { apiKey: '', model: 'claude-stale-local' }
-    installApi(settings)
-    await openAiPane()
-    const trigger = host.querySelector<HTMLButtonElement>('.gs-dd-btn[aria-label="Model"]')!
-    expect(trigger.textContent).toContain('claude-sonnet-5')
-    expect(trigger.textContent).not.toContain('claude-stale-local')
-  })
-
-  it('never writes the org-resolved model into the local slot of an untouched provider', async () => {
-    const settings = stored('', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG })
-    settings.providers.anthropic = { apiKey: '', model: '' }
-    installApi(settings)
-    await openAiPane()
-    // the row shows the model main resolved
-    const trigger = host.querySelector<HTMLButtonElement>('.gs-dd-btn[aria-label="Model"]')!
-    expect(trigger.textContent).toContain('claude-sonnet-5')
-
-    // an unrelated edit (output cap) makes the form dirty, then Save
-    const cap = host.querySelector<HTMLInputElement>('#set-ai-max-tokens')!
-    await act(async () => {
-      setNativeValue(cap, '8192')
-      cap.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
-    })
-    await click(host.querySelector<HTMLButtonElement>('button.set-btn.primary')!)
-    const sent = vi.mocked(window.aiOffice.setAiSettings).mock.calls[0][0]
-    expect(sent.providers.anthropic.model).toBe('')
-    expect(sent.providers.anthropic.apiKey).toBe('')
-    // no model was chosen: the save carries no pick marker
-    expect(vi.mocked(window.aiOffice.setAiSettings).mock.calls[0][1]).toEqual({
-      includeUniworkPick: true,
-    })
-  })
-
-  it('"use a key on this computer" opens the normal key and base URL fields; a typed key is sent on save', async () => {
-    const settings = stored('claude-sonnet-5', {
-      chosen: 'claude-sonnet-5',
-      origin: 'org',
-      listed: CATALOG,
-    })
-    settings.providers.anthropic.apiKey = ''
-    installApi(settings)
-    await openAiPane()
-
-    const useLocal = host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!
-    expect(useLocal.tagName).toBe('BUTTON')
-    expect(useLocal.getAttribute('tabindex')).not.toBe('-1')
-    expect(useLocal.textContent).toBe('Use a key on this computer')
-    await click(useLocal)
-
-    expect(host.querySelector('[data-org-key-row]')).toBeNull()
-    const key = host.querySelector<HTMLInputElement>('#set-ai-key')!
-    expect(key).not.toBeNull()
-    expect(host.querySelector('#set-ai-base-url')).not.toBeNull()
-    expect(host.querySelector(`label[for="set-ai-key"]`)).not.toBeNull()
-    await act(async () => setNativeValue(key, 'sk-ant-new-local'))
-    await click(host.querySelector<HTMLButtonElement>('button.set-btn.primary')!)
-
-    const sent = vi.mocked(window.aiOffice.setAiSettings).mock.calls[0][0]
-    expect(sent.providers.anthropic.apiKey).toBe('sk-ant-new-local')
-  })
-
-  it('cancel on the local key fields restores the read-only org row, drops the typed key and leaves a clean form clean', async () => {
-    installApi(
-      stored('claude-sonnet-5', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG }),
-    )
-    await openAiPane()
-    const saveBtn = () => host.querySelector<HTMLButtonElement>('button.set-btn.primary')!
-    expect(saveBtn().disabled).toBe(true)
-    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!)
-    const key = host.querySelector<HTMLInputElement>('#set-ai-key')!
-    await act(async () => setNativeValue(key, 'sk-ant-typed'))
-    expect(saveBtn().disabled).toBe(false)
-    const cancel = host.querySelector<HTMLButtonElement>('[data-org-key-use-local-cancel]')!
-    expect(cancel.textContent).toBe('Back to the key on UniWork')
-    await click(cancel)
-
-    expect(host.querySelector('#set-ai-key')).toBeNull()
-    expect(host.querySelector('[data-org-key-row]')).not.toBeNull()
-    expect(host.querySelector('[data-org-key-use-local]')).not.toBeNull()
-    // nothing else changed: Save is off again and no save can carry the typed text
-    expect(saveBtn().disabled).toBe(true)
-    await click(saveBtn())
-    expect(window.aiOffice.setAiSettings).not.toHaveBeenCalled()
-  })
-
-  it('cancel keeps the form dirty when something else changed, and the save carries the slot as loaded', async () => {
-    const settings = stored('claude-sonnet-5', {
-      chosen: 'claude-sonnet-5',
-      origin: 'org',
-      listed: CATALOG,
-    })
-    // main gives an org-served slot no key
-    settings.providers.anthropic.apiKey = ''
-    installApi(settings)
-    await openAiPane()
-    // an unrelated edit first (output cap), then the local key row opens, a key is typed, Cancel
-    const cap = host.querySelector<HTMLInputElement>('#set-ai-max-tokens')!
-    await act(async () => {
-      setNativeValue(cap, '8192')
-      cap.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
-    })
-    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!)
-    await act(async () =>
-      setNativeValue(host.querySelector<HTMLInputElement>('#set-ai-key')!, 'sk-ant-typed'),
-    )
-    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local-cancel]')!)
-
-    const saveBtn = host.querySelector<HTMLButtonElement>('button.set-btn.primary')!
-    expect(saveBtn.disabled).toBe(false)
-    await click(saveBtn)
-    const sent = vi.mocked(window.aiOffice.setAiSettings).mock.calls[0][0]
-    expect(sent.maxOutputTokens).toBe(8192)
-    expect(sent.providers.anthropic.apiKey).toBe('')
-  })
-
-  it('moves focus to the key field when the local key row opens and back to its button on cancel', async () => {
-    installApi(
-      stored('claude-sonnet-5', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG }),
-    )
-    await openAiPane()
-    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!)
-    expect(document.activeElement).toBe(host.querySelector('#set-ai-key'))
-    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local-cancel]')!)
-    expect(document.activeElement).toBe(host.querySelector('[data-org-key-use-local]'))
-  })
-
-  it.each([
-    ['en', 'Use a key on this computer', 'Back to the key on UniWork'],
-    ['vi', 'Dùng khóa trên máy này', 'Quay lại khóa trên UniWork'],
-  ] as const)('labels the local key actions in %s', async (locale, useLocal, back) => {
-    installApi(
-      stored('claude-sonnet-5', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG }),
-    )
-    await openAiPaneWithLocale(locale)
-    const action = host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!
-    expect(action.textContent).toBe(useLocal)
-    await click(action)
-    expect(
-      host.querySelector<HTMLButtonElement>('[data-org-key-use-local-cancel]')!.textContent,
-    ).toBe(back)
-  })
-
-  it('opens the manage page on the signed-in server', async () => {
-    installApi(
-      stored('claude-sonnet-5', { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG }),
-    )
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
-    await act(async () => {
-      root.render(
-        createElement(
-          LocaleProvider,
-          { initial: 'en' },
-          createElement(SettingsModal, {
-            onClose: vi.fn(),
-            initialSection: 'aiModel',
-            account: { status: { serverUrl: 'https://org.example.com/' } } as never,
-          }),
-        ),
-      )
-      await Promise.resolve()
-      await Promise.resolve()
-    })
-    await click(host.querySelector<HTMLButtonElement>('[data-org-key-manage]')!)
-    expect(openSpy).toHaveBeenCalledWith(
-      'https://org.example.com/settings/ai',
-      '_blank',
-      'noopener,noreferrer',
-    )
-    openSpy.mockRestore()
-  })
-
-  it('keeps the editable API key input when origin is local or absent', async () => {
-    installApi(
-      stored('claude-sonnet-5', {
-        chosen: 'claude-sonnet-5',
-        origin: 'local',
-        listed: CATALOG,
-      }),
-    )
-    await openAiPane()
-    expect(host.querySelector('[data-org-key-row]')).toBeNull()
-    expect(host.querySelector<HTMLInputElement>('#set-ai-key')?.value).toBe('sk-ant-x')
-  })
-
-  const ORG = { chosen: 'claude-sonnet-5', origin: 'org', listed: CATALOG } as const
-
-  it('puts the "Key on UniWork" tag on the label line as a pill, not next to the buttons (F-1)', async () => {
-    installApi(stored('claude-sonnet-5', ORG))
-    await openAiPane()
-    const row = host.querySelector<HTMLElement>('[data-org-key-row]')!
-    const tag = row.querySelector<HTMLElement>('[data-org-key-tag]')!
-    expect(tag.classList.contains('set-org-key-tag')).toBe(true)
-    const head = tag.parentElement!
-    expect(head.classList.contains('set-org-key-head')).toBe(true)
-    // the same line as the "API key" label, which is a sibling of the tag
-    expect(head.querySelector('.set-field-label')?.textContent).toBe('API key')
-    // the note stays a separate line below, and the tag is not part of the actions column
-    expect(head.contains(row.querySelector('[data-org-key-note]'))).toBe(false)
-    expect(row.querySelector('.set-org-key-actions')!.contains(tag)).toBe(false)
-  })
-
-  it('styles the tag pill like the composer chip tag: no wrap, no shrink, tokens only (F-1)', () => {
-    const css = readFileSync(
-      resolve(dirname(fileURLToPath(import.meta.url)), '../src/renderer/src/settings.css'),
-      'utf8',
-    )
-    const rule = /\.set-org-key-tag\s*\{([^}]*)\}/.exec(css)?.[1] ?? ''
-    expect(rule).toMatch(/white-space:\s*nowrap/)
-    expect(rule).toMatch(/flex-shrink:\s*0/)
-    expect(rule).toMatch(/border:\s*1px solid var\(--border-subtle\)/)
-    expect(rule).toMatch(/background:\s*var\(--surface-subtle\)/)
-    expect(rule).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i)
-  })
-
-  it('says chats go through the key on UniWork above Model, not "your own key" (F-2)', async () => {
-    installApi(stored('claude-sonnet-5', ORG))
-    await openAiPaneWithLocale('en')
-    const hint = host.querySelector('.set-ai-note')!
-    expect(hint.textContent).toBe(
-      'Chats go through the key saved on UniWork. Image generation, media analysis and web search follow the AI Media section.',
-    )
-    expect(hint.textContent).not.toContain('your own key')
-
-    await openAiPaneWithLocale('vi')
-    expect(host.querySelector('.set-ai-note')!.textContent).toBe(
-      'Chat đi qua key đã lưu trên UniWork. Tạo ảnh, phân tích media và tìm kiếm web theo mục AI Media.',
-    )
-  })
-
-  it('keeps the own-key chat hint for a provider with a local key (F-2)', async () => {
-    installApi(stored('claude-sonnet-5', { ...ORG, origin: 'local' }))
-    await openAiPane()
-    expect(host.querySelector('.set-ai-note')!.textContent).toContain('Chats use your own key')
-  })
-
-  it('keeps the own-key chat hint after "use a key on this computer" on an org provider (F-2)', async () => {
-    installApi(stored('claude-sonnet-5', ORG))
-    await openAiPane()
-    await click(host.querySelector<HTMLButtonElement>('[data-org-key-use-local]')!)
-    expect(host.querySelector('.set-ai-note')!.textContent).toContain('Chats use your own key')
-  })
-
-  it('shares the API key row between the use-a-local-key and manage buttons, with no empty-label row (F-3)', async () => {
-    installApi(stored('claude-sonnet-5', ORG))
-    await openAiPane()
-    const row = host.querySelector<HTMLElement>('[data-org-key-row]')!
-    const useLocal = row.querySelector<HTMLButtonElement>('[data-org-key-use-local]')
-    expect(useLocal).not.toBeNull()
-    expect(row.querySelector('[data-org-key-manage]')).not.toBeNull()
-    expect(useLocal!.parentElement).toBe(row.querySelector('[data-org-key-manage]')!.parentElement)
-    // no second row whose label cell is empty
-    expect(host.querySelectorAll('[data-org-key-use-local]')).toHaveLength(1)
-    expect(
-      Array.from(host.querySelectorAll('.set-field-text')).filter(
-        (cell) => !cell.textContent && !cell.children.length,
-      ),
-    ).toHaveLength(0)
-  })
-
-  it('picks for two org-served providers before one Save are all sent in that save', async () => {
-    const settings = stored('claude-sonnet-5', {
-      chosen: 'claude-sonnet-5',
-      origin: 'org',
-      listed: CATALOG,
-    })
-    settings.providers.anthropic = { apiKey: '', model: 'claude-sonnet-5' }
-    settings.providers.openai = { apiKey: '', model: 'gpt-a' }
-    settings.modelSources = {
-      ...settings.modelSources,
-      openai: { chosen: 'gpt-a', origin: 'org', listed: ['gpt-a', 'gpt-b'] },
-    }
-    installApi(settings)
-    const catalog = window.aiOffice.getAiProviders!()
-    window.aiOffice.getAiProviders = () => [
-      ...catalog,
-      { ...catalog[0], id: 'openai', label: 'OpenAI', models: ['gpt-a', 'gpt-b'] },
-    ]
-    await openAiPane()
-
-    const choose = async (label: string, option: string) => {
-      await click(host.querySelector<HTMLButtonElement>(`.gs-dd-btn[aria-label="${label}"]`)!)
-      const target = Array.from(
-        host.querySelectorAll<HTMLButtonElement>('.gs-dd-pop [role="option"]'),
-      ).find((opt) => (opt.getAttribute('aria-label') ?? opt.textContent) === option)!
-      await click(target)
-    }
-    // A, then B on another provider, then one Save
-    await choose('Model', 'claude-opus-5')
-    await choose('Provider', 'OpenAI')
-    await choose('Model', 'gpt-b')
-    await click(host.querySelector<HTMLButtonElement>('button.set-btn.primary')!)
-
-    const setAiSettingsMock = vi.mocked(window.aiOffice.setAiSettings)
-    expect(setAiSettingsMock).toHaveBeenCalledTimes(1)
-    const options = setAiSettingsMock.mock.calls[0][1]
-    expect(options?.modelPicks).toHaveLength(2)
-    expect(options?.modelPicks).toEqual(
-      expect.arrayContaining([
-        { provider: 'anthropic', model: 'claude-opus-5' },
-        { provider: 'openai', model: 'gpt-b' },
-      ]),
-    )
+    expect(host.querySelector('#set-ai-key')).not.toBeNull()
+    expect(host.textContent).not.toContain('Khóa trên UniWork')
   })
 })

@@ -1,27 +1,6 @@
 import type { zh } from './zh'
 
 export const es = {
-  aiWebSettingsTitle: 'Configuración de IA',
-  aiWebSettingsIntro:
-    'El asistente usa tu propia clave API del proveedor. UniWork la guarda cifrada; la clave nunca se envía a esta página.',
-  aiWebProvider: 'Proveedor',
-  aiWebModel: 'Modelo',
-  aiWebKeySaved: 'Clave guardada {hint}',
-  aiWebNoKey: 'No hay ninguna clave guardada',
-  aiWebApiKey: 'Clave API',
-  aiWebApiKeyKeep: 'Nueva clave API (déjalo vacío para conservar la guardada)',
-  aiWebBaseUrl: 'URL base',
-  aiWebSaveKey: 'Guardar clave',
-  aiWebRemoveKey: 'Eliminar clave',
-  aiWebDone: 'Listo',
-  aiWebLoading: 'Cargando…',
-  aiWebLoadFailed: 'No se pudo cargar la configuración de IA. Inténtalo más tarde.',
-  aiWebCloudTitle: 'Herramientas en la nube de UniWork AI',
-  aiWebCloudOff: 'No está incluido en el plan de tu organización',
-  aiWebCredits: 'Créditos restantes: {remaining} de {limit}',
-  aiWebCreditsUnlimited: 'Créditos: sin límite',
-  aiWebCreditsRenew: 'Se renueva el {date}',
-  aiWebOpenSettings: 'Configuración de IA',
   aiWebClose: 'Cerrar',
   aiWebStateCreditsTitle: 'Créditos de IA agotados',
   aiWebStateCreditsBody:
@@ -29,11 +8,6 @@ export const es = {
   aiWebStateEntitlementTitle: 'La IA no está en tu plan',
   aiWebStateEntitlementBody:
     'El plan de UniWork de tu organización no incluye esta función de IA. Consulta a tu administrador.',
-  aiWebStateKeyMissingTitle: 'Aún no hay clave de IA',
-  aiWebStateKeyMissingBody: 'Añade una clave de API en los ajustes de IA para usar el asistente.',
-  aiWebStateKeyRejectedTitle: 'Se rechazó la clave de IA',
-  aiWebStateKeyRejectedBody:
-    'El proveedor rechazó la clave guardada. Sustitúyela en la configuración de IA.',
   aiWebStateRateTitle: 'Demasiadas solicitudes de IA',
   aiWebStateRateBody: 'Espera {seconds} s y vuelve a intentarlo.',
   aiWebStateRateBodyNow: 'Espera un momento y vuelve a intentarlo.',
@@ -49,11 +23,6 @@ export const es = {
   aiWebStateSessionBody: 'Vuelve a abrir el documento desde UniWork para continuar.',
   aiWebStateRefusedTitle: 'Solicitud rechazada',
   aiWebStateRefusedBody: 'El servidor rechazó la solicitud de IA.',
-  aiWebStateModelTitle: 'Elige un modelo',
-  aiWebStateModelBody:
-    'Elige un modelo en el menú de modelos junto al cuadro de mensaje y vuelve a enviar.',
-  aiWebStateBaseUrlBody: 'Esta URL base no está permitida. Usa una dirección https:// pública.',
-  aiWebStateProviderBody: 'Este proveedor no es compatible.',
   aiWebStateUnknownTitle: 'Error en la solicitud de IA',
   aiWebStateUnknownBody: 'Algo salió mal. Inténtalo de nuevo.',
 

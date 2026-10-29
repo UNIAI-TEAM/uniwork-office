@@ -9,7 +9,7 @@
 //  6. keyboard at 390: Enter on the rail focuses the composer, the dock is a modal dialog, Tab stays
 //     in it, Esc closes it and focus returns to the rail; at 1280 neither dialog role nor aria-modal
 //  7. the header close button sits inside the viewport at 360 / 390 / 430
-// No credential is seeded; the numbers come from plan-s0.md section 5 (no dates in the fixtures).
+// UniWork AI is granted (no key); the numbers come from plan-s0.md section 5 (no dates in the fixtures).
 // Run: npx playwright test -c web/e2e ai-panel-phone
 import { test, expect, type APIRequestContext, type Frame, type Page } from '@playwright/test'
 import { built } from './text-modules'
@@ -45,13 +45,13 @@ async function resetFakeAi(request: APIRequestContext) {
 
 async function openModule(page: Page, mod: Mod, width: number, height: number): Promise<Frame> {
   await page.setViewportSize({ width, height })
-  await page.goto(`/test-host/?${FIXTURE[mod]}&lang=en&ai=1`)
+  await page.goto(`/test-host/?${FIXTURE[mod]}&lang=en&uniwork=1`)
   await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
   const frame = (await (await page.waitForSelector('#frame')).contentFrame())!
   await frame.waitForFunction(() => (document.getElementById('root')?.childElementCount ?? 0) > 0)
   await frame
     .locator(RAIL)
-    .or(frame.locator('.ai-input-need button'))
+    .or(frame.locator('.ai-input-box textarea'))
     .first()
     .waitFor({ timeout: 30_000 })
   return frame
@@ -67,7 +67,7 @@ const isOpen = (frame: Frame, mod: Mod) =>
 async function openPanel(frame: Frame, mod: Mod): Promise<void> {
   const rail = frame.locator(RAIL).first()
   if (await rail.isVisible()) await rail.click()
-  await expect(frame.locator(`${DOCK(mod)}:not(.collapsed) .ai-input-need button`)).toBeVisible({
+  await expect(frame.locator(`${DOCK(mod)}:not(.collapsed) .ai-input-box textarea`)).toBeVisible({
     timeout: 30_000,
   })
 }

@@ -1,27 +1,6 @@
 import type { zh } from './zh'
 
 export const cs = {
-  aiWebSettingsTitle: 'Nastavení AI',
-  aiWebSettingsIntro:
-    'Asistent používá váš vlastní klíč API poskytovatele. UniWork jej ukládá šifrovaně; klíč se nikdy neodesílá na tuto stránku.',
-  aiWebProvider: 'Poskytovatel',
-  aiWebModel: 'Model',
-  aiWebKeySaved: 'Uložený klíč {hint}',
-  aiWebNoKey: 'Žádný uložený klíč',
-  aiWebApiKey: 'Klíč API',
-  aiWebApiKeyKeep: 'Nový klíč API (ponechte prázdné pro zachování uloženého)',
-  aiWebBaseUrl: 'Základní URL',
-  aiWebSaveKey: 'Uložit klíč',
-  aiWebRemoveKey: 'Odebrat klíč',
-  aiWebDone: 'Hotovo',
-  aiWebLoading: 'Načítání…',
-  aiWebLoadFailed: 'Nastavení AI se nepodařilo načíst. Zkuste to později.',
-  aiWebCloudTitle: 'Cloudové nástroje UniWork AI',
-  aiWebCloudOff: 'Není součástí tarifu vaší organizace',
-  aiWebCredits: 'Zbývající kredity: {remaining} z {limit}',
-  aiWebCreditsUnlimited: 'Kredity: bez omezení',
-  aiWebCreditsRenew: 'Obnoví se {date}',
-  aiWebOpenSettings: 'Nastavení AI',
   aiWebClose: 'Zavřít',
   aiWebStateCreditsTitle: 'Kredity AI vyčerpány',
   aiWebStateCreditsBody:
@@ -29,10 +8,6 @@ export const cs = {
   aiWebStateEntitlementTitle: 'AI není ve vašem tarifu',
   aiWebStateEntitlementBody:
     'Tarif UniWork vaší organizace tuto funkci AI nezahrnuje. Obraťte se na správce.',
-  aiWebStateKeyMissingTitle: 'Zatím žádný klíč AI',
-  aiWebStateKeyMissingBody: 'Pro použití asistenta přidejte v nastavení AI klíč API.',
-  aiWebStateKeyRejectedTitle: 'Klíč AI byl odmítnut',
-  aiWebStateKeyRejectedBody: 'Poskytovatel odmítl uložený klíč. Nahraďte jej v nastavení AI.',
   aiWebStateRateTitle: 'Příliš mnoho požadavků AI',
   aiWebStateRateBody: 'Počkejte {seconds} s a zkuste to znovu.',
   aiWebStateRateBodyNow: 'Chvíli počkejte a zkuste to znovu.',
@@ -47,10 +22,6 @@ export const cs = {
   aiWebStateSessionBody: 'Pokračujte opětovným otevřením dokumentu z UniWork.',
   aiWebStateRefusedTitle: 'Požadavek odmítnut',
   aiWebStateRefusedBody: 'Server odmítl požadavek AI.',
-  aiWebStateModelTitle: 'Vyberte model',
-  aiWebStateModelBody: 'Vyberte model v nabídce modelů vedle pole zprávy a odešlete znovu.',
-  aiWebStateBaseUrlBody: 'Tato základní URL není povolena. Použijte veřejnou adresu https://.',
-  aiWebStateProviderBody: 'Tento poskytovatel není podporován.',
   aiWebStateUnknownTitle: 'Požadavek AI selhal',
   aiWebStateUnknownBody: 'Něco se pokazilo. Zkuste to znovu.',
 

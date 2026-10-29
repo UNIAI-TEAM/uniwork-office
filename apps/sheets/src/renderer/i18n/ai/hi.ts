@@ -14,7 +14,6 @@ export const hi = {
   aiAnalyzeBtn: 'AI विश्लेषण',
   aiAnalyzePrompt:
     'इस शीट के डेटा का विश्लेषण करें और मुख्य निष्कर्ष, रुझान और विसंगतियों का सारांश दें',
-  aiSettingsTitle: 'AI सेटिंग्स',
   aiSetUp: 'AI सेट करें',
   aiNewChat: 'नई बातचीत',
   aiCollapsePanel: 'AI पैनल संक्षिप्त करें',

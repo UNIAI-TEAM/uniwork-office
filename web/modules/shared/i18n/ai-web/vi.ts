@@ -1,27 +1,6 @@
 import type { zh } from './zh'
 
 export const vi = {
-  aiWebSettingsTitle: 'Cài đặt AI',
-  aiWebSettingsIntro:
-    'Trợ lý dùng khóa API của nhà cung cấp do bạn sở hữu. UniWork lưu khóa đã mã hóa; khóa không bao giờ được gửi tới trang này.',
-  aiWebProvider: 'Nhà cung cấp',
-  aiWebModel: 'Mô hình',
-  aiWebKeySaved: 'Khóa đã lưu {hint}',
-  aiWebNoKey: 'Chưa lưu khóa',
-  aiWebApiKey: 'Khóa API',
-  aiWebApiKeyKeep: 'Khóa API mới (để trống để giữ khóa đã lưu)',
-  aiWebBaseUrl: 'Base URL',
-  aiWebSaveKey: 'Lưu khóa',
-  aiWebRemoveKey: 'Xóa khóa',
-  aiWebDone: 'Xong',
-  aiWebLoading: 'Đang tải…',
-  aiWebLoadFailed: 'Không tải được cài đặt AI. Hãy thử lại sau.',
-  aiWebCloudTitle: 'Công cụ đám mây UniWork AI',
-  aiWebCloudOff: 'Gói của tổ chức bạn không bao gồm tính năng này',
-  aiWebCredits: 'Tín dụng còn lại: {remaining} / {limit}',
-  aiWebCreditsUnlimited: 'Tín dụng: không giới hạn',
-  aiWebCreditsRenew: 'Làm mới vào {date}',
-  aiWebOpenSettings: 'Cài đặt AI',
   aiWebClose: 'Đóng',
   aiWebStateCreditsTitle: 'Đã hết tín dụng AI',
   aiWebStateCreditsBody:
@@ -29,10 +8,6 @@ export const vi = {
   aiWebStateEntitlementTitle: 'Gói không bao gồm AI',
   aiWebStateEntitlementBody:
     'Gói UniWork của tổ chức bạn không bao gồm tính năng AI này. Hãy liên hệ quản trị viên.',
-  aiWebStateKeyMissingTitle: 'Chưa có khóa AI',
-  aiWebStateKeyMissingBody: 'Thêm khóa API trong Cài đặt AI để dùng trợ lý.',
-  aiWebStateKeyRejectedTitle: 'Khóa AI bị từ chối',
-  aiWebStateKeyRejectedBody: 'Nhà cung cấp đã từ chối khóa đã lưu. Hãy thay khóa trong Cài đặt AI.',
   aiWebStateRateTitle: 'Quá nhiều yêu cầu AI',
   aiWebStateRateBody: 'Hãy chờ {seconds} giây rồi thử lại.',
   aiWebStateRateBodyNow: 'Hãy chờ một lát rồi thử lại.',
@@ -47,10 +22,6 @@ export const vi = {
   aiWebStateSessionBody: 'Hãy mở lại tài liệu từ UniWork để tiếp tục.',
   aiWebStateRefusedTitle: 'Yêu cầu bị từ chối',
   aiWebStateRefusedBody: 'Máy chủ đã từ chối yêu cầu AI.',
-  aiWebStateModelTitle: 'Hãy chọn mô hình',
-  aiWebStateModelBody: 'Chọn một mô hình trong menu mô hình cạnh ô nhập tin nhắn, rồi gửi lại.',
-  aiWebStateBaseUrlBody: 'Không cho phép Base URL này. Hãy dùng một địa chỉ https:// công khai.',
-  aiWebStateProviderBody: 'Nhà cung cấp này không được hỗ trợ.',
   aiWebStateUnknownTitle: 'Yêu cầu AI thất bại',
   aiWebStateUnknownBody: 'Đã xảy ra lỗi. Hãy thử lại.',
 

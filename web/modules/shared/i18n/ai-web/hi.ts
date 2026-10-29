@@ -1,27 +1,6 @@
 import type { zh } from './zh'
 
 export const hi = {
-  aiWebSettingsTitle: 'AI सेटिंग्स',
-  aiWebSettingsIntro:
-    'सहायक आपकी अपनी प्रदाता API कुंजी का उपयोग करता है। UniWork इसे एन्क्रिप्ट करके रखता है; कुंजी कभी भी इस पेज पर नहीं भेजी जाती।',
-  aiWebProvider: 'प्रदाता',
-  aiWebModel: 'मॉडल',
-  aiWebKeySaved: 'सहेजी गई कुंजी {hint}',
-  aiWebNoKey: 'कोई कुंजी सहेजी नहीं गई',
-  aiWebApiKey: 'API कुंजी',
-  aiWebApiKeyKeep: 'नई API कुंजी (सहेजी गई कुंजी रखने के लिए खाली छोड़ें)',
-  aiWebBaseUrl: 'बेस URL',
-  aiWebSaveKey: 'कुंजी सहेजें',
-  aiWebRemoveKey: 'कुंजी हटाएँ',
-  aiWebDone: 'हो गया',
-  aiWebLoading: 'लोड हो रहा है…',
-  aiWebLoadFailed: 'AI सेटिंग्स लोड नहीं हो सकीं। बाद में फिर कोशिश करें।',
-  aiWebCloudTitle: 'UniWork AI क्लाउड टूल',
-  aiWebCloudOff: 'आपके संगठन की योजना में शामिल नहीं',
-  aiWebCredits: 'शेष क्रेडिट: {limit} में से {remaining}',
-  aiWebCreditsUnlimited: 'क्रेडिट: कोई सीमा नहीं',
-  aiWebCreditsRenew: '{date} को नवीनीकरण',
-  aiWebOpenSettings: 'AI सेटिंग्स',
   aiWebClose: 'बंद करें',
   aiWebStateCreditsTitle: 'AI क्रेडिट समाप्त',
   aiWebStateCreditsBody:
@@ -29,10 +8,6 @@ export const hi = {
   aiWebStateEntitlementTitle: 'आपकी योजना में AI नहीं है',
   aiWebStateEntitlementBody:
     'आपके संगठन की UniWork योजना में यह AI सुविधा शामिल नहीं है। अपने व्यवस्थापक से संपर्क करें।',
-  aiWebStateKeyMissingTitle: 'अभी तक कोई AI कुंजी नहीं',
-  aiWebStateKeyMissingBody: 'सहायक का उपयोग करने के लिए AI सेटिंग में API कुंजी जोड़ें।',
-  aiWebStateKeyRejectedTitle: 'AI कुंजी अस्वीकार कर दी गई',
-  aiWebStateKeyRejectedBody: 'प्रदाता ने सहेजी गई कुंजी अस्वीकार कर दी। AI सेटिंग्स में इसे बदलें।',
   aiWebStateRateTitle: 'बहुत अधिक AI अनुरोध',
   aiWebStateRateBody: '{seconds} सेकंड रुकें और फिर कोशिश करें।',
   aiWebStateRateBodyNow: 'थोड़ा रुकें और फिर कोशिश करें।',
@@ -46,10 +21,6 @@ export const hi = {
   aiWebStateSessionBody: 'जारी रखने के लिए UniWork से दस्तावेज़ फिर से खोलें।',
   aiWebStateRefusedTitle: 'अनुरोध अस्वीकृत',
   aiWebStateRefusedBody: 'सर्वर ने AI अनुरोध अस्वीकार कर दिया।',
-  aiWebStateModelTitle: 'कोई मॉडल चुनें',
-  aiWebStateModelBody: 'संदेश बॉक्स के पास मॉडल मेनू से कोई मॉडल चुनें, फिर दोबारा भेजें।',
-  aiWebStateBaseUrlBody: 'यह बेस URL अनुमत नहीं है। सार्वजनिक https:// पता उपयोग करें।',
-  aiWebStateProviderBody: 'यह प्रदाता समर्थित नहीं है।',
   aiWebStateUnknownTitle: 'AI अनुरोध विफल',
   aiWebStateUnknownBody: 'कुछ गलत हो गया। फिर कोशिश करें।',
 

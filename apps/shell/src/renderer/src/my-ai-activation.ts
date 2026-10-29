@@ -10,7 +10,6 @@ import {
   aiNoticeKindForCloud,
   aiEffectiveModel,
   aiNoticeText,
-  isOrgServedReady,
   uniAiOpenRouterKey,
 } from '@genoffice/ai-provider/browser'
 
@@ -18,8 +17,6 @@ import {
 export function aiSettingsReady(settings: AiSettings): boolean {
   const provider = settings.provider
   if (provider === 'codex') return true
-  // a key saved on UniWork serves the provider: main routes the call, the slot holds no key
-  if (isOrgServedReady(settings, provider)) return true
   if (provider === 'genspark' || provider === 'openrouter') {
     return Boolean(uniAiOpenRouterKey(settings))
   }
@@ -32,9 +29,9 @@ export function aiSettingsReady(settings: AiSettings): boolean {
 }
 
 /**
- * What a My AI turn goes out with: the active provider, the model main will serve (a key saved on
- * UniWork serves its own, not the slot's) and whether the provider can send at all. The usage
- * record carries `model`, so it must not read the slot of an org-served provider.
+ * What a My AI turn goes out with: the active provider, the model main will serve (the source's
+ * chosen model, else the slot's) and whether the provider can send at all. The usage record
+ * carries `model`.
  */
 export function myAiTurnTarget(settings: AiSettings): {
   provider: AiSettings['provider']

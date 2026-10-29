@@ -57,7 +57,7 @@ export function settingsSupportVision(
 ): boolean {
   try {
     if (!getProviderAdapter(settings.provider).capabilities.vision) return false
-    // the model main will use: for a provider served by a key on UniWork that is the source's, not the slot's
+    // the model main will use: the source's chosen model, else the slot's
     return !modelLacksVision(aiEffectiveModel(settings, settings.provider))
   } catch {
     return false

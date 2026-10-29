@@ -29,6 +29,7 @@ vi.mock('@genoffice/agent-core', async (orig) => {
 })
 
 import { AiPanel, type HtmlAiDeps } from '../src/renderer/ai/AiPanel'
+import { resetForTest } from '../src/renderer/capabilities'
 import { LocaleProvider } from '../src/renderer/i18n/locale'
 
 const flush = async (): Promise<void> => {
@@ -250,6 +251,19 @@ describe('UniWork AI chip wiring (html panel)', () => {
       root_().querySelector<HTMLButtonElement>('.ai-error-action button')!.click(),
     )
     expect((window as any).htmlApi.openAiModelSettings).toHaveBeenCalled()
+  })
+
+  it('F1: a web frame has no other provider: a credits error offers no Chọn nhà cung cấp khác', async () => {
+    ;(window as any).htmlApi.capabilities = { platform: 'web' }
+    resetForTest()
+    try {
+      await uniworkTurn()
+      await failWith('credits_exhausted', 'aiErrCredits')
+      expect(visibleErrorText()).toBe(ui('aiErrCredits'))
+      expect(root_().querySelector('[data-action="choose-provider"]')).toBeNull()
+    } finally {
+      resetForTest()
+    }
   })
 
   // F12 (visual r2): the "not sent" bubble's own Retry sat next to the labelled S9 action on every UniWork

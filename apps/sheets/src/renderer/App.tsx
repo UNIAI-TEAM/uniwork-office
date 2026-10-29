@@ -1843,7 +1843,7 @@ export function App({
   }
 
   function isAgentConfigured(): boolean {
-    return agentConfigured(aiSettingsRef.current, cap('aiCredentials'))
+    return agentConfigured(aiSettingsRef.current)
   }
 
   /** Image attachments read as base64 and sent multimodal with this user message

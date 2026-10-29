@@ -1,27 +1,6 @@
 import type { zh } from './zh'
 
 export const pl = {
-  aiWebSettingsTitle: 'Ustawienia AI',
-  aiWebSettingsIntro:
-    'Asystent używa Twojego własnego klucza API dostawcy. UniWork przechowuje go w postaci zaszyfrowanej; klucz nigdy nie jest wysyłany do tej strony.',
-  aiWebProvider: 'Dostawca',
-  aiWebModel: 'Model',
-  aiWebKeySaved: 'Zapisany klucz {hint}',
-  aiWebNoKey: 'Brak zapisanego klucza',
-  aiWebApiKey: 'Klucz API',
-  aiWebApiKeyKeep: 'Nowy klucz API (zostaw puste, aby zachować zapisany)',
-  aiWebBaseUrl: 'Bazowy URL',
-  aiWebSaveKey: 'Zapisz klucz',
-  aiWebRemoveKey: 'Usuń klucz',
-  aiWebDone: 'Gotowe',
-  aiWebLoading: 'Ładowanie…',
-  aiWebLoadFailed: 'Nie udało się wczytać ustawień AI. Spróbuj ponownie później.',
-  aiWebCloudTitle: 'Narzędzia chmurowe UniWork AI',
-  aiWebCloudOff: 'Nie jest objęte planem Twojej organizacji',
-  aiWebCredits: 'Pozostałe kredyty: {remaining} z {limit}',
-  aiWebCreditsUnlimited: 'Kredyty: bez limitu',
-  aiWebCreditsRenew: 'Odnowienie {date}',
-  aiWebOpenSettings: 'Ustawienia AI',
   aiWebClose: 'Zamknij',
   aiWebStateCreditsTitle: 'Wyczerpano kredyty AI',
   aiWebStateCreditsBody:
@@ -29,10 +8,6 @@ export const pl = {
   aiWebStateEntitlementTitle: 'AI nie ma w Twoim planie',
   aiWebStateEntitlementBody:
     'Plan UniWork Twojej organizacji nie obejmuje tej funkcji AI. Skontaktuj się z administratorem.',
-  aiWebStateKeyMissingTitle: 'Brak klucza AI',
-  aiWebStateKeyMissingBody: 'Dodaj klucz API w ustawieniach AI, aby korzystać z asystenta.',
-  aiWebStateKeyRejectedTitle: 'Klucz AI został odrzucony',
-  aiWebStateKeyRejectedBody: 'Dostawca odrzucił zapisany klucz. Zastąp go w ustawieniach AI.',
   aiWebStateRateTitle: 'Zbyt wiele żądań AI',
   aiWebStateRateBody: 'Odczekaj {seconds} s i spróbuj ponownie.',
   aiWebStateRateBodyNow: 'Odczekaj chwilę i spróbuj ponownie.',
@@ -47,11 +22,6 @@ export const pl = {
   aiWebStateSessionBody: 'Otwórz dokument ponownie z UniWork, aby kontynuować.',
   aiWebStateRefusedTitle: 'Żądanie odrzucone',
   aiWebStateRefusedBody: 'Serwer odrzucił żądanie AI.',
-  aiWebStateModelTitle: 'Wybierz model',
-  aiWebStateModelBody:
-    'Wybierz model w menu modeli obok pola wiadomości, a następnie wyślij ponownie.',
-  aiWebStateBaseUrlBody: 'Ten bazowy URL jest niedozwolony. Użyj publicznego adresu https://.',
-  aiWebStateProviderBody: 'Ten dostawca nie jest obsługiwany.',
   aiWebStateUnknownTitle: 'Żądanie AI nie powiodło się',
   aiWebStateUnknownBody: 'Coś poszło nie tak. Spróbuj ponownie.',
 

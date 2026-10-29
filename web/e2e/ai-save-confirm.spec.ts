@@ -12,7 +12,6 @@ import { buildEditFixture } from '../../apps/sheets/tests/fixture-builder'
 import { built, repoRoot, watch } from './text-modules'
 
 const REPLY = 'Hello from the UniWork AI proxy.'
-const OPENAI_KEY = [{ provider: 'openai', api_key: 'sk-test-openai-abcd' }]
 const MARKER = 'AICONFIRM719'
 const DOCS_EDITOR = '.ProseMirror[contenteditable="true"]'
 
@@ -25,6 +24,11 @@ async function fake(request: APIRequestContext, control?: Record<string, unknown
 }
 
 const panel = (frame: Frame) => frame.locator('.ai-panel-header')
+
+/** UniWork AI asks once per document before the first question (S8): acknowledge it */
+async function acknowledge(frame: Frame) {
+  await frame.locator('.ai-uniwork-disclosure-ack').click()
+}
 
 async function ask(frame: Frame, text: string) {
   const box = frame.locator('.ai-input-box textarea').first()
@@ -112,7 +116,7 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
       module: 'sheets',
       open: '/fixtures/Edit.xlsx',
       lang: 'en',
-      ai: '1',
+      uniwork: '1',
     })
     await page.goto(`/test-host/?${qs}`)
     await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
@@ -124,6 +128,7 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
     await expect.poll(async () => (await state()) !== null, { timeout: 60_000 }).toBe(true)
     await expect(frame.locator('canvas[id^="univer-sheet-main-canvas"]').first()).toBeVisible()
     await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+    await acknowledge(frame)
     return { frame, wb: (await state())! }
   }
 
@@ -161,7 +166,6 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
     request,
   }) => {
     await fake(request)
-    await fake(request, { credentials: OPENAI_KEY })
     await watch(page)
     const { frame, wb } = await openSheets(page)
     expect(await saveCalls(page)).toBe(0)
@@ -171,7 +175,6 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
 
   test('(b) closing the frame without saving sends nothing', async ({ page, request }) => {
     await fake(request)
-    await fake(request, { credentials: OPENAI_KEY })
     await watch(page)
     const { frame, wb } = await openSheets(page)
     await appliedTurn(request, frame, wb)
@@ -186,7 +189,6 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
 
   test('(c) stopping the turn mid-stream sends nothing', async ({ page, request }) => {
     await fake(request)
-    await fake(request, { credentials: OPENAI_KEY })
     await watch(page)
     const { frame, wb } = await openSheets(page)
     // one write already landed and stayed local; the second turn is cut while streaming
@@ -202,7 +204,6 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
 
   test('(d) the frame / port going away mid-stream sends nothing', async ({ page, request }) => {
     await fake(request)
-    await fake(request, { credentials: OPENAI_KEY })
     await watch(page)
     const { frame, wb } = await openSheets(page)
     await appliedTurn(request, frame, wb)
@@ -220,7 +221,6 @@ test.describe('sheets: an AI write reaches UniWork only on the explicit Save (UN
     request,
   }) => {
     await fake(request)
-    await fake(request, { credentials: OPENAI_KEY })
     await watch(page)
     const { frame, wb } = await openSheets(page)
     await appliedTurn(request, frame, wb)
@@ -245,12 +245,13 @@ test.describe('docs: an AI write reaches UniWork only on the explicit Save (UNI-
   test.skip(!built('docs'), 'no dist-web/docs build: npm run build:web')
 
   async function openDocs(page: Page): Promise<Frame> {
-    const qs = new URLSearchParams({ open: '/fixtures/simple.docx', lang: 'en', ai: '1' })
+    const qs = new URLSearchParams({ open: '/fixtures/simple.docx', lang: 'en', uniwork: '1' })
     await page.goto(`/test-host/?${qs}`)
     await expect(page.locator('#status')).toHaveText(/^initialised/, { timeout: 30_000 })
     const frame = (await (await page.waitForSelector('#frame')).contentFrame())!
     await expect(frame.locator(DOCS_EDITOR).first()).toBeVisible({ timeout: 60_000 })
     await expect(panel(frame)).toBeVisible({ timeout: 30_000 })
+    await acknowledge(frame)
     return frame
   }
 
@@ -280,7 +281,6 @@ test.describe('docs: an AI write reaches UniWork only on the explicit Save (UNI-
     request,
   }) => {
     await fake(request)
-    await fake(request, { credentials: OPENAI_KEY })
     await watch(page)
     const frame = await openDocs(page)
     expect(await saveCalls(page)).toBe(0)
@@ -290,7 +290,6 @@ test.describe('docs: an AI write reaches UniWork only on the explicit Save (UNI-
 
   test('(b) closing the frame without saving sends nothing', async ({ page, request }) => {
     await fake(request)
-    await fake(request, { credentials: OPENAI_KEY })
     await watch(page)
     const frame = await openDocs(page)
     await appliedTurn(request, frame)
@@ -305,7 +304,6 @@ test.describe('docs: an AI write reaches UniWork only on the explicit Save (UNI-
 
   test('(c) stopping the turn mid-stream sends nothing', async ({ page, request }) => {
     await fake(request)
-    await fake(request, { credentials: OPENAI_KEY })
     await watch(page)
     const frame = await openDocs(page)
     await appliedTurn(request, frame)
@@ -320,7 +318,6 @@ test.describe('docs: an AI write reaches UniWork only on the explicit Save (UNI-
 
   test('(d) the frame / port going away mid-stream sends nothing', async ({ page, request }) => {
     await fake(request)
-    await fake(request, { credentials: OPENAI_KEY })
     await watch(page)
     const frame = await openDocs(page)
     await appliedTurn(request, frame)
@@ -338,7 +335,6 @@ test.describe('docs: an AI write reaches UniWork only on the explicit Save (UNI-
     request,
   }) => {
     await fake(request)
-    await fake(request, { credentials: OPENAI_KEY })
     await watch(page)
     const frame = await openDocs(page)
     await appliedTurn(request, frame)

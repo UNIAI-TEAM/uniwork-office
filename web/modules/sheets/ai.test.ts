@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 // UNI-1016 (SH4): AI in the Sheets web frame = the shared web AI bridge (CONTRACT C16) on the
-// Sheets globals. Off: no AI keys, no request. On: the frame-token routes. The four desktop-only
-// members stay hidden and answer typed "unavailable".
+// Sheets globals. Off: no AI keys, no request. On (the UniWork AI grant, UNI-2289): the frame-token
+// routes, UniWork AI only. The four desktop-only members stay hidden and answer typed "unavailable".
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Capabilities } from '../../docs/protocol/types'
 import { installModuleBridge } from '../../docs/bridge/module-bridge'
 import { createMockPort } from '../../docs/bridge/testing/mock-port'
 import { createSheetsWebApi } from './bridge'
@@ -18,22 +19,6 @@ const json = (status: number, body: unknown) =>
     status,
     headers: { 'content-type': 'application/json' },
   })
-
-const CREDENTIALS = {
-  items: [
-    {
-      provider: 'openai',
-      label: '',
-      base_url: '',
-      key_hint: '…abcd',
-      created_at: '2026-10-09T00:00:00Z',
-      updated_at: '2026-10-09T00:00:00Z',
-    },
-  ],
-  providers: [
-    { id: 'openai', protocol: 'openai-compatible', requires_base_url: false, default_base_url: '' },
-  ],
-}
 
 const CLOUD = {
   enabled: true,
@@ -55,11 +40,8 @@ function setup(grants: Record<string, boolean>, answer?: (url: string) => Respon
     const url = String(input)
     urls.push(url)
     if (answer) return answer(url)
-    if (url.endsWith('/credentials')) return json(200, CREDENTIALS)
     if (url.endsWith('/cloud')) return json(200, CLOUD)
-    if (url.endsWith('/byok/openai/chat/completions'))
-      return json(200, { choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] })
-    return json(404, { code: 'credential_missing' })
+    return json(404, { code: 'not_found' })
   })
   vi.stubGlobal('fetch', fetch)
   const mock = createMockPort({ documentId: 'doc-1' })
@@ -105,20 +87,27 @@ afterEach(() => {
 })
 
 describe('sheetsHostGrants (AI family)', () => {
-  it('maps ai / aiCredentials / the cloud tools; each tool needs ai too', () => {
+  it('maps the UniWork AI grant and the cloud tools; each tool needs the UniWork AI grant too', () => {
     expect(
-      sheetsHostGrants({ ai: true, webSearch: true, imageSearch: true, imageGeneration: false }),
-    ).toMatchObject({
-      ai: true,
-      aiCredentials: true,
-      webSearch: true,
-      imageSearch: true,
-      imageGeneration: false,
-    })
+      sheetsHostGrants({
+        uniworkAi: true,
+        webSearch: true,
+        imageSearch: true,
+        imageGeneration: false,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        ai: true,
+        uniworkAi: true,
+        webSearch: true,
+        imageSearch: true,
+        imageGeneration: false,
+      }),
+    )
     expect(sheetsHostGrants({ webSearch: true, imageSearch: true, imageGeneration: true })).toEqual(
       expect.objectContaining({
         ai: false,
-        aiCredentials: false,
+        uniworkAi: false,
         webSearch: false,
         imageSearch: false,
         imageGeneration: false,
@@ -127,19 +116,11 @@ describe('sheetsHostGrants (AI family)', () => {
     expect(sheetsHostGrants(undefined).ai).toBe(false)
   })
 
-  it('sheetsHostGrants uniworkAi alone: the panel opens, no credentials entry, no cloud tools', () => {
-    expect(sheetsHostGrants({ uniworkAi: true })).toEqual(
-      expect.objectContaining({
-        ai: true,
-        aiCredentials: false,
-        uniworkAi: true,
-        webSearch: false,
-        imageSearch: false,
-        imageGeneration: false,
-      }),
+  it('has no key settings entry, and an old `ai` grant alone opens nothing', () => {
+    expect(sheetsHostGrants({ uniworkAi: true })).not.toHaveProperty('aiCredentials')
+    expect(sheetsHostGrants({ ai: true, webSearch: true } as Capabilities)).toEqual(
+      expect.objectContaining({ ai: false, uniworkAi: false, webSearch: false }),
     )
-    expect(sheetsHostGrants({ uniworkAi: true, webSearch: true }).webSearch).toBe(true)
-    expect(sheetsHostGrants({ ai: true }).uniworkAi).toBe(false)
   })
 
   it('still maps the file grants', () => {
@@ -149,13 +130,12 @@ describe('sheetsHostGrants (AI family)', () => {
   })
 })
 
-describe('without the ai grant', () => {
+describe('without the UniWork AI grant', () => {
   it('shows no AI UI: every key false, the members answer as the stubs, no AI request', async () => {
     const t = setup({ filePick: true, save: true })
     await t.boot()
     expect(t.caps).toMatchObject({
       ai: false,
-      aiCredentials: false,
       webSearch: false,
       imageSearch: false,
       imageGeneration: false,
@@ -163,6 +143,7 @@ describe('without the ai grant', () => {
       autoRename: false,
       mergeWorkbooks: false,
     })
+    expect(t.caps).not.toHaveProperty('aiCredentials')
     const r = await t.desktop.aiChat({ settings: {}, system: 's', user: 'u' })
     expect(r).toMatchObject({ ok: false })
     expect(String(r.error)).toMatch(/^ai-unavailable:/)
@@ -170,23 +151,23 @@ describe('without the ai grant', () => {
     expect(t.fetch).not.toHaveBeenCalled()
   })
 
-  it('a webSearch grant alone changes nothing', async () => {
-    const t = setup({ webSearch: true, imageSearch: true, imageGeneration: true })
+  it('the cloud tool grants and an old `ai` grant change nothing', async () => {
+    const t = setup({ ai: true, webSearch: true, imageSearch: true, imageGeneration: true })
     await t.boot()
     expect(t.caps).toMatchObject({ ai: false, webSearch: false, imageSearch: false })
     expect(t.fetch).not.toHaveBeenCalled()
   })
 })
 
-describe('with the ai grant', () => {
+describe('with the UniWork AI grant', () => {
   it('turns the AI keys on, narrowed by the server tool switches', async () => {
-    const t = setup({ ai: true, webSearch: true, imageSearch: true, imageGeneration: true })
+    const t = setup({ uniworkAi: true, webSearch: true, imageSearch: true, imageGeneration: true })
     await t.boot()
     await vi.waitFor(() => expect(t.urls.some((u) => u.endsWith('/cloud'))).toBe(true))
     await vi.waitFor(() => expect(t.caps.imageSearch).toBe(false))
     expect(t.caps).toMatchObject({
       ai: true,
-      aiCredentials: true,
+      uniworkAi: true,
       webSearch: true,
       imageGeneration: true,
     })
@@ -198,41 +179,34 @@ describe('with the ai grant', () => {
     })
   })
 
-  it('chat runs on the frame-token BYOK route, never on a stub', async () => {
-    const t = setup({ ai: true })
+  it('the settings name UniWork AI only; nothing reads or uses a provider key', async () => {
+    const t = setup({ uniworkAi: true })
     await t.boot()
     const settings = await t.desktop.getAiSettings()
-    expect(settings.provider).toBe('openai')
-    // never the key: the masked hint of the stored credential, which the proxy transport drops
-    expect(settings.providers.openai.apiKey).toBe('…abcd')
+    expect(settings.provider).toBe('uniwork')
+    expect(Object.keys(settings.providers)).toEqual(['uniwork'])
+    // a one-shot has no UniWork AI route: it answers the failure text and sends nothing
     const r = await t.desktop.aiChat({ settings, system: 's', user: 'hello' })
-    expect(r).toMatchObject({ ok: true, content: 'ok' })
-    expect(t.urls.some((u) => u.endsWith('/documents/doc-1/ai/byok/openai/chat/completions'))).toBe(
-      true,
-    )
-    const headers = new Headers((t.fetch.mock.calls.at(-1)![1] as RequestInit).headers)
-    expect(headers.get('authorization')).toBe('Bearer tok-1')
+    expect(r.ok).toBe(false)
+    for (const url of t.urls) {
+      expect(url).toMatch(/\/office-frame\/documents\/doc-1\/ai\/cloud$/)
+    }
   })
 
   it('a typed server failure comes back in the member shape (and as an in-frame card)', async () => {
-    const t = setup({ ai: true }, (url) =>
-      url.endsWith('/credentials')
-        ? json(200, CREDENTIALS)
-        : url.endsWith('/cloud')
-          ? json(200, CLOUD)
-          : json(402, { code: 'credits_exhausted' }),
+    const t = setup({ uniworkAi: true, webSearch: true }, (url) =>
+      url.endsWith('/cloud') ? json(200, CLOUD) : json(402, { code: 'credits_exhausted' }),
     )
     await t.boot()
-    const settings = await t.desktop.getAiSettings()
-    const r = await t.desktop.aiChat({ settings, system: 's', user: 'hello' })
-    expect(r.ok).toBe(false)
-    expect(document.querySelector('[data-ai-state]')).not.toBeNull()
+    const r = await t.desktop.webSearch('cats')
+    expect(r).toMatchObject({ method: 'error', results: [] })
+    expect(document.querySelector('[data-ai-state="credits_exhausted"]')).not.toBeNull()
   })
 })
 
 describe('desktop-only members stay unavailable (typed answers)', () => {
   it('createDocument, readLocalImage, openWorkbooksForMerge, autoRenameWorkbook', async () => {
-    const t = setup({ ai: true, webSearch: true, imageSearch: true, imageGeneration: true })
+    const t = setup({ uniworkAi: true, webSearch: true, imageSearch: true, imageGeneration: true })
     await t.boot()
     expect(await t.desktop.createDocument({ type: 'md', title: 'x' })).toMatchObject({ ok: false })
     await expect(t.desktop.readLocalImage({ path: '/etc/x.png' })).rejects.toThrow(/Not available/)
@@ -243,7 +217,7 @@ describe('desktop-only members stay unavailable (typed answers)', () => {
 
 describe('fetchImage (AI image tools)', () => {
   it('decodes data: URLs locally, proxies https through the host, refuses the rest', async () => {
-    const t = setup({ ai: true })
+    const t = setup({ uniworkAi: true })
     await t.boot()
     expect(await t.desktop.fetchImage('data:image/png;base64,AAEC')).toEqual({
       base64: 'AAEC',

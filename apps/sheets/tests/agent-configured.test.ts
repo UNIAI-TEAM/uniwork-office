@@ -1,4 +1,5 @@
-// The Sheets agent's readiness gate: a key saved on UniWork (an org source) counts, an empty slot does not.
+// The Sheets agent's readiness gate: UniWork AI is ready as it is; any other provider needs a model
+// and, except the built-in UniAI, a key in its slot (UNI-2289: no key reaches a web frame).
 import { describe, expect, it } from 'vitest'
 import { defaultAiSettings } from '@genoffice/ai-provider'
 
@@ -12,29 +13,27 @@ const anthropicSlot = () => {
 }
 
 describe('agentConfigured', () => {
-  it('needs a key in the slot for a local provider', () => {
-    const s = anthropicSlot()
-    expect(agentConfigured(s, false)).toBe(false)
-    s.providers.anthropic = { ...s.providers.anthropic, apiKey: 'sk-test' }
-    expect(agentConfigured(s, false)).toBe(true)
-    expect(agentConfigured(null, false)).toBe(false)
-  })
-
-  it('is ready for a provider served by a key saved on UniWork', () => {
-    const s = anthropicSlot()
-    s.modelSources = { anthropic: { origin: 'org', chosen: 'claude-org' } }
-    expect(agentConfigured(s, false)).toBe(true)
-  })
-
-  it('is ready in the web frame, whose keys stay in UniWork, once a model is set', () => {
-    expect(agentConfigured(anthropicSlot(), true)).toBe(true)
-  })
-
   it('is ready on UniWork AI, which has no key and no model choice here (UNI-2264)', () => {
     const s = defaultAiSettings()
     s.provider = 'uniwork'
     s.providers.uniwork = { apiKey: '…', model: '' }
-    expect(agentConfigured(s, false)).toBe(true)
-    expect(agentConfigured(s, true)).toBe(true)
+    expect(agentConfigured(s)).toBe(true)
+  })
+
+  it('a provider with a model but no key in its slot is not ready (what a web frame holds)', () => {
+    expect(agentConfigured(anthropicSlot())).toBe(false)
+  })
+
+  it('a model source never stands in for the missing key', () => {
+    const s = anthropicSlot()
+    s.modelSources = { anthropic: { chosen: 'claude-source' } }
+    expect(agentConfigured(s)).toBe(false)
+  })
+
+  it('needs a key in the slot for a local provider', () => {
+    const s = anthropicSlot()
+    s.providers.anthropic = { ...s.providers.anthropic, apiKey: 'sk-test' }
+    expect(agentConfigured(s)).toBe(true)
+    expect(agentConfigured(null)).toBe(false)
   })
 })

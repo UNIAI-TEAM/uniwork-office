@@ -13,7 +13,6 @@ export const id = {
     'Periksa masalah di sheet ini: 1) kesalahan rumus (#REF!, #DIV/0!, dll.), rentang yang tidak mencakup seluruh data, kolom yang terlewat di baris total; 2) angka dan teks tercampur dalam satu kolom, format tanggal tidak konsisten, pencilan yang jelas dan baris duplikat; 3) total yang tidak cocok dengan rincian, kolom persentase yang jumlahnya tidak 100%. Daftarkan masalah yang ditemukan dan sarankan perbaikannya',
   aiAnalyzeBtn: 'Analisis AI',
   aiAnalyzePrompt: 'Analisis data di sheet ini dan rangkum temuan utama, tren, dan anomali',
-  aiSettingsTitle: 'Pengaturan AI',
   aiSetUp: 'Siapkan AI',
   aiNewChat: 'Percakapan baru',
   aiCollapsePanel: 'Ciutkan panel AI',

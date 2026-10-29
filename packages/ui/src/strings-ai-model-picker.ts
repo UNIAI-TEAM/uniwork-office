@@ -17,18 +17,6 @@ export interface AiModelPickerStrings {
   modelsLoading: string
   /** quiet note in a group whose live model list could not be loaded (the suggested list shows instead) */
   modelsUnavailable: string
-  /** quiet tag on a group/row whose requests use the key saved on UniWork */
-  orgKeyTag: string
-  /** tooltip and first-use privacy note for a group served by a key saved on UniWork */
-  orgKeyNote: string
-  /** Settings hint above Model while the provider is served by a key saved on UniWork (replaces the own-key chat hint) */
-  orgKeyChatHint: string
-  /** Settings link to manage keys saved on UniWork in the web app */
-  orgKeyManage: string
-  /** Settings action on a row served by a key on UniWork: type a key stored on this computer instead */
-  orgKeyUseLocal: string
-  /** Settings action that drops that typed key and goes back to the key saved on UniWork */
-  orgKeyUseLocalCancel: string
 }
 
 export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
@@ -41,14 +29,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: '请在 AI 设置中添加服务器地址后再使用助手。',
     modelsLoading: '正在加载模型列表…',
     modelsUnavailable: '无法加载模型列表，已显示推荐列表',
-    orgKeyTag: 'UniWork 上的密钥',
-    orgKeyNote:
-      '通过组织的 UniWork 服务器并使用你在 UniWork 上保存的密钥发送。UniWork 仅记录用量，不保存内容。',
-    orgKeyChatHint:
-      '对话使用你在 UniWork 上保存的密钥；生图、媒体解析与网页搜索按「生图、媒体与搜索」设置。',
-    orgKeyManage: '在 UniWork（网页版）管理密钥',
-    orgKeyUseLocal: '在此电脑上使用密钥',
-    orgKeyUseLocalCancel: '返回 UniWork 上的密钥',
   },
   en: {
     title: 'Model',
@@ -59,14 +39,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Add the server URL in AI settings to use the assistant.',
     modelsLoading: 'Loading models…',
     modelsUnavailable: "Couldn't load the model list; showing suggestions",
-    orgKeyTag: 'Key on UniWork',
-    orgKeyNote:
-      "Sent through your organization's UniWork server with the key you saved on UniWork. UniWork records usage only and does not store the content.",
-    orgKeyChatHint:
-      'Chats go through the key saved on UniWork. Image generation, media analysis and web search follow the AI Media section.',
-    orgKeyManage: 'Manage keys on UniWork (web)',
-    orgKeyUseLocal: 'Use a key on this computer',
-    orgKeyUseLocalCancel: 'Back to the key on UniWork',
   },
   ja: {
     title: 'モデル',
@@ -77,14 +49,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'アシスタントを使うには、AI 設定でサーバー URL を追加してください。',
     modelsLoading: 'モデル一覧を読み込み中…',
     modelsUnavailable: 'モデル一覧を読み込めなかったため、候補を表示しています',
-    orgKeyTag: 'UniWork のキー',
-    orgKeyNote:
-      'UniWork に保存したキーを使い、組織の UniWork サーバー経由で送信されます。UniWork は利用量のみを記録し、内容は保存しません。',
-    orgKeyChatHint:
-      'チャットは UniWork に保存したキーを使用します。画像生成、メディア解析、Web 検索は「AI メディア」の設定に従います。',
-    orgKeyManage: 'UniWork（Web）でキーを管理',
-    orgKeyUseLocal: 'このコンピューターのキーを使う',
-    orgKeyUseLocalCancel: 'UniWork のキーに戻す',
   },
   ko: {
     title: '모델',
@@ -95,14 +59,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: '어시스턴트를 사용하려면 AI 설정에서 서버 URL을 추가하세요.',
     modelsLoading: '모델 목록을 불러오는 중…',
     modelsUnavailable: '모델 목록을 불러오지 못해 추천 목록을 표시합니다',
-    orgKeyTag: 'UniWork에 저장된 키',
-    orgKeyNote:
-      'UniWork에 저장한 키로 조직의 UniWork 서버를 통해 전송됩니다. UniWork는 사용량만 기록하며 내용은 저장하지 않습니다.',
-    orgKeyChatHint:
-      '채팅은 UniWork에 저장된 키를 사용합니다. 이미지 생성, 미디어 분석, 웹 검색은 「AI 미디어」 설정을 따릅니다.',
-    orgKeyManage: 'UniWork(웹)에서 키 관리',
-    orgKeyUseLocal: '이 컴퓨터의 키 사용',
-    orgKeyUseLocalCancel: 'UniWork 키로 돌아가기',
   },
   fr: {
     title: 'Modèle',
@@ -113,14 +69,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Ajoutez l’URL du serveur dans les paramètres IA pour utiliser l’assistant.',
     modelsLoading: 'Chargement des modèles…',
     modelsUnavailable: 'Impossible de charger la liste des modèles ; suggestions affichées',
-    orgKeyTag: 'Clé sur UniWork',
-    orgKeyNote:
-      'Envoyé via le serveur UniWork de votre organisation avec la clé enregistrée sur UniWork. UniWork n’enregistre que l’utilisation et ne stocke pas le contenu.',
-    orgKeyChatHint:
-      "Les conversations utilisent la clé enregistrée sur UniWork. La génération d'images, l'analyse de médias et la recherche web suivent la section « Médias IA ».",
-    orgKeyManage: 'Gérer les clés sur UniWork (web)',
-    orgKeyUseLocal: 'Utiliser une clé sur cet ordinateur',
-    orgKeyUseLocalCancel: 'Revenir à la clé sur UniWork',
   },
   de: {
     title: 'Modell',
@@ -133,14 +81,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
       'Fügen Sie in den KI-Einstellungen die Server-URL hinzu, um den Assistenten zu nutzen.',
     modelsLoading: 'Modelle werden geladen…',
     modelsUnavailable: 'Modellliste konnte nicht geladen werden; Vorschläge werden angezeigt',
-    orgKeyTag: 'Schlüssel auf UniWork',
-    orgKeyNote:
-      'Wird über den UniWork-Server Ihrer Organisation mit dem auf UniWork gespeicherten Schlüssel gesendet. UniWork erfasst nur die Nutzung und speichert keine Inhalte.',
-    orgKeyChatHint:
-      'Chats nutzen den auf UniWork gespeicherten Schlüssel. Bildgenerierung, Medienanalyse und Websuche folgen dem Abschnitt „KI-Medien“.',
-    orgKeyManage: 'Schlüssel auf UniWork verwalten (Web)',
-    orgKeyUseLocal: 'Schlüssel auf diesem Computer verwenden',
-    orgKeyUseLocalCancel: 'Zurück zum Schlüssel auf UniWork',
   },
   es: {
     title: 'Modelo',
@@ -151,14 +91,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Añade la URL del servidor en los ajustes de IA para usar el asistente.',
     modelsLoading: 'Cargando modelos…',
     modelsUnavailable: 'No se pudo cargar la lista de modelos; se muestran sugerencias',
-    orgKeyTag: 'Clave en UniWork',
-    orgKeyNote:
-      'Se envía a través del servidor UniWork de tu organización con la clave que guardaste en UniWork. UniWork solo registra el uso y no almacena el contenido.',
-    orgKeyChatHint:
-      'Los chats usan la clave guardada en UniWork. La generación de imágenes, el análisis de medios y la búsqueda web siguen la sección «Medios de IA».',
-    orgKeyManage: 'Gestionar claves en UniWork (web)',
-    orgKeyUseLocal: 'Usar una clave en este equipo',
-    orgKeyUseLocalCancel: 'Volver a la clave en UniWork',
   },
   th: {
     title: 'โมเดล',
@@ -169,14 +101,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'เพิ่ม URL ของเซิร์ฟเวอร์ในการตั้งค่า AI เพื่อใช้ผู้ช่วย',
     modelsLoading: 'กำลังโหลดรายการโมเดล…',
     modelsUnavailable: 'โหลดรายการโมเดลไม่ได้ จึงแสดงรายการแนะนำ',
-    orgKeyTag: 'คีย์บน UniWork',
-    orgKeyNote:
-      'ส่งผ่านเซิร์ฟเวอร์ UniWork ขององค์กรด้วยคีย์ที่คุณบันทึกไว้บน UniWork โดย UniWork จะบันทึกเฉพาะข้อมูลการใช้งานและไม่เก็บเนื้อหา',
-    orgKeyChatHint:
-      'การแชทใช้คีย์ที่บันทึกไว้บน UniWork การสร้างภาพ การวิเคราะห์สื่อ และการค้นหาเว็บเป็นไปตามส่วน "สื่อ AI"',
-    orgKeyManage: 'จัดการคีย์บน UniWork (เว็บ)',
-    orgKeyUseLocal: 'ใช้คีย์บนคอมพิวเตอร์เครื่องนี้',
-    orgKeyUseLocalCancel: 'กลับไปใช้คีย์บน UniWork',
   },
   id: {
     title: 'Model',
@@ -187,14 +111,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Tambahkan URL server di pengaturan AI untuk memakai asisten.',
     modelsLoading: 'Memuat model…',
     modelsUnavailable: 'Daftar model tidak dapat dimuat; menampilkan saran',
-    orgKeyTag: 'Kunci di UniWork',
-    orgKeyNote:
-      'Dikirim melalui server UniWork organisasi Anda dengan kunci yang Anda simpan di UniWork. UniWork hanya mencatat penggunaan dan tidak menyimpan konten.',
-    orgKeyChatHint:
-      'Chat memakai kunci yang disimpan di UniWork. Pembuatan gambar, analisis media, dan pencarian web mengikuti bagian "Media AI".',
-    orgKeyManage: 'Kelola kunci di UniWork (web)',
-    orgKeyUseLocal: 'Gunakan kunci di komputer ini',
-    orgKeyUseLocalCancel: 'Kembali ke kunci di UniWork',
   },
   ru: {
     title: 'Модель',
@@ -205,14 +121,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Добавьте URL сервера в настройках ИИ, чтобы пользоваться помощником.',
     modelsLoading: 'Загрузка списка моделей…',
     modelsUnavailable: 'Не удалось загрузить список моделей; показаны рекомендации',
-    orgKeyTag: 'Ключ в UniWork',
-    orgKeyNote:
-      'Отправляется через сервер UniWork вашей организации с ключом, сохранённым в UniWork. UniWork учитывает только использование и не хранит содержимое.',
-    orgKeyChatHint:
-      'Чаты используют ключ, сохранённый в UniWork. Генерация изображений, анализ медиа и веб-поиск настраиваются в разделе «Медиа ИИ».',
-    orgKeyManage: 'Управление ключами в UniWork (веб)',
-    orgKeyUseLocal: 'Использовать ключ на этом компьютере',
-    orgKeyUseLocalCancel: 'Вернуться к ключу в UniWork',
   },
   ar: {
     title: 'النموذج',
@@ -223,14 +131,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'أضف عنوان URL للخادم في إعدادات الذكاء الاصطناعي لاستخدام المساعد.',
     modelsLoading: 'جارٍ تحميل النماذج…',
     modelsUnavailable: 'تعذّر تحميل قائمة النماذج؛ تُعرض الاقتراحات',
-    orgKeyTag: 'مفتاح على UniWork',
-    orgKeyNote:
-      'يُرسل عبر خادم UniWork الخاص بمؤسستك باستخدام المفتاح الذي حفظته على UniWork. يسجّل UniWork الاستخدام فقط ولا يخزّن المحتوى.',
-    orgKeyChatHint:
-      'تستخدم المحادثات المفتاح المحفوظ على UniWork. يتبع توليد الصور وتحليل الوسائط والبحث في الويب قسم «وسائط الذكاء الاصطناعي».',
-    orgKeyManage: 'إدارة المفاتيح على UniWork (الويب)',
-    orgKeyUseLocal: 'استخدام مفتاح على هذا الكمبيوتر',
-    orgKeyUseLocalCancel: 'العودة إلى المفتاح على UniWork',
   },
   pt: {
     title: 'Modelo',
@@ -241,14 +141,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Adicione o URL do servidor nas configurações de IA para usar o assistente.',
     modelsLoading: 'Carregando modelos…',
     modelsUnavailable: 'Não foi possível carregar a lista de modelos; mostrando sugestões',
-    orgKeyTag: 'Chave no UniWork',
-    orgKeyNote:
-      'Enviado pelo servidor UniWork da sua organização com a chave que você salvou no UniWork. O UniWork registra apenas o uso e não armazena o conteúdo.',
-    orgKeyChatHint:
-      'Os chats usam a chave salva no UniWork. A geração de imagens, a análise de mídia e a busca na web seguem a seção «Mídia de IA».',
-    orgKeyManage: 'Gerenciar chaves no UniWork (web)',
-    orgKeyUseLocal: 'Usar uma chave neste computador',
-    orgKeyUseLocalCancel: 'Voltar à chave no UniWork',
   },
   it: {
     title: 'Modello',
@@ -259,14 +151,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Aggiungi l’URL del server nelle impostazioni IA per usare l’assistente.',
     modelsLoading: 'Caricamento dei modelli…',
     modelsUnavailable: 'Impossibile caricare l’elenco dei modelli; vengono mostrati i suggerimenti',
-    orgKeyTag: 'Chiave su UniWork',
-    orgKeyNote:
-      'Inviato tramite il server UniWork della tua organizzazione con la chiave salvata su UniWork. UniWork registra solo l’utilizzo e non memorizza il contenuto.',
-    orgKeyChatHint:
-      "Le chat usano la chiave salvata su UniWork. La generazione di immagini, l'analisi dei media e la ricerca web seguono la sezione «Media IA».",
-    orgKeyManage: 'Gestisci chiavi su UniWork (web)',
-    orgKeyUseLocal: 'Usa una chiave su questo computer',
-    orgKeyUseLocalCancel: 'Torna alla chiave su UniWork',
   },
   pl: {
     title: 'Model',
@@ -277,14 +161,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Dodaj adres URL serwera w ustawieniach AI, aby korzystać z asystenta.',
     modelsLoading: 'Ładowanie modeli…',
     modelsUnavailable: 'Nie udało się wczytać listy modeli; wyświetlane są sugestie',
-    orgKeyTag: 'Klucz w UniWork',
-    orgKeyNote:
-      'Wysyłane przez serwer UniWork Twojej organizacji przy użyciu klucza zapisanego w UniWork. UniWork rejestruje wyłącznie użycie i nie przechowuje treści.',
-    orgKeyChatHint:
-      'Czaty używają klucza zapisanego w UniWork. Generowanie obrazów, analiza mediów i wyszukiwanie w sieci zależą od sekcji „Media AI”.',
-    orgKeyManage: 'Zarządzaj kluczami w UniWork (WWW)',
-    orgKeyUseLocal: 'Użyj klucza na tym komputerze',
-    orgKeyUseLocalCancel: 'Wróć do klucza w UniWork',
   },
   cs: {
     title: 'Model',
@@ -295,14 +171,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Pro použití asistenta přidejte v nastavení AI adresu URL serveru.',
     modelsLoading: 'Načítání modelů…',
     modelsUnavailable: 'Seznam modelů se nepodařilo načíst; zobrazují se návrhy',
-    orgKeyTag: 'Klíč na UniWork',
-    orgKeyNote:
-      'Odesíláno přes server UniWork vaší organizace s klíčem uloženým na UniWork. UniWork zaznamenává pouze využití a neukládá obsah.',
-    orgKeyChatHint:
-      'Chaty používají klíč uložený na UniWork. Generování obrázků, analýza médií a webové vyhledávání se řídí sekcí AI média.',
-    orgKeyManage: 'Spravovat klíče na UniWork (web)',
-    orgKeyUseLocal: 'Použít klíč v tomto počítači',
-    orgKeyUseLocalCancel: 'Zpět ke klíči na UniWork',
   },
   nl: {
     title: 'Model',
@@ -313,14 +181,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Voeg de server-URL toe in de AI-instellingen om de assistent te gebruiken.',
     modelsLoading: 'Modellen laden…',
     modelsUnavailable: 'Modellenlijst kon niet worden geladen; suggesties worden getoond',
-    orgKeyTag: 'Sleutel op UniWork',
-    orgKeyNote:
-      'Verzonden via de UniWork-server van uw organisatie met de sleutel die u op UniWork hebt opgeslagen. UniWork registreert alleen het gebruik en slaat de inhoud niet op.',
-    orgKeyChatHint:
-      'Chats gebruiken de sleutel die op UniWork is opgeslagen. Afbeeldingen genereren, media-analyse en zoeken op het web volgen de sectie "AI-media".',
-    orgKeyManage: 'Sleutels beheren op UniWork (web)',
-    orgKeyUseLocal: 'Een sleutel op deze computer gebruiken',
-    orgKeyUseLocalCancel: 'Terug naar de sleutel op UniWork',
   },
   ms: {
     title: 'Model',
@@ -331,14 +191,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Tambah URL pelayan dalam tetapan AI untuk menggunakan pembantu.',
     modelsLoading: 'Memuatkan model…',
     modelsUnavailable: 'Senarai model tidak dapat dimuatkan; menunjukkan cadangan',
-    orgKeyTag: 'Kunci pada UniWork',
-    orgKeyNote:
-      'Dihantar melalui pelayan UniWork organisasi anda dengan kunci yang anda simpan pada UniWork. UniWork hanya merekodkan penggunaan dan tidak menyimpan kandungan.',
-    orgKeyChatHint:
-      'Sembang menggunakan kunci yang disimpan pada UniWork. Penjanaan imej, analisis media dan carian web mengikut bahagian "Media AI".',
-    orgKeyManage: 'Urus kunci pada UniWork (web)',
-    orgKeyUseLocal: 'Guna kunci pada komputer ini',
-    orgKeyUseLocalCancel: 'Kembali ke kunci pada UniWork',
   },
   he: {
     title: 'מודל',
@@ -349,14 +201,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'הוסף את כתובת ה-URL של השרת בהגדרות ה-AI כדי להשתמש בעוזר.',
     modelsLoading: 'טוען מודלים…',
     modelsUnavailable: 'לא ניתן לטעון את רשימת המודלים; מוצגות הצעות',
-    orgKeyTag: 'מפתח ב-UniWork',
-    orgKeyNote:
-      'נשלח דרך שרת UniWork של הארגון שלך עם המפתח ששמרת ב-UniWork. מערכת UniWork מתעדת שימוש בלבד ואינה שומרת את התוכן.',
-    orgKeyChatHint:
-      'הצ׳אטים משתמשים במפתח השמור ב-UniWork. יצירת תמונות, ניתוח מדיה וחיפוש באינטרנט נקבעים בקטע "מדיה AI".',
-    orgKeyManage: 'ניהול מפתחות ב-UniWork (אינטרנט)',
-    orgKeyUseLocal: 'שימוש במפתח במחשב זה',
-    orgKeyUseLocalCancel: 'חזרה למפתח ב-UniWork',
   },
   hi: {
     title: 'मॉडल',
@@ -367,14 +211,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'सहायक का उपयोग करने के लिए AI सेटिंग में सर्वर URL जोड़ें।',
     modelsLoading: 'मॉडल लोड हो रहे हैं…',
     modelsUnavailable: 'मॉडल सूची लोड नहीं हो सकी; सुझाव दिखाए जा रहे हैं',
-    orgKeyTag: 'UniWork पर कुंजी',
-    orgKeyNote:
-      'UniWork पर सहेजी गई कुंजी के साथ आपके संगठन के UniWork सर्वर के माध्यम से भेजा जाता है। UniWork केवल उपयोग रिकॉर्ड करता है और सामग्री संग्रहीत नहीं करता।',
-    orgKeyChatHint:
-      'चैट UniWork पर सहेजी गई कुंजी का उपयोग करती हैं। इमेज जनरेशन, मीडिया विश्लेषण और वेब खोज "AI मीडिया" अनुभाग के अनुसार होते हैं।',
-    orgKeyManage: 'UniWork (वेब) पर कुंजियाँ प्रबंधित करें',
-    orgKeyUseLocal: 'इस कंप्यूटर पर कुंजी का उपयोग करें',
-    orgKeyUseLocalCancel: 'UniWork पर कुंजी पर वापस जाएँ',
   },
   'zh-TW': {
     title: '模型',
@@ -385,14 +221,6 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: '請在 AI 設定中新增伺服器網址後再使用助理。',
     modelsLoading: '正在載入模型清單…',
     modelsUnavailable: '無法載入模型清單，已顯示建議清單',
-    orgKeyTag: 'UniWork 上的金鑰',
-    orgKeyNote:
-      '透過組織的 UniWork 伺服器並使用你在 UniWork 上儲存的金鑰傳送。UniWork 僅記錄用量，不儲存內容。',
-    orgKeyChatHint:
-      '對話使用你在 UniWork 上儲存的金鑰；生圖、媒體解析與網頁搜尋依「生圖、媒體與搜尋」設定。',
-    orgKeyManage: '在 UniWork（網頁版）管理金鑰',
-    orgKeyUseLocal: '在這台電腦上使用金鑰',
-    orgKeyUseLocalCancel: '返回 UniWork 上的金鑰',
   },
   vi: {
     title: 'Mô hình',
@@ -403,13 +231,5 @@ export const AI_MODEL_PICKER_STRINGS: Record<Lang, AiModelPickerStrings> = {
     needBaseUrl: 'Thêm URL máy chủ trong Cài đặt AI để dùng trợ lý.',
     modelsLoading: 'Đang tải danh sách mô hình…',
     modelsUnavailable: 'Không tải được danh sách mô hình, đang hiện danh sách gợi ý',
-    orgKeyTag: 'Khóa trên UniWork',
-    orgKeyNote:
-      'Gửi qua máy chủ UniWork của tổ chức bằng khóa bạn đã lưu trên UniWork. UniWork chỉ ghi số liệu sử dụng, không lưu nội dung.',
-    orgKeyChatHint:
-      'Chat đi qua key đã lưu trên UniWork. Tạo ảnh, phân tích media và tìm kiếm web theo mục AI Media.',
-    orgKeyManage: 'Quản lý khóa trên UniWork (web)',
-    orgKeyUseLocal: 'Dùng khóa trên máy này',
-    orgKeyUseLocalCancel: 'Quay lại khóa trên UniWork',
   },
 }

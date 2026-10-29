@@ -448,15 +448,17 @@ function clampPanelWidth(w: number): number {
   return Math.min(Math.max(w, PANEL_WIDTH_MIN), max)
 }
 
+/** the model chip's "manage" row (one function: the picker keys an effect on its identity) */
+const openDesktopModelSettings = () => window.slidesApi.openAiModelSettings().catch(() => {})
+
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.slidesApi.getAiSettings(),
   setSettings: (settings, options) => window.slidesApi.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.slidesApi.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.slidesApi.aiGskStatus().then((s) => !!s?.loggedIn),
-  openModelSettings: () => window.slidesApi.openAiModelSettings().catch(() => {}),
-  // web frames: no key or no model keeps send off with a hint (see AiModelPicker)
-  get requireModel() {
-    return platform() === 'web'
+  // the chip's "manage" row opens the desktop model settings; a web frame has none to open
+  get openModelSettings() {
+    return platform() === 'web' ? undefined : openDesktopModelSettings
   },
 }
 
@@ -2719,8 +2721,11 @@ export function AiPanel({
                     lang={lang}
                     waiting={Boolean(entry.waitLine)}
                     onRetry={isLast && !busy && lastInstructionRef.current ? retry : undefined}
-                    onChooseProvider={() =>
-                      void window.slidesApi.openAiModelSettings().catch(() => {})
+                    // a web frame has no other provider to choose: no action there
+                    onChooseProvider={
+                      platform() === 'web'
+                        ? undefined
+                        : () => void window.slidesApi.openAiModelSettings().catch(() => {})
                     }
                     onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                     onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
@@ -2874,8 +2879,10 @@ export function AiPanel({
                   lang={lang}
                   provider={settings.provider}
                   onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
-                  onChooseProvider={() =>
-                    void window.slidesApi.openAiModelSettings().catch(() => {})
+                  onChooseProvider={
+                    platform() === 'web'
+                      ? undefined
+                      : () => void window.slidesApi.openAiModelSettings().catch(() => {})
                   }
                   onAnnounce={setComposerAnnouncement}
                 />

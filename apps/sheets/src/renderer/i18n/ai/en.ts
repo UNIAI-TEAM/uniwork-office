@@ -14,7 +14,6 @@ export const en = {
   aiAnalyzeBtn: 'AI Analyze',
   aiAnalyzePrompt:
     'Analyze the data in this sheet and summarize key findings, trends, and anomalies',
-  aiSettingsTitle: 'AI Settings',
   aiSetUp: 'Set up AI',
   aiNewChat: 'New conversation',
   aiCollapsePanel: 'Collapse AI panel',

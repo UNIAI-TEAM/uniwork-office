@@ -158,6 +158,10 @@ interface PendingConfirm {
   settle: (ok: boolean) => void
 }
 
+/** the model chip's "manage" row (one function: the picker keys an effect on its identity) */
+const openDesktopModelSettings = () =>
+  (window.pdfApi?.openAiModelSettings?.() ?? Promise.resolve()).catch(() => {})
+
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.pdfApi?.getAiSettings?.() ?? Promise.resolve({} as AiSettings),
   setSettings: (settings, options) =>
@@ -165,11 +169,9 @@ const MODEL_BRIDGE: AiModelPickerBridge = {
   onSettingsChanged: (handler) => window.pdfApi?.onAiSettingsChanged?.(handler) ?? (() => {}),
   gskLoggedIn: () =>
     (window.pdfApi?.gskStatus?.() ?? Promise.resolve(null)).then((s) => !!s?.loggedIn),
-  openModelSettings: () =>
-    (window.pdfApi?.openAiModelSettings?.() ?? Promise.resolve()).catch(() => {}),
-  // web frames: no key or no model keeps send off with a hint (see AiModelPicker)
-  get requireModel() {
-    return platform() === 'web'
+  // the chip's "manage" row opens the desktop model settings; a web frame has none to open
+  get openModelSettings() {
+    return platform() === 'web' ? undefined : openDesktopModelSettings
   },
 }
 
@@ -1256,7 +1258,12 @@ export function AiPanel({
                       ? () => send(asked.instruction ?? asked.text, asked.scope ?? null, asked.text)
                       : undefined
                   }
-                  onChooseProvider={() => void window.pdfApi?.openAiModelSettings?.()}
+                  // a web frame has no other provider to choose: no action there
+                  onChooseProvider={
+                    platform() === 'web'
+                      ? undefined
+                      : () => void window.pdfApi?.openAiModelSettings?.()
+                  }
                   onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                   onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
                 />
@@ -1354,7 +1361,10 @@ export function AiPanel({
                     lang,
                     note: composerNoteState,
                     onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
-                    onChooseProvider: () => void window.pdfApi?.openAiModelSettings?.(),
+                    onChooseProvider:
+                      platform() === 'web'
+                        ? undefined
+                        : () => void window.pdfApi?.openAiModelSettings?.(),
                     onAnnounce: setComposerAnnouncement,
                     onSendBlockedChange: uniworkGate.onSendBlockedChange,
                     registerBlockedHandler: uniworkGate.registerBlockedHandler,

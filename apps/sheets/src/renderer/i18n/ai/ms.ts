@@ -14,7 +14,6 @@ export const ms = {
   aiAnalyzeBtn: 'Analisis AI',
   aiAnalyzePrompt:
     'Analisis data dalam helaian ini dan rumuskan penemuan utama, arah aliran dan anomali',
-  aiSettingsTitle: 'Tetapan AI',
   aiSetUp: 'Sediakan AI',
   aiNewChat: 'Perbualan baharu',
   aiCollapsePanel: 'Runtuhkan panel AI',

@@ -311,7 +311,6 @@ export const th = {
   appTabDecimal: 'จุดทศนิยม',
   appTabBar: 'แถบ',
   appTabClear: 'ล้าง',
-  appAiSettings: 'การตั้งค่า AI',
   appCut: 'ตัด',
   appCopy: 'คัดลอก',
   appPaste: 'วาง',

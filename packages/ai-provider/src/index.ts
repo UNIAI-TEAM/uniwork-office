@@ -34,7 +34,6 @@ export {
   cloudToolsEnabled,
   defaultAiSettings,
   aiEffectiveModel,
-  isOrgServedReady,
   isProviderUsable,
   maxOutputTokensOf,
   providerNeed,
@@ -46,16 +45,7 @@ export {
   withUniAiOpenRouterAuth,
 } from './providers'
 export type { ProviderNeed } from './providers'
-export {
-  ProxyUrlError,
-  isInsideAiMount,
-  isProxy404,
-  isProxyContractStatus,
-  proxyAnswered,
-  proxyErrorBodyFields,
-  toProxyRequest,
-} from './proxy-url'
-export type { ProxyRequest } from './proxy-url'
+export { isInsideAiMount, proxyErrorBodyFields } from './proxy-url'
 export {
   AI_MEDIA_PROVIDERS,
   GEMINI_MEDIA_BASE_URL,
@@ -123,7 +113,7 @@ export { aiChatFailure, aiChatFailureFromError, aiStreamErrorFields } from './ai
 export { aiChatFailureText } from './ai-chat-error-text'
 export type { AiChatFailure, AiStreamErrorCode, AiStreamErrorFields } from './ai-chat-error'
 export { AI_CHAT_TEST_TIMEOUT_MS, testChatConnection } from './ai-chat-test'
-export { setAiUserAgent, setPrimaryFetch, setRescueFetch } from './fetch'
+export { setAiUserAgent, setRescueFetch } from './fetch'
 export { isAiNetworkError } from './network-error'
 export { isAiOverloadedError } from './overload-error'
 export { parseOutputCapRejection } from './output-cap'

@@ -12,6 +12,7 @@ import {
   AI_PROVIDERS,
   defaultAiSettings,
   setUniworkAiAvailable,
+  type AiModelSource,
   type AiSettings,
   type AiSettingsSaveOptions,
 } from '@genoffice/ai-provider'
@@ -282,72 +283,38 @@ describe('UniWork AI row', () => {
   })
 })
 
-describe('org-origin key source (G6-05k)', () => {
-  function orgAnthropic(origin?: 'local' | 'org'): AiSettings {
+describe('a provider without a key', () => {
+  /** a keyless slot whose source carries a model and an unknown `origin` marker (read like any other) */
+  function keylessAnthropic(): AiSettings {
     const settings = defaultAiSettings()
     settings.provider = 'anthropic'
-    // org source has no local apiKey in ai-settings.json (never copy key_hint into apiKey)
-    settings.providers.anthropic = {
-      apiKey: origin === 'org' ? '' : 'sk-local',
-      model: '',
-    }
+    settings.providers.anthropic = { apiKey: '', model: '' }
     return {
       ...settings,
       uniAiAvailable: false,
       modelSources: {
         anthropic: {
-          chosen: 'claude-org-chosen',
-          listed: ['claude-org-chosen', 'claude-sonnet-5'],
-          ...(origin ? { origin } : {}),
-        },
+          chosen: 'claude-source-chosen',
+          listed: ['claude-source-chosen', 'claude-sonnet-5'],
+          origin: 'org',
+        } as AiModelSource,
       },
     }
   }
 
   it.each(['en', 'vi'] as const)(
-    'renders the org key tag, tooltip, and first-use privacy note in %s',
+    'is not listed and the chip asks for a model in %s, whatever its source says',
     async (lang) => {
       const announce = vi.fn()
-      const m = await mount(orgAnthropic('org'), lang, announce)
-      expect(host.querySelector('.ai-model-chip-text')!.textContent).toBe('claude-org-chosen')
-      await m.open()
-      const tag = host.querySelector('[data-org-key-tag]') as HTMLElement | null
-      expect(tag).not.toBeNull()
-      expect(tag!.textContent).toBe(AI_MODEL_PICKER_STRINGS[lang].orgKeyTag)
-      expect(tag!.getAttribute('title')).toBe(AI_MODEL_PICKER_STRINGS[lang].orgKeyNote)
-      expect(tag!.getAttribute('data-tip')).toBe(AI_MODEL_PICKER_STRINGS[lang].orgKeyNote)
-
-      const note = host.querySelector('[data-org-key-note]') as HTMLElement | null
-      expect(note).not.toBeNull()
-      expect(note!.textContent).toBe(AI_MODEL_PICKER_STRINGS[lang].orgKeyNote)
-      expect(announce).toHaveBeenLastCalledWith(AI_MODEL_PICKER_STRINGS[lang].orgKeyNote)
-      expect(host.querySelector('[aria-live], [role=status]')).toBeNull()
-
-      // after picking a model in the org group, the first-use note is dismissed while the tag stays
-      await act(async () => {
-        ;(host.querySelectorAll('.ai-model-item')[1] as HTMLButtonElement).click()
-      })
-      await m.open()
-      expect(host.querySelector('[data-org-key-tag]')!.textContent).toBe(
-        AI_MODEL_PICKER_STRINGS[lang].orgKeyTag,
+      const m = await mount(keylessAnthropic(), lang, announce)
+      expect(host.querySelector('.ai-model-chip-text')!.textContent).toBe(
+        AI_MODEL_PICKER_STRINGS[lang].choose,
       )
-      expect(host.querySelector('[data-org-key-note]')).toBeNull()
-    },
-  )
-
-  it.each([undefined, 'local' as const])(
-    'renders as today when origin is %j (no org tag or privacy note)',
-    async (origin) => {
-      const m = await mount(orgAnthropic(origin))
       await m.open()
-      expect(host.querySelector('[data-org-key-tag]')).toBeNull()
-      expect(host.querySelector('[data-org-key-note]')).toBeNull()
-      expect(host.querySelector('.ai-model-pop')!.textContent).not.toContain(
-        AI_MODEL_PICKER_STRINGS.en.orgKeyTag,
-      )
-      expect(host.querySelector('.ai-model-pop')!.textContent).not.toContain(
-        AI_MODEL_PICKER_STRINGS.en.orgKeyNote,
-      )
+      const pop = host.querySelector('.ai-model-pop')!
+      expect(pop.textContent).not.toContain('claude-source-chosen')
+      expect(pop.textContent).not.toContain(lang === 'vi' ? 'Khóa trên UniWork' : 'Key on UniWork')
+      expect(announce).not.toHaveBeenCalled()
     },
   )
 })
@@ -358,32 +325,16 @@ describe('strings', () => {
     expect(AI_MODEL_PICKER_STRINGS.vi.modelsUnavailable).toBe(
       'Không tải được danh sách mô hình, đang hiện danh sách gợi ý',
     )
-    expect(AI_MODEL_PICKER_STRINGS.vi.orgKeyTag).toBe('Khóa trên UniWork')
-    expect(AI_MODEL_PICKER_STRINGS.vi.orgKeyNote).toBe(
-      'Gửi qua máy chủ UniWork của tổ chức bằng khóa bạn đã lưu trên UniWork. UniWork chỉ ghi số liệu sử dụng, không lưu nội dung.',
-    )
-    expect(AI_MODEL_PICKER_STRINGS.vi.orgKeyManage).toBe('Quản lý khóa trên UniWork (web)')
     expect(AI_MODEL_PICKER_STRINGS.en.modelsLoading).toBe('Loading models…')
     expect(AI_MODEL_PICKER_STRINGS.en.modelsUnavailable).toBe(
       "Couldn't load the model list; showing suggestions",
     )
-    expect(AI_MODEL_PICKER_STRINGS.en.orgKeyTag).toBe('Key on UniWork')
-    expect(AI_MODEL_PICKER_STRINGS.en.orgKeyNote).toBe(
-      "Sent through your organization's UniWork server with the key you saved on UniWork. UniWork records usage only and does not store the content.",
-    )
-    expect(AI_MODEL_PICKER_STRINGS.en.orgKeyManage).toBe('Manage keys on UniWork (web)')
   })
 
-  it('every locale has all keys, non-empty, with no internal codes or forbidden terms', () => {
+  it('every locale has all keys, non-empty', () => {
     for (const [lang, s] of Object.entries(AI_MODEL_PICKER_STRINGS)) {
       expect(s.modelsLoading.trim(), lang).not.toBe('')
       expect(s.modelsUnavailable.trim(), lang).not.toBe('')
-      expect(s.orgKeyTag.trim(), lang).not.toBe('')
-      expect(s.orgKeyNote.trim(), lang).not.toBe('')
-      expect(s.orgKeyManage.trim(), lang).not.toBe('')
-      for (const copy of [s.orgKeyTag, s.orgKeyNote, s.orgKeyManage]) {
-        expect(copy, lang).not.toMatch(/BYOK|proxy|G6-|UNI-\d|Q-K|git|GitHub/i)
-      }
     }
   })
 })

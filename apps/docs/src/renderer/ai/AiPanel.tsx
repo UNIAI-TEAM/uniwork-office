@@ -135,8 +135,8 @@ import fileVideoIcon from '../assets/file-video.png'
 import fileVoiceIcon from '../assets/file-voice.png'
 import fileDocumentIcon from '../assets/file-document.png'
 import fileGeneralIcon from '../assets/file-general.png'
-import { IconGear, IconNewChat, IconSidebarCollapse } from '../components/icons'
-import { cap } from '../capabilities'
+import { IconNewChat, IconSidebarCollapse } from '../components/icons'
+import { cap, isWebFrame } from '../capabilities'
 import { docsUniworkBoundForAi } from '../uniwork-doc-state'
 
 interface ToolActivity {
@@ -483,15 +483,17 @@ interface AiPanelProps {
   sideState?: AiSideState
 }
 
+/** the model chip's "manage" row (one function: the picker keys an effect on its identity) */
+const openDesktopModelSettings = () => window.desktop.openAiModelSettings().catch(() => {})
+
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.desktop.getAiSettings(),
   setSettings: (settings, options) => window.desktop.setAiSettings(settings, options),
   onSettingsChanged: (handler) => window.desktop.onAiSettingsChanged(handler),
   gskLoggedIn: () => window.desktop.aiGskStatus().then((s) => !!s?.loggedIn),
-  openModelSettings: () => window.desktop.openAiModelSettings().catch(() => {}),
-  // web frames: no key or no model keeps send off with a hint (see AiModelPicker)
-  get requireModel() {
-    return window.desktop?.capabilities?.platform === 'web'
+  // the chip's "manage" row opens the desktop model settings; a web frame has none to open
+  get openModelSettings() {
+    return isWebFrame() ? undefined : openDesktopModelSettings
   },
 }
 
@@ -1874,16 +1876,6 @@ export function AiPanel({
               <IconNewChat size={16} />
             </button>
           )}
-          {cap('aiCredentials') && window.desktop?.openAiSettings && (
-            <button
-              className="ai-header-btn"
-              onClick={() => void window.desktop?.openAiSettings?.()}
-              data-tip={t('appAiSettings')}
-              aria-label={t('appAiSettings')}
-            >
-              <IconGear size={15} />
-            </button>
-          )}
           {onCollapse && (
             <button
               className="ai-header-btn ai-panel-collapse"
@@ -2140,7 +2132,10 @@ export function AiPanel({
                     lang={lang}
                     waiting={Boolean(entry.waitLine)}
                     onRetry={isLast && !busy && lastInstructionRef.current ? retry : undefined}
-                    onChooseProvider={() => void window.desktop?.openAiModelSettings?.()}
+                    // a web frame has no other provider to choose: no action there
+                    onChooseProvider={
+                      isWebFrame() ? undefined : () => void window.desktop?.openAiModelSettings?.()
+                    }
                     onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                     onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
                   />
@@ -2454,7 +2449,9 @@ export function AiPanel({
                     lang,
                     note: composerNoteState,
                     onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
-                    onChooseProvider: () => void window.desktop?.openAiModelSettings?.(),
+                    onChooseProvider: isWebFrame()
+                      ? undefined
+                      : () => void window.desktop?.openAiModelSettings?.(),
                     onAnnounce: setComposerAnnouncement,
                     onSendBlockedChange: uniworkGate.onSendBlockedChange,
                     registerBlockedHandler: uniworkGate.registerBlockedHandler,

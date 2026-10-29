@@ -276,6 +276,10 @@ export interface MarkdownAiDeps {
   onSaveOffer(name: string): void
 }
 
+/** the model chip's "manage" row (one function: the picker keys an effect on its identity) */
+const openDesktopModelSettings = () =>
+  (window.markdownApi?.openAiModelSettings?.() ?? Promise.resolve()).catch(() => {})
+
 const MODEL_BRIDGE: AiModelPickerBridge = {
   getSettings: () => window.markdownApi?.getAiSettings?.() ?? Promise.resolve({} as AiSettings),
   setSettings: (settings, options) =>
@@ -283,11 +287,9 @@ const MODEL_BRIDGE: AiModelPickerBridge = {
   onSettingsChanged: (handler) => window.markdownApi?.onAiSettingsChanged?.(handler) ?? (() => {}),
   gskLoggedIn: () =>
     (window.markdownApi?.aiGskStatus?.() ?? Promise.resolve(null)).then((s) => !!s?.loggedIn),
-  openModelSettings: () =>
-    (window.markdownApi?.openAiModelSettings?.() ?? Promise.resolve()).catch(() => {}),
-  // web frames: no key or no model keeps send off with a hint (see AiModelPicker)
-  get requireModel() {
-    return platform() === 'web'
+  // the chip's "manage" row opens the desktop model settings; a web frame has none to open
+  get openModelSettings() {
+    return platform() === 'web' ? undefined : openDesktopModelSettings
   },
 }
 
@@ -1508,16 +1510,6 @@ export function AiPanel({
               <IconNewChat />
             </button>
           )}
-          {cap('aiCredentials') && window.markdownApi.openAiSettings && (
-            <button
-              className="ai-header-btn"
-              onClick={() => void window.markdownApi.openAiSettings?.()}
-              data-tip={t('aiSettings')}
-              aria-label={t('aiSettings')}
-            >
-              <IconGear />
-            </button>
-          )}
           <button
             className="ai-header-btn ai-panel-collapse"
             onClick={onCollapse}
@@ -1719,7 +1711,12 @@ export function AiPanel({
                   lang={lang}
                   waiting={Boolean(entry.waitLine)}
                   onRetry={isLast && !busy && runInstructionRef.current ? retry : undefined}
-                  onChooseProvider={() => void window.markdownApi?.openAiModelSettings?.()}
+                  // a web frame has no other provider to choose: no action there
+                  onChooseProvider={
+                    platform() === 'web'
+                      ? undefined
+                      : () => void window.markdownApi?.openAiModelSettings?.()
+                  }
                   onSignIn={() => void readUniworkCloudStatus()?.signIn?.()}
                   onAskAgain={isLast && !busy ? () => inputRef.current?.focus() : undefined}
                 />
@@ -1929,7 +1926,10 @@ export function AiPanel({
                     lang,
                     note: composerNoteState,
                     onSignIn: () => void readUniworkCloudStatus()?.signIn?.(),
-                    onChooseProvider: () => void window.markdownApi?.openAiModelSettings?.(),
+                    onChooseProvider:
+                      platform() === 'web'
+                        ? undefined
+                        : () => void window.markdownApi?.openAiModelSettings?.(),
                     onAnnounce: setComposerAnnouncement,
                     onSendBlockedChange: uniworkGate.onSendBlockedChange,
                     registerBlockedHandler: uniworkGate.registerBlockedHandler,
@@ -2206,24 +2206,6 @@ function IconCollapse(): ReactElement {
       <rect x="1.5" y="2.5" width="13" height="11" rx="1" />
       <path d="M5.5 2.5v11" />
       <path d="M12.5 8H8.1M9.8 5.9 7.7 8l2.1 2.1" strokeWidth="1.3" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function IconGear(): ReactElement {
-  return (
-    <svg
-      width={15}
-      height={15}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      aria-hidden
-    >
-      <circle cx="8" cy="8" r="1.78" />
-      <path d="M8 2.98v1.62M8 11.4v1.62M13.02 8H11.4M4.6 8H2.98M11.56 4.44l-1.13 1.13M5.57 10.43l-1.13 1.13M11.56 11.56l-1.13-1.13M5.57 5.57 4.44 4.44" />
     </svg>
   )
 }

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 // G6-05u WI-A (UNI-1372): when the UniWork AI flag is on, `uniwork` (which has `models: []`) must
 // be listed by aiModelPickerGroups so the chip shows "UniWork AI" (not "Choose model") and web
-// frames (`requireModel: true`, `providers.uniwork.apiKey = '…'`) do not resolve `needModel`.
+// frames (`providers.uniwork.apiKey = '…'`) do not resolve `needModel`.
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -29,13 +29,11 @@ afterEach(() => {
 
 async function mountPickerAndComposer(
   settings: AiSettings,
-  requireModel: boolean,
   bridgeOverrides: Partial<AiModelPickerBridge> = {},
 ) {
   const bridge: AiModelPickerBridge = {
     getSettings: async () => settings,
     setSettings: async () => {},
-    requireModel,
     ...bridgeOverrides,
   }
   await act(async () => {
@@ -71,7 +69,7 @@ describe('AiModelPicker with UniWork AI selected', () => {
       uniAiAvailable: false,
       provider: 'uniwork',
     }
-    const { chip, send, hint } = await mountPickerAndComposer(settings, false)
+    const { chip, send, hint } = await mountPickerAndComposer(settings)
     expect(chip).toBe('UniWork AI')
     expect(send.disabled).toBe(false)
     expect(hint).toBe('Enter to send')
@@ -85,7 +83,7 @@ describe('AiModelPicker with UniWork AI selected', () => {
       provider: 'uniwork',
     }
     settings.providers.uniwork = { apiKey: '…uw', model: '' }
-    const { chip, send, hint } = await mountPickerAndComposer(settings, true)
+    const { chip, send, hint } = await mountPickerAndComposer(settings)
     expect(chip).toBe('UniWork AI')
     expect(hint).not.toBe(AI_MODEL_PICKER_STRINGS.en.needModel)
     expect(send.disabled).toBe(false)
@@ -99,7 +97,7 @@ describe('AiModelPicker with UniWork AI selected', () => {
       uniAiAvailable: false,
       provider: 'uniwork',
     }
-    const { chip, send, hint } = await mountPickerAndComposer(settings, false)
+    const { chip, send, hint } = await mountPickerAndComposer(settings)
     expect(chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)
     expect(send.disabled).toBe(true)
     expect(hint).toBe(AI_MODEL_PICKER_STRINGS.en.needModel)
@@ -112,7 +110,7 @@ describe('AiModelPicker with UniWork AI selected', () => {
       uniAiAvailable: true,
       provider: 'uniwork',
     }
-    const { chip, send, hint } = await mountPickerAndComposer(settings, false, {
+    const { chip, send, hint } = await mountPickerAndComposer(settings, {
       gskLoggedIn: async () => true,
     })
     expect(chip).toBe(AI_MODEL_PICKER_STRINGS.en.choose)

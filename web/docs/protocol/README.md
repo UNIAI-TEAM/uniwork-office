@@ -98,8 +98,8 @@ gets no `init` within its retry budget (40 × 500 ms), or is opened top-level (`
 without a handler answers `unsupported` (e.g. AI-adjacent calls stay unavailable on the web).
 
 Capabilities: `save`, `saveAs`, `saveCopy` (additive, UNI-1872), `recents`, `filePick`, `print`, `exportPdf`, `exportHtml`, `attachments`, `images`,
-`ai`, and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`, and (additive, G8-18) `commentsShareView`, and (additive, UNI-2033) `commentsViewVersion`, and (additive, SIZE-F1) `sizeUi`, and (additive, UNI-2264) `aiStart`. The effective set is the frame's ∩
-the host's grant. `desktopOpen` (additive, default false) is the "Open in desktop app" grant, see "Open in desktop app (`app.open`)" below. The three cloud-tool keys only count together with `ai`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
+and (additive, CONTRACT C16) `webSearch`, `imageSearch`, `imageGeneration`, and (additive, X-02) `download`, `uniworkAi`, and (additive, G8-08) `comments`, and (additive, G8-18) `commentsShareView`, and (additive, UNI-2033) `commentsViewVersion`, and (additive, SIZE-F1) `sizeUi`, and (additive, UNI-2264) `aiStart`. The effective set is the frame's ∩
+the host's grant; a key outside this list (the old `ai` grant included, UNI-2289) is ignored. `desktopOpen` (additive, default false) is the "Open in desktop app" grant, see "Open in desktop app (`app.open`)" below. The three cloud-tool keys only count together with `uniworkAi`; see "AI (web)" below. The frame hides File > Open / Ctrl+O unless `filePick`
 is granted (grant it only with an `api` handler for `file.pick`) and stops asking for recents without `recents`.
 `InitPayload.limits?: DocumentSizeLimits` and `OpenPayload.limits?: DocumentSizeLimits` (`{ max_bytes, warn_ratio }`,
 defaults `200 * 1024 * 1024` and `0.9`, resolved leniently field-by-field via `resolveDocumentSizeLimits` with
@@ -351,24 +351,25 @@ One protocol serves every genoffice editor on the web (lane GO-B4/B5/B6, UNI-101
 The frame calls the GO-A7 web AI routes itself; there is **no postMessage relay** for AI. The host only decides
 whether AI exists for this document (grants) and keeps answering `token.refresh`.
 
-- **Grants.** `ai` (the AI panels and every AI entry) and, each only together with `ai`, `webSearch`, `imageSearch`,
-  `imageGeneration` (UniWork cloud tools; image generation also covers media analysis). Grant `ai` only when the
-  organization has the entitlement **and** the frame-token AI mount below is live; without it every AI entry stays
-  hidden exactly as before. Every frame (Docs and all modules) declares the four keys in `ready`.
+- **Grants.** UniWork AI is the only AI of the frame (UNI-2289). `uniworkAi` (the AI panels and every AI entry)
+  and, each only together with `uniworkAi`, `webSearch`, `imageSearch`, `imageGeneration` (UniWork cloud tools;
+  image generation also covers media analysis). Grant `uniworkAi` only when the organization has the entitlement
+  **and** the frame-token AI mount below is live; without it every AI entry stays hidden. Every frame (Docs and
+  all modules) declares the four keys in `ready`, and `aiStart` with `uniworkAi`.
 - **Routes** (same origin as the frame: the bundle CSP is `connect-src 'self'`): the path of `init.apiBase`
   (`/api` or `/api/v1`) on the frame's origin + `/v1/office-frame/documents/{documentId}/ai/...`:
-  `credentials` GET, `credentials/{provider}` PUT / DELETE (masked `key_hint` only, the key is write-only),
-  `byok/{provider}/chat/completions` | `/messages` | `/generate` POST and `/models` GET (the vendor's own wire
-  format; SSE stays SSE; no key from the frame), `cloud` GET, `cloud/search` | `/images` | `/media/analyze` |
-  `/transcribe` POST.
+  `uniwork/chat/completions` POST (a UniWork AI turn, SSE), `uniwork/write` POST (a one-shot writer inside the
+  turn's run, SSE), `cloud` GET (tool switches, credits, the UniWork AI model), `cloud/search` | `/images` |
+  `/media/analyze` | `/transcribe` POST. The frame holds no provider key and calls no vendor route.
 - **Auth.** `Authorization: Bearer <frame token>`, `credentials: 'omit'`, `mode: 'same-origin'`; one retry with a
   refreshed token after a 401 (a second 401 is the "session expired" state).
-- **Errors** (`{error: {code, message}}`, the UniWork envelope; the flat `{code, message}` is read too; the UI picks a typed state from the status, never the message): 400
-  `provider_not_supported` / `base_url_refused`, 402 `credits_exhausted`, 403 `entitlement_required`, 404
-  `credential_missing`, 424 `provider_auth_failed`, 429 (+ `retry-after`), 502 `provider_unreachable`, 503
-  `cloud_unavailable`. A provider's own 400/404 passes through to the genoffice ai-provider unchanged.
-- Frame side: `web/modules/shared/ai/` (client, ai-provider proxy transport, streams, in-frame AI settings + state
-  card). Test host: `?ai=1` grants all four; `web/server/fake-ai.mjs` fakes the routes (`/__fake-ai/*` drives it).
+- **Errors** (`{error: {code, message}}`, the UniWork envelope; the flat `{code, message}` is read too; the UI picks a typed state from the status, never the message): 402
+  `credits_exhausted`, 403 `entitlement_required`, 429 (+ `retry-after`), 502 `provider_unreachable`, 503
+  `cloud_unavailable`; a UniWork AI turn reads the façade's own codes (`office_capability_off`, `run_expired`, ...).
+- Frame side: `web/modules/shared/ai/` (client, streams, state card; the cloud status for the model chip is
+  published as `window.uniworkCloudStatus`, the bridge a desktop preload exposes). Test host: `?uniwork=1` grants
+  `uniworkAi`, `aiStart` and the three cloud tools (`?ai=1` is an alias); `web/server/fake-ai.mjs` fakes the routes
+  (`/__fake-ai/*` drives it).
 
 ## Origin model
 

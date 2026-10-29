@@ -13,18 +13,6 @@ import {
 import { createHash, randomUUID } from 'node:crypto'
 import { handOffBytes } from './byte-handoff'
 import {
-  getUniworkKeysHost,
-  insideOrgFetch,
-  installOrgFetchDispatcher,
-  isDuckUniworkKeyError,
-  keepOrgServedSlots,
-  localSlotClaimed,
-  resolveAiRoute,
-  runOnRoute,
-  type AiRoute,
-  type DuckUniworkKeyError,
-} from './ai-org-route'
-import {
   appendFileSync,
   existsSync,
   mkdirSync,
@@ -136,7 +124,6 @@ import {
   sanitizeAiSettings,
   sanitizeCliPath,
   aiNoticeBody,
-  aiNoticeTagged,
   aiTestFailure,
   testChatConnection,
   noModelMessage,
@@ -147,7 +134,6 @@ import {
   type AiChatFailure,
   type AiChatRequest,
   type AiChatResponse,
-  type AiModelPick,
   type AiModelSource,
   type AiProviderConfig,
   type AiProviderId,
@@ -3997,10 +3983,6 @@ export function setUniworkAiHost(host: UniworkAiHost | null): void {
   uniworkAiHost = host
 }
 
-export { getUniworkKeysHost, setUniworkKeysHost, type UniworkKeysHost } from './ai-org-route'
-
-const BROADCAST_AI_SETTINGS_SYMBOL = Symbol.for('genoffice.broadcastAiSettingsChanged')
-
 /**
  * Whether the active UniWork account chose "UniWork AI" as its provider. The shell backs it with
  * the per-account store (key `uniwork.ai.uniwork-choice`); ai-settings.json only ever holds the
@@ -4042,36 +4024,6 @@ function wantsUniworkPick(options: unknown): boolean {
   )
 }
 
-const MAX_PICKED_MODEL_LENGTH = 200
-
-/** one `{ provider, model }` the renderer says the user chose; anything malformed is none */
-function validModelPick(pick: unknown): AiModelPick | null {
-  if (!pick || typeof pick !== 'object') return null
-  const { provider, model } = pick as { provider?: unknown; model?: unknown }
-  if (typeof provider !== 'string' || typeof model !== 'string') return null
-  const picked = model.trim()
-  // keepOrgServedSlots only honors a provider that has an org source, so the id needs no catalog check
-  return picked && picked.length <= MAX_PICKED_MODEL_LENGTH
-    ? { provider: provider as AiProviderId, model: picked }
-    : null
-}
-
-/**
- * The models the renderer says the user chose (`ai:set-settings` options: `modelPick` from the chip,
- * `modelPicks` from the Settings pane, one entry per provider): each one validated alone, at most
- * one per provider (a later entry replaces an earlier one), anything malformed dropped.
- */
-function modelPicksOf(options: unknown): AiModelPick[] {
-  const { modelPick, modelPicks } = (options ?? {}) as { modelPick?: unknown; modelPicks?: unknown }
-  const entries = [modelPick, ...(Array.isArray(modelPicks) ? modelPicks.slice(0, 64) : [])]
-  const byProvider = new Map<string, AiModelPick>()
-  for (const entry of entries) {
-    const pick = validModelPick(entry)
-    if (pick) byProvider.set(pick.provider, pick)
-  }
-  return [...byProvider.values()]
-}
-
 /** the non-`uniwork` provider ai-settings.json holds for ai:set-settings (normal saves put the `uniwork` pick in the account store; a hand-edited `uniwork` in the file stays `uniwork` on read per no-silent-fallback, while writes keep a non-`uniwork` slot in the file) */
 function fileAiProvider(): AiProviderId {
   const provider = resolveAiSettings(
@@ -4095,10 +4047,6 @@ const providerModelCache = new ProviderModelCache()
  * Per provider that can send: the model chosen in the Settings pane (this file) and the provider's
  * live list. The list never blocks the read: a first call answers `loading` and starts the
  * listing, which announces itself through `ai:settings-changed` when it lands.
- * When signed into UniWork, a key saved on UniWork serves (`origin: 'org'`) every provider whose
- * slot in ai-settings.json has no key of its own; its model is `chosen` there, never copied into
- * `settings.providers`. A renderer may write a pick into `providers[id].model` in memory, but a save
- * restores the stored slot (keepOrgServedSlots) and records only the picks (`modelPick` / `modelPicks`) it was sent.
  */
 function modelSourcesOf(settings: AiSettings): Partial<Record<AiProviderId, AiModelSource>> {
   const sources: Partial<Record<AiProviderId, AiModelSource>> = {}
@@ -4112,50 +4060,7 @@ function modelSourcesOf(settings: AiSettings): Partial<Record<AiProviderId, AiMo
       ...providerModelCache.read(id, config, broadcastAiSettingsChanged),
     }
   }
-  const keysHost = getUniworkKeysHost()
-  if (keysHost) {
-    // a slot with a key stays local even while incomplete (Settings shows what it still needs)
-    const localIds = new Set(
-      AI_PROVIDERS.map((m) => m.id).filter(
-        (id) =>
-          sources[id] !== undefined ||
-          localSlotClaimed(id, settings.providers[id], keysHost.byokBaseUrl(id)),
-      ),
-    )
-    Object.assign(sources, keysHost.sources(localIds))
-  }
   return sources
-}
-
-/**
- * Where a call for `provider` goes: the caller's settings copy, then the stored slot, then a key
- * saved on UniWork (decided in main from ai-settings.json and the cached R1 list).
- */
-function aiRouteOf(settings: AiSettings, provider: AiProviderId): Promise<AiRoute> {
-  const disk = resolveAiSettings(
-    readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {}),
-    defaultAiSettings(),
-  )
-  return resolveAiRoute(
-    provider,
-    withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider]),
-    withUniAiOpenRouterAuth(disk, provider, disk.providers?.[provider]),
-    getUniworkKeysHost(),
-  )
-}
-
-/** the localized state line of a refused org-key call; notices keep their tag for the panel */
-function orgKeyErrorText(
-  err: DuckUniworkKeyError,
-  provider: AiProviderId,
-  tagged: boolean,
-): string {
-  const providerLabel = AI_PROVIDERS.find((m) => m.id === provider)?.label ?? provider
-  const message = err.describe(getUiLang(), providerLabel)
-  if (!tagged) return message
-  if (err.errorKind === 'not_entitled') return aiNoticeTagged('not_entitled', message)
-  if (err.errorKind === 'quota') return aiNoticeTagged('credits_exhausted', message)
-  return message
 }
 
 /**
@@ -4164,20 +4069,11 @@ function orgKeyErrorText(
  * sheets' standalone AI handlers use the same channel names.
  */
 export function registerAiIpc(): void {
-  ;(globalThis as Record<symbol, unknown>)[BROADCAST_AI_SETTINGS_SYMBOL] =
-    broadcastAiSettingsChanged
-  // org-key calls reach the proxy through ai-provider's primary fetch, scoped per call
-  installOrgFetchDispatcher()
   app.once('before-quit', shutdownCodexAppServers)
   ipcMain.handle('ai:get-settings', async (event, options?: unknown): Promise<AiSettings> => {
     const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
     const settings = resolveAiSettings(stored, defaultAiSettings())
-    // the cached UniWork key list answers at once; a stale one is re-read in the background and
-    // announces itself through ai:settings-changed (a slow or dead server never holds this read)
-    void getUniworkKeysHost()
-      ?.list()
-      .catch(() => undefined)
-    // derived, never saved: what the model chip shows besides the catalog (including org sources)
+    // derived, never saved: what the model chip shows besides the catalog
     settings.modelSources = modelSourcesOf(settings)
     // the stored provider stays selected even while its config is incomplete (the picker and
     // Settings show what is missing); only an unknown id degrades to genspark
@@ -4235,17 +4131,6 @@ export function registerAiIpc(): void {
     ) {
       uniworkAiChoiceStore?.write(false)
     }
-    // a provider served by a key saved on UniWork keeps its stored slot; a model picked for it is
-    // kept with the account (see keepOrgServedSlots)
-    keepOrgServedSlots(
-      sanitized,
-      resolveAiSettings(
-        readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {}),
-        defaultAiSettings(),
-      ),
-      getUniworkKeysHost(),
-      modelPicksOf(options),
-    )
     writeJsonAtomic(SETTINGS_PATH(), sanitized)
     broadcastAiSettingsChanged()
   })
@@ -4306,10 +4191,8 @@ export function registerAiIpc(): void {
       return
     }
 
-    const route = await aiRouteOf(settings, provider)
-    const activeConfig = route.config
-    const useOrgProxy = route.kind === 'org'
-    if (!activeConfig || (!useOrgProxy && provider !== 'codex' && !activeConfig.apiKey)) {
+    const streamConfig = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
+    if (!streamConfig || (provider !== 'codex' && !streamConfig.apiKey)) {
       send({
         requestId,
         type: 'error',
@@ -4317,11 +4200,10 @@ export function registerAiIpc(): void {
       })
       return
     }
-    if (provider !== 'codex' && !activeConfig.model) {
+    if (provider !== 'codex' && !streamConfig.model) {
       send({ requestId, type: 'error', error: tm('errNoModel') })
       return
     }
-    const streamConfig = activeConfig
     const controller = new AbortController()
     activeAiStreams.set(requestId, controller)
     const unwatchSender = abortOnDestroyed(event.sender, controller)
@@ -4335,31 +4217,21 @@ export function registerAiIpc(): void {
     }
     try {
       let stopReason: string | undefined
-      const runStream = () =>
-        streamForProvider(provider, streamConfig, system, messages, tools, maxTokens, {
-          ...(request.sessionId ? { sessionId: request.sessionId } : {}),
-          signal: controller.signal,
-          onDelta: (text) => send({ requestId, type: 'delta', text }),
-          onReasoningDelta: (text) => send({ requestId, type: 'reasoning', text }),
-          onToolCall: (toolCall) => send({ requestId, type: 'tool-call', toolCall }),
-          onActivity: ping,
-          onStopReason: (reason) => {
-            stopReason = reason
-          },
-          onUsage: (usage) => send({ requestId, type: 'usage', usage }),
-        })
-      await runOnRoute(route, provider, runStream, () => controller.abort())
+      await streamForProvider(provider, streamConfig, system, messages, tools, maxTokens, {
+        ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+        signal: controller.signal,
+        onDelta: (text) => send({ requestId, type: 'delta', text }),
+        onReasoningDelta: (text) => send({ requestId, type: 'reasoning', text }),
+        onToolCall: (toolCall) => send({ requestId, type: 'tool-call', toolCall }),
+        onActivity: ping,
+        onStopReason: (reason) => {
+          stopReason = reason
+        },
+        onUsage: (usage) => send({ requestId, type: 'usage', usage }),
+      })
       send({ requestId, type: 'done', stopReason })
     } catch (err) {
-      if (isDuckUniworkKeyError(err)) {
-        console.warn(
-          `[ai-stream] ${requestId} (${provider}/${streamConfig.model}) org-key failed:`,
-          err.message,
-        )
-        // the localized state line carries the whole story (wait time included); no errorCode:
-        // the renderer's generic texts for those codes would replace it
-        send({ requestId, type: 'error', error: orgKeyErrorText(err, provider, true) })
-      } else if (controller.signal.aborted) {
+      if (controller.signal.aborted) {
         send({ requestId, type: 'done' })
       } else {
         const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
@@ -4516,12 +4388,10 @@ export function registerAiIpc(): void {
       rawError: failure.raw,
     }
   }
-  // the request's provider config and route, or the reason there is none
-  const chatConfigOf = async (
+  // the request's provider config, or the reason there is none
+  const chatConfigOf = (
     request: AiChatRequest,
-  ): Promise<
-    { config: AiProviderConfig; provider: AiProviderId; route: AiRoute } | AiChatOutcome
-  > => {
+  ): { config: AiProviderConfig; provider: AiProviderId } | AiChatOutcome => {
     // same schema check as ai:stream: one-shot requests would otherwise act on
     // the renderer's settings copy verbatim
     const settings = sanitizeAiSettings(request.settings)
@@ -4537,10 +4407,8 @@ export function registerAiIpc(): void {
       }
     }
     const provider = settings.provider
-    // the same route as ai:stream: a key saved on UniWork serves one-shot calls too
-    const route = await aiRouteOf(settings, provider)
-    const config = route.config
-    if (!config || (route.kind !== 'org' && provider !== 'codex' && !config.apiKey)) {
+    const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
+    if (!config || (provider !== 'codex' && !config.apiKey)) {
       return {
         ok: false,
         // one-shot callers (settings test, email, one-click actions) print the string as is, so no notice code
@@ -4551,43 +4419,22 @@ export function registerAiIpc(): void {
     if (provider !== 'codex' && !config.model) {
       return { ok: false, error: tm('errNoModel'), errorKind: 'failed' }
     }
-    return { config, provider, route }
+    return { config, provider }
   }
-
-  /** the Settings pill kind of a refused org-key call */
-  const ORG_KEY_TEST_KIND: Record<DuckUniworkKeyError['errorKind'], AiTestFailureKind> = {
-    invalid_key: 'invalid_key',
-    not_entitled: 'not_entitled',
-    credits_exhausted: 'credits_exhausted',
-    quota: 'credits_exhausted',
-    rate_limit: 'limit',
-    limit: 'limit',
-    unreachable: 'unavailable',
-    unavailable: 'unavailable',
-    network: 'network',
-    bad_url: 'misconfigured',
-    misconfigured: 'misconfigured',
-    failed: 'failed',
-  }
-  /** a refused org-key call as a one-shot failure (the product line; the code stays in the log) */
-  const orgKeyChatFailure = (err: DuckUniworkKeyError, provider: AiProviderId) =>
-    failedChat({
-      error: orgKeyErrorText(err, provider, false),
-      errorKind: ORG_KEY_TEST_KIND[err.errorKind],
-      raw: err.message,
-    })
 
   const runAiChat = async (request: AiChatRequest): Promise<AiChatOutcome> => {
-    const target = await chatConfigOf(request)
+    const target = chatConfigOf(request)
     if (!('config' in target)) return target
     try {
-      const result = await runOnRoute(target.route, target.provider, () =>
-        chatForProvider(target.provider, target.config, request.system, request.user),
+      const result = await chatForProvider(
+        target.provider,
+        target.config,
+        request.system,
+        request.user,
       )
       // the one-shot path reports HTTP failures as ok:false with the raw body
       return result.ok ? result : failedChat(aiChatFailure(result, getUiLang(), tm('errAiBusy')))
     } catch (err) {
-      if (isDuckUniworkKeyError(err)) return orgKeyChatFailure(err, target.provider)
       return failedChat(aiChatFailureFromError(err, getUiLang(), tm('errAiBusy')))
     }
   }
@@ -4597,18 +4444,11 @@ export function registerAiIpc(): void {
   // settings > AI model "Test": one streamed ping through the same endpoint and wire as the chat panel;
   // a failure keeps its raw text in the log
   ipcMain.handle('ai:settings-test', async (_event, request: AiChatRequest) => {
-    const target = await chatConfigOf(request)
+    const target = chatConfigOf(request)
     let result: AiChatOutcome
     if ('config' in target) {
-      try {
-        const test = await runOnRoute(target.route, target.provider, () =>
-          testChatConnection(target.provider, target.config),
-        )
-        result = test.ok ? test : failedChat(aiChatFailure(test, getUiLang(), tm('errAiBusy')))
-      } catch (err) {
-        if (!isDuckUniworkKeyError(err)) throw err
-        result = orgKeyChatFailure(err, target.provider)
-      }
+      const test = await testChatConnection(target.provider, target.config)
+      result = test.ok ? test : failedChat(aiChatFailure(test, getUiLang(), tm('errAiBusy')))
     } else {
       result = target
     }
@@ -4945,13 +4785,7 @@ export function registerDocsIpc(): void {
   registerZoteroIpc()
   void app.whenReady().then(registerLazyMediaProtocol)
   // Node fetch (undici) direct connections get reset under VPN/tun setups; retry over Chromium's stack
-  // (except for org-proxied calls, which handle auth/status mapping themselves)
-  setRescueFetch((url, init) => {
-    if (insideOrgFetch()) {
-      return Promise.reject(new Error('rescueFetch disabled for org proxy requests'))
-    }
-    return net.fetch(url, init)
-  })
+  setRescueFetch((url, init) => net.fetch(url, init))
   setAiUserAgent(`UniWorkOffice/${app.getVersion()}`)
 
   // shared with the other editor modules — last (identical) registration wins

@@ -83,7 +83,7 @@ const hangs = (init: RequestInit) =>
 
 type Answer = (init: RequestInit) => Response | Promise<Response>
 
-function rig(opts: { caps?: Record<string, boolean>; credentials?: unknown } = {}) {
+function rig(opts: { caps?: Record<string, boolean> } = {}) {
   const caps = opts.caps ?? { uniworkAi: true }
   // the tracker's grace (and nothing the streams wait on) runs on the test's clock
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
@@ -100,7 +100,6 @@ function rig(opts: { caps?: Record<string, boolean>; credentials?: unknown } = {
       if (!next) throw new Error('no scripted answer')
       return next(init)
     }
-    if (url.endsWith('/credentials')) return json(200, opts.credentials)
     return json(200, {
       enabled: true,
       tools: {},
@@ -136,12 +135,11 @@ function rig(opts: { caps?: Record<string, boolean>; credentials?: unknown } = {
   }
   const presets: AiPreset[] = []
   let streams = 0
-  // another provider goes to the streams directly: withWebAi would pick this frame's choice (UniWork AI)
-  const stream = (messages: AgentMessage[], provider = 'uniwork') =>
-    (provider === 'uniwork' ? api.aiStream : ai.streams.aiStream)({
+  const stream = (messages: AgentMessage[]) =>
+    api.aiStream({
       requestId: `s${++streams}`,
       sessionId: 'sess-1',
-      settings: { provider, providers: {} },
+      settings: { provider: 'uniwork', providers: {} },
       system: '',
       messages,
       tools: [{ name: 'edit_doc', description: 'edit', inputSchema: { type: 'object' } }],
@@ -240,32 +238,8 @@ describe('ai.start handoff (UNI-2264)', () => {
     expect(r.presets).toEqual([])
   })
 
-  it("ai.start is refused unsupported when the panel's provider is not UniWork AI", async () => {
-    const r = rig({
-      caps: { ai: true },
-      credentials: {
-        items: [
-          {
-            provider: 'openai',
-            label: '',
-            base_url: '',
-            key_hint: '…abcd',
-            created_at: '2026-10-09T00:00:00Z',
-            updated_at: '2026-10-09T00:00:00Z',
-            model: 'gpt-x',
-            model_updated_at: '2026-10-09T00:00:00Z',
-          },
-        ],
-        providers: [
-          {
-            id: 'openai',
-            protocol: 'openai-compatible',
-            requires_base_url: false,
-            default_base_url: '',
-          },
-        ],
-      },
-    })
+  it('ai.start is refused unsupported without the UniWork AI grant (the old ai grant alone)', async () => {
+    const r = rig({ caps: { ai: true } })
     r.listen()
     const refused = await r.ai.startHandoff({ handoffId: 'h1', text: JOB }).catch((e) => e)
     expect(refused).toBeInstanceOf(DocsProtocolError)
@@ -367,30 +341,21 @@ describe('ai.start handoff (UNI-2264)', () => {
     expect(r.presets).toHaveLength(1)
   })
 
-  it.each([
-    ['UniWork AI', 'uniwork'],
-    ['another provider', 'openai'],
-  ] as const)(
-    "a Stop while tools ran, then the person's own question on %s, drops the job",
-    async (_name, provider) => {
-      const r = rig()
-      r.listen()
-      await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
-      r.answer(() => ok({ calls: [CALL], remaining: 1 }))
-      await r.run(() => r.stream(r.question(JOB)))
-      // Stop: the loop keeps the aborted tool results; the person then asks their own question,
-      // which follows tool results in the history and ends cleanly
-      if (provider === 'uniwork') r.answer(() => ok())
-      await r.run(() =>
-        r.stream(
-          [...r.withResults(JOB, true), { role: 'user', text: 'Summarise this page' }],
-          provider,
-        ),
-      )
-      expect(r.presets).toHaveLength(1)
-      expect(r.posts.map((p) => p.handoff)).toEqual(provider === 'uniwork' ? ['h1', null] : ['h1'])
-    },
-  )
+  it("a Stop while tools ran, then the person's own question, drops the job", async () => {
+    const r = rig()
+    r.listen()
+    await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
+    r.answer(() => ok({ calls: [CALL], remaining: 1 }))
+    await r.run(() => r.stream(r.question(JOB)))
+    // Stop: the loop keeps the aborted tool results; the person then asks their own question,
+    // which follows tool results in the history and ends cleanly
+    r.answer(() => ok())
+    await r.run(() =>
+      r.stream([...r.withResults(JOB, true), { role: 'user', text: 'Summarise this page' }]),
+    )
+    expect(r.presets).toHaveLength(1)
+    expect(r.posts.map((p) => p.handoff)).toEqual(['h1', null])
+  })
 
   it.each([
     ['offline', 'offline'],
@@ -551,17 +516,6 @@ describe('ai.start handoff (UNI-2264)', () => {
     r.answer(() => ok())
     await r.run(() => r.stream(r.question('Something else first')))
     expect(await r.api.consumeAiPreset()).toBeNull()
-  })
-
-  it('a question to another provider drops the job', async () => {
-    const r = rig()
-    r.listen()
-    await r.ai.startHandoff({ handoffId: 'h1', text: JOB })
-    // no BYOK key: the turn fails at once, but the person asked something else
-    await r.run(() => r.stream(r.question('Translate this'), 'openai'))
-    r.answer(() => ok())
-    await r.run(() => r.stream(r.question(JOB)))
-    expect(r.posts.map((p) => p.handoff)).toEqual([null])
   })
 
   it('a module frame answers the host ai.start and its global hands the preset over', async () => {
