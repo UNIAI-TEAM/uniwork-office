@@ -312,8 +312,8 @@ export interface LegacyOpenDeps {
    * in that gap would delete the live file.
    */
   sweepDelayMs?: number
-  /** show the progress box; the returned function ends it */
-  beginProgress(fileName: string, cancel: () => void): () => void
+  /** show the progress box; the returned function ends it (and may return a promise that settles when the box closes) */
+  beginProgress(fileName: string, cancel: () => void): () => void | Promise<void>
   /** a typed notice box */
   notice(message: string): void
   t(key: LegacyOpenStringKey, params?: Record<string, string | number>): string
@@ -453,7 +453,7 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
     fileName: string
     result: ConvertLegacyResult
     signal: AbortSignal
-    endProgress: () => void
+    endProgress: () => void | Promise<void>
     afterOpenNotice?: string
   }): Promise<void> {
     const { filePath, fileName, result, signal, endProgress, afterOpenNotice } = opts
@@ -485,7 +485,7 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
         suggestSaveAs: doc.suggestSaveAs,
         tempDir,
       })
-      endProgress()
+      const progressClosed = Promise.resolve(endProgress())
       try {
         deps.openConverted(doc)
       } catch (err) {
@@ -502,6 +502,7 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
       } catch {
         // a lost recents entry does not undo an open tab
       }
+      await progressClosed
       if (afterOpenNotice) {
         deps.notice(afterOpenNotice)
       }
@@ -516,7 +517,7 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
     fileName: string,
     source: OdfFallbackSourceFormat,
     signal: AbortSignal,
-    endProgress: () => void,
+    endProgress: () => void | Promise<void>,
   ): Promise<void> {
     const engine = deps.odfFallback!
     throwIfStopped(signal)
@@ -583,7 +584,12 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
     const fileName = basename(filePath)
     const controller = new AbortController()
     controllers.add(controller)
-    const endProgress = deps.beginProgress(fileName, () => controller.abort())
+    const rawEndProgress = deps.beginProgress(fileName, () => controller.abort())
+    let progressEnded: Promise<void> | null = null
+    const endProgress = (): Promise<void> => {
+      progressEnded ??= Promise.resolve(rawEndProgress())
+      return progressEnded
+    }
     try {
       const result = await deps.convert(filePath, {
         signal: controller.signal,
@@ -616,8 +622,7 @@ export function createLegacyOpener(deps: LegacyOpenDeps) {
               : fallbackErr
         }
       }
-      endProgress()
-      // a cancelled or disposed job ends silently, whatever error the converter raised after
+      await endProgress()
       // the stop (a missing converter must not open the values-only fallback or show a notice)
       if (controller.signal.aborted || disposed) return
       if (err instanceof LegacyConvertError) {
@@ -735,7 +740,12 @@ export function createCloudLegacyConverter(deps: CloudLegacyConverterDeps) {
       if (disposed) return { ok: false, reason: 'cancelled' }
       const controller = new AbortController()
       controllers.add(controller)
-      const endProgress = deps.beginProgress(input.name, () => controller.abort())
+      const rawEndProgress = deps.beginProgress(input.name, () => controller.abort())
+      let progressEnded: Promise<void> | null = null
+      const endProgress = (): Promise<void> => {
+        progressEnded ??= Promise.resolve(rawEndProgress())
+        return progressEnded
+      }
       let dir: string | null = null
       try {
         const root = deps.stagingRoot?.() ?? tmpdir()
@@ -765,10 +775,11 @@ export function createCloudLegacyConverter(deps: CloudLegacyConverterDeps) {
         }
         const failure =
           err instanceof LegacyConvertError ? err : new LegacyConvertError('failed', String(err))
+        await endProgress()
         deps.notice(legacyErrorMessage(failure, input.name, deps.t))
         return { ok: false, reason: 'failed' }
       } finally {
-        endProgress()
+        await endProgress()
         controllers.delete(controller)
         if (dir) await rm(dir, { recursive: true, force: true }).catch(() => undefined)
       }

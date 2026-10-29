@@ -2,24 +2,26 @@ import { describe, expect, it, vi } from 'vitest'
 import { createLegacyOpener } from '../src/main/legacy-open'
 import { tLegacyOpen, type LegacyOpenStringKey } from '../src/main/legacy-open-strings'
 import {
+  type BeginLegacyProgress,
   createLegacyProgress,
   LEGACY_PROGRESS_DELAY_MS,
   type LegacyProgressDeps,
   type LegacyProgressMessageBoxOptions,
   type LegacyProgressMessageBoxResult,
 } from '../src/main/legacy-progress'
-import type { ConvertLegacyResult } from '../src/main/legacy-converter'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { LegacyConvertError, type ConvertLegacyResult } from '../src/main/legacy-converter'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 interface PendingBox {
   readonly options: LegacyProgressMessageBoxOptions
+  settled: boolean
   resolve(res: LegacyProgressMessageBoxResult): void
 }
 
 interface FakeProgressHarness {
-  readonly beginProgress: (fileName: string, cancel: () => void) => () => void
+  readonly beginProgress: BeginLegacyProgress
   readonly boxes: PendingBox[]
   readonly closedSignals: AbortSignal[]
   readonly progressBarCalls: Array<{ value: number; mode?: 'indeterminate' }>
@@ -27,7 +29,10 @@ interface FakeProgressHarness {
   pendingTimerCount(): number
 }
 
-function createFakeProgressHarness(lang: 'en' | 'vi' = 'en'): FakeProgressHarness {
+function createFakeProgressHarness(
+  lang: 'en' | 'vi' = 'en',
+  opts: { asyncCloseBox?: boolean } = {},
+): FakeProgressHarness {
   let now = 0
   let nextId = 1
   const timers = new Map<number, { due: number; cb: () => void }>()
@@ -36,12 +41,31 @@ function createFakeProgressHarness(lang: 'en' | 'vi' = 'en'): FakeProgressHarnes
   const progressBarCalls: Array<{ value: number; mode?: 'indeterminate' }> = []
 
   const deps: LegacyProgressDeps = {
-    showMessageBox: (options) =>
-      new Promise<LegacyProgressMessageBoxResult>((resolve) => {
-        boxes.push({ options, resolve })
-      }),
+    showMessageBox: (options) => {
+      const { promise, resolve: resolveBox } =
+        Promise.withResolvers<LegacyProgressMessageBoxResult>()
+      const entry: PendingBox = {
+        options,
+        settled: false,
+        resolve: (res) => {
+          if (entry.settled) return
+          entry.settled = true
+          resolveBox(res)
+        },
+      }
+      boxes.push(entry)
+      return promise
+    },
     closeBox: (signal) => {
       closedSignals.push(signal)
+      if (opts.asyncCloseBox) {
+        const box = boxes.find((b) => b.options.signal === signal)
+        if (box) {
+          queueMicrotask(() => {
+            queueMicrotask(() => box.resolve({ response: 0 }))
+          })
+        }
+      }
     },
     setProgressBar: (value, options) => {
       progressBarCalls.push(options ? { value, mode: options.mode } : { value })
@@ -318,5 +342,283 @@ describe('createLegacyProgress', () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
+  })
+
+  describe('closes the progress box and awaits showMessageBox settlement before any notice across all 5 end paths (ODF2A-V1)', () => {
+    const ODF_FIXTURES_DIR = resolve(import.meta.dirname, 'fixtures', 'odf')
+
+    it('1. LibreOffice success: closes the shown progress box and resolves endProgress once the box settles', async () => {
+      const root = mkdtempSync(join(tmpdir(), 'legacy-progress-lo-ok-'))
+      try {
+        const h = createFakeProgressHarness('en', { asyncCloseBox: true })
+        const opened: string[] = []
+        const notices: string[] = []
+        const convertGate = Promise.withResolvers<ConvertLegacyResult>()
+
+        const opener = createLegacyOpener({
+          convert: () => convertGate.promise,
+          importRoot: () => join(root, 'imports'),
+          openConverted: (doc) => opened.push(doc.originalPath),
+          activateConverted: () => false,
+          isPathOpen: () => true,
+          openXlsValuesOnly: () => false,
+          recordRecent: () => undefined,
+          beginProgress: h.beginProgress,
+          notice: (msg) => notices.push(msg),
+          t: (k, p) => tLegacyOpen('en', k, p),
+        })
+
+        expect(opener.open('/work/vn-template.doc')).toBe(true)
+        h.advance(LEGACY_PROGRESS_DELAY_MS)
+        expect(h.boxes).toHaveLength(1)
+
+        convertGate.resolve({
+          kind: 'converted',
+          sourceFormat: 'doc',
+          targetFormat: 'docx',
+          bytes: new Uint8Array([80, 75, 3, 4]),
+          suggestedSaveAsPath: '/work/vn-template.docx',
+        })
+
+        await vi.waitFor(() => expect(opened).toEqual(['/work/vn-template.doc']))
+        await h.beginProgress.waitForIdle()
+        expect(h.closedSignals).toEqual([h.boxes[0]!.options.signal])
+        expect(h.boxes[0]!.settled).toBe(true)
+        expect(h.progressBarCalls).toEqual([{ value: 2, mode: 'indeterminate' }, { value: -1 }])
+        expect(notices).toEqual([])
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
+    it('2. ODF fallback success: closes the progress box and waits for it to settle BEFORE firing the after-open notice', async () => {
+      const root = mkdtempSync(join(tmpdir(), 'legacy-progress-fallback-ok-'))
+      try {
+        const h = createFakeProgressHarness('en', { asyncCloseBox: true })
+        const opened: string[] = []
+        const notices: Array<{ msg: string; boxSettledAtNotice: boolean }> = []
+        let fallbackCalled = false
+        const fallbackGate = Promise.withResolvers<{
+          pptx: Uint8Array
+          slides: number
+          dropped: Array<{ what: string; count: number }>
+        }>()
+
+        const odpPath = join(ODF_FIXTURES_DIR, 'native-impress.odp')
+        const opener = createLegacyOpener({
+          convert: async () => {
+            throw new LegacyConvertError('converter_missing', 'no converter')
+          },
+          importRoot: () => join(root, 'imports'),
+          openConverted: (doc) => opened.push(doc.originalPath),
+          activateConverted: () => false,
+          isPathOpen: () => true,
+          openXlsValuesOnly: () => false,
+          recordRecent: () => undefined,
+          odfFallback: {
+            convertOdtToDocx: vi.fn(),
+            convertOdpToPptx: () => {
+              fallbackCalled = true
+              return fallbackGate.promise
+            },
+          },
+          beginProgress: h.beginProgress,
+          notice: (msg) => {
+            notices.push({
+              msg,
+              boxSettledAtNotice: h.boxes[0]?.settled ?? false,
+            })
+          },
+          t: (k, p) => tLegacyOpen('en', k, p),
+        })
+
+        expect(opener.open(odpPath)).toBe(true)
+        await vi.waitFor(() => expect(fallbackCalled).toBe(true))
+        h.advance(LEGACY_PROGRESS_DELAY_MS)
+        expect(h.boxes).toHaveLength(1)
+        expect(h.boxes[0]!.settled).toBe(false)
+
+        fallbackGate.resolve({
+          pptx: new Uint8Array(readFileSync(odpPath)),
+          slides: 5,
+          dropped: [{ what: 'notes', count: 3 }],
+        })
+        await vi.waitFor(() => expect(notices).toHaveLength(1))
+        expect(opened).toEqual([odpPath])
+        expect(h.closedSignals).toEqual([h.boxes[0]!.options.signal])
+        // Proof: the progress box promise had already settled before notice() was called
+        expect(notices[0]!.boxSettledAtNotice).toBe(true)
+        expect(h.progressBarCalls).toEqual([{ value: 2, mode: 'indeterminate' }, { value: -1 }])
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
+    it('3. ODF fallback typed error: closes the progress box and waits for it to settle BEFORE firing the error notice', async () => {
+      const root = mkdtempSync(join(tmpdir(), 'legacy-progress-fallback-err-'))
+      try {
+        const h = createFakeProgressHarness('en', { asyncCloseBox: true })
+        const notices: Array<{ msg: string; boxSettledAtNotice: boolean }> = []
+        let fallbackCalled = false
+        const fallbackGate = Promise.withResolvers<{
+          docx: Uint8Array
+          blocks: number
+          dropped: Array<{ what: string; count: number }>
+        }>()
+
+        const odtPath = join(ODF_FIXTURES_DIR, 'native-writer.odt')
+        const opener = createLegacyOpener({
+          convert: async () => {
+            throw new LegacyConvertError('converter_missing', 'no converter')
+          },
+          importRoot: () => join(root, 'imports'),
+          openConverted: () => undefined,
+          activateConverted: () => false,
+          isPathOpen: () => false,
+          openXlsValuesOnly: () => false,
+          recordRecent: () => undefined,
+          odfFallback: {
+            convertOdtToDocx: () => {
+              fallbackCalled = true
+              return fallbackGate.promise
+            },
+            convertOdpToPptx: vi.fn(),
+          },
+          beginProgress: h.beginProgress,
+          notice: (msg) => {
+            notices.push({
+              msg,
+              boxSettledAtNotice: h.boxes[0]?.settled ?? false,
+            })
+          },
+          t: (k, p) => tLegacyOpen('en', k, p),
+        })
+
+        expect(opener.open(odtPath)).toBe(true)
+        await vi.waitFor(() => expect(fallbackCalled).toBe(true))
+        h.advance(LEGACY_PROGRESS_DELAY_MS)
+        expect(h.boxes).toHaveLength(1)
+
+        fallbackGate.reject(
+          Object.assign(new Error('unreadable'), { name: 'OdfConvertError', code: 'unreadable' }),
+        )
+        await vi.waitFor(() => expect(notices).toHaveLength(1))
+        expect(h.closedSignals).toEqual([h.boxes[0]!.options.signal])
+        expect(notices[0]!.boxSettledAtNotice).toBe(true)
+        expect(notices[0]!.msg).toMatch(/damaged or isn’t a valid \.odt file/)
+        expect(h.progressBarCalls).toEqual([{ value: 2, mode: 'indeterminate' }, { value: -1 }])
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
+    it('4. Cancel: clicking Cancel in the progress box during ODF fallback aborts the worker, clears the taskbar, and shows no notice', async () => {
+      const root = mkdtempSync(join(tmpdir(), 'legacy-progress-fallback-cancel-'))
+      try {
+        const h = createFakeProgressHarness('en', { asyncCloseBox: true })
+        const opened: string[] = []
+        const notices: string[] = []
+        let fallbackSignal: AbortSignal | undefined
+
+        const odpPath = join(ODF_FIXTURES_DIR, 'native-impress.odp')
+        const opener = createLegacyOpener({
+          convert: async () => {
+            throw new LegacyConvertError('converter_missing', 'no converter')
+          },
+          importRoot: () => join(root, 'imports'),
+          openConverted: (doc) => opened.push(doc.originalPath),
+          activateConverted: () => false,
+          isPathOpen: () => false,
+          openXlsValuesOnly: () => false,
+          recordRecent: () => undefined,
+          odfFallback: {
+            convertOdtToDocx: vi.fn(),
+            convertOdpToPptx: (_bytes, callOpts) => {
+              const { promise, reject } = Promise.withResolvers<never>()
+              fallbackSignal = callOpts?.signal
+              callOpts?.signal?.addEventListener('abort', () =>
+                reject(new LegacyConvertError('cancelled', 'cancelled')),
+              )
+              return promise
+            },
+          },
+          beginProgress: h.beginProgress,
+          notice: (msg) => notices.push(msg),
+          t: (k, p) => tLegacyOpen('en', k, p),
+        })
+
+        expect(opener.open(odpPath)).toBe(true)
+        await vi.waitFor(() => expect(fallbackSignal).toBeDefined())
+        h.advance(LEGACY_PROGRESS_DELAY_MS)
+        expect(h.boxes).toHaveLength(1)
+
+        // User clicks Cancel (response === 0)
+        h.boxes[0]!.resolve({ response: 0 })
+        await vi.waitFor(() => expect(fallbackSignal!.aborted).toBe(true))
+        await h.beginProgress.waitForIdle()
+        expect(opened).toEqual([])
+        expect(notices).toEqual([])
+        expect(h.boxes[0]!.settled).toBe(true)
+        expect(h.progressBarCalls).toEqual([{ value: 2, mode: 'indeterminate' }, { value: -1 }])
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
+    it('5. Timeout: closes the progress box and waits for it to settle BEFORE firing the timeout notice', async () => {
+      const root = mkdtempSync(join(tmpdir(), 'legacy-progress-fallback-timeout-'))
+      try {
+        const h = createFakeProgressHarness('en', { asyncCloseBox: true })
+        const notices: Array<{ msg: string; boxSettledAtNotice: boolean }> = []
+        let fallbackCalled = false
+        const fallbackGate = Promise.withResolvers<{
+          pptx: Uint8Array
+          slides: number
+          dropped: Array<{ what: string; count: number }>
+        }>()
+
+        const odpPath = join(ODF_FIXTURES_DIR, 'native-impress.odp')
+        const opener = createLegacyOpener({
+          convert: async () => {
+            throw new LegacyConvertError('converter_missing', 'no converter')
+          },
+          importRoot: () => join(root, 'imports'),
+          openConverted: () => undefined,
+          activateConverted: () => false,
+          isPathOpen: () => false,
+          openXlsValuesOnly: () => false,
+          recordRecent: () => undefined,
+          odfFallback: {
+            convertOdtToDocx: vi.fn(),
+            convertOdpToPptx: () => {
+              fallbackCalled = true
+              return fallbackGate.promise
+            },
+          },
+          beginProgress: h.beginProgress,
+          notice: (msg) => {
+            notices.push({
+              msg,
+              boxSettledAtNotice: h.boxes[0]?.settled ?? false,
+            })
+          },
+          t: (k, p) => tLegacyOpen('en', k, p),
+        })
+
+        expect(opener.open(odpPath)).toBe(true)
+        await vi.waitFor(() => expect(fallbackCalled).toBe(true))
+        h.advance(LEGACY_PROGRESS_DELAY_MS)
+        expect(h.boxes).toHaveLength(1)
+
+        fallbackGate.reject(new LegacyConvertError('timeout', 'ODF fallback worker timed out'))
+        await vi.waitFor(() => expect(notices).toHaveLength(1))
+        expect(h.closedSignals).toEqual([h.boxes[0]!.options.signal])
+        expect(notices[0]!.boxSettledAtNotice).toBe(true)
+        expect(notices[0]!.msg).toMatch(/took too long/)
+        expect(h.progressBarCalls).toEqual([{ value: 2, mode: 'indeterminate' }, { value: -1 }])
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
   })
 })
