@@ -9,6 +9,8 @@ import {
   presetSize,
   saveDefaultNewSlideSize,
 } from '../src/renderer/slide-size'
+import { vi as viGenofficeSlides } from '../src/renderer/i18n/genoffice-slides/vi'
+import { vi as viRibbon } from '../src/renderer/i18n/ribbon/vi'
 
 describe('matchSlideSizePreset', () => {
   it('recognises each preset in both orientations', () => {
@@ -88,5 +90,13 @@ describe('A4 / portrait round-trip save and reopen', () => {
     if (xmllintAvailable() || process.env.CI) {
       expect(await validatePptx(saved)).toEqual([])
     }
+  })
+})
+
+describe('vi slide size terminology', () => {
+  it('uses Kích cỡ in Custom Size menu and dialog title to match ribbonSlideSize', () => {
+    expect(viRibbon.ribbonSlideSize).toBe('Kích cỡ trang chiếu')
+    expect(viGenofficeSlides.ribbonSlideSizeCustom).toBe('Kích cỡ tùy chỉnh…')
+    expect(viGenofficeSlides.ribbonSlideSizeCustomTitle).toBe('Kích cỡ trang chiếu tùy chỉnh')
   })
 })
