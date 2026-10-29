@@ -43,10 +43,10 @@
 .gs-dd-value {
   flex: 1;
   min-width: 0;
-  display: block;
+  display: flex;
+  align-items: center;
   overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .gs-dd-caret {
