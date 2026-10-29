@@ -207,6 +207,7 @@ import {
   setDocsShellWindow,
   setDocsFileSavedHook,
   setDocsFileOpenedHook,
+  setDocsLegacyOpenHook,
   setSessionPathResolver,
   setUniworkAiHost,
   setUniworkAiChoiceStore,
@@ -273,6 +274,7 @@ import {
   setSlidesCloseTabHook,
   setSlidesExtraFileMenuItems,
   setSlidesOpenedHook,
+  setSlidesLegacyOpenHook,
   setSlidesHostWindowHook,
   setSlidesShellWindow,
   setSlidesShowBleed,
@@ -4098,8 +4100,12 @@ function createShellWindow(): void {
   })
   // When ⌘O opens a file inside a tab, sync the tab title/path (used for de-dup by path) and record it as recent.
   // The first save / save-as fires this too, so applyPendingDir also runs here.
-  // Sheets' own File > Open picked a legacy .xls: the converter route, not the calamine reader
-  setSheetsLegacyOpenHook((path) => legacyFormatForPath(path) !== null && legacyOpener.open(path))
+  // Editor File > Open picked a legacy or OpenDocument file: route through the shell converter seam
+  const openLegacyFromPicker = (path: string) =>
+    legacyFormatForPath(path) !== null && legacyOpener.open(path)
+  setDocsLegacyOpenHook(openLegacyFromPicker)
+  setSheetsLegacyOpenHook(openLegacyFromPicker)
+  setSlidesLegacyOpenHook(openLegacyFromPicker)
   setSheetsWorkbookOpenedHook((wc, path) => {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)

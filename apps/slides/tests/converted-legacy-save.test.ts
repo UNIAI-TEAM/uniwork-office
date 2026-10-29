@@ -12,6 +12,8 @@ const env = vi.hoisted(() => {
     handlers: new Map<string, (...args: never[]) => unknown>(),
     saveDialogPath: '' as string,
     saveDialogOptions: [] as Array<{ defaultPath?: string }>,
+    openDialogPath: '' as string,
+    openDialogOptions: [] as Array<{ filters?: Array<{ extensions: string[] }> }>,
   }
 })
 
@@ -26,6 +28,13 @@ vi.mock('electron', () => ({
     showSaveDialog: async (...args: unknown[]) => {
       env.saveDialogOptions.push(args.at(-1) as { defaultPath?: string })
       return { canceled: false, filePath: env.saveDialogPath }
+    },
+    showOpenDialog: async (...args: unknown[]) => {
+      env.openDialogOptions.push(args.at(-1) as { filters?: Array<{ extensions: string[] }> })
+      return {
+        canceled: !env.openDialogPath,
+        filePaths: env.openDialogPath ? [env.openDialogPath] : [],
+      }
     },
   },
   clipboard: { writeBuffer: () => {} },
@@ -67,6 +76,7 @@ import {
 } from '@genoffice/electron-utils'
 import {
   registerSlidesIpc,
+  setSlidesLegacyOpenHook,
   setSlidesUserSaveHook,
   setUniworkDocumentPolicy,
 } from '../src/main/slides-main'
@@ -121,7 +131,10 @@ beforeEach(async () => {
 
 afterEach(() => {
   setSlidesUserSaveHook(null)
+  setSlidesLegacyOpenHook(null)
   setUniworkDocumentPolicy(null)
+  env.openDialogPath = ''
+  env.openDialogOptions.length = 0
 })
 
 /**
@@ -265,5 +278,32 @@ describe('slides:save of a converted legacy deck', () => {
     expect(ordinary).toMatchObject({ ok: false })
     expect(readFileSync(other, 'utf8')).toBe(ORIGINAL)
     expect(written(`${other}.pptx`)).toBe(false)
+  })
+
+  it('offers .odp and .otp in slides:open and hands them to the shell legacy-open hook instead of openAndBuild', async () => {
+    const handed: string[] = []
+    setSlidesLegacyOpenHook((p) => {
+      handed.push(p)
+      return true
+    })
+    const odpPath = join(env.dir, 'Deck.odp')
+    const otpPath = join(env.dir, 'Template.otp')
+    writeFileSync(odpPath, 'PK\u0003\u0004')
+    writeFileSync(otpPath, 'PK\u0003\u0004')
+
+    env.openDialogPath = odpPath
+    await expect(call('slides:open', FIT)).resolves.toBeNull()
+    expect(env.openDialogOptions.at(-1)).toMatchObject({
+      filters: [{ extensions: ['pptx', 'ppt', 'odp', 'otp'] }],
+    })
+    expect(handed).toEqual([odpPath])
+
+    env.openDialogPath = otpPath
+    await expect(call('slides:open', FIT)).resolves.toBeNull()
+    expect(handed).toEqual([odpPath, otpPath])
+
+    setSlidesLegacyOpenHook(null)
+    env.openDialogPath = odpPath
+    await expect(call('slides:open', FIT)).resolves.toBeNull()
   })
 })

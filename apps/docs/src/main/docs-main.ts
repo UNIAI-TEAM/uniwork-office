@@ -4625,6 +4625,11 @@ export function setDocsFileOpenedHook(hook: (wcId: number, filePath: string) => 
   fileOpenedHook = hook
 }
 
+let legacyOpenHook: ((path: string) => boolean) | null = null
+export function setDocsLegacyOpenHook(fn: ((path: string) => boolean) | null): void {
+  legacyOpenHook = fn
+}
+
 /**
  * Reverse lookup from a sheets sessionId to its file path. In shell mode the
  * project:* handlers are registered by this file, but only sheets-main knows the
@@ -4933,10 +4938,12 @@ export function registerDocsIpc(): void {
   ipcMain.handle('docs:open', async (event) => {
     const result = await openDialog(event, {
       title: tm('dlgOpenDoc'),
-      filters: [{ name: tm('filterWord'), extensions: ['docx'] }],
+      filters: [{ name: tm('filterWord'), extensions: ['docx', 'odt', 'ott'] }],
       properties: ['openFile'],
     })
     if (result.canceled || result.filePaths.length === 0) return null
+    if (/\.(odt|ott)$/i.test(result.filePaths[0]) && legacyOpenHook?.(result.filePaths[0]))
+      return null
     return loadDocx(result.filePaths[0], event.sender.id)
   })
 
