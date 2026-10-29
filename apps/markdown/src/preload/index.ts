@@ -178,6 +178,9 @@ const api: MarkdownApi = {
     return () => ipcRenderer.removeListener(AI_CHANNELS.settingsChanged, listener)
   },
   openAiModelSettings: () => ipcRenderer.invoke(AI_CHANNELS.openModelSettings),
+  openSkillsSettings: () => ipcRenderer.invoke('ai:open-skills-settings'),
+  skillsList: () => ipcRenderer.invoke('ai:skills-list'),
+  skillText: (name: string) => ipcRenderer.invoke('ai:skill-text', name),
   aiGskStatus: () => ipcRenderer.invoke(AI_CHANNELS.gskStatus),
   aiStream: (request) => ipcRenderer.invoke(AI_CHANNELS.stream, request),
   aiStreamCancel: (requestId) => ipcRenderer.invoke(AI_CHANNELS.streamCancel, requestId),

@@ -22,6 +22,7 @@ import { createFakeIdb } from '../../docs/bridge/testing/fake-idb'
 import { TEXT_MODULE_WEB_CAPABILITIES, textModuleGrants } from '../shared/capabilities'
 import type { TextWebApiOptions } from '../shared/text-webapi'
 import { MARKDOWN_WEB_CAPABILITIES, createMarkdownWebApi } from './webapi'
+import type { MarkdownApi } from '../../../apps/markdown/src/shared/ipc'
 
 type Api = ReturnType<typeof createMarkdownWebApi> & { capabilities: Record<string, unknown> }
 
@@ -669,6 +670,22 @@ describe('markdownApi: view only and capabilities', () => {
     const saved = await api.save({ text, imageSources: [], mode: 'save' })
     expect(saved).toMatchObject({ ok: true })
     expect('conflict' in saved).toBe(false)
+  })
+
+  it('skills-attach is desktop-only: webapi omits openSkillsSettings/skillsList/skillText and optional calls do not throw', async () => {
+    const rawApi = createMarkdownWebApi({
+      module: 'markdown',
+      client: createMockPort().port,
+      capabilities: FULL,
+    })
+    expect('openSkillsSettings' in rawApi).toBe(false)
+    expect('skillsList' in rawApi).toBe(false)
+    expect('skillText' in rawApi).toBe(false)
+    const { api } = setup()
+    const maybeSkills: Partial<MarkdownApi> = api
+    expect(await maybeSkills.openSkillsSettings?.()).toBeUndefined()
+    expect(await maybeSkills.skillsList?.()).toBeUndefined()
+    expect(await maybeSkills.skillText?.('tables')).toBeUndefined()
   })
 })
 
