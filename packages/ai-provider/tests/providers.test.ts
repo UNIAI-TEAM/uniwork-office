@@ -4,6 +4,7 @@ import {
   DEFAULT_MAX_OUTPUT_TOKENS,
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
+  aiSettingsFileOf,
   isProviderUsable,
   clampMaxOutputTokens,
   cloudToolsEnabled,
@@ -18,10 +19,33 @@ import {
 } from '../src/providers'
 import type { AiModelSource, AiProviderId } from '../src/types'
 
+describe('aiSettingsFileOf', () => {
+  it('keeps a boolean gskToolsEnabled and drops every other key, legacy root fields included', () => {
+    expect(
+      aiSettingsFileOf({
+        provider: 'codex',
+        apiKey: 'sk-old',
+        providers: { openai: { apiKey: 'sk-1' } },
+        media: { providers: {} },
+        gskToolsEnabled: false,
+      }),
+    ).toEqual({ provider: 'uniwork', providers: {}, gskToolsEnabled: false })
+  })
+
+  it('omits a non-boolean opt-out and accepts any non-object input', () => {
+    expect(aiSettingsFileOf({ gskToolsEnabled: 'no' })).toEqual({
+      provider: 'uniwork',
+      providers: {},
+    })
+    for (const raw of [null, undefined, 'x', 3, []])
+      expect(aiSettingsFileOf(raw)).toEqual({ provider: 'uniwork', providers: {} })
+  })
+})
+
 describe('defaultAiSettings', () => {
   it('gives every provider its default model and an empty key by default', () => {
     const settings = defaultAiSettings()
-    expect(settings.provider).toBe('genspark')
+    expect(settings.provider).toBe('uniwork')
     for (const meta of AI_PROVIDERS) {
       expect(settings.providers[meta.id].apiKey).toBe('')
       expect(settings.providers[meta.id].model).toBe(meta.defaultModel)
@@ -334,7 +358,7 @@ describe('clampMaxOutputTokens', () => {
 describe('selectedProvider / isProviderUsable', () => {
   it('keeps the chosen provider while its config is incomplete and reports it unusable', () => {
     const settings = defaultAiSettings()
-    expect(selectedProvider(settings)).toBe('genspark')
+    expect(selectedProvider(settings)).toBe('uniwork')
 
     settings.provider = 'kimi'
     settings.providers.kimi.apiKey = ''

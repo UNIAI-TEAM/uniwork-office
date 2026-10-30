@@ -178,7 +178,7 @@ describe('policyForChannel', () => {
 
   it.each([
     'docs:save',
-    'ai:chat',
+    'ai:stream',
     'ai:open-model-settings-x',
     'ai:open-model-settingsx',
     'app:open-dropped-files-x',

@@ -4,7 +4,7 @@
  * to avoid renderer CORS), search tools, and the slides-only ai:* channels
  * (image generation, media analysis, style templates).
  */
-import { app, ipcMain, nativeImage, net, webContents } from 'electron'
+import { app, ipcMain, nativeImage, webContents } from 'electron'
 import {
   appendFileSync,
   existsSync,
@@ -16,28 +16,15 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import {
-  aiStreamErrorFields,
+  aiSettingsFileOf,
   defaultAiSettings,
-  maxOutputTokensOf,
   refreshUniworkCloudStatus,
-  resolveAiSettings,
-  selectedProvider,
-  sanitizeAiSettings,
-  noModelMessage,
-  setAiUserAgent,
-  setRescueFetch,
-  streamForProvider,
-  withUniAiOpenRouterAuth,
   type AiSettings,
   type AiStreamChunk,
   type AiStreamRequest,
   type GenSparkAccountStatus,
-  type LegacyAiSettings,
 } from '@genoffice/ai-provider'
-import { shutdownCodexAppServers } from '@genoffice/ai-provider/codex-app-server'
-import { getUiLang } from '@genoffice/i18n'
 import {
-  abortOnDestroyed,
   MAX_REMOTE_IMAGE_BYTES,
   fetchRemoteImage,
   readBodyCapped,
@@ -85,8 +72,6 @@ function readJson<T>(path: string, fallback: T): T {
   return fallback
 }
 
-const activeAiStreams = new Map<string, AbortController>()
-
 // ---- Post-mortem log for runs that produced no usable reply ----
 
 const AI_RUN_FAILURES_PATH = () => join(app.getPath('userData'), 'ai-run-failures.jsonl')
@@ -115,19 +100,13 @@ function appendRunFailure(entry: AiRunFailure): void {
 }
 
 export function registerAiIpc(): void {
-  app.once('before-quit', shutdownCodexAppServers)
-  // Node fetch (undici) direct connections get reset under VPN/tun setups; retry over Chromium's stack
-  setRescueFetch((url, init) => net.fetch(url, init))
-  setAiUserAgent(`UniWorkOffice/${app.getVersion()}`)
-
+  // UniWork AI is the only provider: the file holds just the cloud-tools opt-out
   ipcMain.handle('ai:get-settings', (): AiSettings => {
-    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(AI_SETTINGS_PATH(), {})
-    const settings = resolveAiSettings(stored, defaultAiSettings())
-    // the stored provider stays selected even while its config is incomplete (the picker and
-    // Settings show what is missing); only an unknown id degrades to genspark. A saved `uniwork`
-    // stays `uniwork` (never UniAI): a send with it ends in the ai_disabled error below
-    settings.provider = selectedProvider(settings)
-    return settings
+    const { gskToolsEnabled } = aiSettingsFileOf(readJson<unknown>(AI_SETTINGS_PATH(), {}))
+    return {
+      ...defaultAiSettings(),
+      ...(gskToolsEnabled === undefined ? {} : { gskToolsEnabled }),
+    }
   })
 
   // UniWork cloud account state (internal gsk name; signed in to UniWork + plan includes cloud AI)
@@ -143,115 +122,34 @@ export function registerAiIpc(): void {
     },
   )
 
-  ipcMain.handle('ai:set-settings', (_event, settings: AiSettings) => {
-    // SECURITY.md: payloads are schema-checked in the main process. The settings
-    // file feeds cliPath into spawn() and baseUrl receives provider credentials,
-    // so the renderer's copy is sanitized before it touches disk.
-    const sanitized = sanitizeAiSettings(settings)
-    if (!sanitized) {
-      console.warn('[ai] rejected invalid ai:set-settings payload')
-      return
-    }
-    writeJsonAtomic(AI_SETTINGS_PATH(), sanitized)
+  ipcMain.handle('ai:set-settings', (_event, settings: unknown) => {
+    // the file keeps only the cloud-tools opt-out: every other field of the renderer's copy is dropped
+    const gskToolsEnabled = (settings as { gskToolsEnabled?: unknown } | null | undefined)
+      ?.gskToolsEnabled
+    writeJsonAtomic(
+      AI_SETTINGS_PATH(),
+      aiSettingsFileOf({
+        ...readJson<object>(AI_SETTINGS_PATH(), {}),
+        ...(typeof gskToolsEnabled === 'boolean' ? { gskToolsEnabled } : {}),
+      }),
+    )
     for (const wc of webContents.getAllWebContents())
       if (!wc.isDestroyed()) wc.send('ai:settings-changed')
   })
 
-  ipcMain.handle('ai:log-run-failure', (_event, entry: AiRunFailure) => {
-    appendRunFailure(entry)
+  ipcMain.handle('ai:stream', (event, request: AiStreamRequest) => {
+    // UniWork AI needs the UniWork session of the shell; this standalone module has none
+    if (event.sender.isDestroyed()) return
+    event.sender.send('ai:stream-chunk', {
+      requestId: request.requestId,
+      type: 'error',
+      error: 'UniWork AI is not available here.',
+      uniworkCode: 'ai_disabled',
+    } satisfies AiStreamChunk)
   })
 
-  ipcMain.handle('ai:stream', async (event, request: AiStreamRequest) => {
-    // per-request settings get the same schema check as the persisted ones: a
-    // compromised renderer could otherwise hand cliPath/baseUrl straight to
-    // the provider layer without ever touching the settings file
-    const settings = sanitizeAiSettings(request.settings)
-    if (!settings) {
-      event.sender.send('ai:stream-chunk', {
-        requestId: request.requestId,
-        type: 'error',
-        error: 'invalid AI settings payload',
-      } satisfies AiStreamChunk)
-      return
-    }
-    const { requestId, system, messages } = request
-    const tools = request.tools ?? []
-    const maxTokens = request.maxTokens ?? maxOutputTokensOf(settings)
-    const provider = settings.provider
-    const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
-    const send = (chunk: AiStreamChunk) => {
-      if (!event.sender.isDestroyed()) event.sender.send('ai:stream-chunk', chunk)
-    }
-    if (provider === 'uniwork') {
-      // UniWork AI needs the UniWork session of the shell; this standalone module has none
-      send({
-        requestId,
-        type: 'error',
-        error: 'UniWork AI is not available here.',
-        uniworkCode: 'ai_disabled',
-      })
-      return
-    }
-    if (!config || (provider !== 'codex' && !config.apiKey)) {
-      send({
-        requestId,
-        type: 'error',
-        error: noModelMessage(getUiLang(), tm('errNoApiKey', { provider })),
-      })
-      return
-    }
-    if (provider !== 'codex' && !config.model) {
-      send({ requestId, type: 'error', error: tm('errNoModel') })
-      return
-    }
-    const controller = new AbortController()
-    activeAiStreams.set(requestId, controller)
-    const unwatchSender = abortOnDestroyed(event.sender, controller)
-    // wire-activity keepalive: lets the renderer's silence watchdog tell a slow turn from a dead one
-    let lastPing = 0
-    const ping = () => {
-      const now = Date.now()
-      if (now - lastPing < 5_000) return
-      lastPing = now
-      send({ requestId, type: 'ping' })
-    }
-    try {
-      let stopReason: string | undefined
-      await streamForProvider(provider, config, system, messages, tools, maxTokens, {
-        ...(request.sessionId ? { sessionId: request.sessionId } : {}),
-        signal: controller.signal,
-        onDelta: (text) => send({ requestId, type: 'delta', text }),
-        onReasoningDelta: (text) => send({ requestId, type: 'reasoning', text }),
-        onToolCall: (toolCall) => send({ requestId, type: 'tool-call', toolCall }),
-        onActivity: ping,
-        onStopReason: (reason) => {
-          stopReason = reason
-        },
-        onUsage: (usage) => send({ requestId, type: 'usage', usage }),
-      })
-      send(
-        stopReason === undefined
-          ? { requestId, type: 'done' }
-          : { requestId, type: 'done', stopReason },
-      )
-    } catch (err) {
-      if (controller.signal.aborted) {
-        send({ requestId, type: 'done' })
-      } else {
-        const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
-        // the panel gets the product message; the provider's own text stays in the log
-        console.error(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, raw)
-        send({ requestId, type: 'error', ...fields })
-      }
-    } finally {
-      unwatchSender()
-      activeAiStreams.delete(requestId)
-    }
-  })
-
-  ipcMain.handle('ai:stream-cancel', (_event, requestId: string) => {
-    activeAiStreams.get(requestId)?.abort()
-  })
+  // nothing streams here, so there is nothing to cancel; the channel stays answered
+  ipcMain.handle('ai:stream-cancel', () => undefined)
 
   // Search tools (content + images), Serper with DuckDuckGo fallback
   ipcMain.handle('ai:web-search', async (_event, query: string, maxResults?: number) => {
@@ -285,6 +183,12 @@ export function registerAiIpc(): void {
 // never called; docs does not have these channels, so putting them in the wrong place raises
 // "No handler registered".
 export function registerSlidesOnlyAiIpc(): void {
+  // post-mortem log of a run that produced no usable reply; the shell registers only this file's
+  // slides-only channels, so the handler lives here
+  ipcMain.handle('ai:log-run-failure', (_event, entry: AiRunFailure) => {
+    appendRunFailure(entry)
+  })
+
   // AI image generation / media analysis through the configured media provider; errors when none is set up.
   ipcMain.handle(
     'ai:generate-image',

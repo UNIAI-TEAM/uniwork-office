@@ -211,8 +211,6 @@ import {
   setDocsLegacyOpenHook,
   setSessionPathResolver,
   setUniworkAiHost,
-  setUniworkAiChoiceStore,
-  setUniworkAiEditorSender,
   defaultSaveDir,
   uniquePathIn,
   authorizeMcpDocWrite,
@@ -440,7 +438,6 @@ import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { isVersionRequest } from './version-flag'
 import { clearAiRun, isAiRunning, registerAiRunIpc } from './ai-run-registry'
 import { broadcastUniworkAiFlag, registerUniworkAiFlagIpc } from './uniwork-ai-flag'
-import { createUniworkAiChoiceStore } from './uniwork-ai-choice'
 import { canonicalPath, TabManager } from './tab-manager'
 import {
   tabMenuTemplate,
@@ -3413,9 +3410,6 @@ function syncWorkbenchOwner(): void {
   if (!workbenchAccounts().setOwner(owner)) return
   const wc = shellWindow && !shellWindow.isDestroyed() ? shellWindow.webContents : null
   if (wc && !wc.isDestroyed()) wc.send(HOME_CHANNELS.wbBucketChanged, workbenchAccounts().bucket())
-  // the UniWork AI pick is per account: every panel re-reads which provider is selected
-  for (const other of webContents.getAllWebContents())
-    if (!other.isDestroyed()) other.send('ai:settings-changed')
 }
 let tabManager: TabManager | null = null
 
@@ -7278,7 +7272,7 @@ function installBackToHomeItems(): void {
  *  ⌘, lands on it from anywhere in the suite. The window comes back first if
  *  it was hidden or minimized, and asking again re-opens the same panel —
  *  the renderer keeps one. */
-function openSettingsView(section: 'general' | 'aiModel' | 'skills' = 'general'): void {
+function openSettingsView(section: 'general' | 'account' | 'skills' = 'general'): void {
   openShellSettingsView(
     {
       ensureTabManager,
@@ -7310,7 +7304,7 @@ function installDockMenu(): void {
 }
 
 // On mainland-China networks the main process's Node fetch (undici) bypasses the system proxy,
-// so direct calls to overseas LLM/image-search APIs time out or get region-blocked (403).
+// so direct calls to overseas APIs (the UniWork API, image search) time out or get region-blocked (403).
 // Prefer proxy env vars (terminal launch); a packaged app launched from Finder inherits no shell
 // env vars, so fall back to the system HTTP proxy. The renderer uses Chromium's system proxy and
 // is unaffected. Same bootstrap as slides-main startSlidesStandalone.
@@ -7326,11 +7320,13 @@ async function installMainProcessProxy(): Promise<void> {
   ].find((v) => v && /^https?:\/\//.test(v))
   if (!proxyUrl) {
     try {
-      // PAC/rule proxies answer per-host: probe the Token Hub host the
-      // default chat route targets
-      const resolved = await session.defaultSession.resolveProxy('https://openrouter.ai/')
-      const m = /PROXY\s+([^;\s]+)/.exec(resolved)
-      if (m) proxyUrl = `http://${m[1]}`
+      // PAC/rule proxies answer per-host: probe the UniWork API host every main-process call targets
+      const apiOrigin = uniworkDeploymentProfile()?.apiOrigin
+      if (apiOrigin) {
+        const resolved = await session.defaultSession.resolveProxy(apiOrigin)
+        const m = /PROXY\s+([^;\s]+)/.exec(resolved)
+        if (m) proxyUrl = `http://${m[1]}`
+      }
     } catch {
       /* no system proxy */
     }
@@ -7413,7 +7409,7 @@ installNavigationGuard(app)
 installContextMenu(app, () => contextMenuLabels(currentLang()))
 registerAiIpc()
 guardedIpc.handle('ai:open-model-settings', () => {
-  openSettingsView('aiModel')
+  openSettingsView('account')
 })
 guardedIpc.handle('ai:open-skills-settings', () => {
   openSettingsView('skills')
@@ -7444,8 +7440,6 @@ registerUserSkillsIpc(guardedIpc)
 registerAiRunIpc(guardedIpc)
 // the renderers' own provider lists learn whether UniWork AI is offered (pull + push)
 registerUniworkAiFlagIpc(guardedIpc)
-// "UniWork AI" is picked per account (the account store), BYOK settings stay in ai-settings.json
-setUniworkAiChoiceStore(createUniworkAiChoiceStore(workbenchAccounts()))
 setUniworkAiFlagListener((available) =>
   broadcastUniworkAiFlag(available, webContents.getAllWebContents()),
 )
@@ -7726,11 +7720,6 @@ app.whenReady().then(async () => {
     }
     return null
   }
-  // the account's UniWork AI pick reaches editor tabs only (My AI, email, Settings keep BYOK)
-  setUniworkAiEditorSender((senderId) => {
-    const kind = describeAiSender(senderId)?.kind
-    return kind !== undefined && kind !== 'home'
-  })
   if (uniworkDocsHandle) {
     const uniworkAi = startUniworkAiChat({
       describe: describeAiSender,

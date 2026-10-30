@@ -46,9 +46,7 @@ import {
   dialog,
   ipcMain,
   Menu,
-  net,
   screen,
-  session as electronSession,
   shell,
   systemPreferences,
   webContents,
@@ -63,7 +61,6 @@ import type {
 } from 'electron'
 import { z } from 'zod'
 import {
-  abortOnDestroyed,
   decryptOoxml,
   encryptOoxml,
   isCfbFile,
@@ -97,29 +94,13 @@ import { createI18n, getUiLang, type Lang, normalizeLang, setUiLang } from '@gen
 import { ProjectStore } from '@genoffice/project-store'
 
 import {
-  aiChatFailure,
-  aiChatFailureFromError,
-  aiStreamErrorFields,
-  chatForProvider,
+  aiSettingsFileOf,
   defaultAiSettings,
-  maxOutputTokensOf,
   refreshUniworkCloudStatus,
-  resolveAiSettings,
-  selectedProvider,
-  aiNoticeBody,
-  noModelMessage,
-  setAiUserAgent,
-  setRescueFetch,
-  streamForProvider,
-  withUniAiOpenRouterAuth,
-  type AiChatFailure,
-  type AiProviderId,
   type AiSettings,
   type AiStreamChunk,
   type GenSparkAccountStatus,
-  type LegacyAiSettings,
 } from '@genoffice/ai-provider'
-import { shutdownCodexAppServers } from '@genoffice/ai-provider/codex-app-server'
 import {
   csvToXlsxBufferForOpen,
   decodeCsvBuffer,
@@ -151,7 +132,6 @@ import type {
 } from '../shared/desktop-api'
 import {
   ATTACHMENT_IMAGE_EXTS,
-  aiChatRequestSchema,
   aiSettingsInputSchema,
   aiStreamRequestSchema,
   workbookFileSchema,
@@ -3979,21 +3959,15 @@ let aiIpcRegistered = false
 export function registerSheetsAiIpc(): void {
   if (aiIpcRegistered) return
   aiIpcRegistered = true
-  app.once('before-quit', shutdownCodexAppServers)
 
-  // Node fetch (undici) direct connections get reset under VPN/tun setups; retry over Chromium's stack
-  setRescueFetch((url, init) => net.fetch(url, init))
-  setAiUserAgent(`UniWorkOffice/${app.getVersion()}`)
-
+  // UniWork AI is the only provider: the file holds just the cloud-tools opt-out
   ipcMain.handle(IPC_CHANNELS.aiGetSettings, (event): AiSettings => {
     sessionFor(event)
-    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
-    const settings = resolveAiSettings(stored, defaultAiSettings())
-    // the stored provider stays selected even while its config is incomplete (the picker and
-    // Settings show what is missing); only an unknown id degrades to genspark. A saved `uniwork`
-    // stays `uniwork` (never UniAI): a send with it ends in the ai_disabled error below
-    settings.provider = selectedProvider(settings)
-    return settings
+    const { gskToolsEnabled } = aiSettingsFileOf(readJson<unknown>(SETTINGS_PATH(), {}))
+    return {
+      ...defaultAiSettings(),
+      ...(gskToolsEnabled === undefined ? {} : { gskToolsEnabled }),
+    }
   })
 
   // UniWork cloud sign-in state (loggedIn = signed in to UniWork + plan
@@ -4012,124 +3986,29 @@ export function registerSheetsAiIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.aiSetSettings, async (event, input: unknown) => {
     sessionFor(event)
-    const settings = aiSettingsInputSchema.parse(input)
-    writeJsonAtomic(SETTINGS_PATH(), settings)
+    const { gskToolsEnabled } = aiSettingsInputSchema.parse(input)
+    writeJsonAtomic(
+      SETTINGS_PATH(),
+      aiSettingsFileOf({
+        ...readJson<object>(SETTINGS_PATH(), {}),
+        ...(typeof gskToolsEnabled === 'boolean' ? { gskToolsEnabled } : {}),
+      }),
+    )
     for (const wc of webContents.getAllWebContents())
       if (!wc.isDestroyed()) wc.send(IPC_CHANNELS.aiSettingsChanged)
   })
 
-  ipcMain.handle(IPC_CHANNELS.aiChat, async (event, input: unknown) => {
-    sessionFor(event)
-    const request = aiChatRequestSchema.parse(input)
-    const provider = request.settings.provider as AiProviderId
-    const config = withUniAiOpenRouterAuth(
-      request.settings,
-      provider,
-      request.settings.providers[provider],
-    )
-    if (!config || (provider !== 'codex' && !config.apiKey)) {
-      return {
-        ok: false,
-        // one-shot callers (settings test, email, one-click actions) print the string as is, so no notice code
-        error: aiNoticeBody(noModelMessage(getUiLang(), tm('errNoApiKey', { provider }))),
-      }
-    }
-    if (provider !== 'codex' && !config.model) return { ok: false, error: tm('errNoModel') }
-    const failed = (failure: AiChatFailure) => {
-      console.warn('[ai] chat failed:', failure.raw)
-      return { ok: false, error: failure.error, errorKind: failure.errorKind }
-    }
-    try {
-      const result = await chatForProvider(provider, config, request.system, request.user)
-      // the one-shot path reports HTTP failures as ok:false with the raw body
-      return result.ok ? result : failed(aiChatFailure(result, getUiLang(), tm('errAiBusy')))
-    } catch (err) {
-      return failed(aiChatFailureFromError(err, getUiLang(), tm('errAiBusy')))
-    }
-  })
-
   ipcMain.handle(IPC_CHANNELS.aiStream, async (event, input: unknown) => {
-    const entry = sessionFor(event)
-    const request = aiStreamRequestSchema.parse(input)
-    const { requestId, system, messages } = request
-    const tools = request.tools ?? []
-    const maxTokens = request.maxTokens ?? maxOutputTokensOf(request.settings)
-    const provider = request.settings.provider as AiProviderId
-    const config = withUniAiOpenRouterAuth(
-      request.settings,
-      provider,
-      request.settings.providers[provider],
-    )
-    const send = (chunk: AiStreamChunk) => {
-      if (!event.sender.isDestroyed()) event.sender.send(IPC_CHANNELS.aiStreamChunk, chunk)
-    }
-    if (provider === 'uniwork') {
-      // UniWork AI needs the UniWork session of the shell; this standalone module has none
-      send({
+    sessionFor(event)
+    const { requestId } = aiStreamRequestSchema.parse(input)
+    // UniWork AI needs the UniWork session of the shell; this standalone module has none
+    if (!event.sender.isDestroyed()) {
+      event.sender.send(IPC_CHANNELS.aiStreamChunk, {
         requestId,
         type: 'error',
         error: 'UniWork AI is not available here.',
         uniworkCode: 'ai_disabled',
-      })
-      return
-    }
-    if (!config || (provider !== 'codex' && !config.apiKey)) {
-      send({
-        requestId,
-        type: 'error',
-        error: noModelMessage(getUiLang(), tm('errNoApiKey', { provider })),
-      })
-      return
-    }
-    if (provider !== 'codex' && !config.model) {
-      send({ requestId, type: 'error', error: tm('errNoModel') })
-      return
-    }
-    const controller = new AbortController()
-    entry.aiStreams.set(requestId, controller)
-    const unwatchSender = abortOnDestroyed(event.sender, controller)
-    // wire-activity keepalive: lets the renderer's silence watchdog tell a slow turn from a dead one
-    let lastPing = 0
-    const ping = () => {
-      const now = Date.now()
-      if (now - lastPing < 5_000) return
-      lastPing = now
-      send({ requestId, type: 'ping' })
-    }
-    try {
-      let stopReason: string | undefined
-      await streamForProvider(provider, config, system, messages, tools, maxTokens, {
-        ...(request.sessionId ? { sessionId: request.sessionId } : {}),
-        signal: controller.signal,
-        onDelta: (text) => send({ requestId, type: 'delta', text }),
-        onReasoningDelta: (text) => send({ requestId, type: 'reasoning', text }),
-        onToolCall: (toolCall) => send({ requestId, type: 'tool-call', toolCall }),
-        onActivity: ping,
-        onStopReason: (reason) => {
-          stopReason = reason
-        },
-        onUsage: (usage) => send({ requestId, type: 'usage', usage }),
-      })
-      // sheets tsconfig sets exactOptionalPropertyTypes: an explicit
-      // `stopReason: undefined` is not assignable to AiStreamChunk, so only
-      // include the property when a reason was actually reported.
-      send(
-        stopReason === undefined
-          ? { requestId, type: 'done' }
-          : { requestId, type: 'done', stopReason },
-      )
-    } catch (err) {
-      if (controller.signal.aborted) {
-        send({ requestId, type: 'done' })
-      } else {
-        const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
-        // the panel gets the product message; the provider's own text stays in the log
-        console.warn(`[ai-stream] ${requestId} (${provider}/${config.model}) failed:`, raw)
-        send({ requestId, type: 'error', ...fields })
-      }
-    } finally {
-      unwatchSender()
-      entry.aiStreams.delete(requestId)
+      } satisfies AiStreamChunk)
     }
   })
 
@@ -5123,9 +5002,9 @@ export {
  * Attaches a proxy to the main process's global fetch (same source as
  * slides-main.applyMainProcessProxy): main-process Node fetch (undici) ignores
  * the system proxy by default, so direct connections from mainland networks to
- * overseas LLM endpoints like api.anthropic.com time out or get rejected by
- * egress region (403 Request not allowed). Environment variables take priority;
- * otherwise the system proxy is read via session.resolveProxy() after app ready.
+ * overseas endpoints (image search) time out or get rejected by egress region
+ * (403 Request not allowed). Only environment variables are read here: the
+ * standalone module has no UniWork API host to probe the system proxy against.
  */
 async function applyMainProcessProxy(): Promise<void> {
   const setDispatcher = async (proxyUrl: string) => {
@@ -5148,20 +5027,6 @@ async function applyMainProcessProxy(): Promise<void> {
   if (envProxy) {
     await setDispatcher(envProxy)
     return
-  }
-  try {
-    await app.whenReady()
-    // PAC/rule proxies answer per-host: probe the host the built-in UniAI
-    // provider actually targets
-    const resolved = await electronSession.defaultSession.resolveProxy('https://openrouter.ai/')
-    const m = /PROXY\s+([^;]+)/i.exec(resolved || '')
-    if (m?.[1]) {
-      await setDispatcher(`http://${m[1].trim()}`)
-    } else {
-      console.log('[proxy] system proxy = DIRECT, no dispatcher set')
-    }
-  } catch (e) {
-    console.warn('[proxy] resolveProxy failed:', e)
   }
 }
 

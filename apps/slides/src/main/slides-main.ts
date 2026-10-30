@@ -1993,9 +1993,8 @@ export function installSlidesMenu(): void {
 }
 
 /**
- * Attach a proxy to the main process's global fetch. Environment variables take priority;
- * otherwise, after app ready, read the system proxy via session.resolveProxy() (the critical
- * path for packaged builds launched by double-click).
+ * Attach a proxy to the main process's global fetch from the environment variables. The
+ * standalone module has no UniWork API host to probe the system proxy against.
  */
 async function applyMainProcessProxy(): Promise<void> {
   const setDispatcher = async (proxyUrl: string) => {
@@ -2018,21 +2017,6 @@ async function applyMainProcessProxy(): Promise<void> {
   if (envProxy) {
     await setDispatcher(envProxy)
     return
-  }
-  // No environment variables: read the system proxy (requires app ready)
-  try {
-    await app.whenReady()
-    // PAC/rule proxies answer per-host: probe the host the default UniAI chat route targets
-    const resolved = await electronSession.defaultSession.resolveProxy('https://openrouter.ai/')
-    // resolveProxy returns strings like "PROXY 127.0.0.1:1087" or "DIRECT"
-    const m = /PROXY\s+([^;]+)/i.exec(resolved || '')
-    if (m) {
-      await setDispatcher(`http://${m[1].trim()}`)
-    } else {
-      console.log('[proxy] system proxy = DIRECT, no dispatcher set')
-    }
-  } catch (e) {
-    console.warn('[proxy] resolveProxy failed:', e)
   }
 }
 

@@ -43,8 +43,8 @@ describe('UNI-1395: a stored provider choice is never replaced by UniAI', () => 
     expect(providerNeed(settings, 'custom')).toBeNull()
   })
 
-  it('a fresh install and a hand-edited unknown id still land on UniAI', () => {
-    expect(selectedProvider(defaultAiSettings())).toBe('genspark')
+  it('a fresh install lands on UniWork AI and a hand-edited unknown id still on UniAI', () => {
+    expect(selectedProvider(defaultAiSettings())).toBe('uniwork')
     const settings = defaultAiSettings()
     settings.provider = 'nonsense' as never
     expect(selectedProvider(settings)).toBe('genspark')

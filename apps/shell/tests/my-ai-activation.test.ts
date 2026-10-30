@@ -14,13 +14,13 @@ describe('my-ai-activation', () => {
   })
 
   it('is ready when UniAI Token Hub key is set', () => {
-    const s = defaultAiSettings()
+    const s = { ...defaultAiSettings(), provider: 'genspark' as const }
     s.providers.genspark = { ...s.providers.genspark, apiKey: 'sk-or-test' }
     expect(aiSettingsReady(s)).toBe(true)
   })
 
   it('is ready when only openrouter key is set (shared hub)', () => {
-    const s = defaultAiSettings()
+    const s = { ...defaultAiSettings(), provider: 'genspark' as const }
     s.providers.openrouter = { ...s.providers.openrouter, apiKey: 'sk-or-hub' }
     expect(aiSettingsReady(s)).toBe(true)
   })

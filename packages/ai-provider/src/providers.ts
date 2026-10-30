@@ -425,11 +425,31 @@ export function defaultAiSettings(
     }
   }
   return {
-    provider: 'genspark',
+    provider: 'uniwork',
     providers,
     gskToolsEnabled: true,
     media: defaultAiMediaSettings(),
     search: defaultAiSearchSettings(),
+  }
+}
+
+/**
+ * The only shape ai-settings.json may hold: UniWork AI is the one provider, so the file keeps the
+ * `gskToolsEnabled` opt-out and nothing else. Every other key (provider keys, base URLs, CLI paths,
+ * media/search keys, legacy root-level key fields) is dropped. `providers: {}` is required:
+ * `resolveAiSettings` returns its defaults when `providers` is missing, which would turn a stored
+ * `gskToolsEnabled: false` back into `true`.
+ */
+export function aiSettingsFileOf(raw: unknown): {
+  provider: 'uniwork'
+  providers: Record<string, never>
+  gskToolsEnabled?: boolean
+} {
+  const gsk = isRecord(raw) ? raw.gskToolsEnabled : undefined
+  return {
+    provider: 'uniwork',
+    providers: {},
+    ...(typeof gsk === 'boolean' ? { gskToolsEnabled: gsk } : {}),
   }
 }
 

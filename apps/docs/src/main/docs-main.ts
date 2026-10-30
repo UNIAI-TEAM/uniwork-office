@@ -46,7 +46,6 @@ import {
   dialog,
   ipcMain,
   nativeImage,
-  net,
   session,
   shell,
   webContents,
@@ -105,53 +104,17 @@ import { parseFileToText } from '@genoffice/file-parse'
 import { convertHtmlToDocx } from '../../../../packages/html2docx/src'
 import { ElectronBrowserDriver } from '../../../../packages/html2docx/src/drivers/electron'
 import {
-  aiChatFailure,
-  aiChatFailureFromError,
-  aiStreamErrorFields,
-  AI_PROVIDERS,
-  chatForProvider,
+  aiSettingsFileOf,
   defaultAiSettings,
-  probeOpenRouterKey,
-  testMediaProvider,
-  type AiMediaProviderConfig,
-  type AiMediaProviderId,
-  type AiSearchProviderId,
   refreshUniworkCloudStatus,
-  resolveAiSettings,
-  selectedProvider,
   uniworkAiAvailable,
-  maxOutputTokensOf,
-  sanitizeAiSettings,
-  sanitizeCliPath,
-  aiNoticeBody,
-  aiTestFailure,
-  testChatConnection,
-  noModelMessage,
-  setAiUserAgent,
-  setRescueFetch,
-  streamForProvider,
-  withUniAiOpenRouterAuth,
-  type AiChatFailure,
-  type AiChatRequest,
-  type AiChatResponse,
-  type AiModelSource,
-  type AiProviderConfig,
-  type AiProviderId,
   type AiSettings,
   type AiStreamChunk,
   type AiStreamRequest,
-  type AiTestFailureKind,
-  type AiTestResult,
   type GenSparkAccountStatus,
-  type LegacyAiSettings,
 } from '@genoffice/ai-provider'
-import { listCodexModels, shutdownCodexAppServers } from '@genoffice/ai-provider/codex-app-server'
-import { isProviderUsable } from '@genoffice/ai-provider/browser'
-import { listCustomModelsForIpc } from '@genoffice/ai-provider/custom-models'
-import { ProviderModelCache } from '@genoffice/ai-provider/provider-models'
 import {
   generateImageTool,
-  testSearchProvider,
   gskLoginInfo,
   hasGskAuth,
   webSearchTool,
@@ -3983,56 +3946,6 @@ export function setUniworkAiHost(host: UniworkAiHost | null): void {
   uniworkAiHost = host
 }
 
-/**
- * Whether the active UniWork account chose "UniWork AI" as its provider. The shell backs it with
- * the per-account store (key `uniwork.ai.uniwork-choice`); ai-settings.json only ever holds the
- * BYOK provider, so a pick of `uniwork` is routed here and the file keeps the previous BYOK one.
- */
-export interface UniworkAiChoiceStore {
-  read(): boolean
-  write(on: boolean): void
-}
-
-let uniworkAiChoiceStore: UniworkAiChoiceStore | null = null
-export function setUniworkAiChoiceStore(store: UniworkAiChoiceStore | null): void {
-  uniworkAiChoiceStore = store
-}
-
-/**
- * Whether a webContents is an editor tab (the same tab lookup the UniWork AI scope resolver uses).
- * Only editor panels run UniWork AI; My AI, email, one-click actions and the settings test read
- * the file's BYOK/UniAI provider. Unset (this module on its own): no sender gets the pick.
- */
-let uniworkAiEditorSender: ((senderId: number) => boolean) | null = null
-export function setUniworkAiEditorSender(isEditor: ((senderId: number) => boolean) | null): void {
-  uniworkAiEditorSender = isEditor
-}
-
-function isUniworkAiEditor(event: unknown): boolean {
-  const id = (event as { sender?: { id?: unknown } } | null)?.sender?.id
-  return typeof id === 'number' && uniworkAiEditorSender?.(id) === true
-}
-
-/**
- * The home Settings window reads (and saves) the account pick too, so its AI pane shows what an
- * editor tab uses. Everything else on the home window (My AI, email, one-click) keeps the file
- * provider: it never passes this option.
- */
-function wantsUniworkPick(options: unknown): boolean {
-  return (
-    (options as { includeUniworkPick?: unknown } | null | undefined)?.includeUniworkPick === true
-  )
-}
-
-/** the non-`uniwork` provider ai-settings.json holds for ai:set-settings (normal saves put the `uniwork` pick in the account store; a hand-edited `uniwork` in the file stays `uniwork` on read per no-silent-fallback, while writes keep a non-`uniwork` slot in the file) */
-function fileAiProvider(): AiProviderId {
-  const provider = resolveAiSettings(
-    readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {}),
-    defaultAiSettings(),
-  ).provider
-  return provider === 'uniwork' ? defaultAiSettings().provider : provider
-}
-
 /** every renderer (tabs, home) re-reads ai-settings.json — the composer chip and
  *  the settings page edit the same file from different windows */
 function broadcastAiSettingsChanged(): void {
@@ -4040,49 +3953,26 @@ function broadcastAiSettingsChanged(): void {
     if (!wc.isDestroyed()) wc.send('ai:settings-changed')
 }
 
-/** live `/models` per provider for the model chip, listed in the background (10 min TTL) */
-const providerModelCache = new ProviderModelCache()
-
 /**
- * Per provider that can send: the model chosen in the Settings pane (this file) and the provider's
- * live list. The list never blocks the read: a first call answers `loading` and starts the
- * listing, which announces itself through `ai:settings-changed` when it lands.
- */
-function modelSourcesOf(settings: AiSettings): Partial<Record<AiProviderId, AiModelSource>> {
-  const sources: Partial<Record<AiProviderId, AiModelSource>> = {}
-  for (const meta of AI_PROVIDERS) {
-    const id = meta.id
-    // UniWork AI has no model to choose; its row text is `uniworkModel`
-    if (id === 'uniwork' || !isProviderUsable(settings, id)) continue
-    const config = withUniAiOpenRouterAuth(settings, id, settings.providers[id])
-    sources[id] = {
-      chosen: (settings.providers[id]?.model ?? '').trim(),
-      ...providerModelCache.read(id, config, broadcastAiSettingsChanged),
-    }
-  }
-  return sources
-}
-
-/**
- * AI settings + chat/stream proxy handlers. Split out so the shell can
+ * AI settings + stream proxy handlers. Split out so the shell can
  * register them exactly once for all window types (docs, sheets, home) —
  * sheets' standalone AI handlers use the same channel names.
+ * UniWork AI is the only provider: ai-settings.json holds `gskToolsEnabled` and nothing else.
  */
 export function registerAiIpc(): void {
-  app.once('before-quit', shutdownCodexAppServers)
-  ipcMain.handle('ai:get-settings', async (event, options?: unknown): Promise<AiSettings> => {
-    const stored = readJson<Partial<AiSettings> & LegacyAiSettings>(SETTINGS_PATH(), {})
-    const settings = resolveAiSettings(stored, defaultAiSettings())
-    // derived, never saved: what the model chip shows besides the catalog
-    settings.modelSources = modelSourcesOf(settings)
-    // the stored provider stays selected even while its config is incomplete (the picker and
-    // Settings show what is missing); only an unknown id degrades to genspark
-    // the account's UniWork AI pick overlays the file's BYOK provider; while the entry is not
-    // offered it stays `uniwork` (no silent switch to UniAI): the panel shows the unavailable
-    // state and Send is blocked until it returns
-    if ((isUniworkAiEditor(event) || wantsUniworkPick(options)) && uniworkAiChoiceStore?.read())
-      settings.provider = 'uniwork'
-    settings.provider = selectedProvider(settings)
+  // scrub what older builds stored (provider keys, base URLs, CLI paths, media/search keys)
+  if (existsSync(SETTINGS_PATH())) {
+    const stored = readJson<unknown>(SETTINGS_PATH(), {})
+    const clean = aiSettingsFileOf(stored)
+    if (JSON.stringify(stored) !== JSON.stringify(clean)) writeJsonAtomic(SETTINGS_PATH(), clean)
+  }
+
+  ipcMain.handle('ai:get-settings', async (): Promise<AiSettings> => {
+    const { gskToolsEnabled } = aiSettingsFileOf(readJson<unknown>(SETTINGS_PATH(), {}))
+    const settings: AiSettings = {
+      ...defaultAiSettings(),
+      ...(gskToolsEnabled === undefined ? {} : { gskToolsEnabled }),
+    }
     const uniworkModel = uniworkAiAvailable() ? uniworkAiHost?.uniworkModel().trim() : ''
     if (uniworkModel) settings.uniworkModel = uniworkModel
     return settings
@@ -4102,143 +3992,47 @@ export function registerAiIpc(): void {
     },
   )
 
-  /** Editor AI panels: jump to Home → Settings → AI Model (where the user adds their own key). */
+  /** Editor AI panels: jump to Home → Settings → Account (plan and credit). */
   ipcMain.handle('ai:open-billing', () => {
-    shellHooks?.openSettings?.('aiModel')
+    shellHooks?.openSettings?.('account')
   })
 
-  ipcMain.handle('ai:set-settings', (event, settings: AiSettings, options?: unknown) => {
-    // SECURITY.md: payloads are schema-checked in the main process. The settings
-    // file feeds cliPath into spawn() and baseUrl receives a bearer token,
-    // so the renderer's copy is sanitized before it touches disk.
-    // (it also drops the derived `modelSources` / `uniworkModel` the renderer spreads back in)
-    const sanitized = sanitizeAiSettings(settings)
-    if (!sanitized) {
-      console.warn('[ai] rejected invalid ai:set-settings payload')
-      return
-    }
-    if (sanitized.provider === 'uniwork') {
-      // saved per account, never in the file: the file keeps the BYOK provider it had; while the
-      // entry is hidden the renderer still holds `uniwork` and saves it back, which keeps the pick
-      uniworkAiChoiceStore?.write(true)
-      sanitized.provider = fileAiProvider()
-    } else if (
-      // a window without the pick (home: My AI) clears it only by changing the provider; an editor
-      // tab and the Settings window both saw the pick, so any provider they save is the choice
-      isUniworkAiEditor(event) ||
-      wantsUniworkPick(options) ||
-      sanitized.provider !== fileAiProvider()
-    ) {
-      uniworkAiChoiceStore?.write(false)
-    }
-    writeJsonAtomic(SETTINGS_PATH(), sanitized)
+  ipcMain.handle('ai:set-settings', (_event, settings: unknown) => {
+    // the file keeps only the cloud-tools opt-out: every other field of the renderer's copy is dropped
+    const current = readJson<unknown>(SETTINGS_PATH(), {})
+    const gskToolsEnabled = (settings as { gskToolsEnabled?: unknown } | null | undefined)
+      ?.gskToolsEnabled
+    writeJsonAtomic(
+      SETTINGS_PATH(),
+      aiSettingsFileOf({
+        ...(current as object),
+        ...(typeof gskToolsEnabled === 'boolean' ? { gskToolsEnabled } : {}),
+      }),
+    )
     broadcastAiSettingsChanged()
   })
 
-  ipcMain.handle('ai:openrouter-key-status', async (_event, apiKey: unknown) => {
-    return probeOpenRouterKey(typeof apiKey === 'string' ? apiKey : '')
-  })
-
-  ipcMain.handle('ai:codex-models', async (_event, cliPath: unknown) => {
-    // the probe spawns the path directly, so it gets the same metacharacter and
-    // existence check as the stored setting (anything else: auto-detect)
-    return listCodexModels(sanitizeCliPath(cliPath))
-  })
-
-  ipcMain.handle('ai:custom-models', (_event, input: unknown) => listCustomModelsForIpc(input))
-
   ipcMain.handle('ai:stream', async (event, request: AiStreamRequest) => {
-    // per-request settings get the same schema check as the persisted ones: a
-    // compromised renderer could otherwise hand cliPath/baseUrl straight to
-    // the provider layer without ever touching the settings file
-    const settings = sanitizeAiSettings(request.settings)
-    if (!settings) {
-      event.sender.send('ai:stream-chunk', {
-        requestId: request.requestId,
-        type: 'error',
-        error: 'invalid AI settings payload',
-      } satisfies AiStreamChunk)
-      return
-    }
-    const { requestId, system, messages } = request
-    const tools = request.tools ?? []
-    const maxTokens = request.maxTokens ?? maxOutputTokensOf(settings)
-    const provider = settings.provider
+    const { requestId } = request
     const send = (chunk: AiStreamChunk) => {
       if (!event.sender.isDestroyed()) event.sender.send('ai:stream-chunk', chunk)
     }
-    if (provider === 'uniwork') {
-      // no key, no model: the UniWork session and the server's policy decide
-      const host = uniworkAiHost
-      if (!host) {
-        send({
-          requestId,
-          type: 'error',
-          error: 'UniWork AI is not available here.',
-          uniworkCode: 'ai_disabled',
-        })
-        return
-      }
-      const controller = new AbortController()
-      activeAiStreams.set(requestId, controller)
-      const unwatchSender = abortOnDestroyed(event.sender, controller)
-      try {
-        await host.stream({ senderId: event.sender.id, request, send, signal: controller.signal })
-      } finally {
-        unwatchSender()
-        activeAiStreams.delete(requestId)
-      }
-      return
-    }
-
-    const streamConfig = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
-    if (!streamConfig || (provider !== 'codex' && !streamConfig.apiKey)) {
+    // no key, no model: the UniWork session and the server's policy decide
+    const host = uniworkAiHost
+    if (!host) {
       send({
         requestId,
         type: 'error',
-        error: noModelMessage(getUiLang(), tm('errNoApiKey', { provider })),
+        error: 'UniWork AI is not available here.',
+        uniworkCode: 'ai_disabled',
       })
-      return
-    }
-    if (provider !== 'codex' && !streamConfig.model) {
-      send({ requestId, type: 'error', error: tm('errNoModel') })
       return
     }
     const controller = new AbortController()
     activeAiStreams.set(requestId, controller)
     const unwatchSender = abortOnDestroyed(event.sender, controller)
-    // wire-activity keepalive: lets the renderer's silence watchdog tell a slow turn from a dead one
-    let lastPing = 0
-    const ping = () => {
-      const now = Date.now()
-      if (now - lastPing < 5_000) return
-      lastPing = now
-      send({ requestId, type: 'ping' })
-    }
     try {
-      let stopReason: string | undefined
-      await streamForProvider(provider, streamConfig, system, messages, tools, maxTokens, {
-        ...(request.sessionId ? { sessionId: request.sessionId } : {}),
-        signal: controller.signal,
-        onDelta: (text) => send({ requestId, type: 'delta', text }),
-        onReasoningDelta: (text) => send({ requestId, type: 'reasoning', text }),
-        onToolCall: (toolCall) => send({ requestId, type: 'tool-call', toolCall }),
-        onActivity: ping,
-        onStopReason: (reason) => {
-          stopReason = reason
-        },
-        onUsage: (usage) => send({ requestId, type: 'usage', usage }),
-      })
-      send({ requestId, type: 'done', stopReason })
-    } catch (err) {
-      if (controller.signal.aborted) {
-        send({ requestId, type: 'done' })
-      } else {
-        const { raw, ...fields } = aiStreamErrorFields(err, getUiLang())
-        // the panel gets the product message; the provider's own text stays in the log
-        console.warn(`[ai-stream] ${requestId} (${provider}/${streamConfig.model}) failed:`, raw)
-        send({ requestId, type: 'error', ...fields })
-      }
+      await host.stream({ senderId: event.sender.id, request, send, signal: controller.signal })
     } finally {
       unwatchSender()
       activeAiStreams.delete(requestId)
@@ -4337,128 +4131,6 @@ export function registerAiIpc(): void {
         { mediaRoots: docsMediaRoots(event.sender.id) },
       ),
   )
-
-  // a failed settings test keeps its raw detail here (the log); the renderer only gets the kind
-  const logAiTest = (what: string, provider: string, result: AiTestResult): AiTestResult => {
-    if (!result.ok) console.warn(`[ai] ${what} test failed (${provider}):`, result.error)
-    return result
-  }
-
-  ipcMain.handle('ai:search-test', async (_event, input: unknown) => {
-    const { provider, apiKey } = (input ?? {}) as { provider?: AiSearchProviderId; apiKey?: string }
-    // `auto` is the keyless free chain: nothing to test
-    if (!provider || provider === 'auto') return { ok: true }
-    return logAiTest('search', provider, await testSearchProvider(provider, String(apiKey ?? '')))
-  })
-
-  // settings-UI connection test for the media provider (the UniWork cloud entry shows only while signed in + entitled)
-  ipcMain.handle('ai:media-test', async (_event, input: unknown) => {
-    const { provider, config } = (input ?? {}) as {
-      provider?: AiMediaProviderId
-      config?: AiMediaProviderConfig
-    }
-    if (!provider || provider === 'genspark') {
-      return hasGskAuth()
-        ? { ok: true }
-        : logAiTest('media', 'cloud', aiTestFailure('failed', 'No media provider configuration'))
-    }
-    if (!config) {
-      return logAiTest(
-        'media',
-        provider,
-        aiTestFailure('failed', 'No media provider configuration'),
-      )
-    }
-    return logAiTest('media', provider, await testMediaProvider(provider, config))
-  })
-
-  // one-shot chat; `errorKind` says why a failure failed for the settings test (other callers ignore it).
-  // `error` is a product message in the UI language; the provider's raw text is `rawError` and goes to the log
-  type AiChatOutcome = AiChatResponse & {
-    errorKind?: AiTestFailureKind
-    rawError?: string
-    uniworkCode?: string
-  }
-  const failedChat = (failure: AiChatFailure): AiChatOutcome => {
-    console.warn('[ai] chat failed:', failure.raw)
-    return {
-      ok: false,
-      error: failure.error,
-      errorKind: failure.errorKind,
-      rawError: failure.raw,
-    }
-  }
-  // the request's provider config, or the reason there is none
-  const chatConfigOf = (
-    request: AiChatRequest,
-  ): { config: AiProviderConfig; provider: AiProviderId } | AiChatOutcome => {
-    // same schema check as ai:stream: one-shot requests would otherwise act on
-    // the renderer's settings copy verbatim
-    const settings = sanitizeAiSettings(request.settings)
-    if (!settings) return { ok: false, error: 'invalid AI settings payload', errorKind: 'failed' }
-    // UniWork AI runs only as an editor panel's agent turn: a one-shot caller with `uniwork` gets
-    // a typed refusal instead of silently calling another provider
-    if (settings.provider === 'uniwork') {
-      return {
-        ok: false,
-        error: 'UniWork AI is not available here.',
-        errorKind: 'unavailable',
-        uniworkCode: 'ai_disabled',
-      }
-    }
-    const provider = settings.provider
-    const config = withUniAiOpenRouterAuth(settings, provider, settings.providers?.[provider])
-    if (!config || (provider !== 'codex' && !config.apiKey)) {
-      return {
-        ok: false,
-        // one-shot callers (settings test, email, one-click actions) print the string as is, so no notice code
-        error: aiNoticeBody(noModelMessage(getUiLang(), tm('errNoApiKey', { provider }))),
-        errorKind: 'invalid_key',
-      }
-    }
-    if (provider !== 'codex' && !config.model) {
-      return { ok: false, error: tm('errNoModel'), errorKind: 'failed' }
-    }
-    return { config, provider }
-  }
-
-  const runAiChat = async (request: AiChatRequest): Promise<AiChatOutcome> => {
-    const target = chatConfigOf(request)
-    if (!('config' in target)) return target
-    try {
-      const result = await chatForProvider(
-        target.provider,
-        target.config,
-        request.system,
-        request.user,
-      )
-      // the one-shot path reports HTTP failures as ok:false with the raw body
-      return result.ok ? result : failedChat(aiChatFailure(result, getUiLang(), tm('errAiBusy')))
-    } catch (err) {
-      return failedChat(aiChatFailureFromError(err, getUiLang(), tm('errAiBusy')))
-    }
-  }
-
-  ipcMain.handle('ai:chat', (_event, request: AiChatRequest) => runAiChat(request))
-
-  // settings > AI model "Test": one streamed ping through the same endpoint and wire as the chat panel;
-  // a failure keeps its raw text in the log
-  ipcMain.handle('ai:settings-test', async (_event, request: AiChatRequest) => {
-    const target = chatConfigOf(request)
-    let result: AiChatOutcome
-    if ('config' in target) {
-      const test = await testChatConnection(target.provider, target.config)
-      result = test.ok ? test : failedChat(aiChatFailure(test, getUiLang(), tm('errAiBusy')))
-    } else {
-      result = target
-    }
-    if (result.ok) return { ok: true }
-    return logAiTest(
-      'model',
-      String(request?.settings?.provider ?? ''),
-      aiTestFailure(result.errorKind ?? 'failed', result.rawError ?? result.error ?? ''),
-    )
-  })
 }
 
 // ── project-store IPC (shared across docs / slides / sheets) ──────────────
@@ -4784,10 +4456,6 @@ const reissuedDoc = (
 export function registerDocsIpc(): void {
   registerZoteroIpc()
   void app.whenReady().then(registerLazyMediaProtocol)
-  // Node fetch (undici) direct connections get reset under VPN/tun setups; retry over Chromium's stack
-  setRescueFetch((url, init) => net.fetch(url, init))
-  setAiUserAgent(`UniWorkOffice/${app.getVersion()}`)
-
   // shared with the other editor modules — last (identical) registration wins
   ipcMain.removeHandler('app:get-language')
   ipcMain.handle('app:get-language', () => getUiLang())

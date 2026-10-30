@@ -34,6 +34,7 @@ export {
   cloudToolsEnabled,
   defaultAiSettings,
   aiEffectiveModel,
+  aiSettingsFileOf,
   isProviderUsable,
   maxOutputTokensOf,
   providerNeed,
