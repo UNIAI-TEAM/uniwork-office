@@ -14,7 +14,6 @@ export const pl = {
     'Nie udało się dokończyć. Sprawdź, czy folder umożliwia zapis, i spróbuj ponownie.',
   intgLoadFailed: 'Nie udało się odczytać stanu integracji.',
 
-
   bkLead:
     'Płatne dodatki tworzą kopię zapasową Stanowiska pracy w UniWork Cloud i zwiększają miejsce na dane. Eksport i przywracanie na tym urządzeniu są zawsze bezpłatne.',
   bkPlanLabel: 'Plan kopii zapasowych',

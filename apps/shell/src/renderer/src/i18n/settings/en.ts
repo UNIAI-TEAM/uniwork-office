@@ -12,7 +12,6 @@ export const en = {
   intgActionFailed: 'Couldn’t finish. Check that the folder can be written to, then try again.',
   intgLoadFailed: 'Couldn’t read the integration status.',
 
-
   bkLead:
     'Paid add-ons back up your Workbench to UniWork Cloud and add storage space. Exporting and restoring on this device is always free.',
   bkPlanLabel: 'Backup plan',

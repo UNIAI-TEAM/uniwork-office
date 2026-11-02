@@ -3209,9 +3209,7 @@ export function Home() {
                 ))}
               </div>
             )}
-            <div className="file-search-group">
-              {renderSearchBox()}
-            </div>
+            <div className="file-search-group">{renderSearchBox()}</div>
             {searchActive ? (
               renderSearchHeading()
             ) : (
@@ -3351,9 +3349,7 @@ export function Home() {
                 )}
               </div>
             )}
-            <div className="file-search-group">
-              {renderSearchBox()}
-            </div>
+            <div className="file-search-group">{renderSearchBox()}</div>
             {searchActive ? (
               renderSearchHeading()
             ) : (
@@ -3719,10 +3715,7 @@ export function Home() {
           )}
         </div>
 
-        <SidebarFooter
-          onStatusChange={handleAccountStatus}
-          openRequest={settingsRequest}
-        />
+        <SidebarFooter onStatusChange={handleAccountStatus} openRequest={settingsRequest} />
       </aside>
 
       {selectedProjectId ? (

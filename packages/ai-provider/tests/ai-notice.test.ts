@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { aiNoticeText, composerNoteFor, type AiNoticeKind, type AiNoticeLang } from '../src/ai-notice'
+import {
+  aiNoticeText,
+  composerNoteFor,
+  type AiNoticeKind,
+  type AiNoticeLang,
+} from '../src/ai-notice'
 
 const KINDS: AiNoticeKind[] = ['not_entitled', 'credits_exhausted']
 const LANGS: AiNoticeLang[] = ['en', 'vi']
@@ -66,7 +71,11 @@ describe('composerNoteFor (G6-05u S7/S11)', () => {
   })
 
   it('a plan state on UniWork AI has no action: there is no other provider to choose (UNI-2309)', () => {
-    const note = composerNoteFor({ provider: 'uniwork', cloudState: 'not-entitled', signedOut: false })
+    const note = composerNoteFor({
+      provider: 'uniwork',
+      cloudState: 'not-entitled',
+      signedOut: false,
+    })
     expect(note?.kind).toBe('not-entitled')
     expect(note?.action).toBeNull()
   })

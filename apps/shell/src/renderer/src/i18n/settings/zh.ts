@@ -11,7 +11,6 @@ export const zh = {
   intgActionFailed: '未能完成。请确认该文件夹可写入，然后重试。',
   intgLoadFailed: '无法读取集成状态。',
 
-
   bkLead: '付费附加服务可将工作台备份到 UniWork Cloud 并增加存储空间。在本机导出和恢复始终免费。',
   bkPlanLabel: '备份方案',
   bkPlanNone: '无',

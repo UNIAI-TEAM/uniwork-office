@@ -14,7 +14,6 @@ export const fr = {
     'Impossible de terminer. Vérifiez que le dossier est accessible en écriture, puis réessayez.',
   intgLoadFailed: 'Impossible de lire l’état de l’intégration.',
 
-
   bkLead:
     'Les modules payants sauvegardent votre Plan de travail sur UniWork Cloud et ajoutent de l’espace de stockage. L’exportation et la restauration sur cet appareil restent toujours gratuites.',
   bkPlanLabel: 'Formule de sauvegarde',

@@ -12,7 +12,6 @@ export const vi = {
   intgActionFailed: 'Chưa hoàn tất được. Hãy kiểm tra thư mục có quyền ghi rồi thử lại.',
   intgLoadFailed: 'Không đọc được trạng thái tích hợp.',
 
-
   bkLead:
     'Gói bổ sung trả phí giúp sao lưu Bàn làm việc lên UniWork Cloud và thêm dung lượng. Xuất và khôi phục trên máy này luôn miễn phí.',
   bkPlanLabel: 'Gói sao lưu',

@@ -14,7 +14,6 @@ export const es = {
     'No se pudo completar. Comprueba que se pueda escribir en la carpeta y vuelve a intentarlo.',
   intgLoadFailed: 'No se pudo leer el estado de la integración.',
 
-
   bkLead:
     'Los complementos de pago hacen copias de seguridad de tu Mesa de trabajo en UniWork Cloud y añaden espacio de almacenamiento. Exportar y restaurar en este dispositivo siempre es gratis.',
   bkPlanLabel: 'Plan de copia de seguridad',

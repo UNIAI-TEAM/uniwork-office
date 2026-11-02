@@ -96,8 +96,7 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
         { role: 'user', text: 'Q' },
         { role: 'assistant', text: 'Computed answer', streaming: false },
       ]
-      const fallbackView = getEntryResultChipView(fallbackEntries, 1, false, mockTranslate, {
-      })
+      const fallbackView = getEntryResultChipView(fallbackEntries, 1, false, mockTranslate, {})
       expect(fallbackView?.chip.chip).toBe('answer')
       expect(fallbackView?.labelText).toBe('[aiResultAnswer]')
       expect(fallbackView?.stoppedText).toBeNull()
@@ -353,9 +352,7 @@ describe('uniwork-panel shared helper (RF1-14, RF1-19)', () => {
 
     it('a specific error key (the key of the visible line) is announced, never the generic line', () => {
       for (const key of ['aiErrCredits', 'aiErrSession', 'aiErrUnavailable', 'aiErrRunLimit']) {
-        expect(tail(resultChip({ error: key }))).toBe(
-          `[aiResultError]. [${key}]`,
-        )
+        expect(tail(resultChip({ error: key }))).toBe(`[aiResultError]. [${key}]`)
       }
     })
 

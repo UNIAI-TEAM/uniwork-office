@@ -13,7 +13,6 @@ export const nl = {
     'Kan dit niet voltooien. Controleer of er naar de map kan worden geschreven en probeer het opnieuw.',
   intgLoadFailed: 'Kan de integratiestatus niet lezen.',
 
-
   bkLead:
     'Betaalde add-ons maken een back-up van je Werkbank in UniWork Cloud en voegen opslagruimte toe. Exporteren en herstellen op dit apparaat is altijd gratis.',
   bkPlanLabel: 'Back-upabonnement',

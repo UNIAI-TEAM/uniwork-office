@@ -14,7 +14,6 @@ export const pt = {
     'Não foi possível concluir. Verifique se a pasta permite gravação e tente novamente.',
   intgLoadFailed: 'Não foi possível ler o status da integração.',
 
-
   bkLead:
     'Complementos pagos fazem backup da sua Bancada de trabalho no UniWork Cloud e adicionam espaço de armazenamento. Exportar e restaurar neste dispositivo é sempre gratuito.',
   bkPlanLabel: 'Plano de backup',

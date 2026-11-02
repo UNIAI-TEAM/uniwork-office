@@ -12,7 +12,6 @@ export const ko = {
   intgActionFailed: '완료하지 못했습니다. 폴더에 쓰기 권한이 있는지 확인한 후 다시 시도하세요.',
   intgLoadFailed: '연동 상태를 읽지 못했습니다.',
 
-
   bkLead:
     '유료 애드온으로 워크벤치를 UniWork Cloud에 백업하고 저장 공간을 늘릴 수 있습니다. 이 기기에서 내보내기와 복원은 언제나 무료입니다.',
   bkPlanLabel: '백업 요금제',

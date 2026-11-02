@@ -13,7 +13,6 @@ export const it = {
   intgActionFailed: 'Impossibile completare. Verifica che la cartella sia scrivibile, poi riprova.',
   intgLoadFailed: 'Impossibile leggere lo stato dell’integrazione.',
 
-
   bkLead:
     'I componenti aggiuntivi a pagamento eseguono il backup del Banco di lavoro su UniWork Cloud e aggiungono spazio di archiviazione. L’esportazione e il ripristino su questo dispositivo sono sempre gratuiti.',
   bkPlanLabel: 'Piano di backup',

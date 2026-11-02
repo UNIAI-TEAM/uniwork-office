@@ -14,7 +14,6 @@ export const de = {
     'Vorgang konnte nicht abgeschlossen werden. Prüfe, ob in den Ordner geschrieben werden kann, und versuche es erneut.',
   intgLoadFailed: 'Der Integrationsstatus konnte nicht gelesen werden.',
 
-
   bkLead:
     'Kostenpflichtige Add-ons sichern Ihren Arbeitsplatz in der UniWork Cloud und erweitern den Speicherplatz. Exportieren und Wiederherstellen auf diesem Gerät ist immer kostenlos.',
   bkPlanLabel: 'Sicherungstarif',

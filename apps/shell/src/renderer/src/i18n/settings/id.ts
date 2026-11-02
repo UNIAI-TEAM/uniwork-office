@@ -13,7 +13,6 @@ export const id = {
   intgActionFailed: 'Tidak dapat menyelesaikan. Pastikan folder dapat ditulisi, lalu coba lagi.',
   intgLoadFailed: 'Tidak dapat membaca status integrasi.',
 
-
   bkLead:
     'Add-on berbayar mencadangkan Meja kerja Anda ke UniWork Cloud dan menambah ruang penyimpanan. Ekspor dan pemulihan di perangkat ini selalu gratis.',
   bkPlanLabel: 'Paket cadangan',

@@ -13,7 +13,6 @@ export const ms = {
     'Tidak dapat diselesaikan. Pastikan folder itu boleh ditulis, kemudian cuba lagi.',
   intgLoadFailed: 'Tidak dapat membaca status integrasi.',
 
-
   bkLead:
     'Alat tambah berbayar menyandarkan Meja kerja anda ke UniWork Cloud dan menambah ruang storan. Mengeksport dan memulihkan pada peranti ini sentiasa percuma.',
   bkPlanLabel: 'Pelan sandaran',

@@ -13,7 +13,6 @@ export const cs = {
     'Akci se nepodařilo dokončit. Zkontrolujte, zda lze do složky zapisovat, a zkuste to znovu.',
   intgLoadFailed: 'Stav integrace se nepodařilo načíst.',
 
-
   bkLead:
     'Placené doplňky zálohují váš Pracovní stůl do UniWork Cloud a přidávají úložný prostor. Export a obnovení na tomto zařízení jsou vždy zdarma.',
   bkPlanLabel: 'Plán zálohování',

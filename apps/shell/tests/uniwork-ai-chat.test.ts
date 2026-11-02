@@ -708,7 +708,10 @@ describe('uniworkToolPolicy', () => {
 
   it('withholds cloud tools when the switch is off even though the org has cloud AI', () => {
     setUniworkCloudStatus(ready)
-    writeFileSync(file, JSON.stringify({ provider: 'uniwork', providers: {}, gskToolsEnabled: false }))
+    writeFileSync(
+      file,
+      JSON.stringify({ provider: 'uniwork', providers: {}, gskToolsEnabled: false }),
+    )
     expect(uniworkToolPolicy(file)).toEqual({ cloudTools: false })
   })
 

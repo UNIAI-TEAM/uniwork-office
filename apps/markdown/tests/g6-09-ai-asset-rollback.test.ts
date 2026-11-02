@@ -70,7 +70,8 @@ vi.mock('@genoffice/agent-core', async (orig) => {
   return {
     ...real,
     AgentLoop: FakeLoop,
-    createImageUrlRegistry: (opts: object) => createImageUrlRegistry({ ...opts, enforce: () => false }),
+    createImageUrlRegistry: (opts: object) =>
+      createImageUrlRegistry({ ...opts, enforce: () => false }),
   }
 })
 

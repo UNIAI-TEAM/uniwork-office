@@ -12,7 +12,6 @@ export const zhTW = {
   intgActionFailed: '無法完成。請確認該資料夾可寫入，然後再試一次。',
   intgLoadFailed: '無法讀取整合狀態。',
 
-
   bkLead:
     '付費附加元件可將工作台備份至 UniWork Cloud 並增加儲存空間。在這部裝置上匯出及還原一律免費。',
   bkPlanLabel: '備份方案',

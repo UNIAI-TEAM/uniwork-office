@@ -12,6 +12,5 @@ export const zhTW = {
   cloudCreditsUnlimited: '不限量',
   cloudCreditsRenews: '{date} 重置',
   cloudToolsToggle: '使用 UniWork 雲端工具',
-  cloudToolsToggleDesc:
-    '網頁搜尋、圖片生成和媒體分析使用 UniWork 雲端（消耗 AI 額度）。',
+  cloudToolsToggleDesc: '網頁搜尋、圖片生成和媒體分析使用 UniWork 雲端（消耗 AI 額度）。',
 } satisfies Record<keyof typeof zh, string>
