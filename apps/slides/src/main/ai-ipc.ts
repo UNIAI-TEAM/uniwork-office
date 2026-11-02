@@ -24,6 +24,7 @@ import {
   type AiStreamRequest,
   type GenSparkAccountStatus,
 } from '@genoffice/ai-provider'
+import { saveAiSettingsFile, scrubAiSettingsFile } from '@genoffice/ai-provider/settings-file'
 import {
   MAX_REMOTE_IMAGE_BYTES,
   fetchRemoteImage,
@@ -100,6 +101,7 @@ function appendRunFailure(entry: AiRunFailure): void {
 }
 
 export function registerAiIpc(): void {
+  scrubAiSettingsFile(AI_SETTINGS_PATH())
   // UniWork AI is the only provider: the file holds just the cloud-tools opt-out
   ipcMain.handle('ai:get-settings', (): AiSettings => {
     const { gskToolsEnabled } = aiSettingsFileOf(readJson<unknown>(AI_SETTINGS_PATH(), {}))
@@ -124,15 +126,7 @@ export function registerAiIpc(): void {
 
   ipcMain.handle('ai:set-settings', (_event, settings: unknown) => {
     // the file keeps only the cloud-tools opt-out: every other field of the renderer's copy is dropped
-    const gskToolsEnabled = (settings as { gskToolsEnabled?: unknown } | null | undefined)
-      ?.gskToolsEnabled
-    writeJsonAtomic(
-      AI_SETTINGS_PATH(),
-      aiSettingsFileOf({
-        ...readJson<object>(AI_SETTINGS_PATH(), {}),
-        ...(typeof gskToolsEnabled === 'boolean' ? { gskToolsEnabled } : {}),
-      }),
-    )
+    saveAiSettingsFile(AI_SETTINGS_PATH(), settings)
     for (const wc of webContents.getAllWebContents())
       if (!wc.isDestroyed()) wc.send('ai:settings-changed')
   })

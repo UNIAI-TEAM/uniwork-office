@@ -101,6 +101,32 @@ describe('slides ai:get-settings is UniWork AI only', () => {
     expect(written).not.toContain('sk-')
   })
 
+  it('registering scrubs an old provider key from the file and leaves no removed channel', () => {
+    storeFile({
+      provider: 'openrouter',
+      providers: { openrouter: { apiKey: 'sk-or-old', model: 'm' } },
+      gskToolsEnabled: false,
+    })
+    registerAiIpc()
+    const written = readFileSync(join(dirs.userData, 'ai-settings.json'), 'utf8')
+    expect(JSON.parse(written)).toEqual({
+      provider: 'uniwork',
+      providers: {},
+      gskToolsEnabled: false,
+    })
+    expect(written).not.toContain('sk-')
+    for (const channel of [
+      'ai:chat',
+      'ai:settings-test',
+      'ai:search-test',
+      'ai:media-test',
+      'ai:codex-models',
+      'ai:custom-models',
+      'ai:openrouter-key-status',
+    ])
+      expect(handlers.has(channel)).toBe(false)
+  })
+
   it('a send is refused without any provider request', async () => {
     const settings = await getSettings()
     const chunks: Array<{ type: string; uniworkCode?: string }> = []

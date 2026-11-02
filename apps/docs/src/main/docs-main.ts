@@ -113,6 +113,7 @@ import {
   type AiStreamRequest,
   type GenSparkAccountStatus,
 } from '@genoffice/ai-provider'
+import { saveAiSettingsFile, scrubAiSettingsFile } from '@genoffice/ai-provider/settings-file'
 import {
   generateImageTool,
   gskLoginInfo,
@@ -3961,11 +3962,7 @@ function broadcastAiSettingsChanged(): void {
  */
 export function registerAiIpc(): void {
   // scrub what older builds stored (provider keys, base URLs, CLI paths, media/search keys)
-  if (existsSync(SETTINGS_PATH())) {
-    const stored = readJson<unknown>(SETTINGS_PATH(), {})
-    const clean = aiSettingsFileOf(stored)
-    if (JSON.stringify(stored) !== JSON.stringify(clean)) writeJsonAtomic(SETTINGS_PATH(), clean)
-  }
+  scrubAiSettingsFile(SETTINGS_PATH())
 
   ipcMain.handle('ai:get-settings', async (): Promise<AiSettings> => {
     const { gskToolsEnabled } = aiSettingsFileOf(readJson<unknown>(SETTINGS_PATH(), {}))
@@ -3999,16 +3996,7 @@ export function registerAiIpc(): void {
 
   ipcMain.handle('ai:set-settings', (_event, settings: unknown) => {
     // the file keeps only the cloud-tools opt-out: every other field of the renderer's copy is dropped
-    const current = readJson<unknown>(SETTINGS_PATH(), {})
-    const gskToolsEnabled = (settings as { gskToolsEnabled?: unknown } | null | undefined)
-      ?.gskToolsEnabled
-    writeJsonAtomic(
-      SETTINGS_PATH(),
-      aiSettingsFileOf({
-        ...(current as object),
-        ...(typeof gskToolsEnabled === 'boolean' ? { gskToolsEnabled } : {}),
-      }),
-    )
+    saveAiSettingsFile(SETTINGS_PATH(), settings)
     broadcastAiSettingsChanged()
   })
 

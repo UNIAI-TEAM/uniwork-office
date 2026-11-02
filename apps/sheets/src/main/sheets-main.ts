@@ -85,7 +85,6 @@ import {
   installRendererProtocol,
   registerRendererScheme,
   rendererUrl,
-  writeJsonAtomic,
   newerCopyMtime,
 } from '@genoffice/electron-utils'
 import { answerUniworkAiFlagOff } from '@genoffice/electron-utils/uniwork-ai-flag'
@@ -101,6 +100,7 @@ import {
   type AiStreamChunk,
   type GenSparkAccountStatus,
 } from '@genoffice/ai-provider'
+import { saveAiSettingsFile, scrubAiSettingsFile } from '@genoffice/ai-provider/settings-file'
 import {
   csvToXlsxBufferForOpen,
   decodeCsvBuffer,
@@ -3959,6 +3959,7 @@ let aiIpcRegistered = false
 export function registerSheetsAiIpc(): void {
   if (aiIpcRegistered) return
   aiIpcRegistered = true
+  scrubAiSettingsFile(SETTINGS_PATH())
 
   // UniWork AI is the only provider: the file holds just the cloud-tools opt-out
   ipcMain.handle(IPC_CHANNELS.aiGetSettings, (event): AiSettings => {
@@ -3986,14 +3987,7 @@ export function registerSheetsAiIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.aiSetSettings, async (event, input: unknown) => {
     sessionFor(event)
-    const { gskToolsEnabled } = aiSettingsInputSchema.parse(input)
-    writeJsonAtomic(
-      SETTINGS_PATH(),
-      aiSettingsFileOf({
-        ...readJson<object>(SETTINGS_PATH(), {}),
-        ...(typeof gskToolsEnabled === 'boolean' ? { gskToolsEnabled } : {}),
-      }),
-    )
+    saveAiSettingsFile(SETTINGS_PATH(), aiSettingsInputSchema.parse(input))
     for (const wc of webContents.getAllWebContents())
       if (!wc.isDestroyed()) wc.send(IPC_CHANNELS.aiSettingsChanged)
   })

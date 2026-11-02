@@ -35,9 +35,10 @@ describe('sheets AI settings are UniWork AI only', () => {
     expect(body).not.toMatch(/resolveAiSettings|selectedProvider/)
   })
 
-  it('set-settings writes through aiSettingsFileOf only', () => {
+  it('set-settings writes through saveAiSettingsFile only', () => {
     const body = handlerBody('IPC_CHANNELS.aiSetSettings')
-    expect(body).toMatch(/writeJsonAtomic\(\s*SETTINGS_PATH\(\),\s*aiSettingsFileOf\(/)
+    expect(body).toMatch(/saveAiSettingsFile\(\s*SETTINGS_PATH\(\)/)
+    expect(body).not.toContain('writeJsonAtomic')
   })
 
   it('a send ends in ai_disabled with no provider request', () => {

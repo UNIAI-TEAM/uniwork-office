@@ -11,6 +11,7 @@
     "./browser": "./src/browser.ts",
     "./codex-app-server": "./src/codex-app-server.ts",
     "./custom-models": "./src/custom-models.ts",
+    "./settings-file": "./src/settings-file.ts",
     "./provider-models": "./src/provider-models.ts",
     "./proxy-url": "./src/proxy-url.ts"
   },
