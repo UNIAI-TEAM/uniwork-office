@@ -2,9 +2,6 @@ import type { zh } from './zh'
 import { sharedAskUni } from './shared'
 
 export const cs = {
-  askUniModeGroup: 'Režim',
-  askUniModeChat: 'Asistent',
-  askUniModeAsk: 'Zeptat se UNI',
   askUniTitle: 'Zeptat se UNI',
   askUniDescription:
     'UNI odpovídá jen z dat, která v tomto pracovním prostoru vidíte, a uvádí zdroje.',

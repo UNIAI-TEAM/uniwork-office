@@ -3,7 +3,6 @@ import type { zh } from './zh'
 export const ja = {
   setClose: '閉じる',
   setRetry: '再試行',
-  setAiCreditRate: 'キー残高 1 USD = AI クレジット 1,000',
   setGrpAppearance: '外観',
   setGrpAiPanel: 'AI パネル',
   setGrpFiles: 'ファイルと保存',
@@ -14,18 +13,6 @@ export const ja = {
     '完了できませんでした。フォルダーに書き込めるか確認してから、もう一度お試しください。',
   intgLoadFailed: '連携の状態を読み込めませんでした。',
 
-  cwTitle: 'AI クレジット',
-  cwAddKey: 'キーを追加',
-  cwNoKey: 'AI キーが未設定です',
-  cwUpdating: '更新中…',
-  cwLoadFailed: '読み込めません',
-  cwLeft: '残り {n}',
-  cwUsed: '{n} 使用済み',
-  cwToday: '今日 ≈ {n}',
-  cwHistory: 'AI の使用履歴',
-  cwLogNote: 'この端末での推定値で、請求額ではありません。',
-  cwLogEmpty: 'AI の呼び出し記録はまだありません。',
-  cwOpenHint: 'クリックで AI 設定 · 右クリックで使用状況ページ',
 
   bkLead:
     '有料アドオンでワークベンチを UniWork Cloud にバックアップし、ストレージ容量を追加できます。このデバイスでのエクスポートと復元はいつでも無料です。',

@@ -3,7 +3,6 @@ import type { zh } from './zh'
 export const he = {
   setClose: 'סגירה',
   setRetry: 'ניסיון חוזר',
-  setAiCreditRate: '1 USD ביתרת המפתח = 1,000 קרדיטי AI',
   setGrpAppearance: 'מראה',
   setGrpAiPanel: 'חלונית AI',
   setGrpFiles: 'קבצים ושמירה',
@@ -13,18 +12,6 @@ export const he = {
   intgActionFailed: 'הפעולה לא הושלמה. יש לוודא שאפשר לכתוב לתיקייה ולנסות שוב.',
   intgLoadFailed: 'לא ניתן לקרוא את מצב השילוב.',
 
-  cwTitle: 'קרדיטי AI',
-  cwAddKey: 'הוספת מפתח',
-  cwNoKey: 'עדיין אין מפתח AI',
-  cwUpdating: 'מתעדכן…',
-  cwLoadFailed: 'הטעינה נכשלה',
-  cwLeft: 'נותרו {n}',
-  cwUsed: 'נוצלו {n}',
-  cwToday: 'היום ≈ {n}',
-  cwHistory: 'היסטוריית שימוש ב-AI',
-  cwLogNote: 'הערכה במכשיר הזה, לא החשבון שלך.',
-  cwLogEmpty: 'עדיין לא נרשמו קריאות AI.',
-  cwOpenHint: 'לחיצה להגדרות AI · לחיצה ימנית לדף השימוש',
 
   bkLead:
     'תוספות בתשלום מגבות את עמדת העבודה שלך ל-UniWork Cloud ומוסיפות שטח אחסון. ייצוא ושחזור במכשיר הזה תמיד בחינם.',

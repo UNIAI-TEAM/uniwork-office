@@ -2,9 +2,6 @@ import type { zh } from './zh'
 import { sharedAskUni } from './shared'
 
 export const ja = {
-  askUniModeGroup: 'モード',
-  askUniModeChat: 'アシスタント',
-  askUniModeAsk: 'UNI に質問',
   askUniTitle: 'UNI に質問',
   askUniDescription:
     'UNI は、このワークスペースで閲覧できるデータだけを根拠に、出典つきで回答します。',

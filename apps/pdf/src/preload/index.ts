@@ -14,14 +14,8 @@ import type { PdfApi, UiTheme } from '../shared/ipc'
 const api: PdfApi = {
   consumePending: () => ipcRenderer.invoke(PDF_CHANNELS.consumePending),
   consumeAiPreset: () => ipcRenderer.invoke(PDF_CHANNELS.consumeAiPreset),
-  onAiPreset: (handler) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      preset: { text: string; autoRun?: boolean; displayText?: string },
-    ) => handler(preset)
-    ipcRenderer.on('my-ai:ai-preset', listener)
-    return () => ipcRenderer.removeListener('my-ai:ai-preset', listener)
-  },
+  // the shell no longer pushes presets into a running editor (My AI is gone); only a web host does
+  onAiPreset: () => () => {},
   readFile: (path) => ipcRenderer.invoke(PDF_CHANNELS.readFile, path),
   save: (request) => ipcRenderer.invoke(PDF_CHANNELS.save, request),
   requestRedactionCopy: (path) => ipcRenderer.invoke(PDF_CHANNELS.requestRedactionCopy, path),

@@ -1,4 +1,5 @@
 import {
+  getWorkbenchModule,
   isSkillDomainId,
   moduleSupportsAddItem,
   tabIdForTarget,
@@ -15,9 +16,14 @@ import {
   writeStickyNotes,
 } from './workbench-pins'
 import { pinSkillDomain, writeActiveSkillDomain } from './skill-domain-pins'
-import { workbenchModuleLabel } from './my-ai-consent'
 import { pickActiveWorkspace, readActiveWorkspaceId } from './active-workspace'
 import { settleWork } from './work-cache'
+
+function workbenchModuleLabel(id: string, vi: boolean): string {
+  const meta = getWorkbenchModule(id as WorkbenchModuleId)
+  if (meta) return vi ? meta.labelVi : meta.labelEn
+  return id
+}
 
 export interface AgentAddUndo {
   moduleId: WorkbenchModuleId
@@ -157,16 +163,11 @@ export async function applyAgentIntent(
   }
 
   if (intent.action === 'summarize') {
-    window.dispatchEvent(
-      new CustomEvent('uniwork:agent-summarize', {
-        detail: { practiceId, intentId: intent.intentId, text: intent.text ?? intent.summary },
-      }),
-    )
     return {
-      ok: true,
+      ok: false,
       tabId,
-      messageVi: 'Đã mở My AI để tóm tắt ngữ cảnh trên máy.',
-      messageEn: 'Opened My AI to summarize on-device context.',
+      messageVi: 'Tóm tắt bằng My AI không còn trên ứng dụng; hãy dùng Hỏi UNI.',
+      messageEn: 'My AI summaries are no longer in the app; use Ask UNI instead.',
     }
   }
 

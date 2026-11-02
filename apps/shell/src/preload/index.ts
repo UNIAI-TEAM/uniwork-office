@@ -2,7 +2,6 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import { normalizeUniworkCloudStatus } from '@genoffice/ai-provider/browser'
 import type { AiSettings } from '@genoffice/ai-provider/browser'
-import type { AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { installUniworkAiFlagBridge } from '@genoffice/electron-utils/uniwork-ai-flag-bridge'
 import { installUniworkDiscussionBridge } from '@genoffice/electron-utils/discussion-bridge'
@@ -22,8 +21,6 @@ import type {
   AccountSetServerResult,
   AccountStatus,
   AttachmentAddResult,
-  AttachmentImageResult,
-  AttachmentReadResult,
   CliLinkState,
   DefaultAppStatus,
   FolderListing,
@@ -672,39 +669,6 @@ const homeApi: HomeApi = {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')
     await ipcRenderer.invoke(HOME_CHANNELS.openPath, path)
   },
-  async fileExcerpts(paths) {
-    if (!Array.isArray(paths)) return []
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.fileExcerpts, paths)
-    return Array.isArray(result) ? (result as import('../shared/file-excerpt').FileExcerpt[]) : []
-  },
-  async activeOfficeTab() {
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.activeOfficeTab)
-    if (!result || typeof result !== 'object') return null
-    const tab = result as { id?: unknown; kind?: unknown; title?: unknown; path?: unknown }
-    if (
-      typeof tab.id !== 'string' ||
-      typeof tab.kind !== 'string' ||
-      typeof tab.title !== 'string'
-    ) {
-      return null
-    }
-    return {
-      id: tab.id,
-      kind: tab.kind,
-      title: tab.title,
-      ...(typeof tab.path === 'string' ? { path: tab.path } : {}),
-    }
-  },
-  async pushAiPreset(input) {
-    const result: unknown = await ipcRenderer.invoke(HOME_CHANNELS.pushAiPreset, input)
-    return (result ?? { ok: false }) as {
-      ok: boolean
-      tabId?: string
-      kind?: string
-      title?: string
-      path?: string
-    }
-  },
   async browse() {
     await ipcRenderer.invoke(HOME_CHANNELS.browse)
   },
@@ -1109,9 +1073,6 @@ const homeApi: HomeApi = {
     ipcRenderer.on('app:document-theme-changed', listener)
     return () => ipcRenderer.removeListener('app:document-theme-changed', listener)
   },
-  async openCreditUsage() {
-    await ipcRenderer.invoke(HOME_CHANNELS.openCreditUsage)
-  },
   // AI settings channels are registered once by the shell's aggregated docs handlers
   onAiSettingsChanged(handler) {
     const listener = () => handler()
@@ -1136,62 +1097,8 @@ const homeApi: HomeApi = {
       Object.keys(sent).length > 0 ? sent : undefined,
     )
   },
-  async probeOpenRouterKey(apiKey) {
-    return (await ipcRenderer.invoke(
-      'ai:openrouter-key-status',
-      apiKey,
-    )) as import('@genoffice/ai-provider').OpenRouterKeyStatus
-  },
-  async aiChat(input) {
-    const settings = input.settings ?? ((await ipcRenderer.invoke('ai:get-settings')) as AiSettings)
-    const result: unknown = await ipcRenderer.invoke('ai:chat', {
-      settings,
-      system: input.system,
-      user: input.user,
-    })
-    const raw = (result ?? {}) as {
-      ok?: unknown
-      content?: unknown
-      error?: unknown
-      uniworkCode?: unknown
-    }
-    if (raw.ok === true) {
-      return {
-        ok: true,
-        ...(typeof raw.content === 'string' ? { content: raw.content } : {}),
-      }
-    }
-    return {
-      ok: false,
-      error: typeof raw.error === 'string' ? raw.error : 'AI request failed',
-      ...(typeof raw.uniworkCode === 'string' ? { uniworkCode: raw.uniworkCode } : {}),
-    }
-  },
-  aiStream(request: AiStreamRequest) {
-    return ipcRenderer.invoke('ai:stream', request) as Promise<void>
-  },
-  aiStreamCancel(requestId: string) {
-    return ipcRenderer.invoke('ai:stream-cancel', requestId) as Promise<void>
-  },
-  onAiStream(handler: (chunk: AiStreamChunk) => void) {
-    const listener = (_event: IpcRendererEvent, chunk: AiStreamChunk) => handler(chunk)
-    ipcRenderer.on('ai:stream-chunk', listener)
-    return () => ipcRenderer.removeListener('ai:stream-chunk', listener)
-  },
   pickAttachments() {
     return ipcRenderer.invoke('files:pick') as Promise<AttachmentAddResult | null>
-  },
-  addAttachmentPaths(paths: string[]) {
-    return ipcRenderer.invoke('files:add', paths) as Promise<AttachmentAddResult>
-  },
-  addPastedImage(data: ArrayBuffer, ext: string) {
-    return ipcRenderer.invoke('files:add-pasted-image', data, ext) as Promise<AttachmentAddResult>
-  },
-  readAttachment(path: string, offset: number, maxChars: number) {
-    return ipcRenderer.invoke('files:read', path, offset, maxChars) as Promise<AttachmentReadResult>
-  },
-  readAttachmentImage(path: string) {
-    return ipcRenderer.invoke('files:read-image', path) as Promise<AttachmentImageResult>
   },
   getPathForFile(file: File) {
     return webUtils.getPathForFile(file)

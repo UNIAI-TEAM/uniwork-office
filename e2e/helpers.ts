@@ -41,7 +41,7 @@ interface LaunchOptions {
   openUrl?: string
   /**
    * Home view to land on when onboarding is pre-seeded and nothing is opened
-   * from argv. The product starts on the My AI chat; the suite defaults to the
+   * from argv. The product starts on the Ask UNI chat; the suite defaults to the
    * Recent files view (hero, quick-create cards, file search).
    */
   homeView?: 'files' | 'chat'
@@ -133,7 +133,7 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
 }
 
 /**
- * Switches Home from the My AI chat to the active area's files view:
+ * Switches Home from the Ask UNI chat to the active area's files view:
  * `.home-hero` on the device area, or `.dh-home .dh-title` on the signed-in UniWork area.
  */
 export async function openHomeFiles(page: Page): Promise<void> {

@@ -3,7 +3,6 @@ import type { zh } from './zh'
 export const th = {
   setClose: 'ปิด',
   setRetry: 'ลองอีกครั้ง',
-  setAiCreditRate: 'ยอดคงเหลือของคีย์ 1 USD = เครดิต AI 1,000',
   setGrpAppearance: 'ลักษณะที่ปรากฏ',
   setGrpAiPanel: 'แผง AI',
   setGrpFiles: 'ไฟล์และการบันทึก',
@@ -13,18 +12,6 @@ export const th = {
   intgActionFailed: 'ดำเนินการไม่สำเร็จ ตรวจสอบว่าโฟลเดอร์เขียนได้ แล้วลองอีกครั้ง',
   intgLoadFailed: 'อ่านสถานะการเชื่อมต่อไม่ได้',
 
-  cwTitle: 'เครดิต AI',
-  cwAddKey: 'เพิ่มคีย์',
-  cwNoKey: 'ยังไม่มีคีย์ AI',
-  cwUpdating: 'กำลังอัปเดต…',
-  cwLoadFailed: 'โหลดไม่ได้',
-  cwLeft: 'เหลือ {n}',
-  cwUsed: 'ใช้ไป {n}',
-  cwToday: 'วันนี้ ≈ {n}',
-  cwHistory: 'ประวัติการใช้ AI',
-  cwLogNote: 'เป็นค่าประมาณบนอุปกรณ์นี้ ไม่ใช่ใบเรียกเก็บเงิน',
-  cwLogEmpty: 'ยังไม่มีการบันทึกการเรียกใช้ AI',
-  cwOpenHint: 'คลิกเพื่อเปิดการตั้งค่า AI · คลิกขวาเพื่อเปิดหน้าการใช้งาน',
 
   bkLead:
     'ส่วนเสริมแบบชำระเงินจะสำรองโต๊ะทำงานของคุณไปยัง UniWork Cloud และเพิ่มพื้นที่เก็บข้อมูล การส่งออกและกู้คืนบนอุปกรณ์นี้ใช้ได้ฟรีเสมอ',

@@ -2,9 +2,6 @@ import type { zh } from './zh'
 import { sharedAskUni } from './shared'
 
 export const zhTW = {
-  askUniModeGroup: '模式',
-  askUniModeChat: '助理',
-  askUniModeAsk: '問 UNI',
   askUniTitle: '問 UNI',
   askUniDescription: 'UNI 只會根據你在此工作區可檢視的資料回答，並附上來源。',
   askUniWorkspace: '工作區',

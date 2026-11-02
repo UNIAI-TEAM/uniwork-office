@@ -711,14 +711,8 @@ const desktopApi: DesktopApi = {
       ...(typeof displayText === 'string' ? { displayText } : {}),
     }
   },
-  onAiPreset(handler) {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      preset: { text: string; autoRun?: boolean; displayText?: string },
-    ) => handler(preset)
-    ipcRenderer.on('my-ai:ai-preset', listener)
-    return () => ipcRenderer.removeListener('my-ai:ai-preset', listener)
-  },
+  // the shell no longer pushes presets into a running editor (My AI is gone); only a web host does
+  onAiPreset: () => () => {},
   onMcpCommand(callback) {
     const listener = (_event: unknown, message: unknown): void => {
       if (

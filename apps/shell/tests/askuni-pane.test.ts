@@ -860,146 +860,50 @@ describe('Ask UNI mode (shell Home My AI)', () => {
     })
   })
 
-  describe('My AI pane wiring', () => {
-    const noop = async () => null
-    function chatBridge(): Record<string, unknown> {
-      return new Proxy(
+  describe('Home chat pane wiring', () => {
+    async function mountPane(): Promise<void> {
+      ;(window as unknown as { aiOffice: unknown }).aiOffice = new Proxy(
         {
           uniworkAskUni: ask,
           uniworkAskUniContext: askContext,
-          recents: async () => ({ items: [], total: 0 }),
-          setLanguage: noop,
+          setLanguage: async () => null,
         } as Record<string, unknown>,
-        {
-          get: (t, p: string) => (p in t ? t[p] : undefined),
-        },
+        { get: (t, p: string) => (p in t ? t[p] : undefined) },
       )
-    }
-
-    async function mountPane(): Promise<void> {
-      ;(window as unknown as { aiOffice: unknown }).aiOffice = chatBridge()
       await act(async () => {
-        root.render(
-          h(LocaleProvider, {
-            initial: 'en',
-            children: h(NewChatPane, {
-              practiceId: 'general' as never,
-              ensureWorkbench: () => undefined,
-            }),
-          }),
-        )
+        root.render(h(LocaleProvider, { initial: 'en', children: h(NewChatPane) }))
       })
       await flush()
     }
 
-    const modeBtn = (label: string) =>
-      [...host.querySelectorAll('.new-chat-bar button')].find(
-        (b) => b.textContent?.trim() === label,
-      ) as HTMLButtonElement | undefined
-
-    it('adds a keyboard-reachable mode toggle next to the chat and switches to Ask UNI', async () => {
+    it('shows Ask UNI straight away, with no mode switch and the Ask UNI title', async () => {
       await mountPane()
-      const chat = modeBtn(en.askUniModeChat)
-      const askMode = modeBtn(en.askUniModeAsk)
-      expect(chat).toBeDefined()
-      expect(askMode).toBeDefined()
-      expect(chat!.getAttribute('aria-pressed')).toBe('true')
-      expect(askMode!.getAttribute('aria-pressed')).toBe('false')
-      expect(chat!.tabIndex).toBeGreaterThanOrEqual(0)
-      expect(askMode!.tabIndex).toBeGreaterThanOrEqual(0)
-      expect(host.querySelector('.askuni-pane')).toBeNull()
-      await act(async () => {
-        askMode!.click()
-      })
-      await flush()
       expect(host.querySelector('.askuni-pane')).not.toBeNull()
-      expect(askMode!.getAttribute('aria-pressed')).toBe('true')
+      expect((host.querySelector('.askuni-pane') as HTMLElement).hidden).toBe(false)
+      expect(host.querySelector('.askuni-modes')).toBeNull()
+      expect(host.querySelector('.new-chat-title')?.textContent).toBe(en.askUniTitle)
       expect(host.textContent).toContain(WS_A.name)
-      await act(async () => {
-        chat!.click()
-      })
-      // the pane stays mounted (hidden) so the conversation survives the switch
-      const pane = host.querySelector('.askuni-pane') as HTMLElement
-      expect(pane.hidden).toBe(true)
-      expect(host.querySelector('.new-chat-bar')).not.toBeNull()
     })
 
-    it('keeps the Ask UNI turns, conversation and draft across Assistant and back', async () => {
+    it('asks and keeps the conversation without any chat mode to come back from', async () => {
       await mountPane()
-      await act(async () => {
-        modeBtn(en.askUniModeAsk)!.click()
-      })
-      await flush()
-      await type('First question')
-      await act(async () => {
-        sendBtn().click()
-      })
-      await flush()
-      await type('half a draft')
-      await act(async () => {
-        modeBtn(en.askUniModeChat)!.click()
-      })
-      await flush()
-      await act(async () => {
-        modeBtn(en.askUniModeAsk)!.click()
-      })
-      await flush()
-      const pane = host.querySelector('.askuni-pane') as HTMLElement
-      expect(pane.hidden).toBe(false)
-      expect(pane.textContent).toContain('First question')
-      expect(pane.textContent).toContain('Plain answer')
-      expect(composer().value).toBe('half a draft')
-      expect(askContext).toHaveBeenCalledTimes(1)
+      await sendQuestion('First question')
+      expect(host.querySelector('.askuni-pane')?.textContent).toContain('Plain answer')
       await sendQuestion('Second question')
       expect(ask.mock.calls[1]![0].conversationId).toBe('conv-1')
     })
 
-    it('lets a pending answer land in the kept thread while Ask UNI is hidden', async () => {
-      let resolveAsk: (r: AskUniResult) => void = () => undefined
-      ask.mockImplementation(
-        () =>
-          new Promise<AskUniResult>((res) => {
-            resolveAsk = res
-          }),
-      )
-      await mountPane()
-      await act(async () => {
-        modeBtn(en.askUniModeAsk)!.click()
-      })
-      await flush()
-      await sendQuestion('Slow one')
-      await act(async () => {
-        modeBtn(en.askUniModeChat)!.click()
-      })
-      await act(async () => {
-        resolveAsk(answer('Landed while hidden'))
-      })
-      await flush()
-      await act(async () => {
-        modeBtn(en.askUniModeAsk)!.click()
-      })
-      await flush()
-      expect(host.querySelector('.askuni-pane')?.textContent).toContain('Landed while hidden')
-    })
-
-    it('hides the toggle when the shell bridge has no Ask UNI', async () => {
+    it('shows the signed-out note when the shell bridge has no Ask UNI', async () => {
       ;(window as unknown as { aiOffice: unknown }).aiOffice = new Proxy(
-        { recents: async () => ({ items: [], total: 0 }) } as Record<string, unknown>,
+        {} as Record<string, unknown>,
         { get: (t, p: string) => t[p] },
       )
       await act(async () => {
-        root.render(
-          h(LocaleProvider, {
-            initial: 'en',
-            children: h(NewChatPane, {
-              practiceId: 'general' as never,
-              ensureWorkbench: () => undefined,
-            }),
-          }),
-        )
+        root.render(h(LocaleProvider, { initial: 'en', children: h(NewChatPane) }))
       })
       await flush()
-      expect(modeBtn(en.askUniModeAsk)).toBeUndefined()
+      expect(host.querySelector('.askuni-pane')).not.toBeNull()
+      expect(host.querySelector('.askuni-modes')).toBeNull()
     })
   })
 })

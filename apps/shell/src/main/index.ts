@@ -357,7 +357,6 @@ import type {
 import { HOME_CHANNELS } from '../shared/home-api'
 import { UNIWORK_DOC_CHANNELS } from '../shared/home-api'
 import { OPEN_DIALOG_EXTENSIONS } from '../shared/open-extensions'
-import { extractAllowedFileExcerpts } from './file-excerpts'
 import { isAllowedWbKey, type WbKvMap } from './workbench-db'
 import { ACTIVE_WORKSPACE_STORE_KEY } from './uniwork-askuni/service'
 import { WorkbenchAccounts, loadWorkbenchSnapshot } from './workbench-accounts'
@@ -774,7 +773,6 @@ function currentAiPanelPrefs(): AiPanelPrefs {
 // ---- first-run onboarding ----
 // Token Hub (OpenRouter) credits page opened from the Home credit wallet.
 // Kept main-side so the renderer never supplies the URL.
-const CREDIT_USAGE_URL = 'https://openrouter.ai/settings/credits'
 
 const tMain = createI18n({
   zh: {
@@ -5284,10 +5282,6 @@ function registerHomeIpc(): void {
     fileIndexer?.refresh()
   })
 
-  guardedIpc.handle(HOME_CHANNELS.fileExcerpts, (_event, paths: unknown) =>
-    extractAllowedFileExcerpts(paths, tabManager?.openFilePaths() ?? []),
-  )
-
   guardedIpc.handle(HOME_CHANNELS.wbLoadAll, () =>
     loadWorkbenchSnapshot(workbenchAccounts(), syncWorkbenchOwner),
   )
@@ -5372,44 +5366,6 @@ function registerHomeIpc(): void {
       return { ok: false as const, error: err instanceof Error ? err.message : String(err) }
     }
   })
-
-  guardedIpc.handle(HOME_CHANNELS.activeOfficeTab, () => {
-    const tab = tabManager?.activeOfficeTab()
-    if (!tab) return null
-    return {
-      id: tab.id,
-      kind: tab.kind,
-      title: tab.title,
-      ...(tab.path ? { path: tab.path } : {}),
-    }
-  })
-
-  guardedIpc.handle(
-    HOME_CHANNELS.pushAiPreset,
-    (
-      _event,
-      input?: {
-        text?: string
-        autoRun?: boolean
-        displayText?: string
-        tabId?: string
-      },
-    ) => {
-      if (!input || typeof input.text !== 'string' || !input.text.trim()) {
-        return { ok: false as const }
-      }
-      return (
-        tabManager?.pushAiPresetToOfficeTab(
-          {
-            text: input.text.trim(),
-            autoRun: input.autoRun !== false,
-            ...(typeof input.displayText === 'string' ? { displayText: input.displayText } : {}),
-          },
-          typeof input.tabId === 'string' ? input.tabId : undefined,
-        ) ?? { ok: false as const }
-      )
-    },
-  )
 
   guardedIpc.handle(HOME_CHANNELS.browse, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? shellWindow
@@ -6065,11 +6021,6 @@ function registerHomeIpc(): void {
     return picked
   })
 
-  guardedIpc.handle(HOME_CHANNELS.openCreditUsage, () => {
-    shell.openExternal(CREDIT_USAGE_URL).catch(() => {
-      // no browser handler available; nothing actionable for the user here
-    })
-  })
 }
 
 function stringPaths(value: unknown): string[] {

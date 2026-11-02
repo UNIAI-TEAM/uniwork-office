@@ -116,7 +116,7 @@ function AskUniV2Gate({ visible }: { visible: boolean }): ReactElement {
 const FOCUS_WAIT_MS = 2000
 
 /**
- * What the My AI pane mounts in Ask UNI mode (contract D3): the v2 panel when the public
+ * What the Home chat pane mounts (contract D3): the v2 panel when the public
  * `ask_uni_stream` flag is on, the P1 pane exactly as before when it is off or the bridge has no
  * flags. While the first flag answer is on its way neither shows, so the pane never flashes.
  * `focusToken` changing puts the caret in the composer of whichever pane shows (Ctrl/Cmd+J).

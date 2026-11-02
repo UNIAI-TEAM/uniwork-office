@@ -3,7 +3,6 @@ import type { zh } from './zh'
 export const en = {
   setClose: 'Close',
   setRetry: 'Try again',
-  setAiCreditRate: '1 USD of key balance = 1,000 AI credits',
   setGrpAppearance: 'Appearance',
   setGrpAiPanel: 'AI panel',
   setGrpFiles: 'Files and saving',
@@ -13,18 +12,6 @@ export const en = {
   intgActionFailed: 'Couldn’t finish. Check that the folder can be written to, then try again.',
   intgLoadFailed: 'Couldn’t read the integration status.',
 
-  cwTitle: 'AI credits',
-  cwAddKey: 'Add key',
-  cwNoKey: 'No AI key yet',
-  cwUpdating: 'Updating…',
-  cwLoadFailed: 'Couldn’t load',
-  cwLeft: '{n} left',
-  cwUsed: '{n} used',
-  cwToday: 'Today ≈ {n}',
-  cwHistory: 'AI usage history',
-  cwLogNote: 'Estimated on this device; not your bill.',
-  cwLogEmpty: 'No AI calls logged yet.',
-  cwOpenHint: 'Click for AI settings · right-click for the usage page',
 
   bkLead:
     'Paid add-ons back up your Workbench to UniWork Cloud and add storage space. Exporting and restoring on this device is always free.',

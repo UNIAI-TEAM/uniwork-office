@@ -2,9 +2,6 @@ import type { zh } from './zh'
 import { sharedAskUni } from './shared'
 
 export const de = {
-  askUniModeGroup: 'Modus',
-  askUniModeChat: 'Assistent',
-  askUniModeAsk: 'UNI fragen',
   askUniTitle: 'UNI fragen',
   askUniDescription:
     'UNI antwortet nur anhand von Daten, die Sie in diesem Arbeitsbereich sehen können, und nennt die Quellen.',

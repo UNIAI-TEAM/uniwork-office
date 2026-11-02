@@ -3,7 +3,6 @@ import type { zh } from './zh'
 export const hi = {
   setClose: 'बंद करें',
   setRetry: 'फिर से कोशिश करें',
-  setAiCreditRate: 'कुंजी बैलेंस के 1 USD = 1,000 AI क्रेडिट',
   setGrpAppearance: 'दिखावट',
   setGrpAiPanel: 'AI पैनल',
   setGrpFiles: 'फ़ाइलें और सहेजना',
@@ -14,18 +13,6 @@ export const hi = {
   intgActionFailed: 'पूरा नहीं हो सका। जांचें कि फ़ोल्डर में लिखा जा सकता है, फिर से कोशिश करें।',
   intgLoadFailed: 'इंटीग्रेशन की स्थिति पढ़ी नहीं जा सकी।',
 
-  cwTitle: 'AI क्रेडिट',
-  cwAddKey: 'कुंजी जोड़ें',
-  cwNoKey: 'अभी कोई AI कुंजी नहीं',
-  cwUpdating: 'अपडेट हो रहा है…',
-  cwLoadFailed: 'लोड नहीं हुआ',
-  cwLeft: '{n} शेष',
-  cwUsed: '{n} इस्तेमाल',
-  cwToday: 'आज ≈ {n}',
-  cwHistory: 'AI उपयोग इतिहास',
-  cwLogNote: 'इस डिवाइस पर अनुमानित; यह आपका बिल नहीं है।',
-  cwLogEmpty: 'अभी तक कोई AI कॉल लॉग नहीं हुई।',
-  cwOpenHint: 'AI सेटिंग के लिए क्लिक करें · उपयोग पेज के लिए राइट-क्लिक करें',
 
   bkLead:
     'सशुल्क ऐड-ऑन आपके वर्कबेंच का UniWork Cloud पर बैकअप लेते हैं और स्टोरेज स्पेस बढ़ाते हैं। इस डिवाइस पर एक्सपोर्ट और रीस्टोर करना हमेशा मुफ़्त है।',

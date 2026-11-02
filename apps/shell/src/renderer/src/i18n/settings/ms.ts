@@ -3,7 +3,6 @@ import type { zh } from './zh'
 export const ms = {
   setClose: 'Tutup',
   setRetry: 'Cuba lagi',
-  setAiCreditRate: '1 USD baki kunci = 1,000 kredit AI',
   setGrpAppearance: 'Penampilan',
   setGrpAiPanel: 'Panel AI',
   setGrpFiles: 'Fail dan penyimpanan',
@@ -14,18 +13,6 @@ export const ms = {
     'Tidak dapat diselesaikan. Pastikan folder itu boleh ditulis, kemudian cuba lagi.',
   intgLoadFailed: 'Tidak dapat membaca status integrasi.',
 
-  cwTitle: 'Kredit AI',
-  cwAddKey: 'Tambah kunci',
-  cwNoKey: 'Belum ada kunci AI',
-  cwUpdating: 'Mengemas kini…',
-  cwLoadFailed: 'Gagal dimuatkan',
-  cwLeft: 'Baki {n}',
-  cwUsed: '{n} digunakan',
-  cwToday: 'Hari ini ≈ {n}',
-  cwHistory: 'Sejarah penggunaan AI',
-  cwLogNote: 'Anggaran pada peranti ini, bukan bil anda.',
-  cwLogEmpty: 'Belum ada panggilan AI direkodkan.',
-  cwOpenHint: 'Klik untuk tetapan AI · klik kanan untuk halaman penggunaan',
 
   bkLead:
     'Alat tambah berbayar menyandarkan Meja kerja anda ke UniWork Cloud dan menambah ruang storan. Mengeksport dan memulihkan pada peranti ini sentiasa percuma.',

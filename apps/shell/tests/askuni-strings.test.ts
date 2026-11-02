@@ -12,7 +12,7 @@ import { strings } from '../src/renderer/src/strings'
 
 /**
  * Ask UNI shard of the shell Home (i18n/askuni/<lang>.ts): mode toggle, composer, sources list and
- * the per-state copy of the My AI "Ask UNI" mode. zh defines the key set; vi/en reuse the web Ask UNI
+ * the per-state copy of the Home Ask UNI pane. zh defines the key set; vi/en reuse the web Ask UNI
  * wording (packages/core/i18n ai.*) wherever the web has a key.
  */
 
@@ -68,9 +68,6 @@ describe('askuni string shard', () => {
     const allowed = new Set([
       'askUniUni',
       'askUniTitle',
-      'askUniModeAsk',
-      'askUniModeGroup',
-      'askUniModeChat',
       'askUniSources',
       'askUniKindDocument',
       'askUniCitationLabel',

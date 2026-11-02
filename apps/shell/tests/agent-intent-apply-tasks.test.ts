@@ -10,7 +10,11 @@ vi.mock('../src/renderer/src/skill-domain-pins', () => ({
   pinSkillDomain: vi.fn(),
   writeActiveSkillDomain: vi.fn(),
 }))
-vi.mock('../src/renderer/src/my-ai-consent', () => ({ workbenchModuleLabel: (id: string) => id }))
+// no module metadata: the label falls back to the module id, which keeps the expected texts short
+vi.mock('@uniwork/practice-core', async (orig) => ({
+  ...(await orig<typeof import('@uniwork/practice-core')>()),
+  getWorkbenchModule: () => undefined,
+}))
 vi.mock('../src/renderer/src/active-workspace', async (orig) => ({
   ...(await orig<typeof import('../src/renderer/src/active-workspace')>()),
   readActiveWorkspaceId: () => 'w2',
@@ -47,7 +51,7 @@ beforeEach(() => {
   })
 })
 
-describe('My AI add_item → Tasks', () => {
+describe('agent intent add_item → Tasks', () => {
   it('creates the task on UniWork in the active workspace, with no local Undo', async () => {
     const r = await applyAgentIntent(addTask('Gọi lại khách'), 'entrepreneur')
     expect(createTask).toHaveBeenCalledWith({
@@ -97,5 +101,29 @@ describe('My AI add_item → Tasks', () => {
     )
     expect(r).toMatchObject({ ok: true, tabId: 'calendar', messageEn: 'Opened calendar.' })
     expect(createTask).not.toHaveBeenCalled()
+  })
+})
+
+describe('agent intent summarize', () => {
+  it('is refused with a pointer to Ask UNI, and no event is emitted', async () => {
+    const dispatchEvent = vi.fn()
+    vi.stubGlobal('window', { dispatchEvent })
+    const r = await applyAgentIntent(
+      createAgentIntent({
+        target: { kind: 'module', id: 'desk' },
+        action: 'summarize',
+        source: 'desktop',
+        summary: 'Tóm tắt',
+      }),
+      'entrepreneur',
+    )
+    expect(r).toMatchObject({
+      ok: false,
+      messageVi: 'Tóm tắt bằng My AI không còn trên ứng dụng; hãy dùng Hỏi UNI.',
+      messageEn: 'My AI summaries are no longer in the app; use Ask UNI instead.',
+    })
+    expect(dispatchEvent.mock.calls.map(([e]) => (e as Event).type)).not.toContain(
+      'uniwork:agent-summarize',
+    )
   })
 })

@@ -155,14 +155,8 @@ const api: SlidesApi = {
   openPptxPath: (path, fitWidthPx) => ipcRenderer.invoke('slides:open-path', path, fitWidthPx),
   consumePendingOpen: (fitWidthPx) => ipcRenderer.invoke('slides:consume-pending-open', fitWidthPx),
   consumeAiPreset: () => ipcRenderer.invoke('slides:consume-ai-preset'),
-  onAiPreset: (handler) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      preset: { text: string; autoRun?: boolean; displayText?: string },
-    ) => handler(preset)
-    ipcRenderer.on('my-ai:ai-preset', listener)
-    return () => ipcRenderer.removeListener('my-ai:ai-preset', listener)
-  },
+  // the shell no longer pushes presets into a running editor (My AI is gone); only a web host does
+  onAiPreset: () => () => {},
   consumeHeadlessExport: () => ipcRenderer.invoke('slides:consume-headless-export'),
   headlessExportDone: (result: { ok: boolean; error?: string }) =>
     ipcRenderer.send('slides:headless-export-done', result),

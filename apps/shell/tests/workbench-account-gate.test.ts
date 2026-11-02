@@ -16,7 +16,6 @@ import {
   readEntitlements,
   simulatePurchase,
 } from '../src/renderer/src/backup-addons'
-import { loadMyAiHistory, saveMyAiHistory } from '../src/renderer/src/my-ai-history'
 import {
   currentWorkbenchBucket,
   isWorkbenchBucketCleared,
@@ -44,7 +43,23 @@ const actEnvironment = globalThis as typeof globalThis & {
 }
 actEnvironment.IS_REACT_ACT_ENVIRONMENT = true
 
-const CHAT = 'uniwork.my-ai.chat.v1:entrepreneur'
+// a per-account key under the allow-listed `uniwork.ai.` prefix, standing in for Ask UNI's saved state
+const CHAT = 'uniwork.ai.askuni.probe:entrepreneur'
+
+interface ProbeMessage {
+  id: string
+  role: string
+  text: string
+}
+
+function loadProbe(): ProbeMessage[] {
+  const raw = wbStoreGetRaw(CHAT)
+  return raw ? (JSON.parse(raw) as ProbeMessage[]) : []
+}
+
+function saveProbe(messages: ProbeMessage[]): void {
+  wbStoreWrite(CHAT, messages)
+}
 
 /**
  * The main process as the renderer sees it: one key/value map per bucket, the
@@ -165,9 +180,9 @@ function installMemoryLocalStorage(): Map<string, string> {
   return map
 }
 
-/** stands in for Home: shows the stored My AI chat of the entrepreneur practice */
+/** stands in for Home: shows the stored Ask UNI probe of the entrepreneur practice */
 function ChatView() {
-  const messages = loadMyAiHistory('entrepreneur')
+  const messages = loadProbe()
   return createElement(
     'ul',
     { className: 'chat' },
@@ -216,17 +231,17 @@ afterEach(() => {
   delete (window as unknown as { aiOffice?: unknown }).aiOffice
 })
 
-describe('My AI per UniWork account in the Home renderer', () => {
+describe('Ask UNI state per UniWork account in the Home renderer', () => {
   it('sign-out removes the chat from the DOM at once; sign-in brings it back', async () => {
     main.signIn('owner')
     await renderGate()
     act(() => {
-      saveMyAiHistory('entrepreneur', [{ id: '1', role: 'user', text: 'owner secret' }])
+      saveProbe([{ id: '1', role: 'user', text: 'owner secret' }])
     })
     await flush()
     // the write went to the owner's bucket in main, not to localStorage
     expect(main.buckets.get('a-owner')!.get(CHAT)).toContain('owner secret')
-    expect([...ls.keys()].some((k) => k.includes('my-ai'))).toBe(false)
+    expect([...ls.keys()].some((k) => k.includes('askuni'))).toBe(false)
     // re-render with the stored chat
     await renderGate()
     expect(chatText()).toBe('owner secret')
@@ -279,7 +294,7 @@ describe('My AI per UniWork account in the Home renderer', () => {
   it('signed-out use keeps its own bucket', async () => {
     await renderGate()
     act(() => {
-      saveMyAiHistory('entrepreneur', [{ id: '1', role: 'user', text: 'signed-out note' }])
+      saveProbe([{ id: '1', role: 'user', text: 'signed-out note' }])
     })
     expect(main.buckets.get('local')!.get(CHAT)).toContain('signed-out note')
 

@@ -100,14 +100,8 @@ const api: DesktopApi = {
   consumeNewBlankDoc: () => ipcRenderer.invoke('docs:consume-new-blank'),
   consumeAiDocContent: () => ipcRenderer.invoke('docs:consume-ai-doc-content'),
   consumeAiPreset: () => ipcRenderer.invoke('docs:consume-ai-preset'),
-  onAiPreset: (handler) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      preset: { text: string; autoRun?: boolean; displayText?: string },
-    ) => handler(preset)
-    ipcRenderer.on('my-ai:ai-preset', listener)
-    return () => ipcRenderer.removeListener('my-ai:ai-preset', listener)
-  },
+  // the shell no longer pushes presets into a running editor (My AI is gone); only a web host does
+  onAiPreset: () => () => {},
   consumeHeadlessExport: () => ipcRenderer.invoke('docs:consume-headless-export'),
   headlessExportDone: (result: { ok: boolean; error?: string }) =>
     ipcRenderer.send('docs:headless-export-done', result),

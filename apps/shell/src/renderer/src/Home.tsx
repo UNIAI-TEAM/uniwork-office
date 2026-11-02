@@ -37,7 +37,6 @@ import type { DocRowExtra, DocSubline } from './doclist/DocRow'
 import { readSort, writeSort } from './doclist/persist'
 import { useI18n } from './locale'
 import type { StringKey } from './locale'
-import { CreditWallet } from './CreditWallet'
 import type { SettingsSectionId, SettingsTarget } from './SettingsModal'
 import { AccountEntry } from './AccountEntry'
 import { showsProfile, viewOf, type AccountView } from './account-model'
@@ -1090,7 +1089,7 @@ function ProjectPanel({ projects, selectedId, onSelect, onRefresh }: ProjectPane
   )
 }
 
-// ── Sidebar footer: one dock — AI credits, then account + Settings ─────
+// ── Sidebar footer: one dock — account + Settings ─────
 // The UniWork account entry (AccountEntry.tsx) starts the browser sign-in or
 // opens Settings → Account; the gear beside it opens Settings → General.
 
@@ -1150,7 +1149,6 @@ function SidebarFooter({
   return (
     <div className="sidebar-footer">
       <div className="sidebar-dock">
-        <CreditWallet onOpenAiSettings={() => openSettings('account')} />
         <div className="sidebar-dock-me">
           <AccountEntry
             onStatusChange={onStatusChange}
@@ -1506,7 +1504,7 @@ export function Home() {
 
   // UNI-2079: a notice names a document's Share section or its Trash row. The Documents home does
   // the work (documents-intent-bus); this host brings it on screen: the Documents area, out of
-  // the Workbench / My AI, in the intent's workspace. It waits for the account and workspace
+  // the Workbench / Ask UNI, in the intent's workspace. It waits for the account and workspace
   // list on a cold start, and drops an intent for a workspace the person is not in.
   const [docsRoute, setDocsRoute] = useState<DocumentsIntent | null>(null)
   useEffect(() => onDocumentsIntentRoute(setDocsRoute), [])
@@ -1548,34 +1546,13 @@ export function Home() {
     setRowMenu(null)
   }
 
-  // Ctrl/Cmd+J asks for My AI in Ask UNI mode; NewChatPane applies and consumes the request
+  // Ctrl/Cmd+J asks for Ask UNI; NewChatPane focuses its composer and consumes the request
   const askOpenRequest = useAskUniOpenRequest()
   useEffect(() => {
     if (askOpenRequest && !chatMode) goNewChat()
     // goNewChat only sets state, so the request alone drives this
   }, [askOpenRequest, chatMode])
 
-  useEffect(() => {
-    const openMyAi = () => goNewChat()
-    const onSummarize = () => {
-      goNewChat()
-      window.setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent('uniwork:my-ai-submit', {
-            detail: {
-              text: 'Tóm tắt ngữ cảnh Workbench hôm nay: việc mở, lịch, ghi chú gần đây',
-            },
-          }),
-        )
-      }, 80)
-    }
-    window.addEventListener('uniwork:open-my-ai', openMyAi)
-    window.addEventListener('uniwork:agent-summarize', onSummarize)
-    return () => {
-      window.removeEventListener('uniwork:open-my-ai', openMyAi)
-      window.removeEventListener('uniwork:agent-summarize', onSummarize)
-    }
-  }, [])
   const [greetAskKey] = useState(
     () => GREET_ASK_KEYS[Math.floor(Math.random() * GREET_ASK_KEYS.length)]!,
   )
@@ -3594,7 +3571,7 @@ export function Home() {
   const activeUwSubView: DocumentsHomeSubViewId = activeUwWorkspaceId
     ? (uniworkSubViewByWs[activeUwWorkspaceId] ?? 'workspace')
     : 'workspace'
-  // the sidebar slot stays up under My AI / Workbench; only the main pane yields to them
+  // the sidebar slot stays up under Ask UNI / Workbench; only the main pane yields to them
   const showUniworkPane = area === 'uniwork' && !selectedProjectId && isSignedIn
   const uniworkPaneReady =
     showUniworkPane &&
@@ -3642,13 +3619,7 @@ export function Home() {
                 strokeLinecap="round"
               />
             </svg>
-            <span className="nav-label">
-              {lang === 'vi'
-                ? 'Trợ lý của bạn'
-                : lang === 'zh' || lang === 'zh-TW'
-                  ? '我的 AI'
-                  : 'My AI'}
-            </span>
+            <span className="nav-label">{t('askUniTitle')}</span>
           </button>
           {projectMode && (
             <button
@@ -3776,15 +3747,7 @@ export function Home() {
           accountName={accountName}
         />
       ) : chatMode ? (
-        <NewChatPane
-          practiceId={activePracticeId}
-          ensureWorkbench={() => {
-            setEduMode(true)
-            setChatMode(false)
-            setSelectedProjectId(null)
-            setSelectedFolder(null)
-          }}
-        />
+        <NewChatPane />
       ) : area === 'uniwork' ? (
         uniworkPaneReady ? null : acctView === 'loading' ? (
           <main className="content">
@@ -3822,7 +3785,7 @@ export function Home() {
         renderGlobalContent()
       )}
 
-      {/* stays mounted (main pane hidden) under My AI / Workbench so the portalled sidebar nav and its loaded lists survive */}
+      {/* stays mounted (main pane hidden) under Ask UNI / Workbench so the portalled sidebar nav and its loaded lists survive */}
       {uniworkPaneReady && uwWsState.workspaces && activeUwWorkspaceId && (
         <main className="content home-uw-pane" hidden={chatMode || eduMode}>
           <DocumentsHome

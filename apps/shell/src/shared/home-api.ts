@@ -1,10 +1,6 @@
 import type {
-  AiChatResponse,
   AiSettings,
   AiSettingsSaveOptions,
-  AiStreamChunk,
-  AiStreamRequest,
-  OpenRouterKeyStatus,
   UniworkCloudStatus,
 } from '@genoffice/ai-provider'
 import type {
@@ -56,9 +52,6 @@ export interface AiSettingsPickOptions {
 
 export type LegalDoc = 'license' | 'notice' | 'modifications' | 'thirdParty'
 
-/** Image attachment extensions — multimodal base64 on send (mirrors docs). */
-export const ATTACHMENT_IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp'])
-
 export interface AttachmentMeta {
   path: string
   name: string
@@ -72,23 +65,7 @@ export interface AttachmentAddResult {
   rejected: string[]
 }
 
-export interface AttachmentReadResult {
-  ok: boolean
-  error?: string
-  name?: string
-  totalChars?: number
-  text?: string
-  offset?: number
-}
-
-export interface AttachmentImageResult {
-  ok: boolean
-  base64?: string
-  mime?: string
-  error?: string
-}
 import type { AiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
-import type { FileExcerpt } from './file-excerpt'
 import type { DocumentTabKind } from './tabs-api'
 import type {
   BatchUploadPickInput,
@@ -1306,11 +1283,6 @@ export interface HomeApi {
   toggleStar(path: string): Promise<void>
   /** open an existing file, routing to the right module by extension */
   openPath(path: string): Promise<void>
-  /**
-   * Budget-capped text excerpts for Recent/Starred files (My AI summarize).
-   * Paths outside recents/starred are skipped.
-   */
-  fileExcerpts(paths: string[]): Promise<FileExcerpt[]>
   /** file picker accepting every supported extension, then routes */
   browse(): Promise<void>
   /** open a docs window at its start screen (optional HTML seed for teacher templates) */
@@ -1321,15 +1293,6 @@ export interface HomeApi {
   newSlide(opts?: NewSlideOptions): Promise<void>
   /** create a blank PDF (optional AI preset) */
   newPdf(opts?: NewPdfOptions): Promise<void>
-  /** Best Office tab for My AI continue/summarize (last editor if Home is active) */
-  activeOfficeTab(): Promise<ActiveOfficeTab | null>
-  /** Activate Office tab and push an AI panel preset */
-  pushAiPreset(input: {
-    text: string
-    autoRun?: boolean
-    displayText?: string
-    tabId?: string
-  }): Promise<{ ok: boolean; tabId?: string; kind?: string; title?: string; path?: string }>
   /** PWA / Hub → desktop Agent Intent (navigate Workbench tabs, optional mutate) */
   onAgentIntent(handler: (intent: AgentIntentDto) => void): () => void
   /** Ack intent lifecycle for future Hub result channel */
@@ -1497,8 +1460,6 @@ export interface HomeApi {
   onThemeChanged(handler: (theme: UiTheme) => void): () => void
   /** document page theme switched anywhere (broadcast from the main process) */
   onDocumentThemeChanged(handler: (theme: DocTheme) => void): () => void
-  /** open the Token Hub (OpenRouter) credits page in the default browser */
-  openCreditUsage(): Promise<void>
   /** AI settings (userData/ai-settings.json, shared by every editor) */
   getAiSettings(options?: AiSettingsPickOptions): Promise<AiSettings>
   /** persist AI settings; every renderer gets ai:settings-changed and re-reads */
@@ -1508,20 +1469,8 @@ export interface HomeApi {
   ): Promise<void>
   /** ai-settings.json was rewritten by any renderer (composer model chip, another window) */
   onAiSettingsChanged(handler: () => void): () => void
-  /** OpenRouter Token Hub: GET /api/v1/key for the given (possibly unsaved) API key */
-  probeOpenRouterKey(apiKey: string): Promise<OpenRouterKeyStatus>
-  /** one-shot non-streaming chat using saved (or provided) AI settings — Workbench helpers */
-  aiChat(input: { system: string; user: string; settings?: AiSettings }): Promise<AiChatResponse>
-  /** streaming chat (same IPC as editor AI panels) */
-  aiStream(request: AiStreamRequest): Promise<void>
-  aiStreamCancel(requestId: string): Promise<void>
-  onAiStream(handler: (chunk: AiStreamChunk) => void): () => void
-  /** local file attachments for My AI (files stay on device) */
+  /** file picker for the workbench module panes (files stay on device) */
   pickAttachments(): Promise<AttachmentAddResult | null>
-  addAttachmentPaths(paths: string[]): Promise<AttachmentAddResult>
-  addPastedImage(data: ArrayBuffer, ext: string): Promise<AttachmentAddResult>
-  readAttachment(path: string, offset: number, maxChars: number): Promise<AttachmentReadResult>
-  readAttachmentImage(path: string): Promise<AttachmentImageResult>
   getPathForFile(file: File): string
   /** Local Workbench SQLite store (main-process source of truth) */
   wb: WorkbenchStoreApi
@@ -2117,13 +2066,6 @@ export interface NewPdfOptions extends NewFileOpts {
   aiPreset?: HomeAiPreset
 }
 
-export interface ActiveOfficeTab {
-  id: string
-  kind: string
-  title: string
-  path?: string
-}
-
 export interface TimelineEntryItem {
   filePath: string
   fileName: string
@@ -2277,14 +2219,10 @@ export const HOME_CHANNELS = {
   getCliLinkStatus: 'home:get-cli-link-status',
   installCliLink: 'home:install-cli-link',
   pickDefaultSaveDir: 'home:pick-default-save-dir',
-  openCreditUsage: 'home:open-credit-usage',
   agentIntentEvent: 'home:agent-intent-event',
   agentIntentAck: 'home:agent-intent-ack',
   resolveAgentIntent: 'home:resolve-agent-intent',
   submitAgentIntent: 'home:submit-agent-intent',
-  fileExcerpts: 'home:file-excerpts',
-  activeOfficeTab: 'home:active-office-tab',
-  pushAiPreset: 'home:push-ai-preset',
   wbLoadAll: 'home:wb-load-all',
   wbGetKey: 'home:wb-get-key',
   wbSetKey: 'home:wb-set-key',
