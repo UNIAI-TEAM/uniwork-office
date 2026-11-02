@@ -1,6 +1,6 @@
 import { sharedAskUni } from './shared'
 
-/** Ask UNI mode of the shell Home My AI: workspace Q&A with sources; zh defines the key set */
+/** Ask UNI pane of the shell Home: workspace Q&A with sources; zh defines the key set */
 export const zh = {
   // frame: header, history, composer, pickers, empty state
   askUniV2Untitled: '新对话',

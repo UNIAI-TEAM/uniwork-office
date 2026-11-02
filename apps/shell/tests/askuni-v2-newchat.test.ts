@@ -101,11 +101,95 @@ describe('Home chat pane (Ask UNI v2)', () => {
   })
 
   it('still shows the Ask UNI states when the shell bridge has no Ask UNI', async () => {
-    ;(window as unknown as { aiOffice: unknown }).aiOffice = new Proxy({} as Record<string, unknown>, {
-      get: (t, p: string) => t[p],
-    })
+    ;(window as unknown as { aiOffice: unknown }).aiOffice = new Proxy(
+      {} as Record<string, unknown>,
+      {
+        get: (t, p: string) => t[p],
+      },
+    )
     await mount()
     expect(host.querySelector('.askuni-pane')).not.toBeNull()
     expect(host.querySelector('.askuni-modes')).toBeNull()
+  })
+})
+
+describe('Home chat pane: pick up where you left off', () => {
+  let host: HTMLDivElement
+  let root: Root
+  const entry = (name: string, extra: Record<string, unknown> = {}) => ({
+    path: `/docs/${name}`,
+    name,
+    ext: 'docx',
+    mtimeMs: Date.now() - 3_600_000,
+    ...extra,
+  })
+  let openPath: ReturnType<typeof vi.fn>
+
+  async function mount(entries: unknown[]): Promise<void> {
+    openPath = vi.fn(async () => undefined)
+    ;(window as unknown as { aiOffice: unknown }).aiOffice = new Proxy(
+      {
+        recents: vi.fn(async () => ({ entries })),
+        openPath,
+        uniworkAskUni: vi.fn(),
+        uniworkAskUniContext: vi.fn(async () => ({
+          workspaces: [],
+          currentWorkspaceId: null,
+          signedIn: false,
+        })),
+        askUniFlags: vi.fn(async (): Promise<AskUniFlags> => ({ streamEnabled: true })),
+        setLanguage: async () => null,
+      } as Record<string, unknown>,
+      { get: (t, p: string) => (p in t ? t[p] : undefined) },
+    )
+    await act(async () => {
+      root.render(h(LocaleProvider, { initial: 'en', children: h(NewChatPane) }))
+    })
+    await act(async () => {
+      for (let i = 0; i < 8; i++) await Promise.resolve()
+    })
+  }
+
+  beforeEach(() => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    resetAskUniEntryForTests()
+  })
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    host.remove()
+    delete (window as unknown as { aiOffice?: unknown }).aiOffice
+  })
+
+  it('lists the three newest reachable recents and opens one', async () => {
+    await mount([
+      entry('missing.docx', { missing: true }),
+      entry('a.docx'),
+      entry('b.docx'),
+      entry('c.docx'),
+      entry('d.docx'),
+    ])
+    const rows = [...host.querySelectorAll('.new-chat-continue-row')]
+    expect(rows.map((r) => r.querySelector('.new-chat-continue-name')?.textContent)).toEqual([
+      'a.docx',
+      'b.docx',
+      'c.docx',
+    ])
+    await act(async () =>
+      (rows[1]!.querySelector('.new-chat-continue-open') as HTMLButtonElement).click(),
+    )
+    expect(openPath).toHaveBeenCalledWith('/docs/b.docx')
+  })
+
+  it('has no summarize button', async () => {
+    await mount([entry('a.docx')])
+    expect(host.querySelector('.new-chat-continue-ask')).toBeNull()
+    expect(host.querySelectorAll('.new-chat-continue button')).toHaveLength(1)
+  })
+
+  it('renders nothing when there are no recents', async () => {
+    await mount([])
+    expect(host.querySelector('.new-chat-continue')).toBeNull()
   })
 })

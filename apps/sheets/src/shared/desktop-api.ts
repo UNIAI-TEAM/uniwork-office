@@ -3156,7 +3156,7 @@ export interface DesktopApi {
   /// Returns true once when this tab was opened via "New Spreadsheet" from the
   /// shell home.
   consumeNewBlankWorkbook(): Promise<boolean>
-  /// One-shot AI panel preset queued by Home / My AI when opening a sheet
+  /// One-shot AI panel preset queued by Home when it opens a new sheet with an AI preset
   consumeAiPreset(): Promise<{ text: string; autoRun?: boolean; displayText?: string } | null>
   /// Live push of an AI preset while the tab is already open
   onAiPreset(
